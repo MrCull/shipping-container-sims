@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { useSimsStore } from '@/stores/sims'
 import { useSimRegistry } from '@/composables/useSimRegistry'
 import { useRouter } from 'vue-router'
@@ -17,6 +17,13 @@ if (store.sims.length === 0) {
 }
 
 const sim = computed(() => store.getById(props.simId))
+
+// Wrap the lazy import in defineAsyncComponent so Vue receives a component
+// definition rather than a bare Promise when :is is evaluated.
+const asyncComponent = computed(() => {
+  if (!sim.value || sim.value.status !== 'playable') return null
+  return defineAsyncComponent(sim.value.component)
+})
 
 function goHome() {
   router.push({ name: 'home' })
@@ -42,8 +49,8 @@ function goHome() {
     </header>
 
     <main class="sim-content">
-      <template v-if="sim && sim.status === 'playable'">
-        <component :is="sim.component()" />
+      <template v-if="sim && sim.status === 'playable' && asyncComponent">
+        <component :is="asyncComponent" />
       </template>
 
       <div

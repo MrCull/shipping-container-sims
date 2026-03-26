@@ -1,11 +1,36 @@
 <script setup lang="ts">
-// Stowage Master — main game component (placeholder)
-// This file will be replaced with the full Three.js game implementation.
+import GameCanvas from './components/GameCanvas.vue'
+import TopBar from './components/TopBar.vue'
+import ContainerInfo from './components/ContainerInfo.vue'
+import LoadList from './components/LoadList.vue'
+import PortLegend from './components/PortLegend.vue'
+import ShipStatus from './components/ShipStatus.vue'
+import LastPlacement from './components/LastPlacement.vue'
+import ScorePopup from './components/ScorePopup.vue'
+import EventFeed from './components/EventFeed.vue'
+import MoveCounter from './components/MoveCounter.vue'
+import StartScreen from './components/modals/StartScreen.vue'
+import LevelComplete from './components/modals/LevelComplete.vue'
+import LevelFailed from './components/modals/LevelFailed.vue'
+import DisasterOverlay from './components/modals/DisasterOverlay.vue'
 </script>
 
 <template>
   <div class="stowage-master">
-    <p>Stowage Master — Game loading...</p>
+    <GameCanvas />
+    <TopBar />
+    <ContainerInfo />
+    <LoadList />
+    <PortLegend />
+    <ShipStatus />
+    <LastPlacement />
+    <ScorePopup />
+    <EventFeed />
+    <MoveCounter />
+    <StartScreen />
+    <LevelComplete />
+    <LevelFailed />
+    <DisasterOverlay />
   </div>
 </template>
 
@@ -13,10 +38,10 @@
 .stowage-master {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-retro);
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
+  position: relative;
+  overflow: hidden;
+  background: #0a0e1a;
+  font-family: var(--font-body);
+  color: #eee;
 }
 </style>

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useThreeScene, type ThreeSceneContext } from '@/composables/useThreeScene'
+import { useThreeScene } from '@/composables/useThreeScene'
 import * as THREE from 'three'
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const containers: THREE.Mesh[] = []
 
-const sceneCtx = useThreeScene(canvas, (ctx, delta) => {
+const { getCtx, ready } = useThreeScene(canvas, (ctx, delta) => {
   containers.forEach((c, i) => {
     c.rotation.y += delta * 0.3
     c.position.y = Math.sin(Date.now() * 0.001 + i * 1.2) * 0.3 + c.userData.baseY
@@ -15,7 +15,9 @@ const sceneCtx = useThreeScene(canvas, (ctx, delta) => {
   ctx.camera.lookAt(0, 0, 0)
 })
 
-watch(sceneCtx, (ctx: ThreeSceneContext | null) => {
+watch(ready, (isReady) => {
+  if (!isReady) return
+  const ctx = getCtx()
   if (!ctx) return
 
   ctx.scene.fog = new THREE.FogExp2(0x0a0e1a, 0.06)

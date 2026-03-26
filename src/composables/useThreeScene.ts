@@ -12,12 +12,19 @@ export interface ThreeSceneContext {
  * Sets up a Three.js scene bound to a canvas element ref.
  * Handles resize, animation loop, and cleanup automatically.
  * Pass an `onFrame` callback to run logic each frame.
+ *
+ * IMPORTANT: Three.js objects have non-configurable properties that break
+ * Vue's reactive proxy. The context is stored in a plain variable and exposed
+ * via a getter. A separate `ready` ref is provided for watchers that need to
+ * react when the scene becomes available.
  */
 export function useThreeScene(
   canvasRef: Ref<HTMLCanvasElement | null>,
   onFrame?: (ctx: ThreeSceneContext, delta: number) => void
 ) {
-  const ctx = ref<ThreeSceneContext | null>(null)
+  // Plain variable — must NOT be wrapped in ref/shallowRef
+  let ctx: ThreeSceneContext | null = null
+  const ready = ref(false)
   let animationId = 0
 
   function initScene(canvas: HTMLCanvasElement): ThreeSceneContext {
@@ -41,34 +48,40 @@ export function useThreeScene(
   }
 
   function onResize() {
-    if (!ctx.value || !canvasRef.value) return
-    const { camera, renderer } = ctx.value
+    if (!ctx || !canvasRef.value) return
     const parent = canvasRef.value.parentElement!
-    camera.aspect = parent.clientWidth / parent.clientHeight
-    camera.updateProjectionMatrix()
-    renderer.setSize(parent.clientWidth, parent.clientHeight)
+    ctx.camera.aspect = parent.clientWidth / parent.clientHeight
+    ctx.camera.updateProjectionMatrix()
+    ctx.renderer.setSize(parent.clientWidth, parent.clientHeight)
   }
 
   function animate() {
     animationId = requestAnimationFrame(animate)
-    if (!ctx.value) return
-    const delta = ctx.value.clock.getDelta()
-    onFrame?.(ctx.value, delta)
-    ctx.value.renderer.render(ctx.value.scene, ctx.value.camera)
+    if (!ctx) return
+    const delta = ctx.clock.getDelta()
+    onFrame?.(ctx, delta)
+    ctx.renderer.render(ctx.scene, ctx.camera)
   }
 
   onMounted(() => {
     if (!canvasRef.value) return
-    ctx.value = initScene(canvasRef.value)
+    ctx = initScene(canvasRef.value)
     window.addEventListener('resize', onResize)
     animate()
+    ready.value = true
   })
 
   onBeforeUnmount(() => {
     cancelAnimationFrame(animationId)
     window.removeEventListener('resize', onResize)
-    ctx.value?.renderer.dispose()
+    ctx?.renderer.dispose()
+    ctx = null
+    ready.value = false
   })
 
-  return ctx
+  // Return a getter function + ready signal instead of a reactive ref containing Three.js objects
+  return {
+    getCtx: () => ctx,
+    ready,
+  }
 }

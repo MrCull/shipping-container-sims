@@ -9,7 +9,7 @@ export const definition: SimDefinition = {
     'Balance weight distribution, cargo class restrictions, and port rotation ' +
     'to become the ultimate stowage planner.',
   icon: '🚢',
-  status: 'coming-soon',
+  status: 'playable',
   color: '#3b82f6',
   tags: ['3D', 'Puzzle', 'Logistics'],
   component: () => import('./StowageMaster.vue'),
