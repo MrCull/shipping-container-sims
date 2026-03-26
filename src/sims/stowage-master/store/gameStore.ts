@@ -7,6 +7,8 @@ import { updatePhysics, checkDisasters } from '../modules/physics'
 import { calculatePlacementScore, getStarRating, checkPerfectBalance } from '../modules/scoring'
 import { getLevelConfig, getTargetScore, getTotalSlots } from '../modules/levels'
 
+let eventIdCounter = 0
+
 export const useGameStore = defineStore('stowage-master-game', () => {
   const phase = ref<GamePhase>('start')
   const currentLevel = ref(0)
@@ -163,7 +165,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
   function addEvent(message: string, type: GameEvent['type'] = 'info'): void {
     events.value = [
-      { message, type, time: Date.now() },
+      { message, type, time: ++eventIdCounter },
       ...events.value,
     ].slice(0, 5)
   }
