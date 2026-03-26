@@ -12,6 +12,11 @@ A Vue 3 + TypeScript web app that hosts shipping-container-themed simulations an
 - **Pinia** — state management
 - **Vue Router** — SPA routing (`/` home, `/sim/:simId` game page)
 - **Three.js** — 3D rendering (shared via `useThreeScene` composable)
+- **ESLint** — static analysis for JS/TS/Vue (`eslint.config.js`; Vue + TypeScript recommended presets)
+
+## Linting
+
+After making substantive code changes, run **`npm run lint`** to catch issues. Use **`npm run lint:fix`** to apply auto-fixes (including many Vue template and style rules) before you finish.
 
 ## Project structure
 
@@ -38,6 +43,7 @@ src/
 - **Strict TypeScript**: `noUnusedLocals`, `noUnusedParameters`, `strict` are all enabled.
 - **Scoped styles**: Use `<style scoped>` in all components.
 - **CSS variables**: Use the design tokens defined in `src/assets/main.css` (e.g. `--color-primary`, `--font-retro`).
+- **Keep this guide current**: When project-wide details change or new tooling, conventions, or structure are added that affect how agents or contributors work, update **AGENTS.md** in the same change (or a follow-up) so it stays accurate.
 
 ## Skills
 
