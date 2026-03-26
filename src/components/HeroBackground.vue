@@ -60,7 +60,10 @@ watch(sceneCtx, (ctx: ThreeSceneContext | null) => {
 </script>
 
 <template>
-  <canvas ref="canvas" class="hero-canvas" />
+  <canvas
+    ref="canvas"
+    class="hero-canvas"
+  />
 </template>
 
 <style scoped>

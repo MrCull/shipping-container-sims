@@ -13,21 +13,19 @@ defineProps<{
     :class="[`status-${sim.status}`]"
     :style="{ '--card-accent': sim.color }"
   >
-    <div class="card-icon">{{ sim.icon }}</div>
+    <div class="card-top">
+      <div class="card-icon">{{ sim.icon }}</div>
+      <span class="card-status">
+        {{ sim.status === 'playable' ? '► PLAY' : sim.status === 'wip' ? '⚙ WIP' : '🔒 SOON' }}
+      </span>
+    </div>
 
-    <div class="card-body">
-      <h3 class="card-title">{{ sim.title }}</h3>
-      <p class="card-tagline">{{ sim.tagline }}</p>
-      <p class="card-desc">{{ sim.description }}</p>
+    <h3 class="card-title">{{ sim.title }}</h3>
+    <p class="card-tagline">{{ sim.tagline }}</p>
+    <p class="card-desc">{{ sim.description }}</p>
 
-      <div class="card-footer">
-        <div class="card-tags">
-          <span v-for="tag in sim.tags" :key="tag" class="tag">{{ tag }}</span>
-        </div>
-        <span class="card-status">
-          {{ sim.status === 'playable' ? '► PLAY' : sim.status === 'wip' ? '⚙ WIP' : '🔒 SOON' }}
-        </span>
-      </div>
+    <div class="card-tags">
+      <span v-for="tag in sim.tags" :key="tag" class="tag">{{ tag }}</span>
     </div>
 
     <div class="scanline" />
@@ -38,14 +36,16 @@ defineProps<{
 .sim-card {
   position: relative;
   display: flex;
-  gap: 1.25rem;
-  padding: 1.5rem;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.1rem;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow: hidden;
   transition: all 0.25s ease;
   cursor: default;
+  aspect-ratio: 1 / 1;
 }
 
 .sim-card.status-playable {
@@ -66,10 +66,10 @@ defineProps<{
   position: absolute;
   top: 0;
   left: 0;
-  width: 4px;
-  height: 100%;
+  width: 100%;
+  height: 3px;
   background: var(--card-accent, var(--color-primary));
-  opacity: 0.6;
+  opacity: 0.5;
   transition: opacity 0.25s;
 }
 
@@ -90,62 +90,60 @@ defineProps<{
   pointer-events: none;
 }
 
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
 .card-icon {
-  flex-shrink: 0;
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 1.75rem;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
   border: 1px solid var(--color-border);
-}
-
-.card-body {
-  flex: 1;
-  min-width: 0;
+  flex-shrink: 0;
 }
 
 .card-title {
   font-family: var(--font-retro);
-  font-size: 0.85rem;
-  line-height: 1.4;
+  font-size: 0.7rem;
+  line-height: 1.5;
   color: var(--color-text);
-  margin-bottom: 0.25rem;
 }
 
 .card-tagline {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--color-accent);
   font-weight: 600;
-  margin-bottom: 0.5rem;
 }
 
 .card-desc {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--color-text-muted);
   line-height: 1.5;
-  margin-bottom: 0.75rem;
-}
-
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  flex: 1;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .card-tags {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.35rem;
   flex-wrap: wrap;
+  margin-top: auto;
 }
 
 .tag {
-  font-size: 0.65rem;
-  padding: 0.2rem 0.5rem;
+  font-size: 0.6rem;
+  padding: 0.15rem 0.4rem;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--color-text-muted);
@@ -156,9 +154,10 @@ defineProps<{
 
 .card-status {
   font-family: var(--font-retro);
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   white-space: nowrap;
   color: var(--card-accent, var(--color-primary));
+  padding-top: 0.2rem;
 }
 
 .status-coming-soon {

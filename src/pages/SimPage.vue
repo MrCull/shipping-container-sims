@@ -26,11 +26,19 @@ function goHome() {
 <template>
   <div class="sim-page">
     <header class="sim-header">
-      <button class="back-btn" @click="goHome">
+      <button
+        class="back-btn"
+        @click="goHome"
+      >
         <span class="back-arrow">◄</span>
         <span>MENU</span>
       </button>
-      <h1 v-if="sim" class="sim-name">{{ sim.icon }} {{ sim.title }}</h1>
+      <h1
+        v-if="sim"
+        class="sim-name"
+      >
+        {{ sim.icon }} {{ sim.title }}
+      </h1>
     </header>
 
     <main class="sim-content">
@@ -38,20 +46,46 @@ function goHome() {
         <component :is="sim.component()" />
       </template>
 
-      <div v-else-if="sim" class="coming-soon-screen">
-        <div class="cs-icon">{{ sim.icon }}</div>
-        <h2 class="cs-title">{{ sim.title }}</h2>
-        <p class="cs-tagline">{{ sim.tagline }}</p>
+      <div
+        v-else-if="sim"
+        class="coming-soon-screen"
+      >
+        <div class="cs-icon">
+          {{ sim.icon }}
+        </div>
+        <h2 class="cs-title">
+          {{ sim.title }}
+        </h2>
+        <p class="cs-tagline">
+          {{ sim.tagline }}
+        </p>
         <div class="cs-status">
           <span class="blink">■</span> {{ sim.status === 'wip' ? 'WORK IN PROGRESS' : 'COMING SOON' }}
         </div>
-        <p class="cs-desc">{{ sim.description }}</p>
-        <button class="back-home-btn" @click="goHome">◄ BACK TO MENU</button>
+        <p class="cs-desc">
+          {{ sim.description }}
+        </p>
+        <button
+          class="back-home-btn"
+          @click="goHome"
+        >
+          ◄ BACK TO MENU
+        </button>
       </div>
 
-      <div v-else class="not-found">
-        <p class="nf-text">SIM NOT FOUND</p>
-        <button class="back-home-btn" @click="goHome">◄ BACK TO MENU</button>
+      <div
+        v-else
+        class="not-found"
+      >
+        <p class="nf-text">
+          SIM NOT FOUND
+        </p>
+        <button
+          class="back-home-btn"
+          @click="goHome"
+        >
+          ◄ BACK TO MENU
+        </button>
       </div>
     </main>
   </div>

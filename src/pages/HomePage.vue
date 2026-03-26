@@ -26,35 +26,57 @@ onMounted(() => {
           <span class="title-line accent">CONTAINER</span>
           <span class="title-line">SIMS</span>
         </h1>
-        <p class="hero-sub">Stack &bull; Ship &bull; Simulate</p>
+        <p class="hero-sub">
+          Stack &bull; Ship &bull; Simulate
+        </p>
         <div class="hero-divider">
-          <span class="divider-pixel" v-for="n in 20" :key="n" />
+          <span
+            v-for="n in 20"
+            :key="n"
+            class="divider-pixel"
+          />
         </div>
       </div>
     </header>
 
     <main class="content">
-      <section v-if="store.playable.length" class="sim-section">
+      <section
+        v-if="store.playable.length"
+        class="sim-section"
+      >
         <h2 class="section-title">
           <span class="blink">►</span> READY TO PLAY
         </h2>
         <div class="sim-grid">
-          <SimCard v-for="sim in store.playable" :key="sim.id" :sim="sim" />
+          <SimCard
+            v-for="sim in store.playable"
+            :key="sim.id"
+            :sim="sim"
+          />
         </div>
       </section>
 
-      <section v-if="store.comingSoon.length" class="sim-section">
+      <section
+        v-if="store.comingSoon.length"
+        class="sim-section"
+      >
         <h2 class="section-title">
           <span class="lock-icon">🔒</span> COMING SOON
         </h2>
         <div class="sim-grid">
-          <SimCard v-for="sim in store.comingSoon" :key="sim.id" :sim="sim" />
+          <SimCard
+            v-for="sim in store.comingSoon"
+            :key="sim.id"
+            :sim="sim"
+          />
         </div>
       </section>
 
       <footer class="site-footer">
         <p>SHIPPING CONTAINER SIMS &copy; {{ new Date().getFullYear() }}</p>
-        <p class="footer-sub">INSERT COIN TO CONTINUE...</p>
+        <p class="footer-sub">
+          INSERT COIN TO CONTINUE...
+        </p>
       </footer>
     </main>
   </div>
@@ -67,7 +89,7 @@ onMounted(() => {
 
 .hero {
   position: relative;
-  min-height: 50vh;
+  min-height: 28vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,7 +100,7 @@ onMounted(() => {
   position: relative;
   z-index: 1;
   text-align: center;
-  padding: 3rem 1.5rem;
+  padding: 1.5rem 1.5rem 1rem;
 }
 
 .hero-title {
@@ -89,7 +111,7 @@ onMounted(() => {
 
 .title-line {
   font-family: var(--font-retro);
-  font-size: clamp(1.2rem, 4vw, 2.6rem);
+  font-size: clamp(0.9rem, 3vw, 1.8rem);
   letter-spacing: 0.15em;
   text-shadow:
     0 0 10px rgba(59, 130, 246, 0.5),
@@ -104,9 +126,9 @@ onMounted(() => {
 }
 
 .hero-sub {
-  margin-top: 1rem;
+  margin-top: 0.6rem;
   font-family: var(--font-retro);
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   letter-spacing: 0.3em;
   color: var(--color-text-muted);
 }
@@ -115,7 +137,7 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   gap: 4px;
-  margin-top: 1.5rem;
+  margin-top: 0.75rem;
 }
 
 .divider-pixel {
@@ -131,21 +153,21 @@ onMounted(() => {
 }
 
 .content {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 2rem 1.5rem 4rem;
+  padding: 1.25rem 1.5rem 1.5rem;
 }
 
 .sim-section {
-  margin-bottom: 3rem;
+  margin-bottom: 1.25rem;
 }
 
 .section-title {
   font-family: var(--font-retro);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   letter-spacing: 0.15em;
   color: var(--color-text-muted);
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.75rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -166,12 +188,13 @@ onMounted(() => {
 
 .sim-grid {
   display: grid;
-  gap: 1rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
 }
 
 .site-footer {
   text-align: center;
-  padding-top: 3rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--color-border);
   font-family: var(--font-retro);
   font-size: 0.55rem;
