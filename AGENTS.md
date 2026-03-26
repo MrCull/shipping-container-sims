@@ -52,3 +52,12 @@ src/
 ## Skills
 
 - **[Adding a sim](.cursor/skills/adding-a-sim/SKILL.md)** — How to add a new game or simulation to the project. Follow this when creating, scaffolding, or implementing a new sim.
+
+## Cursor Cloud specific instructions
+
+- **Single service**: This is a purely client-side SPA — no backend, database, or external services required. The only process to run is the Vite dev server.
+- **Dev server**: `npm run dev` (defaults to `http://localhost:5173`). Use `npm run dev -- --host 0.0.0.0` to expose on all interfaces.
+- **Build**: `npm run build` runs `vue-tsc -b && vite build`. The TypeScript check is strict; fix all type errors before committing.
+- **Lint**: `npm run lint` / `npm run lint:fix`. See the Linting section above for the `--` caveat with npm.
+- **No secrets or environment variables** are needed.
+- **No automated test suite** exists yet — verify changes via `npm run lint`, `npm run build`, and manual browser testing.
