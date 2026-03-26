@@ -16,7 +16,11 @@ A Vue 3 + TypeScript web app that hosts shipping-container-themed simulations an
 
 ## Linting
 
-After making substantive code changes, run **`npm run lint`** to catch issues. Use **`npm run lint:fix`** to apply auto-fixes (including many Vue template and style rules) before you finish.
+After making substantive code changes, run **`npm run lint`** to catch issues.
+
+To apply ESLint auto-fixes (including many Vue template and style rules), use **`npm run lint:fix`**.
+
+**npm and `--fix`:** Arguments after `npm run <script>` are **not** passed to the underlying command unless you insert **`--`**. For example, **`npm run lint --fix`** only runs `eslint .` — it does **not** pass `--fix` to ESLint. Either run **`npm run lint:fix`**, or pass the flag explicitly: **`npm run lint -- --fix`**.
 
 ## Project structure
 

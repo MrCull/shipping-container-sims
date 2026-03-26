@@ -14,18 +14,30 @@ defineProps<{
     :style="{ '--card-accent': sim.color }"
   >
     <div class="card-top">
-      <div class="card-icon">{{ sim.icon }}</div>
+      <div class="card-icon">
+        {{ sim.icon }}
+      </div>
       <span class="card-status">
         {{ sim.status === 'playable' ? '► PLAY' : sim.status === 'wip' ? '⚙ WIP' : '🔒 SOON' }}
       </span>
     </div>
 
-    <h3 class="card-title">{{ sim.title }}</h3>
-    <p class="card-tagline">{{ sim.tagline }}</p>
-    <p class="card-desc">{{ sim.description }}</p>
+    <h3 class="card-title">
+      {{ sim.title }}
+    </h3>
+    <p class="card-tagline">
+      {{ sim.tagline }}
+    </p>
+    <p class="card-desc">
+      {{ sim.description }}
+    </p>
 
     <div class="card-tags">
-      <span v-for="tag in sim.tags" :key="tag" class="tag">{{ tag }}</span>
+      <span
+        v-for="tag in sim.tags"
+        :key="tag"
+        class="tag"
+      >{{ tag }}</span>
     </div>
 
     <div class="scanline" />
