@@ -52,3 +52,26 @@ src/
 ## Skills
 
 - **[Adding a sim](.cursor/skills/adding-a-sim/SKILL.md)** — How to add a new game or simulation to the project. Follow this when creating, scaffolding, or implementing a new sim.
+
+## Cursor Cloud specific instructions
+
+### Services
+
+This is a client-side-only SPA with no backend, database, or external API dependencies. The only service to run is the **Vite dev server**.
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start Vite dev server (port 5173) |
+| `npm run build` | Type-check (`vue-tsc`) then production build |
+| `npm run lint` | ESLint static analysis |
+| `npm run lint:fix` | ESLint with auto-fix |
+
+### Running the dev server
+
+Use `npm run dev -- --host 0.0.0.0` to make it accessible outside localhost (needed for browser testing in Cloud VMs). The app will be available at `http://localhost:5173`.
+
+### Notes
+
+- No `.env` files or secrets are required.
+- The Three.js 3D sims require a WebGL-capable browser (Chrome is pre-installed in Cloud VMs).
+- The `npm run build` warning about chunk size (Three.js > 500 kB) is expected and not an error.
