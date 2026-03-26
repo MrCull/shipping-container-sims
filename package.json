@@ -1,0 +1,25 @@
+{
+  "name": "shipping-container-sims",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "pinia": "^3.0",
+    "three": "^0.173",
+    "vue": "^3.5",
+    "vue-router": "^4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/three": "^0.173",
+    "@vitejs/plugin-vue": "^5.2",
+    "typescript": "~5.7",
+    "vite": "^6.2",
+    "vue-tsc": "^2.2"
+  }
+}
