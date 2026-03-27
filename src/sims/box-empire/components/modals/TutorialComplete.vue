@@ -28,6 +28,9 @@ const emit = defineEmits<{
       <p class="complete-subtitle">
         You've mastered the basics of terminal operations!
       </p>
+      <p class="coming-soon">
+        🚢 The full game is coming soon — with more vessels, equipment, and real-time economics!
+      </p>
 
       <div class="stats-grid">
         <div class="stat-card">
@@ -122,7 +125,19 @@ const emit = defineEmits<{
   font-family: var(--font-retro, monospace);
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.7);
-  margin: 0 0 24px 0;
+  margin: 0 0 10px 0;
+}
+
+.coming-soon {
+  font-family: var(--font-retro, monospace);
+  font-size: 0.78rem;
+  color: #f1c40f;
+  margin: 0 0 20px 0;
+  background: rgba(241, 196, 15, 0.08);
+  border: 1px solid rgba(241, 196, 15, 0.25);
+  border-radius: 8px;
+  padding: 8px 14px;
+  line-height: 1.5;
 }
 
 .stats-grid {

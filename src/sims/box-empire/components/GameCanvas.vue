@@ -7,11 +7,11 @@ import { useAudio } from '../composables/useAudio'
 import { useGameStore } from '../store/gameStore'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const { getScene, getCamera, render, updateEntities, isReady, webglFailed } = useBoxEmpireScene(canvasRef)
+const { getScene, getCamera, render, updateEntities, isReady, webglFailed, spawnFloatingText, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen, triggerVesselShake } = useBoxEmpireScene(canvasRef)
 const store = useGameStore()
 const { play } = useAudio()
 
-useInput(canvasRef, getCamera, getScene)
+useInput(canvasRef, getCamera, getScene, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen)
 
 const { start, stop } = useGameLoop(() => {
   if (!isReady.value) return
@@ -19,6 +19,15 @@ const { start, stop } = useGameLoop(() => {
   const pendingEvents = store.consumePendingEvents()
   for (const evt of pendingEvents) {
     play(evt.type)
+    if (evt.type === 'money.earned' && evt.data?.position) {
+      const pos = evt.data.position as { x: number; y: number; z: number }
+      const amount = evt.data.amount as number
+      spawnFloatingText(`+$${amount}`, '#2ecc71', pos)
+    }
+    // Vessel shake when container placed on vessel
+    if (evt.type === 'container.placed' && evt.data?.vesselId) {
+      triggerVesselShake(evt.data.vesselId as string)
+    }
   }
 
   updateEntities()

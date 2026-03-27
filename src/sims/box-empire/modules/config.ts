@@ -26,18 +26,22 @@ export const CONTAINER_STACK_GAP_Y = 0.05
 export const CONTAINER_ROW_GAP = 0.30
 export const CONTAINER_BAY_GAP = 0.15
 
-export const CONTAINER_COLORS: Record<string, string> = {
+export const SHIPPING_LINE_COLORS: Record<string, string> = {
   maersk: '#2E86C1',
   evergreen: '#006747',
   cosco: '#004B87',
   msc: '#FFD700',
   cma_cgm: '#003DA5',
-  hapagLloyd: '#FF6600',
-  one: '#FF00FF',
+  hapag_lloyd: '#FF6600',
+  one: '#CC00CC',
   hmm: '#00BFFF',
 }
 
-export const CONTAINER_COLOR_LIST = Object.values(CONTAINER_COLORS)
+export const SHIPPING_LINES = Object.keys(SHIPPING_LINE_COLORS)
+
+export const CONTAINER_COLORS: Record<string, string> = SHIPPING_LINE_COLORS
+
+export const CONTAINER_COLOR_LIST = Object.values(SHIPPING_LINE_COLORS)
 
 // ---- Reach Stacker --------------------------------------------------------
 
@@ -65,9 +69,9 @@ export const TUTORIAL_VESSEL = {
   loa: 50,
   beam: 12,
   teuCapacity: 10,
-  bays: 1,
+  bays: 5,   // 5 container positions spread along the deck (X axis)
   rows: 1,
-  tiers: 5,
+  tiers: 1,  // single tier on deck
 }
 
 // ---- Yard (Tutorial) ------------------------------------------------------
@@ -91,18 +95,45 @@ export const TUTORIAL_IMPORT_COUNT = 5
 
 // ---- Terminal layout positions (meters) -----------------------------------
 
-export const GATE_POSITION: Position3D = { x: -40, y: 0, z: 50 }
+// Terminal boundary fence — moved back 5m so trucks clear it before entering
+export const TERMINAL_FENCE_Z = 63
+
+// In-gate: queue lane runs parallel to the fence (along X), offset to one side of the gatehouse
+// Trucks queue along +Z OUTSIDE terminal, lane at x=-44 (beside gatehouse at x=-50)
+export const GATE_INGATE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
+// Queue lane X for trucks waiting (parallel to fence, beside gatehouse)
+export const GATE_INGATE_LANE_X = -44
+
+// Out-gate: placed in the fence boundary towards the bottom of the terminal
+// Positioned at x=-50 in the fence line at z ≈ midway down the terminal
+export const GATE_OUTGATE_POSITION: Position3D = { x: -50, y: 0, z: 105 }
+// Out-gate is a gap in the fence at this Z (within TERMINAL_BOUNDS)
+export const GATE_OUTGATE_FENCE_Z = 105
+
+// Legacy aliases
+export const GATE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
+export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
+export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
+
+// Yard handover point where trucks park and equipment loads/unloads
 export const YARD_IO_POSITION: Position3D = { x: 0, y: 0, z: 30 }
+// RS parks this many metres in front of the truck (truck side) to reach container with boom
+export const RS_TRUCK_PARK_OFFSET = 8
+// Waiting position trucks go to while holding before YARD_IO becomes free
+export const YARD_IO_WAIT_POSITION: Position3D = { x: -10, y: 0, z: 30 }
 export const YARD_BLOCK_POSITION: Position = { x: -15, z: 20 }
 export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: 0, z: 3 }
-export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -8 }
+export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -5, y: 0, z: 3 }
+export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: 5, y: 0, z: 3 }
+// Vessel berth further out to sea so ship doesn't overlap quay
+export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -20 }
 export const CRANE_POSITION: Position3D = { x: 0, y: 0, z: 0 }
 
 export const TERMINAL_BOUNDS = {
   minX: -60,
   maxX: 60,
-  minZ: -30,
-  maxZ: 60,
+  minZ: -60,  // more sea visible
+  maxZ: 145,
 }
 
 // ---- Sound events ---------------------------------------------------------
@@ -110,8 +141,10 @@ export const TERMINAL_BOUNDS = {
 export const SOUND_MAP: Record<string, string> = {
   'container.placed': 'container-loaded-to-ship.mp3',
   'money.earned': 'money-increase-ca-ching-.mp3',
-  'vessel.arrived': 'small-ship-three-horns-in-a-row.mp3',
-  'vessel.departed': 'small-ship-three-horns-in-a-row.mp3',
+  // Horn plays only once when vessel first appears (arriving state)
+  'vessel.arriving': 'small-ship-three-horns-in-a-row.mp3',
+  // Departure horn plays immediately when vessel starts leaving (departing state)
+  'vessel.departing': 'small-ship-three-horns-in-a-row.mp3',
   'tutorial.completed': 'group-yay-cheer.mp3',
   'level.up': 'level-up.mp3',
 }

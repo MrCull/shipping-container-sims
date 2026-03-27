@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { YardBlock, YardSlot, YardSlotRef, Position3D } from '../types'
+import { makeYardSlotId } from '../types'
 import {
   CONTAINER_LENGTH,
   CONTAINER_WIDTH,
@@ -40,23 +41,71 @@ export function createYardBlock(): YardBlock {
   }
 }
 
-export function findAvailableSlot(block: YardBlock, reservedSlotIds?: Set<string>): YardSlotRef | null {
+export function findAvailableSlot(
+  block: YardBlock,
+  reservedSlotIds?: Set<string>,
+  preferredVisitType?: 'import' | 'export',
+  containers?: import('../types').Container[],
+): YardSlotRef | null {
+  function trySlotInBay(bay: number, row: number): YardSlotRef | null {
+    const tiersInStack = block.slots.filter(
+      s => s.bay === bay && s.row === row && s.containerId !== null,
+    ).length
+    if (tiersInStack >= block.maxTier) return null
+    const candidate: YardSlotRef = {
+      blockId: block.id,
+      bay,
+      row,
+      tier: tiersInStack + 1,
+    }
+    const slotId = makeYardSlotId(candidate.blockId, candidate.bay, candidate.row, candidate.tier)
+    if (reservedSlotIds && reservedSlotIds.has(slotId)) return null
+    return candidate
+  }
+
+  function bayHasContainerOfType(bay: number, visitType: 'import' | 'export'): boolean {
+    if (!containers) return false
+    const containerIdsInBay = block.slots
+      .filter(s => s.bay === bay && s.containerId !== null)
+      .map(s => s.containerId as string)
+    return containerIdsInBay.some(cid => {
+      const c = containers.find(co => co.id === cid)
+      return c?.visitType === visitType
+    })
+  }
+
+  function bayHasAnyContainer(bay: number): boolean {
+    return block.slots.some(s => s.bay === bay && s.containerId !== null)
+  }
+
+  if (preferredVisitType && containers) {
+    // Pass 1: bays that already have the same type
+    for (let bay = 1; bay <= block.bays; bay++) {
+      if (bayHasContainerOfType(bay, preferredVisitType)) {
+        for (let row = 1; row <= block.rows; row++) {
+          const slot = trySlotInBay(bay, row)
+          if (slot) return slot
+        }
+      }
+    }
+
+    // Pass 2: empty bays
+    for (let bay = 1; bay <= block.bays; bay++) {
+      if (!bayHasAnyContainer(bay)) {
+        for (let row = 1; row <= block.rows; row++) {
+          const slot = trySlotInBay(bay, row)
+          if (slot) return slot
+        }
+      }
+    }
+
+    // Pass 3: fall through to any available
+  }
+
   for (let bay = 1; bay <= block.bays; bay++) {
     for (let row = 1; row <= block.rows; row++) {
-      const tiersInStack = block.slots.filter(
-        s => s.bay === bay && s.row === row && s.containerId !== null,
-      ).length
-      if (tiersInStack < block.maxTier) {
-        const candidate: YardSlotRef = {
-          blockId: block.id,
-          bay,
-          row,
-          tier: tiersInStack + 1,
-        }
-        const slotId = `${candidate.blockId}-${candidate.bay}-${candidate.row}-${candidate.tier}`
-        if (reservedSlotIds && reservedSlotIds.has(slotId)) continue
-        return candidate
-      }
+      const slot = trySlotInBay(bay, row)
+      if (slot) return slot
     }
   }
   return null

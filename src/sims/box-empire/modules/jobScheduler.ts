@@ -10,6 +10,7 @@ import type {
   Position3D,
   BoxEmpireState,
 } from '../types'
+import { isContainerOnTop } from './yardManager'
 
 let jobCounter = 0
 
@@ -51,15 +52,37 @@ function distanceBetween(a: Position3D, b: Position3D): number {
   return Math.sqrt(dx * dx + dz * dz)
 }
 
+function isJobAccessible(job: Job, state: BoxEmpireState): boolean {
+  if (job.pickupLocation.type !== 'yard_slot') return true
+  const yard = state.yardBlocks[0]
+  if (!yard) return true
+  return isContainerOnTop(yard, job.containerId)
+}
+
 export function assignPendingJobs(state: BoxEmpireState): void {
   const pendingJobs = state.jobs
     .filter(j => j.status === 'pending')
     .sort((a, b) => b.priority - a.priority)
 
   for (const job of pendingJobs) {
-    const idleEquipment = state.equipment.filter(
-      e => e.state === 'idle' && e.type === job.equipmentType && !e.currentJobId,
-    )
+    // Skip jobs where the container is buried
+    if (!isJobAccessible(job, state)) continue
+
+    const idleEquipment = state.equipment.filter(e => {
+      if (e.state !== 'idle') return false
+      if (e.type !== job.equipmentType) return false
+      if (e.currentJobId) return false
+      if (!e.enabled) return false
+
+      // Crane mode check
+      if (e.type === 'mobile_harbor_crane') {
+        const mode = e.craneMode
+        if (mode === 'discharge' && job.pickupLocation.type !== 'vessel_slot') return false
+        if (mode === 'load' && job.dropoffLocation.type !== 'vessel_slot') return false
+      }
+
+      return true
+    })
 
     if (idleEquipment.length === 0) continue
 
@@ -81,12 +104,20 @@ export function assignPendingJobs(state: BoxEmpireState): void {
   }
 }
 
+export function recheckBlockedJobs(state: BoxEmpireState): void {
+  for (const job of state.jobs) {
+    if (job.status !== 'blocked') continue
+    if (isJobAccessible(job, state)) {
+      job.status = 'pending'
+    }
+  }
+}
+
 export function cancelJob(state: BoxEmpireState, jobId: string): void {
   const job = state.jobs.find(j => j.id === jobId)
   if (!job) return
   if (job.status === 'completed' || job.status === 'cancelled') return
 
-  const prevStatus = job.status
   job.status = 'cancelled' as JobStatus
 
   if (job.assignedEquipmentId) {
@@ -108,8 +139,6 @@ export function cancelJob(state: BoxEmpireState, jobId: string): void {
       eq.carriedContainerId = null
     }
   }
-
-  void prevStatus
 }
 
 export function getActiveJobForContainer(
@@ -120,7 +149,7 @@ export function getActiveJobForContainer(
     state.jobs.find(
       j =>
         j.containerId === containerId &&
-        (j.status === 'pending' || j.status === 'assigned' || j.status === 'in_progress'),
+        (j.status === 'pending' || j.status === 'assigned' || j.status === 'in_progress' || j.status === 'blocked'),
     ) ?? null
   )
 }

@@ -6,11 +6,12 @@ import { onBeforeUnmount, ref, nextTick, watch, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useGameStore } from '../store/gameStore'
-import { buildScene } from '../modules/sceneBuilder'
+import { buildScene, animateOcean } from '../modules/sceneBuilder'
 import { ContainerRenderer } from '../modules/containerRenderer'
 import { EquipmentRenderer } from '../modules/equipmentRenderer'
 import { VesselRenderer } from '../modules/vesselRenderer'
 import { TruckRenderer } from '../modules/truckRenderer'
+import { FloatingTextRenderer } from '../modules/floatingTextRenderer'
 
 export interface GameSceneRefs {
   getScene: () => THREE.Scene | null
@@ -20,6 +21,11 @@ export interface GameSceneRefs {
   webglFailed: Ref<boolean>
   render: () => void
   updateEntities: () => void
+  spawnFloatingText: (text: string, color: string, worldPos: { x: number; y: number; z: number }) => void
+  getContainerIdAtInstance: () => string | null
+  getContainerMesh: () => THREE.InstancedMesh | null
+  getContainerIdNearScreen: (clickX: number, clickY: number, canvasW: number, canvasH: number) => string | null
+  triggerVesselShake: (vesselId: string) => void
 }
 
 export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): GameSceneRefs {
@@ -31,6 +37,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   let equipmentRenderer: EquipmentRenderer | null = null
   let vesselRenderer: VesselRenderer | null = null
   let truckRenderer: TruckRenderer | null = null
+  let floatingTextRenderer: FloatingTextRenderer | null = null
 
   const isReady = ref(false)
   const webglFailed = ref(false)
@@ -69,10 +76,10 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       renderer.shadowMap.enabled = true
       renderer.shadowMap.type = THREE.PCFSoftShadowMap
       renderer.toneMapping = THREE.ACESFilmicToneMapping
-      renderer.toneMappingExposure = 1.1
+      renderer.toneMappingExposure = 1.15
       renderer.outputColorSpace = THREE.SRGBColorSpace
 
-      camera = new THREE.PerspectiveCamera(50, w / h, 0.5, 500)
+      camera = new THREE.PerspectiveCamera(50, w / h, 0.5, 800)
       camera.position.set(30, 45, 60)
       camera.lookAt(0, 0, 15)
 
@@ -92,6 +99,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       equipmentRenderer = new EquipmentRenderer(scene)
       vesselRenderer = new VesselRenderer(scene)
       truckRenderer = new TruckRenderer(scene)
+      floatingTextRenderer = new FloatingTextRenderer(scene)
 
       window.addEventListener('resize', onResize)
       isReady.value = true
@@ -118,14 +126,39 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   function render(): void {
     if (!renderer || !scene || !camera) return
     controls?.update()
+    floatingTextRenderer?.update()
+    animateOcean(performance.now() / 1000)
     renderer.render(scene, camera)
   }
 
   function updateEntities(): void {
-    containerRenderer?.update(store.containers)
+    containerRenderer?.update(store.containers, store.truckVisits)
     equipmentRenderer?.update(store.equipment)
-    vesselRenderer?.update(store.vesselVisits)
-    truckRenderer?.update(store.truckVisits)
+    vesselRenderer?.update(store.vesselVisits, store.containers, 0.016)
+    truckRenderer?.update(store.truckVisits, store.containers)
+  }
+
+  function spawnFloatingText(text: string, color: string, worldPos: { x: number; y: number; z: number }): void {
+    floatingTextRenderer?.spawn(text, color, worldPos)
+  }
+
+  function getContainerIdAtInstance(): string | null {
+    return containerRenderer?.getContainerIdAtIndex() ?? null
+  }
+
+  function getContainerMesh(): THREE.InstancedMesh | null {
+    return containerRenderer?.getMesh() ?? null
+  }
+
+  function getContainerIdNearScreen(
+    clickX: number, clickY: number, canvasW: number, canvasH: number,
+  ): string | null {
+    if (!camera || !containerRenderer) return null
+    return containerRenderer.getContainerIdNearScreen(clickX, clickY, canvasW, canvasH, camera)
+  }
+
+  function triggerVesselShake(vesselId: string): void {
+    vesselRenderer?.triggerLoadShake(vesselId)
   }
 
   function dispose(): void {
@@ -135,6 +168,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     equipmentRenderer?.dispose()
     vesselRenderer?.dispose()
     truckRenderer?.dispose()
+    floatingTextRenderer?.dispose()
 
     if (scene) {
       scene.traverse(obj => {
@@ -165,5 +199,10 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     webglFailed,
     render,
     updateEntities,
+    spawnFloatingText,
+    getContainerIdAtInstance,
+    getContainerMesh,
+    getContainerIdNearScreen,
+    triggerVesselShake,
   }
 }

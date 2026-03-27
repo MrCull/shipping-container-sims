@@ -1,14 +1,28 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import { useGameStore } from '../store/gameStore'
 import MoneyDisplay from './ui/MoneyDisplay.vue'
 import TimeControls from './ui/TimeControls.vue'
 
 const store = useGameStore()
+const router = useRouter()
+
+function goToMenu(): void {
+  store.setTimeScale(0)
+  router.push('/')
+}
 </script>
 
 <template>
   <div class="top-bar">
     <div class="top-bar-left">
+      <button
+        class="menu-btn"
+        title="Back to main menu"
+        @click="goToMenu"
+      >
+        ← Menu
+      </button>
       <MoneyDisplay />
     </div>
     <div class="top-bar-center">
@@ -48,6 +62,23 @@ const store = useGameStore()
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.menu-btn {
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-retro, monospace);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.menu-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
 .sim-time {

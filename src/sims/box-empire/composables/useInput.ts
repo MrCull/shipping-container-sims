@@ -1,5 +1,8 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Click/hover raycasting for 3D objects
+// Box Empire — Click input: container and equipment selection
+// ---------------------------------------------------------------------------
+// Container selection: use getContainerIdNearScreen (screen-space projection)
+// Equipment selection: standard raycasting against named Group meshes
 // ---------------------------------------------------------------------------
 
 import { onMounted, onBeforeUnmount, type Ref } from 'vue'
@@ -10,10 +13,17 @@ export function useInput(
   canvasRef: Ref<HTMLCanvasElement | null>,
   getCamera: () => THREE.PerspectiveCamera | null,
   getScene: () => THREE.Scene | null,
+  getContainerIdAtInstance: () => string | null,
+  getContainerMesh: () => THREE.InstancedMesh | null,
+  getContainerIdNearScreen: (clickX: number, clickY: number, canvasW: number, canvasH: number) => string | null,
 ) {
   const store = useGameStore()
   const raycaster = new THREE.Raycaster()
   const mouse = new THREE.Vector2()
+
+  // Silence unused-variable warnings (kept for API compat)
+  void getContainerIdAtInstance
+  void getContainerMesh
 
   function onClick(event: MouseEvent): void {
     const canvas = canvasRef.value
@@ -22,42 +32,35 @@ export function useInput(
     if (!canvas || !camera || !scene) return
 
     const rect = canvas.getBoundingClientRect()
-    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    const clickX = event.clientX - rect.left
+    const clickY = event.clientY - rect.top
 
+    mouse.x = (clickX / rect.width) * 2 - 1
+    mouse.y = -(clickY / rect.height) * 2 + 1
+
+    // ---- 1. Equipment selection (raycasting against named groups) --------
     raycaster.setFromCamera(mouse, camera)
     const intersects = raycaster.intersectObjects(scene.children, true)
-
-    if (intersects.length > 0) {
-      const hit = intersects[0].object
-      let current: THREE.Object3D | null = hit
-      while (current) {
-        if (current.name && current.name.startsWith('rs-')) {
-          store.selectedEquipmentId = current.name
+    for (const hit of intersects) {
+      let cur: THREE.Object3D | null = hit.object
+      while (cur) {
+        if (cur.name && (cur.name.startsWith('rs-') || cur.name.startsWith('mhc-'))) {
+          store.selectedEquipmentId = cur.name
           store.selectedContainerId = null
           return
         }
-        if (current.name && current.name.startsWith('mhc-')) {
-          store.selectedEquipmentId = current.name
-          store.selectedContainerId = null
-          return
-        }
-        current = current.parent
+        cur = cur.parent
       }
+    }
 
-      if (hit instanceof THREE.InstancedMesh && intersects[0].instanceId !== undefined) {
-        const mesh = hit as THREE.InstancedMesh
-        const instanceId = intersects[0].instanceId
-        const containerMeshes = scene.children.filter(c => c instanceof THREE.InstancedMesh)
-        if (containerMeshes.includes(mesh)) {
-          const container = store.containers.filter(c => c.lifecycleState !== 'departed')[instanceId]
-          if (container) {
-            store.selectedContainerId = container.id
-            store.selectedEquipmentId = null
-            return
-          }
-        }
-      }
+    // ---- 2. Container selection (screen-space proximity) -----------------
+    const W = rect.width
+    const H = rect.height
+    const containerId = getContainerIdNearScreen(clickX, clickY, W, H)
+    if (containerId) {
+      store.selectedContainerId = containerId
+      store.selectedEquipmentId = null
+      return
     }
 
     store.selectedContainerId = null

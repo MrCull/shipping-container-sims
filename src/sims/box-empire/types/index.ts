@@ -25,8 +25,37 @@ export type LocationType =
 
 export interface Location {
   type: LocationType
-  id: string
+  id: string           // human-readable canonical ID (see locationId helpers in gameStore)
   position: Position3D
+}
+
+// ---- Location ID helpers ---------------------------------------------------
+// Canonical ID formats (used in Job, Location.id, and JobQueueWidget labels):
+//   yard slot  →  "{blockId}-{bay:02}-{row:02}-{tier:02}"   e.g. "yard-a-01-01-01"
+//   vessel slot → "{vesselId}-{bay:02}-{row:02}-{tier:02}"   e.g. "vessel-1-01-01-03"
+//   quay buf   →  "quay-discharge" | "quay-load"
+//   truck      →  truck.id
+//   gate       →  "gate-export" | "gate-import"
+//   equipment  →  equipment.id
+
+export function makeYardSlotId(blockId: string, bay: number, row: number, tier: number): string {
+  return `${blockId}-${String(bay).padStart(2, '0')}-${String(row).padStart(2, '0')}-${String(tier).padStart(2, '0')}`
+}
+
+export function makeVesselSlotId(vesselId: string, bay: number, row: number, tier: number): string {
+  return `${vesselId}-${String(bay).padStart(2, '0')}-${String(row).padStart(2, '0')}-${String(tier).padStart(2, '0')}`
+}
+
+export function parseYardSlotId(id: string): { blockId: string; bay: number; row: number; tier: number } | null {
+  // Format: "yard-a-01-01-01"  (block id can contain hyphens, last 3 segments are numbers)
+  const parts = id.split('-')
+  if (parts.length < 5) return null
+  const tier = parseInt(parts[parts.length - 1])
+  const row = parseInt(parts[parts.length - 2])
+  const bay = parseInt(parts[parts.length - 3])
+  const blockId = parts.slice(0, parts.length - 3).join('-')
+  if (isNaN(bay) || isNaN(row) || isNaN(tier)) return null
+  return { blockId, bay, row, tier }
 }
 
 // ---- Container ------------------------------------------------------------
@@ -40,6 +69,7 @@ export type ContainerLifecycleState =
   | 'staged_for_loading'
   | 'loaded_on_vessel'
   | 'at_gate'
+  | 'returning_to_gate'  // import container on truck heading to gate-out
   | 'departed'
 
 export interface Container {
@@ -52,6 +82,9 @@ export interface Container {
   currentLocation: Location
   yardSlot: YardSlotRef | null
   vesselSlot: VesselSlotRef | null
+  shippingLine: string
+  arrivedAt: number       // sim time when container first became active (gate-in or vessel arrival)
+  revenueEarned: number   // cumulative revenue credited against this container
 }
 
 export interface YardSlotRef {
@@ -109,6 +142,7 @@ export interface VesselVisit {
   slots: VesselSlot[]
   position: Position3D
   arrivalTime: number
+  hornPlayed: boolean   // ensures horn fires exactly once when 'arriving' begins
 }
 
 export interface VesselSlot {
@@ -126,6 +160,8 @@ export type TruckVisitState =
   | 'at_gate'
   | 'driving_to_yard'
   | 'waiting_for_equipment'
+  | 'returning_to_gate'   // import truck loaded with container, driving back to gate-out lane
+  | 'at_gate_out'         // import truck processing gate-out
   | 'departing'
   | 'departed'
 
@@ -137,6 +173,10 @@ export interface TruckVisit {
   position: Position3D
   targetPosition: Position3D | null
   stateStartTime: number
+  queueIndex: number       // stable queue slot so trucks hold fixed positions without jitter
+  waypoints: Position3D[]  // axis-aligned movement waypoints
+  waypointIndex: number    // current waypoint being navigated to
+  headingY: number         // current Y rotation in radians (updated by truckManager)
 }
 
 // ---- Equipment ------------------------------------------------------------
@@ -151,6 +191,8 @@ export type EquipmentState =
   | 'travel_to_drop'
   | 'dropping'
 
+export type CraneMode = 'discharge' | 'load' | 'both'
+
 export interface Equipment {
   id: string
   type: EquipmentType
@@ -162,6 +204,14 @@ export interface Equipment {
   stateElapsed: number
   targetPosition: Position3D | null
   speed: number
+  enabled: boolean
+  craneMode: CraneMode
+  armTargetY: number       // current spreader/boom tip height (world Y)
+  armDropStartY: number    // armTargetY at the start of the drop phase (for lerp from)
+  spreaderZ: number        // lateral position of MHC spreader along jib (+Z=quay, -Z=vessel)
+  waypoints: Position3D[]  // axis-aligned movement waypoints (RS only)
+  waypointIndex: number    // current waypoint index (RS only)
+  headingY: number         // current Y rotation for RS body
 }
 
 // ---- Jobs -----------------------------------------------------------------
@@ -170,6 +220,7 @@ export type JobStatus =
   | 'pending'
   | 'assigned'
   | 'in_progress'
+  | 'blocked'
   | 'completed'
   | 'cancelled'
 
@@ -206,7 +257,9 @@ export type GameEventType =
   | 'container.picked'
   | 'money.earned'
   | 'vessel.announced'
+  | 'vessel.arriving'
   | 'vessel.arrived'
+  | 'vessel.departing'
   | 'vessel.departed'
   | 'truck.arrived'
   | 'truck.departed'
@@ -258,6 +311,13 @@ export interface PathGraph {
   edges: PathEdge[]
 }
 
+// ---- Gatehouse ------------------------------------------------------------
+
+export interface GatehouseState {
+  exportLaneOpen: boolean
+  importLaneOpen: boolean
+}
+
 // ---- Game Phase -----------------------------------------------------------
 
 export type GamePhase = 'menu' | 'tutorial' | 'playing' | 'paused' | 'completed'
@@ -270,7 +330,7 @@ export interface BoxEmpireState {
   timeScale: number
   tutorialStep: number
   tutorialCompleted: boolean
-  gatehouseOpen: boolean
+  gatehouse: GatehouseState
   money: number
   transactions: Transaction[]
   equipment: Equipment[]
