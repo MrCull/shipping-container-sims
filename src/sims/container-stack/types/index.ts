@@ -8,7 +8,11 @@ export type GamePhase =
   | 'wobbling'
   | 'collapsing'
   | 'gameOver'
+  | 'levelComplete'
+  | 'levelFailed'
   | 'paused'
+
+export type LevelFailReason = 'timeoutMove' | 'timeoutLevel' | 'collapse' | null
 
 export interface JengaContainer {
   id: string

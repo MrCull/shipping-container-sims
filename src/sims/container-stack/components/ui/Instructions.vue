@@ -9,7 +9,7 @@ const { phase } = storeToRefs(store)
 const text = computed(() => {
   switch (phase.value) {
     case 'playing':
-      return 'Mouse: click a block, drag away to slide it out. Camera: WASD or arrow keys orbit, + / − zoom. Complete the top row before lower layers; unsupported overhangs collapse the stack.'
+      return 'Beat each level: complete moves before the move timer and level timer run out. Mouse: click, drag out; click a green slot to place. WASD / arrows orbit. Unsupported stacks collapse.'
     case 'removing':
       return 'Keep dragging smoothly — shaky moves rock the stack. Release when the block is far enough out.'
     case 'placing':
@@ -24,7 +24,7 @@ const text = computed(() => {
 
 <template>
   <div
-    v-if="text && phase !== 'start' && phase !== 'gameOver' && phase !== 'paused'"
+    v-if="text && phase !== 'start' && phase !== 'gameOver' && phase !== 'levelComplete' && phase !== 'levelFailed' && phase !== 'paused'"
     class="instructions"
   >
     {{ text }}

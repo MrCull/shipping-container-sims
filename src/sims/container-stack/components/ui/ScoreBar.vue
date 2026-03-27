@@ -5,7 +5,7 @@ import { useContainerStackStore } from '../../store/gameStore'
 import { SCORING } from '../../modules/config'
 
 const store = useContainerStackStore()
-const { score, moveCount, comboStreak, lastScorePopup, phase } = storeToRefs(store)
+const { score, moveCount, comboStreak, lastScorePopup, phase, currentLevel } = storeToRefs(store)
 
 const popupVisible = ref(false)
 const popupValue = ref(0)
@@ -28,6 +28,10 @@ watch(lastScorePopup, v => {
 
 <template>
   <div class="score-bar">
+    <div class="stat">
+      <span class="label">Level</span>
+      <span class="value">{{ currentLevel }}</span>
+    </div>
     <div class="stat">
       <span class="label">Score</span>
       <span class="value">{{ score }}</span>

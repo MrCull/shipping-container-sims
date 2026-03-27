@@ -25,7 +25,13 @@ export function useGameLoop(
     const dt = Math.min((now - last) / 1000, 0.1)
     last = now
 
-    if (phase.value === 'paused' || phase.value === 'start' || phase.value === 'gameOver') {
+    if (
+      phase.value === 'paused' ||
+      phase.value === 'start' ||
+      phase.value === 'gameOver' ||
+      phase.value === 'levelComplete' ||
+      phase.value === 'levelFailed'
+    ) {
       render()
       return
     }
@@ -62,7 +68,13 @@ export function useGameLoop(
   }
 
   watch(phase, p => {
-    if (p === 'gameOver' || p === 'start' || p === 'paused') {
+    if (
+      p === 'gameOver' ||
+      p === 'start' ||
+      p === 'paused' ||
+      p === 'levelComplete' ||
+      p === 'levelFailed'
+    ) {
       setCameraShake(0)
     }
   })

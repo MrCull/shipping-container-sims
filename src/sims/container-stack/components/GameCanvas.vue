@@ -7,7 +7,11 @@ import { useContainerStackThreeScene } from '../composables/useThreeScene'
 import { useContainerPicking } from '../composables/useContainerPicking'
 import { useGameLoop } from '../composables/useGameLoop'
 import { useContainerStackAudio } from '../composables/useAudio'
-import { createContainerMesh, setContainerHighlight } from '../modules/containerRenderer'
+import {
+  createContainerMesh,
+  disposeContainerGroupMaterials,
+  setContainerHighlight,
+} from '../modules/containerRenderer'
 import { createPlacementMarker } from '../modules/placementMarkers'
 import { slotWorldPosition, getTowerTopY, getPlacementCandidates } from '../modules/towerBuilder'
 import { BLOCK, INTERACTION, TOWER } from '../modules/config'
@@ -57,12 +61,19 @@ const picking = useContainerPicking(
   () => three.getTowerPivot() ?? null
 )
 
+function isContainerBlockGroup(g: THREE.Object3D): boolean {
+  if (!(g instanceof THREE.Group)) return false
+  return g.children.some(c => c instanceof THREE.Mesh && c.userData['isJengaBlock'])
+}
+
 function disposeObjectTree(obj: THREE.Object3D): void {
+  if (isContainerBlockGroup(obj)) {
+    disposeContainerGroupMaterials(obj as THREE.Group)
+    return
+  }
   obj.traverse(child => {
     const m = child as THREE.Mesh | THREE.LineSegments
     if (m.geometry) m.geometry.dispose()
-    const ud = m.userData as { usesSharedBodyMaterials?: boolean }
-    if (ud?.usesSharedBodyMaterials) return
     const mat = m.material
     if (mat) {
       if (Array.isArray(mat)) mat.forEach(x => x.dispose())
@@ -232,7 +243,7 @@ function syncCollapseMeshes(): void {
   clearCollapseVisuals()
   for (const p of collapsePieces.value) {
     const fake: JengaContainer = {
-      id: p.id,
+      id: p.meshKey,
       color: p.color,
       layerIndex: 0,
       slotIndex: 0,
@@ -268,7 +279,12 @@ function updateCollapseVisuals(): void {
 watch(
   [layers, phase],
   () => {
-    if (phase.value !== 'collapsing' && phase.value !== 'gameOver') {
+    if (
+      phase.value !== 'collapsing' &&
+      phase.value !== 'gameOver' &&
+      phase.value !== 'levelComplete' &&
+      phase.value !== 'levelFailed'
+    ) {
       rebuildTowerMeshes()
     }
     syncGhostMesh()

@@ -8,6 +8,9 @@ import Instructions from './components/ui/Instructions.vue'
 import StartScreen from './components/modals/StartScreen.vue'
 import GameOver from './components/modals/GameOver.vue'
 import PauseMenu from './components/modals/PauseMenu.vue'
+import LevelCompleteModal from './components/modals/LevelCompleteModal.vue'
+import LevelFailedModal from './components/modals/LevelFailedModal.vue'
+import TimerBar from './components/ui/TimerBar.vue'
 import { useContainerStackStore } from './store/gameStore'
 import { playStackSound } from './modules/audioPlayer'
 
@@ -32,6 +35,9 @@ watch(phase, p => {
   if (p === 'gameOver') {
     playStackSound('negative', 0.5)
   }
+  if (p === 'levelFailed') {
+    playStackSound('negative', 0.45)
+  }
   if (p !== 'paused') {
     pauseOpen.value = false
   }
@@ -45,7 +51,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   <div class="container-stack">
     <GameCanvas />
     <div class="hud-top">
-      <ScoreBar />
+      <div class="hud-left">
+        <ScoreBar />
+        <TimerBar />
+      </div>
       <TowerStability />
     </div>
     <div class="hud-bottom">
@@ -56,6 +65,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     </div>
     <StartScreen v-if="phase === 'start'" />
     <GameOver v-if="phase === 'gameOver'" />
+    <LevelCompleteModal v-if="phase === 'levelComplete'" />
+    <LevelFailedModal v-if="phase === 'levelFailed'" />
     <PauseMenu
       :open="pauseOpen"
       @close="pauseOpen = false"
@@ -88,6 +99,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 }
 .hud-top > * {
   pointer-events: auto;
+}
+.hud-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  align-items: flex-start;
 }
 .hud-bottom {
   position: absolute;

@@ -5,11 +5,17 @@ import type {
   CollapsePiece,
   GamePhase,
   JengaContainer,
+  LevelFailReason,
   LayerOrientation,
   MoveRecord,
   TowerLayer,
 } from '../types'
 import { BLOCK, PHYSICS, TOWER } from '../modules/config'
+import {
+  getLevelTimeLimitSec,
+  getMoveTimeLimitSec,
+  MOVES_PER_LEVEL,
+} from '../modules/levelConfig'
 import {
   buildInitialTower,
   countContainersInLayer,
@@ -59,6 +65,97 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   const placingSlotOptions = ref<number[]>([])
   let collapseIdPrefix = `${Date.now()}-`
 
+  const currentLevel = ref(1)
+  const movesInLevel = ref(0)
+  const levelTimeRemainingSec = ref(0)
+  const moveTimeRemainingSec = ref(0)
+  const levelFailReason = ref<LevelFailReason>(null)
+
+  function refillMoveTimer(): void {
+    moveTimeRemainingSec.value = getMoveTimeLimitSec(currentLevel.value)
+  }
+
+  function resetTowerState(): void {
+    resetContainerIdCounter()
+    layers.value = buildInitialTower()
+    wobble.value = createInitialWobble()
+    recomputePhysics()
+    maxHeightLayers.value = layers.value.length
+  }
+
+  /** Start current level from a fresh tower (same score unless full restart). */
+  function startLevelInternal(): void {
+    collapsePieces.value = []
+    floatingContainer.value = null
+    floatingFrom.value = null
+    placingSlotOptions.value = []
+    movesInLevel.value = 0
+    levelTimeRemainingSec.value = getLevelTimeLimitSec(currentLevel.value)
+    refillMoveTimer()
+    levelFailReason.value = null
+    resetTowerState()
+    phase.value = 'playing'
+  }
+
+  function failLevelTimer(reason: 'timeoutMove' | 'timeoutLevel'): void {
+    if (
+      (phase.value === 'removing' || phase.value === 'placing') &&
+      floatingFrom.value &&
+      floatingContainer.value
+    ) {
+      const { layerIndex, slotIndex } = floatingFrom.value
+      const L = layers.value[layerIndex]
+      const c = floatingContainer.value
+      if (L) {
+        L.slots[slotIndex] = { ...c, layerIndex, slotIndex }
+      }
+    }
+    floatingContainer.value = null
+    floatingFrom.value = null
+    placingSlotOptions.value = []
+    levelFailReason.value = reason
+    phase.value = 'levelFailed'
+    recomputePhysics()
+  }
+
+  function tickLevelTimers(dt: number): void {
+    if (
+      dt <= 0 ||
+      phase.value === 'start' ||
+      phase.value === 'paused' ||
+      phase.value === 'collapsing' ||
+      phase.value === 'gameOver' ||
+      phase.value === 'levelComplete' ||
+      phase.value === 'levelFailed'
+    ) {
+      return
+    }
+    levelTimeRemainingSec.value = Math.max(0, levelTimeRemainingSec.value - dt)
+    moveTimeRemainingSec.value = Math.max(0, moveTimeRemainingSec.value - dt)
+    if (levelTimeRemainingSec.value <= 0) {
+      failLevelTimer('timeoutLevel')
+      return
+    }
+    if (moveTimeRemainingSec.value <= 0) {
+      failLevelTimer('timeoutMove')
+    }
+  }
+
+  function completeLevelIfNeeded(): void {
+    if (movesInLevel.value >= MOVES_PER_LEVEL) {
+      phase.value = 'levelComplete'
+    }
+  }
+
+  function continueToNextLevel(): void {
+    currentLevel.value++
+    startLevelInternal()
+  }
+
+  function retryCurrentLevel(): void {
+    startLevelInternal()
+  }
+
   function beginCollapseFromTower(extraFloating?: {
     container: JengaContainer
     orient: LayerOrientation
@@ -90,22 +187,15 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   }
 
   function newGame(): void {
-    resetContainerIdCounter()
     collapseIdPrefix = `${Date.now()}`
     collapsePieces.value = []
-    layers.value = buildInitialTower()
-    wobble.value = createInitialWobble()
-    recomputePhysics()
     score.value = 0
     moveCount.value = 0
     comboStreak.value = 0
     moves.value = []
-    floatingContainer.value = null
-    floatingFrom.value = null
-    collapsePieces.value = []
-    maxHeightLayers.value = layers.value.length
     lastScorePopup.value = 0
-    phase.value = 'playing'
+    currentLevel.value = 1
+    startLevelInternal()
   }
 
   function beginPlay(): void {
@@ -162,6 +252,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     removalWasCritical.value = critical
     stabilityAtRemovalStart.value = stabBefore
     phase.value = 'removing'
+    refillMoveTimer()
     moveStartedAt.value = performance.now()
     jitterAccumulator.value = 0
     return true
@@ -184,6 +275,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     )
     injectJitterImpulse(wobble.value, jitterAccumulator.value)
     placingSlotOptions.value = computePlacingSlotOptions()
+    refillMoveTimer()
     phase.value = 'placing'
   }
 
@@ -283,14 +375,26 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     floatingContainer.value = null
     floatingFrom.value = null
     placingSlotOptions.value = []
+    movesInLevel.value++
+
+    refillMoveTimer()
     phase.value = 'playing'
+    completeLevelIfNeeded()
     return true
   }
 
   function tickPhysics(dt: number): 'ok' | 'collapsed' {
-    if (phase.value === 'collapsing' || phase.value === 'gameOver' || phase.value === 'start') {
+    if (
+      phase.value === 'collapsing' ||
+      phase.value === 'gameOver' ||
+      phase.value === 'start' ||
+      phase.value === 'paused' ||
+      phase.value === 'levelComplete' ||
+      phase.value === 'levelFailed'
+    ) {
       return 'ok'
     }
+    tickLevelTimers(dt)
     if (
       phase.value === 'playing' &&
       layers.value.length > 0 &&
@@ -353,6 +457,11 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     collapsePieces.value = []
     placingSlotOptions.value = []
     lastScorePopup.value = 0
+    currentLevel.value = 1
+    movesInLevel.value = 0
+    levelTimeRemainingSec.value = 0
+    moveTimeRemainingSec.value = 0
+    levelFailReason.value = null
     wobble.value = createInitialWobble()
   }
 
@@ -377,6 +486,11 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     maxHeightLayers,
     collapsePieces,
     placingSlotOptions,
+    currentLevel,
+    movesInLevel,
+    levelTimeRemainingSec,
+    moveTimeRemainingSec,
+    levelFailReason,
     beginPlay,
     newGame,
     canRemoveFromSlot,
@@ -388,6 +502,8 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     tickPhysics,
     finishCollapse,
     restartToStart,
+    continueToNextLevel,
+    retryCurrentLevel,
     setPaused,
     recomputePhysics,
   }

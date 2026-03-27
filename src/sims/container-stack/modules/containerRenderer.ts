@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { JengaContainer, LayerOrientation } from '../types'
 import { BLOCK } from './config'
-import { getShippingContainerMaterials } from './containerMaterials'
+import { createInstanceContainerMaterials, disposeInstanceMaterials } from './containerMaterials'
 
 export interface ContainerMeshUserData {
   containerId: string
@@ -81,7 +81,7 @@ export function createContainerMesh(
   const sz = longAlongX ? len : w
 
   const geo = new THREE.BoxGeometry(sx, sy, sz)
-  const materials = getShippingContainerMaterials(container.color, longAlongX)
+  const materials = createInstanceContainerMaterials(container.color, longAlongX, container.id)
   const mesh = new THREE.Mesh(geo, materials)
   mesh.castShadow = true
   mesh.receiveShadow = true
@@ -91,7 +91,7 @@ export function createContainerMesh(
     slotIndex: container.slotIndex,
     isJengaBlock: true,
   } satisfies ContainerMeshUserData
-  mesh.userData = { ...ud, usesSharedBodyMaterials: true }
+  mesh.userData = { ...ud, bodyMaterials: materials }
 
   addCornerPosts(group, sx, sy, sz)
 
@@ -129,4 +129,21 @@ export function setContainerHighlight(group: THREE.Group, on: boolean): void {
       applyEmissiveToMesh(child, on)
     }
   }
+}
+
+export function disposeContainerGroupMaterials(group: THREE.Group): void {
+  group.traverse(obj => {
+    const m = obj as THREE.Mesh | THREE.LineSegments
+    if (!m.geometry) return
+    const bodyMats = m.userData['bodyMaterials'] as THREE.MeshStandardMaterial[] | undefined
+    if (bodyMats) {
+      disposeInstanceMaterials(bodyMats)
+      m.userData['bodyMaterials'] = undefined
+    } else if (m.material) {
+      const mat = m.material
+      if (Array.isArray(mat)) mat.forEach(x => x.dispose())
+      else mat.dispose()
+    }
+    m.geometry.dispose()
+  })
 }

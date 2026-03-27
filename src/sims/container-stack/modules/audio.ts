@@ -13,6 +13,8 @@ export const SOUNDS: Record<string, string> = {
   caChing: assetUrl('money-increase-ca-ching-.mp3'),
   scream: assetUrl('man-screaming.mp3'),
   explosionFx: assetUrl('explosion-fx.mp3'),
+  levelPassedOk: assetUrl('level-passed-ok.mp3'),
+  tickClock: assetUrl('level-up-quick-sound.mp3'),
 }
 
 export interface SoundCue {
