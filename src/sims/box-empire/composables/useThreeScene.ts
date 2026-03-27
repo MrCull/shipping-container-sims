@@ -17,6 +17,7 @@ export interface GameSceneRefs {
   getCamera: () => THREE.PerspectiveCamera | null
   getRenderer: () => THREE.WebGLRenderer | null
   isReady: Ref<boolean>
+  webglFailed: Ref<boolean>
   render: () => void
   updateEntities: () => void
 }
@@ -32,9 +33,24 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   let truckRenderer: TruckRenderer | null = null
 
   const isReady = ref(false)
+  const webglFailed = ref(false)
   const store = useGameStore()
 
   function init(canvas: HTMLCanvasElement): void {
+    try {
+      const testCanvas = document.createElement('canvas')
+      const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl')
+      if (!gl) {
+        console.warn('Box Empire: WebGL not available in this environment')
+        webglFailed.value = true
+        return
+      }
+    } catch {
+      console.warn('Box Empire: WebGL check failed')
+      webglFailed.value = true
+      return
+    }
+
     try {
       scene = new THREE.Scene()
 
@@ -80,12 +96,13 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       window.addEventListener('resize', onResize)
       isReady.value = true
     } catch (e) {
-      console.error('Box Empire scene init failed:', e)
+      console.warn('Box Empire: Scene init failed, running in UI-only mode:', e)
+      webglFailed.value = true
     }
   }
 
   watch(canvasRef, async (canvas) => {
-    if (canvas && !isReady.value) {
+    if (canvas && !isReady.value && !webglFailed.value) {
       await nextTick()
       init(canvas)
     }
@@ -145,6 +162,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     getCamera: () => camera,
     getRenderer: () => renderer,
     isReady,
+    webglFailed,
     render,
     updateEntities,
   }

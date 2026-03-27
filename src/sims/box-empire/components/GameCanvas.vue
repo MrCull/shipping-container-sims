@@ -7,7 +7,7 @@ import { useAudio } from '../composables/useAudio'
 import { useGameStore } from '../store/gameStore'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const { getScene, getCamera, render, updateEntities, isReady } = useBoxEmpireScene(canvasRef)
+const { getScene, getCamera, render, updateEntities, isReady, webglFailed } = useBoxEmpireScene(canvasRef)
 const store = useGameStore()
 const { play } = useAudio()
 
@@ -25,6 +25,10 @@ const { start, stop } = useGameLoop(() => {
   render()
 })
 
+const { start: startHeadless } = useGameLoop(() => {
+  store.consumePendingEvents()
+})
+
 watch(isReady, (ready) => {
   if (ready) {
     updateEntities()
@@ -33,25 +37,109 @@ watch(isReady, (ready) => {
   }
 })
 
+watch(webglFailed, (failed) => {
+  if (failed) {
+    startHeadless()
+  }
+})
+
 onBeforeUnmount(() => {
   stop()
 })
+
+defineExpose({ webglFailed })
 </script>
 
 <template>
-  <canvas
-    ref="canvasRef"
-    class="game-canvas"
-  />
+  <div class="game-canvas-wrapper">
+    <canvas
+      v-show="!webglFailed"
+      ref="canvasRef"
+      class="game-canvas"
+    />
+    <div
+      v-if="webglFailed"
+      class="webgl-fallback"
+    >
+      <div class="fallback-scene">
+        <div class="fallback-sky" />
+        <div class="fallback-ground" />
+        <div class="fallback-water" />
+        <div class="fallback-message">
+          3D rendering unavailable — simulation running in text mode
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.game-canvas {
+.game-canvas-wrapper {
   position: absolute;
   top: 0;
   left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.game-canvas {
   width: 100vw;
   height: 100vh;
   display: block;
+}
+
+.webgl-fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.fallback-scene {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.fallback-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background: linear-gradient(180deg, #5b9bd5 0%, #87ceeb 100%);
+}
+
+.fallback-ground {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 35%;
+  background: linear-gradient(180deg, #808080 0%, #606060 100%);
+}
+
+.fallback-water {
+  position: absolute;
+  bottom: 35%;
+  left: 0;
+  width: 100%;
+  height: 15%;
+  background: linear-gradient(180deg, #1a6b8a 0%, #2980b9 100%);
+}
+
+.fallback-message {
+  position: absolute;
+  bottom: 50%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-retro, monospace);
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 12px;
+  border-radius: 4px;
 }
 </style>
