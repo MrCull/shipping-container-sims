@@ -5,6 +5,8 @@ import { useSimRegistry } from '@/composables/useSimRegistry'
 import { useMenuMusic } from '@/composables/useMenuMusic'
 import HeroBackground from '@/components/HeroBackground.vue'
 import SimCard from '@/components/SimCard.vue'
+import FutureGameCard from '@/components/FutureGameCard.vue'
+import { futureGameTeasers } from '@/data/future-game-teasers'
 
 const store = useSimsStore()
 const { registerAll } = useSimRegistry()
@@ -68,6 +70,22 @@ onMounted(() => {
             v-for="sim in store.comingSoon"
             :key="sim.id"
             :sim="sim"
+          />
+        </div>
+      </section>
+
+      <section class="sim-section future-section">
+        <h2 class="section-title">
+          <span class="horizon-icon">◇</span> ON THE HORIZON
+        </h2>
+        <p class="section-lede">
+          Planned games—no release dates yet. These are teasers, not playable builds.
+        </p>
+        <div class="sim-grid">
+          <FutureGameCard
+            v-for="teaser in futureGameTeasers"
+            :key="teaser.id"
+            :teaser="teaser"
           />
         </div>
       </section>
@@ -184,6 +202,30 @@ onMounted(() => {
 
 .lock-icon {
   font-style: normal;
+}
+
+.horizon-icon {
+  color: var(--color-primary);
+  font-style: normal;
+  animation: pulse-soft 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.section-lede {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin: -0.35rem 0 0.65rem;
+  max-width: 36rem;
+}
+
+.future-section {
+  padding-top: 0.25rem;
+  border-top: 1px dashed var(--color-border);
 }
 
 .sim-grid {
