@@ -289,8 +289,14 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
   // ---- Truck spawning helpers ---------------------------------------------
   function spawnExportTruck(containerIndex: number): void {
+    const assignedContainerIds = new Set(
+      truckVisits.value.filter(t => t.containerId).map(t => t.containerId),
+    )
     const container = containers.value.find(
-      c => c.visitType === 'export' && c.lifecycleState === 'at_gate',
+      c =>
+        c.visitType === 'export' &&
+        c.lifecycleState === 'at_gate' &&
+        !assignedContainerIds.has(c.id),
     )
     if (!container) return
     const truck = createTruck(container.id, 'export_delivery')
@@ -307,8 +313,16 @@ export const useGameStore = defineStore('box-empire-game', () => {
   }
 
   function spawnImportPickupTruck(): void {
+    const pickupTruckContainerIds = new Set(
+      truckVisits.value
+        .filter(t => t.visitType === 'import_pickup' && t.containerId)
+        .map(t => t.containerId),
+    )
     const container = containers.value.find(
-      c => c.visitType === 'import' && c.lifecycleState === 'in_yard',
+      c =>
+        c.visitType === 'import' &&
+        c.lifecycleState === 'in_yard' &&
+        !pickupTruckContainerIds.has(c.id),
     )
     if (!container) return
     const truck = createTruck(null, 'import_pickup')
