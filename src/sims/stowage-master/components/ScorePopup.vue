@@ -30,7 +30,7 @@ watch(() => store.lastPlacement, (placement) => {
       :class="popupClass"
     >
       <div class="popup-score">
-        +{{ lastScore }}
+        +${{ lastScore }}
       </div>
       <div
         v-for="(reason, i) in lastReasons"
