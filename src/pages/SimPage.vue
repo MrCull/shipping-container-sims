@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, onUnmounted } from 'vue'
 import { useSimsStore } from '@/stores/sims'
 import { useSimRegistry } from '@/composables/useSimRegistry'
+import { watchSimHead } from '@/composables/useSiteHead'
 import { useRouter } from 'vue-router'
 
 const props = defineProps<{
@@ -28,6 +29,14 @@ const asyncComponent = computed(() => {
 function goHome() {
   router.push({ name: 'home' })
 }
+
+const stopHeadWatch = watchSimHead(
+  () => sim.value,
+  () => props.simId,
+)
+onUnmounted(() => {
+  stopHeadWatch()
+})
 </script>
 
 <template>

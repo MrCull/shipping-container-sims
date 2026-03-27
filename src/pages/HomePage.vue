@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useSimsStore } from '@/stores/sims'
 import { useSimRegistry } from '@/composables/useSimRegistry'
+import { setHomePageMeta } from '@/composables/useSiteHead'
 import { useMenuMusic } from '@/composables/useMenuMusic'
 import HeroBackground from '@/components/HeroBackground.vue'
 import SimCard from '@/components/SimCard.vue'
@@ -14,6 +15,7 @@ const { registerAll } = useSimRegistry()
 useMenuMusic()
 
 onMounted(() => {
+  setHomePageMeta()
   registerAll()
 })
 </script>

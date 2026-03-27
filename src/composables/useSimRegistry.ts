@@ -2,9 +2,8 @@ import { useSimsStore } from '@/stores/sims'
 import type { SimDefinition } from '@/types/sim'
 
 /**
- * Registers all known sims into the Pinia store.
- * Each sim folder exports a `definition` that gets registered here.
- * When adding a new sim, import its definition and add it to the array below.
+ * Registers all known sims into the Pinia store via glob discovery.
+ * When adding a playable sim, add its `/sim/{id}` URL to `public/sitemap.xml` for SEO.
  */
 export function useSimRegistry() {
   const store = useSimsStore()
