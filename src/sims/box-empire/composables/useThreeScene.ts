@@ -22,6 +22,8 @@ export interface GameSceneRefs {
   render: () => void
   updateEntities: () => void
   spawnFloatingText: (text: string, color: string, worldPos: { x: number; y: number; z: number }) => void
+  getContainerIdAtInstance: (instanceId: number) => string | null
+  getContainerMesh: () => THREE.InstancedMesh | null
 }
 
 export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): GameSceneRefs {
@@ -137,6 +139,14 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     floatingTextRenderer?.spawn(text, color, worldPos)
   }
 
+  function getContainerIdAtInstance(instanceId: number): string | null {
+    return containerRenderer?.getContainerIdAtIndex(instanceId) ?? null
+  }
+
+  function getContainerMesh(): THREE.InstancedMesh | null {
+    return containerRenderer?.getMesh() ?? null
+  }
+
   function dispose(): void {
     window.removeEventListener('resize', onResize)
     controls?.dispose()
@@ -176,5 +186,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     render,
     updateEntities,
     spawnFloatingText,
+    getContainerIdAtInstance,
+    getContainerMesh,
   }
 }
