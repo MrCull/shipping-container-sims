@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useContainerStackStore } from '../../store/gameStore'
 import { ensureAudioLoaded, playStackSound } from '../../modules/audioPlayer'
+import { MOVES_PER_LEVEL } from '../../modules/levelConfig'
 
 const emit = defineEmits<{ play: [] }>()
 const store = useContainerStackStore()
@@ -24,6 +25,9 @@ async function onPlay(): Promise<void> {
       </p>
       <p class="blurb">
         Pull containers with the mouse, then place them on top. Use WASD or arrow keys to orbit the camera. If the stack is not supported below, it comes down.
+      </p>
+      <p class="tip">
+        Beat each level: finish {{ MOVES_PER_LEVEL }} moves before the move timer or level timer hits zero — timers get shorter on higher levels.
       </p>
       <button
         type="button"
@@ -70,10 +74,21 @@ async function onPlay(): Promise<void> {
   font-weight: 600;
 }
 .blurb {
-  margin: 0 0 1.5rem;
+  margin: 0 0 0.85rem;
   font-size: 0.88rem;
   line-height: 1.5;
   color: #94a3b8;
+}
+.tip {
+  margin: 0 0 1.5rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #bae6fd;
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 8px;
+  text-align: left;
 }
 .play-btn {
   padding: 0.75rem 2.5rem;

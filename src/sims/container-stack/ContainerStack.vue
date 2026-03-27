@@ -53,10 +53,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     <div class="hud-top">
       <div class="hud-left">
         <ScoreBar />
-        <TimerBar />
       </div>
       <TowerStability />
     </div>
+    <TimerBar />
     <div class="hud-bottom">
       <Instructions />
       <p class="pause-hint">

@@ -9,7 +9,7 @@ const { phase } = storeToRefs(store)
 const text = computed(() => {
   switch (phase.value) {
     case 'playing':
-      return 'Beat each level: complete moves before the move timer and level timer run out. Mouse: click, drag out; click a green slot to place. WASD / arrows orbit. Unsupported stacks collapse.'
+      return ''
     case 'removing':
       return 'Keep dragging smoothly — shaky moves rock the stack. Release when the block is far enough out.'
     case 'placing':
