@@ -40,20 +40,20 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
 
       renderer = new THREE.WebGLRenderer({
         canvas,
-        antialias: true,
+        antialias: false,
         alpha: false,
-        powerPreference: 'default',
+        powerPreference: 'low-power',
+        failIfMajorPerformanceCaveat: false,
       })
 
       const w = window.innerWidth
       const h = window.innerHeight
 
       renderer.setSize(w, h)
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-      renderer.shadowMap.enabled = true
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap
-      renderer.toneMapping = THREE.ACESFilmicToneMapping
-      renderer.toneMappingExposure = 1.1
+      renderer.setPixelRatio(1)
+      renderer.shadowMap.enabled = false
+      renderer.toneMapping = THREE.NoToneMapping
+      renderer.toneMappingExposure = 1
       renderer.outputColorSpace = THREE.SRGBColorSpace
 
       camera = new THREE.PerspectiveCamera(50, w / h, 0.5, 500)
