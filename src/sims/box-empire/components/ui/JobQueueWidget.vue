@@ -30,28 +30,65 @@ function statusColor(status: string): string {
 
 function statusIcon(status: string): string {
   switch (status) {
-    case 'pending': return '⏳'
-    case 'assigned': return '🔔'
+    case 'pending': return '·'
+    case 'assigned': return '⟳'
     case 'in_progress': return '▶'
-    case 'blocked': return '🚫'
+    case 'blocked': return '✕'
     default: return '·'
   }
 }
 
-function shortId(id: string): string {
-  return id.length > 8 ? id.slice(-6) : id
+// Convert a canonical location ID to a human-readable short label
+// Location IDs use formats:
+//   yard: "yard-a-01-01-02"  → "yard-a B01 R01 T02"
+//   vessel: "vessel-1-01-01-03" → "V1 B01 R01 T03"
+//   quay: "quay-discharge" | "quay-load" → "QD" | "QL"
+//   truck: "truck-3" → "Truck3"
+//   gate: "gate-export" → "Gate"
+//   equipment: "rs-1" → "rs-1"
+function locLabel(locType: string, locId: string): string {
+  switch (locType) {
+    case 'yard_slot': {
+      // "yard-a-01-01-02" → parse last 3 segments
+      const parts = locId.split('-')
+      if (parts.length >= 5) {
+        const bay = parseInt(parts[parts.length - 3])
+        const row = parseInt(parts[parts.length - 2])
+        const tier = parseInt(parts[parts.length - 1])
+        const blockParts = parts.slice(0, parts.length - 3).join('-')
+        return `${blockParts} B${String(bay).padStart(2, '0')}R${String(row).padStart(2, '0')}T${tier}`
+      }
+      return locId
+    }
+    case 'vessel_slot': {
+      // "vessel-1-01-01-03" → "V1 Bay01 T03"
+      const parts = locId.split('-')
+      if (parts.length >= 5) {
+        const tier = parseInt(parts[parts.length - 1])
+        const bay = parseInt(parts[parts.length - 3])
+        const vesselNum = parts[1] ?? '?'
+        return `V${vesselNum} Bay${String(bay).padStart(2, '0')} T${tier}`
+      }
+      return locId
+    }
+    case 'quay_buffer':
+      if (locId.includes('discharge') || locId === 'quay-discharge') return 'Quay-Import'
+      if (locId.includes('load') || locId === 'quay-load') return 'Quay-Export'
+      return 'Quay'
+    case 'truck':
+      return locId.replace('truck-', 'Truck ')
+    case 'gate_buffer':
+      return 'Gate'
+    case 'equipment':
+      return locId
+    default:
+      return locId
+  }
 }
 
-function locationLabel(type: string): string {
-  switch (type) {
-    case 'vessel_slot': return 'Vessel'
-    case 'yard_slot': return 'Yard'
-    case 'quay_buffer': return 'Quay'
-    case 'truck': return 'Truck'
-    case 'gate_buffer': return 'Gate'
-    case 'equipment': return 'Equip'
-    default: return type
-  }
+// Last N chars of container ID for display
+function shortContainer(id: string): string {
+  return id.slice(-6)
 }
 </script>
 
@@ -77,6 +114,18 @@ function locationLabel(type: string): string {
         No active jobs
       </div>
 
+      <!-- Column headers -->
+      <div
+        v-if="displayJobs.length > 0"
+        class="col-header-row"
+      >
+        <span class="col-status" />
+        <span class="col-priority">P</span>
+        <span class="col-container">Cntr</span>
+        <span class="col-type">Equip</span>
+        <span class="col-route">From → To</span>
+      </div>
+
       <div
         v-for="job in displayJobs"
         :key="job.id"
@@ -84,40 +133,55 @@ function locationLabel(type: string): string {
         @click="toggleExpand(job.id)"
       >
         <span
-          class="status-icon"
+          class="col-status"
           :style="{ color: statusColor(job.status) }"
+          :title="job.status"
         >{{ statusIcon(job.status) }}</span>
-        <span class="job-id">{{ shortId(job.id) }}</span>
-        <span class="job-route">
-          {{ locationLabel(job.pickupLocation.type) }} → {{ locationLabel(job.dropoffLocation.type) }}
+        <span
+          class="col-priority"
+          :style="{ color: job.priority >= 12 ? '#f59e0b' : '#aaa' }"
+        >{{ job.priority }}</span>
+        <span
+          class="col-container"
+          :title="job.containerId"
+        >{{ shortContainer(job.containerId) }}</span>
+        <span class="col-type">{{ job.equipmentType === 'reach_stacker' ? 'RS' : 'MHC' }}</span>
+        <span class="col-route">
+          {{ locLabel(job.pickupLocation.type, job.pickupLocation.id) }}
+          <span class="arrow">→</span>
+          {{ locLabel(job.dropoffLocation.type, job.dropoffLocation.id) }}
         </span>
-        <span class="job-priority">P{{ job.priority }}</span>
 
+        <!-- Expanded detail -->
         <div
           v-if="expandedJobId === job.id"
           class="job-detail"
         >
           <div class="detail-row">
-            <span class="detail-label">Container:</span>
-            <span class="detail-value">{{ shortId(job.containerId) }}</span>
+            <span class="detail-label">Job</span>
+            <span class="detail-value">{{ job.id }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Equipment:</span>
-            <span class="detail-value">{{ job.equipmentType.replace('_', ' ') }}</span>
+            <span class="detail-label">Status</span>
+            <span
+              class="detail-value"
+              :style="{ color: statusColor(job.status) }"
+            >{{ job.status }}</span>
           </div>
           <div
             v-if="job.assignedEquipmentId"
             class="detail-row"
           >
-            <span class="detail-label">Assigned:</span>
+            <span class="detail-label">Equip</span>
             <span class="detail-value">{{ job.assignedEquipmentId }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Status:</span>
-            <span
-              class="detail-value"
-              :style="{ color: statusColor(job.status) }"
-            >{{ job.status }}</span>
+            <span class="detail-label">From</span>
+            <span class="detail-value">{{ job.pickupLocation.id }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">To</span>
+            <span class="detail-value">{{ job.dropoffLocation.id }}</span>
           </div>
         </div>
       </div>
@@ -129,13 +193,13 @@ function locationLabel(type: string): string {
 .job-queue-widget {
   position: fixed;
   right: 12px;
-  top: 60px;
-  width: 220px;
-  background: rgba(0, 0, 0, 0.85);
+  top: 55px;
+  width: 320px;
+  background: rgba(0, 0, 0, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   font-family: var(--font-retro, monospace);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: #ccc;
   z-index: 15;
   user-select: none;
@@ -158,6 +222,7 @@ function locationLabel(type: string): string {
   color: var(--color-primary, #f59e0b);
   text-transform: uppercase;
   letter-spacing: 1px;
+  font-size: 0.62rem;
 }
 
 .header-count {
@@ -165,19 +230,21 @@ function locationLabel(type: string): string {
   color: #000;
   border-radius: 10px;
   padding: 0 5px;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: bold;
+  min-width: 16px;
+  text-align: center;
 }
 
 .collapse-btn {
-  color: #888;
-  font-size: 0.6rem;
+  color: #666;
+  font-size: 0.55rem;
 }
 
 .job-list {
-  max-height: 320px;
+  max-height: 360px;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .empty-state {
@@ -185,57 +252,86 @@ function locationLabel(type: string): string {
   text-align: center;
   color: #555;
   font-style: italic;
+  font-size: 0.62rem;
+}
+
+.col-header-row {
+  display: grid;
+  grid-template-columns: 14px 22px 50px 32px 1fr;
+  gap: 4px;
+  padding: 3px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.58rem;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .job-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 14px 22px 50px 32px 1fr;
+  gap: 4px;
   align-items: center;
-  gap: 5px;
   padding: 4px 8px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   flex-wrap: wrap;
-  transition: background 0.15s;
+  transition: background 0.12s;
 }
 
 .job-row:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.status-icon {
-  font-size: 0.8rem;
-  width: 14px;
-  flex-shrink: 0;
+.col-status {
+  font-size: 0.75rem;
+  text-align: center;
+  line-height: 1;
 }
 
-.job-id {
-  color: #888;
+.col-priority {
   font-size: 0.65rem;
-  width: 38px;
-  flex-shrink: 0;
+  text-align: right;
+  font-weight: bold;
+  padding-right: 2px;
+}
+
+.col-container {
+  font-size: 0.6rem;
+  color: #99aacc;
+  font-family: monospace;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.job-route {
-  flex: 1;
+.col-type {
+  font-size: 0.6rem;
+  color: #888;
+  text-align: center;
+}
+
+.col-route {
+  font-size: 0.6rem;
   color: #ccc;
-  font-size: 0.65rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  grid-column: 1 / -1;
+  padding-left: 16px;
+  margin-top: -2px;
 }
 
-.job-priority {
-  color: #f59e0b;
-  font-size: 0.6rem;
-  flex-shrink: 0;
+.arrow {
+  color: #555;
+  margin: 0 2px;
 }
 
 .job-detail {
-  width: 100%;
+  grid-column: 1 / -1;
   margin-top: 4px;
-  padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.4);
+  padding: 5px 8px;
+  background: rgba(0, 0, 0, 0.5);
   border-radius: 4px;
   border-left: 2px solid var(--color-primary, #f59e0b);
 }
@@ -247,12 +343,16 @@ function locationLabel(type: string): string {
 }
 
 .detail-label {
-  color: #666;
-  width: 60px;
+  color: #555;
+  min-width: 40px;
   flex-shrink: 0;
+  font-size: 0.58rem;
+  text-transform: uppercase;
 }
 
 .detail-value {
   color: #ccc;
+  font-size: 0.6rem;
+  word-break: break-all;
 }
 </style>

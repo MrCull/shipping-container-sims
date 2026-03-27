@@ -118,6 +118,7 @@ export const TERMINAL_BOUNDS = {
 export const SOUND_MAP: Record<string, string> = {
   'container.placed': 'container-loaded-to-ship.mp3',
   'money.earned': 'money-increase-ca-ching-.mp3',
+  'vessel.arriving': 'small-ship-three-horns-in-a-row.mp3',
   'vessel.arrived': 'small-ship-three-horns-in-a-row.mp3',
   'vessel.departed': 'small-ship-three-horns-in-a-row.mp3',
   'tutorial.completed': 'group-yay-cheer.mp3',

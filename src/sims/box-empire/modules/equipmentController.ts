@@ -165,6 +165,7 @@ function tickMhc(
         }
         // Swing spreader to drop side
         eq.spreaderZ = job.dropoffLocation.type === 'vessel_slot' ? -6 : 4
+        eq.armDropStartY = eq.armTargetY   // remember current height for drop lerp
         eq.state = 'dropping'
         eq.targetPosition = { ...job.dropoffLocation.position }
         eq.stateStartTime = state.simTime
@@ -175,6 +176,7 @@ function tickMhc(
 
     case 'travel_to_drop': {
       // MHC doesn't travel; jump straight to dropping
+      eq.armDropStartY = eq.armTargetY
       eq.state = 'dropping'
       eq.stateStartTime = state.simTime
       eq.stateElapsed = 0
@@ -184,7 +186,8 @@ function tickMhc(
     case 'dropping': {
       const dropTargetY = job.dropoffLocation.position.y
       const dropProgress = Math.min(1, eq.stateElapsed / getDropDuration(eq))
-      eq.armTargetY = dropTargetY * (1 - dropProgress)  // lowers to ground
+      // Lerp from pickup height (armDropStartY) down to the drop target Y
+      eq.armTargetY = eq.armDropStartY + (dropTargetY - eq.armDropStartY) * dropProgress
 
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)
@@ -209,6 +212,7 @@ function tickMhc(
         eq.currentJobId = null
         eq.targetPosition = null
         eq.armTargetY = 0
+        eq.armDropStartY = 0
         eq.spreaderZ = 0
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0
@@ -328,6 +332,7 @@ function tickReachStacker(
         }
       }
       if (arrived) {
+        eq.armDropStartY = eq.armTargetY   // record current arm height for drop lerp
         eq.state = 'dropping'
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0
@@ -338,7 +343,8 @@ function tickReachStacker(
     case 'dropping': {
       const dropTargetY = job.dropoffLocation.position.y
       const dropProgress = Math.min(1, eq.stateElapsed / getDropDuration(eq))
-      eq.armTargetY = dropTargetY * (1 - dropProgress)  // lower to target
+      // Lerp from the height where we arrived (armDropStartY) down to target
+      eq.armTargetY = eq.armDropStartY + (dropTargetY - eq.armDropStartY) * dropProgress
 
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)
@@ -360,6 +366,7 @@ function tickReachStacker(
         eq.currentJobId = null
         eq.targetPosition = null
         eq.armTargetY = 0
+        eq.armDropStartY = 0
         eq.spreaderZ = 0
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0

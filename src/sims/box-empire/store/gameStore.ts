@@ -36,9 +36,10 @@ import {
   TUTORIAL_EXPORT_COUNT,
   TUTORIAL_IMPORT_COUNT,
 } from '../modules/config'
-import { createYardBlock, findAvailableSlot, placeContainerInSlot, removeContainerFromSlot, getSlotWorldPosition } from '../modules/yardManager'
+import { createYardBlock, findAvailableSlot, placeContainerInSlot, removeContainerFromSlot, getSlotWorldPosition, isContainerOnTop } from '../modules/yardManager'
 import { createTutorialVessel, getNextDischargeContainer, getNextLoadSlot, dischargeContainerFromVessel, loadContainerOnVessel, isVesselFullyDischarged, tickVessel, getVesselSlotPosition } from '../modules/vesselManager'
-import { createTruck, tickTruck, startTruckDeparture, resetTruckCounter } from '../modules/truckManager'
+import { createTruck, tickTruck, startTruckDeparture, startTruckReturnToGate, resetTruckCounter } from '../modules/truckManager'
+import { makeYardSlotId, makeVesselSlotId, parseYardSlotId } from '../types'
 import { tickEquipment } from '../modules/equipmentController'
 import { createJob, assignPendingJobs, completeJob, resetJobCounter, getActiveJobForContainer, cancelJob, recheckBlockedJobs } from '../modules/jobScheduler'
 import { createTransaction, resetEconomy } from '../modules/economy'
@@ -273,6 +274,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         enabled: true,
         craneMode: 'both',
         armTargetY: 0,
+        armDropStartY: 0,
         spreaderZ: 0,
       },
       {
@@ -289,6 +291,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         enabled: true,
         craneMode: 'both',
         armTargetY: 0,
+        armDropStartY: 0,
         spreaderZ: 0,
       },
     ]
@@ -417,6 +420,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
     for (const vessel of vesselVisits.value) {
       const vResult = tickVessel(vessel, state, scaledDt)
       if (vResult.stateChanged) {
+        if (vResult.newState === 'arriving') {
+          emitEvent('vessel.arriving', `${vessel.name} is approaching the berth`)
+        }
         if (vResult.newState === 'arrived') {
           emitEvent('vessel.arrived', `${vessel.name} has arrived at berth`)
           vessel.state = 'arrived'
@@ -432,10 +438,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
       if (truck.state === 'departed') continue
       const tResult = tickTruck(truck, state, scaledDt)
 
-      // Sync container position to truck during movement
-      if (truck.containerId && (truck.state === 'approaching' || truck.state === 'at_gate' || truck.state === 'driving_to_yard' || truck.state === 'departing')) {
+      // Sync container position to truck during movement (all moving states)
+      if (truck.containerId) {
         const movingContainer = containers.value.find(c => c.id === truck.containerId)
-        if (movingContainer && movingContainer.currentLocation.type === 'truck') {
+        if (movingContainer && (movingContainer.currentLocation.type === 'truck' || movingContainer.lifecycleState === 'returning_to_gate')) {
           movingContainer.currentLocation.position = { ...truck.position }
         }
       }
@@ -454,10 +460,11 @@ export const useGameStore = defineStore('box-empire-game', () => {
           const slot = findAvailableSlot(yard, getReservedYardSlotIds(), 'export', containers.value)
           if (slot && truck.containerId) {
             const dropPos = getSlotWorldPosition(yard, slot)
+            const slotId = makeYardSlotId(slot.blockId, slot.bay, slot.row, slot.tier)
             const job = createJob(
               truck.containerId,
               { type: 'truck', id: truck.id, position: { ...YARD_IO_POSITION } },
-              { type: 'yard_slot', id: `${slot.blockId}-${slot.bay}-${slot.row}-${slot.tier}`, position: dropPos },
+              { type: 'yard_slot', id: slotId, position: dropPos },
               'reach_stacker',
               10,
               simTime.value,
@@ -467,14 +474,14 @@ export const useGameStore = defineStore('box-empire-game', () => {
           }
         } else if (truck.visitType === 'import_pickup' && truck.containerId) {
           const container = containers.value.find(c => c.id === truck.containerId)
-          if (container && container.lifecycleState === 'in_yard') {
+          if (container && container.lifecycleState === 'in_yard' && container.yardSlot) {
+            const ys = container.yardSlot
+            const slotId = makeYardSlotId(ys.blockId, ys.bay, ys.row, ys.tier)
             const job = createJob(
               truck.containerId,
               {
                 type: 'yard_slot',
-                id: container.yardSlot
-                  ? `${container.yardSlot.blockId}-${container.yardSlot.bay}-${container.yardSlot.row}-${container.yardSlot.tier}`
-                  : 'yard',
+                id: slotId,
                 position: { ...container.currentLocation.position },
               },
               { type: 'truck', id: truck.id, position: { ...YARD_IO_POSITION } },
@@ -484,6 +491,26 @@ export const useGameStore = defineStore('box-empire-game', () => {
             )
             jobs.value.push(job)
             emitEvent('job.created', `Job to deliver import container to truck`)
+          }
+        }
+      }
+
+      // Import truck gate-out: earn revenue when truck clears the gate
+      if (tResult.gateOutProcessed && truck.visitType === 'import_pickup' && truck.containerId) {
+        const container = containers.value.find(c => c.id === truck.containerId)
+        if (container) {
+          const tx = createTransaction('gate_out_revenue', container.id, simTime.value)
+          transactions.value.push(tx)
+          money.value += tx.amount
+          emitEvent('money.earned', `+$${GATE_OUT_REVENUE} — import container gate-out`, {
+            amount: GATE_OUT_REVENUE,
+            position: { ...truck.position },
+          })
+          container.lifecycleState = 'departed'
+          container.currentLocation = {
+            type: 'gate_buffer',
+            id: 'gate-export',
+            position: { ...truck.position },
           }
         }
       }
@@ -527,14 +554,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
   function handleJobCompletion(job: import('../types').Job, container: Container): void {
     if (job.dropoffLocation.type === 'yard_slot') {
       const yard = yardBlocks.value[0]
-      const parts = job.dropoffLocation.id.split('-')
-      if (parts.length >= 4) {
-        const slotRef = {
-          blockId: parts[0] + '-' + parts[1],
-          bay: parseInt(parts[2]),
-          row: parseInt(parts[3]),
-          tier: parseInt(parts[4]),
-        }
+      const slotRef = parseYardSlotId(job.dropoffLocation.id)
+      if (slotRef) {
         placeContainerInSlot(yard, slotRef, container.id)
         container.yardSlot = slotRef
         container.lifecycleState = 'in_yard'
@@ -556,12 +577,6 @@ export const useGameStore = defineStore('box-empire-game', () => {
         }
       }
     } else if (job.dropoffLocation.type === 'truck') {
-      container.lifecycleState = 'at_gate'
-      container.currentLocation = {
-        type: 'truck',
-        id: job.dropoffLocation.id,
-        position: { ...job.dropoffLocation.position },
-      }
       container.yardSlot = null
 
       if (container.visitType === 'import') {
@@ -574,22 +589,25 @@ export const useGameStore = defineStore('box-empire-game', () => {
       )
       if (truck) {
         truck.containerId = container.id
-        startTruckDeparture(truck, simTime.value)
-        container.lifecycleState = 'departed'
-        container.currentLocation = {
-          type: 'gate_buffer',
-          id: 'departed',
-          position: { ...truck.position },
-        }
 
         if (container.visitType === 'import') {
-          const tx = createTransaction('gate_out_revenue', container.id, simTime.value)
-          transactions.value.push(tx)
-          money.value += tx.amount
-          emitEvent('money.earned', `+$${GATE_OUT_REVENUE} — import container gate-out`, {
-            amount: GATE_OUT_REVENUE,
+          // Import truck drives to gate-out; revenue fires when it clears the gate
+          container.lifecycleState = 'returning_to_gate'
+          container.currentLocation = {
+            type: 'truck',
+            id: truck.id,
             position: { ...truck.position },
-          })
+          }
+          startTruckReturnToGate(truck, simTime.value)
+        } else {
+          // Export pickup: depart directly
+          container.lifecycleState = 'departed'
+          container.currentLocation = {
+            type: 'gate_buffer',
+            id: 'gate-export',
+            position: { ...truck.position },
+          }
+          startTruckDeparture(truck, simTime.value)
         }
       }
     } else if (job.dropoffLocation.type === 'quay_buffer') {
@@ -613,10 +631,11 @@ export const useGameStore = defineStore('box-empire-game', () => {
         const slot = findAvailableSlot(yard, getReservedYardSlotIds(), 'import', containers.value)
         if (slot) {
           const dropPos = getSlotWorldPosition(yard, slot)
+          const slotId = makeYardSlotId(slot.blockId, slot.bay, slot.row, slot.tier)
           const moveJob = createJob(
             container.id,
-            { type: 'quay_buffer', id: 'quay-buffer-discharge', position: bufferPos },
-            { type: 'yard_slot', id: `${slot.blockId}-${slot.bay}-${slot.row}-${slot.tier}`, position: dropPos },
+            { type: 'quay_buffer', id: 'quay-discharge', position: bufferPos },
+            { type: 'yard_slot', id: slotId, position: dropPos },
             'reach_stacker',
             9,
             simTime.value,
@@ -635,10 +654,11 @@ export const useGameStore = defineStore('box-empire-game', () => {
           const loadTier = getNextLoadSlot(vessel)
           if (loadTier !== null) {
             const vesselPos = getVesselSlotPosition(vessel, loadTier)
+            const vsId = makeVesselSlotId(vessel.id, 1, 1, loadTier)
             const loadJob = createJob(
               container.id,
-              { type: 'quay_buffer', id: 'quay-buffer-load', position: bufferPos },
-              { type: 'vessel_slot', id: `vessel-slot-${loadTier}`, position: vesselPos },
+              { type: 'quay_buffer', id: 'quay-load', position: bufferPos },
+              { type: 'vessel_slot', id: vsId, position: vesselPos },
               'mobile_harbor_crane',
               10,
               simTime.value,
@@ -650,8 +670,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
     } else if (job.dropoffLocation.type === 'vessel_slot') {
       const vessel = vesselVisits.value[0]
       if (vessel) {
-        const tierMatch = job.dropoffLocation.id.match(/(\d+)$/)
-        const tier = tierMatch ? parseInt(tierMatch[1]) : 1
+        // Parse tier from canonical vessel slot ID "vessel-1-01-01-03"
+        const parsed = parseYardSlotId(job.dropoffLocation.id)
+        const tier = parsed ? parsed.tier : 1
         loadContainerOnVessel(vessel, container.id, tier)
         container.lifecycleState = 'loaded_on_vessel'
         container.vesselSlot = { vesselId: vessel.id, bay: 1, row: 1, tier }
@@ -700,21 +721,24 @@ export const useGameStore = defineStore('box-empire-game', () => {
     if (vessel && vessel.state === 'discharging') {
       const crane = equipment.value.find(e => e.id === 'mhc-1')
       if (crane && crane.state === 'idle' && !crane.currentJobId) {
-        const next = getNextDischargeContainer(vessel)
-        if (next) {
-          const vesselPos = getVesselSlotPosition(vessel, next.tier)
-          const dischargeJob = createJob(
-            next.containerId,
-            { type: 'vessel_slot', id: `vessel-slot-${next.tier}`, position: vesselPos },
-            { type: 'quay_buffer', id: 'quay-buffer-discharge', position: { ...QUAY_BUFFER_DISCHARGE_POSITION } },
-            'mobile_harbor_crane',
-            12,
-            simTime.value,
-          )
-          jobs.value.push(dischargeJob)
-        } else if (isVesselFullyDischarged(vessel)) {
+        if (isVesselFullyDischarged(vessel)) {
           vessel.state = 'loading'
           loadingStarted.value = true
+        } else {
+          const next = getNextDischargeContainer(vessel)
+          if (next && !getActiveJobForContainer(getState(), next.containerId)) {
+            const vesselPos = getVesselSlotPosition(vessel, next.tier)
+            const vsId = makeVesselSlotId(vessel.id, 1, 1, next.tier)
+            const dischargeJob = createJob(
+              next.containerId,
+              { type: 'vessel_slot', id: vsId, position: vesselPos },
+              { type: 'quay_buffer', id: 'quay-discharge', position: { ...QUAY_BUFFER_DISCHARGE_POSITION } },
+              'mobile_harbor_crane',
+              12,
+              simTime.value,
+            )
+            jobs.value.push(dischargeJob)
+          }
         }
       }
     }
@@ -755,24 +779,26 @@ export const useGameStore = defineStore('box-empire-game', () => {
       startExportStaging()
     }
 
-    // Phase: Continue staging export containers
+    // Phase: Continue staging export containers (RS picks accessible ones from yard)
     if (vessel && vessel.state === 'loading') {
+      const yard = yardBlocks.value[0]
       const rs = equipment.value.find(e => e.id === 'rs-1')
       if (rs && rs.state === 'idle' && !rs.currentJobId) {
-        const exportInYard = containers.value.find(
-          c => c.visitType === 'export' && c.lifecycleState === 'in_yard',
-        )
+        // Find first accessible export in yard with no active job
+        const exportInYard = containers.value.find(c => {
+          if (c.visitType !== 'export' || c.lifecycleState !== 'in_yard') return false
+          if (!c.yardSlot) return false
+          if (getActiveJobForContainer(getState(), c.id)) return false
+          return isContainerOnTop(yard, c.id)
+        })
         if (exportInYard && exportInYard.yardSlot) {
-          const yard = yardBlocks.value[0]
-          const slotPos = getSlotWorldPosition(yard, exportInYard.yardSlot)
+          const ys = exportInYard.yardSlot
+          const slotId = makeYardSlotId(ys.blockId, ys.bay, ys.row, ys.tier)
+          const slotPos = getSlotWorldPosition(yard, ys)
           const stageJob = createJob(
             exportInYard.id,
-            {
-              type: 'yard_slot',
-              id: `${exportInYard.yardSlot.blockId}-${exportInYard.yardSlot.bay}-${exportInYard.yardSlot.row}-${exportInYard.yardSlot.tier}`,
-              position: slotPos,
-            },
-            { type: 'quay_buffer', id: 'quay-buffer-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
+            { type: 'yard_slot', id: slotId, position: slotPos },
+            { type: 'quay_buffer', id: 'quay-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
             'reach_stacker',
             10,
             simTime.value,
@@ -784,17 +810,19 @@ export const useGameStore = defineStore('box-empire-game', () => {
       // Continue creating crane load jobs
       const crane = equipment.value.find(e => e.id === 'mhc-1')
       if (crane && crane.state === 'idle' && !crane.currentJobId) {
-        const stagedExport = containers.value.find(
-          c => c.visitType === 'export' && c.lifecycleState === 'staged_for_loading',
-        )
+        const stagedExport = containers.value.find(c => {
+          if (c.visitType !== 'export' || c.lifecycleState !== 'staged_for_loading') return false
+          return !getActiveJobForContainer(getState(), c.id)
+        })
         if (stagedExport) {
           const loadTier = getNextLoadSlot(vessel)
           if (loadTier !== null) {
             const vesselPos = getVesselSlotPosition(vessel, loadTier)
+            const vsId = makeVesselSlotId(vessel.id, 1, 1, loadTier)
             const loadJob = createJob(
               stagedExport.id,
-              { type: 'quay_buffer', id: 'quay-buffer-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
-              { type: 'vessel_slot', id: `vessel-slot-${loadTier}`, position: vesselPos },
+              { type: 'quay_buffer', id: 'quay-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
+              { type: 'vessel_slot', id: vsId, position: vesselPos },
               'mobile_harbor_crane',
               11,
               simTime.value,
@@ -836,11 +864,14 @@ export const useGameStore = defineStore('box-empire-game', () => {
     if (!vessel) return
     const next = getNextDischargeContainer(vessel)
     if (!next) return
+    // Avoid duplicate jobs
+    if (getActiveJobForContainer(getState(), next.containerId)) return
     const vesselPos = getVesselSlotPosition(vessel, next.tier)
+    const vsId = makeVesselSlotId(vessel.id, 1, 1, next.tier)
     const dischargeJob = createJob(
       next.containerId,
-      { type: 'vessel_slot', id: `vessel-slot-${next.tier}`, position: vesselPos },
-      { type: 'quay_buffer', id: 'quay-buffer-discharge', position: { ...QUAY_BUFFER_DISCHARGE_POSITION } },
+      { type: 'vessel_slot', id: vsId, position: vesselPos },
+      { type: 'quay_buffer', id: 'quay-discharge', position: { ...QUAY_BUFFER_DISCHARGE_POSITION } },
       'mobile_harbor_crane',
       12,
       simTime.value,
@@ -849,20 +880,22 @@ export const useGameStore = defineStore('box-empire-game', () => {
   }
 
   function startExportStaging(): void {
-    const exportInYard = containers.value.find(
-      c => c.visitType === 'export' && c.lifecycleState === 'in_yard',
-    )
-    if (!exportInYard || !exportInYard.yardSlot) return
     const yard = yardBlocks.value[0]
-    const slotPos = getSlotWorldPosition(yard, exportInYard.yardSlot)
+    // Find first accessible export container in yard without an active job
+    const exportInYard = containers.value.find(c => {
+      if (c.visitType !== 'export' || c.lifecycleState !== 'in_yard') return false
+      if (!c.yardSlot) return false
+      if (getActiveJobForContainer(getState(), c.id)) return false
+      return isContainerOnTop(yard, c.id)
+    })
+    if (!exportInYard || !exportInYard.yardSlot) return
+    const ys = exportInYard.yardSlot
+    const slotId = makeYardSlotId(ys.blockId, ys.bay, ys.row, ys.tier)
+    const slotPos = getSlotWorldPosition(yard, ys)
     const stageJob = createJob(
       exportInYard.id,
-      {
-        type: 'yard_slot',
-        id: `${exportInYard.yardSlot.blockId}-${exportInYard.yardSlot.bay}-${exportInYard.yardSlot.row}-${exportInYard.yardSlot.tier}`,
-        position: slotPos,
-      },
-      { type: 'quay_buffer', id: 'quay-buffer-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
+      { type: 'yard_slot', id: slotId, position: slotPos },
+      { type: 'quay_buffer', id: 'quay-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
       'reach_stacker',
       10,
       simTime.value,

@@ -149,7 +149,7 @@ export function getActiveJobForContainer(
     state.jobs.find(
       j =>
         j.containerId === containerId &&
-        (j.status === 'pending' || j.status === 'assigned' || j.status === 'in_progress'),
+        (j.status === 'pending' || j.status === 'assigned' || j.status === 'in_progress' || j.status === 'blocked'),
     ) ?? null
   )
 }

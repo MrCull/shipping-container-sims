@@ -164,8 +164,8 @@ function jobStatusColor(status: string): string {
 <style scoped>
 .equipment-info {
   position: fixed;
-  bottom: 12px;
   right: 12px;
+  top: 560px;
   width: 280px;
   background: rgba(0, 0, 0, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -303,8 +303,8 @@ function jobStatusColor(status: string): string {
 /* Equipment list panel */
 .equipment-list {
   position: fixed;
-  bottom: 12px;
-  left: 12px;
+  right: 12px;
+  top: 420px;
   width: 200px;
   background: rgba(0, 0, 0, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.15);

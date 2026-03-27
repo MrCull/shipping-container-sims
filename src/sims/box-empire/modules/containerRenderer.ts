@@ -1,5 +1,10 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Container rendering with improved geometry
+// Box Empire — Container rendering
+// ---------------------------------------------------------------------------
+// Container geometry: a solid corrugated steel ISO container.
+// The main body is a BoxGeometry. Corrugation ribs are thin flat rectangles
+// sitting ON the long side faces (not penetrating). Corner posts and end door
+// panel complete the silhouette.
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
@@ -10,139 +15,125 @@ import {
   CONTAINER_HEIGHT,
 } from './config'
 
-const MAX_INSTANCES = 32
+const MAX_INSTANCES = 64
 
-// Container geometry: corrugated body + structural frame edges
 function buildContainerGeometry(): THREE.BufferGeometry {
-  const geometries: THREE.BufferGeometry[] = []
+  const L = CONTAINER_LENGTH   // ~6.06 m
+  const W = CONTAINER_WIDTH    // ~2.44 m
+  const H = CONTAINER_HEIGHT   // ~2.59 m
 
-  const L = CONTAINER_LENGTH
-  const W = CONTAINER_WIDTH
-  const H = CONTAINER_HEIGHT
-  const half = { L: L / 2, W: W / 2, H: H / 2 }
+  // We'll build everything as separate geometries and merge manually
+  const parts: THREE.BufferGeometry[] = []
 
-  // Main body box
-  const body = new THREE.BoxGeometry(L, H, W)
-  geometries.push(body)
+  // ---- Main body ----------------------------------------------------------
+  parts.push(new THREE.BoxGeometry(L, H, W))
 
-  // Corrugation ribs on side panels (XZ face, running along Z axis, repeating)
-  const ribW = 0.06
-  const ribCount = 12
+  // ---- Corrugation ribs on both long sides (XZ plane, Z face) ------------
+  // Ribs are thin strips (depth 0.04 m) sitting flush on the +Z and -Z faces
+  const ribDepth = 0.04
+  const ribCount = 14
+  const ribW_geo = L / (ribCount + 1)
+
   for (let i = 0; i < ribCount; i++) {
-    const xPos = -half.L + (L / (ribCount + 1)) * (i + 1)
+    const cx = -L / 2 + ribW_geo * (i + 1)
     for (const side of [-1, 1]) {
-      const rib = new THREE.BoxGeometry(ribW, H * 0.95, W + 0.01)
-      const ribMat = new THREE.Matrix4()
-      ribMat.makeTranslation(xPos, 0, side * (W / 2 + ribW / 2 - 0.01))
-      rib.applyMatrix4(ribMat)
-      geometries.push(rib)
+      const ribGeo = new THREE.BoxGeometry(ribW_geo * 0.55, H * 0.97, ribDepth)
+      applyTranslation(ribGeo, cx, 0, side * (W / 2 + ribDepth / 2))
+      parts.push(ribGeo)
     }
   }
 
-  // Horizontal corner rails top/bottom
-  const cornerRailH = 0.06
-  const cornerRailW = 0.06
-
-  // Top rails along length
-  for (const wSide of [-1, 1]) {
-    const rail = new THREE.BoxGeometry(L, cornerRailH, cornerRailW)
-    const m = new THREE.Matrix4()
-    m.makeTranslation(0, half.H + cornerRailH / 2, wSide * (half.W - cornerRailW / 2))
-    rail.applyMatrix4(m)
-    geometries.push(rail)
-  }
-  // Bottom rails along length
-  for (const wSide of [-1, 1]) {
-    const rail = new THREE.BoxGeometry(L, cornerRailH, cornerRailW)
-    const m = new THREE.Matrix4()
-    m.makeTranslation(0, -(half.H + cornerRailH / 2), wSide * (half.W - cornerRailW / 2))
-    rail.applyMatrix4(m)
-    geometries.push(rail)
+  // ---- Corrugation ribs on end faces (front door end) --------------------
+  const doorRibCount = 4
+  const doorRibW = W / (doorRibCount + 1)
+  for (let i = 0; i < doorRibCount; i++) {
+    const cz = -W / 2 + doorRibW * (i + 1)
+    const ribGeo = new THREE.BoxGeometry(ribDepth, H * 0.97, doorRibW * 0.55)
+    applyTranslation(ribGeo, L / 2 + ribDepth / 2, 0, cz)
+    parts.push(ribGeo)
   }
 
-  // Vertical corner posts
-  const postW = 0.08
-  for (const xSide of [-1, 1]) {
-    for (const zSide of [-1, 1]) {
-      const post = new THREE.BoxGeometry(postW, H + 0.1, postW)
-      const m = new THREE.Matrix4()
-      m.makeTranslation(
-        xSide * (half.L - postW / 2),
-        0,
-        zSide * (half.W - postW / 2),
-      )
-      post.applyMatrix4(m)
-      geometries.push(post)
+  // ---- Corner posts (darker colour will come from a tint later, same geo) -
+  const postW = 0.12
+  const postH = H + 0.04
+  for (const xs of [-1, 1]) {
+    for (const zs of [-1, 1]) {
+      const post = new THREE.BoxGeometry(postW, postH, postW)
+      applyTranslation(post, xs * (L / 2 - postW / 2), 0, zs * (W / 2 - postW / 2))
+      parts.push(post)
     }
   }
 
-  // Door end (front face) — slightly inset panel
-  const doorW = W * 0.9
-  const doorH = H * 0.92
-  const doorPanel = new THREE.BoxGeometry(0.04, doorH, doorW)
-  const doorM = new THREE.Matrix4()
-  doorM.makeTranslation(half.L + 0.02, 0, 0)
-  doorPanel.applyMatrix4(doorM)
-  geometries.push(doorPanel)
+  // ---- Top and bottom rails along length ----------------------------------
+  const railH = 0.07
+  const railW = 0.07
+  for (const ys of [-1, 1]) {
+    for (const zs of [-1, 1]) {
+      const rail = new THREE.BoxGeometry(L, railH, railW)
+      applyTranslation(rail, 0, ys * (H / 2 + railH / 2), zs * (W / 2 - railW / 2))
+      parts.push(rail)
+    }
+  }
 
-  const merged = mergeGeometries(geometries)
-  for (const g of geometries) g.dispose()
+  const merged = mergeBufferGeometries(parts)
+  for (const g of parts) g.dispose()
   return merged
 }
 
-function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  // Simple manual merge of positions/normals/uvs
+function applyTranslation(geo: THREE.BufferGeometry, x: number, y: number, z: number): void {
+  geo.translate(x, y, z)
+}
+
+function mergeBufferGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {
   let totalVerts = 0
-  for (const g of geos) totalVerts += g.attributes.position.count
+  let totalIdx = 0
+  for (const g of geos) {
+    totalVerts += g.attributes.position.count
+    totalIdx += g.index ? g.index.count : g.attributes.position.count
+  }
 
   const positions = new Float32Array(totalVerts * 3)
   const normals = new Float32Array(totalVerts * 3)
+  const indices = new Uint32Array(totalIdx)
 
-  // Collect indices
-  const indexArrays: number[][] = []
-  let vertOffset = 0
+  let vOffset = 0
+  let iOffset = 0
+
   for (const g of geos) {
     const pos = g.attributes.position as THREE.BufferAttribute
     const nor = g.attributes.normal as THREE.BufferAttribute
+
     for (let i = 0; i < pos.count; i++) {
-      positions[(vertOffset + i) * 3] = pos.getX(i)
-      positions[(vertOffset + i) * 3 + 1] = pos.getY(i)
-      positions[(vertOffset + i) * 3 + 2] = pos.getZ(i)
+      positions[(vOffset + i) * 3 + 0] = pos.getX(i)
+      positions[(vOffset + i) * 3 + 1] = pos.getY(i)
+      positions[(vOffset + i) * 3 + 2] = pos.getZ(i)
       if (nor) {
-        normals[(vertOffset + i) * 3] = nor.getX(i)
-        normals[(vertOffset + i) * 3 + 1] = nor.getY(i)
-        normals[(vertOffset + i) * 3 + 2] = nor.getZ(i)
+        normals[(vOffset + i) * 3 + 0] = nor.getX(i)
+        normals[(vOffset + i) * 3 + 1] = nor.getY(i)
+        normals[(vOffset + i) * 3 + 2] = nor.getZ(i)
       }
     }
 
     if (g.index) {
-      const idx = g.index.array
-      const localIdx: number[] = []
-      for (let i = 0; i < idx.length; i++) {
-        localIdx.push(idx[i] + vertOffset)
+      const src = g.index.array
+      for (let i = 0; i < src.length; i++) {
+        indices[iOffset++] = src[i] + vOffset
       }
-      indexArrays.push(localIdx)
     } else {
-      const localIdx: number[] = []
-      for (let i = 0; i < pos.count; i++) localIdx.push(vertOffset + i)
-      indexArrays.push(localIdx)
+      for (let i = 0; i < pos.count; i++) {
+        indices[iOffset++] = vOffset + i
+      }
     }
-    vertOffset += pos.count
+
+    vOffset += pos.count
   }
 
-  const totalIndices = indexArrays.reduce((acc, arr) => acc + arr.length, 0)
-  const indices = new Uint32Array(totalIndices)
-  let idxOffset = 0
-  for (const arr of indexArrays) {
-    for (const v of arr) indices[idxOffset++] = v
-  }
-
-  const merged = new THREE.BufferGeometry()
-  merged.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  merged.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
-  merged.setIndex(new THREE.BufferAttribute(indices, 1))
-  merged.computeVertexNormals()
-  return merged
+  const out = new THREE.BufferGeometry()
+  out.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  out.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+  out.setIndex(new THREE.BufferAttribute(indices, 1))
+  out.computeVertexNormals()
+  return out
 }
 
 export class ContainerRenderer {
@@ -153,13 +144,13 @@ export class ContainerRenderer {
 
   constructor(scene: THREE.Scene) {
     const geo = buildContainerGeometry()
-    // vertexColors must be false here — per-instance color comes from instanceColor
-    // attribute set below. With vertexColors:true the material reads per-vertex data
-    // which doesn't exist in our merged geometry, giving black output.
+
+    // White base — instanceColor provides per-container shipping-line colour.
+    // vertexColors: false is critical (merged geometry has no vertex colour data).
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.55,
-      metalness: 0.2,
+      roughness: 0.6,
+      metalness: 0.15,
       vertexColors: false,
     })
 
@@ -193,6 +184,8 @@ export class ContainerRenderer {
         c.currentLocation.position.y,
         c.currentLocation.position.z,
       )
+      this.dummy.rotation.set(0, 0, 0)
+      this.dummy.scale.set(1, 1, 1)
       this.dummy.updateMatrix()
       this.mesh.setMatrixAt(i, this.dummy.matrix)
 

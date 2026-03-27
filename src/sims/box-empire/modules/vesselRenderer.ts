@@ -110,6 +110,8 @@ export class VesselRenderer {
       group.add(rail)
     }
 
+    // Rotate 180° so bow (+X wedge) faces -X — the direction of travel when arriving
+    group.rotation.y = Math.PI
     return group
   }
 

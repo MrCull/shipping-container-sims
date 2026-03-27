@@ -52,6 +52,7 @@ export function createTutorialVessel(
     // Spawn off to the +X side; vessel sails in from the right along the quay
     position: { x: BERTH_POSITION.x + 120, y: BERTH_POSITION.y, z: BERTH_POSITION.z },
     arrivalTime,
+    hornPlayed: false,
   }
 }
 
@@ -126,6 +127,7 @@ export function tickVessel(
         vessel.state = 'arriving'
         result.stateChanged = true
         result.newState = 'arriving'
+        vessel.hornPlayed = false
       }
       break
     }
