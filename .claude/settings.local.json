@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(wc -l /c/Users/culll/source/repos/shipping-container-sims/src/sims/box-empire/*)"
+      "Bash(wc -l /c/Users/culll/source/repos/shipping-container-sims/src/sims/box-empire/*)",
+      "Bash(npm run:*)"
     ]
   }
 }
