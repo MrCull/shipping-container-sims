@@ -74,15 +74,15 @@ export function createDock(scene: THREE.Scene): THREE.Group {
   const dockGroup = new THREE.Group()
   dockGroup.name = 'dock'
 
-  // Main quay platform — wider and longer
-  const platformGeo = new THREE.BoxGeometry(80, 1.2, 22)
+  // Main quay platform — wider and longer, starts close to ship edge
+  const platformGeo = new THREE.BoxGeometry(80, 1.2, 34)
   const platformMat = new THREE.MeshPhongMaterial({
     color: 0x7a7a72,
     specular: 0x222222,
     shininess: 12,
   })
   const platform = new THREE.Mesh(platformGeo, platformMat)
-  platform.position.set(0, 0, -20)
+  platform.position.set(0, 0, -22)
   platform.receiveShadow = true
   platform.castShadow = true
   dockGroup.add(platform)

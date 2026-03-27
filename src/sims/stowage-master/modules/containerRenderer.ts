@@ -6,14 +6,21 @@ import { CONTAINER } from './config'
 // VISUAL_Z is the visual length — slot offsets use CONTAINER.size.z from config
 const VISUAL_Z = 5.9  // visual length (like a real 20ft container)
 
-// Container colors for realistic shipping lines
-const SHIPPING_LINE_COLORS: Record<string, number> = {
-  // Override port colors with more realistic container liveries
-  Rotterdam: 0x2255aa,  // Maersk-ish blue
-  Singapore: 0x228833,  // Evergreen-ish green
-  Shanghai:  0xdd2222,  // China Shipping red
-  Hamburg:   0xff8800,  // Hapag-Lloyd orange
-  Busan:     0x6633aa,  // purple/indigo
+interface ShippingLine {
+  bodyColor: number
+  accentColor: number
+  stripeColor: number
+  name: string
+  code: string
+}
+
+// Realistic shipping line liveries per port
+const SHIPPING_LINES: Record<string, ShippingLine> = {
+  Rotterdam: { bodyColor: 0x1a4a8a, accentColor: 0xffffff, stripeColor: 0x2266cc, name: 'MAERSK', code: 'MAEU' },
+  Singapore: { bodyColor: 0x1a7a35, accentColor: 0xffffff, stripeColor: 0x3aaa55, name: 'EVERGREEN', code: 'EGLV' },
+  Shanghai:  { bodyColor: 0xcc1a1a, accentColor: 0xffffff, stripeColor: 0xff3333, name: 'COSCO', code: 'COSU' },
+  Hamburg:   { bodyColor: 0xdd7700, accentColor: 0x002266, stripeColor: 0xff9900, name: 'HAPAG', code: 'HLCU' },
+  Busan:     { bodyColor: 0x4422aa, accentColor: 0xffffff, stripeColor: 0x6644cc, name: 'HMM', code: 'HDMU' },
 }
 
 export function createContainerMesh(container: Container): THREE.Group {
@@ -25,9 +32,9 @@ export function createContainerMesh(container: Container): THREE.Group {
   const group = new THREE.Group()
   group.name = `container-${container.id}`
 
-  const baseColor = SHIPPING_LINE_COLORS[container.port] ?? container.portColor
+  const line = SHIPPING_LINES[container.port]
+  const bodyColor = line ? line.bodyColor : container.portColor
 
-  const bodyColor = baseColor
   const bodyMat = new THREE.MeshPhongMaterial({
     color: bodyColor,
     specular: 0x334455,
@@ -62,13 +69,18 @@ export function createContainerMesh(container: Container): THREE.Group {
   // Door end detail (one end)
   addDoorEnd(group, x, y, z, bodyColor)
 
+  // Shipping line livery — accent stripe + logo panels
+  if (line) {
+    addShippingLineLivery(group, x, y, z, line)
+  }
+
   // Hazmat markings
   if (container.isHazmat) {
     addHazmatMarkings(group, x, y, z)
   }
 
-  // Container ID label (emissive white text-like rectangle)
-  addContainerLabel(group, x, y, z)
+  // Container ID label
+  addContainerLabel(group, x, y, z, container.id, line)
 
   group.userData['container'] = container
   group.userData['isContainer'] = true
@@ -150,6 +162,59 @@ function addDoorEnd(group: THREE.Group, x: number, y: number, z: number, baseCol
   }
 }
 
+function addShippingLineLivery(
+  group: THREE.Group,
+  x: number,
+  y: number,
+  z: number,
+  line: ShippingLine
+): void {
+  const accentMat = new THREE.MeshPhongMaterial({
+    color: line.accentColor,
+    shininess: 40,
+  })
+  const stripeMat = new THREE.MeshPhongMaterial({
+    color: line.stripeColor,
+    emissive: line.stripeColor,
+    emissiveIntensity: 0.08,
+    shininess: 30,
+  })
+
+  // Horizontal accent stripe near the top of both long sides
+  for (const sign of [-1, 1]) {
+    const stripeGeo = new THREE.BoxGeometry(x * 0.7, y * 0.10, 0.06)
+    const stripe = new THREE.Mesh(stripeGeo, accentMat)
+    stripe.position.set(x * 0.04, y * 0.28, sign * (z / 2 + 0.04))
+    group.add(stripe)
+  }
+
+  // Bold logo-like rectangle panel on both long sides
+  for (const sign of [-1, 1]) {
+    const panelGeo = new THREE.BoxGeometry(x * 0.32, y * 0.38, 0.05)
+    const panel = new THREE.Mesh(panelGeo, stripeMat)
+    panel.position.set(-x * 0.12, -y * 0.05, sign * (z / 2 + 0.03))
+    group.add(panel)
+
+    // Company code block (bright rectangle to simulate text)
+    const codeGeo = new THREE.BoxGeometry(x * 0.24, y * 0.12, 0.06)
+    const codeMat = new THREE.MeshPhongMaterial({
+      color: line.accentColor,
+      emissive: line.accentColor,
+      emissiveIntensity: 0.25,
+      shininess: 60,
+    })
+    const code = new THREE.Mesh(codeGeo, codeMat)
+    code.position.set(-x * 0.12, -y * 0.05, sign * (z / 2 + 0.04))
+    group.add(code)
+  }
+
+  // End-face accent band (short end)
+  const endBandGeo = new THREE.BoxGeometry(0.06, y * 0.10, z * 0.7)
+  const endBand = new THREE.Mesh(endBandGeo, accentMat)
+  endBand.position.set(x / 2 + 0.04, y * 0.28, 0)
+  group.add(endBand)
+}
+
 function addHazmatMarkings(group: THREE.Group, x: number, y: number, z: number): void {
   // Orange stripe
   const hazStripeMat = new THREE.MeshPhongMaterial({
@@ -192,17 +257,48 @@ function addHazmatDiamond(group: THREE.Group, x: number, y: number, z: number): 
   }
 }
 
-function addContainerLabel(group: THREE.Group, x: number, y: number, z: number): void {
-  const labelGeo = new THREE.BoxGeometry(x * 0.38, y * 0.15, 0.04)
-  const labelMat = new THREE.MeshPhongMaterial({
-    color: 0xffffff,
+function addContainerLabel(
+  group: THREE.Group,
+  x: number,
+  y: number,
+  z: number,
+  _containerId: string,
+  line: ShippingLine | undefined
+): void {
+  // Main ID plate — white background panel
+  const plateMat = new THREE.MeshPhongMaterial({
+    color: 0xf0f0f0,
     emissive: 0xffffff,
-    emissiveIntensity: 0.12,
-    shininess: 20,
+    emissiveIntensity: 0.18,
+    shininess: 40,
   })
-  const label = new THREE.Mesh(labelGeo, labelMat)
-  label.position.set(0, y * 0.28, z / 2 + 0.03)
-  group.add(label)
+  const plateGeo = new THREE.BoxGeometry(x * 0.40, y * 0.16, 0.05)
+  const plate = new THREE.Mesh(plateGeo, plateMat)
+  plate.position.set(x * 0.15, y * 0.30, z / 2 + 0.03)
+  group.add(plate)
+
+  // Dark text-like bars inside the plate (simulates printed text)
+  const textMat = new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 10 })
+  for (let i = 0; i < 3; i++) {
+    const lineGeo = new THREE.BoxGeometry(x * 0.30, y * 0.025, 0.06)
+    const textLine = new THREE.Mesh(lineGeo, textMat)
+    textLine.position.set(x * 0.15, y * 0.32 - i * y * 0.045, z / 2 + 0.04)
+    group.add(textLine)
+  }
+
+  // Line code block (e.g. "MAEU" / "EGLV") — accent-colored bar on door end
+  if (line) {
+    const codeBgMat = new THREE.MeshPhongMaterial({
+      color: line.bodyColor,
+      emissive: line.accentColor,
+      emissiveIntensity: 0.15,
+      shininess: 30,
+    })
+    const codePlateGeo = new THREE.BoxGeometry(0.06, y * 0.28, z * 0.52)
+    const codePlate = new THREE.Mesh(codePlateGeo, codeBgMat)
+    codePlate.position.set(-x / 2 + 0.04, y * 0.05, 0)
+    group.add(codePlate)
+  }
 }
 
 // Glowing slot indicators — wireframe outline instead of solid boxes

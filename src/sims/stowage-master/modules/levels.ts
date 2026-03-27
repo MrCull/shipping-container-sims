@@ -9,6 +9,7 @@ export const LEVELS: LevelConfig[] = [
     preset: SHIP_PRESETS.small,
     hazmatRate: CONTAINER.hazmatRate,
     containerCount: 20,
+    timerSeconds: 300,  // 5 min — generous for tutorial
   },
   {
     id: 1,
@@ -16,6 +17,7 @@ export const LEVELS: LevelConfig[] = [
     description: 'A medium-sized regional carrier. More slots, more challenge.',
     preset: SHIP_PRESETS.medium,
     hazmatRate: CONTAINER.hazmatRate * 1.2,
+    timerSeconds: 240,  // 4 min
   },
   {
     id: 2,
@@ -23,6 +25,7 @@ export const LEVELS: LevelConfig[] = [
     description: 'A massive container ship. Master the art of loading.',
     preset: SHIP_PRESETS.large,
     hazmatRate: CONTAINER.hazmatRate * 1.5,
+    timerSeconds: 180,  // 3 min
   },
 ]
 
