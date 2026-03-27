@@ -154,6 +154,10 @@ export class ContainerRenderer {
       vertexColors: false,
     })
 
+    // Ensure geometry has bounding volumes (required for raycasting)
+    geo.computeBoundingBox()
+    geo.computeBoundingSphere()
+
     this.mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES)
     this.mesh.castShadow = true
     this.mesh.receiveShadow = true
