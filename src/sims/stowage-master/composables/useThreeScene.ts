@@ -28,24 +28,27 @@ export function useGameThreeScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     renderer = new THREE.WebGLRenderer({
       canvas: canvasRef.value,
       antialias: true,
+      logarithmicDepthBuffer: true,
     })
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.0
+    renderer.toneMappingExposure = 1.15
+    renderer.outputColorSpace = THREE.SRGBColorSpace
 
-    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500)
+    camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.5, 1000)
     camera.position.set(30, 25, 30)
     camera.lookAt(0, 0, 0)
 
     controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
-    controls.dampingFactor = 0.05
-    controls.minDistance = 10
-    controls.maxDistance = 120
-    controls.maxPolarAngle = Math.PI / 2.1
+    controls.dampingFactor = 0.06
+    controls.minDistance = 12
+    controls.maxDistance = 150
+    controls.maxPolarAngle = Math.PI / 2.05
+    controls.screenSpacePanning = false
 
     window.addEventListener('resize', onResize)
     isReady.value = true
@@ -66,10 +69,15 @@ export function useGameThreeScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
 
   function setCameraForShip(shipConfig: ShipPreset): void {
     if (!camera) return
-    const dist = Math.max(shipConfig.length, shipConfig.width) * 1.2
-    camera.position.set(dist * 0.7, dist * 0.5, dist * 0.7)
-    camera.lookAt(0, 0, 0)
-    if (controls) controls.target.set(0, 2, 0)
+    const dist = Math.max(shipConfig.length, shipConfig.width) * 1.35
+    // Position camera at a nice elevated diagonal angle
+    camera.position.set(dist * 0.65, dist * 0.45, dist * 0.75)
+    const target = new THREE.Vector3(0, shipConfig.height * 0.5, 0)
+    camera.lookAt(target)
+    if (controls) {
+      controls.target.copy(target)
+      controls.update()
+    }
   }
 
   function dispose(): void {
