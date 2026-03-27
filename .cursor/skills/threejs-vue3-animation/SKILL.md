@@ -9,22 +9,57 @@ description: >-
 
 # Three.js + Vue 3 Animation for Container Terminal Sims
 
+## 0. Sim-Scoped Folder Layout
+
+This project hosts many independent sims under `src/sims/`. **All** Three.js code, scene composables, renderers, builders, and 3D assets for a sim live inside its own sub-folder — nothing goes into the top-level `src/` directories unless it is genuinely shared by multiple sims.
+
+Recommended layout inside a sim that uses Three.js:
+
+```
+src/sims/<sim-id>/
+├── <SimName>.vue                # Root component (mounts the canvas)
+├── components/
+│   └── GameCanvas.vue           # Canvas wrapper + HUD overlays
+├── composables/
+│   ├── useThreeScene.ts         # Sim's own scene setup, render loop, disposal
+│   ├── useGameLoop.ts           # Sim tick / game clock
+│   └── useAudio.ts              # Sound effects
+├── modules/
+│   ├── sceneBuilder.ts          # Assemble the Three.js scene graph
+│   ├── shipRenderer.ts          # Vessel mesh building / updates
+│   ├── containerRenderer.ts     # InstancedMesh for containers
+│   ├── craneSystem.ts           # Crane animation state machine
+│   ├── physics.ts               # Simplified physics / collision
+│   └── config.ts                # Constants, dimensions, speed tables
+├── store/
+│   └── gameStore.ts             # Pinia store (domain + app state)
+├── types/
+│   └── index.ts                 # Sim-specific interfaces
+└── assets/                      # Sim-specific 3D models, textures, sounds
+    ├── models/                  #   (copy from available-media/ as needed)
+    └── sounds/
+```
+
+The top-level `src/composables/useThreeScene.ts` provides a shared baseline, but sims are free to create their own scene composable if they need different camera setups, post-processing, or render loop logic (e.g. `stowage-master` has its own `composables/useThreeScene.ts`).
+
+---
+
 ## 1. Architecture: Four-Layer Mental Model
 
 ### Layer 1: Domain Model (pure TypeScript, no Three.js)
 
-Container states, vessel schedules, equipment positions, event queues. Driven by simulation tick. No rendering concerns here.
+Container states, vessel schedules, equipment positions, event queues. Driven by simulation tick. Lives in `modules/` and `types/` inside the sim folder.
 
 ### Layer 2: Application State (Pinia / reactive refs)
 
-Bridge between domain and rendering. Holds current positions, animation targets, camera mode. Vue reactivity drives scene updates.
+Bridge between domain and rendering. Holds current positions, animation targets, camera mode. Vue reactivity drives scene updates. Lives in `store/` inside the sim folder.
 
 ### Layer 3: Scene Adapter (composables)
 
-Translates app state into Three.js objects. Uses watchers/computed to sync. The `useTerminalScene` composable pattern:
+Translates app state into Three.js objects. Uses watchers/computed to sync. Lives in `composables/` inside the sim folder. The `useThreeScene` composable pattern:
 
 ```ts
-function useTerminalScene(
+function useThreeScene(
   canvas: Ref<HTMLCanvasElement | null>,
   onTick: (ctx: { scene: Scene; camera: Camera }, delta: number) => void
 ) {
@@ -306,4 +341,4 @@ watch(
 - `lil-gui` — runtime parameter tweaking
 - Wireframe mode — collision debugging
 
-All code in this skill assumes Vue 3 Composition API with `<script setup lang="ts">`.
+All code in this skill assumes Vue 3 Composition API with `<script setup lang="ts">`. File paths in examples are relative to the sim's own folder (`src/sims/<sim-id>/`) unless explicitly prefixed with `@/` or `src/`.

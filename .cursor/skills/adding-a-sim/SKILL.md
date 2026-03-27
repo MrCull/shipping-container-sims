@@ -16,14 +16,48 @@ description: >-
 
 ### 1. Create the sim folder
 
+Each sim is a self-contained sub-folder. **All** sim-specific code, components, composables, stores, types, and media stay inside this folder — nothing leaks into the top-level `src/` directories.
+
 ```
 src/sims/<sim-id>/
-├── definition.ts       # Required — metadata & lazy component import
-├── <SimName>.vue        # Required — root component for the game
-└── ...                  # Optional — composables, sub-components, assets, etc.
+├── definition.ts            # Required — metadata & lazy component import
+├── <SimName>.vue            # Required — root component for the game
+├── components/              # Sim-specific Vue components
+│   ├── ui/                  #   UI widgets (meters, popups, overlays)
+│   └── modals/              #   Modal dialogs (start screen, level complete)
+├── composables/             # Sim-specific composables (scene, audio, game loop)
+├── modules/                 # Pure-TS logic (scoring, physics, levels, renderers)
+├── store/                   # Pinia store(s) for this sim's state
+├── types/                   # Sim-specific TypeScript interfaces
+└── assets/                  # Sim-specific media (3D models, sounds, textures)
 ```
 
 `<sim-id>` must be lowercase kebab-case (e.g. `cargo-rush`).
+
+**Example** — the existing `stowage-master` sim uses this layout:
+
+```
+src/sims/stowage-master/
+├── definition.ts
+├── StowageMaster.vue
+├── components/
+│   ├── GameCanvas.vue
+│   ├── TopBar.vue, LoadList.vue, ContainerInfo.vue, ...
+│   ├── ui/StarRating.vue, ui/MeterBar.vue
+│   └── modals/StartScreen.vue, modals/LevelComplete.vue, ...
+├── composables/
+│   ├── useThreeScene.ts     # sim's own Three.js scene setup
+│   ├── useGameLoop.ts
+│   ├── useAudio.ts
+│   └── useSlotPicking.ts
+├── modules/
+│   ├── config.ts, levels.ts, scoring.ts, physics.ts
+│   ├── shipGrid.ts, shipRenderer.ts, containerFactory.ts, containerRenderer.ts
+│   ├── craneSystem.ts, sceneBuilder.ts, disasters.ts
+│   └── audio.ts
+├── store/gameStore.ts
+└── types/index.ts
+```
 
 ### 2. Write `definition.ts`
 
@@ -113,9 +147,13 @@ The landing page will automatically move the card from "Coming Soon" to "Ready t
 
 ## Conventions
 
-- Keep all code for a sim inside its own `src/sims/<sim-id>/` folder.
-- Shared logic across sims belongs in `src/composables/`.
-- Shared UI components belong in `src/components/`.
-- Sim-specific composables, helpers, or sub-components stay inside the sim folder.
+- **Sim isolation is the #1 rule.** All code, components, composables, stores, types, and media for a sim live inside its own `src/sims/<sim-id>/` folder. This keeps sims independently deletable and avoids cross-sim coupling.
+- Sim-specific Vue components go in `<sim-id>/components/` (with `ui/` and `modals/` sub-folders as needed).
+- Sim-specific composables go in `<sim-id>/composables/`.
+- Pure-TS logic (scoring, physics, level data, renderers) goes in `<sim-id>/modules/`.
+- Sim-specific Pinia stores go in `<sim-id>/store/`.
+- Sim-specific TypeScript interfaces go in `<sim-id>/types/`.
+- Sim-specific media (3D models, sounds, textures) go in `<sim-id>/assets/`. Copy from `available-media/` as needed.
+- Only logic that is genuinely reused by **multiple** sims belongs in the top-level `src/composables/` or `src/components/`.
 - Use Vue 3 Composition API with `<script setup lang="ts">` and TypeScript strict mode.
 - Use Pinia for any state that needs to persist across components within a sim.

@@ -100,54 +100,58 @@ That composable should:
 
 ## Suggested folder structure
 
+This project hosts **many independent sims** under `src/sims/`. Each sim is fully self-contained — all code, components, composables, stores, types, and media live inside its own sub-folder. Nothing sim-specific goes into the top-level `src/` directories.
+
+### Per-sim layout (everything lives under `src/sims/<sim-id>/`)
+
+```text
+src/sims/<sim-id>/
+  definition.ts                 # sim metadata (auto-discovered)
+  <SimName>.vue                 # root component (mounts canvas)
+  components/
+    GameCanvas.vue              # canvas wrapper + HUD overlays
+    ui/                         # UI widgets (meters, popups)
+    modals/                     # modal dialogs (start screen, level complete)
+  composables/
+    useThreeScene.ts            # sim's own scene setup, render loop, disposal
+    useGameLoop.ts              # sim tick / game clock
+    useAudio.ts                 # sound effects
+    useRaycastSelection.ts      # picking
+  modules/
+    config.ts                   # constants, dimensions, speed tables
+    sceneBuilder.ts             # assemble the Three.js scene graph
+    containerRenderer.ts        # InstancedMesh for containers
+    shipRenderer.ts             # vessel mesh building / updates
+    craneSystem.ts              # crane animation state machine
+    truckMovementSystem.ts      # truck / AGV path following
+    weatherSystem.ts            # wind, rain, lighting changes
+    physics.ts                  # simplified physics / collision
+    scoring.ts                  # game scoring logic
+    levels.ts                   # level definitions
+  store/
+    gameStore.ts                # Pinia store (domain + app state)
+  types/
+    index.ts                    # sim-specific interfaces
+  assets/
+    models/                     # 3D models (copy from available-media/ as needed)
+    sounds/                     # sound effects
+    textures/                   # textures, skyboxes
+```
+
+### Shared top-level code (only for logic reused by multiple sims)
+
 ```text
 src/
-  domain/
-    container.ts
-    vessel.ts
-    yard.ts
-    equipment.ts
-    events.ts
-    kinematics.ts
-  stores/
-    sim.ts
-    ui.ts
   composables/
-    useTerminalScene.ts
-    useAnimationClock.ts
-    useRaycastSelection.ts
-  three/
-    scene/
-      createRenderer.ts
-      createLighting.ts
-      createCameras.ts
-      createPostFx.ts
-    assets/
-      loadGltf.ts
-      materialFactory.ts
-      texturePipeline.ts
-    builders/
-      buildYard.ts
-      buildQuay.ts
-      buildVessel.ts
-      buildContainers.ts
-      buildRoadNetwork.ts
-    systems/
-      containerInstanceSystem.ts
-      craneAnimationSystem.ts
-      truckMovementSystem.ts
-      weatherSystem.ts
-      lodSystem.ts
-      labelSystem.ts
-      pickingSystem.ts
-      cleanup.ts
-    shaders/
-  components/
-    TerminalViewport.vue
-    HudPanel.vue
-    TimelinePanel.vue
-    InspectorPanel.vue
+    useThreeScene.ts            # shared baseline Three.js setup
+    useSimRegistry.ts           # auto-discovers sims
+    useMenuMusic.ts             # main-menu music
+  components/                   # shared UI components (SimCard, etc.)
+  stores/                       # shared Pinia stores
+  types/                        # shared interfaces (SimDefinition, etc.)
 ```
+
+Sims can use the shared `src/composables/useThreeScene.ts` or create their own in `composables/useThreeScene.ts` if they need a custom camera, post-processing, or render loop.
 
 ## Scene conventions
 
@@ -798,9 +802,10 @@ Before coding:
 - decide whether vessel and cranes are procedural, model-based, or hybrid
 
 When building:
-- create one clean viewport component
-- create one scene composable
-- build scene from descriptors
+- scaffold the sim folder (`src/sims/<sim-id>/`) with components/, composables/, modules/, store/, types/, assets/ sub-dirs
+- create one clean viewport component inside `components/`
+- create one scene composable inside `composables/`
+- build scene from descriptors in `modules/`
 - keep selection and focus flows simple
 - measure draw calls and frame time early
 - get one crane cycle working before adding everything else
