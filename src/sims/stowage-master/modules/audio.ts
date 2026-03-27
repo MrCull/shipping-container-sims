@@ -1,9 +1,13 @@
+function assetUrl(filename: string): string {
+  return new URL(`../assets/audio/${filename}`, import.meta.url).href
+}
+
 export const SOUNDS: Record<string, string> = {
-  explosion: '/audio/explosion-fx.mp3',
-  scream: '/audio/man-screaming.mp3',
-  shipSink: '/audio/ship-sink-splash.mp3',
-  underwater: '/audio/underwater-explosion.mp3',
-  splash: '/audio/water-splash.mp3',
+  explosion: assetUrl('explosion-fx.mp3'),
+  scream: assetUrl('man-screaming.mp3'),
+  shipSink: assetUrl('ship-sink-splash.mp3'),
+  underwater: assetUrl('underwater-explosion.mp3'),
+  splash: assetUrl('water-splash.mp3'),
 }
 
 export interface SoundCue {
