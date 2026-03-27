@@ -6,10 +6,19 @@ import { useGameThreeScene } from '../composables/useThreeScene'
 import { useGameLoop } from '../composables/useGameLoop'
 import { useSlotPicking } from '../composables/useSlotPicking'
 import { useAudio } from '../composables/useAudio'
-import { createOcean, animateOcean, createDock, createLighting, createSkybox } from '../modules/sceneBuilder'
+import {
+  createOcean, animateOcean,
+  createDock, createLighting, createSkybox, createSkyDome,
+  createFoamParticles, animateFoam,
+} from '../modules/sceneBuilder'
 import { createShip, updateShipTilt } from '../modules/shipRenderer'
-import { createContainerMesh, createSlotIndicators, removeSlotIndicators } from '../modules/containerRenderer'
-import { createCrane, getDockPosition, createPlacementAnimation } from '../modules/craneSystem'
+import {
+  createContainerMesh,
+  createSlotIndicators, removeSlotIndicators, animateSlotIndicators,
+} from '../modules/containerRenderer'
+import {
+  createCrane, getDockPosition, createPlacementAnimation, animateCraneWarningLight,
+} from '../modules/craneSystem'
 import { createDisasterAnimation } from '../modules/disasters'
 import { CONTAINER } from '../modules/config'
 import type { Container, CraneObject, DisasterAnimation } from '../types'
@@ -25,13 +34,26 @@ const audio = useAudio()
 let shipGroup: THREE.Group | null = null
 let craneObj: CraneObject | null = null
 let ocean: THREE.Mesh | null = null
+let foam: THREE.Points | null = null
 let hoistMesh: THREE.Group | null = null
 let queueMeshes: THREE.Group[] = []
 let currentAnimation: ((dt: number) => boolean) | null = null
 let disasterAnimation: DisasterAnimation | null = null
 
+// Ambient truck engine loop handle
+let truckEngineNode: AudioBufferSourceNode | null = null
+
 const { start: startLoop } = useGameLoop((deltaTime, time) => {
   animateOcean(ocean, time)
+  animateFoam(foam, time)
+
+  if (shipGroup) {
+    animateSlotIndicators(shipGroup, time)
+  }
+
+  if (craneObj) {
+    animateCraneWarningLight(craneObj, time)
+  }
 
   if (currentAnimation) {
     const done = currentAnimation(deltaTime)
@@ -83,14 +105,35 @@ watch(() => store.disasterType, (type) => {
   disasterAnimation = createDisasterAnimation(type, shipGroup, scene, () => { /* noop */ })
 })
 
+watch(() => store.phase, (phase) => {
+  if (phase === 'complete') {
+    audio.playSound('cheer', 0.8)
+    setTimeout(() => audio.playSound('levelUp', 0.75), 800)
+  }
+  if (phase === 'failed') {
+    audio.playSound('negative', 0.7)
+  }
+})
+
+watch(() => store.lastPlacement, (placement) => {
+  if (!placement) return
+  if (placement.score >= 80) {
+    audio.playSound('correctDing', 0.6)
+  } else if (placement.score < 30) {
+    audio.playSound('negative', 0.45)
+  }
+})
+
 function buildScene(): void {
   const scene = getScene()
   if (!scene || !store.shipConfig) return
   clearScene()
 
   createSkybox(scene)
+  createSkyDome(scene)
   createLighting(scene)
   ocean = createOcean(scene)
+  foam = createFoamParticles(scene)
   createDock(scene)
 
   shipGroup = createShip(scene, store.shipConfig)
@@ -102,6 +145,9 @@ function buildScene(): void {
 
   updateHoistMesh(store.currentContainer)
   updateQueueMeshes(store.nextThreeContainers)
+
+  // Play ship horn when game starts
+  audio.playSound('shipHornSmall', 0.55)
 
   attachPicking()
   startLoop()
@@ -134,13 +180,17 @@ function handleClick(event: MouseEvent): void {
   shipGroup!.localToWorld(targetPos)
   removeSlotIndicators(shipGroup!)
 
+  // Play crane pickup sound
+  audio.playSound('containerLoad', 0.7)
+
   currentAnimation = createPlacementAnimation(
     craneObj!,
     containerMesh,
     targetPos,
     shipGroup!,
     () => {
-      audio.playPlacementSound()
+      // Container set-down sound
+      audio.playSound('containerSet', 0.75)
       store.finalizePlacement(slotId)
     }
   )
@@ -195,9 +245,9 @@ function updateQueueMeshes(containers: Container[]): void {
   const dockPos = getDockPosition(craneObj)
   containers.forEach((container, i) => {
     const mesh = createContainerMesh(container)
-    mesh.scale.setScalar(0.9)
+    mesh.scale.setScalar(0.88)
     mesh.position.set(
-      dockPos.x - 4 - i * 3,
+      dockPos.x - 8 - i * 8,
       0.8 + CONTAINER.size.y / 2,
       dockPos.z
     )
@@ -210,6 +260,13 @@ function updateQueueMeshes(containers: Container[]): void {
 function clearScene(): void {
   const scene = getScene()
   if (!scene) return
+
+  // Stop ambient truck engine if running
+  if (truckEngineNode) {
+    try { truckEngineNode.stop() } catch { /* already stopped */ }
+    truckEngineNode = null
+  }
+
   const toRemove: THREE.Object3D[] = []
   scene.traverse(child => {
     if (child !== scene) toRemove.push(child)
@@ -226,6 +283,7 @@ function clearScene(): void {
   shipGroup = null
   craneObj = null
   ocean = null
+  foam = null
   hoistMesh = null
   queueMeshes = []
 }

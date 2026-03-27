@@ -3,11 +3,25 @@ function assetUrl(filename: string): string {
 }
 
 export const SOUNDS: Record<string, string> = {
-  explosion: assetUrl('explosion-fx.mp3'),
-  scream: assetUrl('man-screaming.mp3'),
-  shipSink: assetUrl('ship-sink-splash.mp3'),
-  underwater: assetUrl('underwater-explosion.mp3'),
-  splash: assetUrl('water-splash.mp3'),
+  // Placement sounds
+  containerLoad: assetUrl('container-loaded-to-ship.mp3'),
+  containerSet: assetUrl('container-set-down-on-ship.mp3'),
+  correctDing: assetUrl('correct-ding.mp3'),
+
+  // Bonus / reward sounds
+  bonus: assetUrl('gaming-bonus-sound.mp3'),
+  negative: assetUrl('gaming-negative-event-sound.mp3'),
+  cheer: assetUrl('group-yay-cheer.mp3'),
+  levelUp: assetUrl('horns-level-up.mp3'),
+  levelPassed: assetUrl('level-passed-ok.mp3'),
+  caChing: assetUrl('money-increase-ca-ching-.mp3'),
+
+  // Ship horns
+  shipHornLarge: assetUrl('large-ship-three-horns-in-a-row.mp3'),
+  shipHornSmall: assetUrl('small-ship-three-horns-in-a-row.mp3'),
+
+  // Ambient
+  truckEngine: assetUrl('quiet-truck-engine.mp3'),
 }
 
 export interface SoundCue {
@@ -17,32 +31,28 @@ export interface SoundCue {
 
 export const DISASTER_SEQUENCES: Record<string, SoundCue[]> = {
   capsize: [
-    { sound: 'scream', delay: 0 },
-    { sound: 'splash', delay: 0.8 },
-    { sound: 'shipSink', delay: 1.5 },
-    { sound: 'underwater', delay: 2.5 },
+    { sound: 'negative', delay: 0 },
+    { sound: 'shipHornLarge', delay: 0.5 },
+    { sound: 'negative', delay: 2.0 },
   ],
   founder: [
-    { sound: 'scream', delay: 0 },
-    { sound: 'shipSink', delay: 0.5 },
-    { sound: 'underwater', delay: 1.5 },
-    { sound: 'splash', delay: 2.5 },
+    { sound: 'negative', delay: 0 },
+    { sound: 'shipHornSmall', delay: 0.8 },
+    { sound: 'negative', delay: 2.5 },
   ],
   collapse: [
-    { sound: 'explosion', delay: 0 },
-    { sound: 'splash', delay: 1.0 },
+    { sound: 'negative', delay: 0 },
+    { sound: 'negative', delay: 1.2 },
   ],
   explosion: [
-    { sound: 'explosion', delay: 0 },
-    { sound: 'scream', delay: 0.3 },
-    { sound: 'explosion', delay: 1.0 },
-    { sound: 'shipSink', delay: 2.0 },
-    { sound: 'underwater', delay: 3.0 },
+    { sound: 'negative', delay: 0 },
+    { sound: 'negative', delay: 1.0 },
+    { sound: 'shipHornLarge', delay: 1.5 },
   ],
 }
 
 export const PLACEMENT_SOUND = {
-  startFreq: 80,
-  endFreq: 40,
-  duration: 0.15,
+  startFreq: 220,
+  endFreq: 110,
+  duration: 0.12,
 } as const

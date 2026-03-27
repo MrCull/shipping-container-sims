@@ -82,8 +82,9 @@ export const CONTAINER = {
   heavyMin: 21,
   heavyMax: 30,
   hazmatRate: 0.1,
-  size: { x: 2.4, y: 2.6, z: 2.4 },
-  gap: 0.15,
+  // Logical slot footprint (used for physics/offset calculations)
+  size: { x: 2.55, y: 2.65, z: 6.1 },
+  gap: 0.18,
 } as const
 
 export const PORTS = [
