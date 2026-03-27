@@ -71,6 +71,10 @@ Each sim that has grown beyond a trivial prototype maintains its own agent guide
 - **CSS variables**: Use the design tokens defined in `src/assets/main.css` (e.g. `--color-primary`, `--font-retro`).
 - **Keep this guide current**: When project-wide details change or new tooling, conventions, or structure are added that affect how agents or contributors work, update **AGENTS.md** in the same change (or a follow-up) so it stays accurate.
 
+## Plans
+
+All agent plans should be created in the **`.ai/plans/`** folder at the repo root.
+
 ## Skills
 
 Agent-facing skill files live in **`.ai/skills/`** at the repo root (Markdown `SKILL.md` per topic). Each file documents conventions, schemas, or patterns for this codebase.
