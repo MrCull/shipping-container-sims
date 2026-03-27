@@ -2,7 +2,7 @@
 // Box Empire — Sim-specific Three.js scene setup
 // ---------------------------------------------------------------------------
 
-import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useGameStore } from '../store/gameStore'
@@ -84,11 +84,11 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     }
   }
 
-  watch(canvasRef, (canvas) => {
-    if (canvas && !isReady.value) {
-      init(canvas)
+  onMounted(() => {
+    if (canvasRef.value && !isReady.value) {
+      init(canvasRef.value)
     }
-  }, { immediate: true })
+  })
 
   function onResize(): void {
     if (!camera || !renderer) return
