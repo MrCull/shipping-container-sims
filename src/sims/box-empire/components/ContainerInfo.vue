@@ -51,7 +51,7 @@ const container = computed(() => {
 
 <style scoped>
 .container-info {
-  position: absolute;
+  position: fixed;
   bottom: 12px;
   right: 12px;
   width: 260px;

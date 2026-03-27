@@ -28,7 +28,7 @@ const store = useGameStore()
 
 <style scoped>
 .top-bar {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;

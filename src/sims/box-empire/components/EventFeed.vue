@@ -41,7 +41,7 @@ function getEventColor(type: string): string {
 
 <style scoped>
 .event-feed {
-  position: absolute;
+  position: fixed;
   bottom: 12px;
   left: 12px;
   width: 320px;

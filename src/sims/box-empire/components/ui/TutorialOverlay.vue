@@ -47,7 +47,7 @@ const showGateButton = computed(() => {
 
 <style scoped>
 .tutorial-overlay {
-  position: absolute;
+  position: fixed;
   top: 60px;
   left: 50%;
   transform: translateX(-50%);

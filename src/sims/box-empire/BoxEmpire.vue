@@ -50,7 +50,7 @@ function handleRestart(): void {
   display: flex;
   position: relative;
   width: 100%;
-  height: 100%;
+  min-height: 0;
   overflow: hidden;
   background: #0a0e1a;
 }

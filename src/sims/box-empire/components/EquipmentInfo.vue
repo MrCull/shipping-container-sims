@@ -57,7 +57,7 @@ function typeLabel(type: string): string {
 
 <style scoped>
 .equipment-info {
-  position: absolute;
+  position: fixed;
   bottom: 12px;
   right: 12px;
   width: 260px;
