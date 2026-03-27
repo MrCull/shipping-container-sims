@@ -777,11 +777,18 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
   function checkTutorialAdvance(): void {
     if (tutorialCompleted.value) return
+    if (tutorialStep.value > tutorialSteps.length) return
     const step = getCurrentStep(tutorialSteps, tutorialStep.value)
     if (!step) return
     const state = getState()
     if (checkStepAdvance(step, state)) {
-      tutorialStep.value++
+      if (tutorialStep.value >= tutorialSteps.length) {
+        tutorialCompleted.value = true
+        gamePhase.value = 'completed'
+        emitEvent('tutorial.completed', 'Tutorial complete! You processed all containers!')
+      } else {
+        tutorialStep.value++
+      }
     }
   }
 
