@@ -280,6 +280,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
         armTargetY: 0,
         armDropStartY: 0,
         spreaderZ: 0,
+        waypoints: [],
+        waypointIndex: 0,
       },
       {
         id: 'mhc-1',
@@ -297,6 +299,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
         armTargetY: 0,
         armDropStartY: 0,
         spreaderZ: 0,
+        waypoints: [],
+        waypointIndex: 0,
       },
     ]
 
@@ -436,6 +440,15 @@ export const useGameStore = defineStore('box-empire-game', () => {
         }
         if (vResult.newState === 'departed') {
           emitEvent('vessel.departed', `${vessel.name} has departed`)
+          // Clean up any jobs referencing vessel slots (prevents floating containers)
+          for (const job of jobs.value) {
+            if (
+              (job.pickupLocation.type === 'vessel_slot' || job.dropoffLocation.type === 'vessel_slot') &&
+              (job.status === 'pending' || job.status === 'blocked')
+            ) {
+              job.status = 'cancelled'
+            }
+          }
         }
       }
     }

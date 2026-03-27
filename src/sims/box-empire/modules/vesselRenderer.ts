@@ -1,12 +1,193 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Vessel mesh management (procedural only)
-// ---------------------------------------------------------------------------
-// The GLB model is far too large for the terminal scale. We use a clean
-// procedural hull that exactly matches the tutorial vessel's LOA/beam.
+// Box Empire — Vessel mesh (inspired by stowage-master shipRenderer.ts)
+// Procedural ship with tapered hull, antifouling band, hatch covers,
+// accommodation block, funnel, and deck fittings.
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
 import type { VesselVisit } from '../types'
+
+// Shared materials — allocated once, reused
+let hullMat: THREE.MeshPhongMaterial | null = null
+let antifoulMat: THREE.MeshPhongMaterial | null = null
+let deckMat: THREE.MeshPhongMaterial | null = null
+let superMat: THREE.MeshPhongMaterial | null = null
+let glassMat: THREE.MeshPhongMaterial | null = null
+let metalMat: THREE.MeshPhongMaterial | null = null
+
+function getMaterials() {
+  if (!hullMat) {
+    hullMat = new THREE.MeshPhongMaterial({ color: 0x1a2535, specular: 0x334455, shininess: 40, side: THREE.DoubleSide })
+    antifoulMat = new THREE.MeshPhongMaterial({ color: 0x8b1a1a, specular: 0x441111, shininess: 20 })
+    deckMat = new THREE.MeshPhongMaterial({ color: 0x4a3c28, specular: 0x221a10, shininess: 10 })
+    superMat = new THREE.MeshPhongMaterial({ color: 0xf0f0e8, specular: 0x888880, shininess: 55 })
+    glassMat = new THREE.MeshPhongMaterial({ color: 0x4488bb, emissive: 0x224466, emissiveIntensity: 0.5, specular: 0xaaccee, shininess: 180, transparent: true, opacity: 0.82 })
+    metalMat = new THREE.MeshPhongMaterial({ color: 0x5a5a5a, specular: 0x888888, shininess: 80 })
+  }
+  return { hullMat: hullMat!, antifoulMat: antifoulMat!, deckMat: deckMat!, superMat: superMat!, glassMat: glassMat!, metalMat: metalMat! }
+}
+
+function makeTaperedPrism(
+  xLen: number, h: number,
+  wBack: number, wTip: number, tipZOffset: number,
+  mat: THREE.MeshPhongMaterial,
+): THREE.Mesh {
+  const hw = xLen / 2; const hh = h / 2; const hbk = wBack / 2; const htp = wTip / 2
+  const v = [
+    hw, -hh, -hbk,  hw,  hh, -hbk,  hw,  hh,  hbk,  hw, -hh,  hbk,
+    -hw, -hh, -htp + tipZOffset,  -hw,  hh, -htp + tipZOffset,
+    -hw,  hh,  htp + tipZOffset,  -hw, -hh,  htp + tipZOffset,
+  ]
+  const idx = [0,2,1,0,3,2, 4,5,6,4,6,7, 0,4,7,0,7,3, 1,2,6,1,6,5, 3,7,6,3,6,2, 0,1,5,0,5,4]
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3))
+  geo.setIndex(idx)
+  geo.computeVertexNormals()
+  const mesh = new THREE.Mesh(geo, mat)
+  mesh.castShadow = true
+  return mesh
+}
+
+function buildHull(group: THREE.Group, L: number, W: number, H: number, mats: ReturnType<typeof getMaterials>): void {
+  const { hullMat, antifoulMat } = mats
+  const depth = H * 1.8
+  const deckY = H * 0.3
+  const midLen = L * 0.62
+  const bowLen = L * 0.20
+  const sternLen = L * 0.10
+
+  // Main hull body
+  const mid = new THREE.Mesh(new THREE.BoxGeometry(midLen, depth, W), hullMat)
+  mid.position.set(-L * 0.09, -depth * 0.5 + deckY, 0)
+  mid.castShadow = true; mid.receiveShadow = true
+  group.add(mid)
+
+  // Bow — tapered prism pointing in +X direction (bow faces +X on our rotated vessel)
+  const bow = makeTaperedPrism(bowLen, depth, W, 0.6, 0, hullMat)
+  bow.position.set(-L * 0.09 + midLen / 2 + bowLen / 2, -depth * 0.5 + deckY, 0)
+  group.add(bow)
+
+  // Stern
+  const stern = makeTaperedPrism(sternLen, depth, W, W * 0.72, 0, hullMat)
+  stern.position.set(-L * 0.09 - midLen / 2 - sternLen / 2, -depth * 0.5 + deckY, 0)
+  group.add(stern)
+
+  // Anti-fouling red band
+  const af = new THREE.Mesh(new THREE.BoxGeometry(L * 0.95, depth * 0.30, W * 0.97), antifoulMat)
+  af.position.set(-L * 0.09, -depth * 0.5 + deckY - depth * 0.62, 0)
+  group.add(af)
+
+  // White waterline stripe
+  const wl = new THREE.Mesh(new THREE.BoxGeometry(L * 0.96, 0.28, W * 0.97), new THREE.MeshPhongMaterial({ color: 0xffffff }))
+  wl.position.set(-L * 0.09, -depth * 0.5 + deckY - depth * 0.35, 0)
+  group.add(wl)
+}
+
+function buildDeck(group: THREE.Group, L: number, W: number, H: number, mats: ReturnType<typeof getMaterials>): void {
+  const { deckMat, metalMat } = mats
+  const deckY = H * 0.3
+
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(L * 0.90, 0.32, W * 0.87), deckMat)
+  deck.position.y = deckY
+  deck.castShadow = true; deck.receiveShadow = true
+  group.add(deck)
+
+  // Hatch covers
+  const numHatches = 5
+  const hatchAreaL = L * 0.58
+  const hatchLen = hatchAreaL / numHatches - 0.8
+  const hatchMat = new THREE.MeshPhongMaterial({ color: 0x566470, specular: 0x223344, shininess: 22 })
+  for (let i = 0; i < numHatches; i++) {
+    const hx = (i - (numHatches - 1) / 2) * (hatchLen + 0.8)
+    const hatch = new THREE.Mesh(new THREE.BoxGeometry(hatchLen, 0.22, W * 0.70), hatchMat)
+    hatch.position.set(hx + L * 0.02, deckY + 0.27, 0)
+    hatch.castShadow = true
+    group.add(hatch)
+    const coam = new THREE.Mesh(new THREE.BoxGeometry(hatchLen + 0.25, 0.30, W * 0.70 + 0.25), metalMat)
+    coam.position.set(hx + L * 0.02, deckY + 0.10, 0)
+    group.add(coam)
+  }
+}
+
+function buildSuperstructure(group: THREE.Group, L: number, W: number, H: number, mats: ReturnType<typeof getMaterials>): void {
+  const { superMat, glassMat, metalMat } = mats
+  const deckY = H * 0.3
+  // Stern is at -X end
+  const sternX = -L * 0.38
+
+  const floors = [
+    { w: W * 0.50, l: L * 0.13, h: H * 1.2 },
+    { w: W * 0.44, l: L * 0.11, h: H * 0.95 },
+    { w: W * 0.38, l: L * 0.09, h: H * 0.80 },
+  ]
+  let accY = deckY
+  for (const f of floors) {
+    const geo = new THREE.BoxGeometry(f.l, f.h, f.w)
+    const m = new THREE.Mesh(geo, superMat)
+    m.position.set(sternX, accY + f.h / 2, 0)
+    m.castShadow = true
+    group.add(m)
+    // Window strip
+    const win = new THREE.Mesh(new THREE.BoxGeometry(f.l * 0.09, f.h * 0.30, f.w * 0.88), glassMat)
+    win.position.set(sternX + f.l * 0.54, accY + f.h * 0.62, 0)
+    group.add(win)
+    accY += f.h
+  }
+
+  // Funnel
+  const funnelMat = new THREE.MeshPhongMaterial({ color: 0x1a1a2e, shininess: 38 })
+  const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.25, H * 2.2, 12), funnelMat)
+  funnel.position.set(sternX, accY + H * 1.0, 0)
+  funnel.castShadow = true
+  group.add(funnel)
+
+  // Funnel band
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.90, 1.30, 0.55, 12), new THREE.MeshPhongMaterial({ color: 0xddaa00, emissive: 0x664400, emissiveIntensity: 0.2 }))
+  band.position.set(sternX, accY + H * 1.1, 0)
+  group.add(band)
+
+  // Mast
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, H * 3.2, 8), metalMat)
+  mast.position.set(sternX, accY + H * 2.6, 0)
+  group.add(mast)
+
+  // Radar
+  const radar = new THREE.Mesh(new THREE.SphereGeometry(0.48, 10, 8), new THREE.MeshPhongMaterial({ color: 0xf2f2f2 }))
+  radar.position.set(sternX, accY + H * 4.2, 0)
+  group.add(radar)
+
+  // Propeller
+  const prop = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.75, 0.65, 12), new THREE.MeshPhongMaterial({ color: 0xb8860b, shininess: 120 }))
+  prop.rotation.z = Math.PI / 2
+  prop.position.set(-L * 0.47, deckY - 1.6, 0)
+  group.add(prop)
+}
+
+function buildDeckFittings(group: THREE.Group, L: number, W: number, H: number, mats: ReturnType<typeof getMaterials>): void {
+  const { metalMat } = mats
+  const deckY = H * 0.3 + 0.17
+  const railMat = new THREE.MeshPhongMaterial({ color: 0x888888, shininess: 48 })
+
+  for (const sign of [-1, 1]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(L * 0.63, 0.11, 0.11), railMat)
+    rail.position.set(L * 0.02, deckY + 1.0, sign * (W * 0.42))
+    group.add(rail)
+    for (let i = -4; i <= 4; i++) {
+      const st = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.0, 0.09), metalMat)
+      st.position.set(i * (L * 0.08), deckY + 0.5, sign * (W * 0.42))
+      group.add(st)
+    }
+  }
+
+  // Bow anchor fairleads
+  const fairMat = new THREE.MeshPhongMaterial({ color: 0x666666, shininess: 60 })
+  for (const sign of [-1, 1]) {
+    const fair = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.14, 8, 12), fairMat)
+    fair.rotation.y = Math.PI / 2
+    fair.position.set(L * 0.43, deckY + 0.28, sign * W * 0.34)
+    group.add(fair)
+  }
+}
 
 export class VesselRenderer {
   private meshes = new Map<string, THREE.Group>()
@@ -18,106 +199,23 @@ export class VesselRenderer {
 
   private createVesselMesh(vessel: VesselVisit): THREE.Group {
     const group = new THREE.Group()
+    const L = vessel.loa
+    const W = vessel.beam
+    const H = 5  // deck height reference
 
-    const L = vessel.loa      // ~50 m, runs along X
-    const B = vessel.beam     // ~12 m, runs along Z
-    const hullH = 5           // hull freeboard height
+    const mats = getMaterials()
+    buildHull(group, L, W, H, mats)
+    buildDeck(group, L, W, H, mats)
+    buildSuperstructure(group, L, W, H, mats)
+    buildDeckFittings(group, L, W, H, mats)
 
-    // ---- Hull body (dark navy) -------------------------------------------
-    const hullGeo = new THREE.BoxGeometry(L, hullH, B)
-    const hullMat = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, roughness: 0.7, metalness: 0.3 })
-    const hull = new THREE.Mesh(hullGeo, hullMat)
-    hull.position.y = hullH / 2
-    hull.castShadow = true
-    hull.receiveShadow = true
-    group.add(hull)
-
-    // ---- Bow wedge (+X end, painted red below waterline) -----------------
-    const bowGeo = new THREE.CylinderGeometry(0, B / 2, hullH, 4, 1)
-    const bowMat = new THREE.MeshStandardMaterial({ color: 0xaa2222, roughness: 0.6 })
-    const bow = new THREE.Mesh(bowGeo, bowMat)
-    bow.rotation.y = Math.PI / 4
-    bow.rotation.z = Math.PI / 2
-    bow.position.set(L / 2, hullH / 2, 0)
-    bow.castShadow = true
-    group.add(bow)
-
-    // ---- Deck (light grey) -----------------------------------------------
-    const deckGeo = new THREE.BoxGeometry(L * 0.88, 0.4, B * 0.85)
-    const deckMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.85 })
-    const deck = new THREE.Mesh(deckGeo, deckMat)
-    deck.position.y = hullH + 0.2
-    deck.castShadow = true
-    group.add(deck)
-
-    // ---- Hatch covers (lighter, evenly spaced on deck) -------------------
-    const numHatches = 4
-    const hatchW = (L * 0.7) / numHatches - 1
-    const hatchMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.7 })
-    for (let i = 0; i < numHatches; i++) {
-      const hx = -L * 0.3 + i * (hatchW + 1) + hatchW / 2
-      const hatchGeo = new THREE.BoxGeometry(hatchW, 0.25, B * 0.65)
-      const hatch = new THREE.Mesh(hatchGeo, hatchMat)
-      hatch.position.set(hx, hullH + 0.55, 0)
-      group.add(hatch)
-    }
-
-    // ---- Bridge superstructure (white, at stern / -X end) ----------------
-    const bridgeW = 8
-    const bridgeH = 10
-    const bridgeGeo = new THREE.BoxGeometry(bridgeW, bridgeH, B * 0.75)
-    const bridgeMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.5 })
-    const bridge = new THREE.Mesh(bridgeGeo, bridgeMat)
-    bridge.position.set(-L / 2 + bridgeW / 2 + 1, hullH + bridgeH / 2, 0)
-    bridge.castShadow = true
-    group.add(bridge)
-
-    // Windows on bridge
-    const winMat = new THREE.MeshStandardMaterial({ color: 0x4a90d9, roughness: 0.1, metalness: 0.1 })
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 4; col++) {
-        const winGeo = new THREE.BoxGeometry(0.05, 0.8, 0.9)
-        const win = new THREE.Mesh(winGeo, winMat)
-        win.position.set(
-          -L / 2 + bridgeW + 0.1,
-          hullH + 5 + row * 2,
-          -B * 0.28 + col * B * 0.19,
-        )
-        group.add(win)
-      }
-    }
-
-    // ---- Funnel (yellow/black) at stern ----------------------------------
-    const funnelGeo = new THREE.CylinderGeometry(1.2, 1.5, 5, 12)
-    const funnelMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.5 })
-    const funnel = new THREE.Mesh(funnelGeo, funnelMat)
-    funnel.position.set(-L / 2 + 3, hullH + bridgeH + 2, 0)
-    funnel.castShadow = true
-    group.add(funnel)
-
-    const funnelTopGeo = new THREE.CylinderGeometry(1.2, 1.2, 1, 12)
-    const funnelTopMat = new THREE.MeshStandardMaterial({ color: 0x111111 })
-    const funnelTop = new THREE.Mesh(funnelTopGeo, funnelTopMat)
-    funnelTop.position.set(-L / 2 + 3, hullH + bridgeH + 5, 0)
-    group.add(funnelTop)
-
-    // ---- Railing strip along deck edge ----------------------------------
-    const railMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 })
-    for (const zSide of [-1, 1]) {
-      const railGeo = new THREE.BoxGeometry(L * 0.85, 0.5, 0.1)
-      const rail = new THREE.Mesh(railGeo, railMat)
-      rail.position.set(0, hullH + 0.85, zSide * (B / 2 - 0.1))
-      group.add(rail)
-    }
-
-    // Rotate 180° so bow (+X wedge) faces -X — the direction of travel when arriving
+    // Rotate 180° so bow (+X) faces the direction of approach (-X travel)
     group.rotation.y = Math.PI
     return group
   }
 
   update(vessels: VesselVisit[]): void {
     for (const vessel of vessels) {
-      // Clean up fully departed vessels
       if (vessel.state === 'departed' && vessel.position.x < -80) {
         const mesh = this.meshes.get(vessel.id)
         if (mesh) {
@@ -125,10 +223,6 @@ export class VesselRenderer {
           mesh.traverse(obj => {
             const m = obj as THREE.Mesh
             if (m.geometry) m.geometry.dispose()
-            if (m.material) {
-              if (Array.isArray(m.material)) m.material.forEach(mt => mt.dispose())
-              else m.material.dispose()
-            }
           })
           this.meshes.delete(vessel.id)
         }

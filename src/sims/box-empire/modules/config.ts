@@ -96,21 +96,20 @@ export const TUTORIAL_IMPORT_COUNT = 5
 // ---- Terminal layout positions (meters) -----------------------------------
 
 // Terminal boundary fence
-export const TERMINAL_FENCE_Z = 55  // z position of the terminal boundary fence
+export const TERMINAL_FENCE_Z = 58  // z position of the terminal boundary fence
 
 // In-gate: ALL trucks enter here (outside terminal, z > TERMINAL_FENCE_Z)
-// Trucks queue along +Z from the gate
-export const GATE_INGATE_POSITION: Position3D = { x: -46, y: 0, z: TERMINAL_FENCE_Z }
+// The gate lane is at x=-50, giving a clear path separate from the fence pillars
+export const GATE_INGATE_POSITION: Position3D = { x: -50, y: 0, z: TERMINAL_FENCE_Z }
 
-// Out-gate: ALL trucks exit here (bottom of terminal, z ~ TERMINAL_BOUNDS.maxZ - 5)
-// Positioned far from in-gate so trucks flow through terminal naturally
-// Trucks queue inside terminal before passing out
-export const GATE_OUTGATE_POSITION: Position3D = { x: -46, y: 0, z: 90 }
+// Out-gate: ALL trucks exit here (at the far end, z=100 near terminal bottom edge)
+// Positioned well away from in-gate for realistic flow through terminal
+export const GATE_OUTGATE_POSITION: Position3D = { x: -50, y: 0, z: 100 }
 
 // Legacy aliases used in sceneBuilder (kept for compat)
-export const GATE_POSITION: Position3D = { x: -46, y: 0, z: TERMINAL_FENCE_Z }
-export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -46, y: 0, z: TERMINAL_FENCE_Z }
-export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -46, y: 0, z: TERMINAL_FENCE_Z }
+export const GATE_POSITION: Position3D = { x: -50, y: 0, z: TERMINAL_FENCE_Z }
+export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -50, y: 0, z: TERMINAL_FENCE_Z }
+export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -50, y: 0, z: TERMINAL_FENCE_Z }
 
 // Yard handover point where trucks park and equipment loads/unloads
 export const YARD_IO_POSITION: Position3D = { x: 0, y: 0, z: 30 }
@@ -127,7 +126,7 @@ export const TERMINAL_BOUNDS = {
   minX: -60,
   maxX: 60,
   minZ: -30,
-  maxZ: 120,
+  maxZ: 140,
 }
 
 // ---- Sound events ---------------------------------------------------------

@@ -6,7 +6,7 @@ import { onBeforeUnmount, ref, nextTick, watch, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useGameStore } from '../store/gameStore'
-import { buildScene } from '../modules/sceneBuilder'
+import { buildScene, animateOcean } from '../modules/sceneBuilder'
 import { ContainerRenderer } from '../modules/containerRenderer'
 import { EquipmentRenderer } from '../modules/equipmentRenderer'
 import { VesselRenderer } from '../modules/vesselRenderer'
@@ -24,6 +24,7 @@ export interface GameSceneRefs {
   spawnFloatingText: (text: string, color: string, worldPos: { x: number; y: number; z: number }) => void
   getContainerIdAtInstance: (instanceId: number) => string | null
   getContainerMesh: () => THREE.InstancedMesh | null
+  getContainerIdNearScreen: (clickX: number, clickY: number, canvasW: number, canvasH: number) => string | null
 }
 
 export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): GameSceneRefs {
@@ -74,7 +75,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       renderer.shadowMap.enabled = true
       renderer.shadowMap.type = THREE.PCFSoftShadowMap
       renderer.toneMapping = THREE.ACESFilmicToneMapping
-      renderer.toneMappingExposure = 1.1
+      renderer.toneMappingExposure = 1.15
       renderer.outputColorSpace = THREE.SRGBColorSpace
 
       camera = new THREE.PerspectiveCamera(50, w / h, 0.5, 800)
@@ -125,6 +126,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     if (!renderer || !scene || !camera) return
     controls?.update()
     floatingTextRenderer?.update()
+    animateOcean(performance.now() / 1000)
     renderer.render(scene, camera)
   }
 
@@ -139,12 +141,19 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     floatingTextRenderer?.spawn(text, color, worldPos)
   }
 
-  function getContainerIdAtInstance(instanceId: number): string | null {
-    return containerRenderer?.getContainerIdAtIndex(instanceId) ?? null
+  function getContainerIdAtInstance(_instanceId: number): string | null {
+    return containerRenderer?.getContainerIdAtIndex() ?? null
   }
 
   function getContainerMesh(): THREE.InstancedMesh | null {
     return containerRenderer?.getMesh() ?? null
+  }
+
+  function getContainerIdNearScreen(
+    clickX: number, clickY: number, canvasW: number, canvasH: number,
+  ): string | null {
+    if (!camera || !containerRenderer) return null
+    return containerRenderer.getContainerIdNearScreen(clickX, clickY, canvasW, canvasH, camera)
   }
 
   function dispose(): void {
@@ -188,5 +197,6 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     spawnFloatingText,
     getContainerIdAtInstance,
     getContainerMesh,
+    getContainerIdNearScreen,
   }
 }

@@ -1,10 +1,7 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Container rendering
-// ---------------------------------------------------------------------------
-// Container geometry: a solid corrugated steel ISO container.
-// The main body is a BoxGeometry. Corrugation ribs are thin flat rectangles
-// sitting ON the long side faces (not penetrating). Corner posts and end door
-// panel complete the silhouette.
+// Box Empire — Container rendering with canvas-texture materials
+// Each container is a THREE.Group with textured BoxGeometry + corner posts.
+// Uses the same approach as stowage-master for realistic container appearance.
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
@@ -14,182 +11,120 @@ import {
   CONTAINER_WIDTH,
   CONTAINER_HEIGHT,
 } from './config'
+import { createContainerMaterials, disposeContainerMaterials } from './containerMaterials'
 
-const MAX_INSTANCES = 64
+const POST_SIZE = 0.10
+const POST_COLOR = 0x2c313a
 
-function buildContainerGeometry(): THREE.BufferGeometry {
-  const L = CONTAINER_LENGTH   // ~6.06 m
-  const W = CONTAINER_WIDTH    // ~2.44 m
-  const H = CONTAINER_HEIGHT   // ~2.59 m
+function addCornerPostsAndRails(group: THREE.Group, L: number, H: number, W: number): void {
+  const postMat = new THREE.MeshStandardMaterial({ color: POST_COLOR, roughness: 0.65, metalness: 0.55 })
+  const postGeo = new THREE.BoxGeometry(POST_SIZE, H * 0.97, POST_SIZE)
+  const hL = L / 2 - POST_SIZE / 2
+  const hW = W / 2 - POST_SIZE / 2
+  for (const [px, pz] of [[hL, hW], [hL, -hW], [-hL, hW], [-hL, -hW]] as [number, number][]) {
+    const p = new THREE.Mesh(postGeo, postMat)
+    p.position.set(px, 0, pz)
+    p.castShadow = true
+    group.add(p)
+  }
 
-  // We'll build everything as separate geometries and merge manually
-  const parts: THREE.BufferGeometry[] = []
-
-  // ---- Main body ----------------------------------------------------------
-  parts.push(new THREE.BoxGeometry(L, H, W))
-
-  // ---- Corrugation ribs on both long sides (XZ plane, Z face) ------------
-  // Ribs are thin strips (depth 0.04 m) sitting flush on the +Z and -Z faces
-  const ribDepth = 0.04
-  const ribCount = 14
-  const ribW_geo = L / (ribCount + 1)
-
-  for (let i = 0; i < ribCount; i++) {
-    const cx = -L / 2 + ribW_geo * (i + 1)
-    for (const side of [-1, 1]) {
-      const ribGeo = new THREE.BoxGeometry(ribW_geo * 0.55, H * 0.97, ribDepth)
-      applyTranslation(ribGeo, cx, 0, side * (W / 2 + ribDepth / 2))
-      parts.push(ribGeo)
+  const railT = 0.055
+  const railMat = new THREE.MeshStandardMaterial({ color: POST_COLOR, roughness: 0.65, metalness: 0.55 })
+  const railXGeo = new THREE.BoxGeometry(L * 0.984, railT, POST_SIZE * 0.88)
+  const railZGeo = new THREE.BoxGeometry(POST_SIZE * 0.88, railT, W * 0.984)
+  for (const y of [H / 2 - railT / 2, -H / 2 + railT / 2]) {
+    for (const zSign of [-1, 1]) {
+      const rx = new THREE.Mesh(railXGeo, railMat)
+      rx.position.set(0, y, zSign * (W / 2 - POST_SIZE / 2))
+      rx.castShadow = true
+      group.add(rx)
+    }
+    for (const xSign of [-1, 1]) {
+      const rz = new THREE.Mesh(railZGeo, railMat)
+      rz.position.set(xSign * (L / 2 - POST_SIZE / 2), y, 0)
+      rz.castShadow = true
+      group.add(rz)
     }
   }
-
-  // ---- Corrugation ribs on end faces (front door end) --------------------
-  const doorRibCount = 4
-  const doorRibW = W / (doorRibCount + 1)
-  for (let i = 0; i < doorRibCount; i++) {
-    const cz = -W / 2 + doorRibW * (i + 1)
-    const ribGeo = new THREE.BoxGeometry(ribDepth, H * 0.97, doorRibW * 0.55)
-    applyTranslation(ribGeo, L / 2 + ribDepth / 2, 0, cz)
-    parts.push(ribGeo)
-  }
-
-  // ---- Corner posts (darker colour will come from a tint later, same geo) -
-  const postW = 0.12
-  const postH = H + 0.04
-  for (const xs of [-1, 1]) {
-    for (const zs of [-1, 1]) {
-      const post = new THREE.BoxGeometry(postW, postH, postW)
-      applyTranslation(post, xs * (L / 2 - postW / 2), 0, zs * (W / 2 - postW / 2))
-      parts.push(post)
-    }
-  }
-
-  // ---- Top and bottom rails along length ----------------------------------
-  const railH = 0.07
-  const railW = 0.07
-  for (const ys of [-1, 1]) {
-    for (const zs of [-1, 1]) {
-      const rail = new THREE.BoxGeometry(L, railH, railW)
-      applyTranslation(rail, 0, ys * (H / 2 + railH / 2), zs * (W / 2 - railW / 2))
-      parts.push(rail)
-    }
-  }
-
-  const merged = mergeBufferGeometries(parts)
-  for (const g of parts) g.dispose()
-  return merged
 }
 
-function applyTranslation(geo: THREE.BufferGeometry, x: number, y: number, z: number): void {
-  geo.translate(x, y, z)
-}
+function createContainerGroup(container: Container): THREE.Group {
+  const L = CONTAINER_LENGTH
+  const H = CONTAINER_HEIGHT
+  const W = CONTAINER_WIDTH
 
-function mergeBufferGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  let totalVerts = 0
-  let totalIdx = 0
-  for (const g of geos) {
-    totalVerts += g.attributes.position.count
-    totalIdx += g.index ? g.index.count : g.attributes.position.count
-  }
+  const group = new THREE.Group()
+  group.name = `container-${container.id}`
+  group.userData['containerId'] = container.id
+  group.userData['isContainer'] = true
 
-  const positions = new Float32Array(totalVerts * 3)
-  const normals = new Float32Array(totalVerts * 3)
-  const indices = new Uint32Array(totalIdx)
+  const materials = createContainerMaterials(container.ownerColor, container.id, container.shippingLine)
+  const geo = new THREE.BoxGeometry(L, H, W)
+  const mesh = new THREE.Mesh(geo, materials)
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  mesh.userData['bodyMaterials'] = materials
+  group.add(mesh)
 
-  let vOffset = 0
-  let iOffset = 0
+  // Subtle edge lines
+  const edges = new THREE.EdgesGeometry(geo)
+  const line = new THREE.LineSegments(
+    edges,
+    new THREE.LineBasicMaterial({ color: 0x08080c, transparent: true, opacity: 0.40 }),
+  )
+  group.add(line)
 
-  for (const g of geos) {
-    const pos = g.attributes.position as THREE.BufferAttribute
-    const nor = g.attributes.normal as THREE.BufferAttribute
-
-    for (let i = 0; i < pos.count; i++) {
-      positions[(vOffset + i) * 3 + 0] = pos.getX(i)
-      positions[(vOffset + i) * 3 + 1] = pos.getY(i)
-      positions[(vOffset + i) * 3 + 2] = pos.getZ(i)
-      if (nor) {
-        normals[(vOffset + i) * 3 + 0] = nor.getX(i)
-        normals[(vOffset + i) * 3 + 1] = nor.getY(i)
-        normals[(vOffset + i) * 3 + 2] = nor.getZ(i)
-      }
-    }
-
-    if (g.index) {
-      const src = g.index.array
-      for (let i = 0; i < src.length; i++) {
-        indices[iOffset++] = src[i] + vOffset
-      }
-    } else {
-      for (let i = 0; i < pos.count; i++) {
-        indices[iOffset++] = vOffset + i
-      }
-    }
-
-    vOffset += pos.count
-  }
-
-  const out = new THREE.BufferGeometry()
-  out.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  out.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
-  out.setIndex(new THREE.BufferAttribute(indices, 1))
-  out.computeVertexNormals()
-  return out
+  addCornerPostsAndRails(group, L, H, W)
+  return group
 }
 
 export class ContainerRenderer {
-  private mesh: THREE.InstancedMesh
-  private colorAttr: THREE.InstancedBufferAttribute
-  private dummy = new THREE.Object3D()
+  private scene: THREE.Scene
+  private groups = new Map<string, THREE.Group>()
   private containerIds: string[] = []
 
   constructor(scene: THREE.Scene) {
-    const geo = buildContainerGeometry()
-
-    // White base — instanceColor provides per-container shipping-line colour.
-    // vertexColors: false is critical (merged geometry has no vertex colour data).
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.6,
-      metalness: 0.15,
-      vertexColors: false,
-    })
-
-    // Ensure geometry has bounding volumes (required for raycasting)
-    geo.computeBoundingBox()
-    geo.computeBoundingSphere()
-
-    this.mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES)
-    this.mesh.castShadow = true
-    this.mesh.receiveShadow = true
-    this.mesh.count = 0
-    this.mesh.frustumCulled = false
-
-    const colors = new Float32Array(MAX_INSTANCES * 3)
-    this.colorAttr = new THREE.InstancedBufferAttribute(colors, 3)
-    this.mesh.instanceColor = this.colorAttr
-
-    scene.add(this.mesh)
+    this.scene = scene
   }
 
   update(containers: Container[], trucks?: TruckVisit[]): void {
-    const visibleContainers = containers.filter(
-      c => c.lifecycleState !== 'departed' && c.lifecycleState !== 'on_vessel',
-    )
-    this.mesh.count = Math.min(visibleContainers.length, MAX_INSTANCES)
+    const visibleContainers = containers.filter(c => {
+      if (c.lifecycleState === 'departed') return false
+      if (c.lifecycleState === 'on_vessel') return false
+      if (c.lifecycleState === 'loaded_on_vessel') return false
+      return true
+    })
+
+    const visibleIds = new Set(visibleContainers.map(c => c.id))
     this.containerIds = []
 
-    const color = new THREE.Color()
-    for (let i = 0; i < this.mesh.count; i++) {
-      const c = visibleContainers[i]
+    // Remove departed containers
+    for (const [id, group] of this.groups) {
+      if (!visibleIds.has(id)) {
+        this.disposeGroup(group)
+        this.scene.remove(group)
+        this.groups.delete(id)
+      }
+    }
+
+    for (const c of visibleContainers) {
       this.containerIds.push(c.id)
 
-      this.dummy.position.set(
+      let group = this.groups.get(c.id)
+      if (!group) {
+        group = createContainerGroup(c)
+        this.scene.add(group)
+        this.groups.set(c.id, group)
+      }
+
+      // Position
+      group.position.set(
         c.currentLocation.position.x,
         c.currentLocation.position.y,
         c.currentLocation.position.z,
       )
 
-      // Rotate container to match truck heading when on a truck
+      // Rotation — align with truck heading when on a truck
       const onTruck = c.currentLocation.type === 'truck' ||
         c.lifecycleState === 'returning_to_gate' ||
         c.lifecycleState === 'at_gate'
@@ -199,39 +134,69 @@ export class ContainerRenderer {
           ? c.currentLocation.id
           : trucks.find(t => t.containerId === c.id)?.id
         const truck = truckId ? trucks.find(t => t.id === truckId) : null
-        // Container length (X axis in geometry) should align with truck forward (headingY)
-        // truck.headingY = atan2(dx, dz) gives forward dir; container length = X in geo
-        // So rotate container by headingY + PI/2 to align length with truck forward
         rotY = truck ? truck.headingY + Math.PI / 2 : Math.PI / 2
       }
+      group.rotation.y = rotY
+    }
+  }
 
-      this.dummy.rotation.set(0, rotY, 0)
-      this.dummy.scale.set(1, 1, 1)
-      this.dummy.updateMatrix()
-      this.mesh.setMatrixAt(i, this.dummy.matrix)
+  // Returns container ID closest to the given screen-space click
+  getContainerIdNearScreen(
+    clickX: number,
+    clickY: number,
+    canvasW: number,
+    canvasH: number,
+    camera: THREE.Camera,
+    radiusPx: number = 45,
+  ): string | null {
+    const projected = new THREE.Vector3()
+    let bestId: string | null = null
+    let bestDist = radiusPx
 
-      color.set(c.ownerColor)
-      this.colorAttr.setXYZ(i, color.r, color.g, color.b)
+    for (const [id, group] of this.groups) {
+      projected.copy(group.position)
+      projected.project(camera)
+
+      if (projected.z > 1) continue
+
+      const sx = (projected.x * 0.5 + 0.5) * canvasW
+      const sy = (1 - (projected.y * 0.5 + 0.5)) * canvasH
+      const dist = Math.sqrt((sx - clickX) ** 2 + (sy - clickY) ** 2)
+
+      if (dist < bestDist) {
+        bestDist = dist
+        bestId = id
+      }
     }
 
-    this.mesh.instanceMatrix.needsUpdate = true
-    this.colorAttr.needsUpdate = true
+    return bestId
   }
 
-  getContainerIdAtIndex(index: number): string | null {
-    return this.containerIds[index] ?? null
-  }
+  // Legacy compat for useThreeScene
+  getMesh(): null { return null }
+  getContainerIdAtIndex(): string | null { return null }
 
-  getMesh(): THREE.InstancedMesh {
-    return this.mesh
+  private disposeGroup(group: THREE.Group): void {
+    group.traverse(obj => {
+      const m = obj as THREE.Mesh
+      if (!m.geometry) return
+      const bodyMats = m.userData['bodyMaterials'] as THREE.MeshStandardMaterial[] | undefined
+      if (bodyMats) disposeContainerMaterials(bodyMats)
+      else if (m.material) {
+        const mat = m.material
+        if (Array.isArray(mat)) mat.forEach(x => x.dispose())
+        else mat.dispose()
+      }
+      m.geometry.dispose()
+    })
   }
 
   dispose(): void {
-    this.mesh.geometry.dispose()
-    if (Array.isArray(this.mesh.material)) {
-      this.mesh.material.forEach(m => m.dispose())
-    } else {
-      this.mesh.material.dispose()
+    for (const group of this.groups.values()) {
+      this.disposeGroup(group)
+      this.scene.remove(group)
     }
+    this.groups.clear()
+    this.containerIds = []
   }
 }

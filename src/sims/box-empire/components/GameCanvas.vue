@@ -7,11 +7,11 @@ import { useAudio } from '../composables/useAudio'
 import { useGameStore } from '../store/gameStore'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const { getScene, getCamera, render, updateEntities, isReady, webglFailed, spawnFloatingText, getContainerIdAtInstance, getContainerMesh } = useBoxEmpireScene(canvasRef)
+const { getScene, getCamera, render, updateEntities, isReady, webglFailed, spawnFloatingText, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen } = useBoxEmpireScene(canvasRef)
 const store = useGameStore()
 const { play } = useAudio()
 
-useInput(canvasRef, getCamera, getScene, getContainerIdAtInstance, getContainerMesh)
+useInput(canvasRef, getCamera, getScene, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen)
 
 const { start, stop } = useGameLoop(() => {
   if (!isReady.value) return

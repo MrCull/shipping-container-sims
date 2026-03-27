@@ -209,6 +209,8 @@ export interface Equipment {
   armTargetY: number       // current spreader/boom tip height (world Y)
   armDropStartY: number    // armTargetY at the start of the drop phase (for lerp from)
   spreaderZ: number        // lateral position of MHC spreader along jib (+Z=quay, -Z=vessel)
+  waypoints: Position3D[]  // axis-aligned movement waypoints (RS only)
+  waypointIndex: number    // current waypoint index (RS only)
 }
 
 // ---- Jobs -----------------------------------------------------------------

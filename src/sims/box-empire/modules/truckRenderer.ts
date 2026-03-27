@@ -1,16 +1,9 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Road truck mesh (fully procedural, vivid colors)
-// ---------------------------------------------------------------------------
-// We deliberately skip GLB loading: the model's PBR materials need a specific
-// lighting/environment setup that is not guaranteed. The procedural truck gives
-// predictable, readable visuals at terminal scale.
+// Box Empire — Road truck mesh (improved quality, inspired by stowage-master)
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
 import type { TruckVisit } from '../types'
-
-const TRUCK_COLORS = [0xe74c3c, 0x27ae60, 0x2980b9, 0xf39c12, 0x8e44ad]
-let colorIndex = 0
 
 export class TruckRenderer {
   private meshes = new Map<string, THREE.Group>()
@@ -23,120 +16,91 @@ export class TruckRenderer {
   private createTruckMesh(visitType: 'import_pickup' | 'export_delivery'): THREE.Group {
     const group = new THREE.Group()
 
-    // Pick a distinct color per truck; export=warm, import=cool
-    const bodyColor = visitType === 'export_delivery'
-      ? TRUCK_COLORS[colorIndex++ % 3]         // reds/greens/blues (warm)
-      : TRUCK_COLORS[2 + (colorIndex++ % 3)]   // blues/yellows/purples
-    colorIndex = colorIndex % TRUCK_COLORS.length
+    // Colour palette by visit type
+    const cabColors = visitType === 'export_delivery'
+      ? [0xe74c3c, 0x27ae60, 0x2980b9, 0xe67e22, 0x8e44ad]
+      : [0x1a6ba0, 0x1a9060, 0x8e44ad, 0x16a085, 0x2c3e50]
+    const cabColor = cabColors[Math.floor(Math.random() * cabColors.length)]
 
-    const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.5, metalness: 0.2 })
-    const darkMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 })
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.7 })
-    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.2, metalness: 0.9 })
-    const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffaa, roughness: 0.1, emissive: 0x886600, emissiveIntensity: 0.5 })
+    const cabMat    = new THREE.MeshPhongMaterial({ color: cabColor, specular: 0x442211, shininess: 55 })
+    const darkMat   = new THREE.MeshPhongMaterial({ color: 0x1a1c20, specular: 0x222222, shininess: 18 })
+    const glassMat  = new THREE.MeshPhongMaterial({ color: 0x88ccff, emissive: 0x224466, emissiveIntensity: 0.35, specular: 0xaaddff, shininess: 180, transparent: true, opacity: 0.72 })
+    const chromeMat = new THREE.MeshPhongMaterial({ color: 0xcccccc, specular: 0xffffff, shininess: 140 })
+    const tireMat   = new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 10 })
+    const rimMat    = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, specular: 0xffffff, shininess: 100 })
+    const lightMat  = new THREE.MeshPhongMaterial({ color: 0xffffaa, emissive: 0x886600, emissiveIntensity: 0.6 })
 
-    // ---- Chassis / frame -------------------------------------------------
-    const chassisGeo = new THREE.BoxGeometry(2.4, 0.3, 7)
-    const chassis = new THREE.Mesh(chassisGeo, darkMat)
-    chassis.position.set(0, 0.55, -0.5)
-    chassis.castShadow = true
-    group.add(chassis)
+    // ---- Chassis frame -----------------------------------------------
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.28, 7.5), darkMat)
+    chassis.position.set(0, 0.56, -0.5); chassis.castShadow = true; group.add(chassis)
 
-    // ---- Cab body --------------------------------------------------------
-    const cabGeo = new THREE.BoxGeometry(2.3, 2.0, 2.6)
-    const cab = new THREE.Mesh(cabGeo, bodyMat)
-    cab.position.set(0, 1.7, 2.0)
-    cab.castShadow = true
-    group.add(cab)
+    // Side rails
+    for (const sign of [-1, 1]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.48, 0.12), darkMat)
+      rail.position.set(0, 0.58, sign * 1.22); group.add(rail)
+    }
 
-    // Cab roof (slightly narrower, rounded feel)
-    const roofGeo = new THREE.BoxGeometry(2.1, 0.5, 2.2)
-    const roofMat = new THREE.MeshStandardMaterial({ color: darken(bodyColor, 0.15), roughness: 0.5 })
-    const roof = new THREE.Mesh(roofGeo, roofMat)
-    roof.position.set(0, 2.95, 1.9)
-    roof.castShadow = true
-    group.add(roof)
+    // Fifth-wheel / saddle coupling
+    const saddle = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.20, 12), new THREE.MeshPhongMaterial({ color: 0x555555, specular: 0x888888, shininess: 60 }))
+    saddle.position.set(0, 0.82, 0.35); group.add(saddle)
 
-    // Front windscreen
-    const windscreenGeo = new THREE.BoxGeometry(1.9, 1.0, 0.06)
-    const windscreen = new THREE.Mesh(windscreenGeo, glassMat)
-    windscreen.position.set(0, 2.2, 3.33)
-    group.add(windscreen)
+    // ---- Cab body -------------------------------------------------------
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.36, 2.2, 2.8), cabMat)
+    cab.position.set(0, 1.78, 2.1); cab.castShadow = true; group.add(cab)
+
+    // Cab roof with slight overhang
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(2.28, 0.45, 2.55), new THREE.MeshPhongMaterial({ color: darken(cabColor, 0.15), shininess: 45 }))
+    roof.position.set(0, 3.05, 2.0); roof.castShadow = true; group.add(roof)
+
+    // Windscreen
+    const windscreen = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.1, 0.07), glassMat)
+    windscreen.position.set(0, 2.25, 3.53); group.add(windscreen)
 
     // Side windows
     for (const sx of [-1, 1]) {
-      const sideWinGeo = new THREE.BoxGeometry(0.06, 0.7, 1.0)
-      const sideWin = new THREE.Mesh(sideWinGeo, glassMat)
-      sideWin.position.set(sx * 1.18, 2.2, 1.8)
-      group.add(sideWin)
+      const sw = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.75, 1.1), glassMat)
+      sw.position.set(sx * 1.2, 2.20, 1.8); group.add(sw)
     }
 
-    // Front grille / bumper
-    const grilleGeo = new THREE.BoxGeometry(2.2, 0.6, 0.15)
-    const grille = new THREE.Mesh(grilleGeo, darkMat)
-    grille.position.set(0, 1.1, 3.3)
-    group.add(grille)
+    // Front grille panel
+    const grille = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.62, 0.15), darkMat)
+    grille.position.set(0, 1.14, 3.52); group.add(grille)
 
-    const bumperGeo = new THREE.BoxGeometry(2.4, 0.25, 0.2)
-    const bumper = new THREE.Mesh(bumperGeo, chromeMat)
-    bumper.position.set(0, 0.55, 3.3)
-    group.add(bumper)
+    // Bumper
+    const bumper = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.26, 0.22), chromeMat)
+    bumper.position.set(0, 0.56, 3.52); group.add(bumper)
 
     // Headlights
-    for (const sx of [-0.7, 0.7]) {
-      const lightGeo = new THREE.BoxGeometry(0.5, 0.28, 0.06)
-      const headlight = new THREE.Mesh(lightGeo, lightMat)
-      headlight.position.set(sx, 1.1, 3.38)
-      group.add(headlight)
+    for (const sx of [-0.72, 0.72]) {
+      const hl = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.30, 0.07), lightMat)
+      hl.position.set(sx, 1.14, 3.60); group.add(hl)
     }
 
-    // Air stack (exhaust pipe, export trucks) / aerial (import trucks)
+    // Exhaust stack (export trucks)
     if (visitType === 'export_delivery') {
-      const stackGeo = new THREE.CylinderGeometry(0.08, 0.1, 1.2, 8)
-      const stackMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.6 })
-      const stack = new THREE.Mesh(stackGeo, stackMat)
-      stack.position.set(-0.9, 3.7, 1.5)
-      group.add(stack)
+      const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.10, 1.3, 8), chromeMat)
+      stack.position.set(-0.95, 3.85, 1.5); group.add(stack)
     }
 
-    // ---- Saddle / fifth wheel (coupling) ---------------------------------
-    const saddleGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.2, 12)
-    const saddleMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.6, metalness: 0.5 })
-    const saddle = new THREE.Mesh(saddleGeo, saddleMat)
-    saddle.position.set(0, 0.82, 0.3)
-    group.add(saddle)
+    // ---- Wheels (4 axles) -----------------------------------------------
+    const wheelGeo = new THREE.CylinderGeometry(0.44, 0.44, 0.36, 16)
+    const rimGeo   = new THREE.CylinderGeometry(0.23, 0.23, 0.39, 8)
 
-    // ---- Wheels ----------------------------------------------------------
-    const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.35, 16)
-    const rimGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.38, 8)
-    const rimMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.3, metalness: 0.7 })
-    const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 })
-
-    // Front steer axle (single wheels)
-    for (const sx of [-1.25, 1.25]) {
-      const tire = new THREE.Mesh(wheelGeo, tireMat)
-      tire.rotation.z = Math.PI / 2
-      tire.position.set(sx, 0.42, 2.4)
-      tire.castShadow = true
-      group.add(tire)
-      const rim = new THREE.Mesh(rimGeo, rimMat)
-      rim.rotation.z = Math.PI / 2
-      rim.position.set(sx, 0.42, 2.4)
-      group.add(rim)
+    // Front steer axle
+    for (const sx of [-1.27, 1.27]) {
+      const t = new THREE.Mesh(wheelGeo, tireMat); t.rotation.z = Math.PI / 2
+      t.position.set(sx, 0.44, 2.4); t.castShadow = true; group.add(t)
+      const r = new THREE.Mesh(rimGeo, rimMat); r.rotation.z = Math.PI / 2
+      r.position.set(sx, 0.44, 2.4); group.add(r)
     }
 
-    // Rear drive axles (dual wheels)
-    for (const sz of [-0.8, -2.0]) {
-      for (const sx of [-1.3, 1.3]) {
-        const tire = new THREE.Mesh(wheelGeo, tireMat)
-        tire.rotation.z = Math.PI / 2
-        tire.position.set(sx, 0.42, sz)
-        tire.castShadow = true
-        group.add(tire)
-        const rim = new THREE.Mesh(rimGeo, rimMat)
-        rim.rotation.z = Math.PI / 2
-        rim.position.set(sx, 0.42, sz)
-        group.add(rim)
+    // Rear drive axles (dual-wheel)
+    for (const sz of [-0.9, -2.0]) {
+      for (const sx of [-1.32, 1.32]) {
+        const t = new THREE.Mesh(wheelGeo, tireMat); t.rotation.z = Math.PI / 2
+        t.position.set(sx, 0.44, sz); t.castShadow = true; group.add(t)
+        const r = new THREE.Mesh(rimGeo, rimMat); r.rotation.z = Math.PI / 2
+        r.position.set(sx, 0.44, sz); group.add(r)
       }
     }
 
@@ -147,7 +111,6 @@ export class TruckRenderer {
     const activeTrucks = trucks.filter(t => t.state !== 'departed')
     const activeTruckIds = new Set(activeTrucks.map(t => t.id))
 
-    // Remove departed
     for (const [id, mesh] of this.meshes) {
       if (!activeTruckIds.has(id)) {
         mesh.traverse(obj => {

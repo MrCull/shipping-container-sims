@@ -55,6 +55,32 @@ function moveTowards(
   }
 }
 
+// Build axis-aligned waypoints: move Z first (to align row), then X (to reach bay)
+// RS approaches from +Z (road side), so Z alignment first makes sense
+function buildRsWaypoints(from: Position3D, to: Position3D): Position3D[] {
+  const pts: Position3D[] = []
+  // Corner: same Z as dest, same X as start
+  if (Math.abs(from.z - to.z) > 0.5) {
+    pts.push({ x: from.x, y: 0, z: to.z })
+  }
+  pts.push({ x: to.x, y: 0, z: to.z })
+  return pts
+}
+
+function advanceRsWaypoints(eq: Equipment, speed: number, dt: number): boolean {
+  if (eq.waypointIndex >= eq.waypoints.length) return true
+  const wp = eq.waypoints[eq.waypointIndex]
+  eq.targetPosition = wp
+  const { position, arrived } = moveTowards(eq.position, wp, speed, dt)
+  eq.position = position
+  eq.position.y = 0
+  if (arrived) {
+    eq.waypointIndex++
+    if (eq.waypointIndex >= eq.waypoints.length) return true
+  }
+  return false
+}
+
 // For reach stacker: compute a parking position in front of the target.
 // The RS approaches from the +Z side (from the road), so park at target.z + offset.
 function rsParkingPosition(targetPos: Position3D): Position3D {
@@ -236,9 +262,10 @@ function tickReachStacker(
   switch (eq.state) {
     case 'assigned': {
       eq.state = 'travel_to_pickup'
-      // Travel to parking position, not to the container itself
       const parkPos = rsParkingPosition(job.pickupLocation.position)
-      eq.targetPosition = parkPos
+      eq.waypoints = buildRsWaypoints(eq.position, parkPos)
+      eq.waypointIndex = 0
+      eq.targetPosition = eq.waypoints[0] ?? parkPos
       eq.stateStartTime = state.simTime
       eq.stateElapsed = 0
       eq.speed = getTravelSpeed(eq, false)
@@ -246,17 +273,12 @@ function tickReachStacker(
     }
 
     case 'travel_to_pickup': {
-      if (!eq.targetPosition) {
-        eq.targetPosition = rsParkingPosition(job.pickupLocation.position)
+      if (eq.waypoints.length === 0) {
+        const parkPos = rsParkingPosition(job.pickupLocation.position)
+        eq.waypoints = buildRsWaypoints(eq.position, parkPos)
+        eq.waypointIndex = 0
       }
-      const { position, arrived } = moveTowards(
-        eq.position,
-        eq.targetPosition,
-        getTravelSpeed(eq, false),
-        dt,
-      )
-      eq.position = position
-      eq.position.y = 0
+      const arrived = advanceRsWaypoints(eq, getTravelSpeed(eq, false), dt)
       if (arrived) {
         // Pre-pick accessibility check
         if (job.pickupLocation.type === 'yard_slot') {
@@ -302,8 +324,11 @@ function tickReachStacker(
         const travelHeight = Math.max(pickTargetY, dropTargetY) + 1.5
         eq.armTargetY = travelHeight
 
+        const dropPark = rsParkingPosition(job.dropoffLocation.position)
+        eq.waypoints = buildRsWaypoints(eq.position, dropPark)
+        eq.waypointIndex = 0
+        eq.targetPosition = eq.waypoints[0] ?? dropPark
         eq.state = 'travel_to_drop'
-        eq.targetPosition = rsParkingPosition(job.dropoffLocation.position)
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0
         eq.speed = getTravelSpeed(eq, true)
@@ -313,35 +338,24 @@ function tickReachStacker(
     }
 
     case 'travel_to_drop': {
-      if (!eq.targetPosition) {
-        eq.targetPosition = rsParkingPosition(job.dropoffLocation.position)
+      if (eq.waypoints.length === 0) {
+        const dropPark = rsParkingPosition(job.dropoffLocation.position)
+        eq.waypoints = buildRsWaypoints(eq.position, dropPark)
+        eq.waypointIndex = 0
       }
-      const { position, arrived } = moveTowards(
-        eq.position,
-        eq.targetPosition,
-        getTravelSpeed(eq, true),
-        dt,
-      )
-      eq.position = position
-      eq.position.y = 0
+      const travelArrived = advanceRsWaypoints(eq, getTravelSpeed(eq, true), dt)
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)
         if (container) {
-          // Container travels at RS body X position but stays aligned on Z to the drop slot X
-          // Lerp X between pickup and dropoff as RS travels
-          const pickPos = job.pickupLocation.position
-          const dropPos = job.dropoffLocation.position
-          const totalDist = Math.abs(dropPos.x - pickPos.x) + Math.abs(dropPos.z - pickPos.z)
-          const doneDist = Math.abs(eq.position.x - pickPos.x) + Math.abs(eq.position.z - pickPos.z)
-          const t = totalDist > 0.1 ? Math.min(1, doneDist / totalDist) : 1
+          // Container rides above RS at travel height, aligned on current waypoint X,Z
           container.currentLocation.position = {
-            x: pickPos.x + (dropPos.x - pickPos.x) * t,
+            x: eq.position.x,
             y: eq.armTargetY,
-            z: pickPos.z + (dropPos.z - pickPos.z) * t,
+            z: eq.position.z,
           }
         }
       }
-      if (arrived) {
+      if (travelArrived) {
         eq.armDropStartY = eq.armTargetY
         eq.state = 'dropping'
         eq.stateStartTime = state.simTime
@@ -378,6 +392,8 @@ function tickReachStacker(
         eq.armTargetY = 0
         eq.armDropStartY = 0
         eq.spreaderZ = 0
+        eq.waypoints = []
+        eq.waypointIndex = 0
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0
       }
