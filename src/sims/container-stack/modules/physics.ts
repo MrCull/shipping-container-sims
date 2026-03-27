@@ -218,6 +218,17 @@ export function injectJitterImpulse(wobble: WobbleState, jitterMagnitude: number
   wobble.angularVelocity += jitterMagnitude * PHYSICS.jitterToImpulseScale * 0.001
 }
 
+/** Per-frame mouse jitter while extracting — scales up when the tower is already unstable. */
+export function injectDragFrameWobble(
+  wobble: WobbleState,
+  frameJitterPx: number,
+  stabilityScore: number
+): void {
+  if (frameJitterPx <= 0.25) return
+  const stress = 1.15 + (1 - stabilityScore) * 1.35
+  wobble.angularVelocity += frameJitterPx * PHYSICS.dragWobblePerPixel * stress
+}
+
 export function stabilityAtRemoval(
   layers: TowerLayer[],
   layerIndex: number,
@@ -265,11 +276,13 @@ function randomCollapseSpin(): Vector3 {
 }
 
 export function collapsePieceFromContainer(
+  meshKey: string,
   c: JengaContainer,
   orientation: LayerOrientation,
   position: Vector3
 ): CollapsePiece {
   return {
+    meshKey,
     id: c.id,
     position: position.clone(),
     velocity: randomCollapseVelocity(),
@@ -279,7 +292,11 @@ export function collapsePieceFromContainer(
   }
 }
 
-export function spawnCollapsePieces(layers: TowerLayer[], failureLayerFromTop = 0): CollapsePiece[] {
+export function spawnCollapsePieces(
+  layers: TowerLayer[],
+  failureLayerFromTop = 0,
+  keyPrefix = ''
+): CollapsePiece[] {
   const startLayer = Math.max(0, layers.length - 1 - failureLayerFromTop)
   const pieces: CollapsePiece[] = []
   for (let li = startLayer; li < layers.length; li++) {
@@ -288,7 +305,8 @@ export function spawnCollapsePieces(layers: TowerLayer[], failureLayerFromTop = 
       const c = layer.slots[si]
       if (!c) continue
       const p = slotWorldPosition(li, si, layers)
-      pieces.push(collapsePieceFromContainer(c, layer.orientation, p))
+      const meshKey = `${keyPrefix}L${li}-S${si}-${c.id}`
+      pieces.push(collapsePieceFromContainer(meshKey, c, layer.orientation, p))
     }
   }
   return pieces

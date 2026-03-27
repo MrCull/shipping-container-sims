@@ -25,11 +25,7 @@ export function useGameLoop(
     const dt = Math.min((now - last) / 1000, 0.1)
     last = now
 
-    if (
-      phase.value === 'paused' ||
-      phase.value === 'start' ||
-      phase.value === 'gameOver'
-    ) {
+    if (phase.value === 'paused' || phase.value === 'start' || phase.value === 'gameOver') {
       render()
       return
     }
@@ -45,10 +41,7 @@ export function useGameLoop(
       }
     } else {
       collapsePhaseStart = 0
-      const r = store.tickPhysics(dt)
-      if (r === 'collapsed') {
-        // pieces spawned in store
-      }
+      store.tickPhysics(dt)
     }
 
     beforeRender?.(dt)

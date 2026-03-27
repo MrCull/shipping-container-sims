@@ -91,3 +91,51 @@ export function getTowerTopY(layers: TowerLayer[]): number {
   if (layers.length === 0) return 0
   return layers.length * BLOCK.height
 }
+
+export interface PlacementCandidate {
+  slotIndex: number
+  position: Vector3
+  orientation: LayerOrientation
+}
+
+/** World positions for choosing where to place the floating block (top gaps or next row). */
+export function getPlacementCandidates(
+  layers: TowerLayer[],
+  slotIndices: number[]
+): PlacementCandidate[] {
+  if (layers.length === 0 || slotIndices.length === 0) return []
+
+  const topIdx = getTopLayerIndex(layers)
+  const topLayer = layers[topIdx]!
+  const out: PlacementCandidate[] = []
+
+  for (const slot of slotIndices) {
+    if (topLayer.slots[slot] === null) {
+      out.push({
+        slotIndex: slot,
+        position: slotWorldPosition(topIdx, slot, layers),
+        orientation: topLayer.orientation,
+      })
+    }
+  }
+
+  if (out.length > 0) return out
+
+  const newIdx = layers.length
+  const orient = newIdx % 2 === 0 ? 'alongX' : 'alongZ'
+  const tempLayers = [...layers]
+  tempLayers.push({
+    index: newIdx,
+    orientation: orient,
+    slots: [null, null, null],
+  })
+
+  for (const slot of slotIndices) {
+    out.push({
+      slotIndex: slot,
+      position: slotWorldPosition(newIdx, slot, tempLayers),
+      orientation: orient,
+    })
+  }
+  return out
+}

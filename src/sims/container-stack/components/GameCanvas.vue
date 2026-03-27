@@ -8,8 +8,9 @@ import { useContainerPicking } from '../composables/useContainerPicking'
 import { useGameLoop } from '../composables/useGameLoop'
 import { useContainerStackAudio } from '../composables/useAudio'
 import { createContainerMesh, setContainerHighlight } from '../modules/containerRenderer'
-import { slotWorldPosition, getTowerTopY } from '../modules/towerBuilder'
-import { INTERACTION, TOWER } from '../modules/config'
+import { createPlacementMarker } from '../modules/placementMarkers'
+import { slotWorldPosition, getTowerTopY, getPlacementCandidates } from '../modules/towerBuilder'
+import { BLOCK, INTERACTION, TOWER } from '../modules/config'
 import type { JengaContainer } from '../types'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -22,6 +23,7 @@ const {
   collapsePieces,
   comboStreak,
   maxHeightLayers,
+  placingSlotOptions,
 } = storeToRefs(store)
 
 const three = useContainerStackThreeScene(canvasRef)
@@ -30,7 +32,11 @@ const audio = useContainerStackAudio()
 const blocksGroup = new THREE.Group()
 const ghostGroup = new THREE.Group()
 const collapseGroup = new THREE.Group()
+const placementMarkersGroup = new THREE.Group()
 const particles = new THREE.Points()
+
+const placementRaycaster = new THREE.Raycaster()
+const ndc = new THREE.Vector2()
 
 let blocksById = new Map<string, THREE.Group>()
 let collapseMeshes = new Map<string, THREE.Group>()
@@ -42,11 +48,77 @@ const slideDir = new THREE.Vector3()
 let prevClientX = 0
 let prevClientY = 0
 
+const hoveredPlacementSlot = ref<number | null>(null)
+const lastPhysicsDt = ref(0.016)
+
 const picking = useContainerPicking(
   canvasRef,
   three.getCamera,
   () => three.getTowerPivot() ?? null
 )
+
+function disposeObjectTree(obj: THREE.Object3D): void {
+  obj.traverse(child => {
+    const m = child as THREE.Mesh | THREE.LineSegments
+    if (m.geometry) m.geometry.dispose()
+    const mat = m.material
+    if (mat && !Array.isArray(mat)) mat.dispose()
+  })
+}
+
+function clearCollapseVisuals(): void {
+  for (const g of collapseMeshes.values()) {
+    collapseGroup.remove(g)
+    disposeObjectTree(g)
+  }
+  collapseMeshes.clear()
+  collapseGroup.clear()
+}
+
+function clearPlacementMarkers(): void {
+  for (const c of placementMarkersGroup.children.slice()) {
+    placementMarkersGroup.remove(c)
+    disposeObjectTree(c)
+  }
+}
+
+function rebuildPlacementMarkers(): void {
+  clearPlacementMarkers()
+  if (phase.value !== 'placing') return
+  const opts = placingSlotOptions.value
+  const cands = getPlacementCandidates(layers.value, opts)
+  const hi = hoveredPlacementSlot.value
+  for (const c of cands) {
+    const m = createPlacementMarker(c, c.slotIndex === hi)
+    placementMarkersGroup.add(m)
+  }
+}
+
+function updateNdc(clientX: number, clientY: number): void {
+  if (!canvasRef.value) return
+  const rect = canvasRef.value.getBoundingClientRect()
+  ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1
+  ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1
+}
+
+function pickPlacementSlot(clientX: number, clientY: number): number | null {
+  const camera = three.getCamera()
+  if (!camera) return null
+  updateNdc(clientX, clientY)
+  placementRaycaster.setFromCamera(ndc, camera)
+  const hits = placementRaycaster.intersectObjects(placementMarkersGroup.children, true)
+  for (const hit of hits) {
+    let obj: THREE.Object3D | null = hit.object
+    while (obj) {
+      const ud = obj.userData as { isPlacementMarker?: boolean; slotIndex?: number }
+      if (ud?.isPlacementMarker && ud.slotIndex !== undefined) {
+        return ud.slotIndex
+      }
+      obj = obj.parent
+    }
+  }
+  return null
+}
 
 function rebuildTowerMeshes(): void {
   const pivot = three.getTowerPivot()
@@ -54,12 +126,7 @@ function rebuildTowerMeshes(): void {
 
   for (const g of blocksById.values()) {
     blocksGroup.remove(g)
-    g.traverse(obj => {
-      const m = obj as THREE.Mesh | THREE.LineSegments
-      if (m.geometry) m.geometry.dispose()
-      const mat = m.material
-      if (mat && !Array.isArray(mat)) mat.dispose()
-    })
+    disposeObjectTree(g)
   }
   blocksById = new Map()
 
@@ -127,25 +194,37 @@ function updateGhostPosition(): void {
   if (ghostGroup.children.length === 0) return
   const g = ghostGroup.children[0] as THREE.Group
   const topY = getTowerTopY(layers.value)
-  const cam = three.getCamera()
-  if (phase.value === 'removing' && activePick.value && cam) {
+  if (phase.value === 'removing' && activePick.value) {
     const base = slotWorldPosition(
       activePick.value.layerIndex,
       activePick.value.slotIndex,
       layers.value
     )
-    const worldSlide = slideDir.clone().multiplyScalar(slideProgress.value * INTERACTION.slideOutDistance)
+    const worldSlide = slideDir
+      .clone()
+      .multiplyScalar(slideProgress.value * INTERACTION.slideOutDistance)
     g.position.copy(base).add(worldSlide)
     return
   }
   if (phase.value === 'placing') {
-    g.position.set(0, topY + INTERACTION.ghostHeightAboveTop, 0)
+    const opts = placingSlotOptions.value
+    const cands = getPlacementCandidates(layers.value, opts)
+    const slot = hoveredPlacementSlot.value
+    const chosen =
+      cands.find(c => c.slotIndex === slot) ??
+      cands[0] ??
+      null
+    if (chosen) {
+      g.position.copy(chosen.position)
+      g.position.y += BLOCK.height * 0.95
+    } else {
+      g.position.set(0, topY + INTERACTION.ghostHeightAboveTop, 0)
+    }
   }
 }
 
 function syncCollapseMeshes(): void {
-  collapseGroup.clear()
-  collapseMeshes.clear()
+  clearCollapseVisuals()
   for (const p of collapsePieces.value) {
     const fake: JengaContainer = {
       id: p.id,
@@ -155,7 +234,7 @@ function syncCollapseMeshes(): void {
     }
     const mesh = createContainerMesh(fake, p.orientation)
     mesh.position.copy(p.position)
-    collapseMeshes.set(p.id, mesh)
+    collapseMeshes.set(p.meshKey, mesh)
     collapseGroup.add(mesh)
   }
 }
@@ -169,13 +248,14 @@ function applyWobbleToPivot(): void {
 }
 
 function updateCollapseVisuals(): void {
+  const dt = lastPhysicsDt.value
   for (const p of collapsePieces.value) {
-    const m = collapseMeshes.get(p.id)
+    const m = collapseMeshes.get(p.meshKey)
     if (m) {
       m.position.copy(p.position)
-      m.rotation.x += p.angularVelocity.x * 0.016
-      m.rotation.y += p.angularVelocity.y * 0.016
-      m.rotation.z += p.angularVelocity.z * 0.016
+      m.rotation.x += p.angularVelocity.x * dt
+      m.rotation.y += p.angularVelocity.y * dt
+      m.rotation.z += p.angularVelocity.z * dt
     }
   }
 }
@@ -195,12 +275,22 @@ watch(floatingContainer, () => {
   syncGhostMesh()
 })
 
+watch([phase, placingSlotOptions, layers, hoveredPlacementSlot], () => {
+  rebuildPlacementMarkers()
+})
+
 watch(phase, (p, prevP) => {
+  if (p === 'gameOver' || p === 'start' || (p === 'playing' && prevP === 'start')) {
+    clearCollapseVisuals()
+  }
   if (p === 'gameOver' || p === 'start') {
     const pivot = three.getTowerPivot()
     if (pivot) {
       pivot.rotation.set(0, 0, 0)
     }
+  }
+  if (p !== 'placing') {
+    hoveredPlacementSlot.value = null
   }
   if (p === 'collapsing' && prevP !== 'collapsing') {
     const pivot = three.getTowerPivot()
@@ -211,6 +301,7 @@ watch(phase, (p, prevP) => {
     audio.playCollapseSequence()
     blocksGroup.clear()
     blocksById.clear()
+    clearPlacementMarkers()
   }
   if (p === 'playing' && prevP === 'start') {
     void audio.init()
@@ -234,7 +325,8 @@ const { start: startLoop, stop: stopLoop } = useGameLoop(
   () => getTowerTopY(layers.value),
   y => three.frameTower(y),
   n => three.setCameraShake(n),
-  () => {
+  dt => {
+    lastPhysicsDt.value = dt
     applyWobbleToPivot()
     updateGhostPosition()
     if (phase.value === 'collapsing') {
@@ -249,9 +341,12 @@ function onPointerDown(e: PointerEvent): void {
   canvasRef.value.setPointerCapture(e.pointerId)
 
   if (phase.value === 'placing') {
-    store.placeOnTop()
-    audio.playSound('containerSet', 0.75)
-    audio.playSound('caChing', 0.45)
+    const slot = pickPlacementSlot(e.clientX, e.clientY)
+    if (slot === null) return
+    if (store.placeOnTop(slot)) {
+      audio.playSound('containerSet', 0.75)
+      audio.playSound('caChing', 0.45)
+    }
     return
   }
 
@@ -280,7 +375,11 @@ function onPointerDown(e: PointerEvent): void {
 }
 
 function onPointerMove(e: PointerEvent): void {
-  picking.onPointerMove(e.clientX, e.clientY)
+  if (phase.value === 'placing') {
+    hoveredPlacementSlot.value = pickPlacementSlot(e.clientX, e.clientY)
+  } else {
+    picking.onPointerMove(e.clientX, e.clientY)
+  }
 
   if (phase.value === 'removing' && dragStart.value) {
     const dx = e.clientX - prevClientX
@@ -298,13 +397,15 @@ function onPointerMove(e: PointerEvent): void {
   for (const [, grp] of blocksById) {
     setContainerHighlight(grp, false)
   }
-  const h = picking.hoveredPick.value
-  if (h && phase.value === 'playing') {
-    const layer = layers.value[h.layerIndex]
-    const c = layer?.slots[h.slotIndex]
-    if (c && store.canRemoveFromSlot(h.layerIndex, h.slotIndex)) {
-      const grp = blocksById.get(c.id)
-      if (grp) setContainerHighlight(grp, true)
+  if (phase.value === 'playing') {
+    const h = picking.hoveredPick.value
+    if (h) {
+      const layer = layers.value[h.layerIndex]
+      const c = layer?.slots[h.slotIndex]
+      if (c && store.canRemoveFromSlot(h.layerIndex, h.slotIndex)) {
+        const grp = blocksById.get(c.id)
+        if (grp) setContainerHighlight(grp, true)
+      }
     }
   }
 }
@@ -331,6 +432,9 @@ function onPointerUp(e: PointerEvent): void {
 
 function onPointerLeave(): void {
   picking.onPointerLeave()
+  if (phase.value === 'placing') {
+    hoveredPlacementSlot.value = null
+  }
 }
 
 onMounted(() => {
@@ -344,6 +448,7 @@ onMounted(() => {
     pivot.add(blocksGroup)
     pivot.add(ghostGroup)
     scene.add(collapseGroup)
+    scene.add(placementMarkersGroup)
     setupParticles()
     scene.add(particles)
     rebuildTowerMeshes()
@@ -367,6 +472,7 @@ watch(
         pivot.add(blocksGroup)
         pivot.add(ghostGroup)
         scene.add(collapseGroup)
+        scene.add(placementMarkersGroup)
         scene.add(particles)
         rebuildTowerMeshes()
       }

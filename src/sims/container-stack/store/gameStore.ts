@@ -5,15 +5,17 @@ import type {
   CollapsePiece,
   GamePhase,
   JengaContainer,
+  LayerOrientation,
   MoveRecord,
   TowerLayer,
 } from '../types'
-import { TOWER } from '../modules/config'
+import { BLOCK, PHYSICS, TOWER } from '../modules/config'
 import {
   buildInitialTower,
   countContainersInLayer,
   getHighestOccupiedLayerIndex,
   getTopLayerIndex,
+  getTowerTopY,
   isLayerComplete,
   resetContainerIdCounter,
   slotWorldPosition,
@@ -24,6 +26,7 @@ import {
   computeStabilityScore,
   createInitialWobble,
   injectCriticalRemovalImpulse,
+  injectDragFrameWobble,
   injectJitterImpulse,
   isRemovalCritical,
   isStructurallySound,
@@ -53,6 +56,32 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   const jitterAccumulator = ref(0)
   const removalWasCritical = ref(false)
   const stabilityAtRemovalStart = ref(1)
+  const placingSlotOptions = ref<number[]>([])
+  let collapseIdPrefix = `${Date.now()}-`
+
+  function beginCollapseFromTower(extraFloating?: {
+    container: JengaContainer
+    orient: LayerOrientation
+    position: Vector3
+  }): void {
+    const prefix = `${collapseIdPrefix}-`
+    const towerPieces = spawnCollapsePieces(layers.value, 0, prefix)
+    if (extraFloating) {
+      towerPieces.unshift(
+        collapsePieceFromContainer(
+          `${prefix}floating`,
+          extraFloating.container,
+          extraFloating.orient,
+          extraFloating.position
+        )
+      )
+    }
+    phase.value = 'collapsing'
+    collapsePieces.value = towerPieces
+    floatingContainer.value = null
+    floatingFrom.value = null
+    placingSlotOptions.value = []
+  }
 
   function recomputePhysics(): void {
     const com = computeCenterOfMass(layers.value)
@@ -62,6 +91,8 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
 
   function newGame(): void {
     resetContainerIdCounter()
+    collapseIdPrefix = `${Date.now()}`
+    collapsePieces.value = []
     layers.value = buildInitialTower()
     wobble.value = createInitialWobble()
     recomputePhysics()
@@ -118,16 +149,13 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     if (!isStructurallySound(layers.value)) {
       const floating = floatingContainer.value
       const from = floatingFrom.value
-      const towerPieces = spawnCollapsePieces(layers.value, 0)
       if (floating && from) {
         const orient = layers.value[from.layerIndex]?.orientation ?? 'alongX'
         const pos = slotWorldPosition(from.layerIndex, from.slotIndex, layers.value)
-        towerPieces.unshift(collapsePieceFromContainer(floating, orient, pos))
+        beginCollapseFromTower({ container: floating, orient, position: pos })
+      } else {
+        beginCollapseFromTower()
       }
-      phase.value = 'collapsing'
-      collapsePieces.value = towerPieces
-      floatingContainer.value = null
-      floatingFrom.value = null
       return true
     }
 
@@ -140,7 +168,11 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   }
 
   function recordDragJitter(deltaPixels: number): void {
-    jitterAccumulator.value += Math.abs(deltaPixels)
+    const d = Math.abs(deltaPixels)
+    jitterAccumulator.value += d
+    if (phase.value === 'removing') {
+      injectDragFrameWobble(wobble.value, d, stabilityScore.value)
+    }
   }
 
   function finishSlideAndEnterPlacing(): void {
@@ -151,7 +183,20 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
       removalWasCritical.value
     )
     injectJitterImpulse(wobble.value, jitterAccumulator.value)
+    placingSlotOptions.value = computePlacingSlotOptions()
     phase.value = 'placing'
+  }
+
+  function computePlacingSlotOptions(): number[] {
+    const top = getTopLayerIndex(layers.value)
+    const topLayer = layers.value[top]
+    if (!topLayer) return [0, 1, 2]
+    const opts: number[] = []
+    for (let s = 0; s < topLayer.slots.length; s++) {
+      if (topLayer.slots[s] === null) opts.push(s)
+    }
+    if (opts.length > 0) return opts
+    return [0, 1, 2]
   }
 
   function cancelRemoval(): void {
@@ -168,27 +213,21 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     phase.value = 'playing'
   }
 
-  function validPlacementSlotIndex(): number | null {
-    const top = getTopLayerIndex(layers.value)
-    const topLayer = layers.value[top]
-    if (!topLayer) return null
-    for (let s = 0; s < topLayer.slots.length; s++) {
-      if (topLayer.slots[s] === null) return s
-    }
-    return null
-  }
-
-  function placeOnTop(): boolean {
+  function placeOnTop(slotIndex: number): boolean {
     if (phase.value !== 'placing' || !floatingContainer.value) return false
     const c = floatingContainer.value
-    const slotIdx = validPlacementSlotIndex()
+    if (!placingSlotOptions.value.includes(slotIndex)) return false
 
     let targetLayerIndex: number
     let targetSlot: number
 
-    if (slotIdx !== null) {
-      targetLayerIndex = getTopLayerIndex(layers.value)
-      targetSlot = slotIdx
+    const topIdx = getTopLayerIndex(layers.value)
+    const topLayer = layers.value[topIdx]
+    const openOnTop = topLayer?.slots[slotIndex] === null
+
+    if (openOnTop) {
+      targetLayerIndex = topIdx
+      targetSlot = slotIndex
     } else {
       const orient = layers.value.length % 2 === 0 ? 'alongX' : 'alongZ'
       const newLayer: TowerLayer = {
@@ -198,7 +237,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
       }
       layers.value.push(newLayer)
       targetLayerIndex = newLayer.index
-      targetSlot = 0
+      targetSlot = slotIndex
     }
 
     const placed: JengaContainer = {
@@ -211,10 +250,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
 
     recomputePhysics()
     if (!isStructurallySound(layers.value)) {
-      phase.value = 'collapsing'
-      collapsePieces.value = spawnCollapsePieces(layers.value, 0)
-      floatingContainer.value = null
-      floatingFrom.value = null
+      beginCollapseFromTower()
       return true
     }
 
@@ -246,6 +282,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
 
     floatingContainer.value = null
     floatingFrom.value = null
+    placingSlotOptions.value = []
     phase.value = 'playing'
     return true
   }
@@ -259,14 +296,46 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
       layers.value.length > 0 &&
       !isStructurallySound(layers.value)
     ) {
-      phase.value = 'collapsing'
-      collapsePieces.value = spawnCollapsePieces(layers.value, 0)
+      beginCollapseFromTower()
       return 'collapsed'
     }
     const { collapsed } = updateWobble(wobble.value, stabilityScore.value, dt)
     if (collapsed) {
-      phase.value = 'collapsing'
-      collapsePieces.value = spawnCollapsePieces(layers.value, 0)
+      if (phase.value === 'removing') {
+        const floating = floatingContainer.value
+        const from = floatingFrom.value
+        if (floating && from) {
+          const orient = layers.value[from.layerIndex]?.orientation ?? 'alongX'
+          const pos = slotWorldPosition(from.layerIndex, from.slotIndex, layers.value)
+          beginCollapseFromTower({ container: floating, orient, position: pos })
+        } else {
+          beginCollapseFromTower()
+        }
+      } else if (phase.value === 'placing' && floatingContainer.value) {
+        const floating = floatingContainer.value
+        const top = getTopLayerIndex(layers.value)
+        const orient = layers.value[top]?.orientation ?? 'alongX'
+        const pos = new Vector3(0, getTowerTopY(layers.value) + BLOCK.height * 0.95, 0)
+        beginCollapseFromTower({ container: floating, orient, position: pos })
+      } else {
+        beginCollapseFromTower()
+      }
+      return 'collapsed'
+    }
+    if (
+      phase.value === 'removing' &&
+      stabilityScore.value < PHYSICS.shakyCollapseStabilityThreshold &&
+      jitterAccumulator.value > PHYSICS.shakyCollapseJitterThreshold
+    ) {
+      const floating = floatingContainer.value
+      const from = floatingFrom.value
+      if (floating && from) {
+        const orient = layers.value[from.layerIndex]?.orientation ?? 'alongX'
+        const pos = slotWorldPosition(from.layerIndex, from.slotIndex, layers.value)
+        beginCollapseFromTower({ container: floating, orient, position: pos })
+      } else {
+        beginCollapseFromTower()
+      }
       return 'collapsed'
     }
     return 'ok'
@@ -282,6 +351,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     layers.value = []
     floatingContainer.value = null
     collapsePieces.value = []
+    placingSlotOptions.value = []
     lastScorePopup.value = 0
     wobble.value = createInitialWobble()
   }
@@ -306,6 +376,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     lastScorePopup,
     maxHeightLayers,
     collapsePieces,
+    placingSlotOptions,
     beginPlay,
     newGame,
     canRemoveFromSlot,

@@ -57,6 +57,8 @@ export interface MoveRecord {
 }
 
 export interface CollapsePiece {
+  /** Stable unique key for Three.js maps (container ids can repeat across games). */
+  meshKey: string
   id: string
   position: Vector3
   velocity: Vector3

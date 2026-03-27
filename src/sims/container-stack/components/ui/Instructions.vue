@@ -13,7 +13,7 @@ const text = computed(() => {
     case 'removing':
       return 'Keep dragging smoothly — shaky moves rock the stack. Release when the block is far enough out.'
     case 'placing':
-      return 'Click anywhere to drop the container on top. Fill the row, then build higher.'
+      return 'Click a green slot on the tower top to place the container. Smooth pulls are safer — shaky drags wobble the stack, and a rickety tower can fall before you finish the pull.'
     case 'collapsing':
       return '…'
     default:
