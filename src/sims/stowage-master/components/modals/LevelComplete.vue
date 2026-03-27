@@ -30,7 +30,10 @@ function nextLevel() {
         {{ rating.title }}
       </div>
       <div class="score-display">
-        Score: {{ store.score.toLocaleString() }} / {{ store.targetScore.toLocaleString() }}
+        Score: {{ store.score.toLocaleString() }} / {{ store.perfectScore.toLocaleString() }}
+      </div>
+      <div class="pass-threshold">
+        Pass threshold: {{ store.targetScore.toLocaleString() }}
       </div>
       <div class="actions">
         <button
@@ -82,6 +85,11 @@ function nextLevel() {
 .score-display {
   font-size: 16px;
   color: #aaa;
+  margin-bottom: 4px;
+}
+.pass-threshold {
+  font-size: 13px;
+  color: #666;
   margin-bottom: 24px;
 }
 .actions {

@@ -279,3 +279,70 @@ export function animateFoam(foam: THREE.Points | null, time: number): void {
   }
   pos.needsUpdate = true
 }
+
+// Terminal truck/trailer chassis for quay-side container queue
+export function createTerminalTruck(): THREE.Group {
+  const group = new THREE.Group()
+  group.name = 'terminal-truck'
+
+  const chassisMat = new THREE.MeshPhongMaterial({ color: 0x3a3a3a, shininess: 30 })
+  const axleMat = new THREE.MeshPhongMaterial({ color: 0x222222, shininess: 20 })
+  const tireMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, shininess: 10 })
+  const cabMat = new THREE.MeshPhongMaterial({ color: 0xddddcc, shininess: 40 })
+
+  // Chassis frame
+  const chassisGeo = new THREE.BoxGeometry(7.5, 0.3, 2.6)
+  const chassis = new THREE.Mesh(chassisGeo, chassisMat)
+  chassis.position.y = 0.7
+  chassis.castShadow = true
+  group.add(chassis)
+
+  // Side rails
+  for (const sign of [-1, 1]) {
+    const railGeo = new THREE.BoxGeometry(7.5, 0.5, 0.12)
+    const rail = new THREE.Mesh(railGeo, chassisMat)
+    rail.position.set(0, 0.6, sign * 1.2)
+    group.add(rail)
+  }
+
+  // Axles and wheels
+  const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.25, 12)
+  const axleGeo = new THREE.CylinderGeometry(0.08, 0.08, 2.8, 8)
+  for (const xPos of [-2.5, 2.5]) {
+    const axle = new THREE.Mesh(axleGeo, axleMat)
+    axle.rotation.x = Math.PI / 2
+    axle.position.set(xPos, 0.4, 0)
+    group.add(axle)
+
+    for (const zSign of [-1, 1]) {
+      const wheel = new THREE.Mesh(wheelGeo, tireMat)
+      wheel.rotation.x = Math.PI / 2
+      wheel.position.set(xPos, 0.4, zSign * 1.35)
+      wheel.castShadow = true
+      group.add(wheel)
+    }
+  }
+
+  // Cab (simplified tractor unit at front)
+  const cabGeo = new THREE.BoxGeometry(2.2, 2.0, 2.4)
+  const cab = new THREE.Mesh(cabGeo, cabMat)
+  cab.position.set(4.5, 1.5, 0)
+  cab.castShadow = true
+  group.add(cab)
+
+  // Cab windscreen
+  const winMat = new THREE.MeshPhongMaterial({
+    color: 0x88bbdd,
+    emissive: 0x224466,
+    emissiveIntensity: 0.4,
+    transparent: true,
+    opacity: 0.75,
+    shininess: 120,
+  })
+  const winGeo = new THREE.BoxGeometry(0.08, 1.0, 2.0)
+  const windscreen = new THREE.Mesh(winGeo, winMat)
+  windscreen.position.set(5.65, 1.7, 0)
+  group.add(windscreen)
+
+  return group
+}

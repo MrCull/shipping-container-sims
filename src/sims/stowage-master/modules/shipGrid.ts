@@ -17,16 +17,25 @@ export function parseSlotId(id: string): { bay: number; row: number; tier: numbe
 }
 
 export function generateSlots(shipConfig: ShipPreset): Record<string, Slot> {
+  slotCache.clear()
   const cacheKey = `${shipConfig.bays}-${shipConfig.rows}-${shipConfig.tiers}`
-  if (slotCache.has(cacheKey)) return slotCache.get(cacheKey)!
 
   const slots: Record<string, Slot> = {}
   const { bays, rows, tiers } = shipConfig
-  const cellX = CONTAINER.size.x + CONTAINER.gap
-  const cellY = CONTAINER.size.y + CONTAINER.gap
-  const cellZ = CONTAINER.size.z + CONTAINER.gap
 
-  for (let b = 0; b < bays; b++) {
+  // Derive cell sizes from the actual cargo area so slots stay within the hull
+  const cargoLength = shipConfig.length * shipConfig.cargoLengthFraction
+  const cargoWidth = shipConfig.width * shipConfig.cargoWidthFraction
+  const cargoXCenter = shipConfig.length * shipConfig.cargoXOffsetFraction
+
+  // Evenly distribute bays and rows across the cargo area
+  const cellX = bays > 1 ? cargoLength / bays : CONTAINER.size.z + CONTAINER.gap
+  const cellZ = rows > 1 ? cargoWidth / rows : CONTAINER.size.x + CONTAINER.gap
+  const cellY = CONTAINER.size.y + CONTAINER.gap
+
+  const activeBays = bays - shipConfig.sternBlockedBays
+
+  for (let b = 0; b < activeBays; b++) {
     const bayNum = b * 2 + 1
     for (let r = 0; r < rows; r++) {
       const rowNum = r + 1
@@ -34,7 +43,8 @@ export function generateSlots(shipConfig: ShipPreset): Record<string, Slot> {
         const tierNum = (t + 1) * 2
         const id = slotId(bayNum, rowNum, tierNum)
 
-        const xOffset = (b - (bays - 1) / 2) * cellX
+        // Centre bays along cargoLength, shifted by cargoXCenter
+        const xOffset = cargoXCenter + (b - (activeBays - 1) / 2) * cellX
         const yOffset = t * cellY
         const zOffset = (r - (rows - 1) / 2) * cellZ
 
@@ -61,9 +71,10 @@ export function generateSlots(shipConfig: ShipPreset): Record<string, Slot> {
 
 export function getAvailableSlots(grid: Record<string, Slot>, shipConfig: ShipPreset): string[] {
   const available: string[] = []
-  const { bays, rows, tiers } = shipConfig
+  const { rows, tiers } = shipConfig
+  const activeBays = shipConfig.bays - shipConfig.sternBlockedBays
 
-  for (let b = 0; b < bays; b++) {
+  for (let b = 0; b < activeBays; b++) {
     const bayNum = b * 2 + 1
     for (let r = 0; r < rows; r++) {
       const rowNum = r + 1

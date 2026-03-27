@@ -5,7 +5,7 @@ import { generateContainerList, resetSerialCounter } from '../modules/containerF
 import { generateSlots, getAvailableSlots } from '../modules/shipGrid'
 import { updatePhysics, checkDisasters } from '../modules/physics'
 import { calculatePlacementScore, getStarRating, checkPerfectBalance } from '../modules/scoring'
-import { getLevelConfig, getTargetScore, getTotalSlots } from '../modules/levels'
+import { getLevelConfig, getTotalSlots } from '../modules/levels'
 
 let eventIdCounter = 0
 
@@ -24,7 +24,8 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const events = ref<GameEvent[]>([])
   const disasterType = ref<DisasterType | null>(null)
   const lastPlacement = ref<PlacementResult | null>(null)
-  const targetScore = ref(0)
+  const perfectScore = ref(0)   // containerCount × 100 — theoretical maximum
+  const targetScore = ref(0)    // pass threshold = perfectScore × 0.70
   const totalSlots = ref(0)
 
   const currentContainer = computed<Container | null>(() => {
@@ -66,13 +67,15 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     const config = getLevelConfig(level)
     shipConfig.value = config.preset
     totalSlots.value = getTotalSlots(config.preset)
-    targetScore.value = getTargetScore(config.preset)
+    const containerCount = config.containerCount ?? totalSlots.value
+    perfectScore.value = containerCount * 100
+    targetScore.value = Math.round(perfectScore.value * 0.70)
 
     const slots = generateSlots(config.preset)
     grid.value = JSON.parse(JSON.stringify(slots)) as Record<string, Slot>
 
     resetSerialCounter()
-    containers.value = generateContainerList(totalSlots.value, config.hazmatRate)
+    containers.value = generateContainerList(containerCount, config.hazmatRate)
     currentContainerIndex.value = 0
 
     score.value = 0
@@ -128,7 +131,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
       container, slot, grid.value, shipConfig.value!,
       physics.list, physics.trim
     )
-    score.value += placement.score
+    score.value = Math.min(score.value + placement.score, perfectScore.value)
     moveCount.value++
     lastPlacement.value = placement
 
@@ -145,7 +148,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     if (currentContainerIndex.value >= containers.value.length) {
       const balanceBonus = checkPerfectBalance(physics.list, physics.trim)
       if (balanceBonus > 0) {
-        score.value += balanceBonus
+        score.value = Math.min(score.value + balanceBonus, perfectScore.value)
         addEvent(`Perfect balance bonus: +${balanceBonus}`, 'success')
       }
 
@@ -175,14 +178,14 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   }
 
   function getStarRatingResult(): StarRatingResult {
-    return getStarRating(score.value, targetScore.value)
+    return getStarRating(score.value, perfectScore.value)
   }
 
   return {
     phase, currentLevel, score, moveCount, containers,
     currentContainerIndex, grid, shipConfig, shipList,
     shipTrim, shipVCG, events, disasterType, lastPlacement,
-    targetScore, totalSlots,
+    perfectScore, targetScore, totalSlots,
     currentContainer, queueContainers, nextThreeContainers,
     availableSlots, isWarning, isCritical, progressPercent, levelConfig,
     startLevel, placeContainer, finalizePlacement,

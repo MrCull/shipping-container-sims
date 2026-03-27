@@ -8,6 +8,7 @@ export const LEVELS: LevelConfig[] = [
     description: 'A small feeder ship. Learn the basics of container loading.',
     preset: SHIP_PRESETS.small,
     hazmatRate: CONTAINER.hazmatRate,
+    containerCount: 20,
   },
   {
     id: 1,
@@ -33,6 +34,7 @@ export function getTotalSlots(preset: LevelConfig['preset']): number {
   return preset.bays * preset.rows * preset.tiers
 }
 
-export function getTargetScore(preset: LevelConfig['preset']): number {
-  return getTotalSlots(preset) * 100 * SCORING.targetScoreMultiplier
+export function getTargetScore(preset: LevelConfig['preset'], containerCount?: number): number {
+  const count = containerCount ?? getTotalSlots(preset)
+  return count * 100 * SCORING.targetScoreMultiplier
 }

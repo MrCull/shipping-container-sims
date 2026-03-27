@@ -236,12 +236,18 @@ export function createPlacementAnimation(
   const speed = 12 * CRANE.animationSpeed
 
   const startPos = new THREE.Vector3().copy(containerMesh.position)
-  const aboveTarget = new THREE.Vector3(
-    targetPosition.x,
-    crane.towerHeight - 2,
-    targetPosition.z
-  )
+  const travelHeight = crane.towerHeight - 2
+  const liftPos = new THREE.Vector3(startPos.x, travelHeight, startPos.z)
+  const aboveTarget = new THREE.Vector3(targetPosition.x, travelHeight, targetPosition.z)
   const finalTarget = new THREE.Vector3().copy(targetPosition)
+
+  // Initialise spreader/trolley at the pickup column
+  crane.trolley.position.x = startPos.x
+  crane.trolley.position.z = crane.dockZ
+  crane.spreader.position.x = startPos.x
+  crane.spreader.position.z = crane.dockZ
+  crane.spreader.position.y = startPos.y + CONTAINER.size.y + 0.15
+  updateCables(crane)
 
   let t = 0
 
@@ -249,22 +255,35 @@ export function createPlacementAnimation(
     t += deltaTime * speed
 
     if (currentPhase === 0) {
-      // Phase 0: Trolley moves over target + lift container to travel height
-      const progress = Math.min(t / getDistance(startPos, aboveTarget), 1)
+      // Phase 0: Hoist container up from truck to travel height
+      const progress = Math.min(t / 0.8, 1)
       const eased = easeInOutCubic(progress)
-      containerMesh.position.lerpVectors(startPos, aboveTarget, eased)
+      containerMesh.position.lerpVectors(startPos, liftPos, eased)
+      crane.spreader.position.y = THREE.MathUtils.lerp(
+        startPos.y + CONTAINER.size.y + 0.15,
+        travelHeight - 0.5,
+        eased
+      )
+      updateCables(crane)
+      if (progress >= 1) { currentPhase = 1; t = 0 }
+
+    } else if (currentPhase === 1) {
+      // Phase 1: Trolley travels over target slot (container follows at travel height)
+      const progress = Math.min(t / Math.max(getDistance(liftPos, aboveTarget), 0.4), 1)
+      const eased = easeInOutCubic(progress)
+      containerMesh.position.lerpVectors(liftPos, aboveTarget, eased)
 
       crane.trolley.position.z = THREE.MathUtils.lerp(crane.dockZ, targetPosition.z, eased)
-      crane.trolley.position.x = THREE.MathUtils.lerp(0, targetPosition.x, eased)
+      crane.trolley.position.x = THREE.MathUtils.lerp(startPos.x, targetPosition.x, eased)
       crane.spreader.position.z = crane.trolley.position.z
       crane.spreader.position.x = crane.trolley.position.x
 
       updateCables(crane)
 
-      if (progress >= 1) { currentPhase = 1; t = 0 }
+      if (progress >= 1) { currentPhase = 2; t = 0 }
 
-    } else if (currentPhase === 1) {
-      // Phase 1: Lower container onto slot
+    } else if (currentPhase === 2) {
+      // Phase 2: Lower container onto slot
       const dist = aboveTarget.y - finalTarget.y
       const progress = Math.min(t / Math.max(dist * 0.08, 0.4), 1)
       const eased = easeInOutQuad(progress)
@@ -273,7 +292,7 @@ export function createPlacementAnimation(
       containerMesh.position.z = finalTarget.z
 
       crane.spreader.position.y = THREE.MathUtils.lerp(
-        crane.towerHeight - 2.5,
+        travelHeight - 0.5,
         finalTarget.y + CONTAINER.size.y + 0.15,
         eased
       )
@@ -287,12 +306,12 @@ export function createPlacementAnimation(
         shipGroup.worldToLocal(worldPos)
         containerMesh.position.copy(worldPos)
 
-        currentPhase = 2
+        currentPhase = 3
         t = 0
       }
 
-    } else if (currentPhase === 2) {
-      // Phase 2: Return crane to dock
+    } else if (currentPhase === 3) {
+      // Phase 3: Return crane to dock position (above front truck)
       const progress = Math.min(t / 7, 1)
       const eased = easeInOutCubic(progress)
       crane.trolley.position.z = THREE.MathUtils.lerp(targetPosition.z, crane.dockZ, eased)

@@ -303,9 +303,9 @@ function addDeckFittings(
 
 export function updateShipTilt(shipGroup: THREE.Group | null, list: number, trim: number): void {
   if (!shipGroup) return
-  // Smooth interpolated tilt for visual appeal
+  // list > 0 → starboard heavy → roll to +Z; trim > 0 → bow heavy → bow sinks (−X rotation)
   const targetRotZ = (list * Math.PI) / 180
-  const targetRotX = (trim * Math.PI) / 180
+  const targetRotX = -(trim * Math.PI) / 180
   shipGroup.rotation.z += (targetRotZ - shipGroup.rotation.z) * 0.08
   shipGroup.rotation.x += (targetRotX - shipGroup.rotation.x) * 0.08
 }

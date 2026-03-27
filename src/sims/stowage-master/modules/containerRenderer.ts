@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { Container, Slot, ShipPreset } from '../types'
-import { CONTAINER, WEIGHT_COLORS } from './config'
+import { CONTAINER } from './config'
 
 // Container proportions: proper ISO 20ft proportions (roughly 2.4 wide × 2.6 tall × 6 long)
 // VISUAL_Z is the visual length — slot offsets use CONTAINER.size.z from config
@@ -17,15 +17,16 @@ const SHIPPING_LINE_COLORS: Record<string, number> = {
 }
 
 export function createContainerMesh(container: Container): THREE.Group {
-  const { x, y } = CONTAINER.size
-  const z = VISUAL_Z
+  // x = length along ship (bay direction), z = width across beam (row direction)
+  const x = VISUAL_Z
+  const y = CONTAINER.size.y
+  const z = CONTAINER.size.x
 
   const group = new THREE.Group()
   group.name = `container-${container.id}`
 
   const baseColor = SHIPPING_LINE_COLORS[container.port] ?? container.portColor
 
-  // Main body — slightly darker shade for sides vs face
   const bodyColor = baseColor
   const bodyMat = new THREE.MeshPhongMaterial({
     color: bodyColor,
@@ -34,7 +35,6 @@ export function createContainerMesh(container: Container): THREE.Group {
     flatShading: false,
   })
 
-  // Slightly lighter for top/bottom panel
   const topColor = new THREE.Color(bodyColor).lerp(new THREE.Color(0xffffff), 0.12)
   const topMat = new THREE.MeshPhongMaterial({
     color: topColor,
@@ -42,39 +42,22 @@ export function createContainerMesh(container: Container): THREE.Group {
     shininess: 30,
   })
 
-  // Box for main body (sides only, no end caps because we add corrugated ends)
   const bodyGeo = new THREE.BoxGeometry(x, y, z)
   const body = new THREE.Mesh(bodyGeo, [
-    bodyMat, // right
-    bodyMat, // left
+    bodyMat, // right (+X end)
+    bodyMat, // left (-X end)
     topMat,  // top
     topMat,  // bottom
-    bodyMat, // front (end)
-    bodyMat, // back (end)
+    bodyMat, // front (+Z side)
+    bodyMat, // back (-Z side)
   ])
   body.castShadow = true
   body.receiveShadow = true
   group.add(body)
 
-  // Corrugated panels on the long sides (subtle)
   addSideRidges(group, x, y, z, bodyMat)
 
-  // Corner castings
   addCornerCastings(group, x, y, z)
-
-  // Weight category stripe at bottom
-  const stripeH = y * 0.09
-  const weightColor = WEIGHT_COLORS[container.weightCategory]
-  const stripeMat = new THREE.MeshPhongMaterial({
-    color: weightColor.three,
-    emissive: weightColor.three,
-    emissiveIntensity: 0.35,
-    shininess: 40,
-  })
-  const stripeGeo = new THREE.BoxGeometry(x + 0.02, stripeH, z + 0.02)
-  const stripe = new THREE.Mesh(stripeGeo, stripeMat)
-  stripe.position.y = -y / 2 + stripeH / 2 + 0.01
-  group.add(stripe)
 
   // Door end detail (one end)
   addDoorEnd(group, x, y, z, bodyColor)
@@ -109,15 +92,15 @@ function addSideRidges(
   })
   const ridgeGeo = new THREE.BoxGeometry(ridgeW, ridgeH, 0.06)
 
+  // Ridges on the long sides (+Z / -Z faces), distributed along X
   for (const sign of [-1, 1]) {
     for (let i = 0; i < ridgeCount; i++) {
       const ridge = new THREE.Mesh(ridgeGeo, ridgeMat)
       ridge.position.set(
-        (i - (ridgeCount - 1) / 2) * (z / ridgeCount),
+        (i - (ridgeCount - 1) / 2) * (x / ridgeCount),
         0,
-        sign * (x / 2 + 0.03)
+        sign * (z / 2 + 0.03)
       )
-      ridge.rotation.y = Math.PI / 2
       group.add(ridge)
     }
   }
@@ -142,25 +125,25 @@ function addCornerCastings(group: THREE.Group, x: number, y: number, z: number):
 }
 
 function addDoorEnd(group: THREE.Group, x: number, y: number, z: number, baseColor: number): void {
-  // Door panels (two halves on one end)
+  // Door panels on one short end (-X face)
   const doorMat = new THREE.MeshPhongMaterial({
     color: new THREE.Color(baseColor).lerp(new THREE.Color(0x888888), 0.25),
     shininess: 30,
   })
   for (const side of [-0.25, 0.25]) {
-    const doorGeo = new THREE.BoxGeometry(x / 2 - 0.1, y * 0.96, 0.06)
+    const doorGeo = new THREE.BoxGeometry(0.06, y * 0.96, z / 2 - 0.1)
     const door = new THREE.Mesh(doorGeo, doorMat)
-    door.position.set(side * x / 1, 0, -z / 2 + 0.04)
+    door.position.set(-x / 2 + 0.04, 0, side * z)
     group.add(door)
   }
 
   // Door hinges
   const hingeMat = new THREE.MeshPhongMaterial({ color: 0x777777, shininess: 80 })
   const hingeGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.3, 8)
-  for (const hx of [-x * 0.46, x * 0.46]) {
+  for (const hz of [-z * 0.46, z * 0.46]) {
     for (const hy of [-y * 0.38, 0, y * 0.38]) {
       const hinge = new THREE.Mesh(hingeGeo, hingeMat)
-      hinge.position.set(hx, hy, -z / 2 + 0.07)
+      hinge.position.set(-x / 2 + 0.07, hy, hz)
       hinge.rotation.z = Math.PI / 2
       group.add(hinge)
     }
@@ -210,9 +193,7 @@ function addHazmatDiamond(group: THREE.Group, x: number, y: number, z: number): 
 }
 
 function addContainerLabel(group: THREE.Group, x: number, y: number, z: number): void {
-  // White label rectangle on side — can't do real text in WebGL without a texture atlas
-  // so we use a simple emissive white rectangle as a plaque
-  const labelGeo = new THREE.BoxGeometry(z * 0.38, y * 0.15, 0.04)
+  const labelGeo = new THREE.BoxGeometry(x * 0.38, y * 0.15, 0.04)
   const labelMat = new THREE.MeshPhongMaterial({
     color: 0xffffff,
     emissive: 0xffffff,
@@ -220,8 +201,7 @@ function addContainerLabel(group: THREE.Group, x: number, y: number, z: number):
     shininess: 20,
   })
   const label = new THREE.Mesh(labelGeo, labelMat)
-  label.position.set(0, y * 0.28, x / 2 + 0.03)
-  label.rotation.y = Math.PI / 2
+  label.position.set(0, y * 0.28, z / 2 + 0.03)
   group.add(label)
 }
 
@@ -236,12 +216,12 @@ export function createSlotIndicators(
   const indicators = new THREE.Group()
   indicators.name = 'slot-indicators'
 
-  const { x } = CONTAINER.size
-  const z = VISUAL_Z
+  const cw = CONTAINER.size.x  // container width (across beam / Z)
+  const cl = VISUAL_Z           // container length (along ship / X)
   const y = CONTAINER.size.y
 
-  // Shared wireframe geometry
-  const boxGeo = new THREE.BoxGeometry(x * 0.96, y * 0.96, z * 0.96)
+  // Shared wireframe geometry — length along X, width along Z
+  const boxGeo = new THREE.BoxGeometry(cl * 0.96, y * 0.96, cw * 0.96)
   const wireGeo = new THREE.EdgesGeometry(boxGeo)
   boxGeo.dispose()
 
@@ -252,7 +232,7 @@ export function createSlotIndicators(
   })
 
   // Glowing fill
-  const fillGeo = new THREE.BoxGeometry(x * 0.93, y * 0.93, z * 0.93)
+  const fillGeo = new THREE.BoxGeometry(cl * 0.93, y * 0.93, cw * 0.93)
   const fillMat = new THREE.MeshPhongMaterial({
     color: 0x00ff88,
     emissive: 0x00cc66,

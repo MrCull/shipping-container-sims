@@ -39,6 +39,14 @@ export interface ShipPreset {
   emptyWeight: number
   emptyVCG: number
   maxStackWeight: number
+  /** Fraction of ship length used as cargo deck area */
+  cargoLengthFraction: number
+  /** Centre offset of cargo area along X as fraction of length (bow-positive) */
+  cargoXOffsetFraction: number
+  /** Fraction of ship width available for container rows */
+  cargoWidthFraction: number
+  /** Number of stern bays blocked by superstructure/deck structures */
+  sternBlockedBays: number
 }
 
 export interface GameEvent {
@@ -75,6 +83,7 @@ export interface LevelConfig {
   description: string
   preset: ShipPreset
   hazmatRate: number
+  containerCount?: number
 }
 
 export interface CraneObject {

@@ -20,6 +20,13 @@ export const SOUNDS: Record<string, string> = {
   shipHornLarge: assetUrl('large-ship-three-horns-in-a-row.mp3'),
   shipHornSmall: assetUrl('small-ship-three-horns-in-a-row.mp3'),
 
+  // Disaster sounds
+  scream: assetUrl('man-screaming.mp3'),
+  explosionFx: assetUrl('explosion-fx.mp3'),
+  sinkSplash: assetUrl('ship-sink-splash.mp3'),
+  underwaterExplosion: assetUrl('underwater-explosion.mp3'),
+  waterSplash: assetUrl('water-splash.mp3'),
+
   // Ambient
   truckEngine: assetUrl('quiet-truck-engine.mp3'),
 }
@@ -32,22 +39,26 @@ export interface SoundCue {
 export const DISASTER_SEQUENCES: Record<string, SoundCue[]> = {
   capsize: [
     { sound: 'negative', delay: 0 },
-    { sound: 'shipHornLarge', delay: 0.5 },
-    { sound: 'negative', delay: 2.0 },
+    { sound: 'scream', delay: 0.3 },
+    { sound: 'sinkSplash', delay: 1.0 },
+    { sound: 'waterSplash', delay: 1.8 },
   ],
   founder: [
     { sound: 'negative', delay: 0 },
-    { sound: 'shipHornSmall', delay: 0.8 },
-    { sound: 'negative', delay: 2.5 },
+    { sound: 'scream', delay: 0.4 },
+    { sound: 'sinkSplash', delay: 0.8 },
+    { sound: 'waterSplash', delay: 2.0 },
   ],
   collapse: [
     { sound: 'negative', delay: 0 },
+    { sound: 'scream', delay: 0.5 },
     { sound: 'negative', delay: 1.2 },
   ],
   explosion: [
-    { sound: 'negative', delay: 0 },
-    { sound: 'negative', delay: 1.0 },
-    { sound: 'shipHornLarge', delay: 1.5 },
+    { sound: 'explosionFx', delay: 0 },
+    { sound: 'scream', delay: 0.2 },
+    { sound: 'underwaterExplosion', delay: 1.0 },
+    { sound: 'negative', delay: 2.0 },
   ],
 }
 

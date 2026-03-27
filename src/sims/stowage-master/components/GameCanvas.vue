@@ -9,7 +9,7 @@ import { useAudio } from '../composables/useAudio'
 import {
   createOcean, animateOcean,
   createDock, createLighting, createSkybox, createSkyDome,
-  createFoamParticles, animateFoam,
+  createFoamParticles, animateFoam, createTerminalTruck,
 } from '../modules/sceneBuilder'
 import { createShip, updateShipTilt } from '../modules/shipRenderer'
 import {
@@ -37,11 +37,31 @@ let ocean: THREE.Mesh | null = null
 let foam: THREE.Points | null = null
 let hoistMesh: THREE.Group | null = null
 let queueMeshes: THREE.Group[] = []
+let truckMeshes: THREE.Group[] = []
 let currentAnimation: ((dt: number) => boolean) | null = null
 let disasterAnimation: DisasterAnimation | null = null
 
+const TRUCK_SPACING = 10
+
+interface TruckAnim {
+  truck: THREE.Group
+  container: THREE.Group | null
+  startX: number
+  endX: number
+  elapsed: number
+  duration: number
+  departing: boolean
+}
+let truckAnimations: TruckAnim[] = []
+
 // Ambient truck engine loop handle
 let truckEngineNode: AudioBufferSourceNode | null = null
+
+// Ship shake state
+const shipShake = { active: false, elapsed: 0, duration: 0.4, intensity: 0.15 }
+
+// Sail-away animation state
+const sailAway = { active: false, elapsed: 0, delay: 4.5 }
 
 const { start: startLoop } = useGameLoop((deltaTime, time) => {
   animateOcean(ocean, time)
@@ -65,6 +85,58 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
     if (done) disasterAnimation = null
   }
 
+  if (shipShake.active && shipGroup) {
+    shipShake.elapsed += deltaTime
+    if (shipShake.elapsed >= shipShake.duration) {
+      shipShake.active = false
+      shipGroup.position.x = 0
+      shipGroup.position.y = 0
+    } else {
+      const decay = 1 - shipShake.elapsed / shipShake.duration
+      const freq = 25
+      const t = shipShake.elapsed * freq
+      shipGroup.position.x = Math.sin(t * 1.3) * shipShake.intensity * decay
+      shipGroup.position.y = Math.sin(t) * shipShake.intensity * 0.6 * decay
+    }
+  }
+
+  if (sailAway.active && shipGroup) {
+    sailAway.elapsed += deltaTime
+    if (sailAway.elapsed > sailAway.delay) {
+      const speed = 8 + (sailAway.elapsed - sailAway.delay) * 3
+      shipGroup.position.x += speed * deltaTime
+    }
+  }
+
+  // Advance trucks toward crane, departing truck drives off and fades
+  if (truckAnimations.length > 0) {
+    const scene = getScene()
+    truckAnimations = truckAnimations.filter(anim => {
+      anim.elapsed += deltaTime
+      const t = Math.min(anim.elapsed / anim.duration, 1)
+      const eased = easeOutQuad(t)
+      const x = anim.startX + (anim.endX - anim.startX) * eased
+      anim.truck.position.x = x
+      if (anim.container) anim.container.position.x = x
+
+      if (anim.departing && t >= 0.4) {
+        const fadeT = (t - 0.4) / 0.6
+        const opacity = Math.max(0, 1 - fadeT)
+        setGroupOpacity(anim.truck, opacity)
+        if (anim.container) setGroupOpacity(anim.container, opacity)
+      }
+
+      if (t >= 1) {
+        if (anim.departing && scene) {
+          disposeGroup(anim.truck, scene)
+          if (anim.container) disposeGroup(anim.container, scene)
+        }
+        return false
+      }
+      return true
+    })
+  }
+
   render()
 })
 
@@ -72,9 +144,25 @@ onMounted(async () => {
   await audio.init()
 })
 
+// Single phase watcher — handles both scene rebuilds and audio/animation triggers
 watch(() => store.phase, (newPhase, oldPhase) => {
-  if (newPhase === 'selecting' && oldPhase === 'start') {
+  if (newPhase === 'selecting' && (oldPhase === 'start' || oldPhase === 'disaster' || oldPhase === 'failed' || oldPhase === 'complete')) {
     buildScene()
+  }
+
+  if (newPhase === 'complete') {
+    audio.playSound('cheer', 0.8)
+    setTimeout(() => audio.playSound('levelUp', 0.75), 800)
+    // Three horn blasts spaced 1.8 s apart
+    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 1400)
+    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 3200)
+    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 5000)
+    sailAway.active = true
+    sailAway.elapsed = 0
+  }
+
+  if (newPhase === 'failed') {
+    audio.playSound('negative', 0.7)
   }
 })
 
@@ -103,16 +191,6 @@ watch(() => store.disasterType, (type) => {
   if (!type || !shipGroup || !scene) return
   audio.playDisasterSequence(type)
   disasterAnimation = createDisasterAnimation(type, shipGroup, scene, () => { /* noop */ })
-})
-
-watch(() => store.phase, (phase) => {
-  if (phase === 'complete') {
-    audio.playSound('cheer', 0.8)
-    setTimeout(() => audio.playSound('levelUp', 0.75), 800)
-  }
-  if (phase === 'failed') {
-    audio.playSound('negative', 0.7)
-  }
 })
 
 watch(() => store.lastPlacement, (placement) => {
@@ -146,9 +224,6 @@ function buildScene(): void {
   updateHoistMesh(store.currentContainer)
   updateQueueMeshes(store.nextThreeContainers)
 
-  // Play ship horn when game starts
-  audio.playSound('shipHornSmall', 0.55)
-
   attachPicking()
   startLoop()
 }
@@ -165,10 +240,21 @@ function handleClick(event: MouseEvent): void {
   removeHoistMesh()
 
   const scene = getScene()!
-  const containerMesh = createContainerMesh(result.container)
+
+  // Pick up from the front truck (truck #0 is at dockPos)
   const dockPos = getDockPosition(craneObj!)
-  containerMesh.position.copy(dockPos)
+  const truckHeight = 0.85
+  const pickupPos = new THREE.Vector3(dockPos.x, truckHeight + CONTAINER.size.y + 0.1, dockPos.z)
+
+  const containerMesh = createContainerMesh(result.container)
+  containerMesh.position.copy(pickupPos)
   scene.add(containerMesh)
+
+  // Remove the front container mesh from queue display (it's now being lifted)
+  if (queueMeshes[0]) {
+    disposeGroup(queueMeshes[0], scene)
+    queueMeshes.shift()
+  }
 
   const slot = store.grid[slotId]
   const targetPos = new THREE.Vector3(
@@ -180,8 +266,10 @@ function handleClick(event: MouseEvent): void {
   shipGroup!.localToWorld(targetPos)
   removeSlotIndicators(shipGroup!)
 
-  // Play crane pickup sound
   audio.playSound('containerLoad', 0.7)
+
+  // Trigger trucks to advance as the crane picks up
+  triggerTruckAdvance()
 
   currentAnimation = createPlacementAnimation(
     craneObj!,
@@ -189,8 +277,13 @@ function handleClick(event: MouseEvent): void {
     targetPos,
     shipGroup!,
     () => {
-      // Container set-down sound
       audio.playSound('containerSet', 0.75)
+
+      const weight = result.container.weight
+      shipShake.intensity = 0.08 + (weight / 30) * 0.15
+      shipShake.elapsed = 0
+      shipShake.active = true
+
       store.finalizePlacement(slotId)
     }
   )
@@ -201,9 +294,11 @@ function updateHoistMesh(container: Container | null): void {
   const scene = getScene()
   if (!container || !craneObj || !scene) return
 
+  // Show current container sitting on the front truck, ready to be picked up
+  const dockPos = getDockPosition(craneObj)
+  const truckHeight = 0.85
   const mesh = createContainerMesh(container)
-  const pos = getDockPosition(craneObj)
-  mesh.position.copy(pos)
+  mesh.position.set(dockPos.x, truckHeight + CONTAINER.size.y / 2, dockPos.z)
   mesh.name = 'hoist-mesh'
   scene.add(mesh)
   hoistMesh = mesh
@@ -227,7 +322,7 @@ function removeHoistMesh(): void {
 
 function updateQueueMeshes(containers: Container[]): void {
   const scene = getScene()
-  for (const mesh of queueMeshes) {
+  const disposeMeshGroup = (mesh: THREE.Group) => {
     if (scene) scene.remove(mesh)
     mesh.traverse(child => {
       const m = child as THREE.Mesh
@@ -238,18 +333,34 @@ function updateQueueMeshes(containers: Container[]): void {
       }
     })
   }
+  for (const mesh of queueMeshes) disposeMeshGroup(mesh)
+  for (const mesh of truckMeshes) disposeMeshGroup(mesh)
   queueMeshes = []
+  truckMeshes = []
+  truckAnimations = []
 
   if (!craneObj || !scene || !containers.length) return
 
   const dockPos = getDockPosition(craneObj)
+  const truckHeight = 0.85
+  const zPos = dockPos.z
+
   containers.forEach((container, i) => {
+    // Truck 0 is directly under the crane; subsequent trucks wait behind (negative X)
+    const xPos = dockPos.x - i * TRUCK_SPACING
+
+    const truck = createTerminalTruck()
+    truck.position.set(xPos, 0.0, zPos)
+    truck.name = `queue-truck-${i}`
+    scene.add(truck)
+    truckMeshes.push(truck)
+
     const mesh = createContainerMesh(container)
     mesh.scale.setScalar(0.88)
     mesh.position.set(
-      dockPos.x - 8 - i * 8,
-      0.8 + CONTAINER.size.y / 2,
-      dockPos.z
+      xPos,
+      truckHeight + CONTAINER.size.y / 2,
+      zPos
     )
     mesh.name = `queue-${i}`
     scene.add(mesh)
@@ -280,12 +391,88 @@ function clearScene(): void {
       else mesh.material.dispose()
     }
   }
+  if (disasterAnimation) {
+    disasterAnimation.cleanup()
+    disasterAnimation = null
+  }
+  currentAnimation = null
+  sailAway.active = false
+  sailAway.elapsed = 0
   shipGroup = null
   craneObj = null
   ocean = null
   foam = null
   hoistMesh = null
   queueMeshes = []
+  truckMeshes = []
+  truckAnimations = []
+}
+
+function easeOutQuad(t: number): number {
+  return 1 - (1 - t) * (1 - t)
+}
+
+function setGroupOpacity(group: THREE.Group, opacity: number): void {
+  group.traverse(child => {
+    const mesh = child as THREE.Mesh
+    if (!mesh.material) return
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    for (const mat of mats) {
+      const m = mat as THREE.MeshPhongMaterial
+      m.transparent = true
+      m.opacity = opacity
+    }
+  })
+}
+
+function disposeGroup(group: THREE.Group, scene: THREE.Scene): void {
+  scene.remove(group)
+  group.traverse(child => {
+    const mesh = child as THREE.Mesh
+    if (mesh.geometry) mesh.geometry.dispose()
+    if (mesh.material) {
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      mats.forEach(m => m.dispose())
+    }
+  })
+}
+
+function triggerTruckAdvance(): void {
+  if (!craneObj) return
+  const scene = getScene()
+  if (!scene) return
+
+  const dockX = getDockPosition(craneObj).x
+  const zPos = getDockPosition(craneObj).z
+
+  // Animate each remaining truck forward one TRUCK_SPACING step
+  truckMeshes.forEach((truck, i) => {
+    const containerMesh = queueMeshes[i] ?? null
+    truckAnimations.push({
+      truck,
+      container: containerMesh,
+      startX: truck.position.x,
+      endX: truck.position.x + TRUCK_SPACING,
+      elapsed: 0,
+      duration: 0.8,
+      departing: false,
+    })
+  })
+
+  // The truck that was at position 0 (under crane) is now empty — it already had its
+  // container lifted. Animate it departing forward past the crane.
+  const departingTruck = createTerminalTruck()
+  departingTruck.position.set(dockX, 0.0, zPos)
+  scene.add(departingTruck)
+  truckAnimations.push({
+    truck: departingTruck,
+    container: null,
+    startX: dockX,
+    endX: dockX + TRUCK_SPACING * 2,
+    elapsed: 0,
+    duration: 1.8,
+    departing: true,
+  })
 }
 
 defineExpose({ buildScene, clearScene, isReady })
