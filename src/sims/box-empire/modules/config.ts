@@ -8,8 +8,10 @@ import type { Position, Position3D } from '../types'
 
 export const SIM_TICK_RATE = 20
 export const SIM_TICK_INTERVAL = 1 / SIM_TICK_RATE
-export const MAX_TIME_SCALE = 10
+export const MAX_TIME_SCALE = 100
 export const DEFAULT_TIME_SCALE = 1
+export const MAX_TICKS_PER_FRAME_NORMAL = 20
+export const MAX_TICKS_PER_FRAME_FAST = 200
 
 // ---- Container dimensions (20ft) -----------------------------------------
 

@@ -108,6 +108,19 @@ export const useGameStore = defineStore('box-empire-game', () => {
   })
   const totalTutorialSteps = computed(() => tutorialSteps.length)
 
+  // ---- Yard slot reservation helpers ----------------------------------------
+  function getReservedYardSlotIds(): Set<string> {
+    const reserved = new Set<string>()
+    for (const job of jobs.value) {
+      if (job.status === 'pending' || job.status === 'assigned' || job.status === 'in_progress') {
+        if (job.dropoffLocation.type === 'yard_slot') {
+          reserved.add(job.dropoffLocation.id)
+        }
+      }
+    }
+    return reserved
+  }
+
   // ---- State snapshot for modules -----------------------------------------
   function getState(): BoxEmpireState {
     return {
@@ -362,6 +375,14 @@ export const useGameStore = defineStore('box-empire-game', () => {
       if (truck.state === 'departed') continue
       const tResult = tickTruck(truck, state, scaledDt)
 
+      // Sync container position to truck during movement
+      if (truck.containerId && (truck.state === 'approaching' || truck.state === 'at_gate' || truck.state === 'driving_to_yard' || truck.state === 'departing')) {
+        const movingContainer = containers.value.find(c => c.id === truck.containerId)
+        if (movingContainer && movingContainer.currentLocation.type === 'truck') {
+          movingContainer.currentLocation.position = { ...truck.position }
+        }
+      }
+
       if (tResult.readyForEquipment) {
         if (truck.visitType === 'export_delivery' && truck.containerId) {
           const container = containers.value.find(c => c.id === truck.containerId)
@@ -373,7 +394,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
             }
           }
           const yard = yardBlocks.value[0]
-          const slot = findAvailableSlot(yard)
+          const slot = findAvailableSlot(yard, getReservedYardSlotIds())
           if (slot && truck.containerId) {
             const dropPos = getSlotWorldPosition(yard, slot)
             const job = createJob(
@@ -522,7 +543,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         container.vesselSlot = null
 
         const yard = yardBlocks.value[0]
-        const slot = findAvailableSlot(yard)
+        const slot = findAvailableSlot(yard, getReservedYardSlotIds())
         if (slot) {
           const dropPos = getSlotWorldPosition(yard, slot)
           const moveJob = createJob(

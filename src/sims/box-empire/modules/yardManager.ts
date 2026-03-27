@@ -40,19 +40,22 @@ export function createYardBlock(): YardBlock {
   }
 }
 
-export function findAvailableSlot(block: YardBlock): YardSlotRef | null {
+export function findAvailableSlot(block: YardBlock, reservedSlotIds?: Set<string>): YardSlotRef | null {
   for (let bay = 1; bay <= block.bays; bay++) {
     for (let row = 1; row <= block.rows; row++) {
       const tiersInStack = block.slots.filter(
         s => s.bay === bay && s.row === row && s.containerId !== null,
       ).length
       if (tiersInStack < block.maxTier) {
-        return {
+        const candidate: YardSlotRef = {
           blockId: block.id,
           bay,
           row,
           tier: tiersInStack + 1,
         }
+        const slotId = `${candidate.blockId}-${candidate.bay}-${candidate.row}-${candidate.tier}`
+        if (reservedSlotIds && reservedSlotIds.has(slotId)) continue
+        return candidate
       }
     }
   }

@@ -3,7 +3,7 @@ import { useGameStore } from '../../store/gameStore'
 
 const store = useGameStore()
 
-const speedOptions = [0, 1, 2, 3, 5, 10]
+const speedOptions = [0, 1, 2, 3, 5, 10, 100]
 </script>
 
 <template>

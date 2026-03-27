@@ -15,40 +15,105 @@ export class EquipmentRenderer {
 
   private createReachStacker(): THREE.Group {
     const group = new THREE.Group()
+    const orangeMat = new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.5, metalness: 0.3 })
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.4 })
+    const yellowMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.4 })
+    const blackMat = new THREE.MeshStandardMaterial({ color: 0x111111 })
 
-    const bodyGeo = new THREE.BoxGeometry(3, 2, 2.5)
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.5 })
-    const body = new THREE.Mesh(bodyGeo, bodyMat)
-    body.position.y = 1.5
+    // Main body / chassis
+    const bodyGeo = new THREE.BoxGeometry(3.2, 1.8, 4.5)
+    const body = new THREE.Mesh(bodyGeo, orangeMat)
+    body.position.set(0, 1.5, 0)
     body.castShadow = true
     group.add(body)
 
-    const cabGeo = new THREE.BoxGeometry(1.5, 1.2, 2)
-    const cabMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.4 })
-    const cab = new THREE.Mesh(cabGeo, cabMat)
-    cab.position.set(-0.5, 3, 0)
+    // Raised engine hood at rear
+    const hoodGeo = new THREE.BoxGeometry(3, 1.5, 1.5)
+    const hood = new THREE.Mesh(hoodGeo, orangeMat)
+    hood.position.set(0, 2.3, -1.6)
+    hood.castShadow = true
+    group.add(hood)
+
+    // Cab with glass appearance
+    const cabGeo = new THREE.BoxGeometry(1.8, 1.5, 1.5)
+    const cab = new THREE.Mesh(cabGeo, darkMat)
+    cab.position.set(-0.6, 3, 0.8)
     cab.castShadow = true
     group.add(cab)
 
-    const boomGeo = new THREE.BoxGeometry(0.3, 0.3, 6)
-    const boomMat = new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.5 })
-    const boom = new THREE.Mesh(boomGeo, boomMat)
-    boom.position.set(0, 3.5, 3)
+    // Cab windows (slightly lighter)
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x4a90d9, roughness: 0.1, metalness: 0.1 })
+    const frontWindowGeo = new THREE.BoxGeometry(1.6, 0.9, 0.05)
+    const frontWindow = new THREE.Mesh(frontWindowGeo, glassMat)
+    frontWindow.position.set(-0.6, 3.1, 1.58)
+    group.add(frontWindow)
+
+    // Counter-weight at rear
+    const cwGeo = new THREE.BoxGeometry(3, 1.2, 1.2)
+    const cwMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8 })
+    const cw = new THREE.Mesh(cwGeo, cwMat)
+    cw.position.set(0, 1.1, -2.6)
+    cw.castShadow = true
+    group.add(cw)
+
+    // Main boom arm (angled up slightly when unladen)
+    const boomGroup = new THREE.Group()
+    boomGroup.position.set(0.8, 3.2, 2.1)
+
+    const boomGeo = new THREE.BoxGeometry(0.4, 0.4, 5.5)
+    const boom = new THREE.Mesh(boomGeo, orangeMat)
+    boom.position.set(0, 0, 2.75)
     boom.castShadow = true
-    group.add(boom)
+    boomGroup.add(boom)
 
-    for (let i = -1; i <= 1; i += 2) {
-      const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 12)
-      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x222222 })
-      const frontWheel = new THREE.Mesh(wheelGeo, wheelMat)
-      frontWheel.rotation.z = Math.PI / 2
-      frontWheel.position.set(i * 1.3, 0.5, 1)
-      group.add(frontWheel)
+    // Secondary boom / extension
+    const ext1Geo = new THREE.BoxGeometry(0.3, 0.3, 3)
+    const ext1 = new THREE.Mesh(ext1Geo, orangeMat)
+    ext1.position.set(0, 0, 7)
+    boomGroup.add(ext1)
 
-      const rearWheel = new THREE.Mesh(wheelGeo, wheelMat)
-      rearWheel.rotation.z = Math.PI / 2
-      rearWheel.position.set(i * 1.3, 0.5, -1)
-      group.add(rearWheel)
+    // Spreader frame at end of boom
+    const spreaderGeo = new THREE.BoxGeometry(6.5, 0.2, 0.4)
+    const spreaderMat = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.5 })
+    const spreader = new THREE.Mesh(spreaderGeo, spreaderMat)
+    spreader.position.set(0, -0.6, 8.5)
+    boomGroup.add(spreader)
+
+    // Spreader side beams
+    for (const sx of [-3, 3]) {
+      const sideGeo = new THREE.BoxGeometry(0.2, 0.8, 0.3)
+      const side = new THREE.Mesh(sideGeo, spreaderMat)
+      side.position.set(sx, -0.6, 8.5)
+      boomGroup.add(side)
+    }
+
+    boomGroup.rotation.x = -0.15
+    group.add(boomGroup)
+
+    // Cab warning light
+    const lightGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.15, 8)
+    const light = new THREE.Mesh(lightGeo, yellowMat)
+    light.position.set(-0.6, 3.8, 0.8)
+    group.add(light)
+
+    // Large rear wheels (double-axle at rear)
+    const rearWheelGeo = new THREE.CylinderGeometry(0.65, 0.65, 0.5, 16)
+    for (const sx of [-1.7, 1.7]) {
+      for (const sz of [-1.7, -2.5]) {
+        const wheel = new THREE.Mesh(rearWheelGeo, blackMat)
+        wheel.rotation.z = Math.PI / 2
+        wheel.position.set(sx, 0.65, sz)
+        group.add(wheel)
+      }
+    }
+
+    // Large front steering wheels
+    const frontWheelGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.45, 16)
+    for (const sx of [-1.7, 1.7]) {
+      const wheel = new THREE.Mesh(frontWheelGeo, blackMat)
+      wheel.rotation.z = Math.PI / 2
+      wheel.position.set(sx, 0.6, 1.8)
+      group.add(wheel)
     }
 
     return group
