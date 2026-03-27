@@ -17,6 +17,7 @@ export const SOUNDS: Record<string, string> = {
   tickClock: assetUrl('level-up-quick-sound.mp3'),
   countdownTick: assetUrl('correct-ding.mp3'),
   countdownUrgent: assetUrl('countdown-urgent.mp3'),
+  boo: assetUrl('boo-3-seconds.mp3'),
 }
 
 export interface SoundCue {

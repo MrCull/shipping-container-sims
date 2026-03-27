@@ -146,10 +146,9 @@ onUnmounted(resetCountdownTracking)
 
 <style scoped>
 .timer-bar-wrap {
-  position: absolute;
-  left: 50%;
-  bottom: 22%;
-  transform: translateX(-50%);
+  position: relative;
+  flex: 0 1 auto;
+  margin-top: -0.2rem;
   z-index: 12;
   pointer-events: none;
   transition: filter 0.15s ease;
@@ -164,16 +163,16 @@ onUnmounted(resetCountdownTracking)
 @keyframes pulse-bar {
   0%,
   100% {
-    transform: translateX(-50%) scale(1);
+    transform: scale(1);
     opacity: 1;
   }
   50% {
-    transform: translateX(-50%) scale(1.03);
+    transform: scale(1.03);
     opacity: 0.92;
   }
 }
 .timer-bar {
-  min-width: min(340px, 88vw);
+  min-width: min(280px, 42vw);
   padding: 0.75rem 1rem;
   background: rgba(8, 10, 16, 0.92);
   border: 2px solid rgba(56, 189, 248, 0.45);

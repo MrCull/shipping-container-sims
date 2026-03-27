@@ -32,11 +32,8 @@ function onKey(e: KeyboardEvent): void {
 }
 
 watch(phase, p => {
-  if (p === 'gameOver') {
-    playStackSound('negative', 0.5)
-  }
   if (p === 'levelFailed') {
-    playStackSound('negative', 0.45)
+    playStackSound('boo', 0.68)
   }
   if (p !== 'paused') {
     pauseOpen.value = false
@@ -52,11 +49,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     <GameCanvas />
     <div class="hud-top">
       <div class="hud-left">
-        <ScoreBar />
+        <div class="hud-row">
+          <ScoreBar />
+          <TimerBar />
+        </div>
       </div>
       <TowerStability />
     </div>
-    <TimerBar />
     <div class="hud-bottom">
       <Instructions />
       <p class="pause-hint">
@@ -105,6 +104,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   flex-direction: column;
   gap: 0.65rem;
   align-items: flex-start;
+}
+.hud-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.85rem 1rem;
 }
 .hud-bottom {
   position: absolute;

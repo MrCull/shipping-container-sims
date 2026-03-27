@@ -319,7 +319,7 @@ watch(phase, (p, prevP) => {
       burstParticlesAt(new THREE.Vector3(0, getTowerTopY(layers.value) * 0.6, 0))
     }
     syncCollapseMeshes()
-    audio.playCollapseSequence()
+    audio.playSound('boo', 0.72)
     blocksGroup.clear()
     blocksById.clear()
     clearPlacementMarkers()
