@@ -49,10 +49,12 @@ export function createTutorialSteps(): TutorialStep[] {
       stepNumber: 6,
       prompt: 'The mobile harbor crane is discharging containers from the vessel.',
       condition: (s: BoxEmpireState) => {
-        const importInYard = s.containers.filter(
-          c => c.visitType === 'import' && c.lifecycleState === 'in_yard',
+        const importProcessed = s.containers.filter(
+          c =>
+            c.visitType === 'import' &&
+            (c.lifecycleState === 'in_yard' || c.lifecycleState === 'departed'),
         )
-        return importInYard.length >= 5
+        return importProcessed.length >= 5
       },
     },
     {
