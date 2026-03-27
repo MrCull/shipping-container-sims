@@ -1,11 +1,9 @@
 <script setup lang="ts">
-// Box Empire — main game component (placeholder)
-// This file will be replaced with the full game implementation.
 </script>
 
 <template>
   <div class="box-empire">
-    <p>Box Empire — Game loading...</p>
+    <p>Not implemented</p>
   </div>
 </template>
 
