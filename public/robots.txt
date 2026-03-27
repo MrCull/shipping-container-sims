@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://container-games.net/sitemap.xml
