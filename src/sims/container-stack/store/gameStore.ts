@@ -11,19 +11,22 @@ import type {
 import { TOWER } from '../modules/config'
 import {
   buildInitialTower,
+  countContainersInLayer,
   getHighestOccupiedLayerIndex,
   getTopLayerIndex,
   isLayerComplete,
-  countContainersInLayer,
   resetContainerIdCounter,
+  slotWorldPosition,
 } from '../modules/towerBuilder'
 import {
+  collapsePieceFromContainer,
   computeCenterOfMass,
   computeStabilityScore,
   createInitialWobble,
   injectCriticalRemovalImpulse,
   injectJitterImpulse,
   isRemovalCritical,
+  isStructurallySound,
   spawnCollapsePieces,
   updateWobble,
 } from '../modules/physics'
@@ -112,6 +115,22 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     L.slots[slotIndex] = null
 
     recomputePhysics()
+    if (!isStructurallySound(layers.value)) {
+      const floating = floatingContainer.value
+      const from = floatingFrom.value
+      const towerPieces = spawnCollapsePieces(layers.value, 0)
+      if (floating && from) {
+        const orient = layers.value[from.layerIndex]?.orientation ?? 'alongX'
+        const pos = slotWorldPosition(from.layerIndex, from.slotIndex, layers.value)
+        towerPieces.unshift(collapsePieceFromContainer(floating, orient, pos))
+      }
+      phase.value = 'collapsing'
+      collapsePieces.value = towerPieces
+      floatingContainer.value = null
+      floatingFrom.value = null
+      return true
+    }
+
     removalWasCritical.value = critical
     stabilityAtRemovalStart.value = stabBefore
     phase.value = 'removing'
@@ -190,6 +209,15 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     const TL = layers.value[targetLayerIndex]!
     TL.slots[targetSlot] = placed
 
+    recomputePhysics()
+    if (!isStructurallySound(layers.value)) {
+      phase.value = 'collapsing'
+      collapsePieces.value = spawnCollapsePieces(layers.value, 0)
+      floatingContainer.value = null
+      floatingFrom.value = null
+      return true
+    }
+
     const duration = (performance.now() - moveStartedAt.value) / 1000
     const wobbleSpike = Math.abs(wobble.value.angle) > WobbleSpikeThreshold
     comboStreak.value = nextComboStreak(comboStreak.value, wobbleSpike)
@@ -218,7 +246,6 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
 
     floatingContainer.value = null
     floatingFrom.value = null
-    recomputePhysics()
     phase.value = 'playing'
     return true
   }
@@ -226,6 +253,15 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   function tickPhysics(dt: number): 'ok' | 'collapsed' {
     if (phase.value === 'collapsing' || phase.value === 'gameOver' || phase.value === 'start') {
       return 'ok'
+    }
+    if (
+      phase.value === 'playing' &&
+      layers.value.length > 0 &&
+      !isStructurallySound(layers.value)
+    ) {
+      phase.value = 'collapsing'
+      collapsePieces.value = spawnCollapsePieces(layers.value, 0)
+      return 'collapsed'
     }
     const { collapsed } = updateWobble(wobble.value, stabilityScore.value, dt)
     if (collapsed) {

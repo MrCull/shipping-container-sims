@@ -9,7 +9,7 @@ const { phase } = storeToRefs(store)
 const text = computed(() => {
   switch (phase.value) {
     case 'playing':
-      return 'Click a block, then drag away from the tower to slide it out. Only complete top layers — leave at least two blocks on lower levels if anything rests above.'
+      return 'Mouse: click a block, drag away to slide it out. Camera: WASD or arrow keys orbit, + / − zoom. Complete the top row before lower layers; unsupported overhangs collapse the stack.'
     case 'removing':
       return 'Keep dragging smoothly — shaky moves rock the stack. Release when the block is far enough out.'
     case 'placing':

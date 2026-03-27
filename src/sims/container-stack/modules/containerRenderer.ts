@@ -25,8 +25,8 @@ export function createContainerMesh(
 
   const mat = new THREE.MeshStandardMaterial({
     color: container.color,
-    roughness: 0.55,
-    metalness: 0.25,
+    roughness: 0.42,
+    metalness: 0.32,
   })
   const mesh = new THREE.Mesh(geo, mat)
   mesh.castShadow = true

@@ -240,13 +240,13 @@ const { start: startLoop, stop: stopLoop } = useGameLoop(
     if (phase.value === 'collapsing') {
       updateCollapseVisuals()
     }
-  }
+  },
+  dt => three.applyKeyboardCamera(dt)
 )
 
 function onPointerDown(e: PointerEvent): void {
   if (!canvasRef.value) return
   canvasRef.value.setPointerCapture(e.pointerId)
-  three.setIdleOrbit(false)
 
   if (phase.value === 'placing') {
     store.placeOnTop()

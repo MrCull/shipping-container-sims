@@ -27,6 +27,9 @@ export const PHYSICS = {
   heightPenaltyScale: 0.08,
   incompleteLayerPenalty: 0.06,
   fullLayerOverIncompleteExtra: 0.12,
+  /** Fraction of a block’s footprint that must rest on the layer below (sampled grid). */
+  structuralMinSupportFraction: 0.4,
+  structuralSampleGrid: 5,
   wobbleSpringK: 42,
   wobbleBaseDamping: 2.4,
   wobbleDampingStabilityFactor: 3.5,
@@ -54,7 +57,11 @@ export const CAMERA = {
   minDistance: 14,
   maxDistance: 120,
   maxPolarAngle: Math.PI / 2.05,
+  minPolarAngle: 0.35,
   idleOrbitSpeed: 0.08,
+  /** Radians per second for keyboard orbit */
+  keyOrbitSpeed: 1.15,
+  keyZoomSpeed: 22,
   shakeIntensity: 0.35,
   targetLerp: 0.06,
 } as const

@@ -17,13 +17,13 @@ async function onPlay(): Promise<void> {
   <div class="overlay">
     <div class="card">
       <h1 class="title">
-        Container Stack
+        Contenga
       </h1>
       <p class="tag">
         How high can you stack before the tower falls?
       </p>
       <p class="blurb">
-        Pull containers from the tower like Jenga, then place them on top. Watch stability, keep your hands steady, and listen for the stack groan.
+        Pull containers with the mouse, then place them on top. Use WASD or arrow keys to orbit the camera. If the stack is not supported below, it comes down.
       </p>
       <button
         type="button"

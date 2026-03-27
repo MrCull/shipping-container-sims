@@ -1,9 +1,106 @@
 import { Vector3 } from 'three'
-import type { CollapsePiece, TowerLayer, WobbleState } from '../types'
+import type {
+  CollapsePiece,
+  JengaContainer,
+  LayerOrientation,
+  TowerLayer,
+  WobbleState,
+} from '../types'
 import { BLOCK, PHYSICS } from './config'
 import { layerCompleteness, slotWorldPosition } from './towerBuilder'
 
 const _com = new Vector3()
+
+interface XZRect {
+  x0: number
+  x1: number
+  z0: number
+  z1: number
+}
+
+/** World-space footprint (XZ) of one occupied slot on a layer. */
+function slotFootprintWorldXZ(
+  layerIndex: number,
+  slotIndex: number,
+  orientation: LayerOrientation,
+  layers: TowerLayer[]
+): XZRect {
+  const p = slotWorldPosition(layerIndex, slotIndex, layers)
+  const { width, length } = BLOCK
+  if (orientation === 'alongX') {
+    const hx = width / 2
+    const hz = length / 2
+    return { x0: p.x - hx, x1: p.x + hx, z0: p.z - hz, z1: p.z + hz }
+  }
+  const hx = length / 2
+  const hz = width / 2
+  return { x0: p.x - hx, x1: p.x + hx, z0: p.z - hz, z1: p.z + hz }
+}
+
+function layerSupportRects(layerIndex: number, layers: TowerLayer[]): XZRect[] {
+  if (layerIndex < 0) return []
+  const L = layers[layerIndex]
+  if (!L) return []
+  const rects: XZRect[] = []
+  for (let si = 0; si < L.slots.length; si++) {
+    if (L.slots[si] !== null) {
+      rects.push(slotFootprintWorldXZ(layerIndex, si, L.orientation, layers))
+    }
+  }
+  return rects
+}
+
+function pointSupportedByRects(x: number, z: number, rects: XZRect[]): boolean {
+  for (const r of rects) {
+    if (x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) return true
+  }
+  return false
+}
+
+/**
+ * For each container on layer L>=1, fraction of footprint sample points that lie on the union
+ * of containers on layer L-1. Returns the minimum across all such blocks (weakest link).
+ * Empty tower or only ground layer → 1.
+ */
+export function computeStructuralSupportScore(layers: TowerLayer[]): number {
+  const n = PHYSICS.structuralSampleGrid
+  if (layers.length <= 1) return 1
+
+  let globalMin = 1
+
+  for (let li = 1; li < layers.length; li++) {
+    const supportRects = layerSupportRects(li - 1, layers)
+    if (supportRects.length === 0) {
+      return 0
+    }
+
+    const layer = layers[li]!
+    for (let si = 0; si < layer.slots.length; si++) {
+      if (layer.slots[si] === null) continue
+
+      const foot = slotFootprintWorldXZ(li, si, layer.orientation, layers)
+      let inside = 0
+      const total = n * n
+      for (let iu = 0; iu < n; iu++) {
+        for (let iv = 0; iv < n; iv++) {
+          const u = (iu + 0.5) / n
+          const v = (iv + 0.5) / n
+          const x = foot.x0 + u * (foot.x1 - foot.x0)
+          const z = foot.z0 + v * (foot.z1 - foot.z0)
+          if (pointSupportedByRects(x, z, supportRects)) inside++
+        }
+      }
+      const frac = inside / total
+      if (frac < globalMin) globalMin = frac
+    }
+  }
+
+  return globalMin
+}
+
+export function isStructurallySound(layers: TowerLayer[]): boolean {
+  return computeStructuralSupportScore(layers) >= PHYSICS.structuralMinSupportFraction
+}
 
 export function computeCenterOfMass(layers: TowerLayer[]): Vector3 {
   _com.set(0, 0, 0)
@@ -59,8 +156,12 @@ export function computeStabilityScore(layers: TowerLayer[], centerOfMass: Vector
     }
   }
 
-  const s =
+  const structural = computeStructuralSupportScore(layers)
+  const structuralFactor = Math.pow(structural, 1.25)
+
+  let s =
     PHYSICS.baseStability - comPenalty - heightPenalty - Math.min(0.55, gapPenalty)
+  s = Math.max(0, Math.min(1, s)) * structuralFactor
   return Math.max(0, Math.min(1, s))
 }
 
@@ -147,6 +248,37 @@ export function isRemovalCritical(
   return after < currentStability - 0.08
 }
 
+function randomCollapseVelocity(): Vector3 {
+  return new Vector3(
+    (Math.random() - 0.5) * 6,
+    Math.random() * 4 + 2,
+    (Math.random() - 0.5) * 6
+  )
+}
+
+function randomCollapseSpin(): Vector3 {
+  return new Vector3(
+    (Math.random() - 0.5) * PHYSICS.collapseAngularScatter,
+    (Math.random() - 0.5) * PHYSICS.collapseAngularScatter,
+    (Math.random() - 0.5) * PHYSICS.collapseAngularScatter
+  )
+}
+
+export function collapsePieceFromContainer(
+  c: JengaContainer,
+  orientation: LayerOrientation,
+  position: Vector3
+): CollapsePiece {
+  return {
+    id: c.id,
+    position: position.clone(),
+    velocity: randomCollapseVelocity(),
+    angularVelocity: randomCollapseSpin(),
+    color: c.color,
+    orientation,
+  }
+}
+
 export function spawnCollapsePieces(layers: TowerLayer[], failureLayerFromTop = 0): CollapsePiece[] {
   const startLayer = Math.max(0, layers.length - 1 - failureLayerFromTop)
   const pieces: CollapsePiece[] = []
@@ -156,22 +288,7 @@ export function spawnCollapsePieces(layers: TowerLayer[], failureLayerFromTop = 
       const c = layer.slots[si]
       if (!c) continue
       const p = slotWorldPosition(li, si, layers)
-      pieces.push({
-        id: c.id,
-        position: p.clone(),
-        velocity: new Vector3(
-          (Math.random() - 0.5) * 6,
-          Math.random() * 4 + 2,
-          (Math.random() - 0.5) * 6
-        ),
-        angularVelocity: new Vector3(
-          (Math.random() - 0.5) * PHYSICS.collapseAngularScatter,
-          (Math.random() - 0.5) * PHYSICS.collapseAngularScatter,
-          (Math.random() - 0.5) * PHYSICS.collapseAngularScatter
-        ),
-        color: c.color,
-        orientation: layer.orientation,
-      })
+      pieces.push(collapsePieceFromContainer(c, layer.orientation, p))
     }
   }
   return pieces

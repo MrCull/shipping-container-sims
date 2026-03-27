@@ -9,7 +9,8 @@ export function useGameLoop(
   getTopY: () => number,
   frameTower: (topY: number) => void,
   setCameraShake: (n: number) => void,
-  beforeRender?: (dt: number) => void
+  beforeRender?: (dt: number) => void,
+  applyKeyboardCamera?: (dt: number) => void
 ) {
   const store = useContainerStackStore()
   const { phase, wobble, collapsePieces } = storeToRefs(store)
@@ -51,6 +52,7 @@ export function useGameLoop(
     }
 
     beforeRender?.(dt)
+    applyKeyboardCamera?.(dt)
     setCameraShake(Math.abs(wobble.value.angle) * 1.2)
     frameTower(getTopY())
     render()

@@ -14,6 +14,7 @@ export interface TowerSceneRefs {
   frameTower: (topY: number) => void
   setIdleOrbit: (enabled: boolean) => void
   setCameraShake: (intensity: number) => void
+  applyKeyboardCamera: (dt: number) => void
 }
 
 export function useContainerStackThreeScene(
@@ -28,6 +29,90 @@ export function useContainerStackThreeScene(
 
   let idleOrbit = true
   let shakeIntensity = 0
+  let lastFrameTime = performance.now()
+
+  const keyOrbitLeft = ref(false)
+  const keyOrbitRight = ref(false)
+  const keyOrbitUp = ref(false)
+  const keyOrbitDown = ref(false)
+  const keyZoomIn = ref(false)
+  const keyZoomOut = ref(false)
+
+  const spherical = new THREE.Spherical()
+  const offset = new THREE.Vector3()
+
+  function onKeyDown(e: KeyboardEvent): void {
+    if (e.repeat) return
+    const t = e.target as Node | null
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) {
+      return
+    }
+    switch (e.code) {
+      case 'KeyA':
+      case 'ArrowLeft':
+        keyOrbitLeft.value = true
+        e.preventDefault()
+        break
+      case 'KeyD':
+      case 'ArrowRight':
+        keyOrbitRight.value = true
+        e.preventDefault()
+        break
+      case 'KeyW':
+      case 'ArrowUp':
+        keyOrbitUp.value = true
+        e.preventDefault()
+        break
+      case 'KeyS':
+      case 'ArrowDown':
+        keyOrbitDown.value = true
+        e.preventDefault()
+        break
+      case 'Equal':
+      case 'NumpadAdd':
+        keyZoomIn.value = true
+        e.preventDefault()
+        break
+      case 'Minus':
+      case 'NumpadSubtract':
+        keyZoomOut.value = true
+        e.preventDefault()
+        break
+      default:
+        break
+    }
+  }
+
+  function onKeyUp(e: KeyboardEvent): void {
+    switch (e.code) {
+      case 'KeyA':
+      case 'ArrowLeft':
+        keyOrbitLeft.value = false
+        break
+      case 'KeyD':
+      case 'ArrowRight':
+        keyOrbitRight.value = false
+        break
+      case 'KeyW':
+      case 'ArrowUp':
+        keyOrbitUp.value = false
+        break
+      case 'KeyS':
+      case 'ArrowDown':
+        keyOrbitDown.value = false
+        break
+      case 'Equal':
+      case 'NumpadAdd':
+        keyZoomIn.value = false
+        break
+      case 'Minus':
+      case 'NumpadSubtract':
+        keyZoomOut.value = false
+        break
+      default:
+        break
+    }
+  }
 
   function init(): void {
     if (!canvasRef.value) return
@@ -46,7 +131,7 @@ export function useContainerStackThreeScene(
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.05
+    renderer.toneMappingExposure = 1.35
 
     camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.4, 500)
     camera.position.set(22, 20, 26)
@@ -57,10 +142,16 @@ export function useContainerStackThreeScene(
     controls.dampingFactor = 0.06
     controls.minDistance = CAMERA.minDistance
     controls.maxDistance = CAMERA.maxDistance
+    controls.minPolarAngle = CAMERA.minPolarAngle
     controls.maxPolarAngle = CAMERA.maxPolarAngle
     controls.target.set(0, 8, 0)
+    controls.enableRotate = false
+    controls.enablePan = false
+    controls.enableZoom = false
 
     window.addEventListener('resize', onResize)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
     isReady.value = true
   }
 
@@ -77,10 +168,13 @@ export function useContainerStackThreeScene(
     controls.target.y += (targetY - controls.target.y) * CAMERA.targetLerp
 
     const dist = Math.max(18, topY * 1.15 + 14)
-    const dir = new THREE.Vector3()
-    dir.copy(camera.position).sub(controls.target).normalize()
-    const desired = controls.target.clone().addScaledVector(dir, dist)
-    camera.position.lerp(desired, CAMERA.targetLerp * 0.5)
+    offset.copy(camera.position).sub(controls.target)
+    const currentDist = offset.length()
+    if (currentDist > 0.001) {
+      offset.normalize().multiplyScalar(dist)
+      const desired = controls.target.clone().add(offset)
+      camera.position.lerp(desired, CAMERA.targetLerp * 0.5)
+    }
   }
 
   function setIdleOrbit(enabled: boolean): void {
@@ -89,6 +183,44 @@ export function useContainerStackThreeScene(
 
   function setCameraShake(intensity: number): void {
     shakeIntensity = intensity
+  }
+
+  function applyKeyboardCamera(dt: number): void {
+    if (!camera || !controls) return
+
+    const anyKey =
+      keyOrbitLeft.value ||
+      keyOrbitRight.value ||
+      keyOrbitUp.value ||
+      keyOrbitDown.value ||
+      keyZoomIn.value ||
+      keyZoomOut.value
+    if (anyKey) {
+      idleOrbit = false
+    }
+
+    offset.copy(camera.position).sub(controls.target)
+    spherical.setFromVector3(offset)
+
+    const sp = CAMERA.keyOrbitSpeed * dt
+    if (keyOrbitLeft.value) spherical.theta += sp
+    if (keyOrbitRight.value) spherical.theta -= sp
+    if (keyOrbitUp.value) spherical.phi -= sp * 0.85
+    if (keyOrbitDown.value) spherical.phi += sp * 0.85
+
+    spherical.phi = Math.max(
+      CAMERA.minPolarAngle,
+      Math.min(CAMERA.maxPolarAngle, spherical.phi)
+    )
+
+    let radius = spherical.radius
+    if (keyZoomIn.value) radius -= CAMERA.keyZoomSpeed * dt
+    if (keyZoomOut.value) radius += CAMERA.keyZoomSpeed * dt
+    radius = Math.max(CAMERA.minDistance, Math.min(CAMERA.maxDistance, radius))
+    spherical.radius = radius
+
+    offset.setFromSpherical(spherical)
+    camera.position.copy(controls.target).add(offset)
   }
 
   function applyShake(): void {
@@ -102,11 +234,16 @@ export function useContainerStackThreeScene(
   function render(): void {
     if (!renderer || !scene || !camera || !controls) return
 
+    const now = performance.now()
+    const dt = Math.min((now - lastFrameTime) / 1000, 0.1)
+    lastFrameTime = now
+
     if (idleOrbit) {
-      controls.autoRotate = true
-      controls.autoRotateSpeed = CAMERA.idleOrbitSpeed
-    } else {
-      controls.autoRotate = false
+      offset.copy(camera.position).sub(controls.target)
+      spherical.setFromVector3(offset)
+      spherical.theta += CAMERA.idleOrbitSpeed * dt
+      offset.setFromSpherical(spherical)
+      camera.position.copy(controls.target).add(offset)
     }
 
     controls.update()
@@ -116,6 +253,8 @@ export function useContainerStackThreeScene(
 
   function dispose(): void {
     window.removeEventListener('resize', onResize)
+    window.removeEventListener('keydown', onKeyDown)
+    window.removeEventListener('keyup', onKeyUp)
     controls?.dispose()
     renderer?.dispose()
 
@@ -150,5 +289,6 @@ export function useContainerStackThreeScene(
     frameTower,
     setIdleOrbit,
     setCameraShake,
+    applyKeyboardCamera,
   }
 }

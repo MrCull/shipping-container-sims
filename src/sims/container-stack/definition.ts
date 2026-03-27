@@ -2,11 +2,11 @@ import type { SimDefinition } from '@/types/sim'
 
 export const definition: SimDefinition = {
   id: 'container-stack',
-  title: 'Container Stack',
+  title: 'Contenga',
   tagline: 'How high can you stack before the tower falls?',
   description:
-    'A 3D Jenga-style game with shipping containers. Slide blocks out, stack them on top, ' +
-    'and keep the tower balanced as stability and wobble react to every move.',
+    'Contenga is a 3D Jenga-style game with shipping containers. Slide blocks out, stack them on top, ' +
+    'and keep the tower balanced — poor support under the stack will bring it down.',
   icon: '🏗️',
   status: 'playable',
   color: '#ef4444',

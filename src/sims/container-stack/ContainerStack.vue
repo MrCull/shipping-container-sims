@@ -51,7 +51,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     <div class="hud-bottom">
       <Instructions />
       <p class="pause-hint">
-        Esc — pause
+        WASD / arrows — orbit camera · + / − — zoom · Esc — pause
       </p>
     </div>
     <StartScreen v-if="phase === 'start'" />
