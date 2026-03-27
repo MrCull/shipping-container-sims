@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useGameStore } from '../../store/gameStore'
 import { LEVELS, getTotalSlots } from '../../modules/levels'
-import type { ShipPreset } from '../../types'
+import type { ShipPreset, LevelConfig } from '../../types'
 
 const store = useGameStore()
 const levels = LEVELS
@@ -12,6 +12,13 @@ function startLevel(level: number) {
 
 function getSlots(preset: ShipPreset): number {
   return getTotalSlots(preset)
+}
+
+function formatTimer(level: LevelConfig): string {
+  if (!level.timerSeconds) return ''
+  const m = Math.floor(level.timerSeconds / 60)
+  const s = level.timerSeconds % 60
+  return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 </script>
 
@@ -40,8 +47,12 @@ function getSlots(preset: ShipPreset): number {
           <div class="level-desc">
             {{ level.description }}
           </div>
-          <div class="level-slots">
-            {{ getSlots(level.preset) }} slots
+          <div class="level-meta">
+            <span class="level-slots">{{ getSlots(level.preset) }} slots</span>
+            <span
+              v-if="level.timerSeconds"
+              class="level-timer"
+            >⏱ {{ formatTimer(level) }}</span>
           </div>
         </button>
       </div>
@@ -107,9 +118,17 @@ function getSlots(preset: ShipPreset): number {
   font-size: 12px;
   color: #aaa;
 }
+.level-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
 .level-slots {
   font-size: 11px;
   color: #666;
-  margin-top: 4px;
+}
+.level-timer {
+  font-size: 11px;
+  color: #ffaa00;
 }
 </style>

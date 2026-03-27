@@ -21,7 +21,7 @@ function reasonClass(reason: PlacementReason): string {
       Last Placement
     </div>
     <div class="placement-score">
-      {{ store.lastPlacement.score }} pts
+      +${{ store.lastPlacement.score }}
     </div>
     <div
       v-for="(reason, i) in store.lastPlacement.reasons"
@@ -51,7 +51,7 @@ function reasonClass(reason: PlacementReason): string {
   backdrop-filter: blur(4px);
 }
 .last-placement {
-  top: 200px;
+  top: 230px;
   right: 12px;
   min-width: 220px;
 }

@@ -16,8 +16,9 @@ const store = useGameStore()
       {{ store.levelConfig?.name }}
     </div>
     <div class="score">
-      Score: <span class="score-value">{{ store.score.toLocaleString() }}</span>
-      / {{ store.targetScore.toLocaleString() }}
+      <span class="score-value">${{ store.score.toLocaleString() }}</span>
+      <span class="score-sep">/</span>
+      <span class="score-target">${{ store.targetScore.toLocaleString() }}</span>
     </div>
   </div>
 </template>
@@ -53,5 +54,14 @@ const store = useGameStore()
 .score-value {
   color: #00ff88;
   font-weight: bold;
+  font-size: 16px;
+}
+.score-sep {
+  color: #666;
+  margin: 0 4px;
+}
+.score-target {
+  color: #888;
+  font-size: 13px;
 }
 </style>

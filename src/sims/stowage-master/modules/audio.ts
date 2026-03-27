@@ -15,6 +15,13 @@ export const SOUNDS: Record<string, string> = {
   levelUp: assetUrl('horns-level-up.mp3'),
   levelPassed: assetUrl('level-passed-ok.mp3'),
   caChing: assetUrl('money-increase-ca-ching-.mp3'),
+  moneyGame: assetUrl('money-increase-game-sound.mp3'),
+  jackpot: assetUrl('positive-high-score-reached-like-jackpot-4-seconds.wav'),
+
+  // Timer sounds
+  clockTicking: assetUrl('clock-ticking-8-seconds.mp3'),
+  countdownBoom: assetUrl('20-seconds-increating-pitch-countdown-then-5-seconds-of-boom.mp3'),
+  boo: assetUrl('boo-3-seconds.mp3'),
 
   // Ship horns
   shipHornLarge: assetUrl('large-ship-three-horns-in-a-row.mp3'),
