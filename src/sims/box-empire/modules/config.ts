@@ -69,9 +69,9 @@ export const TUTORIAL_VESSEL = {
   loa: 50,
   beam: 12,
   teuCapacity: 10,
-  bays: 1,
+  bays: 5,   // 5 container positions spread along the deck (X axis)
   rows: 1,
-  tiers: 5,
+  tiers: 1,  // single tier on deck
 }
 
 // ---- Yard (Tutorial) ------------------------------------------------------
@@ -95,9 +95,14 @@ export const TUTORIAL_IMPORT_COUNT = 5
 
 // ---- Terminal layout positions (meters) -----------------------------------
 
-export const GATE_POSITION: Position3D = { x: -40, y: 0, z: 50 }
-export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -43, y: 0, z: 50 }
-export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -37, y: 0, z: 50 }
+// In-gate: export trucks queue OUTSIDE terminal (z > TERMINAL_FENCE_Z)
+// Out-gate: import trucks queue INSIDE terminal before passing the fence
+export const TERMINAL_FENCE_Z = 55  // z position of the terminal boundary fence
+export const GATE_POSITION: Position3D = { x: -40, y: 0, z: TERMINAL_FENCE_Z }
+// In-gate lanes (outside terminal, z > TERMINAL_FENCE_Z)
+export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -46, y: 0, z: TERMINAL_FENCE_Z }
+// Out-gate lanes (inside terminal, queue toward z < TERMINAL_FENCE_Z)
+export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -34, y: 0, z: TERMINAL_FENCE_Z }
 export const YARD_IO_POSITION: Position3D = { x: 0, y: 0, z: 30 }
 export const YARD_BLOCK_POSITION: Position = { x: -15, z: 20 }
 export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: 0, z: 3 }

@@ -13,7 +13,7 @@ import {
   TUTORIAL_VESSEL,
   BERTH_POSITION,
   CONTAINER_HEIGHT,
-  CONTAINER_STACK_GAP_Y,
+  CONTAINER_LENGTH,
 } from './config'
 
 let vesselCounter = 0
@@ -29,14 +29,15 @@ export function createTutorialVessel(
   vesselCounter++
   const vesselId = `vessel-${vesselCounter}`
 
+  // Tutorial vessel: 5 bays along the deck (X axis), 1 tier per bay
   const slots: VesselSlot[] = []
-  for (let tier = 1; tier <= TUTORIAL_VESSEL.tiers; tier++) {
-    const container = importContainers[tier - 1]
+  for (let bay = 1; bay <= TUTORIAL_VESSEL.bays; bay++) {
+    const container = importContainers[bay - 1]
     slots.push({
       vesselId,
-      bay: 1,
+      bay,
       row: 1,
-      tier,
+      tier: 1,
       containerId: container ? container.id : null,
     })
   }
@@ -56,34 +57,44 @@ export function createTutorialVessel(
   }
 }
 
+// Get world position of a vessel slot identified by bay number.
+// Containers are spread along the X axis (length of vessel).
+// bay=1 is near bow, bay=5 is near stern.
 export function getVesselSlotPosition(
   vessel: VesselVisit,
-  tier: number,
+  bay: number,
 ): Position3D {
-  const deckY = 4
+  const deckY = 5.4  // above hull (hull body is 5m tall, deck at top)
+  const containerSpacing = CONTAINER_LENGTH + 0.5
+  // Centre the 5 containers on the vessel; offset from vessel centre X
+  const totalSpan = (TUTORIAL_VESSEL.bays - 1) * containerSpacing
+  const bayOffset = (bay - 1) * containerSpacing - totalSpan / 2
   return {
-    x: vessel.position.x,
-    y: deckY + (tier - 1) * (CONTAINER_HEIGHT + CONTAINER_STACK_GAP_Y) + CONTAINER_HEIGHT / 2,
+    x: vessel.position.x + bayOffset,
+    y: deckY + CONTAINER_HEIGHT / 2,
     z: vessel.position.z,
   }
 }
 
+// Returns the next container to discharge and its bay number
 export function getNextDischargeContainer(
   vessel: VesselVisit,
 ): { containerId: string; tier: number } | null {
-  for (let tier = TUTORIAL_VESSEL.tiers; tier >= 1; tier--) {
-    const slot = vessel.slots.find(s => s.tier === tier && s.containerId !== null)
+  // Discharge from highest bay first (stern to bow)
+  for (let bay = TUTORIAL_VESSEL.bays; bay >= 1; bay--) {
+    const slot = vessel.slots.find(s => s.bay === bay && s.containerId !== null)
     if (slot && slot.containerId) {
-      return { containerId: slot.containerId, tier: slot.tier }
+      return { containerId: slot.containerId, tier: slot.bay }  // tier field reused as bay for API compat
     }
   }
   return null
 }
 
+// Returns the next empty bay for loading (bay number as 'tier' for API compat)
 export function getNextLoadSlot(vessel: VesselVisit): number | null {
-  for (let tier = 1; tier <= TUTORIAL_VESSEL.tiers; tier++) {
-    const slot = vessel.slots.find(s => s.tier === tier)
-    if (slot && !slot.containerId) return tier
+  for (let bay = 1; bay <= TUTORIAL_VESSEL.bays; bay++) {
+    const slot = vessel.slots.find(s => s.bay === bay)
+    if (slot && !slot.containerId) return bay
   }
   return null
 }
@@ -96,12 +107,13 @@ export function dischargeContainerFromVessel(
   if (slot) slot.containerId = null
 }
 
+// 'tier' parameter is actually bay number (API compat — callers use getNextLoadSlot which returns bay)
 export function loadContainerOnVessel(
   vessel: VesselVisit,
   containerId: string,
   tier: number,
 ): void {
-  const slot = vessel.slots.find(s => s.tier === tier)
+  const slot = vessel.slots.find(s => s.bay === tier)
   if (slot) slot.containerId = containerId
 }
 

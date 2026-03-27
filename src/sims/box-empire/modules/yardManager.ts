@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { YardBlock, YardSlot, YardSlotRef, Position3D } from '../types'
+import { makeYardSlotId } from '../types'
 import {
   CONTAINER_LENGTH,
   CONTAINER_WIDTH,
@@ -57,7 +58,7 @@ export function findAvailableSlot(
       row,
       tier: tiersInStack + 1,
     }
-    const slotId = `${candidate.blockId}-${candidate.bay}-${candidate.row}-${candidate.tier}`
+    const slotId = makeYardSlotId(candidate.blockId, candidate.bay, candidate.row, candidate.tier)
     if (reservedSlotIds && reservedSlotIds.has(slotId)) return null
     return candidate
   }

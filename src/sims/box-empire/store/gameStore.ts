@@ -224,7 +224,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
           position: { x: 0, y: 4 + i * 2.64, z: -8 },
         },
         yardSlot: null,
-        vesselSlot: { vesselId: 'vessel-1', bay: 1, row: 1, tier: i + 1 },
+        vesselSlot: { vesselId: 'vessel-1', bay: i + 1, row: 1, tier: 1 },
+        arrivedAt: 0,
+        revenueEarned: 0,
       }
       importContainers.push(c)
     }
@@ -247,6 +249,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
         },
         yardSlot: null,
         vesselSlot: null,
+        arrivedAt: 0,
+        revenueEarned: 0,
       })
     }
 
@@ -256,7 +260,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     vesselVisits.value = [vessel]
 
     importContainers.forEach((c, i) => {
-      c.currentLocation.position = getVesselSlotPosition(vessel, i + 1)
+      c.currentLocation.position = getVesselSlotPosition(vessel, i + 1)  // bay = i+1
     })
 
     equipment.value = [
@@ -502,16 +506,26 @@ export const useGameStore = defineStore('box-empire-game', () => {
           const tx = createTransaction('gate_out_revenue', container.id, simTime.value)
           transactions.value.push(tx)
           money.value += tx.amount
+          container.revenueEarned += tx.amount
           emitEvent('money.earned', `+$${GATE_OUT_REVENUE} — import container gate-out`, {
             amount: GATE_OUT_REVENUE,
             position: { ...truck.position },
           })
-          container.lifecycleState = 'departed'
+          // Keep container visible on the truck until it fully departs; mark at gate-out
+          container.lifecycleState = 'at_gate'
           container.currentLocation = {
-            type: 'gate_buffer',
-            id: 'gate-export',
+            type: 'truck',
+            id: truck.id,
             position: { ...truck.position },
           }
+        }
+      }
+
+      // When truck finally departs (exits scene), mark container as truly departed
+      if (tResult.departed && truck.visitType === 'import_pickup' && truck.containerId) {
+        const container = containers.value.find(c => c.id === truck.containerId)
+        if (container && container.lifecycleState === 'at_gate') {
+          container.lifecycleState = 'departed'
         }
       }
     }
@@ -672,10 +686,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
       if (vessel) {
         // Parse tier from canonical vessel slot ID "vessel-1-01-01-03"
         const parsed = parseYardSlotId(job.dropoffLocation.id)
-        const tier = parsed ? parsed.tier : 1
-        loadContainerOnVessel(vessel, container.id, tier)
+        const bay = parsed ? parsed.tier : 1  // tier field carries bay number (API compat)
+        loadContainerOnVessel(vessel, container.id, bay)
         container.lifecycleState = 'loaded_on_vessel'
-        container.vesselSlot = { vesselId: vessel.id, bay: 1, row: 1, tier }
+        container.vesselSlot = { vesselId: vessel.id, bay, row: 1, tier: 1 }
         container.currentLocation = {
           type: 'vessel_slot',
           id: vessel.id,
@@ -685,6 +699,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         const tx = createTransaction('vessel_load_revenue', container.id, simTime.value)
         transactions.value.push(tx)
         money.value += tx.amount
+        container.revenueEarned += tx.amount
         emitEvent('money.earned', `+$${VESSEL_LOAD_REVENUE} — export container loaded on vessel`, {
           amount: VESSEL_LOAD_REVENUE,
           position: { ...job.dropoffLocation.position },

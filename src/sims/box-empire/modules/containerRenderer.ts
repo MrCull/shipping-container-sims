@@ -184,7 +184,10 @@ export class ContainerRenderer {
         c.currentLocation.position.y,
         c.currentLocation.position.z,
       )
-      this.dummy.rotation.set(0, 0, 0)
+      // On trucks the container should run along the truck's Z axis (length forward)
+      // The geometry is built with L along X, so rotate 90° around Y when on a truck
+      const onTruck = c.currentLocation.type === 'truck' || c.lifecycleState === 'returning_to_gate'
+      this.dummy.rotation.set(0, onTruck ? Math.PI / 2 : 0, 0)
       this.dummy.scale.set(1, 1, 1)
       this.dummy.updateMatrix()
       this.mesh.setMatrixAt(i, this.dummy.matrix)

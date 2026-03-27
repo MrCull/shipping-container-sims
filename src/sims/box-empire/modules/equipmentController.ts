@@ -292,12 +292,16 @@ function tickReachStacker(
           container.currentLocation = {
             type: 'equipment',
             id: eq.id,
-            // Container renders at the boom tip (in front of the RS body)
             position: { x: eq.position.x, y: eq.armTargetY, z: eq.position.z - RS_PARK_OFFSET },
           }
           result.pickedContainerId = container.id
         }
-        // Travel to parking position near dropoff
+        // Raise arm to travel-safe height: max(pickHeight, dropHeight) + clearance
+        // This ensures the container clears any existing stacks along the route
+        const dropTargetY = job.dropoffLocation.position.y
+        const travelHeight = Math.max(pickTargetY, dropTargetY) + 1.5
+        eq.armTargetY = travelHeight
+
         eq.state = 'travel_to_drop'
         eq.targetPosition = rsParkingPosition(job.dropoffLocation.position)
         eq.stateStartTime = state.simTime
@@ -323,7 +327,7 @@ function tickReachStacker(
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)
         if (container) {
-          // Container hangs from boom tip while travelling
+          // Container held at travel height (arm raised to clear stacks)
           container.currentLocation.position = {
             x: eq.position.x,
             y: eq.armTargetY,
@@ -332,7 +336,8 @@ function tickReachStacker(
         }
       }
       if (arrived) {
-        eq.armDropStartY = eq.armTargetY   // record current arm height for drop lerp
+        // Lower arm to just above drop target, then dropping phase lowers to final
+        eq.armDropStartY = eq.armTargetY
         eq.state = 'dropping'
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0

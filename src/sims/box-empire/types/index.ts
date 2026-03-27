@@ -83,6 +83,8 @@ export interface Container {
   yardSlot: YardSlotRef | null
   vesselSlot: VesselSlotRef | null
   shippingLine: string
+  arrivedAt: number       // sim time when container first became active (gate-in or vessel arrival)
+  revenueEarned: number   // cumulative revenue credited against this container
 }
 
 export interface YardSlotRef {
