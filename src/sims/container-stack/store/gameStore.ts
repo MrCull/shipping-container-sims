@@ -65,7 +65,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     position: Vector3
   }): void {
     const prefix = `${collapseIdPrefix}-`
-    const towerPieces = spawnCollapsePieces(layers.value, 0, prefix)
+    const towerPieces = spawnCollapsePieces(layers.value, prefix)
     if (extraFloating) {
       towerPieces.unshift(
         collapsePieceFromContainer(

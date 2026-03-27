@@ -300,14 +300,9 @@ export function collapsePieceFromContainer(
   }
 }
 
-export function spawnCollapsePieces(
-  layers: TowerLayer[],
-  failureLayerFromTop = 0,
-  keyPrefix = ''
-): CollapsePiece[] {
-  const startLayer = Math.max(0, layers.length - 1 - failureLayerFromTop)
+export function spawnCollapsePieces(layers: TowerLayer[], keyPrefix = ''): CollapsePiece[] {
   const pieces: CollapsePiece[] = []
-  for (let li = startLayer; li < layers.length; li++) {
+  for (let li = 0; li < layers.length; li++) {
     const layer = layers[li]!
     for (let si = 0; si < layer.slots.length; si++) {
       const c = layer.slots[si]

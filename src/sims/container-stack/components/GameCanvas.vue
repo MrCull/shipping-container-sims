@@ -61,8 +61,13 @@ function disposeObjectTree(obj: THREE.Object3D): void {
   obj.traverse(child => {
     const m = child as THREE.Mesh | THREE.LineSegments
     if (m.geometry) m.geometry.dispose()
+    const ud = m.userData as { usesSharedBodyMaterials?: boolean }
+    if (ud?.usesSharedBodyMaterials) return
     const mat = m.material
-    if (mat && !Array.isArray(mat)) mat.dispose()
+    if (mat) {
+      if (Array.isArray(mat)) mat.forEach(x => x.dispose())
+      else mat.dispose()
+    }
   })
 }
 

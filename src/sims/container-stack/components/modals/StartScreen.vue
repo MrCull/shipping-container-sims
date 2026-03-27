@@ -43,35 +43,37 @@ async function onPlay(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, rgba(15, 17, 23, 0.92), rgba(5, 6, 10, 0.97));
+  background: radial-gradient(ellipse at center, rgba(15, 23, 32, 0.94), rgba(8, 12, 18, 0.98));
   z-index: 20;
 }
 .card {
   max-width: 400px;
   padding: 2rem 1.75rem;
   text-align: center;
-  border: 2px solid rgba(239, 68, 68, 0.45);
+  border: 2px solid rgba(56, 189, 248, 0.45);
   border-radius: 12px;
-  background: rgba(24, 27, 35, 0.95);
-  box-shadow: 0 0 40px rgba(239, 68, 68, 0.15);
+  background: rgba(22, 30, 42, 0.96);
+  box-shadow:
+    0 0 48px rgba(14, 165, 233, 0.12),
+    0 0 1px rgba(255, 255, 255, 0.06) inset;
 }
 .title {
   margin: 0 0 0.35rem;
   font-size: 1.75rem;
   font-family: var(--font-retro, ui-monospace, monospace);
-  color: #f9fafb;
+  color: #f0f9ff;
 }
 .tag {
   margin: 0 0 1rem;
   font-size: 0.95rem;
-  color: #ef4444;
+  color: #38bdf8;
   font-weight: 600;
 }
 .blurb {
   margin: 0 0 1.5rem;
   font-size: 0.88rem;
   line-height: 1.5;
-  color: #9ca3af;
+  color: #94a3b8;
 }
 .play-btn {
   padding: 0.75rem 2.5rem;
@@ -80,12 +82,12 @@ async function onPlay(): Promise<void> {
   font-family: var(--font-retro, ui-monospace, monospace);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #0f1117;
-  background: linear-gradient(180deg, #fca5a5, #ef4444);
+  color: #0c1220;
+  background: linear-gradient(180deg, #7dd3fc, #0ea5e9);
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.35);
+  box-shadow: 0 4px 24px rgba(14, 165, 233, 0.35);
 }
 .play-btn:hover {
   filter: brightness(1.06);
