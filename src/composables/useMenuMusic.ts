@@ -1,4 +1,5 @@
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
+import { useAudioStore } from '@/stores/audio'
 import menuMusicUrl from '@/assets/audio/menu-music-loop.mp3'
 
 /**
@@ -19,8 +20,14 @@ function getAudio(): HTMLAudioElement {
 }
 
 export function useMenuMusic() {
+  const audioStore = useAudioStore()
+
   function tryPlay() {
     const audio = getAudio()
+    if (audioStore.backgroundMusicMuted) {
+      audio.pause()
+      return
+    }
     void audio.play().catch(() => {
       // Autoplay blocked — wait for first user interaction then retry once
       const onGesture = () => {
@@ -33,7 +40,20 @@ export function useMenuMusic() {
     })
   }
 
-  onMounted(tryPlay)
+  onMounted(() => {
+    tryPlay()
+    watch(
+      () => audioStore.backgroundMusicMuted,
+      (isMuted) => {
+        const audio = getAudio()
+        if (isMuted) {
+          audio.pause()
+        } else {
+          void audio.play()
+        }
+      },
+    )
+  })
 
   onUnmounted(() => {
     // Pause but keep the singleton alive so it can resume on the next mount

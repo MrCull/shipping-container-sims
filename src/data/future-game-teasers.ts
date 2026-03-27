@@ -2,16 +2,6 @@ import type { FutureGameTeaser } from '@/types/future-game-teaser'
 
 export const futureGameTeasers: FutureGameTeaser[] = [
   {
-    id: 'coblox',
-    title: 'Coblox',
-    tagline: 'The shipping-container platform where anyone can build and play',
-    description:
-      'Think Roblox, but every experience is built from modular shipping containers. Join friends in player-made obstacle courses, roleplay hubs, and mini-games, or use creation tools to snap containers into worlds and publish them for the community—social, creative, and endlessly replayable.',
-    icon: '🧱',
-    color: '#06b6d4',
-    tags: ['Platform', 'Social', 'Creator Tools'],
-  },
-  {
     id: 'container-craft',
     title: 'ContainerCraft',
     tagline: 'Survive in a world made of stacked boxes',
@@ -20,6 +10,16 @@ export const futureGameTeasers: FutureGameTeaser[] = [
     icon: '⚒️',
     color: '#c2410c',
     tags: ['Survival', 'Crafting', 'Exploration'],
+  },
+  {
+    id: 'coblox',
+    title: 'Coblox',
+    tagline: 'The shipping-container platform where anyone can build and play',
+    description:
+      'Think Roblox, but every experience is built from modular shipping containers. Join friends in player-made obstacle courses, roleplay hubs, and mini-games, or use creation tools to snap containers into worlds and publish them for the community—social, creative, and endlessly replayable.',
+    icon: '🧱',
+    color: '#06b6d4',
+    tags: ['Platform', 'Social', 'Creator Tools'],
   },
   {
     id: 'captain-container',

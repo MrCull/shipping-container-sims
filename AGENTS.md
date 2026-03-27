@@ -55,6 +55,12 @@ knowledge-base/      Domain knowledge reference files (dk_*.md)
 
 **Sim isolation is the #1 structural rule.** All code, components, composables, stores, types, and media for a sim live inside its own `src/sims/<sim-id>/` folder. Only logic genuinely reused by multiple sims belongs in the top-level `src/composables/` or `src/components/`. When a sim needs media from `available-media/`, copy the files into the sim's own `assets/` folder.
 
+## Sim-specific agent guides
+
+Each sim that has grown beyond a trivial prototype maintains its own agent guide alongside its code:
+
+- **[Box Empire](src/sims/box-empire/box-empire-AGENTS.md)** — Terminal operations tycoon sim. Architecture, modules, components, composables, layout, assets, shipping-line liveries, and known behaviours.
+
 ## Key conventions
 
 - **Auto-discovery**: Sims are registered via `import.meta.glob('@/sims/*/definition.ts')`. No manual imports needed — just add a folder.

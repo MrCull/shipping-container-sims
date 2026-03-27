@@ -10,6 +10,7 @@ export const definition: SimDefinition = {
     'to become the ultimate stowage planner.',
   icon: '🚢',
   status: 'playable',
+  order: 1,
   color: '#3b82f6',
   tags: ['3D', 'Puzzle', 'Logistics'],
   component: () => import('./StowageMaster.vue'),

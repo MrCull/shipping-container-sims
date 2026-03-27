@@ -10,6 +10,7 @@ export const definition: SimDefinition = {
     'shipping companies in this strategic tycoon sim.',
   icon: '📦',
   status: 'playable',
+  order: 3,
   color: '#f59e0b',
   tags: ['Tycoon', 'Strategy', 'Economy'],
   component: () => import('./BoxEmpire.vue'),

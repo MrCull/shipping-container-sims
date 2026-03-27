@@ -9,6 +9,7 @@ export const definition: SimDefinition = {
     'and keep the tower balanced — poor support under the stack will bring it down.',
   icon: '🏗️',
   status: 'playable',
+  order: 2,
   color: '#ef4444',
   tags: ['3D', 'Physics', 'Puzzle'],
   component: () => import('./ContainerStack.vue'),

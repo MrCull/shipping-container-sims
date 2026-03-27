@@ -5,8 +5,16 @@ import type { SimDefinition } from '@/types/sim'
 export const useSimsStore = defineStore('sims', () => {
   const sims = ref<SimDefinition[]>([])
 
-  const playable = computed(() => sims.value.filter(s => s.status === 'playable'))
-  const comingSoon = computed(() => sims.value.filter(s => s.status !== 'playable'))
+  const playable = computed(() =>
+    sims.value
+      .filter(s => s.status === 'playable')
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999)),
+  )
+  const comingSoon = computed(() =>
+    sims.value
+      .filter(s => s.status !== 'playable')
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999)),
+  )
 
   function register(sim: SimDefinition) {
     const idx = sims.value.findIndex(s => s.id === sim.id)

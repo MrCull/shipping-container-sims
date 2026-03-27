@@ -11,5 +11,6 @@ export interface SimDefinition {
   status: SimStatus
   color: string
   tags: string[]
+  order?: number
   component: () => Promise<{ default: Component }>
 }

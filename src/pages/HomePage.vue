@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useSimsStore } from '@/stores/sims'
+import { useAudioStore } from '@/stores/audio'
 import { useSimRegistry } from '@/composables/useSimRegistry'
 import { setHomePageMeta } from '@/composables/useSiteHead'
 import { useMenuMusic } from '@/composables/useMenuMusic'
@@ -10,6 +11,7 @@ import FutureGameCard from '@/components/FutureGameCard.vue'
 import { futureGameTeasers } from '@/data/future-game-teasers'
 
 const store = useSimsStore()
+const audioStore = useAudioStore()
 const { registerAll } = useSimRegistry()
 
 useMenuMusic()
@@ -24,6 +26,13 @@ onMounted(() => {
   <div class="home">
     <header class="hero">
       <HeroBackground />
+      <button
+        class="music-toggle"
+        :title="audioStore.backgroundMusicMuted ? 'Unmute music' : 'Mute music'"
+        @click="audioStore.toggleBackgroundMusic()"
+      >
+        {{ audioStore.backgroundMusicMuted ? '🔇' : '🔊' }}
+      </button>
       <div class="hero-content">
         <h1 class="hero-title">
           <span class="title-line">SHIPPING</span>
@@ -114,6 +123,26 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+
+.music-toggle {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.music-toggle:hover {
+  background: rgba(0, 0, 0, 0.7);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
 }
 
 .hero-content {
