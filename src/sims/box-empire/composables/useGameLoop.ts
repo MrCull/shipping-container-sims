@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { ref, onBeforeUnmount } from 'vue'
-import { SIM_TICK_INTERVAL } from '../modules/config'
+import { SIM_TICK_INTERVAL, MAX_TICKS_PER_FRAME_NORMAL, MAX_TICKS_PER_FRAME_FAST } from '../modules/config'
 import { useGameStore } from '../store/gameStore'
 
 export function useGameLoop(onRender: (dt: number) => void) {
@@ -23,13 +23,14 @@ export function useGameLoop(onRender: (dt: number) => void) {
 
     accumulator += dt
 
+    const maxTicks = store.timeScale >= 50 ? MAX_TICKS_PER_FRAME_FAST : MAX_TICKS_PER_FRAME_NORMAL
     let tickCount = 0
-    while (accumulator >= SIM_TICK_INTERVAL && tickCount < 20) {
+    while (accumulator >= SIM_TICK_INTERVAL && tickCount < maxTicks) {
       store.tick(SIM_TICK_INTERVAL)
       accumulator -= SIM_TICK_INTERVAL
       tickCount++
     }
-    if (tickCount >= 20) accumulator = 0
+    if (tickCount >= maxTicks) accumulator = 0
 
     onRender(dt)
   }

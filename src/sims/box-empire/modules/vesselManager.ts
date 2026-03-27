@@ -130,13 +130,21 @@ export function tickVessel(
     }
     case 'arriving': {
       const targetZ = BERTH_POSITION.z
-      const speed = 3
+      const targetX = BERTH_POSITION.x
+      const dist = targetZ - vessel.position.z
+      // Two-phase: slow deceleration when within 15m, then final alignment
+      const speed = Math.abs(dist) > 15 ? 4 : 1.5
       if (vessel.position.z < targetZ) {
         vessel.position.z = Math.min(vessel.position.z + speed * _dt, targetZ)
       }
-      if (vessel.position.z >= targetZ) {
+      if (vessel.position.x !== targetX) {
+        const xDiff = targetX - vessel.position.x
+        vessel.position.x += Math.sign(xDiff) * Math.min(Math.abs(xDiff), speed * _dt)
+      }
+      if (vessel.position.z >= targetZ && Math.abs(vessel.position.x - targetX) < 0.1) {
         vessel.state = 'arrived'
         vessel.position.z = targetZ
+        vessel.position.x = targetX
         result.stateChanged = true
         result.newState = 'arrived'
       }
