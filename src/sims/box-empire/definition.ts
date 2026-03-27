@@ -9,7 +9,7 @@ export const definition: SimDefinition = {
     'Buy routes, upgrade ports, manage fleets, and outsmart rival ' +
     'shipping companies in this strategic tycoon sim.',
   icon: '📦',
-  status: 'coming-soon',
+  status: 'playable',
   color: '#f59e0b',
   tags: ['Tycoon', 'Strategy', 'Economy'],
   component: () => import('./BoxEmpire.vue'),
