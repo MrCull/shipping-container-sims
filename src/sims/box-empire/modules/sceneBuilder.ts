@@ -50,7 +50,6 @@ export function buildScene(scene: THREE.Scene): void {
   buildTerminalBoundary(scene)
   buildGatehouse(scene)
   buildQuayBufferMarkings(scene)
-  buildTerminalBuildings(scene)
 }
 
 function buildSkyAndFog(scene: THREE.Scene): void {
@@ -360,25 +359,4 @@ function buildQuayBufferMarkings(scene: THREE.Scene): void {
   load.rotation.x = -Math.PI / 2
   load.position.set(QUAY_BUFFER_LOAD_POSITION.x, 0.02, QUAY_BUFFER_LOAD_POSITION.z)
   scene.add(load)
-}
-
-function buildTerminalBuildings(scene: THREE.Scene): void {
-  // Terminal operations building (back of yard)
-  const bldgMat = new THREE.MeshPhongMaterial({ color: 0xc0b8a8, shininess: 8 })
-  const roofMat = new THREE.MeshPhongMaterial({ color: 0x8090a0, shininess: 5 })
-
-  const bldg = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 10), bldgMat)
-  bldg.position.set(35, 4, 12); bldg.castShadow = true; bldg.receiveShadow = true
-  scene.add(bldg)
-
-  const shed = new THREE.Mesh(new THREE.BoxGeometry(18, 5, 14), roofMat)
-  shed.position.set(-45, 2.5, 12); shed.castShadow = true
-  scene.add(shed)
-
-  // Window strip
-  const winMat = new THREE.MeshPhongMaterial({ color: 0x88aacc, emissive: 0x224466, emissiveIntensity: 0.5, transparent: true, opacity: 0.75 })
-  for (let i = -2; i <= 2; i++) {
-    const win = new THREE.Mesh(new THREE.BoxGeometry(2, 1.4, 0.1), winMat)
-    win.position.set(35 + i * 4, 5.5, 7.1); scene.add(win)
-  }
 }
