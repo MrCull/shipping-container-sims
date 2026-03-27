@@ -207,15 +207,19 @@ export class EquipmentRenderer {
         parts.boomGroup.rotation.x = -0.15 - t * 0.65
       }
 
-      // Animate MHC spreader Y based on armTargetY (lowers toward container)
+      // Animate MHC spreader: lateral Z swing + vertical Y lower
       if (parts?.mhcSpreader && eq.type === 'mobile_harbor_crane') {
         const jibY = 13
         const cableLength = Math.max(0.5, jibY - eq.armTargetY)
-        parts.mhcSpreader.position.y = eq.armTargetY
+        // lateral position along jib (jib center at z=-5, range ±7)
+        parts.mhcSpreader.position.set(0, jibY, -5 + eq.spreaderZ)
+        // Cable hangs down from spreader
         if (parts.mhcCable) {
-          parts.mhcCable.scale.y = cableLength
-          parts.mhcCable.position.y = -cableLength / 2
+          const dropAmount = jibY - eq.armTargetY
+          parts.mhcCable.scale.y = Math.max(0.1, dropAmount)
+          parts.mhcCable.position.y = -dropAmount / 2
         }
+        void cableLength
       }
     }
   }

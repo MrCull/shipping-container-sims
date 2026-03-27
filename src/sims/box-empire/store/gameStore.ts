@@ -273,6 +273,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         enabled: true,
         craneMode: 'both',
         armTargetY: 0,
+        spreaderZ: 0,
       },
       {
         id: 'mhc-1',
@@ -288,6 +289,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         enabled: true,
         craneMode: 'both',
         armTargetY: 0,
+        spreaderZ: 0,
       },
     ]
 

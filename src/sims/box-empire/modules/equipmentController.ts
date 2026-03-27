@@ -1,6 +1,13 @@
 // ---------------------------------------------------------------------------
 // Box Empire — Equipment state machine & movement
 // ---------------------------------------------------------------------------
+// Key design decisions:
+//  - Reach Stacker: travels to a *parking position* offset in front of the
+//    target slot, then picks/drops by extending its boom. The body never
+//    enters the stack footprint.
+//  - Mobile Harbor Crane: base is FIXED. It never translates. Only armTargetY
+//    changes to animate the spreader swinging between vessel and quay buffer.
+// ---------------------------------------------------------------------------
 
 import type {
   Equipment,
@@ -15,6 +22,10 @@ import {
   MHC_CYCLE_TIME,
 } from './config'
 import { isContainerOnTop } from './yardManager'
+
+// How far (metres) the reach stacker body parks away from the target container
+// in the Z direction so it does not drive into the stack.
+const RS_PARK_OFFSET = 5.5
 
 function distanceTo(a: Position3D, b: Position3D): number {
   const dx = a.x - b.x
@@ -44,6 +55,12 @@ function moveTowards(
   }
 }
 
+// For reach stacker: compute a parking position in front of the target.
+// The RS approaches from the +Z side (from the road), so park at target.z + offset.
+function rsParkingPosition(targetPos: Position3D): Position3D {
+  return { x: targetPos.x, y: 0, z: targetPos.z + RS_PARK_OFFSET }
+}
+
 function getPickDuration(eq: Equipment): number {
   if (eq.type === 'mobile_harbor_crane') return MHC_CYCLE_TIME / 2
   return RS_PICK_CYCLE_TIME
@@ -55,7 +72,7 @@ function getDropDuration(eq: Equipment): number {
 }
 
 function getTravelSpeed(eq: Equipment, laden: boolean): number {
-  if (eq.type === 'mobile_harbor_crane') return 2
+  if (eq.type === 'mobile_harbor_crane') return 0  // MHC never translates
   return laden ? RS_SPEED_LADEN : RS_SPEED_UNLADEN
 }
 
@@ -80,9 +97,7 @@ export function tickEquipment(
     jobBlocked: false,
   }
 
-  // Disabled equipment does nothing
   if (!eq.enabled) return result
-
   if (eq.state === 'idle' || !eq.currentJobId) return result
 
   const job = state.jobs.find(j => j.id === eq.currentJobId)
@@ -92,12 +107,134 @@ export function tickEquipment(
     return result
   }
 
+  // MHC: base is always fixed; skip any translation completely.
+  // Just animate armTargetY through the pick/drop cycle.
+  if (eq.type === 'mobile_harbor_crane') {
+    return tickMhc(eq, job, state, dt, result)
+  }
+
+  // Reach stacker
+  return tickReachStacker(eq, job, state, dt, result)
+}
+
+function tickMhc(
+  eq: Equipment,
+  job: import('../types').Job,
+  state: BoxEmpireState,
+  dt: number,
+  result: EquipmentTickResult,
+): EquipmentTickResult {
+  eq.stateElapsed += dt
+
+  switch (eq.state) {
+    case 'assigned': {
+      // Transition straight to picking; base does not move.
+      // spreaderZ: negative = vessel side, positive = quay side
+      eq.spreaderZ = job.pickupLocation.type === 'vessel_slot' ? -6 : 4
+      eq.state = 'picking'
+      eq.stateStartTime = state.simTime
+      eq.stateElapsed = 0
+      job.status = 'in_progress'
+      break
+    }
+
+    case 'travel_to_pickup': {
+      // Should not happen for MHC, but handle gracefully
+      eq.state = 'picking'
+      eq.stateStartTime = state.simTime
+      eq.stateElapsed = 0
+      job.status = 'in_progress'
+      break
+    }
+
+    case 'picking': {
+      const pickTargetY = job.pickupLocation.position.y
+      const pickProgress = Math.min(1, eq.stateElapsed / getPickDuration(eq))
+      eq.armTargetY = pickTargetY * pickProgress
+
+      if (eq.stateElapsed >= getPickDuration(eq)) {
+        const container = state.containers.find(c => c.id === job.containerId)
+        if (container) {
+          eq.carriedContainerId = container.id
+          container.currentLocation = {
+            type: 'equipment',
+            id: eq.id,
+            position: { x: eq.position.x, y: eq.armTargetY, z: eq.position.z },
+          }
+          result.pickedContainerId = container.id
+        }
+        // Swing spreader to drop side
+        eq.spreaderZ = job.dropoffLocation.type === 'vessel_slot' ? -6 : 4
+        eq.state = 'dropping'
+        eq.targetPosition = { ...job.dropoffLocation.position }
+        eq.stateStartTime = state.simTime
+        eq.stateElapsed = 0
+      }
+      break
+    }
+
+    case 'travel_to_drop': {
+      // MHC doesn't travel; jump straight to dropping
+      eq.state = 'dropping'
+      eq.stateStartTime = state.simTime
+      eq.stateElapsed = 0
+      break
+    }
+
+    case 'dropping': {
+      const dropTargetY = job.dropoffLocation.position.y
+      const dropProgress = Math.min(1, eq.stateElapsed / getDropDuration(eq))
+      eq.armTargetY = dropTargetY * (1 - dropProgress)  // lowers to ground
+
+      if (eq.carriedContainerId) {
+        const container = state.containers.find(c => c.id === eq.carriedContainerId)
+        if (container) {
+          // Animate container position between pickup and dropoff
+          const pickPos = job.pickupLocation.position
+          const dropPos = job.dropoffLocation.position
+          container.currentLocation.position = {
+            x: pickPos.x + (dropPos.x - pickPos.x) * dropProgress,
+            y: eq.armTargetY,
+            z: pickPos.z + (dropPos.z - pickPos.z) * dropProgress,
+          }
+        }
+      }
+
+      if (eq.stateElapsed >= getDropDuration(eq)) {
+        result.droppedContainerId = eq.carriedContainerId
+        result.jobCompleted = true
+        result.jobId = job.id
+        eq.carriedContainerId = null
+        eq.state = 'idle'
+        eq.currentJobId = null
+        eq.targetPosition = null
+        eq.armTargetY = 0
+        eq.spreaderZ = 0
+        eq.stateStartTime = state.simTime
+        eq.stateElapsed = 0
+      }
+      break
+    }
+  }
+
+  return result
+}
+
+function tickReachStacker(
+  eq: Equipment,
+  job: import('../types').Job,
+  state: BoxEmpireState,
+  dt: number,
+  result: EquipmentTickResult,
+): EquipmentTickResult {
   eq.stateElapsed += dt
 
   switch (eq.state) {
     case 'assigned': {
       eq.state = 'travel_to_pickup'
-      eq.targetPosition = { x: job.pickupLocation.position.x, y: 0, z: job.pickupLocation.position.z }
+      // Travel to parking position, not to the container itself
+      const parkPos = rsParkingPosition(job.pickupLocation.position)
+      eq.targetPosition = parkPos
       eq.stateStartTime = state.simTime
       eq.stateElapsed = 0
       eq.speed = getTravelSpeed(eq, false)
@@ -106,7 +243,7 @@ export function tickEquipment(
 
     case 'travel_to_pickup': {
       if (!eq.targetPosition) {
-        eq.targetPosition = { x: job.pickupLocation.position.x, y: 0, z: job.pickupLocation.position.z }
+        eq.targetPosition = rsParkingPosition(job.pickupLocation.position)
       }
       const { position, arrived } = moveTowards(
         eq.position,
@@ -117,7 +254,7 @@ export function tickEquipment(
       eq.position = position
       eq.position.y = 0
       if (arrived) {
-        // Pre-pick accessibility check for yard containers
+        // Pre-pick accessibility check
         if (job.pickupLocation.type === 'yard_slot') {
           const yard = state.yardBlocks[0]
           if (yard) {
@@ -140,7 +277,6 @@ export function tickEquipment(
     }
 
     case 'picking': {
-      // Interpolate armTargetY toward pickup height during picking phase
       const pickTargetY = job.pickupLocation.position.y
       const pickProgress = Math.min(1, eq.stateElapsed / getPickDuration(eq))
       eq.armTargetY = pickTargetY * pickProgress
@@ -152,12 +288,14 @@ export function tickEquipment(
           container.currentLocation = {
             type: 'equipment',
             id: eq.id,
-            position: { x: eq.position.x, y: eq.armTargetY, z: eq.position.z },
+            // Container renders at the boom tip (in front of the RS body)
+            position: { x: eq.position.x, y: eq.armTargetY, z: eq.position.z - RS_PARK_OFFSET },
           }
           result.pickedContainerId = container.id
         }
+        // Travel to parking position near dropoff
         eq.state = 'travel_to_drop'
-        eq.targetPosition = { x: job.dropoffLocation.position.x, y: 0, z: job.dropoffLocation.position.z }
+        eq.targetPosition = rsParkingPosition(job.dropoffLocation.position)
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0
         eq.speed = getTravelSpeed(eq, true)
@@ -168,7 +306,7 @@ export function tickEquipment(
 
     case 'travel_to_drop': {
       if (!eq.targetPosition) {
-        eq.targetPosition = { x: job.dropoffLocation.position.x, y: 0, z: job.dropoffLocation.position.z }
+        eq.targetPosition = rsParkingPosition(job.dropoffLocation.position)
       }
       const { position, arrived } = moveTowards(
         eq.position,
@@ -181,10 +319,11 @@ export function tickEquipment(
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)
         if (container) {
+          // Container hangs from boom tip while travelling
           container.currentLocation.position = {
             x: eq.position.x,
             y: eq.armTargetY,
-            z: eq.position.z,
+            z: eq.position.z - RS_PARK_OFFSET,
           }
         }
       }
@@ -197,10 +336,20 @@ export function tickEquipment(
     }
 
     case 'dropping': {
-      // Interpolate armTargetY toward drop height
       const dropTargetY = job.dropoffLocation.position.y
       const dropProgress = Math.min(1, eq.stateElapsed / getDropDuration(eq))
-      eq.armTargetY = dropTargetY * dropProgress
+      eq.armTargetY = dropTargetY * (1 - dropProgress)  // lower to target
+
+      if (eq.carriedContainerId) {
+        const container = state.containers.find(c => c.id === eq.carriedContainerId)
+        if (container) {
+          container.currentLocation.position = {
+            x: eq.position.x,
+            y: eq.armTargetY,
+            z: eq.position.z - RS_PARK_OFFSET,
+          }
+        }
+      }
 
       if (eq.stateElapsed >= getDropDuration(eq)) {
         result.droppedContainerId = eq.carriedContainerId
@@ -211,6 +360,7 @@ export function tickEquipment(
         eq.currentJobId = null
         eq.targetPosition = null
         eq.armTargetY = 0
+        eq.spreaderZ = 0
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0
       }

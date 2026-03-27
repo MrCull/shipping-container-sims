@@ -168,6 +168,7 @@ export interface Equipment {
   enabled: boolean
   craneMode: CraneMode
   armTargetY: number
+  spreaderZ: number    // lateral position of MHC spreader along jib (+Z=quay, -Z=vessel)
 }
 
 // ---- Jobs -----------------------------------------------------------------

@@ -153,10 +153,14 @@ export class ContainerRenderer {
 
   constructor(scene: THREE.Scene) {
     const geo = buildContainerGeometry()
+    // vertexColors must be false here — per-instance color comes from instanceColor
+    // attribute set below. With vertexColors:true the material reads per-vertex data
+    // which doesn't exist in our merged geometry, giving black output.
     const mat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
       roughness: 0.55,
-      metalness: 0.35,
-      vertexColors: true,
+      metalness: 0.2,
+      vertexColors: false,
     })
 
     this.mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES)
