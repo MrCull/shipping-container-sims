@@ -62,10 +62,15 @@ export function createTutorialSteps(): TutorialStep[] {
       stepNumber: 7,
       prompt: 'Trucks are arriving to collect the import containers. Each gate-out earns $100!',
       condition: (s: BoxEmpireState) => {
-        const importDeparted = s.containers.filter(
-          c => c.visitType === 'import' && c.lifecycleState === 'departed',
+        const importDone = s.containers.filter(
+          c =>
+            c.visitType === 'import' &&
+            (c.lifecycleState === 'departed' || c.lifecycleState === 'at_gate'),
         )
-        return importDeparted.length >= 5
+        const gateOutRevenue = s.transactions.filter(
+          t => t.type === 'gate_out_revenue',
+        ).length
+        return importDone.length >= 5 || gateOutRevenue >= 5
       },
     },
     {
