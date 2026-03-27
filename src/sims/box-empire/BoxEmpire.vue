@@ -24,7 +24,7 @@ function handleRestart(): void {
   <div class="box-empire">
     <GameCanvas />
 
-    <template v-if="store.gamePhase !== 'menu'">
+    <template v-if="store.gamePhase === 'tutorial' || store.gamePhase === 'playing' || store.gamePhase === 'completed'">
       <TopBar />
       <TutorialOverlay />
       <EventFeed />
@@ -52,5 +52,6 @@ function handleRestart(): void {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background: #0a0e1a;
 }
 </style>

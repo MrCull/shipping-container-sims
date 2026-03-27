@@ -2,7 +2,7 @@
 // Box Empire — Sim-specific Three.js scene setup
 // ---------------------------------------------------------------------------
 
-import { onMounted, onUnmounted, ref, type Ref } from 'vue'
+import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useGameStore } from '../store/gameStore'
@@ -34,47 +34,61 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   const isReady = ref(false)
   const store = useGameStore()
 
-  function init(): void {
-    if (!canvasRef.value) return
+  function init(canvas: HTMLCanvasElement): void {
+    try {
+      scene = new THREE.Scene()
 
-    scene = new THREE.Scene()
+      renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        alpha: false,
+        powerPreference: 'default',
+      })
 
-    renderer = new THREE.WebGLRenderer({
-      canvas: canvasRef.value,
-      antialias: true,
-    })
-    renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.shadowMap.enabled = true
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.1
-    renderer.outputColorSpace = THREE.SRGBColorSpace
+      const w = window.innerWidth
+      const h = window.innerHeight
 
-    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 500)
-    camera.position.set(30, 45, 60)
-    camera.lookAt(0, 0, 15)
+      renderer.setSize(w, h)
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+      renderer.shadowMap.enabled = true
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap
+      renderer.toneMapping = THREE.ACESFilmicToneMapping
+      renderer.toneMappingExposure = 1.1
+      renderer.outputColorSpace = THREE.SRGBColorSpace
 
-    controls = new OrbitControls(camera, renderer.domElement)
-    controls.enableDamping = true
-    controls.dampingFactor = 0.06
-    controls.minDistance = 15
-    controls.maxDistance = 180
-    controls.maxPolarAngle = Math.PI / 2.05
-    controls.screenSpacePanning = false
-    controls.target.set(0, 0, 15)
-    controls.update()
+      camera = new THREE.PerspectiveCamera(50, w / h, 0.5, 500)
+      camera.position.set(30, 45, 60)
+      camera.lookAt(0, 0, 15)
 
-    buildScene(scene)
+      controls = new OrbitControls(camera, renderer.domElement)
+      controls.enableDamping = true
+      controls.dampingFactor = 0.06
+      controls.minDistance = 15
+      controls.maxDistance = 180
+      controls.maxPolarAngle = Math.PI / 2.05
+      controls.screenSpacePanning = false
+      controls.target.set(0, 0, 15)
+      controls.update()
 
-    containerRenderer = new ContainerRenderer(scene)
-    equipmentRenderer = new EquipmentRenderer(scene)
-    vesselRenderer = new VesselRenderer(scene)
-    truckRenderer = new TruckRenderer(scene)
+      buildScene(scene)
 
-    window.addEventListener('resize', onResize)
-    isReady.value = true
+      containerRenderer = new ContainerRenderer(scene)
+      equipmentRenderer = new EquipmentRenderer(scene)
+      vesselRenderer = new VesselRenderer(scene)
+      truckRenderer = new TruckRenderer(scene)
+
+      window.addEventListener('resize', onResize)
+      isReady.value = true
+    } catch (e) {
+      console.error('Box Empire scene init failed:', e)
+    }
   }
+
+  watch(canvasRef, (canvas) => {
+    if (canvas && !isReady.value) {
+      init(canvas)
+    }
+  }, { immediate: true })
 
   function onResize(): void {
     if (!camera || !renderer) return
@@ -120,10 +134,10 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     scene = null
     camera = null
     controls = null
+    isReady.value = false
   }
 
-  onMounted(init)
-  onUnmounted(dispose)
+  onBeforeUnmount(dispose)
 
   return {
     getScene: () => scene,
