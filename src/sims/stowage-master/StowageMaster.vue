@@ -9,6 +9,7 @@ import LastPlacement from './components/LastPlacement.vue'
 import ScorePopup from './components/ScorePopup.vue'
 import EventFeed from './components/EventFeed.vue'
 import MoveCounter from './components/MoveCounter.vue'
+import TimerWidget from './components/TimerWidget.vue'
 import StartScreen from './components/modals/StartScreen.vue'
 import LevelComplete from './components/modals/LevelComplete.vue'
 import LevelFailed from './components/modals/LevelFailed.vue'
@@ -27,6 +28,7 @@ import DisasterOverlay from './components/modals/DisasterOverlay.vue'
     <ScorePopup />
     <EventFeed />
     <MoveCounter />
+    <TimerWidget />
     <StartScreen />
     <LevelComplete />
     <LevelFailed />

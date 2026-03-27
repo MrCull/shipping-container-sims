@@ -61,9 +61,26 @@ let truckEngineNode: AudioBufferSourceNode | null = null
 const shipShake = { active: false, elapsed: 0, duration: 0.4, intensity: 0.15 }
 
 // Sail-away animation state
-const sailAway = { active: false, elapsed: 0, delay: 4.5 }
+const sailAway = { active: false, elapsed: 0, delay: 0.5 }
+
+// Sail-in animation state (ship arrives from off-screen left)
+const sailIn = { active: false, elapsed: 0, startX: -200, targetX: 0, duration: 4.0 }
+
+// Timer warning sound state — track whether we've played each threshold warning
+let timerWarnedAt30pct = false
+let timerWarnedAt15pct = false
 
 const { start: startLoop } = useGameLoop((deltaTime, time) => {
+  // Tick the countdown timer
+  const timerResult = store.tickTimer(deltaTime)
+  if (timerResult === 'warn30pct' && !timerWarnedAt30pct) {
+    timerWarnedAt30pct = true
+    audio.playSound('clockTicking', 0.65)
+  } else if (timerResult === 'warn15pct' && !timerWarnedAt15pct) {
+    timerWarnedAt15pct = true
+    audio.playSound('clockTicking', 1.0)
+  }
+
   animateOcean(ocean, time)
   animateFoam(foam, time)
 
@@ -103,8 +120,19 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
   if (sailAway.active && shipGroup) {
     sailAway.elapsed += deltaTime
     if (sailAway.elapsed > sailAway.delay) {
-      const speed = 8 + (sailAway.elapsed - sailAway.delay) * 3
+      const speed = 12 + (sailAway.elapsed - sailAway.delay) * 6
       shipGroup.position.x += speed * deltaTime
+    }
+  }
+
+  if (sailIn.active && shipGroup) {
+    sailIn.elapsed += deltaTime
+    const t = Math.min(sailIn.elapsed / sailIn.duration, 1)
+    const eased = easeOutQuad(t)
+    shipGroup.position.x = sailIn.startX + (sailIn.targetX - sailIn.startX) * eased
+    if (t >= 1) {
+      shipGroup.position.x = sailIn.targetX
+      sailIn.active = false
     }
   }
 
@@ -144,25 +172,35 @@ onMounted(async () => {
   await audio.init()
 })
 
+// Choose horn sample based on vessel size (level 0 = small feeder)
+function hornSound(): string {
+  return store.currentLevel === 0 ? 'shipHornSmall' : 'shipHornLarge'
+}
+
 // Single phase watcher — handles both scene rebuilds and audio/animation triggers
 watch(() => store.phase, (newPhase, oldPhase) => {
   if (newPhase === 'selecting' && (oldPhase === 'start' || oldPhase === 'disaster' || oldPhase === 'failed' || oldPhase === 'complete')) {
+    // Stop all in-flight sounds from the previous level before building the new scene
+    audio.stopAll()
     buildScene()
   }
 
   if (newPhase === 'complete') {
     audio.playSound('cheer', 0.8)
     setTimeout(() => audio.playSound('levelUp', 0.75), 800)
-    // Three horn blasts spaced 1.8 s apart
-    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 1400)
-    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 3200)
-    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 5000)
+    setTimeout(() => audio.playSound(hornSound(), 0.9), 1400)
+    setTimeout(() => audio.playSound(hornSound(), 0.9), 3200)
+    setTimeout(() => audio.playSound(hornSound(), 0.9), 5000)
     sailAway.active = true
     sailAway.elapsed = 0
   }
 
   if (newPhase === 'failed') {
-    audio.playSound('negative', 0.7)
+    // Boo sound when time runs out or level fails
+    audio.playSound('boo', 0.9)
+    setTimeout(() => audio.playSound(hornSound(), 0.9), 800)
+    sailAway.active = true
+    sailAway.elapsed = 0
   }
 })
 
@@ -195,7 +233,10 @@ watch(() => store.disasterType, (type) => {
 
 watch(() => store.lastPlacement, (placement) => {
   if (!placement) return
-  if (placement.score >= 80) {
+  if (placement.score >= 100) {
+    // Perfect placement — cash register sound
+    audio.playSound('caChing', 0.7)
+  } else if (placement.score >= 80) {
     audio.playSound('correctDing', 0.6)
   } else if (placement.score < 30) {
     audio.playSound('negative', 0.45)
@@ -216,6 +257,14 @@ function buildScene(): void {
 
   shipGroup = createShip(scene, store.shipConfig)
   craneObj = createCrane(scene, store.shipConfig)
+
+  // Start ship off-screen and sail it in
+  shipGroup.position.x = sailIn.startX
+  sailIn.elapsed = 0
+  sailIn.active = true
+
+  // Single horn blast as ship arrives (sample already has 3 blasts; use vessel-appropriate sound)
+  setTimeout(() => audio.playSound(hornSound(), 0.9), 1000)
 
   setCameraForShip(store.shipConfig)
 
@@ -398,6 +447,10 @@ function clearScene(): void {
   currentAnimation = null
   sailAway.active = false
   sailAway.elapsed = 0
+  sailIn.active = false
+  sailIn.elapsed = 0
+  timerWarnedAt30pct = false
+  timerWarnedAt15pct = false
   shipGroup = null
   craneObj = null
   ocean = null

@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { ShipPreset } from '../types'
 
-// Shared materials (created once, reused)
+// Shared materials (created once per session, reused across scene rebuilds)
 let hullMat: THREE.MeshPhongMaterial | null = null
 let antifoulingMat: THREE.MeshPhongMaterial | null = null
 let deckMat: THREE.MeshPhongMaterial | null = null
@@ -16,6 +16,7 @@ function getSharedMaterials() {
       specular: 0x334455,
       shininess: 40,
       flatShading: false,
+      side: THREE.DoubleSide,
     })
     antifoulingMat = new THREE.MeshPhongMaterial({
       color: 0x8b1a1a,
@@ -84,6 +85,65 @@ export function createShip(scene: THREE.Scene, shipConfig: ShipPreset): THREE.Gr
   return group
 }
 
+/**
+ * Build a tapered prism (wedge) as a clean BufferGeometry with no hidden faces.
+ * The prism runs along X (length xLen), spans Y (height h),
+ * and tapers in Z: back face has full width wBack, front tip has wTip.
+ * The tip is offset in Z by tipZOffset from the prism centre.
+ */
+function makeTaperedPrism(
+  xLen: number,
+  h: number,
+  wBack: number,
+  wTip: number,
+  tipZOffset: number,
+  color: THREE.MeshPhongMaterial
+): THREE.Mesh {
+  const hw = xLen / 2
+  const hh = h / 2
+  const hbk = wBack / 2
+  const htp = wTip / 2
+
+  // 8 vertices: back-bottom, back-top × 2 Z sides; front-bottom, front-top × 2 Z sides
+  const v = [
+    // back face (+X end), full width
+    hw,  -hh, -hbk,  // 0
+    hw,   hh, -hbk,  // 1
+    hw,   hh,  hbk,  // 2
+    hw,  -hh,  hbk,  // 3
+    // front face (-X end), tapered width, offset in Z
+    -hw, -hh, -htp + tipZOffset,  // 4
+    -hw,  hh, -htp + tipZOffset,  // 5
+    -hw,  hh,  htp + tipZOffset,  // 6
+    -hw, -hh,  htp + tipZOffset,  // 7
+  ]
+
+  // 6 faces (each a quad split into 2 triangles), winding order for outward normals
+  const idx = [
+    // back (+X)
+    0, 2, 1,  0, 3, 2,
+    // front (-X)
+    4, 5, 6,  4, 6, 7,
+    // bottom (-Y)
+    0, 4, 7,  0, 7, 3,
+    // top (+Y)
+    1, 2, 6,  1, 6, 5,
+    // right (+Z)
+    3, 7, 6,  3, 6, 2,
+    // left (-Z)
+    0, 1, 5,  0, 5, 4,
+  ]
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3))
+  geo.setIndex(idx)
+  geo.computeVertexNormals()
+
+  const mesh = new THREE.Mesh(geo, color)
+  mesh.castShadow = true
+  return mesh
+}
+
 function buildHull(
   group: THREE.Group,
   length: number,
@@ -93,61 +153,36 @@ function buildHull(
   antifoulingMat: THREE.MeshPhongMaterial
 ): void {
   const hullDepth = height * 1.6
+  const deckY = height * 0.28
+  const midLen = length * 0.64
   const bowLen = length * 0.18
+  const sternLen = length * 0.08
 
   // Main hull body — centre section
-  const midLen = length * 0.64
   const midGeo = new THREE.BoxGeometry(midLen, hullDepth, width)
   const mid = new THREE.Mesh(midGeo, hullMat)
-  mid.position.set(-length * 0.1, -hullDepth * 0.5 + height * 0.28, 0)
+  mid.position.set(-length * 0.1, -hullDepth * 0.5 + deckY, 0)
   mid.castShadow = true
   mid.receiveShadow = true
   group.add(mid)
 
-  // Bow section — tapered
-  const bowShape = new THREE.Shape()
-  bowShape.moveTo(0, -width / 2)
-  bowShape.lineTo(bowLen, 0)
-  bowShape.lineTo(0, width / 2)
-  bowShape.lineTo(-midLen * 0.5, width / 2)
-  bowShape.lineTo(-midLen * 0.5, -width / 2)
-  bowShape.closePath()
-  const bowExtrudeSettings: THREE.ExtrudeGeometryOptions = {
-    depth: hullDepth,
-    bevelEnabled: false,
-  }
-  const bowGeo = new THREE.ExtrudeGeometry(bowShape, bowExtrudeSettings)
-  const bow = new THREE.Mesh(bowGeo, hullMat)
-  bow.rotation.x = Math.PI / 2
-  bow.rotation.z = Math.PI / 2
-  bow.position.set(midLen * 0.12, height * 0.28, 0)
-  bow.castShadow = true
-  group.add(bow)
+  // Bow — tapered prism (wide at stern side, pointed at bow tip)
+  const bowMesh = makeTaperedPrism(bowLen, hullDepth, width, 0.6, 0, hullMat)
+  // Position: the wide end butts up against the mid section bow face
+  const midBowX = -length * 0.1 + midLen / 2
+  bowMesh.position.set(midBowX + bowLen / 2, -hullDepth * 0.5 + deckY, 0)
+  group.add(bowMesh)
 
-  // Stern section — slightly tapered
-  const sternShape = new THREE.Shape()
-  sternShape.moveTo(0, -width * 0.46)
-  sternShape.lineTo(-length * 0.08, 0)
-  sternShape.lineTo(0, width * 0.46)
-  sternShape.lineTo(midLen * 0.5, width / 2)
-  sternShape.lineTo(midLen * 0.5, -width / 2)
-  sternShape.closePath()
-  const sternExtrudeSettings: THREE.ExtrudeGeometryOptions = {
-    depth: hullDepth,
-    bevelEnabled: false,
-  }
-  const sternGeo = new THREE.ExtrudeGeometry(sternShape, sternExtrudeSettings)
-  const stern = new THREE.Mesh(sternGeo, hullMat)
-  stern.rotation.x = Math.PI / 2
-  stern.rotation.z = -Math.PI / 2
-  stern.position.set(-midLen * 0.72, height * 0.28, 0)
-  stern.castShadow = true
-  group.add(stern)
+  // Stern — slightly tapered prism
+  const sternMesh = makeTaperedPrism(sternLen, hullDepth, width, width * 0.72, 0, hullMat)
+  const midSternX = -length * 0.1 - midLen / 2
+  sternMesh.position.set(midSternX - sternLen / 2, -hullDepth * 0.5 + deckY, 0)
+  group.add(sternMesh)
 
   // Red anti-fouling band
   const afGeo = new THREE.BoxGeometry(length * 0.96, hullDepth * 0.28, width * 0.96)
   const af = new THREE.Mesh(afGeo, antifoulingMat)
-  af.position.set(-length * 0.1, -hullDepth * 0.5 + height * 0.28 - hullDepth * 0.64, 0)
+  af.position.set(-length * 0.1, -hullDepth * 0.5 + deckY - hullDepth * 0.64, 0)
   af.castShadow = true
   group.add(af)
 
@@ -155,7 +190,7 @@ function buildHull(
   const wlGeo = new THREE.BoxGeometry(length * 0.97, 0.3, width * 0.97)
   const wlMat = new THREE.MeshPhongMaterial({ color: 0xffffff })
   const wl = new THREE.Mesh(wlGeo, wlMat)
-  wl.position.set(-length * 0.1, -hullDepth * 0.5 + height * 0.28 - hullDepth * 0.36, 0)
+  wl.position.set(-length * 0.1, -hullDepth * 0.5 + deckY - hullDepth * 0.36, 0)
   group.add(wl)
 }
 

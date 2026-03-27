@@ -18,8 +18,8 @@ function restart() {
         Level Failed
       </h2>
       <div class="score-info">
-        <div>Your Score: <span class="actual">{{ store.score.toLocaleString() }}</span></div>
-        <div>Required: <span class="required">{{ store.targetScore.toLocaleString() }}</span></div>
+        <div>Earned: <span class="actual">${{ store.score.toLocaleString() }}</span></div>
+        <div>Required: <span class="required">${{ store.targetScore.toLocaleString() }}</span></div>
       </div>
       <button
         class="btn"

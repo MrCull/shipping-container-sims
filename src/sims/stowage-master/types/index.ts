@@ -84,6 +84,8 @@ export interface LevelConfig {
   preset: ShipPreset
   hazmatRate: number
   containerCount?: number
+  /** Countdown timer in seconds. 0 = no timer. */
+  timerSeconds: number
 }
 
 export interface CraneObject {

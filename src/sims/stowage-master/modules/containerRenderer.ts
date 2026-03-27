@@ -1,74 +1,86 @@
 import * as THREE from 'three'
 import type { Container, Slot, ShipPreset } from '../types'
 import { CONTAINER } from './config'
+import {
+  SHIPPING_LINE_LIVERY,
+  createContainerMaterials,
+  disposeContainerMaterials,
+} from './containerMaterials'
 
-// Container proportions: proper ISO 20ft proportions (roughly 2.4 wide × 2.6 tall × 6 long)
-// VISUAL_Z is the visual length — slot offsets use CONTAINER.size.z from config
-const VISUAL_Z = 5.9  // visual length (like a real 20ft container)
+// Visual length of a 20ft container along the X (bay/length) axis
+const VISUAL_Z = 5.9
 
-// Container colors for realistic shipping lines
-const SHIPPING_LINE_COLORS: Record<string, number> = {
-  // Override port colors with more realistic container liveries
-  Rotterdam: 0x2255aa,  // Maersk-ish blue
-  Singapore: 0x228833,  // Evergreen-ish green
-  Shanghai:  0xdd2222,  // China Shipping red
-  Hamburg:   0xff8800,  // Hapag-Lloyd orange
-  Busan:     0x6633aa,  // purple/indigo
+const POST_SIZE = 0.11
+const POST_COLOR = 0x2c313a
+
+function addCornerPostsAndRails(group: THREE.Group, sx: number, sy: number, sz: number): void {
+  const postMat = new THREE.MeshStandardMaterial({ color: POST_COLOR, roughness: 0.65, metalness: 0.55 })
+  const postGeo = new THREE.BoxGeometry(POST_SIZE, sy * 0.97, POST_SIZE)
+  const hx = sx / 2 - POST_SIZE / 2
+  const hz = sz / 2 - POST_SIZE / 2
+  for (const [px, pz] of [[hx, hz], [hx, -hz], [-hx, hz], [-hx, -hz]] as [number, number][]) {
+    const p = new THREE.Mesh(postGeo, postMat)
+    p.position.set(px, 0, pz)
+    p.castShadow = true
+    group.add(p)
+  }
+
+  // Top and bottom rails
+  const railT = 0.06
+  const railMat = new THREE.MeshStandardMaterial({ color: POST_COLOR, roughness: 0.65, metalness: 0.55 })
+  const railX = new THREE.BoxGeometry(sx * 0.985, railT, POST_SIZE * 0.9)
+  const railZ = new THREE.BoxGeometry(POST_SIZE * 0.9, railT, sz * 0.985)
+  for (const y of [sy / 2 - railT / 2, -sy / 2 + railT / 2]) {
+    for (const zSign of [-1, 1]) {
+      const rx = new THREE.Mesh(railX, railMat)
+      rx.position.set(0, y, zSign * (sz / 2 - POST_SIZE / 2))
+      rx.castShadow = true
+      group.add(rx)
+    }
+    for (const xSign of [-1, 1]) {
+      const rz = new THREE.Mesh(railZ, railMat)
+      rz.position.set(xSign * (sx / 2 - POST_SIZE / 2), y, 0)
+      rz.castShadow = true
+      group.add(rz)
+    }
+  }
 }
 
 export function createContainerMesh(container: Container): THREE.Group {
-  // x = length along ship (bay direction), z = width across beam (row direction)
-  const x = VISUAL_Z
-  const y = CONTAINER.size.y
-  const z = CONTAINER.size.x
+  const L = VISUAL_Z           // length along ship x-axis
+  const H = CONTAINER.size.y   // height
+  const W = CONTAINER.size.x   // width across beam z-axis
 
   const group = new THREE.Group()
   group.name = `container-${container.id}`
 
-  const baseColor = SHIPPING_LINE_COLORS[container.port] ?? container.portColor
+  const livery = SHIPPING_LINE_LIVERY[container.port]
+  const colorHex = livery?.hex ?? `#${container.portColor.toString(16).padStart(6, '0')}`
 
-  const bodyColor = baseColor
-  const bodyMat = new THREE.MeshPhongMaterial({
-    color: bodyColor,
-    specular: 0x334455,
-    shininess: 55,
-    flatShading: false,
-  })
+  // Main body with canvas-textured faces
+  const geo = new THREE.BoxGeometry(L, H, W)
+  const materials = createContainerMaterials(colorHex, container.id, container.port)
+  const mesh = new THREE.Mesh(geo, materials)
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  mesh.userData['bodyMaterials'] = materials
+  group.add(mesh)
 
-  const topColor = new THREE.Color(bodyColor).lerp(new THREE.Color(0xffffff), 0.12)
-  const topMat = new THREE.MeshPhongMaterial({
-    color: topColor,
-    specular: 0x334455,
-    shininess: 30,
-  })
+  // Subtle edge lines for definition (like container-stack)
+  const edges = new THREE.EdgesGeometry(geo)
+  const line = new THREE.LineSegments(
+    edges,
+    new THREE.LineBasicMaterial({ color: 0x08080c, transparent: true, opacity: 0.45 })
+  )
+  group.add(line)
 
-  const bodyGeo = new THREE.BoxGeometry(x, y, z)
-  const body = new THREE.Mesh(bodyGeo, [
-    bodyMat, // right (+X end)
-    bodyMat, // left (-X end)
-    topMat,  // top
-    topMat,  // bottom
-    bodyMat, // front (+Z side)
-    bodyMat, // back (-Z side)
-  ])
-  body.castShadow = true
-  body.receiveShadow = true
-  group.add(body)
+  // Corner posts + top/bottom rails
+  addCornerPostsAndRails(group, L, H, W)
 
-  addSideRidges(group, x, y, z, bodyMat)
-
-  addCornerCastings(group, x, y, z)
-
-  // Door end detail (one end)
-  addDoorEnd(group, x, y, z, bodyColor)
-
-  // Hazmat markings
+  // Hazmat markings ONLY if hazardous
   if (container.isHazmat) {
-    addHazmatMarkings(group, x, y, z)
+    addHazmatMarkings(group, L, H, W)
   }
-
-  // Container ID label (emissive white text-like rectangle)
-  addContainerLabel(group, x, y, z)
 
   group.userData['container'] = container
   group.userData['isContainer'] = true
@@ -76,114 +88,36 @@ export function createContainerMesh(container: Container): THREE.Group {
   return group
 }
 
-function addSideRidges(
-  group: THREE.Group,
-  x: number,
-  y: number,
-  z: number,
-  mat: THREE.MeshPhongMaterial
-): void {
-  const ridgeCount = 10
-  const ridgeW = 0.05
-  const ridgeH = y * 0.92
-  const ridgeMat = new THREE.MeshPhongMaterial({
-    color: (mat.color as THREE.Color).clone().lerp(new THREE.Color(0x000000), 0.15),
-    shininess: 15,
-  })
-  const ridgeGeo = new THREE.BoxGeometry(ridgeW, ridgeH, 0.06)
-
-  // Ridges on the long sides (+Z / -Z faces), distributed along X
-  for (const sign of [-1, 1]) {
-    for (let i = 0; i < ridgeCount; i++) {
-      const ridge = new THREE.Mesh(ridgeGeo, ridgeMat)
-      ridge.position.set(
-        (i - (ridgeCount - 1) / 2) * (x / ridgeCount),
-        0,
-        sign * (z / 2 + 0.03)
-      )
-      group.add(ridge)
-    }
-  }
-}
-
-function addCornerCastings(group: THREE.Group, x: number, y: number, z: number): void {
-  const castingGeo = new THREE.BoxGeometry(0.22, 0.22, 0.22)
-  const castingMat = new THREE.MeshPhongMaterial({
-    color: 0x555555,
-    specular: 0x999999,
-    shininess: 90,
-  })
-  for (const sx of [-1, 1]) {
-    for (const sy of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        const c = new THREE.Mesh(castingGeo, castingMat)
-        c.position.set(sx * x / 2, sy * y / 2, sz * z / 2)
-        group.add(c)
-      }
-    }
-  }
-}
-
-function addDoorEnd(group: THREE.Group, x: number, y: number, z: number, baseColor: number): void {
-  // Door panels on one short end (-X face)
-  const doorMat = new THREE.MeshPhongMaterial({
-    color: new THREE.Color(baseColor).lerp(new THREE.Color(0x888888), 0.25),
-    shininess: 30,
-  })
-  for (const side of [-0.25, 0.25]) {
-    const doorGeo = new THREE.BoxGeometry(0.06, y * 0.96, z / 2 - 0.1)
-    const door = new THREE.Mesh(doorGeo, doorMat)
-    door.position.set(-x / 2 + 0.04, 0, side * z)
-    group.add(door)
-  }
-
-  // Door hinges
-  const hingeMat = new THREE.MeshPhongMaterial({ color: 0x777777, shininess: 80 })
-  const hingeGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.3, 8)
-  for (const hz of [-z * 0.46, z * 0.46]) {
-    for (const hy of [-y * 0.38, 0, y * 0.38]) {
-      const hinge = new THREE.Mesh(hingeGeo, hingeMat)
-      hinge.position.set(-x / 2 + 0.07, hy, hz)
-      hinge.rotation.z = Math.PI / 2
-      group.add(hinge)
-    }
-  }
-}
-
-function addHazmatMarkings(group: THREE.Group, x: number, y: number, z: number): void {
-  // Orange stripe
-  const hazStripeMat = new THREE.MeshPhongMaterial({
+function addHazmatMarkings(group: THREE.Group, L: number, H: number, W: number): void {
+  const bandMat = new THREE.MeshStandardMaterial({
     color: 0xff6600,
-    emissive: 0xcc3300,
-    emissiveIntensity: 0.4,
-    shininess: 60,
+    roughness: 0.5,
+    metalness: 0.1,
+    emissive: new THREE.Color(0xff4400),
+    emissiveIntensity: 0.3,
   })
-  const hazStripeGeo = new THREE.BoxGeometry(x + 0.03, y * 0.14, z + 0.03)
-  const hazStripe = new THREE.Mesh(hazStripeGeo, hazStripeMat)
-  hazStripe.position.y = y * 0.22
-  group.add(hazStripe)
+  const bandGeo = new THREE.BoxGeometry(L + 0.04, H * 0.13, W + 0.04)
+  const band = new THREE.Mesh(bandGeo, bandMat)
+  band.position.y = H * 0.22
+  group.add(band)
 
-  // Diamond placards on each visible face
-  addHazmatDiamond(group, x, y, z)
-}
-
-function addHazmatDiamond(group: THREE.Group, x: number, y: number, z: number): void {
-  const diamondSize = Math.min(x, z) * 0.32
-  const diamondGeo = new THREE.PlaneGeometry(diamondSize, diamondSize)
-  const diamondMat = new THREE.MeshPhongMaterial({
+  const diamondMat = new THREE.MeshStandardMaterial({
     color: 0xff6600,
-    emissive: 0xff4400,
-    emissiveIntensity: 0.6,
+    roughness: 0.4,
+    metalness: 0.1,
+    emissive: new THREE.Color(0xff4400),
+    emissiveIntensity: 0.5,
     side: THREE.DoubleSide,
   })
+  const dSize = Math.min(L, W) * 0.30
+  const diamondGeo = new THREE.PlaneGeometry(dSize, dSize)
 
   const faces: [THREE.Vector3, THREE.Euler][] = [
-    [new THREE.Vector3(0, y * 0.22, z / 2 + 0.04), new THREE.Euler(0, 0, Math.PI / 4)],
-    [new THREE.Vector3(0, y * 0.22, -z / 2 - 0.04), new THREE.Euler(0, Math.PI, Math.PI / 4)],
-    [new THREE.Vector3(x / 2 + 0.04, y * 0.22, 0), new THREE.Euler(0, Math.PI / 2, Math.PI / 4)],
-    [new THREE.Vector3(-x / 2 - 0.04, y * 0.22, 0), new THREE.Euler(0, -Math.PI / 2, Math.PI / 4)],
+    [new THREE.Vector3(0,       H * 0.22,  W / 2 + 0.05), new THREE.Euler(0,  0,           Math.PI / 4)],
+    [new THREE.Vector3(0,       H * 0.22, -W / 2 - 0.05), new THREE.Euler(0,  Math.PI,     Math.PI / 4)],
+    [new THREE.Vector3( L / 2 + 0.05, H * 0.22, 0),       new THREE.Euler(0,  Math.PI / 2, Math.PI / 4)],
+    [new THREE.Vector3(-L / 2 - 0.05, H * 0.22, 0),       new THREE.Euler(0, -Math.PI / 2, Math.PI / 4)],
   ]
-
   for (const [pos, rot] of faces) {
     const d = new THREE.Mesh(diamondGeo, diamondMat)
     d.position.copy(pos)
@@ -192,20 +126,8 @@ function addHazmatDiamond(group: THREE.Group, x: number, y: number, z: number): 
   }
 }
 
-function addContainerLabel(group: THREE.Group, x: number, y: number, z: number): void {
-  const labelGeo = new THREE.BoxGeometry(x * 0.38, y * 0.15, 0.04)
-  const labelMat = new THREE.MeshPhongMaterial({
-    color: 0xffffff,
-    emissive: 0xffffff,
-    emissiveIntensity: 0.12,
-    shininess: 20,
-  })
-  const label = new THREE.Mesh(labelGeo, labelMat)
-  label.position.set(0, y * 0.28, z / 2 + 0.03)
-  group.add(label)
-}
+// ── Slot indicators ──────────────────────────────────────────────────────────
 
-// Glowing slot indicators — wireframe outline instead of solid boxes
 export function createSlotIndicators(
   _scene: THREE.Scene,
   slots: Record<string, Slot>,
@@ -216,22 +138,15 @@ export function createSlotIndicators(
   const indicators = new THREE.Group()
   indicators.name = 'slot-indicators'
 
-  const cw = CONTAINER.size.x  // container width (across beam / Z)
-  const cl = VISUAL_Z           // container length (along ship / X)
-  const y = CONTAINER.size.y
+  const cw = CONTAINER.size.x
+  const cl = VISUAL_Z
+  const y  = CONTAINER.size.y
 
-  // Shared wireframe geometry — length along X, width along Z
-  const boxGeo = new THREE.BoxGeometry(cl * 0.96, y * 0.96, cw * 0.96)
+  const boxGeo  = new THREE.BoxGeometry(cl * 0.96, y * 0.96, cw * 0.96)
   const wireGeo = new THREE.EdgesGeometry(boxGeo)
   boxGeo.dispose()
 
-  const wireMat = new THREE.LineBasicMaterial({
-    color: 0x00ffaa,
-    transparent: true,
-    opacity: 0.85,
-  })
-
-  // Glowing fill
+  const wireMat = new THREE.LineBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.85 })
   const fillGeo = new THREE.BoxGeometry(cl * 0.93, y * 0.93, cw * 0.93)
   const fillMat = new THREE.MeshPhongMaterial({
     color: 0x00ff88,
@@ -252,7 +167,6 @@ export function createSlotIndicators(
       slot.zOffset
     )
 
-    // Wireframe outline
     const wire = new THREE.LineSegments(wireGeo, wireMat.clone())
     wire.position.copy(pos)
     wire.userData['slotId'] = slotId
@@ -260,7 +174,6 @@ export function createSlotIndicators(
     wire.name = `slot-${slotId}`
     indicators.add(wire)
 
-    // Transparent fill for hit detection
     const fill = new THREE.Mesh(fillGeo.clone(), fillMat.clone())
     fill.position.copy(pos)
     fill.userData['slotId'] = slotId
@@ -280,11 +193,8 @@ export function removeSlotIndicators(shipGroup: THREE.Group): void {
       const mesh = child as THREE.Mesh
       if (mesh.geometry) mesh.geometry.dispose()
       if (mesh.material) {
-        if (Array.isArray(mesh.material)) {
-          mesh.material.forEach(m => m.dispose())
-        } else {
-          mesh.material.dispose()
-        }
+        if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose())
+        else mesh.material.dispose()
       }
     })
     shipGroup.remove(indicators)
@@ -300,16 +210,31 @@ export function animateSlotIndicators(shipGroup: THREE.Group, time: number): voi
     const mesh = child as THREE.Mesh
     if (mesh.userData['isSlotIndicator'] && mesh.material) {
       const mat = mesh.material as THREE.MeshPhongMaterial
-      if (mat.emissiveIntensity !== undefined) {
-        mat.emissiveIntensity = pulse
-      }
+      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = pulse
       if (mat.opacity !== undefined && mat.transparent) {
-        mat.opacity = 0.08 + Math.abs(Math.sin(time * 2.5)) * 0.1
+        mat.opacity = 0.08 + Math.abs(Math.sin(time * 2.5)) * 0.10
       }
     }
     const line = child as THREE.LineSegments
     if (line.material instanceof THREE.LineBasicMaterial) {
       line.material.opacity = 0.6 + Math.abs(Math.sin(time * 2.5)) * 0.35
     }
+  })
+}
+
+export function disposeContainerGroupMaterials(group: THREE.Group): void {
+  group.traverse(obj => {
+    const m = obj as THREE.Mesh | THREE.LineSegments
+    if (!m.geometry) return
+    const bodyMats = m.userData['bodyMaterials'] as THREE.MeshStandardMaterial[] | undefined
+    if (bodyMats) {
+      disposeContainerMaterials(bodyMats)
+      m.userData['bodyMaterials'] = undefined
+    } else if (m.material) {
+      const mat = m.material
+      if (Array.isArray(mat)) mat.forEach(x => x.dispose())
+      else mat.dispose()
+    }
+    m.geometry.dispose()
   })
 }
