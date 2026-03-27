@@ -21,8 +21,8 @@ export function createTutorialSteps(): TutorialStep[] {
     {
       id: 'open-gate',
       stepNumber: 3,
-      prompt: "Click 'Open Gatehouse' to allow trucks carrying export containers to enter.",
-      condition: (s: BoxEmpireState) => s.gatehouseOpen,
+      prompt: "Click 'Open Export Gate' to allow trucks carrying export containers to enter.",
+      condition: (s: BoxEmpireState) => s.gatehouse.exportLaneOpen,
     },
     {
       id: 'trucks-arriving',

@@ -49,7 +49,8 @@ export function createTutorialVessel(
     teuCapacity: TUTORIAL_VESSEL.teuCapacity,
     state: 'announced',
     slots,
-    position: { x: BERTH_POSITION.x, y: BERTH_POSITION.y, z: BERTH_POSITION.z - 40 },
+    // Spawn off to the +X side; vessel sails in from the right along the quay
+    position: { x: BERTH_POSITION.x + 120, y: BERTH_POSITION.y, z: BERTH_POSITION.z },
     arrivalTime,
   }
 }
@@ -129,22 +130,22 @@ export function tickVessel(
       break
     }
     case 'arriving': {
-      const targetZ = BERTH_POSITION.z
       const targetX = BERTH_POSITION.x
-      const dist = targetZ - vessel.position.z
-      // Two-phase: slow deceleration when within 15m, then final alignment
-      const speed = Math.abs(dist) > 15 ? 4 : 1.5
-      if (vessel.position.z < targetZ) {
-        vessel.position.z = Math.min(vessel.position.z + speed * _dt, targetZ)
+      const targetZ = BERTH_POSITION.z
+      const dist = vessel.position.x - targetX
+      // Two-phase: fast approach, decelerate when within 15m
+      const speed = Math.abs(dist) > 15 ? 6 : 2
+      if (vessel.position.x > targetX) {
+        vessel.position.x = Math.max(vessel.position.x - speed * _dt, targetX)
       }
-      if (vessel.position.x !== targetX) {
-        const xDiff = targetX - vessel.position.x
-        vessel.position.x += Math.sign(xDiff) * Math.min(Math.abs(xDiff), speed * _dt)
+      if (vessel.position.z !== targetZ) {
+        const zDiff = targetZ - vessel.position.z
+        vessel.position.z += Math.sign(zDiff) * Math.min(Math.abs(zDiff), speed * _dt)
       }
-      if (vessel.position.z >= targetZ && Math.abs(vessel.position.x - targetX) < 0.1) {
+      if (vessel.position.x <= targetX && Math.abs(vessel.position.z - targetZ) < 0.1) {
         vessel.state = 'arrived'
-        vessel.position.z = targetZ
         vessel.position.x = targetX
+        vessel.position.z = targetZ
         result.stateChanged = true
         result.newState = 'arrived'
       }
@@ -153,9 +154,10 @@ export function tickVessel(
     case 'departed':
       break
     case 'departing': {
-      const speed = 3
-      vessel.position.z -= speed * _dt
-      if (vessel.position.z < BERTH_POSITION.z - 60) {
+      // Vessel departs along -X (sails away to the left)
+      const speed = 4
+      vessel.position.x -= speed * _dt
+      if (vessel.position.x < BERTH_POSITION.x - 120) {
         vessel.state = 'departed'
         result.stateChanged = true
         result.newState = 'departed'

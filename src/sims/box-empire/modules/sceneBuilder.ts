@@ -11,6 +11,10 @@ import {
   CONTAINER_WIDTH,
   CONTAINER_BAY_GAP,
   CONTAINER_ROW_GAP,
+  QUAY_BUFFER_DISCHARGE_POSITION,
+  QUAY_BUFFER_LOAD_POSITION,
+  GATE_EXPORT_LANE_POSITION,
+  GATE_IMPORT_LANE_POSITION,
 } from './config'
 
 export function buildScene(scene: THREE.Scene): void {
@@ -23,6 +27,7 @@ export function buildScene(scene: THREE.Scene): void {
   buildQuay(scene)
   buildYardMarkings(scene)
   buildGatehouse(scene)
+  buildQuayBufferMarkings(scene)
 }
 
 function buildLighting(scene: THREE.Scene): void {
@@ -135,23 +140,66 @@ function buildYardMarkings(scene: THREE.Scene): void {
 }
 
 function buildGatehouse(scene: THREE.Scene): void {
-  const houseGeo = new THREE.BoxGeometry(6, 4, 3)
+  // Gatehouse building between the two lanes
+  const houseGeo = new THREE.BoxGeometry(4, 4, 3)
   const houseMat = new THREE.MeshStandardMaterial({ color: 0xcc9933, roughness: 0.7 })
   const house = new THREE.Mesh(houseGeo, houseMat)
   house.position.set(-40, 2, 50)
   house.castShadow = true
   scene.add(house)
 
-  const roofGeo = new THREE.BoxGeometry(7, 0.3, 4)
+  const roofGeo = new THREE.BoxGeometry(5, 0.3, 4)
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.6 })
   const roof = new THREE.Mesh(roofGeo, roofMat)
   roof.position.set(-40, 4.15, 50)
   roof.castShadow = true
   scene.add(roof)
 
-  const poleGeo = new THREE.CylinderGeometry(0.1, 0.1, 3)
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0xff0000 })
-  const pole = new THREE.Mesh(poleGeo, poleMat)
-  pole.position.set(-37, 1.5, 50)
-  scene.add(pole)
+  // Export lane barrier pole (orange)
+  const exportPoleGeo = new THREE.CylinderGeometry(0.1, 0.1, 3)
+  const exportPoleMat = new THREE.MeshStandardMaterial({ color: 0xff6600 })
+  const exportPole = new THREE.Mesh(exportPoleGeo, exportPoleMat)
+  exportPole.position.set(GATE_EXPORT_LANE_POSITION.x, 1.5, GATE_EXPORT_LANE_POSITION.z)
+  scene.add(exportPole)
+
+  // Import lane barrier pole (blue)
+  const importPoleGeo = new THREE.CylinderGeometry(0.1, 0.1, 3)
+  const importPoleMat = new THREE.MeshStandardMaterial({ color: 0x2980b9 })
+  const importPole = new THREE.Mesh(importPoleGeo, importPoleMat)
+  importPole.position.set(GATE_IMPORT_LANE_POSITION.x, 1.5, GATE_IMPORT_LANE_POSITION.z)
+  scene.add(importPole)
+
+  // Road marking for export lane (orange strip)
+  const exportRoadGeo = new THREE.PlaneGeometry(2, 20)
+  const exportRoadMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.9, opacity: 0.5, transparent: true })
+  const exportRoad = new THREE.Mesh(exportRoadGeo, exportRoadMat)
+  exportRoad.rotation.x = -Math.PI / 2
+  exportRoad.position.set(GATE_EXPORT_LANE_POSITION.x, 0.02, GATE_EXPORT_LANE_POSITION.z - 10)
+  scene.add(exportRoad)
+
+  // Road marking for import lane (blue strip)
+  const importRoadGeo = new THREE.PlaneGeometry(2, 20)
+  const importRoadMat = new THREE.MeshStandardMaterial({ color: 0x2980b9, roughness: 0.9, opacity: 0.5, transparent: true })
+  const importRoad = new THREE.Mesh(importRoadGeo, importRoadMat)
+  importRoad.rotation.x = -Math.PI / 2
+  importRoad.position.set(GATE_IMPORT_LANE_POSITION.x, 0.02, GATE_IMPORT_LANE_POSITION.z - 10)
+  scene.add(importRoad)
+}
+
+function buildQuayBufferMarkings(scene: THREE.Scene): void {
+  // Discharge buffer zone (blue)
+  const dischargeGeo = new THREE.PlaneGeometry(CONTAINER_LENGTH + 0.5, CONTAINER_WIDTH + 0.5)
+  const dischargeMat = new THREE.MeshStandardMaterial({ color: 0x2980b9, roughness: 0.9, opacity: 0.6, transparent: true })
+  const discharge = new THREE.Mesh(dischargeGeo, dischargeMat)
+  discharge.rotation.x = -Math.PI / 2
+  discharge.position.set(QUAY_BUFFER_DISCHARGE_POSITION.x, 0.02, QUAY_BUFFER_DISCHARGE_POSITION.z)
+  scene.add(discharge)
+
+  // Load buffer zone (orange)
+  const loadGeo = new THREE.PlaneGeometry(CONTAINER_LENGTH + 0.5, CONTAINER_WIDTH + 0.5)
+  const loadMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.9, opacity: 0.6, transparent: true })
+  const load = new THREE.Mesh(loadGeo, loadMat)
+  load.rotation.x = -Math.PI / 2
+  load.position.set(QUAY_BUFFER_LOAD_POSITION.x, 0.02, QUAY_BUFFER_LOAD_POSITION.z)
+  scene.add(load)
 }

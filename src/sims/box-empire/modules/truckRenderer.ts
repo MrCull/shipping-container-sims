@@ -29,7 +29,9 @@ export class TruckRenderer {
           this.attachGlb(truckId, procMesh)
         }
       })
-      .catch(() => {/* keep procedural */})
+      .catch((err: unknown) => {
+        console.warn('[TruckRenderer] Failed to load truck GLB, using procedural fallback:', err)
+      })
   }
 
   private attachGlb(truckId: string, procMesh: THREE.Group): void {

@@ -52,6 +52,7 @@ export interface Container {
   currentLocation: Location
   yardSlot: YardSlotRef | null
   vesselSlot: VesselSlotRef | null
+  shippingLine: string
 }
 
 export interface YardSlotRef {
@@ -151,6 +152,8 @@ export type EquipmentState =
   | 'travel_to_drop'
   | 'dropping'
 
+export type CraneMode = 'discharge' | 'load' | 'both'
+
 export interface Equipment {
   id: string
   type: EquipmentType
@@ -162,6 +165,9 @@ export interface Equipment {
   stateElapsed: number
   targetPosition: Position3D | null
   speed: number
+  enabled: boolean
+  craneMode: CraneMode
+  armTargetY: number
 }
 
 // ---- Jobs -----------------------------------------------------------------
@@ -170,6 +176,7 @@ export type JobStatus =
   | 'pending'
   | 'assigned'
   | 'in_progress'
+  | 'blocked'
   | 'completed'
   | 'cancelled'
 
@@ -258,6 +265,13 @@ export interface PathGraph {
   edges: PathEdge[]
 }
 
+// ---- Gatehouse ------------------------------------------------------------
+
+export interface GatehouseState {
+  exportLaneOpen: boolean
+  importLaneOpen: boolean
+}
+
 // ---- Game Phase -----------------------------------------------------------
 
 export type GamePhase = 'menu' | 'tutorial' | 'playing' | 'paused' | 'completed'
@@ -270,7 +284,7 @@ export interface BoxEmpireState {
   timeScale: number
   tutorialStep: number
   tutorialCompleted: boolean
-  gatehouseOpen: boolean
+  gatehouse: GatehouseState
   money: number
   transactions: Transaction[]
   equipment: Equipment[]

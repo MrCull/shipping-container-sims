@@ -6,7 +6,8 @@ import type { TruckVisit, Position3D, BoxEmpireState } from '../types'
 import {
   TRUCK_SPEED,
   GATE_PROCESSING_TIME,
-  GATE_POSITION,
+  GATE_EXPORT_LANE_POSITION,
+  GATE_IMPORT_LANE_POSITION,
   YARD_IO_POSITION,
 } from './config'
 
@@ -24,7 +25,11 @@ export function createTruck(
   visitType: 'import_pickup' | 'export_delivery',
 ): TruckVisit {
   truckCounter++
-  // Spawn well behind the gate in a line so they approach one at a time
+  // Use dedicated lane positions for each visit type
+  const lanePos = visitType === 'export_delivery'
+    ? GATE_EXPORT_LANE_POSITION
+    : GATE_IMPORT_LANE_POSITION
+  // Spawn behind the gate in a staggered line; keep within scene bounds
   const spawnOffset = truckCounter * QUEUE_SPACING
   return {
     id: `truck-${truckCounter}`,
@@ -32,11 +37,11 @@ export function createTruck(
     containerId,
     visitType,
     position: {
-      x: GATE_POSITION.x,
+      x: lanePos.x,
       y: 0,
-      z: GATE_POSITION.z + spawnOffset + 20,
+      z: lanePos.z + spawnOffset,
     },
-    targetPosition: { ...GATE_POSITION },
+    targetPosition: { ...lanePos },
     stateStartTime: 0,
   }
 }
@@ -66,23 +71,26 @@ function moveTowards(
   }
 }
 
-function isGateFree(state: BoxEmpireState, thisTruckId: string): boolean {
+function isGateFree(state: BoxEmpireState, thisTruck: TruckVisit): boolean {
   return !state.truckVisits.some(
-    t => t.id !== thisTruckId && (t.state === 'at_gate'),
+    t => t.id !== thisTruck.id && t.visitType === thisTruck.visitType && t.state === 'at_gate',
   )
 }
 
-function getQueuePosition(state: BoxEmpireState, thisTruckId: string): Position3D {
-  // Count trucks ahead (those also approaching that are closer to the gate)
+function getLanePosition(visitType: 'import_pickup' | 'export_delivery'): Position3D {
+  return visitType === 'export_delivery' ? GATE_EXPORT_LANE_POSITION : GATE_IMPORT_LANE_POSITION
+}
+
+function getQueuePosition(state: BoxEmpireState, thisTruck: TruckVisit): Position3D {
+  const lanePos = getLanePosition(thisTruck.visitType)
   const approaching = state.truckVisits.filter(
-    t => t.id !== thisTruckId && t.state === 'approaching',
+    t => t.id !== thisTruck.id && t.visitType === thisTruck.visitType && t.state === 'approaching',
   )
-  // Queue behind the gate along +z
   const position = approaching.length
   return {
-    x: GATE_POSITION.x,
+    x: lanePos.x,
     y: 0,
-    z: GATE_POSITION.z + (position + 1) * QUEUE_SPACING,
+    z: lanePos.z + (position + 1) * QUEUE_SPACING,
   }
 }
 
@@ -107,14 +115,11 @@ export function tickTruck(
 
   switch (truck.state) {
     case 'approaching': {
-      // Determine dynamic queue position: move toward gate only if gate is free
-      // and no other truck is closer ahead of us
-      const gateTarget: Position3D = { ...GATE_POSITION }
+      const laneTarget: Position3D = { ...getLanePosition(truck.visitType) }
 
-      if (isGateFree(state, truck.id)) {
-        // Gate is free — move toward gate
-        truck.targetPosition = gateTarget
-        const { position, arrived } = moveTowards(truck.position, gateTarget, TRUCK_SPEED, dt)
+      if (isGateFree(state, truck)) {
+        truck.targetPosition = laneTarget
+        const { position, arrived } = moveTowards(truck.position, laneTarget, TRUCK_SPEED, dt)
         truck.position = position
         if (arrived) {
           truck.state = 'at_gate'
@@ -122,10 +127,8 @@ export function tickTruck(
           result.arrived = true
         }
       } else {
-        // Gate is occupied — compute queue hold position and edge toward it
-        const holdPos = getQueuePosition(state, truck.id)
+        const holdPos = getQueuePosition(state, truck)
         truck.targetPosition = holdPos
-        // Only advance if we haven't reached our hold position yet
         const distToHold = Math.abs(truck.position.z - holdPos.z)
         if (distToHold > 0.5) {
           const { position } = moveTowards(truck.position, holdPos, TRUCK_SPEED, dt)
@@ -167,10 +170,11 @@ export function tickTruck(
     }
 
     case 'departing': {
+      const lanePos = getLanePosition(truck.visitType)
       const exitTarget: Position3D = {
-        x: GATE_POSITION.x,
+        x: lanePos.x,
         y: 0,
-        z: GATE_POSITION.z + 60,
+        z: lanePos.z + 80,
       }
       const { position, arrived } = moveTowards(truck.position, exitTarget, TRUCK_SPEED, dt)
       truck.position = position
@@ -189,11 +193,12 @@ export function tickTruck(
 }
 
 export function startTruckDeparture(truck: TruckVisit, simTime: number): void {
+  const lanePos = getLanePosition(truck.visitType)
   truck.state = 'departing'
   truck.stateStartTime = simTime
   truck.targetPosition = {
-    x: GATE_POSITION.x,
+    x: lanePos.x,
     y: 0,
-    z: GATE_POSITION.z + 60,
+    z: lanePos.z + 80,
   }
 }

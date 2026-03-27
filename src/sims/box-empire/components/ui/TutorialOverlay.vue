@@ -8,8 +8,8 @@ const showNextButton = computed(() => {
   return store.tutorialStep <= 2
 })
 
-const showGateButton = computed(() => {
-  return store.tutorialStep === 3 && !store.gatehouseOpen
+const showExportGateButton = computed(() => {
+  return store.tutorialStep === 3 && !store.gatehouse.exportLaneOpen
 })
 </script>
 
@@ -34,11 +34,11 @@ const showGateButton = computed(() => {
           Next →
         </button>
         <button
-          v-if="showGateButton"
+          v-if="showExportGateButton"
           class="tutorial-btn gate-btn"
-          @click="store.openGatehouse()"
+          @click="store.openExportGate()"
         >
-          🚪 Open Gatehouse
+          🚪 Open Export Gate
         </button>
       </div>
     </div>

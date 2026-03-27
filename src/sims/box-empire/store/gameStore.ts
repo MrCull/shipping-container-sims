@@ -17,12 +17,16 @@ import type {
   GameEventType,
   Location,
   BoxEmpireState,
+  GatehouseState,
+  CraneMode,
 } from '../types'
 import {
-  CONTAINER_COLOR_LIST,
+  SHIPPING_LINE_COLORS,
+  SHIPPING_LINES,
   CONTAINER_MIN_WEIGHT_KG,
   CONTAINER_MAX_WEIGHT_KG,
-  QUAY_BUFFER_POSITION,
+  QUAY_BUFFER_DISCHARGE_POSITION,
+  QUAY_BUFFER_LOAD_POSITION,
   YARD_IO_POSITION,
   CRANE_POSITION,
   GATE_OUT_REVENUE,
@@ -36,7 +40,7 @@ import { createYardBlock, findAvailableSlot, placeContainerInSlot, removeContain
 import { createTutorialVessel, getNextDischargeContainer, getNextLoadSlot, dischargeContainerFromVessel, loadContainerOnVessel, isVesselFullyDischarged, tickVessel, getVesselSlotPosition } from '../modules/vesselManager'
 import { createTruck, tickTruck, startTruckDeparture, resetTruckCounter } from '../modules/truckManager'
 import { tickEquipment } from '../modules/equipmentController'
-import { createJob, assignPendingJobs, completeJob, resetJobCounter, getActiveJobForContainer, cancelJob } from '../modules/jobScheduler'
+import { createJob, assignPendingJobs, completeJob, resetJobCounter, getActiveJobForContainer, cancelJob, recheckBlockedJobs } from '../modules/jobScheduler'
 import { createTransaction, resetEconomy } from '../modules/economy'
 import { createTutorialSteps, getCurrentStep, checkStepAdvance } from '../modules/tutorial'
 import { resetVesselCounter } from '../modules/vesselManager'
@@ -55,8 +59,12 @@ function randomWeight(): number {
   )
 }
 
-function randomColor(): string {
-  return CONTAINER_COLOR_LIST[Math.floor(Math.random() * CONTAINER_COLOR_LIST.length)]
+function randomShippingLine(): string {
+  return SHIPPING_LINES[Math.floor(Math.random() * SHIPPING_LINES.length)]
+}
+
+function shippingLineColor(line: string): string {
+  return SHIPPING_LINE_COLORS[line] ?? '#888888'
 }
 
 export const useGameStore = defineStore('box-empire-game', () => {
@@ -66,7 +74,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   const timeScale = ref(DEFAULT_TIME_SCALE)
   const tutorialStep = ref(1)
   const tutorialCompleted = ref(false)
-  const gatehouseOpen = ref(false)
+  const gatehouse = ref<GatehouseState>({ exportLaneOpen: false, importLaneOpen: false })
   const money = ref(0)
   const transactions = ref<Transaction[]>([])
   const equipment = ref<Equipment[]>([])
@@ -108,6 +116,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
   })
   const totalTutorialSteps = computed(() => tutorialSteps.length)
 
+  // Backward-compat: keep a gatehouseOpen for tutorial.ts which may reference it
+  const gatehouseOpen = computed(() => gatehouse.value.exportLaneOpen || gatehouse.value.importLaneOpen)
+
   // ---- Yard slot reservation helpers ----------------------------------------
   function getReservedYardSlotIds(): Set<string> {
     const reserved = new Set<string>()
@@ -129,7 +140,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       timeScale: timeScale.value,
       tutorialStep: tutorialStep.value,
       tutorialCompleted: tutorialCompleted.value,
-      gatehouseOpen: gatehouseOpen.value,
+      gatehouse: gatehouse.value,
       money: money.value,
       transactions: transactions.value,
       equipment: equipment.value,
@@ -179,7 +190,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     timeScale.value = DEFAULT_TIME_SCALE
     tutorialStep.value = 1
     tutorialCompleted.value = false
-    gatehouseOpen.value = false
+    gatehouse.value = { exportLaneOpen: false, importLaneOpen: false }
     money.value = 0
     transactions.value = []
     events.value = []
@@ -197,10 +208,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
     const importContainers: Container[] = []
     for (let i = 0; i < TUTORIAL_IMPORT_COUNT; i++) {
+      const line = randomShippingLine()
       const c: Container = {
         id: nextContainerId('IMPU'),
         size: '20ft',
-        ownerColor: randomColor(),
+        shippingLine: line,
+        ownerColor: shippingLineColor(line),
         weight: randomWeight(),
         lifecycleState: 'on_vessel',
         visitType: 'import',
@@ -217,10 +230,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
     const exportContainers: Container[] = []
     for (let i = 0; i < TUTORIAL_EXPORT_COUNT; i++) {
+      const line = randomShippingLine()
       exportContainers.push({
         id: nextContainerId('EXPU'),
         size: '20ft',
-        ownerColor: randomColor(),
+        shippingLine: line,
+        ownerColor: shippingLineColor(line),
         weight: randomWeight(),
         lifecycleState: 'at_gate',
         visitType: 'export',
@@ -255,6 +270,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
         stateElapsed: 0,
         targetPosition: null,
         speed: 5,
+        enabled: true,
+        craneMode: 'both',
+        armTargetY: 0,
       },
       {
         id: 'mhc-1',
@@ -267,6 +285,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
         stateElapsed: 0,
         targetPosition: null,
         speed: 2,
+        enabled: true,
+        craneMode: 'both',
+        armTargetY: 0,
       },
     ]
 
@@ -288,16 +309,50 @@ export const useGameStore = defineStore('box-empire-game', () => {
   }
 
   // ---- Gate ---------------------------------------------------------------
+  function openExportGate(): void {
+    if (gatehouse.value.exportLaneOpen) return
+    gatehouse.value.exportLaneOpen = true
+    emitEvent('gate.opened', 'Export lane opened — trucks can enter')
+  }
+
+  function closeExportGate(): void {
+    if (!gatehouse.value.exportLaneOpen) return
+    gatehouse.value.exportLaneOpen = false
+    emitEvent('gate.closed', 'Export lane closed')
+  }
+
+  function openImportGate(): void {
+    if (gatehouse.value.importLaneOpen) return
+    gatehouse.value.importLaneOpen = true
+    emitEvent('gate.opened', 'Import pickup lane opened')
+  }
+
+  function closeImportGate(): void {
+    if (!gatehouse.value.importLaneOpen) return
+    gatehouse.value.importLaneOpen = false
+    emitEvent('gate.closed', 'Import pickup lane closed')
+  }
+
+  // Legacy compat for tutorial steps that still call openGatehouse
   function openGatehouse(): void {
-    if (gatehouseOpen.value) return
-    gatehouseOpen.value = true
-    emitEvent('gate.opened', 'Gatehouse opened — trucks can now enter')
+    openExportGate()
+    openImportGate()
   }
 
   function closeGatehouse(): void {
-    if (!gatehouseOpen.value) return
-    gatehouseOpen.value = false
-    emitEvent('gate.closed', 'Gatehouse closed')
+    closeExportGate()
+    closeImportGate()
+  }
+
+  // ---- Equipment actions --------------------------------------------------
+  function toggleEquipment(equipmentId: string): void {
+    const eq = equipment.value.find(e => e.id === equipmentId)
+    if (eq) eq.enabled = !eq.enabled
+  }
+
+  function setCraneMode(equipmentId: string, mode: CraneMode): void {
+    const eq = equipment.value.find(e => e.id === equipmentId)
+    if (eq) eq.craneMode = mode
   }
 
   // ---- Truck spawning helpers ---------------------------------------------
@@ -394,7 +449,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
             }
           }
           const yard = yardBlocks.value[0]
-          const slot = findAvailableSlot(yard, getReservedYardSlotIds())
+          const slot = findAvailableSlot(yard, getReservedYardSlotIds(), 'export', containers.value)
           if (slot && truck.containerId) {
             const dropPos = getSlotWorldPosition(yard, slot)
             const job = createJob(
@@ -457,6 +512,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
     // Assign pending jobs to idle equipment
     assignPendingJobs(state)
 
+    // Re-check blocked jobs to see if containers became accessible
+    recheckBlockedJobs(state)
+
     // Tutorial flow logic
     handleTutorialFlow()
 
@@ -464,7 +522,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     checkTutorialAdvance()
   }
 
-  function handleJobCompletion(job: Job, container: Container): void {
+  function handleJobCompletion(job: import('../types').Job, container: Container): void {
     if (job.dropoffLocation.type === 'yard_slot') {
       const yard = yardBlocks.value[0]
       const parts = job.dropoffLocation.id.split('-')
@@ -526,14 +584,21 @@ export const useGameStore = defineStore('box-empire-game', () => {
           const tx = createTransaction('gate_out_revenue', container.id, simTime.value)
           transactions.value.push(tx)
           money.value += tx.amount
-          emitEvent('money.earned', `+$${GATE_OUT_REVENUE} — import container gate-out`, { amount: GATE_OUT_REVENUE })
+          emitEvent('money.earned', `+$${GATE_OUT_REVENUE} — import container gate-out`, {
+            amount: GATE_OUT_REVENUE,
+            position: { ...truck.position },
+          })
         }
       }
     } else if (job.dropoffLocation.type === 'quay_buffer') {
+      const bufferPos = container.visitType === 'import'
+        ? { ...QUAY_BUFFER_DISCHARGE_POSITION }
+        : { ...QUAY_BUFFER_LOAD_POSITION }
+
       container.currentLocation = {
         type: 'quay_buffer',
-        id: 'quay-buffer',
-        position: { ...QUAY_BUFFER_POSITION },
+        id: container.visitType === 'import' ? 'quay-buffer-discharge' : 'quay-buffer-load',
+        position: bufferPos,
       }
 
       if (container.visitType === 'import') {
@@ -543,12 +608,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
         container.vesselSlot = null
 
         const yard = yardBlocks.value[0]
-        const slot = findAvailableSlot(yard, getReservedYardSlotIds())
+        const slot = findAvailableSlot(yard, getReservedYardSlotIds(), 'import', containers.value)
         if (slot) {
           const dropPos = getSlotWorldPosition(yard, slot)
           const moveJob = createJob(
             container.id,
-            { type: 'quay_buffer', id: 'quay-buffer', position: { ...QUAY_BUFFER_POSITION } },
+            { type: 'quay_buffer', id: 'quay-buffer-discharge', position: bufferPos },
             { type: 'yard_slot', id: `${slot.blockId}-${slot.bay}-${slot.row}-${slot.tier}`, position: dropPos },
             'reach_stacker',
             9,
@@ -570,7 +635,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
             const vesselPos = getVesselSlotPosition(vessel, loadTier)
             const loadJob = createJob(
               container.id,
-              { type: 'quay_buffer', id: 'quay-buffer', position: { ...QUAY_BUFFER_POSITION } },
+              { type: 'quay_buffer', id: 'quay-buffer-load', position: bufferPos },
               { type: 'vessel_slot', id: `vessel-slot-${loadTier}`, position: vesselPos },
               'mobile_harbor_crane',
               10,
@@ -597,15 +662,18 @@ export const useGameStore = defineStore('box-empire-game', () => {
         const tx = createTransaction('vessel_load_revenue', container.id, simTime.value)
         transactions.value.push(tx)
         money.value += tx.amount
-        emitEvent('money.earned', `+$${VESSEL_LOAD_REVENUE} — export container loaded on vessel`, { amount: VESSEL_LOAD_REVENUE })
+        emitEvent('money.earned', `+$${VESSEL_LOAD_REVENUE} — export container loaded on vessel`, {
+          amount: VESSEL_LOAD_REVENUE,
+          position: { ...job.dropoffLocation.position },
+        })
         emitEvent('container.placed', `Container ${container.id} loaded on ${vessel.name}`)
       }
     }
   }
 
   function handleTutorialFlow(): void {
-    // Phase: spawn export trucks when gate opens
-    if (gatehouseOpen.value && exportTrucksSent.value < TUTORIAL_EXPORT_COUNT) {
+    // Phase: spawn export trucks when export lane opens
+    if (gatehouse.value.exportLaneOpen && exportTrucksSent.value < TUTORIAL_EXPORT_COUNT) {
       const truckInterval = 5
       const nextTruckTime = exportTrucksSent.value * truckInterval + 1
       if (simTime.value > nextTruckTime || exportTrucksSent.value === 0) {
@@ -636,7 +704,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
           const dischargeJob = createJob(
             next.containerId,
             { type: 'vessel_slot', id: `vessel-slot-${next.tier}`, position: vesselPos },
-            { type: 'quay_buffer', id: 'quay-buffer', position: { ...QUAY_BUFFER_POSITION } },
+            { type: 'quay_buffer', id: 'quay-buffer-discharge', position: { ...QUAY_BUFFER_DISCHARGE_POSITION } },
             'mobile_harbor_crane',
             12,
             simTime.value,
@@ -656,6 +724,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
       ).length
       if (importInYard > 0 && vessel && (vessel.state === 'discharging' || vessel.state === 'loading' || vessel.state === 'departing' || vessel.state === 'departed')) {
         importPickupStarted.value = true
+        // Auto-open import lane
+        if (!gatehouse.value.importLaneOpen) {
+          openImportGate()
+        }
       }
     }
 
@@ -698,7 +770,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
               id: `${exportInYard.yardSlot.blockId}-${exportInYard.yardSlot.bay}-${exportInYard.yardSlot.row}-${exportInYard.yardSlot.tier}`,
               position: slotPos,
             },
-            { type: 'quay_buffer', id: 'quay-buffer', position: { ...QUAY_BUFFER_POSITION } },
+            { type: 'quay_buffer', id: 'quay-buffer-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
             'reach_stacker',
             10,
             simTime.value,
@@ -719,7 +791,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
             const vesselPos = getVesselSlotPosition(vessel, loadTier)
             const loadJob = createJob(
               stagedExport.id,
-              { type: 'quay_buffer', id: 'quay-buffer', position: { ...QUAY_BUFFER_POSITION } },
+              { type: 'quay_buffer', id: 'quay-buffer-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
               { type: 'vessel_slot', id: `vessel-slot-${loadTier}`, position: vesselPos },
               'mobile_harbor_crane',
               11,
@@ -766,7 +838,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     const dischargeJob = createJob(
       next.containerId,
       { type: 'vessel_slot', id: `vessel-slot-${next.tier}`, position: vesselPos },
-      { type: 'quay_buffer', id: 'quay-buffer', position: { ...QUAY_BUFFER_POSITION } },
+      { type: 'quay_buffer', id: 'quay-buffer-discharge', position: { ...QUAY_BUFFER_DISCHARGE_POSITION } },
       'mobile_harbor_crane',
       12,
       simTime.value,
@@ -788,7 +860,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         id: `${exportInYard.yardSlot.blockId}-${exportInYard.yardSlot.bay}-${exportInYard.yardSlot.row}-${exportInYard.yardSlot.tier}`,
         position: slotPos,
       },
-      { type: 'quay_buffer', id: 'quay-buffer', position: { ...QUAY_BUFFER_POSITION } },
+      { type: 'quay_buffer', id: 'quay-buffer-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
       'reach_stacker',
       10,
       simTime.value,
@@ -851,6 +923,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     timeScale,
     tutorialStep,
     tutorialCompleted,
+    gatehouse,
     gatehouseOpen,
     money,
     transactions,
@@ -874,6 +947,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
     togglePause,
     openGatehouse,
     closeGatehouse,
+    openExportGate,
+    closeExportGate,
+    openImportGate,
+    closeImportGate,
+    toggleEquipment,
+    setCraneMode,
     advanceTutorialStep,
     emitEvent,
     consumePendingEvents,

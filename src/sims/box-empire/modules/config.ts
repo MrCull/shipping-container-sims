@@ -26,18 +26,22 @@ export const CONTAINER_STACK_GAP_Y = 0.05
 export const CONTAINER_ROW_GAP = 0.30
 export const CONTAINER_BAY_GAP = 0.15
 
-export const CONTAINER_COLORS: Record<string, string> = {
+export const SHIPPING_LINE_COLORS: Record<string, string> = {
   maersk: '#2E86C1',
   evergreen: '#006747',
   cosco: '#004B87',
   msc: '#FFD700',
   cma_cgm: '#003DA5',
-  hapagLloyd: '#FF6600',
-  one: '#FF00FF',
+  hapag_lloyd: '#FF6600',
+  one: '#CC00CC',
   hmm: '#00BFFF',
 }
 
-export const CONTAINER_COLOR_LIST = Object.values(CONTAINER_COLORS)
+export const SHIPPING_LINES = Object.keys(SHIPPING_LINE_COLORS)
+
+export const CONTAINER_COLORS: Record<string, string> = SHIPPING_LINE_COLORS
+
+export const CONTAINER_COLOR_LIST = Object.values(SHIPPING_LINE_COLORS)
 
 // ---- Reach Stacker --------------------------------------------------------
 
@@ -92,9 +96,13 @@ export const TUTORIAL_IMPORT_COUNT = 5
 // ---- Terminal layout positions (meters) -----------------------------------
 
 export const GATE_POSITION: Position3D = { x: -40, y: 0, z: 50 }
+export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -43, y: 0, z: 50 }
+export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -37, y: 0, z: 50 }
 export const YARD_IO_POSITION: Position3D = { x: 0, y: 0, z: 30 }
 export const YARD_BLOCK_POSITION: Position = { x: -15, z: 20 }
 export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: 0, z: 3 }
+export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -5, y: 0, z: 3 }
+export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: 5, y: 0, z: 3 }
 export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -8 }
 export const CRANE_POSITION: Position3D = { x: 0, y: 0, z: 0 }
 
@@ -102,7 +110,7 @@ export const TERMINAL_BOUNDS = {
   minX: -60,
   maxX: 60,
   minZ: -30,
-  maxZ: 60,
+  maxZ: 120,
 }
 
 // ---- Sound events ---------------------------------------------------------

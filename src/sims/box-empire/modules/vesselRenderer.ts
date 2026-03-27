@@ -6,10 +6,10 @@ import * as THREE from 'three'
 import type { VesselVisit } from '../types'
 import { loadModel, disposeModel } from './modelLoader'
 
-const VESSEL_GLB_URL = new URL('../assets/models/container-ship-large-empty-no-containers.glb', import.meta.url).href
+const VESSEL_GLB_URL = new URL('../assets/models/container-ship-small-empty-no-containers.glb', import.meta.url).href
 
-// Target scale for the container ship GLB so it matches LOA ≈ 50m
-const VESSEL_MODEL_SCALE = 0.035
+// Target scale for the small container ship GLB so it matches LOA ≈ 50m
+const VESSEL_MODEL_SCALE = 0.06
 
 export class VesselRenderer {
   private meshes = new Map<string, THREE.Group>()
@@ -43,8 +43,8 @@ export class VesselRenderer {
     }
 
     glb.scale.setScalar(VESSEL_MODEL_SCALE)
-    // Rotate so bow points along -Z (away from camera / toward water)
-    glb.rotation.y = Math.PI
+    // Rotate 90 degrees so the ship's length runs along X (parallel to the quay)
+    glb.rotation.y = Math.PI / 2
     glb.position.set(0, 0, 0)
 
     // Hide procedural sub-meshes
@@ -62,16 +62,16 @@ export class VesselRenderer {
     const halfBeam = vessel.beam / 2
     const hullHeight = 4
 
-    // Hull: shape in XZ plane → vessel length runs along Z axis
+    // Hull: vessel length runs along X axis (parallel to quay)
     const hullShape = new THREE.Shape()
-    hullShape.moveTo(-halfBeam * 0.6, -halfLength)
-    hullShape.lineTo(-halfBeam, -halfLength * 0.3)
-    hullShape.lineTo(-halfBeam, halfLength * 0.5)
-    hullShape.lineTo(-halfBeam * 0.3, halfLength)
-    hullShape.lineTo(halfBeam * 0.3, halfLength)
-    hullShape.lineTo(halfBeam, halfLength * 0.5)
-    hullShape.lineTo(halfBeam, -halfLength * 0.3)
-    hullShape.lineTo(halfBeam * 0.6, -halfLength)
+    hullShape.moveTo(-halfLength, -halfBeam * 0.6)
+    hullShape.lineTo(-halfLength * 0.3, -halfBeam)
+    hullShape.lineTo(halfLength * 0.5, -halfBeam)
+    hullShape.lineTo(halfLength, -halfBeam * 0.3)
+    hullShape.lineTo(halfLength, halfBeam * 0.3)
+    hullShape.lineTo(halfLength * 0.5, halfBeam)
+    hullShape.lineTo(-halfLength * 0.3, halfBeam)
+    hullShape.lineTo(-halfLength, halfBeam * 0.6)
     hullShape.closePath()
 
     const extrudeSettings = { depth: hullHeight, bevelEnabled: false }
@@ -83,17 +83,17 @@ export class VesselRenderer {
     hull.receiveShadow = true
     group.add(hull)
 
-    const deckGeo = new THREE.BoxGeometry(vessel.beam * 0.9, 0.3, vessel.loa * 0.8)
+    const deckGeo = new THREE.BoxGeometry(vessel.loa * 0.8, 0.3, vessel.beam * 0.9)
     const deckMat = new THREE.MeshStandardMaterial({ color: 0x7f8c8d, roughness: 0.8 })
     const deck = new THREE.Mesh(deckGeo, deckMat)
     deck.position.y = hullHeight + 0.15
     deck.castShadow = true
     group.add(deck)
 
-    const bridgeGeo = new THREE.BoxGeometry(6, 5, 5)
+    const bridgeGeo = new THREE.BoxGeometry(5, 5, 6)
     const bridgeMat = new THREE.MeshStandardMaterial({ color: 0xecf0f1, roughness: 0.5 })
     const bridge = new THREE.Mesh(bridgeGeo, bridgeMat)
-    bridge.position.set(0, hullHeight + 2.8, -halfLength * 0.6)
+    bridge.position.set(-halfLength * 0.6, hullHeight + 2.8, 0)
     bridge.castShadow = true
     group.add(bridge)
 
@@ -102,7 +102,7 @@ export class VesselRenderer {
 
   update(vessels: VesselVisit[]): void {
     for (const vessel of vessels) {
-      if (vessel.state === 'departed' && vessel.position.z < -60) {
+      if (vessel.state === 'departed' && vessel.position.x < -60) {
         const mesh = this.meshes.get(vessel.id)
         if (mesh) {
           const glb = this.glbMeshes.get(vessel.id)
