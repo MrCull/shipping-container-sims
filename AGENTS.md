@@ -67,24 +67,26 @@ knowledge-base/      Domain knowledge reference files (dk_*.md)
 
 ## Skills
 
+Agent-facing skill files live in **`.ai/skills/`** at the repo root (Markdown `SKILL.md` per topic). Each file documents conventions, schemas, or patterns for this codebase.
+
 ### Project workflow
 
-- **[Adding a sim](.cursor/skills/adding-a-sim/SKILL.md)** — How to add a new game or simulation to the project. Follow this when creating, scaffolding, or implementing a new sim.
+- **[Adding a sim](.ai/skills/adding-a-sim/SKILL.md)** — How to add a new game or simulation to the project. Follow this when creating, scaffolding, or implementing a new sim.
 
 ### Domain knowledge & entity design
 
 These skills provide TypeScript interfaces, default value ranges, factory functions, and design guidance drawn from the `knowledge-base/` domain files. Use them when building simulation entities, operational logic, or 3D scenes.
 
-- **[Container & Cargo Entities](.cursor/skills/container-cargo-entities/SKILL.md)** — Physical specs (20ft/40ft/HC), ISO 6346 identity, logical attributes, lifecycle state machine, hazardous cargo (IMDG), hold/release logic, yard grouping heuristics, and factory functions.
-- **[Vessel Entities](.cursor/skills/vessel-entities/SKILL.md)** — Vessel classes (Feeder → ULCV), bay-row-tier coordinates, stowage slots, simplified stability model, voyage/manifest, vessel generation algorithms, and factory functions.
-- **[Terminal Equipment Entities](.cursor/skills/terminal-equipment-entities/SKILL.md)** — STS quay cranes (5 size classes), RMG/ASC/RTG yard cranes, reach stackers, terminal tractors, four-lens model (appearance/movement/capabilities/stop conditions), cycle times, animation state machines, and factory functions.
-- **[Terminal Infrastructure](.cursor/skills/terminal-infrastructure/SKILL.md)** — Berths, yard blocks, stacking rules & rehandle model, four layout archetypes (parallel RTG, perpendicular ASC, straddle, U-type), road network model, gatehouse infrastructure, terminal generation presets, and factory functions.
-- **[Terminal Operations](.cursor/skills/terminal-operations/SKILL.md)** — End-to-end container flows (import/export/transshipment), vessel loading/discharge sequences, crane cycle model, gatehouse processes, staff roles & shifts, KPIs with target ranges, EDI message types, simulation event system, and factory functions.
-- **[Terminal Economics](.cursor/skills/terminal-economics/SKILL.md)** — Tariff structure, base handling charges, surcharges, tiered storage/dwell fees, optional services, cargo-class modifiers, revenue/cost tracking, invoice generation, regional presets (Europe/Asia/Americas), and factory functions.
+- **[Container & Cargo Entities](.ai/skills/container-cargo-entities/SKILL.md)** — Physical specs (20ft/40ft/HC), ISO 6346 identity, logical attributes, lifecycle state machine, hazardous cargo (IMDG), hold/release logic, yard grouping heuristics, and factory functions.
+- **[Vessel Entities](.ai/skills/vessel-entities/SKILL.md)** — Vessel classes (Feeder → ULCV), bay-row-tier coordinates, stowage slots, simplified stability model, voyage/manifest, vessel generation algorithms, and factory functions.
+- **[Terminal Equipment Entities](.ai/skills/terminal-equipment-entities/SKILL.md)** — STS quay cranes (5 size classes), RMG/ASC/RTG yard cranes, reach stackers, terminal tractors, four-lens model (appearance/movement/capabilities/stop conditions), cycle times, animation state machines, and factory functions.
+- **[Terminal Infrastructure](.ai/skills/terminal-infrastructure/SKILL.md)** — Berths, yard blocks, stacking rules & rehandle model, four layout archetypes (parallel RTG, perpendicular ASC, straddle, U-type), road network model, gatehouse infrastructure, terminal generation presets, and factory functions.
+- **[Terminal Operations](.ai/skills/terminal-operations/SKILL.md)** — End-to-end container flows (import/export/transshipment), vessel loading/discharge sequences, crane cycle model, gatehouse processes, staff roles & shifts, KPIs with target ranges, EDI message types, simulation event system, and factory functions.
+- **[Terminal Economics](.ai/skills/terminal-economics/SKILL.md)** — Tariff structure, base handling charges, surcharges, tiered storage/dwell fees, optional services, cargo-class modifiers, revenue/cost tracking, invoice generation, regional presets (Europe/Asia/Americas), and factory functions.
 
 ### Rendering & animation
 
-- **[Three.js + Vue 3 Animation](.cursor/skills/threejs-vue3-animation/SKILL.md)** — Four-layer architecture (domain → app state → scene adapter → render loop), scene conventions (units, axes, origins), `InstancedMesh` for containers, asset pipeline (glTF/Draco/KTX2), camera patterns, equipment animation state machines, container stack positioning, lighting, fidelity tiers, data-driven scene generation, and common pitfalls.
+- **[Three.js + Vue 3 Animation](.ai/skills/threejs-vue3-animation/SKILL.md)** — Four-layer architecture (domain → app state → scene adapter → render loop), scene conventions (units, axes, origins), `InstancedMesh` for containers, asset pipeline (glTF/Draco/KTX2), camera patterns, equipment animation state machines, container stack positioning, lighting, fidelity tiers, data-driven scene generation, and common pitfalls.
 
 ## Available media
 
@@ -113,7 +115,7 @@ The `available-media/` folder contains pre-sourced assets that can be copied int
 | `truck-no-trailer.glb`, `truck-no-trailer2.glb` | GLB | Terminal tractor / truck cab (no chassis) |
 | `toll-which-might-be-able-to-be-used-as-gatehouse.glb` | GLB | Toll booth structure, usable as a gatehouse (~37 MB) |
 
-**Format notes:** GLB files can be loaded directly with Three.js `GLTFLoader`. FBX files need `FBXLoader`. OBJ files use `OBJLoader`. For best runtime performance, convert FBX/OBJ assets to GLB with Draco compression before bundling into a sim (see the [Three.js + Vue 3 Animation skill](.cursor/skills/threejs-vue3-animation/SKILL.md) for pipeline guidance).
+**Format notes:** GLB files can be loaded directly with Three.js `GLTFLoader`. FBX files need `FBXLoader`. OBJ files use `OBJLoader`. For best runtime performance, convert FBX/OBJ assets to GLB with Draco compression before bundling into a sim (see the [Three.js + Vue 3 Animation skill](.ai/skills/threejs-vue3-animation/SKILL.md) for pipeline guidance).
 
 ### Sound effects (`available-media/sound-samples/`)
 
