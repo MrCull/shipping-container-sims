@@ -92,6 +92,10 @@ export class ContainerRenderer {
       if (c.lifecycleState === 'departed') return false
       if (c.lifecycleState === 'on_vessel') return false
       if (c.lifecycleState === 'loaded_on_vessel') return false
+      // Containers on trucks are rendered by TruckRenderer as children of the truck mesh
+      if (c.currentLocation.type === 'truck') return false
+      if (c.lifecycleState === 'returning_to_gate') return false
+      if (c.lifecycleState === 'at_gate' && c.visitType === 'import') return false
       return true
     })
 

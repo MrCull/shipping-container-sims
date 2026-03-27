@@ -13,7 +13,7 @@ export function useInput(
   canvasRef: Ref<HTMLCanvasElement | null>,
   getCamera: () => THREE.PerspectiveCamera | null,
   getScene: () => THREE.Scene | null,
-  getContainerIdAtInstance: (instanceId: number) => string | null,
+  getContainerIdAtInstance: () => string | null,
   getContainerMesh: () => THREE.InstancedMesh | null,
   getContainerIdNearScreen: (clickX: number, clickY: number, canvasW: number, canvasH: number) => string | null,
 ) {

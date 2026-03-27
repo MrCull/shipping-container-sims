@@ -211,6 +211,7 @@ export interface Equipment {
   spreaderZ: number        // lateral position of MHC spreader along jib (+Z=quay, -Z=vessel)
   waypoints: Position3D[]  // axis-aligned movement waypoints (RS only)
   waypointIndex: number    // current waypoint index (RS only)
+  headingY: number         // current Y rotation for RS body
 }
 
 // ---- Jobs -----------------------------------------------------------------

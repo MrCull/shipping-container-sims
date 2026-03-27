@@ -16,6 +16,7 @@ import {
   QUAY_BUFFER_LOAD_POSITION,
   GATE_INGATE_POSITION,
   GATE_OUTGATE_POSITION,
+  GATE_OUTGATE_FENCE_Z,
 } from './config'
 
 // Ocean mesh stored for animation
@@ -105,19 +106,21 @@ function buildLighting(scene: THREE.Scene): void {
 }
 
 function buildOcean(scene: THREE.Scene): void {
-  const geometry = new THREE.PlaneGeometry(800, 200, 100, 50)
+  // Large ocean plane visible from shore — extends far out to sea (-Z direction)
+  const geometry = new THREE.PlaneGeometry(1200, 400, 120, 60)
   const material = new THREE.MeshPhongMaterial({
     color: 0x0d4f6e,
     emissive: 0x052838,
-    emissiveIntensity: 0.14,
-    specular: 0xaaddff,
-    shininess: 160,
+    emissiveIntensity: 0.16,
+    specular: 0x88ccee,
+    shininess: 150,
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.92,
   })
   const ocean = new THREE.Mesh(geometry, material)
   ocean.rotation.x = -Math.PI / 2
-  ocean.position.set(0, -0.5, -50)
+  // Centre at z=-80 so it extends from the quay far out to sea
+  ocean.position.set(0, -0.4, -80)
   ocean.receiveShadow = true
   ocean.name = 'ocean'
   scene.add(ocean)
@@ -238,27 +241,40 @@ function buildTerminalBoundary(scene: THREE.Scene): void {
   const fenceMat = new THREE.MeshPhongMaterial({ color: 0x999999, shininess: 15 })
   const pillarMat = new THREE.MeshPhongMaterial({ color: 0x666666, shininess: 10 })
 
-  // Front fence rails at z=TERMINAL_FENCE_Z
+  // Front fence rails at z=TERMINAL_FENCE_Z with gap at in-gate
   for (const ry of [0.9, 2.1]) {
     const rail = new THREE.Mesh(new THREE.BoxGeometry(fenceW, 0.14, 0.14), fenceMat)
     rail.position.set((TERMINAL_BOUNDS.maxX + TERMINAL_BOUNDS.minX) / 2, ry, TERMINAL_FENCE_Z)
     scene.add(rail)
   }
 
-  // Pillars with gap at in-gate
+  // Pillars — gap at in-gate X position (±5m)
   for (let x = TERMINAL_BOUNDS.minX; x <= TERMINAL_BOUNDS.maxX; x += 8) {
-    if (Math.abs(x - GATE_INGATE_POSITION.x) < 6) continue
+    if (Math.abs(x - GATE_INGATE_POSITION.x) < 5) continue
     const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3, 0.18), pillarMat)
     pillar.position.set(x, 1.5, TERMINAL_FENCE_Z)
     pillar.castShadow = true; scene.add(pillar)
   }
 
-  // Side fences (Z-running)
+  // Side fences (Z-running along terminal sides)
   const sideFenceD = TERMINAL_FENCE_Z
   for (const xPos of [TERMINAL_BOUNDS.minX, TERMINAL_BOUNDS.maxX]) {
     const side = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.2, sideFenceD), fenceMat)
     side.position.set(xPos, 1.1, sideFenceD / 2)
     scene.add(side)
+  }
+
+  // Bottom fence at GATE_OUTGATE_FENCE_Z with gap at out-gate
+  for (const ry of [0.9, 2.1]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(fenceW, 0.14, 0.14), fenceMat)
+    rail.position.set((TERMINAL_BOUNDS.maxX + TERMINAL_BOUNDS.minX) / 2, ry, GATE_OUTGATE_FENCE_Z)
+    scene.add(rail)
+  }
+  for (let x = TERMINAL_BOUNDS.minX; x <= TERMINAL_BOUNDS.maxX; x += 8) {
+    if (Math.abs(x - GATE_OUTGATE_POSITION.x) < 5) continue
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3, 0.18), pillarMat)
+    pillar.position.set(x, 1.5, GATE_OUTGATE_FENCE_Z)
+    pillar.castShadow = true; scene.add(pillar)
   }
 }
 
@@ -267,51 +283,67 @@ function buildGatehouse(scene: THREE.Scene): void {
   const roofMat  = new THREE.MeshPhongMaterial({ color: 0x8b4513, shininess: 10 })
   const barMat   = new THREE.MeshPhongMaterial({ color: 0xff5500 })
   const barMat2  = new THREE.MeshPhongMaterial({ color: 0x1166cc })
+  const winMat   = new THREE.MeshPhongMaterial({ color: 0x88aacc, emissive: 0x224466, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 })
 
-  function addBarrier(x: number, z: number, mat: THREE.Material): void {
+  function addBarrierAcrossLane(laneX: number, fenceZ: number, mat: THREE.MeshPhongMaterial): void {
+    // Pole on one side of lane
     const p = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 3), mat)
-    p.position.set(x, 1.5, z); scene.add(p)
-    const b = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.12, 0.12), mat)
-    b.position.set(x + 2.25, 2.65, z); scene.add(b)
+    p.position.set(laneX - 2.5, 1.5, fenceZ); scene.add(p)
+    // Boom extends across lane
+    const b = new THREE.Mesh(new THREE.BoxGeometry(5, 0.12, 0.12), mat)
+    b.position.set(laneX, 2.6, fenceZ); scene.add(b)
   }
 
-  function addBuilding(x: number, z: number): void {
-    const body = new THREE.Mesh(new THREE.BoxGeometry(3, 3.5, 4), houseMat)
-    body.position.set(x, 1.75, z); body.castShadow = true; scene.add(body)
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.28, 4.6), roofMat)
-    roof.position.set(x, 3.66, z); scene.add(roof)
-    // Window
-    const winMat = new THREE.MeshPhongMaterial({ color: 0x88aacc, emissive: 0x224466, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 })
-    const win = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.2, 2.4), winMat)
-    win.position.set(x + 1.55, 2.0, z); scene.add(win)
+  function addBuilding(x: number, z: number, label: string): void {
+    void label
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.2, 3.8, 4.5), houseMat)
+    body.position.set(x, 1.9, z); body.castShadow = true; scene.add(body)
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.30, 5.1), roofMat)
+    roof.position.set(x, 3.95, z); scene.add(roof)
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 2.6), winMat)
+    win.position.set(x + 1.62, 2.2, z); scene.add(win)
   }
 
-  // IN-GATE: at fence (z=TERMINAL_FENCE_Z), outside terminal
-  addBuilding(GATE_INGATE_POSITION.x, TERMINAL_FENCE_Z + 3.5)
-  addBarrier(GATE_INGATE_POSITION.x - 0.5, TERMINAL_FENCE_Z, barMat)
+  // ---- IN-GATE (at TERMINAL_FENCE_Z) ----
+  // Lane is at x=GATE_INGATE_POSITION.x; gatehouse building is beside it at x-4
+  const inBuildX = GATE_INGATE_POSITION.x - 5
+  addBuilding(inBuildX, TERMINAL_FENCE_Z + 2, 'IN')
+  addBarrierAcrossLane(GATE_INGATE_POSITION.x, TERMINAL_FENCE_Z, barMat)
 
-  // IN-GATE road approach strip (orange, outside terminal)
-  const inStrip = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 40), new THREE.MeshPhongMaterial({ color: 0xff6600, transparent: true, opacity: 0.30 }))
-  inStrip.rotation.x = -Math.PI / 2
-  inStrip.position.set(GATE_INGATE_POSITION.x, 0.02, TERMINAL_FENCE_Z + 20)
-  scene.add(inStrip)
+  // Queue lane strip outside terminal (parallel to fence, along Z)
+  const queueLen = 60
+  const inQueueStrip = new THREE.Mesh(
+    new THREE.PlaneGeometry(3, queueLen),
+    new THREE.MeshPhongMaterial({ color: 0xff6600, transparent: true, opacity: 0.28 }),
+  )
+  inQueueStrip.rotation.x = -Math.PI / 2
+  inQueueStrip.position.set(GATE_INGATE_POSITION.x, 0.02, TERMINAL_FENCE_Z + queueLen / 2)
+  scene.add(inQueueStrip)
 
-  // OUT-GATE: at bottom of terminal (z=GATE_OUTGATE_POSITION.z)
-  addBuilding(GATE_OUTGATE_POSITION.x, GATE_OUTGATE_POSITION.z - 3.5)
-  addBarrier(GATE_OUTGATE_POSITION.x - 0.5, GATE_OUTGATE_POSITION.z, barMat2)
+  // ---- OUT-GATE (in fence at GATE_OUTGATE_FENCE_Z) ----
+  // Building inside terminal beside the lane
+  const outBuildX = GATE_OUTGATE_POSITION.x - 5
+  addBuilding(outBuildX, GATE_OUTGATE_FENCE_Z - 2, 'OUT')
+  addBarrierAcrossLane(GATE_OUTGATE_POSITION.x, GATE_OUTGATE_FENCE_Z, barMat2)
 
-  // OUT-GATE road exit strip (blue, outside out-gate)
-  const outStrip = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 40), new THREE.MeshPhongMaterial({ color: 0x2266cc, transparent: true, opacity: 0.30 }))
-  outStrip.rotation.x = -Math.PI / 2
-  outStrip.position.set(GATE_OUTGATE_POSITION.x, 0.02, GATE_OUTGATE_POSITION.z + 20)
-  scene.add(outStrip)
+  // Exit road outside terminal
+  const outExitStrip = new THREE.Mesh(
+    new THREE.PlaneGeometry(3, 50),
+    new THREE.MeshPhongMaterial({ color: 0x2266cc, transparent: true, opacity: 0.28 }),
+  )
+  outExitStrip.rotation.x = -Math.PI / 2
+  outExitStrip.position.set(GATE_OUTGATE_POSITION.x, 0.02, GATE_OUTGATE_FENCE_Z + 25)
+  scene.add(outExitStrip)
 
-  // Internal road connecting in-gate to yard area
-  const roadLen = GATE_OUTGATE_POSITION.z - TERMINAL_FENCE_Z
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(5.5, roadLen), new THREE.MeshPhongMaterial({ color: 0x606060, transparent: true, opacity: 0.50 }))
-  road.rotation.x = -Math.PI / 2
-  road.position.set(GATE_INGATE_POSITION.x, 0.02, TERMINAL_FENCE_Z + roadLen / 2)
-  scene.add(road)
+  // Internal road connecting in-gate to out-gate (along terminal left side)
+  const internalRoadLen = GATE_OUTGATE_FENCE_Z - TERMINAL_FENCE_Z
+  const internalRoad = new THREE.Mesh(
+    new THREE.PlaneGeometry(4, internalRoadLen),
+    new THREE.MeshPhongMaterial({ color: 0x606060, transparent: true, opacity: 0.45 }),
+  )
+  internalRoad.rotation.x = -Math.PI / 2
+  internalRoad.position.set(GATE_INGATE_POSITION.x, 0.02, TERMINAL_FENCE_Z + internalRoadLen / 2)
+  scene.add(internalRoad)
 }
 
 function buildQuayBufferMarkings(scene: THREE.Scene): void {

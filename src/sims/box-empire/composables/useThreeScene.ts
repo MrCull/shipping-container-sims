@@ -22,9 +22,10 @@ export interface GameSceneRefs {
   render: () => void
   updateEntities: () => void
   spawnFloatingText: (text: string, color: string, worldPos: { x: number; y: number; z: number }) => void
-  getContainerIdAtInstance: (instanceId: number) => string | null
+  getContainerIdAtInstance: () => string | null
   getContainerMesh: () => THREE.InstancedMesh | null
   getContainerIdNearScreen: (clickX: number, clickY: number, canvasW: number, canvasH: number) => string | null
+  triggerVesselShake: (vesselId: string) => void
 }
 
 export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): GameSceneRefs {
@@ -133,15 +134,15 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   function updateEntities(): void {
     containerRenderer?.update(store.containers, store.truckVisits)
     equipmentRenderer?.update(store.equipment)
-    vesselRenderer?.update(store.vesselVisits)
-    truckRenderer?.update(store.truckVisits)
+    vesselRenderer?.update(store.vesselVisits, store.containers, 0.016)
+    truckRenderer?.update(store.truckVisits, store.containers)
   }
 
   function spawnFloatingText(text: string, color: string, worldPos: { x: number; y: number; z: number }): void {
     floatingTextRenderer?.spawn(text, color, worldPos)
   }
 
-  function getContainerIdAtInstance(_instanceId: number): string | null {
+  function getContainerIdAtInstance(): string | null {
     return containerRenderer?.getContainerIdAtIndex() ?? null
   }
 
@@ -154,6 +155,10 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   ): string | null {
     if (!camera || !containerRenderer) return null
     return containerRenderer.getContainerIdNearScreen(clickX, clickY, canvasW, canvasH, camera)
+  }
+
+  function triggerVesselShake(vesselId: string): void {
+    vesselRenderer?.triggerLoadShake(vesselId)
   }
 
   function dispose(): void {
@@ -198,5 +203,6 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     getContainerIdAtInstance,
     getContainerMesh,
     getContainerIdNearScreen,
+    triggerVesselShake,
   }
 }

@@ -3,10 +3,36 @@
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
-import type { TruckVisit } from '../types'
+import type { TruckVisit, Container } from '../types'
+import { CONTAINER_LENGTH, CONTAINER_WIDTH, CONTAINER_HEIGHT } from './config'
+import { createContainerMaterials, disposeContainerMaterials } from './containerMaterials'
+
+// Simple container mesh for rendering on truck bed (no corner posts, for performance)
+function makeTruckContainerMesh(container: Container): THREE.Group {
+  const group = new THREE.Group()
+  group.name = 'truck-container'
+
+  const mats = createContainerMaterials(container.ownerColor, container.id, container.shippingLine)
+  const geo = new THREE.BoxGeometry(CONTAINER_LENGTH, CONTAINER_HEIGHT, CONTAINER_WIDTH)
+  const mesh = new THREE.Mesh(geo, mats)
+  mesh.castShadow = true
+  mesh.userData['bodyMaterials'] = mats
+  group.add(mesh)
+
+  // Subtle edge lines
+  const edges = new THREE.EdgesGeometry(geo)
+  group.add(new THREE.LineSegments(
+    edges,
+    new THREE.LineBasicMaterial({ color: 0x08080c, transparent: true, opacity: 0.40 }),
+  ))
+
+  return group
+}
 
 export class TruckRenderer {
   private meshes = new Map<string, THREE.Group>()
+  // Maps truckId → current container group attached to truck mesh
+  private containerGroups = new Map<string, THREE.Group>()
   private scene: THREE.Scene
 
   constructor(scene: THREE.Scene) {
@@ -107,12 +133,19 @@ export class TruckRenderer {
     return group
   }
 
-  update(trucks: TruckVisit[]): void {
+  update(trucks: TruckVisit[], containers?: Container[]): void {
     const activeTrucks = trucks.filter(t => t.state !== 'departed')
     const activeTruckIds = new Set(activeTrucks.map(t => t.id))
 
+    // Remove meshes for departed trucks
     for (const [id, mesh] of this.meshes) {
       if (!activeTruckIds.has(id)) {
+        // Dispose attached container group
+        const cg = this.containerGroups.get(id)
+        if (cg) {
+          this.disposeGroup(cg)
+          this.containerGroups.delete(id)
+        }
         mesh.traverse(obj => {
           const m = obj as THREE.Mesh
           if (m.geometry) m.geometry.dispose()
@@ -137,10 +170,71 @@ export class TruckRenderer {
 
       mesh.position.set(truck.position.x, 0, truck.position.z)
       mesh.rotation.y = truck.headingY
+
+      // ---- Container attachment ----
+      // Find the container this truck is carrying (on-truck or being collected)
+      const carriedContainer = containers
+        ? containers.find(c =>
+          c.id === truck.containerId &&
+          (c.currentLocation.type === 'truck' ||
+           c.lifecycleState === 'returning_to_gate' ||
+           c.lifecycleState === 'at_gate'),
+        )
+        : null
+
+      const existingCg = this.containerGroups.get(truck.id)
+
+      if (carriedContainer) {
+        // Add or update container on truck bed
+        if (!existingCg || existingCg.userData['containerId'] !== carriedContainer.id) {
+          // Remove old container group
+          if (existingCg) {
+            mesh.remove(existingCg)
+            this.disposeGroup(existingCg)
+          }
+          const cg = makeTruckContainerMesh(carriedContainer)
+          cg.userData['containerId'] = carriedContainer.id
+          // Position on truck bed: centred lengthwise, raised to deck height
+          // Truck faces +Z when headingY=0. Container length (CONTAINER_LENGTH) along truck Z axis.
+          // Cab is at +Z; container sits on the chassis behind cab at z≈-1, raised by chassis height
+          cg.position.set(0, 0.72 + CONTAINER_HEIGHT / 2, -1.0)
+          // Container length aligns with truck forward (+Z) when rotation.y = 0 on group.
+          // BoxGeometry L is along X, so rotate 90° around Y so L faces truck's Z
+          cg.rotation.y = Math.PI / 2
+          mesh.add(cg)
+          this.containerGroups.set(truck.id, cg)
+        }
+      } else {
+        // Remove container from truck if no longer carried
+        if (existingCg) {
+          mesh.remove(existingCg)
+          this.disposeGroup(existingCg)
+          this.containerGroups.delete(truck.id)
+        }
+      }
     }
   }
 
+  private disposeGroup(group: THREE.Group): void {
+    group.traverse(obj => {
+      const m = obj as THREE.Mesh
+      if (!m.geometry) return
+      const bodyMats = m.userData['bodyMaterials'] as THREE.MeshStandardMaterial[] | undefined
+      if (bodyMats) disposeContainerMaterials(bodyMats)
+      else if (m.material) {
+        const mat = m.material
+        if (Array.isArray(mat)) mat.forEach(x => x.dispose())
+        else mat.dispose()
+      }
+      m.geometry.dispose()
+    })
+  }
+
   dispose(): void {
+    for (const cg of this.containerGroups.values()) {
+      this.disposeGroup(cg)
+    }
+    this.containerGroups.clear()
     for (const mesh of this.meshes.values()) {
       mesh.traverse(obj => {
         const m = obj as THREE.Mesh

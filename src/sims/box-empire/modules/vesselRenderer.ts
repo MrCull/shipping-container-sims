@@ -5,7 +5,27 @@
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
-import type { VesselVisit } from '../types'
+import type { VesselVisit, Container } from '../types'
+import { CONTAINER_LENGTH, CONTAINER_WIDTH, CONTAINER_HEIGHT, TUTORIAL_VESSEL } from './config'
+import { createContainerMaterials, disposeContainerMaterials } from './containerMaterials'
+
+// Deck-Y constant (must match getVesselSlotPosition in vesselManager)
+const DECK_Y = 5.4
+const CONTAINER_SPACING = CONTAINER_LENGTH + 0.5
+
+function makeDeckContainer(container: Container): THREE.Group {
+  const g = new THREE.Group()
+  g.name = `deck-container-${container.id}`
+  const mats = createContainerMaterials(container.ownerColor, container.id, container.shippingLine)
+  const geo = new THREE.BoxGeometry(CONTAINER_LENGTH, CONTAINER_HEIGHT, CONTAINER_WIDTH)
+  const mesh = new THREE.Mesh(geo, mats)
+  mesh.castShadow = true
+  mesh.userData['bodyMaterials'] = mats
+  g.add(mesh)
+  const edges = new THREE.EdgesGeometry(geo)
+  g.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x08080c, transparent: true, opacity: 0.35 })))
+  return g
+}
 
 // Shared materials — allocated once, reused
 let hullMat: THREE.MeshPhongMaterial | null = null
@@ -192,9 +212,18 @@ function buildDeckFittings(group: THREE.Group, L: number, W: number, H: number, 
 export class VesselRenderer {
   private meshes = new Map<string, THREE.Group>()
   private scene: THREE.Scene
+  // Track deck container groups per vessel: vesselId → Map<containerId, Group>
+  private deckContainers = new Map<string, Map<string, THREE.Group>>()
+  // Shake animation state per vessel: vesselId → { intensity, elapsed }
+  private shakeState = new Map<string, { intensity: number; elapsed: number }>()
 
   constructor(scene: THREE.Scene) {
     this.scene = scene
+  }
+
+  // Call this when a container is placed on the vessel (triggers shake + sound)
+  triggerLoadShake(vesselId: string): void {
+    this.shakeState.set(vesselId, { intensity: 0.06, elapsed: 0 })
   }
 
   private createVesselMesh(vessel: VesselVisit): THREE.Group {
@@ -214,17 +243,21 @@ export class VesselRenderer {
     return group
   }
 
-  update(vessels: VesselVisit[]): void {
+  update(vessels: VesselVisit[], containers?: Container[], dt?: number): void {
+    const dtVal = dt ?? 0.016
+
     for (const vessel of vessels) {
       if (vessel.state === 'departed' && vessel.position.x < -80) {
         const mesh = this.meshes.get(vessel.id)
         if (mesh) {
+          this.disposeDeckContainers(vessel.id)
           this.scene.remove(mesh)
           mesh.traverse(obj => {
             const m = obj as THREE.Mesh
             if (m.geometry) m.geometry.dispose()
           })
           this.meshes.delete(vessel.id)
+          this.shakeState.delete(vessel.id)
         }
         continue
       }
@@ -237,13 +270,104 @@ export class VesselRenderer {
         mesh.name = vessel.id
         this.scene.add(mesh)
         this.meshes.set(vessel.id, mesh)
+        this.deckContainers.set(vessel.id, new Map())
       }
 
+      // Update vessel position
       mesh.position.set(vessel.position.x, vessel.position.y, vessel.position.z)
+
+      // Shake animation
+      const shake = this.shakeState.get(vessel.id)
+      if (shake) {
+        shake.elapsed += dtVal
+        const decay = Math.max(0, 1 - shake.elapsed / 1.5)
+        mesh.rotation.z = Math.sin(shake.elapsed * 30) * shake.intensity * decay
+        mesh.rotation.x = Math.cos(shake.elapsed * 22) * shake.intensity * 0.5 * decay
+        if (decay <= 0) {
+          mesh.rotation.z = 0
+          mesh.rotation.x = 0
+          this.shakeState.delete(vessel.id)
+        }
+      }
+
+      // Update containers on deck
+      if (containers) {
+        this.updateDeckContainers(vessel, mesh, containers)
+      }
     }
   }
 
+  private updateDeckContainers(
+    vessel: VesselVisit,
+    vesselMesh: THREE.Group,
+    containers: Container[],
+  ): void {
+    const deckMap = this.deckContainers.get(vessel.id)
+    if (!deckMap) return
+
+    // Find containers loaded on this vessel
+    const loadedOnVessel = containers.filter(
+      c => c.lifecycleState === 'loaded_on_vessel' && c.vesselSlot?.vesselId === vessel.id,
+    )
+
+    const loadedIds = new Set(loadedOnVessel.map(c => c.id))
+
+    // Remove deck groups for containers no longer on this vessel
+    for (const [cid, cg] of deckMap) {
+      if (!loadedIds.has(cid)) {
+        vesselMesh.remove(cg)
+        this.disposeDeckContainerGroup(cg)
+        deckMap.delete(cid)
+      }
+    }
+
+    // Add or keep deck groups for loaded containers
+    const totalSpan = (TUTORIAL_VESSEL.bays - 1) * CONTAINER_SPACING
+    for (const container of loadedOnVessel) {
+      if (!deckMap.has(container.id)) {
+        const cg = makeDeckContainer(container)
+        // Position: bay determines X offset (vessel is rotated 180° so bay1 is at +X in vessel space)
+        const bay = container.vesselSlot?.bay ?? 1
+        const bayOffset = (bay - 1) * CONTAINER_SPACING - totalSpan / 2
+        // In vessel local space (before rotation.y = PI): bay1 at +halfSpan, bay5 at -halfSpan
+        cg.position.set(-bayOffset, DECK_Y + CONTAINER_HEIGHT / 2, 0)
+        // Container length along vessel X axis
+        cg.rotation.y = 0
+        vesselMesh.add(cg)
+        deckMap.set(container.id, cg)
+      }
+    }
+  }
+
+  private disposeDeckContainers(vesselId: string): void {
+    const deckMap = this.deckContainers.get(vesselId)
+    if (!deckMap) return
+    for (const cg of deckMap.values()) {
+      this.disposeDeckContainerGroup(cg)
+    }
+    deckMap.clear()
+    this.deckContainers.delete(vesselId)
+  }
+
+  private disposeDeckContainerGroup(cg: THREE.Group): void {
+    cg.traverse(obj => {
+      const m = obj as THREE.Mesh
+      if (!m.geometry) return
+      const bodyMats = m.userData['bodyMaterials'] as THREE.MeshStandardMaterial[] | undefined
+      if (bodyMats) disposeContainerMaterials(bodyMats)
+      else if (m.material) {
+        const mat = m.material
+        if (Array.isArray(mat)) mat.forEach(x => x.dispose())
+        else mat.dispose()
+      }
+      m.geometry.dispose()
+    })
+  }
+
   dispose(): void {
+    for (const vid of this.meshes.keys()) {
+      this.disposeDeckContainers(vid)
+    }
     for (const mesh of this.meshes.values()) {
       mesh.traverse(obj => {
         const m = obj as THREE.Mesh
@@ -256,5 +380,7 @@ export class VesselRenderer {
       this.scene.remove(mesh)
     }
     this.meshes.clear()
+    this.deckContainers.clear()
+    this.shakeState.clear()
   }
 }

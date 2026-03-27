@@ -282,6 +282,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         spreaderZ: 0,
         waypoints: [],
         waypointIndex: 0,
+        headingY: 0,
       },
       {
         id: 'mhc-1',
@@ -301,6 +302,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         spreaderZ: 0,
         waypoints: [],
         waypointIndex: 0,
+        headingY: 0,
       },
     ]
 
@@ -721,7 +723,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
           amount: VESSEL_LOAD_REVENUE,
           position: { ...job.dropoffLocation.position },
         })
-        emitEvent('container.placed', `Container ${container.id} loaded on ${vessel.name}`)
+        emitEvent('container.placed', `Container ${container.id} loaded on ${vessel.name}`, { vesselId: vessel.id })
       }
     }
   }
@@ -815,7 +817,16 @@ export const useGameStore = defineStore('box-empire-game', () => {
     if (vessel && vessel.state === 'loading') {
       const yard = yardBlocks.value[0]
       const rs = equipment.value.find(e => e.id === 'rs-1')
-      if (rs && rs.state === 'idle' && !rs.currentJobId) {
+      // Block staging if quay-load position is already occupied by a container or active job
+      const quayLoadOccupied = containers.value.some(
+        c => c.lifecycleState === 'staged_for_loading' || c.lifecycleState === 'discharged_to_buffer' && c.visitType === 'export',
+      ) || jobs.value.some(
+        j =>
+          j.dropoffLocation.id === 'quay-load' &&
+          (j.status === 'pending' || j.status === 'assigned' || j.status === 'in_progress'),
+      )
+
+      if (rs && rs.state === 'idle' && !rs.currentJobId && !quayLoadOccupied) {
         // Find first accessible export in yard with no active job
         const exportInYard = containers.value.find(c => {
           if (c.visitType !== 'export' || c.lifecycleState !== 'in_yard') return false

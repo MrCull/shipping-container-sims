@@ -20,12 +20,15 @@ import {
   RS_PICK_CYCLE_TIME,
   RS_PLACE_CYCLE_TIME,
   MHC_CYCLE_TIME,
+  RS_TRUCK_PARK_OFFSET,
+
 } from './config'
 import { isContainerOnTop } from './yardManager'
 
-// How far (metres) the reach stacker body parks away from the target container
-// in the Z direction so it does not drive into the stack.
+// How far (metres) the RS parks from a yard slot target (in Z, approaching from +Z side)
 const RS_PARK_OFFSET = 5.5
+// RS faces a slot: +Z side of stack → headingY = π (facing -Z)
+
 
 function distanceTo(a: Position3D, b: Position3D): number {
   const dx = a.x - b.x
@@ -81,10 +84,20 @@ function advanceRsWaypoints(eq: Equipment, speed: number, dt: number): boolean {
   return false
 }
 
-// For reach stacker: compute a parking position in front of the target.
-// The RS approaches from the +Z side (from the road), so park at target.z + offset.
+// For RS picking/dropping at yard slots: park RS_PARK_OFFSET behind target (in +Z)
 function rsParkingPosition(targetPos: Position3D): Position3D {
   return { x: targetPos.x, y: 0, z: targetPos.z + RS_PARK_OFFSET }
+}
+
+// For RS picking from a truck at YARD_IO: park RS_TRUCK_PARK_OFFSET metres on the +Z side
+// so RS doesn't drive into the truck
+function rsTruckParkingPosition(targetPos: Position3D): Position3D {
+  return { x: targetPos.x, y: 0, z: targetPos.z + RS_TRUCK_PARK_OFFSET }
+}
+
+// Determine heading for RS at a given position facing a pickup/drop target
+function rsFacingHeading(from: Position3D, to: Position3D): number {
+  return Math.atan2(to.x - from.x, to.z - from.z)
 }
 
 function getPickDuration(eq: Equipment): number {
@@ -262,7 +275,12 @@ function tickReachStacker(
   switch (eq.state) {
     case 'assigned': {
       eq.state = 'travel_to_pickup'
-      const parkPos = rsParkingPosition(job.pickupLocation.position)
+      // For truck pickups (at YARD_IO), use RS_TRUCK_PARK_OFFSET so RS doesn't drive into truck
+      // For yard/quay pickups, use RS_PARK_OFFSET
+      const isPickFromTruck = job.pickupLocation.type === 'truck'
+      const parkPos = isPickFromTruck
+        ? rsTruckParkingPosition(job.pickupLocation.position)
+        : rsParkingPosition(job.pickupLocation.position)
       eq.waypoints = buildRsWaypoints(eq.position, parkPos)
       eq.waypointIndex = 0
       eq.targetPosition = eq.waypoints[0] ?? parkPos
@@ -274,13 +292,18 @@ function tickReachStacker(
 
     case 'travel_to_pickup': {
       if (eq.waypoints.length === 0) {
-        const parkPos = rsParkingPosition(job.pickupLocation.position)
+        const isPickFromTruck = job.pickupLocation.type === 'truck'
+        const parkPos = isPickFromTruck
+          ? rsTruckParkingPosition(job.pickupLocation.position)
+          : rsParkingPosition(job.pickupLocation.position)
         eq.waypoints = buildRsWaypoints(eq.position, parkPos)
         eq.waypointIndex = 0
       }
       const arrived = advanceRsWaypoints(eq, getTravelSpeed(eq, false), dt)
+      // Update heading to face the pickup target
+      eq.headingY = rsFacingHeading(eq.position, job.pickupLocation.position)
       if (arrived) {
-        // Pre-pick accessibility check
+        // Pre-pick accessibility check for yard slots
         if (job.pickupLocation.type === 'yard_slot') {
           const yard = state.yardBlocks[0]
           if (yard) {
@@ -295,6 +318,8 @@ function tickReachStacker(
             }
           }
         }
+        // Face pickup target when parked
+        eq.headingY = rsFacingHeading(eq.position, job.pickupLocation.position)
         eq.state = 'picking'
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0
@@ -311,7 +336,6 @@ function tickReachStacker(
         const container = state.containers.find(c => c.id === job.containerId)
         if (container) {
           eq.carriedContainerId = container.id
-          // Container sits at the pickup slot (where it actually is)
           container.currentLocation = {
             type: 'equipment',
             id: eq.id,
@@ -324,7 +348,11 @@ function tickReachStacker(
         const travelHeight = Math.max(pickTargetY, dropTargetY) + 1.5
         eq.armTargetY = travelHeight
 
-        const dropPark = rsParkingPosition(job.dropoffLocation.position)
+        // Drop position: same side as approach (+Z park offset for yard; truck offset for truck drop)
+        const isDropToTruck = job.dropoffLocation.type === 'truck'
+        const dropPark = isDropToTruck
+          ? rsTruckParkingPosition(job.dropoffLocation.position)
+          : rsParkingPosition(job.dropoffLocation.position)
         eq.waypoints = buildRsWaypoints(eq.position, dropPark)
         eq.waypointIndex = 0
         eq.targetPosition = eq.waypoints[0] ?? dropPark
@@ -339,15 +367,19 @@ function tickReachStacker(
 
     case 'travel_to_drop': {
       if (eq.waypoints.length === 0) {
-        const dropPark = rsParkingPosition(job.dropoffLocation.position)
+        const isDropToTruck = job.dropoffLocation.type === 'truck'
+        const dropPark = isDropToTruck
+          ? rsTruckParkingPosition(job.dropoffLocation.position)
+          : rsParkingPosition(job.dropoffLocation.position)
         eq.waypoints = buildRsWaypoints(eq.position, dropPark)
         eq.waypointIndex = 0
       }
+      // Update heading to face the dropoff target
+      eq.headingY = rsFacingHeading(eq.position, job.dropoffLocation.position)
       const travelArrived = advanceRsWaypoints(eq, getTravelSpeed(eq, true), dt)
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)
         if (container) {
-          // Container rides above RS at travel height, aligned on current waypoint X,Z
           container.currentLocation.position = {
             x: eq.position.x,
             y: eq.armTargetY,
@@ -356,6 +388,8 @@ function tickReachStacker(
         }
       }
       if (travelArrived) {
+        // Face dropoff target once parked
+        eq.headingY = rsFacingHeading(eq.position, job.dropoffLocation.position)
         eq.armDropStartY = eq.armTargetY
         eq.state = 'dropping'
         eq.stateStartTime = state.simTime

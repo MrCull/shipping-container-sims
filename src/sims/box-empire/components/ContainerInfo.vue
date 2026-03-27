@@ -154,7 +154,7 @@ function jobRouteLabel(j: typeof activeJob.value): string {
   position: fixed;
   bottom: 12px;
   left: 344px;
-  width: 240px;
+  width: 280px;
   background: rgba(0, 0, 0, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;

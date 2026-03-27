@@ -7,7 +7,7 @@ import { useAudio } from '../composables/useAudio'
 import { useGameStore } from '../store/gameStore'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const { getScene, getCamera, render, updateEntities, isReady, webglFailed, spawnFloatingText, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen } = useBoxEmpireScene(canvasRef)
+const { getScene, getCamera, render, updateEntities, isReady, webglFailed, spawnFloatingText, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen, triggerVesselShake } = useBoxEmpireScene(canvasRef)
 const store = useGameStore()
 const { play } = useAudio()
 
@@ -23,6 +23,10 @@ const { start, stop } = useGameLoop(() => {
       const pos = evt.data.position as { x: number; y: number; z: number }
       const amount = evt.data.amount as number
       spawnFloatingText(`+$${amount}`, '#2ecc71', pos)
+    }
+    // Vessel shake when container placed on vessel
+    if (evt.type === 'container.placed' && evt.data?.vesselId) {
+      triggerVesselShake(evt.data.vesselId as string)
     }
   }
 

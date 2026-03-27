@@ -192,11 +192,16 @@ export class EquipmentRenderer {
 
       mesh.position.set(eq.position.x, 0, eq.position.z)
 
-      if (eq.type === 'reach_stacker' && eq.targetPosition) {
-        const dx = eq.targetPosition.x - eq.position.x
-        const dz = eq.targetPosition.z - eq.position.z
-        if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) {
-          mesh.rotation.y = Math.atan2(dx, dz)
+      if (eq.type === 'reach_stacker') {
+        // Use headingY from controller (updated to face target)
+        if (eq.headingY !== undefined) {
+          mesh.rotation.y = eq.headingY
+        } else if (eq.targetPosition) {
+          const dx = eq.targetPosition.x - eq.position.x
+          const dz = eq.targetPosition.z - eq.position.z
+          if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) {
+            mesh.rotation.y = Math.atan2(dx, dz)
+          }
         }
       }
 

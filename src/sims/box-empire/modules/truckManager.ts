@@ -2,23 +2,14 @@
 // Box Empire — Truck lifecycle with axis-aligned movement and unified gates
 // ---------------------------------------------------------------------------
 //
-// Gatehouse design:
-//   IN-GATE  (GATE_INGATE_POSITION): ALL trucks enter here regardless of type.
-//            Queue outside terminal (z > TERMINAL_FENCE_Z) along +Z.
-//   OUT-GATE (GATE_OUTGATE_POSITION): ALL trucks exit here.
-//            Located near terminal bottom. Trucks queue inside along -Z.
+// Gate design:
+//   IN-GATE  (GATE_INGATE_POSITION): ALL trucks enter here.
+//            Queue runs along +Z outside terminal at GATE_INGATE_LANE_X.
+//            Lane is offset to the side of the gatehouse building.
+//   OUT-GATE (GATE_OUTGATE_POSITION): ALL trucks exit here (bottom of terminal fence).
 //
-// Flow:
-//   Export delivery truck:
-//     approaching (in-gate) → at_gate → driving_to_yard → waiting_for_equipment
-//     → departing (via out-gate) → departed
-//
-//   Import pickup truck:
-//     approaching (in-gate) → at_gate → driving_to_yard → waiting_for_equipment
-//     → returning_to_gate (heading to out-gate) → at_gate_out → departing → departed
-//
-// Movement: axis-aligned only (move X, then Z, or Z then X).
-//   Trucks follow a waypoint list; they only turn 90 degrees at waypoints.
+// Movement: axis-aligned only. Trucks follow a waypoint list.
+// Collision: trucks wait when yard zone is busy; out-gate queue uses stable positions.
 // ---------------------------------------------------------------------------
 
 import type { TruckVisit, Position3D, BoxEmpireState } from '../types'
@@ -26,17 +17,16 @@ import {
   TRUCK_SPEED,
   GATE_PROCESSING_TIME,
   GATE_INGATE_POSITION,
+  GATE_INGATE_LANE_X,
   GATE_OUTGATE_POSITION,
+  GATE_OUTGATE_FENCE_Z,
   YARD_IO_POSITION,
 } from './config'
 
 let truckCounter = 0
 
-// Spacing between queued trucks (meters)
 const QUEUE_SPACING = 11
-
-// Radius around YARD_IO where we consider a truck "occupying" the drop zone
-const YARD_ZONE_RADIUS = 6
+const YARD_ZONE_RADIUS = 5
 
 export function resetTruckCounter(): void {
   truckCounter = 0
@@ -49,14 +39,13 @@ export function createTruck(
   truckCounter++
   const queueIndex = truckCounter
 
-  // Spawn outside the terminal in the in-gate queue
   return {
     id: `truck-${truckCounter}`,
     state: 'approaching',
     containerId,
     visitType,
     position: {
-      x: GATE_INGATE_POSITION.x,
+      x: GATE_INGATE_LANE_X,
       y: 0,
       z: GATE_INGATE_POSITION.z + queueIndex * QUEUE_SPACING,
     },
@@ -65,19 +54,16 @@ export function createTruck(
     queueIndex,
     waypoints: [],
     waypointIndex: 0,
-    headingY: 0,
+    headingY: -Math.PI,  // initially facing toward gate (negative Z direction)
   }
 }
 
-// ------------------------------------------------------------------
-// Axis-aligned movement helpers
-// ------------------------------------------------------------------
+// ---- Axis-aligned movement -----------------------------------------------
 
-// Build a list of waypoints to move from `from` to `to` axis-aligned.
-// Strategy: move along X first, then Z.
+// Build waypoints: move X first, then Z to reach destination
+// (trucks enter terminal on the lane X, then turn and drive Z inward)
 function buildWaypoints(from: Position3D, to: Position3D): Position3D[] {
   const pts: Position3D[] = []
-  // Corner: same X as dest, same Z as start
   if (Math.abs(from.x - to.x) > 0.5) {
     pts.push({ x: to.x, y: 0, z: from.z })
   }
@@ -85,13 +71,12 @@ function buildWaypoints(from: Position3D, to: Position3D): Position3D[] {
   return pts
 }
 
-function moveTowardsAxisAligned(
+function moveTowards(
   current: Position3D,
   target: Position3D,
   speed: number,
   dt: number,
 ): { position: Position3D; arrived: boolean } {
-  // Only move along one axis at a time (the current waypoint is axis-aligned from current pos)
   const dx = target.x - current.x
   const dz = target.z - current.z
   const d = Math.sqrt(dx * dx + dz * dz)
@@ -101,20 +86,15 @@ function moveTowardsAxisAligned(
   }
   const ratio = step / d
   return {
-    position: {
-      x: current.x + dx * ratio,
-      y: 0,
-      z: current.z + dz * ratio,
-    },
+    position: { x: current.x + dx * ratio, y: 0, z: current.z + dz * ratio },
     arrived: false,
   }
 }
 
-// Advance a truck along its waypoints; return true when all waypoints reached
 function advanceWaypoints(truck: TruckVisit, speed: number, dt: number): boolean {
   if (truck.waypointIndex >= truck.waypoints.length) return true
 
-  const wp = truck.waypoints[truck.waypointIndex]
+  const wp = truck.waypoints[truck.waypointIndex]!
   truck.targetPosition = wp
 
   const dx = wp.x - truck.position.x
@@ -123,51 +103,34 @@ function advanceWaypoints(truck: TruckVisit, speed: number, dt: number): boolean
     truck.headingY = Math.atan2(dx, dz)
   }
 
-  const { position, arrived } = moveTowardsAxisAligned(truck.position, wp, speed, dt)
+  const { position, arrived } = moveTowards(truck.position, wp, speed, dt)
   truck.position = position
 
   if (arrived) {
     truck.waypointIndex++
-    if (truck.waypointIndex >= truck.waypoints.length) return true
+    return truck.waypointIndex >= truck.waypoints.length
   }
   return false
 }
 
-// ------------------------------------------------------------------
-// Queue / collision helpers
-// ------------------------------------------------------------------
+// ---- Collision helpers ----------------------------------------------------
 
-// Is the in-gate slot free (no other truck at_gate)?
-function isIngAteFree(state: BoxEmpireState, thisTruckId: string): boolean {
-  return !state.truckVisits.some(
-    t => t.id !== thisTruckId && t.state === 'at_gate',
-  )
+function isIngateFree(state: BoxEmpireState, thisTruckId: string): boolean {
+  return !state.truckVisits.some(t => t.id !== thisTruckId && t.state === 'at_gate')
 }
 
-// Is the out-gate slot free (no other truck at_gate_out)?
-function isOutGateFree(state: BoxEmpireState, thisTruckId: string): boolean {
-  return !state.truckVisits.some(
-    t => t.id !== thisTruckId && t.state === 'at_gate_out',
-  )
+function isOutgateFree(state: BoxEmpireState, thisTruckId: string): boolean {
+  return !state.truckVisits.some(t => t.id !== thisTruckId && t.state === 'at_gate_out')
 }
 
-// How many trucks ahead in the in-gate queue (approaching state)
-function ingateQueuePosition(state: BoxEmpireState, thisTruck: TruckVisit): Position3D {
+// Stable queue position for approaching trucks (along the gate lane, pure Z movement)
+function ingateQueueZ(state: BoxEmpireState, thisTruck: TruckVisit): number {
   const ahead = state.truckVisits.filter(
-    t =>
-      t.id !== thisTruck.id &&
-      t.state === 'approaching' &&
-      t.queueIndex < thisTruck.queueIndex,
+    t => t.id !== thisTruck.id && t.state === 'approaching' && t.queueIndex < thisTruck.queueIndex,
   ).length
-
-  return {
-    x: GATE_INGATE_POSITION.x,
-    y: 0,
-    z: GATE_INGATE_POSITION.z + (ahead + 1) * QUEUE_SPACING,
-  }
+  return GATE_INGATE_POSITION.z + (ahead + 1) * QUEUE_SPACING
 }
 
-// Is there another truck already occupying the YARD_IO zone?
 function isYardZoneBusy(state: BoxEmpireState, thisTruckId: string): boolean {
   return state.truckVisits.some(t => {
     if (t.id === thisTruckId) return false
@@ -178,26 +141,17 @@ function isYardZoneBusy(state: BoxEmpireState, thisTruckId: string): boolean {
   })
 }
 
-// Out-gate queue: trucks waiting to exit line up along -Z from out-gate
-function outgateHoldPosition(state: BoxEmpireState, thisTruck: TruckVisit): Position3D {
+function outgateHoldZ(state: BoxEmpireState, thisTruck: TruckVisit): number {
   const waiters = state.truckVisits.filter(
     t =>
       t.id !== thisTruck.id &&
-      (t.state === 'returning_to_gate') &&
+      t.state === 'returning_to_gate' &&
       t.queueIndex < thisTruck.queueIndex,
   ).length
-
-  return {
-    x: GATE_OUTGATE_POSITION.x,
-    y: 0,
-    // Queue inside terminal (z decreasing from out-gate)
-    z: GATE_OUTGATE_POSITION.z - (waiters + 1) * QUEUE_SPACING,
-  }
+  return GATE_OUTGATE_FENCE_Z - (waiters + 1) * QUEUE_SPACING
 }
 
-// ------------------------------------------------------------------
-// Main tick
-// ------------------------------------------------------------------
+// ---- Main tick -----------------------------------------------------------
 
 export interface TruckTickResult {
   arrived: boolean
@@ -222,34 +176,27 @@ export function tickTruck(
 
   switch (truck.state) {
     case 'approaching': {
-      // All trucks queue at the single in-gate
-      if (isIngAteFree(state, truck.id)) {
-        // Advance to gate
-        truck.targetPosition = { ...GATE_INGATE_POSITION }
-        const { position, arrived } = moveTowardsAxisAligned(
-          truck.position,
-          GATE_INGATE_POSITION,
-          TRUCK_SPEED,
-          dt,
-        )
+      // Queue runs along pure Z at fixed X=GATE_INGATE_LANE_X (no X movement during queue)
+      if (isIngateFree(state, truck.id)) {
+        // Advance straight to gate (pure -Z move)
+        const gatePos = { x: GATE_INGATE_LANE_X, y: 0, z: GATE_INGATE_POSITION.z }
+        truck.targetPosition = gatePos
+        truck.headingY = Math.atan2(gatePos.x - truck.position.x, gatePos.z - truck.position.z)
+        const { position, arrived } = moveTowards(truck.position, gatePos, TRUCK_SPEED, dt)
         truck.position = position
-        truck.headingY = Math.atan2(
-          GATE_INGATE_POSITION.x - truck.position.x,
-          GATE_INGATE_POSITION.z - truck.position.z,
-        )
         if (arrived) {
           truck.state = 'at_gate'
           truck.stateStartTime = state.simTime
           result.arrived = true
         }
       } else {
-        // Hold at stable queue position (no jitter)
-        const holdPos = ingateQueuePosition(state, truck)
+        const holdZ = ingateQueueZ(state, truck)
+        const holdPos = { x: GATE_INGATE_LANE_X, y: 0, z: holdZ }
         truck.targetPosition = holdPos
-        const dz = Math.abs(truck.position.z - holdPos.z)
-        const dx = Math.abs(truck.position.x - holdPos.x)
-        if (dz > 0.5 || dx > 0.5) {
-          const { position } = moveTowardsAxisAligned(truck.position, holdPos, TRUCK_SPEED, dt)
+        // Only move if not at hold position
+        if (Math.abs(truck.position.z - holdZ) > 0.5) {
+          truck.headingY = Math.atan2(0, holdZ - truck.position.z)  // pure Z
+          const { position } = moveTowards(truck.position, holdPos, TRUCK_SPEED, dt)
           truck.position = position
         }
       }
@@ -259,7 +206,8 @@ export function tickTruck(
     case 'at_gate': {
       const elapsed = state.simTime - truck.stateStartTime
       if (elapsed >= GATE_PROCESSING_TIME) {
-        // Build axis-aligned waypoints from gate → yard IO
+        // After gate: turn into terminal and drive to yard
+        // Route: from gate → internal road X → YARD_IO
         truck.waypoints = buildWaypoints(truck.position, YARD_IO_POSITION)
         truck.waypointIndex = 0
         truck.state = 'driving_to_yard'
@@ -270,11 +218,7 @@ export function tickTruck(
     }
 
     case 'driving_to_yard': {
-      // Check if yard zone is busy — if so wait in place
-      if (isYardZoneBusy(state, truck.id)) {
-        // Stay put — don't advance
-        break
-      }
+      if (isYardZoneBusy(state, truck.id)) break
       const done = advanceWaypoints(truck, TRUCK_SPEED, dt)
       if (done) {
         truck.state = 'waiting_for_equipment'
@@ -284,27 +228,24 @@ export function tickTruck(
       break
     }
 
-    case 'waiting_for_equipment': {
-      // Wait until gameStore triggers departure
+    case 'waiting_for_equipment':
       break
-    }
 
     case 'returning_to_gate': {
-      // Drive to out-gate via axis-aligned waypoints
       if (truck.waypointIndex >= truck.waypoints.length) {
-        // Build route to out-gate if not already set
         truck.waypoints = buildWaypoints(truck.position, GATE_OUTGATE_POSITION)
         truck.waypointIndex = 0
       }
 
-      // If out-gate busy, hold at queue position
-      if (!isOutGateFree(state, truck.id)) {
-        const holdPos = outgateHoldPosition(state, truck)
+      if (!isOutgateFree(state, truck.id)) {
+        const holdZ = outgateHoldZ(state, truck)
+        const holdPos = { x: GATE_OUTGATE_POSITION.x, y: 0, z: holdZ }
         truck.targetPosition = holdPos
-        const dz = Math.abs(truck.position.z - holdPos.z)
-        const dx = Math.abs(truck.position.x - holdPos.x)
-        if (dz > 0.5 || dx > 0.5) {
-          const { position } = moveTowardsAxisAligned(truck.position, holdPos, TRUCK_SPEED, dt)
+        if (Math.abs(truck.position.z - holdZ) > 0.5 || Math.abs(truck.position.x - GATE_OUTGATE_POSITION.x) > 0.5) {
+          const { position } = moveTowards(truck.position, holdPos, TRUCK_SPEED, dt)
+          const dx = holdPos.x - truck.position.x
+          const dz = holdPos.z - truck.position.z
+          if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) truck.headingY = Math.atan2(dx, dz)
           truck.position = position
         }
         break
@@ -346,7 +287,6 @@ export function tickTruck(
 export function startTruckReturnToGate(truck: TruckVisit, simTime: number): void {
   truck.state = 'returning_to_gate'
   truck.stateStartTime = simTime
-  // Waypoints built lazily in returning_to_gate handler
   truck.waypoints = buildWaypoints(truck.position, GATE_OUTGATE_POSITION)
   truck.waypointIndex = 0
   truck.targetPosition = truck.waypoints[0] ?? GATE_OUTGATE_POSITION
@@ -355,14 +295,15 @@ export function startTruckReturnToGate(truck: TruckVisit, simTime: number): void
 export function startTruckDeparture(truck: TruckVisit, simTime: number): void {
   truck.state = 'departing'
   truck.stateStartTime = simTime
-  // Exit: drive from out-gate further along +Z
-  const exitPos: Position3D = { x: GATE_OUTGATE_POSITION.x, y: 0, z: GATE_OUTGATE_POSITION.z + 40 }
+  const exitPos: Position3D = { x: GATE_OUTGATE_POSITION.x, y: 0, z: GATE_OUTGATE_POSITION.z + 45 }
   truck.waypoints = buildWaypoints(truck.position, exitPos)
   truck.waypointIndex = 0
   truck.targetPosition = truck.waypoints[0] ?? exitPos
 }
 
-// For export trucks after dropping container: send to out-gate
 export function startExportTruckExit(truck: TruckVisit, simTime: number): void {
   startTruckReturnToGate(truck, simTime)
 }
+
+// Export for config import
+export { GATE_INGATE_LANE_X }
