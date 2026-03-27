@@ -4,12 +4,12 @@ export const futureGameTeasers: FutureGameTeaser[] = [
   {
     id: 'coblox',
     title: 'Coblox',
-    tagline: 'Snap, build, and play together in container worlds',
+    tagline: 'The shipping-container platform where anyone can build and play',
     description:
-      'A multiplayer sandbox where you construct ports, chaotic vertical cities, and custom mini-games by snapping modular shipping containers together. Physics, progression, and player-made experiences meet industrial port culture.',
+      'Think Roblox, but every experience is built from modular shipping containers. Join friends in player-made obstacle courses, roleplay hubs, and mini-games, or use creation tools to snap containers into worlds and publish them for the community—social, creative, and endlessly replayable.',
     icon: '🧱',
     color: '#06b6d4',
-    tags: ['Sandbox', 'Multiplayer', 'UGC'],
+    tags: ['Platform', 'Social', 'Creator Tools'],
   },
   {
     id: 'container-craft',
@@ -22,13 +22,13 @@ export const futureGameTeasers: FutureGameTeaser[] = [
     tags: ['Survival', 'Crafting', 'Exploration'],
   },
   {
-    id: 'container-ship-captain',
-    title: 'Container Ship Captain',
-    tagline: 'Command the voyage and the bottom line',
+    id: 'captain-container',
+    title: 'Captain Container',
+    tagline: 'Steer the bridge, run the ship, deliver the boxes',
     description:
-      'Plan routes, load for space and weight, run crew and upgrades, and weather storms, inspections, and emergencies. A management sim focused on realistic maritime trade and logistics risk.',
+      'A maritime navigation and container-ship simulation: plot courses, handle helm and engine orders, work with charts and weather, and operate a realistic boxship—loading plans, stability, and port approaches matter as much as keeping schedule at sea.',
     icon: '⚓',
     color: '#2563eb',
-    tags: ['Simulation', 'Management', 'Logistics'],
+    tags: ['Navigation', 'Ship Sim', 'Maritime'],
   },
 ]
