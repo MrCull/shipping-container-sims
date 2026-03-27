@@ -255,25 +255,12 @@ function buildTerminalBoundary(scene: THREE.Scene): void {
     pillar.castShadow = true; scene.add(pillar)
   }
 
-  // Side fences (Z-running along terminal sides)
-  const sideFenceD = TERMINAL_FENCE_Z
+  // Side fences (Z-running along terminal sides) — full depth to out-gate line; no second fence at back
+  const sideFenceD = GATE_OUTGATE_FENCE_Z
   for (const xPos of [TERMINAL_BOUNDS.minX, TERMINAL_BOUNDS.maxX]) {
     const side = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.2, sideFenceD), fenceMat)
     side.position.set(xPos, 1.1, sideFenceD / 2)
     scene.add(side)
-  }
-
-  // Bottom fence at GATE_OUTGATE_FENCE_Z with gap at out-gate
-  for (const ry of [0.9, 2.1]) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(fenceW, 0.14, 0.14), fenceMat)
-    rail.position.set((TERMINAL_BOUNDS.maxX + TERMINAL_BOUNDS.minX) / 2, ry, GATE_OUTGATE_FENCE_Z)
-    scene.add(rail)
-  }
-  for (let x = TERMINAL_BOUNDS.minX; x <= TERMINAL_BOUNDS.maxX; x += 8) {
-    if (Math.abs(x - GATE_OUTGATE_POSITION.x) < 5) continue
-    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3, 0.18), pillarMat)
-    pillar.position.set(x, 1.5, GATE_OUTGATE_FENCE_Z)
-    pillar.castShadow = true; scene.add(pillar)
   }
 }
 
