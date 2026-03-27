@@ -13,13 +13,11 @@ const timeDisplay = computed(() => {
   return `${m}:${s}`
 })
 
-const isWarning = computed(() => store.timerRemaining <= 30 && store.timerRemaining > 10)
-const isCritical = computed(() => store.timerRemaining <= 10)
+const pct = computed(() => store.timerTotal > 0 ? store.timerRemaining / store.timerTotal : 1)
+const isWarning = computed(() => pct.value <= 0.30 && pct.value > 0.15)
+const isCritical = computed(() => pct.value <= 0.15)
 
-const progressPercent = computed(() => {
-  if (store.timerTotal <= 0) return 100
-  return (store.timerRemaining / store.timerTotal) * 100
-})
+const progressPercent = computed(() => Math.max(0, pct.value * 100))
 </script>
 
 <template>
@@ -60,20 +58,25 @@ const progressPercent = computed(() => {
   pointer-events: none;
   backdrop-filter: blur(4px);
   min-width: 100px;
-  transition: border-color 0.3s;
+  transition: border-color 0.3s, background 0.3s;
 }
 .timer-widget.warning {
-  border-color: rgba(255, 170, 0, 0.6);
-  background: rgba(60, 40, 0, 0.82);
+  border-color: rgba(255, 170, 0, 0.7);
+  background: rgba(60, 35, 0, 0.88);
+  animation: pulse-warning 1s ease-in-out infinite alternate;
 }
 .timer-widget.critical {
-  border-color: rgba(255, 60, 60, 0.8);
-  background: rgba(60, 10, 10, 0.88);
-  animation: pulse-border 0.5s ease-in-out infinite alternate;
+  border-color: rgba(255, 40, 40, 1.0);
+  background: rgba(80, 0, 0, 0.92);
+  animation: pulse-critical 0.4s ease-in-out infinite alternate;
 }
-@keyframes pulse-border {
-  from { border-color: rgba(255, 60, 60, 0.4); }
-  to   { border-color: rgba(255, 60, 60, 1.0); }
+@keyframes pulse-warning {
+  from { box-shadow: 0 0 4px rgba(255, 170, 0, 0.2); border-color: rgba(255, 170, 0, 0.3); }
+  to   { box-shadow: 0 0 16px rgba(255, 170, 0, 0.7); border-color: rgba(255, 170, 0, 1.0); }
+}
+@keyframes pulse-critical {
+  from { box-shadow: 0 0 8px rgba(255, 40, 40, 0.4); border-color: rgba(255, 40, 40, 0.5); transform: scale(1.00); }
+  to   { box-shadow: 0 0 28px rgba(255, 40, 40, 1.0); border-color: rgba(255, 40, 40, 1.0); transform: scale(1.04); }
 }
 .timer-label {
   font-size: 10px;
@@ -82,7 +85,7 @@ const progressPercent = computed(() => {
   text-transform: uppercase;
 }
 .timer-display {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: bold;
   font-family: var(--font-retro, monospace);
   color: #00ff88;
@@ -93,26 +96,31 @@ const progressPercent = computed(() => {
   color: #ffaa00;
 }
 .timer-widget.critical .timer-display {
-  color: #ff4444;
+  color: #ff3333;
+  animation: flash-text 0.4s ease-in-out infinite alternate;
+}
+@keyframes flash-text {
+  from { opacity: 1; }
+  to   { opacity: 0.55; }
 }
 .timer-track {
   width: 100%;
-  height: 4px;
+  height: 5px;
   background: rgba(255, 255, 255, 0.12);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 .timer-fill {
   height: 100%;
   background: #00ff88;
-  border-radius: 2px;
+  border-radius: 3px;
   transition: width 0.5s linear, background-color 0.3s;
 }
 .timer-widget.warning .timer-fill {
   background: #ffaa00;
 }
 .timer-widget.critical .timer-fill {
-  background: #ff4444;
+  background: #ff3333;
 }
 </style>

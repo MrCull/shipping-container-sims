@@ -66,21 +66,19 @@ const sailAway = { active: false, elapsed: 0, delay: 0.5 }
 // Sail-in animation state (ship arrives from off-screen left)
 const sailIn = { active: false, elapsed: 0, startX: -200, targetX: 0, duration: 4.0 }
 
-// Timer warning sound state — track whether we've played each warning
-let timerWarnedAt30 = false
-let timerWarnedAt10 = false
+// Timer warning sound state — track whether we've played each threshold warning
+let timerWarnedAt30pct = false
+let timerWarnedAt15pct = false
 
 const { start: startLoop } = useGameLoop((deltaTime, time) => {
   // Tick the countdown timer
   const timerResult = store.tickTimer(deltaTime)
-  if (timerResult === 'warning') {
-    if (store.timerRemaining <= 10 && !timerWarnedAt10) {
-      timerWarnedAt10 = true
-      audio.playSound('clockTicking', 0.9)
-    } else if (store.timerRemaining <= 30 && !timerWarnedAt30) {
-      timerWarnedAt30 = true
-      audio.playSound('clockTicking', 0.6)
-    }
+  if (timerResult === 'warn30pct' && !timerWarnedAt30pct) {
+    timerWarnedAt30pct = true
+    audio.playSound('clockTicking', 0.65)
+  } else if (timerResult === 'warn15pct' && !timerWarnedAt15pct) {
+    timerWarnedAt15pct = true
+    audio.playSound('clockTicking', 1.0)
   }
 
   animateOcean(ocean, time)
@@ -192,8 +190,9 @@ watch(() => store.phase, (newPhase, oldPhase) => {
   }
 
   if (newPhase === 'failed') {
-    audio.playSound('negative', 0.7)
-    // Sail away on fail too (timer expiry or disaster aftermath)
+    audio.playSound('countdownBoom', 0.85)
+    // Horn as ship departs
+    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 800)
     sailAway.active = true
     sailAway.elapsed = 0
   }
@@ -258,10 +257,8 @@ function buildScene(): void {
   sailIn.elapsed = 0
   sailIn.active = true
 
-  // Three horn blasts as ship arrives
-  setTimeout(() => audio.playSound('shipHornSmall', 0.85), 1200)
-  setTimeout(() => audio.playSound('shipHornSmall', 0.85), 2200)
-  setTimeout(() => audio.playSound('shipHornSmall', 0.85), 3000)
+  // Single horn blast as ship arrives — the sample already contains three blasts
+  setTimeout(() => audio.playSound('shipHornSmall', 0.9), 1000)
 
   setCameraForShip(store.shipConfig)
 
@@ -446,8 +443,8 @@ function clearScene(): void {
   sailAway.elapsed = 0
   sailIn.active = false
   sailIn.elapsed = 0
-  timerWarnedAt30 = false
-  timerWarnedAt10 = false
+  timerWarnedAt30pct = false
+  timerWarnedAt15pct = false
   shipGroup = null
   craneObj = null
   ocean = null

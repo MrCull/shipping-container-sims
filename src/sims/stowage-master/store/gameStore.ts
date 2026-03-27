@@ -97,7 +97,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     addEvent('Level started: ' + config.name, 'info')
   }
 
-  function tickTimer(deltaSeconds: number): 'expired' | 'warning' | null {
+  function tickTimer(deltaSeconds: number): 'expired' | 'warn30pct' | 'warn15pct' | null {
     if (timerTotal.value <= 0) return null
     if (phase.value !== 'selecting' && phase.value !== 'animating') return null
 
@@ -105,16 +105,18 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     timerRemaining.value = Math.max(0, timerRemaining.value - deltaSeconds)
 
     if (timerRemaining.value <= 0 && prev > 0) {
-      // Timer just expired
       phase.value = 'failed'
       addEvent('Time expired! Ship is leaving.', 'danger')
       return 'expired'
     }
 
-    // Warning zone crossing (30s and 10s)
-    if ((prev > 30 && timerRemaining.value <= 30) || (prev > 10 && timerRemaining.value <= 10)) {
-      return 'warning'
-    }
+    const pct = timerRemaining.value / timerTotal.value
+    const prevPct = prev / timerTotal.value
+
+    // 30% remaining warning
+    if (prevPct > 0.30 && pct <= 0.30) return 'warn30pct'
+    // 15% remaining warning (critical — more urgent)
+    if (prevPct > 0.15 && pct <= 0.15) return 'warn15pct'
 
     return null
   }

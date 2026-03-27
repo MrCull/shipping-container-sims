@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { ShipPreset } from '../types'
 
-// Shared materials (created once, reused)
+// Shared materials (created once per session, reused across scene rebuilds)
 let hullMat: THREE.MeshPhongMaterial | null = null
 let antifoulingMat: THREE.MeshPhongMaterial | null = null
 let deckMat: THREE.MeshPhongMaterial | null = null
@@ -16,6 +16,7 @@ function getSharedMaterials() {
       specular: 0x334455,
       shininess: 40,
       flatShading: false,
+      side: THREE.DoubleSide,
     })
     antifoulingMat = new THREE.MeshPhongMaterial({
       color: 0x8b1a1a,
