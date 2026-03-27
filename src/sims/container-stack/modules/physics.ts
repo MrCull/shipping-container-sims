@@ -7,7 +7,7 @@ import type {
   WobbleState,
 } from '../types'
 import { BLOCK, PHYSICS } from './config'
-import { layerCompleteness, slotWorldPosition } from './towerBuilder'
+import { isTowerFullyStacked, layerCompleteness, slotWorldPosition } from './towerBuilder'
 
 const _com = new Vector3()
 
@@ -128,6 +128,10 @@ function baseFootprintHalfExtents(): { hx: number; hz: number } {
 }
 
 export function computeStabilityScore(layers: TowerLayer[], centerOfMass: Vector3): number {
+  if (isTowerFullyStacked(layers)) {
+    return 1
+  }
+
   const { hx, hz } = baseFootprintHalfExtents()
   const baseCenter = new Vector3(0, 0, 0)
   const dx = Math.abs(centerOfMass.x - baseCenter.x) / Math.max(hx, 0.01)
@@ -157,7 +161,10 @@ export function computeStabilityScore(layers: TowerLayer[], centerOfMass: Vector
   }
 
   const structural = computeStructuralSupportScore(layers)
-  const structuralFactor = Math.pow(structural, 1.25)
+  const structuralFactor = Math.pow(
+    structural,
+    PHYSICS.structuralStabilityExponent
+  )
 
   let s =
     PHYSICS.baseStability - comPenalty - heightPenalty - Math.min(0.55, gapPenalty)
@@ -225,7 +232,8 @@ export function injectDragFrameWobble(
   stabilityScore: number
 ): void {
   if (frameJitterPx <= 0.25) return
-  const stress = 1.15 + (1 - stabilityScore) * 1.35
+  const t = Math.max(0, Math.min(1, 1 - stabilityScore))
+  const stress = 1 + t * t * 2.8
   wobble.angularVelocity += frameJitterPx * PHYSICS.dragWobblePerPixel * stress
 }
 

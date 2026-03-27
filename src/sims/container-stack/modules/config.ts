@@ -29,19 +29,22 @@ export const PHYSICS = {
   fullLayerOverIncompleteExtra: 0.12,
   /** Fraction of a block’s footprint that must rest on the layer below (sampled grid). */
   structuralMinSupportFraction: 0.4,
-  structuralSampleGrid: 5,
+  structuralSampleGrid: 7,
+  /** Softer blend so UI stability stays high when support is good (was ^1.25, too harsh). */
+  structuralStabilityExponent: 0.42,
   wobbleSpringK: 42,
   wobbleBaseDamping: 2.4,
   wobbleDampingStabilityFactor: 3.5,
   jitterToImpulseScale: 0.85,
-  /** Angular impulse per pixel of mouse movement while dragging a block out */
-  dragWobblePerPixel: 0.0022,
-  /** If stability is below this while dragging, shaky hands can topple the tower */
-  shakyCollapseStabilityThreshold: 0.42,
-  /** Cumulative drag jitter (px) needed to force-collapse when stability is low */
-  shakyCollapseJitterThreshold: 140,
+  /** Angular impulse per pixel while dragging; scales up mainly when stability is low */
+  dragWobblePerPixel: 0.00055,
+  /** If stability is below this while dragging, very shaky hands can topple the tower */
+  shakyCollapseStabilityThreshold: 0.22,
+  /** Cumulative drag jitter (px) needed with low stability to force-collapse */
+  shakyCollapseJitterThreshold: 420,
   criticalRemovalImpulseScale: 2.2,
-  maxAngle: 0.42,
+  /** Lean past this (rad) triggers collapse — higher = harder to tip */
+  maxAngle: 0.55,
   collapseGravity: 18,
   collapseAngularScatter: 4,
 } as const

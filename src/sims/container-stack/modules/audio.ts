@@ -12,6 +12,7 @@ export const SOUNDS: Record<string, string> = {
   hornsLevelUp: assetUrl('horns-level-up.mp3'),
   caChing: assetUrl('money-increase-ca-ching-.mp3'),
   scream: assetUrl('man-screaming.mp3'),
+  explosionFx: assetUrl('explosion-fx.mp3'),
 }
 
 export interface SoundCue {
@@ -23,5 +24,5 @@ export interface SoundCue {
 export const COLLAPSE_SEQUENCE: SoundCue[] = [
   { key: 'containerLoad', delay: 0, volume: 0.55 },
   { key: 'negative', delay: 0.08, volume: 0.85 },
-  { key: 'scream', delay: 0.25, volume: 0.7 },
+  { key: 'explosionFx', delay: 0.12, volume: 0.72 },
 ]
