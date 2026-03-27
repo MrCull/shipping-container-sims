@@ -38,7 +38,7 @@ import {
 } from '../modules/config'
 import { createYardBlock, findAvailableSlot, placeContainerInSlot, removeContainerFromSlot, getSlotWorldPosition, isContainerOnTop } from '../modules/yardManager'
 import { createTutorialVessel, getNextDischargeContainer, getNextLoadSlot, dischargeContainerFromVessel, loadContainerOnVessel, isVesselFullyDischarged, tickVessel, getVesselSlotPosition } from '../modules/vesselManager'
-import { createTruck, tickTruck, startTruckDeparture, startTruckReturnToGate, resetTruckCounter } from '../modules/truckManager'
+import { createTruck, tickTruck, startTruckDeparture, startTruckReturnToGate, startExportTruckExit, resetTruckCounter } from '../modules/truckManager'
 import { makeYardSlotId, makeVesselSlotId, parseYardSlotId } from '../types'
 import { tickEquipment } from '../modules/equipmentController'
 import { createJob, assignPendingJobs, completeJob, resetJobCounter, getActiveJobForContainer, cancelJob, recheckBlockedJobs } from '../modules/jobScheduler'
@@ -431,6 +431,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
           emitEvent('vessel.arrived', `${vessel.name} has arrived at berth`)
           vessel.state = 'arrived'
         }
+        if (vResult.newState === 'departing') {
+          emitEvent('vessel.departing', `${vessel.name} is departing`)
+        }
         if (vResult.newState === 'departed') {
           emitEvent('vessel.departed', `${vessel.name} has departed`)
         }
@@ -586,7 +589,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
           )
           if (truck) {
             truck.containerId = null
-            startTruckDeparture(truck, simTime.value)
+            // Export truck now empty — route to out-gate (not straight off-screen)
+            startExportTruckExit(truck, simTime.value)
           }
         }
       }
@@ -853,6 +857,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       ).length
       if (exportLoaded >= TUTORIAL_EXPORT_COUNT) {
         vessel.state = 'departing'
+        emitEvent('vessel.departing', `${vessel.name} is departing`)
       }
     }
 

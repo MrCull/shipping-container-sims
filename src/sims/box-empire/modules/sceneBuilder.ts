@@ -14,8 +14,8 @@ import {
   CONTAINER_ROW_GAP,
   QUAY_BUFFER_DISCHARGE_POSITION,
   QUAY_BUFFER_LOAD_POSITION,
-  GATE_EXPORT_LANE_POSITION,
-  GATE_IMPORT_LANE_POSITION,
+  GATE_INGATE_POSITION,
+  GATE_OUTGATE_POSITION,
 } from './config'
 
 export function buildScene(scene: THREE.Scene): void {
@@ -142,12 +142,11 @@ function buildYardMarkings(scene: THREE.Scene): void {
 }
 
 function buildTerminalBoundary(scene: THREE.Scene): void {
-  // Perimeter fence along the terminal boundary (z = TERMINAL_FENCE_Z)
   const fenceW = TERMINAL_BOUNDS.maxX - TERMINAL_BOUNDS.minX
   const fenceMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8 })
   const pillarMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.7 })
 
-  // Main fence rail
+  // Front fence (z = TERMINAL_FENCE_Z) with gap at in-gate
   const railGeo = new THREE.BoxGeometry(fenceW, 0.15, 0.15)
   for (const ry of [1, 2.2]) {
     const rail = new THREE.Mesh(railGeo, fenceMat)
@@ -155,24 +154,22 @@ function buildTerminalBoundary(scene: THREE.Scene): void {
     scene.add(rail)
   }
 
-  // Fence pillars every 8m
   for (let x = TERMINAL_BOUNDS.minX; x <= TERMINAL_BOUNDS.maxX; x += 8) {
-    // Skip the gate gap
-    if (x > GATE_EXPORT_LANE_POSITION.x - 6 && x < GATE_IMPORT_LANE_POSITION.x + 6) continue
+    // Leave gap at in-gate
+    if (Math.abs(x - GATE_INGATE_POSITION.x) < 6) continue
     const pillarGeo = new THREE.BoxGeometry(0.2, 3, 0.2)
     const pillar = new THREE.Mesh(pillarGeo, pillarMat)
     pillar.position.set(x, 1.5, TERMINAL_FENCE_Z)
     scene.add(pillar)
   }
 
-  // Left side fence (x = TERMINAL_BOUNDS.minX)
-  const sideFenceDepth = TERMINAL_FENCE_Z - 0
+  // Left side fence
+  const sideFenceDepth = TERMINAL_FENCE_Z
   const leftFenceGeo = new THREE.BoxGeometry(0.15, 2.2, sideFenceDepth)
   const leftFence = new THREE.Mesh(leftFenceGeo, fenceMat)
   leftFence.position.set(TERMINAL_BOUNDS.minX, 1.1, sideFenceDepth / 2)
   scene.add(leftFence)
 
-  // Right side fence (x = TERMINAL_BOUNDS.maxX)
   const rightFence = new THREE.Mesh(leftFenceGeo.clone(), fenceMat)
   rightFence.position.set(TERMINAL_BOUNDS.maxX, 1.1, sideFenceDepth / 2)
   scene.add(rightFence)
@@ -181,32 +178,6 @@ function buildTerminalBoundary(scene: THREE.Scene): void {
 function buildGatehouse(scene: THREE.Scene): void {
   const houseMat = new THREE.MeshStandardMaterial({ color: 0xcc9933, roughness: 0.7 })
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.6 })
-
-  // IN-gate building (export trucks enter here, on outside of fence)
-  const inGateGeo = new THREE.BoxGeometry(3, 3.5, 3)
-  const inGate = new THREE.Mesh(inGateGeo, houseMat)
-  inGate.position.set(GATE_EXPORT_LANE_POSITION.x, 1.75, TERMINAL_FENCE_Z + 3)
-  inGate.castShadow = true
-  scene.add(inGate)
-
-  const inRoofGeo = new THREE.BoxGeometry(4, 0.25, 4)
-  const inRoof = new THREE.Mesh(inRoofGeo, roofMat)
-  inRoof.position.set(GATE_EXPORT_LANE_POSITION.x, 3.65, TERMINAL_FENCE_Z + 3)
-  scene.add(inRoof)
-
-  // OUT-gate building (import trucks exit here, on inside of fence)
-  const outGateGeo = new THREE.BoxGeometry(3, 3.5, 3)
-  const outGate = new THREE.Mesh(outGateGeo, houseMat)
-  outGate.position.set(GATE_IMPORT_LANE_POSITION.x, 1.75, TERMINAL_FENCE_Z - 3)
-  outGate.castShadow = true
-  scene.add(outGate)
-
-  const outRoofGeo = new THREE.BoxGeometry(4, 0.25, 4)
-  const outRoof = new THREE.Mesh(outRoofGeo, roofMat)
-  outRoof.position.set(GATE_IMPORT_LANE_POSITION.x, 3.65, TERMINAL_FENCE_Z - 3)
-  scene.add(outRoof)
-
-  // Barrier poles at both gates
   const barMat = new THREE.MeshStandardMaterial({ color: 0xff6600 })
   const barMat2 = new THREE.MeshStandardMaterial({ color: 0x2980b9 })
 
@@ -215,44 +186,60 @@ function buildGatehouse(scene: THREE.Scene): void {
     const p = new THREE.Mesh(pGeo, mat)
     p.position.set(x, 1.5, z)
     scene.add(p)
-    const bGeo = new THREE.BoxGeometry(3.5, 0.12, 0.12)
+    const bGeo = new THREE.BoxGeometry(4, 0.12, 0.12)
     const b = new THREE.Mesh(bGeo, mat)
-    b.position.set(x + 1.75, 2.5, z)
+    b.position.set(x + 2, 2.6, z)
     scene.add(b)
   }
 
-  addBarrier(GATE_EXPORT_LANE_POSITION.x - 0.5, TERMINAL_FENCE_Z, barMat)
-  addBarrier(GATE_IMPORT_LANE_POSITION.x - 0.5, TERMINAL_FENCE_Z, barMat2)
+  function addGatehouseBuilding(x: number, z: number, label: string): void {
+    void label
+    const geo = new THREE.BoxGeometry(3, 3.5, 3)
+    const m = new THREE.Mesh(geo, houseMat)
+    m.position.set(x, 1.75, z)
+    m.castShadow = true
+    scene.add(m)
+    const rGeo = new THREE.BoxGeometry(4, 0.25, 4)
+    const r = new THREE.Mesh(rGeo, roofMat)
+    r.position.set(x, 3.65, z)
+    scene.add(r)
+  }
 
-  // Road markings
-  const stripLen = 30
-  const exportRoadGeo = new THREE.PlaneGeometry(4, stripLen)
-  const exportRoadMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.9, opacity: 0.35, transparent: true })
-  const exportRoad = new THREE.Mesh(exportRoadGeo, exportRoadMat)
-  exportRoad.rotation.x = -Math.PI / 2
-  // Strip extends OUTSIDE (positive z from fence)
-  exportRoad.position.set(GATE_EXPORT_LANE_POSITION.x, 0.02, TERMINAL_FENCE_Z + stripLen / 2)
-  scene.add(exportRoad)
+  // IN-GATE: at TERMINAL_FENCE_Z, outside the terminal
+  addGatehouseBuilding(GATE_INGATE_POSITION.x, TERMINAL_FENCE_Z + 3, 'IN')
+  addBarrier(GATE_INGATE_POSITION.x - 0.5, TERMINAL_FENCE_Z, barMat)
 
-  const importRoadGeo = new THREE.PlaneGeometry(4, stripLen)
-  const importRoadMat = new THREE.MeshStandardMaterial({ color: 0x2980b9, roughness: 0.9, opacity: 0.35, transparent: true })
-  const importRoad = new THREE.Mesh(importRoadGeo, importRoadMat)
-  importRoad.rotation.x = -Math.PI / 2
-  // Strip extends INSIDE (negative z from fence)
-  importRoad.position.set(GATE_IMPORT_LANE_POSITION.x, 0.02, TERMINAL_FENCE_Z - stripLen / 2)
-  scene.add(importRoad)
+  // Road strip leading into in-gate from outside
+  const inStripGeo = new THREE.PlaneGeometry(5, 35)
+  const inStripMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.9, opacity: 0.35, transparent: true })
+  const inStrip = new THREE.Mesh(inStripGeo, inStripMat)
+  inStrip.rotation.x = -Math.PI / 2
+  inStrip.position.set(GATE_INGATE_POSITION.x, 0.02, TERMINAL_FENCE_Z + 17)
+  scene.add(inStrip)
 
-  // Labels (simple flat signs)
-  const signMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
-  const inSignGeo = new THREE.BoxGeometry(2, 1, 0.1)
-  const inSign = new THREE.Mesh(inSignGeo, signMat)
-  inSign.position.set(GATE_EXPORT_LANE_POSITION.x, 4.5, TERMINAL_FENCE_Z + 1)
-  scene.add(inSign)
+  // OUT-GATE: at bottom of terminal (GATE_OUTGATE_POSITION.z)
+  addGatehouseBuilding(GATE_OUTGATE_POSITION.x, GATE_OUTGATE_POSITION.z - 3, 'OUT')
+  addBarrier(GATE_OUTGATE_POSITION.x - 0.5, GATE_OUTGATE_POSITION.z, barMat2)
 
-  const outSignGeo = new THREE.BoxGeometry(2, 1, 0.1)
-  const outSign = new THREE.Mesh(outSignGeo, signMat)
-  outSign.position.set(GATE_IMPORT_LANE_POSITION.x, 4.5, TERMINAL_FENCE_Z - 1)
-  scene.add(outSign)
+  // Road strip leading out from out-gate
+  const outStripGeo = new THREE.PlaneGeometry(5, 35)
+  const outStripMat = new THREE.MeshStandardMaterial({ color: 0x2980b9, roughness: 0.9, opacity: 0.35, transparent: true })
+  const outStrip = new THREE.Mesh(outStripGeo, outStripMat)
+  outStrip.rotation.x = -Math.PI / 2
+  outStrip.position.set(GATE_OUTGATE_POSITION.x, 0.02, GATE_OUTGATE_POSITION.z + 17)
+  scene.add(outStrip)
+
+  // Road connecting in-gate to yard area (inside terminal)
+  const internalRoadGeo = new THREE.PlaneGeometry(5, GATE_OUTGATE_POSITION.z - TERMINAL_FENCE_Z)
+  const internalRoadMat = new THREE.MeshStandardMaterial({ color: 0x606060, roughness: 0.95, opacity: 0.5, transparent: true })
+  const internalRoad = new THREE.Mesh(internalRoadGeo, internalRoadMat)
+  internalRoad.rotation.x = -Math.PI / 2
+  internalRoad.position.set(
+    GATE_INGATE_POSITION.x,
+    0.02,
+    TERMINAL_FENCE_Z + (GATE_OUTGATE_POSITION.z - TERMINAL_FENCE_Z) / 2,
+  )
+  scene.add(internalRoad)
 }
 
 function buildQuayBufferMarkings(scene: THREE.Scene): void {

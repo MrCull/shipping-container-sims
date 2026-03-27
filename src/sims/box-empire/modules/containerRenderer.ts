@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
-import type { Container } from '../types'
+import type { Container, TruckVisit } from '../types'
 import {
   CONTAINER_LENGTH,
   CONTAINER_WIDTH,
@@ -171,7 +171,7 @@ export class ContainerRenderer {
     scene.add(this.mesh)
   }
 
-  update(containers: Container[]): void {
+  update(containers: Container[], trucks?: TruckVisit[]): void {
     const visibleContainers = containers.filter(
       c => c.lifecycleState !== 'departed' && c.lifecycleState !== 'on_vessel',
     )
@@ -188,10 +188,24 @@ export class ContainerRenderer {
         c.currentLocation.position.y,
         c.currentLocation.position.z,
       )
-      // On trucks the container should run along the truck's Z axis (length forward)
-      // The geometry is built with L along X, so rotate 90° around Y when on a truck
-      const onTruck = c.currentLocation.type === 'truck' || c.lifecycleState === 'returning_to_gate'
-      this.dummy.rotation.set(0, onTruck ? Math.PI / 2 : 0, 0)
+
+      // Rotate container to match truck heading when on a truck
+      const onTruck = c.currentLocation.type === 'truck' ||
+        c.lifecycleState === 'returning_to_gate' ||
+        c.lifecycleState === 'at_gate'
+      let rotY = 0
+      if (onTruck && trucks) {
+        const truckId = c.currentLocation.type === 'truck'
+          ? c.currentLocation.id
+          : trucks.find(t => t.containerId === c.id)?.id
+        const truck = truckId ? trucks.find(t => t.id === truckId) : null
+        // Container length (X axis in geometry) should align with truck forward (headingY)
+        // truck.headingY = atan2(dx, dz) gives forward dir; container length = X in geo
+        // So rotate container by headingY + PI/2 to align length with truck forward
+        rotY = truck ? truck.headingY + Math.PI / 2 : Math.PI / 2
+      }
+
+      this.dummy.rotation.set(0, rotY, 0)
       this.dummy.scale.set(1, 1, 1)
       this.dummy.updateMatrix()
       this.mesh.setMatrixAt(i, this.dummy.matrix)

@@ -173,14 +173,7 @@ export class TruckRenderer {
       }
 
       mesh.position.set(truck.position.x, 0, truck.position.z)
-
-      if (truck.targetPosition) {
-        const dx = truck.targetPosition.x - truck.position.x
-        const dz = truck.targetPosition.z - truck.position.z
-        if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) {
-          mesh.rotation.y = Math.atan2(dx, dz)
-        }
-      }
+      mesh.rotation.y = truck.headingY
     }
   }
 

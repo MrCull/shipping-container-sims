@@ -95,15 +95,27 @@ export const TUTORIAL_IMPORT_COUNT = 5
 
 // ---- Terminal layout positions (meters) -----------------------------------
 
-// In-gate: export trucks queue OUTSIDE terminal (z > TERMINAL_FENCE_Z)
-// Out-gate: import trucks queue INSIDE terminal before passing the fence
+// Terminal boundary fence
 export const TERMINAL_FENCE_Z = 55  // z position of the terminal boundary fence
-export const GATE_POSITION: Position3D = { x: -40, y: 0, z: TERMINAL_FENCE_Z }
-// In-gate lanes (outside terminal, z > TERMINAL_FENCE_Z)
+
+// In-gate: ALL trucks enter here (outside terminal, z > TERMINAL_FENCE_Z)
+// Trucks queue along +Z from the gate
+export const GATE_INGATE_POSITION: Position3D = { x: -46, y: 0, z: TERMINAL_FENCE_Z }
+
+// Out-gate: ALL trucks exit here (bottom of terminal, z ~ TERMINAL_BOUNDS.maxZ - 5)
+// Positioned far from in-gate so trucks flow through terminal naturally
+// Trucks queue inside terminal before passing out
+export const GATE_OUTGATE_POSITION: Position3D = { x: -46, y: 0, z: 90 }
+
+// Legacy aliases used in sceneBuilder (kept for compat)
+export const GATE_POSITION: Position3D = { x: -46, y: 0, z: TERMINAL_FENCE_Z }
 export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -46, y: 0, z: TERMINAL_FENCE_Z }
-// Out-gate lanes (inside terminal, queue toward z < TERMINAL_FENCE_Z)
-export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -34, y: 0, z: TERMINAL_FENCE_Z }
+export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -46, y: 0, z: TERMINAL_FENCE_Z }
+
+// Yard handover point where trucks park and equipment loads/unloads
 export const YARD_IO_POSITION: Position3D = { x: 0, y: 0, z: 30 }
+// Waiting position trucks go to while holding before YARD_IO becomes free
+export const YARD_IO_WAIT_POSITION: Position3D = { x: -10, y: 0, z: 30 }
 export const YARD_BLOCK_POSITION: Position = { x: -15, z: 20 }
 export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: 0, z: 3 }
 export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -5, y: 0, z: 3 }
@@ -123,9 +135,10 @@ export const TERMINAL_BOUNDS = {
 export const SOUND_MAP: Record<string, string> = {
   'container.placed': 'container-loaded-to-ship.mp3',
   'money.earned': 'money-increase-ca-ching-.mp3',
+  // Horn plays only once when vessel first appears (arriving state)
   'vessel.arriving': 'small-ship-three-horns-in-a-row.mp3',
-  'vessel.arrived': 'small-ship-three-horns-in-a-row.mp3',
-  'vessel.departed': 'small-ship-three-horns-in-a-row.mp3',
+  // Departure horn plays immediately when vessel starts leaving (departing state)
+  'vessel.departing': 'small-ship-three-horns-in-a-row.mp3',
   'tutorial.completed': 'group-yay-cheer.mp3',
   'level.up': 'level-up.mp3',
 }

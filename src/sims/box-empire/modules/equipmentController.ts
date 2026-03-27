@@ -289,15 +289,15 @@ function tickReachStacker(
         const container = state.containers.find(c => c.id === job.containerId)
         if (container) {
           eq.carriedContainerId = container.id
+          // Container sits at the pickup slot (where it actually is)
           container.currentLocation = {
             type: 'equipment',
             id: eq.id,
-            position: { x: eq.position.x, y: eq.armTargetY, z: eq.position.z - RS_PARK_OFFSET },
+            position: { ...job.pickupLocation.position, y: eq.armTargetY },
           }
           result.pickedContainerId = container.id
         }
-        // Raise arm to travel-safe height: max(pickHeight, dropHeight) + clearance
-        // This ensures the container clears any existing stacks along the route
+        // Raise arm to travel-safe height
         const dropTargetY = job.dropoffLocation.position.y
         const travelHeight = Math.max(pickTargetY, dropTargetY) + 1.5
         eq.armTargetY = travelHeight
@@ -327,16 +327,21 @@ function tickReachStacker(
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)
         if (container) {
-          // Container held at travel height (arm raised to clear stacks)
+          // Container travels at RS body X position but stays aligned on Z to the drop slot X
+          // Lerp X between pickup and dropoff as RS travels
+          const pickPos = job.pickupLocation.position
+          const dropPos = job.dropoffLocation.position
+          const totalDist = Math.abs(dropPos.x - pickPos.x) + Math.abs(dropPos.z - pickPos.z)
+          const doneDist = Math.abs(eq.position.x - pickPos.x) + Math.abs(eq.position.z - pickPos.z)
+          const t = totalDist > 0.1 ? Math.min(1, doneDist / totalDist) : 1
           container.currentLocation.position = {
-            x: eq.position.x,
+            x: pickPos.x + (dropPos.x - pickPos.x) * t,
             y: eq.armTargetY,
-            z: eq.position.z - RS_PARK_OFFSET,
+            z: pickPos.z + (dropPos.z - pickPos.z) * t,
           }
         }
       }
       if (arrived) {
-        // Lower arm to just above drop target, then dropping phase lowers to final
         eq.armDropStartY = eq.armTargetY
         eq.state = 'dropping'
         eq.stateStartTime = state.simTime
@@ -348,16 +353,16 @@ function tickReachStacker(
     case 'dropping': {
       const dropTargetY = job.dropoffLocation.position.y
       const dropProgress = Math.min(1, eq.stateElapsed / getDropDuration(eq))
-      // Lerp from the height where we arrived (armDropStartY) down to target
       eq.armTargetY = eq.armDropStartY + (dropTargetY - eq.armDropStartY) * dropProgress
 
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)
         if (container) {
+          // Container stays at drop slot X,Z while arm lowers
           container.currentLocation.position = {
-            x: eq.position.x,
+            x: job.dropoffLocation.position.x,
             y: eq.armTargetY,
-            z: eq.position.z - RS_PARK_OFFSET,
+            z: job.dropoffLocation.position.z,
           }
         }
       }

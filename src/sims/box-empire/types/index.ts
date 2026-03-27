@@ -173,7 +173,10 @@ export interface TruckVisit {
   position: Position3D
   targetPosition: Position3D | null
   stateStartTime: number
-  queueIndex: number   // stable queue slot so trucks hold fixed positions without jitter
+  queueIndex: number       // stable queue slot so trucks hold fixed positions without jitter
+  waypoints: Position3D[]  // axis-aligned movement waypoints
+  waypointIndex: number    // current waypoint being navigated to
+  headingY: number         // current Y rotation in radians (updated by truckManager)
 }
 
 // ---- Equipment ------------------------------------------------------------
@@ -253,6 +256,7 @@ export type GameEventType =
   | 'vessel.announced'
   | 'vessel.arriving'
   | 'vessel.arrived'
+  | 'vessel.departing'
   | 'vessel.departed'
   | 'truck.arrived'
   | 'truck.departed'
