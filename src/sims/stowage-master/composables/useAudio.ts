@@ -5,6 +5,8 @@ export function useAudio() {
   const audioContext = ref<AudioContext | null>(null)
   const buffers = new Map<string, AudioBuffer>()
   const isLoaded = ref(false)
+  // Track all active sources so we can stop them on demand
+  const activeSources: AudioBufferSourceNode[] = []
 
   async function init(): Promise<void> {
     try {
@@ -20,9 +22,8 @@ export function useAudio() {
     const ctx = audioContext.value
     if (!ctx) return
 
-    const entries = Object.entries(SOUNDS)
     await Promise.allSettled(
-      entries.map(async ([key, url]) => {
+      Object.entries(SOUNDS).map(async ([key, url]) => {
         try {
           const response = await fetch(url)
           const arrayBuffer = await response.arrayBuffer()
@@ -38,7 +39,6 @@ export function useAudio() {
   function playSound(name: string, volume: number = 0.8): void {
     const ctx = audioContext.value
     if (!ctx || !buffers.has(name)) return
-
     if (ctx.state === 'suspended') ctx.resume()
 
     const source = ctx.createBufferSource()
@@ -49,13 +49,28 @@ export function useAudio() {
 
     source.connect(gainNode)
     gainNode.connect(ctx.destination)
+
+    // Track active source; remove when it ends naturally
+    activeSources.push(source)
+    source.onended = () => {
+      const idx = activeSources.indexOf(source)
+      if (idx !== -1) activeSources.splice(idx, 1)
+    }
+
     source.start(0)
+  }
+
+  /** Stop all currently-playing sounds immediately (e.g. on level transition) */
+  function stopAll(): void {
+    for (const source of activeSources) {
+      try { source.stop() } catch { /* already ended */ }
+    }
+    activeSources.length = 0
   }
 
   function playPlacementSound(): void {
     const ctx = audioContext.value
     if (!ctx) return
-
     if (ctx.state === 'suspended') ctx.resume()
 
     const oscillator = ctx.createOscillator()
@@ -63,10 +78,7 @@ export function useAudio() {
 
     oscillator.type = 'sine'
     oscillator.frequency.setValueAtTime(PLACEMENT_SOUND.startFreq, ctx.currentTime)
-    oscillator.frequency.linearRampToValueAtTime(
-      PLACEMENT_SOUND.endFreq,
-      ctx.currentTime + PLACEMENT_SOUND.duration
-    )
+    oscillator.frequency.linearRampToValueAtTime(PLACEMENT_SOUND.endFreq, ctx.currentTime + PLACEMENT_SOUND.duration)
 
     gainNode.gain.setValueAtTime(0.3, ctx.currentTime)
     gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + PLACEMENT_SOUND.duration)
@@ -86,6 +98,7 @@ export function useAudio() {
   }
 
   function dispose(): void {
+    stopAll()
     if (audioContext.value) {
       audioContext.value.close()
       audioContext.value = null
@@ -95,5 +108,5 @@ export function useAudio() {
 
   onUnmounted(dispose)
 
-  return { init, isLoaded, playSound, playPlacementSound, playDisasterSequence, dispose }
+  return { init, isLoaded, playSound, stopAll, playPlacementSound, playDisasterSequence, dispose }
 }

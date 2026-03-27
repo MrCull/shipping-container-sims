@@ -9,7 +9,7 @@ export const LEVELS: LevelConfig[] = [
     preset: SHIP_PRESETS.small,
     hazmatRate: CONTAINER.hazmatRate,
     containerCount: 20,
-    timerSeconds: 60,   // 60 s — tutorial level
+    timerSeconds: 90,   // 90 s — tutorial level
   },
   {
     id: 1,

@@ -172,27 +172,33 @@ onMounted(async () => {
   await audio.init()
 })
 
+// Choose horn sample based on vessel size (level 0 = small feeder)
+function hornSound(): string {
+  return store.currentLevel === 0 ? 'shipHornSmall' : 'shipHornLarge'
+}
+
 // Single phase watcher — handles both scene rebuilds and audio/animation triggers
 watch(() => store.phase, (newPhase, oldPhase) => {
   if (newPhase === 'selecting' && (oldPhase === 'start' || oldPhase === 'disaster' || oldPhase === 'failed' || oldPhase === 'complete')) {
+    // Stop all in-flight sounds from the previous level before building the new scene
+    audio.stopAll()
     buildScene()
   }
 
   if (newPhase === 'complete') {
     audio.playSound('cheer', 0.8)
     setTimeout(() => audio.playSound('levelUp', 0.75), 800)
-    // Three horn blasts spaced 1.8 s apart
-    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 1400)
-    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 3200)
-    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 5000)
+    setTimeout(() => audio.playSound(hornSound(), 0.9), 1400)
+    setTimeout(() => audio.playSound(hornSound(), 0.9), 3200)
+    setTimeout(() => audio.playSound(hornSound(), 0.9), 5000)
     sailAway.active = true
     sailAway.elapsed = 0
   }
 
   if (newPhase === 'failed') {
-    audio.playSound('countdownBoom', 0.85)
-    // Horn as ship departs
-    setTimeout(() => audio.playSound('shipHornLarge', 0.9), 800)
+    // Boo sound when time runs out or level fails
+    audio.playSound('boo', 0.9)
+    setTimeout(() => audio.playSound(hornSound(), 0.9), 800)
     sailAway.active = true
     sailAway.elapsed = 0
   }
@@ -257,8 +263,8 @@ function buildScene(): void {
   sailIn.elapsed = 0
   sailIn.active = true
 
-  // Single horn blast as ship arrives — the sample already contains three blasts
-  setTimeout(() => audio.playSound('shipHornSmall', 0.9), 1000)
+  // Single horn blast as ship arrives (sample already has 3 blasts; use vessel-appropriate sound)
+  setTimeout(() => audio.playSound(hornSound(), 0.9), 1000)
 
   setCameraForShip(store.shipConfig)
 
