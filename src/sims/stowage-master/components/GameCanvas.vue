@@ -145,7 +145,7 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
       const eased = easeOutQuad(t)
       const x = anim.startX + (anim.endX - anim.startX) * eased
       anim.truck.position.x = x
-      if (anim.container) anim.container.position.x = x
+      if (anim.container) anim.container.position.x = x + TRUCK.containerXOffset
 
       if (anim.departing && t >= 0.4) {
         const fadeT = (t - 0.4) / 0.6
