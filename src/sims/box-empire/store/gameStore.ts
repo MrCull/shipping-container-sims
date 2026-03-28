@@ -45,6 +45,8 @@ import { createJob, assignPendingJobs, completeJob, resetJobCounter, getActiveJo
 import { createTransaction, resetEconomy } from '../modules/economy'
 import { createTutorialSteps, getCurrentStep, checkStepAdvance } from '../modules/tutorial'
 import { resetVesselCounter } from '../modules/vesselManager'
+import { getNarratorGroup } from '../modules/narratorScript'
+import type { NarratorDialogState } from '../types'
 
 let eventCounter = 0
 let containerCounter = 0
@@ -101,6 +103,21 @@ export const useGameStore = defineStore('box-empire-game', () => {
   const loadingStarted = ref(false)
   const importPickupStarted = ref(false)
   const exportStagingStarted = ref(false)
+
+  // ---- Narrator dialog state -----------------------------------------------
+  const narratorDialog = ref<NarratorDialogState | null>(null)
+  // Queue of group IDs waiting to be shown (shown one at a time)
+  const narratorQueue = ref<string[]>([])
+  // Track which groups have already been shown to avoid repeats
+  const narratorShownGroups = ref<Set<string>>(new Set())
+  // Milestone flags to prevent re-triggering narrator groups
+  const narratorVesselDockedFired = ref(false)
+  const narratorCraneEnabledFired = ref(false)
+  const narratorFirstOnQuayFired = ref(false)
+  const narratorImportsInYardFired = ref(false)
+  const narratorGroup4Fired = ref(false)
+  const narratorExportToQuayFired = ref(false)
+  const narratorGroup5Fired = ref(false)
 
   // ---- Computed -----------------------------------------------------------
   const activeJobs = computed(() =>
@@ -192,7 +209,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     gamePhase.value = 'tutorial'
     simTime.value = 0
     timeScale.value = DEFAULT_TIME_SCALE
-    tutorialStep.value = 1
+    tutorialStep.value = 2   // step 1 (welcome) is handled by the narrator intro; start at step 2
     tutorialCompleted.value = false
     gatehouse.value = { exportLaneOpen: false, importLaneOpen: false }
     money.value = 0
@@ -208,6 +225,20 @@ export const useGameStore = defineStore('box-empire-game', () => {
     importPickupStarted.value = false
     exportStagingStarted.value = false
     careerIntroPage.value = 1
+    narratorDialog.value = null
+    narratorQueue.value = []
+    narratorShownGroups.value = new Set()
+    narratorVesselDockedFired.value = false
+    narratorCraneEnabledFired.value = false
+    narratorFirstOnQuayFired.value = false
+    narratorImportsInYardFired.value = false
+    narratorGroup4Fired.value = false
+    narratorExportToQuayFired.value = false
+    narratorGroup5Fired.value = false
+    // Enqueue intro + vessel-announcement upfront so group 2 plays
+    // automatically right after the last intro beat finishes.
+    enqueueNarratorGroup('intro')
+    enqueueNarratorGroup('vessel-announcement')
 
     const yard = createYardBlock()
     yardBlocks.value = [yard]
@@ -280,7 +311,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         stateElapsed: 0,
         targetPosition: null,
         speed: 5,
-        enabled: true,
+        enabled: false,   // disabled until narrator prompts the player to enable it
         craneMode: 'both',
         armTargetY: 0,
         armDropStartY: 0,
@@ -300,7 +331,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         stateElapsed: 0,
         targetPosition: null,
         speed: 2,
-        enabled: true,
+        enabled: false,   // disabled until vessel docks and narrator prompts the player
         craneMode: 'both',
         armTargetY: 0,
         armDropStartY: 0,
@@ -446,6 +477,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
         if (vResult.newState === 'arrived') {
           emitEvent('vessel.arrived', `${vessel.name} has arrived at berth`)
           vessel.state = 'arrived'
+          if (!narratorVesselDockedFired.value) {
+            narratorVesselDockedFired.value = true
+            enqueueNarratorGroup('vessel-docked')
+          }
         }
         if (vResult.newState === 'departing') {
           emitEvent('vessel.departing', `${vessel.name} is departing`)
@@ -593,14 +628,21 @@ export const useGameStore = defineStore('box-empire-game', () => {
       }
     }
 
+    // Unblock any jobs whose containers became accessible this tick (e.g. a container
+    // was picked off the top of a stack, exposing the one below). Do this BEFORE the
+    // first assignPendingJobs pass so newly-unblocked jobs are immediately eligible.
+    recheckBlockedJobs(state)
+
     // Assign pending jobs to idle equipment
     assignPendingJobs(state)
 
-    // Re-check blocked jobs to see if containers became accessible
-    recheckBlockedJobs(state)
-
-    // Tutorial flow logic
+    // Tutorial flow logic (may create new staging jobs)
     handleTutorialFlow()
+
+    // After tutorial flow: re-check blocked jobs again (a new staging job may have been
+    // created for a container that was blocked by something now gone) then assign.
+    recheckBlockedJobs(state)
+    assignPendingJobs(state)
 
     // Check tutorial step advancement
     checkTutorialAdvance()
@@ -792,9 +834,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
       }
     }
 
-    // Phase: Start discharging as soon as vessel arrives at berth
+    // Phase: Start discharging once vessel is at berth AND the MHC has been enabled
     const vessel = vesselVisits.value[0]
-    if (vessel && vessel.state === 'arrived' && !dischargingStarted.value) {
+    const crane = equipment.value.find(e => e.id === 'mhc-1')
+    if (vessel && vessel.state === 'arrived' && crane?.enabled && !dischargingStarted.value) {
       dischargingStarted.value = true
       vessel.state = 'discharging'
       startDischarge()
@@ -943,7 +986,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       const rs = equipment.value.find(e => e.id === 'rs-1')
       // Block staging if quay-load position is already occupied by a container or active job
       const quayLoadOccupied = containers.value.some(
-        c => c.lifecycleState === 'staged_for_loading' || c.lifecycleState === 'discharged_to_buffer' && c.visitType === 'export',
+        c => c.lifecycleState === 'staged_for_loading' || (c.lifecycleState === 'discharged_to_buffer' && c.visitType === 'export'),
       ) || jobs.value.some(
         j =>
           j.dropoffLocation.id === 'quay-load' &&
@@ -1016,6 +1059,50 @@ export const useGameStore = defineStore('box-empire-game', () => {
       if (exportLoaded >= TUTORIAL_EXPORT_COUNT) {
         vessel.state = 'departing'
         emitEvent('vessel.departing', `${vessel.name} is departing`)
+      }
+    }
+
+    // Narrator: imports-in-yard fires when the first import container reaches yard storage
+    if (!narratorImportsInYardFired.value) {
+      const firstInYard = containers.value.some(
+        c => c.visitType === 'import' && c.lifecycleState === 'in_yard',
+      )
+      if (firstInYard) {
+        narratorImportsInYardFired.value = true
+        enqueueNarratorGroup('imports-in-yard')
+      }
+    }
+
+    // Narrator: trucks-rolling fires once an import truck has been loaded (import-on-truck state)
+    if (!narratorGroup4Fired.value) {
+      const importOnTruck = containers.value.some(
+        c => c.visitType === 'import' && c.lifecycleState === 'returning_to_gate',
+      )
+      if (importOnTruck) {
+        narratorGroup4Fired.value = true
+        enqueueNarratorGroup('trucks-rolling')
+      }
+    }
+
+    // Narrator: export-to-quay fires when the first export reaches the quay load buffer
+    if (!narratorExportToQuayFired.value) {
+      const firstExportStaged = containers.value.some(
+        c => c.visitType === 'export' && c.lifecycleState === 'staged_for_loading',
+      )
+      if (firstExportStaged) {
+        narratorExportToQuayFired.value = true
+        enqueueNarratorGroup('export-to-quay')
+      }
+    }
+
+    // Narrator: outro fires once the first export has been loaded onto the vessel
+    if (!narratorGroup5Fired.value) {
+      const firstExportLoaded = containers.value.some(
+        c => c.visitType === 'export' && c.lifecycleState === 'loaded_on_vessel',
+      )
+      if (firstExportLoaded) {
+        narratorGroup5Fired.value = true
+        enqueueNarratorGroup('outro')
       }
     }
 
@@ -1093,7 +1180,13 @@ export const useGameStore = defineStore('box-empire-game', () => {
         // (it waits for all imports to gate out, not just the vessel departure)
         tutorialOverlayDismissed.value = true
       } else {
+        const prevStep = tutorialStep.value
         tutorialStep.value++
+        // Narrator: first-on-quay fires when we enter step 4 (first import discharged to buffer)
+        if (prevStep === 3 && tutorialStep.value === 4 && !narratorFirstOnQuayFired.value) {
+          narratorFirstOnQuayFired.value = true
+          enqueueNarratorGroup('first-on-quay')
+        }
       }
     }
   }
@@ -1131,6 +1224,86 @@ export const useGameStore = defineStore('box-empire-game', () => {
   function exitCareerIntroToMenu(): void {
     gamePhase.value = 'menu'
     careerIntroPage.value = 1
+  }
+
+  // ---- Narrator dialog actions --------------------------------------------
+
+  function enqueueNarratorGroup(groupId: string): void {
+    if (narratorShownGroups.value.has(groupId)) return
+    narratorShownGroups.value.add(groupId)
+    narratorQueue.value.push(groupId)
+    // If no dialog is currently showing, open the next one immediately
+    if (!narratorDialog.value) {
+      showNextNarratorGroup()
+    }
+  }
+
+  function showNextNarratorGroup(): void {
+    const nextId = narratorQueue.value.shift()
+    if (!nextId) return
+    const group = getNarratorGroup(nextId)
+    if (!group || group.beats.length === 0) {
+      showNextNarratorGroup()
+      return
+    }
+    narratorDialog.value = {
+      beats: group.beats,
+      currentBeat: 0,
+      groupId: group.id,
+    }
+  }
+
+  function narratorNextBeat(): void {
+    if (!narratorDialog.value) return
+    const next = narratorDialog.value.currentBeat + 1
+    if (next < narratorDialog.value.beats.length) {
+      narratorDialog.value = { ...narratorDialog.value, currentBeat: next }
+    } else {
+      narratorDialog.value = null
+      showNextNarratorGroup()
+    }
+  }
+
+  function closeNarratorDialog(): void {
+    narratorDialog.value = null
+    showNextNarratorGroup()
+  }
+
+  /**
+   * Dispatches a well-known action key triggered by an in-dialog action button.
+   * Keys must match those defined in NarratorBeat.actions[].action.
+   */
+  function dispatchNarratorAction(action: string): void {
+    switch (action) {
+      case 'acceptVessel':
+        acceptVessel()
+        break
+      case 'enableCrane': {
+        const mhc = equipment.value.find(e => e.id === 'mhc-1')
+        if (mhc) mhc.enabled = true
+        if (!narratorCraneEnabledFired.value) {
+          narratorCraneEnabledFired.value = true
+          enqueueNarratorGroup('crane-enabled')
+        }
+        break
+      }
+      case 'enableReachStacker': {
+        const rs = equipment.value.find(e => e.id === 'rs-1')
+        if (rs) rs.enabled = true
+        break
+      }
+      case 'openGatehouse':
+        openGatehouse()
+        break
+        case 'setSpeed3x':
+          setTimeScale(3)
+          break
+        case 'setSpeed5x':
+          setTimeScale(5)
+          break
+      default:
+        break
+    }
   }
 
   // ---- Manual override ----------------------------------------------------
@@ -1207,5 +1380,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
     consumePendingEvents,
     manualReassignContainer,
     getState,
+    narratorDialog,
+    narratorNextBeat,
+    closeNarratorDialog,
+    dispatchNarratorAction,
   }
 })

@@ -289,6 +289,33 @@ export interface TutorialStep {
   action?: (state: BoxEmpireState) => void
 }
 
+// ---- Narrator dialog -------------------------------------------------------
+
+/**
+ * An in-dialog action button. The `action` string is a well-known key that
+ * NarratorDialog.vue dispatches to the store (e.g. 'acceptVessel',
+ * 'openGatehouse', 'setSpeed3x'). `advancesOnClick` causes the dialog to move
+ * to the next beat immediately after the action fires.
+ */
+export interface NarratorAction {
+  label: string
+  action: string
+  advancesOnClick?: boolean
+}
+
+export interface NarratorBeat {
+  audioFile: string        // filename under assets/sounds/narrator/
+  lines: string[]          // text lines displayed simultaneously with the audio
+  actions?: NarratorAction[] // optional action buttons shown below the text
+  autoAdvance?: boolean    // if true, advance to next beat automatically when audio ends
+}
+
+export interface NarratorDialogState {
+  beats: NarratorBeat[]
+  currentBeat: number    // 0-based index into beats
+  groupId: string        // for keying / duplicate-guard
+}
+
 // ---- Pathfinding ----------------------------------------------------------
 
 export type PathNodeType = 'gate' | 'yard_io' | 'quay_buffer' | 'junction' | 'berth' | 'crane_base'

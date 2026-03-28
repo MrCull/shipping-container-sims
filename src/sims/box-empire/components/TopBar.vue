@@ -27,12 +27,6 @@ function goToMenu(): void {
     </div>
     <div class="top-bar-center">
       <span class="sim-time">⏱ {{ Math.floor(store.simTime) }}s</span>
-      <span
-        v-if="!store.tutorialCompleted"
-        class="tutorial-progress"
-      >
-        Step {{ store.tutorialStep }} / {{ store.totalTutorialSteps }}
-      </span>
     </div>
     <div class="top-bar-right">
       <TimeControls />
@@ -85,14 +79,5 @@ function goToMenu(): void {
   font-family: var(--font-retro, monospace);
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.8);
-}
-
-.tutorial-progress {
-  font-family: var(--font-retro, monospace);
-  font-size: 0.8rem;
-  color: var(--color-primary, #f59e0b);
-  background: rgba(0, 0, 0, 0.4);
-  padding: 2px 8px;
-  border-radius: 4px;
 }
 </style>

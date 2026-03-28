@@ -3,7 +3,7 @@ import { useGameStore } from './store/gameStore'
 import GameCanvas from './components/GameCanvas.vue'
 import TopBar from './components/TopBar.vue'
 import EventFeed from './components/EventFeed.vue'
-import TutorialOverlay from './components/ui/TutorialOverlay.vue'
+import NarratorDialog from './components/ui/NarratorDialog.vue'
 import JobQueueWidget from './components/ui/JobQueueWidget.vue'
 import ContainerInfo from './components/ContainerInfo.vue'
 import EquipmentInfo from './components/EquipmentInfo.vue'
@@ -43,7 +43,7 @@ function handlePlayTutorialFromCareer(): void {
       "
     >
       <TopBar />
-      <TutorialOverlay />
+      <NarratorDialog />
       <EventFeed />
       <ContainerInfo />
       <EquipmentInfo />
