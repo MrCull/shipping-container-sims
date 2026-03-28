@@ -1,4 +1,4 @@
-export type GamePhase = 'start' | 'selecting' | 'animating' | 'disaster' | 'complete' | 'failed'
+export type GamePhase = 'start' | 'discharge_selecting' | 'discharge_animating' | 'selecting' | 'animating' | 'disaster' | 'complete' | 'failed'
 export type DisasterType = 'capsize' | 'founder' | 'collapse' | 'explosion'
 export type WeightCategory = 'light' | 'medium' | 'heavy'
 export type EventType = 'info' | 'warning' | 'danger' | 'success'
@@ -12,6 +12,7 @@ export interface Container {
   portHex: string
   portOrder: number
   isHazmat: boolean
+  isImport: boolean
 }
 
 export interface Slot {
@@ -97,6 +98,8 @@ export interface LevelConfig {
   preset: ShipPreset
   hazmatRate: number
   containerCount?: number
+  /** Number of pre-loaded Import containers to discharge before loading begins. */
+  dischargeContainerCount?: number
   /** Countdown timer in seconds. 0 = no timer. */
   timerSeconds: number
 }

@@ -10,15 +10,23 @@ const lastReasons = ref<PlacementReason[]>([])
 const popupClass = ref('')
 let hideTimer: ReturnType<typeof setTimeout> | null = null
 
-watch(() => store.lastPlacement, (placement) => {
-  if (!placement) return
-  lastScore.value = placement.score
-  lastReasons.value = placement.reasons.slice(0, 3)
-  popupClass.value = placement.score >= 80 ? 'great' : placement.score >= 50 ? 'ok' : 'poor'
+function showResult(score: number, reasons: typeof lastReasons.value): void {
+  lastScore.value = score
+  lastReasons.value = reasons.slice(0, 3)
+  popupClass.value = score >= 80 ? 'great' : score >= 50 ? 'ok' : 'poor'
   visible.value = true
-
   if (hideTimer !== null) clearTimeout(hideTimer)
   hideTimer = setTimeout(() => { visible.value = false }, 2500)
+}
+
+watch(() => store.lastPlacement, (placement) => {
+  if (!placement) return
+  showResult(placement.score, placement.reasons)
+})
+
+watch(() => store.lastDischarge, (discharge) => {
+  if (!discharge) return
+  showResult(discharge.score, discharge.reasons)
 })
 </script>
 

@@ -13,11 +13,13 @@ export const LEVELS: LevelConfig[] = [
   },
   {
     id: 1,
-    name: 'Level 2 - Regional Carrier',
-    description: 'A medium-sized regional carrier. More slots, more challenge.',
-    preset: SHIP_PRESETS.medium,
-    hazmatRate: CONTAINER.hazmatRate * 1.2,
-    timerSeconds: 240,  // 4 min
+    name: 'Level 2 - Feeder Vessel',
+    description: 'Same feeder vessel. First unload 10 Import containers, then load the vessel.',
+    preset: SHIP_PRESETS.small,
+    hazmatRate: CONTAINER.hazmatRate,
+    containerCount: 20,
+    dischargeContainerCount: 10,
+    timerSeconds: 210,  // 3.5 min (extra time for discharge + load)
   },
   {
     id: 2,

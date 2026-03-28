@@ -4,8 +4,9 @@ import type { GamePhase, DisasterType, Container, Slot, ShipPreset, GameEvent, P
 import { generateContainerList, resetSerialCounter } from '../modules/containerFactory'
 import { generateSlots, getAvailableSlots } from '../modules/shipGrid'
 import { updatePhysics, checkDisasters } from '../modules/physics'
-import { calculatePlacementScore, getStarRating, checkPerfectBalance } from '../modules/scoring'
+import { calculatePlacementScore, calculateDischargeScore, getStarRating, checkPerfectBalance } from '../modules/scoring'
 import { getLevelConfig, getTotalSlots } from '../modules/levels'
+import { generateDischargeManifest, getDischargeableSlots } from '../modules/dischargeManifest'
 
 let eventIdCounter = 0
 
@@ -30,6 +31,12 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const timerTotal = ref(0)     // total seconds for the level (0 = no timer)
   const timerRemaining = ref(0) // seconds remaining
 
+  // Discharge phase state
+  const dischargeCount = ref(0)
+  const dischargedCount = ref(0)
+  const dischargeScore = ref(0)
+  const lastDischarge = ref<PlacementResult | null>(null)
+
   const currentContainer = computed<Container | null>(() => {
     return containers.value[currentContainerIndex.value] ?? null
   })
@@ -47,6 +54,11 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const availableSlots = computed<string[]>(() => {
     if (!shipConfig.value) return []
     return getAvailableSlots(grid.value, shipConfig.value)
+  })
+
+  const dischargeableSlots = computed<string[]>(() => {
+    if (!shipConfig.value) return []
+    return getDischargeableSlots(grid.value, shipConfig.value)
   })
 
   const isWarning = computed<boolean>(() => {
@@ -92,14 +104,31 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     timerTotal.value = config.timerSeconds ?? 0
     timerRemaining.value = config.timerSeconds ?? 0
 
-    phase.value = 'selecting'
+    // Discharge phase init
+    dischargeCount.value = 0
+    dischargedCount.value = 0
+    dischargeScore.value = 0
+    lastDischarge.value = null
 
-    addEvent('Level started: ' + config.name, 'info')
+    if (config.dischargeContainerCount && config.dischargeContainerCount > 0) {
+      generateDischargeManifest(config.dischargeContainerCount, config.preset, grid.value)
+      dischargeCount.value = config.dischargeContainerCount
+      phase.value = 'discharge_selecting'
+      addEvent('Discharge phase: unload ' + config.dischargeContainerCount + ' Import containers', 'info')
+    } else {
+      phase.value = 'selecting'
+      addEvent('Level started: ' + config.name, 'info')
+    }
   }
 
   function tickTimer(deltaSeconds: number): 'expired' | 'warn30pct' | 'warn15pct' | null {
     if (timerTotal.value <= 0) return null
-    if (phase.value !== 'selecting' && phase.value !== 'animating') return null
+    if (
+      phase.value !== 'selecting' &&
+      phase.value !== 'animating' &&
+      phase.value !== 'discharge_selecting' &&
+      phase.value !== 'discharge_animating'
+    ) return null
 
     const prev = timerRemaining.value
     timerRemaining.value = Math.max(0, timerRemaining.value - deltaSeconds)
@@ -130,6 +159,71 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
     phase.value = 'animating'
     return { container: currentContainer.value, slot }
+  }
+
+  function pickDischargeContainer(slotId: string): { container: Container; slot: Slot } | null {
+    if (phase.value !== 'discharge_selecting') return null
+
+    const slot = grid.value[slotId]
+    if (!slot || !slot.container || !slot.container.isImport) return null
+
+    phase.value = 'discharge_animating'
+    return { container: slot.container, slot }
+  }
+
+  function finalizeDischarge(slotId: string): { levelPhaseEnd?: boolean; discharge?: PlacementResult } | null {
+    const slot = grid.value[slotId]
+    if (!slot || !slot.container) return null
+
+    const container = slot.container
+
+    // Physics before removal
+    const physicsBefore = updatePhysics(grid.value, shipConfig.value!)
+
+    // Remove from grid
+    slot.container = null
+    grid.value[slotId] = { ...slot }
+
+    // Physics after removal
+    const physicsAfter = updatePhysics(grid.value, shipConfig.value!)
+    shipList.value = physicsAfter.list
+    shipTrim.value = physicsAfter.trim
+    shipVCG.value = physicsAfter.vcg
+
+    // Score the discharge pick
+    const discharge = calculateDischargeScore(
+      container,
+      slot,
+      grid.value,
+      shipConfig.value!,
+      physicsBefore.list,
+      physicsBefore.trim,
+      physicsAfter.list,
+      physicsAfter.trim
+    )
+    dischargeScore.value += discharge.score
+    score.value += discharge.score
+    lastDischarge.value = discharge
+
+    for (const reason of discharge.reasons) {
+      if (reason.good) {
+        addEvent(reason.text, 'success')
+      } else if (reason.points < 0) {
+        addEvent(reason.text, 'warning')
+      }
+    }
+
+    dischargedCount.value++
+
+    if (dischargedCount.value >= dischargeCount.value) {
+      // Transition to loading phase
+      addEvent('Discharge complete! Now load the vessel.', 'success')
+      phase.value = 'selecting'
+      return { levelPhaseEnd: true, discharge }
+    }
+
+    phase.value = 'discharge_selecting'
+    return { discharge }
   }
 
   function finalizePlacement(slotId: string): { disaster?: DisasterType; levelEnd?: boolean; placement?: PlacementResult } | null {
@@ -217,9 +311,11 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     shipTrim, shipVCG, events, disasterType, lastPlacement,
     perfectScore, targetScore, totalSlots,
     timerTotal, timerRemaining,
+    dischargeCount, dischargedCount, dischargeScore, lastDischarge,
     currentContainer, queueContainers, nextThreeContainers,
-    availableSlots, isWarning, isCritical, progressPercent, levelConfig,
+    availableSlots, dischargeableSlots, isWarning, isCritical, progressPercent, levelConfig,
     startLevel, placeContainer, finalizePlacement,
+    pickDischargeContainer, finalizeDischarge,
     addEvent, setPhase, getStarRatingResult, tickTimer,
   }
 })

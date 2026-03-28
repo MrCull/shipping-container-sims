@@ -364,6 +364,121 @@ function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
 }
 
+/**
+ * Discharge animation: reverse of createPlacementAnimation.
+ * Lifts a container from a ship slot and lowers it onto the outbound truck dock position.
+ *
+ * @param crane         The crane object
+ * @param containerMesh Container mesh already positioned at worldSlotPos (in scene space)
+ * @param worldSlotPos  World-space position of the container on the ship
+ * @param outboundDockPos World-space position of the outbound truck dock (where container lands)
+ * @param onComplete    Called when the container has been set down and crane returns
+ */
+export function createDischargeAnimation(
+  crane: CraneObject,
+  containerMesh: THREE.Group,
+  worldSlotPos: THREE.Vector3,
+  outboundDockPos: THREE.Vector3,
+  onComplete: () => void
+): (deltaTime: number) => boolean {
+  let currentPhase = 0
+  const speed = 12 * CRANE.animationSpeed
+
+  const startPos = new THREE.Vector3().copy(worldSlotPos)
+  const travelHeight = crane.towerHeight - 2
+  const liftPos = new THREE.Vector3(startPos.x, travelHeight, startPos.z)
+  const aboveDock = new THREE.Vector3(outboundDockPos.x, travelHeight, outboundDockPos.z)
+  const finalTarget = new THREE.Vector3().copy(outboundDockPos)
+
+  // Start crane trolley/spreader over the ship slot
+  crane.trolley.position.x = startPos.x
+  crane.trolley.position.z = startPos.z
+  crane.spreader.position.x = startPos.x
+  crane.spreader.position.z = startPos.z
+  crane.spreader.position.y = startPos.y + CONTAINER.size.y + 0.15
+  updateCables(crane)
+
+  let t = 0
+
+  function update(deltaTime: number): boolean {
+    t += deltaTime * speed
+
+    if (currentPhase === 0) {
+      // Lift container up from ship slot to travel height
+      const progress = Math.min(t / 0.8, 1)
+      const eased = easeInOutCubic(progress)
+      containerMesh.position.lerpVectors(startPos, liftPos, eased)
+      crane.spreader.position.y = THREE.MathUtils.lerp(
+        startPos.y + CONTAINER.size.y + 0.15,
+        travelHeight - 0.5,
+        eased
+      )
+      updateCables(crane)
+      if (progress >= 1) { currentPhase = 1; t = 0 }
+
+    } else if (currentPhase === 1) {
+      // Trolley travels from ship slot to above outbound dock
+      const dist = getDistance(liftPos, aboveDock)
+      const progress = Math.min(t / Math.max(dist, 0.4), 1)
+      const eased = easeInOutCubic(progress)
+      containerMesh.position.lerpVectors(liftPos, aboveDock, eased)
+
+      crane.trolley.position.z = THREE.MathUtils.lerp(startPos.z, outboundDockPos.z, eased)
+      crane.trolley.position.x = THREE.MathUtils.lerp(startPos.x, outboundDockPos.x, eased)
+      crane.spreader.position.z = crane.trolley.position.z
+      crane.spreader.position.x = crane.trolley.position.x
+      updateCables(crane)
+
+      if (progress >= 1) { currentPhase = 2; t = 0 }
+
+    } else if (currentPhase === 2) {
+      // Lower container onto outbound truck
+      const dist = aboveDock.y - finalTarget.y
+      const progress = Math.min(t / Math.max(dist * 0.08, 0.4), 1)
+      const eased = easeInOutQuad(progress)
+      containerMesh.position.y = THREE.MathUtils.lerp(aboveDock.y, finalTarget.y, eased)
+      containerMesh.position.x = finalTarget.x
+      containerMesh.position.z = finalTarget.z
+
+      crane.spreader.position.y = THREE.MathUtils.lerp(
+        travelHeight - 0.5,
+        finalTarget.y + CONTAINER.size.y + 0.15,
+        eased
+      )
+      updateCables(crane)
+
+      if (progress >= 1) {
+        currentPhase = 3
+        t = 0
+      }
+
+    } else if (currentPhase === 3) {
+      // Return crane trolley to dock position (ready for next discharge or load)
+      const progress = Math.min(t / 7, 1)
+      const eased = easeInOutCubic(progress)
+      crane.trolley.position.z = THREE.MathUtils.lerp(outboundDockPos.z, crane.dockZ, eased)
+      crane.trolley.position.x = THREE.MathUtils.lerp(outboundDockPos.x, 0, eased)
+      crane.spreader.position.z = crane.trolley.position.z
+      crane.spreader.position.x = crane.trolley.position.x
+      crane.spreader.position.y = THREE.MathUtils.lerp(
+        finalTarget.y + CONTAINER.size.y + 0.15,
+        crane.towerHeight - 2.5,
+        eased
+      )
+      updateCables(crane)
+
+      if (progress >= 1) {
+        onComplete()
+        return true
+      }
+    }
+
+    return false
+  }
+
+  return update
+}
+
 // Animate warning light blinking
 export function animateCraneWarningLight(crane: CraneObject, time: number): void {
   const light = crane.group.getObjectByName('warning-light') as THREE.Mesh | undefined

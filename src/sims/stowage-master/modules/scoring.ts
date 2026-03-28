@@ -2,6 +2,65 @@ import type { Container, Slot, ShipPreset, PlacementResult, StarRatingResult } f
 import { SCORING, PHYSICS } from './config'
 import { isOutermostRow, isTopThird } from './shipGrid'
 
+/**
+ * Score a discharge pick.
+ * Base 60 pts; bonuses for top-tier picks and stability-improving choices;
+ * penalties for picking while already in warning zone or picking a buried container
+ * that will require a restow (not the topmost in its stack).
+ */
+export function calculateDischargeScore(
+  container: Container,
+  slot: Slot,
+  grid: Record<string, Slot>,
+  shipConfig: ShipPreset,
+  list: number,
+  trim: number,
+  listAfter: number,
+  trimAfter: number
+): PlacementResult {
+  let score = 60
+  const reasons: PlacementResult['reasons'] = []
+
+  // Bonus: top-tier pick (unblocking lower tiers — good discharge order)
+  const aboveTierNum = slot.tier + 2
+  const aboveId = `${String(slot.bay).padStart(2, '0')}-${String(slot.row).padStart(2, '0')}-${String(aboveTierNum).padStart(2, '0')}`
+  const aboveSlot = grid[aboveId]
+  const isTopOfStack = !aboveSlot || !aboveSlot.container
+  if (isTopOfStack && isTopThird(slot.tierIndex, shipConfig.tiers)) {
+    score += 20
+    reasons.push({ text: 'Good discharge order — top tier first!', points: 20, good: true })
+  }
+
+  // Bonus: improves stability (list or trim magnitude decreases)
+  const listImproved = Math.abs(listAfter) < Math.abs(list)
+  const trimImproved = Math.abs(trimAfter) < Math.abs(trim)
+  if (listImproved || trimImproved) {
+    score += 20
+    reasons.push({ text: 'Improves ship stability', points: 20, good: true })
+  }
+
+  // Bonus: removing heavy outboard container
+  if (container.weight > 20 && isOutermostRow(slot.rowIndex, shipConfig.rows) && listImproved) {
+    score += 10
+    reasons.push({ text: 'Heavy outboard removed — balance restored', points: 10, good: true })
+  }
+
+  // Penalty: discharging while ship already in warning zone
+  if (Math.abs(list) >= PHYSICS.listWarning || Math.abs(trim) >= PHYSICS.trimWarning) {
+    score -= 20
+    reasons.push({ text: 'Ship in warning zone', points: -20 })
+  }
+
+  // Penalty: not the top container in its stack (requires restow)
+  if (!isTopOfStack) {
+    score -= 25
+    reasons.push({ text: 'Container blocked — restow needed', points: -25 })
+  }
+
+  score = Math.max(0, score)
+  return { score, reasons }
+}
+
 export function calculatePlacementScore(
   container: Container,
   slot: Slot,

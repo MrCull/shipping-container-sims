@@ -29,6 +29,20 @@ function nextLevel() {
       <div class="rating-title">
         {{ rating.title }}
       </div>
+      <div
+        v-if="store.dischargeCount > 0"
+        class="breakdown"
+      >
+        <div class="breakdown-row">
+          <span class="breakdown-label">Discharge earnings</span>
+          <span class="breakdown-value discharge">${{ store.dischargeScore.toLocaleString() }}</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Loading score</span>
+          <span class="breakdown-value load">${{ store.score.toLocaleString() }}</span>
+        </div>
+        <div class="breakdown-divider" />
+      </div>
       <div class="score-display">
         ${{ store.score.toLocaleString() }} / ${{ store.perfectScore.toLocaleString() }}
       </div>
@@ -117,5 +131,39 @@ function nextLevel() {
 }
 .btn-primary:hover {
   background: rgba(0, 255, 136, 0.25);
+}
+
+.breakdown {
+  margin: 12px 0 8px;
+  text-align: left;
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.breakdown-label {
+  color: #888;
+}
+
+.breakdown-value {
+  font-weight: bold;
+}
+
+.breakdown-value.discharge {
+  color: #ff8800;
+}
+
+.breakdown-value.load {
+  color: #00ff88;
+}
+
+.breakdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 8px 0 4px;
 }
 </style>

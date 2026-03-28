@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { TRUCK } from './config'
+import { TRUCK, OUTBOUND_TRUCK } from './config'
 
 const GLB_URLS = {
   trailer: new URL('../assets/container-trailer-chassis.glb', import.meta.url).href,
@@ -27,6 +27,36 @@ async function loadAndCache(key: 'trailer' | 'cab'): Promise<THREE.Group> {
 /** Pre-warm both GLBs into cache (call in buildScene alongside loadShipGLB). */
 export async function loadTruckGLBs(): Promise<void> {
   await Promise.all([loadAndCache('trailer'), loadAndCache('cab')])
+}
+
+export interface OutboundTruckEntry {
+  truck: THREE.Group
+}
+
+/**
+ * Spawn a queue of empty outbound trucks on the far road lane (positive Z from crane dock).
+ * Returns an array of truck groups ordered front-to-back (index 0 is at the crane).
+ */
+export async function createOutboundTruckQueue(
+  scene: THREE.Scene,
+  dockX: number,
+  dockZ: number,
+  count: number
+): Promise<OutboundTruckEntry[]> {
+  const entries: OutboundTruckEntry[] = []
+  for (let i = 0; i < count; i++) {
+    const truck = await createTruckGLB()
+    // Truck 0 is at crane dock, queue extends in positive-X (land side)
+    const xPos = dockX + i * OUTBOUND_TRUCK.spacing
+    const zPos = dockZ + OUTBOUND_TRUCK.dockZOffset
+    truck.position.set(xPos, 0, zPos)
+    truck.name = `outbound-truck-${i}`
+    // Face negative-X so trucks drive away toward negative-X after loading
+    truck.rotation.y = Math.PI
+    scene.add(truck)
+    entries.push({ truck })
+  }
+  return entries
 }
 
 /** Assemble a combined truck+trailer group. */

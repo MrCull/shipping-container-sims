@@ -54,6 +54,7 @@ export function createContainer(index: number, _totalContainers: number, hazmatR
     portHex: port.hex,
     portOrder: port.order,
     isHazmat,
+    isImport: false,
   }
 }
 

@@ -202,6 +202,158 @@ export function removeSlotIndicators(shipGroup: THREE.Group): void {
   }
 }
 
+/**
+ * Place container meshes on the ship for all pre-loaded Import containers.
+ * Called once during buildScene for levels with a discharge phase.
+ */
+export function createImportContainerMeshes(
+  grid: Record<string, Slot>,
+  shipConfig: ShipPreset,
+  shipGroup: THREE.Group
+): void {
+  const group = new THREE.Group()
+  group.name = 'import-containers'
+
+  for (const slot of Object.values(grid)) {
+    if (!slot.container || !slot.container.isImport) continue
+
+    const deckY = shipConfig.deckOffsetY ?? shipConfig.height * 0.3
+    const mesh = createContainerMesh(slot.container)
+    mesh.position.set(
+      slot.xOffset,
+      slot.yOffset + deckY + CONTAINER.size.y / 2,
+      slot.zOffset
+    )
+    mesh.name = `import-container-${slot.id}`
+    group.add(mesh)
+  }
+
+  shipGroup.add(group)
+}
+
+export function removeImportContainerMeshes(shipGroup: THREE.Group): void {
+  const group = shipGroup.getObjectByName('import-containers')
+  if (group) {
+    group.traverse(child => {
+      const mesh = child as THREE.Mesh
+      if (mesh.geometry) mesh.geometry.dispose()
+      if (mesh.material) {
+        if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose())
+        else mesh.material.dispose()
+      }
+    })
+    shipGroup.remove(group)
+  }
+}
+
+/** Find and remove the mesh for a single Import container by slot ID. */
+export function removeImportContainerMesh(shipGroup: THREE.Group, slotId: string): THREE.Group | null {
+  const group = shipGroup.getObjectByName('import-containers')
+  if (!group) return null
+  const mesh = group.getObjectByName(`import-container-${slotId}`) as THREE.Group | undefined
+  if (!mesh) return null
+  group.remove(mesh)
+  return mesh
+}
+
+/**
+ * Clickable orange indicators on top of Import containers (discharge targets).
+ * Uses `userData.isImportContainer = true` and `userData.slotId` for raycasting.
+ */
+export function createImportSlotIndicators(
+  grid: Record<string, Slot>,
+  dischargeableIds: string[],
+  shipConfig: ShipPreset,
+  shipGroup: THREE.Group
+): THREE.Group {
+  const indicators = new THREE.Group()
+  indicators.name = 'import-slot-indicators'
+
+  const cw = CONTAINER.size.x
+  const cl = VISUAL_Z
+  const y  = CONTAINER.size.y
+
+  const boxGeo  = new THREE.BoxGeometry(cl * 0.96, y * 0.96, cw * 0.96)
+  const wireGeo = new THREE.EdgesGeometry(boxGeo)
+  boxGeo.dispose()
+
+  const wireMat = new THREE.LineBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.9 })
+  const fillGeo = new THREE.BoxGeometry(cl * 0.93, y * 0.93, cw * 0.93)
+  const fillMat = new THREE.MeshPhongMaterial({
+    color: 0xff6600,
+    emissive: 0xff4400,
+    emissiveIntensity: 0.5,
+    transparent: true,
+    opacity: 0.15,
+    depthWrite: false,
+  })
+
+  for (const slotId of dischargeableIds) {
+    const slot = grid[slotId]
+    if (!slot) continue
+
+    const deckY = shipConfig.deckOffsetY ?? shipConfig.height * 0.3
+    const pos = new THREE.Vector3(
+      slot.xOffset,
+      slot.yOffset + deckY + CONTAINER.size.y / 2,
+      slot.zOffset
+    )
+
+    const wire = new THREE.LineSegments(wireGeo, wireMat.clone())
+    wire.position.copy(pos)
+    wire.userData['slotId'] = slotId
+    wire.userData['isImportContainer'] = true
+    wire.name = `import-slot-${slotId}`
+    indicators.add(wire)
+
+    const fill = new THREE.Mesh(fillGeo.clone(), fillMat.clone())
+    fill.position.copy(pos)
+    fill.userData['slotId'] = slotId
+    fill.userData['isImportContainer'] = true
+    fill.name = `import-slot-fill-${slotId}`
+    indicators.add(fill)
+  }
+
+  shipGroup.add(indicators)
+  return indicators
+}
+
+export function removeImportSlotIndicators(shipGroup: THREE.Group): void {
+  const indicators = shipGroup.getObjectByName('import-slot-indicators')
+  if (indicators) {
+    indicators.traverse(child => {
+      const mesh = child as THREE.Mesh
+      if (mesh.geometry) mesh.geometry.dispose()
+      if (mesh.material) {
+        if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose())
+        else mesh.material.dispose()
+      }
+    })
+    shipGroup.remove(indicators)
+  }
+}
+
+export function animateImportSlotIndicators(shipGroup: THREE.Group, time: number): void {
+  const indicators = shipGroup.getObjectByName('import-slot-indicators')
+  if (!indicators) return
+
+  const pulse = 0.3 + Math.abs(Math.sin(time * 3.0)) * 0.3
+  indicators.traverse(child => {
+    const mesh = child as THREE.Mesh
+    if (mesh.userData['isImportContainer'] && mesh.material) {
+      const mat = mesh.material as THREE.MeshPhongMaterial
+      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = pulse
+      if (mat.opacity !== undefined && mat.transparent) {
+        mat.opacity = 0.10 + Math.abs(Math.sin(time * 3.0)) * 0.12
+      }
+    }
+    const line = child as THREE.LineSegments
+    if (line.material instanceof THREE.LineBasicMaterial && line.userData['isImportContainer']) {
+      line.material.opacity = 0.65 + Math.abs(Math.sin(time * 3.0)) * 0.35
+    }
+  })
+}
+
 export function animateSlotIndicators(shipGroup: THREE.Group, time: number): void {
   const indicators = shipGroup.getObjectByName('slot-indicators')
   if (!indicators) return

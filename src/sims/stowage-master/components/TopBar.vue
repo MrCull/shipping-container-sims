@@ -1,7 +1,12 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useGameStore } from '../store/gameStore'
 
 const store = useGameStore()
+
+const isDischargePhase = computed(() =>
+  store.phase === 'discharge_selecting' || store.phase === 'discharge_animating'
+)
 </script>
 
 <template>
@@ -13,7 +18,15 @@ const store = useGameStore()
       STOWAGE MASTER
     </div>
     <div class="level">
-      {{ store.levelConfig?.name }}
+      <span>{{ store.levelConfig?.name }}</span>
+      <span
+        v-if="isDischargePhase"
+        class="phase-badge"
+      >DISCHARGE</span>
+      <span
+        v-else-if="store.phase !== 'complete' && store.phase !== 'failed' && store.phase !== 'disaster'"
+        class="phase-badge phase-badge--load"
+      >LOAD</span>
     </div>
     <div class="score">
       <span class="score-value">${{ store.score.toLocaleString() }}</span>
@@ -63,5 +76,25 @@ const store = useGameStore()
 .score-target {
   color: #888;
   font-size: 13px;
+}
+
+.phase-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  background: rgba(255, 136, 0, 0.2);
+  border: 1px solid rgba(255, 136, 0, 0.6);
+  color: #ff8800;
+  border-radius: 4px;
+  padding: 1px 6px;
+  vertical-align: middle;
+}
+
+.phase-badge--load {
+  background: rgba(0, 255, 136, 0.1);
+  border-color: rgba(0, 255, 136, 0.4);
+  color: #00ff88;
 }
 </style>

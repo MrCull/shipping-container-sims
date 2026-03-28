@@ -159,6 +159,28 @@ export const TRUCK = {
   spacing: 22,
 } as const
 
+export const OUTBOUND_TRUCK = {
+  /**
+   * Z offset from crane dock position.
+   * Crane dockZ is already negative (land side). A negative offset pushes outbound
+   * trucks further into the land side — the far lane away from the ship.
+   */
+  dockZOffset: -14,
+  /** Spacing between outbound truck group origins along X. */
+  spacing: 22,
+  /** Duration (seconds) for a loaded outbound truck to drive away and fade. */
+  departDuration: 1.8,
+  /** Normalised t at which fade-out begins (0–1). */
+  fadeStartT: 0.4,
+  /**
+   * X offset applied to the dropped container relative to the outbound truck group origin.
+   * Outbound trucks face Math.PI (negative-X), so the trailer bed is in the positive-X
+   * direction from the group centre. Half a container length back from centre positions
+   * the box on the trailer rather than over the cab.
+   */
+  containerXOffset: 5,
+} as const
+
 export const WEIGHT_COLORS: Record<string, { three: number; hex: string }> = {
   light: { three: 0x4caf50, hex: '#4caf50' },
   medium: { three: 0xffeb3b, hex: '#ffeb3b' },

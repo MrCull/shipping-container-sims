@@ -11,17 +11,21 @@ import {
   createDock, createLighting, createSkybox, createSkyDome,
   createFoamParticles, animateFoam, createTerminalTruckGLB,
 } from '../modules/sceneBuilder'
-import { loadTruckGLBs } from '../modules/truckRenderer'
+import { loadTruckGLBs, createTruckGLB } from '../modules/truckRenderer'
 import { createShip, loadShipGLB, updateShipTilt } from '../modules/shipRenderer'
 import {
   createContainerMesh,
   createSlotIndicators, removeSlotIndicators, animateSlotIndicators,
+  createImportContainerMeshes, removeImportContainerMeshes, removeImportContainerMesh,
+  createImportSlotIndicators, removeImportSlotIndicators, animateImportSlotIndicators,
 } from '../modules/containerRenderer'
 import {
-  createCrane, getDockPosition, createPlacementAnimation, animateCraneWarningLight,
+  createCrane, getDockPosition, createPlacementAnimation, createDischargeAnimation,
+  animateCraneWarningLight,
 } from '../modules/craneSystem'
 import { createDisasterAnimation } from '../modules/disasters'
-import { CONTAINER, TRUCK } from '../modules/config'
+import { CONTAINER, TRUCK, OUTBOUND_TRUCK } from '../modules/config'
+import { createOutboundTruckQueue } from '../modules/truckRenderer'
 import type { Container, CraneObject, DisasterAnimation } from '../types'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -39,6 +43,7 @@ let foam: THREE.Points | null = null
 let hoistMesh: THREE.Group | null = null
 let queueMeshes: THREE.Group[] = []
 let truckMeshes: THREE.Group[] = []
+let outboundTruckGroups: THREE.Group[] = []
 let currentAnimation: ((dt: number) => boolean) | null = null
 let disasterAnimation: DisasterAnimation | null = null
 
@@ -53,6 +58,7 @@ interface TruckAnim {
   departing: boolean
 }
 let truckAnimations: TruckAnim[] = []
+let outboundTruckAnimations: TruckAnim[] = []
 
 // Ambient truck engine loop handle
 let truckEngineNode: AudioBufferSourceNode | null = null
@@ -86,6 +92,7 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
 
   if (shipGroup) {
     animateSlotIndicators(shipGroup, time)
+    animateImportSlotIndicators(shipGroup, time)
   }
 
   if (craneObj) {
@@ -136,7 +143,7 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
     }
   }
 
-  // Advance trucks toward crane, departing truck drives off and fades
+  // Advance inbound trucks toward crane, departing inbound truck drives off and fades
   if (truckAnimations.length > 0) {
     const scene = getScene()
     truckAnimations = truckAnimations.filter(anim => {
@@ -158,6 +165,41 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
         if (anim.departing && scene) {
           disposeGroup(anim.truck, scene)
           if (anim.container) disposeGroup(anim.container, scene)
+        } else {
+          setGroupOpacity(anim.truck, 1.0)
+          if (anim.container) setGroupOpacity(anim.container, 1.0)
+        }
+        return false
+      }
+      return true
+    })
+  }
+
+  // Outbound trucks depart with loaded container, then queue advances
+  if (outboundTruckAnimations.length > 0) {
+    const scene = getScene()
+    outboundTruckAnimations = outboundTruckAnimations.filter(anim => {
+      anim.elapsed += deltaTime
+      const t = Math.min(anim.elapsed / anim.duration, 1)
+      const eased = easeOutQuad(t)
+      const x = anim.startX + (anim.endX - anim.startX) * eased
+      anim.truck.position.x = x
+      if (anim.container) anim.container.position.x = x + OUTBOUND_TRUCK.containerXOffset
+
+      if (anim.departing && t >= OUTBOUND_TRUCK.fadeStartT) {
+        const fadeT = (t - OUTBOUND_TRUCK.fadeStartT) / (1 - OUTBOUND_TRUCK.fadeStartT)
+        const opacity = Math.max(0, 1 - fadeT)
+        setGroupOpacity(anim.truck, opacity)
+        if (anim.container) setGroupOpacity(anim.container, opacity)
+      }
+
+      if (t >= 1) {
+        if (anim.departing && scene) {
+          disposeGroup(anim.truck, scene)
+          if (anim.container) disposeGroup(anim.container, scene)
+        } else {
+          // Advancing truck — ensure it is fully opaque after animation completes
+          setGroupOpacity(anim.truck, 1.0)
         }
         return false
       }
@@ -172,17 +214,41 @@ onMounted(async () => {
   await audio.init()
 })
 
-// Choose horn sample based on vessel size (level 0 = small feeder)
+// Choose horn sample based on vessel preset — small feeder uses small horn
 function hornSound(): string {
-  return store.currentLevel === 0 ? 'shipHornSmall' : 'shipHornLarge'
+  return store.shipConfig?.name === 'small' ? 'shipHornSmall' : 'shipHornLarge'
 }
 
 // Single phase watcher — handles both scene rebuilds and audio/animation triggers
 watch(() => store.phase, (newPhase, oldPhase) => {
-  if (newPhase === 'selecting' && (oldPhase === 'start' || oldPhase === 'disaster' || oldPhase === 'failed' || oldPhase === 'complete')) {
+  const isSceneRebuildTrigger =
+    (newPhase === 'discharge_selecting' || newPhase === 'selecting') &&
+    (oldPhase === 'start' || oldPhase === 'disaster' || oldPhase === 'failed' || oldPhase === 'complete')
+
+  if (isSceneRebuildTrigger) {
     // Stop all in-flight sounds from the previous level before building the new scene
     audio.stopAll()
     buildScene()
+  }
+
+  // Discharge phase → load phase: tear down discharge indicators, set up load indicators
+  if (newPhase === 'selecting' && oldPhase === 'discharge_selecting') {
+    if (shipGroup && store.shipConfig) {
+      removeImportSlotIndicators(shipGroup)
+      removeImportContainerMeshes(shipGroup)
+      createSlotIndicators(getScene()!, store.grid, store.availableSlots, store.shipConfig, shipGroup)
+      updateHoistMesh(store.currentContainer)
+      updateQueueMeshes(store.nextThreeContainers)
+      audio.playSound('cheer', 0.5)
+    }
+  }
+
+  // Rebuild import slot indicators after each discharge
+  if (newPhase === 'discharge_selecting' && oldPhase === 'discharge_animating') {
+    if (shipGroup && store.shipConfig) {
+      removeImportSlotIndicators(shipGroup)
+      createImportSlotIndicators(store.grid, store.dischargeableSlots, store.shipConfig, shipGroup)
+    }
   }
 
   if (newPhase === 'complete') {
@@ -210,8 +276,8 @@ watch([() => store.shipList, () => store.shipTrim], ([list, trim]) => {
 
 watch(() => store.availableSlots, (slots) => {
   if (!shipGroup || !store.shipConfig) return
-  removeSlotIndicators(shipGroup)
   if (store.phase === 'selecting') {
+    removeSlotIndicators(shipGroup)
     createSlotIndicators(getScene()!, store.grid, slots, store.shipConfig, shipGroup)
   }
 }, { deep: true })
@@ -240,6 +306,17 @@ watch(() => store.lastPlacement, (placement) => {
     audio.playSound('correctDing', 0.6)
   } else if (placement.score < 30) {
     audio.playSound('negative', 0.45)
+  }
+})
+
+watch(() => store.lastDischarge, (discharge) => {
+  if (!discharge) return
+  if (discharge.score >= 80) {
+    audio.playSound('caChing', 0.6)
+  } else if (discharge.score >= 50) {
+    audio.playSound('correctDing', 0.5)
+  } else if (discharge.score < 20) {
+    audio.playSound('negative', 0.4)
   }
 })
 
@@ -280,16 +357,179 @@ async function buildScene(): Promise<void> {
 
   setCameraForShip(store.shipConfig)
 
-  createSlotIndicators(scene, store.grid, store.availableSlots, store.shipConfig, shipGroup)
+  if (store.phase === 'discharge_selecting') {
+    // Discharge phase: render pre-loaded import containers and orange indicators
+    createImportContainerMeshes(store.grid, store.shipConfig, shipGroup)
+    createImportSlotIndicators(store.grid, store.dischargeableSlots, store.shipConfig, shipGroup)
 
-  updateHoistMesh(store.currentContainer)
-  updateQueueMeshes(store.nextThreeContainers)
+    // Spawn outbound truck queue on the far lane
+    const dockPos = getDockPosition(craneObj!)
+    const obTrucks = await createOutboundTruckQueue(
+      scene,
+      dockPos.x,
+      dockPos.z,
+      Math.min(store.dischargeCount - store.dischargedCount, 4)
+    )
+    outboundTruckGroups = obTrucks.map(e => e.truck)
+
+    // Also spawn the inbound load queue so it's visible in the background
+    updateHoistMesh(store.currentContainer)
+    updateQueueMeshes(store.nextThreeContainers)
+  } else {
+    // Normal load phase
+    createSlotIndicators(scene, store.grid, store.availableSlots, store.shipConfig, shipGroup)
+    updateHoistMesh(store.currentContainer)
+    updateQueueMeshes(store.nextThreeContainers)
+  }
 
   attachPicking()
   startLoop()
 }
 
+function pickImportSlot(event: MouseEvent): string | null {
+  const camera = getCamera()
+  const scene = getScene()
+  if (!camera || !scene) return null
+
+  const canvas = canvasRef.value
+  if (!canvas) return null
+  const rect = canvas.getBoundingClientRect()
+  const mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  )
+  const raycaster = new THREE.Raycaster()
+  raycaster.setFromCamera(mouse, camera)
+  const hits = raycaster.intersectObjects(scene.children, true)
+  for (const hit of hits) {
+    let obj: THREE.Object3D | null = hit.object
+    while (obj) {
+      if (obj.userData?.['isImportContainer']) return obj.userData['slotId'] as string
+      obj = obj.parent
+    }
+  }
+  return null
+}
+
+function handleDischargeClick(event: MouseEvent): void {
+  if (store.phase !== 'discharge_selecting') return
+
+  const slotId = pickImportSlot(event)
+  if (!slotId) return
+
+  const result = store.pickDischargeContainer(slotId)
+  if (!result) return
+
+  const scene = getScene()!
+
+  // Remove the import container mesh from the ship and hand it to the crane
+  const containerMesh = removeImportContainerMesh(shipGroup!, slotId)
+    ?? createContainerMesh(result.container)
+  scene.add(containerMesh)
+
+  // Remove import slot indicators while animating
+  removeImportSlotIndicators(shipGroup!)
+
+  // World position of the container on the ship
+  const cfg = store.shipConfig!
+  const deckY = cfg.deckOffsetY ?? cfg.height * 0.3
+  const localPos = new THREE.Vector3(
+    result.slot.xOffset,
+    result.slot.yOffset + deckY + CONTAINER.size.y / 2,
+    result.slot.zOffset
+  )
+  shipGroup!.localToWorld(localPos)
+  containerMesh.position.copy(localPos)
+
+  // Outbound dock: front outbound truck position, offset onto the trailer bed (not the cab)
+  const dockPos = getDockPosition(craneObj!)
+  const outboundZ = dockPos.z + OUTBOUND_TRUCK.dockZOffset
+  const outboundX = outboundTruckGroups[0]?.position.x ?? dockPos.x
+  const outboundDockPos = new THREE.Vector3(
+    outboundX + OUTBOUND_TRUCK.containerXOffset,
+    TRUCK.deckHeight + CONTAINER.size.y / 2,
+    outboundZ
+  )
+
+  audio.playSound('containerLoad', 0.6)
+
+  currentAnimation = createDischargeAnimation(
+    craneObj!,
+    containerMesh,
+    localPos,
+    outboundDockPos,
+    () => {
+      audio.playSound('containerSet', 0.65)
+      // Trigger front outbound truck to depart with container
+      triggerOutboundTruckDepart(containerMesh)
+      store.finalizeDischarge(slotId)
+    }
+  )
+}
+
+function triggerOutboundTruckDepart(containerMesh: THREE.Group): void {
+  if (outboundTruckGroups.length === 0) return
+
+  const frontTruck = outboundTruckGroups[0]
+  // Trucks face negative-X, so they depart in negative-X direction
+  const departX = frontTruck.position.x - OUTBOUND_TRUCK.spacing * 2
+
+  // Snap container to truck top position (offset onto trailer bed, not the cab)
+  containerMesh.position.x = frontTruck.position.x + OUTBOUND_TRUCK.containerXOffset
+  containerMesh.position.z = frontTruck.position.z
+
+  outboundTruckAnimations.push({
+    truck: frontTruck,
+    container: containerMesh,
+    startX: frontTruck.position.x,
+    endX: departX,
+    elapsed: 0,
+    duration: OUTBOUND_TRUCK.departDuration,
+    departing: true,
+  })
+
+  // Remaining outbound trucks advance toward the crane (negative-X, filling the gap left by truck 0)
+  for (let i = 1; i < outboundTruckGroups.length; i++) {
+    const truck = outboundTruckGroups[i]
+    setGroupOpacity(truck, 1.0)
+    outboundTruckAnimations.push({
+      truck,
+      container: null,
+      startX: truck.position.x,
+      endX: truck.position.x - OUTBOUND_TRUCK.spacing,
+      elapsed: 0,
+      duration: 0.8,
+      departing: false,
+    })
+  }
+
+  outboundTruckGroups.shift()
+
+  // Spawn a new empty truck at the back of the queue if more discharges are coming
+  const remaining = store.dischargeCount - store.dischargedCount
+  if (remaining > outboundTruckGroups.length) {
+    const scene = getScene()
+    if (scene && craneObj) {
+      const dockPos = getDockPosition(craneObj)
+      const lastTruck = outboundTruckGroups[outboundTruckGroups.length - 1]
+      const newX = lastTruck
+        ? lastTruck.position.x + OUTBOUND_TRUCK.spacing
+        : dockPos.x
+      createTruckGLB().then(truck => {
+        truck.position.set(newX, 0, dockPos.z + OUTBOUND_TRUCK.dockZOffset)
+        truck.rotation.y = Math.PI
+        scene.add(truck)
+        outboundTruckGroups.push(truck)
+      })
+    }
+  }
+}
+
 function handleClick(event: MouseEvent): void {
+  if (store.phase === 'discharge_selecting') {
+    handleDischargeClick(event)
+    return
+  }
   if (store.phase !== 'selecting') return
 
   const slotId = pickSlot(event)
@@ -471,6 +711,8 @@ function clearScene(): void {
   queueMeshes = []
   truckMeshes = []
   truckAnimations = []
+  outboundTruckGroups = []
+  outboundTruckAnimations = []
 }
 
 function easeOutQuad(t: number): number {
@@ -478,14 +720,30 @@ function easeOutQuad(t: number): number {
 }
 
 function setGroupOpacity(group: THREE.Group, opacity: number): void {
+  const fullyOpaque = opacity >= 1.0
   group.traverse(child => {
     const mesh = child as THREE.Mesh
     if (!mesh.material) return
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-    for (const mat of mats) {
-      const m = mat as THREE.MeshPhongMaterial
-      m.transparent = true
-      m.opacity = opacity
+    const owned: THREE.Material[] = []
+    for (let i = 0; i < mats.length; i++) {
+      // Clone the material so we never mutate a shared cached instance
+      let m = mats[i]
+      if (!m.userData['owned']) {
+        m = m.clone()
+        m.userData['owned'] = true
+        owned.push(m)
+      } else {
+        owned.push(m)
+      }
+      m.transparent = !fullyOpaque
+      ;(m as THREE.MeshPhongMaterial).opacity = opacity
+      if (fullyOpaque) m.needsUpdate = true
+    }
+    if (Array.isArray(mesh.material)) {
+      mesh.material = owned as THREE.MeshPhongMaterial[]
+    } else {
+      mesh.material = owned[0] as THREE.MeshPhongMaterial
     }
   })
 }
@@ -523,6 +781,8 @@ function triggerTruckAdvance(): void {
       // Remaining trucks advance one TRUCK.spacing toward the crane.
       // queueMeshes was already shifted in handleClick, so index i-1 maps correctly.
       const containerMesh = queueMeshes[i - 1] ?? null
+      setGroupOpacity(truck, 1.0)
+      if (containerMesh) setGroupOpacity(containerMesh, 1.0)
       truckAnimations.push({
         truck,
         container: containerMesh,
