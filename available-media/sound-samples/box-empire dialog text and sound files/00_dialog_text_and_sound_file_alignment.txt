@@ -1,6 +1,6 @@
 ----------------- 1 -------------------
 
-01_01_vx_narrator_intro_welcome_manager.wav
+01_01_vx_narrator_intro_welcome_manager.mp3
 Hey there...
 Welcome to Box Empire…
 Guess that makes you the new manager of this tired old terminal.
@@ -8,13 +8,13 @@ Guess that makes you the new manager of this tired old terminal.
 
 I’ve been running this place for years…
 
-01_02_vx_narrator_intro_old_terminal_state.wav
+01_02_vx_narrator_intro_old_terminal_state.mp3
 I’ve been running this place for years…
 and I’ll be honest with you… never quite managed to make it work.
 Ships got scarce… money got tighter… and well… you can see the state of it.
 
 
-01_03_vx_narrator_intro_family_inheritance.wav
+01_03_vx_narrator_intro_family_inheritance.mp3
 But you… you’re family.
 And that still means something.
 This land, these cranes, this whole operation… it’s yours now.
@@ -22,39 +22,39 @@ I reckon you might just turn this rust bucket into something worth a damn.
 
 ----------------- 2 -------------------
 
-02_01_vx_narrator_event_vessel_announcement.wav
+02_01_vx_narrator_event_vessel_announcement.mp3
 Well I’ll be…
 Looks like we’ve got a vessel announcement.
 Haven’t seen one of those in a long while…
 Maybe today’s the day this place finally earns a few dollers.
 
 
-02_02_vx_narrator_event_feeder_vessel_details.wav
+02_02_vx_narrator_event_feeder_vessel_details.mp3
 She’s a small feeder vessel… nothing fancy.
 Five import containers to unload…
 and she’ll be expecting five exports in return.
 Go ahead… accept the vessel call… let’s see if we still remember how this works.
 
 
-02_03_vx_narrator_event_vessel_docked.wav
+02_03_vx_narrator_event_vessel_docked.mp3
 There she is… docked and ready.
 Now, let’s wake up that quay crane…
 get those containers moving off the ship.
 
 ----------------- 3 -------------------
 
-03_01_vx_narrator_gameplay_speed_up_time.wav
+03_01_vx_narrator_gameplay_speed_up_time.mp3
 Things don’t always move fast around here…
 Go ahead and speed things up a little. (x3)
 
 
-03_02_vx_narrator_gameplay_first_container_quay.wav
+03_02_vx_narrator_gameplay_first_container_quay.mp3
 Alright… first container’s on the quay.
 Now bring that reach stacker online…
 we need those import boxes moved into the yard.
 
 
-03_03_vx_narrator_gameplay_imports_in_storage.wav
+03_03_vx_narrator_gameplay_imports_in_storage.mp3
 Good… now we’ve got import containers in storage.
 Let’s open up the gatehouse.
 Trucks’ll start rolling in… picking up imports…
@@ -62,36 +62,36 @@ And some other trucks will come in and start dropping off the exports.
 
 ----------------- 4 -------------------
 
-04_01_vx_narrator_gameplay_import_loaded_truck.wav
+04_01_vx_narrator_gameplay_import_loaded_truck.mp3
 There… see that?
 Reach stacker just loaded an import onto a truck.
 Once it clears the outgate… that’s money in your pocket.
 
 
-04_02_vx_narrator_progress_first_100_dollars.wav
+04_02_vx_narrator_progress_first_100_dollars.mp3
 And there it is… your first hundred dollars.
 Not much… but it’s a start.
 Every empire begins with something small.
 
 
-04_03_vx_narrator_gameplay_export_to_quay.wav
+04_03_vx_narrator_gameplay_export_to_quay.mp3
 Look sharp…
 That reach stacker’s already moved an export container to the quay.
 Once the crane loads it onto the vessel… you’ll get paid again.
 
 ----------------- 5 -------------------
 
-05_01_vx_narrator_progress_150_dollars.wav
+05_01_vx_narrator_progress_150_dollars.mp3
 There you go… another hundred fifty.
 You’re starting to get the rhythm now.
 
 
-05_02_vx_narrator_feedback_player_progress_good.wav
+05_02_vx_narrator_feedback_player_progress_good.mp3
 Heh… not bad. Not bad at all.
 You’re picking this up quicker than I ever did.
 
 
-05_03_vx_narrator_outro_final_handover.wav
+05_03_vx_narrator_outro_final_handover.mp3
 Well… I won’t be around much longer…
 but I’ve got a feeling about you.
 This place… it’s got a future now.
