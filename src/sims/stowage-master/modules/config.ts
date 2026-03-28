@@ -138,6 +138,27 @@ export const HAZMAT = {
   minTierSeparation: 2,
 } as const
 
+export const TRUCK = {
+  /** Height of trailer deck above ground (game meters). */
+  deckHeight: 1.75,
+  /** Uniform scale applied to trailer GLB to reach ~14 m length. */
+  trailerScale: 1.1227,
+  /**
+   * Target height for the cab in game meters.
+   * Uniform scale is derived from this: scale = cabTargetHeight / glbHeight.
+   * Uniform scale preserves the model's proportions and never squashes regardless of rotation.
+   */
+  cabTargetHeight: 4.9,
+  /** rotation.y for the cab. If direction is wrong try adding/subtracting Math.PI. */
+  cabRotationY: Math.PI / 4,
+  /** Cab group X offset relative to the trailer centre. */
+  cabXOffset: 3.5,
+  /** X offset applied to the container mesh relative to the truck group origin. */
+  containerXOffset: -5,
+  /** Spacing between truck group origins along X. */
+  spacing: 22,
+} as const
+
 export const WEIGHT_COLORS: Record<string, { three: number; hex: string }> = {
   light: { three: 0x4caf50, hex: '#4caf50' },
   medium: { three: 0xffeb3b, hex: '#ffeb3b' },
