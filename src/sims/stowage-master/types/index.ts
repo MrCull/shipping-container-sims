@@ -1,4 +1,4 @@
-export type GamePhase = 'start' | 'discharge_selecting' | 'discharge_animating' | 'selecting' | 'animating' | 'disaster' | 'complete' | 'failed'
+export type GamePhase = 'start' | 'briefing' | 'discharge_selecting' | 'discharge_animating' | 'restow_selecting' | 'restow_animating' | 'selecting' | 'animating' | 'disaster' | 'complete' | 'failed'
 export type DisasterType = 'capsize' | 'founder' | 'collapse' | 'explosion'
 export type WeightCategory = 'light' | 'medium' | 'heavy'
 export type EventType = 'info' | 'warning' | 'danger' | 'success'
@@ -13,6 +13,10 @@ export interface Container {
   portOrder: number
   isHazmat: boolean
   isImport: boolean
+  /** Transit container — remains on board, destined for a future port. */
+  isTransit?: boolean
+  /** Set to true while this transit container has been lifted for restow. */
+  isBeingRestowed?: boolean
 }
 
 export interface Slot {
@@ -91,6 +95,23 @@ export interface StarRatingResult {
   title: string
 }
 
+export interface BriefingLegendItem {
+  /** CSS colour string for the swatch (e.g. '#ffd700') */
+  color: string
+  text: string
+}
+
+export interface BriefingPage {
+  icon: string
+  title: string
+  /** Each string is rendered as a separate paragraph. */
+  body: string[]
+  legend?: BriefingLegendItem[]
+  /** Bullet-point steps rendered as an ordered list. */
+  steps?: string[]
+  warn?: string
+}
+
 export interface LevelConfig {
   id: number
   name: string
@@ -100,8 +121,12 @@ export interface LevelConfig {
   containerCount?: number
   /** Number of pre-loaded Import containers to discharge before loading begins. */
   dischargeContainerCount?: number
+  /** Number of pre-loaded Transit containers that may overstow imports and need restowing. */
+  transitContainerCount?: number
   /** Countdown timer in seconds. 0 = no timer. */
   timerSeconds: number
+  /** Instructional pages shown before gameplay starts. */
+  briefingPages: BriefingPage[]
 }
 
 export interface CraneObject {

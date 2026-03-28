@@ -18,6 +18,7 @@ import StartScreen from './components/modals/StartScreen.vue'
 import LevelComplete from './components/modals/LevelComplete.vue'
 import LevelFailed from './components/modals/LevelFailed.vue'
 import DisasterOverlay from './components/modals/DisasterOverlay.vue'
+import LevelBriefing from './components/modals/LevelBriefing.vue'
 
 const store = useGameStore()
 
@@ -44,6 +45,7 @@ onMounted(() => {
     <TimerWidget />
     <DischargeBar />
     <StartScreen />
+    <LevelBriefing />
     <LevelComplete />
     <LevelFailed />
     <DisasterOverlay />

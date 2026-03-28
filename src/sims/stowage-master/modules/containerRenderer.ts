@@ -206,6 +206,10 @@ export function removeSlotIndicators(shipGroup: THREE.Group): void {
  * Place container meshes on the ship for all pre-loaded Import containers.
  * Called once during buildScene for levels with a discharge phase.
  */
+/**
+ * Place container meshes on the ship for all pre-loaded Import AND Transit containers.
+ * Called once during buildScene for levels with a discharge phase.
+ */
 export function createImportContainerMeshes(
   grid: Record<string, Slot>,
   shipConfig: ShipPreset,
@@ -215,7 +219,9 @@ export function createImportContainerMeshes(
   group.name = 'import-containers'
 
   for (const slot of Object.values(grid)) {
-    if (!slot.container || !slot.container.isImport) continue
+    if (!slot.container) continue
+    // Render both import (local discharge) and transit (stays on board) containers
+    if (!slot.container.isImport && !slot.container.isTransit) continue
 
     const deckY = shipConfig.deckOffsetY ?? shipConfig.height * 0.3
     const mesh = createContainerMesh(slot.container)
@@ -350,6 +356,102 @@ export function animateImportSlotIndicators(shipGroup: THREE.Group, time: number
     const line = child as THREE.LineSegments
     if (line.material instanceof THREE.LineBasicMaterial && line.userData['isImportContainer']) {
       line.material.opacity = 0.65 + Math.abs(Math.sin(time * 3.0)) * 0.35
+    }
+  })
+}
+
+/**
+ * Cyan indicators showing valid restow destinations for a transit container.
+ */
+export function createRestowSlotIndicators(
+  grid: Record<string, Slot>,
+  restowIds: string[],
+  shipConfig: ShipPreset,
+  shipGroup: THREE.Group
+): THREE.Group {
+  const indicators = new THREE.Group()
+  indicators.name = 'restow-slot-indicators'
+
+  const cw = CONTAINER.size.x
+  const cl = VISUAL_Z
+  const y  = CONTAINER.size.y
+
+  const boxGeo  = new THREE.BoxGeometry(cl * 0.96, y * 0.96, cw * 0.96)
+  const wireGeo = new THREE.EdgesGeometry(boxGeo)
+  boxGeo.dispose()
+
+  const wireMat = new THREE.LineBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.9 })
+  const fillGeo = new THREE.BoxGeometry(cl * 0.93, y * 0.93, cw * 0.93)
+  const fillMat = new THREE.MeshPhongMaterial({
+    color: 0x0099ff,
+    emissive: 0x0066cc,
+    emissiveIntensity: 0.5,
+    transparent: true,
+    opacity: 0.15,
+    depthWrite: false,
+  })
+
+  for (const slotId of restowIds) {
+    const slot = grid[slotId]
+    if (!slot) continue
+
+    const deckY = shipConfig.deckOffsetY ?? shipConfig.height * 0.3
+    const pos = new THREE.Vector3(
+      slot.xOffset,
+      slot.yOffset + deckY + CONTAINER.size.y / 2,
+      slot.zOffset
+    )
+
+    const wire = new THREE.LineSegments(wireGeo, wireMat.clone())
+    wire.position.copy(pos)
+    wire.userData['slotId'] = slotId
+    wire.userData['isRestowSlot'] = true
+    wire.name = `restow-slot-${slotId}`
+    indicators.add(wire)
+
+    const fill = new THREE.Mesh(fillGeo.clone(), fillMat.clone())
+    fill.position.copy(pos)
+    fill.userData['slotId'] = slotId
+    fill.userData['isRestowSlot'] = true
+    fill.name = `restow-slot-fill-${slotId}`
+    indicators.add(fill)
+  }
+
+  shipGroup.add(indicators)
+  return indicators
+}
+
+export function removeRestowSlotIndicators(shipGroup: THREE.Group): void {
+  const indicators = shipGroup.getObjectByName('restow-slot-indicators')
+  if (indicators) {
+    indicators.traverse(child => {
+      const mesh = child as THREE.Mesh
+      if (mesh.geometry) mesh.geometry.dispose()
+      if (mesh.material) {
+        if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose())
+        else mesh.material.dispose()
+      }
+    })
+    shipGroup.remove(indicators)
+  }
+}
+
+export function animateRestowSlotIndicators(shipGroup: THREE.Group, time: number): void {
+  const indicators = shipGroup.getObjectByName('restow-slot-indicators')
+  if (!indicators) return
+
+  indicators.traverse(child => {
+    const mesh = child as THREE.Mesh
+    if (mesh.userData['isRestowSlot'] && mesh.material) {
+      const mat = mesh.material as THREE.MeshPhongMaterial
+      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = 0.3 + Math.abs(Math.sin(time * 3.5)) * 0.4
+      if (mat.opacity !== undefined && mat.transparent) {
+        mat.opacity = 0.10 + Math.abs(Math.sin(time * 3.5)) * 0.12
+      }
+    }
+    const line = child as THREE.LineSegments
+    if (line.material instanceof THREE.LineBasicMaterial && line.userData['isRestowSlot']) {
+      line.material.opacity = 0.6 + Math.abs(Math.sin(time * 3.5)) * 0.4
     }
   })
 }

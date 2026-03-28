@@ -1,41 +1,62 @@
 import type { Container, Slot, ShipPreset } from '../types'
-import { CONTAINER } from './config'
+import { CONTAINER, PORTS } from './config'
 import { generateContainerId, generateWeight, getWeightCategory } from './containerFactory'
 
 /**
- * The "local port" — all Import containers have this as their POD since they are
- * being discharged here. A single colour makes them visually distinct from export cargo.
+ * The "local port" — Import containers discharged here.
+ * Gold colour makes them visually distinct from transit/export cargo.
  */
 const LOCAL_PORT = { name: 'Local', color: 0xffd700, hex: '#ffd700', order: 0 } as const
 
-/**
- * Generates `count` Import containers and places them into the grid.
- * Distribution strategy (per knowledge-base discharge sequencing):
- * - Spread across centre rows to keep initial load balanced.
- * - Fill lower tiers first (bottom-up stacking).
- * - Avoid packing all weight in one bay.
- * Returns the list of containers placed (useful for the store to track).
- */
-export function generateDischargeManifest(
-  count: number,
-  preset: ShipPreset,
-  grid: Record<string, Slot>
-): Container[] {
-  const placed: Container[] = []
+/** Future ports used for transit containers. Skip index 0 (Local). */
+const TRANSIT_PORTS = PORTS.slice(1)
 
-  // Build an ordered list of preferred slot IDs: lower tiers first, centre rows first.
+function makeImportContainer(): Container {
+  const weight = Math.round(generateWeight() * 10) / 10
+  return {
+    id: generateContainerId(),
+    weight,
+    weightCategory: getWeightCategory(weight),
+    port: LOCAL_PORT.name,
+    portColor: LOCAL_PORT.color,
+    portHex: LOCAL_PORT.hex,
+    portOrder: LOCAL_PORT.order,
+    isHazmat: false,
+    isImport: true,
+    isTransit: false,
+  }
+}
+
+function makeTransitContainer(): Container {
+  const weight = Math.round(generateWeight() * 10) / 10
+  const port = TRANSIT_PORTS[Math.floor(Math.random() * TRANSIT_PORTS.length)]
+  return {
+    id: generateContainerId(),
+    weight,
+    weightCategory: getWeightCategory(weight),
+    port: port.name,
+    portColor: port.color,
+    portHex: port.hex,
+    portOrder: port.order,
+    isHazmat: false,
+    isImport: false,
+    isTransit: true,
+  }
+}
+
+/**
+ * Builds an ordered list of slot IDs: lower tiers first, centre rows first.
+ */
+function buildOrderedSlotIds(preset: ShipPreset, grid: Record<string, Slot>): string[] {
   const activeBays = preset.bays - preset.sternBlockedBays
   const centreRow = Math.floor(preset.rows / 2)
 
-  // Row priority: centre outward
   const rowPriority: number[] = []
   for (let offset = 0; offset <= Math.floor(preset.rows / 2); offset++) {
-    const mid = centreRow
-    if (mid - offset >= 0) rowPriority.push(mid - offset)
-    if (offset > 0 && mid + offset < preset.rows) rowPriority.push(mid + offset)
+    if (centreRow - offset >= 0) rowPriority.push(centreRow - offset)
+    if (offset > 0 && centreRow + offset < preset.rows) rowPriority.push(centreRow + offset)
   }
 
-  // Build slots tier-by-tier (tier 0 first), iterating rows by priority, bays spread evenly.
   const orderedIds: string[] = []
   for (let t = 0; t < preset.tiers; t++) {
     const tierNum = (t + 1) * 2
@@ -48,84 +69,182 @@ export function generateDischargeManifest(
       }
     }
   }
+  return orderedIds
+}
 
-  let placedCount = 0
+function canPlace(slotId: string, grid: Record<string, Slot>): boolean {
+  const slot = grid[slotId]
+  if (!slot || slot.container) return false
+  if (slot.tierIndex === 0) return true
+  const belowTierNum = slot.tier - 2
+  const belowId = `${String(slot.bay).padStart(2, '0')}-${String(slot.row).padStart(2, '0')}-${String(belowTierNum).padStart(2, '0')}`
+  return !!(grid[belowId]?.container)
+}
+
+/**
+ * Generates Import and (optionally) Transit containers and places them into the grid.
+ *
+ * Import containers (gold) — discharged at this port.
+ * Transit containers (port-coloured) — stay on board, but may be stacked on top of
+ * Import containers creating "overstow" that the player must restow.
+ *
+ * Strategy:
+ * 1. Place imports in lower tiers first, spread across bays/rows.
+ * 2. Place transit containers in remaining slots — deliberately placing some directly
+ *    on top of import stacks to create mandatory restow situations.
+ */
+export function generateDischargeManifest(
+  count: number,
+  preset: ShipPreset,
+  grid: Record<string, Slot>,
+  transitCount: number = 0
+): Container[] {
+  const placed: Container[] = []
+  const orderedIds = buildOrderedSlotIds(preset, grid)
+
+  // 1 — Place import containers (lower tiers first)
+  let importPlaced = 0
   for (const id of orderedIds) {
-    if (placedCount >= count) break
-    const slot = grid[id]
-    if (!slot || slot.container) continue
-
-    // Validate stacking: tier 0 can always be placed; higher tiers need container below.
-    if (slot.tierIndex > 0) {
-      const belowTierNum = slot.tier - 2
-      const belowId = `${String(slot.bay).padStart(2, '0')}-${String(slot.row).padStart(2, '0')}-${String(belowTierNum).padStart(2, '0')}`
-      if (!grid[belowId] || !grid[belowId].container) continue
-    }
-
-    const weight = Math.round(generateWeight() * 10) / 10
-
-    // All import containers share the local port colour (POD = this terminal)
-    const container: Container = {
-      id: generateContainerId(),
-      weight,
-      weightCategory: getWeightCategory(weight),
-      port: LOCAL_PORT.name,
-      portColor: LOCAL_PORT.color,
-      portHex: LOCAL_PORT.hex,
-      portOrder: LOCAL_PORT.order,
-      isHazmat: false,
-      isImport: true,
-    }
-
-    slot.container = container
+    if (importPlaced >= count) break
+    if (!canPlace(id, grid)) continue
+    const container = makeImportContainer()
+    grid[id].container = container
     placed.push(container)
-    placedCount++
+    importPlaced++
+  }
+
+  if (transitCount <= 0) return placed
+
+  // 2 — Place transit containers.
+  // First attempt: stack directly on top of import containers to create overstow.
+  // Then fill remaining free slots if more transit needed.
+  const transitSlots: string[] = []
+
+  // Priority A: slots immediately above an import container (guaranteed overstow)
+  for (const id of orderedIds) {
+    const slot = grid[id]
+    if (!slot?.container?.isImport) continue
+    const aboveTierNum = slot.tier + 2
+    const aboveId = `${String(slot.bay).padStart(2, '0')}-${String(slot.row).padStart(2, '0')}-${String(aboveTierNum).padStart(2, '0')}`
+    if (grid[aboveId] && !grid[aboveId].container) {
+      transitSlots.push(aboveId)
+    }
+  }
+
+  // Priority B: any other free slots (transit not blocking anything)
+  for (const id of orderedIds) {
+    if (!grid[id] || grid[id].container) continue
+    if (!transitSlots.includes(id)) transitSlots.push(id)
+  }
+
+  let transitPlaced = 0
+  for (const id of transitSlots) {
+    if (transitPlaced >= transitCount) break
+    if (!canPlace(id, grid)) continue
+    const container = makeTransitContainer()
+    grid[id].container = container
+    placed.push(container)
+    transitPlaced++
   }
 
   return placed
 }
 
 /**
- * Returns slot IDs that contain Import containers and are on top of their stack
- * (i.e. clickable for discharge — no container above them).
+ * Returns slot IDs that are actionable during the discharge phase:
+ * - Import containers that are on top of their stack (ready to discharge).
+ * - Transit containers that are on top of their stack AND sit directly above an import
+ *   container (must be restowed to expose the import below).
  */
 export function getDischargeableSlots(grid: Record<string, Slot>, preset: ShipPreset): string[] {
-  const dischargeable: string[] = []
+  const actionable: string[] = []
   const activeBays = preset.bays - preset.sternBlockedBays
 
   for (let b = 0; b < activeBays; b++) {
     const bayNum = b * 2 + 1
     for (let r = 0; r < preset.rows; r++) {
       const rowNum = r + 1
-      // Walk tiers from top down; the first occupied tier with an Import container that
-      // has nothing above it is the top of the stack.
+      // Walk from top tier downward to find the topmost occupied slot in this stack.
       for (let t = preset.tiers - 1; t >= 0; t--) {
         const tierNum = (t + 1) * 2
         const id = `${String(bayNum).padStart(2, '0')}-${String(rowNum).padStart(2, '0')}-${String(tierNum).padStart(2, '0')}`
         const slot = grid[id]
-        if (!slot) continue
+        if (!slot?.container) continue
 
-        if (slot.container && slot.container.isImport) {
-          // Check nothing sits above this slot in the same stack
-          const aboveTierNum = tierNum + 2
-          const aboveId = `${String(bayNum).padStart(2, '0')}-${String(rowNum).padStart(2, '0')}-${String(aboveTierNum).padStart(2, '0')}`
-          const aboveSlot = grid[aboveId]
-          if (!aboveSlot || !aboveSlot.container) {
-            dischargeable.push(id)
+        const container = slot.container
+
+        if (container.isImport) {
+          // Top of stack — ready to discharge
+          actionable.push(id)
+          break
+        }
+
+        if (container.isTransit) {
+          // Transit container at top of stack — check if it sits above an import
+          const belowTierNum = tierNum - 2
+          const belowId = `${String(bayNum).padStart(2, '0')}-${String(rowNum).padStart(2, '0')}-${String(belowTierNum).padStart(2, '0')}`
+          const belowSlot = grid[belowId]
+          if (belowSlot?.container?.isImport) {
+            // This transit container is an overstow — must be restowed
+            actionable.push(id)
           }
-          // Only expose the topmost import container per stack
           break
         }
 
-        if (slot.container && !slot.container.isImport) {
-          // Stack has a non-import container — no import accessible above this
-          break
-        }
+        // Any other container (non-import, non-transit) — skip this stack
+        break
       }
     }
   }
 
-  return dischargeable
+  return actionable
+}
+
+/**
+ * Returns the slot IDs that are valid restow destinations for a transit container.
+ * A slot is valid if: empty, stackable (support below), and not in the same bay/row
+ * as a local import (to avoid creating new overstow situations).
+ */
+export function getRestowSlots(
+  grid: Record<string, Slot>,
+  preset: ShipPreset,
+  excludeSlotId: string
+): string[] {
+  const valid: string[] = []
+  const activeBays = preset.bays - preset.sternBlockedBays
+
+  for (let b = 0; b < activeBays; b++) {
+    const bayNum = b * 2 + 1
+    for (let r = 0; r < preset.rows; r++) {
+      const rowNum = r + 1
+      for (let t = 0; t < preset.tiers; t++) {
+        const tierNum = (t + 1) * 2
+        const id = `${String(bayNum).padStart(2, '0')}-${String(rowNum).padStart(2, '0')}-${String(tierNum).padStart(2, '0')}`
+        if (id === excludeSlotId) continue
+        const slot = grid[id]
+        if (!slot || slot.container) continue
+
+        // Must have support below (or be ground tier)
+        if (t > 0) {
+          const belowTierNum = tierNum - 2
+          const belowId = `${String(bayNum).padStart(2, '0')}-${String(rowNum).padStart(2, '0')}-${String(belowTierNum).padStart(2, '0')}`
+          if (!grid[belowId]?.container) continue
+        }
+
+        // Avoid placing transit directly above an import (no new overstow)
+        if (t > 0) {
+          const belowTierNum = tierNum - 2
+          const belowId = `${String(bayNum).padStart(2, '0')}-${String(rowNum).padStart(2, '0')}-${String(belowTierNum).padStart(2, '0')}`
+          if (grid[belowId]?.container?.isImport) continue
+        }
+
+        valid.push(id)
+        break // Only expose lowest free slot per stack
+      }
+    }
+  }
+
+  return valid
 }
 
 /** Returns the world Y position of the top surface of a container sitting in `slot`. */

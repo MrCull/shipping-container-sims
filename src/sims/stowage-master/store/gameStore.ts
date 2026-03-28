@@ -4,9 +4,9 @@ import type { GamePhase, DisasterType, Container, Slot, ShipPreset, GameEvent, P
 import { generateContainerList, resetSerialCounter } from '../modules/containerFactory'
 import { generateSlots, getAvailableSlots } from '../modules/shipGrid'
 import { updatePhysics, checkDisasters } from '../modules/physics'
-import { calculatePlacementScore, calculateDischargeScore, getStarRating, checkPerfectBalance } from '../modules/scoring'
+import { calculatePlacementScore, calculateDischargeScore, calculateRestowScore, getStarRating, checkPerfectBalance } from '../modules/scoring'
 import { getLevelConfig, getTotalSlots } from '../modules/levels'
-import { generateDischargeManifest, getDischargeableSlots } from '../modules/dischargeManifest'
+import { generateDischargeManifest, getDischargeableSlots, getRestowSlots } from '../modules/dischargeManifest'
 
 let eventIdCounter = 0
 
@@ -37,6 +37,14 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const dischargeScore = ref(0)
   const lastDischarge = ref<PlacementResult | null>(null)
 
+  // Restow state — transit container currently lifted and awaiting placement
+  const restowContainer = ref<Container | null>(null)
+  const restowFromSlotId = ref<string | null>(null)
+  const restowSlots = ref<string[]>([])
+
+  // Whether this level has transit containers that may need restowing (drives briefing UI)
+  const hasTransitContainers = ref(false)
+
   const currentContainer = computed<Container | null>(() => {
     return containers.value[currentContainerIndex.value] ?? null
   })
@@ -60,6 +68,8 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     if (!shipConfig.value) return []
     return getDischargeableSlots(grid.value, shipConfig.value)
   })
+
+  const availableRestowSlots = computed<string[]>(() => restowSlots.value)
 
   const isWarning = computed<boolean>(() => {
     return Math.abs(shipList.value) >= 8 || Math.abs(shipTrim.value) >= 6
@@ -110,15 +120,27 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     dischargeScore.value = 0
     lastDischarge.value = null
 
+    // Restow state reset
+    restowContainer.value = null
+    restowFromSlotId.value = null
+    restowSlots.value = []
+    hasTransitContainers.value = false
+
     if (config.dischargeContainerCount && config.dischargeContainerCount > 0) {
-      generateDischargeManifest(config.dischargeContainerCount, config.preset, grid.value)
+      const transitCount = config.transitContainerCount ?? 0
+      generateDischargeManifest(
+        config.dischargeContainerCount,
+        config.preset,
+        grid.value,
+        transitCount
+      )
       dischargeCount.value = config.dischargeContainerCount
-      phase.value = 'discharge_selecting'
-      addEvent('Discharge phase: unload ' + config.dischargeContainerCount + ' Import containers', 'info')
+      hasTransitContainers.value = transitCount > 0
     } else {
-      phase.value = 'selecting'
-      addEvent('Level started: ' + config.name, 'info')
+      // phase set by confirmBriefing after briefing is dismissed
     }
+    // Always show briefing first — confirmBriefing() will advance to the real phase
+    phase.value = 'briefing'
   }
 
   function tickTimer(deltaSeconds: number): 'expired' | 'warn30pct' | 'warn15pct' | null {
@@ -127,7 +149,9 @@ export const useGameStore = defineStore('stowage-master-game', () => {
       phase.value !== 'selecting' &&
       phase.value !== 'animating' &&
       phase.value !== 'discharge_selecting' &&
-      phase.value !== 'discharge_animating'
+      phase.value !== 'discharge_animating' &&
+      phase.value !== 'restow_selecting' &&
+      phase.value !== 'restow_animating'
     ) return null
 
     const prev = timerRemaining.value
@@ -161,14 +185,78 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     return { container: currentContainer.value, slot }
   }
 
-  function pickDischargeContainer(slotId: string): { container: Container; slot: Slot } | null {
+  function pickDischargeContainer(slotId: string): { container: Container; slot: Slot; isRestow?: boolean } | null {
     if (phase.value !== 'discharge_selecting') return null
 
     const slot = grid.value[slotId]
-    if (!slot || !slot.container || !slot.container.isImport) return null
+    if (!slot || !slot.container) return null
+
+    if (slot.container.isTransit) {
+      // Transit container blocking an import — initiate restow
+      restowContainer.value = { ...slot.container, isBeingRestowed: true }
+      restowFromSlotId.value = slotId
+      restowSlots.value = getRestowSlots(grid.value, shipConfig.value!, slotId)
+
+      // Remove from grid immediately so indicators update
+      slot.container = null
+      grid.value[slotId] = { ...slot }
+
+      phase.value = 'restow_selecting'
+      addEvent('Transit container lifted — select a restow position', 'info')
+      return { container: restowContainer.value, slot, isRestow: true }
+    }
+
+    if (!slot.container.isImport) return null
 
     phase.value = 'discharge_animating'
     return { container: slot.container, slot }
+  }
+
+  function placeRestowContainer(slotId: string): { container: Container; slot: Slot } | null {
+    if (phase.value !== 'restow_selecting') return null
+    if (!restowContainer.value) return null
+
+    const slot = grid.value[slotId]
+    if (!slot || slot.container) return null
+    if (!restowSlots.value.includes(slotId)) return null
+
+    phase.value = 'restow_animating'
+    return { container: restowContainer.value, slot }
+  }
+
+  function finalizeRestow(slotId: string): { restow?: PlacementResult } | null {
+    if (!restowContainer.value || !shipConfig.value) return null
+
+    const slot = grid.value[slotId]
+    if (!slot) return null
+
+    // Place the transit container in the new slot
+    const container = { ...restowContainer.value, isBeingRestowed: false }
+    slot.container = container
+    grid.value[slotId] = { ...slot }
+
+    // Update physics
+    const physicsAfter = updatePhysics(grid.value, shipConfig.value)
+    shipList.value = physicsAfter.list
+    shipTrim.value = physicsAfter.trim
+    shipVCG.value = physicsAfter.vcg
+
+    const restow = calculateRestowScore(container, slot, grid.value, shipConfig.value)
+    score.value += restow.score
+    lastDischarge.value = restow
+
+    for (const reason of restow.reasons) {
+      if (reason.good) addEvent(reason.text, 'success')
+      else if (reason.points < 0) addEvent(reason.text, 'warning')
+    }
+
+    // Clear restow state
+    restowContainer.value = null
+    restowFromSlotId.value = null
+    restowSlots.value = []
+
+    phase.value = 'discharge_selecting'
+    return { restow }
   }
 
   function finalizeDischarge(slotId: string): { levelPhaseEnd?: boolean; discharge?: PlacementResult } | null {
@@ -301,6 +389,17 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     phase.value = newPhase
   }
 
+  /** Called when the player dismisses the level briefing — advances to the real first phase. */
+  function confirmBriefing(): void {
+    if (dischargeCount.value > 0) {
+      phase.value = 'discharge_selecting'
+      addEvent('Discharge phase: unload ' + dischargeCount.value + ' import containers', 'info')
+    } else {
+      phase.value = 'selecting'
+      addEvent('Level started: ' + levelConfig.value.name, 'info')
+    }
+  }
+
   function getStarRatingResult(): StarRatingResult {
     return getStarRating(score.value, perfectScore.value)
   }
@@ -316,6 +415,9 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     availableSlots, dischargeableSlots, isWarning, isCritical, progressPercent, levelConfig,
     startLevel, placeContainer, finalizePlacement,
     pickDischargeContainer, finalizeDischarge,
+    placeRestowContainer, finalizeRestow,
+    restowContainer, restowFromSlotId, availableRestowSlots,
+    hasTransitContainers, confirmBriefing,
     addEvent, setPhase, getStarRatingResult, tickTimer,
   }
 })

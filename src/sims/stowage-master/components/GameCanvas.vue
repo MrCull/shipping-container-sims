@@ -18,6 +18,7 @@ import {
   createSlotIndicators, removeSlotIndicators, animateSlotIndicators,
   createImportContainerMeshes, removeImportContainerMeshes, removeImportContainerMesh,
   createImportSlotIndicators, removeImportSlotIndicators, animateImportSlotIndicators,
+  createRestowSlotIndicators, removeRestowSlotIndicators, animateRestowSlotIndicators,
 } from '../modules/containerRenderer'
 import {
   createCrane, getDockPosition, createPlacementAnimation, createDischargeAnimation,
@@ -93,6 +94,7 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
   if (shipGroup) {
     animateSlotIndicators(shipGroup, time)
     animateImportSlotIndicators(shipGroup, time)
+    animateRestowSlotIndicators(shipGroup, time)
   }
 
   if (craneObj) {
@@ -222,13 +224,21 @@ function hornSound(): string {
 // Single phase watcher — handles both scene rebuilds and audio/animation triggers
 watch(() => store.phase, (newPhase, oldPhase) => {
   const isSceneRebuildTrigger =
-    (newPhase === 'discharge_selecting' || newPhase === 'selecting') &&
+    newPhase === 'briefing' &&
     (oldPhase === 'start' || oldPhase === 'disaster' || oldPhase === 'failed' || oldPhase === 'complete')
+
 
   if (isSceneRebuildTrigger) {
     // Stop all in-flight sounds from the previous level before building the new scene
     audio.stopAll()
     buildScene()
+  }
+
+  // Briefing dismissed on a load-only level — show green slot indicators
+  if (newPhase === 'selecting' && oldPhase === 'briefing') {
+    if (shipGroup && store.shipConfig) {
+      createSlotIndicators(getScene()!, store.grid, store.availableSlots, store.shipConfig, shipGroup)
+    }
   }
 
   // Discharge phase → load phase: tear down discharge indicators, set up load indicators
@@ -243,11 +253,21 @@ watch(() => store.phase, (newPhase, oldPhase) => {
     }
   }
 
-  // Rebuild import slot indicators after each discharge
-  if (newPhase === 'discharge_selecting' && oldPhase === 'discharge_animating') {
+  // Set up discharge indicators when entering discharge_selecting for the first time (from briefing)
+  // or after each discharge/restow animation completes
+  if (newPhase === 'discharge_selecting' && (oldPhase === 'briefing' || oldPhase === 'discharge_animating' || oldPhase === 'restow_animating')) {
     if (shipGroup && store.shipConfig) {
       removeImportSlotIndicators(shipGroup)
+      removeRestowSlotIndicators(shipGroup)
       createImportSlotIndicators(store.grid, store.dischargeableSlots, store.shipConfig, shipGroup)
+    }
+  }
+
+  // Transit container picked for restow — show cyan restow destination indicators
+  if (newPhase === 'restow_selecting' && oldPhase === 'discharge_selecting') {
+    if (shipGroup && store.shipConfig) {
+      removeImportSlotIndicators(shipGroup)
+      createRestowSlotIndicators(store.grid, store.availableRestowSlots, store.shipConfig, shipGroup)
     }
   }
 
@@ -357,10 +377,10 @@ async function buildScene(): Promise<void> {
 
   setCameraForShip(store.shipConfig)
 
-  if (store.phase === 'discharge_selecting') {
-    // Discharge phase: render pre-loaded import containers and orange indicators
+  const isDischargeLevel = store.dischargeCount > 0
+  if (isDischargeLevel) {
+    // Discharge level: render pre-loaded containers — indicators added when briefing is dismissed
     createImportContainerMeshes(store.grid, store.shipConfig, shipGroup)
-    createImportSlotIndicators(store.grid, store.dischargeableSlots, store.shipConfig, shipGroup)
 
     // Spawn outbound truck queue on the far lane
     const dockPos = getDockPosition(craneObj!)
@@ -372,12 +392,11 @@ async function buildScene(): Promise<void> {
     )
     outboundTruckGroups = obTrucks.map(e => e.truck)
 
-    // Also spawn the inbound load queue so it's visible in the background
+    // Inbound queue is visible in the background during discharge
     updateHoistMesh(store.currentContainer)
     updateQueueMeshes(store.nextThreeContainers)
   } else {
-    // Normal load phase
-    createSlotIndicators(scene, store.grid, store.availableSlots, store.shipConfig, shipGroup)
+    // Load-only level — no slot indicators yet; added when briefing is dismissed
     updateHoistMesh(store.currentContainer)
     updateQueueMeshes(store.nextThreeContainers)
   }
@@ -411,6 +430,30 @@ function pickImportSlot(event: MouseEvent): string | null {
   return null
 }
 
+function pickSlotByUserData(event: MouseEvent, dataKey: string): string | null {
+  const camera = getCamera()
+  const scene = getScene()
+  if (!camera || !scene) return null
+  const canvas = canvasRef.value
+  if (!canvas) return null
+  const rect = canvas.getBoundingClientRect()
+  const mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  )
+  const raycaster = new THREE.Raycaster()
+  raycaster.setFromCamera(mouse, camera)
+  const hits = raycaster.intersectObjects(scene.children, true)
+  for (const hit of hits) {
+    let obj: THREE.Object3D | null = hit.object
+    while (obj) {
+      if (obj.userData?.[dataKey]) return obj.userData['slotId'] as string
+      obj = obj.parent
+    }
+  }
+  return null
+}
+
 function handleDischargeClick(event: MouseEvent): void {
   if (store.phase !== 'discharge_selecting') return
 
@@ -421,18 +464,37 @@ function handleDischargeClick(event: MouseEvent): void {
   if (!result) return
 
   const scene = getScene()!
+  const cfg = store.shipConfig!
+  const deckY = cfg.deckOffsetY ?? cfg.height * 0.3
 
-  // Remove the import container mesh from the ship and hand it to the crane
+  if (result.isRestow) {
+    // Transit container — store already removed it from grid, phase is now restow_selecting.
+    // Pull the mesh out of the ship group and keep a reference for the pending restow click.
+    const containerMesh = removeImportContainerMesh(shipGroup!, slotId)
+      ?? createContainerMesh(result.container)
+    scene.add(containerMesh)
+
+    const localPos = new THREE.Vector3(
+      result.slot.xOffset,
+      result.slot.yOffset + deckY + CONTAINER.size.y / 2,
+      result.slot.zOffset
+    )
+    shipGroup!.localToWorld(localPos)
+    containerMesh.position.copy(localPos)
+
+    // Park the mesh at crane height so it's visually lifted while awaiting restow choice
+    hoistMesh = containerMesh
+    audio.playSound('containerLoad', 0.5)
+    return
+  }
+
+  // Normal import discharge
   const containerMesh = removeImportContainerMesh(shipGroup!, slotId)
     ?? createContainerMesh(result.container)
   scene.add(containerMesh)
 
-  // Remove import slot indicators while animating
   removeImportSlotIndicators(shipGroup!)
 
-  // World position of the container on the ship
-  const cfg = store.shipConfig!
-  const deckY = cfg.deckOffsetY ?? cfg.height * 0.3
   const localPos = new THREE.Vector3(
     result.slot.xOffset,
     result.slot.yOffset + deckY + CONTAINER.size.y / 2,
@@ -441,7 +503,6 @@ function handleDischargeClick(event: MouseEvent): void {
   shipGroup!.localToWorld(localPos)
   containerMesh.position.copy(localPos)
 
-  // Outbound dock: front outbound truck position, offset onto the trailer bed (not the cab)
   const dockPos = getDockPosition(craneObj!)
   const outboundZ = dockPos.z + OUTBOUND_TRUCK.dockZOffset
   const outboundX = outboundTruckGroups[0]?.position.x ?? dockPos.x
@@ -460,9 +521,62 @@ function handleDischargeClick(event: MouseEvent): void {
     outboundDockPos,
     () => {
       audio.playSound('containerSet', 0.65)
-      // Trigger front outbound truck to depart with container
       triggerOutboundTruckDepart(containerMesh)
       store.finalizeDischarge(slotId)
+    }
+  )
+}
+
+function handleRestowClick(event: MouseEvent): void {
+  if (store.phase !== 'restow_selecting') return
+
+  const slotId = pickSlotByUserData(event, 'isRestowSlot')
+  if (!slotId) return
+
+  const result = store.placeRestowContainer(slotId)
+  if (!result) return
+
+  const scene = getScene()!
+  const cfg = store.shipConfig!
+  const deckY = cfg.deckOffsetY ?? cfg.height * 0.3
+
+  // The hoist mesh is the lifted transit container
+  const containerMesh = hoistMesh ?? createContainerMesh(result.container)
+  hoistMesh = null
+  if (!containerMesh.parent) scene.add(containerMesh)
+
+  removeRestowSlotIndicators(shipGroup!)
+
+  const targetSlot = result.slot
+  const targetLocalPos = new THREE.Vector3(
+    targetSlot.xOffset,
+    targetSlot.yOffset + deckY + CONTAINER.size.y / 2,
+    targetSlot.zOffset
+  )
+  shipGroup!.localToWorld(targetLocalPos)
+
+  audio.playSound('containerLoad', 0.5)
+
+  currentAnimation = createPlacementAnimation(
+    craneObj!,
+    containerMesh,
+    targetLocalPos,
+    shipGroup!,
+    () => {
+      audio.playSound('containerSet', 0.6)
+      // Add mesh back into import-containers group so it stays on the ship
+      const importGroup = shipGroup!.getObjectByName('import-containers')
+      if (importGroup && scene.getObjectById(containerMesh.id)) {
+        scene.remove(containerMesh)
+        containerMesh.position.set(
+          targetSlot.xOffset,
+          targetSlot.yOffset + deckY + CONTAINER.size.y / 2,
+          targetSlot.zOffset
+        )
+        containerMesh.name = `import-container-${targetSlot.id}`
+        importGroup.add(containerMesh)
+      }
+      store.finalizeRestow(slotId)
     }
   )
 }
@@ -545,6 +659,10 @@ function triggerOutboundTruckDepart(containerMesh: THREE.Group): void {
 function handleClick(event: MouseEvent): void {
   if (store.phase === 'discharge_selecting') {
     handleDischargeClick(event)
+    return
+  }
+  if (store.phase === 'restow_selecting') {
+    handleRestowClick(event)
     return
   }
   if (store.phase !== 'selecting') return

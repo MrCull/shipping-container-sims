@@ -135,6 +135,39 @@ function checkPodOrder(container: Container, slot: Slot, grid: Record<string, Sl
   return penalty
 }
 
+/**
+ * Score a restow move (picking up a transit container and placing it elsewhere).
+ * Base -15 (restows cost time and effort); partial credit for placing it well.
+ */
+export function calculateRestowScore(
+  _container: Container,
+  targetSlot: Slot,
+  grid: Record<string, Slot>,
+  shipConfig: ShipPreset
+): PlacementResult {
+  let score = -15
+  const reasons: PlacementResult['reasons'] = []
+  reasons.push({ text: 'Restow required — overstow resolved', points: -15 })
+
+  // Bonus: placed in a sensible low tier (good stowage practice)
+  if (!isTopThird(targetSlot.tierIndex, shipConfig.tiers)) {
+    score += 10
+    reasons.push({ text: 'Restowed low — good stability', points: 10, good: true })
+  }
+
+  // Penalty: placed above another import (creates a new overstow)
+  if (targetSlot.tierIndex > 0) {
+    const belowTierNum = targetSlot.tier - 2
+    const belowId = `${String(targetSlot.bay).padStart(2, '0')}-${String(targetSlot.row).padStart(2, '0')}-${String(belowTierNum).padStart(2, '0')}`
+    if (grid[belowId]?.container?.isImport) {
+      score -= 20
+      reasons.push({ text: 'Restowed above import — new overstow!', points: -20 })
+    }
+  }
+
+  return { score, reasons }
+}
+
 export function getStarRating(score: number, targetScore: number): StarRatingResult {
   const percent = score / targetScore
   if (percent >= 0.95) return { stars: 5, title: 'Perfect Planner' }
