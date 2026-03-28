@@ -129,7 +129,7 @@ function buildHull(group: THREE.Group, L: number, W: number, H: number, mats: Re
   }
 }
 
-function buildDeck(group: THREE.Group, L: number, W: number, H: number, mats: ReturnType<typeof getMaterials>): void {
+function buildDeck(group: THREE.Group, L: number, W: number, mats: ReturnType<typeof getMaterials>): void {
   const { deckMat, metalMat, bollardMat, lashBridgeMat, windlassMat } = mats
   const deckY = DECK_Y
 
@@ -310,7 +310,7 @@ function buildSuperstructure(group: THREE.Group, L: number, W: number, H: number
   group.add(prop)
 }
 
-function buildDeckFittings(group: THREE.Group, L: number, W: number, H: number, mats: ReturnType<typeof getMaterials>): void {
+function buildDeckFittings(group: THREE.Group, L: number, W: number, mats: ReturnType<typeof getMaterials>): void {
   const { metalMat } = mats
   const deckY = DECK_Y + 0.17
   const railMat = new THREE.MeshPhongMaterial({ color: 0x888888, shininess: 48 })
@@ -416,9 +416,9 @@ export class VesselRenderer {
 
     const mats = getMaterials()
     buildHull(group, L, W, H, mats)
-    buildDeck(group, L, W, H, mats)
+    buildDeck(group, L, W, mats)
     buildSuperstructure(group, L, W, H, mats)
-    buildDeckFittings(group, L, W, H, mats)
+    buildDeckFittings(group, L, W, mats)
 
     // Rotate 180° so bow (+X) faces the direction of approach (-X travel)
     group.rotation.y = Math.PI
