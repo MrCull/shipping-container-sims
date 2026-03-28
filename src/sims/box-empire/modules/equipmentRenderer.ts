@@ -228,6 +228,7 @@ export class EquipmentRenderer {
     const centerBlock = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.6), darkMat)
     centerBlock.position.set(0, -0.75, 9.2); boomGroup.add(centerBlock)
 
+    boomGroup.scale.z = 0.5   // halve arm length
     boomGroup.rotation.x = -0.15
     group.add(boomGroup)
 
