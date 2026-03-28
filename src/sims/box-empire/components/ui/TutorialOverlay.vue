@@ -4,13 +4,18 @@ import { useGameStore } from '../../store/gameStore'
 
 const store = useGameStore()
 
-const showNextButton = computed(() => {
-  return store.tutorialStep <= 2
-})
+const showNextButton = computed(() => store.tutorialStep === 1)
 
-const showExportGateButton = computed(() => {
-  return store.tutorialStep === 3 && !store.gatehouse.exportLaneOpen
-})
+const showAcceptVesselButton = computed(() =>
+  store.tutorialStep === 2 &&
+  !!store.vesselVisits[0] &&
+  store.vesselVisits[0].state === 'announced',
+)
+
+const showOpenGatehouseButton = computed(() =>
+  store.tutorialStep === 4 &&
+  (!store.gatehouse.exportLaneOpen || !store.gatehouse.importLaneOpen),
+)
 </script>
 
 <template>
@@ -34,11 +39,18 @@ const showExportGateButton = computed(() => {
           Next →
         </button>
         <button
-          v-if="showExportGateButton"
-          class="tutorial-btn gate-btn"
-          @click="store.openExportGate()"
+          v-if="showAcceptVesselButton"
+          class="tutorial-btn vessel-btn"
+          @click="store.acceptVessel()"
         >
-          🚪 Open Export Gate
+          ⚓ Accept Vessel (5 Import / 5 Export)
+        </button>
+        <button
+          v-if="showOpenGatehouseButton"
+          class="tutorial-btn gate-btn"
+          @click="store.openGatehouse()"
+        >
+          🚪 Open Gatehouse
         </button>
       </div>
     </div>
@@ -114,6 +126,16 @@ const showExportGateButton = computed(() => {
 .tutorial-btn:hover {
   transform: scale(1.05);
   box-shadow: 0 2px 10px rgba(245, 158, 11, 0.5);
+}
+
+.vessel-btn {
+  background: #3498db;
+  border-color: #3498db;
+  color: #fff;
+}
+
+.vessel-btn:hover {
+  box-shadow: 0 2px 10px rgba(52, 152, 219, 0.5);
 }
 
 .gate-btn {

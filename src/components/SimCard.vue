@@ -15,7 +15,13 @@ defineProps<{
   >
     <div class="card-top">
       <div class="card-icon">
-        {{ sim.icon }}
+        <img
+          v-if="sim.logoSrc"
+          :src="sim.logoSrc"
+          alt=""
+          class="card-icon-img"
+        >
+        <span v-else>{{ sim.icon }}</span>
       </div>
       <span class="card-status">
         {{ sim.status === 'playable' ? '► PLAY' : sim.status === 'wip' ? '⚙ WIP' : '🔒 SOON' }}
@@ -120,6 +126,12 @@ defineProps<{
   border-radius: 8px;
   border: 1px solid var(--color-border);
   flex-shrink: 0;
+}
+
+.card-icon-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
 }
 
 .card-title {

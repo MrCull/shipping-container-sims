@@ -259,7 +259,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
     containers.value = [...importContainers, ...exportContainers]
 
-    const vessel = createTutorialVessel(importContainers, 60)
+    const vessel = createTutorialVessel(importContainers, Number.MAX_SAFE_INTEGER)
     vesselVisits.value = [vessel]
 
     importContainers.forEach((c, i) => {
@@ -404,12 +404,17 @@ export const useGameStore = defineStore('box-empire-game', () => {
         .filter(t => t.visitType === 'import_pickup' && t.containerId)
         .map(t => t.containerId),
     )
-    const container = containers.value.find(
+    const yard = yardBlocks.value[0]
+    const eligible = containers.value.filter(
       c =>
         c.visitType === 'import' &&
         c.lifecycleState === 'in_yard' &&
         !pickupTruckContainerIds.has(c.id),
     )
+    // Prefer accessible (top-of-stack) containers — avoids parking a truck at YARD_IO
+    // for a buried container that blocks all other trucks from entering the zone.
+    const container =
+      eligible.find(c => isContainerOnTop(yard, c.id)) ?? eligible[0]
     if (!container) return
     const truck = createTruck(null, 'import_pickup')
     truck.stateStartTime = simTime.value
@@ -560,6 +565,16 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
       if (eResult.pickedContainerId) {
         emitEvent('container.picked', `Container ${eResult.pickedContainerId} picked up`)
+        // Clear the yard slot immediately on pickup so containers below become accessible.
+        // Without this, the slot stays occupied until drop, keeping lower-tier jobs
+        // permanently inaccessible (stuck as 'pending', never assigned).
+        const pickedJob = jobs.value.find(j => j.id === eq.currentJobId)
+        if (pickedJob && pickedJob.pickupLocation.type === 'yard_slot') {
+          const yard = yardBlocks.value[0]
+          removeContainerFromSlot(yard, eResult.pickedContainerId)
+          const pickedContainer = containers.value.find(c => c.id === eResult.pickedContainerId)
+          if (pickedContainer) pickedContainer.yardSlot = null
+        }
       }
 
       if (eResult.jobCompleted && eResult.jobId) {
@@ -594,13 +609,22 @@ export const useGameStore = defineStore('box-empire-game', () => {
       const yard = yardBlocks.value[0]
       const slotRef = parseYardSlotId(job.dropoffLocation.id)
       if (slotRef) {
-        placeContainerInSlot(yard, slotRef, container.id)
-        container.yardSlot = slotRef
+        // Recalculate actual tier at drop time — containers may have been removed since the
+        // job was created, which would leave this container floating above an empty gap.
+        const occupiedTiers = yard.slots.filter(
+          s => s.bay === slotRef.bay && s.row === slotRef.row && s.containerId !== null,
+        ).length
+        const actualSlotRef = { ...slotRef, tier: occupiedTiers + 1 }
+        const actualPos = getSlotWorldPosition(yard, actualSlotRef)
+        const actualSlotId = makeYardSlotId(actualSlotRef.blockId, actualSlotRef.bay, actualSlotRef.row, actualSlotRef.tier)
+
+        placeContainerInSlot(yard, actualSlotRef, container.id)
+        container.yardSlot = actualSlotRef
         container.lifecycleState = 'in_yard'
         container.currentLocation = {
           type: 'yard_slot',
-          id: job.dropoffLocation.id,
-          position: { ...job.dropoffLocation.position },
+          id: actualSlotId,
+          position: actualPos,
         }
         emitEvent('container.placed', `Container ${container.id} stored in yard`)
 
@@ -612,6 +636,28 @@ export const useGameStore = defineStore('box-empire-game', () => {
             truck.containerId = null
             // Export truck now empty — route to out-gate (not straight off-screen)
             startExportTruckExit(truck, simTime.value)
+          }
+        }
+
+        // If an import pickup truck arrived at YARD_IO before the container was placed in the
+        // yard, the readyForEquipment handler skipped creating the RS job (container wasn't
+        // in_yard yet). Create it now so the RS doesn't sit idle.
+        if (container.visitType === 'import' && container.yardSlot) {
+          const waitingTruck = truckVisits.value.find(
+            t => t.visitType === 'import_pickup' && t.containerId === container.id && t.state === 'waiting_for_equipment',
+          )
+          if (waitingTruck && !getActiveJobForContainer(getState(), container.id)) {
+            const ys = container.yardSlot
+            const slotId = makeYardSlotId(ys.blockId, ys.bay, ys.row, ys.tier)
+            const pickupJob = createJob(
+              container.id,
+              { type: 'yard_slot', id: slotId, position: { ...container.currentLocation.position } },
+              { type: 'truck', id: waitingTruck.id, position: { ...YARD_IO_POSITION } },
+              'reach_stacker',
+              8,
+              simTime.value,
+            )
+            jobs.value.push(pickupJob)
           }
         }
       }
@@ -788,21 +834,17 @@ export const useGameStore = defineStore('box-empire-game', () => {
       }
     }
 
-    // Phase: Spawn import pickup trucks
+    // Phase: Spawn import pickup trucks (only once the import gate is open)
     if (!importPickupStarted.value) {
       const importInYard = containers.value.filter(
         c => c.visitType === 'import' && c.lifecycleState === 'in_yard',
       ).length
       if (importInYard > 0 && vessel && (vessel.state === 'discharging' || vessel.state === 'loading' || vessel.state === 'departing' || vessel.state === 'departed')) {
         importPickupStarted.value = true
-        // Auto-open import lane
-        if (!gatehouse.value.importLaneOpen) {
-          openImportGate()
-        }
       }
     }
 
-    if (importPickupStarted.value && importTrucksSent.value < TUTORIAL_IMPORT_COUNT) {
+    if (importPickupStarted.value && importTrucksSent.value < TUTORIAL_IMPORT_COUNT && gatehouse.value.importLaneOpen) {
       const importInYard = containers.value.filter(
         c => c.visitType === 'import' && c.lifecycleState === 'in_yard',
       )
@@ -981,6 +1023,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
     }
   }
 
+  function acceptVessel(): void {
+    const vessel = vesselVisits.value[0]
+    if (!vessel || vessel.state !== 'announced') return
+    vessel.arrivalTime = simTime.value
+  }
+
   const CAREER_INTRO_LAST_PAGE = 4
 
   function beginCareerIntro(): void {
@@ -1063,6 +1111,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     toggleEquipment,
     setCraneMode,
     advanceTutorialStep,
+    acceptVessel,
     careerIntroPage,
     beginCareerIntro,
     advanceCareerIntro,

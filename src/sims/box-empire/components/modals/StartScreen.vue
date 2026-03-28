@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import boxEmpireLogo from '../../assets/logo.svg?url'
+
 const emit = defineEmits<{
   start: []
 }>()
@@ -8,7 +10,11 @@ const emit = defineEmits<{
   <div class="start-screen">
     <div class="start-modal">
       <div class="start-icon">
-        📦
+        <img
+          :src="boxEmpireLogo"
+          alt=""
+          class="start-icon-img"
+        >
       </div>
       <h1 class="start-title">
         Box Empire
@@ -57,8 +63,15 @@ const emit = defineEmits<{
 }
 
 .start-icon {
-  font-size: 4rem;
   margin-bottom: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.start-icon-img {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
 }
 
 .start-title {

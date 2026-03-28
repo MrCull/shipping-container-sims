@@ -53,7 +53,14 @@ onUnmounted(() => {
         v-if="sim"
         class="sim-name"
       >
-        {{ sim.icon }} {{ sim.title }}
+        <img
+          v-if="sim.logoSrc"
+          :src="sim.logoSrc"
+          alt=""
+          class="sim-name-logo"
+        >
+        <span v-else>{{ sim.icon }}</span>
+        <span>{{ sim.title }}</span>
       </h1>
     </header>
 
@@ -67,7 +74,13 @@ onUnmounted(() => {
         class="coming-soon-screen"
       >
         <div class="cs-icon">
-          {{ sim.icon }}
+          <img
+            v-if="sim.logoSrc"
+            :src="sim.logoSrc"
+            alt=""
+            class="cs-icon-img"
+          >
+          <span v-else>{{ sim.icon }}</span>
         </div>
         <h2 class="cs-title">
           {{ sim.title }}
@@ -149,9 +162,18 @@ onUnmounted(() => {
 }
 
 .sim-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-family: var(--font-retro);
   font-size: 0.7rem;
   letter-spacing: 0.1em;
+}
+
+.sim-name-logo {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
 }
 
 .sim-content {
@@ -173,6 +195,15 @@ onUnmounted(() => {
 
 .cs-icon {
   font-size: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cs-icon-img {
+  width: 5rem;
+  height: 5rem;
+  object-fit: contain;
 }
 
 .cs-title {

@@ -53,7 +53,7 @@ export const RS_MAX_STACK_HEIGHT = 3
 
 // ---- Mobile Harbor Crane --------------------------------------------------
 
-export const MHC_CYCLE_TIME = 90
+export const MHC_CYCLE_TIME = 45
 export const MHC_REACH = 1
 
 // ---- Truck ----------------------------------------------------------------
@@ -115,15 +115,15 @@ export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL
 export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
 
 // Yard handover point where trucks park and equipment loads/unloads
-export const YARD_IO_POSITION: Position3D = { x: 0, y: 0, z: 30 }
+export const YARD_IO_POSITION: Position3D = { x: 0, y: CONTAINER_HEIGHT / 2, z: 30 }
 // RS parks this many metres in front of the truck (truck side) to reach container with boom
 export const RS_TRUCK_PARK_OFFSET = 8
 // Waiting position trucks go to while holding before YARD_IO becomes free
 export const YARD_IO_WAIT_POSITION: Position3D = { x: -10, y: 0, z: 30 }
 export const YARD_BLOCK_POSITION: Position = { x: -15, z: 20 }
-export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: 0, z: 3 }
-export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -5, y: 0, z: 3 }
-export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: 5, y: 0, z: 3 }
+export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: CONTAINER_HEIGHT / 2, z: 3 }
+export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -5, y: CONTAINER_HEIGHT / 2, z: 3 }
+export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: 5, y: CONTAINER_HEIGHT / 2, z: 3 }
 // Vessel berth further out to sea so ship doesn't overlap quay
 export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -14 }
 export const CRANE_POSITION: Position3D = { x: 0, y: 0, z: 0 }

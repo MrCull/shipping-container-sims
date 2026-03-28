@@ -79,9 +79,9 @@ export function findAvailableSlot(
   }
 
   if (preferredVisitType && containers) {
-    // Pass 1: bays that already have the same type
+    // Pass 1: empty bays — spread containers out so each is accessible without unstuffing
     for (let bay = 1; bay <= block.bays; bay++) {
-      if (bayHasContainerOfType(bay, preferredVisitType)) {
+      if (!bayHasAnyContainer(bay)) {
         for (let row = 1; row <= block.rows; row++) {
           const slot = trySlotInBay(bay, row)
           if (slot) return slot
@@ -89,9 +89,9 @@ export function findAvailableSlot(
       }
     }
 
-    // Pass 2: empty bays
+    // Pass 2: bays that already have the same type (stack only when no empty bays remain)
     for (let bay = 1; bay <= block.bays; bay++) {
-      if (!bayHasAnyContainer(bay)) {
+      if (bayHasContainerOfType(bay, preferredVisitType)) {
         for (let row = 1; row <= block.rows; row++) {
           const slot = trySlotInBay(bay, row)
           if (slot) return slot

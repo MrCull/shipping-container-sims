@@ -65,8 +65,13 @@ export function assignPendingJobs(state: BoxEmpireState): void {
     .sort((a, b) => b.priority - a.priority)
 
   for (const job of pendingJobs) {
-    // Skip jobs where the container is buried
-    if (!isJobAccessible(job, state)) continue
+    // If the container is buried / not accessible, mark it blocked so recheckBlockedJobs
+    // can revive it the moment it becomes accessible. Without this the job stays pending
+    // forever but is silently skipped every tick, causing permanent deadlocks.
+    if (!isJobAccessible(job, state)) {
+      if (job.pickupLocation.type === 'yard_slot') job.status = 'blocked'
+      continue
+    }
 
     const idleEquipment = state.equipment.filter(e => {
       if (e.state !== 'idle') return false
@@ -109,6 +114,16 @@ export function recheckBlockedJobs(state: BoxEmpireState): void {
     if (job.status !== 'blocked') continue
     if (isJobAccessible(job, state)) {
       job.status = 'pending'
+      continue
+    }
+    // Fallback: if the yard-slot record was cleared (container picked up / slot reset)
+    // but the container lifecycle still says in_yard, treat as accessible so the job
+    // doesn't stay blocked forever.
+    if (job.pickupLocation.type === 'yard_slot') {
+      const container = state.containers.find(c => c.id === job.containerId)
+      if (container?.lifecycleState === 'in_yard') {
+        job.status = 'pending'
+      }
     }
   }
 }

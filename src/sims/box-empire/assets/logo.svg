@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+  <rect x="5" y="51" width="54" height="3" rx="1" fill="#64748b"/>
+  <rect x="8" y="28" width="48" height="3" rx="1" fill="#2563eb"/>
+  <rect x="8" y="30" width="48" height="21" rx="1" fill="#1d4ed8"/>
+  <g stroke="#1e3a8a" stroke-width="0.85" opacity="0.95">
+    <line x1="12" y1="30" x2="12" y2="51"/><line x1="16" y1="30" x2="16" y2="51"/>
+    <line x1="20" y1="30" x2="20" y2="51"/><line x1="24" y1="30" x2="24" y2="51"/>
+    <line x1="28" y1="30" x2="28" y2="51"/><line x1="36" y1="30" x2="36" y2="51"/>
+    <line x1="40" y1="30" x2="40" y2="51"/><line x1="44" y1="30" x2="44" y2="51"/>
+    <line x1="48" y1="30" x2="48" y2="51"/><line x1="52" y1="30" x2="52" y2="51"/>
+  </g>
+  <rect x="8" y="35" width="48" height="4" fill="#f59e0b"/>
+  <line x1="32" y1="30" x2="32" y2="51" stroke="#0f172a" stroke-width="1.2"/>
+  <rect x="10" y="40" width="20" height="9" rx="0.5" fill="#172554" opacity="0.5"/>
+  <rect x="34" y="40" width="20" height="9" rx="0.5" fill="#172554" opacity="0.5"/>
+  <path stroke="#475569" stroke-width="2.2" stroke-linecap="round" d="M14 10h36"/>
+  <path stroke="#475569" stroke-width="2" stroke-linecap="round" d="M32 10v14"/>
+  <path stroke="#64748b" stroke-width="1.5" stroke-linecap="round" d="M32 24l-4 4M32 24l4 4"/>
+  <rect x="29" y="26" width="6" height="4" rx="0.5" fill="#f59e0b" opacity="0.95"/>
+</svg>
