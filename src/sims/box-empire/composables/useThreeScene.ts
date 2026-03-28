@@ -13,6 +13,9 @@ import { EquipmentRenderer } from '../modules/equipmentRenderer'
 import { VesselRenderer } from '../modules/vesselRenderer'
 import { TruckRenderer } from '../modules/truckRenderer'
 import { FloatingTextRenderer } from '../modules/floatingTextRenderer'
+import { loadModel } from '../modules/modelLoader'
+import { TRUCK_GLB_URL } from '../modules/truckRenderer'
+import { VESSEL_GLB_URL } from '../modules/vesselRenderer'
 
 export interface GameSceneRefs {
   getScene: () => THREE.Scene | null
@@ -101,6 +104,10 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       vesselRenderer = new VesselRenderer(scene)
       truckRenderer = new TruckRenderer(scene)
       floatingTextRenderer = new FloatingTextRenderer(scene)
+
+      // Pre-warm GLB assets so they are cached before trucks/vessels appear
+      loadModel(TRUCK_GLB_URL).catch(e => console.warn('Box Empire: truck GLB pre-warm failed', e))
+      loadModel(VESSEL_GLB_URL).catch(e => console.warn('Box Empire: vessel GLB pre-warm failed', e))
 
       window.addEventListener('resize', onResize)
       isReady.value = true

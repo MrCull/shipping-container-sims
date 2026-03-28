@@ -25,8 +25,8 @@ import {
 
 let truckCounter = 0
 
-const QUEUE_SPACING = 11
-const YARD_ZONE_RADIUS = 5
+const QUEUE_SPACING = 16
+const YARD_ZONE_RADIUS = 12
 
 export function resetTruckCounter(): void {
   truckCounter = 0

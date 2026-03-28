@@ -125,7 +125,7 @@ export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: CONTAINER_HEIGHT / 2,
 export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -5, y: CONTAINER_HEIGHT / 2, z: 3 }
 export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: 5, y: CONTAINER_HEIGHT / 2, z: 3 }
 // Vessel berth further out to sea so ship doesn't overlap quay
-export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -14 }
+export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -11.5 }
 export const CRANE_POSITION: Position3D = { x: 0, y: 0, z: 0 }
 
 export const TERMINAL_BOUNDS = {
@@ -134,6 +134,33 @@ export const TERMINAL_BOUNDS = {
   minZ: -60,  // more sea visible
   maxZ: 145,
 }
+
+// ── GLB model transforms ────────────────────────────────────────────────────
+
+export const TRUCK_GLB = {
+  /** Target height in game meters; uniform scale = targetHeight / measuredHeight */
+  targetHeight: 4.5,
+  /** rotation.y to face +Z when headingY = 0. (90° base + 225° correction = 315°) */
+  rotationY: 7 * Math.PI / 4,
+  /** Container deck height (Y) above ground for GLB truck */
+  containerOffsetY: 1.4,
+  /** Container Z offset relative to truck group origin — 2m further back from cab */
+  containerOffsetZ: -4.0,
+} as const
+
+export const VESSEL_GLB = {
+  /** rotation.y to align GLB (length along Z) → game X-axis (length along X) */
+  rotationY: Math.PI / 2,
+  /** Vertical shift so GLB waterline sits correctly at sea level */
+  yOffset: 5,
+  /**
+   * Y position of container bottom in vessel local space for GLB ship.
+   * Tune to sit containers flush on the visible GLB deck.
+   */
+  containerDeckY: 1.8,
+  /** Z row-spacing for deck containers (across ship width) */
+  rowSpacing: 3.0,
+} as const
 
 // ---- Sound events ---------------------------------------------------------
 

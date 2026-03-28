@@ -6,8 +6,40 @@
 
 import * as THREE from 'three'
 import type { VesselVisit, Container } from '../types'
-import { CONTAINER_LENGTH, CONTAINER_WIDTH, CONTAINER_HEIGHT, TUTORIAL_VESSEL } from './config'
+import { CONTAINER_LENGTH, CONTAINER_WIDTH, CONTAINER_HEIGHT, TUTORIAL_VESSEL, VESSEL_GLB } from './config'
+import { loadModel, getModelSync } from './modelLoader'
 import { createContainerMaterials, disposeContainerMaterials } from './containerMaterials'
+
+export const VESSEL_GLB_URL = new URL('../assets/models/container-ship-small-empty-no-containers.glb', import.meta.url).href
+
+/**
+ * Build a hull group from a cloned GLB root.
+ * Rotates to align length along X, scales to loa, and centres.
+ * The returned group is named 'vessel-glb-hull' for easy identification during swap.
+ */
+function buildVesselGLBHull(glbRoot: THREE.Group, loa: number): THREE.Group {
+  glbRoot.rotation.y = VESSEL_GLB.rotationY
+
+  // After rotation the length axis is X — scale to match loa
+  const box = new THREE.Box3().setFromObject(glbRoot)
+  const size = new THREE.Vector3()
+  box.getSize(size)
+  const scale = loa / size.x
+  glbRoot.scale.setScalar(scale)
+
+  // Centre on X/Z, apply configurable Y offset so deck aligns with DECK_Y
+  const scaledBox = new THREE.Box3().setFromObject(glbRoot)
+  const center = new THREE.Vector3()
+  scaledBox.getCenter(center)
+  glbRoot.position.x = -center.x
+  glbRoot.position.z = -center.z
+  glbRoot.position.y = VESSEL_GLB.yOffset
+
+  const hull = new THREE.Group()
+  hull.name = 'vessel-glb-hull'
+  hull.add(glbRoot)
+  return hull
+}
 
 // Deck-Y constant (must match getVesselSlotPosition in vesselManager)
 const DECK_Y = 5.4
@@ -410,18 +442,25 @@ export class VesselRenderer {
 
   private createVesselMesh(vessel: VesselVisit): THREE.Group {
     const group = new THREE.Group()
-    const L = vessel.loa
-    const W = vessel.beam
-    const H = 5  // deck height reference
-
-    const mats = getMaterials()
-    buildHull(group, L, W, H, mats)
-    buildDeck(group, L, W, mats)
-    buildSuperstructure(group, L, W, H, mats)
-    buildDeckFittings(group, L, W, mats)
-
-    // Rotate 180° so bow (+X) faces the direction of approach (-X travel)
+    // Rotate 180° so bow faces the correct world direction (same for both GLB and procedural)
     group.rotation.y = Math.PI
+
+    const cached = getModelSync(VESSEL_GLB_URL)
+    if (cached) {
+      group.add(buildVesselGLBHull(cached, vessel.loa))
+      group.userData['isGlb'] = true
+    } else {
+      // Procedural fallback while GLB is loading
+      const L = vessel.loa
+      const W = vessel.beam
+      const H = 5  // deck height reference
+      const mats = getMaterials()
+      buildHull(group, L, W, H, mats)
+      buildDeck(group, L, W, mats)
+      buildSuperstructure(group, L, W, H, mats)
+      buildDeckFittings(group, L, W, mats)
+    }
+
     return group
   }
 
@@ -453,6 +492,34 @@ export class VesselRenderer {
         this.scene.add(mesh)
         this.meshes.set(vessel.id, mesh)
         this.deckContainers.set(vessel.id, new Map())
+
+        // Schedule async GLB swap if procedural was used (GLB not yet cached)
+        if (!mesh.userData['isGlb']) {
+          const vesselId = vessel.id
+          const vesselLoa = vessel.loa
+          loadModel(VESSEL_GLB_URL).then(glbRoot => {
+            const existingMesh = this.meshes.get(vesselId)
+            if (!existingMesh) return // vessel already departed
+
+            // Remove and dispose procedural hull children, preserve deck containers
+            const hullChildren = [...existingMesh.children].filter(c => !c.name.startsWith('deck-container-'))
+            hullChildren.forEach(c => {
+              existingMesh.remove(c)
+              c.traverse(obj => {
+                const m = obj as THREE.Mesh
+                if (m.geometry) m.geometry.dispose()
+                if (m.material) {
+                  if (Array.isArray(m.material)) m.material.forEach(mt => mt.dispose())
+                  else m.material.dispose()
+                }
+              })
+            })
+
+            // Add GLB hull
+            existingMesh.add(buildVesselGLBHull(glbRoot, vesselLoa))
+            existingMesh.userData['isGlb'] = true
+          }).catch(e => console.warn('Box Empire: vessel GLB swap failed', e))
+        }
       }
 
       // Update vessel position
@@ -504,15 +571,35 @@ export class VesselRenderer {
     }
 
     // Add or keep deck groups for loaded containers
+    const isGlb = vesselMesh.userData['isGlb'] === true
     const totalSpan = (TUTORIAL_VESSEL.bays - 1) * CONTAINER_SPACING
     for (const container of loadedOnVessel) {
       if (!deckMap.has(container.id)) {
         const cg = makeDeckContainer(container)
-        // Position: bay determines X offset (vessel is rotated 180° so bay1 is at +X in vessel space)
         const bay = container.vesselSlot?.bay ?? 1
-        const bayOffset = (bay - 1) * CONTAINER_SPACING - totalSpan / 2
-        // In vessel local space (before rotation.y = PI): bay1 at +halfSpan, bay5 at -halfSpan
-        cg.position.set(-bayOffset, DECK_Y + CONTAINER_HEIGHT / 2, 0)
+
+        let posX: number, posY: number, posZ: number
+
+        if (isGlb) {
+          // GLB ship — 3-row layout (bays 1-5 mapped to 3 rows × 2 tiers):
+          // Bay 1 → row 1 tier 1, Bay 2 → row 1 tier 2
+          // Bay 3 → row 2 tier 1, Bay 4 → row 2 tier 2
+          // Bay 5 → row 3 tier 1
+          const rowIndex = Math.floor((bay - 1) / 2)          // 0, 0, 1, 1, 2
+          const tierIndex = (bay - 1) % 2                      // 0, 1, 0, 1, 0
+          const numRows = 3
+          posX = 0  // all containers in same bay (centered on ship)
+          posZ = (rowIndex - (numRows - 1) / 2) * VESSEL_GLB.rowSpacing
+          posY = VESSEL_GLB.containerDeckY + CONTAINER_HEIGHT / 2 + tierIndex * (CONTAINER_HEIGHT + 0.1)
+        } else {
+          // Procedural ship — existing bay layout along X axis
+          const bayOffset = (bay - 1) * CONTAINER_SPACING - totalSpan / 2
+          posX = -bayOffset
+          posY = DECK_Y + CONTAINER_HEIGHT / 2
+          posZ = 0
+        }
+
+        cg.position.set(posX, posY, posZ)
         // Container length along vessel X axis
         cg.rotation.y = 0
         vesselMesh.add(cg)

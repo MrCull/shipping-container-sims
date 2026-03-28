@@ -1,11 +1,16 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Road truck mesh (improved quality, inspired by stowage-master)
+// Box Empire — Road truck mesh with GLB swap-in
+// Uses truck-no-trailer.glb (pre-warmed at scene init); falls back to
+// procedural geometry while the GLB loads, then swaps in automatically.
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
 import type { TruckVisit, Container } from '../types'
-import { CONTAINER_LENGTH, CONTAINER_WIDTH, CONTAINER_HEIGHT } from './config'
+import { CONTAINER_LENGTH, CONTAINER_WIDTH, CONTAINER_HEIGHT, TRUCK_GLB } from './config'
 import { createContainerMaterials, disposeContainerMaterials } from './containerMaterials'
+import { loadModel, getModelSync } from './modelLoader'
+
+export const TRUCK_GLB_URL = new URL('../assets/models/truck-no-trailer.glb', import.meta.url).href
 
 // Simple container mesh for rendering on truck bed (no corner posts, for performance)
 function makeTruckContainerMesh(container: Container): THREE.Group {
@@ -29,6 +34,67 @@ function makeTruckContainerMesh(container: Container): THREE.Group {
   return group
 }
 
+/** Build a Three.js group from a cloned GLB root: scale, rotate, ground.
+ *  Also adds a procedural flatbed chassis behind the cab so the container has a platform. */
+function buildTruckGroupFromGLB(glbRoot: THREE.Group): THREE.Group {
+  glbRoot.rotation.y = TRUCK_GLB.rotationY
+
+  const box = new THREE.Box3().setFromObject(glbRoot)
+  const size = new THREE.Vector3()
+  box.getSize(size)
+  // Scale so overall height matches target (preserves proportions)
+  const scale = TRUCK_GLB.targetHeight / size.y
+  glbRoot.scale.setScalar(scale)
+
+  // Ground: shift so min.y sits at y=0
+  const groundedBox = new THREE.Box3().setFromObject(glbRoot)
+  glbRoot.position.y = -groundedBox.min.y
+
+  const group = new THREE.Group()
+  group.userData['isGlb'] = true
+  group.add(glbRoot)
+
+  // ── Procedural flatbed chassis (behind cab) ──────────────────────────────
+  const chassisMat = new THREE.MeshPhongMaterial({ color: 0x1a1c20, specular: 0x222222, shininess: 20 })
+  const deckH = 0.22
+  // Main deck plate — slightly wider than container, centered at containerOffsetZ
+  const deckPlate = new THREE.Mesh(
+    new THREE.BoxGeometry(2.5, deckH, CONTAINER_LENGTH + 1.2),
+    chassisMat,
+  )
+  deckPlate.position.set(0, TRUCK_GLB.containerOffsetY - deckH / 2, TRUCK_GLB.containerOffsetZ)
+  deckPlate.castShadow = true
+  group.add(deckPlate)
+
+  // Side rails
+  for (const sx of [-1.22, 1.22]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.30, CONTAINER_LENGTH + 1.2), chassisMat)
+    rail.position.set(sx, TRUCK_GLB.containerOffsetY - 0.04, TRUCK_GLB.containerOffsetZ)
+    group.add(rail)
+  }
+
+  // Rear axle only (front axle omitted — looks out of proportion next to GLB cab wheels)
+  const axleMat = new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 10 })
+  const rimMat  = new THREE.MeshPhongMaterial({ color: 0x888888, specular: 0xffffff, shininess: 90 })
+  const rearSz = TRUCK_GLB.containerOffsetZ - CONTAINER_LENGTH / 2 + 0.8
+  const tyreR = 0.66   // 0.88 reduced by half the increase (was 0.44→0.88, so −0.22)
+  const tyreW = 0.72
+  // sx kept within trailer half-width (1.25m): 0.85 + 0.36 = 1.21 < 1.25 ✓
+  for (const sx of [-0.85, 0.85]) {
+    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(tyreR, tyreR, tyreW, 12), axleMat)
+    tyre.rotation.z = Math.PI / 2
+    tyre.position.set(sx, tyreR, rearSz)
+    tyre.castShadow = true
+    group.add(tyre)
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(tyreR * 0.52, tyreR * 0.52, tyreW + 0.04, 8), rimMat)
+    rim.rotation.z = Math.PI / 2
+    rim.position.set(sx, tyreR, rearSz)
+    group.add(rim)
+  }
+
+  return group
+}
+
 export class TruckRenderer {
   private meshes = new Map<string, THREE.Group>()
   // Maps truckId → current container group attached to truck mesh
@@ -39,7 +105,17 @@ export class TruckRenderer {
     this.scene = scene
   }
 
+  /** Build GLB truck if cached, else fall back to procedural. */
   private createTruckMesh(visitType: 'import_pickup' | 'export_delivery'): THREE.Group {
+    const cached = getModelSync(TRUCK_GLB_URL)
+    if (cached) {
+      return buildTruckGroupFromGLB(cached)
+    }
+    return this.buildProceduralTruckGroup(visitType)
+  }
+
+  /** Original procedural truck — used as fallback while GLB is loading. */
+  private buildProceduralTruckGroup(visitType: 'import_pickup' | 'export_delivery'): THREE.Group {
     const group = new THREE.Group()
 
     // Colour palette by visit type
@@ -166,6 +242,42 @@ export class TruckRenderer {
         mesh.name = truck.id
         this.scene.add(mesh)
         this.meshes.set(truck.id, mesh)
+
+        // Schedule async GLB swap if procedural was used (GLB not yet cached)
+        if (!mesh.userData['isGlb']) {
+          const truckId = truck.id
+          loadModel(TRUCK_GLB_URL).then(glbRoot => {
+            const existingMesh = this.meshes.get(truckId)
+            if (!existingMesh) return // truck already departed
+
+            // Dispose and remove all current children
+            const oldChildren = [...existingMesh.children]
+            oldChildren.forEach(c => {
+              existingMesh.remove(c)
+              c.traverse(obj => {
+                const m = obj as THREE.Mesh
+                if (m.geometry) m.geometry.dispose()
+                if (m.material) {
+                  if (Array.isArray(m.material)) m.material.forEach(mt => mt.dispose())
+                  else m.material.dispose()
+                }
+              })
+            })
+
+            // Add GLB hull
+            const glbGroup = buildTruckGroupFromGLB(glbRoot)
+            glbGroup.children.slice().forEach(c => existingMesh.add(c))
+            existingMesh.userData['isGlb'] = true
+
+            // Force container to be re-placed at correct GLB deck height next update
+            const existingCg = this.containerGroups.get(truckId)
+            if (existingCg) {
+              existingMesh.remove(existingCg)
+              this.disposeGroup(existingCg)
+              this.containerGroups.delete(truckId)
+            }
+          }).catch(e => console.warn('Box Empire: truck GLB swap failed', e))
+        }
       }
 
       mesh.position.set(truck.position.x, 0, truck.position.z)
@@ -194,10 +306,9 @@ export class TruckRenderer {
           }
           const cg = makeTruckContainerMesh(carriedContainer)
           cg.userData['containerId'] = carriedContainer.id
-          // Position on truck bed: centred lengthwise, raised to deck height
-          // Truck faces +Z when headingY=0. Container length (CONTAINER_LENGTH) along truck Z axis.
-          // Cab is at +Z; container sits on the chassis behind cab at z≈-1, raised by chassis height
-          cg.position.set(0, 0.72 + CONTAINER_HEIGHT / 2, -1.0)
+          // Position on truck bed — use GLB deck height if GLB is loaded, else procedural height
+          const deckY = mesh.userData['isGlb'] ? TRUCK_GLB.containerOffsetY : 0.72
+          cg.position.set(0, deckY + CONTAINER_HEIGHT / 2, TRUCK_GLB.containerOffsetZ)
           // Container length aligns with truck forward (+Z) when rotation.y = 0 on group.
           // BoxGeometry L is along X, so rotate 90° around Y so L faces truck's Z
           cg.rotation.y = Math.PI / 2
