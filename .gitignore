@@ -1,3 +1,6 @@
+# Claude Code local worktrees (must not be committed as gitlinks)
+.claude/worktrees/
+
 # Logs
 logs
 *.log
