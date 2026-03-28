@@ -6,7 +6,9 @@
       "Bash(npx tsc:*)",
       "Bash(xargs grep:*)",
       "Bash(grep:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(cp \"/c/Users/culll/source/repos/shipping-container-sims/.claude/worktrees/3d-truck-models/available-media/3d-models/truck-no-trailer.glb\" \"/c/Users/culll/source/repos/shipping-container-sims/.claude/worktrees/3d-truck-models/src/sims/stowage-master/assets/truck-cab.glb\")",
+      "Bash(cp \"/c/Users/culll/source/repos/shipping-container-sims/.claude/worktrees/3d-truck-models/available-media/3d-models/container-trailer-chassis-empty.glb\" \"/c/Users/culll/source/repos/shipping-container-sims/.claude/worktrees/3d-truck-models/src/sims/stowage-master/assets/container-trailer-chassis.glb\")"
     ]
   }
 }

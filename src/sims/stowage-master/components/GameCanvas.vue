@@ -9,8 +9,9 @@ import { useAudio } from '../composables/useAudio'
 import {
   createOcean, animateOcean,
   createDock, createLighting, createSkybox, createSkyDome,
-  createFoamParticles, animateFoam, createTerminalTruck,
+  createFoamParticles, animateFoam, createTerminalTruckGLB,
 } from '../modules/sceneBuilder'
+import { loadTruckGLBs } from '../modules/truckRenderer'
 import { createShip, loadShipGLB, updateShipTilt } from '../modules/shipRenderer'
 import {
   createContainerMesh,
@@ -20,7 +21,7 @@ import {
   createCrane, getDockPosition, createPlacementAnimation, animateCraneWarningLight,
 } from '../modules/craneSystem'
 import { createDisasterAnimation } from '../modules/disasters'
-import { CONTAINER } from '../modules/config'
+import { CONTAINER, TRUCK } from '../modules/config'
 import type { Container, CraneObject, DisasterAnimation } from '../types'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -41,7 +42,6 @@ let truckMeshes: THREE.Group[] = []
 let currentAnimation: ((dt: number) => boolean) | null = null
 let disasterAnimation: DisasterAnimation | null = null
 
-const TRUCK_SPACING = 10
 
 interface TruckAnim {
   truck: THREE.Group
@@ -145,7 +145,7 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
       const eased = easeOutQuad(t)
       const x = anim.startX + (anim.endX - anim.startX) * eased
       anim.truck.position.x = x
-      if (anim.container) anim.container.position.x = x
+      if (anim.container) anim.container.position.x = x + TRUCK.containerXOffset
 
       if (anim.departing && t >= 0.4) {
         const fadeT = (t - 0.4) / 0.6
@@ -255,12 +255,19 @@ async function buildScene(): Promise<void> {
   foam = createFoamParticles(scene)
   createDock(scene)
 
+  // Fire off truck GLB downloads in parallel with ship model
+  const truckPrewarm = loadTruckGLBs()
+
   // Load real GLB model for presets with glbPath, procedural for all others
   if (store.shipConfig.glbPath) {
     shipGroup = await loadShipGLB(scene, store.shipConfig)
   } else {
     shipGroup = createShip(scene, store.shipConfig)
   }
+
+  // Ensure truck GLBs are cached before trucks are needed
+  await truckPrewarm
+
   craneObj = createCrane(scene, store.shipConfig)
 
   // Start ship off-screen and sail it in
@@ -297,8 +304,7 @@ function handleClick(event: MouseEvent): void {
 
   // Pick up from the front truck (truck #0 is at dockPos)
   const dockPos = getDockPosition(craneObj!)
-  const truckHeight = 0.85
-  const pickupPos = new THREE.Vector3(dockPos.x, truckHeight + CONTAINER.size.y + 0.1, dockPos.z)
+  const pickupPos = new THREE.Vector3(dockPos.x + TRUCK.containerXOffset, TRUCK.deckHeight + CONTAINER.size.y + 0.1, dockPos.z)
 
   const containerMesh = createContainerMesh(result.container)
   containerMesh.position.copy(pickupPos)
@@ -352,9 +358,8 @@ function updateHoistMesh(container: Container | null): void {
 
   // Show current container sitting on the front truck, ready to be picked up
   const dockPos = getDockPosition(craneObj)
-  const truckHeight = 0.85
   const mesh = createContainerMesh(container)
-  mesh.position.set(dockPos.x, truckHeight + CONTAINER.size.y / 2, dockPos.z)
+  mesh.position.set(dockPos.x + TRUCK.containerXOffset, TRUCK.deckHeight + CONTAINER.size.y / 2, dockPos.z)
   mesh.name = 'hoist-mesh'
   scene.add(mesh)
   hoistMesh = mesh
@@ -376,7 +381,7 @@ function removeHoistMesh(): void {
   }
 }
 
-function updateQueueMeshes(containers: Container[]): void {
+async function updateQueueMeshes(containers: Container[]): Promise<void> {
   const scene = getScene()
   const disposeMeshGroup = (mesh: THREE.Group) => {
     if (scene) scene.remove(mesh)
@@ -398,14 +403,14 @@ function updateQueueMeshes(containers: Container[]): void {
   if (!craneObj || !scene || !containers.length) return
 
   const dockPos = getDockPosition(craneObj)
-  const truckHeight = 0.85
   const zPos = dockPos.z
 
-  containers.forEach((container, i) => {
+  for (let i = 0; i < containers.length; i++) {
+    const container = containers[i]
     // Truck 0 is directly under the crane; subsequent trucks wait behind (negative X)
-    const xPos = dockPos.x - i * TRUCK_SPACING
+    const xPos = dockPos.x - i * TRUCK.spacing
 
-    const truck = createTerminalTruck()
+    const truck = await createTerminalTruckGLB()
     truck.position.set(xPos, 0.0, zPos)
     truck.name = `queue-truck-${i}`
     scene.add(truck)
@@ -414,14 +419,14 @@ function updateQueueMeshes(containers: Container[]): void {
     const mesh = createContainerMesh(container)
     mesh.scale.setScalar(0.88)
     mesh.position.set(
-      xPos,
-      truckHeight + CONTAINER.size.y / 2,
+      xPos + TRUCK.containerXOffset,
+      TRUCK.deckHeight + CONTAINER.size.y / 2,
       zPos
     )
     mesh.name = `queue-${i}`
     scene.add(mesh)
     queueMeshes.push(mesh)
-  })
+  }
 }
 
 function clearScene(): void {
@@ -502,36 +507,32 @@ function triggerTruckAdvance(): void {
   const scene = getScene()
   if (!scene) return
 
-  const dockX = getDockPosition(craneObj).x
-  const zPos = getDockPosition(craneObj).z
-
-  // Animate each remaining truck forward one TRUCK_SPACING step
   truckMeshes.forEach((truck, i) => {
-    const containerMesh = queueMeshes[i] ?? null
-    truckAnimations.push({
-      truck,
-      container: containerMesh,
-      startX: truck.position.x,
-      endX: truck.position.x + TRUCK_SPACING,
-      elapsed: 0,
-      duration: 0.8,
-      departing: false,
-    })
-  })
-
-  // The truck that was at position 0 (under crane) is now empty — it already had its
-  // container lifted. Animate it departing forward past the crane.
-  const departingTruck = createTerminalTruck()
-  departingTruck.position.set(dockX, 0.0, zPos)
-  scene.add(departingTruck)
-  truckAnimations.push({
-    truck: departingTruck,
-    container: null,
-    startX: dockX,
-    endX: dockX + TRUCK_SPACING * 2,
-    elapsed: 0,
-    duration: 1.8,
-    departing: true,
+    if (i === 0) {
+      // Front truck is now empty — depart it forward past the crane and fade it out
+      truckAnimations.push({
+        truck,
+        container: null,
+        startX: truck.position.x,
+        endX: truck.position.x + TRUCK.spacing * 2,
+        elapsed: 0,
+        duration: 1.8,
+        departing: true,
+      })
+    } else {
+      // Remaining trucks advance one TRUCK.spacing toward the crane.
+      // queueMeshes was already shifted in handleClick, so index i-1 maps correctly.
+      const containerMesh = queueMeshes[i - 1] ?? null
+      truckAnimations.push({
+        truck,
+        container: containerMesh,
+        startX: truck.position.x,
+        endX: truck.position.x + TRUCK.spacing,
+        elapsed: 0,
+        duration: 0.8,
+        departing: false,
+      })
+    }
   })
 }
 

@@ -1,4 +1,9 @@
 import * as THREE from 'three'
+import { createTruckGLB } from './truckRenderer'
+
+export async function createTerminalTruckGLB(): Promise<THREE.Group> {
+  return createTruckGLB()
+}
 
 // Build gradient sky using a large sphere with vertex colors
 export function createSkybox(scene: THREE.Scene): void {
@@ -74,8 +79,8 @@ export function createDock(scene: THREE.Scene): THREE.Group {
   const dockGroup = new THREE.Group()
   dockGroup.name = 'dock'
 
-  // Main quay platform — wider and longer, starts close to ship edge
-  const platformGeo = new THREE.BoxGeometry(80, 1.2, 34)
+  // Main quay platform — extended to 200m to cover full truck queue area
+  const platformGeo = new THREE.BoxGeometry(200, 1.2, 34)
   const platformMat = new THREE.MeshPhongMaterial({
     color: 0x7a7a72,
     specular: 0x222222,
@@ -88,7 +93,7 @@ export function createDock(scene: THREE.Scene): THREE.Group {
   dockGroup.add(platform)
 
   // Quay edge lip (raised edge safety kerb)
-  const lipGeo = new THREE.BoxGeometry(80, 0.35, 0.6)
+  const lipGeo = new THREE.BoxGeometry(200, 0.35, 0.6)
   const lipMat = new THREE.MeshPhongMaterial({ color: 0xeeee33 })
   const lip = new THREE.Mesh(lipGeo, lipMat)
   lip.position.set(0, 0.77, -10.2)
@@ -97,7 +102,7 @@ export function createDock(scene: THREE.Scene): THREE.Group {
   // Road surface stripes
   const stripeGeo = new THREE.BoxGeometry(3, 0.02, 1)
   const stripeMat = new THREE.MeshPhongMaterial({ color: 0xffffff })
-  for (let i = -5; i <= 5; i++) {
+  for (let i = -16; i <= 16; i++) {
     const stripe = new THREE.Mesh(stripeGeo, stripeMat)
     stripe.position.set(i * 6, 0.62, -20)
     dockGroup.add(stripe)
@@ -106,7 +111,7 @@ export function createDock(scene: THREE.Scene): THREE.Group {
   // Rubber fenders along quay edge
   const fenderGeo = new THREE.CylinderGeometry(0.55, 0.55, 1.8, 12)
   const fenderMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, shininess: 60 })
-  for (let i = -6; i <= 6; i++) {
+  for (let i = -16; i <= 16; i++) {
     const fender = new THREE.Mesh(fenderGeo, fenderMat)
     fender.rotation.z = Math.PI / 2
     fender.position.set(i * 6, 0.2, -10.6)
@@ -118,7 +123,7 @@ export function createDock(scene: THREE.Scene): THREE.Group {
   const bollardCapGeo = new THREE.SphereGeometry(0.35, 10, 8)
   const bollardBodyGeo = new THREE.CylinderGeometry(0.28, 0.38, 1.1, 10)
   const bollardMat = new THREE.MeshPhongMaterial({ color: 0x2b2b2b, shininess: 40 })
-  for (let i = -7; i <= 7; i++) {
+  for (let i = -18; i <= 18; i++) {
     const bollardBody = new THREE.Mesh(bollardBodyGeo, bollardMat)
     bollardBody.position.set(i * 5.5, 0.9, -11)
     bollardBody.castShadow = true
@@ -149,7 +154,7 @@ export function createDock(scene: THREE.Scene): THREE.Group {
     emissiveIntensity: 1.2,
   })
 
-  for (let i = -3; i <= 3; i++) {
+  for (let i = -7; i <= 7; i++) {
     const pole = new THREE.Mesh(poleGeo, poleMat)
     pole.position.set(i * 14, 4.5, -28)
     pole.castShadow = true
