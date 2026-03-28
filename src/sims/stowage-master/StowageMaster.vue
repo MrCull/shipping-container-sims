@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
+import { useGameStore } from './store/gameStore'
 import GameCanvas from './components/GameCanvas.vue'
 import TopBar from './components/TopBar.vue'
 import ContainerInfo from './components/ContainerInfo.vue'
@@ -16,6 +18,14 @@ import StartScreen from './components/modals/StartScreen.vue'
 import LevelComplete from './components/modals/LevelComplete.vue'
 import LevelFailed from './components/modals/LevelFailed.vue'
 import DisasterOverlay from './components/modals/DisasterOverlay.vue'
+
+const store = useGameStore()
+
+onMounted(() => {
+  // Reset to the start screen every time this component mounts — handles
+  // returning from the main menu mid-game.
+  store.setPhase('start')
+})
 </script>
 
 <template>

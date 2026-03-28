@@ -512,14 +512,31 @@ function triggerOutboundTruckDepart(containerMesh: THREE.Group): void {
     if (scene && craneObj) {
       const dockPos = getDockPosition(craneObj)
       const lastTruck = outboundTruckGroups[outboundTruckGroups.length - 1]
-      const newX = lastTruck
-        ? lastTruck.position.x + OUTBOUND_TRUCK.spacing
+      // Use the animation's endX (final destination) rather than current position,
+      // which may still be mid-animation and drifts further back each discharge.
+      const lastAnim = lastTruck
+        ? outboundTruckAnimations.find(a => a.truck === lastTruck)
+        : null
+      const lastFinalX = lastAnim ? lastAnim.endX : lastTruck?.position.x
+      const newX = lastFinalX !== undefined
+        ? lastFinalX + OUTBOUND_TRUCK.spacing
         : dockPos.x
       createTruckGLB().then(truck => {
-        truck.position.set(newX, 0, dockPos.z + OUTBOUND_TRUCK.dockZOffset)
+        // Spawn just one spacing back so it rolls in naturally.
+        const spawnX = newX + OUTBOUND_TRUCK.spacing
+        truck.position.set(spawnX, 0, dockPos.z + OUTBOUND_TRUCK.dockZOffset)
         truck.rotation.y = Math.PI
         scene.add(truck)
         outboundTruckGroups.push(truck)
+        outboundTruckAnimations.push({
+          truck,
+          container: null,
+          startX: spawnX,
+          endX: newX,
+          elapsed: 0,
+          duration: 0.8,
+          departing: false,
+        })
       })
     }
   }
