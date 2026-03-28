@@ -4,7 +4,7 @@ import { useGameStore } from '../../store/gameStore'
 
 const store = useGameStore()
 
-const showNextButton = computed(() => store.tutorialStep === 1)
+const showNextButton = computed(() => store.tutorialStep === 1 || (store.tutorialStep >= 5 && store.tutorialStep < store.totalTutorialSteps))
 
 const showAcceptVesselButton = computed(() =>
   store.tutorialStep === 2 &&
@@ -16,11 +16,13 @@ const showOpenGatehouseButton = computed(() =>
   store.tutorialStep === 4 &&
   (!store.gatehouse.exportLaneOpen || !store.gatehouse.importLaneOpen),
 )
+
+const showCloseButton = computed(() => store.tutorialStep === store.totalTutorialSteps)
 </script>
 
 <template>
   <div
-    v-if="!store.tutorialCompleted && store.gamePhase === 'tutorial'"
+    v-if="!store.tutorialCompleted && !store.tutorialOverlayDismissed && store.gamePhase === 'tutorial'"
     class="tutorial-overlay"
   >
     <div class="tutorial-bubble">
@@ -51,6 +53,13 @@ const showOpenGatehouseButton = computed(() =>
           @click="store.openGatehouse()"
         >
           🚪 Open Gatehouse
+        </button>
+        <button
+          v-if="showCloseButton"
+          class="tutorial-btn"
+          @click="store.dismissTutorialOverlay()"
+        >
+          Close ✕
         </button>
       </div>
     </div>

@@ -94,6 +94,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   const careerIntroPage = ref(1)
 
   // ---- Export/import tracking for tutorial flow ---------------------------
+  const tutorialOverlayDismissed = ref(false)
   const exportTrucksSent = ref(0)
   const importTrucksSent = ref(0)
   const dischargingStarted = ref(false)
@@ -199,6 +200,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     events.value = []
     selectedContainerId.value = null
     selectedEquipmentId.value = null
+    tutorialOverlayDismissed.value = false
     exportTrucksSent.value = 0
     importTrucksSent.value = 0
     dischargingStarted.value = false
@@ -1023,6 +1025,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
     }
   }
 
+  function dismissTutorialOverlay(): void {
+    tutorialOverlayDismissed.value = true
+  }
+
   function acceptVessel(): void {
     const vessel = vesselVisits.value[0]
     if (!vessel || vessel.state !== 'announced') return
@@ -1080,6 +1086,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     timeScale,
     tutorialStep,
     tutorialCompleted,
+    tutorialOverlayDismissed,
     gatehouse,
     gatehouseOpen,
     money,
@@ -1111,6 +1118,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     toggleEquipment,
     setCraneMode,
     advanceTutorialStep,
+    dismissTutorialOverlay,
     acceptVessel,
     careerIntroPage,
     beginCareerIntro,

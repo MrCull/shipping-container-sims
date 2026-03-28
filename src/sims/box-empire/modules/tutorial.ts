@@ -46,40 +46,29 @@ export function createTutorialSteps(): TutorialStep[] {
       id: 'trucks-arriving',
       stepNumber: 5,
       prompt: 'Trucks are rolling in! The reach stacker handles export deliveries into the yard and loads import pickups onto trucks.',
+      // Advance when the vessel enters loading phase — guaranteed to happen before
+      // tutorial completion and avoids snapshot-count races on export lifecycle states.
       condition: (s: BoxEmpireState) => {
-        const exportInYard = s.containers.filter(
-          c => c.visitType === 'export' && c.lifecycleState === 'in_yard',
-        )
-        return exportInYard.length >= 5
+        const vessel = s.vesselVisits[0]
+        return !!vessel && (vessel.state === 'loading' || vessel.state === 'departing' || vessel.state === 'departed')
       },
     },
     {
       id: 'discharging',
       stepNumber: 6,
-      prompt: 'The mobile harbor crane is discharging containers from the vessel. Once complete it will load your exports.',
+      prompt: 'The mobile harbor crane is loading your export containers onto the vessel. Each load earns $150!',
+      // Advance once at least one export has been loaded (loading is visibly underway).
       condition: (s: BoxEmpireState) => {
-        const importProcessed = s.containers.filter(
-          c =>
-            c.visitType === 'import' &&
-            (c.lifecycleState === 'in_yard' || c.lifecycleState === 'departed'),
-        )
-        return importProcessed.length >= 5
+        return s.containers.some(c => c.visitType === 'export' && c.lifecycleState === 'loaded_on_vessel')
       },
     },
     {
       id: 'gate-out',
       stepNumber: 7,
       prompt: 'Import trucks are collecting containers and heading out. Each gate-out earns $100!',
+      // Advance once at least one gate-out revenue transaction has been recorded.
       condition: (s: BoxEmpireState) => {
-        const importDone = s.containers.filter(
-          c =>
-            c.visitType === 'import' &&
-            (c.lifecycleState === 'departed' || c.lifecycleState === 'at_gate'),
-        )
-        const gateOutRevenue = s.transactions.filter(
-          t => t.type === 'gate_out_revenue',
-        ).length
-        return importDone.length >= 5 || gateOutRevenue >= 5
+        return s.transactions.some(t => t.type === 'gate_out_revenue')
       },
     },
     {
