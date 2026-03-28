@@ -47,6 +47,19 @@ export interface ShipPreset {
   cargoWidthFraction: number
   /** Number of stern bays blocked by superstructure/deck structures */
   sternBlockedBays: number
+  /** Identifier key used to look up a GLB model URL in shipRenderer. If absent, use procedural geometry. */
+  glbPath?: string
+  /**
+   * Y position (in ship-group local space) of the cargo deck surface.
+   * Containers and slot indicators are placed above this level.
+   * Defaults to height * 0.3 for procedural ships.
+   */
+  deckOffsetY?: number
+  /**
+   * Vertical offset applied to the loaded GLB group to align its deck with deckOffsetY.
+   * Determined empirically after measuring the scaled model's bounding box.
+   */
+  glbYOffset?: number
 }
 
 export interface GameEvent {

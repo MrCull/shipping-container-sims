@@ -161,9 +161,10 @@ export function createSlotIndicators(
     const slot = slots[slotId]
     if (!slot) continue
 
+    const deckY = shipConfig.deckOffsetY ?? shipConfig.height * 0.3
     const pos = new THREE.Vector3(
       slot.xOffset,
-      slot.yOffset + shipConfig.height * 0.3 + CONTAINER.size.y / 2,
+      slot.yOffset + deckY + CONTAINER.size.y / 2,
       slot.zOffset
     )
 

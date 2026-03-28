@@ -11,7 +11,7 @@ import {
   createDock, createLighting, createSkybox, createSkyDome,
   createFoamParticles, animateFoam, createTerminalTruck,
 } from '../modules/sceneBuilder'
-import { createShip, updateShipTilt } from '../modules/shipRenderer'
+import { createShip, loadShipGLB, updateShipTilt } from '../modules/shipRenderer'
 import {
   createContainerMesh,
   createSlotIndicators, removeSlotIndicators, animateSlotIndicators,
@@ -243,7 +243,7 @@ watch(() => store.lastPlacement, (placement) => {
   }
 })
 
-function buildScene(): void {
+async function buildScene(): Promise<void> {
   const scene = getScene()
   if (!scene || !store.shipConfig) return
   clearScene()
@@ -255,7 +255,12 @@ function buildScene(): void {
   foam = createFoamParticles(scene)
   createDock(scene)
 
-  shipGroup = createShip(scene, store.shipConfig)
+  // Load real GLB model for presets with glbPath, procedural for all others
+  if (store.shipConfig.glbPath) {
+    shipGroup = await loadShipGLB(scene, store.shipConfig)
+  } else {
+    shipGroup = createShip(scene, store.shipConfig)
+  }
   craneObj = createCrane(scene, store.shipConfig)
 
   // Start ship off-screen and sail it in
@@ -306,9 +311,11 @@ function handleClick(event: MouseEvent): void {
   }
 
   const slot = store.grid[slotId]
+  const cfg = store.shipConfig!
+  const deckY = cfg.deckOffsetY ?? cfg.height * 0.3
   const targetPos = new THREE.Vector3(
     slot.xOffset,
-    slot.yOffset + store.shipConfig!.height * 0.3 + CONTAINER.size.y / 2,
+    slot.yOffset + deckY + CONTAINER.size.y / 2,
     slot.zOffset
   )
 

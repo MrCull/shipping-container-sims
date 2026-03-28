@@ -3,8 +3,8 @@ import type { ShipPreset } from '../types'
 export const SHIP_PRESETS: Record<string, ShipPreset> = {
   small: {
     name: 'small',
-    bays: 4,
-    rows: 4,
+    bays: 3,
+    rows: 3,
     tiers: 4,
     length: 40,
     width: 12,
@@ -12,10 +12,19 @@ export const SHIP_PRESETS: Record<string, ShipPreset> = {
     emptyWeight: 800,
     emptyVCG: 4.0,
     maxStackWeight: 120,
-    cargoLengthFraction: 0.56,
-    cargoXOffsetFraction: 0.04,
-    cargoWidthFraction: 0.72,
+    // 3 bays: cellX = 18.8/3 = 6.27m > container length 5.9m — no bay overlap.
+    // cargoXOffsetFraction=0.095 centres the 3-bay grid between fwd mast and aft
+    // superstructure (cargo zone midpoint ~3.8m bow-ward of midship).
+    cargoLengthFraction: 0.47,
+    cargoXOffsetFraction: 0.095,
+    // 3 rows: cellZ = 12*0.60/3 = 2.40m. Container width 2.55m → 0.15m overlap (imperceptible).
+    // Outer row centres at ±2.40m, container edges at ±3.68m — within visual hull ±3.76m.
+    cargoWidthFraction: 0.60,
     sternBlockedBays: 0,
+    // GLB model fields
+    glbPath: 'small-feeder',
+    deckOffsetY: 1.2,   // matches existing slot indicator math (height * 0.3 = 1.2)
+    glbYOffset: 3.0,    // lift model so scaled deck aligns with deckOffsetY — tune at runtime
   },
   medium: {
     name: 'medium',

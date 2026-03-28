@@ -1,5 +1,72 @@
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { ShipPreset } from '../types'
+
+// ── GLB loader ────────────────────────────────────────────────────────────────
+
+// Identifier → asset URL mapping (import.meta.url resolves relative to this file)
+const GLB_URLS: Record<string, string> = {
+  'small-feeder': new URL(
+    '../assets/container-ship-small-empty-no-containers.glb',
+    import.meta.url
+  ).href,
+}
+
+const _loader = new GLTFLoader()
+const _cache = new Map<string, THREE.Group>()
+
+export async function loadShipGLB(
+  scene: THREE.Scene,
+  shipConfig: ShipPreset
+): Promise<THREE.Group> {
+  const url = GLB_URLS[shipConfig.glbPath!]
+  if (!url) throw new Error(`No GLB URL for preset glbPath: ${shipConfig.glbPath}`)
+
+  // Load (or clone from cache)
+  let root: THREE.Group
+  if (_cache.has(url)) {
+    root = _cache.get(url)!.clone(true)
+  } else {
+    const gltf = await new Promise<{ scene: THREE.Group }>((resolve, reject) =>
+      _loader.load(url, resolve, undefined, reject)
+    )
+    root = gltf.scene
+    root.traverse(obj => {
+      if ((obj as THREE.Mesh).isMesh) {
+        obj.castShadow = true
+        obj.receiveShadow = true
+      }
+    })
+    _cache.set(url, root.clone(true))
+  }
+
+  // GLB length axis is Z; game convention is length along X — rotate 90° around Y first
+  // (bow confirmed to face +X after this rotation; adjust sign if bow faces wrong way)
+  root.rotation.y = Math.PI / 2
+
+  // After rotation, original Z (length) is now along X — use X for scaling
+  const box = new THREE.Box3().setFromObject(root)
+  const size = new THREE.Vector3()
+  box.getSize(size)
+  const modelLength = size.x
+  const scale = shipConfig.length / modelLength
+  root.scale.setScalar(scale)
+
+  // Re-measure after scale and centre the model in X/Z
+  const scaledBox = new THREE.Box3().setFromObject(root)
+  const center = new THREE.Vector3()
+  scaledBox.getCenter(center)
+  root.position.x = -center.x
+  root.position.z = -center.z
+  root.position.y = shipConfig.glbYOffset ?? 0
+
+  const group = new THREE.Group()
+  group.name = 'ship'
+  group.add(root)
+
+  scene.add(group)
+  return group
+}
 
 // Shared materials (created once per session, reused across scene rebuilds)
 let hullMat: THREE.MeshPhongMaterial | null = null
