@@ -78,18 +78,10 @@ export function findAvailableSlot(
     return block.slots.some(s => s.bay === bay && s.containerId !== null)
   }
 
-  if (preferredVisitType && containers) {
-    // Pass 1: empty bays — spread containers out so each is accessible without unstuffing
-    for (let bay = 1; bay <= block.bays; bay++) {
-      if (!bayHasAnyContainer(bay)) {
-        for (let row = 1; row <= block.rows; row++) {
-          const slot = trySlotInBay(bay, row)
-          if (slot) return slot
-        }
-      }
-    }
+  const oppositeType = preferredVisitType === 'import' ? 'export' : 'import'
 
-    // Pass 2: bays that already have the same type (stack only when no empty bays remain)
+  if (preferredVisitType && containers) {
+    // Pass 1: bays that already have the same type — stack same-type containers together
     for (let bay = 1; bay <= block.bays; bay++) {
       if (bayHasContainerOfType(bay, preferredVisitType)) {
         for (let row = 1; row <= block.rows; row++) {
@@ -99,7 +91,25 @@ export function findAvailableSlot(
       }
     }
 
-    // Pass 3: fall through to any available
+    // Pass 2: empty bays — start a new stack when no same-type bay has room
+    for (let bay = 1; bay <= block.bays; bay++) {
+      if (!bayHasAnyContainer(bay)) {
+        for (let row = 1; row <= block.rows; row++) {
+          const slot = trySlotInBay(bay, row)
+          if (slot) return slot
+        }
+      }
+    }
+
+    // Pass 3: any bay without the opposite type (avoids mixing, last resort)
+    for (let bay = 1; bay <= block.bays; bay++) {
+      if (!bayHasContainerOfType(bay, oppositeType)) {
+        for (let row = 1; row <= block.rows; row++) {
+          const slot = trySlotInBay(bay, row)
+          if (slot) return slot
+        }
+      }
+    }
   }
 
   for (let bay = 1; bay <= block.bays; bay++) {

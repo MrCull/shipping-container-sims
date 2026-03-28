@@ -846,19 +846,88 @@ export const useGameStore = defineStore('box-empire-game', () => {
       }
     }
 
-    if (importPickupStarted.value && importTrucksSent.value < TUTORIAL_IMPORT_COUNT && gatehouse.value.importLaneOpen) {
-      const importInYard = containers.value.filter(
-        c => c.visitType === 'import' && c.lifecycleState === 'in_yard',
-      )
+    if (importPickupStarted.value && gatehouse.value.importLaneOpen) {
+      // Spawn trucks for any in_yard import that has no active pickup truck.
+      // Using per-container tracking rather than a sent-count guard prevents the case
+      // where a buried container was never matched to a truck (or its truck already left).
       const importPickupTrucksActive = truckVisits.value.filter(
         t => t.visitType === 'import_pickup' && t.state !== 'departed',
       ).length
-      const importDone = containers.value.filter(
-        c => c.visitType === 'import' && c.lifecycleState === 'departed',
-      ).length
-
-      if (importInYard.length > 0 && importPickupTrucksActive < 2 && (importTrucksSent.value < importDone + importInYard.length)) {
+      const trucksWithContainer = new Set(
+        truckVisits.value
+          .filter(t => t.visitType === 'import_pickup' && t.containerId && t.state !== 'departed')
+          .map(t => t.containerId as string),
+      )
+      const importNeedingTruck = containers.value.filter(
+        c => c.visitType === 'import' && c.lifecycleState === 'in_yard' && !trucksWithContainer.has(c.id),
+      )
+      if (importNeedingTruck.length > 0 && importPickupTrucksActive < 2) {
         spawnImportPickupTruck()
+      }
+    }
+
+    // Safety net: ensure every import truck waiting at YARD_IO has a pickup job.
+    // Also handles the shuffle case: if the container is buried, move the top container
+    // in that stack to a free bay so the buried one becomes accessible.
+    for (const truck of truckVisits.value) {
+      if (truck.visitType !== 'import_pickup') continue
+      if (truck.state !== 'waiting_for_equipment') continue
+      if (!truck.containerId) continue
+      const container = containers.value.find(c => c.id === truck.containerId)
+      if (!container || container.lifecycleState !== 'in_yard' || !container.yardSlot) continue
+      const yard = yardBlocks.value[0]
+
+      if (isContainerOnTop(yard, container.id)) {
+        // Container is accessible — create pickup job if none exists
+        if (!getActiveJobForContainer(getState(), container.id)) {
+          const ys = container.yardSlot
+          const slotId = makeYardSlotId(ys.blockId, ys.bay, ys.row, ys.tier)
+          const pickupJob = createJob(
+            container.id,
+            { type: 'yard_slot', id: slotId, position: { ...container.currentLocation.position } },
+            { type: 'truck', id: truck.id, position: { ...YARD_IO_POSITION } },
+            'reach_stacker',
+            8,
+            simTime.value,
+          )
+          jobs.value.push(pickupJob)
+        }
+      } else {
+        // Container is buried — find the top container in its stack and shuffle it to a free bay
+        const buriedSlot = yard.slots.find(s => s.containerId === container.id)
+        if (!buriedSlot) continue
+        const topSlot = yard.slots
+          .filter(s => s.bay === buriedSlot.bay && s.row === buriedSlot.row && s.tier > buriedSlot.tier && s.containerId !== null)
+          .sort((a, b) => b.tier - a.tier)[0]
+        if (!topSlot?.containerId) continue
+        if (getActiveJobForContainer(getState(), topSlot.containerId)) continue
+
+        // Find a free slot in a different bay for the shuffle
+        const reserved = getReservedYardSlotIds()
+        let shuffleTarget: import('../types').YardSlotRef | null = null
+        for (let bay = 1; bay <= yard.bays; bay++) {
+          if (bay === buriedSlot.bay) continue
+          for (let row = 1; row <= yard.rows; row++) {
+            const tiersOccupied = yard.slots.filter(s => s.bay === bay && s.row === row && s.containerId !== null).length
+            if (tiersOccupied >= yard.maxTier) continue
+            const candidate: import('../types').YardSlotRef = { blockId: yard.id, bay, row, tier: tiersOccupied + 1 }
+            const cid = makeYardSlotId(candidate.blockId, candidate.bay, candidate.row, candidate.tier)
+            if (!reserved.has(cid)) { shuffleTarget = candidate; break }
+          }
+          if (shuffleTarget) break
+        }
+        if (!shuffleTarget) continue
+
+        const topRef: import('../types').YardSlotRef = { blockId: yard.id, bay: topSlot.bay, row: topSlot.row, tier: topSlot.tier }
+        const shuffleJob = createJob(
+          topSlot.containerId,
+          { type: 'yard_slot', id: makeYardSlotId(topRef.blockId, topRef.bay, topRef.row, topRef.tier), position: getSlotWorldPosition(yard, topRef) },
+          { type: 'yard_slot', id: makeYardSlotId(shuffleTarget.blockId, shuffleTarget.bay, shuffleTarget.row, shuffleTarget.tier), position: getSlotWorldPosition(yard, shuffleTarget) },
+          'reach_stacker',
+          15,
+          simTime.value,
+        )
+        jobs.value.push(shuffleJob)
       }
     }
 
@@ -882,11 +951,21 @@ export const useGameStore = defineStore('box-empire-game', () => {
       )
 
       if (rs && rs.state === 'idle' && !rs.currentJobId && !quayLoadOccupied) {
-        // Find first accessible export in yard with no active job
+        // First: cancel any blocked staging jobs for accessible exports so they can be recreated
+        for (const job of jobs.value) {
+          if (job.status !== 'blocked') continue
+          if (job.dropoffLocation.type !== 'quay_buffer' || job.dropoffLocation.id !== 'quay-load') continue
+          const c = containers.value.find(co => co.id === job.containerId)
+          if (!c || c.visitType !== 'export') continue
+          if (isContainerOnTop(yard, c.id)) job.status = 'cancelled'
+        }
+
+        // Find first accessible export in yard with no active (non-blocked) job
         const exportInYard = containers.value.find(c => {
           if (c.visitType !== 'export' || c.lifecycleState !== 'in_yard') return false
           if (!c.yardSlot) return false
-          if (getActiveJobForContainer(getState(), c.id)) return false
+          const activeJob = getActiveJobForContainer(getState(), c.id)
+          if (activeJob && activeJob.status !== 'blocked') return false
           return isContainerOnTop(yard, c.id)
         })
         if (exportInYard && exportInYard.yardSlot) {
@@ -1010,9 +1089,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
     const state = getState()
     if (checkStepAdvance(step, state)) {
       if (tutorialStep.value >= tutorialSteps.length) {
-        tutorialCompleted.value = true
-        gamePhase.value = 'completed'
-        emitEvent('tutorial.completed', 'Tutorial complete! You processed all containers!')
+        // Dismiss the overlay but don't complete — handleTutorialFlow owns actual completion
+        // (it waits for all imports to gate out, not just the vessel departure)
+        tutorialOverlayDismissed.value = true
       } else {
         tutorialStep.value++
       }
