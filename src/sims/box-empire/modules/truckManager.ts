@@ -6,7 +6,7 @@
 //   IN-GATE  (GATE_INGATE_POSITION): ALL trucks enter here.
 //            Queue runs along +Z outside terminal at GATE_INGATE_LANE_X.
 //            Lane is offset to the side of the gatehouse building.
-//   OUT-GATE (GATE_OUTGATE_POSITION): ALL trucks exit here (bottom of terminal fence).
+//   OUT-GATE (GATE_OUTGATE_POSITION): ALL trucks exit here (right fence, +X side).
 //
 // Movement: axis-aligned only. Trucks follow a waypoint list.
 // Collision: trucks wait when yard zone is busy; out-gate queue uses stable positions.
@@ -295,6 +295,7 @@ export function startTruckReturnToGate(truck: TruckVisit, simTime: number): void
 export function startTruckDeparture(truck: TruckVisit, simTime: number): void {
   truck.state = 'departing'
   truck.stateStartTime = simTime
+  // Landward (+Z), away from berth / quay (−Z) — not out the terminal side toward the sea
   const exitPos: Position3D = { x: GATE_OUTGATE_POSITION.x, y: 0, z: GATE_OUTGATE_POSITION.z + 45 }
   truck.waypoints = buildWaypoints(truck.position, exitPos)
   truck.waypointIndex = 0

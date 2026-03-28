@@ -38,7 +38,7 @@ import {
 } from '../modules/config'
 import { createYardBlock, findAvailableSlot, placeContainerInSlot, removeContainerFromSlot, getSlotWorldPosition, isContainerOnTop } from '../modules/yardManager'
 import { createTutorialVessel, getNextDischargeContainer, getNextLoadSlot, dischargeContainerFromVessel, loadContainerOnVessel, isVesselFullyDischarged, tickVessel, getVesselSlotPosition } from '../modules/vesselManager'
-import { createTruck, tickTruck, startTruckDeparture, startTruckReturnToGate, startExportTruckExit, resetTruckCounter } from '../modules/truckManager'
+import { createTruck, tickTruck, startTruckReturnToGate, startExportTruckExit, resetTruckCounter } from '../modules/truckManager'
 import { makeYardSlotId, makeVesselSlotId, parseYardSlotId } from '../types'
 import { tickEquipment } from '../modules/equipmentController'
 import { createJob, assignPendingJobs, completeJob, resetJobCounter, getActiveJobForContainer, cancelJob, recheckBlockedJobs } from '../modules/jobScheduler'
@@ -90,6 +90,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
   const pendingEventCallbacks = ref<GameEvent[]>([])
 
   const tutorialSteps = createTutorialSteps()
+  /** Multi-page story after tutorial; 1-based while `gamePhase === 'career_intro'`. */
+  const careerIntroPage = ref(1)
 
   // ---- Export/import tracking for tutorial flow ---------------------------
   const exportTrucksSent = ref(0)
@@ -203,6 +205,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     loadingStarted.value = false
     importPickupStarted.value = false
     exportStagingStarted.value = false
+    careerIntroPage.value = 1
 
     const yard = createYardBlock()
     yardBlocks.value = [yard]
@@ -540,9 +543,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
       }
 
       // When truck finally departs (exits scene), mark container as truly departed
-      if (tResult.departed && truck.visitType === 'import_pickup' && truck.containerId) {
+      if (tResult.departed && truck.containerId) {
         const container = containers.value.find(c => c.id === truck.containerId)
-        if (container && container.lifecycleState === 'at_gate') {
+        if (
+          container &&
+          (container.lifecycleState === 'at_gate' || container.lifecycleState === 'returning_to_gate')
+        ) {
           container.lifecycleState = 'departed'
         }
       }
@@ -633,14 +639,14 @@ export const useGameStore = defineStore('box-empire-game', () => {
           }
           startTruckReturnToGate(truck, simTime.value)
         } else {
-          // Export pickup: depart directly
-          container.lifecycleState = 'departed'
+          // Export (or any non-import) load on truck — must leave via out-gate like import pickups
+          container.lifecycleState = 'returning_to_gate'
           container.currentLocation = {
-            type: 'gate_buffer',
-            id: 'gate-export',
+            type: 'truck',
+            id: truck.id,
             position: { ...truck.position },
           }
-          startTruckDeparture(truck, simTime.value)
+          startTruckReturnToGate(truck, simTime.value)
         }
       }
     } else if (job.dropoffLocation.type === 'quay_buffer') {
@@ -738,17 +744,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
       }
     }
 
-    // Phase: Start discharging when vessel arrives and all exports are in yard
+    // Phase: Start discharging as soon as vessel arrives at berth
     const vessel = vesselVisits.value[0]
     if (vessel && vessel.state === 'arrived' && !dischargingStarted.value) {
-      const exportsInYard = containers.value.filter(
-        c => c.visitType === 'export' && c.lifecycleState === 'in_yard',
-      ).length
-      if (exportsInYard >= TUTORIAL_EXPORT_COUNT) {
-        dischargingStarted.value = true
-        vessel.state = 'discharging'
-        startDischarge()
-      }
+      dischargingStarted.value = true
+      vessel.state = 'discharging'
+      startDischarge()
     }
 
     // Phase: Continue discharging (create new discharge jobs as crane becomes idle)
@@ -759,19 +760,29 @@ export const useGameStore = defineStore('box-empire-game', () => {
           vessel.state = 'loading'
           loadingStarted.value = true
         } else {
-          const next = getNextDischargeContainer(vessel)
-          if (next && !getActiveJobForContainer(getState(), next.containerId)) {
-            const vesselPos = getVesselSlotPosition(vessel, next.tier)
-            const vsId = makeVesselSlotId(vessel.id, 1, 1, next.tier)
-            const dischargeJob = createJob(
-              next.containerId,
-              { type: 'vessel_slot', id: vsId, position: vesselPos },
-              { type: 'quay_buffer', id: 'quay-discharge', position: { ...QUAY_BUFFER_DISCHARGE_POSITION } },
-              'mobile_harbor_crane',
-              12,
-              simTime.value,
-            )
-            jobs.value.push(dischargeJob)
+          // Wait for the quay discharge buffer to be clear before discharging the next container
+          const quayDischargeOccupied = containers.value.some(
+            c => c.visitType === 'import' && c.lifecycleState === 'discharged_to_buffer',
+          ) || jobs.value.some(
+            j =>
+              j.dropoffLocation.id === 'quay-discharge' &&
+              (j.status === 'pending' || j.status === 'assigned' || j.status === 'in_progress'),
+          )
+          if (!quayDischargeOccupied) {
+            const next = getNextDischargeContainer(vessel)
+            if (next && !getActiveJobForContainer(getState(), next.containerId)) {
+              const vesselPos = getVesselSlotPosition(vessel, next.tier)
+              const vsId = makeVesselSlotId(vessel.id, 1, 1, next.tier)
+              const dischargeJob = createJob(
+                next.containerId,
+                { type: 'vessel_slot', id: vsId, position: vesselPos },
+                { type: 'quay_buffer', id: 'quay-discharge', position: { ...QUAY_BUFFER_DISCHARGE_POSITION } },
+                'mobile_harbor_crane',
+                12,
+                simTime.value,
+              )
+              jobs.value.push(dischargeJob)
+            }
           }
         }
       }
@@ -970,6 +981,25 @@ export const useGameStore = defineStore('box-empire-game', () => {
     }
   }
 
+  const CAREER_INTRO_LAST_PAGE = 4
+
+  function beginCareerIntro(): void {
+    careerIntroPage.value = 1
+    gamePhase.value = 'career_intro'
+    emitEvent('level.up', 'Level 2 — your terminal awaits')
+  }
+
+  function advanceCareerIntro(): void {
+    if (careerIntroPage.value < CAREER_INTRO_LAST_PAGE) {
+      careerIntroPage.value++
+    }
+  }
+
+  function exitCareerIntroToMenu(): void {
+    gamePhase.value = 'menu'
+    careerIntroPage.value = 1
+  }
+
   // ---- Manual override ----------------------------------------------------
   function manualReassignContainer(containerId: string, targetLocation: Location): void {
     const existingJob = getActiveJobForContainer(getState(), containerId)
@@ -1033,6 +1063,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
     toggleEquipment,
     setCraneMode,
     advanceTutorialStep,
+    careerIntroPage,
+    beginCareerIntro,
+    advanceCareerIntro,
+    exitCareerIntroToMenu,
     emitEvent,
     consumePendingEvents,
     manualReassignContainer,

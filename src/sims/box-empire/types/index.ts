@@ -320,7 +320,13 @@ export interface GatehouseState {
 
 // ---- Game Phase -----------------------------------------------------------
 
-export type GamePhase = 'menu' | 'tutorial' | 'playing' | 'paused' | 'completed'
+export type GamePhase =
+  | 'menu'
+  | 'tutorial'
+  | 'playing'
+  | 'paused'
+  | 'completed'
+  | 'career_intro'
 
 // ---- Store State ----------------------------------------------------------
 

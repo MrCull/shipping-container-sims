@@ -9,6 +9,7 @@ import ContainerInfo from './components/ContainerInfo.vue'
 import EquipmentInfo from './components/EquipmentInfo.vue'
 import StartScreen from './components/modals/StartScreen.vue'
 import TutorialComplete from './components/modals/TutorialComplete.vue'
+import CareerIntroModal from './components/modals/CareerIntroModal.vue'
 
 const store = useGameStore()
 
@@ -19,13 +20,28 @@ function handleStart(): void {
 function handleRestart(): void {
   store.initTutorial()
 }
+
+function handleContinueCareer(): void {
+  store.beginCareerIntro()
+}
+
+function handlePlayTutorialFromCareer(): void {
+  store.initTutorial()
+}
 </script>
 
 <template>
   <div class="box-empire">
     <GameCanvas />
 
-    <template v-if="store.gamePhase === 'tutorial' || store.gamePhase === 'playing' || store.gamePhase === 'completed'">
+    <template
+      v-if="
+        store.gamePhase === 'tutorial'
+          || store.gamePhase === 'playing'
+          || store.gamePhase === 'completed'
+          || store.gamePhase === 'career_intro'
+      "
+    >
       <TopBar />
       <TutorialOverlay />
       <EventFeed />
@@ -42,6 +58,12 @@ function handleRestart(): void {
     <TutorialComplete
       v-if="store.gamePhase === 'completed'"
       @restart="handleRestart"
+      @continue-career="handleContinueCareer"
+    />
+
+    <CareerIntroModal
+      v-if="store.gamePhase === 'career_intro'"
+      @play-tutorial-again="handlePlayTutorialFromCareer"
     />
   </div>
 </template>

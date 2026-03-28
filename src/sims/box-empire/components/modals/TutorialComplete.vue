@@ -13,6 +13,7 @@ const stats = computed(() => ({
 
 const emit = defineEmits<{
   restart: []
+  continueCareer: []
 }>()
 </script>
 
@@ -28,8 +29,8 @@ const emit = defineEmits<{
       <p class="complete-subtitle">
         You've mastered the basics of terminal operations!
       </p>
-      <p class="coming-soon">
-        🚢 The full game is coming soon — with more vessels, equipment, and real-time economics!
+      <p class="next-level-hint">
+        Ready for what comes after the lesson? Continue to the next chapter — your own terminal story.
       </p>
 
       <div class="stats-grid">
@@ -71,12 +72,22 @@ const emit = defineEmits<{
         ⭐⭐⭐
       </div>
 
-      <button
-        class="restart-btn"
-        @click="emit('restart')"
-      >
-        🔄 Play Again
-      </button>
+      <div class="complete-actions">
+        <button
+          type="button"
+          class="next-level-btn"
+          @click="emit('continueCareer')"
+        >
+          Next: Level 2 — Your terminal
+        </button>
+        <button
+          type="button"
+          class="restart-btn"
+          @click="emit('restart')"
+        >
+          🔄 Play tutorial again
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -128,15 +139,11 @@ const emit = defineEmits<{
   margin: 0 0 10px 0;
 }
 
-.coming-soon {
+.next-level-hint {
   font-family: var(--font-retro, monospace);
   font-size: 0.78rem;
-  color: #f1c40f;
+  color: rgba(255, 255, 255, 0.65);
   margin: 0 0 20px 0;
-  background: rgba(241, 196, 15, 0.08);
-  border: 1px solid rgba(241, 196, 15, 0.25);
-  border-radius: 8px;
-  padding: 8px 14px;
   line-height: 1.5;
 }
 
@@ -173,21 +180,46 @@ const emit = defineEmits<{
   margin-bottom: 20px;
 }
 
+.complete-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.next-level-btn {
+  padding: 12px 24px;
+  border: 2px solid #2ecc71;
+  border-radius: 8px;
+  background: #2ecc71;
+  color: #0a1628;
+  font-family: var(--font-retro, monospace);
+  font-size: 0.88rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.next-level-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 22px rgba(46, 204, 113, 0.45);
+}
+
 .restart-btn {
   padding: 10px 28px;
-  border: 2px solid var(--color-primary, #f59e0b);
+  border: 2px solid rgba(255, 255, 255, 0.35);
   border-radius: 8px;
-  background: var(--color-primary, #f59e0b);
-  color: #000;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
   font-family: var(--font-retro, monospace);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .restart-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.55);
 }
 </style>

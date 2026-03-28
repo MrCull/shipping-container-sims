@@ -104,10 +104,9 @@ export const GATE_INGATE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENC
 // Queue lane X for trucks waiting (parallel to fence, beside gatehouse)
 export const GATE_INGATE_LANE_X = -44
 
-// Out-gate: placed in the fence boundary towards the bottom of the terminal
-// Positioned at x=-50 in the fence line at z ≈ midway down the terminal
-export const GATE_OUTGATE_POSITION: Position3D = { x: -50, y: 0, z: 105 }
-// Out-gate is a gap in the fence at this Z (within TERMINAL_BOUNDS)
+// Out-gate: right-hand fence (mirror of in-gate on the left), landside along +Z
+export const GATE_OUTGATE_POSITION: Position3D = { x: 50, y: 0, z: 105 }
+// Trucks queue / hold along this Z before the boom (same as gate z)
 export const GATE_OUTGATE_FENCE_Z = 105
 
 // Legacy aliases
@@ -126,7 +125,7 @@ export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: 0, z: 3 }
 export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -5, y: 0, z: 3 }
 export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: 5, y: 0, z: 3 }
 // Vessel berth further out to sea so ship doesn't overlap quay
-export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -20 }
+export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -14 }
 export const CRANE_POSITION: Position3D = { x: 0, y: 0, z: 0 }
 
 export const TERMINAL_BOUNDS = {
