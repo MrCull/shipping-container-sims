@@ -42,6 +42,48 @@ export const SHIP_PRESETS: Record<string, ShipPreset> = {
     cargoWidthFraction: 0.72,
     sternBlockedBays: 0,
   },
+  'medium-carrier': {
+    name: 'medium-carrier',
+    // 12 active bays: two groups of 6 separated by a mid-ship gap.
+    // Bays 10–11 (foremost two) sit on a raised forecastle ~1 container-height higher.
+    bays: 12,
+    rows: 4,
+    tiers: 4,
+    // Nominal game-space length (before glbScaleMultiplier shrinks the visual model)
+    length: 90,
+    width: 22,
+    height: 7,
+    emptyWeight: 2500,
+    emptyVCG: 6.0,
+    maxStackWeight: 170,
+    // cargoLengthFraction / cargoXOffsetFraction are unused when bayXOffsets is set,
+    // but kept as reasonable fallbacks.
+    cargoLengthFraction: 0.82,
+    cargoXOffsetFraction: 0.08,
+    cargoWidthFraction: 0.62,
+    sternBlockedBays: 0,
+    glbPath: 'medium-carrier',
+    glbScaleMultiplier: 1.431,
+    glbRotationY: 0,
+    deckOffsetY: 5.0,
+    glbYOffset: -8,
+    glbZOffset: 6,
+    // Explicit X positions for each bay (game units, bow = +X).
+    // Two groups of 6 with a ~9-unit gap (≈1.5 container lengths) between groups.
+    // Spacing within each group: 6.3 units (≈container length + gap).
+    bayXOffsets: [
+      // Stern group (bays 0–5)
+      -31.5, -25.2, -18.9, -12.6, -6.3, 0,
+      // Bow group (bays 6–11) — gap of ~9 units between groups 0 and 6
+      9.45, 15.75, 22.05, 28.35, 34.65, 40.95,
+    ],
+    // Front two bays (indices 10 & 11) are elevated by one container height above deck
+    bayYBaseOffsets: [
+      0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0,
+      2.83, 2.83,  // raised forecastle
+    ],
+  },
   large: {
     name: 'large',
     bays: 8,

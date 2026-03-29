@@ -1,12 +1,18 @@
 import { ref, onUnmounted } from 'vue'
 import { SOUNDS, DISASTER_SEQUENCES, PLACEMENT_SOUND } from '../modules/audio'
 
+// Seagull ambient: play roughly every 60 s, jittered ±20 s
+const SEAGULL_INTERVAL_BASE = 60_000
+const SEAGULL_INTERVAL_JITTER = 20_000
+
 export function useAudio() {
   const audioContext = ref<AudioContext | null>(null)
   const buffers = new Map<string, AudioBuffer>()
   const isLoaded = ref(false)
   // Track all active sources so we can stop them on demand
   const activeSources: AudioBufferSourceNode[] = []
+
+  let seagullTimer: ReturnType<typeof setTimeout> | null = null
 
   async function init(): Promise<void> {
     try {
@@ -97,7 +103,28 @@ export function useAudio() {
     }
   }
 
+  function scheduleNextSeagull() {
+    const delay = SEAGULL_INTERVAL_BASE + (Math.random() * 2 - 1) * SEAGULL_INTERVAL_JITTER
+    seagullTimer = setTimeout(() => {
+      playSound('seagulls', 0.35)
+      scheduleNextSeagull()
+    }, delay)
+  }
+
+  function startAmbientSeagulls(): void {
+    if (seagullTimer !== null) return  // already running
+    scheduleNextSeagull()
+  }
+
+  function stopAmbientSeagulls(): void {
+    if (seagullTimer !== null) {
+      clearTimeout(seagullTimer)
+      seagullTimer = null
+    }
+  }
+
   function dispose(): void {
+    stopAmbientSeagulls()
     stopAll()
     if (audioContext.value) {
       audioContext.value.close()
@@ -108,5 +135,5 @@ export function useAudio() {
 
   onUnmounted(dispose)
 
-  return { init, isLoaded, playSound, stopAll, playPlacementSound, playDisasterSequence, dispose }
+  return { init, isLoaded, playSound, stopAll, playPlacementSound, playDisasterSequence, startAmbientSeagulls, stopAmbientSeagulls, dispose }
 }

@@ -10,6 +10,10 @@ const GLB_URLS: Record<string, string> = {
     '../assets/container-ship-small-empty-no-containers.glb',
     import.meta.url
   ).href,
+  'medium-carrier': new URL(
+    '../assets/medium-vessel-no-containers.glb',
+    import.meta.url
+  ).href,
 }
 
 const _loader = new GLTFLoader()
@@ -40,16 +44,16 @@ export async function loadShipGLB(
     _cache.set(url, root.clone(true))
   }
 
-  // GLB length axis is Z; game convention is length along X — rotate 90° around Y first
-  // (bow confirmed to face +X after this rotation; adjust sign if bow faces wrong way)
-  root.rotation.y = Math.PI / 2
+  // GLB length axis is Z; game convention is length along X — rotate 90° around Y by default.
+  // Individual presets can override via glbRotationY.
+  root.rotation.y = shipConfig.glbRotationY ?? Math.PI / 2
 
   // After rotation, original Z (length) is now along X — use X for scaling
   const box = new THREE.Box3().setFromObject(root)
   const size = new THREE.Vector3()
   box.getSize(size)
   const modelLength = size.x
-  const scale = shipConfig.length / modelLength
+  const scale = (shipConfig.length / modelLength) * (shipConfig.glbScaleMultiplier ?? 1)
   root.scale.setScalar(scale)
 
   // Re-measure after scale and centre the model in X/Z
@@ -63,6 +67,8 @@ export async function loadShipGLB(
   const group = new THREE.Group()
   group.name = 'ship'
   group.add(root)
+
+  if (shipConfig.glbZOffset) group.position.z = shipConfig.glbZOffset
 
   scene.add(group)
   return group

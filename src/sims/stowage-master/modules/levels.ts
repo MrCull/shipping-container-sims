@@ -13,44 +13,22 @@ export const LEVELS: LevelConfig[] = [
     briefingPages: [
       {
         icon: '🚢',
-        title: 'VESSEL ARRIVAL',
+        title: 'LOAD THE FEEDER',
         body: [
-          'A small feeder vessel has berthed at your terminal. Your job is to load it with the containers waiting on the dock — quickly and safely.',
-          'You have 90 seconds. The ship leaves when the timer runs out, whether you\'re done or not.',
-        ],
-      },
-      {
-        icon: '📦',
-        title: 'HOW TO LOAD',
-        body: [
-          'Containers are queued on trucks at the crane. The next container to load is shown on the front truck.',
-          'Green slot outlines show where you can place it. Click any green slot to lift the container and stow it on the ship.',
-        ],
-        steps: [
-          'Click a green slot on the ship to place the current container.',
-          'The crane picks it up from the truck and lowers it into position.',
-          'The next container rolls forward automatically.',
-        ],
-      },
-      {
-        icon: '⚖️',
-        title: 'STOWAGE TIPS',
-        body: [
-          'How you stow matters — poor placement costs points.',
+          'A small feeder vessel has berthed. Load it with the containers queued on trucks at the crane — you have 90 seconds before it departs.',
+          'Click any green slot outline on the ship to place the current container. Keep heavy cargo low and centred to score well.',
         ],
         legend: [
-          { color: '#f44336', text: 'Heavy containers placed too high — bad for stability.' },
-          { color: '#ffeb3b', text: 'Heavy containers on the outer rows — risk of listing.' },
-          { color: '#ff9800', text: 'Placing cargo when the ship is already listing.' },
+          { color: '#00ff88', text: 'Green slots — valid placement positions. Click to load.' },
+          { color: '#f44336', text: 'Heavy containers placed high or outboard lose points.' },
         ],
-        warn: 'Keep heavy boxes low and centred. Watch the ship\'s list and trim meters on the left.',
       },
     ],
   },
   {
     id: 1,
     name: 'Level 2 - Feeder Vessel',
-    description: 'Same feeder vessel. First unload 10 Import containers, then load the vessel.',
+    description: 'Same feeder vessel. First unload 10 import containers, then load the vessel.',
     preset: SHIP_PRESETS.small,
     hazmatRate: CONTAINER.hazmatRate,
     containerCount: 20,
@@ -58,44 +36,24 @@ export const LEVELS: LevelConfig[] = [
     timerSeconds: 210,
     briefingPages: [
       {
-        icon: '🚢',
-        title: 'PORT CALL',
-        body: [
-          'The feeder vessel has arrived mid-voyage. It is carrying cargo for this port that must be offloaded before any new cargo can be loaded.',
-          'You have 3 minutes 30 seconds to complete both phases.',
-        ],
-      },
-      {
         icon: '🟡',
-        title: 'PHASE 1 — DISCHARGE',
+        title: 'DISCHARGE THEN LOAD',
         body: [
-          'The vessel is pre-loaded with import containers destined for this port. You must discharge all of them before loading begins.',
+          'The vessel has arrived with 10 import containers for this port. Discharge them first, then load your outbound cargo.',
+          'Click the gold containers on the ship to discharge them. The crane will lift each one onto a waiting truck. Once all gold containers are cleared, loading begins automatically.',
         ],
         legend: [
-          { color: '#ffd700', text: 'Gold containers — discharged HERE. Click them to unload.' },
+          { color: '#ffd700', text: 'Gold — local imports. Click to discharge.' },
+          { color: '#00ff88', text: 'Green slots — appear once discharge is complete.' },
         ],
-        steps: [
-          'Click any gold (highlighted) container on the ship.',
-          'The crane lifts it and lowers it onto a waiting truck.',
-          'The truck drives away. Repeat until all imports are cleared.',
-        ],
-        warn: 'Discharge from the top of each stack first — that earns more points.',
-      },
-      {
-        icon: '📦',
-        title: 'PHASE 2 — LOAD',
-        body: [
-          'Once all import containers are discharged, the loading phase begins automatically.',
-          'Load the waiting containers onto the now-empty ship slots, just like Level 1.',
-        ],
-        warn: 'Keep heavy cargo low and centred to avoid stability penalties.',
+        warn: 'Discharge top-tier containers first for bonus points.',
       },
     ],
   },
   {
     id: 2,
     name: 'Level 3 - Feeder Vessel',
-    description: 'Vessel arrives with local imports AND transit cargo. Discharge locals, restow any transit blocking them, then load.',
+    description: 'Discharge local imports, restow any blocked transit cargo, then load.',
     preset: SHIP_PRESETS.small,
     hazmatRate: CONTAINER.hazmatRate * 1.5,
     containerCount: 14,
@@ -104,46 +62,46 @@ export const LEVELS: LevelConfig[] = [
     timerSeconds: 360,
     briefingPages: [
       {
-        icon: '🚢',
-        title: 'COMPLEX PORT CALL',
+        icon: '🔄',
+        title: 'DISCHARGE + RESTOW',
         body: [
-          'This vessel is on a multi-port voyage. It carries two types of pre-loaded cargo — some for this port, and some continuing onward.',
-          'You have 6 minutes to discharge, restow, and load.',
-        ],
-      },
-      {
-        icon: '🟡',
-        title: 'PHASE 1 — DISCHARGE',
-        body: [
-          'Gold import containers must be discharged at this port. Click them to unload.',
+          'The vessel carries gold import containers (for this port) and coloured transit containers (continuing onward). Discharge all gold containers, then load outbound cargo.',
+          'If a transit container is stacked on top of a gold import, click it first — the crane lifts it and cyan slots appear. Click a cyan slot to restow it, then discharge the gold container below.',
         ],
         legend: [
-          { color: '#ffd700', text: 'Gold — local imports. Must be discharged here.' },
-          { color: '#2196f3', text: 'Coloured — transit cargo. Stays on the vessel.' },
+          { color: '#ffd700', text: 'Gold — discharge here.' },
+          { color: '#2196f3', text: 'Coloured — transit cargo, stays on board.' },
+          { color: '#00ccff', text: 'Cyan slots — valid restow positions.' },
         ],
-        warn: 'Do not click transit containers during normal discharge — they are not yours to unload.',
+        warn: 'Restows cost points. Don\'t place transit cargo above another gold container.',
       },
+    ],
+  },
+  {
+    id: 3,
+    name: 'Level 4 - Medium Carrier',
+    description: 'A medium vessel with 12 bays across two cargo holds. Master stability and restow across a complex layout.',
+    preset: SHIP_PRESETS['medium-carrier'],
+    hazmatRate: CONTAINER.hazmatRate * 1.5,
+    containerCount: 30,
+    dischargeContainerCount: 12,
+    transitContainerCount: 6,
+    timerSeconds: 420,
+    briefingPages: [
       {
-        icon: '🔄',
-        title: 'RESTOW — WHEN BLOCKED',
+        icon: '🚢',
+        title: 'MEDIUM CARRIER',
         body: [
-          'If a transit container is stacked on top of a gold import, it is blocking discharge. You must move it out of the way first — this is called a restow.',
+          'This vessel has two cargo holds separated by a mid-ship gap — 12 bays total. The two foremost bays sit on a raised forecastle deck, about one container height above the main holds.',
+          'Discharge all gold import containers, restow any transit cargo blocking them, then load the outbound boxes. Stability is harder to maintain across a bigger grid — watch the list and trim meters closely.',
         ],
-        steps: [
-          'Click the blocking transit container — the crane lifts it off the ship.',
-          'Cyan slots appear showing safe places to put it.',
-          'Click a cyan slot to place the transit container there.',
-          'The gold import below is now accessible — continue discharge.',
+        legend: [
+          { color: '#ffd700', text: 'Gold — discharge here.' },
+          { color: '#2196f3', text: 'Coloured — transit, stays on board.' },
+          { color: '#00ccff', text: 'Cyan — restow destinations.' },
+          { color: '#00ff88', text: 'Green — load positions (after discharge).' },
         ],
-        warn: 'Restows cost points. Avoid placing transit cargo above another gold import — that creates a new blockage.',
-      },
-      {
-        icon: '📦',
-        title: 'PHASE 2 — LOAD',
-        body: [
-          'Once all imports are discharged, load the waiting containers into the freed slots.',
-          'Transit containers already on board count toward the ship\'s stability — factor them into your loading plan.',
-        ],
+        warn: 'Heavy containers belong low and on the centreline. Hazmat containers must be separated.',
       },
     ],
   },

@@ -36,6 +36,7 @@ export const SOUNDS: Record<string, string> = {
 
   // Ambient
   truckEngine: assetUrl('quiet-truck-engine.mp3'),
+  seagulls: assetUrl('seagul-sound-17-seconds.mp3'),
 }
 
 export interface SoundCue {

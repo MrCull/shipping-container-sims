@@ -232,6 +232,13 @@ watch(() => store.phase, (newPhase, oldPhase) => {
     // Stop all in-flight sounds from the previous level before building the new scene
     audio.stopAll()
     buildScene()
+    // Start seagull ambient loop for the duration of the level
+    audio.startAmbientSeagulls()
+  }
+
+  // Stop seagulls when returning to non-gameplay states
+  if (newPhase === 'start' || newPhase === 'complete' || newPhase === 'failed' || newPhase === 'disaster') {
+    audio.stopAmbientSeagulls()
   }
 
   // Briefing dismissed on a load-only level — show green slot indicators

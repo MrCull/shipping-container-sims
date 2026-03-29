@@ -29,7 +29,10 @@ function next() {
     class="overlay"
   >
     <div class="card">
-      <div class="progress-bar">
+      <div
+        v-if="pages.length > 1"
+        class="progress-bar"
+      >
         <div
           v-for="(_, i) in pages"
           :key="i"

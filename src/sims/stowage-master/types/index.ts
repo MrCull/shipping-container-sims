@@ -65,6 +65,34 @@ export interface ShipPreset {
    * Determined empirically after measuring the scaled model's bounding box.
    */
   glbYOffset?: number
+  /**
+   * Multiplier applied on top of the length-derived scale when loading the GLB.
+   * Use to shrink or grow the model relative to its nominal game length.
+   * e.g. 0.1 = 10% of the derived scale.
+   */
+  glbScaleMultiplier?: number
+  /**
+   * Y-axis rotation (radians) applied to the loaded GLB root.
+   * Overrides the default Math.PI / 2 used for most ships.
+   */
+  glbRotationY?: number
+  /**
+   * Z offset applied to the ship group after loading (positive = away from quay / sea side).
+   * Use to nudge a specific vessel away from or toward the crane dock.
+   */
+  glbZOffset?: number
+  /**
+   * Per-bay X position overrides (game units from ship centre, length axis).
+   * When provided, replaces the uniform bay spacing for that bay index.
+   * Length must equal the number of active bays.
+   */
+  bayXOffsets?: number[]
+  /**
+   * Per-bay Y base offset (game units above deckOffsetY).
+   * Used for raised cargo areas (e.g. forecastle holds).
+   * Length must equal the number of active bays.
+   */
+  bayYBaseOffsets?: number[]
 }
 
 export interface GameEvent {

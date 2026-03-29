@@ -18,7 +18,7 @@ export function parseSlotId(id: string): { bay: number; row: number; tier: numbe
 
 export function generateSlots(shipConfig: ShipPreset): Record<string, Slot> {
   slotCache.clear()
-  const cacheKey = `${shipConfig.bays}-${shipConfig.rows}-${shipConfig.tiers}`
+  const cacheKey = `${shipConfig.name}-${shipConfig.bays}-${shipConfig.rows}-${shipConfig.tiers}`
 
   const slots: Record<string, Slot> = {}
   const { bays, rows, tiers } = shipConfig
@@ -43,9 +43,15 @@ export function generateSlots(shipConfig: ShipPreset): Record<string, Slot> {
         const tierNum = (t + 1) * 2
         const id = slotId(bayNum, rowNum, tierNum)
 
-        // Centre bays along cargoLength, shifted by cargoXCenter
-        const xOffset = cargoXCenter + (b - (activeBays - 1) / 2) * cellX
-        const yOffset = t * cellY
+        // Use per-bay X override if provided, otherwise uniform spacing
+        const xOffset = shipConfig.bayXOffsets
+          ? shipConfig.bayXOffsets[b]
+          : cargoXCenter + (b - (activeBays - 1) / 2) * cellX
+
+        // Per-bay Y base (e.g. raised forecastle bays) + tier stacking
+        const yBase = shipConfig.bayYBaseOffsets ? shipConfig.bayYBaseOffsets[b] : 0
+        const yOffset = yBase + t * cellY
+
         const zOffset = (r - (rows - 1) / 2) * cellZ
 
         slots[id] = {
