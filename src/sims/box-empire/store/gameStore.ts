@@ -28,6 +28,7 @@ import {
   QUAY_BUFFER_DISCHARGE_POSITION,
   QUAY_BUFFER_LOAD_POSITION,
   YARD_IO_POSITION,
+  YARD_IO_CONTAINER_POSITION,
   CRANE_POSITION,
   GATE_OUT_REVENUE,
   VESSEL_LOAD_REVENUE,
@@ -530,7 +531,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
             const slotId = makeYardSlotId(slot.blockId, slot.bay, slot.row, slot.tier)
             const job = createJob(
               truck.containerId,
-              { type: 'truck', id: truck.id, position: { ...YARD_IO_POSITION } },
+              { type: 'truck', id: truck.id, position: { ...YARD_IO_CONTAINER_POSITION } },
               { type: 'yard_slot', id: slotId, position: dropPos },
               'reach_stacker',
               10,
@@ -551,7 +552,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
                 id: slotId,
                 position: { ...container.currentLocation.position },
               },
-              { type: 'truck', id: truck.id, position: { ...YARD_IO_POSITION } },
+              { type: 'truck', id: truck.id, position: { ...YARD_IO_CONTAINER_POSITION } },
               'reach_stacker',
               8,
               simTime.value,
@@ -703,7 +704,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
             const pickupJob = createJob(
               container.id,
               { type: 'yard_slot', id: slotId, position: { ...container.currentLocation.position } },
-              { type: 'truck', id: waitingTruck.id, position: { ...YARD_IO_POSITION } },
+              { type: 'truck', id: waitingTruck.id, position: { ...YARD_IO_CONTAINER_POSITION } },
               'reach_stacker',
               8,
               simTime.value,
@@ -935,7 +936,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
           const pickupJob = createJob(
             container.id,
             { type: 'yard_slot', id: slotId, position: { ...container.currentLocation.position } },
-            { type: 'truck', id: truck.id, position: { ...YARD_IO_POSITION } },
+            { type: 'truck', id: truck.id, position: { ...YARD_IO_CONTAINER_POSITION } },
             'reach_stacker',
             8,
             simTime.value,

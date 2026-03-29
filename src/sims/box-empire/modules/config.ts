@@ -148,6 +148,14 @@ export const TRUCK_GLB = {
   containerOffsetZ: -4.0,
 } as const
 
+// World position of the container when the truck is parked at YARD_IO facing -Z (heading π).
+// Truck local z=-4 maps to world z = YARD_IO_POSITION.z + |containerOffsetZ| = 30+4 = 34.
+export const YARD_IO_CONTAINER_POSITION: Position3D = {
+  x: YARD_IO_POSITION.x,
+  y: CONTAINER_HEIGHT / 2,
+  z: YARD_IO_POSITION.z + Math.abs(TRUCK_GLB.containerOffsetZ),
+}
+
 export const VESSEL_GLB = {
   /** rotation.y to align GLB (length along Z) → game X-axis (length along X) */
   rotationY: Math.PI / 2,

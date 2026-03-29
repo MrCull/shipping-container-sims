@@ -113,11 +113,10 @@ function rsParkingPosition(targetPos: Position3D): Position3D {
 
 // For RS picking/dropping at a truck at YARD_IO: park RS_TRUCK_PARK_OFFSET metres to the +X side
 // so the RS approaches the long face of the container (container length runs along truck Z axis).
-// The truck faces -Z (heading=π) at YARD_IO, so its trailer deck (local z=-4) is at world z+4.
-// We align the RS Z with the trailer position so the spreader is over the trailer, not the cab.
-const RS_TRUCK_TRAILER_Z_OFFSET = 4.0   // = |TRUCK_GLB.containerOffsetZ| when truck faces -Z
+// targetPos is YARD_IO_CONTAINER_POSITION (the actual container world position, z=34),
+// so no extra Z offset is needed — the RS parks directly beside the container.
 function rsTruckParkingPosition(targetPos: Position3D): Position3D {
-  return { x: targetPos.x + RS_TRUCK_PARK_OFFSET, y: 0, z: targetPos.z + RS_TRUCK_TRAILER_Z_OFFSET }
+  return { x: targetPos.x + RS_TRUCK_PARK_OFFSET, y: 0, z: targetPos.z }
 }
 
 // Determine heading for RS at a given position facing a pickup/drop target
