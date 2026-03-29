@@ -270,7 +270,6 @@ export class EquipmentRenderer {
 
     // Side end-arms + twist-locks
     for (const sx of [-3.7, 3.7]) {
-      const sign = sx > 0 ? 1 : -1
       // End-arm box
       const arm = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.55, 0.62), darkMat)
       arm.position.set(sx, -0.55, 9.2); boomGroup.add(arm)

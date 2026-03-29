@@ -15,7 +15,7 @@ import {
 import { createPlacementMarker } from '../modules/placementMarkers'
 import { slotWorldPosition, getTowerTopY, getTopLayerIndex, getPlacementCandidates } from '../modules/towerBuilder'
 import { BLOCK, INTERACTION, TOWER } from '../modules/config'
-import type { JengaContainer } from '../types'
+import type { JengaContainer, LayerOrientation } from '../types'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const store = useContainerStackStore()
@@ -200,7 +200,7 @@ function syncGhostMesh(): void {
   const c = floatingContainer.value
   if (!c || (phase.value !== 'removing' && phase.value !== 'placing')) return
 
-  let orient
+  let orient: LayerOrientation
   if (phase.value === 'placing') {
     const topIdx = getTopLayerIndex(layers.value)
     const topLayer = layers.value[topIdx]
