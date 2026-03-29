@@ -125,9 +125,9 @@ const progressPercent = computed(() => Math.round(progress.value * 100))
 <style scoped>
 .narrator-dialog {
   position: fixed;
-  top: 50%;
+  bottom: 32px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   z-index: 30;
   max-width: 520px;
   width: calc(100vw - 48px);
@@ -274,22 +274,22 @@ const progressPercent = computed(() => Math.round(progress.value * 100))
   box-shadow: 0 2px 10px rgba(46, 204, 113, 0.5);
 }
 
-/* Scale-in / fade transition (no translate — the outer wrapper owns centering) */
+/* Slide-up / fade transition from the bottom */
 .narrator-slide-enter-active {
-  transition: opacity 0.25s ease, scale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .narrator-slide-leave-active {
-  transition: opacity 0.2s ease, scale 0.2s ease-in;
+  transition: opacity 0.2s ease, transform 0.2s ease-in;
 }
 
 .narrator-slide-enter-from {
   opacity: 0;
-  scale: 0.92;
+  transform: translateX(-50%) translateY(24px);
 }
 
 .narrator-slide-leave-to {
   opacity: 0;
-  scale: 0.95;
+  transform: translateX(-50%) translateY(16px);
 }
 </style>

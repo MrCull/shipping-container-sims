@@ -133,8 +133,8 @@ export const NARRATOR_GROUPS: NarratorGroup[] = [
         ],
         actions: [
           {
-            label: '▶▶ Speed up ×5',
-            action: 'setSpeed5x',
+            label: '▶▶ Speed up ×3',
+            action: 'setSpeed3x',
             advancesOnClick: true,
           },
         ],
