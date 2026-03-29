@@ -4,7 +4,7 @@
 
 import * as THREE from 'three'
 import type { Equipment, Container } from '../types'
-import { CONTAINER_HEIGHT } from './config'
+import { CONTAINER_HEIGHT, CONTAINER_WIDTH } from './config'
 import { createContainerGroup } from './containerRenderer'
 import { disposeContainerMaterials } from './containerMaterials'
 
@@ -648,13 +648,15 @@ export class EquipmentRenderer {
             // Position container in RS-group local space so it hangs below the spreader.
             // Spreader end is at boomGroup-local (0, -0.55, 9.2); scale.z=0.5 → z_scaled=4.6.
             // Container centre is twistLockHeight (0.9m) + CONTAINER_HEIGHT/2 below spreader frame.
+            // Shift ¾ container width back toward RS body for a natural carry position.
             const θ = p.boomGroup.rotation.x
             const cY_boom = -(0.55 + 0.9 + CONTAINER_HEIGHT / 2)  // ≈ -2.745
             const cZ_scaled = 9.2 * 0.5                            // = 4.6
+            const zShift = CONTAINER_WIDTH * 0.75                  // ≈ 1.83m toward RS
             cGroup.position.set(
               0.9,
               3.3 + cY_boom * Math.cos(θ) - cZ_scaled * Math.sin(θ),
-              2.2 + cY_boom * Math.sin(θ) + cZ_scaled * Math.cos(θ),
+              2.2 + cY_boom * Math.sin(θ) + cZ_scaled * Math.cos(θ) - zShift,
             )
           }
         } else if (existingCarried) {

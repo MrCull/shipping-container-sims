@@ -284,10 +284,12 @@ export class TruckRenderer {
       mesh.rotation.y = truck.headingY
 
       // ---- Container attachment ----
-      // Find the container this truck is carrying (on-truck or being collected)
+      // Find the container this truck is carrying (on-truck or being collected).
+      // Exclude containers currently held by equipment (RS picked them up).
       const carriedContainer = containers
         ? containers.find(c =>
           c.id === truck.containerId &&
+          c.currentLocation.type !== 'equipment' &&
           (c.currentLocation.type === 'truck' ||
            c.lifecycleState === 'returning_to_gate' ||
            c.lifecycleState === 'at_gate'),
