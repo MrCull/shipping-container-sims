@@ -2,7 +2,11 @@
 
 **Play free in the browser:** **[container-games.net](https://container-games.net)**
 
-Three shipping-container-themed games in one Vue app: plan vessel loads, balance a physics tower, or run a terminal tycoon. Pick a game below for a quick look at how each one plays, then jump in online or run the project locally.
+Three shipping-container-themed games in one Vue app: plan vessel loads, balance a physics tower, or run a terminal tycoon. Below is the **home portal** (pick a game), then each title with **gameplay a few seconds after you start** — not the pre-game menu.
+
+## Main menu
+
+![Home portal — choose a game](docs/readme/home-portal.png)
 
 ---
 
@@ -10,7 +14,7 @@ Three shipping-container-themed games in one Vue app: plan vessel loads, balance
 
 *Tetris meets real-world container logistics — 3D puzzle*
 
-![Stowage Master — vessel stowage planning](docs/readme/stowage-master.png)
+![Stowage Master — gameplay after starting Level 1](docs/readme/stowage-master-gameplay.png)
 
 **What you do:** Place containers on the ship’s bays with an eye on **weight**, **cargo classes** (what can sit next to what), and **port rotation** (unload in the right order). You’re optimising a real stowage puzzle, not just filling slots.
 
@@ -22,7 +26,9 @@ Three shipping-container-themed games in one Vue app: plan vessel loads, balance
 
 *Jenga with containers — 3D physics*
 
-![Contenga — sliding and stacking containers](docs/readme/contenga.gif)
+![Contenga — short motion clip during play](docs/readme/contenga.gif)
+
+![Contenga — gameplay after pressing Play](docs/readme/contenga-gameplay.png)
 
 **What you do:** Pull blocks from the stack and **pile them on top** without letting the tower collapse. **Poor support** and bad balance bring the whole thing down — it’s tactile, risky, and very satisfying when it holds.
 
@@ -34,7 +40,7 @@ Three shipping-container-themed games in one Vue app: plan vessel loads, balance
 
 *Terminal tycoon — strategy and economy*
 
-![Box Empire — terminal operations and upgrades](docs/readme/box-empire.png)
+![Box Empire — gameplay after starting the tutorial](docs/readme/box-empire-gameplay.png)
 
 **What you do:** Start from a **single container** and grow a **logistics empire**: buy **routes**, **upgrade ports**, manage **fleets**, and stay ahead of **rivals**. Numbers, maps, and narrative beats frame a management sim built around real terminal ideas.
 
@@ -55,6 +61,18 @@ Open `http://localhost:5173/` — the home page lists every sim; open any card t
 npm run build      # Production build
 npm run lint       # ESLint checks
 npm run lint:fix   # ESLint with auto-fixes
+```
+
+### Regenerate README screenshots
+
+Requires a production preview and **ffmpeg** (for the Contenga GIF). Default wait before each gameplay shot is **10 seconds** of real time.
+
+```bash
+npm run build
+npm run preview -- --host 127.0.0.1 --port 4173
+# in another terminal:
+npm run capture-readme-media
+# optional: BASE_URL=http://127.0.0.1:4173 GAMEPLAY_WAIT_MS=12000 npm run capture-readme-media
 ```
 
 ## For developers
