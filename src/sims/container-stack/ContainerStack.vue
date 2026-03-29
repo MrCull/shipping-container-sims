@@ -5,6 +5,7 @@ import GameCanvas from './components/GameCanvas.vue'
 import ScoreBar from './components/ui/ScoreBar.vue'
 import TowerStability from './components/ui/TowerStability.vue'
 import Instructions from './components/ui/Instructions.vue'
+import KeyboardHint from './components/ui/KeyboardHint.vue'
 import StartScreen from './components/modals/StartScreen.vue'
 import GameOver from './components/modals/GameOver.vue'
 import PauseMenu from './components/modals/PauseMenu.vue'
@@ -13,6 +14,9 @@ import LevelFailedModal from './components/modals/LevelFailedModal.vue'
 import TimerBar from './components/ui/TimerBar.vue'
 import { useContainerStackStore } from './store/gameStore'
 import { playStackSound } from './modules/audioPlayer'
+import { useGameMusic } from './composables/useGameMusic'
+
+useGameMusic()
 
 const store = useContainerStackStore()
 const { phase } = storeToRefs(store)
@@ -62,6 +66,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         WASD / arrows — orbit camera · + / − — zoom · Esc — pause
       </p>
     </div>
+    <KeyboardHint v-if="phase !== 'start'" />
     <StartScreen v-if="phase === 'start'" />
     <GameOver v-if="phase === 'gameOver'" />
     <LevelCompleteModal v-if="phase === 'levelComplete'" />
