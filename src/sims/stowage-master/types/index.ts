@@ -153,6 +153,12 @@ export interface LevelConfig {
   transitContainerCount?: number
   /** Countdown timer in seconds. 0 = no timer. */
   timerSeconds: number
+  /**
+   * Controls how spread out pre-loaded containers are across tiers and rows.
+   * 0 = bottom tiers / centre rows first (default, easy).
+   * 1 = fully random — any tier, any row.
+   */
+  placementSpread?: number
   /** Instructional pages shown before gameplay starts. */
   briefingPages: BriefingPage[]
 }

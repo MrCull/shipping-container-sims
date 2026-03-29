@@ -57,7 +57,7 @@ function nextLevel() {
           Restart
         </button>
         <button
-          v-if="store.currentLevel < 2"
+          v-if="store.currentLevel < 5"
           class="btn btn-primary"
           @click="nextLevel"
         >

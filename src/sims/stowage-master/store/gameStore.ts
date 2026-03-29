@@ -136,7 +136,8 @@ export const useGameStore = defineStore('stowage-master-game', () => {
         config.dischargeContainerCount,
         config.preset,
         grid.value,
-        transitCount
+        transitCount,
+        config.placementSpread ?? 0,
       )
       dischargeCount.value = config.dischargeContainerCount
       hasTransitContainers.value = transitCount > 0

@@ -105,6 +105,64 @@ export const LEVELS: LevelConfig[] = [
       },
     ],
   },
+  {
+    id: 4,
+    name: 'Level 5 - Medium Carrier',
+    description: 'The same medium carrier, heavily loaded. 28 imports to discharge, 18 transit boxes spread across all tiers, and 64 outbound containers to load.',
+    preset: SHIP_PRESETS['medium-carrier'],
+    hazmatRate: CONTAINER.hazmatRate * 2.0,
+    containerCount: 64,
+    dischargeContainerCount: 28,
+    transitContainerCount: 18,
+    timerSeconds: 720,
+    placementSpread: 0.65,
+    briefingPages: [
+      {
+        icon: '⚠️',
+        title: 'BUSY PORT CALL',
+        body: [
+          'The medium carrier has arrived with 28 gold imports scattered across all tiers and rows — not just the bottom. 18 transit boxes are mixed in throughout, and 64 outbound containers are queued on the quay.',
+          'Gold boxes can be in any tier. Clear the top of each stack before you can reach the ones below. Watch list and trim as big chunks of cargo shift.',
+        ],
+        legend: [
+          { color: '#ffd700', text: 'Gold — discharge here (may be any tier).' },
+          { color: '#2196f3', text: 'Coloured — transit, stays on board.' },
+          { color: '#00ccff', text: 'Cyan — restow destinations.' },
+          { color: '#00ff88', text: 'Green — load positions (after discharge).' },
+        ],
+        warn: 'Hazmat rate is higher this port call. Never place two hazmat boxes in adjacent slots.',
+      },
+    ],
+  },
+  {
+    id: 5,
+    name: 'Level 6 - Medium Carrier',
+    description: 'Maximum capacity. 56 imports to discharge, 36 transit boxes throughout, and 80 outbound containers to load — all on the same vessel.',
+    preset: SHIP_PRESETS['medium-carrier'],
+    hazmatRate: CONTAINER.hazmatRate * 2.5,
+    containerCount: 80,
+    dischargeContainerCount: 56,
+    transitContainerCount: 36,
+    timerSeconds: 900,
+    placementSpread: 1.0,
+    briefingPages: [
+      {
+        icon: '💀',
+        title: 'MAXIMUM LOAD',
+        body: [
+          'The carrier is nearly full — 56 gold imports buried under 36 transit boxes spread across every bay, row, and tier. Discharge everything, then load 80 outbound containers in 15 minutes.',
+          'With stacks reaching the top tier and gold boxes at every level, planning your discharge sequence is everything. One wrong move backs you into a corner.',
+        ],
+        legend: [
+          { color: '#ffd700', text: 'Gold — discharge here (any tier, any row).' },
+          { color: '#2196f3', text: 'Coloured — transit, stays on board.' },
+          { color: '#00ccff', text: 'Cyan — restow destinations.' },
+          { color: '#00ff88', text: 'Green — load positions (after discharge).' },
+        ],
+        warn: 'One in four containers is hazmat. With this many boxes on board, a single chain-block can lock out entire bays.',
+      },
+    ],
+  },
 ]
 
 export function getLevelConfig(levelId: number): LevelConfig {

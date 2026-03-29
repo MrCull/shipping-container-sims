@@ -44,10 +44,27 @@ function makeTransitContainer(): Container {
   }
 }
 
+/** Fisher-Yates shuffle (in-place). */
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
 /**
- * Builds an ordered list of slot IDs: lower tiers first, centre rows first.
+ * Builds a list of all valid slot IDs ordered for pre-placement.
+ *
+ * spreadFactor 0 = deterministic (lower tiers first, centre rows first — original behaviour).
+ * spreadFactor 1 = fully shuffled across every tier and row.
+ * Values in between partially shuffle within each tier group before merging.
  */
-function buildOrderedSlotIds(preset: ShipPreset, grid: Record<string, Slot>): string[] {
+function buildOrderedSlotIds(
+  preset: ShipPreset,
+  grid: Record<string, Slot>,
+  spreadFactor = 0,
+): string[] {
   const activeBays = preset.bays - preset.sternBlockedBays
   const centreRow = Math.floor(preset.rows / 2)
 
@@ -57,19 +74,51 @@ function buildOrderedSlotIds(preset: ShipPreset, grid: Record<string, Slot>): st
     if (offset > 0 && centreRow + offset < preset.rows) rowPriority.push(centreRow + offset)
   }
 
-  const orderedIds: string[] = []
+  // Build per-tier buckets so we can shuffle within / across tiers
+  const tierBuckets: string[][] = []
   for (let t = 0; t < preset.tiers; t++) {
     const tierNum = (t + 1) * 2
+    const bucket: string[] = []
     for (const r of rowPriority) {
       const rowNum = r + 1
       for (let b = 0; b < activeBays; b++) {
         const bayNum = b * 2 + 1
         const id = `${String(bayNum).padStart(2, '0')}-${String(rowNum).padStart(2, '0')}-${String(tierNum).padStart(2, '0')}`
-        if (grid[id]) orderedIds.push(id)
+        if (grid[id]) bucket.push(id)
       }
     }
+    tierBuckets.push(bucket)
   }
-  return orderedIds
+
+  if (spreadFactor <= 0) {
+    // Original deterministic order: tier 1 → tier 2 → … (centre rows first within each)
+    return tierBuckets.flat()
+  }
+
+  if (spreadFactor >= 1) {
+    // Fully flatten then shuffle — every slot equally likely regardless of tier/row
+    return shuffle(tierBuckets.flat())
+  }
+
+  // Partial: shuffle within each tier bucket, then interleave tiers randomly
+  const shuffledBuckets = tierBuckets.map(b => shuffle([...b]))
+  // Interleave by drawing from a randomly weighted bucket each step
+  const result: string[] = []
+  const remaining = shuffledBuckets.map(b => [...b])
+  while (remaining.some(b => b.length > 0)) {
+    // Weight lower tiers slightly higher so ground-floor slots still tend to fill first,
+    // but upper-tier slots have a real chance of appearing early
+    const weights = remaining.map((b, i) => b.length > 0 ? Math.max(1, (preset.tiers - i) * (1 - spreadFactor) + 1) : 0)
+    const total = weights.reduce((s, w) => s + w, 0)
+    let pick = Math.random() * total
+    let chosen = 0
+    for (let i = 0; i < weights.length; i++) {
+      pick -= weights[i]
+      if (pick <= 0) { chosen = i; break }
+    }
+    result.push(remaining[chosen].shift()!)
+  }
+  return result
 }
 
 function canPlace(slotId: string, grid: Record<string, Slot>): boolean {
@@ -97,10 +146,11 @@ export function generateDischargeManifest(
   count: number,
   preset: ShipPreset,
   grid: Record<string, Slot>,
-  transitCount: number = 0
+  transitCount: number = 0,
+  spreadFactor: number = 0,
 ): Container[] {
   const placed: Container[] = []
-  const orderedIds = buildOrderedSlotIds(preset, grid)
+  const orderedIds = buildOrderedSlotIds(preset, grid, spreadFactor)
 
   // 1 — Place import containers (lower tiers first)
   let importPlaced = 0
