@@ -4,8 +4,8 @@ import { SHIP_PRESETS, SCORING, CONTAINER } from './config'
 export const LEVELS: LevelConfig[] = [
   {
     id: 0,
-    name: 'Level 1 - Feeder Vessel',
-    description: 'A small feeder ship. Learn the basics of container loading.',
+    name: 'Level 1',
+    description: 'Learn the basics of container loading on a tiny vessel.',
     preset: SHIP_PRESETS.small,
     hazmatRate: CONTAINER.hazmatRate,
     containerCount: 20,
@@ -27,8 +27,8 @@ export const LEVELS: LevelConfig[] = [
   },
   {
     id: 1,
-    name: 'Level 2 - Feeder Vessel',
-    description: 'Same feeder vessel. First unload 10 import containers, then load the vessel.',
+    name: 'Level 2',
+    description: 'Unload 10 import containers first, then load the vessel.',
     preset: SHIP_PRESETS.small,
     hazmatRate: CONTAINER.hazmatRate,
     containerCount: 20,
@@ -52,8 +52,8 @@ export const LEVELS: LevelConfig[] = [
   },
   {
     id: 2,
-    name: 'Level 3 - Feeder Vessel',
-    description: 'Discharge local imports, restow any blocked transit cargo, then load.',
+    name: 'Level 3',
+    description: 'Discharge imports, restow blocked transit cargo, then load.',
     preset: SHIP_PRESETS.small,
     hazmatRate: CONTAINER.hazmatRate * 1.5,
     containerCount: 14,
@@ -79,8 +79,8 @@ export const LEVELS: LevelConfig[] = [
   },
   {
     id: 3,
-    name: 'Level 4 - Medium Carrier',
-    description: 'A medium vessel with 12 bays across two cargo holds. Master stability and restow across a complex layout.',
+    name: 'Level 4',
+    description: 'A feeder vessel with 12 bays across two holds. Master stability across a complex layout.',
     preset: SHIP_PRESETS['medium-carrier'],
     hazmatRate: CONTAINER.hazmatRate * 1.5,
     containerCount: 30,
@@ -107,8 +107,8 @@ export const LEVELS: LevelConfig[] = [
   },
   {
     id: 4,
-    name: 'Level 5 - Medium Carrier',
-    description: 'The same medium carrier, heavily loaded. 28 imports to discharge, 18 transit boxes spread across all tiers, and 64 outbound containers to load.',
+    name: 'Level 5',
+    description: 'The feeder vessel, heavily loaded. 28 imports, 18 transit boxes, and 64 outbound containers.',
     preset: SHIP_PRESETS['medium-carrier'],
     hazmatRate: CONTAINER.hazmatRate * 2.0,
     containerCount: 64,
@@ -136,8 +136,8 @@ export const LEVELS: LevelConfig[] = [
   },
   {
     id: 5,
-    name: 'Level 6 - Medium Carrier',
-    description: 'Maximum capacity. 56 imports to discharge, 36 transit boxes throughout, and 80 outbound containers to load — all on the same vessel.',
+    name: 'Level 6',
+    description: 'Maximum capacity. 56 imports, 36 transit boxes, 80 outbound containers — nearly full.',
     preset: SHIP_PRESETS['medium-carrier'],
     hazmatRate: CONTAINER.hazmatRate * 2.5,
     containerCount: 80,
