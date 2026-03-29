@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed, onBeforeUnmount } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { useBoxEmpireScene } from '../composables/useThreeScene'
 import { useGameLoop } from '../composables/useGameLoop'
 import { useInput } from '../composables/useInput'
@@ -48,11 +48,10 @@ watch(isReady, (ready) => {
   }
 })
 
-const rsJobId = computed(() => store.equipment.find(e => e.id === 'rs-1')?.currentJobId ?? null)
-const stopRsWatch = watch(rsJobId, (jobId) => {
-  if (jobId) {
+const stopGatehouseWatch = watch(() => store.gatehouseOpen, (open) => {
+  if (open) {
     startBgMusic()
-    stopRsWatch()
+    stopGatehouseWatch()
   }
 })
 
