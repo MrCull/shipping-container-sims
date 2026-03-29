@@ -7,14 +7,16 @@ import { useAudio } from '../composables/useAudio'
 import { useGameStore } from '../store/gameStore'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const { getScene, getCamera, render, updateEntities, isReady, webglFailed, spawnFloatingText, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen, triggerVesselShake } = useBoxEmpireScene(canvasRef)
+const { getScene, getCamera, render, updateEntities, applyKeyboardCamera, isReady, webglFailed, spawnFloatingText, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen, triggerVesselShake } = useBoxEmpireScene(canvasRef)
 const store = useGameStore()
 const { play } = useAudio()
 
 useInput(canvasRef, getCamera, getScene, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen)
 
-const { start, stop } = useGameLoop(() => {
+const { start, stop } = useGameLoop((dt: number) => {
   if (!isReady.value) return
+
+  applyKeyboardCamera(dt)
 
   const pendingEvents = store.consumePendingEvents()
   for (const evt of pendingEvents) {

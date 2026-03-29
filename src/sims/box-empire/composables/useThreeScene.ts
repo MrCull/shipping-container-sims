@@ -17,6 +17,9 @@ import { loadModel } from '../modules/modelLoader'
 import { TRUCK_GLB_URL } from '../modules/truckRenderer'
 import { VESSEL_GLB_URL } from '../modules/vesselRenderer'
 
+const KEY_PAN_SPEED  = 20
+const KEY_ZOOM_SPEED = 25
+
 export interface GameSceneRefs {
   getScene: () => THREE.Scene | null
   getCamera: () => THREE.PerspectiveCamera | null
@@ -25,6 +28,7 @@ export interface GameSceneRefs {
   webglFailed: Ref<boolean>
   render: () => void
   updateEntities: () => void
+  applyKeyboardCamera: (dt: number) => void
   spawnFloatingText: (text: string, color: string, worldPos: { x: number; y: number; z: number }) => void
   getContainerIdAtInstance: () => string | null
   getContainerMesh: () => THREE.InstancedMesh | null
@@ -46,6 +50,71 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   const isReady = ref(false)
   const webglFailed = ref(false)
   const store = useGameStore()
+
+  // Keyboard camera state
+  const keys = { left: false, right: false, up: false, down: false, zoomIn: false, zoomOut: false }
+  const _spherical = new THREE.Spherical()
+  const _offset = new THREE.Vector3()
+
+  function onKeyDown(e: KeyboardEvent): void {
+    if (e.repeat) return
+    const t = e.target as Node | null
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return
+    switch (e.code) {
+      case 'KeyA': case 'ArrowLeft':       keys.left    = true; e.preventDefault(); break
+      case 'KeyD': case 'ArrowRight':      keys.right   = true; e.preventDefault(); break
+      case 'KeyW': case 'ArrowUp':         keys.up      = true; e.preventDefault(); break
+      case 'KeyS': case 'ArrowDown':       keys.down    = true; e.preventDefault(); break
+      case 'Equal': case 'NumpadAdd':      keys.zoomIn  = true; e.preventDefault(); break
+      case 'Minus': case 'NumpadSubtract': keys.zoomOut = true; e.preventDefault(); break
+    }
+  }
+
+  function onKeyUp(e: KeyboardEvent): void {
+    switch (e.code) {
+      case 'KeyA': case 'ArrowLeft':       keys.left    = false; break
+      case 'KeyD': case 'ArrowRight':      keys.right   = false; break
+      case 'KeyW': case 'ArrowUp':         keys.up      = false; break
+      case 'KeyS': case 'ArrowDown':       keys.down    = false; break
+      case 'Equal': case 'NumpadAdd':      keys.zoomIn  = false; break
+      case 'Minus': case 'NumpadSubtract': keys.zoomOut = false; break
+    }
+  }
+
+  function applyKeyboardCamera(dt: number): void {
+    if (!camera || !controls) return
+    const anyKey = keys.left || keys.right || keys.up || keys.down || keys.zoomIn || keys.zoomOut
+    if (!anyKey) return
+
+    const panDist = KEY_PAN_SPEED * dt
+    const right = new THREE.Vector3()
+    const forward = new THREE.Vector3()
+    camera.getWorldDirection(forward)
+    forward.y = 0
+    forward.normalize()
+    right.crossVectors(forward, camera.up).normalize()
+
+    const pan = new THREE.Vector3()
+    if (keys.left)  pan.addScaledVector(right, -panDist)
+    if (keys.right) pan.addScaledVector(right,  panDist)
+    if (keys.up)    pan.addScaledVector(forward,  panDist)
+    if (keys.down)  pan.addScaledVector(forward, -panDist)
+
+    camera.position.add(pan)
+    controls.target.add(pan)
+
+    if (keys.zoomIn || keys.zoomOut) {
+      _offset.copy(camera.position).sub(controls.target)
+      _spherical.setFromVector3(_offset)
+      if (keys.zoomIn)  _spherical.radius -= KEY_ZOOM_SPEED * dt
+      if (keys.zoomOut) _spherical.radius += KEY_ZOOM_SPEED * dt
+      _spherical.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, _spherical.radius))
+      _offset.setFromSpherical(_spherical)
+      camera.position.copy(controls.target).add(_offset)
+    }
+
+    controls.update()
+  }
 
   function init(canvas: HTMLCanvasElement): void {
     try {
@@ -110,6 +179,8 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       loadModel(VESSEL_GLB_URL).catch(e => console.warn('Box Empire: vessel GLB pre-warm failed', e))
 
       window.addEventListener('resize', onResize)
+      window.addEventListener('keydown', onKeyDown)
+      window.addEventListener('keyup', onKeyUp)
       isReady.value = true
     } catch (e) {
       console.warn('Box Empire: Scene init failed, running in UI-only mode:', e)
@@ -171,6 +242,8 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
 
   function dispose(): void {
     window.removeEventListener('resize', onResize)
+    window.removeEventListener('keydown', onKeyDown)
+    window.removeEventListener('keyup', onKeyUp)
     controls?.dispose()
     containerRenderer?.dispose()
     equipmentRenderer?.dispose()
@@ -207,6 +280,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     webglFailed,
     render,
     updateEntities,
+    applyKeyboardCamera,
     spawnFloatingText,
     getContainerIdAtInstance,
     getContainerMesh,

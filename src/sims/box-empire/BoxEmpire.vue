@@ -10,6 +10,7 @@ import EquipmentInfo from './components/EquipmentInfo.vue'
 import StartScreen from './components/modals/StartScreen.vue'
 import TutorialComplete from './components/modals/TutorialComplete.vue'
 import CareerIntroModal from './components/modals/CareerIntroModal.vue'
+import KeyboardHint from './components/ui/KeyboardHint.vue'
 
 const store = useGameStore()
 
@@ -65,6 +66,8 @@ function handlePlayTutorialFromCareer(): void {
       v-if="store.gamePhase === 'career_intro'"
       @play-tutorial-again="handlePlayTutorialFromCareer"
     />
+
+    <KeyboardHint />
   </div>
 </template>
 
