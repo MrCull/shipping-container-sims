@@ -116,7 +116,7 @@ export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL
 
 // Yard handover point where trucks park and equipment loads/unloads
 export const YARD_IO_POSITION: Position3D = { x: 0, y: CONTAINER_HEIGHT / 2, z: 30 }
-// RS parks this many metres in front of the truck (truck side) to reach container with boom
+// RS parks this many metres to the +X side of the truck to approach the container's long face
 export const RS_TRUCK_PARK_OFFSET = 8
 // Waiting position trucks go to while holding before YARD_IO becomes free
 export const YARD_IO_WAIT_POSITION: Position3D = { x: -10, y: 0, z: 30 }

@@ -89,10 +89,10 @@ function rsParkingPosition(targetPos: Position3D): Position3D {
   return { x: targetPos.x, y: 0, z: targetPos.z + RS_PARK_OFFSET }
 }
 
-// For RS picking from a truck at YARD_IO: park RS_TRUCK_PARK_OFFSET metres on the +Z side
-// so RS doesn't drive into the truck
+// For RS picking/dropping at a truck at YARD_IO: park RS_TRUCK_PARK_OFFSET metres to the +X side
+// so the RS approaches the long face of the container (container length runs along truck Z axis)
 function rsTruckParkingPosition(targetPos: Position3D): Position3D {
-  return { x: targetPos.x, y: 0, z: targetPos.z + RS_TRUCK_PARK_OFFSET }
+  return { x: targetPos.x + RS_TRUCK_PARK_OFFSET, y: 0, z: targetPos.z }
 }
 
 // Determine heading for RS at a given position facing a pickup/drop target
