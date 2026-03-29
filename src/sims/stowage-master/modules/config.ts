@@ -72,16 +72,15 @@ export const SHIP_PRESETS: Record<string, ShipPreset> = {
     // Two groups of 6 with a ~9-unit gap (≈1.5 container lengths) between groups.
     // Spacing within each group: 6.3 units (≈container length + gap).
     bayXOffsets: [
-      // Stern group (bays 0–5)
-      -31.5, -25.2, -18.9, -12.6, -6.3, 0,
-      // Bow group (bays 6–11) — gap of ~9 units between groups 0 and 6
-      9.45, 15.75, 22.05, 28.35, 34.65, 40.95,
+      // Stern group (bays 0–5) — shifted back ½ container length (−3.05)
+      -34.55, -28.25, -21.95, -15.65, -9.35, -3.05,
+      // Bow group (bays 6–11) — shifted forward ½ container length (+3.05)
+      12.50, 18.80, 25.10, 31.40, 37.70, 44.00,
     ],
-    // Front two bays (indices 10 & 11) are elevated by one container height above deck
     bayYBaseOffsets: [
-      0, 0, 0, 0, 0, 0,
-      0, 0, 0, 0,
-      2.83, 2.83,  // raised forecastle
+      1.86, 1.86, 1.86, 1.86, 1.86, 1.86,  // stern 6 — prev 1.33 + 0.53 (2/10 container height)
+      2.12, 2.12, 2.12, 2.12,               // mid bow 4 — 8/10 container height
+      4.07, 4.07,                            // forecastle pair — minus 1/3 container height
     ],
   },
   large: {

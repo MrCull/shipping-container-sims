@@ -213,6 +213,13 @@ export function getRestowSlots(
   const valid: string[] = []
   const activeBays = preset.bays - preset.sternBlockedBays
 
+  // Parse the excluded slot so we can also exclude the slot directly above it
+  const excludeParts = excludeSlotId.split('-')
+  const excludeBay = excludeParts[0]
+  const excludeRow = excludeParts[1]
+  const excludeTier = parseInt(excludeParts[2])
+  const slotAboveExcluded = `${excludeBay}-${excludeRow}-${String(excludeTier + 2).padStart(2, '0')}`
+
   for (let b = 0; b < activeBays; b++) {
     const bayNum = b * 2 + 1
     for (let r = 0; r < preset.rows; r++) {
@@ -220,7 +227,8 @@ export function getRestowSlots(
       for (let t = 0; t < preset.tiers; t++) {
         const tierNum = (t + 1) * 2
         const id = `${String(bayNum).padStart(2, '0')}-${String(rowNum).padStart(2, '0')}-${String(tierNum).padStart(2, '0')}`
-        if (id === excludeSlotId) continue
+        // Exclude the container's own slot and the slot directly above it
+        if (id === excludeSlotId || id === slotAboveExcluded) continue
         const slot = grid[id]
         if (!slot || slot.container) continue
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useGameStore } from './store/gameStore'
+import { useGameMusic } from './composables/useGameMusic'
 import GameCanvas from './components/GameCanvas.vue'
 import TopBar from './components/TopBar.vue'
 import ContainerInfo from './components/ContainerInfo.vue'
@@ -21,6 +22,7 @@ import DisasterOverlay from './components/modals/DisasterOverlay.vue'
 import LevelBriefing from './components/modals/LevelBriefing.vue'
 
 const store = useGameStore()
+useGameMusic()
 
 onMounted(() => {
   // Reset to the start screen every time this component mounts — handles
