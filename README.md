@@ -1,25 +1,59 @@
 # Shipping Container Sims
 
-A Vue 3 + TypeScript web app hosting shipping-container-themed simulations and games. Each sim is auto-discovered and self-contained, with a shared framework for 3D rendering, state management, and routing.
+**Play free in the browser:** **[container-games.net](https://container-games.net)**
 
-## Current Sims
+Three shipping-container-themed games in one Vue app: plan vessel loads, balance a physics tower, or run a terminal tycoon. Below is the **home portal** (pick a game), then each title with **gameplay a few seconds after you start** — not the pre-game menu.
 
-- **Stowage Master** — Tetris meets real-world container logistics. Plan and optimise the stowage of shipping containers on a vessel. Balance weight distribution, cargo class restrictions, and port rotation to become the ultimate stowage planner. *(3D, Puzzle, Logistics)*
+## Main menu
 
-- **Contenga** — How high can you stack before the tower falls? A 3D Jenga-style game with shipping containers. Slide blocks out, stack them on top, and keep the tower balanced — poor support under the stack will bring it down. *(3D, Physics, Puzzle)*
+![Home portal — choose a game](docs/readme/home-portal.png)
 
-- **Box Empire** — Build your shipping empire from a single container. Start with one rusty container and grow a global logistics empire. Buy routes, upgrade ports, manage fleets, and outsmart rival shipping companies in this strategic tycoon sim. *(Strategy, Tycoon, Management)*
+---
 
-All sims are playable at **[container-games.net](https://container-games.net)**.
+## Stowage Master
 
-## Quick Start
+*Tetris meets real-world container logistics — 3D puzzle*
+
+![Stowage Master — gameplay after starting Level 1](docs/readme/stowage-master-gameplay.png)
+
+**What you do:** Place containers on the ship’s bays with an eye on **weight**, **cargo classes** (what can sit next to what), and **port rotation** (unload in the right order). You’re optimising a real stowage puzzle, not just filling slots.
+
+**Vibe:** Calm planning, spatial reasoning, and “one more level” optimisation.
+
+---
+
+## Contenga
+
+*Jenga with containers — 3D physics*
+
+![Contenga — gameplay after pressing Play](docs/readme/contenga-gameplay.png)
+
+**What you do:** Pull blocks from the stack and **pile them on top** without letting the tower collapse. **Poor support** and bad balance bring the whole thing down — it’s tactile, risky, and very satisfying when it holds.
+
+**Vibe:** Quick rounds, physics tension, and “just one more pull.”
+
+---
+
+## Box Empire
+
+*Terminal tycoon — strategy and economy*
+
+![Box Empire — gameplay after starting the tutorial](docs/readme/box-empire-gameplay.png)
+
+**What you do:** Start from a **single container** and grow a **logistics empire**: buy **routes**, **upgrade ports**, manage **fleets**, and stay ahead of **rivals**. Numbers, maps, and narrative beats frame a management sim built around real terminal ideas.
+
+**Vibe:** Longer sessions, progression, and empire-building.
+
+---
+
+## Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-The app starts at `http://localhost:5173/` with a home page listing all available sims. Click any card to launch the game.
+Open `http://localhost:5173/` — the home page lists every sim; open any card to play.
 
 ```bash
 npm run build      # Production build
@@ -27,98 +61,58 @@ npm run lint       # ESLint checks
 npm run lint:fix   # ESLint with auto-fixes
 ```
 
-## Tech Stack
+### Regenerate README screenshots
 
-- **Vue 3** — Composition API with `<script setup lang="ts">`
-- **Vite** — dev server & build
-- **TypeScript** — strict mode
-- **Pinia** — state management
-- **Vue Router** — SPA routing (`/` home, `/sim/:simId` game page)
-- **Three.js** — 3D rendering (via `useThreeScene` composable)
-- **ESLint** — static analysis for JS/TS/Vue
+Requires a production preview and **ffmpeg** (for the Contenga GIF). Default wait before each gameplay shot is **10 seconds** of real time.
 
-## Project Structure
+```bash
+npm run build
+npm run preview -- --host 127.0.0.1 --port 4173
+# in another terminal:
+npm run capture-readme-media
+# optional: BASE_URL=http://127.0.0.1:4173 GAMEPLAY_WAIT_MS=12000 npm run capture-readme-media
+```
+
+## For developers
+
+This repo is a **Vue 3 + TypeScript** app: **Vite**, **Pinia**, **Vue Router**, **Three.js** for 3D sims, **ESLint** for static analysis. Each game lives in its own folder under `src/sims/` and is **auto-discovered** at build time — no manual registration.
+
+### Project structure (summary)
 
 ```
 src/
 ├── assets/              # Global CSS, fonts, design tokens
-├── components/          # Shared UI components (SimCard, HeroBackground, etc.)
-├── composables/         # Shared composables
-│   ├── useThreeScene.ts      # Three.js scene lifecycle & utilities
-│   ├── useSimRegistry.ts     # Auto-discovers & registers all sims
-│   └── useMenuMusic.ts       # Background music control
-├── pages/               # Route-level views (HomePage, SimPage)
-├── router/              # Vue Router config
-├── stores/              # Shared Pinia stores
-├── types/               # Shared TypeScript interfaces (SimDefinition)
-└── sims/                # ★ Each sim/game in its own self-contained folder
-    ├── box-empire/
-    │   ├── definition.ts           # SimDefinition metadata (auto-discovered)
-    │   ├── BoxEmpire.vue           # Root game component
-    │   ├── components/             # Sim-specific Vue components
-    │   │   ├── ui/                 # UI widgets (meters, bars, popups)
-    │   │   └── modals/             # Modal dialogs (start, level-complete, fail)
-    │   ├── composables/            # Sim-specific composables
-    │   ├── modules/                # Pure TypeScript logic (scoring, physics, levels)
-    │   ├── store/                  # Sim-specific Pinia store(s)
-    │   ├── types/                  # Sim-specific TypeScript interfaces
-    │   ├── assets/                 # Sim-specific media (3D models, sounds, textures)
-    │   └── box-empire-AGENTS.md    # Sim architecture guide
+├── components/          # Shared UI (SimCard, HeroBackground, …)
+├── composables/         # useThreeScene, useSimRegistry, useMenuMusic
+├── pages/               # HomePage, SimPage
+├── router/
+├── stores/
+├── types/               # SimDefinition, etc.
+└── sims/                # ★ One folder per game (isolated code & assets)
     ├── stowage-master/
-    ├── container-stack/
-    └── [more sims...]
+    ├── container-stack/ # Contenga
+    └── box-empire/
 
-available-media/        # Pre-sourced assets (shared library)
-├── 3d-models/          # GLB, FBX, OBJ container & equipment models
-└── sound-samples/      # Sound effects & ambient tracks
-
-knowledge-base/         # Domain reference (dk_*.md files)
+available-media/         # Shared 3D/sound library (copy into a sim when needed)
+knowledge-base/          # Domain reference (containers, terminals, …)
 ```
 
-## Key Architecture Principles
+### Core rules
 
-### Sim Auto-Discovery
+- **Sim isolation:** All game-specific code, components, stores, and media stay under `src/sims/<sim-id>/`. Only truly shared logic belongs in top-level `composables/` or `components/`.
+- **Auto-discovery:** Add `src/sims/<id>/definition.ts` — the home page picks it up via `import.meta.glob`.
+- **Style:** Composition API only (`<script setup lang="ts">`), strict TypeScript, scoped styles, design tokens from `src/assets/main.css`.
 
-Sims are auto-discovered at build time via `import.meta.glob('@/sims/*/definition.ts')`. Just add a folder under `src/sims/<sim-id>/` with a `definition.ts` — no manual imports needed.
-
-### Sim Isolation (★ Core Rule)
-
-**All** code, components, composables, stores, types, and media for a sim live inside `src/sims/<sim-id>/`. Only logic genuinely reused by multiple sims belongs in top-level `src/composables/` or `src/components/`. When a sim needs media, copy files from `available-media/` into the sim's own `assets/` folder.
-
-### Code Style & Tooling
-
-- **Vue**: Composition API only — always use `<script setup lang="ts">`. No Options API.
-- **TypeScript**: Strict mode enabled (`noUnusedLocals`, `noUnusedParameters`, `strict`).
-- **Styles**: Use `<style scoped>` in all components. Reference CSS variables from `src/assets/main.css` (e.g., `--color-primary`, `--font-retro`).
-- **Linting**: Run `npm run lint` after substantive changes. Use `npm run lint:fix` for auto-fixes.
-
-## Adding a New Sim
+### Add a new sim
 
 1. Create `src/sims/<your-sim-id>/`
-2. Add `definition.ts`:
-   ```ts
-   import type { SimDefinition } from '@/types/sim'
+2. Add `definition.ts` with a `SimDefinition` (id, title, tagline, description, component loader, …)
+3. Add the root `YourSim.vue`
 
-   export const definition: SimDefinition = {
-     id: 'my-sim',
-     title: 'My Sim',
-     tagline: 'A short hook',
-     description: 'Longer description shown on the card.',
-     icon: '🎮',
-     status: 'playable',  // 'playable' | 'coming-soon' | 'wip'
-     color: '#3b82f6',
-     tags: ['3D', 'Puzzle'],
-     component: () => import('./MySim.vue'),
-   }
-   ```
-3. Add a root Vue component (`MySim.vue`)
-4. **Done** — the sim is auto-discovered and appears on the home page
+Full conventions, 3D patterns, and domain skills: **[AGENTS.md](AGENTS.md)** and **`.ai/skills/`**.
 
-For detailed guidance on sim architecture, 3D rendering, entity design, and domain knowledge, see **[AGENTS.md](AGENTS.md)**.
+## More resources
 
-## Available Resources
-
-- **Sim-specific guides**: Each mature sim has its own `*-AGENTS.md` (e.g., `box-empire-AGENTS.md`)
-- **Domain knowledge**: Reference files in `knowledge-base/` (containers, vessels, equipment, operations, economics)
-- **Pre-sourced assets**: `available-media/3d-models/` and `available-media/sound-samples/` 
-- **Skill guides**: `.ai/skills/` (entity design, operations, rendering, economics, adding new sims)
+- **Sim guides:** e.g. `src/sims/box-empire/box-empire-AGENTS.md`
+- **Domain knowledge:** `knowledge-base/`
+- **Pre-sourced assets:** `available-media/3d-models/`, `available-media/sound-samples/`
