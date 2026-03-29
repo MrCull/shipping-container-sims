@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { TRUCK, OUTBOUND_TRUCK } from './config'
 
 const GLB_URLS = {
@@ -7,7 +8,10 @@ const GLB_URLS = {
   cab:     new URL('../assets/truck-cab.glb', import.meta.url).href,
 }
 
+const _draco = new DRACOLoader()
+_draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/')
 const _loader = new GLTFLoader()
+_loader.setDRACOLoader(_draco)
 const _cache  = new Map<string, THREE.Group>()
 
 async function loadAndCache(key: 'trailer' | 'cab'): Promise<THREE.Group> {
