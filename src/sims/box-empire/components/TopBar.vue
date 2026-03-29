@@ -8,7 +8,7 @@ const store = useGameStore()
 const router = useRouter()
 
 function goToMenu(): void {
-  store.setTimeScale(0)
+  store.resetToMenu()
   router.push('/')
 }
 </script>

@@ -352,6 +352,13 @@ export const useGameStore = defineStore('box-empire-game', () => {
     timeScale.value = Math.max(0, Math.min(MAX_TIME_SCALE, scale))
   }
 
+  /** Reset the game to the pre-start menu state. Call before navigating away so
+   *  returning to the page shows a fresh StartScreen instead of a mid-game state. */
+  function resetToMenu(): void {
+    setTimeScale(0)
+    gamePhase.value = 'menu'
+  }
+
   function togglePause(): void {
     if (timeScale.value > 0) {
       timeScale.value = 0
@@ -1368,6 +1375,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     initTutorial,
     tick,
     setTimeScale,
+    resetToMenu,
     togglePause,
     openGatehouse,
     closeGatehouse,
