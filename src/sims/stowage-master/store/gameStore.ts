@@ -31,6 +31,10 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const timerTotal = ref(0)     // total seconds for the level (0 = no timer)
   const timerRemaining = ref(0) // seconds remaining
 
+  // Scene loading state — shown while 3D assets are downloading
+  const isLoading = ref(false)
+  const loadingMessage = ref('')
+
   // Discharge phase state
   const dischargeCount = ref(0)
   const dischargedCount = ref(0)
@@ -410,6 +414,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     shipTrim, shipVCG, events, disasterType, lastPlacement,
     perfectScore, targetScore, totalSlots,
     timerTotal, timerRemaining,
+    isLoading, loadingMessage,
     dischargeCount, dischargedCount, dischargeScore, lastDischarge,
     currentContainer, queueContainers, nextThreeContainers,
     availableSlots, dischargeableSlots, isWarning, isCritical, progressPercent, levelConfig,

@@ -353,6 +353,9 @@ async function buildScene(): Promise<void> {
   if (!scene || !store.shipConfig) return
   clearScene()
 
+  store.isLoading = true
+  store.loadingMessage = 'Preparing berth…'
+
   createSkybox(scene)
   createSkyDome(scene)
   createLighting(scene)
@@ -361,16 +364,19 @@ async function buildScene(): Promise<void> {
   createDock(scene)
 
   // Fire off truck GLB downloads in parallel with ship model
+  store.loadingMessage = 'Loading vessel manifest…'
   const truckPrewarm = loadTruckGLBs()
 
   // Load real GLB model for presets with glbPath, procedural for all others
   if (store.shipConfig.glbPath) {
+    store.loadingMessage = 'Vessel inbound — tug assist in progress…'
     shipGroup = await loadShipGLB(scene, store.shipConfig)
   } else {
     shipGroup = createShip(scene, store.shipConfig)
   }
 
   // Ensure truck GLBs are cached before trucks are needed
+  store.loadingMessage = 'Marshalling quayside equipment…'
   await truckPrewarm
 
   craneObj = createCrane(scene, store.shipConfig)
@@ -411,6 +417,9 @@ async function buildScene(): Promise<void> {
 
   attachPicking()
   startLoop()
+
+  store.isLoading = false
+  store.loadingMessage = ''
 
   // If the player dismissed the briefing while the ship was still loading (race condition),
   // the phase-watcher's 'briefing → selecting' branch ran with shipGroup=null and
