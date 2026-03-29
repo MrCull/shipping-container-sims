@@ -26,8 +26,6 @@ Three shipping-container-themed games in one Vue app: plan vessel loads, balance
 
 *Jenga with containers — 3D physics*
 
-![Contenga — short motion clip during play](docs/readme/contenga.gif)
-
 ![Contenga — gameplay after pressing Play](docs/readme/contenga-gameplay.png)
 
 **What you do:** Pull blocks from the stack and **pile them on top** without letting the tower collapse. **Poor support** and bad balance bring the whole thing down — it’s tactile, risky, and very satisfying when it holds.
