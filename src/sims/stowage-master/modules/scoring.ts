@@ -105,7 +105,9 @@ export function calculatePlacementScore(
   const podPenalty = checkPodOrder(container, slot, grid)
   if (podPenalty < 0) {
     score += podPenalty
-    reasons.push({ text: 'Poor discharge order', points: podPenalty })
+    const blockedCount = Math.round(Math.abs(podPenalty) / Math.abs(SCORING.podWrongOrderDeduction))
+    const suffix = blockedCount > 1 ? ` (×${blockedCount})` : ''
+    reasons.push({ text: `Blocking earlier-discharge cargo below${suffix}`, points: podPenalty })
   }
 
   if (container.weight > 20 && slot.tierIndex < Math.floor(shipConfig.tiers / 3)) {
@@ -122,12 +124,21 @@ export function calculatePlacementScore(
   return { score, reasons }
 }
 
+/**
+ * Penalise placing a container on top of containers destined for a sooner port.
+ * Each container below in the same stack that has a later portOrder (further future)
+ * than the container being placed adds one penalty — it will need to be moved before
+ * the one below it can be discharged.
+ */
 function checkPodOrder(container: Container, slot: Slot, grid: Record<string, Slot>): number {
   let penalty = 0
   for (const other of Object.values(grid)) {
     if (!other.container) continue
     if (other.bay !== slot.bay || other.row !== slot.row) continue
-    if (other.tierIndex <= slot.tierIndex) continue
+    // Only look at containers below the slot being placed
+    if (other.tierIndex >= slot.tierIndex) continue
+    // If the container below is destined for an earlier port (sooner discharge) than
+    // the container being placed, the placed container will block it at discharge
     if (other.container.portOrder < container.portOrder) {
       penalty += SCORING.podWrongOrderDeduction
     }
