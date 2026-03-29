@@ -58,15 +58,37 @@ function moveTowards(
   }
 }
 
-// Build axis-aligned waypoints: move Z first (to align row), then X (to reach bay)
-// RS approaches from +Z (road side), so Z alignment first makes sense
+// Yard container band (single row centred at z=20, WIDTH=2.44m) + RS body clearance.
+// Any path that crosses this Z range would drive through the container stacks.
+const YARD_SEA_EDGE_Z  = 16.5   // sea-side safe limit  (row front – clearance)
+const YARD_ROAD_EDGE_Z = 23.5   // road-side safe limit (row rear  + clearance)
+// X position clear of ALL yard containers (leftmost bay starts at x=−15).
+// Used as a bypass lane to cross the yard band without hitting stacks.
+const YARD_BYPASS_X    = -19.0
+
+// Build axis-aligned waypoints, routing around the container yard band when needed.
 function buildRsWaypoints(from: Position3D, to: Position3D): Position3D[] {
   const pts: Position3D[] = []
-  // Corner: same Z as dest, same X as start
-  if (Math.abs(from.z - to.z) > 0.5) {
-    pts.push({ x: from.x, y: 0, z: to.z })
+
+  const minZ = Math.min(from.z, to.z)
+  const maxZ = Math.max(from.z, to.z)
+  const crossesYard = minZ < YARD_SEA_EDGE_Z && maxZ > YARD_ROAD_EDGE_Z
+
+  if (crossesYard) {
+    // Route via bypass lane left of all containers to avoid driving through stacks.
+    // Use the further-left of the current X or the bypass X to avoid backtracking.
+    const bypassX = Math.min(from.x, YARD_BYPASS_X)
+    pts.push({ x: bypassX, y: 0, z: from.z })  // move to bypass lane (safe side)
+    pts.push({ x: bypassX, y: 0, z: to.z })    // cross the yard band on bypass lane
+    pts.push({ x: to.x,    y: 0, z: to.z })    // approach target X
+  } else {
+    // Standard routing: align Z first, then X
+    if (Math.abs(from.z - to.z) > 0.5) {
+      pts.push({ x: from.x, y: 0, z: to.z })
+    }
+    pts.push({ x: to.x, y: 0, z: to.z })
   }
-  pts.push({ x: to.x, y: 0, z: to.z })
+
   return pts
 }
 
@@ -90,9 +112,12 @@ function rsParkingPosition(targetPos: Position3D): Position3D {
 }
 
 // For RS picking/dropping at a truck at YARD_IO: park RS_TRUCK_PARK_OFFSET metres to the +X side
-// so the RS approaches the long face of the container (container length runs along truck Z axis)
+// so the RS approaches the long face of the container (container length runs along truck Z axis).
+// The truck faces -Z (heading=π) at YARD_IO, so its trailer deck (local z=-4) is at world z+4.
+// We align the RS Z with the trailer position so the spreader is over the trailer, not the cab.
+const RS_TRUCK_TRAILER_Z_OFFSET = 4.0   // = |TRUCK_GLB.containerOffsetZ| when truck faces -Z
 function rsTruckParkingPosition(targetPos: Position3D): Position3D {
-  return { x: targetPos.x + RS_TRUCK_PARK_OFFSET, y: 0, z: targetPos.z }
+  return { x: targetPos.x + RS_TRUCK_PARK_OFFSET, y: 0, z: targetPos.z + RS_TRUCK_TRAILER_Z_OFFSET }
 }
 
 // Determine heading for RS at a given position facing a pickup/drop target
