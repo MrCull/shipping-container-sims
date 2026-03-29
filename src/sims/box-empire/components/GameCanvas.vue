@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, watch, computed, onBeforeUnmount } from 'vue'
 import { useBoxEmpireScene } from '../composables/useThreeScene'
 import { useGameLoop } from '../composables/useGameLoop'
 import { useInput } from '../composables/useInput'
@@ -9,7 +9,7 @@ import { useGameStore } from '../store/gameStore'
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const { getScene, getCamera, render, updateEntities, applyKeyboardCamera, isReady, webglFailed, spawnFloatingText, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen, triggerVesselShake } = useBoxEmpireScene(canvasRef)
 const store = useGameStore()
-const { play } = useAudio()
+const { play, startBgMusic } = useAudio()
 
 useInput(canvasRef, getCamera, getScene, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen)
 
@@ -45,6 +45,14 @@ watch(isReady, (ready) => {
     updateEntities()
     render()
     start()
+  }
+})
+
+const rsJobId = computed(() => store.equipment.find(e => e.id === 'rs-1')?.currentJobId ?? null)
+const stopRsWatch = watch(rsJobId, (jobId) => {
+  if (jobId) {
+    startBgMusic()
+    stopRsWatch()
   }
 })
 

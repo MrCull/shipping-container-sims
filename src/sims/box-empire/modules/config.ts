@@ -166,6 +166,8 @@ export const VESSEL_GLB = {
 
 export const SOUND_MAP: Record<string, string> = {
   'container.placed': 'container-loaded-to-ship.mp3',
+  'vessel.container.lifted': 'container-loaded-to-ship.mp3',
+  'vessel.container.placed': 'container-set-down-on-ship.mp3',
   'money.earned': 'money-increase-ca-ching-.mp3',
   // Horn plays only once when vessel first appears (arriving state)
   'vessel.arriving': 'small-ship-three-horns-in-a-row.mp3',

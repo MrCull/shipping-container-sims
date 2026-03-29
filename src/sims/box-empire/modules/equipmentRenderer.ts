@@ -677,6 +677,34 @@ export class EquipmentRenderer {
             if (c) { c.scale.y = drop; c.position.y = -drop / 2 }
           }
         }
+
+        // ---- Carried container: hang below cable bottom ----
+        const mhcExisting = this.carriedMeshes.get(eq.id)
+        if (eq.carriedContainerId && containers) {
+          const container = containers.find(c => c.id === eq.carriedContainerId)
+          if (container) {
+            let cGroup = mhcExisting
+            if (!cGroup || cGroup.userData['containerId'] !== eq.carriedContainerId) {
+              if (mhcExisting) {
+                mesh.remove(mhcExisting)
+                this.disposeContainerGroup(mhcExisting)
+              }
+              cGroup = createContainerGroup(container)
+              mesh.add(cGroup)
+              this.carriedMeshes.set(eq.id, cGroup)
+            }
+            // Cable bottom is at armTargetY; container centre is half-height below that
+            cGroup.position.set(
+              0,
+              eq.armTargetY - CONTAINER_HEIGHT / 2,
+              -6 + eq.spreaderZ,
+            )
+          }
+        } else if (mhcExisting) {
+          mesh.remove(mhcExisting)
+          this.disposeContainerGroup(mhcExisting)
+          this.carriedMeshes.delete(eq.id)
+        }
       }
     }
   }

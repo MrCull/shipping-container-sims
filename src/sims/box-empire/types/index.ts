@@ -255,6 +255,8 @@ export interface Transaction {
 export type GameEventType =
   | 'container.placed'
   | 'container.picked'
+  | 'vessel.container.lifted'
+  | 'vessel.container.placed'
   | 'money.earned'
   | 'vessel.announced'
   | 'vessel.arriving'

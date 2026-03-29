@@ -602,6 +602,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
       if (eResult.pickedContainerId) {
         emitEvent('container.picked', `Container ${eResult.pickedContainerId} picked up`)
+        if (eq.type === 'mobile_harbor_crane') {
+          emitEvent('vessel.container.lifted', `Crane lifted container ${eResult.pickedContainerId}`)
+        }
         // Clear the yard slot immediately on pickup so containers below become accessible.
         // Without this, the slot stays occupied until drop, keeping lower-tier jobs
         // permanently inaccessible (stuck as 'pending', never assigned).
@@ -618,6 +621,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
         const job = jobs.value.find(j => j.id === eResult.jobId)
         completeJob(state, eResult.jobId)
         emitEvent('job.completed', `Job ${eResult.jobId} completed`)
+
+        if (eq.type === 'mobile_harbor_crane' && eResult.droppedContainerId) {
+          emitEvent('vessel.container.placed', `Crane placed container ${eResult.droppedContainerId}`)
+        }
 
         if (job && eResult.droppedContainerId) {
           const container = containers.value.find(c => c.id === eResult.droppedContainerId)
