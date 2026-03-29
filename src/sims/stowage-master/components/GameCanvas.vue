@@ -411,6 +411,13 @@ async function buildScene(): Promise<void> {
 
   attachPicking()
   startLoop()
+
+  // If the player dismissed the briefing while the ship was still loading (race condition),
+  // the phase-watcher's 'briefing → selecting' branch ran with shipGroup=null and
+  // skipped indicator creation. Catch up here now that the scene is fully built.
+  if (store.phase === 'selecting' && store.dischargeCount === 0 && shipGroup && store.shipConfig) {
+    createSlotIndicators(getScene()!, store.grid, store.availableSlots, store.shipConfig, shipGroup)
+  }
 }
 
 function pickImportSlot(event: MouseEvent): string | null {
