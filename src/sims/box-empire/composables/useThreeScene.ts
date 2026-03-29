@@ -212,7 +212,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
 
   function updateEntities(): void {
     containerRenderer?.update(store.containers, store.truckVisits)
-    equipmentRenderer?.update(store.equipment)
+    equipmentRenderer?.update(store.equipment, store.containers)
     vesselRenderer?.update(store.vesselVisits, store.containers, 0.016)
     truckRenderer?.update(store.truckVisits, store.containers)
   }

@@ -48,7 +48,7 @@ function addCornerPostsAndRails(group: THREE.Group, L: number, H: number, W: num
   }
 }
 
-function createContainerGroup(container: Container): THREE.Group {
+export function createContainerGroup(container: Container): THREE.Group {
   const L = CONTAINER_LENGTH
   const H = CONTAINER_HEIGHT
   const W = CONTAINER_WIDTH
@@ -94,6 +94,8 @@ export class ContainerRenderer {
       if (c.lifecycleState === 'loaded_on_vessel') return false
       // Containers on trucks are rendered by TruckRenderer as children of the truck mesh
       if (c.currentLocation.type === 'truck') return false
+      // Containers on equipment are rendered by EquipmentRenderer as children of the equipment mesh
+      if (c.currentLocation.type === 'equipment') return false
       if (c.lifecycleState === 'returning_to_gate') return false
       if (c.lifecycleState === 'at_gate' && c.visitType === 'import') return false
       return true

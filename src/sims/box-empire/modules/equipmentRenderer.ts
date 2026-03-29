@@ -3,7 +3,10 @@
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
-import type { Equipment } from '../types'
+import type { Equipment, Container } from '../types'
+import { CONTAINER_HEIGHT } from './config'
+import { createContainerGroup } from './containerRenderer'
+import { disposeContainerMaterials } from './containerMaterials'
 
 interface EquipmentParts {
   boomGroup?: THREE.Group
@@ -16,6 +19,7 @@ interface EquipmentParts {
 export class EquipmentRenderer {
   private meshes = new Map<string, THREE.Group>()
   private parts = new Map<string, EquipmentParts>()
+  private carriedMeshes = new Map<string, THREE.Group>()  // equipmentId → container group
   private scene: THREE.Scene
 
   constructor(scene: THREE.Scene) {
@@ -593,7 +597,7 @@ export class EquipmentRenderer {
     return { group, parts: { mhcSpreader, mhcCable, mhcCableL, mhcCableR } }
   }
 
-  update(equipmentList: Equipment[]): void {
+  update(equipmentList: Equipment[], containers?: Container[]): void {
     for (const eq of equipmentList) {
       let mesh = this.meshes.get(eq.id)
       if (!mesh) {
@@ -625,6 +629,39 @@ export class EquipmentRenderer {
       if (p?.boomGroup && eq.type === 'reach_stacker') {
         const t = Math.min(1, eq.armTargetY / 9)
         p.boomGroup.rotation.x = -0.15 - t * 0.60
+
+        // ---- Carried container: attach as child of RS group, hang under spreader ----
+        const existingCarried = this.carriedMeshes.get(eq.id)
+        if (eq.carriedContainerId && containers) {
+          const container = containers.find(c => c.id === eq.carriedContainerId)
+          if (container) {
+            let cGroup = existingCarried
+            if (!cGroup || cGroup.userData['containerId'] !== eq.carriedContainerId) {
+              if (existingCarried) {
+                mesh.remove(existingCarried)
+                this.disposeContainerGroup(existingCarried)
+              }
+              cGroup = createContainerGroup(container)
+              mesh.add(cGroup)
+              this.carriedMeshes.set(eq.id, cGroup)
+            }
+            // Position container in RS-group local space so it hangs below the spreader.
+            // Spreader end is at boomGroup-local (0, -0.55, 9.2); scale.z=0.5 → z_scaled=4.6.
+            // Container centre is twistLockHeight (0.9m) + CONTAINER_HEIGHT/2 below spreader frame.
+            const θ = p.boomGroup.rotation.x
+            const cY_boom = -(0.55 + 0.9 + CONTAINER_HEIGHT / 2)  // ≈ -2.745
+            const cZ_scaled = 9.2 * 0.5                            // = 4.6
+            cGroup.position.set(
+              0.9,
+              3.3 + cY_boom * Math.cos(θ) - cZ_scaled * Math.sin(θ),
+              2.2 + cY_boom * Math.sin(θ) + cZ_scaled * Math.cos(θ),
+            )
+          }
+        } else if (existingCarried) {
+          mesh.remove(existingCarried)
+          this.disposeContainerGroup(existingCarried)
+          this.carriedMeshes.delete(eq.id)
+        }
       }
 
       if (p?.mhcSpreader && eq.type === 'mobile_harbor_crane') {
@@ -642,7 +679,27 @@ export class EquipmentRenderer {
     }
   }
 
+  private disposeContainerGroup(group: THREE.Group): void {
+    group.traverse(obj => {
+      const m = obj as THREE.Mesh
+      if (!m.geometry) return
+      const bodyMats = m.userData['bodyMaterials'] as THREE.MeshStandardMaterial[] | undefined
+      if (bodyMats) disposeContainerMaterials(bodyMats)
+      else if (m.material) {
+        if (Array.isArray(m.material)) m.material.forEach(mt => mt.dispose())
+        else m.material.dispose()
+      }
+      m.geometry.dispose()
+    })
+  }
+
   dispose(): void {
+    for (const [eqId, cGroup] of this.carriedMeshes) {
+      const mesh = this.meshes.get(eqId)
+      if (mesh) mesh.remove(cGroup)
+      this.disposeContainerGroup(cGroup)
+    }
+    this.carriedMeshes.clear()
     for (const mesh of this.meshes.values()) {
       mesh.traverse(obj => {
         const m = obj as THREE.Mesh
