@@ -29,7 +29,10 @@ const isDischargePhase = computed(() =>
       >LOAD</span>
     </div>
     <div class="score">
-      <span class="score-value">${{ store.score.toLocaleString() }}</span>
+      <span
+        class="score-value"
+        :class="{ negative: store.score < 0 }"
+      >${{ store.score.toLocaleString() }}</span>
       <span class="score-sep">/</span>
       <span class="score-target">${{ store.targetScore.toLocaleString() }}</span>
     </div>
@@ -68,6 +71,9 @@ const isDischargePhase = computed(() =>
   color: #00ff88;
   font-weight: bold;
   font-size: 16px;
+}
+.score-value.negative {
+  color: #ff4444;
 }
 .score-sep {
   color: #666;

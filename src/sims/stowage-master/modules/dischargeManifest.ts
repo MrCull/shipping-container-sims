@@ -230,14 +230,8 @@ export function getDischargeableSlots(grid: Record<string, Slot>, preset: ShipPr
         }
 
         if (container.isTransit) {
-          // Transit container at top of stack — check if it sits above an import
-          const belowTierNum = tierNum - 2
-          const belowId = `${String(bayNum).padStart(2, '0')}-${String(rowNum).padStart(2, '0')}-${String(belowTierNum).padStart(2, '0')}`
-          const belowSlot = grid[belowId]
-          if (belowSlot?.container?.isImport) {
-            // This transit container is an overstow — must be restowed
-            actionable.push(id)
-          }
+          // Any transit container at the top of its stack can be restowed
+          actionable.push(id)
           break
         }
 

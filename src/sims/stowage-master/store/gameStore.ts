@@ -213,7 +213,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
       grid.value[slotId] = { ...slot }
 
       phase.value = 'restow_selecting'
-      addEvent('Transit container lifted — select a restow position', 'info')
+      addEvent('Transit container lifted — select a new position', 'info')
       return { container: restowContainer.value, slot, isRestow: true }
     }
 

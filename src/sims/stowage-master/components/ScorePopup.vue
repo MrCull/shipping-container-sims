@@ -38,7 +38,7 @@ watch(() => store.lastDischarge, (discharge) => {
       :class="popupClass"
     >
       <div class="popup-score">
-        +${{ lastScore }}
+        {{ lastScore >= 0 ? '+' : '' }}${{ lastScore }}
       </div>
       <div
         v-for="(reason, i) in lastReasons"
