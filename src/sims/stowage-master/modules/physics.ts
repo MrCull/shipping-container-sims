@@ -14,7 +14,8 @@ export function calculateList(grid: Record<string, Slot>, shipConfig: ShipPreset
 
   if (totalWeight === 0) return 0
   const beamFactor = shipConfig.width / 2
-  return (listMoment / (totalWeight * beamFactor)) * PHYSICS.listMultiplier * 100
+  const multiplier = (shipConfig.physicsMultiplier ?? 1.0) * PHYSICS.listMultiplier
+  return (listMoment / (totalWeight * beamFactor)) * multiplier * 100
 }
 
 export function calculateTrim(grid: Record<string, Slot>, shipConfig: ShipPreset): number {
@@ -30,7 +31,8 @@ export function calculateTrim(grid: Record<string, Slot>, shipConfig: ShipPreset
 
   if (totalWeight === 0) return 0
   const lengthFactor = shipConfig.length / 2
-  return (trimMoment / (totalWeight * lengthFactor)) * PHYSICS.trimMultiplier * 100
+  const multiplier = (shipConfig.physicsMultiplier ?? 1.0) * PHYSICS.trimMultiplier
+  return (trimMoment / (totalWeight * lengthFactor)) * multiplier * 100
 }
 
 export function calculateVCG(grid: Record<string, Slot>, shipConfig: ShipPreset): number {

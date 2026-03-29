@@ -23,8 +23,8 @@ export const SHIP_PRESETS: Record<string, ShipPreset> = {
     sternBlockedBays: 0,
     // GLB model fields
     glbPath: 'small-feeder',
-    deckOffsetY: 1.2,   // matches existing slot indicator math (height * 0.3 = 1.2)
-    glbYOffset: 3.0,    // lift model so scaled deck aligns with deckOffsetY — tune at runtime
+    deckOffsetY: 1.5,   // raised with glbYOffset so containers stay on deck
+    glbYOffset: 3.3,    // small raise above original 3.0 — hull waterline visible above ocean
   },
   medium: {
     name: 'medium',
@@ -67,6 +67,7 @@ export const SHIP_PRESETS: Record<string, ShipPreset> = {
     glbRotationY: 0,
     deckOffsetY: 5.0,
     glbYOffset: -8,
+    physicsMultiplier: 0.45,
     glbZOffset: 6,
     // Explicit X positions for each bay (game units, bow = +X).
     // Two groups of 6 with a ~9-unit gap (≈1.5 container lengths) between groups.
@@ -102,14 +103,14 @@ export const SHIP_PRESETS: Record<string, ShipPreset> = {
 }
 
 export const PHYSICS = {
-  listMultiplier: 1.5,
-  trimMultiplier: 1.0,
-  listWarning: 8,
-  listCritical: 12,
-  listDisaster: 15,
-  trimWarning: 6,
-  trimCritical: 9,
-  trimDisaster: 12,
+  listMultiplier: 2.5,
+  trimMultiplier: 2.5,
+  listWarning: 5,
+  listCritical: 8,
+  listDisaster: 12,
+  trimWarning: 4,
+  trimCritical: 7,
+  trimDisaster: 10,
   vcgWarning: 6.0,
   vcgDanger: 8.0,
 } as const

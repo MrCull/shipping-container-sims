@@ -12,7 +12,7 @@ import {
   createFoamParticles, animateFoam, createTerminalTruckGLB,
 } from '../modules/sceneBuilder'
 import { loadTruckGLBs, createTruckGLB } from '../modules/truckRenderer'
-import { createShip, loadShipGLB, updateShipTilt } from '../modules/shipRenderer'
+import { createShip, loadShipGLB, updateShipTilt, snapShipTilt } from '../modules/shipRenderer'
 import {
   createContainerMesh,
   createSlotIndicators, removeSlotIndicators, animateSlotIndicators,
@@ -91,6 +91,8 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
   applyKeyboardCamera(deltaTime)
   animateOcean(ocean, time)
   animateFoam(foam, time)
+
+  updateShipTilt(shipGroup, store.shipList, store.shipTrim)
 
   if (shipGroup) {
     animateSlotIndicators(shipGroup, time)
@@ -298,10 +300,6 @@ watch(() => store.phase, (newPhase, oldPhase) => {
   }
 })
 
-watch([() => store.shipList, () => store.shipTrim], ([list, trim]) => {
-  updateShipTilt(shipGroup, list, trim)
-})
-
 watch(() => store.availableSlots, (slots) => {
   if (!shipGroup || !store.shipConfig) return
   if (store.phase === 'selecting') {
@@ -380,6 +378,9 @@ async function buildScene(): Promise<void> {
   await truckPrewarm
 
   craneObj = createCrane(scene, store.shipConfig)
+
+  // Snap ship to correct tilt before sail-in so it arrives already leaning correctly
+  snapShipTilt(shipGroup, store.shipList, store.shipTrim)
 
   // Start ship off-screen and sail it in
   shipGroup.position.x = sailIn.startX

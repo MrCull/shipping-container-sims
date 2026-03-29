@@ -154,6 +154,9 @@ export function createShip(scene: THREE.Scene, shipConfig: ShipPreset): THREE.Gr
   // ── Deck fittings ──────────────────────────────────────────────────────────
   addDeckFittings(group, length, width, height, metalMat)
 
+  // Lift the procedural hull so the waterline sits visibly above the ocean surface
+  group.position.y = height * 0.35
+
   scene.add(group)
   return group
 }
@@ -409,11 +412,26 @@ function addDeckFittings(
   }
 }
 
+/** Visual exaggeration multiplier — the ship leans more than the raw physics angle
+ *  so even mild imbalance is clearly readable on screen. */
+const VISUAL_TILT_MULTIPLIER = 0.9
+
+/** Instantly snap the ship to the correct tilt angle with no lerp — call once after scene build. */
+export function snapShipTilt(shipGroup: THREE.Group | null, list: number, trim: number): void {
+  if (!shipGroup) return
+  shipGroup.rotation.x = (list * VISUAL_TILT_MULTIPLIER * Math.PI) / 180
+  shipGroup.rotation.z = -(trim * VISUAL_TILT_MULTIPLIER * Math.PI) / 180
+}
+
 export function updateShipTilt(shipGroup: THREE.Group | null, list: number, trim: number): void {
   if (!shipGroup) return
-  // list > 0 → starboard heavy → roll to +Z; trim > 0 → bow heavy → bow sinks (−X rotation)
-  const targetRotZ = (list * Math.PI) / 180
-  const targetRotX = -(trim * Math.PI) / 180
-  shipGroup.rotation.z += (targetRotZ - shipGroup.rotation.z) * 0.08
+  // Ship length runs along X; Z = starboard (+Z) / port (-Z).
+  // List (port/starboard roll) rotates around the length axis (X):
+  //   list > 0 → starboard (+Z) heavy → +Z side dips → rotation.x positive.
+  // Trim (fore/aft pitch) rotates around the beam axis (Z):
+  //   trim > 0 → bow (+X) heavy → +X side dips → rotation.z negative.
+  const targetRotX = (list * VISUAL_TILT_MULTIPLIER * Math.PI) / 180
+  const targetRotZ = -(trim * VISUAL_TILT_MULTIPLIER * Math.PI) / 180
   shipGroup.rotation.x += (targetRotX - shipGroup.rotation.x) * 0.08
+  shipGroup.rotation.z += (targetRotZ - shipGroup.rotation.z) * 0.08
 }

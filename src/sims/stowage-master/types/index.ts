@@ -93,6 +93,12 @@ export interface ShipPreset {
    * Length must equal the number of active bays.
    */
   bayYBaseOffsets?: number[]
+  /**
+   * Scales the list and trim physics sensitivity for this vessel.
+   * Values < 1.0 make larger ships less reactive to individual container placements.
+   * Defaults to 1.0 if absent.
+   */
+  physicsMultiplier?: number
 }
 
 export interface GameEvent {
