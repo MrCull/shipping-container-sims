@@ -20,6 +20,7 @@ import LevelComplete from './components/modals/LevelComplete.vue'
 import LevelFailed from './components/modals/LevelFailed.vue'
 import DisasterOverlay from './components/modals/DisasterOverlay.vue'
 import LevelBriefing from './components/modals/LevelBriefing.vue'
+import KeyboardHint from './components/ui/KeyboardHint.vue'
 
 const store = useGameStore()
 useGameMusic()
@@ -51,6 +52,7 @@ onMounted(() => {
     <LevelComplete />
     <LevelFailed />
     <DisasterOverlay />
+    <KeyboardHint />
   </div>
 </template>
 

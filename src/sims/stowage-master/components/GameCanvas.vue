@@ -32,7 +32,7 @@ import type { Container, CraneObject, DisasterAnimation } from '../types'
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const store = useGameStore()
 
-const { getScene, getCamera, isReady, render, setCameraForShip } = useGameThreeScene(canvasRef)
+const { getScene, getCamera, isReady, render, setCameraForShip, applyKeyboardCamera } = useGameThreeScene(canvasRef)
 const { onClick: pickSlot, attach: attachPicking } = useSlotPicking(canvasRef, getCamera, getScene)
 const audio = useAudio()
 
@@ -88,6 +88,7 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
     audio.playSound('clockTicking', 1.0)
   }
 
+  applyKeyboardCamera(deltaTime)
   animateOcean(ocean, time)
   animateFoam(foam, time)
 

@@ -3,6 +3,9 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { ShipPreset } from '../types'
 
+const KEY_PAN_SPEED  = 20   // units per second
+const KEY_ZOOM_SPEED = 25    // units per second
+
 export interface GameSceneRefs {
   /** Plain (non-reactive) Three.js objects — do NOT put these in shallowRef */
   getScene: () => THREE.Scene | null
@@ -10,6 +13,7 @@ export interface GameSceneRefs {
   isReady: Ref<boolean>
   render: () => void
   setCameraForShip: (shipConfig: ShipPreset) => void
+  applyKeyboardCamera: (dt: number) => void
 }
 
 export function useGameThreeScene(canvasRef: Ref<HTMLCanvasElement | null>): GameSceneRefs {
@@ -19,6 +23,74 @@ export function useGameThreeScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   let camera: THREE.PerspectiveCamera | null = null
   let controls: OrbitControls | null = null
   const isReady = ref(false)
+
+  // Keyboard camera state
+  const keys = { left: false, right: false, up: false, down: false, zoomIn: false, zoomOut: false }
+  const _spherical = new THREE.Spherical()
+  const _offset = new THREE.Vector3()
+
+  function onKeyDown(e: KeyboardEvent): void {
+    if (e.repeat) return
+    const t = e.target as Node | null
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return
+    switch (e.code) {
+      case 'KeyA': case 'ArrowLeft':  keys.left    = true; e.preventDefault(); break
+      case 'KeyD': case 'ArrowRight': keys.right   = true; e.preventDefault(); break
+      case 'KeyW': case 'ArrowUp':    keys.up      = true; e.preventDefault(); break
+      case 'KeyS': case 'ArrowDown':  keys.down    = true; e.preventDefault(); break
+      case 'Equal': case 'NumpadAdd':        keys.zoomIn  = true; e.preventDefault(); break
+      case 'Minus': case 'NumpadSubtract':   keys.zoomOut = true; e.preventDefault(); break
+    }
+  }
+
+  function onKeyUp(e: KeyboardEvent): void {
+    switch (e.code) {
+      case 'KeyA': case 'ArrowLeft':  keys.left    = false; break
+      case 'KeyD': case 'ArrowRight': keys.right   = false; break
+      case 'KeyW': case 'ArrowUp':    keys.up      = false; break
+      case 'KeyS': case 'ArrowDown':  keys.down    = false; break
+      case 'Equal': case 'NumpadAdd':        keys.zoomIn  = false; break
+      case 'Minus': case 'NumpadSubtract':   keys.zoomOut = false; break
+    }
+  }
+
+  function applyKeyboardCamera(dt: number): void {
+    if (!camera || !controls) return
+    const anyKey = keys.left || keys.right || keys.up || keys.down || keys.zoomIn || keys.zoomOut
+    if (!anyKey) return
+
+    const panDist = KEY_PAN_SPEED * dt
+
+    // Pan: derive right and forward vectors from camera orientation (ignoring Y for forward)
+    const right = new THREE.Vector3()
+    const forward = new THREE.Vector3()
+    camera.getWorldDirection(forward)
+    forward.y = 0
+    forward.normalize()
+    right.crossVectors(forward, camera.up).normalize()
+
+    const pan = new THREE.Vector3()
+    if (keys.left)  pan.addScaledVector(right, -panDist)
+    if (keys.right) pan.addScaledVector(right,  panDist)
+    if (keys.up)    pan.addScaledVector(forward,  panDist)
+    if (keys.down)  pan.addScaledVector(forward, -panDist)
+
+    camera.position.add(pan)
+    controls.target.add(pan)
+
+    // Zoom along the view axis
+    if (keys.zoomIn || keys.zoomOut) {
+      _offset.copy(camera.position).sub(controls.target)
+      _spherical.setFromVector3(_offset)
+      if (keys.zoomIn)  _spherical.radius -= KEY_ZOOM_SPEED * dt
+      if (keys.zoomOut) _spherical.radius += KEY_ZOOM_SPEED * dt
+      _spherical.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, _spherical.radius))
+      _offset.setFromSpherical(_spherical)
+      camera.position.copy(controls.target).add(_offset)
+    }
+
+    controls.update()
+  }
 
   function init(): void {
     if (!canvasRef.value) return
@@ -51,6 +123,8 @@ export function useGameThreeScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     controls.screenSpacePanning = false
 
     window.addEventListener('resize', onResize)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
     isReady.value = true
   }
 
@@ -82,6 +156,8 @@ export function useGameThreeScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
 
   function dispose(): void {
     window.removeEventListener('resize', onResize)
+    window.removeEventListener('keydown', onKeyDown)
+    window.removeEventListener('keyup', onKeyUp)
     controls?.dispose()
     renderer?.dispose()
 
@@ -111,5 +187,6 @@ export function useGameThreeScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     isReady,
     render,
     setCameraForShip,
+    applyKeyboardCamera,
   }
 }
