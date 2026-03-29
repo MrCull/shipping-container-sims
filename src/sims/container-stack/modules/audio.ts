@@ -18,6 +18,7 @@ export const SOUNDS: Record<string, string> = {
   countdownTick: assetUrl('correct-ding.mp3'),
   countdownUrgent: assetUrl('countdown-urgent.mp3'),
   boo: assetUrl('boo-3-seconds.mp3'),
+  towerCollapse: assetUrl('tower-collaps.mp3'),
 }
 
 export interface SoundCue {
@@ -27,6 +28,7 @@ export interface SoundCue {
 }
 
 export const COLLAPSE_SEQUENCE: SoundCue[] = [
+  { key: 'towerCollapse', delay: 0, volume: 1.0 },
   { key: 'containerLoad', delay: 0, volume: 0.55 },
   { key: 'negative', delay: 0.08, volume: 0.85 },
   { key: 'explosionFx', delay: 0.12, volume: 0.72 },
