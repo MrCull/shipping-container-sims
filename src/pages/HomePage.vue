@@ -8,6 +8,7 @@ import { useMenuMusic } from '@/composables/useMenuMusic'
 import HeroBackground from '@/components/HeroBackground.vue'
 import SimCard from '@/components/SimCard.vue'
 import FutureGameCard from '@/components/FutureGameCard.vue'
+import GithubRepoLink from '@/components/GithubRepoLink.vue'
 import { futureGameTeasers } from '@/data/future-game-teasers'
 
 const store = useSimsStore()
@@ -103,6 +104,9 @@ onMounted(() => {
 
       <footer class="site-footer">
         <p>SHIPPING CONTAINER SIMS &copy; {{ new Date().getFullYear() }}</p>
+        <p class="footer-github">
+          <GithubRepoLink variant="footer" />
+        </p>
         <p class="footer-sub">
           INSERT COIN TO CONTINUE...
         </p>
@@ -274,6 +278,11 @@ onMounted(() => {
   letter-spacing: 0.15em;
   color: var(--color-text-muted);
   line-height: 2;
+}
+
+.footer-github {
+  margin: 0;
+  line-height: 1.6;
 }
 
 .footer-sub {
