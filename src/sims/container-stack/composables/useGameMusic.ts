@@ -1,6 +1,5 @@
 import { onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useAudioStore } from '@/stores/audio'
 import { useContainerStackStore } from '../store/gameStore'
 import gameMusicUrl from '../assets/audio/background-gaming-track-upbeat-techno-fun.mp3'
 
@@ -16,16 +15,11 @@ function getAudio(): HTMLAudioElement {
 }
 
 export function useGameMusic(): void {
-  const audioStore = useAudioStore()
   const gameStore = useContainerStackStore()
   const { phase } = storeToRefs(gameStore)
 
   function tryPlay(): void {
     const audio = getAudio()
-    if (audioStore.backgroundMusicMuted) {
-      audio.pause()
-      return
-    }
     void audio.play().catch(() => {
       const onGesture = () => {
         void audio.play()
@@ -48,14 +42,6 @@ export function useGameMusic(): void {
       audio.pause()
     } else if (p === 'levelComplete' || p === 'levelFailed') {
       audio.pause()
-    }
-  })
-
-  watch(() => audioStore.backgroundMusicMuted, (isMuted) => {
-    const audio = getAudio()
-    if (isMuted) audio.pause()
-    else if (phase.value !== 'start' && phase.value !== 'gameOver' && phase.value !== 'paused') {
-      void audio.play()
     }
   })
 

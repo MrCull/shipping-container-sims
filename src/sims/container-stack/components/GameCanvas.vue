@@ -13,7 +13,7 @@ import {
   setContainerHighlight,
 } from '../modules/containerRenderer'
 import { createPlacementMarker } from '../modules/placementMarkers'
-import { slotWorldPosition, getTowerTopY, getPlacementCandidates } from '../modules/towerBuilder'
+import { slotWorldPosition, getTowerTopY, getTopLayerIndex, getPlacementCandidates } from '../modules/towerBuilder'
 import { BLOCK, INTERACTION, TOWER } from '../modules/config'
 import type { JengaContainer } from '../types'
 
@@ -200,8 +200,22 @@ function syncGhostMesh(): void {
   const c = floatingContainer.value
   if (!c || (phase.value !== 'removing' && phase.value !== 'placing')) return
 
-  const layer = layers.value[c.layerIndex]
-  const orient = layer?.orientation ?? (c.layerIndex % 2 === 0 ? 'alongX' : 'alongZ')
+  let orient
+  if (phase.value === 'placing') {
+    const topIdx = getTopLayerIndex(layers.value)
+    const topLayer = layers.value[topIdx]
+    const hasOpenSlot = topLayer?.slots.some(s => s === null) ?? false
+    if (hasOpenSlot && topLayer) {
+      orient = topLayer.orientation
+    } else {
+      const newIdx = layers.value.length
+      orient = newIdx % 2 === 0 ? 'alongX' : 'alongZ'
+    }
+  } else {
+    const layer = layers.value[c.layerIndex]
+    orient = layer?.orientation ?? (c.layerIndex % 2 === 0 ? 'alongX' : 'alongZ')
+  }
+
   const g = createContainerMesh(c, orient)
   ghostGroup.add(g)
 }
