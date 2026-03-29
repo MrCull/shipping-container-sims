@@ -13,6 +13,7 @@ import vesselHornUrl from '../assets/sounds/small-ship-three-horns-in-a-row.mp3'
 import cheerUrl from '../assets/sounds/group-yay-cheer.mp3'
 import levelUpUrl from '../assets/sounds/level-up.mp3'
 import bgTrackUrl from '../assets/sounds/background-gaming-track-fun-light-cotton-toys-soundroll.mp3'
+import seagullUrl from '../assets/sounds/seagul-sound-17-seconds.mp3'
 
 const FILE_TO_URL: Record<string, string> = {
   'container-loaded-to-ship.mp3': containerPlacedUrl,
@@ -26,9 +27,14 @@ const FILE_TO_URL: Record<string, string> = {
 // SFX baseline is 0.4; background music is 50% of that, then reduced a further 40%
 const BG_VOLUME = 0.12
 
+// Seagull ambient: play roughly every 55 s, jittered ±20 s
+const SEAGULL_BASE_MS  = 55_000
+const SEAGULL_JITTER_MS = 20_000
+
 export function useAudio() {
   const audioPool: HTMLAudioElement[] = []
   let bgAudio: HTMLAudioElement | null = null
+  let seagullTimer: ReturnType<typeof setTimeout> | null = null
 
   function play(eventType: GameEventType): void {
     const fileName = SOUND_MAP[eventType]
@@ -55,6 +61,30 @@ export function useAudio() {
     bgAudio.play().catch(() => { /* autoplay blocked until user interaction */ })
   }
 
+  // ---- Seagull ambient ----------------------------------------------------
+
+  function scheduleNextSeagull(): void {
+    const delay = SEAGULL_BASE_MS + (Math.random() * 2 - 1) * SEAGULL_JITTER_MS
+    seagullTimer = setTimeout(() => {
+      const a = new Audio(seagullUrl)
+      a.volume = 0.30
+      a.play().catch(() => {})
+      audioPool.push(a)
+      a.addEventListener('ended', () => {
+        const idx = audioPool.indexOf(a)
+        if (idx >= 0) audioPool.splice(idx, 1)
+      })
+      scheduleNextSeagull()
+    }, delay)
+  }
+
+  function startAmbientSounds(): void {
+    startBgMusic()
+    if (seagullTimer === null) scheduleNextSeagull()
+  }
+
+  // -------------------------------------------------------------------------
+
   function stopAll(): void {
     for (const audio of audioPool) {
       audio.pause()
@@ -66,9 +96,13 @@ export function useAudio() {
       bgAudio.currentTime = 0
       bgAudio = null
     }
+    if (seagullTimer !== null) {
+      clearTimeout(seagullTimer)
+      seagullTimer = null
+    }
   }
 
   onBeforeUnmount(stopAll)
 
-  return { play, startBgMusic, stopAll }
+  return { play, startBgMusic, startAmbientSounds, stopAll }
 }

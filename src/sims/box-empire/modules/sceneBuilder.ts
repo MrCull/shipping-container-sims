@@ -18,12 +18,13 @@ import {
   GATE_OUTGATE_POSITION,
   GATE_OUTGATE_FENCE_Z,
 } from './config'
-import { registerOceanMesh } from './oceanAnimation'
+import { registerOceanMesh, createFoamParticles } from './oceanAnimation'
 
 export function buildScene(scene: THREE.Scene): void {
   buildSkyAndFog(scene)
   buildLighting(scene)
   buildOcean(scene)
+  createFoamParticles(scene)
   buildQuay(scene)
   buildGround(scene)
   buildYardMarkings(scene)
@@ -98,7 +99,7 @@ function buildOcean(scene: THREE.Scene): void {
   const ocean = new THREE.Mesh(geometry, material)
   ocean.rotation.x = -Math.PI / 2
   // Centre at z=-80 so it extends from the quay far out to sea
-  ocean.position.set(0, -0.4, -80)
+  ocean.position.set(0, -1.5, -80)
   ocean.receiveShadow = true
   ocean.name = 'ocean'
   scene.add(ocean)

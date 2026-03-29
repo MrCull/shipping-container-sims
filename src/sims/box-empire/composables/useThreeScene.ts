@@ -7,7 +7,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useGameStore } from '../store/gameStore'
 import { buildScene } from '../modules/sceneBuilder'
-import { animateOcean } from '../modules/oceanAnimation'
+import { animateOcean, animateFoam } from '../modules/oceanAnimation'
 import { ContainerRenderer } from '../modules/containerRenderer'
 import { EquipmentRenderer } from '../modules/equipmentRenderer'
 import { VesselRenderer } from '../modules/vesselRenderer'
@@ -206,7 +206,9 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     if (!renderer || !scene || !camera) return
     controls?.update()
     floatingTextRenderer?.update()
-    animateOcean(performance.now() / 1000)
+    const t = performance.now() / 1000
+    animateOcean(t)
+    animateFoam(t)
     renderer.render(scene, camera)
   }
 

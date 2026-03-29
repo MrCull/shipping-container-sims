@@ -9,7 +9,7 @@ import { useGameStore } from '../store/gameStore'
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const { getScene, getCamera, render, updateEntities, applyKeyboardCamera, isReady, webglFailed, spawnFloatingText, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen, triggerVesselShake } = useBoxEmpireScene(canvasRef)
 const store = useGameStore()
-const { play, startBgMusic } = useAudio()
+const { play, startAmbientSounds } = useAudio()
 
 useInput(canvasRef, getCamera, getScene, getContainerIdAtInstance, getContainerMesh, getContainerIdNearScreen)
 
@@ -50,7 +50,7 @@ watch(isReady, (ready) => {
 
 const stopGatehouseWatch = watch(() => store.gatehouseOpen, (open) => {
   if (open) {
-    startBgMusic()
+    startAmbientSounds()
     stopGatehouseWatch()
   }
 })

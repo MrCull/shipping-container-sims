@@ -29,276 +29,267 @@ export class EquipmentRenderer {
   private createReachStacker(): { group: THREE.Group; parts: EquipmentParts } {
     const group = new THREE.Group()
 
-    // --- Materials ---
-    const orangeMat     = new THREE.MeshPhongMaterial({ color: 0xe67e22, specular: 0x994400, shininess: 45 })
-    const orangeDarkMat = new THREE.MeshPhongMaterial({ color: 0xb85c10, specular: 0x662200, shininess: 30 })
-    const darkMat       = new THREE.MeshPhongMaterial({ color: 0x2c3e50, specular: 0x112233, shininess: 35 })
-    const yellowMat     = new THREE.MeshPhongMaterial({ color: 0xf1c40f, emissive: 0x554400, emissiveIntensity: 0.4 })
-    const blackMat      = new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 60 })
-    const rubberMat     = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, shininess: 5 })
-    const chromeMat     = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, specular: 0xffffff, shininess: 120 })
-    const glassMat      = new THREE.MeshPhongMaterial({ color: 0x4a90d9, specular: 0xaaccee, shininess: 160, transparent: true, opacity: 0.72 })
-    const grillMat      = new THREE.MeshPhongMaterial({ color: 0x222222, shininess: 10 })
-    const stepMat       = new THREE.MeshPhongMaterial({ color: 0x666666, specular: 0x888888, shininess: 40 })
-    const redMat        = new THREE.MeshPhongMaterial({ color: 0xc0392b, shininess: 40 })
-    const tailLightMat  = new THREE.MeshPhongMaterial({ color: 0xff2200, emissive: 0x440000, emissiveIntensity: 0.4 })
-    const headLightMat  = new THREE.MeshPhongMaterial({ color: 0xffffcc, emissive: 0x444400, emissiveIntensity: 0.5 })
-    const cwMat         = new THREE.MeshPhongMaterial({ color: 0x444444, shininess: 20 })
-    const cwDarkMat     = new THREE.MeshPhongMaterial({ color: 0x333333, shininess: 10 })
-    const rimMat        = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, specular: 0xffffff, shininess: 80 })
+    // ---- Materials ----------------------------------------------------------
+    const orangeMat    = new THREE.MeshPhongMaterial({ color: 0xe8720c, specular: 0x883300, shininess: 50 })
+    const orangeDkMat  = new THREE.MeshPhongMaterial({ color: 0xb45000, specular: 0x551100, shininess: 35 })
+    const darkMat      = new THREE.MeshPhongMaterial({ color: 0x1c2833, specular: 0x112233, shininess: 35 })
+    const blackMat     = new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 60 })
+    const rubberMat    = new THREE.MeshPhongMaterial({ color: 0x0e0e0e, shininess: 3 })
+    const chromeMat    = new THREE.MeshPhongMaterial({ color: 0xcccccc, specular: 0xffffff, shininess: 140 })
+    const glassMat     = new THREE.MeshPhongMaterial({ color: 0x4a90d9, specular: 0xaaccee, shininess: 160, transparent: true, opacity: 0.75 })
+    const yellowMat    = new THREE.MeshPhongMaterial({ color: 0xf1c40f, emissive: 0x554400, emissiveIntensity: 0.35 })
+    const hazBlkMat    = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, shininess: 8 })
+    const grillMat     = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, shininess: 12 })
+    const cwMat        = new THREE.MeshPhongMaterial({ color: 0x2a2a2a, shininess: 15 })
+    const rimMat       = new THREE.MeshPhongMaterial({ color: 0xc8c8c8, specular: 0xffffff, shininess: 100 })
+    const headLightMat = new THREE.MeshPhongMaterial({ color: 0xffffcc, emissive: 0x555500, emissiveIntensity: 0.5 })
+    const tailLightMat = new THREE.MeshPhongMaterial({ color: 0xff2200, emissive: 0x550000, emissiveIntensity: 0.4 })
+    const stepMat      = new THREE.MeshPhongMaterial({ color: 0x777777, shininess: 25 })
 
     // -------------------------------------------------------------------------
-    // 1. CHASSIS — 3-layer body for panel-line silhouette
+    // 1. MAIN FRAME — two side box-rails + cross members
     // -------------------------------------------------------------------------
-    const lowerChassis = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.2, 5.0), orangeMat)
-    lowerChassis.position.set(0, 1.0, 0); lowerChassis.castShadow = true; group.add(lowerChassis)
-
-    const upperBody = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.8, 4.6), orangeMat)
-    upperBody.position.set(0, 2.0, 0); upperBody.castShadow = true; group.add(upperBody)
-
-    const sideSkirts = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.4, 4.8), orangeDarkMat)
-    sideSkirts.position.set(0, 0.6, 0); group.add(sideSkirts)
-
-    // Panel-line strips on sides
     for (const sx of [-1, 1]) {
-      const pl = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.15, 4.4), orangeDarkMat)
-      pl.position.set(sx * 1.72, 1.6, 0); group.add(pl)
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.55, 6.2), orangeDkMat)
+      rail.position.set(sx * 1.5, 1.52, -0.6); rail.castShadow = true; group.add(rail)
+    }
+    for (const fz of [1.55, -0.45, -2.45]) {
+      const xb = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.40, 0.34), orangeDkMat)
+      xb.position.set(0, 1.52, fz); group.add(xb)
     }
 
     // -------------------------------------------------------------------------
-    // 2. ENGINE HOOD — multi-part with grilles
+    // 2. MAIN BODY — engine + hydraulic bay
     // -------------------------------------------------------------------------
-    const hood = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.3, 1.5), orangeMat)
-    hood.position.set(0, 2.45, -1.7); hood.castShadow = true; group.add(hood)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.70, 3.8), orangeMat)
+    body.position.set(0, 2.15, -0.65); body.castShadow = true; group.add(body)
 
-    const hoodCap = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.15, 1.3), orangeDarkMat)
-    hoodCap.position.set(0, 3.15, -1.7); group.add(hoodCap)
+    // Engine hood (raised rear section)
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.45, 1.5), orangeMat)
+    hood.position.set(0, 3.08, -1.55); hood.castShadow = true; group.add(hood)
+    const hoodCap = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.10, 1.3), orangeDkMat)
+    hoodCap.position.set(0, 3.33, -1.55); group.add(hoodCap)
 
-    // Side intake grilles
+    // Side grille panels + slats
     for (const sx of [-1, 1]) {
-      const sg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.6, 1.0), grillMat)
-      sg.position.set(sx * 1.55, 2.3, -1.7); group.add(sg)
+      const gp = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.80, 1.2), grillMat)
+      gp.position.set(sx * 1.35, 2.55, -1.55); group.add(gp)
+      for (let i = 0; i < 4; i++) {
+        const sl = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.06, 1.0), chromeMat)
+        sl.position.set(sx * 1.40, 2.22 + i * 0.18, -1.55); group.add(sl)
+      }
+    }
+    // Rear radiator grille
+    const rGrille = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.80, 0.08), grillMat)
+    rGrille.position.set(0, 2.55, -2.60); group.add(rGrille)
+    for (let i = 0; i < 4; i++) {
+      const sl = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.06, 0.10), chromeMat)
+      sl.position.set(0, 2.22 + i * 0.18, -2.64); group.add(sl)
     }
 
-    // Rear radiator grille + chrome slats
-    const rearGrille = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 0.08), grillMat)
-    rearGrille.position.set(0, 2.3, -2.48); group.add(rearGrille)
-    for (let i = 0; i < 3; i++) {
-      const slat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.04, 0.1), chromeMat)
-      slat.position.set(0, 2.15 + i * 0.15, -2.49); group.add(slat)
-    }
+    // Exhaust stack (rear-left, single)
+    const exh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 1.9, 10), chromeMat)
+    exh.position.set(-0.9, 3.8, -1.8); group.add(exh)
+    const exhCap = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.07, 10), darkMat)
+    exhCap.position.set(-0.9, 4.76, -1.8); group.add(exhCap)
 
     // -------------------------------------------------------------------------
-    // 3. EXHAUST — dual stacks with dark caps
+    // 3. OPERATOR CAB — right-forward, large glass
     // -------------------------------------------------------------------------
-    for (const ex of [-1.1, -0.7]) {
-      const stk = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.13, 1.4, 8), chromeMat)
-      stk.position.set(ex, 3.5, -1.5); group.add(stk)
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 8), darkMat)
-      cap.position.set(ex, 4.23, -1.5); group.add(cap)
-    }
-
-    // -------------------------------------------------------------------------
-    // 4. OPERATOR CAB — with ROPS frame, sun visor, extra windows
-    // -------------------------------------------------------------------------
-    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.5, 1.5), darkMat)
-    cab.position.set(-0.5, 3.15, 0.9); cab.castShadow = true; group.add(cab)
-
-    // Cab roof with overhang
-    const cabRoof = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.12, 1.7), darkMat)
-    cabRoof.position.set(-0.5, 3.96, 0.9); group.add(cabRoof)
-
-    // Sun visor protruding forward
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 0.35), orangeMat)
-    visor.position.set(-0.5, 3.9, 1.85); group.add(visor)
-
-    // ROPS posts + top bar
-    for (const px of [-1.45, 0.45]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.10, 1.7, 0.10), orangeMat)
-      post.position.set(px, 3.25, 0.2); group.add(post)
-    }
-    const ropsBar = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.10, 0.10), orangeMat)
-    ropsBar.position.set(-0.5, 4.05, 0.2); group.add(ropsBar)
-
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.60, 1.65), darkMat)
+    cab.position.set(0.82, 2.65, 0.72); cab.castShadow = true; group.add(cab)
+    const cabRoof = new THREE.Mesh(new THREE.BoxGeometry(1.70, 0.11, 1.82), darkMat)
+    cabRoof.position.set(0.82, 3.47, 0.72); group.add(cabRoof)
+    // Visor overhang
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.07, 0.28), orangeMat)
+    visor.position.set(0.82, 3.42, 1.62); group.add(visor)
     // Windscreen
-    const win = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.1, 0.06), glassMat)
-    win.position.set(-0.5, 3.2, 1.68); group.add(win)
-
+    const ws = new THREE.Mesh(new THREE.BoxGeometry(1.32, 1.28, 0.07), glassMat)
+    ws.position.set(0.82, 2.75, 1.57); group.add(ws)
     // Side windows
-    for (const sx of [-1, 1]) {
-      const sw = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.85, 1.2), glassMat)
-      sw.position.set(sx * 1.03 + (-0.5), 3.2, 0.85); group.add(sw)
-    }
-
-    // Rear window
-    const rearWin = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.6, 0.06), glassMat)
-    rearWin.position.set(-0.5, 3.4, 0.12); group.add(rearWin)
-
-    // Door handle
-    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.18), chromeMat)
-    handle.position.set(-1.52, 3.0, 1.0); group.add(handle)
-
-    // -------------------------------------------------------------------------
-    // 5. WARNING BEACON — cylinder base + sphere dome
-    // -------------------------------------------------------------------------
-    const beaconBase = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.14, 0.20, 8), yellowMat)
-    beaconBase.position.set(-0.5, 4.12, 0.8); group.add(beaconBase)
-    const beaconDome = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 6), yellowMat)
-    beaconDome.position.set(-0.5, 4.28, 0.8); group.add(beaconDome)
-
-    // -------------------------------------------------------------------------
-    // 6. COUNTERWEIGHT — 2-part for visual mass
-    // -------------------------------------------------------------------------
-    const cw = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 1.2), cwMat)
-    cw.position.set(0, 1.2, -2.8); cw.castShadow = true; group.add(cw)
-    const cwLip = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.3, 1.4), cwDarkMat)
-    cwLip.position.set(0, 0.55, -2.85); group.add(cwLip)
-
-    // Tail lights
-    for (const tx of [-1.2, 1.2]) {
-      const tl = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.06), tailLightMat)
-      tl.position.set(tx, 1.5, -3.42); group.add(tl)
-    }
-
-    // Hazard stripe plates (alternating yellow/dark on counterweight rear)
-    const hazardYellow = new THREE.MeshPhongMaterial({ color: 0xf1c40f, shininess: 20 })
-    for (const hx of [-0.8, 0.8]) {
-      const hp = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.8, 0.06), hx < 0 ? hazardYellow : cwDarkMat)
-      hp.position.set(hx, 1.2, -3.45); group.add(hp)
+    const sideWin = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.10, 1.38), glassMat)
+    sideWin.position.set(1.57, 2.75, 0.72); group.add(sideWin)
+    const leftWin = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.90, 1.10), glassMat)
+    leftWin.position.set(0.07, 2.75, 0.80); group.add(leftWin)
+    // Beacon
+    const bBase = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.15, 0.18, 8), yellowMat)
+    bBase.position.set(0.82, 3.54, 0.55); group.add(bBase)
+    const bDome = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), yellowMat)
+    bDome.position.set(0.82, 3.69, 0.55); group.add(bDome)
+    // Cab steps (right side)
+    for (let i = 0; i < 3; i++) {
+      const step = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.06, 0.26), stepMat)
+      step.position.set(1.55, 0.9 + i * 0.52, 1.25); group.add(step)
     }
 
     // -------------------------------------------------------------------------
-    // 7. BOOM GROUP — I-beam cross-section + hydraulic rams
-    //    Pivot position unchanged: (0.9, 3.3, 2.2)
+    // 4. COUNTERWEIGHT — heavy rear block with hazard stripes
+    // -------------------------------------------------------------------------
+    const cw = new THREE.Mesh(new THREE.BoxGeometry(3.3, 1.80, 1.55), cwMat)
+    cw.position.set(0, 1.50, -3.15); cw.castShadow = true; group.add(cw)
+    const cwLip = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.30, 1.75), new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 10 }))
+    cwLip.position.set(0, 0.55, -3.15); group.add(cwLip)
+    // Hazard stripes on rear face
+    for (let i = 0; i < 6; i++) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.50, 1.55, 0.07), i % 2 === 0 ? yellowMat : hazBlkMat)
+      stripe.position.set(-1.25 + i * 0.50, 1.5, -3.96); group.add(stripe)
+    }
+    for (const tx of [-1.5, 1.5]) {
+      const tl = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.22, 0.08), tailLightMat)
+      tl.position.set(tx, 1.7, -3.96); group.add(tl)
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. BOOM LIFT CYLINDERS — two large chrome rams from body to boom pivot
+    //    Fixed in main group; give the A-frame support visual.
+    // -------------------------------------------------------------------------
+    for (const bx of [-0.30, 0.30]) {
+      // Cylinder body (dark steel)
+      const cylB = new THREE.Mesh(new THREE.CylinderGeometry(0.130, 0.130, 2.10, 12), darkMat)
+      cylB.rotation.x = 0.52   // ~30° forward lean
+      cylB.position.set(bx, 2.25, 0.30); group.add(cylB)
+      // Chrome rod extending from cylinder
+      const cylR = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 1.45, 10), chromeMat)
+      cylR.rotation.x = 0.52
+      cylR.position.set(bx, 3.10, 0.78); group.add(cylR)
+      // Pivot mount at top
+      const pivotMount = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.22, 0.22), darkMat)
+      pivotMount.position.set(bx, 3.60, 0.92); group.add(pivotMount)
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. TIRES — 4 large single tires (the most distinctive RS feature)
+    // -------------------------------------------------------------------------
+    const tyreR = 0.92      // ~1850mm OD — close to real Kalmar RS tyre
+    const tyreW = 0.62
+    const tyreGeo = new THREE.CylinderGeometry(tyreR, tyreR, tyreW, 22)
+    const rimGeo  = new THREE.CylinderGeometry(0.45, 0.45, tyreW + 0.04, 16)
+    const hubGeo  = new THREE.CylinderGeometry(0.17, 0.17, tyreW + 0.10, 8)
+
+    for (const [sz, tx] of [[1.55, 1.95], [1.55, -1.95], [-2.20, 1.95], [-2.20, -1.95]] as [number, number][]) {
+      const sign = tx > 0 ? 1 : -1
+      // Tyre
+      const tyre = new THREE.Mesh(tyreGeo, rubberMat)
+      tyre.rotation.z = Math.PI / 2
+      tyre.position.set(tx, tyreR, sz); tyre.castShadow = true; group.add(tyre)
+      // Rim
+      const rim = new THREE.Mesh(rimGeo, rimMat)
+      rim.rotation.z = Math.PI / 2
+      rim.position.set(tx, tyreR, sz); group.add(rim)
+      // Hub
+      const hub = new THREE.Mesh(hubGeo, blackMat)
+      hub.rotation.z = Math.PI / 2
+      hub.position.set(tx, tyreR, sz); group.add(hub)
+      // 8 lug nuts on outer face
+      for (let b = 0; b < 8; b++) {
+        const ang = (b / 8) * Math.PI * 2
+        const lug = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.13, 6), rimMat)
+        lug.rotation.z = Math.PI / 2
+        lug.position.set(tx + sign * (tyreW / 2 + 0.05), tyreR + Math.sin(ang) * 0.30, sz + Math.cos(ang) * 0.30)
+        group.add(lug)
+      }
+      // Wheel arch (simple top fender)
+      const archSide = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.58, 1.05), orangeMat)
+      archSide.position.set(tx + sign * 0.46, tyreR + tyreR * 0.55, sz); group.add(archSide)
+      const archTop = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.12, 1.05), orangeMat)
+      archTop.position.set(tx + sign * 0.06, tyreR * 1.78, sz); group.add(archTop)
+    }
+
+    // Axle bars
+    const frontAxle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 3.65, 8), darkMat)
+    frontAxle.rotation.z = Math.PI / 2; frontAxle.position.set(0, tyreR, 1.55); group.add(frontAxle)
+    const rearAxle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 3.65, 8), darkMat)
+    rearAxle.rotation.z = Math.PI / 2; rearAxle.position.set(0, tyreR, -2.20); group.add(rearAxle)
+
+    // -------------------------------------------------------------------------
+    // 7. HEADLIGHTS
+    // -------------------------------------------------------------------------
+    for (const hx of [-1.1, 1.1]) {
+      const hl = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.22, 0.07), headLightMat)
+      hl.position.set(hx, 1.85, 1.86); group.add(hl)
+    }
+
+    // -------------------------------------------------------------------------
+    // 8. BOOM GROUP — wide box-section arm (pivot at top-center-front)
+    //    Container positioning formula uses: pivot (0, 3.50, 0.90)
     // -------------------------------------------------------------------------
     const boomGroup = new THREE.Group()
-    boomGroup.position.set(0.9, 3.3, 2.2)
+    boomGroup.position.set(0, 3.50, 0.90)
 
-    // Pivot housing + pin
-    const pivotBlock = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.5), orangeDarkMat)
-    pivotBlock.position.set(0, 0, 0); boomGroup.add(pivotBlock)
-    const pivotPin = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.85, 8), chromeMat)
-    pivotPin.rotation.z = Math.PI / 2; pivotPin.position.set(0, 0, 0); boomGroup.add(pivotPin)
+    // Pivot pin + housing
+    const pivHousing = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.55, 0.55), orangeDkMat)
+    pivHousing.position.set(0, 0, 0); boomGroup.add(pivHousing)
+    const pivPin = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.1, 10), chromeMat)
+    pivPin.rotation.z = Math.PI / 2; pivPin.position.set(0, 0, 0); boomGroup.add(pivPin)
 
-    // Outer boom — I-beam (top/bottom chord + side webs)
-    const boomTopChord = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.12, 6.0), orangeMat)
-    boomTopChord.position.set(0, 0.20, 3.0); boomTopChord.castShadow = true; boomGroup.add(boomTopChord)
-    const boomBotChord = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.12, 6.0), orangeMat)
-    boomBotChord.position.set(0, -0.20, 3.0); boomGroup.add(boomBotChord)
-    for (const bx of [-1, 1]) {
-      const web = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.52, 6.0), orangeDarkMat)
-      web.position.set(bx * 0.20, 0, 3.0); boomGroup.add(web)
+    // Main boom — wide flat box section (real RS boom is wide in X, not tall)
+    const boomOuter = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.55, 5.8), orangeMat)
+    boomOuter.position.set(0, 0, 2.9); boomOuter.castShadow = true; boomGroup.add(boomOuter)
+    const boomInner = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.35, 5.6), orangeDkMat)
+    boomInner.position.set(0, 0, 2.9); boomGroup.add(boomInner)
+
+    // Telescoping inner section
+    const extOuter = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.46, 3.8), orangeMat)
+    extOuter.position.set(0, 0, 7.1); extOuter.castShadow = true; boomGroup.add(extOuter)
+    const extInner = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.30, 3.6), orangeDkMat)
+    extInner.position.set(0, 0, 7.1); boomGroup.add(extInner)
+
+    // Wear pad strips (telescoping slide interface)
+    for (const bz of [5.65, 8.70]) {
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.10, 0.28), darkMat)
+      pad.position.set(0, -0.33, bz); boomGroup.add(pad)
     }
 
-    // Inner telescoping section — I-beam
-    const extTopChord = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.10, 3.4), orangeMat)
-    extTopChord.position.set(0, 0.16, 7.7); boomGroup.add(extTopChord)
-    const extBotChord = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.10, 3.4), orangeMat)
-    extBotChord.position.set(0, -0.16, 7.7); boomGroup.add(extBotChord)
-    for (const bx of [-1, 1]) {
-      const ew = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.40, 3.4), orangeDarkMat)
-      ew.position.set(bx * 0.14, 0, 7.7); boomGroup.add(ew)
+    // Hazard stripe band near pivot (safety marking)
+    for (let i = 0; i < 4; i++) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.58, 0.48), i % 2 === 0 ? yellowMat : hazBlkMat)
+      stripe.position.set(0, 0, 0.55 + i * 0.48); boomGroup.add(stripe)
     }
 
-    // Hydraulic cylinders (2 pairs — cylinder body + extended rod)
-    for (const hx of [-0.35, 0.35]) {
-      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.5, 8), chromeMat)
-      cyl.rotation.x = Math.PI / 2; cyl.position.set(hx, -0.35, 2.0); boomGroup.add(cyl)
-      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 6), chromeMat)
-      rod.rotation.x = Math.PI / 2; rod.position.set(hx, -0.35, 4.6); boomGroup.add(rod)
+    // rib stiffeners along the top of the boom
+    for (const bz of [1.5, 2.5, 3.5, 4.5]) {
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.07, 0.14), orangeDkMat)
+      rib.position.set(0, 0.31, bz); boomGroup.add(rib)
     }
 
     // -------------------------------------------------------------------------
-    // 8. SPREADER — thicker beam, guide rails, center block
+    // 9. SPREADER / HEADBLOCK — large frame with hazard markings
+    //    Stays at boomGroup z=9.2 to keep container-positioning formula valid.
     // -------------------------------------------------------------------------
-    const spreaderFrame = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.30, 0.55), redMat)
-    spreaderFrame.position.set(0, -0.55, 9.2); boomGroup.add(spreaderFrame)
+    // Main crossbar
+    const spFrame = new THREE.Mesh(new THREE.BoxGeometry(7.4, 0.58, 0.62), darkMat)
+    spFrame.position.set(0, -0.55, 9.2); boomGroup.add(spFrame)
+    // Hazard stripes across crossbar
+    for (let i = 0; i < 9; i++) {
+      const st = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.60, 0.64), i % 2 === 0 ? yellowMat : hazBlkMat)
+      st.position.set(-3.42 + i * 0.76 + 0.38, -0.55, 9.2); boomGroup.add(st)
+    }
+    // Top cover plate
+    const spTop = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.10, 0.58), orangeDkMat)
+    spTop.position.set(0, -0.27, 9.2); boomGroup.add(spTop)
 
-    const spreaderTop = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.06, 0.45), orangeDarkMat)
-    spreaderTop.position.set(0, -0.37, 9.2); boomGroup.add(spreaderTop)
-
-    for (const sx of [-3.2, 3.2]) {
-      // Twist-lock posts
-      const tw = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, 0.35), redMat)
-      tw.position.set(sx, -0.55, 9.2); boomGroup.add(tw)
-      // Guide rail corners (front + rear)
-      for (const gz of [9.0, 9.4]) {
-        const gr = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.7, 0.08), yellowMat)
-        gr.position.set(sx > 0 ? sx + 0.15 : sx - 0.15, -0.55, gz); boomGroup.add(gr)
+    // Side end-arms + twist-locks
+    for (const sx of [-3.7, 3.7]) {
+      const sign = sx > 0 ? 1 : -1
+      // End-arm box
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.55, 0.62), darkMat)
+      arm.position.set(sx, -0.55, 9.2); boomGroup.add(arm)
+      // Twist-lock post
+      const tw = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.82, 0.24), darkMat)
+      tw.position.set(sx, -1.0, 9.2); boomGroup.add(tw)
+      // Twist-lock tip (yellow)
+      const twTip = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.12, 0.30), yellowMat)
+      twTip.position.set(sx, -1.44, 9.2); boomGroup.add(twTip)
+      // Guide cones (front and rear)
+      for (const gz of [8.94, 9.46]) {
+        const gc = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.09, 0.28, 6), orangeDkMat)
+        gc.position.set(sx, -0.92, gz); boomGroup.add(gc)
       }
     }
 
-    // Center mechanism block
-    const centerBlock = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.6), darkMat)
-    centerBlock.position.set(0, -0.75, 9.2); boomGroup.add(centerBlock)
-
-    boomGroup.scale.z = 0.5   // halve arm length
+    boomGroup.scale.z = 0.5   // halve arm length (spreader stays at z=4.6 from pivot)
     boomGroup.rotation.x = -0.15
     group.add(boomGroup)
-
-    // -------------------------------------------------------------------------
-    // 9. WHEELS — rear double axle + front steer (with fenders)
-    // -------------------------------------------------------------------------
-    const wheelGeo = new THREE.CylinderGeometry(0.62, 0.62, 0.48, 16)
-    const rimGeo   = new THREE.CylinderGeometry(0.30, 0.30, 0.50, 8)
-    const hubGeo   = new THREE.CylinderGeometry(0.12, 0.12, 0.52, 6)
-
-    for (const [sx, sz] of [[-1.72, -1.8], [-1.72, -2.7], [1.72, -1.8], [1.72, -2.7]] as [number, number][]) {
-      const w = new THREE.Mesh(wheelGeo, rubberMat); w.rotation.z = Math.PI / 2
-      w.position.set(sx, 0.62, sz); w.castShadow = true; group.add(w)
-      const r = new THREE.Mesh(rimGeo, rimMat); r.rotation.z = Math.PI / 2
-      r.position.set(sx, 0.62, sz); group.add(r)
-      const h = new THREE.Mesh(hubGeo, blackMat); h.rotation.z = Math.PI / 2
-      h.position.set(sx, 0.62, sz); group.add(h)
-    }
-
-    // Rear axle bar
-    const rearAxle = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 3.2, 6), darkMat)
-    rearAxle.rotation.z = Math.PI / 2; rearAxle.position.set(0, 0.62, -2.25); group.add(rearAxle)
-
-    // Rear fenders
-    for (const sx of [-1, 1]) {
-      const fender = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.8, 2.2), orangeMat)
-      fender.position.set(sx * 1.82, 1.3, -2.25); group.add(fender)
-      const fenderTop = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.10, 2.2), orangeMat)
-      fenderTop.position.set(sx * 1.62, 1.7, -2.25); group.add(fenderTop)
-    }
-
-    // Front steering wheels
-    for (const sx of [-1.65, 1.65]) {
-      const fw = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.44, 16), rubberMat)
-      fw.rotation.z = Math.PI / 2; fw.position.set(sx, 0.58, 1.8); fw.castShadow = true; group.add(fw)
-      const fr = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.46, 8), rimMat)
-      fr.rotation.z = Math.PI / 2; fr.position.set(sx, 0.58, 1.8); group.add(fr)
-      const fh = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.48, 6), blackMat)
-      fh.rotation.z = Math.PI / 2; fh.position.set(sx, 0.58, 1.8); group.add(fh)
-      // Front fender
-      const ff = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.6, 0.8), orangeMat)
-      ff.position.set(sx * (Math.abs(sx) / sx) * 1.75, 1.1, 1.8); group.add(ff)
-    }
-
-    // Front axle bar
-    const frontAxle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.0, 6), darkMat)
-    frontAxle.rotation.z = Math.PI / 2; frontAxle.position.set(0, 0.58, 1.8); group.add(frontAxle)
-
-    // -------------------------------------------------------------------------
-    // 10. SURFACE DETAILS — headlights, ladder
-    // -------------------------------------------------------------------------
-    // Headlights (front of body)
-    for (const hx of [-1.2, 1.2]) {
-      const hl = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.18, 0.06), headLightMat)
-      hl.position.set(hx, 2.0, 2.52); group.add(hl)
-    }
-
-    // Access ladder (left side of cab)
-    for (const lx of [0, 1]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.8, 0.04), stepMat)
-      rail.position.set(-1.55, 2.2, 1.7 - lx * 0.25); group.add(rail)
-    }
-    for (let i = 0; i < 4; i++) {
-      const rung = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.25), stepMat)
-      rung.position.set(-1.55, 1.5 + i * 0.3, 1.575); group.add(rung)
-    }
 
     return { group, parts: { boomGroup } }
   }
@@ -646,7 +637,8 @@ export class EquipmentRenderer {
               this.carriedMeshes.set(eq.id, cGroup)
             }
             // Position container in RS-group local space so it hangs below the spreader.
-            // Spreader end is at boomGroup-local (0, -0.55, 9.2); scale.z=0.5 → z_scaled=4.6.
+            // boomGroup pivot: (0, 3.50, 0.90).  Spreader at boomGroup-local z=9.2;
+            // scale.z=0.5 → visual z_scaled=4.6 from pivot.
             // Container centre is twistLockHeight (0.9m) + CONTAINER_HEIGHT/2 below spreader frame.
             // Shift ¾ container width back toward RS body for a natural carry position.
             const θ = p.boomGroup.rotation.x
@@ -654,9 +646,9 @@ export class EquipmentRenderer {
             const cZ_scaled = 9.2 * 0.5                            // = 4.6
             const zShift = CONTAINER_WIDTH * 0.75                  // ≈ 1.83m toward RS
             cGroup.position.set(
-              0.9,
-              3.3 + cY_boom * Math.cos(θ) - cZ_scaled * Math.sin(θ),
-              2.2 + cY_boom * Math.sin(θ) + cZ_scaled * Math.cos(θ) - zShift,
+              0,      // boomGroup.position.x
+              3.50 + cY_boom * Math.cos(θ) - cZ_scaled * Math.sin(θ),
+              0.90 + cY_boom * Math.sin(θ) + cZ_scaled * Math.cos(θ) - zShift,
             )
           }
         } else if (existingCarried) {
