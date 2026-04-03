@@ -5,6 +5,7 @@ import { useSimRegistry } from '@/composables/useSimRegistry'
 import { watchSimHead } from '@/composables/useSiteHead'
 import { useRouter } from 'vue-router'
 import AudioControls from '@/components/AudioControls.vue'
+import { useGameStore as useStowageMasterStore } from '@/sims/stowage-master/store/gameStore'
 
 const props = defineProps<{
   simId: string
@@ -13,6 +14,7 @@ const props = defineProps<{
 const store = useSimsStore()
 const router = useRouter()
 const { registerAll } = useSimRegistry()
+const stowageStore = useStowageMasterStore()
 
 if (store.sims.length === 0) {
   registerAll()
@@ -24,6 +26,12 @@ const asyncComponent = computed(() => {
   if (!sim.value || sim.value.status !== 'playable') return null
   return defineAsyncComponent(sim.value.component)
 })
+
+const showGodBadge = computed(() =>
+  props.simId === 'stowage-master' &&
+  stowageStore.phase === 'start' &&
+  stowageStore.isGodMode
+)
 
 function goHome() {
   router.push({ name: 'home' })
@@ -64,7 +72,19 @@ onUnmounted(() => {
       </h1>
     </header>
 
-    <AudioControls v-if="simId !== 'box-empire'" />
+    <div
+      v-if="simId !== 'box-empire'"
+      class="top-right-controls"
+    >
+      <div
+        v-if="showGodBadge"
+        class="god-badge"
+        title="God mode enabled"
+      >
+        ⚡
+      </div>
+      <AudioControls placement="inline" />
+    </div>
 
     <main class="sim-content">
       <template v-if="sim && sim.status === 'playable' && asyncComponent">
@@ -128,6 +148,35 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   position: relative;
+}
+
+.top-right-controls {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.god-badge {
+  min-width: 2.4rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.5rem;
+  border: 1px solid rgba(255, 204, 0, 0.7);
+  border-radius: 4px;
+  color: #ffcc00;
+  background: rgba(255, 204, 0, 0.18);
+  box-shadow: 0 0 12px rgba(255, 204, 0, 0.18);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
 }
 
 .sim-header {

@@ -11,6 +11,12 @@ import { SCORING } from '../modules/config'
 
 let eventIdCounter = 0
 const STORAGE_KEY = 'stowage-master-level-bests'
+const PROGRESS_STORAGE_KEY = 'stowage-master-progress'
+
+interface StoredProgress {
+  completedLevelIds: number[]
+  godMode: boolean
+}
 
 export const useGameStore = defineStore('stowage-master-game', () => {
   const phase = ref<GamePhase>('start')
@@ -34,6 +40,8 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const timerRemaining = ref(0) // seconds remaining
   const elapsedSeconds = ref(0)
   const levelBests = ref<Record<number, LevelBestRecord>>(loadLevelBests())
+  const completedLevelIds = ref<number[]>(loadProgress().completedLevelIds)
+  const isGodMode = ref(loadProgress().godMode)
 
   // Scene loading state — shown while 3D assets are downloading
   const isLoading = ref(false)
@@ -93,6 +101,54 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   })
 
   const levelConfig = computed(() => getLevelConfig(currentLevel.value))
+  const highestCompletedLevel = computed(() => {
+    if (completedLevelIds.value.length === 0) return -1
+    return Math.max(...completedLevelIds.value)
+  })
+
+  function loadProgress(): StoredProgress {
+    if (typeof localStorage === 'undefined') return { completedLevelIds: [], godMode: false }
+    try {
+      const raw = localStorage.getItem(PROGRESS_STORAGE_KEY)
+      if (!raw) return { completedLevelIds: [], godMode: false }
+      const parsed = JSON.parse(raw) as Partial<StoredProgress>
+      return {
+        completedLevelIds: Array.isArray(parsed.completedLevelIds)
+          ? parsed.completedLevelIds.filter((id): id is number => typeof id === 'number')
+          : [],
+        godMode: parsed.godMode === true,
+      }
+    } catch {
+      return { completedLevelIds: [], godMode: false }
+    }
+  }
+
+  function persistProgress(): void {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify({
+      completedLevelIds: completedLevelIds.value,
+      godMode: isGodMode.value,
+    }))
+  }
+
+  function isLevelUnlocked(levelId: number): boolean {
+    if (isGodMode.value) return true
+    if (levelId <= 0) return true
+    const previousLevelId = levelId - 1
+    return completedLevelIds.value.includes(previousLevelId) || !!levelBests.value[previousLevelId]
+  }
+
+  function markLevelCompleted(levelId: number): void {
+    if (completedLevelIds.value.includes(levelId)) return
+    completedLevelIds.value = [...completedLevelIds.value, levelId].sort((a, b) => a - b)
+    persistProgress()
+  }
+
+  function toggleGodMode(): boolean {
+    isGodMode.value = !isGodMode.value
+    persistProgress()
+    return isGodMode.value
+  }
 
   function loadLevelBests(): Record<number, LevelBestRecord> {
     if (typeof localStorage === 'undefined') return {}
@@ -146,6 +202,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   }
 
   function startLevel(level: number): void {
+    if (!isLevelUnlocked(level)) return
     currentLevel.value = level
     const config = getLevelConfig(level)
     shipConfig.value = config.preset
@@ -402,6 +459,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
       if (levelConfig.value.completionMode === 'discharge-only') {
         phase.value = 'complete'
         recordLevelBest()
+        markLevelCompleted(currentLevel.value)
         addEvent('Discharge complete! Vessel cleared and ready to sail.', 'success')
         return { levelPhaseEnd: true, discharge }
       }
@@ -469,6 +527,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
       if (score.value >= targetScore.value) {
         phase.value = 'complete'
         recordLevelBest()
+        markLevelCompleted(currentLevel.value)
         addEvent('Level complete!', 'success')
       } else {
         phase.value = 'failed'
@@ -517,6 +576,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     shipTrim, shipVCG, events, disasterType, lastPlacement,
     perfectScore, targetScore, totalSlots,
     timerTotal, timerRemaining, elapsedSeconds, levelBests,
+    completedLevelIds, isGodMode, highestCompletedLevel,
     isLoading, loadingMessage,
     dischargeCount, dischargedCount, dischargeScore, lastDischarge,
     currentContainer, queueContainers, nextThreeContainers,
@@ -526,6 +586,6 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     placeRestowContainer, finalizeRestow, cancelRestowSelection,
     restowContainer, restowFromSlotId, availableRestowSlots,
     hasTransitContainers, confirmBriefing,
-    addEvent, setPhase, getStarRatingResult, getLevelBest, tickTimer,
+    addEvent, setPhase, getStarRatingResult, getLevelBest, isLevelUnlocked, toggleGodMode, tickTimer,
   }
 })

@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue'
 import { useGameStore } from '../../store/gameStore'
 import { LEVELS, getTotalSlots } from '../../modules/levels'
 import type { LevelBestRecord, LevelConfig } from '../../types'
 
 const store = useGameStore()
+let godBuffer = ''
 
 function startLevel(level: number) {
+  if (!store.isLevelUnlocked(level)) return
   store.startLevel(level)
 }
 
@@ -42,6 +45,35 @@ function formatBestTime(seconds: number | null): string {
   return mins > 0 ? `${mins}m ${secs.toString().padStart(2, '0')}s` : `${secs}s`
 }
 
+function isLocked(levelId: number): boolean {
+  return !store.isLevelUnlocked(levelId)
+}
+
+function handleKeydown(event: KeyboardEvent): void {
+  if (store.phase !== 'start') return
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+
+  const key = event.key.toLowerCase()
+  if (!/^[a-z]$/.test(key)) {
+    godBuffer = ''
+    return
+  }
+
+  godBuffer = (godBuffer + key).slice(-3)
+  if (godBuffer === 'god') {
+    store.toggleGodMode()
+    godBuffer = ''
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
+
 const vesselGroups = [
   {
     label: 'Tiny Vessel',
@@ -68,6 +100,12 @@ const vesselGroups = [
       <p class="subtitle">
         Container Ship Loading Puzzle
       </p>
+      <p
+        v-if="store.isGodMode"
+        class="god-mode-note"
+      >
+        God mode enabled
+      </p>
 
       <div class="vessel-columns">
         <div
@@ -84,6 +122,8 @@ const vesselGroups = [
             v-for="level in group.levels"
             :key="level.id"
             class="level-btn"
+            :class="{ 'level-btn--locked': isLocked(level.id) }"
+            :aria-disabled="isLocked(level.id)"
             @click="startLevel(level.id)"
           >
             <div
@@ -94,6 +134,18 @@ const vesselGroups = [
               <span class="best-score">${{ getBest(level.id)?.bestScore.toLocaleString() }}</span>
               <span class="best-sep">•</span>
               <span class="best-time">{{ formatBestTime(getBest(level.id)?.bestTimeSeconds ?? null) }}</span>
+            </div>
+            <div
+              v-if="isLocked(level.id)"
+              class="level-lock"
+            >
+              Locked
+            </div>
+            <div
+              v-if="isLocked(level.id)"
+              class="level-tooltip"
+            >
+              You must complete the previous level first.
             </div>
             <div class="level-name">
               {{ level.name }}
@@ -175,7 +227,15 @@ const vesselGroups = [
 .subtitle {
   font-size: 16px;
   color: #888;
-  margin-bottom: 36px;
+  margin-bottom: 10px;
+}
+
+.god-mode-note {
+  font-size: 12px;
+  color: #ffcc00;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 22px;
 }
 
 .vessel-columns {
@@ -232,6 +292,17 @@ const vesselGroups = [
   transform: translateX(3px);
 }
 
+.level-btn--locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.level-btn--locked:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: none;
+}
+
 .level-name {
   font-size: 14px;
   font-weight: bold;
@@ -269,6 +340,39 @@ const vesselGroups = [
   gap: 7px;
   font-size: 10px;
   color: #8f96a3;
+}
+
+.level-lock {
+  position: absolute;
+  top: 13px;
+  right: 15px;
+  font-size: 10px;
+  color: #b9c1ce;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.level-tooltip {
+  position: absolute;
+  top: -34px;
+  right: 0;
+  max-width: 230px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: rgba(12, 16, 24, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #d6dde7;
+  font-size: 10px;
+  line-height: 1.3;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.level-btn--locked:hover .level-tooltip {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .meta-item {
