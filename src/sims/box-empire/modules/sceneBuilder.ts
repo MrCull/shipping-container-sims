@@ -163,21 +163,12 @@ function buildGround(scene: THREE.Scene): void {
   const width = TERMINAL_BOUNDS.maxX - TERMINAL_BOUNDS.minX
   const depth = TERMINAL_BOUNDS.maxZ - 0
   const geo = new THREE.PlaneGeometry(width, depth)
-  const mat = new THREE.MeshPhongMaterial({ color: 0x787870, specular: 0x111111, shininess: 6 })
+  const mat = new THREE.MeshPhongMaterial({ color: 0x69665d, specular: 0x0b0b0b, shininess: 4 })
   const mesh = new THREE.Mesh(geo, mat)
   mesh.rotation.x = -Math.PI / 2
   mesh.position.set(0, -0.01, depth / 2)
   mesh.receiveShadow = true
   scene.add(mesh)
-
-  // Road lane lines
-  const lineMat = new THREE.MeshPhongMaterial({ color: 0xd0c060, transparent: true, opacity: 0.5 })
-  for (let x = TERMINAL_BOUNDS.minX + 8; x < TERMINAL_BOUNDS.maxX; x += 16) {
-    const roadLine = new THREE.Mesh(new THREE.PlaneGeometry(0.25, depth), lineMat)
-    roadLine.rotation.x = -Math.PI / 2
-    roadLine.position.set(x, 0.01, depth / 2)
-    scene.add(roadLine)
-  }
 }
 
 function buildYardMarkings(scene: THREE.Scene): void {
@@ -186,11 +177,11 @@ function buildYardMarkings(scene: THREE.Scene): void {
   const totalBayWidth = TUTORIAL_YARD.bays * bayWidth
   const totalRowWidth = TUTORIAL_YARD.rows * rowWidth
 
-  // Yellow outline
+  // Faded boundary outline
   const outlineGeo = new THREE.EdgesGeometry(
     new THREE.BoxGeometry(totalBayWidth + 1.2, 0.02, totalRowWidth + 1.2),
   )
-  const outline = new THREE.LineSegments(outlineGeo, new THREE.LineBasicMaterial({ color: 0xffee00 }))
+  const outline = new THREE.LineSegments(outlineGeo, new THREE.LineBasicMaterial({ color: 0xa18f49, transparent: true, opacity: 0.55 }))
   outline.position.set(
     YARD_BLOCK_POSITION.x + totalBayWidth / 2 - bayWidth / 2,
     0.03,
@@ -199,7 +190,7 @@ function buildYardMarkings(scene: THREE.Scene): void {
   scene.add(outline)
 
   // Slot footprints
-  const slotMat = new THREE.MeshPhongMaterial({ color: 0x454540, shininess: 5 })
+  const slotMat = new THREE.MeshPhongMaterial({ color: 0x48453f, transparent: true, opacity: 0.92, shininess: 3 })
   for (let bay = 0; bay < TUTORIAL_YARD.bays; bay++) {
     const slotMesh = new THREE.Mesh(new THREE.PlaneGeometry(CONTAINER_LENGTH, CONTAINER_WIDTH), slotMat)
     slotMesh.rotation.x = -Math.PI / 2
@@ -209,7 +200,7 @@ function buildYardMarkings(scene: THREE.Scene): void {
   }
 
   // Yard block label strip
-  const stripMat = new THREE.MeshPhongMaterial({ color: 0xffaa00, transparent: true, opacity: 0.5 })
+  const stripMat = new THREE.MeshPhongMaterial({ color: 0x8a6730, transparent: true, opacity: 0.34 })
   const strip = new THREE.Mesh(new THREE.PlaneGeometry(totalBayWidth + 1, 0.8), stripMat)
   strip.rotation.x = -Math.PI / 2
   strip.position.set(YARD_BLOCK_POSITION.x + totalBayWidth / 2 - bayWidth / 2, 0.02, YARD_BLOCK_POSITION.z - rowWidth / 2 - 0.7)
