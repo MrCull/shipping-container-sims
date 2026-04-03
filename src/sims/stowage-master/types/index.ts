@@ -43,6 +43,11 @@ export interface ShipPreset {
   height: number
   emptyWeight: number
   emptyVCG: number
+  /**
+   * Longitudinal centre of gravity offset for the ship's own lightship mass.
+   * Positive = bow-heavy, negative = stern-heavy.
+   */
+  emptyLongitudinalOffset?: number
   maxStackWeight: number
   /** Fraction of ship length used as cargo deck area */
   cargoLengthFraction: number

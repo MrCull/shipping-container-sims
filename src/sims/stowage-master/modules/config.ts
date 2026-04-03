@@ -11,6 +11,9 @@ export const SHIP_PRESETS: Record<string, ShipPreset> = {
     height: 4,
     emptyWeight: 800,
     emptyVCG: 4.0,
+    // The engine room and accommodation block sit well aft on this feeder,
+    // so the lightship has a meaningful stern-down trim even before cargo.
+    emptyLongitudinalOffset: -0.8,
     maxStackWeight: 120,
     // 3 bays: cellX = 18.8/3 = 6.27m > container length 5.9m — no bay overlap.
     // cargoXOffsetFraction=0.095 centres the 3-bay grid between fwd mast and aft
