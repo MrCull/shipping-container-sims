@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useGameStore } from '../store/gameStore'
-import { PORTS } from '../modules/config'
 
 const store = useGameStore()
 </script>
@@ -11,10 +10,10 @@ const store = useGameStore()
     class="port-legend panel"
   >
     <div class="panel-title">
-      Ports of Discharge
+      Service Sequence
     </div>
     <div
-      v-for="port in PORTS"
+      v-for="port in store.currentPorts"
       :key="port.name"
       class="legend-item"
     >

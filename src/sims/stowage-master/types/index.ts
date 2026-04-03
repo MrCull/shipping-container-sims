@@ -6,6 +6,13 @@ export type LevelCompletionMode = 'standard' | 'discharge-only'
 export type ImportPlacementMode = 'default' | 'upper-tiers'
 export type TransitGroupingMode = 'random' | 'grouped-by-pod'
 
+export interface PortDefinition {
+  name: string
+  color: number
+  hex: string
+  order: number
+}
+
 export interface Container {
   id: string
   weight: number

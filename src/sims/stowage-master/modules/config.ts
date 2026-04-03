@@ -1,4 +1,4 @@
-import type { ShipPreset } from '../types'
+import type { PortDefinition, ShipPreset } from '../types'
 
 export const SHIP_PRESETS: Record<string, ShipPreset> = {
   small: {
@@ -154,13 +154,40 @@ export const CONTAINER = {
   gap: 0.18,
 } as const
 
-export const PORTS = [
-  { name: 'Rotterdam', color: 0x2196f3, hex: '#2196f3', order: 0 },
-  { name: 'Singapore', color: 0x4caf50, hex: '#4caf50', order: 1 },
-  { name: 'Shanghai', color: 0xf44336, hex: '#f44336', order: 2 },
-  { name: 'Hamburg', color: 0xff9800, hex: '#ff9800', order: 3 },
-  { name: 'Busan', color: 0x9c27b0, hex: '#9c27b0', order: 4 },
-] as const
+export const PORT_SEQUENCES: Record<string, PortDefinition[]> = {
+  small: [
+    { name: 'Felixstowe', color: 0x2196f3, hex: '#2196f3', order: 0 },
+    { name: 'Rotterdam', color: 0x4caf50, hex: '#4caf50', order: 1 },
+    { name: 'Antwerp', color: 0xf44336, hex: '#f44336', order: 2 },
+    { name: 'Hamburg', color: 0xff9800, hex: '#ff9800', order: 3 },
+    { name: 'Bremerhaven', color: 0x9c27b0, hex: '#9c27b0', order: 4 },
+  ],
+  medium: [
+    { name: 'Algeciras', color: 0x2196f3, hex: '#2196f3', order: 0 },
+    { name: 'Valencia', color: 0x4caf50, hex: '#4caf50', order: 1 },
+    { name: 'Gioia Tauro', color: 0xf44336, hex: '#f44336', order: 2 },
+    { name: 'Piraeus', color: 0xff9800, hex: '#ff9800', order: 3 },
+    { name: 'Ambarli', color: 0x9c27b0, hex: '#9c27b0', order: 4 },
+  ],
+  'medium-carrier': [
+    { name: 'Jebel Ali', color: 0x2196f3, hex: '#2196f3', order: 0 },
+    { name: 'Nhava Sheva', color: 0x4caf50, hex: '#4caf50', order: 1 },
+    { name: 'Colombo', color: 0xf44336, hex: '#f44336', order: 2 },
+    { name: 'Port Klang', color: 0xff9800, hex: '#ff9800', order: 3 },
+    { name: 'Singapore', color: 0x9c27b0, hex: '#9c27b0', order: 4 },
+  ],
+  large: [
+    { name: 'Shanghai', color: 0x2196f3, hex: '#2196f3', order: 0 },
+    { name: 'Ningbo', color: 0x4caf50, hex: '#4caf50', order: 1 },
+    { name: 'Yantian', color: 0xf44336, hex: '#f44336', order: 2 },
+    { name: 'Singapore', color: 0xff9800, hex: '#ff9800', order: 3 },
+    { name: 'Tanjung Pelepas', color: 0x9c27b0, hex: '#9c27b0', order: 4 },
+  ],
+}
+
+export function getPortsForPreset(presetName: string): PortDefinition[] {
+  return PORT_SEQUENCES[presetName] ?? PORT_SEQUENCES['medium-carrier']
+}
 
 export const CRANE = {
   animationSpeed: 1.0,

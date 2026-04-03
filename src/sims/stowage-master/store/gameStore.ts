@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { GamePhase, DisasterType, Container, Slot, ShipPreset, GameEvent, PlacementResult, StarRatingResult, LevelBestRecord } from '../types'
+import type { GamePhase, DisasterType, Container, Slot, ShipPreset, GameEvent, PlacementResult, StarRatingResult, LevelBestRecord, PortDefinition } from '../types'
 import { generateContainerList, resetSerialCounter } from '../modules/containerFactory'
 import { generateSlots, getAvailableSlots } from '../modules/shipGrid'
 import { updatePhysics, checkDisasters } from '../modules/physics'
 import { calculatePlacementScore, calculateDischargeScore, calculateRestowScore, getStarRating, checkPerfectBalance } from '../modules/scoring'
 import { getLevelConfig, getTotalSlots } from '../modules/levels'
 import { generateDischargeManifest, getDischargeableSlots, getRestowSlots } from '../modules/dischargeManifest'
-import { SCORING } from '../modules/config'
+import { getPortsForPreset, SCORING } from '../modules/config'
 
 let eventIdCounter = 0
 const STORAGE_KEY = 'stowage-master-level-bests'
@@ -30,6 +30,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const shipList = ref(0)
   const shipTrim = ref(0)
   const shipVCG = ref(0)
+  const currentPorts = ref<PortDefinition[]>([])
   const events = ref<GameEvent[]>([])
   const disasterType = ref<DisasterType | null>(null)
   const lastPlacement = ref<PlacementResult | null>(null)
@@ -206,6 +207,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     currentLevel.value = level
     const config = getLevelConfig(level)
     shipConfig.value = config.preset
+    currentPorts.value = getPortsForPreset(config.preset.name)
     totalSlots.value = getTotalSlots(config.preset)
     const outboundContainerCount = config.containerCount ?? 0
     const scoreContainerCount = config.scoreContainerCount ?? config.containerCount ?? totalSlots.value
@@ -214,7 +216,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     grid.value = JSON.parse(JSON.stringify(slots)) as Record<string, Slot>
 
     resetSerialCounter()
-    containers.value = generateContainerList(outboundContainerCount, config.hazmatRate)
+    containers.value = generateContainerList(outboundContainerCount, config.hazmatRate, config.preset.name)
     recalculateScoreTargets(scoreContainerCount)
     currentContainerIndex.value = 0
 
@@ -255,6 +257,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
         config.placementSpread ?? 0,
         config.importPlacement ?? 'default',
         config.transitGrouping ?? 'random',
+        currentPorts.value,
       )
       recalculateScoreTargets(scoreContainerCount)
       dischargeCount.value = config.dischargeContainerCount
@@ -572,7 +575,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
   return {
     phase, currentLevel, score, moveCount, containers,
-    currentContainerIndex, grid, shipConfig, shipList,
+    currentContainerIndex, grid, shipConfig, shipList, currentPorts,
     shipTrim, shipVCG, events, disasterType, lastPlacement,
     perfectScore, targetScore, totalSlots,
     timerTotal, timerRemaining, elapsedSeconds, levelBests,

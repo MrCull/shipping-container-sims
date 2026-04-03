@@ -1,5 +1,5 @@
-import type { Container, WeightCategory } from '../types'
-import { CONTAINER, PORTS } from './config'
+import type { Container, PortDefinition, WeightCategory } from '../types'
+import { CONTAINER, getPortsForPreset } from './config'
 
 const OWNER_CODES = ['MAEU', 'MSCU', 'CMAU', 'HLCU', 'EGLV', 'OOLU', 'COSU', 'YMLU']
 let serialCounter = 0
@@ -40,9 +40,9 @@ export function getWeightCategory(weight: number): WeightCategory {
   return 'heavy'
 }
 
-export function createContainer(index: number, _totalContainers: number, hazmatRate: number): Container {
+export function createContainer(index: number, _totalContainers: number, hazmatRate: number, ports: PortDefinition[]): Container {
   const weight = Math.round(generateWeight() * 10) / 10
-  const port = PORTS[index % PORTS.length]
+  const port = ports[index % ports.length]
   const isHazmat = Math.random() < hazmatRate
 
   return {
@@ -58,10 +58,15 @@ export function createContainer(index: number, _totalContainers: number, hazmatR
   }
 }
 
-export function generateContainerList(count: number, hazmatRate: number = CONTAINER.hazmatRate): Container[] {
+export function generateContainerList(
+  count: number,
+  hazmatRate: number = CONTAINER.hazmatRate,
+  presetName: string = 'small'
+): Container[] {
   const containers: Container[] = []
+  const ports = getPortsForPreset(presetName)
   for (let i = 0; i < count; i++) {
-    containers.push(createContainer(i, count, hazmatRate))
+    containers.push(createContainer(i, count, hazmatRate, ports))
   }
   return containers
 }
