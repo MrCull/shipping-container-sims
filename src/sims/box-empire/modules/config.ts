@@ -91,7 +91,8 @@ export const TUTORIAL_YARD = {
 
 export const GATE_OUT_REVENUE = 100
 export const VESSEL_LOAD_REVENUE = 150
-export const REACH_STACKER_MOVE_COST = 20
+export const REACH_STACKER_MOVE_COST = 10
+export const QUAY_CRANE_IMPORT_UNLOAD_COST = 20
 
 // ---- Tutorial scenario ----------------------------------------------------
 

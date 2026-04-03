@@ -32,6 +32,7 @@ import {
   GATE_OUT_REVENUE,
   VESSEL_LOAD_REVENUE,
   REACH_STACKER_MOVE_COST,
+  QUAY_CRANE_IMPORT_UNLOAD_COST,
   DEFAULT_TIME_SCALE,
   MAX_TIME_SCALE,
   TUTORIAL_EXPORT_COUNT,
@@ -434,6 +435,20 @@ export const useGameStore = defineStore('box-empire-game', () => {
     })
   }
 
+  function applyQuayCraneImportUnloadCost(job: Job, eq: Equipment): void {
+    if (eq.type !== 'mobile_harbor_crane') return
+    if (job.pickupLocation.type !== 'vessel_slot') return
+    if (job.dropoffLocation.type !== 'quay_buffer') return
+
+    const tx = createTransaction('quay_crane_import_unload_cost', job.containerId, simTime.value)
+    transactions.value.push(tx)
+    money.value += tx.amount
+    emitEvent('money.spent', `-$${QUAY_CRANE_IMPORT_UNLOAD_COST} — quay crane import unload cost`, {
+      amount: QUAY_CRANE_IMPORT_UNLOAD_COST,
+      position: { ...job.dropoffLocation.position },
+    })
+  }
+
   function setReachStackerServiceSide(
     equipmentId: string,
     side: Exclude<ReachStackerServiceSide, 'internal'>,
@@ -684,6 +699,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
         if (job && eResult.droppedContainerId) {
           applyReachStackerMoveCost(job, eq)
+          applyQuayCraneImportUnloadCost(job, eq)
           const container = containers.value.find(c => c.id === eResult.droppedContainerId)
           if (container) {
             handleJobCompletion(job, container)

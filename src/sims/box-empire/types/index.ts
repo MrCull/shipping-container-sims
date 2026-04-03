@@ -247,6 +247,7 @@ export type TransactionType =
   | 'gate_out_revenue'
   | 'vessel_load_revenue'
   | 'reach_stacker_move_cost'
+  | 'quay_crane_import_unload_cost'
 
 export interface Transaction {
   id: string

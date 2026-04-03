@@ -126,9 +126,10 @@ Containers use individual `THREE.Mesh` with per-container `createContainerMateri
 
 - Import gate-out: **$100** per container
 - Export vessel load: **$150** per container
-- Reach stacker move cost: **$20** per completed non-revenue move (truck ↔ yard, yard ↔ quay, yard ↔ yard shuffle)
+- Reach stacker move cost: **$10** per completed non-revenue move (truck ↔ yard, yard ↔ quay, yard ↔ yard shuffle)
+- Quay crane import unload cost: **$20** per completed vessel → quay import discharge move
 - Tutorial total: **$1,250** (5 × $100 + 5 × $150)
-- Transactions stored in `Transaction[]` with type `'gate_out_revenue' | 'vessel_load_revenue' | 'reach_stacker_move_cost'`
+- Transactions stored in `Transaction[]` with type `'gate_out_revenue' | 'vessel_load_revenue' | 'reach_stacker_move_cost' | 'quay_crane_import_unload_cost'`
 
 ## Gatehouse State
 
