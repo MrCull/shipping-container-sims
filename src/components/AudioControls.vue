@@ -2,7 +2,7 @@
 import { useAudioStore } from '@/stores/audio'
 
 interface Props {
-  placement?: 'absolute' | 'inline'  // 'absolute' for sim page, 'inline' for top bar
+  placement?: 'absolute' | 'inline'
 }
 
 withDefaults(defineProps<Props>(), {
@@ -13,22 +13,17 @@ const audioStore = useAudioStore()
 </script>
 
 <template>
-  <div class="audio-controls" :class="{ absolute: placement === 'absolute' }">
+  <div
+    class="audio-controls"
+    :class="{ absolute: placement === 'absolute' }"
+  >
     <button
       class="audio-btn"
-      :class="{ muted: audioStore.musicMuted }"
-      :title="audioStore.musicMuted ? 'Unmute music' : 'Mute music'"
-      @click="audioStore.toggleMusic()"
+      :class="{ muted: audioStore.soundMuted }"
+      :title="audioStore.soundMuted ? 'Turn sound on' : 'Turn sound off'"
+      @click="audioStore.toggleSound()"
     >
-      {{ audioStore.musicMuted ? '🔇' : '♫' }}
-    </button>
-    <button
-      class="audio-btn"
-      :class="{ muted: audioStore.sfxMuted }"
-      :title="audioStore.sfxMuted ? 'Unmute sound effects' : 'Mute sound effects'"
-      @click="audioStore.toggleSfx()"
-    >
-      {{ audioStore.sfxMuted ? '🔉' : '🔊' }}
+      {{ audioStore.soundMuted ? '🔇' : '🔊' }}
     </button>
   </div>
 </template>

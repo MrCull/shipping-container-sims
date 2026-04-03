@@ -1,29 +1,55 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
+import { loadSiteStorage, updateSiteStorage } from '@/utils/localStorage'
 
 export const useAudioStore = defineStore('audio', () => {
-  const musicMuted = ref(false)      // canonical — shared across menu + all games
-  const sfxMuted = ref(false)        // new — mutes all sound effects
+  const persistedStorage = loadSiteStorage()
+  const soundMuted = ref(persistedStorage.global.soundMuted)
 
-  function toggleMusic(): void {
-    musicMuted.value = !musicMuted.value
+  function persistSoundMuted(): void {
+    updateSiteStorage(storage => ({
+      ...storage,
+      global: {
+        ...storage.global,
+        soundMuted: soundMuted.value,
+      },
+    }))
   }
 
-  function toggleSfx(): void {
-    sfxMuted.value = !sfxMuted.value
+  function setSoundMuted(value: boolean): void {
+    soundMuted.value = value
+    persistSoundMuted()
   }
 
-  // Legacy aliases for backwards compatibility — all point to musicMuted/toggleMusic
-  const menuMusicMuted = computed(() => musicMuted.value)
-  const gameMusicMuted = computed(() => musicMuted.value)
-  const backgroundMusicMuted = computed(() => musicMuted.value)
-  const toggleMenuMusic = toggleMusic
-  const toggleGameMusic = toggleMusic
-  const toggleBackgroundMusic = toggleMusic
+  function toggleSound(): void {
+    setSoundMuted(!soundMuted.value)
+  }
+
+  // Compatibility aliases keep existing sim audio logic working while using one global mute flag.
+  const musicMuted = computed(() => soundMuted.value)
+  const sfxMuted = computed(() => soundMuted.value)
+  const menuMusicMuted = computed(() => soundMuted.value)
+  const gameMusicMuted = computed(() => soundMuted.value)
+  const backgroundMusicMuted = computed(() => soundMuted.value)
+  const toggleMusic = toggleSound
+  const toggleSfx = toggleSound
+  const toggleMenuMusic = toggleSound
+  const toggleGameMusic = toggleSound
+  const toggleBackgroundMusic = toggleSound
 
   return {
-    musicMuted, sfxMuted, toggleMusic, toggleSfx,
-    menuMusicMuted, gameMusicMuted, backgroundMusicMuted,
-    toggleMenuMusic, toggleGameMusic, toggleBackgroundMusic,
+    soundMuted,
+    setSoundMuted,
+    toggleSound,
+    musicMuted,
+    sfxMuted,
+    toggleMusic,
+    toggleSfx,
+    menuMusicMuted,
+    gameMusicMuted,
+    backgroundMusicMuted,
+    toggleMenuMusic,
+    toggleGameMusic,
+    toggleBackgroundMusic,
   }
 })
