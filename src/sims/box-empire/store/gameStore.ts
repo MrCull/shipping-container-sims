@@ -686,6 +686,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
           const pickedContainer = containers.value.find(c => c.id === eResult.pickedContainerId)
           if (pickedContainer) pickedContainer.yardSlot = null
         }
+        if (pickedJob && eq.type === 'mobile_harbor_crane' && pickedJob.pickupLocation.type === 'vessel_slot') {
+          const vessel = vesselVisits.value[0]
+          if (vessel) dischargeContainerFromVessel(vessel, eResult.pickedContainerId)
+          const pickedContainer = containers.value.find(c => c.id === eResult.pickedContainerId)
+          if (pickedContainer) pickedContainer.vesselSlot = null
+        }
       }
 
       if (eResult.jobCompleted && eResult.jobId) {

@@ -718,15 +718,36 @@ export class EquipmentRenderer {
       }
 
       if (p?.mhcSpreader && eq.type === 'mobile_harbor_crane') {
+        const carriedContainer = eq.carriedContainerId && containers
+          ? containers.find(c => c.id === eq.carriedContainerId) ?? null
+          : null
         const target = eq.targetPosition ?? {
           x: eq.position.x,
           y: CONTAINER_HEIGHT / 2,
-          z: eq.position.z - 10,
+          z: eq.position.z,
         }
         const dx = target.x - eq.position.x
         const dz = target.z - eq.position.z
-        const desiredSlew = Math.atan2(dx, dz) + Math.PI
-        const desiredReach = THREE.MathUtils.clamp(Math.sqrt(dx * dx + dz * dz), 4.6, 9.2)
+        const isImportSetdown =
+          carriedContainer?.visitType === 'import' &&
+          eq.state === 'dropping' &&
+          eq.targetPosition !== null &&
+          eq.targetPosition.z >= 0
+        const isExportPickup =
+          eq.state === 'picking' &&
+          target.z >= 0 &&
+          target.x > 0
+        let slewOffset = 0
+        if (carriedContainer?.visitType === 'import') {
+          slewOffset -= THREE.MathUtils.degToRad(22)
+        }
+        const hasActiveTarget = eq.currentJobId !== null && eq.targetPosition !== null
+        const desiredSlew = hasActiveTarget
+          ? Math.atan2(dx, dz) + Math.PI + slewOffset
+          : (p.mhcHouseGroup?.rotation.y ?? 0)
+        const desiredReach = hasActiveTarget
+          ? THREE.MathUtils.clamp(Math.sqrt(dx * dx + dz * dz), 4.6, 9.2)
+          : 5.2
         const desiredLuff = THREE.MathUtils.clamp(
           -0.21 - ((desiredReach - 4.6) / 4.6) * 0.14 + (dz > 0 ? 0.045 : -0.015),
           -0.38,
@@ -734,9 +755,10 @@ export class EquipmentRenderer {
         )
         const idleHoistY = 10.5
         const desiredHoistY = eq.currentJobId ? eq.armTargetY : idleHoistY
+        const slewLerp = hasActiveTarget ? 0.015 : 1
 
         if (p.mhcHouseGroup) {
-          p.mhcHouseGroup.rotation.y = THREE.MathUtils.lerp(p.mhcHouseGroup.rotation.y, desiredSlew, 0.18)
+          p.mhcHouseGroup.rotation.y = THREE.MathUtils.lerp(p.mhcHouseGroup.rotation.y, desiredSlew, slewLerp)
         }
         if (p.mhcBoomGroup) {
           p.mhcBoomGroup.rotation.x = THREE.MathUtils.lerp(p.mhcBoomGroup.rotation.x, desiredLuff, 0.14)
@@ -757,7 +779,6 @@ export class EquipmentRenderer {
           (trolleyWorldY - desiredHoistY) / Math.cos(boomPitch),
         )
         p.mhcSpreader.position.y = -cableDrop
-        p.mhcSpreader.rotation.x = -(p.mhcBoomGroup?.rotation.x ?? 0)
 
         for (const cable of p.mhcCables ?? []) {
           cable.scale.y = cableDrop
@@ -766,7 +787,7 @@ export class EquipmentRenderer {
 
         const mhcExisting = this.carriedMeshes.get(eq.id)
         if (eq.carriedContainerId && containers) {
-          const container = containers.find(c => c.id === eq.carriedContainerId)
+          const container = carriedContainer
           if (container) {
             let cGroup = mhcExisting
             if (!cGroup || cGroup.userData['containerId'] !== eq.carriedContainerId) {
@@ -779,19 +800,32 @@ export class EquipmentRenderer {
               this.carriedMeshes.set(eq.id, cGroup)
             }
             cGroup.position.set(0, -(0.55 + CONTAINER_HEIGHT / 2), 0)
-            const isImportSetdown =
-              container.visitType === 'import' &&
-              eq.state === 'dropping' &&
-              eq.targetPosition !== null &&
-              eq.targetPosition.z >= 0
             const dropProgress = Math.min(1, eq.stateElapsed / (MHC_CYCLE_TIME / 2))
             const yaw = isImportSetdown ? dropProgress * (Math.PI / 4) : 0
+            p.mhcSpreader.rotation.set(
+              -(p.mhcBoomGroup?.rotation.x ?? 0),
+              yaw,
+              0,
+            )
             cGroup.rotation.set(0, yaw, 0)
           }
         } else if (mhcExisting) {
+          p.mhcSpreader.rotation.set(
+            -(p.mhcBoomGroup?.rotation.x ?? 0),
+            0,
+            0,
+          )
           p.mhcSpreader.remove(mhcExisting)
           this.disposeContainerGroup(mhcExisting)
           this.carriedMeshes.delete(eq.id)
+        } else {
+          const phaseProgress = Math.min(1, eq.stateElapsed / (MHC_CYCLE_TIME / 2))
+          const spreaderYaw = isExportPickup ? -phaseProgress * (Math.PI / 4) : 0
+          p.mhcSpreader.rotation.set(
+            -(p.mhcBoomGroup?.rotation.x ?? 0),
+            spreaderYaw,
+            0,
+          )
         }
       }
     }
