@@ -218,6 +218,15 @@ function buildGatehouse(scene: THREE.Scene): void {
   const blueMat = new THREE.MeshPhongMaterial({ color: 0x1d62b3, shininess: 35 })
   const stripeLight = new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 60 })
   const bollardMat = new THREE.MeshPhongMaterial({ color: 0x2e3236, shininess: 40 })
+  const fencePostMat = new THREE.MeshPhongMaterial({ color: 0x50504a, shininess: 14 })
+  const fenceRailMat = new THREE.MeshPhongMaterial({ color: 0x6c6b64, shininess: 18 })
+  const fenceMeshMat = new THREE.MeshBasicMaterial({
+    color: 0x8a8c82,
+    transparent: true,
+    opacity: 0.32,
+    wireframe: true,
+  })
+  const frontFenceZ = TERMINAL_FENCE_Z + CONTAINER_LENGTH * 2
 
   function addBarrierAcrossLane(name: string, laneX: number, fenceZ: number, mat: THREE.MeshPhongMaterial): void {
     const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 3.3, 10), trimMat)
@@ -249,6 +258,60 @@ function buildGatehouse(scene: THREE.Scene): void {
     tipLamp.position.set(4.85, 0.02, 0)
     pivot.add(tipLamp)
     scene.add(pivot)
+  }
+
+  function addChainLinkFenceRun(
+    start: Position3D,
+    end: Position3D,
+    options: { postSpacing?: number; height?: number } = {},
+  ): void {
+    const dx = end.x - start.x
+    const dz = end.z - start.z
+    const runLength = Math.sqrt(dx * dx + dz * dz)
+    if (runLength < 0.5) return
+
+    const height = options.height ?? 3.2
+    const postSpacing = options.postSpacing ?? 4.8
+    const heading = Math.atan2(dx, dz)
+    const midX = (start.x + end.x) / 2
+    const midZ = (start.z + end.z) / 2
+
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(runLength, height, Math.max(1, Math.floor(runLength * 2)), 10),
+      fenceMeshMat,
+    )
+    mesh.position.set(midX, height / 2, midZ)
+    mesh.rotation.y = heading + Math.PI / 2
+    scene.add(mesh)
+
+    const topRail = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, runLength, 8), fenceRailMat)
+    topRail.rotation.z = Math.PI / 2
+    topRail.rotation.y = heading + Math.PI / 2
+    topRail.position.set(midX, height - 0.12, midZ)
+    topRail.castShadow = true
+    scene.add(topRail)
+
+    const bottomRail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, runLength, 8), fenceRailMat)
+    bottomRail.rotation.z = Math.PI / 2
+    bottomRail.rotation.y = heading + Math.PI / 2
+    bottomRail.position.set(midX, 0.28, midZ)
+    bottomRail.castShadow = true
+    scene.add(bottomRail)
+
+    const postCount = Math.max(2, Math.floor(runLength / postSpacing) + 1)
+    for (let i = 0; i <= postCount; i++) {
+      const t = i / postCount
+      const px = start.x + dx * t
+      const pz = start.z + dz * t
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, height, 8), fencePostMat)
+      post.position.set(px, height / 2, pz)
+      post.castShadow = true
+      scene.add(post)
+
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), fenceRailMat)
+      cap.position.set(px, height + 0.04, pz)
+      scene.add(cap)
+    }
   }
 
   interface GatehouseBuildingOptions {
@@ -361,6 +424,10 @@ function buildGatehouse(scene: THREE.Scene): void {
     includeBollards: false,
   })
   addBarrierAcrossLane('ingate-barrier', GATE_INGATE_POSITION.x, TERMINAL_FENCE_Z - CONTAINER_LENGTH * 0.5, orangeMat)
+  addChainLinkFenceRun(
+    { x: GATE_INGATE_POSITION.x + 3.2, y: 0, z: frontFenceZ },
+    { x: GATE_OUTGATE_POSITION.x - 2.6, y: 0, z: frontFenceZ },
+  )
 
   // Queue lane strip outside terminal (parallel to fence, along Z)
   const queueLen = 60

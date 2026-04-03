@@ -30,7 +30,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 | `modules/vesselRenderer.ts` | Vessel render with GLB swap-in on load |
 | `modules/truckRenderer.ts` | Truck render with GLB swap-in on load |
 | `modules/floatingTextRenderer.ts` | Canvas-sprite popups (money earned, events) that drift upward and fade |
-| `modules/sceneBuilder.ts` | Full static scene construction: sky dome, animated ocean, quay wall, bollards, fenders, port lights, weathered ground, faded yard markings, terminal fence with in/out gates, improved gatehouse buildings with animated barrier rigs, quay buffer markings, terminal buildings |
+| `modules/sceneBuilder.ts` | Full static scene construction: sky dome, animated ocean, quay wall, bollards, fenders, port lights, weathered ground, faded yard markings, old chain-link perimeter fence with in/out gate openings, improved gatehouse buildings with animated barrier rigs, quay buffer markings, terminal buildings |
 | `modules/spatialOccupancy.ts` | AABB soft-collision registry — trucks and equipment register extents; `canMoveTo()` prevents overlap |
 | `modules/terminalMap.ts` | Path graph (nodes + bidirectional edges with speed limits) for the terminal layout |
 | `modules/pathfinding.ts` | Dijkstra-based pathfinding over the terminal graph |
