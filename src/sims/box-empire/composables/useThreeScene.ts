@@ -16,9 +16,30 @@ import { FloatingTextRenderer } from '../modules/floatingTextRenderer'
 import { loadModel } from '../modules/modelLoader'
 import { TRUCK_GLB_URL } from '../modules/truckRenderer'
 import { VESSEL_GLB_URL } from '../modules/vesselRenderer'
+import {
+  BERTH_POSITION,
+  CRANE_POSITION,
+  GATE_INGATE_POSITION,
+  GATE_OUTGATE_POSITION,
+  QUAY_BUFFER_DISCHARGE_POSITION,
+  QUAY_BUFFER_LOAD_POSITION,
+  YARD_BLOCK_POSITION,
+  YARD_TRUCK_PARK_POSITION,
+} from '../modules/config'
+import type { CameraCueTarget } from '../types'
 
 const KEY_PAN_SPEED  = 20
 const KEY_ZOOM_SPEED = 25
+const CAMERA_CUE_DURATION = 1.35
+
+interface CameraAnimation {
+  startTime: number
+  duration: number
+  fromPosition: THREE.Vector3
+  toPosition: THREE.Vector3
+  fromTarget: THREE.Vector3
+  toTarget: THREE.Vector3
+}
 
 export interface GameSceneRefs {
   getScene: () => THREE.Scene | null
@@ -46,6 +67,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   let vesselRenderer: VesselRenderer | null = null
   let truckRenderer: TruckRenderer | null = null
   let floatingTextRenderer: FloatingTextRenderer | null = null
+  let activeCameraAnimation: CameraAnimation | null = null
 
   const isReady = ref(false)
   const webglFailed = ref(false)
@@ -55,6 +77,94 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   const keys = { left: false, right: false, up: false, down: false, zoomIn: false, zoomOut: false }
   const _spherical = new THREE.Spherical()
   const _offset = new THREE.Vector3()
+  const _cameraTarget = new THREE.Vector3()
+  const _cameraPosition = new THREE.Vector3()
+
+  function easeInOutCubic(t: number): number {
+    return t < 0.5
+      ? 4 * t * t * t
+      : 1 - Math.pow(-2 * t + 2, 3) / 2
+  }
+
+  function getCameraCuePose(target: CameraCueTarget): { position: THREE.Vector3; lookAt: THREE.Vector3 } {
+    switch (target) {
+      case 'vessel_approach':
+        return {
+          position: new THREE.Vector3(88, 34, 26),
+          lookAt: new THREE.Vector3(BERTH_POSITION.x + 80, 2, BERTH_POSITION.z),
+        }
+      case 'berth':
+        return {
+          position: new THREE.Vector3(58, 36, 36),
+          lookAt: new THREE.Vector3(BERTH_POSITION.x, 2, BERTH_POSITION.z),
+        }
+      case 'crane':
+        return {
+          position: new THREE.Vector3(34, 30, 30),
+          lookAt: new THREE.Vector3(CRANE_POSITION.x, 10, CRANE_POSITION.z),
+        }
+      case 'gatehouse':
+        return {
+          position: new THREE.Vector3(-34, 30, 116),
+          lookAt: new THREE.Vector3(GATE_INGATE_POSITION.x - 2, 2, GATE_INGATE_POSITION.z + 12),
+        }
+      case 'yard':
+        return {
+          position: new THREE.Vector3(38, 32, 62),
+          lookAt: new THREE.Vector3(YARD_BLOCK_POSITION.x + 12, 4, YARD_BLOCK_POSITION.z),
+        }
+      case 'quay_discharge':
+        return {
+          position: new THREE.Vector3(34, 28, 34),
+          lookAt: new THREE.Vector3(QUAY_BUFFER_DISCHARGE_POSITION.x, 3, QUAY_BUFFER_DISCHARGE_POSITION.z),
+        }
+      case 'quay_load':
+        return {
+          position: new THREE.Vector3(32, 28, 30),
+          lookAt: new THREE.Vector3(QUAY_BUFFER_LOAD_POSITION.x, 3, QUAY_BUFFER_LOAD_POSITION.z),
+        }
+      case 'yard_truck_stand':
+        return {
+          position: new THREE.Vector3(28, 24, 70),
+          lookAt: new THREE.Vector3(YARD_TRUCK_PARK_POSITION.x, 2, YARD_TRUCK_PARK_POSITION.z - 6),
+        }
+      case 'outgate':
+        return {
+          position: new THREE.Vector3(40, 24, 138),
+          lookAt: new THREE.Vector3(GATE_OUTGATE_POSITION.x, 2, GATE_OUTGATE_POSITION.z),
+        }
+    }
+  }
+
+  function startCameraCue(target: CameraCueTarget): void {
+    if (!camera || !controls) return
+    const pose = getCameraCuePose(target)
+    activeCameraAnimation = {
+      startTime: performance.now(),
+      duration: CAMERA_CUE_DURATION,
+      fromPosition: camera.position.clone(),
+      toPosition: pose.position,
+      fromTarget: controls.target.clone(),
+      toTarget: pose.lookAt,
+    }
+  }
+
+  function updateCameraCue(): void {
+    if (!camera || !controls || !activeCameraAnimation) return
+    const elapsed = (performance.now() - activeCameraAnimation.startTime) / 1000
+    const rawProgress = Math.min(1, elapsed / activeCameraAnimation.duration)
+    const t = easeInOutCubic(rawProgress)
+
+    _cameraPosition.copy(activeCameraAnimation.fromPosition).lerp(activeCameraAnimation.toPosition, t)
+    _cameraTarget.copy(activeCameraAnimation.fromTarget).lerp(activeCameraAnimation.toTarget, t)
+    camera.position.copy(_cameraPosition)
+    controls.target.copy(_cameraTarget)
+    controls.update()
+
+    if (rawProgress >= 1) {
+      activeCameraAnimation = null
+    }
+  }
 
   function onKeyDown(e: KeyboardEvent): void {
     if (e.repeat) return
@@ -166,6 +276,10 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       controls.target.set(0, 0, 15)
       controls.update()
 
+      if (store.cameraCue) {
+        startCameraCue(store.cameraCue.target)
+      }
+
       buildScene(scene)
 
       containerRenderer = new ContainerRenderer(scene)
@@ -195,6 +309,12 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     }
   }, { immediate: true })
 
+  watch(() => store.cameraCue?.id, () => {
+    const cue = store.cameraCue
+    if (!cue || !isReady.value) return
+    startCameraCue(cue.target)
+  })
+
   function onResize(): void {
     if (!camera || !renderer) return
     camera.aspect = window.innerWidth / window.innerHeight
@@ -204,6 +324,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
 
   function render(): void {
     if (!renderer || !scene || !camera) return
+    updateCameraCue()
     controls?.update()
     floatingTextRenderer?.update()
     const t = performance.now() / 1000

@@ -14,7 +14,10 @@
       "Bash(pkill -f \"npm run dev\")",
       "Bash(curl -s http://localhost:5174)",
       "Bash(pkill -f \"vite\")",
-      "Bash(curl -s http://localhost:5176)"
+      "Bash(curl -s http://localhost:5176)",
+      "Bash(curl -s http://localhost:5177)",
+      "Bash(curl -s http://localhost:5178)",
+      "Bash(curl -s http://localhost:5179)"
     ]
   }
 }

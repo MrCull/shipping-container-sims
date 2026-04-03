@@ -60,7 +60,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 
 | Composable | Purpose |
 |-----------|---------|
-| `composables/useThreeScene.ts` | Scene setup, renderer instantiation, per-frame `updateEntities()`, `spawnFloatingText()`, `triggerVesselShake()`, container raycasting, WebGL failure detection (`webglFailed` ref) |
+| `composables/useThreeScene.ts` | Scene setup, renderer instantiation, per-frame `updateEntities()`, `spawnFloatingText()`, `triggerVesselShake()`, tutorial/narrator camera cue pans, container raycasting, WebGL failure detection (`webglFailed` ref) |
 | `composables/useGameLoop.ts` | RAF loop with fixed-step accumulator; delegates sim ticks to store and render to scene |
 | `composables/useAudio.ts` | Sound effect playback mapped via `SOUND_MAP` in config |
 | `composables/useInput.ts` | Mouse/pointer event handling for container selection |
@@ -157,6 +157,7 @@ Eight shipping lines are defined in `containerMaterials.ts` (`SHIPPING_LINE_LIVE
 - Containers with `lifecycleState === 'on_vessel'` are **hidden** (not rendered) until discharged
 - Containers are synced to their carrying truck's position during movement phases
 - The vessel hull shape runs along the Z axis (bow at +Z, stern at −Z), matching the berth orientation
+- Tutorial and narrator milestones can request guided camera pans to relevant areas such as the vessel approach lane, berth, crane, quay, yard, truck stand, out-gate, and gatehouse; these animate the OrbitControls camera rather than replacing the camera system
 - Trucks depart via the out-gate at `GATE_OUTGATE_POSITION.z`, clearing the terminal
 - `spatialOccupancy` is rebuilt each tick from current entity positions; no manual "update" call is needed
 - The ocean mesh in `sceneBuilder.ts` is animated each frame via `animateOcean(time)` using vertex displacement — call this from the render loop

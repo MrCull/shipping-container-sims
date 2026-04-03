@@ -321,6 +321,24 @@ export interface NarratorDialogState {
   groupId: string        // for keying / duplicate-guard
 }
 
+// ---- Camera cues ----------------------------------------------------------
+
+export type CameraCueTarget =
+  | 'vessel_approach'
+  | 'berth'
+  | 'crane'
+  | 'gatehouse'
+  | 'yard'
+  | 'quay_discharge'
+  | 'quay_load'
+  | 'yard_truck_stand'
+  | 'outgate'
+
+export interface CameraCue {
+  id: number
+  target: CameraCueTarget
+}
+
 // ---- Pathfinding ----------------------------------------------------------
 
 export type PathNodeType = 'gate' | 'yard_io' | 'quay_buffer' | 'junction' | 'berth' | 'crane_base'

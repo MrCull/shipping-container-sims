@@ -47,9 +47,11 @@ import { createTutorialSteps, getCurrentStep, checkStepAdvance } from '../module
 import { resetVesselCounter } from '../modules/vesselManager'
 import { getNarratorGroup } from '../modules/narratorScript'
 import type { NarratorDialogState } from '../types'
+import type { CameraCueTarget, CameraCue } from '../types'
 
 let eventCounter = 0
 let containerCounter = 0
+let cameraCueCounter = 0
 
 function nextContainerId(prefix: string): string {
   containerCounter++
@@ -106,6 +108,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
   // ---- Narrator dialog state -----------------------------------------------
   const narratorDialog = ref<NarratorDialogState | null>(null)
+  const cameraCue = ref<CameraCue | null>(null)
   // Queue of group IDs waiting to be shown (shown one at a time)
   const narratorQueue = ref<string[]>([])
   // Track which groups have already been shown to avoid repeats
@@ -116,6 +119,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   const narratorFirstOnQuayFired = ref(false)
   const narratorImportsInYardFired = ref(false)
   const narratorGroup4Fired = ref(false)
+  const narratorFirstGateOutMoneyFired = ref(false)
   const narratorExportToQuayFired = ref(false)
   const narratorGroup5Fired = ref(false)
 
@@ -226,6 +230,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     exportStagingStarted.value = false
     careerIntroPage.value = 1
     narratorDialog.value = null
+    cameraCue.value = null
     narratorQueue.value = []
     narratorShownGroups.value = new Set()
     narratorVesselDockedFired.value = false
@@ -233,6 +238,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     narratorFirstOnQuayFired.value = false
     narratorImportsInYardFired.value = false
     narratorGroup4Fired.value = false
+    narratorFirstGateOutMoneyFired.value = false
     narratorExportToQuayFired.value = false
     narratorGroup5Fired.value = false
     // Enqueue intro + vessel-announcement upfront so group 2 plays
@@ -360,6 +366,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   function resetToMenu(): void {
     setTimeScale(0)
     gamePhase.value = 'menu'
+    cameraCue.value = null
   }
 
   function togglePause(): void {
@@ -404,6 +411,14 @@ export const useGameStore = defineStore('box-empire-game', () => {
   function closeGatehouse(): void {
     closeExportGate()
     closeImportGate()
+  }
+
+  function requestCameraCue(target: CameraCueTarget): void {
+    cameraCueCounter++
+    cameraCue.value = {
+      id: cameraCueCounter,
+      target,
+    }
   }
 
   function setReachStackerServiceSide(
@@ -598,6 +613,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
             amount: GATE_OUT_REVENUE,
             position: { ...truck.position },
           })
+          if (!narratorFirstGateOutMoneyFired.value) {
+            narratorFirstGateOutMoneyFired.value = true
+            enqueueNarratorGroup('first-gate-out-money')
+          }
           // Keep container visible on the truck until it fully departs; mark at gate-out
           container.lifecycleState = 'at_gate'
           container.currentLocation = {
@@ -1100,7 +1119,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       )
       if (firstInYard) {
         narratorImportsInYardFired.value = true
-        enqueueNarratorGroup('imports-in-yard')
+        interruptWithNarratorGroup('imports-in-yard')
       }
     }
 
@@ -1236,6 +1255,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     const vessel = vesselVisits.value[0]
     if (!vessel || vessel.state !== 'announced') return
     vessel.arrivalTime = simTime.value
+    requestCameraCue('vessel_approach')
   }
 
   const CAREER_INTRO_LAST_PAGE = 4
@@ -1282,6 +1302,40 @@ export const useGameStore = defineStore('box-empire-game', () => {
       currentBeat: 0,
       groupId: group.id,
     }
+    switch (group.id) {
+      case 'vessel-docked':
+        requestCameraCue('crane')
+        break
+      case 'first-on-quay':
+        requestCameraCue('quay_discharge')
+        break
+      case 'imports-in-yard':
+        requestCameraCue('gatehouse')
+        break
+      case 'trucks-rolling':
+        requestCameraCue('outgate')
+        break
+      case 'first-gate-out-money':
+        requestCameraCue('outgate')
+        break
+      case 'export-to-quay':
+        requestCameraCue('quay_load')
+        break
+      case 'outro':
+        requestCameraCue('berth')
+        break
+      default:
+        break
+    }
+  }
+
+  function interruptWithNarratorGroup(groupId: string): void {
+    if (narratorShownGroups.value.has(groupId)) return
+    narratorShownGroups.value.add(groupId)
+    narratorQueue.value = narratorQueue.value.filter(id => id !== groupId)
+    narratorDialog.value = null
+    narratorQueue.value.unshift(groupId)
+    showNextNarratorGroup()
   }
 
   function narratorNextBeat(): void {
@@ -1289,6 +1343,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
     const next = narratorDialog.value.currentBeat + 1
     if (next < narratorDialog.value.beats.length) {
       narratorDialog.value = { ...narratorDialog.value, currentBeat: next }
+      if (narratorDialog.value.groupId === 'vessel-announcement' && next === 1) {
+        requestCameraCue('vessel_approach')
+      }
     } else {
       narratorDialog.value = null
       showNextNarratorGroup()
@@ -1312,6 +1369,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       case 'enableCrane': {
         const mhc = equipment.value.find(e => e.id === 'mhc-1')
         if (mhc) mhc.enabled = true
+        requestCameraCue('crane')
         if (!narratorCraneEnabledFired.value) {
           narratorCraneEnabledFired.value = true
           enqueueNarratorGroup('crane-enabled')
@@ -1321,10 +1379,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
       case 'enableReachStacker': {
         const rs = equipment.value.find(e => e.id === 'rs-1')
         if (rs) rs.enabled = true
+        requestCameraCue('yard')
         break
       }
       case 'openGatehouse':
         openGatehouse()
+        requestCameraCue('gatehouse')
         break
         case 'setSpeed3x':
           setTimeScale(3)
@@ -1414,8 +1474,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
     manualReassignContainer,
     getState,
     narratorDialog,
+    cameraCue,
     narratorNextBeat,
     closeNarratorDialog,
     dispatchNarratorAction,
+    requestCameraCue,
   }
 })
