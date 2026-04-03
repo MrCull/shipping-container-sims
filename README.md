@@ -10,8 +10,7 @@ This is a small **Vue 3** hub for three standalone **3D browser games**, all the
 - **Contenga** — a physics stacker: pull and pile containers without collapsing the tower.
 - **Box Empire** — a terminal tycoon: routes, upgrades, fleets, and rivals on a stylised map.
 
-Below you will see the **home portal** first, then each game with **live gameplay** (not the menu) — Stowage Master is captured **about 15 seconds after** you start Level 1 so the scene and motion read clearly.
-
+Below you will see the **home portal** first, then each game with **live gameplay**
 ## Main menu
 
 ![Home portal — choose a game](docs/readme/home-portal.png)
