@@ -73,7 +73,11 @@ export function getReachStackerServiceSide(job: Job): ReachStackerServiceSide {
 export function assignPendingJobs(state: BoxEmpireState): void {
   const pendingJobs = state.jobs
     .filter(j => j.status === 'pending')
-    .sort((a, b) => b.priority - a.priority)
+    .sort((a, b) => {
+      if (b.priority !== a.priority) return b.priority - a.priority
+      if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt
+      return a.id.localeCompare(b.id)
+    })
 
   for (const job of pendingJobs) {
     // If the container is buried / not accessible, mark it blocked so recheckBlockedJobs

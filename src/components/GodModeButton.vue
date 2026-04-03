@@ -6,6 +6,7 @@ const globalSettings = useGlobalSettingsStore()
 
 <template>
   <button
+    v-if="globalSettings.godModeEnabled"
     class="god-btn"
     :class="{ active: globalSettings.godModeEnabled }"
     :title="globalSettings.godModeEnabled ? 'Disable god mode' : 'Enable god mode'"

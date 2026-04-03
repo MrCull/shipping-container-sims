@@ -876,7 +876,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
             { type: 'quay_buffer', id: 'quay-discharge', position: bufferPos },
             { type: 'yard_slot', id: slotId, position: dropPos },
             'reach_stacker',
-            9,
+            10.5,
             simTime.value,
           )
           jobs.value.push(moveJob)
@@ -1130,7 +1130,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
             { type: 'yard_slot', id: slotId, position: slotPos },
             { type: 'quay_buffer', id: 'quay-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
             'reach_stacker',
-            10,
+            10.25,
             simTime.value,
           )
           jobs.value.push(stageJob)
@@ -1272,7 +1272,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       { type: 'yard_slot', id: slotId, position: slotPos },
       { type: 'quay_buffer', id: 'quay-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
       'reach_stacker',
-      10,
+      10.25,
       simTime.value,
     )
     jobs.value.push(stageJob)
