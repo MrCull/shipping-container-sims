@@ -246,10 +246,12 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     restowSlots.value = []
     hasTransitContainers.value = false
 
-    if (config.dischargeContainerCount && config.dischargeContainerCount > 0) {
-      const transitCount = config.transitContainerCount ?? 0
+    const importCount = config.dischargeContainerCount ?? 0
+    const transitCount = config.transitContainerCount ?? 0
+
+    if (importCount > 0 || transitCount > 0) {
       generateDischargeManifest(
-        config.dischargeContainerCount,
+        importCount,
         config.preset,
         grid.value,
         transitCount,
@@ -260,7 +262,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
         currentPorts.value,
       )
       recalculateScoreTargets(scoreContainerCount)
-      dischargeCount.value = config.dischargeContainerCount
+      dischargeCount.value = importCount
       hasTransitContainers.value = transitCount > 0
 
       // Recalculate from the pre-loaded grid so tilt is correct when the ship sails in
@@ -554,6 +556,14 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     phase.value = newPhase
   }
 
+  function returnToStartMenu(): void {
+    phase.value = 'start'
+    disasterType.value = null
+    restowContainer.value = null
+    restowFromSlotId.value = null
+    restowSlots.value = []
+  }
+
   /** Called when the player dismisses the level briefing — advances to the real first phase. */
   function confirmBriefing(): void {
     if (dischargeCount.value > 0) {
@@ -589,6 +599,6 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     placeRestowContainer, finalizeRestow, cancelRestowSelection,
     restowContainer, restowFromSlotId, availableRestowSlots,
     hasTransitContainers, confirmBriefing,
-    addEvent, setPhase, getStarRatingResult, getLevelBest, isLevelUnlocked, toggleGodMode, tickTimer,
+    addEvent, setPhase, returnToStartMenu, getStarRatingResult, getLevelBest, isLevelUnlocked, toggleGodMode, tickTimer,
   }
 })

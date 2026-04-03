@@ -14,6 +14,7 @@ import { generateContainerId, generateWeight, getWeightCategory } from './contai
  * Gold colour makes them visually distinct from transit/export cargo.
  */
 const LOCAL_PORT = { name: 'Local', color: 0xffd700, hex: '#ffd700', order: 0 } as const
+const BAY_GROUPING_PRIMARY_CHANCE = 0.95
 
 function rollHazmat(hazmatRate: number): boolean {
   return Math.random() < hazmatRate
@@ -190,18 +191,220 @@ function placeImportContainers(
   return importPlaced
 }
 
-function buildGroupedTransitContainers(count: number, hazmatRate: number, transitPorts: PortDefinition[]): Container[] {
-  const ports = shuffle([...transitPorts])
-  const grouped: Container[] = []
+function sortTransitSlotsForBayGrouping(slotIds: string[], grid: Record<string, Slot>, preset: ShipPreset): string[] {
+  const centreRow = (preset.rows - 1) / 2
+  return [...slotIds].sort((a, b) => {
+    const slotA = grid[a]
+    const slotB = grid[b]
+    if (!slotA || !slotB) return 0
 
-  while (grouped.length < count) {
-    for (const port of ports) {
-      if (grouped.length >= count) break
-      grouped.push(makeTransitContainerForPort(port, hazmatRate))
+    if (slotA.bayIndex !== slotB.bayIndex) return slotA.bayIndex - slotB.bayIndex
+    if (slotA.tierIndex !== slotB.tierIndex) return slotA.tierIndex - slotB.tierIndex
+
+    const rowDeltaA = Math.abs(slotA.rowIndex - centreRow)
+    const rowDeltaB = Math.abs(slotB.rowIndex - centreRow)
+    if (rowDeltaA !== rowDeltaB) return rowDeltaA - rowDeltaB
+
+    return slotA.rowIndex - slotB.rowIndex
+  })
+}
+
+interface BayPortGroup {
+  port: PortDefinition | typeof LOCAL_PORT
+  remaining: number
+  isImport: boolean
+  assignedBayIndexes: number[]
+}
+
+function buildTransitPortCounts(
+  transitCount: number,
+  transitPorts: PortDefinition[],
+): Array<{ port: PortDefinition; count: number }> {
+  if (transitCount <= 0 || transitPorts.length === 0) return []
+
+  const baseCount = Math.floor(transitCount / transitPorts.length)
+  const remainder = transitCount % transitPorts.length
+
+  return transitPorts.map((port, index) => ({
+    port,
+    count: baseCount + (index < remainder ? 1 : 0),
+  })).filter(entry => entry.count > 0)
+}
+
+function allocateBayCounts(weights: number[], bayCount: number): number[] {
+  if (weights.length === 0) return []
+
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0)
+  const counts = weights.map(weight => Math.max(1, Math.floor((weight / totalWeight) * bayCount)))
+
+  let allocated = counts.reduce((sum, count) => sum + count, 0)
+  while (allocated > bayCount) {
+    let removeIndex = -1
+    let largestCount = 1
+    for (let i = 0; i < counts.length; i++) {
+      if (counts[i] > largestCount) {
+        largestCount = counts[i]
+        removeIndex = i
+      }
+    }
+    if (removeIndex === -1) break
+    counts[removeIndex]--
+    allocated--
+  }
+
+  while (allocated < bayCount) {
+    let addIndex = 0
+    let smallestCount = Number.POSITIVE_INFINITY
+    for (let i = 0; i < counts.length; i++) {
+      if (counts[i] < smallestCount) {
+        smallestCount = counts[i]
+        addIndex = i
+      }
+    }
+    counts[addIndex]++
+    allocated++
+  }
+
+  return counts
+}
+
+function buildPrimaryBayIndexes(activeBayCount: number, groupCount: number): number[] {
+  if (activeBayCount <= 0 || groupCount <= 0) return []
+  if (groupCount === 1) return [Math.floor((activeBayCount - 1) / 2)]
+
+  const indexes: number[] = []
+  const used = new Set<number>()
+
+  for (let i = 0; i < groupCount; i++) {
+    const ratio = i / (groupCount - 1)
+    let bayIndex = Math.round(ratio * (activeBayCount - 1))
+
+    while (used.has(bayIndex) && bayIndex < activeBayCount - 1) bayIndex++
+    while (used.has(bayIndex) && bayIndex > 0) bayIndex--
+
+    if (!used.has(bayIndex)) {
+      indexes.push(bayIndex)
+      used.add(bayIndex)
     }
   }
 
-  return grouped
+  return indexes
+}
+
+function buildBayPortGroups(
+  importCount: number,
+  transitCount: number,
+  transitPorts: PortDefinition[],
+  preset: ShipPreset,
+): BayPortGroup[] {
+  const activeBayCount = preset.bays - preset.sternBlockedBays
+  const transitPortCounts = buildTransitPortCounts(transitCount, transitPorts)
+  const entries: BayPortGroup[] = []
+
+  if (importCount > 0) {
+    entries.push({
+      port: LOCAL_PORT,
+      remaining: importCount,
+      isImport: true,
+      assignedBayIndexes: [],
+    })
+  }
+
+  for (const entry of transitPortCounts) {
+    entries.push({
+      port: entry.port,
+      remaining: entry.count,
+      isImport: false,
+      assignedBayIndexes: [],
+    })
+  }
+
+  if (entries.length === 0) return []
+
+  const bayCounts = allocateBayCounts(entries.map(entry => entry.remaining), activeBayCount)
+  const remainingBayCounts = [...bayCounts]
+  const primaryBayIndexes = buildPrimaryBayIndexes(activeBayCount, entries.length)
+  const usedBayIndexes = new Set<number>()
+
+  for (let groupIndex = 0; groupIndex < entries.length; groupIndex++) {
+    if ((remainingBayCounts[groupIndex] ?? 0) <= 0) continue
+    const primaryBayIndex = primaryBayIndexes[groupIndex]
+    if (primaryBayIndex == null) break
+    entries[groupIndex].assignedBayIndexes.push(primaryBayIndex)
+    usedBayIndexes.add(primaryBayIndex)
+    remainingBayCounts[groupIndex]--
+  }
+
+  while (remainingBayCounts.some(count => count > 0)) {
+    let assignedAny = false
+
+    for (let groupIndex = 0; groupIndex < entries.length; groupIndex++) {
+      if ((remainingBayCounts[groupIndex] ?? 0) <= 0) continue
+      const nextBay = Array.from({ length: activeBayCount }, (_, bayIndex) => bayIndex)
+        .find(bayIndex => !usedBayIndexes.has(bayIndex))
+      if (nextBay == null) break
+      entries[groupIndex].assignedBayIndexes.push(nextBay)
+      usedBayIndexes.add(nextBay)
+      remainingBayCounts[groupIndex]--
+      assignedAny = true
+    }
+
+    if (!assignedAny) break
+  }
+
+  return entries
+}
+
+function placeBayGroupedContainers(
+  groups: BayPortGroup[],
+  grid: Record<string, Slot>,
+  slotIds: string[],
+  placed: Container[],
+  hazmatRate: number,
+  includeImports: boolean,
+): void {
+  const eligibleGroups = groups.filter(group => includeImports || !group.isImport)
+  const spillSlots = [...slotIds]
+
+  for (const group of eligibleGroups) {
+    const preferredSlots = slotIds.filter(slotId =>
+      group.assignedBayIndexes.includes(grid[slotId]?.bayIndex ?? -1),
+    )
+    const preferredTarget = Math.min(group.remaining, Math.round(group.remaining * BAY_GROUPING_PRIMARY_CHANCE))
+    let placedPreferred = 0
+
+    for (const slotId of preferredSlots) {
+      if (placedPreferred >= preferredTarget || group.remaining <= 0) break
+      if (!canPlace(slotId, grid)) continue
+
+      const container = group.isImport
+        ? makeImportContainer(hazmatRate)
+        : makeTransitContainerForPort(group.port, hazmatRate)
+
+      grid[slotId].container = container
+      placed.push(container)
+      group.remaining--
+      placedPreferred++
+
+      const spillIndex = spillSlots.indexOf(slotId)
+      if (spillIndex >= 0) spillSlots.splice(spillIndex, 1)
+    }
+  }
+
+  for (const group of eligibleGroups) {
+    for (const slotId of spillSlots) {
+      if (group.remaining <= 0) break
+      if (!canPlace(slotId, grid)) continue
+
+      const container = group.isImport
+        ? makeImportContainer(hazmatRate)
+        : makeTransitContainerForPort(group.port, hazmatRate)
+
+      grid[slotId].container = container
+      placed.push(container)
+      group.remaining--
+    }
+  }
 }
 
 /**
@@ -230,6 +433,9 @@ export function generateDischargeManifest(
   const placed: Container[] = []
   const orderedIds = buildOrderedSlotIds(preset, grid, spreadFactor)
   const transitPorts = ports.slice(1)
+  const bayPortGroups = transitGrouping === 'grouped-by-pod'
+    ? buildBayPortGroups(count, transitCount, transitPorts, preset)
+    : []
 
   const importSlotIds = importPlacement === 'upper-tiers'
     ? buildUpperTierSlotIds(preset, grid)
@@ -238,42 +444,55 @@ export function generateDischargeManifest(
   if (importPlacement === 'upper-tiers' && transitCount > 0) {
     const transitBaseTarget = Math.min(transitCount, preset.bays - preset.sternBlockedBays)
     const transitBaseIds = orderedIds.filter(id => grid[id]?.tierIndex === 0).slice(0, transitBaseTarget)
-    const groupedTransit = transitGrouping === 'grouped-by-pod'
-      ? buildGroupedTransitContainers(transitBaseIds.length, hazmatRate, transitPorts)
-      : transitBaseIds.map(() => makeTransitContainer(hazmatRate, transitPorts))
-
-    for (let i = 0; i < transitBaseIds.length; i++) {
-      const id = transitBaseIds[i]
-      const container = groupedTransit[i]
-      grid[id].container = container
-      placed.push(container)
+    const groupedTransitBaseIds = transitGrouping === 'grouped-by-pod'
+      ? sortTransitSlotsForBayGrouping(transitBaseIds, grid, preset)
+      : transitBaseIds
+    if (transitGrouping === 'grouped-by-pod') {
+      placeBayGroupedContainers(bayPortGroups, grid, groupedTransitBaseIds, placed, hazmatRate, false)
+    } else {
+      for (const id of groupedTransitBaseIds) {
+        const container = makeTransitContainer(hazmatRate, transitPorts)
+        grid[id].container = container
+        placed.push(container)
+      }
     }
 
-    placeImportContainers(count, grid, importSlotIds, placed, hazmatRate)
+    if (transitGrouping === 'grouped-by-pod') {
+      placeBayGroupedContainers(bayPortGroups, grid, importSlotIds, placed, hazmatRate, true)
+    } else {
+      placeImportContainers(count, grid, importSlotIds, placed, hazmatRate)
+    }
 
     const remainingTransit = transitCount - transitBaseIds.length
     if (remainingTransit <= 0) return placed
 
     const transitSlots = orderedIds.filter(id => !grid[id]?.container)
-    const extraTransit = transitGrouping === 'grouped-by-pod'
-      ? buildGroupedTransitContainers(remainingTransit, hazmatRate, transitPorts)
-      : transitSlots.slice(0, remainingTransit).map(() => makeTransitContainer(hazmatRate, transitPorts))
-
-    let transitPlaced = 0
-    for (const id of transitSlots) {
-      if (transitPlaced >= remainingTransit) break
-      if (!canPlace(id, grid)) continue
-      const container = extraTransit[transitPlaced]
-      grid[id].container = container
-      placed.push(container)
-      transitPlaced++
+    const orderedTransitSlots = transitGrouping === 'grouped-by-pod'
+      ? sortTransitSlotsForBayGrouping(transitSlots, grid, preset)
+      : transitSlots
+    if (transitGrouping === 'grouped-by-pod') {
+      placeBayGroupedContainers(bayPortGroups, grid, orderedTransitSlots, placed, hazmatRate, false)
+    } else {
+      let transitPlaced = 0
+      for (const id of orderedTransitSlots) {
+        if (transitPlaced >= remainingTransit) break
+        if (!canPlace(id, grid)) continue
+        const container = makeTransitContainer(hazmatRate, transitPorts)
+        grid[id].container = container
+        placed.push(container)
+        transitPlaced++
+      }
     }
 
     return placed
   }
 
   // 1 — Place import containers.
-  placeImportContainers(count, grid, importSlotIds, placed, hazmatRate)
+  if (transitGrouping === 'grouped-by-pod') {
+    placeBayGroupedContainers(bayPortGroups, grid, importSlotIds, placed, hazmatRate, true)
+  } else {
+    placeImportContainers(count, grid, importSlotIds, placed, hazmatRate)
+  }
 
   if (transitCount <= 0) return placed
 
@@ -299,18 +518,22 @@ export function generateDischargeManifest(
     if (!transitSlots.includes(id)) transitSlots.push(id)
   }
 
-  const groupedTransit = transitGrouping === 'grouped-by-pod'
-    ? buildGroupedTransitContainers(transitCount, hazmatRate, transitPorts)
-    : transitSlots.slice(0, transitCount).map(() => makeTransitContainer(hazmatRate, transitPorts))
+  const orderedTransitSlots = transitGrouping === 'grouped-by-pod'
+    ? sortTransitSlotsForBayGrouping(transitSlots, grid, preset)
+    : transitSlots
 
-  let transitPlaced = 0
-  for (const id of transitSlots) {
-    if (transitPlaced >= transitCount) break
-    if (!canPlace(id, grid)) continue
-    const container = groupedTransit[transitPlaced]
-    grid[id].container = container
-    placed.push(container)
-    transitPlaced++
+  if (transitGrouping === 'grouped-by-pod') {
+    placeBayGroupedContainers(bayPortGroups, grid, orderedTransitSlots, placed, hazmatRate, false)
+  } else {
+    let transitPlaced = 0
+    for (const id of orderedTransitSlots) {
+      if (transitPlaced >= transitCount) break
+      if (!canPlace(id, grid)) continue
+      const container = makeTransitContainer(hazmatRate, transitPorts)
+      grid[id].container = container
+      placed.push(container)
+      transitPlaced++
+    }
   }
 
   return placed

@@ -521,11 +521,14 @@ async function buildScene(): Promise<void> {
 
   setCameraForShip(store.shipConfig)
 
+  const hasPreloadedOnboardCargo = store.dischargeCount > 0 || store.hasTransitContainers
   const isDischargeLevel = store.dischargeCount > 0
-  if (isDischargeLevel) {
-    // Discharge level: render pre-loaded containers — indicators added when briefing is dismissed
+  if (hasPreloadedOnboardCargo) {
+    // Any level with pre-loaded onboard cargo should render it immediately as the ship sails in.
     createImportContainerMeshes(store.grid, store.shipConfig, shipGroup)
+  }
 
+  if (isDischargeLevel) {
     // Spawn outbound truck queue on the far lane
     const dockPos = getDockPosition(craneObj!)
     const obTrucks = await createOutboundTruckQueue(
