@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useSimsStore } from '@/stores/sims'
 import { useSimRegistry } from '@/composables/useSimRegistry'
 import { setHomePageMeta } from '@/composables/useSiteHead'
@@ -13,13 +13,22 @@ import { futureGameTeasers } from '@/data/future-game-teasers'
 
 const store = useSimsStore()
 const { registerAll } = useSimRegistry()
+const cookieNoticeVisible = ref(false)
+const cookieConsentKey = 'shipping-container-sims-cookie-notice-dismissed'
 
 useMenuMusic()
 
 onMounted(() => {
   setHomePageMeta()
   registerAll()
+
+  cookieNoticeVisible.value = window.localStorage.getItem(cookieConsentKey) !== 'true'
 })
+
+function dismissCookieNotice(): void {
+  cookieNoticeVisible.value = false
+  window.localStorage.setItem(cookieConsentKey, 'true')
+}
 </script>
 
 <template>
@@ -93,6 +102,28 @@ onMounted(() => {
             :teaser="teaser"
           />
         </div>
+      </section>
+
+      <section
+        v-if="cookieNoticeVisible"
+        class="cookie-notice"
+        aria-label="Cookie and analytics notice"
+      >
+        <div class="cookie-copy">
+          <p class="cookie-kicker">
+            SITE NOTICE
+          </p>
+          <p class="cookie-text">
+            This site uses a small number of cookies to understand visits and improve the experience.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="cookie-dismiss"
+          @click="dismissCookieNotice"
+        >
+          OK
+        </button>
       </section>
 
       <footer class="site-footer">
@@ -188,6 +219,67 @@ onMounted(() => {
   margin-bottom: 1.25rem;
 }
 
+.cookie-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.1rem 0 0.9rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.82)),
+    rgba(15, 23, 42, 0.9);
+  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.18);
+}
+
+.cookie-copy {
+  min-width: 0;
+}
+
+.cookie-kicker {
+  margin: 0 0 0.2rem;
+  font-family: var(--font-retro);
+  font-size: 0.55rem;
+  letter-spacing: 0.18em;
+  color: var(--color-accent);
+}
+
+.cookie-text {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.cookie-dismiss {
+  flex: 0 0 auto;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--color-accent);
+  font-family: var(--font-retro);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  padding: 0.55rem 0.8rem;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.cookie-dismiss:hover,
+.cookie-dismiss:focus-visible {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.7);
+  transform: translateY(-1px);
+}
+
+.cookie-dismiss:focus-visible {
+  outline: 2px solid rgba(245, 158, 11, 0.45);
+  outline-offset: 2px;
+}
+
 .section-title {
   font-family: var(--font-retro);
   font-size: 0.65rem;
@@ -261,5 +353,16 @@ onMounted(() => {
 .footer-sub {
   animation: blink 1.5s step-end infinite;
   color: var(--color-accent);
+}
+
+@media (max-width: 780px) {
+  .cookie-notice {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cookie-dismiss {
+    width: 100%;
+  }
 }
 </style>
