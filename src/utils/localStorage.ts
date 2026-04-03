@@ -42,7 +42,13 @@ function sanitizeStorage(raw: unknown): SiteStorageData {
   }
 
   if (isRecord(raw.sims)) {
-    storage.sims = raw.sims
+    const sanitizedSims: Record<string, Record<string, unknown>> = {}
+    for (const [key, value] of Object.entries(raw.sims)) {
+      if (isRecord(value)) {
+        sanitizedSims[key] = value
+      }
+    }
+    storage.sims = sanitizedSims
   }
 
   return storage

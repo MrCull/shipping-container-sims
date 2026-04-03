@@ -417,20 +417,12 @@ export function startExportTruckExit(truck: TruckVisit, simTime: number): void {
   startTruckReturnToGate(truck, simTime)
 }
 
-export function getTruckYardStandPosition(): Position3D {
-  return { ...YARD_TRUCK_PARK_POSITION }
-}
-
 export function getTruckYardStandPositionForVisitType(
   visitType: 'import_pickup' | 'export_delivery',
 ): Position3D {
   return visitType === 'import_pickup'
     ? { ...YARD_TRUCK_IMPORT_PARK_POSITION }
     : { ...YARD_TRUCK_EXPORT_PARK_POSITION }
-}
-
-export function getTruckContainerPosition(): Position3D {
-  return { ...YARD_TRUCK_CONTAINER_POSITION }
 }
 
 export function getTruckContainerPositionForVisitType(
@@ -441,5 +433,4 @@ export function getTruckContainerPositionForVisitType(
     : { ...YARD_TRUCK_EXPORT_CONTAINER_POSITION }
 }
 
-// Export for config import
 export { GATE_INGATE_LANE_X }

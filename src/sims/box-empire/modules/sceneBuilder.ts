@@ -2,6 +2,7 @@
 // Box Empire — Scene graph construction (inspired by stowage-master quality)
 // ---------------------------------------------------------------------------
 
+import type { Position3D } from '../types'
 import * as THREE from 'three'
 import {
   TERMINAL_BOUNDS,
@@ -325,7 +326,6 @@ function buildGatehouse(scene: THREE.Scene): void {
   function addBuilding(
     x: number,
     z: number,
-    label: string,
     accentMat: THREE.MeshPhongMaterial,
     selectName: string,
     options: GatehouseBuildingOptions = {},
@@ -431,7 +431,7 @@ function buildGatehouse(scene: THREE.Scene): void {
   // ---- IN-GATE (at TERMINAL_FENCE_Z) ----
   // Lane is at x=GATE_INGATE_POSITION.x; gatehouse building is beside it at x-4
   const inBuildX = GATE_INGATE_POSITION.x - 5
-  addBuilding(inBuildX, TERMINAL_FENCE_Z + 2, 'IN', orangeMat, 'gatehouse-ingate', {
+  addBuilding(inBuildX, TERMINAL_FENCE_Z + 2, orangeMat, 'gatehouse-ingate', {
     facing: -1,
     includeCanopyPosts: false,
     includeBollards: false,
@@ -456,7 +456,7 @@ function buildGatehouse(scene: THREE.Scene): void {
   // Same footprint as in-gate but on maxX: long axis ∥ Z (fence), trucks exit +Z (landward, away from berth)
   const outBuildX = GATE_OUTGATE_POSITION.x + 5.1
   const outBuildZ = GATE_OUTGATE_POSITION.z - 5
-  addBuilding(outBuildX, outBuildZ, 'OUT', blueMat, 'gatehouse-outgate', {
+  addBuilding(outBuildX, outBuildZ, blueMat, 'gatehouse-outgate', {
     facing: 1,
     includeCanopyPosts: false,
     includeBollards: false,
