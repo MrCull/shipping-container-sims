@@ -19,7 +19,7 @@ export function calculateList(grid: Record<string, Slot>, shipConfig: ShipPreset
 }
 
 export function calculateTrim(grid: Record<string, Slot>, shipConfig: ShipPreset): number {
-  let trimMoment = shipConfig.emptyWeight * (shipConfig.emptyLongitudinalOffset ?? 0)
+  let trimMoment = shipConfig.emptyTrimMoment ?? 0
   let totalWeight = shipConfig.emptyWeight
 
   for (const slot of Object.values(grid)) {

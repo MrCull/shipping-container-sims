@@ -108,9 +108,10 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
     score.value = 0
     moveCount.value = 0
-    shipList.value = 0
-    shipTrim.value = 0
-    shipVCG.value = config.preset.emptyVCG
+    const initialPhysics = updatePhysics(grid.value, config.preset)
+    shipList.value = initialPhysics.list
+    shipTrim.value = initialPhysics.trim
+    shipVCG.value = initialPhysics.vcg
     events.value = []
     disasterType.value = null
     lastPlacement.value = null
@@ -142,11 +143,11 @@ export const useGameStore = defineStore('stowage-master-game', () => {
       dischargeCount.value = config.dischargeContainerCount
       hasTransitContainers.value = transitCount > 0
 
-      // Calculate physics from the pre-loaded grid so tilt is correct when the ship sails in
-      const initialPhysics = updatePhysics(grid.value, config.preset)
-      shipList.value = initialPhysics.list
-      shipTrim.value = initialPhysics.trim
-      shipVCG.value = initialPhysics.vcg
+      // Recalculate from the pre-loaded grid so tilt is correct when the ship sails in
+      const loadedPhysics = updatePhysics(grid.value, config.preset)
+      shipList.value = loadedPhysics.list
+      shipTrim.value = loadedPhysics.trim
+      shipVCG.value = loadedPhysics.vcg
     } else {
       // phase set by confirmBriefing after briefing is dismissed
     }
