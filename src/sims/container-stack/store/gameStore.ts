@@ -451,17 +451,27 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   }
 
   function restartToStart(): void {
+    collapseIdPrefix = `${Date.now()}`
     phase.value = 'start'
     layers.value = []
     floatingContainer.value = null
+    floatingFrom.value = null
     collapsePieces.value = []
     placingSlotOptions.value = []
+    score.value = 0
+    moveCount.value = 0
+    comboStreak.value = 0
+    moves.value = []
     lastScorePopup.value = 0
+    maxHeightLayers.value = TOWER.startLayers
     currentLevel.value = 1
     movesInLevel.value = 0
     levelTimeRemainingSec.value = 0
     moveTimeRemainingSec.value = 0
     levelFailReason.value = null
+    jitterAccumulator.value = 0
+    removalWasCritical.value = false
+    stabilityAtRemovalStart.value = 1
     wobble.value = createInitialWobble()
   }
 

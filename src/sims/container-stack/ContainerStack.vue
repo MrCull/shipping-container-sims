@@ -44,7 +44,13 @@ watch(phase, p => {
   }
 })
 
-onMounted(() => window.addEventListener('keydown', onKey))
+onMounted(() => {
+  // Reset game state when component mounts (e.g., returning from menu)
+  if (phase.value !== 'start') {
+    store.restartToStart()
+  }
+  window.addEventListener('keydown', onKey)
+})
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 </script>
 
