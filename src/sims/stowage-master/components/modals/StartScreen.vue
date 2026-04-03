@@ -7,30 +7,43 @@ import type { LevelBestRecord, LevelConfig } from '../../types'
 const store = useGameStore()
 let godBuffer = ''
 
-function startLevel(level: number) {
-  if (!store.isLevelUnlocked(level)) return
-  store.startLevel(level)
+interface MenuLevel {
+  id: number
+  name: string
+  description: string
+  preset: LevelConfig['preset']
+  timerSeconds: number
+  containerCount?: number
+  dischargeContainerCount?: number
+  transitContainerCount?: number
+  hazmatRate: number
+  comingSoon?: boolean
 }
 
-function formatTimer(level: LevelConfig): string {
+function startLevel(level: MenuLevel) {
+  if (level.comingSoon || !store.isLevelUnlocked(level.id)) return
+  store.startLevel(level.id)
+}
+
+function formatTimer(level: MenuLevel): string {
   if (!level.timerSeconds) return ''
   const mins = Math.ceil(level.timerSeconds / 60)
   return mins === 1 ? '1min' : `${mins}mins`
 }
 
-function loadCount(level: LevelConfig): number {
+function loadCount(level: MenuLevel): number {
   return level.containerCount ?? 0
 }
 
-function dischargeCount(level: LevelConfig): number {
+function dischargeCount(level: MenuLevel): number {
   return level.dischargeContainerCount ?? 0
 }
 
-function onboardCount(level: LevelConfig): number {
+function onboardCount(level: MenuLevel): number {
   return level.transitContainerCount ?? 0
 }
 
-function hasHazmat(level: LevelConfig): boolean {
+function hasHazmat(level: MenuLevel): boolean {
   return level.hazmatRate > 0
 }
 
@@ -45,8 +58,18 @@ function formatBestTime(seconds: number | null): string {
   return mins > 0 ? `${mins}m ${secs.toString().padStart(2, '0')}s` : `${secs}s`
 }
 
-function isLocked(levelId: number): boolean {
-  return !store.isLevelUnlocked(levelId)
+function isLocked(level: MenuLevel): boolean {
+  return !!level.comingSoon || !store.isLevelUnlocked(level.id)
+}
+
+function lockLabel(level: MenuLevel): string {
+  return level.comingSoon ? 'Coming Soon' : 'Locked'
+}
+
+function lockTooltip(level: MenuLevel): string {
+  return level.comingSoon
+    ? 'This vessel tier is coming soon.'
+    : 'You must complete the previous level first.'
 }
 
 function handleKeydown(event: KeyboardEvent): void {
@@ -74,16 +97,34 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
 })
 
-const vesselGroups = [
+const megaLevels: MenuLevel[] = Array.from({ length: 5 }, (_, index) => ({
+  id: 10 + index,
+  name: `Level ${11 + index}`,
+  description: 'Large-vessel operations coming soon.',
+  preset: LEVELS[LEVELS.length - 1].preset,
+  timerSeconds: 0,
+  containerCount: 0,
+  dischargeContainerCount: 0,
+  transitContainerCount: 0,
+  hazmatRate: 0,
+  comingSoon: true,
+}))
+
+const vesselMenuGroups: Array<{ label: string; icon: string; levels: MenuLevel[] }> = [
   {
     label: 'Tiny Vessel',
-    icon: '🛥️',
+    icon: '🚢',
     levels: LEVELS.slice(0, 5),
   },
   {
-    label: 'Medium Vessel',
+    label: 'Medium Feeder Vessel',
     icon: '🚢',
     levels: LEVELS.slice(5, 10),
+  },
+  {
+    label: 'Mega Vessel',
+    icon: '🛳️',
+    levels: megaLevels,
   },
 ]
 </script>
@@ -109,7 +150,7 @@ const vesselGroups = [
 
       <div class="vessel-columns">
         <div
-          v-for="group in vesselGroups"
+          v-for="group in vesselMenuGroups"
           :key="group.label"
           class="vessel-column"
         >
@@ -122,12 +163,12 @@ const vesselGroups = [
             v-for="level in group.levels"
             :key="level.id"
             class="level-btn"
-            :class="{ 'level-btn--locked': isLocked(level.id) }"
-            :aria-disabled="isLocked(level.id)"
-            @click="startLevel(level.id)"
+            :class="{ 'level-btn--locked': isLocked(level), 'level-btn--coming-soon': level.comingSoon }"
+            :aria-disabled="isLocked(level)"
+            @click="startLevel(level)"
           >
             <div
-              v-if="getBest(level.id)"
+              v-if="getBest(level.id) && !level.comingSoon"
               class="level-best"
             >
               <span class="best-label">Best</span>
@@ -136,16 +177,16 @@ const vesselGroups = [
               <span class="best-time">{{ formatBestTime(getBest(level.id)?.bestTimeSeconds ?? null) }}</span>
             </div>
             <div
-              v-if="isLocked(level.id)"
+              v-if="isLocked(level)"
               class="level-lock"
             >
-              Locked
+              {{ lockLabel(level) }}
             </div>
             <div
-              v-if="isLocked(level.id)"
+              v-if="isLocked(level)"
               class="level-tooltip"
             >
-              You must complete the previous level first.
+              {{ lockTooltip(level) }}
             </div>
             <div class="level-name">
               {{ level.name }}
@@ -211,7 +252,7 @@ const vesselGroups = [
 
 .modal-content {
   text-align: center;
-  width: min(1040px, 96vw);
+  width: min(1260px, 98vw);
   padding: 36px 32px;
 }
 
@@ -240,8 +281,8 @@ const vesselGroups = [
 
 .vessel-columns {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(3, minmax(320px, 1fr));
+  gap: 20px;
   align-items: start;
 }
 
@@ -301,6 +342,10 @@ const vesselGroups = [
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.22);
   transform: none;
+}
+
+.level-btn--coming-soon {
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .level-name {
