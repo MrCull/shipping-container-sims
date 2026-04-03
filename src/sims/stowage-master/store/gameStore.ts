@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { GamePhase, DisasterType, Container, Slot, ShipPreset, GameEvent, PlacementResult, StarRatingResult } from '../types'
+import type { GamePhase, DisasterType, Container, Slot, ShipPreset, GameEvent, PlacementResult, StarRatingResult, LevelBestRecord } from '../types'
 import { generateContainerList, resetSerialCounter } from '../modules/containerFactory'
 import { generateSlots, getAvailableSlots } from '../modules/shipGrid'
 import { updatePhysics, checkDisasters } from '../modules/physics'
@@ -10,6 +10,7 @@ import { generateDischargeManifest, getDischargeableSlots, getRestowSlots } from
 import { SCORING } from '../modules/config'
 
 let eventIdCounter = 0
+const STORAGE_KEY = 'stowage-master-level-bests'
 
 export const useGameStore = defineStore('stowage-master-game', () => {
   const phase = ref<GamePhase>('start')
@@ -31,6 +32,8 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const totalSlots = ref(0)
   const timerTotal = ref(0)     // total seconds for the level (0 = no timer)
   const timerRemaining = ref(0) // seconds remaining
+  const elapsedSeconds = ref(0)
+  const levelBests = ref<Record<number, LevelBestRecord>>(loadLevelBests())
 
   // Scene loading state — shown while 3D assets are downloading
   const isLoading = ref(false)
@@ -91,6 +94,43 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
   const levelConfig = computed(() => getLevelConfig(currentLevel.value))
 
+  function loadLevelBests(): Record<number, LevelBestRecord> {
+    if (typeof localStorage === 'undefined') return {}
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (!raw) return {}
+      return JSON.parse(raw) as Record<number, LevelBestRecord>
+    } catch {
+      return {}
+    }
+  }
+
+  function persistLevelBests(): void {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(levelBests.value))
+  }
+
+  function getElapsedSeconds(): number {
+    return Math.max(0, Math.round(elapsedSeconds.value))
+  }
+
+  function recordLevelBest(): void {
+    const levelId = currentLevel.value
+    const completionSeconds = getElapsedSeconds()
+    const previous = levelBests.value[levelId]
+    const next: LevelBestRecord = {
+      bestScore: previous ? Math.max(previous.bestScore, score.value) : score.value,
+      bestTimeSeconds: previous?.bestTimeSeconds == null
+        ? completionSeconds
+        : Math.min(previous.bestTimeSeconds, completionSeconds),
+    }
+    levelBests.value = {
+      ...levelBests.value,
+      [levelId]: next,
+    }
+    persistLevelBests()
+  }
+
   function countHazmatPremiumContainers(): number {
     let count = containers.value.filter(container => container.isHazmat).length
     for (const slot of Object.values(grid.value)) {
@@ -133,6 +173,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
     timerTotal.value = config.timerSeconds ?? 0
     timerRemaining.value = config.timerSeconds ?? 0
+    elapsedSeconds.value = 0
 
     // Discharge phase init
     dischargeCount.value = 0
@@ -175,7 +216,6 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   }
 
   function tickTimer(deltaSeconds: number): 'expired' | 'warn30pct' | 'warn15pct' | null {
-    if (timerTotal.value <= 0) return null
     if (
       phase.value !== 'selecting' &&
       phase.value !== 'animating' &&
@@ -184,6 +224,9 @@ export const useGameStore = defineStore('stowage-master-game', () => {
       phase.value !== 'restow_selecting' &&
       phase.value !== 'restow_animating'
     ) return null
+
+    elapsedSeconds.value += deltaSeconds
+    if (timerTotal.value <= 0) return null
 
     const prev = timerRemaining.value
     timerRemaining.value = Math.max(0, timerRemaining.value - deltaSeconds)
@@ -358,6 +401,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     if (dischargedCount.value >= dischargeCount.value) {
       if (levelConfig.value.completionMode === 'discharge-only') {
         phase.value = 'complete'
+        recordLevelBest()
         addEvent('Discharge complete! Vessel cleared and ready to sail.', 'success')
         return { levelPhaseEnd: true, discharge }
       }
@@ -424,6 +468,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
       if (score.value >= targetScore.value) {
         phase.value = 'complete'
+        recordLevelBest()
         addEvent('Level complete!', 'success')
       } else {
         phase.value = 'failed'
@@ -462,12 +507,16 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     return getStarRating(score.value, perfectScore.value)
   }
 
+  function getLevelBest(levelId: number): LevelBestRecord | null {
+    return levelBests.value[levelId] ?? null
+  }
+
   return {
     phase, currentLevel, score, moveCount, containers,
     currentContainerIndex, grid, shipConfig, shipList,
     shipTrim, shipVCG, events, disasterType, lastPlacement,
     perfectScore, targetScore, totalSlots,
-    timerTotal, timerRemaining,
+    timerTotal, timerRemaining, elapsedSeconds, levelBests,
     isLoading, loadingMessage,
     dischargeCount, dischargedCount, dischargeScore, lastDischarge,
     currentContainer, queueContainers, nextThreeContainers,
@@ -477,6 +526,6 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     placeRestowContainer, finalizeRestow, cancelRestowSelection,
     restowContainer, restowFromSlotId, availableRestowSlots,
     hasTransitContainers, confirmBriefing,
-    addEvent, setPhase, getStarRatingResult, tickTimer,
+    addEvent, setPhase, getStarRatingResult, getLevelBest, tickTimer,
   }
 })

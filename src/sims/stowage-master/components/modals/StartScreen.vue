@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useGameStore } from '../../store/gameStore'
 import { LEVELS, getTotalSlots } from '../../modules/levels'
-import type { LevelConfig } from '../../types'
+import type { LevelBestRecord, LevelConfig } from '../../types'
 
 const store = useGameStore()
 
@@ -29,6 +29,17 @@ function onboardCount(level: LevelConfig): number {
 
 function hasHazmat(level: LevelConfig): boolean {
   return level.hazmatRate > 0
+}
+
+function getBest(levelId: number): LevelBestRecord | null {
+  return store.getLevelBest(levelId)
+}
+
+function formatBestTime(seconds: number | null): string {
+  if (seconds == null) return '--'
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return mins > 0 ? `${mins}m ${secs.toString().padStart(2, '0')}s` : `${secs}s`
 }
 
 const vesselGroups = [
@@ -75,6 +86,15 @@ const vesselGroups = [
             class="level-btn"
             @click="startLevel(level.id)"
           >
+            <div
+              v-if="getBest(level.id)"
+              class="level-best"
+            >
+              <span class="best-label">Best</span>
+              <span class="best-score">${{ getBest(level.id)?.bestScore.toLocaleString() }}</span>
+              <span class="best-sep">•</span>
+              <span class="best-time">{{ formatBestTime(getBest(level.id)?.bestTimeSeconds ?? null) }}</span>
+            </div>
             <div class="level-name">
               {{ level.name }}
             </div>
@@ -194,6 +214,7 @@ const vesselGroups = [
 }
 
 .level-btn {
+  position: relative;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
@@ -237,6 +258,17 @@ const vesselGroups = [
   margin-top: 8px;
   padding-top: 7px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.level-best {
+  position: absolute;
+  top: 13px;
+  right: 15px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  color: #8f96a3;
 }
 
 .meta-item {
@@ -285,6 +317,26 @@ const vesselGroups = [
 .meta-sep {
   color: rgba(255, 255, 255, 0.18);
   font-size: 9px;
+}
+
+.best-label {
+  color: #728094;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.best-score {
+  color: #7df0b3;
+  font-weight: bold;
+}
+
+.best-time {
+  color: #ffcb6b;
+  font-weight: bold;
+}
+
+.best-sep {
+  color: rgba(255, 255, 255, 0.18);
 }
 
 @media (max-width: 800px) {

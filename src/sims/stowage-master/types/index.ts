@@ -137,6 +137,11 @@ export interface StarRatingResult {
   title: string
 }
 
+export interface LevelBestRecord {
+  bestScore: number
+  bestTimeSeconds: number | null
+}
+
 export interface BriefingLegendItem {
   /** CSS colour string for the swatch (e.g. '#ffd700') */
   color: string
