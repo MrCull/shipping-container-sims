@@ -46,8 +46,8 @@ const visible = ref(true)
 <style scoped>
 .keyboard-hint {
   position: absolute;
-  bottom: 18px;
-  right: 18px;
+  top: 72px;
+  left: 18px;
   z-index: 20;
   background: rgba(0, 0, 0, 0.78);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -126,6 +126,6 @@ kbd {
 .hint-fade-enter-from,
 .hint-fade-leave-to {
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(-6px);
 }
 </style>

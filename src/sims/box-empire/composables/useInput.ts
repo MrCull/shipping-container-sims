@@ -47,6 +47,13 @@ export function useInput(
         if (cur.name && (cur.name.startsWith('rs-') || cur.name.startsWith('mhc-'))) {
           store.selectedEquipmentId = cur.name
           store.selectedContainerId = null
+          store.selectedGatehouseId = null
+          return
+        }
+        if (cur.name === 'gatehouse-ingate' || cur.name === 'gatehouse-outgate') {
+          store.selectedGatehouseId = cur.name
+          store.selectedEquipmentId = null
+          store.selectedContainerId = null
           return
         }
         cur = cur.parent
@@ -60,11 +67,13 @@ export function useInput(
     if (containerId) {
       store.selectedContainerId = containerId
       store.selectedEquipmentId = null
+      store.selectedGatehouseId = null
       return
     }
 
     store.selectedContainerId = null
     store.selectedEquipmentId = null
+    store.selectedGatehouseId = null
   }
 
   onMounted(() => {

@@ -132,6 +132,16 @@ function isOutgateFree(state: BoxEmpireState, thisTruckId: string): boolean {
   return !state.truckVisits.some(t => t.id !== thisTruckId && t.state === 'at_gate_out')
 }
 
+function isIngateLaneOpen(state: BoxEmpireState, truck: TruckVisit): boolean {
+  return truck.visitType === 'export_delivery'
+    ? state.gatehouse.exportLaneOpen
+    : state.gatehouse.importLaneOpen
+}
+
+function isOutgateLaneOpen(state: BoxEmpireState): boolean {
+  return state.gatehouse.importLaneOpen
+}
+
 // Stable queue position for approaching trucks (along the gate lane, pure Z movement)
 function ingateQueueZ(state: BoxEmpireState, thisTruck: TruckVisit): number {
   const ahead = state.truckVisits.filter(
@@ -240,7 +250,7 @@ export function tickTruck(
     case 'approaching': {
       // Queue runs along pure Z at fixed X=GATE_INGATE_LANE_X (no X movement during queue)
       const baseGateZ = GATE_INGATE_POSITION.z + GATE_STOP_OFFSET
-      if (isIngateFree(state, truck.id)) {
+      if (isIngateFree(state, truck.id) && isIngateLaneOpen(state, truck)) {
         // Stop short of the barrier until gate processing completes.
         const gatePos = {
           x: GATE_INGATE_LANE_X,
@@ -279,6 +289,7 @@ export function tickTruck(
 
     case 'at_gate': {
       truck.headingY = INGATE_QUEUE_HEADING
+      if (!isIngateLaneOpen(state, truck)) break
       const elapsed = state.simTime - truck.stateStartTime
       if (elapsed >= GATE_PROCESSING_TIME) {
         // After acceptance: roll forward into the terminal before turning across.
@@ -334,6 +345,20 @@ export function tickTruck(
         break
       }
 
+      if (!isOutgateLaneOpen(state)) {
+        const holdZ = Math.max(outgateHoldZ(state, truck), gateHoldPos.z)
+        const holdPos = { x: GATE_OUTGATE_POSITION.x, y: 0, z: holdZ }
+        truck.targetPosition = holdPos
+        if (Math.abs(truck.position.z - holdZ) > 0.5 || Math.abs(truck.position.x - GATE_OUTGATE_POSITION.x) > 0.5) {
+          const { position } = moveTowards(truck.position, holdPos, TRUCK_SPEED, dt)
+          const dx = holdPos.x - truck.position.x
+          const dz = holdPos.z - truck.position.z
+          if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) truck.headingY = Math.atan2(dx, dz)
+          truck.position = position
+        }
+        break
+      }
+
       const done = advanceWaypoints(truck, TRUCK_SPEED, dt)
       if (done) {
         truck.state = 'at_gate_out'
@@ -344,6 +369,7 @@ export function tickTruck(
     }
 
     case 'at_gate_out': {
+      if (!isOutgateLaneOpen(state)) break
       const elapsed = state.simTime - truck.stateStartTime
       if (elapsed >= GATE_PROCESSING_TIME) {
         result.gateOutProcessed = true

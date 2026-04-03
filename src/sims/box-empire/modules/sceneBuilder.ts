@@ -327,6 +327,7 @@ function buildGatehouse(scene: THREE.Scene): void {
     z: number,
     label: string,
     accentMat: THREE.MeshPhongMaterial,
+    selectName: string,
     options: GatehouseBuildingOptions = {},
   ): void {
     const facing = options.facing ?? 1
@@ -336,20 +337,24 @@ function buildGatehouse(scene: THREE.Scene): void {
     const includeSignPlate = options.includeSignPlate ?? true
 
     const island = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.28, 8), curbMat)
+    island.name = selectName
     island.position.set(x + 0.4, 0.14, z)
     island.receiveShadow = true
     scene.add(island)
 
     const booth = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.6, 4.8), boothMat)
+    booth.name = selectName
     booth.position.set(x, 1.8, z)
     booth.castShadow = true
     scene.add(booth)
 
     const baseTrim = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.36, 5.1), trimMat)
+    baseTrim.name = selectName
     baseTrim.position.set(x, 0.2, z)
     scene.add(baseTrim)
 
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.34, 6.4), canopyMat)
+    canopy.name = selectName
     canopy.position.set(x + 1.4, 4.35, z)
     canopy.castShadow = true
     scene.add(canopy)
@@ -358,6 +363,7 @@ function buildGatehouse(scene: THREE.Scene): void {
       for (const px of [x - 2.1, x + 4.1]) {
         for (const pz of [z - 2.4, z + 2.4]) {
           const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 4.0, 0.22), trimMat)
+          post.name = selectName
           post.position.set(px, 2.0, pz)
           post.castShadow = true
           scene.add(post)
@@ -366,21 +372,25 @@ function buildGatehouse(scene: THREE.Scene): void {
     }
 
     const fascia = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.52, 0.18), accentMat)
+    fascia.name = selectName
     fascia.position.set(x + 1.58, 3.65, z + facing * 2.33)
     scene.add(fascia)
 
     const frontWin = new THREE.Mesh(new THREE.BoxGeometry(2.75, 1.5, 0.07), winMat)
+    frontWin.name = selectName
     frontWin.position.set(x, 2.2, z + facing * 2.43)
     scene.add(frontWin)
 
     for (const sx of [-1, 1]) {
       const sideWin = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.4, 2.1), winMat)
+      sideWin.name = selectName
       sideWin.position.set(x + sx * 1.83, 2.2, z)
       scene.add(sideWin)
     }
 
     if (includeSignPlate) {
       const signPlate = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.7, 0.08), trimMat)
+      signPlate.name = selectName
       signPlate.position.set(x + 1.55, 3.65, z + facing * 2.46)
       scene.add(signPlate)
     }
@@ -390,6 +400,7 @@ function buildGatehouse(scene: THREE.Scene): void {
       transparent: true,
       opacity: 0.22,
     }))
+    laneMark.name = selectName
     laneMark.rotation.x = -Math.PI / 2
     laneMark.position.set(x + 4.15, 0.03, z)
     scene.add(laneMark)
@@ -398,6 +409,7 @@ function buildGatehouse(scene: THREE.Scene): void {
       for (const bx of [x + 2.95, x + 5.3]) {
         for (const bz of [z - 2.6, z + 2.6]) {
           const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 1.0, 10), bollardMat)
+          bollard.name = selectName
           bollard.position.set(bx, 0.5, bz)
           bollard.castShadow = true
           scene.add(bollard)
@@ -407,6 +419,7 @@ function buildGatehouse(scene: THREE.Scene): void {
 
     if (includeRoofLamps) {
       const roofLampLeft = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.18, 0.14), lampMat)
+      roofLampLeft.name = selectName
       roofLampLeft.position.set(x - 1.4, 4.2, z + facing * 2.15)
       scene.add(roofLampLeft)
       const roofLampRight = roofLampLeft.clone()
@@ -418,7 +431,7 @@ function buildGatehouse(scene: THREE.Scene): void {
   // ---- IN-GATE (at TERMINAL_FENCE_Z) ----
   // Lane is at x=GATE_INGATE_POSITION.x; gatehouse building is beside it at x-4
   const inBuildX = GATE_INGATE_POSITION.x - 5
-  addBuilding(inBuildX, TERMINAL_FENCE_Z + 2, 'IN', orangeMat, {
+  addBuilding(inBuildX, TERMINAL_FENCE_Z + 2, 'IN', orangeMat, 'gatehouse-ingate', {
     facing: -1,
     includeCanopyPosts: false,
     includeBollards: false,
@@ -443,7 +456,7 @@ function buildGatehouse(scene: THREE.Scene): void {
   // Same footprint as in-gate but on maxX: long axis ∥ Z (fence), trucks exit +Z (landward, away from berth)
   const outBuildX = GATE_OUTGATE_POSITION.x + 5.1
   const outBuildZ = GATE_OUTGATE_POSITION.z - 5
-  addBuilding(outBuildX, outBuildZ, 'OUT', blueMat, {
+  addBuilding(outBuildX, outBuildZ, 'OUT', blueMat, 'gatehouse-outgate', {
     facing: 1,
     includeCanopyPosts: false,
     includeBollards: false,

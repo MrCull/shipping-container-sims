@@ -94,6 +94,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   const jobs = ref<Job[]>([])
   const selectedContainerId = ref<string | null>(null)
   const selectedEquipmentId = ref<string | null>(null)
+  const selectedGatehouseId = ref<string | null>(null)
   const events = ref<GameEvent[]>([])
   const pendingEventCallbacks = ref<GameEvent[]>([])
 
@@ -193,6 +194,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       jobs: jobs.value,
       selectedContainerId: selectedContainerId.value,
       selectedEquipmentId: selectedEquipmentId.value,
+      selectedGatehouseId: selectedGatehouseId.value,
       events: events.value,
     }
   }
@@ -243,6 +245,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     events.value = []
     selectedContainerId.value = null
     selectedEquipmentId.value = null
+    selectedGatehouseId.value = null
     tutorialOverlayDismissed.value = false
     exportTrucksSent.value = 0
     importTrucksSent.value = 0
@@ -1505,6 +1508,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     jobs,
     selectedContainerId,
     selectedEquipmentId,
+    selectedGatehouseId,
     events,
     activeJobs,
     pendingJobs,

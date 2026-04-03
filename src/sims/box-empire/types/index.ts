@@ -402,5 +402,6 @@ export interface BoxEmpireState {
   jobs: Job[]
   selectedContainerId: string | null
   selectedEquipmentId: string | null
+  selectedGatehouseId: string | null
   events: GameEvent[]
 }

@@ -154,7 +154,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   }
 
   function shouldOpenIngateBarrier(trucks: TruckVisit[], gatehouse: GatehouseState): boolean {
-    if (!gatehouse.exportLaneOpen) return false
+    if (!gatehouse.exportLaneOpen && !gatehouse.importLaneOpen) return false
     return trucks.some(truck =>
       (truck.state === 'driving_to_yard' && truck.position.z < GATE_INGATE_POSITION.z + 12),
     )
