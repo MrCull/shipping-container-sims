@@ -44,11 +44,15 @@ let craneObj: CraneObject | null = null
 let ocean: THREE.Mesh | null = null
 let foam: THREE.Points | null = null
 let hoistMesh: THREE.Group | null = null
+let activeTruckMesh: THREE.Group | null = null
 let queueMeshes: THREE.Group[] = []
 let truckMeshes: THREE.Group[] = []
 let outboundTruckGroups: THREE.Group[] = []
 let currentAnimation: ((dt: number) => boolean) | null = null
 let disasterAnimation: DisasterAnimation | null = null
+let pendingHoistContainer: Container | null = null
+let pendingQueueContainers: Container[] | null = null
+let inboundQueueAdvancing = false
 
 
 interface TruckAnim {
@@ -185,6 +189,41 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
       }
       return true
     })
+  }
+
+  if (inboundQueueAdvancing && truckAnimations.length === 0) {
+    inboundQueueAdvancing = false
+    if (truckMeshes[0] && queueMeshes[0] && craneObj) {
+      const dockPos = getDockPosition(craneObj)
+      activeTruckMesh = truckMeshes.shift() ?? null
+      hoistMesh = queueMeshes.shift() ?? null
+
+      if (activeTruckMesh) {
+        activeTruckMesh.position.set(dockPos.x, 0.0, dockPos.z)
+        activeTruckMesh.name = 'active-load-truck'
+      }
+
+      if (hoistMesh) {
+        hoistMesh.position.set(
+          dockPos.x + TRUCK.containerXOffset,
+          TRUCK.deckHeight + CONTAINER.size.y / 2,
+          dockPos.z
+        )
+        hoistMesh.name = 'hoist-mesh'
+      }
+
+      pendingHoistContainer = null
+    } else if (pendingHoistContainer) {
+      const nextContainer = pendingHoistContainer
+      pendingHoistContainer = null
+      void updateHoistMesh(nextContainer)
+    }
+
+    if (pendingQueueContainers) {
+      const nextQueue = pendingQueueContainers
+      pendingQueueContainers = null
+      void updateQueueMeshes(nextQueue)
+    }
   }
 
   // Outbound trucks depart with loaded container, then queue advances
@@ -394,11 +433,15 @@ watch(() => store.restowContainer, () => {
 })
 
 watch(() => store.currentContainer, (container) => {
-  updateHoistMesh(container)
+  void updateHoistMesh(container)
 })
 
 watch(() => store.nextThreeContainers, (containers) => {
-  updateQueueMeshes(containers)
+  if (inboundQueueAdvancing) {
+    pendingQueueContainers = [...containers]
+    return
+  }
+  void updateQueueMeshes(containers)
 }, { deep: true })
 
 watch(() => store.disasterType, (type) => {
@@ -493,11 +536,11 @@ async function buildScene(): Promise<void> {
     outboundTruckGroups = obTrucks.map(e => e.truck)
 
     // Inbound queue is visible in the background during discharge
-    updateHoistMesh(store.currentContainer)
+    await updateHoistMesh(store.currentContainer)
     updateQueueMeshes(store.nextThreeContainers)
   } else {
     // Load-only level — no slot indicators yet; added when briefing is dismissed
-    updateHoistMesh(store.currentContainer)
+    await updateHoistMesh(store.currentContainer)
     updateQueueMeshes(store.nextThreeContainers)
   }
 
@@ -857,12 +900,6 @@ function handleClick(event: MouseEvent): void {
   containerMesh.position.copy(pickupPos)
   scene.add(containerMesh)
 
-  // Remove the front container mesh from queue display (it's now being lifted)
-  if (queueMeshes[0]) {
-    disposeGroup(queueMeshes[0], scene)
-    queueMeshes.shift()
-  }
-
   const slot = store.grid[slotId]
   const cfg = store.shipConfig!
   const deckY = cfg.deckOffsetY ?? cfg.height * 0.3
@@ -898,10 +935,50 @@ function handleClick(event: MouseEvent): void {
   )
 }
 
-function updateHoistMesh(container: Container | null): void {
-  removeHoistMesh()
+async function ensureActiveTruckMesh(): Promise<void> {
   const scene = getScene()
-  if (!container || !craneObj || !scene) return
+  if (!scene || !craneObj || activeTruckMesh) return
+
+  const dockPos = getDockPosition(craneObj)
+  const truck = await createTerminalTruckGLB()
+  truck.position.set(dockPos.x, 0.0, dockPos.z)
+  truck.name = 'active-load-truck'
+  scene.add(truck)
+  activeTruckMesh = truck
+}
+
+function removeActiveTruckMesh(): void {
+  const scene = getScene()
+  if (!scene || !activeTruckMesh) return
+  disposeGroup(activeTruckMesh, scene)
+  activeTruckMesh = null
+}
+
+async function updateHoistMesh(container: Container | null): Promise<void> {
+  if (!container || !craneObj) {
+    removeHoistMesh()
+    pendingHoistContainer = null
+    removeActiveTruckMesh()
+    return
+  }
+
+  if (inboundQueueAdvancing) {
+    pendingHoistContainer = container
+    return
+  }
+
+  const visibleContainer = hoistMesh?.userData['container'] as Container | undefined
+  if (activeTruckMesh && visibleContainer?.id === container.id) {
+    pendingHoistContainer = null
+    return
+  }
+
+  removeHoistMesh()
+
+  await ensureActiveTruckMesh()
+
+  const scene = getScene()
+  if (!scene) return
 
   // Show current container sitting on the front truck, ready to be picked up
   const dockPos = getDockPosition(craneObj)
@@ -910,6 +987,7 @@ function updateHoistMesh(container: Container | null): void {
   mesh.name = 'hoist-mesh'
   scene.add(mesh)
   hoistMesh = mesh
+  pendingHoistContainer = null
 }
 
 function removeHoistMesh(): void {
@@ -954,8 +1032,10 @@ async function updateQueueMeshes(containers: Container[]): Promise<void> {
 
   for (let i = 0; i < containers.length; i++) {
     const container = containers[i]
-    // Truck 0 is directly under the crane; subsequent trucks wait behind (negative X)
-    const xPos = dockPos.x - i * TRUCK.spacing
+    // The active load truck sits at dockPos under the crane. Visible queued trucks
+    // should wait one full truck length behind it so the next container is not
+    // rendered in the same pickup position.
+    const xPos = dockPos.x - (i + 1) * TRUCK.spacing
 
     const truck = await createTerminalTruckGLB()
     truck.position.set(xPos, 0.0, zPos)
@@ -1004,6 +1084,9 @@ function clearScene(): void {
     disasterAnimation = null
   }
   currentAnimation = null
+  pendingHoistContainer = null
+  pendingQueueContainers = null
+  inboundQueueAdvancing = false
   sailAway.active = false
   sailAway.elapsed = 0
   sailIn.active = false
@@ -1017,6 +1100,7 @@ function clearScene(): void {
   ocean = null
   foam = null
   hoistMesh = null
+  activeTruckMesh = null
   queueMeshes = []
   truckMeshes = []
   truckAnimations = []
@@ -1073,35 +1157,36 @@ function triggerTruckAdvance(): void {
   if (!craneObj) return
   const scene = getScene()
   if (!scene) return
+  inboundQueueAdvancing = true
+
+  if (activeTruckMesh) {
+    truckAnimations.push({
+      truck: activeTruckMesh,
+      container: null,
+      startX: activeTruckMesh.position.x,
+      endX: activeTruckMesh.position.x + TRUCK.spacing * 2,
+      elapsed: 0,
+      duration: 1.8,
+      departing: true,
+    })
+    activeTruckMesh = null
+  }
 
   truckMeshes.forEach((truck, i) => {
-    if (i === 0) {
-      // Front truck is now empty — depart it forward past the crane and fade it out
-      truckAnimations.push({
-        truck,
-        container: null,
-        startX: truck.position.x,
-        endX: truck.position.x + TRUCK.spacing * 2,
-        elapsed: 0,
-        duration: 1.8,
-        departing: true,
-      })
-    } else {
-      // Remaining trucks advance one TRUCK.spacing toward the crane.
-      // queueMeshes was already shifted in handleClick, so index i-1 maps correctly.
-      const containerMesh = queueMeshes[i - 1] ?? null
-      setGroupOpacity(truck, 1.0)
-      if (containerMesh) setGroupOpacity(containerMesh, 1.0)
-      truckAnimations.push({
-        truck,
-        container: containerMesh,
-        startX: truck.position.x,
-        endX: truck.position.x + TRUCK.spacing,
-        elapsed: 0,
-        duration: 0.8,
-        departing: false,
-      })
-    }
+    // Queued trucks advance one TRUCK.spacing toward the crane with their own
+    // container still on the trailer.
+    const containerMesh = queueMeshes[i] ?? null
+    setGroupOpacity(truck, 1.0)
+    if (containerMesh) setGroupOpacity(containerMesh, 1.0)
+    truckAnimations.push({
+      truck,
+      container: containerMesh,
+      startX: truck.position.x,
+      endX: truck.position.x + TRUCK.spacing,
+      elapsed: 0,
+      duration: 0.8,
+      departing: false,
+    })
   })
 }
 
