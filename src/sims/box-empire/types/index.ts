@@ -243,7 +243,10 @@ export interface Job {
 
 // ---- Economy --------------------------------------------------------------
 
-export type TransactionType = 'gate_out_revenue' | 'vessel_load_revenue'
+export type TransactionType =
+  | 'gate_out_revenue'
+  | 'vessel_load_revenue'
+  | 'reach_stacker_move_cost'
 
 export interface Transaction {
   id: string
@@ -261,6 +264,7 @@ export type GameEventType =
   | 'vessel.container.lifted'
   | 'vessel.container.placed'
   | 'money.earned'
+  | 'money.spent'
   | 'vessel.announced'
   | 'vessel.arriving'
   | 'vessel.arrived'

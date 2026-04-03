@@ -91,6 +91,7 @@ export const TUTORIAL_YARD = {
 
 export const GATE_OUT_REVENUE = 100
 export const VESSEL_LOAD_REVENUE = 150
+export const REACH_STACKER_MOVE_COST = 20
 
 // ---- Tutorial scenario ----------------------------------------------------
 
@@ -186,6 +187,7 @@ export const SOUND_MAP: Record<string, string> = {
   'vessel.container.lifted': 'container-loaded-to-ship.mp3',
   'vessel.container.placed': 'container-set-down-on-ship.mp3',
   'money.earned': 'money-increase-ca-ching-.mp3',
+  'money.spent': 'coin-drop-1-second.mp3',
   // Horn plays only once when vessel first appears (arriving state)
   'vessel.arriving': 'small-ship-three-horns-in-a-row.mp3',
   // Departure horn plays immediately when vessel starts leaving (departing state)

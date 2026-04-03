@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Transaction, TransactionType } from '../types'
-import { GATE_OUT_REVENUE, VESSEL_LOAD_REVENUE } from './config'
+import { GATE_OUT_REVENUE, VESSEL_LOAD_REVENUE, REACH_STACKER_MOVE_COST } from './config'
 
 let txCounter = 0
 
@@ -13,7 +13,9 @@ export function createTransaction(
   simTime: number,
 ): Transaction {
   txCounter++
-  const amount = type === 'gate_out_revenue' ? GATE_OUT_REVENUE : VESSEL_LOAD_REVENUE
+  let amount = VESSEL_LOAD_REVENUE
+  if (type === 'gate_out_revenue') amount = GATE_OUT_REVENUE
+  if (type === 'reach_stacker_move_cost') amount = -REACH_STACKER_MOVE_COST
   return {
     id: `tx-${txCounter}`,
     type,

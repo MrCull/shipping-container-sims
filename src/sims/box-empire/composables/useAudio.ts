@@ -10,6 +10,7 @@ import { SOUND_MAP } from '../modules/config'
 import containerPlacedUrl from '../assets/sounds/container-loaded-to-ship.mp3'
 import containerSetDownUrl from '../assets/sounds/container-set-down-on-ship.mp3'
 import moneyEarnedUrl from '../assets/sounds/money-increase-ca-ching-.mp3'
+import moneySpentUrl from '../assets/sounds/coin-drop-1-second.mp3'
 import vesselHornUrl from '../assets/sounds/small-ship-three-horns-in-a-row.mp3'
 import cheerUrl from '../assets/sounds/group-yay-cheer.mp3'
 import levelUpUrl from '../assets/sounds/level-up.mp3'
@@ -20,6 +21,7 @@ const FILE_TO_URL: Record<string, string> = {
   'container-loaded-to-ship.mp3': containerPlacedUrl,
   'container-set-down-on-ship.mp3': containerSetDownUrl,
   'money-increase-ca-ching-.mp3': moneyEarnedUrl,
+  'coin-drop-1-second.mp3': moneySpentUrl,
   'small-ship-three-horns-in-a-row.mp3': vesselHornUrl,
   'group-yay-cheer.mp3': cheerUrl,
   'level-up.mp3': levelUpUrl,

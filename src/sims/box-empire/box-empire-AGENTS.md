@@ -126,8 +126,9 @@ Containers use individual `THREE.Mesh` with per-container `createContainerMateri
 
 - Import gate-out: **$100** per container
 - Export vessel load: **$150** per container
+- Reach stacker move cost: **$20** per completed non-revenue move (truck ↔ yard, yard ↔ quay, yard ↔ yard shuffle)
 - Tutorial total: **$1,250** (5 × $100 + 5 × $150)
-- Transactions stored in `Transaction[]` with type `'gate_out_revenue' | 'vessel_load_revenue'`
+- Transactions stored in `Transaction[]` with type `'gate_out_revenue' | 'vessel_load_revenue' | 'reach_stacker_move_cost'`
 
 ## Gatehouse State
 
@@ -158,6 +159,7 @@ Eight shipping lines are defined in `containerMaterials.ts` (`SHIPPING_LINE_LIVE
 - Containers are synced to their carrying truck's position during movement phases
 - The vessel hull shape runs along the Z axis (bow at +Z, stern at −Z), matching the berth orientation
 - Tutorial and narrator milestones can request guided camera pans to relevant areas such as the vessel approach lane, berth, crane, quay, yard, truck stand, out-gate, and gatehouse; these animate the OrbitControls camera rather than replacing the camera system
+- Completed reach-stacker jobs deduct operating cost immediately, emit a `money.spent` event, and play `coin-drop-1-second.mp3`
 - Trucks depart via the out-gate at `GATE_OUTGATE_POSITION.z`, clearing the terminal
 - `spatialOccupancy` is rebuilt each tick from current entity positions; no manual "update" call is needed
 - The ocean mesh in `sceneBuilder.ts` is animated each frame via `animateOcean(time)` using vertex displacement — call this from the render loop

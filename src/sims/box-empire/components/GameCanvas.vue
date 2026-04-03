@@ -26,6 +26,11 @@ const { start, stop } = useGameLoop((dt: number) => {
       const amount = evt.data.amount as number
       spawnFloatingText(`+$${amount}`, '#2ecc71', pos)
     }
+    if (evt.type === 'money.spent' && evt.data?.position) {
+      const pos = evt.data.position as { x: number; y: number; z: number }
+      const amount = evt.data.amount as number
+      spawnFloatingText(`-$${amount}`, '#e74c3c', pos)
+    }
     // Vessel shake when container placed on vessel
     if (evt.type === 'container.placed' && evt.data?.vesselId) {
       triggerVesselShake(evt.data.vesselId as string)

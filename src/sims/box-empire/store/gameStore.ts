@@ -31,6 +31,7 @@ import {
   CRANE_POSITION,
   GATE_OUT_REVENUE,
   VESSEL_LOAD_REVENUE,
+  REACH_STACKER_MOVE_COST,
   DEFAULT_TIME_SCALE,
   MAX_TIME_SCALE,
   TUTORIAL_EXPORT_COUNT,
@@ -421,6 +422,18 @@ export const useGameStore = defineStore('box-empire-game', () => {
     }
   }
 
+  function applyReachStackerMoveCost(job: Job, eq: Equipment): void {
+    if (eq.type !== 'reach_stacker') return
+
+    const tx = createTransaction('reach_stacker_move_cost', job.containerId, simTime.value)
+    transactions.value.push(tx)
+    money.value += tx.amount
+    emitEvent('money.spent', `-$${REACH_STACKER_MOVE_COST} — reach stacker move cost`, {
+      amount: REACH_STACKER_MOVE_COST,
+      position: { ...job.dropoffLocation.position },
+    })
+  }
+
   function setReachStackerServiceSide(
     equipmentId: string,
     side: Exclude<ReachStackerServiceSide, 'internal'>,
@@ -670,6 +683,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         }
 
         if (job && eResult.droppedContainerId) {
+          applyReachStackerMoveCost(job, eq)
           const container = containers.value.find(c => c.id === eResult.droppedContainerId)
           if (container) {
             handleJobCompletion(job, container)
