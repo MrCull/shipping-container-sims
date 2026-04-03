@@ -1,27 +1,28 @@
 # Shipping Container Sims
 
-**Play free in your browser — no install, no signup:** **[container-games.net](https://container-games.net)**
+**Play free in your browser (no install, no signup):** **[container-games.net](https://container-games.net)**
 
-This is a small **Vue 3** hub for three standalone **3D browser games**, all themed around shipping containers. Open the site, choose a card on the home page, and you are in the sim within seconds — everything runs locally in the tab with **WebGL (Three.js)** under the hood.
+This is a small **Vue 3** hub for three standalone **3D browser games**, all themed around shipping containers. Open the site, choose a card on the home page, and you are in the sim within seconds; everything runs locally in the tab with **WebGL (Three.js)** under the hood.
 
 **What is here**
 
-- **Stowage Master** — a planning puzzle: weight, cargo compatibility, and port rotation on a real bay layout.
-- **Contenga** — a physics stacker: pull and pile containers without collapsing the tower.
-- **Box Empire** — a terminal tycoon: routes, upgrades, fleets, and rivals on a stylised map.
+- **Stowage Master:** a planning puzzle: weight, cargo compatibility, and port rotation on a real bay layout.
+- **Contenga:** a physics stacker: pull and pile containers without collapsing the tower.
+- **Box Empire:** a terminal tycoon: routes, upgrades, fleets, and rivals on a stylised map.
 
-Below you will see the **home portal** first, then each game with **live gameplay**
+Below you will see the **home portal** first, then each game with **live gameplay** (not the menu). **Stowage Master** is captured **about 15 seconds after** you start Level 1 so the scene and motion read clearly.
+
 ## Main menu
 
-![Home portal — choose a game](docs/readme/home-portal.png)
+![Home portal: choose a game](docs/readme/home-portal.png)
 
 ---
 
 ## Stowage Master
 
-*Tetris meets real-world container logistics — 3D puzzle*
+*Tetris meets real-world container logistics: 3D puzzle*
 
-![Stowage Master — gameplay ~15s after starting Level 1](docs/readme/stowage-master-gameplay.png)
+![Stowage Master: gameplay ~15s after starting Level 1](docs/readme/stowage-master-gameplay.png)
 
 **What you do:** Place containers on the ship’s bays with an eye on **weight**, **cargo classes** (what can sit next to what), and **port rotation** (unload in the right order). You’re optimising a real stowage puzzle, not just filling slots.
 
@@ -31,11 +32,11 @@ Below you will see the **home portal** first, then each game with **live gamepla
 
 ## Contenga
 
-*Jenga with containers — 3D physics*
+*Jenga with containers: 3D physics*
 
-![Contenga — gameplay after pressing Play](docs/readme/contenga-gameplay.png)
+![Contenga: gameplay after pressing Play](docs/readme/contenga-gameplay.png)
 
-**What you do:** Pull blocks from the stack and **pile them on top** without letting the tower collapse. **Poor support** and bad balance bring the whole thing down — it’s tactile, risky, and very satisfying when it holds.
+**What you do:** Pull blocks from the stack and **pile them on top** without letting the tower collapse. **Poor support** and bad balance bring the whole thing down: it’s tactile, risky, and very satisfying when it holds.
 
 **Vibe:** Quick rounds, physics tension, and “just one more pull.”
 
@@ -43,9 +44,9 @@ Below you will see the **home portal** first, then each game with **live gamepla
 
 ## Box Empire
 
-*Terminal tycoon — strategy and economy*
+*Terminal tycoon: strategy and economy*
 
-![Box Empire — gameplay after starting the tutorial](docs/readme/box-empire-gameplay.png)
+![Box Empire: gameplay after starting the tutorial](docs/readme/box-empire-gameplay.png)
 
 **What you do:** Start from a **single container** and grow a **logistics empire**: buy **routes**, **upgrade ports**, manage **fleets**, and stay ahead of **rivals**. Numbers, maps, and narrative beats frame a management sim built around real terminal ideas.
 
@@ -60,7 +61,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173/` — the home page lists every sim; open any card to play.
+Open `http://localhost:5173/`. The home page lists every sim; open any card to play.
 
 ```bash
 npm run build      # Production build
@@ -82,7 +83,7 @@ npm run capture-readme-media
 
 ## For developers
 
-This repo is a **Vue 3 + TypeScript** app: **Vite**, **Pinia**, **Vue Router**, **Three.js** for 3D sims, **ESLint** for static analysis. Each game lives in its own folder under `src/sims/` and is **auto-discovered** at build time — no manual registration.
+This repo is a **Vue 3 + TypeScript** app: **Vite**, **Pinia**, **Vue Router**, **Three.js** for 3D sims, **ESLint** for static analysis. Each game lives in its own folder under `src/sims/` and is **auto-discovered** at build time (no manual registration).
 
 ### Project structure (summary)
 
@@ -107,7 +108,7 @@ knowledge-base/          # Domain reference (containers, terminals, …)
 ### Core rules
 
 - **Sim isolation:** All game-specific code, components, stores, and media stay under `src/sims/<sim-id>/`. Only truly shared logic belongs in top-level `composables/` or `components/`.
-- **Auto-discovery:** Add `src/sims/<id>/definition.ts` — the home page picks it up via `import.meta.glob`.
+- **Auto-discovery:** Add `src/sims/<id>/definition.ts`; the home page picks it up via `import.meta.glob`.
 - **Style:** Composition API only (`<script setup lang="ts">`), strict TypeScript, scoped styles, design tokens from `src/assets/main.css`.
 
 ### Add a new sim
@@ -120,7 +121,7 @@ Full conventions, 3D patterns, and domain skills: **[AGENTS.md](AGENTS.md)** and
 
 ## Experiment: agentic AI and a four-day timebox
 
-This repository was a **personal experiment** to see what could be shipped by leaning on **agentic, AI-assisted development** — combining **Claude Code**, **Cursor AI**, **OpenAI Codex**, and **GitHub Copilot** for iterative, “vibe-coded” building rather than hand-typing every line. Part of the aim was to **avoid writing or reading project code myself** as much as possible, and see what could still be achieved through prompting and tool-assisted iteration alone. I set a **four-day timebox** for myself and wanted to learn how much of a cohesive, playable browser game collection could land in that window. The stack, structure, and rough edges are honest artefacts of that sprint, not a polished studio roadmap.
+This repository was a **personal experiment** to see what could be shipped by leaning on **agentic, AI-assisted development**, combining **Claude Code**, **Cursor AI**, **OpenAI Codex**, and **GitHub Copilot** for iterative, “vibe-coded” building rather than hand-typing every line. Part of the aim was to **avoid writing or reading project code myself** as much as possible, and see what could still be achieved through prompting and tool-assisted iteration alone. I set a **four-day timebox** for myself and wanted to learn how much of a cohesive, playable browser game collection could land in that window. The stack, structure, and rough edges are honest artefacts of that sprint, not a polished studio roadmap.
 
 ## More resources
 
