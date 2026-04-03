@@ -192,6 +192,7 @@ export type EquipmentState =
   | 'dropping'
 
 export type CraneMode = 'discharge' | 'load' | 'both'
+export type ReachStackerServiceSide = 'landside' | 'waterside' | 'internal'
 
 export interface Equipment {
   id: string
@@ -205,6 +206,8 @@ export interface Equipment {
   targetPosition: Position3D | null
   speed: number
   enabled: boolean
+  canServeLandside: boolean
+  canServeWaterside: boolean
   craneMode: CraneMode
   armTargetY: number       // current spreader/boom tip height (world Y)
   armDropStartY: number    // armTargetY at the start of the drop phase (for lerp from)

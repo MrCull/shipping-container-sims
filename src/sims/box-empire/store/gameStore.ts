@@ -19,6 +19,7 @@ import type {
   BoxEmpireState,
   GatehouseState,
   CraneMode,
+  ReachStackerServiceSide,
 } from '../types'
 import {
   SHIPPING_LINE_COLORS,
@@ -27,8 +28,6 @@ import {
   CONTAINER_MAX_WEIGHT_KG,
   QUAY_BUFFER_DISCHARGE_POSITION,
   QUAY_BUFFER_LOAD_POSITION,
-  YARD_IO_POSITION,
-  YARD_IO_CONTAINER_POSITION,
   CRANE_POSITION,
   GATE_OUT_REVENUE,
   VESSEL_LOAD_REVENUE,
@@ -39,7 +38,7 @@ import {
 } from '../modules/config'
 import { createYardBlock, findAvailableSlot, placeContainerInSlot, removeContainerFromSlot, getSlotWorldPosition, isContainerOnTop } from '../modules/yardManager'
 import { createTutorialVessel, getNextDischargeContainer, getNextLoadSlot, dischargeContainerFromVessel, loadContainerOnVessel, isVesselFullyDischarged, tickVessel, getVesselSlotPosition } from '../modules/vesselManager'
-import { createTruck, tickTruck, startTruckReturnToGate, startExportTruckExit, resetTruckCounter } from '../modules/truckManager'
+import { createTruck, tickTruck, startTruckReturnToGate, startExportTruckExit, resetTruckCounter, getTruckContainerPosition, getTruckYardStandPosition } from '../modules/truckManager'
 import { makeYardSlotId, makeVesselSlotId, parseYardSlotId } from '../types'
 import { tickEquipment } from '../modules/equipmentController'
 import { createJob, assignPendingJobs, completeJob, resetJobCounter, getActiveJobForContainer, cancelJob, recheckBlockedJobs } from '../modules/jobScheduler'
@@ -313,6 +312,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
         targetPosition: null,
         speed: 5,
         enabled: false,   // disabled until narrator prompts the player to enable it
+        canServeLandside: true,
+        canServeWaterside: true,
         craneMode: 'both',
         armTargetY: 0,
         armDropStartY: 0,
@@ -333,6 +334,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
         targetPosition: null,
         speed: 2,
         enabled: false,   // disabled until vessel docks and narrator prompts the player
+        canServeLandside: true,
+        canServeWaterside: true,
         craneMode: 'both',
         armTargetY: 0,
         armDropStartY: 0,
@@ -401,6 +404,17 @@ export const useGameStore = defineStore('box-empire-game', () => {
   function closeGatehouse(): void {
     closeExportGate()
     closeImportGate()
+  }
+
+  function setReachStackerServiceSide(
+    equipmentId: string,
+    side: Exclude<ReachStackerServiceSide, 'internal'>,
+    enabled: boolean,
+  ): void {
+    const eq = equipment.value.find(e => e.id === equipmentId && e.type === 'reach_stacker')
+    if (!eq) return
+    if (side === 'landside') eq.canServeLandside = enabled
+    if (side === 'waterside') eq.canServeWaterside = enabled
   }
 
   // ---- Equipment actions --------------------------------------------------
@@ -524,11 +538,13 @@ export const useGameStore = defineStore('box-empire-game', () => {
       if (tResult.readyForEquipment) {
         if (truck.visitType === 'export_delivery' && truck.containerId) {
           const container = containers.value.find(c => c.id === truck.containerId)
+          const truckStandPosition = getTruckYardStandPosition()
+          const truckContainerPosition = getTruckContainerPosition()
           if (container) {
             container.currentLocation = {
               type: 'truck',
               id: truck.id,
-              position: { ...YARD_IO_POSITION },
+              position: truckStandPosition,
             }
           }
           const yard = yardBlocks.value[0]
@@ -538,7 +554,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
             const slotId = makeYardSlotId(slot.blockId, slot.bay, slot.row, slot.tier)
             const job = createJob(
               truck.containerId,
-              { type: 'truck', id: truck.id, position: { ...YARD_IO_CONTAINER_POSITION } },
+              { type: 'truck', id: truck.id, position: truckContainerPosition },
               { type: 'yard_slot', id: slotId, position: dropPos },
               'reach_stacker',
               10,
@@ -559,7 +575,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
                 id: slotId,
                 position: { ...container.currentLocation.position },
               },
-              { type: 'truck', id: truck.id, position: { ...YARD_IO_CONTAINER_POSITION } },
+              { type: 'truck', id: truck.id, position: getTruckContainerPosition() },
               'reach_stacker',
               8,
               simTime.value,
@@ -711,7 +727,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
             const pickupJob = createJob(
               container.id,
               { type: 'yard_slot', id: slotId, position: { ...container.currentLocation.position } },
-              { type: 'truck', id: waitingTruck.id, position: { ...YARD_IO_CONTAINER_POSITION } },
+              { type: 'truck', id: waitingTruck.id, position: getTruckContainerPosition() },
               'reach_stacker',
               8,
               simTime.value,
@@ -943,7 +959,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
           const pickupJob = createJob(
             container.id,
             { type: 'yard_slot', id: slotId, position: { ...container.currentLocation.position } },
-            { type: 'truck', id: truck.id, position: { ...YARD_IO_CONTAINER_POSITION } },
+            { type: 'truck', id: truck.id, position: getTruckContainerPosition() },
             'reach_stacker',
             8,
             simTime.value,
@@ -1385,6 +1401,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     closeImportGate,
     toggleEquipment,
     setCraneMode,
+    setReachStackerServiceSide,
     advanceTutorialStep,
     dismissTutorialOverlay,
     acceptVessel,

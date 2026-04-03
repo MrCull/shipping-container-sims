@@ -18,8 +18,8 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 | File | Purpose |
 |------|---------|
 | `store/gameStore.ts` | Central Pinia store — all game state, tick logic, and job/truck/vessel orchestration |
-| `modules/jobScheduler.ts` | Job creation, assignment, cancellation, and blocked-job recheck |
-| `modules/equipmentController.ts` | Equipment state machine and movement (RS waypoints, MHC spreader animation) |
+| `modules/jobScheduler.ts` | Job creation, assignment, cancellation, blocked-job recheck, and RS landside/waterside capability filtering |
+| `modules/equipmentController.ts` | Equipment state machine and movement (RS waypoints, side-aware truck/yard access, MHC spreader animation) |
 | `modules/vesselManager.ts` | Vessel visit lifecycle |
 | `modules/truckManager.ts` | Truck gate flow, queue logic, waypoint-based axis-aligned movement |
 | `modules/yardManager.ts` | Yard slot assignment (reserved slot tracking) |
@@ -86,7 +86,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 
 - **In-gate** — `GATE_INGATE_POSITION` `{ x: -44, z: 63 }` in the front fence; truck queue lane runs along X outside the terminal
 - **Out-gate** — `GATE_OUTGATE_POSITION` `{ x: -50, z: 105 }` in the back fence; import trucks exit here after pickup
-- **Yard I/O** — `YARD_IO_POSITION` `{ x: 0, z: 30 }` — RS meets trucks here; waiting trucks hold at `YARD_IO_WAIT_POSITION`
+- **Yard truck stand** — trucks stop on the landside road no closer than 1.5 reach-stacker lengths from the yard stack line; RS serves them from either truck side based on the shorter approach
 - **Quay buffer** — separate discharge `{ x: -5, z: 3 }` and load `{ x: 5, z: 3 }` spots
 - **Berth** — `BERTH_POSITION` `{ x: 0, z: -20 }` so the vessel hull clears the quay wall
 - **Terminal bounds** — X: −60 → 60, Z: −60 → 145
@@ -119,7 +119,7 @@ Containers use individual `THREE.Mesh` with per-container `createContainerMateri
 
 ## Equipment Types
 
-- **Reach Stacker** (`rs-1`): Yard operations — unladen 5 m/s, laden 4 m/s, 8s pick/place. Uses axis-aligned waypoints. `armTargetY` / `armDropStartY` drive boom tip animation; `headingY` drives body rotation.
+- **Reach Stacker** (`rs-1`): Yard operations — unladen 5 m/s, laden 4 m/s, 8s pick/place. Uses axis-aligned waypoints, can access yard stacks from both landside and waterside, and can approach trucks from either side based on the shorter path. `canServeLandside` gates truck ↔ yard jobs, `canServeWaterside` gates quay ↔ yard jobs, both default to enabled, and both are overridden by the main `enabled` toggle. `armTargetY` / `armDropStartY` drive boom tip animation; `headingY` drives body rotation.
 - **Mobile Harbor Crane** (`mhc-1`): Vessel operations — 90s full cycle. `spreaderZ` tracks lateral position along jib (positive = quay side, negative = vessel side). `craneMode` controls whether it discharges, loads, or both.
 
 ## Economy

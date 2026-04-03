@@ -20,7 +20,8 @@ import {
   GATE_INGATE_LANE_X,
   GATE_OUTGATE_POSITION,
   GATE_OUTGATE_FENCE_Z,
-  YARD_IO_POSITION,
+  YARD_TRUCK_PARK_POSITION,
+  YARD_TRUCK_CONTAINER_POSITION,
 } from './config'
 
 let truckCounter = 0
@@ -135,8 +136,8 @@ function isYardZoneBusy(state: BoxEmpireState, thisTruckId: string): boolean {
   return state.truckVisits.some(t => {
     if (t.id === thisTruckId) return false
     if (t.state !== 'waiting_for_equipment' && t.state !== 'driving_to_yard') return false
-    const dx = t.position.x - YARD_IO_POSITION.x
-    const dz = t.position.z - YARD_IO_POSITION.z
+    const dx = t.position.x - YARD_TRUCK_PARK_POSITION.x
+    const dz = t.position.z - YARD_TRUCK_PARK_POSITION.z
     return Math.sqrt(dx * dx + dz * dz) < YARD_ZONE_RADIUS
   })
 }
@@ -208,7 +209,7 @@ export function tickTruck(
       if (elapsed >= GATE_PROCESSING_TIME) {
         // After gate: turn into terminal and drive to yard
         // Route: from gate → internal road X → YARD_IO
-        truck.waypoints = buildWaypoints(truck.position, YARD_IO_POSITION)
+        truck.waypoints = buildWaypoints(truck.position, YARD_TRUCK_PARK_POSITION)
         truck.waypointIndex = 0
         truck.state = 'driving_to_yard'
         truck.stateStartTime = state.simTime
@@ -304,6 +305,14 @@ export function startTruckDeparture(truck: TruckVisit, simTime: number): void {
 
 export function startExportTruckExit(truck: TruckVisit, simTime: number): void {
   startTruckReturnToGate(truck, simTime)
+}
+
+export function getTruckYardStandPosition(): Position3D {
+  return { ...YARD_TRUCK_PARK_POSITION }
+}
+
+export function getTruckContainerPosition(): Position3D {
+  return { ...YARD_TRUCK_CONTAINER_POSITION }
 }
 
 // Export for config import

@@ -33,6 +33,11 @@ function handleCraneMode(mode: CraneMode): void {
   if (equipment.value) store.setCraneMode(equipment.value.id, mode)
 }
 
+function handleReachStackerService(side: 'landside' | 'waterside', enabled: boolean): void {
+  if (equipment.value?.type !== 'reach_stacker') return
+  store.setReachStackerServiceSide(equipment.value.id, side, enabled)
+}
+
 function jobStatusColor(status: string): string {
   switch (status) {
     case 'pending': return '#aaa'
@@ -106,6 +111,32 @@ function jobStatusColor(status: string): string {
             @click="handleCraneMode('load')"
           >
             ↑ Load
+          </button>
+        </div>
+      </div>
+
+      <div
+        v-if="equipment.type === 'reach_stacker'"
+        class="info-row crane-mode-row"
+      >
+        <span class="label">Service</span>
+        <div
+          class="mode-buttons"
+          :class="{ disabled: !equipment.enabled }"
+        >
+          <button
+            :class="['mode-btn', equipment.canServeLandside ? 'active' : '']"
+            title="Allow truck-to-yard and yard-to-truck jobs"
+            @click="handleReachStackerService('landside', !equipment.canServeLandside)"
+          >
+            Landside
+          </button>
+          <button
+            :class="['mode-btn', equipment.canServeWaterside ? 'active' : '']"
+            title="Allow quay-to-yard and yard-to-quay jobs"
+            @click="handleReachStackerService('waterside', !equipment.canServeWaterside)"
+          >
+            Waterside
           </button>
         </div>
       </div>
@@ -274,6 +305,10 @@ function jobStatusColor(status: string): string {
 .mode-buttons {
   display: flex;
   gap: 4px;
+}
+
+.mode-buttons.disabled {
+  opacity: 0.55;
 }
 
 .mode-btn {

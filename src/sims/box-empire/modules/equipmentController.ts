@@ -21,12 +21,12 @@ import {
   RS_PLACE_CYCLE_TIME,
   MHC_CYCLE_TIME,
   RS_TRUCK_PARK_OFFSET,
-
+  RS_YARD_PARK_OFFSET,
 } from './config'
 import { isContainerOnTop } from './yardManager'
 
 // How far (metres) the RS parks from a yard slot target (in Z, approaching from +Z side)
-const RS_PARK_OFFSET = 5.5
+const RS_PARK_OFFSET = RS_YARD_PARK_OFFSET
 // RS faces a slot: +Z side of stack → headingY = π (facing -Z)
 
 
@@ -107,16 +107,28 @@ function advanceRsWaypoints(eq: Equipment, speed: number, dt: number): boolean {
 }
 
 // For RS picking/dropping at yard slots: park RS_PARK_OFFSET behind target (in +Z)
-function rsParkingPosition(targetPos: Position3D): Position3D {
-  return { x: targetPos.x, y: 0, z: targetPos.z + RS_PARK_OFFSET }
+function chooseClosestPosition(from: Position3D, candidates: Position3D[]): Position3D {
+  return candidates.reduce((best, candidate) =>
+    distanceTo(from, candidate) <= distanceTo(from, best) ? candidate : best,
+  )
+}
+
+function rsParkingPosition(currentPos: Position3D, targetPos: Position3D): Position3D {
+  return chooseClosestPosition(currentPos, [
+    { x: targetPos.x, y: 0, z: targetPos.z + RS_PARK_OFFSET },
+    { x: targetPos.x, y: 0, z: targetPos.z - RS_PARK_OFFSET },
+  ])
 }
 
 // For RS picking/dropping at a truck at YARD_IO: park RS_TRUCK_PARK_OFFSET metres to the +X side
 // so the RS approaches the long face of the container (container length runs along truck Z axis).
 // targetPos is YARD_IO_CONTAINER_POSITION (the actual container world position, z=34),
 // so no extra Z offset is needed — the RS parks directly beside the container.
-function rsTruckParkingPosition(targetPos: Position3D): Position3D {
-  return { x: targetPos.x + RS_TRUCK_PARK_OFFSET, y: 0, z: targetPos.z }
+function rsTruckParkingPosition(currentPos: Position3D, targetPos: Position3D): Position3D {
+  return chooseClosestPosition(currentPos, [
+    { x: targetPos.x + RS_TRUCK_PARK_OFFSET, y: 0, z: targetPos.z },
+    { x: targetPos.x - RS_TRUCK_PARK_OFFSET, y: 0, z: targetPos.z },
+  ])
 }
 
 // Determine heading for RS at a given position facing a pickup/drop target
@@ -303,8 +315,8 @@ function tickReachStacker(
       // For yard/quay pickups, use RS_PARK_OFFSET
       const isPickFromTruck = job.pickupLocation.type === 'truck'
       const parkPos = isPickFromTruck
-        ? rsTruckParkingPosition(job.pickupLocation.position)
-        : rsParkingPosition(job.pickupLocation.position)
+        ? rsTruckParkingPosition(eq.position, job.pickupLocation.position)
+        : rsParkingPosition(eq.position, job.pickupLocation.position)
       eq.waypoints = buildRsWaypoints(eq.position, parkPos)
       eq.waypointIndex = 0
       eq.targetPosition = eq.waypoints[0] ?? parkPos
@@ -318,8 +330,8 @@ function tickReachStacker(
       if (eq.waypoints.length === 0) {
         const isPickFromTruck = job.pickupLocation.type === 'truck'
         const parkPos = isPickFromTruck
-          ? rsTruckParkingPosition(job.pickupLocation.position)
-          : rsParkingPosition(job.pickupLocation.position)
+          ? rsTruckParkingPosition(eq.position, job.pickupLocation.position)
+          : rsParkingPosition(eq.position, job.pickupLocation.position)
         eq.waypoints = buildRsWaypoints(eq.position, parkPos)
         eq.waypointIndex = 0
       }
@@ -375,8 +387,8 @@ function tickReachStacker(
         // Drop position: same side as approach (+Z park offset for yard; truck offset for truck drop)
         const isDropToTruck = job.dropoffLocation.type === 'truck'
         const dropPark = isDropToTruck
-          ? rsTruckParkingPosition(job.dropoffLocation.position)
-          : rsParkingPosition(job.dropoffLocation.position)
+          ? rsTruckParkingPosition(eq.position, job.dropoffLocation.position)
+          : rsParkingPosition(eq.position, job.dropoffLocation.position)
         eq.waypoints = buildRsWaypoints(eq.position, dropPark)
         eq.waypointIndex = 0
         eq.targetPosition = eq.waypoints[0] ?? dropPark
@@ -393,8 +405,8 @@ function tickReachStacker(
       if (eq.waypoints.length === 0) {
         const isDropToTruck = job.dropoffLocation.type === 'truck'
         const dropPark = isDropToTruck
-          ? rsTruckParkingPosition(job.dropoffLocation.position)
-          : rsParkingPosition(job.dropoffLocation.position)
+          ? rsTruckParkingPosition(eq.position, job.dropoffLocation.position)
+          : rsParkingPosition(eq.position, job.dropoffLocation.position)
         eq.waypoints = buildRsWaypoints(eq.position, dropPark)
         eq.waypointIndex = 0
       }

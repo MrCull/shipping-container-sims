@@ -9,6 +9,7 @@ import type {
   EquipmentType,
   Position3D,
   BoxEmpireState,
+  ReachStackerServiceSide,
 } from '../types'
 import { isContainerOnTop } from './yardManager'
 
@@ -59,6 +60,16 @@ function isJobAccessible(job: Job, state: BoxEmpireState): boolean {
   return isContainerOnTop(yard, job.containerId)
 }
 
+export function getReachStackerServiceSide(job: Job): ReachStackerServiceSide {
+  if (job.pickupLocation.type === 'truck' || job.dropoffLocation.type === 'truck') {
+    return 'landside'
+  }
+  if (job.pickupLocation.type === 'quay_buffer' || job.dropoffLocation.type === 'quay_buffer') {
+    return 'waterside'
+  }
+  return 'internal'
+}
+
 export function assignPendingJobs(state: BoxEmpireState): void {
   const pendingJobs = state.jobs
     .filter(j => j.status === 'pending')
@@ -78,6 +89,12 @@ export function assignPendingJobs(state: BoxEmpireState): void {
       if (e.type !== job.equipmentType) return false
       if (e.currentJobId) return false
       if (!e.enabled) return false
+
+      if (e.type === 'reach_stacker') {
+        const serviceSide = getReachStackerServiceSide(job)
+        if (serviceSide === 'landside' && !e.canServeLandside) return false
+        if (serviceSide === 'waterside' && !e.canServeWaterside) return false
+      }
 
       // Crane mode check
       if (e.type === 'mobile_harbor_crane') {

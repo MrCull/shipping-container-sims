@@ -50,6 +50,10 @@ export const RS_SPEED_LADEN = 4
 export const RS_PICK_CYCLE_TIME = 8
 export const RS_PLACE_CYCLE_TIME = 8
 export const RS_MAX_STACK_HEIGHT = 3
+export const RS_LENGTH = 9.5
+export const RS_YARD_PARK_OFFSET = 5.5
+export const RS_TRUCK_PARK_OFFSET = 8
+export const RS_TRUCK_STANDOFF_MULTIPLIER = 1.5
 
 // ---- Mobile Harbor Crane --------------------------------------------------
 
@@ -114,13 +118,18 @@ export const GATE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
 export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
 export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
 
-// Yard handover point where trucks park and equipment loads/unloads
-export const YARD_IO_POSITION: Position3D = { x: 0, y: CONTAINER_HEIGHT / 2, z: 30 }
-// RS parks this many metres to the +X side of the truck to approach the container's long face
-export const RS_TRUCK_PARK_OFFSET = 8
-// Waiting position trucks go to while holding before YARD_IO becomes free
-export const YARD_IO_WAIT_POSITION: Position3D = { x: -10, y: 0, z: 30 }
 export const YARD_BLOCK_POSITION: Position = { x: -15, z: 20 }
+const YARD_TRUCK_STANDOFF = RS_LENGTH * RS_TRUCK_STANDOFF_MULTIPLIER
+
+// Yard truck stand where road trucks wait for RS service, kept well clear of the stack face.
+export const YARD_TRUCK_PARK_POSITION: Position3D = {
+  x: 0,
+  y: 0,
+  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF,
+}
+// Legacy aliases kept while Box Empire still refers to Yard I/O in some UI/docs.
+export const YARD_IO_POSITION: Position3D = { ...YARD_TRUCK_PARK_POSITION, y: CONTAINER_HEIGHT / 2 }
+export const YARD_IO_WAIT_POSITION: Position3D = { x: -10, y: 0, z: YARD_TRUCK_PARK_POSITION.z }
 export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: CONTAINER_HEIGHT / 2, z: 3 }
 export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -5, y: CONTAINER_HEIGHT / 2, z: 3 }
 export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: 5, y: CONTAINER_HEIGHT / 2, z: 3 }
@@ -148,13 +157,13 @@ export const TRUCK_GLB = {
   containerOffsetZ: -4.0,
 } as const
 
-// World position of the container when the truck is parked at YARD_IO facing -Z (heading π).
-// Truck local z=-4 maps to world z = YARD_IO_POSITION.z + |containerOffsetZ| = 30+4 = 34.
-export const YARD_IO_CONTAINER_POSITION: Position3D = {
-  x: YARD_IO_POSITION.x,
+// World position of the container when the truck is parked at the yard truck stand facing -Z (heading π).
+export const YARD_TRUCK_CONTAINER_POSITION: Position3D = {
+  x: YARD_TRUCK_PARK_POSITION.x,
   y: CONTAINER_HEIGHT / 2,
-  z: YARD_IO_POSITION.z + Math.abs(TRUCK_GLB.containerOffsetZ),
+  z: YARD_TRUCK_PARK_POSITION.z + Math.abs(TRUCK_GLB.containerOffsetZ),
 }
+export const YARD_IO_CONTAINER_POSITION: Position3D = { ...YARD_TRUCK_CONTAINER_POSITION }
 
 export const VESSEL_GLB = {
   /** rotation.y to align GLB (length along Z) → game X-axis (length along X) */
