@@ -4,7 +4,6 @@ import * as THREE from 'three'
 import { useGameStore } from '../store/gameStore'
 import { useGameThreeScene } from '../composables/useThreeScene'
 import { useGameLoop } from '../composables/useGameLoop'
-import { useSlotPicking } from '../composables/useSlotPicking'
 import { useAudio } from '../composables/useAudio'
 import {
   createOcean, animateOcean,
@@ -35,7 +34,6 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const store = useGameStore()
 
 const { getScene, getCamera, isReady, render, setCameraForShip, applyKeyboardCamera } = useGameThreeScene(canvasRef)
-const { onClick: pickSlot, attach: attachPicking } = useSlotPicking(canvasRef, getCamera, getScene)
 const audio = useAudio()
 
 // Plain variables — Three.js objects must never be wrapped in Vue reactivity
@@ -53,6 +51,9 @@ let disasterAnimation: DisasterAnimation | null = null
 let pendingHoistContainer: Container | null = null
 let pendingQueueContainers: Container[] | null = null
 let inboundQueueAdvancing = false
+let hoveredSlotIndicatorId: string | null = null
+let hoveredImportIndicatorId: string | null = null
+let hoveredRestowIndicatorId: string | null = null
 
 
 interface TruckAnim {
@@ -544,7 +545,6 @@ async function buildScene(): Promise<void> {
     updateQueueMeshes(store.nextThreeContainers)
   }
 
-  attachPicking()
   startLoop()
 
   store.isLoading = false
@@ -595,7 +595,7 @@ function maybePlayHazmatRestowAlert(): void {
   audio.playSound('hazmatAlert', 0.85)
 }
 
-function pickImportSlot(event: MouseEvent): string | null {
+function getPointerData(event: MouseEvent): { camera: THREE.PerspectiveCamera; scene: THREE.Scene; canvas: HTMLCanvasElement; mouse: THREE.Vector2 } | null {
   const camera = getCamera()
   const scene = getScene()
   if (!camera || !scene) return null
@@ -607,47 +607,103 @@ function pickImportSlot(event: MouseEvent): string | null {
     ((event.clientX - rect.left) / rect.width) * 2 - 1,
     -((event.clientY - rect.top) / rect.height) * 2 + 1
   )
-  const raycaster = new THREE.Raycaster()
-  raycaster.setFromCamera(mouse, camera)
-  const hits = raycaster.intersectObjects(scene.children, true)
-  for (const hit of hits) {
-    let obj: THREE.Object3D | null = hit.object
-    while (obj) {
-      if (obj.userData?.['isImportContainer']) return obj.userData['slotId'] as string
-      obj = obj.parent
-    }
-  }
-  return null
+  return { camera, scene, canvas, mouse }
 }
 
-function pickSlotByUserData(event: MouseEvent, dataKey: string): string | null {
-  const camera = getCamera()
-  const scene = getScene()
-  if (!camera || !scene) return null
-  const canvas = canvasRef.value
-  if (!canvas) return null
-  const rect = canvas.getBoundingClientRect()
-  const mouse = new THREE.Vector2(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1
-  )
+function pickIndicatorSlot(event: MouseEvent, dataKey: string): string | null {
+  const pointer = getPointerData(event)
+  if (!pointer) return null
+
   const raycaster = new THREE.Raycaster()
-  raycaster.setFromCamera(mouse, camera)
-  const hits = raycaster.intersectObjects(scene.children, true)
+  raycaster.params.Line.threshold = 0.12
+  raycaster.setFromCamera(pointer.mouse, pointer.camera)
+  const hits = raycaster.intersectObjects(pointer.scene.children, true)
+
+  let bestSlotId: string | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+
   for (const hit of hits) {
     let obj: THREE.Object3D | null = hit.object
     while (obj) {
-      if (obj.userData?.[dataKey]) return obj.userData['slotId'] as string
+      if (obj.userData?.[dataKey]) {
+        const slotId = obj.userData['slotId'] as string
+        const worldPos = new THREE.Vector3()
+        obj.getWorldPosition(worldPos)
+        worldPos.project(pointer.camera)
+
+        const screenX = ((worldPos.x + 1) / 2) * pointer.canvas.clientWidth
+        const screenY = ((-worldPos.y + 1) / 2) * pointer.canvas.clientHeight
+        const mouseX = ((pointer.mouse.x + 1) / 2) * pointer.canvas.clientWidth
+        const mouseY = ((-pointer.mouse.y + 1) / 2) * pointer.canvas.clientHeight
+        const screenDistSq = (screenX - mouseX) ** 2 + (screenY - mouseY) ** 2
+        const wirePenalty = hit.object instanceof THREE.LineSegments ? 400 : 0
+        const score = screenDistSq + wirePenalty + hit.distance * 4
+
+        if (score < bestScore) {
+          bestScore = score
+          bestSlotId = slotId
+        }
+        break
+      }
       obj = obj.parent
     }
   }
-  return null
+
+  return bestSlotId
+}
+
+function setHoveredIndicator(groupName: string, dataKey: string, slotId: string | null): void {
+  if (!shipGroup) return
+  const group = shipGroup.getObjectByName(groupName)
+  if (!group) return
+
+  group.traverse(child => {
+    if (!child.userData?.[dataKey]) return
+    child.userData['isHovered'] = child.userData['slotId'] === slotId
+  })
+}
+
+function clearHoveredIndicators(): void {
+  hoveredSlotIndicatorId = null
+  hoveredImportIndicatorId = null
+  hoveredRestowIndicatorId = null
+  setHoveredIndicator('slot-indicators', 'isSlotIndicator', null)
+  setHoveredIndicator('import-slot-indicators', 'isImportContainer', null)
+  setHoveredIndicator('restow-slot-indicators', 'isRestowSlot', null)
+}
+
+function handlePointerMove(event: MouseEvent): void {
+  if (store.phase === 'selecting') {
+    hoveredSlotIndicatorId = pickIndicatorSlot(event, 'isSlotIndicator')
+    setHoveredIndicator('slot-indicators', 'isSlotIndicator', hoveredSlotIndicatorId)
+    setHoveredIndicator('import-slot-indicators', 'isImportContainer', null)
+    setHoveredIndicator('restow-slot-indicators', 'isRestowSlot', null)
+    return
+  }
+
+  if (store.phase === 'discharge_selecting') {
+    hoveredImportIndicatorId = pickIndicatorSlot(event, 'isImportContainer')
+    setHoveredIndicator('import-slot-indicators', 'isImportContainer', hoveredImportIndicatorId)
+    setHoveredIndicator('slot-indicators', 'isSlotIndicator', null)
+    setHoveredIndicator('restow-slot-indicators', 'isRestowSlot', null)
+    return
+  }
+
+  if (store.phase === 'restow_selecting') {
+    hoveredRestowIndicatorId = pickIndicatorSlot(event, 'isRestowSlot')
+    setHoveredIndicator('restow-slot-indicators', 'isRestowSlot', hoveredRestowIndicatorId)
+    setHoveredIndicator('slot-indicators', 'isSlotIndicator', null)
+    setHoveredIndicator('import-slot-indicators', 'isImportContainer', null)
+    return
+  }
+
+  clearHoveredIndicators()
 }
 
 function handleDischargeClick(event: MouseEvent): void {
   if (store.phase !== 'discharge_selecting') return
 
-  const slotId = pickImportSlot(event)
+  const slotId = pickIndicatorSlot(event, 'isImportContainer')
   if (!slotId) return
 
   const result = store.pickDischargeContainer(slotId)
@@ -720,7 +776,7 @@ function handleDischargeClick(event: MouseEvent): void {
 function handleRestowClick(event: MouseEvent): void {
   if (store.phase !== 'restow_selecting') return
 
-  const slotId = pickSlotByUserData(event, 'isRestowSlot')
+  const slotId = pickIndicatorSlot(event, 'isRestowSlot')
   if (!slotId) return
 
   const result = store.placeRestowContainer(slotId)
@@ -882,7 +938,7 @@ function handleClick(event: MouseEvent): void {
   }
   if (store.phase !== 'selecting') return
 
-  const slotId = pickSlot(event)
+  const slotId = pickIndicatorSlot(event, 'isSlotIndicator')
   if (!slotId) return
 
   const result = store.placeContainer(slotId)
@@ -954,6 +1010,16 @@ function removeActiveTruckMesh(): void {
   activeTruckMesh = null
 }
 
+function removeNamedSceneGroups(name: string, keepId?: number): void {
+  const scene = getScene()
+  if (!scene) return
+
+  const matches = scene.children.filter(child => child.name === name && child.id !== keepId)
+  for (const child of matches) {
+    disposeGroup(child as THREE.Group, scene)
+  }
+}
+
 async function updateHoistMesh(container: Container | null): Promise<void> {
   if (!container || !craneObj) {
     removeHoistMesh()
@@ -980,6 +1046,8 @@ async function updateHoistMesh(container: Container | null): Promise<void> {
   const scene = getScene()
   if (!scene) return
 
+  removeNamedSceneGroups('hoist-mesh')
+
   // Show current container sitting on the front truck, ready to be picked up
   const dockPos = getDockPosition(craneObj)
   const mesh = createContainerMesh(container)
@@ -1004,6 +1072,7 @@ function removeHoistMesh(): void {
     })
     hoistMesh = null
   }
+  removeNamedSceneGroups('hoist-mesh')
 }
 
 async function updateQueueMeshes(containers: Container[]): Promise<void> {
@@ -1087,6 +1156,9 @@ function clearScene(): void {
   pendingHoistContainer = null
   pendingQueueContainers = null
   inboundQueueAdvancing = false
+  hoveredSlotIndicatorId = null
+  hoveredImportIndicatorId = null
+  hoveredRestowIndicatorId = null
   sailAway.active = false
   sailAway.elapsed = 0
   sailIn.active = false
@@ -1198,6 +1270,7 @@ defineExpose({ buildScene, clearScene, isReady })
     ref="canvasRef"
     class="game-canvas"
     @click="handleClick"
+    @mousemove="handlePointerMove"
     @mousedown.right.prevent="handleRestowCancel"
     @contextmenu.prevent
   />

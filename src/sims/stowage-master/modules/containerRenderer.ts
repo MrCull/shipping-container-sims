@@ -363,14 +363,15 @@ export function animateImportSlotIndicators(shipGroup: THREE.Group, time: number
     const mesh = child as THREE.Mesh
     if (mesh.userData['isImportContainer'] && mesh.material) {
       const mat = mesh.material as THREE.MeshPhongMaterial
-      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = pulse
+      const hoverBoost = mesh.userData['isHovered'] ? 0.4 : 0
+      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = pulse + hoverBoost
       if (mat.opacity !== undefined && mat.transparent) {
-        mat.opacity = 0.10 + Math.abs(Math.sin(time * 3.0)) * 0.12
+        mat.opacity = 0.10 + Math.abs(Math.sin(time * 3.0)) * 0.12 + (mesh.userData['isHovered'] ? 0.12 : 0)
       }
     }
     const line = child as THREE.LineSegments
     if (line.material instanceof THREE.LineBasicMaterial && line.userData['isImportContainer']) {
-      line.material.opacity = 0.65 + Math.abs(Math.sin(time * 3.0)) * 0.35
+      line.material.opacity = 0.65 + Math.abs(Math.sin(time * 3.0)) * 0.35 + (line.userData['isHovered'] ? 0.2 : 0)
     }
   })
 }
@@ -473,14 +474,15 @@ export function animateRestowSlotIndicators(shipGroup: THREE.Group, time: number
       const mat = mesh.material as THREE.MeshPhongMaterial
       const base = mesh.userData['isDangerSlot'] ? 0.45 : 0.3
       const range = mesh.userData['isDangerSlot'] ? 0.5 : 0.4
-      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = base + Math.abs(Math.sin(time * 3.5)) * range
+      const hoverBoost = mesh.userData['isHovered'] ? 0.35 : 0
+      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = base + Math.abs(Math.sin(time * 3.5)) * range + hoverBoost
       if (mat.opacity !== undefined && mat.transparent) {
-        mat.opacity = 0.10 + Math.abs(Math.sin(time * 3.5)) * 0.12
+        mat.opacity = 0.10 + Math.abs(Math.sin(time * 3.5)) * 0.12 + (mesh.userData['isHovered'] ? 0.12 : 0)
       }
     }
     const line = child as THREE.LineSegments
     if (line.material instanceof THREE.LineBasicMaterial && line.userData['isRestowSlot']) {
-      line.material.opacity = 0.6 + Math.abs(Math.sin(time * 3.5)) * 0.4
+      line.material.opacity = 0.6 + Math.abs(Math.sin(time * 3.5)) * 0.4 + (line.userData['isHovered'] ? 0.2 : 0)
     }
   })
 }
@@ -495,14 +497,15 @@ export function animateSlotIndicators(shipGroup: THREE.Group, time: number): voi
     if (mesh.userData['isSlotIndicator'] && mesh.material) {
       const mat = mesh.material as THREE.MeshPhongMaterial
       const boost = mesh.userData['isDangerSlot'] ? 0.18 : 0
-      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = pulse + boost
+      const hoverBoost = mesh.userData['isHovered'] ? 0.28 : 0
+      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = pulse + boost + hoverBoost
       if (mat.opacity !== undefined && mat.transparent) {
-        mat.opacity = 0.08 + Math.abs(Math.sin(time * 2.5)) * 0.10
+        mat.opacity = 0.08 + Math.abs(Math.sin(time * 2.5)) * 0.10 + (mesh.userData['isHovered'] ? 0.12 : 0)
       }
     }
     const line = child as THREE.LineSegments
     if (line.material instanceof THREE.LineBasicMaterial) {
-      line.material.opacity = 0.6 + Math.abs(Math.sin(time * 2.5)) * 0.35
+      line.material.opacity = 0.6 + Math.abs(Math.sin(time * 2.5)) * 0.35 + (line.userData['isHovered'] ? 0.2 : 0)
     }
   })
 }
