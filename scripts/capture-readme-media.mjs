@@ -1,5 +1,5 @@
 /**
- * Captures README screenshots: home portal + ~10s into active gameplay per sim.
+ * Captures README screenshots: home portal + gameplay waits (10s default; 15s for Stowage Master).
  * Requires: npm run build && npm run preview (default http://127.0.0.1:4173)
  * Usage: BASE_URL=http://127.0.0.1:4173 node scripts/capture-readme-media.mjs
  */
@@ -15,6 +15,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const OUT_DIR = join(__dirname, '..', 'docs', 'readme')
 const BASE_URL = process.env.BASE_URL?.replace(/\/$/, '') ?? 'http://127.0.0.1:4173'
 const GAMEPLAY_WAIT_MS = Number(process.env.GAMEPLAY_WAIT_MS ?? 10_000)
+/** Longer wait for Stowage Master so the 3D scene and crane motion read clearly in the README shot. */
+const STOWAGE_MASTER_WAIT_MS = Number(process.env.STOWAGE_MASTER_WAIT_MS ?? 15_000)
 const VIEWPORT = { width: 1280, height: 720 }
 
 async function main() {
@@ -31,11 +33,11 @@ async function main() {
   // --- Stowage Master: level 1 → briefing → START → wait 10s → screenshot ---
   await page.goto(`${BASE_URL}/sim/stowage-master`, { waitUntil: 'networkidle', timeout: 60_000 })
   await page.locator('h1.game-title').waitFor({ state: 'visible' })
-  await page.getByRole('button', { name: /Level 1 - Feeder Vessel/i }).click()
+  await page.getByRole('button', { name: /^Level 1\b/i }).click()
   await page.getByRole('button', { name: 'START' }).waitFor({ state: 'visible' })
   await page.getByRole('button', { name: 'START' }).click()
   await page.locator('.timer-widget').waitFor({ state: 'visible', timeout: 15_000 })
-  await sleep(GAMEPLAY_WAIT_MS)
+  await sleep(STOWAGE_MASTER_WAIT_MS)
   await page.screenshot({ path: join(OUT_DIR, 'stowage-master-gameplay.png') })
 
   // --- Contenga: Play → wait 10s → screenshot + GIF frames ---

@@ -1,8 +1,16 @@
 # Shipping Container Sims
 
-**Play free in the browser:** **[container-games.net](https://container-games.net)**
+**Play free in your browser — no install, no signup:** **[container-games.net](https://container-games.net)**
 
-Three shipping-container-themed games in one Vue app: plan vessel loads, balance a physics tower, or run a terminal tycoon. Below is the **home portal** (pick a game), then each title with **gameplay a few seconds after you start** — not the pre-game menu.
+This is a small **Vue 3** hub for three standalone **3D browser games**, all themed around shipping containers. Open the site, choose a card on the home page, and you are in the sim within seconds — everything runs locally in the tab with **WebGL (Three.js)** under the hood.
+
+**What is here**
+
+- **Stowage Master** — a planning puzzle: weight, cargo compatibility, and port rotation on a real bay layout.
+- **Contenga** — a physics stacker: pull and pile containers without collapsing the tower.
+- **Box Empire** — a terminal tycoon: routes, upgrades, fleets, and rivals on a stylised map.
+
+Below you will see the **home portal** first, then each game with **live gameplay** (not the menu) — Stowage Master is captured **about 15 seconds after** you start Level 1 so the scene and motion read clearly.
 
 ## Main menu
 
@@ -14,7 +22,7 @@ Three shipping-container-themed games in one Vue app: plan vessel loads, balance
 
 *Tetris meets real-world container logistics — 3D puzzle*
 
-![Stowage Master — gameplay after starting Level 1](docs/readme/stowage-master-gameplay.png)
+![Stowage Master — gameplay ~15s after starting Level 1](docs/readme/stowage-master-gameplay.png)
 
 **What you do:** Place containers on the ship’s bays with an eye on **weight**, **cargo classes** (what can sit next to what), and **port rotation** (unload in the right order). You’re optimising a real stowage puzzle, not just filling slots.
 
@@ -63,14 +71,14 @@ npm run lint:fix   # ESLint with auto-fixes
 
 ### Regenerate README screenshots
 
-Requires a production preview and **ffmpeg** (for the Contenga GIF). Default wait before each gameplay shot is **10 seconds** of real time.
+Requires a production preview and **ffmpeg** (for the Contenga GIF). Default wait is **10 seconds** for Contenga and Box Empire; **Stowage Master** waits **15 seconds** so the README frame shows richer 3D gameplay (override with `STOWAGE_MASTER_WAIT_MS`).
 
 ```bash
 npm run build
 npm run preview -- --host 127.0.0.1 --port 4173
 # in another terminal:
 npm run capture-readme-media
-# optional: BASE_URL=http://127.0.0.1:4173 GAMEPLAY_WAIT_MS=12000 npm run capture-readme-media
+# optional: BASE_URL=http://127.0.0.1:4173 GAMEPLAY_WAIT_MS=12000 STOWAGE_MASTER_WAIT_MS=18000 npm run capture-readme-media
 ```
 
 ## For developers
@@ -110,6 +118,10 @@ knowledge-base/          # Domain reference (containers, terminals, …)
 3. Add the root `YourSim.vue`
 
 Full conventions, 3D patterns, and domain skills: **[AGENTS.md](AGENTS.md)** and **`.ai/skills/`**.
+
+## Experiment: agentic AI and a four-day timebox
+
+This repository was a **personal experiment** to see what could be shipped by leaning on **agentic, AI-assisted development** — combining **Claude Code**, **Cursor AI**, **OpenAI Codex**, and **GitHub Copilot** for iterative, “vibe-coded” building rather than hand-typing every line. I set a **four-day timebox** for myself and wanted to learn how much of a cohesive, playable browser game collection could land in that window. The stack, structure, and rough edges are honest artefacts of that sprint, not a polished studio roadmap.
 
 ## More resources
 
