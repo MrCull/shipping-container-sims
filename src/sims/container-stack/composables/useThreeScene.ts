@@ -31,6 +31,7 @@ export function useContainerStackThreeScene(
   let idleOrbit = true
   let shakeIntensity = 0
   let showTopMode = false
+  let normalPhi: number | null = null
   let lastFrameTime = performance.now()
 
   const keyOrbitLeft = ref(false)
@@ -190,6 +191,14 @@ export function useContainerStackThreeScene(
   }
 
   function setShowTopMode(show: boolean): void {
+    if (show && !showTopMode) {
+      // Entering placing mode: capture current phi
+      if (camera) {
+        offset.copy(camera.position).sub(controls?.target || new THREE.Vector3())
+        spherical.setFromVector3(offset)
+        normalPhi = spherical.phi
+      }
+    }
     showTopMode = show
   }
 
@@ -217,11 +226,19 @@ export function useContainerStackThreeScene(
     if (keyOrbitDown.value) spherical.phi += sp * 0.85
 
     // When in placing mode, automatically tilt down to look at top of stack
+    // When exiting, return to normal phi
     if (showTopMode) {
       const targetPhi = 0.65
       const phiDiff = targetPhi - spherical.phi
       if (Math.abs(phiDiff) > 0.01) {
         spherical.phi += phiDiff * 0.08
+      }
+    } else if (normalPhi !== null) {
+      const phiDiff = normalPhi - spherical.phi
+      if (Math.abs(phiDiff) > 0.01) {
+        spherical.phi += phiDiff * 0.06
+      } else {
+        normalPhi = null
       }
     }
 
