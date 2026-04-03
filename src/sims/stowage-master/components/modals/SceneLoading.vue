@@ -39,32 +39,79 @@ function boxColour(i: number): string {
             xmlns="http://www.w3.org/2000/svg"
           >
             <!-- Tower -->
-            <rect x="54" y="20" width="8" height="65" fill="#607d8b" rx="2" />
+            <rect
+              x="54"
+              y="20"
+              width="8"
+              height="65"
+              fill="#607d8b"
+              rx="2"
+            />
             <!-- Jib (horizontal boom) -->
-            <rect x="10" y="20" width="100" height="6" fill="#607d8b" rx="2" />
+            <rect
+              x="10"
+              y="20"
+              width="100"
+              height="6"
+              fill="#607d8b"
+              rx="2"
+            />
             <!-- Counter-jib -->
-            <rect x="10" y="20" width="28" height="5" fill="#546e7a" rx="2" />
+            <rect
+              x="10"
+              y="20"
+              width="28"
+              height="5"
+              fill="#546e7a"
+              rx="2"
+            />
             <!-- Pendant cables from jib tip -->
-            <line x1="110" y1="26" x2="62" y2="20" stroke="#78909c" stroke-width="1.5" />
-            <line x1="10"  y1="26" x2="58" y2="20" stroke="#78909c" stroke-width="1.5" />
+            <line
+              x1="110"
+              y1="26"
+              x2="62"
+              y2="20"
+              stroke="#78909c"
+              stroke-width="1.5"
+            />
+            <line
+              x1="10"
+              y1="26"
+              x2="58"
+              y2="20"
+              stroke="#78909c"
+              stroke-width="1.5"
+            />
             <!-- Trolley (animated along jib) -->
             <rect
               class="trolley"
-              x="68" y="19" width="14" height="8"
-              fill="#ffcc00" rx="2"
+              x="68"
+              y="19"
+              width="14"
+              height="8"
+              fill="#ffcc00"
+              rx="2"
             />
             <!-- Hoist rope from trolley -->
             <line
               class="hoist-rope"
-              x1="75" y1="27" x2="75" y2="52"
-              stroke="#aaa" stroke-width="1.5"
+              x1="75"
+              y1="27"
+              x2="75"
+              y2="52"
+              stroke="#aaa"
+              stroke-width="1.5"
               stroke-dasharray="3 2"
             />
             <!-- Spreader bar -->
             <rect
               class="spreader"
-              x="65" y="52" width="20" height="4"
-              fill="#90a4ae" rx="1"
+              x="65"
+              y="52"
+              width="20"
+              height="4"
+              fill="#90a4ae"
+              rx="1"
             />
           </svg>
         </div>
@@ -79,15 +126,21 @@ function boxColour(i: number): string {
           />
         </div>
 
-        <p class="title">PORT OPERATIONS</p>
-        <p class="message">{{ store.loadingMessage || 'Initialising terminal…' }}</p>
+        <p class="title">
+          PORT OPERATIONS
+        </p>
+        <p class="message">
+          {{ store.loadingMessage || 'Initialising terminal…' }}
+        </p>
 
         <!-- Animated progress bar -->
         <div class="progress-track">
           <div class="progress-fill" />
         </div>
 
-        <p class="hint">Stand clear of crane operating area</p>
+        <p class="hint">
+          Stand clear of crane operating area
+        </p>
       </div>
     </div>
   </Transition>

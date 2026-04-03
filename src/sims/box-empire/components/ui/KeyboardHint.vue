@@ -6,9 +6,19 @@ const visible = ref(true)
 
 <template>
   <Transition name="hint-fade">
-    <div v-if="visible" class="keyboard-hint">
-      <button class="close-btn" @click="visible = false">✕</button>
-      <div class="hint-title">CAMERA CONTROLS</div>
+    <div
+      v-if="visible"
+      class="keyboard-hint"
+    >
+      <button
+        class="close-btn"
+        @click="visible = false"
+      >
+        ✕
+      </button>
+      <div class="hint-title">
+        CAMERA CONTROLS
+      </div>
       <div class="hint-grid">
         <div class="key-row">
           <kbd>W</kbd><kbd>↑</kbd><span class="hint-label">Forward</span>
