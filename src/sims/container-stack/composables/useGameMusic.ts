@@ -19,11 +19,11 @@ export function useGameMusic(): void {
   const gameStore = useContainerStackStore()
   const audioStore = useAudioStore()
   const { phase } = storeToRefs(gameStore)
-  const { gameMusicMuted } = storeToRefs(audioStore)
+  const { musicMuted } = storeToRefs(audioStore)
 
   function tryPlay(): void {
     const audio = getAudio()
-    if (gameMusicMuted.value) {
+    if (musicMuted.value) {
       audio.pause()
       return
     }
@@ -52,7 +52,7 @@ export function useGameMusic(): void {
     }
   })
 
-  watch(gameMusicMuted, (isMuted) => {
+  watch(musicMuted, (isMuted) => {
     const audio = getAudio()
     if (isMuted) {
       audio.pause()

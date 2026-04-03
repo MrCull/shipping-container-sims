@@ -29,10 +29,10 @@ onMounted(() => {
       <HeroBackground />
       <button
         class="music-toggle"
-        :title="audioStore.backgroundMusicMuted ? 'Unmute music' : 'Mute music'"
-        @click="audioStore.toggleBackgroundMusic()"
+        :title="audioStore.musicMuted ? 'Unmute music' : 'Mute music'"
+        @click="audioStore.toggleMusic()"
       >
-        {{ audioStore.backgroundMusicMuted ? '🔇' : '🔊' }}
+        {{ audioStore.musicMuted ? '🔇' : '🔊' }}
       </button>
       <div class="hero-content">
         <h1 class="hero-title">

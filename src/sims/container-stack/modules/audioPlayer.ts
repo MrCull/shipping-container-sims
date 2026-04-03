@@ -1,3 +1,4 @@
+import { useAudioStore } from '@/stores/audio'
 import { SOUNDS, COLLAPSE_SEQUENCE } from './audio'
 
 let ctx: AudioContext | null = null
@@ -30,6 +31,7 @@ export async function ensureAudioLoaded(): Promise<void> {
 }
 
 export function playStackSound(name: string, volume: number = 0.8, playbackRate: number = 1): void {
+  if (useAudioStore().sfxMuted) return
   if (!ctx || !buffers.has(name)) return
   if (ctx.state === 'suspended') void ctx.resume()
 

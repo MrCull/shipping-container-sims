@@ -1,20 +1,29 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 export const useAudioStore = defineStore('audio', () => {
-  const menuMusicMuted = ref(false)
-  const gameMusicMuted = ref(false)
+  const musicMuted = ref(false)      // canonical — shared across menu + all games
+  const sfxMuted = ref(false)        // new — mutes all sound effects
 
-  function toggleMenuMusic(): void {
-    menuMusicMuted.value = !menuMusicMuted.value
+  function toggleMusic(): void {
+    musicMuted.value = !musicMuted.value
   }
 
-  function toggleGameMusic(): void {
-    gameMusicMuted.value = !gameMusicMuted.value
+  function toggleSfx(): void {
+    sfxMuted.value = !sfxMuted.value
   }
 
-  // Legacy alias for backwards compatibility
-  const backgroundMusicMuted = menuMusicMuted
+  // Legacy aliases for backwards compatibility — all point to musicMuted/toggleMusic
+  const menuMusicMuted = computed(() => musicMuted.value)
+  const gameMusicMuted = computed(() => musicMuted.value)
+  const backgroundMusicMuted = computed(() => musicMuted.value)
+  const toggleMenuMusic = toggleMusic
+  const toggleGameMusic = toggleMusic
+  const toggleBackgroundMusic = toggleMusic
 
-  return { menuMusicMuted, gameMusicMuted, toggleMenuMusic, toggleGameMusic, backgroundMusicMuted, toggleBackgroundMusic: toggleMenuMusic }
+  return {
+    musicMuted, sfxMuted, toggleMusic, toggleSfx,
+    menuMusicMuted, gameMusicMuted, backgroundMusicMuted,
+    toggleMenuMusic, toggleGameMusic, toggleBackgroundMusic,
+  }
 })

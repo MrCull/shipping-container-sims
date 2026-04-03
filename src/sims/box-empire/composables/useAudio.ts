@@ -2,7 +2,8 @@
 // Box Empire — Sound effect management
 // ---------------------------------------------------------------------------
 
-import { onBeforeUnmount } from 'vue'
+import { onBeforeUnmount, watch } from 'vue'
+import { useAudioStore } from '@/stores/audio'
 import type { GameEventType } from '../types'
 import { SOUND_MAP } from '../modules/config'
 
@@ -32,11 +33,13 @@ const SEAGULL_BASE_MS  = 55_000
 const SEAGULL_JITTER_MS = 20_000
 
 export function useAudio() {
+  const audioStore = useAudioStore()
   const audioPool: HTMLAudioElement[] = []
   let bgAudio: HTMLAudioElement | null = null
   let seagullTimer: ReturnType<typeof setTimeout> | null = null
 
   function play(eventType: GameEventType): void {
+    if (audioStore.sfxMuted) return
     const fileName = SOUND_MAP[eventType]
     if (!fileName) return
     const url = FILE_TO_URL[fileName]
@@ -55,25 +58,38 @@ export function useAudio() {
 
   function startBgMusic(): void {
     if (bgAudio) return
+    if (audioStore.musicMuted) return
     bgAudio = new Audio(bgTrackUrl)
     bgAudio.loop = true
     bgAudio.volume = BG_VOLUME
     bgAudio.play().catch(() => { /* autoplay blocked until user interaction */ })
   }
 
+  // Watch for music mute toggles while game is running
+  watch(() => audioStore.musicMuted, (muted) => {
+    if (muted) {
+      bgAudio?.pause()
+    } else {
+      startBgMusic()
+      bgAudio?.play().catch(() => {})
+    }
+  })
+
   // ---- Seagull ambient ----------------------------------------------------
 
   function scheduleNextSeagull(): void {
     const delay = SEAGULL_BASE_MS + (Math.random() * 2 - 1) * SEAGULL_JITTER_MS
     seagullTimer = setTimeout(() => {
-      const a = new Audio(seagullUrl)
-      a.volume = 0.30
-      a.play().catch(() => {})
-      audioPool.push(a)
-      a.addEventListener('ended', () => {
-        const idx = audioPool.indexOf(a)
-        if (idx >= 0) audioPool.splice(idx, 1)
-      })
+      if (!audioStore.sfxMuted) {
+        const a = new Audio(seagullUrl)
+        a.volume = 0.30
+        a.play().catch(() => {})
+        audioPool.push(a)
+        a.addEventListener('ended', () => {
+          const idx = audioPool.indexOf(a)
+          if (idx >= 0) audioPool.splice(idx, 1)
+        })
+      }
       scheduleNextSeagull()
     }, delay)
   }

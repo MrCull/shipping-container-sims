@@ -24,7 +24,7 @@ export function useMenuMusic() {
 
   function tryPlay() {
     const audio = getAudio()
-    if (audioStore.backgroundMusicMuted) {
+    if (audioStore.musicMuted) {
       audio.pause()
       return
     }
@@ -43,7 +43,7 @@ export function useMenuMusic() {
   onMounted(() => {
     tryPlay()
     watch(
-      () => audioStore.backgroundMusicMuted,
+      () => audioStore.musicMuted,
       (isMuted) => {
         const audio = getAudio()
         if (isMuted) {

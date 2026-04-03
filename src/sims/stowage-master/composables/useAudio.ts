@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { useAudioStore } from '@/stores/audio'
 import { SOUNDS, DISASTER_SEQUENCES, PLACEMENT_SOUND } from '../modules/audio'
 
 // Seagull ambient: play roughly every 60 s, jittered ±20 s
@@ -6,6 +7,7 @@ const SEAGULL_INTERVAL_BASE = 60_000
 const SEAGULL_INTERVAL_JITTER = 20_000
 
 export function useAudio() {
+  const audioStore = useAudioStore()
   const audioContext = ref<AudioContext | null>(null)
   const buffers = new Map<string, AudioBuffer>()
   const isLoaded = ref(false)
@@ -43,6 +45,7 @@ export function useAudio() {
   }
 
   function playSound(name: string, volume: number = 0.8): void {
+    if (audioStore.sfxMuted) return
     const ctx = audioContext.value
     if (!ctx || !buffers.has(name)) return
     if (ctx.state === 'suspended') ctx.resume()
@@ -75,6 +78,7 @@ export function useAudio() {
   }
 
   function playPlacementSound(): void {
+    if (audioStore.sfxMuted) return
     const ctx = audioContext.value
     if (!ctx) return
     if (ctx.state === 'suspended') ctx.resume()
@@ -106,7 +110,7 @@ export function useAudio() {
   function scheduleNextSeagull() {
     const delay = SEAGULL_INTERVAL_BASE + (Math.random() * 2 - 1) * SEAGULL_INTERVAL_JITTER
     seagullTimer = setTimeout(() => {
-      playSound('seagulls', 0.35)
+      if (!audioStore.sfxMuted) playSound('seagulls', 0.35)
       scheduleNextSeagull()
     }, delay)
   }

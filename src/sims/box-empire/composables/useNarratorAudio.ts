@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { ref, onBeforeUnmount } from 'vue'
+import { useAudioStore } from '@/stores/audio'
 
 // Static imports — Vite resolves these at build time
 import n01_01 from '../assets/sounds/narrator/01_01_vx_narrator_intro_welcome_manager.mp3'
@@ -43,6 +44,7 @@ const NARRATOR_URLS: Record<string, string> = {
 }
 
 export function useNarratorAudio() {
+  const audioStore = useAudioStore()
   let currentAudio: HTMLAudioElement | null = null
 
   // Reactive progress for the optional progress bar (0–1)
@@ -85,6 +87,15 @@ export function useNarratorAudio() {
     audioEnded.value = false
   }
 
+  /** Manually advance to next dialog (used when SFX is muted and user clicks next button) */
+  function skipToNext(): void {
+    if (endedCallback) {
+      endedCallback()
+      endedCallback = null
+    }
+    stopCurrent()
+  }
+
   /**
    * Play a narrator beat audio clip.
    * @param audioFile  Filename key from NARRATOR_URLS
@@ -99,9 +110,15 @@ export function useNarratorAudio() {
       return
     }
 
+    // Treat narrator as SFX — when muted, don't auto-advance; require manual next
+    if (audioStore.sfxMuted) {
+      return
+    }
+
     const audio = new Audio(url)
     audio.volume = 0.94
     currentAudio = audio
+    // Store callback even if muted, so user can manually skip via next button
     endedCallback = onEnded ?? null
 
     audio.addEventListener('loadedmetadata', () => {
@@ -131,5 +148,5 @@ export function useNarratorAudio() {
     stopCurrent()
   })
 
-  return { playBeat, stopCurrent, progress, duration, audioEnded }
+  return { playBeat, stopCurrent, skipToNext, progress, duration, audioEnded }
 }

@@ -48,6 +48,7 @@ src/sims/stowage-master/
 ├── composables/
 │   ├── useThreeScene.ts     # sim's own Three.js scene setup
 │   ├── useGameLoop.ts
+│   ├── useGameMusic.ts      # watches audioStore.musicMuted, controls background track
 │   ├── useAudio.ts
 │   └── useSlotPicking.ts
 ├── modules/
@@ -144,6 +145,27 @@ status: 'playable',
 ```
 
 The landing page will automatically move the card from "Coming Soon" to "Ready to Play".
+
+### 6. Audio integration
+
+#### Music
+
+Create `composables/useGameMusic.ts` following the pattern in `stowage-master` or `container-stack`. The composable must:
+- Watch `useAudioStore().musicMuted` (not `gameMusicMuted`) to pause/resume the looping background track
+- Use a module-level singleton `HTMLAudioElement` to survive component remounts
+
+`AudioControls.vue` is automatically rendered in the sim header by `SimPage.vue` — no per-sim UI work is needed.
+
+#### SFX
+
+In `composables/useAudio.ts` (or equivalent SFX module):
+- Import `useAudioStore` from `@/stores/audio`
+- Guard every sound-playing function with `if (audioStore.sfxMuted) return`
+- For ambient/scheduled sounds (seagulls etc.), check `sfxMuted` at fire time inside the timeout callback rather than cancelling the timer
+
+#### Rules
+- Use `audioStore.musicMuted` and `audioStore.sfxMuted` — do NOT add new flags to the audio store
+- Narrator / voiceover clips are SFX — guard with `sfxMuted`; when muted, still call `onEnded` after a short delay so sequences don't freeze
 
 ## Conventions
 

@@ -4,7 +4,7 @@ import { useSimsStore } from '@/stores/sims'
 import { useSimRegistry } from '@/composables/useSimRegistry'
 import { watchSimHead } from '@/composables/useSiteHead'
 import { useRouter } from 'vue-router'
-import GithubRepoLink from '@/components/GithubRepoLink.vue'
+import AudioControls from '@/components/AudioControls.vue'
 
 const props = defineProps<{
   simId: string
@@ -63,11 +63,9 @@ onUnmounted(() => {
         <span v-else>{{ sim.icon }}</span>
         <span>{{ sim.title }}</span>
       </h1>
-      <GithubRepoLink
-        variant="header"
-        class="sim-header-github"
-      />
     </header>
+
+    <AudioControls v-if="simId !== 'box-empire'" />
 
     <main class="sim-content">
       <template v-if="sim && sim.status === 'playable' && asyncComponent">
@@ -130,6 +128,7 @@ onUnmounted(() => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .sim-header {
@@ -140,10 +139,6 @@ onUnmounted(() => {
   background: rgba(17, 24, 39, 0.95);
   border-bottom: 1px solid var(--color-border);
   backdrop-filter: blur(8px);
-}
-
-.sim-header-github {
-  margin-left: auto;
 }
 
 .back-btn {
