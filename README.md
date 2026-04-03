@@ -121,7 +121,7 @@ Full conventions, 3D patterns, and domain skills: **[AGENTS.md](AGENTS.md)** and
 
 ## Experiment: agentic AI and a four-day timebox
 
-This repository was a **personal experiment** to see what could be shipped by leaning on **agentic, AI-assisted development**, combining **Claude Code**, **Cursor AI**, **OpenAI Codex**, and **GitHub Copilot** for iterative, “vibe-coded” building rather than hand-typing every line. Part of the aim was to **avoid writing or reading project code myself** as much as possible, and see what could still be achieved through prompting and tool-assisted iteration alone. I set a **four-day timebox** for myself and wanted to learn how much of a cohesive, playable browser game collection could land in that window. The stack, structure, and rough edges are honest artefacts of that sprint, not a polished studio roadmap.
+This repository was a **personal experiment** to see what could be shipped by leaning on **agentic, AI-assisted development**, combining **Claude Code**, **Cursor AI**, **OpenAI Codex**, and **GitHub Copilot** for iterative, “vibe-coded” building rather than hand-typing every line. Part of the aim was to **avoid writing or reading project code myself**, and see what could still be achieved through prompting and tool-assisted iteration alone. I set a **four-day timebox** for myself and wanted to learn how much of a cohesive, playable browser game collection could land in that window. The stack, structure, and rough edges are honest artefacts of that sprint, not a polished studio roadmap.
 
 ## More resources
 
