@@ -12,9 +12,9 @@ import {
 
 const nodes: PathNode[] = [
   { id: 'gate', type: 'gate', position: { x: GATE_POSITION.x, z: GATE_POSITION.z } },
-  { id: 'junction-1', type: 'junction', position: { x: -20, z: 40 } },
+  { id: 'junction-1', type: 'junction', position: { x: -16, z: 32 } },
   { id: 'yard-io', type: 'yard_io', position: { x: YARD_IO_POSITION.x, z: YARD_IO_POSITION.z } },
-  { id: 'junction-2', type: 'junction', position: { x: 0, z: 15 } },
+  { id: 'junction-2', type: 'junction', position: { x: 0, z: 12 } },
   { id: 'quay-buffer', type: 'quay_buffer', position: { x: QUAY_BUFFER_POSITION.x, z: QUAY_BUFFER_POSITION.z } },
   { id: 'crane-base', type: 'crane_base', position: { x: CRANE_POSITION.x, z: CRANE_POSITION.z } },
 ]

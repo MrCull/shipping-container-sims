@@ -101,26 +101,26 @@ export const TUTORIAL_IMPORT_COUNT = 5
 
 // ---- Terminal layout positions (meters) -----------------------------------
 
-// Terminal boundary fence — moved back 5m so trucks clear it before entering
-export const TERMINAL_FENCE_Z = 63
+// Compact tutorial terminal footprint so the starter site feels tighter.
+export const TERMINAL_FENCE_Z = 54
 
 // In-gate: queue lane runs parallel to the fence (along X), offset to one side of the gatehouse
-// Trucks queue along +Z OUTSIDE terminal, lane at x=-44 (beside gatehouse at x=-50)
-export const GATE_INGATE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
+// Trucks queue along +Z OUTSIDE terminal, lane at x=-38 (beside gatehouse at x=-43)
+export const GATE_INGATE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
 // Queue lane X for trucks waiting (parallel to fence, beside gatehouse)
-export const GATE_INGATE_LANE_X = -44
+export const GATE_INGATE_LANE_X = -38
 
 // Out-gate: right-hand fence (mirror of in-gate on the left), landside along +Z
-export const GATE_OUTGATE_POSITION: Position3D = { x: 50, y: 0, z: 105 }
+export const GATE_OUTGATE_POSITION: Position3D = { x: 42, y: 0, z: 88 }
 // Trucks queue / hold along this Z before the boom (same as gate z)
-export const GATE_OUTGATE_FENCE_Z = 105
+export const GATE_OUTGATE_FENCE_Z = 88
 
 // Legacy aliases
-export const GATE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
-export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
-export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -44, y: 0, z: TERMINAL_FENCE_Z }
+export const GATE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
+export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
+export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
 
-export const YARD_BLOCK_POSITION: Position = { x: -15, z: 20 }
+export const YARD_BLOCK_POSITION: Position = { x: -12, z: 18 }
 const YARD_TRUCK_STANDOFF = RS_LENGTH * RS_TRUCK_STANDOFF_MULTIPLIER
 
 // Yard truck stand where road trucks wait for RS service, kept well clear of the stack face.
@@ -140,10 +140,10 @@ export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -11.5 }
 export const CRANE_POSITION: Position3D = { x: 0, y: 0, z: 0 }
 
 export const TERMINAL_BOUNDS = {
-  minX: -60,
-  maxX: 60,
+  minX: -50,
+  maxX: 50,
   minZ: -60,  // more sea visible
-  maxZ: 145,
+  maxZ: 118,
 }
 
 // ── GLB model transforms ────────────────────────────────────────────────────

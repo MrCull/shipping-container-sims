@@ -84,12 +84,12 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 
 ## Terminal Layout
 
-- **In-gate** — `GATE_INGATE_POSITION` `{ x: -44, z: 63 }` in the front fence; truck queue lane runs along X outside the terminal
-- **Out-gate** — `GATE_OUTGATE_POSITION` `{ x: -50, z: 105 }` in the back fence; import trucks exit here after pickup
+- **In-gate** — `GATE_INGATE_POSITION` `{ x: -38, z: 54 }` in the front fence; truck queue lane runs along X outside the terminal
+- **Out-gate** — `GATE_OUTGATE_POSITION` `{ x: 42, z: 88 }` on the right/back edge of the compact tutorial terminal; import trucks exit here after pickup
 - **Yard truck stand** — trucks stop on the landside road no closer than 1.5 reach-stacker lengths from the yard stack line; RS serves them from either truck side based on the shorter approach
 - **Quay buffer** — separate discharge `{ x: -5, z: 3 }` and load `{ x: 5, z: 3 }` spots
 - **Berth** — `BERTH_POSITION` `{ x: 0, z: -20 }` so the vessel hull clears the quay wall
-- **Terminal bounds** — X: −60 → 60, Z: −60 → 145
+- **Terminal bounds** — X: -50 → 50, Z: -60 → 118
 
 Trucks use axis-aligned waypoint routes (stored in `TruckVisit.waypoints`), updated by `truckManager`. The RS uses waypoints too; both go through `spatialOccupancy` checks via `canMoveTo()` before moving.
 
