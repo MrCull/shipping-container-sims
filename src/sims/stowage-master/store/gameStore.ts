@@ -95,15 +95,16 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     const config = getLevelConfig(level)
     shipConfig.value = config.preset
     totalSlots.value = getTotalSlots(config.preset)
-    const containerCount = config.containerCount ?? totalSlots.value
-    perfectScore.value = containerCount * 100
+    const outboundContainerCount = config.containerCount ?? 0
+    const scoreContainerCount = config.scoreContainerCount ?? config.containerCount ?? totalSlots.value
+    perfectScore.value = scoreContainerCount * 100
     targetScore.value = Math.round(perfectScore.value * 0.70)
 
     const slots = generateSlots(config.preset)
     grid.value = JSON.parse(JSON.stringify(slots)) as Record<string, Slot>
 
     resetSerialCounter()
-    containers.value = generateContainerList(containerCount, config.hazmatRate)
+    containers.value = generateContainerList(outboundContainerCount, config.hazmatRate)
     currentContainerIndex.value = 0
 
     score.value = 0
@@ -139,6 +140,8 @@ export const useGameStore = defineStore('stowage-master-game', () => {
         grid.value,
         transitCount,
         config.placementSpread ?? 0,
+        config.importPlacement ?? 'default',
+        config.transitGrouping ?? 'random',
       )
       dischargeCount.value = config.dischargeContainerCount
       hasTransitContainers.value = transitCount > 0
@@ -316,6 +319,12 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     dischargedCount.value++
 
     if (dischargedCount.value >= dischargeCount.value) {
+      if (levelConfig.value.completionMode === 'discharge-only') {
+        phase.value = 'complete'
+        addEvent('Discharge complete! Vessel cleared and ready to sail.', 'success')
+        return { levelPhaseEnd: true, discharge }
+      }
+
       // Transition to loading phase
       addEvent('Discharge complete! Now load the vessel.', 'success')
       phase.value = 'selecting'

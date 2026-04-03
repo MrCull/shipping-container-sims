@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useGameStore } from '../../store/gameStore'
+import { LEVELS } from '../../modules/levels'
 import StarRating from '../ui/StarRating.vue'
 
 const store = useGameStore()
 
 const rating = computed(() => store.getStarRatingResult())
+const hasNextLevel = computed(() => store.currentLevel < LEVELS.length - 1)
+const hasLoadPhase = computed(() => store.containers.length > 0)
 
 function restart() {
   store.startLevel(store.currentLevel)
@@ -37,7 +40,10 @@ function nextLevel() {
           <span class="breakdown-label">Discharge earnings</span>
           <span class="breakdown-value discharge">${{ store.dischargeScore.toLocaleString() }}</span>
         </div>
-        <div class="breakdown-row">
+        <div
+          v-if="hasLoadPhase"
+          class="breakdown-row"
+        >
           <span class="breakdown-label">Loading score</span>
           <span class="breakdown-value load">${{ store.score.toLocaleString() }}</span>
         </div>
@@ -57,7 +63,7 @@ function nextLevel() {
           Restart
         </button>
         <button
-          v-if="store.currentLevel < 5"
+          v-if="hasNextLevel"
           class="btn btn-primary"
           @click="nextLevel"
         >

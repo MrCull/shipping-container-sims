@@ -14,6 +14,7 @@ export interface TowerSceneRefs {
   frameTower: (topY: number) => void
   setIdleOrbit: (enabled: boolean) => void
   setCameraShake: (intensity: number) => void
+  setShowTopMode: (show: boolean) => void
   applyKeyboardCamera: (dt: number) => void
 }
 
@@ -29,6 +30,7 @@ export function useContainerStackThreeScene(
 
   let idleOrbit = true
   let shakeIntensity = 0
+  let showTopMode = false
   let lastFrameTime = performance.now()
 
   const keyOrbitLeft = ref(false)
@@ -164,7 +166,9 @@ export function useContainerStackThreeScene(
 
   function frameTower(topY: number): void {
     if (!camera || !controls) return
-    const targetY = Math.max(BLOCK.height * 2, topY * 0.55)
+    const targetY = showTopMode
+      ? Math.max(BLOCK.height * 2, topY * 0.85)
+      : Math.max(BLOCK.height * 2, topY * 0.55)
     controls.target.y += (targetY - controls.target.y) * CAMERA.targetLerp
 
     const dist = Math.max(18, topY * 1.15 + 14)
@@ -183,6 +187,10 @@ export function useContainerStackThreeScene(
 
   function setCameraShake(intensity: number): void {
     shakeIntensity = intensity
+  }
+
+  function setShowTopMode(show: boolean): void {
+    showTopMode = show
   }
 
   function applyKeyboardCamera(dt: number): void {
@@ -207,6 +215,15 @@ export function useContainerStackThreeScene(
     if (keyOrbitRight.value) spherical.theta -= sp
     if (keyOrbitUp.value) spherical.phi -= sp * 0.85
     if (keyOrbitDown.value) spherical.phi += sp * 0.85
+
+    // When in placing mode, automatically tilt down to look at top of stack
+    if (showTopMode) {
+      const targetPhi = 0.65
+      const phiDiff = targetPhi - spherical.phi
+      if (Math.abs(phiDiff) > 0.01) {
+        spherical.phi += phiDiff * 0.08
+      }
+    }
 
     spherical.phi = Math.max(
       CAMERA.minPolarAngle,
@@ -289,6 +306,7 @@ export function useContainerStackThreeScene(
     frameTower,
     setIdleOrbit,
     setCameraShake,
+    setShowTopMode,
     applyKeyboardCamera,
   }
 }

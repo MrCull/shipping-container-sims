@@ -16,45 +16,16 @@ function formatTimer(level: LevelConfig): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
-const megaCarrierStubs = [
-  {
-    level: 7,
-    description: 'Load 120 containers across 24 bays while managing strict weight limits.',
-    slots: '384 slots',
-    timer: '15m',
-  },
-  {
-    level: 8,
-    description: 'Discharge 80 imports buried under transit cargo across a fully laden vessel.',
-    slots: '384 slots',
-    timer: '20m',
-  },
-  {
-    level: 9,
-    description: 'Maximum chaos — full discharge, restow, and reload of a mega carrier under time pressure.',
-    slots: '384 slots',
-    timer: '25m',
-  },
-]
-
 const vesselGroups = [
   {
     label: 'Tiny Vessel',
     icon: '🛥️',
-    levels: LEVELS.slice(0, 3),
-    comingSoon: false,
+    levels: LEVELS.slice(0, 5),
   },
   {
-    label: 'Feeder Vessel',
+    label: 'Medium Vessel',
     icon: '🚢',
-    levels: LEVELS.slice(3, 6),
-    comingSoon: false,
-  },
-  {
-    label: 'Mega Carrier',
-    icon: '🛳️',
-    levels: [],
-    comingSoon: true,
+    levels: LEVELS.slice(5, 10),
   },
 ]
 </script>
@@ -77,54 +48,32 @@ const vesselGroups = [
           v-for="group in vesselGroups"
           :key="group.label"
           class="vessel-column"
-          :class="{ 'coming-soon-column': group.comingSoon }"
         >
           <div class="column-header">
             <span class="column-icon">{{ group.icon }}</span>
             <span class="column-label">{{ group.label }}</span>
           </div>
 
-          <template v-if="!group.comingSoon">
-            <button
-              v-for="level in group.levels"
-              :key="level.id"
-              class="level-btn"
-              @click="startLevel(level.id)"
-            >
-              <div class="level-name">
-                {{ level.name }}
-              </div>
-              <div class="level-desc">
-                {{ level.description }}
-              </div>
-              <div class="level-meta">
-                <span class="level-slots">{{ getTotalSlots(level.preset) }} slots</span>
-                <span
-                  v-if="level.timerSeconds"
-                  class="level-timer"
-                >⏱ {{ formatTimer(level) }}</span>
-              </div>
-            </button>
-          </template>
-
-          <template v-else>
-            <div
-              v-for="stub in megaCarrierStubs"
-              :key="stub.level"
-              class="level-btn level-btn--disabled"
-            >
-              <div class="level-name coming-soon-name">
-                Level {{ stub.level }}
-              </div>
-              <div class="level-desc coming-soon-desc">
-                {{ stub.description }}
-              </div>
-              <div class="level-meta">
-                <span class="level-slots coming-soon-meta">{{ stub.slots }} slots</span>
-                <span class="level-timer coming-soon-meta">⏱ {{ stub.timer }}</span>
-              </div>
+          <button
+            v-for="level in group.levels"
+            :key="level.id"
+            class="level-btn"
+            @click="startLevel(level.id)"
+          >
+            <div class="level-name">
+              {{ level.name }}
             </div>
-          </template>
+            <div class="level-desc">
+              {{ level.description }}
+            </div>
+            <div class="level-meta">
+              <span class="level-slots">{{ getTotalSlots(level.preset) }} slots</span>
+              <span
+                v-if="level.timerSeconds"
+                class="level-timer"
+              >⏱ {{ formatTimer(level) }}</span>
+            </div>
+          </button>
         </div>
       </div>
     </div>
@@ -165,8 +114,8 @@ const vesselGroups = [
 
 .vessel-columns {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
   align-items: start;
 }
 
@@ -198,14 +147,6 @@ const vesselGroups = [
   text-transform: uppercase;
 }
 
-.coming-soon-column .column-header {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-.coming-soon-column .column-label {
-  color: #888;
-}
-
 .level-btn {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -224,21 +165,11 @@ const vesselGroups = [
   transform: translateX(3px);
 }
 
-.level-btn--disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-  pointer-events: none;
-}
-
 .level-name {
   font-size: 14px;
   font-weight: bold;
   color: #ffcc00;
   margin-bottom: 4px;
-}
-
-.coming-soon-name {
-  color: #999;
 }
 
 .level-desc {
@@ -263,11 +194,9 @@ const vesselGroups = [
   color: #ffaa00;
 }
 
-.coming-soon-desc {
-  color: #777;
-}
-
-.coming-soon-meta {
-  color: #666;
+@media (max-width: 800px) {
+  .vessel-columns {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

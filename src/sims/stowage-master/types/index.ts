@@ -2,6 +2,9 @@ export type GamePhase = 'start' | 'briefing' | 'discharge_selecting' | 'discharg
 export type DisasterType = 'capsize' | 'founder' | 'collapse' | 'explosion'
 export type WeightCategory = 'light' | 'medium' | 'heavy'
 export type EventType = 'info' | 'warning' | 'danger' | 'success'
+export type LevelCompletionMode = 'standard' | 'discharge-only'
+export type ImportPlacementMode = 'default' | 'upper-tiers'
+export type TransitGroupingMode = 'random' | 'grouped-by-pod'
 
 export interface Container {
   id: string
@@ -157,11 +160,19 @@ export interface LevelConfig {
   description: string
   preset: ShipPreset
   hazmatRate: number
+  /** Level ends after discharge is complete instead of transitioning to loading. */
+  completionMode?: LevelCompletionMode
   containerCount?: number
+  /** Optional score baseline count when a level has little or no loading. */
+  scoreContainerCount?: number
   /** Number of pre-loaded Import containers to discharge before loading begins. */
   dischargeContainerCount?: number
   /** Number of pre-loaded Transit containers that may overstow imports and need restowing. */
   transitContainerCount?: number
+  /** Controls where import containers appear in the pre-loaded manifest. */
+  importPlacement?: ImportPlacementMode
+  /** Controls whether transit cargo is randomly mixed or grouped by POD. */
+  transitGrouping?: TransitGroupingMode
   /** Countdown timer in seconds. 0 = no timer. */
   timerSeconds: number
   /**

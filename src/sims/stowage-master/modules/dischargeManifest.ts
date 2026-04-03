@@ -1,4 +1,10 @@
-import type { Container, Slot, ShipPreset } from '../types'
+import type {
+  Container,
+  Slot,
+  ShipPreset,
+  ImportPlacementMode,
+  TransitGroupingMode,
+} from '../types'
 import { CONTAINER, PORTS } from './config'
 import { generateContainerId, generateWeight, getWeightCategory } from './containerFactory'
 
@@ -28,8 +34,12 @@ function makeImportContainer(): Container {
 }
 
 function makeTransitContainer(): Container {
-  const weight = Math.round(generateWeight() * 10) / 10
   const port = TRANSIT_PORTS[Math.floor(Math.random() * TRANSIT_PORTS.length)]
+  return makeTransitContainerForPort(port)
+}
+
+function makeTransitContainerForPort(port: typeof TRANSIT_PORTS[number]): Container {
+  const weight = Math.round(generateWeight() * 10) / 10
   return {
     id: generateContainerId(),
     weight,
@@ -130,6 +140,67 @@ function canPlace(slotId: string, grid: Record<string, Slot>): boolean {
   return !!(grid[belowId]?.container)
 }
 
+function buildUpperTierSlotIds(
+  preset: ShipPreset,
+  grid: Record<string, Slot>,
+): string[] {
+  const activeBays = preset.bays - preset.sternBlockedBays
+  const centreRow = Math.floor(preset.rows / 2)
+
+  const rowPriority: number[] = []
+  for (let offset = 0; offset <= Math.floor(preset.rows / 2); offset++) {
+    if (centreRow - offset >= 0) rowPriority.push(centreRow - offset)
+    if (offset > 0 && centreRow + offset < preset.rows) rowPriority.push(centreRow + offset)
+  }
+
+  const ordered: string[] = []
+  for (let t = preset.tiers - 1; t >= 0; t--) {
+    const tierNum = (t + 1) * 2
+    for (const r of rowPriority) {
+      const rowNum = r + 1
+      for (let b = 0; b < activeBays; b++) {
+        const bayNum = b * 2 + 1
+        const id = `${String(bayNum).padStart(2, '0')}-${String(rowNum).padStart(2, '0')}-${String(tierNum).padStart(2, '0')}`
+        if (grid[id]) ordered.push(id)
+      }
+    }
+  }
+
+  return ordered
+}
+
+function placeImportContainers(
+  count: number,
+  grid: Record<string, Slot>,
+  slotIds: string[],
+  placed: Container[],
+): number {
+  let importPlaced = 0
+  for (const id of slotIds) {
+    if (importPlaced >= count) break
+    if (!canPlace(id, grid)) continue
+    const container = makeImportContainer()
+    grid[id].container = container
+    placed.push(container)
+    importPlaced++
+  }
+  return importPlaced
+}
+
+function buildGroupedTransitContainers(count: number): Container[] {
+  const ports = shuffle([...TRANSIT_PORTS])
+  const grouped: Container[] = []
+
+  while (grouped.length < count) {
+    for (const port of ports) {
+      if (grouped.length >= count) break
+      grouped.push(makeTransitContainerForPort(port))
+    }
+  }
+
+  return grouped
+}
+
 /**
  * Generates Import and (optionally) Transit containers and places them into the grid.
  *
@@ -148,20 +219,55 @@ export function generateDischargeManifest(
   grid: Record<string, Slot>,
   transitCount: number = 0,
   spreadFactor: number = 0,
+  importPlacement: ImportPlacementMode = 'default',
+  transitGrouping: TransitGroupingMode = 'random',
 ): Container[] {
   const placed: Container[] = []
   const orderedIds = buildOrderedSlotIds(preset, grid, spreadFactor)
 
-  // 1 — Place import containers (lower tiers first)
-  let importPlaced = 0
-  for (const id of orderedIds) {
-    if (importPlaced >= count) break
-    if (!canPlace(id, grid)) continue
-    const container = makeImportContainer()
-    grid[id].container = container
-    placed.push(container)
-    importPlaced++
+  const importSlotIds = importPlacement === 'upper-tiers'
+    ? buildUpperTierSlotIds(preset, grid)
+    : orderedIds
+
+  if (importPlacement === 'upper-tiers' && transitCount > 0) {
+    const transitBaseTarget = Math.min(transitCount, preset.bays - preset.sternBlockedBays)
+    const transitBaseIds = orderedIds.filter(id => grid[id]?.tierIndex === 0).slice(0, transitBaseTarget)
+    const groupedTransit = transitGrouping === 'grouped-by-pod'
+      ? buildGroupedTransitContainers(transitBaseIds.length)
+      : transitBaseIds.map(() => makeTransitContainer())
+
+    for (let i = 0; i < transitBaseIds.length; i++) {
+      const id = transitBaseIds[i]
+      const container = groupedTransit[i]
+      grid[id].container = container
+      placed.push(container)
+    }
+
+    placeImportContainers(count, grid, importSlotIds, placed)
+
+    const remainingTransit = transitCount - transitBaseIds.length
+    if (remainingTransit <= 0) return placed
+
+    const transitSlots = orderedIds.filter(id => !grid[id]?.container)
+    const extraTransit = transitGrouping === 'grouped-by-pod'
+      ? buildGroupedTransitContainers(remainingTransit)
+      : transitSlots.slice(0, remainingTransit).map(() => makeTransitContainer())
+
+    let transitPlaced = 0
+    for (const id of transitSlots) {
+      if (transitPlaced >= remainingTransit) break
+      if (!canPlace(id, grid)) continue
+      const container = extraTransit[transitPlaced]
+      grid[id].container = container
+      placed.push(container)
+      transitPlaced++
+    }
+
+    return placed
   }
+
+  // 1 — Place import containers.
+  placeImportContainers(count, grid, importSlotIds, placed)
 
   if (transitCount <= 0) return placed
 
@@ -187,11 +293,15 @@ export function generateDischargeManifest(
     if (!transitSlots.includes(id)) transitSlots.push(id)
   }
 
+  const groupedTransit = transitGrouping === 'grouped-by-pod'
+    ? buildGroupedTransitContainers(transitCount)
+    : transitSlots.slice(0, transitCount).map(() => makeTransitContainer())
+
   let transitPlaced = 0
   for (const id of transitSlots) {
     if (transitPlaced >= transitCount) break
     if (!canPlace(id, grid)) continue
-    const container = makeTransitContainer()
+    const container = groupedTransit[transitPlaced]
     grid[id].container = container
     placed.push(container)
     transitPlaced++

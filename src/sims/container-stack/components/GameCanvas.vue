@@ -342,6 +342,7 @@ watch(phase, (p, prevP) => {
   if (p === 'playing' && prevP === 'start') {
     void audio.init()
   }
+  three.setShowTopMode(p === 'placing')
 })
 
 watch(comboStreak, (c, o) => {
