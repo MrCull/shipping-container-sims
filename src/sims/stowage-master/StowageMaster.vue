@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useGameStore } from './store/gameStore'
+import { useGodModeHotkey } from '@/composables/useGodModeHotkey'
 import { useGameMusic } from './composables/useGameMusic'
 import GameCanvas from './components/GameCanvas.vue'
 import TopBar from './components/TopBar.vue'
@@ -25,6 +26,7 @@ import KeyboardHint from './components/ui/KeyboardHint.vue'
 
 const store = useGameStore()
 useGameMusic()
+useGodModeHotkey()
 
 onMounted(() => {
   // Reset to the start screen every time this component mounts — handles

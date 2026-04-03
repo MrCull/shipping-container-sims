@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useGlobalSettingsStore } from '@/stores/globalSettings'
 import type { GamePhase, DisasterType, Container, Slot, ShipPreset, GameEvent, PlacementResult, StarRatingResult, LevelBestRecord, PortDefinition } from '../types'
 import { generateContainerList, resetSerialCounter } from '../modules/containerFactory'
 import { generateSlots, getAvailableSlots } from '../modules/shipGrid'
@@ -15,10 +16,10 @@ const PROGRESS_STORAGE_KEY = 'stowage-master-progress'
 
 interface StoredProgress {
   completedLevelIds: number[]
-  godMode: boolean
 }
 
 export const useGameStore = defineStore('stowage-master-game', () => {
+  const globalSettings = useGlobalSettingsStore()
   const phase = ref<GamePhase>('start')
   const currentLevel = ref(0)
   const score = ref(0)
@@ -42,7 +43,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const elapsedSeconds = ref(0)
   const levelBests = ref<Record<number, LevelBestRecord>>(loadLevelBests())
   const completedLevelIds = ref<number[]>(loadProgress().completedLevelIds)
-  const isGodMode = ref(loadProgress().godMode)
+  const isGodMode = computed(() => globalSettings.godModeEnabled)
 
   // Scene loading state — shown while 3D assets are downloading
   const isLoading = ref(false)
@@ -108,19 +109,18 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   })
 
   function loadProgress(): StoredProgress {
-    if (typeof localStorage === 'undefined') return { completedLevelIds: [], godMode: false }
+    if (typeof localStorage === 'undefined') return { completedLevelIds: [] }
     try {
       const raw = localStorage.getItem(PROGRESS_STORAGE_KEY)
-      if (!raw) return { completedLevelIds: [], godMode: false }
+      if (!raw) return { completedLevelIds: [] }
       const parsed = JSON.parse(raw) as Partial<StoredProgress>
       return {
         completedLevelIds: Array.isArray(parsed.completedLevelIds)
           ? parsed.completedLevelIds.filter((id): id is number => typeof id === 'number')
           : [],
-        godMode: parsed.godMode === true,
       }
     } catch {
-      return { completedLevelIds: [], godMode: false }
+      return { completedLevelIds: [] }
     }
   }
 
@@ -128,7 +128,6 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     if (typeof localStorage === 'undefined') return
     localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify({
       completedLevelIds: completedLevelIds.value,
-      godMode: isGodMode.value,
     }))
   }
 
@@ -143,12 +142,6 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     if (completedLevelIds.value.includes(levelId)) return
     completedLevelIds.value = [...completedLevelIds.value, levelId].sort((a, b) => a - b)
     persistProgress()
-  }
-
-  function toggleGodMode(): boolean {
-    isGodMode.value = !isGodMode.value
-    persistProgress()
-    return isGodMode.value
   }
 
   function loadLevelBests(): Record<number, LevelBestRecord> {
@@ -599,6 +592,6 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     placeRestowContainer, finalizeRestow, cancelRestowSelection,
     restowContainer, restowFromSlotId, availableRestowSlots,
     hasTransitContainers, confirmBriefing,
-    addEvent, setPhase, returnToStartMenu, getStarRatingResult, getLevelBest, isLevelUnlocked, toggleGodMode, tickTimer,
+    addEvent, setPhase, returnToStartMenu, getStarRatingResult, getLevelBest, isLevelUnlocked, tickTimer,
   }
 })

@@ -1,5 +1,6 @@
 export interface SiteStorageGlobalSettings {
   soundMuted: boolean
+  godModeEnabled: boolean
 }
 
 export interface SiteStorageData {

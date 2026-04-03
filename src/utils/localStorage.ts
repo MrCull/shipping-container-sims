@@ -6,6 +6,7 @@ const DEFAULT_STORAGE: SiteStorageData = {
   version: 1,
   global: {
     soundMuted: false,
+    godModeEnabled: false,
   },
   sims: {},
 }
@@ -36,12 +37,30 @@ function sanitizeStorage(raw: unknown): SiteStorageData {
   if (isRecord(raw.global) && typeof raw.global.soundMuted === 'boolean') {
     storage.global.soundMuted = raw.global.soundMuted
   }
+  if (isRecord(raw.global) && typeof raw.global.godModeEnabled === 'boolean') {
+    storage.global.godModeEnabled = raw.global.godModeEnabled
+  }
 
   if (isRecord(raw.sims)) {
     storage.sims = raw.sims
   }
 
   return storage
+}
+
+function loadLegacyGodMode(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    const raw = window.localStorage.getItem('stowage-master-progress')
+    if (!raw) return false
+    const parsed = JSON.parse(raw) as { godMode?: unknown }
+    return parsed.godMode === true
+  } catch {
+    return false
+  }
 }
 
 export function loadSiteStorage(): SiteStorageData {
@@ -55,9 +74,16 @@ export function loadSiteStorage(): SiteStorageData {
       return cloneDefaultStorage()
     }
 
-    return sanitizeStorage(JSON.parse(raw))
+    const parsed = JSON.parse(raw)
+    const storage = sanitizeStorage(parsed)
+    if (!isRecord(parsed.global) || typeof parsed.global.godModeEnabled !== 'boolean') {
+      storage.global.godModeEnabled = loadLegacyGodMode()
+    }
+    return storage
   } catch {
-    return cloneDefaultStorage()
+    const storage = cloneDefaultStorage()
+    storage.global.godModeEnabled = loadLegacyGodMode()
+    return storage
   }
 }
 

@@ -45,7 +45,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 |-----------|---------|
 | `BoxEmpire.vue` | Root component — mounts canvas, wires composables, renders HUD |
 | `components/GameCanvas.vue` | Three.js canvas wrapper |
-| `components/TopBar.vue` | Money display, time controls, gate buttons |
+| `components/TopBar.vue` | Money display, time controls, gate buttons, shared god-mode toggle, audio control |
 | `components/EventFeed.vue` | Scrolling live event log |
 | `components/ContainerInfo.vue` | Selected container detail panel |
 | `components/EquipmentInfo.vue` | Selected equipment detail panel |
@@ -162,6 +162,7 @@ Eight shipping lines are defined in `containerMaterials.ts` (`SHIPPING_LINE_LIVE
 - The vessel hull shape runs along the Z axis (bow at +Z, stern at −Z), matching the berth orientation
 - Tutorial and narrator milestones can request guided camera pans to relevant areas such as the vessel approach lane, berth, crane, quay, yard, truck stand, out-gate, and gatehouse; these animate the OrbitControls camera rather than replacing the camera system
 - Completed reach-stacker jobs deduct operating cost immediately, emit a `money.spent` event, and play `coin-drop-1-second.mp3`
+- Shared global god mode can be toggled by typing `god` or using the lightning icon beside mute; in Box Empire it suppresses move-cost and quay-unload money deductions, hides narrator/tutorial dialog prompts, and disables event-driven camera pans
 - Trucks depart via the out-gate at `GATE_OUTGATE_POSITION.z`, clearing the terminal
 - `spatialOccupancy` is rebuilt each tick from current entity positions; no manual "update" call is needed
 - The ocean mesh in `sceneBuilder.ts` is animated each frame via `animateOcean(time)` using vertex displacement — call this from the render loop

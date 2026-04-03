@@ -3,7 +3,8 @@
 // ---------------------------------------------------------------------------
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useGlobalSettingsStore } from '@/stores/globalSettings'
 import type {
   GamePhase,
   Container,
@@ -75,6 +76,7 @@ function shippingLineColor(line: string): string {
 }
 
 export const useGameStore = defineStore('box-empire-game', () => {
+  const globalSettings = useGlobalSettingsStore()
   // ---- Reactive state -----------------------------------------------------
   const gamePhase = ref<GamePhase>('menu')
   const simTime = ref(0)
@@ -142,9 +144,22 @@ export const useGameStore = defineStore('box-empire-game', () => {
     return step?.prompt ?? ''
   })
   const totalTutorialSteps = computed(() => tutorialSteps.length)
+  const isGodMode = computed(() => globalSettings.godModeEnabled)
 
   // Backward-compat: keep a gatehouseOpen for tutorial.ts which may reference it
   const gatehouseOpen = computed(() => gatehouse.value.exportLaneOpen || gatehouse.value.importLaneOpen)
+
+  watch(() => globalSettings.godModeEnabled, (enabled) => {
+    if (!enabled) return
+    narratorDialog.value = null
+    narratorQueue.value = []
+    cameraCue.value = null
+    for (const vessel of vesselVisits.value) {
+      if (vessel.state === 'announced') {
+        vessel.arrivalTime = simTime.value
+      }
+    }
+  })
 
   // ---- Yard slot reservation helpers ----------------------------------------
   function getReservedYardSlotIds(): Set<string> {
@@ -205,6 +220,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
   // ---- Init ---------------------------------------------------------------
   function initTutorial(): void {
+    const godModeEnabled = isGodMode.value
+
     eventCounter = 0
     containerCounter = 0
     resetJobCounter()
@@ -217,7 +234,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
     timeScale.value = DEFAULT_TIME_SCALE
     tutorialStep.value = 2   // step 1 (welcome) is handled by the narrator intro; start at step 2
     tutorialCompleted.value = false
-    gatehouse.value = { exportLaneOpen: false, importLaneOpen: false }
+    gatehouse.value = {
+      exportLaneOpen: godModeEnabled,
+      importLaneOpen: godModeEnabled,
+    }
     money.value = 0
     transactions.value = []
     events.value = []
@@ -319,7 +339,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         stateElapsed: 0,
         targetPosition: null,
         speed: 5,
-        enabled: false,   // disabled until narrator prompts the player to enable it
+        enabled: godModeEnabled,
         canServeLandside: true,
         canServeWaterside: true,
         craneMode: 'both',
@@ -341,7 +361,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
         stateElapsed: 0,
         targetPosition: null,
         speed: 2,
-        enabled: false,   // disabled until vessel docks and narrator prompts the player
+        enabled: godModeEnabled,
         canServeLandside: true,
         canServeWaterside: true,
         craneMode: 'both',
@@ -416,6 +436,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   }
 
   function requestCameraCue(target: CameraCueTarget): void {
+    if (isGodMode.value) return
     cameraCueCounter++
     cameraCue.value = {
       id: cameraCueCounter,
@@ -425,6 +446,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
   function applyReachStackerMoveCost(job: Job, eq: Equipment): void {
     if (eq.type !== 'reach_stacker') return
+    if (isGodMode.value) return
 
     const tx = createTransaction('reach_stacker_move_cost', job.containerId, simTime.value)
     transactions.value.push(tx)
@@ -439,6 +461,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     if (eq.type !== 'mobile_harbor_crane') return
     if (job.pickupLocation.type !== 'vessel_slot') return
     if (job.dropoffLocation.type !== 'quay_buffer') return
+    if (isGodMode.value) return
 
     const tx = createTransaction('quay_crane_import_unload_cost', job.containerId, simTime.value)
     transactions.value.push(tx)
@@ -534,7 +557,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
     // Tick vessels
     for (const vessel of vesselVisits.value) {
-      const vResult = tickVessel(vessel, state, scaledDt)
+      if (isGodMode.value && vessel.state === 'announced') {
+        vessel.arrivalTime = simTime.value
+      }
+      const vResult = tickVessel(vessel, state, scaledDt, isGodMode.value)
       if (vResult.stateChanged) {
         if (vResult.newState === 'arriving') {
           emitEvent('vessel.arriving', `${vessel.name} is approaching the berth`)
@@ -1316,6 +1342,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   function enqueueNarratorGroup(groupId: string): void {
     if (narratorShownGroups.value.has(groupId)) return
     narratorShownGroups.value.add(groupId)
+    if (isGodMode.value) return
     narratorQueue.value.push(groupId)
     // If no dialog is currently showing, open the next one immediately
     if (!narratorDialog.value) {
@@ -1324,6 +1351,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   }
 
   function showNextNarratorGroup(): void {
+    if (isGodMode.value) return
     const nextId = narratorQueue.value.shift()
     if (!nextId) return
     const group = getNarratorGroup(nextId)
@@ -1366,6 +1394,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   function interruptWithNarratorGroup(groupId: string): void {
     if (narratorShownGroups.value.has(groupId)) return
     narratorShownGroups.value.add(groupId)
+    if (isGodMode.value) return
     narratorQueue.value = narratorQueue.value.filter(id => id !== groupId)
     narratorDialog.value = null
     narratorQueue.value.unshift(groupId)

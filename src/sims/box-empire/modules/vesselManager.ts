@@ -130,16 +130,25 @@ export function tickVessel(
   vessel: VesselVisit,
   state: BoxEmpireState,
   _dt: number,
+  instantArrive: boolean = false,
 ): { stateChanged: boolean; newState: string | null } {
   const result = { stateChanged: false, newState: null as string | null }
 
   switch (vessel.state) {
     case 'announced': {
       if (state.simTime >= vessel.arrivalTime) {
-        vessel.state = 'arriving'
-        result.stateChanged = true
-        result.newState = 'arriving'
-        vessel.hornPlayed = false
+        if (instantArrive) {
+          vessel.state = 'arrived'
+          vessel.position.x = BERTH_POSITION.x
+          vessel.position.z = BERTH_POSITION.z
+          result.stateChanged = true
+          result.newState = 'arrived'
+        } else {
+          vessel.state = 'arriving'
+          result.stateChanged = true
+          result.newState = 'arriving'
+          vessel.hornPlayed = false
+        }
       }
       break
     }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useGameStore } from './store/gameStore'
+import { useGodModeHotkey } from '@/composables/useGodModeHotkey'
 import GameCanvas from './components/GameCanvas.vue'
 import TopBar from './components/TopBar.vue'
 import EventFeed from './components/EventFeed.vue'
@@ -13,6 +14,7 @@ import CareerIntroModal from './components/modals/CareerIntroModal.vue'
 import KeyboardHint from './components/ui/KeyboardHint.vue'
 
 const store = useGameStore()
+useGodModeHotkey()
 
 function handleStart(): void {
   store.initTutorial()

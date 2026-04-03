@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
 import { useGameStore } from '../../store/gameStore'
 import { LEVELS, getTotalSlots } from '../../modules/levels'
 import type { LevelBestRecord, LevelConfig } from '../../types'
 
 const store = useGameStore()
-let godBuffer = ''
 
 interface MenuLevel {
   id: number
@@ -71,31 +69,6 @@ function lockTooltip(level: MenuLevel): string {
     ? 'This vessel tier is coming soon.'
     : 'You must complete the previous level first.'
 }
-
-function handleKeydown(event: KeyboardEvent): void {
-  if (store.phase !== 'start') return
-  if (event.ctrlKey || event.metaKey || event.altKey) return
-
-  const key = event.key.toLowerCase()
-  if (!/^[a-z]$/.test(key)) {
-    godBuffer = ''
-    return
-  }
-
-  godBuffer = (godBuffer + key).slice(-3)
-  if (godBuffer === 'god') {
-    store.toggleGodMode()
-    godBuffer = ''
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
-})
 
 const megaLevels: MenuLevel[] = Array.from({ length: 5 }, (_, index) => ({
   id: 10 + index,

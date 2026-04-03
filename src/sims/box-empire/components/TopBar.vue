@@ -4,6 +4,7 @@ import { useGameStore } from '../store/gameStore'
 import MoneyDisplay from './ui/MoneyDisplay.vue'
 import TimeControls from './ui/TimeControls.vue'
 import AudioControls from '@/components/AudioControls.vue'
+import GodModeButton from '@/components/GodModeButton.vue'
 
 const store = useGameStore()
 const router = useRouter()
@@ -31,6 +32,7 @@ function goToMenu(): void {
     </div>
     <div class="top-bar-right">
       <TimeControls />
+      <GodModeButton />
       <AudioControls placement="inline" />
     </div>
   </div>
