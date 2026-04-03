@@ -45,6 +45,7 @@ const WobbleSpikeThreshold = 0.12
 
 export const useContainerStackStore = defineStore('container-stack-game', () => {
   const phase = ref<GamePhase>('start')
+  const hasStartedGame = ref(false)
   const layers = ref<TowerLayer[]>([])
   const centerOfMass = ref(new Vector3())
   const stabilityScore = ref(1)
@@ -153,7 +154,16 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   }
 
   function retryCurrentLevel(): void {
-    startLevelInternal()
+    collapsePieces.value = []
+    floatingContainer.value = null
+    floatingFrom.value = null
+    placingSlotOptions.value = []
+    movesInLevel.value = 0
+    levelTimeRemainingSec.value = getLevelTimeLimitSec(currentLevel.value)
+    refillMoveTimer()
+    levelFailReason.value = null
+    resetTowerState()
+    phase.value = 'playing'
   }
 
   function beginCollapseFromTower(extraFloating?: {
@@ -199,6 +209,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   }
 
   function beginPlay(): void {
+    hasStartedGame.value = true
     newGame()
   }
 
@@ -453,6 +464,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   function restartToStart(): void {
     collapseIdPrefix = `${Date.now()}`
     phase.value = 'start'
+    hasStartedGame.value = false
     layers.value = []
     floatingContainer.value = null
     floatingFrom.value = null
@@ -482,6 +494,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
 
   return {
     phase,
+    hasStartedGame,
     layers,
     centerOfMass,
     stabilityScore,

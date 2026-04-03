@@ -37,7 +37,7 @@ export const PHYSICS = {
   wobbleDampingStabilityFactor: 3.5,
   jitterToImpulseScale: 0.85,
   /** Angular impulse per pixel while dragging; scales up mainly when stability is low */
-  dragWobblePerPixel: 0.00055,
+  dragWobblePerPixel: 0.0018,
   /** If stability is below this while dragging, very shaky hands can topple the tower */
   shakyCollapseStabilityThreshold: 0.22,
   /** Cumulative drag jitter (px) needed with low stability to force-collapse */

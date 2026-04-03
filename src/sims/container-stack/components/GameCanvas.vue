@@ -335,11 +335,13 @@ watch(phase, (p, prevP) => {
     syncCollapseMeshes()
     audio.playCollapseSequence()
     setTimeout(() => audio.playSound('boo', 0.72), 3000)
+    setTimeout(() => audio.playSound('youSuck', 0.8), 7000)
     blocksGroup.clear()
     blocksById.clear()
     clearPlacementMarkers()
+    three.setShowTopMode(false)
   }
-  if (p === 'playing' && prevP === 'start') {
+  if (p === 'playing' && (prevP === 'start' || prevP === 'levelFailed')) {
     void audio.init()
   }
   three.setShowTopMode(p === 'placing')

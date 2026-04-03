@@ -18,6 +18,7 @@ export const SOUNDS: Record<string, string> = {
   countdownTick: assetUrl('correct-ding.mp3'),
   countdownUrgent: assetUrl('countdown-urgent.mp3'),
   boo: assetUrl('boo-3-seconds.mp3'),
+  youSuck: assetUrl('you-suck-1-second.mp3'),
   towerCollapse: assetUrl('tower-collaps.mp3'),
 }
 

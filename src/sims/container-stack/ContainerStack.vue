@@ -19,7 +19,7 @@ import { useGameMusic } from './composables/useGameMusic'
 useGameMusic()
 
 const store = useContainerStackStore()
-const { phase } = storeToRefs(store)
+const { phase, hasStartedGame } = storeToRefs(store)
 
 const pauseOpen = ref(false)
 
@@ -46,7 +46,8 @@ watch(phase, p => {
 
 onMounted(() => {
   // Reset game state when component mounts (e.g., returning from menu)
-  if (phase.value !== 'start') {
+  // But NOT if we're retrying a level (hasStartedGame will be true)
+  if (phase.value !== 'start' && !hasStartedGame.value) {
     store.restartToStart()
   }
   window.addEventListener('keydown', onKey)
@@ -73,7 +74,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       </p>
     </div>
     <KeyboardHint v-if="phase !== 'start'" />
-    <StartScreen v-if="phase === 'start'" />
+    <StartScreen v-if="phase === 'start' && !hasStartedGame" />
     <GameOver v-if="phase === 'gameOver'" />
     <LevelCompleteModal v-if="phase === 'levelComplete'" />
     <LevelFailedModal v-if="phase === 'levelFailed'" />
