@@ -18,7 +18,7 @@ export function useGameMusic() {
 
   function tryPlay() {
     const audio = getAudio()
-    if (audioStore.backgroundMusicMuted) {
+    if (audioStore.gameMusicMuted) {
       audio.pause()
       return
     }
@@ -36,7 +36,7 @@ export function useGameMusic() {
   onMounted(() => {
     tryPlay()
     watch(
-      () => audioStore.backgroundMusicMuted,
+      () => audioStore.gameMusicMuted,
       (isMuted) => {
         const audio = getAudio()
         if (isMuted) audio.pause()

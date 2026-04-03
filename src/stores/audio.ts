@@ -2,11 +2,19 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useAudioStore = defineStore('audio', () => {
-  const backgroundMusicMuted = ref(false)
+  const menuMusicMuted = ref(false)
+  const gameMusicMuted = ref(false)
 
-  function toggleBackgroundMusic(): void {
-    backgroundMusicMuted.value = !backgroundMusicMuted.value
+  function toggleMenuMusic(): void {
+    menuMusicMuted.value = !menuMusicMuted.value
   }
 
-  return { backgroundMusicMuted, toggleBackgroundMusic }
+  function toggleGameMusic(): void {
+    gameMusicMuted.value = !gameMusicMuted.value
+  }
+
+  // Legacy alias for backwards compatibility
+  const backgroundMusicMuted = menuMusicMuted
+
+  return { menuMusicMuted, gameMusicMuted, toggleMenuMusic, toggleGameMusic, backgroundMusicMuted, toggleBackgroundMusic: toggleMenuMusic }
 })
