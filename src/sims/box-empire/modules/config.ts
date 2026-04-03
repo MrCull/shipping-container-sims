@@ -111,9 +111,10 @@ export const GATE_INGATE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENC
 export const GATE_INGATE_LANE_X = -38
 
 // Out-gate: right-hand fence (mirror of in-gate on the left), landside along +Z
-export const GATE_OUTGATE_POSITION: Position3D = { x: 42, y: 0, z: 88 }
+export const GATE_OUTGATE_POSITION: Position3D = { x: 35, y: 0, z: 88 }
 // Trucks queue / hold along this Z before the boom (same as gate z)
 export const GATE_OUTGATE_FENCE_Z = 88
+export const GATE_OUTGATE_QUEUE_LENGTH = 25
 
 // Legacy aliases
 export const GATE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
@@ -123,7 +124,18 @@ export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL
 export const YARD_BLOCK_POSITION: Position = { x: -12, z: 18 }
 const YARD_TRUCK_STANDOFF = RS_LENGTH * RS_TRUCK_STANDOFF_MULTIPLIER
 
-// Yard truck stand where road trucks wait for RS service, kept well clear of the stack face.
+// Separate yard truck stands so export deliveries and import pickups do not stack into one bay.
+export const YARD_TRUCK_EXPORT_PARK_POSITION: Position3D = {
+  x: -7,
+  y: 0,
+  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF,
+}
+export const YARD_TRUCK_IMPORT_PARK_POSITION: Position3D = {
+  x: 9,
+  y: 0,
+  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF,
+}
+// Legacy midpoint retained for generic camera framing / old references.
 export const YARD_TRUCK_PARK_POSITION: Position3D = {
   x: 0,
   y: 0,
@@ -160,6 +172,16 @@ export const TRUCK_GLB = {
 } as const
 
 // World position of the container when the truck is parked at the yard truck stand facing -Z (heading π).
+export const YARD_TRUCK_EXPORT_CONTAINER_POSITION: Position3D = {
+  x: YARD_TRUCK_EXPORT_PARK_POSITION.x,
+  y: CONTAINER_HEIGHT / 2,
+  z: YARD_TRUCK_EXPORT_PARK_POSITION.z + Math.abs(TRUCK_GLB.containerOffsetZ),
+}
+export const YARD_TRUCK_IMPORT_CONTAINER_POSITION: Position3D = {
+  x: YARD_TRUCK_IMPORT_PARK_POSITION.x,
+  y: CONTAINER_HEIGHT / 2,
+  z: YARD_TRUCK_IMPORT_PARK_POSITION.z + Math.abs(TRUCK_GLB.containerOffsetZ),
+}
 export const YARD_TRUCK_CONTAINER_POSITION: Position3D = {
   x: YARD_TRUCK_PARK_POSITION.x,
   y: CONTAINER_HEIGHT / 2,

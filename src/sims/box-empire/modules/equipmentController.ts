@@ -67,9 +67,10 @@ const YARD_ROAD_EDGE_Z = 23.5   // road-side safe limit (row rear  + clearance)
 // X position clear of ALL yard containers (leftmost bay starts at x=−15).
 // Used as a bypass lane to cross the yard band without hitting stacks.
 const YARD_BYPASS_X    = -19.0
+const YARD_LANDSIDE_SERVICE_Z = YARD_ROAD_EDGE_Z + 3.0
 
 // Build axis-aligned waypoints, routing around the container yard band when needed.
-function buildRsWaypoints(from: Position3D, to: Position3D): Position3D[] {
+function buildRsWaypoints(from: Position3D, to: Position3D, preferXFirst: boolean = false): Position3D[] {
   const pts: Position3D[] = []
 
   const minZ = Math.min(from.z, to.z)
@@ -84,12 +85,49 @@ function buildRsWaypoints(from: Position3D, to: Position3D): Position3D[] {
     pts.push({ x: bypassX, y: 0, z: to.z })    // cross the yard band on bypass lane
     pts.push({ x: to.x,    y: 0, z: to.z })    // approach target X
   } else {
-    // Standard routing: align Z first, then X
-    if (Math.abs(from.z - to.z) > 0.5) {
-      pts.push({ x: from.x, y: 0, z: to.z })
+    if (preferXFirst) {
+      if (Math.abs(from.x - to.x) > 0.5) {
+        pts.push({ x: to.x, y: 0, z: from.z })
+      }
+      pts.push({ x: to.x, y: 0, z: to.z })
+    } else {
+      // Standard routing: align Z first, then X
+      if (Math.abs(from.z - to.z) > 0.5) {
+        pts.push({ x: from.x, y: 0, z: to.z })
+      }
+      pts.push({ x: to.x, y: 0, z: to.z })
     }
-    pts.push({ x: to.x, y: 0, z: to.z })
   }
+
+  return pts
+}
+
+function buildRsYardToTruckWaypoints(from: Position3D, to: Position3D): Position3D[] {
+  const pts: Position3D[] = []
+  const serviceLaneZ = Math.max(from.z, YARD_LANDSIDE_SERVICE_Z)
+
+  if (Math.abs(from.z - serviceLaneZ) > 0.5) {
+    pts.push({ x: from.x, y: 0, z: serviceLaneZ })
+  }
+  if (Math.abs(from.x - to.x) > 0.5) {
+    pts.push({ x: to.x, y: 0, z: serviceLaneZ })
+  }
+  pts.push({ x: to.x, y: 0, z: to.z })
+
+  return pts
+}
+
+function buildRsTruckToYardWaypoints(from: Position3D, to: Position3D): Position3D[] {
+  const pts: Position3D[] = []
+  const serviceLaneZ = Math.max(from.z, YARD_LANDSIDE_SERVICE_Z)
+
+  if (Math.abs(from.z - serviceLaneZ) > 0.5) {
+    pts.push({ x: from.x, y: 0, z: serviceLaneZ })
+  }
+  if (Math.abs(from.x - to.x) > 0.5) {
+    pts.push({ x: to.x, y: 0, z: serviceLaneZ })
+  }
+  pts.push({ x: to.x, y: 0, z: to.z })
 
   return pts
 }
@@ -136,6 +174,24 @@ function rsTruckParkingPosition(currentPos: Position3D, targetPos: Position3D): 
 // Determine heading for RS at a given position facing a pickup/drop target
 function rsFacingHeading(from: Position3D, to: Position3D): number {
   return Math.atan2(to.x - from.x, to.z - from.z)
+}
+
+function shouldUseStackHuggingRoute(job: import('../types').Job): boolean {
+  return job.pickupLocation.type === 'yard_slot' && job.dropoffLocation.type === 'truck'
+}
+
+function buildRsDropWaypoints(
+  from: Position3D,
+  to: Position3D,
+  job: import('../types').Job,
+): Position3D[] {
+  if (shouldUseStackHuggingRoute(job)) {
+    return buildRsYardToTruckWaypoints(from, to)
+  }
+  if (job.pickupLocation.type === 'truck' && job.dropoffLocation.type === 'yard_slot') {
+    return buildRsTruckToYardWaypoints(from, to)
+  }
+  return buildRsWaypoints(from, to)
 }
 
 function getPickDuration(eq: Equipment): number {
@@ -416,7 +472,7 @@ function tickReachStacker(
         const dropPark = isDropToTruck
           ? rsTruckParkingPosition(eq.position, job.dropoffLocation.position)
           : rsParkingPosition(eq.position, job.dropoffLocation.position)
-        eq.waypoints = buildRsWaypoints(eq.position, dropPark)
+        eq.waypoints = buildRsDropWaypoints(eq.position, dropPark, job)
         eq.waypointIndex = 0
         eq.targetPosition = eq.waypoints[0] ?? dropPark
         eq.state = 'travel_to_drop'
@@ -434,7 +490,7 @@ function tickReachStacker(
         const dropPark = isDropToTruck
           ? rsTruckParkingPosition(eq.position, job.dropoffLocation.position)
           : rsParkingPosition(eq.position, job.dropoffLocation.position)
-        eq.waypoints = buildRsWaypoints(eq.position, dropPark)
+        eq.waypoints = buildRsDropWaypoints(eq.position, dropPark, job)
         eq.waypointIndex = 0
       }
       // Update heading to face the dropoff target

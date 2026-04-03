@@ -30,7 +30,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 | `modules/vesselRenderer.ts` | Vessel render with GLB swap-in on load |
 | `modules/truckRenderer.ts` | Truck render with GLB swap-in on load |
 | `modules/floatingTextRenderer.ts` | Canvas-sprite popups (money earned, events) that drift upward and fade |
-| `modules/sceneBuilder.ts` | Full static scene construction: sky dome, animated ocean, quay wall, bollards, fenders, port lights, ground, yard markings, terminal fence with in/out gates, gatehouse buildings with barriers, quay buffer markings, terminal buildings |
+| `modules/sceneBuilder.ts` | Full static scene construction: sky dome, animated ocean, quay wall, bollards, fenders, port lights, ground, yard markings, terminal fence with in/out gates, improved gatehouse buildings with animated barrier rigs, quay buffer markings, terminal buildings |
 | `modules/spatialOccupancy.ts` | AABB soft-collision registry — trucks and equipment register extents; `canMoveTo()` prevents overlap |
 | `modules/terminalMap.ts` | Path graph (nodes + bidirectional edges with speed limits) for the terminal layout |
 | `modules/pathfinding.ts` | Dijkstra-based pathfinding over the terminal graph |
@@ -60,7 +60,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 
 | Composable | Purpose |
 |-----------|---------|
-| `composables/useThreeScene.ts` | Scene setup, renderer instantiation, per-frame `updateEntities()`, `spawnFloatingText()`, `triggerVesselShake()`, tutorial/narrator camera cue pans, container raycasting, WebGL failure detection (`webglFailed` ref) |
+| `composables/useThreeScene.ts` | Scene setup, renderer instantiation, per-frame `updateEntities()`, `spawnFloatingText()`, `triggerVesselShake()`, tutorial/narrator camera cue pans, animated gate barrier updates, container raycasting, WebGL failure detection (`webglFailed` ref) |
 | `composables/useGameLoop.ts` | RAF loop with fixed-step accumulator; delegates sim ticks to store and render to scene |
 | `composables/useAudio.ts` | Sound effect playback mapped via `SOUND_MAP` in config |
 | `composables/useInput.ts` | Mouse/pointer event handling for container selection |
@@ -138,6 +138,7 @@ Containers use individual `THREE.Mesh` with per-container `createContainerMateri
 - `importLaneOpen` — controls whether import pickup trucks can enter and use the out-gate flow
 
 Both flags are checked in the tutorial flow and reflected in the `TopBar` gate-open buttons.
+The gate barriers are animated in the scene layer: they raise before nearby trucks pass through the respective gate lane and settle back down once the truck has cleared the boom.
 
 ## Shipping Lines / Container Liveries
 

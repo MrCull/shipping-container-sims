@@ -21,12 +21,14 @@ import {
   CRANE_POSITION,
   GATE_INGATE_POSITION,
   GATE_OUTGATE_POSITION,
+  GATE_OUTGATE_FENCE_Z,
   QUAY_BUFFER_DISCHARGE_POSITION,
   QUAY_BUFFER_LOAD_POSITION,
   YARD_BLOCK_POSITION,
   YARD_TRUCK_PARK_POSITION,
 } from '../modules/config'
 import type { CameraCueTarget } from '../types'
+import type { GatehouseState, TruckVisit } from '../types'
 
 const KEY_PAN_SPEED  = 20
 const KEY_ZOOM_SPEED = 25
@@ -68,6 +70,8 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   let truckRenderer: TruckRenderer | null = null
   let floatingTextRenderer: FloatingTextRenderer | null = null
   let activeCameraAnimation: CameraAnimation | null = null
+  let ingateBarrier: THREE.Group | null = null
+  let outgateBarrier: THREE.Group | null = null
 
   const isReady = ref(false)
   const webglFailed = ref(false)
@@ -147,6 +151,30 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       fromTarget: controls.target.clone(),
       toTarget: pose.lookAt,
     }
+  }
+
+  function shouldOpenIngateBarrier(trucks: TruckVisit[], gatehouse: GatehouseState): boolean {
+    if (!gatehouse.exportLaneOpen) return false
+    return trucks.some(truck =>
+      (truck.state === 'driving_to_yard' && truck.position.z < GATE_INGATE_POSITION.z + 12),
+    )
+  }
+
+  function shouldOpenOutgateBarrier(trucks: TruckVisit[], gatehouse: GatehouseState): boolean {
+    if (!gatehouse.importLaneOpen) return false
+    return trucks.some(truck =>
+      truck.state === 'departing' &&
+      Math.abs(truck.position.x - GATE_OUTGATE_POSITION.x) < 6 &&
+      truck.position.z < GATE_OUTGATE_FENCE_Z + 12,
+    )
+  }
+
+  function updateGatehouseBarriers(): void {
+    const openAngle = Math.PI * 0.43
+    const ingateTarget = shouldOpenIngateBarrier(store.truckVisits, store.gatehouse) ? openAngle : 0
+    const outgateTarget = shouldOpenOutgateBarrier(store.truckVisits, store.gatehouse) ? openAngle : 0
+    if (ingateBarrier) ingateBarrier.rotation.z = THREE.MathUtils.lerp(ingateBarrier.rotation.z, ingateTarget, 0.12)
+    if (outgateBarrier) outgateBarrier.rotation.z = THREE.MathUtils.lerp(outgateBarrier.rotation.z, outgateTarget, 0.12)
   }
 
   function updateCameraCue(): void {
@@ -281,6 +309,8 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       }
 
       buildScene(scene)
+      ingateBarrier = scene.getObjectByName('ingate-barrier') as THREE.Group | null
+      outgateBarrier = scene.getObjectByName('outgate-barrier') as THREE.Group | null
 
       containerRenderer = new ContainerRenderer(scene)
       equipmentRenderer = new EquipmentRenderer(scene)
@@ -330,6 +360,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     const t = performance.now() / 1000
     animateOcean(t)
     animateFoam(t)
+    updateGatehouseBarriers()
     renderer.render(scene, camera)
   }
 
@@ -373,6 +404,8 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     vesselRenderer?.dispose()
     truckRenderer?.dispose()
     floatingTextRenderer?.dispose()
+    ingateBarrier = null
+    outgateBarrier = null
 
     if (scene) {
       scene.traverse(obj => {

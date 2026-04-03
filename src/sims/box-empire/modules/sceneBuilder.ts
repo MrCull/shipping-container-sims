@@ -17,6 +17,7 @@ import {
   GATE_INGATE_POSITION,
   GATE_OUTGATE_POSITION,
   GATE_OUTGATE_FENCE_Z,
+  GATE_OUTGATE_QUEUE_LENGTH,
 } from './config'
 import { registerOceanMesh, createFoamParticles } from './oceanAnimation'
 
@@ -216,36 +217,159 @@ function buildYardMarkings(scene: THREE.Scene): void {
 }
 
 function buildGatehouse(scene: THREE.Scene): void {
-  const houseMat = new THREE.MeshPhongMaterial({ color: 0xcc9933, shininess: 12 })
-  const roofMat  = new THREE.MeshPhongMaterial({ color: 0x8b4513, shininess: 10 })
-  const barMat   = new THREE.MeshPhongMaterial({ color: 0xff5500 })
-  const barMat2  = new THREE.MeshPhongMaterial({ color: 0x1166cc })
-  const winMat   = new THREE.MeshPhongMaterial({ color: 0x88aacc, emissive: 0x224466, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 })
+  const boothMat = new THREE.MeshPhongMaterial({ color: 0xe3d3b3, shininess: 16 })
+  const trimMat = new THREE.MeshPhongMaterial({ color: 0x40515f, shininess: 24 })
+  const canopyMat = new THREE.MeshPhongMaterial({ color: 0x6e7f89, shininess: 18 })
+  const curbMat = new THREE.MeshPhongMaterial({ color: 0xd8d0be, shininess: 10 })
+  const winMat = new THREE.MeshPhongMaterial({ color: 0x98c4de, emissive: 0x224466, emissiveIntensity: 0.45, transparent: true, opacity: 0.84 })
+  const lampMat = new THREE.MeshPhongMaterial({ color: 0xfff2ba, emissive: 0x665500, emissiveIntensity: 0.8 })
+  const orangeMat = new THREE.MeshPhongMaterial({ color: 0xf47d20, shininess: 35 })
+  const blueMat = new THREE.MeshPhongMaterial({ color: 0x1d62b3, shininess: 35 })
+  const stripeLight = new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 60 })
+  const bollardMat = new THREE.MeshPhongMaterial({ color: 0x2e3236, shininess: 40 })
 
-  function addBarrierAcrossLane(laneX: number, fenceZ: number, mat: THREE.MeshPhongMaterial): void {
-    // Pole on one side of lane
-    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 3), mat)
-    p.position.set(laneX - 2.5, 1.5, fenceZ); scene.add(p)
-    // Boom extends across lane
-    const b = new THREE.Mesh(new THREE.BoxGeometry(5, 0.12, 0.12), mat)
-    b.position.set(laneX, 2.6, fenceZ); scene.add(b)
+  function addBarrierAcrossLane(name: string, laneX: number, fenceZ: number, mat: THREE.MeshPhongMaterial): void {
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 3.3, 10), trimMat)
+    mast.position.set(laneX - 2.65, 1.65, fenceZ)
+    mast.castShadow = true
+    scene.add(mast)
+
+    const motor = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.5, 0.7), trimMat)
+    motor.position.set(laneX - 2.65, 2.6, fenceZ)
+    motor.castShadow = true
+    scene.add(motor)
+
+    const pivot = new THREE.Group()
+    pivot.name = name
+    pivot.position.set(laneX - 2.35, 2.65, fenceZ)
+
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.14, 0.16), mat)
+    arm.position.x = 2.45
+    arm.castShadow = true
+    pivot.add(arm)
+
+    for (let i = 0; i < 6; i++) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.18), i % 2 === 0 ? stripeLight : mat)
+      stripe.position.set(0.5 + i * 0.75, 0, 0)
+      pivot.add(stripe)
+    }
+
+    const tipLamp = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), lampMat)
+    tipLamp.position.set(4.85, 0.02, 0)
+    pivot.add(tipLamp)
+    scene.add(pivot)
   }
 
-  function addBuilding(x: number, z: number, label: string): void {
-    void label
-    const body = new THREE.Mesh(new THREE.BoxGeometry(3.2, 3.8, 4.5), houseMat)
-    body.position.set(x, 1.9, z); body.castShadow = true; scene.add(body)
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.30, 5.1), roofMat)
-    roof.position.set(x, 3.95, z); scene.add(roof)
-    const win = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 2.6), winMat)
-    win.position.set(x + 1.62, 2.2, z); scene.add(win)
+  interface GatehouseBuildingOptions {
+    facing?: 1 | -1
+    includeCanopyPosts?: boolean
+    includeBollards?: boolean
+    includeRoofLamps?: boolean
+    includeSignPlate?: boolean
+  }
+
+  function addBuilding(
+    x: number,
+    z: number,
+    label: string,
+    accentMat: THREE.MeshPhongMaterial,
+    options: GatehouseBuildingOptions = {},
+  ): void {
+    const facing = options.facing ?? 1
+    const includeCanopyPosts = options.includeCanopyPosts ?? true
+    const includeBollards = options.includeBollards ?? true
+    const includeRoofLamps = options.includeRoofLamps ?? true
+    const includeSignPlate = options.includeSignPlate ?? true
+
+    const island = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.28, 8), curbMat)
+    island.position.set(x + 0.4, 0.14, z)
+    island.receiveShadow = true
+    scene.add(island)
+
+    const booth = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.6, 4.8), boothMat)
+    booth.position.set(x, 1.8, z)
+    booth.castShadow = true
+    scene.add(booth)
+
+    const baseTrim = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.36, 5.1), trimMat)
+    baseTrim.position.set(x, 0.2, z)
+    scene.add(baseTrim)
+
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.34, 6.4), canopyMat)
+    canopy.position.set(x + 1.4, 4.35, z)
+    canopy.castShadow = true
+    scene.add(canopy)
+
+    if (includeCanopyPosts) {
+      for (const px of [x - 2.1, x + 4.1]) {
+        for (const pz of [z - 2.4, z + 2.4]) {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 4.0, 0.22), trimMat)
+          post.position.set(px, 2.0, pz)
+          post.castShadow = true
+          scene.add(post)
+        }
+      }
+    }
+
+    const fascia = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.52, 0.18), accentMat)
+    fascia.position.set(x + 1.58, 3.65, z + facing * 2.33)
+    scene.add(fascia)
+
+    const frontWin = new THREE.Mesh(new THREE.BoxGeometry(2.75, 1.5, 0.07), winMat)
+    frontWin.position.set(x, 2.2, z + facing * 2.43)
+    scene.add(frontWin)
+
+    for (const sx of [-1, 1]) {
+      const sideWin = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.4, 2.1), winMat)
+      sideWin.position.set(x + sx * 1.83, 2.2, z)
+      scene.add(sideWin)
+    }
+
+    if (includeSignPlate) {
+      const signPlate = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.7, 0.08), trimMat)
+      signPlate.position.set(x + 1.55, 3.65, z + facing * 2.46)
+      scene.add(signPlate)
+    }
+
+    const laneMark = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 10.5), new THREE.MeshPhongMaterial({
+      color: accentMat === orangeMat ? 0xf39c12 : 0x3d84d6,
+      transparent: true,
+      opacity: 0.22,
+    }))
+    laneMark.rotation.x = -Math.PI / 2
+    laneMark.position.set(x + 4.15, 0.03, z)
+    scene.add(laneMark)
+
+    if (includeBollards) {
+      for (const bx of [x + 2.95, x + 5.3]) {
+        for (const bz of [z - 2.6, z + 2.6]) {
+          const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 1.0, 10), bollardMat)
+          bollard.position.set(bx, 0.5, bz)
+          bollard.castShadow = true
+          scene.add(bollard)
+        }
+      }
+    }
+
+    if (includeRoofLamps) {
+      const roofLampLeft = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.18, 0.14), lampMat)
+      roofLampLeft.position.set(x - 1.4, 4.2, z + facing * 2.15)
+      scene.add(roofLampLeft)
+      const roofLampRight = roofLampLeft.clone()
+      roofLampRight.position.x = x + 4.2
+      scene.add(roofLampRight)
+    }
   }
 
   // ---- IN-GATE (at TERMINAL_FENCE_Z) ----
   // Lane is at x=GATE_INGATE_POSITION.x; gatehouse building is beside it at x-4
   const inBuildX = GATE_INGATE_POSITION.x - 5
-  addBuilding(inBuildX, TERMINAL_FENCE_Z + 2, 'IN')
-  addBarrierAcrossLane(GATE_INGATE_POSITION.x, TERMINAL_FENCE_Z, barMat)
+  addBuilding(inBuildX, TERMINAL_FENCE_Z + 2, 'IN', orangeMat, {
+    facing: -1,
+    includeCanopyPosts: false,
+    includeBollards: false,
+  })
+  addBarrierAcrossLane('ingate-barrier', GATE_INGATE_POSITION.x, TERMINAL_FENCE_Z - CONTAINER_LENGTH * 0.5, orangeMat)
 
   // Queue lane strip outside terminal (parallel to fence, along Z)
   const queueLen = 60
@@ -259,15 +383,19 @@ function buildGatehouse(scene: THREE.Scene): void {
 
   // ---- OUT-GATE (right fence at +X) ----
   // Same footprint as in-gate but on maxX: long axis ∥ Z (fence), trucks exit +Z (landward, away from berth)
-  const outRoofHalfW = 3.8 / 2
-  const outFenceGap = 0.02
-  const outBuildX = TERMINAL_BOUNDS.maxX - outFenceGap - outRoofHalfW
+  const outBuildX = GATE_OUTGATE_POSITION.x + 5.1
   const outBuildZ = GATE_OUTGATE_POSITION.z - 5
-  addBuilding(outBuildX, outBuildZ, 'OUT')
-  addBarrierAcrossLane(GATE_OUTGATE_POSITION.x, GATE_OUTGATE_FENCE_Z, barMat2)
+  addBuilding(outBuildX, outBuildZ, 'OUT', blueMat, {
+    facing: 1,
+    includeCanopyPosts: false,
+    includeBollards: false,
+    includeRoofLamps: false,
+    includeSignPlate: false,
+  })
+  addBarrierAcrossLane('outgate-barrier', GATE_OUTGATE_POSITION.x, GATE_OUTGATE_FENCE_Z, blueMat)
 
   // Queue inside terminal (hold positions are z < boom; then trucks exit +Z through boom)
-  const outQueueLen = 50
+  const outQueueLen = GATE_OUTGATE_QUEUE_LENGTH
   const outQueueStrip = new THREE.Mesh(
     new THREE.PlaneGeometry(3, outQueueLen),
     new THREE.MeshPhongMaterial({ color: 0x2266cc, transparent: true, opacity: 0.28 }),
