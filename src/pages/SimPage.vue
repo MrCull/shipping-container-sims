@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onUnmounted } from 'vue'
-import { useSimsStore } from '@/stores/sims'
-import { useSimRegistry } from '@/composables/useSimRegistry'
-import { watchSimHead } from '@/composables/useSiteHead'
 import { useRouter } from 'vue-router'
 import AudioControls from '@/components/AudioControls.vue'
+import { useSimRegistry } from '@/composables/useSimRegistry'
+import { watchSimHead } from '@/composables/useSiteHead'
 import { useGameStore as useStowageMasterStore } from '@/sims/stowage-master/store/gameStore'
+import { useSimsStore } from '@/stores/sims'
 
 const props = defineProps<{
   simId: string
@@ -37,10 +37,19 @@ function goHome() {
   router.push({ name: 'home' })
 }
 
+function handleMenuClick() {
+  if (props.simId === 'stowage-master' && stowageStore.phase !== 'start') {
+    stowageStore.returnToStartMenu()
+    return
+  }
+  goHome()
+}
+
 const stopHeadWatch = watchSimHead(
   () => sim.value,
   () => props.simId,
 )
+
 onUnmounted(() => {
   stopHeadWatch()
 })
@@ -49,14 +58,17 @@ onUnmounted(() => {
 <template>
   <div class="sim-page">
     <header class="sim-header">
-      <button
-        class="back-btn"
-        @click="goHome"
-      >
-        <span class="menu-icon">☰</span>
-        <span class="back-arrow">◀</span>
-        <span>MENU</span>
-      </button>
+      <div class="header-actions">
+        <button
+          class="back-btn"
+          @click="handleMenuClick"
+        >
+          <span class="menu-icon">MENU</span>
+          <span class="back-arrow">&lt;</span>
+          <span>MENU</span>
+        </button>
+      </div>
+
       <h1
         v-if="sim"
         class="sim-name"
@@ -120,7 +132,7 @@ onUnmounted(() => {
           class="back-home-btn"
           @click="goHome"
         >
-          ◀ BACK TO MENU
+          &lt; BACK TO MENU
         </button>
       </div>
 
@@ -135,7 +147,7 @@ onUnmounted(() => {
           class="back-home-btn"
           @click="goHome"
         >
-          ◀ BACK TO MENU
+          &lt; BACK TO MENU
         </button>
       </div>
     </main>
@@ -180,13 +192,21 @@ onUnmounted(() => {
 }
 
 .sim-header {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
   padding: 0.75rem 1.5rem;
   background: rgba(17, 24, 39, 0.95);
   border-bottom: 1px solid var(--color-border);
   backdrop-filter: blur(8px);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
 }
 
 .back-btn {
@@ -210,7 +230,7 @@ onUnmounted(() => {
 }
 
 .menu-icon {
-  font-size: 0.62rem;
+  font-size: 0.5rem;
   line-height: 1;
 }
 
@@ -219,9 +239,18 @@ onUnmounted(() => {
 }
 
 .sim-name {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
+  max-width: min(48vw, calc(100vw - 360px));
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-retro);
   font-size: 0.7rem;
   letter-spacing: 0.1em;
@@ -294,7 +323,9 @@ onUnmounted(() => {
 }
 
 @keyframes blink {
-  50% { opacity: 0; }
+  50% {
+    opacity: 0;
+  }
 }
 
 .nf-text {
