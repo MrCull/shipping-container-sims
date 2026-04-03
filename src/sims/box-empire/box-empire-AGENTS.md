@@ -19,14 +19,14 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 |------|---------|
 | `store/gameStore.ts` | Central Pinia store — all game state, tick logic, and job/truck/vessel orchestration |
 | `modules/jobScheduler.ts` | Job creation, assignment, cancellation, blocked-job recheck, and RS landside/waterside capability filtering |
-| `modules/equipmentController.ts` | Equipment state machine and movement (RS waypoints, side-aware truck/yard access, MHC spreader animation) |
+| `modules/equipmentController.ts` | Equipment state machine and movement (RS waypoints, side-aware truck/yard access, MHC slew/trolley/hoist target state) |
 | `modules/vesselManager.ts` | Vessel visit lifecycle |
 | `modules/truckManager.ts` | Truck gate flow, queue logic, waypoint-based axis-aligned movement |
 | `modules/yardManager.ts` | Yard slot assignment (reserved slot tracking) |
 | `modules/modelLoader.ts` | Async GLB loader with caching and clone pattern |
 | `modules/containerRenderer.ts` | Per-container `Mesh` with full 6-face canvas-texture materials |
 | `modules/containerMaterials.ts` | Canvas-texture PBR materials: corrugated walls, ISO markings, door panels, CSC plates, shipping-line liveries |
-| `modules/equipmentRenderer.ts` | Procedural reach stacker (body + cab + boom) and MHC meshes with animated spreader |
+| `modules/equipmentRenderer.ts` | Procedural reach stacker and MHC meshes; the MHC now uses a shorter luffing boom, rotating upper works, trolley, hoist cables, and spreader-carried container placement tied to the active target |
 | `modules/vesselRenderer.ts` | Vessel render with GLB swap-in on load |
 | `modules/truckRenderer.ts` | Truck render with GLB swap-in on load |
 | `modules/floatingTextRenderer.ts` | Canvas-sprite popups (money earned, events) that drift upward and fade |
@@ -120,7 +120,7 @@ Containers use individual `THREE.Mesh` with per-container `createContainerMateri
 ## Equipment Types
 
 - **Reach Stacker** (`rs-1`): Yard operations — unladen 5 m/s, laden 4 m/s, 8s pick/place. Uses axis-aligned waypoints, can access yard stacks from both landside and waterside, and can approach trucks from either side based on the shorter path. `canServeLandside` gates truck ↔ yard jobs, `canServeWaterside` gates quay ↔ yard jobs, both default to enabled, and both are overridden by the main `enabled` toggle. `armTargetY` / `armDropStartY` drive boom tip animation; `headingY` drives body rotation.
-- **Mobile Harbor Crane** (`mhc-1`): Vessel operations — 90s full cycle. `spreaderZ` tracks lateral position along jib (positive = quay side, negative = vessel side). `craneMode` controls whether it discharges, loads, or both.
+- **Mobile Harbor Crane** (`mhc-1`): Vessel operations — 90s full cycle. The base stays fixed, but the upper works now slew so the boom head faces the active target correctly, the shorter boom luffs, the trolley runs out along the boom, and the spreader hoists to the pickup/drop height without sinking boxes below the intended set-down level. `spreaderZ` is used as a signed reach command, and `craneMode` controls whether it discharges, loads, or both.
 
 ## Economy
 

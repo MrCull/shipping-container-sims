@@ -6,7 +6,8 @@
 //    target slot, then picks/drops by extending its boom. The body never
 //    enters the stack footprint.
 //  - Mobile Harbor Crane: base is FIXED. It never translates. Only armTargetY
-//    changes to animate the spreader swinging between vessel and quay buffer.
+//    and targetPosition/reach commands change; the renderer handles slew,
+//    trolley travel, and hoist geometry from that state.
 // ---------------------------------------------------------------------------
 
 import type {
@@ -20,6 +21,7 @@ import {
   RS_PICK_CYCLE_TIME,
   RS_PLACE_CYCLE_TIME,
   MHC_CYCLE_TIME,
+  CONTAINER_HEIGHT,
   RS_TRUCK_PARK_OFFSET,
   RS_YARD_PARK_OFFSET,
 } from './config'
@@ -151,6 +153,20 @@ function getTravelSpeed(eq: Equipment, laden: boolean): number {
   return laden ? RS_SPEED_LADEN : RS_SPEED_UNLADEN
 }
 
+const MHC_TRAVEL_HOIST_Y = 10.5
+const MHC_SPREADER_CLEARANCE_Y = 0.55
+
+function getMhcSpreaderTargetY(containerCenterY: number): number {
+  return containerCenterY + CONTAINER_HEIGHT / 2 + MHC_SPREADER_CLEARANCE_Y
+}
+
+function getMhcReachCommand(cranePosition: Position3D, target: Position3D): number {
+  const dx = target.x - cranePosition.x
+  const dz = target.z - cranePosition.z
+  const reach = Math.sqrt(dx * dx + dz * dz)
+  return dz >= 0 ? reach : -reach
+}
+
 export interface EquipmentTickResult {
   jobCompleted: boolean
   jobId: string | null
@@ -204,8 +220,9 @@ function tickMhc(
   switch (eq.state) {
     case 'assigned': {
       // Transition straight to picking; base does not move.
-      // spreaderZ: negative = vessel side, positive = quay side
-      eq.spreaderZ = job.pickupLocation.type === 'vessel_slot' ? -6 : 4
+      eq.targetPosition = { ...job.pickupLocation.position }
+      eq.spreaderZ = getMhcReachCommand(eq.position, job.pickupLocation.position)
+      eq.armTargetY = MHC_TRAVEL_HOIST_Y
       eq.state = 'picking'
       eq.stateStartTime = state.simTime
       eq.stateElapsed = 0
@@ -215,6 +232,9 @@ function tickMhc(
 
     case 'travel_to_pickup': {
       // Should not happen for MHC, but handle gracefully
+      eq.targetPosition = { ...job.pickupLocation.position }
+      eq.spreaderZ = getMhcReachCommand(eq.position, job.pickupLocation.position)
+      eq.armTargetY = MHC_TRAVEL_HOIST_Y
       eq.state = 'picking'
       eq.stateStartTime = state.simTime
       eq.stateElapsed = 0
@@ -223,9 +243,11 @@ function tickMhc(
     }
 
     case 'picking': {
-      const pickTargetY = job.pickupLocation.position.y
+      eq.targetPosition = { ...job.pickupLocation.position }
+      eq.spreaderZ = getMhcReachCommand(eq.position, job.pickupLocation.position)
+      const pickTargetY = getMhcSpreaderTargetY(job.pickupLocation.position.y)
       const pickProgress = Math.min(1, eq.stateElapsed / getPickDuration(eq))
-      eq.armTargetY = pickTargetY * pickProgress
+      eq.armTargetY = MHC_TRAVEL_HOIST_Y + (pickTargetY - MHC_TRAVEL_HOIST_Y) * pickProgress
 
       if (eq.stateElapsed >= getPickDuration(eq)) {
         const container = state.containers.find(c => c.id === job.containerId)
@@ -238,11 +260,11 @@ function tickMhc(
           }
           result.pickedContainerId = container.id
         }
-        // Swing spreader to drop side
-        eq.spreaderZ = job.dropoffLocation.type === 'vessel_slot' ? -6 : 4
-        eq.armDropStartY = eq.armTargetY   // remember current height for drop lerp
-        eq.state = 'dropping'
         eq.targetPosition = { ...job.dropoffLocation.position }
+        eq.spreaderZ = getMhcReachCommand(eq.position, job.dropoffLocation.position)
+        eq.armTargetY = MHC_TRAVEL_HOIST_Y
+        eq.armDropStartY = MHC_TRAVEL_HOIST_Y
+        eq.state = 'dropping'
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0
       }
@@ -251,7 +273,10 @@ function tickMhc(
 
     case 'travel_to_drop': {
       // MHC doesn't travel; jump straight to dropping
-      eq.armDropStartY = eq.armTargetY
+      eq.targetPosition = { ...job.dropoffLocation.position }
+      eq.spreaderZ = getMhcReachCommand(eq.position, job.dropoffLocation.position)
+      eq.armTargetY = MHC_TRAVEL_HOIST_Y
+      eq.armDropStartY = MHC_TRAVEL_HOIST_Y
       eq.state = 'dropping'
       eq.stateStartTime = state.simTime
       eq.stateElapsed = 0
@@ -259,7 +284,9 @@ function tickMhc(
     }
 
     case 'dropping': {
-      const dropTargetY = job.dropoffLocation.position.y
+      eq.targetPosition = { ...job.dropoffLocation.position }
+      eq.spreaderZ = getMhcReachCommand(eq.position, job.dropoffLocation.position)
+      const dropTargetY = getMhcSpreaderTargetY(job.dropoffLocation.position.y)
       const dropProgress = Math.min(1, eq.stateElapsed / getDropDuration(eq))
       // Lerp from pickup height (armDropStartY) down to the drop target Y
       eq.armTargetY = eq.armDropStartY + (dropTargetY - eq.armDropStartY) * dropProgress

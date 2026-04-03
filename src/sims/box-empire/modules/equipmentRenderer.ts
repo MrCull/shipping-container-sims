@@ -4,16 +4,17 @@
 
 import * as THREE from 'three'
 import type { Equipment, Container } from '../types'
-import { CONTAINER_HEIGHT, CONTAINER_WIDTH } from './config'
+import { CONTAINER_HEIGHT, CONTAINER_WIDTH, MHC_CYCLE_TIME } from './config'
 import { createContainerGroup } from './containerRenderer'
 import { disposeContainerMaterials } from './containerMaterials'
 
 interface EquipmentParts {
   boomGroup?: THREE.Group
+  mhcHouseGroup?: THREE.Group
+  mhcBoomGroup?: THREE.Group
+  mhcTrolley?: THREE.Group
   mhcSpreader?: THREE.Group
-  mhcCable?: THREE.Mesh
-  mhcCableL?: THREE.Mesh
-  mhcCableR?: THREE.Mesh
+  mhcCables?: THREE.Mesh[]
 }
 
 export class EquipmentRenderer {
@@ -296,295 +297,354 @@ export class EquipmentRenderer {
   private createMobileHarborCrane(): { group: THREE.Group; parts: EquipmentParts } {
     const group = new THREE.Group()
 
-    // --- Materials ---
-    const blueMat    = new THREE.MeshPhongMaterial({ color: 0x1a5276, specular: 0x224488, shininess: 55 })
-    const blueDarkMat= new THREE.MeshPhongMaterial({ color: 0x0e2d42, specular: 0x112233, shininess: 35 })
-    const redMat     = new THREE.MeshPhongMaterial({ color: 0xc0392b, specular: 0x441111, shininess: 45 })
-    const yellowMat  = new THREE.MeshPhongMaterial({ color: 0xf1c40f, emissive: 0x554400, emissiveIntensity: 0.3 })
-    const beaconMat  = new THREE.MeshPhongMaterial({ color: 0xf1c40f, emissive: 0x664400, emissiveIntensity: 0.6 })
-    const darkMat    = new THREE.MeshPhongMaterial({ color: 0x1c2833, shininess: 22 })
-    const greyMat    = new THREE.MeshPhongMaterial({ color: 0x888888, specular: 0xaaaaaa, shininess: 50 })
-    const greyDarkMat= new THREE.MeshPhongMaterial({ color: 0x555555, shininess: 20 })
-    const glassMat   = new THREE.MeshPhongMaterial({ color: 0x4a90d9, emissive: 0x224466, emissiveIntensity: 0.5, transparent: true, opacity: 0.75 })
-    const stepMat    = new THREE.MeshPhongMaterial({ color: 0x666666, specular: 0x888888, shininess: 40 })
-    const cableMat   = new THREE.MeshPhongMaterial({ color: 0x333333, shininess: 8 })
-    const cwMat      = new THREE.MeshPhongMaterial({ color: 0x444444, shininess: 20 })
-    const cwDarkMat  = new THREE.MeshPhongMaterial({ color: 0x333333, shininess: 10 })
+    const blueMat = new THREE.MeshPhongMaterial({ color: 0x1f5f8b, specular: 0x265f92, shininess: 55 })
+    const blueDarkMat = new THREE.MeshPhongMaterial({ color: 0x15384f, specular: 0x112233, shininess: 35 })
+    const redMat = new THREE.MeshPhongMaterial({ color: 0xc44830, specular: 0x552218, shininess: 45 })
+    const yellowMat = new THREE.MeshPhongMaterial({ color: 0xf1c40f, emissive: 0x5d4600, emissiveIntensity: 0.3 })
+    const beaconMat = new THREE.MeshPhongMaterial({ color: 0xf4d03f, emissive: 0x775500, emissiveIntensity: 0.65 })
+    const darkMat = new THREE.MeshPhongMaterial({ color: 0x1b232b, shininess: 20 })
+    const steelMat = new THREE.MeshPhongMaterial({ color: 0x8fa4b2, specular: 0xcad4dc, shininess: 80 })
+    const steelDarkMat = new THREE.MeshPhongMaterial({ color: 0x54616c, shininess: 30 })
+    const glassMat = new THREE.MeshPhongMaterial({ color: 0x6fb4f5, emissive: 0x19324a, emissiveIntensity: 0.45, transparent: true, opacity: 0.78 })
+    const cableMat = new THREE.MeshPhongMaterial({ color: 0x2f3438, shininess: 6 })
+    const walkwayMat = new THREE.MeshPhongMaterial({ color: 0x777f85, shininess: 35 })
+    const floodMat = new THREE.MeshPhongMaterial({ color: 0xffffd0, emissive: 0x444400, emissiveIntensity: 0.45 })
 
-    // -------------------------------------------------------------------------
-    // 1. BASE UNDERCARRIAGE — multi-layer stepped profile
-    // -------------------------------------------------------------------------
-    const lowerFrame = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.6, 4.4), darkMat)
-    lowerFrame.position.y = 0.3; lowerFrame.castShadow = true; group.add(lowerFrame)
+    const undercarriage = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.7, 4.8), darkMat)
+    undercarriage.position.y = 0.35
+    undercarriage.castShadow = true
+    group.add(undercarriage)
 
-    const upperFrame = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.6, 4.0), darkMat)
-    upperFrame.position.y = 0.9; upperFrame.castShadow = true; group.add(upperFrame)
+    const machineryDeck = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.45, 4.0), steelDarkMat)
+    machineryDeck.position.y = 1.0
+    machineryDeck.castShadow = true
+    group.add(machineryDeck)
 
-    for (const sx of [-1, 1]) {
-      const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 4.2), darkMat)
-      skirt.position.set(sx * 2.15, 0.6, 0); group.add(skirt)
-    }
-
-    // -------------------------------------------------------------------------
-    // 2. CRAWLER TRACKS — existing pattern + drive sprocket + idler + pads
-    // -------------------------------------------------------------------------
     for (const sign of [-1, 1]) {
-      const track = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.8, 1.0), darkMat)
-      track.position.set(0, 0.4, sign * 2.2); group.add(track)
+      const trackFrame = new THREE.Mesh(new THREE.BoxGeometry(5.9, 0.95, 1.1), darkMat)
+      trackFrame.position.set(0, 0.48, sign * 2.1)
+      trackFrame.castShadow = true
+      group.add(trackFrame)
 
-      // Rollers
-      for (let i = -1.5; i <= 1.5; i += 0.5) {
-        const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.05, 10), greyMat)
-        roller.rotation.z = Math.PI / 2; roller.position.set(i, 0.32, sign * 2.2); group.add(roller)
+      for (let i = -2; i <= 2; i += 0.55) {
+        const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.12, 14), steelDarkMat)
+        roller.rotation.z = Math.PI / 2
+        roller.position.set(i, 0.28, sign * 2.1)
+        group.add(roller)
       }
 
-      // Drive sprocket (front) + idler (rear)
-      const sprocket = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.05, 10), greyDarkMat)
-      sprocket.rotation.z = Math.PI / 2; sprocket.position.set(2.1, 0.45, sign * 2.2); group.add(sprocket)
-      const idler = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.05, 10), greyDarkMat)
-      idler.rotation.z = Math.PI / 2; idler.position.set(-2.1, 0.45, sign * 2.2); group.add(idler)
-
-      // Track pad strips
-      for (let p = -1.6; p <= 1.6; p += 0.8) {
-        const pad = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 1.05), greyDarkMat)
-        pad.position.set(p, 0.82, sign * 2.2); group.add(pad)
+      for (const x of [-2.45, 2.45]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.37, 1.12, 14), steelMat)
+        wheel.rotation.z = Math.PI / 2
+        wheel.position.set(x, 0.44, sign * 2.1)
+        group.add(wheel)
       }
     }
 
-    // -------------------------------------------------------------------------
-    // 3. ROTATING PLATFORM — with slew ring
-    // -------------------------------------------------------------------------
-    const platformLip = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.15, 4.4), blueDarkMat)
-    platformLip.position.y = 1.2; group.add(platformLip)
-
-    const platform = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.4, 4.2), blueMat)
-    platform.position.y = 1.4; platform.castShadow = true; group.add(platform)
-
-    const slewRing = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 0.15, 16), greyMat)
-    slewRing.position.y = 1.18; group.add(slewRing)
-
-    // -------------------------------------------------------------------------
-    // 4. TOWER — 4-post lattice with horizontal ties + diagonal bracing
-    // -------------------------------------------------------------------------
-    // Corner posts
-    for (const [px, pz] of [[-0.9, -0.9], [-0.9, 0.9], [0.9, -0.9], [0.9, 0.9]] as [number, number][]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 13, 0.3), blueMat)
-      post.position.set(px, 8.3, pz); post.castShadow = true; group.add(post)
+    for (const [sx, sz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]] as [number, number][]) {
+      const outrigger = new THREE.Mesh(new THREE.BoxGeometry(0.45, 1.2, 0.45), blueDarkMat)
+      outrigger.position.set(sx * 2.0, 1.15, sz * 1.55)
+      outrigger.castShadow = true
+      group.add(outrigger)
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.38, 0.18, 10), steelMat)
+      foot.position.set(sx * 2.0, 0.18, sz * 1.55)
+      group.add(foot)
     }
 
-    // Horizontal tie beams at 4 levels
-    for (const ty of [3.0, 6.0, 9.0, 12.0]) {
-      // Front/back (along Z)
-      for (const tz of [-0.9, 0.9]) {
-        const tie = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.15, 0.15), blueDarkMat)
-        tie.position.set(0, ty, tz); group.add(tie)
-      }
-      // Left/right (along X)
-      for (const tx of [-0.9, 0.9]) {
-        const tie = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 1.5), blueDarkMat)
-        tie.position.set(tx, ty, 0); group.add(tie)
-      }
+    const slewRing = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 0.2, 22), steelMat)
+    slewRing.position.y = 1.32
+    group.add(slewRing)
+
+    const houseGroup = new THREE.Group()
+    group.add(houseGroup)
+
+    const rotatingDeck = new THREE.Mesh(new THREE.BoxGeometry(4.7, 0.45, 4.2), blueMat)
+    rotatingDeck.position.y = 1.55
+    rotatingDeck.castShadow = true
+    houseGroup.add(rotatingDeck)
+
+    const machineryHouse = new THREE.Mesh(new THREE.BoxGeometry(3.3, 2.4, 2.5), blueDarkMat)
+    machineryHouse.position.set(0, 3.0, 1.2)
+    machineryHouse.castShadow = true
+    houseGroup.add(machineryHouse)
+
+    const engineRoof = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.18, 2.7), blueMat)
+    engineRoof.position.set(0, 4.28, 1.2)
+    houseGroup.add(engineRoof)
+
+    const counterweight = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 2.2), darkMat)
+    counterweight.position.set(0, 2.4, 2.8)
+    counterweight.castShadow = true
+    houseGroup.add(counterweight)
+
+    const towerLegs = [
+      [-1.0, -0.95], [-1.0, 0.95], [1.0, -0.95], [1.0, 0.95],
+    ] as [number, number][]
+    for (const [px, pz] of towerLegs) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 13.2, 0.22), blueMat)
+      leg.position.set(px, 8.0, pz)
+      leg.castShadow = true
+      houseGroup.add(leg)
     }
 
-    // Diagonal cross-bracing on front face (z = -0.9) and left face (x = -0.9)
-    const braceAngle = Math.atan2(1.8, 3.0)
-    const braceLen = Math.sqrt(1.8 * 1.8 + 3.0 * 3.0)
+    for (const level of [2.8, 5.6, 8.4, 11.2, 14.0]) {
+      const tieX = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.12, 0.12), blueDarkMat)
+      tieX.position.set(0, level, -0.95)
+      houseGroup.add(tieX)
+      const tieXRear = tieX.clone()
+      tieXRear.position.z = 0.95
+      houseGroup.add(tieXRear)
+
+      const tieZ = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 2.0), blueDarkMat)
+      tieZ.position.set(-1.0, level, 0)
+      houseGroup.add(tieZ)
+      const tieZRight = tieZ.clone()
+      tieZRight.position.x = 1.0
+      houseGroup.add(tieZRight)
+    }
+
+    const faceBraceLength = Math.sqrt(2 * 2 + 2.8 * 2.8)
+    const faceBraceAngle = Math.atan2(2, 2.8)
     for (let tier = 0; tier < 4; tier++) {
-      const baseY = 1.8 + tier * 3.0
-
-      // Front face diagonals
+      const centerY = 4.2 + tier * 2.8
       for (const dir of [-1, 1]) {
-        const brace = new THREE.Mesh(new THREE.BoxGeometry(0.10, braceLen, 0.10), blueDarkMat)
-        brace.position.set(dir * 0.45, baseY + 1.5, -0.9)
-        brace.rotation.z = dir * braceAngle
-        group.add(brace)
-      }
+        const frontBrace = new THREE.Mesh(new THREE.BoxGeometry(0.08, faceBraceLength, 0.08), steelMat)
+        frontBrace.position.set(dir * 0.52, centerY, -0.95)
+        frontBrace.rotation.z = dir * faceBraceAngle
+        houseGroup.add(frontBrace)
 
-      // Left face diagonals
-      for (const dir of [-1, 1]) {
-        const brace = new THREE.Mesh(new THREE.BoxGeometry(0.10, braceLen, 0.10), blueDarkMat)
-        brace.position.set(-0.9, baseY + 1.5, dir * 0.45)
-        brace.rotation.x = -dir * braceAngle
-        group.add(brace)
+        const sideBrace = new THREE.Mesh(new THREE.BoxGeometry(0.08, faceBraceLength, 0.08), steelMat)
+        sideBrace.position.set(-1.0, centerY, dir * 0.48)
+        sideBrace.rotation.x = -dir * faceBraceAngle
+        houseGroup.add(sideBrace)
       }
     }
 
-    // Tower top cap
-    const towerCap = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.3, 2.0), blueMat)
-    towerCap.position.set(0, 14.85, 0); group.add(towerCap)
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.25, 1.65, 1.9), yellowMat)
+    cab.position.set(0, 13.75, 1.35)
+    cab.castShadow = true
+    houseGroup.add(cab)
 
-    // Machinery house (hoist winch) on tower rear
-    const machHouse = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.0, 1.5), blueDarkMat)
-    machHouse.position.set(0, 13.5, 1.2); machHouse.castShadow = true; group.add(machHouse)
+    const cabRoof = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.12, 2.0), yellowMat)
+    cabRoof.position.set(0, 14.63, 1.35)
+    houseGroup.add(cabRoof)
 
-    // -------------------------------------------------------------------------
-    // 5. A-FRAME BRACES — 4 struts forming proper A-frame
-    // -------------------------------------------------------------------------
-    for (const sign of [-1, 1]) {
-      // Inner struts
-      const inner = new THREE.Mesh(new THREE.BoxGeometry(0.18, 8, 0.18), greyMat)
-      inner.position.set(sign * 1.0, 7.5, 0.4); inner.rotation.z = sign * 0.16; group.add(inner)
-      // Outer struts
-      const outer = new THREE.Mesh(new THREE.BoxGeometry(0.14, 6, 0.14), greyMat)
-      outer.position.set(sign * 1.8, 6.0, 0.4); outer.rotation.z = sign * 0.28; group.add(outer)
-      // Cross-tie
-      const xtie = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.0), greyMat)
-      xtie.position.set(sign * 1.4, 5.0, 0.4); group.add(xtie)
-    }
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.08, 0.34), darkMat)
+    visor.position.set(0, 14.5, 2.32)
+    houseGroup.add(visor)
 
-    // -------------------------------------------------------------------------
-    // 6. OPERATOR CAB — with roof, visor, multi-pane windows, beacon
-    // -------------------------------------------------------------------------
-    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.8, 1.6), yellowMat)
-    cab.position.set(0, 13.9, 1.2); cab.castShadow = true; group.add(cab)
+    const frontWin = new THREE.Mesh(new THREE.BoxGeometry(1.95, 1.05, 0.07), glassMat)
+    frontWin.position.set(0, 13.75, 2.26)
+    houseGroup.add(frontWin)
 
-    const cabRoof = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.12, 1.8), yellowMat)
-    cabRoof.position.set(0, 14.86, 1.2); group.add(cabRoof)
+    const lowerWin = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.08, 1.08), glassMat)
+    lowerWin.position.set(0, 12.85, 1.35)
+    houseGroup.add(lowerWin)
 
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.3), darkMat)
-    visor.position.set(0, 14.8, 2.2); group.add(visor)
-
-    const frontWin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.2, 0.07), glassMat)
-    frontWin.position.set(0, 13.9, 2.03); group.add(frontWin)
-
-    // Bottom observation window (characteristic of crane cabs)
-    const bottomWin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.07, 1.0), glassMat)
-    bottomWin.position.set(0, 13.0, 1.2); group.add(bottomWin)
-
-    // Side windows
     for (const sx of [-1, 1]) {
-      const sw = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.0, 1.2), glassMat)
-      sw.position.set(sx * 1.03, 13.9, 1.2); group.add(sw)
+      const sideWin = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.95, 1.4), glassMat)
+      sideWin.position.set(sx * 1.13, 13.7, 1.35)
+      houseGroup.add(sideWin)
     }
 
-    // Warning beacon on cab roof
-    const beaconBase = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.14, 0.18, 8), beaconMat)
-    beaconBase.position.set(0.7, 15.02, 1.2); group.add(beaconBase)
-    const beaconDome = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 6), beaconMat)
-    beaconDome.position.set(0.7, 15.18, 1.2); group.add(beaconDome)
+    const beaconBase = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.18, 8), beaconMat)
+    beaconBase.position.set(0.8, 14.78, 1.15)
+    houseGroup.add(beaconBase)
+    const beaconDome = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), beaconMat)
+    beaconDome.position.set(0.8, 14.95, 1.15)
+    houseGroup.add(beaconDome)
 
-    // -------------------------------------------------------------------------
-    // 7. JIB (WATERSIDE BOOM) — box-truss profile with trolley rails
-    // -------------------------------------------------------------------------
-    // Top and bottom chords
-    const jibTop = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.10, 16), redMat)
-    jibTop.position.set(0, 14.7, -6); jibTop.castShadow = true; group.add(jibTop)
-    const jibBot = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.10, 16), redMat)
-    jibBot.position.set(0, 14.3, -6); group.add(jibBot)
-
-    // Side webs
-    for (const jx of [-0.18, 0.18]) {
-      const web = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.50, 16), redMat)
-      web.position.set(jx, 14.5, -6); group.add(web)
+    for (const lx of [-0.55, -0.35]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 10.5, 0.05), walkwayMat)
+      rail.position.set(lx, 7.0, 1.02)
+      houseGroup.add(rail)
+    }
+    for (let i = 0; i < 16; i++) {
+      const rung = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.04), walkwayMat)
+      rung.position.set(-0.45, 2 + i * 0.62, 1.04)
+      houseGroup.add(rung)
     }
 
-    // Trolley rails under jib
-    for (const jx of [-0.15, 0.15]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 16), greyMat)
-      rail.position.set(jx, 14.25, -6); group.add(rail)
+    const boomPivot = new THREE.Group()
+    boomPivot.position.set(0, 14.35, 0.15)
+    houseGroup.add(boomPivot)
+
+    const boomLength = 9.5
+    const boomGroup = new THREE.Group()
+    boomPivot.add(boomGroup)
+
+    for (const x of [-0.28, 0.28]) {
+      const topChord = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, boomLength), redMat)
+      topChord.position.set(x, 0.48, -boomLength / 2)
+      topChord.castShadow = true
+      boomGroup.add(topChord)
+
+      const bottomChord = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, boomLength), redMat)
+      bottomChord.position.set(x, -0.42, -boomLength / 2)
+      bottomChord.castShadow = true
+      boomGroup.add(bottomChord)
     }
 
-    // Jib tip block
-    const jibTip = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 1.0), redMat)
-    jibTip.position.set(0, 14.5, -14.5); group.add(jibTip)
+    for (let i = 0; i <= 9; i++) {
+      const z = -i * (boomLength / 9)
+      const crossTie = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.08, 0.08), redMat)
+      crossTie.position.set(0, 0.02, z)
+      boomGroup.add(crossTie)
 
-    // Head sheave block (pulley housing at jib tip)
-    const sheave = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.3), greyMat)
-    sheave.position.set(0, 14.2, -14.0); group.add(sheave)
+      if (i < 9) {
+        const panelLen = Math.sqrt((boomLength / 9) ** 2 + 0.9 ** 2)
+        const braceA = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, panelLen), steelMat)
+        braceA.position.set(-0.15, 0.02, z - boomLength / 18)
+        braceA.rotation.x = 0.08
+        braceA.rotation.y = 0.36
+        boomGroup.add(braceA)
 
-    // Jib walkway grating (underside surface)
-    const walkway = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.04, 14), stepMat)
-    walkway.position.set(0, 14.15, -6); group.add(walkway)
-
-    // Floodlights on jib underside
-    const floodMat = new THREE.MeshPhongMaterial({ color: 0xffffcc, emissive: 0x444400, emissiveIntensity: 0.5 })
-    for (const jx of [-0.3, 0.3]) {
-      const fl = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.12, 0.10), floodMat)
-      fl.position.set(jx, 14.2, -4); group.add(fl)
-    }
-
-    // -------------------------------------------------------------------------
-    // 8. COUNTERJIB — dual-member truss with counterweight
-    // -------------------------------------------------------------------------
-    const cjibBot = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 6), greyMat)
-    cjibBot.position.set(0, 14.3, 4); group.add(cjibBot)
-
-    const cjibTop = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 6), greyMat)
-    cjibTop.position.set(0, 14.6, 4); group.add(cjibTop)
-
-    // Vertical ties every 2m
-    for (const ctz of [2, 4, 6]) {
-      const vt = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.35, 0.08), greyMat)
-      vt.position.set(0, 14.45, ctz); group.add(vt)
-    }
-
-    // Counterweight
-    const cwMain = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.0, 1.8), cwMat)
-    cwMain.position.set(0, 14.4, 6.5); cwMain.castShadow = true; group.add(cwMain)
-    const cwBase = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.15, 2.0), cwDarkMat)
-    cwBase.position.set(0, 13.85, 6.5); group.add(cwBase)
-
-    // -------------------------------------------------------------------------
-    // 9. SURFACE DETAILS — tower ladder, cable reel
-    // -------------------------------------------------------------------------
-    // Access ladder on tower front face
-    for (const lx of [0.48, 0.52]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.04, 10, 0.04), stepMat)
-      rail.position.set(lx, 7.0, -0.93); group.add(rail)
-    }
-    for (let ri = 0; ri < 15; ri++) {
-      const rung = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.20), stepMat)
-      rung.position.set(0.5, 2.0 + ri * 0.65, -0.94); group.add(rung)
-    }
-
-    // Cable reel at tower base (landside)
-    const cableReel = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 10), greyMat)
-    cableReel.rotation.z = Math.PI / 2; cableReel.position.set(1.5, 2.0, 1.5); group.add(cableReel)
-
-    // -------------------------------------------------------------------------
-    // 10. SPREADER GROUP (animated — position driven by eq.spreaderZ)
-    // -------------------------------------------------------------------------
-    const mhcSpreader = new THREE.Group()
-    mhcSpreader.position.set(0, 14.5, -6)
-
-    // Main beam
-    const spreaderBar = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.28, 0.50), greyMat)
-    mhcSpreader.add(spreaderBar)
-
-    // Top plate
-    const spreaderTop = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.06, 0.40), blueDarkMat)
-    spreaderTop.position.set(0, 0.17, 0); mhcSpreader.add(spreaderTop)
-
-    // Twist-lock posts
-    for (const sx of [-3.2, 3.2]) {
-      const tw = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.85, 0.35), greyMat)
-      tw.position.set(sx, -0.5, 0); mhcSpreader.add(tw)
-    }
-
-    // Guide rail corners
-    for (const sx of [-3.35, 3.35]) {
-      for (const gz of [-0.22, 0.22]) {
-        const gr = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.08), yellowMat)
-        gr.position.set(sx, -0.5, gz); mhcSpreader.add(gr)
+        const braceB = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, panelLen), steelMat)
+        braceB.position.set(0.15, 0.02, z - boomLength / 18)
+        braceB.rotation.x = -0.08
+        braceB.rotation.y = -0.36
+        boomGroup.add(braceB)
       }
     }
 
-    // Center mechanism block
-    const centerBlock = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.5), darkMat)
-    centerBlock.position.set(0, -0.5, 0); mhcSpreader.add(centerBlock)
+    const walkway = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.04, boomLength - 1.2), walkwayMat)
+    walkway.position.set(0, -0.56, -(boomLength - 1.2) / 2 - 0.3)
+    boomGroup.add(walkway)
 
-    // Hoist cables — main + left + right (all animated via scale.y)
-    const mhcCable = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1, 0.06), cableMat)
-    mhcCable.position.set(0, -0.5, 0); mhcSpreader.add(mhcCable)
+    const boomTip = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.62, 0.5), steelMat)
+    boomTip.position.set(0, 0, -boomLength)
+    boomGroup.add(boomTip)
 
-    const mhcCableL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1, 0.04), cableMat)
-    mhcCableL.position.set(-0.2, -0.5, 0); mhcSpreader.add(mhcCableL)
+    for (const x of [-0.25, 0.25]) {
+      const sheave = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 10), steelMat)
+      sheave.rotation.z = Math.PI / 2
+      sheave.position.set(x, -0.08, -boomLength + 0.18)
+      boomGroup.add(sheave)
+    }
 
-    const mhcCableR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1, 0.04), cableMat)
-    mhcCableR.position.set(0.2, -0.5, 0); mhcSpreader.add(mhcCableR)
+    const floodLeft = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.11), floodMat)
+    floodLeft.position.set(-0.34, -0.22, -5.4)
+    boomGroup.add(floodLeft)
+    const floodRight = floodLeft.clone()
+    floodRight.position.x = 0.34
+    boomGroup.add(floodRight)
 
-    group.add(mhcSpreader)
-    return { group, parts: { mhcSpreader, mhcCable, mhcCableL, mhcCableR } }
+    const aFrameLeft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 5.0, 0.12), steelMat)
+    aFrameLeft.position.set(-0.8, 12.1, -0.6)
+    aFrameLeft.rotation.z = 0.24
+    houseGroup.add(aFrameLeft)
+    const aFrameRight = aFrameLeft.clone()
+    aFrameRight.position.x = 0.8
+    aFrameRight.rotation.z = -0.24
+    houseGroup.add(aFrameRight)
+
+    const backstayLeft = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 6.4), steelMat)
+    backstayLeft.position.set(-0.28, 14.0, 3.4)
+    backstayLeft.rotation.x = -0.55
+    houseGroup.add(backstayLeft)
+    const backstayRight = backstayLeft.clone()
+    backstayRight.position.x = 0.28
+    houseGroup.add(backstayRight)
+
+    const counterJib = new THREE.Group()
+    counterJib.position.set(0, 14.15, 0.75)
+    houseGroup.add(counterJib)
+
+    const counterTop = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 7.2), steelMat)
+    counterTop.position.set(0, 0.45, 3.6)
+    counterJib.add(counterTop)
+    const counterBottom = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.28, 7.2), steelDarkMat)
+    counterBottom.position.set(0, 0, 3.6)
+    counterJib.add(counterBottom)
+
+    for (const z of [1.4, 3.1, 4.8, 6.5]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.48, 0.08), steelMat)
+      post.position.set(0, 0.22, z)
+      counterJib.add(post)
+    }
+
+    const cwBase = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.2, 2.5), steelDarkMat)
+    cwBase.position.set(0, -0.35, 6.9)
+    counterJib.add(cwBase)
+    const cwMain = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 2.1), darkMat)
+    cwMain.position.set(0, 0.25, 6.9)
+    cwMain.castShadow = true
+    counterJib.add(cwMain)
+
+    const trolley = new THREE.Group()
+    trolley.position.set(0, -0.34, -5.2)
+    boomGroup.add(trolley)
+
+    const trolleyBody = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.42, 1.2), blueDarkMat)
+    trolleyBody.castShadow = true
+    trolley.add(trolleyBody)
+
+    const trolleyWheelLeft = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.16, 8), steelMat)
+    trolleyWheelLeft.rotation.z = Math.PI / 2
+    trolleyWheelLeft.position.set(-0.33, -0.18, -0.35)
+    trolley.add(trolleyWheelLeft)
+    const trolleyWheelRight = trolleyWheelLeft.clone()
+    trolleyWheelRight.position.x = 0.33
+    trolley.add(trolleyWheelRight)
+    const trolleyWheelRearL = trolleyWheelLeft.clone()
+    trolleyWheelRearL.position.z = 0.35
+    trolley.add(trolleyWheelRearL)
+    const trolleyWheelRearR = trolleyWheelRight.clone()
+    trolleyWheelRearR.position.z = 0.35
+    trolley.add(trolleyWheelRearR)
+
+    const mhcSpreader = new THREE.Group()
+    mhcSpreader.position.set(0, -7.8, 0)
+    trolley.add(mhcSpreader)
+
+    const spreaderFrame = new THREE.Mesh(new THREE.BoxGeometry(6.7, 0.34, 0.62), steelMat)
+    spreaderFrame.castShadow = true
+    mhcSpreader.add(spreaderFrame)
+
+    const spreaderTop = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.08, 0.46), blueDarkMat)
+    spreaderTop.position.y = 0.21
+    mhcSpreader.add(spreaderTop)
+
+    for (const sx of [-3.2, 3.2]) {
+      const endBox = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.36, 0.62), darkMat)
+      endBox.position.set(sx, 0, 0)
+      mhcSpreader.add(endBox)
+
+      const twistPost = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.82, 0.26), steelDarkMat)
+      twistPost.position.set(sx, -0.56, 0)
+      mhcSpreader.add(twistPost)
+
+      for (const sz of [-0.22, 0.22]) {
+        const guide = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.62, 0.08), yellowMat)
+        guide.position.set(sx + (sx < 0 ? -0.1 : 0.1), -0.3, sz)
+        mhcSpreader.add(guide)
+      }
+    }
+
+    const centerBlock = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.24, 0.6), darkMat)
+    centerBlock.position.set(0, -0.1, 0)
+    mhcSpreader.add(centerBlock)
+
+    const mhcCables: THREE.Mesh[] = []
+    for (const [x, z] of [[-1.9, -0.14], [1.9, -0.14], [-1.9, 0.14], [1.9, 0.14]] as [number, number][]) {
+      const cable = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1, 0.05), cableMat)
+      cable.position.set(x, -0.5, z)
+      trolley.add(cable)
+      mhcCables.push(cable)
+    }
+
+    boomPivot.rotation.x = -0.2
+
+    return {
+      group,
+      parts: {
+        mhcHouseGroup: houseGroup,
+        mhcBoomGroup: boomPivot,
+        mhcTrolley: trolley,
+        mhcSpreader,
+        mhcCables,
+      },
+    }
   }
 
   update(equipmentList: Equipment[], containers?: Container[]): void {
@@ -658,18 +718,52 @@ export class EquipmentRenderer {
       }
 
       if (p?.mhcSpreader && eq.type === 'mobile_harbor_crane') {
-        const jibY = 14.5
-        p.mhcSpreader.position.set(0, jibY, -6 + eq.spreaderZ)
-        if (p.mhcCable) {
-          const drop = Math.max(0.1, jibY - eq.armTargetY)
-          p.mhcCable.scale.y = drop
-          p.mhcCable.position.y = -drop / 2
-          for (const c of [p.mhcCableL, p.mhcCableR]) {
-            if (c) { c.scale.y = drop; c.position.y = -drop / 2 }
-          }
+        const target = eq.targetPosition ?? {
+          x: eq.position.x,
+          y: CONTAINER_HEIGHT / 2,
+          z: eq.position.z - 10,
+        }
+        const dx = target.x - eq.position.x
+        const dz = target.z - eq.position.z
+        const desiredSlew = Math.atan2(dx, dz) + Math.PI
+        const desiredReach = THREE.MathUtils.clamp(Math.sqrt(dx * dx + dz * dz), 4.6, 9.2)
+        const desiredLuff = THREE.MathUtils.clamp(
+          -0.21 - ((desiredReach - 4.6) / 4.6) * 0.14 + (dz > 0 ? 0.045 : -0.015),
+          -0.38,
+          -0.14,
+        )
+        const idleHoistY = 10.5
+        const desiredHoistY = eq.currentJobId ? eq.armTargetY : idleHoistY
+
+        if (p.mhcHouseGroup) {
+          p.mhcHouseGroup.rotation.y = THREE.MathUtils.lerp(p.mhcHouseGroup.rotation.y, desiredSlew, 0.18)
+        }
+        if (p.mhcBoomGroup) {
+          p.mhcBoomGroup.rotation.x = THREE.MathUtils.lerp(p.mhcBoomGroup.rotation.x, desiredLuff, 0.14)
+        }
+        if (p.mhcTrolley) {
+          p.mhcTrolley.position.z = THREE.MathUtils.lerp(p.mhcTrolley.position.z, -desiredReach, 0.2)
         }
 
-        // ---- Carried container: hang below cable bottom ----
+        const boomPivotY = p.mhcBoomGroup?.position.y ?? 14.35
+        const boomPitch = p.mhcBoomGroup?.rotation.x ?? desiredLuff
+        const trolleyLocalY = p.mhcTrolley?.position.y ?? -0.34
+        const trolleyLocalZ = p.mhcTrolley?.position.z ?? -desiredReach
+        const trolleyWorldY = boomPivotY +
+          trolleyLocalY * Math.cos(boomPitch) -
+          trolleyLocalZ * Math.sin(boomPitch)
+        const cableDrop = Math.max(
+          2,
+          (trolleyWorldY - desiredHoistY) / Math.cos(boomPitch),
+        )
+        p.mhcSpreader.position.y = -cableDrop
+        p.mhcSpreader.rotation.x = -(p.mhcBoomGroup?.rotation.x ?? 0)
+
+        for (const cable of p.mhcCables ?? []) {
+          cable.scale.y = cableDrop
+          cable.position.y = -cableDrop / 2
+        }
+
         const mhcExisting = this.carriedMeshes.get(eq.id)
         if (eq.carriedContainerId && containers) {
           const container = containers.find(c => c.id === eq.carriedContainerId)
@@ -677,22 +771,25 @@ export class EquipmentRenderer {
             let cGroup = mhcExisting
             if (!cGroup || cGroup.userData['containerId'] !== eq.carriedContainerId) {
               if (mhcExisting) {
-                mesh.remove(mhcExisting)
+                p.mhcSpreader.remove(mhcExisting)
                 this.disposeContainerGroup(mhcExisting)
               }
               cGroup = createContainerGroup(container)
-              mesh.add(cGroup)
+              p.mhcSpreader.add(cGroup)
               this.carriedMeshes.set(eq.id, cGroup)
             }
-            // Cable bottom is at armTargetY; container centre is half-height below that
-            cGroup.position.set(
-              0,
-              eq.armTargetY - CONTAINER_HEIGHT / 2,
-              -6 + eq.spreaderZ,
-            )
+            cGroup.position.set(0, -(0.55 + CONTAINER_HEIGHT / 2), 0)
+            const isImportSetdown =
+              container.visitType === 'import' &&
+              eq.state === 'dropping' &&
+              eq.targetPosition !== null &&
+              eq.targetPosition.z >= 0
+            const dropProgress = Math.min(1, eq.stateElapsed / (MHC_CYCLE_TIME / 2))
+            const yaw = isImportSetdown ? dropProgress * (Math.PI / 4) : 0
+            cGroup.rotation.set(0, yaw, 0)
           }
         } else if (mhcExisting) {
-          mesh.remove(mhcExisting)
+          p.mhcSpreader.remove(mhcExisting)
           this.disposeContainerGroup(mhcExisting)
           this.carriedMeshes.delete(eq.id)
         }
