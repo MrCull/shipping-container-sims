@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import type { FutureGameTeaser } from '@/types/future-game-teaser'
+import { trackEvent } from '@/utils/analytics'
 
-defineProps<{
+const props = defineProps<{
   teaser: FutureGameTeaser
 }>()
+
+function handlePlannedClick(): void {
+  trackEvent('planned_game_click', {
+    teaser_id: props.teaser.id,
+    teaser_title: props.teaser.title,
+    location: 'home_page',
+  })
+}
 </script>
 
 <template>
@@ -11,6 +20,7 @@ defineProps<{
     class="future-card"
     :style="{ '--card-accent': teaser.color }"
     title="This game is planned and coming later. It is not playable yet."
+    @click="handlePlannedClick"
   >
     <div class="card-top">
       <div class="card-icon">

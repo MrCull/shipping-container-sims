@@ -10,6 +10,7 @@ import FutureGameCard from '@/components/FutureGameCard.vue'
 import GithubRepoLink from '@/components/GithubRepoLink.vue'
 import AudioControls from '@/components/AudioControls.vue'
 import { futureGameTeasers } from '@/data/future-game-teasers'
+import { trackEvent } from '@/utils/analytics'
 
 const store = useSimsStore()
 const { registerAll } = useSimRegistry()
@@ -28,6 +29,9 @@ onMounted(() => {
 function dismissCookieNotice(): void {
   cookieNoticeVisible.value = false
   window.localStorage.setItem(cookieConsentKey, 'true')
+  trackEvent('cookie_notice_dismissed', {
+    location: 'home_page',
+  })
 }
 </script>
 

@@ -1,27 +1,37 @@
 <script setup lang="ts">
 import { useAudioStore } from '@/stores/audio'
+import { trackEvent } from '@/utils/analytics'
 
 interface Props {
   placement?: 'absolute' | 'inline'
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   placement: 'absolute',
 })
 
 const audioStore = useAudioStore()
+
+function handleToggleSound(): void {
+  const nextMuted = !audioStore.soundMuted
+  audioStore.toggleSound()
+  trackEvent('audio_toggle', {
+    muted: nextMuted,
+    placement: props.placement,
+  })
+}
 </script>
 
 <template>
   <div
     class="audio-controls"
-    :class="{ absolute: placement === 'absolute' }"
+    :class="{ absolute: props.placement === 'absolute' }"
   >
     <button
       class="audio-btn"
       :class="{ muted: audioStore.soundMuted }"
       :title="audioStore.soundMuted ? 'Turn sound on' : 'Turn sound off'"
-      @click="audioStore.toggleSound()"
+      @click="handleToggleSound"
     >
       {{ audioStore.soundMuted ? '🔇' : '🔊' }}
     </button>

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomePage from '@/pages/HomePage.vue'
+import { trackPageView } from '@/utils/analytics'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -16,4 +17,10 @@ export const router = createRouter({
       props: true,
     },
   ],
+})
+
+router.afterEach((to) => {
+  const path = typeof to.fullPath === 'string' ? to.fullPath : '/'
+  const title = typeof document !== 'undefined' ? document.title : undefined
+  trackPageView(path, title)
 })

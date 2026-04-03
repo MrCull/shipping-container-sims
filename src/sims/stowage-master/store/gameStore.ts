@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useGlobalSettingsStore } from '@/stores/globalSettings'
+import { trackEvent } from '@/utils/analytics'
 import type { GamePhase, DisasterType, Container, Slot, ShipPreset, GameEvent, PlacementResult, StarRatingResult, LevelBestRecord, PortDefinition } from '../types'
 import { generateContainerList, resetSerialCounter } from '../modules/containerFactory'
 import { generateSlots, getAvailableSlots } from '../modules/shipGrid'
@@ -289,6 +290,14 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     if (timerRemaining.value <= 0 && prev > 0) {
       phase.value = 'failed'
       addEvent('Time expired! Ship is leaving.', 'danger')
+      trackEvent('stowage_master_level_failed', {
+        level_id: currentLevel.value,
+        level_name: levelConfig.value.name,
+        reason: 'time_expired',
+        score: score.value,
+        target_score: targetScore.value,
+        elapsed_seconds: getElapsedSeconds(),
+      })
       return 'expired'
     }
 
@@ -459,6 +468,15 @@ export const useGameStore = defineStore('stowage-master-game', () => {
         recordLevelBest()
         markLevelCompleted(currentLevel.value)
         addEvent('Discharge complete! Vessel cleared and ready to sail.', 'success')
+        trackEvent('stowage_master_level_completed', {
+          level_id: currentLevel.value,
+          level_name: levelConfig.value.name,
+          completion_mode: levelConfig.value.completionMode,
+          score: score.value,
+          target_score: targetScore.value,
+          move_count: moveCount.value,
+          elapsed_seconds: getElapsedSeconds(),
+        })
         return { levelPhaseEnd: true, discharge }
       }
 
@@ -527,9 +545,27 @@ export const useGameStore = defineStore('stowage-master-game', () => {
         recordLevelBest()
         markLevelCompleted(currentLevel.value)
         addEvent('Level complete!', 'success')
+        trackEvent('stowage_master_level_completed', {
+          level_id: currentLevel.value,
+          level_name: levelConfig.value.name,
+          completion_mode: levelConfig.value.completionMode,
+          score: score.value,
+          target_score: targetScore.value,
+          move_count: moveCount.value,
+          elapsed_seconds: getElapsedSeconds(),
+        })
       } else {
         phase.value = 'failed'
         addEvent('Level failed - score too low', 'danger')
+        trackEvent('stowage_master_level_failed', {
+          level_id: currentLevel.value,
+          level_name: levelConfig.value.name,
+          reason: 'score_too_low',
+          score: score.value,
+          target_score: targetScore.value,
+          move_count: moveCount.value,
+          elapsed_seconds: getElapsedSeconds(),
+        })
       }
       return { levelEnd: true }
     }

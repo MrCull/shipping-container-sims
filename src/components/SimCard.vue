@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import type { SimDefinition } from '@/types/sim'
+import { trackEvent } from '@/utils/analytics'
 
 const props = defineProps<{
   sim: SimDefinition
@@ -15,9 +16,21 @@ function getUnavailableMessage(sim: SimDefinition): string {
 
 function openSim(): void {
   if (props.sim.status !== 'playable') {
+    trackEvent('sim_card_unavailable_click', {
+      sim_id: props.sim.id,
+      sim_title: props.sim.title,
+      sim_status: props.sim.status,
+      location: 'home_page',
+    })
     return
   }
 
+  trackEvent('sim_card_click', {
+    sim_id: props.sim.id,
+    sim_title: props.sim.title,
+    sim_status: props.sim.status,
+    location: 'home_page',
+  })
   router.push({ name: 'sim', params: { simId: props.sim.id } })
 }
 </script>

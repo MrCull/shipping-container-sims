@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useGlobalSettingsStore } from '@/stores/globalSettings'
+import { trackEvent } from '@/utils/analytics'
 import type {
   GamePhase,
   Container,
@@ -1233,6 +1234,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
         tutorialCompleted.value = true
         gamePhase.value = 'completed'
         emitEvent('tutorial.completed', 'Tutorial complete! You processed all containers!')
+        trackEvent('box_empire_tutorial_completed', {
+          import_departed: importDeparted,
+          export_loaded: exportLoaded,
+          sim_time_seconds: Math.round(simTime.value),
+          money: money.value,
+        })
       }
     }
   }

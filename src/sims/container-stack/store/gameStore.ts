@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { Vector3 } from 'three'
+import { trackEvent } from '@/utils/analytics'
 import type {
   CollapsePiece,
   GamePhase,
@@ -117,6 +118,13 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     levelFailReason.value = reason
     phase.value = 'levelFailed'
     recomputePhysics()
+    trackEvent('contenga_level_failed', {
+      level: currentLevel.value,
+      reason,
+      score: score.value,
+      moves_completed: movesInLevel.value,
+      total_moves_required: MOVES_PER_LEVEL,
+    })
   }
 
   function tickLevelTimers(dt: number): void {
@@ -145,6 +153,13 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   function completeLevelIfNeeded(): void {
     if (movesInLevel.value >= MOVES_PER_LEVEL) {
       phase.value = 'levelComplete'
+      trackEvent('contenga_level_completed', {
+        level: currentLevel.value,
+        score: score.value,
+        total_moves: moveCount.value,
+        moves_completed: movesInLevel.value,
+        combo_streak: comboStreak.value,
+      })
     }
   }
 
@@ -459,6 +474,13 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   function finishCollapse(): void {
     wobble.value = createInitialWobble()
     phase.value = 'gameOver'
+    trackEvent('contenga_level_failed', {
+      level: currentLevel.value,
+      reason: 'tower_collapse',
+      score: score.value,
+      moves_completed: movesInLevel.value,
+      total_moves_required: MOVES_PER_LEVEL,
+    })
   }
 
   function restartToStart(): void {
