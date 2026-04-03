@@ -138,7 +138,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 5,
     name: 'Level 6',
-    description: 'A medium carrier with two holds. Master stability across a wider layout.',
+    description: 'Learn the two-hold medium carrier and its wider layout.',
     preset: SHIP_PRESETS['medium-carrier'],
     hazmatRate: CONTAINER.hazmatRate * 1.5,
     containerCount: 30,
@@ -166,7 +166,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 6,
     name: 'Level 7',
-    description: 'A busy medium-vessel port call with 28 imports, 18 transit boxes, and 64 outbound containers.',
+    description: 'Busy medium-vessel call with mixed imports, transit, and loading.',
     preset: SHIP_PRESETS['medium-carrier'],
     hazmatRate: CONTAINER.hazmatRate * 2.0,
     containerCount: 64,
@@ -195,7 +195,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 7,
     name: 'Level 8',
-    description: 'Maximum capacity on the medium vessel: discharge, restow, and reload under pressure.',
+    description: 'Maximum-capacity medium-vessel run under heavy restow pressure.',
     preset: SHIP_PRESETS['medium-carrier'],
     hazmatRate: CONTAINER.hazmatRate * 2.5,
     containerCount: 80,
@@ -224,7 +224,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 8,
     name: 'Level 9',
-    description: 'Maximum capacity on the medium vessel: discharge, restow, and reload under pressure.',
+    description: 'Maximum-capacity medium-vessel run under heavy restow pressure.',
     preset: SHIP_PRESETS['medium-carrier'],
     hazmatRate: CONTAINER.hazmatRate * 2.5,
     containerCount: 80,
@@ -253,7 +253,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 9,
     name: 'Level 10',
-    description: 'Maximum capacity on the medium vessel: discharge, restow, and reload under pressure.',
+    description: 'Maximum-capacity medium-vessel run under heavy restow pressure.',
     preset: SHIP_PRESETS['medium-carrier'],
     hazmatRate: CONTAINER.hazmatRate * 2.5,
     containerCount: 80,

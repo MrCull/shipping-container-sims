@@ -11,9 +11,20 @@ function startLevel(level: number) {
 
 function formatTimer(level: LevelConfig): string {
   if (!level.timerSeconds) return ''
-  const m = Math.floor(level.timerSeconds / 60)
-  const s = level.timerSeconds % 60
-  return s > 0 ? `${m}m ${s}s` : `${m}m`
+  const mins = Math.ceil(level.timerSeconds / 60)
+  return mins === 1 ? '1min' : `${mins}mins`
+}
+
+function loadCount(level: LevelConfig): number {
+  return level.containerCount ?? 0
+}
+
+function dischargeCount(level: LevelConfig): number {
+  return level.dischargeContainerCount ?? 0
+}
+
+function onboardCount(level: LevelConfig): number {
+  return level.transitContainerCount ?? 0
 }
 
 const vesselGroups = [
@@ -67,11 +78,25 @@ const vesselGroups = [
               {{ level.description }}
             </div>
             <div class="level-meta">
-              <span class="level-slots">{{ getTotalSlots(level.preset) }} slots</span>
+              <span class="meta-item meta-item--slots">{{ getTotalSlots(level.preset) }} slots</span>
+              <span class="meta-sep">•</span>
+              <span class="meta-item">
+                <span class="meta-label">Load</span>
+                <span class="meta-value meta-value--load">{{ loadCount(level) }}</span>
+              </span>
+              <span class="meta-item">
+                <span class="meta-label">Disch</span>
+                <span class="meta-value meta-value--discharge">{{ dischargeCount(level) }}</span>
+              </span>
+              <span class="meta-item">
+                <span class="meta-label">On board</span>
+                <span class="meta-value meta-value--onboard">{{ onboardCount(level) }}</span>
+              </span>
+              <span class="meta-sep">•</span>
               <span
                 v-if="level.timerSeconds"
-                class="level-timer"
-              >⏱ {{ formatTimer(level) }}</span>
+                class="meta-item meta-item--timer"
+              >{{ formatTimer(level) }}</span>
             </div>
           </button>
         </div>
@@ -93,7 +118,7 @@ const vesselGroups = [
 
 .modal-content {
   text-align: center;
-  width: min(960px, 96vw);
+  width: min(1040px, 96vw);
   padding: 36px 32px;
 }
 
@@ -151,7 +176,7 @@ const vesselGroups = [
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
-  padding: 14px 16px;
+  padding: 13px 15px 12px;
   cursor: pointer;
   text-align: left;
   color: #eee;
@@ -169,29 +194,71 @@ const vesselGroups = [
   font-size: 14px;
   font-weight: bold;
   color: #ffcc00;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .level-desc {
   font-size: 11px;
   color: #aaa;
-  line-height: 1.4;
+  line-height: 1.35;
+  min-height: 30px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .level-meta {
   display: flex;
-  gap: 10px;
-  margin-top: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.level-slots {
+.meta-item {
+  display: inline-flex;
+  align-items: center;
   font-size: 10px;
-  color: #666;
+  letter-spacing: 0.15px;
+  color: #8f96a3;
 }
 
-.level-timer {
-  font-size: 10px;
+.meta-item--slots {
+  color: #7f8793;
+}
+
+.meta-label {
+  color: #7f8793;
+  margin-right: 4px;
+}
+
+.meta-value {
+  font-weight: bold;
+}
+
+.meta-value--load {
+  color: #00ff88;
+}
+
+.meta-value--discharge {
+  color: #ffd166;
+}
+
+.meta-value--onboard {
+  color: #5cc8ff;
+}
+
+.meta-item--timer {
   color: #ffaa00;
+  font-weight: bold;
+}
+
+.meta-sep {
+  color: rgba(255, 255, 255, 0.18);
+  font-size: 9px;
 }
 
 @media (max-width: 800px) {

@@ -285,8 +285,6 @@ watch(() => store.phase, (newPhase, oldPhase) => {
     audio.playSound('cheer', 0.8)
     setTimeout(() => audio.playSound('levelUp', 0.75), 800)
     setTimeout(() => audio.playSound(hornSound(), 0.9), 1400)
-    setTimeout(() => audio.playSound(hornSound(), 0.9), 3200)
-    setTimeout(() => audio.playSound(hornSound(), 0.9), 5000)
     sailAway.active = true
     sailAway.elapsed = 0
   }
