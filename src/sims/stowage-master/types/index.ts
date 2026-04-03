@@ -148,6 +148,8 @@ export interface BriefingPage {
   title: string
   /** Each string is rendered as a separate paragraph. */
   body: string[]
+  /** Optional sound cue played when this briefing page is first shown. */
+  soundCue?: string
   legend?: BriefingLegendItem[]
   /** Bullet-point steps rendered as an ordered list. */
   steps?: string[]

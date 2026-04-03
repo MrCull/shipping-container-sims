@@ -7,6 +7,7 @@ import { updatePhysics, checkDisasters } from '../modules/physics'
 import { calculatePlacementScore, calculateDischargeScore, calculateRestowScore, getStarRating, checkPerfectBalance } from '../modules/scoring'
 import { getLevelConfig, getTotalSlots } from '../modules/levels'
 import { generateDischargeManifest, getDischargeableSlots, getRestowSlots } from '../modules/dischargeManifest'
+import { SCORING } from '../modules/config'
 
 let eventIdCounter = 0
 
@@ -90,6 +91,20 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
   const levelConfig = computed(() => getLevelConfig(currentLevel.value))
 
+  function countHazmatPremiumContainers(): number {
+    let count = containers.value.filter(container => container.isHazmat).length
+    for (const slot of Object.values(grid.value)) {
+      if (slot.container?.isHazmat) count++
+    }
+    return count
+  }
+
+  function recalculateScoreTargets(baseScoreContainerCount: number): void {
+    const hazmatPremiumScore = countHazmatPremiumContainers() * SCORING.hazmatSafeBonus
+    perfectScore.value = baseScoreContainerCount * 100 + hazmatPremiumScore
+    targetScore.value = Math.round(perfectScore.value * 0.70)
+  }
+
   function startLevel(level: number): void {
     currentLevel.value = level
     const config = getLevelConfig(level)
@@ -97,14 +112,13 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     totalSlots.value = getTotalSlots(config.preset)
     const outboundContainerCount = config.containerCount ?? 0
     const scoreContainerCount = config.scoreContainerCount ?? config.containerCount ?? totalSlots.value
-    perfectScore.value = scoreContainerCount * 100
-    targetScore.value = Math.round(perfectScore.value * 0.70)
 
     const slots = generateSlots(config.preset)
     grid.value = JSON.parse(JSON.stringify(slots)) as Record<string, Slot>
 
     resetSerialCounter()
     containers.value = generateContainerList(outboundContainerCount, config.hazmatRate)
+    recalculateScoreTargets(scoreContainerCount)
     currentContainerIndex.value = 0
 
     score.value = 0
@@ -139,10 +153,12 @@ export const useGameStore = defineStore('stowage-master-game', () => {
         config.preset,
         grid.value,
         transitCount,
+        config.hazmatRate,
         config.placementSpread ?? 0,
         config.importPlacement ?? 'default',
         config.transitGrouping ?? 'random',
       )
+      recalculateScoreTargets(scoreContainerCount)
       dischargeCount.value = config.dischargeContainerCount
       hasTransitContainers.value = transitCount > 0
 
@@ -237,6 +253,27 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
     phase.value = 'restow_animating'
     return { container: restowContainer.value, slot }
+  }
+
+  function cancelRestowSelection(): { container: Container; slot: Slot; slotId: string } | null {
+    if (phase.value !== 'restow_selecting') return null
+    if (!restowContainer.value || !restowFromSlotId.value) return null
+
+    const slotId = restowFromSlotId.value
+    const slot = grid.value[slotId]
+    if (!slot) return null
+
+    const container = { ...restowContainer.value, isBeingRestowed: false }
+    slot.container = container
+    grid.value[slotId] = { ...slot }
+
+    restowContainer.value = null
+    restowFromSlotId.value = null
+    restowSlots.value = []
+    phase.value = 'discharge_selecting'
+    addEvent('Restow cancelled - container returned to its original slot', 'info')
+
+    return { container, slot, slotId }
   }
 
   function finalizeRestow(slotId: string): { restow?: PlacementResult } | null {
@@ -437,7 +474,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     availableSlots, dischargeableSlots, isWarning, isCritical, progressPercent, levelConfig,
     startLevel, placeContainer, finalizePlacement,
     pickDischargeContainer, finalizeDischarge,
-    placeRestowContainer, finalizeRestow,
+    placeRestowContainer, finalizeRestow, cancelRestowSelection,
     restowContainer, restowFromSlotId, availableRestowSlots,
     hasTransitContainers, confirmBriefing,
     addEvent, setPhase, getStarRatingResult, tickTimer,

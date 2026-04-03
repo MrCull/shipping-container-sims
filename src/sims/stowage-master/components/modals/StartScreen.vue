@@ -27,6 +27,10 @@ function onboardCount(level: LevelConfig): number {
   return level.transitContainerCount ?? 0
 }
 
+function hasHazmat(level: LevelConfig): boolean {
+  return level.hazmatRate > 0
+}
+
 const vesselGroups = [
   {
     label: 'Tiny Vessel',
@@ -78,25 +82,42 @@ const vesselGroups = [
               {{ level.description }}
             </div>
             <div class="level-meta">
-              <span class="meta-item meta-item--slots">{{ getTotalSlots(level.preset) }} slots</span>
-              <span class="meta-sep">•</span>
-              <span class="meta-item">
-                <span class="meta-label">Load</span>
-                <span class="meta-value meta-value--load">{{ loadCount(level) }}</span>
-              </span>
-              <span class="meta-item">
-                <span class="meta-label">Disch</span>
-                <span class="meta-value meta-value--discharge">{{ dischargeCount(level) }}</span>
-              </span>
-              <span class="meta-item">
-                <span class="meta-label">On board</span>
-                <span class="meta-value meta-value--onboard">{{ onboardCount(level) }}</span>
-              </span>
-              <span class="meta-sep">•</span>
               <span
                 v-if="level.timerSeconds"
                 class="meta-item meta-item--timer"
               >{{ formatTimer(level) }}</span>
+              <span class="meta-sep">|</span>
+              <span class="meta-item meta-item--slots">{{ getTotalSlots(level.preset) }} slots</span>
+              <span class="meta-sep">|</span>
+              <span class="meta-item">
+                <span class="meta-label">Load</span>
+                <span class="meta-value meta-value--load">{{ loadCount(level) }}</span>
+              </span>
+              <span class="meta-sep">|</span>
+              <span class="meta-item">
+                <span class="meta-label">Disch</span>
+                <span class="meta-value meta-value--discharge">{{ dischargeCount(level) }}</span>
+              </span>
+              <span
+                v-if="onboardCount(level) > 0"
+                class="meta-sep"
+              >|</span>
+              <span
+                v-if="onboardCount(level) > 0"
+                class="meta-item"
+              >
+                <span class="meta-label">On board</span>
+                <span class="meta-value meta-value--onboard">{{ onboardCount(level) }}</span>
+              </span>
+              <span
+                v-if="hasHazmat(level)"
+                class="meta-sep"
+              >|</span>
+              <span
+                v-if="hasHazmat(level)"
+                class="meta-item meta-item--hazmat"
+                title="Hazardous containers appear in this level"
+              >☢ Haz</span>
             </div>
           </button>
         </div>
@@ -253,6 +274,11 @@ const vesselGroups = [
 
 .meta-item--timer {
   color: #ffaa00;
+  font-weight: bold;
+}
+
+.meta-item--hazmat {
+  color: #ff6a3d;
   font-weight: bold;
 }
 

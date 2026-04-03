@@ -125,6 +125,7 @@ export const SCORING = {
   outboardWeightThreshold: 15,
   imbalanceDeduction: -35,
   hazmatDeduction: -50,
+  hazmatSafeBonus: 25,
   podWrongOrderDeduction: -25,
   perfectBalanceBonus: 50,
   perfectBalanceThreshold: 2,

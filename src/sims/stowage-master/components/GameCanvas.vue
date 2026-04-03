@@ -19,12 +19,14 @@ import {
   createImportContainerMeshes, removeImportContainerMeshes, removeImportContainerMesh,
   createImportSlotIndicators, removeImportSlotIndicators, animateImportSlotIndicators,
   createRestowSlotIndicators, removeRestowSlotIndicators, animateRestowSlotIndicators,
+  animateHazmatMeshes,
 } from '../modules/containerRenderer'
 import {
   createCrane, getDockPosition, createPlacementAnimation, createDischargeAnimation,
   animateCraneWarningLight,
 } from '../modules/craneSystem'
 import { createDisasterAnimation } from '../modules/disasters'
+import { wouldCauseHazmatExplosion } from '../modules/physics'
 import { CONTAINER, TRUCK, OUTBOUND_TRUCK } from '../modules/config'
 import { createOutboundTruckQueue } from '../modules/truckRenderer'
 import type { Container, CraneObject, DisasterAnimation } from '../types'
@@ -63,6 +65,8 @@ let outboundTruckAnimations: TruckAnim[] = []
 
 // Ambient truck engine loop handle
 let truckEngineNode: AudioBufferSourceNode | null = null
+let lastHazmatLoadAlertId: string | null = null
+let lastHazmatRestowAlertId: string | null = null
 
 // Ship shake state
 const shipShake = { active: false, elapsed: 0, duration: 0.4, intensity: 0.15 }
@@ -93,6 +97,9 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
   animateFoam(foam, time)
 
   updateShipTilt(shipGroup, store.shipList, store.shipTrim)
+  animateHazmatMeshes(shipGroup, time)
+  animateHazmatMeshes(hoistMesh, time)
+  for (const mesh of queueMeshes) animateHazmatMeshes(mesh, time)
 
   if (shipGroup) {
     animateSlotIndicators(shipGroup, time)
@@ -247,7 +254,14 @@ watch(() => store.phase, (newPhase, oldPhase) => {
   // Briefing dismissed on a load-only level — show green slot indicators
   if (newPhase === 'selecting' && oldPhase === 'briefing') {
     if (shipGroup && store.shipConfig) {
-      createSlotIndicators(getScene()!, store.grid, store.availableSlots, store.shipConfig, shipGroup)
+      createSlotIndicators(
+        getScene()!,
+        store.grid,
+        store.availableSlots,
+        store.shipConfig,
+        shipGroup,
+        getHazmatDangerSlotIds(store.availableSlots, store.currentContainer)
+      )
     }
   }
 
@@ -256,7 +270,14 @@ watch(() => store.phase, (newPhase, oldPhase) => {
     if (shipGroup && store.shipConfig) {
       removeImportSlotIndicators(shipGroup)
       removeImportContainerMeshes(shipGroup)
-      createSlotIndicators(getScene()!, store.grid, store.availableSlots, store.shipConfig, shipGroup)
+      createSlotIndicators(
+        getScene()!,
+        store.grid,
+        store.availableSlots,
+        store.shipConfig,
+        shipGroup,
+        getHazmatDangerSlotIds(store.availableSlots, store.currentContainer)
+      )
       updateHoistMesh(store.currentContainer)
       updateQueueMeshes(store.nextThreeContainers)
       audio.playSound('cheer', 0.5)
@@ -265,7 +286,15 @@ watch(() => store.phase, (newPhase, oldPhase) => {
 
   // Set up discharge indicators when entering discharge_selecting for the first time (from briefing)
   // or after each discharge/restow animation completes
-  if (newPhase === 'discharge_selecting' && (oldPhase === 'briefing' || oldPhase === 'discharge_animating' || oldPhase === 'restow_animating')) {
+  if (
+    newPhase === 'discharge_selecting' &&
+    (
+      oldPhase === 'briefing' ||
+      oldPhase === 'discharge_animating' ||
+      oldPhase === 'restow_animating' ||
+      oldPhase === 'restow_selecting'
+    )
+  ) {
     if (shipGroup && store.shipConfig) {
       removeImportSlotIndicators(shipGroup)
       removeRestowSlotIndicators(shipGroup)
@@ -277,7 +306,13 @@ watch(() => store.phase, (newPhase, oldPhase) => {
   if (newPhase === 'restow_selecting' && oldPhase === 'discharge_selecting') {
     if (shipGroup && store.shipConfig) {
       removeImportSlotIndicators(shipGroup)
-      createRestowSlotIndicators(store.grid, store.availableRestowSlots, store.shipConfig, shipGroup)
+      createRestowSlotIndicators(
+        store.grid,
+        store.availableRestowSlots,
+        store.shipConfig,
+        shipGroup,
+        getHazmatDangerSlotIds(store.availableRestowSlots, store.restowContainer)
+      )
     }
   }
 
@@ -302,9 +337,61 @@ watch(() => store.availableSlots, (slots) => {
   if (!shipGroup || !store.shipConfig) return
   if (store.phase === 'selecting') {
     removeSlotIndicators(shipGroup)
-    createSlotIndicators(getScene()!, store.grid, slots, store.shipConfig, shipGroup)
+    createSlotIndicators(
+      getScene()!,
+      store.grid,
+      slots,
+      store.shipConfig,
+      shipGroup,
+      getHazmatDangerSlotIds(slots, store.currentContainer)
+    )
   }
 }, { deep: true })
+
+watch(() => store.availableRestowSlots, (slots) => {
+  if (!shipGroup || !store.shipConfig) return
+  if (store.phase === 'restow_selecting') {
+    removeRestowSlotIndicators(shipGroup)
+    createRestowSlotIndicators(
+      store.grid,
+      slots,
+      store.shipConfig,
+      shipGroup,
+      getHazmatDangerSlotIds(slots, store.restowContainer)
+    )
+  }
+}, { deep: true })
+
+watch(() => store.currentContainer, () => {
+  maybePlayHazmatLoadAlert()
+  if (!shipGroup || !store.shipConfig) return
+  if (store.phase === 'selecting') {
+    removeSlotIndicators(shipGroup)
+    createSlotIndicators(
+      getScene()!,
+      store.grid,
+      store.availableSlots,
+      store.shipConfig,
+      shipGroup,
+      getHazmatDangerSlotIds(store.availableSlots, store.currentContainer)
+    )
+  }
+})
+
+watch(() => store.restowContainer, () => {
+  maybePlayHazmatRestowAlert()
+  if (!shipGroup || !store.shipConfig) return
+  if (store.phase === 'restow_selecting') {
+    removeRestowSlotIndicators(shipGroup)
+    createRestowSlotIndicators(
+      store.grid,
+      store.availableRestowSlots,
+      store.shipConfig,
+      shipGroup,
+      getHazmatDangerSlotIds(store.availableRestowSlots, store.restowContainer)
+    )
+  }
+})
 
 watch(() => store.currentContainer, (container) => {
   updateHoistMesh(container)
@@ -424,8 +511,45 @@ async function buildScene(): Promise<void> {
   // the phase-watcher's 'briefing → selecting' branch ran with shipGroup=null and
   // skipped indicator creation. Catch up here now that the scene is fully built.
   if (store.phase === 'selecting' && store.dischargeCount === 0 && shipGroup && store.shipConfig) {
-    createSlotIndicators(getScene()!, store.grid, store.availableSlots, store.shipConfig, shipGroup)
+    createSlotIndicators(
+      getScene()!,
+      store.grid,
+      store.availableSlots,
+      store.shipConfig,
+      shipGroup,
+      getHazmatDangerSlotIds(store.availableSlots, store.currentContainer)
+    )
   }
+}
+
+function getHazmatDangerSlotIds(slotIds: string[], container: Container | null): string[] {
+  if (!container?.isHazmat) return []
+  return slotIds.filter(slotId => {
+    const slot = store.grid[slotId]
+    return !!slot && wouldCauseHazmatExplosion(store.grid, slot, container)
+  })
+}
+
+function maybePlayHazmatLoadAlert(): void {
+  const container = store.currentContainer
+  if (!container?.isHazmat) {
+    lastHazmatLoadAlertId = null
+    return
+  }
+  if (container.id === lastHazmatLoadAlertId) return
+  lastHazmatLoadAlertId = container.id
+  audio.playSound('hazmatAlert', 0.85)
+}
+
+function maybePlayHazmatRestowAlert(): void {
+  const container = store.restowContainer
+  if (!container?.isHazmat) {
+    lastHazmatRestowAlertId = null
+    return
+  }
+  if (container.id === lastHazmatRestowAlertId) return
+  lastHazmatRestowAlertId = container.id
+  audio.playSound('hazmatAlert', 0.85)
 }
 
 function pickImportSlot(event: MouseEvent): string | null {
@@ -602,6 +726,31 @@ function handleRestowClick(event: MouseEvent): void {
       store.finalizeRestow(slotId)
     }
   )
+}
+
+function handleRestowCancel(event: MouseEvent): void {
+  if (store.phase !== 'restow_selecting') return
+  event.preventDefault()
+
+  const result = store.cancelRestowSelection()
+  if (!result || !shipGroup || !store.shipConfig) return
+
+  removeRestowSlotIndicators(shipGroup)
+
+  const importGroup = shipGroup.getObjectByName('import-containers')
+  const scene = getScene()
+  if (hoistMesh && importGroup && scene) {
+    const deckY = store.shipConfig.deckOffsetY ?? store.shipConfig.height * 0.3
+    scene.remove(hoistMesh)
+    hoistMesh.position.set(
+      result.slot.xOffset,
+      result.slot.yOffset + deckY + CONTAINER.size.y / 2,
+      result.slot.zOffset
+    )
+    hoistMesh.name = `import-container-${result.slotId}`
+    importGroup.add(hoistMesh)
+    hoistMesh = null
+  }
 }
 
 function triggerOutboundTruckDepart(containerMesh: THREE.Group): void {
@@ -861,6 +1010,8 @@ function clearScene(): void {
   sailIn.elapsed = 0
   timerWarnedAt30pct = false
   timerWarnedAt15pct = false
+  lastHazmatLoadAlertId = null
+  lastHazmatRestowAlertId = null
   shipGroup = null
   craneObj = null
   ocean = null
@@ -962,6 +1113,8 @@ defineExpose({ buildScene, clearScene, isReady })
     ref="canvasRef"
     class="game-canvas"
     @click="handleClick"
+    @mousedown.right.prevent="handleRestowCancel"
+    @contextmenu.prevent
   />
 </template>
 

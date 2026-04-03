@@ -57,6 +57,24 @@ export function updatePhysics(grid: Record<string, Slot>, shipConfig: ShipPreset
   return { list, trim, vcg }
 }
 
+export function wouldCauseHazmatExplosion(
+  grid: Record<string, Slot>,
+  targetSlot: Slot,
+  container: Container | null
+): boolean {
+  if (!container?.isHazmat) return false
+
+  for (const slot of Object.values(grid)) {
+    if (!slot.container || !slot.container.isHazmat || slot.id === targetSlot.id) continue
+    const bayDiff = Math.abs(slot.bay - targetSlot.bay) / 2
+    const rowDiff = Math.abs(slot.row - targetSlot.row)
+    const tierDiff = Math.abs(slot.tier - targetSlot.tier) / 2
+    if (bayDiff < 2 && rowDiff < 1.5 && tierDiff < 2) return true
+  }
+
+  return false
+}
+
 export function checkDisasters(
   list: number,
   trim: number,
@@ -79,16 +97,7 @@ export function checkDisasters(
     if (stackWeight > shipConfig.maxStackWeight) return 'collapse'
   }
 
-  if (container && container.isHazmat && placedSlot) {
-    for (const slot of Object.values(grid)) {
-      if (slot.container && slot.container.isHazmat && slot.id !== placedSlot.id) {
-        const bayDiff = Math.abs(slot.bay - placedSlot.bay) / 2
-        const rowDiff = Math.abs(slot.row - placedSlot.row)
-        const tierDiff = Math.abs(slot.tier - placedSlot.tier) / 2
-        if (bayDiff < 2 && rowDiff < 1.5 && tierDiff < 2) return 'explosion'
-      }
-    }
-  }
+  if (placedSlot && wouldCauseHazmatExplosion(grid, placedSlot, container)) return 'explosion'
 
   return null
 }

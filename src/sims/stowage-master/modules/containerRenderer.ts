@@ -80,6 +80,7 @@ export function createContainerMesh(container: Container): THREE.Group {
   // Hazmat markings ONLY if hazardous
   if (container.isHazmat) {
     addHazmatMarkings(group, L, H, W)
+    group.userData['isHazmatContainer'] = true
   }
 
   group.userData['container'] = container
@@ -99,6 +100,7 @@ function addHazmatMarkings(group: THREE.Group, L: number, H: number, W: number):
   const bandGeo = new THREE.BoxGeometry(L + 0.04, H * 0.13, W + 0.04)
   const band = new THREE.Mesh(bandGeo, bandMat)
   band.position.y = H * 0.22
+  band.userData['hazmatPulse'] = true
   group.add(band)
 
   const diamondMat = new THREE.MeshStandardMaterial({
@@ -122,6 +124,7 @@ function addHazmatMarkings(group: THREE.Group, L: number, H: number, W: number):
     const d = new THREE.Mesh(diamondGeo, diamondMat)
     d.position.copy(pos)
     d.rotation.copy(rot)
+    d.userData['hazmatPulse'] = true
     group.add(d)
   }
 }
@@ -133,7 +136,8 @@ export function createSlotIndicators(
   slots: Record<string, Slot>,
   availableIds: string[],
   shipConfig: ShipPreset,
-  shipGroup: THREE.Group
+  shipGroup: THREE.Group,
+  dangerIds: string[] = []
 ): THREE.Group {
   const indicators = new THREE.Group()
   indicators.name = 'slot-indicators'
@@ -146,20 +150,12 @@ export function createSlotIndicators(
   const wireGeo = new THREE.EdgesGeometry(boxGeo)
   boxGeo.dispose()
 
-  const wireMat = new THREE.LineBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.85 })
   const fillGeo = new THREE.BoxGeometry(cl * 0.93, y * 0.93, cw * 0.93)
-  const fillMat = new THREE.MeshPhongMaterial({
-    color: 0x00ff88,
-    emissive: 0x00cc66,
-    emissiveIntensity: 0.4,
-    transparent: true,
-    opacity: 0.12,
-    depthWrite: false,
-  })
 
   for (const slotId of availableIds) {
     const slot = slots[slotId]
     if (!slot) continue
+    const isDanger = dangerIds.includes(slotId)
 
     const deckY = shipConfig.deckOffsetY ?? shipConfig.height * 0.3
     const pos = new THREE.Vector3(
@@ -168,17 +164,36 @@ export function createSlotIndicators(
       slot.zOffset
     )
 
-    const wire = new THREE.LineSegments(wireGeo, wireMat.clone())
+    const wire = new THREE.LineSegments(
+      wireGeo,
+      new THREE.LineBasicMaterial({
+        color: isDanger ? 0xff5555 : 0x00ffaa,
+        transparent: true,
+        opacity: 0.85,
+      })
+    )
     wire.position.copy(pos)
     wire.userData['slotId'] = slotId
     wire.userData['isSlotIndicator'] = true
+    wire.userData['isDangerSlot'] = isDanger
     wire.name = `slot-${slotId}`
     indicators.add(wire)
 
-    const fill = new THREE.Mesh(fillGeo.clone(), fillMat.clone())
+    const fill = new THREE.Mesh(
+      fillGeo.clone(),
+      new THREE.MeshPhongMaterial({
+        color: isDanger ? 0xff4444 : 0x00ff88,
+        emissive: isDanger ? 0xaa2222 : 0x00cc66,
+        emissiveIntensity: 0.4,
+        transparent: true,
+        opacity: 0.12,
+        depthWrite: false,
+      })
+    )
     fill.position.copy(pos)
     fill.userData['slotId'] = slotId
     fill.userData['isSlotIndicator'] = true
+    fill.userData['isDangerSlot'] = isDanger
     fill.name = `slot-fill-${slotId}`
     indicators.add(fill)
   }
@@ -367,7 +382,8 @@ export function createRestowSlotIndicators(
   grid: Record<string, Slot>,
   restowIds: string[],
   shipConfig: ShipPreset,
-  shipGroup: THREE.Group
+  shipGroup: THREE.Group,
+  dangerIds: string[] = []
 ): THREE.Group {
   const indicators = new THREE.Group()
   indicators.name = 'restow-slot-indicators'
@@ -380,20 +396,12 @@ export function createRestowSlotIndicators(
   const wireGeo = new THREE.EdgesGeometry(boxGeo)
   boxGeo.dispose()
 
-  const wireMat = new THREE.LineBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.9 })
   const fillGeo = new THREE.BoxGeometry(cl * 0.93, y * 0.93, cw * 0.93)
-  const fillMat = new THREE.MeshPhongMaterial({
-    color: 0x0099ff,
-    emissive: 0x0066cc,
-    emissiveIntensity: 0.5,
-    transparent: true,
-    opacity: 0.15,
-    depthWrite: false,
-  })
 
   for (const slotId of restowIds) {
     const slot = grid[slotId]
     if (!slot) continue
+    const isDanger = dangerIds.includes(slotId)
 
     const deckY = shipConfig.deckOffsetY ?? shipConfig.height * 0.3
     const pos = new THREE.Vector3(
@@ -402,17 +410,36 @@ export function createRestowSlotIndicators(
       slot.zOffset
     )
 
-    const wire = new THREE.LineSegments(wireGeo, wireMat.clone())
+    const wire = new THREE.LineSegments(
+      wireGeo,
+      new THREE.LineBasicMaterial({
+        color: isDanger ? 0xff5555 : 0x00ccff,
+        transparent: true,
+        opacity: 0.9,
+      })
+    )
     wire.position.copy(pos)
     wire.userData['slotId'] = slotId
     wire.userData['isRestowSlot'] = true
+    wire.userData['isDangerSlot'] = isDanger
     wire.name = `restow-slot-${slotId}`
     indicators.add(wire)
 
-    const fill = new THREE.Mesh(fillGeo.clone(), fillMat.clone())
+    const fill = new THREE.Mesh(
+      fillGeo.clone(),
+      new THREE.MeshPhongMaterial({
+        color: isDanger ? 0xff4444 : 0x0099ff,
+        emissive: isDanger ? 0xaa2222 : 0x0066cc,
+        emissiveIntensity: 0.5,
+        transparent: true,
+        opacity: 0.15,
+        depthWrite: false,
+      })
+    )
     fill.position.copy(pos)
     fill.userData['slotId'] = slotId
     fill.userData['isRestowSlot'] = true
+    fill.userData['isDangerSlot'] = isDanger
     fill.name = `restow-slot-fill-${slotId}`
     indicators.add(fill)
   }
@@ -444,7 +471,9 @@ export function animateRestowSlotIndicators(shipGroup: THREE.Group, time: number
     const mesh = child as THREE.Mesh
     if (mesh.userData['isRestowSlot'] && mesh.material) {
       const mat = mesh.material as THREE.MeshPhongMaterial
-      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = 0.3 + Math.abs(Math.sin(time * 3.5)) * 0.4
+      const base = mesh.userData['isDangerSlot'] ? 0.45 : 0.3
+      const range = mesh.userData['isDangerSlot'] ? 0.5 : 0.4
+      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = base + Math.abs(Math.sin(time * 3.5)) * range
       if (mat.opacity !== undefined && mat.transparent) {
         mat.opacity = 0.10 + Math.abs(Math.sin(time * 3.5)) * 0.12
       }
@@ -465,7 +494,8 @@ export function animateSlotIndicators(shipGroup: THREE.Group, time: number): voi
     const mesh = child as THREE.Mesh
     if (mesh.userData['isSlotIndicator'] && mesh.material) {
       const mat = mesh.material as THREE.MeshPhongMaterial
-      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = pulse
+      const boost = mesh.userData['isDangerSlot'] ? 0.18 : 0
+      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = pulse + boost
       if (mat.opacity !== undefined && mat.transparent) {
         mat.opacity = 0.08 + Math.abs(Math.sin(time * 2.5)) * 0.10
       }
@@ -474,6 +504,18 @@ export function animateSlotIndicators(shipGroup: THREE.Group, time: number): voi
     if (line.material instanceof THREE.LineBasicMaterial) {
       line.material.opacity = 0.6 + Math.abs(Math.sin(time * 2.5)) * 0.35
     }
+  })
+}
+
+export function animateHazmatMeshes(root: THREE.Object3D | null, time: number): void {
+  if (!root) return
+
+  const pulse = 0.25 + Math.abs(Math.sin(time * 1.6)) * 0.35
+  root.traverse(child => {
+    const mesh = child as THREE.Mesh
+    if (!mesh.userData['hazmatPulse'] || !mesh.material) return
+    const mat = mesh.material as THREE.MeshStandardMaterial
+    if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = pulse
   })
 }
 

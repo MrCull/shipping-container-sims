@@ -20,8 +20,6 @@ if (store.sims.length === 0) {
 
 const sim = computed(() => store.getById(props.simId))
 
-// Wrap the lazy import in defineAsyncComponent so Vue receives a component
-// definition rather than a bare Promise when :is is evaluated.
 const asyncComponent = computed(() => {
   if (!sim.value || sim.value.status !== 'playable') return null
   return defineAsyncComponent(sim.value.component)
@@ -47,7 +45,8 @@ onUnmounted(() => {
         class="back-btn"
         @click="goHome"
       >
-        <span class="back-arrow">◄</span>
+        <span class="menu-icon">☰</span>
+        <span class="back-arrow">◀</span>
         <span>MENU</span>
       </button>
       <h1
@@ -101,7 +100,7 @@ onUnmounted(() => {
           class="back-home-btn"
           @click="goHome"
         >
-          ◄ BACK TO MENU
+          ◀ BACK TO MENU
         </button>
       </div>
 
@@ -116,7 +115,7 @@ onUnmounted(() => {
           class="back-home-btn"
           @click="goHome"
         >
-          ◄ BACK TO MENU
+          ◀ BACK TO MENU
         </button>
       </div>
     </main>
@@ -144,7 +143,7 @@ onUnmounted(() => {
 .back-btn {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
   padding: 0.4rem 0.8rem;
   background: transparent;
   border: 1px solid var(--color-border);
@@ -159,6 +158,11 @@ onUnmounted(() => {
 .back-btn:hover {
   border-color: var(--color-primary);
   color: var(--color-text);
+}
+
+.menu-icon {
+  font-size: 0.62rem;
+  line-height: 1;
 }
 
 .back-arrow {

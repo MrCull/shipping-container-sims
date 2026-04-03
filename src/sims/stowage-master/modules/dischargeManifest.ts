@@ -17,7 +17,11 @@ const LOCAL_PORT = { name: 'Local', color: 0xffd700, hex: '#ffd700', order: 0 } 
 /** Future ports used for transit containers. Skip index 0 (Local). */
 const TRANSIT_PORTS = PORTS.slice(1)
 
-function makeImportContainer(): Container {
+function rollHazmat(hazmatRate: number): boolean {
+  return Math.random() < hazmatRate
+}
+
+function makeImportContainer(hazmatRate: number): Container {
   const weight = Math.round(generateWeight() * 10) / 10
   return {
     id: generateContainerId(),
@@ -27,18 +31,18 @@ function makeImportContainer(): Container {
     portColor: LOCAL_PORT.color,
     portHex: LOCAL_PORT.hex,
     portOrder: LOCAL_PORT.order,
-    isHazmat: false,
+    isHazmat: rollHazmat(hazmatRate),
     isImport: true,
     isTransit: false,
   }
 }
 
-function makeTransitContainer(): Container {
+function makeTransitContainer(hazmatRate: number): Container {
   const port = TRANSIT_PORTS[Math.floor(Math.random() * TRANSIT_PORTS.length)]
-  return makeTransitContainerForPort(port)
+  return makeTransitContainerForPort(port, hazmatRate)
 }
 
-function makeTransitContainerForPort(port: typeof TRANSIT_PORTS[number]): Container {
+function makeTransitContainerForPort(port: typeof TRANSIT_PORTS[number], hazmatRate: number): Container {
   const weight = Math.round(generateWeight() * 10) / 10
   return {
     id: generateContainerId(),
@@ -48,7 +52,7 @@ function makeTransitContainerForPort(port: typeof TRANSIT_PORTS[number]): Contai
     portColor: port.color,
     portHex: port.hex,
     portOrder: port.order,
-    isHazmat: false,
+    isHazmat: rollHazmat(hazmatRate),
     isImport: false,
     isTransit: true,
   }
@@ -174,12 +178,13 @@ function placeImportContainers(
   grid: Record<string, Slot>,
   slotIds: string[],
   placed: Container[],
+  hazmatRate: number,
 ): number {
   let importPlaced = 0
   for (const id of slotIds) {
     if (importPlaced >= count) break
     if (!canPlace(id, grid)) continue
-    const container = makeImportContainer()
+    const container = makeImportContainer(hazmatRate)
     grid[id].container = container
     placed.push(container)
     importPlaced++
@@ -187,14 +192,14 @@ function placeImportContainers(
   return importPlaced
 }
 
-function buildGroupedTransitContainers(count: number): Container[] {
+function buildGroupedTransitContainers(count: number, hazmatRate: number): Container[] {
   const ports = shuffle([...TRANSIT_PORTS])
   const grouped: Container[] = []
 
   while (grouped.length < count) {
     for (const port of ports) {
       if (grouped.length >= count) break
-      grouped.push(makeTransitContainerForPort(port))
+      grouped.push(makeTransitContainerForPort(port, hazmatRate))
     }
   }
 
@@ -218,6 +223,7 @@ export function generateDischargeManifest(
   preset: ShipPreset,
   grid: Record<string, Slot>,
   transitCount: number = 0,
+  hazmatRate: number = 0,
   spreadFactor: number = 0,
   importPlacement: ImportPlacementMode = 'default',
   transitGrouping: TransitGroupingMode = 'random',
@@ -233,8 +239,8 @@ export function generateDischargeManifest(
     const transitBaseTarget = Math.min(transitCount, preset.bays - preset.sternBlockedBays)
     const transitBaseIds = orderedIds.filter(id => grid[id]?.tierIndex === 0).slice(0, transitBaseTarget)
     const groupedTransit = transitGrouping === 'grouped-by-pod'
-      ? buildGroupedTransitContainers(transitBaseIds.length)
-      : transitBaseIds.map(() => makeTransitContainer())
+      ? buildGroupedTransitContainers(transitBaseIds.length, hazmatRate)
+      : transitBaseIds.map(() => makeTransitContainer(hazmatRate))
 
     for (let i = 0; i < transitBaseIds.length; i++) {
       const id = transitBaseIds[i]
@@ -243,15 +249,15 @@ export function generateDischargeManifest(
       placed.push(container)
     }
 
-    placeImportContainers(count, grid, importSlotIds, placed)
+    placeImportContainers(count, grid, importSlotIds, placed, hazmatRate)
 
     const remainingTransit = transitCount - transitBaseIds.length
     if (remainingTransit <= 0) return placed
 
     const transitSlots = orderedIds.filter(id => !grid[id]?.container)
     const extraTransit = transitGrouping === 'grouped-by-pod'
-      ? buildGroupedTransitContainers(remainingTransit)
-      : transitSlots.slice(0, remainingTransit).map(() => makeTransitContainer())
+      ? buildGroupedTransitContainers(remainingTransit, hazmatRate)
+      : transitSlots.slice(0, remainingTransit).map(() => makeTransitContainer(hazmatRate))
 
     let transitPlaced = 0
     for (const id of transitSlots) {
@@ -267,7 +273,7 @@ export function generateDischargeManifest(
   }
 
   // 1 — Place import containers.
-  placeImportContainers(count, grid, importSlotIds, placed)
+  placeImportContainers(count, grid, importSlotIds, placed, hazmatRate)
 
   if (transitCount <= 0) return placed
 
@@ -294,8 +300,8 @@ export function generateDischargeManifest(
   }
 
   const groupedTransit = transitGrouping === 'grouped-by-pod'
-    ? buildGroupedTransitContainers(transitCount)
-    : transitSlots.slice(0, transitCount).map(() => makeTransitContainer())
+    ? buildGroupedTransitContainers(transitCount, hazmatRate)
+    : transitSlots.slice(0, transitCount).map(() => makeTransitContainer(hazmatRate))
 
   let transitPlaced = 0
   for (const id of transitSlots) {

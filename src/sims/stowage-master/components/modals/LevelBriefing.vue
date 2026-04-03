@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useGameStore } from '../../store/gameStore'
+import { SOUNDS } from '../../modules/audio'
 
 const store = useGameStore()
 const pageIndex = ref(0)
+const playedCueKeys = ref(new Set<string>())
 
 const pages = computed(() => store.levelConfig?.briefingPages ?? [])
 const currentPage = computed(() => pages.value[pageIndex.value])
@@ -11,8 +13,23 @@ const isLastPage = computed(() => pageIndex.value >= pages.value.length - 1)
 
 // Reset page index whenever a new briefing starts
 watch(() => store.phase, (phase) => {
-  if (phase === 'briefing') pageIndex.value = 0
+  if (phase === 'briefing') {
+    pageIndex.value = 0
+    playedCueKeys.value = new Set<string>()
+  }
 })
+
+watch(currentPage, page => {
+  if (!page?.soundCue || store.phase !== 'briefing') return
+  const cueKey = `${store.currentLevel}-${pageIndex.value}-${page.soundCue}`
+  if (playedCueKeys.value.has(cueKey)) return
+  playedCueKeys.value.add(cueKey)
+  const soundUrl = SOUNDS[page.soundCue]
+  if (!soundUrl) return
+  const sound = new Audio(soundUrl)
+  sound.volume = 0.85
+  void sound.play().catch(() => {})
+}, { immediate: true })
 
 function next() {
   if (isLastPage.value) {

@@ -17,6 +17,7 @@ export const SOUNDS: Record<string, string> = {
   caChing: assetUrl('money-increase-ca-ching-.mp3'),
   moneyGame: assetUrl('money-increase-game-sound.mp3'),
   jackpot: assetUrl('positive-high-score-reached-like-jackpot-4-seconds.wav'),
+  hazmatAlert: assetUrl('siren-attantion-2-seconds.mp3'),
 
   // Timer sounds
   clockTicking: assetUrl('clock-ticking-8-seconds.mp3'),

@@ -21,17 +21,15 @@ export function calculateDischargeScore(
   let score = 60
   const reasons: PlacementResult['reasons'] = []
 
-  // Bonus: top-tier pick (unblocking lower tiers — good discharge order)
   const aboveTierNum = slot.tier + 2
   const aboveId = `${String(slot.bay).padStart(2, '0')}-${String(slot.row).padStart(2, '0')}-${String(aboveTierNum).padStart(2, '0')}`
   const aboveSlot = grid[aboveId]
   const isTopOfStack = !aboveSlot || !aboveSlot.container
   if (isTopOfStack && isTopThird(slot.tierIndex, shipConfig.tiers)) {
     score += 20
-    reasons.push({ text: 'Good discharge order — top tier first!', points: 20, good: true })
+    reasons.push({ text: 'Good discharge order - top tier first!', points: 20, good: true })
   }
 
-  // Bonus: improves stability (list or trim magnitude decreases)
   const listImproved = Math.abs(listAfter) < Math.abs(list)
   const trimImproved = Math.abs(trimAfter) < Math.abs(trim)
   if (listImproved || trimImproved) {
@@ -39,22 +37,24 @@ export function calculateDischargeScore(
     reasons.push({ text: 'Improves ship stability', points: 20, good: true })
   }
 
-  // Bonus: removing heavy outboard container
   if (container.weight > 20 && isOutermostRow(slot.rowIndex, shipConfig.rows) && listImproved) {
     score += 10
-    reasons.push({ text: 'Heavy outboard removed — balance restored', points: 10, good: true })
+    reasons.push({ text: 'Heavy outboard removed - balance restored', points: 10, good: true })
   }
 
-  // Penalty: discharging while ship already in warning zone
+  if (container.isHazmat) {
+    score += SCORING.hazmatSafeBonus
+    reasons.push({ text: 'Hazmat handled safely - premium cargo', points: SCORING.hazmatSafeBonus, good: true })
+  }
+
   if (Math.abs(list) >= PHYSICS.listWarning || Math.abs(trim) >= PHYSICS.trimWarning) {
     score -= 20
     reasons.push({ text: 'Ship in warning zone', points: -20 })
   }
 
-  // Penalty: not the top container in its stack (requires restow)
   if (!isTopOfStack) {
     score -= 25
-    reasons.push({ text: 'Container blocked — restow needed', points: -25 })
+    reasons.push({ text: 'Container blocked - restow needed', points: -25 })
   }
 
   score = Math.max(0, score)
@@ -106,7 +106,7 @@ export function calculatePlacementScore(
   if (podPenalty < 0) {
     score += podPenalty
     const blockedCount = Math.round(Math.abs(podPenalty) / Math.abs(SCORING.podWrongOrderDeduction))
-    const suffix = blockedCount > 1 ? ` (×${blockedCount})` : ''
+    const suffix = blockedCount > 1 ? ` (x${blockedCount})` : ''
     reasons.push({ text: `Blocking earlier-discharge cargo below${suffix}`, points: podPenalty })
   }
 
@@ -116,7 +116,9 @@ export function calculatePlacementScore(
   if (container.weight > 20 && slot.rowIndex === Math.floor(shipConfig.rows / 2)) {
     reasons.push({ text: 'Heavy on centreline - perfect balance!', points: 0, good: true })
   }
-  if (container.isHazmat && !reasons.some(r => r.text.includes('Hazmat'))) {
+  if (container.isHazmat && !reasons.some(r => r.text.includes('Hazmat too close'))) {
+    score += SCORING.hazmatSafeBonus
+    reasons.push({ text: 'Hazmat loaded safely - premium cargo', points: SCORING.hazmatSafeBonus, good: true })
     reasons.push({ text: 'Hazmat safely separated', points: 0, good: true })
   }
 
@@ -124,21 +126,12 @@ export function calculatePlacementScore(
   return { score, reasons }
 }
 
-/**
- * Penalise placing a container on top of containers destined for a sooner port.
- * Each container below in the same stack that has a later portOrder (further future)
- * than the container being placed adds one penalty — it will need to be moved before
- * the one below it can be discharged.
- */
 function checkPodOrder(container: Container, slot: Slot, grid: Record<string, Slot>): number {
   let penalty = 0
   for (const other of Object.values(grid)) {
     if (!other.container) continue
     if (other.bay !== slot.bay || other.row !== slot.row) continue
-    // Only look at containers below the slot being placed
     if (other.tierIndex >= slot.tierIndex) continue
-    // If the container below is destined for an earlier port (sooner discharge) than
-    // the container being placed, the placed container will block it at discharge
     if (other.container.portOrder < container.portOrder) {
       penalty += SCORING.podWrongOrderDeduction
     }
@@ -147,33 +140,36 @@ function checkPodOrder(container: Container, slot: Slot, grid: Record<string, Sl
 }
 
 /**
- * Score a restow move (picking up a transit container and placing it elsewhere).
+ * Score a restow move.
  * Base -15 (restows cost time and effort); partial credit for placing it well.
  */
 export function calculateRestowScore(
-  _container: Container,
+  container: Container,
   targetSlot: Slot,
   grid: Record<string, Slot>,
   shipConfig: ShipPreset
 ): PlacementResult {
   let score = -15
   const reasons: PlacementResult['reasons'] = []
-  reasons.push({ text: 'Restow required — overstow resolved', points: -15 })
+  reasons.push({ text: 'Restow required - overstow resolved', points: -15 })
 
-  // Bonus: placed in a sensible low tier (good stowage practice)
   if (!isTopThird(targetSlot.tierIndex, shipConfig.tiers)) {
     score += 10
-    reasons.push({ text: 'Restowed low — good stability', points: 10, good: true })
+    reasons.push({ text: 'Restowed low - good stability', points: 10, good: true })
   }
 
-  // Penalty: placed above another import (creates a new overstow)
   if (targetSlot.tierIndex > 0) {
     const belowTierNum = targetSlot.tier - 2
     const belowId = `${String(targetSlot.bay).padStart(2, '0')}-${String(targetSlot.row).padStart(2, '0')}-${String(belowTierNum).padStart(2, '0')}`
     if (grid[belowId]?.container?.isImport) {
       score -= 20
-      reasons.push({ text: 'Restowed above import — new overstow!', points: -20 })
+      reasons.push({ text: 'Restowed above import - new overstow!', points: -20 })
     }
+  }
+
+  if (container.isHazmat) {
+    score += SCORING.hazmatSafeBonus
+    reasons.push({ text: 'Hazmat restowed safely - premium cargo', points: SCORING.hazmatSafeBonus, good: true })
   }
 
   return { score, reasons }
