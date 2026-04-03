@@ -79,6 +79,17 @@ All agent plans should be created in the **`.ai/plans/`** folder at the repo roo
 
 Agent-facing skill files live in **`.ai/skills/`** at the repo root (Markdown `SKILL.md` per topic). Each file documents conventions, schemas, or patterns for this codebase.
 
+**Skill index** (every `SKILL.md` in `.ai/skills/`):
+
+- [adding-a-sim](.ai/skills/adding-a-sim/SKILL.md)
+- [container-cargo-entities](.ai/skills/container-cargo-entities/SKILL.md)
+- [terminal-economics](.ai/skills/terminal-economics/SKILL.md)
+- [terminal-equipment-entities](.ai/skills/terminal-equipment-entities/SKILL.md)
+- [terminal-infrastructure](.ai/skills/terminal-infrastructure/SKILL.md)
+- [terminal-operations](.ai/skills/terminal-operations/SKILL.md)
+- [threejs-vue3-animation](.ai/skills/threejs-vue3-animation/SKILL.md)
+- [vessel-entities](.ai/skills/vessel-entities/SKILL.md)
+
 ### Project workflow
 
 - **[Adding a sim](.ai/skills/adding-a-sim/SKILL.md)** — How to add a new game or simulation to the project. Follow this when creating, scaffolding, or implementing a new sim.
