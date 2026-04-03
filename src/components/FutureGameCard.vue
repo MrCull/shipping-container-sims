@@ -10,6 +10,7 @@ defineProps<{
   <article
     class="future-card"
     :style="{ '--card-accent': teaser.color }"
+    title="This game is planned and coming later. It is not playable yet."
   >
     <div class="card-top">
       <div class="card-icon">
@@ -39,6 +40,13 @@ defineProps<{
       >{{ tag }}</span>
     </div>
 
+    <div
+      class="card-tooltip"
+      role="tooltip"
+    >
+      Planned game. Coming later and not playable yet.
+    </div>
+
     <div class="scanline" />
   </article>
 </template>
@@ -60,6 +68,9 @@ defineProps<{
   overflow: hidden;
   aspect-ratio: 1 / 1;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  cursor: not-allowed;
+  opacity: 0.52;
+  filter: saturate(0.68);
 }
 
 .future-card::before {
@@ -76,6 +87,16 @@ defineProps<{
     transparent
   );
   opacity: 0.65;
+}
+
+.future-card:hover::before {
+  opacity: 0.85;
+}
+
+.future-card:hover .card-tooltip,
+.future-card:focus-visible .card-tooltip {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .scanline {
@@ -109,18 +130,19 @@ defineProps<{
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--card-accent) 35%, var(--color-border));
   flex-shrink: 0;
+  opacity: 0.8;
 }
 
 .card-title {
   font-family: var(--font-retro);
   font-size: 0.7rem;
   line-height: 1.5;
-  color: var(--color-text);
+  color: color-mix(in srgb, var(--color-text-muted) 88%, var(--color-text) 12%);
 }
 
 .card-tagline {
   font-size: 0.75rem;
-  color: var(--card-accent);
+  color: color-mix(in srgb, var(--card-accent) 45%, var(--color-text-muted) 55%);
   font-weight: 600;
 }
 
@@ -151,6 +173,7 @@ defineProps<{
   border: 1px solid color-mix(in srgb, var(--card-accent) 25%, var(--color-border));
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  opacity: 0.8;
 }
 
 .card-status {
@@ -160,6 +183,27 @@ defineProps<{
   color: var(--card-accent);
   padding-top: 0.35rem;
   letter-spacing: 0.12em;
-  opacity: 0.9;
+  opacity: 0.72;
+}
+
+.card-tooltip {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: calc(100% + 0.55rem);
+  padding: 0.55rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 45%, var(--color-border));
+  border-radius: 6px;
+  background: rgba(10, 15, 26, 0.96);
+  color: var(--color-text);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+  z-index: 2;
 }
 </style>

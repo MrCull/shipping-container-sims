@@ -1,17 +1,38 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import type { SimDefinition } from '@/types/sim'
 
-defineProps<{
+const props = defineProps<{
   sim: SimDefinition
 }>()
+const router = useRouter()
+
+function getUnavailableMessage(sim: SimDefinition): string {
+  return sim.status === 'wip'
+    ? 'This sim is not ready yet. It is still in development.'
+    : 'This sim is coming soon and is not playable yet.'
+}
+
+function openSim(): void {
+  if (props.sim.status !== 'playable') {
+    return
+  }
+
+  router.push({ name: 'sim', params: { simId: props.sim.id } })
+}
 </script>
 
 <template>
-  <router-link
-    :to="sim.status === 'playable' ? { name: 'sim', params: { simId: sim.id } } : ''"
+  <article
     class="sim-card"
     :class="[`status-${sim.status}`]"
     :style="{ '--card-accent': sim.color }"
+    :aria-disabled="sim.status !== 'playable'"
+    :title="sim.status !== 'playable' ? getUnavailableMessage(props.sim) : undefined"
+    :tabindex="sim.status === 'playable' ? 0 : -1"
+    @click="openSim"
+    @keydown.enter.prevent="openSim"
+    @keydown.space.prevent="openSim"
   >
     <div class="card-top">
       <div class="card-icon">
@@ -46,8 +67,16 @@ defineProps<{
       >{{ tag }}</span>
     </div>
 
+    <div
+      v-if="sim.status !== 'playable'"
+      class="card-tooltip"
+      role="tooltip"
+    >
+      {{ getUnavailableMessage(props.sim) }}
+    </div>
+
     <div class="scanline" />
-  </router-link>
+  </article>
 </template>
 
 <style scoped>
@@ -68,6 +97,27 @@ defineProps<{
 
 .sim-card.status-playable {
   cursor: pointer;
+}
+
+.sim-card.status-coming-soon,
+.sim-card.status-wip {
+  cursor: not-allowed;
+  opacity: 0.58;
+  filter: saturate(0.75);
+}
+
+.sim-card.status-coming-soon .card-title,
+.sim-card.status-coming-soon .card-tagline,
+.sim-card.status-wip .card-title,
+.sim-card.status-wip .card-tagline {
+  color: color-mix(in srgb, var(--color-text-muted) 82%, var(--card-accent) 18%);
+}
+
+.sim-card.status-coming-soon .card-icon,
+.sim-card.status-wip .card-icon,
+.sim-card.status-coming-soon .tag,
+.sim-card.status-wip .tag {
+  opacity: 0.78;
 }
 
 .sim-card.status-playable:hover {
@@ -93,6 +143,35 @@ defineProps<{
 
 .sim-card:hover::before {
   opacity: 1;
+}
+
+.card-tooltip {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: calc(100% + 0.55rem);
+  padding: 0.55rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 45%, var(--color-border));
+  border-radius: 6px;
+  background: rgba(10, 15, 26, 0.96);
+  color: var(--color-text);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+  z-index: 2;
+}
+
+.sim-card.status-coming-soon:hover .card-tooltip,
+.sim-card.status-coming-soon:focus-visible .card-tooltip,
+.sim-card.status-wip:hover .card-tooltip,
+.sim-card.status-wip:focus-visible .card-tooltip {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .scanline {
