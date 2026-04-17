@@ -7,6 +7,7 @@ import type {
   CameraCue,
   CameraCueTarget,
   CraneMode,
+  Equipment,
   EquipmentType,
   GameEvent,
   GameEventType,
@@ -18,7 +19,7 @@ import type {
   ReachStackerServiceSide,
   Transaction,
 } from '../types'
-import { DEFAULT_TIME_SCALE, MAX_TIME_SCALE } from '../modules/config'
+import { DEFAULT_TIME_SCALE, MAX_TIME_SCALE, RS_SPEED_UNLADEN } from '../modules/config'
 import { createJob, cancelJob, getActiveJobForContainer, resetJobCounter } from '../modules/jobScheduler'
 import { resetEconomy } from '../modules/economy'
 import { resetTruckCounter } from '../modules/truckManager'
@@ -32,6 +33,8 @@ import {
 } from '../modules/scenario/tutorialScenario'
 import { tickSimulation } from '../modules/simulation/simulationEngine'
 import type { NarratorRuntime, TutorialFlowRuntime } from '../modules/simulation/simulationTypes'
+import { getReachStackerHomePosition } from '../modules/movement/terminalGeometry'
+import { resetEquipmentDeadlockState } from '../modules/equipmentController'
 
 let eventCounter = 0
 let cameraCueCounter = 0
@@ -246,6 +249,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     resetTruckCounter()
     resetVesselCounter()
     resetEconomy()
+    resetEquipmentDeadlockState()
 
     const scenario = createTutorialScenario(godModeEnabled)
     applyState({
@@ -557,6 +561,36 @@ export const useGameStore = defineStore('box-empire-game', () => {
     }
   })
 
+  function spawnReachStacker(): void {
+    if (!isGodMode.value) return
+    const existingRS = equipment.value.filter(eq => eq.type === 'reach_stacker')
+    const newId = `rs-${existingRS.length + 1}`
+    const home = getReachStackerHomePosition()
+    const newRS: Equipment = {
+      id: newId,
+      type: 'reach_stacker',
+      state: 'idle',
+      position: { x: home.x + existingRS.length * 4, y: 0, z: home.z },
+      currentJobId: null,
+      carriedContainerId: null,
+      stateStartTime: simTime.value,
+      stateElapsed: 0,
+      targetPosition: null,
+      speed: RS_SPEED_UNLADEN,
+      enabled: true,
+      canServeLandside: true,
+      canServeWaterside: true,
+      craneMode: 'both',
+      armTargetY: 0,
+      armDropStartY: 0,
+      spreaderZ: 0,
+      waypoints: [],
+      waypointIndex: 0,
+      headingY: 0,
+    }
+    equipment.value.push(newRS)
+  }
+
   return {
     gamePhase,
     simTime,
@@ -614,5 +648,6 @@ export const useGameStore = defineStore('box-empire-game', () => {
     closeNarratorDialog,
     dispatchNarratorAction,
     requestCameraCue,
+    spawnReachStacker,
   }
 })

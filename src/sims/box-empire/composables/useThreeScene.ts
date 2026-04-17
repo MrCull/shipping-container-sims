@@ -205,6 +205,9 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       case 'KeyS': case 'ArrowDown':       keys.down    = true; e.preventDefault(); break
       case 'Equal': case 'NumpadAdd':      keys.zoomIn  = true; e.preventDefault(); break
       case 'Minus': case 'NumpadSubtract': keys.zoomOut = true; e.preventDefault(); break
+      case 'KeyR':
+        store.spawnReachStacker()
+        break
     }
   }
 

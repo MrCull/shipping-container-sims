@@ -38,18 +38,19 @@ function laneZ(side: YardServiceSide, lanes: YardServiceLanes = getYardServiceLa
   return side === 'landside' ? lanes.landsideZ : lanes.watersideZ
 }
 
-function serviceSideForYardEndpoint(job: Job, endpoint: JobEndpoint): YardServiceSide {
+function serviceSideForYardEndpoint(current: Position3D, job: Job, endpoint: JobEndpoint): YardServiceSide {
   const yardLocation = endpoint === 'pickup' ? job.pickupLocation : job.dropoffLocation
   const otherLocation = endpoint === 'pickup' ? job.dropoffLocation : job.pickupLocation
 
   if (yardLocation.type !== 'yard_slot') return sideForZ(yardLocation.position.z)
   if (otherLocation.type === 'truck') return 'landside'
   if (otherLocation.type === 'quay_buffer' || otherLocation.type === 'vessel_slot') return 'waterside'
-  return 'landside'
+  // yard→yard shuffle: stay on whichever side the RS is already on
+  return sideForZ(current.z)
 }
 
-function parkingSideForEndpoint(job: Job, endpoint: JobEndpoint, location: Location): YardServiceSide {
-  if (location.type === 'yard_slot') return serviceSideForYardEndpoint(job, endpoint)
+function parkingSideForEndpoint(current: Position3D, job: Job, endpoint: JobEndpoint, location: Location): YardServiceSide {
+  if (location.type === 'yard_slot') return serviceSideForYardEndpoint(current, job, endpoint)
   if (location.type === 'quay_buffer' || location.type === 'vessel_slot') return 'waterside'
   return 'landside'
 }
@@ -69,8 +70,8 @@ function chooseBestPosition(
   )
 }
 
-function yardParkingPosition(job: Job, endpoint: JobEndpoint, target: Position3D): Position3D {
-  const side = serviceSideForYardEndpoint(job, endpoint)
+function yardParkingPosition(current: Position3D, job: Job, endpoint: JobEndpoint, target: Position3D): Position3D {
+  const side = serviceSideForYardEndpoint(current, job, endpoint)
   return {
     x: target.x,
     y: 0,
@@ -109,7 +110,7 @@ export function reachStackerParkingPosition(
 ): Position3D {
   const location = endpoint === 'pickup' ? job.pickupLocation : job.dropoffLocation
   if (location.type === 'truck') return truckParkingPosition(current, location.position, occupancy, movingEntityId)
-  if (location.type === 'yard_slot') return yardParkingPosition(job, endpoint, location.position)
+  if (location.type === 'yard_slot') return yardParkingPosition(current, job, endpoint, location.position)
   if (location.type === 'quay_buffer') return quayParkingPosition(location.position)
   return { x: location.position.x, y: 0, z: location.position.z }
 }
@@ -123,7 +124,7 @@ export function buildReachStackerRoute(
   const points: Position3D[] = []
   const lanes = getYardServiceLanes()
   const destination = endpoint === 'pickup' ? job.pickupLocation : job.dropoffLocation
-  const targetSide = parkingSideForEndpoint(job, endpoint, destination)
+  const targetSide = parkingSideForEndpoint(from, job, endpoint, destination)
   const fromSide = sideForZ(from.z, lanes)
   const fromLaneZ = laneZ(fromSide, lanes)
   const targetLaneZ = laneZ(targetSide, lanes)

@@ -18,6 +18,7 @@ import type {
 } from '../types'
 import type { MoveAttempt, OccupancyWorld } from './movement/occupancyWorld'
 import { buildReachStackerRoute, reachStackerParkingPosition } from './movement/reachStackerRouting'
+import { getYardServiceLanes } from './movement/terminalGeometry'
 import {
   RS_SPEED_UNLADEN,
   RS_SPEED_LADEN,
@@ -29,6 +30,7 @@ import {
 import { isContainerOnTop } from './yardManager'
 
 const STUCK_FAIL_OPEN_SECONDS = 20
+const DEADLOCK_YIELD_SECONDS = 30
 const FORCE_THROUGH_SECONDS = 4
 const BACKUP_SPEED_FACTOR = 1.1
 const BACKUP_TURN_SECONDS = 2
@@ -36,9 +38,21 @@ const BACKUP_TURN_SECONDS = 2
 interface BlockRecoveryState {
   blockedSeconds: number
   forceThroughSeconds: number
+  blockedById?: string
+}
+
+interface ClearingState {
+  waypoints: Position3D[]
+  waypointIndex: number
 }
 
 const equipmentRecovery = new Map<string, BlockRecoveryState>()
+const equipmentClearing = new Map<string, ClearingState>()
+
+export function resetEquipmentDeadlockState(): void {
+  equipmentRecovery.clear()
+  equipmentClearing.clear()
+}
 
 function distanceTo(a: Position3D, b: Position3D): number {
   const dx = a.x - b.x
@@ -123,6 +137,7 @@ function recoverBlockedEquipmentMove(
 
   const recovery = equipmentRecovery.get(eq.id) ?? { blockedSeconds: 0, forceThroughSeconds: 0 }
   recovery.blockedSeconds += dt
+  recovery.blockedById = attempt.blockedBy
   equipmentRecovery.set(eq.id, recovery)
 
   if (recovery.blockedSeconds >= STUCK_FAIL_OPEN_SECONDS) {
@@ -158,6 +173,62 @@ function shouldBackUpThisTurn(entityId: string, blockedBy: string | undefined, b
   const phase = Math.floor(blockedSeconds / BACKUP_TURN_SECONDS) % 2
   const entityFirst = entityId.localeCompare(blockedBy) < 0
   return phase === 0 ? entityFirst : !entityFirst
+}
+
+function shouldYield(myId: string, theirId: string): boolean {
+  return myId.localeCompare(theirId) < 0
+}
+
+function buildClearingWaypoints(eq: Equipment): Position3D[] {
+  const lanes = getYardServiceLanes()
+  const neutralX = eq.position.x >= 0 ? -25 : 25
+  const points: Position3D[] = []
+  if (Math.abs(eq.position.z - lanes.landsideZ) > 0.5) {
+    points.push({ x: eq.position.x, y: 0, z: lanes.landsideZ })
+  }
+  points.push({ x: neutralX, y: 0, z: lanes.landsideZ })
+  return points
+}
+
+function initiateDeadlockYield(eq: Equipment, state: BoxEmpireState): void {
+  if (eq.currentJobId) {
+    const job = state.jobs.find(j => j.id === eq.currentJobId)
+    if (job && job.status !== 'completed' && job.status !== 'cancelled') {
+      job.status = 'pending'
+      job.assignedEquipmentId = null
+    }
+  }
+  eq.currentJobId = null
+  eq.state = 'idle'
+  equipmentClearing.set(eq.id, { waypoints: buildClearingWaypoints(eq), waypointIndex: 0 })
+  equipmentRecovery.delete(eq.id)
+}
+
+function tickReachStackerClearing(
+  eq: Equipment,
+  clearing: ClearingState,
+  dt: number,
+  occupancy?: OccupancyWorld,
+): void {
+  if (clearing.waypointIndex >= clearing.waypoints.length) {
+    equipmentClearing.delete(eq.id)
+    return
+  }
+  const wp = clearing.waypoints[clearing.waypointIndex]
+  const { position, arrived } = moveTowards(eq.position, wp, RS_SPEED_UNLADEN, dt)
+  if (occupancy) {
+    const attempt = occupancy.tryMoveEntity(eq.id, position, undefined, {})
+    if (attempt.allowed) eq.position = attempt.position
+  } else {
+    eq.position = position
+  }
+  eq.position.y = 0
+  if (arrived) {
+    clearing.waypointIndex++
+    if (clearing.waypointIndex >= clearing.waypoints.length) {
+      equipmentClearing.delete(eq.id)
+    }
+  }
 }
 
 // Determine heading for RS at a given position facing a pickup/drop target
@@ -222,6 +293,15 @@ export function tickEquipment(
   }
 
   if (!eq.enabled) return result
+
+  if (eq.type === 'reach_stacker') {
+    const clearing = equipmentClearing.get(eq.id)
+    if (clearing) {
+      tickReachStackerClearing(eq, clearing, dt, occupancy)
+      return result
+    }
+  }
+
   if (eq.state === 'idle' || !eq.currentJobId) return result
 
   const job = state.jobs.find(j => j.id === eq.currentJobId)
@@ -389,6 +469,19 @@ function tickReachStacker(
         eq.waypointIndex = 0
       }
       const arrived = advanceRsWaypoints(eq, getTravelSpeed(eq, false), dt, occupancy)
+      // RS-vs-RS deadlock: yield if blocked by another RS for too long
+      if (!arrived) {
+        const recovery = equipmentRecovery.get(eq.id)
+        if (
+          recovery &&
+          recovery.blockedSeconds >= DEADLOCK_YIELD_SECONDS &&
+          recovery.blockedById?.startsWith('rs-') &&
+          shouldYield(eq.id, recovery.blockedById)
+        ) {
+          initiateDeadlockYield(eq, state)
+          break
+        }
+      }
       // Update heading to face the pickup target
       eq.headingY = rsWorkingHeading(eq.position, job.pickupLocation)
       if (arrived) {
