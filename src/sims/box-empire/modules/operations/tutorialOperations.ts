@@ -8,13 +8,16 @@ import {
   createExportYardToQuayJob,
   createVesselDischargeJob,
   createYardShuffleJob,
+  getLoadExchangePositionForCraneX,
 } from '../allocators/destinationAllocator'
 import { findShuffleTargetSlot } from '../allocators/yardAllocator'
 import { getActiveJobForContainer } from '../jobScheduler'
 import { getTruckContainerPositionForVisitType } from '../truckManager'
 import {
+  getDischargeableVesselContainers,
   getNextDischargeContainer,
   getNextLoadSlot,
+  getVesselSlotPosition,
   isVesselFullyDischarged,
 } from '../vesselManager'
 import { isContainerOnTop } from '../yardManager'
@@ -35,12 +38,33 @@ export function createInitialDischargeJob(state: BoxEmpireState): void {
   const next = getNextDischargeContainer(vessel)
   if (!next) return
   if (getActiveJobForContainer(state, next.containerId)) return
-  state.jobs.push(createVesselDischargeJob(vessel, next.containerId, next.tier, state.simTime))
+  state.jobs.push(createVesselDischargeJob(vessel, next.containerId, next.bay, next.row, next.tier, state.simTime))
+}
+
+function createAvailableDischargeJobsForVessel(state: BoxEmpireState, vessel: BoxEmpireState['vesselVisits'][number]): void {
+  for (const next of getDischargeableVesselContainers(vessel)) {
+    if (getActiveJobForContainer(state, next.containerId)) continue
+    state.jobs.push(createVesselDischargeJob(
+      vessel,
+      next.containerId,
+      next.bay,
+      next.row,
+      next.tier,
+      state.simTime,
+    ))
+  }
 }
 
 export function createInitialExportStagingJob(state: BoxEmpireState): void {
   const yard = state.yardBlocks[0]
   if (!yard) return
+  const loadingVessel = state.vesselVisits.find(v => v.state === 'loading')
+  if (!loadingVessel) return
+  const loadSlot = getNextLoadSlot(loadingVessel)
+  if (loadSlot === null) return
+  const loadExchangePosition = getLoadExchangePositionForCraneX(
+    getVesselSlotPosition(loadingVessel, loadSlot.bay, loadSlot.row, loadSlot.tier).x,
+  )
   const exportInYard = state.containers.find(container => {
     if (container.visitType !== 'export' || container.lifecycleState !== 'in_yard') return false
     if (!container.yardSlot) return false
@@ -48,34 +72,21 @@ export function createInitialExportStagingJob(state: BoxEmpireState): void {
     return isContainerOnTop(yard, container.id)
   })
   if (!exportInYard) return
-  const stageJob = createExportYardToQuayJob(exportInYard, yard, state.simTime)
+  const stageJob = createExportYardToQuayJob(exportInYard, yard, state.simTime, loadExchangePosition)
   if (stageJob) state.jobs.push(stageJob)
 }
 
 function continueVesselDischarge(state: BoxEmpireState): void {
-  const vessel = state.vesselVisits[0]
-  if (!vessel || vessel.state !== 'discharging') return
+  for (const vessel of state.vesselVisits) {
+    if (vessel.state !== 'discharging') continue
 
-  const crane = state.equipment.find(eq => eq.type === 'mobile_harbor_crane' && eq.enabled)
-  if (!crane || crane.state !== 'idle' || crane.currentJobId) return
+    if (isVesselFullyDischarged(vessel)) {
+      vessel.state = 'loading'
+      continue
+    }
 
-  if (isVesselFullyDischarged(vessel)) {
-    vessel.state = 'loading'
-    return
+    createAvailableDischargeJobsForVessel(state, vessel)
   }
-
-  const quayDischargeOccupied = state.containers.some(
-    container => container.visitType === 'import' && container.lifecycleState === 'discharged_to_buffer',
-  ) || state.jobs.some(
-    job =>
-      job.dropoffLocation.id === 'quay-discharge' &&
-      (job.status === 'pending' || job.status === 'assigned' || job.status === 'in_progress'),
-  )
-  if (quayDischargeOccupied) return
-
-  const next = getNextDischargeContainer(vessel)
-  if (!next || getActiveJobForContainer(state, next.containerId)) return
-  state.jobs.push(createVesselDischargeJob(vessel, next.containerId, next.tier, state.simTime))
 }
 
 function maybeStartImportPickupFlow(state: BoxEmpireState, flow: TutorialFlowRuntime): void {
@@ -83,15 +94,10 @@ function maybeStartImportPickupFlow(state: BoxEmpireState, flow: TutorialFlowRun
     const importInYard = state.containers.filter(
       container => container.visitType === 'import' && container.lifecycleState === 'in_yard',
     ).length
-    const vessel = state.vesselVisits[0]
-    if (
-      importInYard > 0 &&
-      vessel &&
-      (vessel.state === 'discharging' ||
-        vessel.state === 'loading' ||
-        vessel.state === 'departing' ||
-        vessel.state === 'departed')
-    ) {
+    const anyVesselInProgress = state.vesselVisits.some(v =>
+      v.state === 'discharging' || v.state === 'loading' || v.state === 'departing' || v.state === 'departed',
+    )
+    if (importInYard > 0 && anyVesselInProgress) {
       flow.importPickupStarted = true
     }
   }
@@ -173,13 +179,13 @@ function ensureImportPickupJobs(state: BoxEmpireState): void {
 }
 
 function continueExportStagingAndLoading(state: BoxEmpireState, callbacks: SimulationCallbacks): void {
-  const vessel = state.vesselVisits[0]
-  if (!vessel || vessel.state !== 'loading') return
+  const loadingVessels = state.vesselVisits.filter(v => v.state === 'loading')
+  if (loadingVessels.length === 0) return
 
   const yard = state.yardBlocks[0]
   if (!yard) return
 
-  const rs = state.equipment.find(eq => eq.type === 'reach_stacker')
+  // RS: stage export containers from yard to quay load buffer
   const quayLoadOccupied = state.containers.some(
     container =>
       container.lifecycleState === 'staged_for_loading' ||
@@ -190,49 +196,73 @@ function continueExportStagingAndLoading(state: BoxEmpireState, callbacks: Simul
       (job.status === 'pending' || job.status === 'assigned' || job.status === 'in_progress'),
   )
 
-  if (rs && rs.state === 'idle' && !rs.currentJobId && !quayLoadOccupied) {
-    for (const job of state.jobs) {
-      if (job.status !== 'blocked') continue
-      if (job.dropoffLocation.type !== 'quay_buffer' || job.dropoffLocation.id !== 'quay-load') continue
-      const container = state.containers.find(candidate => candidate.id === job.containerId)
-      if (!container || container.visitType !== 'export') continue
-      if (isContainerOnTop(yard, container.id)) job.status = 'cancelled'
-    }
+  if (!quayLoadOccupied) {
+    const rs = state.equipment.find(eq => eq.type === 'reach_stacker')
+    if (rs && rs.state === 'idle' && !rs.currentJobId) {
+      for (const job of state.jobs) {
+        if (job.status !== 'blocked') continue
+        if (job.dropoffLocation.type !== 'quay_buffer' || job.dropoffLocation.id !== 'quay-load') continue
+        const container = state.containers.find(candidate => candidate.id === job.containerId)
+        if (!container || container.visitType !== 'export') continue
+        if (isContainerOnTop(yard, container.id)) job.status = 'cancelled'
+      }
 
-    const exportInYard = state.containers.find(container => {
-      if (container.visitType !== 'export' || container.lifecycleState !== 'in_yard') return false
-      if (!container.yardSlot) return false
-      const activeJob = getActiveJobForContainer(state, container.id)
-      if (activeJob && activeJob.status !== 'blocked') return false
-      return isContainerOnTop(yard, container.id)
-    })
-
-    if (exportInYard) {
-      const stageJob = createExportYardToQuayJob(exportInYard, yard, state.simTime)
-      if (stageJob) state.jobs.push(stageJob)
-    }
-  }
-
-  const crane = state.equipment.find(eq => eq.type === 'mobile_harbor_crane')
-  if (crane && crane.state === 'idle' && !crane.currentJobId) {
-    const stagedExport = state.containers.find(container => {
-      if (container.visitType !== 'export' || container.lifecycleState !== 'staged_for_loading') return false
-      return !getActiveJobForContainer(state, container.id)
-    })
-    if (stagedExport) {
-      const loadBay = getNextLoadSlot(vessel)
-      if (loadBay !== null) {
-        state.jobs.push(createExportQuayToVesselJob(stagedExport.id, vessel, loadBay, state.simTime, 11))
+      const exportInYard = state.containers.find(container => {
+        if (container.visitType !== 'export' || container.lifecycleState !== 'in_yard') return false
+        if (!container.yardSlot) return false
+        const activeJob = getActiveJobForContainer(state, container.id)
+        if (activeJob && activeJob.status !== 'blocked') return false
+        return isContainerOnTop(yard, container.id)
+      })
+      if (exportInYard) {
+        const targetVessel = loadingVessels.find(v => getNextLoadSlot(v) !== null)
+        const targetSlot = targetVessel ? getNextLoadSlot(targetVessel) : null
+        const loadExchangePosition = targetVessel && targetSlot
+          ? getLoadExchangePositionForCraneX(getVesselSlotPosition(
+            targetVessel,
+            targetSlot.bay,
+            targetSlot.row,
+            targetSlot.tier,
+          ).x)
+          : undefined
+        const stageJob = createExportYardToQuayJob(exportInYard, yard, state.simTime, loadExchangePosition)
+        if (stageJob) state.jobs.push(stageJob)
       }
     }
   }
 
-  const exportLoaded = state.containers.filter(
-    container => container.visitType === 'export' && container.lifecycleState === 'loaded_on_vessel',
-  ).length
-  if (exportLoaded >= TUTORIAL_EXPORT_COUNT) {
-    vessel.state = 'departing'
-    callbacks.emitEvent('vessel.departing', `${vessel.name} is departing`)
+  // No exports remain anywhere — all loading vessels can depart
+  const noExportsLeft = !state.containers.some(
+    c => c.visitType === 'export' && ['in_yard', 'at_gate', 'staged_for_loading'].includes(c.lifecycleState),
+  )
+
+  // MHC: load staged exports onto each loading vessel
+  for (const vessel of loadingVessels) {
+    if (getNextLoadSlot(vessel) === null || noExportsLeft) {
+      vessel.state = 'departing'
+      callbacks.emitEvent('vessel.departing', `${vessel.name} is departing`)
+      continue
+    }
+
+    const stagedExport = state.containers.find(container => {
+      if (container.visitType !== 'export' || container.lifecycleState !== 'staged_for_loading') return false
+      return !getActiveJobForContainer(state, container.id)
+    })
+    if (!stagedExport) continue
+
+    const loadSlot = getNextLoadSlot(vessel)
+    if (loadSlot !== null) {
+      state.jobs.push(createExportQuayToVesselJob(
+        stagedExport.id,
+        vessel,
+        loadSlot.bay,
+        loadSlot.row,
+        loadSlot.tier,
+        state.simTime,
+        11,
+        { ...stagedExport.currentLocation.position },
+      ))
+    }
   }
 }
 
@@ -282,8 +312,9 @@ function fireNarratorMilestones(
   }
 }
 
-function checkTutorialCompletion(state: BoxEmpireState, callbacks: SimulationCallbacks): void {
+function checkTutorialCompletion(state: BoxEmpireState, isGodMode: boolean, callbacks: SimulationCallbacks): void {
   if (state.tutorialCompleted) return
+  if (isGodMode) return  // No auto-completion in god mode
 
   const vessel = state.vesselVisits[0]
   const importDeparted = state.containers.filter(
@@ -312,8 +343,15 @@ export function planTutorialOperations(
   flow: TutorialFlowRuntime,
   narrator: NarratorRuntime,
   callbacks: SimulationCallbacks,
+  isGodMode = false,
 ): void {
-  if (state.gatehouse.exportLaneOpen && flow.exportTrucksSent < TUTORIAL_EXPORT_COUNT) {
+  const exportContainersWaitingAtGate = state.containers.some(
+    container => container.visitType === 'export' && container.lifecycleState === 'at_gate',
+  )
+  const activeExportDeliveryTrucks = state.truckVisits.filter(
+    truck => truck.visitType === 'export_delivery' && truck.state !== 'departed',
+  ).length
+  if (state.gatehouse.exportLaneOpen && exportContainersWaitingAtGate && activeExportDeliveryTrucks < 4) {
     const truckInterval = 5
     const nextTruckTime = flow.exportTrucksSent * truckInterval + 1
     if (state.simTime > nextTruckTime || flow.exportTrucksSent === 0) {
@@ -321,29 +359,29 @@ export function planTutorialOperations(
     }
   }
 
-  const vessel = state.vesselVisits[0]
-  const crane = state.equipment.find(eq => eq.id === 'mhc-1')
-  if (vessel && vessel.state === 'arrived' && crane?.enabled && !flow.dischargingStarted) {
-    flow.dischargingStarted = true
+  // Make discharge work available as soon as a vessel is alongside.
+  for (const vessel of state.vesselVisits) {
+    if (vessel.state !== 'arrived') continue
     vessel.state = 'discharging'
-    createInitialDischargeJob(state)
+    flow.dischargingStarted = true
+    createAvailableDischargeJobsForVessel(state, vessel)
   }
 
   continueVesselDischarge(state)
-  if (vessel?.state === 'loading') flow.loadingStarted = true
+  if (state.vesselVisits.some(v => v.state === 'loading')) flow.loadingStarted = true
 
   maybeStartImportPickupFlow(state, flow)
   spawnNeededImportPickupTruck(state, flow, callbacks)
   ensureImportPickupJobs(state)
 
-  if (vessel && vessel.state === 'loading' && !flow.exportStagingStarted) {
+  if (!flow.exportStagingStarted && state.vesselVisits.some(v => v.state === 'loading')) {
     flow.exportStagingStarted = true
     createInitialExportStagingJob(state)
   }
 
   continueExportStagingAndLoading(state, callbacks)
   fireNarratorMilestones(state, narrator, callbacks)
-  checkTutorialCompletion(state, callbacks)
+  checkTutorialCompletion(state, isGodMode, callbacks)
 }
 
 export function advanceTutorialProgress(

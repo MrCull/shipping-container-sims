@@ -5,9 +5,8 @@
 //  - Reach Stacker: travels to a *parking position* offset in front of the
 //    target slot, then picks/drops by extending its boom. The body never
 //    enters the stack footprint.
-//  - Mobile Harbor Crane: base is FIXED. It never translates. Only armTargetY
-//    and targetPosition/reach commands change; the renderer handles slew,
-//    trolley travel, and hoist geometry from that state.
+//  - Mobile Harbor Crane: travels along the quay only while empty to align
+//    with vessel bays. It reaches nearby quay exchanges with the boom/trolley.
 // ---------------------------------------------------------------------------
 
 import type {
@@ -25,6 +24,8 @@ import {
   RS_PICK_CYCLE_TIME,
   RS_PLACE_CYCLE_TIME,
   MHC_CYCLE_TIME,
+  MHC_TRAVEL_SPEED,
+  MHC_MIN_SEPARATION_X,
   CONTAINER_HEIGHT,
 } from './config'
 import { isContainerOnTop } from './yardManager'
@@ -49,15 +50,23 @@ interface ClearingState {
 const equipmentRecovery = new Map<string, BlockRecoveryState>()
 const equipmentClearing = new Map<string, ClearingState>()
 
+interface MhcBlockedState {
+  blockedSeconds: number
+  blockedById: string | undefined
+}
+
+interface MhcClearingState {
+  targetX: number
+}
+
+const mhcBlocked = new Map<string, MhcBlockedState>()
+const mhcClearing = new Map<string, MhcClearingState>()
+
 export function resetEquipmentDeadlockState(): void {
   equipmentRecovery.clear()
   equipmentClearing.clear()
-}
-
-function distanceTo(a: Position3D, b: Position3D): number {
-  const dx = a.x - b.x
-  const dz = a.z - b.z
-  return Math.sqrt(dx * dx + dz * dz)
+  mhcBlocked.clear()
+  mhcClearing.clear()
 }
 
 function moveTowards(
@@ -66,20 +75,36 @@ function moveTowards(
   speed: number,
   dt: number,
 ): { position: Position3D; arrived: boolean } {
-  const d = distanceTo(current, target)
+  const dx = target.x - current.x
+  const dz = target.z - current.z
+  const axisDx = Math.abs(dx) > 0.1
+  const axisDz = Math.abs(dz) > 0.1
+  const d = axisDx ? Math.abs(dx) : Math.abs(dz)
   const step = speed * dt
-  if (d <= step || d < 0.1) {
+  if (!axisDx && !axisDz) {
     return { position: { x: target.x, y: 0, z: target.z }, arrived: true }
   }
-  const ratio = step / d
+  if (d <= step || d < 0.1) {
+    const position = axisDx
+      ? { x: target.x, y: 0, z: current.z }
+      : { x: current.x, y: 0, z: target.z }
+    const arrived = Math.abs(position.x - target.x) < 0.1 && Math.abs(position.z - target.z) < 0.1
+    return { position: arrived ? { x: target.x, y: 0, z: target.z } : position, arrived }
+  }
   return {
-    position: {
-      x: current.x + (target.x - current.x) * ratio,
-      y: 0,
-      z: current.z + (target.z - current.z) * ratio,
-    },
+    position: axisDx
+      ? { x: current.x + Math.sign(dx) * step, y: 0, z: current.z }
+      : { x: current.x, y: 0, z: current.z + Math.sign(dz) * step },
     arrived: false,
   }
+}
+
+function axisTravelHeading(from: Position3D, to: Position3D): number | null {
+  const dx = to.x - from.x
+  const dz = to.z - from.z
+  if (Math.abs(dx) > 0.1) return dx > 0 ? Math.PI / 2 : -Math.PI / 2
+  if (Math.abs(dz) > 0.1) return dz > 0 ? 0 : Math.PI
+  return null
 }
 
 function advanceRsWaypoints(
@@ -91,6 +116,8 @@ function advanceRsWaypoints(
   if (eq.waypointIndex >= eq.waypoints.length) return true
   const wp = eq.waypoints[eq.waypointIndex]
   eq.targetPosition = wp
+  const heading = axisTravelHeading(eq.position, wp)
+  if (heading !== null) eq.headingY = heading
   const { position, arrived } = moveTowards(eq.position, wp, speed, dt)
   if (occupancy) {
     const recovery = equipmentRecovery.get(eq.id)
@@ -151,15 +178,16 @@ function recoverBlockedEquipmentMove(
 
   const dx = target.x - eq.position.x
   const dz = target.z - eq.position.z
-  const distance = Math.sqrt(dx * dx + dz * dz)
+  const movingX = Math.abs(dx) > 0.1
+  const distance = movingX ? Math.abs(dx) : Math.abs(dz)
   if (distance < 0.1) return
   if (!shouldBackUpThisTurn(eq.id, attempt.blockedBy, recovery.blockedSeconds)) return
 
   const backupStep = Math.max(speed * dt * BACKUP_SPEED_FACTOR, 0.45)
   const backupPosition = {
-    x: eq.position.x - (dx / distance) * backupStep,
+    x: movingX ? eq.position.x - Math.sign(dx) * backupStep : eq.position.x,
     y: 0,
-    z: eq.position.z - (dz / distance) * backupStep,
+    z: movingX ? eq.position.z : eq.position.z - Math.sign(dz) * backupStep,
   }
   const backedUp = occupancy.tryMoveEntity(eq.id, backupPosition)
   if (backedUp.allowed) {
@@ -215,6 +243,8 @@ function tickReachStackerClearing(
     return
   }
   const wp = clearing.waypoints[clearing.waypointIndex]
+  const heading = axisTravelHeading(eq.position, wp)
+  if (heading !== null) eq.headingY = heading
   const { position, arrived } = moveTowards(eq.position, wp, RS_SPEED_UNLADEN, dt)
   if (occupancy) {
     const attempt = occupancy.tryMoveEntity(eq.id, position, undefined, {})
@@ -252,7 +282,7 @@ function getDropDuration(eq: Equipment): number {
 }
 
 function getTravelSpeed(eq: Equipment, laden: boolean): number {
-  if (eq.type === 'mobile_harbor_crane') return 0  // MHC never translates
+  if (eq.type === 'mobile_harbor_crane') return MHC_TRAVEL_SPEED
   return laden ? RS_SPEED_LADEN : RS_SPEED_UNLADEN
 }
 
@@ -302,6 +332,14 @@ export function tickEquipment(
     }
   }
 
+  if (eq.type === 'mobile_harbor_crane') {
+    const clearing = mhcClearing.get(eq.id)
+    if (clearing) {
+      tickMhcClearing(eq, clearing, state, dt)
+      return result
+    }
+  }
+
   if (eq.state === 'idle' || !eq.currentJobId) return result
 
   const job = state.jobs.find(j => j.id === eq.currentJobId)
@@ -311,14 +349,120 @@ export function tickEquipment(
     return result
   }
 
-  // MHC: base is always fixed; skip any translation completely.
-  // Just animate armTargetY through the pick/drop cycle.
+  // MHC: base translates only while empty to align with the vessel bay.
   if (eq.type === 'mobile_harbor_crane') {
     return tickMhc(eq, job, state, dt, result)
   }
 
   // Reach stacker
   return tickReachStacker(eq, job, state, dt, result, occupancy)
+}
+
+const MHC_DEADLOCK_SECONDS = MHC_CYCLE_TIME * 1.5
+const MHC_CLEAR_DISTANCE = 15
+
+function isMhcBlockedByOther(eq: Equipment, targetX: number, state: BoxEmpireState): string | undefined {
+  const direction = Math.sign(targetX - eq.position.x)
+  if (direction === 0) return undefined
+  for (const other of state.equipment) {
+    if (other.id === eq.id || other.type !== 'mobile_harbor_crane' || !other.enabled) continue
+    const distAhead = (other.position.x - eq.position.x) * direction
+    const distToTarget = Math.abs(targetX - eq.position.x)
+    if (distAhead > 0 && distAhead <= distToTarget + MHC_MIN_SEPARATION_X) return other.id
+    if (Math.abs(targetX - other.position.x) < MHC_MIN_SEPARATION_X) return other.id
+  }
+  return undefined
+}
+
+function initiateMhcClearance(eq: Equipment, state: BoxEmpireState, blockerId: string | undefined): void {
+  if (eq.currentJobId) {
+    const job = state.jobs.find(j => j.id === eq.currentJobId)
+    if (job && job.status !== 'completed' && job.status !== 'cancelled') {
+      job.status = 'pending'
+      job.assignedEquipmentId = null
+    }
+  }
+  eq.currentJobId = null
+  eq.state = 'idle'
+  eq.carriedContainerId = null
+  eq.spreaderZ = 0
+  eq.armTargetY = 0
+
+  const blocker = state.equipment.find(e => e.id === blockerId)
+  const clearX = blocker && blocker.position.x < eq.position.x
+    ? eq.position.x + MHC_CLEAR_DISTANCE
+    : eq.position.x - MHC_CLEAR_DISTANCE
+
+  mhcClearing.set(eq.id, { targetX: clearX })
+  mhcBlocked.delete(eq.id)
+}
+
+function tickMhcClearing(eq: Equipment, clearing: MhcClearingState, state: BoxEmpireState, dt: number): void {
+  const dx = clearing.targetX - eq.position.x
+  const step = MHC_TRAVEL_SPEED * dt
+  if (Math.abs(dx) <= step) {
+    if (isMhcBlockedByOther(eq, clearing.targetX, state)) return
+    eq.position.x = clearing.targetX
+    mhcClearing.delete(eq.id)
+    mhcBlocked.delete(eq.id)
+    return
+  }
+  if (!isMhcBlockedByOther(eq, clearing.targetX, state)) {
+    eq.position.x += Math.sign(dx) * step
+  }
+}
+
+function mhcTravelAlongQuay(eq: Equipment, targetX: number, dt: number, state: BoxEmpireState): boolean {
+  const dx = targetX - eq.position.x
+  const step = MHC_TRAVEL_SPEED * dt
+
+  if (Math.abs(dx) <= step) {
+    const blockerId = isMhcBlockedByOther(eq, targetX, state)
+    if (blockerId) {
+      const blocked = mhcBlocked.get(eq.id) ?? { blockedSeconds: 0, blockedById: blockerId }
+      blocked.blockedSeconds += dt
+      blocked.blockedById = blockerId
+      mhcBlocked.set(eq.id, blocked)
+      return false
+    }
+    mhcBlocked.delete(eq.id)
+    eq.position.x = targetX
+    return true
+  }
+
+  const direction = Math.sign(dx)
+  let desiredX = eq.position.x + direction * step
+  let blockerId: string | undefined
+  for (const other of state.equipment) {
+    if (other.id === eq.id || other.type !== 'mobile_harbor_crane' || !other.enabled) continue
+    if (Math.abs(desiredX - other.position.x) >= MHC_MIN_SEPARATION_X) continue
+    blockerId = other.id
+    const safeX = other.position.x - direction * MHC_MIN_SEPARATION_X
+    if (Math.abs(safeX - eq.position.x) < Math.abs(desiredX - eq.position.x)) {
+      desiredX = safeX
+    }
+  }
+
+  if (blockerId) {
+    if (Math.sign(desiredX - eq.position.x) === direction && Math.abs(desiredX - eq.position.x) > 0.01) {
+      eq.position.x = desiredX
+    }
+    const blocked = mhcBlocked.get(eq.id) ?? { blockedSeconds: 0, blockedById: blockerId }
+    blocked.blockedSeconds += dt
+    blocked.blockedById = blockerId
+    mhcBlocked.set(eq.id, blocked)
+    return false
+  }
+
+  mhcBlocked.delete(eq.id)
+  eq.position.x = desiredX
+  return false
+}
+
+function mhcBaseTargetXForJob(job: import('../types').Job): number {
+  if (job.pickupLocation.type === 'vessel_slot') return job.pickupLocation.position.x
+  if (job.dropoffLocation.type === 'vessel_slot') return job.dropoffLocation.position.x
+  return job.pickupLocation.position.x
 }
 
 function tickMhc(
@@ -332,26 +476,40 @@ function tickMhc(
 
   switch (eq.state) {
     case 'assigned': {
-      // Transition straight to picking; base does not move.
-      eq.targetPosition = { ...job.pickupLocation.position }
-      eq.spreaderZ = getMhcReachCommand(eq.position, job.pickupLocation.position)
+      const baseTargetX = mhcBaseTargetXForJob(job)
       eq.armTargetY = MHC_TRAVEL_HOIST_Y
-      eq.state = 'picking'
+      eq.targetPosition = { ...job.pickupLocation.position }
+      job.status = 'in_progress'
+      if (Math.abs(eq.position.x - baseTargetX) > 0.5) {
+        eq.state = 'travel_to_pickup'
+      } else {
+        eq.position.x = baseTargetX
+        eq.spreaderZ = getMhcReachCommand(eq.position, job.pickupLocation.position)
+        eq.state = 'picking'
+      }
       eq.stateStartTime = state.simTime
       eq.stateElapsed = 0
-      job.status = 'in_progress'
       break
     }
 
     case 'travel_to_pickup': {
-      // Should not happen for MHC, but handle gracefully
+      // Crane travels empty along quay (X axis) to align with the vessel bay.
+      const baseTargetX = mhcBaseTargetXForJob(job)
       eq.targetPosition = { ...job.pickupLocation.position }
-      eq.spreaderZ = getMhcReachCommand(eq.position, job.pickupLocation.position)
       eq.armTargetY = MHC_TRAVEL_HOIST_Y
+      eq.spreaderZ = getMhcReachCommand(eq.position, job.pickupLocation.position)
+      const arrivedAtPickup = mhcTravelAlongQuay(eq, baseTargetX, dt, state)
+      if (!arrivedAtPickup) {
+        const blocked = mhcBlocked.get(eq.id)
+        if (blocked && blocked.blockedSeconds >= MHC_DEADLOCK_SECONDS) {
+          initiateMhcClearance(eq, state, blocked.blockedById)
+        }
+        break
+      }
+      eq.spreaderZ = getMhcReachCommand(eq.position, job.pickupLocation.position)
       eq.state = 'picking'
       eq.stateStartTime = state.simTime
       eq.stateElapsed = 0
-      job.status = 'in_progress'
       break
     }
 
@@ -373,10 +531,11 @@ function tickMhc(
           }
           result.pickedContainerId = container.id
         }
-        eq.targetPosition = { ...job.dropoffLocation.position }
-        eq.spreaderZ = getMhcReachCommand(eq.position, job.dropoffLocation.position)
         eq.armTargetY = MHC_TRAVEL_HOIST_Y
         eq.armDropStartY = MHC_TRAVEL_HOIST_Y
+
+        eq.targetPosition = { ...job.dropoffLocation.position }
+        eq.spreaderZ = getMhcReachCommand(eq.position, job.dropoffLocation.position)
         eq.state = 'dropping'
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0
@@ -385,11 +544,30 @@ function tickMhc(
     }
 
     case 'travel_to_drop': {
-      // MHC doesn't travel; jump straight to dropping
       eq.targetPosition = { ...job.dropoffLocation.position }
-      eq.spreaderZ = getMhcReachCommand(eq.position, job.dropoffLocation.position)
       eq.armTargetY = MHC_TRAVEL_HOIST_Y
-      eq.armDropStartY = MHC_TRAVEL_HOIST_Y
+      eq.spreaderZ = getMhcReachCommand(eq.position, job.dropoffLocation.position)
+      if (eq.carriedContainerId) {
+        const container = state.containers.find(c => c.id === eq.carriedContainerId)
+        if (container) {
+          container.currentLocation.position = { x: eq.position.x, y: eq.armTargetY, z: eq.position.z }
+        }
+        eq.state = 'dropping'
+        eq.stateStartTime = state.simTime
+        eq.stateElapsed = 0
+        break
+      }
+
+      const dropBaseTargetX = mhcBaseTargetXForJob(job)
+      const arrivedAtDrop = mhcTravelAlongQuay(eq, dropBaseTargetX, dt, state)
+      if (!arrivedAtDrop) {
+        const blocked = mhcBlocked.get(eq.id)
+        if (blocked && blocked.blockedSeconds >= MHC_DEADLOCK_SECONDS) {
+          initiateMhcClearance(eq, state, blocked.blockedById)
+        }
+        break
+      }
+      eq.spreaderZ = getMhcReachCommand(eq.position, job.dropoffLocation.position)
       eq.state = 'dropping'
       eq.stateStartTime = state.simTime
       eq.stateElapsed = 0
@@ -401,13 +579,11 @@ function tickMhc(
       eq.spreaderZ = getMhcReachCommand(eq.position, job.dropoffLocation.position)
       const dropTargetY = getMhcSpreaderTargetY(job.dropoffLocation.position.y)
       const dropProgress = Math.min(1, eq.stateElapsed / getDropDuration(eq))
-      // Lerp from pickup height (armDropStartY) down to the drop target Y
       eq.armTargetY = eq.armDropStartY + (dropTargetY - eq.armDropStartY) * dropProgress
 
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)
         if (container) {
-          // Animate container position between pickup and dropoff
           const pickPos = job.pickupLocation.position
           const dropPos = job.dropoffLocation.position
           container.currentLocation.position = {
@@ -482,8 +658,6 @@ function tickReachStacker(
           break
         }
       }
-      // Update heading to face the pickup target
-      eq.headingY = rsWorkingHeading(eq.position, job.pickupLocation)
       if (arrived) {
         // Pre-pick accessibility check for yard slots
         if (job.pickupLocation.type === 'yard_slot') {
@@ -549,8 +723,6 @@ function tickReachStacker(
         eq.waypoints = buildReachStackerRoute(eq.position, dropPark, job, 'dropoff')
         eq.waypointIndex = 0
       }
-      // Update heading to face the dropoff target
-      eq.headingY = rsWorkingHeading(eq.position, job.dropoffLocation)
       const travelArrived = advanceRsWaypoints(eq, getTravelSpeed(eq, true), dt, occupancy)
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)

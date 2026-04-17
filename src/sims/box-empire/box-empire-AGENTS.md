@@ -70,6 +70,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 | `components/EventFeed.vue` | Scrolling live event log |
 | `components/ContainerInfo.vue` | Selected container detail panel |
 | `components/EquipmentInfo.vue` | Selected equipment detail panel |
+| `components/VesselInfo.vue` | Selected vessel detail panel with the manual sail action |
 | `components/ui/JobQueueWidget.vue` | Active/pending job list |
 | `components/ui/MoneyDisplay.vue` | Animated money counter |
 | `components/ui/TimeControls.vue` | Speed selector (0×/1×/2×/3×/5×/10×/100×) |
@@ -91,11 +92,11 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 1. Player clicks "Start Tutorial" → `initTutorial()` sets up yard, vessel, containers, equipment
 2. Player opens **Export Gate** (`gatehouse.exportLaneOpen = true`) → export trucks spawn and queue in a lane outside the in-gate at `GATE_INGATE_POSITION` (one-at-a-time through gate)
 3. Reach stacker stores export containers in yard (slot conflicts prevented via reservation set in `getReservedYardSlotIds()`)
-4. Vessel arrives (correctly oriented along the Z axis, bow at +Z) → MHC discharges import containers to the discharge quay buffer
+4. Vessel arrives (correctly oriented along the Z axis, bow at +Z) → top-of-stack discharge jobs become pending immediately, then enabled MHCs discharge import containers to crane-relative discharge exchange points
 5. Reach stacker moves imports from buffer to yard
 6. **Import Gate** opens (`gatehouse.importLaneOpen = true`) → import pickup trucks arrive; RS delivers containers to trucks → trucks exit via the out-gate at `GATE_OUTGATE_POSITION`, earning $100 per container
 7. RS moves export containers to load quay buffer → MHC loads onto vessel → $150 revenue per container
-8. Vessel departs (horn plays) → tutorial complete
+8. Vessel departs (horn plays) → tutorial complete. A selected vessel can also be ordered to sail manually; that cancels active vessel moves and charges an unprocessed-import fine for each import container still on board.
 
 ## Time Controls
 
@@ -109,10 +110,10 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 - **Out-gate** — `GATE_OUTGATE_POSITION` `{ x: 42, z: 88 }` on the right/back edge of the compact tutorial terminal; import trucks exit here after pickup
 - **Yard truck stand** — trucks stop on the landside road no closer than 1.5 reach-stacker lengths from the yard stack line; RS serves them from either truck side based on the shorter approach
 - **Quay buffer** — separate discharge `{ x: -5, z: 3 }` and load `{ x: 5, z: 3 }` spots
-- **Berth** — `BERTH_POSITION` `{ x: 0, z: -20 }` so the vessel hull clears the quay wall
+- **Berth** — first vessel berth is offset to the left of centre and later god-mode berths step along +X behind it, with wide spacing so multiple feeder hulls do not overlap
 - **Terminal bounds** — X: -50 → 50, Z: -60 → 118
 
-Trucks use axis-aligned waypoint routes (stored in `TruckVisit.waypoints`), updated by `truckManager`. The RS uses side-aware routes from `movement/reachStackerRouting.ts` and validates movement through `movement/occupancyWorld.ts`. Yard stack zones are static occupancy obstacles, and service lanes are derived from `movement/terminalGeometry.ts`, so vehicles cannot drive through storage stacks even if a future route is generated incorrectly.
+Trucks use axis-aligned waypoint routes (stored in `TruckVisit.waypoints`), updated by `truckManager`. Truck movement is clamped to one axis per tick even if a direct hold target has both X and Z differences, so trucks should never point or move diagonally. The RS uses side-aware routes from `movement/reachStackerRouting.ts` and validates movement through `movement/occupancyWorld.ts`; its body heading follows the current travel axis while driving, then turns to face the work target only once parked. Yard stack zones are static occupancy obstacles, and service lanes are derived from `movement/terminalGeometry.ts`, so vehicles cannot drive through storage stacks even if a future route is generated incorrectly.
 
 ## Assets
 
@@ -141,7 +142,8 @@ Containers use individual `THREE.Mesh` with per-container `createContainerMateri
 ## Equipment Types
 
 - **Reach Stacker** (`rs-1`): Yard operations — unladen 5 m/s, laden 4 m/s, 8s pick/place. Uses axis-aligned waypoints, can access yard stacks from both landside and waterside, and can approach trucks from either side based on the shorter path. `canServeLandside` gates truck ↔ yard jobs, `canServeWaterside` gates quay ↔ yard jobs, both default to enabled, and both are overridden by the main `enabled` toggle. `armTargetY` / `armDropStartY` drive boom tip animation; `headingY` drives body rotation.
-- **Mobile Harbor Crane** (`mhc-1`): Vessel operations — 45s full cycle. The base stays fixed, but the upper works now slew so the boom head faces the active target correctly, the shorter boom luffs, the trolley runs out along the boom, and the spreader hoists to the pickup/drop height without sinking boxes below the intended set-down level. `spreaderZ` is used as a signed reach command, and `craneMode` controls whether it discharges, loads, or both.
+- **Mobile Harbor Crane** (`mhc-1`): Vessel operations — 45s full cycle. The base travels along the quay only while empty to line up with vessel bays, keeps at least two container lengths from other MHCs, and carries out pickup/drop reach with the upper works, boom, trolley, hoist, and spreader. The paired import/export quay exchange markings move with the crane base. `spreaderZ` is used as a signed reach command, and `craneMode` controls whether it discharges, loads, or both. Each MHC also has per-vessel and per-bay permissions used by job assignment; newly spawned vessels are enabled by default on all existing MHCs.
+- **Vessel stowage**: The small feeder cargo grid is 4 bays × 3 rows × 2 tiers (24 slots), matching the usable deck area of the shared small feeder GLB and avoiding the aft deckhouse. Slot references are ordered tier-first, then bay, then row, so initial/spawned containers fill a whole tier before stacking above another container. God-mode spawned vessels use the first 12 slots for import containers and add 12 export containers at the export gate so road trucks deliver them through the normal truck-to-yard flow.
 
 ## Economy
 
@@ -149,8 +151,9 @@ Containers use individual `THREE.Mesh` with per-container `createContainerMateri
 - Export vessel load: **$150** per container
 - Reach stacker move cost: **$10** per completed non-revenue move (truck ↔ yard, yard ↔ quay, yard ↔ yard shuffle)
 - Quay crane import unload cost: **$20** per completed vessel → quay import discharge move
+- Manual sail fine: **$100** per import container still on the departing vessel
 - Tutorial total: **$1,250** (5 × $100 + 5 × $150)
-- Transactions stored in `Transaction[]` with type `'gate_out_revenue' | 'vessel_load_revenue' | 'reach_stacker_move_cost' | 'quay_crane_import_unload_cost'`
+- Transactions stored in `Transaction[]` with type `'gate_out_revenue' | 'vessel_load_revenue' | 'reach_stacker_move_cost' | 'quay_crane_import_unload_cost' | 'unprocessed_import_fine'`
 
 ## Gatehouse State
 
@@ -185,6 +188,7 @@ Eight shipping lines are defined in `containerMaterials.ts` (`SHIPPING_LINE_LIVE
 - Completed reach-stacker jobs deduct operating cost immediately, emit a `money.spent` event, and play `coin-drop-1-second.mp3`
 - Shared global god mode can be toggled by typing `god` or using the lightning icon beside mute; in Box Empire it suppresses move-cost and quay-unload money deductions, hides narrator/tutorial dialog prompts, and disables event-driven camera pans
 - Trucks depart via the out-gate at `GATE_OUTGATE_POSITION.z`, clearing the terminal
+- Yard destination allocation reserves whole stacks around in-progress conflicting work: stacks with an active outbound yard pickup are skipped as new destinations, and yard pickup jobs from a stack remain blocked while another active move is inbound to that same stack.
 - `movement/occupancyWorld.ts` is rebuilt during simulation ticks from current moving entity positions plus static yard stack zones; extend it when adding richer traffic, route reservations, or additional blocked zones
 - The ocean mesh in `sceneBuilder.ts` is animated each frame via `animateOcean(time)` using vertex displacement — call this from the render loop
 - `FloatingTextRenderer.update()` must be called each animation frame to advance fade/drift

@@ -6,7 +6,15 @@
 
 import * as THREE from 'three'
 import type { VesselVisit, Container } from '../types'
-import { CONTAINER_LENGTH, CONTAINER_WIDTH, CONTAINER_HEIGHT, TUTORIAL_VESSEL, VESSEL_GLB } from './config'
+import {
+  CONTAINER_LENGTH,
+  CONTAINER_WIDTH,
+  CONTAINER_HEIGHT,
+  TUTORIAL_VESSEL,
+  VESSEL_GLB,
+  VESSEL_CONTAINER_DECK_Y,
+  CONTAINER_STACK_GAP_Y,
+} from './config'
 import { loadModel, getModelSync } from './modelLoader'
 import { createContainerMaterials, disposeContainerMaterials } from './containerMaterials'
 
@@ -41,9 +49,9 @@ function buildVesselGLBHull(glbRoot: THREE.Group, loa: number): THREE.Group {
   return hull
 }
 
-// Deck-Y constant (must match getVesselSlotPosition in vesselManager)
 const DECK_Y = 5.4
-const CONTAINER_SPACING = CONTAINER_LENGTH + 0.5
+// Container slot deck-Y constant (must match getVesselSlotPosition in vesselManager)
+const CONTAINER_DECK_Y = VESSEL_CONTAINER_DECK_Y
 
 function makeDeckContainer(container: Container): THREE.Group {
   const g = new THREE.Group()
@@ -571,36 +579,22 @@ export class VesselRenderer {
     }
 
     // Add or keep deck groups for loaded containers
-    const isGlb = vesselMesh.userData['isGlb'] === true
-    const totalSpan = (TUTORIAL_VESSEL.bays - 1) * CONTAINER_SPACING
     for (const container of loadedOnVessel) {
       if (!deckMap.has(container.id)) {
         const cg = makeDeckContainer(container)
         const bay = container.vesselSlot?.bay ?? 1
+        const row = container.vesselSlot?.row ?? 1
+        const tier = container.vesselSlot?.tier ?? 1
 
-        let posX: number, posY: number, posZ: number
-
-        if (isGlb) {
-          // GLB ship — 3-row layout (bays 1-5 mapped to 3 rows × 2 tiers):
-          // Bay 1 → row 1 tier 1, Bay 2 → row 1 tier 2
-          // Bay 3 → row 2 tier 1, Bay 4 → row 2 tier 2
-          // Bay 5 → row 3 tier 1
-          const rowIndex = Math.floor((bay - 1) / 2)          // 0, 0, 1, 1, 2
-          const tierIndex = (bay - 1) % 2                      // 0, 1, 0, 1, 0
-          const numRows = 3
-          posX = 0  // all containers in same bay (centered on ship)
-          posZ = (rowIndex - (numRows - 1) / 2) * VESSEL_GLB.rowSpacing
-          posY = VESSEL_GLB.containerDeckY + CONTAINER_HEIGHT / 2 + tierIndex * (CONTAINER_HEIGHT + 0.1)
-        } else {
-          // Procedural ship — existing bay layout along X axis
-          const bayOffset = (bay - 1) * CONTAINER_SPACING - totalSpan / 2
-          posX = -bayOffset
-          posY = DECK_Y + CONTAINER_HEIGHT / 2
-          posZ = 0
-        }
+        // Vessel group has rotation.y = pi, so local X/Z are inverted from world offsets.
+        const bayOffset = TUTORIAL_VESSEL.bayXOffsets[bay - 1] ?? 0
+        const rowOffset = TUTORIAL_VESSEL.rowZOffsets[row - 1] ?? 0
+        const tierOffset = (tier - 1) * (CONTAINER_HEIGHT + CONTAINER_STACK_GAP_Y)
+        const posX = -bayOffset
+        const posY = CONTAINER_DECK_Y + tierOffset + CONTAINER_HEIGHT / 2
+        const posZ = -rowOffset
 
         cg.position.set(posX, posY, posZ)
-        // Container length along vessel X axis
         cg.rotation.y = 0
         vesselMesh.add(cg)
         deckMap.set(container.id, cg)

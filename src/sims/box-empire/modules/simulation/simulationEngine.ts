@@ -146,9 +146,10 @@ function removePickedContainerFromSource(
   }
 
   if (eq.type === 'mobile_harbor_crane' && pickedJob.pickupLocation.type === 'vessel_slot') {
-    const vessel = state.vesselVisits[0]
-    if (vessel) dischargeContainerFromVessel(vessel, pickedContainerId)
     const container = state.containers.find(candidate => candidate.id === pickedContainerId)
+    const vesselId = container?.vesselSlot?.vesselId
+    const vessel = state.vesselVisits.find(v => v.id === vesselId) ?? state.vesselVisits[0]
+    if (vessel) dischargeContainerFromVessel(vessel, pickedContainerId)
     if (container) container.vesselSlot = null
   }
 }
@@ -214,7 +215,7 @@ export function tickSimulation(context: SimulationTickContext): void {
   processEquipment(tickContext)
 
   assignJobs(state)
-  planTutorialOperations(state, context.flow, context.narrator, context.callbacks)
+  planTutorialOperations(state, context.flow, context.narrator, context.callbacks, context.isGodMode)
   assignJobs(state)
   advanceTutorialProgress(state, context.flow, context.narrator, tutorialSteps, context.callbacks)
 }

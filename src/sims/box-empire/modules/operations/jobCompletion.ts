@@ -2,7 +2,6 @@ import type { BoxEmpireState, Container, Job, Position3D, YardSlotRef } from '..
 import { makeYardSlotId, parseYardSlotId } from '../../types'
 import { allocateYardSlot } from '../allocators/yardAllocator'
 import {
-  createExportQuayToVesselJob,
   createImportQuayToYardJob,
   createImportYardToTruckJob,
 } from '../allocators/destinationAllocator'
@@ -13,7 +12,7 @@ import {
 } from '../config'
 import { getActiveJobForContainer } from '../jobScheduler'
 import { startTruckReturnToGate } from '../truckManager'
-import { getNextLoadSlot, loadContainerOnVessel, dischargeContainerFromVessel } from '../vesselManager'
+import { loadContainerOnVessel, dischargeContainerFromVessel } from '../vesselManager'
 import { getSlotWorldPosition, placeContainerInSlot, removeContainerFromSlot } from '../yardManager'
 
 function settleYardSlot(state: BoxEmpireState, job: Job): YardSlotRef | null {
@@ -108,9 +107,12 @@ export function handleJobCompletion(
   }
 
   if (job.dropoffLocation.type === 'quay_buffer') {
-    const bufferPos = container.visitType === 'import'
-      ? { ...QUAY_BUFFER_DISCHARGE_POSITION }
-      : { ...QUAY_BUFFER_LOAD_POSITION }
+    // Use the actual drop position baked into the job (MHC may have updated it to its current X).
+    // Fall back to constants only if the job position was never set.
+    const fallback = container.visitType === 'import'
+      ? QUAY_BUFFER_DISCHARGE_POSITION
+      : QUAY_BUFFER_LOAD_POSITION
+    const bufferPos = { ...job.dropoffLocation.position, y: fallback.y }
 
     container.currentLocation = {
       type: 'quay_buffer',
@@ -120,8 +122,10 @@ export function handleJobCompletion(
 
     if (container.visitType === 'import') {
       container.lifecycleState = 'discharged_to_buffer'
-      const vessel = state.vesselVisits.find(candidate => candidate.slots.some(slot => slot.vesselId === candidate.id)) ??
-        state.vesselVisits[0]
+      // vesselSlot may already be null (cleared in simulationEngine on pickup); call is idempotent
+      const vessel = state.vesselVisits.find(v => v.id === container.vesselSlot?.vesselId)
+        ?? state.vesselVisits.find(v => v.slots.some(s => s.containerId === container.id))
+        ?? state.vesselVisits[0]
       if (vessel) dischargeContainerFromVessel(vessel, container.id)
       container.vesselSlot = null
 
@@ -136,26 +140,23 @@ export function handleJobCompletion(
       container.lifecycleState = 'staged_for_loading'
       container.yardSlot = null
       if (yard) removeContainerFromSlot(yard, container.id)
-
-      const vessel = state.vesselVisits[0]
-      const loadBay = vessel ? getNextLoadSlot(vessel) : null
-      if (vessel && loadBay !== null) {
-        state.jobs.push(createExportQuayToVesselJob(container.id, vessel, loadBay, state.simTime))
-      }
+      // The export-quay-to-vessel job will be created by continueExportStagingAndLoading
       return events
     }
   }
 
   if (job.dropoffLocation.type === 'vessel_slot') {
-    const vessel = state.vesselVisits.find(candidate => candidate.id === container.vesselSlot?.vesselId) ??
-      state.vesselVisits[0]
+    const vessel = state.vesselVisits.find(v => job.dropoffLocation.id.startsWith(v.id))
+      ?? state.vesselVisits[0]
     if (!vessel) return events
 
     const parsed = parseYardSlotId(job.dropoffLocation.id)
-    const bay = parsed ? parsed.tier : 1
-    loadContainerOnVessel(vessel, container.id, bay)
+    const bay = parsed ? parsed.bay : 1
+    const row = parsed ? parsed.row : 1
+    const tier = parsed ? parsed.tier : 1
+    loadContainerOnVessel(vessel, container.id, bay, row, tier)
     container.lifecycleState = 'loaded_on_vessel'
-    container.vesselSlot = { vesselId: vessel.id, bay, row: 1, tier: 1 }
+    container.vesselSlot = { vesselId: vessel.id, bay, row, tier }
     container.currentLocation = {
       type: 'vessel_slot',
       id: vessel.id,

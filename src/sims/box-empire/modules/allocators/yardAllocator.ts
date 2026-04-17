@@ -1,6 +1,10 @@
 import type { Container, Job, YardBlock, YardSlotRef } from '../../types'
-import { makeYardSlotId } from '../../types'
-import { findAvailableSlot, getSlotWorldPosition } from '../yardManager'
+import { makeYardSlotId, parseYardSlotId } from '../../types'
+import { findAvailableSlot, getSlotWorldPosition, makeYardStackKey } from '../yardManager'
+
+function isActiveMove(job: Job): boolean {
+  return job.status === 'assigned' || job.status === 'in_progress'
+}
 
 export function getReservedYardSlotIds(jobs: Job[]): Set<string> {
   const reserved = new Set<string>()
@@ -12,6 +16,19 @@ export function getReservedYardSlotIds(jobs: Job[]): Set<string> {
   return reserved
 }
 
+export function getOutboundYardStackKeys(jobs: Job[]): Set<string> {
+  const blocked = new Set<string>()
+  for (const job of jobs) {
+    if (!isActiveMove(job)) continue
+    if (job.pickupLocation.type !== 'yard_slot') continue
+    if (job.dropoffLocation.type === 'yard_slot') continue
+    const slot = parseYardSlotId(job.pickupLocation.id)
+    if (!slot) continue
+    blocked.add(makeYardStackKey(slot.blockId, slot.bay, slot.row))
+  }
+  return blocked
+}
+
 export function allocateYardSlot(
   yard: YardBlock | undefined,
   jobs: Job[],
@@ -19,7 +36,7 @@ export function allocateYardSlot(
   containers: Container[],
 ): YardSlotRef | null {
   if (!yard) return null
-  return findAvailableSlot(yard, getReservedYardSlotIds(jobs), visitType, containers)
+  return findAvailableSlot(yard, getReservedYardSlotIds(jobs), visitType, containers, getOutboundYardStackKeys(jobs))
 }
 
 export function findShuffleTargetSlot(
@@ -28,9 +45,11 @@ export function findShuffleTargetSlot(
   jobs: Job[],
 ): YardSlotRef | null {
   const reserved = getReservedYardSlotIds(jobs)
+  const blockedStacks = getOutboundYardStackKeys(jobs)
   for (let bay = 1; bay <= yard.bays; bay++) {
     if (bay === source.bay) continue
     for (let row = 1; row <= yard.rows; row++) {
+      if (blockedStacks.has(makeYardStackKey(yard.id, bay, row))) continue
       const tiersOccupied = yard.slots.filter(
         slot => slot.bay === bay && slot.row === row && slot.containerId !== null,
       ).length

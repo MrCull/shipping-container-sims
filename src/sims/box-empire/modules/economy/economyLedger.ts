@@ -3,6 +3,7 @@ import {
   GATE_OUT_REVENUE,
   QUAY_CRANE_IMPORT_UNLOAD_COST,
   REACH_STACKER_MOVE_COST,
+  UNPROCESSED_IMPORT_FINE,
   VESSEL_LOAD_REVENUE,
 } from '../config'
 import { createTransaction } from '../economy'
@@ -94,6 +95,23 @@ export function applyQuayCraneImportUnloadCost(
     data: {
       amount: QUAY_CRANE_IMPORT_UNLOAD_COST,
       position: { ...job.dropoffLocation.position },
+    },
+  }
+}
+
+export function applyUnprocessedImportFine(
+  state: BoxEmpireState,
+  container: Container,
+  position: Position3D,
+): DomainEventPayload {
+  const tx = createTransaction('unprocessed_import_fine', container.id, state.simTime)
+  pushTransaction(state, tx)
+  return {
+    type: 'money.spent',
+    message: `-$${UNPROCESSED_IMPORT_FINE} - import left on departing vessel`,
+    data: {
+      amount: UNPROCESSED_IMPORT_FINE,
+      position: { ...position },
     },
   }
 }

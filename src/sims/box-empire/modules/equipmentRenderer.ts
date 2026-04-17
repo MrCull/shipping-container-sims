@@ -4,7 +4,14 @@
 
 import * as THREE from 'three'
 import type { Equipment, Container } from '../types'
-import { CONTAINER_HEIGHT, CONTAINER_WIDTH, MHC_CYCLE_TIME } from './config'
+import {
+  CONTAINER_HEIGHT,
+  CONTAINER_LENGTH,
+  CONTAINER_WIDTH,
+  MHC_CYCLE_TIME,
+  QUAY_BUFFER_DISCHARGE_POSITION,
+  QUAY_BUFFER_LOAD_POSITION,
+} from './config'
 import { createContainerGroup } from './containerRenderer'
 import { disposeContainerMaterials } from './containerMaterials'
 
@@ -309,6 +316,23 @@ export class EquipmentRenderer {
     const cableMat = new THREE.MeshPhongMaterial({ color: 0x2f3438, shininess: 6 })
     const walkwayMat = new THREE.MeshPhongMaterial({ color: 0x777f85, shininess: 35 })
     const floodMat = new THREE.MeshPhongMaterial({ color: 0xffffd0, emissive: 0x444400, emissiveIntensity: 0.45 })
+
+    const exchangeMarkerGeo = new THREE.PlaneGeometry(CONTAINER_LENGTH + 0.6, CONTAINER_WIDTH + 0.6)
+    const dischargeMarker = new THREE.Mesh(
+      exchangeMarkerGeo,
+      new THREE.MeshPhongMaterial({ color: 0x2980b9, transparent: true, opacity: 0.45 }),
+    )
+    dischargeMarker.rotation.x = -Math.PI / 2
+    dischargeMarker.position.set(QUAY_BUFFER_DISCHARGE_POSITION.x, 0.025, QUAY_BUFFER_DISCHARGE_POSITION.z)
+    group.add(dischargeMarker)
+
+    const loadMarker = new THREE.Mesh(
+      exchangeMarkerGeo,
+      new THREE.MeshPhongMaterial({ color: 0xff6600, transparent: true, opacity: 0.45 }),
+    )
+    loadMarker.rotation.x = -Math.PI / 2
+    loadMarker.position.set(QUAY_BUFFER_LOAD_POSITION.x, 0.026, QUAY_BUFFER_LOAD_POSITION.z)
+    group.add(loadMarker)
 
     const undercarriage = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.7, 4.8), darkMat)
     undercarriage.position.y = 0.35

@@ -48,12 +48,21 @@ export function useInput(
           store.selectedEquipmentId = cur.name
           store.selectedContainerId = null
           store.selectedGatehouseId = null
+          store.selectedVesselId = null
           return
         }
         if (cur.name === 'gatehouse-ingate' || cur.name === 'gatehouse-outgate') {
           store.selectedGatehouseId = cur.name
           store.selectedEquipmentId = null
           store.selectedContainerId = null
+          store.selectedVesselId = null
+          return
+        }
+        if (cur.name.startsWith('vessel-')) {
+          store.selectedVesselId = cur.name
+          store.selectedEquipmentId = null
+          store.selectedContainerId = null
+          store.selectedGatehouseId = null
           return
         }
         cur = cur.parent
@@ -68,12 +77,14 @@ export function useInput(
       store.selectedContainerId = containerId
       store.selectedEquipmentId = null
       store.selectedGatehouseId = null
+      store.selectedVesselId = null
       return
     }
 
     store.selectedContainerId = null
     store.selectedEquipmentId = null
     store.selectedGatehouseId = null
+    store.selectedVesselId = null
   }
 
   onMounted(() => {

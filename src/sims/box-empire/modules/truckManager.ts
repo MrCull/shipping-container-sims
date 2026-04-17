@@ -102,14 +102,24 @@ function moveTowards(
 ): { position: Position3D; arrived: boolean } {
   const dx = target.x - current.x
   const dz = target.z - current.z
-  const d = Math.sqrt(dx * dx + dz * dz)
+  const axisDx = Math.abs(dx) > 0.1
+  const axisDz = Math.abs(dz) > 0.1
+  const d = axisDx ? Math.abs(dx) : Math.abs(dz)
   const step = speed * dt
-  if (d <= step || d < 0.5) {
+  if (!axisDx && !axisDz) {
     return { position: { x: target.x, y: 0, z: target.z }, arrived: true }
   }
-  const ratio = step / d
+  if (d <= step || d < 0.5) {
+    const position = axisDx
+      ? { x: target.x, y: 0, z: current.z }
+      : { x: current.x, y: 0, z: target.z }
+    const arrived = Math.abs(position.x - target.x) < 0.5 && Math.abs(position.z - target.z) < 0.5
+    return { position: arrived ? { x: target.x, y: 0, z: target.z } : position, arrived }
+  }
   return {
-    position: { x: current.x + dx * ratio, y: 0, z: current.z + dz * ratio },
+    position: axisDx
+      ? { x: current.x + Math.sign(dx) * step, y: 0, z: current.z }
+      : { x: current.x, y: 0, z: current.z + Math.sign(dz) * step },
     arrived: false,
   }
 }
@@ -166,7 +176,8 @@ function recoverBlockedTruckMove(
 
   const dx = target.x - truck.position.x
   const dz = target.z - truck.position.z
-  const distance = Math.sqrt(dx * dx + dz * dz)
+  const movingX = Math.abs(dx) > 0.1
+  const distance = movingX ? Math.abs(dx) : Math.abs(dz)
 
   if (recovery.blockedSeconds >= STUCK_FAIL_OPEN_SECONDS) {
     recovery.forceThroughSeconds = FORCE_THROUGH_SECONDS
@@ -182,9 +193,9 @@ function recoverBlockedTruckMove(
 
   const backupStep = Math.max(speed * dt * BACKUP_SPEED_FACTOR, 0.45)
   const backupPosition = {
-    x: truck.position.x - (dx / distance) * backupStep,
+    x: movingX ? truck.position.x - Math.sign(dx) * backupStep : truck.position.x,
     y: 0,
-    z: truck.position.z - (dz / distance) * backupStep,
+    z: movingX ? truck.position.z : truck.position.z - Math.sign(dz) * backupStep,
   }
   const backedUp = occupancy.tryMoveEntity(truck.id, backupPosition)
   if (backedUp.allowed) {
@@ -219,8 +230,10 @@ function advanceWaypoints(
 
   const dx = wp.x - truck.position.x
   const dz = wp.z - truck.position.z
-  if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) {
-    truck.headingY = Math.atan2(dx, dz)
+  if (Math.abs(dx) > 0.1) {
+    truck.headingY = dx > 0 ? Math.PI / 2 : -Math.PI / 2
+  } else if (Math.abs(dz) > 0.1) {
+    truck.headingY = dz > 0 ? 0 : Math.PI
   }
 
   const arrived = applyTruckMove(truck, wp, speed, dt, occupancy)
@@ -498,7 +511,8 @@ export function tickTruck(
         if (Math.abs(truck.position.z - holdZ) > 0.5 || Math.abs(truck.position.x - GATE_OUTGATE_POSITION.x) > 0.5) {
           const dx = holdPos.x - truck.position.x
           const dz = holdPos.z - truck.position.z
-          if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) truck.headingY = Math.atan2(dx, dz)
+          if (Math.abs(dx) > 0.1) truck.headingY = dx > 0 ? Math.PI / 2 : -Math.PI / 2
+          else if (Math.abs(dz) > 0.1) truck.headingY = dz > 0 ? 0 : Math.PI
           applyTruckMove(truck, holdPos, TRUCK_SPEED, dt, occupancy)
         }
         break
@@ -511,7 +525,8 @@ export function tickTruck(
         if (Math.abs(truck.position.z - holdZ) > 0.5 || Math.abs(truck.position.x - GATE_OUTGATE_POSITION.x) > 0.5) {
           const dx = holdPos.x - truck.position.x
           const dz = holdPos.z - truck.position.z
-          if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) truck.headingY = Math.atan2(dx, dz)
+          if (Math.abs(dx) > 0.1) truck.headingY = dx > 0 ? Math.PI / 2 : -Math.PI / 2
+          else if (Math.abs(dz) > 0.1) truck.headingY = dz > 0 ? 0 : Math.PI
           applyTruckMove(truck, holdPos, TRUCK_SPEED, dt, occupancy)
         }
         break

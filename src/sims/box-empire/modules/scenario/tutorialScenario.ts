@@ -11,7 +11,14 @@ import {
 } from '../config'
 import { getReachStackerHomePosition } from '../movement/terminalGeometry'
 import { createYardBlock } from '../yardManager'
-import { createTutorialVessel, getVesselSlotPosition } from '../vesselManager'
+import {
+  createTutorialVessel,
+  createSpawnedVessel,
+  getNextBerthX,
+  getVesselSlotRefs,
+  getVesselSlotPosition,
+  peekNextVesselId,
+} from '../vesselManager'
 
 let containerCounter = 0
 
@@ -38,6 +45,72 @@ export function resetTutorialScenarioCounters(): void {
   containerCounter = 0
 }
 
+export function createSpawnedVesselScenario(
+  activeVesselCount: number,
+): { vessel: ReturnType<typeof createSpawnedVessel>; containers: Container[] } {
+  const berthX = getNextBerthX(activeVesselCount)
+  const vesselId = peekNextVesselId()
+  const slotRefs = getVesselSlotRefs().slice(0, 12)
+  const importContainers: Container[] = []
+  for (const slotRef of slotRefs) {
+    const line = randomShippingLine()
+    importContainers.push({
+      id: nextContainerId('IMPV'),
+      size: '20ft',
+      shippingLine: line,
+      ownerColor: shippingLineColor(line),
+      weight: randomWeight(),
+      lifecycleState: 'on_vessel',
+      visitType: 'import',
+      currentLocation: { type: 'vessel_slot', id: vesselId, position: { x: berthX, y: 4, z: -8 } },
+      yardSlot: null,
+      vesselSlot: { vesselId, ...slotRef },
+      arrivedAt: 0,
+      revenueEarned: 0,
+    })
+  }
+  const vessel = createSpawnedVessel(importContainers, berthX)
+  importContainers.forEach(container => {
+    if (!container.vesselSlot) return
+    container.currentLocation.position = getVesselSlotPosition(
+      vessel,
+      container.vesselSlot.bay,
+      container.vesselSlot.row,
+      container.vesselSlot.tier,
+    )
+  })
+
+  const exportContainers = createSpawnedExportContainers(slotRefs.length)
+  return { vessel, containers: [...importContainers, ...exportContainers] }
+}
+
+function createSpawnedExportContainers(count: number): Container[] {
+  const containers: Container[] = []
+  for (let i = 0; i < count; i++) {
+    const line = randomShippingLine()
+    const container: Container = {
+      id: nextContainerId('EXPV'),
+      size: '20ft',
+      shippingLine: line,
+      ownerColor: shippingLineColor(line),
+      weight: randomWeight(),
+      lifecycleState: 'at_gate',
+      visitType: 'export',
+      currentLocation: {
+        type: 'gate_buffer',
+        id: `spawned-export-${i + 1}`,
+        position: { x: 0, y: 0, z: 0 },
+      },
+      yardSlot: null,
+      vesselSlot: null,
+      arrivedAt: 0,
+      revenueEarned: 0,
+    }
+    containers.push(container)
+  }
+  return containers
+}
+
 export interface TutorialScenario {
   state: Pick<
     BoxEmpireState,
@@ -57,6 +130,7 @@ export interface TutorialScenario {
     | 'jobs'
     | 'selectedContainerId'
     | 'selectedEquipmentId'
+    | 'selectedVesselId'
     | 'selectedGatehouseId'
     | 'events'
   >
@@ -64,7 +138,9 @@ export interface TutorialScenario {
 
 function createImportContainers(): Container[] {
   const containers: Container[] = []
+  const slotRefs = getVesselSlotRefs()
   for (let i = 0; i < TUTORIAL_IMPORT_COUNT; i++) {
+    const slotRef = slotRefs[i % slotRefs.length]
     const line = randomShippingLine()
     containers.push({
       id: nextContainerId('IMPU'),
@@ -80,7 +156,7 @@ function createImportContainers(): Container[] {
         position: { x: 0, y: 4 + i * 2.64, z: -8 },
       },
       yardSlot: null,
-      vesselSlot: { vesselId: 'vessel-1', bay: i + 1, row: 1, tier: 1 },
+      vesselSlot: { vesselId: 'vessel-1', ...slotRef },
       arrivedAt: 0,
       revenueEarned: 0,
     })
@@ -131,6 +207,8 @@ function createTutorialEquipment(godModeEnabled: boolean): Equipment[] {
       canServeLandside: true,
       canServeWaterside: true,
       craneMode: 'both',
+      craneAllowedVesselIds: [],
+      craneAllowedBaysByVessel: {},
       armTargetY: 0,
       armDropStartY: 0,
       spreaderZ: 0,
@@ -153,6 +231,8 @@ function createTutorialEquipment(godModeEnabled: boolean): Equipment[] {
       canServeLandside: true,
       canServeWaterside: true,
       craneMode: 'both',
+      craneAllowedVesselIds: ['vessel-1'],
+      craneAllowedBaysByVessel: { 'vessel-1': getVesselSlotRefs().map(slot => slot.bay) },
       armTargetY: 0,
       armDropStartY: 0,
       spreaderZ: 0,
@@ -169,8 +249,14 @@ export function createTutorialScenario(godModeEnabled: boolean): TutorialScenari
   const exportContainers = createExportContainers()
   const vessel = createTutorialVessel(importContainers, Number.MAX_SAFE_INTEGER)
 
-  importContainers.forEach((container, i) => {
-    container.currentLocation.position = getVesselSlotPosition(vessel, i + 1)
+  importContainers.forEach(container => {
+    if (!container.vesselSlot) return
+    container.currentLocation.position = getVesselSlotPosition(
+      vessel,
+      container.vesselSlot.bay,
+      container.vesselSlot.row,
+      container.vesselSlot.tier,
+    )
   })
 
   return {
@@ -194,6 +280,7 @@ export function createTutorialScenario(godModeEnabled: boolean): TutorialScenari
       jobs: [] as Job[],
       selectedContainerId: null,
       selectedEquipmentId: null,
+      selectedVesselId: null,
       selectedGatehouseId: null,
       events: [],
     },

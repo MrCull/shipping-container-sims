@@ -15,6 +15,10 @@ import {
   YARD_BLOCK_POSITION,
 } from './config'
 
+export function makeYardStackKey(blockId: string, bay: number, row: number): string {
+  return `${blockId}:${bay}:${row}`
+}
+
 export function createYardBlock(): YardBlock {
   const slots: YardSlot[] = []
   for (let bay = 1; bay <= TUTORIAL_YARD.bays; bay++) {
@@ -46,8 +50,10 @@ export function findAvailableSlot(
   reservedSlotIds?: Set<string>,
   preferredVisitType?: 'import' | 'export',
   containers?: import('../types').Container[],
+  blockedStackKeys?: Set<string>,
 ): YardSlotRef | null {
   function trySlotInBay(bay: number, row: number): YardSlotRef | null {
+    if (blockedStackKeys?.has(makeYardStackKey(block.id, bay, row))) return null
     const tiersInStack = block.slots.filter(
       s => s.bay === bay && s.row === row && s.containerId !== null,
     ).length

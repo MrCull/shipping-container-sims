@@ -120,12 +120,20 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       case 'quay_discharge':
         return {
           position: new THREE.Vector3(34, 28, 34),
-          lookAt: new THREE.Vector3(QUAY_BUFFER_DISCHARGE_POSITION.x, 3, QUAY_BUFFER_DISCHARGE_POSITION.z),
+          lookAt: new THREE.Vector3(
+            CRANE_POSITION.x + QUAY_BUFFER_DISCHARGE_POSITION.x,
+            3,
+            QUAY_BUFFER_DISCHARGE_POSITION.z,
+          ),
         }
       case 'quay_load':
         return {
           position: new THREE.Vector3(32, 28, 30),
-          lookAt: new THREE.Vector3(QUAY_BUFFER_LOAD_POSITION.x, 3, QUAY_BUFFER_LOAD_POSITION.z),
+          lookAt: new THREE.Vector3(
+            CRANE_POSITION.x + QUAY_BUFFER_LOAD_POSITION.x,
+            3,
+            QUAY_BUFFER_LOAD_POSITION.z,
+          ),
         }
       case 'yard_truck_stand':
         return {
@@ -207,6 +215,12 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       case 'Minus': case 'NumpadSubtract': keys.zoomOut = true; e.preventDefault(); break
       case 'KeyR':
         store.spawnReachStacker()
+        break
+      case 'KeyC':
+        store.spawnMobileHarborCrane()
+        break
+      case 'KeyV':
+        store.spawnVessel()
         break
     }
   }

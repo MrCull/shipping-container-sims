@@ -15,6 +15,14 @@ const currentJob = computed(() => {
   return store.jobs.find(j => j.id === equipment.value!.currentJobId) ?? null
 })
 
+const vesselBays = computed(() => {
+  const bays = new Set<number>()
+  for (const vessel of store.vesselVisits) {
+    for (const slot of vessel.slots) bays.add(slot.bay)
+  }
+  return [...bays].sort((a, b) => a - b)
+})
+
 function typeLabel(type: string): string {
   if (type === 'reach_stacker') return 'Reach Stacker'
   if (type === 'mobile_harbor_crane') return 'Mobile Harbor Crane'
@@ -36,6 +44,31 @@ function handleCraneMode(mode: CraneMode): void {
 function handleReachStackerService(side: 'landside' | 'waterside', enabled: boolean): void {
   if (equipment.value?.type !== 'reach_stacker') return
   store.setReachStackerServiceSide(equipment.value.id, side, enabled)
+}
+
+function vesselAllowed(vesselId: string): boolean {
+  return equipment.value?.craneAllowedVesselIds.includes(vesselId) ?? false
+}
+
+function bayAllowed(vesselId: string, bay: number): boolean {
+  return equipment.value?.craneAllowedBaysByVessel[vesselId]?.includes(bay) ?? false
+}
+
+function handleVesselPermission(vesselId: string, enabled: boolean): void {
+  if (equipment.value?.type !== 'mobile_harbor_crane') return
+  store.setCraneVesselPermission(equipment.value.id, vesselId, enabled)
+}
+
+function handleBayPermission(vesselId: string, bay: number, enabled: boolean): void {
+  if (equipment.value?.type !== 'mobile_harbor_crane') return
+  store.setCraneVesselBayPermission(equipment.value.id, vesselId, bay, enabled)
+}
+
+function handleEquipmentRowClick(equipmentId: string): void {
+  store.selectedEquipmentId = store.selectedEquipmentId === equipmentId ? null : equipmentId
+  store.selectedContainerId = null
+  store.selectedGatehouseId = null
+  store.selectedVesselId = null
 }
 
 function jobStatusColor(status: string): string {
@@ -142,6 +175,40 @@ function jobStatusColor(status: string): string {
       </div>
 
       <div
+        v-if="equipment.type === 'mobile_harbor_crane'"
+        class="info-row crane-mode-row"
+      >
+        <span class="label">Vessels</span>
+        <div class="vessel-permissions">
+          <div
+            v-for="vessel in store.vesselVisits.filter(v => v.state !== 'departed')"
+            :key="vessel.id"
+            class="vessel-permission"
+          >
+            <button
+              :class="['mode-btn vessel-btn', vesselAllowed(vessel.id) ? 'active' : '']"
+              :title="vesselAllowed(vessel.id) ? 'Disable this vessel for this crane' : 'Allow this vessel for this crane'"
+              @click="handleVesselPermission(vessel.id, !vesselAllowed(vessel.id))"
+            >
+              {{ vessel.id }}
+            </button>
+            <div class="bay-buttons">
+              <button
+                v-for="bay in vesselBays"
+                :key="`${vessel.id}-${bay}`"
+                :class="['bay-btn', bayAllowed(vessel.id, bay) ? 'active' : '', !vesselAllowed(vessel.id) ? 'muted' : '']"
+                :disabled="!vesselAllowed(vessel.id)"
+                :title="`Toggle bay ${bay} for ${vessel.id}`"
+                @click="handleBayPermission(vessel.id, bay, !bayAllowed(vessel.id, bay))"
+              >
+                B{{ bay }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
         v-if="currentJob"
         class="info-row"
       >
@@ -176,7 +243,7 @@ function jobStatusColor(status: string): string {
       v-for="eq in store.equipment"
       :key="eq.id"
       :class="['eq-row', store.selectedEquipmentId === eq.id ? 'selected' : '']"
-      @click="store.selectedEquipmentId = store.selectedEquipmentId === eq.id ? null : eq.id"
+      @click="handleEquipmentRowClick(eq.id)"
     >
       <span class="eq-icon">{{ eq.type === 'reach_stacker' ? '🏗' : '🏛' }}</span>
       <span class="eq-name">{{ eq.type === 'reach_stacker' ? 'RS' : 'MHC' }} · {{ eq.id }}</span>
@@ -305,6 +372,52 @@ function jobStatusColor(status: string): string {
 .mode-buttons {
   display: flex;
   gap: 4px;
+}
+
+.vessel-permissions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.vessel-permission {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vessel-btn {
+  align-self: flex-start;
+}
+
+.bay-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.bay-btn {
+  font-family: var(--font-retro, monospace);
+  font-size: 0.55rem;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+}
+
+.bay-btn.active {
+  background: rgba(52, 152, 219, 0.3);
+  border-color: #3498db;
+  color: #8fd0ff;
+}
+
+.bay-btn.muted,
+.bay-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .mode-buttons.disabled {

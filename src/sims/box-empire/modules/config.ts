@@ -60,6 +60,11 @@ export const RS_TRUCK_STANDOFF_MULTIPLIER = 1.5
 
 export const MHC_CYCLE_TIME = 45
 export const MHC_REACH = 1
+export const MHC_TRAVEL_SPEED = 3   // m/s lateral quay travel along X axis
+export const BERTH_X_SPACING = 56  // spacing between vessel berth centres along X
+export const FIRST_BERTH_X = -BERTH_X_SPACING / 2
+export const MHC_MIN_SEPARATION_X = CONTAINER_LENGTH * 2
+export const MHC_QUAY_EXCHANGE_OFFSET_X = 4.5
 
 // ---- Truck ----------------------------------------------------------------
 
@@ -73,17 +78,19 @@ export const TUTORIAL_VESSEL = {
   name: 'Tiny Feeder',
   loa: 50,
   beam: 12,
-  teuCapacity: 10,
-  bays: 5,   // 5 container positions spread along the deck (X axis)
-  rows: 1,
-  tiers: 1,  // single tier on deck
+  teuCapacity: 24,
+  bays: 4,
+  rows: 3,
+  tiers: 2,
+  bayXOffsets: [-12.6, -6.1, 0.4, 6.9],
+  rowZOffsets: [-2.7, 0, 2.7],
 }
 
 // ---- Yard (Tutorial) ------------------------------------------------------
 
 export const TUTORIAL_YARD = {
   id: 'yard-a',
-  bays: 10,
+  bays: 20,
   rows: 1,
   maxTier: 3,
 }
@@ -94,6 +101,7 @@ export const GATE_OUT_REVENUE = 100
 export const VESSEL_LOAD_REVENUE = 150
 export const REACH_STACKER_MOVE_COST = 10
 export const QUAY_CRANE_IMPORT_UNLOAD_COST = 20
+export const UNPROCESSED_IMPORT_FINE = 100
 
 // ---- Tutorial scenario ----------------------------------------------------
 
@@ -151,15 +159,16 @@ export const YARD_TRUCK_PARK_POSITION: Position3D = {
 export const YARD_IO_POSITION: Position3D = { ...YARD_TRUCK_PARK_POSITION, y: CONTAINER_HEIGHT / 2 }
 export const YARD_IO_WAIT_POSITION: Position3D = { x: -10, y: 0, z: YARD_TRUCK_PARK_POSITION.z }
 export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: CONTAINER_HEIGHT / 2, z: 3 }
-export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -5, y: CONTAINER_HEIGHT / 2, z: 3 }
-export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: 5, y: CONTAINER_HEIGHT / 2, z: 3 }
+export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -MHC_QUAY_EXCHANGE_OFFSET_X, y: CONTAINER_HEIGHT / 2, z: 3 }
+export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: MHC_QUAY_EXCHANGE_OFFSET_X, y: CONTAINER_HEIGHT / 2, z: 3 }
 // Vessel berth further out to sea so ship doesn't overlap quay
-export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -11.5 }
-export const CRANE_POSITION: Position3D = { x: 0, y: 0, z: 0 }
+export const BERTH_POSITION: Position3D = { x: FIRST_BERTH_X, y: 0, z: -11.5 }
+export const CRANE_POSITION: Position3D = { x: FIRST_BERTH_X, y: 0, z: 0 }
+export const VESSEL_CONTAINER_DECK_Y = 5.4 - CONTAINER_HEIGHT
 
 export const TERMINAL_BOUNDS = {
-  minX: -50,
-  maxX: 50,
+  minX: -70,
+  maxX: 70,
   minZ: -60,  // more sea visible
   maxZ: 118 + LANDSIDE_GATE_SETBACK,
 }

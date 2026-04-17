@@ -6,6 +6,14 @@ import { getTruckContainerPositionForVisitType } from '../truckManager'
 import { getVesselSlotPosition } from '../vesselManager'
 import { getSlotWorldPosition } from '../yardManager'
 
+export function getDischargeExchangePositionForCraneX(craneX: number): Position3D {
+  return { ...QUAY_BUFFER_DISCHARGE_POSITION, x: craneX + QUAY_BUFFER_DISCHARGE_POSITION.x }
+}
+
+export function getLoadExchangePositionForCraneX(craneX: number): Position3D {
+  return { ...QUAY_BUFFER_LOAD_POSITION, x: craneX + QUAY_BUFFER_LOAD_POSITION.x }
+}
+
 export function createExportTruckToYardJob(
   truck: TruckVisit,
   yard: YardBlock,
@@ -50,14 +58,16 @@ export function createVesselDischargeJob(
   vessel: VesselVisit,
   containerId: string,
   bay: number,
+  row: number,
+  tier: number,
   simTime: number,
 ): Job {
-  const vesselPos = getVesselSlotPosition(vessel, bay)
-  const slotId = makeVesselSlotId(vessel.id, 1, 1, bay)
+  const vesselPos = getVesselSlotPosition(vessel, bay, row, tier)
+  const slotId = makeVesselSlotId(vessel.id, bay, row, tier)
   return createJob(
     containerId,
     { type: 'vessel_slot', id: slotId, position: vesselPos },
-    { type: 'quay_buffer', id: 'quay-discharge', position: { ...QUAY_BUFFER_DISCHARGE_POSITION } },
+    { type: 'quay_buffer', id: 'quay-discharge', position: getDischargeExchangePositionForCraneX(vesselPos.x) },
     'mobile_harbor_crane',
     12,
     simTime,
@@ -86,6 +96,7 @@ export function createExportYardToQuayJob(
   container: Container,
   yard: YardBlock,
   simTime: number,
+  loadExchangePosition: Position3D = { ...QUAY_BUFFER_LOAD_POSITION },
 ): Job | null {
   if (!container.yardSlot) return null
   const slotId = makeYardSlotId(
@@ -97,7 +108,7 @@ export function createExportYardToQuayJob(
   return createJob(
     container.id,
     { type: 'yard_slot', id: slotId, position: getSlotWorldPosition(yard, container.yardSlot) },
-    { type: 'quay_buffer', id: 'quay-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
+    { type: 'quay_buffer', id: 'quay-load', position: loadExchangePosition },
     'reach_stacker',
     10.25,
     simTime,
@@ -108,14 +119,17 @@ export function createExportQuayToVesselJob(
   containerId: string,
   vessel: VesselVisit,
   bay: number,
+  row: number,
+  tier: number,
   simTime: number,
   priority = 10,
+  pickupPosition: Position3D = { ...QUAY_BUFFER_LOAD_POSITION },
 ): Job {
-  const vesselPos = getVesselSlotPosition(vessel, bay)
-  const slotId = makeVesselSlotId(vessel.id, 1, 1, bay)
+  const vesselPos = getVesselSlotPosition(vessel, bay, row, tier)
+  const slotId = makeVesselSlotId(vessel.id, bay, row, tier)
   return createJob(
     containerId,
-    { type: 'quay_buffer', id: 'quay-load', position: { ...QUAY_BUFFER_LOAD_POSITION } },
+    { type: 'quay_buffer', id: 'quay-load', position: pickupPosition },
     { type: 'vessel_slot', id: slotId, position: vesselPos },
     'mobile_harbor_crane',
     priority,

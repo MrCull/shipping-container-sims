@@ -9,6 +9,7 @@ import JobQueueWidget from './components/ui/JobQueueWidget.vue'
 import ContainerInfo from './components/ContainerInfo.vue'
 import EquipmentInfo from './components/EquipmentInfo.vue'
 import GatehouseInfo from './components/GatehouseInfo.vue'
+import VesselInfo from './components/VesselInfo.vue'
 import StartScreen from './components/modals/StartScreen.vue'
 import TutorialComplete from './components/modals/TutorialComplete.vue'
 import CareerIntroModal from './components/modals/CareerIntroModal.vue'
@@ -52,6 +53,7 @@ function handlePlayTutorialFromCareer(): void {
       <ContainerInfo />
       <EquipmentInfo />
       <GatehouseInfo />
+      <VesselInfo />
       <JobQueueWidget />
     </template>
 

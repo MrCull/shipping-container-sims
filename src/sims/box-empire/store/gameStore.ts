@@ -19,11 +19,24 @@ import type {
   ReachStackerServiceSide,
   Transaction,
 } from '../types'
-import { DEFAULT_TIME_SCALE, MAX_TIME_SCALE, RS_SPEED_UNLADEN } from '../modules/config'
-import { createJob, cancelJob, getActiveJobForContainer, resetJobCounter } from '../modules/jobScheduler'
+import {
+  DEFAULT_TIME_SCALE,
+  MAX_TIME_SCALE,
+  RS_SPEED_UNLADEN,
+  CRANE_POSITION,
+  BERTH_X_SPACING,
+  FIRST_BERTH_X,
+} from '../modules/config'
+import {
+  canMhcServeJob,
+  createJob,
+  cancelJob,
+  getActiveJobForContainer,
+  resetJobCounter,
+} from '../modules/jobScheduler'
 import { resetEconomy } from '../modules/economy'
 import { resetTruckCounter } from '../modules/truckManager'
-import { resetVesselCounter } from '../modules/vesselManager'
+import { getVesselSlotRefs, resetVesselCounter } from '../modules/vesselManager'
 import { createTutorialSteps, getCurrentStep } from '../modules/tutorial'
 import { getNarratorGroup } from '../modules/narratorScript'
 import {
@@ -35,6 +48,8 @@ import { tickSimulation } from '../modules/simulation/simulationEngine'
 import type { NarratorRuntime, TutorialFlowRuntime } from '../modules/simulation/simulationTypes'
 import { getReachStackerHomePosition } from '../modules/movement/terminalGeometry'
 import { resetEquipmentDeadlockState } from '../modules/equipmentController'
+import { createSpawnedVesselScenario } from '../modules/scenario/tutorialScenario'
+import { applyUnprocessedImportFine } from '../modules/economy/economyLedger'
 
 let eventCounter = 0
 let cameraCueCounter = 0
@@ -59,6 +74,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   const jobs = ref<Job[]>([])
   const selectedContainerId = ref<string | null>(null)
   const selectedEquipmentId = ref<string | null>(null)
+  const selectedVesselId = ref<string | null>(null)
   const selectedGatehouseId = ref<string | null>(null)
   const events = ref<GameEvent[]>([])
   const pendingEventCallbacks = ref<GameEvent[]>([])
@@ -123,6 +139,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       jobs: jobs.value,
       selectedContainerId: selectedContainerId.value,
       selectedEquipmentId: selectedEquipmentId.value,
+      selectedVesselId: selectedVesselId.value,
       selectedGatehouseId: selectedGatehouseId.value,
       events: events.value,
     }
@@ -145,6 +162,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     jobs.value = state.jobs
     selectedContainerId.value = state.selectedContainerId
     selectedEquipmentId.value = state.selectedEquipmentId
+    selectedVesselId.value = state.selectedVesselId
     selectedGatehouseId.value = state.selectedGatehouseId
     events.value = state.events
   }
@@ -341,6 +359,68 @@ export const useGameStore = defineStore('box-empire-game', () => {
   function setCraneMode(equipmentId: string, mode: CraneMode): void {
     const eq = equipment.value.find(candidate => candidate.id === equipmentId)
     if (eq) eq.craneMode = mode
+  }
+
+  function deallocateDisallowedCraneMoves(eq: Equipment): void {
+    if (eq.type !== 'mobile_harbor_crane') return
+    if (eq.carriedContainerId) return
+
+    const state = getState()
+    const disallowedJobs = jobs.value.filter(
+      job =>
+        job.assignedEquipmentId === eq.id &&
+        (job.status === 'assigned' || job.status === 'in_progress') &&
+        !canMhcServeJob(eq, job, state),
+    )
+    if (disallowedJobs.length === 0) return
+
+    for (const job of disallowedJobs) {
+      job.status = 'pending'
+      job.assignedEquipmentId = null
+      job.startedAt = null
+    }
+
+    if (eq.currentJobId && disallowedJobs.some(job => job.id === eq.currentJobId)) {
+      eq.currentJobId = null
+      eq.state = 'idle'
+      eq.targetPosition = null
+      eq.armTargetY = 0
+      eq.armDropStartY = 0
+      eq.spreaderZ = 0
+      eq.stateStartTime = simTime.value
+      eq.stateElapsed = 0
+    }
+  }
+
+  function setCraneVesselPermission(equipmentId: string, vesselId: string, enabled: boolean): void {
+    const eq = equipment.value.find(candidate => candidate.id === equipmentId && candidate.type === 'mobile_harbor_crane')
+    if (!eq) return
+    const allowed = new Set(eq.craneAllowedVesselIds)
+    if (enabled) {
+      allowed.add(vesselId)
+      if (!eq.craneAllowedBaysByVessel[vesselId]) {
+        eq.craneAllowedBaysByVessel[vesselId] = getVesselSlotRefs().map(slot => slot.bay)
+      }
+    } else {
+      allowed.delete(vesselId)
+    }
+    eq.craneAllowedVesselIds = [...allowed]
+    deallocateDisallowedCraneMoves(eq)
+  }
+
+  function setCraneVesselBayPermission(
+    equipmentId: string,
+    vesselId: string,
+    bay: number,
+    enabled: boolean,
+  ): void {
+    const eq = equipment.value.find(candidate => candidate.id === equipmentId && candidate.type === 'mobile_harbor_crane')
+    if (!eq) return
+    const allowed = new Set(eq.craneAllowedBaysByVessel[vesselId] ?? getVesselSlotRefs().map(slot => slot.bay))
+    if (enabled) allowed.add(bay)
+    else allowed.delete(bay)
+    eq.craneAllowedBaysByVessel[vesselId] = [...allowed].sort((a, b) => a - b)
+    deallocateDisallowedCraneMoves(eq)
   }
 
   function tick(dt: number): void {
@@ -561,6 +641,98 @@ export const useGameStore = defineStore('box-empire-game', () => {
     }
   })
 
+  function spawnMobileHarborCrane(): void {
+    if (!isGodMode.value) return
+    const existingMHCs = equipment.value.filter(eq => eq.type === 'mobile_harbor_crane')
+    const newId = `mhc-${existingMHCs.length + 1}`
+    const newMHC: Equipment = {
+      id: newId,
+      type: 'mobile_harbor_crane',
+      state: 'idle',
+      position: { x: FIRST_BERTH_X + existingMHCs.length * BERTH_X_SPACING, y: 0, z: CRANE_POSITION.z },
+      currentJobId: null,
+      carriedContainerId: null,
+      stateStartTime: simTime.value,
+      stateElapsed: 0,
+      targetPosition: null,
+      speed: 2,
+      enabled: true,
+      canServeLandside: true,
+      canServeWaterside: true,
+      craneMode: 'both',
+      craneAllowedVesselIds: vesselVisits.value.map(vessel => vessel.id),
+      craneAllowedBaysByVessel: Object.fromEntries(
+        vesselVisits.value.map(vessel => [vessel.id, getVesselSlotRefs().map(slot => slot.bay)]),
+      ),
+      armTargetY: 0,
+      armDropStartY: 0,
+      spreaderZ: 0,
+      waypoints: [],
+      waypointIndex: 0,
+      headingY: 0,
+    }
+    equipment.value.push(newMHC)
+  }
+
+  function spawnVessel(): void {
+    if (!isGodMode.value) return
+    const activeCount = vesselVisits.value.filter(v => v.state !== 'departed').length
+    const { vessel, containers: newContainers } = createSpawnedVesselScenario(activeCount)
+    containers.value.push(...newContainers)
+    vesselVisits.value.push(vessel)
+    const vesselBays = getVesselSlotRefs().map(slot => slot.bay)
+    for (const eq of equipment.value) {
+      if (eq.type !== 'mobile_harbor_crane') continue
+      if (!eq.craneAllowedVesselIds.includes(vessel.id)) eq.craneAllowedVesselIds.push(vessel.id)
+      eq.craneAllowedBaysByVessel[vessel.id] = [...vesselBays]
+    }
+  }
+
+  function jobInvolvesVessel(job: Job, vesselId: string): boolean {
+    return (
+      (job.pickupLocation.type === 'vessel_slot' && job.pickupLocation.id.startsWith(`${vesselId}-`)) ||
+      (job.dropoffLocation.type === 'vessel_slot' && job.dropoffLocation.id.startsWith(`${vesselId}-`))
+    )
+  }
+
+  function sailVesselNow(vesselId: string): void {
+    const vessel = vesselVisits.value.find(candidate => candidate.id === vesselId)
+    if (!vessel || vessel.state === 'departing' || vessel.state === 'departed') return
+
+    const state = getState()
+    const cancellableJobs = jobs.value.filter(
+      job =>
+        jobInvolvesVessel(job, vesselId) &&
+        (job.status === 'pending' ||
+          job.status === 'assigned' ||
+          job.status === 'in_progress' ||
+          job.status === 'blocked'),
+    )
+    for (const job of cancellableJobs) {
+      cancelJob(state, job.id)
+    }
+
+    const remainingImports = containers.value.filter(
+      container =>
+        container.visitType === 'import' &&
+        container.vesselSlot?.vesselId === vesselId &&
+        container.lifecycleState === 'on_vessel',
+    )
+    for (const container of remainingImports) {
+      const event = applyUnprocessedImportFine(state, container, vessel.position)
+      addEvent(event.type, event.message, event.data)
+    }
+    money.value = state.money
+
+    vessel.state = 'departing'
+    selectedVesselId.value = null
+    addEvent('vessel.departing', `${vessel.name} ordered to sail`, {
+      vesselId: vessel.id,
+      cancelledMoves: cancellableJobs.length,
+      unprocessedImports: remainingImports.length,
+    })
+  }
+
   function spawnReachStacker(): void {
     if (!isGodMode.value) return
     const existingRS = equipment.value.filter(eq => eq.type === 'reach_stacker')
@@ -581,6 +753,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
       canServeLandside: true,
       canServeWaterside: true,
       craneMode: 'both',
+      craneAllowedVesselIds: [],
+      craneAllowedBaysByVessel: {},
       armTargetY: 0,
       armDropStartY: 0,
       spreaderZ: 0,
@@ -610,6 +784,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     jobs,
     selectedContainerId,
     selectedEquipmentId,
+    selectedVesselId,
     selectedGatehouseId,
     events,
     activeJobs,
@@ -630,6 +805,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
     closeImportGate,
     toggleEquipment,
     setCraneMode,
+    setCraneVesselPermission,
+    setCraneVesselBayPermission,
     setReachStackerServiceSide,
     advanceTutorialStep,
     dismissTutorialOverlay,
@@ -649,5 +826,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
     dispatchNarratorAction,
     requestCameraCue,
     spawnReachStacker,
+    spawnMobileHarborCrane,
+    spawnVessel,
+    sailVesselNow,
   }
 })

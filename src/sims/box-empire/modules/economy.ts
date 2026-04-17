@@ -8,6 +8,7 @@ import {
   VESSEL_LOAD_REVENUE,
   REACH_STACKER_MOVE_COST,
   QUAY_CRANE_IMPORT_UNLOAD_COST,
+  UNPROCESSED_IMPORT_FINE,
 } from './config'
 
 let txCounter = 0
@@ -22,6 +23,7 @@ export function createTransaction(
   if (type === 'gate_out_revenue') amount = GATE_OUT_REVENUE
   if (type === 'reach_stacker_move_cost') amount = -REACH_STACKER_MOVE_COST
   if (type === 'quay_crane_import_unload_cost') amount = -QUAY_CRANE_IMPORT_UNLOAD_COST
+  if (type === 'unprocessed_import_fine') amount = -UNPROCESSED_IMPORT_FINE
   return {
     id: `tx-${txCounter}`,
     type,
