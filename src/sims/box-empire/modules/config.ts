@@ -51,7 +51,8 @@ export const RS_PICK_CYCLE_TIME = 8
 export const RS_PLACE_CYCLE_TIME = 8
 export const RS_MAX_STACK_HEIGHT = 3
 export const RS_LENGTH = 9.5
-export const RS_YARD_PARK_OFFSET = 5.5
+export const RS_YARD_PARK_OFFSET = 6.25
+export const RS_QUAY_PARK_OFFSET = 6.25
 export const RS_TRUCK_PARK_OFFSET = 8
 export const RS_TRUCK_STANDOFF_MULTIPLIER = 1.5
 
@@ -121,25 +122,28 @@ export const GATE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
 export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
 export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
 
-export const YARD_BLOCK_POSITION: Position = { x: -12, z: 18 }
+// Keep the yard stack inland of the quay-side service lane so the reach stacker
+// can work waterside imports without clipping the stored-container footprint.
+export const YARD_BLOCK_POSITION: Position = { x: -12, z: 18 + CONTAINER_WIDTH }
 const YARD_TRUCK_STANDOFF = RS_LENGTH * RS_TRUCK_STANDOFF_MULTIPLIER
+const YARD_TRUCK_SERVICE_CLEARANCE = CONTAINER_LENGTH
 
 // Separate yard truck stands so export deliveries and import pickups do not stack into one bay.
 export const YARD_TRUCK_EXPORT_PARK_POSITION: Position3D = {
   x: -7,
   y: 0,
-  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF,
+  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF + YARD_TRUCK_SERVICE_CLEARANCE,
 }
 export const YARD_TRUCK_IMPORT_PARK_POSITION: Position3D = {
   x: 9,
   y: 0,
-  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF,
+  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF + YARD_TRUCK_SERVICE_CLEARANCE,
 }
 // Legacy midpoint retained for generic camera framing / old references.
 export const YARD_TRUCK_PARK_POSITION: Position3D = {
   x: 0,
   y: 0,
-  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF,
+  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF + YARD_TRUCK_SERVICE_CLEARANCE,
 }
 // Legacy aliases kept while Box Empire still refers to Yard I/O in some UI/docs.
 export const YARD_IO_POSITION: Position3D = { ...YARD_TRUCK_PARK_POSITION, y: CONTAINER_HEIGHT / 2 }

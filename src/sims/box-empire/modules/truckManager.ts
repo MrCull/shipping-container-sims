@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import type { TruckVisit, Position3D, BoxEmpireState } from '../types'
+import type { OccupancyWorld } from './movement/occupancyWorld'
 import {
   CONTAINER_LENGTH,
   TRUCK_SPEED,
@@ -100,7 +101,30 @@ function moveTowards(
   }
 }
 
-function advanceWaypoints(truck: TruckVisit, speed: number, dt: number): boolean {
+function applyTruckMove(
+  truck: TruckVisit,
+  target: Position3D,
+  speed: number,
+  dt: number,
+  occupancy?: OccupancyWorld,
+): boolean {
+  const { position, arrived } = moveTowards(truck.position, target, speed, dt)
+  if (occupancy) {
+    const attempt = occupancy.tryMoveEntity(truck.id, position)
+    if (!attempt.allowed) return false
+    truck.position = attempt.position
+    return arrived
+  }
+  truck.position = position
+  return arrived
+}
+
+function advanceWaypoints(
+  truck: TruckVisit,
+  speed: number,
+  dt: number,
+  occupancy?: OccupancyWorld,
+): boolean {
   if (truck.waypointIndex >= truck.waypoints.length) return true
 
   const wp = truck.waypoints[truck.waypointIndex]!
@@ -112,8 +136,7 @@ function advanceWaypoints(truck: TruckVisit, speed: number, dt: number): boolean
     truck.headingY = Math.atan2(dx, dz)
   }
 
-  const { position, arrived } = moveTowards(truck.position, wp, speed, dt)
-  truck.position = position
+  const arrived = applyTruckMove(truck, wp, speed, dt, occupancy)
 
   if (arrived) {
     truck.waypointIndex++
@@ -237,6 +260,7 @@ export function tickTruck(
   truck: TruckVisit,
   state: BoxEmpireState,
   dt: number,
+  occupancy?: OccupancyWorld,
 ): TruckTickResult {
   const result: TruckTickResult = {
     arrived: false,
@@ -262,8 +286,7 @@ export function tickTruck(
         }
         truck.targetPosition = gatePos
         truck.headingY = INGATE_QUEUE_HEADING
-        const { position, arrived } = moveTowards(truck.position, gatePos, TRUCK_SPEED, dt)
-        truck.position = position
+        const arrived = applyTruckMove(truck, gatePos, TRUCK_SPEED, dt, occupancy)
         if (arrived && Math.abs(gatePos.z - baseGateZ) < 0.1) {
           truck.state = 'at_gate'
           truck.stateStartTime = state.simTime
@@ -279,8 +302,7 @@ export function tickTruck(
         // Only move if not at hold position
         if (Math.abs(truck.position.z - holdZ) > 0.5) {
           truck.headingY = INGATE_QUEUE_HEADING
-          const { position } = moveTowards(truck.position, holdPos, TRUCK_SPEED, dt)
-          truck.position = position
+          applyTruckMove(truck, holdPos, TRUCK_SPEED, dt, occupancy)
         }
         truck.headingY = INGATE_QUEUE_HEADING
       }
@@ -312,7 +334,7 @@ export function tickTruck(
 
     case 'driving_to_yard': {
       if (isYardZoneBusy(state, truck.id)) break
-      const done = advanceWaypoints(truck, TRUCK_SPEED, dt)
+      const done = advanceWaypoints(truck, TRUCK_SPEED, dt, occupancy)
       if (done) {
         truck.state = 'waiting_for_equipment'
         truck.stateStartTime = state.simTime
@@ -336,11 +358,10 @@ export function tickTruck(
         const holdPos = { x: GATE_OUTGATE_POSITION.x, y: 0, z: holdZ }
         truck.targetPosition = holdPos
         if (Math.abs(truck.position.z - holdZ) > 0.5 || Math.abs(truck.position.x - GATE_OUTGATE_POSITION.x) > 0.5) {
-          const { position } = moveTowards(truck.position, holdPos, TRUCK_SPEED, dt)
           const dx = holdPos.x - truck.position.x
           const dz = holdPos.z - truck.position.z
           if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) truck.headingY = Math.atan2(dx, dz)
-          truck.position = position
+          applyTruckMove(truck, holdPos, TRUCK_SPEED, dt, occupancy)
         }
         break
       }
@@ -350,16 +371,15 @@ export function tickTruck(
         const holdPos = { x: GATE_OUTGATE_POSITION.x, y: 0, z: holdZ }
         truck.targetPosition = holdPos
         if (Math.abs(truck.position.z - holdZ) > 0.5 || Math.abs(truck.position.x - GATE_OUTGATE_POSITION.x) > 0.5) {
-          const { position } = moveTowards(truck.position, holdPos, TRUCK_SPEED, dt)
           const dx = holdPos.x - truck.position.x
           const dz = holdPos.z - truck.position.z
           if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) truck.headingY = Math.atan2(dx, dz)
-          truck.position = position
+          applyTruckMove(truck, holdPos, TRUCK_SPEED, dt, occupancy)
         }
         break
       }
 
-      const done = advanceWaypoints(truck, TRUCK_SPEED, dt)
+      const done = advanceWaypoints(truck, TRUCK_SPEED, dt, occupancy)
       if (done) {
         truck.state = 'at_gate_out'
         truck.stateStartTime = state.simTime
@@ -379,7 +399,7 @@ export function tickTruck(
     }
 
     case 'departing': {
-      const done = advanceWaypoints(truck, TRUCK_SPEED, dt)
+      const done = advanceWaypoints(truck, TRUCK_SPEED, dt, occupancy)
       if (done) {
         truck.state = 'departed'
         result.departed = true

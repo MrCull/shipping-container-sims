@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Equipment state machine & movement
+// Box Empire - Equipment state machine & movement
 // ---------------------------------------------------------------------------
 // Key design decisions:
 //  - Reach Stacker: travels to a *parking position* offset in front of the
@@ -13,8 +13,11 @@
 import type {
   Equipment,
   BoxEmpireState,
+  Location,
   Position3D,
 } from '../types'
+import type { OccupancyWorld } from './movement/occupancyWorld'
+import { buildReachStackerRoute, reachStackerParkingPosition } from './movement/reachStackerRouting'
 import {
   RS_SPEED_UNLADEN,
   RS_SPEED_LADEN,
@@ -22,15 +25,8 @@ import {
   RS_PLACE_CYCLE_TIME,
   MHC_CYCLE_TIME,
   CONTAINER_HEIGHT,
-  RS_TRUCK_PARK_OFFSET,
-  RS_YARD_PARK_OFFSET,
 } from './config'
 import { isContainerOnTop } from './yardManager'
-
-// How far (metres) the RS parks from a yard slot target (in Z, approaching from +Z side)
-const RS_PARK_OFFSET = RS_YARD_PARK_OFFSET
-// RS faces a slot: +Z side of stack → headingY = π (facing -Z)
-
 
 function distanceTo(a: Position3D, b: Position3D): number {
   const dx = a.x - b.x
@@ -60,84 +56,23 @@ function moveTowards(
   }
 }
 
-// Yard container band (single row centred at z=20, WIDTH=2.44m) + RS body clearance.
-// Any path that crosses this Z range would drive through the container stacks.
-const YARD_SEA_EDGE_Z  = 16.5   // sea-side safe limit  (row front – clearance)
-const YARD_ROAD_EDGE_Z = 23.5   // road-side safe limit (row rear  + clearance)
-// X position clear of ALL yard containers (leftmost bay starts at x=−15).
-// Used as a bypass lane to cross the yard band without hitting stacks.
-const YARD_BYPASS_X    = -19.0
-const YARD_LANDSIDE_SERVICE_Z = YARD_ROAD_EDGE_Z + 3.0
-
-// Build axis-aligned waypoints, routing around the container yard band when needed.
-function buildRsWaypoints(from: Position3D, to: Position3D, preferXFirst: boolean = false): Position3D[] {
-  const pts: Position3D[] = []
-
-  const minZ = Math.min(from.z, to.z)
-  const maxZ = Math.max(from.z, to.z)
-  const crossesYard = minZ < YARD_SEA_EDGE_Z && maxZ > YARD_ROAD_EDGE_Z
-
-  if (crossesYard) {
-    // Route via bypass lane left of all containers to avoid driving through stacks.
-    // Use the further-left of the current X or the bypass X to avoid backtracking.
-    const bypassX = Math.min(from.x, YARD_BYPASS_X)
-    pts.push({ x: bypassX, y: 0, z: from.z })  // move to bypass lane (safe side)
-    pts.push({ x: bypassX, y: 0, z: to.z })    // cross the yard band on bypass lane
-    pts.push({ x: to.x,    y: 0, z: to.z })    // approach target X
-  } else {
-    if (preferXFirst) {
-      if (Math.abs(from.x - to.x) > 0.5) {
-        pts.push({ x: to.x, y: 0, z: from.z })
-      }
-      pts.push({ x: to.x, y: 0, z: to.z })
-    } else {
-      // Standard routing: align Z first, then X
-      if (Math.abs(from.z - to.z) > 0.5) {
-        pts.push({ x: from.x, y: 0, z: to.z })
-      }
-      pts.push({ x: to.x, y: 0, z: to.z })
-    }
-  }
-
-  return pts
-}
-
-function buildRsYardToTruckWaypoints(from: Position3D, to: Position3D): Position3D[] {
-  const pts: Position3D[] = []
-  const serviceLaneZ = Math.max(from.z, YARD_LANDSIDE_SERVICE_Z)
-
-  if (Math.abs(from.z - serviceLaneZ) > 0.5) {
-    pts.push({ x: from.x, y: 0, z: serviceLaneZ })
-  }
-  if (Math.abs(from.x - to.x) > 0.5) {
-    pts.push({ x: to.x, y: 0, z: serviceLaneZ })
-  }
-  pts.push({ x: to.x, y: 0, z: to.z })
-
-  return pts
-}
-
-function buildRsTruckToYardWaypoints(from: Position3D, to: Position3D): Position3D[] {
-  const pts: Position3D[] = []
-  const serviceLaneZ = Math.max(from.z, YARD_LANDSIDE_SERVICE_Z)
-
-  if (Math.abs(from.z - serviceLaneZ) > 0.5) {
-    pts.push({ x: from.x, y: 0, z: serviceLaneZ })
-  }
-  if (Math.abs(from.x - to.x) > 0.5) {
-    pts.push({ x: to.x, y: 0, z: serviceLaneZ })
-  }
-  pts.push({ x: to.x, y: 0, z: to.z })
-
-  return pts
-}
-
-function advanceRsWaypoints(eq: Equipment, speed: number, dt: number): boolean {
+function advanceRsWaypoints(
+  eq: Equipment,
+  speed: number,
+  dt: number,
+  occupancy?: OccupancyWorld,
+): boolean {
   if (eq.waypointIndex >= eq.waypoints.length) return true
   const wp = eq.waypoints[eq.waypointIndex]
   eq.targetPosition = wp
   const { position, arrived } = moveTowards(eq.position, wp, speed, dt)
-  eq.position = position
+  if (occupancy) {
+    const attempt = occupancy.tryMoveEntity(eq.id, position)
+    if (!attempt.allowed) return false
+    eq.position = attempt.position
+  } else {
+    eq.position = position
+  }
   eq.position.y = 0
   if (arrived) {
     eq.waypointIndex++
@@ -146,52 +81,14 @@ function advanceRsWaypoints(eq: Equipment, speed: number, dt: number): boolean {
   return false
 }
 
-// For RS picking/dropping at yard slots: park RS_PARK_OFFSET behind target (in +Z)
-function chooseClosestPosition(from: Position3D, candidates: Position3D[]): Position3D {
-  return candidates.reduce((best, candidate) =>
-    distanceTo(from, candidate) <= distanceTo(from, best) ? candidate : best,
-  )
-}
-
-function rsParkingPosition(currentPos: Position3D, targetPos: Position3D): Position3D {
-  return chooseClosestPosition(currentPos, [
-    { x: targetPos.x, y: 0, z: targetPos.z + RS_PARK_OFFSET },
-    { x: targetPos.x, y: 0, z: targetPos.z - RS_PARK_OFFSET },
-  ])
-}
-
-// For RS picking/dropping at a truck at YARD_IO: park RS_TRUCK_PARK_OFFSET metres to the +X side
-// so the RS approaches the long face of the container (container length runs along truck Z axis).
-// targetPos is YARD_IO_CONTAINER_POSITION (the actual container world position, z=34),
-// so no extra Z offset is needed — the RS parks directly beside the container.
-function rsTruckParkingPosition(currentPos: Position3D, targetPos: Position3D): Position3D {
-  return chooseClosestPosition(currentPos, [
-    { x: targetPos.x + RS_TRUCK_PARK_OFFSET, y: 0, z: targetPos.z },
-    { x: targetPos.x - RS_TRUCK_PARK_OFFSET, y: 0, z: targetPos.z },
-  ])
-}
-
 // Determine heading for RS at a given position facing a pickup/drop target
 function rsFacingHeading(from: Position3D, to: Position3D): number {
   return Math.atan2(to.x - from.x, to.z - from.z)
 }
 
-function shouldUseStackHuggingRoute(job: import('../types').Job): boolean {
-  return job.pickupLocation.type === 'yard_slot' && job.dropoffLocation.type === 'truck'
-}
-
-function buildRsDropWaypoints(
-  from: Position3D,
-  to: Position3D,
-  job: import('../types').Job,
-): Position3D[] {
-  if (shouldUseStackHuggingRoute(job)) {
-    return buildRsYardToTruckWaypoints(from, to)
-  }
-  if (job.pickupLocation.type === 'truck' && job.dropoffLocation.type === 'yard_slot') {
-    return buildRsTruckToYardWaypoints(from, to)
-  }
-  return buildRsWaypoints(from, to)
+function rsWorkingHeading(from: Position3D, location: Location): number {
+  if (location.type === 'quay_buffer') return Math.PI
+  return rsFacingHeading(from, location.position)
 }
 
 function getPickDuration(eq: Equipment): number {
@@ -235,6 +132,7 @@ export function tickEquipment(
   eq: Equipment,
   state: BoxEmpireState,
   dt: number,
+  occupancy?: OccupancyWorld,
 ): EquipmentTickResult {
   const result: EquipmentTickResult = {
     jobCompleted: false,
@@ -261,7 +159,7 @@ export function tickEquipment(
   }
 
   // Reach stacker
-  return tickReachStacker(eq, job, state, dt, result)
+  return tickReachStacker(eq, job, state, dt, result, occupancy)
 }
 
 function tickMhc(
@@ -388,19 +286,15 @@ function tickReachStacker(
   state: BoxEmpireState,
   dt: number,
   result: EquipmentTickResult,
+  occupancy?: OccupancyWorld,
 ): EquipmentTickResult {
   eq.stateElapsed += dt
 
   switch (eq.state) {
     case 'assigned': {
       eq.state = 'travel_to_pickup'
-      // For truck pickups (at YARD_IO), use RS_TRUCK_PARK_OFFSET so RS doesn't drive into truck
-      // For yard/quay pickups, use RS_PARK_OFFSET
-      const isPickFromTruck = job.pickupLocation.type === 'truck'
-      const parkPos = isPickFromTruck
-        ? rsTruckParkingPosition(eq.position, job.pickupLocation.position)
-        : rsParkingPosition(eq.position, job.pickupLocation.position)
-      eq.waypoints = buildRsWaypoints(eq.position, parkPos)
+      const parkPos = reachStackerParkingPosition(eq.position, job, 'pickup', occupancy, eq.id)
+      eq.waypoints = buildReachStackerRoute(eq.position, parkPos, job, 'pickup')
       eq.waypointIndex = 0
       eq.targetPosition = eq.waypoints[0] ?? parkPos
       eq.stateStartTime = state.simTime
@@ -411,16 +305,13 @@ function tickReachStacker(
 
     case 'travel_to_pickup': {
       if (eq.waypoints.length === 0) {
-        const isPickFromTruck = job.pickupLocation.type === 'truck'
-        const parkPos = isPickFromTruck
-          ? rsTruckParkingPosition(eq.position, job.pickupLocation.position)
-          : rsParkingPosition(eq.position, job.pickupLocation.position)
-        eq.waypoints = buildRsWaypoints(eq.position, parkPos)
+        const parkPos = reachStackerParkingPosition(eq.position, job, 'pickup', occupancy, eq.id)
+        eq.waypoints = buildReachStackerRoute(eq.position, parkPos, job, 'pickup')
         eq.waypointIndex = 0
       }
-      const arrived = advanceRsWaypoints(eq, getTravelSpeed(eq, false), dt)
+      const arrived = advanceRsWaypoints(eq, getTravelSpeed(eq, false), dt, occupancy)
       // Update heading to face the pickup target
-      eq.headingY = rsFacingHeading(eq.position, job.pickupLocation.position)
+      eq.headingY = rsWorkingHeading(eq.position, job.pickupLocation)
       if (arrived) {
         // Pre-pick accessibility check for yard slots
         if (job.pickupLocation.type === 'yard_slot') {
@@ -438,7 +329,7 @@ function tickReachStacker(
           }
         }
         // Face pickup target when parked
-        eq.headingY = rsFacingHeading(eq.position, job.pickupLocation.position)
+        eq.headingY = rsWorkingHeading(eq.position, job.pickupLocation)
         eq.state = 'picking'
         eq.stateStartTime = state.simTime
         eq.stateElapsed = 0
@@ -467,12 +358,8 @@ function tickReachStacker(
         const travelHeight = Math.max(pickTargetY, dropTargetY) + 1.5
         eq.armTargetY = travelHeight
 
-        // Drop position: same side as approach (+Z park offset for yard; truck offset for truck drop)
-        const isDropToTruck = job.dropoffLocation.type === 'truck'
-        const dropPark = isDropToTruck
-          ? rsTruckParkingPosition(eq.position, job.dropoffLocation.position)
-          : rsParkingPosition(eq.position, job.dropoffLocation.position)
-        eq.waypoints = buildRsDropWaypoints(eq.position, dropPark, job)
+        const dropPark = reachStackerParkingPosition(eq.position, job, 'dropoff', occupancy, eq.id)
+        eq.waypoints = buildReachStackerRoute(eq.position, dropPark, job, 'dropoff')
         eq.waypointIndex = 0
         eq.targetPosition = eq.waypoints[0] ?? dropPark
         eq.state = 'travel_to_drop'
@@ -486,16 +373,13 @@ function tickReachStacker(
 
     case 'travel_to_drop': {
       if (eq.waypoints.length === 0) {
-        const isDropToTruck = job.dropoffLocation.type === 'truck'
-        const dropPark = isDropToTruck
-          ? rsTruckParkingPosition(eq.position, job.dropoffLocation.position)
-          : rsParkingPosition(eq.position, job.dropoffLocation.position)
-        eq.waypoints = buildRsDropWaypoints(eq.position, dropPark, job)
+        const dropPark = reachStackerParkingPosition(eq.position, job, 'dropoff', occupancy, eq.id)
+        eq.waypoints = buildReachStackerRoute(eq.position, dropPark, job, 'dropoff')
         eq.waypointIndex = 0
       }
       // Update heading to face the dropoff target
-      eq.headingY = rsFacingHeading(eq.position, job.dropoffLocation.position)
-      const travelArrived = advanceRsWaypoints(eq, getTravelSpeed(eq, true), dt)
+      eq.headingY = rsWorkingHeading(eq.position, job.dropoffLocation)
+      const travelArrived = advanceRsWaypoints(eq, getTravelSpeed(eq, true), dt, occupancy)
       if (eq.carriedContainerId) {
         const container = state.containers.find(c => c.id === eq.carriedContainerId)
         if (container) {
@@ -508,7 +392,7 @@ function tickReachStacker(
       }
       if (travelArrived) {
         // Face dropoff target once parked
-        eq.headingY = rsFacingHeading(eq.position, job.dropoffLocation.position)
+        eq.headingY = rsWorkingHeading(eq.position, job.dropoffLocation)
         eq.armDropStartY = eq.armTargetY
         eq.state = 'dropping'
         eq.stateStartTime = state.simTime

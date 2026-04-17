@@ -6,10 +6,19 @@ Box Empire is a container terminal operations sim/tycoon game. The player manage
 
 ## Architecture
 
+Current implementation note: the Pinia store is now a UI-facing facade. Simulation behavior is delegated into focused domain modules:
+
+- `modules/scenario/` builds initial tutorial state and scenario counters.
+- `modules/simulation/` owns the main tick orchestration and store-to-domain runtime contracts.
+- `modules/operations/` owns truck operations, tutorial operation planning, and job completion side effects.
+- `modules/allocators/` owns reserved yard destinations, shuffle target selection, and destination-specific job creation.
+- `modules/movement/` owns centralized moving-entity occupancy checks, static yard stack obstacles, and reach-stacker routing.
+- `modules/economy/` owns ledger-style transaction application and money event payloads.
+
 Follows the four-layer architecture from `threejs-vue3-animation` skill:
 
-1. **Domain Model** (`modules/`) — Pure TypeScript: jobs, equipment, yard, vessels, trucks, economy, pathfinding, spatial occupancy, scene construction
-2. **Application State** (`store/gameStore.ts`) — Pinia store bridging domain and rendering
+1. **Domain Model** (`modules/`) — Pure TypeScript: scenario setup, simulation orchestration, operations, allocators, movement/occupancy, jobs, equipment, yard, vessels, trucks, economy, pathfinding, and scene construction
+2. **Application State** (`store/gameStore.ts`) — Pinia facade bridging domain, UI state, rendering, events, narrator state, and camera cues
 3. **Scene Adapter** (`composables/useThreeScene.ts`) — Translates Pinia state to Three.js; owns all renderers
 4. **Render Loop** (`composables/useGameLoop.ts`) — Fixed-step 20Hz sim tick + RAF render
 
@@ -17,9 +26,21 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 
 | File | Purpose |
 |------|---------|
-| `store/gameStore.ts` | Central Pinia store — all game state, tick logic, and job/truck/vessel orchestration |
+| `modules/scenario/tutorialScenario.ts` | Tutorial scenario factory: initial containers, yard, vessel, equipment, and counters |
+| `modules/simulation/simulationEngine.ts` | Main simulation tick orchestration: vessels, trucks, equipment, jobs, tutorial operations, and tutorial progression |
+| `modules/simulation/simulationTypes.ts` | Runtime contracts between the Pinia facade and simulation engine |
+| `modules/operations/truckOperations.ts` | Truck spawning, truck/container sync, and truck-ready job creation |
+| `modules/operations/tutorialOperations.ts` | Tutorial import/export operation planner, narrator milestones, and completion checks |
+| `modules/operations/jobCompletion.ts` | Container lifecycle changes and follow-on work after completed jobs |
+| `modules/allocators/yardAllocator.ts` | Reserved yard destinations, yard slot allocation, and shuffle target selection |
+| `modules/allocators/destinationAllocator.ts` | Destination-specific job creation for truck, yard, quay, vessel, and shuffle moves |
+| `modules/movement/occupancyWorld.ts` | Shared occupancy model for trucks, equipment, and static yard stack zones |
+| `modules/movement/terminalGeometry.ts` | Shared physical footprints, yard stack geometry, and service-lane clearance calculations |
+| `modules/movement/reachStackerRouting.ts` | Reach-stacker parking and waypoint routing around yard stack zones |
+| `modules/economy/economyLedger.ts` | Revenue/cost application and money event payloads |
+| `store/gameStore.ts` | Pinia facade: UI/render state, user actions, event buffering, narrator queueing, camera cues, and simulation engine delegation |
 | `modules/jobScheduler.ts` | Job creation, assignment, cancellation, blocked-job recheck, and RS landside/waterside capability filtering |
-| `modules/equipmentController.ts` | Equipment state machine and movement (RS waypoints, side-aware truck/yard access, MHC slew/trolley/hoist target state) |
+| `modules/equipmentController.ts` | Equipment state machine (delegates RS route choice to movement modules; owns MHC slew/trolley/hoist target state) |
 | `modules/vesselManager.ts` | Vessel visit lifecycle |
 | `modules/truckManager.ts` | Truck gate flow, queue logic, waypoint-based axis-aligned movement |
 | `modules/yardManager.ts` | Yard slot assignment (reserved slot tracking) |
@@ -31,7 +52,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 | `modules/truckRenderer.ts` | Truck render with GLB swap-in on load |
 | `modules/floatingTextRenderer.ts` | Canvas-sprite popups (money earned, events) that drift upward and fade |
 | `modules/sceneBuilder.ts` | Full static scene construction: sky dome, animated ocean, quay wall, bollards, fenders, port lights, weathered ground, faded yard markings, old chain-link perimeter fence with in/out gate openings, improved gatehouse buildings with animated barrier rigs, quay buffer markings, terminal buildings |
-| `modules/spatialOccupancy.ts` | AABB soft-collision registry — trucks and equipment register extents; `canMoveTo()` prevents overlap |
+| `modules/spatialOccupancy.ts` | Legacy AABB helper retained for compatibility |
 | `modules/terminalMap.ts` | Path graph (nodes + bidirectional edges with speed limits) for the terminal layout |
 | `modules/pathfinding.ts` | Dijkstra-based pathfinding over the terminal graph |
 | `modules/economy.ts` | Revenue tracking and transaction creation |
@@ -91,7 +112,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 - **Berth** — `BERTH_POSITION` `{ x: 0, z: -20 }` so the vessel hull clears the quay wall
 - **Terminal bounds** — X: -50 → 50, Z: -60 → 118
 
-Trucks use axis-aligned waypoint routes (stored in `TruckVisit.waypoints`), updated by `truckManager`. The RS uses waypoints too; both go through `spatialOccupancy` checks via `canMoveTo()` before moving.
+Trucks use axis-aligned waypoint routes (stored in `TruckVisit.waypoints`), updated by `truckManager`. The RS uses side-aware routes from `movement/reachStackerRouting.ts` and validates movement through `movement/occupancyWorld.ts`. Yard stack zones are static occupancy obstacles, and service lanes are derived from `movement/terminalGeometry.ts`, so vehicles cannot drive through storage stacks even if a future route is generated incorrectly.
 
 ## Assets
 
@@ -120,7 +141,7 @@ Containers use individual `THREE.Mesh` with per-container `createContainerMateri
 ## Equipment Types
 
 - **Reach Stacker** (`rs-1`): Yard operations — unladen 5 m/s, laden 4 m/s, 8s pick/place. Uses axis-aligned waypoints, can access yard stacks from both landside and waterside, and can approach trucks from either side based on the shorter path. `canServeLandside` gates truck ↔ yard jobs, `canServeWaterside` gates quay ↔ yard jobs, both default to enabled, and both are overridden by the main `enabled` toggle. `armTargetY` / `armDropStartY` drive boom tip animation; `headingY` drives body rotation.
-- **Mobile Harbor Crane** (`mhc-1`): Vessel operations — 90s full cycle. The base stays fixed, but the upper works now slew so the boom head faces the active target correctly, the shorter boom luffs, the trolley runs out along the boom, and the spreader hoists to the pickup/drop height without sinking boxes below the intended set-down level. `spreaderZ` is used as a signed reach command, and `craneMode` controls whether it discharges, loads, or both.
+- **Mobile Harbor Crane** (`mhc-1`): Vessel operations — 45s full cycle. The base stays fixed, but the upper works now slew so the boom head faces the active target correctly, the shorter boom luffs, the trolley runs out along the boom, and the spreader hoists to the pickup/drop height without sinking boxes below the intended set-down level. `spreaderZ` is used as a signed reach command, and `craneMode` controls whether it discharges, loads, or both.
 
 ## Economy
 
@@ -164,7 +185,7 @@ Eight shipping lines are defined in `containerMaterials.ts` (`SHIPPING_LINE_LIVE
 - Completed reach-stacker jobs deduct operating cost immediately, emit a `money.spent` event, and play `coin-drop-1-second.mp3`
 - Shared global god mode can be toggled by typing `god` or using the lightning icon beside mute; in Box Empire it suppresses move-cost and quay-unload money deductions, hides narrator/tutorial dialog prompts, and disables event-driven camera pans
 - Trucks depart via the out-gate at `GATE_OUTGATE_POSITION.z`, clearing the terminal
-- `spatialOccupancy` is rebuilt each tick from current entity positions; no manual "update" call is needed
+- `movement/occupancyWorld.ts` is rebuilt during simulation ticks from current moving entity positions plus static yard stack zones; extend it when adding richer traffic, route reservations, or additional blocked zones
 - The ocean mesh in `sceneBuilder.ts` is animated each frame via `animateOcean(time)` using vertex displacement — call this from the render loop
 - `FloatingTextRenderer.update()` must be called each animation frame to advance fade/drift
 - WebGL availability is tested at startup; if it fails, `webglFailed` ref is set and the scene is not initialised
