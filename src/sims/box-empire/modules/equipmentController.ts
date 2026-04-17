@@ -16,7 +16,7 @@ import type {
   Location,
   Position3D,
 } from '../types'
-import type { OccupancyWorld } from './movement/occupancyWorld'
+import type { MoveAttempt, OccupancyWorld } from './movement/occupancyWorld'
 import { buildReachStackerRoute, reachStackerParkingPosition } from './movement/reachStackerRouting'
 import {
   RS_SPEED_UNLADEN,
@@ -27,6 +27,18 @@ import {
   CONTAINER_HEIGHT,
 } from './config'
 import { isContainerOnTop } from './yardManager'
+
+const STUCK_FAIL_OPEN_SECONDS = 20
+const FORCE_THROUGH_SECONDS = 4
+const BACKUP_SPEED_FACTOR = 1.1
+const BACKUP_TURN_SECONDS = 2
+
+interface BlockRecoveryState {
+  blockedSeconds: number
+  forceThroughSeconds: number
+}
+
+const equipmentRecovery = new Map<string, BlockRecoveryState>()
 
 function distanceTo(a: Position3D, b: Position3D): number {
   const dx = a.x - b.x
@@ -67,10 +79,27 @@ function advanceRsWaypoints(
   eq.targetPosition = wp
   const { position, arrived } = moveTowards(eq.position, wp, speed, dt)
   if (occupancy) {
-    const attempt = occupancy.tryMoveEntity(eq.id, position)
-    if (!attempt.allowed) return false
+    const recovery = equipmentRecovery.get(eq.id)
+    const forceThrough = recovery && recovery.forceThroughSeconds > 0
+    const attempt = occupancy.tryMoveEntity(
+      eq.id,
+      position,
+      undefined,
+      forceThrough ? { ignoreDynamic: true } : {},
+    )
+    if (!attempt.allowed) {
+      recoverBlockedEquipmentMove(eq, wp, position, speed, dt, occupancy, attempt)
+      return false
+    }
+    if (forceThrough) {
+      recovery.forceThroughSeconds = Math.max(0, recovery.forceThroughSeconds - dt)
+      if (recovery.forceThroughSeconds <= 0) equipmentRecovery.delete(eq.id)
+    } else {
+      equipmentRecovery.delete(eq.id)
+    }
     eq.position = attempt.position
   } else {
+    equipmentRecovery.delete(eq.id)
     eq.position = position
   }
   eq.position.y = 0
@@ -79,6 +108,56 @@ function advanceRsWaypoints(
     if (eq.waypointIndex >= eq.waypoints.length) return true
   }
   return false
+}
+
+function recoverBlockedEquipmentMove(
+  eq: Equipment,
+  target: Position3D,
+  attemptedPosition: Position3D,
+  speed: number,
+  dt: number,
+  occupancy: OccupancyWorld,
+  attempt: MoveAttempt,
+): void {
+  if (attempt.blockedByStatic) return
+
+  const recovery = equipmentRecovery.get(eq.id) ?? { blockedSeconds: 0, forceThroughSeconds: 0 }
+  recovery.blockedSeconds += dt
+  equipmentRecovery.set(eq.id, recovery)
+
+  if (recovery.blockedSeconds >= STUCK_FAIL_OPEN_SECONDS) {
+    recovery.forceThroughSeconds = FORCE_THROUGH_SECONDS
+    const forced = occupancy.tryMoveEntity(eq.id, attemptedPosition, undefined, { ignoreDynamic: true })
+    if (forced.allowed) {
+      eq.position = forced.position
+    }
+    return
+  }
+
+  const dx = target.x - eq.position.x
+  const dz = target.z - eq.position.z
+  const distance = Math.sqrt(dx * dx + dz * dz)
+  if (distance < 0.1) return
+  if (!shouldBackUpThisTurn(eq.id, attempt.blockedBy, recovery.blockedSeconds)) return
+
+  const backupStep = Math.max(speed * dt * BACKUP_SPEED_FACTOR, 0.45)
+  const backupPosition = {
+    x: eq.position.x - (dx / distance) * backupStep,
+    y: 0,
+    z: eq.position.z - (dz / distance) * backupStep,
+  }
+  const backedUp = occupancy.tryMoveEntity(eq.id, backupPosition)
+  if (backedUp.allowed) {
+    eq.position = backedUp.position
+    eq.position.y = 0
+  }
+}
+
+function shouldBackUpThisTurn(entityId: string, blockedBy: string | undefined, blockedSeconds: number): boolean {
+  if (!blockedBy) return true
+  const phase = Math.floor(blockedSeconds / BACKUP_TURN_SECONDS) % 2
+  const entityFirst = entityId.localeCompare(blockedBy) < 0
+  return phase === 0 ? entityFirst : !entityFirst
 }
 
 // Determine heading for RS at a given position facing a pickup/drop target

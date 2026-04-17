@@ -102,8 +102,10 @@ export const TUTORIAL_IMPORT_COUNT = 5
 
 // ---- Terminal layout positions (meters) -----------------------------------
 
-// Compact tutorial terminal footprint so the starter site feels tighter.
-export const TERMINAL_FENCE_Z = 54
+// Landside fence/gates sit well behind the yard so multiple trucks can queue
+// inside the terminal without crowding the yard stack service area.
+const LANDSIDE_GATE_SETBACK = CONTAINER_LENGTH * 4
+export const TERMINAL_FENCE_Z = 54 + LANDSIDE_GATE_SETBACK
 
 // In-gate: queue lane runs parallel to the fence (along X), offset to one side of the gatehouse
 // Trucks queue along +Z OUTSIDE terminal, lane at x=-38 (beside gatehouse at x=-43)
@@ -112,9 +114,9 @@ export const GATE_INGATE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENC
 export const GATE_INGATE_LANE_X = -38
 
 // Out-gate: right-hand fence (mirror of in-gate on the left), landside along +Z
-export const GATE_OUTGATE_POSITION: Position3D = { x: 35, y: 0, z: 88 }
+export const GATE_OUTGATE_POSITION: Position3D = { x: 35, y: 0, z: 88 + LANDSIDE_GATE_SETBACK }
 // Trucks queue / hold along this Z before the boom (same as gate z)
-export const GATE_OUTGATE_FENCE_Z = 88
+export const GATE_OUTGATE_FENCE_Z = 88 + LANDSIDE_GATE_SETBACK
 export const GATE_OUTGATE_QUEUE_LENGTH = 25
 
 // Legacy aliases
@@ -159,7 +161,7 @@ export const TERMINAL_BOUNDS = {
   minX: -50,
   maxX: 50,
   minZ: -60,  // more sea visible
-  maxZ: 118,
+  maxZ: 118 + LANDSIDE_GATE_SETBACK,
 }
 
 // ── GLB model transforms ────────────────────────────────────────────────────

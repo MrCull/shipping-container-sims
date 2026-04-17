@@ -141,7 +141,7 @@ function removePickedContainerFromSource(
     )
     if (truck && truck.visitType === 'export_delivery' && truck.containerId === pickedContainerId) {
       truck.containerId = null
-      startExportTruckExit(truck, state.simTime)
+      startExportTruckExit(truck, state.simTime, eq.position)
     }
   }
 
@@ -185,7 +185,7 @@ function processEquipment(context: SimulationTickContext): void {
 
     const container = state.containers.find(candidate => candidate.id === result.droppedContainerId)
     if (container) {
-      emitMany(callbacks, handleJobCompletion(state, job, container))
+      emitMany(callbacks, handleJobCompletion(state, job, container, eq.position))
     }
   }
 }

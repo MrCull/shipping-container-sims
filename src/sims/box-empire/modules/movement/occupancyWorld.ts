@@ -17,6 +17,11 @@ export interface MoveAttempt {
   allowed: boolean
   position: Position3D
   blockedBy?: string
+  blockedByStatic?: boolean
+}
+
+export interface OccupancyOptions {
+  ignoreDynamic?: boolean
 }
 
 function overlaps(a: OccupancyRect, b: OccupancyRect): boolean {
@@ -67,7 +72,12 @@ export class OccupancyWorld {
     }
   }
 
-  canOccupy(entityId: string, position: Position3D, footprint?: Footprint): MoveAttempt {
+  canOccupy(
+    entityId: string,
+    position: Position3D,
+    footprint?: Footprint,
+    options: OccupancyOptions = {},
+  ): MoveAttempt {
     const current = this.rects.get(entityId)
     const fp = footprint ?? current
     if (!fp) return { allowed: true, position }
@@ -82,12 +92,14 @@ export class OccupancyWorld {
 
     for (const rect of this.rects.values()) {
       if (rect.entityId === entityId) continue
+      if (options.ignoreDynamic && !rect.static) continue
       if (overlaps(proposed, rect)) {
         if (isMovingOutOfOverlap(current, proposed, rect)) continue
         return {
           allowed: false,
           position: current ? { x: current.x, y: position.y, z: current.z } : position,
           blockedBy: rect.entityId,
+          blockedByStatic: rect.static === true,
         }
       }
     }
@@ -95,8 +107,13 @@ export class OccupancyWorld {
     return { allowed: true, position }
   }
 
-  tryMoveEntity(entityId: string, position: Position3D, footprint?: Footprint): MoveAttempt {
-    const attempt = this.canOccupy(entityId, position, footprint)
+  tryMoveEntity(
+    entityId: string,
+    position: Position3D,
+    footprint?: Footprint,
+    options: OccupancyOptions = {},
+  ): MoveAttempt {
+    const attempt = this.canOccupy(entityId, position, footprint, options)
     if (!attempt.allowed) return attempt
 
     const current = this.rects.get(entityId)

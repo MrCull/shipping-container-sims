@@ -1,4 +1,4 @@
-import type { BoxEmpireState, Container, Job, YardSlotRef } from '../../types'
+import type { BoxEmpireState, Container, Job, Position3D, YardSlotRef } from '../../types'
 import { makeYardSlotId, parseYardSlotId } from '../../types'
 import { allocateYardSlot } from '../allocators/yardAllocator'
 import {
@@ -50,6 +50,7 @@ export function handleJobCompletion(
   state: BoxEmpireState,
   job: Job,
   container: Container,
+  servicedByPosition?: Position3D,
 ): DomainEventPayload[] {
   const events: DomainEventPayload[] = []
   const yard = state.yardBlocks[0]
@@ -101,7 +102,7 @@ export function handleJobCompletion(
         id: truck.id,
         position: { ...truck.position },
       }
-      startTruckReturnToGate(truck, state.simTime)
+      startTruckReturnToGate(truck, state.simTime, servicedByPosition)
     }
     return events
   }
