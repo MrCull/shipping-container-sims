@@ -1,4 +1,5 @@
 import type { SimDefinition } from '@/types/sim'
+import { getStowageMasterProgressSummary } from './modules/progressStorage'
 
 export const definition: SimDefinition = {
   id: 'stowage-master',
@@ -13,5 +14,6 @@ export const definition: SimDefinition = {
   order: 1,
   color: '#3b82f6',
   tags: ['3D', 'Puzzle', 'Logistics'],
+  progressSummary: getStowageMasterProgressSummary,
   component: () => import('./StowageMaster.vue'),
 }

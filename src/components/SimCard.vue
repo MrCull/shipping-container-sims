@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import type { SimDefinition } from '@/types/sim'
 import { trackEvent } from '@/utils/analytics'
@@ -7,6 +8,8 @@ const props = defineProps<{
   sim: SimDefinition
 }>()
 const router = useRouter()
+
+const progressSummary = computed(() => props.sim.progressSummary?.() ?? null)
 
 function getUnavailableMessage(sim: SimDefinition): string {
   return sim.status === 'wip'
@@ -71,6 +74,14 @@ function openSim(): void {
     <p class="card-desc">
       {{ sim.description }}
     </p>
+
+    <div
+      v-if="progressSummary"
+      class="card-progress"
+    >
+      <span class="progress-label">Highest reached</span>
+      <span class="progress-value">{{ progressSummary }}</span>
+    </div>
 
     <div class="card-tags">
       <span
@@ -250,11 +261,34 @@ function openSim(): void {
   -webkit-box-orient: vertical;
 }
 
+.card-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 34%, var(--color-border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--card-accent) 11%, rgba(255, 255, 255, 0.04));
+}
+
+.progress-label {
+  font-family: var(--font-retro);
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--card-accent, var(--color-primary));
+}
+
+.progress-value {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
 .card-tags {
   display: flex;
   gap: 0.35rem;
   flex-wrap: wrap;
-  margin-top: auto;
 }
 
 .tag {

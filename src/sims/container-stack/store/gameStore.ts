@@ -14,8 +14,8 @@ import type {
 import { BLOCK, PHYSICS, TOWER } from '../modules/config'
 import {
   getLevelTimeLimitSec,
+  getMovesRequiredForLevel,
   getMoveTimeLimitSec,
-  MOVES_PER_LEVEL,
 } from '../modules/levelConfig'
 import {
   buildInitialTower,
@@ -41,8 +41,11 @@ import {
   updateWobble,
 } from '../modules/physics'
 import { computeMoveScore, nextComboStreak } from '../modules/scoring'
+import { saveHighestContainerStackLevelReached } from '../modules/progressStorage'
 
 const WobbleSpikeThreshold = 0.12
+const LevelCompleteDelayMs = 1000
+const FirstLevel = 1
 
 export const useContainerStackStore = defineStore('container-stack-game', () => {
   const phase = ref<GamePhase>('start')
@@ -72,6 +75,13 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   const levelTimeRemainingSec = ref(0)
   const moveTimeRemainingSec = ref(0)
   const levelFailReason = ref<LevelFailReason>(null)
+  let levelCompleteTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearLevelCompleteTimer(): void {
+    if (levelCompleteTimer === null) return
+    clearTimeout(levelCompleteTimer)
+    levelCompleteTimer = null
+  }
 
   function refillMoveTimer(): void {
     moveTimeRemainingSec.value = getMoveTimeLimitSec(currentLevel.value)
@@ -87,6 +97,8 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
 
   /** Start current level from a fresh tower (same score unless full restart). */
   function startLevelInternal(): void {
+    clearLevelCompleteTimer()
+    saveHighestContainerStackLevelReached(currentLevel.value)
     collapsePieces.value = []
     floatingContainer.value = null
     floatingFrom.value = null
@@ -100,6 +112,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   }
 
   function failLevelTimer(reason: 'timeoutMove' | 'timeoutLevel'): void {
+    clearLevelCompleteTimer()
     if (
       (phase.value === 'removing' || phase.value === 'placing') &&
       floatingFrom.value &&
@@ -123,7 +136,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
       reason,
       score: score.value,
       moves_completed: movesInLevel.value,
-      total_moves_required: MOVES_PER_LEVEL,
+      total_moves_required: getMovesRequiredForLevel(currentLevel.value),
     })
   }
 
@@ -134,6 +147,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
       phase.value === 'paused' ||
       phase.value === 'collapsing' ||
       phase.value === 'gameOver' ||
+      phase.value === 'levelCompletePending' ||
       phase.value === 'levelComplete' ||
       phase.value === 'levelFailed'
     ) {
@@ -151,15 +165,22 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   }
 
   function completeLevelIfNeeded(): void {
-    if (movesInLevel.value >= MOVES_PER_LEVEL) {
-      phase.value = 'levelComplete'
-      trackEvent('contenga_level_completed', {
-        level: currentLevel.value,
-        score: score.value,
-        total_moves: moveCount.value,
-        moves_completed: movesInLevel.value,
-        combo_streak: comboStreak.value,
-      })
+    if (movesInLevel.value >= getMovesRequiredForLevel(currentLevel.value)) {
+      clearLevelCompleteTimer()
+      phase.value = 'levelCompletePending'
+      levelCompleteTimer = setTimeout(() => {
+        levelCompleteTimer = null
+        if (phase.value !== 'levelCompletePending') return
+        phase.value = 'levelComplete'
+        trackEvent('contenga_level_completed', {
+          level: currentLevel.value,
+          score: score.value,
+          total_moves: moveCount.value,
+          moves_completed: movesInLevel.value,
+          total_moves_required: getMovesRequiredForLevel(currentLevel.value),
+          combo_streak: comboStreak.value,
+        })
+      }, LevelCompleteDelayMs)
     }
   }
 
@@ -169,6 +190,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   }
 
   function retryCurrentLevel(): void {
+    clearLevelCompleteTimer()
     collapsePieces.value = []
     floatingContainer.value = null
     floatingFrom.value = null
@@ -186,6 +208,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     orient: LayerOrientation
     position: Vector3
   }): void {
+    clearLevelCompleteTimer()
     const prefix = `${collapseIdPrefix}-`
     const towerPieces = spawnCollapsePieces(layers.value, prefix)
     if (extraFloating) {
@@ -212,6 +235,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   }
 
   function newGame(): void {
+    clearLevelCompleteTimer()
     collapseIdPrefix = `${Date.now()}`
     collapsePieces.value = []
     score.value = 0
@@ -219,7 +243,8 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     comboStreak.value = 0
     moves.value = []
     lastScorePopup.value = 0
-    currentLevel.value = 1
+    // Progress storage is display-only; every new run starts from level 1.
+    currentLevel.value = FirstLevel
     startLevelInternal()
   }
 
@@ -415,6 +440,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
       phase.value === 'gameOver' ||
       phase.value === 'start' ||
       phase.value === 'paused' ||
+      phase.value === 'levelCompletePending' ||
       phase.value === 'levelComplete' ||
       phase.value === 'levelFailed'
     ) {
@@ -472,6 +498,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
   }
 
   function finishCollapse(): void {
+    clearLevelCompleteTimer()
     wobble.value = createInitialWobble()
     phase.value = 'gameOver'
     trackEvent('contenga_level_failed', {
@@ -479,11 +506,12 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
       reason: 'tower_collapse',
       score: score.value,
       moves_completed: movesInLevel.value,
-      total_moves_required: MOVES_PER_LEVEL,
+      total_moves_required: getMovesRequiredForLevel(currentLevel.value),
     })
   }
 
   function restartToStart(): void {
+    clearLevelCompleteTimer()
     collapseIdPrefix = `${Date.now()}`
     phase.value = 'start'
     hasStartedGame.value = false
@@ -498,7 +526,7 @@ export const useContainerStackStore = defineStore('container-stack-game', () => 
     moves.value = []
     lastScorePopup.value = 0
     maxHeightLayers.value = TOWER.startLayers
-    currentLevel.value = 1
+    currentLevel.value = FirstLevel
     movesInLevel.value = 0
     levelTimeRemainingSec.value = 0
     moveTimeRemainingSec.value = 0

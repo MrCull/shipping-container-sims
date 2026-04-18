@@ -53,9 +53,11 @@ Failure and interruption phases branch off that flow:
 - `paused` toggles from `playing` via Escape and returns to `playing`.
 - `levelFailed` is used for move or level timeout failures.
 - `collapsing` runs collapse visuals, then `gameOver`.
-- `levelComplete` fires after `MOVES_PER_LEVEL` successful placements.
+- `levelCompletePending` pauses briefly after the final placement so the player can see the container land, then `levelComplete` shows the cleared dialog. Level 1 needs 1 placement, level 2 needs 2, level 3 needs 3, and so on.
 
 When adding gameplay behavior, prefer adding actions to the store rather than mutating layers or timers directly from components. `GameCanvas.vue` should translate pointer/canvas events into store actions, not become the gameplay rules engine.
+
+Highest level reached is persisted in `modules/progressStorage.ts` under local storage key `container-stack-progress`. The sim definition exposes that as a home-card progress summary only; route entry resets to the intro screen, and new runs always start from level 1.
 
 ## Tower and physics conventions
 
@@ -95,7 +97,7 @@ Audio assets are local to `assets/audio/`. Add new Contenga sounds there and reg
 Use these files for balance changes:
 
 - `modules/config.ts` for block dimensions, tower height, physics constants, scoring constants, camera behavior, and drag thresholds.
-- `modules/levelConfig.ts` for level time limits, move time limits, and moves required per level.
+- `modules/levelConfig.ts` for level time limits, move time limits, and the current level's required move count.
 - `modules/scoring.ts` for score calculation and combo behavior.
 
 Avoid scattering tuning constants through Vue components. If a visual depends on a gameplay dimension, import the relevant config value.

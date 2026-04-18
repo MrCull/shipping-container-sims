@@ -8,6 +8,7 @@ export type GamePhase =
   | 'wobbling'
   | 'collapsing'
   | 'gameOver'
+  | 'levelCompletePending'
   | 'levelComplete'
   | 'levelFailed'
   | 'paused'

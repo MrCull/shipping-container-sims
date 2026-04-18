@@ -14,5 +14,6 @@ export interface SimDefinition {
   color: string
   tags: string[]
   order?: number
+  progressSummary?: () => string | null
   component: () => Promise<{ default: Component }>
 }

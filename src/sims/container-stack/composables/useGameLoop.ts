@@ -29,6 +29,7 @@ export function useGameLoop(
       phase.value === 'paused' ||
       phase.value === 'start' ||
       phase.value === 'gameOver' ||
+      phase.value === 'levelCompletePending' ||
       phase.value === 'levelComplete' ||
       phase.value === 'levelFailed'
     ) {
@@ -72,6 +73,7 @@ export function useGameLoop(
       p === 'gameOver' ||
       p === 'start' ||
       p === 'paused' ||
+      p === 'levelCompletePending' ||
       p === 'levelComplete' ||
       p === 'levelFailed'
     ) {

@@ -2,7 +2,11 @@
 import { computed, watch, ref, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useContainerStackStore } from '../../store/gameStore'
-import { getLevelTimeLimitSec, getMoveTimeLimitSec, MOVES_PER_LEVEL } from '../../modules/levelConfig'
+import {
+  getLevelTimeLimitSec,
+  getMovesRequiredForLevel,
+  getMoveTimeLimitSec,
+} from '../../modules/levelConfig'
 import { playStackSound } from '../../modules/audioPlayer'
 
 const store = useContainerStackStore()
@@ -16,6 +20,7 @@ const {
 
 const levelLimit = computed(() => getLevelTimeLimitSec(currentLevel.value))
 const moveLimit = computed(() => getMoveTimeLimitSec(currentLevel.value))
+const movesRequired = computed(() => getMovesRequiredForLevel(currentLevel.value))
 
 const levelPct = computed(() =>
   levelLimit.value > 0 ? Math.min(100, (levelTimeRemainingSec.value / levelLimit.value) * 100) : 0
@@ -106,7 +111,7 @@ onUnmounted(resetCountdownTracking)
     <div class="timer-bar">
       <div class="row head">
         <span class="lab">Level {{ currentLevel }}</span>
-        <span class="moves">{{ movesInLevel }} / {{ MOVES_PER_LEVEL }} moves</span>
+        <span class="moves">{{ movesInLevel }} / {{ movesRequired }} moves</span>
       </div>
       <div class="row track-row">
         <span class="mini">Level</span>

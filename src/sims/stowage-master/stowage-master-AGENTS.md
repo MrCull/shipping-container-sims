@@ -153,6 +153,8 @@ Key state groups:
 | Persistence | `levelBests{}` (localStorage), `completedLevelIds[]` |
 | Dev | `isGodMode` (unlocks all levels) |
 
+Home-card progress is read by `modules/progressStorage.ts` from the existing `stowage-master-progress` and `stowage-master-level-bests` local-storage keys. It reports the highest unlocked/reached level for display only. Opening Stowage Master must continue to show the `start` phase level-select screen so the player can choose any unlocked level.
+
 Key actions:
 
 | Action | What it does |

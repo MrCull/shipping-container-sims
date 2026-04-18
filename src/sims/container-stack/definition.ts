@@ -1,4 +1,5 @@
 import type { SimDefinition } from '@/types/sim'
+import { getContainerStackProgressSummary } from './modules/progressStorage'
 
 export const definition: SimDefinition = {
   id: 'container-stack',
@@ -12,5 +13,6 @@ export const definition: SimDefinition = {
   order: 2,
   color: '#ef4444',
   tags: ['3D', 'Physics', 'Puzzle'],
+  progressSummary: getContainerStackProgressSummary,
   component: () => import('./ContainerStack.vue'),
 }

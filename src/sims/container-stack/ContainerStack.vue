@@ -19,7 +19,7 @@ import { useGameMusic } from './composables/useGameMusic'
 useGameMusic()
 
 const store = useContainerStackStore()
-const { phase, hasStartedGame } = storeToRefs(store)
+const { phase } = storeToRefs(store)
 
 const pauseOpen = ref(false)
 
@@ -45,11 +45,8 @@ watch(phase, p => {
 })
 
 onMounted(() => {
-  // Reset game state when component mounts (e.g., returning from menu)
-  // But NOT if we're retrying a level (hasStartedGame will be true)
-  if (phase.value !== 'start' && !hasStartedGame.value) {
-    store.restartToStart()
-  }
+  // Route entry always starts from the intro; saved progress is display-only.
+  store.restartToStart()
   window.addEventListener('keydown', onKey)
 })
 onUnmounted(() => window.removeEventListener('keydown', onKey))
