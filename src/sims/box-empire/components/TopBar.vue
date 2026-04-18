@@ -448,9 +448,9 @@ function goToMenu(): void {
 }
 
 .mode-btn.active {
-  background: rgba(245, 158, 11, 0.25);
-  border-color: #f59e0b;
-  color: #f59e0b;
+  background: rgba(46, 204, 113, 0.2);
+  border-color: #2ecc71;
+  color: #2ecc71;
   font-weight: bold;
 }
 

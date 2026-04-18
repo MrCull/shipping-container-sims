@@ -94,7 +94,7 @@ function handleLoadToggle(): void {
         <span class="value">{{ remainingImports }}</span>
       </div>
       <div class="info-row">
-        <span class="label">Fine</span>
+        <span class="label">Sail Early Fine</span>
         <span
           class="value"
           :class="{ warning: fineTotal > 0 }"
@@ -258,9 +258,9 @@ function handleLoadToggle(): void {
 }
 
 .ops-btn.active {
-  background: rgba(108, 183, 255, 0.2);
-  border-color: #6cb7ff;
-  color: #6cb7ff;
+  background: rgba(46, 204, 113, 0.2);
+  border-color: #2ecc71;
+  color: #2ecc71;
   font-weight: bold;
 }
 </style>

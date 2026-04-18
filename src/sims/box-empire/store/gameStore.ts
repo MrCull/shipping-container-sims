@@ -725,6 +725,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     fresh.vesselVisits = []
     fresh.equipment = []
     fresh.containers = fresh.containers.filter(c => c.lifecycleState !== 'on_vessel')
+    resetVesselCounter()  // tutorial vessel was discarded; start names from "Small Feeder 1"
     applyState({ ...getState(), ...fresh })
     gamePhase.value = 'sandbox'
   }
