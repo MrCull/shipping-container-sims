@@ -13,6 +13,7 @@ import { EquipmentRenderer } from '../modules/equipmentRenderer'
 import { VesselRenderer } from '../modules/vesselRenderer'
 import { TruckRenderer } from '../modules/truckRenderer'
 import { FloatingTextRenderer } from '../modules/floatingTextRenderer'
+import { buildRenderEntityIndexes } from '../modules/renderEntityIndexes'
 import { loadModel } from '../modules/modelLoader'
 import { TRUCK_GLB_URL } from '../modules/truckRenderer'
 import { VESSEL_GLB_URL } from '../modules/vesselRenderer'
@@ -94,47 +95,55 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
     switch (target) {
       case 'vessel_approach':
         return {
-          position: new THREE.Vector3(88, 34, 26),
-          lookAt: new THREE.Vector3(BERTH_POSITION.x + 80, 2, BERTH_POSITION.z),
+          position: new THREE.Vector3(120, 55, 50),
+          lookAt: new THREE.Vector3(BERTH_POSITION.x + 60, 2, BERTH_POSITION.z),
         }
       case 'berth':
         return {
-          position: new THREE.Vector3(58, 36, 36),
+          position: new THREE.Vector3(80, 55, 60),
           lookAt: new THREE.Vector3(BERTH_POSITION.x, 2, BERTH_POSITION.z),
         }
       case 'crane':
         return {
-          position: new THREE.Vector3(34, 30, 30),
-          lookAt: new THREE.Vector3(CRANE_POSITION.x, 10, CRANE_POSITION.z),
+          position: new THREE.Vector3(55, 50, 55),
+          lookAt: new THREE.Vector3(CRANE_POSITION.x, 5, CRANE_POSITION.z),
         }
       case 'gatehouse':
         return {
-          position: new THREE.Vector3(-34, 30, 116),
+          position: new THREE.Vector3(-20, 50, 130),
           lookAt: new THREE.Vector3(GATE_INGATE_POSITION.x - 2, 2, GATE_INGATE_POSITION.z + 12),
         }
       case 'yard':
         return {
-          position: new THREE.Vector3(38, 32, 62),
+          position: new THREE.Vector3(60, 52, 85),
           lookAt: new THREE.Vector3(YARD_BLOCK_POSITION.x + 12, 4, YARD_BLOCK_POSITION.z),
         }
       case 'quay_discharge':
         return {
-          position: new THREE.Vector3(34, 28, 34),
-          lookAt: new THREE.Vector3(QUAY_BUFFER_DISCHARGE_POSITION.x, 3, QUAY_BUFFER_DISCHARGE_POSITION.z),
+          position: new THREE.Vector3(55, 48, 55),
+          lookAt: new THREE.Vector3(
+            CRANE_POSITION.x + QUAY_BUFFER_DISCHARGE_POSITION.x,
+            3,
+            QUAY_BUFFER_DISCHARGE_POSITION.z,
+          ),
         }
       case 'quay_load':
         return {
-          position: new THREE.Vector3(32, 28, 30),
-          lookAt: new THREE.Vector3(QUAY_BUFFER_LOAD_POSITION.x, 3, QUAY_BUFFER_LOAD_POSITION.z),
+          position: new THREE.Vector3(52, 48, 52),
+          lookAt: new THREE.Vector3(
+            CRANE_POSITION.x + QUAY_BUFFER_LOAD_POSITION.x,
+            3,
+            QUAY_BUFFER_LOAD_POSITION.z,
+          ),
         }
       case 'yard_truck_stand':
         return {
-          position: new THREE.Vector3(28, 24, 70),
+          position: new THREE.Vector3(50, 45, 90),
           lookAt: new THREE.Vector3(YARD_TRUCK_PARK_POSITION.x, 2, YARD_TRUCK_PARK_POSITION.z - 6),
         }
       case 'outgate':
         return {
-          position: new THREE.Vector3(40, 24, 138),
+          position: new THREE.Vector3(60, 45, 155),
           lookAt: new THREE.Vector3(GATE_OUTGATE_POSITION.x, 2, GATE_OUTGATE_POSITION.z),
         }
     }
@@ -205,6 +214,15 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
       case 'KeyS': case 'ArrowDown':       keys.down    = true; e.preventDefault(); break
       case 'Equal': case 'NumpadAdd':      keys.zoomIn  = true; e.preventDefault(); break
       case 'Minus': case 'NumpadSubtract': keys.zoomOut = true; e.preventDefault(); break
+      case 'KeyR':
+        store.spawnReachStacker()
+        break
+      case 'KeyC':
+        store.spawnMobileHarborCrane()
+        break
+      case 'KeyV':
+        store.spawnVessel()
+        break
     }
   }
 
@@ -365,10 +383,11 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   }
 
   function updateEntities(): void {
-    containerRenderer?.update(store.containers, store.truckVisits)
-    equipmentRenderer?.update(store.equipment, store.containers)
-    vesselRenderer?.update(store.vesselVisits, store.containers, 0.016)
-    truckRenderer?.update(store.truckVisits, store.containers)
+    const indexes = buildRenderEntityIndexes(store.containers, store.truckVisits)
+    containerRenderer?.update(store.containers, store.truckVisits, indexes)
+    equipmentRenderer?.update(store.equipment, store.containers, indexes)
+    vesselRenderer?.update(store.vesselVisits, store.containers, 0.016, indexes)
+    truckRenderer?.update(store.truckVisits, store.containers, indexes)
   }
 
   function spawnFloatingText(text: string, color: string, worldPos: { x: number; y: number; z: number }): void {
@@ -386,8 +405,10 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   function getContainerIdNearScreen(
     clickX: number, clickY: number, canvasW: number, canvasH: number,
   ): string | null {
-    if (!camera || !containerRenderer) return null
-    return containerRenderer.getContainerIdNearScreen(clickX, clickY, canvasW, canvasH, camera)
+    if (!camera) return null
+    return containerRenderer?.getContainerIdNearScreen(clickX, clickY, canvasW, canvasH, camera)
+      ?? truckRenderer?.getContainerIdNearScreen(clickX, clickY, canvasW, canvasH, camera)
+      ?? null
   }
 
   function triggerVesselShake(vesselId: string): void {

@@ -13,13 +13,46 @@ import {
   TUTORIAL_VESSEL,
   BERTH_POSITION,
   CONTAINER_HEIGHT,
-  CONTAINER_LENGTH,
+  CONTAINER_STACK_GAP_Y,
+  BERTH_X_SPACING,
+  FIRST_BERTH_X,
+  VESSEL_CONTAINER_DECK_Y,
 } from './config'
 
 let vesselCounter = 0
 
 export function resetVesselCounter(): void {
   vesselCounter = 0
+}
+
+export function peekNextVesselId(): string {
+  return `vessel-${vesselCounter + 1}`
+}
+
+export function getVesselSlotRefs(): Array<{ bay: number; row: number; tier: number }> {
+  const refs: Array<{ bay: number; row: number; tier: number }> = []
+  for (let tier = 1; tier <= TUTORIAL_VESSEL.tiers; tier++) {
+    for (let bay = 1; bay <= TUTORIAL_VESSEL.bays; bay++) {
+      for (let row = 1; row <= TUTORIAL_VESSEL.rows; row++) {
+        refs.push({ bay, row, tier })
+      }
+    }
+  }
+  return refs
+}
+
+function createSlots(vesselId: string, importContainers: Container[]): VesselSlot[] {
+  const slots: VesselSlot[] = []
+  const refs = getVesselSlotRefs()
+  refs.forEach((ref, index) => {
+    const container = importContainers[index]
+    slots.push({
+      vesselId,
+      ...ref,
+      containerId: container ? container.id : null,
+    })
+  })
+  return slots
 }
 
 export function createTutorialVessel(
@@ -29,19 +62,6 @@ export function createTutorialVessel(
   vesselCounter++
   const vesselId = `vessel-${vesselCounter}`
 
-  // Tutorial vessel: 5 bays along the deck (X axis), 1 tier per bay
-  const slots: VesselSlot[] = []
-  for (let bay = 1; bay <= TUTORIAL_VESSEL.bays; bay++) {
-    const container = importContainers[bay - 1]
-    slots.push({
-      vesselId,
-      bay,
-      row: 1,
-      tier: 1,
-      containerId: container ? container.id : null,
-    })
-  }
-
   return {
     id: vesselId,
     name: TUTORIAL_VESSEL.name,
@@ -49,52 +69,116 @@ export function createTutorialVessel(
     beam: TUTORIAL_VESSEL.beam,
     teuCapacity: TUTORIAL_VESSEL.teuCapacity,
     state: 'announced',
-    slots,
+    slots: createSlots(vesselId, importContainers),
     // Spawn off to the +X side; vessel sails in from the right along the quay
     position: { x: BERTH_POSITION.x + 120, y: BERTH_POSITION.y, z: BERTH_POSITION.z },
+    berthPosition: { ...BERTH_POSITION },
     arrivalTime,
     hornPlayed: false,
   }
 }
 
-// Get world position of a vessel slot identified by bay number.
-// Containers are spread along the X axis (length of vessel).
-// bay=1 is near bow, bay=5 is near stern.
+export function createSpawnedVessel(
+  importContainers: Container[],
+  berthX: number,
+): VesselVisit {
+  vesselCounter++
+  const vesselId = `vessel-${vesselCounter}`
+  const berthPosition: Position3D = { x: berthX, y: 0, z: BERTH_POSITION.z }
+
+  return {
+    id: vesselId,
+    name: `Feeder ${vesselCounter}`,
+    loa: TUTORIAL_VESSEL.loa,
+    beam: TUTORIAL_VESSEL.beam,
+    teuCapacity: TUTORIAL_VESSEL.teuCapacity,
+    state: 'announced',
+    slots: createSlots(vesselId, importContainers),
+    position: { x: berthX + 120, y: 0, z: BERTH_POSITION.z },
+    berthPosition,
+    arrivalTime: 0,  // arrives immediately (god mode)
+    hornPlayed: false,
+  }
+}
+
+export function getNextBerthX(activeVesselCount: number): number {
+  return FIRST_BERTH_X + activeVesselCount * BERTH_X_SPACING
+}
+
+const SANDBOX_BERTH_COUNT = 8
+
+export function getSandboxBerthX(currentVessels: VesselVisit[]): number {
+  const occupiedX = new Set(
+    currentVessels
+      .filter(v => v.state !== 'departed')
+      .map(v => v.berthPosition.x),
+  )
+  for (let i = SANDBOX_BERTH_COUNT - 1; i >= 0; i--) {
+    const berthX = FIRST_BERTH_X + i * BERTH_X_SPACING
+    if (!occupiedX.has(berthX)) return berthX
+  }
+  return FIRST_BERTH_X + SANDBOX_BERTH_COUNT * BERTH_X_SPACING
+}
+
 export function getVesselSlotPosition(
   vessel: VesselVisit,
   bay: number,
+  row = 1,
+  tier = 1,
 ): Position3D {
-  const deckY = 5.4  // above hull (hull body is 5m tall, deck at top)
-  const containerSpacing = CONTAINER_LENGTH + 0.5
-  // Centre the 5 containers on the vessel; offset from vessel centre X
-  const totalSpan = (TUTORIAL_VESSEL.bays - 1) * containerSpacing
-  const bayOffset = (bay - 1) * containerSpacing - totalSpan / 2
+  const deckY = VESSEL_CONTAINER_DECK_Y
+  const bayOffset = TUTORIAL_VESSEL.bayXOffsets[bay - 1] ?? 0
+  const rowOffset = TUTORIAL_VESSEL.rowZOffsets[row - 1] ?? 0
+  const tierOffset = (tier - 1) * (CONTAINER_HEIGHT + CONTAINER_STACK_GAP_Y)
   return {
     x: vessel.position.x + bayOffset,
-    y: deckY + CONTAINER_HEIGHT / 2,
-    z: vessel.position.z,
+    y: deckY + tierOffset + CONTAINER_HEIGHT / 2,
+    z: vessel.position.z + rowOffset,
   }
 }
 
-// Returns the next container to discharge and its bay number
+function hasContainerAbove(vessel: VesselVisit, slot: VesselSlot): boolean {
+  return vessel.slots.some(
+    other =>
+      other.bay === slot.bay &&
+      other.row === slot.row &&
+      other.tier > slot.tier &&
+      other.containerId !== null,
+  )
+}
+
+export function getDischargeableVesselContainers(
+  vessel: VesselVisit,
+): Array<{ containerId: string; bay: number; row: number; tier: number }> {
+  return vessel.slots
+    .filter(slot => slot.containerId !== null && !hasContainerAbove(vessel, slot))
+    .sort((a, b) => {
+      if (b.tier !== a.tier) return b.tier - a.tier
+      if (b.bay !== a.bay) return b.bay - a.bay
+      return a.row - b.row
+    })
+    .map(slot => ({
+      containerId: slot.containerId as string,
+      bay: slot.bay,
+      row: slot.row,
+      tier: slot.tier,
+    }))
+}
+
 export function getNextDischargeContainer(
   vessel: VesselVisit,
-): { containerId: string; tier: number } | null {
-  // Discharge from highest bay first (stern to bow)
-  for (let bay = TUTORIAL_VESSEL.bays; bay >= 1; bay--) {
-    const slot = vessel.slots.find(s => s.bay === bay && s.containerId !== null)
-    if (slot && slot.containerId) {
-      return { containerId: slot.containerId, tier: slot.bay }  // tier field reused as bay for API compat
-    }
-  }
-  return null
+): { containerId: string; bay: number; row: number; tier: number } | null {
+  return getDischargeableVesselContainers(vessel)[0] ?? null
 }
 
-// Returns the next empty bay for loading (bay number as 'tier' for API compat)
-export function getNextLoadSlot(vessel: VesselVisit): number | null {
-  for (let bay = 1; bay <= TUTORIAL_VESSEL.bays; bay++) {
-    const slot = vessel.slots.find(s => s.bay === bay)
-    if (slot && !slot.containerId) return bay
+export function getNextLoadSlot(vessel: VesselVisit): VesselSlot | null {
+  for (let tier = 1; tier <= TUTORIAL_VESSEL.tiers; tier++) {
+    for (let bay = 1; bay <= TUTORIAL_VESSEL.bays; bay++) {
+      for (let row = 1; row <= TUTORIAL_VESSEL.rows; row++) {
+        const slot = vessel.slots.find(s => s.bay === bay && s.row === row && s.tier === tier)
+        if (slot && !slot.containerId) return slot
+      }
+    }
   }
   return null
 }
@@ -111,9 +195,11 @@ export function dischargeContainerFromVessel(
 export function loadContainerOnVessel(
   vessel: VesselVisit,
   containerId: string,
-  tier: number,
+  bay: number,
+  row = 1,
+  tier = 1,
 ): void {
-  const slot = vessel.slots.find(s => s.bay === tier)
+  const slot = vessel.slots.find(s => s.bay === bay && s.row === row && s.tier === tier)
   if (slot) slot.containerId = containerId
 }
 
@@ -139,8 +225,8 @@ export function tickVessel(
       if (state.simTime >= vessel.arrivalTime) {
         if (instantArrive) {
           vessel.state = 'arrived'
-          vessel.position.x = BERTH_POSITION.x
-          vessel.position.z = BERTH_POSITION.z
+          vessel.position.x = vessel.berthPosition.x
+          vessel.position.z = vessel.berthPosition.z
           result.stateChanged = true
           result.newState = 'arrived'
         } else {
@@ -153,8 +239,8 @@ export function tickVessel(
       break
     }
     case 'arriving': {
-      const targetX = BERTH_POSITION.x
-      const targetZ = BERTH_POSITION.z
+      const targetX = vessel.berthPosition.x
+      const targetZ = vessel.berthPosition.z
       const dist = vessel.position.x - targetX
       // Two-phase: fast approach, decelerate when within 15m
       const speed = Math.abs(dist) > 15 ? 6 : 2
@@ -180,7 +266,7 @@ export function tickVessel(
       // Vessel departs along -X (sails away to the left)
       const speed = 4
       vessel.position.x -= speed * _dt
-      if (vessel.position.x < BERTH_POSITION.x - 120) {
+      if (vessel.position.x < vessel.berthPosition.x - 120) {
         vessel.state = 'departed'
         result.stateChanged = true
         result.newState = 'departed'

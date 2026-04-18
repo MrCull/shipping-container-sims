@@ -51,7 +51,8 @@ export const RS_PICK_CYCLE_TIME = 8
 export const RS_PLACE_CYCLE_TIME = 8
 export const RS_MAX_STACK_HEIGHT = 3
 export const RS_LENGTH = 9.5
-export const RS_YARD_PARK_OFFSET = 5.5
+export const RS_YARD_PARK_OFFSET = 6.25
+export const RS_QUAY_PARK_OFFSET = 6.25
 export const RS_TRUCK_PARK_OFFSET = 8
 export const RS_TRUCK_STANDOFF_MULTIPLIER = 1.5
 
@@ -59,6 +60,11 @@ export const RS_TRUCK_STANDOFF_MULTIPLIER = 1.5
 
 export const MHC_CYCLE_TIME = 45
 export const MHC_REACH = 1
+export const MHC_TRAVEL_SPEED = 3   // m/s lateral quay travel along X axis
+export const BERTH_X_SPACING = 56  // spacing between vessel berth centres along X
+export const FIRST_BERTH_X = -BERTH_X_SPACING / 2
+export const MHC_MIN_SEPARATION_X = CONTAINER_LENGTH * 2
+export const MHC_QUAY_EXCHANGE_OFFSET_X = 4.5
 
 // ---- Truck ----------------------------------------------------------------
 
@@ -72,17 +78,19 @@ export const TUTORIAL_VESSEL = {
   name: 'Tiny Feeder',
   loa: 50,
   beam: 12,
-  teuCapacity: 10,
-  bays: 5,   // 5 container positions spread along the deck (X axis)
-  rows: 1,
-  tiers: 1,  // single tier on deck
+  teuCapacity: 24,
+  bays: 4,
+  rows: 3,
+  tiers: 2,
+  bayXOffsets: [-12.6, -6.1, 0.4, 6.9],
+  rowZOffsets: [-2.7, 0, 2.7],
 }
 
 // ---- Yard (Tutorial) ------------------------------------------------------
 
 export const TUTORIAL_YARD = {
   id: 'yard-a',
-  bays: 10,
+  bays: 13,
   rows: 1,
   maxTier: 3,
 }
@@ -93,6 +101,7 @@ export const GATE_OUT_REVENUE = 100
 export const VESSEL_LOAD_REVENUE = 150
 export const REACH_STACKER_MOVE_COST = 10
 export const QUAY_CRANE_IMPORT_UNLOAD_COST = 20
+export const UNPROCESSED_IMPORT_FINE = 100
 
 // ---- Tutorial scenario ----------------------------------------------------
 
@@ -101,8 +110,10 @@ export const TUTORIAL_IMPORT_COUNT = 5
 
 // ---- Terminal layout positions (meters) -----------------------------------
 
-// Compact tutorial terminal footprint so the starter site feels tighter.
-export const TERMINAL_FENCE_Z = 54
+// Landside fence/gates sit well behind the yard so multiple trucks can queue
+// inside the terminal without crowding the yard stack service area.
+const LANDSIDE_GATE_SETBACK = CONTAINER_LENGTH * 4
+export const TERMINAL_FENCE_Z = 54 + LANDSIDE_GATE_SETBACK
 
 // In-gate: queue lane runs parallel to the fence (along X), offset to one side of the gatehouse
 // Trucks queue along +Z OUTSIDE terminal, lane at x=-38 (beside gatehouse at x=-43)
@@ -111,9 +122,9 @@ export const GATE_INGATE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENC
 export const GATE_INGATE_LANE_X = -38
 
 // Out-gate: right-hand fence (mirror of in-gate on the left), landside along +Z
-export const GATE_OUTGATE_POSITION: Position3D = { x: 35, y: 0, z: 88 }
+export const GATE_OUTGATE_POSITION: Position3D = { x: 35, y: 0, z: 88 + LANDSIDE_GATE_SETBACK }
 // Trucks queue / hold along this Z before the boom (same as gate z)
-export const GATE_OUTGATE_FENCE_Z = 88
+export const GATE_OUTGATE_FENCE_Z = 88 + LANDSIDE_GATE_SETBACK
 export const GATE_OUTGATE_QUEUE_LENGTH = 25
 
 // Legacy aliases
@@ -121,41 +132,45 @@ export const GATE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
 export const GATE_EXPORT_LANE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
 export const GATE_IMPORT_LANE_POSITION: Position3D = { x: -38, y: 0, z: TERMINAL_FENCE_Z }
 
-export const YARD_BLOCK_POSITION: Position = { x: -12, z: 18 }
+// Keep the yard stack inland of the quay-side service lane so the reach stacker
+// can work waterside imports without clipping the stored-container footprint.
+export const YARD_BLOCK_POSITION: Position = { x: -12, z: 18 + CONTAINER_WIDTH }
 const YARD_TRUCK_STANDOFF = RS_LENGTH * RS_TRUCK_STANDOFF_MULTIPLIER
+const YARD_TRUCK_SERVICE_CLEARANCE = CONTAINER_LENGTH
 
 // Separate yard truck stands so export deliveries and import pickups do not stack into one bay.
 export const YARD_TRUCK_EXPORT_PARK_POSITION: Position3D = {
   x: -7,
   y: 0,
-  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF,
+  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF + YARD_TRUCK_SERVICE_CLEARANCE,
 }
 export const YARD_TRUCK_IMPORT_PARK_POSITION: Position3D = {
   x: 9,
   y: 0,
-  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF,
+  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF + YARD_TRUCK_SERVICE_CLEARANCE,
 }
 // Legacy midpoint retained for generic camera framing / old references.
 export const YARD_TRUCK_PARK_POSITION: Position3D = {
   x: 0,
   y: 0,
-  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF,
+  z: YARD_BLOCK_POSITION.z + YARD_TRUCK_STANDOFF + YARD_TRUCK_SERVICE_CLEARANCE,
 }
 // Legacy aliases kept while Box Empire still refers to Yard I/O in some UI/docs.
 export const YARD_IO_POSITION: Position3D = { ...YARD_TRUCK_PARK_POSITION, y: CONTAINER_HEIGHT / 2 }
 export const YARD_IO_WAIT_POSITION: Position3D = { x: -10, y: 0, z: YARD_TRUCK_PARK_POSITION.z }
 export const QUAY_BUFFER_POSITION: Position3D = { x: 0, y: CONTAINER_HEIGHT / 2, z: 3 }
-export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -5, y: CONTAINER_HEIGHT / 2, z: 3 }
-export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: 5, y: CONTAINER_HEIGHT / 2, z: 3 }
+export const QUAY_BUFFER_DISCHARGE_POSITION: Position3D = { x: -MHC_QUAY_EXCHANGE_OFFSET_X, y: CONTAINER_HEIGHT / 2, z: 3 }
+export const QUAY_BUFFER_LOAD_POSITION: Position3D = { x: MHC_QUAY_EXCHANGE_OFFSET_X, y: CONTAINER_HEIGHT / 2, z: 3 }
 // Vessel berth further out to sea so ship doesn't overlap quay
-export const BERTH_POSITION: Position3D = { x: 0, y: 0, z: -11.5 }
-export const CRANE_POSITION: Position3D = { x: 0, y: 0, z: 0 }
+export const BERTH_POSITION: Position3D = { x: FIRST_BERTH_X, y: 0, z: -11.5 }
+export const CRANE_POSITION: Position3D = { x: FIRST_BERTH_X, y: 0, z: 0 }
+export const VESSEL_CONTAINER_DECK_Y = 5.4 - CONTAINER_HEIGHT
 
 export const TERMINAL_BOUNDS = {
-  minX: -50,
-  maxX: 50,
+  minX: -70,
+  maxX: 70,
   minZ: -60,  // more sea visible
-  maxZ: 118,
+  maxZ: 118 + LANDSIDE_GATE_SETBACK,
 }
 
 // ── GLB model transforms ────────────────────────────────────────────────────
@@ -217,4 +232,5 @@ export const SOUND_MAP: Record<string, string> = {
   'vessel.departing': 'small-ship-three-horns-in-a-row.mp3',
   'tutorial.completed': 'group-yay-cheer.mp3',
   'level.up': 'level-up.mp3',
+  'item.spawned': 'item-spawn.mp3',
 }

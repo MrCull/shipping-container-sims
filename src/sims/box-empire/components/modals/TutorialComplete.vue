@@ -14,6 +14,7 @@ const stats = computed(() => ({
 const emit = defineEmits<{
   restart: []
   continueCareer: []
+  sandbox: []
 }>()
 </script>
 
@@ -78,7 +79,14 @@ const emit = defineEmits<{
           class="next-level-btn"
           @click="emit('continueCareer')"
         >
-          Next: Level 2 — Your terminal
+          Next: Full Game Mode — Build Your First Terminal
+        </button>
+        <button
+          type="button"
+          class="sandbox-btn"
+          @click="emit('sandbox')"
+        >
+          Continue in Sandbox Mode
         </button>
         <button
           type="button"
@@ -203,6 +211,25 @@ const emit = defineEmits<{
 .next-level-btn:hover {
   transform: scale(1.02);
   box-shadow: 0 4px 22px rgba(46, 204, 113, 0.45);
+}
+
+.sandbox-btn {
+  padding: 10px 28px;
+  border: 2px solid #3498db;
+  border-radius: 8px;
+  background: transparent;
+  color: #3498db;
+  font-family: var(--font-retro, monospace);
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sandbox-btn:hover {
+  background: rgba(52, 152, 219, 0.15);
+  border-color: #5dade2;
+  color: #5dade2;
 }
 
 .restart-btn {

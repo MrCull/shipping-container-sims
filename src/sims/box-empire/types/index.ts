@@ -141,6 +141,7 @@ export interface VesselVisit {
   state: VesselVisitState
   slots: VesselSlot[]
   position: Position3D
+  berthPosition: Position3D  // where this vessel docks (allows multiple berths along the quay)
   arrivalTime: number
   hornPlayed: boolean   // ensures horn fires exactly once when 'arriving' begins
 }
@@ -209,6 +210,8 @@ export interface Equipment {
   canServeLandside: boolean
   canServeWaterside: boolean
   craneMode: CraneMode
+  craneAllowedVesselIds: string[]
+  craneAllowedBaysByVessel: Record<string, number[]>
   armTargetY: number       // current spreader/boom tip height (world Y)
   armDropStartY: number    // armTargetY at the start of the drop phase (for lerp from)
   spreaderZ: number        // MHC reach command magnitude; sign indicates quay/vessel side
@@ -239,6 +242,7 @@ export interface Job {
   startedAt: number | null
   completedAt: number | null
   equipmentType: EquipmentType
+  blockedReason?: string
 }
 
 // ---- Economy --------------------------------------------------------------
@@ -248,6 +252,7 @@ export type TransactionType =
   | 'vessel_load_revenue'
   | 'reach_stacker_move_cost'
   | 'quay_crane_import_unload_cost'
+  | 'unprocessed_import_fine'
 
 export interface Transaction {
   id: string
@@ -280,6 +285,10 @@ export type GameEventType =
   | 'job.created'
   | 'job.completed'
   | 'equipment.idle'
+  | 'yard.slot.repaired'
+  | 'yard.gravity.applied'
+  | 'yard.gravity.skipped'
+  | 'item.spawned'
 
 export interface GameEvent {
   id: string
@@ -382,6 +391,7 @@ export type GamePhase =
   | 'paused'
   | 'completed'
   | 'career_intro'
+  | 'sandbox'
 
 // ---- Store State ----------------------------------------------------------
 
@@ -402,6 +412,7 @@ export interface BoxEmpireState {
   jobs: Job[]
   selectedContainerId: string | null
   selectedEquipmentId: string | null
+  selectedVesselId: string | null
   selectedGatehouseId: string | null
   events: GameEvent[]
 }

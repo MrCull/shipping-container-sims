@@ -13,8 +13,10 @@
 // ---------------------------------------------------------------------------
 
 import type { TruckVisit, Position3D, BoxEmpireState } from '../types'
+import type { MoveAttempt, OccupancyWorld } from './movement/occupancyWorld'
 import {
   CONTAINER_LENGTH,
+  TRUCK_GLB,
   TRUCK_SPEED,
   GATE_PROCESSING_TIME,
   GATE_INGATE_POSITION,
@@ -36,6 +38,18 @@ const GATE_STOP_OFFSET = CONTAINER_LENGTH
 const TRUCK_TURN_RUNOUT = 7.5
 const YARD_STAND_OCCUPY_RADIUS = 4.5
 const INGATE_QUEUE_HEADING = Math.PI
+const POST_SERVICE_CLEARANCE_X = TRUCK_GLB.targetHeight * 2
+const STUCK_FAIL_OPEN_SECONDS = 20
+const FORCE_THROUGH_SECONDS = 4
+const BACKUP_SPEED_FACTOR = 1.1
+const BACKUP_TURN_SECONDS = 2
+
+interface BlockRecoveryState {
+  blockedSeconds: number
+  forceThroughSeconds: number
+}
+
+const truckRecovery = new Map<string, BlockRecoveryState>()
 
 export function resetTruckCounter(): void {
   truckCounter = 0
@@ -88,19 +102,127 @@ function moveTowards(
 ): { position: Position3D; arrived: boolean } {
   const dx = target.x - current.x
   const dz = target.z - current.z
-  const d = Math.sqrt(dx * dx + dz * dz)
+  const axisDx = Math.abs(dx) > 0.1
+  const axisDz = Math.abs(dz) > 0.1
+  const d = axisDx ? Math.abs(dx) : Math.abs(dz)
   const step = speed * dt
-  if (d <= step || d < 0.5) {
+  if (!axisDx && !axisDz) {
     return { position: { x: target.x, y: 0, z: target.z }, arrived: true }
   }
-  const ratio = step / d
+  if (d <= step || d < 0.5) {
+    const position = axisDx
+      ? { x: target.x, y: 0, z: current.z }
+      : { x: current.x, y: 0, z: target.z }
+    const arrived = Math.abs(position.x - target.x) < 0.5 && Math.abs(position.z - target.z) < 0.5
+    return { position: arrived ? { x: target.x, y: 0, z: target.z } : position, arrived }
+  }
   return {
-    position: { x: current.x + dx * ratio, y: 0, z: current.z + dz * ratio },
+    position: axisDx
+      ? { x: current.x + Math.sign(dx) * step, y: 0, z: current.z }
+      : { x: current.x, y: 0, z: current.z + Math.sign(dz) * step },
     arrived: false,
   }
 }
 
-function advanceWaypoints(truck: TruckVisit, speed: number, dt: number): boolean {
+function applyTruckMove(
+  truck: TruckVisit,
+  target: Position3D,
+  speed: number,
+  dt: number,
+  occupancy?: OccupancyWorld,
+): boolean {
+  const { position, arrived } = moveTowards(truck.position, target, speed, dt)
+  if (occupancy) {
+    const recovery = truckRecovery.get(truck.id)
+    const forceThrough = recovery && recovery.forceThroughSeconds > 0
+    const attempt = occupancy.tryMoveEntity(
+      truck.id,
+      position,
+      undefined,
+      forceThrough ? { ignoreDynamic: true } : {},
+    )
+    if (!attempt.allowed) {
+      recoverBlockedTruckMove(truck, target, position, speed, dt, occupancy, attempt)
+      return false
+    }
+    if (forceThrough) {
+      recovery.forceThroughSeconds = Math.max(0, recovery.forceThroughSeconds - dt)
+      if (recovery.forceThroughSeconds <= 0) truckRecovery.delete(truck.id)
+    } else {
+      truckRecovery.delete(truck.id)
+    }
+    truck.position = attempt.position
+    return arrived
+  }
+  truckRecovery.delete(truck.id)
+  truck.position = position
+  return arrived
+}
+
+function recoverBlockedTruckMove(
+  truck: TruckVisit,
+  target: Position3D,
+  attemptedPosition: Position3D,
+  speed: number,
+  dt: number,
+  occupancy: OccupancyWorld,
+  attempt: MoveAttempt,
+): void {
+  if (attempt.blockedByStatic) return
+
+  const recovery = truckRecovery.get(truck.id) ?? { blockedSeconds: 0, forceThroughSeconds: 0 }
+  recovery.blockedSeconds += dt
+  truckRecovery.set(truck.id, recovery)
+
+  const dx = target.x - truck.position.x
+  const dz = target.z - truck.position.z
+  const movingX = Math.abs(dx) > 0.1
+  const distance = movingX ? Math.abs(dx) : Math.abs(dz)
+
+  if (recovery.blockedSeconds >= STUCK_FAIL_OPEN_SECONDS) {
+    recovery.forceThroughSeconds = FORCE_THROUGH_SECONDS
+    const forced = occupancy.tryMoveEntity(truck.id, attemptedPosition, undefined, { ignoreDynamic: true })
+    if (forced.allowed) {
+      truck.position = forced.position
+    }
+    return
+  }
+
+  if (distance < 0.1) return
+  if (!shouldBackUpThisTurn(truck.id, attempt.blockedBy, recovery.blockedSeconds)) return
+
+  const backupStep = Math.max(speed * dt * BACKUP_SPEED_FACTOR, 0.45)
+  const backupPosition = {
+    x: movingX ? truck.position.x - Math.sign(dx) * backupStep : truck.position.x,
+    y: 0,
+    z: movingX ? truck.position.z : truck.position.z - Math.sign(dz) * backupStep,
+  }
+  const backedUp = occupancy.tryMoveEntity(truck.id, backupPosition)
+  if (backedUp.allowed) {
+    truck.position = backedUp.position
+  }
+}
+
+function shouldBackUpThisTurn(entityId: string, blockedBy: string | undefined, blockedSeconds: number): boolean {
+  if (!blockedBy) return true
+  const phase = Math.floor(blockedSeconds / BACKUP_TURN_SECONDS) % 2
+  const entityFirst = entityId.localeCompare(blockedBy) < 0
+  return phase === 0 ? entityFirst : !entityFirst
+}
+
+function isCurrentRouteTo(truck: TruckVisit, destination: Position3D): boolean {
+  const finalWaypoint = truck.waypoints[truck.waypoints.length - 1] ?? truck.targetPosition
+  return finalWaypoint !== null &&
+    Math.abs(finalWaypoint.x - destination.x) < 0.1 &&
+    Math.abs(finalWaypoint.z - destination.z) < 0.1
+}
+
+function advanceWaypoints(
+  truck: TruckVisit,
+  speed: number,
+  dt: number,
+  occupancy?: OccupancyWorld,
+): boolean {
   if (truck.waypointIndex >= truck.waypoints.length) return true
 
   const wp = truck.waypoints[truck.waypointIndex]!
@@ -108,12 +230,13 @@ function advanceWaypoints(truck: TruckVisit, speed: number, dt: number): boolean
 
   const dx = wp.x - truck.position.x
   const dz = wp.z - truck.position.z
-  if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) {
-    truck.headingY = Math.atan2(dx, dz)
+  if (Math.abs(dx) > 0.1) {
+    truck.headingY = dx > 0 ? Math.PI / 2 : -Math.PI / 2
+  } else if (Math.abs(dz) > 0.1) {
+    truck.headingY = dz > 0 ? 0 : Math.PI
   }
 
-  const { position, arrived } = moveTowards(truck.position, wp, speed, dt)
-  truck.position = position
+  const arrived = applyTruckMove(truck, wp, speed, dt, occupancy)
 
   if (arrived) {
     truck.waypointIndex++
@@ -177,6 +300,28 @@ function isYardZoneBusy(state: BoxEmpireState, thisTruckId: string): boolean {
   })
 }
 
+function yardStandForTruck(truck: TruckVisit): Position3D {
+  return truck.visitType === 'import_pickup'
+    ? YARD_TRUCK_IMPORT_PARK_POSITION
+    : YARD_TRUCK_EXPORT_PARK_POSITION
+}
+
+function yardQueueHoldForTruck(state: BoxEmpireState, truck: TruckVisit): Position3D {
+  const stand = yardStandForTruck(truck)
+  const queueRank = state.truckVisits.filter(other => {
+    if (other.id === truck.id) return false
+    if (other.queueIndex >= truck.queueIndex) return false
+    if (other.state !== 'waiting_for_equipment' && other.state !== 'driving_to_yard') return false
+    const otherStand = yardStandForTruck(other)
+    return Math.abs(otherStand.x - stand.x) < 1
+  }).length
+  return {
+    x: stand.x,
+    y: 0,
+    z: stand.z + QUEUE_SPACING * Math.max(1, queueRank),
+  }
+}
+
 function outgateHoldZ(state: BoxEmpireState, thisTruck: TruckVisit): number {
   const waiters = state.truckVisits.filter(
     t =>
@@ -200,6 +345,20 @@ function buildOutgateApproachWaypoints(from: Position3D, to: Position3D): Positi
     pts.push({ x: GATE_OUTGATE_POSITION.x, y: 0, z: to.z })
   }
   return pts
+}
+
+function buildPostServiceOutgateWaypoints(
+  from: Position3D,
+  servicedByPosition: Position3D,
+  to: Position3D,
+): Position3D[] {
+  const shiftSign = from.x >= servicedByPosition.x ? 1 : -1
+  const shiftedX = from.x + shiftSign * POST_SERVICE_CLEARANCE_X
+  const laneClearPos = { x: shiftedX, y: 0, z: from.z }
+  return [
+    laneClearPos,
+    ...buildOutgateApproachWaypoints(laneClearPos, to),
+  ]
 }
 
 function clampForwardOnly(currentZ: number, targetZ: number): number {
@@ -237,6 +396,7 @@ export function tickTruck(
   truck: TruckVisit,
   state: BoxEmpireState,
   dt: number,
+  occupancy?: OccupancyWorld,
 ): TruckTickResult {
   const result: TruckTickResult = {
     arrived: false,
@@ -262,8 +422,7 @@ export function tickTruck(
         }
         truck.targetPosition = gatePos
         truck.headingY = INGATE_QUEUE_HEADING
-        const { position, arrived } = moveTowards(truck.position, gatePos, TRUCK_SPEED, dt)
-        truck.position = position
+        const arrived = applyTruckMove(truck, gatePos, TRUCK_SPEED, dt, occupancy)
         if (arrived && Math.abs(gatePos.z - baseGateZ) < 0.1) {
           truck.state = 'at_gate'
           truck.stateStartTime = state.simTime
@@ -279,8 +438,7 @@ export function tickTruck(
         // Only move if not at hold position
         if (Math.abs(truck.position.z - holdZ) > 0.5) {
           truck.headingY = INGATE_QUEUE_HEADING
-          const { position } = moveTowards(truck.position, holdPos, TRUCK_SPEED, dt)
-          truck.position = position
+          applyTruckMove(truck, holdPos, TRUCK_SPEED, dt, occupancy)
         }
         truck.headingY = INGATE_QUEUE_HEADING
       }
@@ -311,8 +469,23 @@ export function tickTruck(
     }
 
     case 'driving_to_yard': {
-      if (isYardZoneBusy(state, truck.id)) break
-      const done = advanceWaypoints(truck, TRUCK_SPEED, dt)
+      if (isYardZoneBusy(state, truck.id)) {
+        const holdPos = yardQueueHoldForTruck(state, truck)
+        if (!isCurrentRouteTo(truck, holdPos)) {
+          truck.waypoints = buildWaypoints(truck.position, holdPos)
+          truck.waypointIndex = 0
+          truck.targetPosition = truck.waypoints[0] ?? holdPos
+        }
+        advanceWaypoints(truck, TRUCK_SPEED, dt, occupancy)
+        break
+      }
+      const yardStand = yardStandForTruck(truck)
+      if (!isCurrentRouteTo(truck, yardStand)) {
+        truck.waypoints = buildWaypoints(truck.position, yardStand)
+        truck.waypointIndex = 0
+        truck.targetPosition = truck.waypoints[0] ?? yardStand
+      }
+      const done = advanceWaypoints(truck, TRUCK_SPEED, dt, occupancy)
       if (done) {
         truck.state = 'waiting_for_equipment'
         truck.stateStartTime = state.simTime
@@ -336,11 +509,11 @@ export function tickTruck(
         const holdPos = { x: GATE_OUTGATE_POSITION.x, y: 0, z: holdZ }
         truck.targetPosition = holdPos
         if (Math.abs(truck.position.z - holdZ) > 0.5 || Math.abs(truck.position.x - GATE_OUTGATE_POSITION.x) > 0.5) {
-          const { position } = moveTowards(truck.position, holdPos, TRUCK_SPEED, dt)
           const dx = holdPos.x - truck.position.x
           const dz = holdPos.z - truck.position.z
-          if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) truck.headingY = Math.atan2(dx, dz)
-          truck.position = position
+          if (Math.abs(dx) > 0.1) truck.headingY = dx > 0 ? Math.PI / 2 : -Math.PI / 2
+          else if (Math.abs(dz) > 0.1) truck.headingY = dz > 0 ? 0 : Math.PI
+          applyTruckMove(truck, holdPos, TRUCK_SPEED, dt, occupancy)
         }
         break
       }
@@ -350,16 +523,16 @@ export function tickTruck(
         const holdPos = { x: GATE_OUTGATE_POSITION.x, y: 0, z: holdZ }
         truck.targetPosition = holdPos
         if (Math.abs(truck.position.z - holdZ) > 0.5 || Math.abs(truck.position.x - GATE_OUTGATE_POSITION.x) > 0.5) {
-          const { position } = moveTowards(truck.position, holdPos, TRUCK_SPEED, dt)
           const dx = holdPos.x - truck.position.x
           const dz = holdPos.z - truck.position.z
-          if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) truck.headingY = Math.atan2(dx, dz)
-          truck.position = position
+          if (Math.abs(dx) > 0.1) truck.headingY = dx > 0 ? Math.PI / 2 : -Math.PI / 2
+          else if (Math.abs(dz) > 0.1) truck.headingY = dz > 0 ? 0 : Math.PI
+          applyTruckMove(truck, holdPos, TRUCK_SPEED, dt, occupancy)
         }
         break
       }
 
-      const done = advanceWaypoints(truck, TRUCK_SPEED, dt)
+      const done = advanceWaypoints(truck, TRUCK_SPEED, dt, occupancy)
       if (done) {
         truck.state = 'at_gate_out'
         truck.stateStartTime = state.simTime
@@ -379,7 +552,7 @@ export function tickTruck(
     }
 
     case 'departing': {
-      const done = advanceWaypoints(truck, TRUCK_SPEED, dt)
+      const done = advanceWaypoints(truck, TRUCK_SPEED, dt, occupancy)
       if (done) {
         truck.state = 'departed'
         result.departed = true
@@ -394,11 +567,17 @@ export function tickTruck(
   return result
 }
 
-export function startTruckReturnToGate(truck: TruckVisit, simTime: number): void {
+export function startTruckReturnToGate(
+  truck: TruckVisit,
+  simTime: number,
+  servicedByPosition?: Position3D,
+): void {
   truck.state = 'returning_to_gate'
   truck.stateStartTime = simTime
   const gateHoldPos = { x: GATE_OUTGATE_POSITION.x, y: 0, z: GATE_OUTGATE_FENCE_Z - GATE_STOP_OFFSET }
-  truck.waypoints = buildOutgateApproachWaypoints(truck.position, gateHoldPos)
+  truck.waypoints = servicedByPosition
+    ? buildPostServiceOutgateWaypoints(truck.position, servicedByPosition, gateHoldPos)
+    : buildOutgateApproachWaypoints(truck.position, gateHoldPos)
   truck.waypointIndex = 0
   truck.targetPosition = truck.waypoints[0] ?? gateHoldPos
 }
@@ -413,8 +592,12 @@ export function startTruckDeparture(truck: TruckVisit, simTime: number): void {
   truck.targetPosition = truck.waypoints[0] ?? exitPos
 }
 
-export function startExportTruckExit(truck: TruckVisit, simTime: number): void {
-  startTruckReturnToGate(truck, simTime)
+export function startExportTruckExit(
+  truck: TruckVisit,
+  simTime: number,
+  servicedByPosition?: Position3D,
+): void {
+  startTruckReturnToGate(truck, simTime, servicedByPosition)
 }
 
 export function getTruckYardStandPositionForVisitType(

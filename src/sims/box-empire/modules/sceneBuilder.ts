@@ -13,8 +13,6 @@ import {
   CONTAINER_WIDTH,
   CONTAINER_BAY_GAP,
   CONTAINER_ROW_GAP,
-  QUAY_BUFFER_DISCHARGE_POSITION,
-  QUAY_BUFFER_LOAD_POSITION,
   GATE_INGATE_POSITION,
   GATE_OUTGATE_POSITION,
   GATE_OUTGATE_FENCE_Z,
@@ -489,17 +487,12 @@ function buildGatehouse(scene: THREE.Scene): void {
 }
 
 function buildQuayBufferMarkings(scene: THREE.Scene): void {
-  // Discharge buffer (blue)
-  const dischMat = new THREE.MeshPhongMaterial({ color: 0x2980b9, transparent: true, opacity: 0.55 })
-  const disch = new THREE.Mesh(new THREE.PlaneGeometry(CONTAINER_LENGTH + 0.6, CONTAINER_WIDTH + 0.6), dischMat)
-  disch.rotation.x = -Math.PI / 2
-  disch.position.set(QUAY_BUFFER_DISCHARGE_POSITION.x, 0.02, QUAY_BUFFER_DISCHARGE_POSITION.z)
-  scene.add(disch)
-
-  // Load buffer (orange)
-  const loadMat = new THREE.MeshPhongMaterial({ color: 0xff6600, transparent: true, opacity: 0.55 })
-  const load = new THREE.Mesh(new THREE.PlaneGeometry(CONTAINER_LENGTH + 0.6, CONTAINER_WIDTH + 0.6), loadMat)
-  load.rotation.x = -Math.PI / 2
-  load.position.set(QUAY_BUFFER_LOAD_POSITION.x, 0.02, QUAY_BUFFER_LOAD_POSITION.z)
-  scene.add(load)
+  const laneMat = new THREE.MeshPhongMaterial({ color: 0x2d3436, transparent: true, opacity: 0.22 })
+  const lane = new THREE.Mesh(
+    new THREE.PlaneGeometry(TERMINAL_BOUNDS.maxX - TERMINAL_BOUNDS.minX, CONTAINER_WIDTH + 1.2),
+    laneMat,
+  )
+  lane.rotation.x = -Math.PI / 2
+  lane.position.set(0, 0.015, 3)
+  scene.add(lane)
 }

@@ -6,12 +6,15 @@ import type {
   Job,
   JobStatus,
   Location,
+  Equipment,
   EquipmentType,
   Position3D,
   BoxEmpireState,
   ReachStackerServiceSide,
 } from '../types'
-import { isContainerOnTop } from './yardManager'
+import { parseYardSlotId } from '../types'
+import type { SimulationIndexes } from './simulation/simulationIndexes'
+import { isContainerOnTop, makeYardStackKey } from './yardManager'
 
 let jobCounter = 0
 
@@ -57,7 +60,50 @@ function isJobAccessible(job: Job, state: BoxEmpireState): boolean {
   if (job.pickupLocation.type !== 'yard_slot') return true
   const yard = state.yardBlocks[0]
   if (!yard) return true
+  if (hasActiveInboundMoveToPickupStack(job, state)) return false
   return isContainerOnTop(yard, job.containerId)
+}
+
+function isActiveMove(job: Job): boolean {
+  return job.status === 'assigned' || job.status === 'in_progress'
+}
+
+function hasActiveInboundMoveToPickupStack(job: Job, state: BoxEmpireState): boolean {
+  if (job.pickupLocation.type !== 'yard_slot') return false
+  const pickupSlot = parseYardSlotId(job.pickupLocation.id)
+  if (!pickupSlot) return false
+  const pickupStack = makeYardStackKey(pickupSlot.blockId, pickupSlot.bay, pickupSlot.row)
+
+  return state.jobs.some(candidate => {
+    if (candidate.id === job.id) return false
+    if (!isActiveMove(candidate)) return false
+    if (candidate.dropoffLocation.type !== 'yard_slot') return false
+    const dropoffSlot = parseYardSlotId(candidate.dropoffLocation.id)
+    if (!dropoffSlot) return false
+    return makeYardStackKey(dropoffSlot.blockId, dropoffSlot.bay, dropoffSlot.row) === pickupStack
+  })
+}
+
+export function getMhcJobVesselSlot(job: Job, state: BoxEmpireState): { vesselId: string; bay: number } | null {
+  const location = job.pickupLocation.type === 'vessel_slot'
+    ? job.pickupLocation
+    : job.dropoffLocation.type === 'vessel_slot'
+      ? job.dropoffLocation
+      : null
+  if (!location) return null
+
+  const vessel = state.vesselVisits.find(candidate => location.id.startsWith(`${candidate.id}-`))
+  if (!vessel) return null
+  const parsed = parseYardSlotId(location.id)
+  return { vesselId: vessel.id, bay: parsed?.bay ?? 1 }
+}
+
+export function canMhcServeJob(eq: Equipment, job: Job, state: BoxEmpireState): boolean {
+  const slot = getMhcJobVesselSlot(job, state)
+  if (!slot) return true
+  if (!eq.craneAllowedVesselIds.includes(slot.vesselId)) return false
+  const allowedBays = eq.craneAllowedBaysByVessel[slot.vesselId]
+  return !allowedBays || allowedBays.includes(slot.bay)
 }
 
 export function getReachStackerServiceSide(job: Job): ReachStackerServiceSide {
@@ -84,7 +130,10 @@ export function assignPendingJobs(state: BoxEmpireState): void {
     // can revive it the moment it becomes accessible. Without this the job stays pending
     // forever but is silently skipped every tick, causing permanent deadlocks.
     if (!isJobAccessible(job, state)) {
-      if (job.pickupLocation.type === 'yard_slot') job.status = 'blocked'
+      if (job.pickupLocation.type === 'yard_slot') {
+        job.status = 'blocked'
+        job.blockedReason = 'Container buried — waiting for shuffle to clear path'
+      }
       continue
     }
 
@@ -105,6 +154,7 @@ export function assignPendingJobs(state: BoxEmpireState): void {
         const mode = e.craneMode
         if (mode === 'discharge' && job.pickupLocation.type !== 'vessel_slot') return false
         if (mode === 'load' && job.dropoffLocation.type !== 'vessel_slot') return false
+        if (!canMhcServeJob(e, job, state)) return false
       }
 
       return true
@@ -135,6 +185,7 @@ export function recheckBlockedJobs(state: BoxEmpireState): void {
     if (job.status !== 'blocked') continue
     if (isJobAccessible(job, state)) {
       job.status = 'pending'
+      job.blockedReason = undefined
       continue
     }
     // Fallback: if the yard-slot record was cleared (container picked up / slot reset)
@@ -142,7 +193,7 @@ export function recheckBlockedJobs(state: BoxEmpireState): void {
     // doesn't stay blocked forever.
     if (job.pickupLocation.type === 'yard_slot') {
       const container = state.containers.find(c => c.id === job.containerId)
-      if (container?.lifecycleState === 'in_yard') {
+      if (container?.lifecycleState === 'in_yard' && !hasActiveInboundMoveToPickupStack(job, state)) {
         job.status = 'pending'
       }
     }
@@ -180,7 +231,9 @@ export function cancelJob(state: BoxEmpireState, jobId: string): void {
 export function getActiveJobForContainer(
   state: BoxEmpireState,
   containerId: string,
+  indexes?: SimulationIndexes,
 ): Job | null {
+  if (indexes) return indexes.activeJobByContainerId.get(containerId) ?? null
   return (
     state.jobs.find(
       j =>
