@@ -383,7 +383,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     return { container, slot, slotId }
   }
 
-  function finalizeRestow(slotId: string): { restow?: PlacementResult } | null {
+  function finalizeRestow(slotId: string): { restow?: PlacementResult; disaster?: DisasterType } | null {
     if (!restowContainer.value || !shipConfig.value) return null
 
     const slot = grid.value[slotId]
@@ -399,6 +399,22 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     shipList.value = physicsAfter.list
     shipTrim.value = physicsAfter.trim
     shipVCG.value = physicsAfter.vcg
+
+    // Check for disasters (hazmat explosion, capsize, founder, collapse)
+    const disaster = checkDisasters(
+      physicsAfter.list, physicsAfter.trim, physicsAfter.vcg,
+      grid.value, shipConfig.value, slot, container
+    )
+
+    if (disaster) {
+      disasterType.value = disaster
+      phase.value = 'disaster'
+      addEvent(`DISASTER: ${disaster.toUpperCase()}!`, 'danger')
+      restowContainer.value = null
+      restowFromSlotId.value = null
+      restowSlots.value = []
+      return { disaster }
+    }
 
     const restow = calculateRestowScore(container, slot, grid.value, shipConfig.value)
     score.value += restow.score

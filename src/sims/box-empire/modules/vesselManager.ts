@@ -29,6 +29,10 @@ export function peekNextVesselId(): string {
   return `vessel-${vesselCounter + 1}`
 }
 
+export function peekNextVesselName(): string {
+  return `Small Feeder ${vesselCounter + 1}`
+}
+
 export function getVesselSlotRefs(): Array<{ bay: number; row: number; tier: number }> {
   const refs: Array<{ bay: number; row: number; tier: number }> = []
   for (let tier = 1; tier <= TUTORIAL_VESSEL.tiers; tier++) {
@@ -75,12 +79,15 @@ export function createTutorialVessel(
     berthPosition: { ...BERTH_POSITION },
     arrivalTime,
     hornPlayed: false,
+    dischargeEnabled: true,
+    loadEnabled: true,
   }
 }
 
 export function createSpawnedVessel(
   importContainers: Container[],
   berthX: number,
+  opts?: { name?: string; dischargeEnabled?: boolean; loadEnabled?: boolean },
 ): VesselVisit {
   vesselCounter++
   const vesselId = `vessel-${vesselCounter}`
@@ -88,7 +95,7 @@ export function createSpawnedVessel(
 
   return {
     id: vesselId,
-    name: `Feeder ${vesselCounter}`,
+    name: opts?.name ?? `Small Feeder ${vesselCounter}`,
     loa: TUTORIAL_VESSEL.loa,
     beam: TUTORIAL_VESSEL.beam,
     teuCapacity: TUTORIAL_VESSEL.teuCapacity,
@@ -98,6 +105,8 @@ export function createSpawnedVessel(
     berthPosition,
     arrivalTime: 0,  // arrives immediately (god mode)
     hornPlayed: false,
+    dischargeEnabled: opts?.dischargeEnabled ?? true,
+    loadEnabled: opts?.loadEnabled ?? true,
   }
 }
 

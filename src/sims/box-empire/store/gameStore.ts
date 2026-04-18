@@ -36,7 +36,7 @@ import {
 } from '../modules/jobScheduler'
 import { resetEconomy } from '../modules/economy'
 import { resetTruckCounter } from '../modules/truckManager'
-import { getVesselSlotRefs, resetVesselCounter } from '../modules/vesselManager'
+import { getVesselSlotRefs, peekNextVesselName, resetVesselCounter } from '../modules/vesselManager'
 import { createTutorialSteps, getCurrentStep } from '../modules/tutorial'
 import { getNarratorGroup } from '../modules/narratorScript'
 import {
@@ -748,7 +748,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     if (selectedEquipmentId.value === equipmentId) selectedEquipmentId.value = null
   }
 
-  function spawnMobileHarborCrane(): void {
+  function spawnMobileHarborCrane(opts?: { craneMode?: CraneMode }): void {
     if (!isGodMode.value && gamePhase.value !== 'sandbox') return
     const existingMHCs = equipment.value.filter(eq => eq.type === 'mobile_harbor_crane')
     const newId = `mhc-${existingMHCs.length + 1}`
@@ -766,7 +766,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       enabled: true,
       canServeLandside: true,
       canServeWaterside: true,
-      craneMode: 'both',
+      craneMode: opts?.craneMode ?? 'both',
       craneAllowedVesselIds: vesselVisits.value.map(vessel => vessel.id),
       craneAllowedBaysByVessel: Object.fromEntries(
         vesselVisits.value.map(vessel => [vessel.id, getVesselSlotRefs().map(slot => slot.bay)]),
@@ -783,10 +783,16 @@ export const useGameStore = defineStore('box-empire-game', () => {
     emitEvent('item.spawned', `Mobile Harbor Crane ${newId} deployed`)
   }
 
-  function spawnVessel(): void {
+  function spawnVessel(opts?: {
+    name?: string
+    importCount?: number
+    exportCount?: number
+    dischargeEnabled?: boolean
+    loadEnabled?: boolean
+  }): void {
     if (!isGodMode.value && gamePhase.value !== 'sandbox') return
     const activeCount = vesselVisits.value.filter(v => v.state !== 'departed').length
-    const { vessel, containers: newContainers } = createSpawnedVesselScenario(activeCount)
+    const { vessel, containers: newContainers } = createSpawnedVesselScenario(activeCount, undefined, opts)
     containers.value.push(...newContainers)
     vesselVisits.value.push(vessel)
     const vesselBays = getVesselSlotRefs().map(slot => slot.bay)
@@ -799,6 +805,26 @@ export const useGameStore = defineStore('box-empire-game', () => {
     triggerRef(vesselVisits)
     triggerRef(equipment)
     emitEvent('item.spawned', `Vessel ${vessel.name} incoming`)
+  }
+
+  function getNextVesselName(): string {
+    return peekNextVesselName()
+  }
+
+  function setVesselDischargeEnabled(vesselId: string, enabled: boolean): void {
+    const vessel = vesselVisits.value.find(v => v.id === vesselId)
+    if (vessel) {
+      vessel.dischargeEnabled = enabled
+      triggerRef(vesselVisits)
+    }
+  }
+
+  function setVesselLoadEnabled(vesselId: string, enabled: boolean): void {
+    const vessel = vesselVisits.value.find(v => v.id === vesselId)
+    if (vessel) {
+      vessel.loadEnabled = enabled
+      triggerRef(vesselVisits)
+    }
   }
 
   function jobInvolvesVessel(job: Job, vesselId: string): boolean {
@@ -847,7 +873,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     refreshSimulationCollections()
   }
 
-  function spawnReachStacker(): void {
+  function spawnReachStacker(opts?: { landsideEnabled?: boolean; watersideEnabled?: boolean }): void {
     if (!isGodMode.value && gamePhase.value !== 'sandbox') return
     const existingRS = equipment.value.filter(eq => eq.type === 'reach_stacker')
     const newId = `rs-${existingRS.length + 1}`
@@ -864,8 +890,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
       targetPosition: null,
       speed: RS_SPEED_UNLADEN,
       enabled: true,
-      canServeLandside: true,
-      canServeWaterside: true,
+      canServeLandside: opts?.landsideEnabled ?? true,
+      canServeWaterside: opts?.watersideEnabled ?? true,
       craneMode: 'both',
       craneAllowedVesselIds: [],
       craneAllowedBaysByVessel: {},
@@ -945,6 +971,9 @@ export const useGameStore = defineStore('box-empire-game', () => {
     spawnReachStacker,
     spawnMobileHarborCrane,
     spawnVessel,
+    getNextVesselName,
+    setVesselDischargeEnabled,
+    setVesselLoadEnabled,
     sailVesselNow,
     startSandboxMode,
     deleteEquipment,

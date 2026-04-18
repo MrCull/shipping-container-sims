@@ -46,6 +46,16 @@ function handleSail(): void {
   if (!vessel.value) return
   store.sailVesselNow(vessel.value.id)
 }
+
+function handleDischargeToggle(): void {
+  if (!vessel.value) return
+  store.setVesselDischargeEnabled(vessel.value.id, !vessel.value.dischargeEnabled)
+}
+
+function handleLoadToggle(): void {
+  if (!vessel.value) return
+  store.setVesselLoadEnabled(vessel.value.id, !vessel.value.loadEnabled)
+}
 </script>
 
 <template>
@@ -91,6 +101,26 @@ function handleSail(): void {
         >
           ${{ fineTotal }}
         </span>
+      </div>
+
+      <div class="info-row ops-row">
+        <span class="label">Ops</span>
+        <div class="ops-buttons">
+          <button
+            :class="['ops-btn', vessel.dischargeEnabled ? 'active' : '']"
+            title="Toggle discharge (vessel → quay)"
+            @click="handleDischargeToggle"
+          >
+            ↓ Disch
+          </button>
+          <button
+            :class="['ops-btn', vessel.loadEnabled ? 'active' : '']"
+            title="Toggle loading (quay → vessel)"
+            @click="handleLoadToggle"
+          >
+            ↑ Load
+          </button>
+        </div>
       </div>
     </div>
 
@@ -199,5 +229,38 @@ function handleSail(): void {
 .sail-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.ops-row {
+  align-items: center;
+}
+
+.ops-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.ops-btn {
+  font-family: var(--font-retro, monospace);
+  font-size: 0.58rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ops-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.ops-btn.active {
+  background: rgba(108, 183, 255, 0.2);
+  border-color: #6cb7ff;
+  color: #6cb7ff;
+  font-weight: bold;
 }
 </style>

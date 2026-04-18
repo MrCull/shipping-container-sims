@@ -275,7 +275,7 @@ function continueExportStagingAndLoading(
 
   // MHC: load staged exports onto each loading vessel
   for (const vessel of loadingVessels) {
-    if (getNextLoadSlot(vessel) === null || noExportsLeft) {
+    if (!vessel.loadEnabled || getNextLoadSlot(vessel) === null || noExportsLeft) {
       vessel.state = 'departing'
       callbacks.emitEvent('vessel.departing', `${vessel.name} is departing`)
       continue
@@ -404,6 +404,10 @@ export function planTutorialOperations(
   // Make discharge work available as soon as a vessel is alongside.
   for (const vessel of state.vesselVisits) {
     if (vessel.state !== 'arrived') continue
+    if (!vessel.dischargeEnabled) {
+      vessel.state = 'loading'
+      continue
+    }
     vessel.state = 'discharging'
     flow.dischargingStarted = true
     createAvailableDischargeJobsForVessel(state, vessel, indexes)

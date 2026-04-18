@@ -10,6 +10,7 @@ export interface OccupancyRect extends Footprint {
   entityId: string
   x: number
   z: number
+  kind?: 'truck' | 'reach_stacker' | 'mobile_harbor_crane' | 'yard_stack'
   static?: boolean
 }
 
@@ -27,6 +28,15 @@ export interface OccupancyOptions {
 function overlaps(a: OccupancyRect, b: OccupancyRect): boolean {
   return Math.abs(a.x - b.x) < a.halfX + b.halfX &&
     Math.abs(a.z - b.z) < a.halfZ + b.halfZ
+}
+
+function occupancyKindForEntityId(entityId: string): OccupancyRect['kind'] {
+  if (entityId.startsWith('rs-')) return 'reach_stacker'
+  return undefined
+}
+
+function canOverlap(a: OccupancyRect, b: OccupancyRect): boolean {
+  return a.kind === 'reach_stacker' && b.kind === 'reach_stacker'
 }
 
 function overlapDepth(a: OccupancyRect, b: OccupancyRect): number {
@@ -59,6 +69,7 @@ function yardStackZone(block: YardBlock): OccupancyRect {
     z: stack.z,
     halfX: stack.halfX,
     halfZ: stack.halfZ,
+    kind: 'yard_stack',
     static: true,
   }
 }
@@ -88,11 +99,13 @@ export class OccupancyWorld {
       z: position.z,
       halfX: fp.halfX,
       halfZ: fp.halfZ,
+      kind: current?.kind ?? occupancyKindForEntityId(entityId),
     }
 
     for (const rect of this.rects.values()) {
       if (rect.entityId === entityId) continue
       if (options.ignoreDynamic && !rect.static) continue
+      if (canOverlap(proposed, rect)) continue
       if (overlaps(proposed, rect)) {
         if (isMovingOutOfOverlap(current, proposed, rect)) continue
         return {
@@ -125,6 +138,7 @@ export class OccupancyWorld {
         z: position.z,
         halfX: fp.halfX,
         halfZ: fp.halfZ,
+        kind: current?.kind ?? occupancyKindForEntityId(entityId),
       })
     }
     return attempt
@@ -144,6 +158,7 @@ export function createOccupancyWorld(state: BoxEmpireState): OccupancyWorld {
       entityId: truck.id,
       x: truck.position.x,
       z: truck.position.z,
+      kind: 'truck',
       ...TRUCK_FOOTPRINT,
     })
   }
@@ -154,6 +169,7 @@ export function createOccupancyWorld(state: BoxEmpireState): OccupancyWorld {
       entityId: eq.id,
       x: eq.position.x,
       z: eq.position.z,
+      kind: eq.type,
       ...fp,
     })
   }

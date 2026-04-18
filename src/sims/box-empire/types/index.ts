@@ -144,6 +144,8 @@ export interface VesselVisit {
   berthPosition: Position3D  // where this vessel docks (allows multiple berths along the quay)
   arrivalTime: number
   hornPlayed: boolean   // ensures horn fires exactly once when 'arriving' begins
+  dischargeEnabled: boolean
+  loadEnabled: boolean
 }
 
 export interface VesselSlot {

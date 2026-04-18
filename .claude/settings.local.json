@@ -17,7 +17,8 @@
       "Bash(curl -s http://localhost:5176)",
       "Bash(curl -s http://localhost:5177)",
       "Bash(curl -s http://localhost:5178)",
-      "Bash(curl -s http://localhost:5179)"
+      "Bash(curl -s http://localhost:5179)",
+      "Bash(git stash *)"
     ]
   }
 }

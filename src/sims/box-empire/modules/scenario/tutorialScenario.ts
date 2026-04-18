@@ -45,13 +45,24 @@ export function resetTutorialScenarioCounters(): void {
   containerCounter = 0
 }
 
+export interface SpawnVesselOpts {
+  name?: string
+  importCount?: number
+  exportCount?: number
+  dischargeEnabled?: boolean
+  loadEnabled?: boolean
+}
+
 export function createSpawnedVesselScenario(
   activeVesselCount: number,
   berthXOverride?: number,
+  opts?: SpawnVesselOpts,
 ): { vessel: ReturnType<typeof createSpawnedVessel>; containers: Container[] } {
   const berthX = berthXOverride ?? getNextBerthX(activeVesselCount)
   const vesselId = peekNextVesselId()
-  const slotRefs = getVesselSlotRefs().slice(0, 12)
+  const allSlotRefs = getVesselSlotRefs()
+  const importCount = Math.min(opts?.importCount ?? 12, allSlotRefs.length)
+  const slotRefs = allSlotRefs.slice(0, importCount)
   const importContainers: Container[] = []
   for (const slotRef of slotRefs) {
     const line = randomShippingLine()
@@ -70,7 +81,11 @@ export function createSpawnedVesselScenario(
       revenueEarned: 0,
     })
   }
-  const vessel = createSpawnedVessel(importContainers, berthX)
+  const vessel = createSpawnedVessel(importContainers, berthX, {
+    name: opts?.name,
+    dischargeEnabled: opts?.dischargeEnabled,
+    loadEnabled: opts?.loadEnabled,
+  })
   importContainers.forEach(container => {
     if (!container.vesselSlot) return
     container.currentLocation.position = getVesselSlotPosition(
@@ -81,7 +96,8 @@ export function createSpawnedVesselScenario(
     )
   })
 
-  const exportContainers = createSpawnedExportContainers(slotRefs.length)
+  const exportCount = opts?.exportCount ?? 12
+  const exportContainers = createSpawnedExportContainers(exportCount)
   return { vessel, containers: [...importContainers, ...exportContainers] }
 }
 
