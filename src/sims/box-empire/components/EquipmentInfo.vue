@@ -287,8 +287,10 @@ function jobStatusColor(status: string): string {
 .equipment-info {
   position: fixed;
   right: 12px;
-  top: 560px;
+  bottom: 12px;
   width: 280px;
+  max-height: calc(100vh - 440px);
+  overflow-y: auto;
   background: rgba(0, 0, 0, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
