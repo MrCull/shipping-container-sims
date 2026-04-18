@@ -7,6 +7,7 @@ import { useAudioStore } from '@/stores/audio'
 import type { GameEventType } from '../types'
 import { SOUND_MAP } from '../modules/config'
 
+import itemSpawnUrl from '../assets/sounds/item-spawn.mp3'
 import containerPlacedUrl from '../assets/sounds/container-loaded-to-ship.mp3'
 import containerSetDownUrl from '../assets/sounds/container-set-down-on-ship.mp3'
 import moneyEarnedUrl from '../assets/sounds/money-increase-ca-ching-.mp3'
@@ -18,6 +19,7 @@ import bgTrackUrl from '../assets/sounds/background-gaming-track-fun-light-cotto
 import seagullUrl from '../assets/sounds/seagul-sound-17-seconds.mp3'
 
 const FILE_TO_URL: Record<string, string> = {
+  'item-spawn.mp3': itemSpawnUrl,
   'container-loaded-to-ship.mp3': containerPlacedUrl,
   'container-set-down-on-ship.mp3': containerSetDownUrl,
   'money-increase-ca-ching-.mp3': moneyEarnedUrl,

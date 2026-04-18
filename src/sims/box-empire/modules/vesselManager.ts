@@ -105,6 +105,21 @@ export function getNextBerthX(activeVesselCount: number): number {
   return FIRST_BERTH_X + activeVesselCount * BERTH_X_SPACING
 }
 
+const SANDBOX_BERTH_COUNT = 8
+
+export function getSandboxBerthX(currentVessels: VesselVisit[]): number {
+  const occupiedX = new Set(
+    currentVessels
+      .filter(v => v.state !== 'departed')
+      .map(v => v.berthPosition.x),
+  )
+  for (let i = SANDBOX_BERTH_COUNT - 1; i >= 0; i--) {
+    const berthX = FIRST_BERTH_X + i * BERTH_X_SPACING
+    if (!occupiedX.has(berthX)) return berthX
+  }
+  return FIRST_BERTH_X + SANDBOX_BERTH_COUNT * BERTH_X_SPACING
+}
+
 export function getVesselSlotPosition(
   vessel: VesselVisit,
   bay: number,

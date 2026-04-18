@@ -21,10 +21,14 @@ function settleYardSlot(state: BoxEmpireState, job: Job): YardSlotRef | null {
   const slotRef = parseYardSlotId(job.dropoffLocation.id)
   if (!slotRef) return null
 
-  const occupiedTiers = yard.slots.filter(
-    slot => slot.bay === slotRef.bay && slot.row === slotRef.row && slot.containerId !== null,
-  ).length
-  return { ...slotRef, tier: occupiedTiers + 1 }
+  // Always place at the lowest empty tier so gaps from shuffles never produce floating containers.
+  for (let tier = 1; tier <= yard.maxTier; tier++) {
+    const slot = yard.slots.find(
+      s => s.bay === slotRef.bay && s.row === slotRef.row && s.tier === tier,
+    )
+    if (slot && slot.containerId === null) return { ...slotRef, tier }
+  }
+  return null  // stack full — caller ignores null
 }
 
 function createWaitingImportPickupJobIfNeeded(
@@ -70,6 +74,7 @@ export function handleJobCompletion(
     placeContainerInSlot(yard, actualSlotRef, container.id)
     container.yardSlot = actualSlotRef
     container.lifecycleState = 'in_yard'
+    if (container.arrivedAt === 0) container.arrivedAt = state.simTime
     container.currentLocation = {
       type: 'yard_slot',
       id: actualSlotId,
@@ -77,7 +82,8 @@ export function handleJobCompletion(
     }
     events.push({
       type: 'container.placed',
-      message: `Container ${container.id} stored in yard`,
+      message: `Container ${container.id} stored in yard at bay ${actualSlotRef.bay} row ${actualSlotRef.row} tier ${actualSlotRef.tier} (${actualSlotId})`,
+      data: { containerId: container.id, bay: actualSlotRef.bay, row: actualSlotRef.row, tier: actualSlotRef.tier, slotId: actualSlotId },
     })
     createWaitingImportPickupJobIfNeeded(state, container)
     return events

@@ -14,6 +14,7 @@ export function spawnExportTruck(state: BoxEmpireState, flow: TutorialFlowRuntim
     candidate =>
       candidate.visitType === 'export' &&
       candidate.lifecycleState === 'at_gate' &&
+      candidate.currentLocation.type === 'gate_buffer' &&
       !assignedContainerIds.has(candidate.id),
   )
   if (!container) return null

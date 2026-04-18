@@ -13,6 +13,7 @@ import type {
   ReachStackerServiceSide,
 } from '../types'
 import { parseYardSlotId } from '../types'
+import type { SimulationIndexes } from './simulation/simulationIndexes'
 import { isContainerOnTop, makeYardStackKey } from './yardManager'
 
 let jobCounter = 0
@@ -129,7 +130,10 @@ export function assignPendingJobs(state: BoxEmpireState): void {
     // can revive it the moment it becomes accessible. Without this the job stays pending
     // forever but is silently skipped every tick, causing permanent deadlocks.
     if (!isJobAccessible(job, state)) {
-      if (job.pickupLocation.type === 'yard_slot') job.status = 'blocked'
+      if (job.pickupLocation.type === 'yard_slot') {
+        job.status = 'blocked'
+        job.blockedReason = 'Container buried — waiting for shuffle to clear path'
+      }
       continue
     }
 
@@ -181,6 +185,7 @@ export function recheckBlockedJobs(state: BoxEmpireState): void {
     if (job.status !== 'blocked') continue
     if (isJobAccessible(job, state)) {
       job.status = 'pending'
+      job.blockedReason = undefined
       continue
     }
     // Fallback: if the yard-slot record was cleared (container picked up / slot reset)
@@ -226,7 +231,9 @@ export function cancelJob(state: BoxEmpireState, jobId: string): void {
 export function getActiveJobForContainer(
   state: BoxEmpireState,
   containerId: string,
+  indexes?: SimulationIndexes,
 ): Job | null {
+  if (indexes) return indexes.activeJobByContainerId.get(containerId) ?? null
   return (
     state.jobs.find(
       j =>

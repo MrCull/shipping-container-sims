@@ -90,7 +90,7 @@ export const TUTORIAL_VESSEL = {
 
 export const TUTORIAL_YARD = {
   id: 'yard-a',
-  bays: 20,
+  bays: 13,
   rows: 1,
   maxTier: 3,
 }
@@ -232,4 +232,5 @@ export const SOUND_MAP: Record<string, string> = {
   'vessel.departing': 'small-ship-three-horns-in-a-row.mp3',
   'tutorial.completed': 'group-yay-cheer.mp3',
   'level.up': 'level-up.mp3',
+  'item.spawned': 'item-spawn.mp3',
 }

@@ -3,7 +3,7 @@ import { makeYardSlotId, parseYardSlotId } from '../../types'
 import { findAvailableSlot, getSlotWorldPosition, makeYardStackKey } from '../yardManager'
 
 function isActiveMove(job: Job): boolean {
-  return job.status === 'assigned' || job.status === 'in_progress'
+  return job.status === 'pending' || job.status === 'assigned' || job.status === 'in_progress'
 }
 
 export function getReservedYardSlotIds(jobs: Job[]): Set<string> {

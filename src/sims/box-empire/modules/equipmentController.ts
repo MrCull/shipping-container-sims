@@ -666,6 +666,7 @@ function tickReachStacker(
             const accessible = isContainerOnTop(yard, job.containerId)
             if (!accessible) {
               job.status = 'blocked'
+              job.blockedReason = 'Container buried — waiting for shuffle to clear path'
               result.jobBlocked = true
               eq.state = 'idle'
               eq.currentJobId = null

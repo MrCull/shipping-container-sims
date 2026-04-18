@@ -3,6 +3,7 @@ import boxEmpireLogo from '../../assets/logo.svg?url'
 
 const emit = defineEmits<{
   start: []
+  sandbox: []
 }>()
 </script>
 
@@ -36,6 +37,12 @@ const emit = defineEmits<{
         @click="emit('start')"
       >
         ▶ Start Tutorial
+      </button>
+      <button
+        class="sandbox-btn"
+        @click="emit('sandbox')"
+      >
+        ⚙ Sandbox Mode
       </button>
     </div>
   </div>
@@ -138,5 +145,26 @@ const emit = defineEmits<{
 .start-btn:hover {
   transform: scale(1.05);
   box-shadow: 0 4px 20px rgba(245, 158, 11, 0.5);
+}
+
+.sandbox-btn {
+  margin-top: 10px;
+  padding: 10px 32px;
+  border: 2px solid #3498db;
+  border-radius: 8px;
+  background: transparent;
+  color: #5dade2;
+  font-family: var(--font-retro, monospace);
+  font-size: 0.88rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.sandbox-btn:hover {
+  background: rgba(52, 152, 219, 0.15);
+  border-color: #5dade2;
+  color: #fff;
 }
 </style>

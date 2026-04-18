@@ -6,6 +6,7 @@
 
 import * as THREE from 'three'
 import type { Container, TruckVisit } from '../types'
+import type { RenderEntityIndexes } from './renderEntityIndexes'
 import {
   CONTAINER_LENGTH,
   CONTAINER_WIDTH,
@@ -87,7 +88,7 @@ export class ContainerRenderer {
     this.scene = scene
   }
 
-  update(containers: Container[], trucks?: TruckVisit[]): void {
+  update(containers: Container[], trucks?: TruckVisit[], indexes?: RenderEntityIndexes): void {
     const visibleContainers = containers.filter(c => {
       if (c.lifecycleState === 'departed') return false
       if (c.lifecycleState === 'on_vessel') return false
@@ -97,7 +98,9 @@ export class ContainerRenderer {
       // Containers on equipment are rendered by EquipmentRenderer as children of the equipment mesh
       if (c.currentLocation.type === 'equipment') return false
       if (c.lifecycleState === 'returning_to_gate') return false
-      if (c.lifecycleState === 'at_gate' && c.visitType === 'import') return false
+      // at_gate containers are either outside the terminal or waiting for a truck —
+      // they become visible once they're on a truck (handled by TruckRenderer).
+      if (c.lifecycleState === 'at_gate') return false
       return true
     })
 
@@ -138,8 +141,10 @@ export class ContainerRenderer {
       if (onTruck && trucks) {
         const truckId = c.currentLocation.type === 'truck'
           ? c.currentLocation.id
-          : trucks.find(t => t.containerId === c.id)?.id
-        const truck = truckId ? trucks.find(t => t.id === truckId) : null
+          : indexes?.truckByContainerId.get(c.id)?.id ?? trucks.find(t => t.containerId === c.id)?.id
+        const truck = truckId
+          ? indexes?.truckById.get(truckId) ?? trucks.find(t => t.id === truckId)
+          : null
         rotY = truck ? truck.headingY + Math.PI / 2 : Math.PI / 2
       }
       group.rotation.y = rotY

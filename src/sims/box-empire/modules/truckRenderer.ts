@@ -6,6 +6,7 @@
 
 import * as THREE from 'three'
 import type { TruckVisit, Container } from '../types'
+import type { RenderEntityIndexes } from './renderEntityIndexes'
 import { CONTAINER_LENGTH, CONTAINER_WIDTH, CONTAINER_HEIGHT, TRUCK_GLB } from './config'
 import { createContainerMaterials, disposeContainerMaterials } from './containerMaterials'
 import { loadModel, getModelSync } from './modelLoader'
@@ -209,7 +210,7 @@ export class TruckRenderer {
     return group
   }
 
-  update(trucks: TruckVisit[], containers?: Container[]): void {
+  update(trucks: TruckVisit[], containers?: Container[], indexes?: RenderEntityIndexes): void {
     const activeTrucks = trucks.filter(t => t.state !== 'departed')
     const activeTruckIds = new Set(activeTrucks.map(t => t.id))
 
@@ -287,27 +288,28 @@ export class TruckRenderer {
       // Find the container this truck is carrying (on-truck or being collected).
       // Exclude containers currently held by equipment (RS picked them up).
       const carriedContainer = containers
-        ? containers.find(c =>
-          c.id === truck.containerId &&
-          c.currentLocation.type !== 'equipment' &&
-          (c.currentLocation.type === 'truck' ||
-           c.lifecycleState === 'returning_to_gate' ||
-           c.lifecycleState === 'at_gate'),
-        )
+        ? (truck.containerId ? indexes?.containerById.get(truck.containerId) ?? containers.find(c => c.id === truck.containerId) : null)
+        : null
+      const renderableCarriedContainer = carriedContainer &&
+        carriedContainer.currentLocation.type !== 'equipment' &&
+        (carriedContainer.currentLocation.type === 'truck' ||
+          carriedContainer.lifecycleState === 'returning_to_gate' ||
+          carriedContainer.lifecycleState === 'at_gate')
+        ? carriedContainer
         : null
 
       const existingCg = this.containerGroups.get(truck.id)
 
-      if (carriedContainer) {
+      if (renderableCarriedContainer) {
         // Add or update container on truck bed
-        if (!existingCg || existingCg.userData['containerId'] !== carriedContainer.id) {
+        if (!existingCg || existingCg.userData['containerId'] !== renderableCarriedContainer.id) {
           // Remove old container group
           if (existingCg) {
             mesh.remove(existingCg)
             this.disposeGroup(existingCg)
           }
-          const cg = makeTruckContainerMesh(carriedContainer)
-          cg.userData['containerId'] = carriedContainer.id
+          const cg = makeTruckContainerMesh(renderableCarriedContainer)
+          cg.userData['containerId'] = renderableCarriedContainer.id
           // Position on truck bed — use GLB deck height if GLB is loaded, else procedural height
           const deckY = mesh.userData['isGlb'] ? TRUCK_GLB.containerOffsetY : 0.72
           cg.position.set(0, deckY + CONTAINER_HEIGHT / 2, TRUCK_GLB.containerOffsetZ)
@@ -326,6 +328,34 @@ export class TruckRenderer {
         }
       }
     }
+  }
+
+  getContainerIdNearScreen(
+    clickX: number,
+    clickY: number,
+    canvasW: number,
+    canvasH: number,
+    camera: THREE.Camera,
+    radiusPx: number = 45,
+  ): string | null {
+    const projected = new THREE.Vector3()
+    let bestId: string | null = null
+    let bestDist = radiusPx
+    for (const cg of this.containerGroups.values()) {
+      const containerId = cg.userData['containerId'] as string | undefined
+      if (!containerId) continue
+      cg.getWorldPosition(projected)
+      projected.project(camera)
+      if (projected.z > 1) continue
+      const sx = (projected.x * 0.5 + 0.5) * canvasW
+      const sy = (1 - (projected.y * 0.5 + 0.5)) * canvasH
+      const dist = Math.sqrt((sx - clickX) ** 2 + (sy - clickY) ** 2)
+      if (dist < bestDist) {
+        bestDist = dist
+        bestId = containerId
+      }
+    }
+    return bestId
   }
 
   private disposeGroup(group: THREE.Group): void {

@@ -6,6 +6,7 @@
 
 import * as THREE from 'three'
 import type { VesselVisit, Container } from '../types'
+import type { RenderEntityIndexes } from './renderEntityIndexes'
 import {
   CONTAINER_LENGTH,
   CONTAINER_WIDTH,
@@ -472,7 +473,7 @@ export class VesselRenderer {
     return group
   }
 
-  update(vessels: VesselVisit[], containers?: Container[], dt?: number): void {
+  update(vessels: VesselVisit[], containers?: Container[], dt?: number, indexes?: RenderEntityIndexes): void {
     const dtVal = dt ?? 0.016
 
     for (const vessel of vessels) {
@@ -549,7 +550,7 @@ export class VesselRenderer {
 
       // Update containers on deck
       if (containers) {
-        this.updateDeckContainers(vessel, mesh, containers)
+        this.updateDeckContainers(vessel, mesh, containers, indexes)
       }
     }
   }
@@ -558,12 +559,14 @@ export class VesselRenderer {
     vessel: VesselVisit,
     vesselMesh: THREE.Group,
     containers: Container[],
+    indexes?: RenderEntityIndexes,
   ): void {
     const deckMap = this.deckContainers.get(vessel.id)
     if (!deckMap) return
 
     // Find containers loaded on this vessel
-    const loadedOnVessel = containers.filter(
+    const candidateContainers = indexes?.containersByVesselId.get(vessel.id) ?? containers
+    const loadedOnVessel = candidateContainers.filter(
       c => (c.lifecycleState === 'loaded_on_vessel' || c.lifecycleState === 'on_vessel') && c.vesselSlot?.vesselId === vessel.id,
     )
 

@@ -183,6 +183,13 @@ function shortContainer(id: string): string {
             <span class="detail-label">To</span>
             <span class="detail-value">{{ job.dropoffLocation.id }}</span>
           </div>
+          <div
+            v-if="job.blockedReason"
+            class="detail-row blocked-reason"
+          >
+            <span class="detail-label">Block</span>
+            <span class="detail-value blocked-text">{{ job.blockedReason }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -354,5 +361,9 @@ function shortContainer(id: string): string {
   color: #ccc;
   font-size: 0.6rem;
   word-break: break-all;
+}
+
+.blocked-text {
+  color: #e74c3c;
 }
 </style>

@@ -47,8 +47,9 @@ export function resetTutorialScenarioCounters(): void {
 
 export function createSpawnedVesselScenario(
   activeVesselCount: number,
+  berthXOverride?: number,
 ): { vessel: ReturnType<typeof createSpawnedVessel>; containers: Container[] } {
-  const berthX = getNextBerthX(activeVesselCount)
+  const berthX = berthXOverride ?? getNextBerthX(activeVesselCount)
   const vesselId = peekNextVesselId()
   const slotRefs = getVesselSlotRefs().slice(0, 12)
   const importContainers: Container[] = []

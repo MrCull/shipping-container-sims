@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, markRaw, ref, shallowRef, triggerRef, watch } from 'vue'
 import { useGlobalSettingsStore } from '@/stores/globalSettings'
 import { trackEvent } from '@/utils/analytics'
 import type {
@@ -44,7 +44,7 @@ import {
   resetTutorialFlowFlags,
   resetTutorialScenarioCounters,
 } from '../modules/scenario/tutorialScenario'
-import { tickSimulation } from '../modules/simulation/simulationEngine'
+import { tickSimulation, resetGravityCheck } from '../modules/simulation/simulationEngine'
 import type { NarratorRuntime, TutorialFlowRuntime } from '../modules/simulation/simulationTypes'
 import { getReachStackerHomePosition } from '../modules/movement/terminalGeometry'
 import { resetEquipmentDeadlockState } from '../modules/equipmentController'
@@ -65,18 +65,19 @@ export const useGameStore = defineStore('box-empire-game', () => {
   const tutorialOverlayDismissed = ref(false)
   const gatehouse = ref<GatehouseState>({ exportLaneOpen: false, importLaneOpen: false })
   const money = ref(0)
-  const transactions = ref<Transaction[]>([])
-  const equipment = ref<BoxEmpireState['equipment']>([])
-  const containers = ref<BoxEmpireState['containers']>([])
-  const yardBlocks = ref<BoxEmpireState['yardBlocks']>([])
-  const vesselVisits = ref<BoxEmpireState['vesselVisits']>([])
-  const truckVisits = ref<BoxEmpireState['truckVisits']>([])
-  const jobs = ref<Job[]>([])
+  const transactions = shallowRef<Transaction[]>(markRaw([]))
+  const equipment = shallowRef<BoxEmpireState['equipment']>(markRaw([]))
+  const containers = shallowRef<BoxEmpireState['containers']>(markRaw([]))
+  const yardBlocks = shallowRef<BoxEmpireState['yardBlocks']>(markRaw([]))
+  const vesselVisits = shallowRef<BoxEmpireState['vesselVisits']>(markRaw([]))
+  const truckVisits = shallowRef<BoxEmpireState['truckVisits']>(markRaw([]))
+  const jobs = shallowRef<Job[]>(markRaw([]))
   const selectedContainerId = ref<string | null>(null)
   const selectedEquipmentId = ref<string | null>(null)
   const selectedVesselId = ref<string | null>(null)
   const selectedGatehouseId = ref<string | null>(null)
   const events = ref<GameEvent[]>([])
+  const eventHistory = ref<GameEvent[]>([])
   const pendingEventCallbacks = ref<GameEvent[]>([])
 
   const tutorialSteps = createTutorialSteps()
@@ -153,18 +154,28 @@ export const useGameStore = defineStore('box-empire-game', () => {
     tutorialCompleted.value = state.tutorialCompleted
     gatehouse.value = state.gatehouse
     money.value = state.money
-    transactions.value = state.transactions
-    equipment.value = state.equipment
-    containers.value = state.containers
-    yardBlocks.value = state.yardBlocks
-    vesselVisits.value = state.vesselVisits
-    truckVisits.value = state.truckVisits
-    jobs.value = state.jobs
+    transactions.value = markRaw(state.transactions)
+    equipment.value = markRaw(state.equipment)
+    containers.value = markRaw(state.containers)
+    yardBlocks.value = markRaw(state.yardBlocks)
+    vesselVisits.value = markRaw(state.vesselVisits)
+    truckVisits.value = markRaw(state.truckVisits)
+    jobs.value = markRaw(state.jobs)
     selectedContainerId.value = state.selectedContainerId
     selectedEquipmentId.value = state.selectedEquipmentId
     selectedVesselId.value = state.selectedVesselId
     selectedGatehouseId.value = state.selectedGatehouseId
     events.value = state.events
+  }
+
+  function refreshSimulationCollections(): void {
+    triggerRef(transactions)
+    triggerRef(equipment)
+    triggerRef(containers)
+    triggerRef(yardBlocks)
+    triggerRef(vesselVisits)
+    triggerRef(truckVisits)
+    triggerRef(jobs)
   }
 
   function addEvent(
@@ -183,6 +194,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     }
     events.value.unshift(event)
     if (events.value.length > 20) events.value.length = 20
+    eventHistory.value.push(event)
     pendingEventCallbacks.value.push(event)
   }
 
@@ -261,6 +273,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     const godModeEnabled = isGodMode.value
 
     eventCounter = 0
+    eventHistory.value = []
     cameraCueCounter = 0
     resetTutorialScenarioCounters()
     resetJobCounter()
@@ -268,6 +281,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     resetVesselCounter()
     resetEconomy()
     resetEquipmentDeadlockState()
+    resetGravityCheck()
 
     const scenario = createTutorialScenario(godModeEnabled)
     applyState({
@@ -288,9 +302,42 @@ export const useGameStore = defineStore('box-empire-game', () => {
   }
 
   function resetToMenu(): void {
-    setTimeScale(0)
-    gamePhase.value = 'menu'
-    cameraCue.value = null
+    eventCounter = 0
+    eventHistory.value = []
+    cameraCueCounter = 0
+    resetTutorialScenarioCounters()
+    applyFlowRuntime(resetTutorialFlowFlags())
+    resetJobCounter()
+    resetTruckCounter()
+    resetVesselCounter()
+    resetEconomy()
+    resetEquipmentDeadlockState()
+    resetGravityCheck()
+    resetNarratorState()
+    applyState({
+      gamePhase: 'menu',
+      simTime: 0,
+      timeScale: 0,
+      tutorialStep: 1,
+      tutorialCompleted: false,
+      gatehouse: { exportLaneOpen: false, importLaneOpen: false },
+      money: 0,
+      transactions: [],
+      equipment: [],
+      containers: [],
+      yardBlocks: [],
+      vesselVisits: [],
+      truckVisits: [],
+      jobs: [],
+      selectedContainerId: null,
+      selectedEquipmentId: null,
+      selectedVesselId: null,
+      selectedGatehouseId: null,
+      events: [],
+    })
+    tutorialCompleted.value = false
+    tutorialOverlayDismissed.value = false
+    refreshSimulationCollections()
   }
 
   function togglePause(): void {
@@ -333,6 +380,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
 
   function requestCameraCue(target: CameraCueTarget): void {
     if (isGodMode.value) return
+    if (gamePhase.value === 'sandbox') return
     cameraCueCounter++
     cameraCue.value = {
       id: cameraCueCounter,
@@ -349,16 +397,23 @@ export const useGameStore = defineStore('box-empire-game', () => {
     if (!eq) return
     if (side === 'landside') eq.canServeLandside = enabled
     if (side === 'waterside') eq.canServeWaterside = enabled
+    triggerRef(equipment)
   }
 
   function toggleEquipment(equipmentId: string): void {
     const eq = equipment.value.find(candidate => candidate.id === equipmentId)
-    if (eq) eq.enabled = !eq.enabled
+    if (eq) {
+      eq.enabled = !eq.enabled
+      triggerRef(equipment)
+    }
   }
 
   function setCraneMode(equipmentId: string, mode: CraneMode): void {
     const eq = equipment.value.find(candidate => candidate.id === equipmentId)
-    if (eq) eq.craneMode = mode
+    if (eq) {
+      eq.craneMode = mode
+      triggerRef(equipment)
+    }
   }
 
   function deallocateDisallowedCraneMoves(eq: Equipment): void {
@@ -390,6 +445,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
       eq.stateStartTime = simTime.value
       eq.stateElapsed = 0
     }
+    triggerRef(equipment)
+    triggerRef(jobs)
   }
 
   function setCraneVesselPermission(equipmentId: string, vesselId: string, enabled: boolean): void {
@@ -406,6 +463,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     }
     eq.craneAllowedVesselIds = [...allowed]
     deallocateDisallowedCraneMoves(eq)
+    triggerRef(equipment)
   }
 
   function setCraneVesselBayPermission(
@@ -421,6 +479,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     else allowed.delete(bay)
     eq.craneAllowedBaysByVessel[vesselId] = [...allowed].sort((a, b) => a - b)
     deallocateDisallowedCraneMoves(eq)
+    triggerRef(equipment)
   }
 
   function tick(dt: number): void {
@@ -446,6 +505,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     applyState(state)
     applyFlowRuntime(flow)
     applyNarratorRuntime(narrator)
+    refreshSimulationCollections()
   }
 
   function advanceTutorialStep(): void {
@@ -462,6 +522,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     const vessel = vesselVisits.value[0]
     if (!vessel || vessel.state !== 'announced') return
     vessel.arrivalTime = simTime.value
+    triggerRef(vesselVisits)
     requestCameraCue('vessel_approach')
   }
 
@@ -574,7 +635,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
         break
       case 'enableCrane': {
         const mhc = equipment.value.find(eq => eq.id === 'mhc-1')
-        if (mhc) mhc.enabled = true
+        if (mhc) {
+          mhc.enabled = true
+          triggerRef(equipment)
+        }
         requestCameraCue('crane')
         if (!narratorCraneEnabledFired.value) {
           narratorCraneEnabledFired.value = true
@@ -584,7 +648,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
       }
       case 'enableReachStacker': {
         const rs = equipment.value.find(eq => eq.id === 'rs-1')
-        if (rs) rs.enabled = true
+        if (rs) {
+          rs.enabled = true
+          triggerRef(equipment)
+        }
         requestCameraCue('yard')
         break
       }
@@ -627,6 +694,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       simTime.value,
     )
     jobs.value.push(job)
+    triggerRef(jobs)
   }
 
   watch(() => globalSettings.godModeEnabled, (enabled) => {
@@ -639,10 +707,49 @@ export const useGameStore = defineStore('box-empire-game', () => {
         vessel.arrivalTime = simTime.value
       }
     }
+    triggerRef(vesselVisits)
   })
 
+  function startSandboxMode(): void {
+    resetTutorialScenarioCounters()
+    resetTutorialFlowFlags()
+    resetJobCounter()
+    resetTruckCounter()
+    resetVesselCounter()
+    resetEconomy()
+    resetGravityCheck()
+    resetEquipmentDeadlockState()
+    const scenario = createTutorialScenario(true)
+    const fresh = scenario.state
+    fresh.gamePhase = 'sandbox'
+    fresh.vesselVisits = []
+    fresh.equipment = []
+    fresh.containers = fresh.containers.filter(c => c.lifecycleState !== 'on_vessel')
+    applyState({ ...getState(), ...fresh })
+    gamePhase.value = 'sandbox'
+  }
+
+  function deleteEquipment(equipmentId: string): void {
+    if (!isGodMode.value && gamePhase.value !== 'sandbox') return
+    const eq = equipment.value.find(e => e.id === equipmentId)
+    if (!eq) return
+    if (eq.type !== 'reach_stacker' && eq.type !== 'mobile_harbor_crane') return
+    // Cancel any active job assigned to this equipment
+    const activeJob = jobs.value.find(j => j.assignedEquipmentId === equipmentId && (j.status === 'assigned' || j.status === 'in_progress'))
+    if (activeJob) {
+      activeJob.status = 'cancelled'
+      if (eq.carriedContainerId) {
+        const container = containers.value.find(c => c.id === eq.carriedContainerId)
+        if (container) container.lifecycleState = 'at_gate'
+      }
+    }
+    equipment.value = equipment.value.filter(e => e.id !== equipmentId)
+    triggerRef(equipment)
+    if (selectedEquipmentId.value === equipmentId) selectedEquipmentId.value = null
+  }
+
   function spawnMobileHarborCrane(): void {
-    if (!isGodMode.value) return
+    if (!isGodMode.value && gamePhase.value !== 'sandbox') return
     const existingMHCs = equipment.value.filter(eq => eq.type === 'mobile_harbor_crane')
     const newId = `mhc-${existingMHCs.length + 1}`
     const newMHC: Equipment = {
@@ -672,10 +779,12 @@ export const useGameStore = defineStore('box-empire-game', () => {
       headingY: 0,
     }
     equipment.value.push(newMHC)
+    triggerRef(equipment)
+    emitEvent('item.spawned', `Mobile Harbor Crane ${newId} deployed`)
   }
 
   function spawnVessel(): void {
-    if (!isGodMode.value) return
+    if (!isGodMode.value && gamePhase.value !== 'sandbox') return
     const activeCount = vesselVisits.value.filter(v => v.state !== 'departed').length
     const { vessel, containers: newContainers } = createSpawnedVesselScenario(activeCount)
     containers.value.push(...newContainers)
@@ -686,6 +795,10 @@ export const useGameStore = defineStore('box-empire-game', () => {
       if (!eq.craneAllowedVesselIds.includes(vessel.id)) eq.craneAllowedVesselIds.push(vessel.id)
       eq.craneAllowedBaysByVessel[vessel.id] = [...vesselBays]
     }
+    triggerRef(containers)
+    triggerRef(vesselVisits)
+    triggerRef(equipment)
+    emitEvent('item.spawned', `Vessel ${vessel.name} incoming`)
   }
 
   function jobInvolvesVessel(job: Job, vesselId: string): boolean {
@@ -731,10 +844,11 @@ export const useGameStore = defineStore('box-empire-game', () => {
       cancelledMoves: cancellableJobs.length,
       unprocessedImports: remainingImports.length,
     })
+    refreshSimulationCollections()
   }
 
   function spawnReachStacker(): void {
-    if (!isGodMode.value) return
+    if (!isGodMode.value && gamePhase.value !== 'sandbox') return
     const existingRS = equipment.value.filter(eq => eq.type === 'reach_stacker')
     const newId = `rs-${existingRS.length + 1}`
     const home = getReachStackerHomePosition()
@@ -763,6 +877,8 @@ export const useGameStore = defineStore('box-empire-game', () => {
       headingY: 0,
     }
     equipment.value.push(newRS)
+    triggerRef(equipment)
+    emitEvent('item.spawned', `Reach Stacker ${newId} deployed`)
   }
 
   return {
@@ -816,6 +932,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     advanceCareerIntro,
     exitCareerIntroToMenu,
     emitEvent,
+    eventHistory,
     consumePendingEvents,
     manualReassignContainer,
     getState,
@@ -829,5 +946,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     spawnMobileHarborCrane,
     spawnVessel,
     sailVesselNow,
+    startSandboxMode,
+    deleteEquipment,
   }
 })

@@ -15,6 +15,8 @@ Current implementation note: the Pinia store is now a UI-facing facade. Simulati
 - `modules/movement/` owns centralized moving-entity occupancy checks, static yard stack obstacles, and reach-stacker routing.
 - `modules/economy/` owns ledger-style transaction application and money event payloads.
 
+Performance note: the large mutable simulation collections in `store/gameStore.ts` (`containers`, `equipment`, `jobs`, `truckVisits`, `vesselVisits`, `yardBlocks`, and `transactions`) are intentionally `shallowRef(markRaw(...))`. Mutate their objects in place during sim ticks, then call/retain the store's explicit collection refresh path so Vue updates HUD panels without deep-proxying every entity. Do not convert these collections back to deep reactive arrays unless you also replace the sim loop architecture.
+
 Follows the four-layer architecture from `threejs-vue3-animation` skill:
 
 1. **Domain Model** (`modules/`) — Pure TypeScript: scenario setup, simulation orchestration, operations, allocators, movement/occupancy, jobs, equipment, yard, vessels, trucks, economy, pathfinding, and scene construction

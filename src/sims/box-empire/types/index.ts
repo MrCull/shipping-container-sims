@@ -242,6 +242,7 @@ export interface Job {
   startedAt: number | null
   completedAt: number | null
   equipmentType: EquipmentType
+  blockedReason?: string
 }
 
 // ---- Economy --------------------------------------------------------------
@@ -284,6 +285,10 @@ export type GameEventType =
   | 'job.created'
   | 'job.completed'
   | 'equipment.idle'
+  | 'yard.slot.repaired'
+  | 'yard.gravity.applied'
+  | 'yard.gravity.skipped'
+  | 'item.spawned'
 
 export interface GameEvent {
   id: string
@@ -386,6 +391,7 @@ export type GamePhase =
   | 'paused'
   | 'completed'
   | 'career_intro'
+  | 'sandbox'
 
 // ---- Store State ----------------------------------------------------------
 

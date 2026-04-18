@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useGameStore } from '../store/gameStore'
+import { useGlobalSettingsStore } from '@/stores/globalSettings'
 import type { CraneMode } from '../types'
 
 const store = useGameStore()
+const globalSettings = useGlobalSettingsStore()
 
 const equipment = computed(() => {
   if (!store.selectedEquipmentId) return null
-  return store.equipment.find(e => e.id === store.selectedEquipmentId) ?? null
+  const eq = store.equipment.find(e => e.id === store.selectedEquipmentId)
+  return eq ? { ...eq } : null
 })
 
 const currentJob = computed(() => {
@@ -33,8 +36,17 @@ function stateLabel(state: string): string {
   return state.replace(/_/g, ' ')
 }
 
+const canDelete = computed(() =>
+  (store.gamePhase === 'sandbox' || globalSettings.godModeEnabled) &&
+  (equipment.value?.type === 'reach_stacker' || equipment.value?.type === 'mobile_harbor_crane'),
+)
+
 function handleToggle(): void {
   if (equipment.value) store.toggleEquipment(equipment.value.id)
+}
+
+function handleDelete(): void {
+  if (equipment.value) store.deleteEquipment(equipment.value.id)
 }
 
 function handleCraneMode(mode: CraneMode): void {
@@ -105,6 +117,18 @@ function jobStatusColor(status: string): string {
           ✕
         </button>
       </div>
+    </div>
+
+    <div
+      v-if="canDelete"
+      class="delete-row"
+    >
+      <button
+        class="delete-btn"
+        @click="handleDelete"
+      >
+        🗑 Delete
+      </button>
     </div>
 
     <div class="info-rows">
@@ -271,6 +295,29 @@ function jobStatusColor(status: string): string {
   padding: 10px;
   pointer-events: auto;
   z-index: 10;
+}
+
+.delete-row {
+  margin-bottom: 8px;
+}
+
+.delete-btn {
+  width: 100%;
+  padding: 5px 10px;
+  border: 1px solid #e74c3c;
+  border-radius: 5px;
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+  font-family: var(--font-retro, monospace);
+  font-size: 0.72rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.delete-btn:hover {
+  background: rgba(231, 76, 60, 0.35);
+  color: #ff6b6b;
 }
 
 .info-header {

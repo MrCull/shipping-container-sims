@@ -25,11 +25,40 @@ import { createImportYardToTruckJob } from '../allocators/destinationAllocator'
 import { spawnExportTruck, spawnImportPickupTruck } from './truckOperations'
 import { checkStepAdvance, getCurrentStep } from '../tutorial'
 import type { DomainEventPayload } from '../economy/economyLedger'
+import type { SimulationIndexes } from '../simulation/simulationIndexes'
 import type { NarratorRuntime, SimulationCallbacks, TutorialFlowRuntime } from '../simulation/simulationTypes'
 
 function emit(callbacks: SimulationCallbacks, event: DomainEventPayload | null): void {
   if (!event) return
   callbacks.emitEvent(event.type, event.message, event.data)
+}
+
+function getActiveJob(
+  state: BoxEmpireState,
+  containerId: string,
+  indexes?: SimulationIndexes,
+) {
+  return getActiveJobForContainer(state, containerId, indexes)
+}
+
+function pushPlannedJob(
+  state: BoxEmpireState,
+  job: BoxEmpireState['jobs'][number] | null,
+  indexes?: SimulationIndexes,
+): void {
+  if (!job) return
+  state.jobs.push(job)
+  indexes?.jobById.set(job.id, job)
+  if (
+    job.status === 'pending' ||
+    job.status === 'assigned' ||
+    job.status === 'in_progress' ||
+    job.status === 'blocked'
+  ) {
+    if (!indexes?.activeJobByContainerId.has(job.containerId)) {
+      indexes?.activeJobByContainerId.set(job.containerId, job)
+    }
+  }
 }
 
 export function createInitialDischargeJob(state: BoxEmpireState): void {
@@ -41,17 +70,21 @@ export function createInitialDischargeJob(state: BoxEmpireState): void {
   state.jobs.push(createVesselDischargeJob(vessel, next.containerId, next.bay, next.row, next.tier, state.simTime))
 }
 
-function createAvailableDischargeJobsForVessel(state: BoxEmpireState, vessel: BoxEmpireState['vesselVisits'][number]): void {
+function createAvailableDischargeJobsForVessel(
+  state: BoxEmpireState,
+  vessel: BoxEmpireState['vesselVisits'][number],
+  indexes?: SimulationIndexes,
+): void {
   for (const next of getDischargeableVesselContainers(vessel)) {
-    if (getActiveJobForContainer(state, next.containerId)) continue
-    state.jobs.push(createVesselDischargeJob(
+    if (getActiveJob(state, next.containerId, indexes)) continue
+    pushPlannedJob(state, createVesselDischargeJob(
       vessel,
       next.containerId,
       next.bay,
       next.row,
       next.tier,
       state.simTime,
-    ))
+    ), indexes)
   }
 }
 
@@ -76,7 +109,7 @@ export function createInitialExportStagingJob(state: BoxEmpireState): void {
   if (stageJob) state.jobs.push(stageJob)
 }
 
-function continueVesselDischarge(state: BoxEmpireState): void {
+function continueVesselDischarge(state: BoxEmpireState, indexes?: SimulationIndexes): void {
   for (const vessel of state.vesselVisits) {
     if (vessel.state !== 'discharging') continue
 
@@ -85,7 +118,7 @@ function continueVesselDischarge(state: BoxEmpireState): void {
       continue
     }
 
-    createAvailableDischargeJobsForVessel(state, vessel)
+    createAvailableDischargeJobsForVessel(state, vessel, indexes)
   }
 }
 
@@ -130,7 +163,7 @@ function spawnNeededImportPickupTruck(
   }
 }
 
-function ensureImportPickupJobs(state: BoxEmpireState): void {
+function ensureImportPickupJobs(state: BoxEmpireState, indexes?: SimulationIndexes): void {
   const yard = state.yardBlocks[0]
   if (!yard) return
 
@@ -143,9 +176,9 @@ function ensureImportPickupJobs(state: BoxEmpireState): void {
     if (!container || container.lifecycleState !== 'in_yard' || !container.yardSlot) continue
 
     if (isContainerOnTop(yard, container.id)) {
-      if (!getActiveJobForContainer(state, container.id)) {
+      if (!getActiveJob(state, container.id, indexes)) {
         const pickupJob = createImportYardToTruckJob(container, truck, state.simTime)
-        if (pickupJob) state.jobs.push(pickupJob)
+        pushPlannedJob(state, pickupJob, indexes)
       }
       continue
     }
@@ -163,7 +196,7 @@ function ensureImportPickupJobs(state: BoxEmpireState): void {
       )
       .sort((a, b) => b.tier - a.tier)[0]
     if (!topSlot?.containerId) continue
-    if (getActiveJobForContainer(state, topSlot.containerId)) continue
+    if (getActiveJob(state, topSlot.containerId, indexes)) continue
 
     const topRef = {
       blockId: yard.id,
@@ -174,11 +207,15 @@ function ensureImportPickupJobs(state: BoxEmpireState): void {
     const shuffleTarget = findShuffleTargetSlot(yard, topRef, state.jobs)
     if (!shuffleTarget) continue
 
-    state.jobs.push(createYardShuffleJob(topSlot.containerId, yard, topRef, shuffleTarget, state.simTime))
+    pushPlannedJob(state, createYardShuffleJob(topSlot.containerId, yard, topRef, shuffleTarget, state.simTime), indexes)
   }
 }
 
-function continueExportStagingAndLoading(state: BoxEmpireState, callbacks: SimulationCallbacks): void {
+function continueExportStagingAndLoading(
+  state: BoxEmpireState,
+  callbacks: SimulationCallbacks,
+  indexes?: SimulationIndexes,
+): void {
   const loadingVessels = state.vesselVisits.filter(v => v.state === 'loading')
   if (loadingVessels.length === 0) return
 
@@ -210,7 +247,7 @@ function continueExportStagingAndLoading(state: BoxEmpireState, callbacks: Simul
       const exportInYard = state.containers.find(container => {
         if (container.visitType !== 'export' || container.lifecycleState !== 'in_yard') return false
         if (!container.yardSlot) return false
-        const activeJob = getActiveJobForContainer(state, container.id)
+        const activeJob = getActiveJob(state, container.id, indexes)
         if (activeJob && activeJob.status !== 'blocked') return false
         return isContainerOnTop(yard, container.id)
       })
@@ -226,7 +263,7 @@ function continueExportStagingAndLoading(state: BoxEmpireState, callbacks: Simul
           ).x)
           : undefined
         const stageJob = createExportYardToQuayJob(exportInYard, yard, state.simTime, loadExchangePosition)
-        if (stageJob) state.jobs.push(stageJob)
+        pushPlannedJob(state, stageJob, indexes)
       }
     }
   }
@@ -246,13 +283,13 @@ function continueExportStagingAndLoading(state: BoxEmpireState, callbacks: Simul
 
     const stagedExport = state.containers.find(container => {
       if (container.visitType !== 'export' || container.lifecycleState !== 'staged_for_loading') return false
-      return !getActiveJobForContainer(state, container.id)
+      return !getActiveJob(state, container.id, indexes)
     })
     if (!stagedExport) continue
 
     const loadSlot = getNextLoadSlot(vessel)
     if (loadSlot !== null) {
-      state.jobs.push(createExportQuayToVesselJob(
+      pushPlannedJob(state, createExportQuayToVesselJob(
         stagedExport.id,
         vessel,
         loadSlot.bay,
@@ -261,7 +298,7 @@ function continueExportStagingAndLoading(state: BoxEmpireState, callbacks: Simul
         state.simTime,
         11,
         { ...stagedExport.currentLocation.position },
-      ))
+      ), indexes)
     }
   }
 }
@@ -344,6 +381,7 @@ export function planTutorialOperations(
   narrator: NarratorRuntime,
   callbacks: SimulationCallbacks,
   isGodMode = false,
+  indexes?: SimulationIndexes,
 ): void {
   const exportContainersWaitingAtGate = state.containers.some(
     container => container.visitType === 'export' && container.lifecycleState === 'at_gate',
@@ -351,7 +389,11 @@ export function planTutorialOperations(
   const activeExportDeliveryTrucks = state.truckVisits.filter(
     truck => truck.visitType === 'export_delivery' && truck.state !== 'departed',
   ).length
-  if (state.gatehouse.exportLaneOpen && exportContainersWaitingAtGate && activeExportDeliveryTrucks < 4) {
+  const vesselActive = state.vesselVisits.some(
+    v => v.state !== 'announced' && v.state !== 'departed',
+  )
+  const sandboxTrucksAllowed = state.gamePhase !== 'sandbox' || vesselActive
+  if (state.gatehouse.exportLaneOpen && exportContainersWaitingAtGate && activeExportDeliveryTrucks < 4 && sandboxTrucksAllowed) {
     const truckInterval = 5
     const nextTruckTime = flow.exportTrucksSent * truckInterval + 1
     if (state.simTime > nextTruckTime || flow.exportTrucksSent === 0) {
@@ -364,24 +406,26 @@ export function planTutorialOperations(
     if (vessel.state !== 'arrived') continue
     vessel.state = 'discharging'
     flow.dischargingStarted = true
-    createAvailableDischargeJobsForVessel(state, vessel)
+    createAvailableDischargeJobsForVessel(state, vessel, indexes)
   }
 
-  continueVesselDischarge(state)
+  continueVesselDischarge(state, indexes)
   if (state.vesselVisits.some(v => v.state === 'loading')) flow.loadingStarted = true
 
   maybeStartImportPickupFlow(state, flow)
   spawnNeededImportPickupTruck(state, flow, callbacks)
-  ensureImportPickupJobs(state)
+  ensureImportPickupJobs(state, indexes)
 
   if (!flow.exportStagingStarted && state.vesselVisits.some(v => v.state === 'loading')) {
     flow.exportStagingStarted = true
     createInitialExportStagingJob(state)
   }
 
-  continueExportStagingAndLoading(state, callbacks)
-  fireNarratorMilestones(state, narrator, callbacks)
-  checkTutorialCompletion(state, isGodMode, callbacks)
+  continueExportStagingAndLoading(state, callbacks, indexes)
+  if (state.gamePhase !== 'sandbox') {
+    fireNarratorMilestones(state, narrator, callbacks)
+    checkTutorialCompletion(state, isGodMode, callbacks)
+  }
 }
 
 export function advanceTutorialProgress(

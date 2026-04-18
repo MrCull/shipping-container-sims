@@ -1,4 +1,5 @@
 import type { BoxEmpireState, GameEventType, TutorialStep } from '../../types'
+import type { SimulationIndexes } from './simulationIndexes'
 
 export interface TutorialFlowRuntime {
   exportTrucksSent: number
@@ -41,4 +42,5 @@ export interface SimulationTickContext {
   flow: TutorialFlowRuntime
   narrator: NarratorRuntime
   callbacks: SimulationCallbacks
+  indexes?: SimulationIndexes
 }

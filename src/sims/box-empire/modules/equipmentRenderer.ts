@@ -4,6 +4,7 @@
 
 import * as THREE from 'three'
 import type { Equipment, Container } from '../types'
+import type { RenderEntityIndexes } from './renderEntityIndexes'
 import {
   CONTAINER_HEIGHT,
   CONTAINER_LENGTH,
@@ -671,7 +672,29 @@ export class EquipmentRenderer {
     }
   }
 
-  update(equipmentList: Equipment[], containers?: Container[]): void {
+  update(equipmentList: Equipment[], containers?: Container[], indexes?: RenderEntityIndexes): void {
+    const activeIds = new Set(equipmentList.map(e => e.id))
+    for (const [eqId, mesh] of this.meshes) {
+      if (activeIds.has(eqId)) continue
+      const carried = this.carriedMeshes.get(eqId)
+      if (carried) {
+        mesh.remove(carried)
+        this.disposeContainerGroup(carried)
+        this.carriedMeshes.delete(eqId)
+      }
+      mesh.traverse(obj => {
+        const m = obj as THREE.Mesh
+        if (m.geometry) m.geometry.dispose()
+        if (m.material) {
+          if (Array.isArray(m.material)) m.material.forEach(mt => mt.dispose())
+          else m.material.dispose()
+        }
+      })
+      this.scene.remove(mesh)
+      this.meshes.delete(eqId)
+      this.parts.delete(eqId)
+    }
+
     for (const eq of equipmentList) {
       let mesh = this.meshes.get(eq.id)
       if (!mesh) {
@@ -707,7 +730,7 @@ export class EquipmentRenderer {
         // ---- Carried container: attach as child of RS group, hang under spreader ----
         const existingCarried = this.carriedMeshes.get(eq.id)
         if (eq.carriedContainerId && containers) {
-          const container = containers.find(c => c.id === eq.carriedContainerId)
+          const container = indexes?.containerById.get(eq.carriedContainerId) ?? containers.find(c => c.id === eq.carriedContainerId)
           if (container) {
             let cGroup = existingCarried
             if (!cGroup || cGroup.userData['containerId'] !== eq.carriedContainerId) {
@@ -743,7 +766,7 @@ export class EquipmentRenderer {
 
       if (p?.mhcSpreader && eq.type === 'mobile_harbor_crane') {
         const carriedContainer = eq.carriedContainerId && containers
-          ? containers.find(c => c.id === eq.carriedContainerId) ?? null
+          ? indexes?.containerById.get(eq.carriedContainerId) ?? containers.find(c => c.id === eq.carriedContainerId) ?? null
           : null
         const target = eq.targetPosition ?? {
           x: eq.position.x,
