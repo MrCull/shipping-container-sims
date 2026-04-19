@@ -62,6 +62,7 @@ export function createSpawnedVesselScenario(
   const vesselId = peekNextVesselId()
   const allSlotRefs = getVesselSlotRefs()
   const importCount = Math.min(opts?.importCount ?? 12, allSlotRefs.length)
+  const exportCount = opts?.exportCount ?? 12
   const slotRefs = allSlotRefs.slice(0, importCount)
   const importContainers: Container[] = []
   for (const slotRef of slotRefs) {
@@ -85,6 +86,7 @@ export function createSpawnedVesselScenario(
     name: opts?.name,
     dischargeEnabled: opts?.dischargeEnabled,
     loadEnabled: opts?.loadEnabled,
+    targetExportCount: exportCount,
   })
   importContainers.forEach(container => {
     if (!container.vesselSlot) return
@@ -96,7 +98,6 @@ export function createSpawnedVesselScenario(
     )
   })
 
-  const exportCount = opts?.exportCount ?? 12
   const exportContainers = createSpawnedExportContainers(exportCount)
   return { vessel, containers: [...importContainers, ...exportContainers] }
 }

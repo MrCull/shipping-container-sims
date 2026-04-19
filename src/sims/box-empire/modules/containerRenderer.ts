@@ -7,12 +7,14 @@
 import * as THREE from 'three'
 import type { Container, TruckVisit } from '../types'
 import type { RenderEntityIndexes } from './renderEntityIndexes'
+import type { ContainerColorMode } from '@/stores/globalSettings'
 import {
   CONTAINER_LENGTH,
   CONTAINER_WIDTH,
   CONTAINER_HEIGHT,
 } from './config'
 import { createContainerMaterials, disposeContainerMaterials } from './containerMaterials'
+import { applyColorModeToGroup } from './containerColorMode'
 
 const POST_SIZE = 0.10
 const POST_COLOR = 0x2c313a
@@ -83,12 +85,11 @@ export class ContainerRenderer {
   private scene: THREE.Scene
   private groups = new Map<string, THREE.Group>()
   private containerIds: string[] = []
-
   constructor(scene: THREE.Scene) {
     this.scene = scene
   }
 
-  update(containers: Container[], trucks?: TruckVisit[], indexes?: RenderEntityIndexes): void {
+  update(containers: Container[], trucks?: TruckVisit[], indexes?: RenderEntityIndexes, colorMode: ContainerColorMode = 'shipping_line', simTime = 0): void {
     const visibleContainers = containers.filter(c => {
       if (c.lifecycleState === 'departed') return false
       if (c.lifecycleState === 'on_vessel') return false
@@ -125,6 +126,8 @@ export class ContainerRenderer {
         this.scene.add(group)
         this.groups.set(c.id, group)
       }
+
+      applyColorModeToGroup(group, c, colorMode, simTime)
 
       // Position
       group.position.set(

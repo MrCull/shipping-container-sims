@@ -62,6 +62,7 @@ function createSlots(vesselId: string, importContainers: Container[]): VesselSlo
 export function createTutorialVessel(
   importContainers: Container[],
   arrivalTime: number,
+  targetExportCount = 5,
 ): VesselVisit {
   vesselCounter++
   const vesselId = `vessel-${vesselCounter}`
@@ -80,14 +81,16 @@ export function createTutorialVessel(
     arrivalTime,
     hornPlayed: false,
     dischargeEnabled: true,
-    loadEnabled: true,
+    loadEnabled: false,
+    initialImportCount: importContainers.length,
+    targetExportCount,
   }
 }
 
 export function createSpawnedVessel(
   importContainers: Container[],
   berthX: number,
-  opts?: { name?: string; dischargeEnabled?: boolean; loadEnabled?: boolean },
+  opts?: { name?: string; dischargeEnabled?: boolean; loadEnabled?: boolean; targetExportCount?: number },
 ): VesselVisit {
   vesselCounter++
   const vesselId = `vessel-${vesselCounter}`
@@ -106,7 +109,9 @@ export function createSpawnedVessel(
     arrivalTime: 0,  // arrives immediately (god mode)
     hornPlayed: false,
     dischargeEnabled: opts?.dischargeEnabled ?? true,
-    loadEnabled: opts?.loadEnabled ?? true,
+    loadEnabled: opts?.loadEnabled ?? false,
+    initialImportCount: importContainers.length,
+    targetExportCount: opts?.targetExportCount ?? 0,
   }
 }
 
@@ -180,9 +185,18 @@ export function getNextDischargeContainer(
   return getDischargeableVesselContainers(vessel)[0] ?? null
 }
 
-export function getNextLoadSlot(vessel: VesselVisit): VesselSlot | null {
+export function getNextLoadSlot(vessel: VesselVisit, containers?: Container[]): VesselSlot | null {
   for (let tier = 1; tier <= TUTORIAL_VESSEL.tiers; tier++) {
     for (let bay = 1; bay <= TUTORIAL_VESSEL.bays; bay++) {
+      if (containers) {
+        // Skip bays that still have import containers on the vessel
+        const bayHasImports = vessel.slots.some(s => {
+          if (s.bay !== bay || !s.containerId) return false
+          const c = containers.find(x => x.id === s.containerId)
+          return c?.visitType === 'import'
+        })
+        if (bayHasImports) continue
+      }
       for (let row = 1; row <= TUTORIAL_VESSEL.rows; row++) {
         const slot = vessel.slots.find(s => s.bay === bay && s.row === row && s.tier === tier)
         if (slot && !slot.containerId) return slot

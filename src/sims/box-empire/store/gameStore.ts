@@ -50,6 +50,7 @@ import { getReachStackerHomePosition } from '../modules/movement/terminalGeometr
 import { resetEquipmentDeadlockState } from '../modules/equipmentController'
 import { createSpawnedVesselScenario } from '../modules/scenario/tutorialScenario'
 import { applyUnprocessedImportFine } from '../modules/economy/economyLedger'
+import { removeContainerFromSlot } from '../modules/yardManager'
 
 let eventCounter = 0
 let cameraCueCounter = 0
@@ -76,6 +77,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   const selectedEquipmentId = ref<string | null>(null)
   const selectedVesselId = ref<string | null>(null)
   const selectedGatehouseId = ref<string | null>(null)
+  const selectedTruckId = ref<string | null>(null)
   const events = ref<GameEvent[]>([])
   const eventHistory = ref<GameEvent[]>([])
   const pendingEventCallbacks = ref<GameEvent[]>([])
@@ -98,6 +100,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
   const narratorCraneEnabledFired = ref(false)
   const narratorFirstOnQuayFired = ref(false)
   const narratorImportsInYardFired = ref(false)
+  const narratorDischargeCompletedFired = ref(false)
   const narratorGroup4Fired = ref(false)
   const narratorFirstGateOutMoneyFired = ref(false)
   const narratorExportToQuayFired = ref(false)
@@ -142,6 +145,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       selectedEquipmentId: selectedEquipmentId.value,
       selectedVesselId: selectedVesselId.value,
       selectedGatehouseId: selectedGatehouseId.value,
+      selectedTruckId: selectedTruckId.value,
       events: events.value,
     }
   }
@@ -165,6 +169,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     selectedEquipmentId.value = state.selectedEquipmentId
     selectedVesselId.value = state.selectedVesselId
     selectedGatehouseId.value = state.selectedGatehouseId
+    selectedTruckId.value = state.selectedTruckId
     events.value = state.events
   }
 
@@ -236,6 +241,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       craneEnabledFired: narratorCraneEnabledFired.value,
       firstOnQuayFired: narratorFirstOnQuayFired.value,
       importsInYardFired: narratorImportsInYardFired.value,
+      dischargeCompletedFired: narratorDischargeCompletedFired.value,
       trucksRollingFired: narratorGroup4Fired.value,
       firstGateOutMoneyFired: narratorFirstGateOutMoneyFired.value,
       exportToQuayFired: narratorExportToQuayFired.value,
@@ -248,6 +254,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     narratorCraneEnabledFired.value = narrator.craneEnabledFired
     narratorFirstOnQuayFired.value = narrator.firstOnQuayFired
     narratorImportsInYardFired.value = narrator.importsInYardFired
+    narratorDischargeCompletedFired.value = narrator.dischargeCompletedFired
     narratorGroup4Fired.value = narrator.trucksRollingFired
     narratorFirstGateOutMoneyFired.value = narrator.firstGateOutMoneyFired
     narratorExportToQuayFired.value = narrator.exportToQuayFired
@@ -263,6 +270,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     narratorCraneEnabledFired.value = false
     narratorFirstOnQuayFired.value = false
     narratorImportsInYardFired.value = false
+    narratorDischargeCompletedFired.value = false
     narratorGroup4Fired.value = false
     narratorFirstGateOutMoneyFired.value = false
     narratorExportToQuayFired.value = false
@@ -333,6 +341,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
       selectedEquipmentId: null,
       selectedVesselId: null,
       selectedGatehouseId: null,
+      selectedTruckId: null,
       events: [],
     })
     tutorialCompleted.value = false
@@ -828,6 +837,47 @@ export const useGameStore = defineStore('box-empire-game', () => {
     }
   }
 
+  function deleteContainer(containerId: string): void {
+    if (gamePhase.value !== 'sandbox' && !isGodMode.value) return
+    const state = getState()
+    const activeStatuses = new Set(['pending', 'assigned', 'in_progress', 'blocked'])
+    const relatedJobs = jobs.value.filter(j => j.containerId === containerId && activeStatuses.has(j.status))
+    for (const job of relatedJobs) cancelJob(state, job.id)
+    for (const yard of yardBlocks.value) removeContainerFromSlot(yard, containerId)
+    for (const vessel of vesselVisits.value) {
+      const slot = vessel.slots.find(s => s.containerId === containerId)
+      if (slot) slot.containerId = null
+    }
+    for (const truck of truckVisits.value) {
+      if (truck.containerId === containerId) truck.containerId = null
+    }
+    const idx = containers.value.findIndex(c => c.id === containerId)
+    if (idx !== -1) containers.value.splice(idx, 1)
+    selectedContainerId.value = null
+    triggerRef(containers)
+    triggerRef(yardBlocks)
+    triggerRef(vesselVisits)
+    triggerRef(truckVisits)
+    triggerRef(jobs)
+  }
+
+  function deleteTruck(truckId: string): void {
+    if (gamePhase.value !== 'sandbox' && !isGodMode.value) return
+    const state = getState()
+    const activeStatuses = new Set(['pending', 'assigned', 'in_progress', 'blocked'])
+    const relatedJobs = jobs.value.filter(
+      j => activeStatuses.has(j.status) &&
+        ((j.pickupLocation.type === 'truck' && j.pickupLocation.id === truckId) ||
+         (j.dropoffLocation.type === 'truck' && j.dropoffLocation.id === truckId)),
+    )
+    for (const job of relatedJobs) cancelJob(state, job.id)
+    const idx = truckVisits.value.findIndex(t => t.id === truckId)
+    if (idx !== -1) truckVisits.value.splice(idx, 1)
+    selectedTruckId.value = null
+    triggerRef(truckVisits)
+    triggerRef(jobs)
+  }
+
   function jobInvolvesVessel(job: Job, vesselId: string): boolean {
     return (
       (job.pickupLocation.type === 'vessel_slot' && job.pickupLocation.id.startsWith(`${vesselId}-`)) ||
@@ -929,6 +979,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     selectedEquipmentId,
     selectedVesselId,
     selectedGatehouseId,
+    selectedTruckId,
     events,
     activeJobs,
     pendingJobs,
@@ -978,5 +1029,7 @@ export const useGameStore = defineStore('box-empire-game', () => {
     sailVesselNow,
     startSandboxMode,
     deleteEquipment,
+    deleteContainer,
+    deleteTruck,
   }
 })

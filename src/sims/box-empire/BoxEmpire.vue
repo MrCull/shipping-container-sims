@@ -11,11 +11,13 @@ import ContainerInfo from './components/ContainerInfo.vue'
 import EquipmentInfo from './components/EquipmentInfo.vue'
 import GatehouseInfo from './components/GatehouseInfo.vue'
 import VesselInfo from './components/VesselInfo.vue'
+import TruckInfo from './components/TruckInfo.vue'
 import StartScreen from './components/modals/StartScreen.vue'
 import TutorialComplete from './components/modals/TutorialComplete.vue'
 import CareerIntroModal from './components/modals/CareerIntroModal.vue'
 import SandboxOnboarding from './components/modals/SandboxOnboarding.vue'
 import KeyboardHint from './components/ui/KeyboardHint.vue'
+import ColorByMenu from './components/ui/ColorByMenu.vue'
 
 const store = useGameStore()
 useGodModeHotkey()
@@ -64,7 +66,8 @@ function handlePlayTutorialFromCareer(): void {
       <TopBar />
       <NarratorDialog v-if="store.gamePhase !== 'sandbox'" />
       <EventFeed />
-      <ContainerInfo />
+      <ContainerInfo v-if="!store.selectedTruckId" />
+      <TruckInfo />
       <EquipmentInfo />
       <GatehouseInfo />
       <VesselInfo />
@@ -95,6 +98,14 @@ function handlePlayTutorialFromCareer(): void {
     />
 
     <KeyboardHint />
+    <ColorByMenu
+      v-if="
+        store.gamePhase === 'tutorial'
+          || store.gamePhase === 'playing'
+          || store.gamePhase === 'completed'
+          || store.gamePhase === 'sandbox'
+      "
+    />
   </div>
 </template>
 

@@ -45,7 +45,7 @@ function buildVesselGLBHull(glbRoot: THREE.Group, loa: number): THREE.Group {
   glbRoot.position.y = VESSEL_GLB.yOffset
 
   const hull = new THREE.Group()
-  hull.name = 'vessel-glb-hull'
+  hull.name = ''
   hull.add(glbRoot)
   return hull
 }

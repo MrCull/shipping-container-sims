@@ -99,7 +99,7 @@ export function createJobsForTruckReadyAtYard(state: BoxEmpireState, truck: Truc
     const container = state.containers.find(candidate => candidate.id === truck.containerId)
     if (!container || container.lifecycleState !== 'in_yard' || !container.yardSlot) return null
 
-    const job = createImportYardToTruckJob(container, truck, state.simTime)
+    const job = createImportYardToTruckJob(container, truck, state.simTime, 10.5)
     if (!job) return null
     state.jobs.push(job)
     return {

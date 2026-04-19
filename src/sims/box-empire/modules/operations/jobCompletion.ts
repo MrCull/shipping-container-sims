@@ -45,7 +45,7 @@ function createWaitingImportPickupJobIfNeeded(
   if (!waitingTruck) return
   if (getActiveJobForContainer(state, container.id)) return
 
-  const pickupJob = createImportYardToTruckJob(container, waitingTruck, state.simTime)
+  const pickupJob = createImportYardToTruckJob(container, waitingTruck, state.simTime, 10.5)
   if (pickupJob) state.jobs.push(pickupJob)
 }
 

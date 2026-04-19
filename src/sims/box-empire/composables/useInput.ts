@@ -49,12 +49,22 @@ export function useInput(
           store.selectedContainerId = null
           store.selectedGatehouseId = null
           store.selectedVesselId = null
+          store.selectedTruckId = null
           return
         }
         if (cur.name === 'gatehouse-ingate' || cur.name === 'gatehouse-outgate') {
           store.selectedGatehouseId = cur.name
           store.selectedEquipmentId = null
           store.selectedContainerId = null
+          store.selectedVesselId = null
+          store.selectedTruckId = null
+          return
+        }
+        if (cur.name.startsWith('truck-')) {
+          store.selectedTruckId = cur.name
+          store.selectedEquipmentId = null
+          store.selectedContainerId = null
+          store.selectedGatehouseId = null
           store.selectedVesselId = null
           return
         }
@@ -63,6 +73,7 @@ export function useInput(
           store.selectedEquipmentId = null
           store.selectedContainerId = null
           store.selectedGatehouseId = null
+          store.selectedTruckId = null
           return
         }
         cur = cur.parent
@@ -78,6 +89,7 @@ export function useInput(
       store.selectedEquipmentId = null
       store.selectedGatehouseId = null
       store.selectedVesselId = null
+      store.selectedTruckId = null
       return
     }
 
@@ -85,6 +97,7 @@ export function useInput(
     store.selectedEquipmentId = null
     store.selectedGatehouseId = null
     store.selectedVesselId = null
+    store.selectedTruckId = null
   }
 
   onMounted(() => {

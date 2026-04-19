@@ -16,6 +16,7 @@ export interface NarratorRuntime {
   craneEnabledFired: boolean
   firstOnQuayFired: boolean
   importsInYardFired: boolean
+  dischargeCompletedFired: boolean
   trucksRollingFired: boolean
   firstGateOutMoneyFired: boolean
   exportToQuayFired: boolean

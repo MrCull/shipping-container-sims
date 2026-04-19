@@ -491,9 +491,9 @@ function jobStatusColor(status: string): string {
 }
 
 .mode-btn.active {
-  background: rgba(245, 158, 11, 0.3);
-  border-color: #f59e0b;
-  color: #f59e0b;
+  background: rgba(46, 204, 113, 0.2);
+  border-color: #2ecc71;
+  color: #2ecc71;
   font-weight: bold;
 }
 

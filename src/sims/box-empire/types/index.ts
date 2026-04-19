@@ -146,6 +146,8 @@ export interface VesselVisit {
   hornPlayed: boolean   // ensures horn fires exactly once when 'arriving' begins
   dischargeEnabled: boolean
   loadEnabled: boolean
+  initialImportCount: number
+  targetExportCount: number
 }
 
 export interface VesselSlot {
@@ -416,5 +418,6 @@ export interface BoxEmpireState {
   selectedEquipmentId: string | null
   selectedVesselId: string | null
   selectedGatehouseId: string | null
+  selectedTruckId: string | null
   events: GameEvent[]
 }

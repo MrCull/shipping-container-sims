@@ -15,6 +15,8 @@ import {
 } from './config'
 import { createContainerGroup } from './containerRenderer'
 import { disposeContainerMaterials } from './containerMaterials'
+import type { ContainerColorMode } from '@/stores/globalSettings'
+import { applyColorModeToGroup } from './containerColorMode'
 
 interface EquipmentParts {
   boomGroup?: THREE.Group
@@ -672,7 +674,7 @@ export class EquipmentRenderer {
     }
   }
 
-  update(equipmentList: Equipment[], containers?: Container[], indexes?: RenderEntityIndexes): void {
+  update(equipmentList: Equipment[], containers?: Container[], indexes?: RenderEntityIndexes, colorMode: ContainerColorMode = 'shipping_line', simTime = 0): void {
     const activeIds = new Set(equipmentList.map(e => e.id))
     for (const [eqId, mesh] of this.meshes) {
       if (activeIds.has(eqId)) continue
@@ -742,6 +744,7 @@ export class EquipmentRenderer {
               mesh.add(cGroup)
               this.carriedMeshes.set(eq.id, cGroup)
             }
+            applyColorModeToGroup(cGroup, container, colorMode, simTime)
             // Position container in RS-group local space so it hangs below the spreader.
             // boomGroup pivot: (0, 3.50, 0.90).  Spreader at boomGroup-local z=9.2;
             // scale.z=0.5 → visual z_scaled=4.6 from pivot.
@@ -846,6 +849,7 @@ export class EquipmentRenderer {
               p.mhcSpreader.add(cGroup)
               this.carriedMeshes.set(eq.id, cGroup)
             }
+            applyColorModeToGroup(cGroup, container, colorMode, simTime)
             cGroup.position.set(0, -(0.55 + CONTAINER_HEIGHT / 2), 0)
             const dropProgress = Math.min(1, eq.stateElapsed / (MHC_CYCLE_TIME / 2))
             const yaw = isImportSetdown ? dropProgress * (Math.PI / 4) : 0

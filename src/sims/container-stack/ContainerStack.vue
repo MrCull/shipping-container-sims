@@ -71,7 +71,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       </p>
     </div>
     <KeyboardHint v-if="phase !== 'start'" />
-    <StartScreen v-if="phase === 'start' && !hasStartedGame" />
+    <StartScreen v-if="phase === 'start'" />
     <GameOver v-if="phase === 'gameOver'" />
     <LevelCompleteModal v-if="phase === 'levelComplete'" />
     <LevelFailedModal v-if="phase === 'levelFailed'" />

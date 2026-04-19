@@ -6,6 +6,7 @@ import { onBeforeUnmount, ref, nextTick, watch, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useGameStore } from '../store/gameStore'
+import { useGlobalSettingsStore } from '@/stores/globalSettings'
 import { buildScene } from '../modules/sceneBuilder'
 import { animateOcean, animateFoam } from '../modules/oceanAnimation'
 import { ContainerRenderer } from '../modules/containerRenderer'
@@ -77,6 +78,7 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
   const isReady = ref(false)
   const webglFailed = ref(false)
   const store = useGameStore()
+  const globalSettings = useGlobalSettingsStore()
 
   // Keyboard camera state
   const keys = { left: false, right: false, up: false, down: false, zoomIn: false, zoomOut: false }
@@ -384,10 +386,12 @@ export function useBoxEmpireScene(canvasRef: Ref<HTMLCanvasElement | null>): Gam
 
   function updateEntities(): void {
     const indexes = buildRenderEntityIndexes(store.containers, store.truckVisits)
-    containerRenderer?.update(store.containers, store.truckVisits, indexes)
-    equipmentRenderer?.update(store.equipment, store.containers, indexes)
+    const colorMode = globalSettings.containerColorMode
+    const simTime = store.simTime
+    containerRenderer?.update(store.containers, store.truckVisits, indexes, colorMode, simTime)
+    equipmentRenderer?.update(store.equipment, store.containers, indexes, colorMode, simTime)
     vesselRenderer?.update(store.vesselVisits, store.containers, 0.016, indexes)
-    truckRenderer?.update(store.truckVisits, store.containers, indexes)
+    truckRenderer?.update(store.truckVisits, store.containers, indexes, colorMode, simTime)
   }
 
   function spawnFloatingText(text: string, color: string, worldPos: { x: number; y: number; z: number }): void {

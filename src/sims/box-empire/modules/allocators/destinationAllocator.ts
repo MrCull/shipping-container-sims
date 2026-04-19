@@ -36,6 +36,7 @@ export function createImportYardToTruckJob(
   container: Container,
   truck: TruckVisit,
   simTime: number,
+  priority = 8,
 ): Job | null {
   if (!container.yardSlot) return null
   const slotId = makeYardSlotId(
@@ -49,7 +50,7 @@ export function createImportYardToTruckJob(
     { type: 'yard_slot', id: slotId, position: { ...container.currentLocation.position } },
     { type: 'truck', id: truck.id, position: getTruckContainerPositionForVisitType(truck.visitType) },
     'reach_stacker',
-    8,
+    priority,
     simTime,
   )
 }

@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useGameStore } from '../store/gameStore'
+import { useGlobalSettingsStore } from '@/stores/globalSettings'
 
 const store = useGameStore()
+const globalSettings = useGlobalSettingsStore()
+
+const canDelete = computed(() => store.gamePhase === 'sandbox' || globalSettings.godModeEnabled)
 
 const container = computed(() => {
   if (!store.selectedContainerId) return null
@@ -116,6 +120,19 @@ function jobRouteLabel(j: typeof activeJob.value): string {
           class="value"
           style="color: #2ecc71"
         >${{ container.revenueEarned }}</span>
+      </div>
+
+      <!-- Delete (sandbox) -->
+      <div
+        v-if="canDelete"
+        class="delete-row"
+      >
+        <button
+          class="delete-btn"
+          @click="store.deleteContainer(container.id)"
+        >
+          🗑 Delete
+        </button>
       </div>
 
       <!-- Active job -->
@@ -237,6 +254,26 @@ function jobRouteLabel(j: typeof activeJob.value): string {
 .small {
   font-size: 0.58rem;
   word-break: break-all;
+}
+
+.delete-row {
+  margin-top: 6px;
+}
+
+.delete-btn {
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid #e74c3c;
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+  font-family: var(--font-retro, monospace);
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+
+.delete-btn:hover {
+  background: rgba(231, 76, 60, 0.3);
 }
 
 .job-section {

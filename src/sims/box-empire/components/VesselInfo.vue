@@ -36,6 +36,21 @@ const remainingImports = computed(() => {
   ).length
 })
 
+const dischargedImports = computed(() => {
+  if (!vessel.value) return 0
+  return vessel.value.initialImportCount - remainingImports.value
+})
+
+const loadedExports = computed(() => {
+  if (!vessel.value) return 0
+  return store.containers.filter(
+    container =>
+      container.visitType === 'export' &&
+      container.vesselSlot?.vesselId === vessel.value!.id &&
+      container.lifecycleState === 'loaded_on_vessel',
+  ).length
+})
+
 const fineTotal = computed(() => remainingImports.value * UNPROCESSED_IMPORT_FINE)
 
 function stateLabel(state: string): string {
@@ -91,7 +106,11 @@ function handleLoadToggle(): void {
       </div>
       <div class="info-row">
         <span class="label">Imports</span>
-        <span class="value">{{ remainingImports }}</span>
+        <span class="value">{{ dischargedImports }} / {{ vessel.initialImportCount }}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Exports</span>
+        <span class="value">{{ loadedExports }} / {{ vessel.targetExportCount }}</span>
       </div>
       <div class="info-row">
         <span class="label">Sail Early Fine</span>
@@ -101,6 +120,14 @@ function handleLoadToggle(): void {
         >
           ${{ fineTotal }}
         </span>
+      </div>
+
+      <div
+        v-if="vessel.state === 'discharging' && !vessel.loadEnabled && vessel.targetExportCount > 0"
+        class="info-row"
+      >
+        <span class="label">Loading</span>
+        <span class="value dim">Awaiting discharge</span>
       </div>
 
       <div class="info-row ops-row">
@@ -115,7 +142,8 @@ function handleLoadToggle(): void {
           </button>
           <button
             :class="['ops-btn', vessel.loadEnabled ? 'active' : '']"
-            title="Toggle loading (quay → vessel)"
+            :disabled="vessel.state === 'discharging'"
+            :title="vessel.state === 'discharging' ? 'Loading starts automatically after discharge' : 'Toggle loading (quay → vessel)'"
             @click="handleLoadToggle"
           >
             ↑ Load
@@ -206,6 +234,11 @@ function handleLoadToggle(): void {
 
 .warning {
   color: #e74c3c;
+}
+
+.dim {
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
 }
 
 .sail-btn {

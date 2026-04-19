@@ -10,6 +10,8 @@ import type { RenderEntityIndexes } from './renderEntityIndexes'
 import { CONTAINER_LENGTH, CONTAINER_WIDTH, CONTAINER_HEIGHT, TRUCK_GLB } from './config'
 import { createContainerMaterials, disposeContainerMaterials } from './containerMaterials'
 import { loadModel, getModelSync } from './modelLoader'
+import type { ContainerColorMode } from '@/stores/globalSettings'
+import { applyColorModeToGroup } from './containerColorMode'
 
 export const TRUCK_GLB_URL = new URL('../assets/models/truck-no-trailer.glb', import.meta.url).href
 
@@ -210,7 +212,7 @@ export class TruckRenderer {
     return group
   }
 
-  update(trucks: TruckVisit[], containers?: Container[], indexes?: RenderEntityIndexes): void {
+  update(trucks: TruckVisit[], containers?: Container[], indexes?: RenderEntityIndexes, colorMode: ContainerColorMode = 'shipping_line', simTime = 0): void {
     const activeTrucks = trucks.filter(t => t.state !== 'departed')
     const activeTruckIds = new Set(activeTrucks.map(t => t.id))
 
@@ -302,13 +304,14 @@ export class TruckRenderer {
 
       if (renderableCarriedContainer) {
         // Add or update container on truck bed
-        if (!existingCg || existingCg.userData['containerId'] !== renderableCarriedContainer.id) {
+        let cg = existingCg
+        if (!cg || cg.userData['containerId'] !== renderableCarriedContainer.id) {
           // Remove old container group
-          if (existingCg) {
-            mesh.remove(existingCg)
-            this.disposeGroup(existingCg)
+          if (cg) {
+            mesh.remove(cg)
+            this.disposeGroup(cg)
           }
-          const cg = makeTruckContainerMesh(renderableCarriedContainer)
+          cg = makeTruckContainerMesh(renderableCarriedContainer)
           cg.userData['containerId'] = renderableCarriedContainer.id
           // Position on truck bed — use GLB deck height if GLB is loaded, else procedural height
           const deckY = mesh.userData['isGlb'] ? TRUCK_GLB.containerOffsetY : 0.72
@@ -319,6 +322,7 @@ export class TruckRenderer {
           mesh.add(cg)
           this.containerGroups.set(truck.id, cg)
         }
+        applyColorModeToGroup(cg, renderableCarriedContainer, colorMode, simTime)
       } else {
         // Remove container from truck if no longer carried
         if (existingCg) {
