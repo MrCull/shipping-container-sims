@@ -133,9 +133,10 @@ function onToggleMinConfidence(event: Event): void {
 
 <style scoped>
 .jev-start-toggle {
-  position: absolute;
-  bottom: 10px;
-  right: 14px;
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
   z-index: 5;
 }
 
@@ -166,7 +167,7 @@ function onToggleMinConfidence(event: Event): void {
 
 .jev-popover {
   position: absolute;
-  bottom: 24px;
+  top: calc(100% + 6px);
   right: 0;
   width: 260px;
   background: rgba(10, 14, 26, 0.97);
@@ -244,10 +245,7 @@ input[type='range'] {
 
 @media (max-width: 800px) {
   .jev-start-toggle {
-    position: static;
-    display: flex;
     justify-content: center;
-    margin-top: 16px;
   }
 
   .jev-popover {

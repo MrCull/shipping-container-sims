@@ -220,10 +220,11 @@ const vesselMenuGroups: Array<{ label: string; icon: string; levels: MenuLevel[]
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: rgba(0, 0, 0, 0.88);
   z-index: 100;
+  overflow-y: auto;
 }
 
 .modal-content {
@@ -231,6 +232,7 @@ const vesselMenuGroups: Array<{ label: string; icon: string; levels: MenuLevel[]
   text-align: center;
   width: min(1260px, 98vw);
   padding: 36px 32px;
+  margin: auto 0;
 }
 
 .game-title {
