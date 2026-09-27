@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { JEV_CONFIG } from '../modules/jev/jevConfig'
 import { clearApiKey, hasApiKey, setApiKey } from '../modules/jev/jevKeyVault'
-import type { JevControllerStatus, JevErrorKind } from '../types/jev'
+import type { JevControllerStatus, JevErrorKind, JevMoveCommand, JevMoveKind } from '../types/jev'
 
 interface JevPrefs {
   enabled: boolean
@@ -60,6 +60,14 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
   const movesByJevThisLevel = ref(0)
   const sessionCostUsd = ref(0)
   const isKeyDialogOpen = ref(false)
+
+  // --- Command channel (plan 03): plain-data commands from the Jev controller to GameCanvas. ---
+  // GameCanvas owns the Three.js scene and must never be reached through Pinia directly, so the
+  // controller issues a command here and GameCanvas watches `pendingCommand` and executes it via
+  // the same store actions a mouse click uses.
+  let nextCommandId = 1
+  const pendingCommand = ref<JevMoveCommand | null>(null)
+  const lastCommandResult = ref<{ id: number; accepted: boolean } | null>(null)
 
   const isBusy = computed(
     () =>
@@ -156,6 +164,23 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
     movesByJevThisLevel.value = 0
   }
 
+  /**
+   * Issues a move command for GameCanvas to execute by slot ID. Returns the command's id so the
+   * caller can await the matching `lastCommandResult`. Overwrites any prior pending command (the
+   * controller must never have two commands in flight at once).
+   */
+  function issueCommand(kind: JevMoveKind, slotId: string): number {
+    const id = nextCommandId++
+    pendingCommand.value = { id, kind, slotId }
+    return id
+  }
+
+  /** Called by GameCanvas once it has executed (or rejected) a command. */
+  function ackCommand(id: number, accepted: boolean): void {
+    pendingCommand.value = null
+    lastCommandResult.value = { id, accepted }
+  }
+
   return {
     // Persisted prefs
     enabled,
@@ -177,6 +202,10 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
     isKeyDialogOpen,
     isBusy,
 
+    // Command channel
+    pendingCommand,
+    lastCommandResult,
+
     // Actions
     enable,
     disable,
@@ -187,5 +216,7 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
     recordError,
     clearError,
     resetLevelCounters,
+    issueCommand,
+    ackCommand,
   }
 })
