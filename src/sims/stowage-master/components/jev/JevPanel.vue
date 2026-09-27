@@ -249,6 +249,15 @@ onUnmounted(() => {
       <div class="jev-meta">
         Jev moves: {{ jev.movesByJevThisLevel }} · Session cost: ${{ jev.sessionCostUsd.toFixed(4) }}
       </div>
+
+      <button
+        v-if="jev.showInspector"
+        type="button"
+        class="jev-details-btn"
+        @click="jev.toggleInspector()"
+      >
+        {{ jev.isInspectorOpen ? 'Hide details ▾' : 'Details ▸' }}
+      </button>
     </template>
   </div>
 </template>
@@ -417,5 +426,21 @@ onUnmounted(() => {
 .jev-meta {
   font-size: 9.5px;
   color: #8f96a3;
+}
+
+.jev-details-btn {
+  width: 100%;
+  margin-top: 6px;
+  background: none;
+  border: none;
+  color: #ffcc00;
+  font-size: 10px;
+  text-align: right;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.jev-details-btn:hover {
+  color: #ffe066;
 }
 </style>

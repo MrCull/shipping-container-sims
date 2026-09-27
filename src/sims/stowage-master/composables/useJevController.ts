@@ -14,7 +14,16 @@ import { requestDecision } from '../modules/jev/jevClient'
 import { buildJevState, type JevGameSnapshot } from '../modules/jev/jevStateBuilder'
 import { buildMoveQuestion } from '../modules/jev/jevQuestionBuilder'
 import { buildMoveKey, isStaleResponse, shouldPauseForLowConfidence, validateDecision } from '../modules/jev/jevDecision'
-import { JevError, type JevErrorKind, type JevMoveKind, type JevRequestBody, type JevResponseBody } from '../types/jev'
+import { summarizeRequest, summarizeResponse } from '../modules/jev/jevSummaries'
+import {
+  JevError,
+  type JevErrorKind,
+  type JevExchange,
+  type JevGameResult,
+  type JevMoveKind,
+  type JevRequestBody,
+  type JevResponseBody,
+} from '../types/jev'
 
 function phaseToKind(phase: GamePhase): JevMoveKind | null {
   if (phase === 'selecting') return 'load'
@@ -88,10 +97,30 @@ export function useJevController(): JevController {
     }
   }
 
-  function buildRequestBody(snapshot: JevGameSnapshot): JevRequestBody {
+  interface PreparedRequest {
+    body: JevRequestBody
+    estTokens: number
+    requestSummary: string
+  }
+
+  /** Builds the request body plus the inspector's "sent" summary and token estimate in one pass. */
+  function prepareRequest(snapshot: JevGameSnapshot): PreparedRequest {
     const stateResult = buildJevState(snapshot)
     const questions = buildMoveQuestion(snapshot)
-    return { model: JEV_CONFIG.model, state: stateResult.state, questions }
+    const body: JevRequestBody = { model: JEV_CONFIG.model, state: stateResult.state, questions }
+    return { body, estTokens: stateResult.estimatedTokens, requestSummary: summarizeRequest(snapshot, stateResult) }
+  }
+
+  /** Reads the score/reasons/disaster/physics the game recorded for the move Jev just executed. */
+  function captureGameResult(kind: JevMoveKind): JevGameResult {
+    const result = kind === 'load' ? store.lastPlacement : store.lastDischarge
+    return {
+      points: result?.score ?? 0,
+      reasons: result?.reasons.map(r => r.text) ?? [],
+      disaster: store.disasterType ?? undefined,
+      listAfter: store.shipList,
+      trimAfter: store.shipTrim,
+    }
   }
 
   /** Records the mapped error, moves the controller to `paused`, and stops auto-play. Auth
@@ -160,29 +189,58 @@ export function useJevController(): JevController {
 
     let snapshot = buildSnapshot(kind)
     const moveKey = buildMoveKey(snapshot)
-    let body = buildRequestBody(snapshot)
+    let prepared: PreparedRequest
+    try {
+      prepared = prepareRequest(snapshot)
+    } catch (err) {
+      const jevError = err instanceof JevError
+        ? err
+        : new JevError('bad_request', err instanceof Error ? err.message : 'Failed to build the Jev request')
+      pause(jevError.kind, jevError.message)
+      return
+    }
 
     const maxAttempts = 1 + JEV_CONFIG.retriesPerMove
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       abortController = new AbortController()
+
+      const exchangeSeq = jev.recordExchange({
+        levelId: snapshot.level.id,
+        kind,
+        attempt,
+        requestSummary: prepared.requestSummary,
+        requestBody: prepared.body,
+        estTokens: prepared.estTokens,
+        outcome: 'pending',
+      })
+
       let result: { response: JevResponseBody; latencyMs: number; generationId?: string }
 
       try {
-        result = await requestDecision(body, abortController.signal)
+        result = await requestDecision(prepared.body, abortController.signal)
       } catch (err) {
         const jevError = err instanceof JevError
           ? err
           : new JevError('network', err instanceof Error ? err.message : 'Jev request failed')
 
         if (jevError.kind === 'cancelled') {
+          jev.updateExchange(exchangeSeq, { outcome: 'cancelled' })
           jev.status = 'idle'
           return
         }
+
+        const errorPatch: Partial<JevExchange> = {
+          outcome: 'error' as const,
+          error: { kind: jevError.kind, message: jevError.message, status: jevError.status },
+        }
+
         if (!jevError.retryable || attempt >= maxAttempts) {
+          jev.updateExchange(exchangeSeq, errorPatch)
           pause(jevError.kind, jevError.message)
           return
         }
+        jev.updateExchange(exchangeSeq, errorPatch)
 
         await delay(Math.min(jevError.retryAfterMs ?? 1000, JEV_CONFIG.maxRetryAfterMs))
 
@@ -194,7 +252,15 @@ export function useJevController(): JevController {
           return
         }
         snapshot = freshSnapshot
-        body = buildRequestBody(snapshot)
+        try {
+          prepared = prepareRequest(snapshot)
+        } catch (buildErr) {
+          const jevBuildError = buildErr instanceof JevError
+            ? buildErr
+            : new JevError('bad_request', buildErr instanceof Error ? buildErr.message : 'Failed to build the Jev request')
+          pause(jevBuildError.kind, jevBuildError.message)
+          return
+        }
         continue
       }
 
@@ -203,12 +269,34 @@ export function useJevController(): JevController {
       const liveKind = phaseToKind(store.phase)
       const liveSnapshot = liveKind ? buildSnapshot(liveKind) : null
       if (!liveSnapshot || isStaleResponse(moveKey, liveSnapshot)) {
+        jev.updateExchange(exchangeSeq, {
+          outcome: 'stale',
+          responseBody: result.response,
+          latencyMs: result.latencyMs,
+          model: result.response.model,
+          generationId: result.generationId,
+          costUsd: result.response.usage?.cost,
+        })
         jev.status = 'idle'
         return
       }
 
       const validated = validateDecision(result.response, snapshot.legalSlotIds)
+
+      const responsePatch: Partial<JevExchange> = {
+        responseBody: result.response,
+        latencyMs: result.latencyMs,
+        model: result.response.model,
+        generationId: result.generationId,
+        costUsd: result.response.usage?.cost,
+      }
+
       if (!validated.ok) {
+        jev.updateExchange(exchangeSeq, {
+          ...responsePatch,
+          outcome: 'error',
+          error: { kind: validated.error.kind, message: validated.error.message },
+        })
         if (attempt >= maxAttempts) {
           pause(validated.error.kind, validated.error.message)
           return
@@ -216,11 +304,28 @@ export function useJevController(): JevController {
         continue
       }
 
+      const responseSummary = summarizeResponse({
+        decision: validated.decision,
+        latencyMs: result.latencyMs,
+        usage: result.response.usage,
+        model: result.response.model,
+      })
+
+      jev.updateExchange(exchangeSeq, {
+        ...responsePatch,
+        responseSummary,
+        ranked: validated.decision.ranked,
+        choice: validated.decision.answer.choice,
+        confidence: validated.decision.answer.confidence,
+        warnings: validated.decision.probabilitySumWarning ? ['Probabilities did not sum to ~1.'] : undefined,
+      })
+
       if (
         jev.autoPlay &&
         jev.minConfidenceToAutoplay !== null &&
         shouldPauseForLowConfidence(validated.decision.answer.confidence, jev.minConfidenceToAutoplay)
       ) {
+        jev.updateExchange(exchangeSeq, { outcome: 'paused_low_confidence' })
         pause(
           'invalid_answer',
           `Paused: confidence ${validated.decision.answer.confidence.toFixed(2)} is below your threshold.`,
@@ -232,6 +337,7 @@ export function useJevController(): JevController {
       const commandId = jev.issueCommand(kind, validated.decision.answer.choice)
       const accepted = await waitForAck(commandId)
       if (!accepted) {
+        jev.updateExchange(exchangeSeq, { outcome: 'rejected' })
         if (attempt >= maxAttempts) {
           pause('invalid_answer', "Jev's chosen move was rejected by the game.")
           return
@@ -245,9 +351,16 @@ export function useJevController(): JevController {
       jev.status = 'settling'
       const settledInTime = await waitForPhase(phase => isSelectingPhase(phase) || isTerminalPhase(phase))
       if (!settledInTime) {
+        jev.updateExchange(exchangeSeq, {
+          outcome: 'error',
+          error: { kind: 'timeout', message: 'Move animation did not finish in time.' },
+        })
         pause('timeout', 'Move animation did not finish in time.')
         return
       }
+
+      jev.updateExchange(exchangeSeq, { outcome: 'executed', gameResult: captureGameResult(kind) })
+
       await delay(jev.settleDelayMs)
       jev.status = 'idle'
 

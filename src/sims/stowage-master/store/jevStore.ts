@@ -1,8 +1,8 @@
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { JEV_CONFIG } from '../modules/jev/jevConfig'
 import { clearApiKey, hasApiKey, setApiKey } from '../modules/jev/jevKeyVault'
-import type { JevControllerStatus, JevErrorKind, JevMoveCommand, JevMoveKind } from '../types/jev'
+import type { JevControllerStatus, JevErrorKind, JevExchange, JevMoveCommand, JevMoveKind } from '../types/jev'
 
 interface JevPrefs {
   enabled: boolean
@@ -68,6 +68,13 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
   let nextCommandId = 1
   const pendingCommand = ref<JevMoveCommand | null>(null)
   const lastCommandResult = ref<{ id: number; accepted: boolean } | null>(null)
+
+  // --- Exchange history (plan 05): request/response/outcome records for the JevInspector drawer.
+  // In memory only, never persisted. `shallowRef` + array replacement avoids deep-proxying large
+  // request/response bodies. ---
+  let nextExchangeSeq = 1
+  const history = shallowRef<JevExchange[]>([])
+  const isInspectorOpen = ref(false)
 
   const isBusy = computed(
     () =>
@@ -149,6 +156,8 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
     forgetKey()
     enabled.value = false
     persistPrefs()
+    clearHistory()
+    closeInspector()
   }
 
   function recordError(kind: JevErrorKind, message: string): void {
@@ -181,6 +190,39 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
     lastCommandResult.value = { id, accepted }
   }
 
+  /**
+   * Records a new exchange (request sent) and returns its `seq` so the controller can patch it
+   * as the response, outcome and game result arrive. Newest first, capped at `historyLimit`.
+   */
+  function recordExchange(entry: Omit<JevExchange, 'seq' | 'at'>): number {
+    const seq = nextExchangeSeq++
+    const exchange: JevExchange = { ...entry, seq, at: Date.now() }
+    const next = [exchange, ...history.value]
+    history.value = next.length > JEV_CONFIG.historyLimit ? next.slice(0, JEV_CONFIG.historyLimit) : next
+    return seq
+  }
+
+  /** Patches an existing exchange (by `seq`) with response, outcome or game-result fields. */
+  function updateExchange(seq: number, patch: Partial<Omit<JevExchange, 'seq' | 'at'>>): void {
+    history.value = history.value.map(exchange => (exchange.seq === seq ? { ...exchange, ...patch } : exchange))
+  }
+
+  function clearHistory(): void {
+    history.value = []
+  }
+
+  function openInspector(): void {
+    isInspectorOpen.value = true
+  }
+
+  function closeInspector(): void {
+    isInspectorOpen.value = false
+  }
+
+  function toggleInspector(): void {
+    isInspectorOpen.value = !isInspectorOpen.value
+  }
+
   return {
     // Persisted prefs
     enabled,
@@ -205,6 +247,16 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
     // Command channel
     pendingCommand,
     lastCommandResult,
+
+    // Exchange history / inspector
+    history,
+    isInspectorOpen,
+    recordExchange,
+    updateExchange,
+    clearHistory,
+    openInspector,
+    closeInspector,
+    toggleInspector,
 
     // Actions
     enable,

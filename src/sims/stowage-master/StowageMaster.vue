@@ -26,6 +26,7 @@ import SceneLoading from './components/modals/SceneLoading.vue'
 import KeyboardHint from './components/ui/KeyboardHint.vue'
 import JevPanel from './components/jev/JevPanel.vue'
 import JevKeyDialog from './components/jev/JevKeyDialog.vue'
+import JevInspector from './components/jev/JevInspector.vue'
 
 const store = useGameStore()
 const jev = useJevStore()
@@ -71,6 +72,7 @@ watch(() => store.phase, (phase) => {
     <KeyboardHint />
     <JevPanel v-if="jev.enabled" />
     <JevKeyDialog />
+    <JevInspector v-if="jev.enabled" />
   </div>
 </template>
 

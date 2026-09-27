@@ -1,6 +1,8 @@
 // Jev (TypeSafe System One, via OpenRouter Decisions API) request/response/error/command types.
 // See .ai/plans/stowage-master/00-jev-overview.md and 01-jev-client-and-key.md for the design.
 
+import type { DisasterType } from './index'
+
 export type JevMoveKind = 'load' | 'discharge' | 'restow'
 
 export interface JevChoiceQuestion {
@@ -74,5 +76,51 @@ export interface JevMoveCommand {
 
 export type JevControllerStatus = 'idle' | 'requesting' | 'executing' | 'settling' | 'paused' | 'error'
 
-// Fully defined in plan 05 §5.2 (request/response summaries, cost, latency, outcome for the inspector).
-export type JevExchange = Record<string, unknown>
+/** Score/reasons/disaster/physics captured from the game right after an executed Jev move. */
+export interface JevGameResult {
+  points: number
+  reasons: string[]
+  disaster?: DisasterType
+  listAfter: number
+  trimAfter: number
+}
+
+export type JevExchangeOutcome =
+  | 'pending'
+  | 'executed'
+  | 'stale'
+  | 'rejected'
+  | 'error'
+  | 'cancelled'
+  | 'paused_low_confidence'
+
+/**
+ * One Jev request/response pair plus its outcome, recorded for the inspector (plan 05 §5.2).
+ * Held in `jevStore.history`, newest first, capped at `JEV_CONFIG.historyLimit`. In-memory only —
+ * never persisted, cleared on disable.
+ */
+export interface JevExchange {
+  seq: number // 1-based within the session
+  at: number // Date.now()
+  levelId: number
+  kind: JevMoveKind
+  attempt: number // 1 or 2
+  requestSummary: string // summarizeRequest() (02 §2.10)
+  requestBody: JevRequestBody // full body (state + questions); the key is never in the body
+  estTokens: number
+  // filled on response
+  responseSummary?: string // summarizeResponse()
+  responseBody?: JevResponseBody
+  ranked?: Array<{ slotId: string; p: number }>
+  choice?: string
+  confidence?: number
+  latencyMs?: number
+  costUsd?: number
+  model?: string
+  generationId?: string
+  // outcome
+  outcome: JevExchangeOutcome
+  error?: { kind: JevErrorKind; message: string; status?: number }
+  gameResult?: JevGameResult
+  warnings?: string[] // e.g. probabilities didn't sum to ~1, budget degradation step applied
+}
