@@ -4,7 +4,8 @@ export const JEV_CONFIG = {
   endpoint: 'https://openrouter.ai/api/alpha/decisions',
   keyInfoEndpoint: 'https://openrouter.ai/api/v1/key',
   model: 'typesafe/jev-1.13',
-  appTitle: 'Shipping Container Sims – Stowage Master',
+  // Plain ASCII only: this is sent as the X-Title fetch header, which must be ISO-8859-1/ByteString.
+  appTitle: 'Shipping Container Sims - Stowage Master',
   requestTimeoutMs: 20_000,
   maxRetryAfterMs: 10_000,
   retriesPerMove: 1, // "retry once, then pause"
