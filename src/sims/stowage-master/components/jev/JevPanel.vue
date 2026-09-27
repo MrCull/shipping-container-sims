@@ -122,6 +122,7 @@ onUnmounted(() => {
   <div
     v-if="isVisible"
     class="jev-panel"
+    :class="{ 'jev-panel--inspector-open': jev.isInspectorOpen }"
   >
     <div class="jev-header">
       <span class="jev-title">JEV</span>
@@ -276,7 +277,22 @@ onUnmounted(() => {
   border-radius: 8px;
   padding: 10px 12px;
   backdrop-filter: blur(4px);
+  transition: right 0.15s ease, bottom 0.15s ease;
   pointer-events: all;
+}
+
+/* JevInspector is a right-edge drawer (up to 360px wide) at a higher z-index; without this the
+   inspector fully covers this panel and there is no way to trigger a move while reviewing it. */
+.jev-panel--inspector-open {
+  right: 384px;
+}
+
+@media (max-width: 700px) {
+  /* Below 700px JevInspector becomes a bottom sheet instead, so shift up rather than left. */
+  .jev-panel--inspector-open {
+    right: 12px;
+    bottom: calc(60vh + 12px);
+  }
 }
 
 .jev-header {
