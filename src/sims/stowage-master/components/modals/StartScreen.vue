@@ -2,6 +2,7 @@
 import { useGameStore } from '../../store/gameStore'
 import { LEVELS, getTotalSlots } from '../../modules/levels'
 import type { LevelBestRecord, LevelConfig } from '../../types'
+import JevStartToggle from '../jev/JevStartToggle.vue'
 
 const store = useGameStore()
 
@@ -208,6 +209,8 @@ const vesselMenuGroups: Array<{ label: string; icon: string; levels: MenuLevel[]
           </button>
         </div>
       </div>
+
+      <JevStartToggle />
     </div>
   </div>
 </template>
@@ -224,6 +227,7 @@ const vesselMenuGroups: Array<{ label: string; icon: string; levels: MenuLevel[]
 }
 
 .modal-content {
+  position: relative;
   text-align: center;
   width: min(1260px, 98vw);
   padding: 36px 32px;
