@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useGameStore } from './store/gameStore'
+import { useJevStore } from './store/jevStore'
 import { useGodModeHotkey } from '@/composables/useGodModeHotkey'
 import { useGameMusic } from './composables/useGameMusic'
 import GameCanvas from './components/GameCanvas.vue'
@@ -23,8 +24,12 @@ import DisasterOverlay from './components/modals/DisasterOverlay.vue'
 import LevelBriefing from './components/modals/LevelBriefing.vue'
 import SceneLoading from './components/modals/SceneLoading.vue'
 import KeyboardHint from './components/ui/KeyboardHint.vue'
+import JevPanel from './components/jev/JevPanel.vue'
+import JevKeyDialog from './components/jev/JevKeyDialog.vue'
+import JevInspector from './components/jev/JevInspector.vue'
 
 const store = useGameStore()
+const jev = useJevStore()
 useGameMusic()
 useGodModeHotkey()
 
@@ -32,6 +37,14 @@ onMounted(() => {
   // Reset to the start screen every time this component mounts — handles
   // returning from the main menu mid-game.
   store.setPhase('start')
+})
+
+// Reset Jev's per-level counters whenever a new level's briefing begins (covers both a fresh
+// startLevel() and a replay). Runs regardless of jev.enabled — harmless when Jev is off.
+watch(() => store.phase, (phase) => {
+  if (phase === 'briefing') {
+    jev.resetLevelCounters()
+  }
 })
 </script>
 
@@ -57,6 +70,9 @@ onMounted(() => {
     <LevelFailed />
     <DisasterOverlay />
     <KeyboardHint />
+    <JevPanel v-if="jev.enabled" />
+    <JevKeyDialog />
+    <JevInspector v-if="jev.enabled" />
   </div>
 </template>
 

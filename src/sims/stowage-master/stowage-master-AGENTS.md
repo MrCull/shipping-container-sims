@@ -18,35 +18,41 @@ stowage-master/
 ├── StowageMaster.vue           Root component — mounts canvas + all UI
 ├── components/
 │   ├── GameCanvas.vue          Three.js canvas + main game loop callback
+│   ├── TopBar.vue              Level name, phase badge, score/target
+│   ├── ContainerInfo.vue       Current container (weight, port, hazmat)
+│   ├── LoadList.vue            Next 6 containers in queue
+│   ├── PortLegend.vue          Port color swatches
+│   ├── ShipStatus.vue          List/trim/VCG gauges
+│   ├── LastPlacement.vue       Score breakdown after placement
+│   ├── LastDischarge.vue       Score breakdown after discharge
+│   ├── ScorePopup.vue          Float-up "+N pts" feedback
+│   ├── MoveCounter.vue         Progress bar (moves / total containers)
+│   ├── TimerWidget.vue         Countdown (red when critical)
+│   ├── EventFeed.vue           Last 5 events
 │   ├── ui/
-│   │   ├── TopBar.vue          Level name, phase badge, score/target
-│   │   ├── ContainerInfo.vue   Current container (weight, port, hazmat)
-│   │   ├── LoadList.vue        Next 6 containers in queue
-│   │   ├── PortLegend.vue      Port color swatches
-│   │   ├── ShipStatus.vue      List/trim/VCG gauges
-│   │   ├── LastPlacement.vue   Score breakdown after placement
-│   │   ├── LastDischarge.vue   Score breakdown after discharge
-│   │   ├── ScorePopup.vue      Float-up "+N pts" feedback
-│   │   ├── MoveCounter.vue     Progress bar (moves / total containers)
-│   │   ├── TimerWidget.vue     Countdown (red when critical)
 │   │   ├── DischargeBar.vue    Discharged N/total progress
-│   │   ├── EventFeed.vue       Last 5 events
 │   │   ├── MeterBar.vue        Horizontal gauge component
 │   │   ├── StarRating.vue      1–5 stars + title
 │   │   └── KeyboardHint.vue    Context-sensitive key hints
-│   └── modals/
-│       ├── StartScreen.vue     Level select with star ratings + unlock state
-│       ├── SceneLoading.vue    "Loading assets…" overlay
-│       ├── LevelBriefing.vue   Multi-page instructional modal
-│       ├── LevelComplete.vue   Stars, score, best record, next level
-│       ├── LevelFailed.vue     Reason + retry button
-│       └── DisasterOverlay.vue Disaster name + dramatic message during FX
+│   ├── modals/
+│   │   ├── StartScreen.vue     Level select with star ratings + unlock state
+│   │   ├── SceneLoading.vue    "Loading assets…" overlay
+│   │   ├── LevelBriefing.vue   Multi-page instructional modal
+│   │   ├── LevelComplete.vue   Stars, score, best record, next level
+│   │   ├── LevelFailed.vue     Reason + retry button
+│   │   └── DisasterOverlay.vue Disaster name + dramatic message during FX
+│   └── jev/                    Optional Jev assist UI — see § Jev assist (optional)
+│       ├── JevStartToggle.vue  Low-key link + settings popover on StartScreen
+│       ├── JevKeyDialog.vue    API key entry, disclosure, validation
+│       ├── JevPanel.vue        In-game controls, status and "Details ▸" link
+│       └── JevInspector.vue    Request/response inspector drawer
 ├── composables/
 │   ├── useThreeScene.ts        Renderer, camera, OrbitControls, keyboard
 │   ├── useGameLoop.ts          requestAnimationFrame loop with deltaTime cap
 │   ├── useAudio.ts             SFX + synthesised placement tone
 │   ├── useGameMusic.ts         Shared background track (survives rebuilds)
-│   └── useSlotPicking.ts       Raycasting for slot click/hover
+│   ├── useSlotPicking.ts       Raycasting for slot click/hover
+│   └── useJevController.ts     Jev "next move" / "play all" orchestration — see § Jev assist
 ├── modules/
 │   ├── config.ts               All constants (SHIP_PRESETS, PHYSICS, SCORING, etc.)
 │   ├── levels.ts               10 LevelConfig objects (LevelConfig[])
@@ -61,11 +67,15 @@ stowage-master/
 │   ├── sceneBuilder.ts         Sky, ocean, dock, lighting, foam particles
 │   ├── shipRenderer.ts         Procedural hull OR GLB loader + tilt interpolation
 │   ├── craneSystem.ts          STS crane model + placement/discharge animations
-│   └── truckRenderer.ts        GLB truck assembly + inbound/outbound queue
+│   ├── truckRenderer.ts        GLB truck assembly + inbound/outbound queue
+│   └── jev/                    Jev client, config, key vault, rules, state/question builders,
+│                               decision validation, summaries — see § Jev assist (optional)
 ├── store/
-│   └── gameStore.ts            Central Pinia store (all game state)
+│   ├── gameStore.ts            Central Pinia store (all game state)
+│   └── jevStore.ts             Jev enabled flag, prefs, status, command channel, exchange history
 ├── types/
-│   └── index.ts                Container, Slot, GamePhase, LevelConfig, etc.
+│   ├── index.ts                Container, Slot, GamePhase, LevelConfig, etc.
+│   └── jev.ts                  Jev request/response/error/command/exchange types
 └── assets/                     Audio (MP3), ship GLBs, truck GLBs
 ```
 
@@ -210,11 +220,18 @@ Pure functions — no side effects:
 - `calculateVCG(grid)` → float
 - `checkDisasters(grid, preset, newContainer, slotId)` → `DisasterType | null`
 
-Disaster thresholds (absolute values):
-- List: warning ≥ 8, critical ≥ 12, **disaster ≥ 12**
-- Trim: warning ≥ 6, critical ≥ 9, **disaster ≥ 10**
+Disaster thresholds (absolute values, from `config.PHYSICS` — the source of truth):
+- List: warning ≥ 5, critical ≥ 8, **disaster ≥ 12**
+- Trim: warning ≥ 4, critical ≥ 7, **disaster ≥ 10**
 - Hazmat explosion: two hazmat containers within bay diff < 2, row diff < 1.5, tier diff < 2
 - Stack collapse: column weight > `preset.maxStackWeight`
+
+> **Known discrepancy:** `gameStore.ts`'s `isWarning` / `isCritical` computed properties still
+> hardcode older thresholds (list ≥ 8 / ≥ 12, trim ≥ 6 / ≥ 9) instead of reading `PHYSICS`. This
+> means the ship-status warning/critical UI styling can disagree slightly with the disaster
+> thresholds above and with `scoring.ts` (which does use `PHYSICS.*Warning`). This is a **known,
+> separate issue** — not fixed here, since fixing it changes gameplay (when the warning-zone
+> scoring penalty and status colours kick in). Flagged for a follow-up.
 
 ### `scoring.ts`
 Pure functions returning `{ score, reasons }`:
@@ -308,10 +325,14 @@ Raycast-based click/hover. Searches meshes with `userData.isSlotIndicator` or `u
 
 ## Physics reference
 
+Thresholds below are `config.PHYSICS` — the source of truth for stowage-master's physics.
+`store.isWarning` / `isCritical` still hardcode the older values (list ≥ 8 / ≥ 12, trim ≥ 6 / ≥ 9);
+see the callout under § Modules → `physics.ts` above.
+
 | Metric | Warning | Critical | Disaster |
 |---|---|---|---|
-| List (°) | ≥ 8 | ≥ 12 | ≥ 12 |
-| Trim (°) | ≥ 6 | ≥ 9 | ≥ 10 |
+| List (°) | ≥ 5 | ≥ 8 | ≥ 12 |
+| Trim (°) | ≥ 4 | ≥ 7 | ≥ 10 |
 
 List formula: `(Σ weight·zOffset) / (totalWeight · beamFactor) · multiplier · 100`  
 Trim formula: `(emptyTrimMoment + Σ weight·xOffset) / (totalWeight · lengthFactor) · multiplier · 100`  
@@ -362,6 +383,143 @@ Star rating (score / targetScore):
 - 12 bays split into two groups (stern 0–5, bow 6–11) separated by `bayXOffsets[]` gap of ~9 units.
 - Bays 10–11 have higher `bayYBaseOffset` to model the raised forecastle.
 - GLB uses 0° model rotation (differs from other ships that rotate 90°).
+
+---
+
+## Jev assist (optional)
+
+Stowage Master can optionally hand a phase's move ("which legal slot?") to **Jev**
+(TypeSafe System One, via OpenRouter's Decisions API) instead of the player clicking it
+themselves. Most players never see this — the only visible sign when it's off is a small,
+low-contrast `Jev` link on the Start screen. See [.ai/plans/stowage-master/00-jev-overview.md](../../../.ai/plans/stowage-master/completed/00-jev-overview.md)
+(moved to `completed/` once implemented) for the full design and
+[.agents/skills/jev-integration/SKILL.md](../../../.agents/skills/jev-integration/SKILL.md) for
+the provider-level rules this integration follows.
+
+### File map
+
+```
+types/jev.ts                          Request/response/error/command/exchange types
+modules/jev/
+  jevConfig.ts                        Endpoint, model id, timeouts, limits, versions
+  jevKeyVault.ts                      Module-scoped in-memory API key holder
+  jevClient.ts                        fetch wrapper, key validation, error taxonomy
+  jevRules.ts                         Rules/briefing text for Jev, generated from PHYSICS/SCORING
+  jevStateBuilder.ts                  Game snapshot → Jev `state` object (+ token-budget degrade)
+  jevQuestionBuilder.ts               Phase → Choice question with legal options only
+  jevDecision.ts                      Response validation, ranking, stale-response guard, policy
+  jevSummaries.ts                     Human-readable request/response summaries for the inspector
+store/jevStore.ts                     Enabled flag, prefs, status, command channel, exchange history
+composables/useJevController.ts       "Next move" / "play all" orchestration, retry/pause policy
+components/jev/
+  JevStartToggle.vue                  Low-key link + settings popover on StartScreen
+  JevKeyDialog.vue                    API key entry, disclosure, validation
+  JevPanel.vue                        In-game controls, status, "Details ▸" link
+  JevInspector.vue                    Request/response inspector drawer (evidence + probabilities)
+```
+
+### The command-channel pattern (never call store actions from Jev code directly)
+
+`useJevController.ts` never calls `gameStore.placeContainer()` / `pickDischargeContainer()` /
+etc. directly. Doing so would skip the crane/truck animation the same move gets from a mouse
+click. Instead:
+
+1. The controller snapshots the game, builds the Jev request and validates the response against
+   the legal slot set (`store.availableSlots` / `dischargeableSlots` / `availableRestowSlots`).
+2. It calls `jevStore.issueCommand(kind, slotId)`, which sets `jevStore.pendingCommand` — a
+   plain-data command, not a direct mutation.
+3. `GameCanvas.vue` watches `pendingCommand` and executes it through the **same** `execute*`
+   functions a mouse click uses (animation, `finalizePlacement`/`finalizeDischarge`/etc.), then
+   calls `jevStore.ackCommand(id, accepted)`.
+4. The controller awaits the ack (`waitForAck`) before moving on.
+
+Code owns legality, execution, staleness and retries. Jev only answers "which of these legal
+slots?" — never call a `gameStore` mutation from `modules/jev/*` or `useJevController.ts` other
+than through this channel.
+
+### Key handling
+
+The API key lives **only** in a module-scoped variable in `jevKeyVault.ts` — never in
+localStorage, sessionStorage, a Pinia store, a cookie, a file or a log. It is lost on page
+refresh by design (`jevStore.hasKey` becomes `false`; the player is re-prompted). Persisted
+Jev *preferences* (`enabled`, `showInspector`, `settleDelayMs`, `minConfidenceToAutoplay`) live in
+localStorage under `JEV_CONFIG.prefsStorageKey` — the key itself must never be added there.
+
+### The raw-state boundary
+
+Jev is given roughly what a human sees on screen, plus the rules — vessel geometry, current
+list/trim/VCG, the bay plan, the container to move, the load list, and legal slot descriptions.
+Code does **not** precompute per-candidate outcomes (resulting list/trim, disaster flags, score
+previews) and does **not** filter dangerous slots out of the option list — only rule-legal slots
+are offered, exactly the slots a human could click, and Jev can still sink the ship. Never add
+predicted-outcome fields to `jevStateBuilder.ts` or `jevQuestionBuilder.ts` without revisiting
+this boundary (see 02 §2.9 for the "assisted mode" idea, deliberately not built).
+
+### Versioning
+
+Bump these whenever the corresponding shape or wording changes, so historical exchanges and any
+recorded evaluation baseline (§ below) can be told apart from a differently-behaving build:
+- `JEV_CONFIG.stateSchemaVersion` — the `state` object's shape (`jevStateBuilder.ts`)
+- `JEV_CONFIG.questionVersion` — the Choice question's instructions/criteria wording (`jevQuestionBuilder.ts`)
+- `JEV_CONFIG.model` — the pinned Jev model build (`typesafe/jev-1.13` at time of writing)
+
+### Provider endpoint gotcha
+
+The Decisions API is `POST https://openrouter.ai/api/alpha/decisions` — **`/api/alpha/...`**, not
+`/api/v1/...` (the key-check endpoint, `GET /api/v1/key`, is the only `/api/v1/` call this
+integration makes). Hitting `/api/v1/decisions` 404s.
+
+### The exchange/inspector pipeline
+
+Every request `useJevController.ts` sends is recorded via `jevStore.recordExchange()` before the
+`fetch` call (a `JevExchange` with `outcome: 'pending'`), then patched via `jevStore.updateExchange()`
+as the response, validation, execution and game result arrive (`outcome` becomes one of
+`executed | stale | rejected | error | cancelled | paused_low_confidence`). History is
+newest-first, capped at `JEV_CONFIG.historyLimit` (50), held in `shallowRef` so large request/
+response bodies aren't deep-proxied, and is in-memory only — cleared whenever Jev is disabled.
+`JevPanel.vue`'s "Details ▸" link (shown only when the "Show Jev details" preference is on)
+toggles `jevStore.isInspectorOpen`, which `JevInspector.vue` reads to render itself as a drawer.
+The inspector shows the evidence sent and the probabilities returned — it never invents or
+displays a rationale for Jev's choice, because Jev doesn't return one.
+
+### Manual QA checklist
+
+There is no automated test runner in this repo, and Jev needs a live browser session (an
+OpenRouter key, `npm run dev`) to exercise — this cannot be verified by lint/build/type-check
+alone. The checklist below has **not been run** as part of this change; run it in Chrome (plus
+Firefox for the key dialog and CORS) before relying on Jev in a real session:
+
+- **Hidden by default:** with cleared site data, the Start screen shows only the faint `Jev`
+  link and there's no Jev UI in-game; `J` / `Shift+J` do nothing.
+- **Key handling:** a junk key errors with no key persisted anywhere in devtools storage; a
+  valid key enables Jev and shows remaining credit; after a refresh Jev stays enabled but the
+  key is gone; Forget key and Disable both work (Disable also hides the panel and clears history).
+- **Single step:** L1 discharges an import with full crane/truck animation and a score popup;
+  L4 lifts a transit container and places it (both in one press, and split across two presses);
+  L2 loads a container with hazmat alerts/score reasons intact.
+- **Play all:** L1 and L3 run to completion (L3 crosses from discharge to load unattended); L5
+  or L8 runs to complete/failed/disaster and stops cleanly, with the disaster overlay and failed
+  modal working as usual; L10 completes ~130–200 moves with no memory growth (history capped at
+  50) or stray meshes; stopping mid-request leaves nothing moving afterwards; a timer expiry
+  during a request discards the answer and stops play-all.
+- **Failures:** offline gives one retry then pauses with Resume working; a 401 (key revoked
+  mid-run) pauses, forgets the key and re-prompts.
+- **Inspector:** summaries are readable, probability bars sum to ~100%, raw JSON copy works,
+  there is no `Authorization` field anywhere in the drawer, and the cost total matches the
+  OpenRouter activity page.
+- **Budget:** inspector `estTokens` vs. the response's `usage.input_tokens` on L10 stays under
+  24K; if the estimate is far off, adjust the divisor in `jevStateBuilder.ts`.
+- **Regression:** normal mouse play on L1, L4, L5 and L8 is unchanged with Jev disabled **and**
+  enabled-but-idle.
+- **Build:** `npm run lint` and `npm run build` pass (verified for this change; see repo history).
+
+### Evaluation baseline (not yet recorded)
+
+The skill recommends recording a raw-mode play-quality baseline (play-all 3× each on L2, L5, L8;
+completion rate, disaster rate, average score % of target, average confidence, cost), tagged with
+`stateSchemaVersion`, `questionVersion` and the model build, to judge whether a future "assisted"
+mode (state/02 §2.9) is worth building. This requires the manual QA session above and has not
+been run yet — add the results table here once it has.
 
 ---
 

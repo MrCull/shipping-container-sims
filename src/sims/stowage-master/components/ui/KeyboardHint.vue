@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useJevStore } from '../../store/jevStore'
 
 const visible = ref(true)
+const jev = useJevStore()
 </script>
 
 <template>
@@ -37,6 +39,18 @@ const visible = ref(true)
         </div>
         <div class="key-row">
           <kbd>-</kbd><span class="hint-label">Zoom out</span>
+        </div>
+        <div
+          v-if="jev.enabled"
+          class="key-row"
+        >
+          <kbd>J</kbd><span class="hint-label">Jev move</span>
+        </div>
+        <div
+          v-if="jev.enabled"
+          class="key-row"
+        >
+          <kbd>⇧J</kbd><span class="hint-label">Jev play all</span>
         </div>
       </div>
     </div>

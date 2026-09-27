@@ -55,7 +55,8 @@ watch(() => store.lastDischarge, (discharge) => {
 <style scoped>
 .score-popup {
   position: absolute;
-  top: 50%;
+  /* Above dead-center so it doesn't sit squarely over the vessel/containers. */
+  top: 22%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;

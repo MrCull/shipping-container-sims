@@ -2,6 +2,7 @@
 import { ref, watch, onMounted } from 'vue'
 import * as THREE from 'three'
 import { useGameStore } from '../store/gameStore'
+import { useJevStore } from '../store/jevStore'
 import { useGameThreeScene } from '../composables/useThreeScene'
 import { useGameLoop } from '../composables/useGameLoop'
 import { useAudio } from '../composables/useAudio'
@@ -32,6 +33,7 @@ import type { Container, CraneObject, DisasterAnimation } from '../types'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const store = useGameStore()
+const jev = useJevStore()
 
 const { getScene, getCamera, isReady, render, setCameraForShip, applyKeyboardCamera } = useGameThreeScene(canvasRef)
 const audio = useAudio()
@@ -703,14 +705,24 @@ function handlePointerMove(event: MouseEvent): void {
   clearHoveredIndicators()
 }
 
-function handleDischargeClick(event: MouseEvent): void {
-  if (store.phase !== 'discharge_selecting') return
+/** True while Jev has a request in flight, a command executing, or auto-play running. Pointer
+ *  input is suppressed during this window to avoid racing a Jev-issued move. */
+function isPointerInputLocked(): boolean {
+  return jev.isBusy
+}
 
-  const slotId = pickIndicatorSlot(event, 'isImportContainer')
-  if (!slotId) return
+/**
+ * Execute a discharge pick for `slotId` (import → discharge, transit → lift for restow).
+ * Returns false if the slot is not currently legal, an animation is already running, or the
+ * store rejected the move.
+ */
+function executeDischargePick(slotId: string): boolean {
+  if (store.phase !== 'discharge_selecting') return false
+  if (currentAnimation) return false
+  if (!store.dischargeableSlots.includes(slotId)) return false
 
   const result = store.pickDischargeContainer(slotId)
-  if (!result) return
+  if (!result) return false
 
   const scene = getScene()!
   const cfg = store.shipConfig!
@@ -734,7 +746,7 @@ function handleDischargeClick(event: MouseEvent): void {
     // Park the mesh at crane height so it's visually lifted while awaiting restow choice
     hoistMesh = containerMesh
     audio.playSound('containerLoad', 0.5)
-    return
+    return true
   }
 
   // Normal import discharge
@@ -774,16 +786,20 @@ function handleDischargeClick(event: MouseEvent): void {
       store.finalizeDischarge(slotId)
     }
   )
+  return true
 }
 
-function handleRestowClick(event: MouseEvent): void {
-  if (store.phase !== 'restow_selecting') return
-
-  const slotId = pickIndicatorSlot(event, 'isRestowSlot')
-  if (!slotId) return
+/**
+ * Place the currently lifted transit container into `slotId`. Returns false if the slot is not
+ * currently legal, an animation is already running, or the store rejected the move.
+ */
+function executeRestowMove(slotId: string): boolean {
+  if (store.phase !== 'restow_selecting') return false
+  if (currentAnimation) return false
+  if (!store.availableRestowSlots.includes(slotId)) return false
 
   const result = store.placeRestowContainer(slotId)
-  if (!result) return
+  if (!result) return false
 
   const scene = getScene()!
   const cfg = store.shipConfig!
@@ -828,9 +844,11 @@ function handleRestowClick(event: MouseEvent): void {
       store.finalizeRestow(slotId)
     }
   )
+  return true
 }
 
 function handleRestowCancel(event: MouseEvent): void {
+  if (isPointerInputLocked()) return
   if (store.phase !== 'restow_selecting') return
   event.preventDefault()
 
@@ -930,22 +948,17 @@ function triggerOutboundTruckDepart(containerMesh: THREE.Group): void {
   }
 }
 
-function handleClick(event: MouseEvent): void {
-  if (store.phase === 'discharge_selecting') {
-    handleDischargeClick(event)
-    return
-  }
-  if (store.phase === 'restow_selecting') {
-    handleRestowClick(event)
-    return
-  }
-  if (store.phase !== 'selecting') return
-
-  const slotId = pickIndicatorSlot(event, 'isSlotIndicator')
-  if (!slotId) return
+/**
+ * Execute a load move for the current container into `slotId`. Returns false if the slot is
+ * not currently legal, an animation is already running, or the store rejected the move.
+ */
+function executeLoadMove(slotId: string): boolean {
+  if (store.phase !== 'selecting') return false
+  if (currentAnimation) return false
+  if (!store.availableSlots.includes(slotId)) return false
 
   const result = store.placeContainer(slotId)
-  if (!result) return
+  if (!result) return false
 
   removeHoistMesh()
 
@@ -992,7 +1005,38 @@ function handleClick(event: MouseEvent): void {
       store.finalizePlacement(slotId)
     }
   )
+  return true
 }
+
+function handleClick(event: MouseEvent): void {
+  if (isPointerInputLocked()) return
+
+  if (store.phase === 'discharge_selecting') {
+    const slotId = pickIndicatorSlot(event, 'isImportContainer')
+    if (slotId) executeDischargePick(slotId)
+    return
+  }
+  if (store.phase === 'restow_selecting') {
+    const slotId = pickIndicatorSlot(event, 'isRestowSlot')
+    if (slotId) executeRestowMove(slotId)
+    return
+  }
+  if (store.phase !== 'selecting') return
+
+  const slotId = pickIndicatorSlot(event, 'isSlotIndicator')
+  if (slotId) executeLoadMove(slotId)
+}
+
+/** Executes a Jev-issued move by slot ID, using the same store actions and animation paths a
+ *  mouse click uses. Acks the command with whether the move was accepted. */
+watch(() => jev.pendingCommand, (cmd) => {
+  if (!cmd) return
+  const accepted =
+    cmd.kind === 'load' ? executeLoadMove(cmd.slotId) :
+    cmd.kind === 'discharge' ? executeDischargePick(cmd.slotId) :
+    executeRestowMove(cmd.slotId)
+  jev.ackCommand(cmd.id, accepted)
+})
 
 async function ensureActiveTruckMesh(): Promise<void> {
   const scene = getScene()
@@ -1044,7 +1088,13 @@ async function updateHoistMesh(container: Container | null): Promise<void> {
 
   removeHoistMesh()
 
+  const phaseAtRequest = store.phase
   await ensureActiveTruckMesh()
+
+  // Guard against a stale async resolution: if the phase or current container changed while
+  // we were awaiting the truck GLB, this hoist mesh no longer applies. The watchers that fired
+  // after the change will have already issued (or will issue) their own updateHoistMesh call.
+  if (store.phase !== phaseAtRequest || store.currentContainer?.id !== container.id) return
 
   const scene = getScene()
   if (!scene) return
