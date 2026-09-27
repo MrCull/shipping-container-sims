@@ -83,6 +83,8 @@ All agent plans should be created in the **`.ai/plans/`** folder at the repo roo
 
 Agent-facing skill files live in **`.ai/skills/`** at the repo root (Markdown `SKILL.md` per topic). Each file documents conventions, schemas, or patterns for this codebase.
 
+New skills go under **`.agents/skills/`** instead — the repo's new top-level naming/location standard for agent-facing content. Existing `.ai/skills/` entries have not been migrated yet.
+
 **Skill index** (every `SKILL.md` in `.ai/skills/`):
 
 - [adding-a-sim](.ai/skills/adding-a-sim/SKILL.md)
@@ -93,6 +95,10 @@ Agent-facing skill files live in **`.ai/skills/`** at the repo root (Markdown `S
 - [terminal-operations](.ai/skills/terminal-operations/SKILL.md)
 - [threejs-vue3-animation](.ai/skills/threejs-vue3-animation/SKILL.md)
 - [vessel-entities](.ai/skills/vessel-entities/SKILL.md)
+
+**Skill index** (every `SKILL.md` in `.agents/skills/`):
+
+- [jev-integration](.agents/skills/jev-integration/SKILL.md) — Using Jev (TypeSafe System One), a bounded-decision model: typed questions (Choice/Score/Noul), state design, API access, and interpreting/applying judgments.
 
 ### Project workflow
 
@@ -112,6 +118,10 @@ These skills provide TypeScript interfaces, default value ranges, factory functi
 ### Rendering & animation
 
 - **[Three.js + Vue 3 Animation](.ai/skills/threejs-vue3-animation/SKILL.md)** — Four-layer architecture (domain → app state → scene adapter → render loop), scene conventions (units, axes, origins), `InstancedMesh` for containers, asset pipeline (glTF/Draco/KTX2), camera patterns, equipment animation state machines, container stack positioning, lighting, fidelity tiers, data-driven scene generation, and common pitfalls.
+
+### Third-party integrations
+
+- **[Jev integration](.agents/skills/jev-integration/SKILL.md)** — When and how to use Jev (TypeSafe System One) for bounded semantic decisions (Choice/Score/Noul questions), state design, provider API access, and turning judgments into application policy.
 
 ## Available media
 
