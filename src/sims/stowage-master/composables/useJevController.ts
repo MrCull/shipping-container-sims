@@ -76,7 +76,11 @@ export function useJevController(): JevController {
         completionMode: store.levelConfig.completionMode ?? 'standard',
       },
       preset: store.shipConfig!,
-      grid: structuredClone(toRaw(store.grid)),
+      // Vue wraps nested slot/container values in reactive proxies on access; toRaw() only
+      // strips the outer grid proxy, and structuredClone() cannot clone those nested proxies
+      // (throws DataCloneError as soon as any slot holds a container). A JSON round-trip
+      // deep-clones the plain data underneath instead.
+      grid: JSON.parse(JSON.stringify(toRaw(store.grid))),
       ports: store.currentPorts.map(p => ({ ...p })),
       physics: { list: store.shipList, trim: store.shipTrim, vcg: store.shipVCG },
       score: store.score,
@@ -154,8 +158,10 @@ export function useJevController(): JevController {
     })
   }
 
-  /** Resolves once `store.phase` satisfies `predicate`, or after `timeoutMs` (default 15s). */
-  function waitForPhase(predicate: (phase: GamePhase) => boolean, timeoutMs = 15000): Promise<boolean> {
+  /** Resolves once `store.phase` satisfies `predicate`, or after `timeoutMs` (default 30s — crane
+   *  animations normally settle in under a second, but the first placement of a level can be slower
+   *  while the browser compiles shaders/decodes geometry for the first time). */
+  function waitForPhase(predicate: (phase: GamePhase) => boolean, timeoutMs = 30000): Promise<boolean> {
     return new Promise(resolve => {
       if (predicate(store.phase)) {
         resolve(true)
@@ -187,12 +193,17 @@ export function useJevController(): JevController {
     jev.clearError()
     jev.status = 'requesting'
 
-    let snapshot = buildSnapshot(kind)
-    const moveKey = buildMoveKey(snapshot)
+    let snapshot: JevGameSnapshot
+    let moveKey: string
     let prepared: PreparedRequest
     try {
+      snapshot = buildSnapshot(kind)
+      moveKey = buildMoveKey(snapshot)
       prepared = prepareRequest(snapshot)
     } catch (err) {
+      // Any failure while snapshotting the game or building the request (e.g. state that can't
+      // be cloned or serialized) must not become an unhandled rejection — that would silently
+      // kill the autoplay loop and leave the panel stuck on "Thinking…" forever.
       const jevError = err instanceof JevError
         ? err
         : new JevError('bad_request', err instanceof Error ? err.message : 'Failed to build the Jev request')

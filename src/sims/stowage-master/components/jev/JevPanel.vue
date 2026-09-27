@@ -266,7 +266,9 @@ onUnmounted(() => {
 .jev-panel {
   position: absolute;
   right: 12px;
-  bottom: 64px;
+  /* Clears KeyboardHint's box, which grows by two rows (and sits at a higher z-index) once
+     Jev is enabled — the same condition this panel is mounted under. */
+  bottom: 300px;
   z-index: 15;
   width: 220px;
   background: rgba(0, 0, 0, 0.85);
