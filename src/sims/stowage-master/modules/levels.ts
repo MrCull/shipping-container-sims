@@ -85,6 +85,7 @@ export const LEVELS: LevelConfig[] = [
     hazmatRate: 0,
     containerCount: 12,
     scoreContainerCount: 24,
+    targetScore: 1480,
     dischargeContainerCount: 12,
     transitContainerCount: 4,
     importPlacement: 'upper-tiers',

@@ -179,6 +179,8 @@ export interface LevelConfig {
   containerCount?: number
   /** Optional score baseline count when a level has little or no loading. */
   scoreContainerCount?: number
+  /** Optional fixed pass threshold, overriding the default perfectScore × 0.70. */
+  targetScore?: number
   /** Number of pre-loaded Import containers to discharge before loading begins. */
   dischargeContainerCount?: number
   /** Number of pre-loaded Transit containers that may overstow imports and need restowing. */

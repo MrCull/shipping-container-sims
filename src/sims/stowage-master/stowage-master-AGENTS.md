@@ -181,7 +181,7 @@ Key actions:
 
 **Score targets:**  
 `perfectScore = containerCount × 100 + hazmatCount × 25`  
-`targetScore = perfectScore × 0.70`
+`targetScore = perfectScore × 0.70` (unless the level sets a fixed `targetScore` override, e.g. Level 4 = 1480)
 
 ---
 

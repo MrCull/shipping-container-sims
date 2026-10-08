@@ -190,10 +190,10 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     return count
   }
 
-  function recalculateScoreTargets(baseScoreContainerCount: number): void {
+  function recalculateScoreTargets(baseScoreContainerCount: number, targetScoreOverride?: number): void {
     const hazmatPremiumScore = countHazmatPremiumContainers() * SCORING.hazmatSafeBonus
     perfectScore.value = baseScoreContainerCount * 100 + hazmatPremiumScore
-    targetScore.value = Math.round(perfectScore.value * 0.70)
+    targetScore.value = targetScoreOverride ?? Math.round(perfectScore.value * 0.70)
   }
 
   function startLevel(level: number): void {
@@ -211,7 +211,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
     resetSerialCounter()
     containers.value = generateContainerList(outboundContainerCount, config.hazmatRate, config.preset.name)
-    recalculateScoreTargets(scoreContainerCount)
+    recalculateScoreTargets(scoreContainerCount, config.targetScore)
     currentContainerIndex.value = 0
 
     score.value = 0
@@ -255,7 +255,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
         config.transitGrouping ?? 'random',
         currentPorts.value,
       )
-      recalculateScoreTargets(scoreContainerCount)
+      recalculateScoreTargets(scoreContainerCount, config.targetScore)
       dischargeCount.value = importCount
       hasTransitContainers.value = transitCount > 0
 
