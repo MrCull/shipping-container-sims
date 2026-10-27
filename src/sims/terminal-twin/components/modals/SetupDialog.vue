@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { randomSeed, scenarioCatalogue, useTwinStore } from '../../store/twinStore'
+import { computed, ref, watch } from 'vue'
+import { randomSeed, resolveScenario, scenarioCatalogue, useTwinStore } from '../../store/twinStore'
 import { fromLocalInputValue, toLocalInputValue } from '../../modules/time'
+import { applyOverrides, LIMITS, validateOverrides, type ScenarioOverrides } from '../../scenario/overrides'
+import type { VesselConfig } from '../../scenario/types'
+import VesselTable from '../setup/VesselTable.vue'
 
 const store = useTwinStore()
 const catalogue = scenarioCatalogue()
@@ -13,13 +16,45 @@ const formError = ref<string | null>(null)
 
 const selected = computed(() => catalogue.find((c) => c.name === name.value))
 
+// Editable quay, cranes and vessel table, initialised from the chosen scenario.
+const quayLengthM = ref(0)
+const stsCount = ref(0)
+const vessels = ref<VesselConfig[]>([])
+
+function loadDraft(scenario: string, overrides: ScenarioOverrides = {}): void {
+  try {
+    const config = applyOverrides(resolveScenario(scenario), overrides)
+    quayLengthM.value = config.quay.lengthM
+    stsCount.value = config.sts.length
+    vessels.value = JSON.parse(JSON.stringify(config.vessels))
+  } catch {
+    vessels.value = []
+  }
+}
+loadDraft(name.value, store.choice.name === name.value ? store.choice.overrides : {})
+watch(name, (n) => loadDraft(n))
+
+const startDate = computed(() => fromLocalInputValue(start.value))
+const overrides = computed<ScenarioOverrides>(() => ({
+  quayLengthM: quayLengthM.value,
+  stsCount: stsCount.value,
+  vessels: vessels.value,
+}))
+const check = computed(() => {
+  try {
+    return validateOverrides(applyOverrides(resolveScenario(name.value), overrides.value))
+  } catch (err) {
+    return { errors: [err instanceof Error ? err.message : String(err)], warnings: [] }
+  }
+})
+
 function reroll(): void {
   seed.value = randomSeed()
 }
 
 async function submit(): Promise<void> {
-  const startDate = fromLocalInputValue(start.value)
-  if (!startDate) {
+  const startAt = startDate.value
+  if (!startAt) {
     formError.value = 'Enter a valid start date and time'
     return
   }
@@ -27,9 +62,18 @@ async function submit(): Promise<void> {
     formError.value = 'The seed must be a whole number ≥ 0'
     return
   }
+  if (check.value.errors.length > 0) {
+    formError.value = check.value.errors[0]
+    return
+  }
   formError.value = null
   await store
-    .startScenario({ name: name.value, seed: seed.value, startDateTime: startDate.toISOString() })
+    .startScenario({
+      name: name.value,
+      seed: seed.value,
+      startDateTime: startAt.toISOString(),
+      overrides: JSON.parse(JSON.stringify(overrides.value)),
+    })
     .catch(() => {})
 }
 </script>
@@ -111,6 +155,59 @@ async function submit(): Promise<void> {
         </label>
       </div>
 
+      <div class="row">
+        <label class="field">
+          <span>Quay length (m)</span>
+          <input
+            v-model.number="quayLengthM"
+            type="number"
+            :min="LIMITS.quayLengthM.min"
+            :max="LIMITS.quayLengthM.max"
+            step="10"
+            name="quayLength"
+          >
+        </label>
+        <label class="field">
+          <span>STS cranes</span>
+          <input
+            v-model.number="stsCount"
+            type="number"
+            :min="LIMITS.sts.min"
+            :max="LIMITS.sts.max"
+            step="1"
+            name="stsCount"
+          >
+        </label>
+      </div>
+
+      <fieldset class="field">
+        <legend>Vessels</legend>
+        <VesselTable
+          v-model="vessels"
+          :start-date-time="startDate"
+        />
+      </fieldset>
+
+      <ul
+        v-if="check.errors.length || check.warnings.length"
+        class="checks"
+      >
+        <li
+          v-for="e in check.errors"
+          :key="e"
+          class="error"
+        >
+          ⛔ {{ e }}
+        </li>
+        <li
+          v-for="w in check.warnings"
+          :key="w"
+          class="warning"
+        >
+          ⚠ {{ w }}
+        </li>
+      </ul>
+
       <p
         v-if="formError || store.error"
         class="error"
@@ -153,7 +250,7 @@ async function submit(): Promise<void> {
 }
 
 .dialog {
-  width: min(34rem, 100%);
+  width: min(52rem, 100%);
   max-height: 100%;
   overflow: auto;
   display: flex;
@@ -294,6 +391,20 @@ input[type='datetime-local'] {
 
 .error {
   color: var(--color-danger);
+  font-size: 0.85rem;
+}
+
+.checks {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0;
+  margin: 0;
+}
+
+.warning {
+  color: var(--color-accent);
   font-size: 0.85rem;
 }
 </style>

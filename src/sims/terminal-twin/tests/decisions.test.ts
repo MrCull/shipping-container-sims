@@ -14,6 +14,15 @@ const tracer = fixtures['tracer-1sts-10-boxes']
 const ofType = <K extends EngineEvent['type']>(sim: { eventLog(): readonly EngineEvent[] }, type: K) =>
   sim.eventLog().filter((e) => e.type === type) as unknown as EventOf<K>[]
 
+/** Decision events of the ground-position decision point only (berth and crane-split decisions also run). */
+const gpOfType = <K extends 'DecisionRequested' | 'DecisionResolved'>(sim: { eventLog(): readonly EngineEvent[] }, type: K) =>
+  ofType(sim, type).filter((e) => e.payload.decisionPoint === 'stsGroundPosition')
+
+/** Run condition: stop right after a ground-position decision event of this type. */
+const gpEvent = (type: 'DecisionRequested' | 'DecisionResolved') => ({
+  predicate: (e: EngineEvent) => e.type === type && e.payload.decisionPoint === 'stsGroundPosition',
+})
+
 describe('swapping a handler through the engine API', () => {
   it('a scripted handler replaces the built-in strategy and receives message-shaped requests', () => {
     const received: { correlationId: string; decisionPoint: string; version: number; stsId: string }[] = []
@@ -45,8 +54,8 @@ describe('swapping a handler through the engine API', () => {
   it('every decision raises DecisionRequested and DecisionResolved with the same correlation id', () => {
     const sim = createSimulation(tracer)
     sim.runUntil()
-    const requested = ofType(sim, 'DecisionRequested')
-    const resolved = ofType(sim, 'DecisionResolved')
+    const requested = gpOfType(sim, 'DecisionRequested')
+    const resolved = gpOfType(sim, 'DecisionResolved')
     expect(requested).toHaveLength(10)
     expect(resolved.map((e) => e.payload.correlationId)).toEqual(requested.map((e) => e.payload.correlationId))
     for (const [i, req] of requested.entries()) {
@@ -71,7 +80,7 @@ describe('built-in strategies', () => {
     const lanes = ofType(sim, 'StsGrounded').map((e) => e.payload.groundPositionId)
     expect(lanes[0]).toBe('STS01-GP10')
     expect(lanes[9]).toBe('STS01-GP1')
-    expect(ofType(sim, 'DecisionResolved')[0].payload.handler).toBe('strategy:highest-free-lane')
+    expect(gpOfType(sim, 'DecisionResolved')[0].payload.handler).toBe('strategy:highest-free-lane')
   })
 
   it('the registry lists 1–3 strategies per decision point, and an unknown name fails at creation', () => {
@@ -108,16 +117,18 @@ describe('built-in strategies', () => {
 /** Two STS on one vessel, no move variation: one crane's pending decision does not stop the other. */
 const twoCranes = new ScenarioBuilder('two-sts', '2 STS share one vessel')
   .seed(3)
-  .sts('STS01', { gantryX: 60, groundPositions: 6 })
-  .sts('STS02', { gantryX: 90, groundPositions: 6 })
-  .vessel('V001', { berthAtS: 0, berthX: 50, stsIds: ['STS01', 'STS02'], bays: 4, rows: 5 })
-  .dischargeBoxes('V001', 10)
+  .quay(400, { mooringS: 60, unmooringS: 60 })
+  .sts('STS01', { gantryX: 30, groundPositions: 10 })
+  .sts('STS02', { gantryX: 100, groundPositions: 10 })
+  .vesselCall('V001', { sizeClass: 'feeder', discharge: 10, maxSts: 2, sizeMix: { '40': 1 } })
   .endWhen({ vesselsCompleted: 1 })
   .build()
 
 const pairs = (sim: { eventLog(): readonly EngineEvent[] }) => {
   const resolved = new Map(ofType(sim, 'DecisionResolved').map((e) => [e.payload.correlationId, e]))
-  return ofType(sim, 'DecisionRequested').map((req) => ({ req, res: resolved.get(req.payload.correlationId)! }))
+  return ofType(sim, 'DecisionRequested')
+    .filter((req) => req.payload.decisionPoint === 'stsGroundPosition')
+    .map((req) => ({ req, res: resolved.get(req.payload.correlationId)! }))
 }
 
 describe('keep-running mode with injected latency', () => {
@@ -142,7 +153,7 @@ describe('keep-running mode with injected latency', () => {
     expect(overlapped).toBe(true)
     // the STS sits in waiting-for-decision while the reply is in flight
     const mid = createSimulation(withDecisions(fixed20s, twoCranes))
-    mid.runUntil({ eventType: 'DecisionRequested' })
+    mid.runUntil(gpEvent('DecisionRequested'))
     const waitingSts = mid.eventLog().at(-1)!.subjects.equipment![0]
     mid.runUntil({ time: mid.now + 10 })
     expect(mid.query.sts(waitingSts).status).toBe('waiting-for-decision')
@@ -299,21 +310,21 @@ describe('async (Promise) handlers', () => {
 
   it('keep-running: a paced host advances sim time while the reply is in flight; the idle time is attributed', async () => {
     const sim = createSimulation(tracer, remote(1))
-    sim.runUntil({ eventType: 'DecisionRequested' })
+    sim.runUntil(gpEvent('DecisionRequested'))
     const requestedAt = sim.now
     // e.g. the browser worker advancing the clock frame by frame
     expect(sim.runUntil({ time: requestedAt + 30 }).reason).toBe('condition')
     expect(sim.now).toBe(requestedAt + 30)
     expect(sim.query.sts('STS01').status).toBe('waiting-for-decision')
     await new Promise((r) => setTimeout(r, 10))
-    sim.runUntil({ eventType: 'DecisionResolved' })
+    sim.runUntil(gpEvent('DecisionResolved'))
     expect(sim.now).toBe(requestedAt + 30)
     const h = sim.kpiReport().handlers.stsGroundPosition
     expect(h.simLatencyS.max).toBe(30)
     expect(h.equipmentIdleS).toBe(30)
 
     const paused = createSimulation(withDecisions({ asyncMode: 'pause' }), remote(1))
-    paused.runUntil({ eventType: 'DecisionRequested' })
+    paused.runUntil(gpEvent('DecisionRequested'))
     const frozenAt = paused.now
     expect(paused.runUntil({ time: frozenAt + 30 }).reason).toBe('waiting-for-decision')
     expect(paused.now).toBe(frozenAt)
@@ -330,7 +341,7 @@ describe('async (Promise) handlers', () => {
 
   it('a reply slower than timeoutMs times out in wall time; the late reply is counted and discarded', async () => {
     const sim = createSimulation(withDecisions({ points: { stsGroundPosition: { timeoutMs: 5 } } }, tracer), remote(40))
-    await sim.runUntilAsync({ eventType: 'DecisionResolved' })
+    await sim.runUntilAsync(gpEvent('DecisionResolved'))
     expect(ofType(sim, 'DecisionFailed')[0].payload.failure).toBe('timeout')
     await new Promise((r) => setTimeout(r, 60))
     expect(sim.kpiReport().handlers.stsGroundPosition.lateReplies).toBe(1)

@@ -3,6 +3,9 @@
  * run. Fixtures are JSON files of this shape, produced by the typed
  * `ScenarioBuilder`. All values are SI (metres, seconds, m/s, m/s²).
  *
+ * Vessel bay plans and their containers are NOT stored here: they are
+ * generated from the vessel table and the seed (`scenario/bayPlan.ts`).
+ *
  * Bump SCENARIO_SCHEMA_VERSION on breaking changes and add a migration
  * (persistence ticket TT-17).
  */
@@ -24,6 +27,7 @@ export interface StsKinematics {
   unlockS: number
 }
 
+/** STS cranes are listed in rail order (ascending `gantryX`); they never pass each other. */
 export interface StsConfig {
   id: string
   /** Initial gantry position along the quay (m, X axis). */
@@ -32,41 +36,58 @@ export interface StsConfig {
   groundPositions: number
 }
 
+/** Vessel size classes, smallest first (dimensions in `VESSEL_CLASSES`, `vesselClasses.ts`). */
+export type VesselSizeClass = 'feeder' | 'feedermax' | 'panamax' | 'neo-panamax' | 'ulcv'
+
+/** Relative weights (any non-negative numbers; normalised when drawn). */
+export type Weights<K extends string> = Partial<Record<K, number>>
+
+/**
+ * One vessel call (a row of the setup dialog's vessel table). Its bay plan
+ * (slots and discharge boxes) is generated from it and the scenario seed when
+ * the simulation starts. The berth position and the STS cranes are chosen by
+ * the berth-allocation and crane-split decision points.
+ */
 export interface VesselConfig {
   id: string
   name: string
-  /** Sim time (s from scenario start) at which the vessel is berthed. */
-  berthAtS: number
-  /** X of the vessel's bay 0 aft edge along the quay (m). */
-  berthX: number
-  /** STS cranes that work this vessel. */
-  stsIds: string[]
-  bays: number
-  rows: number
-  tiersOnDeck: number
-  bayPitchM: number
-  rowPitchM: number
-  /** Height of the hatch cover / deck stack base above quay level (m). */
-  deckHeightM: number
-  /** Gap between the quay edge (Z = 0) and the vessel side (m). */
-  fenderGapM: number
+  /** Arrival at the port (s from scenario start). The vessel berths, or waits at anchorage. */
+  arrivalS: number
+  sizeClass: VesselSizeClass
+  /** Boxes discharged here (real boxes in the bay plan). */
+  discharge: number
+  /** Export boxes to load here (slots reserved in the bay plan; loading comes in TT-10). */
+  load: number
+  /** Transshipment boxes to load here (slots reserved in the bay plan). */
+  transshipment: number
+  /** Maximum number of STS cranes working this vessel at once. */
+  maxSts: number
+  /** Size mix of this vessel's discharge boxes (default: `cargo.sizeMix`). */
+  sizeMix?: Weights<ContainerSize>
 }
 
-export interface VesselSlotRef {
-  vesselId: string
-  bay: number
-  row: number
-  tier: number
+/** The continuous quay and its berth/crane rules. */
+export interface QuayConfig {
+  lengthM: number
+  /** Minimum clear distance between two berthed vessels (m). */
+  berthGapM: number
+  /** From berth allocation to all-fast: pilotage, approach and mooring (s). */
+  mooringS: number
+  /** From the last move to departure: unmooring (s). */
+  unmooringS: number
+  /** Minimum distance between the gantry centres of two neighbouring STS (m). */
+  stsMinSpacingM: number
+  /** STS lift two 20 ft boxes of the same vessel cell together (twin-20). */
+  twinLift: boolean
 }
 
-export interface ContainerConfig {
-  /** ISO 6346 id with check digit, e.g. "HDMU1000016". */
-  id: string
-  size: ContainerSize
-  full: boolean
-  line: string
-  /** Where the container starts. Only vessel slots exist in v1. */
-  initial: { kind: 'vesselSlot' } & VesselSlotRef
+/** How discharge boxes are generated. */
+export interface CargoConfig {
+  /** Shipping lines and their weights (owner prefixes from `LINE_OWNER_PREFIX`). */
+  lines: Weights<string>
+  sizeMix: Weights<ContainerSize>
+  /** Share of empty boxes (0–1). */
+  emptyShare: number
 }
 
 export interface EndConditions {
@@ -93,14 +114,16 @@ export interface ScenarioConfig {
   seed: number
   /** ISO date-time of sim t = 0. */
   startDateTime: string
-  quay: { lengthM: number }
+  quay: QuayConfig
   layout: LayoutConfig
   kinematics: { sts: StsKinematics }
   /** ± % random variation applied to each move's duration (0 = none). */
   moveVariationPct: number
+  /** STS cranes in rail order. */
   sts: StsConfig[]
+  /** Vessel calls (the vessel table). */
   vessels: VesselConfig[]
-  containers: ContainerConfig[]
+  cargo: CargoConfig
   endConditions: EndConditions
   /** Decision points: async mode, strategy per decision point, latency injection (optional; defaults apply). */
   decisions?: DecisionsConfig

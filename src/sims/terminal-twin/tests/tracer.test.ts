@@ -14,8 +14,9 @@ describe('tracer fixture: 1 STS discharges 10 boxes to ground positions', () => 
   })
 
   it('has 10 boxes with valid ISO 6346 ids', () => {
-    expect(tracer.containers).toHaveLength(10)
-    for (const c of tracer.containers) expect(isValidIso6346(c.id), c.id).toBe(true)
+    const boxes = createSimulation(tracer).query.containers()
+    expect(boxes).toHaveLength(10)
+    for (const c of boxes) expect(isValidIso6346(c.id), c.id).toBe(true)
   })
 
   it('runs to completion: the vessel departs and the scenario ends', () => {
@@ -36,7 +37,7 @@ describe('tracer fixture: 1 STS discharges 10 boxes to ground positions', () => 
     const sim = createSimulation(tracer)
     sim.runUntil()
     const groundPositionsUsed = new Set<string>()
-    for (const { id } of tracer.containers) {
+    for (const { id } of sim.query.containers()) {
       const box = sim.query.container(id)
       expect(box.custodyHistory.map((h) => h.owner.kind)).toEqual(['vesselSlot', 'sts', 'groundPosition'])
       expect(box.custodyHistory[1].owner.id).toBe('STS01')

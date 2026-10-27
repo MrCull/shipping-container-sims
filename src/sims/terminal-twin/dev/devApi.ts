@@ -13,6 +13,7 @@
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
  *   __tt.select('STS01'); __tt.cameraTo('STS01'); __tt.setSpeed(600); __tt.pause(); __tt.clock()
  */
+import type { ScenarioOverrides } from '../scenario/overrides'
 import type { CustodyRef, EngineEvent, EventPayloads, EventSubjects, EventType, RunResult, SimSnapshot } from '../engine'
 import type { SceneStats } from '../modules/sceneRenderer'
 import type { StsPose } from '../modules/sceneModel'
@@ -32,7 +33,10 @@ export interface TwinClock {
 
 export interface TwinDevApi {
   /** Load a fixture or preset (default: the current choice) and wait until it is ready. Starts paused unless autoplay. */
-  load(name?: string, options?: { seed?: number; startDateTime?: string; autoplay?: boolean }): Promise<EngineInfo | null>
+  load(
+    name?: string,
+    options?: { seed?: number; startDateTime?: string; autoplay?: boolean; overrides?: ScenarioOverrides },
+  ): Promise<EngineInfo | null>
   step(): Promise<EventSummary | null>
   runUntil(condition?: WorkerRunCondition): Promise<RunResult>
   /** "Run to…" a sim time (s), like the top bar. */
@@ -91,6 +95,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
           // Default: the scenario's own seed (so a fixture reproduces its golden run).
           seed: options.seed ?? (name ? resolveScenario(name).seed : store.choice.seed),
           startDateTime: options.startDateTime ?? store.choice.startDateTime,
+          overrides: options.overrides,
         },
         { autoplay: options.autoplay ?? false },
       )

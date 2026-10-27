@@ -15,15 +15,16 @@ import { createEventLogger, type LogOptions } from './logging'
 import { createQuery, type SimQuery } from './query'
 import { nextRandom } from './rng'
 import { createInitialState, type CustodyRef, type SimState } from './state'
+import { berthReactors } from './subsystems/berth'
 import { quayReactors } from './subsystems/quay'
 import type { ScenarioConfig } from '../scenario/types'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.2.0'
+export const ENGINE_VERSION = '0.3.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
-const REACTORS: ReactorMap[] = [quayReactors]
+const REACTORS: ReactorMap[] = [berthReactors, quayReactors]
 
 export interface SimulationOptions {
   /** Overrides `config.seed`. */
@@ -195,6 +196,11 @@ export function createSimulation(
 
   function endConditionMet(): string | null {
     const ec = config.endConditions
+    // no end condition configured: end when every scheduled vessel has departed
+    if (ec.vesselsCompleted === undefined && ec.moves === undefined && ec.simDurationS === undefined) {
+      const n = config.vessels.length
+      return n > 0 && state.kpis.vesselsCompleted >= n ? `vesselsCompleted >= ${n}` : null
+    }
     if (ec.vesselsCompleted !== undefined && state.kpis.vesselsCompleted >= ec.vesselsCompleted)
       return `vesselsCompleted >= ${ec.vesselsCompleted}`
     if (ec.moves !== undefined && state.kpis.movesCompleted >= ec.moves) return `moves >= ${ec.moves}`
@@ -259,7 +265,7 @@ export function createSimulation(
     commit(ev)
     if (invariantsEnabled) {
       invariants.checks++
-      const violations = checkInvariants(state)
+      const violations = checkInvariants(state, config)
       for (const v of violations) {
         const violation = { ...v, eventId: ev.id, t: ev.t }
         invariants.violations.push(violation)

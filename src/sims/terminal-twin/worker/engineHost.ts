@@ -5,6 +5,7 @@
  */
 import { createSimulation, summarizeRun, type EngineEvent, type Simulation } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
+import { HALF_OFFSET_M } from '../scenario/vesselClasses'
 import {
   EVENT_SUMMARY_CAP,
   summarizeEvent,
@@ -49,7 +50,10 @@ export function createEngineHost() {
       if (last && last.eventId === ev.id) {
         const change: CustodyChange = { containerId: id, t: last.t, owner: { ...last.owner }, eventId: last.eventId }
         if (last.owner.kind === 'groundPosition') {
-          change.x = sim.query.sts(sim.query.groundPosition(last.owner.id).stsId).gantryX
+          change.x = ev.type === 'StsGrounded' ? ev.payload.x : sim.query.sts(sim.query.groundPosition(last.owner.id).stsId).gantryX
+        }
+        if (last.owner.kind === 'sts' && ev.type === 'StsPicked' && ev.payload.twin) {
+          change.dx = id === ev.payload.twin.containerId ? HALF_OFFSET_M : -HALF_OFFSET_M
         }
         delta.custody.push(change)
       }
@@ -67,11 +71,11 @@ export function createEngineHost() {
       }
     }
     for (const v of sim.config.vessels) {
-      const status = sim.query.vessel(v.id).status
+      const vessel = sim.query.vessel(v.id)
       const key = `vessel:${v.id}`
-      if (statusRefs.get(key) !== status) {
-        statusRefs.set(key, status)
-        delta.entities.push({ kind: 'vessel', id: v.id, t: ev.t, status })
+      if (statusRefs.get(key) !== vessel.status) {
+        statusRefs.set(key, vessel.status)
+        delta.entities.push({ kind: 'vessel', id: v.id, t: ev.t, status: vessel.status, berthX: vessel.berthX })
       }
     }
   }
@@ -162,6 +166,8 @@ export function createEngineHost() {
         return s.query.vessel(need())
       case 'vessels':
         return s.config.vessels.map((v) => s.query.vessel(v.id))
+      case 'vesselSlots':
+        return s.query.vesselSlots(id)
       case 'sts':
         return s.query.sts(need())
       case 'stsList':

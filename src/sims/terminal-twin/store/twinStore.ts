@@ -9,6 +9,7 @@
 import { defineStore } from 'pinia'
 import { markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
+import { applyOverrides, type ScenarioOverrides } from '../scenario/overrides'
 import { presets } from '../scenario/presets'
 import type { ScenarioConfig } from '../scenario/types'
 import type { Delta, EngineInfo, EventSummary } from '../worker/protocol'
@@ -24,6 +25,8 @@ export interface ScenarioChoice {
   seed: number
   /** ISO date-time of sim t = 0. */
   startDateTime: string
+  /** Setup-dialog edits: quay length, STS count, vessel table. */
+  overrides?: ScenarioOverrides
 }
 
 /** What the 3D view registers so the dev API can reach it. */
@@ -113,7 +116,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   async function startScenario(next: ScenarioChoice, options: { autoplay?: boolean } = {}): Promise<void> {
-    const base = resolveScenario(next.name)
+    const base = applyOverrides(resolveScenario(next.name), next.overrides ?? {})
     const config: ScenarioConfig = JSON.parse(JSON.stringify({ ...base, startDateTime: next.startDateTime }))
     choice.value = { ...next }
     loading.value = true
