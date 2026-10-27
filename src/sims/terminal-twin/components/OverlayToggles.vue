@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { useTwinStore } from '../store/twinStore'
 import type { OverlayState } from '../modules/sceneRenderer'
+import { t, type MessageKey } from '../i18n/messages'
 
 const store = useTwinStore()
 
-const toggles: { key: keyof OverlayState; label: string; title: string }[] = [
-  { key: 'laneGraph', label: 'Lane graph', title: 'Show the one-way SHC lane graph' },
-  { key: 'reservations', label: 'Reservations', title: 'Highlight conflict zones reserved at the displayed time' },
+const toggles: { key: keyof OverlayState; label: MessageKey; title: MessageKey }[] = [
+  { key: 'laneGraph', label: 'overlays.laneGraph', title: 'overlays.laneGraphHint' },
+  { key: 'reservations', label: 'overlays.reservations', title: 'overlays.reservationsHint' },
 ]
 
 function toggle(key: keyof OverlayState): void {
@@ -18,24 +19,24 @@ function toggle(key: keyof OverlayState): void {
   <div
     class="overlays"
     role="group"
-    aria-label="3D overlays"
+    :aria-label="t('overlays.group')"
   >
-    <span class="label">Overlays</span>
+    <span class="label">{{ t('overlays.label') }}</span>
     <button
-      v-for="t in toggles"
-      :key="t.key"
+      v-for="item in toggles"
+      :key="item.key"
       type="button"
       class="toggle"
-      :class="{ on: store.overlays[t.key] }"
-      :aria-pressed="store.overlays[t.key]"
-      :title="t.title"
-      @click="toggle(t.key)"
+      :class="{ on: store.overlays[item.key] }"
+      :aria-pressed="store.overlays[item.key]"
+      :title="t(item.title)"
+      @click="toggle(item.key)"
     >
       <span
         class="dot"
         aria-hidden="true"
       />
-      {{ t.label }}
+      {{ t(item.label) }}
     </button>
   </div>
 </template>

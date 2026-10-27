@@ -13,7 +13,7 @@ import {
   type ShcDispatchRequest,
   type Simulation,
 } from '../engine'
-import { withShcFleet } from '../scenario/builder'
+import { ScenarioBuilder, withShcFleet } from '../scenario/builder'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
 
@@ -88,11 +88,22 @@ function scarce(): ScenarioConfig {
   return c
 }
 
-/** Crowded: 6 SHCs for 1 STS, so vehicles compete for conflict zones. */
+/** Crowded: two cranes feed one block with 6 SHCs, so trips cross and compete for conflict zones. */
 function crowded(): ScenarioConfig {
-  const c = withShcFleet(shcFixture, 6)
-  c.name = 'shc-crowded'
-  return c
+  return new ScenarioBuilder('shc-crowded', '2 STS → 6 SHC → 1 WTP strip')
+    .seed(7)
+    .moveVariation(10)
+    .driverVariability(20)
+    .sts('STS01', { gantryX: 60, groundPositions: 3 })
+    .sts('STS02', { gantryX: 190, groundPositions: 3 })
+    .vessel('V001', { berthAtS: 60, berthX: 50, stsIds: ['STS01'], bays: 2, rows: 5 })
+    .vessel('V002', { berthAtS: 90, berthX: 180, stsIds: ['STS02'], bays: 2, rows: 5 })
+    .dischargeBoxes('V001', 10)
+    .dischargeBoxes('V002', 10, { line: 'MSC' })
+    .shcs(6)
+    .block('B01', { x: 125, wtpPads: 4 })
+    .endWhen({ simDurationS: 2400 })
+    .build()
 }
 
 /** Occupation intervals per place, from custody histories (independent of the engine's invariants). */
@@ -151,7 +162,9 @@ describe('SHC invariants hold for every fixture and stress variant', () => {
     sim.runUntil()
     const waits = Object.values(sim.kpiReport().horizontal!.shcs).map((s) => s.reservationWaitS)
     expect(Math.max(...waits)).toBeGreaterThan(0)
-    const delayed = sim.eventLog().filter((e) => e.type === 'ShcJobAssigned' && e.payload.departAt > e.t)
+    const delayed = sim
+      .eventLog()
+      .filter((e) => (e.type === 'ShcJobAssigned' || e.type === 'ShcRoutingToParking') && e.payload.departAt > e.t)
     expect(delayed.length).toBeGreaterThan(0)
   })
 

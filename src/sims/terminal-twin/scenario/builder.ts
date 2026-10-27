@@ -39,10 +39,14 @@ export const DEFAULT_STS_KINEMATICS: StsKinematics = {
   unlockS: 3,
 }
 
-/** [A] Shuttle-carrier (1-over-0/1) kinematics: ~30 km/h empty, ~25 km/h loaded. */
+/**
+ * [A] Shuttle-carrier (1-over-0/1) kinematics: ~30 km/h empty, ~25 km/h loaded.
+ * SHCs stop at every turn of the lane graph, so short runs never reach top
+ * speed: acceleration matters as much as vMax.
+ */
 export const DEFAULT_SHC_KINEMATICS: ShcKinematics = {
-  driveEmpty: { vMax: 8.3, accel: 0.6, decel: 0.8 },
-  driveLoaded: { vMax: 6.9, accel: 0.4, decel: 0.6 },
+  driveEmpty: { vMax: 8.3, accel: 1.0, decel: 1.2 },
+  driveLoaded: { vMax: 6.9, accel: 0.7, decel: 0.9 },
   lift: { vMax: 0.4, accel: 0.4, decel: 0.4 },
   liftHeightM: 1,
   lockS: 2,

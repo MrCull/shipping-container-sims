@@ -40,13 +40,13 @@
     "shc": {
       "driveEmpty": {
         "vMax": 8.3,
-        "accel": 0.6,
-        "decel": 0.8
+        "accel": 1,
+        "decel": 1.2
       },
       "driveLoaded": {
         "vMax": 6.9,
-        "accel": 0.4,
-        "decel": 0.6
+        "accel": 0.7,
+        "decel": 0.9
       },
       "lift": {
         "vMax": 0.4,

@@ -171,7 +171,7 @@ test('the setup dialog sets the SHC count and kinematics', async ({ page }) => {
   const readout = dialog.getByTestId('tt-shc-readout')
   const before = await readout.textContent()
   await dialog.getByLabel('Count').fill('3')
-  await dialog.getByLabel('Empty speed (m/s)').fill('5')
+  await dialog.getByLabel(/Empty speed/).fill('5') // well below the speeds SHCs reach between turns
   await expect(readout).not.toHaveText(before ?? '')
   await dialog.getByRole('button', { name: 'Start' }).click()
   await expect(dialog).toBeHidden()

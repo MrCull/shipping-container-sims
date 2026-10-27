@@ -21,6 +21,8 @@ function webglAvailable(): boolean {
   }
 }
 
+const HIDDEN_OVERLAYS: OverlayState = { laneGraph: false, reservations: false }
+
 export function useTwinScene(host: Ref<HTMLElement | null>) {
   const store = useTwinStore()
   const webglFailed = ref(false)
@@ -73,9 +75,16 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (!renderer || !camera || !controller) return
     if (controller.model !== builtFor) rebuild(controller.model)
     if (!view || controller.busy) return
-    if (overlaysApplied !== store.overlays) {
-      overlaysApplied = store.overlays
-      view.setOverlays(store.overlays)
+    // O (overlaysVisible) is the master switch over the individual 3D overlays.
+    const overlays = store.overlaysVisible ? store.overlays : HIDDEN_OVERLAYS
+    if (overlaysApplied !== overlays) {
+      overlaysApplied = overlays
+      view.setOverlays(overlays)
+    }
+    if (store.following && store.selectedId) {
+      // Follow camera (F): keep the selection centred, keeping the user's viewing offset.
+      const centre = controller.model?.entityCentre(store.selectedId, controller.displayTime)
+      if (centre) aim(centre, true)
     }
     view.update(controller.displayTime, store.selectedId)
     controls?.update()

@@ -13,7 +13,9 @@
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
  *   __tt.select('STS01'); __tt.cameraTo('STS01'); __tt.setSpeed(600); __tt.pause(); __tt.clock()
  *   __tt.overlays({ laneGraph: true, reservations: true })   // 3D debug overlays
+ *   __tt.setDisplay({ locale: 'de-DE', units: 'imperial' }); __tt.display(); __tt.config(); __tt.ui()
  */
+import type { DisplaySettings, ScenarioConfig } from '../scenario/types'
 import type { CustodyRef, EngineEvent, EventPayloads, EventSubjects, EventType, RunResult, SimSnapshot } from '../engine'
 import type { OverlayState, SceneStats } from '../modules/sceneRenderer'
 import type { ShcPose, StsPose } from '../modules/sceneModel'
@@ -60,6 +62,22 @@ export interface TwinDevApi {
   scene(): (SceneStats & { frames: number }) | null
   /** What the scene shows at the displayed time: custody per container, status and pose per STS, status per vessel. */
   sceneState(): SceneState | null
+  /** Locale + units in use (display only). */
+  display(): DisplaySettings
+  /** Change locale and/or units live (like the setup dialog). */
+  setDisplay(next: Partial<DisplaySettings>): DisplaySettings
+  /** The loaded scenario's config (SI) with the current display settings: what a save stores. */
+  config(): ScenarioConfig | null
+  /** Keyboard-driven UI state. */
+  ui(): TwinUiState
+}
+
+export interface TwinUiState {
+  selectedId: string | null
+  following: boolean
+  overlaysVisible: boolean
+  dashboardOpen: boolean
+  helpOpen: boolean
 }
 
 export interface SceneState {
@@ -152,6 +170,19 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
       }
     },
+    display: () => ({ ...store.display }),
+    setDisplay: (next) => {
+      store.setDisplay(next)
+      return { ...store.display }
+    },
+    config: () => (store.config ? (JSON.parse(JSON.stringify(store.config)) as ScenarioConfig) : null),
+    ui: () => ({
+      selectedId: store.selectedId,
+      following: store.following,
+      overlaysVisible: store.overlaysVisible,
+      dashboardOpen: store.dashboardOpen,
+      helpOpen: store.helpOpen,
+    }),
   }
 
   window.__tt = api

@@ -3,7 +3,7 @@
   "seed": 42,
   "status": "ended",
   "endReason": "simDurationS >= 1800",
-  "eventLogHash": "1f48801241d7ba",
+  "eventLogHash": "1c402e7d826a28",
   "kpis": {
     "simTimeS": 1800,
     "eventsProcessed": 225,
@@ -12,14 +12,14 @@
     "sts": {
       "STS01": {
         "moves": 10,
-        "grossMovesPerHour": 34.365
+        "grossMovesPerHour": 33.659
       }
     },
     "vessels": {
       "V001": {
         "berthedAtS": 60,
-        "departedAtS": 1125.497,
-        "turnaroundS": 1065.497
+        "departedAtS": 1146.386,
+        "turnaroundS": 1086.386
       }
     },
     "handlers": {
@@ -71,15 +71,15 @@
       "shcs": {
         "SHC01": {
           "jobs": 5,
-          "emptyDistanceM": 863.75,
-          "loadedDistanceM": 806.75,
-          "reservationWaitS": 5.095
+          "emptyDistanceM": 872.25,
+          "loadedDistanceM": 804.25,
+          "reservationWaitS": 0
         },
         "SHC02": {
           "jobs": 5,
-          "emptyDistanceM": 964.25,
-          "loadedDistanceM": 766.25,
-          "reservationWaitS": 5.33
+          "emptyDistanceM": 947.75,
+          "loadedDistanceM": 782.75,
+          "reservationWaitS": 0
         }
       },
       "stsGroundPositionWaitS": {

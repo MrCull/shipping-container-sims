@@ -73,4 +73,6 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Reservation:** a time window `[from, to)` on a conflict zone held by one piece of equipment. Trips reserve all their zones before departing and depart later if any window is taken.
 - **Subsystem mode:** how a subsystem runs: **real**, **instant** (a stub that raises the same events with zero durations) or **off**.
 - **Overlay (3D debug overlay):** an optional drawing over the 3D view: lane graph, active reservations.
+- **Display settings:** the UI's **locale** (Intl formatting of dates, times, numbers, first day of week) and **unit system** (metric: m, km/h, t; imperial: ft, mi/h, US tons). Display only: the engine and saved configs are always SI. Imperial speed is written **mi/h** because **mph** would read as crane moves per hour.
+- **Message catalogue:** `i18n/messages.ts`, the single home of every user-visible UI string (English only for now), looked up with `t(key)`.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.

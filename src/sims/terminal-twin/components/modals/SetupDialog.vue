@@ -1,16 +1,46 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { travelTime } from '../../engine'
-import { DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
-import type { ShcKinematics } from '../../scenario/types'
 import { randomSeed, resolveScenario, scenarioCatalogue, useTwinStore } from '../../store/twinStore'
 import { fromLocalInputValue, toLocalInputValue } from '../../modules/time'
+import { t } from '../../i18n/messages'
+import { browserDisplayDefaults } from '../../i18n/display'
+import { travelTime, type AxisProfile } from '../../engine'
+import { DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
+import type { ShcKinematics, UnitSystem } from '../../scenario/types'
 
 /** Spec scale limit for the SHC fleet. */
 const MAX_SHC = 120
 
 const store = useTwinStore()
 const catalogue = scenarioCatalogue()
+
+/** Offered locales; the browser's and the current one are added if missing. */
+const COMMON_LOCALES = ['en-GB', 'en-US', 'de-DE', 'es-ES', 'fr-FR', 'it-IT', 'nl-NL', 'pt-BR', 'ja-JP', 'zh-CN']
+const UNIT_SYSTEMS: UnitSystem[] = ['metric', 'imperial']
+const browserLocale = browserDisplayDefaults(typeof navigator === 'undefined' ? [] : navigator.languages ?? []).locale
+
+function localeName(tag: string): string {
+  try {
+    return new Intl.DisplayNames([tag], { type: 'language' }).of(tag) ?? tag
+  } catch {
+    return tag
+  }
+}
+
+const localeOptions = computed(() => {
+  const tags = [...new Set([browserLocale, store.display.locale, ...COMMON_LOCALES])]
+  return tags.map((tag) => {
+    const name = `${localeName(tag)} · ${tag}`
+    return { tag, label: tag === browserLocale ? t('setup.localeBrowser', { name }) : name }
+  })
+})
+
+const preview = computed(() => {
+  const fmt = store.fmt
+  const sample = new Date(fromLocalInputValue(start.value) ?? Date.now())
+  const { date, time } = fmt.dateTime(sample)
+  return t('setup.preview', { date, time, number: fmt.number(1234567.89, 2), weekStart: fmt.weekdayName(fmt.firstDayOfWeek()) })
+})
 
 const name = ref(store.choice.name)
 const seed = ref(store.choice.seed)
@@ -19,14 +49,45 @@ const formError = ref<string | null>(null)
 
 const selected = computed(() => catalogue.find((c) => c.name === name.value))
 
-// SHC fleet and kinematics (only for scenarios that have SHCs).
-const scenarioShcs = computed(() => (name.value ? (resolveScenario(name.value).shcs?.length ?? 0) : 0))
-const shcCount = ref(0)
+/** Key figures of the selected scenario, in the chosen units (the config itself stays SI). */
+const summary = computed(() => {
+  let config
+  try {
+    config = resolveScenario(name.value)
+  } catch {
+    return []
+  }
+  const fmt = store.fmt
+  const sts = config.kinematics.sts
+  return [
+    { label: t('setup.summary.quay'), value: fmt.length(config.quay.lengthM), testid: 'quay' },
+    { label: t('setup.summary.sts'), value: fmt.number(config.sts.length, 0), testid: 'sts' },
+    { label: t('setup.summary.containers'), value: fmt.number(config.containers.length, 0), testid: 'containers' },
+    { label: t('setup.summary.gantry'), value: fmt.speed(sts.gantry.vMax), testid: 'gantry' },
+    { label: t('setup.summary.trolley'), value: fmt.speed(sts.trolley.vMax), testid: 'trolley' },
+    { label: t('setup.summary.hoist'), value: fmt.speed(sts.hoistLoaded.vMax), testid: 'hoist' },
+  ]
+})
+
+// ── SHC fleet and kinematics (scenarios with SHCs only). Edited in display units, kept in SI. ──
 /** Plain deep copy (structuredClone cannot copy Vue reactive proxies). */
 const copy = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T
+const scenarioShcs = computed(() => {
+  try {
+    return resolveScenario(name.value).shcs?.length ?? 0
+  } catch {
+    return 0
+  }
+})
+const shcCount = ref(0)
 const shcK = ref<ShcKinematics>(copy(DEFAULT_SHC_KINEMATICS))
 function loadShcDefaults(): void {
-  const base = name.value ? resolveScenario(name.value) : null
+  let base: ReturnType<typeof resolveScenario> | null
+  try {
+    base = resolveScenario(name.value)
+  } catch {
+    base = null
+  }
   const previous = store.choice.name === name.value ? store.choice.shc : undefined
   shcCount.value = previous?.count ?? base?.shcs?.length ?? 0
   shcK.value = copy(previous?.kinematics ?? base?.kinematics.shc ?? DEFAULT_SHC_KINEMATICS)
@@ -34,18 +95,39 @@ function loadShcDefaults(): void {
 loadShcDefaults()
 watch(name, loadShcDefaults)
 
+const M_PER_FT = 0.3048
+const M_PER_MILE = 1609.344
+const imperial = computed(() => store.display.units === 'imperial')
+/** m/s ↔ km/h or mi/h; m/s² ↔ m/s² or ft/s². */
+const speedFactor = computed(() => (imperial.value ? 3600 / M_PER_MILE : 3.6))
+const accelFactor = computed(() => (imperial.value ? 1 / M_PER_FT : 1))
+const speedUnit = computed(() => t(imperial.value ? 'unit.label.mih' : 'unit.label.kmh'))
+const accelUnit = computed(() => t(imperial.value ? 'unit.label.fts2' : 'unit.label.ms2'))
+const round2 = (n: number) => Math.round(n * 100) / 100
+
+type ProfileKey = 'driveEmpty' | 'driveLoaded'
+const shcFields = computed(() => [
+  { id: 'shc-v-empty', label: t('setup.shc.emptySpeed', { unit: speedUnit.value }), profile: 'driveEmpty' as ProfileKey, key: 'vMax' as keyof AxisProfile, factor: speedFactor.value },
+  { id: 'shc-v-loaded', label: t('setup.shc.loadedSpeed', { unit: speedUnit.value }), profile: 'driveLoaded' as ProfileKey, key: 'vMax' as keyof AxisProfile, factor: speedFactor.value },
+  { id: 'shc-accel', label: t('setup.shc.accel', { unit: accelUnit.value }), profile: 'driveEmpty' as ProfileKey, key: 'accel' as keyof AxisProfile, factor: accelFactor.value },
+  { id: 'shc-decel', label: t('setup.shc.decel', { unit: accelUnit.value }), profile: 'driveEmpty' as ProfileKey, key: 'decel' as keyof AxisProfile, factor: accelFactor.value },
+])
+function setProfile(profile: ProfileKey, key: keyof AxisProfile, factor: number, raw: string): void {
+  shcK.value[profile][key] = Number(raw) / factor
+}
+
 /** Derived readout: a nominal 300 m empty + 300 m loaded trip with lock, lift, lower and unlock. */
 const nominalTrip = computed(() => {
   const k = shcK.value
   const valid = [k.driveEmpty, k.driveLoaded, k.lift].every((p) => p.vMax > 0 && p.accel > 0 && p.decel > 0)
-  if (!valid) return null
+  if (!valid || !(k.lockS >= 0) || !(k.unlockS >= 0)) return null
   const seconds =
-    travelTime(300, k.driveEmpty) +
-    travelTime(300, k.driveLoaded) +
-    2 * travelTime(k.liftHeightM, k.lift) +
-    k.lockS +
-    k.unlockS
-  return { seconds, perHour: 3600 / seconds }
+    travelTime(300, k.driveEmpty) + travelTime(300, k.driveLoaded) + 2 * travelTime(k.liftHeightM, k.lift) + k.lockS + k.unlockS
+  return t('setup.shc.readout', {
+    distance: store.fmt.length(300),
+    seconds: store.fmt.number(seconds, 0),
+    trips: store.fmt.number(3600 / seconds, 1),
+  })
 })
 
 function reroll(): void {
@@ -55,19 +137,19 @@ function reroll(): void {
 async function submit(): Promise<void> {
   const startDate = fromLocalInputValue(start.value)
   if (!startDate) {
-    formError.value = 'Enter a valid start date and time'
+    formError.value = t('setup.errorStart')
     return
   }
   if (!Number.isInteger(seed.value) || seed.value < 0) {
-    formError.value = 'The seed must be a whole number ≥ 0'
+    formError.value = t('setup.errorSeed')
     return
   }
   if (scenarioShcs.value > 0 && (!Number.isInteger(shcCount.value) || shcCount.value < 1 || shcCount.value > MAX_SHC)) {
-    formError.value = `SHC count must be a whole number from 1 to ${MAX_SHC}`
+    formError.value = t('setup.shc.errorCount', { max: MAX_SHC })
     return
   }
   if (scenarioShcs.value > 0 && !nominalTrip.value) {
-    formError.value = 'SHC speeds and accelerations must be greater than 0'
+    formError.value = t('setup.shc.errorKinematics')
     return
   }
   formError.value = null
@@ -92,14 +174,14 @@ async function submit(): Promise<void> {
       @submit.prevent="submit"
     >
       <h2 id="tt-setup-title">
-        New scenario
+        {{ t('setup.title') }}
       </h2>
       <p class="intro">
-        Pick a scenario, set the seed and the start date/time. The same seed always gives the same run.
+        {{ t('setup.intro') }}
       </p>
 
       <fieldset class="field">
-        <legend>Scenario</legend>
+        <legend>{{ t('setup.scenario') }}</legend>
         <label
           v-for="c in catalogue"
           :key="c.name"
@@ -113,7 +195,7 @@ async function submit(): Promise<void> {
             :value="c.name"
           >
           <span class="choice-name">{{ c.name }}</span>
-          <span class="choice-kind">{{ c.kind }}</span>
+          <span class="choice-kind">{{ t(`setup.kind.${c.kind}`) }}</span>
         </label>
         <p
           v-if="selected"
@@ -122,13 +204,30 @@ async function submit(): Promise<void> {
           {{ selected.description }}
         </p>
         <p class="hint muted">
-          Presets (TTI Algeciras, Small automated, Stress test) are coming soon.
+          {{ t('setup.presetsSoon') }}
         </p>
+        <dl
+          v-if="summary.length"
+          class="summary"
+          :aria-label="t('setup.summary')"
+          data-testid="tt-setup-summary"
+        >
+          <div
+            v-for="item in summary"
+            :key="item.testid"
+            class="summary-item"
+          >
+            <dt>{{ item.label }}</dt>
+            <dd :data-testid="`tt-summary-${item.testid}`">
+              {{ item.value }}
+            </dd>
+          </div>
+        </dl>
       </fieldset>
 
       <div class="row">
         <label class="field">
-          <span>Seed</span>
+          <span>{{ t('setup.seed') }}</span>
           <span class="seed">
             <input
               v-model.number="seed"
@@ -141,15 +240,15 @@ async function submit(): Promise<void> {
             <button
               type="button"
               class="btn"
-              title="Random seed"
+              :title="t('setup.rerollHint')"
               @click="reroll"
             >
-              ↻ Re-roll
+              {{ t('setup.reroll') }}
             </button>
           </span>
         </label>
         <label class="field">
-          <span>Start date/time</span>
+          <span>{{ t('setup.start') }}</span>
           <input
             v-model="start"
             type="datetime-local"
@@ -159,14 +258,65 @@ async function submit(): Promise<void> {
         </label>
       </div>
 
+      <fieldset class="field">
+        <legend>{{ t('setup.display') }}</legend>
+        <div class="row">
+          <label class="field">
+            <span>{{ t('setup.locale') }}</span>
+            <select
+              name="locale"
+              data-testid="tt-locale"
+              :value="store.display.locale"
+              @change="store.setDisplay({ locale: ($event.target as HTMLSelectElement).value })"
+            >
+              <option
+                v-for="o in localeOptions"
+                :key="o.tag"
+                :value="o.tag"
+              >
+                {{ o.label }}
+              </option>
+            </select>
+          </label>
+          <div
+            class="field"
+            role="radiogroup"
+            :aria-label="t('setup.units')"
+          >
+            <span>{{ t('setup.units') }}</span>
+            <label
+              v-for="u in UNIT_SYSTEMS"
+              :key="u"
+              class="unit-choice"
+            >
+              <input
+                type="radio"
+                name="tt-units"
+                :value="u"
+                :checked="store.display.units === u"
+                :data-testid="`tt-units-${u}`"
+                @change="store.setDisplay({ units: u })"
+              >
+              {{ t(`setup.units.${u}`) }}
+            </label>
+          </div>
+        </div>
+        <p
+          class="hint"
+          data-testid="tt-display-preview"
+        >
+          {{ preview }}
+        </p>
+      </fieldset>
+
       <fieldset
         v-if="scenarioShcs > 0"
-        class="field shc"
+        class="field"
       >
-        <legend>Shuttle carriers (SHC)</legend>
+        <legend>{{ t('setup.shc.title') }}</legend>
         <div class="grid">
           <label class="mini">
-            <span>Count</span>
+            <span>{{ t('setup.shc.count') }}</span>
             <input
               v-model.number="shcCount"
               type="number"
@@ -176,48 +326,23 @@ async function submit(): Promise<void> {
               name="shc-count"
             >
           </label>
-          <label class="mini">
-            <span>Empty speed (m/s)</span>
+          <label
+            v-for="f in shcFields"
+            :key="f.id"
+            class="mini"
+          >
+            <span>{{ f.label }}</span>
             <input
-              v-model.number="shcK.driveEmpty.vMax"
               type="number"
-              min="0.1"
+              min="0"
               step="any"
-              name="shc-v-empty"
+              :name="f.id"
+              :value="round2(shcK[f.profile][f.key] * f.factor)"
+              @input="setProfile(f.profile, f.key, f.factor, ($event.target as HTMLInputElement).value)"
             >
           </label>
           <label class="mini">
-            <span>Loaded speed (m/s)</span>
-            <input
-              v-model.number="shcK.driveLoaded.vMax"
-              type="number"
-              min="0.1"
-              step="any"
-              name="shc-v-loaded"
-            >
-          </label>
-          <label class="mini">
-            <span>Accel. (m/s²)</span>
-            <input
-              v-model.number="shcK.driveEmpty.accel"
-              type="number"
-              min="0.05"
-              step="any"
-              name="shc-accel"
-            >
-          </label>
-          <label class="mini">
-            <span>Decel. (m/s²)</span>
-            <input
-              v-model.number="shcK.driveEmpty.decel"
-              type="number"
-              min="0.05"
-              step="any"
-              name="shc-decel"
-            >
-          </label>
-          <label class="mini">
-            <span>Lock / unlock (s)</span>
+            <span>{{ t('setup.shc.lockUnlock') }}</span>
             <span class="pair">
               <input
                 v-model.number="shcK.lockS"
@@ -225,7 +350,7 @@ async function submit(): Promise<void> {
                 min="0"
                 step="any"
                 name="shc-lock"
-                aria-label="Lock time (s)"
+                :aria-label="t('setup.shc.lockTime')"
               >
               <input
                 v-model.number="shcK.unlockS"
@@ -233,7 +358,7 @@ async function submit(): Promise<void> {
                 min="0"
                 step="any"
                 name="shc-unlock"
-                aria-label="Unlock time (s)"
+                :aria-label="t('setup.shc.unlockTime')"
               >
             </span>
           </label>
@@ -243,10 +368,7 @@ async function submit(): Promise<void> {
           class="hint"
           data-testid="tt-shc-readout"
         >
-          Nominal 300 m empty + 300 m loaded trip:
-          <span class="mono">{{ nominalTrip.seconds.toFixed(0) }} s</span>
-          (<span class="mono">{{ nominalTrip.perHour.toFixed(1) }}</span> trips/h per SHC). Loaded acceleration
-          stays at the scenario's value.
+          {{ nominalTrip }}
         </p>
       </fieldset>
 
@@ -264,14 +386,14 @@ async function submit(): Promise<void> {
           class="btn"
           @click="store.cancelSetup()"
         >
-          Cancel
+          {{ t('setup.cancel') }}
         </button>
         <button
           type="submit"
           class="btn primary"
           :disabled="store.loading"
         >
-          {{ store.loading ? 'Starting…' : 'Start' }}
+          {{ store.loading ? t('setup.starting') : t('setup.startButton') }}
         </button>
       </div>
     </form>
@@ -279,6 +401,46 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.mini {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.mini input {
+  padding: 0.4rem 0.5rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  font-family: var(--tt-font-mono);
+  color-scheme: dark;
+  min-width: 0;
+}
+
+.pair {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.pair input {
+  width: 50%;
+}
+
 .backdrop {
   position: absolute;
   inset: 0;
@@ -382,8 +544,13 @@ legend,
   }
 }
 
+.row > * {
+  min-width: 0;
+}
+
 input[type='number'],
-input[type='datetime-local'] {
+input[type='datetime-local'],
+select {
   padding: 0.45rem 0.6rem;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -392,6 +559,39 @@ input[type='datetime-local'] {
   font-family: var(--tt-font-mono);
   color-scheme: dark;
   min-width: 0;
+  width: 100%;
+}
+
+.unit-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 560px) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.summary dt {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.summary dd {
+  margin: 0;
+  font-family: var(--tt-font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .seed {
@@ -434,39 +634,5 @@ input[type='datetime-local'] {
 .error {
   color: var(--color-danger);
   font-size: 0.85rem;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.6rem;
-}
-
-@media (max-width: 560px) {
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.mini {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
-
-.pair {
-  display: flex;
-  gap: 0.3rem;
-}
-
-.pair input {
-  width: 50%;
-}
-
-.mono {
-  font-family: var(--tt-font-mono);
-  color: var(--color-text);
 }
 </style>
