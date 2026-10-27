@@ -7,7 +7,29 @@
  * identical runs. A strategy that needs randomness must take it from the
  * request, never from Math.random.
  */
-import type { DecisionHandler, DecisionPointId, HandlerSet } from './types'
+import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchPad, ShcDispatchRequest } from './types'
+
+const isFree = (p: ShcDispatchPad) => p.occupiedBy === null && p.claimedBy === null
+
+/** First free pad in list order. */
+function firstFreePad(req: ShcDispatchRequest): string | null {
+  return req.wtpPads.find(isFree)?.id ?? null
+}
+
+/** Free pad closest (plan distance) to a point; ties by list order. */
+function nearestFreePad(req: ShcDispatchRequest, x: number, z: number): string | null {
+  let best: ShcDispatchPad | null = null
+  let bestD = Infinity
+  for (const p of req.wtpPads) {
+    if (!isFree(p)) continue
+    const d = Math.abs(p.x - x) + Math.abs(p.z - z)
+    if (d < bestD - 1e-9) {
+      best = p
+      bestD = d
+    }
+  }
+  return best?.id ?? null
+}
 
 export interface StrategyDefinition<K extends DecisionPointId> {
   description: string
@@ -41,6 +63,29 @@ export const strategies: StrategyRegistry = {
       },
     },
   },
+  shcDispatch: {
+    default: 'oldest-job',
+    strategies: {
+      'oldest-job': {
+        description: 'Oldest open job first (FIFO by grounding time); first free WTP pad.',
+        handler: (msg) => {
+          const job = [...msg.payload.jobs].sort((a, b) => a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1))[0]
+          const pad = job ? firstFreePad(msg.payload) : null
+          return job && pad ? { jobId: job.jobId, wtpPadId: pad } : { jobId: null, wtpPadId: null }
+        },
+      },
+      'nearest-job': {
+        description: 'Nearest open job by route length; the free WTP pad nearest to that box.',
+        handler: (msg) => {
+          const job = [...msg.payload.jobs].sort(
+            (a, b) => a.distanceM - b.distanceM || a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1),
+          )[0]
+          const pad = job ? nearestFreePad(msg.payload, job.x, job.z) : null
+          return job && pad ? { jobId: job.jobId, wtpPadId: pad } : { jobId: null, wtpPadId: null }
+        },
+      },
+    },
+  },
 }
 
 /** Look up a built-in strategy; throws with the available names if unknown. */
@@ -54,4 +99,5 @@ export function getStrategy<K extends DecisionPointId>(dp: K, name: string): Dec
 /** Each decision point's default strategy. */
 export const defaultHandlers: HandlerSet = {
   stsGroundPosition: getStrategy('stsGroundPosition', strategies.stsGroundPosition.default),
+  shcDispatch: getStrategy('shcDispatch', strategies.shcDispatch.default),
 }

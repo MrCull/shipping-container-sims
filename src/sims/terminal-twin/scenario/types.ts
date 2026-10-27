@@ -24,6 +24,70 @@ export interface StsKinematics {
   unlockS: number
 }
 
+/** SHC (shuttle carrier) kinematics. Drive axes are along X or Z; `lift` raises the box. */
+export interface ShcKinematics {
+  driveEmpty: AxisProfile
+  driveLoaded: AxisProfile
+  lift: AxisProfile
+  /** Height the box is lifted to for travel (m, box bottom above ground). */
+  liftHeightM: number
+  /** Spreader twist-lock lock time (s). */
+  lockS: number
+  /** Spreader twist-lock unlock time (s). */
+  unlockS: number
+}
+
+export interface ShcConfig {
+  id: string
+}
+
+export interface BlockConfig {
+  id: string
+  /** Centre of the block along the quay (m, X axis). */
+  x: number
+  /** WTP pads at the block's waterside end. */
+  wtpPads: number
+}
+
+export interface YardConfig {
+  blocks: BlockConfig[]
+}
+
+/**
+ * Waterside lane-graph geometry (m). All optional; defaults in
+ * `DEFAULT_APRON_LAYOUT` (engine/laneGraph.ts).
+ */
+export interface ApronLayout {
+  /** Z of the westbound (-X) apron lane, landside of the STS backreach legs. */
+  westboundZ: number
+  /** Z of the eastbound (+X) apron lane. */
+  eastboundZ: number
+  /** Z of the clear position an SHC reverses to after a WTP drop. */
+  padClearZ: number
+  /** Z of the SHC parking spots. */
+  parkingZ: number
+  /** Z of the WTP pad centres (boxes lie along Z). */
+  wtpZ: number
+  /** Spacing of WTP pads across a block (m). */
+  padPitchM: number
+  /** Half length of an STS lane either side of the crane's home gantry X. */
+  stsLaneHalfSpanM: number
+  /** Spacing of parking spots along X. */
+  parkingPitchM: number
+  /** Distance either side of a conflict point that a passing vehicle reserves. */
+  zoneClearanceM: number
+}
+
+/** Subsystem modes: real behaviour, an "instant" stub raising the same events, or off. */
+export type SubsystemMode = 'real' | 'instant' | 'off'
+
+export interface SubsystemModes {
+  /** SHC horizontal transport (default real when SHCs are configured). */
+  shc?: SubsystemMode
+  /** ASC yard cranes (default instant; real arrives with TT-06). */
+  asc?: SubsystemMode
+}
+
 export interface StsConfig {
   id: string
   /** Initial gantry position along the quay (m, X axis). */
@@ -95,13 +159,23 @@ export interface ScenarioConfig {
   startDateTime: string
   quay: { lengthM: number }
   layout: LayoutConfig
-  kinematics: { sts: StsKinematics }
+  kinematics: { sts: StsKinematics; shc?: ShcKinematics }
   /** ± % random variation applied to each move's duration (0 = none). */
   moveVariationPct: number
   sts: StsConfig[]
   vessels: VesselConfig[]
   containers: ContainerConfig[]
   endConditions: EndConditions
+  /** SHC fleet (TT-05). Absent or empty = no horizontal transport. */
+  shcs?: ShcConfig[]
+  /** Yard blocks with their WTP pads (TT-05; TT-06 adds stacks and ASCs). */
+  yard?: YardConfig
+  /** Waterside lane-graph geometry overrides. */
+  apron?: Partial<ApronLayout>
+  /** ± % random variation of each SHC trip (driver variability; 0 = none). */
+  driverVariabilityPct?: number
+  /** Subsystem modes (overridable with `SimulationOptions.subsystems`). */
+  subsystems?: SubsystemModes
   /** Decision points: async mode, strategy per decision point, latency injection (optional; defaults apply). */
   decisions?: DecisionsConfig
 }

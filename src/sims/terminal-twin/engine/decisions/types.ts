@@ -29,14 +29,62 @@ export interface GroundPositionReply {
   groundPositionId: string | null
 }
 
+// ── shcDispatch ────────────────────────────────────────────────────────────
+
+/** An open job in the released pool: a box on an STS ground position waiting for an SHC. */
+export interface ShcDispatchJob {
+  jobId: string
+  containerId: string
+  groundPositionId: string
+  stsId: string
+  /** Sim time the box was grounded. */
+  readyAt: number
+  /** Where the box is (m). */
+  x: number
+  z: number
+  /** Lane-graph route length from the SHC to the box (m). */
+  distanceM: number
+}
+
+export interface ShcDispatchPad {
+  id: string
+  blockId: string
+  x: number
+  z: number
+  occupiedBy: string | null
+  /** SHC already heading there with a box. */
+  claimedBy: string | null
+}
+
+/** A free SHC pulls its next job from the released pool. */
+export interface ShcDispatchRequest {
+  shcId: string
+  /** Lane-graph node where the SHC is. */
+  nodeId: string
+  x: number
+  z: number
+  /** Open (unclaimed) jobs, oldest first. */
+  jobs: ShcDispatchJob[]
+  wtpPads: ShcDispatchPad[]
+}
+
+export interface ShcDispatchReply {
+  /** The job to take, or null (the SHC parks). */
+  jobId: string | null
+  /** WTP pad to deliver to (required with a job). */
+  wtpPadId: string | null
+}
+
 // ── catalogue ──────────────────────────────────────────────────────────────
 
 export interface DecisionRequests {
   stsGroundPosition: GroundPositionRequest
+  shcDispatch: ShcDispatchRequest
 }
 
 export interface DecisionReplies {
   stsGroundPosition: GroundPositionReply
+  shcDispatch: ShcDispatchReply
 }
 
 export type DecisionPointId = keyof DecisionRequests
@@ -44,6 +92,7 @@ export type DecisionPointId = keyof DecisionRequests
 /** Bump a decision point's version when its request or reply shape changes. */
 export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   stsGroundPosition: 1,
+  shcDispatch: 1,
 }
 
 export const DECISION_POINT_IDS = Object.keys(DECISION_CONTRACT_VERSIONS) as DecisionPointId[]

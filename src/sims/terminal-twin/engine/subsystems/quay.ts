@@ -10,7 +10,8 @@
  */
 import type { EngineContext, ReactorMap } from '../context'
 import { planSegment, type Axis, type AxisProfile, type MotionSegment } from '../kinematics'
-import type { StsState } from '../state'
+import { earliestStart, reserve } from '../reservations'
+import type { ContainerState, StsState } from '../state'
 import type { ContainerSize, VesselConfig } from '../../scenario/types'
 
 /** [A] Container heights (m). */
@@ -77,6 +78,40 @@ function startNextMove(ctx: EngineContext, sts: StsState, at: number, segments: 
   })
 }
 
+/** Ask the stsGroundPosition decision point where to set down the box the STS holds. */
+function requestGroundPosition(ctx: EngineContext, sts: StsState, box: ContainerState): void {
+  const { state } = ctx
+  sts.status = 'waiting-for-decision'
+  ctx.requestDecision(
+    'stsGroundPosition',
+    {
+      stsId: sts.id,
+      containerId: box.id,
+      groundPositions: sts.groundPositionIds.map((id) => ({
+        id,
+        lane: state.groundPositions[id].lane,
+        occupiedBy: state.groundPositions[id].containerId,
+      })),
+    },
+    { equipment: [sts.id], containers: [box.id] },
+  )
+}
+
+/**
+ * A ground position of `stsId` was freed (an SHC picked its box). If the
+ * STS is waiting for one, it ends the wait and asks again.
+ */
+export function resumeStsWaitingForGroundPosition(ctx: EngineContext, stsId: string): void {
+  const sts = ctx.state.sts[stsId]
+  if (sts.status !== 'waiting-for-ground-position' || !sts.carrying) return
+  sts.status = 'waiting-for-decision'
+  ctx.schedule('StsGroundPositionWaitEnded', ctx.state.now, { equipment: [sts.id], containers: [sts.carrying] }, {
+    stsId: sts.id,
+    containerId: sts.carrying,
+    waitedS: ctx.state.now - (sts.waitingSince ?? ctx.state.now),
+  })
+}
+
 export const quayReactors: ReactorMap = {
   ScenarioStarted: (_e, ctx) => {
     for (const v of ctx.config.vessels) {
@@ -127,21 +162,17 @@ export const quayReactors: ReactorMap = {
     const box = state.containers[e.payload.containerId]
     state.vesselSlots[e.payload.from.id].containerId = null
     sts.carrying = box.id
-    sts.status = 'waiting-for-decision'
     ctx.transferCustody(box.id, { kind: 'sts', id: sts.id })
-    ctx.requestDecision(
-      'stsGroundPosition',
-      {
-        stsId: sts.id,
-        containerId: box.id,
-        groundPositions: sts.groundPositionIds.map((id) => ({
-          id,
-          lane: state.groundPositions[id].lane,
-          occupiedBy: state.groundPositions[id].containerId,
-        })),
-      },
-      { equipment: [sts.id], containers: [box.id] },
-    )
+    requestGroundPosition(ctx, sts, box)
+  },
+
+  StsGroundPositionWaitEnded: (e, ctx) => {
+    const { state } = ctx
+    const sts = state.sts[e.payload.stsId]
+    sts.waitingSince = null
+    const waits = state.kpis.horizontal?.stsGroundPositionWaitS
+    if (waits) waits[sts.id] = (waits[sts.id] ?? 0) + e.payload.waitedS
+    requestGroundPosition(ctx, sts, state.containers[e.payload.containerId])
   },
 
   /** Ground-position reply: carry the box to the chosen lane (or wait if none). */
@@ -154,6 +185,7 @@ export const quayReactors: ReactorMap = {
     sts.status = 'carrying'
     if (reply.groundPositionId === null) {
       sts.status = 'waiting-for-ground-position'
+      sts.waitingSince = e.t
       ctx.schedule('StsWaitingForGroundPosition', e.t, { equipment: [sts.id], containers: [box.id] }, {
         stsId: sts.id,
         containerId: box.id,
@@ -163,11 +195,18 @@ export const quayReactors: ReactorMap = {
     const gp = state.groundPositions[reply.groundPositionId]
     if (!gp) throw new Error(`stsGroundPosition handler returned unknown ground position ${reply.groundPositionId}`)
     const k = config.kinematics.sts
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), [
-      { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: k.hoistLoaded },
-      { axis: 'trolley', to: config.layout.stsGroundLaneZ0M + gp.lane * config.layout.stsGroundLaneSpacingM, profile: k.trolley },
-      { axis: 'hoist', to: CONTAINER_HEIGHT[box.size], profile: k.hoistLoaded },
-    ])
+    const f = variation(ctx)
+    const moves = [
+      { axis: 'hoist' as const, to: config.layout.stsSafeHoistM, profile: k.hoistLoaded },
+      { axis: 'trolley' as const, to: config.layout.stsGroundLaneZ0M + gp.lane * config.layout.stsGroundLaneSpacingM, profile: k.trolley },
+      { axis: 'hoist' as const, to: CONTAINER_HEIGHT[box.size], profile: k.hoistLoaded },
+    ]
+    // The ground position's lane is a conflict zone: the carry starts once it is free until the box is down.
+    const dry = planSequence({ ...sts }, 0, f, moves)
+    const windows = [{ zone: gp.id, from: 0, to: dry.end + k.unlockS }]
+    const start = earliestStart(state, windows, e.t)
+    reserve(state, sts.id, windows, start)
+    const { segments, end } = planSequence(sts, start, f, moves)
     ctx.schedule('StsGrounded', end + k.unlockS, { equipment: [sts.id], containers: [box.id] }, {
       stsId: sts.id,
       containerId: box.id,

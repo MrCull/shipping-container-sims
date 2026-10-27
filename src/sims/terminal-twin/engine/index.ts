@@ -7,7 +7,22 @@
  */
 export * from './kinematics'
 export type { EngineEvent, EventEnvelope, EventOf, EventPayloads, EventSubjects, EventType } from './events'
-export type { CustodyKind, CustodyRef, CustodyRecord, ContainerState, StsState, VesselState } from './state'
+export type {
+  CustodyKind,
+  CustodyRef,
+  CustodyRecord,
+  ContainerState,
+  StsState,
+  VesselState,
+  ShcState,
+  ShcStatus,
+  ShcJob,
+  WtpPadState,
+} from './state'
+export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
+export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
+export type { Reservation } from './reservations'
+export type { ShcPhasePayload } from './events'
 export { defaultHandlers } from './handlers'
 export type { HandlerSet, GroundPositionRequest, GroundPositionReply } from './handlers'
 export {
@@ -26,6 +41,10 @@ export type {
   DecisionsConfig,
   LatencyDelay,
   LatencySpec,
+  ShcDispatchJob,
+  ShcDispatchPad,
+  ShcDispatchReply,
+  ShcDispatchRequest,
 } from './decisions/types'
 export { strategies, getStrategy } from './decisions/strategies'
 export type { StrategyDefinition, StrategyRegistry, DecisionPointStrategies } from './decisions/strategies'
@@ -33,7 +52,7 @@ export type { DecisionRequestedPayload, DecisionResolvedPayload } from './events
 export type { HandlerKpiReport } from './kpis'
 export type { SimQuery } from './query'
 export type { InvariantViolation } from './invariants'
-export type { KpiReport } from './kpis'
+export type { KpiReport, HorizontalKpiReport } from './kpis'
 export {
   createSimulation,
   restoreSimulation,

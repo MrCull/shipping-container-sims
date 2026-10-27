@@ -1,0 +1,97 @@
+{
+  "scenario": "shc-1sts-2shc-1wtp",
+  "seed": 42,
+  "status": "ended",
+  "endReason": "simDurationS >= 1800",
+  "eventLogHash": "1f48801241d7ba",
+  "kpis": {
+    "simTimeS": 1800,
+    "eventsProcessed": 225,
+    "movesCompleted": 10,
+    "vesselsCompleted": 1,
+    "sts": {
+      "STS01": {
+        "moves": 10,
+        "grossMovesPerHour": 34.365
+      }
+    },
+    "vessels": {
+      "V001": {
+        "berthedAtS": 60,
+        "departedAtS": 1125.497,
+        "turnaroundS": 1065.497
+      }
+    },
+    "handlers": {
+      "stsGroundPosition": {
+        "handler": "strategy:lowest-free-lane",
+        "calls": 10,
+        "resolved": 10,
+        "ok": 10,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "shcDispatch": {
+        "handler": "strategy:oldest-job",
+        "calls": 10,
+        "resolved": 10,
+        "ok": 10,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      }
+    },
+    "horizontal": {
+      "boxesToWtp": 10,
+      "shcs": {
+        "SHC01": {
+          "jobs": 5,
+          "emptyDistanceM": 863.75,
+          "loadedDistanceM": 806.75,
+          "reservationWaitS": 5.095
+        },
+        "SHC02": {
+          "jobs": 5,
+          "emptyDistanceM": 964.25,
+          "loadedDistanceM": 766.25,
+          "reservationWaitS": 5.33
+        }
+      },
+      "stsGroundPositionWaitS": {
+        "STS01": 0
+      }
+    }
+  },
+  "invariants": {
+    "enabled": true,
+    "checks": 224,
+    "violations": 0,
+    "first": null
+  },
+  "firstError": null
+}

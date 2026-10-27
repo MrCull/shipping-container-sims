@@ -14,16 +14,18 @@ import { buildKpiReport, type KpiReport } from './kpis'
 import { createEventLogger, type LogOptions } from './logging'
 import { createQuery, type SimQuery } from './query'
 import { nextRandom } from './rng'
-import { createInitialState, type CustodyRef, type SimState } from './state'
+import { createInitialState, resolveSubsystemModes, type CustodyRef, type SimState } from './state'
+import { ascStubReactors } from './subsystems/ascStub'
 import { quayReactors } from './subsystems/quay'
-import type { ScenarioConfig } from '../scenario/types'
+import { shcReactors } from './subsystems/shc'
+import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.2.0'
+export const ENGINE_VERSION = '0.3.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
-const REACTORS: ReactorMap[] = [quayReactors]
+const REACTORS: ReactorMap[] = [quayReactors, shcReactors, ascStubReactors]
 
 export interface SimulationOptions {
   /** Overrides `config.seed`. */
@@ -36,6 +38,12 @@ export interface SimulationOptions {
     /** Stop the run at the first violation (default true). */
     failFast?: boolean
   }
+  /**
+   * Subsystem modes (override `config.subsystems`): real, instant (same
+   * events, no durations) or off. SHC defaults to real when SHCs and blocks
+   * exist; ASC defaults to instant (real ASC: TT-06).
+   */
+  subsystems?: SubsystemModes
   /** Structured logging: each committed event that passes the verbosity filter is written as a `LogRecord`. */
   log?: LogOptions
 }
@@ -138,7 +146,7 @@ export function createSimulation(
   const invariantsEnabled = options.invariants?.enabled ?? true
   const failFast = options.invariants?.failFast ?? true
 
-  let state = createInitialState(config, seed)
+  let state = createInitialState(config, seed, resolveSubsystemModes(config, options.subsystems))
   let log: EngineEvent[] = []
   let byId = new Map<number, EngineEvent>()
   let status: SimStatus = 'ready'

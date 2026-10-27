@@ -17,7 +17,8 @@ export interface AxisProfile {
   decel: number
 }
 
-export type Axis = 'gantry' | 'trolley' | 'hoist'
+/** Crane axes (gantry/trolley/hoist) and vehicle axes (x/z drive along the lane graph, lift). */
+export type Axis = 'gantry' | 'trolley' | 'hoist' | 'x' | 'z' | 'lift'
 
 export interface MotionSegment {
   entityId: string
@@ -81,8 +82,9 @@ export function planSegment(
 
 /** Axis coordinate of a segment at sim time `t` (clamped to the segment). */
 export function positionAt(seg: MotionSegment, t: number): number {
-  if (t <= seg.t0 || seg.vPeak === 0) return seg.from
+  // t1 first: an instant (zero-duration) segment is already at `to` from t0 on.
   if (t >= seg.t1) return seg.to
+  if (t <= seg.t0 || seg.vPeak === 0) return seg.from
   const dir = seg.to >= seg.from ? 1 : -1
   const dt = t - seg.t0
   const accelT = seg.vPeak / seg.accel

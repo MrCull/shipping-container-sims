@@ -7,7 +7,16 @@
  */
 import type { DecisionPointId, DecisionReplies, DecisionRequests } from './decisions/types'
 import type { MotionSegment } from './kinematics'
+import type { Reservation } from './reservations'
 import type { CustodyRef } from './state'
+
+/** Common payload of the SHC trip phase events. `segments` = the motion that led up to the event. */
+export interface ShcPhasePayload {
+  shcId: string
+  jobId: string
+  containerId: string
+  segments: MotionSegment[]
+}
 
 /** Ids of the domain objects an event involves (for filtering and `why`). */
 export interface EventSubjects {
@@ -72,7 +81,44 @@ export interface EventPayloads {
   StsGrounded: { stsId: string; containerId: string; groundPositionId: string; segments: MotionSegment[] }
   /** The ground-position decision returned no position; the STS holds the box and idles. */
   StsWaitingForGroundPosition: { stsId: string; containerId: string }
+  /** A ground position freed up; the waiting STS asks for one again. */
+  StsGroundPositionWaitEnded: { stsId: string; containerId: string; waitedS: number }
   StsWorkComplete: { stsId: string; vesselId: string }
+  /**
+   * The SHC dispatch reply claimed a job: the whole trip (pickup, drop at the
+   * WTP pad, clearing) is planned and its conflict zones reserved. The SHC
+   * departs at `departAt` (later than now if a zone is busy).
+   */
+  ShcJobAssigned: {
+    shcId: string
+    jobId: string
+    containerId: string
+    groundPositionId: string
+    wtpPadId: string
+    departAt: number
+    distanceM: number
+    reservations: Reservation[]
+  }
+  ShcRoutingEmpty: ShcPhasePayload
+  ShcPositioningAtPickup: ShcPhasePayload
+  ShcLocking: ShcPhasePayload
+  /** Spreader locked: custody ground position → SHC; the ground position is free again. */
+  ShcPicked: ShcPhasePayload & { groundPositionId: string }
+  ShcRoutingLoaded: ShcPhasePayload
+  ShcPositioningAtDropoff: ShcPhasePayload
+  ShcLowering: ShcPhasePayload
+  ShcUnlocking: ShcPhasePayload
+  /** Box released on the WTP pad: custody SHC → WTP pad. */
+  ShcDroppedAtWtp: ShcPhasePayload & { wtpPadId: string }
+  /** The SHC reversed clear of the pad and is available. */
+  ShcCleared: ShcPhasePayload & { nodeId: string }
+  /** An idle SHC heads for its parking spot. */
+  ShcRoutingToParking: { shcId: string; departAt: number; reservations: Reservation[] }
+  ShcParked: { shcId: string; nodeId: string; segments: MotionSegment[] }
+  /** ASC took the box off the WTP pad: custody WTP pad → ASC (the instant stub raises it at the drop time). */
+  AscPicked: { ascId: string; blockId: string; containerId: string; wtpPadId: string }
+  /** ASC set the box down in the stack: custody ASC → yard slot. */
+  AscStacked: { ascId: string; blockId: string; containerId: string; yardSlotId: string }
   VesselDeparted: { vesselId: string }
   DecisionRequested: DecisionRequestedPayload
   /** The handler timed out or returned an error; the fallback strategy answers next. */

@@ -15,12 +15,16 @@
 import { makeIso6346Id } from './iso6346'
 import {
   SCENARIO_SCHEMA_VERSION,
+  type ApronLayout,
+  type BlockConfig,
   type ContainerConfig,
   type ContainerSize,
   type EndConditions,
   type LayoutConfig,
   type ScenarioConfig,
+  type ShcKinematics,
   type StsConfig,
+  type SubsystemModes,
   type StsKinematics,
   type VesselConfig,
 } from './types'
@@ -33,6 +37,32 @@ export const DEFAULT_STS_KINEMATICS: StsKinematics = {
   hoistEmpty: { vMax: 3, accel: 0.8, decel: 0.8 },
   lockS: 3,
   unlockS: 3,
+}
+
+/** [A] Shuttle-carrier (1-over-0/1) kinematics: ~30 km/h empty, ~25 km/h loaded. */
+export const DEFAULT_SHC_KINEMATICS: ShcKinematics = {
+  driveEmpty: { vMax: 8.3, accel: 0.6, decel: 0.8 },
+  driveLoaded: { vMax: 6.9, accel: 0.4, decel: 0.6 },
+  lift: { vMax: 0.4, accel: 0.4, decel: 0.4 },
+  liftHeightM: 1,
+  lockS: 2,
+  unlockS: 2,
+}
+
+/** SHC ids: SHC01, SHC02, … */
+export function shcId(index: number): string {
+  return `SHC${String(index + 1).padStart(2, '0')}`
+}
+
+/**
+ * Replace a config's SHC fleet and/or kinematics (setup dialog). Returns a
+ * new config; the input is not modified.
+ */
+export function withShcFleet(config: ScenarioConfig, count: number, kinematics?: Partial<ShcKinematics>): ScenarioConfig {
+  const next: ScenarioConfig = structuredClone(config)
+  next.shcs = Array.from({ length: count }, (_, i) => ({ id: shcId(i) }))
+  next.kinematics.shc = { ...(config.kinematics.shc ?? DEFAULT_SHC_KINEMATICS), ...kinematics }
+  return next
 }
 
 export const DEFAULT_LAYOUT: LayoutConfig = {
@@ -171,6 +201,34 @@ export class ScenarioBuilder {
       }
     }
     if (placed < count) throw new Error(`Vessel ${vesselId} has room for only ${placed} more boxes`)
+    return this
+  }
+
+  /** Add `count` SHCs (SHC01…) with optional kinematics overrides. */
+  shcs(count: number, kinematics: Partial<ShcKinematics> = {}): this {
+    this.config = withShcFleet(this.config, count, kinematics)
+    return this
+  }
+
+  /** Add a yard block (with its WTP pads). */
+  block(id: string, opts: Omit<BlockConfig, 'id'>): this {
+    this.config.yard ??= { blocks: [] }
+    this.config.yard.blocks.push({ id, ...opts })
+    return this
+  }
+
+  apron(layout: Partial<ApronLayout>): this {
+    this.config.apron = { ...this.config.apron, ...layout }
+    return this
+  }
+
+  driverVariability(pct: number): this {
+    this.config.driverVariabilityPct = pct
+    return this
+  }
+
+  subsystems(modes: SubsystemModes): this {
+    this.config.subsystems = { ...this.config.subsystems, ...modes }
     return this
   }
 

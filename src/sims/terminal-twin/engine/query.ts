@@ -3,13 +3,17 @@
  * API and by decision-point handlers. Returned objects are live views of
  * engine state: treat them as read-only (copy before keeping them).
  */
+import type { Reservation } from './reservations'
 import type {
   ContainerState,
   GroundPositionState,
+  ShcJob,
+  ShcState,
   SimState,
   StsState,
   VesselSlotState,
   VesselState,
+  WtpPadState,
 } from './state'
 
 export interface SimQuery {
@@ -20,6 +24,13 @@ export interface SimQuery {
   vesselSlot(id: string): Readonly<VesselSlotState>
   sts(id: string): Readonly<StsState>
   groundPosition(id: string): Readonly<GroundPositionState>
+  shc(id: string): Readonly<ShcState>
+  shcs(): readonly Readonly<ShcState>[]
+  /** Released jobs not yet delivered (open and claimed). */
+  shcJobs(): readonly Readonly<ShcJob>[]
+  wtpPad(id: string): Readonly<WtpPadState>
+  /** Current and future conflict-zone reservations. */
+  reservations(): readonly Readonly<Reservation>[]
 }
 
 function get<T>(record: Record<string, T>, id: string, what: string): T {
@@ -37,5 +48,10 @@ export function createQuery(getState: () => SimState): SimQuery {
     vesselSlot: (id) => get(getState().vesselSlots, id, 'vessel slot'),
     sts: (id) => get(getState().sts, id, 'STS'),
     groundPosition: (id) => get(getState().groundPositions, id, 'ground position'),
+    shc: (id) => get(getState().shcs, id, 'SHC'),
+    shcs: () => Object.values(getState().shcs),
+    shcJobs: () => Object.values(getState().shcJobs),
+    wtpPad: (id) => get(getState().wtpPads, id, 'WTP pad'),
+    reservations: () => getState().reservations.filter((r) => r.to > getState().now),
   }
 }

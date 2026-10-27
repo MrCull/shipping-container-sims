@@ -86,7 +86,7 @@ export class SceneModel {
         { gantryX: s.gantryX, trolleyZ: config.layout.stsGroundLaneZ0M, hoistY: config.layout.stsSafeHoistM },
       ]),
     )
-    for (const s of config.sts) this.axisSegments[s.id] = { gantry: [], trolley: [], hoist: [] }
+    for (const s of config.sts) this.axisSegments[s.id] = { gantry: [], trolley: [], hoist: [], x: [], z: [], lift: [] }
     for (const c of config.containers) {
       const slot = `${c.initial.vesselId}:${[c.initial.bay, c.initial.row, c.initial.tier]
         .map((n) => String(n).padStart(2, '0'))

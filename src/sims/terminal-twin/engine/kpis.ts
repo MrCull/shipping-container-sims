@@ -35,8 +35,18 @@ export interface KpiReport {
   vesselsCompleted: number
   sts: Record<string, { moves: number; grossMovesPerHour: number | null }>
   vessels: Record<string, { berthedAtS: number | null; departedAtS: number | null; turnaroundS: number | null }>
-  /** TOS handler KPIs per decision point. */
+  /** TOS handler KPIs per decision point (decision points never called are omitted). */
   handlers: Record<string, HandlerKpiReport>
+  /** Horizontal transport (only when SHCs are configured). */
+  horizontal?: HorizontalKpiReport
+}
+
+export interface HorizontalKpiReport {
+  /** Boxes SHCs delivered to WTP pads. */
+  boxesToWtp: number
+  shcs: Record<string, { jobs: number; emptyDistanceM: number; loadedDistanceM: number; reservationWaitS: number }>
+  /** STS seconds spent waiting for a free ground position (SHCs too slow). */
+  stsGroundPositionWaitS: Record<string, number>
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000
@@ -58,6 +68,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
   const handlers: KpiReport['handlers'] = {}
   const pending = Object.values(state.decisions.pending)
   for (const [dp, k] of Object.entries(state.decisions.kpis)) {
+    if (k.calls === 0) continue
     const mean = (total: number) => (k.resolved > 0 ? r3(total / k.resolved) : 0)
     handlers[dp] = {
       handler: k.handler,
@@ -75,6 +86,22 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
       equipmentIdleS: r3(k.equipmentIdleS),
     }
   }
+  const h = state.kpis.horizontal
+  const horizontal: HorizontalKpiReport | undefined = h && {
+    boxesToWtp: h.boxesToWtp,
+    shcs: Object.fromEntries(
+      Object.entries(h.perShc).map(([id, k]) => [
+        id,
+        {
+          jobs: k.jobs,
+          emptyDistanceM: r3(k.emptyDistanceM),
+          loadedDistanceM: r3(k.loadedDistanceM),
+          reservationWaitS: r3(k.reservationWaitS),
+        },
+      ]),
+    ),
+    stsGroundPositionWaitS: Object.fromEntries(Object.entries(h.stsGroundPositionWaitS).map(([id, s]) => [id, r3(s)])),
+  }
   return {
     simTimeS: r3(state.now),
     eventsProcessed,
@@ -83,5 +110,6 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     sts,
     vessels,
     handlers,
+    ...(horizontal ? { horizontal } : {}),
   }
 }
