@@ -1,0 +1,299 @@
+/**
+ * Phase 1 procedural low-poly scene: quay, water, STS cranes on their rail,
+ * vessel hulls and all containers as ONE InstancedMesh. Shared geometries
+ * and materials; nothing here is reactive (never put these in Vue state).
+ *
+ * `update(model, t)` poses everything for display time `t` from the
+ * SceneModel timelines.
+ */
+import * as THREE from 'three'
+import type { ScenarioConfig } from '../scenario/types'
+import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
+
+/** [A] Malaccamax-style STS proportions (m). */
+const STS = {
+  waterRailZ: 3,
+  gauge: 30.48,
+  legSpacingX: 18,
+  legSize: 1.6,
+  portalY: 48,
+  boomOutreachZ: -72,
+  boomBackreachZ: 22,
+  apexY: 72,
+}
+
+/** Shipping-line livery colours (approximate; [A]). */
+const LINE_COLOURS: Record<string, string> = {
+  HMM: '#f47b20',
+  MSC: '#d8c9a3',
+  Maersk: '#42b0d5',
+  'CMA CGM': '#1f3f8f',
+  'Hapag-Lloyd': '#ef7d00',
+  ONE: '#d6007f',
+  Evergreen: '#00843d',
+  COSCO: '#2f5fae',
+  ZIM: '#c9ccd1',
+  'Yang Ming': '#f2c318',
+}
+const DEFAULT_CONTAINER_COLOUR = '#8a95a5'
+
+export interface SceneStats {
+  /** Container instances drawn. */
+  containers: number
+  /** STS crane objects in the scene. */
+  sts: number
+  /** Vessel hulls currently visible. */
+  vessels: number
+}
+
+interface StsParts {
+  group: THREE.Group
+  trolley: THREE.Mesh
+  ropes: THREE.Mesh
+  spreader: THREE.Mesh
+}
+
+const LAND_RAIL_Z = STS.waterRailZ + STS.gauge
+
+export class SceneRenderer {
+  readonly scene = new THREE.Scene()
+  private containers: THREE.InstancedMesh
+  private sts = new Map<string, StsParts>()
+  private vessels = new Map<string, THREE.Group>()
+  private selection: THREE.LineSegments
+  private disposables: { dispose(): void }[] = []
+  private readonly matrix = new THREE.Matrix4()
+  private readonly position = new THREE.Vector3()
+  private readonly scale = new THREE.Vector3()
+  private readonly quaternion = new THREE.Quaternion()
+
+  constructor(private model: SceneModel) {
+    const { config } = model
+    this.scene.background = new THREE.Color('#a9bfd3')
+    this.scene.fog = new THREE.Fog('#a9bfd3', 600, 2600)
+    this.addLights()
+    this.addGround(config)
+    for (const s of config.sts) this.addSts(s.id)
+    for (const v of config.vessels) this.addVessel(v.id)
+
+    const box = this.track(new THREE.BoxGeometry(1, 1, 1))
+    const mat = this.track(new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0.15 }))
+    this.containers = new THREE.InstancedMesh(box, mat, Math.max(1, model.containerIds.length))
+    this.containers.count = model.containerIds.length
+    this.containers.castShadow = true
+    this.containers.receiveShadow = true
+    this.containers.frustumCulled = false
+    const colour = new THREE.Color()
+    model.containerIds.forEach((id, i) => {
+      colour.set(LINE_COLOURS[model.containerLine[id]] ?? DEFAULT_CONTAINER_COLOUR)
+      this.containers.setColorAt(i, colour)
+    })
+    this.scene.add(this.containers)
+
+    const edges = this.track(new THREE.EdgesGeometry(box))
+    this.selection = new THREE.LineSegments(edges, this.track(new THREE.LineBasicMaterial({ color: '#f59e0b' })))
+    this.selection.visible = false
+    this.scene.add(this.selection)
+  }
+
+  private track<T extends { dispose(): void }>(thing: T): T {
+    this.disposables.push(thing)
+    return thing
+  }
+
+  private addLights(): void {
+    this.scene.add(new THREE.HemisphereLight('#dfe9f5', '#5a5248', 1.4))
+    const sun = new THREE.DirectionalLight('#fff4e0', 2.2)
+    sun.position.set(-150, 260, 180)
+    sun.castShadow = true
+    sun.shadow.mapSize.set(2048, 2048)
+    const c = sun.shadow.camera
+    c.left = -250
+    c.right = 250
+    c.top = 250
+    c.bottom = -250
+    c.near = 10
+    c.far = 800
+    sun.target.position.set(0, 0, 0)
+    this.scene.add(sun, sun.target)
+  }
+
+  private addGround(config: ScenarioConfig): void {
+    const length = config.quay.lengthM
+    const water = new THREE.Mesh(
+      this.track(new THREE.PlaneGeometry(6000, 3000)),
+      this.track(new THREE.MeshStandardMaterial({ color: '#2d5873', roughness: 0.35, metalness: 0.1 })),
+    )
+    water.rotation.x = -Math.PI / 2
+    water.position.set(length / 2, -2.5, -1500)
+    water.receiveShadow = true
+    this.scene.add(water)
+
+    const apronDepth = 140
+    const apron = new THREE.Mesh(
+      this.track(new THREE.BoxGeometry(length + 80, 3, apronDepth)),
+      this.track(new THREE.MeshStandardMaterial({ color: '#9a9c9a', roughness: 0.95 })),
+    )
+    apron.position.set(length / 2, -1.5, apronDepth / 2)
+    apron.receiveShadow = true
+    this.scene.add(apron)
+
+    const strip = (z: number, width: number, colour: string, y = 0.02) => {
+      const m = new THREE.Mesh(
+        this.track(new THREE.PlaneGeometry(length + 80, width)),
+        this.track(new THREE.MeshStandardMaterial({ color: colour, roughness: 0.9 })),
+      )
+      m.rotation.x = -Math.PI / 2
+      m.position.set(length / 2, y, z)
+      m.receiveShadow = true
+      this.scene.add(m)
+    }
+    strip(0.6, 1.2, '#e5c84a') // quay edge
+    strip(STS.waterRailZ, 0.5, '#4b4f55', 0.04) // STS rails
+    strip(LAND_RAIL_Z, 0.5, '#4b4f55', 0.04)
+    const { stsGroundLaneZ0M: z0, stsGroundLaneSpacingM: dz } = config.layout
+    const lanes = Math.max(0, ...config.sts.map((s) => s.groundPositions))
+    for (let lane = 0; lane <= lanes; lane++) strip(z0 - dz / 2 + lane * dz, 0.15, '#eef0f2', 0.03)
+  }
+
+  private addSts(id: string): void {
+    const group = new THREE.Group()
+    group.name = id
+    const steel = this.track(new THREE.MeshStandardMaterial({ color: '#dfe4ea', roughness: 0.6, metalness: 0.3 }))
+    const accent = this.track(new THREE.MeshStandardMaterial({ color: '#c0392b', roughness: 0.6 }))
+    const dark = this.track(new THREE.MeshStandardMaterial({ color: '#2b3038', roughness: 0.7 }))
+    const box = (w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number) => {
+      const m = new THREE.Mesh(this.track(new THREE.BoxGeometry(w, h, d)), mat)
+      m.position.set(x, y, z)
+      m.castShadow = true
+      group.add(m)
+      return m
+    }
+    const zW = STS.waterRailZ
+    const zL = LAND_RAIL_Z
+    const hx = STS.legSpacingX / 2
+    for (const x of [-hx, hx]) {
+      for (const z of [zW, zL]) box(STS.legSize, STS.portalY, STS.legSize, steel, x, STS.portalY / 2, z)
+      box(STS.legSize, STS.legSize, zL - zW, steel, x, STS.portalY, (zW + zL) / 2) // portal side beams
+      box(STS.legSize * 0.8, STS.legSize * 0.8, zL - zW, steel, x, 12, (zW + zL) / 2) // sill beams
+      box(STS.legSize * 0.7, STS.apexY - STS.portalY, STS.legSize * 0.7, steel, x, (STS.apexY + STS.portalY) / 2, zL - 4) // A-frame
+    }
+    for (const z of [zW, zL]) box(STS.legSpacingX, STS.legSize, STS.legSize, steel, 0, STS.portalY, z)
+    // Boom (girders on both sides of the trolley path) and the machinery house.
+    const boomLen = STS.boomBackreachZ + zL - STS.boomOutreachZ
+    const boomZ = (STS.boomOutreachZ + zL + STS.boomBackreachZ) / 2
+    for (const x of [-3, 3]) box(1.2, 2.4, boomLen, steel, x, STS.portalY + 4, boomZ)
+    box(7.2, 0.6, 2, accent, 0, STS.portalY + 4, STS.boomOutreachZ + 1) // boom tip
+    box(10, 6, 14, steel, 0, STS.portalY + 9, zL + STS.boomBackreachZ - 8) // machinery house
+    box(STS.legSpacingX + 2, 1.2, 2, accent, 0, STS.portalY + 1.2, zW) // waterside portal accent
+    // Moving parts.
+    const trolley = box(6.4, 2.4, 5, dark, 0, STS.portalY + 1.6, 0)
+    const ropes = box(0.25, 1, 0.25, dark, 0, 0, 0)
+    const spreader = box(12.2, 0.7, 2.5, this.track(new THREE.MeshStandardMaterial({ color: '#f2b705' })), 0, 0, 0)
+    this.scene.add(group)
+    this.sts.set(id, { group, trolley, ropes, spreader })
+  }
+
+  private addVessel(id: string): void {
+    const v = this.model.vesselConfig(id)
+    const group = new THREE.Group()
+    group.name = id
+    const length = v.bays * v.bayPitchM + 50
+    const beam = v.rows * v.rowPitchM + 4
+    const draft = 8
+    const hull = new THREE.Mesh(
+      this.track(new THREE.BoxGeometry(length, v.deckHeightM + draft, beam)),
+      this.track(new THREE.MeshStandardMaterial({ color: '#1e2a3a', roughness: 0.6 })),
+    )
+    // Hull spans from 30 m aft of bay 0 (bridge + engine room) to 20 m forward of the last bay.
+    hull.position.set(v.berthX - 30 + length / 2, (v.deckHeightM - draft) / 2, -(v.fenderGapM + beam / 2) + 2)
+    hull.castShadow = true
+    hull.receiveShadow = true
+    const boot = new THREE.Mesh(
+      this.track(new THREE.BoxGeometry(length + 0.2, 3, beam + 0.2)),
+      this.track(new THREE.MeshStandardMaterial({ color: '#8c2f2f', roughness: 0.7 })),
+    )
+    boot.position.set(hull.position.x, -1.5, hull.position.z)
+    const bridge = new THREE.Mesh(
+      this.track(new THREE.BoxGeometry(12, 18, beam - 2)),
+      this.track(new THREE.MeshStandardMaterial({ color: '#f1f3f5', roughness: 0.6 })),
+    )
+    bridge.position.set(v.berthX - 18, v.deckHeightM + 9, hull.position.z)
+    bridge.castShadow = true
+    group.add(hull, boot, bridge)
+    group.visible = false
+    this.scene.add(group)
+    this.vessels.set(id, group)
+  }
+
+  update(t: number, selectedId: string | null): void {
+    const model = this.model
+    for (const [id, parts] of this.sts) {
+      const pose = model.stsPose(id, t)
+      parts.group.position.x = pose.gantryX
+      parts.trolley.position.z = pose.trolleyZ
+      parts.spreader.position.set(0, pose.hoistY + 0.35, pose.trolleyZ)
+      const ropeTop = STS.portalY + 0.4
+      const ropeLen = Math.max(0.1, ropeTop - (pose.hoistY + 0.7))
+      parts.ropes.scale.y = ropeLen
+      parts.ropes.position.set(0, ropeTop - ropeLen / 2, pose.trolleyZ)
+    }
+    for (const [id, group] of this.vessels) group.visible = model.vesselVisible(id, t)
+
+    let drawn = 0
+    model.containerIds.forEach((id) => {
+      const c = model.containerCentre(id, t)
+      if (!c) return
+      const dims = CONTAINER_DIMS[model.containerSize[id]]
+      this.position.set(c.x, c.y, c.z)
+      this.scale.set(dims.length, dims.height, dims.width)
+      this.matrix.compose(this.position, this.quaternion, this.scale)
+      this.containers.setMatrixAt(drawn, this.matrix)
+      drawn++
+    })
+    this.containers.count = drawn
+    this.containers.instanceMatrix.needsUpdate = true
+
+    this.updateSelection(selectedId, t)
+  }
+
+  private updateSelection(id: string | null, t: number): void {
+    const centre = id ? this.model.entityCentre(id, t) : null
+    if (!id || !centre) {
+      this.selection.visible = false
+      return
+    }
+    const size = this.model.containerSize[id]
+    if (size) {
+      const d = CONTAINER_DIMS[size]
+      this.selection.scale.set(d.length + 0.6, d.height + 0.6, d.width + 0.6)
+      this.selection.position.set(centre.x, centre.y, centre.z)
+    } else if (this.sts.has(id)) {
+      this.selection.scale.set(STS.legSpacingX + 4, STS.apexY + 2, STS.gauge + 6)
+      this.selection.position.set(centre.x, (STS.apexY + 2) / 2, STS.waterRailZ + STS.gauge / 2)
+    } else {
+      const v = this.model.vesselConfig(id)
+      this.selection.scale.set(v.bays * v.bayPitchM + 52, v.deckHeightM + 4, v.rows * v.rowPitchM + 6)
+      this.selection.position.set(v.berthX - 30 + (v.bays * v.bayPitchM + 50) / 2, v.deckHeightM / 2, centre.z)
+    }
+    this.selection.visible = true
+  }
+
+  /** A reasonable camera target for the whole scene. */
+  overviewTarget(): Vec3 {
+    const s = this.model.config.sts[0]
+    return { x: s ? s.gantryX : this.model.config.quay.lengthM / 2, y: 10, z: 5 }
+  }
+
+  stats(): SceneStats {
+    let vessels = 0
+    for (const g of this.vessels.values()) if (g.visible) vessels++
+    return { containers: this.containers.count, sts: this.sts.size, vessels }
+  }
+
+  dispose(): void {
+    for (const d of this.disposables) d.dispose()
+    this.containers.dispose()
+    this.disposables = []
+  }
+}

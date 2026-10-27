@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "types": ["node"],
     "skipLibCheck": true,
@@ -20,5 +20,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.test.ts", "src/sims/*/cli/**/*.ts"]
+  "include": ["src/**/*.test.ts", "src/**/*.smoke.ts", "src/sims/*/cli/**/*.ts"]
 }

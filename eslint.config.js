@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'scripts/**'] },
+  { ignores: ['dist/**', 'node_modules/**', 'scripts/**', '.smoke-dist/**', '.smoke-results/**'] },
 
   js.configs.recommended,
 
@@ -33,7 +33,7 @@ export default tseslint.config(
   },
 
   {
-    files: ['vite.config.ts', 'vitest.config.ts'],
+    files: ['vite.config.ts', 'vitest.config.ts', 'playwright.config.ts', 'src/**/*.smoke.ts'],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -41,10 +41,14 @@ export default tseslint.config(
     },
   },
 
-  // Terminal Twin engine + scenario code must run in Node and a Web Worker:
+  // Terminal Twin engine, scenario and worker code must run in Node and a Web Worker:
   // no DOM, Vue, Three.js or Node built-ins.
   {
-    files: ['src/sims/terminal-twin/engine/**/*.ts', 'src/sims/terminal-twin/scenario/**/*.ts'],
+    files: [
+      'src/sims/terminal-twin/engine/**/*.ts',
+      'src/sims/terminal-twin/scenario/**/*.ts',
+      'src/sims/terminal-twin/worker/**/*.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',

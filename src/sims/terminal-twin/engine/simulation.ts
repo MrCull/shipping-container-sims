@@ -103,6 +103,8 @@ export interface Simulation {
   /** The event and its cause chain back to the root: [event, parent, …, root]. */
   why(eventId: number): EngineEvent[]
   subscribe(listener: EventListener, filter?: { types?: EventType[] }): () => void
+  /** Schedule an external event (dev API / tests) as an extra root (`causedBy` null) at sim time `at` (>= now). */
+  inject<K extends EventType>(type: K, at: number, subjects: EventSubjects, payload: EventPayloads[K]): EventOf<K>
   eventLog(): readonly EngineEvent[]
   eventLogHash(): string
   kpiReport(): KpiReport
@@ -332,6 +334,11 @@ export function createSimulation(
       const entry = { fn, types: filter?.types ? new Set(filter.types) : undefined }
       listeners.add(entry)
       return () => listeners.delete(entry)
+    },
+    inject(type, at, subjects, payload) {
+      const ev = makeEvent(type, at, null, subjects, payload)
+      schedule(ev as EngineEvent)
+      return ev
     },
     eventLog: () => log,
     eventLogHash: () => hashDigest(state.logHash),

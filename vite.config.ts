@@ -9,6 +9,10 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // ES-module workers (Terminal Twin's engine worker); the default iife breaks if a worker code-splits.
+  worker: {
+    format: 'es',
+  },
   build: {
     rollupOptions: {
       output: {

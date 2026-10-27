@@ -85,7 +85,7 @@ onUnmounted(() => {
     </header>
 
     <div
-      v-if="simId !== 'box-empire'"
+      v-if="simId !== 'box-empire' && simId !== 'terminal-twin'"
       class="top-right-controls"
     >
       <div
