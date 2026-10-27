@@ -13,12 +13,15 @@ A Vue 3 + TypeScript web app that hosts shipping-container-themed simulations an
 - **Vue Router** — SPA routing (`/` home, `/sim/:simId` game page)
 - **Three.js** — 3D rendering (shared via `useThreeScene` composable)
 - **ESLint** — static analysis for JS/TS/Vue (`eslint.config.js`; Vue + TypeScript recommended presets)
+- **Vitest** — unit/integration tests (`npm test`); **tsx** — runs headless TypeScript CLIs
 
 ## Linting and verification
 
 After making substantive code changes, run **`npm run lint`** to catch issues.
 
 Before handing work back after code changes, run **`npm run verify`**: lint, then build (catches TypeScript or Vite errors that linting may miss), then tests when a `test` script exists. Pull requests to `main` run the same checks in CI (`.github/workflows/pr-checks.yml`).
+
+**Tests:** `npm test` runs **Vitest** (`*.test.ts` under `src/`, Node environment); `npm run test:watch` for watch mode. Test files and Node-only CLI code (`src/sims/*/cli/`) are type-checked by `tsconfig.tools.json` (Node types, no DOM) and excluded from `tsconfig.app.json`. Headless TypeScript scripts run with **`tsx`** (e.g. `npm run tt:run -- --help`).
 
 To apply ESLint auto-fixes (including many Vue template and style rules), use **`npm run lint:fix`**.
 
@@ -70,6 +73,7 @@ Each sim that has grown beyond a trivial prototype maintains its own agent guide
 - **[Box Empire](src/sims/box-empire/box-empire-AGENTS.md)** — Terminal operations tycoon sim. Architecture, modules, components, composables, layout, assets, shipping-line liveries, and known behaviours.
 - **[Container Stack / Contenga](src/sims/container-stack/AGENTS.md)** — 3D Jenga-style container stacking game. Phase state machine, Three.js rendering split, pointer interaction, stability physics, scoring, level timers, audio, and known pitfalls.
 - **[Stowage Master](src/sims/stowage-master/stowage-master-AGENTS.md)** — Container stowage puzzle sim. Phase state machine, physics (list/trim/VCG), scoring, disaster system, 10 levels, ship presets, rendering modules, optional Jev assist, and known pitfalls.
+- **[Terminal Twin](src/sims/terminal-twin/terminal-twin-AGENTS.md)** — Event-driven automated-terminal digital twin / TOS test bench. Headless engine API, events and causality, invariants, fixtures and golden summaries, CLI runner, and "How to prove a change works". Domain terms: **[GLOSSARY.md](GLOSSARY.md)**.
 
 ## Key conventions
 
@@ -143,7 +147,7 @@ The default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent
 
 ### Domain docs
 
-Single-context: one root `GLOSSARY.md` plus `docs/adr/`, created lazily. See `docs/agents/domain.md`.
+Single-context: one root [`GLOSSARY.md`](GLOSSARY.md) (currently Terminal Twin terms) plus `docs/adr/`, created lazily. See `docs/agents/domain.md`.
 
 ## Available media
 

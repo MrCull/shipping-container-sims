@@ -1,0 +1,33 @@
+{
+  "scenario": "tracer-1sts-10-boxes",
+  "seed": 42,
+  "status": "ended",
+  "endReason": "vesselsCompleted >= 1",
+  "eventLogHash": "15489ee6002065",
+  "kpis": {
+    "simTimeS": 1168.805,
+    "eventsProcessed": 35,
+    "movesCompleted": 10,
+    "vesselsCompleted": 1,
+    "sts": {
+      "STS01": {
+        "moves": 10,
+        "grossMovesPerHour": 32.949
+      }
+    },
+    "vessels": {
+      "V001": {
+        "berthedAtS": 60,
+        "departedAtS": 1168.805,
+        "turnaroundS": 1108.805
+      }
+    }
+  },
+  "invariants": {
+    "enabled": true,
+    "checks": 34,
+    "violations": 0,
+    "first": null
+  },
+  "firstError": null
+}
