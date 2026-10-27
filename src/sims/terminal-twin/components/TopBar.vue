@@ -2,22 +2,24 @@
 import { computed, ref } from 'vue'
 import { useTwinStore } from '../store/twinStore'
 import { SPEEDS } from '../modules/twinController'
-import { clockParts, fromLocalInputValue, simDate, toLocalInputValue } from '../modules/time'
+import { fromLocalInputValue, simDate, toLocalInputValue } from '../modules/time'
+import { t } from '../i18n/messages'
 
 const store = useTwinStore()
 
-const clock = computed(() => clockParts(store.choice.startDateTime, store.displayTime))
+const clock = computed(() => store.fmt.clock(store.choice.startDateTime, store.displayTime))
 
 const ended = computed(() => {
   const info = store.info
   return !!info && info.status !== 'ready' && store.displayTime >= (info.endT ?? info.now)
 })
 
-const statusLabel = computed(() => {
-  if (store.busy) return 'Running…'
-  if (store.info?.status === 'failed') return 'Failed'
-  if (ended.value) return 'Complete'
-  return store.paused ? 'Paused' : 'Live'
+/** Status pill state (also its CSS class). */
+const status = computed<'running' | 'failed' | 'complete' | 'paused' | 'live'>(() => {
+  if (store.busy) return 'running'
+  if (store.info?.status === 'failed') return 'failed'
+  if (ended.value) return 'complete'
+  return store.paused ? 'paused' : 'live'
 })
 
 const runToOpen = ref(false)
@@ -35,16 +37,16 @@ function openRunTo(): void {
 async function submitRunTo(): Promise<void> {
   const target = fromLocalInputValue(runToValue.value)
   if (!target) {
-    runToError.value = 'Enter a date and time'
+    runToError.value = t('topbar.runToMissing')
     return
   }
-  const t = (target.getTime() - new Date(store.choice.startDateTime).getTime()) / 1000
-  if (t <= store.displayTime) {
-    runToError.value = 'Pick a time after the current sim time'
+  const simT = (target.getTime() - new Date(store.choice.startDateTime).getTime()) / 1000
+  if (simT <= store.displayTime) {
+    runToError.value = t('topbar.runToPast')
     return
   }
   runToOpen.value = false
-  await store.runTo(t).catch(() => {})
+  await store.runTo(simT).catch(() => {})
 }
 </script>
 
@@ -56,24 +58,24 @@ async function submitRunTo(): Promise<void> {
     <div
       class="clock"
       data-testid="tt-clock"
-      :title="`Elapsed ${clock.elapsed}`"
+      :title="t('topbar.elapsed', { elapsed: clock.elapsed })"
     >
       <span class="clock-day">{{ clock.day }}</span>
       <span class="clock-date">{{ clock.date }}</span>
       <span class="clock-time">{{ clock.time }}</span>
-      <span class="clock-elapsed">T+{{ clock.elapsed }}</span>
+      <span class="clock-elapsed">{{ clock.elapsed }}</span>
     </div>
 
     <div
       class="speeds"
       role="group"
-      aria-label="Speed"
+      :aria-label="t('topbar.speedGroup')"
     >
       <button
         class="speed-btn"
         :class="{ active: store.paused }"
         :aria-pressed="store.paused"
-        title="Pause"
+        :title="store.paused ? t('topbar.resume') : t('topbar.pause')"
         @click="store.togglePause()"
       >
         {{ store.paused ? '▶' : '❚❚' }}
@@ -87,7 +89,7 @@ async function submitRunTo(): Promise<void> {
         :data-speed="s"
         @click="store.setSpeed(s)"
       >
-        ×{{ s }}
+        {{ t('topbar.speed', { speed: s }) }}
       </button>
     </div>
 
@@ -98,7 +100,7 @@ async function submitRunTo(): Promise<void> {
           :disabled="store.busy"
           @click="openRunTo"
         >
-          Run to…
+          {{ t('topbar.runTo') }}
         </button>
         <form
           v-if="runToOpen"
@@ -106,7 +108,7 @@ async function submitRunTo(): Promise<void> {
           @submit.prevent="submitRunTo"
         >
           <label>
-            <span>Target sim time</span>
+            <span>{{ t('topbar.runToTarget') }}</span>
             <input
               v-model="runToValue"
               type="datetime-local"
@@ -126,13 +128,13 @@ async function submitRunTo(): Promise<void> {
               class="action-btn"
               @click="runToOpen = false"
             >
-              Cancel
+              {{ t('setup.cancel') }}
             </button>
             <button
               type="submit"
               class="action-btn primary"
             >
-              Run
+              {{ t('topbar.run') }}
             </button>
           </div>
         </form>
@@ -140,23 +142,32 @@ async function submitRunTo(): Promise<void> {
       <button
         class="action-btn"
         :disabled="store.busy"
-        title="Back to t = 0 with the same seed"
+        :title="t('topbar.resetHint')"
         @click="store.reset()"
       >
-        Reset
+        {{ t('topbar.reset') }}
       </button>
       <button
         class="action-btn"
         :disabled="store.busy"
         @click="store.newScenario()"
       >
-        New Scenario
+        {{ t('topbar.newScenario') }}
+      </button>
+      <button
+        class="action-btn help-btn"
+        :title="t('topbar.shortcuts')"
+        :aria-label="t('topbar.shortcuts')"
+        data-testid="tt-help-button"
+        @click="store.setHelpOpen(!store.helpOpen)"
+      >
+        ?
       </button>
       <span
         class="status"
-        :class="statusLabel.toLowerCase().replace('…', '')"
+        :class="status"
         data-testid="tt-status"
-      >{{ statusLabel }}</span>
+      >{{ t(`status.${status}`) }}</span>
     </div>
   </header>
 </template>
@@ -181,7 +192,7 @@ async function submitRunTo(): Promise<void> {
   gap: 0.5rem;
   font-family: var(--tt-font-mono);
   font-variant-numeric: tabular-nums;
-  min-width: 21rem;
+  min-width: 23rem;
 }
 
 .clock-day {
@@ -310,6 +321,11 @@ async function submitRunTo(): Promise<void> {
 .error {
   color: var(--color-danger);
   font-size: 0.78rem;
+}
+
+.help-btn {
+  min-width: 2rem;
+  font-family: var(--tt-font-mono);
 }
 
 .status {

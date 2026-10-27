@@ -127,4 +127,18 @@ export interface ScenarioConfig {
   endConditions: EndConditions
   /** Decision points: async mode, strategy per decision point, latency injection (optional; defaults apply). */
   decisions?: DecisionsConfig
+  /**
+   * How the UI displays this scenario (optional; the engine ignores it). Units
+   * are display-only: every value in this config stays SI whatever is chosen.
+   */
+  display?: DisplaySettings
+}
+
+export type UnitSystem = 'metric' | 'imperial'
+
+/** Locale (Intl formatting) and unit system for the UI. */
+export interface DisplaySettings {
+  /** BCP 47 locale tag, e.g. "en-GB". */
+  locale: string
+  units: UnitSystem
 }

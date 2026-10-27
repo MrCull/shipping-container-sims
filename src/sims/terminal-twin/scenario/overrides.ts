@@ -3,6 +3,7 @@
  * and the vessel table. Pure; `validateOverrides` returns readable errors and
  * warnings for the dialog (the engine still validates on start).
  */
+import type { MessageKey, MessageParams } from '../i18n/messages'
 import type { ScenarioConfig, StsConfig, VesselConfig } from './types'
 import { cellCapacity, vesselClass } from './vesselClasses'
 
@@ -38,35 +39,44 @@ export function applyOverrides(base: ScenarioConfig, o: ScenarioOverrides): Scen
   return config
 }
 
+/** A validation finding as a message-catalogue key plus its parameters (the dialog renders it with `t()`). */
+export interface CheckMessage {
+  key: MessageKey
+  params?: MessageParams
+}
+
 export interface OverrideCheck {
-  errors: string[]
-  warnings: string[]
+  errors: CheckMessage[]
+  warnings: CheckMessage[]
 }
 
 export function validateOverrides(config: ScenarioConfig): OverrideCheck {
-  const errors: string[] = []
-  const warnings: string[] = []
+  const errors: CheckMessage[] = []
+  const warnings: CheckMessage[] = []
+  const err = (key: MessageKey, params?: MessageParams) => errors.push({ key, params })
   const L = config.quay.lengthM
   if (!(L >= LIMITS.quayLengthM.min && L <= LIMITS.quayLengthM.max))
-    errors.push(`Quay length must be ${LIMITS.quayLengthM.min}–${LIMITS.quayLengthM.max} m`)
+    err('setup.check.quayLength', { min: LIMITS.quayLengthM.min, max: LIMITS.quayLengthM.max })
   const n = config.sts.length
-  if (!(Number.isInteger(n) && n >= LIMITS.sts.min && n <= LIMITS.sts.max)) errors.push(`STS count must be ${LIMITS.sts.min}–${LIMITS.sts.max}`)
-  else if (L / n < config.quay.stsMinSpacingM)
-    errors.push(`${n} STS need at least ${n * config.quay.stsMinSpacingM} m of quay (${config.quay.stsMinSpacingM} m each)`)
-  if (config.vessels.length === 0) errors.push('Add at least one vessel')
-  if (config.vessels.length > LIMITS.vessels) errors.push(`At most ${LIMITS.vessels} vessels`)
+  const spacing = config.quay.stsMinSpacingM
+  if (!(Number.isInteger(n) && n >= LIMITS.sts.min && n <= LIMITS.sts.max))
+    err('setup.check.stsCount', { min: LIMITS.sts.min, max: LIMITS.sts.max })
+  else if (L / n < spacing) err('setup.check.stsSpacing', { count: n, length: n * spacing, spacing })
+  if (config.vessels.length === 0) err('setup.check.noVessels')
+  if (config.vessels.length > LIMITS.vessels) err('setup.check.tooManyVessels', { max: LIMITS.vessels })
   const ids = new Set<string>()
   for (const v of config.vessels) {
-    if (ids.has(v.id)) errors.push(`Duplicate vessel id ${v.id}`)
+    if (ids.has(v.id)) err('setup.check.duplicateId', { id: v.id })
     ids.add(v.id)
     const spec = vesselClass(v.sizeClass)
     const counts = [v.discharge, v.load, v.transshipment, v.maxSts]
-    if (counts.some((c) => !Number.isInteger(c) || c < 0)) errors.push(`${v.id}: counts must be whole numbers ≥ 0`)
-    if (!(v.arrivalS >= 0)) errors.push(`${v.id}: arrival must be at or after the scenario start`)
-    if (v.maxSts < 1) errors.push(`${v.id}: max STS must be at least 1`)
-    if (v.discharge + v.load + v.transshipment > cellCapacity(spec))
-      errors.push(`${v.id}: ${v.discharge + v.load + v.transshipment} boxes exceed a ${spec.label}'s ~${cellCapacity(spec)} slots`)
-    if (spec.loaM > L) warnings.push(`${v.id}: a ${spec.label} (${spec.loaM} m) is longer than the quay and can never berth`)
+    if (counts.some((c) => !Number.isInteger(c) || c < 0)) err('setup.check.counts', { id: v.id })
+    if (!(v.arrivalS >= 0)) err('setup.check.arrival', { id: v.id })
+    if (v.maxSts < 1) err('setup.check.maxSts', { id: v.id })
+    const boxes = v.discharge + v.load + v.transshipment
+    if (boxes > cellCapacity(spec))
+      err('setup.check.capacity', { id: v.id, boxes, vesselClass: spec.label, capacity: cellCapacity(spec) })
+    if (spec.loaM > L) warnings.push({ key: 'setup.check.tooLong', params: { id: v.id, vesselClass: spec.label, loa: spec.loaM } })
   }
   return { errors, warnings }
 }

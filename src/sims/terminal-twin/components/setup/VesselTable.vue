@@ -5,6 +5,7 @@
  * scenario start; the table stores seconds from the start.
  */
 import { computed, reactive, ref } from 'vue'
+import { t, type MessageKey } from '../../i18n/messages'
 import { makeVesselCall } from '../../scenario/builder'
 import type { VesselConfig, VesselSizeClass } from '../../scenario/types'
 import { VESSEL_CLASSES, VESSEL_SIZE_CLASSES } from '../../scenario/vesselClasses'
@@ -15,6 +16,13 @@ const props = defineProps<{ startDateTime: Date | null }>()
 const vessels = defineModel<VesselConfig[]>({ required: true })
 
 const start = computed(() => props.startDateTime ?? new Date(0))
+
+const COUNT_FIELDS: { field: 'discharge' | 'load' | 'transshipment' | 'maxSts'; label: MessageKey; min: number }[] = [
+  { field: 'discharge', label: 'vessels.col.discharge', min: 0 },
+  { field: 'load', label: 'vessels.col.load', min: 0 },
+  { field: 'transshipment', label: 'vessels.col.transshipment', min: 0 },
+  { field: 'maxSts', label: 'vessels.col.maxSts', min: 1 },
+]
 
 function arrivalInput(v: VesselConfig): string {
   return toLocalInputValue(new Date(start.value.getTime() + v.arrivalS * 1000))
@@ -57,20 +65,20 @@ const gen = reactive({
     number
   >,
 })
-const genError = ref<string | null>(null)
+const genError = ref<MessageKey | null>(null)
 
 function generate(): void {
   const startDate = gen.start ? fromLocalInputValue(gen.start) : start.value
   if (!startDate) {
-    genError.value = 'Enter a valid first arrival'
+    genError.value = 'vessels.generate.errorStart'
     return
   }
   if (!(gen.count >= 1 && gen.count <= 60)) {
-    genError.value = 'Generate 1–60 vessels'
+    genError.value = 'vessels.generate.errorCount'
     return
   }
   if (!Object.values(gen.mix).some((w) => w > 0)) {
-    genError.value = 'Give at least one size class a weight'
+    genError.value = 'vessels.generate.errorMix'
     return
   }
   genError.value = null
@@ -89,25 +97,27 @@ function generate(): void {
 <template>
   <div class="vessels">
     <div class="table-wrap">
-      <table aria-label="Vessel table">
+      <table :aria-label="t('vessels.table')">
         <thead>
           <tr>
-            <th>Vessel</th>
-            <th>Arrival</th>
-            <th>Size class</th>
-            <th title="Boxes discharged">
-              Disch.
+            <th>{{ t('vessels.col.vessel') }}</th>
+            <th>{{ t('vessels.col.arrival') }}</th>
+            <th>{{ t('vessels.col.sizeClass') }}</th>
+            <th :title="t('vessels.col.dischargeHint')">
+              {{ t('vessels.col.discharge') }}
             </th>
-            <th title="Export boxes loaded (slots reserved)">
-              Load
+            <th :title="t('vessels.col.loadHint')">
+              {{ t('vessels.col.load') }}
             </th>
-            <th title="Transshipment boxes loaded (slots reserved)">
-              T/S
+            <th :title="t('vessels.col.transshipmentHint')">
+              {{ t('vessels.col.transshipment') }}
             </th>
-            <th title="Maximum STS cranes">
-              Max STS
+            <th :title="t('vessels.col.maxStsHint')">
+              {{ t('vessels.col.maxSts') }}
             </th>
-            <th><span class="sr-only">Remove</span></th>
+            <th>
+              <span class="sr-only">{{ t('vessels.col.remove') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -123,67 +133,42 @@ function generate(): void {
               <input
                 type="datetime-local"
                 :value="arrivalInput(v)"
-                :aria-label="`${v.id} arrival`"
+                :aria-label="t('vessels.field', { id: v.id, field: t('vessels.col.arrival') })"
                 @change="setArrival(v, ($event.target as HTMLInputElement).value)"
               >
             </td>
             <td>
               <select
                 v-model="v.sizeClass"
-                :aria-label="`${v.id} size class`"
+                :aria-label="t('vessels.field', { id: v.id, field: t('vessels.col.sizeClass') })"
               >
                 <option
                   v-for="c in VESSEL_SIZE_CLASSES"
                   :key="c"
                   :value="c"
                 >
-                  {{ VESSEL_CLASSES[c].label }} ({{ VESSEL_CLASSES[c].loaM }} m)
+                  {{ t('vessels.classOption', { label: VESSEL_CLASSES[c].label, loa: VESSEL_CLASSES[c].loaM }) }}
                 </option>
               </select>
             </td>
-            <td>
+            <td
+              v-for="f in COUNT_FIELDS"
+              :key="f.field"
+            >
               <input
-                v-model.number="v.discharge"
+                v-model.number="v[f.field]"
                 type="number"
-                min="0"
+                :min="f.min"
                 step="1"
-                :aria-label="`${v.id} discharge`"
-              >
-            </td>
-            <td>
-              <input
-                v-model.number="v.load"
-                type="number"
-                min="0"
-                step="1"
-                :aria-label="`${v.id} load`"
-              >
-            </td>
-            <td>
-              <input
-                v-model.number="v.transshipment"
-                type="number"
-                min="0"
-                step="1"
-                :aria-label="`${v.id} transshipment`"
-              >
-            </td>
-            <td>
-              <input
-                v-model.number="v.maxSts"
-                type="number"
-                min="1"
-                max="24"
-                step="1"
-                :aria-label="`${v.id} max STS`"
+                :aria-label="t('vessels.field', { id: v.id, field: t(f.label) })"
               >
             </td>
             <td>
               <button
                 type="button"
                 class="icon"
-                :aria-label="`Remove ${v.id}`"
-                title="Remove"
+                :aria-label="t('vessels.remove', { id: v.id })"
+                :title="t('vessels.remove', { id: v.id })"
                 @click="removeVessel(i)"
               >
                 ✕
@@ -195,7 +180,7 @@ function generate(): void {
               colspan="8"
               class="empty"
             >
-              No vessels yet. Add one, or generate a schedule below.
+              {{ t('vessels.empty') }}
             </td>
           </tr>
         </tbody>
@@ -206,74 +191,67 @@ function generate(): void {
       class="btn small"
       @click="addVessel"
     >
-      + Add vessel
+      {{ t('vessels.add') }}
     </button>
 
     <details class="generator">
-      <summary>Generate N vessels…</summary>
+      <summary>{{ t('vessels.generate.title') }}</summary>
       <div class="gen-grid">
         <label>
-          <span>Vessels</span>
+          <span>{{ t('vessels.generate.count') }}</span>
           <input
             v-model.number="gen.count"
             type="number"
             min="1"
             max="60"
-            aria-label="Number of vessels"
           >
         </label>
         <label>
-          <span>First arrival</span>
+          <span>{{ t('vessels.generate.firstArrival') }}</span>
           <input
             v-model="gen.start"
             type="datetime-local"
-            aria-label="First arrival"
           >
         </label>
         <label>
-          <span>Interval (h)</span>
+          <span>{{ t('vessels.generate.intervalH') }}</span>
           <input
             v-model.number="gen.intervalH"
             type="number"
             min="0"
-            step="0.5"
-            aria-label="Interval in hours"
+            step="any"
           >
         </label>
         <label>
-          <span>Jitter ± (min)</span>
+          <span>{{ t('vessels.generate.jitterMin') }}</span>
           <input
             v-model.number="gen.jitterMin"
             type="number"
             min="0"
-            step="5"
-            aria-label="Jitter in minutes"
+            step="any"
           >
         </label>
-        <label>
-          <span>Moves scale</span>
+        <label :title="t('vessels.generate.movesScaleHint')">
+          <span>{{ t('vessels.generate.movesScale') }}</span>
           <input
             v-model.number="gen.movesScale"
             type="number"
             min="0.01"
             step="any"
-            aria-label="Moves scale"
-            title="1 = typical moves per call for each class"
           >
         </label>
         <label>
-          <span>Seed</span>
+          <span>{{ t('vessels.generate.seed') }}</span>
           <input
             v-model.number="gen.seed"
             type="number"
             min="0"
             step="1"
-            aria-label="Generator seed"
           >
         </label>
       </div>
       <fieldset class="mix">
-        <legend>Size mix (weights)</legend>
+        <legend>{{ t('vessels.generate.mix') }}</legend>
         <label
           v-for="c in VESSEL_SIZE_CLASSES"
           :key="c"
@@ -283,8 +261,8 @@ function generate(): void {
             v-model.number="gen.mix[c]"
             type="number"
             min="0"
-            step="1"
-            :aria-label="`${VESSEL_CLASSES[c].label} weight`"
+            step="any"
+            :aria-label="t('vessels.generate.weight', { label: VESSEL_CLASSES[c].label })"
           >
         </label>
       </fieldset>
@@ -292,14 +270,14 @@ function generate(): void {
         v-if="genError"
         class="error"
       >
-        {{ genError }}
+        {{ t(genError) }}
       </p>
       <button
         type="button"
         class="btn small"
         @click="generate"
       >
-        Generate (replaces the table)
+        {{ t('vessels.generate.run') }}
       </button>
     </details>
   </div>
@@ -367,7 +345,7 @@ select {
 }
 
 td input[type='number'] {
-  width: 4.6rem;
+  width: 3.8rem;
 }
 
 .icon {
