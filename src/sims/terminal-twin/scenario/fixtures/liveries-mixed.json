@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "name": "liveries-mixed",
+  "description": "1 STS discharges 12 boxes of mixed lines and sizes",
+  "seed": 7,
+  "startDateTime": "2026-01-05T06:00:00Z",
+  "quay": {
+    "lengthM": 400
+  },
+  "layout": {
+    "stsGroundLaneZ0M": 8,
+    "stsGroundLaneSpacingM": 3,
+    "stsSafeHoistM": 45
+  },
+  "kinematics": {
+    "sts": {
+      "gantry": {
+        "vMax": 0.75,
+        "accel": 0.25,
+        "decel": 0.25
+      },
+      "trolley": {
+        "vMax": 4,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "hoistLoaded": {
+        "vMax": 1.5,
+        "accel": 0.6,
+        "decel": 0.6
+      },
+      "hoistEmpty": {
+        "vMax": 3,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "lockS": 3,
+      "unlockS": 3
+    }
+  },
+  "moveVariationPct": 10,
+  "sts": [
+    {
+      "id": "STS01",
+      "gantryX": 60,
+      "groundPositions": 12
+    }
+  ],
+  "vessels": [
+    {
+      "id": "V001",
+      "name": "Livery Trader",
+      "berthAtS": 30,
+      "berthX": 50,
+      "stsIds": [
+        "STS01"
+      ],
+      "bays": 3,
+      "rows": 5,
+      "tiersOnDeck": 1,
+      "bayPitchM": 13,
+      "rowPitchM": 2.5,
+      "deckHeightM": 18,
+      "fenderGapM": 2
+    }
+  ],
+  "containers": [
+    {
+      "id": "HDMU1000012",
+      "size": "40",
+      "full": true,
+      "line": "HMM",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 0,
+        "row": 0,
+        "tier": 0
+      }
+    },
+    {
+      "id": "HDMU1000028",
+      "size": "40",
+      "full": true,
+      "line": "HMM",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 0,
+        "row": 1,
+        "tier": 0
+      }
+    },
+    {
+      "id": "MAEU1000039",
+      "size": "40HC",
+      "full": true,
+      "line": "Maersk",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 0,
+        "row": 2,
+        "tier": 0
+      }
+    },
+    {
+      "id": "MAEU1000044",
+      "size": "40HC",
+      "full": true,
+      "line": "Maersk",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 0,
+        "row": 3,
+        "tier": 0
+      }
+    },
+    {
+      "id": "MSCU1000059",
+      "size": "20",
+      "full": true,
+      "line": "MSC",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 0,
+        "row": 4,
+        "tier": 0
+      }
+    },
+    {
+      "id": "CMAU1000062",
+      "size": "40",
+      "full": true,
+      "line": "CMA CGM",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 1,
+        "row": 0,
+        "tier": 0
+      }
+    },
+    {
+      "id": "HLXU1000075",
+      "size": "40HC",
+      "full": true,
+      "line": "Hapag-Lloyd",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 1,
+        "row": 1,
+        "tier": 0
+      }
+    },
+    {
+      "id": "ONEU1000085",
+      "size": "20",
+      "full": true,
+      "line": "ONE",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 1,
+        "row": 2,
+        "tier": 0
+      }
+    },
+    {
+      "id": "EGHU1000097",
+      "size": "40",
+      "full": true,
+      "line": "Evergreen",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 1,
+        "row": 3,
+        "tier": 0
+      }
+    },
+    {
+      "id": "CSNU1000108",
+      "size": "20",
+      "full": true,
+      "line": "COSCO",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 1,
+        "row": 4,
+        "tier": 0
+      }
+    },
+    {
+      "id": "ZIMU1000112",
+      "size": "40HC",
+      "full": true,
+      "line": "ZIM",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 2,
+        "row": 0,
+        "tier": 0
+      }
+    },
+    {
+      "id": "YMLU1000122",
+      "size": "40",
+      "full": true,
+      "line": "Yang Ming",
+      "initial": {
+        "kind": "vesselSlot",
+        "vesselId": "V001",
+        "bay": 2,
+        "row": 1,
+        "tier": 0
+      }
+    }
+  ],
+  "endConditions": {
+    "vesselsCompleted": 1
+  }
+}

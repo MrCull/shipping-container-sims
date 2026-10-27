@@ -40,4 +40,27 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .block('B01', { x: 20, wtpPads: 4 })
       .endWhen({ simDurationS: 1800 })
       .build(),
+
+  /**
+   * TT-22 liveries: 1 STS discharges 12 boxes of 10 lines and all three sizes,
+   * so the browser can check each rendered box's livery and model size.
+   */
+  'liveries-mixed': () =>
+    new ScenarioBuilder('liveries-mixed', '1 STS discharges 12 boxes of mixed lines and sizes')
+      .seed(7)
+      .moveVariation(10)
+      .sts('STS01', { gantryX: 60, groundPositions: 12 })
+      .vessel('V001', { name: 'Livery Trader', berthAtS: 30, berthX: 50, stsIds: ['STS01'], bays: 3, rows: 5 })
+      .dischargeBoxes('V001', 2, { line: 'HMM', size: '40' })
+      .dischargeBoxes('V001', 2, { line: 'Maersk', size: '40HC' })
+      .dischargeBoxes('V001', 1, { line: 'MSC', size: '20' })
+      .dischargeBoxes('V001', 1, { line: 'CMA CGM', size: '40' })
+      .dischargeBoxes('V001', 1, { line: 'Hapag-Lloyd', size: '40HC' })
+      .dischargeBoxes('V001', 1, { line: 'ONE', size: '20' })
+      .dischargeBoxes('V001', 1, { line: 'Evergreen', size: '40' })
+      .dischargeBoxes('V001', 1, { line: 'COSCO', size: '20' })
+      .dischargeBoxes('V001', 1, { line: 'ZIM', size: '40HC' })
+      .dischargeBoxes('V001', 1, { line: 'Yang Ming', size: '40' })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
 }

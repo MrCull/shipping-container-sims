@@ -1,0 +1,189 @@
+{
+  "image": "embedded in each container GLB (material container_lod0 / container_lod1 baseColorTexture)",
+  "size": [
+    2048,
+    2048
+  ],
+  "tileCols": 2,
+  "tileRows": 6,
+  "tileSizeUv": [
+    0.5,
+    0.16666666666666666
+  ],
+  "uvConvention": "glTF TEXCOORD_0 is authored for tile 0; add (index % tileCols, floor(index / tileCols)) * tileSizeUv per instance",
+  "genericIndex": 10,
+  "liveries": [
+    {
+      "index": 0,
+      "line": "HMM",
+      "ownerPrefix": "HDMU",
+      "body": "#f47b20",
+      "text": "#ffffff",
+      "wordmark": "HMM",
+      "typeface": "Montserrat-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 1,
+      "line": "MSC",
+      "ownerPrefix": "MSCU",
+      "body": "#d8c9a3",
+      "text": "#1d1d1b",
+      "wordmark": "MSC",
+      "typeface": "LibreBaskerville-Bold",
+      "tag": "A"
+    },
+    {
+      "index": 2,
+      "line": "Maersk",
+      "ownerPrefix": "MAEU",
+      "body": "#42b0d5",
+      "text": "#ffffff",
+      "wordmark": "MAERSK",
+      "typeface": "Montserrat-SemiBold",
+      "tag": "A"
+    },
+    {
+      "index": 3,
+      "line": "CMA CGM",
+      "ownerPrefix": "CMAU",
+      "body": "#1f3f8f",
+      "text": "#ffffff",
+      "wordmark": "CMA CGM",
+      "typeface": "Archivo-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 4,
+      "line": "Hapag-Lloyd",
+      "ownerPrefix": "HLXU",
+      "body": "#ef7d00",
+      "text": "#002b5c",
+      "wordmark": "Hapag-Lloyd",
+      "typeface": "Archivo-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 5,
+      "line": "ONE",
+      "ownerPrefix": "ONEU",
+      "body": "#d6007f",
+      "text": "#ffffff",
+      "wordmark": "ONE",
+      "typeface": "Montserrat-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 6,
+      "line": "Evergreen",
+      "ownerPrefix": "EGHU",
+      "body": "#00843d",
+      "text": "#ffffff",
+      "wordmark": "EVERGREEN",
+      "typeface": "Archivo-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 7,
+      "line": "COSCO",
+      "ownerPrefix": "CSNU",
+      "body": "#2f5fae",
+      "text": "#ffffff",
+      "wordmark": "COSCO SHIPPING",
+      "typeface": "Archivo-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 8,
+      "line": "ZIM",
+      "ownerPrefix": "ZIMU",
+      "body": "#c9ccd1",
+      "text": "#1b2a6b",
+      "wordmark": "ZIM",
+      "typeface": "Montserrat-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 9,
+      "line": "Yang Ming",
+      "ownerPrefix": "YMLU",
+      "body": "#f2c318",
+      "text": "#1d1d1b",
+      "wordmark": "YANG MING",
+      "typeface": "Archivo-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 10,
+      "line": null,
+      "ownerPrefix": "",
+      "body": "#8a95a5",
+      "text": "#ffffff",
+      "wordmark": "",
+      "typeface": "Archivo-ExtraBold",
+      "tag": "A"
+    }
+  ],
+  "regions": {
+    "side40": [
+      8,
+      8,
+      1016,
+      222
+    ],
+    "side20": [
+      8,
+      232,
+      244,
+      333
+    ],
+    "door": [
+      254,
+      232,
+      349,
+      333
+    ],
+    "front": [
+      359,
+      232,
+      454,
+      333
+    ],
+    "solid": [
+      470,
+      240,
+      530,
+      325
+    ],
+    "dark": [
+      546,
+      240,
+      606,
+      325
+    ],
+    "metal": [
+      622,
+      240,
+      682,
+      325
+    ]
+  },
+  "provenance": [
+    {
+      "fact": "line wordmarks are the brand name set in an open-licence typeface close to the brand typeface, in brand colours",
+      "tag": "A"
+    },
+    {
+      "fact": "livery body colours are approximations of each line's container colour",
+      "tag": "A"
+    },
+    {
+      "fact": "owner prefixes (BIC codes) as used by scenario/builder.ts",
+      "tag": "A"
+    },
+    {
+      "fact": "no official logo artwork is included; draw it into the same regions to replace a wordmark",
+      "tag": "M"
+    }
+  ]
+}

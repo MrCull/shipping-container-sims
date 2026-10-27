@@ -76,3 +76,15 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Display settings:** the UI's **locale** (Intl formatting of dates, times, numbers, first day of week) and **unit system** (metric: m, km/h, t; imperial: ft, mi/h, US tons). Display only: the engine and saved configs are always SI. Imperial speed is written **mi/h** because **mph** would read as crane moves per hour.
 - **Message catalogue:** `i18n/messages.ts`, the single home of every user-visible UI string (English only for now), looked up with `t(key)`.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.
+
+## 3D assets (phase 2)
+
+- **Asset:** one generated GLB (for example `container-40`) plus its **sidecar** `<asset>.meta.json`, made by the Python (bpy) **generators** in `assets/generators/` and committed. *Avoid:* "model file" for the pair.
+- **LOD (level of detail):** `LOD0` (most detailed), `LOD1`, `LOD2` nodes in an asset. The renderer picks one per instance by camera distance.
+- **Rig node:** a named movable node (`door_left`, `trolley`, `hoist`, …) whose origin is its mechanical pivot. Its range is in the sidecar's **travel limits**.
+- **Attach point:** a named point where something connects (container twist-lock and stacking points, a spreader's container seat).
+- **Provenance tag:** how a value is known: `V` verified, `P` photo-supported, `A` approximated, `M` intentional modification. These are the TTI reference pack's tags.
+- **Livery:** a shipping line's container colours and wordmark. The **livery atlas** has one tile per line, and an instance's **livery index** is its tile.
+- **Wordmark:** the line's name set in a close open-licence typeface and the brand colours, standing in for the official logo.
+- **Asset budget:** the triangle, draw-call and file-size limits per asset kind (`assets/budgets.json`), enforced by the **budget check** (`npm run tt:assets:check`).
+- **Asset viewer:** the dev-only page `/sim/terminal-twin?viewer=<asset>` (or `?viewer=yard`), with its API `window.__ttAssets`.

@@ -8,7 +8,7 @@
  *   await __tt.load('tracer-1sts-10-boxes', { seed: 42 })
  *   await __tt.runUntil()                      // to the end (or { time, eventType, moves, vesselsCompleted, maxEvents })
  *   await __tt.query('summary')                // also: container/vessel/sts/groundPosition (+ id), containers, stsList, kpis, eventLog…
- *   __tt.scene()                               // rendered counts { containers, sts, vessels, frames }
+ *   __tt.scene()                               // rendered counts { containers, sts, vessels, frames, containerLods, containerAssets }
  *   await __tt.step(); await __tt.why(id); await __tt.snapshot()
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
  *   __tt.select('STS01'); __tt.cameraTo('STS01'); __tt.setSpeed(600); __tt.pause(); __tt.clock()
@@ -17,7 +17,7 @@
  */
 import type { DisplaySettings, ScenarioConfig } from '../scenario/types'
 import type { CustodyRef, EngineEvent, EventPayloads, EventSubjects, EventType, RunResult, SimSnapshot } from '../engine'
-import type { OverlayState, SceneStats } from '../modules/sceneRenderer'
+import type { OverlayState, RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcPose, StsPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
 import { resolveScenario, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
@@ -48,8 +48,8 @@ export interface TwinDevApi {
   snapshot(): Promise<SimSnapshot>
   why(eventId: number): Promise<EngineEvent[]>
   select(entityId: string | null): void
-  /** Point the camera at an entity (container, STS or vessel id); false if unknown. */
-  cameraTo(entityId: string): boolean
+  /** Point the camera at an entity (container, STS or vessel id), optionally from `distanceM`; false if unknown. */
+  cameraTo(entityId: string, distanceM?: number): boolean
   setSpeed(speed: number): void
   pause(): void
   play(): void
@@ -88,6 +88,8 @@ export interface SceneState {
   vessels: Record<string, { status: string }>
   /** Conflict zones reserved at the displayed time (zone → holder). */
   reservations: Record<string, string>
+  /** Per container: livery atlas index, model size and LOD actually drawn (phase 2 assets). */
+  liveries: Record<string, RenderedLivery>
 }
 
 declare global {
@@ -132,7 +134,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     snapshot: () => ctl().passthrough<SimSnapshot>({ op: 'snapshot' }),
     why: (eventId) => ctl().passthrough<EngineEvent[]>({ op: 'why', eventId }),
     select: (id) => store.select(id),
-    cameraTo: (id) => store.view()?.cameraTo(id) ?? false,
+    cameraTo: (id, distanceM) => store.view()?.cameraTo(id, distanceM) ?? false,
     setSpeed: (s) => store.setSpeed(s),
     pause: () => {
       ctl().pause()
@@ -168,6 +170,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         shcs: Object.fromEntries(model.shcIds.map((id) => [id, { status: model.statusAt('shc', id, t), ...model.shcPose(id, t) }])),
         reservations: model.activeReservations(t),
         vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
+        liveries: store.view()?.liveries() ?? {},
       }
     },
     display: () => ({ ...store.display }),
