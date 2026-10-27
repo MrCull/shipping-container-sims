@@ -12,6 +12,7 @@ import {
   type CustodyChange,
   type Delta,
   type EngineInfo,
+  type MotionPlan,
   type QueryKind,
   type WorkerReply,
   type WorkerRequestMessage,
@@ -30,6 +31,25 @@ function latestBy<T>(items: T[], key: (item: T) => string): T[] {
     map.set(k, item)
   }
   return [...map.values()]
+}
+
+/**
+ * Compact motion plans to the latest segment of each axis per entity. (The
+ * latest plan alone may lack an axis, e.g. a hoist-only plan after a gantry
+ * move, which would leave the scene at the crane's initial gantry position.)
+ */
+function compactMotion(plans: MotionPlan[]): MotionPlan[] {
+  const byEntity = new Map<string, Map<string, MotionPlan['segments'][number]>>()
+  for (const plan of plans) {
+    const axes = byEntity.get(plan.entityId) ?? new Map()
+    for (const seg of plan.segments) axes.set(seg.axis, seg)
+    byEntity.delete(plan.entityId)
+    byEntity.set(plan.entityId, axes)
+  }
+  return [...byEntity.entries()].map(([entityId, axes]) => ({
+    entityId,
+    segments: [...axes.values()].sort((a, b) => a.t0 - b.t0),
+  }))
 }
 
 export function createEngineHost() {
@@ -130,7 +150,7 @@ export function createEngineHost() {
         return requireSim().runUntilAsync({ time: req.to })
       case 'run': {
         const result = await requireSim().runUntilAsync(req.condition)
-        delta.motion = latestBy(delta.motion, (m) => m.entityId)
+        delta.motion = compactMotion(delta.motion)
         delta.custody = latestBy(delta.custody, (c) => c.containerId)
         delta.entities = latestBy(delta.entities, (e) => `${e.kind}:${e.id}`)
         return result

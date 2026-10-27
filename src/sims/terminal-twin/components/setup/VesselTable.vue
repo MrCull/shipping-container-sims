@@ -256,7 +256,7 @@ function generate(): void {
             v-model.number="gen.movesScale"
             type="number"
             min="0.01"
-            step="0.05"
+            step="any"
             aria-label="Moves scale"
             title="1 = typical moves per call for each class"
           >

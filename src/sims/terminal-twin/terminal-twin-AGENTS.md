@@ -4,7 +4,7 @@
 
 **Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root — use its terms in code, tests and docs.
 
-**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API.
+**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-09 added real vessel calls: five size classes, generated bay plans, a continuous quay with berth allocation and anchorage, STS cranes on one rail with a crane split, twin-20 lifts, and the setup dialog's vessel table and generator.
 
 **Sim ID:** `terminal-twin`
 
@@ -30,6 +30,10 @@
 | Browser / UI / 3D view | `npm run test:smoke` | Playwright smoke tests in `tests/browser/*.smoke.ts` pass (dev server + a production build). Not part of `npm test` or CI. |
 | Look at the 3D view | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('tracer-1sts-10-boxes').then(() => window.__tt.runTo(330)).then(() => window.__tt.pause())"` | PNG in `.screenshots/` shows the STS mid-cycle, no page errors |
 | Fixture definition change | `npm run tt:fixtures`, then `npm run tt:golden -- --update` | committed fixture JSON matches `definitions.ts` |
+| Berthing / anchorage | `npm run tt:run -- --fixture two-vessels-compete-for-berth` | V002 `anchorage` > 0 s, `Quay: 1 vessel(s) waited`; `tests/berthing.test.ts` |
+| Crane split / rail order | `npm run tt:run -- --fixture crane-split-4sts --strategy craneSplit=equal-bays` (vs the default `balanced-moves`) | 4 STS lines with different move counts, 0 violations (`sts.rail-order` is checked after every event); `tests/crane-split.test.ts` |
+| Twin-20 | `npm run tt:run -- --fixture twin-20-lift` | `4 moves in 2 cycles (2 twin-20)`; `tests/vessels.test.ts` |
+| Vessels in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('crane-split-4sts').then(() => window.__tt.runTo(1500)).then(() => window.__tt.pause()).then(() => window.__tt.cameraTo('V001'))"` | hull at its berth, four STS along it, deck boxes on the hatch covers |
 
 Never regenerate goldens to make a failing test pass unless the behaviour change is intended and explained in the commit. Without `--update` / `UPDATE_GOLDEN=1` nothing ever rewrites a golden.
 
@@ -45,11 +49,14 @@ terminal-twin/
 │   ├── simulation.ts         createSimulation / restoreSimulation, run loop, snapshot, why, subscribe
 │   ├── events.ts             Event envelope + EventPayloads catalogue
 │   ├── context.ts            EngineContext + Reactor types (internal behaviour per event type)
-│   ├── subsystems/quay.ts    Vessel berthing + STS discharge cycle reactors
+│   ├── subsystems/berth.ts   Vessel calls: arrival, berth allocation, anchorage, mooring, crane split, departure
+│   ├── subsystems/quay.ts    STS discharge cycle (gantry to bay, deck before hold, twin-20) + work order
+│   ├── subsystems/rail.ts    Shared STS rail: reservations, waiting for the rail, free cranes stepping aside
 │   ├── handlers.ts           HandlerSet re-exports (TOS seams)
 │   ├── decisions/            Decision-point framework
 │   │   ├── types.ts          Request/reply catalogue, contract versions, HandlerSet, DecisionsConfig
 │   │   ├── strategies.ts     Built-in strategy registry (1–3 per decision point) + defaultHandlers
+│   │   ├── quayStrategies.ts Berth allocation (first-fit, best-fit), crane split (balanced-moves, equal-bays)
 │   │   ├── runtime.ts        Dispatch, async modes, timeouts/fallback, handler KPIs (SimState.decisions)
 │   │   └── latency.ts        Latency injector (own RNG stream)
 │   ├── invariants.ts         INVARIANTS registry + custody holders
@@ -64,11 +71,17 @@ terminal-twin/
 │   ├── types.ts              ScenarioConfig (schemaVersion 1, SI units)
 │   ├── builder.ts            Typed ScenarioBuilder + [A] default kinematics
 │   ├── iso6346.ts            Container id check digits
+│   ├── lines.ts              Shipping lines: owner prefixes, default weights, default cargo mix
+│   ├── vesselClasses.ts      VESSEL_CLASSES (Feeder → ULCV) + bay-plan geometry (slotX/Z, tierBaseY, slot ids)
+│   ├── bayPlan.ts            planCargo(config, seed): slots + discharge boxes (engine AND scene model call it)
+│   ├── vesselGenerator.ts    generateVessels(...): "Generate N vessels"
+│   ├── overrides.ts          Setup-dialog edits (quay length, STS count, vessel table) + validation
 │   ├── presets.ts            Preset registry (empty until TT-15)
 │   └── fixtures/             definitions.ts → <name>.json (+ <name>.golden.json), index.ts
 ├── definition.ts             Home card (keep light: eagerly imported)
 ├── TerminalTwin.vue          Root: TopBar, 3D host, SetupDialog, banner; installs window.__tt in DEV
-├── components/               TopBar.vue (clock, speeds, Run to…, Reset, New Scenario), modals/SetupDialog.vue
+├── components/               TopBar.vue (clock, speeds, Run to…, Reset, New Scenario), modals/SetupDialog.vue,
+│                             setup/VesselTable.vue (vessel table + "Generate N vessels")
 ├── composables/useTwinScene.ts  Renderer/camera/OrbitControls + the frame loop (tick → sync → pose → render)
 ├── modules/                  Main-thread, non-reactive
 │   ├── twinController.ts     Playback clock, look-ahead, Run to/runUntil/step, generation guard
@@ -103,10 +116,10 @@ terminal-twin/
 `dev/devApi.ts` is dynamically imported inside `if (import.meta.env.DEV)`, so production builds don't contain it (checked by `terminal-twin.prod.smoke.ts`). Every call is async-safe from `page.evaluate`:
 
 ```js
-await __tt.load('tracer-1sts-10-boxes', { seed?, startDateTime?, autoplay? })  // default: fixture's own seed, paused
+await __tt.load('tracer-1sts-10-boxes', { seed?, startDateTime?, autoplay?, overrides? })  // default: fixture's own seed, paused
 await __tt.runUntil({ time?, eventType?, moves?, vesselsCompleted?, maxEvents? }) // no arg = to the end; pauses
 await __tt.runTo(600); await __tt.step()
-await __tt.query('summary' | 'kpis' | 'containers' | 'stsList' | 'vessels' | 'invariants' | 'eventLog')
+await __tt.query('summary' | 'kpis' | 'containers' | 'stsList' | 'vessels' | 'vesselSlots' | 'invariants' | 'eventLog')
 await __tt.query('container' | 'vessel' | 'sts' | 'groundPosition', id)
 await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })  // new root event
 await __tt.snapshot(); await __tt.why(eventId)
@@ -125,6 +138,18 @@ __tt.sceneState()  // what the scene shows: custody per box, status + pose per S
 - **Custody.** Change it only via `ctx.transferCustody(containerId, owner)` at grip and release, and update the physical holder (slot, `sts.carrying`, ground position) in the same reactor.
 - **Determinism.** Draw randomness only from `ctx.random()` (mulberry32, state in `SimState.rngState`); `Math.random` is lint-banned in `engine/`. The event-log hash is a streaming 53-bit hash of each committed event's JSON.
 - **Snapshots.** These are a JSON deep copy of `{config, seed, state, log, status, …}`. `SimState` must stay plain JSON, with no Maps, classes or functions.
+
+## Vessels, berthing and the STS rail (TT-09)
+
+- **Vessel table.** `config.vessels` holds vessel *calls*: `arrivalS`, `sizeClass`, `discharge`, `load`, `transshipment`, `maxSts`, optional `sizeMix`. Berth position and cranes are NOT in the config: decision points choose them. `config.containers` no longer exists.
+- **Size classes** (`scenario/vesselClasses.ts`, all [A]): LOA, beam, 40 ft bays, rows, hold and deck tiers, hatch-cover height. Frame: `berthX` = stern; bay 0 aft; row 0 quay side; tier 0 = hold floor, tiers >= `holdTiers` on deck. A cell holds one 40 ft or two 20 ft (aft `a` / fore `f` half). Slot id `V001:BB-RR-TT[a|f]`. Engine, scene model and renderer use the same `slotX/slotZ/tierBaseY`.
+- **Bay plan** (`planCargo(config, seed)`, own RNG stream): discharge boxes (ISO 6346 ids, weighted lines from `cargo.lines`, sizes from `sizeMix`, `emptyShare`) spread unevenly over bays, hold/deck in proportion, stacked bottom-up; 20 ft paired fore/aft. Load/transshipment slots are reserved empty (`purpose`). The scene model regenerates it from config + seed, so it never crosses the worker protocol. Query: `sim.query.vesselSlots(vesselId?)`.
+- **Berth flow** (`subsystems/berth.ts`): `VesselArrived` → `berthAllocation` (one pending at a time, arrival order, strictly first come first served) → `BerthAllocated` (quay stretch taken) or `VesselAtAnchorage` (asked again at every `VesselDeparted`) → `mooringS` → `VesselBerthed` → `craneSplit` → STS work → `StsWorkComplete` per crane → `VesselWorkComplete` → `unmooringS` → `VesselDeparted`. Anchorage wait = allocation − arrival (`kpis.vessels.*.anchorageWaitS`, `kpis.quay`). The engine rejects (throws, so the run fails) berths off the quay or within `berthGapM` of another vessel.
+- **Crane split:** the reply lists free cranes with ascending bay ranges in rail order, covering every work bay once. The engine rejects splits that would make cranes pass (`validateSplit`). No cranes → the vessel waits berthed and is asked about again whenever a crane is freed. Both strategies pick up to `maxSts` eligible free cranes nearest the vessel (eligible = no busy crane would have to pass them), then split the bays: `balanced-moves` (min-max moves, dynamic programming) or `equal-bays`.
+- **Rail** (`subsystems/rail.ts`): each STS has a reservation `[railLo, railHi]` covering its current gantry motion; neighbours stay `quay.stsMinSpacingM` (27 m) apart. A move that needs the rail waits (`StsWaitingForRail`, status `waiting-for-rail`, `kpis.sts.*.railWaitS`), and `wakeRail` retries after every rail change. A free idle crane in the way is asked to step aside (`StsRepositionStarted/Completed`). Reservations shrink at `StsPicked`. The `sts.rail-order` invariant checks order, spacing and position-within-reservation after every event; `berth.no-overlap` checks vessels.
+- **STS cycle:** the gantry move is part of `StsMoveStarted`'s plan (hoist up, gantry, trolley, hoist down). Work order per crane: bay ascending, deck before hold, top tier first, row ascending, aft before fore. **Twin-20** (`quay.twinLift`): the aft and fore halves of one cell are picked in one `StsPicked` (`payload.twin`); each gets its own ground-position decision, and they are set down one after the other (two `StsGrounded`, `payload.x` = set-down X) before the next cycle [A: sequential release]. KPIs: `moves` (boxes), `cycles`, `twinLifts`.
+- **End:** with no end condition configured, the run ends when every vessel has departed.
+- **Browser:** vessel entity deltas carry `berthX`. The scene places hulls (procedural per class: extruded outline, boot-top, hatch covers, bridge, funnel; livery from the line the vessel name starts with) at the berth or in an anchorage row offshore. Twin boxes on the spreader use `CustodyChange.dx`. Run-to compaction keeps the latest segment *per axis* (`compactMotion`). Setup dialog: quay length, STS count (`spreadSts` spreads them evenly), vessel table and generator → `ScenarioChoice.overrides` → `applyOverrides`; `__tt.load(name, { overrides })` does the same.
 
 ## Public engine API (`engine/index.ts`)
 
@@ -194,7 +219,9 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 
 ## Known behaviours and pitfalls
 
-- The tracer fixture gives STS01 **10 ground positions** because nothing clears them yet (SHCs arrive in TT-05).
+- Fixtures give each STS enough ground positions for all its boxes (tracer 10, others 6–30) because nothing clears them yet (SHCs arrive in TT-05). Lower them once SHCs clear ground positions.
+- Berth allocation is strictly first come, first served: a vessel that never fits (LOA > quay) blocks the queue for good (the setup dialog warns).
+- A free crane steps aside only if its other neighbour leaves room (chains of free cranes move one after another). A busy crane is never pushed, so a waiting crane may idle until its neighbour finishes.
 - Every decision adds two events (`DecisionRequested`, `DecisionResolved`) to the log. The tracer golden went from 35 to 55 events in TT-03, with KPIs unchanged.
 - An injected delay of at least `timeoutMs` (default 5 s) is a timeout. Raise `timeoutMs` when you inject long latencies.
 - A reply computed at request time is delivered later in keep-running mode, so it can be stale. That is realistic: a reply with an invalid ground position surfaces as an invariant violation.

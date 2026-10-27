@@ -155,7 +155,7 @@ test('Reset returns to t = 0 with the same seed; New Scenario reopens the setup 
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await expect(dialog).toBeVisible()
   // Start a different seed through the dialog itself.
-  await dialog.getByLabel('Seed').fill('7')
+  await dialog.getByRole('spinbutton', { name: /^Seed/ }).fill('7')
   await dialog.getByRole('button', { name: 'Start' }).click()
   await expect(dialog).toBeHidden()
   await page.evaluate(() => window.__tt!.runUntil())
@@ -163,6 +163,47 @@ test('Reset returns to t = 0 with the same seed; New Scenario reopens the setup 
   expect(other.seed).toBe(7)
   expect(other.status).toBe('ended')
   expect(other.eventLogHash).not.toBe(golden.eventLogHash)
+})
+
+test('vessels render at their berth (or anchorage) and STS cranes gantry along the rail to their bays', async ({ page }) => {
+  const errors = collectErrors(page)
+  await page.goto('/sim/terminal-twin')
+  await page.waitForFunction(() => !!window.__tt)
+
+  // Two vessels compete for one berth: at t = 1200 V001 is alongside, V002 waits at anchorage.
+  await page.evaluate(() => window.__tt!.load('two-vessels-compete-for-berth'))
+  await page.evaluate(() => window.__tt!.runTo(1200))
+  await page.evaluate(() => window.__tt!.pause())
+  const vessels = await page.evaluate(() =>
+    window.__tt!.query<{ id: string; status: string; berthX: number | null }[]>('vessels'),
+  )
+  expect(vessels.map((v) => [v.id, v.status, v.berthX])).toEqual([
+    ['V001', 'berthed', 0],
+    ['V002', 'at-anchorage', null],
+  ])
+  const state = await page.evaluate(() => window.__tt!.sceneState())
+  for (const v of vessels) expect(state!.vessels[v.id].status).toBe(v.status)
+  await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 3)
+  expect((await page.evaluate(() => window.__tt!.scene()))!.vessels).toBe(2) // alongside + at anchorage
+
+  // Four cranes share the rail: the scene's gantry positions equal the engine's, in rail order.
+  await page.evaluate(() => window.__tt!.load('crane-split-4sts'))
+  await page.evaluate(() => window.__tt!.runTo(1500))
+  await page.evaluate(() => window.__tt!.pause())
+  const sts = await page.evaluate(() =>
+    window.__tt!.query<{ id: string; status: string; gantryX: number; railLo: number; railHi: number }[]>('stsList'),
+  )
+  const scene = await page.evaluate(() => window.__tt!.sceneState())
+  const xs = sts.map((s) => scene!.sts[s.id].gantryX)
+  for (const [i, s] of sts.entries()) {
+    expect(xs[i]).toBeGreaterThanOrEqual(s.railLo - 1e-6)
+    expect(xs[i]).toBeLessThanOrEqual(s.railHi + 1e-6)
+    if (i > 0) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(27 - 1e-6)
+  }
+  // they left their parking positions (40, 140, 240, 340 m) for their bays
+  expect(xs.some((x, i) => Math.abs(x - [40, 140, 240, 340][i]) > 1)).toBe(true)
+  await page.screenshot({ path: '.screenshots/terminal-twin-smoke-crane-split.png' })
+  expect(errors).toEqual([])
 })
 
 test('mid-run screenshot', async ({ page }) => {
