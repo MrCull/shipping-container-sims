@@ -4,7 +4,7 @@
 
 **Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root — use its terms in code, tests and docs.
 
-**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). There is no `definition.ts` yet, so the sim is not on the home page; the browser host arrives with TT-02.
+**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API.
 
 **Sim ID:** `terminal-twin`
 
@@ -27,6 +27,8 @@
 | Reproduce a late bug | `npm run tt:run -- --fixture <name> --until time:50400 --snapshot /tmp/h14.json`, then `npm run tt:run -- --from-snapshot /tmp/h14.json --until time:54000 --events /tmp/win.jsonl --log /tmp/win.log.jsonl --log-level debug` | the window's events equal that window of the uninterrupted run; re-run the window as often as needed |
 | Check goldens | `npm run tt:golden` (also part of `npm test`) | `<fixture>: match` per fixture, exit 0; drift prints `path: golden X → actual Y` per field and exits 1 |
 | Intentional behaviour change | `npm run tt:golden -- --update` (or `UPDATE_GOLDEN=1 npm test`), then review the `*.golden.json` diff | the golden diff shows only the change you intended |
+| Browser / UI / 3D view | `npm run test:smoke` | Playwright smoke tests in `tests/browser/*.smoke.ts` pass (dev server + a production build). Not part of `npm test` or CI. |
+| Look at the 3D view | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('tracer-1sts-10-boxes').then(() => window.__tt.runTo(330)).then(() => window.__tt.pause())"` | PNG in `.screenshots/` shows the STS mid-cycle, no page errors |
 | Fixture definition change | `npm run tt:fixtures`, then `npm run tt:golden -- --update` | committed fixture JSON matches `definitions.ts` |
 
 Never regenerate goldens to make a failing test pass unless the behaviour change is intended and explained in the commit. Without `--update` / `UPDATE_GOLDEN=1` nothing ever rewrites a golden.
@@ -64,12 +66,55 @@ terminal-twin/
 │   ├── iso6346.ts            Container id check digits
 │   ├── presets.ts            Preset registry (empty until TT-15)
 │   └── fixtures/             definitions.ts → <name>.json (+ <name>.golden.json), index.ts
+├── definition.ts             Home card (keep light: eagerly imported)
+├── TerminalTwin.vue          Root: TopBar, 3D host, SetupDialog, banner; installs window.__tt in DEV
+├── components/               TopBar.vue (clock, speeds, Run to…, Reset, New Scenario), modals/SetupDialog.vue
+├── composables/useTwinScene.ts  Renderer/camera/OrbitControls + the frame loop (tick → sync → pose → render)
+├── modules/                  Main-thread, non-reactive
+│   ├── twinController.ts     Playback clock, look-ahead, Run to/runUntil/step, generation guard
+│   ├── engineClient.ts       Promise wrapper over the worker (request ids)
+│   ├── sceneModel.ts         Pure-TS timelines from worker deltas → poses/positions at any time
+│   ├── sceneRenderer.ts      Three.js procedural quay, STS, vessel hulls, ONE InstancedMesh of containers
+│   └── time.ts               Start date default (Mon 06:00), clock formatting
+├── store/twinStore.ts        Pinia facade (small reactive UI state; controller/view kept raw)
+├── worker/                   Engine Web Worker (same ESLint bans as engine/)
+│   ├── engine.worker.ts      Entry; serialises requests
+│   ├── engineHost.ts         Serves requests via the public engine API; builds compact Deltas
+│   └── protocol.ts           Request/reply/Delta types (internal, not a public seam)
+├── dev/devApi.ts             window.__tt (dev builds only)
 ├── cli/                      Node-only: run.ts→runCli.ts (tt:run), diff.ts→diffCli.ts (tt:diff),
 │                             golden-cli.ts→golden.ts (tt:golden), handlerSets.ts, build-fixtures.ts
-└── tests/                    Vitest suites (Node-only)
+└── tests/                    Vitest suites (Node-only); tests/browser/*.smoke.ts = Playwright (npm run test:smoke)
 ```
 
-`cli/` and `*.test.ts` are type-checked by `tsconfig.tools.json` (Node types, no DOM); everything else by `tsconfig.app.json`.
+`cli/`, `*.test.ts` and `*.smoke.ts` are type-checked by `tsconfig.tools.json` (Node types + DOM for `page.evaluate`); everything else by `tsconfig.app.json`.
+
+## Browser host (TT-02)
+
+- **Threads.** The engine runs in a Web Worker (`worker/engine.worker.ts`), driven only through the public engine API (`runUntilAsync`, `step`, `query`, `inject`, …). The main thread renders and runs the UI. The worker answers each request with a **Delta**: new motion plans per STS (diffed by `StsState.motion` identity), custody changes (with the grounding X for ground positions), STS/vessel status changes, the last 200 summarised events, and per-type counts. It also sends `EngineInfo` (engine time, status, end time, moves, hash).
+- **Playback clock** (`TwinController`). `displayTime` advances by wall time × speed. It is clamped to the **engine horizon** (`info.now`) and to the scenario end. While playing, the controller keeps the engine a look-ahead ahead (`max(5 s, 1.5 s × speed)`) with `advance` requests, so the motion segments for the displayed instant are already known. That keeps animation smooth up to ×600. **While paused it does not run ahead**, so the scene and dev-API queries describe the same instant.
+- **Flat-out runs.** "Run to…", `__tt.runUntil` and `__tt.step` send `run`/`step`. Rendering is skipped while `busy`. The delta is compacted to the latest plan, custody and status per entity, and the display jumps to the target (Run to…) or to the engine time (runUntil/step, which also pause).
+- **Scene model.** `SceneModel` keeps per-axis segment lists and custody/status timelines and prunes history older than the display time. `positionAt` interpolates the crane, and a carried box follows the spreader. Display time never goes backwards, except on reset/load, which build a new model; a generation counter drops replies that belong to the old scenario.
+- **Rendering.** All containers are one `InstancedMesh` (colour per shipping line). STS, hulls and the quay are shared low-poly boxes. Three.js objects never enter Vue reactivity; the store mirrors only the clock, speed, engine info and selection.
+- **Setup dialog.** It lists fixtures plus the `presets` registry, with an editable seed (re-roll) and start date/time (default Monday 06:00 of the current week, local time). Start = `store.startScenario({ name, seed, startDateTime })`. The start date changes only the clock, not the run.
+
+### Dev API (`window.__tt`, dev builds only)
+
+`dev/devApi.ts` is dynamically imported inside `if (import.meta.env.DEV)`, so production builds don't contain it (checked by `terminal-twin.prod.smoke.ts`). Every call is async-safe from `page.evaluate`:
+
+```js
+await __tt.load('tracer-1sts-10-boxes', { seed?, startDateTime?, autoplay? })  // default: fixture's own seed, paused
+await __tt.runUntil({ time?, eventType?, moves?, vesselsCompleted?, maxEvents? }) // no arg = to the end; pauses
+await __tt.runTo(600); await __tt.step()
+await __tt.query('summary' | 'kpis' | 'containers' | 'stsList' | 'vessels' | 'invariants' | 'eventLog')
+await __tt.query('container' | 'vessel' | 'sts' | 'groundPosition', id)
+await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })  // new root event
+await __tt.snapshot(); await __tt.why(eventId)
+__tt.select(id | null); __tt.cameraTo(id); __tt.setSpeed(600); __tt.pause(); __tt.play(); await __tt.reset(); __tt.newScenario()
+__tt.clock()       // { displayTime, speed, paused, busy, engine: EngineInfo }
+__tt.scene()       // rendered { containers, sts, vessels, frames }
+__tt.sceneState()  // what the scene shows: custody per box, status + pose per STS, status per vessel
+```
 
 ## Engine architecture
 
@@ -92,6 +137,7 @@ sim.asyncMode               // 'keep-running' | 'pause'
 sim.snapshot(); sim.restore(snap); restoreSimulation(snap, handlers?, options?)
 sim.query.container(id) / .containers() / .vessel(id) / .vesselSlot(id) / .sts(id) / .groundPosition(id)
 sim.why(eventId)            // [event, parent, …, ScenarioStarted]
+sim.inject(type, at, subjects, payload) // schedule an external event as an extra root (causedBy null; dev API / tests)
 sim.subscribe(fn, { types? }) // returns unsubscribe
 sim.eventLog(); sim.eventLogHash(); sim.kpiReport(); sim.invariantReport(); sim.status; sim.firstError
 summarizeRun(sim)           // RunSummary = CLI --out and golden format
@@ -158,4 +204,8 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 - `--until time:T` leaves `now = T`, so a snapshot taken there resumes at exactly `T`; events at `t ≤ T` are in the snapshot, the window holds `t > T`.
 - Handlers are not in snapshots: pass the same `--handlers` when resuming a window.
 - Logs are derived from committed events only; there is no free-text reactor logging yet.
+- Browser: `runUntil({ time })` leaves `now = time`, so the engine horizon is exact. Playback in time slices gives the same hash as one run (`tests/live-driving.test.ts`).
+- Browser: injected events are extra roots, so `why` on them (or their descendants) ends at the injected event, not at `ScenarioStarted`.
+- Browser: deltas in a flat-out run are compacted per entity. Large Run to… jumps at TTI scale may still need a smarter "final state only" message (TT-19).
+- Smoke tests: `playwright.config.ts` starts a Vite dev server (port 5199) and builds plus previews production (`.smoke-dist/`, port 5198) every run. Chromium falls back to `/opt/pw-browsers/chromium` like `npm run screenshot`.
 - The `ScenarioEnded` and `InvariantViolated` events are committed directly. They are not queued and are not invariant-checked.

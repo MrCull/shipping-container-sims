@@ -129,9 +129,9 @@ export class SceneRenderer {
     water.receiveShadow = true
     this.scene.add(water)
 
-    const apronDepth = 140
+    const apronDepth = 900
     const apron = new THREE.Mesh(
-      this.track(new THREE.BoxGeometry(length + 80, 3, apronDepth)),
+      this.track(new THREE.BoxGeometry(length + 1200, 3, apronDepth)),
       this.track(new THREE.MeshStandardMaterial({ color: '#9a9c9a', roughness: 0.95 })),
     )
     apron.position.set(length / 2, -1.5, apronDepth / 2)
@@ -203,7 +203,7 @@ export class SceneRenderer {
     const draft = 8
     const hull = new THREE.Mesh(
       this.track(new THREE.BoxGeometry(length, v.deckHeightM + draft, beam)),
-      this.track(new THREE.MeshStandardMaterial({ color: '#1e2a3a', roughness: 0.6 })),
+      this.track(new THREE.MeshStandardMaterial({ color: '#33465f', roughness: 0.6 })),
     )
     // Hull spans from 30 m aft of bay 0 (bridge + engine room) to 20 m forward of the last bay.
     hull.position.set(v.berthX - 30 + length / 2, (v.deckHeightM - draft) / 2, -(v.fenderGapM + beam / 2) + 2)

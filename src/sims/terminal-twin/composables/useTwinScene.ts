@@ -48,7 +48,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (!camera || !controls) return
     const offset = keepOffset
       ? camera.position.clone().sub(controls.target)
-      : new THREE.Vector3(150, 110, 170)
+      : new THREE.Vector3(95, 70, 115)
     controls.target.set(target.x, target.y, target.z)
     camera.position.copy(controls.target).add(offset)
     controls.update()

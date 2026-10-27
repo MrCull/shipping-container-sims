@@ -36,7 +36,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Fixture:** a small focused scenario config committed as JSON under `scenario/fixtures/`, with a **golden summary** (`*.golden.json`: KPIs plus event-log hash).
 - **Preset:** a full-size scenario config generated in code (TTI Algeciras baseline, Small automated, Stress test).
 - **Event:** a happening in the sim, wrapped in the common **envelope** (`id`, `seq`, `t`, `type`, `causedBy`, `subjects`, `payload`).
-- **Root event:** an event with no cause. The only one is `ScenarioStarted`.
+- **Root event:** an event with no cause: `ScenarioStarted`, plus any event injected through `inject` (dev API / tests).
 - **Cause chain:** an event's `causedBy` links back to the root, as returned by `why(eventId)`.
 - **Reactor:** the engine's internal handling of one event type (physics and flow). It is not swappable.
 - **Decision point:** a place where the sim asks the TOS for a decision (berth allocation, yard allocation, ground-position selection, dispatch, …).
@@ -56,4 +56,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Run diff:** a comparison of two event logs that reports the **first diverging event** (its `seq`, the differing fields and both events).
 - **Time window:** a run resumed from a snapshot that processes only events after the snapshot's time, up to a stop condition.
 - **Golden update:** an explicit rewrite of golden summaries (`npm run tt:golden -- --update`). Without it, any difference from a golden is **drift** and fails.
+- **Engine horizon:** in the browser, the sim time up to which the worker's engine has processed events. The displayed time never passes it.
+- **Display time:** the sim time the 3D view and clock show. It advances with wall time × **speed** (×1 = real time) and is drawn by interpolating motion segments.
+- **Look-ahead:** how far the engine runs ahead of the display time while playing, so that the motion for the displayed instant is already known.
+- **Run to…:** run the engine flat out (without rendering) to a target sim time, then resume playback there.
+- **Delta:** the compact worker → main-thread update: new motion plans, custody changes, status changes and summarised events.
+- **Dev API:** `window.__tt`, the dev-build-only browser API (load, step, runUntil, query, inject, snapshot, why, select, cameraTo) used by Playwright smoke tests and agents.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.
