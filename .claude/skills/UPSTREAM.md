@@ -1,0 +1,1 @@
+Skills in this directory are copied from https://github.com/mattpocock/skills (plugin mattpocock-skills v1.3.1, commit 59db609eb1e18aaf59b63284d0e52255aff0c63c), MIT licensed. See LICENSE-mattpocock-skills.
