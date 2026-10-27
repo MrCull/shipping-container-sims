@@ -52,5 +52,9 @@ export type {
   InvariantReport,
   EventListener,
 } from './simulation'
+export { parseLogVerbosity, toLogRecord, eventSubsystem, eventLogLevel, LOG_LEVELS } from './logging'
+export type { LogLevel, LogRecord, LogOptions, LogVerbosity } from './logging'
+export { diffEventLogs, jsonDifferences } from './runDiff'
+export type { RunDiff, RunDiffOptions } from './runDiff'
 export { summarizeRun } from './summary'
 export type { RunSummary } from './summary'

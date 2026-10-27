@@ -4,7 +4,7 @@
 
 **Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root — use its terms in code, tests and docs.
 
-**Status:** headless engine tracer (TT-01) with the decision-point framework (TT-03). There is no `definition.ts` yet, so the sim is not on the home page; the browser host arrives with TT-02.
+**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). There is no `definition.ts` yet, so the sim is not on the home page; the browser host arrives with TT-02.
 
 **Sim ID:** `terminal-twin`
 
@@ -20,10 +20,18 @@
 | Inspect events | `npm run tt:run -- --fixture <name> --events /tmp/ev.jsonl --out /tmp/summary.json` | one JSON event per line; summary = golden format |
 | Failure path | `npm run tt:run -- --fixture <name> --handlers broken-first-lane` | exit 1, first error names `custody.single-owner` at the offending event |
 | Decision points / TOS latency | `npm run tt:run -- --fixture <name> --strategy stsGroundPosition=highest-free-lane --latency stsGroundPosition=exp:2000,timeout:10,error:10 [--async-mode pause]` | `TOS handlers:` block shows calls, fallbacks, latency, backlog, idle caused; invariants still 0 |
-| Intentional behaviour change | `UPDATE_GOLDEN=1 npm test`, then review the `*.golden.json` diff | the golden diff shows only the change you intended |
-| Fixture definition change | `npm run tt:fixtures`, then `UPDATE_GOLDEN=1 npm test` | committed fixture JSON matches `definitions.ts` |
+| Structured logs | `npm run tt:run -- --fixture <name> --log /tmp/run.log.jsonl --log-level "sts=debug,vessel=warn,*=info"` | one JSON object per line with `t`, `eventId`, `seq`, `subsystem`, `level`, `type`, `subjects` (+ `causedBy`, `payload` at `debug`); `grep '"subsystem":"sts"'` |
+| Two strategies diverge where? | `npm run tt:diff -- --fixture <name> --b-handlers highest-free-lane` | exit 1; `First divergence at seq N`, differing fields, context and both payloads (exit 0 + `No divergence` if identical) |
+| Two seeds | `npm run tt:diff -- --fixture <name> --a-seed 1 --b-seed 2` | same report |
+| Two code versions | before: `npm run tt:run -- --fixture <name> --events /tmp/before.jsonl`; after your change: `… --events /tmp/after.jsonl`; then `npm run tt:diff -- /tmp/before.jsonl /tmp/after.jsonl` | first diverging event = first effect of your change |
+| Reproduce a late bug | `npm run tt:run -- --fixture <name> --until time:50400 --snapshot /tmp/h14.json`, then `npm run tt:run -- --from-snapshot /tmp/h14.json --until time:54000 --events /tmp/win.jsonl --log /tmp/win.log.jsonl --log-level debug` | the window's events equal that window of the uninterrupted run; re-run the window as often as needed |
+| Check goldens | `npm run tt:golden` (also part of `npm test`) | `<fixture>: match` per fixture, exit 0; drift prints `path: golden X → actual Y` per field and exits 1 |
+| Intentional behaviour change | `npm run tt:golden -- --update` (or `UPDATE_GOLDEN=1 npm test`), then review the `*.golden.json` diff | the golden diff shows only the change you intended |
+| Fixture definition change | `npm run tt:fixtures`, then `npm run tt:golden -- --update` | committed fixture JSON matches `definitions.ts` |
 
-Never regenerate goldens to make a failing test pass unless the behaviour change is intended and explained in the commit.
+Never regenerate goldens to make a failing test pass unless the behaviour change is intended and explained in the commit. Without `--update` / `UPDATE_GOLDEN=1` nothing ever rewrites a golden.
+
+All three commands print usage with `--help`. Exit codes: `tt:run` 0 ok / 1 violation or error / 2 usage; `tt:diff` 0 identical / 1 diverged / 2 usage; `tt:golden` 0 all match / 1 drift or missing / 2 usage.
 
 ## Folder layout
 
@@ -47,6 +55,8 @@ terminal-twin/
 │   ├── state.ts              SimState (plain JSON) + initial state from config
 │   ├── query.ts              Read-only SimQuery
 │   ├── kpis.ts, summary.ts   KpiReport, RunSummary (golden format)
+│   ├── logging.ts            Structured log records + per-subsystem verbosity (EVENT_LOG_META)
+│   ├── runDiff.ts            diffEventLogs: first diverging event between two logs
 │   └── rng.ts, hash.ts, eventQueue.ts
 ├── scenario/
 │   ├── types.ts              ScenarioConfig (schemaVersion 1, SI units)
@@ -54,7 +64,8 @@ terminal-twin/
 │   ├── iso6346.ts            Container id check digits
 │   ├── presets.ts            Preset registry (empty until TT-15)
 │   └── fixtures/             definitions.ts → <name>.json (+ <name>.golden.json), index.ts
-├── cli/                      Node-only: run.ts (entry), runCli.ts, handlerSets.ts, build-fixtures.ts
+├── cli/                      Node-only: run.ts→runCli.ts (tt:run), diff.ts→diffCli.ts (tt:diff),
+│                             golden-cli.ts→golden.ts (tt:golden), handlerSets.ts, build-fixtures.ts
 └── tests/                    Vitest suites (Node-only)
 ```
 
@@ -73,7 +84,8 @@ terminal-twin/
 ## Public engine API (`engine/index.ts`)
 
 ```ts
-const sim = createSimulation(config, handlers?, { seed?, asyncMode?, invariants?: { enabled?, failFast? } })
+const sim = createSimulation(config, handlers?, { seed?, asyncMode?, invariants?: { enabled?, failFast? },
+                                                 log?: { verbosity?: 'sts=debug,*=warn', write(record) } })
 sim.step(); sim.runUntil({ time?, eventType?, vesselsCompleted?, moves?, maxEvents?, predicate? })
 await sim.runUntilAsync(cond?) // same, but awaits async (Promise) handlers instead of stopping
 sim.asyncMode               // 'keep-running' | 'pause'
@@ -83,6 +95,8 @@ sim.why(eventId)            // [event, parent, …, ScenarioStarted]
 sim.subscribe(fn, { types? }) // returns unsubscribe
 sim.eventLog(); sim.eventLogHash(); sim.kpiReport(); sim.invariantReport(); sim.status; sim.firstError
 summarizeRun(sim)           // RunSummary = CLI --out and golden format
+diffEventLogs(logA, logB, { context? }) // { diverged, commonEvents, seq, a, b, differences, before, afterA, afterB }
+parseLogVerbosity('asc=debug,*=warn'); toLogRecord(event, verbosity)
 ```
 
 ## Extending
@@ -92,6 +106,8 @@ summarizeRun(sim)           // RunSummary = CLI --out and golden format
 - **New custody owner kind:** extend `CustodyKind` and add its holders to `custodyHolders()` in `invariants.ts`.
 - **New invariant:** append it to `INVARIANTS` with a dotted id, and add a test that uses a broken handler or reactor to trigger it.
 - **New fixture:** add it to `scenario/fixtures/definitions.ts`, run `npm run tt:fixtures`, import the JSON in `fixtures/index.ts`, then `UPDATE_GOLDEN=1 npm test`.
+- **Logging a new event type:** nothing to do if its name starts with its subsystem (`AscMoveStarted` → `asc`, level `info`). Otherwise, or for a `debug`/`warn`/`error` level, add it to `EVENT_LOG_META` in `engine/logging.ts`.
+- **New CLI strategy for diffs:** add a named handler set to `cli/handlerSets.ts` (or, for one decision point, pass `--strategy <dp>=<name>`; `tt:run` takes the same flag).
 - **New decision point or strategy:** see [Decision points](#decision-points-tos-seams) below.
 
 ## Decision points (TOS seams)
@@ -138,5 +154,8 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 - A reply computed at request time is delivered later in keep-running mode, so it can be stale. That is realistic: a reply with an invalid ground position surfaces as an invariant violation.
 - If the ground-position handler returns `null`, the STS raises `StsWaitingForGroundPosition` and idles for good. Nothing wakes it yet.
 - Invariants are checked over the whole state after every event (O(state)), which is fine at tracer scale. Revisit before the TTI preset (TT-19).
-- Snapshots embed the full event log.
+- Snapshots embed the full event log. `--from-snapshot` runs write only the window's events/log lines, but KPIs and the event-log hash in the summary are cumulative from t = 0.
+- `--until time:T` leaves `now = T`, so a snapshot taken there resumes at exactly `T`; events at `t ≤ T` are in the snapshot, the window holds `t > T`.
+- Handlers are not in snapshots: pass the same `--handlers` when resuming a window.
+- Logs are derived from committed events only; there is no free-text reactor logging yet.
 - The `ScenarioEnded` and `InvariantViolated` events are committed directly. They are not queued and are not invariant-checked.

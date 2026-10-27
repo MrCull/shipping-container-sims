@@ -11,6 +11,7 @@ import type { HandlerSet } from './handlers'
 import { hashDigest, hashUpdate } from './hash'
 import { checkInvariants, type InvariantViolation } from './invariants'
 import { buildKpiReport, type KpiReport } from './kpis'
+import { createEventLogger, type LogOptions } from './logging'
 import { createQuery, type SimQuery } from './query'
 import { nextRandom } from './rng'
 import { createInitialState, type CustodyRef, type SimState } from './state'
@@ -35,6 +36,8 @@ export interface SimulationOptions {
     /** Stop the run at the first violation (default true). */
     failFast?: boolean
   }
+  /** Structured logging: each committed event that passes the verbosity filter is written as a `LogRecord`. */
+  log?: LogOptions
 }
 
 export type SimStatus = 'ready' | 'ended' | 'failed'
@@ -150,6 +153,7 @@ export function createSimulation(
     scheduleFrom: (causedBy, type, at, subjects, payload) => schedule(makeEvent(type, at, causedBy, subjects, payload) as EngineEvent),
   })
   const reactorMaps: ReactorMap[] = [decisions.reactors, ...REACTORS]
+  if (options.log) listeners.add({ fn: createEventLogger(options.log) })
 
   function makeEvent<K extends EventType>(
     type: K,

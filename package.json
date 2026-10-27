@@ -15,7 +15,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "tt:run": "tsx src/sims/terminal-twin/cli/run.ts",
-    "tt:fixtures": "tsx src/sims/terminal-twin/cli/build-fixtures.ts"
+    "tt:fixtures": "tsx src/sims/terminal-twin/cli/build-fixtures.ts",
+    "tt:diff": "tsx src/sims/terminal-twin/cli/diff.ts",
+    "tt:golden": "tsx src/sims/terminal-twin/cli/golden-cli.ts"
   },
   "dependencies": {
     "pinia": "^4.0",
