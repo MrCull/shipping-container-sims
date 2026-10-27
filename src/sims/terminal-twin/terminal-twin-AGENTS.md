@@ -4,7 +4,7 @@
 
 **Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root — use its terms in code, tests and docs.
 
-**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-20 added locale and units, the message catalogue and keyboard shortcuts. TT-09 added real vessel calls: five size classes, generated bay plans, a continuous quay with berth allocation and anchorage, STS cranes on one rail with a crane split, twin-20 lifts, and the setup dialog's vessel table and generator.
+**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-20 added locale and units, the message catalogue and keyboard shortcuts. Phase 2 has started with the asset pipeline and container models (TT-22): Blender-generated GLBs with LODs and a livery atlas, instanced in the 3D view, plus a dev asset viewer and an asset budget check in CI. See [Phase 2 asset pipeline](#phase-2-asset-pipeline). TT-09 added real vessel calls: five size classes, generated bay plans, a continuous quay with berth allocation and anchorage, STS cranes on one rail with a crane split, twin-20 lifts, and the setup dialog's vessel table and generator.
 
 **Sim ID:** `terminal-twin`
 
@@ -35,6 +35,11 @@
 | Crane split / rail order | `npm run tt:run -- --fixture crane-split-4sts --strategy craneSplit=equal-bays` (vs the default `balanced-moves`) | 4 STS lines with different move counts, 0 violations (`sts.rail-order` is checked after every event); `tests/crane-split.test.ts` |
 | Twin-20 | `npm run tt:run -- --fixture twin-20-lift` | `4 moves in 2 cycles (2 twin-20)`; `tests/vessels.test.ts` |
 | Vessels in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('crane-split-4sts').then(() => window.__tt.runTo(1500)).then(() => window.__tt.pause()).then(() => window.__tt.cameraTo('V001'))"` | hull at its berth, four STS along it, deck boxes on the hatch covers |
+| Asset budgets (CI) | `npm run tt:assets:check` (also in `npm test`) | `ok` per GLB with LOD triangles/draw calls, `Budgets: pass`, exit 0 |
+| Regenerate assets (needs bpy) | `npm run tt:assets -- --python <venv python>` | GLBs, sidecars, atlas, previews rewritten; budget check passes; `git diff` shows only intended changes |
+| Generator is deterministic | `npm run tt:assets -- --check --python <venv python>` | `Regenerated assets are identical to the committed ones`, exit 0 |
+| Assets in the real renderer | `npm run tt:assets:shots` | PNG per asset × LOD + `yard.png` in `.screenshots/assets/`, no page errors |
+| Look at one asset | `npm run dev`, open `/sim/terminal-twin?viewer=container-40` (or `?viewer=yard`) | viewer with LOD buttons, livery picker, rig sliders, 20 ft reference box |
 
 Never regenerate goldens to make a failing test pass unless the behaviour change is intended and explained in the commit. Without `--update` / `UPDATE_GOLDEN=1` nothing ever rewrites a golden.
 
@@ -93,7 +98,9 @@ terminal-twin/
 │   ├── twinController.ts     Playback clock, look-ahead, Run to/runUntil/step, generation guard
 │   ├── engineClient.ts       Promise wrapper over the worker (request ids)
 │   ├── sceneModel.ts         Pure-TS timelines from worker deltas → poses/positions at any time
-│   ├── sceneRenderer.ts      Three.js procedural quay, STS, vessel hulls, ONE InstancedMesh of containers
+│   ├── sceneRenderer.ts      Three.js procedural quay, STS, vessel hulls; containers via ContainerInstancer
+│   ├── containerAssets.ts    Loads container GLBs (meshopt decoder from three), bakes LODs, livery shader patch
+│   ├── containerInstancer.ts Instanced containers: placeholders → GLB LOD0/LOD1 per size, liveryIndex per instance
 │   ├── shortcuts.ts          SHORTCUT_HELP table + shortcutFor(key event) (ignores typing targets)
 │   └── time.ts               Start date default (Mon 06:00), datetime-local helpers
 ├── store/twinStore.ts        Pinia facade (small reactive UI state; controller/view kept raw)
@@ -102,8 +109,15 @@ terminal-twin/
 │   ├── engineHost.ts         Serves requests via the public engine API; builds compact Deltas
 │   └── protocol.ts           Request/reply/Delta types (internal, not a public seam)
 ├── dev/devApi.ts             window.__tt (dev builds only)
+├── dev/AssetViewer.vue       Dev asset viewer (?viewer=<asset>|yard); assetViewerScene.ts; assetViewerApi.ts (window.__ttAssets)
+├── assets/                   Phase 2 asset library (see "Phase 2 asset pipeline")
+│   ├── budgets.json          Triangle / draw-call / file-size budgets per asset kind
+│   ├── generators/           Python (bpy) generators: build.py, tt_assets/*.py, fonts/ (OFL), requirements.txt
+│   └── models/<group>/       Committed outputs: <asset>.glb + .meta.json, livery-atlas.json, previews/*.webp
 ├── cli/                      Node-only: run.ts→runCli.ts (tt:run), diff.ts→diffCli.ts (tt:diff),
-│                             golden-cli.ts→golden.ts (tt:golden), handlerSets.ts, build-fixtures.ts
+│                             golden-cli.ts→golden.ts (tt:golden), handlerSets.ts, build-fixtures.ts,
+│                             assets/ (build.ts = tt:assets, check.ts→budgetCheck.ts = tt:assets:check,
+│                             screenshots.ts = tt:assets:shots, glb.ts = JSON-chunk GLB reader)
 └── tests/                    Vitest suites (Node-only); tests/browser/*.smoke.ts = Playwright (npm run test:smoke)
 ```
 
@@ -115,7 +129,7 @@ terminal-twin/
 - **Playback clock** (`TwinController`). `displayTime` advances by wall time × speed. It is clamped to the **engine horizon** (`info.now`) and to the scenario end. While playing, the controller keeps the engine a look-ahead ahead (`max(5 s, 1.5 s × speed)`) with `advance` requests, so the motion segments for the displayed instant are already known. That keeps animation smooth up to ×600. **While paused it does not run ahead**, so the scene and dev-API queries describe the same instant.
 - **Flat-out runs.** "Run to…", `__tt.runUntil` and `__tt.step` send `run`/`step`. Rendering is skipped while `busy`. The delta is compacted to the latest plan, custody and status per entity, and the display jumps to the target (Run to…) or to the engine time (runUntil/step, which also pause).
 - **Scene model.** `SceneModel` keeps per-axis segment lists and custody/status timelines and prunes history older than the display time. `positionAt` interpolates the crane, and a carried box follows the spreader. Display time never goes backwards, except on reset/load, which build a new model; a generation counter drops replies that belong to the old scenario.
-- **Rendering.** All containers are one `InstancedMesh` (colour per shipping line). STS, hulls and the quay are shared low-poly boxes. Three.js objects never enter Vue reactivity; the store mirrors only the clock, speed, engine info and selection.
+- **Rendering.** Containers are drawn by `ContainerInstancer`: procedural boxes until the GLBs load, then one `InstancedMesh` per size × LOD with a livery per instance (see [Phase 2 asset pipeline](#phase-2-asset-pipeline)). STS, hulls and the quay are shared low-poly boxes. Three.js objects never enter Vue reactivity; the store mirrors only the clock, speed, engine info and selection.
 - **Setup dialog.** It lists fixtures plus the `presets` registry, with an editable seed (re-roll) and start date/time (default Monday 06:00 of the current week, local time). Start = `store.startScenario({ name, seed, startDateTime })`. The start date changes only the clock, not the run.
 
 ### Locale, units, message catalogue, shortcuts (TT-20)
@@ -140,12 +154,107 @@ await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001
 await __tt.snapshot(); await __tt.why(eventId)
 __tt.select(id | null); __tt.cameraTo(id); __tt.setSpeed(600); __tt.pause(); __tt.play(); await __tt.reset(); __tt.newScenario()
 __tt.clock()       // { displayTime, speed, paused, busy, engine: EngineInfo }
-__tt.scene()       // rendered { containers, sts, vessels, frames }
-__tt.sceneState()  // what the scene shows: custody per box, status + pose per STS, status per vessel
+__tt.scene()       // rendered { containers, sts, vessels, frames, containerLods: { lod0, lod1 }, containerAssets: 'placeholder'|'loaded' }
+__tt.sceneState()  // what the scene shows: custody per box, status + pose per STS, status per vessel,
+                   //   liveries: { [containerId]: { index (atlas tile), size, lod } } as drawn
+__tt.cameraTo(id, distanceM?)  // aim at an entity, optionally from a distance (60 → LOD0, 600 → LOD1)
 __tt.display(); __tt.setDisplay({ locale: 'de-DE', units: 'imperial' })  // live locale/units
 __tt.config()      // loaded scenario config (SI) + current display settings
 __tt.ui()          // { selectedId, following, overlaysVisible, dashboardOpen, helpOpen }
 ```
+
+## Phase 2 asset pipeline
+
+Blender (`bpy`) Python generators → raw GLB → gltf-transform (meshopt) → committed GLB + `.meta.json` sidecar + WebP previews. The web build never runs Blender, and CI checks only the committed outputs.
+
+### Setup (once)
+
+- Python **3.13** in a venv (the `bpy` 5.2 wheels target 3.13 only): `python3.13 -m venv .venv-bpy`, then `.venv-bpy/bin/pip install -r src/sims/terminal-twin/assets/generators/requirements.txt`. On Windows: `py -3.13 -m venv .venv-bpy`, then `.venv-bpy\Scripts\pip install -r ...`. `.venv-bpy/` is git-ignored.
+- A Blender install can run the generator too (`blender --background --python src/sims/terminal-twin/assets/generators/build.py -- --out <dir>`), but then you compress the GLBs yourself. `npm run tt:assets` needs a Python that can `import bpy`.
+- The Node dependencies (`@gltf-transform/*`, `meshoptimizer`) come with `npm install`.
+
+### Regenerate (one command, also on Windows)
+
+```
+npm run tt:assets -- --python .venv-bpy/bin/python      # or set TT_BPY_PYTHON; Windows: .venv-bpy\Scripts\python.exe
+npm run tt:assets -- --check --python ...               # regenerate into a temp dir and byte-compare with the commit
+npm run tt:assets -- --no-previews --python ...         # fast iteration (keeps the committed previews)
+```
+
+What `cli/assets/build.ts` does:
+
+1. Finds Python: `--python`, then `$TT_BPY_PYTHON`, then `python3.13`/`python3`/`python` (`py -3.13` on Windows).
+2. Runs `assets/generators/build.py --out <staging>`.
+3. Compresses each GLB with gltf-transform `dedup` + `prune` + `meshopt`. Meshopt also quantises; TEXCOORD_1 stays float because it tiles beyond [0, 1].
+4. Replaces `assets/models/<group>/` entirely, then runs the budget check.
+
+It takes about 80 s for containers, mostly the Cycles previews. Two runs give byte-identical outputs, and `--check` proves it: there is no randomness, the Cycles seed is 0, there is no denoiser, and sample counts are fixed.
+
+- **No Draco:** the bpy exporter's Draco option silently does nothing.
+- **No KTX2:** no encoder is available. Textures are WebP from the Blender exporter (`EXT_texture_webp`).
+- **Offline:** the meshopt decoder is `three/examples/jsm/libs/meshopt_decoder.module.js` (bundled), and GLB URLs are Vite asset URLs. No CDN is ever contacted (smoke-tested).
+- **Never commit** `.blend` files (git-ignored) or third-party reference photos. Record photo URLs and credits only.
+
+### Budgets and the check
+
+`assets/budgets.json` holds the budgets per asset kind and the library total (15 MB). Containers are used now; the STS/ASC/SHC/truck/vessel/building numbers from the spec are pre-filled for later tickets.
+
+`npm run tt:assets:check` (`cli/assets/budgetCheck.ts`) reads only each GLB's JSON chunk. It also runs as a Vitest suite (`tests/asset-budgets.test.ts`) and as a step in `.github/workflows/pr-checks.yml`. It fails on:
+
+- triangles or draw calls (primitives) per `LODn` subtree over budget;
+- file size over `maxFileBytes`, or the library over `libraryMaxBytes`;
+- a missing required rig node (`requiredNodes`), or a GLB node that the sidecar's `nodes` list does not document;
+- a missing sidecar or sidecar field (`requiredMetaFields`);
+- Draco/KTX2 extensions, or external buffer/image URIs.
+
+| Asset | LOD0 | LOD1 | Draw calls (LOD0 / LOD1) | File |
+|---|---|---|---|---|
+| `container-20` | 308 triangles (budget 450) | 12 (budget 12) | 3 / 1 | ~134 KB |
+| `container-40`, `container-40hc` | 440 triangles (budget 450) | 12 | 3 / 1 | ~136 KB |
+
+Most of each container file is the embedded 2048² livery atlas. The renderer shares one texture between them.
+
+### Rig and sidecar conventions (all assets)
+
+- **Hierarchy:** the root node is the asset name, with children `LOD0` and `LOD1` (plus `LOD2` for big equipment). Movable parts are named nodes under the LOD with their **origin at the mechanical pivot**. Use the spec's names: `gantry`, `trolley`, `hoist`, `spreader`, twist-locks, `wheel_*`, `steer_*`, `boom`. Containers have `LOD0/{body, door_left, door_right}` and a `LOD1` mesh.
+- **Axes (glTF):** +Y up, metres, origin at the ground-contact point (bottom centre for containers), length along +X (container doors at +X), width along Z. Blender authoring is Z-up, and the exporter converts (glTF Z = −Blender Y).
+- **Sidecar `<asset>.meta.json`:**
+  - `asset`, and `kind` (the budget key);
+  - `dimensions` and `axes`;
+  - `nodes`: every non-root node, with its parent, role, pivot and axis;
+  - `travelLimits` per rig node: `rotation` with `minDeg`/`maxDeg`, or `translation` with `minM`/`maxM`, plus axis and rest;
+  - `attachPoints` (containers: 4 top twist-lock points and 4 bottom stacking points) and `groundContact`;
+  - `lods` and `provenance`.
+- **Provenance tags** follow the TTI reference pack: `V` verified, `P` photo-supported, `A` approximated, `M` intentional modification (with a `reason`). Anything newly assumed is `A`. For example, the container corrugation pitch is `M`: 0.56 m instead of about 0.28 m, to fit the triangle budget.
+- **Rig sliders** in the asset viewer are generated from `travelLimits`, so a new asset gets them for free.
+
+### Containers and liveries
+
+- **Geometry** (`generators/tt_assets/containers.py`): ISO 668 sizes `20`, `40` and `40HC` [V] and ISO 1161 corner castings [V]. It builds corrugated sides (a valley plane plus trapezoid ribs), frame rails, corner posts, the front wall, and two door leaves with two locking bars and handles each, hinged at the outer corners (270° swing [P]).
+- **LOD1** is a 12-triangle box. Its normal map (TEXCOORD_1, 128×4, repeat) has the same rib profile and pitch as LOD0's geometry, so switching LODs does not pop.
+- **Liveries** (`generators/tt_assets/liveries.py`):
+  - `LIVERIES` order = atlas index = per-instance livery index. Lines and owner prefixes match `LINE_OWNER_PREFIX` in `scenario/builder.ts`, and the last entry is the generic grey.
+  - The atlas is 2048² with 2×6 tiles. Each tile has the regions `side40`, `side20`, `door`, `front`, `solid`, `dark` and `metal`.
+  - Wordmarks are the brand name in brand colours, set in an open-licence typeface close to the brand's (`generators/fonts/`, with the OFL licences alongside) [A].
+  - **To use official logos later:** draw them into the same regions in `_draw_tile` (keep the layout) and regenerate.
+- **Livery in the renderer:** GLB TEXCOORD_0 is authored for **tile 0 (HMM)**. `liveryMaterial()` in `modules/containerAssets.ts` patches the material so that `vMapUv += tileOffset(liveryIndex + liveryBase)`. `livery-atlas.json`, committed next to the GLBs, is the renderer's lookup (`liveryIndexForLine(line)`).
+- **Adding a line:** append it to `LIVERIES` **before** the generic entry, add its prefix to `LINE_OWNER_PREFIX`, and regenerate. The current atlas holds at most 12 tiles.
+
+### Renderer integration (`ContainerInstancer`)
+
+- It starts with procedural placeholder boxes (one InstancedMesh per size, in the livery body colour), so the scene is usable at once. `loadContainerAssets()`, cached per page, then swaps in 6 InstancedMeshes (3 sizes × LOD0/LOD1). LOD0 is the body and the closed doors merged into one geometry.
+- **LOD choice per frame:** boxes within `lod0DistanceM` (140 m) of the camera are LOD0 candidates. A box already at LOD0 keeps it out to ×1.15 (hysteresis). At most `lod0Cap` (300) of the nearest candidates get LOD0. Tune these in `DEFAULT_LOD_OPTIONS`.
+- Model origins are at the bottom, so `push()` takes the box **centre** (as `SceneModel` returns it) and subtracts half the height.
+- **Yard scale** (dev viewer `?viewer=yard`, and a smoke test): 18,000 boxes come to about 264k container triangles, 6 container draw calls, and 14 draw calls per frame including the shadow pass.
+  - Headless SwiftShader renders this at well under 1 fps, which says nothing about real frame rate.
+  - The TT-19 frame-rate target is not defined yet. Check fps on a real GPU in the viewer's readout.
+
+### Adding the next asset (STS, ASC, …)
+
+1. Add `generators/tt_assets/<kind>.py`, and wire a group into `build.py` (`GROUPS`) and `cli/assets/build.ts` (`GROUPS`).
+2. Follow the rig and sidecar conventions above, and tag every dimension `V`, `P`, `A` or `M`.
+3. Check or tune its entry in `budgets.json` and run `npm run tt:assets`. Look at the previews and at `?viewer=<asset>`, then run `npm run tt:assets:shots`.
+4. Commit the generators, GLBs, sidecars and previews (never `.blend` files or photos).
 
 ## Engine architecture
 
@@ -256,3 +365,7 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 - Locale: `<input type="datetime-local">` (setup start, Run to…) is rendered by the browser in the *browser's* locale, not the chosen one; the clock, preview and readouts follow the chosen locale.
 - Shortcut `.` while playing pauses and steps the engine's next event, which is beyond the look-ahead, so the display jumps forward slightly. Pause first (Space/0) to step event by event.
 - The `ScenarioEnded` and `InvariantViolated` events are committed directly. They are not queued and are not invariant-checked.
+- Assets: run the generators only through `npm run tt:assets`; it replaces `assets/models/<group>/` wholesale, so hand edits to a committed GLB or sidecar are lost.
+- Assets: the viewer and the twin share one cached `loadContainerAssets()` promise; never dispose its materials or textures from a renderer.
+- Assets: container shadows need `shadow.normalBias` (0.35 in the twin) or the corrugation shows shadow acne.
+- Fixture `liveries-mixed` (12 generated boxes, equal weights over all ten lines → 8 lines with seed 7, all three sizes) exists for the livery smoke test.

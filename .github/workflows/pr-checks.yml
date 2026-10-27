@@ -33,3 +33,6 @@ jobs:
 
       - name: Test
         run: npm test --if-present
+
+      - name: Asset budgets (Terminal Twin GLBs + sidecars; no Blender needed)
+        run: npm run tt:assets:check

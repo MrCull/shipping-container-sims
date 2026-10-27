@@ -18,7 +18,7 @@ import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/
 import { createFormatter } from '../i18n/format'
 import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
-import type { SceneStats } from '../modules/sceneRenderer'
+import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 
 export type TwinPhase = 'setup' | 'running'
 
@@ -34,9 +34,12 @@ export interface ScenarioChoice {
 
 /** What the 3D view registers so the dev API can reach it. */
 export interface TwinView {
-  cameraTo(entityId: string): boolean
+  /** Aim at an entity, keeping the view direction (and, if given, at `distanceM`). */
+  cameraTo(entityId: string, distanceM?: number): boolean
   /** Rendered entity counts plus frames rendered so far; null without a 3D view. */
   stats(): (SceneStats & { frames: number }) | null
+  /** Livery index, size and LOD drawn per container; null without a 3D view. */
+  liveries(): Record<string, RenderedLivery> | null
 }
 
 const RECENT_EVENTS_CAP = 500

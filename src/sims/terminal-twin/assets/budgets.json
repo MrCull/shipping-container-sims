@@ -1,0 +1,45 @@
+{
+  "$comment": "Phase 2 asset budgets (spec #24, 'Phase 2 asset pipeline'). Checked by `npm run tt:assets:check` and tests/asset-budgets.test.ts. Triangles and draw calls are per LOD subtree; maxFileBytes is per GLB; libraryMaxBytes is all GLBs together.",
+  "libraryMaxBytes": 15000000,
+  "requiredMetaFields": ["asset", "kind", "dimensions", "axes", "nodes", "travelLimits", "attachPoints", "groundContact", "provenance"],
+  "kinds": {
+    "container": {
+      "lods": {
+        "LOD0": { "maxTriangles": 450, "maxDrawCalls": 3 },
+        "LOD1": { "maxTriangles": 12, "maxDrawCalls": 1 }
+      },
+      "maxFileBytes": 400000,
+      "requiredNodes": ["LOD0", "LOD1", "body", "door_left", "door_right"]
+    },
+    "sts": {
+      "lods": { "LOD0": { "maxTriangles": 40000, "maxDrawCalls": 12 }, "LOD1": { "maxTriangles": 8000, "maxDrawCalls": 8 }, "LOD2": { "maxTriangles": 1000, "maxDrawCalls": 4 } },
+      "maxFileBytes": 3000000,
+      "requiredNodes": ["LOD0", "LOD1", "LOD2", "gantry", "trolley", "hoist", "spreader", "boom"]
+    },
+    "asc": {
+      "lods": { "LOD0": { "maxTriangles": 15000, "maxDrawCalls": 10 }, "LOD1": { "maxTriangles": 4000, "maxDrawCalls": 6 }, "LOD2": { "maxTriangles": 600, "maxDrawCalls": 3 } },
+      "maxFileBytes": 1500000,
+      "requiredNodes": ["LOD0", "LOD1", "LOD2", "gantry", "trolley", "hoist", "spreader"]
+    },
+    "shc": {
+      "lods": { "LOD0": { "maxTriangles": 12000, "maxDrawCalls": 10 }, "LOD1": { "maxTriangles": 3000, "maxDrawCalls": 6 }, "LOD2": { "maxTriangles": 400, "maxDrawCalls": 3 } },
+      "maxFileBytes": 1500000,
+      "requiredNodes": ["LOD0", "LOD1", "LOD2", "hoist", "spreader"]
+    },
+    "truck": {
+      "lods": { "LOD0": { "maxTriangles": 8000, "maxDrawCalls": 8 }, "LOD1": { "maxTriangles": 2000, "maxDrawCalls": 4 }, "LOD2": { "maxTriangles": 300, "maxDrawCalls": 2 } },
+      "maxFileBytes": 1000000,
+      "requiredNodes": ["LOD0", "LOD1", "LOD2"]
+    },
+    "vessel": {
+      "lods": { "LOD0": { "maxTriangles": 20000, "maxDrawCalls": 10 }, "LOD1": { "maxTriangles": 5000, "maxDrawCalls": 6 }, "LOD2": { "maxTriangles": 800, "maxDrawCalls": 3 } },
+      "maxFileBytes": 2000000,
+      "requiredNodes": ["LOD0", "LOD1", "LOD2"]
+    },
+    "building": {
+      "lods": { "LOD0": { "maxTriangles": 5000, "maxDrawCalls": 8 } },
+      "maxFileBytes": 1000000,
+      "requiredNodes": ["LOD0"]
+    }
+  }
+}

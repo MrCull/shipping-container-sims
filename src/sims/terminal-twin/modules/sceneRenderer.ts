@@ -1,7 +1,9 @@
 /**
- * Phase 1 procedural low-poly scene: quay, water, STS cranes on their rail,
- * vessel hulls and all containers as ONE InstancedMesh. Shared geometries
- * and materials; nothing here is reactive (never put these in Vue state).
+ * Phase 1 procedural low-poly scene: quay, water, STS cranes on their rail and
+ * vessel hulls. Containers are drawn by the ContainerInstancer: procedural
+ * placeholder boxes at once, then the phase 2 GLB LODs (LOD0 near the camera,
+ * LOD1 elsewhere) with a per-instance livery as soon as they load. Shared
+ * geometries and materials; nothing here is reactive (never put these in Vue state).
  *
  * `update(model, t)` poses everything for display time `t` from the
  * SceneModel timelines.
@@ -9,6 +11,8 @@
 import * as THREE from 'three'
 import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
+import { ContainerInstancer } from './containerInstancer'
+import { LIVERY_ATLAS, liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
 import { aftOffsetM, BAY_PITCH_M, FENDER_GAP_M, ROW_PITCH_M, slotX, slotZ, TIER_PITCH_M } from '../scenario/vesselClasses'
 
 /** [A] Malaccamax-style STS proportions (m). */
@@ -23,21 +27,6 @@ const STS = {
   apexY: 72,
 }
 
-/** Shipping-line livery colours (approximate; [A]). */
-const LINE_COLOURS: Record<string, string> = {
-  HMM: '#f47b20',
-  MSC: '#d8c9a3',
-  Maersk: '#42b0d5',
-  'CMA CGM': '#1f3f8f',
-  'Hapag-Lloyd': '#ef7d00',
-  ONE: '#d6007f',
-  Evergreen: '#00843d',
-  COSCO: '#2f5fae',
-  ZIM: '#c9ccd1',
-  'Yang Ming': '#f2c318',
-}
-const DEFAULT_CONTAINER_COLOUR = '#8a95a5'
-
 export interface SceneStats {
   /** Container instances drawn. */
   containers: number
@@ -45,6 +34,18 @@ export interface SceneStats {
   sts: number
   /** Vessel hulls currently visible. */
   vessels: number
+  /** Container instances per LOD (placeholders count as LOD1). */
+  containerLods: { lod0: number; lod1: number }
+  /** 'placeholder' until the container GLBs have loaded. */
+  containerAssets: 'placeholder' | 'loaded'
+}
+
+/** What the scene draws for one container (dev API). */
+export interface RenderedLivery {
+  /** Livery atlas index (see assets/models/containers/livery-atlas.json). */
+  index: number
+  size: string
+  lod: 0 | 1
 }
 
 interface StsParts {
@@ -58,15 +59,13 @@ const LAND_RAIL_Z = STS.waterRailZ + STS.gauge
 
 export class SceneRenderer {
   readonly scene = new THREE.Scene()
-  private containers: THREE.InstancedMesh
+  private containers: ContainerInstancer
+  private containerLivery: number[]
+  private disposed = false
   private sts = new Map<string, StsParts>()
   private vessels = new Map<string, THREE.Group>()
   private selection: THREE.LineSegments
   private disposables: { dispose(): void }[] = []
-  private readonly matrix = new THREE.Matrix4()
-  private readonly position = new THREE.Vector3()
-  private readonly scale = new THREE.Vector3()
-  private readonly quaternion = new THREE.Quaternion()
 
   constructor(private model: SceneModel) {
     const { config } = model
@@ -77,20 +76,19 @@ export class SceneRenderer {
     for (const s of config.sts) this.addSts(s.id)
     for (const v of config.vessels) this.addVessel(v.id)
 
-    const box = this.track(new THREE.BoxGeometry(1, 1, 1))
-    const mat = this.track(new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0.15 }))
-    this.containers = new THREE.InstancedMesh(box, mat, Math.max(1, model.containerIds.length))
-    this.containers.count = model.containerIds.length
-    this.containers.castShadow = true
-    this.containers.receiveShadow = true
-    this.containers.frustumCulled = false
-    const colour = new THREE.Color()
-    model.containerIds.forEach((id, i) => {
-      colour.set(LINE_COLOURS[model.containerLine[id]] ?? DEFAULT_CONTAINER_COLOUR)
-      this.containers.setColorAt(i, colour)
-    })
-    this.scene.add(this.containers)
+    const capacity: Partial<Record<string, number>> = {}
+    for (const id of model.containerIds) capacity[model.containerSize[id]] = (capacity[model.containerSize[id]] ?? 0) + 1
+    this.containers = new ContainerInstancer(capacity)
+    this.containerLivery = model.containerIds.map((id) => liveryIndexForLine(model.containerLine[id]))
+    this.scene.add(this.containers.group)
+    loadContainerAssets().then(
+      (assets) => {
+        if (!this.disposed) this.containers.setAssets(assets)
+      },
+      (err: unknown) => console.warn('Terminal Twin: container GLBs failed to load; keeping placeholders', err),
+    )
 
+    const box = this.track(new THREE.BoxGeometry(1, 1, 1))
     const edges = this.track(new THREE.EdgesGeometry(box))
     this.selection = new THREE.LineSegments(edges, this.track(new THREE.LineBasicMaterial({ color: '#f59e0b' })))
     this.selection.visible = false
@@ -108,6 +106,9 @@ export class SceneRenderer {
     sun.position.set(-150, 260, 180)
     sun.castShadow = true
     sun.shadow.mapSize.set(2048, 2048)
+    // ~0.25 m shadow texels: bias so container corrugation does not self-shadow (acne).
+    sun.shadow.normalBias = 0.35
+    sun.shadow.bias = -0.0004
     const c = sun.shadow.camera
     c.left = -250
     c.right = 250
@@ -222,8 +223,8 @@ export class SceneRenderer {
       g.rotateX(-Math.PI / 2) // shape Y (beam) -> -Z (seaward), extrusion -> +Y
       return this.track(g)
     }
-    const line = Object.keys(LINE_COLOURS).find((l) => v.name.startsWith(l))
-    const hullColour = line ? LINE_COLOURS[line] : '#33465f'
+    const line = LIVERY_ATLAS.liveries.find((l) => l.line !== null && v.name.startsWith(l.line))?.line
+    const hullColour = line ? liveryBodyColour(liveryIndexForLine(line)) : '#33465f'
     const hull = new THREE.Mesh(
       extrude(mainDeck + draft),
       this.track(new THREE.MeshStandardMaterial({ color: new THREE.Color(hullColour).multiplyScalar(0.55), roughness: 0.6 })),
@@ -261,7 +262,7 @@ export class SceneRenderer {
     this.vessels.set(id, group)
   }
 
-  update(t: number, selectedId: string | null): void {
+  update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3): void {
     const model = this.model
     for (const [id, parts] of this.sts) {
       const pose = model.stsPose(id, t)
@@ -279,19 +280,13 @@ export class SceneRenderer {
       if (p) group.position.set(p.x, 0, p.zOffset)
     }
 
-    let drawn = 0
-    model.containerIds.forEach((id) => {
+    const containers = this.containers
+    containers.begin()
+    model.containerIds.forEach((id, i) => {
       const c = model.containerCentre(id, t)
-      if (!c) return
-      const dims = CONTAINER_DIMS[model.containerSize[id]]
-      this.position.set(c.x, c.y, c.z)
-      this.scale.set(dims.length, dims.height, dims.width)
-      this.matrix.compose(this.position, this.quaternion, this.scale)
-      this.containers.setMatrixAt(drawn, this.matrix)
-      drawn++
+      if (c) containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i])
     })
-    this.containers.count = drawn
-    this.containers.instanceMatrix.needsUpdate = true
+    containers.end(cameraPosition)
 
     this.updateSelection(selectedId, t)
   }
@@ -327,10 +322,28 @@ export class SceneRenderer {
   stats(): SceneStats {
     let vessels = 0
     for (const g of this.vessels.values()) if (g.visible) vessels++
-    return { containers: this.containers.count, sts: this.sts.size, vessels }
+    const c = this.containers.stats()
+    return {
+      containers: c.drawn,
+      sts: this.sts.size,
+      vessels,
+      containerLods: { lod0: c.lod0, lod1: c.lod1 },
+      containerAssets: c.assets,
+    }
+  }
+
+  /** Livery, size and LOD drawn per container id at the last update. */
+  renderedLiveries(): Record<string, RenderedLivery> {
+    const out: Record<string, RenderedLivery> = {}
+    this.model.containerIds.forEach((id, i) => {
+      const r = this.containers.renderedContainer(i)
+      if (r) out[id] = { index: r.livery, size: r.size, lod: r.lod }
+    })
+    return out
   }
 
   dispose(): void {
+    this.disposed = true
     for (const d of this.disposables) d.dispose()
     this.containers.dispose()
     this.disposables = []

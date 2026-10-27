@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import TopBar from './components/TopBar.vue'
 import SetupDialog from './components/modals/SetupDialog.vue'
 import ShortcutHelp from './components/modals/ShortcutHelp.vue'
@@ -9,6 +9,9 @@ import { useTwinStore } from './store/twinStore'
 import { t } from './i18n/messages'
 
 const store = useTwinStore()
+// Dev-only asset viewer: /sim/terminal-twin?viewer=<asset>|yard (stripped from production builds).
+const assetViewer = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('viewer') : null
+const AssetViewer = import.meta.env.DEV ? defineAsyncComponent(() => import('./dev/AssetViewer.vue')) : null
 const sceneHost = ref<HTMLElement | null>(null)
 const { webglFailed } = useTwinScene(sceneHost)
 useTwinShortcuts()
@@ -36,7 +39,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="terminal-twin">
+  <component
+    :is="AssetViewer"
+    v-if="AssetViewer && assetViewer"
+    :initial="assetViewer"
+  />
+  <div
+    v-else
+    class="terminal-twin"
+  >
     <TopBar v-if="store.hasScenario" />
     <div
       ref="sceneHost"

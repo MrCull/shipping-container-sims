@@ -5,6 +5,7 @@
  */
 import type { ScenarioConfig } from '../types'
 import craneSplit4Sts from './crane-split-4sts.json'
+import liveriesMixed from './liveries-mixed.json'
 import tracer1Sts10Boxes from './tracer-1sts-10-boxes.json'
 import twin20Lift from './twin-20-lift.json'
 import twoVesselsCompeteForBerth from './two-vessels-compete-for-berth.json'
@@ -14,4 +15,5 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'two-vessels-compete-for-berth': twoVesselsCompeteForBerth as ScenarioConfig,
   'crane-split-4sts': craneSplit4Sts as ScenarioConfig,
   'twin-20-lift': twin20Lift as ScenarioConfig,
+  'liveries-mixed': liveriesMixed as ScenarioConfig,
 }

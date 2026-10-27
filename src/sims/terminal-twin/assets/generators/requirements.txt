@@ -1,0 +1,3 @@
+# Python 3.13 (bpy 5.2 wheels are built for 3.13 only). Install into a venv:
+#   python3.13 -m venv .venv-bpy && .venv-bpy/bin/pip install -r requirements.txt
+bpy==5.2.3

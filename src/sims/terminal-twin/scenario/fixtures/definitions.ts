@@ -8,6 +8,7 @@
  * (real cranes have ~3).
  */
 import { ScenarioBuilder } from '../builder'
+import { SHIPPING_LINES } from '../lines'
 import type { ScenarioConfig } from '../types'
 
 export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
@@ -57,6 +58,25 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .quay(400, { mooringS: 60, unmooringS: 60, twinLift: true })
       .sts('STS01', { gantryX: 60, groundPositions: 6 })
       .vesselCall('V001', { name: 'Twin Feeder', sizeClass: 'feeder', discharge: 4, maxSts: 1, sizeMix: { '20': 1 } })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /**
+   * TT-22 liveries: 1 STS discharges 12 boxes of 10 lines and all three sizes,
+   * so the browser can check each rendered box's livery and model size.
+   */
+  /** Livery smoke test (TT-22): 12 boxes over all ten lines (equal weights) and all three sizes. */
+  'liveries-mixed': () =>
+    new ScenarioBuilder('liveries-mixed', '1 STS discharges 12 boxes of mixed lines and sizes')
+      .seed(7)
+      .moveVariation(10)
+      .quay(400, { mooringS: 30, unmooringS: 30, twinLift: false })
+      .sts('STS01', { gantryX: 60, groundPositions: 12 })
+      .cargo({
+        lines: Object.fromEntries(SHIPPING_LINES.map((l) => [l, 1])),
+        sizeMix: { '20': 1, '40': 1, '40HC': 1 },
+      })
+      .vesselCall('V001', { name: 'Livery Trader', sizeClass: 'feeder', discharge: 12, maxSts: 1 })
       .endWhen({ vesselsCompleted: 1 })
       .build(),
 }

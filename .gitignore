@@ -147,6 +147,13 @@ vite.config.ts.timestamp-*
 # Per-machine Claude Code settings (permissions, local paths)
 .claude/settings.local.json
 
+# Terminal Twin asset generators (Python/bpy): caches, local venvs, Blender files.
+# Never commit .blend files or third-party reference photos.
+__pycache__/
+.venv-bpy/
+*.blend
+*.blend1
+
 # Browser smoke tests (npm run test:smoke)
 .smoke-dist/
 .smoke-results/

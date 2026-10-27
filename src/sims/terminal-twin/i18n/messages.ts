@@ -159,6 +159,29 @@ const en = {
   'shortcuts.dashboard': 'Dashboard tab',
   'shortcuts.overlays': 'Toggle overlays',
   'shortcuts.help': 'Show this help',
+
+  // Dev-only asset viewer (?viewer=<asset>|yard)
+  'assetViewer.title': 'Asset viewer',
+  'assetViewer.devBadge': 'dev',
+  'assetViewer.asset': 'Asset',
+  'assetViewer.yardOption': 'yard (instanced stress test)',
+  'assetViewer.livery': 'Livery',
+  'assetViewer.liveryOption': '{index} · {line}',
+  'assetViewer.genericLivery': 'generic',
+  'assetViewer.rigLabel': '{node} ({axis}, {unit}):',
+  'assetViewer.showing': 'Showing',
+  'assetViewer.triangles': 'Triangles',
+  'assetViewer.drawCalls': 'Draw calls',
+  'assetViewer.lodCost': '{triangles} tris · {drawCalls} dc',
+  'assetViewer.referenceHint': 'Grey outline: 20 ft ISO reference box.',
+  'assetViewer.instances': 'Instances',
+  'assetViewer.lodSplit': 'LOD0 / LOD1',
+  'assetViewer.lodSplitValue': '{lod0} / {lod1}',
+  'assetViewer.containerTriangles': 'Container tris',
+  'assetViewer.frameDrawCalls': 'Frame draw calls',
+  'assetViewer.frameTriangles': 'Frame triangles',
+  'assetViewer.fps': 'FPS',
+  'assetViewer.notMounted': 'Asset viewer is not mounted',
 } as const
 
 export type MessageKey = keyof typeof en
