@@ -7,12 +7,15 @@
  * recent-event buffer use shallowRef + triggerRef (Box Empire pattern).
  */
 import { defineStore } from 'pinia'
-import { markRaw, ref, shallowRef, triggerRef } from 'vue'
+import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
-import type { ScenarioConfig } from '../scenario/types'
+import type { DisplaySettings, ScenarioConfig } from '../scenario/types'
 import type { Delta, EngineInfo, EventSummary } from '../worker/protocol'
-import { TwinController } from '../modules/twinController'
+import { SPEEDS, TwinController } from '../modules/twinController'
+import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/display'
+import { createFormatter } from '../i18n/format'
+import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
 import type { SceneStats } from '../modules/sceneRenderer'
 
@@ -34,6 +37,20 @@ export interface TwinView {
 }
 
 const RECENT_EVENTS_CAP = 500
+const TOAST_MS = 1600
+
+/** localStorage, or null where it is unavailable (private mode, blocked, tests). */
+function browserStorage(): Storage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage
+  } catch {
+    return null
+  }
+}
+
+function browserLanguages(): readonly string[] {
+  return typeof navigator === 'undefined' ? [] : (navigator.languages ?? [navigator.language])
+}
 
 /** Fixtures and presets offered by the setup dialog. */
 export function scenarioCatalogue(): { name: string; kind: 'fixture' | 'preset'; description: string }[] {
@@ -73,6 +90,19 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const error = ref<string | null>(null)
   const selectedId = ref<string | null>(null)
   const recentEvents = shallowRef<EventSummary[]>(markRaw([]))
+  /** Locale + units: browser defaults on first open, then the remembered choice. Display only. */
+  const display = ref<DisplaySettings>(loadDisplaySettings(browserStorage(), browserLanguages()))
+  /** Formatter for the current display settings (Intl objects; rebuilt when they change). */
+  const fmt = computed(() => markRaw(createFormatter(display.value)))
+  /** The SI config of the loaded scenario, with the current display settings (what a save stores). */
+  const config = shallowRef<ScenarioConfig | null>(null)
+  /** Keyboard-driven view state (TT-16 dashboard and TT-18 overlays/follow camera build on these). */
+  const following = ref(false)
+  const overlaysVisible = ref(true)
+  const dashboardOpen = ref(false)
+  const helpOpen = ref(false)
+  const toast = ref<{ id: number; text: string } | null>(null)
+  let toastTimer: ReturnType<typeof setTimeout> | null = null
 
   let controller: TwinController | null = null
   let view: TwinView | null = null
@@ -113,14 +143,15 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   async function startScenario(next: ScenarioChoice, options: { autoplay?: boolean } = {}): Promise<void> {
-    const base = resolveScenario(next.name)
-    const config: ScenarioConfig = JSON.parse(JSON.stringify({ ...base, startDateTime: next.startDateTime }))
+    const runConfig = runConfigFor(resolveScenario(next.name), next.startDateTime, display.value)
     choice.value = { ...next }
     loading.value = true
     try {
-      await run(() => ctl().load(config, next.seed))
+      await run(() => ctl().load(runConfig, next.seed))
+      config.value = markRaw(runConfig)
       recentEvents.value = markRaw([])
       selectedId.value = null
+      following.value = false
       hasScenario.value = true
       phase.value = 'running'
       if (options.autoplay ?? true) ctl().play()
@@ -163,6 +194,64 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   function select(id: string | null): void {
     selectedId.value = id
+    if (!id) following.value = false
+  }
+
+  /** Change locale and/or units: applies live, is remembered, and is stored with the scenario config. */
+  function setDisplay(next: Partial<DisplaySettings>): void {
+    display.value = { ...display.value, ...next }
+    saveDisplaySettings(browserStorage(), display.value)
+    if (config.value) config.value = markRaw({ ...config.value, display: { ...display.value } })
+  }
+
+  /** Speed step by index into SPEEDS (keyboard 1–9); out of range is ignored. */
+  function setSpeedStep(index: number): void {
+    const s = SPEEDS[index]
+    if (s !== undefined) setSpeed(s)
+  }
+
+  function pause(): void {
+    ctl().pause()
+    sync()
+  }
+
+  /** Single-step to the next engine event (pauses). */
+  function step() {
+    return run(() => ctl().step())
+  }
+
+  function showToast(key: MessageKey, params?: MessageParams): void {
+    const id = (toast.value?.id ?? 0) + 1
+    toast.value = { id, text: t(key, params) }
+    if (toastTimer) clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => {
+      if (toast.value?.id === id) toast.value = null
+    }, TOAST_MS)
+  }
+
+  function toggleFollow(): void {
+    if (following.value) {
+      following.value = false
+      showToast('twin.toast.followOff')
+    } else if (selectedId.value) {
+      following.value = true
+      showToast('twin.toast.followOn', { id: selectedId.value })
+    } else {
+      showToast('twin.toast.followNothing')
+    }
+  }
+
+  function toggleOverlays(): void {
+    overlaysVisible.value = !overlaysVisible.value
+    showToast(overlaysVisible.value ? 'twin.toast.overlaysOn' : 'twin.toast.overlaysOff')
+  }
+
+  function toggleDashboard(): void {
+    dashboardOpen.value = !dashboardOpen.value
+  }
+
+  function setHelpOpen(open: boolean): void {
+    helpOpen.value = open
   }
 
   function attachView(v: TwinView | null): void {
@@ -172,6 +261,9 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   function dispose(): void {
     controller?.dispose()
     controller = null
+    if (toastTimer) clearTimeout(toastTimer)
+    toast.value = null
+    config.value = null
     hasScenario.value = false
     phase.value = 'setup'
     info.value = null
@@ -190,6 +282,14 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     error,
     selectedId,
     recentEvents,
+    display,
+    fmt,
+    config,
+    following,
+    overlaysVisible,
+    dashboardOpen,
+    helpOpen,
+    toast,
     controller: () => controller,
     view: () => view,
     sync,
@@ -201,6 +301,14 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     togglePause,
     runTo,
     select,
+    setDisplay,
+    setSpeedStep,
+    pause,
+    step,
+    toggleFollow,
+    toggleOverlays,
+    toggleDashboard,
+    setHelpOpen,
     attachView,
     dispose,
   }
