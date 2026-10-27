@@ -140,3 +140,9 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Local screenshots from scripts/screenshot.mjs
+.screenshots/
+
+# Per-machine Claude Code settings (permissions, local paths)
+.claude/settings.local.json
