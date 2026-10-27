@@ -9,6 +9,6 @@ export const handlerSets: Record<string, Partial<HandlerSet>> = {
   default: {},
   /** Always answers ground position lane 1, even when it is occupied. */
   'broken-first-lane': {
-    stsGroundPosition: (req) => ({ groundPositionId: req.groundPositions[0].id }),
+    stsGroundPosition: (msg) => ({ groundPositionId: msg.payload.groundPositions[0].id }),
   },
 }

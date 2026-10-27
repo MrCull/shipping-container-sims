@@ -81,9 +81,15 @@ describe('causality', () => {
     expect(chain[0]).toBe(lastGrounded)
     expect(chain.at(-1)?.type).toBe('ScenarioStarted')
     for (let i = 0; i < chain.length - 1; i++) expect(chain[i].causedBy).toBe(chain[i + 1].id)
-    // root → berth → (move started → picked → grounded) × 10
+    // root → berth → (move started → picked → ground-position decision → grounded) × 10
     expect(chain.map((e) => e.type)).toEqual([
-      ...Array.from({ length: 10 }, () => ['StsGrounded', 'StsPicked', 'StsMoveStarted']).flat(),
+      ...Array.from({ length: 10 }, () => [
+        'StsGrounded',
+        'DecisionResolved',
+        'DecisionRequested',
+        'StsPicked',
+        'StsMoveStarted',
+      ]).flat(),
       'VesselBerthed',
       'ScenarioStarted',
     ])

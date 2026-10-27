@@ -68,6 +68,34 @@ describe('CLI runner', () => {
     expect(text).toMatch(/First error:\s+event #\d+ .*custody\.single-owner/)
   })
 
+  it('prints per-handler KPIs and accepts decision-point options', () => {
+    const plain = cli('--fixture', 'tracer-1sts-10-boxes')
+    expect(plain.text).toMatch(
+      /stsGroundPosition\s+strategy:lowest-free-lane\s+10 calls, 10 ok, 0 fallbacks \(0 timeouts, 0 errors\)/,
+    )
+    expect(plain.text).toMatch(/sim latency mean 0 s \/ max 0 s, wall mean 0 ms \/ max 0 ms, backlog 0 \(max 1\), idle caused 0 s/)
+
+    const slow = cli(
+      '--fixture', 'tracer-1sts-10-boxes',
+      '--async-mode', 'keep-running',
+      '--strategy', 'stsGroundPosition=highest-free-lane',
+      '--latency', 'stsGroundPosition=fixed:1500,timeout:0,error:0',
+    )
+    expect(slow.exitCode).toBe(0)
+    expect(slow.text).toMatch(/stsGroundPosition\s+strategy:highest-free-lane\s+10 calls/)
+    expect(slow.text).toMatch(/sim latency mean 1\.5 s \/ max 1\.5 s, wall mean 1500 ms/)
+    expect(slow.text).toMatch(/idle caused 15 s/)
+
+    const paused = cli('--fixture', 'tracer-1sts-10-boxes', '--async-mode', 'pause', '--latency', 'stsGroundPosition=uniform:100-900')
+    expect(paused.text).toMatch(/sim latency mean 0 s/)
+    expect(paused.text).toMatch(/Async mode:\s+pause/)
+
+    expect(cli('--fixture', 'tracer-1sts-10-boxes', '--async-mode', 'sometimes').exitCode).toBe(2)
+    expect(cli('--fixture', 'tracer-1sts-10-boxes', '--strategy', 'stsGroundPosition=nope').exitCode).toBe(2)
+    expect(cli('--fixture', 'tracer-1sts-10-boxes', '--latency', 'stsGroundPosition=soon').exitCode).toBe(2)
+    expect(cli('--fixture', 'tracer-1sts-10-boxes', '--latency', 'noSuchPoint=fixed:5').exitCode).toBe(2)
+  })
+
   it('exits 2 with usage help on bad arguments', () => {
     expect(cli().exitCode).toBe(2)
     expect(cli('--fixture', 'no-such-fixture').text).toMatch(/Unknown fixture/)

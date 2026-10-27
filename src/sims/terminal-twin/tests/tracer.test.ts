@@ -61,6 +61,9 @@ describe('tracer fixture: 1 STS discharges 10 boxes to ground positions', () => 
     const end = (segs: { t1: number }[]) => Math.max(...segs.map((s) => s.t1))
     expect(picked.t).toBeCloseTo(end(picked.payload.segments) + tracer.kinematics.sts.lockS, 9)
     expect(grounded.t).toBeCloseTo(end(grounded.payload.segments) + tracer.kinematics.sts.unlockS, 9)
-    expect(grounded.causedBy).toBe(picked.id)
+    // picked → ground-position decision → grounded
+    const chain = sim.why(grounded.id)
+    expect(chain.slice(0, 4).map((e) => e.type)).toEqual(['StsGrounded', 'DecisionResolved', 'DecisionRequested', 'StsPicked'])
+    expect(chain[3].id).toBe(picked.id)
   })
 })

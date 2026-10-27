@@ -41,6 +41,12 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Reactor:** the engine's internal handling of one event type (physics and flow). It is not swappable.
 - **Decision point:** a place where the sim asks the TOS for a decision (berth allocation, yard allocation, ground-position selection, dispatch, …).
 - **Handler:** a function that answers a decision point. Handlers are swappable, and a **handler set** maps decision points to handlers.
+- **Strategy (built-in strategy):** a named built-in handler for a decision point (1–3 each, e.g. `lowest-free-lane`), selected per scenario.
+- **Correlation id:** the id that ties a decision's request, failure and reply events together (`<decisionPoint>-<n>`).
+- **Async mode:** what the sim does while a decision is pending: **keep running** (equipment waiting on it idles) or **pause** (the sim clock freezes).
+- **Latency injector:** a per-decision-point wrapper that delays replies (none / fixed / random ms) and injects a % of timeouts or errors.
+- **Fallback:** the built-in strategy that answers when a handler times out or errors (`DecisionFailed` → `DecisionResolved` with outcome `fallback`).
+- **Idle time caused:** sim seconds that equipment spent waiting on a decision, attributed to that decision point's handler.
 - **Motion segment:** a planned rest-to-rest move of one equipment axis with a known start and end time. It uses an accelerate/cruise/decelerate (trapezoidal) or short-move (triangular) profile.
 - **Invariant:** a rule that must hold after every event (for example `custody.single-owner`). **Fail-fast** stops the run at the first violation.
 - **Snapshot:** a full JSON copy of a run's state (queue, RNG, log), used to resume the run exactly.

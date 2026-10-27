@@ -3,6 +3,7 @@
  * instances, Maps or functions) so a snapshot is a deep copy of it, and it
  * includes the event queue, RNG state and running event-log hash.
  */
+import { createDecisionState, type DecisionState } from './decisions/runtime'
 import type { EngineEvent } from './events'
 import { HASH_SEED, type HashState } from './hash'
 import type { MotionSegment } from './kinematics'
@@ -53,7 +54,13 @@ export interface VesselState {
   dischargeQueue: string[]
 }
 
-export type StsStatus = 'idle' | 'moving-to-pick' | 'carrying' | 'returning' | 'waiting-for-ground-position'
+export type StsStatus =
+  | 'idle'
+  | 'moving-to-pick'
+  | 'carrying'
+  | 'returning'
+  | 'waiting-for-decision'
+  | 'waiting-for-ground-position'
 
 export interface StsState {
   id: string
@@ -96,6 +103,8 @@ export interface SimState {
   sts: Record<string, StsState>
   groundPositions: Record<string, GroundPositionState>
   kpis: KpiCounters
+  /** Decision points: correlation counter, injector RNG, pending decisions, handler KPIs. */
+  decisions: DecisionState
   ended: { reason: string; t: number } | null
 }
 
@@ -133,6 +142,7 @@ export function createInitialState(config: ScenarioConfig, seed: number): SimSta
     sts: {},
     groundPositions: {},
     kpis: { movesCompleted: 0, vesselsCompleted: 0, perSts: {} },
+    decisions: createDecisionState(seed),
     ended: null,
   }
   for (const v of config.vessels) {

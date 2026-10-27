@@ -3,9 +3,11 @@
  * Worker host and the browser dev API all drive the engine through it.
  */
 import type { EngineContext, ReactorMap } from './context'
+import { createDecisionRuntime } from './decisions/runtime'
+import type { AsyncMode } from './decisions/types'
 import { heapPop, heapPush } from './eventQueue'
 import type { EngineEvent, EventOf, EventPayloads, EventSubjects, EventType } from './events'
-import { defaultHandlers, type HandlerSet } from './handlers'
+import type { HandlerSet } from './handlers'
 import { hashDigest, hashUpdate } from './hash'
 import { checkInvariants, type InvariantViolation } from './invariants'
 import { buildKpiReport, type KpiReport } from './kpis'
@@ -16,14 +18,17 @@ import { quayReactors } from './subsystems/quay'
 import type { ScenarioConfig } from '../scenario/types'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.1.0'
+export const ENGINE_VERSION = '0.2.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
+/** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
 const REACTORS: ReactorMap[] = [quayReactors]
 
 export interface SimulationOptions {
   /** Overrides `config.seed`. */
   seed?: number
+  /** Overrides `config.decisions.asyncMode` (default 'keep-running'). */
+  asyncMode?: AsyncMode
   invariants?: {
     /** Check all invariants after every event (default true). */
     enabled?: boolean
@@ -47,7 +52,12 @@ export interface RunCondition {
   predicate?: (event: EngineEvent) => boolean
 }
 
-export type StopReason = 'condition' | 'ended' | 'failed' | 'idle' | 'max-events'
+/**
+ * `waiting-for-decision`: the engine cannot proceed until an async handler
+ * replies (pause mode with a pending decision, or nothing else queued).
+ * `runUntilAsync` awaits the reply and continues.
+ */
+export type StopReason = 'condition' | 'ended' | 'failed' | 'idle' | 'max-events' | 'waiting-for-decision'
 
 export interface RunResult {
   reason: StopReason
@@ -97,6 +107,9 @@ export interface Simulation {
   step(): EngineEvent | null
   /** Run until the condition, the scenario end, a failure or an empty queue. No condition = to the end. */
   runUntil(condition?: RunCondition): RunResult
+  /** Like runUntil, but awaits async (Promise) handlers instead of stopping with 'waiting-for-decision'. */
+  runUntilAsync(condition?: RunCondition): Promise<RunResult>
+  readonly asyncMode: AsyncMode
   snapshot(): SimSnapshot
   /** Replace this simulation's state with a snapshot's (handlers, options and subscribers are kept). */
   restore(snapshot: SimSnapshot): void
@@ -116,7 +129,6 @@ export function createSimulation(
   handlers: Partial<HandlerSet> = {},
   options: SimulationOptions = {},
 ): Simulation {
-  const handlerSet: HandlerSet = { ...defaultHandlers, ...handlers }
   const seed = options.seed ?? config.seed
   const invariantsEnabled = options.invariants?.enabled ?? true
   const failFast = options.invariants?.failFast ?? true
@@ -129,6 +141,15 @@ export function createSimulation(
   let invariants: InvariantReport = { enabled: invariantsEnabled, checks: 0, violations: [] }
   const listeners = new Set<{ fn: EventListener; types?: Set<EventType> }>()
   const query = createQuery(() => state)
+  const decisions = createDecisionRuntime({
+    getState: () => state,
+    config: config.decisions,
+    handlers,
+    asyncMode: options.asyncMode ?? config.decisions?.asyncMode ?? 'keep-running',
+    query,
+    scheduleFrom: (causedBy, type, at, subjects, payload) => schedule(makeEvent(type, at, causedBy, subjects, payload) as EngineEvent),
+  })
+  const reactorMaps: ReactorMap[] = [decisions.reactors, ...REACTORS]
 
   function makeEvent<K extends EventType>(
     type: K,
@@ -175,10 +196,9 @@ export function createSimulation(
   }
 
   function makeContext(current: EngineEvent): EngineContext {
-    return {
+    const ctx: EngineContext = {
       state,
       config,
-      handlers: handlerSet,
       query,
       current,
       schedule: (type, at, subjects, payload) => {
@@ -186,6 +206,7 @@ export function createSimulation(
         schedule(ev as EngineEvent)
         return ev
       },
+      requestDecision: (dp, request, subjects) => decisions.request(ctx, dp, request, subjects),
       random: () => {
         const [value, next] = nextRandom(state.rngState)
         state.rngState = next
@@ -198,11 +219,12 @@ export function createSimulation(
         box.custodyHistory.push({ t: state.now, owner: { ...to }, eventId: current.id })
       },
     }
+    return ctx
   }
 
   function react(ev: EngineEvent): void {
     const ctx = makeContext(ev)
-    for (const reactors of REACTORS) {
+    for (const reactors of reactorMaps) {
       const reactor = reactors[ev.type] as ((e: EngineEvent, c: EngineContext) => void) | undefined
       reactor?.(ev, ctx)
     }
@@ -210,6 +232,8 @@ export function createSimulation(
 
   function step(): EngineEvent | null {
     if (status !== 'ready') return null
+    decisions.drain()
+    if (decisions.waiting()) return null
     const next = state.queue[0]
     const duration = config.endConditions.simDurationS
     if (duration !== undefined && (!next || next.t > duration)) {
@@ -256,6 +280,10 @@ export function createSimulation(
       if (status === 'ended') return done('ended')
       if (status === 'failed') return done('failed')
       if (cond.maxEvents !== undefined && processed >= cond.maxEvents) return done('max-events')
+      decisions.drain()
+      // keep-running + a time condition: the clock may advance past an in-flight async reply
+      if (decisions.waiting() && (decisions.asyncMode === 'pause' || cond.time === undefined))
+        return done('waiting-for-decision')
       const next = state.queue[0]
       if (cond.time !== undefined && (!next || next.t > cond.time)) {
         const duration = config.endConditions.simDurationS
@@ -275,6 +303,17 @@ export function createSimulation(
     }
   }
 
+  async function runUntilAsync(cond: RunCondition = {}): Promise<RunResult> {
+    let processed = 0
+    for (;;) {
+      const left = cond.maxEvents === undefined ? undefined : cond.maxEvents - processed
+      const result = runUntil({ ...cond, maxEvents: left })
+      processed += result.eventsProcessed
+      if (result.reason !== 'waiting-for-decision') return { ...result, eventsProcessed: processed }
+      await decisions.nextSettled()
+    }
+  }
+
   // Root event: everything else descends from it.
   schedule(makeEvent('ScenarioStarted', 0, null, {}, { scenario: config.name, seed }))
 
@@ -290,9 +329,13 @@ export function createSimulation(
     get firstError() {
       return firstError
     },
+    get asyncMode() {
+      return decisions.asyncMode
+    },
     query,
     step,
     runUntil,
+    runUntilAsync,
     snapshot: () =>
       clone({
         kind: 'terminal-twin-snapshot',
@@ -317,6 +360,7 @@ export function createSimulation(
       status = copy.status
       firstError = copy.firstError
       invariants = { ...copy.invariants, enabled: invariantsEnabled }
+      decisions.reset()
     },
     why(eventId) {
       const chain: EngineEvent[] = []

@@ -6,6 +6,7 @@
  * Bump SCENARIO_SCHEMA_VERSION on breaking changes and add a migration
  * (persistence ticket TT-17).
  */
+import type { DecisionsConfig } from '../engine/decisions/types'
 import type { AxisProfile } from '../engine/kinematics'
 
 export const SCENARIO_SCHEMA_VERSION = 1
@@ -101,4 +102,6 @@ export interface ScenarioConfig {
   vessels: VesselConfig[]
   containers: ContainerConfig[]
   endConditions: EndConditions
+  /** Decision points: async mode, strategy per decision point, latency injection (optional; defaults apply). */
+  decisions?: DecisionsConfig
 }
