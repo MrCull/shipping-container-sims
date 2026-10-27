@@ -18,7 +18,10 @@
     "tt:fixtures": "tsx src/sims/terminal-twin/cli/build-fixtures.ts",
     "tt:diff": "tsx src/sims/terminal-twin/cli/diff.ts",
     "tt:golden": "tsx src/sims/terminal-twin/cli/golden-cli.ts",
-    "test:smoke": "playwright test"
+    "test:smoke": "playwright test",
+    "tt:assets": "tsx src/sims/terminal-twin/cli/assets/build.ts",
+    "tt:assets:check": "tsx src/sims/terminal-twin/cli/assets/check.ts",
+    "tt:assets:shots": "tsx src/sims/terminal-twin/cli/assets/screenshots.ts"
   },
   "dependencies": {
     "pinia": "^4.0",
@@ -28,6 +31,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.3",
     "@types/three": "^0.186",
@@ -35,6 +41,7 @@
     "eslint": "^10.11.0",
     "eslint-plugin-vue": "^10.11.1",
     "globals": "^17.12.0",
+    "meshoptimizer": "^1.3.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0",
     "typescript-eslint": "^8.70.1",

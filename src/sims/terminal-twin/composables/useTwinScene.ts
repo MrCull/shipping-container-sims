@@ -44,11 +44,12 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     camera.updateProjectionMatrix()
   }
 
-  function aim(target: { x: number; y: number; z: number }, keepOffset: boolean): void {
+  function aim(target: { x: number; y: number; z: number }, keepOffset: boolean, distanceM?: number): void {
     if (!camera || !controls) return
     const offset = keepOffset
       ? camera.position.clone().sub(controls.target)
       : new THREE.Vector3(95, 70, 115)
+    if (distanceM !== undefined) offset.setLength(Math.max(controls.minDistance, distanceM))
     controls.target.set(target.x, target.y, target.z)
     camera.position.copy(controls.target).add(offset)
     controls.update()
@@ -71,7 +72,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (!renderer || !camera || !controller) return
     if (controller.model !== builtFor) rebuild(controller.model)
     if (!view || controller.busy) return
-    view.update(controller.displayTime, store.selectedId)
+    view.update(controller.displayTime, store.selectedId, camera.position)
     controls?.update()
     renderer.render(view.scene, camera)
     framesRendered++
@@ -108,14 +109,15 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       webglFailed.value = true
     }
     store.attachView({
-      cameraTo(entityId) {
+      cameraTo(entityId, distanceM) {
         const controller = store.controller()
         const centre = controller?.model?.entityCentre(entityId, controller.displayTime)
         if (!centre) return false
-        aim(centre, true)
+        aim(centre, true, distanceM)
         return true
       },
       stats: () => (view ? { ...view.stats(), frames: framesRendered } : null),
+      liveries: () => view?.renderedLiveries() ?? null,
     })
     frame = requestAnimationFrame(loop)
   })

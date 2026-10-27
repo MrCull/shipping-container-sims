@@ -74,7 +74,7 @@ Each sim that has grown beyond a trivial prototype maintains its own agent guide
 - **[Box Empire](src/sims/box-empire/box-empire-AGENTS.md)** — Terminal operations tycoon sim. Architecture, modules, components, composables, layout, assets, shipping-line liveries, and known behaviours.
 - **[Container Stack / Contenga](src/sims/container-stack/AGENTS.md)** — 3D Jenga-style container stacking game. Phase state machine, Three.js rendering split, pointer interaction, stability physics, scoring, level timers, audio, and known pitfalls.
 - **[Stowage Master](src/sims/stowage-master/stowage-master-AGENTS.md)** — Container stowage puzzle sim. Phase state machine, physics (list/trim/VCG), scoring, disaster system, 10 levels, ship presets, rendering modules, optional Jev assist, and known pitfalls.
-- **[Terminal Twin](src/sims/terminal-twin/terminal-twin-AGENTS.md)** — Event-driven automated-terminal digital twin / TOS test bench. Headless engine API, events and causality, invariants, fixtures and golden summaries, CLI runner, browser host (Web Worker, 3D view, time controls, `window.__tt` dev API), and "How to prove a change works". Domain terms: **[GLOSSARY.md](GLOSSARY.md)**.
+- **[Terminal Twin](src/sims/terminal-twin/terminal-twin-AGENTS.md)** — Event-driven automated-terminal digital twin / TOS test bench. Headless engine API, events and causality, invariants, fixtures and golden summaries, CLI runner, browser host (Web Worker, 3D view, time controls, `window.__tt` dev API), phase 2 asset pipeline (Blender `bpy` generators, `npm run tt:assets`, asset budget check in CI, dev asset viewer), and "How to prove a change works". Domain terms: **[GLOSSARY.md](GLOSSARY.md)**.
 
 ## Key conventions
 

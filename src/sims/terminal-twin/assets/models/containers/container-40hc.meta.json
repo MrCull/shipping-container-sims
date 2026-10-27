@@ -1,0 +1,229 @@
+{
+  "asset": "container-40hc",
+  "kind": "container",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only containers",
+  "units": "m",
+  "isoSizeType": "45G1",
+  "teu": 2,
+  "dimensions": {
+    "lengthM": 12.192,
+    "widthM": 2.438,
+    "heightM": 2.896,
+    "tag": "V",
+    "source": "ISO 668 external dimensions"
+  },
+  "axes": {
+    "up": "+Y",
+    "length": "+X (front end at -X, doors at +X)",
+    "width": "+Z",
+    "origin": "bottom centre of the box (ground contact)",
+    "handedness": "right-handed, glTF"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "container-40hc",
+      "role": "lod",
+      "description": "detailed; renderer uses it for the nearest few hundred boxes"
+    },
+    {
+      "name": "body",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "frame, corner castings, corrugated sides, roof, front wall"
+    },
+    {
+      "name": "door_left",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        6.086,
+        0.0,
+        -1.209
+      ],
+      "axis": "+Y",
+      "description": "door leaf hinged at +Z (glTF) side; positive rotation opens it"
+    },
+    {
+      "name": "door_right",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        6.086,
+        0.0,
+        1.209
+      ],
+      "axis": "+Y",
+      "description": "door leaf hinged at -Z (glTF) side; negative rotation opens it"
+    },
+    {
+      "name": "LOD1",
+      "parent": "container-40hc",
+      "role": "lod",
+      "description": "12-triangle box with normal-mapped corrugation (TEXCOORD_1)"
+    }
+  ],
+  "travelLimits": {
+    "door_left": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 270,
+      "rest": 0,
+      "tag": "P"
+    },
+    "door_right": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -270,
+      "maxDeg": 0,
+      "rest": 0,
+      "tag": "P"
+    }
+  },
+  "attachPoints": [
+    {
+      "name": "twistlock_front_left",
+      "position": [
+        -6.007,
+        2.896,
+        -1.138
+      ],
+      "tag": "V"
+    },
+    {
+      "name": "twistlock_front_right",
+      "position": [
+        -6.007,
+        2.896,
+        1.138
+      ],
+      "tag": "V"
+    },
+    {
+      "name": "twistlock_door_left",
+      "position": [
+        6.007,
+        2.896,
+        -1.138
+      ],
+      "tag": "V"
+    },
+    {
+      "name": "twistlock_door_right",
+      "position": [
+        6.007,
+        2.896,
+        1.138
+      ],
+      "tag": "V"
+    },
+    {
+      "name": "stack_front_left",
+      "position": [
+        -6.007,
+        0.0,
+        -1.138
+      ],
+      "tag": "V"
+    },
+    {
+      "name": "stack_front_right",
+      "position": [
+        -6.007,
+        0.0,
+        1.138
+      ],
+      "tag": "V"
+    },
+    {
+      "name": "stack_door_left",
+      "position": [
+        6.007,
+        0.0,
+        -1.138
+      ],
+      "tag": "V"
+    },
+    {
+      "name": "stack_door_right",
+      "position": [
+        6.007,
+        0.0,
+        1.138
+      ],
+      "tag": "V"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "stack_front_left",
+      "stack_front_right",
+      "stack_door_left",
+      "stack_door_right"
+    ],
+    "tag": "V"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 440,
+      "material": "container_lod0"
+    },
+    "LOD1": {
+      "triangles": 12,
+      "material": "container_lod1"
+    }
+  },
+  "liveries": {
+    "atlas": "livery-atlas.json",
+    "uv": "TEXCOORD_0 is authored for atlas tile 0 (HMM); offset by the tile of the instance's livery index",
+    "corrugationNormalMap": {
+      "texCoord": 1,
+      "pitchM": 0.5636,
+      "ribs": 21
+    }
+  },
+  "provenance": [
+    {
+      "fact": "external dimensions 12192 x 2438 x 2896 mm",
+      "tag": "V",
+      "source": "ISO 668"
+    },
+    {
+      "fact": "corner casting envelope 178 x 162 x 118 mm at the eight corners",
+      "tag": "V",
+      "source": "ISO 1161"
+    },
+    {
+      "fact": "twist-lock / stacking points at the corner-casting centres",
+      "tag": "V",
+      "source": "ISO 1161 (aperture centres approximated)"
+    },
+    {
+      "fact": "two door leaves with two vertical locking bars each, opening 270 degrees",
+      "tag": "P",
+      "source": "reference photographs (not committed)"
+    },
+    {
+      "fact": "side-wall corrugation pitch 0.564 m and depth 0.038 m",
+      "tag": "M",
+      "reason": "real pitch is about 0.28 m; doubled to fit the ~400-triangle LOD0 budget. LOD1 normal map uses the same pitch so LODs match"
+    },
+    {
+      "fact": "rail, post and door-plane insets",
+      "tag": "A"
+    },
+    {
+      "fact": "front end wall and roof drawn flat (no corrugation)",
+      "tag": "M",
+      "reason": "triangle budget"
+    },
+    {
+      "fact": "livery colours and wordmarks",
+      "tag": "A",
+      "source": "livery-atlas.json"
+    }
+  ]
+}
