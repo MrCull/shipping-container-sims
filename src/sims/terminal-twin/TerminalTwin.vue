@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import OverlayToggles from './components/OverlayToggles.vue'
 import TopBar from './components/TopBar.vue'
 import SetupDialog from './components/modals/SetupDialog.vue'
 import { useTwinScene } from './composables/useTwinScene'
@@ -39,6 +40,7 @@ onBeforeUnmount(() => {
       class="scene"
       data-testid="tt-scene"
     >
+      <OverlayToggles v-if="store.hasScenario && store.hasShcs && !webglFailed" />
       <div
         v-if="webglFailed"
         class="notice"

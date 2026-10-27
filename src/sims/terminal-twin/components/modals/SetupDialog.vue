@@ -1,7 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { randomSeed, scenarioCatalogue, useTwinStore } from '../../store/twinStore'
+import { computed, ref, watch } from 'vue'
+import { travelTime } from '../../engine'
+import { DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
+import type { ShcKinematics } from '../../scenario/types'
+import { randomSeed, resolveScenario, scenarioCatalogue, useTwinStore } from '../../store/twinStore'
 import { fromLocalInputValue, toLocalInputValue } from '../../modules/time'
+
+/** Spec scale limit for the SHC fleet. */
+const MAX_SHC = 120
 
 const store = useTwinStore()
 const catalogue = scenarioCatalogue()
@@ -12,6 +18,35 @@ const start = ref(toLocalInputValue(new Date(store.choice.startDateTime)))
 const formError = ref<string | null>(null)
 
 const selected = computed(() => catalogue.find((c) => c.name === name.value))
+
+// SHC fleet and kinematics (only for scenarios that have SHCs).
+const scenarioShcs = computed(() => (name.value ? (resolveScenario(name.value).shcs?.length ?? 0) : 0))
+const shcCount = ref(0)
+/** Plain deep copy (structuredClone cannot copy Vue reactive proxies). */
+const copy = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T
+const shcK = ref<ShcKinematics>(copy(DEFAULT_SHC_KINEMATICS))
+function loadShcDefaults(): void {
+  const base = name.value ? resolveScenario(name.value) : null
+  const previous = store.choice.name === name.value ? store.choice.shc : undefined
+  shcCount.value = previous?.count ?? base?.shcs?.length ?? 0
+  shcK.value = copy(previous?.kinematics ?? base?.kinematics.shc ?? DEFAULT_SHC_KINEMATICS)
+}
+loadShcDefaults()
+watch(name, loadShcDefaults)
+
+/** Derived readout: a nominal 300 m empty + 300 m loaded trip with lock, lift, lower and unlock. */
+const nominalTrip = computed(() => {
+  const k = shcK.value
+  const valid = [k.driveEmpty, k.driveLoaded, k.lift].every((p) => p.vMax > 0 && p.accel > 0 && p.decel > 0)
+  if (!valid) return null
+  const seconds =
+    travelTime(300, k.driveEmpty) +
+    travelTime(300, k.driveLoaded) +
+    2 * travelTime(k.liftHeightM, k.lift) +
+    k.lockS +
+    k.unlockS
+  return { seconds, perHour: 3600 / seconds }
+})
 
 function reroll(): void {
   seed.value = randomSeed()
@@ -27,9 +62,22 @@ async function submit(): Promise<void> {
     formError.value = 'The seed must be a whole number ≥ 0'
     return
   }
+  if (scenarioShcs.value > 0 && (!Number.isInteger(shcCount.value) || shcCount.value < 1 || shcCount.value > MAX_SHC)) {
+    formError.value = `SHC count must be a whole number from 1 to ${MAX_SHC}`
+    return
+  }
+  if (scenarioShcs.value > 0 && !nominalTrip.value) {
+    formError.value = 'SHC speeds and accelerations must be greater than 0'
+    return
+  }
   formError.value = null
   await store
-    .startScenario({ name: name.value, seed: seed.value, startDateTime: startDate.toISOString() })
+    .startScenario({
+      name: name.value,
+      seed: seed.value,
+      startDateTime: startDate.toISOString(),
+      shc: scenarioShcs.value > 0 ? { count: shcCount.value, kinematics: copy(shcK.value) } : undefined,
+    })
     .catch(() => {})
 }
 </script>
@@ -110,6 +158,97 @@ async function submit(): Promise<void> {
           >
         </label>
       </div>
+
+      <fieldset
+        v-if="scenarioShcs > 0"
+        class="field shc"
+      >
+        <legend>Shuttle carriers (SHC)</legend>
+        <div class="grid">
+          <label class="mini">
+            <span>Count</span>
+            <input
+              v-model.number="shcCount"
+              type="number"
+              min="1"
+              :max="MAX_SHC"
+              step="1"
+              name="shc-count"
+            >
+          </label>
+          <label class="mini">
+            <span>Empty speed (m/s)</span>
+            <input
+              v-model.number="shcK.driveEmpty.vMax"
+              type="number"
+              min="0.1"
+              step="any"
+              name="shc-v-empty"
+            >
+          </label>
+          <label class="mini">
+            <span>Loaded speed (m/s)</span>
+            <input
+              v-model.number="shcK.driveLoaded.vMax"
+              type="number"
+              min="0.1"
+              step="any"
+              name="shc-v-loaded"
+            >
+          </label>
+          <label class="mini">
+            <span>Accel. (m/s²)</span>
+            <input
+              v-model.number="shcK.driveEmpty.accel"
+              type="number"
+              min="0.05"
+              step="any"
+              name="shc-accel"
+            >
+          </label>
+          <label class="mini">
+            <span>Decel. (m/s²)</span>
+            <input
+              v-model.number="shcK.driveEmpty.decel"
+              type="number"
+              min="0.05"
+              step="any"
+              name="shc-decel"
+            >
+          </label>
+          <label class="mini">
+            <span>Lock / unlock (s)</span>
+            <span class="pair">
+              <input
+                v-model.number="shcK.lockS"
+                type="number"
+                min="0"
+                step="any"
+                name="shc-lock"
+                aria-label="Lock time (s)"
+              >
+              <input
+                v-model.number="shcK.unlockS"
+                type="number"
+                min="0"
+                step="any"
+                name="shc-unlock"
+                aria-label="Unlock time (s)"
+              >
+            </span>
+          </label>
+        </div>
+        <p
+          v-if="nominalTrip"
+          class="hint"
+          data-testid="tt-shc-readout"
+        >
+          Nominal 300 m empty + 300 m loaded trip:
+          <span class="mono">{{ nominalTrip.seconds.toFixed(0) }} s</span>
+          (<span class="mono">{{ nominalTrip.perHour.toFixed(1) }}</span> trips/h per SHC). Loaded acceleration
+          stays at the scenario's value.
+        </p>
+      </fieldset>
 
       <p
         v-if="formError || store.error"
@@ -295,5 +434,39 @@ input[type='datetime-local'] {
 .error {
   color: var(--color-danger);
   font-size: 0.85rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.mini {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.pair {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.pair input {
+  width: 50%;
+}
+
+.mono {
+  font-family: var(--tt-font-mono);
+  color: var(--color-text);
 }
 </style>

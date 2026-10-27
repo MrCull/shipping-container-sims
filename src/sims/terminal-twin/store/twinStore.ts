@@ -10,11 +10,12 @@ import { defineStore } from 'pinia'
 import { markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
-import type { ScenarioConfig } from '../scenario/types'
+import { withShcFleet } from '../scenario/builder'
+import type { ScenarioConfig, ShcKinematics } from '../scenario/types'
 import type { Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { TwinController } from '../modules/twinController'
 import { defaultStartDate } from '../modules/time'
-import type { SceneStats } from '../modules/sceneRenderer'
+import type { OverlayState, SceneStats } from '../modules/sceneRenderer'
 
 export type TwinPhase = 'setup' | 'running'
 
@@ -24,6 +25,8 @@ export interface ScenarioChoice {
   seed: number
   /** ISO date-time of sim t = 0. */
   startDateTime: string
+  /** SHC fleet overrides from the setup dialog (scenarios with SHCs only). */
+  shc?: { count: number; kinematics: ShcKinematics }
 }
 
 /** What the 3D view registers so the dev API can reach it. */
@@ -64,6 +67,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   })
   /** Whether a scenario has been loaded (so the setup dialog can be cancelled). */
   const hasScenario = ref(false)
+  /** The loaded scenario has SHCs (shows the SHC overlay toggles). */
+  const hasShcs = ref(false)
   const loading = ref(false)
   const displayTime = ref(0)
   const speed = ref(10)
@@ -73,6 +78,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const error = ref<string | null>(null)
   const selectedId = ref<string | null>(null)
   const recentEvents = shallowRef<EventSummary[]>(markRaw([]))
+  /** 3D debug overlays (lane graph, active reservations). */
+  const overlays = ref<OverlayState>({ laneGraph: false, reservations: false })
 
   let controller: TwinController | null = null
   let view: TwinView | null = null
@@ -114,7 +121,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   async function startScenario(next: ScenarioChoice, options: { autoplay?: boolean } = {}): Promise<void> {
     const base = resolveScenario(next.name)
-    const config: ScenarioConfig = JSON.parse(JSON.stringify({ ...base, startDateTime: next.startDateTime }))
+    let config: ScenarioConfig = JSON.parse(JSON.stringify({ ...base, startDateTime: next.startDateTime }))
+    if (next.shc && (base.shcs?.length ?? 0) > 0) config = withShcFleet(config, next.shc.count, next.shc.kinematics)
     choice.value = { ...next }
     loading.value = true
     try {
@@ -122,6 +130,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       recentEvents.value = markRaw([])
       selectedId.value = null
       hasScenario.value = true
+      hasShcs.value = (config.shcs?.length ?? 0) > 0
       phase.value = 'running'
       if (options.autoplay ?? true) ctl().play()
     } finally {
@@ -161,6 +170,11 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     return run(() => ctl().runTo(time))
   }
 
+  function setOverlays(next: Partial<OverlayState>): OverlayState {
+    overlays.value = { ...overlays.value, ...next }
+    return { ...overlays.value }
+  }
+
   function select(id: string | null): void {
     selectedId.value = id
   }
@@ -181,6 +195,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     phase,
     choice,
     hasScenario,
+    hasShcs,
     loading,
     displayTime,
     speed,
@@ -190,6 +205,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     error,
     selectedId,
     recentEvents,
+    overlays,
+    setOverlays,
     controller: () => controller,
     view: () => view,
     sync,

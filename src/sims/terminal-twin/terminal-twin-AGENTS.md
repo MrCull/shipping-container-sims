@@ -4,7 +4,7 @@
 
 **Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root — use its terms in code, tests and docs.
 
-**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API.
+**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-05 adds SHC horizontal transport (STS ground position → WTP pad) over a generated lane graph with conflict-zone reservations, the `shcDispatch` decision point, an instant ASC stub, subsystem modes, SHC setup fields and 3D lane/reservation overlays.
 
 **Sim ID:** `terminal-twin`
 
@@ -30,6 +30,10 @@
 | Browser / UI / 3D view | `npm run test:smoke` | Playwright smoke tests in `tests/browser/*.smoke.ts` pass (dev server + a production build). Not part of `npm test` or CI. |
 | Look at the 3D view | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('tracer-1sts-10-boxes').then(() => window.__tt.runTo(330)).then(() => window.__tt.pause())"` | PNG in `.screenshots/` shows the STS mid-cycle, no page errors |
 | Fixture definition change | `npm run tt:fixtures`, then `npm run tt:golden -- --update` | committed fixture JSON matches `definitions.ts` |
+| SHC transport | `npm run tt:run -- --fixture shc-1sts-2shc-1wtp` | `Horizontal: 10 boxes to WTP pads`, per-SHC jobs/distances/reservation wait, `0 violations` |
+| SHC dispatch strategies | `npm run tt:diff -- --fixture shc-1sts-2shc-1wtp --b-handlers nearest-job` (or `tt:run … --strategy shcDispatch=nearest-job`) | first divergence at the first `shcDispatch` `DecisionResolved` (`payload.reply.wtpPadId`) |
+| SHCs in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('shc-1sts-2shc-1wtp').then(() => window.__tt.runTo(300)).then(() => { window.__tt.pause(); window.__tt.overlays({ laneGraph: true, reservations: true }) })"` | SHCs on the apron, boxes on pads/yard, cyan lane graph, amber reserved zones |
+| Smoke tests side by side with another checkout | `SMOKE_DEV_PORT=5299 SMOKE_PROD_PORT=5298 npm run test:smoke` | same as `npm run test:smoke`, on other ports |
 
 Never regenerate goldens to make a failing test pass unless the behaviour change is intended and explained in the commit. Without `--update` / `UPDATE_GOLDEN=1` nothing ever rewrites a golden.
 
@@ -45,7 +49,11 @@ terminal-twin/
 │   ├── simulation.ts         createSimulation / restoreSimulation, run loop, snapshot, why, subscribe
 │   ├── events.ts             Event envelope + EventPayloads catalogue
 │   ├── context.ts            EngineContext + Reactor types (internal behaviour per event type)
-│   ├── subsystems/quay.ts    Vessel berthing + STS discharge cycle reactors
+│   ├── subsystems/quay.ts    Vessel berthing + STS discharge cycle reactors (+ ground-position wait/resume)
+│   ├── subsystems/shc.ts     SHC jobs, pull dispatch, whole-trip planning, parking (TT-05)
+│   ├── subsystems/ascStub.ts Instant ASC stub: AscPicked / AscStacked at the drop time (until TT-06)
+│   ├── laneGraph.ts          Waterside one-way lane graph from config + shortest paths (cached per config)
+│   ├── reservations.ts       Conflict-zone time-window reservations (earliestStart / reserve)
 │   ├── handlers.ts           HandlerSet re-exports (TOS seams)
 │   ├── decisions/            Decision-point framework
 │   │   ├── types.ts          Request/reply catalogue, contract versions, HandlerSet, DecisionsConfig
@@ -68,13 +76,15 @@ terminal-twin/
 │   └── fixtures/             definitions.ts → <name>.json (+ <name>.golden.json), index.ts
 ├── definition.ts             Home card (keep light: eagerly imported)
 ├── TerminalTwin.vue          Root: TopBar, 3D host, SetupDialog, banner; installs window.__tt in DEV
-├── components/               TopBar.vue (clock, speeds, Run to…, Reset, New Scenario), modals/SetupDialog.vue
+├── components/               TopBar.vue (clock, speeds, Run to…, Reset, New Scenario), OverlayToggles.vue,
+│                             modals/SetupDialog.vue (scenario, seed, start, SHC count + kinematics)
 ├── composables/useTwinScene.ts  Renderer/camera/OrbitControls + the frame loop (tick → sync → pose → render)
 ├── modules/                  Main-thread, non-reactive
 │   ├── twinController.ts     Playback clock, look-ahead, Run to/runUntil/step, generation guard
 │   ├── engineClient.ts       Promise wrapper over the worker (request ids)
 │   ├── sceneModel.ts         Pure-TS timelines from worker deltas → poses/positions at any time
-│   ├── sceneRenderer.ts      Three.js procedural quay, STS, vessel hulls, ONE InstancedMesh of containers
+│   ├── sceneRenderer.ts      Three.js procedural quay, STS, SHCs, pads/blocks, vessel hulls, ONE InstancedMesh
+│   │                         of containers, lane-graph + reservation overlays
 │   └── time.ts               Start date default (Mon 06:00), clock formatting
 ├── store/twinStore.ts        Pinia facade (small reactive UI state; controller/view kept raw)
 ├── worker/                   Engine Web Worker (same ESLint bans as engine/)
@@ -98,6 +108,19 @@ terminal-twin/
 - **Rendering.** All containers are one `InstancedMesh` (colour per shipping line). STS, hulls and the quay are shared low-poly boxes. Three.js objects never enter Vue reactivity; the store mirrors only the clock, speed, engine info and selection.
 - **Setup dialog.** It lists fixtures plus the `presets` registry, with an editable seed (re-roll) and start date/time (default Monday 06:00 of the current week, local time). Start = `store.startScenario({ name, seed, startDateTime })`. The start date changes only the clock, not the run.
 
+## Horizontal transport: SHCs (TT-05)
+
+- **Config** (all optional, so older fixtures are unchanged): `shcs: [{id}]`, `kinematics.shc` (`DEFAULT_SHC_KINEMATICS` [A]), `yard.blocks: [{id, x, wtpPads}]`, `apron` (lane geometry, `DEFAULT_APRON_LAYOUT`), `driverVariabilityPct`, `subsystems: {shc, asc}`. Builder: `.shcs(n, kin?)`, `.block(id, {x, wtpPads})`, `.driverVariability(pct)`, `.subsystems({...})`; `withShcFleet(config, n, kin?)` (setup dialog).
+- **Lane graph** (`engine/laneGraph.ts`, pure, cached per config object): STS lanes run +X under each crane (entry E → ground position G → exit X) with entry/exit spines to a westbound/eastbound apron loop (crossovers at every apron X); WTP pads are spurs off the eastbound lane (`AE → C (clear position) → P (pad)` and back); one parking spur per SHC west of everything. Every edge is along X or Z. Node ids: `AW@x`, `AE@x`, `E:<sts>:<lane>`, `G:<gpId>`, `X:<sts>:<lane>`, `C:<padId>`, `P:<padId>`, `S:<shcId>`. Pads: `<blockId>-WTP<n>`, centred on the block across X, boxes along Z.
+- **Conflict zones and reservations** (`engine/reservations.ts`): zones are intersections (apron and spine nodes), each ground position's lane section, and each pad with its spur. A trip reserves `[t(enter − clearance), t(leave + clearance))` for every zone visit before it starts; if any window overlaps, **the whole trip departs later** (`earliestStart`). Vehicles therefore wait only where they rest (parking spot, pad clear position), which are not zones. The STS also reserves its ground position's lane from the start of the carry until the box is down, and delays the carry if an SHC is still in the lane. Windows are half-open; zero-length (instant) windows are not stored.
+- **Jobs and dispatch:** `StsGrounded` releases a job (`J<n>`) into the pool. `maybeDispatch` asks one free SHC (available first, then parked, by id) per open job/free pad not already being asked about. The `shcDispatch` decision point replies `{jobId, wtpPadId}` (or nulls → the SHC parks). Strategies: `oldest-job` (default; FIFO, first free pad) and `nearest-job` (shortest route, nearest free pad). The engine **trusts** the reply; invariants catch a double claim or a double-occupied pad.
+- **Trip:** the whole job is planned at once (straight runs rest-to-rest, stop at every turn; lock/lift/lower/unlock at the box and pad) and installed as `ShcState.motion` + `ShcState.plan`. Phase events chain (`ShcJobAssigned → ShcRoutingEmpty → ShcPositioningAtPickup → ShcLocking → ShcPicked → ShcRoutingLoaded → ShcPositioningAtDropoff → ShcLowering → ShcUnlocking → ShcDroppedAtWtp → ShcCleared`), each carrying the `segments` that led up to it. "Positioning" = the final straight run into the box/pad. Custody: GP → SHC at `ShcPicked`, SHC → pad at `ShcDroppedAtWtp`. Idle SHCs: `ShcRoutingToParking → ShcParked`.
+- **Waiting:** a `null` ground-position reply → `StsWaitingForGroundPosition` (status `waiting-for-ground-position`); when an SHC picks a box off that crane's lane, `StsGroundPositionWaitEnded {waitedS}` fires and the STS asks again. KPI `horizontal.stsGroundPositionWaitS`.
+- **Subsystem modes** (`SimulationOptions.subsystems` overrides `config.subsystems`; resolved into `SimState.subsystems`): SHC `real` (default with SHCs + blocks) / `instant` (same events, zero durations) / `off` (no jobs; boxes stay on ground positions). ASC `instant` (default: `AscPicked` + `AscStacked` at the drop time, yard slots `<block>:I<n>`) / `off` (pads fill) / `real` → throws until TT-06.
+- **KPIs:** `kpiReport().horizontal` (only with SHCs): `boxesToWtp`, per SHC `jobs`, `emptyDistanceM`, `loadedDistanceM`, `reservationWaitS`, and `stsGroundPositionWaitS`. The CLI prints a `Horizontal:` block.
+- **Invariants added:** `reservation.no-overlap`, `claim.single-holder`. Double occupancy of a ground position or pad surfaces as `custody.single-owner` with "… is double-occupied: X was set down on it" (a place holds one `containerId`).
+- **Browser:** the worker diffs `ShcState.motion`/`status` like the STS and sends new reservations (`Delta.reservations`). `SceneModel.shcPose(id,t)` → `{x, z, lift, heading}`; `containerPose` adds a yaw (boxes on pads/SHCs heading Z lie along Z). Overlays: `store.overlays` / `OverlayToggles.vue` / `__tt.overlays()`.
+
 ### Dev API (`window.__tt`, dev builds only)
 
 `dev/devApi.ts` is dynamically imported inside `if (import.meta.env.DEV)`, so production builds don't contain it (checked by `terminal-twin.prod.smoke.ts`). Every call is async-safe from `page.evaluate`:
@@ -111,9 +134,12 @@ await __tt.query('container' | 'vessel' | 'sts' | 'groundPosition', id)
 await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })  // new root event
 await __tt.snapshot(); await __tt.why(eventId)
 __tt.select(id | null); __tt.cameraTo(id); __tt.setSpeed(600); __tt.pause(); __tt.play(); await __tt.reset(); __tt.newScenario()
+await __tt.query('shc' | 'wtpPad', id); await __tt.query('shcList' | 'reservations')
+__tt.overlays({ laneGraph?, reservations? })   // toggles 3D overlays, returns the state
+await __tt.load('shc-1sts-2shc-1wtp', { shc: { count: 3, kinematics } })  // SHC fleet override, like the setup dialog
 __tt.clock()       // { displayTime, speed, paused, busy, engine: EngineInfo }
-__tt.scene()       // rendered { containers, sts, vessels, frames }
-__tt.sceneState()  // what the scene shows: custody per box, status + pose per STS, status per vessel
+__tt.scene()       // rendered { containers, sts, shcs, vessels, overlays, reservedZones, frames }
+__tt.sceneState()  // what the scene shows: custody per box, status + pose per STS and SHC, status per vessel, active reservations
 ```
 
 ## Engine architecture
@@ -194,7 +220,11 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 
 ## Known behaviours and pitfalls
 
-- The tracer fixture gives STS01 **10 ground positions** because nothing clears them yet (SHCs arrive in TT-05).
+- The tracer fixture gives STS01 **10 ground positions** and has no SHCs (its golden is unchanged by TT-05). `shc-1sts-2shc-1wtp` (3 ground positions, 2 SHCs, block B01 with 4 pads west of the crane) ends at `simDurationS 1800`, after every box is in the yard.
+- SHC trips are planned whole at dispatch; a later conflict never re-plans a trip, it only delays the next trip's departure. A vehicle waiting at a pad clear position holds no reservation, so another SHC approaching that same pad can pass through it visually (rare; dispatch is instant).
+- Ground positions sit at the STS's **home** gantry X in the lane graph; an SHC positions at the box's actual X, clamped to the lane section (`stsLaneHalfSpanM`, default 30 m).
+- `kpis.handlers` omits decision points that were never called (so fixtures without SHCs keep their goldens).
+- Shortest paths are cached per lane graph (WeakMap on the config object) and the lane graph per config object: do not mutate a config after `createSimulation`.
 - Every decision adds two events (`DecisionRequested`, `DecisionResolved`) to the log. The tracer golden went from 35 to 55 events in TT-03, with KPIs unchanged.
 - An injected delay of at least `timeoutMs` (default 5 s) is a timeout. Raise `timeoutMs` when you inject long latencies.
 - A reply computed at request time is delivered later in keep-running mode, so it can be stale. That is realistic: a reply with an invalid ground position surfaces as an invariant violation.

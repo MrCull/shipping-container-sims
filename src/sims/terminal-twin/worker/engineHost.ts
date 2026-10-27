@@ -17,7 +17,7 @@ import {
 } from './protocol'
 
 function emptyDelta(): Delta {
-  return { motion: [], custody: [], entities: [], events: [], eventCounts: {} }
+  return { motion: [], custody: [], entities: [], reservations: [], events: [], eventCounts: {} }
 }
 
 /** Keep only the latest entry per key (order of last occurrence). */
@@ -37,6 +37,7 @@ export function createEngineHost() {
   let delta = emptyDelta()
   let motionRefs = new Map<string, unknown>()
   let statusRefs = new Map<string, string>()
+  let lastReservationId = -1
 
   function observe(ev: EngineEvent): void {
     if (!sim) return
@@ -66,6 +67,23 @@ export function createEngineHost() {
         delta.entities.push({ kind: 'sts', id: s.id, t: ev.t, status: sts.status })
       }
     }
+    for (const c of sim.config.shcs ?? []) {
+      const shc = sim.query.shc(c.id)
+      if (motionRefs.get(c.id) !== shc.motion) {
+        motionRefs.set(c.id, shc.motion)
+        if (shc.motion.length > 0) delta.motion.push({ entityId: c.id, segments: shc.motion.map((m) => ({ ...m })) })
+      }
+      const key = `shc:${c.id}`
+      if (statusRefs.get(key) !== shc.status) {
+        statusRefs.set(key, shc.status)
+        delta.entities.push({ kind: 'shc', id: c.id, t: ev.t, status: shc.status })
+      }
+    }
+    for (const r of sim.query.reservations()) {
+      if (r.id <= lastReservationId) continue
+      lastReservationId = r.id
+      delta.reservations.push({ ...r })
+    }
     for (const v of sim.config.vessels) {
       const status = sim.query.vessel(v.id).status
       const key = `vessel:${v.id}`
@@ -86,6 +104,11 @@ export function createEngineHost() {
       statusRefs.set(`sts:${s.id}`, sim.query.sts(s.id).status)
     }
     for (const v of config.vessels) statusRefs.set(`vessel:${v.id}`, sim.query.vessel(v.id).status)
+    for (const c of config.shcs ?? []) {
+      motionRefs.set(c.id, sim.query.shc(c.id).motion)
+      statusRefs.set(`shc:${c.id}`, sim.query.shc(c.id).status)
+    }
+    lastReservationId = -1
     sim.subscribe(observe)
   }
 
@@ -129,6 +152,7 @@ export function createEngineHost() {
         delta.motion = latestBy(delta.motion, (m) => m.entityId)
         delta.custody = latestBy(delta.custody, (c) => c.containerId)
         delta.entities = latestBy(delta.entities, (e) => `${e.kind}:${e.id}`)
+        delta.reservations = delta.reservations.filter((r) => r.to > requireSim().now)
         return result
       }
       case 'step': {
@@ -168,6 +192,14 @@ export function createEngineHost() {
         return s.config.sts.map((x) => s.query.sts(x.id))
       case 'groundPosition':
         return s.query.groundPosition(need())
+      case 'shc':
+        return s.query.shc(need())
+      case 'shcList':
+        return s.query.shcs()
+      case 'wtpPad':
+        return s.query.wtpPad(need())
+      case 'reservations':
+        return s.query.reservations()
       case 'kpis':
         return s.kpiReport()
       case 'summary':

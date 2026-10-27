@@ -189,6 +189,16 @@ function formatSummary(s: RunSummary, stopped: string, started: string, processe
     lines.push(`  ${id.padEnd(15)} ${k.moves} moves, ${k.grossMovesPerHour ?? '–'} gross moves/h`)
   for (const [id, v] of Object.entries(s.kpis.vessels))
     lines.push(`  ${id.padEnd(15)} turnaround ${v.turnaroundS === null ? '–' : `${v.turnaroundS} s`}`)
+  const hz = s.kpis.horizontal
+  if (hz) {
+    lines.push(`Horizontal:       ${hz.boxesToWtp} boxes to WTP pads`)
+    for (const [id, k] of Object.entries(hz.shcs))
+      lines.push(
+        `  ${id.padEnd(15)} ${k.jobs} jobs, ${k.loadedDistanceM} m loaded / ${k.emptyDistanceM} m empty, reservation wait ${k.reservationWaitS} s`,
+      )
+    for (const [id, w] of Object.entries(hz.stsGroundPositionWaitS))
+      lines.push(`  ${id.padEnd(15)} waited ${w} s for a free ground position`)
+  }
   lines.push('TOS handlers:')
   for (const [dp, h] of Object.entries(s.kpis.handlers)) {
     lines.push(

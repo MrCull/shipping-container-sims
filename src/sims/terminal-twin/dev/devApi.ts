@@ -12,12 +12,13 @@
  *   await __tt.step(); await __tt.why(id); await __tt.snapshot()
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
  *   __tt.select('STS01'); __tt.cameraTo('STS01'); __tt.setSpeed(600); __tt.pause(); __tt.clock()
+ *   __tt.overlays({ laneGraph: true, reservations: true })   // 3D debug overlays
  */
 import type { CustodyRef, EngineEvent, EventPayloads, EventSubjects, EventType, RunResult, SimSnapshot } from '../engine'
-import type { SceneStats } from '../modules/sceneRenderer'
-import type { StsPose } from '../modules/sceneModel'
+import type { OverlayState, SceneStats } from '../modules/sceneRenderer'
+import type { ShcPose, StsPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
-import { resolveScenario, type useTwinStore } from '../store/twinStore'
+import { resolveScenario, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
 import type { EngineInfo, EventSummary, QueryKind, WorkerRunCondition } from '../worker/protocol'
 
 export interface TwinClock {
@@ -32,7 +33,10 @@ export interface TwinClock {
 
 export interface TwinDevApi {
   /** Load a fixture or preset (default: the current choice) and wait until it is ready. Starts paused unless autoplay. */
-  load(name?: string, options?: { seed?: number; startDateTime?: string; autoplay?: boolean }): Promise<EngineInfo | null>
+  load(
+    name?: string,
+    options?: { seed?: number; startDateTime?: string; autoplay?: boolean; shc?: ScenarioChoice['shc'] },
+  ): Promise<EngineInfo | null>
   step(): Promise<EventSummary | null>
   runUntil(condition?: WorkerRunCondition): Promise<RunResult>
   /** "Run to…" a sim time (s), like the top bar. */
@@ -50,6 +54,8 @@ export interface TwinDevApi {
   reset(): Promise<void>
   newScenario(): void
   clock(): TwinClock
+  /** Turn 3D debug overlays on/off (omitted keys unchanged); returns the new state. */
+  overlays(next?: Partial<OverlayState>): OverlayState
   /** Rendered counts (null if there is no 3D view). */
   scene(): (SceneStats & { frames: number }) | null
   /** What the scene shows at the displayed time: custody per container, status and pose per STS, status per vessel. */
@@ -60,7 +66,10 @@ export interface SceneState {
   displayTime: number
   containers: Record<string, CustodyRef | null>
   sts: Record<string, { status: string } & StsPose>
+  shcs: Record<string, { status: string } & ShcPose>
   vessels: Record<string, { status: string }>
+  /** Conflict zones reserved at the displayed time (zone → holder). */
+  reservations: Record<string, string>
 }
 
 declare global {
@@ -91,6 +100,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
           // Default: the scenario's own seed (so a fixture reproduces its golden run).
           seed: options.seed ?? (name ? resolveScenario(name).seed : store.choice.seed),
           startDateTime: options.startDateTime ?? store.choice.startDateTime,
+          shc: options.shc,
         },
         { autoplay: options.autoplay ?? false },
       )
@@ -126,6 +136,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         engine: c?.info ?? null,
       }
     },
+    overlays: (next = {}) => store.setOverlays(next),
     scene: () => store.view()?.stats() ?? null,
     sceneState: () => {
       const c = store.controller()
@@ -136,6 +147,8 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         displayTime: t,
         containers: Object.fromEntries(model.containerIds.map((id) => [id, model.custodyAt(id, t)])),
         sts: Object.fromEntries(model.stsIds.map((id) => [id, { status: model.statusAt('sts', id, t), ...model.stsPose(id, t) }])),
+        shcs: Object.fromEntries(model.shcIds.map((id) => [id, { status: model.statusAt('shc', id, t), ...model.shcPose(id, t) }])),
+        reservations: model.activeReservations(t),
         vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
       }
     },

@@ -12,6 +12,7 @@ import type {
   EventSubjects,
   EventType,
   MotionSegment,
+  Reservation,
   RunCondition,
 } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
@@ -27,6 +28,10 @@ export type QueryKind =
   | 'sts'
   | 'stsList'
   | 'groundPosition'
+  | 'shc'
+  | 'shcList'
+  | 'wtpPad'
+  | 'reservations'
   | 'kpis'
   | 'summary'
   | 'invariants'
@@ -47,7 +52,7 @@ export type WorkerRequest =
 
 export type WorkerRequestMessage = WorkerRequest & { rid: number }
 
-/** A new motion plan of one crane (all axes, sequential). */
+/** A new motion plan of one crane or SHC (all axes, sequential). */
 export interface MotionPlan {
   entityId: string
   segments: MotionSegment[]
@@ -63,7 +68,7 @@ export interface CustodyChange {
 }
 
 export interface EntityStateChange {
-  kind: 'sts' | 'vessel'
+  kind: 'sts' | 'vessel' | 'shc'
   id: string
   t: number
   status: string
@@ -83,6 +88,8 @@ export interface Delta {
   motion: MotionPlan[]
   custody: CustodyChange[]
   entities: EntityStateChange[]
+  /** Conflict-zone reservations made in this batch (overlay). */
+  reservations: Reservation[]
   /** The most recent events of this batch (capped at EVENT_SUMMARY_CAP). */
   events: EventSummary[]
   /** Number of events of each type in this batch. */

@@ -59,9 +59,9 @@ export function shcId(index: number): string {
  * new config; the input is not modified.
  */
 export function withShcFleet(config: ScenarioConfig, count: number, kinematics?: Partial<ShcKinematics>): ScenarioConfig {
-  const next: ScenarioConfig = structuredClone(config)
+  const next: ScenarioConfig = JSON.parse(JSON.stringify(config)) // also copies Vue reactive proxies
   next.shcs = Array.from({ length: count }, (_, i) => ({ id: shcId(i) }))
-  next.kinematics.shc = { ...(config.kinematics.shc ?? DEFAULT_SHC_KINEMATICS), ...kinematics }
+  next.kinematics.shc = JSON.parse(JSON.stringify({ ...(config.kinematics.shc ?? DEFAULT_SHC_KINEMATICS), ...kinematics }))
   return next
 }
 

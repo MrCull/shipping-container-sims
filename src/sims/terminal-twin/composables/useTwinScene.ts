@@ -8,7 +8,7 @@
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { SceneRenderer } from '../modules/sceneRenderer'
+import { SceneRenderer, type OverlayState } from '../modules/sceneRenderer'
 import type { SceneModel } from '../modules/sceneModel'
 import { useTwinStore } from '../store/twinStore'
 
@@ -29,6 +29,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   let controls: OrbitControls | null = null
   let view: SceneRenderer | null = null
   let builtFor: SceneModel | null = null
+  let overlaysApplied: OverlayState | null = null
   let frame = 0
   /** Frames actually rendered (dev API: proves the view keeps animating). */
   let framesRendered = 0
@@ -60,6 +61,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     builtFor = model
     if (!model) return
     view = new SceneRenderer(model)
+    overlaysApplied = null
     aim(view.overviewTarget(), false)
   }
 
@@ -71,6 +73,10 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (!renderer || !camera || !controller) return
     if (controller.model !== builtFor) rebuild(controller.model)
     if (!view || controller.busy) return
+    if (overlaysApplied !== store.overlays) {
+      overlaysApplied = store.overlays
+      view.setOverlays(store.overlays)
+    }
     view.update(controller.displayTime, store.selectedId)
     controls?.update()
     renderer.render(view.scene, camera)

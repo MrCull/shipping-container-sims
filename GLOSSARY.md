@@ -28,6 +28,12 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Cycle:** one complete loop of a crane: start, pick, carry, ground, return.
 - **Work package:** one STS's moves for one bay section (deck or hold, discharge or load). Its release is a decision point.
 - **Rehandle:** a non-productive ASC move needed to reach a buried box.
+- **Job (SHC job):** one box to move from an STS ground position to a WTP pad. Grounding a box **releases** a job into the **released pool**; a job is **open** until an SHC **claims** it.
+- **Pull dispatch:** free equipment asks the dispatch decision point (`shcDispatch`) for its next job from the released pool, rather than jobs being pushed to equipment.
+- **Trip:** an SHC's planned drive with its phases (routing empty, positioning at pickup, locking, lifting, routing loaded, positioning at drop-off, lowering, unlocking, clearing), or its drive to its parking spot.
+- **Clear position (pad clear position):** where an SHC reverses to after setting a box down on a WTP pad, clear of the pad. *Avoid:* "exit".
+- **Parking spot:** an SHC's own rest position off the apron, where idle SHCs return.
+- **Driver variability:** a ± % random factor on each SHC trip's drive times.
 - **Transshipment:** a box that goes vessel → yard → another vessel.
 
 ## Engine and tooling
@@ -62,4 +68,9 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Run to…:** run the engine flat out (without rendering) to a target sim time, then resume playback there.
 - **Delta:** the compact worker → main-thread update: new motion plans, custody changes, status changes and summarised events.
 - **Dev API:** `window.__tt`, the dev-build-only browser API (load, step, runUntil, query, inject, snapshot, why, select, cameraTo) used by Playwright smoke tests and agents.
+- **Lane graph:** the generated one-way graph SHCs route over (apron loop, STS lanes, WTP spurs, parking spurs). Edges run along X or Z.
+- **Conflict zone:** a part of the lane graph only one vehicle may use at a time: an intersection, an STS lane section (ground position) or a WTP pad with its spur.
+- **Reservation:** a time window `[from, to)` on a conflict zone held by one piece of equipment. Trips reserve all their zones before departing and depart later if any window is taken.
+- **Subsystem mode:** how a subsystem runs: **real**, **instant** (a stub that raises the same events with zero durations) or **off**.
+- **Overlay (3D debug overlay):** an optional drawing over the 3D view: lane graph, active reservations.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.

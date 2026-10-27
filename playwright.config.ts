@@ -12,8 +12,9 @@
 import { chromium, defineConfig } from '@playwright/test'
 import { existsSync } from 'node:fs'
 
-const DEV_PORT = 5199
-const PROD_PORT = 5198
+// Override with SMOKE_DEV_PORT / SMOKE_PROD_PORT to run several checkouts side by side.
+const DEV_PORT = Number(process.env.SMOKE_DEV_PORT ?? 5199)
+const PROD_PORT = Number(process.env.SMOKE_PROD_PORT ?? 5198)
 const vite = 'node node_modules/vite/bin/vite.js'
 
 function chromiumExecutable(): string | undefined {
