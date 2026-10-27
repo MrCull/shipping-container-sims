@@ -14,15 +14,21 @@ A Vue 3 + TypeScript web app that hosts shipping-container-themed simulations an
 - **Three.js** — 3D rendering (shared via `useThreeScene` composable)
 - **ESLint** — static analysis for JS/TS/Vue (`eslint.config.js`; Vue + TypeScript recommended presets)
 
-## Linting
+## Linting and verification
 
 After making substantive code changes, run **`npm run lint`** to catch issues.
 
-Before handing work back after code changes, run **`npm run build`** to catch TypeScript or Vite build errors that linting may miss.
+Before handing work back after code changes, run **`npm run verify`**: lint, then build (catches TypeScript or Vite errors that linting may miss), then tests when a `test` script exists. Pull requests to `main` run the same checks in CI (`.github/workflows/pr-checks.yml`).
 
 To apply ESLint auto-fixes (including many Vue template and style rules), use **`npm run lint:fix`**.
 
 **npm and `--fix`:** Arguments after `npm run <script>` are **not** passed to the underlying command unless you insert **`--`**. For example, **`npm run lint --fix`** only runs `eslint .` — it does **not** pass `--fix` to ESLint. Either run **`npm run lint:fix`**, or pass the flag explicitly: **`npm run lint -- --fix`**.
+
+## Agent tooling
+
+- **Cloud sessions**: a SessionStart hook (`.claude/hooks/session-start.sh`) runs `npm install` in Claude Code cloud sessions, so lint/build/test work immediately. It does nothing locally.
+- **Visual checks**: `npm run screenshot -- --path /sim/<sim-id> --wait 8000` starts a Vite dev server on a free port, opens the route in headless Chromium (WebGL works via software rendering), saves a PNG to `.screenshots/` (git-ignored) and reports page errors. Use `--out <file>`, `--wait-for <selector>`, `--eval "<js>"` (e.g. drive a dev-only debug API before the shot), `--full-page`, `--fail-on-error`, or `--base <url>` to use an already-running server. If Playwright's bundled Chromium isn't installed it falls back to `CHROMIUM_PATH` or the cloud image's preinstalled `/opt/pw-browsers/chromium`.
+- **README media**: `npm run capture-readme-media` (needs `npm run build && npm run preview` first) regenerates the README screenshots.
 
 ## Project structure
 
@@ -85,6 +91,8 @@ Agent-facing skill files live in **`.ai/skills/`** at the repo root (Markdown `S
 
 New skills go under **`.agents/skills/`** instead — the repo's new top-level naming/location standard for agent-facing content. Existing `.ai/skills/` entries have not been migrated yet.
 
+**`.claude/skills/`** holds Matt Pocock's engineering-workflow skills (vendored from upstream, see `.claude/skills/UPSTREAM.md`), invoked as slash commands in Claude Code: e.g. `/grill-me`, `/to-spec`, `/to-tickets`, `/implement`, `/tdd`, `/diagnosing-bugs`, `/code-review`, `/pr`. They read their per-repo configuration from `docs/agents/` (see § Agent skills).
+
 **Skill index** (every `SKILL.md` in `.ai/skills/`):
 
 - [adding-a-sim](.ai/skills/adding-a-sim/SKILL.md)
@@ -122,6 +130,20 @@ These skills provide TypeScript interfaces, default value ranges, factory functi
 ### Third-party integrations
 
 - **[Jev integration](.agents/skills/jev-integration/SKILL.md)** — When and how to use Jev (TypeSafe System One) for bounded semantic decisions (Choice/Score/Noul questions), state design, provider API access, and turning judgments into application policy.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues on `MrCull/shipping-container-sims`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `GLOSSARY.md` plus `docs/adr/`, created lazily. See `docs/agents/domain.md`.
 
 ## Available media
 
