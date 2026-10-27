@@ -1,10 +1,41 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { randomSeed, scenarioCatalogue, useTwinStore } from '../../store/twinStore'
+import { randomSeed, resolveScenario, scenarioCatalogue, useTwinStore } from '../../store/twinStore'
 import { fromLocalInputValue, toLocalInputValue } from '../../modules/time'
+import { t } from '../../i18n/messages'
+import { browserDisplayDefaults } from '../../i18n/display'
+import type { UnitSystem } from '../../scenario/types'
 
 const store = useTwinStore()
 const catalogue = scenarioCatalogue()
+
+/** Offered locales; the browser's and the current one are added if missing. */
+const COMMON_LOCALES = ['en-GB', 'en-US', 'de-DE', 'es-ES', 'fr-FR', 'it-IT', 'nl-NL', 'pt-BR', 'ja-JP', 'zh-CN']
+const UNIT_SYSTEMS: UnitSystem[] = ['metric', 'imperial']
+const browserLocale = browserDisplayDefaults(typeof navigator === 'undefined' ? [] : navigator.languages ?? []).locale
+
+function localeName(tag: string): string {
+  try {
+    return new Intl.DisplayNames([tag], { type: 'language' }).of(tag) ?? tag
+  } catch {
+    return tag
+  }
+}
+
+const localeOptions = computed(() => {
+  const tags = [...new Set([browserLocale, store.display.locale, ...COMMON_LOCALES])]
+  return tags.map((tag) => {
+    const name = `${localeName(tag)} · ${tag}`
+    return { tag, label: tag === browserLocale ? t('setup.localeBrowser', { name }) : name }
+  })
+})
+
+const preview = computed(() => {
+  const fmt = store.fmt
+  const sample = new Date(fromLocalInputValue(start.value) ?? Date.now())
+  const { date, time } = fmt.dateTime(sample)
+  return t('setup.preview', { date, time, number: fmt.number(1234567.89, 2), weekStart: fmt.weekdayName(fmt.firstDayOfWeek()) })
+})
 
 const name = ref(store.choice.name)
 const seed = ref(store.choice.seed)
@@ -13,6 +44,26 @@ const formError = ref<string | null>(null)
 
 const selected = computed(() => catalogue.find((c) => c.name === name.value))
 
+/** Key figures of the selected scenario, in the chosen units (the config itself stays SI). */
+const summary = computed(() => {
+  let config
+  try {
+    config = resolveScenario(name.value)
+  } catch {
+    return []
+  }
+  const fmt = store.fmt
+  const sts = config.kinematics.sts
+  return [
+    { label: t('setup.summary.quay'), value: fmt.length(config.quay.lengthM), testid: 'quay' },
+    { label: t('setup.summary.sts'), value: fmt.number(config.sts.length, 0), testid: 'sts' },
+    { label: t('setup.summary.containers'), value: fmt.number(config.containers.length, 0), testid: 'containers' },
+    { label: t('setup.summary.gantry'), value: fmt.speed(sts.gantry.vMax), testid: 'gantry' },
+    { label: t('setup.summary.trolley'), value: fmt.speed(sts.trolley.vMax), testid: 'trolley' },
+    { label: t('setup.summary.hoist'), value: fmt.speed(sts.hoistLoaded.vMax), testid: 'hoist' },
+  ]
+})
+
 function reroll(): void {
   seed.value = randomSeed()
 }
@@ -20,11 +71,11 @@ function reroll(): void {
 async function submit(): Promise<void> {
   const startDate = fromLocalInputValue(start.value)
   if (!startDate) {
-    formError.value = 'Enter a valid start date and time'
+    formError.value = t('setup.errorStart')
     return
   }
   if (!Number.isInteger(seed.value) || seed.value < 0) {
-    formError.value = 'The seed must be a whole number ≥ 0'
+    formError.value = t('setup.errorSeed')
     return
   }
   formError.value = null
@@ -44,14 +95,14 @@ async function submit(): Promise<void> {
       @submit.prevent="submit"
     >
       <h2 id="tt-setup-title">
-        New scenario
+        {{ t('setup.title') }}
       </h2>
       <p class="intro">
-        Pick a scenario, set the seed and the start date/time. The same seed always gives the same run.
+        {{ t('setup.intro') }}
       </p>
 
       <fieldset class="field">
-        <legend>Scenario</legend>
+        <legend>{{ t('setup.scenario') }}</legend>
         <label
           v-for="c in catalogue"
           :key="c.name"
@@ -65,7 +116,7 @@ async function submit(): Promise<void> {
             :value="c.name"
           >
           <span class="choice-name">{{ c.name }}</span>
-          <span class="choice-kind">{{ c.kind }}</span>
+          <span class="choice-kind">{{ t(`setup.kind.${c.kind}`) }}</span>
         </label>
         <p
           v-if="selected"
@@ -74,13 +125,30 @@ async function submit(): Promise<void> {
           {{ selected.description }}
         </p>
         <p class="hint muted">
-          Presets (TTI Algeciras, Small automated, Stress test) are coming soon.
+          {{ t('setup.presetsSoon') }}
         </p>
+        <dl
+          v-if="summary.length"
+          class="summary"
+          :aria-label="t('setup.summary')"
+          data-testid="tt-setup-summary"
+        >
+          <div
+            v-for="item in summary"
+            :key="item.testid"
+            class="summary-item"
+          >
+            <dt>{{ item.label }}</dt>
+            <dd :data-testid="`tt-summary-${item.testid}`">
+              {{ item.value }}
+            </dd>
+          </div>
+        </dl>
       </fieldset>
 
       <div class="row">
         <label class="field">
-          <span>Seed</span>
+          <span>{{ t('setup.seed') }}</span>
           <span class="seed">
             <input
               v-model.number="seed"
@@ -93,15 +161,15 @@ async function submit(): Promise<void> {
             <button
               type="button"
               class="btn"
-              title="Random seed"
+              :title="t('setup.rerollHint')"
               @click="reroll"
             >
-              ↻ Re-roll
+              {{ t('setup.reroll') }}
             </button>
           </span>
         </label>
         <label class="field">
-          <span>Start date/time</span>
+          <span>{{ t('setup.start') }}</span>
           <input
             v-model="start"
             type="datetime-local"
@@ -110,6 +178,57 @@ async function submit(): Promise<void> {
           >
         </label>
       </div>
+
+      <fieldset class="field">
+        <legend>{{ t('setup.display') }}</legend>
+        <div class="row">
+          <label class="field">
+            <span>{{ t('setup.locale') }}</span>
+            <select
+              name="locale"
+              data-testid="tt-locale"
+              :value="store.display.locale"
+              @change="store.setDisplay({ locale: ($event.target as HTMLSelectElement).value })"
+            >
+              <option
+                v-for="o in localeOptions"
+                :key="o.tag"
+                :value="o.tag"
+              >
+                {{ o.label }}
+              </option>
+            </select>
+          </label>
+          <div
+            class="field"
+            role="radiogroup"
+            :aria-label="t('setup.units')"
+          >
+            <span>{{ t('setup.units') }}</span>
+            <label
+              v-for="u in UNIT_SYSTEMS"
+              :key="u"
+              class="unit-choice"
+            >
+              <input
+                type="radio"
+                name="tt-units"
+                :value="u"
+                :checked="store.display.units === u"
+                :data-testid="`tt-units-${u}`"
+                @change="store.setDisplay({ units: u })"
+              >
+              {{ t(`setup.units.${u}`) }}
+            </label>
+          </div>
+        </div>
+        <p
+          class="hint"
+          data-testid="tt-display-preview"
+        >
+          {{ preview }}
+        </p>
+      </fieldset>
 
       <p
         v-if="formError || store.error"
@@ -125,14 +244,14 @@ async function submit(): Promise<void> {
           class="btn"
           @click="store.cancelSetup()"
         >
-          Cancel
+          {{ t('setup.cancel') }}
         </button>
         <button
           type="submit"
           class="btn primary"
           :disabled="store.loading"
         >
-          {{ store.loading ? 'Starting…' : 'Start' }}
+          {{ store.loading ? t('setup.starting') : t('setup.startButton') }}
         </button>
       </div>
     </form>
@@ -243,8 +362,13 @@ legend,
   }
 }
 
+.row > * {
+  min-width: 0;
+}
+
 input[type='number'],
-input[type='datetime-local'] {
+input[type='datetime-local'],
+select {
   padding: 0.45rem 0.6rem;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -253,6 +377,39 @@ input[type='datetime-local'] {
   font-family: var(--tt-font-mono);
   color-scheme: dark;
   min-width: 0;
+  width: 100%;
+}
+
+.unit-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 560px) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.summary dt {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.summary dd {
+  margin: 0;
+  font-family: var(--tt-font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .seed {

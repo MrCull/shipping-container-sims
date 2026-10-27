@@ -5,6 +5,7 @@
  * selection and a 20 ft reference box; installs `window.__ttAssets`.
  */
 import { markRaw, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { t } from '../i18n/messages'
 import { LIVERY_ATLAS } from '../modules/containerAssets'
 import { ASSETS, AssetViewerScene } from './assetViewerScene'
 import type { AssetViewerApi, AssetViewStats, ViewerLod, YardStats } from './assetViewerApi'
@@ -61,7 +62,7 @@ onMounted(() => {
   const api: AssetViewerApi = {
     list: () => [...names],
     async show(name, options = {}) {
-      if (!view) throw new Error('viewer not mounted')
+      if (!view) throw new Error(t('assetViewer.notMounted'))
       yardStats.value = null
       const s = await view.show(name, options)
       selected.value = name
@@ -104,9 +105,9 @@ onBeforeUnmount(() => {
       class="canvas-host"
     />
     <aside class="panel">
-      <h2>Asset viewer <span class="dev">dev</span></h2>
+      <h2>{{ t('assetViewer.title') }} <span class="dev">{{ t('assetViewer.devBadge') }}</span></h2>
       <label>
-        Asset
+        {{ t('assetViewer.asset') }}
         <select
           :value="selected"
           @change="open(($event.target as HTMLSelectElement).value)"
@@ -116,7 +117,9 @@ onBeforeUnmount(() => {
             :key="n"
             :value="n"
           >{{ n }}</option>
-          <option value="yard">yard (instanced stress test)</option>
+          <option value="yard">
+            {{ t('assetViewer.yardOption') }}
+          </option>
         </select>
       </label>
       <p
@@ -137,7 +140,7 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <label v-if="stats.kind === 'container'">
-          Livery
+          {{ t('assetViewer.livery') }}
           <select
             :value="stats.livery"
             @change="setLivery"
@@ -146,14 +149,16 @@ onBeforeUnmount(() => {
               v-for="l in liveries"
               :key="l.index"
               :value="l.index"
-            >{{ l.index }} · {{ l.line ?? 'generic' }}</option>
+            >
+              {{ t('assetViewer.liveryOption', { index: l.index, line: l.line ?? t('assetViewer.genericLivery') }) }}
+            </option>
           </select>
         </label>
         <label
           v-for="rig in stats.rig"
           :key="rig.node"
         >
-          {{ rig.node }} ({{ rig.axis }}, {{ rig.unit }}): <span class="mono">{{ stats.rigValues[rig.node] }}</span>
+          {{ t('assetViewer.rigLabel', { node: rig.node, axis: rig.axis, unit: rig.unit }) }} <span class="mono">{{ stats.rigValues[rig.node] }}</span>
           <input
             type="range"
             :min="rig.min"
@@ -164,13 +169,13 @@ onBeforeUnmount(() => {
           >
         </label>
         <dl>
-          <dt>Showing</dt><dd class="mono">
+          <dt>{{ t('assetViewer.showing') }}</dt><dd class="mono">
             {{ stats.shownLod }}
           </dd>
-          <dt>Triangles</dt><dd class="mono">
+          <dt>{{ t('assetViewer.triangles') }}</dt><dd class="mono">
             {{ stats.triangles }}
           </dd>
-          <dt>Draw calls</dt><dd class="mono">
+          <dt>{{ t('assetViewer.drawCalls') }}</dt><dd class="mono">
             {{ stats.drawCalls }}
           </dd>
           <template
@@ -178,31 +183,31 @@ onBeforeUnmount(() => {
             :key="name"
           >
             <dt>{{ name }}</dt><dd class="mono">
-              {{ l.triangles }} tris · {{ l.drawCalls }} dc
+              {{ t('assetViewer.lodCost', { triangles: l.triangles, drawCalls: l.drawCalls }) }}
             </dd>
           </template>
         </dl>
         <p class="hint">
-          Grey outline: 20 ft ISO reference box.
+          {{ t('assetViewer.referenceHint') }}
         </p>
       </template>
       <dl v-if="yardStats">
-        <dt>Instances</dt><dd class="mono">
+        <dt>{{ t('assetViewer.instances') }}</dt><dd class="mono">
           {{ yardStats.instances }}
         </dd>
-        <dt>LOD0 / LOD1</dt><dd class="mono">
-          {{ yardStats.lod0 }} / {{ yardStats.lod1 }}
+        <dt>{{ t('assetViewer.lodSplit') }}</dt><dd class="mono">
+          {{ t('assetViewer.lodSplitValue', { lod0: yardStats.lod0, lod1: yardStats.lod1 }) }}
         </dd>
-        <dt>Container tris</dt><dd class="mono">
+        <dt>{{ t('assetViewer.containerTriangles') }}</dt><dd class="mono">
           {{ yardStats.containerTriangles }}
         </dd>
-        <dt>Frame draw calls</dt><dd class="mono">
+        <dt>{{ t('assetViewer.frameDrawCalls') }}</dt><dd class="mono">
           {{ yardStats.drawCalls }}
         </dd>
-        <dt>Frame triangles</dt><dd class="mono">
+        <dt>{{ t('assetViewer.frameTriangles') }}</dt><dd class="mono">
           {{ yardStats.triangles }}
         </dd>
-        <dt>FPS</dt><dd class="mono">
+        <dt>{{ t('assetViewer.fps') }}</dt><dd class="mono">
           {{ yardStats.fps }}
         </dd>
       </dl>

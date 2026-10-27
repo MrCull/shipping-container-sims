@@ -2,8 +2,11 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import TopBar from './components/TopBar.vue'
 import SetupDialog from './components/modals/SetupDialog.vue'
+import ShortcutHelp from './components/modals/ShortcutHelp.vue'
 import { useTwinScene } from './composables/useTwinScene'
+import { useTwinShortcuts } from './composables/useTwinShortcuts'
 import { useTwinStore } from './store/twinStore'
+import { t } from './i18n/messages'
 
 const store = useTwinStore()
 // Dev-only asset viewer: /sim/terminal-twin?viewer=<asset>|yard (stripped from production builds).
@@ -11,6 +14,7 @@ const assetViewer = import.meta.env.DEV ? new URLSearchParams(window.location.se
 const AssetViewer = import.meta.env.DEV ? defineAsyncComponent(() => import('./dev/AssetViewer.vue')) : null
 const sceneHost = ref<HTMLElement | null>(null)
 const { webglFailed } = useTwinScene(sceneHost)
+useTwinShortcuts()
 
 let uninstallDevApi: (() => void) | null = null
 let unmounted = false
@@ -54,14 +58,14 @@ onBeforeUnmount(() => {
         v-if="webglFailed"
         class="notice"
       >
-        3D view unavailable: WebGL could not start in this browser. The simulation still runs.
+        {{ t('twin.webglUnavailable') }}
       </div>
       <div
         v-if="store.busy"
         class="notice busy"
         role="status"
       >
-        Running flat out…
+        {{ t('twin.runningFlatOut') }}
       </div>
       <div
         v-else-if="ended && store.info"
@@ -69,14 +73,32 @@ onBeforeUnmount(() => {
         role="status"
       >
         <template v-if="store.info.status === 'ended'">
-          Scenario complete · {{ store.info.endReason }} ·
-          <span class="mono">{{ store.info.movesCompleted }}</span> moves
+          {{ t('twin.scenarioComplete', { reason: store.info.endReason ?? '', moves: store.fmt.number(store.info.movesCompleted, 0) }) }}
         </template>
         <template v-else>
-          Run stopped: {{ store.info.firstError }}
+          {{ t('twin.runStopped', { error: store.info.firstError ?? '' }) }}
         </template>
       </div>
+      <div
+        v-if="store.toast"
+        :key="store.toast.id"
+        class="toast"
+        role="status"
+        data-testid="tt-toast"
+      >
+        {{ store.toast.text }}
+      </div>
+      <section
+        v-if="store.dashboardOpen"
+        class="dashboard"
+        data-testid="tt-dashboard"
+        :aria-label="t('twin.dashboardTitle')"
+      >
+        <h2>{{ t('twin.dashboardTitle') }}</h2>
+        <p>{{ t('twin.dashboardPlaceholder') }}</p>
+      </section>
     </div>
+    <ShortcutHelp v-if="store.helpOpen && store.phase === 'running'" />
     <SetupDialog v-if="store.phase === 'setup'" />
   </div>
 </template>
@@ -135,7 +157,49 @@ onBeforeUnmount(() => {
   border-color: var(--color-success);
 }
 
-.mono {
-  font-family: var(--tt-font-mono);
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 1.2rem;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: rgba(17, 24, 39, 0.92);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  animation: tt-toast-in 0.15s ease-out;
+}
+
+@keyframes tt-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0.4rem);
+  }
+}
+
+.dashboard {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 1rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: center;
+}
+
+.dashboard h2 {
+  font-size: 1.2rem;
+}
+
+.dashboard p {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
 }
 </style>

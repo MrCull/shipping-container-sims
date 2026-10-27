@@ -72,6 +72,11 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (!renderer || !camera || !controller) return
     if (controller.model !== builtFor) rebuild(controller.model)
     if (!view || controller.busy) return
+    if (store.following && store.selectedId) {
+      // Follow camera (F): keep the selection centred, keeping the user's viewing offset.
+      const centre = controller.model?.entityCentre(store.selectedId, controller.displayTime)
+      if (centre) aim(centre, true)
+    }
     view.update(controller.displayTime, store.selectedId, camera.position)
     controls?.update()
     renderer.render(view.scene, camera)

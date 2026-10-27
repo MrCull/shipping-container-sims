@@ -62,6 +62,8 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Run to…:** run the engine flat out (without rendering) to a target sim time, then resume playback there.
 - **Delta:** the compact worker → main-thread update: new motion plans, custody changes, status changes and summarised events.
 - **Dev API:** `window.__tt`, the dev-build-only browser API (load, step, runUntil, query, inject, snapshot, why, select, cameraTo) used by Playwright smoke tests and agents.
+- **Display settings:** the UI's **locale** (Intl formatting of dates, times, numbers, first day of week) and **unit system** (metric: m, km/h, t; imperial: ft, mi/h, US tons). Display only: the engine and saved configs are always SI. Imperial speed is written **mi/h** because **mph** would read as crane moves per hour.
+- **Message catalogue:** `i18n/messages.ts`, the single home of every user-visible UI string (English only for now), looked up with `t(key)`.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.
 
 ## 3D assets (phase 2)
