@@ -13,6 +13,8 @@ const scope = self as unknown as {
 
 const host = createEngineHost()
 
+// Serve requests strictly in order (a request may await async decision handlers).
+let queue: Promise<void> = Promise.resolve()
 scope.addEventListener('message', (e) => {
-  scope.postMessage(host.handle(e.data))
+  queue = queue.then(async () => scope.postMessage(await host.handle(e.data)))
 })

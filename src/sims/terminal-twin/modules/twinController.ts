@@ -4,8 +4,9 @@
  * - Owns the EngineClient (worker) and the SceneModel (render timelines).
  * - Owns the playback clock: `displayTime` advances with wall time × speed and
  *   never passes the engine horizon (`info.now`) or the scenario end.
- * - Keeps the engine a look-ahead window ahead of the display (`advance`), so
- *   motion segments for the displayed instant are always known.
+ * - While playing, keeps the engine a look-ahead window ahead of the display
+ *   (`advance`), so motion segments for the displayed instant are always known.
+ *   While paused it does not run ahead.
  * - "Run to…" / runUntil / step run the engine flat out (no rendering while
  *   `busy`) and jump the display to the engine time.
  *
@@ -87,7 +88,9 @@ export class TwinController {
     if (!this.model || !this.info || this.busy) return
     if (!this.paused) this.displayTime = Math.min(this.displayTime + dt * this.speed, this.limit)
     const lookahead = Math.max(MIN_LOOKAHEAD_SIM_S, this.speed * LOOKAHEAD_WALL_S)
-    if (!this.inflight && this.info.status === 'ready' && this.info.now < this.displayTime + lookahead) {
+    // Look ahead only while playing: when paused, the engine stays at the displayed
+    // time, so dev-API queries and the scene describe the same instant.
+    if (!this.paused && !this.inflight && this.info.status === 'ready' && this.info.now < this.displayTime + lookahead) {
       this.inflight = true
       const gen = this.generation
       void this.call({ op: 'advance', to: this.displayTime + lookahead })

@@ -111,18 +111,23 @@ test('Run to… jumps to the target and the scene matches the engine there', asy
   await page.evaluate(() => window.__tt!.runTo(600))
 
   const clock = await page.evaluate(() => window.__tt!.clock())
-  expect(clock.displayTime).toBe(600)
-  expect(clock.engine!.now).toBe(600)
+  expect(clock.displayTime).toBeGreaterThanOrEqual(600)
+  expect(clock.displayTime).toBeLessThan(620)
   expect(clock.paused).toBe(false) // playback resumes at the previous speed
   expect(clock.speed).toBe(5)
 
+  // Paused, the engine does not run ahead, so the scene and the engine describe the same instant.
   await page.evaluate(() => window.__tt!.pause())
+  await page.evaluate(() => window.__tt!.runTo(700))
+  const paused = await page.evaluate(() => window.__tt!.clock())
+  expect(paused.displayTime).toBe(700)
+  expect(paused.engine!.now).toBe(700)
   const state = await page.evaluate(() => window.__tt!.sceneState())
   const engineBoxes = await page.evaluate(() =>
     window.__tt!.query<{ id: string; custody: { kind: string; id: string } }[]>('containers'),
   )
   const engineSts = await page.evaluate(() => window.__tt!.query<{ id: string; status: string }[]>('stsList'))
-  expect(state!.displayTime).toBe(600)
+  expect(state!.displayTime).toBe(700)
   for (const box of engineBoxes) expect(state!.containers[box.id], box.id).toEqual(box.custody)
   for (const sts of engineSts) expect(state!.sts[sts.id].status).toBe(sts.status)
   const grounded = engineBoxes.filter((b) => b.custody.kind === 'groundPosition').length

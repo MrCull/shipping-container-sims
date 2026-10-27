@@ -3,6 +3,8 @@
  *
  * STS discharge cycle (events in order, each `segments` = motion leading up to it):
  *   StsMoveStarted → (gantry, trolley out, hoist down empty, lock) → StsPicked
+ *   → DecisionRequested / DecisionResolved (stsGroundPosition; the STS waits
+ *     holding the box while the decision is pending)
  *   → (hoist up loaded, trolley to lane, hoist down loaded, unlock) → StsGrounded
  *   → (hoist up empty) → StsMoveStarted … → StsWorkComplete → VesselDeparted
  */
@@ -120,15 +122,15 @@ export const quayReactors: ReactorMap = {
   },
 
   StsPicked: (e, ctx) => {
-    const { state, config } = ctx
+    const { state } = ctx
     const sts = state.sts[e.payload.stsId]
     const box = state.containers[e.payload.containerId]
     state.vesselSlots[e.payload.from.id].containerId = null
     sts.carrying = box.id
-    sts.status = 'carrying'
+    sts.status = 'waiting-for-decision'
     ctx.transferCustody(box.id, { kind: 'sts', id: sts.id })
-
-    const reply = ctx.handlers.stsGroundPosition(
+    ctx.requestDecision(
+      'stsGroundPosition',
       {
         stsId: sts.id,
         containerId: box.id,
@@ -138,8 +140,18 @@ export const quayReactors: ReactorMap = {
           occupiedBy: state.groundPositions[id].containerId,
         })),
       },
-      ctx.query,
+      { equipment: [sts.id], containers: [box.id] },
     )
+  },
+
+  /** Ground-position reply: carry the box to the chosen lane (or wait if none). */
+  DecisionResolved: (e, ctx) => {
+    if (e.payload.decisionPoint !== 'stsGroundPosition') return
+    const { state, config } = ctx
+    const { request, reply } = e.payload
+    const sts = state.sts[request.stsId]
+    const box = state.containers[request.containerId]
+    sts.status = 'carrying'
     if (reply.groundPositionId === null) {
       sts.status = 'waiting-for-ground-position'
       ctx.schedule('StsWaitingForGroundPosition', e.t, { equipment: [sts.id], containers: [box.id] }, {

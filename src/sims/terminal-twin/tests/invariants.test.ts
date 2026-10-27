@@ -6,7 +6,7 @@ const tracer = fixtures['tracer-1sts-10-boxes']
 
 /** Broken TOS handler: always answers lane 1, even when a box is already there. */
 const alwaysFirstLane: Partial<HandlerSet> = {
-  stsGroundPosition: (req) => ({ groundPositionId: req.groundPositions[0].id }),
+  stsGroundPosition: (msg) => ({ groundPositionId: msg.payload.groundPositions[0].id }),
 }
 
 describe('invariant checker', () => {

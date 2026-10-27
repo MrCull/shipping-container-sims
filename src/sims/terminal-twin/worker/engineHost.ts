@@ -112,7 +112,7 @@ export function createEngineHost() {
     }
   }
 
-  function serve(req: WorkerRequestMessage): unknown {
+  async function serve(req: WorkerRequestMessage): Promise<unknown> {
     switch (req.op) {
       case 'load':
         start(req.config, req.seed)
@@ -122,9 +122,10 @@ export function createEngineHost() {
         start(loaded.config, loaded.seed)
         return null
       case 'advance':
-        return requireSim().runUntil({ time: req.to })
+        // Async variant: awaits Promise handlers (pause mode) instead of stalling the horizon.
+        return requireSim().runUntilAsync({ time: req.to })
       case 'run': {
-        const result = requireSim().runUntil(req.condition)
+        const result = await requireSim().runUntilAsync(req.condition)
         delta.motion = latestBy(delta.motion, (m) => m.entityId)
         delta.custody = latestBy(delta.custody, (c) => c.containerId)
         delta.entities = latestBy(delta.entities, (e) => `${e.kind}:${e.id}`)
@@ -179,10 +180,11 @@ export function createEngineHost() {
   }
 
   return {
-    handle(req: WorkerRequestMessage): WorkerReply {
+    /** Serve one request. Callers must not overlap requests (the worker entry serialises them). */
+    async handle(req: WorkerRequestMessage): Promise<WorkerReply> {
       delta = emptyDelta()
       try {
-        const result = serve(req)
+        const result = await serve(req)
         const s = requireSim()
         if (delta.events.length > EVENT_SUMMARY_CAP) delta.events = delta.events.slice(-EVENT_SUMMARY_CAP)
         return { rid: req.rid, ok: true, result, delta, info: info(s) }

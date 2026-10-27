@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'scripts/**', '.smoke-dist/**', '.smoke-results/**'] },
+  { ignores: ['dist/**', 'node_modules/**', 'scripts/**', '.claude/**', '.smoke-dist/**', '.smoke-results/**'] },
 
   js.configs.recommended,
 
