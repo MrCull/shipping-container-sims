@@ -45,4 +45,9 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Invariant:** a rule that must hold after every event (for example `custody.single-owner`). **Fail-fast** stops the run at the first violation.
 - **Snapshot:** a full JSON copy of a run's state (queue, RNG, log), used to resume the run exactly.
 - **Event-log hash:** a deterministic hash of every committed event. The same seed and config always give the same hash.
+- **Structured log:** JSON-lines records derived from committed events (`t`, `eventId`, `seq`, `subsystem`, `level`, …), filtered by **per-subsystem verbosity** (`sts=debug,*=warn`).
+- **Subsystem (logging):** the part of the sim an event belongs to (`scenario`, `vessel`, `sts`, `invariants`; later `asc`, `shc`, …), normally the first word of its event type.
+- **Run diff:** a comparison of two event logs that reports the **first diverging event** (its `seq`, the differing fields and both events).
+- **Time window:** a run resumed from a snapshot that processes only events after the snapshot's time, up to a stop condition.
+- **Golden update:** an explicit rewrite of golden summaries (`npm run tt:golden -- --update`). Without it, any difference from a golden is **drift** and fails.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.
