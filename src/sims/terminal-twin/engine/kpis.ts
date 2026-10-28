@@ -83,8 +83,24 @@ export interface YardKpiReport {
   boxesInTransit: number
   /** yardAllocation replies with no slot (block full). */
   allocationFailures: number
-  /** Per block: stacked boxes, slots in use (20 ft cells) and the highest stack. */
-  blocks: Record<string, { boxes: number; cells: number; capacityCells: number; maxHeight: number }>
+  /**
+   * Rehandles (blocker moves, TT-12) against productive ASC moves (stack + retrieve);
+   * `perProductiveMove` is null until a productive move is done.
+   */
+  rehandles: { total: number; productiveMoves: number; perProductiveMove: number | null; failures: number }
+  /** Per block: stacked boxes, slots in use (20 ft cells), the highest stack and its rehandle ratio. */
+  blocks: Record<
+    string,
+    {
+      boxes: number
+      cells: number
+      capacityCells: number
+      maxHeight: number
+      rehandles: number
+      productiveMoves: number
+      rehandlesPerProductiveMove: number | null
+    }
+  >
   ascs: Record<
     string,
     {
@@ -190,8 +206,14 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
   const y = state.kpis.yard
   const yard: YardKpiReport | undefined = y && {
     boxesStacked: y.boxesStacked,
-    boxesInTransit: Object.keys(state.ascJobs).length,
+    boxesInTransit: Object.values(state.ascJobs).filter((j) => j.kind !== 'rehandle').length,
     allocationFailures: y.allocationFailures,
+    rehandles: {
+      total: y.rehandles,
+      productiveMoves: y.productiveMoves,
+      perProductiveMove: y.productiveMoves > 0 ? r3(y.rehandles / y.productiveMoves) : null,
+      failures: y.rehandleFailures,
+    },
     blocks: Object.fromEntries(
       Object.values(state.yardBlocks).map((b) => {
         const slots = Object.values(state.yardSlots).filter((s) => s.blockId === b.id)
@@ -202,6 +224,10 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
             cells: slots.reduce((n, s) => n + s.span, 0),
             capacityCells: b.bays * b.rows * b.tiers,
             maxHeight: slots.reduce((m, s) => Math.max(m, s.tier), 0),
+            rehandles: y.perBlock[b.id].rehandles,
+            productiveMoves: y.perBlock[b.id].productiveMoves,
+            rehandlesPerProductiveMove:
+              y.perBlock[b.id].productiveMoves > 0 ? r3(y.perBlock[b.id].rehandles / y.perBlock[b.id].productiveMoves) : null,
           },
         ]
       }),

@@ -194,6 +194,27 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .endWhen({ vesselsCompleted: 1 })
       .build(),
 
+  /**
+   * TT-12 rehandle fixture: a random yard. Vessel V001 discharges 36 boxes into block B01 with
+   * the `random` allocation, so imports land on the stacks where the export boxes of V002
+   * (arriving later) stand. V002's retrievals then find buried boxes: every blocker is
+   * rehandled (extra ASC moves) before the productive move.
+   */
+  'rehandle-random-yard': () =>
+    new ScenarioBuilder('rehandle-random-yard', 'Random yard allocation buries export boxes: the ASC rehandles blockers before each retrieval')
+      .seed(2)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 36, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', discharge: 0, load: 24, arrivalS: 5400, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(3)
+      .block('B01', { x: 20, bays: 10, tiers: 3 })
+      .decisions({ points: { yardAllocation: { strategy: 'random' } } })
+      .endWhen({ vesselsCompleted: 2 })
+      .build(),
+
   /** Livery smoke test (TT-22): 12 boxes over all ten lines (equal weights) and all three sizes. */
   'liveries-mixed': () =>
     new ScenarioBuilder('liveries-mixed', '1 STS discharges 12 boxes of mixed lines and sizes')

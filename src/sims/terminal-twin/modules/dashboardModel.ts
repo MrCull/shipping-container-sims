@@ -48,7 +48,7 @@ export const KPI_GROUPS: readonly KpiGroup[] = [
       'wtp.dwell-s',
     ],
   },
-  { id: 'yard', kpis: ['asc.utilisation-pct', 'asc.cycle-time-s', 'asc.jobs', 'yard.fill-pct'] },
+  { id: 'yard', kpis: ['asc.utilisation-pct', 'asc.cycle-time-s', 'asc.jobs', 'yard.fill-pct', 'yard.rehandles-per-move'] },
   { id: 'landside', kpis: [] },
   {
     id: 'handlers',

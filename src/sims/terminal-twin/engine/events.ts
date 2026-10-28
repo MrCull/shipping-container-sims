@@ -171,6 +171,9 @@ export interface EventPayloads {
     reservations: Reservation[]
     /** Twin-ASC blocks: seconds the departure waits for the other ASC's rail segments. */
     railWaitS?: number
+    /** The job is a rehandle (TT-12): `yardSlotId` is the blocker's slot, `targetSlotId` where it goes. */
+    rehandle?: true
+    targetSlotId?: string
   }
   /**
    * Twin-ASC blocks: the ASC steps aside along the rail so the other ASC can
@@ -186,6 +189,12 @@ export interface EventPayloads {
     departAt: number
     reservations: Reservation[]
   }
+  /**
+   * An export retrieval found its box buried (TT-12): `blockerIds` (top first) stand on it, so
+   * each is rehandled to another slot of the block before the productive move. A rehandleTarget
+   * decision follows for the top blocker, and for each next one when the previous move is done.
+   */
+  RehandleRequired: { blockId: string; jobId: string; containerId: string; yardSlotId: string; blockerIds: string[] }
   /** Spreader up, gantry and trolley heading for the WTP pad. */
   AscRoutingToPad: AscPhasePayload
   /** Over the pad; the hoist lowers the spreader onto the box. */
@@ -201,7 +210,7 @@ export interface EventPayloads {
   /** Box on the stack; twist-locks opening. */
   AscUnlocking: AscPhasePayload
   /** Box released in its slot: custody ASC → yard slot. */
-  AscStacked: AscPhasePayload & { yardSlotId: string }
+  AscStacked: AscPhasePayload & { yardSlotId: string; /** A rehandle (TT-12): a blocker set down in its new slot, not a productive move. */ rehandle?: true }
   /** Spreader back at travel height: the ASC is available for its next box. */
   AscReady: { ascId: string; blockId: string; segments: MotionSegment[] }
   /** An STS load pick from a WTP pad by an SHC: custody WTP pad → SHC; the pad is free. */
@@ -213,7 +222,7 @@ export interface EventPayloads {
   /** Over the stack; the hoist lowers the spreader onto the box. */
   AscPositioningAtStack: AscPhasePayload
   /** Export box locked and lifted out of its stack: custody yard slot → ASC. */
-  AscRetrieved: AscPhasePayload & { yardSlotId: string }
+  AscRetrieved: AscPhasePayload & { yardSlotId: string; /** A rehandle (TT-12): a blocker lifted out of the way. */ rehandle?: true }
   /** Box up; gantry and trolley heading for the WTP pad. */
   AscRoutingToWtp: AscPhasePayload
   /** Over the pad; the hoist lowers the box onto it. */

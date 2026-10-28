@@ -295,7 +295,17 @@ export interface AscJob {
    * 'retrieve' (TT-10): take an export box from the stack (`yardSlotId`) to a WTP
    * pad (`wtpPadId`, chosen when the ASC starts, '' before). Absent = stack a box.
    */
-  kind?: 'retrieve'
+  kind?: 'retrieve' | 'rehandle'
+  /**
+   * 'rehandle' (TT-12): move a box that blocks an export retrieval to another slot
+   * of the same block. `yardSlotId` = the blocker's slot (source), `targetSlotId` =
+   * where the rehandleTarget decision sent it (null until it answers), `forJobId` =
+   * the retrieval it unblocks.
+   */
+  targetSlotId?: string | null
+  forJobId?: string
+  /** Retrieval jobs: a RehandleRequired event has been sent; 'full' = no slot could take a blocker (no more tries). */
+  rehandle?: 'required' | 'full'
 }
 
 /** Stack heights of a block. Claimed slots count: a slot is claimed when allocated, stacked later. */
@@ -491,6 +501,12 @@ export interface AscKpiCounters {
 
 export interface YardKpiCounters {
   boxesStacked: number
+  /** Rehandles (blocker moves) and productive ASC moves (stack + retrieve), overall and per block (TT-12). */
+  rehandles: number
+  productiveMoves: number
+  perBlock: Record<string, { rehandles: number; productiveMoves: number }>
+  /** rehandleTarget replies with no slot (block full). */
+  rehandleFailures: number
   /** yardAllocation replies with no slot (block full). */
   allocationFailures: number
   perAsc: Record<string, AscKpiCounters>
@@ -754,8 +770,9 @@ export function createInitialState(
     }
     for (const s of config.sts) horizontal.stsGroundPositionWaitS[s.id] = 0
     for (const p of graph.pads) state.wtpPads[p.id] = { id: p.id, blockId: p.blockId, containerId: null, claimedBy: null }
-    const yard: YardKpiCounters = { boxesStacked: 0, allocationFailures: 0, perAsc: {} }
+    const yard: YardKpiCounters = { boxesStacked: 0, rehandles: 0, productiveMoves: 0, perBlock: {}, rehandleFailures: 0, allocationFailures: 0, perAsc: {} }
     for (const b of blockSpecs(config)) {
+      yard.perBlock[b.id] = { rehandles: 0, productiveMoves: 0 }
       state.yardBlocks[b.id] = {
         id: b.id,
         bays: b.bays,

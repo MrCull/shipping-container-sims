@@ -502,6 +502,7 @@ const en = {
   'dashboard.kpi.asc.cycle-time-s': 'ASC cycle time',
   'dashboard.kpi.asc.jobs': 'ASC jobs',
   'dashboard.kpi.yard.fill-pct': 'Yard fill per block',
+  'dashboard.kpi.yard.rehandles-per-move': 'Rehandles per productive move',
   'dashboard.kpi.handler.calls': 'TOS handler calls',
   'dashboard.kpi.handler.mean-latency-s': 'TOS handler mean latency',
   'dashboard.kpi.handler.fallbacks': 'TOS handler fallbacks',

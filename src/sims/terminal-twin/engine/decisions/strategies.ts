@@ -7,6 +7,7 @@
  * identical runs. A strategy that needs randomness must take it from the
  * request, never from Math.random.
  */
+import { minFutureRehandles, nearestValidRehandle } from './rehandleStrategies'
 import { balancedAscDispatch, watersideFirstDispatch } from './ascStrategies'
 import { groupByVesselSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
 import { nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
@@ -150,6 +151,19 @@ export const strategies: StrategyRegistry = {
       },
     },
   },
+  rehandleTarget: {
+    default: 'nearest-valid',
+    strategies: {
+      'nearest-valid': {
+        description: "The legal slot nearest the blocking box's stack (shortest ASC move), low tiers first.",
+        handler: (msg) => nearestValidRehandle(msg.payload),
+      },
+      'min-future-rehandles': {
+        description: 'A slot that buries no export box retrieved before it (else the box needed latest), so later retrievals need fewer rehandles.',
+        handler: (msg) => minFutureRehandles(msg.payload),
+      },
+    },
+  },
   berthAllocation: {
     default: 'first-fit',
     strategies: {
@@ -196,4 +210,5 @@ export const defaultHandlers: HandlerSet = {
   craneSplit: getStrategy('craneSplit', strategies.craneSplit.default),
   workPackageRelease: getStrategy('workPackageRelease', strategies.workPackageRelease.default),
   emptyAllocation: getStrategy('emptyAllocation', strategies.emptyAllocation.default),
+  rehandleTarget: getStrategy('rehandleTarget', strategies.rehandleTarget.default),
 }
