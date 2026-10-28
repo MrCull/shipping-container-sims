@@ -3,10 +3,12 @@
  * Expected values come from the engine's own reports, not from re-deriving them.
  */
 import { describe, expect, it } from 'vitest'
-import { createSimulation } from '../engine'
+import { createSimulation, KPI_DEFS } from '../engine'
+import { catalogues } from '../i18n/messages'
 import { fixtures } from '../scenario/fixtures'
 import {
   KPI_GROUPS,
+  kpiLabelKey,
   blockFillPct,
   buildGroupCharts,
   buildYardHeatmap,
@@ -89,6 +91,16 @@ describe('yard heatmap', () => {
     for (const b of sim.query.yardBlocks()) {
       expect(blockFillPct(b, sim.query.yardSlots(b.id))).toBeCloseTo(series.series['yard.fill-pct'].entities[b.id].total ?? 0, 1)
       expect(heat.values[b.id][last]).toBe(series.series['yard.fill-pct'].entities[b.id].hourly[last])
+    }
+  })
+})
+
+describe('KPI coverage', () => {
+  it('every collector KPI is charted in a group and has a catalogue title', () => {
+    const grouped = new Set(KPI_GROUPS.flatMap((g) => g.kpis))
+    for (const def of KPI_DEFS) {
+      expect(grouped.has(def.id), def.id).toBe(true)
+      expect(catalogues.en[kpiLabelKey(def.id)], def.id).toBeTruthy()
     }
   })
 })

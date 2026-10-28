@@ -18,6 +18,8 @@ const store = useTwinStore()
 // Dev-only asset viewer: /sim/terminal-twin?viewer=<asset>|yard (stripped from production builds).
 const assetViewer = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('viewer') : null
 const AssetViewer = import.meta.env.DEV ? defineAsyncComponent(() => import('./dev/AssetViewer.vue')) : null
+/** The dashboard tab (and, through it, ECharts) loads on first open, never with the 3D view. */
+const DashboardTab = defineAsyncComponent(() => import('./components/DashboardTab.vue'))
 const sceneHost = ref<HTMLElement | null>(null)
 const { webglFailed } = useTwinScene(sceneHost)
 useTwinShortcuts()
@@ -58,7 +60,7 @@ onBeforeUnmount(() => {
       data-testid="tt-scene"
     >
       <KpiStrip v-if="store.hasScenario" />
-      <FinalReport v-if="store.hasScenario && store.phase === 'running'" />
+      <FinalReport v-if="store.hasScenario && store.phase === 'running' && !store.dashboardOpen" />
       <OverlayToggles v-if="store.hasScenario && !webglFailed" />
       <EventFeedPanel v-if="store.hasScenario" />
       <InspectorPanel v-if="store.hasScenario" />
@@ -96,15 +98,7 @@ onBeforeUnmount(() => {
       >
         {{ store.toast.text }}
       </div>
-      <section
-        v-if="store.dashboardOpen"
-        class="dashboard"
-        data-testid="tt-dashboard"
-        :aria-label="t('twin.dashboardTitle')"
-      >
-        <h2>{{ t('twin.dashboardTitle') }}</h2>
-        <p>{{ t('twin.dashboardPlaceholder') }}</p>
-      </section>
+      <DashboardTab v-if="store.dashboardOpen && store.hasScenario" />
     </div>
     <ShortcutHelp v-if="store.helpOpen && store.phase === 'running'" />
     <SetupDialog v-if="store.phase === 'setup'" />
@@ -185,29 +179,5 @@ onBeforeUnmount(() => {
     opacity: 0;
     transform: translate(-50%, 0.4rem);
   }
-}
-
-.dashboard {
-  position: absolute;
-  inset: 0;
-  z-index: 8;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  padding: 1rem;
-  background: var(--color-bg);
-  color: var(--color-text);
-  text-align: center;
-}
-
-.dashboard h2 {
-  font-size: 1.2rem;
-}
-
-.dashboard p {
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
 }
 </style>

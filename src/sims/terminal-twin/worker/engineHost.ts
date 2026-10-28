@@ -4,13 +4,15 @@
  * Web Worker entry (`engine.worker.ts`); it has no worker or DOM globals.
  */
 import { firstBreakpointHit, type Breakpoint } from '../modules/breakpoints'
-import { createSimulation, exportRun, headlineKpis, highlightsOf, summarizeRun, type EngineEvent, type Simulation } from '../engine'
+import { blockFillPct } from '../modules/dashboardModel'
+import { buildTimeline, createSimulation, exportRun, headlineKpis, highlightsOf, summarizeRun, type EngineEvent, type Simulation } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import { HALF_OFFSET_M } from '../scenario/vesselClasses'
 import {
   EVENT_SUMMARY_CAP,
   summarizeEvent,
   type CustodyChange,
+  type DashboardData,
   type Delta,
   type EngineInfo,
   type MotionPlan,
@@ -280,6 +282,14 @@ export function createEngineHost() {
         const series = s.kpiSeries()
         const report = s.kpiReport()
         return { headline: headlineKpis(series, report), highlights: highlightsOf(series, report) }
+      }
+      case 'dashboard': {
+        const data: DashboardData = {
+          series: s.kpiSeries(),
+          timeline: buildTimeline(s.eventLog(), s.now),
+          yard: s.query.yardBlocks().map((b) => ({ id: b.id, fillPct: blockFillPct(b, s.query.yardSlots(b.id)) })),
+        }
+        return data
       }
       case 'summary':
         return summarizeRun(s)

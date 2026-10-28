@@ -7,6 +7,8 @@ import { highlightText } from '../modules/highlights'
 import { stripItems } from '../modules/kpiStrip'
 import { t } from '../i18n/messages'
 
+/** `embedded`: shown inside the dashboard's report tab (no docking, no close button). */
+const props = defineProps<{ embedded?: boolean }>()
 const store = useTwinStore()
 const report = computed(() => store.finalReport)
 const fmt = computed(() => store.fmt)
@@ -79,7 +81,7 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
 
 <template>
   <button
-    v-if="store.runEnded && !store.reportOpen"
+    v-if="!props.embedded && store.runEnded && !store.reportOpen"
     class="reopen"
     :class="{ shifted: store.inspectorOpen }"
     data-testid="tt-report-reopen"
@@ -87,10 +89,11 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
   >
     {{ t('report.show') }}
   </button>
-  <aside
-    v-else-if="store.runEnded"
+  <component
+    :is="props.embedded ? 'section' : 'aside'"
+    v-else-if="props.embedded || store.runEnded"
     class="report"
-    :class="{ shifted: store.inspectorOpen }"
+    :class="{ shifted: store.inspectorOpen && !props.embedded, embedded: props.embedded }"
     role="region"
     :aria-label="t('report.region')"
     data-testid="tt-final-report"
@@ -98,6 +101,7 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
     <header>
       <h2>{{ t('report.title') }}</h2>
       <button
+        v-if="!props.embedded"
         class="close"
         :aria-label="t('report.close')"
         data-testid="tt-report-close"
@@ -235,7 +239,7 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
         {{ t('report.hash', { hash: report.eventLogHash }) }}
       </p>
     </template>
-  </aside>
+  </component>
 </template>
 
 <style scoped>
@@ -272,6 +276,16 @@ h3 {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-text-muted);
+}
+
+.report.embedded {
+  position: static;
+  width: auto;
+  max-width: 60rem;
+  margin: 0 auto;
+  border-color: var(--color-border);
+  background: transparent;
+  overflow: visible;
 }
 
 .close,

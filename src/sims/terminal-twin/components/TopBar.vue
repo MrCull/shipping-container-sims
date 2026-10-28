@@ -164,6 +164,16 @@ async function submitRunTo(): Promise<void> {
         {{ t('topbar.newScenario') }}
       </button>
       <button
+        class="action-btn"
+        :class="{ active: store.dashboardOpen }"
+        :aria-pressed="store.dashboardOpen"
+        :title="t('topbar.dashboardHint')"
+        data-testid="tt-dashboard-button"
+        @click="store.toggleDashboard()"
+      >
+        {{ t('topbar.dashboard') }}
+      </button>
+      <button
         class="action-btn help-btn"
         :title="t('topbar.shortcuts')"
         :aria-label="t('topbar.shortcuts')"
@@ -254,6 +264,12 @@ async function submitRunTo(): Promise<void> {
 
 .speed-btn.active {
   background: var(--color-primary);
+  color: #fff;
+}
+
+.action-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
   color: #fff;
 }
 

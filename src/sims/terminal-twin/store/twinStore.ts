@@ -14,11 +14,12 @@ import { presets } from '../scenario/presets'
 import { withShcFleet, withYard, type YardSetup } from '../scenario/builder'
 import type { DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
 import { EXPORT_FILES, type EngineEvent, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport } from '../engine'
-import type { BreakpointHit, Delta, EngineInfo, EventSummary } from '../worker/protocol'
+import type { BreakpointHit, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { describeEntity, entityKind, entityQueryKind, type EntityView } from '../modules/entityInspector'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
 import { FEED_BUFFER_CAP } from '../modules/eventFeed'
+import type { Bucketing, KpiGroupId } from '../modules/dashboardModel'
 import { SPEEDS, TwinController } from '../modules/twinController'
 import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/display'
 import { createFormatter } from '../i18n/format'
@@ -29,6 +30,16 @@ import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
 
 export type TwinPhase = 'setup' | 'running'
+export type DashboardTab = 'charts' | 'report'
+
+/** What the dashboard has rendered (read by the dev API and smoke tests). */
+export interface DashboardRendered {
+  chartLibLoaded: boolean
+  /** KPI charts currently drawn (ids) and the lines in each. */
+  charts: { kpiId: string; lines: string[]; points: number; zoom: { start: number; end: number } | null; drawn: boolean }[]
+  heatmap: { blocks: string[]; hours: number[]; values: Record<string, (number | null)[]>; liveFill: Record<string, number> } | null
+  gantt: { rows: string[]; bars: { row: string; phase: string; startS: number; endS: number }[] } | null
+}
 
 export interface ScenarioChoice {
   /** Fixture or preset name. */
@@ -153,6 +164,13 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const following = ref(false)
   const overlaysVisible = ref(true)
   const dashboardOpen = ref(false)
+  /** Dashboard tab (TT-16): KPI charts, yard heatmap and Gantt, or the final report. */
+  const dashboardTab = ref<DashboardTab>('charts')
+  /** Data the dashboard shows (refreshed while it is open). */
+  const dashboardData = shallowRef<DashboardData | null>(null)
+  const dashboardGroup = ref<KpiGroupId>('quay')
+  const dashboardBucketing = ref<Bucketing>('hour')
+  const dashboardRendered = shallowRef<DashboardRendered | null>(null)
   const helpOpen = ref(false)
   const toast = ref<{ id: number; text: string } | null>(null)
   let toastTimer: ReturnType<typeof setTimeout> | null = null
@@ -182,6 +200,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   let kpiTimer: ReturnType<typeof setInterval> | null = null
   let kpiEvents = -1
   let kpiBusy = false
+  let dashEvents = -1
+  let dashBusy = false
 
   function onDelta(delta: Delta): void {
     if (delta.events.length === 0) return
@@ -229,7 +249,14 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       kpiEvents = eventsAt
       if (c.info.status !== 'ready' && finalReport.value?.eventLogHash !== c.info.eventLogHash) {
         const [kpis, series] = await Promise.all([c.query<KpiReport>('kpis'), c.query<KpiSeriesReport>('kpiSeries')])
+        const first = finalReport.value === null
         finalReport.value = markRaw({ ...kpi.value, kpis, series, eventLogHash: c.info.eventLogHash })
+        // the run is over: the final report opens as the dashboard's report tab and stays browsable
+        if (first) {
+          dashboardTab.value = 'report'
+          dashboardOpen.value = true
+          void refreshDashboard()
+        }
       }
     } catch {
       // the scenario was replaced meanwhile: the next poll catches up
@@ -239,13 +266,34 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     }
   }
 
+  /** Fetch the dashboard's data (KPI series, timeline, yard fill) from the engine. */
+  async function refreshDashboard(): Promise<void> {
+    const c = controller
+    if (!c || dashBusy || !c.info) return
+    dashBusy = true
+    try {
+      const eventsAt = c.info.eventsTotal
+      dashboardData.value = markRaw(await c.query<DashboardData>('dashboard'))
+      dashEvents = eventsAt
+    } catch {
+      // the scenario was replaced meanwhile: the next poll catches up
+    } finally {
+      dashBusy = false
+    }
+  }
+
   function startKpiPolling(): void {
     if (kpiTimer) return
     kpiTimer = setInterval(() => {
       const c = controller
-      if (!c || c.busy || !c.info || c.info.eventsTotal === kpiEvents) return
-      void refreshKpis()
+      if (!c || c.busy || !c.info) return
+      if (c.info.eventsTotal !== kpiEvents) void refreshKpis()
+      if (dashboardOpen.value && c.info.eventsTotal !== dashEvents) void refreshDashboard()
     }, KPI_POLL_MS)
+  }
+
+  function setDashboardTab(tab: DashboardTab): void {
+    dashboardTab.value = tab
   }
 
   function resetKpis(): void {
@@ -253,6 +301,10 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     finalReport.value = null
     reportOpen.value = true
     kpiEvents = -1
+    dashboardOpen.value = false
+    dashboardTab.value = 'charts'
+    dashboardData.value = null
+    dashEvents = -1
   }
 
   /** Download the KPI report or the event log (JSON or CSV), built by the engine in the worker. */
@@ -495,6 +547,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   function toggleDashboard(): void {
     dashboardOpen.value = !dashboardOpen.value
+    if (dashboardOpen.value) void refreshDashboard()
   }
 
   function setHelpOpen(open: boolean): void {
@@ -560,6 +613,13 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     following,
     overlaysVisible,
     dashboardOpen,
+    dashboardTab,
+    dashboardData,
+    dashboardGroup,
+    dashboardBucketing,
+    dashboardRendered,
+    setDashboardTab,
+    refreshDashboard,
     helpOpen,
     toast,
     kpi,

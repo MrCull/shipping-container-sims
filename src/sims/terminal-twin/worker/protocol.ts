@@ -13,14 +13,24 @@ import type {
   EventType,
   ExportKind,
   MotionSegment,
+  KpiSeriesReport,
   Reservation,
   RunCondition,
+  TimelineReport,
 } from '../engine'
 import type { Breakpoint } from '../modules/breakpoints'
 import type { ScenarioConfig } from '../scenario/types'
 
 /** Serialisable subset of the engine's RunCondition (no predicate). */
 export type WorkerRunCondition = Omit<RunCondition, 'predicate'>
+
+/** Everything the dashboard tab shows, as of the engine's current state. */
+export interface DashboardData {
+  series: KpiSeriesReport
+  timeline: TimelineReport
+  /** Current fill of each yard block (% of cells holding a box). */
+  yard: { id: string; fillPct: number }[]
+}
 
 export type QueryKind =
   | 'container'
@@ -45,6 +55,8 @@ export type QueryKind =
   | 'kpiSeries'
   /** `{ headline, highlights }`: the KPI strip and the final report's highlights. */
   | 'kpiHeadline'
+  /** `DashboardData`: KPI series, vessel/STS timeline and per-block yard fill, in one round trip. */
+  | 'dashboard'
   | 'summary'
   | 'invariants'
   | 'eventLog'

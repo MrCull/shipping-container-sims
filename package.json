@@ -24,6 +24,7 @@
     "tt:assets:shots": "tsx src/sims/terminal-twin/cli/assets/screenshots.ts"
   },
   "dependencies": {
+    "echarts": "^6.1.0",
     "pinia": "^4.0",
     "three": "^0.186",
     "vue": "^3.5",

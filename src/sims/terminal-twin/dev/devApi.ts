@@ -17,6 +17,7 @@
  *   __tt.setDisplay({ locale: 'de-DE', units: 'imperial' }); __tt.display(); __tt.config(); __tt.ui()
  *   await __tt.query('kpiHeadline'); await __tt.query('kpiSeries'); await __tt.exportRun('kpi-csv')   // KPIs and exports (TT-07)
  *   __tt.load(name, { endConditions: { moves: 5 } })   // end after 5 moves; __tt.report() = final report state
+ *   await __tt.openDashboard({ group: 'yard', bucketing: 'shift' }); __tt.dashboard().rendered   // dashboard tab (TT-16)
  *   await __tt.addBreakpoint('eventType', 'StsPicked'); __tt.setSpeed(600)   // plays, pauses at the hit; __tt.debug().breakHit
  *   await __tt.inspectEvent(id); __tt.debug().inspectedEvent.chain   // cause chain, newest first, root last
  *   __tt.screenPoint('STS01'); __tt.pickAt(x, y)                         // 3D picking, client coordinates
@@ -41,7 +42,7 @@ import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
 import type { AscPose, ShcPose, StsPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
-import { resolveScenario, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
+import { resolveScenario, type DashboardRendered, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
 import type { BreakpointHit, EngineInfo, EventSummary, QueryKind, WorkerRunCondition } from '../worker/protocol'
 
 export interface TwinClock {
@@ -99,6 +100,9 @@ export interface TwinDevApi {
   config(): ScenarioConfig | null
   /** Keyboard-driven UI state. */
   ui(): TwinUiState
+  /** Dashboard (TT-16): open it, pick a tab/group/bucketing, read what it rendered. */
+  dashboard(): TwinDashboardState
+  openDashboard(opts?: { tab?: 'charts' | 'report'; group?: string; bucketing?: 'hour' | 'shift' }): Promise<TwinDashboardState>
   /** The KPI report or the event log as the exported text (JSON or CSV), built in the worker. */
   exportRun(kind: ExportKind): Promise<string>
   /** What the KPI strip and the final report show right now. */
@@ -137,6 +141,14 @@ export interface TwinDebugState {
   /** The inspected event, with its cause chain (newest first, the root last). */
   inspectedEvent: { id: number; type: string; chain: { id: number; type: string; causedBy: number | null }[] } | null
   entity: { kind: string; id: string; status: string | null } | null
+}
+
+export interface TwinDashboardState {
+  open: boolean
+  tab: 'charts' | 'report'
+  group: string
+  bucketing: 'hour' | 'shift'
+  rendered: DashboardRendered | null
 }
 
 export interface TwinUiState {
@@ -185,6 +197,14 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       store.sync()
     }
   }
+
+  const dashboardState = (): TwinDashboardState => ({
+    open: store.dashboardOpen,
+    tab: store.dashboardTab,
+    group: store.dashboardGroup,
+    bucketing: store.dashboardBucketing,
+    rendered: store.dashboardRendered,
+  })
 
   const api: TwinDevApi = {
     async load(name, options = {}) {
@@ -258,6 +278,15 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       return { ...store.display }
     },
     config: () => (store.config ? (JSON.parse(JSON.stringify(store.config)) as ScenarioConfig) : null),
+    dashboard: () => dashboardState(),
+    openDashboard: async (opts = {}) => {
+      if (opts.group) store.dashboardGroup = opts.group as typeof store.dashboardGroup
+      if (opts.bucketing) store.dashboardBucketing = opts.bucketing
+      store.setDashboardTab(opts.tab ?? 'charts')
+      if (!store.dashboardOpen) store.toggleDashboard()
+      await store.refreshDashboard()
+      return dashboardState()
+    },
     ui: () => ({
       selectedId: store.selectedId,
       following: store.following,
