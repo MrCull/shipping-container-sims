@@ -10,16 +10,19 @@ import type { ContainerSize } from '../scenario/types'
 import { LIVERY_ATLAS, liveryMaterial, loadContainerAssets, loadGltf } from '../modules/containerAssets'
 import { ContainerInstancer, DEFAULT_LOD_OPTIONS } from '../modules/containerInstancer'
 import { CONTAINER_DIMS } from '../modules/sceneModel'
-import type { AssetViewStats, RigControl, ViewerLod, YardStats } from './assetViewerApi'
+import { AssetRig, type RigMeta } from '../modules/assetRig'
+import type { AssetPose, AssetViewStats, RigControl, Vec3Tuple, ViewerLod, YardStats } from './assetViewerApi'
 
 const glbUrls = import.meta.glob('../assets/models/**/*.glb', { query: '?url', import: 'default', eager: true }) as Record<string, string>
 const sidecars = import.meta.glob('../assets/models/**/*.meta.json', { import: 'default', eager: true }) as Record<string, Sidecar>
 
-interface Sidecar {
+interface Sidecar extends RigMeta {
   asset: string
   kind: string
   dimensions: { lengthM: number; widthM: number; heightM: number }
-  travelLimits: Record<string, { type: 'rotation' | 'translation'; axis: string; minDeg?: number; maxDeg?: number; minM?: number; maxM?: number }>
+  travelLimits: NonNullable<RigMeta['travelLimits']>
+  attachPoints?: { name: string; node?: string; position: number[] }[]
+  lods?: Record<string, { maxDistanceM?: number }>
 }
 
 export interface AssetEntry {
@@ -36,13 +39,7 @@ export const ASSETS: AssetEntry[] = Object.entries(glbUrls)
   .filter((a) => !!a.meta)
   .sort((a, b) => a.name.localeCompare(b.name))
 
-function axisVector(axis: string): THREE.Vector3 {
-  const v = new THREE.Vector3()
-  const sign = axis.startsWith('-') ? -1 : 1
-  const c = axis.replace(/^[+-]/, '').toLowerCase() as 'x' | 'y' | 'z'
-  v[c] = sign
-  return v
-}
+const tuple = (v: THREE.Vector3): Vec3Tuple => [v.x, v.y, v.z]
 
 function meshCost(root: THREE.Object3D, onlyVisible: boolean): { triangles: number; drawCalls: number } {
   let triangles = 0
@@ -66,12 +63,14 @@ export class AssetViewerScene {
   readonly camera = new THREE.PerspectiveCamera(40, 1, 0.1, 5000)
   readonly controls: OrbitControls
   private frame = 0
-  private asset: { entry: AssetEntry; root: THREE.Object3D; lods: Record<string, THREE.Object3D>; rest: Map<string, THREE.Object3D> } | null = null
+  private asset: { entry: AssetEntry; root: THREE.Object3D; lods: Record<string, THREE.Object3D>; rig: AssetRig } | null = null
   private lod: ViewerLod = 'LOD0'
   private shownLod = 'LOD0'
   private livery = 0
-  private rigValues: Record<string, number> = {}
   private reference: THREE.Object3D
+  /** A 40 ft ISO box for assets with a `container` attach point (cranes): hangs from that node, top centre at the point. */
+  private hanging: THREE.Object3D
+  private hangingFrom: string | null = null
   private yardInstancer: ContainerInstancer | null = null
   private loadToken = 0
   private materials = new Set<THREE.Material & { userData: { liveryBase?: { value: number } } }>()
@@ -112,6 +111,15 @@ export class AssetViewerScene {
     )
     this.reference.name = 'reference-20ft'
     this.scene.add(this.reference)
+    const d40 = CONTAINER_DIMS['40']
+    const box40 = new THREE.BoxGeometry(d40.length, d40.height, d40.width).translate(0, -d40.height / 2, 0)
+    this.hanging = new THREE.Group()
+    this.hanging.add(
+      new THREE.Mesh(box40, new THREE.MeshStandardMaterial({ color: '#2f5fae', transparent: true, opacity: 0.55 })),
+      new THREE.LineSegments(new THREE.EdgesGeometry(box40), new THREE.LineBasicMaterial({ color: '#111827' })),
+    )
+    this.hanging.name = 'reference-40ft-hanging'
+    this.hanging.userData.size = [d40.length, d40.height, d40.width]
     this.resize(host)
     const loop = () => {
       this.frame = requestAnimationFrame(loop)
@@ -156,20 +164,22 @@ export class AssetViewerScene {
       const node = root.getObjectByName(n)
       if (node) lods[n] = node
     }
-    const rest = new Map<string, THREE.Object3D>()
-    for (const node of Object.keys(entry.meta.travelLimits ?? {})) {
-      const o = root.getObjectByName(node)
-      if (o) rest.set(node, o.clone(false))
-    }
-    this.asset = { entry, root, lods, rest }
-    this.rigValues = Object.fromEntries([...rest.keys()].map((n) => [n, 0]))
+    const rig = new AssetRig(root, entry.meta)
+    this.asset = { entry, root, lods, rig }
     this.scene.add(root)
     const { lengthM, widthM, heightM } = entry.meta.dimensions
+    this.hanging.removeFromParent()
+    this.hangingFrom = entry.meta.attachPoints?.find((a) => a.name === 'container' && a.node)?.node ?? null
     this.reference.position.set(0, 0, widthM / 2 + CONTAINER_DIMS['20'].width / 2 + 1.5)
-    this.reference.visible = true
+    this.reference.visible = !this.hangingFrom
     const span = Math.max(lengthM, heightM, 8)
     this.controls.target.set(0, heightM / 2, 1.5)
     this.camera.position.set(span * 0.9, span * 0.55, -span * 1.1)
+    if (this.hangingFrom) {
+      // Cranes: frame the whole structure (boom to backreach).
+      this.controls.target.set(0, heightM * 0.45, 0)
+      this.camera.position.set(widthM * 0.75, heightM * 0.7, -widthM * 0.55)
+    }
     this.controls.update()
     this.setLod(options.lod ?? 'LOD0')
     this.setLivery(options.livery ?? 0)
@@ -180,12 +190,27 @@ export class AssetViewerScene {
     if (!this.asset) return
     this.shownLod = level in this.asset.lods ? level : Object.keys(this.asset.lods)[0]
     for (const [n, node] of Object.entries(this.asset.lods)) node.visible = n === this.shownLod
+    this.attachHanging()
+  }
+
+  /** Hangs the 40 ft reference box from the shown LOD's attach node. */
+  private attachHanging(): void {
+    if (!this.asset || !this.hangingFrom) return
+    const suffix = this.asset.entry.meta.lodNaming?.[this.shownLod] ?? ''
+    const node = this.asset.root.getObjectByName(this.hangingFrom + suffix)
+    const point = this.asset.entry.meta.attachPoints!.find((a) => a.name === 'container')!.position
+    if (!node) return
+    node.add(this.hanging)
+    this.hanging.position.set(point[0], point[1], point[2])
   }
 
   private updateAutoLod(): void {
     if (this.lod !== 'auto' || !this.asset) return
     const d = this.camera.position.distanceTo(this.controls.target)
-    this.applyLod(d <= DEFAULT_LOD_OPTIONS.lod0DistanceM ? 'LOD0' : 'LOD1')
+    const lods = this.asset.entry.meta.lods ?? {}
+    const lod0 = lods.LOD0?.maxDistanceM ?? DEFAULT_LOD_OPTIONS.lod0DistanceM
+    const lod1 = lods.LOD1?.maxDistanceM ?? Infinity
+    this.applyLod(d <= lod0 ? 'LOD0' : d <= lod1 || !('LOD2' in this.asset.lods) ? 'LOD1' : 'LOD2')
   }
 
   setLod(lod: ViewerLod): AssetViewStats {
@@ -213,20 +238,43 @@ export class AssetViewerScene {
     }))
   }
 
+  /** Moves a rig node (in every LOD), clamped to its sidecar travel limits, and re-stretches ropes. */
   setRig(node: string, value: number): AssetViewStats {
-    const ctl = this.rigControls().find((c) => c.node === node)
-    const o = this.asset?.root.getObjectByName(node)
-    const rest = this.asset?.rest.get(node)
-    if (!ctl || !o || !rest) throw new Error(`no rig control ${node}`)
-    const v = Math.min(ctl.max, Math.max(ctl.min, value))
-    const axis = axisVector(ctl.axis)
-    if (ctl.type === 'rotation') {
-      o.quaternion.copy(rest.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(axis, THREE.MathUtils.degToRad(v)))
-    } else {
-      o.position.copy(rest.position).addScaledVector(axis, v)
-    }
-    this.rigValues[node] = v
+    const rig = this.asset?.rig
+    if (!rig || !rig.nodes.includes(node)) throw new Error(`no rig control ${node}`)
+    rig.set(node, value)
+    rig.applyStretch()
     return this.stats()!
+  }
+
+  pose(): AssetPose | null {
+    if (!this.asset) return null
+    const { root, rig, entry } = this.asset
+    root.updateMatrixWorld(true)
+    const suffix = entry.meta.lodNaming?.[this.shownLod] ?? ''
+    const nodes: Record<string, Vec3Tuple> = {}
+    for (const n of rig.nodes) {
+      const o = root.getObjectByName(n + suffix)
+      if (o) nodes[n] = tuple(o.getWorldPosition(new THREE.Vector3()))
+    }
+    const stretch: Record<string, number> = {}
+    for (const s of entry.meta.stretch ?? []) {
+      const o = root.getObjectByName(s.node + suffix)
+      if (o) stretch[s.node] = o.scale.y * s.unitLengthM
+    }
+    const hanging = !!this.hangingFrom && !!this.hanging.parent
+    const ref = hanging ? this.hanging : this.reference
+    const size = (hanging ? this.hanging.userData.size : [CONTAINER_DIMS['20'].length, CONTAINER_DIMS['20'].height, CONTAINER_DIMS['20'].width]) as Vec3Tuple
+    const top = ref.getWorldPosition(new THREE.Vector3())
+    if (!hanging) top.y += size[1]
+    const box = new THREE.Box3().setFromObject(this.asset.lods[this.shownLod] ?? root)
+    return {
+      shownLod: this.shownLod,
+      nodes,
+      stretch,
+      reference: { hangingFrom: hanging ? this.hangingFrom : null, size, topCentre: tuple(top) },
+      topY: box.max.y,
+    }
   }
 
   stats(): AssetViewStats | null {
@@ -241,9 +289,9 @@ export class AssetViewerScene {
       drawCalls: shown.drawCalls,
       lods: Object.fromEntries(Object.entries(this.asset.lods).map(([n, node]) => [n, meshCost(node, false)])),
       rig: this.rigControls(),
-      rigValues: { ...this.rigValues },
+      rigValues: { ...this.asset.rig.values },
       livery: this.livery,
-      referenceContainer: this.reference.visible,
+      referenceContainer: this.reference.visible || !!this.hanging.parent,
     }
   }
 
@@ -260,6 +308,7 @@ export class AssetViewerScene {
     if (this.asset) this.scene.remove(this.asset.root)
     this.asset = null
     this.reference.visible = false
+    this.hanging.removeFromParent()
     this.clearYard()
     const assets = await loadContainerAssets()
     const sizes: ContainerSize[] = ['40', '40', '40HC', '20']

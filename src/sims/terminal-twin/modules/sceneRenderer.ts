@@ -2,7 +2,9 @@
  * Phase 1 procedural low-poly scene: quay, water, STS cranes on their rail and
  * vessel hulls. Containers are drawn by the ContainerInstancer: procedural
  * placeholder boxes at once, then the phase 2 GLB LODs (LOD0 near the camera,
- * LOD1 elsewhere) with a per-instance livery as soon as they load. Shared
+ * LOD1 elsewhere) with a per-instance livery as soon as they load. STS cranes
+ * start as procedural placeholders and switch to the phase 2 Malaccamax GLB
+ * (`StsModel`, three LODs, rigged) once it loads. Shared
  * geometries and materials; nothing here is reactive (never put these in Vue state).
  *
  * `update(model, t)` poses everything for display time `t` from the
@@ -13,12 +15,13 @@ import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 import { ContainerInstancer } from './containerInstancer'
 import { LIVERY_ATLAS, liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
+import { loadStsTemplate, StsModel, STS_RAIL_GAUGE, STS_WATER_RAIL_Z, type SpreaderMode, type StsRenderState } from './stsAssets'
 import { aftOffsetM, BAY_PITCH_M, FENDER_GAP_M, ROW_PITCH_M, slotX, slotZ, TIER_PITCH_M } from '../scenario/vesselClasses'
 
-/** [A] Malaccamax-style STS proportions (m). */
+/** [A] Malaccamax-style STS proportions (m) of the procedural placeholder; rails from the GLB sidecar. */
 const STS = {
-  waterRailZ: 3,
-  gauge: 30.48,
+  waterRailZ: STS_WATER_RAIL_Z,
+  gauge: STS_RAIL_GAUGE,
   legSpacingX: 18,
   legSize: 1.6,
   portalY: 48,
@@ -38,6 +41,10 @@ export interface SceneStats {
   containerLods: { lod0: number; lod1: number }
   /** 'placeholder' until the container GLBs have loaded. */
   containerAssets: 'placeholder' | 'loaded'
+  /** 'placeholder' (procedural cranes) until the STS GLB has loaded. */
+  stsAssets: 'placeholder' | 'loaded'
+  /** STS cranes per LOD drawn (placeholders count as none). */
+  stsLods: { lod0: number; lod1: number; lod2: number }
 }
 
 /** What the scene draws for one container (dev API). */
@@ -63,6 +70,8 @@ export class SceneRenderer {
   private containerLivery: number[]
   private disposed = false
   private sts = new Map<string, StsParts>()
+  private stsModels = new Map<string, StsModel>()
+  private lastSpreader = new Map<string, SpreaderMode>()
   private vessels = new Map<string, THREE.Group>()
   private selection: THREE.LineSegments
   private disposables: { dispose(): void }[] = []
@@ -86,6 +95,21 @@ export class SceneRenderer {
         if (!this.disposed) this.containers.setAssets(assets)
       },
       (err: unknown) => console.warn('Terminal Twin: container GLBs failed to load; keeping placeholders', err),
+    )
+
+    loadStsTemplate().then(
+      (template) => {
+        if (this.disposed) return
+        config.sts.forEach((s, i) => {
+          const m = new StsModel(template, i)
+          m.root.name = `${s.id}-model`
+          this.scene.add(m.root)
+          this.stsModels.set(s.id, m)
+          const placeholder = this.sts.get(s.id)
+          if (placeholder) placeholder.group.visible = false
+        })
+      },
+      (err: unknown) => console.warn('Terminal Twin: STS GLB failed to load; keeping procedural cranes', err),
     )
 
     const box = this.track(new THREE.BoxGeometry(1, 1, 1))
@@ -264,7 +288,35 @@ export class SceneRenderer {
 
   update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3): void {
     const model = this.model
+    const containers = this.containers
+    // Containers first: what each spreader carries decides its configuration (20 / 40 / twin-20).
+    const load = new Map<string, { count: number; size: string }>()
+    containers.begin()
+    model.containerIds.forEach((id, i) => {
+      const c = model.containerCentre(id, t)
+      if (!c) return
+      containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i])
+      if (this.stsModels.size) {
+        const owner = model.custodyAt(id, t)
+        if (owner?.kind === 'sts') {
+          const l = load.get(owner.id)
+          load.set(owner.id, { count: (l?.count ?? 0) + 1, size: model.containerSize[id] })
+        }
+      }
+    })
+    containers.end(cameraPosition)
+
+    for (const [id, m] of this.stsModels) {
+      const pose = model.stsPose(id, t)
+      const l = load.get(id)
+      const mode: SpreaderMode = !l ? (this.lastSpreader.get(id) ?? '40') : l.count > 1 ? 'twin-20' : l.size === '20' ? '20' : '40'
+      this.lastSpreader.set(id, mode)
+      m.carrying = l?.count ?? 0
+      m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l })
+      m.updateLod(cameraPosition)
+    }
     for (const [id, parts] of this.sts) {
+      if (this.stsModels.has(id)) continue
       const pose = model.stsPose(id, t)
       parts.group.position.x = pose.gantryX
       parts.trolley.position.z = pose.trolleyZ
@@ -280,13 +332,6 @@ export class SceneRenderer {
       if (p) group.position.set(p.x, 0, p.zOffset)
     }
 
-    const containers = this.containers
-    containers.begin()
-    model.containerIds.forEach((id, i) => {
-      const c = model.containerCentre(id, t)
-      if (c) containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i])
-    })
-    containers.end(cameraPosition)
 
     this.updateSelection(selectedId, t)
   }
@@ -329,7 +374,18 @@ export class SceneRenderer {
       vessels,
       containerLods: { lod0: c.lod0, lod1: c.lod1 },
       containerAssets: c.assets,
+      stsAssets: this.stsModels.size ? 'loaded' : 'placeholder',
+      stsLods: {
+        lod0: [...this.stsModels.values()].filter((m) => m.lod === 0).length,
+        lod1: [...this.stsModels.values()].filter((m) => m.lod === 1).length,
+        lod2: [...this.stsModels.values()].filter((m) => m.lod === 2).length,
+      },
     }
+  }
+
+  /** Per STS: LOD, spreader configuration, boxes carried and the drawn spreader/trolley positions (GLB cranes only). */
+  renderedSts(): Record<string, StsRenderState> {
+    return Object.fromEntries([...this.stsModels].map(([id, m]) => [id, m.renderState()]))
   }
 
   /** Livery, size and LOD drawn per container id at the last update. */
@@ -344,6 +400,7 @@ export class SceneRenderer {
 
   dispose(): void {
     this.disposed = true
+    for (const m of this.stsModels.values()) m.dispose()
     for (const d of this.disposables) d.dispose()
     this.containers.dispose()
     this.disposables = []

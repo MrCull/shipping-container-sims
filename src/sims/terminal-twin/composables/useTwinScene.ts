@@ -32,6 +32,8 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   let frame = 0
   /** Frames actually rendered (dev API: proves the view keeps animating). */
   let framesRendered = 0
+  /** Draw calls and triangles of the last frame (main + shadow pass). */
+  let lastRender = { calls: 0, triangles: 0 }
   let resizeObserver: ResizeObserver | null = null
 
   function resize(): void {
@@ -80,6 +82,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     view.update(controller.displayTime, store.selectedId, camera.position)
     controls?.update()
     renderer.render(view.scene, camera)
+    lastRender = { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }
     framesRendered++
   }
 
@@ -121,8 +124,9 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         aim(centre, true, distanceM)
         return true
       },
-      stats: () => (view ? { ...view.stats(), frames: framesRendered } : null),
+      stats: () => (view ? { ...view.stats(), frames: framesRendered, render: { ...lastRender } } : null),
       liveries: () => view?.renderedLiveries() ?? null,
+      sts: () => view?.renderedSts() ?? null,
     })
     frame = requestAnimationFrame(loop)
   })

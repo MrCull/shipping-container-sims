@@ -8,7 +8,8 @@
  *   await __tt.load('tracer-1sts-10-boxes', { seed: 42 })
  *   await __tt.runUntil()                      // to the end (or { time, eventType, moves, vesselsCompleted, maxEvents })
  *   await __tt.query('summary')                // also: container/vessel/sts/groundPosition (+ id), containers, stsList, kpis, eventLog…
- *   __tt.scene()                               // rendered counts { containers, sts, vessels, frames, containerLods, containerAssets }
+ *   __tt.scene()                               // rendered counts { containers, sts, vessels, frames, containerLods, containerAssets,
+ *                                              //   stsAssets, stsLods, render: { calls, triangles } }
  *   await __tt.step(); await __tt.why(id); await __tt.snapshot()
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
  *   __tt.select('STS01'); __tt.cameraTo('STS01'); __tt.setSpeed(600); __tt.pause(); __tt.clock()
@@ -20,7 +21,8 @@ import type { CustodyRef, EngineEvent, EventPayloads, EventSubjects, EventType, 
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { StsPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
-import { resolveScenario, type useTwinStore } from '../store/twinStore'
+import type { StsRenderState } from '../modules/stsAssets'
+import { resolveScenario, type RenderInfo, type useTwinStore } from '../store/twinStore'
 import type { EngineInfo, EventSummary, QueryKind, WorkerRunCondition } from '../worker/protocol'
 
 export interface TwinClock {
@@ -57,7 +59,7 @@ export interface TwinDevApi {
   newScenario(): void
   clock(): TwinClock
   /** Rendered counts (null if there is no 3D view). */
-  scene(): (SceneStats & { frames: number }) | null
+  scene(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** What the scene shows at the displayed time: custody per container, status and pose per STS, status per vessel. */
   sceneState(): SceneState | null
   /** Locale + units in use (display only). */
@@ -85,6 +87,8 @@ export interface SceneState {
   vessels: Record<string, { status: string }>
   /** Per container: livery atlas index, model size and LOD actually drawn (phase 2 assets). */
   liveries: Record<string, RenderedLivery>
+  /** Per STS as drawn by the GLB model: LOD, spreader configuration (20 / 40 / twin-20), boxes carried, spreader and trolley world positions. */
+  stsRendered: Record<string, StsRenderState>
 }
 
 declare global {
@@ -163,6 +167,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         sts: Object.fromEntries(model.stsIds.map((id) => [id, { status: model.statusAt('sts', id, t), ...model.stsPose(id, t) }])),
         vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
         liveries: store.view()?.liveries() ?? {},
+        stsRendered: store.view()?.sts() ?? {},
       }
     },
     display: () => ({ ...store.display }),

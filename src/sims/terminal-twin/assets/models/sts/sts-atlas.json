@@ -1,0 +1,53 @@
+{
+  "size": [
+    1024,
+    1024
+  ],
+  "palette": {
+    "blue": {
+      "colour": "#1d4596",
+      "tag": "P"
+    },
+    "blue_dark": {
+      "colour": "#142f68",
+      "tag": "A"
+    },
+    "white": {
+      "colour": "#eef1f4",
+      "tag": "P"
+    },
+    "grey": {
+      "colour": "#a9b0b8",
+      "tag": "A"
+    },
+    "dark": {
+      "colour": "#24282e",
+      "tag": "A"
+    },
+    "yellow": {
+      "colour": "#f2b705",
+      "tag": "P"
+    },
+    "red": {
+      "colour": "#c0392b",
+      "tag": "A"
+    },
+    "lamp": {
+      "colour": "#fff1c2",
+      "tag": "A"
+    }
+  },
+  "wordmark": "ZPMC",
+  "plates": {
+    "first": 101,
+    "count": 24,
+    "cols": 6,
+    "rows": 4,
+    "tileSizeUv": [
+      0.16666666666666666,
+      0.09375
+    ],
+    "material": "sts_plate",
+    "uvConvention": "TEXCOORD_0 of material sts_plate is authored for tile 0 (crane 101); add (index % cols, floor(index / cols)) * tileSizeUv"
+  }
+}

@@ -19,6 +19,7 @@ import { createFormatter } from '../i18n/format'
 import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
+import type { StsRenderState } from '../modules/stsAssets'
 
 export type TwinPhase = 'setup' | 'running'
 
@@ -36,10 +37,18 @@ export interface ScenarioChoice {
 export interface TwinView {
   /** Aim at an entity, keeping the view direction (and, if given, at `distanceM`). */
   cameraTo(entityId: string, distanceM?: number): boolean
-  /** Rendered entity counts plus frames rendered so far; null without a 3D view. */
-  stats(): (SceneStats & { frames: number }) | null
+  /** Rendered entity counts plus frames rendered so far and the last frame's draw calls/triangles; null without a 3D view. */
+  stats(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */
   liveries(): Record<string, RenderedLivery> | null
+  /** Per STS: LOD, spreader configuration and drawn positions (GLB cranes); null without a 3D view. */
+  sts(): Record<string, StsRenderState> | null
+}
+
+/** The last rendered frame (main pass + shadow pass), from `renderer.info`. */
+export interface RenderInfo {
+  calls: number
+  triangles: number
 }
 
 const RECENT_EVENTS_CAP = 500
