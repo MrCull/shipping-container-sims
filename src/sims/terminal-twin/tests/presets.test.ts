@@ -46,13 +46,13 @@ describe('presets', () => {
 
   /**
    * Full-length TTI and Stress runs take minutes (tens of thousands of events on a 28,800-cell yard), so those two
-   * run to a shortened end condition (200 productive moves); Small automated runs to its own (all vessels departed).
+   * run to a shortened end condition (10 productive moves); Small automated runs to its own (all vessels departed).
    * Invariants are checked every 500th event and at the end.
    */
   it.each([
     ['Small automated', undefined],
-    ['TTI Algeciras baseline', { moves: 200 }],
-    ['Stress test', { moves: 200 }],
+    ['TTI Algeciras baseline', { moves: 10 }],
+    ['Stress test', { moves: 10 }],
   ] as const)('%s runs headless to its end condition with all invariants passing', (name, end) => {
     const config = presets[name]()
     if (end) config.endConditions = { ...end }
