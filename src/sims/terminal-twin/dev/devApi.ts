@@ -23,6 +23,8 @@
  *   await __tt.openDashboard({ group: 'yard', bucketing: 'shift' }); __tt.dashboard().rendered   // dashboard tab (TT-16)
  *   await __tt.addBreakpoint('eventType', 'StsPicked'); __tt.setSpeed(600)   // plays, pauses at the hit; __tt.debug().breakHit
  *   await __tt.inspectEvent(id); __tt.debug().inspectedEvent.chain   // cause chain, newest first, root last
+ *   await __tt.saves.saveToBrowser('config'); await __tt.saves.list(); await __tt.saves.load(id)   // IndexedDB saves (TT-17); also fileText(type), importText(text)
+ *   await __tt.saves.rewindPoints(); await __tt.saves.rewindTo(0)        // automatic rewind points (default every 15 sim-minutes)
  *   __tt.screenPoint('STS01'); __tt.pickAt(x, y)                         // 3D picking, client coordinates
  */
 import type { ScenarioOverrides } from '../scenario/overrides'
@@ -50,7 +52,8 @@ import type { AscPose, ShcPose, StsPose, TruckPose } from '../modules/sceneModel
 import type { TwinController } from '../modules/twinController'
 import type { StsRenderState } from '../modules/stsAssets'
 import { resolveScenario, type DashboardRendered, type RenderInfo, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
-import type { BreakpointHit, EngineInfo, EventSummary, QueryKind, WorkerRunCondition } from '../worker/protocol'
+import type { SaveMeta, SaveType } from '../persistence/saves'
+import type { BreakpointHit, Checkpoint, EngineInfo, EventSummary, QueryKind, WorkerRunCondition } from '../worker/protocol'
 
 export interface TwinClock {
   /** Displayed sim time (s). */
@@ -129,6 +132,31 @@ export interface TwinDevApi {
   screenPoint(entityId: string): { x: number; y: number } | null
   /** Where the orbit camera looks (follow-camera checks). */
   cameraTarget(): { x: number; y: number; z: number } | null
+  /** Saves, snapshots and rewind (TT-17). */
+  saves: TwinSavesApi
+}
+
+export interface TwinSavesApi {
+  /** The save document of the run as JSON text (what Export writes to a file). */
+  fileText(type: SaveType, name?: string): Promise<string>
+  /** Save to the browser's IndexedDB list; null where storage is unavailable. */
+  saveToBrowser(type: SaveType, name?: string): Promise<SaveMeta | null>
+  list(): Promise<SaveMeta[]>
+  /** Load a saved entry (config: start it; snapshot: resume it). */
+  load(id: string): Promise<'loaded' | 'version-mismatch' | null>
+  remove(id: string): Promise<void>
+  /** Load a save from file text (as the Import button does). */
+  importText(text: string): Promise<'loaded' | 'version-mismatch' | null>
+  /** Dialog state: storage availability, the last message, a pending version warning. */
+  state(): { storage: 'unknown' | 'ok' | 'unavailable'; open: boolean; message: { kind: 'info' | 'error'; text: string } | null; versionWarning: boolean }
+  /** Rewind points of the current timeline (queried live). */
+  rewindPoints(): Promise<Checkpoint[]>
+  /** Jump back to a rewind point by index (paused there); true when the replay matched the recorded hash. */
+  rewindTo(index: number): Promise<boolean>
+  /** Interval between rewind points in sim-minutes (applies from the next load, reset or rewind). */
+  setRewindInterval(minutes: number): Promise<void>
+  /** Restart from the embedded config after a version warning. */
+  restartFromEmbeddedConfig(): Promise<void>
 }
 
 export interface TwinReportState {
@@ -361,6 +389,25 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     pickAt: (x, y) => store.view()?.pickAt(x, y) ?? null,
     screenPoint: (id) => store.view()?.screenPoint(id) ?? null,
     cameraTarget: () => store.view()?.cameraTarget() ?? null,
+    saves: {
+      fileText: async (type, name) => JSON.stringify(await store.buildSave(type, name)),
+      saveToBrowser: (type, name) => store.saveToBrowser(type, name),
+      list: async () => {
+        await store.refreshSaves()
+        return [...store.saves]
+      },
+      load: (id) => synced(store.loadSaved(id)),
+      remove: (id) => store.deleteSaved(id),
+      importText: (text) => synced(store.importSaveText(text)),
+      state: () => ({ storage: store.storage, open: store.savesOpen, message: store.savesMessage, versionWarning: store.versionPrompt !== null }),
+      rewindPoints: () => ctl().query<Checkpoint[]>('checkpoints'),
+      rewindTo: async (index) => {
+        await store.refreshRewind()
+        return synced(store.rewindTo(index))
+      },
+      setRewindInterval: (minutes) => store.setRewindInterval(minutes),
+      restartFromEmbeddedConfig: () => synced(store.restartFromEmbeddedConfig()),
+    },
   }
 
   window.__tt = api

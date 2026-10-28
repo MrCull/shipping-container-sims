@@ -474,3 +474,12 @@ Branch `tt/48-presets-validation`. Guide: `terminal-twin-AGENTS.md` § "Presets,
 - **Gotchas:** `createSimulation` now throws for limit/frontage errors. Dialog Start is disabled while any error shows. Full TTI/Stress runs are slow (minutes without invariants); TT-19 should look at per-event cost on 28,800-cell yards.
 - **Open defect:** pre-filled yard deadlock (ASCs idle, `planJob` null) seen with Small automated at 50% fill; see the guide. Small preset uses 30%.
 - **Follow-ups:** persistence (TT-17) should store the new overrides; dialog tests for decisions are smoke-only.
+
+### ticket-49 (TT-17): persistence, snapshots, rewind
+
+Branch `tt/49-persistence`. Guide: `terminal-twin-AGENTS.md` § "Persistence: saves, snapshots and rewind (TT-17)". Glossary: Persistence.
+
+- **APIs:** `persistence/saves.ts` (`makeConfigSave`, `makeSnapshotSave`, `parseSaveFile`, `planLoad`, `migrateScenarioConfig`, `SAVE_SCHEMA_VERSION`), `persistence/saveStore.ts` (`openSaveStore`); worker ops `restore`, `rewind`, `setCheckpointInterval`, query `checkpoints`; `TwinController.restore/rewind/setCheckpointInterval`; store `launch()` (shared by `startScenario` and loads), `saveToBrowser`, `exportToFile`, `importSaveText`, `rewindTo`; `engine` now exports `hashDigest`.
+- **Gotchas:** restore/rewind replay events (cost grows with run length). Settings ops (`setCheckpointInterval`) are served before a scenario is loaded (host returns empty `EngineInfo`). A loaded config's `display` becomes the UI's locale and units.
+- **Follow-ups:** new scenario fields only need a migration when the scenario schema version bumps. Snapshots with dev-injected events lose their scene history on load (state stays exact).
+

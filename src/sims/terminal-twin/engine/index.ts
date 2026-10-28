@@ -117,6 +117,7 @@ export type { SimQuery } from './query'
 export type { InvariantViolation } from './invariants'
 export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport, LandsideKpiReport } from './kpis'
 export type { WorkPackage, WorkPackageKind, WorkPackageStatus, LoadOrder } from './state'
+export { hashDigest } from './hash'
 export {
   createSimulation,
   restoreSimulation,

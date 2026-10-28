@@ -195,3 +195,11 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Frontage:** the quay length a block needs (32 m); blocks need count x 32 m.
 - **Scale limits / stress-test scale:** hard maxima (errors) and the softer size above which the dialog warns the run may be slow.
 - **Nominal cycle:** the derived cycle time and moves per hour of one crane from its kinematics, without variation or waiting.
+
+## Persistence (TT-17)
+
+- **Config save:** the scenario as run (layout, equipment, kinematics, vessels, landside, strategies and latency, end conditions, start date/time, locale and units) plus the seed. Small; re-running it reproduces the run.
+- **Snapshot save:** the engine's full state mid-run (containers, equipment, motion segments, event queue, reservations, KPIs, RNG, event log). Loading it resumes exactly where the run left off.
+- **Save schema version:** the version of the save file format; older files migrate forward on load. A snapshot also records the **engine version** that wrote it.
+- **Rewind point:** an automatic checkpoint (every 15 sim-minutes by default) the user can jump back to; running on from it reproduces the original events.
+
