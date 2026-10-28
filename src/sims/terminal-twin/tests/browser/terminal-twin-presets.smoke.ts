@@ -8,8 +8,9 @@ import type {} from '../../dev/devApi' // window.__tt typing
 async function openDialog(page: Page) {
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
-  await page.getByRole('button', { name: /new scenario/i }).click()
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
+  // A fresh page opens the dialog itself; only reopen it when a scenario is already loaded.
+  if (!(await dialog.isVisible())) await page.getByRole('button', { name: /new scenario/i }).click()
   await expect(dialog).toBeVisible()
   return dialog
 }
@@ -48,7 +49,7 @@ test('the STS cycle readout follows the kinematics', async ({ page }) => {
   await dialog.getByText('TTI Algeciras baseline', { exact: true }).click()
   const readout = dialog.getByTestId('tt-sts-readout')
   const before = await readout.textContent()
-  await dialog.locator('input[name="sts-v-trolley"]').fill('30')
+  await dialog.locator('input[name="sts-v-trolley"]').fill('1')
   await expect(readout).not.toHaveText(before ?? '')
 })
 
