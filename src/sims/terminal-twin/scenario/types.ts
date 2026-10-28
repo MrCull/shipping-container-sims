@@ -143,6 +143,11 @@ export type Weights<K extends string> = Partial<Record<K, number>>
 export interface VesselConfig {
   id: string
   name: string
+  /**
+   * Operator (a key of `LINE_OWNER_PREFIX`): picks the hull livery. Optional;
+   * without it the line is read from the name's style (`vesselLine`). The engine ignores it.
+   */
+  line?: string
   /** Arrival at the port (s from scenario start). The vessel berths, or waits at anchorage. */
   arrivalS: number
   sizeClass: VesselSizeClass

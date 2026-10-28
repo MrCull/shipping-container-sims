@@ -12,9 +12,17 @@
       "requiredNodes": ["LOD0", "LOD1", "body", "door_left", "door_right"]
     },
     "sts": {
-      "lods": { "LOD0": { "maxTriangles": 40000, "maxDrawCalls": 12 }, "LOD1": { "maxTriangles": 8000, "maxDrawCalls": 8 }, "LOD2": { "maxTriangles": 1000, "maxDrawCalls": 4 } },
+      "$comment": "TT-23. One mesh node per rig part (each a draw call): LOD0 = 10 parts + 8 twist-locks + the crane-number plate material; LOD1 drops the twist-locks; LOD2 keeps gantry, boom, trolley, ropes and spreader.",
+      "lods": { "LOD0": { "maxTriangles": 40000, "maxDrawCalls": 20 }, "LOD1": { "maxTriangles": 8000, "maxDrawCalls": 10 }, "LOD2": { "maxTriangles": 1000, "maxDrawCalls": 6 } },
       "maxFileBytes": 3000000,
-      "requiredNodes": ["LOD0", "LOD1", "LOD2", "gantry", "trolley", "hoist", "spreader", "boom"]
+      "requiredNodes": [
+        "LOD0", "LOD1", "LOD2",
+        "gantry", "trolley", "hoist", "spreader", "boom", "ropes", "spreader_tele_fore", "spreader_tele_aft", "twin_locks",
+        "twistlock_fore_land", "twistlock_fore_sea", "twistlock_aft_land", "twistlock_aft_sea",
+        "twistlock_twin_aft_land", "twistlock_twin_aft_sea", "twistlock_twin_fore_land", "twistlock_twin_fore_sea",
+        "gantry_lod1", "trolley_lod1", "hoist_lod1", "spreader_lod1", "boom_lod1", "ropes_lod1", "spreader_tele_fore_lod1", "spreader_tele_aft_lod1", "twin_locks_lod1",
+        "gantry_lod2", "trolley_lod2", "hoist_lod2", "spreader_lod2", "boom_lod2", "ropes_lod2", "spreader_tele_fore_lod2", "spreader_tele_aft_lod2", "twin_locks_lod2"
+      ]
     },
     "asc": {
       "lods": { "LOD0": { "maxTriangles": 15000, "maxDrawCalls": 10 }, "LOD1": { "maxTriangles": 4000, "maxDrawCalls": 6 }, "LOD2": { "maxTriangles": 600, "maxDrawCalls": 3 } },
@@ -34,7 +42,7 @@
     "vessel": {
       "lods": { "LOD0": { "maxTriangles": 20000, "maxDrawCalls": 10 }, "LOD1": { "maxTriangles": 5000, "maxDrawCalls": 6 }, "LOD2": { "maxTriangles": 800, "maxDrawCalls": 3 } },
       "maxFileBytes": 2000000,
-      "requiredNodes": ["LOD0", "LOD1", "LOD2"]
+      "requiredNodes": ["LOD0", "LOD1", "LOD2", "hull", "hatch_covers", "lashing_bridges", "bay_grid"]
     },
     "building": {
       "lods": { "LOD0": { "maxTriangles": 5000, "maxDrawCalls": 8 } },

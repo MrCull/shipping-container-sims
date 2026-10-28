@@ -1,8 +1,11 @@
 /**
  * Phase 1 procedural low-poly scene: quay, water, STS cranes on their rail,
- * vessel hulls, yard blocks (rails, bay marks, WTP pads, transfer stalls) and ASCs. Containers are drawn by the ContainerInstancer: procedural
+ * yard blocks (rails, bay marks, WTP pads, transfer stalls) and ASCs. Vessel hulls are drawn by VesselHulls (placeholder, then the TT-27 GLB LODs in the line's livery,
+ * see vesselRenderer.ts). Containers are drawn by the ContainerInstancer: procedural
  * placeholder boxes at once, then the phase 2 GLB LODs (LOD0 near the camera,
- * LOD1 elsewhere) with a per-instance livery as soon as they load. Shared
+ * LOD1 elsewhere) with a per-instance livery as soon as they load. STS cranes
+ * start as procedural placeholders and switch to the phase 2 Malaccamax GLB
+ * (`StsModel`, three LODs, rigged) once it loads. Shared
  * geometries and materials; nothing here is reactive (never put these in Vue state).
  *
  * `update(model, t)` poses everything for display time `t` from the
@@ -20,14 +23,15 @@ import { NO_OVERLAYS, type OverlayState } from './overlays'
 export type { OverlayState }
 import { ContainerInstancer } from './containerInstancer'
 import { loadShcModel, ShcRig, SHC_RIG, type ShcRigState } from './shcAssets'
-import { LIVERY_ATLAS, liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
-import { aftOffsetM, BAY_PITCH_M, FENDER_GAP_M, ROW_PITCH_M, slotX, slotZ, TIER_PITCH_M } from '../scenario/vesselClasses'
+import { liveryIndexForLine, loadContainerAssets } from './containerAssets'
+import { loadStsTemplate, StsModel, type SpreaderMode, type StsRenderState } from './stsAssets'
+import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
+import { VesselHulls, type VesselHullState } from './vesselRenderer'
 
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
 const EMPTY_HOIST_MPS = 1.5
 /** Height of the spreader's twist-lock plane when an empty SHC is not driving: the top of a standard box on the ground. */
 const EMPTY_SPREADER_DOWN_Y = CONTAINER_DIMS['40'].height
-
 export interface SceneStats {
   /** Container instances drawn. */
   containers: number
@@ -39,6 +43,10 @@ export interface SceneStats {
   ascs: number
   /** Vessel hulls currently visible. */
   vessels: number
+  /** 'placeholder' until every scenario vessel's hull GLB has loaded (TT-27). */
+  vesselAssets: 'placeholder' | 'loaded'
+  /** Visible vessels per hull LOD (placeholders not counted). */
+  vesselLods: { lod0: number; lod1: number; lod2: number }
   overlays: OverlayState
   /** Reserved zones highlighted (0 when the reservations overlay is off). */
   reservedZones: number
@@ -54,6 +62,10 @@ export interface SceneStats {
   shcAssets: 'placeholder' | 'loaded'
   /** 'placeholder' until the container GLBs have loaded. */
   containerAssets: 'placeholder' | 'loaded'
+  /** 'placeholder' (procedural cranes) until the STS GLB has loaded. */
+  stsAssets: 'placeholder' | 'loaded'
+  /** STS cranes per LOD drawn (placeholders count as none). */
+  stsLods: { lod0: number; lod1: number; lod2: number }
 }
 
 /** What the scene draws for one container (dev API). */
@@ -62,6 +74,8 @@ export interface RenderedLivery {
   index: number
   size: string
   lod: 0 | 1
+  /** Centre drawn at the last update (m, world). */
+  centre: Vec3
 }
 
 interface StsParts {
@@ -79,7 +93,10 @@ export class SceneRenderer {
   private containerLivery: number[]
   private disposed = false
   private sts = new Map<string, StsParts>()
-  private vessels = new Map<string, THREE.Group>()
+  private stsModels = new Map<string, StsModel>()
+  private lastSpreader = new Map<string, SpreaderMode>()
+  private vessels: VesselHulls
+  private lastT = 0
   private shcs = new Map<string, { group: THREE.Group; spreader: THREE.Mesh; rig?: ShcRig }>()
   private hoistEase = new Map<string, { t: number; y: number }>()
   private ascs = new Map<string, { group: THREE.Group; trolley: THREE.Mesh; spreader: THREE.Mesh; ropes: THREE.Mesh; blockX: number; height: number }>()
@@ -102,7 +119,8 @@ export class SceneRenderer {
     this.addLights()
     this.addGround(config)
     for (const s of config.sts) this.addSts(s.id)
-    for (const v of config.vessels) this.addVessel(v.id)
+    this.vessels = new VesselHulls(model)
+    this.scene.add(this.vessels.group)
     this.addYard()
     for (const id of model.shcIds) this.addShc(id)
     for (const id of model.ascIds) this.addAsc(id)
@@ -137,6 +155,20 @@ export class SceneRenderer {
         (err: unknown) => console.warn('Terminal Twin: SHC GLB failed to load; keeping placeholders', err),
       )
     }
+    loadStsTemplate().then(
+      (template) => {
+        if (this.disposed) return
+        config.sts.forEach((s, i) => {
+          const m = new StsModel(template, i)
+          m.root.name = `${s.id}-model`
+          this.scene.add(m.root)
+          this.stsModels.set(s.id, m)
+          const placeholder = this.sts.get(s.id)
+          if (placeholder) placeholder.group.visible = false
+        })
+      },
+      (err: unknown) => console.warn('Terminal Twin: STS GLB failed to load; keeping procedural cranes', err),
+    )
 
     const box = this.track(new THREE.BoxGeometry(1, 1, 1))
     const edges = this.track(new THREE.EdgesGeometry(box))
@@ -177,7 +209,7 @@ export class SceneRenderer {
       this.track(new THREE.MeshStandardMaterial({ color: '#2d5873', roughness: 0.35, metalness: 0.1 })),
     )
     water.rotation.x = -Math.PI / 2
-    water.position.set(length / 2, -2.5, -1500)
+    water.position.set(length / 2, -QUAY_ABOVE_WATER_M, -1500)
     water.receiveShadow = true
     this.scene.add(water)
 
@@ -244,72 +276,6 @@ export class SceneRenderer {
     const spreader = box(12.2, 0.7, 2.5, this.track(new THREE.MeshStandardMaterial({ color: '#f2b705' })), 0, 0, 0)
     this.scene.add(group)
     this.sts.set(id, { group, trolley, ropes, spreader })
-  }
-
-  /**
-   * Procedural low-poly hull sized to the vessel's class: a plan-view outline
-   * (square stern, pointed bow) extruded from the keel to the main deck, a
-   * boot-top band, hatch covers per bay, the accommodation block aft of bay 0
-   * and a funnel. Local frame: stern at x = 0, quay-side hull face at
-   * z = -FENDER_GAP_M; the group is moved to the berth (or anchorage) per frame.
-   */
-  private addVessel(id: string): void {
-    const spec = this.model.vesselSpec(id)
-    const v = this.model.vesselConfig(id)
-    const group = new THREE.Group()
-    group.name = id
-    const draft = 10
-    const mainDeck = spec.deckHeightM - 0.8
-    const bow = Math.min(30, spec.loaM * 0.12)
-    const outline = new THREE.Shape()
-    outline.moveTo(0, 0)
-    outline.lineTo(spec.loaM - bow, 0)
-    outline.lineTo(spec.loaM, spec.beamM / 2)
-    outline.lineTo(spec.loaM - bow, spec.beamM)
-    outline.lineTo(0, spec.beamM)
-    outline.closePath()
-    const extrude = (depth: number) => {
-      const g = new THREE.ExtrudeGeometry(outline, { depth, bevelEnabled: false })
-      g.rotateX(-Math.PI / 2) // shape Y (beam) -> -Z (seaward), extrusion -> +Y
-      return this.track(g)
-    }
-    const line = LIVERY_ATLAS.liveries.find((l) => l.line !== null && v.name.startsWith(l.line))?.line
-    const hullColour = line ? liveryBodyColour(liveryIndexForLine(line)) : '#33465f'
-    const hull = new THREE.Mesh(
-      extrude(mainDeck + draft),
-      this.track(new THREE.MeshStandardMaterial({ color: new THREE.Color(hullColour).multiplyScalar(0.55), roughness: 0.6 })),
-    )
-    hull.position.set(0, -draft, -FENDER_GAP_M)
-    hull.castShadow = true
-    hull.receiveShadow = true
-    const boot = new THREE.Mesh(extrude(4), this.track(new THREE.MeshStandardMaterial({ color: '#8c2f2f', roughness: 0.7 })))
-    boot.scale.set(1.002, 1, 1.004)
-    boot.position.set(-0.05, -3, -FENDER_GAP_M + 0.05)
-    const aft = aftOffsetM(spec)
-    const white = this.track(new THREE.MeshStandardMaterial({ color: '#f1f3f5', roughness: 0.6 }))
-    const bridgeL = Math.min(14, aft - 4)
-    const bridgeH = spec.deckTiers * TIER_PITCH_M + 8
-    const bridge = new THREE.Mesh(this.track(new THREE.BoxGeometry(bridgeL, bridgeH, spec.beamM - 2)), white)
-    bridge.position.set(aft - bridgeL / 2 - 2, mainDeck + bridgeH / 2, -FENDER_GAP_M - spec.beamM / 2)
-    bridge.castShadow = true
-    const funnel = new THREE.Mesh(
-      this.track(new THREE.BoxGeometry(5, 8, 5)),
-      this.track(new THREE.MeshStandardMaterial({ color: hullColour, roughness: 0.6 })),
-    )
-    funnel.position.set(Math.max(3, aft - bridgeL - 6), mainDeck + 4, -FENDER_GAP_M - spec.beamM / 2)
-    // hatch covers: one slab per 40 ft bay
-    const hatchMat = this.track(new THREE.MeshStandardMaterial({ color: '#5b6470', roughness: 0.8 }))
-    const hatchGeo = this.track(new THREE.BoxGeometry(BAY_PITCH_M - 1.2, 0.8, spec.rows * ROW_PITCH_M))
-    for (let bay = 0; bay < spec.bays; bay++) {
-      const hatch = new THREE.Mesh(hatchGeo, hatchMat)
-      hatch.position.set(slotX(spec, 0, bay), spec.deckHeightM - 0.4, slotZ(spec, (spec.rows - 1) / 2))
-      hatch.receiveShadow = true
-      group.add(hatch)
-    }
-    group.add(hull, boot, bridge, funnel)
-    group.visible = false
-    this.scene.add(group)
-    this.vessels.set(id, group)
   }
 
   /** Blocks: paved slab, ASC rails, bay marks and transfer stalls; WTP pad markings. */
@@ -527,7 +493,37 @@ export class SceneRenderer {
 
   update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3): void {
     const model = this.model
+    const containers = this.containers
+    // Containers first: what each spreader carries decides its configuration (20 / 40 / twin-20).
+    const load = new Map<string, { count: number; size: string }>()
+    const carried = new Map<string, number>()
+    containers.begin()
+    model.containerIds.forEach((id, i) => {
+      const c = model.containerPose(id, t)
+      if (!c) return
+      containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw)
+      if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
+      if (this.stsModels.size) {
+        const owner = model.custodyAt(id, t)
+        if (owner?.kind === 'sts') {
+          const l = load.get(owner.id)
+          load.set(owner.id, { count: (l?.count ?? 0) + 1, size: model.containerSize[id] })
+        }
+      }
+    })
+    containers.end(cameraPosition)
+
+    for (const [id, m] of this.stsModels) {
+      const pose = model.stsPose(id, t)
+      const l = load.get(id)
+      const mode: SpreaderMode = !l ? (this.lastSpreader.get(id) ?? '40') : l.count > 1 ? 'twin-20' : l.size === '20' ? '20' : '40'
+      this.lastSpreader.set(id, mode)
+      m.carrying = l?.count ?? 0
+      m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l })
+      m.updateLod(cameraPosition)
+    }
     for (const [id, parts] of this.sts) {
+      if (this.stsModels.has(id)) continue
       const pose = model.stsPose(id, t)
       parts.group.position.x = pose.gantryX
       parts.trolley.position.z = pose.trolleyZ
@@ -537,11 +533,8 @@ export class SceneRenderer {
       parts.ropes.scale.y = ropeLen
       parts.ropes.position.set(0, ropeTop - ropeLen / 2, pose.trolleyZ)
     }
-    for (const [id, group] of this.vessels) {
-      const p = model.vesselPlacement(id, t)
-      group.visible = p !== null
-      if (p) group.position.set(p.x, 0, p.zOffset)
-    }
+    this.lastT = t
+    this.vessels.update(t, cameraPosition)
     for (const [id, parts] of this.ascs) {
       const pose = model.ascPose(id, t)
       const lx = pose.x - parts.blockX
@@ -571,16 +564,6 @@ export class SceneRenderer {
       }
     }
 
-    const containers = this.containers
-    const carried = new Map<string, number>()
-    containers.begin()
-    model.containerIds.forEach((id, i) => {
-      const c = model.containerPose(id, t)
-      if (!c) return
-      containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw)
-      if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
-    })
-    containers.end(cameraPosition)
 
     for (const [id, parts] of this.shcs) {
       const pose = model.shcPose(id, t)
@@ -650,8 +633,7 @@ export class SceneRenderer {
   }
 
   stats(): SceneStats {
-    let vessels = 0
-    for (const g of this.vessels.values()) if (g.visible) vessels++
+    const v = this.vessels.stats()
     const c = this.containers.stats()
     const shcLods = { lod0: 0, lod1: 0, lod2: 0 }
     let rigged = 0
@@ -665,7 +647,9 @@ export class SceneRenderer {
       sts: this.sts.size,
       shcs: this.shcs.size,
       ascs: this.ascs.size,
-      vessels,
+      vessels: v.visible,
+      vesselAssets: v.assets,
+      vesselLods: v.lods,
       overlays: { ...this.overlays },
       reservedZones: this.reservedZones,
       reservedRailSegments: this.reservedRailSegments,
@@ -674,8 +658,20 @@ export class SceneRenderer {
       containerAssets: c.assets,
       shcLods,
       shcAssets: rigged > 0 ? 'loaded' : 'placeholder',
+      stsAssets: this.stsModels.size ? 'loaded' : 'placeholder',
+      stsLods: {
+        lod0: [...this.stsModels.values()].filter((m) => m.lod === 0).length,
+        lod1: [...this.stsModels.values()].filter((m) => m.lod === 1).length,
+        lod2: [...this.stsModels.values()].filter((m) => m.lod === 2).length,
+      },
     }
   }
+
+  /** Per STS: LOD, spreader configuration, boxes carried and the drawn spreader/trolley positions (GLB cranes only). */
+  renderedSts(): Record<string, StsRenderState> {
+    return Object.fromEntries([...this.stsModels].map(([id, m]) => [id, m.renderState()]))
+  }
+
 
   /** Rig state per SHC at the last update (empty until the SHC GLB has loaded). */
   renderedShcs(): Record<string, ShcRigState> {
@@ -689,13 +685,21 @@ export class SceneRenderer {
     const out: Record<string, RenderedLivery> = {}
     this.model.containerIds.forEach((id, i) => {
       const r = this.containers.renderedContainer(i)
-      if (r) out[id] = { index: r.livery, size: r.size, lod: r.lod }
+      const centre = r && this.model.containerCentre(id, this.lastT)
+      if (r && centre) out[id] = { index: r.livery, size: r.size, lod: r.lod, centre }
     })
     return out
   }
 
+  /** Per vessel: class, line, livery, name, LOD and the rendered bay grid (TT-27). */
+  vesselHulls(): Record<string, VesselHullState> {
+    return this.vessels.states()
+  }
+
   dispose(): void {
     this.disposed = true
+    for (const m of this.stsModels.values()) m.dispose()
+    this.vessels.dispose()
     for (const d of this.disposables) d.dispose()
     this.containers.dispose()
     this.layers.dispose()

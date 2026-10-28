@@ -133,9 +133,12 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Wordmark:** the line's name set in a close open-licence typeface and the brand colours, standing in for the official logo.
 - **Asset budget:** the triangle, draw-call and file-size limits per asset kind (`assets/budgets.json`), enforced by the **budget check** (`npm run tt:assets:check`).
 - **SHC model:** the rigged Kalmar-style shuttle carrier asset `shc` (nodes `steer_*`, `wheel_*`, `hoist`, `spreader`, `twistlock_*`). Its **tunnel** is the open space between the legs that a box is carried through, and its **container attach point** is the centre of the twist-lock plane (the top of the carried box). *Avoid:* "SHC mesh".
+- **STS model:** the rigged Malaccamax quay-crane asset `sts-malaccamax` (nodes `gantry`, `trolley`, `hoist`, `spreader`, `boom`, twist-locks). Its **container attach point** is the spreader's seat for the top of a box; a **spreader mode** (`20`, `40`, `twin-20`) sets the telescope and twin-lock positions. *Avoid:* "crane mesh".
 - **Hoist travel:** how far the SHC's `hoist` node moves down from rest (0 to −3.1 m); equal to the carried box's top height minus 6.0 m.
 - **Odometer (SHC):** the signed distance an SHC has rolled along its heading, from which the renderer derives wheel roll.
 - **Asset viewer:** the dev-only page `/sim/terminal-twin?viewer=<asset>` (or `?viewer=yard`), with its API `window.__ttAssets`.
+- **Hull asset:** the generated GLB of a vessel size class (`vessel-ulcv`, …), with nodes `hull`, `hatch_covers`, `lashing_bridges` and `bay_grid`. Its **bay grid** (in the sidecar) is the origin and pitches that put a deck or hold slot exactly where the engine's bay plan does.
+- **Vessel livery:** the hull colour, funnel mark and hull-side wordmark of a shipping line, from the **vessel livery atlas** (one tile per line, like the container atlas). The line comes from `VesselConfig.line` or from the vessel name's style ("HMM Tarifa").
 
 ## Dashboard (TT-16)
 
