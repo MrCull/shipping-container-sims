@@ -11,6 +11,7 @@ import { LIVERY_ATLAS, liveryMaterial, loadContainerAssets, loadGltf } from '../
 import { ContainerInstancer, DEFAULT_LOD_OPTIONS } from '../modules/containerInstancer'
 import { CONTAINER_DIMS } from '../modules/sceneModel'
 import { AssetRig, type RigMeta } from '../modules/assetRig'
+import { ASC_MODEL, HC_HEIGHT_M } from '../modules/ascRig'
 import type { AssetPose, AssetViewStats, RigControl, Vec3Tuple, ViewerLod, YardStats } from './assetViewerApi'
 
 const glbUrls = import.meta.glob('../assets/models/**/*.glb', { query: '?url', import: 'default', eager: true }) as Record<string, string>
@@ -23,7 +24,9 @@ interface Sidecar extends RigMeta {
   travelLimits: NonNullable<RigMeta['travelLimits']>
   /** SHC only: clear tunnel size. */
   tunnel?: { clearWidthM: number; clearHeightM: number }
-  attachPoints?: { name: string; node?: string; position: number[] }[]
+  attachPoints?: { name: string; node?: string; position: number[]; yawDeg?: number; referenceBox?: string }[]
+  /** ASC only: the design stack (rows, row pitch, clear span between the legs, bridge underside). */
+  stack?: { rows: number; rowPitchM: number; designTiers: number; clearSpanM: number; underBridgeM: number }
   lods?: Record<string, { maxDistanceM?: number }>
 }
 
@@ -74,6 +77,9 @@ export class AssetViewerScene {
   /** A 40 ft ISO box for assets with a `container` attach point (cranes): hangs from that node, top centre at the point. */
   private hanging: THREE.Object3D
   private hangingFrom: string | null = null
+  /** ASC: 8 rows of reference containers on the ground under the span, `stackTiers` high. */
+  private stack: THREE.Group | null = null
+  private stackTiers = 5
   private yardInstancer: ContainerInstancer | null = null
   private loadToken = 0
   private materials = new Set<THREE.Material & { userData: { liveryBase?: { value: number } } }>()
@@ -152,6 +158,77 @@ export class AssetViewerScene {
     this.reference.position.set(0, top - CONTAINER_DIMS[this.referenceSize].height, 0)
   }
 
+  /** ASC: rebuilds the reference stack (all rows of 40 ft high-cube boxes, long axis along the rails) at the given height. */
+  private buildStack(tiers: number): void {
+    this.clearStack()
+    this.stackTiers = tiers
+    const st = this.asset?.entry.meta.stack
+    if (!st) return
+    const d = CONTAINER_DIMS['40HC']
+    const geo = new THREE.BoxGeometry(d.width, d.height, d.length)
+    const edges = new THREE.EdgesGeometry(geo)
+    const fill = new THREE.MeshStandardMaterial({ color: '#9ca3af', transparent: true, opacity: 0.35 })
+    const line = new THREE.LineBasicMaterial({ color: '#111827' })
+    const group = new THREE.Group()
+    group.name = 'reference-stack'
+    for (let r = 0; r < st.rows; r++) {
+      for (let k = 0; k < tiers; k++) {
+        const pos = new THREE.Vector3((r - (st.rows - 1) / 2) * st.rowPitchM, k * d.height + d.height / 2, 0)
+        const m = new THREE.Mesh(geo, fill)
+        m.position.copy(pos)
+        const l = new THREE.LineSegments(edges, line)
+        l.position.copy(pos)
+        group.add(m, l)
+      }
+    }
+    group.userData.dispose = () => {
+      geo.dispose()
+      edges.dispose()
+      fill.dispose()
+      line.dispose()
+    }
+    this.stack = group
+    this.scene.add(group)
+  }
+
+  private clearStack(): void {
+    if (!this.stack) return
+    this.scene.remove(this.stack)
+    ;(this.stack.userData.dispose as (() => void) | undefined)?.()
+    this.stack = null
+  }
+
+  /** ASC viewer: sets the reference stack height (tiers of 40 ft high-cube boxes). */
+  setStack(tiers: number): AssetViewStats {
+    if (this.asset?.entry.meta.kind !== 'asc') throw new Error('setStack applies to the ASC asset')
+    this.buildStack(Math.min(8, Math.max(0, Math.round(tiers))))
+    return this.stats()!
+  }
+
+  /** ASC viewer: the reference stack against the span and the hoist (sidecar `stack`). */
+  private stackFit(): AssetViewStats['stack'] {
+    const st = this.asset?.entry.meta.stack
+    if (!st || !this.stack || !this.asset) return null
+    const d = CONTAINER_DIMS['40HC']
+    const stackTopM = this.stackTiers * d.height
+    const outerRowM = ((st.rows - 1) / 2) * st.rowPitchM + d.width / 2
+    const sideClearanceM = st.clearSpanM / 2 - outerRowM
+    const restCarryClearanceM = ASC_MODEL.restAttachY - HC_HEIGHT_M - stackTopM
+    const carriedBottomM = ASC_MODEL.restAttachY + (this.asset.rig.values.hoist ?? 0) - HC_HEIGHT_M
+    return {
+      rows: st.rows,
+      tiers: this.stackTiers,
+      stackTopM,
+      clearSpanM: st.clearSpanM,
+      rowsWidthM: 2 * outerRowM,
+      sideClearanceM,
+      underBridgeM: st.underBridgeM,
+      carryClearanceM: restCarryClearanceM,
+      carriedBottomM,
+      fits: sideClearanceM > 0 && restCarryClearanceM > 0 && stackTopM < st.underBridgeM,
+    }
+  }
+
   resize(host: HTMLElement): void {
     const w = Math.max(1, host.clientWidth)
     const h = Math.max(1, host.clientHeight)
@@ -167,6 +244,7 @@ export class AssetViewerScene {
     const gltf = await loadGltf(entry.url)
     if (token !== this.loadToken) throw new Error(`show(${name}) superseded by a later show/yard call`)
     this.clearYard()
+    this.clearStack()
     if (this.asset) this.scene.remove(this.asset.root)
     const root = gltf.scene
     root.traverse((o) => {
@@ -189,6 +267,7 @@ export class AssetViewerScene {
     const rig = new AssetRig(root, entry.meta)
     this.asset = { entry, root, lods, rig }
     this.scene.add(root)
+    if (entry.meta.kind === 'asc') this.buildStack(this.stackTiers)
     const { lengthM, widthM, heightM } = entry.meta.dimensions
     this.hanging.removeFromParent()
     this.hangingFrom = entry.meta.attachPoints?.find((a) => a.name === 'container' && a.node)?.node ?? null
@@ -225,11 +304,22 @@ export class AssetViewerScene {
   private attachHanging(): void {
     if (!this.asset || !this.hangingFrom) return
     const suffix = this.asset.entry.meta.lodNaming?.[this.shownLod] ?? ''
-    const node = this.asset.root.getObjectByName(this.hangingFrom + suffix)
-    const point = this.asset.entry.meta.attachPoints!.find((a) => a.name === 'container')!.position
+    // Per-LOD copies are either suffixed (`spreader_lod1`) or repeat the name (GLTFLoader keeps it in userData.name).
+    const wanted = new Set([this.hangingFrom, this.hangingFrom + suffix])
+    let node: THREE.Object3D | null = null
+    ;(this.asset.lods[this.shownLod] ?? this.asset.root).traverse((o) => {
+      if (!node && wanted.has((o.userData.name as string | undefined) ?? o.name)) node = o
+    })
+    const point = this.asset.entry.meta.attachPoints!.find((a) => a.name === 'container')!
     if (!node) return
-    node.add(this.hanging)
-    this.hanging.position.set(point[0], point[1], point[2])
+    ;(node as THREE.Object3D).add(this.hanging)
+    this.hanging.position.set(point.position[0], point.position[1], point.position[2])
+    // Spreaders whose long axis is not X (the ASC's runs along the rails) turn the box; a high-cube reference stretches it.
+    this.hanging.rotation.y = THREE.MathUtils.degToRad(point.yawDeg ?? 0)
+    const d40 = CONTAINER_DIMS['40']
+    const height = point.referenceBox === '40HC' ? CONTAINER_DIMS['40HC'].height : d40.height
+    this.hanging.scale.set(1, height / d40.height, 1)
+    this.hanging.userData.size = [d40.length, height, d40.width]
   }
 
   private updateAutoLod(): void {
@@ -322,6 +412,7 @@ export class AssetViewerScene {
       livery: this.livery,
       referenceContainer: this.reference.visible || !!this.hanging.parent,
       reference: this.referenceFit(),
+      stack: this.stackFit(),
     }
   }
 
@@ -357,6 +448,7 @@ export class AssetViewerScene {
     this.asset = null
     this.reference.visible = false
     this.hanging.removeFromParent()
+    this.clearStack()
     this.clearYard()
     const assets = await loadContainerAssets()
     const sizes: ContainerSize[] = ['40', '40', '40HC', '20']
@@ -429,6 +521,7 @@ export class AssetViewerScene {
   dispose(): void {
     cancelAnimationFrame(this.frame)
     this.clearYard()
+    this.clearStack()
     this.controls.dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()

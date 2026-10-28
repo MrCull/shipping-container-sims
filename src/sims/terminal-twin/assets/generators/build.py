@@ -6,7 +6,7 @@ copies everything into assets/models/). Direct use:
     python build.py --out <staging dir> [--only containers] [--no-previews]
     blender --background --python build.py -- --out <staging dir>
 
-Groups: containers, shc, sts, vessels (needs --vessel-classes <json>: the engine class table + bay grid). Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
+Groups: containers, shc, asc, sts, vessels (needs --vessel-classes <json>: the engine class table + bay grid). Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
 Writes, under <staging>/sts/:
     sts-malaccamax.glb / .meta.json   rigged Malaccamax quay crane (LOD0-2)
     sts-atlas.json                    paint/branding atlas layout (crane-number plates)
@@ -34,13 +34,15 @@ import bpy  # noqa: E402
 from tt_assets import blender as B  # noqa: E402
 from tt_assets import containers as C  # noqa: E402
 from tt_assets import liveries as LV  # noqa: E402
+from tt_assets import asc as A  # noqa: E402
+from tt_assets import asc_meta as AM  # noqa: E402
 from tt_assets import shc as S  # noqa: E402
 from tt_assets import shc_meta as SM  # noqa: E402
 from tt_assets import vessel_liveries as VLV  # noqa: E402
 from tt_assets import vessels as VS  # noqa: E402
 
 FONTS = os.path.join(HERE, 'fonts')
-GROUPS = ('containers', 'shc', 'sts', 'vessels')
+GROUPS = ('containers', 'shc', 'asc', 'sts', 'vessels')
 from tt_assets import sts as STS  # noqa: E402
 from tt_assets import sts_atlas as STSA  # noqa: E402
 
@@ -315,6 +317,39 @@ def build_vessels(out_dir, classes_file, previews=True, samples=48):
     os.makedirs(tmp, exist_ok=True)
 
 
+def build_asc(out_dir, previews=True, samples=48):
+    os.makedirs(out_dir, exist_ok=True)
+    preview_dir = os.path.join(out_dir, 'previews')
+    os.makedirs(preview_dir, exist_ok=True)
+    tmp = os.path.join(out_dir, '.work')
+    os.makedirs(tmp, exist_ok=True)
+    atlas_png = os.path.join(tmp, 'asc-atlas.png')
+    print('[asc] rendering atlas', flush=True)
+    AM.render_atlas(atlas_png, FONTS)
+    B.reset_scene()
+    atlas = B.load_image(atlas_png, name='asc-atlas')
+    root, info = A.build_asc(atlas)
+    info['height'] = A.TOTAL_HEIGHT
+    print(f'[asc] LOD0 {info["triangles"]["LOD0"]} tris, LOD1 {info["triangles"]["LOD1"]}, LOD2 {info["triangles"]["LOD2"]}', flush=True)
+    glb = os.path.join(out_dir, 'asc.glb')
+    B.export_glb(root, glb)
+    strip_lod_suffix(glb)
+    write_json(os.path.join(out_dir, 'asc.meta.json'), AM.sidecar(info))
+    if not previews:
+        return
+    S.hide_lods_for_preview('LOD0')
+    cam, _ = B.setup_preview_stage(ground_size=260.0)
+    # Blender axes: X across the rows, Y along the rails (front = -Y), Z up; the hoist rests raised.
+    views = {
+        'front': ((0, -78.0, 13.0), (0, 0, 12.0)),
+        'side': ((72.0, 0, 13.0), (0, 0, 11.5)),
+        'rear': ((0, 78.0, 13.0), (0, 0, 12.0)),
+        'three-quarter': ((46.0, -50.0, 27.0), (0, 0, 11.0)),
+    }
+    for view, (loc, tgt) in views.items():
+        B.render_preview(cam, loc, tgt, os.path.join(preview_dir, f'asc-{view}.webp'), samples=samples)
+
+
 def main(argv):
     p = argparse.ArgumentParser(description='Generate Terminal Twin assets with Blender (bpy).')
     p.add_argument('--out', required=True, help='staging directory')
@@ -329,6 +364,8 @@ def main(argv):
         build_containers(os.path.join(args.out, 'containers'), previews=not args.no_previews, samples=args.samples)
     if 'shc' in groups:
         build_shc(os.path.join(args.out, 'shc'), previews=not args.no_previews, samples=args.samples)
+    if 'asc' in groups:
+        build_asc(os.path.join(args.out, 'asc'), previews=not args.no_previews, samples=args.samples)
     if 'sts' in groups:
         build_sts(os.path.join(args.out, 'sts'), previews=not args.no_previews, samples=args.samples)
     if 'vessels' in groups:
