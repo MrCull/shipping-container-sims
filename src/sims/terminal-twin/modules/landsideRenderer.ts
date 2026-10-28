@@ -6,6 +6,7 @@
  * cab, glass, wheels). The box on the chassis is drawn by the ContainerInstancer. Nothing here is reactive.
  */
 import * as THREE from 'three'
+import { GROUND_ROTATION_X, StaticBatch } from './staticBatch'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { STALL_LENGTH_M, TRUCK_DECK_M } from '../engine'
 import { TRUCK } from './equipmentDims'
@@ -141,19 +142,17 @@ export class LandsideScene {
     const asphalt = this.track(new THREE.MeshStandardMaterial({ color: '#4a4d52', roughness: 0.95 }))
     const line = this.track(new THREE.MeshBasicMaterial({ color: '#e8e8e8' }))
     const yellow = this.track(new THREE.MeshStandardMaterial({ color: '#f2c94c', roughness: 0.8 }))
+    // static scenery is merged per material (StaticBatch): a handful of draw calls instead of hundreds
+    const batch = new StaticBatch()
     const plane = (w: number, d: number, x: number, z: number, mat: THREE.Material, y: number, shadow = false) => {
-      const m = new THREE.Mesh(this.track(new THREE.PlaneGeometry(w, d)), mat)
-      m.rotation.x = -Math.PI / 2
-      m.position.set(x, y, z)
-      m.receiveShadow = shadow
-      this.group.add(m)
+      const geo = new THREE.PlaneGeometry(w, d)
+      batch.add(geo, mat, { x, y, z }, { rotationX: GROUND_ROTATION_X, receiveShadow: shadow })
+      geo.dispose()
     }
     const slab = (w: number, h: number, d: number, x: number, y: number, z: number, mat: THREE.Material) => {
-      const m = new THREE.Mesh(this.track(new THREE.BoxGeometry(w, h, d)), mat)
-      m.position.set(x, y, z)
-      m.castShadow = true
-      this.group.add(m)
-      return m
+      const geo = new THREE.BoxGeometry(w, h, d)
+      batch.add(geo, mat, { x, y, z }, { castShadow: true })
+      geo.dispose()
     }
     const { roadInZ, roadOutZ, eastX, westX, kioskZ, entryZ } = g.gate
     const w = 7
@@ -209,6 +208,7 @@ export class LandsideScene {
     for (const x of [x0 - 1, x1 + 1]) for (const dz of [-5, 5]) slab(0.5, 6, 0.5, x, 3, kioskZ + dz, concrete)
     slab(14, 4, 8, westX - 14, 2, kioskZ + 6, concrete) // gatehouse office
     slab(14.2, 1, 0.1, westX - 14, 2.6, kioskZ + 1.95, glass)
+    for (const m of batch.build((x) => this.track(x))) this.group.add(m)
   }
 
   update(t: number, cameraPosition: THREE.Vector3): void {

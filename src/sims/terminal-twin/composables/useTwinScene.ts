@@ -36,6 +36,8 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   let lastReportAt = 0
   /** Smoothed main-thread ms per frame (pose + render submit). */
   let cpuMs = 0
+  /** The part of it spent posing the scene (`view.update`), without the render submit. */
+  let poseMs = 0
   let lastSetting = perf.setting
   const webglFailed = ref(false)
   let renderer: THREE.WebGLRenderer | null = null
@@ -157,6 +159,8 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     frustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
     const cpuStart = performance.now()
     view.update(controller.displayTime, store.selectedId, camera.position, frustum)
+    const poseDone = performance.now()
+    poseMs = poseMs === 0 ? poseDone - cpuStart : poseMs * 0.9 + (poseDone - cpuStart) * 0.1
     if (import.meta.env.DEV && perf.debugLoadMs > 0) {
       const until = performance.now() + perf.debugLoadMs
       while (performance.now() < until) {
@@ -173,11 +177,15 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       if (perf.setting === 'auto') auto.reset(perf.effective)
       lastSetting = perf.setting
     }
+    if (perf.debugAuto) {
+      auto.downFps = perf.debugAuto.down
+      auto.upFps = perf.debugAuto.up
+    }
     if (perf.setting === 'auto') auto.frame(now)
     if (appliedLevel !== perf.effective) applyQuality()
     if (now - lastReportAt >= 250) {
       lastReportAt = now
-      perf.report({ fps: meter.fps, calls: lastRender.calls, triangles: lastRender.triangles, cpuMs })
+      perf.report({ fps: meter.fps, calls: lastRender.calls, triangles: lastRender.triangles, cpuMs, poseMs })
     }
   }
 
@@ -231,6 +239,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       ascRigs: () => view?.renderedAscs() ?? null,
       sts: () => view?.renderedSts() ?? null,
       vesselHulls: () => view?.vesselHulls() ?? null,
+      drawBreakdown: () => (view ? view.drawBreakdown(frustum) : null),
     })
     frame = requestAnimationFrame(loop)
   })

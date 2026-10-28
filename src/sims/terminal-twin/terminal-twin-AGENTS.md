@@ -453,7 +453,7 @@ Most of each container file is the embedded 2048² livery atlas. The renderer sh
 - Model origins are at the bottom, so `push()` takes the box **centre** (as `SceneModel` returns it) and subtracts half the height.
 - **Yard scale** (dev viewer `?viewer=yard`, and a smoke test): 18,000 boxes come to about 264k container triangles, 6 container draw calls, and 14 draw calls per frame including the shadow pass.
   - Headless SwiftShader renders this at well under 1 fps, which says nothing about real frame rate.
-  - The TT-19 frame-rate target is not defined yet. Check fps on a real GPU in the viewer's readout.
+  - The frame-rate target and what was measured are in § Performance and graphics quality (TT-19). Check fps on a real GPU in the viewer's readout.
 
 ### SHC model (TT-25)
 
@@ -501,7 +501,7 @@ A Malaccamax quay crane (`assets/models/sts/sts-malaccamax.glb`, sidecar `sts-ma
 - **Dev API:** `__tt.scene()` adds `stsAssets`, `stsLods {lod0, lod1, lod2}` and `render {calls, triangles}` (last frame, main + shadow pass); `__tt.sceneState().stsRendered[id]` = `{lod, spreaderMode, carrying, spreader, trolley}` (world positions as drawn).
 - **Asset viewer** (`?viewer=sts-malaccamax`): sliders for every rig node (all LODs), a 40 ft reference box hangs under the spreader's `container` attach point at true scale; `__ttAssets` exposes the rig values and the reference position.
 - **Tests:** `tests/sts-asset.test.ts` (committed GLB and sidecar: dimensions, tags, rig nodes, travel limits, attach points, branding, triangles), `tests/browser/sts-asset.smoke.ts` (viewer sliders and hanging box, twin LOD switching and engine-matched motion, twin-20 shows two boxes, eight-crane overview budget).
-- **Not done:** the TTI pack is not in the repo, so values outside the [V] list are approximations; the engine gantry is unbounded along the rail (the sidecar's +-40 m range is for the viewer only). The TT-19 frame-rate budget does not exist yet, so performance is checked only as draw calls and triangles in an eight-crane overview.
+- **Not done:** the TTI pack is not in the repo, so values outside the [V] list are approximations; the engine gantry is unbounded along the rail (the sidecar's +-40 m range is for the viewer only). Performance is checked as draw calls and triangles in an eight-crane overview; the frame-rate budget is in § Performance and graphics quality (TT-19).
 
 ### Vessel hulls (TT-27)
 
@@ -540,6 +540,31 @@ A blue ZPMC-style rail-mounted stacking crane (`assets/models/asc/asc.glb`, side
 2. Follow the rig and sidecar conventions above, and tag every dimension `V`, `P`, `A` or `M`.
 3. Check or tune its entry in `budgets.json` and run `npm run tt:assets`. Look at the previews and at `?viewer=<asset>`, then run `npm run tt:assets:shots`.
 4. Commit the generators, GLBs, sidecars and previews (never `.blend` files or photos).
+
+## Performance and graphics quality (TT-19)
+
+### Engine benchmark (local only, not in CI)
+- `npm run tt:bench` runs the TTI preset for 24 sim-hours headless in one-hour slices and prints events/sec, wall-ms per sim-hour, peak memory (process RSS) and the machine (node, CPU, load average). It compares with `perf/baseline.json` and exits 1 on a **regression: any metric more than 20% worse**. Options: `--preset "Stress test"`, `--hours n`, `--invariants-every n` (0 = off), `--update-baseline` (records the run under `<preset>|<hours>h`), `--out report.json`, `--slow-ms n` (busy-waits n ms per event: the self-test that proves the flag trips).
+- Code: `cli/benchmark.ts` (`runBenchmark`, `compareToBaseline`, `formatReport`), `cli/benchCli.ts` (`benchMain`), `tests/benchmark.test.ts` (a deliberately slowed engine trips the flag).
+- Timings only compare on a like machine and a like load: re-record with `--update-baseline` when the reference machine changes, and check the recorded `load1` before blaming code for a regression. Baselines were recorded on a shared 4-vCPU Xeon container at load 4-6, so they are conservative (slow).
+- **Recorded (24 sim-hours, invariants every 144 events as the browser worker does):** TTI baseline 28,938 events, about 1,700 events/s, about 710 ms per sim-hour, 434 MB peak. **Stress test** 78,057 events, about 840 events/s, about 3,900 ms per sim-hour, 757 MB peak, status ready, 0 invariant violations and no engine error.
+- **What the benchmark found and fixed:** the TTI preset ran about 20 events/s in the browser worker (one sim-hour took 147 s). Two causes: (1) rehandle helpers (`boxesAbove`, `vesselBelow`, `retrievalRanks`) scanned all ~28,000 yard slots per call, now served from `engine/yardIndex.ts` (per-block and per-column lists, kept current by `indexYardSlotAdded` / `indexYardSlotRemoved` at the three places slots are added or removed; any new code that adds or deletes `state.yardSlots` entries MUST call them); (2) the invariants scan the whole state, ~50 ms per event at TTI scale. `suggestedInvariantEvery(config)` (engine export) gives every event for yards up to 2,000 slots and every ~150 events at TTI scale; the worker uses it. The CLI runner and tests still check every event unless `--invariants-every` is used. Golden hashes did not change.
+- Still hot at TTI: `eligiblePickups` / `scanPickups` in `subsystems/landside.ts` scan every yard slot for each truck arrival (about 35% of the run); an index of pickup-ready boxes is the next win.
+
+### Quality settings and the overlay
+- `modules/quality.ts` (pure): `QUALITY_PROFILES` low / medium / high, `AutoQuality`, `FpsMeter`. A profile sets: sun shadows on/off and map size, container LOD0 distance and cap, `lodScale` (multiplies the STS / SHC / ASC LOD switch distances), render resolution scale (of the device pixel ratio, cap 2), ocean detail (grid segments; low is a flat Lambert quad), and `nightLights` (budget of lamp lights for the atmosphere ticket; nothing consumes it until night lighting exists, so wire it where the lamps are created via `SceneRenderer.qualityProfile`).
+- Setting: Low / Medium / High / **Auto (default)**, remembered in localStorage (guarded). `store/perfStore.ts` holds setting, effective level, live stats (fps, draw calls, triangles, frame CPU ms, pose ms) and the overlay switch. `useTwinScene` measures every rendered frame, feeds `AutoQuality`, applies the effective profile (renderer shadow switch, pixel ratio, `SceneRenderer.setQuality`) and reports stats four times a second.
+- **Auto:** steps down one level when 4 consecutive one-second windows are under 45 fps; steps up when 8 windows are at 57 fps or more; a step up that is undone within 30 s doubles the wait for the next one (max 240 s) so it does not oscillate; a frame gap over 1 s (hidden tab, long pause) is ignored. History restarts after every change.
+- UI: `components/PerfPanel.vue` (top right): quality picker and a Stats button (key **P**) that shows FPS, draw calls, triangles, frame CPU ms and the quality in force. Draw calls and triangles come from `renderer.info` and include the shadow pass.
+- Dev API: `perf()`, `setQuality(setting)`, `perfOverlay(on)`, `setFrameLoad(ms)` (busy-wait per frame), `setAutoThresholds({down, up})` (headless software rendering cannot reach 45 / 57 fps), `drawBreakdown()` (which scene groups cost the draw calls).
+
+### Renderer budget
+- **Culling:** `ContainerInstancer.end(camera, frustum)` skips boxes outside the camera frustum (per-instance sphere test; the InstancedMesh itself is never culled); `containerLods.culled` in `scene()` counts them. Everything else uses Three's own frustum culling.
+- **Batching:** static scenery (yard slabs, ASC rails, bay ticks, stall and pad markings, road surfaces, gate buildings) goes through `modules/staticBatch.ts` and is merged per material: the TTI overview went from 1,563 to 265 draw calls (including the shadow pass). New static scenery should use `StaticBatch`, not one mesh per piece.
+- `SceneModel.containerPose` caches the pose of stacked boxes (`yardPoses`); treat the returned object as read-only.
+- **Measured (TTI preset, overview at 1,100 m from STS104, High, headless SwiftShader):** 10,151 containers, 265 draw calls, 307k triangles, scene posing about 10 ms per frame (inflated, the container shared four cores with the software rasteriser and other agents). Zoomed in on one crane over 80% of the boxes are culled.
+- **Frame-rate target and the reference machine:** 60 fps for the full TTI preset at overview zoom on a **mid-range laptop: a 4-core CPU of about 2020 (e.g. Core i5-1135G7 or Apple M1 class) with an integrated GPU (Intel Iris Xe or similar), 16 GB, Chrome, a 1080p window, the engine in its worker**. Budget that follows: at most about 300 draw calls and 400k triangles in the main plus shadow pass, and under about 8 ms of main-thread time per frame for posing. **Unmet here, and why:** this container has no GPU (WebGL is software rendered at about 1 fps), so no real frame rate could be measured. The numbers above are the proxies that were measured; read the real figure from the in-app overlay on the reference machine (press P, TTI preset, zoom out). Auto holds 45 fps or better by stepping quality down. Record the observed fps here when someone has done that.
+- Smoke: `tests/browser/terminal-twin-perf.smoke.ts` (overlay, Low vs High draw calls, Auto step down and recovery with retuned thresholds, TTI overview budget and culling).
 
 ## Engine architecture
 

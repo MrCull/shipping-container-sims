@@ -31,6 +31,7 @@ import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { VesselHulls, type VesselHullState } from './vesselRenderer'
 import { LandsideScene, type LandsideStats } from './landsideRenderer'
 import { loadTruckModels, type TruckRigState } from './truckAssets'
+import { GROUND_ROTATION_X, StaticBatch } from './staticBatch'
 import { QUALITY_PROFILES, type QualityProfile } from './quality'
 
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
@@ -334,19 +335,22 @@ export class SceneRenderer {
     const rail = this.track(new THREE.MeshStandardMaterial({ color: '#4b4f55', roughness: 0.8 }))
     const mark = this.track(new THREE.MeshBasicMaterial({ color: '#8d9091' }))
     const stall = this.track(new THREE.MeshStandardMaterial({ color: '#f2c94c', roughness: 0.8 }))
+    // every flat piece below is merged per material (StaticBatch): ~1,300 meshes at TTI scale become a handful of draw calls
+    const batch = new StaticBatch()
+    const flat = (w: number, d: number, x: number, y: number, z: number, mat: THREE.Material, receiveShadow = false) => {
+      const geo = new THREE.PlaneGeometry(w, d)
+      batch.add(geo, mat, { x, y, z }, { rotationX: GROUND_ROTATION_X, receiveShadow })
+      geo.dispose()
+    }
     for (const b of this.model.blockList) {
       const z0 = b.wtpZ + 7
       const endZ = b.firstBayZ + (b.bays - 0.5) * YARD_BAY_PITCH_M
       const depth = endZ - z0 + 22
-      const m = new THREE.Mesh(this.track(new THREE.PlaneGeometry(ASC.span + 3.6, depth)), slab)
-      m.rotation.x = -Math.PI / 2
-      m.position.set(b.x, 0.02, z0 + depth / 2)
-      m.receiveShadow = true
-      this.scene.add(m)
+      flat(ASC.span + 3.6, depth, b.x, 0.02, z0 + depth / 2, slab, true)
       for (const dx of [-ASC.span / 2, ASC.span / 2]) {
-        const r = new THREE.Mesh(this.track(new THREE.BoxGeometry(0.4, 0.2, depth)), rail)
-        r.position.set(b.x + dx, 0.1, z0 + depth / 2)
-        this.scene.add(r)
+        const geo = new THREE.BoxGeometry(0.4, 0.2, depth)
+        batch.add(geo, rail, { x: b.x + dx, y: 0.1, z: z0 + depth / 2 })
+        geo.dispose()
       }
       // row lines (between the rows) and bay ticks along the block
       const lines = new THREE.BufferGeometry()
@@ -359,31 +363,20 @@ export class SceneRenderer {
       this.track(lines)
       this.scene.add(new THREE.LineSegments(lines, this.track(new THREE.LineBasicMaterial({ color: '#8d9091' }))))
       for (let bay = 0; bay <= b.bays; bay++) {
-        const tick = new THREE.Mesh(this.track(new THREE.PlaneGeometry(b.rows * YARD_ROW_PITCH_M, 0.12)), mark)
-        tick.rotation.x = -Math.PI / 2
-        tick.position.set(b.x, 0.04, b.firstBayZ + (bay - 0.5) * YARD_BAY_PITCH_M)
-        this.scene.add(tick)
+        flat(b.rows * YARD_ROW_PITCH_M, 0.12, b.x, 0.04, b.firstBayZ + (bay - 0.5) * YARD_BAY_PITCH_M, mark)
       }
       // transfer stalls (truck handover, TT-13) at the landside end
       for (const st of transferStallLayout(b)) {
-        const outline = new THREE.Mesh(this.track(new THREE.PlaneGeometry(3.2, STALL_LENGTH_M)), stall)
-        outline.rotation.x = -Math.PI / 2
-        outline.position.set(st.x, 0.03, st.z)
-        this.scene.add(outline)
+        flat(3.2, STALL_LENGTH_M, st.x, 0.03, st.z, stall)
       }
     }
     const padMat = this.track(new THREE.MeshStandardMaterial({ color: '#f2c94c', roughness: 0.8 }))
     const padInner = this.track(new THREE.MeshStandardMaterial({ color: '#8f918f', roughness: 0.95 }))
     for (const p of graph.pads) {
-      const outline = new THREE.Mesh(this.track(new THREE.PlaneGeometry(3.2, 13)), padMat)
-      outline.rotation.x = -Math.PI / 2
-      outline.position.set(p.x, 0.03, p.z)
-      this.scene.add(outline)
-      const inner = new THREE.Mesh(this.track(new THREE.PlaneGeometry(2.8, 12.6)), padInner)
-      inner.rotation.x = -Math.PI / 2
-      inner.position.set(p.x, 0.035, p.z)
-      this.scene.add(inner)
+      flat(3.2, 13, p.x, 0.03, p.z, padMat)
+      flat(2.8, 12.6, p.x, 0.035, p.z, padInner)
     }
+    for (const m of batch.build((x) => this.track(x))) this.scene.add(m)
   }
 
   /** Procedural low-poly shuttle carrier: four legs, side and cross beams, cab, spreader. Length along local X. */
@@ -626,7 +619,7 @@ export class SceneRenderer {
       this.lastSpreader.set(id, mode)
       m.carrying = l?.count ?? 0
       m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l })
-      m.updateLod(cameraPosition)
+      m.updateLod(cameraPosition, this.quality.lodScale)
     }
     for (const [id, parts] of this.sts) {
       if (this.stsModels.has(id)) continue
@@ -666,7 +659,7 @@ export class SceneRenderer {
       const lx = pose.x - parts.blockX
       const boxHeight = carried.get(id)
       if (parts.rig) {
-        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 12, cameraPosition.z - pose.z))
+        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 12, cameraPosition.z - pose.z) / this.quality.lodScale)
         // Twist-lock plane: the top of the carried box; empty, where the top of a high-cube box would be.
         parts.rig.pose({
           blockX: parts.blockX,
@@ -691,7 +684,7 @@ export class SceneRenderer {
       const pose = model.shcPose(id, t)
       if (parts.rig) {
         const boxHeight = carried.get(id)
-        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 4, cameraPosition.z - pose.z))
+        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 4, cameraPosition.z - pose.z) / this.quality.lodScale)
         parts.rig.pose({
           x: pose.x,
           z: pose.z,
@@ -752,6 +745,30 @@ export class SceneRenderer {
     const block = this.model.config.yard?.blocks[0]
     if (block && this.model.shcIds.length > 0) return { x: (x + block.x) / 2, y: 8, z: 30 }
     return { x, y: 10, z: 5 }
+  }
+
+  /**
+   * Where the draw calls go (dev/perf tool): visible, in-frustum drawables grouped by top-level
+   * scene child (its name, else its type) and geometry type, with object and triangle counts.
+   * Shadow-pass draws are not counted, so the main-pass total is what `renderer.info` reports without shadows.
+   */
+  drawBreakdown(frustum: THREE.Frustum): Record<string, { objects: number; triangles: number }> {
+    const out: Record<string, { objects: number; triangles: number }> = {}
+    for (const top of this.scene.children) {
+      const label = top.name || top.type
+      top.traverseVisible((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh && !(o as THREE.Line).isLine && !(o as THREE.Points).isPoints) return
+        if (m.frustumCulled && !frustum.intersectsObject(m)) return
+        const key = `${label}/${m.geometry.type}`
+        const g = m.geometry
+        const tris = (g.index ? g.index.count : g.getAttribute('position').count) / 3
+        const entry = (out[key] ??= { objects: 0, triangles: 0 })
+        entry.objects++
+        entry.triangles += tris * ((o as THREE.InstancedMesh).isInstancedMesh ? (o as THREE.InstancedMesh).count : 1)
+      })
+    }
+    return out
   }
 
   stats(): SceneStats {

@@ -88,7 +88,7 @@ const store = useTwinStore()
 .perf {
   position: absolute;
   top: 0.8rem;
-  right: 0.8rem;
+  right: 6.2rem; /* clear of the Inspector tab on the right edge */
   z-index: 6;
   display: flex;
   flex-direction: column;

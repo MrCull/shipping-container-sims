@@ -22,6 +22,8 @@ describe('quality profiles', () => {
     expect(med.shadowMapSize).toBeLessThanOrEqual(high.shadowMapSize)
     expect(low.lod0DistanceM).toBeLessThan(med.lod0DistanceM)
     expect(med.lod0DistanceM).toBeLessThan(high.lod0DistanceM)
+    expect(low.lodScale).toBeLessThan(med.lodScale)
+    expect(med.lodScale).toBeLessThan(high.lodScale)
     expect(low.lod0Cap).toBeLessThan(high.lod0Cap)
     expect(low.resolutionScale).toBeLessThan(high.resolutionScale)
     expect(low.oceanSegments).toBeLessThan(high.oceanSegments)

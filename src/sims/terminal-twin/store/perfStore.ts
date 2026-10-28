@@ -34,6 +34,8 @@ export interface PerfStats {
   triangles: number
   /** Main-thread ms per frame spent posing the scene and submitting the render (not GPU time). */
   cpuMs: number
+  /** The part of cpuMs spent posing the scene from the sim state (instanced boxes, rigs), before the render submit. */
+  poseMs: number
 }
 
 export const usePerfStore = defineStore('terminal-twin-perf', () => {
@@ -42,11 +44,13 @@ export const usePerfStore = defineStore('terminal-twin-perf', () => {
   /** The level in force: the fixed setting, or what Auto currently picked. */
   const effective = ref<QualityLevel>(setting.value === 'auto' ? 'high' : setting.value)
   const overlayVisible = ref(read(KEY_OVERLAY) === '1')
-  const stats = ref<PerfStats>({ fps: 0, calls: 0, triangles: 0, cpuMs: 0 })
+  const stats = ref<PerfStats>({ fps: 0, calls: 0, triangles: 0, cpuMs: 0, poseMs: 0 })
   /** How many times Auto changed the level (dev API / tests). */
   const autoChanges = ref(0)
   /** Dev only: busy-wait this many ms every frame, to prove Auto steps down and recovers. */
   const debugLoadMs = ref(0)
+  /** Dev only: retuned Auto thresholds (fps), for renderers that cannot reach 45 / 57 fps (headless software rendering). */
+  const debugAuto = ref<{ down: number; up: number } | null>(null)
 
   function setSetting(next: QualitySetting): void {
     setting.value = next
@@ -69,5 +73,5 @@ export const usePerfStore = defineStore('terminal-twin-perf', () => {
     stats.value = next
   }
 
-  return { setting, effective, overlayVisible, stats, autoChanges, debugLoadMs, setSetting, setEffective, toggleOverlay, report }
+  return { setting, effective, overlayVisible, stats, autoChanges, debugLoadMs, debugAuto, setSetting, setEffective, toggleOverlay, report }
 })

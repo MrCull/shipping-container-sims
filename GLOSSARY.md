@@ -195,3 +195,13 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Frontage:** the quay length a block needs (32 m); blocks need count x 32 m.
 - **Scale limits / stress-test scale:** hard maxima (errors) and the softer size above which the dialog warns the run may be slow.
 - **Nominal cycle:** the derived cycle time and moves per hour of one crane from its kinematics, without variation or waiting.
+
+## Performance and quality (TT-19)
+
+- **Engine benchmark:** `npm run tt:bench`, a headless run of a preset for N sim-hours that reports events/sec, wall-ms per sim-hour and peak memory and compares them with the committed baseline (a metric over 20% worse is a regression). Local only.
+- **Quality level / quality setting:** Low, Medium or High is a level (a bundle of shadows, LOD distances, resolution, ocean detail and night-light budget); the setting is a level or Auto (default).
+- **Auto quality:** steps the level down when the frame rate stays under 45 fps and back up when there is headroom, with a back-off against oscillation.
+- **Performance overlay:** the toggleable (key P) readout of FPS, draw calls, triangles, frame CPU time and the quality in force.
+- **Instance culling:** boxes outside the camera frustum are not written to the instanced meshes.
+- **Static batch:** scenery that never moves, merged into one mesh per material to save draw calls.
+- **Yard index:** the per-block and per-column lookup of yard slots that keeps rehandle queries off a whole-yard scan.

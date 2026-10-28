@@ -23,6 +23,8 @@ export interface QualityProfile {
   /** Container LOD0 distance (m) and cap on boxes drawn at LOD0. */
   lod0DistanceM: number
   lod0Cap: number
+  /** Multiplier on the LOD switch distances of the cranes and carriers (STS, SHC, ASC): below 1 they drop to cheaper LODs sooner. */
+  lodScale: number
   /** Multiplier on the device pixel ratio (render resolution), before the cap of 2. */
   resolutionScale: number
   /** Water plane subdivisions per side (1 = a flat quad); also picks the water material. */
@@ -33,9 +35,9 @@ export interface QualityProfile {
 }
 
 export const QUALITY_PROFILES: Readonly<Record<QualityLevel, QualityProfile>> = {
-  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, resolutionScale: 0.65, oceanSegments: 1, nightLights: 0 },
-  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, resolutionScale: 0.85, oceanSegments: 24, nightLights: 8 },
-  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, resolutionScale: 1, oceanSegments: 96, nightLights: 24 },
+  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 0 },
+  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 8 },
+  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 24 },
 }
 
 export const profileFor = (level: QualityLevel): QualityProfile => QUALITY_PROFILES[level]
@@ -72,6 +74,9 @@ const HICCUP_MS = 1000
 
 export class AutoQuality {
   level: QualityLevel = 'high'
+  /** Step down below this and up at or above that (fps). Fixed in the app; tests and the dev API retune them to suit a slow renderer. */
+  downFps = AUTO_DOWN_FPS
+  upFps = AUTO_UP_FPS
   private last: number | null = null
   private windowStart = 0
   private frames = 0
@@ -106,13 +111,13 @@ export class AutoQuality {
     const idx = QUALITY_LEVELS.indexOf(this.level)
     const tail = (n: number) => (this.recent.length >= n ? this.recent.slice(-n) : null)
     const slow = tail(DOWN_WINDOWS)
-    if (slow && idx > 0 && slow.every((f) => f < AUTO_DOWN_FPS)) {
+    if (slow && idx > 0 && slow.every((f) => f < this.downFps)) {
       if (nowMs - this.lastUpAt < HOLD_MS) this.upWindows = Math.min(MAX_UP_WINDOWS, this.upWindows * 2)
       this.set(QUALITY_LEVELS[idx - 1])
       return
     }
     const fast = tail(this.upWindows)
-    if (fast && idx < QUALITY_LEVELS.length - 1 && fast.every((f) => f >= AUTO_UP_FPS)) {
+    if (fast && idx < QUALITY_LEVELS.length - 1 && fast.every((f) => f >= this.upFps)) {
       this.lastUpAt = nowMs
       this.set(QUALITY_LEVELS[idx + 1])
     }

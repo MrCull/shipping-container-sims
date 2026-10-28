@@ -113,6 +113,10 @@ export interface TwinDevApi {
   perfOverlay(on: boolean): void
   /** Add `ms` of busy-wait to every frame (0 = none): proves Auto steps down under load and recovers when it ends. */
   setFrameLoad(ms: number): void
+  /** Where the draw calls go: visible drawables per scene group and geometry type (main pass only). */
+  drawBreakdown(): Record<string, { objects: number; triangles: number }> | null
+  /** Retune Auto's step-down / step-up fps thresholds (default 45 / 57); null restores them. For renderers that cannot reach those rates. */
+  setAutoThresholds(thresholds: { down: number; up: number } | null): void
   /** Rendered counts (null if there is no 3D view). */
   scene(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** What the scene shows at the displayed time: custody per container, status and pose per STS, status per vessel. */
@@ -299,9 +303,13 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     },
     overlays: (next = {}) => store.setOverlays(next),
     perf: () => perfInfo(),
+    drawBreakdown: () => store.view()?.drawBreakdown() ?? null,
     setQuality: (setting) => {
       perfStore.setSetting(setting)
       return perfInfo()
+    },
+    setAutoThresholds: (thresholds) => {
+      perfStore.debugAuto = thresholds
     },
     perfOverlay: (on) => {
       if (perfStore.overlayVisible !== on) perfStore.toggleOverlay()
