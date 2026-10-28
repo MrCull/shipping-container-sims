@@ -130,3 +130,13 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Hoist travel:** how far the SHC's `hoist` node moves down from rest (0 to −3.1 m); equal to the carried box's top height minus 6.0 m.
 - **Odometer (SHC):** the signed distance an SHC has rolled along its heading, from which the renderer derives wheel roll.
 - **Asset viewer:** the dev-only page `/sim/terminal-twin?viewer=<asset>` (or `?viewer=yard`), with its API `window.__ttAssets`.
+
+## Dashboard (TT-16)
+
+- **Dashboard:** the full-screen tab (D) with the KPI time-series charts, the yard heatmap, the Gantt timeline and the final report. It loads Apache ECharts lazily on first open. *Avoid:* "KPI strip" (that is the small always-visible bar over the 3D view).
+- **KPI group:** a set of KPI charts shown together: Quay, Horizontal transport, Yard, Landside (when it has data) or TOS handlers.
+- **Bucketing:** whether the dashboard charts show one point per clock hour or per 8-hour shift (the same series the collector builds).
+- **Yard heatmap:** yard fill % per block (rows) per hour (columns), plus each block's fill now.
+- **Gantt timeline:** one row per vessel (anchorage, mooring, berthed and working, unmooring) and one per crane **work package**, built from the event log by `buildTimeline`.
+- **Work package:** one crane-split assignment: a crane takes a range of bays of a vessel from the split decision until `StsWorkComplete`.
+- **Data palette:** the colour-blind-safe categorical steps of the dashboard; every slot also has a marker symbol and a dash style, so state is never shown by colour alone.

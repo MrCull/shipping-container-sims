@@ -64,7 +64,7 @@ export function lineChartOption(chart: KpiChartData, fmt: ChartFormat): EChartsC
       formatter: (raw: unknown) => {
         const params = raw as { axisValue: number; marker: string; seriesName: string; value: [number, number | null] }[]
         if (!params.length) return ''
-        const rows = params.map((p) => {
+        const rows = params.filter((p) => Array.isArray(p.value)).map((p) => {
           const v = p.value[1]
           return `${p.marker}${p.seriesName}: ${v === null ? t('unit.none') : fmt.value(chart.unit, v)}`
         })
@@ -118,10 +118,12 @@ export function lineChartOption(chart: KpiChartData, fmt: ChartFormat): EChartsC
 // ------------------------------------------------------------------ heatmap
 
 export function heatmapOption(heat: YardHeatmap, fmt: ChartFormat): EChartsCoreOption {
-  const data: [number, number, number | null][] = []
+  const data: { value: [number, number, number | null]; label: { color: string } }[] = []
   heat.blocks.forEach((b, row) => {
     heat.values[b].forEach((v, col) => {
-      data.push([col, row, v === null ? null : Math.round(v * 10) / 10])
+      const value = v === null ? null : Math.round(v * 10) / 10
+      // dark text on the light steps, light text on the dark ones
+      data.push({ value: [col, row, value], label: { color: value !== null && value >= 50 ? '#f0efec' : '#0b0b0b' } })
     })
   })
   return {
@@ -166,7 +168,7 @@ export function heatmapOption(heat: YardHeatmap, fmt: ChartFormat): EChartsCoreO
         data,
         // 2 px surface gap between cells; the value is also in the tooltip and the table view
         itemStyle: { borderColor: SURFACE, borderWidth: 2 },
-        label: { show: heat.hours.length <= 12, color: TEXT, formatter: (p: { value: [number, number, number | null] }) =>
+        label: { show: heat.hours.length <= 12, formatter: (p: { value: [number, number, number | null] }) =>
           p.value[2] === null ? '' : fmt.value('pct', p.value[2]) },
         emphasis: { itemStyle: { borderColor: TEXT } },
       },
@@ -239,7 +241,7 @@ export function ganttOption(model: GanttModel, fmt: ChartFormat): EChartsCoreOpt
   return {
     backgroundColor: SURFACE,
     animation: false,
-    aria: { enabled: true, decal: { show: true } },
+    aria: { enabled: true },
     textStyle,
     tooltip: {
       ...tooltipCommon,
@@ -253,14 +255,8 @@ export function ganttOption(model: GanttModel, fmt: ChartFormat): EChartsCoreOpt
         ].join('<br/>')
       },
     },
-    legend: {
-      top: 0,
-      textStyle: { color: TEXT },
-      data: (Object.keys(PHASE_COLOURS) as TimelinePhase[]).map((p) => ({
-        name: phaseName(p),
-        itemStyle: { color: PHASE_COLOURS[p], decal: decalOf(p) },
-      })),
-    },
+    // the legend is the HTML one beside the chart (its swatches carry the same textures)
+    legend: { show: false },
     grid: { left: 120, right: 20, top: 34, bottom: 62 },
     dataZoom: [
       { type: 'inside', xAxisIndex: 0, filterMode: 'weakFilter' },
@@ -284,16 +280,21 @@ export function ganttOption(model: GanttModel, fmt: ChartFormat): EChartsCoreOpt
       name: phaseName(phase),
       type: 'custom',
       encode: { x: [1, 2], y: 0 },
-      itemStyle: { color: PHASE_COLOURS[phase], decal: decalOf(phase), borderColor: SURFACE, borderWidth: 1 },
+      itemStyle: { color: PHASE_COLOURS[phase], borderColor: SURFACE, borderWidth: 1 },
       renderItem: (_params: unknown, api: GanttApi) => {
         const row = api.value(0) as number
         const start = api.coord([api.value(1), row])
         const end = api.coord([api.value(2), row])
         const height = api.size([0, 1])[1] * 0.6
+        const shape = { x: start[0], y: start[1] - height / 2, width: Math.max(end[0] - start[0], 1), height }
+        const pattern = patternFill(phase)
         return {
-          type: 'rect',
-          shape: { x: start[0], y: start[1] - height / 2, width: Math.max(end[0] - start[0], 1), height },
-          style: api.style(),
+          type: 'group',
+          children: [
+            { type: 'rect', shape, style: { fill: PHASE_COLOURS[phase], stroke: SURFACE, lineWidth: 1 } },
+            // texture on top of the colour: the phase is never conveyed by colour alone
+            ...(pattern ? [{ type: 'rect', shape, style: { fill: pattern }, silent: true }] : []),
+          ],
         }
       },
       data: model.bars
@@ -308,14 +309,55 @@ interface GanttApi {
   value(dim: number): number | string
   coord(v: [number | string, number]): [number, number]
   size(v: [number, number]): [number, number]
-  style(): Record<string, unknown>
 }
 
-function decalOf(phase: TimelinePhase) {
-  const p = PHASE_PATTERNS[phase]
-  return p.symbol === 'none'
-    ? { symbol: 'none' }
-    : { symbol: p.symbol, symbolSize: 0.8, dashArrayX: 5, dashArrayY: 5, rotation: p.rotation, color: 'rgba(0,0,0,0.38)' }
+const patterns = new Map<TimelinePhase, { image: HTMLCanvasElement; repeat: 'repeat' } | null>()
+
+/** A repeating zrender pattern fill for a phase (browser only; built on first use). */
+function patternFill(phase: TimelinePhase): { image: HTMLCanvasElement; repeat: 'repeat' } | null {
+  if (patterns.has(phase)) return patterns.get(phase) ?? null
+  let result: { image: HTMLCanvasElement; repeat: 'repeat' } | null = null
+  const spec = PHASE_PATTERNS[phase]
+  if (spec.symbol !== 'none' && typeof document !== 'undefined') {
+    const size = 8
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)'
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      if (spec.symbol === 'circle') {
+        ctx.arc(size / 2, size / 2, 1.6, 0, Math.PI * 2)
+        ctx.fill()
+      } else if (spec.symbol === 'triangle') {
+        ctx.moveTo(size / 2, 0)
+        ctx.lineTo(size / 2, size)
+        ctx.stroke()
+      } else if (spec.rotation > 0) {
+        ctx.moveTo(0, size)
+        ctx.lineTo(size, 0)
+        ctx.moveTo(-1, 1)
+        ctx.lineTo(1, -1)
+        ctx.moveTo(size - 1, size + 1)
+        ctx.lineTo(size + 1, size - 1)
+        ctx.stroke()
+      } else {
+        ctx.moveTo(0, 0)
+        ctx.lineTo(size, size)
+        ctx.moveTo(-1, size - 1)
+        ctx.lineTo(1, size + 1)
+        ctx.moveTo(size - 1, -1)
+        ctx.lineTo(size + 1, 1)
+        ctx.stroke()
+      }
+      result = { image: canvas, repeat: 'repeat' }
+    }
+  }
+  patterns.set(phase, result)
+  return result
 }
 
 export { kpiLabelKey }

@@ -69,6 +69,12 @@ test('an end condition ends the run: report shown, time controls locked, scene s
   expect((await page.evaluate(() => window.__tt!.ui())).selectedId).toBe('STS01')
   expect((await page.evaluate(() => window.__tt!.query<{ movesCompleted: number }>('kpis'))).movesCompleted).toBe(4)
 
+  // the report opened as the dashboard's report tab (TT-16); closing the dashboard docks it over the 3D view
+  await expect(page.getByTestId('tt-dashboard-report')).toBeVisible()
+  await page.getByTestId('tt-dashboard-close').click()
+  await expect(page.getByTestId('tt-dashboard')).toBeHidden()
+  await expect(report).toBeVisible()
+
   // close and reopen the report
   await page.getByTestId('tt-report-close').click()
   await expect(report).toBeHidden()
