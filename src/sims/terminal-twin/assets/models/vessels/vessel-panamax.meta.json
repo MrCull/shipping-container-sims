@@ -1,0 +1,325 @@
+{
+  "asset": "vessel-panamax",
+  "kind": "vessel",
+  "sizeClass": "panamax",
+  "label": "Panamax",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only vessels",
+  "units": "m",
+  "dimensions": {
+    "loaM": 294,
+    "beamM": 32.3,
+    "draftM": 12.0,
+    "depthM": 30.3,
+    "airDraftM": 45.98,
+    "tag": "A",
+    "source": "scenario/vesselClasses.ts (LOA, beam); draft per class [A]"
+  },
+  "axes": {
+    "up": "+Y",
+    "length": "+X (stern at x = 0, bow at x = LOA)",
+    "width": "+Z is the quay side (row 0); rows run towards -Z",
+    "origin": "stern (aft end of LOA), on the centreline, on the waterline",
+    "handedness": "right-handed, glTF"
+  },
+  "waterline": {
+    "y": 0,
+    "quayLevelAboveWaterlineM": 2.5,
+    "tag": "A",
+    "description": "the twin places the waterline this far below quay level (y = 0)"
+  },
+  "bayGrid": {
+    "origin": [
+      36,
+      20.5,
+      15.3
+    ],
+    "holdTopY": 20.0,
+    "bays": 17,
+    "rows": 12,
+    "holdTiers": 7,
+    "deckTiers": 5,
+    "bayPitchM": 14,
+    "rowPitchM": 2.55,
+    "tierPitchM": 2.896,
+    "halfOffsetM": 3.067,
+    "axes": {
+      "bay": "+X",
+      "row": "-Z",
+      "tier": "+Y"
+    },
+    "description": "origin = aft edge of bay 0, quay-side edge of row 0, deck-stack base (hatch-cover top); deck tier t stacks from origin.y + (t - holdTiers) * tierPitch, hold tier t from holdTopY - (holdTiers - t) * tierPitch; same grid as scenario/vesselClasses.ts"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "vessel-panamax",
+      "role": "lod",
+      "description": "detailed, near the camera"
+    },
+    {
+      "name": "hull",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "hull, deck, wordmarks, breakwater, accommodation, bridge, funnel, lifeboats, mooring gear, anchors"
+    },
+    {
+      "name": "hatch_covers",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "coamings and hatch-cover pontoons, one hatch per 40 ft bay"
+    },
+    {
+      "name": "lashing_bridges",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "2-level lashing bridges between bays"
+    },
+    {
+      "name": "LOD1",
+      "parent": "vessel-panamax",
+      "role": "lod",
+      "description": "mid distance"
+    },
+    {
+      "name": "hull_lod1",
+      "parent": "LOD1",
+      "role": "mesh",
+      "description": "everything merged, simplified"
+    },
+    {
+      "name": "LOD2",
+      "parent": "vessel-panamax",
+      "role": "lod",
+      "description": "far / anchorage"
+    },
+    {
+      "name": "hull_lod2",
+      "parent": "LOD2",
+      "role": "mesh",
+      "description": "silhouette"
+    },
+    {
+      "name": "bay_grid",
+      "parent": "vessel-panamax",
+      "role": "marker",
+      "description": "bay-grid origin (see bayGrid)"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "bollard_fwd_1_quay",
+      "position": [
+        285.0,
+        21.65,
+        12.4104
+      ],
+      "tag": "A"
+    },
+    {
+      "name": "bollard_fwd_1_sea",
+      "position": [
+        285.0,
+        21.65,
+        -12.4104
+      ],
+      "tag": "A"
+    },
+    {
+      "name": "bollard_fwd_2_quay",
+      "position": [
+        279.0,
+        21.65,
+        14.3597
+      ],
+      "tag": "A"
+    },
+    {
+      "name": "bollard_fwd_2_sea",
+      "position": [
+        279.0,
+        21.65,
+        -14.3597
+      ],
+      "tag": "A"
+    },
+    {
+      "name": "bollard_fwd_3_quay",
+      "position": [
+        280.5,
+        21.65,
+        14.0505
+      ],
+      "tag": "A"
+    },
+    {
+      "name": "bollard_fwd_3_sea",
+      "position": [
+        280.5,
+        21.65,
+        -14.0505
+      ],
+      "tag": "A"
+    },
+    {
+      "name": "bollard_aft_1_quay",
+      "position": [
+        1.6,
+        19.05,
+        12.1953
+      ],
+      "tag": "A"
+    },
+    {
+      "name": "bollard_aft_1_sea",
+      "position": [
+        1.6,
+        19.05,
+        -12.1953
+      ],
+      "tag": "A"
+    },
+    {
+      "name": "bollard_aft_2_quay",
+      "position": [
+        7.5,
+        19.05,
+        12.7619
+      ],
+      "tag": "A"
+    },
+    {
+      "name": "bollard_aft_2_sea",
+      "position": [
+        7.5,
+        19.05,
+        -12.7619
+      ],
+      "tag": "A"
+    },
+    {
+      "name": "nameboard_bow_quay",
+      "position": [
+        257.0,
+        14.057,
+        16.15
+      ],
+      "normal": [
+        0,
+        0,
+        1.0
+      ],
+      "widthM": 30.0,
+      "heightM": 1.83,
+      "tag": "A",
+      "description": "runtime name board: the renderer draws the vessel name here"
+    },
+    {
+      "name": "nameboard_bow_sea",
+      "position": [
+        257.0,
+        14.057,
+        -16.15
+      ],
+      "normal": [
+        0,
+        0,
+        -1.0
+      ],
+      "widthM": 30.0,
+      "heightM": 1.83,
+      "tag": "A",
+      "description": "runtime name board: the renderer draws the vessel name here"
+    },
+    {
+      "name": "nameboard_stern",
+      "position": [
+        -0.03,
+        14.057,
+        0.0
+      ],
+      "normal": [
+        -1,
+        0,
+        0.0
+      ],
+      "widthM": 16.833,
+      "heightM": 1.83,
+      "tag": "A",
+      "description": "runtime name board: the renderer draws the vessel name here"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "description": "floats: y = 0 is the waterline",
+    "tag": "A"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 11798,
+      "material": "vessel_livery"
+    },
+    "LOD1": {
+      "triangles": 2862,
+      "material": "vessel_livery"
+    },
+    "LOD2": {
+      "triangles": 460,
+      "material": "vessel_livery"
+    }
+  },
+  "liveries": {
+    "atlas": "vessel-livery-atlas.json",
+    "uv": "TEXCOORD_0 is authored for atlas tile 0 (HMM); offset by the tile of the vessel's line",
+    "wordmark": {
+      "centreX": 159.76,
+      "widthM": 52.694,
+      "heightM": 7.423,
+      "z0": 7.449
+    }
+  },
+  "provenance": [
+    {
+      "fact": "LOA 294 m, beam 32.3 m, 17 bays x 12 rows x 7+5 tiers",
+      "tag": "A",
+      "source": "scenario/vesselClasses.ts"
+    },
+    {
+      "fact": "bay grid (pitches, aft offset, row margins, tier heights) is the engine bay plan",
+      "tag": "V",
+      "source": "scenario/vesselClasses.ts slotX/slotZ/tierBaseY"
+    },
+    {
+      "fact": "draft 12.0 m, bilge radius, bulbous bow, raked stem and transom stern",
+      "tag": "A"
+    },
+    {
+      "fact": "aft accommodation and funnel (the bay grid leaves no room for a forward bridge)",
+      "tag": "M",
+      "reason": "the engine bay plan is contiguous from the aft offset to 20 m from the bow"
+    },
+    {
+      "fact": "wheelhouse floor 2 m above the top of a full deck stack (line of sight)",
+      "tag": "A"
+    },
+    {
+      "fact": "hatch covers 0.5 m thick, coaming 1.7 m, 1.4 m gap between hatches for lashing bridges",
+      "tag": "A"
+    },
+    {
+      "fact": "hull form does not narrow inside the bay grid",
+      "tag": "M",
+      "reason": "every bay has the full row count in the engine"
+    },
+    {
+      "fact": "line hull colours, funnel marks, wordmarks",
+      "tag": "A",
+      "source": "vessel-livery-atlas.json"
+    },
+    {
+      "fact": "vessel names are drawn at runtime on the name boards (attachPoints nameboard_*)",
+      "tag": "A"
+    }
+  ]
+}

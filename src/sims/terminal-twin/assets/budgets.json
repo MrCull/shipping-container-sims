@@ -34,7 +34,7 @@
     "vessel": {
       "lods": { "LOD0": { "maxTriangles": 20000, "maxDrawCalls": 10 }, "LOD1": { "maxTriangles": 5000, "maxDrawCalls": 6 }, "LOD2": { "maxTriangles": 800, "maxDrawCalls": 3 } },
       "maxFileBytes": 2000000,
-      "requiredNodes": ["LOD0", "LOD1", "LOD2"]
+      "requiredNodes": ["LOD0", "LOD1", "LOD2", "hull", "hatch_covers", "lashing_bridges", "bay_grid"]
     },
     "building": {
       "lods": { "LOD0": { "maxTriangles": 5000, "maxDrawCalls": 8 } },

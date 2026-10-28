@@ -7,6 +7,7 @@ import { nextRandom } from '../engine/rng'
 import { pickWeighted } from './bayPlan'
 import { DEFAULT_MAX_STS } from './builder'
 import { DEFAULT_LINE_WEIGHTS } from './lines'
+import { vesselName } from './vesselNames'
 import type { VesselConfig, VesselSizeClass, Weights } from './types'
 
 export interface VesselGeneratorOptions {
@@ -37,11 +38,6 @@ export const DEFAULT_CALL_MOVES: Record<VesselSizeClass, { discharge: number; lo
   ulcv: { discharge: 1800, load: 1600 },
 }
 
-const PLACES = [
-  'Tarifa', 'Alboran', 'Gibraltar', 'Ceuta', 'Tanger', 'Malaga', 'Cadiz', 'Huelva', 'Almeria', 'Valencia',
-  'Sines', 'Lisbon', 'Genoa', 'Piraeus', 'Busan', 'Ningbo', 'Shanghai', 'Rotterdam', 'Antwerp', 'Hamburg',
-]
-
 export function generateVessels(opts: VesselGeneratorOptions): VesselConfig[] {
   let state = (opts.seed ^ 0x2545f491) >>> 0
   const rng = () => {
@@ -58,11 +54,11 @@ export function generateVessels(opts: VesselGeneratorOptions): VesselConfig[] {
     const moves = DEFAULT_CALL_MOVES[sizeClass]
     const loaded = Math.round(moves.load * scale * (0.8 + rng() * 0.4))
     const line = pickWeighted(DEFAULT_LINE_WEIGHTS, rng)
-    const place = PLACES[Math.floor(rng() * PLACES.length)]
     return {
       sizeClass,
       arrivalS,
-      name: `${line} ${place}`,
+      line,
+      name: vesselName(line, rng),
       discharge: Math.round(moves.discharge * scale * (0.8 + rng() * 0.4)),
       transshipment: Math.round(loaded * tsShare),
       load: loaded - Math.round(loaded * tsShare),
@@ -73,6 +69,7 @@ export function generateVessels(opts: VesselGeneratorOptions): VesselConfig[] {
   return drafts.map((d, i) => ({
     id: `${prefix}${String(i + 1).padStart(3, '0')}`,
     name: d.name,
+    line: d.line,
     arrivalS: d.arrivalS,
     sizeClass: d.sizeClass,
     discharge: d.discharge,
