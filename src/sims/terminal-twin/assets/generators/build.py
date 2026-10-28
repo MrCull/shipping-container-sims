@@ -6,7 +6,7 @@ copies everything into assets/models/). Direct use:
     python build.py --out <staging dir> [--only containers] [--no-previews]
     blender --background --python build.py -- --out <staging dir>
 
-Groups: containers, shc, asc, sts, vessels (needs --vessel-classes <json>: the engine class table + bay grid). Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
+Groups: containers, shc, asc, sts, trucks, vessels (needs --vessel-classes <json>: the engine class table + bay grid). Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
 Writes, under <staging>/sts/:
     sts-malaccamax.glb / .meta.json   rigged Malaccamax quay crane (LOD0-2)
     sts-atlas.json                    paint/branding atlas layout (crane-number plates)
@@ -20,6 +20,7 @@ Writes, under <staging>/containers/:
 """
 import argparse
 import json
+import math
 import os
 import re
 import struct
@@ -40,9 +41,11 @@ from tt_assets import shc as S  # noqa: E402
 from tt_assets import shc_meta as SM  # noqa: E402
 from tt_assets import vessel_liveries as VLV  # noqa: E402
 from tt_assets import vessels as VS  # noqa: E402
+from tt_assets import truck as TR  # noqa: E402
+from tt_assets import truck_meta as TM  # noqa: E402
 
 FONTS = os.path.join(HERE, 'fonts')
-GROUPS = ('containers', 'shc', 'asc', 'sts', 'vessels')
+GROUPS = ('containers', 'shc', 'asc', 'sts', 'vessels', 'trucks')
 from tt_assets import sts as STS  # noqa: E402
 from tt_assets import sts_atlas as STSA  # noqa: E402
 
@@ -350,6 +353,48 @@ def build_asc(out_dir, previews=True, samples=48):
         B.render_preview(cam, loc, tgt, os.path.join(preview_dir, f'asc-{view}.webp'), samples=samples)
 
 
+def build_trucks(out_dir, previews=True, samples=48):
+    """Three tractor cab variants (each with the chassis) and the standalone chassis; one livery atlas for all."""
+    os.makedirs(out_dir, exist_ok=True)
+    preview_dir = os.path.join(out_dir, 'previews')
+    os.makedirs(preview_dir, exist_ok=True)
+    tmp = os.path.join(out_dir, '.work')
+    os.makedirs(tmp, exist_ok=True)
+    atlas_png = os.path.join(tmp, 'truck-atlas.png')
+    print('[trucks] rendering livery atlas', flush=True)
+    TM.render_atlas(atlas_png, FONTS)
+    if previews:
+        save_atlas_preview(atlas_png, os.path.join(preview_dir, 'truck-livery-atlas.webp'))
+    for cab in list(TR.CABS) + [None]:
+        B.reset_scene()
+        atlas = B.load_image(atlas_png, name='truck-atlas')
+        root, info = TR.build_truck(atlas, cab)
+        name = info['name']
+        t = info['triangles']
+        print(f'[trucks] {name}: LOD0 {t["LOD0"]} tris, LOD1 {t["LOD1"]} tris, LOD2 {t["LOD2"]} tris', flush=True)
+        glb = os.path.join(out_dir, f'{name}.glb')
+        B.export_glb(root, glb)
+        strip_lod_suffix(glb)
+        write_json(os.path.join(out_dir, f'{name}.meta.json'), TM.sidecar(info))
+        if not previews:
+            continue
+        S.hide_lods_for_preview('LOD0')
+        cam, _ = B.setup_preview_stage(ground_size=80.0)
+        # Blender axes: cab end +X, left side +Y. The tractor is steered so the articulation shows.
+        if cab:
+            for o in bpy.data.objects:
+                if o.name == 'fifth_wheel@LOD0':
+                    o.rotation_euler = (0, 0, math.radians(18))
+        views = {
+            'side': ((1.5, -32.0, 2.6), (1.5, 0, 1.9)),
+            'three-quarter': ((19.0, -17.0, 6.0), (0.5, 0, 1.5)),
+            'front': ((24.0, -5.0, 2.8), (3, 0, 1.8)),
+            'rear': ((-20.0, -9.0, 3.0), (0, 0, 1.4)),
+        }
+        for view, (loc, tgt) in views.items():
+            B.render_preview(cam, loc, tgt, os.path.join(preview_dir, f'{name}-{view}.webp'), samples=samples)
+
+
 def main(argv):
     p = argparse.ArgumentParser(description='Generate Terminal Twin assets with Blender (bpy).')
     p.add_argument('--out', required=True, help='staging directory')
@@ -368,6 +413,8 @@ def main(argv):
         build_asc(os.path.join(args.out, 'asc'), previews=not args.no_previews, samples=args.samples)
     if 'sts' in groups:
         build_sts(os.path.join(args.out, 'sts'), previews=not args.no_previews, samples=args.samples)
+    if 'trucks' in groups:
+        build_trucks(os.path.join(args.out, 'trucks'), previews=not args.no_previews, samples=args.samples)
     if 'vessels' in groups:
         if not args.vessel_classes:
             p.error('--vessel-classes is required for the vessels group')

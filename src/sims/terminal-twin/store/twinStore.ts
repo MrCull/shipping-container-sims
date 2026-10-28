@@ -29,6 +29,7 @@ import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { VesselHullState } from '../modules/vesselRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
+import type { TruckRigState } from '../modules/truckAssets'
 import type { AscRigState } from '../modules/ascAssets'
 import type { StsRenderState } from '../modules/stsAssets'
 
@@ -89,6 +90,8 @@ export interface TwinView {
   liveries(): Record<string, RenderedLivery> | null
   /** Rig state per SHC (LOD, steering, wheel roll, hoist travel, carrying); null without a 3D view. */
   shcRigs(): Record<string, ShcRigState> | null
+  /** Rig state per truck drawn from the GLB models (LOD, cab shape, livery, steering, articulation, wheel roll); null without a 3D view. */
+  truckRigs(): Record<string, TruckRigState> | null
   /** Rig state per ASC (LOD, gantry, trolley, hoist, rope scale, carrying); null without a 3D view. */
   ascRigs(): Record<string, AscRigState> | null
   /** Per STS: LOD, spreader configuration and drawn positions (GLB cranes); null without a 3D view. */

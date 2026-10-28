@@ -12,7 +12,7 @@ import { ContainerInstancer, DEFAULT_LOD_OPTIONS } from '../modules/containerIns
 import { CONTAINER_DIMS } from '../modules/sceneModel'
 import { AssetRig, type RigMeta } from '../modules/assetRig'
 import { ASC_MODEL, HC_HEIGHT_M } from '../modules/ascRig'
-import type { AssetPose, AssetViewStats, RigControl, Vec3Tuple, ViewerLod, YardStats } from './assetViewerApi'
+import type { AssetPose, AssetViewStats, RigControl, Vec3Tuple, ViewerLoad, ViewerLod, YardStats } from './assetViewerApi'
 
 const glbUrls = import.meta.glob('../assets/models/**/*.glb', { query: '?url', import: 'default', eager: true }) as Record<string, string>
 const sidecars = import.meta.glob('../assets/models/**/*.meta.json', { import: 'default', eager: true }) as Record<string, Sidecar>
@@ -22,12 +22,29 @@ interface Sidecar extends RigMeta {
   kind: string
   dimensions: { lengthM: number; widthM: number; heightM: number }
   travelLimits: NonNullable<RigMeta['travelLimits']>
+  /** Truck / chassis only: the livery tile layout and the chassis deck. */
+  atlas?: { tileCols: number; tileRows: number }
+  chassis?: { deckY: number }
   /** SHC only: clear tunnel size. */
   tunnel?: { clearWidthM: number; clearHeightM: number }
   attachPoints?: { name: string; node?: string; position: number[]; yawDeg?: number; referenceBox?: string }[]
   /** ASC only: the design stack (rows, row pitch, clear span between the legs, bridge underside). */
   stack?: { rows: number; rowPitchM: number; designTiers: number; clearSpanM: number; underBridgeM: number }
   lods?: Record<string, { maxDistanceM?: number }>
+}
+
+/** ISO 1161 casting centre spacing (m) by box size (length between the castings; width is 2.259 m). */
+const CASTING_SPACING_M: Record<string, number> = { '20': 5.853, '40': 11.985, '40HC': 11.985 }
+const CASTING_WIDTH_M = 2.259
+const LOAD_BOXES: Record<Exclude<ViewerLoad, 'none'>, { size: ContainerSize; attach: string }[]> = {
+  '40': [{ size: '40', attach: 'load_40' }],
+  '40HC': [{ size: '40HC', attach: 'load_40' }],
+  '20front': [{ size: '20', attach: 'load_20_front' }],
+  '20rear': [{ size: '20', attach: 'load_20_rear' }],
+  '20twin': [
+    { size: '20', attach: 'load_20_twin_a' },
+    { size: '20', attach: 'load_20_twin_b' },
+  ],
 }
 
 export interface AssetEntry {
@@ -80,6 +97,10 @@ export class AssetViewerScene {
   /** ASC: 8 rows of reference containers on the ground under the span, `stackTiers` high. */
   private stack: THREE.Group | null = null
   private stackTiers = 5
+  /** Truck / chassis: reference boxes standing on the chassis twist-locks. */
+  private load: THREE.Group | null = null
+  private loadMode: ViewerLoad = '40'
+  private truckMaterials: THREE.MeshStandardMaterial[] = []
   private yardInstancer: ContainerInstancer | null = null
   private loadToken = 0
   private materials = new Set<THREE.Material & { userData: { liveryBase?: { value: number } } }>()
@@ -198,6 +219,70 @@ export class AssetViewerScene {
     this.stack = null
   }
 
+  private clearLoad(): void {
+    if (!this.load) return
+    this.scene.remove(this.load)
+    this.load.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (m.geometry) m.geometry.dispose()
+    })
+    this.load = null
+  }
+
+  /** Truck / chassis viewer: reference boxes on the chassis twist-locks (positions from the sidecar's attach points). */
+  setLoad(mode: ViewerLoad): AssetViewStats {
+    const meta = this.asset?.entry.meta
+    if (!meta || !(meta.kind === 'truck' || meta.kind === 'chassis')) throw new Error('setLoad applies to the truck and chassis assets')
+    this.loadMode = mode
+    this.clearLoad()
+    if (mode === 'none') return this.stats()!
+    const group = new THREE.Group()
+    group.name = `reference-load-${mode}`
+    group.userData.boxes = [] as { size: string; centre: Vec3Tuple; bottomY: number }[]
+    for (const { size, attach } of LOAD_BOXES[mode]) {
+      const point = meta.attachPoints?.find((a) => a.name === attach)
+      if (!point) throw new Error(`sidecar has no attach point ${attach}`)
+      const d = CONTAINER_DIMS[size]
+      const geo = new THREE.BoxGeometry(d.length, d.height, d.width)
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: '#9ca3af', transparent: true, opacity: 0.4 }))
+      mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: '#111827' })))
+      mesh.position.set(point.position[0], point.position[1] + d.height / 2, point.position[2])
+      group.add(mesh);
+      (group.userData.boxes as unknown[]).push({ size, centre: tuple(mesh.position), bottomY: mesh.position.y - d.height / 2 })
+    }
+    this.load = group
+    this.scene.add(group)
+    return this.stats()!
+  }
+
+  /** Where the boxes' ISO casting centres are against the chassis pins in the sidecar. */
+  private loadFit(): AssetViewStats['load'] {
+    const meta = this.asset?.entry.meta
+    if (!meta || !(meta.kind === 'truck' || meta.kind === 'chassis')) return null
+    const boxes = (this.load?.userData.boxes ?? []) as { size: string; centre: Vec3Tuple; bottomY: number }[]
+    const pins = (meta.attachPoints ?? []).filter((a) => a.name.startsWith('pin_'))
+    let maxErr = 0
+    let castings = 0
+    for (const b of boxes) {
+      const half = CASTING_SPACING_M[b.size] / 2
+      for (const dx of [-half, half]) {
+        for (const dz of [-CASTING_WIDTH_M / 2, CASTING_WIDTH_M / 2]) {
+          castings++
+          const err = Math.min(...pins.map((p) => Math.hypot(b.centre[0] + dx - p.position[0], b.centre[2] + dz - p.position[2])))
+          maxErr = Math.max(maxErr, err)
+        }
+      }
+    }
+    const deck = (meta.chassis as { deckY: number } | undefined)?.deckY ?? 0
+    return {
+      mode: this.loadMode,
+      boxes,
+      castings,
+      maxPinErrorM: maxErr,
+      onPins: boxes.length > 0 && maxErr < 0.002 && boxes.every((b) => Math.abs(b.bottomY - deck) < 0.002),
+    }
+  }
+
   /** ASC viewer: sets the reference stack height (tiers of 40 ft high-cube boxes). */
   setStack(tiers: number): AssetViewStats {
     if (this.asset?.entry.meta.kind !== 'asc') throw new Error('setStack applies to the ASC asset')
@@ -245,6 +330,8 @@ export class AssetViewerScene {
     if (token !== this.loadToken) throw new Error(`show(${name}) superseded by a later show/yard call`)
     this.clearYard()
     this.clearStack()
+    this.clearLoad()
+    this.truckMaterials = []
     if (this.asset) this.scene.remove(this.asset.root)
     const root = gltf.scene
     root.traverse((o) => {
@@ -253,6 +340,14 @@ export class AssetViewerScene {
       mesh.castShadow = true
       mesh.receiveShadow = true
       const mat = mesh.material as THREE.MeshStandardMaterial
+      if ((entry.meta.kind === 'truck' || entry.meta.kind === 'chassis') && mat.map) {
+        // one livery tile at a time: a private material and texture clone whose offset picks the tile (clones share the image)
+        const own = mat.clone()
+        own.map = mat.map.clone()
+        own.map.needsUpdate = true
+        mesh.material = own
+        this.truckMaterials.push(own)
+      }
       if (entry.meta.kind === 'container' && mat.map) {
         const patched = liveryMaterial(mat)
         mesh.material = patched
@@ -271,7 +366,8 @@ export class AssetViewerScene {
     const { lengthM, widthM, heightM } = entry.meta.dimensions
     this.hanging.removeFromParent()
     this.hangingFrom = entry.meta.attachPoints?.find((a) => a.name === 'container' && a.node)?.node ?? null
-    this.reference.visible = !this.hangingFrom
+    const isTruck = entry.meta.kind === 'truck' || entry.meta.kind === 'chassis'
+    this.reference.visible = !this.hangingFrom && !isTruck
     if (entry.meta.kind === 'shc') {
       this.setReferenceSize('40HC')
       this.placeCarriedReference()
@@ -279,6 +375,7 @@ export class AssetViewerScene {
       this.setReferenceSize('20')
       this.reference.position.set(0, 0, widthM / 2 + CONTAINER_DIMS['20'].width / 2 + 1.5)
     }
+    if (isTruck) this.setLoad(this.loadMode === 'none' ? 'none' : this.loadMode)
     const span = Math.max(lengthM, heightM, 8)
     this.controls.target.set(0, heightM / 2, entry.meta.kind === 'shc' ? 0 : 1.5)
     this.camera.position.set(span * 0.9, span * 0.55, -span * 1.1)
@@ -340,6 +437,11 @@ export class AssetViewerScene {
 
   setLivery(index: number): AssetViewStats {
     this.livery = index
+    const meta = this.asset?.entry.meta
+    if (meta && (meta.kind === 'truck' || meta.kind === 'chassis') && meta.atlas) {
+      const { tileCols, tileRows } = meta.atlas
+      for (const m of this.truckMaterials) m.map?.offset.set((index % tileCols) / tileCols, Math.floor(index / tileCols) / tileRows)
+    }
     for (const m of this.materials) if (m.userData.liveryBase) m.userData.liveryBase.value = index
     return this.stats()!
   }
@@ -410,9 +512,10 @@ export class AssetViewerScene {
       rig: this.rigControls(),
       rigValues: { ...this.asset.rig.values },
       livery: this.livery,
-      referenceContainer: this.reference.visible || !!this.hanging.parent,
+      referenceContainer: this.reference.visible || !!this.hanging.parent || !!this.load,
       reference: this.referenceFit(),
       stack: this.stackFit(),
+      load: this.loadFit(),
     }
   }
 
@@ -449,6 +552,7 @@ export class AssetViewerScene {
     this.reference.visible = false
     this.hanging.removeFromParent()
     this.clearStack()
+    this.clearLoad()
     this.clearYard()
     const assets = await loadContainerAssets()
     const sizes: ContainerSize[] = ['40', '40', '40HC', '20']
@@ -522,6 +626,7 @@ export class AssetViewerScene {
     cancelAnimationFrame(this.frame)
     this.clearYard()
     this.clearStack()
+    this.clearLoad()
     this.controls.dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()

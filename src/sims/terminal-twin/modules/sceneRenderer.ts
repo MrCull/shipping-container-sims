@@ -30,6 +30,7 @@ import { loadStsTemplate, StsModel, type SpreaderMode, type StsRenderState } fro
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { VesselHulls, type VesselHullState } from './vesselRenderer'
 import { LandsideScene, type LandsideStats } from './landsideRenderer'
+import { loadTruckModels, type TruckRigState } from './truckAssets'
 
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
 const EMPTY_HOIST_MPS = 1.5
@@ -134,6 +135,14 @@ export class SceneRenderer {
     this.addYard()
     this.landside = new LandsideScene(model)
     this.scene.add(this.landside.group)
+    if (config.landside) {
+      loadTruckModels().then(
+        (models) => {
+          if (!this.disposed) this.landside.setTruckModels(models)
+        },
+        (err: unknown) => console.warn('Terminal Twin: truck GLBs failed to load; keeping procedural trucks', err),
+      )
+    }
     for (const id of model.shcIds) this.addShc(id)
     for (const id of model.ascIds) this.addAsc(id)
     this.laneOverlay = this.buildLaneOverlay()
@@ -581,7 +590,7 @@ export class SceneRenderer {
     }
     this.lastT = t
     this.vessels.update(t, cameraPosition)
-    this.landside.update(t)
+    this.landside.update(t, cameraPosition)
     this.reservedZones = 0
     const active = this.overlays.reservations ? model.activeReservations(t) : {}
     for (const [zone, mesh] of this.zoneMeshes) {
@@ -750,6 +759,11 @@ export class SceneRenderer {
     const out: Record<string, ShcRigState> = {}
     for (const [id, { rig }] of this.shcs) if (rig) out[id] = { ...rig.rigState }
     return out
+  }
+
+  /** Rig state per truck at the last update (empty until the truck GLBs have loaded). */
+  renderedTrucks(): Record<string, TruckRigState> {
+    return this.landside.rigStates()
   }
 
   /** Rig state per ASC at the last update (empty until the ASC GLB has loaded). */

@@ -151,7 +151,8 @@ export function createEngineHost() {
         const key = `truck:${truck.id}`
         if (statusRefs.get(key) !== truck.status) {
           statusRefs.set(key, truck.status)
-          delta.entities.push({ kind: 'truck', id: truck.id, t: ev.t, status: truck.status })
+          const first = truck.legs[0]
+          delta.entities.push({ kind: 'truck', id: truck.id, t: ev.t, status: truck.status, loadSize: first ? sim.query.container(first.containerId).size : undefined })
         }
       }
       if (ev.type === 'TruckDeparted') {

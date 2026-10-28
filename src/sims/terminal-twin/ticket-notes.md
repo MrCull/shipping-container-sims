@@ -453,3 +453,15 @@ Branch `tt/46-yard-start-modes`. Guide: `terminal-twin-AGENTS.md` § "Yard start
 - **Browser:** `SceneModel` uses the same planner (imports become scene containers; empty start has booked boxes with custody `external:outside`); setup dialog "Yard start" (default Pre-filled 60 %); `YardSetup.start`.
 - **Gotchas:** the legacy start (no `yardStart`) is what every existing fixture uses; only the dialog defaults to pre-filled. A heavy truck load (about 20 trucks/h) on a small yard stalls retrievals with the legacy start too (rehandles behind truck-claimed boxes; seen in a 2 x 12 bay yard): pre-existing TT-12/TT-13 interplay, not changed here. The empty start delivers a vessel's booked boxes last-loaded first. Pre-fill imports are `vesselId 'POOL'` and `full`.
 - **Follow-ups:** TT-15 presets should choose a start mode per preset; a warm-up indicator in the UI.
+
+### ticket-47 (TT-26): truck tractor and skeletal chassis models
+
+Branch `tt/47-truck-models`. Guide: `terminal-twin-AGENTS.md` § "Truck models (TT-26)". Glossary: Truck model, Fifth wheel, Chassis pin, Truck livery.
+
+- **Assets:** `assets/models/trucks/truck-cab-{high,mid,day}.glb` (tractor + chassis, kind `truck`) and `truck-chassis.glb` (kind `chassis`), sidecars, previews, `truck-livery-atlas.webp`. Generators `tt_assets/truck.py`, `truck_meta.py`; `npm run tt:assets -- --only trucks` (deterministic, `--check` passes). `budgets.json` kinds `truck` (8 dc LOD0/LOD1, 2 dc LOD2) and `chassis`.
+- **Rig:** `fifth_wheel` (+Y, +-40) > `tractor`, `steer_fl|fr` (+-35) > `wheel_fl|fr`, `wheel_r`; `wheel_t1..t3`; `chassis`. Attach points in the sidecar: `pin_40_*`, `pin_20_mid_*`, `load_40`, `load_20_front|rear`, `load_20_twin_a|b`. Origin = under the centre of a 40 ft box, deck 1.3 m.
+- **Atlas:** 8 livery tiles (4x2, 2048x1024); the renderer shifts a texture clone's offset (`truckAssets.ts materialFor`). Add a tile = append to `LIVERIES` in `truck.py` (and the sidecar follows).
+- **Sim:** `modules/truckAssets.ts` (`loadTruckModels`, `TruckRig`, `truckVariant`, `TRUCK_LOD_DISTANCES`), `landsideRenderer.ts` (`setTruckModels`, procedural truck stays as placeholder), `SceneModel.truckPose` gained `articulationRad`, `loadOffsetM`; `EntityStateChange.loadSize` (engineHost sets it for trucks); truck boxes drawn with yaw + pi.
+- **Dev API:** `scene().landside {lods, assets}`, `sceneState().truckRigs`, viewer `setLoad(...)`, `stats().load`.
+- **Gotchas:** `tt:assets` GROUPS list in `cli/assets/build.ts` and `build.py` both need a new group. Meta JSON has no pos for `fifth_wheel` mesh (empty node, listed with role rig). A 20 ft box shifts the whole model 3.0675 m back so the box (at pose origin) sits on the front pins; the engine's stall geometry is unchanged. Procedural placeholder steering sign fixed (now +steerRad).
+- **Smoke:** `tests/browser/truck-model.smoke.ts`. `terminal-twin.smoke.ts` "x600 keeps animating" and the yard fps test are timing-sensitive and flaked under CPU load from parallel agents (tracer fixture, unrelated to trucks).

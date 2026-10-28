@@ -43,6 +43,7 @@ import type { Breakpoint, BreakpointKind } from '../modules/breakpoints'
 import type { OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
+import type { TruckRigState } from '../modules/truckAssets'
 import type { AscRigState } from '../modules/ascAssets'
 import type { VesselHullState } from '../modules/vesselRenderer'
 import type { AscPose, ShcPose, StsPose, TruckPose } from '../modules/sceneModel'
@@ -184,6 +185,8 @@ export interface SceneState {
   liveries: Record<string, RenderedLivery>
   /** Per SHC, the phase 2 rig as last drawn: LOD, steering, wheel roll, hoist travel, carrying (empty until the GLB loads). */
   shcRigs: Record<string, ShcRigState>
+  /** Truck GLB rig state (LOD, cab shape, livery, steering, articulation, wheel roll, load offset) per visible truck. */
+  truckRigs: Record<string, TruckRigState>
   /** Per ASC, the phase 2 rig as last drawn: LOD, gantry Z, trolley X, hoist travel, rope scale, vertical stretch, carrying (empty until the GLB loads). */
   ascRigs: Record<string, AscRigState>
   /** Per STS as drawn by the GLB model: LOD, spreader configuration (20 / 40 / twin-20), boxes carried, spreader and trolley world positions. */
@@ -285,6 +288,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
         liveries: store.view()?.liveries() ?? {},
         shcRigs: store.view()?.shcRigs() ?? {},
+        truckRigs: store.view()?.truckRigs() ?? {},
         ascRigs: store.view()?.ascRigs() ?? {},
         stsRendered: store.view()?.sts() ?? {},
         vesselHulls: store.view()?.vesselHulls() ?? {},
