@@ -27,7 +27,7 @@ Updated 2026-10-28. Merged: #25–#45. Remaining: #46–#52, then the code-revie
 |---|---|---|---|
 | TT-13 landside | #45 | MERGED | |
 | TT-14 yard start modes | #46 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
-| TT-26 truck/chassis models | #47 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
+| TT-26 truck/chassis models | #47 | MERGED | |
 | TT-15 presets/layout | #48 | blocked by 46 | |
 | TT-17 persistence | #49 | blocked by 48 | |
 | TT-19 performance | #50 | blocked by 48 | |
