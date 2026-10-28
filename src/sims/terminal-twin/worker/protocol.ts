@@ -107,6 +107,8 @@ export interface EntityStateChange {
   status: string
   /** Vessels only: stern X along the quay once a berth is allocated (null before). */
   berthX?: number | null
+  /** Trucks only: size of the box on its first leg (the model's load position: a 20 ft box sits on the front pins). */
+  loadSize?: ContainerSize
 }
 
 /** A summarised event for feeds and the dev API. */

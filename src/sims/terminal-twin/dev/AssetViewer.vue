@@ -5,10 +5,11 @@
  * selection and a 20 ft reference box; installs `window.__ttAssets`.
  */
 import { markRaw, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
-import { t } from '../i18n/messages'
+import { t, type MessageKey } from '../i18n/messages'
 import { LIVERY_ATLAS } from '../modules/containerAssets'
 import { ASSETS, AssetViewerScene } from './assetViewerScene'
-import type { AssetViewerApi, AssetViewStats, ViewerLod, YardStats } from './assetViewerApi'
+import type { AssetViewerApi, AssetViewStats, ViewerLoad, ViewerLod, YardStats } from './assetViewerApi'
+import { TRUCK_META } from '../modules/truckAssets'
 
 const props = defineProps<{ initial: string }>()
 
@@ -53,6 +54,10 @@ function setLivery(e: Event): void {
 function setRig(node: string, e: Event): void {
   if (view) stats.value = view.setRig(node, Number((e.target as HTMLInputElement).value))
 }
+const LOADS: ViewerLoad[] = ['none', '40', '40HC', '20front', '20rear', '20twin']
+function setLoad(mode: ViewerLoad): void {
+  if (view) stats.value = view.setLoad(mode)
+}
 function setStack(e: Event): void {
   if (view) stats.value = view.setStack(Number((e.target as HTMLInputElement).value))
 }
@@ -77,6 +82,7 @@ onMounted(() => {
     setLivery: (i) => (stats.value = view!.setLivery(i)),
     setRig: (node, v) => (stats.value = view!.setRig(node, v)),
     setStack: (tiers) => (stats.value = view!.setStack(tiers)),
+    setLoad: (mode) => (stats.value = view!.setLoad(mode)),
     stats: () => view?.stats() ?? null,
     pose: () => view?.pose() ?? null,
     async yard(count) {
@@ -144,6 +150,43 @@ onBeforeUnmount(() => {
             {{ lod }}
           </button>
         </div>
+        <label v-if="stats.kind === 'truck'">
+          {{ t('assetViewer.livery') }}
+          <select
+            :value="stats.livery"
+            @change="setLivery"
+          >
+            <option
+              v-for="(l, i) in TRUCK_META.high.liveries"
+              :key="i"
+              :value="i"
+            >
+              {{ t('assetViewer.liveryOption', { index: i, line: l.maker }) }}
+            </option>
+          </select>
+        </label>
+        <div
+          v-if="stats.load"
+          class="row"
+        >
+          <button
+            v-for="mode in LOADS"
+            :key="mode"
+            :class="{ on: stats.load.mode === mode }"
+            :data-testid="`viewer-load-${mode}`"
+            @click="setLoad(mode)"
+          >
+            {{ t(`assetViewer.load.${mode}` as MessageKey) }}
+          </button>
+        </div>
+        <dl v-if="stats.load && stats.load.boxes.length">
+          <dt>{{ t('assetViewer.loadFit') }}</dt><dd
+            class="mono"
+            data-testid="viewer-load-fit"
+          >
+            {{ t(stats.load.onPins ? 'assetViewer.loadOnPins' : 'assetViewer.loadOffPins') }}
+          </dd>
+        </dl>
         <label v-if="stats.kind === 'container'">
           {{ t('assetViewer.livery') }}
           <select
@@ -219,7 +262,7 @@ onBeforeUnmount(() => {
           </template>
         </dl>
         <p class="hint">
-          {{ t(stats.kind === 'shc' ? 'assetViewer.referenceHintShc' : stats.kind === 'asc' ? 'assetViewer.referenceHintAsc' : 'assetViewer.referenceHint') }}
+          {{ t(stats.kind === 'shc' ? 'assetViewer.referenceHintShc' : stats.kind === 'asc' ? 'assetViewer.referenceHintAsc' : stats.load ? 'assetViewer.referenceHintTruck' : 'assetViewer.referenceHint') }}
         </p>
       </template>
       <dl v-if="yardStats">

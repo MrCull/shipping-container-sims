@@ -152,7 +152,20 @@ export interface TruckPose {
   travelling: boolean
   /** In the scene: it has arrived at the gate and has not left yet. */
   visible: boolean
+  /** Tractor yaw against the chassis (rad, positive = the cab swings the way the front wheels steer): follows the steering through a turn. */
+  articulationRad: number
+  /**
+   * Where the model sits along its heading (m, truck frame): -3.0675 for a 20 ft box, so that box (drawn at the pose
+   * origin) rests on the front twist-locks; 0 for a 40 ft box or no known load (the 40 ft centre is the model origin).
+   */
+  loadOffsetM: number
 }
+
+/** ISO 1161: a single 20 ft box on the front pins of a 40 ft chassis sits 3.0675 m ahead of the 40 ft centre (matches the truck sidecar's `load_20_front`). */
+export const TRUCK_BOX20_OFFSET_M = 3.0675
+/** [A] Tractor swing per steering radian, and the limit (the truck sidecar's `fifth_wheel` travel). */
+const ARTICULATION_GAIN = 1.15
+export const MAX_ARTICULATION_RAD = (40 * Math.PI) / 180
 
 /** A container's centre and its yaw (0 = length along X, π/2 = along Z). */
 export interface ContainerPose extends Vec3 {
@@ -189,6 +202,8 @@ export class SceneModel {
   readonly landside: LandsideGraph | null
   /** Trucks the scene knows (arrived and not pruned after leaving), in arrival order. */
   readonly truckIds: string[] = []
+  /** Size of the box each truck brings or collects (its first leg), as the worker reported it. */
+  private truckLoad: Record<string, ContainerSize> = {}
   private readonly vessels: Record<string, VesselConfig>
   private readonly blocks: Record<string, BlockSpec>
   private readonly specs: Record<string, VesselClassSpec>
@@ -328,7 +343,10 @@ export class SceneModel {
     for (const c of delta.custody) {
       this.custody[c.containerId]?.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
     }
-    for (const e of delta.entities) this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX })
+    for (const e of delta.entities) {
+      this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX })
+      if (e.kind === 'truck' && e.loadSize) this.truckLoad[e.id] = e.loadSize
+    }
     for (const r of delta.reservations ?? []) (this.reservations[r.zone] ??= []).push(r)
   }
 
@@ -391,6 +409,7 @@ export class SceneModel {
       const last = list[list.length - 1]
       if (!last || last.status !== 'gone' || last.t >= time) continue
       this.truckIds.splice(this.truckIds.indexOf(id), 1)
+      delete this.truckLoad[id]
       delete this.axisSegments[id]
       delete this.drives[id]
       delete this.status[`truck:${id}`]
@@ -412,7 +431,9 @@ export class SceneModel {
     const visible = i >= 0 && list[i].status !== 'gone'
     const drive = this.driveState(id, time)
     const resting = this.drives[id]?.length ? drive : { ...drive, yaw: Math.PI / 2 }
-    return { x: value('x', gate?.queueX ?? 0), z: value('z', gate?.spawnZ ?? 0), ...resting, visible }
+    const articulationRad = Math.max(-MAX_ARTICULATION_RAD, Math.min(MAX_ARTICULATION_RAD, resting.steerRad * ARTICULATION_GAIN))
+    const loadOffsetM = this.truckLoad[id] === '20' ? -TRUCK_BOX20_OFFSET_M : 0
+    return { x: value('x', gate?.queueX ?? 0), z: value('z', gate?.spawnZ ?? 0), ...resting, visible, articulationRad, loadOffsetM }
   }
 
   shcPose(shcId: string, time: number): ShcPose {
@@ -541,7 +562,7 @@ export class SceneModel {
     if (kind === 'external') return null
     if (kind === 'truck') {
       const p = this.truckPose(id, time)
-      return p.visible ? { x: p.x, y: TRUCK_DECK_M + dims.height / 2, z: p.z, yaw: p.yaw } : null
+      return p.visible ? { x: p.x, y: TRUCK_DECK_M + dims.height / 2, z: p.z, yaw: p.yaw + Math.PI } : null // doors at the rear, away from the cab
     }
     if (kind === 'wtpPad') {
       const pad = this.graph.pads.find((p) => p.id === id)

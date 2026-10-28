@@ -5,11 +5,14 @@
  *   __ttAssets.list()                                   // asset names (GLB basenames)
  *   await __ttAssets.show('container-40', { lod: 'LOD0', livery: 2 })
  *   __ttAssets.setLod('LOD1' | 'auto'); __ttAssets.setLivery(4); __ttAssets.setRig('door_left', 180)
+ *   __ttAssets.setLoad('40' | '20front' | '20rear' | '20twin' | 'none')  // trucks: reference boxes on the chassis; stats().load reports the pin fit
  *   __ttAssets.setStack(5)                              // ASC: reference stack height in tiers; stats().stack reports the fit
  *   __ttAssets.pose()                                   // world positions of the rig nodes + the reference container
  *   await __ttAssets.yard(18000)                        // instanced TTI-size yard: LOD split, draw calls, triangles, fps
  */
 export type ViewerLod = 'LOD0' | 'LOD1' | 'LOD2' | 'auto'
+/** Truck / chassis viewers: the reference boxes on the chassis (`20front`/`20rear` = a single 20 ft box on those pins, `20twin` = two end to end). */
+export type ViewerLoad = 'none' | '40' | '40HC' | '20front' | '20rear' | '20twin'
 
 export interface RigControl {
   node: string
@@ -47,6 +50,17 @@ export interface AssetViewStats {
     clearWidthM: number
     clearHeightM: number
     fitsTunnel: boolean
+  } | null
+  /** Truck and chassis assets: reference boxes on the chassis against the sidecar's twist-lock pins; null for other assets. */
+  load: {
+    mode: ViewerLoad
+    boxes: { size: string; centre: Vec3Tuple; bottomY: number }[]
+    /** Casting centres of the boxes (ISO 1161). */
+    castings: number
+    /** Largest distance from a casting centre to the nearest chassis pin. */
+    maxPinErrorM: number
+    /** Every casting centre is on a pin and every box bottom is on the deck. */
+    onPins: boolean
   } | null
   /** ASC assets: 8 rows of 40 ft high-cube reference boxes under the span; null for other assets. */
   stack: {
@@ -106,6 +120,8 @@ export interface AssetViewerApi {
   setLivery(index: number): AssetViewStats
   setRig(node: string, value: number): AssetViewStats
   setStack(tiers: number): AssetViewStats
+  /** Trucks and chassis: puts reference boxes on the chassis twist-locks. */
+  setLoad(mode: ViewerLoad): AssetViewStats
   stats(): AssetViewStats | null
   pose(): AssetPose | null
   yard(count?: number): Promise<YardStats>

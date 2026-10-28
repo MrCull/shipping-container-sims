@@ -1,21 +1,25 @@
 /**
  * Landside scene (TT-13): the truck roads, the gate complex (lanes, kiosks, canopy, barriers, the unused
- * out-of-gauge lane), the transfer stalls and the trucks. Procedural low-poly; the phase 2 truck and gate
- * models (TT-26, TT-28) replace it. A truck is a handful of merged meshes (skeletal chassis, tractor, cab, glass,
- * wheels, steering wheels) so a hundred trucks stay cheap. The box on the chassis is drawn by the ContainerInstancer.
- * Nothing here is reactive.
+ * out-of-gauge lane), the transfer stalls and the trucks. Procedural low-poly; the phase 2 gate model (TT-28)
+ * replaces the gate. Trucks use the phase 2 GLBs (TT-26: `truckAssets.ts`, LOD switching, articulation) once they have
+ * loaded; until then (and if loading fails) a truck is a handful of merged procedural meshes (skeletal chassis, tractor,
+ * cab, glass, wheels). The box on the chassis is drawn by the ContainerInstancer. Nothing here is reactive.
  */
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { STALL_LENGTH_M, TRUCK_DECK_M } from '../engine'
 import { TRUCK } from './equipmentDims'
 import type { SceneModel } from './sceneModel'
+import { TruckRig, type TruckModels, type TruckRigState } from './truckAssets'
 
 export interface LandsideStats {
   /** Trucks drawn at the last update. */
   trucks: number
   /** Trucks standing in the gate queue (status queued). */
   queued: number
+  /** Trucks drawn from the GLB models per LOD (zero until they load). */
+  lods: { lod0: number; lod1: number; lod2: number }
+  assets: 'placeholder' | 'loaded'
 }
 
 /** [A] Cab colours (haulier fleets). */
@@ -23,7 +27,9 @@ const CAB_COLOURS = ['#c0392b', '#2471a3', '#f4f4f4', '#d4ac0d', '#1e8449', '#5d
 
 interface TruckMeshes {
   group: THREE.Group
-  front: THREE.Mesh
+  front?: THREE.Mesh
+  /** Set when the GLB model draws this truck (the procedural group is then unused). */
+  rig?: TruckRig
 }
 
 export class LandsideScene {
@@ -39,7 +45,8 @@ export class LandsideScene {
   private darkMat: THREE.MeshStandardMaterial
   private glassMat: THREE.MeshStandardMaterial
   private wheelMat: THREE.MeshStandardMaterial
-  private current: LandsideStats = { trucks: 0, queued: 0 }
+  private current: LandsideStats = { trucks: 0, queued: 0, lods: { lod0: 0, lod1: 0, lod2: 0 }, assets: 'placeholder' }
+  private models: TruckModels | null = null
 
   constructor(private model: SceneModel) {
     this.group.name = 'landside'
@@ -95,7 +102,19 @@ export class LandsideScene {
 
   private static readonly FRONT_AXLE_X = 9.6
 
+  /** The GLB models have loaded: trucks are drawn from them from the next update on. */
+  setTruckModels(models: TruckModels): void {
+    this.models = models
+    for (const meshes of this.trucks.values()) this.group.remove(meshes.group)
+    this.trucks.clear() // rebuilt on the next update
+  }
+
   private makeTruck(id: string): TruckMeshes {
+    if (this.models) {
+      const rig = new TruckRig(this.models, id)
+      this.group.add(rig.root)
+      return { group: rig.root, rig }
+    }
     const group = new THREE.Group()
     group.name = id
     const n = Number(id.slice(1)) || 0
@@ -192,10 +211,11 @@ export class LandsideScene {
     slab(14.2, 1, 0.1, westX - 14, 2.6, kioskZ + 1.95, glass)
   }
 
-  update(t: number): void {
+  update(t: number, cameraPosition: THREE.Vector3): void {
     const model = this.model
     let drawn = 0
     let queued = 0
+    const lods = { lod0: 0, lod1: 0, lod2: 0 }
     const seen = new Set<string>()
     for (const id of model.truckIds) {
       const pose = model.truckPose(id, t)
@@ -209,16 +229,29 @@ export class LandsideScene {
       if (!pose.visible) continue
       drawn++
       if (model.statusAt('truck', id, t) === 'queued') queued++
+      if (meshes.rig) {
+        meshes.rig.pose(pose)
+        const lod = meshes.rig.chooseLod(Math.hypot(pose.x - cameraPosition.x, cameraPosition.y, pose.z - cameraPosition.z))
+        lods[`lod${lod}` as keyof typeof lods]++
+        continue
+      }
       meshes.group.position.set(pose.x, 0, pose.z)
       meshes.group.rotation.y = pose.yaw
-      meshes.front.rotation.y = -pose.steerRad
+      if (meshes.front) meshes.front.rotation.y = pose.steerRad
     }
     for (const [id, meshes] of this.trucks)
       if (!seen.has(id)) {
         this.group.remove(meshes.group)
         this.trucks.delete(id)
       }
-    this.current = { trucks: drawn, queued }
+    this.current = { trucks: drawn, queued, lods, assets: this.models ? 'loaded' : 'placeholder' }
+  }
+
+  /** Rig state per truck drawn from the GLB models at the last update (empty until they have loaded). */
+  rigStates(): Record<string, TruckRigState> {
+    const out: Record<string, TruckRigState> = {}
+    for (const [id, m] of this.trucks) if (m.rig && m.group.visible) out[id] = { ...m.rig.rigState }
+    return out
   }
 
   stats(): LandsideStats {
