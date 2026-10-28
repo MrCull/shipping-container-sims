@@ -11,18 +11,18 @@ const slot = (id: string, bay: number, row: number, tier: number, span: 1 | 2 = 
 
 describe('yard index (TT-19)', () => {
   it('answers "what stands above" like the full scan did, and follows adds and removals', () => {
-    const slots = { a: slot('a', 1, 1, 1), b: slot('b', 1, 1, 2), c: slot('c', 2, 1, 1, 2), d: slot('d', 1, 1, 3) }
+    const slots: Record<string, YardSlotState> = { a: slot('a', 1, 1, 1), b: slot('b', 1, 1, 2), c: slot('c', 2, 1, 1, 2), d: slot('d', 1, 1, 3) }
     const state = { yardSlots: slots } as unknown as Parameters<typeof boxesAbove>[0]
     expect(boxesAbove(state, slots.a).map((s) => s.id)).toEqual(['d', 'b'])
     // a 40 ft box on bays 2-3 and a 20 ft box on bay 1: nothing is above the 40 ft box
     expect(boxesAbove(state, slots.c)).toEqual([])
     const e = slot('e', 2, 1, 2, 2)
-    slots.e = e as never
+    slots.e = e
     indexYardSlotAdded(state, e)
     expect(boxesAbove(state, slots.c).map((s) => s.id)).toEqual(['e'])
     expect(blockersOf(state, slots.a).map((s) => s.id)).toEqual(['d', 'b'])
     const removed = slots.b
-    delete (slots as Record<string, unknown>).b
+    delete slots.b
     indexYardSlotRemoved(state, removed)
     expect(boxesAbove(state, slots.a).map((s) => s.id)).toEqual(['d'])
     expect(yardIndexOf(state).byBlock.get('B01')?.length).toBe(4) // a, c, d, e

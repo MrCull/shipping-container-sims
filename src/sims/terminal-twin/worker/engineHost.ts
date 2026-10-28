@@ -5,18 +5,21 @@
  */
 import { firstBreakpointHit, type Breakpoint } from '../modules/breakpoints'
 import { blockFillPct } from '../modules/dashboardModel'
-import { buildTimeline, createSimulation, exportRun, headlineKpis, highlightsOf, summarizeRun, suggestedInvariantEvery, type EngineEvent, type Simulation } from '../engine'
+import { buildTimeline, createSimulation, hashDigest, exportRun, headlineKpis, highlightsOf, summarizeRun, suggestedInvariantEvery, type EngineEvent, type Simulation } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import { HALF_OFFSET_M } from '../scenario/vesselClasses'
 import {
   EVENT_SUMMARY_CAP,
   summarizeEvent,
+  DEFAULT_CHECKPOINT_S,
+  type Checkpoint,
   type CustodyChange,
   type DashboardData,
   type Delta,
   type EngineInfo,
   type MotionPlan,
   type QueryKind,
+  type ReplayResult,
   type WorkerReply,
   type WorkerRequestMessage,
 } from './protocol'
@@ -59,6 +62,9 @@ function compactMotion(plans: MotionPlan[]): MotionPlan[] {
   })
 }
 
+/** Reply info before any scenario is loaded (only settings requests are served then). */
+const NO_INFO: EngineInfo = { now: 0, status: 'ready', endT: null, endReason: null, eventsTotal: 0, movesCompleted: 0, vesselsCompleted: 0, eventLogHash: '', firstError: null }
+
 export function createEngineHost() {
   let sim: Simulation | null = null
   let loaded: { config: ScenarioConfig; seed: number } | null = null
@@ -69,6 +75,10 @@ export function createEngineHost() {
   /** Containers created during the run that the scene has been told about. */
   const announced = new Set<string>()
   let breakpoints: Breakpoint[] = []
+  /** Rewind points of the current timeline (TT-17). */
+  let checkpoints: Checkpoint[] = []
+  let checkpointS = DEFAULT_CHECKPOINT_S
+  let prevHash = ''
 
   /** Stop predicate of every run: records the first breakpoint an event hits (the run stops after it). */
   function stopAtBreakpoint(ev: EngineEvent): boolean {
@@ -80,6 +90,11 @@ export function createEngineHost() {
 
   function observe(ev: EngineEvent): void {
     if (!sim) return
+    // rewind points: every boundary this event passes, with the log as it stood before it
+    while (ev.t >= (checkpoints.length + 1) * checkpointS) {
+      checkpoints.push({ t: (checkpoints.length + 1) * checkpointS, events: sim.eventLog().length - 1, hash: prevHash })
+    }
+    prevHash = sim.eventLogHash()
     delta.events.push(summarizeEvent(ev))
     if (delta.events.length > EVENT_SUMMARY_CAP * 2) delta.events.splice(0, delta.events.length - EVENT_SUMMARY_CAP)
     delta.eventCounts[ev.type] = (delta.eventCounts[ev.type] ?? 0) + 1
@@ -180,24 +195,47 @@ export function createEngineHost() {
   function start(config: ScenarioConfig, seed: number): void {
     sim = createSimulation(config, {}, { seed, invariants: { every: suggestedInvariantEvery(config) } })
     loaded = { config, seed }
+    announced.clear()
+    checkpoints = []
+    seedRefs(sim, config)
+    sim.subscribe(observe)
+  }
+
+  /** Remember the current state of every entity, so only later changes go into deltas. */
+  function seedRefs(s: Simulation, config: ScenarioConfig): void {
     motionRefs = new Map()
     statusRefs = new Map()
-    announced.clear()
-    for (const s of config.sts) {
-      motionRefs.set(s.id, sim.query.sts(s.id).motion)
-      statusRefs.set(`sts:${s.id}`, sim.query.sts(s.id).status)
+    for (const x of config.sts) {
+      motionRefs.set(x.id, s.query.sts(x.id).motion)
+      statusRefs.set(`sts:${x.id}`, s.query.sts(x.id).status)
     }
-    for (const v of config.vessels) statusRefs.set(`vessel:${v.id}`, sim.query.vessel(v.id).status)
+    for (const v of config.vessels) statusRefs.set(`vessel:${v.id}`, s.query.vessel(v.id).status)
     for (const c of config.shcs ?? []) {
-      motionRefs.set(c.id, sim.query.shc(c.id).motion)
-      statusRefs.set(`shc:${c.id}`, sim.query.shc(c.id).status)
+      motionRefs.set(c.id, s.query.shc(c.id).motion)
+      statusRefs.set(`shc:${c.id}`, s.query.shc(c.id).status)
     }
-    for (const asc of sim.query.ascs()) {
+    for (const asc of s.query.ascs()) {
       motionRefs.set(asc.id, asc.motion)
       statusRefs.set(`asc:${asc.id}`, asc.status)
     }
     lastReservationId = -1
-    sim.subscribe(observe)
+    prevHash = s.eventLogHash()
+  }
+
+  /** Compact the delta of a flat-out run (latest state per entity only). */
+  function compactDelta(): void {
+    delta.motion = compactMotion(delta.motion)
+    delta.custody = latestBy(delta.custody, (c) => c.containerId)
+    delta.entities = latestBy(delta.entities, (e) => `${e.kind}:${e.id}`)
+    delta.reservations = delta.reservations.filter((r) => r.to > requireSim().now)
+  }
+
+  /** Start the scenario and replay `events` events (no breakpoints); the delta holds everything the scene needs. */
+  async function replay(config: ScenarioConfig, seed: number, events: number): Promise<Simulation> {
+    start(config, seed)
+    const s = requireSim()
+    if (events > 0) await s.runUntilAsync({ maxEvents: events })
+    return s
   }
 
   function requireSim(): Simulation {
@@ -237,10 +275,7 @@ export function createEngineHost() {
         return requireSim().runUntilAsync({ time: req.to, predicate: stopAtBreakpoint })
       case 'run': {
         const result = await requireSim().runUntilAsync({ ...req.condition, predicate: stopAtBreakpoint })
-        delta.motion = compactMotion(delta.motion)
-        delta.custody = latestBy(delta.custody, (c) => c.containerId)
-        delta.entities = latestBy(delta.entities, (e) => `${e.kind}:${e.id}`)
-        delta.reservations = delta.reservations.filter((r) => r.to > requireSim().now)
+        compactDelta()
         return result
       }
       case 'step': {
@@ -258,6 +293,26 @@ export function createEngineHost() {
       }
       case 'snapshot':
         return requireSim().snapshot()
+      case 'setCheckpointInterval':
+        if (!(req.seconds > 0)) throw new Error('Rewind interval must be positive')
+        checkpointS = req.seconds
+        return null
+      case 'rewind': {
+        if (!loaded) throw new Error('No scenario loaded')
+        const s = await replay(loaded.config, loaded.seed, req.events)
+        compactDelta()
+        return { hashMatched: s.eventLogHash() === req.hash } satisfies ReplayResult
+      }
+      case 'restore': {
+        const snap = req.snapshot
+        const s = await replay(snap.config, snap.seed, snap.log.length)
+        const hashMatched = s.eventLogHash() === hashDigest(snap.state.logHash)
+        // the replay taught the scene the history; the snapshot's exact state (now, queue, injected events) wins
+        s.restore(snap)
+        seedRefs(s, snap.config)
+        compactDelta()
+        return { hashMatched } satisfies ReplayResult
+      }
       case 'why':
         return requireSim().why(req.eventId)
       case 'export':
@@ -336,6 +391,8 @@ export function createEngineHost() {
         return s.invariantReport()
       case 'eventLog':
         return s.eventLog().map(summarizeEvent)
+      case 'checkpoints':
+        return checkpoints
     }
   }
 
@@ -345,6 +402,7 @@ export function createEngineHost() {
       delta = emptyDelta()
       try {
         const result = await serve(req)
+        if (!sim) return { rid: req.rid, ok: true, result, delta, info: NO_INFO }
         const s = requireSim()
         if (delta.events.length > EVENT_SUMMARY_CAP) delta.events = delta.events.slice(-EVENT_SUMMARY_CAP)
         return { rid: req.rid, ok: true, result, delta, info: info(s) }

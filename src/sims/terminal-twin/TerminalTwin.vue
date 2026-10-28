@@ -8,6 +8,7 @@ import OverlayToggles from './components/OverlayToggles.vue'
 import PerfPanel from './components/PerfPanel.vue'
 import TopBar from './components/TopBar.vue'
 import SetupDialog from './components/modals/SetupDialog.vue'
+import SavesDialog from './components/modals/SavesDialog.vue'
 import ShortcutHelp from './components/modals/ShortcutHelp.vue'
 import { useTwinScene } from './composables/useTwinScene'
 import { useTwinShortcuts } from './composables/useTwinShortcuts'
@@ -103,6 +104,7 @@ onBeforeUnmount(() => {
       <DashboardTab v-if="store.dashboardOpen && store.hasScenario" />
     </div>
     <ShortcutHelp v-if="store.helpOpen && store.phase === 'running'" />
+    <SavesDialog v-if="store.savesOpen && store.phase === 'running'" />
     <SetupDialog v-if="store.phase === 'setup'" />
   </div>
 </template>
