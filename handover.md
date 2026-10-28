@@ -21,14 +21,14 @@ Another session may have pushed while you were stopped. Two sessions once built 
 
 ## Ticket status
 
-Updated 2026-10-28. Merged: #25–#45. Remaining: #46–#52, then the code-review pass. Open tickets are not yet commented or closed on GitHub; resolve them (comment, then close) when PR #54 is marked ready.
+Updated 2026-10-28. Merged: #25–#47. Remaining: #48–#52, then the code-review pass. Open tickets are not yet commented or closed on GitHub; resolve them (comment, then close) when PR #54 is marked ready.
 
 | Ticket | Issue | State | Claimed by |
 |---|---|---|---|
 | TT-13 landside | #45 | MERGED | |
-| TT-14 yard start modes | #46 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
+| TT-14 yard start modes | #46 | MERGED | |
 | TT-26 truck/chassis models | #47 | MERGED | |
-| TT-15 presets/layout | #48 | blocked by 46 | |
+| TT-15 presets/layout | #48 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
 | TT-17 persistence | #49 | blocked by 48 | |
 | TT-19 performance | #50 | blocked by 48 | |
 | TT-21 atmosphere/polish | #51 | blocked by 48 | |
