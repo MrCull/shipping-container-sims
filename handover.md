@@ -18,7 +18,7 @@ Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration br
 | Ticket | Issue | State |
 |---|---|---|
 | TT-23 STS model | #36 | WIP, uncommitted files in worktree; branch `tt/36-sts-model` still at 95e15d6. Not yet resumed |
-| TT-27 vessel hulls | #37 | WIP, uncommitted files in worktree; branch `tt/37-vessel-hulls` still at 95e15d6. Not yet resumed |
+| TT-27 vessel hulls | #37 | MERGED (tt/37-vessel-hulls-v2) |
 | TT-10 export load flow | #40 | started (implementer on `tt/40-export-load-flow`) |
 | #42–#52 | | not started (#42 is unblocked) |
 
