@@ -15,18 +15,18 @@ import { createEventLogger, type LogOptions } from './logging'
 import { createQuery, type SimQuery } from './query'
 import { nextRandom } from './rng'
 import { createInitialState, resolveSubsystemModes, type CustodyRef, type SimState } from './state'
-import { ascStubReactors } from './subsystems/ascStub'
+import { ascReactors } from './subsystems/asc'
 import { berthReactors } from './subsystems/berth'
 import { quayReactors } from './subsystems/quay'
 import { shcReactors } from './subsystems/shc'
 import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.3.0'
+export const ENGINE_VERSION = '0.4.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
-const REACTORS: ReactorMap[] = [berthReactors, quayReactors, shcReactors, ascStubReactors]
+const REACTORS: ReactorMap[] = [berthReactors, quayReactors, shcReactors, ascReactors]
 
 export interface SimulationOptions {
   /** Overrides `config.seed`. */
@@ -42,7 +42,7 @@ export interface SimulationOptions {
   /**
    * Subsystem modes (override `config.subsystems`): real, instant (same
    * events, no durations) or off. SHC defaults to real when SHCs and blocks
-   * exist; ASC defaults to instant (real ASC: TT-06).
+   * exist; ASC defaults to real when blocks exist.
    */
   subsystems?: SubsystemModes
   /** Structured logging: each committed event that passes the verbosity filter is written as a `LogRecord`. */

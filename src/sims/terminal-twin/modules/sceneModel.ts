@@ -9,8 +9,17 @@
  * yard at +Z, X along the quay.
  */
 import {
+  ascIdOf,
+  blockSpecs,
+  boxSpan,
   buildLaneGraph,
+  parseYardSlotId,
   positionAt,
+  rowX,
+  slotZ,
+  tierBaseY,
+  travelHoistM,
+  type BlockSpec,
   type Axis,
   type CustodyRef,
   type LaneGraph,
@@ -33,8 +42,6 @@ export const CONTAINER_DIMS: Record<ContainerSize, { length: number; height: num
   '40': { length: 12.192, height: 2.591, width: 2.438 },
   '40HC': { length: 12.192, height: 2.896, width: 2.438 },
 }
-/** [A] Yard stub layout: 8 rows across the block, bays along Z beyond the WTP strip. */
-const YARD = { rows: 8, rowPitchM: 2.9, bayPitchM: 12.8, bays: 10, firstBayGapM: 14 }
 /** Vessel statuses in which a vessel is alongside the quay. */
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
 /** [A] Anchorage: offshore, beyond the quay end. */
@@ -78,6 +85,13 @@ export interface VesselPlacement {
 
 const AXES: Axis[] = ['gantry', 'trolley', 'hoist', 'x', 'z', 'lift']
 
+/** Where an ASC's spreader is: gantry along Z, trolley along X, hoist = box bottom height. */
+export interface AscPose {
+  x: number
+  z: number
+  hoistY: number
+}
+
 export interface ShcPose {
   x: number
   z: number
@@ -117,11 +131,12 @@ export class SceneModel {
   readonly containerLine: Record<string, string>
   readonly graph: LaneGraph
   private readonly vessels: Record<string, VesselConfig>
-  private readonly blocks: Record<string, { x: number }>
+  private readonly blocks: Record<string, BlockSpec>
   private readonly specs: Record<string, VesselClassSpec>
   private readonly anchorageSlot: Record<string, number>
   private readonly initialPose: Record<string, StsPose>
   private readonly initialShc: Record<string, { x: number; z: number }>
+  private readonly initialAsc: Record<string, AscPose> = {}
   private reservations: Record<string, Reservation[]> = {}
   private axisSegments: Record<string, Record<Axis, MotionSegment[]>> = {}
   private custody: Record<string, CustodyEntry[]> = {}
@@ -146,7 +161,13 @@ export class SceneModel {
     )
     for (const s of config.sts) this.axisSegments[s.id] = emptyAxes()
     this.graph = buildLaneGraph(config)
-    this.blocks = Object.fromEntries((config.yard?.blocks ?? []).map((b) => [b.id, { x: b.x }]))
+    this.blocks = Object.fromEntries(blockSpecs(config).map((b) => [b.id, b]))
+    for (const b of Object.values(this.blocks)) {
+      const id = ascIdOf(b.id)
+      this.axisSegments[id] = emptyAxes()
+      this.initialAsc[id] = { x: b.x, z: b.wtpZ, hoistY: travelHoistM(b) }
+      this.status[`asc:${id}`] = [{ t: 0, status: 'idle' }]
+    }
     this.initialShc = {}
     for (const shc of config.shcs ?? []) {
       this.axisSegments[shc.id] = emptyAxes()
@@ -165,6 +186,20 @@ export class SceneModel {
 
   get shcIds(): string[] {
     return (this.config.shcs ?? []).map((s) => s.id)
+  }
+
+  /** One ASC per yard block (present in the scene whenever blocks exist; idle if the ASC subsystem is off). */
+  get ascIds(): string[] {
+    return Object.keys(this.initialAsc)
+  }
+
+  /** The block an ASC works. */
+  blockOfAsc(ascId: string): BlockSpec {
+    return this.blocks[ascId.replace(/-ASC\d+$/, '')]
+  }
+
+  get blockList(): BlockSpec[] {
+    return Object.values(this.blocks)
   }
 
   get vesselIds(): string[] {
@@ -242,6 +277,18 @@ export class SceneModel {
     }
   }
 
+  ascPose(ascId: string, time: number): AscPose {
+    const axes = this.axisSegments[ascId]
+    const start = this.initialAsc[ascId] ?? { x: 0, z: 0, hoistY: 0 }
+    const value = (axis: Axis, initial: number) => {
+      const list = axes?.[axis] ?? []
+      if (list.length === 0) return initial
+      const i = lastAtOrBefore(list, time, (s) => s.t0)
+      return i < 0 ? list[0].from : positionAt(list[i], time)
+    }
+    return { x: value('trolley', start.x), z: value('gantry', start.z), hoistY: value('hoist', start.hoistY) }
+  }
+
   stsPose(stsId: string, time: number): StsPose {
     const axes = this.axisSegments[stsId]
     const pose = { ...this.initialPose[stsId] }
@@ -259,7 +306,7 @@ export class SceneModel {
     }
   }
 
-  statusAt(kind: 'sts' | 'vessel' | 'shc', id: string, time: number): string {
+  statusAt(kind: 'sts' | 'vessel' | 'shc' | 'asc', id: string, time: number): string {
     const list = this.status[`${kind}:${id}`] ?? []
     const i = lastAtOrBefore(list, time, (e) => e.t)
     return i < 0 ? 'unknown' : list[i].status
@@ -312,19 +359,19 @@ export class SceneModel {
       const pad = this.graph.pads.find((p) => p.id === id)
       return pad ? { x: pad.x, y: dims.height / 2, z: pad.z, yaw: alongZ } : null
     }
-    if (kind === 'asc' || kind === 'yardSlot') {
-      const blockId = kind === 'asc' ? id.replace(/-ASC\d+$/, '') : id.split(':')[0]
-      const block = this.blocks[blockId]
+    if (kind === 'asc') {
+      const p = this.ascPose(id, time)
+      return { x: p.x, y: p.hoistY + dims.height / 2, z: p.z, yaw: alongZ }
+    }
+    if (kind === 'yardSlot') {
+      const cell = parseYardSlotId(id)
+      const block = this.blocks[cell.blockId]
       if (!block) return null
-      const n = kind === 'yardSlot' ? Number(id.split(':I')[1] ?? 1) - 1 : 0
-      const row = n % YARD.rows
-      const bay = Math.floor(n / YARD.rows) % YARD.bays
-      const tier = Math.floor(n / (YARD.rows * YARD.bays))
-      const lift = kind === 'asc' ? 6 : 0
+      const span = boxSpan(this.containerSize[containerId])
       return {
-        x: block.x + (row - (YARD.rows - 1) / 2) * YARD.rowPitchM,
-        y: lift + tier * dims.height + dims.height / 2,
-        z: this.graph.layout.wtpZ + YARD.firstBayGapM + bay * YARD.bayPitchM,
+        x: rowX(block, cell.row),
+        y: tierBaseY(cell.tier) + dims.height / 2,
+        z: slotZ(block, cell.bay, span),
         yaw: alongZ,
       }
     }
@@ -356,6 +403,10 @@ export class SceneModel {
     if (this.initialShc[id]) {
       const p = this.shcPose(id, time)
       return { x: p.x, y: 3, z: p.z }
+    }
+    if (this.initialAsc[id]) {
+      const p = this.ascPose(id, time)
+      return { x: p.x, y: 6, z: p.z }
     }
     if (this.axisSegments[id]) {
       const p = this.stsPose(id, time)

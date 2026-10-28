@@ -3,16 +3,17 @@
  * container, STS, SHC or vessel, from the engine's query results. Pure TS; the
  * component formats values with the display formatter and the catalogue.
  */
-import type { ContainerState, ShcJob, ShcState, StsState, VesselState } from '../engine'
+import type { AscState, ContainerState, ShcJob, ShcState, StsState, VesselState } from '../engine'
 import type { MessageKey } from '../i18n/messages'
 import type { EventSummary, QueryKind } from '../worker/protocol'
 import type { SceneModel } from './sceneModel'
 
-export type EntityKind = 'container' | 'sts' | 'shc' | 'vessel'
+export type EntityKind = 'container' | 'sts' | 'shc' | 'asc' | 'vessel'
 
 export function entityKind(model: SceneModel, id: string): EntityKind | null {
   if (model.containerSize[id]) return 'container'
   if (model.shcIds.includes(id)) return 'shc'
+  if (model.ascIds.includes(id)) return 'asc'
   if (model.stsIds.includes(id)) return 'sts'
   if (model.vesselIds.includes(id)) return 'vessel'
   return null
@@ -95,6 +96,27 @@ function shcView(shc: Readonly<ShcState>, job?: Readonly<ShcJob>): EntityView {
   }
 }
 
+function ascView(asc: Readonly<AscState>): EntityView {
+  return {
+    kind: 'asc',
+    id: asc.id,
+    facts: [
+      { label: 'inspector.fact.status', value: asc.status },
+      { label: 'inspector.fact.block', value: asc.blockId },
+      { label: 'inspector.fact.stacked', value: asc.stacked },
+      { label: 'inspector.fact.carrying', value: asc.carrying, link: asc.carrying !== null },
+    ],
+    job:
+      asc.jobId !== null
+        ? [
+            { label: 'inspector.fact.job', value: asc.jobId },
+            { label: 'inspector.fact.container', value: asc.carrying, link: asc.carrying !== null },
+          ]
+        : null,
+    custody: [],
+  }
+}
+
 function stsView(sts: Readonly<StsState>): EntityView {
   const working = sts.carrying.length > 0 || sts.workQueue.length > 0
   return {
@@ -143,6 +165,8 @@ export function describeEntity(kind: EntityKind, state: unknown, extras: EntityE
       return shcView(state as ShcState, extras.job)
     case 'sts':
       return stsView(state as StsState)
+    case 'asc':
+      return ascView(state as AscState)
     case 'vessel':
       return vesselView(state as VesselState)
   }

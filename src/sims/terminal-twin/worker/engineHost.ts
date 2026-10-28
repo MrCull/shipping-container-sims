@@ -117,6 +117,17 @@ export function createEngineHost() {
         delta.entities.push({ kind: 'shc', id: c.id, t: ev.t, status: shc.status })
       }
     }
+    for (const asc of sim.query.ascs()) {
+      if (motionRefs.get(asc.id) !== asc.motion) {
+        motionRefs.set(asc.id, asc.motion)
+        if (asc.motion.length > 0) delta.motion.push({ entityId: asc.id, segments: asc.motion.map((m) => ({ ...m })) })
+      }
+      const key = `asc:${asc.id}`
+      if (statusRefs.get(key) !== asc.status) {
+        statusRefs.set(key, asc.status)
+        delta.entities.push({ kind: 'asc', id: asc.id, t: ev.t, status: asc.status })
+      }
+    }
     for (const r of sim.query.reservations()) {
       if (r.id <= lastReservationId) continue
       lastReservationId = r.id
@@ -145,6 +156,10 @@ export function createEngineHost() {
     for (const c of config.shcs ?? []) {
       motionRefs.set(c.id, sim.query.shc(c.id).motion)
       statusRefs.set(`shc:${c.id}`, sim.query.shc(c.id).status)
+    }
+    for (const asc of sim.query.ascs()) {
+      motionRefs.set(asc.id, asc.motion)
+      statusRefs.set(`asc:${asc.id}`, asc.status)
     }
     lastReservationId = -1
     sim.subscribe(observe)
@@ -245,6 +260,14 @@ export function createEngineHost() {
         return s.query.shcJobs()
       case 'wtpPad':
         return s.query.wtpPad(need())
+      case 'asc':
+        return s.query.asc(need())
+      case 'ascList':
+        return s.query.ascs()
+      case 'yardBlocks':
+        return s.query.yardBlocks()
+      case 'yardSlots':
+        return s.query.yardSlots(id)
       case 'reservations':
         return s.query.reservations()
       case 'kpis':

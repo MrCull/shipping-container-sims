@@ -18,6 +18,15 @@ export interface ShcPhasePayload {
   segments: MotionSegment[]
 }
 
+/** Common payload of the ASC job phase events. `segments` = the motion that led up to the event. */
+export interface AscPhasePayload {
+  ascId: string
+  blockId: string
+  jobId: string
+  containerId: string
+  segments: MotionSegment[]
+}
+
 /** Ids of the domain objects an event involves (for filtering and `why`). */
 export interface EventSubjects {
   containers?: string[]
@@ -145,10 +154,39 @@ export interface EventPayloads {
   /** An idle SHC heads for its parking spot. */
   ShcRoutingToParking: { shcId: string; departAt: number; reservations: Reservation[] }
   ShcParked: { shcId: string; nodeId: string; segments: MotionSegment[] }
-  /** ASC took the box off the WTP pad: custody WTP pad → ASC (the instant stub raises it at the drop time). */
-  AscPicked: { ascId: string; blockId: string; containerId: string; wtpPadId: string }
-  /** ASC set the box down in the stack: custody ASC → yard slot. */
-  AscStacked: { ascId: string; blockId: string; containerId: string; yardSlotId: string }
+  /**
+   * The ASC took the oldest stackable box (allocated, SHC cleared): the whole
+   * cycle (pad, lift, slot, set down) is planned and the pad zone reserved.
+   * The ASC departs at `departAt` (later than now if the pad zone is busy).
+   */
+  AscJobAssigned: {
+    ascId: string
+    blockId: string
+    jobId: string
+    containerId: string
+    wtpPadId: string
+    yardSlotId: string
+    departAt: number
+    reservations: Reservation[]
+  }
+  /** Spreader up, gantry and trolley heading for the WTP pad. */
+  AscRoutingToPad: AscPhasePayload
+  /** Over the pad; the hoist lowers the spreader onto the box. */
+  AscPositioningAtPad: AscPhasePayload
+  /** Spreader on the box; twist-locks closing. */
+  AscLocking: AscPhasePayload
+  /** Box locked and ready to lift: custody WTP pad → ASC; the pad is free. */
+  AscPicked: AscPhasePayload & { wtpPadId: string }
+  /** Box up; gantry and trolley heading for the slot. */
+  AscRoutingToSlot: AscPhasePayload
+  /** Over the slot; the hoist lowers the box onto the stack. */
+  AscPositioningAtSlot: AscPhasePayload
+  /** Box on the stack; twist-locks opening. */
+  AscUnlocking: AscPhasePayload
+  /** Box released in its slot: custody ASC → yard slot. */
+  AscStacked: AscPhasePayload & { yardSlotId: string }
+  /** Spreader back at travel height: the ASC is available for its next box. */
+  AscReady: { ascId: string; blockId: string; segments: MotionSegment[] }
   /** The STS finished its bays of the vessel and is free again. */
   StsWorkComplete: { stsId: string; vesselId: string }
   /** All the vessel's moves are done: unmooring starts. */

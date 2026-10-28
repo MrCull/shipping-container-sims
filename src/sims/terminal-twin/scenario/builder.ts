@@ -18,6 +18,7 @@ import { DEFAULT_CARGO, LINE_OWNER_PREFIX } from './lines'
 import {
   SCENARIO_SCHEMA_VERSION,
   type ApronLayout,
+  type AscKinematics,
   type BlockConfig,
   type CargoConfig,
   type EndConditions,
@@ -30,6 +31,7 @@ import {
   type StsKinematics,
   type VesselConfig,
 } from './types'
+import { DEFAULT_WTP_PADS } from '../engine/yardLayout'
 import type { DecisionsConfig } from '../engine/decisions/types'
 import type { VesselSizeClass } from './types'
 
@@ -59,6 +61,19 @@ export const DEFAULT_SHC_KINEMATICS: ShcKinematics = {
   unlockS: 2,
 }
 
+/**
+ * [A] ASC kinematics: gantry 4 m/s along the block, trolley 1 m/s across the
+ * 25.4 m span, hoist 0.5 m/s loaded / 1.0 m/s empty.
+ */
+export const DEFAULT_ASC_KINEMATICS: AscKinematics = {
+  gantry: { vMax: 4, accel: 0.4, decel: 0.5 },
+  trolley: { vMax: 1, accel: 0.4, decel: 0.4 },
+  hoistLoaded: { vMax: 0.5, accel: 0.3, decel: 0.3 },
+  hoistEmpty: { vMax: 1, accel: 0.5, decel: 0.5 },
+  lockS: 2,
+  unlockS: 2,
+}
+
 /** SHC ids: SHC01, SHC02, … */
 export function shcId(index: number): string {
   return `SHC${String(index + 1).padStart(2, '0')}`
@@ -72,6 +87,42 @@ export function withShcFleet(config: ScenarioConfig, count: number, kinematics?:
   const next: ScenarioConfig = JSON.parse(JSON.stringify(config)) // also copies Vue reactive proxies
   next.shcs = Array.from({ length: count }, (_, i) => ({ id: shcId(i) }))
   next.kinematics.shc = JSON.parse(JSON.stringify({ ...(config.kinematics.shc ?? DEFAULT_SHC_KINEMATICS), ...kinematics }))
+  return next
+}
+
+/** Distance between neighbouring blocks' centres added by the setup dialog (m): the 25.4 m span plus a road. */
+export const BLOCK_PITCH_M = 40
+
+/** The setup dialog's yard fields: one entry per block, plus the ASC kinematics (one ASC per block). */
+export interface YardSetup {
+  blocks: { bays: number; tiers: number; wtpPads: number; transferStalls: number }[]
+  asc: AscKinematics
+}
+
+/**
+ * Replace a config's yard blocks and ASC kinematics (setup dialog). Existing
+ * blocks keep their id and position; extra blocks are added east of the last
+ * one. Returns a new config; the input is not modified.
+ */
+export function withYard(config: ScenarioConfig, setup: YardSetup): ScenarioConfig {
+  const next: ScenarioConfig = JSON.parse(JSON.stringify(config)) // also copies Vue reactive proxies
+  const old = config.yard?.blocks ?? []
+  let lastX = old[0]?.x ?? 0
+  next.yard = {
+    blocks: setup.blocks.map((b, i) => {
+      const kept = old[i]
+      lastX = kept?.x ?? lastX + BLOCK_PITCH_M
+      return {
+        id: kept?.id ?? `B${String(i + 1).padStart(2, '0')}`,
+        x: lastX,
+        wtpPads: b.wtpPads,
+        bays: b.bays,
+        tiers: b.tiers,
+        transferStalls: b.transferStalls,
+      }
+    }),
+  }
+  next.kinematics.asc = JSON.parse(JSON.stringify(setup.asc))
   return next
 }
 
@@ -202,10 +253,16 @@ export class ScenarioBuilder {
     return this
   }
 
-  /** Add a yard block (with its WTP pads). */
-  block(id: string, opts: Omit<BlockConfig, 'id'>): this {
+  /** Add a yard block: `x` across the quay; 5 WTP pads, 20 bays, 5 tiers and 5 transfer stalls unless given. */
+  block(id: string, opts: Omit<BlockConfig, 'id' | 'wtpPads'> & Partial<Pick<BlockConfig, 'wtpPads'>>): this {
     this.config.yard ??= { blocks: [] }
-    this.config.yard.blocks.push({ id, ...opts })
+    this.config.yard.blocks.push({ id, ...opts, wtpPads: opts.wtpPads ?? DEFAULT_WTP_PADS })
+    return this
+  }
+
+  /** ASC kinematics (one ASC per block). */
+  ascKinematics(k: Partial<AscKinematics>): this {
+    this.config.kinematics.asc = structuredClone({ ...(this.config.kinematics.asc ?? DEFAULT_ASC_KINEMATICS), ...k })
     return this
   }
 

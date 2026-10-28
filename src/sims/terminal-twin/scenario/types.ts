@@ -44,12 +44,35 @@ export interface ShcConfig {
   id: string
 }
 
+/** ASC (automated stacking crane) kinematics: gantry along the block (Z), trolley across the rows (X), hoist (Y). */
+export interface AscKinematics {
+  gantry: AxisProfile
+  trolley: AxisProfile
+  hoistLoaded: AxisProfile
+  hoistEmpty: AxisProfile
+  /** Spreader twist-lock lock time (s). */
+  lockS: number
+  /** Spreader twist-lock unlock time (s). */
+  unlockS: number
+}
+
+/**
+ * A yard block, perpendicular to the quay: 8 rows across X (fixed by the
+ * 25.4 m ASC span), `bays` 20 ft bays along Z, `tiers` high. WTP pads sit at
+ * the waterside end, transfer stalls (truck handover, TT-13) at the landside end.
+ */
 export interface BlockConfig {
   id: string
   /** Centre of the block along the quay (m, X axis). */
   x: number
-  /** WTP pads at the block's waterside end. */
+  /** WTP pads at the block's waterside end (builder default 5). */
   wtpPads: number
+  /** 20 ft bays along the block (default 20). */
+  bays?: number
+  /** Maximum stack height (default 5). */
+  tiers?: number
+  /** Transfer stalls at the landside end (default 5; used by TT-13). */
+  transferStalls?: number
 }
 
 export interface YardConfig {
@@ -87,7 +110,7 @@ export type SubsystemMode = 'real' | 'instant' | 'off'
 export interface SubsystemModes {
   /** SHC horizontal transport (default real when SHCs are configured). */
   shc?: SubsystemMode
-  /** ASC yard cranes (default instant; real arrives with TT-06). */
+  /** ASC yard cranes (default real when SHCs and blocks exist). */
   asc?: SubsystemMode
 }
 
@@ -180,7 +203,7 @@ export interface ScenarioConfig {
   startDateTime: string
   quay: QuayConfig
   layout: LayoutConfig
-  kinematics: { sts: StsKinematics; shc?: ShcKinematics }
+  kinematics: { sts: StsKinematics; shc?: ShcKinematics; asc?: AscKinematics }
   /** ± % random variation applied to each move's duration (0 = none). */
   moveVariationPct: number
   /** STS cranes in rail order. */
@@ -191,7 +214,7 @@ export interface ScenarioConfig {
   endConditions: EndConditions
   /** SHC fleet (TT-05). Absent or empty = no horizontal transport. */
   shcs?: ShcConfig[]
-  /** Yard blocks with their WTP pads (TT-05; TT-06 adds stacks and ASCs). */
+  /** Yard blocks: WTP pads, stacks and an ASC each (TT-05, TT-06). */
   yard?: YardConfig
   /** Waterside lane-graph geometry overrides. */
   apron?: Partial<ApronLayout>

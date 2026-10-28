@@ -87,3 +87,16 @@ describe('entityBounds', () => {
     expect(entityBounds(model, 'NOPE', 0)).toBeNull()
   })
 })
+
+describe('ASC picking', () => {
+  it('has bounds around the portal and is picked by a ray through its girder', () => {
+    const ascConfig = fixtures['asc-1sts-10-boxes-1block']
+    const model = new SceneModel(ascConfig, ascConfig.seed)
+    const asc = model.ascIds[0]
+    const b = entityBounds(model, asc, 0)!
+    expect(b).not.toBeNull()
+    expect(b.sx).toBeGreaterThan(25)
+    const hit = pickEntity(model, 0, { origin: { x: b.x, y: b.y * 2 + 30, z: b.z }, dir: { x: 0, y: -1, z: 0 } })
+    expect(hit).toBe(asc)
+  })
+})

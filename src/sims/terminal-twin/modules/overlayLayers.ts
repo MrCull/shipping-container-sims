@@ -53,7 +53,7 @@ export class OverlayLayers {
       this.padPlates.set(pad.id, m)
       this.group.add(m)
     }
-    const labelled = [...model.stsIds, ...model.shcIds, ...model.vesselIds]
+    const labelled = [...model.stsIds, ...model.shcIds, ...model.ascIds, ...model.vesselIds]
     for (const id of labelled.slice(0, LABEL_CAP)) {
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false }))
       sprite.scale.set(LABEL_W_M, LABEL_H_M, 1)
@@ -138,7 +138,7 @@ export class OverlayLayers {
     }
 
     for (const [id, sprite] of this.labels) {
-      const kind = model.stsIds.includes(id) ? 'sts' : model.shcIds.includes(id) ? 'shc' : 'vessel'
+      const kind = model.stsIds.includes(id) ? 'sts' : model.shcIds.includes(id) ? 'shc' : model.ascIds.includes(id) ? 'asc' : 'vessel'
       const b = overlays.labels ? entityBounds(model, id, t) : null
       sprite.visible = b !== null
       if (!b) continue

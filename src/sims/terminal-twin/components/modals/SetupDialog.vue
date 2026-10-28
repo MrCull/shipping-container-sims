@@ -5,13 +5,15 @@ import { fromLocalInputValue, toLocalInputValue } from '../../modules/time'
 import { t } from '../../i18n/messages'
 import { browserDisplayDefaults } from '../../i18n/display'
 import { travelTime, type AxisProfile } from '../../engine'
-import { DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
+import { DEFAULT_ASC_KINEMATICS, DEFAULT_SHC_KINEMATICS, type YardSetup } from '../../scenario/builder'
 import { applyOverrides, LIMITS, validateOverrides, type OverrideCheck, type ScenarioOverrides } from '../../scenario/overrides'
-import type { ShcKinematics, UnitSystem, VesselConfig } from '../../scenario/types'
+import type { AscKinematics, ShcKinematics, UnitSystem, VesselConfig } from '../../scenario/types'
 import VesselTable from '../setup/VesselTable.vue'
 
 /** Spec scale limit for the SHC fleet. */
 const MAX_SHC = 120
+/** Yard limits: blocks, 20 ft bays, tiers, and pads/stalls (which must fit the 25.4 m ASC span at 5.5 m pitch). */
+const YARD_LIMITS = { blocks: 8, bays: 60, tiers: 8, pads: 5, stalls: 5 }
 
 const store = useTwinStore()
 const catalogue = scenarioCatalogue()
@@ -137,6 +139,47 @@ function loadShcDefaults(): void {
 loadShcDefaults()
 watch(name, loadShcDefaults)
 
+// ── Yard blocks and ASC kinematics (scenarios with yard blocks only). ──
+type BlockDraft = YardSetup['blocks'][number]
+const DEFAULT_BLOCK: BlockDraft = { bays: 20, tiers: 5, wtpPads: 5, transferStalls: 5 }
+const scenarioBlocks = computed(() => {
+  try {
+    return resolveScenario(name.value).yard?.blocks.length ?? 0
+  } catch {
+    return 0
+  }
+})
+const yardBlocks = ref<BlockDraft[]>([])
+const ascK = ref<AscKinematics>(copy(DEFAULT_ASC_KINEMATICS))
+function loadYardDefaults(): void {
+  let base: ReturnType<typeof resolveScenario> | null
+  try {
+    base = resolveScenario(name.value)
+  } catch {
+    base = null
+  }
+  const previous = store.choice.name === name.value ? store.choice.yard : undefined
+  yardBlocks.value =
+    previous?.blocks.map((b) => ({ ...b })) ??
+    (base?.yard?.blocks ?? []).map((b) => ({
+      bays: b.bays ?? DEFAULT_BLOCK.bays,
+      tiers: b.tiers ?? DEFAULT_BLOCK.tiers,
+      wtpPads: b.wtpPads,
+      transferStalls: b.transferStalls ?? DEFAULT_BLOCK.transferStalls,
+    }))
+  ascK.value = copy(previous?.asc ?? base?.kinematics.asc ?? DEFAULT_ASC_KINEMATICS)
+}
+loadYardDefaults()
+watch(name, loadYardDefaults)
+
+function setBlockCount(raw: string): void {
+  const n = Math.floor(Number(raw))
+  if (!Number.isFinite(n) || n < 1 || n > YARD_LIMITS.blocks) return
+  const list = yardBlocks.value.slice(0, n)
+  while (list.length < n) list.push({ ...(list[list.length - 1] ?? DEFAULT_BLOCK) })
+  yardBlocks.value = list
+}
+
 const M_PER_FT = 0.3048
 const M_PER_MILE = 1609.344
 const imperial = computed(() => store.display.units === 'imperial')
@@ -172,6 +215,37 @@ const nominalTrip = computed(() => {
   })
 })
 
+type AscAxis = 'gantry' | 'trolley' | 'hoistLoaded'
+const yardSpeedFields = computed(() => [
+  { id: 'asc-v-gantry', label: t('setup.yard.gantrySpeed', { unit: speedUnit.value }), axis: 'gantry' as AscAxis },
+  { id: 'asc-v-trolley', label: t('setup.yard.trolleySpeed', { unit: speedUnit.value }), axis: 'trolley' as AscAxis },
+  { id: 'asc-v-hoist', label: t('setup.yard.hoistSpeed', { unit: speedUnit.value }), axis: 'hoistLoaded' as AscAxis },
+])
+function setAscSpeed(axis: AscAxis, raw: string): void {
+  ascK.value[axis].vMax = Number(raw) / speedFactor.value
+}
+
+const yardValid = computed(() => ascK.value.gantry.vMax > 0 && ascK.value.trolley.vMax > 0 && ascK.value.hoistLoaded.vMax > 0 && ascK.value.hoistEmpty.vMax > 0)
+/** Derived readout: capacity and a nominal pad-to-slot cycle (40 m along, 12 m across, 3 tiers). */
+const yardReadout = computed(() => {
+  const k = ascK.value
+  if (!yardValid.value || !(k.lockS >= 0) || !(k.unlockS >= 0)) return null
+  const lift = 8.7
+  const seconds =
+    2 * Math.max(travelTime(40, k.gantry), travelTime(12, k.trolley)) +
+    2 * travelTime(lift, k.hoistEmpty) +
+    2 * travelTime(lift, k.hoistLoaded) +
+    k.lockS +
+    k.unlockS
+  const capacity = yardBlocks.value.reduce((n, b) => n + b.bays * 8 * b.tiers, 0)
+  return t('setup.yard.readout', {
+    capacity: store.fmt.number(capacity, 0),
+    distance: store.fmt.length(40),
+    seconds: store.fmt.number(seconds, 0),
+    cycles: store.fmt.number(3600 / seconds, 1),
+  })
+})
+
 function reroll(): void {
   seed.value = randomSeed()
 }
@@ -198,6 +272,34 @@ async function submit(): Promise<void> {
     formError.value = t('setup.shc.errorKinematics')
     return
   }
+  if (scenarioBlocks.value > 0) {
+    if (yardBlocks.value.length < 1 || yardBlocks.value.length > YARD_LIMITS.blocks) {
+      formError.value = t('setup.yard.errorBlocks', { max: YARD_LIMITS.blocks })
+      return
+    }
+    const bad = yardBlocks.value.findIndex(
+      (b) =>
+        ![b.bays, b.tiers, b.wtpPads, b.transferStalls].every(Number.isInteger) ||
+        b.bays < 1 || b.bays > YARD_LIMITS.bays ||
+        b.tiers < 1 || b.tiers > YARD_LIMITS.tiers ||
+        b.wtpPads < 1 || b.wtpPads > YARD_LIMITS.pads ||
+        b.transferStalls < 0 || b.transferStalls > YARD_LIMITS.stalls,
+    )
+    if (bad >= 0) {
+      formError.value = t('setup.yard.errorBlock', {
+        n: bad + 1,
+        maxBays: YARD_LIMITS.bays,
+        maxTiers: YARD_LIMITS.tiers,
+        maxPads: YARD_LIMITS.pads,
+        maxStalls: YARD_LIMITS.stalls,
+      })
+      return
+    }
+    if (!yardReadout.value) {
+      formError.value = t('setup.yard.errorKinematics')
+      return
+    }
+  }
   formError.value = null
   await store
     .startScenario({
@@ -206,6 +308,7 @@ async function submit(): Promise<void> {
       startDateTime: startAt.toISOString(),
       overrides: JSON.parse(JSON.stringify(overrides.value)),
       shc: scenarioShcs.value > 0 ? { count: shcCount.value, kinematics: copy(shcK.value) } : undefined,
+      yard: scenarioBlocks.value > 0 ? { blocks: copy(yardBlocks.value), asc: copy(ascK.value) } : undefined,
     })
     .catch(() => {})
 }
@@ -472,6 +575,127 @@ async function submit(): Promise<void> {
         </p>
       </fieldset>
 
+      <fieldset
+        v-if="scenarioBlocks > 0"
+        class="field"
+      >
+        <legend>{{ t('setup.yard.title') }}</legend>
+        <div class="grid">
+          <label class="mini">
+            <span>{{ t('setup.yard.blocks') }}</span>
+            <input
+              type="number"
+              min="1"
+              :max="YARD_LIMITS.blocks"
+              step="1"
+              name="yard-blocks"
+              :value="yardBlocks.length"
+              @change="setBlockCount(($event.target as HTMLInputElement).value)"
+            >
+          </label>
+        </div>
+        <div
+          v-for="(b, i) in yardBlocks"
+          :key="i"
+          class="grid"
+          :data-testid="`tt-yard-block-${i + 1}`"
+        >
+          <span class="blockname">{{ t('setup.yard.block', { n: i + 1 }) }}</span>
+          <label class="mini">
+            <span>{{ t('setup.yard.bays') }}</span>
+            <input
+              v-model.number="b.bays"
+              type="number"
+              min="1"
+              :max="YARD_LIMITS.bays"
+              step="1"
+              :name="`yard-bays-${i + 1}`"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.yard.tiers') }}</span>
+            <input
+              v-model.number="b.tiers"
+              type="number"
+              min="1"
+              :max="YARD_LIMITS.tiers"
+              step="1"
+              :name="`yard-tiers-${i + 1}`"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.yard.wtpPads') }}</span>
+            <input
+              v-model.number="b.wtpPads"
+              type="number"
+              min="1"
+              :max="YARD_LIMITS.pads"
+              step="1"
+              :name="`yard-pads-${i + 1}`"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.yard.stalls') }}</span>
+            <input
+              v-model.number="b.transferStalls"
+              type="number"
+              min="0"
+              :max="YARD_LIMITS.stalls"
+              step="1"
+              :name="`yard-stalls-${i + 1}`"
+            >
+          </label>
+        </div>
+        <div class="grid">
+          <label
+            v-for="f in yardSpeedFields"
+            :key="f.id"
+            class="mini"
+          >
+            <span>{{ f.label }}</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              :name="f.id"
+              :value="round2(ascK[f.axis].vMax * speedFactor)"
+              @input="setAscSpeed(f.axis, ($event.target as HTMLInputElement).value)"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.yard.lockUnlock') }}</span>
+            <span class="pair">
+              <input
+                v-model.number="ascK.lockS"
+                type="number"
+                min="0"
+                step="any"
+                name="asc-lock"
+                :aria-label="t('setup.yard.lockTime')"
+              >
+              <input
+                v-model.number="ascK.unlockS"
+                type="number"
+                min="0"
+                step="any"
+                name="asc-unlock"
+                :aria-label="t('setup.yard.unlockTime')"
+              >
+            </span>
+          </label>
+        </div>
+        <p class="hint">
+          {{ t('setup.yard.rowsNote') }}
+        </p>
+        <p
+          v-if="yardReadout"
+          class="hint"
+          data-testid="tt-yard-readout"
+        >
+          {{ yardReadout }}
+        </p>
+      </fieldset>
+
       <p
         v-if="formError || store.error"
         class="error"
@@ -530,6 +754,12 @@ async function submit(): Promise<void> {
   font-family: var(--tt-font-mono);
   color-scheme: dark;
   min-width: 0;
+}
+
+.blockname {
+  align-self: end;
+  font-weight: 600;
+  min-width: 5em;
 }
 
 .pair {

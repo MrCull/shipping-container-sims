@@ -11,7 +11,7 @@ import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
 import { applyOverrides, type ScenarioOverrides } from '../scenario/overrides'
 import { presets } from '../scenario/presets'
-import { withShcFleet } from '../scenario/builder'
+import { withShcFleet, withYard, type YardSetup } from '../scenario/builder'
 import type { DisplaySettings, ScenarioConfig, ShcKinematics } from '../scenario/types'
 import type { EngineEvent } from '../engine'
 import type { BreakpointHit, Delta, EngineInfo, EventSummary } from '../worker/protocol'
@@ -39,6 +39,8 @@ export interface ScenarioChoice {
   overrides?: ScenarioOverrides
   /** SHC fleet overrides from the setup dialog (scenarios with SHCs only). */
   shc?: { count: number; kinematics: ShcKinematics }
+  /** Yard block and ASC overrides from the setup dialog (scenarios with yard blocks only). */
+  yard?: YardSetup
 }
 
 /** What the 3D view registers so the dev API can reach it. */
@@ -195,6 +197,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     const base = applyOverrides(resolveScenario(next.name), next.overrides ?? {})
     let runConfig = runConfigFor(base, next.startDateTime, display.value)
     if (next.shc && (base.shcs?.length ?? 0) > 0) runConfig = withShcFleet(runConfig, next.shc.count, next.shc.kinematics)
+    if (next.yard && (base.yard?.blocks.length ?? 0) > 0) runConfig = withYard(runConfig, next.yard)
     choice.value = { ...next }
     loading.value = true
     try {

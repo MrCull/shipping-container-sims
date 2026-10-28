@@ -85,3 +85,21 @@ describe('eventsInvolving', () => {
     expect(mine.at(-1)!.id).toBe(events.filter((e) => e.subjects.equipment?.includes(id)).at(-1)!.id)
   })
 })
+
+describe('ASC (TT-06 yard crane)', () => {
+  const ascConfig = fixtures['asc-1sts-10-boxes-1block']
+  const ascModel = new SceneModel(ascConfig, ascConfig.seed)
+
+  it('is classified, and shows status, block, stacked count and the box it carries as the current job', () => {
+    const asc = ascModel.ascIds[0]
+    expect(entityKind(ascModel, asc)).toBe('asc')
+    const sim = createSimulation(ascConfig)
+    sim.runUntil({ eventType: 'AscPicked' })
+    const state = sim.query.ascs().find((a) => a.carrying !== null) ?? sim.query.ascs()[0]
+    const view = describeEntity('asc', state)
+    expect(view.id).toBe(state.id)
+    expect(view.facts.find((f) => f.label === 'inspector.fact.block')!.value).toBe(state.blockId)
+    expect(view.facts.find((f) => f.label === 'inspector.fact.stacked')!.value).toBe(state.stacked)
+    if (state.carrying) expect(view.job!.map((f) => f.value)).toContain(state.carrying)
+  })
+})

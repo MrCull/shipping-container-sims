@@ -126,5 +126,8 @@
         "wtpPads": 4
       }
     ]
+  },
+  "subsystems": {
+    "asc": "instant"
   }
 }

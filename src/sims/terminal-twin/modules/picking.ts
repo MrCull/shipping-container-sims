@@ -7,7 +7,7 @@
  * win because crane and hull boxes enclose the boxes they carry.
  */
 import { FENDER_GAP_M } from '../scenario/vesselClasses'
-import { SHC, STS } from './equipmentDims'
+import { ASC, ascHeightM, SHC, STS } from './equipmentDims'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 
 export interface Ray {
@@ -38,6 +38,10 @@ export function entityBounds(model: SceneModel, id: string, time: number): Entit
     const p = model.shcPose(id, time)
     const height = SHC.height + 3
     return { x: p.x, y: height / 2, z: p.z, sx: SHC.length + 1, sy: height, sz: SHC.width + 1, yaw: p.heading === 'z' ? Math.PI / 2 : 0 }
+  }
+  if (model.ascIds.includes(id)) {
+    const height = ascHeightM(model.blockOfAsc(id)) + ASC.girderHeight + 2
+    return { x: model.blockOfAsc(id).x, y: height / 2, z: model.ascPose(id, time).z, sx: ASC.span + 6, sy: height, sz: ASC.legLength + 2, yaw: 0 }
   }
   if (model.stsIds.includes(id)) {
     const p = model.stsPose(id, time)
@@ -90,7 +94,7 @@ export function pickEntity(model: SceneModel, time: number, ray: Ray): string | 
     if (dist !== null && dist !== undefined && (!best || dist < best.dist)) best = { id, dist }
   }
   if (best) return best.id
-  for (const id of [...model.shcIds, ...model.stsIds, ...model.vesselIds]) {
+  for (const id of [...model.shcIds, ...model.ascIds, ...model.stsIds, ...model.vesselIds]) {
     const b = entityBounds(model, id, time)
     const dist = b && rayBox(ray, b)
     if (dist !== null && dist !== undefined && (!best || dist < best.dist)) best = { id, dist }
