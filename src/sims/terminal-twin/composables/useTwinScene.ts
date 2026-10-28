@@ -181,6 +181,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       stats: () => (view ? { ...view.stats(), frames: framesRendered, render: { ...lastRender } } : null),
       liveries: () => view?.renderedLiveries() ?? null,
       shcRigs: () => view?.renderedShcs() ?? null,
+      ascRigs: () => view?.renderedAscs() ?? null,
       sts: () => view?.renderedSts() ?? null,
       vesselHulls: () => view?.vesselHulls() ?? null,
     })

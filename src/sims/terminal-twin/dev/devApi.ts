@@ -8,6 +8,7 @@
  *   await __tt.load('tracer-1sts-10-boxes', { seed: 42 })
  *   await __tt.runUntil()                      // to the end (or { time, eventType, moves, vesselsCompleted, maxEvents })
  *   await __tt.query('summary')                // also: container/vessel/sts/groundPosition (+ id), containers, stsList, kpis, eventLog…
+ *   __tt.scene()                               // rendered counts { containers, sts, vessels, frames, containerLods, containerAssets, shcLods, shcAssets, ascLods, ascAssets }
  *   __tt.scene()                               // rendered counts { containers, sts, vessels, frames, containerLods, containerAssets, shcLods, shcAssets, vesselLods, vesselAssets,
  *                                              //   stsAssets, stsLods, render: { calls, triangles } }
  *   await __tt.step(); await __tt.why(id); await __tt.snapshot()
@@ -41,6 +42,7 @@ import type { Breakpoint, BreakpointKind } from '../modules/breakpoints'
 import type { OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
+import type { AscRigState } from '../modules/ascAssets'
 import type { VesselHullState } from '../modules/vesselRenderer'
 import type { AscPose, ShcPose, StsPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
@@ -179,6 +181,8 @@ export interface SceneState {
   liveries: Record<string, RenderedLivery>
   /** Per SHC, the phase 2 rig as last drawn: LOD, steering, wheel roll, hoist travel, carrying (empty until the GLB loads). */
   shcRigs: Record<string, ShcRigState>
+  /** Per ASC, the phase 2 rig as last drawn: LOD, gantry Z, trolley X, hoist travel, rope scale, vertical stretch, carrying (empty until the GLB loads). */
+  ascRigs: Record<string, AscRigState>
   /** Per STS as drawn by the GLB model: LOD, spreader configuration (20 / 40 / twin-20), boxes carried, spreader and trolley world positions. */
   stsRendered: Record<string, StsRenderState>
   /** Per vessel: hull class, line, livery tile, name, hull LOD and the rendered bay grid (TT-27). */
@@ -277,6 +281,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
         liveries: store.view()?.liveries() ?? {},
         shcRigs: store.view()?.shcRigs() ?? {},
+        ascRigs: store.view()?.ascRigs() ?? {},
         stsRendered: store.view()?.sts() ?? {},
         vesselHulls: store.view()?.vesselHulls() ?? {},
       }

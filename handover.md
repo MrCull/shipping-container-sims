@@ -20,7 +20,9 @@ Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration br
 | TT-23 STS model | #36 | MERGED (tt/36-sts-model-v2) |
 | TT-27 vessel hulls | #37 | MERGED (tt/37-vessel-hulls-v2) |
 | TT-10 export load flow | #40 | MERGED (tt/40-export-load-flow-v2) |
-| #42–#52 | | not started (#42 is unblocked) |
+| TT-24 ASC model | #42 | MERGED (tt/42-asc-model) |
+| #43, #44 | | in progress |
+| #45–#52 | | not started (blocked, see graph) |
 
 **WIP is NOT on GitHub.** It lives only in git worktrees under `.claude/worktrees/agent-*` of the orchestrating session's container (branches `tt/36…`–`tt/39…` above; the merged `tt/33`, `tt/34`, `tt/35` branches are also there). A 5-hour API rate limit stopped all six implementers at once (limit reset at 12:10 UTC). If you can't see those branches, restart those tickets from the integration tip. Implementer subagents can be resumed with SendMessage if the session is still alive.
 

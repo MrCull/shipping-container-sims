@@ -7,7 +7,7 @@
  *
  * Options:
  *   --check          regenerate into a temp folder and compare with the committed files (exit 1 on any difference)
- *   --only <group>   regenerate one group only (containers | shc | vessels; repeatable); default all
+ *   --only <group>   regenerate one group only (containers | shc | asc | sts | vessels; repeatable); default all
  *   --no-previews    skip the Cycles previews (keeps the committed ones)
  *   --samples <n>    Cycles samples per preview (default 48)
  *   --python <exe>   Python with bpy (default: $TT_BPY_PYTHON, then python3.13 / python3 / python, or `py -3.13` on Windows)
@@ -34,7 +34,7 @@ import {
 import { ASSETS_DIR, MODELS_DIR, runBudgetCli } from './budgetCheck'
 
 const GENERATOR = join(ASSETS_DIR, 'generators', 'build.py')
-const GROUPS = ['containers', 'shc', 'sts', 'vessels']
+const GROUPS = ['containers', 'shc', 'asc', 'sts', 'vessels']
 
 /** What the hull generator needs from the engine's vessel model (so hulls are built on the engine's bay grid). */
 function vesselClassTable() {
