@@ -95,7 +95,15 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Park hold:** the open-ended reservation of the segments around an ASC that stands still. It ends when the crane's next trip starts. A trip that conflicts with the other ASC's trip waits (**rail wait**); one that conflicts with its parked position makes it **step aside** (yield) if idle, or cannot start until it is idle.
 - **ASC dispatch:** the decision point (`ascDispatch`) that picks which idle ASC of a twin block takes the oldest ready box. Built-in strategies: `waterside-first` (default: WTP work to the waterside ASC, transfer-stall work to the landside ASC, the other crane only when no step-aside is needed) and `balanced` (fewest jobs so far).
 - **Subsystem mode:** how a subsystem runs: **real**, **instant** (a stub that raises the same events with zero durations) or **off**.
-- **Overlay (3D debug overlay):** an optional drawing over the 3D view: lane graph, active reservations, **ASC rail** (reserved and parked rail segments, waterside ASC blue and landside ASC red).
+- **Overlay (3D debug overlay):** an optional drawing over the 3D view: lane graph, active reservations, occupancy, state labels, **ASC rail** (reserved and parked rail segments, waterside ASC blue and landside ASC red). Each toggles independently; `O` hides or shows them all.
+- **Breakpoint:** a debugger rule that pauses the sim right after an event that matches it: an event type, a container id, an equipment id or a decision point. Set from the event feed panel or `__tt.addBreakpoint`.
+- **Single-step:** process exactly one engine event and pause, at any speed setting.
+- **Event feed:** the left panel's live list of recent events, newest first, filterable and capped. At high speed it **summarises bursts** (runs of the same event type) into one row.
+- **Event inspector:** the right panel's view of one event: payload, subjects, a decision's handler, request and reply, and its **cause chain**.
+- **Cause chain:** the events that led to one, from the event back to the root, as returned by the engine's `why`. Clicking an entry inspects it.
+- **Selection:** the container, equipment or vessel picked in the 3D view (or by an id in the feed or inspector). The **inspector** shows its current state, current job and history, and the **follow camera** can track it.
+- **Picking:** finding the entity under a click by testing the view ray against each entity's bounding box (containers first).
+- **Occupancy overlay:** plates over WTP pads and STS ground positions, free or occupied at the displayed time. The **labels overlay** floats each crane, carrier and vessel's status above it.
 - **Display settings:** the UI's **locale** (Intl formatting of dates, times, numbers, first day of week) and **unit system** (metric: m, km/h, t; imperial: ft, mi/h, US tons). Display only: the engine and saved configs are always SI. Imperial speed is written **mi/h** because **mph** would read as crane moves per hour.
 - **Message catalogue:** `i18n/messages.ts`, the single home of every user-visible UI string (English only for now), looked up with `t(key)`.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.
@@ -110,4 +118,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Livery:** a shipping line's container colours and wordmark. The **livery atlas** has one tile per line, and an instance's **livery index** is its tile.
 - **Wordmark:** the line's name set in a close open-licence typeface and the brand colours, standing in for the official logo.
 - **Asset budget:** the triangle, draw-call and file-size limits per asset kind (`assets/budgets.json`), enforced by the **budget check** (`npm run tt:assets:check`).
+- **SHC model:** the rigged Kalmar-style shuttle carrier asset `shc` (nodes `steer_*`, `wheel_*`, `hoist`, `spreader`, `twistlock_*`). Its **tunnel** is the open space between the legs that a box is carried through, and its **container attach point** is the centre of the twist-lock plane (the top of the carried box). *Avoid:* "SHC mesh".
+- **Hoist travel:** how far the SHC's `hoist` node moves down from rest (0 to −3.1 m); equal to the carried box's top height minus 6.0 m.
+- **Odometer (SHC):** the signed distance an SHC has rolled along its heading, from which the renderer derives wheel roll.
 - **Asset viewer:** the dev-only page `/sim/terminal-twin?viewer=<asset>` (or `?viewer=yard`), with its API `window.__ttAssets`.

@@ -73,6 +73,27 @@ class MeshBuilder:
             src = uv_sets[layer] if layer < len(uv_sets) else uv_sets[0]
             uvs.extend(src)
 
+    def ngon(self, points, uv, outward=None):
+        """A convex polygon face (3+ points), one UV per point (first UV layer only)."""
+        pts = [mathutils.Vector(p) for p in points]
+        uvs = list(uv)
+        if outward is not None:
+            n = (pts[1] - pts[0]).cross(pts[2] - pts[0])
+            if n.dot(mathutils.Vector(outward)) < 0:
+                pts.reverse()
+                uvs.reverse()
+        base = len(self.verts)
+        self.verts.extend(tuple(round(c, 6) for c in p) for p in pts)
+        self.faces.append(tuple(range(base, base + len(pts))))
+        self.uvs[0].extend(uvs)
+        for extra in self.uvs[1:]:
+            extra.extend([uvs[0]] * len(pts))
+
+    def shift(self, offset):
+        """Moves every vertex by -offset (to express the mesh in a rig node's local frame)."""
+        ox, oy, oz = offset
+        self.verts = [(x - ox, y - oy, z - oz) for x, y, z in self.verts]
+
     def box_faces(self, lo, hi, faces, uv_for_face, uv1_for_face=None):
         """Axis-aligned box from `lo` to `hi`, emitting only the listed faces
         ('+x', '-x', '+y', '-y', '+z', '-z'). `uv_for_face(face, corners)`
@@ -94,7 +115,7 @@ class MeshBuilder:
 
     @property
     def triangles(self):
-        return 2 * len(self.faces)
+        return sum(len(f) - 2 for f in self.faces)
 
     def to_object(self, name, material, parent=None, uv_names=('UVMap', 'UV1')):
         mesh = bpy.data.meshes.new(name)

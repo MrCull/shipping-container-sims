@@ -8,22 +8,28 @@
  *   await __tt.load('tracer-1sts-10-boxes', { seed: 42 })
  *   await __tt.runUntil()                      // to the end (or { time, eventType, moves, vesselsCompleted, maxEvents })
  *   await __tt.query('summary')                // also: container/vessel/sts/groundPosition (+ id), containers, stsList, kpis, eventLog…
- *   __tt.scene()                               // rendered counts { containers, sts, vessels, frames, containerLods, containerAssets }
+ *   __tt.scene()                               // rendered counts { containers, sts, vessels, frames, containerLods, containerAssets, shcLods, shcAssets }
  *   await __tt.step(); await __tt.why(id); await __tt.snapshot()
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
  *   __tt.select('STS01'); __tt.cameraTo('STS01'); __tt.setSpeed(600); __tt.pause(); __tt.clock()
  *   __tt.overlays({ laneGraph: true, reservations: true })   // 3D debug overlays
  *   await __tt.query('ascList'); await __tt.query('yardSlots', 'B01'); __tt.sceneState().ascs   // yard (TT-06)
  *   __tt.setDisplay({ locale: 'de-DE', units: 'imperial' }); __tt.display(); __tt.config(); __tt.ui()
+ *   await __tt.addBreakpoint('eventType', 'StsPicked'); __tt.setSpeed(600)   // plays, pauses at the hit; __tt.debug().breakHit
+ *   await __tt.inspectEvent(id); __tt.debug().inspectedEvent.chain   // cause chain, newest first, root last
+ *   __tt.screenPoint('STS01'); __tt.pickAt(x, y)                         // 3D picking, client coordinates
  */
 import type { ScenarioOverrides } from '../scenario/overrides'
 import type { DisplaySettings, ScenarioConfig } from '../scenario/types'
 import type { CustodyRef, EngineEvent, EventPayloads, EventSubjects, EventType, RunResult, SimSnapshot } from '../engine'
-import type { OverlayState, RenderedLivery, SceneStats } from '../modules/sceneRenderer'
+import type { Breakpoint, BreakpointKind } from '../modules/breakpoints'
+import type { OverlayState } from '../modules/overlays'
+import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
+import type { ShcRigState } from '../modules/shcAssets'
 import type { AscPose, ShcPose, StsPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
 import { resolveScenario, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
-import type { EngineInfo, EventSummary, QueryKind, WorkerRunCondition } from '../worker/protocol'
+import type { BreakpointHit, EngineInfo, EventSummary, QueryKind, WorkerRunCondition } from '../worker/protocol'
 
 export interface TwinClock {
   /** Displayed sim time (s). */
@@ -79,6 +85,29 @@ export interface TwinDevApi {
   config(): ScenarioConfig | null
   /** Keyboard-driven UI state. */
   ui(): TwinUiState
+  /** Add a breakpoint (event type, container id, equipment id or decision-point id); returns the new list. */
+  addBreakpoint(kind: BreakpointKind, value: string): Promise<Breakpoint[]>
+  removeBreakpoint(id: number): Promise<Breakpoint[]>
+  clearBreakpoints(): Promise<Breakpoint[]>
+  breakpoints(): Breakpoint[]
+  /** Show an event in the inspector (payload, decision request/reply, cause chain to the root). */
+  inspectEvent(eventId: number): Promise<void>
+  /** Debugger state: the breakpoint that paused playback, the inspected event and the inspected selection. */
+  debug(): TwinDebugState
+  /** Entity id under a viewport point (client coordinates) at the displayed time, like a click. */
+  pickAt(clientX: number, clientY: number): string | null
+  /** Viewport (client) coordinates of an entity's centre, or null when it is not drawn or off screen. */
+  screenPoint(entityId: string): { x: number; y: number } | null
+  /** Where the orbit camera looks (follow-camera checks). */
+  cameraTarget(): { x: number; y: number; z: number } | null
+}
+
+export interface TwinDebugState {
+  breakHit: BreakpointHit | null
+  paused: boolean
+  /** The inspected event, with its cause chain (newest first, the root last). */
+  inspectedEvent: { id: number; type: string; chain: { id: number; type: string; causedBy: number | null }[] } | null
+  entity: { kind: string; id: string; status: string | null } | null
 }
 
 export interface TwinUiState {
@@ -87,6 +116,8 @@ export interface TwinUiState {
   overlaysVisible: boolean
   dashboardOpen: boolean
   helpOpen: boolean
+  feedOpen: boolean
+  inspectorOpen: boolean
 }
 
 export interface SceneState {
@@ -101,6 +132,8 @@ export interface SceneState {
   reservations: Record<string, string>
   /** Per container: livery atlas index, model size and LOD actually drawn (phase 2 assets). */
   liveries: Record<string, RenderedLivery>
+  /** Per SHC, the phase 2 rig as last drawn: LOD, steering, wheel roll, hoist travel, carrying (empty until the GLB loads). */
+  shcRigs: Record<string, ShcRigState>
 }
 
 declare global {
@@ -185,6 +218,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         reservations: model.activeReservations(t),
         vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
         liveries: store.view()?.liveries() ?? {},
+        shcRigs: store.view()?.shcRigs() ?? {},
       }
     },
     display: () => ({ ...store.display }),
@@ -199,7 +233,43 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       overlaysVisible: store.overlaysVisible,
       dashboardOpen: store.dashboardOpen,
       helpOpen: store.helpOpen,
+      feedOpen: store.feedOpen,
+      inspectorOpen: store.inspectorOpen,
     }),
+    addBreakpoint: async (kind, value) => {
+      await store.addBreakpoint(kind, value)
+      return store.breakpoints.map((b) => ({ ...b }))
+    },
+    removeBreakpoint: async (id) => {
+      await store.removeBreakpoint(id)
+      return store.breakpoints.map((b) => ({ ...b }))
+    },
+    clearBreakpoints: async () => {
+      await store.clearBreakpoints()
+      return []
+    },
+    breakpoints: () => store.breakpoints.map((b) => ({ ...b })),
+    inspectEvent: (eventId) => store.inspectEvent(eventId),
+    debug: () => {
+      const inspected = store.inspectedEvent
+      const entity = store.entityView
+      const c = store.controller()
+      return {
+        breakHit: c?.breakHit ?? null,
+        paused: c?.paused ?? true,
+        inspectedEvent: inspected
+          ? {
+              id: inspected.chain[inspected.index].id,
+              type: inspected.chain[inspected.index].type,
+              chain: inspected.chain.map((e) => ({ id: e.id, type: e.type, causedBy: e.causedBy })),
+            }
+          : null,
+        entity: entity ? { kind: entity.kind, id: entity.id, status: String(entity.facts.find((f) => f.label === 'inspector.fact.status')?.value ?? '') || null } : null,
+      }
+    },
+    pickAt: (x, y) => store.view()?.pickAt(x, y) ?? null,
+    screenPoint: (id) => store.view()?.screenPoint(id) ?? null,
+    cameraTarget: () => store.view()?.cameraTarget() ?? null,
   }
 
   window.__tt = api

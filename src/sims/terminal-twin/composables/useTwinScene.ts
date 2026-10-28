@@ -8,7 +8,9 @@
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { SceneRenderer, type OverlayState } from '../modules/sceneRenderer'
+import { NO_OVERLAYS } from '../modules/overlays'
+import { pickEntity } from '../modules/picking'
+import { SceneRenderer } from '../modules/sceneRenderer'
 import type { SceneModel } from '../modules/sceneModel'
 import { useTwinStore } from '../store/twinStore'
 
@@ -21,8 +23,6 @@ function webglAvailable(): boolean {
   }
 }
 
-const HIDDEN_OVERLAYS: OverlayState = { laneGraph: false, reservations: false, ascRail: false }
-
 export function useTwinScene(host: Ref<HTMLElement | null>) {
   const store = useTwinStore()
   const webglFailed = ref(false)
@@ -31,7 +31,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   let controls: OrbitControls | null = null
   let view: SceneRenderer | null = null
   let builtFor: SceneModel | null = null
-  let overlaysApplied: OverlayState | null = null
+  let overlaysApplied: object | null = null
   let frame = 0
   /** Frames actually rendered (dev API: proves the view keeps animating). */
   let framesRendered = 0
@@ -58,6 +58,45 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     controls.update()
   }
 
+  /** The entity under a viewport point (client coordinates) at the displayed time, or null. */
+  function pickAt(clientX: number, clientY: number): string | null {
+    const controller = store.controller()
+    if (!renderer || !camera || !controller?.model) return null
+    const rect = renderer.domElement.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return null
+    const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -(((clientY - rect.top) / rect.height) * 2 - 1))
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(ndc, camera)
+    const { origin, direction } = raycaster.ray
+    return pickEntity(controller.model, controller.displayTime, { origin: { x: origin.x, y: origin.y, z: origin.z }, dir: { x: direction.x, y: direction.y, z: direction.z } })
+  }
+
+  /** Viewport (client) coordinates of an entity's centre, or null if it is not in the scene or off screen. */
+  function screenPoint(entityId: string): { x: number; y: number } | null {
+    const controller = store.controller()
+    const centre = controller?.model?.entityCentre(entityId, controller.displayTime)
+    if (!renderer || !camera || !centre) return null
+    camera.updateMatrixWorld()
+    const p = new THREE.Vector3(centre.x, centre.y, centre.z).project(camera)
+    if (p.z > 1 || Math.abs(p.x) > 1 || Math.abs(p.y) > 1) return null
+    const rect = renderer.domElement.getBoundingClientRect()
+    return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height }
+  }
+
+  // A click (little movement, short press) selects; a drag orbits and must not.
+  let pressed: { x: number; y: number; at: number } | null = null
+  function onPointerDown(e: PointerEvent): void {
+    pressed = { x: e.clientX, y: e.clientY, at: performance.now() }
+  }
+  function onPointerUp(e: PointerEvent): void {
+    const p = pressed
+    pressed = null
+    if (!p || e.button !== 0) return
+    if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 5 || performance.now() - p.at > 600) return
+    const id = pickAt(e.clientX, e.clientY)
+    store.select(id)
+  }
+
   function rebuild(model: SceneModel | null): void {
     view?.dispose()
     view = null
@@ -77,7 +116,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (controller.model !== builtFor) rebuild(controller.model)
     if (!view || controller.busy) return
     // O (overlaysVisible) is the master switch over the individual 3D overlays.
-    const overlays = store.overlaysVisible ? store.overlays : HIDDEN_OVERLAYS
+    const overlays = store.overlaysVisible ? store.overlays : NO_OVERLAYS
     if (overlaysApplied !== overlays) {
       overlaysApplied = overlays
       view.setOverlays(overlays)
@@ -112,6 +151,8 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         controls.minDistance = 8
         controls.maxDistance = 2500
         controls.maxPolarAngle = Math.PI / 2.05
+        renderer.domElement.addEventListener('pointerdown', onPointerDown)
+        renderer.domElement.addEventListener('pointerup', onPointerUp)
         resize()
         resizeObserver = new ResizeObserver(resize)
         resizeObserver.observe(el)
@@ -131,8 +172,12 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         aim(centre, true, distanceM)
         return true
       },
+      pickAt,
+      screenPoint,
+      cameraTarget: () => (controls ? { x: controls.target.x, y: controls.target.y, z: controls.target.z } : null),
       stats: () => (view ? { ...view.stats(), frames: framesRendered } : null),
       liveries: () => view?.renderedLiveries() ?? null,
+      shcRigs: () => view?.renderedShcs() ?? null,
     })
     frame = requestAnimationFrame(loop)
   })
@@ -142,6 +187,8 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     resizeObserver?.disconnect()
     store.attachView(null)
     view?.dispose()
+    renderer?.domElement.removeEventListener('pointerdown', onPointerDown)
+    renderer?.domElement.removeEventListener('pointerup', onPointerUp)
     controls?.dispose()
     renderer?.dispose()
     renderer?.domElement.remove()

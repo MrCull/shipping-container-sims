@@ -65,7 +65,7 @@ describe('withYard (setup dialog)', () => {
     expect(model.ascPose('B01-ASC1', 0).z).toBeLessThan(model.ascPose('B01-ASC2', 0).z - 12)
     // the parked cranes hold rail segments from the start
     const sim = createSimulation(cfg)
-    model.apply({ motion: [], custody: [], entities: [], reservations: sim.query.reservations().map((r) => ({ ...r })), events: [], eventCounts: {} })
+    model.apply({ motion: [], custody: [], entities: [], reservations: sim.query.reservations().map((r) => ({ ...r })), events: [], eventCounts: {}, breakpoint: null })
     const held = Object.entries(model.activeReservations(0)).filter(([zone]) => /^B01:R\d+$/.test(zone))
     expect(new Set(held.map(([, holder]) => holder))).toEqual(new Set(['B01-ASC1', 'B01-ASC2']))
     expect(model.railSegments('B01').length).toBeGreaterThan(held.length)

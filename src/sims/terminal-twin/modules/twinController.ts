@@ -14,7 +14,8 @@
  */
 import type { EventPayloads, EventSubjects, EventType, RunResult } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
-import type { Delta, EngineInfo, EventSummary, QueryKind, WorkerRequest, WorkerRunCondition } from '../worker/protocol'
+import type { BreakpointHit, Delta, EngineInfo, EventSummary, QueryKind, WorkerRequest, WorkerRunCondition } from '../worker/protocol'
+import type { Breakpoint } from './breakpoints'
 import { EngineClient, type EngineResponse } from './engineClient'
 import { SceneModel } from './sceneModel'
 
@@ -25,6 +26,12 @@ export const SPEEDS = [1, 2, 5, 10, 30, 60, 120, 300, 600] as const
 const LOOKAHEAD_WALL_S = 1.5
 const MIN_LOOKAHEAD_SIM_S = 5
 
+/** What the controller needs from the engine worker (an in-process fake in tests). */
+export interface EngineLink {
+  request<T = unknown>(req: WorkerRequest): Promise<EngineResponse<T>>
+  dispose(): void
+}
+
 export class TwinController {
   model: SceneModel | null = null
   info: EngineInfo | null = null
@@ -33,12 +40,19 @@ export class TwinController {
   paused = true
   /** A flat-out run is in progress (rendering is skipped). */
   busy = false
-  private client = new EngineClient()
   private inflight = false
   private lastWall: number | null = null
   private generation = 0
+  /** The breakpoint that paused playback; cleared when playback resumes or a new scenario starts. */
+  breakHit: BreakpointHit | null = null
+  /** A breakpoint the engine has stopped at but the display has not reached yet (look-ahead). */
+  private pendingBreak: BreakpointHit | null = null
+  private breakpoints: Breakpoint[] = []
 
-  constructor(private onDelta: (delta: Delta) => void = () => {}) {}
+  constructor(
+    private onDelta: (delta: Delta) => void = () => {},
+    private client: EngineLink = new EngineClient(),
+  ) {}
 
   get ended(): boolean {
     return this.info?.status !== 'ready' && this.info !== null && this.displayTime >= this.limit
@@ -56,6 +70,7 @@ export class TwinController {
     if (gen !== this.generation) return null // stale: a new scenario was loaded meanwhile
     this.model?.apply(res.delta)
     this.info = res.info
+    if (res.delta.breakpoint) this.pendingBreak = res.delta.breakpoint
     this.onDelta(res.delta)
     return res
   }
@@ -75,6 +90,8 @@ export class TwinController {
     this.inflight = false
     this.busy = false
     this.paused = true
+    this.breakHit = null
+    this.pendingBreak = null
     this.displayTime = 0
     this.info = null
     this.model = new SceneModel(config, seed)
@@ -90,7 +107,8 @@ export class TwinController {
     const lookahead = Math.max(MIN_LOOKAHEAD_SIM_S, this.speed * LOOKAHEAD_WALL_S)
     // Look ahead only while playing: when paused, the engine stays at the displayed
     // time, so dev-API queries and the scene describe the same instant.
-    if (!this.paused && !this.inflight && this.info.status === 'ready' && this.info.now < this.displayTime + lookahead) {
+    this.settleBreak()
+    if (!this.paused && !this.pendingBreak && !this.inflight && this.info.status === 'ready' && this.info.now < this.displayTime + lookahead) {
       this.inflight = true
       const gen = this.generation
       void this.call({ op: 'advance', to: this.displayTime + lookahead })
@@ -102,9 +120,26 @@ export class TwinController {
     this.model.prune(this.displayTime)
   }
 
+  /** Pause when the display reaches the event the engine stopped at for a breakpoint. */
+  private settleBreak(): void {
+    const hit = this.pendingBreak
+    if (!hit || this.displayTime < hit.event.t) return
+    this.pendingBreak = null
+    this.breakHit = hit
+    this.paused = true
+  }
+
+  /** Replace the breakpoints (the engine worker keeps them across resets). */
+  async setBreakpoints(list: Breakpoint[]): Promise<void> {
+    this.breakpoints = list.map((b) => ({ ...b }))
+    if (this.pendingBreak && !this.breakpoints.some((b) => b.id === this.pendingBreak?.breakpointId)) this.pendingBreak = null
+    await this.call({ op: 'setBreakpoints', breakpoints: this.breakpoints })
+  }
+
   setSpeed(speed: number): void {
     this.speed = speed
     this.paused = false
+    this.breakHit = null
   }
 
   pause(): void {
@@ -113,6 +148,7 @@ export class TwinController {
 
   play(): void {
     this.paused = false
+    this.breakHit = null
   }
 
   private async flatOut<T>(req: WorkerRequest, displayAt: (info: EngineInfo) => number): Promise<T> {
@@ -121,6 +157,7 @@ export class TwinController {
       const res = await this.call<T>(req)
       if (!res) throw new Error('Scenario was replaced during the run')
       this.displayTime = Math.max(this.displayTime, Math.min(displayAt(res.info), this.limit))
+      this.settleBreak()
       return res.result
     } finally {
       this.busy = false
@@ -130,6 +167,8 @@ export class TwinController {
   /** "Run to…": run flat out to sim time `time`, then resume at the current speed. */
   async runTo(time: number): Promise<RunResult> {
     if (!this.info) throw new Error('No scenario loaded')
+    this.breakHit = null
+    this.pendingBreak = null
     if (time <= this.displayTime) throw new Error('Run to: pick a time after the current sim time')
     return this.flatOut<RunResult>({ op: 'run', condition: { time } }, () => time)
   }
@@ -137,12 +176,16 @@ export class TwinController {
   /** Dev API: run flat out until a condition, then pause at the engine time. */
   async runUntil(condition: WorkerRunCondition = {}): Promise<RunResult> {
     this.paused = true
+    this.breakHit = null
+    this.pendingBreak = null
     return this.flatOut<RunResult>({ op: 'run', condition }, (info) => info.now)
   }
 
   /** Process the next engine event and show its time (pauses playback). */
   async step(): Promise<EventSummary | null> {
     this.paused = true
+    this.breakHit = null
+    this.pendingBreak = null
     return this.flatOut<EventSummary | null>({ op: 'step' }, (info) => info.now)
   }
 

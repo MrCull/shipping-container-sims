@@ -13,35 +13,28 @@ Handover for the next agent continuing the Terminal Twin build (the `/implement-
 
 ## Ticket status
 
+Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration branch: #25–#35 (TT-01, 02, 03, 04, 05, 09, 20, 22, 06, 25, 18). `npm run verify` passes (252 tests).
+
 | Ticket | Issue | State |
 |---|---|---|
-| TT-01 headless engine | #25 | ✅ merged |
-| TT-02 browser tracer | #26 | ✅ merged |
-| TT-03 decision points | #27 | ✅ merged |
-| TT-04 debug tooling | #28 | ✅ merged |
-| TT-05 SHC transport | #29 | ✅ merged |
-| TT-09 vessels & berthing | #30 | ✅ merged |
-| TT-20 locale/units/shortcuts | #31 | ✅ merged |
-| TT-22 asset pipeline + containers | #32 | ✅ merged |
-| TT-06 ASC block storage | #33 | ⏸ halted mid-way (see below) |
-| TT-18 debugger UI | #34 | ⏸ halted mid-way |
-| TT-25 SHC model | #35 | ⏸ halted mid-way |
-| TT-23 STS model | #36 | ⏸ halted mid-way |
-| TT-27 vessel hull models | #37 | ⏸ halted mid-way |
-| all others (#38–#52) | | not started |
+| TT-23 STS model | #36 | WIP, uncommitted files in worktree; branch `tt/36-sts-model` still at 95e15d6. Not yet resumed |
+| TT-27 vessel hulls | #37 | WIP, uncommitted files in worktree; branch `tt/37-vessel-hulls` still at 95e15d6. Not yet resumed |
+| TT-07 KPIs/report | #38 | WIP, uncommitted in worktree; `tt/38-kpis-report`. Not yet resumed |
+| TT-08 paired ASCs | #39 | WIP, uncommitted in worktree; `tt/39-paired-ascs`. Not yet resumed |
+| #40–#52 | | not started |
 
-**Halted work is NOT on GitHub.** It exists only as local branches `tt/33-…`, `tt/34-…`, `tt/35-…`, `tt/36-…` and `tt/37-…` in the original session's container, as unverified WIP commits. If you can't see those branches, restart those five tickets from this branch. All five are ready to start: their blockers are merged.
+**WIP is NOT on GitHub.** It lives only in git worktrees under `.claude/worktrees/agent-*` of the orchestrating session's container (branches `tt/36…`–`tt/39…` above; the merged `tt/33`, `tt/34`, `tt/35` branches are also there). A 5-hour API rate limit stopped all six implementers at once (limit reset at 12:10 UTC). If you can't see those branches, restart those tickets from the integration tip. Implementer subagents can be resumed with SendMessage if the session is still alive.
 
 ### Dependency graph (ticket ← blockers)
 
 ```
-33←29  34←29  35←32,29  36←32,30  37←32,30
+36←32,30  37←32,30
 38←33  39←33  40←39,30  41←38  42←32,39
 43←40  44←40  45←39,43  46←43,45  47←32,45
 48←46  49←48  50←48  51←48  52←32,45,51
 ```
 
-The frontier now is 33, 34, 35, 36 and 37. After 33 merges, 38 and 39 open; then follow the graph.
+Frontier: #36–#39 (in progress). After #39: #40, #42. After #38: #41. Then follow the graph.
 
 ## Process that worked
 
@@ -69,6 +62,9 @@ The frontier now is 33, 34, 35, 36 and 37. After 33 merges, 38 and 39 open; then
 - **Assets:** never commit `.blend` files or reference photos. `npm run tt:assets -- --python <bpy python>` regenerates GLBs (needs `pip install bpy`). Blender's Draco export is broken, so the pipeline uses gltf-transform meshopt + WebP. The CI budget check reads only committed GLBs and sidecars.
 - **Reference pack:** the TTI Algeciras pack (dimensions, workflows) was a user upload and is not in the repo. Ask the user for it if a model ticket needs it; the spec (#24) carries the key figures.
 - **Lint:** ESLint ignores `.claude/**`, because agent worktrees live there.
+- **GitHub MCP:** the github MCP server may fail to connect (bad Authorization header). Read issues with `gh api repos/MrCull/shipping-container-sims/issues/<n>` instead.
+- **Credit limit:** when near the session's usage limit, do not spawn new subagents (it leaves several tickets half done). Finish and merge what exists, and update this file.
+- **After a merge:** the main checkout needs `npm install` before `npm run verify`.
 
 ## Open follow-ups noted by implementers
 
@@ -457,3 +453,36 @@ Branch `tt/32-container-assets`. Full docs: `terminal-twin-AGENTS.md` § "Phase 
 - `.gitignore` has `out` (CRA leftover): don't name asset dirs `out`. Also ignores `*.blend`, `__pycache__/`, `.venv-bpy/`.
 - npm devDeps added: @gltf-transform/{core,extensions,functions} ^4.5, meshoptimizer ^1.3 (sharp comes in as optional).
 - Smoke: `tests/browser/container-assets.smoke.ts` (liveries, LOD switch, offline asset requests, viewer per asset, yard budget; ~50 s).
+
+### ticket-33 (TT-06): ASC block storage
+
+Branch `tt/33-asc-block-storage`, merged (5f944e4). Guide: `terminal-twin-AGENTS.md` § "ASC block storage (TT-06)". Replaces `ascStub.ts`; the asc `real` throw is gone.
+
+- **Engine:** `engine/subsystems/asc.ts`, `engine/yardLayout.ts` (slot ids like `B01:03-5-2`: 8 rows, 20 ft bays, tiers; a 40 ft box covers two bays, named by its lower bay). Default ASC mode is `real` when SHCs and blocks exist.
+- **Flow:** `ShcDroppedAtWtp` asks the `yardAllocation` DP (v1; strategies `random`, `nearest-wtp` default, `group-by-vessel`; use `candidateSlots(request)`). One request at a time per block. `ShcCleared` makes the box eligible; the ASC picks the oldest allocated, cleared job unless an older claim shares its stack (`claimSeq`).
+- **ASC events:** `AscJobAssigned → AscRoutingToPad → AscPositioningAtPad → AscLocking → AscPicked → AscRoutingToSlot → AscPositioningAtSlot → AscUnlocking → AscStacked → AscReady`, each carrying the gantry (Z), trolley (X) and hoist segments. The ASC reserves the pad zone via `reservations.ts`.
+- **State:** `SimState.yardSlots`, `SimState.yardBlocks` (claimed heights, `topVessels`), `ascJobs` (deleted at `AscStacked`). Invariants: `yard.slot-bounds`, `yard.stack-height`, `yard.no-floating`, `yard.no-double-occupied`, `yard.no-mixed-length-overlap`, `asc.wtp-handover`. `kpiReport().yard`; queries `asc ascs ascJobs yardBlock(s) yardSlot(s)`. ENGINE_VERSION 0.4.0.
+- **Config:** `BlockConfig` adds `bays, tiers, transferStalls`; `kinematics.asc`, `DEFAULT_ASC_KINEMATICS`; builder `.block() .ascKinematics()`, `withYard()`. Fixture `asc-1sts-10-boxes-1block`. The SHC fixture `shc-1sts-2shc-1wtp` is pinned to `asc:'instant'` (its golden was regenerated on purpose).
+- **Browser:** worker deltas for ASC motion/status, query kinds `asc ascList yardBlocks yardSlots`, `SceneModel.ascPose`, procedural blocks and ASCs, setup fieldset "Yard blocks and ASC", `__tt.load(name,{yard})`, `sceneState().ascs`. Smoke: `tests/browser/terminal-twin-asc.smoke.ts`.
+- **For later tickets:** nothing frees stack space yet (a full block leaves boxes on pads: `allocationFailures`). Retrieval must delete the slot, lower `heights`/`topVessels` and add rehandle events. Reuse `AscTrip`, `install`, `scheduleNext`, `advance`, the pad-zone reservation pattern, `ascPoseAt`, `shcPositionAt`. More ASCs per block need an ASC-ASC rail reservation like `rail.ts`; `ascIdOf(blockId)` assumes one ASC (`B01-ASC1`) and `SceneModel.blockOfAsc` strips `-ASC<n>`. Transfer stalls (TT-13) exist in config and drawing only; the truck flow needs a custody kind `truck` plus `custodyHolders` entries. Max 5 pads/stalls per block (enforced only by the setup dialog). The yardAllocation request carries two arrays of bays × 8 entries: revisit in TT-19.
+
+### ticket-34 (TT-18): debugger and inspection UI
+
+Merged. Guide: `terminal-twin-AGENTS.md` (debugger sections), GLOSSARY.
+
+- **Panels:** `E` = left panel (Step, Continue, breakpoints, event feed), `I` = right panel (event inspector, entity inspector). Overlay toggle bar is bottom-centre; new UI must not clash with the panels or the E/I shortcuts.
+- **Breakpoints** (`modules/breakpoints.ts`): event type, container id, equipment id, decision point. `eventMatchesBreakpoint` is the worker's stop predicate; `Delta.breakpoint` reports a hit (all hand-built `Delta` objects in tests need `breakpoint: null`). A breakpoint only catches events not yet processed (the engine runs up to `max(5 s, 1.5 s × speed)` ahead while playing).
+- **Picking/inspector:** `modules/picking.ts` (oriented boxes), `modules/entityInspector.ts`, `modules/overlayLayers.ts`, `modules/equipmentDims.ts` (STS/SHC/ASC dimensions; keep in sync with the 3D models since picking uses them; SHC there is still the placeholder 9.2 × 4.9 × 6.2 m, not the TT-25 rig box). **New equipment kind:** add it in `entityBounds` and `pickEntity` (picking.ts), `entityKind` and `describeEntity` (entityInspector.ts), the labelled-id list in overlayLayers.ts, and catalogue keys `inspector.kind.*` / `inspector.fact.*`.
+- **Overlays:** `laneGraph`, `reservations`, `occupancy`, `labels`; `O` masters them. Not built: an ASC reserved-rail-segment overlay (add it with TT-08, which introduces ASC rail reservations).
+- **Feed:** `store.recentEvents` capped at 1000 (`FEED_BUFFER_CAP`); TT-16 replaces the `store.dashboardOpen` placeholder.
+- **Dev API:** `addBreakpoint removeBreakpoint clearBreakpoints breakpoints inspectEvent debug pickAt screenPoint cameraTarget`; `ui()` adds `feedOpen inspectorOpen`.
+- **Smoke:** 9 new debugger specs. Three older smoke tests failed under load (clock ratio, SHC ×600 frame count, 18k-yard draw-call budget: 26 vs limit 20, also failing on the base). Rerun on a quiet machine.
+
+### ticket-35 (TT-25): SHC 3D model
+
+Merged. Guide: `terminal-twin-AGENTS.md` § "SHC model (TT-25)".
+
+- **Asset:** `assets/models/shc/shc.glb` + sidecar + previews; generators `tt_assets/shc.py` (geometry) and `shc_meta.py`; `budgets.json` shc entry; `tt:assets -- --only <group>`. Proportions are tagged `A` (the TTI reference pack is not in the repo); tune the constants at the top of `shc.py`.
+- **Renderer:** `modules/shcAssets.ts` (`loadShcModel`, `ShcRig`, `SHC_RIG`) loads the GLB behind the procedural placeholder; LODs 0–2 at 110 m / 380 m. `ShcPose` adds `yaw steerRad odometerM travelling`; `ContainerPose.carriedBy`. Dev API: `scene().shcLods/shcAssets`, `sceneState().shcRigs`, viewer `?viewer=shc`.
+- **Conventions for the STS/ASC/truck models:** every LOD repeats the rig node names (GLTFLoader renames duplicates; look nodes up via `userData.name` and animate every node of that name). Blender object names carry an `@LODn` suffix that `build.py strip_lod_suffix` removes from the GLB JSON. `container_attach` is the top of the carried box. Move the `Part` helpers (beam, plate, revolve) from `shc.py` into a shared module before the STS/ASC models. Use `liveries._Canvas` and `shc_meta.render_atlas` for swatch atlases.
+- **Gotchas:** SHC corners are visual only (the engine still stops at each turn). `tt:assets` is slow when several Blender jobs share the CPU; use `--only`. A bpy 5.2.3 venv (Python 3.13) is needed for regeneration. Don't use `pkill -f` patterns that match your own shell.

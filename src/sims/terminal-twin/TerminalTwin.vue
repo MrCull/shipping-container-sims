@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
+import EventFeedPanel from './components/debug/EventFeedPanel.vue'
+import InspectorPanel from './components/debug/InspectorPanel.vue'
 import OverlayToggles from './components/OverlayToggles.vue'
 import TopBar from './components/TopBar.vue'
 import SetupDialog from './components/modals/SetupDialog.vue'
@@ -55,7 +57,9 @@ onBeforeUnmount(() => {
       class="scene"
       data-testid="tt-scene"
     >
-      <OverlayToggles v-if="store.hasScenario && store.hasShcs && !webglFailed" />
+      <OverlayToggles v-if="store.hasScenario && !webglFailed" />
+      <EventFeedPanel v-if="store.hasScenario" />
+      <InspectorPanel v-if="store.hasScenario" />
       <div
         v-if="webglFailed"
         class="notice"

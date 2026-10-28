@@ -20,6 +20,16 @@ interface Sidecar {
   kind: string
   dimensions: { lengthM: number; widthM: number; heightM: number }
   travelLimits: Record<string, { type: 'rotation' | 'translation'; axis: string; minDeg?: number; maxDeg?: number; minM?: number; maxM?: number }>
+  /** SHC only: clear tunnel size and the container attach point (twist-lock plane at hoist rest). */
+  tunnel?: { clearWidthM: number; clearHeightM: number }
+  attachPoints?: { name: string; position: number[] }[]
+}
+
+/** A node with the rest transform its rig value is applied on top of (one per LOD that repeats the name). */
+interface RigNode {
+  o: THREE.Object3D
+  position: THREE.Vector3
+  quaternion: THREE.Quaternion
 }
 
 export interface AssetEntry {
@@ -66,12 +76,13 @@ export class AssetViewerScene {
   readonly camera = new THREE.PerspectiveCamera(40, 1, 0.1, 5000)
   readonly controls: OrbitControls
   private frame = 0
-  private asset: { entry: AssetEntry; root: THREE.Object3D; lods: Record<string, THREE.Object3D>; rest: Map<string, THREE.Object3D> } | null = null
+  private asset: { entry: AssetEntry; root: THREE.Object3D; lods: Record<string, THREE.Object3D>; rest: Map<string, RigNode[]> } | null = null
   private lod: ViewerLod = 'LOD0'
   private shownLod = 'LOD0'
   private livery = 0
   private rigValues: Record<string, number> = {}
   private reference: THREE.Object3D
+  private referenceSize: ContainerSize = '20'
   private yardInstancer: ContainerInstancer | null = null
   private loadToken = 0
   private materials = new Set<THREE.Material & { userData: { liveryBase?: { value: number } } }>()
@@ -102,15 +113,9 @@ export class AssetViewerScene {
     const grid = new THREE.GridHelper(200, 200, '#6b7280', '#8b9096')
     grid.position.y = 0.01
     this.scene.add(grid)
-    // Reference: a plain 20 ft ISO box outline, for scale.
-    const d = CONTAINER_DIMS['20']
-    const box = new THREE.BoxGeometry(d.length, d.height, d.width).translate(0, d.height / 2, 0)
+    // Reference: a plain ISO box outline for scale (20 ft beside most assets; 40 ft HC inside an SHC).
     this.reference = new THREE.Group()
-    this.reference.add(
-      new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: '#9ca3af', transparent: true, opacity: 0.35 })),
-      new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineBasicMaterial({ color: '#111827' })),
-    )
-    this.reference.name = 'reference-20ft'
+    this.setReferenceSize('20')
     this.scene.add(this.reference)
     this.resize(host)
     const loop = () => {
@@ -120,6 +125,31 @@ export class AssetViewerScene {
       this.renderer.render(this.scene, this.camera)
     }
     this.frame = requestAnimationFrame(loop)
+  }
+
+  private setReferenceSize(size: ContainerSize): void {
+    this.referenceSize = size
+    const d = CONTAINER_DIMS[size]
+    for (const child of [...this.reference.children]) {
+      this.reference.remove(child)
+      ;(child as THREE.Mesh).geometry?.dispose()
+    }
+    const box = new THREE.BoxGeometry(d.length, d.height, d.width).translate(0, d.height / 2, 0)
+    this.reference.add(
+      new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: '#9ca3af', transparent: true, opacity: 0.35 })),
+      new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineBasicMaterial({ color: '#111827' })),
+    )
+    this.reference.name = `reference-${size.toLowerCase()}`
+  }
+
+  /** SHC: the reference box hangs from the spreader, so it follows the hoist slider (its top is the twist-lock plane). */
+  private placeCarriedReference(): void {
+    const asset = this.asset
+    if (!asset || asset.entry.meta.kind !== 'shc') return
+    const attach = asset.entry.meta.attachPoints?.find((a) => a.name === 'container_attach')
+    const hoist = this.rigValues.hoist ?? 0
+    const top = (attach?.position[1] ?? 0) + hoist
+    this.reference.position.set(0, top - CONTAINER_DIMS[this.referenceSize].height, 0)
   }
 
   resize(host: HTMLElement): void {
@@ -156,19 +186,30 @@ export class AssetViewerScene {
       const node = root.getObjectByName(n)
       if (node) lods[n] = node
     }
-    const rest = new Map<string, THREE.Object3D>()
-    for (const node of Object.keys(entry.meta.travelLimits ?? {})) {
-      const o = root.getObjectByName(node)
-      if (o) rest.set(node, o.clone(false))
-    }
+    // Every LOD repeats the rig node names, so a rig value is applied to each node of that name.
+    const rest = new Map<string, RigNode[]>()
+    root.traverse((o) => {
+      // GLTFLoader renames duplicate node names (`wheel_fl_1`); the file's own name is in userData.name.
+      const name = (o.userData.name as string | undefined) ?? o.name
+      if (!(name in (entry.meta.travelLimits ?? {}))) return
+      const list = rest.get(name) ?? []
+      list.push({ o, position: o.position.clone(), quaternion: o.quaternion.clone() })
+      rest.set(name, list)
+    })
     this.asset = { entry, root, lods, rest }
     this.rigValues = Object.fromEntries([...rest.keys()].map((n) => [n, 0]))
     this.scene.add(root)
     const { lengthM, widthM, heightM } = entry.meta.dimensions
-    this.reference.position.set(0, 0, widthM / 2 + CONTAINER_DIMS['20'].width / 2 + 1.5)
     this.reference.visible = true
+    if (entry.meta.kind === 'shc') {
+      this.setReferenceSize('40HC')
+      this.placeCarriedReference()
+    } else {
+      this.setReferenceSize('20')
+      this.reference.position.set(0, 0, widthM / 2 + CONTAINER_DIMS['20'].width / 2 + 1.5)
+    }
     const span = Math.max(lengthM, heightM, 8)
-    this.controls.target.set(0, heightM / 2, 1.5)
+    this.controls.target.set(0, heightM / 2, entry.meta.kind === 'shc' ? 0 : 1.5)
     this.camera.position.set(span * 0.9, span * 0.55, -span * 1.1)
     this.controls.update()
     this.setLod(options.lod ?? 'LOD0')
@@ -215,17 +256,19 @@ export class AssetViewerScene {
 
   setRig(node: string, value: number): AssetViewStats {
     const ctl = this.rigControls().find((c) => c.node === node)
-    const o = this.asset?.root.getObjectByName(node)
     const rest = this.asset?.rest.get(node)
-    if (!ctl || !o || !rest) throw new Error(`no rig control ${node}`)
+    if (!ctl || !rest) throw new Error(`no rig control ${node}`)
     const v = Math.min(ctl.max, Math.max(ctl.min, value))
     const axis = axisVector(ctl.axis)
-    if (ctl.type === 'rotation') {
-      o.quaternion.copy(rest.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(axis, THREE.MathUtils.degToRad(v)))
-    } else {
-      o.position.copy(rest.position).addScaledVector(axis, v)
+    for (const { o, position, quaternion } of rest) {
+      if (ctl.type === 'rotation') {
+        o.quaternion.copy(quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(axis, THREE.MathUtils.degToRad(v)))
+      } else {
+        o.position.copy(position).addScaledVector(axis, v)
+      }
     }
     this.rigValues[node] = v
+    if (node === 'hoist') this.placeCarriedReference()
     return this.stats()!
   }
 
@@ -244,6 +287,25 @@ export class AssetViewerScene {
       rigValues: { ...this.rigValues },
       livery: this.livery,
       referenceContainer: this.reference.visible,
+      reference: this.referenceFit(),
+    }
+  }
+
+  /** SHC viewer: the reference box against the sidecar's tunnel (clear width and height). */
+  private referenceFit(): AssetViewStats['reference'] {
+    const tunnel = this.asset?.entry.meta.tunnel
+    if (!this.reference.visible || !tunnel) return null
+    const d = CONTAINER_DIMS[this.referenceSize]
+    const topM = this.reference.position.y + d.height
+    return {
+      size: this.referenceSize,
+      lengthM: d.length,
+      widthM: d.width,
+      heightM: d.height,
+      topM,
+      clearWidthM: tunnel.clearWidthM,
+      clearHeightM: tunnel.clearHeightM,
+      fitsTunnel: d.width < tunnel.clearWidthM && topM < tunnel.clearHeightM && this.reference.position.y >= 0,
     }
   }
 

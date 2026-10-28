@@ -7,6 +7,7 @@
  *
  * Options:
  *   --check          regenerate into a temp folder and compare with the committed files (exit 1 on any difference)
+ *   --only <group>   regenerate one group only (containers | shc; repeatable); default all
  *   --no-previews    skip the Cycles previews (keeps the committed ones)
  *   --samples <n>    Cycles samples per preview (default 48)
  *   --python <exe>   Python with bpy (default: $TT_BPY_PYTHON, then python3.13 / python3 / python, or `py -3.13` on Windows)
@@ -24,9 +25,10 @@ import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer'
 import { ASSETS_DIR, MODELS_DIR, runBudgetCli } from './budgetCheck'
 
 const GENERATOR = join(ASSETS_DIR, 'generators', 'build.py')
-const GROUPS = ['containers']
+const GROUPS = ['containers', 'shc']
 
 interface Options {
+  only: string[]
   check: boolean
   previews: boolean
   samples: number
@@ -34,10 +36,11 @@ interface Options {
 }
 
 function parseArgs(argv: string[]): Options {
-  const o: Options = { check: false, previews: true, samples: 48, python: process.env.TT_BPY_PYTHON }
+  const o: Options = { only: [], check: false, previews: true, samples: 48, python: process.env.TT_BPY_PYTHON }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--check') o.check = true
+    else if (a === '--only') o.only.push(argv[++i])
     else if (a === '--no-previews') o.previews = false
     else if (a === '--samples') o.samples = Number(argv[++i])
     else if (a === '--python') o.python = argv[++i]
@@ -90,18 +93,21 @@ function listFiles(dir: string): string[] {
 
 async function main(): Promise<number> {
   const opts = parseArgs(process.argv.slice(2))
+  for (const g of opts.only) if (!GROUPS.includes(g)) throw new Error(`Unknown group ${g} (known: ${GROUPS.join(', ')})`)
+  const groups = opts.only.length ? GROUPS.filter((g) => opts.only.includes(g)) : GROUPS
   const python = findPython(opts.python)
   const staging = mkdtempSync(join(tmpdir(), 'tt-assets-stage-'))
   const result = mkdtempSync(join(tmpdir(), 'tt-assets-out-'))
   try {
     const args = [...python.slice(1), GENERATOR, '--out', staging, '--samples', String(opts.samples)]
     if (!opts.previews) args.push('--no-previews')
+    for (const g of groups) args.push('--only', g)
     console.log('Generating with Blender…')
     const gen = spawnSync(python[0], args, { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8', maxBuffer: 1 << 28 })
     for (const line of gen.stdout.split('\n')) if (line.startsWith('[') || line.startsWith('bpy')) console.log(`  ${line}`)
     if (gen.status !== 0) throw new Error(`Blender generator failed (exit ${gen.status})`)
 
-    for (const group of GROUPS) {
+    for (const group of groups) {
       const from = join(staging, group)
       const to = join(result, group)
       mkdirSync(to, { recursive: true })
@@ -118,7 +124,7 @@ async function main(): Promise<number> {
 
     if (opts.check) {
       const diffs: string[] = []
-      for (const group of GROUPS) {
+      for (const group of groups) {
         const a = listFiles(join(MODELS_DIR, group)).sort()
         const b = listFiles(join(result, group)).sort()
         for (const f of new Set([...a, ...b])) {
@@ -133,7 +139,7 @@ async function main(): Promise<number> {
       return diffs.length ? 1 : 0
     }
 
-    for (const group of GROUPS) {
+    for (const group of groups) {
       const target = join(MODELS_DIR, group)
       rmSync(target, { recursive: true, force: true })
       cpSync(join(result, group), target, { recursive: true })
