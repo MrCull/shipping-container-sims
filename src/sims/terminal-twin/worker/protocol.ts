@@ -32,6 +32,10 @@ export type QueryKind =
   | 'shc'
   | 'shcList'
   | 'wtpPad'
+  | 'asc'
+  | 'ascList'
+  | 'yardBlocks'
+  | 'yardSlots'
   | 'reservations'
   | 'kpis'
   | 'summary'
@@ -53,7 +57,7 @@ export type WorkerRequest =
 
 export type WorkerRequestMessage = WorkerRequest & { rid: number }
 
-/** A new motion plan of one crane or SHC (all axes, sequential). */
+/** A new motion plan of one crane, SHC or ASC (all axes, sequential). */
 export interface MotionPlan {
   entityId: string
   segments: MotionSegment[]
@@ -71,7 +75,7 @@ export interface CustodyChange {
 }
 
 export interface EntityStateChange {
-  kind: 'sts' | 'vessel' | 'shc'
+  kind: 'sts' | 'vessel' | 'shc' | 'asc'
   id: string
   t: number
   status: string

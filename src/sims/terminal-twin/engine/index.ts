@@ -18,11 +18,36 @@ export type {
   ShcStatus,
   ShcJob,
   WtpPadState,
+  AscState,
+  AscStatus,
+  AscJob,
+  YardBlockState,
+  YardSlotState,
 } from './state'
+export {
+  BLOCK_ROWS,
+  ROW_PITCH_M,
+  BAY_PITCH_M,
+  TIER_PITCH_M,
+  blockSpec,
+  blockSpecs,
+  boxSpan,
+  candidateSlots,
+  parseYardSlotId,
+  yardSlotId,
+  rowX,
+  bayZ,
+  slotZ,
+  tierBaseY,
+  travelHoistM,
+} from './yardLayout'
+export type { BlockSpec, YardCandidate, YardStacks } from './yardLayout'
+export { ascPoseAt } from './subsystems/asc'
+export { ascIdOf } from './state'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
 export type { Reservation } from './reservations'
-export type { ShcPhasePayload } from './events'
+export type { ShcPhasePayload, AscPhasePayload } from './events'
 export { defaultHandlers } from './handlers'
 export type { HandlerSet, GroundPositionRequest, GroundPositionReply } from './handlers'
 export {
@@ -45,6 +70,8 @@ export type {
   ShcDispatchPad,
   ShcDispatchReply,
   ShcDispatchRequest,
+  YardAllocationReply,
+  YardAllocationRequest,
 } from './decisions/types'
 export { strategies, getStrategy } from './decisions/strategies'
 export type { StrategyDefinition, StrategyRegistry, DecisionPointStrategies } from './decisions/strategies'

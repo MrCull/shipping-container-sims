@@ -47,6 +47,23 @@ const STATUS_AFTER: Record<PlannedType, ShcStatus> = {
   ShcParked: 'parked',
 }
 
+/** Where an SHC is at `t` (plan view), from its current trip's motion; at rest it is at its node. */
+export function shcPositionAt(graph: LaneGraph, shc: ShcState, t: number): { x: number; z: number } {
+  const node = graph.nodes[shc.nodeId]
+  const axis = (a: 'x' | 'z', rest: number): number => {
+    let last: MotionSegment | null = null
+    let first: MotionSegment | null = null
+    for (const s of shc.motion) {
+      if (s.axis !== a) continue
+      first ??= s
+      if (s.t0 <= t) last = s
+    }
+    if (last) return positionAt(last, t)
+    return first ? first.from : rest
+  }
+  return { x: axis('x', node.x), z: axis('z', node.z) }
+}
+
 function kinematics(ctx: EngineContext): ShcKinematics {
   return ctx.config.kinematics.shc ?? DEFAULT_SHC_KINEMATICS
 }
