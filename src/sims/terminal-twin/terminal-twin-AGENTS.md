@@ -30,6 +30,8 @@
 | Browser / UI / 3D view | `npm run test:smoke` | Playwright smoke tests in `tests/browser/*.smoke.ts` pass (dev server + a production build). Not part of `npm test` or CI. |
 | Look at the 3D view | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('tracer-1sts-10-boxes').then(() => window.__tt.runTo(330)).then(() => window.__tt.pause())"` | PNG in `.screenshots/` shows the STS mid-cycle, no page errors |
 | UI text, locale, units, shortcuts | `npm test` (`display-format`, `display-settings`, `message-catalogue`) + `npx playwright test --project=dev src/sims/terminal-twin/tests/browser/terminal-twin-display.smoke.ts` | catalogue audit lists no hard-coded strings; locale/units/shortcut smoke tests pass |
+| Debugger and inspector (breakpoints, step, cause chain, picking, follow, overlays) | `npx vitest run src/sims/terminal-twin/tests/{breakpoints,debugger-host,debugger-controller,event-feed,event-inspector,entity-inspector,picking}.test.ts` + `npx playwright test --project=dev src/sims/terminal-twin/tests/browser/terminal-twin-debugger.smoke.ts` | Vitest proves the logic through the worker host and an in-process controller; the smoke spec clicks, steps, pauses at breakpoints and checks the overlays against `sceneState()` |
+| Debugger in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 2500 --fail-on-error --eval "window.__tt.load('shc-1sts-2shc-1wtp').then(async () => { await window.__tt.addBreakpoint('eventType','ShcDroppedAtWtp'); await window.__tt.runTo(1e5); window.__tt.overlays({occupancy:true,labels:true}); window.__tt.select('SHC01'); window.dispatchEvent(new KeyboardEvent('keydown',{key:'e'})) })"` | feed on the left with the breakpoint hit highlighted, inspector on the right (event, payload, cause chain), labels and pad plates in the scene |
 | Fixture definition change | `npm run tt:fixtures`, then `npm run tt:golden -- --update` | committed fixture JSON matches `definitions.ts` |
 | Berthing / anchorage | `npm run tt:run -- --fixture two-vessels-compete-for-berth` | V002 `anchorage` > 0 s, `Quay: 1 vessel(s) waited`; `tests/berthing.test.ts` |
 | Crane split / rail order | `npm run tt:run -- --fixture crane-split-4sts --strategy craneSplit=equal-bays` (vs the default `balanced-moves`) | 4 STS lines with different move counts, 0 violations (`sts.rail-order` is checked after every event); `tests/crane-split.test.ts` |
@@ -101,7 +103,9 @@ terminal-twin/
 │   └── display.ts            Browser defaults, remembered choice (localStorage), runConfigFor (config + display, SI)
 ├── definition.ts             Home card (keep light: eagerly imported)
 ├── TerminalTwin.vue          Root: TopBar, 3D host, SetupDialog, banner; installs window.__tt in DEV
-├── components/               TopBar.vue (clock, speeds, Run to…, Reset, New Scenario, ?), OverlayToggles.vue,
+├── components/               TopBar.vue (clock, speeds, Step, Run to…, Reset, New Scenario, ?), OverlayToggles.vue,
+│                             debug/EventFeedPanel.vue (left: step/continue, breakpoints, filterable feed),
+│                             debug/InspectorPanel.vue (right: event inspector + selection inspector),
 │                             modals/SetupDialog.vue (scenario, seed, start, display, quay, STS, vessels, SHC fleet),
 │                             modals/ShortcutHelp.vue, setup/VesselTable.vue (vessel table + "Generate N vessels")
 ├── composables/useTwinShortcuts.ts  Window keydown → store actions (table in modules/shortcuts.ts)
@@ -114,6 +118,14 @@ terminal-twin/
 │   │                         ContainerInstancer (yaw per box); lane-graph + reservation overlays
 │   ├── containerAssets.ts    Loads container GLBs (meshopt decoder from three), bakes LODs, livery shader patch
 │   ├── containerInstancer.ts Instanced containers: placeholders → GLB LOD0/LOD1 per size, liveryIndex per instance
+│   ├── breakpoints.ts        Breakpoint kinds + eventMatchesBreakpoint (also used inside the worker)
+│   ├── eventFeed.ts          Feed rows: filter, display-time cut-off, burst summaries, caps
+│   ├── eventInspector.ts     describeEvent: payload, subject links, decision request/reply
+│   ├── entityInspector.ts    describeEntity: state, current job, custody history of a container/STS/SHC/ASC/vessel
+│   ├── picking.ts            entityBounds + pickEntity (ray vs oriented boxes; also the selection outline)
+│   ├── overlays.ts           OverlayState (laneGraph, reservations, occupancy, labels) + NO_OVERLAYS
+│   ├── overlayLayers.ts      Three.js occupancy plates and state labels (read the SceneModel at display time)
+│   ├── equipmentDims.ts      STS / SHC proportions shared by the renderer and picking
 │   ├── shortcuts.ts          SHORTCUT_HELP table + shortcutFor(key event) (ignores typing targets)
 │   └── time.ts               Start date default (Mon 06:00), datetime-local helpers
 ├── store/twinStore.ts        Pinia facade (small reactive UI state; controller/view kept raw)
@@ -150,7 +162,7 @@ terminal-twin/
 - **Message catalogue.** Every user-visible string in the sim's `.vue` files comes from `i18n/messages.ts` via `t('key', { param })`. `tests/message-catalogue.test.ts` parses every SFC (template text, `title`/`aria-label`/`placeholder`/`alt`/`label`, string literals in `<script>` and template expressions that read as UI text) and fails on hard-coded text. Add the key first, then use it. Ids, fixture names and engine values are data, not text.
 - **Display settings** (`DisplaySettings {locale, units}`, type in `scenario/types.ts`): `store.display`, `store.fmt` (a `Formatter`), `store.setDisplay(partial)`. They default from `navigator.languages` on first open (US region → imperial, else metric; bare `en` → US), are remembered in `localStorage` (`terminal-twin.display`), and are written into the run's config as `config.display` (`store.config`, the SI config a save should store). Changing them applies live (the setup dialog's select/radios call `setDisplay` immediately; Cancel keeps them).
 - **Units are display-only.** Engine, configs, snapshots stay SI. Format with `store.fmt.length(m)`, `.speed(m/s)` (km/h or **mi/h**; never "mph", which means crane moves per hour), `.mass(t)` (t or US tons), `.number(n, digits)`, `.movesPerHour`, `.teu`, `.clock(startIso, t)`, `.dateTime(date)`, `.firstDayOfWeek()`, `.weekdayName(d)`. Never format numbers or dates with `toFixed`/`toLocale*` in components.
-- **Shortcuts** (`modules/shortcuts.ts` table → `composables/useTwinShortcuts.ts`): Space pause/resume, 1–9 = ×1…×600, 0 = pause, `.` single-step (`store.step()`, pauses), F follow selection (`store.following`; the scene loop re-aims the camera each frame), Esc closes help else deselects (stops following), D `store.dashboardOpen` (placeholder panel until TT-16), O `store.overlaysVisible` (state only, plus a toast; TT-18 overlays read it), `?` help overlay (`store.helpOpen`; also the top bar `?` button). Ignored with Ctrl/Meta/Alt, in inputs/selects/textareas/contenteditable, on key repeat (except `.`), and while the setup dialog is open. Space calls `preventDefault` so a focused button is not also clicked. The help overlay renders `SHORTCUT_HELP`, so add new shortcuts there.
+- **Shortcuts** (`modules/shortcuts.ts` table → `composables/useTwinShortcuts.ts`): Space pause/resume, 1–9 = ×1…×600, 0 = pause, `.` single-step (`store.step()`, pauses), F follow selection (`store.following`; the scene loop re-aims the camera each frame), Esc closes help else deselects (stops following), D `store.dashboardOpen` (placeholder panel until TT-16), O `store.overlaysVisible` (master switch of the TT-18 overlays, plus a toast), E / I toggle the event feed and inspector panels (TT-18), `?` help overlay (`store.helpOpen`; also the top bar `?` button). Ignored with Ctrl/Meta/Alt, in inputs/selects/textareas/contenteditable, on key repeat (except `.`), and while the setup dialog is open. Space calls `preventDefault` so a focused button is not also clicked. The help overlay renders `SHORTCUT_HELP`, so add new shortcuts there.
 - **God mode:** the shared `useGodModeHotkey` ("god" typed anywhere) is not mounted by Terminal Twin. Don't add it: its `o`/`d` keys would also toggle overlays and the dashboard.
 
 ### Dev API (`window.__tt`, dev builds only)
@@ -167,7 +179,7 @@ await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001
 await __tt.snapshot(); await __tt.why(eventId)
 __tt.select(id | null); __tt.cameraTo(id); __tt.setSpeed(600); __tt.pause(); __tt.play(); await __tt.reset(); __tt.newScenario()
 await __tt.query('shc' | 'wtpPad', id); await __tt.query('shcList' | 'reservations')
-__tt.overlays({ laneGraph?, reservations? })   // toggles 3D overlays, returns the state
+__tt.overlays({ laneGraph?, reservations?, occupancy?, labels? })   // toggles 3D overlays, returns the state
 await __tt.load('shc-1sts-2shc-1wtp', { shc: { count: 3, kinematics } })  // SHC fleet override, like the setup dialog
 __tt.clock()       // { displayTime, speed, paused, busy, engine: EngineInfo }
 __tt.scene()       // rendered { containers, sts, shcs, vessels, overlays, reservedZones, frames,
@@ -179,8 +191,23 @@ __tt.sceneState()  // what the scene shows: custody per box, status + pose per S
 __tt.cameraTo(id, distanceM?)  // aim at an entity, optionally from a distance (60 → LOD0, 600 → LOD1)
 __tt.display(); __tt.setDisplay({ locale: 'de-DE', units: 'imperial' })  // live locale/units
 __tt.config()      // loaded scenario config (SI) + current display settings
-__tt.ui()          // { selectedId, following, overlaysVisible, dashboardOpen, helpOpen }
+__tt.ui()          // { selectedId, following, overlaysVisible, dashboardOpen, helpOpen, feedOpen, inspectorOpen }
+await __tt.addBreakpoint('eventType' | 'container' | 'equipment' | 'decision', value); await __tt.removeBreakpoint(id); await __tt.clearBreakpoints(); __tt.breakpoints()
+await __tt.inspectEvent(eventId)   // opens the inspector on the event and its cause chain
+__tt.debug()       // { breakHit, paused, inspectedEvent: { id, type, chain: [{id, type, causedBy}] }, entity: { kind, id, status } }
+__tt.screenPoint(id); __tt.pickAt(clientX, clientY); __tt.cameraTarget()   // 3D picking and the follow camera, client coordinates
 ```
+
+## Debugger and inspection UI (TT-18)
+
+- **Panels.** `E` toggles the left panel (`EventFeedPanel`: Step, Continue, breakpoints, filter, event feed), `I` the right panel (`InspectorPanel`). Both start collapsed. Clicking something, or a breakpoint hit, opens the inspector. They overlay the 3D view (the canvas is not resized). The top bar has a Step button as well as `.`.
+- **Breakpoints** (`modules/breakpoints.ts`): on an event type, a container id, an equipment id or a decision point (matches `DecisionRequested/Resolved/Failed` of that point). The list lives in the store and is sent to the worker (`setBreakpoints`), which keeps it across load/reset. `eventMatchesBreakpoint` is the stop `predicate` of every `advance`/`run`/`step`, so the engine stops right after the matching event and `Delta.breakpoint` names it. The controller keeps it as `pendingBreak` until the display reaches that event (look-ahead), then pauses with `breakHit` set, and the store opens the inspector on it. `play()`, a speed button, Run to… and step clear `breakHit`. A breakpoint added while the engine is already ahead of the display (look-ahead, at most `max(5 s, 1.5 s × speed)`) only catches events that have not been processed yet.
+- **Single-step** is one engine event per press at any speed (it pauses). The inspector shows the stepped event. With the engine ahead of the display after a pause, the display jumps to that event's time (see the pitfalls).
+- **Event feed** (`modules/eventFeed.ts`): the store keeps the last `FEED_BUFFER_CAP` (1000) summarised events; the panel rebuilds its rows every `FEED_REFRESH_MS` (250 ms, never per frame), shows only events up to the display time, newest first, at most `FEED_MAX_ROWS` (150). From ×60 (`FEED_SUMMARY_MIN_SPEED`) while playing, runs of three or more events of one type collapse into a "N × Type" row. The filter takes space-separated terms that must all occur in the event type or a subject id.
+- **Event inspector** (`modules/eventInspector.ts`): payload (motion segments summarised), clickable subjects, and for decision events the handler, outcome, request and reply. The cause chain comes from the engine's `why` through the worker (`op: 'why'`), newest first and ending at the root `ScenarioStarted` (or an injected root); clicking an entry shows that event while keeping the chain.
+- **Selection** (`modules/picking.ts`): `entityBounds(model, id, t)` gives each container, SHC, ASC, STS and vessel an oriented box (also the selection outline). `pickEntity` returns the nearest container the ray hits, else the nearest equipment or vessel (their boxes enclose their boxes). A click (under 5 px and 600 ms) selects; a click on nothing deselects; dragging orbits as before. `store.select(id)` opens the inspector and `refreshEntity()` queries the engine (`container`, `sts`, `shc` + `shcJobs`, `asc`, `vessel`); the inspector refreshes twice a second. It shows the engine's state (which may be slightly ahead of the display while playing); the container custody history is the engine's full history. For equipment and vessels, "history" is the recent events that name the id (from the feed buffer).
+- **Follow camera.** The Follow button in the inspector or `F`. The scene loop re-aims the orbit target at the selection every frame, keeping the viewing offset.
+- **Overlays** (`modules/overlays.ts`, `OverlayToggles.vue`): `laneGraph`, `reservations`, `occupancy`, `labels`, independent of each other; `O` is the master switch. Occupancy tints WTP pads free/occupied and marks boxes standing on STS ground positions; labels float above each STS, SHC, ASC and berthed or anchored vessel with its status. Both read the `SceneModel` at the display time (`OverlayLayers`), and `scene().layers` reports the counts for tests. An overlay for the ASC reserved rail segments is not built: the ASCs (TT-06) do not reserve rail segments yet, so add it with the ticket that introduces them.
 
 ## Horizontal transport: SHCs (TT-05)
 
@@ -445,6 +472,9 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 - Browser: deltas in a flat-out run are compacted per entity. Large Run to… jumps at TTI scale may still need a smarter "final state only" message (TT-19).
 - Smoke tests: `playwright.config.ts` starts a Vite dev server (port 5199) and builds plus previews production (`.smoke-dist/`, port 5198) every run. Chromium falls back to `/opt/pw-browsers/chromium` like `npm run screenshot`.
 - Locale: `<input type="datetime-local">` (setup start, Run to…) is rendered by the browser in the *browser's* locale, not the chosen one; the clock, preview and readouts follow the chosen locale.
+- Debugger: the engine runs ahead of the display while playing, so `query` and the inspector describe the engine's time, not the displayed instant, and a pause followed by Step jumps the display to the next unprocessed event.
+- Debugger: a breakpoint can only stop events not yet processed; the feed and the inspector never show events later than the display time, except the one that hit a breakpoint (the display is moved to it).
+- Debugger: the picking boxes are generous (cranes and hulls enclose everything under them); containers always win. A box on an SHC or inside a crane is picked, the carrier itself by clicking its frame.
 - Shortcut `.` while playing pauses and steps the engine's next event, which is beyond the look-ahead, so the display jumps forward slightly. Pause first (Space/0) to step event by event.
 - The `ScenarioEnded` and `InvariantViolated` events are committed directly. They are not queued and are not invariant-checked.
 - Assets: run the generators only through `npm run tt:assets`; it replaces `assets/models/<group>/` wholesale, so hand edits to a committed GLB or sidecar are lost.

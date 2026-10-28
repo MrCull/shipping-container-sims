@@ -146,7 +146,7 @@ test('lane-graph and reservation overlays toggle on and off', async ({ page }) =
   await expect(lanes).toHaveAttribute('aria-pressed', 'true')
   await expect
     .poll(() => page.evaluate(() => window.__tt!.scene()?.overlays))
-    .toEqual({ laneGraph: true, reservations: true })
+    .toEqual({ laneGraph: true, reservations: true, occupancy: false, labels: false })
   const active = await page.evaluate(() => window.__tt!.sceneState()!.reservations)
   expect(Object.keys(active).length).toBeGreaterThan(0)
   await expect.poll(() => page.evaluate(() => window.__tt!.scene()?.reservedZones ?? 0)).toBe(Object.keys(active).length)
@@ -158,7 +158,7 @@ test('lane-graph and reservation overlays toggle on and off', async ({ page }) =
   await reservations.click()
   await expect
     .poll(() => page.evaluate(() => window.__tt!.scene()?.overlays))
-    .toEqual({ laneGraph: false, reservations: false })
+    .toEqual({ laneGraph: false, reservations: false, occupancy: false, labels: false })
   await expect.poll(() => page.evaluate(() => window.__tt!.scene()?.reservedZones)).toBe(0)
   expect(errors).toEqual([])
 })

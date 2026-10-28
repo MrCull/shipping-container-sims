@@ -13,13 +13,19 @@ import { applyOverrides, type ScenarioOverrides } from '../scenario/overrides'
 import { presets } from '../scenario/presets'
 import { withShcFleet, withYard, type YardSetup } from '../scenario/builder'
 import type { DisplaySettings, ScenarioConfig, ShcKinematics } from '../scenario/types'
-import type { Delta, EngineInfo, EventSummary } from '../worker/protocol'
+import type { EngineEvent } from '../engine'
+import type { BreakpointHit, Delta, EngineInfo, EventSummary } from '../worker/protocol'
+import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
+import { describeEntity, entityKind, entityQueryKind, type EntityView } from '../modules/entityInspector'
+import { describeEvent, type EventDescription } from '../modules/eventInspector'
+import { FEED_BUFFER_CAP } from '../modules/eventFeed'
 import { SPEEDS, TwinController } from '../modules/twinController'
 import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/display'
 import { createFormatter } from '../i18n/format'
 import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
-import type { OverlayState, RenderedLivery, SceneStats } from '../modules/sceneRenderer'
+import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
+import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
 
 export type TwinPhase = 'setup' | 'running'
@@ -42,6 +48,12 @@ export interface ScenarioChoice {
 export interface TwinView {
   /** Aim at an entity, keeping the view direction (and, if given, at `distanceM`). */
   cameraTo(entityId: string, distanceM?: number): boolean
+  /** The entity under a viewport point (client coordinates) at the displayed time, or null. */
+  pickAt(clientX: number, clientY: number): string | null
+  /** Viewport (client) coordinates of an entity's centre; null when it is not drawn or off screen. */
+  screenPoint(entityId: string): { x: number; y: number } | null
+  /** Where the orbit camera currently looks. */
+  cameraTarget(): { x: number; y: number; z: number } | null
   /** Rendered entity counts plus frames rendered so far; null without a 3D view. */
   stats(): (SceneStats & { frames: number }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */
@@ -50,7 +62,7 @@ export interface TwinView {
   shcRigs(): Record<string, ShcRigState> | null
 }
 
-const RECENT_EVENTS_CAP = 500
+const RECENT_EVENTS_CAP = FEED_BUFFER_CAP
 const TOAST_MS = 1600
 
 /** localStorage, or null where it is unavailable (private mode, blocked, tests). */
@@ -86,6 +98,13 @@ export function randomSeed(): number {
   return Math.floor(Math.random() * 2 ** 31)
 }
 
+/** An inspected event with its cause chain (newest first, root last). */
+export interface InspectedEvent {
+  chain: EventDescription[]
+  /** Which chain entry the inspector shows. */
+  index: number
+}
+
 export const useTwinStore = defineStore('terminal-twin', () => {
   const phase = ref<TwinPhase>('setup')
   const choice = ref<ScenarioChoice>({
@@ -107,7 +126,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const selectedId = ref<string | null>(null)
   const recentEvents = shallowRef<EventSummary[]>(markRaw([]))
   /** 3D debug overlays (lane graph, active reservations). */
-  const overlays = ref<OverlayState>({ laneGraph: false, reservations: false })
+  const overlays = ref<OverlayState>({ ...NO_OVERLAYS })
   /** Locale + units: browser defaults on first open, then the remembered choice. Display only. */
   const display = ref<DisplaySettings>(loadDisplaySettings(browserStorage(), browserLanguages()))
   /** Formatter for the current display settings (Intl objects; rebuilt when they change). */
@@ -121,6 +140,16 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const helpOpen = ref(false)
   const toast = ref<{ id: number; text: string } | null>(null)
   let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+  /** Debugger (TT-18): breakpoints, the one that paused playback, panels, inspected event and selection. */
+  const breakpoints = ref<Breakpoint[]>([])
+  const breakHit = shallowRef<BreakpointHit | null>(null)
+  const feedOpen = ref(false)
+  const inspectorOpen = ref(false)
+  const feedFilter = ref('')
+  const inspectedEvent = shallowRef<InspectedEvent | null>(null)
+  const entityView = shallowRef<EntityView | null>(null)
+  let nextBreakpointId = 1
 
   let controller: TwinController | null = null
   let view: TwinView | null = null
@@ -146,6 +175,13 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     paused.value = controller.paused
     busy.value = controller.busy
     if (info.value !== controller.info) info.value = controller.info
+    if (breakHit.value !== controller.breakHit) {
+      breakHit.value = controller.breakHit
+      if (controller.breakHit) {
+        inspectorOpen.value = true
+        void inspectEvent(controller.breakHit.event.id)
+      }
+    }
   }
 
   async function run<T>(action: () => Promise<T>): Promise<T> {
@@ -172,6 +208,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       config.value = markRaw(runConfig)
       recentEvents.value = markRaw([])
       selectedId.value = null
+      entityView.value = null
+      inspectedEvent.value = null
       following.value = false
       hasScenario.value = true
       hasShcs.value = (runConfig.shcs?.length ?? 0) > 0
@@ -186,6 +224,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   async function reset(): Promise<void> {
     await run(() => ctl().reset())
     recentEvents.value = markRaw([])
+    inspectedEvent.value = null
+    void refreshEntity()
   }
 
   function newScenario(): void {
@@ -221,7 +261,82 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   function select(id: string | null): void {
     selectedId.value = id
-    if (!id) following.value = false
+    if (!id) {
+      following.value = false
+      entityView.value = null
+      return
+    }
+    inspectorOpen.value = true
+    void refreshEntity()
+  }
+
+  /** Re-read the selected entity from the engine (the inspector calls this a few times per second). */
+  async function refreshEntity(): Promise<void> {
+    const id = selectedId.value
+    const c = controller
+    if (!id || !c?.model) {
+      entityView.value = null
+      return
+    }
+    const kind = entityKind(c.model, id)
+    if (!kind) {
+      entityView.value = null
+      return
+    }
+    try {
+      const state = await c.query(entityQueryKind(kind), id)
+      let job
+      if (kind === 'shc') job = (await c.query<{ id: string }[]>('shcJobs')).find((j) => j.id === (state as { jobId: string | null }).jobId)
+      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, { job: job as never }))
+    } catch {
+      // The scenario was replaced meanwhile; the next refresh shows the new state.
+    }
+  }
+
+  /** Inspect an event: payload, decision request/reply and the cause chain back to the root. */
+  async function inspectEvent(eventId: number): Promise<void> {
+    const current = inspectedEvent.value
+    const inChain = current?.chain.findIndex((e) => e.id === eventId) ?? -1
+    if (current && inChain >= 0) {
+      inspectedEvent.value = { chain: current.chain, index: inChain }
+      inspectorOpen.value = true
+      return
+    }
+    const chain = await ctl().passthrough<EngineEvent[]>({ op: 'why', eventId })
+    inspectedEvent.value = markRaw({ chain: chain.map(describeEvent), index: 0 })
+    inspectorOpen.value = true
+  }
+
+  async function addBreakpoint(kind: BreakpointKind, text: string): Promise<boolean> {
+    const parsed = parseBreakpointInput(kind, text)
+    if (!parsed) return false
+    breakpoints.value = [...breakpoints.value, { id: nextBreakpointId++, ...parsed }]
+    await ctl().setBreakpoints(breakpoints.value)
+    return true
+  }
+
+  async function removeBreakpoint(id: number): Promise<void> {
+    breakpoints.value = breakpoints.value.filter((b) => b.id !== id)
+    await ctl().setBreakpoints(breakpoints.value)
+  }
+
+  async function clearBreakpoints(): Promise<void> {
+    breakpoints.value = []
+    await ctl().setBreakpoints([])
+  }
+
+  /** Resume after a breakpoint (or play when paused). */
+  function resume(): void {
+    ctl().play()
+    sync()
+  }
+
+  function toggleFeed(): void {
+    feedOpen.value = !feedOpen.value
+  }
+
+  function toggleInspector(): void {
+    inspectorOpen.value = !inspectorOpen.value
   }
 
   /** Change locale and/or units: applies live, is remembered, and is stored with the scenario config. */
@@ -243,8 +358,10 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   /** Single-step to the next engine event (pauses). */
-  function step() {
-    return run(() => ctl().step())
+  async function step() {
+    const ev = await run(() => ctl().step())
+    if (ev) void inspectEvent(ev.id)
+    return ev
   }
 
   function showToast(key: MessageKey, params?: MessageParams): void {
@@ -291,6 +408,10 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     if (toastTimer) clearTimeout(toastTimer)
     toast.value = null
     config.value = null
+    breakpoints.value = []
+    breakHit.value = null
+    inspectedEvent.value = null
+    entityView.value = null
     hasScenario.value = false
     phase.value = 'setup'
     info.value = null
@@ -310,6 +431,21 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     error,
     selectedId,
     recentEvents,
+    breakpoints,
+    breakHit,
+    feedOpen,
+    inspectorOpen,
+    feedFilter,
+    inspectedEvent,
+    entityView,
+    refreshEntity,
+    inspectEvent,
+    addBreakpoint,
+    removeBreakpoint,
+    clearBreakpoints,
+    resume,
+    toggleFeed,
+    toggleInspector,
     overlays,
     setOverlays,
     display,

@@ -23,7 +23,7 @@ function seg(axis: Axis, from: number, to: number, t0: number): MotionSegment {
 }
 
 function drive(m: SceneModel, segments: MotionSegment[]): void {
-  const delta: Delta = { motion: [{ entityId: SHC, segments }], custody: [], entities: [], reservations: [], events: [], eventCounts: {} }
+  const delta: Delta = { motion: [{ entityId: SHC, segments }], custody: [], entities: [], reservations: [], events: [], eventCounts: {}, breakpoint: null }
   m.apply(delta)
 }
 
@@ -95,7 +95,7 @@ describe('SHC pose for the 3D model', () => {
     const run = seg('z', s0.z, s0.z + 10, 0)
     drive(m, [run])
     const id = m.containerIds[0]
-    m.apply({ motion: [], custody: [{ containerId: id, t: 0, owner: { kind: 'shc', id: SHC }, eventId: 1 }], entities: [], reservations: [], events: [], eventCounts: {} })
+    m.apply({ motion: [], custody: [{ containerId: id, t: 0, owner: { kind: 'shc', id: SHC }, eventId: 1 }], entities: [], reservations: [], events: [], eventCounts: {}, breakpoint: null })
     const pose = m.containerPose(id, run.t1 + 1)!
     expect(pose.z).toBeCloseTo(s0.z + 10, 6)
     expect(pose.carriedBy).toBe(SHC)

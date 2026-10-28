@@ -3,6 +3,7 @@
  * WorkerRequests, collecting a compact Delta of what changed. Used by the
  * Web Worker entry (`engine.worker.ts`); it has no worker or DOM globals.
  */
+import { firstBreakpointHit, type Breakpoint } from '../modules/breakpoints'
 import { createSimulation, summarizeRun, type EngineEvent, type Simulation } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import { HALF_OFFSET_M } from '../scenario/vesselClasses'
@@ -19,7 +20,7 @@ import {
 } from './protocol'
 
 function emptyDelta(): Delta {
-  return { motion: [], custody: [], entities: [], reservations: [], events: [], eventCounts: {} }
+  return { motion: [], custody: [], entities: [], reservations: [], events: [], eventCounts: {}, breakpoint: null }
 }
 
 /** Keep only the latest entry per key (order of last occurrence). */
@@ -63,6 +64,15 @@ export function createEngineHost() {
   let motionRefs = new Map<string, unknown>()
   let statusRefs = new Map<string, string>()
   let lastReservationId = -1
+  let breakpoints: Breakpoint[] = []
+
+  /** Stop predicate of every run: records the first breakpoint an event hits (the run stops after it). */
+  function stopAtBreakpoint(ev: EngineEvent): boolean {
+    const bp = firstBreakpointHit(breakpoints, ev)
+    if (!bp) return false
+    delta.breakpoint = { breakpointId: bp.id, event: summarizeEvent(ev) }
+    return true
+  }
 
   function observe(ev: EngineEvent): void {
     if (!sim) return
@@ -189,9 +199,9 @@ export function createEngineHost() {
         return null
       case 'advance':
         // Async variant: awaits Promise handlers (pause mode) instead of stalling the horizon.
-        return requireSim().runUntilAsync({ time: req.to })
+        return requireSim().runUntilAsync({ time: req.to, predicate: stopAtBreakpoint })
       case 'run': {
-        const result = await requireSim().runUntilAsync(req.condition)
+        const result = await requireSim().runUntilAsync({ ...req.condition, predicate: stopAtBreakpoint })
         delta.motion = compactMotion(delta.motion)
         delta.custody = latestBy(delta.custody, (c) => c.containerId)
         delta.entities = latestBy(delta.entities, (e) => `${e.kind}:${e.id}`)
@@ -200,7 +210,12 @@ export function createEngineHost() {
       }
       case 'step': {
         const ev = requireSim().step()
+        if (ev) stopAtBreakpoint(ev)
         return ev ? summarizeEvent(ev) : null
+      }
+      case 'setBreakpoints': {
+        breakpoints = req.breakpoints.map((b) => ({ ...b }))
+        return null
       }
       case 'inject': {
         const s = requireSim()
@@ -241,6 +256,8 @@ export function createEngineHost() {
         return s.query.shc(need())
       case 'shcList':
         return s.query.shcs()
+      case 'shcJobs':
+        return s.query.shcJobs()
       case 'wtpPad':
         return s.query.wtpPad(need())
       case 'asc':

@@ -9,43 +9,24 @@
  * SceneModel timelines.
  */
 import * as THREE from 'three'
-import { BAY_PITCH_M as YARD_BAY_PITCH_M, ROW_PITCH_M as YARD_ROW_PITCH_M, rowX, travelHoistM } from '../engine'
+import { BAY_PITCH_M as YARD_BAY_PITCH_M, ROW_PITCH_M as YARD_ROW_PITCH_M, rowX } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
+import { ASC, ascHeightM, SHC, STS } from './equipmentDims'
+import { entityBounds } from './picking'
+import { OverlayLayers, type OverlayLayerStats } from './overlayLayers'
+import { NO_OVERLAYS, type OverlayState } from './overlays'
+
+export type { OverlayState }
 import { ContainerInstancer } from './containerInstancer'
 import { loadShcModel, ShcRig, SHC_RIG, type ShcRigState } from './shcAssets'
 import { LIVERY_ATLAS, liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
 import { aftOffsetM, BAY_PITCH_M, FENDER_GAP_M, ROW_PITCH_M, slotX, slotZ, TIER_PITCH_M } from '../scenario/vesselClasses'
 
-/** [A] Malaccamax-style STS proportions (m). */
-const STS = {
-  waterRailZ: 3,
-  gauge: 30.48,
-  legSpacingX: 18,
-  legSize: 1.6,
-  portalY: 48,
-  boomOutreachZ: -72,
-  boomBackreachZ: 22,
-  apexY: 72,
-}
-
-/** [A] Shuttle-carrier proportions (m): length along travel, width across, height. */
-const SHC = { length: 9.2, width: 4.9, height: 6.2, leg: 0.6, beam: 0.7 }
-/** Selection box of the phase 2 model (from its sidecar). */
-const SHC_BOX = { length: SHC_RIG.lengthM, width: SHC_RIG.widthM, height: SHC_RIG.heightM }
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
 const EMPTY_HOIST_MPS = 1.5
 /** Height of the spreader's twist-lock plane when an empty SHC is not driving: the top of a standard box on the ground. */
 const EMPTY_SPREADER_DOWN_Y = CONTAINER_DIMS['40'].height
-/** [A] ASC proportions (m): span between the rails (25.4 m), leg and girder sizes. */
-const ASC = { span: 25.4, legLength: 5, legWidth: 1, girderDepth: 4, girderHeight: 1.4 }
-
-export interface OverlayState {
-  /** Lane graph (one-way edges) drawn on the ground. */
-  laneGraph: boolean
-  /** Conflict zones reserved at the displayed time, highlighted. */
-  reservations: boolean
-}
 
 export interface SceneStats {
   /** Container instances drawn. */
@@ -61,6 +42,8 @@ export interface SceneStats {
   overlays: OverlayState
   /** Reserved zones highlighted (0 when the reservations overlay is off). */
   reservedZones: number
+  /** Occupancy and label overlay counts (zeros while those overlays are off). */
+  layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
   containerLods: { lod0: number; lod1: number }
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
@@ -100,8 +83,9 @@ export class SceneRenderer {
   private ascs = new Map<string, { group: THREE.Group; trolley: THREE.Mesh; spreader: THREE.Mesh; ropes: THREE.Mesh; blockX: number; height: number }>()
   private laneOverlay: THREE.Group
   private zoneMeshes = new Map<string, THREE.Mesh>()
-  private overlays: OverlayState = { laneGraph: false, reservations: false }
+  private overlays: OverlayState = { ...NO_OVERLAYS }
   private reservedZones = 0
+  private layers: OverlayLayers
   private readonly matrix = new THREE.Matrix4()
   private selection: THREE.LineSegments
   private disposables: { dispose(): void }[] = []
@@ -119,6 +103,8 @@ export class SceneRenderer {
     for (const id of model.ascIds) this.addAsc(id)
     this.laneOverlay = this.buildLaneOverlay()
     this.buildZoneMeshes()
+    this.layers = new OverlayLayers(model)
+    this.scene.add(this.layers.group)
 
     const capacity: Partial<Record<string, number>> = {}
     for (const id of model.containerIds) capacity[model.containerSize[id]] = (capacity[model.containerSize[id]] ?? 0) + 1
@@ -423,7 +409,7 @@ export class SceneRenderer {
    */
   private addAsc(id: string): void {
     const block = this.model.blockOfAsc(id)
-    const height = travelHoistM(block) + CONTAINER_DIMS['40HC'].height + 3
+    const height = ascHeightM(block)
     const group = new THREE.Group()
     group.name = id
     const frame = this.track(new THREE.MeshStandardMaterial({ color: '#2f6fb3', roughness: 0.55, metalness: 0.25 }))
@@ -581,7 +567,7 @@ export class SceneRenderer {
       // the spreader sits on top of the (possible) box: box bottom = lift
       parts.spreader.position.y = pose.lift + CONTAINER_DIMS['40'].height + 0.2
     }
-
+    this.layers.update(t, this.overlays)
     this.updateSelection(selectedId, t)
   }
 
@@ -607,37 +593,14 @@ export class SceneRenderer {
 
 
   private updateSelection(id: string | null, t: number): void {
-    const centre = id ? this.model.entityCentre(id, t) : null
-    if (!id || !centre) {
+    const b = id ? entityBounds(this.model, id, t) : null
+    if (!b) {
       this.selection.visible = false
       return
     }
-    const size = this.model.containerSize[id]
-    this.selection.rotation.y = 0
-    if (size) {
-      const d = CONTAINER_DIMS[size]
-      this.selection.scale.set(d.length + 0.6, d.height + 0.6, d.width + 0.6)
-      this.selection.position.set(centre.x, centre.y, centre.z)
-      this.selection.rotation.y = this.model.containerPose(id, t)?.yaw ?? 0
-    } else if (this.shcs.has(id)) {
-      const pose = this.model.shcPose(id, t)
-      const rigged = !!this.shcs.get(id)?.rig
-      const h = rigged ? SHC_BOX.height + 0.5 : SHC.height + 3
-      this.selection.scale.set((rigged ? SHC_BOX.length : SHC.length) + 1, h, (rigged ? SHC_BOX.width : SHC.width) + 1)
-      this.selection.position.set(pose.x, h / 2, pose.z)
-      this.selection.rotation.y = rigged ? pose.yaw : pose.heading === 'z' ? Math.PI / 2 : 0
-    } else if (this.ascs.has(id)) {
-      const parts = this.ascs.get(id)!
-      this.selection.scale.set(ASC.span + 6, parts.height + 2, ASC.legLength + 2)
-      this.selection.position.set(parts.blockX, (parts.height + 2) / 2, this.model.ascPose(id, t).z)
-    } else if (this.sts.has(id)) {
-      this.selection.scale.set(STS.legSpacingX + 4, STS.apexY + 2, STS.gauge + 6)
-      this.selection.position.set(centre.x, (STS.apexY + 2) / 2, STS.waterRailZ + STS.gauge / 2)
-    } else {
-      const spec = this.model.vesselSpec(id)
-      this.selection.scale.set(spec.loaM + 2, spec.deckHeightM + 14, spec.beamM + 2)
-      this.selection.position.set(centre.x, spec.deckHeightM / 2, centre.z - FENDER_GAP_M)
-    }
+    this.selection.scale.set(b.sx, b.sy, b.sz)
+    this.selection.position.set(b.x, b.y, b.z)
+    this.selection.rotation.y = b.yaw
     this.selection.visible = true
   }
 
@@ -669,6 +632,7 @@ export class SceneRenderer {
       vessels,
       overlays: { ...this.overlays },
       reservedZones: this.reservedZones,
+      layers: this.layers.stats(),
       containerLods: { lod0: c.lod0, lod1: c.lod1 },
       containerAssets: c.assets,
       shcLods,
@@ -697,6 +661,7 @@ export class SceneRenderer {
     this.disposed = true
     for (const d of this.disposables) d.dispose()
     this.containers.dispose()
+    this.layers.dispose()
     this.disposables = []
   }
 }
