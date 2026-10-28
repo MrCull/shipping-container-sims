@@ -27,6 +27,7 @@ import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
 import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
+import type { VesselHullState } from '../modules/vesselRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
 
 export type TwinPhase = 'setup' | 'running'
@@ -86,6 +87,8 @@ export interface TwinView {
   liveries(): Record<string, RenderedLivery> | null
   /** Rig state per SHC (LOD, steering, wheel roll, hoist travel, carrying); null without a 3D view. */
   shcRigs(): Record<string, ShcRigState> | null
+  /** Per vessel: hull class, line, livery, name, LOD and rendered bay grid (TT-27); null without a 3D view. */
+  vesselHulls(): Record<string, VesselHullState> | null
 }
 
 const RECENT_EVENTS_CAP = FEED_BUFFER_CAP

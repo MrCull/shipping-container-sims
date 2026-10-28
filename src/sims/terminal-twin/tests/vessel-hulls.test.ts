@@ -17,12 +17,10 @@ const DIR = join(MODELS_DIR, 'vessels')
 const meta = (c: VesselSizeClass) => JSON.parse(readFileSync(join(DIR, `${HULL_ASSET_FILES[c]}.meta.json`), 'utf8')) as HullMeta
 const glb = (c: VesselSizeClass) => readGlbJson(join(DIR, `${HULL_ASSET_FILES[c]}.glb`))
 
-type TrsNode = { name?: string; mesh?: number; translation?: number[]; scale?: number[] }
-
-function node(json: GltfJson, name: string): TrsNode {
+function node(json: GltfJson, name: string) {
   const found = (json.nodes ?? []).find((n) => n.name === name)
   if (!found) throw new Error(`no node ${name}`)
-  return found as TrsNode
+  return found
 }
 
 /** Asset-space bounds of one mesh node (accessor min/max, dequantised through the node's TRS; no rotation used). */
@@ -34,8 +32,9 @@ function meshBounds(json: GltfJson, name: string): { min: number[]; max: number[
   const min = [Infinity, Infinity, Infinity]
   const max = [-Infinity, -Infinity, -Infinity]
   for (const p of mesh.primitives) {
-    const a = json.accessors![p.attributes.POSITION] as { min: number[]; max: number[]; normalized?: boolean; componentType: number }
-    const unit = a.normalized ? ({ 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 } as Record<number, number>)[a.componentType] : 1
+    const a = json.accessors![p.attributes.POSITION]
+    if (!a.min || !a.max) throw new Error(`${name}: POSITION accessor has no bounds`)
+    const unit = a.normalized ? ({ 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 } as Record<number, number>)[a.componentType ?? 5126] : 1
     for (let k = 0; k < 3; k++) {
       min[k] = Math.min(min[k], t[k] + (s[k] * a.min[k]) / unit)
       max[k] = Math.max(max[k], t[k] + (s[k] * a.max[k]) / unit)

@@ -303,8 +303,6 @@ def build_breakwater(h, m, lod):
             a, b = (x + off, side * yw), (tip + off, 0.0)
             pts = [(a[0], a[1], z0), (b[0], b[1], z0), (b[0], b[1], z1), (a[0], a[1], z1)]
             m.quad(pts, [uv] * 4, outward=(out_sign, out_sign * side * 0.3, 0))
-            if lod > 0:
-                break
         if lod == 0:
             m.quad([(x, side * yw, z1), (tip, 0.0, z1), (tip - 0.25, 0.0, z1), (x - 0.25, side * yw, z1)], [uv] * 4, outward=(0, 0, 1))
 
@@ -491,6 +489,8 @@ def build_vessel(key, cls, grid, atlas_image):
     h = Hull(key, cls, grid)
     name = f'vessel-{key}'
     mat = textured_material('vessel_livery', atlas_image, roughness=0.62)
+    # Single-sided: bulwark and breakwater plates have separate inner/outer faces.
+    mat.use_backface_culling = True
     root = empty(name)
     tris = {}
     info = {}

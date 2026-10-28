@@ -190,7 +190,8 @@ def _hull_strip(canvas, ox, oy, h):
 def _draw_tile(canvas, index, base):
     ox, oy = tile_origin(index)
     h = _livery(base['line'])
-    canvas.rect(ox, oy, ox + TILE_W, oy + TILE_H, '#808080')
+    # Background in the hull colour, so mip-mapping around the narrow hull strip never pulls in grey.
+    canvas.rect(ox, oy, ox + TILE_W, oy + TILE_H, h['hull'])
     # Wordmark decal: the line's wordmark (container-atlas typeface) on the hull colour.
     x0, y0, x1, y1 = REGIONS['wordmark']
     w, hh = x1 - x0, y1 - y0
