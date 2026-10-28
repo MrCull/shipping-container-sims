@@ -77,6 +77,11 @@ export interface BlockConfig {
 
 export interface YardConfig {
   blocks: BlockConfig[]
+  /**
+   * ASCs per block (TT-08): 1 (default) or 2 sharing the block's rails
+   * (waterside `<block>-ASC1`, landside `<block>-ASC2`).
+   */
+  ascsPerBlock?: 1 | 2
 }
 
 /**

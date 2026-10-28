@@ -102,6 +102,55 @@ export interface YardAllocationReply {
   slotId: string | null
 }
 
+// ── ascDispatch ────────────────────────────────────────────────────────────
+
+/** One ASC of the block that could take the job (idle now). */
+export interface AscDispatchCandidate {
+  ascId: string
+  /** Position on the rail: waterside ASC1 or landside ASC2. */
+  side: 'waterside' | 'landside'
+  /** Gantry position (Z, m). */
+  gantryZ: number
+  /** Jobs this ASC has taken so far. */
+  jobs: number
+  /** Seconds spent on cycles and yield moves so far. */
+  busyS: number
+  /** The crane can do the job without breaking the no-passing rule (the other ASC is out of the way or can step aside). */
+  canServe: boolean
+  /** The other ASC (idle) would have to step aside first. */
+  needsYield: boolean
+}
+
+/**
+ * A block with two ASCs has an open box (allocated, SHC cleared) and at least
+ * one idle ASC: which ASC takes it? Only WTP work exists so far; `kind`
+ * leaves room for transfer-stall work (TT-13).
+ */
+export interface AscDispatchRequest {
+  blockId: string
+  job: {
+    jobId: string
+    containerId: string
+    kind: 'wtp' | 'transfer'
+    wtpPadId: string
+    yardSlotId: string
+    /** Gantry Z of the pad and of the slot (m). */
+    padZ: number
+    slotZ: number
+  }
+  /** Idle ASCs, waterside first. */
+  candidates: AscDispatchCandidate[]
+  /** Both ASCs with their status (the other one may be busy). */
+  ascs: { ascId: string; side: 'waterside' | 'landside'; status: string; gantryZ: number }[]
+  /** Minimum distance between ASC centres (m). */
+  minSeparationM: number
+}
+
+export interface AscDispatchReply {
+  /** The idle ASC to take the box, or null to leave it open for now (asked again when the block changes). */
+  ascId: string | null
+}
+
 // ── berthAllocation ────────────────────────────────────────────────────────
 
 export interface BerthAllocationRequest {
@@ -156,6 +205,7 @@ export interface DecisionRequests {
   stsGroundPosition: GroundPositionRequest
   shcDispatch: ShcDispatchRequest
   yardAllocation: YardAllocationRequest
+  ascDispatch: AscDispatchRequest
   berthAllocation: BerthAllocationRequest
   craneSplit: CraneSplitRequest
 }
@@ -164,6 +214,7 @@ export interface DecisionReplies {
   stsGroundPosition: GroundPositionReply
   shcDispatch: ShcDispatchReply
   yardAllocation: YardAllocationReply
+  ascDispatch: AscDispatchReply
   berthAllocation: BerthAllocationReply
   craneSplit: CraneSplitReply
 }
@@ -175,6 +226,7 @@ export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   stsGroundPosition: 1,
   shcDispatch: 1,
   yardAllocation: 1,
+  ascDispatch: 1,
   berthAllocation: 1,
   craneSplit: 1,
 }

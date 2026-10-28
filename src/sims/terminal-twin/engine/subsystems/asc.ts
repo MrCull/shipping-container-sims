@@ -25,9 +25,11 @@ import type { EngineContext, ReactorMap } from '../context'
 import type { EventOf } from '../events'
 import { planSegment, positionAt, type AxisProfile, type MotionSegment } from '../kinematics'
 import { laneGraphOf } from '../laneGraph'
-import { earliestStart, reserve, type WindowSpec } from '../reservations'
-import { ascIdOf, type AscJob, type AscPlannedEvent, type AscState, type AscStatus, type SimState } from '../state'
+import { earliestStart, earliestStartAmong, reserve, type Reservation, type WindowSpec } from '../reservations'
+import { ascIndexOf, type AscJob, type AscPlannedEvent, type AscState, type AscStatus, type SimState } from '../state'
 import {
+  ASC_MIN_SEPARATION_M,
+  PARK_UNTIL_S,
   blockSpec,
   boxSpan,
   parseYardSlotId,
@@ -42,6 +44,16 @@ import { DEFAULT_ASC_KINEMATICS } from '../../scenario/builder'
 import type { AscKinematics } from '../../scenario/types'
 import { parseVesselSlotId } from '../../scenario/vesselClasses'
 import { maybeDispatch } from './shc'
+import {
+  isBlockedStart,
+  isParkHold,
+  occupancyPieces,
+  parkWindows,
+  pieceWindows,
+  sweepOf,
+  truncateParkHolds,
+  yieldTarget,
+} from './ascRail'
 
 type PlannedType = AscPlannedEvent['type']
 
@@ -221,8 +233,12 @@ function blockedByOlderClaim(state: SimState, job: AscJob): boolean {
   )
 }
 
-/** Plan an ASC's whole cycle for `job` (pad → lift → slot → set down → spreader up). */
-function startJob(ctx: EngineContext, asc: AscState, job: AscJob): void {
+/** The crane sharing the rail with `asc` (twin blocks), or null. */
+const partnerOf = (state: SimState, asc: AscState): AscState | null =>
+  Object.values(state.ascs).find((a) => a.blockId === asc.blockId && a.id !== asc.id) ?? null
+
+/** The ASC's whole cycle for `job` as a relative trip (pad → lift → slot → set down → spreader up). */
+function buildJobTrip(ctx: EngineContext, asc: AscState, job: AscJob): { trip: AscTrip; padId: string } {
   const { state } = ctx
   const k = kinematics(ctx)
   const block = blockOf(ctx, asc.blockId)
@@ -235,8 +251,6 @@ function startJob(ctx: EngineContext, asc: AscState, job: AscJob): void {
   const travel = travelHoistM(block)
   const instant = state.subsystems.asc === 'instant'
 
-  job.ascId = asc.id
-  asc.jobId = job.id
   const trip = new AscTrip(asc.id, { z: asc.gantryZ, x: asc.trolleyX, hoistY: asc.hoistY }, instant)
   trip.mark('AscRoutingToPad')
   trip.hoistTo(travel, k.hoistEmpty)
@@ -258,10 +272,137 @@ function startJob(ctx: EngineContext, asc: AscState, job: AscJob): void {
   trip.mark('AscStacked')
   trip.hoistTo(travel, k.hoistEmpty)
   trip.mark('AscReady')
+  return { trip, padId: pad.id }
+}
 
-  const windows = trip.windows(pad.id)
-  const start = earliestStart(state, windows, state.now)
-  const reservations = reserve(state, asc.id, windows, start)
+/** A partner stepping aside along the rail (planned, not yet committed). */
+interface YieldPlan {
+  asc: AscState
+  trip: AscTrip
+  toZ: number
+  start: number
+  finite: WindowSpec[]
+  park: WindowSpec[]
+}
+
+/** A planned job: the trip, when it departs, and (twin blocks) the partner's step-aside. */
+interface JobPlan {
+  trip: AscTrip
+  padWindows: WindowSpec[]
+  railWindows: WindowSpec[]
+  park: WindowSpec[]
+  start: number
+  /** Departure delay caused by the pad zone alone (the SHC is there), and by the rail. */
+  padWaitS: number
+  railWaitS: number
+  yield: YieldPlan | null
+}
+
+/** Plan the partner's step-aside to `toZ`; null if it cannot start (blocked by the requester or the rail end). */
+function planYield(ctx: EngineContext, partner: AscState, requester: AscState, sweep: { lo: number; hi: number }): YieldPlan | null {
+  const { state } = ctx
+  const k = kinematics(ctx)
+  const block = blockOf(ctx, partner.blockId)
+  const toZ = yieldTarget(block, ascIndexOf(partner.id) > ascIndexOf(requester.id), sweep)
+  if (toZ === null) return null
+  const trip = new AscTrip(partner.id, { z: partner.gantryZ, x: partner.trolleyX, hoistY: partner.hoistY }, false)
+  trip.moveTo(toZ, partner.trolleyX, k.gantry, k.trolley)
+  trip.mark('AscReady')
+  const pieces = occupancyPieces(partner.gantryZ, trip.segments, trip.t)
+  const finite = pieceWindows(block, pieces)
+  const park = parkWindows(block, toZ, trip.t)
+  const others = state.reservations.filter((r) => r.holder !== partner.id)
+  const start = earliestStartAmong(others, [...finite, ...park], state.now)
+  if (isBlockedStart(start)) return null
+  return { asc: partner, trip, toZ, start, finite, park }
+}
+
+/** Reservations as they would be if the partner had stepped aside (nothing is changed). */
+function withYield(list: readonly Reservation[], y: YieldPlan): Reservation[] {
+  const out = list.filter((r) => r.holder !== y.asc.id || !isParkHold(r))
+  for (const w of y.finite) out.push({ id: -1, zone: w.zone, holder: y.asc.id, from: y.start + w.from, to: y.start + w.to })
+  for (const w of y.park) out.push({ id: -1, zone: w.zone, holder: y.asc.id, from: y.start + w.from, to: PARK_UNTIL_S })
+  return out
+}
+
+/**
+ * Plan `job` for `asc` without changing anything. Single-ASC blocks only wait
+ * for the pad zone. Twin blocks also reserve rail segments; if the other ASC
+ * is parked in the way and idle it steps aside first, if it is busy the job
+ * cannot be served now (null).
+ */
+function planJob(ctx: EngineContext, asc: AscState, job: AscJob): JobPlan | null {
+  const { state } = ctx
+  const { trip, padId } = buildJobTrip(ctx, asc, job)
+  const padWindows = trip.windows(padId)
+  const partner = state.subsystems.asc === 'real' ? partnerOf(state, asc) : null
+  if (!partner) {
+    const start = earliestStart(state, padWindows, state.now)
+    return { trip, padWindows, railWindows: [], park: [], start, padWaitS: start - state.now, railWaitS: 0, yield: null }
+  }
+  const block = blockOf(ctx, asc.blockId)
+  const pieces = occupancyPieces(asc.gantryZ, trip.segments, trip.t)
+  const railWindows = pieceWindows(block, pieces)
+  const park = parkWindows(block, trip.gantry, trip.t)
+  const check = [...padWindows, ...railWindows, ...park]
+  let others: readonly Reservation[] = state.reservations.filter((r) => r.holder !== asc.id)
+  const padStart = earliestStartAmong(others, padWindows, state.now)
+  let start = earliestStartAmong(others, check, state.now)
+  let yielded: YieldPlan | null = null
+  if (isBlockedStart(start)) {
+    if (partner.status !== 'idle') return null
+    yielded = planYield(ctx, partner, asc, sweepOf(pieces))
+    if (!yielded) return null
+    others = withYield(others, yielded)
+    start = earliestStartAmong(others, check, state.now)
+    if (isBlockedStart(start)) return null
+  }
+  return { trip, padWindows, railWindows, park, start, padWaitS: padStart - state.now, railWaitS: start - padStart, yield: yielded }
+}
+
+function countGantry(trip: AscTrip): { gantry: number; trolley: number; hoist: number } {
+  const sum = { gantry: 0, trolley: 0, hoist: 0 }
+  for (const s of trip.segments) sum[s.axis as 'gantry' | 'trolley' | 'hoist'] += Math.abs(s.to - s.from)
+  return sum
+}
+
+/** Make the partner's step-aside real: reserve its rail windows, install its plan, announce it. */
+function commitYield(ctx: EngineContext, y: YieldPlan, forAsc: AscState): void {
+  const { state } = ctx
+  state.reservations = truncateParkHolds(state.reservations, y.asc.id, y.start)
+  const made = reserve(state, y.asc.id, y.finite, y.start)
+  for (const w of y.park)
+    state.reservations.push({ id: state.nextReservationId++, zone: w.zone, holder: y.asc.id, from: y.start + w.from, to: PARK_UNTIL_S })
+  install(y.asc, y.trip, y.start)
+  y.asc.gantryZ = y.toZ
+  y.asc.status = 'repositioning'
+  const kpi = ascKpi(state, y.asc.id)
+  kpi.yields = (kpi.yields ?? 0) + 1
+  kpi.gantryM += countGantry(y.trip).gantry
+  kpi.busyS = (kpi.busyS ?? 0) + y.trip.t
+  ctx.schedule('AscYieldAssigned', state.now, { equipment: [y.asc.id] }, {
+    ascId: y.asc.id,
+    blockId: y.asc.blockId,
+    forAscId: forAsc.id,
+    toZ: y.toZ,
+    departAt: y.start,
+    reservations: made,
+  })
+}
+
+/** Commit a planned job: reserve, install the plan, update KPIs, announce. */
+function startJob(ctx: EngineContext, asc: AscState, job: AscJob, plan: JobPlan): void {
+  const { state } = ctx
+  const { trip, start } = plan
+  const twin = plan.railWindows.length > 0 || plan.yield !== null || plan.park.length > 0
+  if (plan.yield) commitYield(ctx, plan.yield, asc)
+
+  job.ascId = asc.id
+  asc.jobId = job.id
+  state.reservations = truncateParkHolds(state.reservations, asc.id, start)
+  const reservations = reserve(state, asc.id, plan.padWindows.concat(plan.railWindows), start)
+  for (const w of plan.park)
+    state.reservations.push({ id: state.nextReservationId++, zone: w.zone, holder: asc.id, from: start + w.from, to: PARK_UNTIL_S })
   install(asc, trip, start)
   asc.gantryZ = trip.gantry
   asc.trolleyX = trip.trolley
@@ -270,13 +411,15 @@ function startJob(ctx: EngineContext, asc: AscState, job: AscJob): void {
 
   const kpi = ascKpi(state, asc.id)
   kpi.jobs++
-  kpi.padWaitS += start - state.now
-  for (const s of trip.segments) {
-    const d = Math.abs(s.to - s.from)
-    if (s.axis === 'gantry') kpi.gantryM += d
-    else if (s.axis === 'trolley') kpi.trolleyM += d
-    else kpi.hoistM += d
+  kpi.padWaitS += plan.padWaitS
+  if (twin) {
+    kpi.railWaitS = (kpi.railWaitS ?? 0) + plan.railWaitS
+    kpi.busyS = (kpi.busyS ?? 0) + trip.t
   }
+  const d = countGantry(trip)
+  kpi.gantryM += d.gantry
+  kpi.trolleyM += d.trolley
+  kpi.hoistM += d.hoist
   ctx.schedule('AscJobAssigned', state.now, { equipment: [asc.id], containers: [job.containerId], jobs: [job.id] }, {
     ascId: asc.id,
     blockId: asc.blockId,
@@ -286,19 +429,102 @@ function startJob(ctx: EngineContext, asc: AscState, job: AscJob): void {
     yardSlotId: job.yardSlotId ?? '',
     departAt: start,
     reservations,
+    ...(twin ? { railWaitS: Math.round(plan.railWaitS * 1000) / 1000 } : {}),
   })
 }
 
-/** If the block's ASC is idle, give it the next job that is allocated, cleared and not blocked. */
-export function maybeDispatchAsc(ctx: EngineContext, blockId: string): void {
-  const { state } = ctx
-  const asc = state.ascs[ascIdOf(blockId)]
-  if (!asc || asc.status !== 'idle') return
+/** Next open job of the block: allocated, cleared, oldest claim, not blocked by an older claim on its stacks. */
+function nextOpenJob(state: SimState, blockId: string): AscJob | undefined {
   const open = Object.values(state.ascJobs)
     .filter((j) => j.blockId === blockId && j.ascId === null && j.cleared && j.claimSeq !== null)
     .sort((a, b) => (a.claimSeq as number) - (b.claimSeq as number))
-  const next = open.find((j) => !blockedByOlderClaim(state, j))
-  if (next) startJob(ctx, asc, next)
+  return open.find((j) => !blockedByOlderClaim(state, j))
+}
+
+const ascsOfBlock = (state: SimState, blockId: string): AscState[] =>
+  Object.values(state.ascs)
+    .filter((a) => a.blockId === blockId)
+    .sort((a, b) => ascIndexOf(a.id) - ascIndexOf(b.id))
+
+/**
+ * Give the block's open box to an idle ASC. One ASC: it takes the box. Two
+ * ASCs: the ascDispatch decision point picks (one request per block at a time).
+ */
+export function maybeDispatchAsc(ctx: EngineContext, blockId: string): void {
+  const { state } = ctx
+  const ascs = ascsOfBlock(state, blockId)
+  const idle = ascs.filter((a) => a.status === 'idle')
+  if (idle.length === 0) return
+  if (ascs.length === 1) {
+    const next = nextOpenJob(state, blockId)
+    if (next) startJob(ctx, idle[0], next, planJob(ctx, idle[0], next) as JobPlan)
+    return
+  }
+  if (Object.values(state.ascJobs).some((j) => j.blockId === blockId && j.dispatch === 'asked')) return
+  const job = nextOpenJob(state, blockId)
+  if (!job) return
+  requestDispatch(ctx, job, ascs, idle)
+}
+
+function requestDispatch(ctx: EngineContext, job: AscJob, ascs: AscState[], idle: AscState[]): void {
+  const { state } = ctx
+  const block = blockOf(ctx, job.blockId)
+  const pad = laneGraphOf(ctx.config).pads.find((p) => p.id === job.wtpPadId)
+  if (!pad) throw new Error(`Unknown WTP pad ${job.wtpPadId}`)
+  const cell = parseYardSlotId(job.yardSlotId ?? '')
+  const span = boxSpan(state.containers[job.containerId].size)
+  const sideOf = (a: AscState) => (ascIndexOf(a.id) === 1 ? 'waterside' : 'landside') as 'waterside' | 'landside'
+  job.dispatch = 'asked'
+  ctx.requestDecision(
+    'ascDispatch',
+    {
+      blockId: job.blockId,
+      job: {
+        jobId: job.id,
+        containerId: job.containerId,
+        kind: 'wtp',
+        wtpPadId: job.wtpPadId,
+        yardSlotId: job.yardSlotId ?? '',
+        padZ: pad.z,
+        slotZ: slotZ(block, cell.bay, span),
+      },
+      candidates: idle.map((a) => {
+        const plan = planJob(ctx, a, job)
+        const kpi = ascKpi(state, a.id)
+        return {
+          ascId: a.id,
+          side: sideOf(a),
+          gantryZ: a.gantryZ,
+          jobs: kpi.jobs,
+          busyS: Math.round((kpi.busyS ?? 0) * 1000) / 1000,
+          canServe: plan !== null,
+          needsYield: plan?.yield != null,
+        }
+      }),
+      ascs: ascs.map((a) => ({ ascId: a.id, side: sideOf(a), status: a.status, gantryZ: a.gantryZ })),
+      minSeparationM: ASC_MIN_SEPARATION_M,
+    },
+    { equipment: idle.map((a) => a.id), jobs: [job.id], containers: [job.containerId] },
+  )
+}
+
+/** The TOS named an ASC for the box: start the cycle if that ASC can still serve it. */
+function resolveDispatch(ctx: EngineContext, jobId: string, ascId: string | null): void {
+  const { state } = ctx
+  const job = state.ascJobs[jobId]
+  if (!job) return
+  delete job.dispatch
+  if (ascId === null) return // left open; asked again when the block changes
+  const asc = state.ascs[ascId]
+  if (!asc || asc.blockId !== job.blockId) throw new Error(`ascDispatch handler returned ${ascId}, which is not an ASC of block ${job.blockId}`)
+  if (asc.status !== 'idle' || job.ascId !== null) {
+    maybeDispatchAsc(ctx, job.blockId) // the reply was stale (keep-running latency)
+    return
+  }
+  const plan = planJob(ctx, asc, job)
+  if (!plan) return // cannot serve it now (the other ASC is busy in the way); asked again later
+  startJob(ctx, asc, job, plan)
+  maybeDispatchAsc(ctx, job.blockId)
 }
 
 /**
@@ -407,6 +633,10 @@ export const ascReactors: ReactorMap = {
   },
 
   DecisionResolved: (e, ctx) => {
+    if (e.payload.decisionPoint === 'ascDispatch') {
+      resolveDispatch(ctx, e.payload.request.job.jobId, e.payload.reply.ascId)
+      return
+    }
     if (e.payload.decisionPoint !== 'yardAllocation') return
     const { state } = ctx
     const job = jobOfBox(state, e.payload.request.containerId)
@@ -432,6 +662,7 @@ export const ascReactors: ReactorMap = {
   },
 
   AscJobAssigned: (e, ctx) => scheduleNext(ctx, ctx.state.ascs[e.payload.ascId]),
+  AscYieldAssigned: (e, ctx) => scheduleNext(ctx, ctx.state.ascs[e.payload.ascId]),
 
   AscRoutingToPad: phase(),
   AscPositioningAtPad: phase(),

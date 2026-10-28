@@ -31,6 +31,19 @@ export const DEFAULT_TRANSFER_STALLS = 5
 /** Travel clearance of the spreader above the top tier (m). */
 const TRAVEL_CLEARANCE_M = 0.6
 
+/** [A] ASC portal length along the rail (m). */
+export const ASC_LENGTH_M = 8
+/** [A] Safe clearance kept between two ASCs on one rail (m). */
+export const ASC_SAFE_GAP_M = 4
+/** Minimum distance between two ASC centres (m): length + safe gap. */
+export const ASC_MIN_SEPARATION_M = ASC_LENGTH_M + ASC_SAFE_GAP_M
+/** Rail reservation granularity along Z (m): half a bay. */
+export const RAIL_SEGMENT_M = BAY_PITCH_M / 2
+/** The rail extends this far past the WTP pads and the last bay (m): room for a crane to stand clear. */
+export const RAIL_MARGIN_M = 16
+/** Reservation end of a parked crane (s): effectively never. */
+export const PARK_UNTIL_S = 1e9
+
 export interface BlockSpec {
   id: string
   x: number
@@ -176,4 +189,30 @@ export function candidateSlots(stacks: YardStacks): YardCandidate[] {
     }
   }
   return out
+}
+
+/** Z where the block's ASC rail starts / ends (waterside / landside limit of a crane centre). */
+export const railStartZ = (block: Pick<BlockSpec, 'wtpZ'>): number => block.wtpZ - RAIL_MARGIN_M
+export const railEndZ = (block: Pick<BlockSpec, 'firstBayZ' | 'bays'>): number =>
+  block.firstBayZ + (block.bays - 1) * BAY_PITCH_M + RAIL_MARGIN_M
+
+/** Rail segment (zone) ids covering the Z interval [lo, hi] (a crane footprint is inflated by half the minimum separation). */
+export function railSegmentIds(block: Pick<BlockSpec, 'id' | 'wtpZ'>, lo: number, hi: number): string[] {
+  const origin = block.wtpZ - RAIL_MARGIN_M - ASC_MIN_SEPARATION_M
+  const first = Math.max(0, Math.floor((lo - ASC_MIN_SEPARATION_M / 2 - origin) / RAIL_SEGMENT_M + 1e-9))
+  const last = Math.max(first, Math.ceil((hi + ASC_MIN_SEPARATION_M / 2 - origin) / RAIL_SEGMENT_M - 1e-9) - 1)
+  const ids: string[] = []
+  for (let k = first; k <= last; k++) ids.push(`${block.id}:R${k}`)
+  return ids
+}
+
+/** Z interval [from, to) of the rail segment with index `k`. */
+export function railSegmentSpan(block: Pick<BlockSpec, 'wtpZ'>, k: number): [number, number] {
+  const origin = block.wtpZ - RAIL_MARGIN_M - ASC_MIN_SEPARATION_M
+  return [origin + k * RAIL_SEGMENT_M, origin + (k + 1) * RAIL_SEGMENT_M]
+}
+
+/** Z where ASC number `index` of a twin block stands at the start (1 = at the WTP pads, 2 = at the landside end). */
+export function ascStartZ(block: BlockSpec, index: number): number {
+  return index === 1 ? block.wtpZ : Math.max(block.firstBayZ + (block.bays - 1) * BAY_PITCH_M, block.wtpZ + ASC_MIN_SEPARATION_M + RAIL_SEGMENT_M + 1)
 }

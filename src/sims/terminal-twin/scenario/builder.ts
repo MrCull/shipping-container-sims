@@ -93,10 +93,12 @@ export function withShcFleet(config: ScenarioConfig, count: number, kinematics?:
 /** Distance between neighbouring blocks' centres added by the setup dialog (m): the 25.4 m span plus a road. */
 export const BLOCK_PITCH_M = 40
 
-/** The setup dialog's yard fields: one entry per block, plus the ASC kinematics (one ASC per block). */
+/** The setup dialog's yard fields: one entry per block, the ASCs per block and the ASC kinematics. */
 export interface YardSetup {
   blocks: { bays: number; tiers: number; wtpPads: number; transferStalls: number }[]
   asc: AscKinematics
+  /** ASCs per block (TT-08); omitted keeps the scenario's value. */
+  ascsPerBlock?: 1 | 2
 }
 
 /**
@@ -122,6 +124,8 @@ export function withYard(config: ScenarioConfig, setup: YardSetup): ScenarioConf
       }
     }),
   }
+  const ascsPerBlock = setup.ascsPerBlock ?? config.yard?.ascsPerBlock
+  if (ascsPerBlock) next.yard.ascsPerBlock = ascsPerBlock
   next.kinematics.asc = JSON.parse(JSON.stringify(setup.asc))
   return next
 }
@@ -260,7 +264,14 @@ export class ScenarioBuilder {
     return this
   }
 
-  /** ASC kinematics (one ASC per block). */
+  /** ASCs per block (TT-08): 1 (default) or 2 sharing the rail. */
+  ascsPerBlock(n: 1 | 2): this {
+    this.config.yard ??= { blocks: [] }
+    this.config.yard.ascsPerBlock = n
+    return this
+  }
+
+  /** ASC kinematics. */
   ascKinematics(k: Partial<AscKinematics>): this {
     this.config.kinematics.asc = structuredClone({ ...(this.config.kinematics.asc ?? DEFAULT_ASC_KINEMATICS), ...k })
     return this

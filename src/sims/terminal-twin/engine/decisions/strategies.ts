@@ -7,6 +7,7 @@
  * identical runs. A strategy that needs randomness must take it from the
  * request, never from Math.random.
  */
+import { balancedAscDispatch, watersideFirstDispatch } from './ascStrategies'
 import { groupByVesselSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
 import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchPad, ShcDispatchRequest } from './types'
@@ -105,6 +106,20 @@ export const strategies: StrategyRegistry = {
       },
     },
   },
+  ascDispatch: {
+    default: 'waterside-first',
+    strategies: {
+      'waterside-first': {
+        description:
+          'WTP work goes to the waterside ASC, transfer-stall work to the landside ASC; the other crane helps when the separation permits (no step-aside needed).',
+        handler: (msg) => watersideFirstDispatch(msg.payload),
+      },
+      balanced: {
+        description: 'The serviceable idle ASC with the fewest jobs so far (ties: nearest the pad), stepping the other aside if needed.',
+        handler: (msg) => balancedAscDispatch(msg.payload),
+      },
+    },
+  },
   berthAllocation: {
     default: 'first-fit',
     strategies: {
@@ -146,6 +161,7 @@ export const defaultHandlers: HandlerSet = {
   stsGroundPosition: getStrategy('stsGroundPosition', strategies.stsGroundPosition.default),
   shcDispatch: getStrategy('shcDispatch', strategies.shcDispatch.default),
   yardAllocation: getStrategy('yardAllocation', strategies.yardAllocation.default),
+  ascDispatch: getStrategy('ascDispatch', strategies.ascDispatch.default),
   berthAllocation: getStrategy('berthAllocation', strategies.berthAllocation.default),
   craneSplit: getStrategy('craneSplit', strategies.craneSplit.default),
 }

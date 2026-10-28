@@ -13,15 +13,15 @@ Handover for the next agent continuing the Terminal Twin build (the `/implement-
 
 ## Ticket status
 
-Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration branch: #25–#35 (TT-01, 02, 03, 04, 05, 09, 20, 22, 06, 25, 18). `npm run verify` passes (252 tests).
+Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration branch: #25–#35 and #39 (TT-01–06, 09, 20, 22, 25, 18, 08). `npm run verify` passes (271 tests).
 
 | Ticket | Issue | State |
 |---|---|---|
 | TT-23 STS model | #36 | WIP, uncommitted files in worktree; branch `tt/36-sts-model` still at 95e15d6. Not yet resumed |
 | TT-27 vessel hulls | #37 | WIP, uncommitted files in worktree; branch `tt/37-vessel-hulls` still at 95e15d6. Not yet resumed |
-| TT-07 KPIs/report | #38 | WIP, uncommitted in worktree; `tt/38-kpis-report`. Not yet resumed |
-| TT-08 paired ASCs | #39 | WIP, uncommitted in worktree; `tt/39-paired-ascs`. Not yet resumed |
-| #40–#52 | | not started |
+| TT-07 KPIs/report | #38 | WIP, resumed; branch `tt/38-kpis-report` |
+| TT-10 export load flow | #40 | started (implementer on `tt/40-export-load-flow`) |
+| #41–#52 | | not started (#42 is unblocked) |
 
 **WIP is NOT on GitHub.** It lives only in git worktrees under `.claude/worktrees/agent-*` of the orchestrating session's container (branches `tt/36…`–`tt/39…` above; the merged `tt/33`, `tt/34`, `tt/35` branches are also there). A 5-hour API rate limit stopped all six implementers at once (limit reset at 12:10 UTC). If you can't see those branches, restart those tickets from the integration tip. Implementer subagents can be resumed with SendMessage if the session is still alive.
 
@@ -29,12 +29,12 @@ Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration br
 
 ```
 36←32,30  37←32,30
-38←33  39←33  40←39,30  41←38  42←32,39
+38←33  40←30    41←38  42←32,39
 43←40  44←40  45←39,43  46←43,45  47←32,45
 48←46  49←48  50←48  51←48  52←32,45,51
 ```
 
-Frontier: #36–#39 (in progress). After #39: #40, #42. After #38: #41. Then follow the graph.
+Frontier: #36–#38, #40, #42. After #38: #41. Then follow the graph.
 
 ## Process that worked
 
@@ -486,3 +486,13 @@ Merged. Guide: `terminal-twin-AGENTS.md` § "SHC model (TT-25)".
 - **Renderer:** `modules/shcAssets.ts` (`loadShcModel`, `ShcRig`, `SHC_RIG`) loads the GLB behind the procedural placeholder; LODs 0–2 at 110 m / 380 m. `ShcPose` adds `yaw steerRad odometerM travelling`; `ContainerPose.carriedBy`. Dev API: `scene().shcLods/shcAssets`, `sceneState().shcRigs`, viewer `?viewer=shc`.
 - **Conventions for the STS/ASC/truck models:** every LOD repeats the rig node names (GLTFLoader renames duplicates; look nodes up via `userData.name` and animate every node of that name). Blender object names carry an `@LODn` suffix that `build.py strip_lod_suffix` removes from the GLB JSON. `container_attach` is the top of the carried box. Move the `Part` helpers (beam, plate, revolve) from `shc.py` into a shared module before the STS/ASC models. Use `liveries._Canvas` and `shc_meta.render_atlas` for swatch atlases.
 - **Gotchas:** SHC corners are visual only (the engine still stops at each turn). `tt:assets` is slow when several Blender jobs share the CPU; use `--only`. A bpy 5.2.3 venv (Python 3.13) is needed for regeneration. Don't use `pkill -f` patterns that match your own shell.
+
+### ticket-39 (TT-08): paired ASCs per block
+
+Merged. Guide: `terminal-twin-AGENTS.md` § "Paired ASCs (TT-08)".
+
+- `yard.ascsPerBlock` 1|2 (engine default 1, setup dialog default 2). Ids `<block>-ASC1` (waterside), `-ASC2` (landside); `ascIdOf(blockId, n)`, `ascIndexOf`.
+- **Rail:** half-bay segments, zone `<block>:R<k>`, min ASC centre separation 12 m (assumed 8 m portal + 4 m gap). Each trip reserves its window per segment via `reservations.ts`; an idle ASC holds an open-ended park hold (`PARK_UNTIL_S` = 1e9). Conflicts delay the trip (rail wait) or make an idle ASC step aside (`AscYieldAssigned`). Invariant `asc.no-passing` (real mode only).
+- **Dispatch:** `ascDispatch` DP v1 (`waterside-first` default, `balanced`); not called with one ASC. Default sends everything to ASC1, so ASC2 idles until TT-13 transfer-stall work (`job.kind 'transfer'` goes to the landside ASC).
+- **For TT-10/12:** rehandles go through `planJob` / `maybeDispatchAsc` and the same segment windows (`occupancyPieces`, `pieceWindows`). Rail extends 16 m past the pads (`RAIL_MARGIN_M`). KPIs add `railWaitS busyS yields` for twin blocks. `ascRail` overlay in `modules/overlays.ts`; `scene().reservedRailSegments`. Fixture `asc-2asc-block-conflict`.
+- Smoke: run with `--reporter=list` redirected to a file when the machine is loaded.

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { createSimulation } from '../engine'
 import { DEFAULT_ASC_KINEMATICS, withYard } from '../scenario/builder'
 import { fixtures } from '../scenario/fixtures'
+import { SceneModel } from '../modules/sceneModel'
 
 const fixture = fixtures['asc-1sts-10-boxes-1block']
 const block = { bays: 6, tiers: 3, wtpPads: 3, transferStalls: 4 }
@@ -45,5 +46,28 @@ describe('withYard (setup dialog)', () => {
       return sim.now
     }
     expect(stackedAt(8)).toBeLessThan(stackedAt(0.5))
+  })
+
+  it('ASCs per block: 2 gives a waterside and a landside ASC per block, 1 keeps one, omitted keeps the scenario value', () => {
+    const asc = DEFAULT_ASC_KINEMATICS
+    const ids = (ascsPerBlock?: 1 | 2) =>
+      createSimulation(withYard(fixture, { blocks: [block, block], asc, ascsPerBlock })).query.ascs().map((a) => a.id)
+    expect(ids(2)).toEqual(['B01-ASC1', 'B01-ASC2', 'B02-ASC1', 'B02-ASC2'])
+    expect(ids(1)).toEqual(['B01-ASC1', 'B02-ASC1'])
+    expect(ids(undefined)).toEqual(['B01-ASC1', 'B02-ASC1'])
+  })
+
+  it('the scene model draws the same ASCs as the engine and maps their rail segments to blocks', () => {
+    const cfg = withYard(fixture, { blocks: [block], asc: DEFAULT_ASC_KINEMATICS, ascsPerBlock: 2 })
+    const model = new SceneModel(cfg)
+    expect(model.ascIds).toEqual(['B01-ASC1', 'B01-ASC2'])
+    expect(model.blockOfAsc('B01-ASC2').id).toBe('B01')
+    expect(model.ascPose('B01-ASC1', 0).z).toBeLessThan(model.ascPose('B01-ASC2', 0).z - 12)
+    // the parked cranes hold rail segments from the start
+    const sim = createSimulation(cfg)
+    model.apply({ motion: [], custody: [], entities: [], reservations: sim.query.reservations().map((r) => ({ ...r })), events: [], eventCounts: {}, breakpoint: null })
+    const held = Object.entries(model.activeReservations(0)).filter(([zone]) => /^B01:R\d+$/.test(zone))
+    expect(new Set(held.map(([, holder]) => holder))).toEqual(new Set(['B01-ASC1', 'B01-ASC2']))
+    expect(model.railSegments('B01').length).toBeGreaterThan(held.length)
   })
 })

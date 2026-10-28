@@ -8,8 +8,10 @@ export interface OverlayState {
   occupancy: boolean
   /** Equipment and vessel state labels floating above each one. */
   labels: boolean
+  /** ASC rail segments reserved (or held by a parked ASC) at the displayed time, coloured by ASC (TT-08). */
+  ascRail: boolean
 }
 
-export const OVERLAY_KEYS: readonly (keyof OverlayState)[] = ['laneGraph', 'reservations', 'occupancy', 'labels']
+export const OVERLAY_KEYS: readonly (keyof OverlayState)[] = ['laneGraph', 'reservations', 'occupancy', 'labels', 'ascRail']
 
-export const NO_OVERLAYS: Readonly<OverlayState> = { laneGraph: false, reservations: false, occupancy: false, labels: false }
+export const NO_OVERLAYS: Readonly<OverlayState> = { laneGraph: false, reservations: false, occupancy: false, labels: false, ascRail: false }

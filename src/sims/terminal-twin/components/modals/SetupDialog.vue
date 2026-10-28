@@ -166,6 +166,8 @@ const scenarioBlocks = computed(() => {
 })
 const yardBlocks = ref<BlockDraft[]>([])
 const ascK = ref<AscKinematics>(copy(DEFAULT_ASC_KINEMATICS))
+/** ASCs per block; the dialog defaults to two (TTI Algeciras), the engine config to one. */
+const ascsPerBlock = ref<1 | 2>(2)
 function loadYardDefaults(): void {
   let base: ReturnType<typeof resolveScenario> | null
   try {
@@ -183,6 +185,7 @@ function loadYardDefaults(): void {
       transferStalls: b.transferStalls ?? DEFAULT_BLOCK.transferStalls,
     }))
   ascK.value = copy(previous?.asc ?? base?.kinematics.asc ?? DEFAULT_ASC_KINEMATICS)
+  ascsPerBlock.value = previous?.ascsPerBlock ?? 2
 }
 loadYardDefaults()
 watch(name, loadYardDefaults)
@@ -329,7 +332,7 @@ async function submit(): Promise<void> {
       startDateTime: startAt.toISOString(),
       overrides: JSON.parse(JSON.stringify(overrides.value)),
       shc: scenarioShcs.value > 0 ? { count: shcCount.value, kinematics: copy(shcK.value) } : undefined,
-      yard: scenarioBlocks.value > 0 ? { blocks: copy(yardBlocks.value), asc: copy(ascK.value) } : undefined,
+      yard: scenarioBlocks.value > 0 ? { blocks: copy(yardBlocks.value), asc: copy(ascK.value), ascsPerBlock: ascsPerBlock.value } : undefined,
     })
     .catch(() => {})
 }
@@ -709,6 +712,34 @@ async function submit(): Promise<void> {
             >
           </label>
         </div>
+        <div
+          class="grid"
+          role="radiogroup"
+          :aria-label="t('setup.yard.ascs')"
+          data-testid="tt-yard-ascs"
+        >
+          <span class="blockname">{{ t('setup.yard.ascs') }}</span>
+          <label class="unit-choice">
+            <input
+              v-model.number="ascsPerBlock"
+              type="radio"
+              name="yard-ascs"
+              :value="1"
+              data-testid="tt-yard-ascs-1"
+            >
+            {{ t('setup.yard.ascsOne') }}
+          </label>
+          <label class="unit-choice">
+            <input
+              v-model.number="ascsPerBlock"
+              type="radio"
+              name="yard-ascs"
+              :value="2"
+              data-testid="tt-yard-ascs-2"
+            >
+            {{ t('setup.yard.ascsTwo') }}
+          </label>
+        </div>
         <div class="grid">
           <label
             v-for="f in yardSpeedFields"
@@ -749,6 +780,12 @@ async function submit(): Promise<void> {
         </div>
         <p class="hint">
           {{ t('setup.yard.rowsNote') }}
+        </p>
+        <p
+          v-if="ascsPerBlock === 2"
+          class="hint"
+        >
+          {{ t('setup.yard.twinNote') }}
         </p>
         <p
           v-if="yardReadout"

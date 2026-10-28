@@ -8,11 +8,11 @@
  */
 import { laneGraphOf } from './laneGraph'
 import { overlappingReservations } from './reservations'
-import type { CustodyRef, SimState } from './state'
+import { ascIndexOf, type AscState, type CustodyRef, type SimState } from './state'
 import { ascPoseAt } from './subsystems/asc'
 import { gantryPositionAt, railOrder } from './subsystems/rail'
 import { shcPositionAt } from './subsystems/shc'
-import { blockSpecs, travelHoistM } from './yardLayout'
+import { ASC_MIN_SEPARATION_M, blockSpecs, travelHoistM } from './yardLayout'
 import type { ScenarioConfig } from '../scenario/types'
 import { vesselClass } from '../scenario/vesselClasses'
 
@@ -226,6 +226,36 @@ export const INVARIANTS: Invariant[] = [
             const at = shcPositionAt(graph, shc, state.now)
             if (Math.abs(at.x - pad.x) < PAD_HALF_X_M && Math.abs(at.z - pad.z) < PAD_HALF_Z_M)
               messages.push(`${asc.id} is in the lifting envelope of ${pad.id} (hoist ${pose.hoistY.toFixed(2)} m) while ${shc.id} is there`)
+          }
+        }
+      }
+      return messages
+    },
+  },
+  {
+    id: 'asc.no-passing',
+    description:
+      'The two ASCs of a block never pass or collide: the waterside ASC stays waterside of the landside ASC and their centres ' +
+      'stay at least ASC_MIN_SEPARATION_M apart, now and at every breakpoint of their planned motion.',
+    check(state) {
+      const messages: string[] = []
+      if (state.subsystems.asc !== 'real') return messages // instant ASCs jump: no rail to share
+      const byBlock = new Map<string, AscState[]>()
+      for (const a of Object.values(state.ascs)) byBlock.set(a.blockId, [...(byBlock.get(a.blockId) ?? []), a])
+      for (const [blockId, list] of byBlock) {
+        if (list.length < 2) continue
+        const [w, l] = [...list].sort((a, b) => ascIndexOf(a.id) - ascIndexOf(b.id))
+        const times = new Set<number>([state.now])
+        for (const s of [...w.motion, ...l.motion]) {
+          for (const t of [s.t0, (s.t0 + s.t1) / 2, s.t1]) if (t >= state.now) times.add(t)
+        }
+        for (const t of [...times].sort((a, b) => a - b)) {
+          const gap = ascPoseAt(l, t).z - ascPoseAt(w, t).z
+          if (gap < ASC_MIN_SEPARATION_M - 1e-6) {
+            messages.push(
+              `${w.id} and ${l.id} of ${blockId} are ${gap.toFixed(2)} m apart at t=${t.toFixed(2)} s (minimum ${ASC_MIN_SEPARATION_M} m, waterside ASC must stay waterside)`,
+            )
+            break
           }
         }
       }

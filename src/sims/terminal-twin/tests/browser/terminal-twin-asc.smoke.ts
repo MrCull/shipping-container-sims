@@ -89,6 +89,7 @@ test('the setup dialog edits blocks, bays, tiers, pads, stalls and ASC speeds', 
   await dialog.locator('input[name="yard-tiers-2"]').fill('2')
   await dialog.locator('input[name="yard-pads-2"]').fill('3')
   await dialog.locator('input[name="yard-stalls-2"]').fill('2')
+  await dialog.getByTestId('tt-yard-ascs-1').check()
   await dialog.getByRole('button', { name: /start/i }).click()
   await expect(dialog).toBeHidden()
   const cfg = await page.evaluate(() => window.__tt!.config())
