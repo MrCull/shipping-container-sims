@@ -7,7 +7,7 @@
  *
  * Options:
  *   --check          regenerate into a temp folder and compare with the committed files (exit 1 on any difference)
- *   --only <group>   regenerate one group only (containers | shc; repeatable); default all
+ *   --only <group>   regenerate one group only (containers | shc | asc; repeatable); default all
  *   --no-previews    skip the Cycles previews (keeps the committed ones)
  *   --samples <n>    Cycles samples per preview (default 48)
  *   --python <exe>   Python with bpy (default: $TT_BPY_PYTHON, then python3.13 / python3 / python, or `py -3.13` on Windows)
@@ -25,7 +25,7 @@ import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer'
 import { ASSETS_DIR, MODELS_DIR, runBudgetCli } from './budgetCheck'
 
 const GENERATOR = join(ASSETS_DIR, 'generators', 'build.py')
-const GROUPS = ['containers', 'shc']
+const GROUPS = ['containers', 'shc', 'asc']
 
 interface Options {
   only: string[]

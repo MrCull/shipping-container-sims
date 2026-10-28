@@ -1,0 +1,377 @@
+{
+  "asset": "asc",
+  "kind": "asc",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only asc",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 10.1,
+    "widthM": 29.2,
+    "heightM": 24.7,
+    "spanM": 25.4,
+    "railGaugeM": 25.4,
+    "tag": "A",
+    "reason": "rail span 25.4 m over 8 rows is the spec figure (V); length, width over the head-beam decks and height are approximations of a ZPMC rail-mounted ASC"
+  },
+  "axes": {
+    "up": "+Y",
+    "gantryTravel": "+Z (along the block rails)",
+    "trolleyTravel": "+X (across the rows)",
+    "spreaderLength": "+Z",
+    "origin": "ground contact at the span centre and the gantry centre",
+    "handedness": "right-handed, glTF"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "asc",
+      "role": "lod",
+      "description": "full detail, nearest ASCs"
+    },
+    {
+      "name": "LOD1",
+      "parent": "asc",
+      "role": "lod",
+      "description": "simplified, rig kept (gantry, trolley, ropes, hoist, spreader)"
+    },
+    {
+      "name": "LOD2",
+      "parent": "asc",
+      "role": "lod",
+      "description": "silhouette boxes; gantry, trolley, hoist and spreader nodes kept so far cranes still move (spreader has no mesh: merged into hoist)"
+    },
+    {
+      "name": "gantry",
+      "parent": "LOD*",
+      "role": "rig",
+      "pivot": [
+        0,
+        0,
+        0.0
+      ],
+      "axis": "+Z",
+      "description": "portal on the two rails (legs, sills, rail bogies, head beams, bridge, walkways, ladders, e-house); translates along the block rails; pivot at the ground on the span and gantry centre"
+    },
+    {
+      "name": "trolley",
+      "parent": "gantry",
+      "role": "rig",
+      "pivot": [
+        0,
+        22.2,
+        0.0
+      ],
+      "axis": "+X",
+      "description": "trolley frame and hoist machinery on the bridge rails; translates across the rows; pivot at the top of the bridge rails on the centre line"
+    },
+    {
+      "name": "ropes",
+      "parent": "trolley",
+      "role": "rig",
+      "pivot": [
+        0,
+        22.5,
+        0.0
+      ],
+      "axis": "+Y",
+      "derived": {
+        "from": "hoist",
+        "scaleAxis": "+Y",
+        "restLengthM": 2.2,
+        "topY": 22.5,
+        "headblockTopAboveAttachM": 2.3
+      },
+      "description": "four rope strands drum to head block; no travel limit of its own: scale along Y = (topY - (attachY + headblockTopAboveAttachM)) / restLengthM"
+    },
+    {
+      "name": "hoist",
+      "parent": "trolley",
+      "role": "rig",
+      "pivot": [
+        0,
+        18.0,
+        0.0
+      ],
+      "axis": "+Y",
+      "description": "head block with sheaves and hangers; pivot = container attach plane at rest (raised); travels down (negative)"
+    },
+    {
+      "name": "spreader",
+      "parent": "hoist",
+      "role": "rig",
+      "pivot": [
+        0,
+        18.0,
+        0.0
+      ],
+      "axis": "+Y",
+      "description": "telescopic 40 ft spreader hung from the head block, long axis along the rails; small float travel"
+    },
+    {
+      "name": "twistlock_fl",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        1.1295,
+        18.0,
+        -5.9925
+      ],
+      "axis": "+Y",
+      "description": "twist-lock; 0 = unlocked, 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_fr",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        -1.1295,
+        18.0,
+        -5.9925
+      ],
+      "axis": "+Y",
+      "description": "twist-lock; 0 = unlocked, 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_rl",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        1.1295,
+        18.0,
+        5.9925
+      ],
+      "axis": "+Y",
+      "description": "twist-lock; 0 = unlocked, 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_rr",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        -1.1295,
+        18.0,
+        5.9925
+      ],
+      "axis": "+Y",
+      "description": "twist-lock; 0 = unlocked, 90 degrees = locked"
+    }
+  ],
+  "travelLimits": {
+    "gantry": {
+      "type": "translation",
+      "axis": "+Z",
+      "minM": -200.0,
+      "maxM": 200.0,
+      "rest": 0,
+      "tag": "A",
+      "note": "the rail run is per block (engine owns the real limits); +Z is the engine gantry axis"
+    },
+    "trolley": {
+      "type": "translation",
+      "axis": "+X",
+      "minM": -11.0,
+      "maxM": 11.0,
+      "rest": 0,
+      "tag": "A",
+      "note": "reaches the outer rows (row centres at +-10.15 m) and the outer WTP pads (about +-10.8 m)"
+    },
+    "hoist": {
+      "type": "translation",
+      "axis": "+Y",
+      "minM": -15.104,
+      "maxM": 0,
+      "rest": 0,
+      "tag": "A"
+    },
+    "spreader": {
+      "type": "translation",
+      "axis": "+Y",
+      "minM": 0,
+      "maxM": 0.35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "twistlock_fl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A"
+    },
+    "twistlock_fr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A"
+    },
+    "twistlock_rl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A"
+    },
+    "twistlock_rr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A"
+    }
+  },
+  "attachPoints": [
+    {
+      "name": "container_attach",
+      "parent": "hoist",
+      "position": [
+        0,
+        18.0,
+        0.0
+      ],
+      "description": "centre of the twist-lock plane, i.e. the TOP of the carried box. At hoist 0 it is 18.0 m above the ground; hoist = (box bottom + box height) - 18.0",
+      "tag": "A"
+    },
+    {
+      "name": "twistlock_fl",
+      "position": [
+        1.1295,
+        18.0,
+        -5.9925
+      ],
+      "parent": "hoist",
+      "tag": "V",
+      "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
+    },
+    {
+      "name": "twistlock_fr",
+      "position": [
+        -1.1295,
+        18.0,
+        -5.9925
+      ],
+      "parent": "hoist",
+      "tag": "V",
+      "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
+    },
+    {
+      "name": "twistlock_rl",
+      "position": [
+        1.1295,
+        18.0,
+        5.9925
+      ],
+      "parent": "hoist",
+      "tag": "V",
+      "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
+    },
+    {
+      "name": "twistlock_rr",
+      "position": [
+        -1.1295,
+        18.0,
+        5.9925
+      ],
+      "parent": "hoist",
+      "tag": "V",
+      "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "gantry"
+    ],
+    "rails": [
+      {
+        "x": -12.7
+      },
+      {
+        "x": 12.7
+      }
+    ],
+    "tag": "V"
+  },
+  "hoist": {
+    "restAttachM": 18.0,
+    "lowestAttachM": 2.896,
+    "spreaderFloatM": 0.35,
+    "tag": "A",
+    "note": "lowest plane = top of a 40 ft high-cube box standing on the ground; restAttachM suits a 5-high stack plus the engine travel clearance; taller blocks scale the model vertically (see ascAssets.ts)"
+  },
+  "stack": {
+    "rows": 8,
+    "rowPitchM": 2.9,
+    "designTiers": 5,
+    "stackTopM": 14.48,
+    "clearSpanM": 24.3,
+    "underBridgeM": 20.0,
+    "bridgeTopM": 22.2,
+    "carryClearanceM": 0.624,
+    "referenceContainer": "40HC",
+    "tag": "V",
+    "note": "8 rows at 2.9 m pitch inside the 25.4 m span (the engine row pitch); a carried box clears a 5-high stack by the engine travel clearance"
+  },
+  "branding": {
+    "manufacturerWordmark": "ZPMC",
+    "swlMark": "40 t",
+    "unitNumber": "ASC 12",
+    "bridgePanelNumbers": "1..8",
+    "operatorBranding": false,
+    "tag": "A",
+    "note": "ZPMC wordmark set in Montserrat ExtraBold on the blue atlas (no official logo artwork); numbered bridge panels over the rows; no operator branding"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 14474,
+      "material": "asc_atlas"
+    },
+    "LOD1": {
+      "triangles": 3624,
+      "material": "asc_atlas"
+    },
+    "LOD2": {
+      "triangles": 556,
+      "material": "asc_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "25.4 m rail span over 8 container rows, 40 t rated load",
+      "tag": "V",
+      "source": "spec #24 (rails, rows and ASC rating)"
+    },
+    {
+      "fact": "dark/medium-blue rail-mounted gantry: twin box-beam bridge, vertical legs on sills with rail bogies, trolley with hoist machinery, yellow spreader",
+      "tag": "P",
+      "source": "public ZPMC ASC photographs (not committed)"
+    },
+    {
+      "fact": "leg, girder, trolley and e-house proportions; 24.7 m overall height; bridge underside 20.0 m",
+      "tag": "A",
+      "reason": "no manufacturer drawing in the repo; sized so a 5-high stack plus a carried box fits under the bridge"
+    },
+    {
+      "fact": "portal length 9.4 m (sill) plus buffers, so two ASCs fit the engine 12 m minimum centre separation",
+      "tag": "A"
+    },
+    {
+      "fact": "40 ft spreader with end beams, telescopic tubes and four twist-locks at the ISO 1161 casting centres",
+      "tag": "V",
+      "source": "ISO 1161 / ISO 668"
+    },
+    {
+      "fact": "ZPMC wordmark and \"40 t\" baked into the atlas, numbered bridge panels 1..8 over the rows; no operator branding",
+      "tag": "A"
+    },
+    {
+      "fact": "rope strands are a scaled node (rest length follows the hoist); stiffener ribs, grating and rungs as boxes",
+      "tag": "M",
+      "reason": "triangle budget"
+    }
+  ]
+}
