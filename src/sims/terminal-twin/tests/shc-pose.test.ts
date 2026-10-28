@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { planSegment, type Axis, type MotionSegment } from '../engine'
 import { SceneModel } from '../modules/sceneModel'
 import { fixtures } from '../scenario/fixtures'
-import type { Delta } from '../worker/protocol'
+import { emptyDelta } from './delta'
 
 const config = fixtures['shc-1sts-2shc-1wtp']
 const SHC = config.shcs![0].id
@@ -23,8 +23,7 @@ function seg(axis: Axis, from: number, to: number, t0: number): MotionSegment {
 }
 
 function drive(m: SceneModel, segments: MotionSegment[]): void {
-  const delta: Delta = { motion: [{ entityId: SHC, segments }], custody: [], entities: [], reservations: [], events: [], eventCounts: {}, breakpoint: null }
-  m.apply(delta)
+  m.apply(emptyDelta({ motion: [{ entityId: SHC, segments }] }))
 }
 
 describe('SHC pose for the 3D model', () => {
@@ -95,7 +94,7 @@ describe('SHC pose for the 3D model', () => {
     const run = seg('z', s0.z, s0.z + 10, 0)
     drive(m, [run])
     const id = m.containerIds[0]
-    m.apply({ motion: [], custody: [{ containerId: id, t: 0, owner: { kind: 'shc', id: SHC }, eventId: 1 }], entities: [], reservations: [], events: [], eventCounts: {}, breakpoint: null })
+    m.apply(emptyDelta({ custody: [{ containerId: id, t: 0, owner: { kind: 'shc', id: SHC }, eventId: 1 }] }))
     const pose = m.containerPose(id, run.t1 + 1)!
     expect(pose.z).toBeCloseTo(s0.z + 10, 6)
     expect(pose.carriedBy).toBe(SHC)

@@ -11,7 +11,7 @@
     "screenshot": "node scripts/screenshot.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "verify": "npm run lint && npm run build && npm test --if-present",
+    "verify": "node scripts/check-deps.mjs && npm run lint && npm run build && npm test --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
     "tt:run": "tsx src/sims/terminal-twin/cli/run.ts",
