@@ -474,3 +474,13 @@ Branch `tt/48-presets-validation`. Guide: `terminal-twin-AGENTS.md` § "Presets,
 - **Gotchas:** `createSimulation` now throws for limit/frontage errors. Dialog Start is disabled while any error shows. Full TTI/Stress runs are slow (minutes without invariants); TT-19 should look at per-event cost on 28,800-cell yards.
 - **Open defect:** pre-filled yard deadlock (ASCs idle, `planJob` null) seen with Small automated at 50% fill; see the guide. Small preset uses 30%.
 - **Follow-ups:** persistence (TT-17) should store the new overrides; dialog tests for decisions are smoke-only.
+
+### ticket-51 (TT-21): atmosphere and polish
+
+Branch `tt/51-atmosphere-polish`. Guide: `terminal-twin-AGENTS.md` § "Atmosphere and polish (TT-21)". Glossary: Atmosphere.
+
+- **APIs:** `modules/atmosphere.ts` (`lightingFor`, `hourOfDay`), `atmosphereRig.ts`, `backdrop.ts`, `cues.ts`, `soundPlayer.ts`, `microcopy.ts`; store `soundOn`, `sounds`, `lockDaylight`, `banner`, `toggleSound`, `toggleLockDaylight`; `TwinView.atmosphere()`; `__tt.atmosphere()`; `SceneRenderer.setLighting` / `atmosphereState`; `TTI_PRESET_NAME` / `STRESS_PRESET_NAME` in `scenario/presets.ts`.
+- **Home card:** `SimDefinition.cardImage` (optional) drawn faintly behind `SimCard` text; `npm run tt:card` regenerates `assets/home-card.png`.
+- **Gotchas:** the scene's lights, background and fog now live in `AtmosphereRig` (`SceneRenderer.addLights` is gone). Camera far plane is 14 000 and near 1. Water plane is 40 km x 12 km. Cues come from `delta.events` (capped at 200 per batch), so flat-out runs drop most of them by design. Per-frame cue release is in `store.sync()`.
+- **Follow-ups:** night lights on trucks; real-GPU night fps against the TT-19 budget; seasonal sunrise/sunset.
+

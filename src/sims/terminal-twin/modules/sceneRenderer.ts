@@ -31,6 +31,9 @@ import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { VesselHulls, type VesselHullState } from './vesselRenderer'
 import { LandsideScene, type LandsideStats } from './landsideRenderer'
 import { loadTruckModels, type TruckRigState } from './truckAssets'
+import { AtmosphereRig, type AtmosphereState } from './atmosphereRig'
+import type { Lighting } from './atmosphere'
+import { backdropKindFor, buildBackdrop, type Backdrop, type BackdropKind } from './backdrop'
 
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
 const EMPTY_HOIST_MPS = 1.5
@@ -122,13 +125,15 @@ export class SceneRenderer {
   private readonly matrix = new THREE.Matrix4()
   private selection: THREE.LineSegments
   private disposables: { dispose(): void }[] = []
+  private atmosphere: AtmosphereRig
+  private backdrop: Backdrop
 
   constructor(private model: SceneModel) {
     const { config } = model
-    this.scene.background = new THREE.Color('#a9bfd3')
-    this.scene.fog = new THREE.Fog('#a9bfd3', 600, 2600)
-    this.addLights()
+    this.atmosphere = new AtmosphereRig(this.scene, model, { quayZ: LAND_RAIL_Z + 6 })
     this.addGround(config)
+    this.backdrop = buildBackdrop(backdropKindFor(config.name), config.quay.lengthM)
+    this.scene.add(this.backdrop.group)
     for (const s of config.sts) this.addSts(s.id)
     this.vessels = new VesselHulls(model)
     this.scene.add(this.vessels.group)
@@ -223,34 +228,14 @@ export class SceneRenderer {
     return thing
   }
 
-  private addLights(): void {
-    this.scene.add(new THREE.HemisphereLight('#dfe9f5', '#5a5248', 1.4))
-    const sun = new THREE.DirectionalLight('#fff4e0', 2.2)
-    sun.position.set(-150, 260, 180)
-    sun.castShadow = true
-    sun.shadow.mapSize.set(2048, 2048)
-    // ~0.25 m shadow texels: bias so container corrugation does not self-shadow (acne).
-    sun.shadow.normalBias = 0.35
-    sun.shadow.bias = -0.0004
-    const c = sun.shadow.camera
-    c.left = -250
-    c.right = 250
-    c.top = 250
-    c.bottom = -250
-    c.near = 10
-    c.far = 800
-    sun.target.position.set(0, 0, 0)
-    this.scene.add(sun, sun.target)
-  }
-
   private addGround(config: ScenarioConfig): void {
     const length = config.quay.lengthM
     const water = new THREE.Mesh(
-      this.track(new THREE.PlaneGeometry(6000, 3000)),
+      this.track(new THREE.PlaneGeometry(40000, 12000)),
       this.track(new THREE.MeshStandardMaterial({ color: '#2d5873', roughness: 0.35, metalness: 0.1 })),
     )
     water.rotation.x = -Math.PI / 2
-    water.position.set(length / 2, -QUAY_ABOVE_WATER_M, -1500)
+    water.position.set(length / 2, -QUAY_ABOVE_WATER_M, -6000)
     water.receiveShadow = true
     this.scene.add(water)
 
@@ -540,6 +525,15 @@ export class SceneRenderer {
     }
   }
 
+  /** Apply the time-of-day lighting (day/dusk/night; cheap, call when it changes). */
+  setLighting(l: Lighting): void {
+    this.atmosphere.apply(l)
+  }
+
+  atmosphereState(): AtmosphereState & { backdrop: { kind: BackdropKind; parts: string[] } } {
+    return { ...this.atmosphere.state(), backdrop: { kind: this.backdrop.kind, parts: [...this.backdrop.parts] } }
+  }
+
   setOverlays(next: OverlayState): void {
     this.overlays = { ...next }
     this.laneOverlay.visible = next.laneGraph
@@ -589,6 +583,7 @@ export class SceneRenderer {
       parts.ropes.position.set(0, ropeTop - ropeLen / 2, pose.trolleyZ)
     }
     this.lastT = t
+    this.atmosphere.update(t)
     this.vessels.update(t, cameraPosition)
     this.landside.update(t, cameraPosition)
     this.reservedZones = 0
@@ -791,6 +786,8 @@ export class SceneRenderer {
 
   dispose(): void {
     this.disposed = true
+    this.atmosphere.dispose()
+    this.backdrop.dispose()
     for (const m of this.stsModels.values()) m.dispose()
     this.vessels.dispose()
     this.landside.dispose()

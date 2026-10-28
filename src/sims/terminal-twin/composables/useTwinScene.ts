@@ -10,6 +10,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { NO_OVERLAYS } from '../modules/overlays'
 import { pickEntity } from '../modules/picking'
+import { hourOfDay, lightingFor } from '../modules/atmosphere'
 import { SceneRenderer } from '../modules/sceneRenderer'
 import type { SceneModel } from '../modules/sceneModel'
 import { useTwinStore } from '../store/twinStore'
@@ -32,6 +33,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   let view: SceneRenderer | null = null
   let builtFor: SceneModel | null = null
   let overlaysApplied: object | null = null
+  let lightingKey = ''
   let frame = 0
   /** Frames actually rendered (dev API: proves the view keeps animating). */
   let framesRendered = 0
@@ -106,6 +108,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (!model) return
     view = new SceneRenderer(model)
     overlaysApplied = null
+    lightingKey = ''
     aim(view.overviewTarget(), false)
   }
 
@@ -128,6 +131,13 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       const centre = controller.model?.entityCentre(store.selectedId, controller.displayTime)
       if (centre) aim(centre, true)
     }
+    // Time of day: the sun follows the sim clock (re-applied when the clock moves a minute or the lock changes).
+    const hour = hourOfDay(store.choice.startDateTime, controller.displayTime)
+    const key = `${Math.floor(hour * 60)}:${store.lockDaylight}`
+    if (key !== lightingKey) {
+      lightingKey = key
+      view.setLighting(lightingFor(hour, store.lockDaylight))
+    }
     view.update(controller.displayTime, store.selectedId, camera.position)
     controls?.update()
     renderer.render(view.scene, camera)
@@ -147,12 +157,12 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         renderer.outputColorSpace = THREE.SRGBColorSpace
         el.appendChild(renderer.domElement)
         renderer.domElement.classList.add('tt-canvas')
-        camera = new THREE.PerspectiveCamera(45, 1, 0.5, 6000)
+        camera = new THREE.PerspectiveCamera(45, 1, 1, 14000)
         controls = new OrbitControls(camera, renderer.domElement)
         controls.enableDamping = true
         controls.dampingFactor = 0.08
         controls.minDistance = 8
-        controls.maxDistance = 2500
+        controls.maxDistance = 3500
         controls.maxPolarAngle = Math.PI / 2.05
         renderer.domElement.addEventListener('pointerdown', onPointerDown)
         renderer.domElement.addEventListener('pointerup', onPointerUp)
@@ -185,6 +195,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       ascRigs: () => view?.renderedAscs() ?? null,
       sts: () => view?.renderedSts() ?? null,
       vesselHulls: () => view?.vesselHulls() ?? null,
+      atmosphere: () => view?.atmosphereState() ?? null,
     })
     frame = requestAnimationFrame(loop)
   })

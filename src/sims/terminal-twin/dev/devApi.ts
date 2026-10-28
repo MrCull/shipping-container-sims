@@ -107,6 +107,8 @@ export interface TwinDevApi {
   config(): ScenarioConfig | null
   /** Keyboard-driven UI state. */
   ui(): TwinUiState
+  /** Atmosphere (TT-21): lighting mode, daylight lock, backdrop, sound toggle and what played, the banner showing. */
+  atmosphere(): TwinAtmosphereState
   /** Dashboard (TT-16): open it, pick a tab/group/bucketing, read what it rendered. */
   dashboard(): TwinDashboardState
   openDashboard(opts?: { tab?: 'charts' | 'report'; group?: string; bucketing?: 'hour' | 'shift' }): Promise<TwinDashboardState>
@@ -156,6 +158,16 @@ export interface TwinDashboardState {
   group: string
   bucketing: 'hour' | 'shift'
   rendered: DashboardRendered | null
+}
+
+export interface TwinAtmosphereState {
+  lockDaylight: boolean
+  soundOn: boolean
+  /** Sounds played since the scenario started (0 while the toggle is off). */
+  sound: { played: number; recent: { kind: string; large: boolean; simT: number }[] }
+  banner: { kind: string; vesselName: string } | null
+  /** The 3D view's lighting and backdrop; null without a 3D view. */
+  scene: { mode: string; daylight: number; shadows: boolean; masts: number; equipmentLights: number; backdrop: { kind: string; parts: string[] } } | null
 }
 
 export interface TwinUiState {
@@ -309,6 +321,13 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       await store.refreshDashboard()
       return dashboardState()
     },
+    atmosphere: () => ({
+      lockDaylight: store.lockDaylight,
+      soundOn: store.soundOn,
+      sound: store.sounds.stats(),
+      banner: store.banner ? { kind: store.banner.kind, vesselName: store.banner.vesselName } : null,
+      scene: store.view()?.atmosphere() ?? null,
+    }),
     ui: () => ({
       selectedId: store.selectedId,
       following: store.following,

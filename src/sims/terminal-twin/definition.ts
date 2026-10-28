@@ -1,4 +1,6 @@
 import type { SimDefinition } from '@/types/sim'
+// Regenerate with `npm run tt:card` whenever the visuals change.
+import cardImage from './assets/home-card.png?url'
 
 // Keep this file light: it is eagerly imported for the home page. Everything
 // else (engine, worker, Three.js view) loads with the component.
@@ -14,6 +16,7 @@ export const definition: SimDefinition = {
   status: 'playable',
   order: 4,
   color: '#3b82f6',
+  cardImage,
   tags: ['Simulation', 'Digital twin', '3D'],
   component: () => import('./TerminalTwin.vue'),
 }

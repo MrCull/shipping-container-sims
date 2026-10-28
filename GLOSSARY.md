@@ -195,3 +195,12 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Frontage:** the quay length a block needs (32 m); blocks need count x 32 m.
 - **Scale limits / stress-test scale:** hard maxima (errors) and the softer size above which the dialog warns the run may be slow.
 - **Nominal cycle:** the derived cycle time and moves per hour of one crane from its kinematics, without variation or waiting.
+
+## Atmosphere (TT-21)
+
+- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On by default in the Stress test preset.
+- **Night mode:** the cheaper lighting at night: no sun shadow pass, floodlight glow on high masts and emissive equipment lights instead of real lights.
+- **Backdrop:** the distant low-poly scenery: Algeciras (Rock of Gibraltar, hills, North Quay) for the TTI preset, a generic coastline otherwise.
+- **North Quay:** TTI's 550 m of quay beside the working berths, drawn idle (non-operational).
+- **Cue:** a moment (box landed, vessel horn, scenario complete) that may make a sound or banner when the display clock reaches it.
+

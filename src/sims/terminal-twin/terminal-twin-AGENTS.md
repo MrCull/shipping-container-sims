@@ -541,6 +541,23 @@ A blue ZPMC-style rail-mounted stacking crane (`assets/models/asc/asc.glb`, side
 3. Check or tune its entry in `budgets.json` and run `npm run tt:assets`. Look at the previews and at `?viewer=<asset>`, then run `npm run tt:assets:shots`.
 4. Commit the generators, GLBs, sidecars and previews (never `.blend` files or photos).
 
+## Atmosphere and polish (TT-21)
+
+| Piece | Where | Notes |
+|---|---|---|
+| Time of day | `modules/atmosphere.ts` (`hourOfDay`, `lightingFor`, `daylightLockDefault`) | Local hour of the sim clock (same zone as the clock display). Sun 06:30 to 19:30, modes `day` / `dusk` / `night`. `lockDaylight` squeezes the 24 h into the daylight window: the sun still travels, night never falls. Default on for the Stress test preset (`store.lockDaylight`, top-bar Daylight button). |
+| Lighting rig | `modules/atmosphereRig.ts` (`AtmosphereRig`, owned by `SceneRenderer`) | Sun, hemisphere, sky/fog colours. Night is the cheaper mode: sun shadow pass off, no extra real lights; high-mast poles (instanced, always drawn) get additive glow points and every STS/ASC/SHC gets one glow point (2 draw calls in all). `useTwinScene` re-applies lighting when the clock crosses a minute or the lock flips. |
+| Backdrop | `modules/backdrop.ts` (`backdropKindFor`, `buildBackdrop`, `BACKDROP_PARTS`) | `tti` only for the preset named `TTI_PRESET_NAME`: Rock of Gibraltar across the bay, Algeciras hills, the 550 m North Quay (bare slab, no equipment, no lights). Every other scenario (presets and fixtures): `generic` coastline. Flat-shaded, no textures. Water, land, camera far plane (14 000 m) and fog (900 to 9000 m) were enlarged for it. |
+| Cues | `modules/cues.ts` (`CuePlanner`, `SoundThrottle`, `minGapMs`) | Events to cues: `StsGrounded`/`StsLoaded` landed, `VesselArrived`/`VesselDeparted` horn (departure also a banner), `ScenarioEnded` chime. Released when the DISPLAY clock reaches them; long-past cues (a Run to… jump) are dropped. |
+| Sound | `modules/soundPlayer.ts`, `assets/sounds/*.mp3` (copies from `available-media/sound-samples`) | `store.soundOn` (top-bar Sound button) is off by default; while off no `Audio` object is created. Throttle by real time and speed (landed 150 ms at x10 or less, 600 ms to x60, 2.5 s above; horns 3 s, 12 s above x60). Horn samples are cut to 1.7 s. No music. |
+| Banner | `components/DepartureBanner.vue`, `store.banner` | 3.5 s, `pointer-events: none`, reduced-motion safe. Shown on every vessel departure regardless of the sound toggle. Scenario completion uses the existing end banner (now with a soft amber glow) plus the chime. |
+| Micro-copy | `modules/microcopy.ts` (`quayNote`), `i18n/messages.ts` | "Quay's quiet. Next vessel ETA 03:40" bottom-left while no vessel is at the quay or anchorage; friendlier empty states in the feed, inspector and Gantt. |
+| Home card | `npm run tt:card` (`scripts/tt-home-card.mjs`), `assets/home-card.png`, `SimDefinition.cardImage` | Loads the TTI preset, runs to 04:30, frames the overview, hides all UI, captures the canvas at 1200x630 via `scripts/screenshot.mjs`. Re-run and commit the PNG whenever visuals change. Do not edit sim source while it runs (Vite hot reload kills the capture). |
+
+Dev API: `__tt.atmosphere()` returns `{ lockDaylight, soundOn, sound: { played, recent }, banner, scene: { mode, daylight, shadows, masts, equipmentLights, backdrop: { kind, parts } } }`.
+Proof: `tests/atmosphere.test.ts`, `tests/cues.test.ts`, `tests/backdrop.test.ts`; `tests/browser/terminal-twin-atmosphere.smoke.ts` (day/night, lock, draw calls day vs night, backdrop per preset, sound off/on and x600 throttle, banner click-through).
+Not done: real-GPU frame rate at night (the TT-19 budget lands separately; the smoke test compares draw calls, and night has no shadow pass); trucks have no night lights; the sun is not seasonal.
+
 ## Engine architecture
 
 - **Discrete-event clock.** `state.queue` is a binary heap ordered by `(t, id)`. `step()` pops one event, sets `now`, runs its reactors, commits it to the log (assigning `seq`), checks invariants, then checks end conditions.

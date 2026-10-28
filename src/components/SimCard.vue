@@ -50,6 +50,14 @@ function openSim(): void {
     @keydown.enter.prevent="openSim"
     @keydown.space.prevent="openSim"
   >
+    <img
+      v-if="sim.cardImage"
+      :src="sim.cardImage"
+      alt=""
+      class="card-art"
+      loading="lazy"
+    >
+
     <div class="card-top">
       <div class="card-icon">
         <img
@@ -216,6 +224,21 @@ function openSim(): void {
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 0.25rem;
+}
+
+.card-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.32;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 90%);
+}
+
+.sim-card > :not(.card-art):not(.scanline):not(.card-tooltip) {
+  position: relative;
 }
 
 .card-icon {
