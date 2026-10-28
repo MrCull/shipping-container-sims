@@ -64,7 +64,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
   /**
    * TT-05: 1 STS → 2 SHC → 1 WTP strip. The STS grounds on 3 lanes (a
    * realistic count: SHCs clear them); two SHCs carry every box to the 4 WTP
-   * pads of block B01 (west of the crane), where the instant ASC stub clears
+   * pads of block B01 (west of the crane), where the instant ASC clears
    * them. Ends at a fixed time, after the last box has reached the yard.
    */
   'shc-1sts-2shc-1wtp': () =>
@@ -77,6 +77,26 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .vesselCall('V001', { name: 'Shuttle Star', sizeClass: 'feeder', discharge: 10, maxSts: 1, sizeMix: { '40': 1 } })
       .shcs(2)
       .block('B01', { x: 20, wtpPads: 4 })
+      .subsystems({ asc: 'instant' })
+      .endWhen({ simDurationS: 1800 })
+      .build(),
+
+  /**
+   * ASC block storage (TT-06): the import flow from vessel to stack. One STS
+   * discharges 10 boxes (20 ft and 40 ft mixed) to 2 SHCs; the block (8 bays,
+   * 3 tiers, 5 WTP pads) has one ASC that stacks them. Ends at a fixed time,
+   * after the last box has been stacked.
+   */
+  'asc-1sts-10-boxes-1block': () =>
+    new ScenarioBuilder('asc-1sts-10-boxes-1block', '1 STS discharges 10 boxes to 1 block: vessel → STS → SHC → WTP pad → ASC → stack')
+      .seed(42)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Stack Star', sizeClass: 'feeder', discharge: 10, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 8, tiers: 3 })
       .endWhen({ simDurationS: 1800 })
       .build(),
 

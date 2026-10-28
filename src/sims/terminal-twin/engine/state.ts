@@ -10,6 +10,7 @@ import type { MotionSegment } from './kinematics'
 import { laneGraphOf, validateLaneLayout } from './laneGraph'
 import type { Reservation } from './reservations'
 import { seedState } from './rng'
+import { blockSpecs, travelHoistM } from './yardLayout'
 import { planCargo, type SlotPurpose } from '../scenario/bayPlan'
 import type { ContainerSize, ScenarioConfig, SubsystemMode, VesselSizeClass } from '../scenario/types'
 import { vesselSlotId as makeVesselSlotId, type CellHalf } from '../scenario/vesselClasses'
@@ -171,20 +172,101 @@ export interface WtpPadState {
   claimedBy: string | null
 }
 
-export type AscStatus = 'idle'
+/**
+ * ASC state machine (TT-06):
+ *   idle → job-assigned (waits for the pad zone) → routing-to-pad → positioning-at-pad
+ *   → locking → lifting → routing-to-slot → positioning-at-slot → unlocking
+ *   → releasing (spreader back up) → idle
+ */
+export type AscStatus =
+  | 'idle'
+  | 'job-assigned'
+  | 'routing-to-pad'
+  | 'positioning-at-pad'
+  | 'locking'
+  | 'lifting'
+  | 'routing-to-slot'
+  | 'positioning-at-slot'
+  | 'unlocking'
+  | 'releasing'
+
+/** One planned phase event of an ASC cycle (the next one is scheduled by the previous). */
+export interface AscPlannedEvent {
+  type:
+    | 'AscRoutingToPad'
+    | 'AscPositioningAtPad'
+    | 'AscLocking'
+    | 'AscPicked'
+    | 'AscRoutingToSlot'
+    | 'AscPositioningAtSlot'
+    | 'AscUnlocking'
+    | 'AscStacked'
+    | 'AscReady'
+  at: number
+  /** The motion leading up to this event (its payload `segments`). */
+  segments: MotionSegment[]
+}
 
 export interface AscState {
   id: string
   blockId: string
   status: AscStatus
   carrying: string | null
-  /** Boxes stacked so far (numbers the stub's yard slots). */
+  jobId: string | null
+  /** Boxes stacked so far. */
   stacked: number
+  /** Axis positions at the end of the currently planned motion: gantry along Z, trolley along X, hoist = box bottom height. */
+  gantryZ: number
+  trolleyX: number
+  hoistY: number
+  /** Current cycle's motion (axes gantry, trolley, hoist); the renderer interpolates from these. */
+  motion: MotionSegment[]
+  /** Remaining phase events of the current cycle. */
+  plan: AscPlannedEvent[]
 }
 
+/**
+ * A box on a WTP pad on its way into the stack. Created when the SHC drops it
+ * (which asks yardAllocation); it can be picked once the slot is allocated and
+ * the SHC has cleared the pad.
+ */
+export interface AscJob {
+  id: string
+  blockId: string
+  containerId: string
+  wtpPadId: string
+  vesselId: string
+  /** Allocated slot (anchor cell id), null until yardAllocation answers. */
+  yardSlotId: string | null
+  /** Order in which slots were allocated (stacks are filled in this order). */
+  claimSeq: number | null
+  /** The SHC has released the box and cleared the pad zone. */
+  cleared: boolean
+  /** ASC that took the job (null = open). */
+  ascId: string | null
+}
+
+/** Stack heights of a block. Claimed slots count: a slot is claimed when allocated, stacked later. */
+export interface YardBlockState {
+  id: string
+  bays: number
+  rows: number
+  tiers: number
+  /** Bay-major: index (bay-1)*rows + (row-1). */
+  heights: number[]
+  /** Vessel of each stack's top box (null if empty). */
+  topVessels: (string | null)[]
+}
+
+/** A box in the stack. The id is its anchor cell; a 40 ft box also covers the next bay. */
 export interface YardSlotState {
   id: string
   blockId: string
+  bay: number
+  row: number
+  tier: number
+  /** Bays covered (2 = 40 ft). */
+  span: 1 | 2
   containerId: string | null
 }
 
@@ -256,6 +338,15 @@ export interface KpiCounters {
   perSts: Record<string, StsKpiCounters>
   /** Horizontal transport (present when SHCs are configured). */
   horizontal?: HorizontalKpiCounters
+  /** Yard blocks and ASCs (present when blocks are configured with SHCs). */
+  yard?: YardKpiCounters
+}
+
+export interface YardKpiCounters {
+  boxesStacked: number
+  /** yardAllocation replies with no slot (block full). */
+  allocationFailures: number
+  perAsc: Record<string, { jobs: number; gantryM: number; trolleyM: number; hoistM: number; padWaitS: number }>
 }
 
 export interface HorizontalKpiCounters {
@@ -295,6 +386,10 @@ export interface SimState {
   nextShcJob: number
   wtpPads: Record<string, WtpPadState>
   ascs: Record<string, AscState>
+  ascJobs: Record<string, AscJob>
+  nextAscJob: number
+  nextClaimSeq: number
+  yardBlocks: Record<string, YardBlockState>
   yardSlots: Record<string, YardSlotState>
   reservations: Reservation[]
   nextReservationId: number
@@ -309,8 +404,8 @@ export function vesselSlotId(vesselId: string, bay: number, row: number, tier: n
   return makeVesselSlotId(vesselId, bay, row, tier, half)
 }
 
-/** The block's (single, waterside) ASC while the ASC is a stub. */
-export function ascStubId(blockId: string): string {
+/** The block's ASC (one per block for now). */
+export function ascIdOf(blockId: string): string {
   return `${blockId}-ASC1`
 }
 
@@ -339,10 +434,9 @@ export function resolveSubsystemModes(
   const hasShc = (config.shcs?.length ?? 0) > 0 && (config.yard?.blocks.length ?? 0) > 0
   const modes = {
     shc: overrides.shc ?? config.subsystems?.shc ?? (hasShc ? 'real' : 'off'),
-    asc: overrides.asc ?? config.subsystems?.asc ?? 'instant',
+    asc: overrides.asc ?? config.subsystems?.asc ?? (hasShc ? 'real' : 'off'),
   }
   if (!hasShc) modes.shc = 'off'
-  if (modes.asc === 'real') throw new Error("ASC mode 'real' is not implemented yet (TT-06): use 'instant' or 'off'")
   return modes
 }
 
@@ -370,6 +464,10 @@ export function createInitialState(
     nextShcJob: 0,
     wtpPads: {},
     ascs: {},
+    ascJobs: {},
+    nextAscJob: 0,
+    nextClaimSeq: 0,
+    yardBlocks: {},
     yardSlots: {},
     reservations: [],
     nextReservationId: 0,
@@ -464,12 +562,34 @@ export function createInitialState(
     }
     for (const s of config.sts) horizontal.stsGroundPositionWaitS[s.id] = 0
     for (const p of graph.pads) state.wtpPads[p.id] = { id: p.id, blockId: p.blockId, containerId: null, claimedBy: null }
-    if (subsystems.asc !== 'off') {
-      for (const b of config.yard?.blocks ?? []) {
-        const id = ascStubId(b.id)
-        state.ascs[id] = { id, blockId: b.id, status: 'idle', carrying: null, stacked: 0 }
+    const yard: YardKpiCounters = { boxesStacked: 0, allocationFailures: 0, perAsc: {} }
+    for (const b of blockSpecs(config)) {
+      state.yardBlocks[b.id] = {
+        id: b.id,
+        bays: b.bays,
+        rows: b.rows,
+        tiers: b.tiers,
+        heights: new Array<number>(b.bays * b.rows).fill(0),
+        topVessels: new Array<string | null>(b.bays * b.rows).fill(null),
       }
+      if (subsystems.asc === 'off') continue
+      const id = ascIdOf(b.id)
+      state.ascs[id] = {
+        id,
+        blockId: b.id,
+        status: 'idle',
+        carrying: null,
+        jobId: null,
+        stacked: 0,
+        gantryZ: b.wtpZ,
+        trolleyX: b.x,
+        hoistY: travelHoistM(b),
+        motion: [],
+        plan: [],
+      }
+      yard.perAsc[id] = { jobs: 0, gantryM: 0, trolleyM: 0, hoistM: 0, padWaitS: 0 }
     }
+    state.kpis.yard = yard
     state.kpis.horizontal = horizontal
   }
   return state

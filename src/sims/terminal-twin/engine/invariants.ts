@@ -6,9 +6,13 @@
  * Add an invariant: append to INVARIANTS with a stable dotted id. When a
  * ticket adds a new custody owner kind, extend `custodyHolders`.
  */
+import { laneGraphOf } from './laneGraph'
 import { overlappingReservations } from './reservations'
 import type { CustodyRef, SimState } from './state'
+import { ascPoseAt } from './subsystems/asc'
 import { gantryPositionAt, railOrder } from './subsystems/rail'
+import { shcPositionAt } from './subsystems/shc'
+import { blockSpecs, travelHoistM } from './yardLayout'
 import type { ScenarioConfig } from '../scenario/types'
 import { vesselClass } from '../scenario/vesselClasses'
 
@@ -55,6 +59,24 @@ function placeHolder(state: SimState, ref: CustodyRef): string | null {
   if (ref.kind === 'wtpPad') return state.wtpPads[ref.id]?.containerId ?? null
   return null
 }
+
+
+/** Cells (block:bay-row-tier) each stacked box covers, with the slots covering each. */
+function yardCells(state: SimState): Map<string, string[]> {
+  const cells = new Map<string, string[]>()
+  for (const s of Object.values(state.yardSlots)) {
+    if (!s.containerId) continue
+    for (let b = 0; b < s.span; b++) {
+      const key = `${s.blockId}:${s.bay + b}-${s.row}-${s.tier}`
+      cells.set(key, [...(cells.get(key) ?? []), s.id])
+    }
+  }
+  return cells
+}
+
+/** Half-extent (m) of a WTP pad's lifting envelope across X and along Z. */
+const PAD_HALF_X_M = 1.6
+const PAD_HALF_Z_M = 6.5
 
 export const INVARIANTS: Invariant[] = [
   {
@@ -115,6 +137,98 @@ export const INVARIANTS: Invariant[] = [
       }
       for (const [containerId, holders] of claims)
         if (holders.length > 1) messages.push(`container ${containerId} is claimed by ${holders.join(', ')}`)
+      return messages
+    },
+  },
+  {
+    id: 'yard.slot-bounds',
+    description: 'Every stacked box lies inside its block: bays, rows and tiers within the block, a 40 ft box on two bays.',
+    check(state) {
+      const messages: string[] = []
+      for (const s of Object.values(state.yardSlots)) {
+        const block = state.yardBlocks[s.blockId]
+        if (!block) messages.push(`slot ${s.id} is in unknown block ${s.blockId}`)
+        else if (s.bay < 1 || s.bay + s.span - 1 > block.bays || s.row < 1 || s.row > block.rows || s.tier < 1)
+          messages.push(`slot ${s.id} lies outside block ${block.id} (${block.bays} bays × ${block.rows} rows)`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'yard.stack-height',
+    description: "No stack is higher than its block's tier limit.",
+    check(state) {
+      const messages: string[] = []
+      for (const s of Object.values(state.yardSlots)) {
+        const block = state.yardBlocks[s.blockId]
+        if (block && s.tier > block.tiers) messages.push(`slot ${s.id} is on tier ${s.tier}, above the tier limit ${block.tiers}`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'yard.no-floating',
+    description: 'Every box above tier 1 rests on boxes: each bay it covers has a box directly below.',
+    check(state) {
+      const cells = yardCells(state)
+      const messages: string[] = []
+      for (const s of Object.values(state.yardSlots)) {
+        if (!s.containerId || s.tier <= 1) continue
+        for (let b = 0; b < s.span; b++)
+          if (!cells.has(`${s.blockId}:${s.bay + b}-${s.row}-${s.tier - 1}`))
+            messages.push(`box ${s.containerId} in slot ${s.id} is floating: nothing below bay ${s.bay + b} on tier ${s.tier - 1}`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'yard.no-double-occupied',
+    description: 'No stack cell holds two boxes of the same length.',
+    check(state) {
+      const messages: string[] = []
+      for (const [cell, slots] of yardCells(state)) {
+        if (slots.length < 2) continue
+        const spans = new Set(slots.map((id) => state.yardSlots[id].span))
+        if (spans.size === 1) messages.push(`cell ${cell} is double-occupied by ${slots.join(', ')}`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'yard.no-mixed-length-overlap',
+    description: 'A 40 ft box never overlaps a 20 ft box in the same cell.',
+    check(state) {
+      const messages: string[] = []
+      for (const [cell, slots] of yardCells(state)) {
+        if (slots.length < 2) continue
+        const spans = new Set(slots.map((id) => state.yardSlots[id].span))
+        if (spans.size > 1) messages.push(`cell ${cell}: a 40 ft box overlaps a 20 ft box (${slots.join(', ')})`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'asc.wtp-handover',
+    description:
+      "An ASC never enters a WTP pad's lifting envelope (spreader below travel height over the pad) while an SHC is on the pad.",
+    check(state, config) {
+      const messages: string[] = []
+      if (Object.keys(state.ascs).length === 0 || Object.keys(state.shcs).length === 0) return messages
+      const graph = laneGraphOf(config)
+      const blocks = Object.fromEntries(blockSpecs(config).map((b) => [b.id, b]))
+      for (const asc of Object.values(state.ascs)) {
+        const pose = ascPoseAt(asc, state.now)
+        const travel = travelHoistM(blocks[asc.blockId])
+        if (pose.hoistY >= travel - 1e-6) continue
+        for (const pad of graph.pads) {
+          if (Math.abs(pose.x - pad.x) >= PAD_HALF_X_M || Math.abs(pose.z - pad.z) >= PAD_HALF_Z_M) continue
+          for (const shc of Object.values(state.shcs)) {
+            const at = shcPositionAt(graph, shc, state.now)
+            if (Math.abs(at.x - pad.x) < PAD_HALF_X_M && Math.abs(at.z - pad.z) < PAD_HALF_Z_M)
+              messages.push(`${asc.id} is in the lifting envelope of ${pad.id} (hoist ${pose.hoistY.toFixed(2)} m) while ${shc.id} is there`)
+          }
+        }
+      }
       return messages
     },
   },

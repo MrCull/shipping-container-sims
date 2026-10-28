@@ -5,6 +5,8 @@
  */
 import type { Reservation } from './reservations'
 import type {
+  AscJob,
+  AscState,
   ContainerState,
   GroundPositionState,
   ShcJob,
@@ -14,6 +16,8 @@ import type {
   VesselSlotState,
   VesselState,
   WtpPadState,
+  YardBlockState,
+  YardSlotState,
 } from './state'
 
 export interface SimQuery {
@@ -34,6 +38,15 @@ export interface SimQuery {
   /** Released jobs not yet delivered (open and claimed). */
   shcJobs(): readonly Readonly<ShcJob>[]
   wtpPad(id: string): Readonly<WtpPadState>
+  asc(id: string): Readonly<AscState>
+  ascs(): readonly Readonly<AscState>[]
+  /** Boxes on WTP pads that are not stacked yet (allocated or waiting for a slot). */
+  ascJobs(): readonly Readonly<AscJob>[]
+  yardBlock(id: string): Readonly<YardBlockState>
+  yardBlocks(): readonly Readonly<YardBlockState>[]
+  /** Stacked boxes (a block's, or all). */
+  yardSlots(blockId?: string): readonly Readonly<YardSlotState>[]
+  yardSlot(id: string): Readonly<YardSlotState>
   /** Current and future conflict-zone reservations. */
   reservations(): readonly Readonly<Reservation>[]
 }
@@ -63,6 +76,16 @@ export function createQuery(getState: () => SimState): SimQuery {
     shcs: () => Object.values(getState().shcs),
     shcJobs: () => Object.values(getState().shcJobs),
     wtpPad: (id) => get(getState().wtpPads, id, 'WTP pad'),
+    asc: (id) => get(getState().ascs, id, 'ASC'),
+    ascs: () => Object.values(getState().ascs),
+    ascJobs: () => Object.values(getState().ascJobs),
+    yardBlock: (id) => get(getState().yardBlocks, id, 'yard block'),
+    yardBlocks: () => Object.values(getState().yardBlocks),
+    yardSlots: (blockId) => {
+      const all = Object.values(getState().yardSlots)
+      return blockId === undefined ? all : all.filter((s) => s.blockId === blockId)
+    },
+    yardSlot: (id) => get(getState().yardSlots, id, 'yard slot'),
     reservations: () => getState().reservations.filter((r) => r.to > getState().now),
   }
 }

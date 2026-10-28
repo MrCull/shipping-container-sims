@@ -4,6 +4,7 @@
  * then import the JSON here.
  */
 import type { ScenarioConfig } from '../types'
+import asc1Sts10Boxes1Block from './asc-1sts-10-boxes-1block.json'
 import craneSplit4Sts from './crane-split-4sts.json'
 import liveriesMixed from './liveries-mixed.json'
 import shc1Sts2Shc1Wtp from './shc-1sts-2shc-1wtp.json'
@@ -18,4 +19,5 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'twin-20-lift': twin20Lift as ScenarioConfig,
   'shc-1sts-2shc-1wtp': shc1Sts2Shc1Wtp as ScenarioConfig,
   'liveries-mixed': liveriesMixed as ScenarioConfig,
+  'asc-1sts-10-boxes-1block': asc1Sts10Boxes1Block as ScenarioConfig,
 }

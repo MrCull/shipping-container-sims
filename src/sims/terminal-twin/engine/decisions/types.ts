@@ -14,6 +14,8 @@
  * subsystem that asks (see the agent guide).
  */
 import type { SimQuery } from '../query'
+import type { YardStacks } from '../yardLayout'
+import type { ContainerSize } from '../../scenario/types'
 
 // ── stsGroundPosition ──────────────────────────────────────────────────────
 
@@ -75,6 +77,31 @@ export interface ShcDispatchReply {
   wtpPadId: string | null
 }
 
+// ── yardAllocation ─────────────────────────────────────────────────────────
+
+/**
+ * A box was set down on a WTP pad: pick its stack slot in the pad's block.
+ * The legal slots are derived from the stacks with `candidateSlots(request)`
+ * (exported from the engine), which keeps the request small: per-stack heights
+ * instead of a candidate list.
+ */
+export interface YardAllocationRequest extends YardStacks {
+  containerId: string
+  size: ContainerSize
+  full: boolean
+  line: string
+  /** Vessel the box was discharged from. */
+  vesselId: string
+  wtpPadId: string
+  /** Uniform [0, 1) drawn from the engine's seeded RNG (the only source of randomness for strategies). */
+  random: number
+}
+
+export interface YardAllocationReply {
+  /** Slot (anchor cell `<block>:<bay>-<row>-<tier>`), or null when the block has no room (the box stays on the pad). */
+  slotId: string | null
+}
+
 // ── berthAllocation ────────────────────────────────────────────────────────
 
 export interface BerthAllocationRequest {
@@ -128,6 +155,7 @@ export interface CraneSplitReply {
 export interface DecisionRequests {
   stsGroundPosition: GroundPositionRequest
   shcDispatch: ShcDispatchRequest
+  yardAllocation: YardAllocationRequest
   berthAllocation: BerthAllocationRequest
   craneSplit: CraneSplitRequest
 }
@@ -135,6 +163,7 @@ export interface DecisionRequests {
 export interface DecisionReplies {
   stsGroundPosition: GroundPositionReply
   shcDispatch: ShcDispatchReply
+  yardAllocation: YardAllocationReply
   berthAllocation: BerthAllocationReply
   craneSplit: CraneSplitReply
 }
@@ -145,6 +174,7 @@ export type DecisionPointId = keyof DecisionRequests
 export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   stsGroundPosition: 1,
   shcDispatch: 1,
+  yardAllocation: 1,
   berthAllocation: 1,
   craneSplit: 1,
 }

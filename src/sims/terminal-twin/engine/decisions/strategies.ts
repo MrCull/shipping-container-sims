@@ -7,6 +7,7 @@
  * identical runs. A strategy that needs randomness must take it from the
  * request, never from Math.random.
  */
+import { groupByVesselSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
 import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchPad, ShcDispatchRequest } from './types'
 
@@ -87,6 +88,23 @@ export const strategies: StrategyRegistry = {
       },
     },
   },
+  yardAllocation: {
+    default: 'nearest-wtp',
+    strategies: {
+      random: {
+        description: 'A random legal slot (from the seeded RNG).',
+        handler: (msg) => randomSlot(msg.payload),
+      },
+      'nearest-wtp': {
+        description: 'The legal slot nearest the WTP pad, spreading over low tiers before stacking high.',
+        handler: (msg) => nearestWtpSlot(msg.payload),
+      },
+      'group-by-vessel': {
+        description: "Keeps a vessel's boxes together: its own bays first, then the lowest empty bay.",
+        handler: (msg) => groupByVesselSlot(msg.payload),
+      },
+    },
+  },
   berthAllocation: {
     default: 'first-fit',
     strategies: {
@@ -127,6 +145,7 @@ export function getStrategy<K extends DecisionPointId>(dp: K, name: string): Dec
 export const defaultHandlers: HandlerSet = {
   stsGroundPosition: getStrategy('stsGroundPosition', strategies.stsGroundPosition.default),
   shcDispatch: getStrategy('shcDispatch', strategies.shcDispatch.default),
+  yardAllocation: getStrategy('yardAllocation', strategies.yardAllocation.default),
   berthAllocation: getStrategy('berthAllocation', strategies.berthAllocation.default),
   craneSplit: getStrategy('craneSplit', strategies.craneSplit.default),
 }

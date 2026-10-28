@@ -287,16 +287,20 @@ describe('shcDispatch decision point', () => {
 describe('subsystem modes', () => {
   const types = (sim: Simulation) => new Set(sim.eventLog().map((e) => e.type))
 
-  it('the instant ASC stub raises AscPicked and AscStacked at the drop time', () => {
+  it('the instant ASC takes each box as soon as its SHC has cleared the pad, with zero-duration moves', () => {
     const sim = createSimulation(shcFixture)
     sim.runUntil()
     const log = sim.eventLog()
-    const drops = log.filter((e) => e.type === 'ShcDroppedAtWtp')
+    const cleared = log.filter((e) => e.type === 'ShcCleared')
     const picks = log.filter((e) => e.type === 'AscPicked')
     expect(picks).toHaveLength(10)
     expect(log.filter((e) => e.type === 'AscStacked')).toHaveLength(10)
-    for (const p of picks) expect(sim.why(p.id)[1].type).toBe('ShcDroppedAtWtp')
-    expect(picks.map((e) => e.t)).toEqual(drops.map((e) => e.t))
+    for (const p of picks) {
+      const stacked = log.find((e) => e.type === 'AscStacked' && e.payload.containerId === p.payload.containerId)!
+      expect(stacked.t).toBe(p.t)
+      const c = cleared.find((e) => e.payload.containerId === p.payload.containerId)!
+      expect(p.t).toBeGreaterThanOrEqual(c.t)
+    }
     for (const { id } of sim.query.containers())
       expect(sim.query.container(id).custodyHistory.slice(5).map((h) => h.owner.kind)).toEqual(['asc', 'yardSlot'])
   })
@@ -332,10 +336,6 @@ describe('subsystem modes', () => {
       expect(drop?.t).toBe(a.t)
     }
     expect(instant.invariantReport().violations).toEqual([])
-  })
-
-  it("ASC 'real' is refused until TT-06", () => {
-    expect(() => createSimulation(shcFixture, {}, { subsystems: { asc: 'real' } })).toThrow(/TT-06/)
   })
 })
 

@@ -59,6 +59,20 @@ export interface KpiReport {
   handlers: Record<string, HandlerKpiReport>
   /** Horizontal transport (only when SHCs are configured). */
   horizontal?: HorizontalKpiReport
+  /** Yard blocks and ASCs (only when blocks are configured with SHCs). */
+  yard?: YardKpiReport
+}
+
+export interface YardKpiReport {
+  /** Boxes the ASCs have stacked. */
+  boxesStacked: number
+  /** Boxes on WTP pads or in ASC hands (not stacked yet). */
+  boxesInTransit: number
+  /** yardAllocation replies with no slot (block full). */
+  allocationFailures: number
+  /** Per block: stacked boxes, slots in use (20 ft cells) and the highest stack. */
+  blocks: Record<string, { boxes: number; cells: number; capacityCells: number; maxHeight: number }>
+  ascs: Record<string, { jobs: number; gantryM: number; trolleyM: number; hoistM: number; padWaitS: number }>
 }
 
 export interface HorizontalKpiReport {
@@ -145,6 +159,32 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     ),
     stsGroundPositionWaitS: Object.fromEntries(Object.entries(h.stsGroundPositionWaitS).map(([id, s]) => [id, r3(s)])),
   }
+  const y = state.kpis.yard
+  const yard: YardKpiReport | undefined = y && {
+    boxesStacked: y.boxesStacked,
+    boxesInTransit: Object.keys(state.ascJobs).length,
+    allocationFailures: y.allocationFailures,
+    blocks: Object.fromEntries(
+      Object.values(state.yardBlocks).map((b) => {
+        const slots = Object.values(state.yardSlots).filter((s) => s.blockId === b.id)
+        return [
+          b.id,
+          {
+            boxes: slots.length,
+            cells: slots.reduce((n, s) => n + s.span, 0),
+            capacityCells: b.bays * b.rows * b.tiers,
+            maxHeight: slots.reduce((m, s) => Math.max(m, s.tier), 0),
+          },
+        ]
+      }),
+    ),
+    ascs: Object.fromEntries(
+      Object.entries(y.perAsc).map(([id, k]) => [
+        id,
+        { jobs: k.jobs, gantryM: r3(k.gantryM), trolleyM: r3(k.trolleyM), hoistM: r3(k.hoistM), padWaitS: r3(k.padWaitS) },
+      ]),
+    ),
+  }
   return {
     simTimeS: r3(state.now),
     eventsProcessed,
@@ -155,5 +195,6 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     quay,
     handlers,
     ...(horizontal ? { horizontal } : {}),
+    ...(yard ? { yard } : {}),
   }
 }

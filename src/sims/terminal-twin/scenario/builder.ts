@@ -18,6 +18,7 @@ import { DEFAULT_CARGO, LINE_OWNER_PREFIX } from './lines'
 import {
   SCENARIO_SCHEMA_VERSION,
   type ApronLayout,
+  type AscKinematics,
   type BlockConfig,
   type CargoConfig,
   type EndConditions,
@@ -30,6 +31,7 @@ import {
   type StsKinematics,
   type VesselConfig,
 } from './types'
+import { DEFAULT_WTP_PADS } from '../engine/yardLayout'
 import type { DecisionsConfig } from '../engine/decisions/types'
 import type { VesselSizeClass } from './types'
 
@@ -55,6 +57,19 @@ export const DEFAULT_SHC_KINEMATICS: ShcKinematics = {
   driveLoaded: { vMax: 6.9, accel: 0.7, decel: 0.9 },
   lift: { vMax: 0.4, accel: 0.4, decel: 0.4 },
   liftHeightM: 1,
+  lockS: 2,
+  unlockS: 2,
+}
+
+/**
+ * [A] ASC kinematics: gantry 4 m/s along the block, trolley 1 m/s across the
+ * 25.4 m span, hoist 0.5 m/s loaded / 1.0 m/s empty.
+ */
+export const DEFAULT_ASC_KINEMATICS: AscKinematics = {
+  gantry: { vMax: 4, accel: 0.4, decel: 0.5 },
+  trolley: { vMax: 1, accel: 0.4, decel: 0.4 },
+  hoistLoaded: { vMax: 0.5, accel: 0.3, decel: 0.3 },
+  hoistEmpty: { vMax: 1, accel: 0.5, decel: 0.5 },
   lockS: 2,
   unlockS: 2,
 }
@@ -202,10 +217,16 @@ export class ScenarioBuilder {
     return this
   }
 
-  /** Add a yard block (with its WTP pads). */
-  block(id: string, opts: Omit<BlockConfig, 'id'>): this {
+  /** Add a yard block: `x` across the quay; 5 WTP pads, 20 bays, 5 tiers and 5 transfer stalls unless given. */
+  block(id: string, opts: Omit<BlockConfig, 'id' | 'wtpPads'> & Partial<Pick<BlockConfig, 'wtpPads'>>): this {
     this.config.yard ??= { blocks: [] }
-    this.config.yard.blocks.push({ id, ...opts })
+    this.config.yard.blocks.push({ id, ...opts, wtpPads: opts.wtpPads ?? DEFAULT_WTP_PADS })
+    return this
+  }
+
+  /** ASC kinematics (one ASC per block). */
+  ascKinematics(k: Partial<AscKinematics>): this {
+    this.config.kinematics.asc = structuredClone({ ...(this.config.kinematics.asc ?? DEFAULT_ASC_KINEMATICS), ...k })
     return this
   }
 
