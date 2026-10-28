@@ -7,6 +7,7 @@ import { createSimulation } from '../engine'
 import { DEFAULT_ASC_KINEMATICS, withYard } from '../scenario/builder'
 import { fixtures } from '../scenario/fixtures'
 import { SceneModel } from '../modules/sceneModel'
+import { emptyDelta } from './delta'
 
 const fixture = fixtures['asc-1sts-10-boxes-1block']
 const block = { bays: 6, tiers: 3, wtpPads: 3, transferStalls: 4 }
@@ -65,7 +66,7 @@ describe('withYard (setup dialog)', () => {
     expect(model.ascPose('B01-ASC1', 0).z).toBeLessThan(model.ascPose('B01-ASC2', 0).z - 12)
     // the parked cranes hold rail segments from the start
     const sim = createSimulation(cfg)
-    model.apply({ motion: [], custody: [], entities: [], reservations: sim.query.reservations().map((r) => ({ ...r })), events: [], eventCounts: {}, breakpoint: null })
+    model.apply(emptyDelta({ reservations: sim.query.reservations().map((r) => ({ ...r })) }))
     const held = Object.entries(model.activeReservations(0)).filter(([zone]) => /^B01:R\d+$/.test(zone))
     expect(new Set(held.map(([, holder]) => holder))).toEqual(new Set(['B01-ASC1', 'B01-ASC2']))
     expect(model.railSegments('B01').length).toBeGreaterThan(held.length)

@@ -65,6 +65,17 @@ export default tseslint.config(
     },
   },
 
+  // useGodModeHotkey clashes with the Terminal Twin D/O shortcuts.
+  {
+    files: ['src/sims/terminal-twin/**/*.{ts,vue}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ group: ['**/useGodModeHotkey'], message: 'Do not mount useGodModeHotkey in Terminal Twin: it clashes with the D/O shortcuts.' }] },
+      ],
+    },
+  },
+
   {
     rules: {
       'vue/multi-word-component-names': 'off',
