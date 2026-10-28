@@ -12,7 +12,8 @@ import { fixtures } from '../scenario/fixtures'
 import { applyOverrides, type ScenarioOverrides } from '../scenario/overrides'
 import { presets } from '../scenario/presets'
 import { withShcFleet, withYard, type YardSetup } from '../scenario/builder'
-import type { DisplaySettings, ScenarioConfig, ShcKinematics } from '../scenario/types'
+import type { DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
+import { EXPORT_FILES, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport } from '../engine'
 import type { Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { SPEEDS, TwinController } from '../modules/twinController'
 import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/display'
@@ -35,6 +36,21 @@ export interface ScenarioChoice {
   shc?: { count: number; kinematics: ShcKinematics }
   /** Yard block and ASC overrides from the setup dialog (scenarios with yard blocks only). */
   yard?: YardSetup
+  /** End conditions from the setup dialog (replace the scenario's own). */
+  endConditions?: EndConditions
+}
+
+/** The headline KPIs and highlights the strip and report show. */
+export interface KpiHeadlineState {
+  headline: HeadlineKpis
+  highlights: Highlight[]
+}
+
+/** Everything the final report shows (fetched once the run has ended). */
+export interface FinalReportData extends KpiHeadlineState {
+  kpis: KpiReport
+  series: KpiSeriesReport
+  eventLogHash: string
 }
 
 /** What the 3D view registers so the dev API can reach it. */
@@ -49,6 +65,7 @@ export interface TwinView {
 
 const RECENT_EVENTS_CAP = 500
 const TOAST_MS = 1600
+const KPI_POLL_MS = 1000
 
 /** localStorage, or null where it is unavailable (private mode, blocked, tests). */
 function browserStorage(): Storage | null {
@@ -119,8 +136,22 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const toast = ref<{ id: number; text: string } | null>(null)
   let toastTimer: ReturnType<typeof setTimeout> | null = null
 
+  /** Headline KPIs of the engine's current state (null until the first poll). */
+  const kpi = shallowRef<KpiHeadlineState | null>(null)
+  /** The final report data, once the run has ended. */
+  const finalReport = shallowRef<FinalReportData | null>(null)
+  const reportOpen = ref(true)
+  /** The run is over and the display has reached its end: only Reset and New Scenario remain. */
+  const runEnded = computed(() => {
+    const i = info.value
+    return !!i && i.status !== 'ready' && displayTime.value >= (i.endT ?? i.now)
+  })
+
   let controller: TwinController | null = null
   let view: TwinView | null = null
+  let kpiTimer: ReturnType<typeof setInterval> | null = null
+  let kpiEvents = -1
+  let kpiBusy = false
 
   function onDelta(delta: Delta): void {
     if (delta.events.length === 0) return
@@ -143,6 +174,69 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     paused.value = controller.paused
     busy.value = controller.busy
     if (info.value !== controller.info) info.value = controller.info
+    // the ended run is frozen: the display stays at its end
+    if (runEnded.value && !controller.paused) {
+      controller.pause()
+      paused.value = true
+    }
+  }
+
+  /** Fetch the headline KPIs (and, once the run has ended, the final report data). */
+  async function refreshKpis(): Promise<void> {
+    const c = controller
+    if (!c || kpiBusy || !c.info) return
+    kpiBusy = true
+    try {
+      const eventsAt = c.info.eventsTotal
+      kpi.value = markRaw(await c.query<KpiHeadlineState>('kpiHeadline'))
+      kpiEvents = eventsAt
+      if (c.info.status !== 'ready' && finalReport.value?.eventLogHash !== c.info.eventLogHash) {
+        const [kpis, series] = await Promise.all([c.query<KpiReport>('kpis'), c.query<KpiSeriesReport>('kpiSeries')])
+        finalReport.value = markRaw({ ...kpi.value, kpis, series, eventLogHash: c.info.eventLogHash })
+      }
+    } catch {
+      // the scenario was replaced meanwhile: the next poll catches up
+    } finally {
+      kpiBusy = false
+      sync()
+    }
+  }
+
+  function startKpiPolling(): void {
+    if (kpiTimer) return
+    kpiTimer = setInterval(() => {
+      const c = controller
+      if (!c || c.busy || !c.info || c.info.eventsTotal === kpiEvents) return
+      void refreshKpis()
+    }, KPI_POLL_MS)
+  }
+
+  function resetKpis(): void {
+    kpi.value = null
+    finalReport.value = null
+    reportOpen.value = true
+    kpiEvents = -1
+  }
+
+  /** Download the KPI report or the event log (JSON or CSV), built by the engine in the worker. */
+  async function exportRun(kind: ExportKind): Promise<string> {
+    const text = await ctl().passthrough<string>({ op: 'export', kind })
+    return text
+  }
+
+  async function downloadExport(kind: ExportKind): Promise<void> {
+    try {
+      const text = await exportRun(kind)
+      const file = EXPORT_FILES[kind]
+      const blob = new Blob([text], { type: file.mime })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `${choice.value.name}-seed${choice.value.seed}-${file.suffix}`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+    } catch (err) {
+      showToast('report.exportFailed', { error: err instanceof Error ? err.message : String(err) })
+    }
   }
 
   async function run<T>(action: () => Promise<T>): Promise<T> {
@@ -162,18 +256,22 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     let runConfig = runConfigFor(base, next.startDateTime, display.value)
     if (next.shc && (base.shcs?.length ?? 0) > 0) runConfig = withShcFleet(runConfig, next.shc.count, next.shc.kinematics)
     if (next.yard && (base.yard?.blocks.length ?? 0) > 0) runConfig = withYard(runConfig, next.yard)
+    if (next.endConditions) runConfig = { ...runConfig, endConditions: { ...next.endConditions } }
     choice.value = { ...next }
     loading.value = true
     try {
       await run(() => ctl().load(runConfig, next.seed))
       config.value = markRaw(runConfig)
       recentEvents.value = markRaw([])
+      resetKpis()
       selectedId.value = null
       following.value = false
       hasScenario.value = true
       hasShcs.value = (runConfig.shcs?.length ?? 0) > 0
       phase.value = 'running'
       if (options.autoplay ?? true) ctl().play()
+      startKpiPolling()
+      void refreshKpis()
     } finally {
       loading.value = false
       sync()
@@ -183,6 +281,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   async function reset(): Promise<void> {
     await run(() => ctl().reset())
     recentEvents.value = markRaw([])
+    resetKpis()
+    void refreshKpis()
   }
 
   function newScenario(): void {
@@ -196,11 +296,13 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   function setSpeed(s: number): void {
+    if (runEnded.value) return
     ctl().setSpeed(s)
     sync()
   }
 
   function togglePause(): void {
+    if (runEnded.value) return
     const c = ctl()
     if (c.paused) c.play()
     else c.pause()
@@ -208,7 +310,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   function runTo(time: number) {
-    return run(() => ctl().runTo(time))
+    if (runEnded.value) return Promise.resolve(null)
+    return run(() => ctl().runTo(time).then((r) => (void refreshKpis(), r)))
   }
 
   function setOverlays(next: Partial<OverlayState>): OverlayState {
@@ -241,7 +344,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   /** Single-step to the next engine event (pauses). */
   function step() {
-    return run(() => ctl().step())
+    if (runEnded.value) return Promise.resolve(null)
+    return run(() => ctl().step().then((r) => (void refreshKpis(), r)))
   }
 
   function showToast(key: MessageKey, params?: MessageParams): void {
@@ -283,6 +387,9 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   function dispose(): void {
+    if (kpiTimer) clearInterval(kpiTimer)
+    kpiTimer = null
+    resetKpis()
     controller?.dispose()
     controller = null
     if (toastTimer) clearTimeout(toastTimer)
@@ -317,6 +424,13 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     dashboardOpen,
     helpOpen,
     toast,
+    kpi,
+    finalReport,
+    reportOpen,
+    runEnded,
+    refreshKpis,
+    exportRun,
+    downloadExport,
     controller: () => controller,
     view: () => view,
     sync,

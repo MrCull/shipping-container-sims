@@ -229,6 +229,16 @@ export interface ScenarioConfig {
    * are display-only: every value in this config stays SI whatever is chosen.
    */
   display?: DisplaySettings
+  /** KPI bucket clock (optional; defaults come from `startDateTime`, see `engine/kpi/clock.ts`). */
+  kpi?: KpiClockConfig
+}
+
+/** Where the scenario clock sits, so hour and shift buckets line up with the clock the user sees. */
+export interface KpiClockConfig {
+  /** Seconds since clock midnight at sim t = 0 (default: `startDateTime`'s UTC time of day). */
+  startTimeOfDayS?: number
+  /** Clock hour (0-23) at which shift 1 of 3 starts (default 6: 06-14, 14-22, 22-06). */
+  shiftStartHour?: number
 }
 
 export type UnitSystem = 'metric' | 'imperial'

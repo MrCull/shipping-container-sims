@@ -3,7 +3,7 @@
  * WorkerRequests, collecting a compact Delta of what changed. Used by the
  * Web Worker entry (`engine.worker.ts`); it has no worker or DOM globals.
  */
-import { createSimulation, summarizeRun, type EngineEvent, type Simulation } from '../engine'
+import { createSimulation, exportRun, headlineKpis, highlightsOf, summarizeRun, type EngineEvent, type Simulation } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import { HALF_OFFSET_M } from '../scenario/vesselClasses'
 import {
@@ -210,6 +210,8 @@ export function createEngineHost() {
         return requireSim().snapshot()
       case 'why':
         return requireSim().why(req.eventId)
+      case 'export':
+        return exportRun(requireSim(), req.kind)
       case 'query':
         return query(requireSim(), req.kind, req.id)
     }
@@ -255,6 +257,13 @@ export function createEngineHost() {
         return s.query.reservations()
       case 'kpis':
         return s.kpiReport()
+      case 'kpiSeries':
+        return s.kpiSeries()
+      case 'kpiHeadline': {
+        const series = s.kpiSeries()
+        const report = s.kpiReport()
+        return { headline: headlineKpis(series, report), highlights: highlightsOf(series, report) }
+      }
       case 'summary':
         return summarizeRun(s)
       case 'invariants':

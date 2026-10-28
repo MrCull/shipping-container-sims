@@ -14,6 +14,8 @@ import { parseArgs } from 'node:util'
 import {
   createSimulation,
   DECISION_POINT_IDS,
+  exportRun,
+  headlineKpis,
   getStrategy,
   parseLogVerbosity,
   restoreSimulation,
@@ -22,6 +24,7 @@ import {
   type DecisionPointId,
   type DecisionsConfig,
   type EventType,
+  type HeadlineKpis,
   type LatencySpec,
   type LogRecord,
   type LogVerbosity,
@@ -31,7 +34,7 @@ import {
 } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
-import type { ScenarioConfig } from '../scenario/types'
+import type { EndConditions, ScenarioConfig } from '../scenario/types'
 import { handlerSets } from './handlerSets'
 
 export const USAGE = `Usage: npm run tt:run -- (--fixture <name|file.json> | --preset <name> | --from-snapshot <file>) [options]
@@ -50,7 +53,12 @@ export const USAGE = `Usage: npm run tt:run -- (--fixture <name|file.json> | --p
                          e.g. stsGroundPosition=fixed:1500,timeout:5
                          Decision points: ${DECISION_POINT_IDS.join(', ')}
   --no-fail-fast         Keep running after an invariant violation
+  --end <cond>           End condition (repeatable; the first one met ends the run): moves:<n> | vessels:<n> | time:<s>
   --out <file>           Write the run summary JSON
+  --kpi-json <file>      Write the KPI report (summary, hourly/shift series, headline, highlights) as JSON
+  --kpi-csv <file>       Write every KPI series as CSV (one row per KPI, entity and bucket)
+  --events-json <file>   Write the full event log as one JSON array
+  --events-csv <file>    Write the full event log as CSV
   --snapshot <file>      Write a snapshot of the run where it stopped (resume with --from-snapshot)
   --events <file>        Write the event log as JSON lines
   --log <file>           Write structured JSON-lines logs (t, eventId, seq, subsystem, level, type, subjects;
@@ -83,6 +91,22 @@ export function parseUntil(text: string | undefined): RunCondition {
   if (kind === 'moves') return { moves: n }
   if (kind === 'vessels') return { vesselsCompleted: n }
   throw new UsageError(`Bad --until "${text}"`)
+}
+
+/** `--end moves:50 --end time:3600`: replaces the scenario's end conditions. */
+function endConditionsFromArgs(args: string[]): EndConditions | undefined {
+  if (args.length === 0) return undefined
+  const out: EndConditions = {}
+  for (const arg of args) {
+    const [kind, value] = arg.split(':')
+    const n = Number(value)
+    if (value === undefined || !Number.isFinite(n) || n <= 0) throw new UsageError(`Bad --end "${arg}"`)
+    if (kind === 'moves') out.moves = n
+    else if (kind === 'vessels') out.vesselsCompleted = n
+    else if (kind === 'time') out.simDurationS = n
+    else throw new UsageError(`Bad --end "${arg}" (moves:<n> | vessels:<n> | time:<s>)`)
+  }
+  return out
 }
 
 function splitPoint(text: string, flag: string): [DecisionPointId, string] {
@@ -174,7 +198,7 @@ export function formatSimTime(seconds: number): string {
   return days > 0 ? `day ${days} ${hms}` : hms
 }
 
-function formatSummary(s: RunSummary, stopped: string, started: string, processed: number, asyncMode: AsyncMode): string[] {
+function formatSummary(s: RunSummary, headline: HeadlineKpis, stopped: string, started: string, processed: number, asyncMode: AsyncMode): string[] {
   const lines = [
     `Terminal Twin — ${s.scenario} (seed ${s.seed})`,
     `Started:          ${started}  [${processed} events processed in this run]`,
@@ -207,6 +231,17 @@ function formatSummary(s: RunSummary, stopped: string, started: string, processe
     for (const [id, w] of Object.entries(hz.stsGroundPositionWaitS))
       lines.push(`  ${id.padEnd(15)} waited ${w} s for a free ground position`)
   }
+  const h = headline
+  const num = (x: number | null, unit = '') => (x === null ? '–' : `${x}${unit}`)
+  lines.push(
+    'Headline KPIs:',
+    `  Gross moves/h:    ${num(h.grossMovesPerHour)}`,
+    `  Net moves/h:      ${num(h.netMovesPerHour)}`,
+  )
+  if (h.shcBusyPct !== null) lines.push(`  SHC busy:         ${num(h.shcBusyPct, ' %')}  (empty travel ratio ${num(h.shcEmptyTravelRatio)})`)
+  if (h.wtpDwellS !== null) lines.push(`  WTP pad dwell:    ${num(h.wtpDwellS, ' s')}`)
+  if (h.ascUtilisationPct !== null) lines.push(`  ASC utilisation:  ${num(h.ascUtilisationPct, ' %')}`)
+  if (h.yardFillPct !== null) lines.push(`  Yard fill:        ${num(h.yardFillPct, ' %')}`)
   lines.push('TOS handlers:')
   for (const [dp, h] of Object.entries(s.kpis.handlers)) {
     lines.push(
@@ -241,6 +276,11 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
         snapshot: { type: 'string' },
         log: { type: 'string' },
         'log-level': { type: 'string' },
+        end: { type: 'string', multiple: true, default: [] },
+        'kpi-json': { type: 'string' },
+        'kpi-csv': { type: 'string' },
+        'events-json': { type: 'string' },
+        'events-csv': { type: 'string' },
         help: { type: 'boolean', default: false },
       },
       strict: true,
@@ -257,6 +297,9 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
     const decisionFlags = values['async-mode'] !== undefined || values.strategy.length > 0 || values.latency.length > 0
     if (start && decisionFlags)
       throw new UsageError('--from-snapshot takes decision settings from the snapshot: drop --async-mode/--strategy/--latency')
+    const endConditions = endConditionsFromArgs(values.end)
+    if (start && endConditions) throw new UsageError('--from-snapshot takes end conditions from the snapshot: drop --end')
+    if (endConditions) config = { ...config, endConditions }
     const decisions = decisionsFromArgs(config.decisions, values['async-mode'], values.strategy, values.latency)
     if (decisions !== config.decisions) config = { ...config, decisions }
     const seed = values.seed === undefined ? undefined : Number(values.seed)
@@ -278,10 +321,20 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
     const result = sim.runUntil(condition)
     const summary = summarizeRun(sim)
     const startedAt = start ? `snapshot at ${formatSimTime(start.state.now)} (after ${firstNewEvent} events)` : 'scenario start'
-    for (const line of formatSummary(summary, result.reason, startedAt, result.eventsProcessed, sim.asyncMode)) print(line)
+    const headline = headlineKpis(sim.kpiSeries(), sim.kpiReport())
+    for (const line of formatSummary(summary, headline, result.reason, startedAt, result.eventsProcessed, sim.asyncMode)) print(line)
     if (values.out) writeFileSync(values.out, `${JSON.stringify(summary, null, 2)}\n`)
     if (values.snapshot) writeFileSync(values.snapshot, JSON.stringify(sim.snapshot()))
     if (values.log) writeFileSync(values.log, logLines.length ? `${logLines.join('\n')}\n` : '')
+    for (const [flag, kind] of [
+      ['kpi-json', 'kpi-json'],
+      ['kpi-csv', 'kpi-csv'],
+      ['events-json', 'events-json'],
+      ['events-csv', 'events-csv'],
+    ] as const) {
+      const file = values[flag]
+      if (file) writeFileSync(file, exportRun(sim, kind))
+    }
     if (values.events) {
       const events = sim.eventLog().slice(firstNewEvent)
       writeFileSync(values.events, events.length ? `${events.map((e) => JSON.stringify(e)).join('\n')}\n` : '')

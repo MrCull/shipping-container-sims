@@ -11,6 +11,7 @@ import type {
   EventPayloads,
   EventSubjects,
   EventType,
+  ExportKind,
   MotionSegment,
   Reservation,
   RunCondition,
@@ -38,6 +39,10 @@ export type QueryKind =
   | 'yardSlots'
   | 'reservations'
   | 'kpis'
+  /** Hourly, per-shift and total series of every KPI (the collector). */
+  | 'kpiSeries'
+  /** `{ headline, highlights }`: the KPI strip and the final report's highlights. */
+  | 'kpiHeadline'
   | 'summary'
   | 'invariants'
   | 'eventLog'
@@ -54,6 +59,8 @@ export type WorkerRequest =
   | { op: 'inject'; type: EventType; at: number; subjects: EventSubjects; payload: EventPayloads[EventType] }
   | { op: 'snapshot' }
   | { op: 'why'; eventId: number }
+  /** The KPI report or the full event log as a JSON/CSV string. */
+  | { op: 'export'; kind: ExportKind }
 
 export type WorkerRequestMessage = WorkerRequest & { rid: number }
 

@@ -9,6 +9,7 @@ import { DEFAULT_ASC_KINEMATICS, DEFAULT_SHC_KINEMATICS, type YardSetup } from '
 import { applyOverrides, LIMITS, validateOverrides, type OverrideCheck, type ScenarioOverrides } from '../../scenario/overrides'
 import type { AscKinematics, ShcKinematics, UnitSystem, VesselConfig } from '../../scenario/types'
 import VesselTable from '../setup/VesselTable.vue'
+import { endConditionsFromFields, endFieldsOf, type EndFields } from '../../modules/endConditions'
 
 /** Spec scale limit for the SHC fleet. */
 const MAX_SHC = 120
@@ -70,6 +71,20 @@ function loadDraft(scenario: string, overrides: ScenarioOverrides = {}): void {
 }
 loadDraft(name.value, store.choice.name === name.value ? store.choice.overrides : {})
 watch(name, (n) => loadDraft(n))
+
+// End conditions: the scenario's own are shown; they only replace it once the user edits a field.
+const scenarioEnd = computed<EndFields>(() => {
+  try {
+    return endFieldsOf(resolveScenario(name.value).endConditions)
+  } catch {
+    return { vessels: '', hours: '', moves: '' }
+  }
+})
+const endFields = ref<EndFields>({ ...endFieldsOf(store.choice.endConditions ?? resolveScenario(name.value).endConditions) })
+watch(name, () => {
+  endFields.value = { ...scenarioEnd.value }
+})
+const endEdited = computed(() => (Object.keys(endFields.value) as (keyof EndFields)[]).some((k) => String(endFields.value[k] ?? '') !== scenarioEnd.value[k]))
 
 const startDate = computed(() => fromLocalInputValue(start.value))
 const overrides = computed<ScenarioOverrides>(() => ({
@@ -300,9 +315,15 @@ async function submit(): Promise<void> {
       return
     }
   }
+  const end = endEdited.value ? endConditionsFromFields(endFields.value, vessels.value.length) : null
+  if (end && !end.ok) {
+    formError.value = t(end.error)
+    return
+  }
   formError.value = null
   await store
     .startScenario({
+      endConditions: end?.value,
       name: name.value,
       seed: seed.value,
       startDateTime: startAt.toISOString(),
@@ -439,6 +460,51 @@ async function submit(): Promise<void> {
           v-model="vessels"
           :start-date-time="startDate"
         />
+      </fieldset>
+
+      <fieldset
+        class="field"
+        data-testid="tt-end-conditions"
+      >
+        <legend>{{ t('setup.end.title') }}</legend>
+        <p class="hint">
+          {{ t('setup.end.hint') }}
+        </p>
+        <div class="grid">
+          <label class="mini">
+            <span>{{ t('setup.end.vessels') }}</span>
+            <input
+              v-model="endFields.vessels"
+              type="number"
+              min="1"
+              step="1"
+              name="end-vessels"
+              :placeholder="t('setup.end.vesselsPlaceholder')"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.end.hours') }}</span>
+            <input
+              v-model="endFields.hours"
+              type="number"
+              min="0"
+              step="any"
+              name="end-hours"
+              :placeholder="t('setup.end.off')"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.end.moves') }}</span>
+            <input
+              v-model="endFields.moves"
+              type="number"
+              min="1"
+              step="1"
+              name="end-moves"
+              :placeholder="t('setup.end.off')"
+            >
+          </label>
+        </div>
       </fieldset>
 
       <ul

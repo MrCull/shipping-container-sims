@@ -61,6 +61,13 @@ describe('remembered settings', () => {
 describe('the run config stores locale and units, and stays SI', () => {
   const base = fixtures['tracer-1sts-10-boxes']
 
+  it('the KPI clock starts at the local time of day of the start, so shifts match the clock the user sees', () => {
+    const iso = '2026-10-26T05:00:00.000Z'
+    const d = new Date(iso)
+    const config = runConfigFor(base, iso, { locale: 'en-GB', units: 'metric' })
+    expect(config.kpi?.startTimeOfDayS).toBe(d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds())
+  })
+
   it('imperial changes what is displayed, not the config or the engine', () => {
     const imperial = runConfigFor(base, '2026-10-26T05:00:00.000Z', { locale: 'en-US', units: 'imperial' })
     const metric = runConfigFor(base, '2026-10-26T05:00:00.000Z', { locale: 'en-GB', units: 'metric' })
@@ -72,6 +79,9 @@ describe('the run config stores locale and units, and stays SI', () => {
     const metricRest: Partial<typeof metric> = { ...metric }
     delete imperialRest.display
     delete metricRest.display
+    // the KPI clock follows the local time of the start (checked in its own test), not units
+    delete imperialRest.kpi
+    delete metricRest.kpi
     expect(imperialRest).toEqual({ ...base, startDateTime: '2026-10-26T05:00:00.000Z' })
     expect(metricRest).toEqual(imperialRest)
     // The base fixture is not mutated.

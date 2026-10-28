@@ -15,10 +15,23 @@
  *   __tt.overlays({ laneGraph: true, reservations: true })   // 3D debug overlays
  *   await __tt.query('ascList'); await __tt.query('yardSlots', 'B01'); __tt.sceneState().ascs   // yard (TT-06)
  *   __tt.setDisplay({ locale: 'de-DE', units: 'imperial' }); __tt.display(); __tt.config(); __tt.ui()
+ *   await __tt.query('kpiHeadline'); await __tt.query('kpiSeries'); await __tt.exportRun('kpi-csv')   // KPIs and exports (TT-07)
+ *   __tt.load(name, { endConditions: { moves: 5 } })   // end after 5 moves; __tt.report() = final report state
  */
 import type { ScenarioOverrides } from '../scenario/overrides'
 import type { DisplaySettings, ScenarioConfig } from '../scenario/types'
-import type { CustodyRef, EngineEvent, EventPayloads, EventSubjects, EventType, RunResult, SimSnapshot } from '../engine'
+import type {
+  CustodyRef,
+  EngineEvent,
+  EventPayloads,
+  EventSubjects,
+  EventType,
+  ExportKind,
+  HeadlineKpis,
+  Highlight,
+  RunResult,
+  SimSnapshot,
+} from '../engine'
 import type { OverlayState, RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { AscPose, ShcPose, StsPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
@@ -46,6 +59,7 @@ export interface TwinDevApi {
       overrides?: ScenarioOverrides
       shc?: ScenarioChoice['shc']
       yard?: ScenarioChoice['yard']
+      endConditions?: ScenarioChoice['endConditions']
     },
   ): Promise<EngineInfo | null>
   step(): Promise<EventSummary | null>
@@ -79,6 +93,21 @@ export interface TwinDevApi {
   config(): ScenarioConfig | null
   /** Keyboard-driven UI state. */
   ui(): TwinUiState
+  /** The KPI report or the event log as the exported text (JSON or CSV), built in the worker. */
+  exportRun(kind: ExportKind): Promise<string>
+  /** What the KPI strip and the final report show right now. */
+  report(): TwinReportState
+}
+
+export interface TwinReportState {
+  /** The run has ended and the display has reached its end (time controls are locked). */
+  ended: boolean
+  /** The final report panel is on screen. */
+  open: boolean
+  headline: HeadlineKpis | null
+  highlights: Highlight[]
+  /** Strip items as text: id, value and the formatted text on screen is in the DOM. */
+  reportReady: boolean
 }
 
 export interface TwinUiState {
@@ -87,6 +116,7 @@ export interface TwinUiState {
   overlaysVisible: boolean
   dashboardOpen: boolean
   helpOpen: boolean
+  reportOpen: boolean
 }
 
 export interface SceneState {
@@ -134,6 +164,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
           overrides: options.overrides,
           shc: options.shc,
           yard: options.yard,
+          endConditions: options.endConditions,
         },
         { autoplay: options.autoplay ?? false },
       )
@@ -199,6 +230,15 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       overlaysVisible: store.overlaysVisible,
       dashboardOpen: store.dashboardOpen,
       helpOpen: store.helpOpen,
+      reportOpen: store.reportOpen,
+    }),
+    exportRun: (kind) => store.exportRun(kind),
+    report: () => ({
+      ended: store.runEnded,
+      open: store.runEnded && store.reportOpen,
+      headline: store.kpi?.headline ?? null,
+      highlights: store.finalReport?.highlights ?? store.kpi?.highlights ?? [],
+      reportReady: store.finalReport !== null,
     }),
   }
 

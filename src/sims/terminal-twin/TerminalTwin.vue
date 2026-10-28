@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
+import FinalReport from './components/FinalReport.vue'
+import KpiStrip from './components/KpiStrip.vue'
 import OverlayToggles from './components/OverlayToggles.vue'
 import TopBar from './components/TopBar.vue'
 import SetupDialog from './components/modals/SetupDialog.vue'
@@ -7,6 +9,7 @@ import ShortcutHelp from './components/modals/ShortcutHelp.vue'
 import { useTwinScene } from './composables/useTwinScene'
 import { useTwinShortcuts } from './composables/useTwinShortcuts'
 import { useTwinStore } from './store/twinStore'
+import { describeEndReason } from './modules/endReason'
 import { t } from './i18n/messages'
 
 const store = useTwinStore()
@@ -20,10 +23,7 @@ useTwinShortcuts()
 let uninstallDevApi: (() => void) | null = null
 let unmounted = false
 
-const ended = computed(() => {
-  const info = store.info
-  return !!info && info.status !== 'ready' && store.displayTime >= (info.endT ?? info.now)
-})
+const ended = computed(() => store.runEnded)
 
 onMounted(async () => {
   if (import.meta.env.DEV) {
@@ -55,6 +55,8 @@ onBeforeUnmount(() => {
       class="scene"
       data-testid="tt-scene"
     >
+      <KpiStrip v-if="store.hasScenario" />
+      <FinalReport v-if="store.hasScenario && store.phase === 'running'" />
       <OverlayToggles v-if="store.hasScenario && store.hasShcs && !webglFailed" />
       <div
         v-if="webglFailed"
@@ -75,7 +77,7 @@ onBeforeUnmount(() => {
         role="status"
       >
         <template v-if="store.info.status === 'ended'">
-          {{ t('twin.scenarioComplete', { reason: store.info.endReason ?? '', moves: store.fmt.number(store.info.movesCompleted, 0) }) }}
+          {{ t('twin.scenarioComplete', { reason: describeEndReason(store.info.endReason, store.fmt), moves: store.fmt.number(store.info.movesCompleted, 0) }) }}
         </template>
         <template v-else>
           {{ t('twin.runStopped', { error: store.info.firstError ?? '' }) }}
@@ -155,7 +157,7 @@ onBeforeUnmount(() => {
 }
 
 .banner {
-  top: 1rem;
+  bottom: 3.4rem;
   border-color: var(--color-success);
 }
 

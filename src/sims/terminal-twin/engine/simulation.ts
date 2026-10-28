@@ -11,6 +11,7 @@ import type { HandlerSet } from './handlers'
 import { hashDigest, hashUpdate } from './hash'
 import { checkInvariants, type InvariantViolation } from './invariants'
 import { buildKpiReport, type KpiReport } from './kpis'
+import { createKpiCollector, type KpiSeriesReport } from './kpi/collector'
 import { createEventLogger, type LogOptions } from './logging'
 import { createQuery, type SimQuery } from './query'
 import { nextRandom } from './rng'
@@ -133,6 +134,8 @@ export interface Simulation {
   eventLog(): readonly EngineEvent[]
   eventLogHash(): string
   kpiReport(): KpiReport
+  /** Every KPI as hourly, per-shift and whole-run series (the collector behind the KPI strip, report and exports). */
+  kpiSeries(): KpiSeriesReport
   invariantReport(): InvariantReport
 }
 
@@ -164,6 +167,9 @@ export function createSimulation(
     scheduleFrom: (causedBy, type, at, subjects, payload) => schedule(makeEvent(type, at, causedBy, subjects, payload) as EngineEvent),
   })
   const reactorMaps: ReactorMap[] = [decisions.reactors, ...REACTORS]
+  const vesselBoxes = Object.fromEntries(Object.values(state.vessels).map((v) => [v.id, v.remainingDischarge]))
+  const newCollector = () => createKpiCollector(config, { vesselBoxes, containerSize: (id) => state.containers[id].size })
+  let collector = newCollector()
   if (options.log) listeners.add({ fn: createEventLogger(options.log) })
 
   function makeEvent<K extends EventType>(
@@ -186,6 +192,7 @@ export function createSimulation(
     ev.seq = state.nextSeq++
     log.push(ev)
     byId.set(ev.id, ev)
+    collector.ingest(ev)
     state.logHash = hashUpdate(state.logHash, JSON.stringify(ev))
     for (const l of listeners) if (!l.types || l.types.has(ev.type)) l.fn(ev)
   }
@@ -381,6 +388,8 @@ export function createSimulation(
       firstError = copy.firstError
       invariants = { ...copy.invariants, enabled: invariantsEnabled }
       decisions.reset()
+      collector = newCollector()
+      for (const ev of log) collector.ingest(ev)
     },
     why(eventId) {
       const chain: EngineEvent[] = []
@@ -405,6 +414,7 @@ export function createSimulation(
     eventLog: () => log,
     eventLogHash: () => hashDigest(state.logHash),
     kpiReport: () => buildKpiReport(state, log.length),
+    kpiSeries: () => collector.report(state.now),
     invariantReport: () => clone(invariants),
   }
 }

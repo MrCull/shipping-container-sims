@@ -37,6 +37,10 @@ export interface Formatter {
   /** Unit-free measures: identical in both unit systems. */
   movesPerHour(value: number): string
   teu(value: number): string
+  percent(value: number): string
+  seconds(value: number): string
+  /** A span of sim time: `45 s`, `12 min 05 s`, `3 h 20 min`. */
+  duration(seconds: number): string
   /** First day of the locale's week (0 = Sunday). */
   firstDayOfWeek(): Weekday
   weekdayName(day: Weekday): string
@@ -137,6 +141,14 @@ export function createFormatter(settings: DisplaySettings): Formatter {
       imperial ? t('unit.usTons', { value: number((tonnes * 1000) / KG_PER_US_TON, 1) }) : t('unit.t', { value: number(tonnes, 1) }),
     movesPerHour: (v) => t('unit.movesPerHour', { value: number(v, 1) }),
     teu: (v) => t('unit.teu', { value: number(v, 0) }),
+    percent: (v) => t('unit.percent', { value: number(v, 1) }),
+    seconds: (v) => t('unit.seconds', { value: number(v, 1) }),
+    duration: (s) => {
+      const total = Math.max(0, Math.round(s))
+      if (total < 60) return t('unit.seconds', { value: number(total, 0) })
+      if (total < 3600) return t('unit.durationMin', { min: number(Math.floor(total / 60), 0), sec: pad(total % 60) })
+      return t('unit.durationHour', { hour: number(Math.floor(total / 3600), 0), min: pad(Math.floor((total % 3600) / 60)) })
+    },
     firstDayOfWeek: () => firstDayOfWeek(locale),
     weekdayName(day) {
       // 4 Jan 1970 was a Sunday.

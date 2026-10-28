@@ -9,10 +9,7 @@ const store = useTwinStore()
 
 const clock = computed(() => store.fmt.clock(store.choice.startDateTime, store.displayTime))
 
-const ended = computed(() => {
-  const info = store.info
-  return !!info && info.status !== 'ready' && store.displayTime >= (info.endT ?? info.now)
-})
+const ended = computed(() => store.runEnded)
 
 /** Status pill state (also its CSS class). */
 const status = computed<'running' | 'failed' | 'complete' | 'paused' | 'live'>(() => {
@@ -75,7 +72,8 @@ async function submitRunTo(): Promise<void> {
         class="speed-btn"
         :class="{ active: store.paused }"
         :aria-pressed="store.paused"
-        :title="store.paused ? t('topbar.resume') : t('topbar.pause')"
+        :disabled="ended"
+        :title="ended ? t('topbar.endedHint') : store.paused ? t('topbar.resume') : t('topbar.pause')"
         @click="store.togglePause()"
       >
         {{ store.paused ? '▶' : '❚❚' }}
@@ -87,6 +85,7 @@ async function submitRunTo(): Promise<void> {
         :class="{ active: !store.paused && store.speed === s }"
         :aria-pressed="!store.paused && store.speed === s"
         :data-speed="s"
+        :disabled="ended"
         @click="store.setSpeed(s)"
       >
         {{ t('topbar.speed', { speed: s }) }}
@@ -97,7 +96,8 @@ async function submitRunTo(): Promise<void> {
       <div class="run-to">
         <button
           class="action-btn"
-          :disabled="store.busy"
+          :disabled="store.busy || ended"
+          :title="ended ? t('topbar.endedHint') : undefined"
           @click="openRunTo"
         >
           {{ t('topbar.runTo') }}
@@ -233,7 +233,12 @@ async function submitRunTo(): Promise<void> {
   border-right: none;
 }
 
-.speed-btn:hover {
+.speed-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.speed-btn:hover:not(:disabled) {
   background: var(--color-bg-card-hover);
   color: var(--color-text);
 }

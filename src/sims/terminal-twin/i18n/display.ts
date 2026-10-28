@@ -61,5 +61,10 @@ export function saveDisplaySettings(storage: SettingsStorage | null, settings: D
 
 /** The config a run starts from: a copy of the scenario with the start date and display settings. All values stay SI. */
 export function runConfigFor(base: ScenarioConfig, startDateTime: string, display: DisplaySettings): ScenarioConfig {
-  return JSON.parse(JSON.stringify({ ...base, startDateTime, display })) as ScenarioConfig
+  // KPI hours and shifts follow the clock the user sees (local time of the start), not UTC.
+  const d = new Date(startDateTime)
+  const kpi = Number.isNaN(d.getTime())
+    ? base.kpi
+    : { ...base.kpi, startTimeOfDayS: d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds() }
+  return JSON.parse(JSON.stringify({ ...base, startDateTime, display, ...(kpi ? { kpi } : {}) })) as ScenarioConfig
 }
