@@ -153,6 +153,15 @@ export const KPI_DEFS: KpiDef[] = [
       ratio(w.sum('sts.moves', id), hoursOf(stsOnVesselS(w, id) - w.sum('sts.waitShcS', id) - w.sum('sts.waitRailS', id))),
   },
   { id: 'sts.wait-shc-s', unit: 's', entityKind: 'sts', entities: stsIds, value: (w, id) => r3(w.sum('sts.waitShcS', id)) },
+  { id: 'wp.released', unit: 'count', entityKind: 'sts', entities: stsIds, value: (w, id) => w.sum('wp.released', id) },
+  { id: 'wp.completed', unit: 'count', entityKind: 'sts', entities: stsIds, value: (w, id) => w.sum('wp.completed', id) },
+  {
+    id: 'wp.lead-time-s',
+    unit: 's',
+    entityKind: 'sts',
+    entities: stsIds,
+    value: (w, id) => ratio(w.sum('wp.leadS', id), w.sum('wp.started', id)),
+  },
   { id: 'sts.wait-work-s', unit: 's', entityKind: 'sts', entities: stsIds, value: (w, id) => r3(w.sum('sts.waitWorkS', id)) },
   { id: 'sts.wait-rail-s', unit: 's', entityKind: 'sts', entities: stsIds, value: (w, id) => r3(w.sum('sts.waitRailS', id)) },
   {
@@ -279,7 +288,14 @@ function defApplies(def: KpiDef, config: ScenarioConfig, ctx: DefContext): boole
 
 // ------------------------------------------------------------------ the fold
 
-const LOADED_SHC_EVENTS = new Set(['ShcRoutingLoaded', 'ShcPositioningAtDropoff', 'ShcLowering', 'ShcUnlocking', 'ShcDroppedAtWtp'])
+const LOADED_SHC_EVENTS = new Set([
+  'ShcRoutingLoaded',
+  'ShcPositioningAtDropoff',
+  'ShcLowering',
+  'ShcUnlocking',
+  'ShcDroppedAtWtp',
+  'ShcDroppedAtGround',
+])
 
 interface Open {
   kind: 'empty' | 'loaded'
@@ -291,6 +307,8 @@ export interface KpiStaticInfo {
   /** Discharge boxes per vessel at the start (for "remaining moves"). */
   vesselBoxes: Record<string, number>
   containerSize(containerId: string): ContainerSize
+  /** Boxes standing in the stacks at the start, per block, as 20 ft cells (export pre-fill). */
+  initialCells?: Record<string, number>
 }
 
 export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo): KpiCollector {
@@ -315,7 +333,8 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
   const requestedAt: Record<string, number> = {}
   const pending: Record<string, number> = {}
   const picked: Record<string, number> = {}
-  const cells: Record<string, number> = {}
+  const cells: Record<string, number> = { ...(info.initialCells ?? {}) }
+  for (const [block, n] of Object.entries(cells)) acc.gauge('yard.cells', block, 0, n)
   const seenDecisionPoints = new Set<string>()
 
   function flushRail(upTo: number): void {
@@ -353,6 +372,34 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
   function observe(e: EngineEvent): void {
     const h = hourOf(e.t)
     switch (e.type) {
+      case 'WorkPackageReleased':
+        acc.add('wp.released', e.payload.stsId, h, 1)
+        break
+      case 'WorkPackageStarted':
+        acc.add('wp.started', e.payload.stsId, h, 1)
+        acc.add('wp.leadS', e.payload.stsId, h, e.payload.leadTimeS)
+        break
+      case 'WorkPackageCompleted':
+        acc.add('wp.completed', e.payload.stsId, h, 1)
+        break
+      case 'StsWaitingForBox':
+        waitShcSince[e.payload.stsId] = e.t
+        break
+      case 'StsBoxWaitEnded': {
+        const id = e.payload.stsId
+        acc.interval(clock, 'sts.waitShcS', id, waitShcSince[id] ?? e.t - e.payload.waitedS, e.t)
+        waitShcSince[id] = null
+        break
+      }
+      case 'StsLoaded': {
+        acc.add('sts.moves', e.payload.stsId, h, 1)
+        acc.add('berth.moves', 'terminal', h, 1)
+        const vessel = e.payload.vesselId
+        picked[vessel] = (picked[vessel] ?? 0) + 1
+        acc.gauge('vessel.remaining', vessel, h, (vesselBoxes[vessel] ?? 0) - picked[vessel])
+        break
+      }
+      case 'StsLoadStarted':
       case 'StsMoveStarted': {
         const id = e.payload.stsId
         if (waitWorkSince[id] !== null && waitWorkSince[id] !== undefined) {
@@ -412,7 +459,11 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         shcTransition(e.payload.shcId, 'empty', e.t, e.payload.departAt)
         break
       case 'ShcPicked':
+      case 'ShcPickedAtWtp':
         shcTransition(e.payload.shcId, 'loaded', e.t)
+        break
+      case 'ShcDroppedAtGround':
+        shcTransition(e.payload.shcId, 'empty', e.t)
         break
       case 'ShcDroppedAtWtp':
         shcTransition(e.payload.shcId, 'empty', e.t)
@@ -488,6 +539,8 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         case 'ShcPositioningAtPickup':
         case 'ShcLocking':
         case 'ShcPicked':
+        case 'ShcPickedAtWtp':
+        case 'ShcDroppedAtGround':
         case 'ShcRoutingLoaded':
         case 'ShcPositioningAtDropoff':
         case 'ShcLowering':
@@ -497,6 +550,11 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         case 'ShcParked':
           distance(e.payload.shcId, LOADED_SHC_EVENTS.has(e.type) ? 'shc.loadedM' : 'shc.emptyM', e.payload.segments)
           break
+      }
+      if (e.type === 'AscRetrieved') {
+        const block = e.payload.blockId
+        cells[block] = Math.max(0, (cells[block] ?? 0) - boxSpan(info.containerSize(e.payload.containerId)))
+        acc.gauge('yard.cells', block, hourOf(e.t), cells[block])
       }
       if (e.type === 'AscStacked') {
         const block = e.payload.blockId

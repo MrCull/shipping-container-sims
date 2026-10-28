@@ -287,6 +287,31 @@ export const INVARIANTS: Invariant[] = [
     },
   },
   {
+    id: 'stowage.order',
+    description:
+      'Stowage order: a box on board never lies above an empty cell. Every filled load slot above the bottom tier of its ' +
+      'section (hold floor or hatch cover) has a box directly below it, so lower tiers are loaded before upper tiers.',
+    check(state) {
+      const messages: string[] = []
+      const filled = new Map<string, ('aft' | 'fore' | null)[]>()
+      const loads = []
+      for (const s of Object.values(state.vesselSlots)) {
+        if (!s.containerId) continue
+        const key = `${s.vesselId}:${s.bay}:${s.row}:${s.tier}`
+        filled.set(key, [...(filled.get(key) ?? []), s.half])
+        if (s.purpose === 'load') loads.push(s)
+      }
+      for (const s of loads) {
+        const holdTiers = vesselClass(state.vessels[s.vesselId].sizeClass).holdTiers
+        if (s.tier === 0 || s.tier === holdTiers) continue
+        const below = filled.get(`${s.vesselId}:${s.bay}:${s.row}:${s.tier - 1}`) ?? []
+        if (!below.some((h) => h === null || s.half === null || h === s.half))
+          messages.push(`box ${s.containerId} in ${s.id} lies above an empty cell (bay ${s.bay} row ${s.row} tier ${s.tier - 1})`)
+      }
+      return messages
+    },
+  },
+  {
     id: 'berth.no-overlap',
     description: 'Vessels on the quay (mooring, berthed, unmooring) lie within the quay and keep berthGapM apart.',
     check(state, config) {

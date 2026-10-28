@@ -61,6 +61,19 @@ export interface KpiReport {
   horizontal?: HorizontalKpiReport
   /** Yard blocks and ASCs (only when blocks are configured with SHCs). */
   yard?: YardKpiReport
+  /** Work packages (only when some were released). */
+  workPackages?: WorkPackageKpiReport
+}
+
+export interface WorkPackageKpiReport {
+  released: number
+  started: number
+  completed: number
+  /** Time from release to the start of work: the look-ahead the yard had (s). */
+  leadTimeMeanS: number
+  leadTimeMaxS: number
+  /** Export boxes loaded. */
+  boxesLoaded: number
 }
 
 export interface YardKpiReport {
@@ -218,5 +231,17 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     handlers,
     ...(horizontal ? { horizontal } : {}),
     ...(yard ? { yard } : {}),
+    ...(state.kpis.workPackages.released > 0
+      ? {
+          workPackages: {
+            released: state.kpis.workPackages.released,
+            started: state.kpis.workPackages.started,
+            completed: state.kpis.workPackages.completed,
+            leadTimeMeanS: r3(state.kpis.workPackages.started > 0 ? state.kpis.workPackages.leadTimeSumS / state.kpis.workPackages.started : 0),
+            leadTimeMaxS: r3(state.kpis.workPackages.leadTimeMaxS),
+            boxesLoaded: state.kpis.workPackages.boxesLoaded,
+          },
+        }
+      : {}),
   }
 }

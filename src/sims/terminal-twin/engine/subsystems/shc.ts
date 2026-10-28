@@ -18,6 +18,9 @@
  * parking spots and pad clear positions, which are not conflict zones.
  * Idle SHCs drive back to their parking spot.
  *
+ * Export load jobs (TT-10) run the same trip backwards: pad → ShcPickedAtWtp → lane →
+ * ShcDroppedAtGround (custody SHC → ground position) → ShcCleared at the lane exit.
+ *
  * Modes: real (kinematics), instant (same events, zero durations), off (no
  * jobs; boxes stay on the ground positions).
  */
@@ -26,10 +29,12 @@ import type { EventOf, ShcPhasePayload } from '../events'
 import { planSegment, positionAt, type AxisProfile, type MotionSegment } from '../kinematics'
 import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph } from '../laneGraph'
 import { earliestStart, mergeWindows, reserve, type WindowSpec } from '../reservations'
-import type { ShcPlannedEvent, ShcState, ShcStatus, SimState } from '../state'
+import type { ShcJob, ShcPlannedEvent, ShcState, ShcStatus, SimState } from '../state'
 import { DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
 import type { ShcKinematics } from '../../scenario/types'
-import { resumeStsWaitingForGroundPosition } from './quay'
+import { resumeStsWaitingForBox, resumeStsWaitingForGroundPosition } from './quay'
+import { maybeDispatchAsc } from './asc'
+import { pumpLoadPrep } from './loadPrep'
 
 type PlannedType = ShcPlannedEvent['type']
 
@@ -38,11 +43,13 @@ const STATUS_AFTER: Record<PlannedType, ShcStatus> = {
   ShcPositioningAtPickup: 'positioning-at-pickup',
   ShcLocking: 'locking',
   ShcPicked: 'lifting',
+  ShcPickedAtWtp: 'lifting',
   ShcRoutingLoaded: 'routing-loaded',
   ShcPositioningAtDropoff: 'positioning-at-dropoff',
   ShcLowering: 'lowering',
   ShcUnlocking: 'unlocking',
   ShcDroppedAtWtp: 'clearing',
+  ShcDroppedAtGround: 'clearing',
   ShcCleared: 'available',
   ShcParked: 'parked',
 }
@@ -286,6 +293,12 @@ function scheduleNext(ctx: EngineContext, shc: ShcState): void {
     case 'ShcDroppedAtWtp':
       ctx.schedule(next.type, next.at, withBox, { ...base, wtpPadId: job.wtpPadId ?? '' })
       break
+    case 'ShcPickedAtWtp':
+      ctx.schedule(next.type, next.at, withBox, { ...base, wtpPadId: job.wtpPadId ?? '' })
+      break
+    case 'ShcDroppedAtGround':
+      ctx.schedule(next.type, next.at, withBox, { ...base, groundPositionId: job.groundPositionId, x: job.x })
+      break
     case 'ShcCleared':
       ctx.schedule(next.type, next.at, withBox, { ...base, nodeId: shc.nodeId })
       break
@@ -344,6 +357,22 @@ function requestDispatch(ctx: EngineContext, shc: ShcState): void {
     .filter((j) => j.shcId === null)
     .sort((a, b) => a.readyAt - b.readyAt || (a.id < b.id ? -1 : 1))
     .map((j) => {
+      if (j.kind === 'load') {
+        const pad = graph.pads.find((p) => p.id === j.wtpPadId)
+        if (!pad) throw new Error(`Load job ${j.id} names unknown pad ${j.wtpPadId}`)
+        return {
+          jobId: j.id,
+          containerId: j.containerId,
+          groundPositionId: j.groundPositionId,
+          stsId: j.stsId,
+          readyAt: j.readyAt,
+          x: pad.x,
+          z: pad.z,
+          kind: 'load' as const,
+          padId: pad.id,
+          distanceM: Math.round(pathLength(graph, route(graph, shc.nodeId, graph.padNode[pad.id])) * 1000) / 1000,
+        }
+      }
       const lane = state.groundPositions[j.groundPositionId].lane
       const entry = graph.nodes[laneAccess(graph, lane, j.x).walk[0]]
       return {
@@ -381,14 +410,16 @@ export function maybeDispatch(ctx: EngineContext): void {
   const { state } = ctx
   if (state.subsystems.shc === 'off') return
   const shcs = Object.values(state.shcs)
-  const open = Object.values(state.shcJobs).filter((j) => j.shcId === null).length
+  const openJobs = Object.values(state.shcJobs).filter((j) => j.shcId === null)
+  const open = openJobs.filter((j) => j.kind !== 'load').length
+  const openLoad = openJobs.length - open
   const freePads = Object.values(state.wtpPads).filter((p) => p.containerId === null && p.claimedBy === null).length
   let asking = shcs.filter((s) => s.status === 'waiting-for-dispatch').length
   const free = shcs
     .filter((s) => s.status === 'available' || s.status === 'parked')
     .sort((a, b) => (a.status === b.status ? (a.id < b.id ? -1 : 1) : a.status === 'available' ? -1 : 1))
   for (const shc of free) {
-    if (asking >= Math.min(open, freePads)) break
+    if (asking >= Math.min(open, freePads) + openLoad) break
     requestDispatch(ctx, shc)
     asking++
   }
@@ -400,6 +431,10 @@ function assignJob(ctx: EngineContext, shc: ShcState, jobId: string, padId: stri
   const graph = laneGraphOf(ctx.config)
   const job = state.shcJobs[jobId]
   if (!job) throw new Error(`shcDispatch handler returned unknown job ${jobId}`)
+  if (job.kind === 'load') {
+    assignLoadJob(ctx, shc, job)
+    return
+  }
   const pad = state.wtpPads[padId]
   if (!pad) throw new Error(`shcDispatch handler returned unknown WTP pad ${padId}`)
   // The engine trusts the TOS reply; invariants catch double claims and double occupancy.
@@ -454,11 +489,26 @@ function assignJob(ctx: EngineContext, shc: ShcState, jobId: string, padId: stri
   trip.driveThrough(waypoints(graph, [pNode, cNode]).slice(1), empty)
   trip.mark('ShcCleared')
 
+  commitTrip(ctx, shc, job, trip, emptyM, loadedM, pad.id, cNode)
+}
+
+/** Reserve the trip's zones, install it as the SHC's plan, count its distances and announce it. */
+function commitTrip(
+  ctx: EngineContext,
+  shc: ShcState,
+  job: ShcJob,
+  trip: TripBuilder,
+  emptyM: number,
+  loadedM: number,
+  padId: string,
+  endNode: string,
+): void {
+  const { state } = ctx
   const windows = trip.windows()
   const start = earliestStart(state, windows, state.now)
   const reservations = reserve(state, shc.id, windows, start)
   install(shc, trip, start)
-  shc.nodeId = cNode
+  shc.nodeId = endNode
   shc.status = 'job-assigned'
   const kpi = shcKpi(state, shc.id)
   kpi.jobs++
@@ -470,11 +520,63 @@ function assignJob(ctx: EngineContext, shc: ShcState, jobId: string, padId: stri
     jobId: job.id,
     containerId: job.containerId,
     groundPositionId: job.groundPositionId,
-    wtpPadId: pad.id,
+    wtpPadId: padId,
     departAt: start,
     distanceM: Math.round(trip.s * 1000) / 1000,
     reservations,
   })
+}
+
+/**
+ * Plan an export load job: the SHC drives to the WTP pad, lifts the box,
+ * carries it along its STS lane to the drop X and puts it down, then leaves the
+ * lane at the next up spine (where it rests: lane exits are conflict zones, but
+ * a resting vehicle holds no reservation, as everywhere in this model).
+ */
+function assignLoadJob(ctx: EngineContext, shc: ShcState, job: ShcJob): void {
+  const { state } = ctx
+  const graph = laneGraphOf(ctx.config)
+  job.shcId = shc.id
+  shc.jobId = job.id
+  const k = kinematics(ctx)
+  const f = driverFactor(ctx)
+  const empty = scaled(k.driveEmpty, f)
+  const loaded = scaled(k.driveLoaded, f)
+  const instant = state.subsystems.shc === 'instant'
+  const padId = job.wtpPadId as string
+  const pNode = graph.padNode[padId]
+  const { walk, before } = laneAccess(graph, state.groundPositions[job.groundPositionId].lane, job.x)
+  const lane = waypoints(graph, walk)
+  const dropPoint: Waypoint = {
+    nodeId: walk[before],
+    x: job.x,
+    z: lane[before].z,
+    zone: null,
+    edgeZone: edgeBetween(graph, walk[before], walk[before + 1]).zone,
+  }
+  const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant)
+  trip.mark('ShcRoutingEmpty')
+  trip.driveThrough(waypoints(graph, route(graph, shc.nodeId, pNode)).slice(1), empty, 'ShcPositioningAtPickup')
+  trip.mark('ShcLocking')
+  trip.dwell(k.lockS)
+  trip.mark('ShcPickedAtWtp')
+  trip.liftTo(k.liftHeightM, k.lift)
+  trip.mark('ShcRoutingLoaded')
+  const emptyM = trip.s
+  trip.driveThrough(
+    [...waypoints(graph, route(graph, pNode, walk[0])).slice(1), ...lane.slice(1, before + 1), dropPoint],
+    loaded,
+    'ShcPositioningAtDropoff',
+  )
+  const loadedM = trip.s - emptyM
+  trip.mark('ShcLowering')
+  trip.liftTo(0, k.lift)
+  trip.mark('ShcUnlocking')
+  trip.dwell(k.unlockS)
+  trip.mark('ShcDroppedAtGround')
+  trip.driveThrough([{ ...lane[before + 1], edgeZone: dropPoint.edgeZone }, ...lane.slice(before + 2)], empty)
+  trip.mark('ShcCleared')
+  commitTrip(ctx, shc, job, trip, emptyM, loadedM, padId, walk[walk.length - 1])
 }
 
 type PhaseReactor<K extends PlannedType> = (e: EventOf<K>, ctx: EngineContext) => void
@@ -524,6 +626,12 @@ export const shcReactors: ReactorMap = {
   ShcPositioningAtPickup: phase(),
   ShcLocking: phase((e, ctx) => {
     const job = ctx.state.shcJobs[e.payload.jobId]
+    if (job.kind === 'load') {
+      const pad = ctx.state.wtpPads[job.wtpPadId as string]
+      if (pad.containerId !== job.containerId)
+        throw new Error(`${e.payload.shcId}: box ${job.containerId} is not on ${pad.id} (found ${pad.containerId ?? 'nothing'})`)
+      return
+    }
     const gp = ctx.state.groundPositions[job.groundPositionId]
     if (gp.containerId !== job.containerId)
       throw new Error(`${e.payload.shcId}: box ${job.containerId} is not on ${gp.id} (found ${gp.containerId ?? 'nothing'})`)
@@ -535,6 +643,31 @@ export const shcReactors: ReactorMap = {
     shc.carrying = e.payload.containerId
     ctx.transferCustody(e.payload.containerId, { kind: 'shc', id: shc.id })
     resumeStsWaitingForGroundPosition(ctx, gp.stsId)
+    pumpLoadPrep(ctx)
+  }),
+  /** Export load: the SHC lifted the box off its WTP pad. */
+  ShcPickedAtWtp: phase((e, ctx, shc) => {
+    const { state } = ctx
+    const pad = state.wtpPads[e.payload.wtpPadId]
+    pad.containerId = null
+    shc.carrying = e.payload.containerId
+    ctx.transferCustody(e.payload.containerId, { kind: 'shc', id: shc.id })
+    const order = state.loadOrders[e.payload.containerId]
+    if (order) order.stage = 'to-ground'
+    maybeDispatch(ctx)
+    maybeDispatchAsc(ctx, pad.blockId) // a pad is free: the ASC may bring the next export box
+  }),
+  /** Export load: the SHC set the box down on its STS ground position. */
+  ShcDroppedAtGround: phase((e, ctx, shc) => {
+    const { state } = ctx
+    const gp = state.groundPositions[e.payload.groundPositionId]
+    gp.containerId = e.payload.containerId
+    if (gp.claimedBy === e.payload.containerId) gp.claimedBy = null
+    shc.carrying = null
+    ctx.transferCustody(e.payload.containerId, { kind: 'groundPosition', id: gp.id })
+    const order = state.loadOrders[e.payload.containerId]
+    if (order) order.stage = 'on-ground'
+    resumeStsWaitingForBox(ctx, gp.stsId, e.payload.containerId)
   }),
   ShcRoutingLoaded: phase(),
   ShcPositioningAtDropoff: phase(),

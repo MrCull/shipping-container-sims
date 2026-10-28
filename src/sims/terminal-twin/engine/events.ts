@@ -203,6 +203,50 @@ export interface EventPayloads {
   AscStacked: AscPhasePayload & { yardSlotId: string }
   /** Spreader back at travel height: the ASC is available for its next box. */
   AscReady: { ascId: string; blockId: string; segments: MotionSegment[] }
+  /** An STS load pick from a WTP pad by an SHC: custody WTP pad → SHC; the pad is free. */
+  ShcPickedAtWtp: ShcPhasePayload & { wtpPadId: string }
+  /** Export box released on an STS ground position: custody SHC → ground position. */
+  ShcDroppedAtGround: ShcPhasePayload & { groundPositionId: string; x: number },
+  /** Spreader up, gantry and trolley heading for the box in the stack (export retrieval). */
+  AscRoutingToStack: AscPhasePayload
+  /** Over the stack; the hoist lowers the spreader onto the box. */
+  AscPositioningAtStack: AscPhasePayload
+  /** Export box locked and lifted out of its stack: custody yard slot → ASC. */
+  AscRetrieved: AscPhasePayload & { yardSlotId: string }
+  /** Box up; gantry and trolley heading for the WTP pad. */
+  AscRoutingToWtp: AscPhasePayload
+  /** Over the pad; the hoist lowers the box onto it. */
+  AscPositioningAtWtp: AscPhasePayload
+  /** Export box released on the WTP pad: custody ASC → WTP pad. */
+  AscDroppedAtWtp: AscPhasePayload & { wtpPadId: string }
+  /**
+   * A work package was released by the workPackageRelease decision. `ahead` =
+   * released packages waiting behind the active one, after this release.
+   */
+  WorkPackageReleased: {
+    packageId: string
+    stsId: string
+    vesselId: string
+    kind: 'discharge' | 'load'
+    section: 'deck' | 'hold'
+    bay: number
+    moves: number
+    ahead: number
+  }
+  /** The STS starts its next released package; `leadTimeS` = time since its release. */
+  WorkPackageStarted: { packageId: string; stsId: string; vesselId: string; kind: 'discharge' | 'load'; moves: number; leadTimeS: number }
+  /** The package's last move is done. */
+  WorkPackageCompleted: { packageId: string; stsId: string; vesselId: string; kind: 'discharge' | 'load'; moves: number; durationS: number }
+  /** The STS takes its next export box from its ground position and puts it in its vessel slot. */
+  StsLoadStarted: { stsId: string; vesselId: string; packageId: string; containerId: string; slotId: string; segments: MotionSegment[] }
+  /** The next export box is not on a ground position yet; the STS waits (counts as waiting for the SHC). */
+  StsWaitingForBox: { stsId: string; containerId: string }
+  /** The export box reached a ground position; the waiting STS goes on. */
+  StsBoxWaitEnded: { stsId: string; containerId: string; waitedS: number }
+  /** Spreader locked on the export box: custody ground position → STS. */
+  StsLoadPicked: { stsId: string; containerId: string; groundPositionId: string; segments: MotionSegment[] }
+  /** Box released in its vessel slot: custody STS → vessel slot. */
+  StsLoaded: { stsId: string; vesselId: string; containerId: string; slotId: string; segments: MotionSegment[] }
   /** The STS finished its bays of the vessel and is free again. */
   StsWorkComplete: { stsId: string; vesselId: string }
   /** All the vessel's moves are done: unmooring starts. */

@@ -64,7 +64,7 @@ describe('run diff', () => {
   it('CLI compares two seeds / two handler sets of one scenario', () => {
     const same = cli(runDiffCli, '--fixture', 'tracer-1sts-10-boxes')
     expect(same.exitCode).toBe(0)
-    expect(same.text).toMatch(/No divergence: 62 events identical/)
+    expect(same.text).toMatch(/No divergence: 104 events identical/)
 
     const strategies = cli(runDiffCli, '--fixture', 'tracer-1sts-10-boxes', '--b-handlers', 'highest-free-lane')
     expect(strategies.exitCode).toBe(1)

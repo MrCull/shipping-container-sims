@@ -12,6 +12,7 @@ import type { Reservation } from './reservations'
 import { seedState } from './rng'
 import { ascStartZ, blockSpecs, PARK_UNTIL_S, railSegmentIds, travelHoistM } from './yardLayout'
 import { planCargo, type SlotPurpose } from '../scenario/bayPlan'
+import { planExportYard } from '../scenario/exportYard'
 import type { ContainerSize, ScenarioConfig, SubsystemMode, VesselSizeClass } from '../scenario/types'
 import { vesselSlotId as makeVesselSlotId, type CellHalf } from '../scenario/vesselClasses'
 
@@ -35,6 +36,8 @@ export interface ContainerState {
   size: ContainerSize
   full: boolean
   line: string
+  /** Vessel the box belongs to: discharged from it, or booked to it for loading. */
+  vesselId: string
   custody: CustodyRef
   custodyHistory: CustodyRecord[]
 }
@@ -52,6 +55,8 @@ export interface VesselSlotState {
   /** What the bay plan uses the slot for. Load/transshipment slots are reserved (empty) until TT-10. */
   purpose: SlotPurpose
   containerId: string | null
+  /** Load slots: the export box booked to this slot (it is `containerId` once loaded). */
+  plannedContainerId?: string | null
 }
 
 /**
@@ -82,6 +87,8 @@ export interface VesselState {
   stsHistory: string[]
   /** Discharge boxes still on board. */
   remainingDischarge: number
+  /** Export boxes still to be loaded (TT-10). */
+  remainingLoad: number
 }
 
 export type StsStatus =
@@ -93,6 +100,10 @@ export type StsStatus =
   | 'waiting-for-rail'
   | 'waiting-for-decision'
   | 'waiting-for-ground-position'
+  /** Load flow: the next export box is not on a ground position yet. */
+  | 'waiting-for-box'
+  /** Load flow: picking the box from its ground position and putting it into its slot. */
+  | 'loading'
 
 /**
  * SHC state machine (TT-05):
@@ -125,11 +136,13 @@ export interface ShcPlannedEvent {
     | 'ShcPositioningAtPickup'
     | 'ShcLocking'
     | 'ShcPicked'
+    | 'ShcPickedAtWtp'
     | 'ShcRoutingLoaded'
     | 'ShcPositioningAtDropoff'
     | 'ShcLowering'
     | 'ShcUnlocking'
     | 'ShcDroppedAtWtp'
+    | 'ShcDroppedAtGround'
     | 'ShcCleared'
     | 'ShcParked'
   at: number
@@ -156,8 +169,13 @@ export interface ShcJob {
   containerId: string
   groundPositionId: string
   stsId: string
-  /** X where the box sits in its STS lane. */
+  /**
+   * X where the box sits in its STS lane (discharge), or where it is to be put
+   * down (load).
+   */
   x: number
+  /** 'load' (TT-10): carry an export box from `wtpPadId` to `groundPositionId`; absent = discharge. */
+  kind?: 'load'
   readyAt: number
   /** Claiming SHC (null = open). */
   shcId: string | null
@@ -168,7 +186,7 @@ export interface WtpPadState {
   id: string
   blockId: string
   containerId: string | null
-  /** SHC that will drop a box here. */
+  /** SHC (or, for a retrieved export box, ASC) that will drop a box here. */
   claimedBy: string | null
 }
 
@@ -198,6 +216,12 @@ export interface AscPlannedEvent {
     | 'AscPositioningAtPad'
     | 'AscLocking'
     | 'AscPicked'
+    | 'AscRoutingToStack'
+    | 'AscPositioningAtStack'
+    | 'AscRetrieved'
+    | 'AscRoutingToWtp'
+    | 'AscPositioningAtWtp'
+    | 'AscDroppedAtWtp'
     | 'AscRoutingToSlot'
     | 'AscPositioningAtSlot'
     | 'AscUnlocking'
@@ -253,6 +277,11 @@ export interface AscJob {
   ascId: string | null
   /** An ascDispatch request for this job is pending (twin blocks). */
   dispatch?: 'asked'
+  /**
+   * 'retrieve' (TT-10): take an export box from the stack (`yardSlotId`) to a WTP
+   * pad (`wtpPadId`, chosen when the ASC starts, '' before). Absent = stack a box.
+   */
+  kind?: 'retrieve'
 }
 
 /** Stack heights of a block. Claimed slots count: a slot is claimed when allocated, stacked later. */
@@ -297,7 +326,7 @@ export interface StsState {
   vesselId: string | null
   /** Bays of `vesselId` assigned by the crane split (ascending). */
   bays: number[]
-  /** Remaining discharge boxes of this crane, in work order (bay by bay, deck before hold, top tier first). */
+  /** Remaining boxes of the active work package, in work order (discharge: top tier first; load: bottom tier first). */
   workQueue: string[]
   /** Axis positions at the end of the currently planned motion. */
   gantryX: number
@@ -318,8 +347,14 @@ export interface StsState {
   /** Motion segments currently planned (renderer interpolates from these). */
   motion: MotionSegment[]
   groundPositionIds: string[]
-  /** Since when the STS has been waiting for a free ground position (null = not waiting). */
+  /** Since when the STS has been waiting for a free ground position or an export box (null = not waiting). */
   waitingSince?: number | null
+  /** The crane's work packages for its current vessel, in work order. */
+  packageIds: string[]
+  /** The package being worked (its boxes are in `workQueue`). */
+  activePackageId: string | null
+  /** A work-package-release decision is pending for this crane. */
+  releasing?: boolean
 }
 
 export interface GroundPositionState {
@@ -327,6 +362,51 @@ export interface GroundPositionState {
   stsId: string
   lane: number
   containerId: string | null
+  /** Load flow: the export box that will be put down here (reserved before it arrives). */
+  claimedBy: string | null
+}
+
+export type WorkPackageKind = 'discharge' | 'load'
+/** planned (not yet released) → released → active (the STS works it) → complete. */
+export type WorkPackageStatus = 'planned' | 'released' | 'active' | 'complete'
+
+/**
+ * One STS's moves for one bay section (deck or hold) of one vessel, discharge
+ * or load (TT-10). The work-package-release decision point releases them; an
+ * STS only works released packages, in sequence.
+ */
+export interface WorkPackage {
+  id: string
+  stsId: string
+  vesselId: string
+  kind: WorkPackageKind
+  section: 'deck' | 'hold'
+  bay: number
+  /** The boxes in work order (load: export boxes in load sequence, bottom tiers first). */
+  containerIds: string[]
+  /** Position in the crane's package sequence (0-based). */
+  seq: number
+  status: WorkPackageStatus
+  releasedAt: number | null
+  startedAt: number | null
+  completedAt: number | null
+}
+
+/**
+ * Load preparation of one export box: from its package's release to its
+ * ground position. planned boxes wait for a ground position, then the ASC
+ * retrieves them, an SHC carries them.
+ */
+export interface LoadOrder {
+  containerId: string
+  vesselId: string
+  stsId: string
+  packageId: string
+  slotId: string
+  /** Position in the crane's load sequence (0-based, over all its load packages). */
+  seq: number
+  stage: 'released' | 'gp-asked' | 'gp-claimed' | 'retrieving' | 'on-pad' | 'to-ground' | 'on-ground'
+  groundPositionId: string | null
 }
 
 export interface StsKpiCounters {
@@ -349,6 +429,19 @@ export interface KpiCounters {
   horizontal?: HorizontalKpiCounters
   /** Yard blocks and ASCs (present when blocks are configured with SHCs). */
   yard?: YardKpiCounters
+  /** Work packages (TT-10). */
+  workPackages: WorkPackageKpiCounters
+}
+
+export interface WorkPackageKpiCounters {
+  released: number
+  started: number
+  completed: number
+  /** Sum / max of the time from release to the start of work (s). */
+  leadTimeSumS: number
+  leadTimeMaxS: number
+  /** Export boxes loaded. */
+  boxesLoaded: number
 }
 
 /** Per-ASC counters; the last three exist only for twin-ASC blocks (TT-08). */
@@ -415,6 +508,9 @@ export interface SimState {
   nextClaimSeq: number
   yardBlocks: Record<string, YardBlockState>
   yardSlots: Record<string, YardSlotState>
+  workPackages: Record<string, WorkPackage>
+  nextWorkPackage: number
+  loadOrders: Record<string, LoadOrder>
   reservations: Reservation[]
   nextReservationId: number
   subsystems: ResolvedSubsystemModes
@@ -498,10 +594,18 @@ export function createInitialState(
     nextClaimSeq: 0,
     yardBlocks: {},
     yardSlots: {},
+    workPackages: {},
+    nextWorkPackage: 0,
+    loadOrders: {},
     reservations: [],
     nextReservationId: 0,
     subsystems,
-    kpis: { movesCompleted: 0, vesselsCompleted: 0, perSts: {} },
+    kpis: {
+      movesCompleted: 0,
+      vesselsCompleted: 0,
+      perSts: {},
+      workPackages: { released: 0, started: 0, completed: 0, leadTimeSumS: 0, leadTimeMaxS: 0, boxesLoaded: 0 },
+    },
     decisions: createDecisionState(seed),
     ended: null,
   }
@@ -522,18 +626,28 @@ export function createInitialState(
       stsIds: [],
       stsHistory: [],
       remainingDischarge: 0,
+      remainingLoad: 0,
     }
   }
   for (const s of plan.slots) state.vesselSlots[s.id] = { ...s, containerId: null }
+  const exportPlacement = new Map(planExportYard(config, plan).map((p) => [p.containerId, p]))
   for (const c of plan.containers) {
-    state.vesselSlots[c.slotId].containerId = c.id
-    state.vessels[c.vesselId].remainingDischarge++
-    const owner: CustodyRef = { kind: 'vesselSlot', id: c.slotId }
+    let owner: CustodyRef
+    if (c.flow === 'load') {
+      state.vesselSlots[c.slotId].plannedContainerId = c.id
+      if (subsystems.shc !== 'off' && subsystems.asc !== 'off') state.vessels[c.vesselId].remainingLoad++
+      owner = { kind: 'yardSlot', id: (exportPlacement.get(c.id) as { slotId: string }).slotId }
+    } else {
+      state.vesselSlots[c.slotId].containerId = c.id
+      state.vessels[c.vesselId].remainingDischarge++
+      owner = { kind: 'vesselSlot', id: c.slotId }
+    }
     state.containers[c.id] = {
       id: c.id,
       size: c.size,
       full: c.full,
       line: c.line,
+      vesselId: c.vesselId,
       custody: owner,
       custodyHistory: [{ t: 0, owner, eventId: null }],
     }
@@ -543,7 +657,7 @@ export function createInitialState(
     for (let lane = 0; lane < s.groundPositions; lane++) {
       const id = groundPositionId(s.id, lane)
       gpIds.push(id)
-      state.groundPositions[id] = { id, stsId: s.id, lane, containerId: null }
+      state.groundPositions[id] = { id, stsId: s.id, lane, containerId: null, claimedBy: null }
     }
     state.sts[s.id] = {
       id: s.id,
@@ -562,6 +676,8 @@ export function createInitialState(
       drops: [],
       motion: [],
       groundPositionIds: gpIds,
+      packageIds: [],
+      activePackageId: null,
     }
     state.kpis.perSts[s.id] = {
       moves: 0,
@@ -630,6 +746,24 @@ export function createInitialState(
     }
     state.kpis.yard = yard
     state.kpis.horizontal = horizontal
+    // export boxes booked to the vessels start in the stacks
+    for (const p of exportPlacement.values()) {
+      const blk = state.yardBlocks[p.blockId]
+      state.yardSlots[p.slotId] = {
+        id: p.slotId,
+        blockId: p.blockId,
+        bay: p.bay,
+        row: p.row,
+        tier: p.tier,
+        span: p.span,
+        containerId: p.containerId,
+      }
+      for (let k = 0; k < p.span; k++) {
+        const i = (p.bay + k - 1) * blk.rows + (p.row - 1)
+        blk.heights[i] = Math.max(blk.heights[i], p.tier)
+        blk.topVessels[i] = p.vesselId
+      }
+    }
   }
   return state
 }

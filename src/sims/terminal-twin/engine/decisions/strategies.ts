@@ -9,6 +9,7 @@
  */
 import { balancedAscDispatch, watersideFirstDispatch } from './ascStrategies'
 import { groupByVesselSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
+import { justInTimeRelease, keepKAheadRelease } from './workPackageStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
 import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchPad, ShcDispatchRequest } from './types'
 
@@ -73,6 +74,7 @@ export const strategies: StrategyRegistry = {
         description: 'Oldest open job first (FIFO by grounding time); first free WTP pad.',
         handler: (msg) => {
           const job = [...msg.payload.jobs].sort((a, b) => a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1))[0]
+          if (job?.kind === 'load') return { jobId: job.jobId, wtpPadId: job.padId ?? null }
           const pad = job ? firstFreePad(msg.payload) : null
           return job && pad ? { jobId: job.jobId, wtpPadId: pad } : { jobId: null, wtpPadId: null }
         },
@@ -83,6 +85,7 @@ export const strategies: StrategyRegistry = {
           const job = [...msg.payload.jobs].sort(
             (a, b) => a.distanceM - b.distanceM || a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1),
           )[0]
+          if (job?.kind === 'load') return { jobId: job.jobId, wtpPadId: job.padId ?? null }
           const pad = job ? nearestFreePad(msg.payload, job.x, job.z) : null
           return job && pad ? { jobId: job.jobId, wtpPadId: pad } : { jobId: null, wtpPadId: null }
         },
@@ -117,6 +120,19 @@ export const strategies: StrategyRegistry = {
       balanced: {
         description: 'The serviceable idle ASC with the fewest jobs so far (ties: nearest the pad), stepping the other aside if needed.',
         handler: (msg) => balancedAscDispatch(msg.payload),
+      },
+    },
+  },
+  workPackageRelease: {
+    default: 'keep-k-ahead',
+    strategies: {
+      'keep-k-ahead': {
+        description: 'Keeps k packages released ahead of the one the crane is working (default k = 2).',
+        handler: (msg) => keepKAheadRelease(msg.payload),
+      },
+      'just-in-time': {
+        description: 'Releases the next package only when the crane has no released package left (no look-ahead for the yard).',
+        handler: (msg) => justInTimeRelease(msg.payload),
       },
     },
   },
@@ -164,4 +180,5 @@ export const defaultHandlers: HandlerSet = {
   ascDispatch: getStrategy('ascDispatch', strategies.ascDispatch.default),
   berthAllocation: getStrategy('berthAllocation', strategies.berthAllocation.default),
   craneSplit: getStrategy('craneSplit', strategies.craneSplit.default),
+  workPackageRelease: getStrategy('workPackageRelease', strategies.workPackageRelease.default),
 }

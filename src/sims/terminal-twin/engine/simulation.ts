@@ -19,15 +19,17 @@ import { createInitialState, resolveSubsystemModes, type CustodyRef, type SimSta
 import { ascReactors } from './subsystems/asc'
 import { berthReactors } from './subsystems/berth'
 import { quayReactors } from './subsystems/quay'
+import { loadPrepReactors } from './subsystems/loadPrep'
+import { workPackageReactors } from './subsystems/workPackages'
 import { shcReactors } from './subsystems/shc'
 import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.4.0'
+export const ENGINE_VERSION = '0.5.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
-const REACTORS: ReactorMap[] = [berthReactors, quayReactors, shcReactors, ascReactors]
+const REACTORS: ReactorMap[] = [berthReactors, workPackageReactors, quayReactors, loadPrepReactors, shcReactors, ascReactors]
 
 export interface SimulationOptions {
   /** Overrides `config.seed`. */
@@ -167,8 +169,11 @@ export function createSimulation(
     scheduleFrom: (causedBy, type, at, subjects, payload) => schedule(makeEvent(type, at, causedBy, subjects, payload) as EngineEvent),
   })
   const reactorMaps: ReactorMap[] = [decisions.reactors, ...REACTORS]
-  const vesselBoxes = Object.fromEntries(Object.values(state.vessels).map((v) => [v.id, v.remainingDischarge]))
-  const newCollector = () => createKpiCollector(config, { vesselBoxes, containerSize: (id) => state.containers[id].size })
+  const vesselBoxes = Object.fromEntries(Object.values(state.vessels).map((v) => [v.id, v.remainingDischarge + v.remainingLoad]))
+  const initialCells: Record<string, number> = {}
+  for (const s of Object.values(state.yardSlots)) initialCells[s.blockId] = (initialCells[s.blockId] ?? 0) + s.span
+  const newCollector = () =>
+    createKpiCollector(config, { vesselBoxes, containerSize: (id) => state.containers[id].size, initialCells })
   let collector = newCollector()
   if (options.log) listeners.add({ fn: createEventLogger(options.log) })
 

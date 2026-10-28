@@ -87,7 +87,10 @@ export function createEngineHost() {
       if (last && last.eventId === ev.id) {
         const change: CustodyChange = { containerId: id, t: last.t, owner: { ...last.owner }, eventId: last.eventId }
         if (last.owner.kind === 'groundPosition') {
-          change.x = ev.type === 'StsGrounded' ? ev.payload.x : sim.query.sts(sim.query.groundPosition(last.owner.id).stsId).gantryX
+          change.x =
+            ev.type === 'StsGrounded' || ev.type === 'ShcDroppedAtGround'
+              ? ev.payload.x
+              : sim.query.sts(sim.query.groundPosition(last.owner.id).stsId).gantryX
         }
         if (last.owner.kind === 'sts' && ev.type === 'StsPicked' && ev.payload.twin) {
           change.dx = id === ev.payload.twin.containerId ? HALF_OFFSET_M : -HALF_OFFSET_M

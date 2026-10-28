@@ -22,6 +22,20 @@ export interface TimelinePackage extends TimelineWindow {
   open: boolean
 }
 
+/** One work package (TT-10): released by the TOS, worked by one STS. `startS` = start of work (now while only released). */
+export interface TimelineWorkPackage extends TimelineWindow {
+  packageId: string
+  stsId: string
+  kind: 'discharge' | 'load'
+  section: 'deck' | 'hold'
+  bay: number
+  moves: number
+  releasedAt: number
+  /** Work not started yet (released, waiting behind other packages). */
+  waiting: boolean
+  open: boolean
+}
+
 export interface VesselTimelineRow {
   vesselId: string
   arrivedAt: number | null
@@ -41,6 +55,8 @@ export interface VesselTimelineRow {
   /** Berth allocation until departure: the quay stretch is taken. */
   berth: TimelineWindow
   packages: TimelinePackage[]
+  /** Work packages in release order; the window runs from the start of work to completion. */
+  workPackages: TimelineWorkPackage[]
 }
 
 export interface TimelineReport {
@@ -67,6 +83,7 @@ export function buildTimeline(events: readonly EngineEvent[], now: number): Time
         unmooring: { startS: 0, endS: 0 },
         berth: { startS: 0, endS: 0 },
         packages: [],
+        workPackages: [],
       }
       rows.set(id, r)
     }
@@ -107,6 +124,37 @@ export function buildTimeline(events: readonly EngineEvent[], now: number): Time
           }
         }
         break
+      case 'WorkPackageReleased':
+        row(e.payload.vesselId).workPackages.push({
+          packageId: e.payload.packageId,
+          stsId: e.payload.stsId,
+          kind: e.payload.kind,
+          section: e.payload.section,
+          bay: e.payload.bay,
+          moves: e.payload.moves,
+          releasedAt: e.t,
+          startS: now,
+          endS: now,
+          waiting: true,
+          open: true,
+        })
+        break
+      case 'WorkPackageStarted': {
+        const wp = row(e.payload.vesselId).workPackages.find((p) => p.packageId === e.payload.packageId)
+        if (wp) {
+          wp.startS = e.t
+          wp.waiting = false
+        }
+        break
+      }
+      case 'WorkPackageCompleted': {
+        const wp = row(e.payload.vesselId).workPackages.find((p) => p.packageId === e.payload.packageId)
+        if (wp) {
+          wp.endS = e.t
+          wp.open = false
+        }
+        break
+      }
       case 'StsWorkComplete': {
         const open = row(e.payload.vesselId).packages.find((p) => p.open && p.stsId === e.payload.stsId)
         if (open) {

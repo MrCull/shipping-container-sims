@@ -3,10 +3,10 @@
   "seed": 1,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "0e0ac846245e92",
+  "eventLogHash": "10c9cc40f251ef",
   "kpis": {
     "simTimeS": 3364.614,
-    "eventsProcessed": 297,
+    "eventsProcessed": 455,
     "movesCompleted": 60,
     "vesselsCompleted": 1,
     "sts": {
@@ -127,12 +127,41 @@
           "max": 0
         },
         "equipmentIdleS": 0
+      },
+      "workPackageRelease": {
+        "handler": "strategy:keep-k-ahead",
+        "calls": 34,
+        "resolved": 34,
+        "ok": 34,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 4,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
       }
+    },
+    "workPackages": {
+      "released": 30,
+      "started": 30,
+      "completed": 30,
+      "leadTimeMeanS": 377.988,
+      "leadTimeMaxS": 798.899,
+      "boxesLoaded": 0
     }
   },
   "invariants": {
     "enabled": true,
-    "checks": 296,
+    "checks": 454,
     "violations": 0,
     "first": null
   },

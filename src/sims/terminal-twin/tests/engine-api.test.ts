@@ -81,7 +81,7 @@ describe('causality', () => {
     expect(chain[0]).toBe(lastGrounded)
     expect(chain.at(-1)?.type).toBe('ScenarioStarted')
     for (let i = 0; i < chain.length - 1; i++) expect(chain[i].causedBy).toBe(chain[i + 1].id)
-    // root → arrival → berth allocation → berthed → crane split → (move started → picked → ground-position decision → grounded) × 10
+    // root → arrival → berth allocation → berthed → crane split → work-package release → (move started → picked → ground-position decision → grounded) × 10
     expect(chain.map((e) => e.type)).toEqual([
       ...Array.from({ length: 10 }, () => [
         'StsGrounded',
@@ -90,6 +90,8 @@ describe('causality', () => {
         'StsPicked',
         'StsMoveStarted',
       ]).flat(),
+      'DecisionResolved', // workPackageRelease: the crane starts once its first package is released
+      'DecisionRequested',
       'DecisionResolved', // craneSplit
       'DecisionRequested',
       'VesselBerthed',
