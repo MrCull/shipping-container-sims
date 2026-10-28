@@ -12,6 +12,10 @@ Another session may have pushed while you were stopped. Two sessions once built 
 4. Tell every agent you resume or start to do the same: fetch the branch, read this file's diff and the new commits, and merge the tip before carrying on.
 5. Claim a ticket before you start it: put your session in the Claimed by column, commit and push this file. Skip tickets another session has claimed or merged.
 
+## Known engine bug (open)
+
+Small preset at 50% fill (and a few other seeds/layouts) deadlocks: both ASCs of a twin block sit idle with retrieve/rehandle jobs open, `planJob` returns null and `resolveDispatch` does not retry. Repro is in the sim guide (TT-15 section). Presets use 30% fill for Small. Owner: TT-08/TT-12 code (`engine/subsystems/asc.ts`). Fix in the review pass if not earlier.
+
 ## Where things are
 
 - **Spec:** MrCull/shipping-container-sims#24. **Tickets:** #25–#52 (each has `## Blocked by`).
@@ -21,17 +25,17 @@ Another session may have pushed while you were stopped. Two sessions once built 
 
 ## Ticket status
 
-Updated 2026-10-28. Merged: #25–#47. Remaining: #48–#52, then the code-review pass. Open tickets are not yet commented or closed on GitHub; resolve them (comment, then close) when PR #54 is marked ready.
+Updated 2026-10-28. Merged: #25–#48. Remaining: #49–#52, then the code-review pass. Open tickets are not yet commented or closed on GitHub; resolve them (comment, then close) when PR #54 is marked ready.
 
 | Ticket | Issue | State | Claimed by |
 |---|---|---|---|
 | TT-13 landside | #45 | MERGED | |
 | TT-14 yard start modes | #46 | MERGED | |
 | TT-26 truck/chassis models | #47 | MERGED | |
-| TT-15 presets/layout | #48 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
-| TT-17 persistence | #49 | blocked by 48 | |
-| TT-19 performance | #50 | blocked by 48 | |
-| TT-21 atmosphere/polish | #51 | blocked by 48 | |
+| TT-15 presets/layout | #48 | MERGED | |
+| TT-17 persistence | #49 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
+| TT-19 performance | #50 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
+| TT-21 atmosphere/polish | #51 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
 | TT-28 infrastructure models | #52 | blocked by 45, 51 | |
 
 Obsolete: the first session's worktrees under `.claude/worktrees/agent-*` (local to its container; its tickets were merged or redone as `-v2` branches). Remove them at the end with `git worktree remove --force`.
