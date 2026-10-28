@@ -9,11 +9,12 @@
 import { defineStore } from 'pinia'
 import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
-import { applyOverrides, type ScenarioOverrides } from '../scenario/overrides'
+import { type ScenarioOverrides } from '../scenario/overrides'
+import { composeScenario } from '../scenario/compose'
 import { presets } from '../scenario/presets'
-import { withShcFleet, withYard, type YardSetup } from '../scenario/builder'
+import type { YardSetup } from '../scenario/builder'
 import type { DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
-import { EXPORT_FILES, type EngineEvent, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport } from '../engine'
+import { EXPORT_FILES, ScenarioValidationError, validateScenario, type EngineEvent, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport } from '../engine'
 import type { BreakpointHit, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { describeEntity, entityKind, entityQueryKind, type EntityView } from '../modules/entityInspector'
@@ -359,15 +360,17 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   async function startScenario(next: ScenarioChoice, options: { autoplay?: boolean } = {}): Promise<void> {
-    const base = applyOverrides(resolveScenario(next.name), next.overrides ?? {})
-    let runConfig = runConfigFor(base, next.startDateTime, display.value)
-    if (next.shc && (base.shcs?.length ?? 0) > 0) runConfig = withShcFleet(runConfig, next.shc.count, next.shc.kinematics)
-    if (next.yard && (base.yard?.blocks.length ?? 0) > 0) runConfig = withYard(runConfig, next.yard)
-    if (next.endConditions) runConfig = { ...runConfig, endConditions: { ...next.endConditions } }
+    const base = composeScenario(resolveScenario(next.name), next)
+    const runConfig = runConfigFor(base, next.startDateTime, display.value)
     choice.value = { ...next }
     loading.value = true
     try {
-      await run(() => ctl().load(runConfig, next.seed))
+      await run(async () => {
+        // impossible configurations never reach the engine
+        const { errors } = validateScenario(runConfig)
+        if (errors.length > 0) throw new ScenarioValidationError(errors)
+        return ctl().load(runConfig, next.seed)
+      })
       config.value = markRaw(runConfig)
       recentEvents.value = markRaw([])
       resetKpis()

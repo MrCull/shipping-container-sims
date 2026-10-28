@@ -4,9 +4,12 @@
  * warnings for the dialog (the engine still validates on start).
  */
 import type { MessageKey, MessageParams } from '../i18n/messages'
-import type { ScenarioConfig, StsConfig, VesselConfig } from './types'
+import type { DecisionsConfig } from '../engine/decisions/types'
+import type { ScenarioConfig, StsConfig, StsKinematics, VesselConfig } from './types'
 import { DEFAULT_TRANSSHIPMENT } from './dwell'
 import { cellCapacity, vesselClass } from './vesselClasses'
+import { SCALE_LIMITS } from './limits'
+import { deriveSts } from './layout'
 
 export interface ScenarioOverrides {
   quayLengthM?: number
@@ -16,20 +19,28 @@ export interface ScenarioOverrides {
   dwellMedianS?: number
   /** Empty pool at start: box count and the longest age (s) (TT-11). */
   emptyPool?: { count: number; maxAgeS?: number }
+  /** STS kinematics (TT-15 kinematics editor). */
+  stsKinematics?: StsKinematics
+  /** ± % random variation of each STS move (0 = none). */
+  moveVariationPct?: number
+  /** ± % random variation of each SHC trip (driver variability). */
+  driverVariabilityPct?: number
+  /** Peak trucks per hour: scales the scenario's hourly profile so its maximum is this (needs a landside). */
+  peakTrucksPerHour?: number
+  /** Gate lanes (needs a landside). */
+  gate?: { inLanes: number; outLanes: number }
+  /** Decision points: async mode, strategy per point and latency injection; replaces the scenario's. */
+  decisions?: DecisionsConfig
+  /** Derive the STS and block positions from the counts and the quay length (presets); fixtures keep their layout. */
+  derive?: boolean
 }
 
 /** Spec scale limits. */
-export const LIMITS = { quayLengthM: { min: 100, max: 3000 }, sts: { min: 1, max: 24 }, vessels: 60 } as const
+export const LIMITS = SCALE_LIMITS
 
 /** STS cranes spread evenly along the quay (rail order), keeping the first crane's ground positions. */
 export function spreadSts(config: ScenarioConfig, count: number, lengthM: number): StsConfig[] {
-  const groundPositions = config.sts[0]?.groundPositions ?? 3
-  const pitch = lengthM / count
-  return Array.from({ length: count }, (_, i) => ({
-    id: `STS${String(i + 1).padStart(2, '0')}`,
-    gantryX: Math.round((i + 0.5) * pitch * 10) / 10,
-    groundPositions,
-  }))
+  return deriveSts(config, count, lengthM)
 }
 
 export function applyOverrides(base: ScenarioConfig, o: ScenarioOverrides): ScenarioConfig {
@@ -37,7 +48,18 @@ export function applyOverrides(base: ScenarioConfig, o: ScenarioOverrides): Scen
   if (o.quayLengthM !== undefined) config.quay.lengthM = o.quayLengthM
   const stsCount = o.stsCount ?? config.sts.length
   const outOfQuay = config.sts.some((s) => s.gantryX > config.quay.lengthM)
-  if (stsCount !== config.sts.length || outOfQuay) config.sts = spreadSts(config, stsCount, config.quay.lengthM)
+  const quayMoved = o.derive === true && config.quay.lengthM !== base.quay.lengthM
+  if (stsCount !== config.sts.length || outOfQuay || quayMoved) config.sts = spreadSts(config, stsCount, config.quay.lengthM)
+  if (o.stsKinematics) config.kinematics.sts = JSON.parse(JSON.stringify(o.stsKinematics))
+  if (o.moveVariationPct !== undefined) config.moveVariationPct = o.moveVariationPct
+  if (o.driverVariabilityPct !== undefined) config.driverVariabilityPct = o.driverVariabilityPct
+  if (config.landside) {
+    const peak = Math.max(0, ...config.landside.hourlyProfile)
+    if (o.peakTrucksPerHour !== undefined && peak > 0)
+      config.landside.hourlyProfile = config.landside.hourlyProfile.map((n) => Math.round((n * o.peakTrucksPerHour!) / peak))
+    if (o.gate) config.landside.gate = { ...config.landside.gate, ...o.gate }
+  }
+  if (o.decisions) config.decisions = JSON.parse(JSON.stringify(o.decisions))
   if (o.vessels) config.vessels = JSON.parse(JSON.stringify(o.vessels))
   if (o.dwellMedianS !== undefined) {
     const current = (base.transshipment ?? DEFAULT_TRANSSHIPMENT).dwell

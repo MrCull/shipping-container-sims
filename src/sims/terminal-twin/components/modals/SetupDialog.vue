@@ -4,18 +4,25 @@ import { randomSeed, resolveScenario, scenarioCatalogue, useTwinStore } from '..
 import { fromLocalInputValue, toLocalInputValue } from '../../modules/time'
 import { t } from '../../i18n/messages'
 import { browserDisplayDefaults } from '../../i18n/display'
-import { travelTime, type AxisProfile } from '../../engine'
-import { DEFAULT_ASC_KINEMATICS, DEFAULT_SHC_KINEMATICS, type YardSetup } from '../../scenario/builder'
-import { applyOverrides, LIMITS, validateOverrides, type OverrideCheck, type ScenarioOverrides } from '../../scenario/overrides'
-import { DEFAULT_WARM_UP_S, DEFAULT_YARD_TARGET_PCT, type AscKinematics, type ShcKinematics, type UnitSystem, type VesselConfig, type YardStartMode } from '../../scenario/types'
+import { ascNominalCycle, profileValid, shcNominalCycle, stsCycleGeometry, stsNominalCycle, validateScenario, type AxisProfile, type DecisionsConfig, type ScenarioCheck } from '../../engine'
+import { DEFAULT_ASC_KINEMATICS, DEFAULT_SHC_KINEMATICS, DEFAULT_STS_KINEMATICS, type YardSetup } from '../../scenario/builder'
+import { composeScenario, type ScenarioEdits } from '../../scenario/compose'
+import { applyOverrides } from '../../scenario/overrides'
+import { peakTrucksPerHour } from '../../scenario/validate'
+import { SCALE_LIMITS } from '../../scenario/limits'
+import { LIMITS, type ScenarioOverrides } from '../../scenario/overrides'
+import { TTI_DERIVED_BAYS_PRESETS } from '../../scenario/presets'
+import { DEFAULT_WARM_UP_S, DEFAULT_YARD_TARGET_PCT, type AscKinematics, type ScenarioConfig, type ShcKinematics, type StsKinematics, type UnitSystem, type VesselConfig, type YardStartMode } from '../../scenario/types'
 import { DEFAULT_TRANSSHIPMENT } from '../../scenario/dwell'
 import VesselTable from '../setup/VesselTable.vue'
+import PlanPreview from '../setup/PlanPreview.vue'
+import DecisionSettings from '../setup/DecisionSettings.vue'
 import { endConditionsFromFields, endFieldsOf, type EndFields } from '../../modules/endConditions'
 
-/** Spec scale limit for the SHC fleet. */
-const MAX_SHC = 120
+/** Spec scale limits (`scenario/limits.ts`): the engine enforces the same ones. */
+const MAX_SHC = SCALE_LIMITS.shc.max
 /** Yard limits: blocks, 20 ft bays, tiers, and pads/stalls (which must fit the 25.4 m ASC span at 5.5 m pitch). */
-const YARD_LIMITS = { blocks: 8, bays: 60, tiers: 8, pads: 5, stalls: 5 }
+const YARD_LIMITS = { blocks: SCALE_LIMITS.blocks.max, bays: SCALE_LIMITS.bays.max, tiers: SCALE_LIMITS.tiers.max, pads: SCALE_LIMITS.pads, stalls: SCALE_LIMITS.stalls }
 
 const store = useTwinStore()
 const catalogue = scenarioCatalogue()
@@ -63,6 +70,14 @@ const vessels = ref<VesselConfig[]>([])
 const dwellMedianH = ref(48)
 const poolCount = ref(0)
 const poolAgeDays = ref(7)
+// STS kinematics, variation, landside and decision points (TT-15).
+const stsK = ref<StsKinematics>(JSON.parse(JSON.stringify(DEFAULT_STS_KINEMATICS)))
+const moveVariationPct = ref(0)
+const driverVariabilityPct = ref(0)
+const peakTrucks = ref(0)
+const gateIn = ref(0)
+const gateOut = ref(0)
+const decisions = ref<DecisionsConfig>({})
 
 function loadDraft(scenario: string, overrides: ScenarioOverrides = {}): void {
   try {
@@ -75,6 +90,13 @@ function loadDraft(scenario: string, overrides: ScenarioOverrides = {}): void {
     dwellMedianH.value = Math.round((medianS / 3600) * 10) / 10
     poolCount.value = config.emptyPool?.count ?? 0
     poolAgeDays.value = (config.emptyPool?.maxAgeS ?? 7 * 86400) / 86400
+    stsK.value = JSON.parse(JSON.stringify(config.kinematics.sts))
+    moveVariationPct.value = config.moveVariationPct
+    driverVariabilityPct.value = config.driverVariabilityPct ?? 0
+    peakTrucks.value = peakTrucksPerHour(config)
+    gateIn.value = config.landside?.gate.inLanes ?? 0
+    gateOut.value = config.landside?.gate.outLanes ?? 0
+    decisions.value = JSON.parse(JSON.stringify(config.decisions ?? {}))
   } catch {
     vessels.value = []
   }
@@ -97,28 +119,56 @@ watch(name, () => {
 const endEdited = computed(() => (Object.keys(endFields.value) as (keyof EndFields)[]).some((k) => String(endFields.value[k] ?? '') !== scenarioEnd.value[k]))
 
 const startDate = computed(() => fromLocalInputValue(start.value))
+/** Presets derive their layout (STS and block positions) from the counts; fixtures keep their hand-placed one. */
+const isPreset = computed(() => selected.value?.kind === 'preset')
 const overrides = computed<ScenarioOverrides>(() => ({
   quayLengthM: quayLengthM.value,
   stsCount: stsCount.value,
   vessels: vessels.value,
   dwellMedianS: Math.round(dwellMedianH.value * 3600),
   emptyPool: { count: poolCount.value, maxAgeS: Math.round(poolAgeDays.value * 86400) },
+  stsKinematics: stsK.value,
+  moveVariationPct: moveVariationPct.value,
+  driverVariabilityPct: driverVariabilityPct.value,
+  ...(scenarioHasLandside.value
+    ? { peakTrucksPerHour: peakTrucks.value, gate: { inLanes: gateIn.value, outLanes: gateOut.value } }
+    : {}),
+  decisions: decisions.value,
+  derive: isPreset.value,
 }))
-/** The scenario as it would start (selected fixture/preset + the edits above). */
-const draftConfig = computed(() => {
+function yardStartConfig(): NonNullable<YardSetup['start']> {
+  return startMode.value === 'prefilled'
+    ? { mode: 'prefilled', targetPct: startTargetPct.value }
+    : startMode.value === 'warmup'
+      ? { mode: 'warmup', warmUpS: Math.round(startWarmUpH.value * 3600) }
+      : { mode: 'empty' }
+}
+/** Everything the dialog edits, in the shape the store starts the run with. */
+const edits = computed<ScenarioEdits>(() => ({
+  overrides: copy(overrides.value),
+  shc: scenarioShcs.value > 0 ? { count: shcCount.value, kinematics: copy(shcK.value) } : undefined,
+  yard:
+    scenarioBlocks.value > 0
+      ? { blocks: copy(yardBlocks.value), asc: copy(ascK.value), ascsPerBlock: ascsPerBlock.value, start: yardStartConfig() }
+      : undefined,
+}))
+/** The scenario as it would start (selected fixture/preset + the edits above): what the plan previews and the checks validate. */
+const draftConfig = computed<ScenarioConfig | null>(() => {
   try {
-    return applyOverrides(resolveScenario(name.value), overrides.value)
+    return composeScenario(resolveScenario(name.value), edits.value)
   } catch {
     return null
   }
 })
-const check = computed<OverrideCheck>(() => {
+const check = computed<ScenarioCheck>(() => {
   try {
-    return validateOverrides(applyOverrides(resolveScenario(name.value), overrides.value))
+    return validateScenario(composeScenario(resolveScenario(name.value), edits.value))
   } catch (err) {
     return { errors: [{ key: 'setup.check.invalid', params: { message: err instanceof Error ? err.message : String(err) } }], warnings: [] }
   }
 })
+/** The preset's bay count comes from a published capacity, not a layout drawing: say so. */
+const derivedBaysNote = computed(() => TTI_DERIVED_BAYS_PRESETS.includes(name.value))
 
 /** Key figures of the scenario as edited, in the chosen units (the config itself stays SI). */
 const summary = computed(() => {
@@ -210,13 +260,27 @@ function loadYardDefaults(): void {
     }))
   ascK.value = copy(previous?.asc ?? base?.kinematics.asc ?? DEFAULT_ASC_KINEMATICS)
   ascsPerBlock.value = previous?.ascsPerBlock ?? 2
-  startMode.value = previous?.start?.mode ?? 'prefilled'
-  startTargetPct.value = previous?.start?.targetPct ?? DEFAULT_YARD_TARGET_PCT
-  startWarmUpH.value = (previous?.start?.warmUpS ?? DEFAULT_WARM_UP_S) / 3600
+  // a preset chooses its own start mode; the dialog's default is pre-filled
+  startMode.value = previous?.start?.mode ?? base?.yardStart?.mode ?? 'prefilled'
+  startTargetPct.value = previous?.start?.targetPct ?? base?.yardStart?.targetPct ?? DEFAULT_YARD_TARGET_PCT
+  startWarmUpH.value = (previous?.start?.warmUpS ?? base?.yardStart?.warmUpS ?? DEFAULT_WARM_UP_S) / 3600
   if (startMode.value !== 'prefilled' && !scenarioHasLandside.value) startMode.value = 'prefilled'
 }
 loadYardDefaults()
 watch(name, loadYardDefaults)
+
+/** The uniform "all blocks" row: sets one field of every block (the per-block rows below stay editable). */
+const ALL_BLOCK_FIELDS = [
+  { key: 'bays', label: 'setup.yard.bays', min: 1, max: YARD_LIMITS.bays },
+  { key: 'tiers', label: 'setup.yard.tiers', min: 1, max: YARD_LIMITS.tiers },
+  { key: 'wtpPads', label: 'setup.yard.wtpPads', min: 1, max: YARD_LIMITS.pads },
+  { key: 'transferStalls', label: 'setup.yard.stalls', min: 0, max: YARD_LIMITS.stalls },
+] as const
+function setAllBlocks(key: keyof BlockDraft, raw: string): void {
+  const n = Number(raw)
+  if (raw === '' || !Number.isFinite(n)) return
+  for (const b of yardBlocks.value) b[key] = n
+}
 
 function setBlockCount(raw: string): void {
   const n = Math.floor(Number(raw))
@@ -250,14 +314,13 @@ function setProfile(profile: ProfileKey, key: keyof AxisProfile, factor: number,
 /** Derived readout: a nominal 300 m empty + 300 m loaded trip with lock, lift, lower and unlock. */
 const nominalTrip = computed(() => {
   const k = shcK.value
-  const valid = [k.driveEmpty, k.driveLoaded, k.lift].every((p) => p.vMax > 0 && p.accel > 0 && p.decel > 0)
+  const valid = [k.driveEmpty, k.driveLoaded, k.lift].every(profileValid)
   if (!valid || !(k.lockS >= 0) || !(k.unlockS >= 0)) return null
-  const seconds =
-    travelTime(300, k.driveEmpty) + travelTime(300, k.driveLoaded) + 2 * travelTime(k.liftHeightM, k.lift) + k.lockS + k.unlockS
+  const { cycleS, perHour } = shcNominalCycle(k, 300)
   return t('setup.shc.readout', {
     distance: store.fmt.length(300),
-    seconds: store.fmt.number(seconds, 0),
-    trips: store.fmt.number(3600 / seconds, 1),
+    seconds: store.fmt.number(cycleS, 0),
+    trips: store.fmt.number(perHour, 1),
   })
 })
 
@@ -276,20 +339,35 @@ const yardValid = computed(() => ascK.value.gantry.vMax > 0 && ascK.value.trolle
 const yardReadout = computed(() => {
   const k = ascK.value
   if (!yardValid.value || !(k.lockS >= 0) || !(k.unlockS >= 0)) return null
-  const lift = 8.7
-  const seconds =
-    2 * Math.max(travelTime(40, k.gantry), travelTime(12, k.trolley)) +
-    2 * travelTime(lift, k.hoistEmpty) +
-    2 * travelTime(lift, k.hoistLoaded) +
-    k.lockS +
-    k.unlockS
+  const { cycleS, perHour } = ascNominalCycle(k, 40, 12, 8.7)
   const capacity = yardBlocks.value.reduce((n, b) => n + b.bays * 8 * b.tiers, 0)
   return t('setup.yard.readout', {
     capacity: store.fmt.number(capacity, 0),
     distance: store.fmt.length(40),
-    seconds: store.fmt.number(seconds, 0),
-    cycles: store.fmt.number(3600 / seconds, 1),
+    seconds: store.fmt.number(cycleS, 0),
+    cycles: store.fmt.number(perHour, 1),
   })
+})
+
+// ── STS kinematics (TT-15): speeds in display units, kept in SI; the cycle is derived live. ──
+type StsAxisKey = 'gantry' | 'trolley' | 'hoistLoaded' | 'hoistEmpty'
+const stsFields = computed(() => [
+  { id: 'sts-v-gantry', label: t('setup.sts.gantrySpeed', { unit: speedUnit.value }), axis: 'gantry' as StsAxisKey },
+  { id: 'sts-v-trolley', label: t('setup.sts.trolleySpeed', { unit: speedUnit.value }), axis: 'trolley' as StsAxisKey },
+  { id: 'sts-v-hoist-loaded', label: t('setup.sts.hoistLoadedSpeed', { unit: speedUnit.value }), axis: 'hoistLoaded' as StsAxisKey },
+  { id: 'sts-v-hoist-empty', label: t('setup.sts.hoistEmptySpeed', { unit: speedUnit.value }), axis: 'hoistEmpty' as StsAxisKey },
+])
+function setStsSpeed(axis: StsAxisKey, raw: string): void {
+  stsK.value[axis].vMax = Number(raw) / speedFactor.value
+}
+const stsValid = computed(() => [stsK.value.gantry, stsK.value.trolley, stsK.value.hoistLoaded, stsK.value.hoistEmpty].every(profileValid))
+/** Derived readout: the nominal discharge cycle of one crane and the moves per hour it implies. */
+const stsReadout = computed(() => {
+  const k = stsK.value
+  const config = draftConfig.value
+  if (!config || !stsValid.value || !(k.lockS >= 0) || !(k.unlockS >= 0)) return null
+  const { cycleS, perHour } = stsNominalCycle(k, config.layout.stsSafeHoistM, stsCycleGeometry(config))
+  return t('setup.sts.readout', { seconds: store.fmt.number(cycleS, 0), moves: store.fmt.number(perHour, 1) })
 })
 
 function reroll(): void {
@@ -308,6 +386,10 @@ async function submit(): Promise<void> {
   }
   if (check.value.errors.length > 0) {
     formError.value = t(check.value.errors[0].key, check.value.errors[0].params)
+    return
+  }
+  if (!stsValid.value) {
+    formError.value = t('setup.sts.errorKinematics')
     return
   }
   if (scenarioShcs.value > 0 && (!Number.isInteger(shcCount.value) || shcCount.value < 1 || shcCount.value > MAX_SHC)) {
@@ -366,22 +448,9 @@ async function submit(): Promise<void> {
       name: name.value,
       seed: seed.value,
       startDateTime: startAt.toISOString(),
-      overrides: JSON.parse(JSON.stringify(overrides.value)),
-      shc: scenarioShcs.value > 0 ? { count: shcCount.value, kinematics: copy(shcK.value) } : undefined,
-      yard:
-        scenarioBlocks.value > 0
-          ? {
-              blocks: copy(yardBlocks.value),
-              asc: copy(ascK.value),
-              ascsPerBlock: ascsPerBlock.value,
-              start:
-                startMode.value === 'prefilled'
-                  ? { mode: 'prefilled', targetPct: startTargetPct.value }
-                  : startMode.value === 'warmup'
-                    ? { mode: 'warmup', warmUpS: Math.round(startWarmUpH.value * 3600) }
-                    : { mode: 'empty' },
-            }
-          : undefined,
+      overrides: edits.value.overrides,
+      shc: edits.value.shc,
+      yard: edits.value.yard,
     })
     .catch(() => {})
 }
@@ -426,8 +495,12 @@ async function submit(): Promise<void> {
         >
           {{ selected.description }}
         </p>
-        <p class="hint muted">
-          {{ t('setup.presetsSoon') }}
+        <p
+          v-if="derivedBaysNote"
+          class="hint"
+          data-testid="tt-bays-assumption"
+        >
+          {{ t('setup.preset.baysAssumption') }}
         </p>
         <dl
           v-if="summary.length"
@@ -505,6 +578,17 @@ async function submit(): Promise<void> {
           >
         </label>
       </div>
+
+      <fieldset class="field">
+        <legend>{{ t('setup.plan.title') }}</legend>
+        <PlanPreview :config="draftConfig" />
+        <p
+          v-if="isPreset"
+          class="hint"
+        >
+          {{ t('setup.plan.derived') }}
+        </p>
+      </fieldset>
 
       <fieldset class="field">
         <legend>{{ t('setup.vessels') }}</legend>
@@ -670,6 +754,129 @@ async function submit(): Promise<void> {
       </fieldset>
 
       <fieldset
+        class="field"
+        data-testid="tt-sts-kinematics"
+      >
+        <legend>{{ t('setup.sts.title') }}</legend>
+        <div class="grid">
+          <label
+            v-for="f in stsFields"
+            :key="f.id"
+            class="mini"
+          >
+            <span>{{ f.label }}</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              :name="f.id"
+              :value="round2(stsK[f.axis].vMax * speedFactor)"
+              @input="setStsSpeed(f.axis, ($event.target as HTMLInputElement).value)"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.sts.lockUnlock') }}</span>
+            <span class="pair">
+              <input
+                v-model.number="stsK.lockS"
+                type="number"
+                min="0"
+                step="any"
+                name="sts-lock"
+                :aria-label="t('setup.sts.lockTime')"
+              >
+              <input
+                v-model.number="stsK.unlockS"
+                type="number"
+                min="0"
+                step="any"
+                name="sts-unlock"
+                :aria-label="t('setup.sts.unlockTime')"
+              >
+            </span>
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.sts.variationPct') }}</span>
+            <input
+              v-model.number="moveVariationPct"
+              type="number"
+              min="0"
+              max="100"
+              step="any"
+              name="move-variation"
+              data-testid="tt-move-variation"
+            >
+          </label>
+          <label
+            v-if="scenarioShcs > 0"
+            class="mini"
+          >
+            <span>{{ t('setup.shc.driverVariabilityPct') }}</span>
+            <input
+              v-model.number="driverVariabilityPct"
+              type="number"
+              min="0"
+              max="100"
+              step="any"
+              name="driver-variability"
+              data-testid="tt-driver-variability"
+            >
+          </label>
+        </div>
+        <p
+          v-if="stsReadout"
+          class="hint"
+          data-testid="tt-sts-readout"
+        >
+          {{ stsReadout }}
+        </p>
+      </fieldset>
+
+      <fieldset
+        v-if="scenarioHasLandside"
+        class="field"
+        data-testid="tt-landside"
+      >
+        <legend>{{ t('setup.landside.title') }}</legend>
+        <div class="grid">
+          <label class="mini">
+            <span>{{ t('setup.landside.peakTrucks') }}</span>
+            <input
+              v-model.number="peakTrucks"
+              type="number"
+              min="0"
+              :max="SCALE_LIMITS.trucksPerHour"
+              step="1"
+              name="peak-trucks"
+              data-testid="tt-peak-trucks"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.landside.gateIn') }}</span>
+            <input
+              v-model.number="gateIn"
+              type="number"
+              min="1"
+              max="12"
+              step="1"
+              name="gate-in"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.landside.gateOut') }}</span>
+            <input
+              v-model.number="gateOut"
+              type="number"
+              min="1"
+              max="12"
+              step="1"
+              name="gate-out"
+            >
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset
         v-if="scenarioShcs > 0"
         class="field"
       >
@@ -752,56 +959,80 @@ async function submit(): Promise<void> {
           </label>
         </div>
         <div
-          v-for="(b, i) in yardBlocks"
-          :key="i"
           class="grid"
-          :data-testid="`tt-yard-block-${i + 1}`"
+          data-testid="tt-yard-all-blocks"
         >
-          <span class="blockname">{{ t('setup.yard.block', { n: i + 1 }) }}</span>
-          <label class="mini">
-            <span>{{ t('setup.yard.bays') }}</span>
+          <span class="blockname">{{ t('setup.yard.allBlocks') }}</span>
+          <label
+            v-for="f in ALL_BLOCK_FIELDS"
+            :key="f.key"
+            class="mini"
+          >
+            <span>{{ t(f.label) }}</span>
             <input
-              v-model.number="b.bays"
               type="number"
-              min="1"
-              :max="YARD_LIMITS.bays"
+              :min="f.min"
+              :max="f.max"
               step="1"
-              :name="`yard-bays-${i + 1}`"
+              :name="`yard-all-${f.key}`"
+              :value="yardBlocks[0]?.[f.key]"
+              @input="setAllBlocks(f.key, ($event.target as HTMLInputElement).value)"
             >
           </label>
-          <label class="mini">
-            <span>{{ t('setup.yard.tiers') }}</span>
-            <input
-              v-model.number="b.tiers"
-              type="number"
-              min="1"
-              :max="YARD_LIMITS.tiers"
-              step="1"
-              :name="`yard-tiers-${i + 1}`"
-            >
-          </label>
-          <label class="mini">
-            <span>{{ t('setup.yard.wtpPads') }}</span>
-            <input
-              v-model.number="b.wtpPads"
-              type="number"
-              min="1"
-              :max="YARD_LIMITS.pads"
-              step="1"
-              :name="`yard-pads-${i + 1}`"
-            >
-          </label>
-          <label class="mini">
-            <span>{{ t('setup.yard.stalls') }}</span>
-            <input
-              v-model.number="b.transferStalls"
-              type="number"
-              min="0"
-              :max="YARD_LIMITS.stalls"
-              step="1"
-              :name="`yard-stalls-${i + 1}`"
-            >
-          </label>
+        </div>
+        <div class="blocklist">
+          <div
+            v-for="(b, i) in yardBlocks"
+            :key="i"
+            class="grid"
+            :data-testid="`tt-yard-block-${i + 1}`"
+          >
+            <span class="blockname">{{ t('setup.yard.block', { n: i + 1 }) }}</span>
+            <label class="mini">
+              <span>{{ t('setup.yard.bays') }}</span>
+              <input
+                v-model.number="b.bays"
+                type="number"
+                min="1"
+                :max="YARD_LIMITS.bays"
+                step="1"
+                :name="`yard-bays-${i + 1}`"
+              >
+            </label>
+            <label class="mini">
+              <span>{{ t('setup.yard.tiers') }}</span>
+              <input
+                v-model.number="b.tiers"
+                type="number"
+                min="1"
+                :max="YARD_LIMITS.tiers"
+                step="1"
+                :name="`yard-tiers-${i + 1}`"
+              >
+            </label>
+            <label class="mini">
+              <span>{{ t('setup.yard.wtpPads') }}</span>
+              <input
+                v-model.number="b.wtpPads"
+                type="number"
+                min="1"
+                :max="YARD_LIMITS.pads"
+                step="1"
+                :name="`yard-pads-${i + 1}`"
+              >
+            </label>
+            <label class="mini">
+              <span>{{ t('setup.yard.stalls') }}</span>
+              <input
+                v-model.number="b.transferStalls"
+                type="number"
+                min="0"
+                :max="YARD_LIMITS.stalls"
+                step="1"
+                :name="`yard-stalls-${i + 1}`"
+              >
+            </label>
+          </div>
         </div>
         <div
           class="grid"
@@ -946,6 +1177,14 @@ async function submit(): Promise<void> {
         </p>
       </fieldset>
 
+      <fieldset class="field">
+        <legend>{{ t('setup.decisions.title') }}</legend>
+        <details data-testid="tt-decisions-details">
+          <summary>{{ t('setup.decisions.summary') }}</summary>
+          <DecisionSettings v-model="decisions" />
+        </details>
+      </fieldset>
+
       <p
         v-if="formError || store.error"
         class="error"
@@ -965,7 +1204,7 @@ async function submit(): Promise<void> {
         <button
           type="submit"
           class="btn primary"
-          :disabled="store.loading"
+          :disabled="store.loading || check.errors.length > 0"
         >
           {{ store.loading ? t('setup.starting') : t('setup.startButton') }}
         </button>
@@ -975,6 +1214,15 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
+.blocklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 14rem;
+  padding-right: 0.3rem;
+  overflow-y: auto;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

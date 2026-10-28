@@ -28,6 +28,7 @@ import { transshipmentReactors } from './subsystems/transshipment'
 import { shcReactors } from './subsystems/shc'
 import { landsideReactors } from './subsystems/landside'
 import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
+import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
 export const ENGINE_VERSION = '0.7.0'
@@ -46,6 +47,8 @@ export interface SimulationOptions {
     enabled?: boolean
     /** Stop the run at the first violation (default true). */
     failFast?: boolean
+    /** Check after every Nth event instead of every event (default 1); the event that ends the run is always checked. For long runs of big scenarios. */
+    every?: number
   }
   /**
    * Subsystem modes (override `config.subsystems`): real, instant (same
@@ -162,9 +165,12 @@ export function createSimulation(
   handlers: Partial<HandlerSet> = {},
   options: SimulationOptions = {},
 ): Simulation {
+  assertValidScenario(config)
   const seed = options.seed ?? config.seed
   const invariantsEnabled = options.invariants?.enabled ?? true
   const failFast = options.invariants?.failFast ?? true
+  const invariantEvery = Math.max(1, Math.floor(options.invariants?.every ?? 1))
+  let sinceInvariantCheck = 0
 
   let state = createInitialState(config, seed, resolveSubsystemModes(config, options.subsystems), handlers.yardAllocation)
   let log: EngineEvent[] = []
@@ -322,7 +328,9 @@ export function createSimulation(
       return ev
     }
     commit(ev)
-    if (invariantsEnabled) {
+    const endReason = endConditionMet()
+    if (invariantsEnabled && (++sinceInvariantCheck >= invariantEvery || endReason)) {
+      sinceInvariantCheck = 0
       invariants.checks++
       const violations = checkInvariants(state, config)
       for (const v of violations) {
@@ -339,8 +347,7 @@ export function createSimulation(
       }
       if (violations.length > 0 && failFast) return ev
     }
-    const reason = endConditionMet()
-    if (reason) endScenario(reason, ev.t, ev.id)
+    if (endReason) endScenario(endReason, ev.t, ev.id)
     return ev
   }
 

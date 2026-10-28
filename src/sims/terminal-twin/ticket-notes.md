@@ -465,3 +465,12 @@ Branch `tt/47-truck-models`. Guide: `terminal-twin-AGENTS.md` § "Truck models (
 - **Dev API:** `scene().landside {lods, assets}`, `sceneState().truckRigs`, viewer `setLoad(...)`, `stats().load`.
 - **Gotchas:** `tt:assets` GROUPS list in `cli/assets/build.ts` and `build.py` both need a new group. Meta JSON has no pos for `fifth_wheel` mesh (empty node, listed with role rig). A 20 ft box shifts the whole model 3.0675 m back so the box (at pose origin) sits on the front pins; the engine's stall geometry is unchanged. Procedural placeholder steering sign fixed (now +steerRad).
 - **Smoke:** `tests/browser/truck-model.smoke.ts`. `terminal-twin.smoke.ts` "x600 keeps animating" and the yard fps test are timing-sensitive and flaked under CPU load from parallel agents (tracer fixture, unrelated to trucks).
+
+### ticket-48 (TT-15): presets, layout derivation, validation
+
+Branch `tt/48-presets-validation`. Guide: `terminal-twin-AGENTS.md` § "Presets, layout and validation (TT-15)". Glossary: Presets and layout.
+
+- **APIs:** `validateScenario`, `ScenarioValidationError` (engine); `SCALE_LIMITS`/`STRESS_SCALE` (`scenario/limits.ts`); `composeScenario`; `planOf`; cycle-time functions; `invariants.every`.
+- **Gotchas:** `createSimulation` now throws for limit/frontage errors. Dialog Start is disabled while any error shows. Full TTI/Stress runs are slow (minutes without invariants); TT-19 should look at per-event cost on 28,800-cell yards.
+- **Open defect:** pre-filled yard deadlock (ASCs idle, `planJob` null) seen with Small automated at 50% fill; see the guide. Small preset uses 30%.
+- **Follow-ups:** persistence (TT-17) should store the new overrides; dialog tests for decisions are smoke-only.

@@ -353,6 +353,19 @@ External trucks bring boxes in and take them out. Terms (truck transaction, gate
 - **Tests:** `tests/yard-start.test.ts` (target %, stack invariants, booking, dwell and pickup, reproducibility, strategy, custom handler, warm-up reset, empty start completion, scene model), `tests/browser/terminal-twin-yard-start.smoke.ts` (the dialog).
 - **Not yet:** a 3D/KPI indicator while the warm-up runs (only `kpiReport().warmUp`), setup fields for the landside, pre-fill through the async handler path.
 
+## Presets, layout and validation (TT-15)
+
+- **Presets** (`scenario/presets.ts`): `TTI Algeciras baseline` (850 m, STS101-108, 16 blocks x 2 ASC x 8 rows x 45 bays x 5 tiers, 23 SHC, gate 3/3 + OOG, ~85% transshipment), `Small automated` (400 m, 3 STS, 6 blocks), `Stress test` (TTI layout, 5 vessels within 40 min, trucks x3). Each chooses its yard start mode (TTI 60%, Small 30%, Stress 75% pre-filled). `TTI_BAYS` = round(28,647 / (16 x 8 x 5)) = 45 is an assumption; the dialog says so (`TTI_DERIVED_BAYS_PRESETS`). Vessel counts and `movesScale` are small so runs finish.
+- **Layout derivation** (`scenario/layout.ts`): `deriveBlockXs`, `deriveSts`, `relayoutBlocks`; blocks centred on the quay at min(40 m, quay/blocks) pitch. Presets derive (`ScenarioOverrides.derive`), fixtures keep their hand-placed layout.
+- **Compose** (`scenario/compose.ts` `composeScenario`): fixture/preset + dialog edits, used by both the dialog (preview and checks) and `store.startScenario`, so what is previewed is what runs. New overrides: `stsKinematics moveVariationPct driverVariabilityPct peakTrucksPerHour gate decisions derive`.
+- **Validation** (`scenario/validate.ts`, exported from `engine`): `validateScenario(config)` -> `{errors, warnings}` of catalogue keys. Errors: scale limits (`scenario/limits.ts` `SCALE_LIMITS`: quay 3 km, 24 STS, 40 blocks, 80 bays, 6 tiers, 120 SHC, 60 vessels, 600 trucks/h), block frontage (32 m per block: "16 blocks need 512 m of frontage; the quay is 400 m"), empty/warm-up start without landside, plus the older vessel-table checks. Warnings: vessel longer than the quay, above `STRESS_SCALE`. `createSimulation` throws `ScenarioValidationError` for the limit, frontage and start-mode errors only (`ENGINE_ERROR_KEYS`); the dialog disables Start for any error.
+- **Plan preview:** `modules/planModel.ts` `planOf(config)` (pure, from `blockSpecs` and the lane/landside graphs) drawn by `components/setup/PlanPreview.vue`. `tests/plan-preview.test.ts` compares it with `SceneModel`.
+- **Cycle readouts:** `engine/cycleTime.ts` (`stsNominalCycle`, `shcNominalCycle`, `ascNominalCycle`, `stsCycleGeometry`); the STS one is within 15% of the measured average (`tests/cycle-readout.test.ts`, it ignores gantry moves, so reads a few % low).
+- **Decisions UI:** `components/setup/DecisionSettings.vue` (async mode, strategy and latency per decision point).
+- **Engine option:** `SimulationOptions.invariants.every` checks every Nth event (and the last); the preset tests use 500 because per-event checks cost ~25x on big yards.
+- **Known deadlock (follow-up):** a pre-filled `Small automated` at 50% fill (and some seeds/yard sizes) stalls: ASCs idle, retrieve/rehandle jobs open with `ascId: null`, so a vessel never finishes loading (with trucks the clock runs on). `planJob` returns null for both ASCs (twin-ASC yield/rail windows), `resolveDispatch` then just returns. Not fixed here (TT-08/TT-12 territory); the Small preset uses 30% fill, which completes. Repro: `presets['Small automated']()` with `yardStart.targetPct = 50`, run 60k events. Full-length TTI/Stress runs take minutes (TT-19); the preset tests shorten them to 200 moves.
+- **Smoke:** `tests/browser/terminal-twin-presets.smoke.ts`.
+
 ## Phase 2 asset pipeline
 
 Blender (`bpy`) Python generators → raw GLB → gltf-transform (meshopt) → committed GLB + `.meta.json` sidecar + WebP previews. The web build never runs Blender, and CI checks only the committed outputs.

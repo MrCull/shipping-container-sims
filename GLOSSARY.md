@@ -187,3 +187,11 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Yard start mode:** how the yard looks at t = 0: **pre-filled** (default; exports, empty pool and imports placed through the selected yard-allocation strategy up to a target % of the cells), **warm-up** (starts empty; a warm-up period of truck and vessel activity runs first and is excluded from KPIs and end conditions) or **empty** (starts empty; exports arrive by truck during the run).
 - **Pre-fill:** the starting population of a pre-filled yard: boxes booked to the scenario's vessels, imports awaiting pickup with their dwell partly elapsed, and the empty pool.
 - **Warm-up / measured period:** the first `warmUpS` of a warm-up start / everything after it. At `WarmUpEnded` the KPI and end-condition counters restart at zero.
+
+## Presets and layout (TT-15)
+
+- **Preset:** a named full scenario (TTI Algeciras baseline, Small automated, Stress test); every value stays overridable.
+- **Derived layout:** block and STS positions computed from the counts and the quay length, in the TTI functional order (quay, STS rail, apron and WTP pads, blocks, stalls, roads, gate).
+- **Frontage:** the quay length a block needs (32 m); blocks need count x 32 m.
+- **Scale limits / stress-test scale:** hard maxima (errors) and the softer size above which the dialog warns the run may be slow.
+- **Nominal cycle:** the derived cycle time and moves per hour of one crane from its kinematics, without variation or waiting.
