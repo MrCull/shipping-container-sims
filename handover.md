@@ -25,7 +25,7 @@ Updated 2026-10-28. Merged: #25–#44 (TT-01–12, 16, 18, 20, 22–25, 27). Rem
 
 | Ticket | Issue | State | Claimed by |
 |---|---|---|---|
-| TT-13 landside | #45 | not started, unblocked | |
+| TT-13 landside | #45 | in progress (agent resumed in worktree) | session_0155BNjwYFnoWyKFHuSZhUEE |
 | TT-14 yard start modes | #46 | blocked by 45 | |
 | TT-26 truck/chassis models | #47 | blocked by 45 | |
 | TT-15 presets/layout | #48 | blocked by 46 | |
