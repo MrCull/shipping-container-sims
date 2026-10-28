@@ -246,12 +246,12 @@ describe('browser scene model', () => {
     const engine = Object.fromEntries(sim.query.containers().map((c) => [c.id, `${c.custody.kind}:${c.custody.id}`]))
     expect(new Set(model.containerIds)).toEqual(new Set(Object.keys(engine)))
     for (const id of model.containerIds) {
-      const o = model.custodyAt(id, 0)
+      const o = model.custodyAt(id, 0)!
       expect(`${o.kind}:${o.id}`, id).toBe(engine[id])
     }
     const empty = scenario({ start: { mode: 'empty' } })
     const em = new SceneModel(empty, empty.seed)
-    expect(em.containerIds.some((id) => em.custodyAt(id, 0).kind === 'yardSlot')).toBe(false)
+    expect(em.containerIds.some((id) => em.custodyAt(id, 0)?.kind === 'yardSlot')).toBe(false)
     expect(em.containerIds.length).toBe(createSimulation(empty).query.containers().length)
   })
 
