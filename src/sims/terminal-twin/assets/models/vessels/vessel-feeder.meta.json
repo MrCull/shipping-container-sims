@@ -261,11 +261,11 @@
       "material": "vessel_livery"
     },
     "LOD1": {
-      "triangles": 1892,
+      "triangles": 1896,
       "material": "vessel_livery"
     },
     "LOD2": {
-      "triangles": 432,
+      "triangles": 436,
       "material": "vessel_livery"
     }
   },

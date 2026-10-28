@@ -130,6 +130,8 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Hoist travel:** how far the SHC's `hoist` node moves down from rest (0 to −3.1 m); equal to the carried box's top height minus 6.0 m.
 - **Odometer (SHC):** the signed distance an SHC has rolled along its heading, from which the renderer derives wheel roll.
 - **Asset viewer:** the dev-only page `/sim/terminal-twin?viewer=<asset>` (or `?viewer=yard`), with its API `window.__ttAssets`.
+- **Hull asset:** the generated GLB of a vessel size class (`vessel-ulcv`, …), with nodes `hull`, `hatch_covers`, `lashing_bridges` and `bay_grid`. Its **bay grid** (in the sidecar) is the origin and pitches that put a deck or hold slot exactly where the engine's bay plan does.
+- **Vessel livery:** the hull colour, funnel mark and hull-side wordmark of a shipping line, from the **vessel livery atlas** (one tile per line, like the container atlas). The line comes from `VesselConfig.line` or from the vessel name's style ("HMM Tarifa").
 
 ## Dashboard (TT-16)
 
