@@ -2,7 +2,7 @@
 import { travelHoistM, type BlockSpec } from '../engine'
 import { CONTAINER_DIMS } from './sceneModel'
 
-/** [A] Malaccamax-style STS proportions (m). */
+/** [A] Malaccamax-style STS proportions (m); keep apexY in sync with the TT-23 model (sts-malaccamax.meta.json: apex 82 m, over buffers 27 m). */
 export const STS = {
   waterRailZ: 3,
   gauge: 30.48,
@@ -11,7 +11,7 @@ export const STS = {
   portalY: 48,
   boomOutreachZ: -72,
   boomBackreachZ: 22,
-  apexY: 72,
+  apexY: 82,
 }
 
 /** [A] Shuttle-carrier proportions (m): length along travel, width across, height. */
