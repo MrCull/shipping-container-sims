@@ -13,15 +13,15 @@ Handover for the next agent continuing the Terminal Twin build (the `/implement-
 
 ## Ticket status
 
-Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration branch: #25–#35 and #39 (TT-01–06, 09, 20, 22, 25, 18, 08). `npm run verify` passes (271 tests).
+Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration branch: #25–#35, #38, #39 (TT-01–09, 18, 20, 22, 25). `npm run verify` passes (319 tests).
 
 | Ticket | Issue | State |
 |---|---|---|
 | TT-23 STS model | #36 | WIP, uncommitted files in worktree; branch `tt/36-sts-model` still at 95e15d6. Not yet resumed |
 | TT-27 vessel hulls | #37 | WIP, uncommitted files in worktree; branch `tt/37-vessel-hulls` still at 95e15d6. Not yet resumed |
-| TT-07 KPIs/report | #38 | WIP, resumed; branch `tt/38-kpis-report` |
 | TT-10 export load flow | #40 | started (implementer on `tt/40-export-load-flow`) |
-| #41–#52 | | not started (#42 is unblocked) |
+| TT-16 dashboard | #41 | started (implementer on `tt/41-dashboard`) |
+| #42–#52 | | not started (#42 is unblocked) |
 
 **WIP is NOT on GitHub.** It lives only in git worktrees under `.claude/worktrees/agent-*` of the orchestrating session's container (branches `tt/36…`–`tt/39…` above; the merged `tt/33`, `tt/34`, `tt/35` branches are also there). A 5-hour API rate limit stopped all six implementers at once (limit reset at 12:10 UTC). If you can't see those branches, restart those tickets from the integration tip. Implementer subagents can be resumed with SendMessage if the session is still alive.
 
@@ -34,7 +34,7 @@ Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration br
 48←46  49←48  50←48  51←48  52←32,45,51
 ```
 
-Frontier: #36–#38, #40, #42. After #38: #41. Then follow the graph.
+Frontier: #36, #37, #40, #41, #42. After #38: #41. Then follow the graph.
 
 ## Process that worked
 
@@ -496,3 +496,13 @@ Merged. Guide: `terminal-twin-AGENTS.md` § "Paired ASCs (TT-08)".
 - **Dispatch:** `ascDispatch` DP v1 (`waterside-first` default, `balanced`); not called with one ASC. Default sends everything to ASC1, so ASC2 idles until TT-13 transfer-stall work (`job.kind 'transfer'` goes to the landside ASC).
 - **For TT-10/12:** rehandles go through `planJob` / `maybeDispatchAsc` and the same segment windows (`occupancyPieces`, `pieceWindows`). Rail extends 16 m past the pads (`RAIL_MARGIN_M`). KPIs add `railWaitS busyS yields` for twin blocks. `ascRail` overlay in `modules/overlays.ts`; `scene().reservedRailSegments`. Fixture `asc-2asc-block-conflict`.
 - Smoke: run with `--reporter=list` redirected to a file when the machine is loaded.
+
+### ticket-38 (TT-07): KPIs, end conditions, final report
+
+Merged. Guide: `terminal-twin-AGENTS.md` § "KPIs, end conditions and final report (TT-07)".
+
+- **Collector:** `engine/kpi/collector.ts` + `clock.ts`, `Simulation.kpiSeries()`; a pure fold over committed events, rebuilt by replaying the log on restore; no effect on the hash or goldens. Per-hour components, so shift/whole-run ratios are exact. Add a KPI = a row in `KPI_DEFS` + an `observe` case. **TT-10/13 retrieval must lower `yard.fill-pct`** (it only grows on `AscStacked` now).
+- **Buckets:** shifts 3 × 8 h (06-14, 14-22, 22-06); `config.kpi {startTimeOfDayS?, shiftStartHour?}` (optional, schemaVersion still 1); `runConfigFor` sets it from local time.
+- **UI:** `components/KpiStrip.vue` (thresholds are illustrative, not from the spec), `components/FinalReport.vue` (docked panel, JSON/CSV exports via `engine/export.ts`), setup "End conditions" fieldset (`modules/endConditions.ts`). `store.runEnded` is the single "run over" flag: any new transport or time control must no-op when true.
+- **CLI:** `--kpi-json --kpi-csv --events-json --events-csv`, `--end moves:n|vessels:n|time:s`, `Headline KPIs:` block.
+- **Gotchas:** an unreachable end condition just idles. Setup number inputs must not carry `min`/`step` (native validation hides the catalogue errors).
