@@ -13,7 +13,7 @@ Handover for the next agent continuing the Terminal Twin build (the `/implement-
 
 ## Ticket status
 
-Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration branch: #25–#35, #38, #39, #41 (TT-01–09, 16, 18, 20, 22, 25). `npm run verify` passes (345 tests).
+Updated 2026-10-28. Merged on the integration branch: #25–#44 (TT-01–12, 16, 18, 20, 22–25, 27). `npm run verify` passes (437 tests). Remaining: #45–#52, then the code-review pass.
 
 | Ticket | Issue | State |
 |---|---|---|
@@ -23,20 +23,19 @@ Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration br
 | TT-24 ASC model | #42 | MERGED (tt/42-asc-model) |
 | TT-11 transshipment+empties | #43 | MERGED (tt/43-transshipment-empties) |
 | TT-12 rehandles | #44 | MERGED (tt/44-rehandles) |
-| #45–#52 | | not started (blocked, see graph) |
+| TT-13 landside | #45 | not started (unblocked) |
+| #46–#52 | | not started (blocked, see graph) |
 
-**WIP is NOT on GitHub.** It lives only in git worktrees under `.claude/worktrees/agent-*` of the orchestrating session's container (branches `tt/36…`–`tt/39…` above; the merged `tt/33`, `tt/34`, `tt/35` branches are also there). A 5-hour API rate limit stopped all six implementers at once (limit reset at 12:10 UTC). If you can't see those branches, restart those tickets from the integration tip. Implementer subagents can be resumed with SendMessage if the session is still alive.
+**No ticket is in progress.** Tickets #36, #37, #40 were redone by a second session as `-v2` branches and merged; the original agents' worktrees under `.claude/worktrees/agent-*` (local to the first session's container) are obsolete, so ignore them and remove them at the end (`git worktree remove --force`).
 
 ### Dependency graph (ticket ← blockers)
 
 ```
-36←32,30  37←32,30
-38←33  40←30    41←38  42←32,39
-43←40  44←40  45←39,43  46←43,45  47←32,45
+45←39,43  46←43,45  47←32,45
 48←46  49←48  50←48  51←48  52←32,45,51
 ```
 
-Frontier: #36, #37, #40, #42. After #38: #41. Then follow the graph.
+Frontier: #45 (TT-13 landside). After #45: #46 and #47. Then #48, then #49/#50/#51, then #52.
 
 ## Process that worked
 
