@@ -79,8 +79,8 @@ test('while an ASC carries a box, the box hangs at the twist-lock plane and the 
   const [id, rig] = Object.entries(s.ascRigs).find(([, r]) => r.carrying)!
   const carried = Object.entries(s.containers).find(([, c]) => c?.kind === 'asc' && c.id === id)
   expect(carried).toBeTruthy()
-  // Ropes: a lowered hoist stretches them (scale > 1); raised is 1.
-  if (rig.hoistM < -0.5) expect(rig.ropeScale).toBeGreaterThan(1)
+  // Ropes: 2.2 m between the drums and the head block at rest; a lowered hoist stretches them.
+  if (rig.hoistM < -0.5) expect(rig.ropeScale).toBeGreaterThan(2.2)
   expect(rig.scaleY).toBe(1) // the fixture's block is at most 5 tiers high
   await page.evaluate((i) => window.__tt!.cameraTo(i, 45), id)
   await page.waitForTimeout(500)
@@ -123,6 +123,14 @@ test('the asset viewer shows the ASC with working rig sliders and 8 rows of refe
     return v.setRig('hoist', -6)
   })
   expect(moved.rigValues).toMatchObject({ gantry: 40, trolley: 9, spreader: 0.3, hoist: -6 })
+  // The reference box hangs from the spreader's `container` point (top at the twist-lock plane: 18 - 6 + 0.3 float), the ropes stretch with the hoist.
+  const pose = await page.evaluate(() => window.__ttAssets!.pose()!)
+  expect(pose.reference.hangingFrom).toBe('spreader')
+  expect(pose.reference.topCentre[1]).toBeCloseTo(18 - 6 + 0.3, 2)
+  expect(pose.reference.topCentre[0]).toBeCloseTo(9, 2)
+  expect(pose.reference.topCentre[2]).toBeCloseTo(40, 2)
+  expect(pose.reference.size[1]).toBeCloseTo(2.896, 3)
+  expect(pose.stretch.ropes).toBeCloseTo(2.2 + 6, 2)
   expect(limits.hoist.min).toBeCloseTo(2.896 - 18, 2)
   const lowest = await page.evaluate((v) => window.__ttAssets!.setRig('hoist', v), limits.hoist.min)
   expect(lowest.stack!.carriedBottomM).toBeCloseTo(0, 2) // box bottom on the ground at the lowest travel

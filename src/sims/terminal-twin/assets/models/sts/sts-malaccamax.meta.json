@@ -1,0 +1,1049 @@
+{
+  "asset": "sts-malaccamax",
+  "kind": "sts",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only sts",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 27.3,
+    "widthM": 136.6,
+    "heightM": 83.3,
+    "tag": "A",
+    "note": "overall LOD0 extents at rest (boom down): length along the rail (over buffers), width across (boom tip to backreach end), height to the apex"
+  },
+  "geometry": {
+    "railGaugeM": {
+      "value": 30.48,
+      "tag": "V",
+      "source": "TTI reference pack, STS table"
+    },
+    "liftHeightAboveRailM": {
+      "value": 52.0,
+      "tag": "V",
+      "source": "TTI reference pack (operator height above rail)"
+    },
+    "outreachM": {
+      "value": 68.0,
+      "tag": "V",
+      "source": "TTI reference pack (Malaccamax seaward outreach)"
+    },
+    "backreachM": {
+      "value": 18.0,
+      "tag": "A",
+      "reason": "not verified; functional backreach behind the landside rail"
+    },
+    "apexHeightM": {
+      "value": 82.0,
+      "tag": "A",
+      "reason": "overall steel height not verified; proportional structure above the 52 m envelope"
+    },
+    "trolleyRailHeightM": {
+      "value": 57.4,
+      "tag": "A",
+      "reason": "52 m lift + spreader/headblock + clearance"
+    },
+    "boomHingeM": {
+      "y": 55.6,
+      "z": -3.2,
+      "tag": "A"
+    },
+    "legSpacingM": {
+      "value": 18.0,
+      "tag": "A",
+      "reason": "leg centres along the rail; mechanical-clearance approximation"
+    },
+    "overBuffersM": {
+      "value": 27.0,
+      "tag": "A",
+      "reason": "matches quay.stsMinSpacingM (27 m)"
+    },
+    "boomTipM": {
+      "value": 74.0,
+      "tag": "A"
+    }
+  },
+  "axes": {
+    "up": "+Y",
+    "rail": "+X (along the quay)",
+    "landward": "+Z (the sea and the boom are at -Z)",
+    "origin": "waterside rail centreline at rail level, on the crane centre line",
+    "handedness": "right-handed, glTF"
+  },
+  "sceneMounting": {
+    "waterRailZ": 3.0,
+    "note": "the twin places the root at (0, 0, waterRailZ); gantry.x = gantryX, trolley.z = trolleyZ - waterRailZ, hoist.y = hoistY"
+  },
+  "lodNaming": {
+    "LOD0": "",
+    "LOD1": "_lod1",
+    "LOD2": "_lod2",
+    "note": "every node under LODn carries the suffix; twist-locks exist in LOD0 only"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "sts-malaccamax",
+      "role": "lod"
+    },
+    {
+      "name": "gantry",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rig": "gantry",
+      "axis": "+X",
+      "description": "travels along the quay rail"
+    },
+    {
+      "name": "gantry_geo",
+      "parent": "gantry",
+      "role": "mesh",
+      "description": "legs, portal, sills, bogies, girders, A-frame, machinery house, ladders, festoon"
+    },
+    {
+      "name": "boom",
+      "parent": "gantry",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        55.6,
+        -3.2
+      ],
+      "rig": "boom",
+      "axis": "+X",
+      "description": "boom hinge pin; positive rotation raises the boom"
+    },
+    {
+      "name": "boom_geo",
+      "parent": "boom",
+      "role": "mesh",
+      "description": "seaward lattice boom, forestays, catwalks, floodlights"
+    },
+    {
+      "name": "trolley",
+      "parent": "gantry",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        57.4,
+        0.0
+      ],
+      "rig": "trolley",
+      "axis": "+Z",
+      "description": "on the trolley rails; Z = trolley position from the waterside rail"
+    },
+    {
+      "name": "trolley_geo",
+      "parent": "trolley",
+      "role": "mesh",
+      "description": "trolley frame, wheels, operator cab"
+    },
+    {
+      "name": "ropes",
+      "parent": "trolley",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        57.4,
+        0.0
+      ],
+      "rig": "ropes",
+      "axis": "-Y",
+      "description": "hoist ropes, 1 m long at rest: scale Y = rope length (see stretch)"
+    },
+    {
+      "name": "ropes_geo",
+      "parent": "ropes",
+      "role": "mesh",
+      "description": "hoist ropes (unit length)"
+    },
+    {
+      "name": "hoist",
+      "parent": "trolley",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rig": "hoist",
+      "axis": "+Y",
+      "description": "spreader underside centre; Y = height above the rail"
+    },
+    {
+      "name": "hoist_geo",
+      "parent": "hoist",
+      "role": "mesh",
+      "description": "headblock"
+    },
+    {
+      "name": "spreader",
+      "parent": "hoist",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rig": "spreader",
+      "axis": "+Y",
+      "description": "container attach point (top centre of the box); skew rotation"
+    },
+    {
+      "name": "spreader_geo",
+      "parent": "spreader",
+      "role": "mesh",
+      "description": "telescopic spreader main frame"
+    },
+    {
+      "name": "spreader_tele_fore",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        2.94,
+        0.0,
+        0.0
+      ],
+      "rig": "spreader_tele_fore",
+      "axis": "+X",
+      "description": "fore telescope end beam (20 ft at rest)"
+    },
+    {
+      "name": "spreader_tele_fore_geo",
+      "parent": "spreader_tele_fore",
+      "role": "mesh",
+      "description": "fore telescope end beam and arms"
+    },
+    {
+      "name": "spreader_tele_aft",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        -2.94,
+        0.0,
+        0.0
+      ],
+      "rig": "spreader_tele_aft",
+      "axis": "-X",
+      "description": "aft telescope end beam (20 ft at rest)"
+    },
+    {
+      "name": "spreader_tele_aft_geo",
+      "parent": "spreader_tele_aft",
+      "role": "mesh",
+      "description": "aft telescope end beam and arms"
+    },
+    {
+      "name": "twin_locks",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.4,
+        0.0
+      ],
+      "rig": "twin_locks",
+      "axis": "-Y",
+      "description": "twin-20 centre twist-lock units (retracted at rest)"
+    },
+    {
+      "name": "twin_locks_geo",
+      "parent": "twin_locks",
+      "role": "mesh",
+      "description": "twin-lift housing"
+    },
+    {
+      "name": "twistlock_fore_land",
+      "parent": "spreader_tele_fore",
+      "role": "rig",
+      "pivot": [
+        2.94,
+        0.0,
+        1.138
+      ],
+      "rig": "twistlock_fore_land",
+      "axis": "+Y",
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_fore_land_geo",
+      "parent": "twistlock_fore_land",
+      "role": "mesh",
+      "description": "twist-lock cone"
+    },
+    {
+      "name": "twistlock_fore_sea",
+      "parent": "spreader_tele_fore",
+      "role": "rig",
+      "pivot": [
+        2.94,
+        0.0,
+        -1.138
+      ],
+      "rig": "twistlock_fore_sea",
+      "axis": "+Y",
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_fore_sea_geo",
+      "parent": "twistlock_fore_sea",
+      "role": "mesh",
+      "description": "twist-lock cone"
+    },
+    {
+      "name": "twistlock_aft_land",
+      "parent": "spreader_tele_aft",
+      "role": "rig",
+      "pivot": [
+        -2.94,
+        0.0,
+        1.138
+      ],
+      "rig": "twistlock_aft_land",
+      "axis": "+Y",
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_aft_land_geo",
+      "parent": "twistlock_aft_land",
+      "role": "mesh",
+      "description": "twist-lock cone"
+    },
+    {
+      "name": "twistlock_aft_sea",
+      "parent": "spreader_tele_aft",
+      "role": "rig",
+      "pivot": [
+        -2.94,
+        0.0,
+        -1.138
+      ],
+      "rig": "twistlock_aft_sea",
+      "axis": "+Y",
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_aft_sea_geo",
+      "parent": "twistlock_aft_sea",
+      "role": "mesh",
+      "description": "twist-lock cone"
+    },
+    {
+      "name": "twistlock_twin_aft_land",
+      "parent": "twin_locks",
+      "role": "rig",
+      "pivot": [
+        -0.127,
+        0.4,
+        1.138
+      ],
+      "rig": "twistlock_twin_aft_land",
+      "axis": "+Y",
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_twin_aft_land_geo",
+      "parent": "twistlock_twin_aft_land",
+      "role": "mesh",
+      "description": "twist-lock cone"
+    },
+    {
+      "name": "twistlock_twin_aft_sea",
+      "parent": "twin_locks",
+      "role": "rig",
+      "pivot": [
+        -0.127,
+        0.4,
+        -1.138
+      ],
+      "rig": "twistlock_twin_aft_sea",
+      "axis": "+Y",
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_twin_aft_sea_geo",
+      "parent": "twistlock_twin_aft_sea",
+      "role": "mesh",
+      "description": "twist-lock cone"
+    },
+    {
+      "name": "twistlock_twin_fore_land",
+      "parent": "twin_locks",
+      "role": "rig",
+      "pivot": [
+        0.127,
+        0.4,
+        1.138
+      ],
+      "rig": "twistlock_twin_fore_land",
+      "axis": "+Y",
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_twin_fore_land_geo",
+      "parent": "twistlock_twin_fore_land",
+      "role": "mesh",
+      "description": "twist-lock cone"
+    },
+    {
+      "name": "twistlock_twin_fore_sea",
+      "parent": "twin_locks",
+      "role": "rig",
+      "pivot": [
+        0.127,
+        0.4,
+        -1.138
+      ],
+      "rig": "twistlock_twin_fore_sea",
+      "axis": "+Y",
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_twin_fore_sea_geo",
+      "parent": "twistlock_twin_fore_sea",
+      "role": "mesh",
+      "description": "twist-lock cone"
+    },
+    {
+      "name": "LOD1",
+      "parent": "sts-malaccamax",
+      "role": "lod"
+    },
+    {
+      "name": "gantry_lod1",
+      "parent": "LOD1",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rig": "gantry",
+      "axis": "+X",
+      "description": "travels along the quay rail"
+    },
+    {
+      "name": "gantry_geo_lod1",
+      "parent": "gantry_lod1",
+      "role": "mesh",
+      "description": "legs, portal, sills, bogies, girders, A-frame, machinery house, ladders, festoon"
+    },
+    {
+      "name": "boom_lod1",
+      "parent": "gantry_lod1",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        55.6,
+        -3.2
+      ],
+      "rig": "boom",
+      "axis": "+X",
+      "description": "boom hinge pin; positive rotation raises the boom"
+    },
+    {
+      "name": "boom_geo_lod1",
+      "parent": "boom_lod1",
+      "role": "mesh",
+      "description": "seaward lattice boom, forestays, catwalks, floodlights"
+    },
+    {
+      "name": "trolley_lod1",
+      "parent": "gantry_lod1",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        57.4,
+        0.0
+      ],
+      "rig": "trolley",
+      "axis": "+Z",
+      "description": "on the trolley rails; Z = trolley position from the waterside rail"
+    },
+    {
+      "name": "trolley_geo_lod1",
+      "parent": "trolley_lod1",
+      "role": "mesh",
+      "description": "trolley frame, wheels, operator cab"
+    },
+    {
+      "name": "ropes_lod1",
+      "parent": "trolley_lod1",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        57.4,
+        0.0
+      ],
+      "rig": "ropes",
+      "axis": "-Y",
+      "description": "hoist ropes, 1 m long at rest: scale Y = rope length (see stretch)"
+    },
+    {
+      "name": "ropes_geo_lod1",
+      "parent": "ropes_lod1",
+      "role": "mesh",
+      "description": "hoist ropes (unit length)"
+    },
+    {
+      "name": "hoist_lod1",
+      "parent": "trolley_lod1",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rig": "hoist",
+      "axis": "+Y",
+      "description": "spreader underside centre; Y = height above the rail"
+    },
+    {
+      "name": "hoist_geo_lod1",
+      "parent": "hoist_lod1",
+      "role": "mesh",
+      "description": "headblock"
+    },
+    {
+      "name": "spreader_lod1",
+      "parent": "hoist_lod1",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rig": "spreader",
+      "axis": "+Y",
+      "description": "container attach point (top centre of the box); skew rotation"
+    },
+    {
+      "name": "spreader_geo_lod1",
+      "parent": "spreader_lod1",
+      "role": "mesh",
+      "description": "telescopic spreader main frame"
+    },
+    {
+      "name": "spreader_tele_fore_lod1",
+      "parent": "spreader_lod1",
+      "role": "rig",
+      "pivot": [
+        2.94,
+        0.0,
+        0.0
+      ],
+      "rig": "spreader_tele_fore",
+      "axis": "+X",
+      "description": "fore telescope end beam (20 ft at rest)"
+    },
+    {
+      "name": "spreader_tele_fore_geo_lod1",
+      "parent": "spreader_tele_fore_lod1",
+      "role": "mesh",
+      "description": "fore telescope end beam and arms"
+    },
+    {
+      "name": "spreader_tele_aft_lod1",
+      "parent": "spreader_lod1",
+      "role": "rig",
+      "pivot": [
+        -2.94,
+        0.0,
+        0.0
+      ],
+      "rig": "spreader_tele_aft",
+      "axis": "-X",
+      "description": "aft telescope end beam (20 ft at rest)"
+    },
+    {
+      "name": "spreader_tele_aft_geo_lod1",
+      "parent": "spreader_tele_aft_lod1",
+      "role": "mesh",
+      "description": "aft telescope end beam and arms"
+    },
+    {
+      "name": "twin_locks_lod1",
+      "parent": "spreader_lod1",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.4,
+        0.0
+      ],
+      "rig": "twin_locks",
+      "axis": "-Y",
+      "description": "twin-20 centre twist-lock units (retracted at rest)"
+    },
+    {
+      "name": "twin_locks_geo_lod1",
+      "parent": "twin_locks_lod1",
+      "role": "mesh",
+      "description": "twin-lift housing"
+    },
+    {
+      "name": "LOD2",
+      "parent": "sts-malaccamax",
+      "role": "lod"
+    },
+    {
+      "name": "gantry_lod2",
+      "parent": "LOD2",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rig": "gantry",
+      "axis": "+X",
+      "description": "travels along the quay rail"
+    },
+    {
+      "name": "gantry_geo_lod2",
+      "parent": "gantry_lod2",
+      "role": "mesh",
+      "description": "legs, portal, sills, bogies, girders, A-frame, machinery house, ladders, festoon"
+    },
+    {
+      "name": "boom_lod2",
+      "parent": "gantry_lod2",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        55.6,
+        -3.2
+      ],
+      "rig": "boom",
+      "axis": "+X",
+      "description": "boom hinge pin; positive rotation raises the boom"
+    },
+    {
+      "name": "boom_geo_lod2",
+      "parent": "boom_lod2",
+      "role": "mesh",
+      "description": "seaward lattice boom, forestays, catwalks, floodlights"
+    },
+    {
+      "name": "trolley_lod2",
+      "parent": "gantry_lod2",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        57.4,
+        0.0
+      ],
+      "rig": "trolley",
+      "axis": "+Z",
+      "description": "on the trolley rails; Z = trolley position from the waterside rail"
+    },
+    {
+      "name": "trolley_geo_lod2",
+      "parent": "trolley_lod2",
+      "role": "mesh",
+      "description": "trolley frame, wheels, operator cab"
+    },
+    {
+      "name": "ropes_lod2",
+      "parent": "trolley_lod2",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        57.4,
+        0.0
+      ],
+      "rig": "ropes",
+      "axis": "-Y",
+      "description": "hoist ropes, 1 m long at rest: scale Y = rope length (see stretch)"
+    },
+    {
+      "name": "ropes_geo_lod2",
+      "parent": "ropes_lod2",
+      "role": "mesh",
+      "description": "hoist ropes (unit length)"
+    },
+    {
+      "name": "hoist_lod2",
+      "parent": "trolley_lod2",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rig": "hoist",
+      "axis": "+Y",
+      "description": "spreader underside centre; Y = height above the rail"
+    },
+    {
+      "name": "spreader_lod2",
+      "parent": "hoist_lod2",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rig": "spreader",
+      "axis": "+Y",
+      "description": "container attach point (top centre of the box); skew rotation"
+    },
+    {
+      "name": "spreader_geo_lod2",
+      "parent": "spreader_lod2",
+      "role": "mesh",
+      "description": "telescopic spreader main frame"
+    },
+    {
+      "name": "spreader_tele_fore_lod2",
+      "parent": "spreader_lod2",
+      "role": "rig",
+      "pivot": [
+        2.94,
+        0.0,
+        0.0
+      ],
+      "rig": "spreader_tele_fore",
+      "axis": "+X",
+      "description": "fore telescope end beam (20 ft at rest)"
+    },
+    {
+      "name": "spreader_tele_aft_lod2",
+      "parent": "spreader_lod2",
+      "role": "rig",
+      "pivot": [
+        -2.94,
+        0.0,
+        0.0
+      ],
+      "rig": "spreader_tele_aft",
+      "axis": "-X",
+      "description": "aft telescope end beam (20 ft at rest)"
+    },
+    {
+      "name": "twin_locks_lod2",
+      "parent": "spreader_lod2",
+      "role": "rig",
+      "pivot": [
+        0.0,
+        0.4,
+        0.0
+      ],
+      "rig": "twin_locks",
+      "axis": "-Y",
+      "description": "twin-20 centre twist-lock units (retracted at rest)"
+    }
+  ],
+  "travelLimits": {
+    "gantry": {
+      "type": "translation",
+      "axis": "+X",
+      "minM": -40,
+      "maxM": 40,
+      "rest": 0,
+      "tag": "A",
+      "note": "unbounded along the quay rail in the twin; this range is for the asset viewer"
+    },
+    "trolley": {
+      "type": "translation",
+      "axis": "+Z",
+      "minM": -68.0,
+      "maxM": 48.48,
+      "rest": 0,
+      "tag": "V",
+      "note": "from the waterside rail; 68 m outreach [V], 18 m backreach behind the landside rail [A]"
+    },
+    "hoist": {
+      "type": "translation",
+      "axis": "+Y",
+      "minM": -20,
+      "maxM": 52.0,
+      "rest": 0,
+      "tag": "V",
+      "note": "spreader underside height above the rail: 52 m lift [V]; 20 m below the rail into the hold [A]"
+    },
+    "spreader": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -5,
+      "maxDeg": 5,
+      "rest": 0,
+      "tag": "A",
+      "note": "skew"
+    },
+    "spreader_tele_fore": {
+      "type": "translation",
+      "axis": "+X",
+      "minM": 0,
+      "maxM": 3.067,
+      "rest": 0,
+      "tag": "V",
+      "note": "0 = 20 ft, max = 40 ft (ISO 668 lengths)"
+    },
+    "spreader_tele_aft": {
+      "type": "translation",
+      "axis": "-X",
+      "minM": 0,
+      "maxM": 3.067,
+      "rest": 0,
+      "tag": "V",
+      "note": "0 = 20 ft, max = 40 ft (ISO 668 lengths)"
+    },
+    "twin_locks": {
+      "type": "translation",
+      "axis": "-Y",
+      "minM": 0,
+      "maxM": 0.4,
+      "rest": 0,
+      "tag": "A",
+      "note": "lowered = twin-20 lift (inner castings of two 20 ft boxes)"
+    },
+    "boom": {
+      "type": "rotation",
+      "axis": "+X",
+      "minDeg": 0,
+      "maxDeg": 80,
+      "rest": 0,
+      "tag": "A",
+      "note": "boom up for vessel passage"
+    },
+    "twistlock_fore_land": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "90 = locked"
+    },
+    "twistlock_fore_sea": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "90 = locked"
+    },
+    "twistlock_aft_land": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "90 = locked"
+    },
+    "twistlock_aft_sea": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "90 = locked"
+    },
+    "twistlock_twin_aft_land": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "90 = locked"
+    },
+    "twistlock_twin_aft_sea": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "90 = locked"
+    },
+    "twistlock_twin_fore_land": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "90 = locked"
+    },
+    "twistlock_twin_fore_sea": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "90 = locked"
+    }
+  },
+  "stretch": [
+    {
+      "node": "ropes",
+      "to": "hoist",
+      "axis": "Y",
+      "offsetM": 2.25,
+      "unitLengthM": 1.0,
+      "note": "ropes.scale.y = ropes.y - (hoist.y + offsetM), both children of the trolley"
+    }
+  ],
+  "spreaderModes": {
+    "20": {
+      "spreader_tele_fore": 0.0,
+      "spreader_tele_aft": 0.0,
+      "twin_locks": 0.0
+    },
+    "40": {
+      "spreader_tele_fore": 3.067,
+      "spreader_tele_aft": 3.067,
+      "twin_locks": 0.0
+    },
+    "twin-20": {
+      "spreader_tele_fore": 3.067,
+      "spreader_tele_aft": 3.067,
+      "twin_locks": 0.4
+    }
+  },
+  "attachPoints": [
+    {
+      "name": "container",
+      "node": "spreader",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "tag": "V",
+      "description": "top centre of a single 20/40 ft box (twist-locks at the ISO 1161 casting centres)"
+    },
+    {
+      "name": "container_twin_aft",
+      "node": "spreader",
+      "position": [
+        -3.067,
+        0,
+        0
+      ],
+      "tag": "A",
+      "description": "top centre of the aft box of a twin-20 lift"
+    },
+    {
+      "name": "container_twin_fore",
+      "node": "spreader",
+      "position": [
+        3.067,
+        0,
+        0
+      ],
+      "tag": "A",
+      "description": "top centre of the fore box of a twin-20 lift"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "rails": [
+      {
+        "z": 0
+      },
+      {
+        "z": 30.48
+      }
+    ],
+    "wheelsPerCorner": 8,
+    "tag": "A"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 31132,
+      "maxDistanceM": 250,
+      "note": "camera to crane centre; the renderer adds 15 % hysteresis"
+    },
+    "LOD1": {
+      "triangles": 5522,
+      "maxDistanceM": 900
+    },
+    "LOD2": {
+      "triangles": 468
+    }
+  },
+  "materials": {
+    "sts_paint": "palette + wordmarks (sts-atlas)",
+    "sts_plate": "crane-number plates; UVs for tile 0 (crane 101)"
+  },
+  "branding": {
+    "wordmark": "ZPMC",
+    "typeface": "Archivo-ExtraBold",
+    "placement": "machinery house sides (blue on white), main girder outer faces (white on blue)",
+    "craneNumbers": {
+      "first": 101,
+      "count": 24,
+      "placement": "seaward and landward portal beams, landside end of the machinery house",
+      "cols": 6,
+      "rows": 4,
+      "tileSizeUv": [
+        0.16666666666666666,
+        0.09375
+      ],
+      "material": "sts_plate",
+      "uvConvention": "TEXCOORD_0 of material sts_plate is authored for tile 0 (crane 101); add (index % cols, floor(index / cols)) * tileSizeUv"
+    },
+    "operatorBranding": "none",
+    "tag": "A"
+  },
+  "provenance": [
+    {
+      "fact": "rail gauge 30.48 m",
+      "tag": "V",
+      "source": "TTI reference pack, STS table"
+    },
+    {
+      "fact": "52 m lift height above rail (hoist travel maximum)",
+      "tag": "V",
+      "source": "TTI reference pack"
+    },
+    {
+      "fact": "68 m seaward outreach from the waterside rail (trolley travel minimum)",
+      "tag": "V",
+      "source": "TTI reference pack"
+    },
+    {
+      "fact": "Malaccamax geometry on every crane",
+      "tag": "M",
+      "reason": "builder version: real fleet is 5 Malaccamax + 3 Super Post-Panamax"
+    },
+    {
+      "fact": "dark royal-blue steelwork, white machinery house, yellow spreader, lattice boom, ties, ladders, catwalks, floodlights",
+      "tag": "P",
+      "source": "reference photographs (not committed)"
+    },
+    {
+      "fact": "apex, trolley-rail and hinge heights, leg spacing, backreach, bogie layout, house size",
+      "tag": "A"
+    },
+    {
+      "fact": "ZPMC wordmark set in Archivo ExtraBold; crane numbers 101-124 on plates",
+      "tag": "A"
+    },
+    {
+      "fact": "no TTI ALGECIRAS emblem",
+      "tag": "M",
+      "reason": "spec: manufacturer wordmark and crane numbers only, no operator branding"
+    },
+    {
+      "fact": "forestays rotate with the boom (they detach from the apex when the boom is raised)",
+      "tag": "M",
+      "reason": "boom raising is a viewer-only pose; real tie bars fold"
+    },
+    {
+      "fact": "ladder cages, handrail posts and festoon loops simplified",
+      "tag": "M",
+      "reason": "triangle budget"
+    }
+  ]
+}

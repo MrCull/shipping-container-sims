@@ -7,7 +7,7 @@
  *
  * Options:
  *   --check          regenerate into a temp folder and compare with the committed files (exit 1 on any difference)
- *   --only <group>   regenerate one group only (containers | shc | asc; repeatable); default all
+ *   --only <group>   regenerate one group only (containers | shc | asc | sts | vessels; repeatable); default all
  *   --no-previews    skip the Cycles previews (keeps the committed ones)
  *   --samples <n>    Cycles samples per preview (default 48)
  *   --python <exe>   Python with bpy (default: $TT_BPY_PYTHON, then python3.13 / python3 / python, or `py -3.13` on Windows)
@@ -22,10 +22,34 @@ import { NodeIO } from '@gltf-transform/core'
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
 import { dedup, meshopt, prune } from '@gltf-transform/functions'
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer'
+import {
+  BAY_PITCH_M,
+  BOW_M,
+  HALF_OFFSET_M,
+  QUAY_ABOVE_WATER_M,
+  ROW_PITCH_M,
+  TIER_PITCH_M,
+  VESSEL_CLASSES,
+} from '../../scenario/vesselClasses'
 import { ASSETS_DIR, MODELS_DIR, runBudgetCli } from './budgetCheck'
 
 const GENERATOR = join(ASSETS_DIR, 'generators', 'build.py')
-const GROUPS = ['containers', 'shc', 'asc']
+const GROUPS = ['containers', 'shc', 'asc', 'sts', 'vessels']
+
+/** What the hull generator needs from the engine's vessel model (so hulls are built on the engine's bay grid). */
+function vesselClassTable() {
+  return {
+    classes: VESSEL_CLASSES,
+    grid: {
+      bayPitchM: BAY_PITCH_M,
+      rowPitchM: ROW_PITCH_M,
+      tierPitchM: TIER_PITCH_M,
+      bowM: BOW_M,
+      halfOffsetM: HALF_OFFSET_M,
+      quayAboveWaterM: QUAY_ABOVE_WATER_M,
+    },
+  }
+}
 
 interface Options {
   only: string[]
@@ -99,7 +123,9 @@ async function main(): Promise<number> {
   const staging = mkdtempSync(join(tmpdir(), 'tt-assets-stage-'))
   const result = mkdtempSync(join(tmpdir(), 'tt-assets-out-'))
   try {
-    const args = [...python.slice(1), GENERATOR, '--out', staging, '--samples', String(opts.samples)]
+    const classesFile = join(staging, 'vessel-classes.json')
+    writeFileSync(classesFile, JSON.stringify(vesselClassTable(), null, 2))
+    const args = [...python.slice(1), GENERATOR, '--out', staging, '--samples', String(opts.samples), '--vessel-classes', classesFile]
     if (!opts.previews) args.push('--no-previews')
     for (const g of groups) args.push('--only', g)
     console.log('Generating with Blender…')

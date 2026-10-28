@@ -14,10 +14,10 @@ import type { Delta, WorkerRequest } from '../worker/protocol'
 const HC = 2.896
 
 describe('ascRigValues', () => {
-  it('is at rest (hoist 0, ropes at rest length) with the plane raised and the trolley centred', () => {
+  it('is at rest (hoist 0, ropes at their rest length) with the plane raised and the trolley centred', () => {
     const v = ascRigValues({ trolleyX: 0, gantryZ: 12, attachY: ASC_MODEL.restAttachY, carrying: false, scaleY: 1 })
     expect(v.hoistM).toBe(0)
-    expect(v.ropeScale).toBeCloseTo(1, 6)
+    expect(v.ropeScale).toBeCloseTo(2.2, 6) // 1 m of rope mesh scaled to the 2.2 m between the drums and the head block
     expect(v.trolleyX).toBe(0)
     expect(v.gantryZ).toBe(12)
     expect(v.twistRad).toBe(0)
@@ -28,7 +28,7 @@ describe('ascRigValues', () => {
     expect(v.hoistM).toBeCloseTo(HC - ASC_MODEL.restAttachY, 6)
     expect(v.hoistM).toBeCloseTo(ASC_MODEL.hoistMinM, 3)
     const ropeLen = ASC_MODEL.ropeTopY - (HC + ASC_MODEL.headblockTopAboveAttachM)
-    expect(v.ropeScale).toBeCloseTo(ropeLen / ASC_MODEL.ropeRestLengthM, 6)
+    expect(v.ropeScale).toBeCloseTo(ropeLen / ASC_MODEL.ropeUnitM, 6)
     expect(v.twistRad).toBeCloseTo(Math.PI / 2, 6) // locked while carrying
   })
 

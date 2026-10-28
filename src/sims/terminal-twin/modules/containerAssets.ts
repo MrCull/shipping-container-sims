@@ -101,19 +101,29 @@ export function bakeLod(root: THREE.Object3D, node: THREE.Object3D): THREE.Buffe
   return merged
 }
 
+/** Tile layout of a livery atlas (the container atlas, or TT-27's vessel atlas). */
+export interface LiveryAtlasLayout {
+  tileSizeUv: number[]
+  tileCols: number
+}
+
 /**
  * Patches a (cloned) material for per-instance livery tiles. Works for
  * InstancedMesh (attribute `liveryIndex`) and plain meshes (attribute absent
- * = 0, so the `liveryBase` uniform picks the tile).
+ * = 0, so the `liveryBase` uniform picks the tile). `layout` defaults to the
+ * container atlas.
  */
-export function liveryMaterial<T extends THREE.MeshStandardMaterial>(source: T): T & { userData: { liveryBase: { value: number } } } {
+export function liveryMaterial<T extends THREE.MeshStandardMaterial>(
+  source: T,
+  layout: LiveryAtlasLayout = atlas,
+): T & { userData: { liveryBase: { value: number } } } {
   const mat = source.clone() as T & { userData: { liveryBase: { value: number } } }
   const liveryBase = { value: 0 }
   mat.userData.liveryBase = liveryBase
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.liveryBase = liveryBase
-    shader.uniforms.liveryTile = { value: new THREE.Vector2(atlas.tileSizeUv[0], atlas.tileSizeUv[1]) }
-    shader.uniforms.liveryCols = { value: atlas.tileCols }
+    shader.uniforms.liveryTile = { value: new THREE.Vector2(layout.tileSizeUv[0], layout.tileSizeUv[1]) }
+    shader.uniforms.liveryCols = { value: layout.tileCols }
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',

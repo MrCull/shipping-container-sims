@@ -369,11 +369,11 @@ def trolley_mesh(detail):
 
 
 def ropes_mesh():
-    """Four rope strands from the drums down to the head block sheaves; unit-scaled at rest length."""
+    """Four rope strands from the drums down, 1 m long at scale 1 (the stretch rule scales the node to reach the head block)."""
     p = Part()
     for sx in (-1, 1):
         for sy in (-1, 1):
-            p.box((sx * 0.9 - 0.035, sy * 1.2 - 0.035, -ROPE_REST_LEN), (sx * 0.9 + 0.035, sy * 1.2 + 0.035, 0.0), 'rope', ('+x', '-x', '+y', '-y'))
+            p.box((sx * 0.9 - 0.035, sy * 1.2 - 0.035, -1.0), (sx * 0.9 + 0.035, sy * 1.2 + 0.035, 0.0), 'rope', ('+x', '-x', '+y', '-y'))
     return p
 
 
@@ -510,10 +510,14 @@ def build_lod(root, level, material):
     parts = {}
 
     def add(part, name, parent, loc=(0, 0, 0)):
+        """A rig node: an empty at the mechanical pivot, with its mesh in the child `<name>_geo` (the compression step puts its
+        dequantisation transform on mesh nodes, which must never be rig nodes)."""
         nonlocal tris
         tris += part.triangles
         parts[name] = part.triangles
-        return _obj(part, name + suffix, material, parent, loc)
+        rig = empty(name + suffix, parent, loc)
+        _obj(part, name + '_geo' + suffix, material, rig)
+        return rig
 
     def node(name, parent, loc):
         return empty(name + suffix, parent, loc)

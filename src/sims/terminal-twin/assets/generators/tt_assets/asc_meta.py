@@ -8,6 +8,10 @@ from .asc import (
 )
 
 
+# [A] camera distances (m) up to which LOD0 and LOD1 are drawn; the twin's renderer and the viewer's auto LOD read them from the sidecar.
+LOD_MAX_DISTANCE_M = (90, 300)
+
+
 def render_atlas(path, fonts_dir, samples=16):
     """Swatch grid + ZPMC wordmark + numbered panel cells + "40 t" + unit number + warning stripes + spec plate (Cycles, emission only)."""
     from .blender import hex_to_linear, reset_scene
@@ -98,8 +102,7 @@ def sidecar(info):
         {'name': 'trolley', 'parent': 'gantry', 'role': 'rig', 'pivot': _gl((0, 0, TROLLEY_Z)), 'axis': '+X',
          'description': 'trolley frame and hoist machinery on the bridge rails; translates across the rows; pivot at the top of the bridge rails on the centre line'},
         {'name': 'ropes', 'parent': 'trolley', 'role': 'rig', 'pivot': _gl((0, 0, ROPE_TOP_Z)), 'axis': '+Y',
-         'derived': {'from': 'hoist', 'scaleAxis': '+Y', 'restLengthM': round(ROPE_REST_LEN, 4), 'topY': round(ROPE_TOP_Z, 4), 'headblockTopAboveAttachM': HEADBLOCK_Z1},
-         'description': 'four rope strands drum to head block; no travel limit of its own: scale along Y = (topY - (attachY + headblockTopAboveAttachM)) / restLengthM'},
+         'description': 'four rope strands hanging from the drums, 1 m long at scale 1; no travel limit of its own: the sidecar `stretch` rule scales Y so they reach the head block (2.2 m at rest)'},
         {'name': 'hoist', 'parent': 'trolley', 'role': 'rig', 'pivot': _gl((0, 0, REST_PLANE)), 'axis': '+Y',
          'description': 'head block with sheaves and hangers; pivot = container attach plane at rest (raised); travels down (negative)'},
         {'name': 'spreader', 'parent': 'hoist', 'role': 'rig', 'pivot': _gl((0, 0, REST_PLANE)), 'axis': '+Y',
@@ -118,9 +121,21 @@ def sidecar(info):
         pos = _gl((sx * TWIST_X, sy * TWIST_Y, REST_PLANE))
         nodes.append({'name': f'twistlock_{n}', 'parent': 'spreader', 'role': 'rig', 'pivot': pos, 'axis': '+Y',
                       'description': 'twist-lock; 0 = unlocked, 90 degrees = locked'})
-        twist.append({'name': f'twistlock_{n}', 'position': pos, 'parent': 'hoist', 'tag': 'V',
+        twist.append({'name': f'twistlock_{n}', 'node': 'spreader', 'position': [round(sx * TWIST_X, 4), 0, round(-sy * TWIST_Y, 4)], 'tag': 'V',
                       'source': 'ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)'})
         limits[f'twistlock_{n}'] = {'type': 'rotation', 'axis': '+Y', 'minDeg': 0, 'maxDeg': TWIST_DEG, 'rest': 0, 'tag': 'A'}
+    # Every rig node is an empty at its pivot; the mesh is its `<name>_geo` child (LOD2 has no spreader mesh: it is merged into hoist_geo).
+    geo_text = {
+        'gantry': 'legs, sills, bogies, head beams, bridge girders, walkways, ladders, e-house',
+        'trolley': 'trolley frame, wheels, machinery houses, drums and motors',
+        'ropes': 'four rope strands (1 m, scaled by the stretch rule)',
+        'hoist': 'head block with sheaves and hangers (LOD2: with the spreader box)',
+        'spreader': 'telescopic 40 ft spreader',
+    }
+    for n, text in geo_text.items():
+        nodes.append({'name': f'{n}_geo', 'parent': n, 'role': 'mesh', 'description': text})
+    for n, _, _ in CORNERS:
+        nodes.append({'name': f'twistlock_{n}_geo', 'parent': f'twistlock_{n}', 'role': 'mesh', 'description': 'twist-lock stem and cone'})
     return {
         'asset': 'asc',
         'kind': 'asc',
@@ -135,9 +150,11 @@ def sidecar(info):
                  'origin': 'ground contact at the span centre and the gantry centre', 'handedness': 'right-handed, glTF'},
         'nodes': nodes,
         'travelLimits': limits,
-        'attachPoints': [{'name': 'container_attach', 'parent': 'hoist', 'position': _gl((0, 0, REST_PLANE)),
-                          'description': 'centre of the twist-lock plane, i.e. the TOP of the carried box. At hoist 0 it is 18.0 m above the ground; '
-                                         'hoist = (box bottom + box height) - 18.0', 'tag': 'A'}] + twist,
+        'attachPoints': [{'name': 'container', 'node': 'spreader', 'position': [0, 0, 0], 'yawDeg': 90, 'referenceBox': '40HC', 'tag': 'A',
+                          'description': 'centre of the twist-lock plane, i.e. the TOP of the carried box (long axis along the rails, hence yawDeg 90 for a box modelled along X). '
+                                         'The plane is 18.0 m above the ground at hoist 0: hoist = (box bottom + box height) - 18.0'}] + twist,
+        'stretch': [{'node': 'ropes', 'to': 'hoist', 'axis': 'Y', 'offsetM': HEADBLOCK_Z1, 'unitLengthM': 1.0,
+                     'note': 'ropes scale Y = (ropes.y - (hoist.y + offsetM)) / unitLengthM, both children of the trolley; 2.2 at rest'}],
         'groundContact': {'y': 0, 'points': ['gantry'], 'rails': [{'x': -RX}, {'x': RX}], 'tag': 'V'},
         'hoist': {'restAttachM': REST_PLANE, 'lowestAttachM': HC_H, 'spreaderFloatM': SPREADER_FLOAT, 'tag': 'A',
                   'note': 'lowest plane = top of a 40 ft high-cube box standing on the ground; restAttachM suits a 5-high stack plus the engine travel clearance; '
@@ -148,7 +165,7 @@ def sidecar(info):
                   'note': '8 rows at 2.9 m pitch inside the 25.4 m span (the engine row pitch); a carried box clears a 5-high stack by the engine travel clearance'},
         'branding': {'manufacturerWordmark': 'ZPMC', 'swlMark': '40 t', 'unitNumber': UNIT_LABEL, 'bridgePanelNumbers': f'1..{ROWS}', 'operatorBranding': False, 'tag': 'A',
                      'note': 'ZPMC wordmark set in Montserrat ExtraBold on the blue atlas (no official logo artwork); numbered bridge panels over the rows; no operator branding'},
-        'lods': {f'LOD{i}': {'triangles': info['triangles'][f'LOD{i}'], 'material': 'asc_atlas'} for i in range(3)},
+        'lods': {f'LOD{i}': dict({'triangles': info['triangles'][f'LOD{i}'], 'material': 'asc_atlas'}, **({'maxDistanceM': LOD_MAX_DISTANCE_M[i]} if i < 2 else {})) for i in range(3)},
         'provenance': [
             {'fact': '25.4 m rail span over 8 container rows, 40 t rated load', 'tag': 'V', 'source': 'spec #24 (rails, rows and ASC rating)'},
             {'fact': 'dark/medium-blue rail-mounted gantry: twin box-beam bridge, vertical legs on sills with rail bogies, trolley with hoist machinery, yellow spreader',

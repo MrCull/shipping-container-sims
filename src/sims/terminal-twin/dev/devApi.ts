@@ -9,6 +9,8 @@
  *   await __tt.runUntil()                      // to the end (or { time, eventType, moves, vesselsCompleted, maxEvents })
  *   await __tt.query('summary')                // also: container/vessel/sts/groundPosition (+ id), containers, stsList, kpis, eventLog…
  *   __tt.scene()                               // rendered counts { containers, sts, vessels, frames, containerLods, containerAssets, shcLods, shcAssets, ascLods, ascAssets }
+ *   __tt.scene()                               // rendered counts { containers, sts, vessels, frames, containerLods, containerAssets, shcLods, shcAssets, vesselLods, vesselAssets,
+ *                                              //   stsAssets, stsLods, render: { calls, triangles } }
  *   await __tt.step(); await __tt.why(id); await __tt.snapshot()
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
  *   __tt.select('STS01'); __tt.cameraTo('STS01'); __tt.setSpeed(600); __tt.pause(); __tt.clock()
@@ -41,9 +43,11 @@ import type { OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
 import type { AscRigState } from '../modules/ascAssets'
+import type { VesselHullState } from '../modules/vesselRenderer'
 import type { AscPose, ShcPose, StsPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
-import { resolveScenario, type DashboardRendered, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
+import type { StsRenderState } from '../modules/stsAssets'
+import { resolveScenario, type DashboardRendered, type RenderInfo, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
 import type { BreakpointHit, EngineInfo, EventSummary, QueryKind, WorkerRunCondition } from '../worker/protocol'
 
 export interface TwinClock {
@@ -90,7 +94,7 @@ export interface TwinDevApi {
   /** Turn 3D debug overlays on/off (omitted keys unchanged); returns the new state. */
   overlays(next?: Partial<OverlayState>): OverlayState
   /** Rendered counts (null if there is no 3D view). */
-  scene(): (SceneStats & { frames: number }) | null
+  scene(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** What the scene shows at the displayed time: custody per container, status and pose per STS, status per vessel. */
   sceneState(): SceneState | null
   /** Locale + units in use (display only). */
@@ -173,12 +177,16 @@ export interface SceneState {
   vessels: Record<string, { status: string }>
   /** Conflict zones reserved at the displayed time (zone → holder). */
   reservations: Record<string, string>
-  /** Per container: livery atlas index, model size and LOD actually drawn (phase 2 assets). */
+  /** Per container: livery atlas index, model size, LOD and centre actually drawn (phase 2 assets). */
   liveries: Record<string, RenderedLivery>
   /** Per SHC, the phase 2 rig as last drawn: LOD, steering, wheel roll, hoist travel, carrying (empty until the GLB loads). */
   shcRigs: Record<string, ShcRigState>
   /** Per ASC, the phase 2 rig as last drawn: LOD, gantry Z, trolley X, hoist travel, rope scale, vertical stretch, carrying (empty until the GLB loads). */
   ascRigs: Record<string, AscRigState>
+  /** Per STS as drawn by the GLB model: LOD, spreader configuration (20 / 40 / twin-20), boxes carried, spreader and trolley world positions. */
+  stsRendered: Record<string, StsRenderState>
+  /** Per vessel: hull class, line, livery tile, name, hull LOD and the rendered bay grid (TT-27). */
+  vesselHulls: Record<string, VesselHullState>
 }
 
 declare global {
@@ -274,6 +282,8 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         liveries: store.view()?.liveries() ?? {},
         shcRigs: store.view()?.shcRigs() ?? {},
         ascRigs: store.view()?.ascRigs() ?? {},
+        stsRendered: store.view()?.sts() ?? {},
+        vesselHulls: store.view()?.vesselHulls() ?? {},
       }
     },
     display: () => ({ ...store.display }),

@@ -44,6 +44,22 @@ describe('ASC model asset', () => {
     for (const n of ['twistlock_fl', 'twistlock_fr', 'twistlock_rl', 'twistlock_rr']) expect(names, n).toContain(n)
   })
 
+  it('keeps rig nodes exact: they are empties at their pivots, with the meshes in `_geo` children (compression puts its transform on mesh nodes)', () => {
+    const json = readGlbJson(join(DIR, 'asc.glb'))
+    const rig = new Set(['gantry', 'trolley', 'ropes', 'hoist', 'spreader', 'twistlock_fl', 'twistlock_fr', 'twistlock_rl', 'twistlock_rr'])
+    const nodes = (json.nodes ?? []) as { name?: string; mesh?: number; scale?: number[]; translation?: number[] }[]
+    const rigNodes = nodes.filter((n) => rig.has(n.name ?? ''))
+    expect(rigNodes.length).toBe(9 + 5 + 4)
+    for (const n of rigNodes) {
+      expect(n.mesh, n.name).toBeUndefined()
+      expect(n.scale, n.name).toBeUndefined()
+    }
+    // Pivots are exact: the trolley sits at the top of the bridge rails, the hoist 4.2 m below it (plane at 18 m).
+    expect(nodes.find((n) => n.name === 'trolley')!.translation).toEqual([0, expect.closeTo(22.2, 5), 0])
+    expect(nodes.find((n) => n.name === 'hoist')!.translation).toEqual([0, expect.closeTo(-4.2, 5), 0])
+    expect(nodes.filter((n) => n.name?.endsWith('_geo') && n.mesh !== undefined).length).toBe(9 + 5 + 3) // LOD0, LOD1, LOD2 (its spreader has no mesh)
+  })
+
   it('records travel limits with pivots at the mechanical axes, and the container attach point', () => {
     const m = meta()
     expect(m.travelLimits.gantry).toMatchObject({ type: 'translation', axis: '+Z' })
@@ -58,10 +74,12 @@ describe('ASC model asset', () => {
     // Pivots: hoist at the twist-lock plane (raised), ropes derived from the hoist.
     const node = (name: string) => m.nodes.find((n: { name: string }) => n.name === name)
     expect(node('hoist').pivot[1]).toBeCloseTo(m.hoist.restAttachM, 3)
-    expect(node('ropes').derived.from).toBe('hoist')
-    const attach = m.attachPoints.find((a: { name: string }) => a.name === 'container_attach')
-    expect(attach.parent).toBe('hoist')
-    expect(attach.position[1]).toBeCloseTo(m.hoist.restAttachM, 3)
+    // The ropes are a stretch rule (trolley drum to head block), like the STS; the box hangs from the spreader's `container` point.
+    expect(m.stretch).toEqual([expect.objectContaining({ node: 'ropes', to: 'hoist', axis: 'Y' })])
+    expect(node('ropes').pivot[1]).toBeGreaterThan(m.hoist.restAttachM)
+    const attach = m.attachPoints.find((a: { name: string }) => a.name === 'container')
+    expect(attach).toMatchObject({ node: 'spreader', position: [0, 0, 0], yawDeg: 90 })
+    expect(m.lods.LOD0.maxDistanceM).toBeLessThan(m.lods.LOD1.maxDistanceM)
     // Lowest plane = top of a 40 ft HC standing on the ground (the hoist reaches it).
     expect(m.hoist.restAttachM + m.travelLimits.hoist.minM).toBeCloseTo(CONTAINER_DIMS['40HC'].height, 2)
   })

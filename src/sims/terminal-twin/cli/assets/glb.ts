@@ -9,6 +9,9 @@ export interface GltfNode {
   name?: string
   children?: number[]
   mesh?: number
+  translation?: number[]
+  rotation?: number[]
+  scale?: number[]
 }
 export interface GltfPrimitive {
   attributes: Record<string, number>
@@ -21,7 +24,7 @@ export interface GltfJson {
   scenes?: { nodes?: number[] }[]
   nodes?: GltfNode[]
   meshes?: { name?: string; primitives: GltfPrimitive[] }[]
-  accessors?: { count: number }[]
+  accessors?: { count: number; componentType?: number; normalized?: boolean; min?: number[]; max?: number[] }[]
   materials?: { name?: string }[]
   images?: { mimeType?: string; uri?: string }[]
   buffers?: { uri?: string }[]

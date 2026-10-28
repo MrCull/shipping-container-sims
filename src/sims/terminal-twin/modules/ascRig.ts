@@ -8,8 +8,9 @@
 import { travelHoistM } from '../engine'
 import meta from '../assets/models/asc/asc.meta.json'
 
-const node = (name: string) => meta.nodes.find((n) => n.name === name)!
-const ropes = node('ropes') as { derived: { topY: number; restLengthM: number; headblockTopAboveAttachM: number } }
+const ropesNode = meta.nodes.find((n) => n.name === 'ropes') as { pivot: number[] }
+/** The sidecar's `stretch` rule for the ropes: they span from the drum pivot down to the head block top (`offsetM` above the attach plane). */
+const ropeRule = meta.stretch.find((r) => r.node === 'ropes')!
 
 /** Sidecar facts the renderer, picking and the viewer need. */
 export const ASC_MODEL = {
@@ -27,9 +28,10 @@ export const ASC_MODEL = {
   trolleyMaxM: meta.travelLimits.trolley.maxM,
   spreaderFloatM: meta.travelLimits.spreader.maxM,
   twistLockedRad: (meta.travelLimits.twistlock_fl.maxDeg * Math.PI) / 180,
-  ropeTopY: ropes.derived.topY,
-  ropeRestLengthM: ropes.derived.restLengthM,
-  headblockTopAboveAttachM: ropes.derived.headblockTopAboveAttachM,
+  ropeTopY: ropesNode.pivot[1],
+  /** The rope mesh is this long at scale 1 (1 m); the rope node's Y scale is its length in metres. */
+  ropeUnitM: ropeRule.unitLengthM,
+  headblockTopAboveAttachM: ropeRule.offsetM,
   designTiers: meta.stack.designTiers,
   bridgeUnderY: meta.stack.underBridgeM,
   rows: meta.stack.rows,
@@ -73,11 +75,15 @@ export interface AscRigValues {
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
 
+/** Rope length (m) from the drums down to the head block top for a hoist value (model metres). */
+export function ropeLengthFor(hoistM: number): number {
+  const plane = ASC_MODEL.restAttachY + hoistM
+  return ASC_MODEL.ropeTopY - (plane + ASC_MODEL.headblockTopAboveAttachM)
+}
+
 /** Rope node scale for a hoist value (model metres). */
 export function ropeScaleFor(hoistM: number): number {
-  const plane = ASC_MODEL.restAttachY + hoistM
-  const length = ASC_MODEL.ropeTopY - (plane + ASC_MODEL.headblockTopAboveAttachM)
-  return Math.max(0.01, length / ASC_MODEL.ropeRestLengthM)
+  return Math.max(0.01, ropeLengthFor(hoistM) / ASC_MODEL.ropeUnitM)
 }
 
 export function ascRigValues(p: AscRigInput): AscRigValues {

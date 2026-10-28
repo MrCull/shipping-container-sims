@@ -74,14 +74,7 @@
         0.0
       ],
       "axis": "+Y",
-      "derived": {
-        "from": "hoist",
-        "scaleAxis": "+Y",
-        "restLengthM": 2.2,
-        "topY": 22.5,
-        "headblockTopAboveAttachM": 2.3
-      },
-      "description": "four rope strands drum to head block; no travel limit of its own: scale along Y = (topY - (attachY + headblockTopAboveAttachM)) / restLengthM"
+      "description": "four rope strands hanging from the drums, 1 m long at scale 1; no travel limit of its own: the sidecar `stretch` rule scales Y so they reach the head block (2.2 m at rest)"
     },
     {
       "name": "hoist",
@@ -154,6 +147,60 @@
       ],
       "axis": "+Y",
       "description": "twist-lock; 0 = unlocked, 90 degrees = locked"
+    },
+    {
+      "name": "gantry_geo",
+      "parent": "gantry",
+      "role": "mesh",
+      "description": "legs, sills, bogies, head beams, bridge girders, walkways, ladders, e-house"
+    },
+    {
+      "name": "trolley_geo",
+      "parent": "trolley",
+      "role": "mesh",
+      "description": "trolley frame, wheels, machinery houses, drums and motors"
+    },
+    {
+      "name": "ropes_geo",
+      "parent": "ropes",
+      "role": "mesh",
+      "description": "four rope strands (1 m, scaled by the stretch rule)"
+    },
+    {
+      "name": "hoist_geo",
+      "parent": "hoist",
+      "role": "mesh",
+      "description": "head block with sheaves and hangers (LOD2: with the spreader box)"
+    },
+    {
+      "name": "spreader_geo",
+      "parent": "spreader",
+      "role": "mesh",
+      "description": "telescopic 40 ft spreader"
+    },
+    {
+      "name": "twistlock_fl_geo",
+      "parent": "twistlock_fl",
+      "role": "mesh",
+      "description": "twist-lock stem and cone"
+    },
+    {
+      "name": "twistlock_fr_geo",
+      "parent": "twistlock_fr",
+      "role": "mesh",
+      "description": "twist-lock stem and cone"
+    },
+    {
+      "name": "twistlock_rl_geo",
+      "parent": "twistlock_rl",
+      "role": "mesh",
+      "description": "twist-lock stem and cone"
+    },
+    {
+      "name": "twistlock_rr_geo",
+      "parent": "twistlock_rr",
+      "role": "mesh",
+      "description": "twist-lock stem and cone"
     }
   ],
   "travelLimits": {
@@ -226,59 +273,71 @@
   },
   "attachPoints": [
     {
-      "name": "container_attach",
-      "parent": "hoist",
+      "name": "container",
+      "node": "spreader",
       "position": [
         0,
-        18.0,
-        0.0
+        0,
+        0
       ],
-      "description": "centre of the twist-lock plane, i.e. the TOP of the carried box. At hoist 0 it is 18.0 m above the ground; hoist = (box bottom + box height) - 18.0",
-      "tag": "A"
+      "yawDeg": 90,
+      "referenceBox": "40HC",
+      "tag": "A",
+      "description": "centre of the twist-lock plane, i.e. the TOP of the carried box (long axis along the rails, hence yawDeg 90 for a box modelled along X). The plane is 18.0 m above the ground at hoist 0: hoist = (box bottom + box height) - 18.0"
     },
     {
       "name": "twistlock_fl",
+      "node": "spreader",
       "position": [
         1.1295,
-        18.0,
+        0,
         -5.9925
       ],
-      "parent": "hoist",
       "tag": "V",
       "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
     },
     {
       "name": "twistlock_fr",
+      "node": "spreader",
       "position": [
         -1.1295,
-        18.0,
+        0,
         -5.9925
       ],
-      "parent": "hoist",
       "tag": "V",
       "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
     },
     {
       "name": "twistlock_rl",
+      "node": "spreader",
       "position": [
         1.1295,
-        18.0,
+        0,
         5.9925
       ],
-      "parent": "hoist",
       "tag": "V",
       "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
     },
     {
       "name": "twistlock_rr",
+      "node": "spreader",
       "position": [
         -1.1295,
-        18.0,
+        0,
         5.9925
       ],
-      "parent": "hoist",
       "tag": "V",
       "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
+    }
+  ],
+  "stretch": [
+    {
+      "node": "ropes",
+      "to": "hoist",
+      "axis": "Y",
+      "offsetM": 2.3,
+      "unitLengthM": 1.0,
+      "note": "ropes scale Y = (ropes.y - (hoist.y + offsetM)) / unitLengthM, both children of the trolley; 2.2 at rest"
     }
   ],
   "groundContact": {
@@ -328,11 +387,13 @@
   "lods": {
     "LOD0": {
       "triangles": 14474,
-      "material": "asc_atlas"
+      "material": "asc_atlas",
+      "maxDistanceM": 90
     },
     "LOD1": {
       "triangles": 3624,
-      "material": "asc_atlas"
+      "material": "asc_atlas",
+      "maxDistanceM": 300
     },
     "LOD2": {
       "triangles": 556,

@@ -11,15 +11,18 @@
  */
 import * as THREE from 'three'
 import { loadGltf } from './containerAssets'
-import { ascRigValues, ascScaleY } from './ascRig'
+import { ASC_MODEL, ascRigValues, ascScaleY } from './ascRig'
+import meta from '../assets/models/asc/asc.meta.json'
 
 /** GLTFLoader renames duplicate node names (`hoist_1`); the file's own name is kept in `userData.name`. */
 const nodeName = (o: THREE.Object3D): string => (o.userData.name as string | undefined) ?? o.name
 
+const ASC_REST_PLANE = ASC_MODEL.restAttachY
+
 export const ASC_ASSET_URL = new URL('../assets/models/asc/asc.glb', import.meta.url).href
 
-/** [A] LOD switch distances (m) from the camera, with 15% hysteresis. An ASC is 25 m wide, so these are wider than the SHC's. */
-export const ASC_LOD_DISTANCES = { lod0: 90, lod1: 300, hysteresis: 1.15 }
+/** [A] LOD switch distances (m) from the camera (the sidecar's `lods.*.maxDistanceM`), with 15% hysteresis. An ASC is 25 m wide, so these are wider than the SHC's. */
+export const ASC_LOD_DISTANCES = { lod0: meta.lods.LOD0.maxDistanceM, lod1: meta.lods.LOD1.maxDistanceM, hysteresis: 1.15 }
 
 export interface AscRigPose {
   /** Block centre line (world X). */
@@ -113,6 +116,7 @@ export class AscRig {
       this.root.add(lod)
     }
     this.setLod(0)
+    this.pose({ blockX: 0, trolleyX: 0, gantryZ: 0, attachY: ASC_REST_PLANE, carrying: false, tiers: 1 })
   }
 
   /** Picks the LOD for a camera distance (with hysteresis) and shows only that subtree. */

@@ -6,6 +6,7 @@
  *   await __ttAssets.show('container-40', { lod: 'LOD0', livery: 2 })
  *   __ttAssets.setLod('LOD1' | 'auto'); __ttAssets.setLivery(4); __ttAssets.setRig('door_left', 180)
  *   __ttAssets.setStack(5)                              // ASC: reference stack height in tiers; stats().stack reports the fit
+ *   __ttAssets.pose()                                   // world positions of the rig nodes + the reference container
  *   await __ttAssets.yard(18000)                        // instanced TTI-size yard: LOD split, draw calls, triangles, fps
  */
 export type ViewerLod = 'LOD0' | 'LOD1' | 'LOD2' | 'auto'
@@ -68,6 +69,21 @@ export interface AssetViewStats {
   } | null
 }
 
+export type Vec3Tuple = [number, number, number]
+
+/** Where things are in the viewer (world metres, glTF axes). */
+export interface AssetPose {
+  shownLod: string
+  /** World position of every rig node (sidecar `travelLimits` keys) in the shown LOD. */
+  nodes: Record<string, Vec3Tuple>
+  /** Current length (m) of each stretch node, e.g. STS hoist ropes. */
+  stretch: Record<string, number>
+  /** The reference container: hanging from the asset's `container` attach point (cranes), or standing beside it. */
+  reference: { hangingFrom: string | null; size: Vec3Tuple; topCentre: Vec3Tuple }
+  /** Highest point of the shown LOD (e.g. the STS boom tip when raised). */
+  topY: number
+}
+
 export interface YardStats {
   instances: number
   lod0: number
@@ -91,6 +107,7 @@ export interface AssetViewerApi {
   setRig(node: string, value: number): AssetViewStats
   setStack(tiers: number): AssetViewStats
   stats(): AssetViewStats | null
+  pose(): AssetPose | null
   yard(count?: number): Promise<YardStats>
 }
 
