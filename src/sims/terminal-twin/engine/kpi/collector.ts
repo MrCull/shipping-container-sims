@@ -129,7 +129,8 @@ const TERMINAL = ['terminal']
 const stsIds = (c: DefContext) => c.config.sts.map((s) => s.id)
 const shcIds = (c: DefContext) => (c.config.shcs ?? []).map((s) => s.id)
 const blockIds = (c: DefContext) => Object.keys(c.capacityCells)
-const ascIds = (c: DefContext) => blockIds(c).map(ascIdOf)
+const ascIds = (c: DefContext) =>
+  blockIds(c).flatMap((b) => Array.from({ length: c.config.yard?.ascsPerBlock ?? 1 }, (_, n) => ascIdOf(b, n + 1)))
 
 const stsOnVesselS = (w: Window, id: string) => w.spanS - w.sum('sts.waitWorkS', id)
 

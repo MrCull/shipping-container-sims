@@ -71,6 +71,14 @@ describe('KPI collector on real runs', () => {
     expect(total(series, 'asc.cycle-time-s', 'B01-ASC1')).toBeGreaterThan(0)
   })
 
+  it('yard: both ASCs of a paired block get their own utilisation and job counts', () => {
+    const sim = run('asc-2asc-block-conflict')
+    const series = sim.kpiSeries()
+    const ascs = sim.kpiReport().yard!.ascs
+    expect(Object.keys(series.series['asc.jobs'].entities)).toEqual(Object.keys(ascs))
+    for (const [id, k] of Object.entries(ascs)) expect(total(series, 'asc.jobs', id), id).toBe(k.jobs)
+  })
+
   it('handlers: calls per decision point match the TT-03 KPIs', () => {
     const sim = run('asc-1sts-10-boxes-1block')
     const series = sim.kpiSeries()
