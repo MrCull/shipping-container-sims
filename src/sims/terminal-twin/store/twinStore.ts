@@ -29,6 +29,7 @@ import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { VesselHullState } from '../modules/vesselRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
+import type { StsRenderState } from '../modules/stsAssets'
 
 export type TwinPhase = 'setup' | 'running'
 export type DashboardTab = 'charts' | 'report'
@@ -81,14 +82,22 @@ export interface TwinView {
   screenPoint(entityId: string): { x: number; y: number } | null
   /** Where the orbit camera currently looks. */
   cameraTarget(): { x: number; y: number; z: number } | null
-  /** Rendered entity counts plus frames rendered so far; null without a 3D view. */
-  stats(): (SceneStats & { frames: number }) | null
+  /** Rendered entity counts plus frames rendered so far and the last frame's draw calls/triangles; null without a 3D view. */
+  stats(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */
   liveries(): Record<string, RenderedLivery> | null
   /** Rig state per SHC (LOD, steering, wheel roll, hoist travel, carrying); null without a 3D view. */
   shcRigs(): Record<string, ShcRigState> | null
+  /** Per STS: LOD, spreader configuration and drawn positions (GLB cranes); null without a 3D view. */
+  sts(): Record<string, StsRenderState> | null
   /** Per vessel: hull class, line, livery, name, LOD and rendered bay grid (TT-27); null without a 3D view. */
   vesselHulls(): Record<string, VesselHullState> | null
+}
+
+/** The last rendered frame (main pass + shadow pass), from `renderer.info`. */
+export interface RenderInfo {
+  calls: number
+  triangles: number
 }
 
 const RECENT_EVENTS_CAP = FEED_BUFFER_CAP

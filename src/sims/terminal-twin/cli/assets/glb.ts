@@ -10,6 +10,7 @@ export interface GltfNode {
   children?: number[]
   mesh?: number
   translation?: number[]
+  rotation?: number[]
   scale?: number[]
 }
 export interface GltfPrimitive {

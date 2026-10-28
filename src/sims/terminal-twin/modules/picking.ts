@@ -45,7 +45,7 @@ export function entityBounds(model: SceneModel, id: string, time: number): Entit
   }
   if (model.stsIds.includes(id)) {
     const p = model.stsPose(id, time)
-    const height = STS.apexY + 2
+    const height = STS.apexY + 1.3
     return { x: p.gantryX, y: height / 2, z: STS.waterRailZ + STS.gauge / 2, sx: STS.legSpacingX + 4, sy: height, sz: STS.gauge + 6, yaw: 0 }
   }
   if (model.vesselIds.includes(id)) {

@@ -74,6 +74,7 @@ onMounted(() => {
     setLivery: (i) => (stats.value = view!.setLivery(i)),
     setRig: (node, v) => (stats.value = view!.setRig(node, v)),
     stats: () => view?.stats() ?? null,
+    pose: () => view?.pose() ?? null,
     async yard(count) {
       stats.value = null
       const s = await view!.yard(count)
