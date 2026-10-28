@@ -22,7 +22,7 @@ import {
 } from './protocol'
 
 function emptyDelta(): Delta {
-  return { motion: [], custody: [], entities: [], reservations: [], events: [], eventCounts: {}, breakpoint: null }
+  return { newContainers: [], motion: [], custody: [], entities: [], reservations: [], events: [], eventCounts: {}, breakpoint: null }
 }
 
 /** Keep only the latest entry per key (order of last occurrence). */
@@ -66,6 +66,8 @@ export function createEngineHost() {
   let motionRefs = new Map<string, unknown>()
   let statusRefs = new Map<string, string>()
   let lastReservationId = -1
+  /** Containers created during the run that the scene has been told about. */
+  const announced = new Set<string>()
   let breakpoints: Breakpoint[] = []
 
   /** Stop predicate of every run: records the first breakpoint an event hits (the run stops after it). */
@@ -83,6 +85,13 @@ export function createEngineHost() {
     delta.eventCounts[ev.type] = (delta.eventCounts[ev.type] ?? 0) + 1
     for (const id of ev.subjects.containers ?? []) {
       const box = sim.query.container(id)
+      // a box created while the run is going (a truck brings it): the scene registers it, with its first custody, before anything else
+      const first = box.custodyHistory[0]
+      if (first.eventId !== null && !announced.has(id)) {
+        announced.add(id)
+        ;(delta.newContainers ??= []).push({ id, size: box.size, line: box.line })
+        delta.custody.push({ containerId: id, t: first.t, owner: { ...first.owner }, eventId: first.eventId })
+      }
       const last = box.custodyHistory[box.custodyHistory.length - 1]
       if (last && last.eventId === ev.id) {
         const change: CustodyChange = { containerId: id, t: last.t, owner: { ...last.owner }, eventId: last.eventId }
@@ -133,6 +142,25 @@ export function createEngineHost() {
         delta.entities.push({ kind: 'asc', id: asc.id, t: ev.t, status: asc.status })
       }
     }
+    if (ev.type.startsWith('Truck') || ev.type === 'AscJobAssigned') {
+      for (const truck of sim.query.trucks()) {
+        if (motionRefs.get(truck.id) !== truck.motion) {
+          motionRefs.set(truck.id, truck.motion)
+          if (truck.motion.length > 0) delta.motion.push({ entityId: truck.id, segments: truck.motion.map((m) => ({ ...m })) })
+        }
+        const key = `truck:${truck.id}`
+        if (statusRefs.get(key) !== truck.status) {
+          statusRefs.set(key, truck.status)
+          delta.entities.push({ kind: 'truck', id: truck.id, t: ev.t, status: truck.status })
+        }
+      }
+      if (ev.type === 'TruckDeparted') {
+        const id = ev.payload.truckId
+        motionRefs.delete(id)
+        statusRefs.delete(`truck:${id}`)
+        delta.entities.push({ kind: 'truck', id, t: ev.t, status: 'gone' })
+      }
+    }
     for (const r of sim.query.reservations()) {
       if (r.id <= lastReservationId) continue
       lastReservationId = r.id
@@ -153,6 +181,7 @@ export function createEngineHost() {
     loaded = { config, seed }
     motionRefs = new Map()
     statusRefs = new Map()
+    announced.clear()
     for (const s of config.sts) {
       motionRefs.set(s.id, sim.query.sts(s.id).motion)
       statusRefs.set(`sts:${s.id}`, sim.query.sts(s.id).status)
@@ -271,6 +300,12 @@ export function createEngineHost() {
         return s.query.asc(need())
       case 'ascList':
         return s.query.ascs()
+      case 'truck':
+        return s.query.truck(need())
+      case 'trucks':
+        return s.query.trucks()
+      case 'transferStalls':
+        return s.query.transferStalls()
       case 'yardBlocks':
         return s.query.yardBlocks()
       case 'yardSlots':

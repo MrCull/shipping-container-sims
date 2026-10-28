@@ -14,6 +14,8 @@ import {
   blockSpecs,
   boxSpan,
   buildLaneGraph,
+  hasLandside,
+  landsideGraphOf,
   parseYardSlotId,
   positionAt,
   railEndZ,
@@ -24,10 +26,12 @@ import {
   slotZ,
   tierBaseY,
   travelHoistM,
+  TRUCK_DECK_M,
   type BlockSpec,
   type Axis,
   type CustodyRef,
   type LaneGraph,
+  type LandsideGraph,
   type MotionSegment,
   type Reservation,
 } from '../engine'
@@ -40,7 +44,7 @@ import {
   vesselClass,
   type VesselClassSpec,
 } from '../scenario/vesselClasses'
-import type { Delta } from '../worker/protocol'
+import type { Delta, NewContainer } from '../worker/protocol'
 
 /** [A] ISO container outer dimensions (m): length, height, width. */
 export const CONTAINER_DIMS: Record<ContainerSize, { length: number; height: number; width: number }> = {
@@ -136,6 +140,20 @@ interface DriveLeg {
 
 const wrapPi = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a))
 
+/** Where a truck is (plan view, origin = the centre of the box on its chassis) and how its body is turned. */
+export interface TruckPose {
+  x: number
+  z: number
+  /** Body yaw (rad about +Y, three.js sense; 0 = front towards +X, π/2 = towards -Z, the gate queue's heading). */
+  yaw: number
+  steerRad: number
+  /** Signed distance rolled since the start (m): wheel roll angle = odometerM / tyre radius. */
+  odometerM: number
+  travelling: boolean
+  /** In the scene: it has arrived at the gate and has not left yet. */
+  visible: boolean
+}
+
 /** A container's centre and its yaw (0 = length along X, π/2 = along Z). */
 export interface ContainerPose extends Vec3 {
   yaw: number
@@ -167,6 +185,10 @@ export class SceneModel {
   readonly containerSize: Record<string, ContainerSize>
   readonly containerLine: Record<string, string>
   readonly graph: LaneGraph
+  /** Landside roads, gate and stalls (null without a landside). */
+  readonly landside: LandsideGraph | null
+  /** Trucks the scene knows (arrived and not pruned after leaving), in arrival order. */
+  readonly truckIds: string[] = []
   private readonly vessels: Record<string, VesselConfig>
   private readonly blocks: Record<string, BlockSpec>
   private readonly specs: Record<string, VesselClassSpec>
@@ -199,6 +221,7 @@ export class SceneModel {
     )
     for (const s of config.sts) this.axisSegments[s.id] = emptyAxes()
     this.graph = buildLaneGraph(config)
+    this.landside = hasLandside(config) ? landsideGraphOf(config) : null
     this.blocks = Object.fromEntries(blockSpecs(config).map((b) => [b.id, b]))
     const ascCount = config.yard?.ascsPerBlock ?? 1
     for (const b of Object.values(this.blocks)) {
@@ -272,7 +295,28 @@ export class SceneModel {
     return this.specs[id]
   }
 
+  /** A box created during the run (a truck brought it). */
+  private addContainer(c: NewContainer): void {
+    if (this.containerSize[c.id]) return
+    this.containerIds.push(c.id)
+    this.containerSize[c.id] = c.size
+    this.containerLine[c.id] = c.line
+    this.custody[c.id] = []
+  }
+
+  /** Start tracking a truck the first time the engine mentions it. */
+  private ensureTruck(id: string): void {
+    if (this.axisSegments[id]) return
+    this.axisSegments[id] = emptyAxes()
+    this.drives[id] = []
+    this.status[`truck:${id}`] = []
+    this.truckIds.push(id)
+  }
+
   apply(delta: Delta): void {
+    for (const c of delta.newContainers ?? []) this.addContainer(c)
+    for (const e of delta.entities) if (e.kind === 'truck') this.ensureTruck(e.id)
+    for (const plan of delta.motion) if (this.landside && /^T\d+$/.test(plan.entityId)) this.ensureTruck(plan.entityId)
     for (const plan of delta.motion) {
       const axes = this.axisSegments[plan.entityId]
       if (!axes) continue
@@ -294,7 +338,7 @@ export class SceneModel {
     const d = seg.to - seg.from
     if (d === 0) return
     const prev = list[list.length - 1]
-    const yawPrev = prev ? prev.yaw1 : 0
+    const yawPrev = prev ? prev.yaw1 : this.truckIds.includes(shcId) ? Math.PI / 2 : 0
     const target = seg.axis === 'x' ? (d > 0 ? 0 : Math.PI) : d > 0 ? -Math.PI / 2 : Math.PI / 2
     const delta = wrapPi(target - yawPrev)
     const reverse = Math.abs(delta) > (3 * Math.PI) / 4
@@ -341,6 +385,34 @@ export class SceneModel {
       if (i > 0) list.splice(0, i)
     }
     for (const [zone, list] of Object.entries(this.reservations)) this.reservations[zone] = list.filter((r) => r.to >= time)
+    // trucks that left before `time` are not drawn any more: forget them
+    for (const id of [...this.truckIds]) {
+      const list = this.status[`truck:${id}`] ?? []
+      const last = list[list.length - 1]
+      if (!last || last.status !== 'gone' || last.t >= time) continue
+      this.truckIds.splice(this.truckIds.indexOf(id), 1)
+      delete this.axisSegments[id]
+      delete this.drives[id]
+      delete this.status[`truck:${id}`]
+    }
+  }
+
+  /** Where a truck is at `time` (the spawn point at the gate before its first move). */
+  truckPose(id: string, time: number): TruckPose {
+    const axes = this.axisSegments[id]
+    const gate = this.landside?.gate
+    const value = (axis: Axis, initial: number) => {
+      const list = axes?.[axis] ?? []
+      if (list.length === 0) return initial
+      const i = lastAtOrBefore(list, time, (s) => s.t0)
+      return i < 0 ? list[0].from : positionAt(list[i], time)
+    }
+    const list = this.status[`truck:${id}`] ?? []
+    const i = lastAtOrBefore(list, time, (e) => e.t)
+    const visible = i >= 0 && list[i].status !== 'gone'
+    const drive = this.driveState(id, time)
+    const resting = this.drives[id]?.length ? drive : { ...drive, yaw: Math.PI / 2 }
+    return { x: value('x', gate?.queueX ?? 0), z: value('z', gate?.spawnZ ?? 0), ...resting, visible }
   }
 
   shcPose(shcId: string, time: number): ShcPose {
@@ -417,7 +489,7 @@ export class SceneModel {
     }
   }
 
-  statusAt(kind: 'sts' | 'vessel' | 'shc' | 'asc', id: string, time: number): string {
+  statusAt(kind: 'sts' | 'vessel' | 'shc' | 'asc' | 'truck', id: string, time: number): string {
     const list = this.status[`${kind}:${id}`] ?? []
     const i = lastAtOrBefore(list, time, (e) => e.t)
     return i < 0 ? 'unknown' : list[i].status
@@ -465,6 +537,11 @@ export class SceneModel {
     if (kind === 'shc') {
       const p = this.shcPose(id, time)
       return { x: p.x, y: p.lift + dims.height / 2, z: p.z, yaw: p.yaw, carriedBy: id }
+    }
+    if (kind === 'external') return null
+    if (kind === 'truck') {
+      const p = this.truckPose(id, time)
+      return p.visible ? { x: p.x, y: TRUCK_DECK_M + dims.height / 2, z: p.z, yaw: p.yaw } : null
     }
     if (kind === 'wtpPad') {
       const pad = this.graph.pads.find((p) => p.id === id)
@@ -518,6 +595,10 @@ export class SceneModel {
     if (this.initialAsc[id]) {
       const p = this.ascPose(id, time)
       return { x: p.x, y: 6, z: p.z }
+    }
+    if (this.truckIds.includes(id)) {
+      const p = this.truckPose(id, time)
+      return p.visible ? { x: p.x, y: 2, z: p.z } : null
     }
     if (this.axisSegments[id]) {
       const p = this.stsPose(id, time)

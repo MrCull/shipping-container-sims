@@ -19,7 +19,7 @@ import type {
   TimelineReport,
 } from '../engine'
 import type { Breakpoint } from '../modules/breakpoints'
-import type { ScenarioConfig } from '../scenario/types'
+import type { ContainerSize, ScenarioConfig } from '../scenario/types'
 
 /** Serialisable subset of the engine's RunCondition (no predicate). */
 export type WorkerRunCondition = Omit<RunCondition, 'predicate'>
@@ -47,6 +47,9 @@ export type QueryKind =
   | 'wtpPad'
   | 'asc'
   | 'ascList'
+  | 'truck'
+  | 'trucks'
+  | 'transferStalls'
   | 'yardBlocks'
   | 'yardSlots'
   | 'reservations'
@@ -98,7 +101,7 @@ export interface CustodyChange {
 }
 
 export interface EntityStateChange {
-  kind: 'sts' | 'vessel' | 'shc' | 'asc'
+  kind: 'sts' | 'vessel' | 'shc' | 'asc' | 'truck'
   id: string
   t: number
   status: string
@@ -122,7 +125,16 @@ export interface BreakpointHit {
   event: EventSummary
 }
 
+/** A container created while the run is going (a box a truck brings, TT-13): the scene learns it here. */
+export interface NewContainer {
+  id: string
+  size: ContainerSize
+  line: string
+}
+
 export interface Delta {
+  /** Containers created in this batch (before their first custody change). */
+  newContainers?: NewContainer[]
   motion: MotionPlan[]
   custody: CustodyChange[]
   entities: EntityStateChange[]
