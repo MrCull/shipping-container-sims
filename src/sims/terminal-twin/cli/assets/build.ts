@@ -25,7 +25,7 @@ import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer'
 import { ASSETS_DIR, MODELS_DIR, runBudgetCli } from './budgetCheck'
 
 const GENERATOR = join(ASSETS_DIR, 'generators', 'build.py')
-const GROUPS = ['containers', 'shc']
+const GROUPS = ['containers', 'shc', 'sts']
 
 interface Options {
   only: string[]

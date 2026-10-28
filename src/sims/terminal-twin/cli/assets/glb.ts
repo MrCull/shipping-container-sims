@@ -9,6 +9,9 @@ export interface GltfNode {
   name?: string
   children?: number[]
   mesh?: number
+  translation?: number[]
+  rotation?: number[]
+  scale?: number[]
 }
 export interface GltfPrimitive {
   attributes: Record<string, number>
