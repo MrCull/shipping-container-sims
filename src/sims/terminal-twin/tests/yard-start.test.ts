@@ -4,7 +4,8 @@
  */
 import { describe, expect, it } from 'vitest'
 import { candidateSlots, createSimulation, yardCapacityCells, type DecisionHandler, type EngineEvent, type Simulation } from '../engine'
-import { ScenarioBuilder } from '../scenario/builder'
+import { SceneModel } from '../modules/sceneModel'
+import { DEFAULT_ASC_KINEMATICS, ScenarioBuilder, withYard } from '../scenario/builder'
 import type { ScenarioConfig, YardStartConfig } from '../scenario/types'
 
 const HOUR = 3600
@@ -234,5 +235,28 @@ describe('empty start', () => {
     const config = scenario({ start: { mode: 'empty' } })
     delete config.landside
     expect(() => createSimulation(config)).toThrow(/landside/)
+  })
+})
+
+describe('browser scene model', () => {
+  it('starts with the same boxes in the same slots as the engine (pre-filled), and none for an empty start', () => {
+    const config = scenario({ start: { mode: 'prefilled', targetPct: 40 } })
+    const sim = createSimulation(config)
+    const model = new SceneModel(config, config.seed)
+    const engine = Object.fromEntries(sim.query.containers().map((c) => [c.id, `${c.custody.kind}:${c.custody.id}`]))
+    expect(new Set(model.containerIds)).toEqual(new Set(Object.keys(engine)))
+    for (const id of model.containerIds) {
+      const o = model.custodyAt(id, 0)
+      expect(`${o.kind}:${o.id}`, id).toBe(engine[id])
+    }
+    const empty = scenario({ start: { mode: 'empty' } })
+    const em = new SceneModel(empty, empty.seed)
+    expect(em.containerIds.some((id) => em.custodyAt(id, 0).kind === 'yardSlot')).toBe(false)
+    expect(em.containerIds.length).toBe(createSimulation(empty).query.containers().length)
+  })
+
+  it('the setup dialog helper applies the yard start to the config', () => {
+    const config = withYard(scenario(), { blocks: [{ bays: 6, tiers: 3, wtpPads: 5, transferStalls: 5 }], asc: DEFAULT_ASC_KINEMATICS, start: { mode: 'warmup', warmUpS: 7200 } })
+    expect(config.yardStart).toEqual({ mode: 'warmup', warmUpS: 7200 })
   })
 })

@@ -122,6 +122,8 @@ export interface YardSetup {
   asc: AscKinematics
   /** ASCs per block (TT-08); omitted keeps the scenario's value. */
   ascsPerBlock?: 1 | 2
+  /** Yard start mode (TT-14); omitted keeps the scenario's value. */
+  start?: YardStartConfig
 }
 
 /**
@@ -149,6 +151,7 @@ export function withYard(config: ScenarioConfig, setup: YardSetup): ScenarioConf
   }
   const ascsPerBlock = setup.ascsPerBlock ?? config.yard?.ascsPerBlock
   if (ascsPerBlock) next.yard.ascsPerBlock = ascsPerBlock
+  if (setup.start) next.yardStart = { ...setup.start }
   next.kinematics.asc = JSON.parse(JSON.stringify(setup.asc))
   return next
 }

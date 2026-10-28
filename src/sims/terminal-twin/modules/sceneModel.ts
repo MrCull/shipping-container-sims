@@ -37,6 +37,7 @@ import {
 } from '../engine'
 import { planCargo } from '../scenario/bayPlan'
 import { planExportYard } from '../scenario/exportYard'
+import { prefillOf } from '../engine/prefill'
 import type { ContainerSize, ScenarioConfig, VesselConfig } from '../scenario/types'
 import {
   parseVesselSlotId,
@@ -207,9 +208,19 @@ export class SceneModel {
     this.config = config
     this.seed = seed
     const cargo = planCargo(config, seed)
+    // yard start (TT-14): the pre-fill (same pure planner and default strategy as the engine) or an empty yard (no pool)
+    const startMode = config.yardStart?.mode
+    const emptyStart = (startMode === 'empty' || startMode === 'warmup') && blockSpecs(config).length > 0
+    const prefill = prefillOf(config, cargo, seed)
+    if (emptyStart) cargo.containers = cargo.containers.filter((c) => c.flow !== 'pool')
     this.containerIds = cargo.containers.map((c) => c.id)
     this.containerSize = Object.fromEntries(cargo.containers.map((c) => [c.id, c.size]))
     this.containerLine = Object.fromEntries(cargo.containers.map((c) => [c.id, c.line]))
+    for (const imp of prefill?.imports ?? []) {
+      this.containerIds.push(imp.id)
+      this.containerSize[imp.id] = imp.size
+      this.containerLine[imp.id] = imp.line
+    }
     this.vessels = Object.fromEntries(config.vessels.map((v) => [v.id, v]))
     this.specs = Object.fromEntries(config.vessels.map((v) => [v.id, vesselClass(v.sizeClass)]))
     this.anchorageSlot = Object.fromEntries(config.vessels.map((v, i) => [v.id, i]))
@@ -241,12 +252,18 @@ export class SceneModel {
       this.status[`shc:${shc.id}`] = [{ t: 0, status: 'parked' }]
     }
     // export boxes start in the stacks (TT-10); discharge boxes on board
-    const exportSlot = new Map(planExportYard(config, cargo).map((p) => [p.containerId, p.slotId]))
+    const placements = prefill ? prefill.placements : emptyStart ? [] : planExportYard(config, cargo)
+    const exportSlot = new Map(placements.map((p) => [p.containerId, p.slotId]))
     for (const c of cargo.containers) {
       const owner: CustodyRef =
-        c.flow !== 'discharge' ? { kind: 'yardSlot', id: exportSlot.get(c.id) as string } : { kind: 'vesselSlot', id: c.slotId }
+        c.flow === 'discharge'
+          ? { kind: 'vesselSlot', id: c.slotId }
+          : emptyStart
+            ? { kind: 'external', id: 'outside' } // booked exports wait outside until a truck brings them
+            : { kind: 'yardSlot', id: exportSlot.get(c.id) as string }
       this.custody[c.id] = [{ t: 0, owner }]
     }
+    for (const imp of prefill?.imports ?? []) this.custody[imp.id] = [{ t: 0, owner: { kind: 'yardSlot', id: exportSlot.get(imp.id) as string } }]
     for (const v of config.vessels) this.status[`vessel:${v.id}`] = [{ t: 0, status: 'scheduled' }]
     for (const s of config.sts) this.status[`sts:${s.id}`] = [{ t: 0, status: 'idle' }]
   }

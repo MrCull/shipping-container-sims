@@ -105,6 +105,16 @@ const en = {
   'setup.yard.ascs': 'ASCs per block',
   'setup.yard.ascsOne': '1 ASC',
   'setup.yard.ascsTwo': '2 ASCs',
+  'setup.yard.start': 'Yard start',
+  'setup.yard.start.prefilled': 'Pre-filled',
+  'setup.yard.start.warmup': 'Warm-up',
+  'setup.yard.start.empty': 'Empty',
+  'setup.yard.targetPct': 'Fill target (% of cells)',
+  'setup.yard.warmUpH': 'Warm-up (h)',
+  'setup.yard.startNoLandside':
+    'This scenario has no landside, so only a pre-filled start is available: warm-up and empty starts need trucks to bring the export boxes.',
+  'setup.yard.errorTarget': 'The fill target must be from 0 to 100 %',
+  'setup.yard.errorWarmUp': 'The warm-up must be from 1 to 720 hours',
   'setup.yard.twinNote':
     'Two ASCs share the block rails and never pass each other. The waterside ASC prefers WTP work; the ascDispatch decision point can override.',
   'setup.yard.gantrySpeed': 'ASC gantry speed ({unit})',

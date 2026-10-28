@@ -177,3 +177,9 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Import dwell / export window:** how long an import stands in the yard before a truck may collect it (default lognormal, median 3 days); the period before a vessel's ETA (default 1 to 5 days) in which trucks may deliver its exports.
 - **Segregation:** trucks never enter the waterside network and SHCs never use the gate (invariant `landside.segregation`).
 - **Truck turn time:** gate-in to gate-out.
+
+## Yard start (TT-14)
+
+- **Yard start mode:** how the yard looks at t = 0: **pre-filled** (default; exports, empty pool and imports placed through the selected yard-allocation strategy up to a target % of the cells), **warm-up** (starts empty; a warm-up period of truck and vessel activity runs first and is excluded from KPIs and end conditions) or **empty** (starts empty; exports arrive by truck during the run).
+- **Pre-fill:** the starting population of a pre-filled yard: boxes booked to the scenario's vessels, imports awaiting pickup with their dwell partly elapsed, and the empty pool.
+- **Warm-up / measured period:** the first `warmUpS` of a warm-up start / everything after it. At `WarmUpEnded` the KPI and end-condition counters restart at zero.
