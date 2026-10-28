@@ -24,7 +24,7 @@ export interface GltfJson {
   scenes?: { nodes?: number[] }[]
   nodes?: GltfNode[]
   meshes?: { name?: string; primitives: GltfPrimitive[] }[]
-  accessors?: { count: number }[]
+  accessors?: { count: number; componentType?: number; normalized?: boolean; min?: number[]; max?: number[] }[]
   materials?: { name?: string }[]
   images?: { mimeType?: string; uri?: string }[]
   buffers?: { uri?: string }[]

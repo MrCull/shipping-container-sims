@@ -56,6 +56,7 @@ class MeshBuilder:
     def __init__(self, uv_layers=1):
         self.verts = []
         self.faces = []
+        self.smooth = []
         self.uvs = [[] for _ in range(uv_layers)]
 
     def quad(self, points, uv0, uv1=None, outward=None):
@@ -68,7 +69,8 @@ class MeshBuilder:
                 uv_sets = [list(reversed(u)) for u in uv_sets]
         base = len(self.verts)
         self.verts.extend(tuple(round(c, 6) for c in p) for p in pts)
-        self.faces.append(tuple(range(base, base + 4)))
+        self.faces.append(tuple(range(base, base + len(pts))))
+        self.smooth.append(False)
         for layer, uvs in enumerate(self.uvs):
             src = uv_sets[layer] if layer < len(uv_sets) else uv_sets[0]
             uvs.extend(src)
@@ -85,6 +87,7 @@ class MeshBuilder:
         base = len(self.verts)
         self.verts.extend(tuple(round(c, 6) for c in p) for p in pts)
         self.faces.append(tuple(range(base, base + len(pts))))
+        self.smooth.append(False)
         self.uvs[0].extend(uvs)
         for extra in self.uvs[1:]:
             extra.extend([uvs[0]] * len(pts))
@@ -93,6 +96,53 @@ class MeshBuilder:
         """Moves every vertex by -offset (to express the mesh in a rig node's local frame)."""
         ox, oy, oz = offset
         self.verts = [(x - ox, y - oy, z - oz) for x, y, z in self.verts]
+
+    def tri(self, points, uv0, outward=None):
+        """One triangle (same conventions as `quad`)."""
+        self.quad(points, uv0, outward=outward)
+
+    def grid(self, rings, uv_of, flip=False, smooth=True):
+        """A smooth surface through `rings` (a list of equally long point lists),
+        with shared vertices: ring i point j joins ring i+1 point j. `uv_of(point)`
+        gives each vertex its UV (so UVs must be continuous over the surface).
+        `flip` reverses the winding."""
+        base = len(self.verts)
+        n = len(rings[0])
+        for ring in rings:
+            for p in ring:
+                self.verts.append(tuple(round(c, 6) for c in p))
+                uv = uv_of(p)
+                for uvs in self.uvs:
+                    uvs.append(uv)
+        for i in range(len(rings) - 1):
+            for j in range(n - 1):
+                a, b = base + i * n + j, base + (i + 1) * n + j
+                face = (a, b, b + 1, a + 1)
+                self.faces.append(tuple(reversed(face)) if flip else face)
+                self.smooth.append(smooth)
+
+    def cylinder(self, centre, radius, height, segments, uv, axis='z', caps=True):
+        """Closed prism approximating a cylinder (flat UV `uv`). `axis` x/y/z; `centre` is the base centre."""
+        cx, cy, cz = centre
+
+        def at(a, h):
+            c, s_ = radius * math.cos(a), radius * math.sin(a)
+            if axis == 'z':
+                return (cx + c, cy + s_, cz + h)
+            if axis == 'y':
+                return (cx + c, cy + h, cz + s_)
+            return (cx + h, cy + c, cz + s_)
+        d = {'x': (1, 0, 0), 'y': (0, 1, 0), 'z': (0, 0, 1)}[axis]
+        for k in range(segments):
+            a0, a1 = 2 * math.pi * k / segments, 2 * math.pi * (k + 1) / segments
+            mid = at((a0 + a1) / 2, height / 2)
+            axis_mid = (cx + d[0] * height / 2, cy + d[1] * height / 2, cz + d[2] * height / 2)
+            outward = tuple(m - c for m, c in zip(mid, axis_mid))
+            self.quad([at(a0, 0), at(a1, 0), at(a1, height), at(a0, height)], [uv] * 4, outward=outward)
+        if caps:
+            for h, sign in ((0, -1), (height, 1)):
+                pts = [at(2 * math.pi * k / segments, h) for k in range(segments)]
+                self.quad(pts, [uv] * segments, outward=tuple(sign * c for c in d))
 
     def box_faces(self, lo, hi, faces, uv_for_face, uv1_for_face=None):
         """Axis-aligned box from `lo` to `hi`, emitting only the listed faces
@@ -117,6 +167,15 @@ class MeshBuilder:
     def triangles(self):
         return sum(len(f) - 2 for f in self.faces)
 
+    def extend(self, other):
+        """Appends another builder's faces (same UV layer count)."""
+        base = len(self.verts)
+        self.verts.extend(other.verts)
+        self.faces.extend(tuple(base + i for i in f) for f in other.faces)
+        self.smooth.extend(other.smooth)
+        for mine, theirs in zip(self.uvs, other.uvs):
+            mine.extend(theirs)
+
     def to_object(self, name, material, parent=None, uv_names=('UVMap', 'UV1')):
         mesh = bpy.data.meshes.new(name)
         mesh.from_pydata(self.verts, [], self.faces)
@@ -126,8 +185,8 @@ class MeshBuilder:
             # Every quad has its own 4 vertices, so a loop's vertex index is its UV index.
             for i, loop in enumerate(mesh.loops):
                 uv_layer.data[i].uv = uvs[loop.vertex_index]
-        for poly in mesh.polygons:
-            poly.use_smooth = False
+        for poly, smooth in zip(mesh.polygons, self.smooth):
+            poly.use_smooth = smooth
         mesh.materials.append(material)
         obj = bpy.data.objects.new(name, mesh)
         bpy.context.scene.collection.objects.link(obj)

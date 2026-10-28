@@ -27,6 +27,7 @@ import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
 import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
+import type { VesselHullState } from '../modules/vesselRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
 import type { StsRenderState } from '../modules/stsAssets'
 
@@ -89,6 +90,8 @@ export interface TwinView {
   shcRigs(): Record<string, ShcRigState> | null
   /** Per STS: LOD, spreader configuration and drawn positions (GLB cranes); null without a 3D view. */
   sts(): Record<string, StsRenderState> | null
+  /** Per vessel: hull class, line, livery, name, LOD and rendered bay grid (TT-27); null without a 3D view. */
+  vesselHulls(): Record<string, VesselHullState> | null
 }
 
 /** The last rendered frame (main pass + shadow pass), from `renderer.info`. */

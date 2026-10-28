@@ -1,0 +1,143 @@
+{
+  "image": "embedded in each vessel GLB (material vessel_livery baseColorTexture)",
+  "size": [
+    2048,
+    2048
+  ],
+  "tileCols": 2,
+  "tileRows": 6,
+  "tileSizeUv": [
+    0.5,
+    0.16666666666666666
+  ],
+  "uvConvention": "glTF TEXCOORD_0 is authored for tile 0; add (index % tileCols, floor(index / tileCols)) * tileSizeUv per vessel",
+  "genericIndex": 10,
+  "liveries": [
+    {
+      "index": 0,
+      "line": "HMM",
+      "hull": "#1f3260",
+      "funnel": "#f47b20",
+      "wordmark": "HMM",
+      "tag": "A"
+    },
+    {
+      "index": 1,
+      "line": "MSC",
+      "hull": "#1c1c1e",
+      "funnel": "#f2c200",
+      "wordmark": "MSC",
+      "tag": "A"
+    },
+    {
+      "index": 2,
+      "line": "Maersk",
+      "hull": "#3a93c3",
+      "funnel": "#3a93c3",
+      "wordmark": "MAERSK",
+      "tag": "A"
+    },
+    {
+      "index": 3,
+      "line": "CMA CGM",
+      "hull": "#16306b",
+      "funnel": "#16306b",
+      "wordmark": "CMA CGM",
+      "tag": "A"
+    },
+    {
+      "index": 4,
+      "line": "Hapag-Lloyd",
+      "hull": "#0d2b52",
+      "funnel": "#ef7d00",
+      "wordmark": "Hapag-Lloyd",
+      "tag": "A"
+    },
+    {
+      "index": 5,
+      "line": "ONE",
+      "hull": "#c4006f",
+      "funnel": "#c4006f",
+      "wordmark": "ONE",
+      "tag": "A"
+    },
+    {
+      "index": 6,
+      "line": "Evergreen",
+      "hull": "#00733a",
+      "funnel": "#f4f5f6",
+      "wordmark": "EVERGREEN",
+      "tag": "A"
+    },
+    {
+      "index": 7,
+      "line": "COSCO",
+      "hull": "#1d4f91",
+      "funnel": "#1d4f91",
+      "wordmark": "COSCO SHIPPING",
+      "tag": "A"
+    },
+    {
+      "index": 8,
+      "line": "ZIM",
+      "hull": "#1d2a5e",
+      "funnel": "#f4f5f6",
+      "wordmark": "ZIM",
+      "tag": "A"
+    },
+    {
+      "index": 9,
+      "line": "Yang Ming",
+      "hull": "#2b2f36",
+      "funnel": "#f2c318",
+      "wordmark": "YANG MING",
+      "tag": "A"
+    },
+    {
+      "index": 10,
+      "line": null,
+      "hull": "#45556b",
+      "funnel": "#1f2328",
+      "wordmark": "",
+      "tag": "A"
+    }
+  ],
+  "regions": {
+    "wordmark": [
+      8,
+      8,
+      1016,
+      150
+    ],
+    "hull": [
+      8,
+      162,
+      48,
+      333
+    ],
+    "funnel": [
+      108,
+      162,
+      428,
+      333
+    ]
+  },
+  "hullStripM": [
+    -20.0,
+    36.0
+  ],
+  "provenance": [
+    {
+      "fact": "hull, boot-top, funnel colours and funnel marks approximate each line's fleet livery",
+      "tag": "A"
+    },
+    {
+      "fact": "hull-side wordmarks reuse the container atlas wordmark typefaces (open licence)",
+      "tag": "A"
+    },
+    {
+      "fact": "no official logo artwork; the Maersk-style star and Evergreen-style ring are simple geometric marks",
+      "tag": "M"
+    }
+  ]
+}

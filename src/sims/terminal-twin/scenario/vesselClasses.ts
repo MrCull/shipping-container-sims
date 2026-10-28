@@ -46,6 +46,8 @@ export const TIER_PITCH_M = 2.896
 export const BOW_M = 20
 /** Gap between the quay edge (Z = 0) and the vessel side (m). */
 export const FENDER_GAP_M = 2
+/** [A] Quay level above the waterline (m): the renderer's water plane and the hull assets' waterline (TT-27). */
+export const QUAY_ABOVE_WATER_M = 2.5
 /** Distance from a 40 ft cell centre to the centre of each 20 ft half (m). */
 export const HALF_OFFSET_M = 3.067
 

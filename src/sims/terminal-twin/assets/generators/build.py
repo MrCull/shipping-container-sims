@@ -6,7 +6,7 @@ copies everything into assets/models/). Direct use:
     python build.py --out <staging dir> [--only containers] [--no-previews]
     blender --background --python build.py -- --out <staging dir>
 
-Groups: containers, shc, sts. Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
+Groups: containers, shc, sts, vessels (needs --vessel-classes <json>: the engine class table + bay grid). Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
 Writes, under <staging>/sts/:
     sts-malaccamax.glb / .meta.json   rigged Malaccamax quay crane (LOD0-2)
     sts-atlas.json                    paint/branding atlas layout (crane-number plates)
@@ -36,9 +36,11 @@ from tt_assets import containers as C  # noqa: E402
 from tt_assets import liveries as LV  # noqa: E402
 from tt_assets import shc as S  # noqa: E402
 from tt_assets import shc_meta as SM  # noqa: E402
+from tt_assets import vessel_liveries as VLV  # noqa: E402
+from tt_assets import vessels as VS  # noqa: E402
 
 FONTS = os.path.join(HERE, 'fonts')
-GROUPS = ('containers', 'shc', 'sts')
+GROUPS = ('containers', 'shc', 'sts', 'vessels')
 from tt_assets import sts as STS  # noqa: E402
 from tt_assets import sts_atlas as STSA  # noqa: E402
 
@@ -250,10 +252,74 @@ def build_sts(out_dir, previews=True, samples=48):
                      os.path.join(preview_dir, f'{STS.NAME}-closeup.webp'), samples=samples)
 
 
+def save_atlas_preview(png, path, size=1024):
+    B.reset_scene()
+    img = B.load_image(png)
+    img.scale(size, size)
+    scene = bpy.context.scene
+    scene.render.image_settings.file_format = 'WEBP'
+    scene.render.image_settings.quality = 85
+    scene.render.image_settings.color_mode = 'RGB'
+    img.save_render(path, scene=scene)
+
+
+def build_vessels(out_dir, classes_file, previews=True, samples=48):
+    with open(classes_file, encoding='utf-8') as f:
+        table = json.load(f)
+    os.makedirs(out_dir, exist_ok=True)
+    preview_dir = os.path.join(out_dir, 'previews')
+    os.makedirs(preview_dir, exist_ok=True)
+    tmp = os.path.join(out_dir, '.work')
+    os.makedirs(tmp, exist_ok=True)
+    atlas_png = os.path.join(tmp, 'vessel-livery-atlas.png')
+    print('[vessels] rendering vessel livery atlas', flush=True)
+    VLV.render_atlas(atlas_png, FONTS)
+    write_json(os.path.join(out_dir, 'vessel-livery-atlas.json'), VLV.manifest())
+    if previews:
+        save_atlas_preview(atlas_png, os.path.join(preview_dir, 'vessel-livery-atlas.webp'))
+
+    for key, cls in table['classes'].items():
+        B.reset_scene()
+        atlas = B.load_image(atlas_png, name='vessel-livery-atlas')
+        root, info = VS.build_vessel(key, cls, table['grid'], atlas)
+        name = info['name']
+        t = info['triangles']
+        print(f'[vessels] {name}: LOD0 {t["LOD0"]} tris, LOD1 {t["LOD1"]} tris, LOD2 {t["LOD2"]} tris', flush=True)
+        B.export_glb(root, os.path.join(out_dir, f'{name}.glb'))
+        write_json(os.path.join(out_dir, f'{name}.meta.json'), VS.sidecar(key, cls, table['grid'], info))
+        if not previews:
+            continue
+        # Previews show LOD0 in the tile-0 (HMM) livery, on water.
+        for lod in ('LOD1', 'LOD2'):
+            for child in bpy.data.objects[lod].children:
+                child.hide_render = True
+        L = cls['loaM']
+        cam, ground = B.setup_preview_stage(ground_size=L * 8)
+        ground.location = (L / 2, 0, 0)
+        ground.data.materials[0].node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = B.hex_to_linear('#2d5873')
+        ground.data.materials[0].node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = 0.3
+        cam.data.clip_end = L * 10
+        h = info['hull']
+        top = h.z_bridge
+        views = {
+            'side': ((L * 0.5, -L * 1.25, top * 0.9), (L * 0.5, 0, top * 0.35)),
+            'three-quarter': ((L * 1.1, -L * 0.75, L * 0.38), (L * 0.5, 0, top * 0.25)),
+            'bow': ((L + L * 0.32, -L * 0.2, top * 0.75), (L * 0.75, 0, top * 0.4)),
+        }
+        for view, (loc, tgt) in views.items():
+            B.render_preview(cam, loc, tgt, os.path.join(preview_dir, f'{name}-{view}.webp'), samples=samples)
+    os.makedirs(out_dir, exist_ok=True)
+    preview_dir = os.path.join(out_dir, 'previews')
+    os.makedirs(preview_dir, exist_ok=True)
+    tmp = os.path.join(out_dir, '.work')
+    os.makedirs(tmp, exist_ok=True)
+
+
 def main(argv):
     p = argparse.ArgumentParser(description='Generate Terminal Twin assets with Blender (bpy).')
     p.add_argument('--out', required=True, help='staging directory')
     p.add_argument('--only', choices=GROUPS, action='append', help='asset group(s); default all')
+    p.add_argument('--vessel-classes', help='JSON with the engine vessel class table + bay grid (vessels group)')
     p.add_argument('--no-previews', action='store_true', help='skip Cycles previews (fast iteration)')
     p.add_argument('--samples', type=int, default=48, help='Cycles samples per preview')
     args = p.parse_args(argv)
@@ -265,6 +331,10 @@ def main(argv):
         build_shc(os.path.join(args.out, 'shc'), previews=not args.no_previews, samples=args.samples)
     if 'sts' in groups:
         build_sts(os.path.join(args.out, 'sts'), previews=not args.no_previews, samples=args.samples)
+    if 'vessels' in groups:
+        if not args.vessel_classes:
+            p.error('--vessel-classes is required for the vessels group')
+        build_vessels(os.path.join(args.out, 'vessels'), args.vessel_classes, previews=not args.no_previews, samples=args.samples)
 
 
 if __name__ == '__main__':

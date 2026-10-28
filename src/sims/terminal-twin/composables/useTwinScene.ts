@@ -182,6 +182,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       liveries: () => view?.renderedLiveries() ?? null,
       shcRigs: () => view?.renderedShcs() ?? null,
       sts: () => view?.renderedSts() ?? null,
+      vesselHulls: () => view?.vesselHulls() ?? null,
     })
     frame = requestAnimationFrame(loop)
   })
