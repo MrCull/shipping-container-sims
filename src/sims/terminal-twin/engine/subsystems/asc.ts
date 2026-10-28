@@ -49,7 +49,7 @@ import { parseVesselSlotId } from '../../scenario/vesselClasses'
 import { maybeDispatch } from './shc'
 import { landsideGraphOf } from '../landsideGraph'
 import { truckReadyForPick } from './landside'
-import { slotGantryX } from './loadPrep'
+import { pumpLoadPrep, slotGantryX } from './loadPrep'
 import {
   isBlockedStart,
   isParkHold,
@@ -1245,6 +1245,7 @@ export const ascReactors: ReactorMap = {
       yard.productiveMoves++
       yard.perBlock[asc.blockId].productiveMoves++
     }
+    pumpLoadPrep(ctx) // an export box a truck delivered (empty start) may be the next one to load
   }),
   AscReady: phase((e, ctx) => maybeDispatchAsc(ctx, e.payload.blockId)),
 }

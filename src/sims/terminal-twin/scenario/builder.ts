@@ -35,7 +35,7 @@ import {
 } from './types'
 import { DEFAULT_WTP_PADS } from '../engine/yardLayout'
 import type { DecisionsConfig } from '../engine/decisions/types'
-import type { DwellDistribution, EmptyPoolConfig, VesselSizeClass } from './types'
+import type { DwellDistribution, EmptyPoolConfig, VesselSizeClass, YardStartConfig } from './types'
 
 export { LINE_OWNER_PREFIX }
 
@@ -344,6 +344,12 @@ export class ScenarioBuilder {
       ...rest,
       gate: { ...DEFAULT_GATE, ...this.config.landside?.gate, ...gate },
     })
+    return this
+  }
+
+  /** Yard start mode (TT-14): pre-filled to a target %, warm-up, or empty. */
+  yardStart(start: YardStartConfig): this {
+    this.config.yardStart = { ...start }
     return this
   }
 

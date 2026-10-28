@@ -340,6 +340,8 @@ export interface EventPayloads {
     fallback: string
   }
   DecisionResolved: DecisionResolvedPayload
+  /** The warm-up is over (TT-14): KPIs and end-condition counters restart at zero. */
+  WarmUpEnded: { warmUpS: number }
   ScenarioEnded: { reason: string }
   InvariantViolated: { invariant: string; message: string; offendingEventId: number }
 }

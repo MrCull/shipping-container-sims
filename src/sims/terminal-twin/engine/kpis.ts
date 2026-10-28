@@ -29,7 +29,10 @@ export interface HandlerKpiReport {
 }
 
 export interface KpiReport {
+  /** Sim time of the measured period (after a warm-up, counted from its end). */
   simTimeS: number
+  /** Warm-up start (TT-14): its length and whether it is over; absent for other starts. */
+  warmUp?: { durationS: number; ended: boolean }
   eventsProcessed: number
   movesCompleted: number
   vesselsCompleted: number
@@ -302,7 +305,8 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     fallbacks: ls.fallbacks,
   }
   return {
-    simTimeS: r3(state.now),
+    simTimeS: r3(state.now - (state.warmUp?.ended ? state.warmUp.durationS : 0)),
+    ...(state.warmUp ? { warmUp: { durationS: state.warmUp.durationS, ended: state.warmUp.ended } } : {}),
     eventsProcessed,
     movesCompleted: state.kpis.movesCompleted,
     vesselsCompleted: state.kpis.vesselsCompleted,

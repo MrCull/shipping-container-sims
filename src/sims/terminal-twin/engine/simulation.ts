@@ -11,7 +11,9 @@ import type { HandlerSet } from './handlers'
 import { hashDigest, hashUpdate } from './hash'
 import { checkInvariants, type InvariantViolation } from './invariants'
 import { buildKpiReport, type KpiReport } from './kpis'
+import { kpiClockOf } from './kpi/clock'
 import { createKpiCollector, type KpiSeriesReport } from './kpi/collector'
+import { warmUpReactors } from './subsystems/warmUp'
 import { createEventLogger, type LogOptions } from './logging'
 import { createQuery, type SimQuery } from './query'
 import { nextRandom } from './rng'
@@ -32,7 +34,7 @@ export const ENGINE_VERSION = '0.7.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
-const REACTORS: ReactorMap[] = [berthReactors, workPackageReactors, quayReactors, loadPrepReactors, shcReactors, ascReactors, emptiesReactors, transshipmentReactors, landsideReactors]
+const REACTORS: ReactorMap[] = [berthReactors, workPackageReactors, quayReactors, loadPrepReactors, shcReactors, ascReactors, emptiesReactors, transshipmentReactors, landsideReactors, warmUpReactors]
 
 export interface SimulationOptions {
   /** Overrides `config.seed`. */
@@ -144,6 +146,15 @@ export interface Simulation {
   invariantReport(): InvariantReport
 }
 
+/** The event as the measured clock sees it (warm-up removed): its time and any planned motion segments move back. */
+function shiftEvent(ev: EngineEvent, by: number): EngineEvent {
+  const payload = ev.payload as unknown as { segments?: { t0: number; t1: number }[] }
+  const shifted: unknown = Array.isArray(payload.segments)
+    ? { ...payload, segments: payload.segments.map((s) => ({ ...s, t0: s.t0 - by, t1: s.t1 - by })) }
+    : ev.payload
+  return { ...ev, t: ev.t - by, payload: shifted } as EngineEvent
+}
+
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
 export function createSimulation(
@@ -155,7 +166,7 @@ export function createSimulation(
   const invariantsEnabled = options.invariants?.enabled ?? true
   const failFast = options.invariants?.failFast ?? true
 
-  let state = createInitialState(config, seed, resolveSubsystemModes(config, options.subsystems))
+  let state = createInitialState(config, seed, resolveSubsystemModes(config, options.subsystems), handlers.yardAllocation)
   let log: EngineEvent[] = []
   let byId = new Map<number, EngineEvent>()
   let status: SimStatus = 'ready'
@@ -175,8 +186,26 @@ export function createSimulation(
   const vesselBoxes = Object.fromEntries(Object.values(state.vessels).map((v) => [v.id, v.remainingDischarge + v.remainingLoad]))
   const initialCells: Record<string, number> = {}
   for (const s of Object.values(state.yardSlots)) initialCells[s.blockId] = (initialCells[s.blockId] ?? 0) + s.span
-  const newCollector = () =>
-    createKpiCollector(config, { vesselBoxes, containerSize: (id) => state.containers[id].size, initialCells })
+  // a warm-up start (TT-14): the KPI series start when the measured period does, on a clock moved by the warm-up
+  const warmUpS = (): number => (state.warmUp?.ended ? state.warmUp.durationS : 0)
+  const newCollector = () => {
+    const w = state.warmUp
+    if (!w?.ended)
+      return createKpiCollector(config, { vesselBoxes, containerSize: (id) => state.containers[id].size, initialCells })
+    const clock = kpiClockOf(config)
+    return createKpiCollector(
+      { ...config, kpi: { ...config.kpi, startTimeOfDayS: clock.startTimeOfDayS + w.durationS } },
+      { vesselBoxes, containerSize: (id) => state.containers[id].size, initialCells: w.cellsAtEnd ?? {} },
+    )
+  }
+  /** Feed the collector: warm-up events are dropped; measured events are shifted to the measured clock. */
+  const feed = (ev: EngineEvent): void => {
+    const w = state.warmUp
+    if (!w) return collector.ingest(ev)
+    if (ev.type === 'WarmUpEnded') collector = newCollector()
+    if (!w.ended || ev.t < w.durationS) return
+    collector.ingest(shiftEvent(ev, w.durationS))
+  }
   let collector = newCollector()
   if (options.log) listeners.add({ fn: createEventLogger(options.log) })
 
@@ -200,7 +229,7 @@ export function createSimulation(
     ev.seq = state.nextSeq++
     log.push(ev)
     byId.set(ev.id, ev)
-    collector.ingest(ev)
+    feed(ev)
     state.logHash = hashUpdate(state.logHash, JSON.stringify(ev))
     for (const l of listeners) if (!l.types || l.types.has(ev.type)) l.fn(ev)
   }
@@ -217,11 +246,18 @@ export function createSimulation(
     status = 'ended'
   }
 
+  /** Sim time at which `simDurationS` is reached: it counts the measured period, so a warm-up comes first. */
+  function durationEnd(): number | undefined {
+    const d = config.endConditions.simDurationS
+    return d === undefined ? undefined : d + (state.warmUp?.durationS ?? 0)
+  }
+
   function endConditionMet(): string | null {
     const ec = config.endConditions
     // no end condition configured: end when every scheduled vessel has departed
+    if (state.warmUp && !state.warmUp.ended) return null // warm-up counts toward nothing
     if (ec.vesselsCompleted === undefined && ec.moves === undefined && ec.simDurationS === undefined) {
-      const n = config.vessels.length
+      const n = config.vessels.length - (state.warmUp?.vesselsCompletedBefore ?? 0)
       return n > 0 && state.kpis.vesselsCompleted >= n ? `vesselsCompleted >= ${n}` : null
     }
     if (ec.vesselsCompleted !== undefined && state.kpis.vesselsCompleted >= ec.vesselsCompleted)
@@ -270,9 +306,9 @@ export function createSimulation(
     decisions.drain()
     if (decisions.waiting()) return null
     const next = state.queue[0]
-    const duration = config.endConditions.simDurationS
+    const duration = durationEnd()
     if (duration !== undefined && (!next || next.t > duration)) {
-      endScenario(`simDurationS >= ${duration}`, Math.max(state.now, duration), null)
+      endScenario(`simDurationS >= ${config.endConditions.simDurationS}`, Math.max(state.now, duration), null)
       return log[log.length - 1]
     }
     const ev = heapPop(state.queue)
@@ -321,7 +357,7 @@ export function createSimulation(
         return done('waiting-for-decision')
       const next = state.queue[0]
       if (cond.time !== undefined && (!next || next.t > cond.time)) {
-        const duration = config.endConditions.simDurationS
+        const duration = durationEnd()
         if (duration === undefined || cond.time < duration) {
           state.now = Math.max(state.now, cond.time)
           return done('condition')
@@ -397,7 +433,7 @@ export function createSimulation(
       invariants = { ...copy.invariants, enabled: invariantsEnabled }
       decisions.reset()
       collector = newCollector()
-      for (const ev of log) collector.ingest(ev)
+      for (const ev of log) feed(ev)
     },
     why(eventId) {
       const chain: EngineEvent[] = []
@@ -422,7 +458,7 @@ export function createSimulation(
     eventLog: () => log,
     eventLogHash: () => hashDigest(state.logHash),
     kpiReport: () => buildKpiReport(state, log.length),
-    kpiSeries: () => collector.report(state.now),
+    kpiSeries: () => collector.report(Math.max(0, state.now - warmUpS())),
     invariantReport: () => clone(invariants),
   }
 }

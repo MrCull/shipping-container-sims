@@ -237,6 +237,27 @@ export interface CargoConfig {
   emptyShare: number
 }
 
+/**
+ * How the yard starts (TT-14).
+ * - `prefilled`: filled to `targetPct` of the cells with exports and transshipment boxes booked to the scenario's
+ *   vessels, an empty pool and import boxes awaiting pickup, every box placed by the selected yardAllocation strategy.
+ * - `warmup`: starts empty; `warmUpS` of truck and vessel activity run first and are excluded from KPIs and end conditions.
+ * - `empty`: starts empty; export boxes arrive by truck during the run (needs the landside).
+ * Without `yardStart` the legacy start applies (export boxes and the empty pool stacked by `planExportYard`).
+ */
+export type YardStartMode = 'prefilled' | 'warmup' | 'empty'
+
+export interface YardStartConfig {
+  mode: YardStartMode
+  /** Pre-fill target, % of the yard's cells (default 60). */
+  targetPct?: number
+  /** Warm-up length (s, default 48 h). */
+  warmUpS?: number
+}
+
+export const DEFAULT_YARD_TARGET_PCT = 60
+export const DEFAULT_WARM_UP_S = 48 * 3600
+
 export interface EndConditions {
   /** End when this many vessels have departed. */
   vesselsCompleted?: number
@@ -276,6 +297,8 @@ export interface ScenarioConfig {
   shcs?: ShcConfig[]
   /** Yard blocks: WTP pads, stacks and an ASC each (TT-05, TT-06). */
   yard?: YardConfig
+  /** How the yard starts (TT-14); optional (legacy start). */
+  yardStart?: YardStartConfig
   /** Waterside lane-graph geometry overrides. */
   apron?: Partial<ApronLayout>
   /** ± % random variation of each SHC trip (driver variability; 0 = none). */

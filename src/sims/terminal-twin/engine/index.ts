@@ -151,3 +151,5 @@ export { exportRun, kpiReportJson, kpiReportCsv, eventLogJson, eventLogCsv, EXPO
 export type { ExportKind } from './export'
 export { buildTimeline } from './kpi/timeline'
 export type { TimelineReport, VesselTimelineRow, TimelinePackage, TimelineWorkPackage, TimelineWindow } from './kpi/timeline'
+export { yardCapacityCells, planPrefill, yardPlacerOf } from './prefill'
+export type { PrefillPlan, PrefillImport, YardPlacer } from './prefill'
