@@ -273,7 +273,7 @@ test('each overlay toggles independently and reflects live engine state', async 
     const scene = window.__tt!.scene()!
     const state = window.__tt!.sceneState()!
     const visibleVessels = Object.values(state.vessels).filter((v) => ['mooring', 'berthed', 'unmooring', 'at-anchorage'].includes(v.status)).length
-    return { shown: scene.layers.labels, expected: scene.sts + scene.shcs + visibleVessels, pads: scene.layers.padsOccupied + scene.layers.padsFree }
+    return { shown: scene.layers.labels, expected: scene.sts + scene.shcs + scene.ascs + visibleVessels, pads: scene.layers.padsOccupied + scene.layers.padsFree }
   })
   expect(labels.shown).toBe(labels.expected)
   expect(labels.pads).toBe(0)
