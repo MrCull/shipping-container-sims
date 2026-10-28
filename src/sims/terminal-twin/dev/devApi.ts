@@ -13,7 +13,8 @@
  *                                              //   stsAssets, stsLods, render: { calls, triangles } }
  *   await __tt.step(); await __tt.why(id); await __tt.snapshot()
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
- *   __tt.select('STS01'); __tt.cameraTo('STS01'); __tt.setSpeed(600); __tt.pause(); __tt.clock()
+ *   __tt.select('STS01'); __tt.cameraTo('STS01');   // also 'gate' and 'stalls:B01' (landside, TT-13); __tt.sceneState().trucks
+ * __tt.setSpeed(600); __tt.pause(); __tt.clock()
  *   __tt.overlays({ laneGraph: true, reservations: true })   // 3D debug overlays
  *   await __tt.query('ascList'); await __tt.query('yardSlots', 'B01'); __tt.sceneState().ascs   // yard (TT-06)
  *   __tt.setDisplay({ locale: 'de-DE', units: 'imperial' }); __tt.display(); __tt.config(); __tt.ui()
@@ -44,7 +45,7 @@ import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
 import type { AscRigState } from '../modules/ascAssets'
 import type { VesselHullState } from '../modules/vesselRenderer'
-import type { AscPose, ShcPose, StsPose } from '../modules/sceneModel'
+import type { AscPose, ShcPose, StsPose, TruckPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
 import type { StsRenderState } from '../modules/stsAssets'
 import { resolveScenario, type DashboardRendered, type RenderInfo, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
@@ -174,6 +175,8 @@ export interface SceneState {
   shcs: Record<string, { status: string } & ShcPose>
   /** The ASCs of every yard block (1 or 2 each): status and spreader pose (gantry Z, trolley X, hoist height). */
   ascs: Record<string, { status: string } & AscPose>
+  /** Trucks in the scene (TT-13): status and pose; `visible` false once they have left. */
+  trucks: Record<string, { status: string } & TruckPose>
   vessels: Record<string, { status: string }>
   /** Conflict zones reserved at the displayed time (zone → holder). */
   reservations: Record<string, string>
@@ -277,6 +280,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         sts: Object.fromEntries(model.stsIds.map((id) => [id, { status: model.statusAt('sts', id, t), ...model.stsPose(id, t) }])),
         shcs: Object.fromEntries(model.shcIds.map((id) => [id, { status: model.statusAt('shc', id, t), ...model.shcPose(id, t) }])),
         ascs: Object.fromEntries(model.ascIds.map((id) => [id, { status: model.statusAt('asc', id, t), ...model.ascPose(id, t) }])),
+        trucks: Object.fromEntries(model.truckIds.map((id) => [id, { status: model.statusAt('truck', id, t), ...model.truckPose(id, t) }])),
         reservations: model.activeReservations(t),
         vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
         liveries: store.view()?.liveries() ?? {},

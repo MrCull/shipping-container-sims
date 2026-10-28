@@ -167,3 +167,13 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Flow mix:** a vessel's moves split into import, export and transshipment percent (`flowMixOf`); the vessel generator can be given one (`flowMix`).
 - **Empty:** an unladen container (`full = false`), distinct by size and shipping line. The **empty pool** is the empties standing in the yard at the start.
 - **Empties required:** the event raised when a released load work package needs N empties of a size and line; the **empty-allocation** decision point (`emptyAllocation`) then assigns which yard empties go (strategies `nearest-wtp`, `oldest-first`).
+
+## Landside (TT-13)
+
+- **Truck transaction:** what one truck visit does: drop an export, pick an import, drop an empty, pick an empty, or **dual** (drop an export and pick an import in one visit).
+- **Gate:** the public entrance: a FIFO queue, inbound lanes with kiosks (processing time each), outbound lanes and an unused out-of-gauge (OOG) lane. The `gateLaneAssignment` decision point picks the inbound lane.
+- **Transfer stall:** the truck standing place at the landside end of a block where the landside ASC works the chassis. The `transferStallSelection` decision point picks it. Also a conflict zone.
+- **Interchange:** the ASC lifting a box off a chassis (drop) or setting one on it (pick) at a stall.
+- **Import dwell / export window:** how long an import stands in the yard before a truck may collect it (default lognormal, median 3 days); the period before a vessel's ETA (default 1 to 5 days) in which trucks may deliver its exports.
+- **Segregation:** trucks never enter the waterside network and SHCs never use the gate (invariant `landside.segregation`).
+- **Truck turn time:** gate-in to gate-out.

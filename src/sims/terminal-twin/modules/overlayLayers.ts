@@ -14,6 +14,9 @@ export interface OverlayLayerStats {
   padsOccupied: number
   padsFree: number
   groundPositionsOccupied: number
+  /** Transfer stalls with a truck standing in them / free (zeros without a landside or while occupancy is off). */
+  stallsOccupied: number
+  stallsFree: number
   /** Labels currently visible. */
   labels: number
 }
@@ -28,6 +31,7 @@ export class OverlayLayers {
   readonly group = new THREE.Group()
   private model: SceneModel
   private padPlates = new Map<string, THREE.Mesh>()
+  private stallPlates = new Map<string, THREE.Mesh>()
   private gpPlates: THREE.Mesh[] = []
   private labels = new Map<string, THREE.Sprite>()
   private labelTextures = new Map<string, THREE.CanvasTexture>()
@@ -35,7 +39,7 @@ export class OverlayLayers {
   private busy: THREE.MeshBasicMaterial
   private gpMat: THREE.MeshBasicMaterial
   private plane = new THREE.PlaneGeometry(1, 1)
-  private current: OverlayLayerStats = { padsOccupied: 0, padsFree: 0, groundPositionsOccupied: 0, labels: 0 }
+  private current: OverlayLayerStats = { padsOccupied: 0, padsFree: 0, groundPositionsOccupied: 0, stallsOccupied: 0, stallsFree: 0, labels: 0 }
 
   constructor(model: SceneModel) {
     this.model = model
@@ -51,6 +55,16 @@ export class OverlayLayers {
       m.renderOrder = 4
       m.visible = false
       this.padPlates.set(pad.id, m)
+      this.group.add(m)
+    }
+    for (const stall of model.landside?.stalls ?? []) {
+      const m = new THREE.Mesh(this.plane, this.free)
+      m.rotation.x = -Math.PI / 2
+      m.position.set(stall.x, 0.28, stall.z)
+      m.scale.set(3.6, 13.6, 1)
+      m.renderOrder = 4
+      m.visible = false
+      this.stallPlates.set(stall.id, m)
       this.group.add(m)
     }
     const labelled = [...model.stsIds, ...model.shcIds, ...model.ascIds, ...model.vesselIds]
@@ -106,7 +120,7 @@ export class OverlayLayers {
   update(t: number, overlays: OverlayState): void {
     const model = this.model
     this.group.visible = overlays.occupancy || overlays.labels
-    const stats = { padsOccupied: 0, padsFree: 0, groundPositionsOccupied: 0, labels: 0 }
+    const stats = { padsOccupied: 0, padsFree: 0, groundPositionsOccupied: 0, stallsOccupied: 0, stallsFree: 0, labels: 0 }
 
     const occupiedPads = new Set<string>()
     let gps = 0
@@ -137,8 +151,25 @@ export class OverlayLayers {
       else stats.padsFree++
     }
 
+    if (this.stallPlates.size > 0) {
+      const taken = new Set<string>()
+      if (overlays.occupancy)
+        for (const truckId of model.truckIds) {
+          const p = model.truckPose(truckId, t)
+          if (!p.visible) continue
+          for (const stall of model.landside?.stalls ?? []) if (Math.abs(p.x - stall.x) < 1.5 && Math.abs(p.z - stall.z) < 1.5) taken.add(stall.id)
+        }
+      for (const [id, plate] of this.stallPlates) {
+        plate.visible = overlays.occupancy
+        if (!overlays.occupancy) continue
+        plate.material = taken.has(id) ? this.busy : this.free
+        if (taken.has(id)) stats.stallsOccupied++
+        else stats.stallsFree++
+      }
+    }
+
     for (const [id, sprite] of this.labels) {
-      const kind = model.stsIds.includes(id) ? 'sts' : model.shcIds.includes(id) ? 'shc' : model.ascIds.includes(id) ? 'asc' : 'vessel'
+      const kind = model.truckIds.includes(id) ? 'truck' : model.stsIds.includes(id) ? 'sts' : model.shcIds.includes(id) ? 'shc' : model.ascIds.includes(id) ? 'asc' : 'vessel'
       const b = overlays.labels ? entityBounds(model, id, t) : null
       sprite.visible = b !== null
       if (!b) continue

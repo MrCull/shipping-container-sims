@@ -7,7 +7,7 @@
  * win because crane and hull boxes enclose the boxes they carry.
  */
 import { FENDER_GAP_M } from '../scenario/vesselClasses'
-import { SHC, STS } from './equipmentDims'
+import { SHC, STS, TRUCK } from './equipmentDims'
 import { ASC_MODEL, ascScaleY } from './ascRig'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 
@@ -45,6 +45,14 @@ export function entityBounds(model: SceneModel, id: string, time: number): Entit
     const block = model.blockOfAsc(id)
     const height = ASC_MODEL.heightM * ascScaleY(block.tiers)
     return { x: block.x, y: height / 2, z: model.ascPose(id, time).z, sx: ASC_MODEL.widthM, sy: height, sz: ASC_MODEL.lengthM, yaw: 0 }
+  }
+  if (model.truckIds.includes(id)) {
+    const p = model.truckPose(id, time)
+    if (!p.visible) return null
+    // the box on the chassis stands at the origin; the cab is ahead along the body's heading
+    const cx = p.x + Math.cos(p.yaw) * ((TRUCK.rearX + TRUCK.frontX) / 2)
+    const cz = p.z - Math.sin(p.yaw) * ((TRUCK.rearX + TRUCK.frontX) / 2)
+    return { x: cx, y: TRUCK.height / 2, z: cz, sx: TRUCK.frontX - TRUCK.rearX + 0.6, sy: TRUCK.height, sz: TRUCK.width + 0.6, yaw: p.yaw }
   }
   if (model.stsIds.includes(id)) {
     const p = model.stsPose(id, time)
@@ -97,7 +105,7 @@ export function pickEntity(model: SceneModel, time: number, ray: Ray): string | 
     if (dist !== null && dist !== undefined && (!best || dist < best.dist)) best = { id, dist }
   }
   if (best) return best.id
-  for (const id of [...model.shcIds, ...model.ascIds, ...model.stsIds, ...model.vesselIds]) {
+  for (const id of [...model.shcIds, ...model.ascIds, ...model.truckIds, ...model.stsIds, ...model.vesselIds]) {
     const b = entityBounds(model, id, time)
     const dist = b && rayBox(ray, b)
     if (dist !== null && dist !== undefined && (!best || dist < best.dist)) best = { id, dist }

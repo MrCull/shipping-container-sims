@@ -24,3 +24,21 @@ export const ASC = { span: 25.4, legLength: 5, legWidth: 1, girderDepth: 4, gird
 export function ascHeightM(block: BlockSpec): number {
   return travelHoistM(block) + CONTAINER_DIMS['40HC'].height + 3
 }
+
+/**
+ * [A] Haulier truck with a 40 ft skeletal chassis (m). The origin is the centre of the box on the chassis; the cab is ahead
+ * (+X in the truck's frame). Length from the trailer's rear to the cab front.
+ */
+export const TRUCK = {
+  rearX: -6.6,
+  frontX: 11.2,
+  width: 2.55,
+  height: 4,
+  /** Fifth wheel X (tractor / trailer coupling). */
+  couplingX: 5.6,
+  wheelRadius: 0.5,
+  /** Cab-over tractor: cab box. */
+  cabX0: 8.6,
+  cabX1: 11.2,
+  cabHeight: 3.1,
+}

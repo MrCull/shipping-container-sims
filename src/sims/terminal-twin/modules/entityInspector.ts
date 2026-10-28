@@ -3,17 +3,18 @@
  * container, STS, SHC or vessel, from the engine's query results. Pure TS; the
  * component formats values with the display formatter and the catalogue.
  */
-import type { AscState, ContainerState, ShcJob, ShcState, StsState, VesselState } from '../engine'
+import type { AscState, ContainerState, ShcJob, ShcState, StsState, TruckState, VesselState } from '../engine'
 import type { MessageKey } from '../i18n/messages'
 import type { EventSummary, QueryKind } from '../worker/protocol'
 import type { SceneModel } from './sceneModel'
 
-export type EntityKind = 'container' | 'sts' | 'shc' | 'asc' | 'vessel'
+export type EntityKind = 'container' | 'sts' | 'shc' | 'asc' | 'truck' | 'vessel'
 
 export function entityKind(model: SceneModel, id: string): EntityKind | null {
   if (model.containerSize[id]) return 'container'
   if (model.shcIds.includes(id)) return 'shc'
   if (model.ascIds.includes(id)) return 'asc'
+  if (model.truckIds.includes(id)) return 'truck'
   if (model.stsIds.includes(id)) return 'sts'
   if (model.vesselIds.includes(id)) return 'vessel'
   return null
@@ -117,6 +118,25 @@ function ascView(asc: Readonly<AscState>): EntityView {
   }
 }
 
+function truckView(truck: Readonly<TruckState>): EntityView {
+  const open = truck.legs.filter((l) => !l.done)
+  return {
+    kind: 'truck',
+    id: truck.id,
+    facts: [
+      { label: 'inspector.fact.status', value: truck.status },
+      { label: 'inspector.fact.transaction', value: truck.transaction },
+      { label: 'inspector.fact.stall', value: truck.stallId },
+      { label: 'inspector.fact.carrying', value: truck.carrying, link: truck.carrying !== null },
+    ],
+    job:
+      open.length > 0
+        ? open.map((l) => ({ label: 'inspector.fact.container' as const, value: l.containerId, link: true }))
+        : null,
+    custody: [],
+  }
+}
+
 function stsView(sts: Readonly<StsState>): EntityView {
   const working = sts.carrying.length > 0 || sts.workQueue.length > 0
   return {
@@ -167,6 +187,8 @@ export function describeEntity(kind: EntityKind, state: unknown, extras: EntityE
       return stsView(state as StsState)
     case 'asc':
       return ascView(state as AscState)
+    case 'truck':
+      return truckView(state as TruckState)
     case 'vessel':
       return vesselView(state as VesselState)
   }

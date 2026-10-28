@@ -12,7 +12,7 @@
  * SceneModel timelines.
  */
 import * as THREE from 'three'
-import { ascIndexOf, BAY_PITCH_M as YARD_BAY_PITCH_M, ROW_PITCH_M as YARD_ROW_PITCH_M, rowX } from '../engine'
+import { ascIndexOf, BAY_PITCH_M as YARD_BAY_PITCH_M, ROW_PITCH_M as YARD_ROW_PITCH_M, rowX, transferStallLayout, STALL_LENGTH_M } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 import { ASC, ascHeightM, SHC, STS } from './equipmentDims'
@@ -29,6 +29,7 @@ import { liveryIndexForLine, loadContainerAssets } from './containerAssets'
 import { loadStsTemplate, StsModel, type SpreaderMode, type StsRenderState } from './stsAssets'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { VesselHulls, type VesselHullState } from './vesselRenderer'
+import { LandsideScene, type LandsideStats } from './landsideRenderer'
 
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
 const EMPTY_HOIST_MPS = 1.5
@@ -37,6 +38,8 @@ const EMPTY_SPREADER_DOWN_Y = CONTAINER_DIMS['40'].height
 export interface SceneStats {
   /** Container instances drawn. */
   containers: number
+  /** Trucks drawn and queued at the gate (TT-13). */
+  landside: LandsideStats
   /** STS crane objects in the scene. */
   sts: number
   /** SHC objects in the scene. */
@@ -102,6 +105,7 @@ export class SceneRenderer {
   private stsModels = new Map<string, StsModel>()
   private lastSpreader = new Map<string, SpreaderMode>()
   private vessels: VesselHulls
+  private landside: LandsideScene
   private lastT = 0
   private shcs = new Map<string, { group: THREE.Group; spreader: THREE.Mesh; rig?: ShcRig }>()
   private hoistEase = new Map<string, { t: number; y: number }>()
@@ -128,6 +132,8 @@ export class SceneRenderer {
     this.vessels = new VesselHulls(model)
     this.scene.add(this.vessels.group)
     this.addYard()
+    this.landside = new LandsideScene(model)
+    this.scene.add(this.landside.group)
     for (const id of model.shcIds) this.addShc(id)
     for (const id of model.ascIds) this.addAsc(id)
     this.laneOverlay = this.buildLaneOverlay()
@@ -138,6 +144,12 @@ export class SceneRenderer {
 
     const capacity: Partial<Record<string, number>> = {}
     for (const id of model.containerIds) capacity[model.containerSize[id]] = (capacity[model.containerSize[id]] ?? 0) + 1
+    // boxes trucks bring are created during the run: room for them (instances beyond the capacity are not drawn)
+    if (config.landside) {
+      const perDay = (config.landside.hourlyProfile ?? []).reduce((a, b) => a + b, 0)
+      const extra = Math.min(2500, Math.ceil(perDay * 0.5) + (config.landside.scripted?.length ?? 0) + 60)
+      for (const size of ['20', '40', '40HC'] as const) capacity[size] = (capacity[size] ?? 0) + extra
+    }
     this.containers = new ContainerInstancer(capacity)
     this.containerLivery = model.containerIds.map((id) => liveryIndexForLine(model.containerLine[id]))
     this.scene.add(this.containers.group)
@@ -336,11 +348,10 @@ export class SceneRenderer {
         this.scene.add(tick)
       }
       // transfer stalls (truck handover, TT-13) at the landside end
-      for (let k = 0; k < b.transferStalls; k++) {
-        const x = b.x + (k - (b.transferStalls - 1) / 2) * 5.5
-        const outline = new THREE.Mesh(this.track(new THREE.PlaneGeometry(3.2, 13)), stall)
+      for (const st of transferStallLayout(b)) {
+        const outline = new THREE.Mesh(this.track(new THREE.PlaneGeometry(3.2, STALL_LENGTH_M)), stall)
         outline.rotation.x = -Math.PI / 2
-        outline.position.set(x, 0.03, endZ + 14)
+        outline.position.set(st.x, 0.03, st.z)
         this.scene.add(outline)
       }
     }
@@ -448,6 +459,20 @@ export class SceneRenderer {
       points.push(mx - dx * s - dz * s, y, mz - dz * s + dx * s, mx, y, mz)
       points.push(mx - dx * s + dz * s, y, mz - dz * s - dx * s, mx, y, mz)
     }
+    const road = this.model.landside
+    for (const e of road?.edges ?? []) {
+      const a = road!.nodes[e.from]
+      const b = road!.nodes[e.to]
+      points.push(a.x, y, a.z, b.x, y, b.z)
+      const len = Math.max(1e-6, Math.abs(b.x - a.x) + Math.abs(b.z - a.z))
+      const dx = (b.x - a.x) / len
+      const dz = (b.z - a.z) / len
+      const mx = (a.x + b.x) / 2
+      const mz = (a.z + b.z) / 2
+      const s = Math.min(1.5, len / 4)
+      points.push(mx - dx * s - dz * s, y, mz - dz * s + dx * s, mx, y, mz)
+      points.push(mx - dx * s + dz * s, y, mz - dz * s - dx * s, mx, y, mz)
+    }
     const geom = this.track(new THREE.BufferGeometry())
     geom.setAttribute('position', new THREE.Float32BufferAttribute(points, 3))
     const lines = new THREE.LineSegments(geom, this.track(new THREE.LineBasicMaterial({ color: '#22d3ee' })))
@@ -475,7 +500,7 @@ export class SceneRenderer {
     const mat = this.track(
       new THREE.MeshBasicMaterial({ color: '#f59e0b', transparent: true, opacity: 0.45, depthWrite: false }),
     )
-    for (const zone of Object.values(this.model.graph.zones)) {
+    for (const zone of [...Object.values(this.model.graph.zones), ...Object.values(this.model.landside?.zones ?? {})]) {
       const m = new THREE.Mesh(this.track(new THREE.PlaneGeometry(zone.x1 - zone.x0, zone.z1 - zone.z0)), mat)
       m.rotation.x = -Math.PI / 2
       m.position.set((zone.x0 + zone.x1) / 2, 0.3, (zone.z0 + zone.z1) / 2)
@@ -521,6 +546,7 @@ export class SceneRenderer {
     model.containerIds.forEach((id, i) => {
       const c = model.containerPose(id, t)
       if (!c) return
+      this.containerLivery[i] ??= liveryIndexForLine(model.containerLine[id])
       containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw)
       if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
       if (this.stsModels.size) {
@@ -555,6 +581,7 @@ export class SceneRenderer {
     }
     this.lastT = t
     this.vessels.update(t, cameraPosition)
+    this.landside.update(t)
     this.reservedZones = 0
     const active = this.overlays.reservations ? model.activeReservations(t) : {}
     for (const [zone, mesh] of this.zoneMeshes) {
@@ -686,6 +713,7 @@ export class SceneRenderer {
     }
     return {
       containers: c.drawn,
+      landside: this.landside.stats(),
       sts: this.sts.size,
       shcs: this.shcs.size,
       ascs: this.ascs.size,
@@ -751,6 +779,7 @@ export class SceneRenderer {
     this.disposed = true
     for (const m of this.stsModels.values()) m.dispose()
     this.vessels.dispose()
+    this.landside.dispose()
     for (const d of this.disposables) d.dispose()
     this.containers.dispose()
     this.layers.dispose()

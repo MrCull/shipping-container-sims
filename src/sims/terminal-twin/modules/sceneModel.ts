@@ -596,6 +596,11 @@ export class SceneModel {
       const p = this.ascPose(id, time)
       return { x: p.x, y: 6, z: p.z }
     }
+    if (this.landside && id === 'gate') return { x: this.landside.gate.queueX + 20, y: 3, z: this.landside.gate.kioskZ }
+    if (this.landside && id.startsWith('stalls:')) {
+      const stalls = this.landside.stalls.filter((s) => s.blockId === id.slice(7))
+      return stalls.length ? { x: stalls[0].x, y: 3, z: stalls[0].z } : null
+    }
     if (this.truckIds.includes(id)) {
       const p = this.truckPose(id, time)
       return p.visible ? { x: p.x, y: 2, z: p.z } : null
