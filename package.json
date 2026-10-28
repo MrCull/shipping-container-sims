@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "tt:run": "tsx src/sims/terminal-twin/cli/run.ts",
     "tt:fixtures": "tsx src/sims/terminal-twin/cli/build-fixtures.ts",
+    "tt:bench": "tsx src/sims/terminal-twin/cli/bench.ts",
     "tt:diff": "tsx src/sims/terminal-twin/cli/diff.ts",
     "tt:golden": "tsx src/sims/terminal-twin/cli/golden-cli.ts",
     "test:smoke": "playwright test",

@@ -590,6 +590,25 @@ const en = {
   'shortcuts.key.i': 'I',
   'shortcuts.feed': 'Event feed and debugger panel',
   'shortcuts.inspector': 'Inspector panel',
+
+  // Performance and graphics quality (TT-19)
+  'perf.group': 'Graphics',
+  'perf.quality': 'Quality',
+  'perf.quality.auto': 'Auto',
+  'perf.quality.low': 'Low',
+  'perf.quality.medium': 'Medium',
+  'perf.quality.high': 'High',
+  'perf.qualityHint': 'Auto lowers shadows, detail and resolution when the frame rate stays under 45 fps and raises them again when there is headroom',
+  'perf.stats': 'Stats',
+  'perf.statsHint': 'Show frames per second, draw calls and triangles',
+  'perf.fps': 'FPS',
+  'perf.drawCalls': 'Draw calls',
+  'perf.triangles': 'Triangles',
+  'perf.cpu': 'Frame CPU (ms)',
+  'perf.level': 'Quality in force',
+  'perf.overlay': 'Performance',
+  'shortcuts.key.p': 'P',
+  'shortcuts.perf': 'Performance overlay (FPS, draw calls, triangles)',
 } as const
 
 export type MessageKey = keyof typeof en

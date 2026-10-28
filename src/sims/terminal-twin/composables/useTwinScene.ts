@@ -12,6 +12,8 @@ import { NO_OVERLAYS } from '../modules/overlays'
 import { pickEntity } from '../modules/picking'
 import { SceneRenderer } from '../modules/sceneRenderer'
 import type { SceneModel } from '../modules/sceneModel'
+import { AutoQuality, FpsMeter, profileFor } from '../modules/quality'
+import { usePerfStore } from '../store/perfStore'
 import { useTwinStore } from '../store/twinStore'
 
 function webglAvailable(): boolean {
@@ -25,6 +27,16 @@ function webglAvailable(): boolean {
 
 export function useTwinScene(host: Ref<HTMLElement | null>) {
   const store = useTwinStore()
+  const perf = usePerfStore()
+  const meter = new FpsMeter()
+  const auto = new AutoQuality((level) => perf.setEffective(level, true))
+  const frustum = new THREE.Frustum()
+  const viewProjection = new THREE.Matrix4()
+  let appliedLevel: string | null = null
+  let lastReportAt = 0
+  /** Smoothed main-thread ms per frame (pose + render submit). */
+  let cpuMs = 0
+  let lastSetting = perf.setting
   const webglFailed = ref(false)
   let renderer: THREE.WebGLRenderer | null = null
   let camera: THREE.PerspectiveCamera | null = null
@@ -47,6 +59,17 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     renderer.setSize(w, h, false)
     camera.aspect = w / h
     camera.updateProjectionMatrix()
+  }
+
+  /** Puts the effective quality profile in force: shadows, render resolution, and the scene's own LOD / ocean settings. */
+  function applyQuality(): void {
+    if (!renderer) return
+    const profile = profileFor(perf.effective)
+    appliedLevel = perf.effective
+    renderer.shadowMap.enabled = profile.shadows
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio * profile.resolutionScale, 2))
+    resize()
+    view?.setQuality(profile)
   }
 
   function aim(target: { x: number; y: number; z: number }, keepOffset: boolean, distanceM?: number): void {
@@ -106,6 +129,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (!model) return
     view = new SceneRenderer(model)
     overlaysApplied = null
+    view.setQuality(profileFor(perf.effective))
     aim(view.overviewTarget(), false)
   }
 
@@ -128,11 +152,33 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       const centre = controller.model?.entityCentre(store.selectedId, controller.displayTime)
       if (centre) aim(centre, true)
     }
-    view.update(controller.displayTime, store.selectedId, camera.position)
     controls?.update()
+    camera.updateMatrixWorld()
+    frustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
+    const cpuStart = performance.now()
+    view.update(controller.displayTime, store.selectedId, camera.position, frustum)
+    if (import.meta.env.DEV && perf.debugLoadMs > 0) {
+      const until = performance.now() + perf.debugLoadMs
+      while (performance.now() < until) {
+        /* dev-only artificial frame cost */
+      }
+    }
     renderer.render(view.scene, camera)
+    cpuMs = cpuMs === 0 ? performance.now() - cpuStart : cpuMs * 0.9 + (performance.now() - cpuStart) * 0.1
     lastRender = { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }
     framesRendered++
+    // quality: measure this frame, let Auto judge, apply a changed level on the next frame
+    meter.frame(now)
+    if (perf.setting !== lastSetting) {
+      if (perf.setting === 'auto') auto.reset(perf.effective)
+      lastSetting = perf.setting
+    }
+    if (perf.setting === 'auto') auto.frame(now)
+    if (appliedLevel !== perf.effective) applyQuality()
+    if (now - lastReportAt >= 250) {
+      lastReportAt = now
+      perf.report({ fps: meter.fps, calls: lastRender.calls, triangles: lastRender.triangles, cpuMs })
+    }
   }
 
   onMounted(() => {
@@ -156,7 +202,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         controls.maxPolarAngle = Math.PI / 2.05
         renderer.domElement.addEventListener('pointerdown', onPointerDown)
         renderer.domElement.addEventListener('pointerup', onPointerUp)
-        resize()
+        applyQuality()
         resizeObserver = new ResizeObserver(resize)
         resizeObserver.observe(el)
       } catch (err) {

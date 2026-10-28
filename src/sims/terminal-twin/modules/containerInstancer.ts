@@ -32,9 +32,13 @@ export interface ContainerLodOptions {
 export const DEFAULT_LOD_OPTIONS: ContainerLodOptions = { lod0Cap: 300, lod0DistanceM: 140, hysteresis: 1.15 }
 
 export interface ContainerRenderStats {
+  /** Boxes posed this frame (visible or not). */
   drawn: number
   lod0: number
+  /** Everything not at LOD0, culled boxes included, so lod0 + lod1 = drawn. */
   lod1: number
+  /** Boxes outside the camera frustum, not written to the GPU (0 without a frustum). */
+  culled: number
   assets: 'placeholder' | 'loaded'
 }
 
@@ -70,7 +74,7 @@ export class ContainerInstancer {
   /** LOD per key from the previous frame (hysteresis). */
   private lastLod = new Map<number, 0 | 1>()
   private rendered = new Map<number, RenderedContainer>()
-  private lastStats: ContainerRenderStats = { drawn: 0, lod0: 0, lod1: 0, assets: 'placeholder' }
+  private lastStats: ContainerRenderStats = { drawn: 0, lod0: 0, lod1: 0, culled: 0, assets: 'placeholder' }
   private readonly matrix = new THREE.Matrix4()
   private readonly colour = new THREE.Color()
 
@@ -145,7 +149,17 @@ export class ContainerInstancer {
     this.yaws[i] = yaw
   }
 
-  end(cameraPosition: THREE.Vector3): ContainerRenderStats {
+  /** Retune the LOD0 range and cap (quality settings). */
+  setLodOptions(next: Partial<ContainerLodOptions>): void {
+    Object.assign(this.options, next)
+  }
+
+  /**
+   * Writes the pushed boxes into the instanced meshes. With a `frustum`, boxes outside it are not
+   * written at all (per-instance culling: the InstancedMesh itself is never culled), so a
+   * 30,000-box yard costs only what the camera can see.
+   */
+  end(cameraPosition: THREE.Vector3, frustum?: THREE.Frustum): ContainerRenderStats {
     this.rendered.clear()
     const counts: Record<string, number> = {}
     const write = (layer: Layer, i: number) => {
@@ -157,20 +171,30 @@ export class ContainerInstancer {
       else layer.mesh.setColorAt(slot, this.colour.set(liveryBodyColour(this.liveries[i])))
     }
 
+    const seen = this.cull(frustum)
     let lod0 = 0
+    let culled = 0
     if (this.lods) {
-      const lod = this.chooseLods(cameraPosition)
+      const lod = this.chooseLods(cameraPosition, seen)
       for (let i = 0; i < this.n; i++) {
         const level = lod[i] as 0 | 1
+        this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: level })
+        if (seen && !seen[i]) {
+          culled++
+          continue
+        }
         if (level === 0) lod0++
         write(this.lods[this.sizes[i]][level], i)
         this.lastLod.set(this.keys[i], level)
-        this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: level })
       }
     } else if (this.placeholders) {
       for (let i = 0; i < this.n; i++) {
-        write(this.placeholders[this.sizes[i]], i)
         this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: 1 })
+        if (seen && !seen[i]) {
+          culled++
+          continue
+        }
+        write(this.placeholders[this.sizes[i]], i)
       }
     }
     const layers: Layer[] = this.lods
@@ -182,12 +206,28 @@ export class ContainerInstancer {
       if (layer.livery) layer.livery.needsUpdate = true
       if (layer.mesh.instanceColor) layer.mesh.instanceColor.needsUpdate = true
     }
-    this.lastStats = { drawn: this.n, lod0, lod1: this.n - lod0, assets: this.lods ? 'loaded' : 'placeholder' }
+    this.lastStats = { drawn: this.n, lod0, lod1: this.n - lod0, culled, assets: this.lods ? 'loaded' : 'placeholder' }
     return this.lastStats
   }
 
-  /** LOD per pushed box: nearest within range get LOD0, capped at lod0Cap. */
-  private chooseLods(cam: THREE.Vector3): Uint8Array {
+  private readonly sphere = new THREE.Sphere()
+
+  /** 1 per pushed box that is inside the frustum (a 40 ft box fits in a 7 m radius sphere); null = no culling. */
+  private cull(frustum?: THREE.Frustum): Uint8Array | null {
+    if (!frustum) return null
+    if (this.visible.length < this.n) this.visible = new Uint8Array(Math.max(this.n, this.visible.length * 2))
+    this.sphere.radius = 7.5
+    for (let i = 0; i < this.n; i++) {
+      this.sphere.center.set(this.xs[i], this.ys[i] + 1.3, this.zs[i])
+      this.visible[i] = frustum.intersectsSphere(this.sphere) ? 1 : 0
+    }
+    return this.visible
+  }
+
+  private visible: Uint8Array = new Uint8Array(0)
+
+  /** LOD per pushed box: nearest within range get LOD0, capped at lod0Cap. Culled boxes are never LOD0. */
+  private chooseLods(cam: THREE.Vector3, seen: Uint8Array | null): Uint8Array {
     const { lod0Cap, lod0DistanceM, hysteresis } = this.options
     if (this.dist2.length < this.n) this.dist2 = new Float64Array(Math.max(this.n, this.dist2.length * 2))
     const lod = new Uint8Array(this.n).fill(1)
@@ -200,6 +240,7 @@ export class ContainerInstancer {
       const dz = this.zs[i] - cam.z
       const d2 = dx * dx + dy * dy + dz * dz
       this.dist2[i] = d2
+      if (seen && !seen[i]) continue
       const limit = this.lastLod.get(this.keys[i]) === 0 ? r2Sticky : r2
       if (d2 <= limit) near.push(i)
     }

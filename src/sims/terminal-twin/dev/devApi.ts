@@ -41,6 +41,8 @@ import type {
 } from '../engine'
 import type { Breakpoint, BreakpointKind } from '../modules/breakpoints'
 import type { OverlayState } from '../modules/overlays'
+import type { QualityLevel, QualitySetting } from '../modules/quality'
+import { usePerfStore, type PerfStats } from '../store/perfStore'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
 import type { TruckRigState } from '../modules/truckAssets'
@@ -60,6 +62,14 @@ export interface TwinClock {
   busy: boolean
   /** Engine status and horizon. */
   engine: EngineInfo | null
+}
+
+export interface PerfInfo {
+  setting: QualitySetting
+  effective: QualityLevel
+  autoChanges: number
+  overlay: boolean
+  stats: PerfStats
 }
 
 export interface TwinDevApi {
@@ -95,6 +105,14 @@ export interface TwinDevApi {
   clock(): TwinClock
   /** Turn 3D debug overlays on/off (omitted keys unchanged); returns the new state. */
   overlays(next?: Partial<OverlayState>): OverlayState
+  /** Graphics quality (TT-19): the setting, the level in force, live fps / draw calls / triangles / frame CPU ms, how often Auto changed level, the overlay switch. */
+  perf(): PerfInfo
+  /** Set Low / Medium / High / Auto (the same as the picker); returns the new perf(). */
+  setQuality(setting: QualitySetting): PerfInfo
+  /** Show or hide the FPS / draw-call / triangle overlay. */
+  perfOverlay(on: boolean): void
+  /** Add `ms` of busy-wait to every frame (0 = none): proves Auto steps down under load and recovers when it ends. */
+  setFrameLoad(ms: number): void
   /** Rendered counts (null if there is no 3D view). */
   scene(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** What the scene shows at the displayed time: custody per container, status and pose per STS, status per vessel. */
@@ -223,6 +241,15 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     rendered: store.dashboardRendered,
   })
 
+  const perfStore = usePerfStore()
+  const perfInfo = (): PerfInfo => ({
+    setting: perfStore.setting,
+    effective: perfStore.effective,
+    autoChanges: perfStore.autoChanges,
+    overlay: perfStore.overlayVisible,
+    stats: { ...perfStore.stats },
+  })
+
   const api: TwinDevApi = {
     async load(name, options = {}) {
       await store.startScenario(
@@ -271,6 +298,17 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       }
     },
     overlays: (next = {}) => store.setOverlays(next),
+    perf: () => perfInfo(),
+    setQuality: (setting) => {
+      perfStore.setSetting(setting)
+      return perfInfo()
+    },
+    perfOverlay: (on) => {
+      if (perfStore.overlayVisible !== on) perfStore.toggleOverlay()
+    },
+    setFrameLoad: (ms) => {
+      perfStore.debugLoadMs = Math.max(0, ms)
+    },
     scene: () => store.view()?.stats() ?? null,
     sceneState: () => {
       const c = store.controller()

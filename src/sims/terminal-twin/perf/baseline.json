@@ -1,0 +1,41 @@
+{
+  "note": "Engine benchmark baseline (npm run tt:bench). Timings only compare on a like machine: re-record with --update-baseline when the reference machine changes.",
+  "reports": {
+    "TTI Algeciras baseline|24h": {
+      "preset": "TTI Algeciras baseline",
+      "simHours": 24,
+      "invariantsEvery": 144,
+      "events": 28938,
+      "wallMs": 18279.075649000002,
+      "eventsPerSec": 1583.1216280120334,
+      "wallMsPerSimHour": 761.6281520416668,
+      "peakMemoryMb": 433.3359375,
+      "status": "ready",
+      "invariantViolations": 0,
+      "firstError": null,
+      "env": {
+        "node": "v22.22.0",
+        "cpu": "Intel(R) Xeon(R) Processor x4",
+        "load1": 7
+      }
+    },
+    "Stress test|24h": {
+      "preset": "Stress test",
+      "simHours": 24,
+      "invariantsEvery": 144,
+      "events": 78057,
+      "wallMs": 93401.635814,
+      "eventsPerSec": 835.7134146498537,
+      "wallMsPerSimHour": 3891.734825583333,
+      "peakMemoryMb": 757.11328125,
+      "status": "ready",
+      "invariantViolations": 0,
+      "firstError": null,
+      "env": {
+        "node": "v22.22.0",
+        "cpu": "Intel(R) Xeon(R) Processor x4",
+        "load1": 6.3
+      }
+    }
+  }
+}

@@ -5,6 +5,7 @@ import KpiStrip from './components/KpiStrip.vue'
 import EventFeedPanel from './components/debug/EventFeedPanel.vue'
 import InspectorPanel from './components/debug/InspectorPanel.vue'
 import OverlayToggles from './components/OverlayToggles.vue'
+import PerfPanel from './components/PerfPanel.vue'
 import TopBar from './components/TopBar.vue'
 import SetupDialog from './components/modals/SetupDialog.vue'
 import ShortcutHelp from './components/modals/ShortcutHelp.vue'
@@ -62,6 +63,7 @@ onBeforeUnmount(() => {
       <KpiStrip v-if="store.hasScenario" />
       <FinalReport v-if="store.hasScenario && store.phase === 'running' && !store.dashboardOpen" />
       <OverlayToggles v-if="store.hasScenario && !webglFailed" />
+      <PerfPanel v-if="store.hasScenario && !webglFailed" />
       <EventFeedPanel v-if="store.hasScenario" />
       <InspectorPanel v-if="store.hasScenario" />
       <div

@@ -119,6 +119,20 @@ export function nextPoissonArrival(ctx: EngineContext, t: number): number | null
 /** Boxes a truck may collect now: in a stack, dwell elapsed, not claimed. `full`: imports; else empties. */
 export function eligiblePickups(state: SimState, full: boolean): ContainerState[] {
   const out: ContainerState[] = []
+  scanPickups(state, full, (box) => {
+    out.push(box)
+    return false
+  })
+  return out.sort((a, b) => (a.id < b.id ? -1 : 1))
+}
+
+/** Whether any box is eligible for a pickup: `eligiblePickups(...).length > 0` without listing the yard (stops at the first). */
+export function hasEligiblePickup(state: SimState, full: boolean): boolean {
+  return scanPickups(state, full, () => true)
+}
+
+/** Visits the eligible boxes in slot order until `visit` returns true (then true). */
+function scanPickups(state: SimState, full: boolean, visit: (box: ContainerState) => boolean): boolean {
   for (const slot of Object.values(state.yardSlots)) {
     if (!slot.containerId) continue
     const box = state.containers[slot.containerId]
@@ -126,9 +140,9 @@ export function eligiblePickups(state: SimState, full: boolean): ContainerState[
     if (box.pickupReadyAt === undefined || box.pickupReadyAt > state.now) continue
     if (box.truckClaim !== undefined || box.allocatedTo !== undefined) continue
     if (box.custody.kind !== 'yardSlot' || box.custody.id !== slot.id) continue
-    out.push(box)
+    if (visit(box)) return true
   }
-  return out.sort((a, b) => (a.id < b.id ? -1 : 1))
+  return false
 }
 
 /** An empty or warm-up yard start (TT-14): the boxes booked to the vessels are delivered by trucks. */
@@ -206,8 +220,8 @@ interface Plan {
 function feasibleKinds(ctx: EngineContext): Record<TruckTransactionKind, boolean> {
   const { state } = ctx
   const exports = exportVessels(ctx).length > 0
-  const imports = eligiblePickups(state, true).length > 0
-  const empties = eligiblePickups(state, false).length > 0
+  const imports = hasEligiblePickup(state, true)
+  const empties = hasEligiblePickup(state, false)
   return { dropExport: exports, pickImport: imports, dropEmpty: true, pickEmpty: empties, dual: exports && imports }
 }
 

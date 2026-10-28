@@ -31,6 +31,7 @@ import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { VesselHulls, type VesselHullState } from './vesselRenderer'
 import { LandsideScene, type LandsideStats } from './landsideRenderer'
 import { loadTruckModels, type TruckRigState } from './truckAssets'
+import { QUALITY_PROFILES, type QualityProfile } from './quality'
 
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
 const EMPTY_HOIST_MPS = 1.5
@@ -61,7 +62,7 @@ export interface SceneStats {
   /** Occupancy and label overlay counts (zeros while those overlays are off). */
   layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
-  containerLods: { lod0: number; lod1: number }
+  containerLods: { lod0: number; lod1: number; culled: number }
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -122,6 +123,11 @@ export class SceneRenderer {
   private readonly matrix = new THREE.Matrix4()
   private selection: THREE.LineSegments
   private disposables: { dispose(): void }[] = []
+  private sun!: THREE.DirectionalLight
+  private water!: THREE.Mesh
+  private waterSegments = 0
+  private waterBase!: THREE.BufferGeometry
+  private quality: QualityProfile = QUALITY_PROFILES.high
 
   constructor(private model: SceneModel) {
     const { config } = model
@@ -225,7 +231,7 @@ export class SceneRenderer {
 
   private addLights(): void {
     this.scene.add(new THREE.HemisphereLight('#dfe9f5', '#5a5248', 1.4))
-    const sun = new THREE.DirectionalLight('#fff4e0', 2.2)
+    const sun = (this.sun = new THREE.DirectionalLight('#fff4e0', 2.2))
     sun.position.set(-150, 260, 180)
     sun.castShadow = true
     sun.shadow.mapSize.set(2048, 2048)
@@ -245,10 +251,12 @@ export class SceneRenderer {
 
   private addGround(config: ScenarioConfig): void {
     const length = config.quay.lengthM
-    const water = new THREE.Mesh(
+    const water = (this.water = new THREE.Mesh(
       this.track(new THREE.PlaneGeometry(6000, 3000)),
       this.track(new THREE.MeshStandardMaterial({ color: '#2d5873', roughness: 0.35, metalness: 0.1 })),
-    )
+    ))
+    this.waterBase = water.geometry
+    this.waterSegments = 1
     water.rotation.x = -Math.PI / 2
     water.position.set(length / 2, -QUAY_ABOVE_WATER_M, -1500)
     water.receiveShadow = true
@@ -540,12 +548,55 @@ export class SceneRenderer {
     }
   }
 
+  /**
+   * Applies a quality profile (TT-19): sun shadow on/off and map size, container LOD range, ocean
+   * detail. Render resolution and the shadow switch of the renderer itself are applied by
+   * `useTwinScene`; the night-lighting budget is read by the atmosphere through `qualityProfile`.
+   */
+  setQuality(profile: QualityProfile): void {
+    this.quality = profile
+    const sun = this.sun
+    sun.castShadow = profile.shadows
+    if (sun.shadow.mapSize.x !== profile.shadowMapSize) {
+      sun.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize)
+      sun.shadow.map?.dispose()
+      sun.shadow.map = null
+    }
+    this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap })
+    this.setOceanDetail(profile.oceanSegments)
+  }
+
+  get qualityProfile(): QualityProfile {
+    return this.quality
+  }
+
+  /** Water: a flat Lambert quad at the lowest detail, else the standard material on a gently displaced grid of `segments` per side. */
+  private setOceanDetail(segments: number): void {
+    if (segments === this.waterSegments) return
+    this.waterSegments = segments
+    const old = this.water.geometry
+    const oldMat = this.water.material as THREE.Material
+    if (segments <= 1) {
+      this.water.geometry = this.waterBase
+      this.water.material = this.track(new THREE.MeshLambertMaterial({ color: '#2d5873' }))
+    } else {
+      const geo = this.track(new THREE.PlaneGeometry(6000, 3000, segments, Math.max(1, Math.round(segments / 2))))
+      const pos = geo.getAttribute('position')
+      for (let i = 0; i < pos.count; i++) pos.setZ(i, 0.18 * Math.sin(pos.getX(i) * 0.011) * Math.cos(pos.getY(i) * 0.017))
+      geo.computeVertexNormals()
+      this.water.geometry = geo
+      this.water.material = this.track(new THREE.MeshStandardMaterial({ color: '#2d5873', roughness: 0.35, metalness: 0.1 }))
+    }
+    if (old !== this.waterBase) old.dispose()
+    oldMat.dispose()
+  }
+
   setOverlays(next: OverlayState): void {
     this.overlays = { ...next }
     this.laneOverlay.visible = next.laneGraph
   }
 
-  update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3): void {
+  update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3, frustum?: THREE.Frustum): void {
     const model = this.model
     const containers = this.containers
     // Containers first: what each spreader carries decides its configuration (20 / 40 / twin-20).
@@ -566,7 +617,7 @@ export class SceneRenderer {
         }
       }
     })
-    containers.end(cameraPosition)
+    containers.end(cameraPosition, frustum)
 
     for (const [id, m] of this.stsModels) {
       const pose = model.stsPose(id, t)
@@ -733,7 +784,7 @@ export class SceneRenderer {
       reservedZones: this.reservedZones,
       reservedRailSegments: this.reservedRailSegments,
       layers: this.layers.stats(),
-      containerLods: { lod0: c.lod0, lod1: c.lod1 },
+      containerLods: { lod0: c.lod0, lod1: c.lod1, culled: c.culled },
       containerAssets: c.assets,
       shcLods,
       shcAssets: rigged > 0 ? 'loaded' : 'placeholder',

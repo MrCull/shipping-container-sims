@@ -383,3 +383,13 @@ export function checkInvariants(state: SimState, config: ScenarioConfig): Invari
     for (const message of inv.check(state, config)) violations.push({ invariant: inv.id, message })
   return violations
 }
+
+/**
+ * How often a long-running host should scan the invariants (TT-19). Every event is right for small
+ * scenarios and tests; at TTI scale (tens of thousands of yard slots) the full-state scan costs ~50 ms
+ * per event and throttles the run to ~20 events/s, so large yards check every few hundred events.
+ */
+export function suggestedInvariantEvery(config: ScenarioConfig): number {
+  const slots = blockSpecs(config).reduce((n, b) => n + b.bays * b.rows * b.tiers, 0)
+  return slots <= 2000 ? 1 : Math.min(500, Math.ceil(slots / 200))
+}

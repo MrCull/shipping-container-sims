@@ -15,6 +15,7 @@ export type ShortcutAction =
   | { kind: 'overlays' }
   | { kind: 'feed' }
   | { kind: 'inspector' }
+  | { kind: 'perf' }
   | { kind: 'help' }
 
 export interface ShortcutHelpRow {
@@ -36,6 +37,7 @@ export const SHORTCUT_HELP: readonly ShortcutHelpRow[] = [
   { keys: 'shortcuts.key.o', action: 'shortcuts.overlays' },
   { keys: 'shortcuts.key.e', action: 'shortcuts.feed' },
   { keys: 'shortcuts.key.i', action: 'shortcuts.inspector' },
+  { keys: 'shortcuts.key.p', action: 'shortcuts.perf' },
   { keys: 'shortcuts.key.help', action: 'shortcuts.help' },
 ]
 
@@ -78,6 +80,8 @@ export function shortcutFor(e: KeyLike): ShortcutAction | null {
       return { kind: 'feed' }
     case 'i':
       return { kind: 'inspector' }
+    case 'p':
+      return { kind: 'perf' }
     default:
       return null
   }
