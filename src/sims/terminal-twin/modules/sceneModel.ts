@@ -465,7 +465,7 @@ export class SceneModel {
     }
     if (kind === 'asc') {
       const p = this.ascPose(id, time)
-      return { x: p.x, y: p.hoistY + dims.height / 2, z: p.z, yaw: alongZ }
+      return { x: p.x, y: p.hoistY + dims.height / 2, z: p.z, yaw: alongZ, carriedBy: id }
     }
     if (kind === 'yardSlot') {
       const cell = parseYardSlotId(id)

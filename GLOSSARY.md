@@ -129,6 +129,8 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **SHC model:** the rigged Kalmar-style shuttle carrier asset `shc` (nodes `steer_*`, `wheel_*`, `hoist`, `spreader`, `twistlock_*`). Its **tunnel** is the open space between the legs that a box is carried through, and its **container attach point** is the centre of the twist-lock plane (the top of the carried box). *Avoid:* "SHC mesh".
 - **Hoist travel:** how far the SHC's `hoist` node moves down from rest (0 to −3.1 m); equal to the carried box's top height minus 6.0 m.
 - **Odometer (SHC):** the signed distance an SHC has rolled along its heading, from which the renderer derives wheel roll.
+- **ASC model:** the rigged ZPMC-style stacking crane asset `asc` (nodes `gantry` > `trolley` > `ropes`/`hoist` > `spreader` > `twistlock_*`). The **bridge** is its twin box-beam girder across the 25.4 m **span**; the **design stack** is the 5-high stack of 40 ft high-cube boxes it was sized for. *Avoid:* "ASC mesh".
+- **Rope scale:** the Y scale of the ASC `ropes` node, derived from the hoist (the ropes have no travel limit of their own).
 - **Asset viewer:** the dev-only page `/sim/terminal-twin?viewer=<asset>` (or `?viewer=yard`), with its API `window.__ttAssets`.
 
 ## Dashboard (TT-16)

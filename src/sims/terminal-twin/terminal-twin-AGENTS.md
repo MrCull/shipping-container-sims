@@ -4,7 +4,7 @@
 
 **Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root — use its terms in code, tests and docs.
 
-**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-20 added locale and units, the message catalogue and keyboard shortcuts. Phase 2 has started with the asset pipeline and container models (TT-22): Blender-generated GLBs with LODs and a livery atlas, instanced in the 3D view, plus a dev asset viewer and an asset budget check in CI. See [Phase 2 asset pipeline](#phase-2-asset-pipeline). TT-09 added real vessel calls: five size classes, generated bay plans, a continuous quay with berth allocation and anchorage, STS cranes on one rail with a crane split, twin-20 lifts, and the setup dialog's vessel table and generator. TT-05 adds SHC horizontal transport (STS ground position → WTP pad) over a generated lane graph with conflict-zone reservations, the `shcDispatch` decision point, an instant ASC stub, subsystem modes, SHC setup fields and 3D lane/reservation overlays. TT-06 replaces the stub with real block storage: yard blocks (8 rows, configurable bays/tiers), one ASC per block with gantry/trolley/hoist motion, the `yardAllocation` decision point, stack and ASC/SHC handover invariants, yard setup fields and 3D blocks, ASCs and stacked boxes. See [ASC block storage](#asc-block-storage-tt-06). TT-25 replaced the procedural shuttle carrier with a rigged Kalmar-style GLB model (see [SHC model](#shc-model-tt-25)). TT-08 adds a second ASC per block on a shared rail with no-passing reservations and the `ascDispatch` decision point. See [Paired ASCs](#paired-ascs-tt-08). TT-07 added the KPI collector (hourly and per-shift series), end conditions, the KPI strip, the final report and JSON/CSV export (see [KPIs, end conditions and final report](#kpis-end-conditions-and-final-report-tt-07)).
+**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-20 added locale and units, the message catalogue and keyboard shortcuts. Phase 2 has started with the asset pipeline and container models (TT-22): Blender-generated GLBs with LODs and a livery atlas, instanced in the 3D view, plus a dev asset viewer and an asset budget check in CI. See [Phase 2 asset pipeline](#phase-2-asset-pipeline). TT-09 added real vessel calls: five size classes, generated bay plans, a continuous quay with berth allocation and anchorage, STS cranes on one rail with a crane split, twin-20 lifts, and the setup dialog's vessel table and generator. TT-05 adds SHC horizontal transport (STS ground position → WTP pad) over a generated lane graph with conflict-zone reservations, the `shcDispatch` decision point, an instant ASC stub, subsystem modes, SHC setup fields and 3D lane/reservation overlays. TT-06 replaces the stub with real block storage: yard blocks (8 rows, configurable bays/tiers), one ASC per block with gantry/trolley/hoist motion, the `yardAllocation` decision point, stack and ASC/SHC handover invariants, yard setup fields and 3D blocks, ASCs and stacked boxes. See [ASC block storage](#asc-block-storage-tt-06). TT-25 replaced the procedural shuttle carrier with a rigged Kalmar-style GLB model (see [SHC model](#shc-model-tt-25)). TT-08 adds a second ASC per block on a shared rail with no-passing reservations and the `ascDispatch` decision point. See [Paired ASCs](#paired-ascs-tt-08). TT-07 added the KPI collector (hourly and per-shift series), end conditions, the KPI strip, the final report and JSON/CSV export (see [KPIs, end conditions and final report](#kpis-end-conditions-and-final-report-tt-07)). TT-24 replaced the procedural stacking crane with a rigged ZPMC-style ASC GLB (see [ASC model](#asc-model-tt-24)).
 
 **Sim ID:** `terminal-twin`
 
@@ -140,7 +140,7 @@ terminal-twin/
 ├── dev/AssetViewer.vue       Dev asset viewer (?viewer=<asset>|yard); assetViewerScene.ts; assetViewerApi.ts (window.__ttAssets)
 ├── assets/                   Phase 2 asset library (see "Phase 2 asset pipeline")
 │   ├── budgets.json          Triangle / draw-call / file-size budgets per asset kind
-│   ├── generators/           Python (bpy) generators: build.py, tt_assets/*.py (containers, liveries, shc, shc_meta), fonts/ (OFL), requirements.txt
+│   ├── generators/           Python (bpy) generators: build.py, tt_assets/*.py (containers, liveries, parts, shc, shc_meta, asc, asc_meta), fonts/ (OFL), requirements.txt
 │   └── models/<group>/       Committed outputs: <asset>.glb + .meta.json, livery-atlas.json, previews/*.webp
 ├── cli/                      Node-only: run.ts→runCli.ts (tt:run), diff.ts→diffCli.ts (tt:diff),
 │                             golden-cli.ts→golden.ts (tt:golden), handlerSets.ts, build-fixtures.ts,
@@ -187,10 +187,12 @@ await __tt.load('shc-1sts-2shc-1wtp', { shc: { count: 3, kinematics } })  // SHC
 __tt.clock()       // { displayTime, speed, paused, busy, engine: EngineInfo }
 __tt.scene()       // rendered { containers, sts, shcs, vessels, overlays, reservedZones, frames,
                    //   containerLods: { lod0, lod1 }, containerAssets: 'placeholder'|'loaded',
-                   //   shcLods: { lod0, lod1, lod2 }, shcAssets: 'placeholder'|'loaded' }
+                   //   shcLods: { lod0, lod1, lod2 }, shcAssets: 'placeholder'|'loaded',
+                   //   ascLods: { lod0, lod1, lod2 }, ascAssets: 'placeholder'|'loaded' }
 __tt.sceneState()  // what the scene shows: custody per box, status + pose per STS and SHC, status per vessel,
                    //   active reservations, liveries: { [containerId]: { index (atlas tile), size, lod } } as drawn,
-                   //   shcRigs: { [shcId]: { lod, steerRad, wheelRollRad, hoistM, carrying } } as drawn
+                   //   shcRigs: { [shcId]: { lod, steerRad, wheelRollRad, hoistM, carrying } } as drawn,
+                   //   ascRigs: { [ascId]: { lod, gantryZ, trolleyX, hoistM, ropeScale, scaleY, carrying } } as drawn
 __tt.cameraTo(id, distanceM?)  // aim at an entity, optionally from a distance (60 → LOD0, 600 → LOD1)
 __tt.display(); __tt.setDisplay({ locale: 'de-DE', units: 'imperial' })  // live locale/units
 __tt.config()      // loaded scenario config (SI) + current display settings
@@ -298,7 +300,7 @@ Blender (`bpy`) Python generators → raw GLB → gltf-transform (meshopt) → c
 npm run tt:assets -- --python .venv-bpy/bin/python      # or set TT_BPY_PYTHON; Windows: .venv-bpy\Scripts\python.exe
 npm run tt:assets -- --check --python ...               # regenerate into a temp dir and byte-compare with the commit
 npm run tt:assets -- --no-previews --python ...         # fast iteration (keeps the committed previews)
-npm run tt:assets -- --only shc --python ...            # one group only (containers | shc); the other group's files are untouched
+npm run tt:assets -- --only asc --python ...            # one group only (containers | shc | asc); the other groups' files are untouched
 ```
 
 What `cli/assets/build.ts` does:
@@ -332,6 +334,7 @@ It takes about 80 s for containers, mostly the Cycles previews. Two runs give by
 | `container-20` | 308 triangles (budget 450) | 12 (budget 12) | 3 / 1 | ~134 KB |
 | `container-40`, `container-40hc` | 440 triangles (budget 450) | 12 | 3 / 1 | ~136 KB |
 | `shc` | 11,016 (budget 12,000) | 2,532 (3,000); LOD2 342 (400) | 15 / 11 (budgets 16 / 12; LOD2 2 of 3) | ~147 KB |
+| `asc` | 14,474 (budget 15,000) | 3,624 (4,000); LOD2 556 (600) | 9 / 5 (budgets 10 / 6; LOD2 3 of 3) | ~300 KB |
 
 Most of each container file is the embedded 2048² livery atlas. The renderer shares one texture between them.
 
@@ -389,9 +392,27 @@ A red Kalmar-style shuttle carrier (`assets/models/shc/shc.glb`, sidecar `shc.me
 - **Tests:** `tests/shc-asset.test.ts` (committed GLB and sidecar: rig, attach point, tunnel fit, provenance), `tests/shc-pose.test.ts` (pose maths), `tests/browser/shc-model.smoke.ts` (LOD switching, carried box, rolling and steering, viewer).
 - **Not done:** the TTI reference pack and reference photos are not in the repo, so the proportions are approximations tagged [A]; a reference-photo pass can re-tune the constants at the top of `shc.py` and regenerate. Per-unit numbers (`SC 108`) are baked into the atlas, not taken from the SHC id.
 
-### Adding the next asset (STS, ASC, …)
+### ASC model (TT-24)
 
-1. Add `generators/tt_assets/<kind>.py`, and wire a group into `build.py` (`GROUPS`) and `cli/assets/build.ts` (`GROUPS`).
+A blue ZPMC-style rail-mounted stacking crane (`assets/models/asc/asc.glb`, sidecar `asc.meta.json`, previews `asc-{front,side,rear,three-quarter}.webp`), generated by `generators/tt_assets/asc.py` (geometry) and `asc_meta.py` (atlas and sidecar). The shared `Part`/`Atlas` modelling vocabulary now lives in `tt_assets/parts.py` (moved out of `shc.py`; the SHC output is byte-identical). The 25.4 m rail span, 8 rows and 40 t rating are the spec's figures (tag `V`); every other proportion is `[A]` (no reference pack or photos in the repo; tune the constants at the top of `asc.py`).
+
+- **Look:** twin box-beam bridge across the span on four vertical legs (two per rail) with X-bracing, sills and rail bogies with wheels; walkways with grating and handrails along both girders, two caged ladders with landings, head-beam decks, an e-house on the +X deck, a trolley with two machinery houses, drums, motors and rope openings, and a yellow telescopic 40 ft spreader with four twist-locks. Branding: a `ZPMC` wordmark on both bridge sides, a `40 t` mark on the trolley, the unit number `ASC 12`, and numbered bridge panels 1..8 over the eight rows (all baked into a 1024² atlas; no operator branding). It is 25.4 m between rail centres (29.2 m over the decks), 10.1 m along the rails (two ASCs fit the engine's 12 m minimum separation) and 24.7 m high; the bridge underside is 20.0 m.
+- **Axes:** glTF X = across the rows (trolley), Z = along the block rails (gantry), Y up; the spreader's long axis is Z, like the boxes in the yard. The asset origin is on the ground at the span centre and the gantry centre, so the renderer places it at `(block.x, 0, 0)`.
+- **Rig (names repeat in every LOD; the build strips `@LODn`):** `gantry` (translation +Z; the whole portal) > `trolley` (+X, ±11 m, pivot at the top of the bridge rails) > `ropes` (LOD0/1; no limit of its own: its scale along Y is `(ropeTopY − (attachY + 2.3)) / restLength`, from the sidecar's `derived` entry) and `hoist` (+Y, 0 to −15.1 m, pivot = the twist-lock plane at rest, raised to 18.0 m) > `spreader` (0 to 0.35 m float) > `twistlock_fl|fr|rl|rr` (0°–90°, LOD0 only). **LOD2 keeps `gantry`, `trolley`, `hoist` and `spreader`** (the spreader node is empty there, its box is merged into `hoist`), so far cranes still move.
+- **Attach point:** `container_attach` (child of `hoist`) is the TOP of the carried box: 18.0 m above the ground at hoist 0. `hoist = (box bottom + box height) − 18.0`. The lowest travel (−15.104 m) puts the plane at 2.896 m, the top of a high-cube box on the ground. 18.0 m passes a box over a 5-high stack with the engine's 0.6 m travel clearance (stack top 14.48 m, carried box bottom 15.10 m).
+- **Stack:** the sidecar's `stack` block records 8 rows at 2.9 m pitch, 24.3 m clear between the legs (0.9 m each side of the outer rows), `designTiers 5`, `underBridgeM 20.0`.
+- **Triangles / draw calls:** LOD0 14,474 / 9, LOD1 3,624 / 5, LOD2 556 / 3 (budgets 15,000 / 4,000 / 600 and 10 / 6 / 3). One atlas (WebP), ~300 KB.
+- **Renderer** (`modules/ascAssets.ts`, `modules/ascRig.ts`, `SceneRenderer`): `loadAscModel()` loads the GLB once per page behind the procedural placeholder. Each ASC gets an `AscRig` (three cloned LODs sharing geometry and material). LOD by camera distance: `ASC_LOD_DISTANCES` [A] 90 m / 300 m (hysteresis ×1.15). `ascRigValues()` (pure, in `ascRig.ts`) maps the scene model's `ascPose` (gantry Z, trolley X from the block centre, hoist = box bottom) and the carried box height to the rig: gantry Z and trolley X directly, hoist from the plane height, rope scale, twist-locks locked while a box hangs. Containers carried by an ASC now have `ContainerPose.carriedBy`. The engine's motion segments are the only input, so the animation matches them exactly (unit-tested over a whole fixture run: no clamping).
+- **Taller blocks:** the model is built for 5 tiers. `ascScaleY(tiers)` stretches the whole rig vertically for blocks with more tiers (up to 8) so its raised plane covers the engine's top of travel; wheels and ladders stretch with it. Fewer tiers just use less of the hoist.
+- **Picking:** `entityBounds` for an ASC uses `ASC_MODEL` (29.2 × 24.7 × 10.1 m, stretched like the model); the old `ASC` constants in `equipmentDims.ts` only size the procedural placeholder.
+- **Dev API:** `__tt.scene()` adds `ascLods {lod0, lod1, lod2}` and `ascAssets`; `__tt.sceneState().ascRigs[id]` = `{lod, gantryZ, trolleyX, hoistM, ropeScale, scaleY, carrying}` as last drawn.
+- **Asset viewer** (`?viewer=asc`): sliders for gantry, trolley, hoist, spreader and the twist-locks (applied to every LOD; the ropes follow the hoist), 8 rows of 40 ft high-cube reference boxes under the span with a stack-height slider (`__ttAssets.setStack(tiers)`), and a 40 ft box hanging from the spreader that follows the hoist and trolley. `stats().stack` reports `sideClearanceM`, `carryClearanceM`, `carriedBottomM` and `fits` (true at 5 tiers, false at 6).
+- **Tests:** `tests/asc-asset.test.ts` (committed GLB and sidecar: rig, attach point, span, stack fit, branding, provenance), `tests/asc-rig.test.ts` (rig maths, scale, and a full engine run through the host with no clamping), `tests/browser/asc-model.smoke.ts` (paired ASCs with LOD switching, carried box and ropes, viewer sliders and stack fit).
+- **Not done:** the reference pack and photos are not in the repo, so proportions are `[A]`; the TT-19 frame budget does not exist yet, so frame rate was not compared (worst case in a TTI-size yard: 2 × 32 ASCs, at most a handful at LOD0).
+
+### Adding the next asset (STS, truck, vessels, …)
+
+1. Add `generators/tt_assets/<kind>.py` (use `tt_assets/parts.py`: `Atlas` for the swatch/region atlas, `Part` for boxes, beams, plates and revolves), and wire a group into `build.py` (`GROUPS`) and `cli/assets/build.ts` (`GROUPS`).
 2. Follow the rig and sidecar conventions above, and tag every dimension `V`, `P`, `A` or `M`.
 3. Check or tune its entry in `budgets.json` and run `npm run tt:assets`. Look at the previews and at `?viewer=<asset>`, then run `npm run tt:assets:shots`.
 4. Commit the generators, GLBs, sidecars and previews (never `.blend` files or photos).

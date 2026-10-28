@@ -10,6 +10,7 @@ import type { ContainerSize } from '../scenario/types'
 import { LIVERY_ATLAS, liveryMaterial, loadContainerAssets, loadGltf } from '../modules/containerAssets'
 import { ContainerInstancer, DEFAULT_LOD_OPTIONS } from '../modules/containerInstancer'
 import { CONTAINER_DIMS } from '../modules/sceneModel'
+import { ASC_MODEL, HC_HEIGHT_M, ropeScaleFor } from '../modules/ascRig'
 import type { AssetViewStats, RigControl, ViewerLod, YardStats } from './assetViewerApi'
 
 const glbUrls = import.meta.glob('../assets/models/**/*.glb', { query: '?url', import: 'default', eager: true }) as Record<string, string>
@@ -23,6 +24,8 @@ interface Sidecar {
   /** SHC only: clear tunnel size and the container attach point (twist-lock plane at hoist rest). */
   tunnel?: { clearWidthM: number; clearHeightM: number }
   attachPoints?: { name: string; position: number[] }[]
+  /** ASC only: the design stack (rows, row pitch, clear span between the legs, bridge underside). */
+  stack?: { rows: number; rowPitchM: number; designTiers: number; clearSpanM: number; underBridgeM: number }
 }
 
 /** A node with the rest transform its rig value is applied on top of (one per LOD that repeats the name). */
@@ -83,6 +86,10 @@ export class AssetViewerScene {
   private rigValues: Record<string, number> = {}
   private reference: THREE.Object3D
   private referenceSize: ContainerSize = '20'
+  /** ASC: 8 rows of reference containers on the ground under the span, `stackTiers` high. */
+  private stack: THREE.Group | null = null
+  private stackTiers = 5
+  private ropeNodes: THREE.Object3D[] = []
   private yardInstancer: ContainerInstancer | null = null
   private loadToken = 0
   private materials = new Set<THREE.Material & { userData: { liveryBase?: { value: number } } }>()
@@ -142,14 +149,61 @@ export class AssetViewerScene {
     this.reference.name = `reference-${size.toLowerCase()}`
   }
 
-  /** SHC: the reference box hangs from the spreader, so it follows the hoist slider (its top is the twist-lock plane). */
+  /** SHC and ASC: the reference box hangs from the spreader, so it follows the hoist slider (its top is the twist-lock plane); on an ASC it also follows the trolley. */
   private placeCarriedReference(): void {
     const asset = this.asset
-    if (!asset || asset.entry.meta.kind !== 'shc') return
+    if (!asset || (asset.entry.meta.kind !== 'shc' && asset.entry.meta.kind !== 'asc')) return
     const attach = asset.entry.meta.attachPoints?.find((a) => a.name === 'container_attach')
     const hoist = this.rigValues.hoist ?? 0
     const top = (attach?.position[1] ?? 0) + hoist
-    this.reference.position.set(0, top - CONTAINER_DIMS[this.referenceSize].height, 0)
+    this.reference.position.set(asset.entry.meta.kind === 'asc' ? (this.rigValues.trolley ?? 0) : 0, top - CONTAINER_DIMS[this.referenceSize].height, 0)
+  }
+
+  /** ASC: rebuilds the reference stack (all rows of 40 ft high-cube boxes, long axis along the rails) at the given height. */
+  private buildStack(tiers: number): void {
+    this.clearStack()
+    this.stackTiers = tiers
+    const st = this.asset?.entry.meta.stack
+    if (!st) return
+    const d = CONTAINER_DIMS['40HC']
+    const geo = new THREE.BoxGeometry(d.width, d.height, d.length)
+    const edges = new THREE.EdgesGeometry(geo)
+    const fill = new THREE.MeshStandardMaterial({ color: '#9ca3af', transparent: true, opacity: 0.35 })
+    const line = new THREE.LineBasicMaterial({ color: '#111827' })
+    const group = new THREE.Group()
+    group.name = 'reference-stack'
+    for (let r = 0; r < st.rows; r++) {
+      for (let k = 0; k < tiers; k++) {
+        const pos = new THREE.Vector3((r - (st.rows - 1) / 2) * st.rowPitchM, k * d.height + d.height / 2, 0)
+        const m = new THREE.Mesh(geo, fill)
+        m.position.copy(pos)
+        const l = new THREE.LineSegments(edges, line)
+        l.position.copy(pos)
+        group.add(m, l)
+      }
+    }
+    group.userData.dispose = () => {
+      geo.dispose()
+      edges.dispose()
+      fill.dispose()
+      line.dispose()
+    }
+    this.stack = group
+    this.scene.add(group)
+  }
+
+  private clearStack(): void {
+    if (!this.stack) return
+    this.scene.remove(this.stack)
+    ;(this.stack.userData.dispose as (() => void) | undefined)?.()
+    this.stack = null
+  }
+
+  /** ASC viewer: sets the reference stack height (tiers of 40 ft high-cube boxes). */
+  setStack(tiers: number): AssetViewStats {
+    if (this.asset?.entry.meta.kind !== 'asc') throw new Error('setStack applies to the ASC asset')
+    this.buildStack(Math.min(8, Math.max(0, Math.round(tiers))))
+    return this.stats()!
   }
 
   resize(host: HTMLElement): void {
@@ -167,6 +221,8 @@ export class AssetViewerScene {
     const gltf = await loadGltf(entry.url)
     if (token !== this.loadToken) throw new Error(`show(${name}) superseded by a later show/yard call`)
     this.clearYard()
+    this.clearStack()
+    this.reference.rotation.y = 0
     if (this.asset) this.scene.remove(this.asset.root)
     const root = gltf.scene
     root.traverse((o) => {
@@ -198,18 +254,28 @@ export class AssetViewerScene {
     })
     this.asset = { entry, root, lods, rest }
     this.rigValues = Object.fromEntries([...rest.keys()].map((n) => [n, 0]))
+    this.ropeNodes = []
+    root.traverse((o) => {
+      if (((o.userData.name as string | undefined) ?? o.name) === 'ropes') this.ropeNodes.push(o)
+    })
     this.scene.add(root)
     const { lengthM, widthM, heightM } = entry.meta.dimensions
     this.reference.visible = true
     if (entry.meta.kind === 'shc') {
       this.setReferenceSize('40HC')
       this.placeCarriedReference()
+    } else if (entry.meta.kind === 'asc') {
+      this.setReferenceSize('40HC')
+      this.reference.rotation.y = Math.PI / 2 // long axis along the rails, like the boxes in the yard
+      this.buildStack(this.stackTiers)
+      this.placeCarriedReference()
     } else {
       this.setReferenceSize('20')
       this.reference.position.set(0, 0, widthM / 2 + CONTAINER_DIMS['20'].width / 2 + 1.5)
     }
-    const span = Math.max(lengthM, heightM, 8)
-    this.controls.target.set(0, heightM / 2, entry.meta.kind === 'shc' ? 0 : 1.5)
+    const isAsc = entry.meta.kind === 'asc'
+    const span = isAsc ? Math.max(widthM * 0.8, heightM, 8) : Math.max(lengthM, heightM, 8)
+    this.controls.target.set(0, isAsc ? heightM * 0.45 : heightM / 2, entry.meta.kind === 'shc' || isAsc ? 0 : 1.5)
     this.camera.position.set(span * 0.9, span * 0.55, -span * 1.1)
     this.controls.update()
     this.setLod(options.lod ?? 'LOD0')
@@ -268,7 +334,11 @@ export class AssetViewerScene {
       }
     }
     this.rigValues[node] = v
-    if (node === 'hoist') this.placeCarriedReference()
+    if (node === 'hoist') {
+      // The ropes stretch with the hoist (the `ropes` node has no travel limit of its own).
+      for (const r of this.ropeNodes) r.scale.y = ropeScaleFor(v)
+    }
+    if (node === 'hoist' || node === 'trolley') this.placeCarriedReference()
     return this.stats()!
   }
 
@@ -288,6 +358,31 @@ export class AssetViewerScene {
       livery: this.livery,
       referenceContainer: this.reference.visible,
       reference: this.referenceFit(),
+      stack: this.stackFit(),
+    }
+  }
+
+  /** ASC viewer: the reference stack against the span and the hoist (sidecar `stack` and `hoist`). */
+  private stackFit(): AssetViewStats['stack'] {
+    const st = this.asset?.entry.meta.stack
+    if (!st || !this.stack) return null
+    const d = CONTAINER_DIMS['40HC']
+    const stackTopM = this.stackTiers * d.height
+    const outerRowM = ((st.rows - 1) / 2) * st.rowPitchM + d.width / 2
+    const sideClearanceM = st.clearSpanM / 2 - outerRowM
+    const restCarryClearanceM = ASC_MODEL.restAttachY - HC_HEIGHT_M - stackTopM
+    const carriedBottomM = ASC_MODEL.restAttachY + (this.rigValues.hoist ?? 0) - HC_HEIGHT_M
+    return {
+      rows: st.rows,
+      tiers: this.stackTiers,
+      stackTopM,
+      clearSpanM: st.clearSpanM,
+      rowsWidthM: 2 * outerRowM,
+      sideClearanceM,
+      underBridgeM: st.underBridgeM,
+      carryClearanceM: restCarryClearanceM,
+      carriedBottomM,
+      fits: sideClearanceM > 0 && restCarryClearanceM > 0 && stackTopM < st.underBridgeM,
     }
   }
 
@@ -321,6 +416,7 @@ export class AssetViewerScene {
     this.loadToken++
     if (this.asset) this.scene.remove(this.asset.root)
     this.asset = null
+    this.clearStack()
     this.reference.visible = false
     this.clearYard()
     const assets = await loadContainerAssets()
@@ -394,6 +490,7 @@ export class AssetViewerScene {
   dispose(): void {
     cancelAnimationFrame(this.frame)
     this.clearYard()
+    this.clearStack()
     this.controls.dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()

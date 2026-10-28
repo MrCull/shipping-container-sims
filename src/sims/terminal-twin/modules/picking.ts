@@ -7,7 +7,8 @@
  * win because crane and hull boxes enclose the boxes they carry.
  */
 import { FENDER_GAP_M } from '../scenario/vesselClasses'
-import { ASC, ascHeightM, SHC, STS } from './equipmentDims'
+import { SHC, STS } from './equipmentDims'
+import { ASC_MODEL, ascScaleY } from './ascRig'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 
 export interface Ray {
@@ -40,8 +41,10 @@ export function entityBounds(model: SceneModel, id: string, time: number): Entit
     return { x: p.x, y: height / 2, z: p.z, sx: SHC.length + 1, sy: height, sz: SHC.width + 1, yaw: p.heading === 'z' ? Math.PI / 2 : 0 }
   }
   if (model.ascIds.includes(id)) {
-    const height = ascHeightM(model.blockOfAsc(id)) + ASC.girderHeight + 2
-    return { x: model.blockOfAsc(id).x, y: height / 2, z: model.ascPose(id, time).z, sx: ASC.span + 6, sy: height, sz: ASC.legLength + 2, yaw: 0 }
+    // The ASC GLB's overall box (rails to e-house roof), stretched for blocks taller than the model's design stack.
+    const block = model.blockOfAsc(id)
+    const height = ASC_MODEL.heightM * ascScaleY(block.tiers)
+    return { x: block.x, y: height / 2, z: model.ascPose(id, time).z, sx: ASC_MODEL.widthM, sy: height, sz: ASC_MODEL.lengthM, yaw: 0 }
   }
   if (model.stsIds.includes(id)) {
     const p = model.stsPose(id, time)

@@ -53,6 +53,9 @@ function setLivery(e: Event): void {
 function setRig(node: string, e: Event): void {
   if (view) stats.value = view.setRig(node, Number((e.target as HTMLInputElement).value))
 }
+function setStack(e: Event): void {
+  if (view) stats.value = view.setStack(Number((e.target as HTMLInputElement).value))
+}
 
 onMounted(() => {
   if (!host.value) return
@@ -73,6 +76,7 @@ onMounted(() => {
     setLod: (lod) => (stats.value = view!.setLod(lod)),
     setLivery: (i) => (stats.value = view!.setLivery(i)),
     setRig: (node, v) => (stats.value = view!.setRig(node, v)),
+    setStack: (tiers) => (stats.value = view!.setStack(tiers)),
     stats: () => view?.stats() ?? null,
     async yard(count) {
       stats.value = null
@@ -168,6 +172,32 @@ onBeforeUnmount(() => {
             @input="setRig(rig.node, $event)"
           >
         </label>
+        <label v-if="stats.stack">
+          {{ t('assetViewer.stackTiers') }} <span class="mono">{{ stats.stack.tiers }}</span>
+          <input
+            type="range"
+            min="0"
+            max="8"
+            step="1"
+            data-testid="viewer-stack-tiers"
+            :value="stats.stack.tiers"
+            @input="setStack"
+          >
+        </label>
+        <dl v-if="stats.stack">
+          <dt>{{ t('assetViewer.stackFit') }}</dt><dd
+            class="mono"
+            data-testid="viewer-stack-fit"
+          >
+            {{ t(stats.stack.fits ? 'assetViewer.stackFits' : 'assetViewer.stackBlocked') }}
+          </dd>
+          <dt>{{ t('assetViewer.stackSide') }}</dt><dd class="mono">
+            {{ t('assetViewer.metres', { value: stats.stack.sideClearanceM.toFixed(2) }) }}
+          </dd>
+          <dt>{{ t('assetViewer.stackCarry') }}</dt><dd class="mono">
+            {{ t('assetViewer.metres', { value: stats.stack.carryClearanceM.toFixed(2) }) }}
+          </dd>
+        </dl>
         <dl>
           <dt>{{ t('assetViewer.showing') }}</dt><dd class="mono">
             {{ stats.shownLod }}
@@ -188,7 +218,7 @@ onBeforeUnmount(() => {
           </template>
         </dl>
         <p class="hint">
-          {{ t(stats.kind === 'shc' ? 'assetViewer.referenceHintShc' : 'assetViewer.referenceHint') }}
+          {{ t(stats.kind === 'shc' ? 'assetViewer.referenceHintShc' : stats.kind === 'asc' ? 'assetViewer.referenceHintAsc' : 'assetViewer.referenceHint') }}
         </p>
       </template>
       <dl v-if="yardStats">

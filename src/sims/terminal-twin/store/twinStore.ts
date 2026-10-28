@@ -28,6 +28,7 @@ import { defaultStartDate } from '../modules/time'
 import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
+import type { AscRigState } from '../modules/ascAssets'
 
 export type TwinPhase = 'setup' | 'running'
 export type DashboardTab = 'charts' | 'report'
@@ -86,6 +87,8 @@ export interface TwinView {
   liveries(): Record<string, RenderedLivery> | null
   /** Rig state per SHC (LOD, steering, wheel roll, hoist travel, carrying); null without a 3D view. */
   shcRigs(): Record<string, ShcRigState> | null
+  /** Rig state per ASC (LOD, gantry, trolley, hoist, rope scale, carrying); null without a 3D view. */
+  ascRigs(): Record<string, AscRigState> | null
 }
 
 const RECENT_EVENTS_CAP = FEED_BUFFER_CAP

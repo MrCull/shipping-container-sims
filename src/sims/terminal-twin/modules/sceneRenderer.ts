@@ -20,6 +20,8 @@ import { NO_OVERLAYS, type OverlayState } from './overlays'
 export type { OverlayState }
 import { ContainerInstancer } from './containerInstancer'
 import { loadShcModel, ShcRig, SHC_RIG, type ShcRigState } from './shcAssets'
+import { AscRig, loadAscModel, type AscRigState } from './ascAssets'
+import { HC_HEIGHT_M } from './ascRig'
 import { LIVERY_ATLAS, liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
 import { aftOffsetM, BAY_PITCH_M, FENDER_GAP_M, ROW_PITCH_M, slotX, slotZ, TIER_PITCH_M } from '../scenario/vesselClasses'
 
@@ -52,6 +54,10 @@ export interface SceneStats {
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
   shcAssets: 'placeholder' | 'loaded'
+  /** ASC objects per LOD (all 0 until the ASC GLB has loaded). */
+  ascLods: { lod0: number; lod1: number; lod2: number }
+  /** 'placeholder' until the ASC GLB has loaded. */
+  ascAssets: 'placeholder' | 'loaded'
   /** 'placeholder' until the container GLBs have loaded. */
   containerAssets: 'placeholder' | 'loaded'
 }
@@ -82,7 +88,7 @@ export class SceneRenderer {
   private vessels = new Map<string, THREE.Group>()
   private shcs = new Map<string, { group: THREE.Group; spreader: THREE.Mesh; rig?: ShcRig }>()
   private hoistEase = new Map<string, { t: number; y: number }>()
-  private ascs = new Map<string, { group: THREE.Group; trolley: THREE.Mesh; spreader: THREE.Mesh; ropes: THREE.Mesh; blockX: number; height: number }>()
+  private ascs = new Map<string, { group: THREE.Group; trolley: THREE.Mesh; spreader: THREE.Mesh; ropes: THREE.Mesh; blockX: number; height: number; tiers: number; rig?: AscRig }>()
   private laneOverlay: THREE.Group
   private zoneMeshes = new Map<string, THREE.Mesh>()
   private overlays: OverlayState = { ...NO_OVERLAYS }
@@ -135,6 +141,20 @@ export class SceneRenderer {
           }
         },
         (err: unknown) => console.warn('Terminal Twin: SHC GLB failed to load; keeping placeholders', err),
+      )
+    }
+
+    if (model.ascIds.length > 0) {
+      loadAscModel().then(
+        (ascModel) => {
+          if (this.disposed) return
+          for (const [id, entry] of this.ascs) {
+            entry.rig = new AscRig(ascModel, id)
+            entry.group.visible = false
+            this.scene.add(entry.rig.root)
+          }
+        },
+        (err: unknown) => console.warn('Terminal Twin: ASC GLB failed to load; keeping placeholders', err),
       )
     }
 
@@ -440,7 +460,7 @@ export class SceneRenderer {
     const ropes = box(0.12, 1, 0.12, dark, 0, 0, 0)
     const spreader = box(6.4, 0.35, 2.6, accent, 0, 0, 0)
     this.scene.add(group)
-    this.ascs.set(id, { group, trolley, spreader, ropes, blockX: block.x, height: height + ASC.girderHeight })
+    this.ascs.set(id, { group, trolley, spreader, ropes, blockX: block.x, height: height + ASC.girderHeight, tiers: block.tiers })
   }
 
   /** Lane-graph overlay: every one-way edge with a chevron at its midpoint, plus node markers. */
@@ -542,17 +562,6 @@ export class SceneRenderer {
       group.visible = p !== null
       if (p) group.position.set(p.x, 0, p.zOffset)
     }
-    for (const [id, parts] of this.ascs) {
-      const pose = model.ascPose(id, t)
-      const lx = pose.x - parts.blockX
-      parts.group.position.set(parts.blockX, 0, pose.z)
-      parts.trolley.position.x = lx
-      const spreaderY = pose.hoistY + CONTAINER_DIMS['40HC'].height + 0.2
-      parts.spreader.position.set(lx, spreaderY, 0)
-      const ropeLen = Math.max(0.1, parts.height - spreaderY)
-      parts.ropes.scale.y = ropeLen
-      parts.ropes.position.set(lx, parts.height - ropeLen / 2, 0)
-    }
     this.reservedZones = 0
     const active = this.overlays.reservations ? model.activeReservations(t) : {}
     for (const [zone, mesh] of this.zoneMeshes) {
@@ -581,6 +590,32 @@ export class SceneRenderer {
       if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
     })
     containers.end(cameraPosition)
+
+    for (const [id, parts] of this.ascs) {
+      const pose = model.ascPose(id, t)
+      const lx = pose.x - parts.blockX
+      const boxHeight = carried.get(id)
+      if (parts.rig) {
+        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 12, cameraPosition.z - pose.z))
+        // Twist-lock plane: the top of the carried box; empty, where the top of a high-cube box would be.
+        parts.rig.pose({
+          blockX: parts.blockX,
+          trolleyX: lx,
+          gantryZ: pose.z,
+          attachY: pose.hoistY + (boxHeight ?? HC_HEIGHT_M),
+          carrying: boxHeight !== undefined,
+          tiers: parts.tiers,
+        })
+        continue
+      }
+      parts.group.position.set(parts.blockX, 0, pose.z)
+      parts.trolley.position.x = lx
+      const spreaderY = pose.hoistY + CONTAINER_DIMS['40HC'].height + 0.2
+      parts.spreader.position.set(lx, spreaderY, 0)
+      const ropeLen = Math.max(0.1, parts.height - spreaderY)
+      parts.ropes.scale.y = ropeLen
+      parts.ropes.position.set(lx, parts.height - ropeLen / 2, 0)
+    }
 
     for (const [id, parts] of this.shcs) {
       const pose = model.shcPose(id, t)
@@ -660,6 +695,13 @@ export class SceneRenderer {
       rigged++
       shcLods[`lod${rig.rigState.lod}` as keyof typeof shcLods]++
     }
+    const ascLods = { lod0: 0, lod1: 0, lod2: 0 }
+    let ascRigged = 0
+    for (const { rig } of this.ascs.values()) {
+      if (!rig) continue
+      ascRigged++
+      ascLods[`lod${rig.rigState.lod}` as keyof typeof ascLods]++
+    }
     return {
       containers: c.drawn,
       sts: this.sts.size,
@@ -674,6 +716,8 @@ export class SceneRenderer {
       containerAssets: c.assets,
       shcLods,
       shcAssets: rigged > 0 ? 'loaded' : 'placeholder',
+      ascLods,
+      ascAssets: ascRigged > 0 ? 'loaded' : 'placeholder',
     }
   }
 
@@ -681,6 +725,13 @@ export class SceneRenderer {
   renderedShcs(): Record<string, ShcRigState> {
     const out: Record<string, ShcRigState> = {}
     for (const [id, { rig }] of this.shcs) if (rig) out[id] = { ...rig.rigState }
+    return out
+  }
+
+  /** Rig state per ASC at the last update (empty until the ASC GLB has loaded). */
+  renderedAscs(): Record<string, AscRigState> {
+    const out: Record<string, AscRigState> = {}
+    for (const [id, { rig }] of this.ascs) if (rig) out[id] = { ...rig.rigState }
     return out
   }
 
