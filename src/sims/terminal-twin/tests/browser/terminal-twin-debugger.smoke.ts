@@ -1,0 +1,287 @@
+/**
+ * TT-18 browser smoke tests: breakpoints, single-step, cause chain, click
+ * selection, follow camera, feed throttling and the live overlays, driven by
+ * the dev-only `window.__tt` API plus real clicks. Run with `npm run test:smoke`.
+ */
+import { expect, test, type Page } from '@playwright/test'
+import type { EngineEvent } from '../../engine'
+import type {} from '../../dev/devApi' // window.__tt typing
+
+const FIXTURE = 'shc-1sts-2shc-1wtp'
+
+function collectErrors(page: Page): string[] {
+  const errors: string[] = []
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(`console: ${msg.text()}`)
+  })
+  page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`))
+  return errors
+}
+
+async function open(page: Page, fixture = FIXTURE): Promise<void> {
+  await page.goto('/sim/terminal-twin')
+  await page.waitForFunction(() => !!window.__tt)
+  await page.evaluate((name) => window.__tt!.load(name), fixture)
+  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
+}
+
+test('a breakpoint on an event type pauses playback exactly at that event and the inspector shows it', async ({ page }) => {
+  const errors = collectErrors(page)
+  await open(page)
+  await page.keyboard.press('e')
+  await expect(page.getByTestId('tt-feed-filter')).toBeVisible()
+
+  // Through the UI: pick the kind, type the value, add.
+  await page.getByTestId('tt-bp-kind').selectOption('eventType')
+  await page.getByTestId('tt-bp-value').fill('ShcRoutingLoaded')
+  await page.getByTestId('tt-bp-add').click()
+  await expect(page.getByTestId('tt-bp-list')).toContainText('eventType:ShcRoutingLoaded')
+
+  await page.evaluate(() => window.__tt!.setSpeed(600))
+  await page.waitForFunction(() => window.__tt!.debug().breakHit !== null)
+
+  const hit = await page.evaluate(() => window.__tt!.debug())
+  expect(hit.breakHit!.event.type).toBe('ShcRoutingLoaded')
+  expect(hit.paused).toBe(true)
+  const clock = await page.evaluate(() => window.__tt!.clock())
+  expect(clock.displayTime).toBe(hit.breakHit!.event.t)
+  expect(clock.engine!.now).toBe(hit.breakHit!.event.t)
+  const log = await page.evaluate(() => window.__tt!.query<{ id: number }[]>('eventLog'))
+  expect(log[log.length - 1].id).toBe(hit.breakHit!.event.id)
+
+  await expect(page.getByTestId('tt-break-hit')).toContainText('ShcRoutingLoaded')
+  await expect(page.getByTestId('tt-event-heading')).toContainText(`#${hit.breakHit!.event.id}`)
+  await expect(page.getByTestId('tt-event-heading')).toContainText('ShcRoutingLoaded')
+
+  // Continue runs on to the next hit.
+  await page.getByTestId('tt-continue').click()
+  await page.waitForFunction((id) => {
+    const h = window.__tt!.debug().breakHit
+    return h !== null && h.event.id !== id
+  }, hit.breakHit!.event.id)
+  expect(errors).toEqual([])
+})
+
+test('breakpoints on container, equipment and decision point stop at matching events', async ({ page }) => {
+  await open(page)
+  const boxes = await page.evaluate(() => window.__tt!.query<{ id: string }[]>('containers'))
+  const cases: { kind: 'container' | 'equipment' | 'decision'; value: string; check: (e: EngineEvent) => boolean }[] = [
+    { kind: 'container', value: boxes[2].id, check: (e) => e.subjects.containers?.includes(boxes[2].id) ?? false },
+    { kind: 'equipment', value: 'SHC02', check: (e) => e.subjects.equipment?.includes('SHC02') ?? false },
+    { kind: 'decision', value: 'shcDispatch', check: (e) => e.type.startsWith('Decision') && (e.payload as { decisionPoint: string }).decisionPoint === 'shcDispatch' },
+  ]
+  for (const c of cases) {
+    await page.evaluate(
+      async ({ kind, value }) => {
+        await window.__tt!.reset()
+        await window.__tt!.clearBreakpoints()
+        await window.__tt!.addBreakpoint(kind, value)
+        await window.__tt!.runTo(1e5)
+      },
+      { kind: c.kind, value: c.value },
+    )
+    const hitId = await page.evaluate(() => window.__tt!.debug().breakHit!.event.id)
+    const chain = await page.evaluate((id) => window.__tt!.why(id), hitId)
+    expect(c.check(chain[0]), `${c.kind} breakpoint stopped at ${chain[0].type}`).toBe(true)
+  }
+})
+
+test('single-step processes exactly one event per press at any speed setting', async ({ page }) => {
+  await open(page)
+  await page.evaluate(() => window.__tt!.setSpeed(600))
+  await page.evaluate(() => window.__tt!.pause())
+  for (let i = 0; i < 4; i++) {
+    const before = await page.evaluate(() => window.__tt!.clock().engine!.eventsTotal)
+    await page.getByTestId('tt-topbar-step').click()
+    await page.waitForFunction((n) => window.__tt!.clock().engine!.eventsTotal === n + 1 && !window.__tt!.clock().busy, before)
+    const after = await page.evaluate(() => window.__tt!.clock())
+    expect(after.engine!.eventsTotal).toBe(before + 1)
+    expect(after.paused).toBe(true)
+  }
+  // The '.' shortcut is the same single step.
+  const before = await page.evaluate(() => window.__tt!.clock().engine!.eventsTotal)
+  await page.keyboard.press('.')
+  await page.waitForFunction((n) => window.__tt!.clock().engine!.eventsTotal === n + 1, before)
+})
+
+test('the cause chain reaches the root event and equals the engine why; each link can be inspected', async ({ page }) => {
+  await open(page)
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcDroppedAtWtp' }))
+  const log = await page.evaluate(() => window.__tt!.query<{ id: number; type: string }[]>('eventLog'))
+  const target = log[log.length - 1]
+  await page.evaluate((id) => window.__tt!.inspectEvent(id), target.id)
+  await page.keyboard.press('i').catch(() => {})
+  const ui = await page.evaluate(() => window.__tt!.ui())
+  if (!ui.inspectorOpen) await page.keyboard.press('i')
+
+  const why = await page.evaluate((id) => window.__tt!.why(id), target.id)
+  const debug = await page.evaluate(() => window.__tt!.debug())
+  expect(debug.inspectedEvent!.chain.map((e) => e.id)).toEqual(why.map((e) => e.id))
+  expect(debug.inspectedEvent!.chain.at(-1)!.type).toBe('ScenarioStarted')
+
+  const rows = page.getByTestId('tt-cause-chain').locator('button')
+  await expect(rows).toHaveCount(why.length)
+  // Click through to the root.
+  await rows.last().click()
+  await expect(page.getByTestId('tt-event-heading')).toContainText('ScenarioStarted')
+  await expect(page.getByTestId('tt-event-payload')).toContainText('seed')
+  // And back to the first link.
+  await rows.first().click()
+  await expect(page.getByTestId('tt-event-heading')).toContainText(target.type)
+})
+
+test('a decision event shows the handler, its request and its reply', async ({ page }) => {
+  await open(page)
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'DecisionResolved' }))
+  const log = await page.evaluate(() => window.__tt!.query<{ id: number; type: string }[]>('eventLog'))
+  await page.evaluate((id) => window.__tt!.inspectEvent(id), log[log.length - 1].id)
+  await page.keyboard.press('Escape')
+  if (!(await page.evaluate(() => window.__tt!.ui().inspectorOpen))) await page.keyboard.press('i')
+  const decision = page.getByTestId('tt-decision')
+  await expect(decision).toContainText('strategy:')
+  await expect(page.getByTestId('tt-decision-request')).toBeVisible()
+  await expect(page.getByTestId('tt-decision-reply')).toBeVisible()
+})
+
+test('clicking a container in 3D selects it and shows its custody history', async ({ page }) => {
+  const errors = collectErrors(page)
+  await open(page)
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcDroppedAtWtp' }))
+  await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 3)
+  // A box that is on screen and not hidden behind another one.
+  const target = await page.evaluate(() => {
+    const state = window.__tt!.sceneState()!
+    for (const id of Object.keys(state.containers)) {
+      const p = window.__tt!.screenPoint(id)
+      if (p && window.__tt!.pickAt(p.x, p.y) === id && state.containers[id]?.kind !== 'vesselSlot') return { id, ...p }
+    }
+    return null
+  })
+  expect(target, 'a pickable box in view').not.toBeNull()
+  await page.mouse.click(target!.x, target!.y)
+  await expect.poll(() => page.evaluate(() => window.__tt!.ui().selectedId)).toBe(target!.id)
+  await expect(page.getByTestId('tt-entity-heading')).toContainText(target!.id)
+  const history = page.getByTestId('tt-custody-history').locator('li')
+  expect(await history.count()).toBeGreaterThanOrEqual(2)
+  await expect(history.last()).toContainText('now')
+  // The shown history is the engine's, including the first custody (vessel slot).
+  await expect(history.first()).toContainText('vesselSlot')
+  const box = await page.evaluate((id) => window.__tt!.query<{ custodyHistory: unknown[] }>('container', id), target!.id)
+  expect(await history.count()).toBe(box.custodyHistory.length)
+
+  // A click on empty sky deselects.
+  const sky = await page.evaluate(() => {
+    for (let y = 130; y < 700; y += 40) for (let x = 440; x < 840; x += 40) if (window.__tt!.pickAt(x, y) === null) return { x, y }
+    return null
+  })
+  expect(sky, 'an empty spot in the view').not.toBeNull()
+  await page.mouse.click(sky!.x, sky!.y)
+  await expect.poll(() => page.evaluate(() => window.__tt!.ui().selectedId)).toBeNull()
+  expect(errors).toEqual([])
+})
+
+test('the follow camera tracks a moving SHC smoothly', async ({ page }) => {
+  await open(page)
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingLoaded' }))
+  const shcId = await page.evaluate(() => {
+    const state = window.__tt!.sceneState()!
+    return Object.entries(state.shcs).find(([, s]) => s.status !== 'parked')?.[0] ?? Object.keys(state.shcs)[0]
+  })
+  await page.evaluate((id) => window.__tt!.select(id), shcId)
+  await expect(page.getByTestId('tt-follow')).toBeVisible()
+  await page.getByTestId('tt-follow').click()
+  expect((await page.evaluate(() => window.__tt!.ui())).following).toBe(true)
+
+  await page.evaluate(() => window.__tt!.setSpeed(10))
+  const samples: { dx: number; dz: number; jump: number; moved: number }[] = []
+  let prev: { x: number; z: number } | null = null
+  let start: { x: number; z: number } | null = null
+  for (let i = 0; i < 25; i++) {
+    await page.waitForTimeout(120)
+    const s = await page.evaluate((id) => ({ cam: window.__tt!.cameraTarget()!, shc: window.__tt!.sceneState()!.shcs[id] }), shcId)
+    start ??= { x: s.shc.x, z: s.shc.z }
+    samples.push({
+      dx: Math.abs(s.cam.x - s.shc.x),
+      dz: Math.abs(s.cam.z - s.shc.z),
+      jump: prev ? Math.hypot(s.cam.x - prev.x, s.cam.z - prev.z) : 0,
+      moved: Math.hypot(s.shc.x - start.x, s.shc.z - start.z),
+    })
+    prev = { x: s.cam.x, z: s.cam.z }
+  }
+  // The carrier moved, the camera stayed on it, and never jumped.
+  expect(Math.max(...samples.map((s) => s.moved))).toBeGreaterThan(10)
+  expect(Math.max(...samples.map((s) => s.dx))).toBeLessThan(6)
+  expect(Math.max(...samples.map((s) => s.dz))).toBeLessThan(6)
+  expect(Math.max(...samples.map((s) => s.jump))).toBeLessThan(40)
+})
+
+test('at x600 the feed stays capped, summarises bursts and refreshes at a throttled rate', async ({ page }) => {
+  const errors = collectErrors(page)
+  await open(page)
+  await page.keyboard.press('e')
+  await expect(page.getByTestId('tt-feed-rows')).toBeAttached()
+  await page.evaluate(() => {
+    const target = document.querySelector('[data-testid="tt-feed-rows"]')!
+    const w = window as unknown as { __feedBatches: number }
+    w.__feedBatches = 0
+    new MutationObserver(() => w.__feedBatches++).observe(target, { childList: true, subtree: true, characterData: true })
+  })
+  await page.evaluate(() => window.__tt!.setSpeed(600))
+  await page.waitForTimeout(2500)
+  await expect(page.getByTestId('tt-feed-summarised')).toBeVisible()
+  const rowCount = await page.getByTestId('tt-feed-rows').locator('li').count()
+  expect(rowCount).toBeGreaterThan(0)
+  expect(rowCount).toBeLessThanOrEqual(150)
+  const batches = await page.evaluate(() => (window as unknown as { __feedBatches: number }).__feedBatches)
+  // 250 ms refresh: at most ~4 per second (plus a little slack), however many events arrive.
+  expect(batches).toBeLessThanOrEqual(14)
+  // The view kept animating and the feed memory stayed capped.
+  expect((await page.evaluate(() => window.__tt!.scene()))!.frames).toBeGreaterThan(5)
+  expect(errors).toEqual([])
+})
+
+test('each overlay toggles independently and reflects live engine state', async ({ page }) => {
+  await open(page)
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcDroppedAtWtp' }))
+  await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 3)
+
+  const keys = ['laneGraph', 'reservations', 'occupancy', 'labels'] as const
+  for (const key of keys) {
+    const state = await page.evaluate((k) => window.__tt!.overlays({ laneGraph: false, reservations: false, occupancy: false, labels: false, [k]: true }), key)
+    expect(Object.entries(state).filter(([, on]) => on).map(([name]) => name)).toEqual([key])
+  }
+
+  // Occupancy: pads occupied in the overlay = boxes the scene has on pads.
+  await page.evaluate(() => window.__tt!.overlays({ laneGraph: false, reservations: false, occupancy: true, labels: false }))
+  await page.waitForFunction(() => window.__tt!.scene()!.layers.padsOccupied + window.__tt!.scene()!.layers.padsFree > 0)
+  const occ = await page.evaluate(() => {
+    const scene = window.__tt!.scene()!
+    const state = window.__tt!.sceneState()!
+    const onPads = Object.values(state.containers).filter((c) => c?.kind === 'wtpPad').length
+    const onGp = Object.values(state.containers).filter((c) => c?.kind === 'groundPosition').length
+    return { layers: scene.layers, onPads, onGp }
+  })
+  expect(occ.layers.padsOccupied).toBe(occ.onPads)
+  expect(occ.layers.padsOccupied).toBeGreaterThan(0)
+  expect(occ.layers.groundPositionsOccupied).toBe(occ.onGp)
+  expect(occ.layers.labels).toBe(0)
+
+  // Labels: one per crane, carrier and visible vessel; occupancy plates are off again.
+  await page.evaluate(() => window.__tt!.overlays({ occupancy: false, labels: true }))
+  await page.waitForFunction(() => window.__tt!.scene()!.layers.labels > 0)
+  const labels = await page.evaluate(() => {
+    const scene = window.__tt!.scene()!
+    const state = window.__tt!.sceneState()!
+    const visibleVessels = Object.values(state.vessels).filter((v) => ['mooring', 'berthed', 'unmooring', 'at-anchorage'].includes(v.status)).length
+    return { shown: scene.layers.labels, expected: scene.sts + scene.shcs + visibleVessels, pads: scene.layers.padsOccupied + scene.layers.padsFree }
+  })
+  expect(labels.shown).toBe(labels.expected)
+  expect(labels.pads).toBe(0)
+
+  // The O shortcut is the master switch: everything hidden, counts go to zero.
+  await page.evaluate(() => window.__tt!.overlays({ occupancy: true, labels: true }))
+  await page.keyboard.press('o')
+  await page.waitForFunction(() => window.__tt!.scene()!.layers.labels === 0)
+  await page.keyboard.press('o')
+  await page.waitForFunction(() => window.__tt!.scene()!.layers.labels > 0)
+})

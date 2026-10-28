@@ -82,7 +82,15 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Conflict zone:** a part of the lane graph only one vehicle may use at a time: an intersection, an STS lane section (ground position) or a WTP pad with its spur.
 - **Reservation:** a time window `[from, to)` on a conflict zone held by one piece of equipment. Trips reserve all their zones before departing and depart later if any window is taken.
 - **Subsystem mode:** how a subsystem runs: **real**, **instant** (a stub that raises the same events with zero durations) or **off**.
-- **Overlay (3D debug overlay):** an optional drawing over the 3D view: lane graph, active reservations.
+- **Overlay (3D debug overlay):** an optional drawing over the 3D view: lane graph, active reservations, occupancy, state labels. Each toggles independently; `O` hides or shows them all.
+- **Breakpoint:** a debugger rule that pauses the sim right after an event that matches it: an event type, a container id, an equipment id or a decision point. Set from the event feed panel or `__tt.addBreakpoint`.
+- **Single-step:** process exactly one engine event and pause, at any speed setting.
+- **Event feed:** the left panel's live list of recent events, newest first, filterable and capped. At high speed it **summarises bursts** (runs of the same event type) into one row.
+- **Event inspector:** the right panel's view of one event: payload, subjects, a decision's handler, request and reply, and its **cause chain**.
+- **Cause chain:** the events that led to one, from the event back to the root, as returned by the engine's `why`. Clicking an entry inspects it.
+- **Selection:** the container, equipment or vessel picked in the 3D view (or by an id in the feed or inspector). The **inspector** shows its current state, current job and history, and the **follow camera** can track it.
+- **Picking:** finding the entity under a click by testing the view ray against each entity's bounding box (containers first).
+- **Occupancy overlay:** plates over WTP pads and STS ground positions, free or occupied at the displayed time. The **labels overlay** floats each crane, carrier and vessel's status above it.
 - **Display settings:** the UI's **locale** (Intl formatting of dates, times, numbers, first day of week) and **unit system** (metric: m, km/h, t; imperial: ft, mi/h, US tons). Display only: the engine and saved configs are always SI. Imperial speed is written **mi/h** because **mph** would read as crane moves per hour.
 - **Message catalogue:** `i18n/messages.ts`, the single home of every user-visible UI string (English only for now), looked up with `t(key)`.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.

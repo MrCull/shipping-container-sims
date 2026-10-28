@@ -15,6 +15,7 @@ import type {
   Reservation,
   RunCondition,
 } from '../engine'
+import type { Breakpoint } from '../modules/breakpoints'
 import type { ScenarioConfig } from '../scenario/types'
 
 /** Serialisable subset of the engine's RunCondition (no predicate). */
@@ -31,6 +32,7 @@ export type QueryKind =
   | 'groundPosition'
   | 'shc'
   | 'shcList'
+  | 'shcJobs'
   | 'wtpPad'
   | 'reservations'
   | 'kpis'
@@ -50,6 +52,8 @@ export type WorkerRequest =
   | { op: 'inject'; type: EventType; at: number; subjects: EventSubjects; payload: EventPayloads[EventType] }
   | { op: 'snapshot' }
   | { op: 'why'; eventId: number }
+  /** Replace the debugger breakpoints (kept across load/reset). Runs and steps stop at the first hit. */
+  | { op: 'setBreakpoints'; breakpoints: Breakpoint[] }
 
 export type WorkerRequestMessage = WorkerRequest & { rid: number }
 
@@ -89,6 +93,12 @@ export interface EventSummary {
   subjects: EventSubjects
 }
 
+/** The breakpoint a run or step stopped on, and the event that hit it. */
+export interface BreakpointHit {
+  breakpointId: number
+  event: EventSummary
+}
+
 export interface Delta {
   motion: MotionPlan[]
   custody: CustodyChange[]
@@ -99,6 +109,8 @@ export interface Delta {
   events: EventSummary[]
   /** Number of events of each type in this batch. */
   eventCounts: Partial<Record<EventType, number>>
+  /** Set when this request stopped at a breakpoint (the hit event is the last one processed). */
+  breakpoint: BreakpointHit | null
 }
 
 export interface EngineInfo {

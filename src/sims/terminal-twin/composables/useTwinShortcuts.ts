@@ -38,6 +38,12 @@ export function useTwinShortcuts(): void {
       case 'overlays':
         store.toggleOverlays()
         break
+      case 'feed':
+        store.toggleFeed()
+        break
+      case 'inspector':
+        store.toggleInspector()
+        break
       case 'help':
         store.setHelpOpen(!store.helpOpen)
         break

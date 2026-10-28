@@ -11,31 +11,15 @@
 import * as THREE from 'three'
 import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
+import { SHC, STS } from './equipmentDims'
+import { entityBounds } from './picking'
+import { OverlayLayers, type OverlayLayerStats } from './overlayLayers'
+import { NO_OVERLAYS, type OverlayState } from './overlays'
+
+export type { OverlayState }
 import { ContainerInstancer } from './containerInstancer'
 import { LIVERY_ATLAS, liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
 import { aftOffsetM, BAY_PITCH_M, FENDER_GAP_M, ROW_PITCH_M, slotX, slotZ, TIER_PITCH_M } from '../scenario/vesselClasses'
-
-/** [A] Malaccamax-style STS proportions (m). */
-const STS = {
-  waterRailZ: 3,
-  gauge: 30.48,
-  legSpacingX: 18,
-  legSize: 1.6,
-  portalY: 48,
-  boomOutreachZ: -72,
-  boomBackreachZ: 22,
-  apexY: 72,
-}
-
-/** [A] Shuttle-carrier proportions (m): length along travel, width across, height. */
-const SHC = { length: 9.2, width: 4.9, height: 6.2, leg: 0.6, beam: 0.7 }
-
-export interface OverlayState {
-  /** Lane graph (one-way edges) drawn on the ground. */
-  laneGraph: boolean
-  /** Conflict zones reserved at the displayed time, highlighted. */
-  reservations: boolean
-}
 
 export interface SceneStats {
   /** Container instances drawn. */
@@ -49,6 +33,8 @@ export interface SceneStats {
   overlays: OverlayState
   /** Reserved zones highlighted (0 when the reservations overlay is off). */
   reservedZones: number
+  /** Occupancy and label overlay counts (zeros while those overlays are off). */
+  layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
   containerLods: { lod0: number; lod1: number }
   /** 'placeholder' until the container GLBs have loaded. */
@@ -82,8 +68,9 @@ export class SceneRenderer {
   private shcs = new Map<string, { group: THREE.Group; spreader: THREE.Mesh }>()
   private laneOverlay: THREE.Group
   private zoneMeshes = new Map<string, THREE.Mesh>()
-  private overlays: OverlayState = { laneGraph: false, reservations: false }
+  private overlays: OverlayState = { ...NO_OVERLAYS }
   private reservedZones = 0
+  private layers: OverlayLayers
   private readonly matrix = new THREE.Matrix4()
   private selection: THREE.LineSegments
   private disposables: { dispose(): void }[] = []
@@ -100,6 +87,8 @@ export class SceneRenderer {
     for (const id of model.shcIds) this.addShc(id)
     this.laneOverlay = this.buildLaneOverlay()
     this.buildZoneMeshes()
+    this.layers = new OverlayLayers(model)
+    this.scene.add(this.layers.group)
 
     const capacity: Partial<Record<string, number>> = {}
     for (const id of model.containerIds) capacity[model.containerSize[id]] = (capacity[model.containerSize[id]] ?? 0) + 1
@@ -458,35 +447,19 @@ export class SceneRenderer {
     })
     containers.end(cameraPosition)
 
+    this.layers.update(t, this.overlays)
     this.updateSelection(selectedId, t)
   }
 
   private updateSelection(id: string | null, t: number): void {
-    const centre = id ? this.model.entityCentre(id, t) : null
-    if (!id || !centre) {
+    const b = id ? entityBounds(this.model, id, t) : null
+    if (!b) {
       this.selection.visible = false
       return
     }
-    const size = this.model.containerSize[id]
-    this.selection.rotation.y = 0
-    if (size) {
-      const d = CONTAINER_DIMS[size]
-      this.selection.scale.set(d.length + 0.6, d.height + 0.6, d.width + 0.6)
-      this.selection.position.set(centre.x, centre.y, centre.z)
-      this.selection.rotation.y = this.model.containerPose(id, t)?.yaw ?? 0
-    } else if (this.shcs.has(id)) {
-      const pose = this.model.shcPose(id, t)
-      this.selection.scale.set(SHC.length + 1, SHC.height + 3, SHC.width + 1)
-      this.selection.position.set(pose.x, (SHC.height + 3) / 2, pose.z)
-      this.selection.rotation.y = pose.heading === 'z' ? Math.PI / 2 : 0
-    } else if (this.sts.has(id)) {
-      this.selection.scale.set(STS.legSpacingX + 4, STS.apexY + 2, STS.gauge + 6)
-      this.selection.position.set(centre.x, (STS.apexY + 2) / 2, STS.waterRailZ + STS.gauge / 2)
-    } else {
-      const spec = this.model.vesselSpec(id)
-      this.selection.scale.set(spec.loaM + 2, spec.deckHeightM + 14, spec.beamM + 2)
-      this.selection.position.set(centre.x, spec.deckHeightM / 2, centre.z - FENDER_GAP_M)
-    }
+    this.selection.scale.set(b.sx, b.sy, b.sz)
+    this.selection.position.set(b.x, b.y, b.z)
+    this.selection.rotation.y = b.yaw
     this.selection.visible = true
   }
 
@@ -510,6 +483,7 @@ export class SceneRenderer {
       vessels,
       overlays: { ...this.overlays },
       reservedZones: this.reservedZones,
+      layers: this.layers.stats(),
       containerLods: { lod0: c.lod0, lod1: c.lod1 },
       containerAssets: c.assets,
     }
@@ -529,6 +503,7 @@ export class SceneRenderer {
     this.disposed = true
     for (const d of this.disposables) d.dispose()
     this.containers.dispose()
+    this.layers.dispose()
     this.disposables = []
   }
 }

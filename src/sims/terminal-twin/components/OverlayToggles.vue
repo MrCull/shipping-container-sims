@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useTwinStore } from '../store/twinStore'
-import type { OverlayState } from '../modules/sceneRenderer'
+import type { OverlayState } from '../modules/overlays'
 import { t, type MessageKey } from '../i18n/messages'
 
 const store = useTwinStore()
@@ -8,6 +8,8 @@ const store = useTwinStore()
 const toggles: { key: keyof OverlayState; label: MessageKey; title: MessageKey }[] = [
   { key: 'laneGraph', label: 'overlays.laneGraph', title: 'overlays.laneGraphHint' },
   { key: 'reservations', label: 'overlays.reservations', title: 'overlays.reservationsHint' },
+  { key: 'occupancy', label: 'overlays.occupancy', title: 'overlays.occupancyHint' },
+  { key: 'labels', label: 'overlays.labels', title: 'overlays.labelsHint' },
 ]
 
 function toggle(key: keyof OverlayState): void {
@@ -44,7 +46,8 @@ function toggle(key: keyof OverlayState): void {
 <style scoped>
 .overlays {
   position: absolute;
-  left: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 1rem;
   z-index: 6;
   display: flex;
