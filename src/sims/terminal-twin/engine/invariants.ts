@@ -299,7 +299,7 @@ export const INVARIANTS: Invariant[] = [
         if (!s.containerId) continue
         const key = `${s.vesselId}:${s.bay}:${s.row}:${s.tier}`
         filled.set(key, [...(filled.get(key) ?? []), s.half])
-        if (s.purpose === 'load') loads.push(s)
+        if (s.purpose === 'load' || s.purpose === 'transshipment') loads.push(s)
       }
       for (const s of loads) {
         const holdTiers = vesselClass(state.vessels[s.vesselId].sizeClass).holdTiers

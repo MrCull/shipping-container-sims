@@ -12,6 +12,8 @@ import liveriesMixed from './liveries-mixed.json'
 import mixedFixture from './mixed-discharge-then-load.json'
 import shc1Sts2Shc1Wtp from './shc-1sts-2shc-1wtp.json'
 import tracer1Sts10Boxes from './tracer-1sts-10-boxes.json'
+import transshipmentAToB from './transshipment-a-to-b.json'
+import emptiesLoad from './empties-load-4-of-16.json'
 import twin20Lift from './twin-20-lift.json'
 import twoVesselsCompeteForBerth from './two-vessels-compete-for-berth.json'
 
@@ -26,4 +28,6 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'asc-2asc-block-conflict': asc2AscBlockConflict as ScenarioConfig,
   'load-1sts-10-boxes-1block': loadFixture as ScenarioConfig,
   'mixed-discharge-then-load': mixedFixture as ScenarioConfig,
+  'transshipment-a-to-b': transshipmentAToB as ScenarioConfig,
+  'empties-load-4-of-16': emptiesLoad as ScenarioConfig,
 }

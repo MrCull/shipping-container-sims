@@ -29,8 +29,16 @@ export interface ExportPlacement {
 }
 
 /** Load sequence key of a booked slot: bay, hold before deck, tier, row, aft before fore. */
-export function loadSequenceKey(slot: { bay: number; deck: boolean; tier: number; row: number; half: 'aft' | 'fore' | null }): number[] {
-  return [slot.bay, Number(slot.deck), slot.tier, slot.row, slot.half === 'fore' ? 1 : 0]
+export function loadSequenceKey(slot: {
+  bay: number
+  deck: boolean
+  tier: number
+  row: number
+  half: 'aft' | 'fore' | null
+  emptyReq?: { index: number }
+}): number[] {
+  // empties (TT-11) follow the other boxes of their bay section: they are stowed last, so they never lie below them
+  return [slot.bay, Number(slot.deck), slot.emptyReq ? 1 + slot.emptyReq.index : 0, slot.tier, slot.row, slot.half === 'fore' ? 1 : 0]
 }
 
 export function compareKeys(a: number[], b: number[]): number {
@@ -49,14 +57,16 @@ export function planExportYard(config: ScenarioConfig, plan: CargoPlan): ExportP
       return { c, key: [vesselIndex.get(c.vesselId) ?? 0, ...loadSequenceKey(slot)] }
     })
     .sort((a, b) => compareKeys(b.key, a.key)) // reverse load sequence
-  if (boxes.length === 0) return []
+  // the empty pool follows the export boxes (oldest first), so it never buries them
+  const pool = plan.containers.filter((c) => c.flow === 'pool').sort((a, b) => (b.ageS ?? 0) - (a.ageS ?? 0) || (a.id < b.id ? -1 : 1))
+  if (boxes.length + pool.length === 0) return []
   const blocks = blockSpecs(config).map((b) => ({
     spec: b,
     heights: new Array<number>(b.bays * b.rows).fill(0),
     tops: new Array<string | null>(b.bays * b.rows).fill(null),
   }))
   const out: ExportPlacement[] = []
-  for (const { c } of boxes) {
+  for (const { c } of [...boxes, ...pool.map((c) => ({ c }))]) {
     let placed = false
     for (const blk of blocks) {
       const stacks: YardStacks = {

@@ -16,7 +16,7 @@ import type { BerthAllocationRequest, CraneSplitReply, CraneSplitRequest } from 
 import type { VesselState } from '../state'
 import { slotX, vesselClass } from '../../scenario/vesselClasses'
 import { continueWork, wakeQuayRail } from './quay'
-import { askRelease, createPackages, loadActive } from './workPackages'
+import { askRelease, createPackages, isLoadSlot, loadActive } from './workPackages'
 import { railOrder } from './rail'
 
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
@@ -74,8 +74,7 @@ function workBays(ctx: EngineContext, vessel: VesselState): CraneSplitRequest['b
   for (const s of Object.values(ctx.state.vesselSlots))
     if (
       s.vesselId === vessel.id &&
-      ((s.containerId !== null && s.purpose === 'discharge') ||
-        (loadActive(ctx.state) && s.purpose === 'load' && s.plannedContainerId && s.containerId === null))
+      ((s.containerId !== null && s.purpose === 'discharge') || (loadActive(ctx.state) && isLoadSlot(s)))
     )
       moves.set(s.bay, (moves.get(s.bay) ?? 0) + 1)
   return [...moves.entries()]

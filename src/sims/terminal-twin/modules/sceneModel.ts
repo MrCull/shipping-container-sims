@@ -221,7 +221,7 @@ export class SceneModel {
     const exportSlot = new Map(planExportYard(config, cargo).map((p) => [p.containerId, p.slotId]))
     for (const c of cargo.containers) {
       const owner: CustodyRef =
-        c.flow === 'load' ? { kind: 'yardSlot', id: exportSlot.get(c.id) as string } : { kind: 'vesselSlot', id: c.slotId }
+        c.flow !== 'discharge' ? { kind: 'yardSlot', id: exportSlot.get(c.id) as string } : { kind: 'vesselSlot', id: c.slotId }
       this.custody[c.id] = [{ t: 0, owner }]
     }
     for (const v of config.vessels) this.status[`vessel:${v.id}`] = [{ t: 0, status: 'scheduled' }]

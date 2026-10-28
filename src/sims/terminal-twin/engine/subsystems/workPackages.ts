@@ -13,16 +13,24 @@
  * `StsState.workQueue` holds the boxes of the active package.
  */
 import type { EngineContext, ReactorMap } from '../context'
-import type { SimState, StsState, WorkPackage } from '../state'
+import type { SimState, StsState, VesselSlotState, WorkPackage } from '../state'
 import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import { continueWork } from './quay'
 import { pumpLoadPrep } from './loadPrep'
+import { raiseEmptiesRequired } from './empties'
 
 /** Export boxes are loaded only when the SHC and ASC subsystems run (they carry and fetch the boxes). */
 export const loadActive = (state: SimState): boolean => state.subsystems.shc !== 'off' && state.subsystems.asc !== 'off'
 
 /** Packages kept released ahead of the active one (`config.workPackages.releaseAhead`, default 2). */
 export const releaseAhead = (ctx: EngineContext): number => ctx.config.workPackages?.releaseAhead ?? 2
+
+/** A slot that still has a box to load: booked export / transshipment box, or an empties requirement. */
+export const isLoadSlot = (s: VesselSlotState): boolean =>
+  (s.purpose === 'load' || s.purpose === 'transshipment') && s.containerId === null && (!!s.plannedContainerId || !!s.emptyReq)
+
+/** Boxes a package moves (an empties package counts its required empties before they are allocated). */
+export const packageMoves = (p: WorkPackage): number => (p.emptyReq ? p.emptyReq.count : p.containerIds.length)
 
 const section = (deck: boolean): 'deck' | 'hold' => (deck ? 'deck' : 'hold')
 
@@ -46,7 +54,7 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
     )
   const load = loadActive(state)
     ? slots
-        .filter((s) => s.purpose === 'load' && s.plannedContainerId && s.containerId === null)
+        .filter(isLoadSlot)
         .sort((a, b) => compareKeys(loadSequenceKey(a), loadSequenceKey(b)))
     : []
   sts.packageIds = []
@@ -54,7 +62,12 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
   const add = (kind: 'discharge' | 'load', group: typeof slots) => {
     let current: WorkPackage | null = null
     for (const s of group) {
-      if (!current || current.bay !== s.bay || current.section !== section(s.deck)) {
+      if (
+        !current ||
+        current.bay !== s.bay ||
+        current.section !== section(s.deck) ||
+        (current.emptyReq?.index ?? -1) !== (s.emptyReq?.index ?? -1)
+      ) {
         current = {
           id: `WP${++state.nextWorkPackage}`,
           stsId: sts.id,
@@ -69,10 +82,15 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
           startedAt: null,
           completedAt: null,
         }
+        if (s.emptyReq)
+          current.emptyReq = { index: s.emptyReq.index, size: s.emptyReq.size, line: s.emptyReq.line, count: 0, slotIds: [], stage: 'pending' }
         state.workPackages[current.id] = current
         sts.packageIds.push(current.id)
       }
-      current.containerIds.push((kind === 'discharge' ? s.containerId : s.plannedContainerId) as string)
+      if (current.emptyReq) {
+        current.emptyReq.count++
+        current.emptyReq.slotIds.push(s.id)
+      } else current.containerIds.push((kind === 'discharge' ? s.containerId : s.plannedContainerId) as string)
     }
   }
   add('discharge', discharge)
@@ -97,7 +115,7 @@ export function askRelease(ctx: EngineContext, sts: StsState): void {
         kind: p.kind,
         section: p.section,
         bay: p.bay,
-        moves: p.containerIds.length,
+        moves: packageMoves(p),
         status: p.status,
       })),
     },
@@ -128,7 +146,7 @@ export function prepareNextPackage(ctx: EngineContext, sts: StsState, at: number
       stsId: sts.id,
       vesselId: done.vesselId,
       kind: done.kind,
-      moves: done.containerIds.length,
+      moves: packageMoves(done),
       durationS: Math.round((at - (done.startedAt ?? at)) * 1000) / 1000,
     })
     pumpLoadPrep(ctx) // the crane may have finished its discharge: load preparation can start
@@ -139,6 +157,7 @@ export function prepareNextPackage(ctx: EngineContext, sts: StsState, at: number
     askRelease(ctx, sts)
     return 'waiting'
   }
+  if (next.emptyReq && next.emptyReq.stage !== 'allocated') return 'waiting' // released, but its empties are not allocated yet
   next.status = 'active'
   next.startedAt = at
   sts.activePackageId = next.id
@@ -153,10 +172,35 @@ export function prepareNextPackage(ctx: EngineContext, sts: StsState, at: number
     stsId: sts.id,
     vesselId: next.vesselId,
     kind: next.kind,
-    moves: next.containerIds.length,
+    moves: packageMoves(next),
     leadTimeS: Math.round(lead * 1000) / 1000,
   })
   return 'ready'
+}
+
+/** Create the load orders of a package's boxes (load sequence continues over the crane's load packages). */
+export function createLoadOrders(state: SimState, pkg: WorkPackage): void {
+  const sts = state.sts[pkg.stsId]
+  const before = packagesOf(state, sts)
+    .filter((p) => p.kind === 'load' && p.seq < pkg.seq)
+    .reduce((n, p) => n + packageMoves(p), 0)
+  const slotOf = new Map(
+    Object.values(state.vesselSlots)
+      .filter((s) => s.vesselId === pkg.vesselId && s.bay === pkg.bay && s.plannedContainerId)
+      .map((s) => [s.plannedContainerId, s.id]),
+  )
+  pkg.containerIds.forEach((containerId, i) => {
+    state.loadOrders[containerId] = {
+      containerId,
+      vesselId: pkg.vesselId,
+      stsId: sts.id,
+      packageId: pkg.id,
+      slotId: slotOf.get(containerId) as string,
+      seq: before + i,
+      stage: 'released',
+      groundPositionId: null,
+    }
+  })
 }
 
 export const workPackageReactors: ReactorMap = {
@@ -190,26 +234,7 @@ export const workPackageReactors: ReactorMap = {
       throw new Error(`workPackageRelease for ${sts.id} released nothing while the crane has no package to work`)
     for (const pkg of fresh) {
       state.kpis.workPackages.released++
-      if (pkg.kind === 'load') {
-        const before = packages.filter((p) => p.kind === 'load' && p.seq < pkg.seq).reduce((n, p) => n + p.containerIds.length, 0)
-        const slotOf = new Map(
-          Object.values(state.vesselSlots)
-            .filter((s) => s.vesselId === pkg.vesselId && s.bay === pkg.bay && s.plannedContainerId)
-            .map((s) => [s.plannedContainerId, s.id]),
-        )
-        pkg.containerIds.forEach((containerId, i) => {
-          state.loadOrders[containerId] = {
-            containerId,
-            vesselId: pkg.vesselId,
-            stsId: sts.id,
-            packageId: pkg.id,
-            slotId: slotOf.get(containerId) as string,
-            seq: before + i,
-            stage: 'released',
-            groundPositionId: null,
-          }
-        })
-      }
+      if (pkg.kind === 'load' && !pkg.emptyReq) createLoadOrders(state, pkg)
       ctx.schedule('WorkPackageReleased', e.t, { equipment: [sts.id], vessels: [pkg.vesselId] }, {
         packageId: pkg.id,
         stsId: sts.id,
@@ -217,9 +242,10 @@ export const workPackageReactors: ReactorMap = {
         kind: pkg.kind,
         section: pkg.section,
         bay: pkg.bay,
-        moves: pkg.containerIds.length,
+        moves: packageMoves(pkg),
         ahead: ahead(),
       })
+      if (pkg.emptyReq) raiseEmptiesRequired(ctx, pkg)
     }
     if (sts.vesselId && sts.status === 'idle' && !sts.activePackageId) continueWork(ctx, sts, e.t)
     pumpLoadPrep(ctx)

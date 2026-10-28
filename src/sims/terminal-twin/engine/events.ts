@@ -9,6 +9,7 @@ import type { DecisionPointId, DecisionReplies, DecisionRequests } from './decis
 import type { MotionSegment } from './kinematics'
 import type { Reservation } from './reservations'
 import type { CustodyRef } from './state'
+import type { ContainerSize } from '../scenario/types'
 
 /** Common payload of the SHC trip phase events. `segments` = the motion that led up to the event. */
 export interface ShcPhasePayload {
@@ -237,6 +238,16 @@ export interface EventPayloads {
   WorkPackageStarted: { packageId: string; stsId: string; vesselId: string; kind: 'discharge' | 'load'; moves: number; leadTimeS: number }
   /** The package's last move is done. */
   WorkPackageCompleted: { packageId: string; stsId: string; vesselId: string; kind: 'discharge' | 'load'; moves: number; durationS: number }
+  /**
+   * A released load package needs N empty containers of a size and line (TT-11). `available` = matching empties in
+   * the yard that an ASC could take now; with fewer than `count` the package waits for more (asked again when an
+   * empty is stacked or becomes reachable).
+   */
+  EmptiesRequired: { packageId: string; stsId: string; vesselId: string; size: ContainerSize; line: string; count: number; available: number }
+  /** The emptyAllocation decision assigned these empties to the package; they are booked to its vessel slots. */
+  EmptiesAllocated: { packageId: string; stsId: string; vesselId: string; containerIds: string[] }
+  /** A transshipment box finished its yard dwell: it may now be fetched for its onward vessel (TT-11). */
+  TransshipmentReady: { containerId: string; onwardVesselId: string; dwellS: number }
   /** The STS takes its next export box from its ground position and puts it in its vessel slot. */
   StsLoadStarted: { stsId: string; vesselId: string; packageId: string; containerId: string; slotId: string; segments: MotionSegment[] }
   /** The next export box is not on a ground position yet; the STS waits (counts as waiting for the SHC). */

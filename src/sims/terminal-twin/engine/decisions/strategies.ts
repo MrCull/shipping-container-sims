@@ -9,6 +9,7 @@
  */
 import { balancedAscDispatch, watersideFirstDispatch } from './ascStrategies'
 import { groupByVesselSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
+import { nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
 import { justInTimeRelease, keepKAheadRelease } from './workPackageStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
 import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchPad, ShcDispatchRequest } from './types'
@@ -136,6 +137,19 @@ export const strategies: StrategyRegistry = {
       },
     },
   },
+  emptyAllocation: {
+    default: 'nearest-wtp',
+    strategies: {
+      'nearest-wtp': {
+        description: 'The matching empties nearest the WTP pads (shortest trips), lowest tier first.',
+        handler: (msg) => nearestWtpEmpties(msg.payload),
+      },
+      'oldest-first': {
+        description: 'The matching empties that have stood in the yard longest.',
+        handler: (msg) => oldestFirstEmpties(msg.payload),
+      },
+    },
+  },
   berthAllocation: {
     default: 'first-fit',
     strategies: {
@@ -181,4 +195,5 @@ export const defaultHandlers: HandlerSet = {
   berthAllocation: getStrategy('berthAllocation', strategies.berthAllocation.default),
   craneSplit: getStrategy('craneSplit', strategies.craneSplit.default),
   workPackageRelease: getStrategy('workPackageRelease', strategies.workPackageRelease.default),
+  emptyAllocation: getStrategy('emptyAllocation', strategies.emptyAllocation.default),
 }

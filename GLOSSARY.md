@@ -149,3 +149,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Gantt timeline:** one row per vessel (anchorage, mooring, berthed and working, unmooring) and one per crane **assignment** (and one per **work package**), built from the event log by `buildTimeline`.
 - **Crane assignment:** a crane takes a range of bays of a vessel from the split decision until `StsWorkComplete` (the dashboard's Gantt row per crane). *Avoid:* "work package" (that is the release unit above).
 - **Data palette:** the colour-blind-safe categorical steps of the dashboard; every slot also has a marker symbol and a dash style, so state is never shown by colour alone.
+
+## Transshipment and empties (TT-11)
+
+- **Transshipment box:** a box discharged from one vessel that another vessel loads. It carries an **onward-vessel link** (`onwardVesselId`), stands in the yard for its **dwell** (sampled from the transshipment dwell distribution once it is stacked), then flows like an export box. *Avoid:* "transfer box".
+- **Flow mix:** a vessel's moves split into import, export and transshipment percent (`flowMixOf`); the vessel generator can be given one (`flowMix`).
+- **Empty:** an unladen container (`full = false`), distinct by size and shipping line. The **empty pool** is the empties standing in the yard at the start.
+- **Empties required:** the event raised when a released load work package needs N empties of a size and line; the **empty-allocation** decision point (`emptyAllocation`) then assigns which yard empties go (strategies `nearest-wtp`, `oldest-first`).

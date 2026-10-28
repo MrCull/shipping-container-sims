@@ -44,9 +44,14 @@ export function pumpLoadPrep(ctx: EngineContext): void {
       .sort((a, b) => a.seq - b.seq)
     if (orders.length === 0 || !dischargeDone(state, sts)) continue
     if (orders.some((o) => o.stage === 'gp-asked')) continue
+    // an earlier empties package whose empties are not allocated yet keeps the later boxes back (load sequence)
+    const waiting = packagesOf(state, sts).find((p) => p.emptyReq && p.emptyReq.stage !== 'allocated' && p.status === 'released')
     if (orders.filter((o) => STAGED.has(o.stage)).length >= sts.groundPositionIds.length) continue
     const next = orders.find((o) => o.stage === 'released')
     if (!next) continue
+    if (waiting && state.workPackages[next.packageId].seq > waiting.seq) continue
+    const box = state.containers[next.containerId]
+    if (box.onwardVesselId && box.readyAt == null) continue // transshipment box still dwelling (or still on its first vessel)
     next.stage = 'gp-asked'
     requestGroundPosition(ctx, sts, next.containerId, 'load')
   }

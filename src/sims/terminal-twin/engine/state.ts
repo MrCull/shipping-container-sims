@@ -40,6 +40,18 @@ export interface ContainerState {
   vesselId: string
   custody: CustodyRef
   custodyHistory: CustodyRecord[]
+  /** Transshipment box (TT-11): the vessel that will load it (null/absent = not a linked transshipment box). */
+  onwardVesselId?: string
+  /** Transshipment box: slot on the onward vessel it is booked to. */
+  onwardSlotId?: string
+  /** Transshipment box: how long it stays in the yard before it may load (s). */
+  dwellS?: number
+  /** Transshipment box: when its dwell ended (set by `TransshipmentReady`). */
+  readyAt?: number | null
+  /** Sim time since which the box has stood in the yard (negative for pre-filled boxes). */
+  yardSince?: number
+  /** Empty allocated to a load work package (TT-11): the package id. */
+  allocatedTo?: string
 }
 
 export interface VesselSlotState {
@@ -57,6 +69,8 @@ export interface VesselSlotState {
   containerId: string | null
   /** Load slots: the export box booked to this slot (it is `containerId` once loaded). */
   plannedContainerId?: string | null
+  /** Empty-container slot (TT-11): requirement it is booked for; `plannedContainerId` is set when an empty is allocated. */
+  emptyReq?: { index: number; size: ContainerSize; line: string }
 }
 
 /**
@@ -390,6 +404,22 @@ export interface WorkPackage {
   releasedAt: number | null
   startedAt: number | null
   completedAt: number | null
+  /**
+   * Empties package (TT-11): N empties of a size and line to be picked by the `emptyAllocation` decision when the
+   * package is released. `containerIds` stays empty until `stage` is 'allocated'.
+   */
+  emptyReq?: EmptiesRequirement
+}
+
+export interface EmptiesRequirement {
+  index: number
+  size: ContainerSize
+  line: string
+  count: number
+  /** The package's booked slots in load sequence. */
+  slotIds: string[]
+  /** pending (not released, or waiting for enough empties) → asked (decision pending) → allocated. */
+  stage: 'pending' | 'asked' | 'allocated'
 }
 
 /**
@@ -510,6 +540,8 @@ export interface SimState {
   yardSlots: Record<string, YardSlotState>
   workPackages: Record<string, WorkPackage>
   nextWorkPackage: number
+  /** Empties package whose `emptyAllocation` decision is pending (one at a time), or null. */
+  emptiesAsking: string | null
   loadOrders: Record<string, LoadOrder>
   reservations: Reservation[]
   nextReservationId: number
@@ -596,6 +628,7 @@ export function createInitialState(
     yardSlots: {},
     workPackages: {},
     nextWorkPackage: 0,
+    emptiesAsking: null,
     loadOrders: {},
     reservations: [],
     nextReservationId: 0,
@@ -630,12 +663,16 @@ export function createInitialState(
     }
   }
   for (const s of plan.slots) state.vesselSlots[s.id] = { ...s, containerId: null }
+  const loading = subsystems.shc !== 'off' && subsystems.asc !== 'off'
+  for (const s of plan.slots) if (s.emptyReq && loading) state.vessels[s.vesselId].remainingLoad++
   const exportPlacement = new Map(planExportYard(config, plan).map((p) => [p.containerId, p]))
   for (const c of plan.containers) {
     let owner: CustodyRef
     if (c.flow === 'load') {
       state.vesselSlots[c.slotId].plannedContainerId = c.id
-      if (subsystems.shc !== 'off' && subsystems.asc !== 'off') state.vessels[c.vesselId].remainingLoad++
+      if (loading) state.vessels[c.vesselId].remainingLoad++
+      owner = { kind: 'yardSlot', id: (exportPlacement.get(c.id) as { slotId: string }).slotId }
+    } else if (c.flow === 'pool') {
       owner = { kind: 'yardSlot', id: (exportPlacement.get(c.id) as { slotId: string }).slotId }
     } else {
       state.vesselSlots[c.slotId].containerId = c.id
@@ -650,6 +687,16 @@ export function createInitialState(
       vesselId: c.vesselId,
       custody: owner,
       custodyHistory: [{ t: 0, owner, eventId: null }],
+    }
+    if (c.flow === 'pool') state.containers[c.id].yardSince = -(c.ageS ?? 0)
+    if (c.transshipment) {
+      Object.assign(state.containers[c.id], {
+        onwardVesselId: c.transshipment.onwardVesselId,
+        onwardSlotId: c.transshipment.onwardSlotId,
+        dwellS: c.transshipment.dwellS,
+        readyAt: null,
+      })
+      if (loading) state.vessels[c.transshipment.onwardVesselId].remainingLoad++
     }
   }
   config.sts.forEach((s, railIndex) => {

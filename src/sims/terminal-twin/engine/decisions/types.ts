@@ -240,6 +240,43 @@ export interface WorkPackageReleaseReply {
   packageIds: string[]
 }
 
+// ── emptyAllocation ────────────────────────────────────────────────────────
+
+/** An empty container in the yard that could be assigned (reachable: on top of its stack, not yet allocated). */
+export interface EmptyCandidate {
+  containerId: string
+  blockId: string
+  /** Anchor cell `<block>:<bay>-<row>-<tier>`. */
+  slotId: string
+  bay: number
+  row: number
+  tier: number
+  /** Plan distance from the block's WTP pads (m). */
+  distanceM: number
+  /** Sim time since which the box has stood in the yard (negative for pre-filled boxes). */
+  yardSince: number
+}
+
+/**
+ * A released load work package needs `count` empties of `size` and `line` (TT-11): which of the
+ * yard's matching empties go? Asked once at least `count` candidates exist.
+ */
+export interface EmptyAllocationRequest {
+  packageId: string
+  stsId: string
+  vesselId: string
+  size: ContainerSize
+  line: string
+  count: number
+  /** Matching empties in the yard, in container id order. */
+  candidates: EmptyCandidate[]
+}
+
+export interface EmptyAllocationReply {
+  /** Exactly `count` distinct candidates, in the order the vessel loads them. */
+  containerIds: string[]
+}
+
 // ── catalogue ──────────────────────────────────────────────────────────────
 
 export interface DecisionRequests {
@@ -250,6 +287,7 @@ export interface DecisionRequests {
   berthAllocation: BerthAllocationRequest
   craneSplit: CraneSplitRequest
   workPackageRelease: WorkPackageReleaseRequest
+  emptyAllocation: EmptyAllocationRequest
 }
 
 export interface DecisionReplies {
@@ -260,6 +298,7 @@ export interface DecisionReplies {
   berthAllocation: BerthAllocationReply
   craneSplit: CraneSplitReply
   workPackageRelease: WorkPackageReleaseReply
+  emptyAllocation: EmptyAllocationReply
 }
 
 export type DecisionPointId = keyof DecisionRequests
@@ -273,6 +312,7 @@ export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   berthAllocation: 1,
   craneSplit: 1,
   workPackageRelease: 1,
+  emptyAllocation: 1,
 }
 
 export const DECISION_POINT_IDS = Object.keys(DECISION_CONTRACT_VERSIONS) as DecisionPointId[]

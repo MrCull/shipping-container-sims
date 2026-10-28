@@ -5,12 +5,17 @@
  */
 import type { MessageKey, MessageParams } from '../i18n/messages'
 import type { ScenarioConfig, StsConfig, VesselConfig } from './types'
+import { DEFAULT_TRANSSHIPMENT } from './dwell'
 import { cellCapacity, vesselClass } from './vesselClasses'
 
 export interface ScenarioOverrides {
   quayLengthM?: number
   stsCount?: number
   vessels?: VesselConfig[]
+  /** Median transshipment dwell (s); keeps a lognormal distribution (TT-11). */
+  dwellMedianS?: number
+  /** Empty pool at start: box count and the longest age (s) (TT-11). */
+  emptyPool?: { count: number; maxAgeS?: number }
 }
 
 /** Spec scale limits. */
@@ -34,6 +39,12 @@ export function applyOverrides(base: ScenarioConfig, o: ScenarioOverrides): Scen
   const outOfQuay = config.sts.some((s) => s.gantryX > config.quay.lengthM)
   if (stsCount !== config.sts.length || outOfQuay) config.sts = spreadSts(config, stsCount, config.quay.lengthM)
   if (o.vessels) config.vessels = JSON.parse(JSON.stringify(o.vessels))
+  if (o.dwellMedianS !== undefined) {
+    const current = (base.transshipment ?? DEFAULT_TRANSSHIPMENT).dwell
+    const sigma = current.kind === 'lognormal' ? current.sigma : 0.6
+    config.transshipment = { dwell: { kind: 'lognormal', medianS: o.dwellMedianS, sigma } }
+  }
+  if (o.emptyPool) config.emptyPool = { ...config.emptyPool, ...o.emptyPool }
   // an edited vessel table ends when all its vessels have departed
   if (o.vessels && config.endConditions.vesselsCompleted !== undefined) config.endConditions.vesselsCompleted = o.vessels.length
   return config
@@ -71,12 +82,16 @@ export function validateOverrides(config: ScenarioConfig): OverrideCheck {
     const spec = vesselClass(v.sizeClass)
     const counts = [v.discharge, v.load, v.transshipment, v.maxSts]
     if (counts.some((c) => !Number.isInteger(c) || c < 0)) err('setup.check.counts', { id: v.id })
+    if ((v.dischargeTransshipment ?? 0) > v.discharge) err('setup.check.tsIn', { id: v.id })
     if (!(v.arrivalS >= 0)) err('setup.check.arrival', { id: v.id })
     if (v.maxSts < 1) err('setup.check.maxSts', { id: v.id })
-    const boxes = v.discharge + v.load + v.transshipment
+    const boxes = v.discharge + v.load + v.transshipment + (v.empties ?? []).reduce((n, e) => n + e.count, 0)
     if (boxes > cellCapacity(spec))
       err('setup.check.capacity', { id: v.id, boxes, vesselClass: spec.label, capacity: cellCapacity(spec) })
     if (spec.loaM > L) warnings.push({ key: 'setup.check.tooLong', params: { id: v.id, vesselClass: spec.label, loa: spec.loaM } })
   }
+  const dwell = config.transshipment?.dwell
+  if (dwell?.kind === 'lognormal' && !(dwell.medianS > 0)) err('setup.check.dwell')
+  if (config.emptyPool && !(config.emptyPool.count >= 0)) err('setup.check.pool')
   return { errors, warnings }
 }

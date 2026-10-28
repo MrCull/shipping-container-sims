@@ -33,7 +33,7 @@ import {
 } from './types'
 import { DEFAULT_WTP_PADS } from '../engine/yardLayout'
 import type { DecisionsConfig } from '../engine/decisions/types'
-import type { VesselSizeClass } from './types'
+import type { DwellDistribution, EmptyPoolConfig, VesselSizeClass } from './types'
 
 export { LINE_OWNER_PREFIX }
 
@@ -169,6 +169,8 @@ export function makeVesselCall(id: string, opts: VesselCallOptions): VesselConfi
     maxSts: opts.maxSts ?? DEFAULT_MAX_STS[opts.sizeClass],
   }
   if (opts.sizeMix) v.sizeMix = { ...opts.sizeMix }
+  if (opts.dischargeTransshipment) v.dischargeTransshipment = opts.dischargeTransshipment
+  if (opts.empties?.length) v.empties = structuredClone(opts.empties)
   return v
 }
 
@@ -243,6 +245,18 @@ export class ScenarioBuilder {
 
   cargo(cargo: Partial<CargoConfig>): this {
     this.config.cargo = { ...this.config.cargo, ...structuredClone(cargo) }
+    return this
+  }
+
+  /** Transshipment dwell distribution (TT-11). */
+  transshipmentDwell(dwell: DwellDistribution): this {
+    this.config.transshipment = { dwell: structuredClone(dwell) }
+    return this
+  }
+
+  /** Empty pool pre-filled into the yard (TT-11). */
+  emptyPool(pool: EmptyPoolConfig): this {
+    this.config.emptyPool = structuredClone(pool)
     return this
   }
 

@@ -8,6 +8,7 @@ import { travelTime, type AxisProfile } from '../../engine'
 import { DEFAULT_ASC_KINEMATICS, DEFAULT_SHC_KINEMATICS, type YardSetup } from '../../scenario/builder'
 import { applyOverrides, LIMITS, validateOverrides, type OverrideCheck, type ScenarioOverrides } from '../../scenario/overrides'
 import type { AscKinematics, ShcKinematics, UnitSystem, VesselConfig } from '../../scenario/types'
+import { DEFAULT_TRANSSHIPMENT } from '../../scenario/dwell'
 import VesselTable from '../setup/VesselTable.vue'
 import { endConditionsFromFields, endFieldsOf, type EndFields } from '../../modules/endConditions'
 
@@ -58,6 +59,10 @@ const selected = computed(() => catalogue.find((c) => c.name === name.value))
 const quayLengthM = ref(0)
 const stsCount = ref(0)
 const vessels = ref<VesselConfig[]>([])
+// Transshipment dwell (median, hours) and the empty pool (TT-11).
+const dwellMedianH = ref(48)
+const poolCount = ref(0)
+const poolAgeDays = ref(7)
 
 function loadDraft(scenario: string, overrides: ScenarioOverrides = {}): void {
   try {
@@ -65,6 +70,11 @@ function loadDraft(scenario: string, overrides: ScenarioOverrides = {}): void {
     quayLengthM.value = config.quay.lengthM
     stsCount.value = config.sts.length
     vessels.value = JSON.parse(JSON.stringify(config.vessels))
+    const dwell = (config.transshipment ?? DEFAULT_TRANSSHIPMENT).dwell
+    const medianS = dwell.kind === 'lognormal' ? dwell.medianS : dwell.kind === 'fixed' ? dwell.s : (dwell.minS + dwell.maxS) / 2
+    dwellMedianH.value = Math.round((medianS / 3600) * 10) / 10
+    poolCount.value = config.emptyPool?.count ?? 0
+    poolAgeDays.value = (config.emptyPool?.maxAgeS ?? 7 * 86400) / 86400
   } catch {
     vessels.value = []
   }
@@ -91,6 +101,8 @@ const overrides = computed<ScenarioOverrides>(() => ({
   quayLengthM: quayLengthM.value,
   stsCount: stsCount.value,
   vessels: vessels.value,
+  dwellMedianS: Math.round(dwellMedianH.value * 3600),
+  emptyPool: { count: poolCount.value, maxAgeS: Math.round(poolAgeDays.value * 86400) },
 }))
 /** The scenario as it would start (selected fixture/preset + the edits above). */
 const draftConfig = computed(() => {
@@ -463,6 +475,48 @@ async function submit(): Promise<void> {
           v-model="vessels"
           :start-date-time="startDate"
         />
+      </fieldset>
+
+      <fieldset
+        class="field"
+        data-testid="tt-flows"
+      >
+        <legend>{{ t('setup.flows.title') }}</legend>
+        <p class="hint">
+          {{ t('setup.flows.hint') }}
+        </p>
+        <div class="grid">
+          <label>
+            <span>{{ t('setup.flows.dwellMedianH') }}</span>
+            <input
+              v-model.number="dwellMedianH"
+              type="number"
+              min="0.1"
+              step="any"
+              name="dwellMedianH"
+            >
+          </label>
+          <label>
+            <span>{{ t('setup.flows.poolCount') }}</span>
+            <input
+              v-model.number="poolCount"
+              type="number"
+              min="0"
+              step="1"
+              name="poolCount"
+            >
+          </label>
+          <label>
+            <span>{{ t('setup.flows.poolAgeDays') }}</span>
+            <input
+              v-model.number="poolAgeDays"
+              type="number"
+              min="0"
+              step="any"
+              name="poolAgeDays"
+            >
+          </label>
+        </div>
       </fieldset>
 
       <fieldset

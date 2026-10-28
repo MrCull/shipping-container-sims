@@ -157,6 +157,43 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .endWhen({ vesselsCompleted: 1 })
       .build(),
 
+  /**
+   * TT-11 transshipment fixture: vessel A discharges 8 transshipment boxes, they
+   * dwell 10 minutes in the yard, and vessel B (arriving later) loads them.
+   */
+  'transshipment-a-to-b': () =>
+    new ScenarioBuilder('transshipment-a-to-b', 'Vessel A discharges 8 transshipment boxes; vessel B loads them after a 10 minute yard dwell')
+      .seed(5)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('VA', { name: 'Feeder Alpha', sizeClass: 'feeder', arrivalS: 0, discharge: 8, dischargeTransshipment: 8, maxSts: 1, sizeMix: { '40': 1 } })
+      .vesselCall('VB', { name: 'Feeder Bravo', sizeClass: 'feeder', arrivalS: 1500, transshipment: 8, maxSts: 1, sizeMix: { '40': 1 } })
+      .transshipmentDwell({ kind: 'fixed', s: 600 })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 1 }) // one tier: nothing is buried (rehandles are TT-12)
+      .endWhen({ vesselsCompleted: 2 })
+      .build(),
+
+  /**
+   * TT-11 empties fixture: a feeder loads 4 empty 40 ft MSC containers. The yard holds a
+   * pool of 16 empties (40 ft, MSC and Maersk) of varying age.
+   */
+  'empties-load-4-of-16': () =>
+    new ScenarioBuilder('empties-load-4-of-16', 'A feeder loads 4 empty 40 ft MSC containers picked from a pool of 16 empties')
+      .seed(11)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Empty Star', sizeClass: 'feeder', maxSts: 1, empties: [{ size: '40', line: 'MSC', count: 4 }] })
+      .emptyPool({ count: 16, sizeMix: { '40': 1 }, lines: { MSC: 1, Maersk: 1 } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3 })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
   /** Livery smoke test (TT-22): 12 boxes over all ten lines (equal weights) and all three sizes. */
   'liveries-mixed': () =>
     new ScenarioBuilder('liveries-mixed', '1 STS discharges 12 boxes of mixed lines and sizes')

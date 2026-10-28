@@ -9,7 +9,7 @@ import { t, type MessageKey } from '../../i18n/messages'
 import { makeVesselCall } from '../../scenario/builder'
 import type { VesselConfig, VesselSizeClass } from '../../scenario/types'
 import { VESSEL_CLASSES, VESSEL_SIZE_CLASSES } from '../../scenario/vesselClasses'
-import { generateVessels } from '../../scenario/vesselGenerator'
+import { flowMixOf, generateVessels, TTI_FLOW_MIX } from '../../scenario/vesselGenerator'
 import { fromLocalInputValue, toLocalInputValue } from '../../modules/time'
 
 const props = defineProps<{ startDateTime: Date | null }>()
@@ -17,12 +17,29 @@ const vessels = defineModel<VesselConfig[]>({ required: true })
 
 const start = computed(() => props.startDateTime ?? new Date(0))
 
-const COUNT_FIELDS: { field: 'discharge' | 'load' | 'transshipment' | 'maxSts'; label: MessageKey; min: number }[] = [
+const COUNT_FIELDS: { field: 'discharge' | 'dischargeTransshipment' | 'load' | 'transshipment' | 'maxSts'; label: MessageKey; min: number }[] = [
   { field: 'discharge', label: 'vessels.col.discharge', min: 0 },
+  { field: 'dischargeTransshipment', label: 'vessels.col.tsIn', min: 0 },
   { field: 'load', label: 'vessels.col.load', min: 0 },
   { field: 'transshipment', label: 'vessels.col.transshipment', min: 0 },
   { field: 'maxSts', label: 'vessels.col.maxSts', min: 1 },
 ]
+
+/** Empty 40 ft containers a vessel loads (the table edits one requirement; richer ones come from scenario JSON). */
+function emptiesOf(v: VesselConfig): number {
+  return (v.empties ?? []).reduce((n, e) => n + e.count, 0)
+}
+
+function setEmpties(v: VesselConfig, value: number): void {
+  const count = Math.max(0, Math.round(Number(value) || 0))
+  if (count === 0) delete v.empties
+  else v.empties = [{ size: '40', line: v.line ?? 'MSC', count }]
+}
+
+function mixText(v: VesselConfig): string {
+  const m = flowMixOf(v)
+  return t('vessels.mix', { imp: Math.round(m.import), exp: Math.round(m.export), ts: Math.round(m.transshipment) })
+}
 
 function arrivalInput(v: VesselConfig): string {
   return toLocalInputValue(new Date(start.value.getTime() + v.arrivalS * 1000))
@@ -65,6 +82,7 @@ const gen = reactive({
     number
   >,
 })
+const flow = reactive({ import: 35, export: 35, transshipment: 30 })
 const genError = ref<MessageKey | null>(null)
 
 function generate(): void {
@@ -81,8 +99,13 @@ function generate(): void {
     genError.value = 'vessels.generate.errorMix'
     return
   }
+  if (!(flow.import > 0 || flow.export > 0 || flow.transshipment > 0)) {
+    genError.value = 'vessels.generate.errorFlow'
+    return
+  }
   genError.value = null
   vessels.value = generateVessels({
+    flowMix: { ...flow },
     count: gen.count,
     startS: Math.max(0, Math.round((startDate.getTime() - start.value.getTime()) / 1000)),
     intervalS: gen.intervalH * 3600,
@@ -106,14 +129,23 @@ function generate(): void {
             <th :title="t('vessels.col.dischargeHint')">
               {{ t('vessels.col.discharge') }}
             </th>
+            <th :title="t('vessels.col.tsInHint')">
+              {{ t('vessels.col.tsIn') }}
+            </th>
             <th :title="t('vessels.col.loadHint')">
               {{ t('vessels.col.load') }}
             </th>
             <th :title="t('vessels.col.transshipmentHint')">
               {{ t('vessels.col.transshipment') }}
             </th>
+            <th :title="t('vessels.col.emptiesHint')">
+              {{ t('vessels.col.empties') }}
+            </th>
             <th :title="t('vessels.col.maxStsHint')">
               {{ t('vessels.col.maxSts') }}
+            </th>
+            <th :title="t('vessels.col.mixHint')">
+              {{ t('vessels.col.mix') }}
             </th>
             <th>
               <span class="sr-only">{{ t('vessels.col.remove') }}</span>
@@ -164,6 +196,19 @@ function generate(): void {
               >
             </td>
             <td>
+              <input
+                :value="emptiesOf(v)"
+                type="number"
+                min="0"
+                step="1"
+                :aria-label="t('vessels.field', { id: v.id, field: t('vessels.col.empties') })"
+                @change="setEmpties(v, ($event.target as HTMLInputElement).valueAsNumber)"
+              >
+            </td>
+            <td class="mono mixcell">
+              {{ mixText(v) }}
+            </td>
+            <td>
               <button
                 type="button"
                 class="icon"
@@ -177,7 +222,7 @@ function generate(): void {
           </tr>
           <tr v-if="vessels.length === 0">
             <td
-              colspan="8"
+              colspan="11"
               class="empty"
             >
               {{ t('vessels.empty') }}
@@ -265,6 +310,43 @@ function generate(): void {
             :aria-label="t('vessels.generate.weight', { label: VESSEL_CLASSES[c].label })"
           >
         </label>
+      </fieldset>
+      <fieldset class="mix">
+        <legend>{{ t('vessels.generate.flow') }}</legend>
+        <label>
+          <span>{{ t('vessels.generate.flowImport') }}</span>
+          <input
+            v-model.number="flow.import"
+            type="number"
+            min="0"
+            step="any"
+          >
+        </label>
+        <label>
+          <span>{{ t('vessels.generate.flowExport') }}</span>
+          <input
+            v-model.number="flow.export"
+            type="number"
+            min="0"
+            step="any"
+          >
+        </label>
+        <label>
+          <span>{{ t('vessels.generate.flowTs') }}</span>
+          <input
+            v-model.number="flow.transshipment"
+            type="number"
+            min="0"
+            step="any"
+          >
+        </label>
+        <button
+          type="button"
+          class="btn small"
+          @click="Object.assign(flow, TTI_FLOW_MIX)"
+        >
+          {{ t('vessels.generate.flowTti') }}
+        </button>
       </fieldset>
       <p
         v-if="genError"

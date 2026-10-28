@@ -1,0 +1,241 @@
+{
+  "scenario": "transshipment-a-to-b",
+  "seed": 5,
+  "status": "ended",
+  "endReason": "vesselsCompleted >= 2",
+  "eventLogHash": "028714862af270",
+  "kpis": {
+    "simTimeS": 3263.422,
+    "eventsProcessed": 606,
+    "movesCompleted": 16,
+    "vesselsCompleted": 2,
+    "sts": {
+      "STS01": {
+        "moves": 16,
+        "cycles": 16,
+        "twinLifts": 0,
+        "grossMovesPerHour": 18.43,
+        "railWaitS": 0
+      }
+    },
+    "vessels": {
+      "VA": {
+        "sizeClass": "feeder",
+        "arrivedAtS": 0,
+        "anchorageWaitS": 0,
+        "berthX": 0,
+        "berthedAtS": 60,
+        "departedAtS": 1294.874,
+        "turnaroundS": 1234.874,
+        "sts": [
+          "STS01"
+        ]
+      },
+      "VB": {
+        "sizeClass": "feeder",
+        "arrivedAtS": 1500,
+        "anchorageWaitS": 0,
+        "berthX": 0,
+        "berthedAtS": 1560,
+        "departedAtS": 3263.422,
+        "turnaroundS": 1703.422,
+        "sts": [
+          "STS01"
+        ]
+      }
+    },
+    "quay": {
+      "vesselsWaited": 0,
+      "anchorageWaitS": {
+        "total": 0,
+        "mean": 0,
+        "max": 0
+      }
+    },
+    "handlers": {
+      "stsGroundPosition": {
+        "handler": "strategy:lowest-free-lane",
+        "calls": 16,
+        "resolved": 16,
+        "ok": 16,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "shcDispatch": {
+        "handler": "strategy:oldest-job",
+        "calls": 16,
+        "resolved": 16,
+        "ok": 16,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "yardAllocation": {
+        "handler": "strategy:nearest-wtp",
+        "calls": 8,
+        "resolved": 8,
+        "ok": 8,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "berthAllocation": {
+        "handler": "strategy:first-fit",
+        "calls": 2,
+        "resolved": 2,
+        "ok": 2,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "craneSplit": {
+        "handler": "strategy:balanced-moves",
+        "calls": 2,
+        "resolved": 2,
+        "ok": 2,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "workPackageRelease": {
+        "handler": "strategy:keep-k-ahead",
+        "calls": 16,
+        "resolved": 16,
+        "ok": 16,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 2,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      }
+    },
+    "horizontal": {
+      "boxesToWtp": 8,
+      "shcs": {
+        "SHC01": {
+          "jobs": 13,
+          "emptyDistanceM": 3013,
+          "loadedDistanceM": 1524,
+          "reservationWaitS": 0
+        },
+        "SHC02": {
+          "jobs": 3,
+          "emptyDistanceM": 794.5,
+          "loadedDistanceM": 387.5,
+          "reservationWaitS": 0
+        }
+      },
+      "stsGroundPositionWaitS": {
+        "STS01": 368.523
+      }
+    },
+    "yard": {
+      "boxesStacked": 8,
+      "boxesInTransit": 0,
+      "allocationFailures": 0,
+      "blocks": {
+        "B01": {
+          "boxes": 0,
+          "cells": 0,
+          "capacityCells": 80,
+          "maxHeight": 0
+        }
+      },
+      "ascs": {
+        "B01-ASC1": {
+          "jobs": 16,
+          "gantryM": 494.6,
+          "trolleyM": 201.5,
+          "hoistM": 223.744,
+          "padWaitS": 0
+        }
+      }
+    },
+    "workPackages": {
+      "released": 14,
+      "started": 14,
+      "completed": 14,
+      "leadTimeMeanS": 341.138,
+      "leadTimeMaxS": 860.715,
+      "boxesLoaded": 8
+    }
+  },
+  "invariants": {
+    "enabled": true,
+    "checks": 605,
+    "violations": 0,
+    "first": null
+  },
+  "firstError": null
+}

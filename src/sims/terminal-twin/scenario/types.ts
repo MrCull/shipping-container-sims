@@ -161,6 +161,54 @@ export interface VesselConfig {
   maxSts: number
   /** Size mix of this vessel's discharge boxes (default: `cargo.sizeMix`). */
   sizeMix?: Weights<ContainerSize>
+  /**
+   * How many of the `discharge` boxes are transshipment boxes (TT-11, default 0): the rest are
+   * imports. With the load flow on, each one is linked to an onward vessel that loads it.
+   */
+  dischargeTransshipment?: number
+  /**
+   * Empty containers this vessel loads (TT-11): N empties of a size and shipping line per entry.
+   * Releasing the work package that carries them raises "empties required" and asks the
+   * `emptyAllocation` decision point which empties in the yard go.
+   */
+  empties?: EmptyRequirement[]
+}
+
+/** A load requirement for empty containers of one size and shipping line. */
+export interface EmptyRequirement {
+  size: ContainerSize
+  /** Shipping line (a key of `LINE_OWNER_PREFIX`). */
+  line: string
+  count: number
+}
+
+/** A vessel's flow mix as shares of its box moves (percent, summing to 100). */
+export interface FlowMix {
+  import: number
+  export: number
+  transshipment: number
+}
+
+/** Dwell-time distribution (s). `lognormal`: median and the sigma of the underlying normal. */
+export type DwellDistribution =
+  | { kind: 'fixed'; s: number }
+  | { kind: 'uniform'; minS: number; maxS: number }
+  | { kind: 'lognormal'; medianS: number; sigma: number }
+
+/** Transshipment boxes dwell in the yard before they load onto their onward vessel (TT-11). */
+export interface TransshipmentConfig {
+  dwell: DwellDistribution
+}
+
+/** Empty containers standing in the yard when the scenario starts (TT-11), by size and line. */
+export interface EmptyPoolConfig {
+  count: number
+  /** Default: `cargo.sizeMix`. */
+  sizeMix?: Weights<ContainerSize>
+  /** Default: `cargo.lines`. */
+  lines?: Weights<string>
+  /** Boxes have been in the pool for a uniform 0 to this long (s, default 7 days). */
+  maxAgeS?: number
 }
 
 /** The continuous quay and its berth/crane rules. */
@@ -239,6 +287,10 @@ export interface ScenarioConfig {
    * are display-only: every value in this config stays SI whatever is chosen.
    */
   display?: DisplaySettings
+  /** Transshipment dwell (TT-11); optional (default `DEFAULT_TRANSSHIPMENT`). */
+  transshipment?: TransshipmentConfig
+  /** Empty pool pre-filled into the yard (TT-11); optional. */
+  emptyPool?: EmptyPoolConfig
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
   /** KPI bucket clock (optional; defaults come from `startDateTime`, see `engine/kpi/clock.ts`). */
