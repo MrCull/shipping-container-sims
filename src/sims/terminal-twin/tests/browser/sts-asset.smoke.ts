@@ -99,7 +99,9 @@ test('the twin draws every STS from the GLB, switches LODs and animates it from 
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'StsPicked' }))
   const picked = await page.evaluate(() => window.__tt!.clock().displayTime)
   await page.evaluate((t) => window.__tt!.runTo(t + 8), picked)
-  await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 3)
+  // The drawn pose must come from a frame rendered after the jump, not from one drawn before it.
+  const framesAfterJump = (await page.evaluate(() => window.__tt!.scene()?.frames ?? 0)) + 3
+  await page.waitForFunction((n) => (window.__tt!.scene()?.frames ?? 0) > n, framesAfterJump)
   const state = (await page.evaluate(() => window.__tt!.sceneState()))!
   const scene = (await page.evaluate(() => window.__tt!.scene()))!
   expect(scene.stsAssets).toBe('loaded')
