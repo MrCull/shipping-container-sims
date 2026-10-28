@@ -97,4 +97,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Livery:** a shipping line's container colours and wordmark. The **livery atlas** has one tile per line, and an instance's **livery index** is its tile.
 - **Wordmark:** the line's name set in a close open-licence typeface and the brand colours, standing in for the official logo.
 - **Asset budget:** the triangle, draw-call and file-size limits per asset kind (`assets/budgets.json`), enforced by the **budget check** (`npm run tt:assets:check`).
+- **SHC model:** the rigged Kalmar-style shuttle carrier asset `shc` (nodes `steer_*`, `wheel_*`, `hoist`, `spreader`, `twistlock_*`). Its **tunnel** is the open space between the legs that a box is carried through, and its **container attach point** is the centre of the twist-lock plane (the top of the carried box). *Avoid:* "SHC mesh".
+- **Hoist travel:** how far the SHC's `hoist` node moves down from rest (0 to −3.1 m); equal to the carried box's top height minus 6.0 m.
+- **Odometer (SHC):** the signed distance an SHC has rolled along its heading, from which the renderer derives wheel roll.
 - **Asset viewer:** the dev-only page `/sim/terminal-twin?viewer=<asset>` (or `?viewer=yard`), with its API `window.__ttAssets`.

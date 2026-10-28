@@ -34,6 +34,18 @@ export interface AssetViewStats {
   livery: number
   /** A procedural 20 ft reference container is shown beside the asset for scale. */
   referenceContainer: boolean
+  /** SHC assets: the 40 ft HC reference box inside the tunnel against the sidecar's clear width and height; null for other assets. */
+  reference: {
+    size: string
+    lengthM: number
+    widthM: number
+    heightM: number
+    /** Top of the box (the twist-lock plane while it hangs from the spreader). */
+    topM: number
+    clearWidthM: number
+    clearHeightM: number
+    fitsTunnel: boolean
+  } | null
 }
 
 export interface YardStats {

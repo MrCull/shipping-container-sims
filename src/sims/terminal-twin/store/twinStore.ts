@@ -20,6 +20,7 @@ import { createFormatter } from '../i18n/format'
 import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
 import type { OverlayState, RenderedLivery, SceneStats } from '../modules/sceneRenderer'
+import type { ShcRigState } from '../modules/shcAssets'
 
 export type TwinPhase = 'setup' | 'running'
 
@@ -43,6 +44,8 @@ export interface TwinView {
   stats(): (SceneStats & { frames: number }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */
   liveries(): Record<string, RenderedLivery> | null
+  /** Rig state per SHC (LOD, steering, wheel roll, hoist travel, carrying); null without a 3D view. */
+  shcRigs(): Record<string, ShcRigState> | null
 }
 
 const RECENT_EVENTS_CAP = 500

@@ -12,6 +12,7 @@ import * as THREE from 'three'
 import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 import { ContainerInstancer } from './containerInstancer'
+import { loadShcModel, ShcRig, SHC_RIG, type ShcRigState } from './shcAssets'
 import { LIVERY_ATLAS, liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
 import { aftOffsetM, BAY_PITCH_M, FENDER_GAP_M, ROW_PITCH_M, slotX, slotZ, TIER_PITCH_M } from '../scenario/vesselClasses'
 
@@ -29,6 +30,12 @@ const STS = {
 
 /** [A] Shuttle-carrier proportions (m): length along travel, width across, height. */
 const SHC = { length: 9.2, width: 4.9, height: 6.2, leg: 0.6, beam: 0.7 }
+/** Selection box of the phase 2 model (from its sidecar). */
+const SHC_BOX = { length: SHC_RIG.lengthM, width: SHC_RIG.widthM, height: SHC_RIG.heightM }
+/** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
+const EMPTY_HOIST_MPS = 1.5
+/** Height of the spreader's twist-lock plane when an empty SHC is not driving: the top of a standard box on the ground. */
+const EMPTY_SPREADER_DOWN_Y = CONTAINER_DIMS['40'].height
 
 export interface OverlayState {
   /** Lane graph (one-way edges) drawn on the ground. */
@@ -51,6 +58,10 @@ export interface SceneStats {
   reservedZones: number
   /** Container instances per LOD (placeholders count as LOD1). */
   containerLods: { lod0: number; lod1: number }
+  /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
+  shcLods: { lod0: number; lod1: number; lod2: number }
+  /** 'placeholder' until the SHC GLB has loaded. */
+  shcAssets: 'placeholder' | 'loaded'
   /** 'placeholder' until the container GLBs have loaded. */
   containerAssets: 'placeholder' | 'loaded'
 }
@@ -79,7 +90,8 @@ export class SceneRenderer {
   private disposed = false
   private sts = new Map<string, StsParts>()
   private vessels = new Map<string, THREE.Group>()
-  private shcs = new Map<string, { group: THREE.Group; spreader: THREE.Mesh }>()
+  private shcs = new Map<string, { group: THREE.Group; spreader: THREE.Mesh; rig?: ShcRig }>()
+  private hoistEase = new Map<string, { t: number; y: number }>()
   private laneOverlay: THREE.Group
   private zoneMeshes = new Map<string, THREE.Mesh>()
   private overlays: OverlayState = { laneGraph: false, reservations: false }
@@ -112,6 +124,20 @@ export class SceneRenderer {
       },
       (err: unknown) => console.warn('Terminal Twin: container GLBs failed to load; keeping placeholders', err),
     )
+
+    if (model.shcIds.length > 0) {
+      loadShcModel().then(
+        (shcModel) => {
+          if (this.disposed) return
+          for (const [id, entry] of this.shcs) {
+            entry.rig = new ShcRig(shcModel, id)
+            entry.group.visible = false
+            this.scene.add(entry.rig.root)
+          }
+        },
+        (err: unknown) => console.warn('Terminal Twin: SHC GLB failed to load; keeping placeholders', err),
+      )
+    }
 
     const box = this.track(new THREE.BoxGeometry(1, 1, 1))
     const edges = this.track(new THREE.EdgesGeometry(box))
@@ -436,13 +462,6 @@ export class SceneRenderer {
       group.visible = p !== null
       if (p) group.position.set(p.x, 0, p.zOffset)
     }
-    for (const [id, parts] of this.shcs) {
-      const pose = model.shcPose(id, t)
-      parts.group.position.set(pose.x, 0, pose.z)
-      parts.group.rotation.y = pose.heading === 'z' ? Math.PI / 2 : 0
-      // the spreader sits on top of the (possible) box: box bottom = lift
-      parts.spreader.position.y = pose.lift + CONTAINER_DIMS['40'].height + 0.2
-    }
     this.reservedZones = 0
     const active = this.overlays.reservations ? model.activeReservations(t) : {}
     for (const [zone, mesh] of this.zoneMeshes) {
@@ -451,15 +470,61 @@ export class SceneRenderer {
     }
 
     const containers = this.containers
+    const carried = new Map<string, number>()
     containers.begin()
     model.containerIds.forEach((id, i) => {
       const c = model.containerPose(id, t)
-      if (c) containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw)
+      if (!c) return
+      containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw)
+      if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
     })
     containers.end(cameraPosition)
 
+    for (const [id, parts] of this.shcs) {
+      const pose = model.shcPose(id, t)
+      if (parts.rig) {
+        const boxHeight = carried.get(id)
+        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 4, cameraPosition.z - pose.z))
+        parts.rig.pose({
+          x: pose.x,
+          z: pose.z,
+          yaw: pose.yaw,
+          steerRad: pose.steerRad,
+          odometerM: pose.odometerM,
+          attachY: this.spreaderPlane(id, t, pose.lift, pose.travelling || model.statusAt('shc', id, t) === 'parked', boxHeight),
+          carrying: boxHeight !== undefined,
+        })
+        continue
+      }
+      parts.group.position.set(pose.x, 0, pose.z)
+      parts.group.rotation.y = pose.heading === 'z' ? Math.PI / 2 : 0
+      // the spreader sits on top of the (possible) box: box bottom = lift
+      parts.spreader.position.y = pose.lift + CONTAINER_DIMS['40'].height + 0.2
+    }
+
     this.updateSelection(selectedId, t)
   }
+
+  /**
+   * Height of the spreader's twist-lock plane. Carrying: exactly the box top (it follows the engine's lift
+   * motion). Empty: raised while driving or parked, lowered onto where a box would stand otherwise, eased so it never snaps.
+   */
+  private spreaderPlane(id: string, t: number, lift: number, raised: boolean, boxHeight: number | undefined): number {
+    if (boxHeight !== undefined) {
+      this.hoistEase.delete(id)
+      return lift + boxHeight
+    }
+    const target = raised ? SHC_RIG.attachRestY : lift + EMPTY_SPREADER_DOWN_Y
+    const ease = this.hoistEase.get(id)
+    let y = target
+    if (ease && Math.abs(t - ease.t) < 30) {
+      const step = EMPTY_HOIST_MPS * Math.abs(t - ease.t)
+      y = ease.y + Math.max(-step, Math.min(step, target - ease.y))
+    }
+    this.hoistEase.set(id, { t, y })
+    return y
+  }
+
 
   private updateSelection(id: string | null, t: number): void {
     const centre = id ? this.model.entityCentre(id, t) : null
@@ -476,9 +541,11 @@ export class SceneRenderer {
       this.selection.rotation.y = this.model.containerPose(id, t)?.yaw ?? 0
     } else if (this.shcs.has(id)) {
       const pose = this.model.shcPose(id, t)
-      this.selection.scale.set(SHC.length + 1, SHC.height + 3, SHC.width + 1)
-      this.selection.position.set(pose.x, (SHC.height + 3) / 2, pose.z)
-      this.selection.rotation.y = pose.heading === 'z' ? Math.PI / 2 : 0
+      const rigged = !!this.shcs.get(id)?.rig
+      const h = rigged ? SHC_BOX.height + 0.5 : SHC.height + 3
+      this.selection.scale.set((rigged ? SHC_BOX.length : SHC.length) + 1, h, (rigged ? SHC_BOX.width : SHC.width) + 1)
+      this.selection.position.set(pose.x, h / 2, pose.z)
+      this.selection.rotation.y = rigged ? pose.yaw : pose.heading === 'z' ? Math.PI / 2 : 0
     } else if (this.sts.has(id)) {
       this.selection.scale.set(STS.legSpacingX + 4, STS.apexY + 2, STS.gauge + 6)
       this.selection.position.set(centre.x, (STS.apexY + 2) / 2, STS.waterRailZ + STS.gauge / 2)
@@ -503,6 +570,13 @@ export class SceneRenderer {
     let vessels = 0
     for (const g of this.vessels.values()) if (g.visible) vessels++
     const c = this.containers.stats()
+    const shcLods = { lod0: 0, lod1: 0, lod2: 0 }
+    let rigged = 0
+    for (const { rig } of this.shcs.values()) {
+      if (!rig) continue
+      rigged++
+      shcLods[`lod${rig.rigState.lod}` as keyof typeof shcLods]++
+    }
     return {
       containers: c.drawn,
       sts: this.sts.size,
@@ -512,7 +586,16 @@ export class SceneRenderer {
       reservedZones: this.reservedZones,
       containerLods: { lod0: c.lod0, lod1: c.lod1 },
       containerAssets: c.assets,
+      shcLods,
+      shcAssets: rigged > 0 ? 'loaded' : 'placeholder',
     }
+  }
+
+  /** Rig state per SHC at the last update (empty until the SHC GLB has loaded). */
+  renderedShcs(): Record<string, ShcRigState> {
+    const out: Record<string, ShcRigState> = {}
+    for (const [id, { rig }] of this.shcs) if (rig) out[id] = { ...rig.rigState }
+    return out
   }
 
   /** Livery, size and LOD drawn per container id at the last update. */

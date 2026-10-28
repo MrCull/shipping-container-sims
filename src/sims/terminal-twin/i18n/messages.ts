@@ -198,6 +198,7 @@ const en = {
   'assetViewer.drawCalls': 'Draw calls',
   'assetViewer.lodCost': '{triangles} tris · {drawCalls} dc',
   'assetViewer.referenceHint': 'Grey outline: 20 ft ISO reference box.',
+  'assetViewer.referenceHintShc': 'Grey outline: 40 ft high-cube reference box hanging from the spreader at true scale; the hoist slider moves it.',
   'assetViewer.instances': 'Instances',
   'assetViewer.lodSplit': 'LOD0 / LOD1',
   'assetViewer.lodSplitValue': '{lod0} / {lod1}',

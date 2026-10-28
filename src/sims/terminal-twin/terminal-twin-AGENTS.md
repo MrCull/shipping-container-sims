@@ -4,7 +4,7 @@
 
 **Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root — use its terms in code, tests and docs.
 
-**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-20 added locale and units, the message catalogue and keyboard shortcuts. Phase 2 has started with the asset pipeline and container models (TT-22): Blender-generated GLBs with LODs and a livery atlas, instanced in the 3D view, plus a dev asset viewer and an asset budget check in CI. See [Phase 2 asset pipeline](#phase-2-asset-pipeline). TT-09 added real vessel calls: five size classes, generated bay plans, a continuous quay with berth allocation and anchorage, STS cranes on one rail with a crane split, twin-20 lifts, and the setup dialog's vessel table and generator. TT-05 adds SHC horizontal transport (STS ground position → WTP pad) over a generated lane graph with conflict-zone reservations, the `shcDispatch` decision point, an instant ASC stub, subsystem modes, SHC setup fields and 3D lane/reservation overlays.
+**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-20 added locale and units, the message catalogue and keyboard shortcuts. Phase 2 has started with the asset pipeline and container models (TT-22): Blender-generated GLBs with LODs and a livery atlas, instanced in the 3D view, plus a dev asset viewer and an asset budget check in CI. See [Phase 2 asset pipeline](#phase-2-asset-pipeline). TT-09 added real vessel calls: five size classes, generated bay plans, a continuous quay with berth allocation and anchorage, STS cranes on one rail with a crane split, twin-20 lifts, and the setup dialog's vessel table and generator. TT-25 replaced the procedural shuttle carrier with a rigged Kalmar-style GLB model (see [SHC model](#shc-model-tt-25)). TT-05 adds SHC horizontal transport (STS ground position → WTP pad) over a generated lane graph with conflict-zone reservations, the `shcDispatch` decision point, an instant ASC stub, subsystem modes, SHC setup fields and 3D lane/reservation overlays.
 
 **Sim ID:** `terminal-twin`
 
@@ -123,7 +123,7 @@ terminal-twin/
 ├── dev/AssetViewer.vue       Dev asset viewer (?viewer=<asset>|yard); assetViewerScene.ts; assetViewerApi.ts (window.__ttAssets)
 ├── assets/                   Phase 2 asset library (see "Phase 2 asset pipeline")
 │   ├── budgets.json          Triangle / draw-call / file-size budgets per asset kind
-│   ├── generators/           Python (bpy) generators: build.py, tt_assets/*.py, fonts/ (OFL), requirements.txt
+│   ├── generators/           Python (bpy) generators: build.py, tt_assets/*.py (containers, liveries, shc, shc_meta), fonts/ (OFL), requirements.txt
 │   └── models/<group>/       Committed outputs: <asset>.glb + .meta.json, livery-atlas.json, previews/*.webp
 ├── cli/                      Node-only: run.ts→runCli.ts (tt:run), diff.ts→diffCli.ts (tt:diff),
 │                             golden-cli.ts→golden.ts (tt:golden), handlerSets.ts, build-fixtures.ts,
@@ -169,9 +169,11 @@ __tt.overlays({ laneGraph?, reservations? })   // toggles 3D overlays, returns t
 await __tt.load('shc-1sts-2shc-1wtp', { shc: { count: 3, kinematics } })  // SHC fleet override, like the setup dialog
 __tt.clock()       // { displayTime, speed, paused, busy, engine: EngineInfo }
 __tt.scene()       // rendered { containers, sts, shcs, vessels, overlays, reservedZones, frames,
-                   //   containerLods: { lod0, lod1 }, containerAssets: 'placeholder'|'loaded' }
+                   //   containerLods: { lod0, lod1 }, containerAssets: 'placeholder'|'loaded',
+                   //   shcLods: { lod0, lod1, lod2 }, shcAssets: 'placeholder'|'loaded' }
 __tt.sceneState()  // what the scene shows: custody per box, status + pose per STS and SHC, status per vessel,
-                   //   active reservations, liveries: { [containerId]: { index (atlas tile), size, lod } } as drawn
+                   //   active reservations, liveries: { [containerId]: { index (atlas tile), size, lod } } as drawn,
+                   //   shcRigs: { [shcId]: { lod, steerRad, wheelRollRad, hoistM, carrying } } as drawn
 __tt.cameraTo(id, distanceM?)  // aim at an entity, optionally from a distance (60 → LOD0, 600 → LOD1)
 __tt.display(); __tt.setDisplay({ locale: 'de-DE', units: 'imperial' })  // live locale/units
 __tt.config()      // loaded scenario config (SI) + current display settings
@@ -189,7 +191,7 @@ __tt.ui()          // { selectedId, following, overlaysVisible, dashboardOpen, h
 - **Subsystem modes** (`SimulationOptions.subsystems` overrides `config.subsystems`; resolved into `SimState.subsystems`): SHC `real` (default with SHCs + blocks) / `instant` (same events, zero durations) / `off` (no jobs; boxes stay on ground positions). ASC `instant` (default: `AscPicked` + `AscStacked` at the drop time, yard slots `<block>:I<n>`) / `off` (pads fill) / `real` → throws until TT-06.
 - **KPIs:** `kpiReport().horizontal` (only with SHCs): `boxesToWtp`, per SHC `jobs`, `emptyDistanceM`, `loadedDistanceM`, `reservationWaitS`, and `stsGroundPositionWaitS`. The CLI prints a `Horizontal:` block.
 - **Invariants added:** `reservation.no-overlap`, `claim.single-holder`. Double occupancy of a ground position or pad surfaces as `custody.single-owner` with "… is double-occupied: X was set down on it" (a place holds one `containerId`).
-- **Browser:** the worker diffs `ShcState.motion`/`status` like the STS and sends new reservations (`Delta.reservations`). `SceneModel.shcPose(id,t)` → `{x, z, lift, heading}`; `containerPose` adds a yaw (boxes on pads/SHCs heading Z lie along Z). Overlays: `store.overlays` / `OverlayToggles.vue` (catalogue keys `overlays.*`) / `__tt.overlays()`; the O shortcut (`store.overlaysVisible`) is the master switch over them. The setup dialog edits SHC speeds in display units (km/h or mi/h, m/s² or ft/s²) and stores SI.
+- **Browser:** the worker diffs `ShcState.motion`/`status` like the STS and sends new reservations (`Delta.reservations`). `SceneModel.shcPose(id,t)` → `{x, z, lift, heading, yaw, steerRad, odometerM, travelling}`; `containerPose` adds a yaw (boxes on pads/SHCs heading Z lie along Z; a carried box takes the SHC's yaw). Overlays: `store.overlays` / `OverlayToggles.vue` (catalogue keys `overlays.*`) / `__tt.overlays()`; the O shortcut (`store.overlaysVisible`) is the master switch over them. The setup dialog edits SHC speeds in display units (km/h or mi/h, m/s² or ft/s²) and stores SI.
 
 ## Phase 2 asset pipeline
 
@@ -207,6 +209,7 @@ Blender (`bpy`) Python generators → raw GLB → gltf-transform (meshopt) → c
 npm run tt:assets -- --python .venv-bpy/bin/python      # or set TT_BPY_PYTHON; Windows: .venv-bpy\Scripts\python.exe
 npm run tt:assets -- --check --python ...               # regenerate into a temp dir and byte-compare with the commit
 npm run tt:assets -- --no-previews --python ...         # fast iteration (keeps the committed previews)
+npm run tt:assets -- --only shc --python ...            # one group only (containers | shc); the other group's files are untouched
 ```
 
 What `cli/assets/build.ts` does:
@@ -239,6 +242,7 @@ It takes about 80 s for containers, mostly the Cycles previews. Two runs give by
 |---|---|---|---|---|
 | `container-20` | 308 triangles (budget 450) | 12 (budget 12) | 3 / 1 | ~134 KB |
 | `container-40`, `container-40hc` | 440 triangles (budget 450) | 12 | 3 / 1 | ~136 KB |
+| `shc` | 11,016 (budget 12,000) | 2,532 (3,000); LOD2 342 (400) | 15 / 11 (budgets 16 / 12; LOD2 2 of 3) | ~147 KB |
 
 Most of each container file is the embedded 2048² livery atlas. The renderer shares one texture between them.
 
@@ -276,6 +280,25 @@ Most of each container file is the embedded 2048² livery atlas. The renderer sh
 - **Yard scale** (dev viewer `?viewer=yard`, and a smoke test): 18,000 boxes come to about 264k container triangles, 6 container draw calls, and 14 draw calls per frame including the shadow pass.
   - Headless SwiftShader renders this at well under 1 fps, which says nothing about real frame rate.
   - The TT-19 frame-rate target is not defined yet. Check fps on a real GPU in the viewer's readout.
+
+### SHC model (TT-25)
+
+A red Kalmar-style shuttle carrier (`assets/models/shc/shc.glb`, sidecar `shc.meta.json`, previews `shc-{front,side,rear,three-quarter}.webp`), generated by `generators/tt_assets/shc.py` (geometry) and `shc_meta.py` (atlas and sidecar) through the same one-command pipeline. Proportions are [A]: no manufacturer drawing and no reference photos are in the repo (see the sidecar's provenance).
+
+- **Look:** tall welded gantry on four legs with an open tunnel (clear 3.6 m wide between the tyres, 6.4 m high, open at both ends), dual tyres on four steered legs, engine/hoist assembly on top, glazed cab offset to the front -Z side, two ladders, handrails, white diagonal warning stripes on the lower legs, a telescopic 40 ft spreader with four twist-locks. A 40 ft box (12.19 m) is longer than the frame (8.2 m) and overhangs it fore and aft, as on a real SHC. Branding: a KALMAR wordmark and the unit number `SC 108` baked into a small swatch atlas (no operator branding).
+- **Rig (names repeat in every animated LOD; the build strips the `@LODn` suffix Blender needs to keep object names unique):** `steer_fl|fr|rl|rr` (rotation about +Y, ±35°, pivot on the steer axis at axle height) with child `wheel_*` (rotation about +Z, pivot on the axle; a forward roll is negative about +Z); `hoist` (translation along +Y, 0 to −3.1 m; pivot = the container attach plane) with child `spreader` (0 to 0.35 m float) and its `twistlock_*` (0° unlocked, 90° locked). LOD0 has everything, LOD1 keeps wheels, steering, hoist and spreader, LOD2 is a static silhouette.
+- **Attach point:** the sidecar's `container_attach` (child of `hoist`) is the centre of the twist-lock plane, i.e. the TOP of the carried box: 6.0 m above the ground at hoist 0. `hoist = (box bottom + box height) − 6.0`, and the engine's `lift` is the box bottom, so the carried box stays exactly under the spreader. The lowest travel (−3.1 m) puts the plane at 2.9 m, the top of a 40 ft high-cube standing on the ground.
+- **Triangles / draw calls:** LOD0 11,016 / 15, LOD1 2,532 / 11, LOD2 342 / 2 (budgets in `budgets.json`, `shc` kind; `requiredNodes` lists the rig). One 1024² swatch atlas (WebP) is the only texture.
+- **Renderer** (`modules/shcAssets.ts`, `SceneRenderer`): `loadShcModel()` loads the GLB once per page behind the procedural placeholder (kept until it loads). Each SHC gets a `ShcRig` (clones of the three LODs sharing geometry and material). `SHC_LOD_DISTANCES` [A]: LOD0 up to 110 m, LOD1 up to 380 m, LOD2 beyond (hysteresis ×1.15), chosen per SHC from the camera distance.
+- **Animation, all from the scene model** (`SceneModel.shcPose`, pure and unit-tested in `tests/shc-pose.test.ts`):
+  - *Wheel roll* = `−odometerM / tyre radius`. The odometer sums the distance driven along the heading, so reversing rolls backwards.
+  - *Steering from path curvature:* each X/Z leg is stored with its heading on ingest. At a corner the body yaw swings through 2 s (shorter on short legs) with a smoothstep, and `steerRad` follows `sin(π·progress)` up to ±35°; the rear pairs steer the opposite way. A reversal of more than 135° is driven in reverse (no spin).
+  - *Spreader/hoist:* carrying, it follows the engine's `lift` segments exactly (`lift + box height`). Empty, it is raised while driving or parked and lowered onto where a box would stand otherwise, eased at 1.5 m/s of display time so it never snaps. Twist-locks are locked while carrying.
+  - `ShcPose` gained `yaw`, `steerRad`, `odometerM`, `travelling`; `ContainerPose` gained `carriedBy`, and a carried box takes the SHC's yaw.
+- **Dev API:** `__tt.scene()` adds `shcLods {lod0, lod1, lod2}` and `shcAssets`; `__tt.sceneState().shcRigs[id]` = `{lod, steerRad, wheelRollRad, hoistM, carrying}` as last drawn.
+- **Asset viewer** (`?viewer=shc`): sliders for every rig node, applied to every LOD; the reference is a 40 ft high-cube box hanging from the attach plane that follows the hoist slider; `stats().reference` reports `fitsTunnel` against the sidecar's clear width and height.
+- **Tests:** `tests/shc-asset.test.ts` (committed GLB and sidecar: rig, attach point, tunnel fit, provenance), `tests/shc-pose.test.ts` (pose maths), `tests/browser/shc-model.smoke.ts` (LOD switching, carried box, rolling and steering, viewer).
+- **Not done:** the TTI reference pack and reference photos are not in the repo, so the proportions are approximations tagged [A]; a reference-photo pass can re-tune the constants at the top of `shc.py` and regenerate. Per-unit numbers (`SC 108`) are baked into the atlas, not taken from the SHC id.
 
 ### Adding the next asset (STS, ASC, …)
 
@@ -373,6 +396,10 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 4. Test it in `tests/decisions.test.ts` style: strategy selection, a scripted handler, and a latency case. Then `UPDATE_GOLDEN=1 npm test` if fixtures use it.
 
 ## Known behaviours and pitfalls
+
+- SHC model: the rig node names repeat in every LOD. Three's GLTFLoader renames duplicates (`wheel_fl`, `wheel_fl_1`, …) and keeps the file's name in `userData.name`, so look nodes up by `userData.name` and animate every node of a name (the viewer and `ShcRig` do). The Blender object names carry `@LODn` and `build.py` strips it from the GLB's JSON; do not rename them in glTF tooling.
+- SHC model: the hoist is driven by `lift` only while carrying. An empty SHC stops being a "stationary, spreader down" picture the moment it drives (it is eased up at 1.5 m/s), and a parked SHC has the spreader raised.
+- SHC model: corners are visual only. The engine still plans rest-to-rest legs, so an SHC stops at each turn and the 2 s swing happens at the start of the next leg while it is already moving.
 
 - Fixtures without SHCs give each STS enough ground positions for all its boxes (tracer 10, others 6–30) because nothing clears them; SHC fixtures use a realistic 3.
 - Berth allocation is strictly first come, first served: a vessel that never fits (LOA > quay) blocks the queue for good (the setup dialog warns).
