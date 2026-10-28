@@ -21,7 +21,7 @@ function webglAvailable(): boolean {
   }
 }
 
-const HIDDEN_OVERLAYS: OverlayState = { laneGraph: false, reservations: false }
+const HIDDEN_OVERLAYS: OverlayState = { laneGraph: false, reservations: false, ascRail: false }
 
 export function useTwinScene(host: Ref<HTMLElement | null>) {
   const store = useTwinStore()

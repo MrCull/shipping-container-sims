@@ -10,11 +10,16 @@
  */
 import {
   ascIdOf,
+  ascStartZ,
   blockSpecs,
   boxSpan,
   buildLaneGraph,
   parseYardSlotId,
   positionAt,
+  railEndZ,
+  railSegmentIds,
+  railSegmentSpan,
+  railStartZ,
   rowX,
   slotZ,
   tierBaseY,
@@ -162,11 +167,14 @@ export class SceneModel {
     for (const s of config.sts) this.axisSegments[s.id] = emptyAxes()
     this.graph = buildLaneGraph(config)
     this.blocks = Object.fromEntries(blockSpecs(config).map((b) => [b.id, b]))
+    const ascCount = config.yard?.ascsPerBlock ?? 1
     for (const b of Object.values(this.blocks)) {
-      const id = ascIdOf(b.id)
-      this.axisSegments[id] = emptyAxes()
-      this.initialAsc[id] = { x: b.x, z: b.wtpZ, hoistY: travelHoistM(b) }
-      this.status[`asc:${id}`] = [{ t: 0, status: 'idle' }]
+      for (let n = 1; n <= ascCount; n++) {
+        const id = ascIdOf(b.id, n)
+        this.axisSegments[id] = emptyAxes()
+        this.initialAsc[id] = { x: b.x, z: ascCount === 1 ? b.wtpZ : ascStartZ(b, n), hoistY: travelHoistM(b) }
+        this.status[`asc:${id}`] = [{ t: 0, status: 'idle' }]
+      }
     }
     this.initialShc = {}
     for (const shc of config.shcs ?? []) {
@@ -188,7 +196,7 @@ export class SceneModel {
     return (this.config.shcs ?? []).map((s) => s.id)
   }
 
-  /** One ASC per yard block (present in the scene whenever blocks exist; idle if the ASC subsystem is off). */
+  /** The ASCs of every yard block, waterside first (present whenever blocks exist; idle if the ASC subsystem is off). */
   get ascIds(): string[] {
     return Object.keys(this.initialAsc)
   }
@@ -196,6 +204,16 @@ export class SceneModel {
   /** The block an ASC works. */
   blockOfAsc(ascId: string): BlockSpec {
     return this.blocks[ascId.replace(/-ASC\d+$/, '')]
+  }
+
+  /** The rail segments of a block's ASC rail (zone ids as in the engine's reservations), waterside first. */
+  railSegments(blockId: string): { zone: string; z0: number; z1: number }[] {
+    const b = this.blocks[blockId]
+    const ids = railSegmentIds(b, railStartZ(b), railEndZ(b))
+    return ids.map((zone) => {
+      const [z0, z1] = railSegmentSpan(b, Number(zone.slice(zone.lastIndexOf(':R') + 2)))
+      return { zone, z0, z1 }
+    })
   }
 
   get blockList(): BlockSpec[] {

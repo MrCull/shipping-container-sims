@@ -8,6 +8,7 @@ const store = useTwinStore()
 const toggles: { key: keyof OverlayState; label: MessageKey; title: MessageKey }[] = [
   { key: 'laneGraph', label: 'overlays.laneGraph', title: 'overlays.laneGraphHint' },
   { key: 'reservations', label: 'overlays.reservations', title: 'overlays.reservationsHint' },
+  { key: 'ascRail', label: 'overlays.ascRail', title: 'overlays.ascRailHint' },
 ]
 
 function toggle(key: keyof OverlayState): void {

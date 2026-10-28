@@ -100,6 +100,27 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .endWhen({ simDurationS: 1800 })
       .build(),
 
+  /**
+   * TT-08 conflict fixture: one block with two ASCs, 30 boxes of 20 and 40 ft
+   * spread over the whole block (random slots) and the `balanced` dispatch, so
+   * both cranes want overlapping rail segments again and again: waits and
+   * step-asides, never a pass or a deadlock.
+   */
+  'asc-2asc-block-conflict': () =>
+    new ScenarioBuilder('asc-2asc-block-conflict', 'Two ASCs share one block rail: overlapping rail needs, waits and step-asides')
+      .seed(3)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Twin Trader', sizeClass: 'feeder', discharge: 30, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(3)
+      .block('B01', { x: 20, bays: 10, tiers: 3 })
+      .ascsPerBlock(2)
+      .decisions({ points: { yardAllocation: { strategy: 'random' }, ascDispatch: { strategy: 'balanced' } } })
+      .endWhen({ simDurationS: 4800 })
+      .build(),
+
   /** Livery smoke test (TT-22): 12 boxes over all ten lines (equal weights) and all three sizes. */
   'liveries-mixed': () =>
     new ScenarioBuilder('liveries-mixed', '1 STS discharges 12 boxes of mixed lines and sizes')

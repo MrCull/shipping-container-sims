@@ -94,7 +94,7 @@ export interface SceneState {
   containers: Record<string, CustodyRef | null>
   sts: Record<string, { status: string } & StsPose>
   shcs: Record<string, { status: string } & ShcPose>
-  /** One ASC per yard block: status and spreader pose (gantry Z, trolley X, hoist height). */
+  /** The ASCs of every yard block (1 or 2 each): status and spreader pose (gantry Z, trolley X, hoist height). */
   ascs: Record<string, { status: string } & AscPose>
   vessels: Record<string, { status: string }>
   /** Conflict zones reserved at the displayed time (zone → holder). */

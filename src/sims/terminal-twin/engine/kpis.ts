@@ -72,7 +72,22 @@ export interface YardKpiReport {
   allocationFailures: number
   /** Per block: stacked boxes, slots in use (20 ft cells) and the highest stack. */
   blocks: Record<string, { boxes: number; cells: number; capacityCells: number; maxHeight: number }>
-  ascs: Record<string, { jobs: number; gantryM: number; trolleyM: number; hoistM: number; padWaitS: number }>
+  ascs: Record<
+    string,
+    {
+      jobs: number
+      gantryM: number
+      trolleyM: number
+      hoistM: number
+      padWaitS: number
+      /** Twin-ASC blocks only: seconds jobs waited for the other ASC's rail segments. */
+      railWaitS?: number
+      /** Twin-ASC blocks only: seconds on cycles and yield moves. */
+      busyS?: number
+      /** Twin-ASC blocks only: times this ASC stepped aside. */
+      yields?: number
+    }
+  >
 }
 
 export interface HorizontalKpiReport {
@@ -181,7 +196,14 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     ascs: Object.fromEntries(
       Object.entries(y.perAsc).map(([id, k]) => [
         id,
-        { jobs: k.jobs, gantryM: r3(k.gantryM), trolleyM: r3(k.trolleyM), hoistM: r3(k.hoistM), padWaitS: r3(k.padWaitS) },
+        {
+          jobs: k.jobs,
+          gantryM: r3(k.gantryM),
+          trolleyM: r3(k.trolleyM),
+          hoistM: r3(k.hoistM),
+          padWaitS: r3(k.padWaitS),
+          ...(k.railWaitS !== undefined ? { railWaitS: r3(k.railWaitS), busyS: r3(k.busyS ?? 0), yields: k.yields ?? 0 } : {}),
+        },
       ]),
     ),
   }

@@ -40,10 +40,17 @@ export {
   slotZ,
   tierBaseY,
   travelHoistM,
+  ASC_MIN_SEPARATION_M,
+  RAIL_SEGMENT_M,
+  ascStartZ,
+  railEndZ,
+  railSegmentIds,
+  railSegmentSpan,
+  railStartZ,
 } from './yardLayout'
 export type { BlockSpec, YardCandidate, YardStacks } from './yardLayout'
 export { ascPoseAt } from './subsystems/asc'
-export { ascIdOf } from './state'
+export { ascIdOf, ascIndexOf } from './state'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
 export type { Reservation } from './reservations'
@@ -66,6 +73,9 @@ export type {
   DecisionsConfig,
   LatencyDelay,
   LatencySpec,
+  AscDispatchCandidate,
+  AscDispatchReply,
+  AscDispatchRequest,
   ShcDispatchJob,
   ShcDispatchPad,
   ShcDispatchReply,

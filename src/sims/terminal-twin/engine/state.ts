@@ -10,7 +10,7 @@ import type { MotionSegment } from './kinematics'
 import { laneGraphOf, validateLaneLayout } from './laneGraph'
 import type { Reservation } from './reservations'
 import { seedState } from './rng'
-import { blockSpecs, travelHoistM } from './yardLayout'
+import { ascStartZ, blockSpecs, PARK_UNTIL_S, railSegmentIds, travelHoistM } from './yardLayout'
 import { planCargo, type SlotPurpose } from '../scenario/bayPlan'
 import type { ContainerSize, ScenarioConfig, SubsystemMode, VesselSizeClass } from '../scenario/types'
 import { vesselSlotId as makeVesselSlotId, type CellHalf } from '../scenario/vesselClasses'
@@ -189,6 +189,7 @@ export type AscStatus =
   | 'positioning-at-slot'
   | 'unlocking'
   | 'releasing'
+  | 'repositioning'
 
 /** One planned phase event of an ASC cycle (the next one is scheduled by the previous). */
 export interface AscPlannedEvent {
@@ -250,6 +251,8 @@ export interface AscJob {
   cleared: boolean
   /** ASC that took the job (null = open). */
   ascId: string | null
+  /** An ascDispatch request for this job is pending (twin blocks). */
+  dispatch?: 'asked'
 }
 
 /** Stack heights of a block. Claimed slots count: a slot is claimed when allocated, stacked later. */
@@ -348,11 +351,26 @@ export interface KpiCounters {
   yard?: YardKpiCounters
 }
 
+/** Per-ASC counters; the last three exist only for twin-ASC blocks (TT-08). */
+export interface AscKpiCounters {
+  jobs: number
+  gantryM: number
+  trolleyM: number
+  hoistM: number
+  padWaitS: number
+  /** Seconds jobs waited for the other ASC's rail segments (twin blocks). */
+  railWaitS?: number
+  /** Seconds spent on cycles and yield moves (twin blocks). */
+  busyS?: number
+  /** Times this ASC stepped aside for the other (twin blocks). */
+  yields?: number
+}
+
 export interface YardKpiCounters {
   boxesStacked: number
   /** yardAllocation replies with no slot (block full). */
   allocationFailures: number
-  perAsc: Record<string, { jobs: number; gantryM: number; trolleyM: number; hoistM: number; padWaitS: number }>
+  perAsc: Record<string, AscKpiCounters>
 }
 
 export interface HorizontalKpiCounters {
@@ -410,9 +428,14 @@ export function vesselSlotId(vesselId: string, bay: number, row: number, tier: n
   return makeVesselSlotId(vesselId, bay, row, tier, half)
 }
 
-/** The block's ASC (one per block for now). */
-export function ascIdOf(blockId: string): string {
-  return `${blockId}-ASC1`
+/** The block's ASC number `index` (1 = waterside, 2 = landside). */
+export function ascIdOf(blockId: string, index = 1): string {
+  return `${blockId}-ASC${index}`
+}
+
+/** 1-based position of an ASC along its block's rail (1 = waterside). */
+export function ascIndexOf(ascId: string): number {
+  return Number(/-ASC(\d+)$/.exec(ascId)?.[1] ?? 1)
 }
 
 export function groundPositionId(stsId: string, lane: number): string {
@@ -579,21 +602,31 @@ export function createInitialState(
         topVessels: new Array<string | null>(b.bays * b.rows).fill(null),
       }
       if (subsystems.asc === 'off') continue
-      const id = ascIdOf(b.id)
-      state.ascs[id] = {
-        id,
-        blockId: b.id,
-        status: 'idle',
-        carrying: null,
-        jobId: null,
-        stacked: 0,
-        gantryZ: b.wtpZ,
-        trolleyX: b.x,
-        hoistY: travelHoistM(b),
-        motion: [],
-        plan: [],
+      const count = config.yard?.ascsPerBlock ?? 1
+      for (let n = 1; n <= count; n++) {
+        const id = ascIdOf(b.id, n)
+        const z = count === 1 ? b.wtpZ : ascStartZ(b, n)
+        state.ascs[id] = {
+          id,
+          blockId: b.id,
+          status: 'idle',
+          carrying: null,
+          jobId: null,
+          stacked: 0,
+          gantryZ: z,
+          trolleyX: b.x,
+          hoistY: travelHoistM(b),
+          motion: [],
+          plan: [],
+        }
+        yard.perAsc[id] = { jobs: 0, gantryM: 0, trolleyM: 0, hoistM: 0, padWaitS: 0 }
+        if (count > 1) {
+          Object.assign(yard.perAsc[id], { railWaitS: 0, busyS: 0, yields: 0 })
+          // a parked crane holds the rail segments around it until its first trip
+          for (const zone of railSegmentIds(b, z, z))
+            state.reservations.push({ id: state.nextReservationId++, zone, holder: id, from: 0, to: PARK_UNTIL_S })
+        }
       }
-      yard.perAsc[id] = { jobs: 0, gantryM: 0, trolleyM: 0, hoistM: 0, padWaitS: 0 }
     }
     state.kpis.yard = yard
     state.kpis.horizontal = horizontal

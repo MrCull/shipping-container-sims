@@ -9,7 +9,7 @@
  * SceneModel timelines.
  */
 import * as THREE from 'three'
-import { BAY_PITCH_M as YARD_BAY_PITCH_M, ROW_PITCH_M as YARD_ROW_PITCH_M, rowX, travelHoistM } from '../engine'
+import { ascIndexOf, BAY_PITCH_M as YARD_BAY_PITCH_M, ROW_PITCH_M as YARD_ROW_PITCH_M, rowX, travelHoistM } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 import { ContainerInstancer } from './containerInstancer'
@@ -38,6 +38,8 @@ export interface OverlayState {
   laneGraph: boolean
   /** Conflict zones reserved at the displayed time, highlighted. */
   reservations: boolean
+  /** ASC rail segments reserved (or held by a parked ASC) at the displayed time, coloured by ASC. */
+  ascRail: boolean
 }
 
 export interface SceneStats {
@@ -47,13 +49,15 @@ export interface SceneStats {
   sts: number
   /** SHC objects in the scene. */
   shcs: number
-  /** ASC objects in the scene (one per yard block). */
+  /** ASC objects in the scene (one or two per yard block). */
   ascs: number
   /** Vessel hulls currently visible. */
   vessels: number
   overlays: OverlayState
   /** Reserved zones highlighted (0 when the reservations overlay is off). */
   reservedZones: number
+  /** Rail segments highlighted (0 when the ASC rail overlay is off). */
+  reservedRailSegments: number
   /** Container instances per LOD (placeholders count as LOD1). */
   containerLods: { lod0: number; lod1: number }
   /** 'placeholder' until the container GLBs have loaded. */
@@ -88,8 +92,11 @@ export class SceneRenderer {
   private ascs = new Map<string, { group: THREE.Group; trolley: THREE.Mesh; spreader: THREE.Mesh; ropes: THREE.Mesh; blockX: number; height: number }>()
   private laneOverlay: THREE.Group
   private zoneMeshes = new Map<string, THREE.Mesh>()
-  private overlays: OverlayState = { laneGraph: false, reservations: false }
+  private railMeshes = new Map<string, THREE.Mesh>()
+  private railMaterials: THREE.MeshBasicMaterial[] = []
+  private overlays: OverlayState = { laneGraph: false, reservations: false, ascRail: false }
   private reservedZones = 0
+  private reservedRailSegments = 0
   private readonly matrix = new THREE.Matrix4()
   private selection: THREE.LineSegments
   private disposables: { dispose(): void }[] = []
@@ -107,6 +114,7 @@ export class SceneRenderer {
     for (const id of model.ascIds) this.addAsc(id)
     this.laneOverlay = this.buildLaneOverlay()
     this.buildZoneMeshes()
+    this.buildRailMeshes()
 
     const capacity: Partial<Record<string, number>> = {}
     for (const id of model.containerIds) capacity[model.containerSize[id]] = (capacity[model.containerSize[id]] ?? 0) + 1
@@ -483,6 +491,25 @@ export class SceneRenderer {
     }
   }
 
+  /** One translucent strip per ASC rail segment, shown while a crane holds it (colour per crane). */
+  private buildRailMeshes(): void {
+    this.railMaterials = ['#38bdf8', '#fb7185'].map((color) =>
+      this.track(new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, depthWrite: false })),
+    )
+    for (const b of this.model.blockList) {
+      for (const seg of this.model.railSegments(b.id)) {
+        const m = new THREE.Mesh(this.track(new THREE.PlaneGeometry(ASC.span, seg.z1 - seg.z0)), this.railMaterials[0])
+        m.rotation.x = -Math.PI / 2
+        m.position.set(b.x, 0.35, (seg.z0 + seg.z1) / 2)
+        m.renderOrder = 4
+        m.visible = false
+        m.name = seg.zone
+        this.scene.add(m)
+        this.railMeshes.set(seg.zone, m)
+      }
+    }
+  }
+
   setOverlays(next: OverlayState): void {
     this.overlays = { ...next }
     this.laneOverlay.visible = next.laneGraph
@@ -528,6 +555,17 @@ export class SceneRenderer {
     for (const [zone, mesh] of this.zoneMeshes) {
       mesh.visible = zone in active
       if (mesh.visible) this.reservedZones++
+    }
+
+    this.reservedRailSegments = 0
+    const holders = this.overlays.ascRail ? model.activeReservations(t) : {}
+    for (const [zone, mesh] of this.railMeshes) {
+      const holder = holders[zone]
+      mesh.visible = holder !== undefined
+      if (mesh.visible) {
+        this.reservedRailSegments++
+        mesh.material = this.railMaterials[ascIndexOf(holder) === 1 ? 0 : 1]
+      }
     }
 
     const containers = this.containers
@@ -595,6 +633,7 @@ export class SceneRenderer {
       vessels,
       overlays: { ...this.overlays },
       reservedZones: this.reservedZones,
+      reservedRailSegments: this.reservedRailSegments,
       containerLods: { lod0: c.lod0, lod1: c.lod1 },
       containerAssets: c.assets,
     }

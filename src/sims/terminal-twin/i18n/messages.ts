@@ -29,6 +29,8 @@ const en = {
   'overlays.laneGraphHint': 'Show the one-way SHC lane graph',
   'overlays.reservations': 'Reservations',
   'overlays.reservationsHint': 'Highlight conflict zones reserved at the displayed time',
+  'overlays.ascRail': 'ASC rail',
+  'overlays.ascRailHint': 'Show the rail segments each ASC has reserved or is parked on (waterside ASC blue, landside ASC red)',
 
   // Top bar
   'topbar.elapsed': 'Elapsed {elapsed}',
@@ -99,7 +101,12 @@ const en = {
   'setup.yard.tiers': 'Tiers',
   'setup.yard.wtpPads': 'WTP pads',
   'setup.yard.stalls': 'Transfer stalls',
-  'setup.yard.rowsNote': 'Each block has 8 rows (the 25.4 m ASC span); one ASC per block.',
+  'setup.yard.rowsNote': 'Each block has 8 rows (the 25.4 m ASC span).',
+  'setup.yard.ascs': 'ASCs per block',
+  'setup.yard.ascsOne': '1 ASC',
+  'setup.yard.ascsTwo': '2 ASCs',
+  'setup.yard.twinNote':
+    'Two ASCs share the block rails and never pass each other. The waterside ASC prefers WTP work; the ascDispatch decision point can override.',
   'setup.yard.gantrySpeed': 'ASC gantry speed ({unit})',
   'setup.yard.trolleySpeed': 'ASC trolley speed ({unit})',
   'setup.yard.hoistSpeed': 'ASC hoist speed, loaded ({unit})',

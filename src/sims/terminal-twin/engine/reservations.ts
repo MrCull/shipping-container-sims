@@ -30,8 +30,13 @@ const overlaps = (a0: number, a1: number, b0: number, b1: number) => a0 < b1 - 1
 
 /** Earliest start ≥ `now` at which none of the plan's windows overlap an existing reservation. */
 export function earliestStart(state: SimState, windows: WindowSpec[], now: number): number {
+  return earliestStartAmong(state.reservations, windows, now)
+}
+
+/** `earliestStart` against an explicit reservation list (e.g. without the planner's own holds). */
+export function earliestStartAmong(list: readonly Reservation[], windows: WindowSpec[], now: number): number {
   const byZone = new Map<string, { from: number; to: number }[]>()
-  for (const r of state.reservations) {
+  for (const r of list) {
     if (r.to <= now) continue
     const list = byZone.get(r.zone) ?? []
     list.push(r)

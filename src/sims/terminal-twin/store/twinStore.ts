@@ -104,7 +104,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const selectedId = ref<string | null>(null)
   const recentEvents = shallowRef<EventSummary[]>(markRaw([]))
   /** 3D debug overlays (lane graph, active reservations). */
-  const overlays = ref<OverlayState>({ laneGraph: false, reservations: false })
+  const overlays = ref<OverlayState>({ laneGraph: false, reservations: false, ascRail: false })
   /** Locale + units: browser defaults on first open, then the remembered choice. Display only. */
   const display = ref<DisplaySettings>(loadDisplaySettings(browserStorage(), browserLanguages()))
   /** Formatter for the current display settings (Intl objects; rebuilt when they change). */

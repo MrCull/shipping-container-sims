@@ -168,6 +168,22 @@ export interface EventPayloads {
     yardSlotId: string
     departAt: number
     reservations: Reservation[]
+    /** Twin-ASC blocks: seconds the departure waits for the other ASC's rail segments. */
+    railWaitS?: number
+  }
+  /**
+   * Twin-ASC blocks: the ASC steps aside along the rail so the other ASC can
+   * do its job. It heads for `toZ` at `departAt` and is ready again (AscReady)
+   * when it gets there.
+   */
+  AscYieldAssigned: {
+    ascId: string
+    blockId: string
+    /** The ASC that needs the room. */
+    forAscId: string
+    toZ: number
+    departAt: number
+    reservations: Reservation[]
   }
   /** Spreader up, gantry and trolley heading for the WTP pad. */
   AscRoutingToPad: AscPhasePayload

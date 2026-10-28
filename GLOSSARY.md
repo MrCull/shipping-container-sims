@@ -90,8 +90,12 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Claim (slot claim):** a slot is claimed when allocation answers and stacked later. Stacks fill in claim order: an ASC does not stack a box before an older claim in the same stack.
 - **ASC job:** one box to move from a WTP pad to its slot. It is **ready** once its slot is allocated and its SHC has released the box and cleared the pad.
 - **Lifting envelope (of a WTP pad):** the space over the pad where an ASC spreader is below travel height. An ASC never enters it while an SHC is on the pad (the pad zone's **handover**).
+- **Twin-ASC block:** a block with two ASCs on one rail (`ascsPerBlock: 2`): the **waterside ASC** (`<block>-ASC1`) and the **landside ASC** (`<block>-ASC2`). The engine default is 1; the setup dialog defaults to 2.
+- **Rail segment:** a half-bay slice of a block's ASC rail (zone `<block>:R<k>`). A crane's footprint is its position plus half the **minimum separation** (12 m between centres: 8 m portal + 4 m safe gap) either side; it holds the segments the footprint touches.
+- **Park hold:** the open-ended reservation of the segments around an ASC that stands still. It ends when the crane's next trip starts. A trip that conflicts with the other ASC's trip waits (**rail wait**); one that conflicts with its parked position makes it **step aside** (yield) if idle, or cannot start until it is idle.
+- **ASC dispatch:** the decision point (`ascDispatch`) that picks which idle ASC of a twin block takes the oldest ready box. Built-in strategies: `waterside-first` (default: WTP work to the waterside ASC, transfer-stall work to the landside ASC, the other crane only when no step-aside is needed) and `balanced` (fewest jobs so far).
 - **Subsystem mode:** how a subsystem runs: **real**, **instant** (a stub that raises the same events with zero durations) or **off**.
-- **Overlay (3D debug overlay):** an optional drawing over the 3D view: lane graph, active reservations.
+- **Overlay (3D debug overlay):** an optional drawing over the 3D view: lane graph, active reservations, **ASC rail** (reserved and parked rail segments, waterside ASC blue and landside ASC red).
 - **Display settings:** the UI's **locale** (Intl formatting of dates, times, numbers, first day of week) and **unit system** (metric: m, km/h, t; imperial: ft, mi/h, US tons). Display only: the engine and saved configs are always SI. Imperial speed is written **mi/h** because **mph** would read as crane moves per hour.
 - **Message catalogue:** `i18n/messages.ts`, the single home of every user-visible UI string (English only for now), looked up with `t(key)`.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.
