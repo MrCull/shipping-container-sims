@@ -234,6 +234,8 @@ export interface ScenarioConfig {
    * are display-only: every value in this config stays SI whatever is chosen.
    */
   display?: DisplaySettings
+  /** Work packages (TT-10); optional. */
+  workPackages?: { releaseAhead?: number }
   /** KPI bucket clock (optional; defaults come from `startDateTime`, see `engine/kpi/clock.ts`). */
   kpi?: KpiClockConfig
 }

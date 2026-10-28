@@ -22,6 +22,11 @@ import type { ContainerSize } from '../../scenario/types'
 export interface GroundPositionRequest {
   stsId: string
   containerId: string
+  /**
+   * 'load' (TT-10): the box is an export box on its way to the crane (an ASC fetched it,
+   * an SHC will deliver it); absent = a discharged box the crane is holding.
+   */
+  direction?: 'load'
   /** The crane's ground positions in lane order, with current occupancy. */
   groundPositions: { id: string; lane: number; occupiedBy: string | null }[]
 }
@@ -41,9 +46,13 @@ export interface ShcDispatchJob {
   stsId: string
   /** Sim time the box was grounded. */
   readyAt: number
-  /** Where the box is (m). */
+  /** Where the box is (m); for a load job, the WTP pad it stands on. */
   x: number
   z: number
+  /** 'load' (TT-10): an export box on a WTP pad, to be carried to `groundPositionId`; absent = a discharged box to be carried to a pad. */
+  kind?: 'load'
+  /** Load jobs: the pad the box stands on (the reply's `wtpPadId` is ignored for them). */
+  padId?: string
   /** Lane-graph route length from the SHC to the box (m). */
   distanceM: number
 }
@@ -131,7 +140,8 @@ export interface AscDispatchRequest {
   job: {
     jobId: string
     containerId: string
-    kind: 'wtp' | 'transfer'
+    /** wtp: stack a box from a pad; transfer: truck handover (TT-13); retrieve: export box from the stack to a pad (TT-10; `yardSlotId` is its source, `wtpPadId` its destination). */
+    kind: 'wtp' | 'transfer' | 'retrieve'
     wtpPadId: string
     yardSlotId: string
     /** Gantry Z of the pad and of the slot (m). */
@@ -199,6 +209,37 @@ export interface CraneSplitReply {
   assignments: { stsId: string; bays: number[] }[]
 }
 
+// ── workPackageRelease ─────────────────────────────────────────────────────
+
+/** One of a crane's work packages as the release decision sees it. */
+export interface WorkPackageInfo {
+  packageId: string
+  kind: 'discharge' | 'load'
+  section: 'deck' | 'hold'
+  bay: number
+  moves: number
+  status: 'planned' | 'released' | 'active' | 'complete'
+}
+
+/**
+ * Which of a crane's packages to release next. Asked when the crane is assigned
+ * to a vessel and whenever a package starts or completes. The default strategy
+ * keeps `k` packages released ahead of the one being worked.
+ */
+export interface WorkPackageReleaseRequest {
+  stsId: string
+  vesselId: string
+  /** Packages to keep released ahead of the active one (`config.workPackages.releaseAhead`, default 2). */
+  k: number
+  /** All the crane's packages in work order (planned, released, active and complete). */
+  packages: WorkPackageInfo[]
+}
+
+export interface WorkPackageReleaseReply {
+  /** Packages to release now (planned ones of this crane). Must release something while the crane has no released package left. */
+  packageIds: string[]
+}
+
 // ── catalogue ──────────────────────────────────────────────────────────────
 
 export interface DecisionRequests {
@@ -208,6 +249,7 @@ export interface DecisionRequests {
   ascDispatch: AscDispatchRequest
   berthAllocation: BerthAllocationRequest
   craneSplit: CraneSplitRequest
+  workPackageRelease: WorkPackageReleaseRequest
 }
 
 export interface DecisionReplies {
@@ -217,6 +259,7 @@ export interface DecisionReplies {
   ascDispatch: AscDispatchReply
   berthAllocation: BerthAllocationReply
   craneSplit: CraneSplitReply
+  workPackageRelease: WorkPackageReleaseReply
 }
 
 export type DecisionPointId = keyof DecisionRequests
@@ -229,6 +272,7 @@ export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   ascDispatch: 1,
   berthAllocation: 1,
   craneSplit: 1,
+  workPackageRelease: 1,
 }
 
 export const DECISION_POINT_IDS = Object.keys(DECISION_CONTRACT_VERSIONS) as DecisionPointId[]

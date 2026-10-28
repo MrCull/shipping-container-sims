@@ -42,7 +42,15 @@ export interface PlannedContainer {
   full: boolean
   line: string
   vesselId: string
+  /** The discharge box's slot on board, or the load box's booked (empty) load slot. */
   slotId: string
+  /** discharge: starts on the vessel; load: an export box starting in the yard (TT-10). */
+  flow: 'discharge' | 'load'
+}
+
+/** True when export boxes exist: the load flow needs yard blocks and SHCs to carry them. */
+export function loadFlowEnabled(config: ScenarioConfig): boolean {
+  return (config.yard?.blocks.length ?? 0) > 0 && (config.shcs?.length ?? 0) > 0
 }
 
 export interface CargoPlan {
@@ -117,6 +125,7 @@ function planVessel(
   rng: Rng,
   serials: Map<string, number>,
   plan: CargoPlan,
+  loadRng: Rng,
 ): void {
   const spec = vesselClass(v.sizeClass)
   const tiers = spec.holdTiers + spec.deckTiers
@@ -139,7 +148,8 @@ function planVessel(
     const j = Math.floor(rng() * (i + 1))
     ;[units[i], units[j]] = [units[j], units[i]]
   }
-  const reserved = v.load + v.transshipment
+  const withLoad = loadFlowEnabled(config)
+  const reserved = (withLoad ? 0 : v.load) + v.transshipment
   const capacity = cellCapacity(spec)
   if (units.length + reserved > capacity)
     throw new Error(
@@ -191,9 +201,59 @@ function planVessel(
       const serial = (serials.get(prefix) ?? 100000 + Math.floor(rng() * 400000)) + 1 + Math.floor(rng() * 5)
       if (serial > 999999) throw new Error(`Owner prefix ${prefix} ran out of serial numbers`)
       serials.set(prefix, serial)
-      plan.containers.push({ id: makeIso6346Id(prefix, serial), ...box, vesselId: v.id, slotId })
+      plan.containers.push({ id: makeIso6346Id(prefix, serial), ...box, vesselId: v.id, slotId, flow: 'discharge' })
     })
   })
+
+  // 2b. Export boxes (load flow): each goes to a slot whose stack held no discharge box, filled bottom-up,
+  // so the slot below is always loaded first and nothing is left floating once the discharge is out.
+  if (withLoad && v.load > 0) {
+    const stackHasDischarge = (bay: number, row: number, deck: boolean): boolean => {
+      for (let tier = deck ? spec.holdTiers : 0; tier < (deck ? tiers : spec.holdTiers); tier++)
+        if (occupied.has(`${bay}:${row}:${tier}`)) return true
+      return false
+    }
+    const loadTwenties: Unit['boxes'] = []
+    const loadUnits: Unit[] = []
+    for (let i = 0; i < v.load; i++) {
+      const box = { size: pickWeighted(v.sizeMix ?? cargo.sizeMix, loadRng), full: true, line: pickWeighted(cargo.lines, loadRng) }
+      if (box.size === '20') loadTwenties.push(box)
+      else loadUnits.push({ boxes: [box] })
+    }
+    for (let i = 0; i < loadTwenties.length; i += 2) loadUnits.push({ boxes: loadTwenties.slice(i, i + 2) })
+    for (let i = loadUnits.length - 1; i > 0; i--) {
+      const j = Math.floor(loadRng() * (i + 1))
+      ;[loadUnits[i], loadUnits[j]] = [loadUnits[j], loadUnits[i]]
+    }
+    const clean: { row: number; tier: number }[][] = []
+    for (let bay = 0; bay < spec.bays; bay++) {
+      const list: { row: number; tier: number }[] = []
+      for (const deck of [false, true])
+        for (let tier = deck ? spec.holdTiers : 0; tier < (deck ? tiers : spec.holdTiers); tier++)
+          for (let row = 0; row < spec.rows; row++) if (!stackHasDischarge(bay, row, deck)) list.push({ row, tier })
+      clean.push(list)
+    }
+    const room = clean.reduce((n, l) => n + l.length, 0)
+    if (loadUnits.length > room)
+      throw new Error(`Vessel ${v.id} (${spec.label}): ${loadUnits.length} export cells do not fit beside the discharge boxes (room for ${room})`)
+    let b = 0
+    for (const unit of loadUnits) {
+      while (clean[b].length === 0) b = (b + 1) % spec.bays
+      const cell = clean[b].shift() as { row: number; tier: number }
+      occupied.add(`${b}:${cell.row}:${cell.tier}`)
+      unit.boxes.forEach((box, k) => {
+        const half: CellHalf = box.size === '20' ? (k === 0 ? 'aft' : 'fore') : null
+        const slotId = addSlot(b, cell.row, cell.tier, half, 'load')
+        const prefix = LINE_OWNER_PREFIX[box.line]
+        if (!prefix) throw new Error(`Unknown shipping line ${box.line} (no owner prefix)`)
+        const serial = (serials.get(prefix) ?? 100000 + Math.floor(loadRng() * 400000)) + 1 + Math.floor(loadRng() * 5)
+        if (serial > 999999) throw new Error(`Owner prefix ${prefix} ran out of serial numbers`)
+        serials.set(prefix, serial)
+        plan.containers.push({ id: makeIso6346Id(prefix, serial), ...box, vesselId: v.id, slotId, flow: 'load' })
+      })
+      b = (b + 1) % spec.bays
+    }
+  }
 
   // 3. Reserved load / transshipment slots: free cells, round-robin over bays, hold first.
   const freeByBay: { row: number; tier: number }[][] = []
@@ -204,7 +264,7 @@ function planVessel(
     freeByBay.push(free)
   }
   const purposes: SlotPurpose[] = [
-    ...Array.from({ length: v.load }, () => 'load' as const),
+    ...Array.from({ length: withLoad ? 0 : v.load }, () => 'load' as const),
     ...Array.from({ length: v.transshipment }, () => 'transshipment' as const),
   ]
   let bay = 0
@@ -219,8 +279,9 @@ function planVessel(
 /** Generate every vessel's bay plan and discharge boxes (vessel table order). */
 export function planCargo(config: ScenarioConfig, seed: number): CargoPlan {
   const rng = makeRng(seed)
+  const loadRng = makeRng(seed ^ 0x51ed270b)
   const serials = new Map<string, number>()
   const plan: CargoPlan = { slots: [], containers: [] }
-  for (const v of config.vessels) planVessel(config, v, rng, serials, plan)
+  for (const v of config.vessels) planVessel(config, v, rng, serials, plan, loadRng)
   return plan
 }

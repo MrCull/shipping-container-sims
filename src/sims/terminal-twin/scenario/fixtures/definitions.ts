@@ -121,6 +121,42 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .endWhen({ simDurationS: 4800 })
       .build(),
 
+  /**
+   * TT-10 load fixture: the export flow from stack to vessel. One STS loads 10
+   * export boxes (20 and 40 ft) booked to a feeder, all standing in block B01:
+   * stack → ASC → WTP pad → SHC → ground position → STS → vessel slot.
+   */
+  'load-1sts-10-boxes-1block': () =>
+    new ScenarioBuilder('load-1sts-10-boxes-1block', '1 STS loads 10 export boxes from 1 block: stack → ASC → WTP pad → SHC → STS → vessel')
+      .seed(42)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Load Star', sizeClass: 'feeder', discharge: 0, load: 10, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 8, tiers: 3 })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /**
+   * TT-10 mixed fixture: one vessel call discharges 8 boxes and then loads 8
+   * export boxes with the same crane (discharge packages first, then load
+   * packages); the vessel departs when both are done.
+   */
+  'mixed-discharge-then-load': () =>
+    new ScenarioBuilder('mixed-discharge-then-load', '1 STS discharges 8 boxes, then loads 8 export boxes, and the vessel departs')
+      .seed(7)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Mixed Star', sizeClass: 'feeder', discharge: 8, load: 8, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3 })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
   /** Livery smoke test (TT-22): 12 boxes over all ten lines (equal weights) and all three sizes. */
   'liveries-mixed': () =>
     new ScenarioBuilder('liveries-mixed', '1 STS discharges 12 boxes of mixed lines and sizes')

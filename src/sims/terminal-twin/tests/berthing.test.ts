@@ -7,7 +7,7 @@ import { VESSEL_CLASSES } from '../scenario/vesselClasses'
 const twoVessels = fixtures['two-vessels-compete-for-berth']
 
 function eventsOf(log: readonly EngineEvent[], vesselId: string): EngineEvent[] {
-  return log.filter((e) => e.subjects.vessels?.includes(vesselId) && !e.type.startsWith('Decision') && !e.type.startsWith('Sts'))
+  return log.filter((e) => e.subjects.vessels?.includes(vesselId) && !e.type.startsWith('Decision') && !e.type.startsWith('Sts') && !e.type.startsWith('WorkPackage'))
 }
 
 describe('berthing on a continuous quay', () => {

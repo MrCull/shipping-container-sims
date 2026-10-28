@@ -15,7 +15,8 @@ import type { EngineContext, ReactorMap } from '../context'
 import type { BerthAllocationRequest, CraneSplitReply, CraneSplitRequest } from '../decisions/types'
 import type { VesselState } from '../state'
 import { slotX, vesselClass } from '../../scenario/vesselClasses'
-import { continueWork, wakeQuayRail, workOrder } from './quay'
+import { continueWork, wakeQuayRail } from './quay'
+import { askRelease, createPackages, loadActive } from './workPackages'
 import { railOrder } from './rail'
 
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
@@ -66,12 +67,16 @@ function validateBerth(ctx: EngineContext, vessel: VesselState, berthX: number):
   }
 }
 
-/** Bays of a vessel that still hold discharge boxes, with their gantry X and moves. */
+/** Bays of a vessel with discharge boxes on board or export boxes to load, with their gantry X and moves. */
 function workBays(ctx: EngineContext, vessel: VesselState): CraneSplitRequest['bays'] {
   const spec = vesselClass(vessel.sizeClass)
   const moves = new Map<number, number>()
   for (const s of Object.values(ctx.state.vesselSlots))
-    if (s.vesselId === vessel.id && s.containerId !== null && s.purpose === 'discharge')
+    if (
+      s.vesselId === vessel.id &&
+      ((s.containerId !== null && s.purpose === 'discharge') ||
+        (loadActive(ctx.state) && s.purpose === 'load' && s.plannedContainerId && s.containerId === null))
+    )
       moves.set(s.bay, (moves.get(s.bay) ?? 0) + 1)
   return [...moves.entries()]
     .sort((a, b) => a[0] - b[0])
@@ -197,7 +202,8 @@ export const berthReactors: ReactorMap = {
           const sts = state.sts[x.stsId]
           sts.vesselId = vessel.id
           sts.bays = [...x.bays]
-          sts.workQueue = workOrder(state, vessel.id, x.bays)
+          sts.workQueue = []
+          createPackages(ctx, sts, vessel.id, x.bays)
           vessel.stsIds.push(sts.id)
           vessel.stsHistory.push(sts.id)
           if (sts.status === 'waiting-for-rail') {
@@ -205,6 +211,7 @@ export const berthReactors: ReactorMap = {
             sts.status = 'idle'
             sts.railTargetX = null
           }
+          askRelease(ctx, sts)
           if (sts.status === 'idle') continueWork(ctx, sts, e.t)
           // a repositioning crane starts its work at StsRepositionCompleted
         }
@@ -225,7 +232,7 @@ export const berthReactors: ReactorMap = {
     const vessel = ctx.state.vessels[e.payload.vesselId]
     vessel.status = 'berthed'
     vessel.berthedAt = e.t
-    if (vessel.remainingDischarge === 0) {
+    if (vessel.remainingDischarge === 0 && (vessel.remainingLoad === 0 || !loadActive(ctx.state))) {
       ctx.schedule('VesselWorkComplete', e.t, { vessels: [vessel.id] }, { vesselId: vessel.id })
       return
     }
@@ -241,7 +248,7 @@ export const berthReactors: ReactorMap = {
     sts.status = 'idle'
     const vessel = state.vessels[e.payload.vesselId]
     vessel.stsIds = vessel.stsIds.filter((id) => id !== sts.id)
-    if (vessel.stsIds.length === 0 && vessel.remainingDischarge === 0 && vessel.status === 'berthed') {
+    if (vessel.stsIds.length === 0 && vessel.remainingDischarge === 0 && (vessel.remainingLoad === 0 || !loadActive(state)) && vessel.status === 'berthed') {
       ctx.schedule('VesselWorkComplete', e.t, { vessels: [vessel.id] }, { vesselId: vessel.id })
     }
     trySplit(ctx)

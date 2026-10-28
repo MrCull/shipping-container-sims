@@ -32,6 +32,7 @@ import {
   type Reservation,
 } from '../engine'
 import { planCargo } from '../scenario/bayPlan'
+import { planExportYard } from '../scenario/exportYard'
 import type { ContainerSize, ScenarioConfig, VesselConfig } from '../scenario/types'
 import {
   parseVesselSlotId,
@@ -216,7 +217,13 @@ export class SceneModel {
       this.initialShc[shc.id] = { x: n.x, z: n.z }
       this.status[`shc:${shc.id}`] = [{ t: 0, status: 'parked' }]
     }
-    for (const c of cargo.containers) this.custody[c.id] = [{ t: 0, owner: { kind: 'vesselSlot', id: c.slotId } }]
+    // export boxes start in the stacks (TT-10); discharge boxes on board
+    const exportSlot = new Map(planExportYard(config, cargo).map((p) => [p.containerId, p.slotId]))
+    for (const c of cargo.containers) {
+      const owner: CustodyRef =
+        c.flow === 'load' ? { kind: 'yardSlot', id: exportSlot.get(c.id) as string } : { kind: 'vesselSlot', id: c.slotId }
+      this.custody[c.id] = [{ t: 0, owner }]
+    }
     for (const v of config.vessels) this.status[`vessel:${v.id}`] = [{ t: 0, status: 'scheduled' }]
     for (const s of config.sts) this.status[`sts:${s.id}`] = [{ t: 0, status: 'idle' }]
   }

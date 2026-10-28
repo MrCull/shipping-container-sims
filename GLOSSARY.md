@@ -41,7 +41,13 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Deck before hold:** within a bay, an STS discharges the deck stacks (top tier first) before the hold.
 - **Move:** one productive container transfer by an STS (a discharge or a load). This is the unit of moves per hour.
 - **Cycle:** one complete loop of a crane: start, pick, carry, ground, return.
-- **Work package:** one STS's moves for one bay section (deck or hold, discharge or load). Its release is a decision point.
+- **Work package:** one STS's moves for one bay section (deck or hold, discharge or load) of one vessel. A package is `planned`, then `released` by the `workPackageRelease` decision point, `active` while its crane works it, then `complete`. A crane works its packages in sequence: discharge packages first, then load packages.
+- **Release ahead (K):** how many packages the default release strategy keeps released behind the one the crane is working (default 2). The **release lead time** is the time from a package's release to the start of its work.
+- **Export box:** a box booked to a vessel for loading. It starts in the yard (pre-filled from the bay plan) and is loaded into its **load slot**, the empty slot the bay plan booked for it.
+- **Load flow:** the reverse of discharge: stack → ASC → WTP pad → SHC → STS ground position → STS → vessel slot. The ASC step is a **retrieval**.
+- **Load order:** the yard work of one export box from its package's release to its ground position (claim a ground position, retrieve, carry). A crane **stages** at most as many boxes as it has ground positions, in load sequence.
+- **Load sequence:** the order a crane loads a vessel: bay by bay, hold before deck, bottom tier before upper tier, then row, aft half before fore half.
+- **Stowage order:** a box is never loaded into a slot whose lower tier (in the same stack) is still empty. Checked by the invariant `stowage.order`.
 - **Rehandle:** a non-productive ASC move needed to reach a buried box.
 - **Job (SHC job):** one box to move from an STS ground position to a WTP pad. Grounding a box **releases** a job into the **released pool**; a job is **open** until an SHC **claims** it.
 - **Pull dispatch:** free equipment asks the dispatch decision point (`shcDispatch`) for its next job from the released pool, rather than jobs being pushed to equipment.
@@ -137,6 +143,6 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **KPI group:** a set of KPI charts shown together: Quay, Horizontal transport, Yard, Landside (when it has data) or TOS handlers.
 - **Bucketing:** whether the dashboard charts show one point per clock hour or per 8-hour shift (the same series the collector builds).
 - **Yard heatmap:** yard fill % per block (rows) per hour (columns), plus each block's fill now.
-- **Gantt timeline:** one row per vessel (anchorage, mooring, berthed and working, unmooring) and one per crane **work package**, built from the event log by `buildTimeline`.
-- **Work package:** one crane-split assignment: a crane takes a range of bays of a vessel from the split decision until `StsWorkComplete`.
+- **Gantt timeline:** one row per vessel (anchorage, mooring, berthed and working, unmooring) and one per crane **assignment** (and one per **work package**), built from the event log by `buildTimeline`.
+- **Crane assignment:** a crane takes a range of bays of a vessel from the split decision until `StsWorkComplete` (the dashboard's Gantt row per crane). *Avoid:* "work package" (that is the release unit above).
 - **Data palette:** the colour-blind-safe categorical steps of the dashboard; every slot also has a marker symbol and a dash style, so state is never shown by colour alone.

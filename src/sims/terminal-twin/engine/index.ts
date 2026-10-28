@@ -80,6 +80,9 @@ export type {
   ShcDispatchPad,
   ShcDispatchReply,
   ShcDispatchRequest,
+  WorkPackageInfo,
+  WorkPackageReleaseReply,
+  WorkPackageReleaseRequest,
   YardAllocationReply,
   YardAllocationRequest,
 } from './decisions/types'
@@ -89,7 +92,8 @@ export type { DecisionRequestedPayload, DecisionResolvedPayload } from './events
 export type { HandlerKpiReport } from './kpis'
 export type { SimQuery } from './query'
 export type { InvariantViolation } from './invariants'
-export type { KpiReport, HorizontalKpiReport } from './kpis'
+export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport } from './kpis'
+export type { WorkPackage, WorkPackageKind, WorkPackageStatus, LoadOrder } from './state'
 export {
   createSimulation,
   restoreSimulation,
@@ -123,4 +127,4 @@ export type { HeadlineKpis, Highlight } from './kpi/headline'
 export { exportRun, kpiReportJson, kpiReportCsv, eventLogJson, eventLogCsv, EXPORT_FILES, KPI_REPORT_FORMAT } from './export'
 export type { ExportKind } from './export'
 export { buildTimeline } from './kpi/timeline'
-export type { TimelineReport, VesselTimelineRow, TimelinePackage, TimelineWindow } from './kpi/timeline'
+export type { TimelineReport, VesselTimelineRow, TimelinePackage, TimelineWorkPackage, TimelineWindow } from './kpi/timeline'
