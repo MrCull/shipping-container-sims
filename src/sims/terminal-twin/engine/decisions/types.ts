@@ -14,7 +14,7 @@
  * subsystem that asks (see the agent guide).
  */
 import type { SimQuery } from '../query'
-import type { YardStacks } from '../yardLayout'
+import type { YardCandidate, YardStacks } from '../yardLayout'
 import type { ContainerSize } from '../../scenario/types'
 
 // ── stsGroundPosition ──────────────────────────────────────────────────────
@@ -141,7 +141,7 @@ export interface AscDispatchRequest {
     jobId: string
     containerId: string
     /** wtp: stack a box from a pad; transfer: truck handover (TT-13); retrieve: export box from the stack to a pad (TT-10; `yardSlotId` is its source, `wtpPadId` its destination). */
-    kind: 'wtp' | 'transfer' | 'retrieve'
+    kind: 'wtp' | 'transfer' | 'retrieve' | 'rehandle'
     wtpPadId: string
     yardSlotId: string
     /** Gantry Z of the pad and of the slot (m). */
@@ -240,6 +240,50 @@ export interface WorkPackageReleaseReply {
   packageIds: string[]
 }
 
+// ── rehandleTarget ─────────────────────────────────────────────────────────
+
+/** A legal slot for a rehandled box, with what is already stacked there. */
+export interface RehandleCandidate extends YardCandidate {
+  /**
+   * Retrieval rank of the soonest-needed export box already in the stack (0 = the
+   * next box the block must retrieve), or null when no box there will be retrieved.
+   * A rehandled box placed here buries that box unless its own rank is lower.
+   */
+  soonestRank: number | null
+}
+
+/**
+ * An export retrieval is blocked: `containerId` stands on top of the box to retrieve.
+ * Where in the same block does it go? `candidates` are the legal slots (never the
+ * stack being dug out or the blocker's own stack); a 40 ft blocker needs two
+ * neighbouring stacks of equal height. Reply with one of them.
+ */
+export interface RehandleTargetRequest {
+  blockId: string
+  /** The rehandle's ASC job. */
+  jobId: string
+  /** The blocking box. */
+  containerId: string
+  size: ContainerSize
+  vesselId: string
+  /** Where the blocking box stands now. */
+  from: { slotId: string; bay: number; row: number; tier: number; x: number; z: number }
+  /** The export box being dug out. */
+  retrieval: { containerId: string; slotId: string; jobId: string }
+  /** Blockers still on the box to retrieve, this one included (top first). */
+  blockersLeft: number
+  /** Retrieval rank of the blocking box itself (0 = next, null = never retrieved from this yard). */
+  retrievalRank: number | null
+  candidates: RehandleCandidate[]
+  /** Uniform [0, 1) from the engine's seeded RNG. */
+  random: number
+}
+
+export interface RehandleTargetReply {
+  /** One of `candidates` (anchor cell `<block>:<bay>-<row>-<tier>`), or null when there is none (the retrieval then stays blocked). */
+  slotId: string | null
+}
+
 // ── catalogue ──────────────────────────────────────────────────────────────
 
 export interface DecisionRequests {
@@ -250,6 +294,7 @@ export interface DecisionRequests {
   berthAllocation: BerthAllocationRequest
   craneSplit: CraneSplitRequest
   workPackageRelease: WorkPackageReleaseRequest
+  rehandleTarget: RehandleTargetRequest
 }
 
 export interface DecisionReplies {
@@ -260,6 +305,7 @@ export interface DecisionReplies {
   berthAllocation: BerthAllocationReply
   craneSplit: CraneSplitReply
   workPackageRelease: WorkPackageReleaseReply
+  rehandleTarget: RehandleTargetReply
 }
 
 export type DecisionPointId = keyof DecisionRequests
@@ -273,6 +319,7 @@ export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   berthAllocation: 1,
   craneSplit: 1,
   workPackageRelease: 1,
+  rehandleTarget: 1,
 }
 
 export const DECISION_POINT_IDS = Object.keys(DECISION_CONTRACT_VERSIONS) as DecisionPointId[]

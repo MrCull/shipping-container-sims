@@ -192,12 +192,21 @@
       "boxesStacked": 10,
       "boxesInTransit": 0,
       "allocationFailures": 0,
+      "rehandles": {
+        "total": 0,
+        "productiveMoves": 10,
+        "perProductiveMove": 0,
+        "failures": 0
+      },
       "blocks": {
         "B01": {
           "boxes": 10,
           "cells": 20,
           "capacityCells": 800,
-          "maxHeight": 2
+          "maxHeight": 2,
+          "rehandles": 0,
+          "productiveMoves": 10,
+          "rehandlesPerProductiveMove": 0
         }
       },
       "ascs": {

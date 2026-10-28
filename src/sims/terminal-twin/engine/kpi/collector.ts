@@ -241,6 +241,13 @@ export const KPI_DEFS: KpiDef[] = [
     value: (w, id) => ratio(w.sum('asc.cycleS', id), w.sum('asc.cycles', id)),
   },
   {
+    id: 'yard.rehandles-per-move',
+    unit: 'ratio',
+    entityKind: 'block',
+    entities: blockIds,
+    value: (w, id) => ratio(w.sum('yard.rehandles', id), w.sum('yard.moves', id)),
+  },
+  {
     id: 'yard.fill-pct',
     unit: 'pct',
     entityKind: 'block',
@@ -556,6 +563,8 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         cells[block] = Math.max(0, (cells[block] ?? 0) - boxSpan(info.containerSize(e.payload.containerId)))
         acc.gauge('yard.cells', block, hourOf(e.t), cells[block])
       }
+      if (e.type === 'AscStacked' && e.payload.rehandle) acc.add('yard.rehandles', e.payload.blockId, hourOf(e.t), 1)
+      else if (e.type === 'AscStacked' || e.type === 'AscDroppedAtWtp') acc.add('yard.moves', e.payload.blockId, hourOf(e.t), 1)
       if (e.type === 'AscStacked') {
         const block = e.payload.blockId
         cells[block] = (cells[block] ?? 0) + boxSpan(info.containerSize(e.payload.containerId))

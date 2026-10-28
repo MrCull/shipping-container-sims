@@ -122,6 +122,15 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Highlights:** friendly facts in the final report: hardest-working crane, busiest block, longest wait.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.
 
+## Rehandles (TT-12)
+
+- **Buried box:** an export box with other boxes stacked on top of it, so it cannot be lifted.
+- **Blocker:** a box that has to move before a buried box can be retrieved (the boxes on it, and the boxes on those).
+- **Rehandle:** the extra ASC move that takes a blocker to another slot of the same block. It is not a productive move. *Avoid:* "reshuffle", "restow" (that is on board a vessel).
+- **Productive move:** an ASC move that stacks an arriving box or retrieves an export box for loading.
+- **Rehandle ratio:** rehandles per productive move, overall and per block (`rehandlesPerProductiveMove`).
+- **Rehandle target:** the slot the `rehandleTarget` decision picks for a blocker.
+
 ## 3D assets (phase 2)
 
 - **Asset:** one generated GLB (for example `container-40`) plus its **sidecar** `<asset>.meta.json`, made by the Python (bpy) **generators** in `assets/generators/` and committed. *Avoid:* "model file" for the pair.
