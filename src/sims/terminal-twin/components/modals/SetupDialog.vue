@@ -476,8 +476,7 @@ async function submit(): Promise<void> {
             <input
               v-model="endFields.vessels"
               type="number"
-              min="1"
-              step="1"
+              step="any"
               name="end-vessels"
               :placeholder="t('setup.end.vesselsPlaceholder')"
             >
@@ -487,7 +486,6 @@ async function submit(): Promise<void> {
             <input
               v-model="endFields.hours"
               type="number"
-              min="0"
               step="any"
               name="end-hours"
               :placeholder="t('setup.end.off')"
@@ -498,8 +496,7 @@ async function submit(): Promise<void> {
             <input
               v-model="endFields.moves"
               type="number"
-              min="1"
-              step="1"
+              step="any"
               name="end-moves"
               :placeholder="t('setup.end.off')"
             >

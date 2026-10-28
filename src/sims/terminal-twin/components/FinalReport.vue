@@ -81,6 +81,7 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
   <button
     v-if="store.runEnded && !store.reportOpen"
     class="reopen"
+    :class="{ shifted: store.inspectorOpen }"
     data-testid="tt-report-reopen"
     @click="store.reportOpen = true"
   >
@@ -89,6 +90,7 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
   <aside
     v-else-if="store.runEnded"
     class="report"
+    :class="{ shifted: store.inspectorOpen }"
     role="region"
     :aria-label="t('report.region')"
     data-testid="tt-final-report"
@@ -240,7 +242,7 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
 .report {
   position: absolute;
   top: 0.6rem;
-  right: 0.8rem;
+  right: 3.4rem;
   bottom: 0.8rem;
   z-index: 7;
   width: min(26rem, calc(100% - 1.6rem));
@@ -295,7 +297,7 @@ h3 {
 
 .reopen {
   position: absolute;
-  right: 0.8rem;
+  right: 3.4rem;
   top: 0.6rem;
   z-index: 7;
   padding: 0.35rem 0.8rem;
@@ -385,5 +387,12 @@ thead th {
 
 .export-btn {
   padding: 0.3rem 0.6rem;
+}
+</style>
+
+<style scoped>
+.report.shifted,
+.reopen.shifted {
+  right: 24rem;
 }
 </style>

@@ -96,7 +96,7 @@ async function submitRunTo(): Promise<void> {
       <button
         class="action-btn"
         data-testid="tt-topbar-step"
-        :disabled="store.busy"
+        :disabled="store.busy || ended"
         :title="t('debug.stepHint')"
         @click="store.step().catch(() => {})"
       >

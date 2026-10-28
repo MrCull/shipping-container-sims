@@ -102,6 +102,14 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Occupancy overlay:** plates over WTP pads and STS ground positions, free or occupied at the displayed time. The **labels overlay** floats each crane, carrier and vessel's status above it.
 - **Display settings:** the UI's **locale** (Intl formatting of dates, times, numbers, first day of week) and **unit system** (metric: m, km/h, t; imperial: ft, mi/h, US tons). Display only: the engine and saved configs are always SI. Imperial speed is written **mi/h** because **mph** would read as crane moves per hour.
 - **Message catalogue:** `i18n/messages.ts`, the single home of every user-visible UI string (English only for now), looked up with `t(key)`.
+- **KPI collector:** the engine fold (`engine/kpi/`) that turns the event log into every KPI as a time series. `Simulation.kpiSeries()`.
+- **KPI series:** one KPI for one entity (a crane, a block, the terminal) with an **hourly** value per hour bucket, a value per **shift** and a **total**.
+- **Hour bucket / shift bucket:** an hour cut on the scenario clock, and a run of 8 whole hours (3 per day; default 06-14, 14-22, 22-06). A night shift belongs to the day it starts.
+- **Gross / net moves per hour:** a crane's moves divided by the hours it was on a vessel (gross) or on a vessel and not waiting for an SHC or the rail (net).
+- **Headline KPIs:** the few numbers on the **KPI strip** and in the CLI summary.
+- **End condition:** a rule that ends the run: N vessels completed (default all scheduled), sim duration or total moves. The first one met wins.
+- **Final report:** the panel shown when a run ends: reason, **highlights**, headline KPIs, tables and export buttons. The scene stays inspectable; only Reset and New Scenario remain of the time controls.
+- **Highlights:** friendly facts in the final report: hardest-working crane, busiest block, longest wait.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.
 
 ## 3D assets (phase 2)
