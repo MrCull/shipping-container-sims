@@ -6,7 +6,9 @@ import { t } from '../../i18n/messages'
 import { browserDisplayDefaults } from '../../i18n/display'
 import { travelTime, type AxisProfile } from '../../engine'
 import { DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
-import type { ShcKinematics, UnitSystem } from '../../scenario/types'
+import { applyOverrides, LIMITS, validateOverrides, type OverrideCheck, type ScenarioOverrides } from '../../scenario/overrides'
+import type { ShcKinematics, UnitSystem, VesselConfig } from '../../scenario/types'
+import VesselTable from '../setup/VesselTable.vue'
 
 /** Spec scale limit for the SHC fleet. */
 const MAX_SHC = 120
@@ -49,20 +51,60 @@ const formError = ref<string | null>(null)
 
 const selected = computed(() => catalogue.find((c) => c.name === name.value))
 
-/** Key figures of the selected scenario, in the chosen units (the config itself stays SI). */
-const summary = computed(() => {
-  let config
+// Editable quay, cranes and vessel table, initialised from the chosen scenario.
+const quayLengthM = ref(0)
+const stsCount = ref(0)
+const vessels = ref<VesselConfig[]>([])
+
+function loadDraft(scenario: string, overrides: ScenarioOverrides = {}): void {
   try {
-    config = resolveScenario(name.value)
+    const config = applyOverrides(resolveScenario(scenario), overrides)
+    quayLengthM.value = config.quay.lengthM
+    stsCount.value = config.sts.length
+    vessels.value = JSON.parse(JSON.stringify(config.vessels))
   } catch {
-    return []
+    vessels.value = []
   }
+}
+loadDraft(name.value, store.choice.name === name.value ? store.choice.overrides : {})
+watch(name, (n) => loadDraft(n))
+
+const startDate = computed(() => fromLocalInputValue(start.value))
+const overrides = computed<ScenarioOverrides>(() => ({
+  quayLengthM: quayLengthM.value,
+  stsCount: stsCount.value,
+  vessels: vessels.value,
+}))
+/** The scenario as it would start (selected fixture/preset + the edits above). */
+const draftConfig = computed(() => {
+  try {
+    return applyOverrides(resolveScenario(name.value), overrides.value)
+  } catch {
+    return null
+  }
+})
+const check = computed<OverrideCheck>(() => {
+  try {
+    return validateOverrides(applyOverrides(resolveScenario(name.value), overrides.value))
+  } catch (err) {
+    return { errors: [{ key: 'setup.check.invalid', params: { message: err instanceof Error ? err.message : String(err) } }], warnings: [] }
+  }
+})
+
+/** Key figures of the scenario as edited, in the chosen units (the config itself stays SI). */
+const summary = computed(() => {
+  const config = draftConfig.value
+  if (!config) return []
   const fmt = store.fmt
   const sts = config.kinematics.sts
   return [
     { label: t('setup.summary.quay'), value: fmt.length(config.quay.lengthM), testid: 'quay' },
     { label: t('setup.summary.sts'), value: fmt.number(config.sts.length, 0), testid: 'sts' },
-    { label: t('setup.summary.containers'), value: fmt.number(config.containers.length, 0), testid: 'containers' },
+    {
+      label: t('setup.summary.containers'),
+      value: fmt.number(config.vessels.reduce((n, v) => n + v.discharge, 0), 0),
+      testid: 'containers',
+    },
     { label: t('setup.summary.gantry'), value: fmt.speed(sts.gantry.vMax), testid: 'gantry' },
     { label: t('setup.summary.trolley'), value: fmt.speed(sts.trolley.vMax), testid: 'trolley' },
     { label: t('setup.summary.hoist'), value: fmt.speed(sts.hoistLoaded.vMax), testid: 'hoist' },
@@ -135,13 +177,17 @@ function reroll(): void {
 }
 
 async function submit(): Promise<void> {
-  const startDate = fromLocalInputValue(start.value)
-  if (!startDate) {
+  const startAt = startDate.value
+  if (!startAt) {
     formError.value = t('setup.errorStart')
     return
   }
   if (!Number.isInteger(seed.value) || seed.value < 0) {
     formError.value = t('setup.errorSeed')
+    return
+  }
+  if (check.value.errors.length > 0) {
+    formError.value = t(check.value.errors[0].key, check.value.errors[0].params)
     return
   }
   if (scenarioShcs.value > 0 && (!Number.isInteger(shcCount.value) || shcCount.value < 1 || shcCount.value > MAX_SHC)) {
@@ -157,7 +203,8 @@ async function submit(): Promise<void> {
     .startScenario({
       name: name.value,
       seed: seed.value,
-      startDateTime: startDate.toISOString(),
+      startDateTime: startAt.toISOString(),
+      overrides: JSON.parse(JSON.stringify(overrides.value)),
       shc: scenarioShcs.value > 0 ? { count: shcCount.value, kinematics: copy(shcK.value) } : undefined,
     })
     .catch(() => {})
@@ -257,6 +304,59 @@ async function submit(): Promise<void> {
           >
         </label>
       </div>
+
+      <div class="row">
+        <label class="field">
+          <span>{{ t('setup.quayLength') }}</span>
+          <input
+            v-model.number="quayLengthM"
+            type="number"
+            :min="LIMITS.quayLengthM.min"
+            :max="LIMITS.quayLengthM.max"
+            step="any"
+            name="quayLength"
+          >
+        </label>
+        <label class="field">
+          <span>{{ t('setup.stsCount') }}</span>
+          <input
+            v-model.number="stsCount"
+            type="number"
+            :min="LIMITS.sts.min"
+            :max="LIMITS.sts.max"
+            step="1"
+            name="stsCount"
+          >
+        </label>
+      </div>
+
+      <fieldset class="field">
+        <legend>{{ t('setup.vessels') }}</legend>
+        <VesselTable
+          v-model="vessels"
+          :start-date-time="startDate"
+        />
+      </fieldset>
+
+      <ul
+        v-if="check.errors.length || check.warnings.length"
+        class="checks"
+      >
+        <li
+          v-for="(e, i) in check.errors"
+          :key="`e${i}`"
+          class="error"
+        >
+          ⛔ {{ t(e.key, e.params) }}
+        </li>
+        <li
+          v-for="(w, i) in check.warnings"
+          :key="`w${i}`"
+          class="warning"
+        >
+          ⚠ {{ t(w.key, w.params) }}
+        </li>
+      </ul>
 
       <fieldset class="field">
         <legend>{{ t('setup.display') }}</legend>
@@ -454,7 +554,7 @@ async function submit(): Promise<void> {
 }
 
 .dialog {
-  width: min(34rem, 100%);
+  width: min(52rem, 100%);
   max-height: 100%;
   overflow: auto;
   display: flex;
@@ -489,6 +589,7 @@ fieldset {
   border: none;
   padding: 0;
   margin: 0;
+  min-width: 0;
 }
 
 .field {
@@ -633,6 +734,20 @@ select {
 
 .error {
   color: var(--color-danger);
+  font-size: 0.85rem;
+}
+
+.checks {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0;
+  margin: 0;
+}
+
+.warning {
+  color: var(--color-accent);
   font-size: 0.85rem;
 }
 </style>

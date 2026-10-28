@@ -15,6 +15,7 @@
  *   __tt.overlays({ laneGraph: true, reservations: true })   // 3D debug overlays
  *   __tt.setDisplay({ locale: 'de-DE', units: 'imperial' }); __tt.display(); __tt.config(); __tt.ui()
  */
+import type { ScenarioOverrides } from '../scenario/overrides'
 import type { DisplaySettings, ScenarioConfig } from '../scenario/types'
 import type { CustodyRef, EngineEvent, EventPayloads, EventSubjects, EventType, RunResult, SimSnapshot } from '../engine'
 import type { OverlayState, RenderedLivery, SceneStats } from '../modules/sceneRenderer'
@@ -37,7 +38,13 @@ export interface TwinDevApi {
   /** Load a fixture or preset (default: the current choice) and wait until it is ready. Starts paused unless autoplay. */
   load(
     name?: string,
-    options?: { seed?: number; startDateTime?: string; autoplay?: boolean; shc?: ScenarioChoice['shc'] },
+    options?: {
+      seed?: number
+      startDateTime?: string
+      autoplay?: boolean
+      overrides?: ScenarioOverrides
+      shc?: ScenarioChoice['shc']
+    },
   ): Promise<EngineInfo | null>
   step(): Promise<EventSummary | null>
   runUntil(condition?: WorkerRunCondition): Promise<RunResult>
@@ -120,6 +127,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
           // Default: the scenario's own seed (so a fixture reproduces its golden run).
           seed: options.seed ?? (name ? resolveScenario(name).seed : store.choice.seed),
           startDateTime: options.startDateTime ?? store.choice.startDateTime,
+          overrides: options.overrides,
           shc: options.shc,
         },
         { autoplay: options.autoplay ?? false },

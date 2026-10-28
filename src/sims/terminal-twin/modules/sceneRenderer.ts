@@ -12,7 +12,8 @@ import * as THREE from 'three'
 import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 import { ContainerInstancer } from './containerInstancer'
-import { liveryIndexForLine, loadContainerAssets } from './containerAssets'
+import { LIVERY_ATLAS, liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
+import { aftOffsetM, BAY_PITCH_M, FENDER_GAP_M, ROW_PITCH_M, slotX, slotZ, TIER_PITCH_M } from '../scenario/vesselClasses'
 
 /** [A] Malaccamax-style STS proportions (m). */
 const STS = {
@@ -220,33 +221,67 @@ export class SceneRenderer {
     this.sts.set(id, { group, trolley, ropes, spreader })
   }
 
+  /**
+   * Procedural low-poly hull sized to the vessel's class: a plan-view outline
+   * (square stern, pointed bow) extruded from the keel to the main deck, a
+   * boot-top band, hatch covers per bay, the accommodation block aft of bay 0
+   * and a funnel. Local frame: stern at x = 0, quay-side hull face at
+   * z = -FENDER_GAP_M; the group is moved to the berth (or anchorage) per frame.
+   */
   private addVessel(id: string): void {
+    const spec = this.model.vesselSpec(id)
     const v = this.model.vesselConfig(id)
     const group = new THREE.Group()
     group.name = id
-    const length = v.bays * v.bayPitchM + 50
-    const beam = v.rows * v.rowPitchM + 4
-    const draft = 8
+    const draft = 10
+    const mainDeck = spec.deckHeightM - 0.8
+    const bow = Math.min(30, spec.loaM * 0.12)
+    const outline = new THREE.Shape()
+    outline.moveTo(0, 0)
+    outline.lineTo(spec.loaM - bow, 0)
+    outline.lineTo(spec.loaM, spec.beamM / 2)
+    outline.lineTo(spec.loaM - bow, spec.beamM)
+    outline.lineTo(0, spec.beamM)
+    outline.closePath()
+    const extrude = (depth: number) => {
+      const g = new THREE.ExtrudeGeometry(outline, { depth, bevelEnabled: false })
+      g.rotateX(-Math.PI / 2) // shape Y (beam) -> -Z (seaward), extrusion -> +Y
+      return this.track(g)
+    }
+    const line = LIVERY_ATLAS.liveries.find((l) => l.line !== null && v.name.startsWith(l.line))?.line
+    const hullColour = line ? liveryBodyColour(liveryIndexForLine(line)) : '#33465f'
     const hull = new THREE.Mesh(
-      this.track(new THREE.BoxGeometry(length, v.deckHeightM + draft, beam)),
-      this.track(new THREE.MeshStandardMaterial({ color: '#33465f', roughness: 0.6 })),
+      extrude(mainDeck + draft),
+      this.track(new THREE.MeshStandardMaterial({ color: new THREE.Color(hullColour).multiplyScalar(0.55), roughness: 0.6 })),
     )
-    // Hull spans from 30 m aft of bay 0 (bridge + engine room) to 20 m forward of the last bay.
-    hull.position.set(v.berthX - 30 + length / 2, (v.deckHeightM - draft) / 2, -(v.fenderGapM + beam / 2) + 2)
+    hull.position.set(0, -draft, -FENDER_GAP_M)
     hull.castShadow = true
     hull.receiveShadow = true
-    const boot = new THREE.Mesh(
-      this.track(new THREE.BoxGeometry(length + 0.2, 3, beam + 0.2)),
-      this.track(new THREE.MeshStandardMaterial({ color: '#8c2f2f', roughness: 0.7 })),
-    )
-    boot.position.set(hull.position.x, -1.5, hull.position.z)
-    const bridge = new THREE.Mesh(
-      this.track(new THREE.BoxGeometry(12, 18, beam - 2)),
-      this.track(new THREE.MeshStandardMaterial({ color: '#f1f3f5', roughness: 0.6 })),
-    )
-    bridge.position.set(v.berthX - 18, v.deckHeightM + 9, hull.position.z)
+    const boot = new THREE.Mesh(extrude(4), this.track(new THREE.MeshStandardMaterial({ color: '#8c2f2f', roughness: 0.7 })))
+    boot.scale.set(1.002, 1, 1.004)
+    boot.position.set(-0.05, -3, -FENDER_GAP_M + 0.05)
+    const aft = aftOffsetM(spec)
+    const white = this.track(new THREE.MeshStandardMaterial({ color: '#f1f3f5', roughness: 0.6 }))
+    const bridgeL = Math.min(14, aft - 4)
+    const bridgeH = spec.deckTiers * TIER_PITCH_M + 8
+    const bridge = new THREE.Mesh(this.track(new THREE.BoxGeometry(bridgeL, bridgeH, spec.beamM - 2)), white)
+    bridge.position.set(aft - bridgeL / 2 - 2, mainDeck + bridgeH / 2, -FENDER_GAP_M - spec.beamM / 2)
     bridge.castShadow = true
-    group.add(hull, boot, bridge)
+    const funnel = new THREE.Mesh(
+      this.track(new THREE.BoxGeometry(5, 8, 5)),
+      this.track(new THREE.MeshStandardMaterial({ color: hullColour, roughness: 0.6 })),
+    )
+    funnel.position.set(Math.max(3, aft - bridgeL - 6), mainDeck + 4, -FENDER_GAP_M - spec.beamM / 2)
+    // hatch covers: one slab per 40 ft bay
+    const hatchMat = this.track(new THREE.MeshStandardMaterial({ color: '#5b6470', roughness: 0.8 }))
+    const hatchGeo = this.track(new THREE.BoxGeometry(BAY_PITCH_M - 1.2, 0.8, spec.rows * ROW_PITCH_M))
+    for (let bay = 0; bay < spec.bays; bay++) {
+      const hatch = new THREE.Mesh(hatchGeo, hatchMat)
+      hatch.position.set(slotX(spec, 0, bay), spec.deckHeightM - 0.4, slotZ(spec, (spec.rows - 1) / 2))
+      hatch.receiveShadow = true
+      group.add(hatch)
+    }
+    group.add(hull, boot, bridge, funnel)
     group.visible = false
     this.scene.add(group)
     this.vessels.set(id, group)
@@ -396,7 +431,11 @@ export class SceneRenderer {
       parts.ropes.scale.y = ropeLen
       parts.ropes.position.set(0, ropeTop - ropeLen / 2, pose.trolleyZ)
     }
-    for (const [id, group] of this.vessels) group.visible = model.vesselVisible(id, t)
+    for (const [id, group] of this.vessels) {
+      const p = model.vesselPlacement(id, t)
+      group.visible = p !== null
+      if (p) group.position.set(p.x, 0, p.zOffset)
+    }
     for (const [id, parts] of this.shcs) {
       const pose = model.shcPose(id, t)
       parts.group.position.set(pose.x, 0, pose.z)
@@ -444,9 +483,9 @@ export class SceneRenderer {
       this.selection.scale.set(STS.legSpacingX + 4, STS.apexY + 2, STS.gauge + 6)
       this.selection.position.set(centre.x, (STS.apexY + 2) / 2, STS.waterRailZ + STS.gauge / 2)
     } else {
-      const v = this.model.vesselConfig(id)
-      this.selection.scale.set(v.bays * v.bayPitchM + 52, v.deckHeightM + 4, v.rows * v.rowPitchM + 6)
-      this.selection.position.set(v.berthX - 30 + (v.bays * v.bayPitchM + 50) / 2, v.deckHeightM / 2, centre.z)
+      const spec = this.model.vesselSpec(id)
+      this.selection.scale.set(spec.loaM + 2, spec.deckHeightM + 14, spec.beamM + 2)
+      this.selection.position.set(centre.x, spec.deckHeightM / 2, centre.z - FENDER_GAP_M)
     }
     this.selection.visible = true
   }

@@ -5,12 +5,17 @@
   "seed": 42,
   "startDateTime": "2026-01-05T06:00:00Z",
   "quay": {
-    "lengthM": 400
+    "lengthM": 400,
+    "berthGapM": 15,
+    "mooringS": 60,
+    "unmooringS": 60,
+    "stsMinSpacingM": 27,
+    "twinLift": true
   },
   "layout": {
     "stsGroundLaneZ0M": 8,
     "stsGroundLaneSpacingM": 3,
-    "stsSafeHoistM": 45
+    "stsSafeHoistM": 50
   },
   "kinematics": {
     "sts": {
@@ -70,152 +75,37 @@
     {
       "id": "V001",
       "name": "Shuttle Star",
-      "berthAtS": 60,
-      "berthX": 50,
-      "stsIds": [
-        "STS01"
-      ],
-      "bays": 2,
-      "rows": 5,
-      "tiersOnDeck": 1,
-      "bayPitchM": 13,
-      "rowPitchM": 2.5,
-      "deckHeightM": 18,
-      "fenderGapM": 2
-    }
-  ],
-  "containers": [
-    {
-      "id": "HDMU1000012",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 0,
-        "row": 0,
-        "tier": 0
-      }
-    },
-    {
-      "id": "HDMU1000028",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 0,
-        "row": 1,
-        "tier": 0
-      }
-    },
-    {
-      "id": "HDMU1000033",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 0,
-        "row": 2,
-        "tier": 0
-      }
-    },
-    {
-      "id": "HDMU1000049",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 0,
-        "row": 3,
-        "tier": 0
-      }
-    },
-    {
-      "id": "HDMU1000054",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 0,
-        "row": 4,
-        "tier": 0
-      }
-    },
-    {
-      "id": "HDMU1000060",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 1,
-        "row": 0,
-        "tier": 0
-      }
-    },
-    {
-      "id": "HDMU1000075",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 1,
-        "row": 1,
-        "tier": 0
-      }
-    },
-    {
-      "id": "HDMU1000080",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 1,
-        "row": 2,
-        "tier": 0
-      }
-    },
-    {
-      "id": "HDMU1000096",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 1,
-        "row": 3,
-        "tier": 0
-      }
-    },
-    {
-      "id": "HDMU1000100",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 1,
-        "row": 4,
-        "tier": 0
+      "arrivalS": 0,
+      "sizeClass": "feeder",
+      "discharge": 10,
+      "load": 0,
+      "transshipment": 0,
+      "maxSts": 1,
+      "sizeMix": {
+        "40": 1
       }
     }
   ],
+  "cargo": {
+    "lines": {
+      "HMM": 30,
+      "MSC": 15,
+      "Maersk": 12,
+      "CMA CGM": 10,
+      "Hapag-Lloyd": 8,
+      "ONE": 7,
+      "Evergreen": 6,
+      "COSCO": 6,
+      "ZIM": 3,
+      "Yang Ming": 3
+    },
+    "sizeMix": {
+      "20": 0.3,
+      "40": 0.25,
+      "40HC": 0.45
+    },
+    "emptyShare": 0.1
+  },
   "endConditions": {
     "simDurationS": 1800
   },

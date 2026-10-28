@@ -75,16 +75,68 @@ export interface ShcDispatchReply {
   wtpPadId: string | null
 }
 
+// ── berthAllocation ────────────────────────────────────────────────────────
+
+export interface BerthAllocationRequest {
+  vesselId: string
+  sizeClass: string
+  /** Length over all (m). */
+  loaM: number
+  quayLengthM: number
+  /** Minimum clear distance to a neighbouring vessel (m). */
+  berthGapM: number
+  /** Quay stretches taken by vessels mooring, berthed or unmooring (stern X → bow X), ascending. */
+  occupied: { vesselId: string; fromX: number; toX: number }[]
+  arrivedAtS: number
+}
+
+export interface BerthAllocationReply {
+  /** Stern position along the quay, or null: no berth now (the vessel waits at anchorage). */
+  berthX: number | null
+}
+
+// ── craneSplit ─────────────────────────────────────────────────────────────
+
+export interface CraneSplitRequest {
+  vesselId: string
+  berthX: number
+  maxSts: number
+  /** Minimum distance between neighbouring gantry centres (m). */
+  stsMinSpacingM: number
+  /** Bays that have discharge work, ascending, with their gantry X and number of moves. */
+  bays: { bay: number; x: number; moves: number }[]
+  /**
+   * Every STS in rail order. `vesselId` is the vessel it is assigned to (null = free);
+   * `vesselBerthX` is that vessel's stern X, so a strategy can tell which side it is on.
+   */
+  cranes: { stsId: string; railIndex: number; gantryX: number; vesselId: string | null; vesselBerthX: number | null }[]
+}
+
+export interface CraneSplitReply {
+  /**
+   * Free cranes to assign, each with a contiguous ascending bay range. Crane
+   * order on the rail must match bay order, every work bay must be covered
+   * exactly once, and no crane of another vessel may sit between the chosen
+   * cranes or on the wrong side of them. An empty list = no cranes yet (the
+   * vessel waits; the split is asked again when a crane becomes free).
+   */
+  assignments: { stsId: string; bays: number[] }[]
+}
+
 // ── catalogue ──────────────────────────────────────────────────────────────
 
 export interface DecisionRequests {
   stsGroundPosition: GroundPositionRequest
   shcDispatch: ShcDispatchRequest
+  berthAllocation: BerthAllocationRequest
+  craneSplit: CraneSplitRequest
 }
 
 export interface DecisionReplies {
   stsGroundPosition: GroundPositionReply
   shcDispatch: ShcDispatchReply
+  berthAllocation: BerthAllocationReply
+  craneSplit: CraneSplitReply
 }
 
 export type DecisionPointId = keyof DecisionRequests
@@ -93,6 +145,8 @@ export type DecisionPointId = keyof DecisionRequests
 export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   stsGroundPosition: 1,
   shcDispatch: 1,
+  berthAllocation: 1,
+  craneSplit: 1,
 }
 
 export const DECISION_POINT_IDS = Object.keys(DECISION_CONTRACT_VERSIONS) as DecisionPointId[]

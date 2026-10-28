@@ -3,23 +3,41 @@
   "seed": 7,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "073d59295d1f6a",
+  "eventLogHash": "1e8e5da51921f9",
   "kpis": {
-    "simTimeS": 1390.989,
-    "eventsProcessed": 65,
+    "simTimeS": 1838.656,
+    "eventsProcessed": 72,
     "movesCompleted": 12,
     "vesselsCompleted": 1,
     "sts": {
       "STS01": {
         "moves": 12,
-        "grossMovesPerHour": 32.2
+        "cycles": 12,
+        "twinLifts": 0,
+        "grossMovesPerHour": 24.579,
+        "railWaitS": 0
       }
     },
     "vessels": {
       "V001": {
+        "sizeClass": "feeder",
+        "arrivedAtS": 0,
+        "anchorageWaitS": 0,
+        "berthX": 0,
         "berthedAtS": 30,
-        "departedAtS": 1390.989,
-        "turnaroundS": 1360.989
+        "departedAtS": 1838.656,
+        "turnaroundS": 1808.656,
+        "sts": [
+          "STS01"
+        ]
+      }
+    },
+    "quay": {
+      "vesselsWaited": 0,
+      "anchorageWaitS": {
+        "total": 0,
+        "mean": 0,
+        "max": 0
       }
     },
     "handlers": {
@@ -43,12 +61,54 @@
           "max": 0
         },
         "equipmentIdleS": 0
+      },
+      "berthAllocation": {
+        "handler": "strategy:first-fit",
+        "calls": 1,
+        "resolved": 1,
+        "ok": 1,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "craneSplit": {
+        "handler": "strategy:balanced-moves",
+        "calls": 1,
+        "resolved": 1,
+        "ok": 1,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
       }
     }
   },
   "invariants": {
     "enabled": true,
-    "checks": 64,
+    "checks": 71,
     "violations": 0,
     "first": null
   },

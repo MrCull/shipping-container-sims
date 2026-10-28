@@ -5,12 +5,14 @@
  */
 import { createSimulation, summarizeRun, type EngineEvent, type Simulation } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
+import { HALF_OFFSET_M } from '../scenario/vesselClasses'
 import {
   EVENT_SUMMARY_CAP,
   summarizeEvent,
   type CustodyChange,
   type Delta,
   type EngineInfo,
+  type MotionPlan,
   type QueryKind,
   type WorkerReply,
   type WorkerRequestMessage,
@@ -29,6 +31,29 @@ function latestBy<T>(items: T[], key: (item: T) => string): T[] {
     map.set(k, item)
   }
   return [...map.values()]
+}
+
+/**
+ * Compact motion plans to the latest segment of each axis per entity. (The
+ * latest plan alone may lack an axis, e.g. a hoist-only plan after a gantry
+ * move, which would leave the scene at the crane's initial gantry position.)
+ */
+function compactMotion(plans: MotionPlan[]): MotionPlan[] {
+  // Per entity: its latest plan whole (an SHC trip is one multi-segment plan that is still
+  // being driven), plus the latest earlier segment of every axis that plan does not move.
+  const byEntity = new Map<string, { latest: MotionPlan['segments']; earlier: Map<string, MotionPlan['segments'][number]> }>()
+  for (const plan of plans) {
+    const entry = byEntity.get(plan.entityId) ?? { latest: [], earlier: new Map() }
+    for (const seg of entry.latest) entry.earlier.set(seg.axis, seg)
+    entry.latest = plan.segments
+    byEntity.delete(plan.entityId)
+    byEntity.set(plan.entityId, entry)
+  }
+  return [...byEntity.entries()].map(([entityId, { latest, earlier }]) => {
+    const moved = new Set(latest.map((s) => s.axis))
+    const kept = [...earlier.values()].filter((s) => !moved.has(s.axis))
+    return { entityId, segments: [...kept, ...latest].sort((a, b) => a.t0 - b.t0) }
+  })
 }
 
 export function createEngineHost() {
@@ -50,7 +75,10 @@ export function createEngineHost() {
       if (last && last.eventId === ev.id) {
         const change: CustodyChange = { containerId: id, t: last.t, owner: { ...last.owner }, eventId: last.eventId }
         if (last.owner.kind === 'groundPosition') {
-          change.x = sim.query.sts(sim.query.groundPosition(last.owner.id).stsId).gantryX
+          change.x = ev.type === 'StsGrounded' ? ev.payload.x : sim.query.sts(sim.query.groundPosition(last.owner.id).stsId).gantryX
+        }
+        if (last.owner.kind === 'sts' && ev.type === 'StsPicked' && ev.payload.twin) {
+          change.dx = id === ev.payload.twin.containerId ? HALF_OFFSET_M : -HALF_OFFSET_M
         }
         delta.custody.push(change)
       }
@@ -85,11 +113,11 @@ export function createEngineHost() {
       delta.reservations.push({ ...r })
     }
     for (const v of sim.config.vessels) {
-      const status = sim.query.vessel(v.id).status
+      const vessel = sim.query.vessel(v.id)
       const key = `vessel:${v.id}`
-      if (statusRefs.get(key) !== status) {
-        statusRefs.set(key, status)
-        delta.entities.push({ kind: 'vessel', id: v.id, t: ev.t, status })
+      if (statusRefs.get(key) !== vessel.status) {
+        statusRefs.set(key, vessel.status)
+        delta.entities.push({ kind: 'vessel', id: v.id, t: ev.t, status: vessel.status, berthX: vessel.berthX })
       }
     }
   }
@@ -149,7 +177,7 @@ export function createEngineHost() {
         return requireSim().runUntilAsync({ time: req.to })
       case 'run': {
         const result = await requireSim().runUntilAsync(req.condition)
-        delta.motion = latestBy(delta.motion, (m) => m.entityId)
+        delta.motion = compactMotion(delta.motion)
         delta.custody = latestBy(delta.custody, (c) => c.containerId)
         delta.entities = latestBy(delta.entities, (e) => `${e.kind}:${e.id}`)
         delta.reservations = delta.reservations.filter((r) => r.to > requireSim().now)
@@ -186,6 +214,8 @@ export function createEngineHost() {
         return s.query.vessel(need())
       case 'vessels':
         return s.config.vessels.map((v) => s.query.vessel(v.id))
+      case 'vesselSlots':
+        return s.query.vesselSlots(id)
       case 'sts':
         return s.query.sts(need())
       case 'stsList':

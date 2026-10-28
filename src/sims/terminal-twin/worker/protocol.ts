@@ -25,6 +25,7 @@ export type QueryKind =
   | 'containers'
   | 'vessel'
   | 'vessels'
+  | 'vesselSlots'
   | 'sts'
   | 'stsList'
   | 'groundPosition'
@@ -63,8 +64,10 @@ export interface CustodyChange {
   t: number
   owner: CustodyRef
   eventId: number | null
-  /** Ground positions only: X along the quay where the box was set down (the STS gantry position). */
+  /** Ground positions only: X along the quay where the box was set down. */
   x?: number
+  /** STS only: offset of the box from the spreader centre along X (twin-20: aft −, fore +). */
+  dx?: number
 }
 
 export interface EntityStateChange {
@@ -72,6 +75,8 @@ export interface EntityStateChange {
   id: string
   t: number
   status: string
+  /** Vessels only: stern X along the quay once a berth is allocated (null before). */
+  berthX?: number | null
 }
 
 /** A summarised event for feeds and the dev API. */

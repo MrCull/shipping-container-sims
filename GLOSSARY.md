@@ -12,7 +12,12 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 ## Places
 
 - **Quay:** the continuous berth face at Z = 0. Sea is at negative Z and the yard at positive Z, with X running along the quay.
-- **Vessel slot:** a bay/row/tier position on a vessel (`<vesselId>:<bay>-<row>-<tier>`).
+- **Vessel slot:** a bay/row/tier position on a vessel (`<vesselId>:<bay>-<row>-<tier>`, plus `a`/`f` for the aft/fore 20 ft half of a cell). Its **purpose** is discharge, load or transshipment.
+- **Cell:** one bay/row/tier position of a vessel. It holds one 40 ft box or two 20 ft boxes (aft and fore half).
+- **Bay plan:** a vessel's slots and the boxes in them, generated from the vessel call and the seed. Bays are 40 ft bays counted from aft. Tiers count from the hold floor; tiers above the hatch covers are **on deck**, the rest **in the hold**.
+- **Berth:** a vessel's stretch of the continuous quay, from its stern (`berthX`) to its bow (LOA). Vessels keep a **berth gap** apart.
+- **Anchorage:** where an arrived vessel waits when no berth is free. **Anchorage wait** = berth allocation time − arrival time.
+- **Rail reservation:** the stretch of the STS rail a crane may occupy during its current gantry motion. Neighbouring reservations stay at least the minimum STS spacing apart.
 - **Ground position (STS ground position):** a buffer lane under an STS where discharged boxes are set down and from which load boxes are picked (`<stsId>-GP<n>`).
 - **WTP (waterside transfer point) pad:** a buffer position at the waterside end of a yard block. SHCs drop boxes there, and the ASC picks them up (and the reverse).
 - **Transfer stall (landside transfer stall):** a truck position at the landside end of a block where the ASC serves external trucks.
@@ -24,6 +29,11 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Custody:** the single owner that currently holds a container (vessel slot, STS, ground position, SHC, WTP pad, ASC, yard slot or truck). Custody changes only at a confirmed grip or release. Each container keeps a **custody history**.
 - **Handover:** a custody change between two pieces of equipment via a ground buffer, never directly.
 - **Discharge / load:** a vessel-to-quay move / a quay-to-vessel move.
+- **Vessel call:** one vessel's visit: arrival, size class (Feeder, Feedermax, Panamax, Neo-Panamax, ULCV), discharge/load/transshipment counts and max STS. The **vessel table** lists the calls.
+- **Mooring / unmooring:** the time from berth allocation to all-fast, and from the last move to departure.
+- **Crane split:** which STS cranes work which bays of a vessel (a decision point). Cranes keep rail order, so bay ranges follow crane order.
+- **Twin-20 lift:** an STS lift of the two 20 ft boxes of one cell in one cycle; each box gets its own ground position.
+- **Deck before hold:** within a bay, an STS discharges the deck stacks (top tier first) before the hold.
 - **Move:** one productive container transfer by an STS (a discharge or a load). This is the unit of moves per hour.
 - **Cycle:** one complete loop of a crane: start, pick, carry, ground, return.
 - **Work package:** one STS's moves for one bay section (deck or hold, discharge or load). Its release is a decision point.
@@ -38,14 +48,14 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Engine and tooling
 
-- **Scenario config:** the small, serialisable description of a run (layout, equipment, kinematics, vessels, containers, end conditions, seed). It is built with the **scenario builder**.
+- **Scenario config:** the small, serialisable description of a run (layout, equipment, kinematics, vessel table, cargo mix, end conditions, seed; bay plans and containers are generated from it and the seed). It is built with the **scenario builder**.
 - **Fixture:** a small focused scenario config committed as JSON under `scenario/fixtures/`, with a **golden summary** (`*.golden.json`: KPIs plus event-log hash).
 - **Preset:** a full-size scenario config generated in code (TTI Algeciras baseline, Small automated, Stress test).
 - **Event:** a happening in the sim, wrapped in the common **envelope** (`id`, `seq`, `t`, `type`, `causedBy`, `subjects`, `payload`).
 - **Root event:** an event with no cause: `ScenarioStarted`, plus any event injected through `inject` (dev API / tests).
 - **Cause chain:** an event's `causedBy` links back to the root, as returned by `why(eventId)`.
 - **Reactor:** the engine's internal handling of one event type (physics and flow). It is not swappable.
-- **Decision point:** a place where the sim asks the TOS for a decision (berth allocation, yard allocation, ground-position selection, dispatch, …).
+- **Decision point:** a place where the sim asks the TOS for a decision (berth allocation, crane split, yard allocation, ground-position selection, dispatch, …).
 - **Handler:** a function that answers a decision point. Handlers are swappable, and a **handler set** maps decision points to handlers.
 - **Strategy (built-in strategy):** a named built-in handler for a decision point (1–3 each, e.g. `lowest-free-lane`), selected per scenario.
 - **Correlation id:** the id that ties a decision's request, failure and reply events together (`<decisionPoint>-<n>`).

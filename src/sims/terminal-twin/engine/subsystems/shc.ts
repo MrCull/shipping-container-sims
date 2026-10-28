@@ -24,7 +24,7 @@
 import type { EngineContext, ReactorMap } from '../context'
 import type { EventOf, ShcPhasePayload } from '../events'
 import { planSegment, positionAt, type AxisProfile, type MotionSegment } from '../kinematics'
-import { edgeBetween, laneGraphOf, pathLength, shortestPath, type LaneGraph } from '../laneGraph'
+import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph } from '../laneGraph'
 import { earliestStart, mergeWindows, reserve, type WindowSpec } from '../reservations'
 import type { ShcPlannedEvent, ShcState, ShcStatus, SimState } from '../state'
 import { DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
@@ -67,6 +67,10 @@ interface Waypoint {
   nodeId: string
   x: number
   z: number
+  /** Conflict zone of this point (null = free). */
+  zone: string | null
+  /** Conflict zone of the stretch from the previous waypoint to this one. */
+  edgeZone: string | null
 }
 
 /**
@@ -96,7 +100,7 @@ class TripBuilder {
     this.x = start.x
     this.z = start.z
     this.lift = 0
-    this.visitNode(start.nodeId)
+    if (start.zone) this.addVisit(start.zone, 0, 0)
   }
 
   private plan(axis: 'x' | 'z' | 'lift', from: number, to: number, profile: AxisProfile): MotionSegment {
@@ -105,11 +109,6 @@ class TripBuilder {
     this.segments.push(seg)
     this.t = seg.t1
     return seg
-  }
-
-  private visitNode(nodeId: string): void {
-    const zone = this.graph.nodes[nodeId].zone
-    if (zone) this.addVisit(zone, this.s, this.s)
   }
 
   private addVisit(zone: string, s0: number, s1: number): void {
@@ -136,11 +135,11 @@ class TripBuilder {
    * Drive through `points` (the first is the next waypoint after the current
    * position). `lastRunMark` is marked when the final straight run starts.
    */
-  driveThrough(from: string, points: Waypoint[], profile: AxisProfile, lastRunMark?: PlannedType): void {
+  driveThrough(points: Waypoint[], profile: AxisProfile, lastRunMark?: PlannedType): void {
     // Split into straight runs.
     const runs: Waypoint[][] = []
     let pending: Waypoint[] = []
-    let prev = { nodeId: from, x: this.x, z: this.z }
+    let prev = { x: this.x, z: this.z }
     let dir = ''
     for (const p of points) {
       const dx = p.x - prev.x
@@ -159,7 +158,6 @@ class TripBuilder {
       dir = d
       prev = p
     }
-    let fromNode = from
     runs.forEach((run, i) => {
       if (i === runs.length - 1 && lastRunMark) this.mark(lastRunMark)
       const end = run[run.length - 1]
@@ -171,13 +169,11 @@ class TripBuilder {
       let pz = this.z
       for (const p of run) {
         const len = Math.abs(p.x - px) + Math.abs(p.z - pz)
-        const edgeZone = edgeBetween(this.graph, fromNode, p.nodeId).zone
-        if (edgeZone) this.addVisit(edgeZone, this.s, this.s + len)
+        if (p.edgeZone) this.addVisit(p.edgeZone, this.s, this.s + len)
         this.s += len
-        this.visitNode(p.nodeId)
+        if (p.zone) this.addVisit(p.zone, this.s, this.s)
         px = p.x
         pz = p.z
-        fromNode = p.nodeId
       }
       this.runs.push({ s0, s1: this.s, seg })
       this.x = end.x
@@ -218,8 +214,15 @@ class TripBuilder {
   }
 }
 
+/** Waypoints of a node path, with node and edge zones. */
 function waypoints(graph: LaneGraph, path: string[]): Waypoint[] {
-  return path.map((id) => ({ nodeId: id, x: graph.nodes[id].x, z: graph.nodes[id].z }))
+  return path.map((id, i) => ({
+    nodeId: id,
+    x: graph.nodes[id].x,
+    z: graph.nodes[id].z,
+    zone: graph.nodes[id].zone,
+    edgeZone: i === 0 ? null : edgeBetween(graph, path[i - 1], id).zone,
+  }))
 }
 
 function route(graph: LaneGraph, from: string, to: string): string[] {
@@ -296,7 +299,7 @@ function goPark(ctx: EngineContext, shc: ShcState): void {
   const k = kinematics(ctx)
   const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant)
   const path = route(graph, shc.nodeId, target)
-  trip.driveThrough(shc.nodeId, waypoints(graph, path.slice(1)), scaled(k.driveEmpty, driverFactor(ctx)))
+  trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx)))
   trip.mark('ShcParked')
   const windows = trip.windows()
   const start = earliestStart(ctx.state, windows, ctx.state.now)
@@ -324,7 +327,8 @@ function requestDispatch(ctx: EngineContext, shc: ShcState): void {
     .filter((j) => j.shcId === null)
     .sort((a, b) => a.readyAt - b.readyAt || (a.id < b.id ? -1 : 1))
     .map((j) => {
-      const node = graph.nodes[graph.groundPositionNode[j.groundPositionId]]
+      const lane = state.groundPositions[j.groundPositionId].lane
+      const entry = graph.nodes[laneAccess(graph, lane, j.x).walk[0]]
       return {
         jobId: j.id,
         containerId: j.containerId,
@@ -332,8 +336,8 @@ function requestDispatch(ctx: EngineContext, shc: ShcState): void {
         stsId: j.stsId,
         readyAt: j.readyAt,
         x: j.x,
-        z: node.z,
-        distanceM: pathLength(graph, route(graph, shc.nodeId, node.id)),
+        z: graph.laneZ[lane],
+        distanceM: Math.round((pathLength(graph, route(graph, shc.nodeId, entry.id)) + (j.x - entry.x)) * 1000) / 1000,
       }
     })
   const wtpPads = graph.pads.map((p) => ({
@@ -392,32 +396,45 @@ function assignJob(ctx: EngineContext, shc: ShcState, jobId: string, padId: stri
   const empty = scaled(k.driveEmpty, f)
   const loaded = scaled(k.driveLoaded, f)
   const instant = state.subsystems.shc === 'instant'
-  const gNode = graph.groundPositionNode[job.groundPositionId]
   const pNode = graph.padNode[pad.id]
   const cNode = graph.padClearNode[pad.id]
-  const [spanA, spanB] = graph.groundPositionSpan[job.groundPositionId]
-  const boxX = Math.min(spanB - 1, Math.max(spanA + 1, job.x))
-
-  const toBox = route(graph, shc.nodeId, gNode)
-  const toPad = route(graph, gNode, pNode)
-  const atBox = (w: Waypoint) => (w.nodeId === gNode ? { ...w, x: boxX } : w)
+  // The box lies on its STS lane at job.x: enter at the spine before it, leave at the spine after it.
+  const { walk, before } = laneAccess(graph, state.groundPositions[job.groundPositionId].lane, job.x)
+  const toEntry = route(graph, shc.nodeId, walk[0])
+  const lane = waypoints(graph, walk)
+  const pickup: Waypoint = {
+    nodeId: walk[before],
+    x: job.x,
+    z: lane[before].z,
+    zone: null,
+    edgeZone: edgeBetween(graph, walk[before], walk[before + 1]).zone,
+  }
+  const toPad = route(graph, walk[walk.length - 1], pNode)
   const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant)
   trip.mark('ShcRoutingEmpty')
-  trip.driveThrough(shc.nodeId, waypoints(graph, toBox.slice(1)).map(atBox), empty, 'ShcPositioningAtPickup')
+  trip.driveThrough(
+    [...waypoints(graph, toEntry).slice(1), ...lane.slice(1, before + 1), pickup],
+    empty,
+    'ShcPositioningAtPickup',
+  )
   trip.mark('ShcLocking')
   trip.dwell(k.lockS)
   trip.mark('ShcPicked')
   trip.liftTo(k.liftHeightM, k.lift)
   trip.mark('ShcRoutingLoaded')
   const emptyM = trip.s
-  trip.driveThrough(gNode, waypoints(graph, toPad.slice(1)), loaded, 'ShcPositioningAtDropoff')
+  trip.driveThrough(
+    [{ ...lane[before + 1], edgeZone: pickup.edgeZone }, ...lane.slice(before + 2), ...waypoints(graph, toPad).slice(1)],
+    loaded,
+    'ShcPositioningAtDropoff',
+  )
   const loadedM = trip.s - emptyM
   trip.mark('ShcLowering')
   trip.liftTo(0, k.lift)
   trip.mark('ShcUnlocking')
   trip.dwell(k.unlockS)
   trip.mark('ShcDroppedAtWtp')
-  trip.driveThrough(pNode, waypoints(graph, [cNode]), empty)
+  trip.driveThrough(waypoints(graph, [pNode, cNode]).slice(1), empty)
   trip.mark('ShcCleared')
 
   const windows = trip.windows()

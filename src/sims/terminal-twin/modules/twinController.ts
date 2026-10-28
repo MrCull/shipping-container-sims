@@ -61,23 +61,23 @@ export class TwinController {
   }
 
   async load(config: ScenarioConfig, seed: number): Promise<void> {
-    await this.restart({ op: 'load', config, seed }, config)
+    await this.restart({ op: 'load', config, seed }, config, seed)
   }
 
   /** Back to t = 0 with the same config and seed. */
   async reset(): Promise<void> {
     if (!this.model) throw new Error('No scenario loaded')
-    await this.restart({ op: 'reset' }, this.model.config)
+    await this.restart({ op: 'reset' }, this.model.config, this.model.seed)
   }
 
-  private async restart(req: WorkerRequest, config: ScenarioConfig): Promise<void> {
+  private async restart(req: WorkerRequest, config: ScenarioConfig, seed: number): Promise<void> {
     this.generation++
     this.inflight = false
     this.busy = false
     this.paused = true
     this.displayTime = 0
     this.info = null
-    this.model = new SceneModel(config)
+    this.model = new SceneModel(config, seed)
     await this.call(req)
   }
 

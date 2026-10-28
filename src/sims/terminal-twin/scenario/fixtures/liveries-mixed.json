@@ -5,12 +5,17 @@
   "seed": 7,
   "startDateTime": "2026-01-05T06:00:00Z",
   "quay": {
-    "lengthM": 400
+    "lengthM": 400,
+    "berthGapM": 15,
+    "mooringS": 30,
+    "unmooringS": 30,
+    "stsMinSpacingM": 27,
+    "twinLift": false
   },
   "layout": {
     "stsGroundLaneZ0M": 8,
     "stsGroundLaneSpacingM": 3,
-    "stsSafeHoistM": 45
+    "stsSafeHoistM": 50
   },
   "kinematics": {
     "sts": {
@@ -50,178 +55,34 @@
     {
       "id": "V001",
       "name": "Livery Trader",
-      "berthAtS": 30,
-      "berthX": 50,
-      "stsIds": [
-        "STS01"
-      ],
-      "bays": 3,
-      "rows": 5,
-      "tiersOnDeck": 1,
-      "bayPitchM": 13,
-      "rowPitchM": 2.5,
-      "deckHeightM": 18,
-      "fenderGapM": 2
+      "arrivalS": 0,
+      "sizeClass": "feeder",
+      "discharge": 12,
+      "load": 0,
+      "transshipment": 0,
+      "maxSts": 1
     }
   ],
-  "containers": [
-    {
-      "id": "HDMU1000012",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 0,
-        "row": 0,
-        "tier": 0
-      }
+  "cargo": {
+    "lines": {
+      "HMM": 1,
+      "MSC": 1,
+      "Maersk": 1,
+      "CMA CGM": 1,
+      "Hapag-Lloyd": 1,
+      "ONE": 1,
+      "Evergreen": 1,
+      "COSCO": 1,
+      "ZIM": 1,
+      "Yang Ming": 1
     },
-    {
-      "id": "HDMU1000028",
-      "size": "40",
-      "full": true,
-      "line": "HMM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 0,
-        "row": 1,
-        "tier": 0
-      }
+    "sizeMix": {
+      "20": 1,
+      "40": 1,
+      "40HC": 1
     },
-    {
-      "id": "MAEU1000039",
-      "size": "40HC",
-      "full": true,
-      "line": "Maersk",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 0,
-        "row": 2,
-        "tier": 0
-      }
-    },
-    {
-      "id": "MAEU1000044",
-      "size": "40HC",
-      "full": true,
-      "line": "Maersk",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 0,
-        "row": 3,
-        "tier": 0
-      }
-    },
-    {
-      "id": "MSCU1000059",
-      "size": "20",
-      "full": true,
-      "line": "MSC",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 0,
-        "row": 4,
-        "tier": 0
-      }
-    },
-    {
-      "id": "CMAU1000062",
-      "size": "40",
-      "full": true,
-      "line": "CMA CGM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 1,
-        "row": 0,
-        "tier": 0
-      }
-    },
-    {
-      "id": "HLXU1000075",
-      "size": "40HC",
-      "full": true,
-      "line": "Hapag-Lloyd",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 1,
-        "row": 1,
-        "tier": 0
-      }
-    },
-    {
-      "id": "ONEU1000085",
-      "size": "20",
-      "full": true,
-      "line": "ONE",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 1,
-        "row": 2,
-        "tier": 0
-      }
-    },
-    {
-      "id": "EGHU1000097",
-      "size": "40",
-      "full": true,
-      "line": "Evergreen",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 1,
-        "row": 3,
-        "tier": 0
-      }
-    },
-    {
-      "id": "CSNU1000108",
-      "size": "20",
-      "full": true,
-      "line": "COSCO",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 1,
-        "row": 4,
-        "tier": 0
-      }
-    },
-    {
-      "id": "ZIMU1000112",
-      "size": "40HC",
-      "full": true,
-      "line": "ZIM",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 2,
-        "row": 0,
-        "tier": 0
-      }
-    },
-    {
-      "id": "YMLU1000122",
-      "size": "40",
-      "full": true,
-      "line": "Yang Ming",
-      "initial": {
-        "kind": "vesselSlot",
-        "vesselId": "V001",
-        "bay": 2,
-        "row": 1,
-        "tier": 0
-      }
-    }
-  ],
+    "emptyShare": 0.1
+  },
   "endConditions": {
     "vesselsCompleted": 1
   }

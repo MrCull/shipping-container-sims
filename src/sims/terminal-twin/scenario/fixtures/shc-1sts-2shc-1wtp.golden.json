@@ -3,23 +3,41 @@
   "seed": 42,
   "status": "ended",
   "endReason": "simDurationS >= 1800",
-  "eventLogHash": "1c402e7d826a28",
+  "eventLogHash": "11eca7e7f4ec1e",
   "kpis": {
     "simTimeS": 1800,
-    "eventsProcessed": 225,
+    "eventsProcessed": 232,
     "movesCompleted": 10,
     "vesselsCompleted": 1,
     "sts": {
       "STS01": {
         "moves": 10,
-        "grossMovesPerHour": 33.659
+        "cycles": 10,
+        "twinLifts": 0,
+        "grossMovesPerHour": 25.355,
+        "railWaitS": 0
       }
     },
     "vessels": {
       "V001": {
+        "sizeClass": "feeder",
+        "arrivedAtS": 0,
+        "anchorageWaitS": 0,
+        "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1146.386,
-        "turnaroundS": 1086.386
+        "departedAtS": 1558.246,
+        "turnaroundS": 1498.246,
+        "sts": [
+          "STS01"
+        ]
+      }
+    },
+    "quay": {
+      "vesselsWaited": 0,
+      "anchorageWaitS": {
+        "total": 0,
+        "mean": 0,
+        "max": 0
       }
     },
     "handlers": {
@@ -64,22 +82,64 @@
           "max": 0
         },
         "equipmentIdleS": 0
+      },
+      "berthAllocation": {
+        "handler": "strategy:first-fit",
+        "calls": 1,
+        "resolved": 1,
+        "ok": 1,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "craneSplit": {
+        "handler": "strategy:balanced-moves",
+        "calls": 1,
+        "resolved": 1,
+        "ok": 1,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
       }
     },
     "horizontal": {
       "boxesToWtp": 10,
       "shcs": {
         "SHC01": {
-          "jobs": 5,
-          "emptyDistanceM": 872.25,
-          "loadedDistanceM": 804.25,
+          "jobs": 8,
+          "emptyDistanceM": 1866,
+          "loadedDistanceM": 1054,
           "reservationWaitS": 0
         },
         "SHC02": {
-          "jobs": 5,
-          "emptyDistanceM": 947.75,
-          "loadedDistanceM": 782.75,
-          "reservationWaitS": 0
+          "jobs": 2,
+          "emptyDistanceM": 455.5,
+          "loadedDistanceM": 248.5,
+          "reservationWaitS": 1.045
         }
       },
       "stsGroundPositionWaitS": {
@@ -89,7 +149,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 224,
+    "checks": 231,
     "violations": 0,
     "first": null
   },

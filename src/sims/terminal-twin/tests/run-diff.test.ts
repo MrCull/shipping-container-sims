@@ -30,7 +30,7 @@ describe('run diff', () => {
   it('reports no divergence for two identical runs', () => {
     const diff = diffEventLogs(log(), log())
     expect(diff.diverged).toBe(false)
-    expect(diff.commonEvents).toBe(55)
+    expect(diff.commonEvents).toBe(log().length)
   })
 
   it('reports the first diverging event (seq + both payloads) for two strategies', () => {
@@ -39,7 +39,7 @@ describe('run diff', () => {
     const diff = diffEventLogs(a, b, { context: 2 })
     if (!diff.diverged) throw new Error('expected divergence')
     // Events before the first ground-position reply are identical; the reply differs there.
-    const firstReply = a.find((e) => e.type === 'DecisionResolved')!
+    const firstReply = a.find((e) => e.type === 'DecisionResolved' && e.payload.decisionPoint === 'stsGroundPosition')!
     expect(diff.seq).toBe(firstReply.seq)
     expect(diff.commonEvents).toBe(firstReply.seq)
     expect(diff.a?.type).toBe('DecisionResolved')
@@ -64,7 +64,7 @@ describe('run diff', () => {
   it('CLI compares two seeds / two handler sets of one scenario', () => {
     const same = cli(runDiffCli, '--fixture', 'tracer-1sts-10-boxes')
     expect(same.exitCode).toBe(0)
-    expect(same.text).toMatch(/No divergence: 55 events identical/)
+    expect(same.text).toMatch(/No divergence: 62 events identical/)
 
     const strategies = cli(runDiffCli, '--fixture', 'tracer-1sts-10-boxes', '--b-handlers', 'highest-free-lane')
     expect(strategies.exitCode).toBe(1)

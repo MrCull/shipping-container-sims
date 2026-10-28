@@ -81,7 +81,7 @@ describe('causality', () => {
     expect(chain[0]).toBe(lastGrounded)
     expect(chain.at(-1)?.type).toBe('ScenarioStarted')
     for (let i = 0; i < chain.length - 1; i++) expect(chain[i].causedBy).toBe(chain[i + 1].id)
-    // root → berth → (move started → picked → ground-position decision → grounded) × 10
+    // root → arrival → berth allocation → berthed → crane split → (move started → picked → ground-position decision → grounded) × 10
     expect(chain.map((e) => e.type)).toEqual([
       ...Array.from({ length: 10 }, () => [
         'StsGrounded',
@@ -90,7 +90,13 @@ describe('causality', () => {
         'StsPicked',
         'StsMoveStarted',
       ]).flat(),
+      'DecisionResolved', // craneSplit
+      'DecisionRequested',
       'VesselBerthed',
+      'BerthAllocated',
+      'DecisionResolved', // berthAllocation
+      'DecisionRequested',
+      'VesselArrived',
       'ScenarioStarted',
     ])
   })
@@ -109,7 +115,7 @@ describe('stepping and subscribing', () => {
     const off = sim.subscribe((e) => grounded.push(e), { types: ['StsGrounded'] })
     const first = sim.step()
     expect(first?.type).toBe('ScenarioStarted')
-    expect(sim.step()?.type).toBe('VesselBerthed')
+    expect(sim.step()?.type).toBe('VesselArrived')
     sim.runUntil({ moves: 2 })
     off()
     sim.runUntil()
@@ -123,7 +129,8 @@ describe('stepping and subscribing', () => {
     const sim = createSimulation(tracer)
     const result = sim.runUntil({ eventType: 'StsPicked' })
     expect(result.reason).toBe('condition')
-    expect(sim.eventLog().at(-1)?.type).toBe('StsPicked')
-    expect(sim.query.container(tracer.containers[0].id).custody.kind).toBe('sts')
+    const picked = sim.eventLog().at(-1)
+    if (picked?.type !== 'StsPicked') throw new Error(`expected StsPicked, got ${picked?.type}`)
+    expect(sim.query.container(picked.payload.containerId).custody.kind).toBe('sts')
   })
 })

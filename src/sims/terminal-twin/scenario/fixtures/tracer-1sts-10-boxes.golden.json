@@ -3,23 +3,41 @@
   "seed": 42,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "15fe2f67b6318f",
+  "eventLogHash": "1b8a4d6ae6a66e",
   "kpis": {
-    "simTimeS": 1168.805,
-    "eventsProcessed": 55,
+    "simTimeS": 1595.849,
+    "eventsProcessed": 62,
     "movesCompleted": 10,
     "vesselsCompleted": 1,
     "sts": {
       "STS01": {
         "moves": 10,
-        "grossMovesPerHour": 32.949
+        "cycles": 10,
+        "twinLifts": 0,
+        "grossMovesPerHour": 24.689,
+        "railWaitS": 0
       }
     },
     "vessels": {
       "V001": {
+        "sizeClass": "feeder",
+        "arrivedAtS": 0,
+        "anchorageWaitS": 0,
+        "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1168.805,
-        "turnaroundS": 1108.805
+        "departedAtS": 1595.849,
+        "turnaroundS": 1535.849,
+        "sts": [
+          "STS01"
+        ]
+      }
+    },
+    "quay": {
+      "vesselsWaited": 0,
+      "anchorageWaitS": {
+        "total": 0,
+        "mean": 0,
+        "max": 0
       }
     },
     "handlers": {
@@ -43,12 +61,54 @@
           "max": 0
         },
         "equipmentIdleS": 0
+      },
+      "berthAllocation": {
+        "handler": "strategy:first-fit",
+        "calls": 1,
+        "resolved": 1,
+        "ok": 1,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "craneSplit": {
+        "handler": "strategy:balanced-moves",
+        "calls": 1,
+        "resolved": 1,
+        "ok": 1,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
       }
     }
   },
   "invariants": {
     "enabled": true,
-    "checks": 54,
+    "checks": 61,
     "violations": 0,
     "first": null
   },

@@ -9,6 +9,7 @@
 import { defineStore } from 'pinia'
 import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
+import { applyOverrides, type ScenarioOverrides } from '../scenario/overrides'
 import { presets } from '../scenario/presets'
 import { withShcFleet } from '../scenario/builder'
 import type { DisplaySettings, ScenarioConfig, ShcKinematics } from '../scenario/types'
@@ -28,6 +29,8 @@ export interface ScenarioChoice {
   seed: number
   /** ISO date-time of sim t = 0. */
   startDateTime: string
+  /** Setup-dialog edits: quay length, STS count, vessel table. */
+  overrides?: ScenarioOverrides
   /** SHC fleet overrides from the setup dialog (scenarios with SHCs only). */
   shc?: { count: number; kinematics: ShcKinematics }
 }
@@ -153,7 +156,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   async function startScenario(next: ScenarioChoice, options: { autoplay?: boolean } = {}): Promise<void> {
-    const base = resolveScenario(next.name)
+    const base = applyOverrides(resolveScenario(next.name), next.overrides ?? {})
     let runConfig = runConfigFor(base, next.startDateTime, display.value)
     if (next.shc && (base.shcs?.length ?? 0) > 0) runConfig = withShcFleet(runConfig, next.shc.count, next.shc.kinematics)
     choice.value = { ...next }

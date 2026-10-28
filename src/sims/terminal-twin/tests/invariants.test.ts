@@ -36,7 +36,7 @@ describe('invariant checker', () => {
     expect(last.payload.invariant).toBe('custody.single-owner')
     expect(last.payload.offendingEventId).toBe(offending.id)
     expect(last.causedBy).toBe(offending.id)
-    expect(last.payload.message).toContain(tracer.containers[0].id)
+    expect(last.payload.message).toContain(grounded[0].subjects.containers![0])
 
     expect(sim.firstError?.eventId).toBe(offending.id)
     expect(sim.firstError?.message).toMatch(/custody\.single-owner/)

@@ -4,7 +4,7 @@
 
 **Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root — use its terms in code, tests and docs.
 
-**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-20 added locale and units, the message catalogue and keyboard shortcuts. Phase 2 has started with the asset pipeline and container models (TT-22): Blender-generated GLBs with LODs and a livery atlas, instanced in the 3D view, plus a dev asset viewer and an asset budget check in CI. See [Phase 2 asset pipeline](#phase-2-asset-pipeline). TT-05 adds SHC horizontal transport (STS ground position → WTP pad) over a generated lane graph with conflict-zone reservations, the `shcDispatch` decision point, an instant ASC stub, subsystem modes, SHC setup fields and 3D lane/reservation overlays.
+**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-20 added locale and units, the message catalogue and keyboard shortcuts. Phase 2 has started with the asset pipeline and container models (TT-22): Blender-generated GLBs with LODs and a livery atlas, instanced in the 3D view, plus a dev asset viewer and an asset budget check in CI. See [Phase 2 asset pipeline](#phase-2-asset-pipeline). TT-09 added real vessel calls: five size classes, generated bay plans, a continuous quay with berth allocation and anchorage, STS cranes on one rail with a crane split, twin-20 lifts, and the setup dialog's vessel table and generator. TT-05 adds SHC horizontal transport (STS ground position → WTP pad) over a generated lane graph with conflict-zone reservations, the `shcDispatch` decision point, an instant ASC stub, subsystem modes, SHC setup fields and 3D lane/reservation overlays.
 
 **Sim ID:** `terminal-twin`
 
@@ -31,6 +31,10 @@
 | Look at the 3D view | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('tracer-1sts-10-boxes').then(() => window.__tt.runTo(330)).then(() => window.__tt.pause())"` | PNG in `.screenshots/` shows the STS mid-cycle, no page errors |
 | UI text, locale, units, shortcuts | `npm test` (`display-format`, `display-settings`, `message-catalogue`) + `npx playwright test --project=dev src/sims/terminal-twin/tests/browser/terminal-twin-display.smoke.ts` | catalogue audit lists no hard-coded strings; locale/units/shortcut smoke tests pass |
 | Fixture definition change | `npm run tt:fixtures`, then `npm run tt:golden -- --update` | committed fixture JSON matches `definitions.ts` |
+| Berthing / anchorage | `npm run tt:run -- --fixture two-vessels-compete-for-berth` | V002 `anchorage` > 0 s, `Quay: 1 vessel(s) waited`; `tests/berthing.test.ts` |
+| Crane split / rail order | `npm run tt:run -- --fixture crane-split-4sts --strategy craneSplit=equal-bays` (vs the default `balanced-moves`) | 4 STS lines with different move counts, 0 violations (`sts.rail-order` is checked after every event); `tests/crane-split.test.ts` |
+| Twin-20 | `npm run tt:run -- --fixture twin-20-lift` | `4 moves in 2 cycles (2 twin-20)`; `tests/vessels.test.ts` |
+| Vessels in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('crane-split-4sts').then(() => window.__tt.runTo(1500)).then(() => window.__tt.pause()).then(() => window.__tt.cameraTo('V001'))"` | hull at its berth, four STS along it, deck boxes on the hatch covers |
 | SHC transport | `npm run tt:run -- --fixture shc-1sts-2shc-1wtp` | `Horizontal: 10 boxes to WTP pads`, per-SHC jobs/distances/reservation wait, `0 violations` |
 | SHC dispatch strategies | `npm run tt:diff -- --fixture shc-1sts-2shc-1wtp --b-handlers nearest-job` (or `tt:run … --strategy shcDispatch=nearest-job`) | first divergence at the first `shcDispatch` `DecisionResolved` (`payload.reply.wtpPadId`) |
 | SHCs in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('shc-1sts-2shc-1wtp').then(() => window.__tt.runTo(300)).then(() => { window.__tt.pause(); window.__tt.overlays({ laneGraph: true, reservations: true }) })"` | SHCs on the apron, boxes on pads/yard, cyan lane graph, amber reserved zones |
@@ -55,7 +59,10 @@ terminal-twin/
 │   ├── simulation.ts         createSimulation / restoreSimulation, run loop, snapshot, why, subscribe
 │   ├── events.ts             Event envelope + EventPayloads catalogue
 │   ├── context.ts            EngineContext + Reactor types (internal behaviour per event type)
-│   ├── subsystems/quay.ts    Vessel berthing + STS discharge cycle reactors (+ ground-position wait/resume)
+│   ├── subsystems/berth.ts   Vessel calls: arrival, berth allocation, anchorage, mooring, crane split, departure
+│   ├── subsystems/quay.ts    STS discharge cycle (gantry to bay, deck before hold, twin-20) + work order;
+│   │                         ground-position wait/resume; lane reservation while setting down (with SHCs)
+│   ├── subsystems/rail.ts    Shared STS rail: reservations, waiting for the rail, free cranes stepping aside
 │   ├── subsystems/shc.ts     SHC jobs, pull dispatch, whole-trip planning, parking (TT-05)
 │   ├── subsystems/ascStub.ts Instant ASC stub: AscPicked / AscStacked at the drop time (until TT-06)
 │   ├── laneGraph.ts          Waterside one-way lane graph from config + shortest paths (cached per config)
@@ -64,6 +71,7 @@ terminal-twin/
 │   ├── decisions/            Decision-point framework
 │   │   ├── types.ts          Request/reply catalogue, contract versions, HandlerSet, DecisionsConfig
 │   │   ├── strategies.ts     Built-in strategy registry (1–3 per decision point) + defaultHandlers
+│   │   ├── quayStrategies.ts Berth allocation (first-fit, best-fit), crane split (balanced-moves, equal-bays)
 │   │   ├── runtime.ts        Dispatch, async modes, timeouts/fallback, handler KPIs (SimState.decisions)
 │   │   └── latency.ts        Latency injector (own RNG stream)
 │   ├── invariants.ts         INVARIANTS registry + custody holders
@@ -78,6 +86,11 @@ terminal-twin/
 │   ├── types.ts              ScenarioConfig (schemaVersion 1, SI units)
 │   ├── builder.ts            Typed ScenarioBuilder + [A] default kinematics
 │   ├── iso6346.ts            Container id check digits
+│   ├── lines.ts              Shipping lines: owner prefixes, default weights, default cargo mix
+│   ├── vesselClasses.ts      VESSEL_CLASSES (Feeder → ULCV) + bay-plan geometry (slotX/Z, tierBaseY, slot ids)
+│   ├── bayPlan.ts            planCargo(config, seed): slots + discharge boxes (engine AND scene model call it)
+│   ├── vesselGenerator.ts    generateVessels(...): "Generate N vessels"
+│   ├── overrides.ts          Setup-dialog edits (quay length, STS count, vessel table) + validation
 │   ├── presets.ts            Preset registry (empty until TT-15)
 │   └── fixtures/             definitions.ts → <name>.json (+ <name>.golden.json), index.ts
 ├── i18n/                     UI text and display formatting (no Vue)
@@ -87,8 +100,8 @@ terminal-twin/
 ├── definition.ts             Home card (keep light: eagerly imported)
 ├── TerminalTwin.vue          Root: TopBar, 3D host, SetupDialog, banner; installs window.__tt in DEV
 ├── components/               TopBar.vue (clock, speeds, Run to…, Reset, New Scenario, ?), OverlayToggles.vue,
-│                             modals/SetupDialog.vue (scenario, seed, start, display, SHC count + kinematics),
-│                             modals/ShortcutHelp.vue
+│                             modals/SetupDialog.vue (scenario, seed, start, display, quay, STS, vessels, SHC fleet),
+│                             modals/ShortcutHelp.vue, setup/VesselTable.vue (vessel table + "Generate N vessels")
 ├── composables/useTwinShortcuts.ts  Window keydown → store actions (table in modules/shortcuts.ts)
 ├── composables/useTwinScene.ts  Renderer/camera/OrbitControls + the frame loop (tick → sync → pose → render)
 ├── modules/                  Main-thread, non-reactive
@@ -143,10 +156,10 @@ terminal-twin/
 `dev/devApi.ts` is dynamically imported inside `if (import.meta.env.DEV)`, so production builds don't contain it (checked by `terminal-twin.prod.smoke.ts`). Every call is async-safe from `page.evaluate`:
 
 ```js
-await __tt.load('tracer-1sts-10-boxes', { seed?, startDateTime?, autoplay? })  // default: fixture's own seed, paused
+await __tt.load('tracer-1sts-10-boxes', { seed?, startDateTime?, autoplay?, overrides? })  // default: fixture's own seed, paused
 await __tt.runUntil({ time?, eventType?, moves?, vesselsCompleted?, maxEvents? }) // no arg = to the end; pauses
 await __tt.runTo(600); await __tt.step()
-await __tt.query('summary' | 'kpis' | 'containers' | 'stsList' | 'vessels' | 'invariants' | 'eventLog')
+await __tt.query('summary' | 'kpis' | 'containers' | 'stsList' | 'vessels' | 'vesselSlots' | 'invariants' | 'eventLog')
 await __tt.query('container' | 'vessel' | 'sts' | 'groundPosition', id)
 await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })  // new root event
 await __tt.snapshot(); await __tt.why(eventId)
@@ -168,8 +181,8 @@ __tt.ui()          // { selectedId, following, overlaysVisible, dashboardOpen, h
 ## Horizontal transport: SHCs (TT-05)
 
 - **Config** (all optional, so older fixtures are unchanged): `shcs: [{id}]`, `kinematics.shc` (`DEFAULT_SHC_KINEMATICS` [A]), `yard.blocks: [{id, x, wtpPads}]`, `apron` (lane geometry, `DEFAULT_APRON_LAYOUT`), `driverVariabilityPct`, `subsystems: {shc, asc}`. Builder: `.shcs(n, kin?)`, `.block(id, {x, wtpPads})`, `.driverVariability(pct)`, `.subsystems({...})`; `withShcFleet(config, n, kin?)` (setup dialog).
-- **Lane graph** (`engine/laneGraph.ts`, pure, cached per config object): STS lanes run +X under each crane (entry E → ground position G → exit X) with entry/exit spines to a westbound/eastbound apron loop (crossovers at every apron X); WTP pads are spurs off the eastbound lane (`AE → C (clear position) → P (pad)` and back); one parking spur per SHC west of everything. Every edge is along X or Z. Node ids: `AW@x`, `AE@x`, `E:<sts>:<lane>`, `G:<gpId>`, `X:<sts>:<lane>`, `C:<padId>`, `P:<padId>`, `S:<shcId>`. Pads: `<blockId>-WTP<n>`, centred on the block across X, boxes along Z.
-- **Conflict zones and reservations** (`engine/reservations.ts`): zones are intersections (apron and spine nodes), each ground position's lane section, and each pad with its spur. A trip reserves `[t(enter − clearance), t(leave + clearance))` for every zone visit before it starts; if any window overlaps, **the whole trip departs later** (`earliestStart`). Vehicles therefore wait only where they rest (parking spot, pad clear position), which are not zones. The STS also reserves its ground position's lane from the start of the carry until the box is down, and delays the carry if an SHC is still in the lane. Windows are half-open; zero-length (instant) windows are not stored.
+- **Lane graph** (`engine/laneGraph.ts`, pure, cached per config object): one continuous one-way (+X) STS lane per ground-position lane along the whole quay; **stations** every `stationSpacingM` (25 m) with a down spine (westbound apron → lanes, nodes `D<k>:<lane>`) and, 5 m further, an up spine (lanes → westbound apron, `U<k>:<lane>`); a westbound/eastbound apron loop (`AW@x`, `AE@x`, crossovers at every apron X); WTP pads as spurs off the eastbound lane (`AE → C:<padId> (clear position) → P:<padId>` and back); one parking spur per SHC (`S:<shcId>`) west of everything. Every edge is along X or Z. `laneAccess(graph, lane, x)` gives the lane walk for a box at x; `laneZonesAt` the zones a set-down covers. Pads: `<blockId>-WTP<n>`, centred on the block, boxes along Z.
+- **Conflict zones and reservations** (`engine/reservations.ts`): zones are intersections (apron and lane/spine nodes), each STS lane section between two lane nodes (`L<lane>@<x>`), and each pad with its spur. A trip reserves `[t(enter − clearance), t(leave + clearance))` for every zone visit before it starts; if any window overlaps, **the whole trip departs later** (`earliestStart`). Vehicles therefore wait only where they rest (parking spot, pad clear position), which are not zones. With SHCs, the STS also reserves the lane sections under the box from the start of the carry until the box is down, and delays the carry if an SHC is still there. Windows are half-open; zero-length (instant) windows are not stored.
 - **Jobs and dispatch:** `StsGrounded` releases a job (`J<n>`) into the pool. `maybeDispatch` asks one free SHC (available first, then parked, by id) per open job/free pad not already being asked about. The `shcDispatch` decision point replies `{jobId, wtpPadId}` (or nulls → the SHC parks). Strategies: `oldest-job` (default; FIFO, first free pad) and `nearest-job` (shortest route, nearest free pad). The engine **trusts** the reply; invariants catch a double claim or a double-occupied pad.
 - **Trip:** the whole job is planned at once (straight runs rest-to-rest, stop at every turn; lock/lift/lower/unlock at the box and pad) and installed as `ShcState.motion` + `ShcState.plan`. Phase events chain (`ShcJobAssigned → ShcRoutingEmpty → ShcPositioningAtPickup → ShcLocking → ShcPicked → ShcRoutingLoaded → ShcPositioningAtDropoff → ShcLowering → ShcUnlocking → ShcDroppedAtWtp → ShcCleared`), each carrying the `segments` that led up to it. "Positioning" = the final straight run into the box/pad. Custody: GP → SHC at `ShcPicked`, SHC → pad at `ShcDroppedAtWtp`. Idle SHCs: `ShcRoutingToParking → ShcParked`.
 - **Waiting:** a `null` ground-position reply → `StsWaitingForGroundPosition` (status `waiting-for-ground-position`); when an SHC picks a box off that crane's lane, `StsGroundPositionWaitEnded {waitedS}` fires and the STS asks again. KPI `horizontal.stsGroundPositionWaitS`.
@@ -281,6 +294,18 @@ Most of each container file is the embedded 2048² livery atlas. The renderer sh
 - **Determinism.** Draw randomness only from `ctx.random()` (mulberry32, state in `SimState.rngState`); `Math.random` is lint-banned in `engine/`. The event-log hash is a streaming 53-bit hash of each committed event's JSON.
 - **Snapshots.** These are a JSON deep copy of `{config, seed, state, log, status, …}`. `SimState` must stay plain JSON, with no Maps, classes or functions.
 
+## Vessels, berthing and the STS rail (TT-09)
+
+- **Vessel table.** `config.vessels` holds vessel *calls*: `arrivalS`, `sizeClass`, `discharge`, `load`, `transshipment`, `maxSts`, optional `sizeMix`. Berth position and cranes are NOT in the config: decision points choose them. `config.containers` no longer exists.
+- **Size classes** (`scenario/vesselClasses.ts`, all [A]): LOA, beam, 40 ft bays, rows, hold and deck tiers, hatch-cover height. Frame: `berthX` = stern; bay 0 aft; row 0 quay side; tier 0 = hold floor, tiers >= `holdTiers` on deck. A cell holds one 40 ft or two 20 ft (aft `a` / fore `f` half). Slot id `V001:BB-RR-TT[a|f]`. Engine, scene model and renderer use the same `slotX/slotZ/tierBaseY`.
+- **Bay plan** (`planCargo(config, seed)`, own RNG stream): discharge boxes (ISO 6346 ids, weighted lines from `cargo.lines`, sizes from `sizeMix`, `emptyShare`) spread unevenly over bays, hold/deck in proportion, stacked bottom-up; 20 ft paired fore/aft. Load/transshipment slots are reserved empty (`purpose`). The scene model regenerates it from config + seed, so it never crosses the worker protocol. Query: `sim.query.vesselSlots(vesselId?)`.
+- **Berth flow** (`subsystems/berth.ts`): `VesselArrived` → `berthAllocation` (one pending at a time, arrival order, strictly first come first served) → `BerthAllocated` (quay stretch taken) or `VesselAtAnchorage` (asked again at every `VesselDeparted`) → `mooringS` → `VesselBerthed` → `craneSplit` → STS work → `StsWorkComplete` per crane → `VesselWorkComplete` → `unmooringS` → `VesselDeparted`. Anchorage wait = allocation − arrival (`kpis.vessels.*.anchorageWaitS`, `kpis.quay`). The engine rejects (throws, so the run fails) berths off the quay or within `berthGapM` of another vessel.
+- **Crane split:** the reply lists free cranes with ascending bay ranges in rail order, covering every work bay once. The engine rejects splits that would make cranes pass (`validateSplit`). No cranes → the vessel waits berthed and is asked about again whenever a crane is freed. Both strategies pick up to `maxSts` eligible free cranes nearest the vessel (eligible = no busy crane would have to pass them), then split the bays: `balanced-moves` (min-max moves, dynamic programming) or `equal-bays`.
+- **Rail** (`subsystems/rail.ts`): each STS has a reservation `[railLo, railHi]` covering its current gantry motion; neighbours stay `quay.stsMinSpacingM` (27 m) apart. A move that needs the rail waits (`StsWaitingForRail`, status `waiting-for-rail`, `kpis.sts.*.railWaitS`), and `wakeRail` retries after every rail change. A free idle crane in the way is asked to step aside (`StsRepositionStarted/Completed`). Reservations shrink at `StsPicked`. The `sts.rail-order` invariant checks order, spacing and position-within-reservation after every event; `berth.no-overlap` checks vessels.
+- **STS cycle:** the gantry move is part of `StsMoveStarted`'s plan (hoist up, gantry, trolley, hoist down). Work order per crane: bay ascending, deck before hold, top tier first, row ascending, aft before fore. **Twin-20** (`quay.twinLift`): the aft and fore halves of one cell are picked in one `StsPicked` (`payload.twin`); each gets its own ground-position decision, and they are set down one after the other (two `StsGrounded`, `payload.x` = set-down X) before the next cycle [A: sequential release]. KPIs: `moves` (boxes), `cycles`, `twinLifts`.
+- **End:** with no end condition configured, the run ends when every vessel has departed.
+- **Browser:** vessel entity deltas carry `berthX`. The scene places hulls (procedural per class: extruded outline, boot-top, hatch covers, bridge, funnel; livery from the line the vessel name starts with) at the berth or in an anchorage row offshore. Twin boxes on the spreader use `CustodyChange.dx`. Run-to compaction (`compactMotion`) keeps each entity's latest motion plan whole (an SHC trip is one multi-segment plan) plus the latest earlier segment of every axis that plan does not move. Setup dialog: quay length, STS count (`spreadSts` spreads them evenly), vessel table and generator → `ScenarioChoice.overrides` → `applyOverrides`; `__tt.load(name, { overrides })` does the same.
+
 ## Public engine API (`engine/index.ts`)
 
 ```ts
@@ -349,9 +374,13 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 
 ## Known behaviours and pitfalls
 
-- The tracer fixture gives STS01 **10 ground positions** and has no SHCs (its golden is unchanged by TT-05). `shc-1sts-2shc-1wtp` (3 ground positions, 2 SHCs, block B01 with 4 pads west of the crane) ends at `simDurationS 1800`, after every box is in the yard.
+- Fixtures without SHCs give each STS enough ground positions for all its boxes (tracer 10, others 6–30) because nothing clears them; SHC fixtures use a realistic 3.
+- Berth allocation is strictly first come, first served: a vessel that never fits (LOA > quay) blocks the queue for good (the setup dialog warns).
+- A free crane steps aside only if its other neighbour leaves room (chains of free cranes move one after another). A busy crane is never pushed, so a waiting crane may idle until its neighbour finishes.
+- `shc-1sts-2shc-1wtp` (3 ground positions, 2 SHCs, block B01 with 4 pads west of the crane) ends at `simDurationS 1800`, after every box is in the yard.
 - SHC trips are planned whole at dispatch; a later conflict never re-plans a trip, it only delays the next trip's departure. A vehicle waiting at a pad clear position holds no reservation, so another SHC approaching that same pad can pass through it visually (rare; dispatch is instant).
-- Ground positions sit at the STS's **home** gantry X in the lane graph; an SHC positions at the box's actual X, clamped to the lane section (`stsLaneHalfSpanM`, default 30 m).
+- STS lanes are continuous along the quay (cranes move, TT-09): an SHC enters a lane at the down spine before the box (stations every `stationSpacingM`, 25 m) and leaves at the up spine after it. The STS reserves the lane sections it sets a box down in, so traffic in that lane and the set-down never overlap.
+- With SHCs, the STS lanes must stay clear of the apron: `validateLaneLayout` rejects ground-position counts whose last lane reaches the westbound apron lane (≥ 11 lanes with the default layout).
 - `kpis.handlers` omits decision points that were never called (so fixtures without SHCs keep their goldens).
 - Shortest paths are cached per lane graph (WeakMap on the config object) and the lane graph per config object: do not mutate a config after `createSimulation`.
 - Every decision adds two events (`DecisionRequested`, `DecisionResolved`) to the log. The tracer golden went from 35 to 55 events in TT-03, with KPIs unchanged.
@@ -373,4 +402,4 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 - Assets: run the generators only through `npm run tt:assets`; it replaces `assets/models/<group>/` wholesale, so hand edits to a committed GLB or sidecar are lost.
 - Assets: the viewer and the twin share one cached `loadContainerAssets()` promise; never dispose its materials or textures from a renderer.
 - Assets: container shadows need `shadow.normalBias` (0.35 in the twin) or the corrugation shows shadow acne.
-- Fixture `liveries-mixed` (12 boxes, 10 lines, all three sizes) exists for the livery smoke test.
+- Fixture `liveries-mixed` (12 generated boxes, equal weights over all ten lines → 8 lines with seed 7, all three sizes) exists for the livery smoke test.

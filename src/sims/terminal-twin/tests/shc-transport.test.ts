@@ -34,7 +34,7 @@ describe('SHC fixture: 1 STS → 2 SHC → 1 WTP strip', () => {
     sim.runUntil()
     const shcIds = new Set<string>()
     const typeOf = (eventId: number | null) => sim.eventLog().find((e) => e.id === eventId)?.type
-    for (const { id } of shcFixture.containers) {
+    for (const { id } of sim.query.containers()) {
       const history = sim.query.container(id).custodyHistory
       expect(history.slice(0, 5).map((h) => h.owner.kind), id).toEqual([
         'vesselSlot',
@@ -79,8 +79,8 @@ describe('SHC fixture: 1 STS → 2 SHC → 1 WTP strip', () => {
 /** Same fixture, scarce SHCs: 1 slow SHC and 2 ground positions. */
 function scarce(): ScenarioConfig {
   const c = withShcFleet(shcFixture, 1, {
-    driveEmpty: { vMax: 3, accel: 0.4, decel: 0.5 },
-    driveLoaded: { vMax: 2.5, accel: 0.3, decel: 0.4 },
+    driveEmpty: { vMax: 1.2, accel: 0.3, decel: 0.3 },
+    driveLoaded: { vMax: 1, accel: 0.2, decel: 0.2 },
   })
   c.name = 'shc-scarce'
   c.sts[0].groundPositions = 2
@@ -94,14 +94,13 @@ function crowded(): ScenarioConfig {
     .seed(7)
     .moveVariation(10)
     .driverVariability(20)
+    .quay(500, { mooringS: 60, unmooringS: 60 })
     .sts('STS01', { gantryX: 60, groundPositions: 3 })
-    .sts('STS02', { gantryX: 190, groundPositions: 3 })
-    .vessel('V001', { berthAtS: 60, berthX: 50, stsIds: ['STS01'], bays: 2, rows: 5 })
-    .vessel('V002', { berthAtS: 90, berthX: 180, stsIds: ['STS02'], bays: 2, rows: 5 })
-    .dischargeBoxes('V001', 10)
-    .dischargeBoxes('V002', 10, { line: 'MSC' })
+    .sts('STS02', { gantryX: 300, groundPositions: 3 })
+    .vesselCall('V001', { name: 'Shuttle One', sizeClass: 'feeder', discharge: 10, maxSts: 1, sizeMix: { '40': 1 } })
+    .vesselCall('V002', { name: 'Shuttle Two', sizeClass: 'feeder', arrivalS: 30, discharge: 10, maxSts: 1, sizeMix: { '40': 1 } })
     .shcs(6)
-    .block('B01', { x: 125, wtpPads: 4 })
+    .block('B01', { x: 180, wtpPads: 4 })
     .endWhen({ simDurationS: 2400 })
     .build()
 }
@@ -169,10 +168,11 @@ describe('SHC invariants hold for every fixture and stress variant', () => {
   })
 
   it('a broken dispatch handler that hands out an already claimed job trips claim.single-holder', () => {
+    // Hands every SHC the first job it ever saw, as long as that job is still in flight.
     let first: string | null = null
     const sim = createSimulation(crowded(), {
-      shcDispatch: (msg) => {
-        first ??= msg.payload.jobs[0]?.jobId ?? null
+      shcDispatch: (msg, query) => {
+        if (!first || !query.shcJobs().some((j) => j.id === first)) first = msg.payload.jobs[0]?.jobId ?? null
         return { jobId: first, wtpPadId: msg.payload.wtpPads[0].id }
       },
     })
@@ -297,7 +297,7 @@ describe('subsystem modes', () => {
     expect(log.filter((e) => e.type === 'AscStacked')).toHaveLength(10)
     for (const p of picks) expect(sim.why(p.id)[1].type).toBe('ShcDroppedAtWtp')
     expect(picks.map((e) => e.t)).toEqual(drops.map((e) => e.t))
-    for (const { id } of shcFixture.containers)
+    for (const { id } of sim.query.containers())
       expect(sim.query.container(id).custodyHistory.slice(5).map((h) => h.owner.kind)).toEqual(['asc', 'yardSlot'])
   })
 

@@ -33,8 +33,28 @@ export interface KpiReport {
   eventsProcessed: number
   movesCompleted: number
   vesselsCompleted: number
-  sts: Record<string, { moves: number; grossMovesPerHour: number | null }>
-  vessels: Record<string, { berthedAtS: number | null; departedAtS: number | null; turnaroundS: number | null }>
+  sts: Record<
+    string,
+    { moves: number; cycles: number; twinLifts: number; grossMovesPerHour: number | null; railWaitS: number }
+  >
+  vessels: Record<
+    string,
+    {
+      sizeClass: string
+      arrivedAtS: number | null
+      /** Arrival → berth allocation. */
+      anchorageWaitS: number | null
+      berthX: number | null
+      berthedAtS: number | null
+      departedAtS: number | null
+      /** All fast → departure. */
+      turnaroundS: number | null
+      /** STS cranes that worked the vessel. */
+      sts: string[]
+    }
+  >
+  /** Berth congestion: anchorage waits over vessels that have been allocated a berth. */
+  quay: { vesselsWaited: number; anchorageWaitS: { total: number; mean: number; max: number } }
   /** TOS handler KPIs per decision point (decision points never called are omitted). */
   handlers: Record<string, HandlerKpiReport>
   /** Horizontal transport (only when SHCs are configured). */
@@ -55,15 +75,38 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
   const sts: KpiReport['sts'] = {}
   for (const [id, k] of Object.entries(state.kpis.perSts)) {
     const span = k.firstMoveStartS !== null && k.lastMoveEndS !== null ? k.lastMoveEndS - k.firstMoveStartS : 0
-    sts[id] = { moves: k.moves, grossMovesPerHour: span > 0 ? r3((k.moves * 3600) / span) : null }
+    sts[id] = {
+      moves: k.moves,
+      cycles: k.cycles,
+      twinLifts: k.twinLifts,
+      grossMovesPerHour: span > 0 ? r3((k.moves * 3600) / span) : null,
+      railWaitS: r3(k.railWaitS),
+    }
   }
   const vessels: KpiReport['vessels'] = {}
+  const n3 = (x: number | null) => (x === null ? null : r3(x))
+  const waits: number[] = []
   for (const v of Object.values(state.vessels)) {
+    if (v.anchorageWaitS !== null) waits.push(v.anchorageWaitS)
     vessels[v.id] = {
-      berthedAtS: v.berthedAt === null ? null : r3(v.berthedAt),
-      departedAtS: v.departedAt === null ? null : r3(v.departedAt),
+      sizeClass: v.sizeClass,
+      arrivedAtS: n3(v.arrivedAt),
+      anchorageWaitS: n3(v.anchorageWaitS),
+      berthX: n3(v.berthX),
+      berthedAtS: n3(v.berthedAt),
+      departedAtS: n3(v.departedAt),
       turnaroundS: v.berthedAt !== null && v.departedAt !== null ? r3(v.departedAt - v.berthedAt) : null,
+      sts: [...v.stsHistory],
     }
+  }
+  const totalWait = waits.reduce((a, b) => a + b, 0)
+  const quay: KpiReport['quay'] = {
+    vesselsWaited: waits.filter((w) => w > 0).length,
+    anchorageWaitS: {
+      total: r3(totalWait),
+      mean: waits.length ? r3(totalWait / waits.length) : 0,
+      max: waits.length ? r3(Math.max(...waits)) : 0,
+    },
   }
   const handlers: KpiReport['handlers'] = {}
   const pending = Object.values(state.decisions.pending)
@@ -109,6 +152,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     vesselsCompleted: state.kpis.vesselsCompleted,
     sts,
     vessels,
+    quay,
     handlers,
     ...(horizontal ? { horizontal } : {}),
   }

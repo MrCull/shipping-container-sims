@@ -21,8 +21,13 @@ export interface SimQuery {
   container(id: string): Readonly<ContainerState>
   containers(): readonly Readonly<ContainerState>[]
   vessel(id: string): Readonly<VesselState>
+  vessels(): readonly Readonly<VesselState>[]
   vesselSlot(id: string): Readonly<VesselSlotState>
+  /** A vessel's bay-plan slots (all vessels' when no id is given). */
+  vesselSlots(vesselId?: string): readonly Readonly<VesselSlotState>[]
   sts(id: string): Readonly<StsState>
+  /** All STS cranes in rail order. */
+  stsList(): readonly Readonly<StsState>[]
   groundPosition(id: string): Readonly<GroundPositionState>
   shc(id: string): Readonly<ShcState>
   shcs(): readonly Readonly<ShcState>[]
@@ -45,8 +50,14 @@ export function createQuery(getState: () => SimState): SimQuery {
     container: (id) => get(getState().containers, id, 'container'),
     containers: () => Object.values(getState().containers),
     vessel: (id) => get(getState().vessels, id, 'vessel'),
+    vessels: () => Object.values(getState().vessels),
     vesselSlot: (id) => get(getState().vesselSlots, id, 'vessel slot'),
+    vesselSlots: (vesselId) => {
+      const all = Object.values(getState().vesselSlots)
+      return vesselId === undefined ? all : all.filter((s) => s.vesselId === vesselId)
+    },
     sts: (id) => get(getState().sts, id, 'STS'),
+    stsList: () => Object.values(getState().sts).sort((a, b) => a.railIndex - b.railIndex),
     groundPosition: (id) => get(getState().groundPositions, id, 'ground position'),
     shc: (id) => get(getState().shcs, id, 'SHC'),
     shcs: () => Object.values(getState().shcs),

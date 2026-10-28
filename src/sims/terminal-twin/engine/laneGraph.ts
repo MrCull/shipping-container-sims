@@ -3,21 +3,24 @@
  * config, used by SHC routing, conflict-zone reservations and the 3D lane
  * overlay. Pure and deterministic; every edge runs along X or Z.
  *
- * Layout from water to land (Z grows landside):
+ * STS cranes travel the whole quay (TT-09), so the STS ground lanes are
+ * continuous along it. Layout from water to land (Z grows landside):
  *
- *   STS lanes   Z = stsGroundLaneZ0M + lane × spacing, one-way +X under each
- *               crane: entry E → ground position G → exit X.
- *               Entry spine runs down (-Z) from the westbound apron lane,
- *               exit spine runs up (+Z) to it.
- *   westbound apron lane (-X)   Z = westboundZ
- *   eastbound apron lane (+X)   Z = eastboundZ
- *               crossovers both ways at every apron X (they make the loop)
- *   WTP spurs   eastbound node → pad clear position C → WTP pad P and back
- *               (the SHC drives in, sets down, and reverses clear to C)
- *   parking     spurs off the eastbound lane, west of everything, one per SHC
+ *   STS lanes   one per ground-position lane j, Z = stsGroundLaneZ0M + j × spacing,
+ *               one-way +X from before the quay start to past its end. A box
+ *               grounded at X lies on lane j at X; an SHC picks it up there.
+ *   stations    every `stationSpacingM` along the quay: a down spine at x_k
+ *               (westbound apron → lane J … lane 1, nodes `D<k>:<j>`) and an up
+ *               spine at x_k + 5 (lane 1 … lane J → westbound apron, `U<k>:<j>`).
+ *               SHCs enter a lane at a down spine and leave at an up spine.
+ *   westbound apron lane (-X) Z = westboundZ; eastbound (+X) Z = eastboundZ;
+ *               crossovers both ways at every apron X (they make the loop).
+ *   WTP spurs   eastbound node → pad clear position C → WTP pad P and back.
+ *   parking     spurs off the eastbound lane, west of everything, one per SHC.
  *
- * Conflict zones: every apron node and spine node (intersections), each
- * ground position's lane section E→X, and each WTP pad with its spur.
+ * Conflict zones: every apron and spine node (intersections), every STS lane
+ * section between two lane nodes (`L<j>@<x>`; the STS reserves the sections it
+ * sets a box down in), and each WTP pad with its spur.
  */
 import type { ApronLayout, ScenarioConfig } from '../scenario/types'
 
@@ -28,19 +31,17 @@ export const DEFAULT_APRON_LAYOUT: ApronLayout = {
   parkingZ: 54,
   wtpZ: 64,
   padPitchM: 5.5,
-  stsLaneHalfSpanM: 30,
+  stationSpacingM: 25,
   parkingPitchM: 6,
   zoneClearanceM: 4,
 }
 
-export type LaneNodeKind =
-  | 'apron'
-  | 'stsLaneEntry'
-  | 'groundPosition'
-  | 'stsLaneExit'
-  | 'padClear'
-  | 'wtpPad'
-  | 'parking'
+/** Offset of a station's up spine from its down spine (m). */
+const UP_SPINE_OFFSET_M = 5
+/** STS lanes start this far before the quay and end this far past it (m). */
+const LANE_MARGIN_M = 15
+
+export type LaneNodeKind = 'apron' | 'laneDown' | 'laneUp' | 'padClear' | 'wtpPad' | 'parking'
 
 export interface LaneNode {
   id: string
@@ -62,7 +63,7 @@ export interface LaneEdge {
   zone: string | null
 }
 
-export type ConflictZoneKind = 'intersection' | 'groundPosition' | 'wtpPad'
+export type ConflictZoneKind = 'intersection' | 'stsLane' | 'wtpPad'
 
 export interface ConflictZone {
   id: string
@@ -90,10 +91,10 @@ export interface LaneGraph {
   out: Record<string, LaneEdge[]>
   zones: Record<string, ConflictZone>
   pads: WtpPadLayout[]
-  /** Ground position id → its pickup node. */
-  groundPositionNode: Record<string, string>
-  /** Ground position id → [lane entry X, lane exit X] (an SHC positions within it). */
-  groundPositionSpan: Record<string, [number, number]>
+  /** Z of each STS lane (index = ground-position lane). */
+  laneZ: number[]
+  /** Nodes of each STS lane in driving order (+X): D0, U0, D1, U1, … */
+  laneNodes: string[][]
   padNode: Record<string, string>
   padClearNode: Record<string, string>
   /** SHC id → its parking spot node. */
@@ -129,11 +130,25 @@ export function wtpPadLayout(config: ScenarioConfig): WtpPadLayout[] {
   return pads
 }
 
+/** Throws if the STS lanes would run into the apron lanes (too many ground positions for SHCs). */
+export function validateLaneLayout(config: ScenarioConfig): void {
+  const layout = apronLayout(config)
+  const lanes = Math.max(0, ...config.sts.map((s) => s.groundPositions))
+  const lastZ = config.layout.stsGroundLaneZ0M + (lanes - 1) * config.layout.stsGroundLaneSpacingM
+  if (lanes > 0 && lastZ + 3 > layout.westboundZ)
+    throw new Error(
+      `With SHCs, STS ground lanes must stay clear of the apron: ${lanes} lanes reach Z ${lastZ} m, ` +
+        `the westbound apron lane is at Z ${layout.westboundZ} m (use fewer ground positions per STS)`,
+    )
+}
+
 export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
   const layout = apronLayout(config)
   const nodes: Record<string, LaneNode> = {}
   const edges: LaneEdge[] = []
   const zones: Record<string, ConflictZone> = {}
+  const { stsGroundLaneZ0M: z0, stsGroundLaneSpacingM: dz } = config.layout
+  const lanes = Math.max(0, ...config.sts.map((s) => s.groundPositions))
   const graph: LaneGraph = {
     layout,
     nodes,
@@ -141,8 +156,8 @@ export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
     out: {},
     zones,
     pads: wtpPadLayout(config),
-    groundPositionNode: {},
-    groundPositionSpan: {},
+    laneZ: Array.from({ length: lanes }, (_, j) => z0 + j * dz),
+    laneNodes: Array.from({ length: lanes }, () => []),
     padNode: {},
     padClearNode: {},
     parkingNode: {},
@@ -155,17 +170,23 @@ export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
   const edge = (from: string, to: string, kind: LaneEdgeKind, zone: string | null = null) => {
     const a = nodes[from]
     const b = nodes[to]
-    const axis = a.z === b.z ? 'x' : 'z'
     if (a.x !== b.x && a.z !== b.z) throw new Error(`Lane edge ${from} → ${to} is not axis-aligned`)
-    edges.push({ from, to, lengthM: r3(Math.abs(b.x - a.x) + Math.abs(b.z - a.z)), axis, kind, zone })
+    edges.push({ from, to, lengthM: r3(Math.abs(b.x - a.x) + Math.abs(b.z - a.z)), axis: a.z === b.z ? 'x' : 'z', kind, zone })
   }
 
-  // Apron X positions: STS lane ends, pads, parking spots.
+  // Stations along the quay.
+  const stations: number[] = []
+  if (lanes > 0)
+    for (let x = -LANE_MARGIN_M; ; x += layout.stationSpacingM) {
+      stations.push(r3(x))
+      if (x >= config.quay.lengthM + LANE_MARGIN_M) break
+    }
+
+  // Apron X positions: spines, pads, parking spots.
   const xs = new Set<number>()
-  const { stsGroundLaneZ0M: z0, stsGroundLaneSpacingM: dz } = config.layout
-  for (const s of config.sts) {
-    xs.add(r3(s.gantryX - layout.stsLaneHalfSpanM))
-    xs.add(r3(s.gantryX + layout.stsLaneHalfSpanM))
+  for (const x of stations) {
+    xs.add(x)
+    xs.add(r3(x + UP_SPINE_OFFSET_M))
   }
   for (const p of graph.pads) xs.add(p.x)
   const shcs = config.shcs ?? []
@@ -187,31 +208,27 @@ export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
     edge(apronId('E', x), apronId('W', x), 'crossover')
   }
 
-  // STS lanes with entry and exit spines.
-  for (const s of config.sts) {
-    const ex = r3(s.gantryX - layout.stsLaneHalfSpanM)
-    const xx = r3(s.gantryX + layout.stsLaneHalfSpanM)
-    const lanes = s.groundPositions
+  // STS lanes and spines.
+  stations.forEach((x, k) => {
     for (let j = 0; j < lanes; j++) {
-      const z = z0 + j * dz
-      const gpId = `${s.id}-GP${j + 1}`
-      node(`E:${s.id}:${j + 1}`, ex, z, 'stsLaneEntry', `E:${s.id}:${j + 1}`)
-      node(`G:${gpId}`, s.gantryX, z, 'groundPosition', gpId)
-      node(`X:${s.id}:${j + 1}`, xx, z, 'stsLaneExit', `X:${s.id}:${j + 1}`)
-      zones[gpId] = { id: gpId, kind: 'groundPosition', x0: ex + half, x1: xx - half, z0: z - 1.5, z1: z + 1.5 }
-      graph.groundPositionNode[gpId] = `G:${gpId}`
-      graph.groundPositionSpan[gpId] = [ex, xx]
-      edge(`E:${s.id}:${j + 1}`, `G:${gpId}`, 'stsLane', gpId)
-      edge(`G:${gpId}`, `X:${s.id}:${j + 1}`, 'stsLane', gpId)
+      node(`D${k}:${j + 1}`, x, graph.laneZ[j], 'laneDown', `D${k}:${j + 1}`)
+      node(`U${k}:${j + 1}`, x + UP_SPINE_OFFSET_M, graph.laneZ[j], 'laneUp', `U${k}:${j + 1}`)
+      graph.laneNodes[j].push(`D${k}:${j + 1}`, `U${k}:${j + 1}`)
     }
-    if (lanes === 0) continue
-    // Entry spine: westbound apron → highest lane → … → lane 1.
-    edge(apronId('W', ex), `E:${s.id}:${lanes}`, 'spine')
-    for (let j = lanes; j > 1; j--) edge(`E:${s.id}:${j}`, `E:${s.id}:${j - 1}`, 'spine')
-    // Exit spine: lane 1 → … → highest lane → westbound apron.
-    for (let j = 1; j < lanes; j++) edge(`X:${s.id}:${j}`, `X:${s.id}:${j + 1}`, 'spine')
-    edge(`X:${s.id}:${lanes}`, apronId('W', xx), 'spine')
-  }
+    edge(apronId('W', x), `D${k}:${lanes}`, 'spine')
+    for (let j = lanes; j > 1; j--) edge(`D${k}:${j}`, `D${k}:${j - 1}`, 'spine')
+    for (let j = 1; j < lanes; j++) edge(`U${k}:${j}`, `U${k}:${j + 1}`, 'spine')
+    edge(`U${k}:${lanes}`, apronId('W', r3(x + UP_SPINE_OFFSET_M)), 'spine')
+  })
+  graph.laneNodes.forEach((list, j) => {
+    for (let i = 0; i + 1 < list.length; i++) {
+      const a = nodes[list[i]]
+      const b = nodes[list[i + 1]]
+      const zone = `L${j + 1}@${a.x}`
+      zones[zone] = { id: zone, kind: 'stsLane', x0: a.x + half, x1: b.x - half, z0: a.z - 1.5, z1: a.z + 1.5 }
+      edge(a.id, b.id, 'stsLane', zone)
+    }
+  })
 
   // WTP spurs.
   for (const p of graph.pads) {
@@ -243,6 +260,41 @@ export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
   return graph
 }
 
+/**
+ * How an SHC reaches a box at `x` on STS lane `lane` (0-based): enter at the
+ * last down spine before it, drive +X, leave at the first up spine after it.
+ * `walk` = lane nodes from entry to exit; the box lies between `walk[before]`
+ * and `walk[before + 1]`.
+ */
+export function laneAccess(graph: LaneGraph, lane: number, x: number): { walk: string[]; before: number } {
+  const list = graph.laneNodes[lane]
+  if (!list || list.length === 0) throw new Error(`No STS lane ${lane + 1} in the lane graph`)
+  const at = (id: string) => graph.nodes[id].x
+  let entry = 0
+  for (let i = 0; i < list.length; i += 2) if (at(list[i]) <= x - 1) entry = i
+  let exit = list.length - 1
+  for (let i = list.length - 1; i >= 1; i -= 2) if (at(list[i]) >= x + 1) exit = i
+  const walk = list.slice(entry, exit + 1)
+  let before = 0
+  for (let i = 0; i < walk.length - 1; i++) if (at(walk[i]) <= x) before = i
+  return { walk, before }
+}
+
+/** Conflict zones (lane sections and lane nodes) of STS lane `lane` within `halfLength` of `x`. */
+export function laneZonesAt(graph: LaneGraph, lane: number, x: number, halfLength: number): string[] {
+  const list = graph.laneNodes[lane] ?? []
+  const lo = x - halfLength
+  const hi = x + halfLength
+  const out: string[] = []
+  for (let i = 0; i < list.length; i++) {
+    const a = graph.nodes[list[i]]
+    if (a.x >= lo && a.x <= hi && a.zone) out.push(a.zone)
+    const b = list[i + 1] ? graph.nodes[list[i + 1]] : null
+    if (b && a.x < hi && b.x > lo) out.push(`L${lane + 1}@${a.x}`)
+  }
+  return out
+}
+
 const graphCache = new WeakMap<ScenarioConfig, LaneGraph>()
 const pathCache = new WeakMap<LaneGraph, Map<string, string[] | null>>()
 
@@ -266,29 +318,58 @@ export function shortestPath(graph: LaneGraph, from: string, to: string): string
   const key = `${from}>${to}`
   if (cache.has(key)) return cache.get(key) ?? null
   if (!graph.nodes[from] || !graph.nodes[to]) throw new Error(`shortestPath: unknown node ${graph.nodes[from] ? to : from}`)
+  // Dijkstra with a binary heap of [distance, node id].
   const dist = new Map<string, number>([[from, 0]])
   const prev = new Map<string, string>()
-  const done = new Set<string>()
-  for (;;) {
-    let best: string | null = null
-    for (const [id, d] of dist) {
-      if (done.has(id)) continue
-      if (best === null || d < dist.get(best)! || (d === dist.get(best)! && id < best)) best = id
+  const heap: [number, string][] = [[0, from]]
+  const less = (a: [number, string], b: [number, string]) => a[0] < b[0] || (a[0] === b[0] && a[1] < b[1])
+  const push = (item: [number, string]) => {
+    heap.push(item)
+    let i = heap.length - 1
+    while (i > 0) {
+      const p = (i - 1) >> 1
+      if (!less(heap[i], heap[p])) break
+      ;[heap[i], heap[p]] = [heap[p], heap[i]]
+      i = p
     }
-    if (best === null) break
-    if (best === to) break
-    done.add(best)
-    for (const e of graph.out[best]) {
-      const nd = dist.get(best)! + e.lengthM
+  }
+  const pop = (): [number, string] | undefined => {
+    const top = heap[0]
+    const last = heap.pop()
+    if (heap.length > 0 && last) {
+      heap[0] = last
+      let i = 0
+      for (;;) {
+        const l = 2 * i + 1
+        const r = l + 1
+        let m = i
+        if (l < heap.length && less(heap[l], heap[m])) m = l
+        if (r < heap.length && less(heap[r], heap[m])) m = r
+        if (m === i) break
+        ;[heap[i], heap[m]] = [heap[m], heap[i]]
+        i = m
+      }
+    }
+    return top
+  }
+  const done = new Set<string>()
+  for (let item = pop(); item; item = pop()) {
+    const [d, id] = item
+    if (done.has(id)) continue
+    done.add(id)
+    if (id === to) break
+    for (const e of graph.out[id]) {
+      const nd = d + e.lengthM
       const cur = dist.get(e.to)
       if (cur === undefined || nd < cur - 1e-9) {
         dist.set(e.to, nd)
-        prev.set(e.to, best)
+        prev.set(e.to, id)
+        push([nd, e.to])
       }
     }
   }
   let path: string[] | null = null
-  if (dist.has(to)) {
+  if (done.has(to)) {
     path = [to]
     while (path[0] !== from) path.unshift(prev.get(path[0])!)
   }

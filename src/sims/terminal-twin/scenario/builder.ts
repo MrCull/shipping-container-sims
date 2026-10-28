@@ -4,23 +4,25 @@
  *
  *   const cfg = new ScenarioBuilder('my-fixture', 'What it exercises')
  *     .seed(7)
- *     .sts('STS01', { gantryX: 100, groundPositions: 3 })
- *     .vessel('V001', { stsIds: ['STS01'], bays: 2, rows: 5 })
- *     .dischargeBoxes('V001', 10)
+ *     .quay(600)
+ *     .sts('STS01', { gantryX: 100, groundPositions: 3 })     // rail order
+ *     .vesselCall('V001', { sizeClass: 'panamax', arrivalS: 0, discharge: 40 })
  *     .endWhen({ vesselsCompleted: 1 })
  *     .build()
  *
- * Default values are approximations [A] of Malaccamax STS performance.
+ * Default values are approximations [A] (Malaccamax STS performance,
+ * typical berth times). The bay plan is generated from the vessel table and
+ * the seed when the simulation starts (`bayPlan.ts`).
  */
-import { makeIso6346Id } from './iso6346'
+import { DEFAULT_CARGO, LINE_OWNER_PREFIX } from './lines'
 import {
   SCENARIO_SCHEMA_VERSION,
   type ApronLayout,
   type BlockConfig,
-  type ContainerConfig,
-  type ContainerSize,
+  type CargoConfig,
   type EndConditions,
   type LayoutConfig,
+  type QuayConfig,
   type ScenarioConfig,
   type ShcKinematics,
   type StsConfig,
@@ -28,6 +30,10 @@ import {
   type StsKinematics,
   type VesselConfig,
 } from './types'
+import type { DecisionsConfig } from '../engine/decisions/types'
+import type { VesselSizeClass } from './types'
+
+export { LINE_OWNER_PREFIX }
 
 /** [A] Malaccamax-class STS kinematics. */
 export const DEFAULT_STS_KINEMATICS: StsKinematics = {
@@ -72,34 +78,47 @@ export function withShcFleet(config: ScenarioConfig, count: number, kinematics?:
 export const DEFAULT_LAYOUT: LayoutConfig = {
   stsGroundLaneZ0M: 8,
   stsGroundLaneSpacingM: 3,
-  stsSafeHoistM: 45,
+  stsSafeHoistM: 50,
 }
 
-/** Owner prefixes (owner code + "U") per shipping line. */
-export const LINE_OWNER_PREFIX: Record<string, string> = {
-  HMM: 'HDMU',
-  MSC: 'MSCU',
-  Maersk: 'MAEU',
-  'CMA CGM': 'CMAU',
-  'Hapag-Lloyd': 'HLXU',
-  ONE: 'ONEU',
-  Evergreen: 'EGHU',
-  COSCO: 'CSNU',
-  ZIM: 'ZIMU',
-  'Yang Ming': 'YMLU',
+/** [A] Berth and crane rules. */
+export const DEFAULT_QUAY: QuayConfig = {
+  lengthM: 400,
+  berthGapM: 15,
+  mooringS: 1800,
+  unmooringS: 1200,
+  stsMinSpacingM: 27,
+  twinLift: true,
 }
 
-type VesselOptions = Partial<Omit<VesselConfig, 'id'>> & Pick<VesselConfig, 'stsIds'>
+/** [A] Default maximum STS per vessel by size class. */
+export const DEFAULT_MAX_STS: Record<VesselSizeClass, number> = {
+  feeder: 2,
+  feedermax: 3,
+  panamax: 4,
+  'neo-panamax': 5,
+  ulcv: 6,
+}
 
-export interface DischargeOptions {
-  size?: ContainerSize
-  full?: boolean
-  line?: string
+export type VesselCallOptions = Partial<Omit<VesselConfig, 'id'>> & Pick<VesselConfig, 'sizeClass'>
+
+export function makeVesselCall(id: string, opts: VesselCallOptions): VesselConfig {
+  const v: VesselConfig = {
+    id,
+    name: opts.name ?? id,
+    arrivalS: opts.arrivalS ?? 0,
+    sizeClass: opts.sizeClass,
+    discharge: opts.discharge ?? 0,
+    load: opts.load ?? 0,
+    transshipment: opts.transshipment ?? 0,
+    maxSts: opts.maxSts ?? DEFAULT_MAX_STS[opts.sizeClass],
+  }
+  if (opts.sizeMix) v.sizeMix = { ...opts.sizeMix }
+  return v
 }
 
 export class ScenarioBuilder {
   private config: ScenarioConfig
-  private nextSerial = 100001
 
   constructor(name: string, description: string) {
     this.config = {
@@ -108,13 +127,13 @@ export class ScenarioBuilder {
       description,
       seed: 1,
       startDateTime: '2026-01-05T06:00:00Z',
-      quay: { lengthM: 400 },
+      quay: { ...DEFAULT_QUAY },
       layout: { ...DEFAULT_LAYOUT },
       kinematics: { sts: structuredClone(DEFAULT_STS_KINEMATICS) },
       moveVariationPct: 0,
       sts: [],
       vessels: [],
-      containers: [],
+      cargo: structuredClone(DEFAULT_CARGO),
       endConditions: {},
     }
   }
@@ -129,8 +148,8 @@ export class ScenarioBuilder {
     return this
   }
 
-  quay(lengthM: number): this {
-    this.config.quay = { lengthM }
+  quay(lengthM: number, ops: Partial<Omit<QuayConfig, 'lengthM'>> = {}): this {
+    this.config.quay = { ...this.config.quay, ...ops, lengthM }
     return this
   }
 
@@ -149,62 +168,31 @@ export class ScenarioBuilder {
     return this
   }
 
+  /** Add an STS; call in rail order (ascending gantryX). */
   sts(id: string, opts: Omit<StsConfig, 'id'>): this {
     this.config.sts.push({ id, ...opts })
     return this
   }
 
-  vessel(id: string, opts: VesselOptions): this {
-    this.config.vessels.push({
-      id,
-      name: opts.name ?? id,
-      berthAtS: opts.berthAtS ?? 0,
-      berthX: opts.berthX ?? 50,
-      stsIds: opts.stsIds,
-      bays: opts.bays ?? 4,
-      rows: opts.rows ?? 6,
-      tiersOnDeck: opts.tiersOnDeck ?? 1,
-      bayPitchM: opts.bayPitchM ?? 13,
-      rowPitchM: opts.rowPitchM ?? 2.5,
-      deckHeightM: opts.deckHeightM ?? 18,
-      fenderGapM: opts.fenderGapM ?? 2,
-    })
+  /** Add one vessel call to the vessel table. */
+  vesselCall(id: string, opts: VesselCallOptions): this {
+    this.config.vessels.push(makeVesselCall(id, opts))
     return this
   }
 
-  /**
-   * Place `count` discharge boxes on the vessel's deck, filling bay by bay,
-   * row by row, tier by tier. Ids are deterministic valid ISO 6346 ids.
-   */
-  dischargeBoxes(vesselId: string, count: number, opts: DischargeOptions = {}): this {
-    const vessel = this.config.vessels.find((v) => v.id === vesselId)
-    if (!vessel) throw new Error(`Unknown vessel ${vesselId}`)
-    const line = opts.line ?? 'HMM'
-    const prefix = LINE_OWNER_PREFIX[line]
-    if (!prefix) throw new Error(`Unknown shipping line ${line}`)
-    const taken = new Set(
-      this.config.containers
-        .filter((c) => c.initial.vesselId === vesselId)
-        .map((c) => `${c.initial.bay}:${c.initial.row}:${c.initial.tier}`),
-    )
-    let placed = 0
-    for (let bay = 0; bay < vessel.bays && placed < count; bay++) {
-      for (let tier = 0; tier < vessel.tiersOnDeck && placed < count; tier++) {
-        for (let row = 0; row < vessel.rows && placed < count; row++) {
-          if (taken.has(`${bay}:${row}:${tier}`)) continue
-          const c: ContainerConfig = {
-            id: makeIso6346Id(prefix, this.nextSerial++),
-            size: opts.size ?? '40',
-            full: opts.full ?? true,
-            line,
-            initial: { kind: 'vesselSlot', vesselId, bay, row, tier },
-          }
-          this.config.containers.push(c)
-          placed++
-        }
-      }
-    }
-    if (placed < count) throw new Error(`Vessel ${vesselId} has room for only ${placed} more boxes`)
+  /** Replace the vessel table (e.g. with `generateVessels(...)`). */
+  vessels(vessels: VesselConfig[]): this {
+    this.config.vessels = structuredClone(vessels)
+    return this
+  }
+
+  cargo(cargo: Partial<CargoConfig>): this {
+    this.config.cargo = { ...this.config.cargo, ...structuredClone(cargo) }
+    return this
+  }
+
+  decisions(decisions: DecisionsConfig): this {
+    this.config.decisions = structuredClone(decisions)
     return this
   }
 

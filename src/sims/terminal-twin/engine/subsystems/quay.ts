@@ -1,28 +1,37 @@
 /**
- * Quay subsystem: vessels at berth and STS discharge to ground positions.
+ * Quay subsystem: the STS discharge cycle on the shared rail.
  *
  * STS discharge cycle (events in order, each `segments` = motion leading up to it):
- *   StsMoveStarted → (gantry, trolley out, hoist down empty, lock) → StsPicked
- *   → DecisionRequested / DecisionResolved (stsGroundPosition; the STS waits
- *     holding the box while the decision is pending)
- *   → (hoist up loaded, trolley to lane, hoist down loaded, unlock) → StsGrounded
- *   → (hoist up empty) → StsMoveStarted … → StsWorkComplete → VesselDeparted
+ *   StsMoveStarted → rail reserved for the gantry move to the next bay
+ *     (or StsWaitingForRail until the neighbour is clear) → (gantry, trolley
+ *     out, hoist down empty, lock) → StsPicked (one box, or two for twin-20)
+ *   → DecisionRequested / DecisionResolved (stsGroundPosition, once per box;
+ *     the STS waits holding the box(es) while a decision is pending)
+ *   → (hoist up loaded, trolley to lane, hoist down, unlock) → StsGrounded
+ *     [twin-20: → (hoist clear, trolley to the 2nd lane, down, unlock) → StsGrounded]
+ *   → (hoist up empty) → StsMoveStarted … → StsWorkComplete (its bays are done)
+ *
+ * Work order per crane: bay by bay (ascending), deck before hold, top tier
+ * first, then row; a 20 ft cell aft half before fore half. Berthing, the
+ * crane split and vessel departure live in `berth.ts`; the rail in `rail.ts`.
  */
 import type { EngineContext, ReactorMap } from '../context'
 import { planSegment, type Axis, type AxisProfile, type MotionSegment } from '../kinematics'
+import type { SimState, StsDrop, StsState } from '../state'
+import {
+  CONTAINER_HEIGHT_M,
+  HALF_OFFSET_M,
+  slotX,
+  slotZ,
+  tierBaseY,
+  vesselClass,
+} from '../../scenario/vesselClasses'
+import { releaseRail, reserveRail, startReposition, wakeRail } from './rail'
+import { laneGraphOf, laneZonesAt } from '../laneGraph'
 import { earliestStart, reserve } from '../reservations'
-import type { ContainerState, StsState } from '../state'
-import type { ContainerSize, VesselConfig } from '../../scenario/types'
 
-/** [A] Container heights (m). */
-const CONTAINER_HEIGHT: Record<ContainerSize, number> = { '20': 2.591, '40': 2.591, '40HC': 2.896 }
-const TIER_HEIGHT_M = 2.591
-
-function vesselConfig(ctx: EngineContext, id: string): VesselConfig {
-  const v = ctx.config.vessels.find((x) => x.id === id)
-  if (!v) throw new Error(`Unknown vessel ${id}`)
-  return v
-}
+/** [A] Container lengths (m), for the lane sections a set-down covers. */
+const CONTAINER_LENGTH_M = { '20': 6.058, '40': 12.192, '40HC': 12.192 } as const
 
 /** Random duration factor for one move phase (1 ± moveVariationPct %). */
 function variation(ctx: EngineContext): number {
@@ -60,41 +69,125 @@ function planSequence(
   return { segments, end: t }
 }
 
-function startNextMove(ctx: EngineContext, sts: StsState, at: number, segments: MotionSegment[]): void {
-  if (!sts.vesselId) return
-  const vessel = ctx.state.vessels[sts.vesselId]
-  if (vessel.dischargeQueue.length === 0) {
+/** Order a crane's discharge boxes: bay ↑, deck before hold, tier ↓, row ↑, aft half before fore. */
+export function workOrder(state: SimState, vesselId: string, bays: number[]): string[] {
+  const inBays = new Set(bays)
+  return Object.values(state.vesselSlots)
+    .filter((s) => s.vesselId === vesselId && s.containerId !== null && s.purpose === 'discharge' && inBays.has(s.bay))
+    .sort(
+      (a, b) =>
+        a.bay - b.bay ||
+        Number(b.deck) - Number(a.deck) ||
+        b.tier - a.tier ||
+        a.row - b.row ||
+        (a.half === 'fore' ? 1 : 0) - (b.half === 'fore' ? 1 : 0),
+    )
+    .map((s) => s.containerId as string)
+}
+
+/** The next lift of a crane: its next box, plus the fore half of the same cell for a twin-20 lift. */
+function nextLift(ctx: EngineContext, sts: StsState): string[] {
+  const [first, second] = sts.workQueue
+  if (!first) return []
+  if (!ctx.config.quay.twinLift || !second) return [first]
+  const a = ctx.state.vesselSlots[ctx.state.containers[first].custody.id]
+  const b = ctx.state.vesselSlots[ctx.state.containers[second].custody.id]
+  const sameCell = a.vesselId === b.vesselId && a.bay === b.bay && a.row === b.row && a.tier === b.tier
+  return sameCell && a.half === 'aft' && b.half === 'fore' ? [first, second] : [first]
+}
+
+/** Gantry X for a lift: the half centre for a single 20 ft box, else the bay centre. */
+function liftX(ctx: EngineContext, vesselId: string, containerIds: string[]): number {
+  const vessel = ctx.state.vessels[vesselId]
+  const slot = ctx.state.vesselSlots[ctx.state.containers[containerIds[0]].custody.id]
+  const spec = vesselClass(vessel.sizeClass)
+  return slotX(spec, vessel.berthX ?? 0, slot.bay, containerIds.length === 1 ? slot.half : null)
+}
+
+/** Continue a crane's work at `at`: next move, or StsWorkComplete when its bays are done. */
+export function continueWork(ctx: EngineContext, sts: StsState, at: number, segments: MotionSegment[] = []): void {
+  if (!sts.vesselId) {
     sts.status = 'idle'
-    ctx.schedule('StsWorkComplete', at, { equipment: [sts.id], vessels: [vessel.id] }, {
-      stsId: sts.id,
-      vesselId: vessel.id,
-    })
     return
   }
-  ctx.schedule('StsMoveStarted', at, { equipment: [sts.id], vessels: [vessel.id] }, {
+  const vesselId = sts.vesselId
+  if (sts.workQueue.length === 0) {
+    sts.status = 'idle'
+    ctx.schedule('StsWorkComplete', at, { equipment: [sts.id], vessels: [vesselId] }, { stsId: sts.id, vesselId })
+    return
+  }
+  const containerIds = nextLift(ctx, sts)
+  ctx.schedule('StsMoveStarted', at, { equipment: [sts.id], vessels: [vesselId], containers: containerIds }, {
     stsId: sts.id,
-    vesselId: vessel.id,
+    vesselId,
+    containerIds,
     segments,
   })
 }
 
-/** Ask the stsGroundPosition decision point where to set down the box the STS holds. */
-function requestGroundPosition(ctx: EngineContext, sts: StsState, box: ContainerState): void {
+/** Run the rail wake-up after a rail change. */
+function wake(ctx: EngineContext): void {
+  wakeRail(ctx, (sts) => continueWork(ctx, sts, ctx.state.now))
+}
+
+function requestGroundPosition(ctx: EngineContext, sts: StsState, containerId: string): void {
   const { state } = ctx
-  sts.status = 'waiting-for-decision'
+  const reserved = new Map(sts.drops.map((d) => [d.groundPositionId, d.containerId]))
   ctx.requestDecision(
     'stsGroundPosition',
     {
       stsId: sts.id,
-      containerId: box.id,
+      containerId,
       groundPositions: sts.groundPositionIds.map((id) => ({
         id,
         lane: state.groundPositions[id].lane,
-        occupiedBy: state.groundPositions[id].containerId,
+        occupiedBy: state.groundPositions[id].containerId ?? reserved.get(id) ?? null,
       })),
     },
-    { equipment: [sts.id], containers: [box.id] },
+    { equipment: [sts.id], containers: [containerId] },
   )
+}
+
+/** Spreader offset of a carried box along X (twin-20: aft −, fore +). */
+function spreaderOffset(sts: StsState, containerId: string): number {
+  if (sts.carrying.length < 2) return 0
+  return sts.carrying[0] === containerId ? -HALF_OFFSET_M : HALF_OFFSET_M
+}
+
+/** Carry the next box to its chosen ground position and set it down. */
+function planDrop(ctx: EngineContext, sts: StsState, t0: number, drop: StsDrop, liftFirst: number): void {
+  const { config, state } = ctx
+  const k = config.kinematics.sts
+  const box = state.containers[drop.containerId]
+  const gp = state.groundPositions[drop.groundPositionId]
+  const f = variation(ctx)
+  const moves = [
+    { axis: 'hoist' as const, to: liftFirst, profile: k.hoistLoaded },
+    { axis: 'trolley' as const, to: config.layout.stsGroundLaneZ0M + gp.lane * config.layout.stsGroundLaneSpacingM, profile: k.trolley },
+    { axis: 'hoist' as const, to: CONTAINER_HEIGHT_M[box.size], profile: k.hoistLoaded },
+  ]
+  // With SHCs, the STS lane under the crane is a conflict zone: the carry starts once the lane
+  // section is free for the whole carry and set-down (an SHC may still be driving out of it).
+  let start = t0
+  if (state.subsystems.shc !== 'off') {
+    const dry = planSequence({ ...sts }, 0, f, moves)
+    const x = sts.gantryX + spreaderOffset(sts, box.id)
+    const windows = laneZonesAt(laneGraphOf(config), gp.lane, x, CONTAINER_LENGTH_M[box.size] / 2).map((zone) => ({
+      zone,
+      from: 0,
+      to: dry.end + k.unlockS,
+    }))
+    start = earliestStart(state, windows, t0)
+    reserve(state, sts.id, windows, start)
+  }
+  const { segments, end } = planSequence(sts, start, f, moves)
+  ctx.schedule('StsGrounded', end + k.unlockS, { equipment: [sts.id], containers: [box.id] }, {
+    stsId: sts.id,
+    containerId: box.id,
+    groundPositionId: gp.id,
+    x: sts.gantryX + spreaderOffset(sts, box.id),
+    segments,
+  })
 }
 
 /**
@@ -103,55 +196,63 @@ function requestGroundPosition(ctx: EngineContext, sts: StsState, box: Container
  */
 export function resumeStsWaitingForGroundPosition(ctx: EngineContext, stsId: string): void {
   const sts = ctx.state.sts[stsId]
-  if (sts.status !== 'waiting-for-ground-position' || !sts.carrying) return
+  if (sts.status !== 'waiting-for-ground-position') return
+  const containerId = sts.carrying.find((id) => !sts.drops.some((d) => d.containerId === id))
+  if (!containerId) return
   sts.status = 'waiting-for-decision'
-  ctx.schedule('StsGroundPositionWaitEnded', ctx.state.now, { equipment: [sts.id], containers: [sts.carrying] }, {
+  ctx.schedule('StsGroundPositionWaitEnded', ctx.state.now, { equipment: [sts.id], containers: [containerId] }, {
     stsId: sts.id,
-    containerId: sts.carrying,
+    containerId,
     waitedS: ctx.state.now - (sts.waitingSince ?? ctx.state.now),
   })
 }
 
 export const quayReactors: ReactorMap = {
-  ScenarioStarted: (_e, ctx) => {
-    for (const v of ctx.config.vessels) {
-      ctx.schedule('VesselBerthed', v.berthAtS, { vessels: [v.id] }, { vesselId: v.id, berthX: v.berthX })
-    }
-  },
-
-  VesselBerthed: (e, ctx) => {
-    const vessel = ctx.state.vessels[e.payload.vesselId]
-    vessel.status = 'berthed'
-    vessel.berthedAt = e.t
-    for (const stsId of vesselConfig(ctx, vessel.id).stsIds) {
-      const sts = ctx.state.sts[stsId]
-      sts.vesselId = vessel.id
-      startNextMove(ctx, sts, e.t, [])
-    }
-  },
-
   StsMoveStarted: (e, ctx) => {
     const { state, config } = ctx
     const sts = state.sts[e.payload.stsId]
     const vessel = state.vessels[e.payload.vesselId]
-    const containerId = vessel.dischargeQueue.shift()
-    if (!containerId) throw new Error(`${sts.id}: no box to discharge`)
-    const box = state.containers[containerId]
-    const slot = state.vesselSlots[box.custody.id]
-    const vc = vesselConfig(ctx, vessel.id)
-    const k = config.kinematics.sts
-    sts.status = 'moving-to-pick'
+    const ids = e.payload.containerIds
+    const targetX = liftX(ctx, vessel.id, ids)
     const kpi = state.kpis.perSts[sts.id]
+    const blockedBy = reserveRail(state, config, sts, targetX)
+    if (blockedBy !== null) {
+      sts.status = 'waiting-for-rail'
+      sts.railTargetX = targetX
+      kpi.railWaitSince ??= e.t
+      ctx.schedule('StsWaitingForRail', e.t, { equipment: [sts.id], vessels: [vessel.id] }, {
+        stsId: sts.id,
+        targetX,
+        blockedBy,
+      })
+      return
+    }
+    if (kpi.railWaitSince !== null) {
+      kpi.railWaitS += e.t - kpi.railWaitSince
+      kpi.railWaitSince = null
+    }
+    sts.workQueue.splice(0, ids.length)
+    sts.status = 'moving-to-pick'
     kpi.firstMoveStartS ??= e.t
+    kpi.cycles++
+    if (ids.length === 2) kpi.twinLifts++
+    const spec = vesselClass(vessel.sizeClass)
+    const box = state.containers[ids[0]]
+    const slot = state.vesselSlots[box.custody.id]
+    const tallest = Math.max(...ids.map((id) => CONTAINER_HEIGHT_M[state.containers[id].size]))
+    const k = config.kinematics.sts
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
-      { axis: 'gantry', to: vc.berthX + (slot.bay + 0.5) * vc.bayPitchM, profile: k.gantry },
-      { axis: 'trolley', to: -(vc.fenderGapM + (slot.row + 0.5) * vc.rowPitchM), profile: k.trolley },
-      { axis: 'hoist', to: vc.deckHeightM + slot.tier * TIER_HEIGHT_M + CONTAINER_HEIGHT[box.size], profile: k.hoistEmpty },
+      { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: k.hoistEmpty },
+      { axis: 'gantry', to: targetX, profile: k.gantry },
+      { axis: 'trolley', to: slotZ(spec, slot.row), profile: k.trolley },
+      { axis: 'hoist', to: tierBaseY(spec, slot.tier) + tallest, profile: k.hoistEmpty },
     ])
-    ctx.schedule('StsPicked', end + k.lockS, { equipment: [sts.id], containers: [box.id], vessels: [vessel.id] }, {
+    const twin = ids[1] ? { containerId: ids[1], from: { ...state.containers[ids[1]].custody } } : undefined
+    ctx.schedule('StsPicked', end + k.lockS, { equipment: [sts.id], containers: ids, vessels: [vessel.id] }, {
       stsId: sts.id,
       containerId: box.id,
       from: { ...box.custody },
+      ...(twin ? { twin } : {}),
       segments,
     })
   },
@@ -159,11 +260,20 @@ export const quayReactors: ReactorMap = {
   StsPicked: (e, ctx) => {
     const { state } = ctx
     const sts = state.sts[e.payload.stsId]
-    const box = state.containers[e.payload.containerId]
-    state.vesselSlots[e.payload.from.id].containerId = null
-    sts.carrying = box.id
-    ctx.transferCustody(box.id, { kind: 'sts', id: sts.id })
-    requestGroundPosition(ctx, sts, box)
+    const picks = [{ containerId: e.payload.containerId, from: e.payload.from }]
+    if (e.payload.twin) picks.push(e.payload.twin)
+    releaseRail(sts)
+    sts.carrying = picks.map((p) => p.containerId)
+    sts.drops = []
+    sts.status = 'waiting-for-decision'
+    for (const p of picks) {
+      state.vesselSlots[p.from.id].containerId = null
+      const vessel = state.vessels[state.vesselSlots[p.from.id].vesselId]
+      vessel.remainingDischarge--
+      ctx.transferCustody(p.containerId, { kind: 'sts', id: sts.id })
+    }
+    requestGroundPosition(ctx, sts, picks[0].containerId)
+    wake(ctx)
   },
 
   StsGroundPositionWaitEnded: (e, ctx) => {
@@ -172,17 +282,16 @@ export const quayReactors: ReactorMap = {
     sts.waitingSince = null
     const waits = state.kpis.horizontal?.stsGroundPositionWaitS
     if (waits) waits[sts.id] = (waits[sts.id] ?? 0) + e.payload.waitedS
-    requestGroundPosition(ctx, sts, state.containers[e.payload.containerId])
+    requestGroundPosition(ctx, sts, e.payload.containerId)
   },
 
-  /** Ground-position reply: carry the box to the chosen lane (or wait if none). */
+  /** Ground-position reply: once every carried box has a position, carry the first one there (or wait if none). */
   DecisionResolved: (e, ctx) => {
     if (e.payload.decisionPoint !== 'stsGroundPosition') return
     const { state, config } = ctx
     const { request, reply } = e.payload
     const sts = state.sts[request.stsId]
     const box = state.containers[request.containerId]
-    sts.status = 'carrying'
     if (reply.groundPositionId === null) {
       sts.status = 'waiting-for-ground-position'
       sts.waitingSince = e.t
@@ -192,27 +301,16 @@ export const quayReactors: ReactorMap = {
       })
       return
     }
-    const gp = state.groundPositions[reply.groundPositionId]
-    if (!gp) throw new Error(`stsGroundPosition handler returned unknown ground position ${reply.groundPositionId}`)
-    const k = config.kinematics.sts
-    const f = variation(ctx)
-    const moves = [
-      { axis: 'hoist' as const, to: config.layout.stsSafeHoistM, profile: k.hoistLoaded },
-      { axis: 'trolley' as const, to: config.layout.stsGroundLaneZ0M + gp.lane * config.layout.stsGroundLaneSpacingM, profile: k.trolley },
-      { axis: 'hoist' as const, to: CONTAINER_HEIGHT[box.size], profile: k.hoistLoaded },
-    ]
-    // The ground position's lane is a conflict zone: the carry starts once it is free until the box is down.
-    const dry = planSequence({ ...sts }, 0, f, moves)
-    const windows = [{ zone: gp.id, from: 0, to: dry.end + k.unlockS }]
-    const start = earliestStart(state, windows, e.t)
-    reserve(state, sts.id, windows, start)
-    const { segments, end } = planSequence(sts, start, f, moves)
-    ctx.schedule('StsGrounded', end + k.unlockS, { equipment: [sts.id], containers: [box.id] }, {
-      stsId: sts.id,
-      containerId: box.id,
-      groundPositionId: gp.id,
-      segments,
-    })
+    if (!state.groundPositions[reply.groundPositionId])
+      throw new Error(`stsGroundPosition handler returned unknown ground position ${reply.groundPositionId}`)
+    sts.drops.push({ containerId: box.id, groundPositionId: reply.groundPositionId })
+    const next = sts.carrying.find((id) => !sts.drops.some((d) => d.containerId === id))
+    if (next) {
+      requestGroundPosition(ctx, sts, next)
+      return
+    }
+    sts.status = 'carrying'
+    planDrop(ctx, sts, e.t, sts.drops[0], config.layout.stsSafeHoistM)
   },
 
   StsGrounded: (e, ctx) => {
@@ -221,33 +319,39 @@ export const quayReactors: ReactorMap = {
     const box = state.containers[e.payload.containerId]
     // Trusts the handler's choice; the custody invariant catches a bad one.
     state.groundPositions[e.payload.groundPositionId].containerId = box.id
-    sts.carrying = null
-    sts.status = 'returning'
     ctx.transferCustody(box.id, { kind: 'groundPosition', id: e.payload.groundPositionId })
+    sts.drops = sts.drops.filter((d) => d.containerId !== box.id)
     state.kpis.movesCompleted++
     const kpi = state.kpis.perSts[sts.id]
     kpi.moves++
     kpi.lastMoveEndS = e.t
+    const rest = sts.carrying.filter((id) => id !== box.id)
+    if (rest.length > 0 && sts.drops.length > 0) {
+      // twin-20: the second box goes to its own ground position in the same cycle
+      planDrop(ctx, sts, e.t, sts.drops[0], CONTAINER_HEIGHT_M[box.size] + 1)
+      sts.carrying = rest
+      return
+    }
+    sts.carrying = rest
+    sts.status = 'returning'
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
       { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: config.kinematics.sts.hoistEmpty },
     ])
-    startNextMove(ctx, sts, end, segments)
+    continueWork(ctx, sts, end, segments)
   },
 
-  StsWorkComplete: (e, ctx) => {
-    const { state } = ctx
-    state.sts[e.payload.stsId].vesselId = null
-    const vessel = state.vessels[e.payload.vesselId]
-    const busy = vesselConfig(ctx, vessel.id).stsIds.some((id) => state.sts[id].vesselId === vessel.id)
-    if (vessel.dischargeQueue.length === 0 && !busy) {
-      ctx.schedule('VesselDeparted', e.t, { vessels: [vessel.id] }, { vesselId: vessel.id })
-    }
-  },
+  StsWaitingForRail: (_e, ctx) => wake(ctx),
 
-  VesselDeparted: (e, ctx) => {
-    const vessel = ctx.state.vessels[e.payload.vesselId]
-    vessel.status = 'departed'
-    vessel.departedAt = e.t
-    ctx.state.kpis.vesselsCompleted++
+  StsRepositionStarted: (e, ctx) => startReposition(ctx, ctx.state.sts[e.payload.stsId], e.payload.toX),
+
+  StsRepositionCompleted: (e, ctx) => {
+    const sts = ctx.state.sts[e.payload.stsId]
+    releaseRail(sts)
+    sts.status = 'idle'
+    // assigned to a vessel while repositioning: start its work now
+    if (sts.vesselId) continueWork(ctx, sts, e.t)
+    wake(ctx)
   },
 }
+
+export { wake as wakeQuayRail }

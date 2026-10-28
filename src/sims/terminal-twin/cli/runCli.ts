@@ -186,9 +186,17 @@ function formatSummary(s: RunSummary, stopped: string, started: string, processe
     `Vessels done:     ${s.kpis.vesselsCompleted}`,
   ]
   for (const [id, k] of Object.entries(s.kpis.sts))
-    lines.push(`  ${id.padEnd(15)} ${k.moves} moves, ${k.grossMovesPerHour ?? '–'} gross moves/h`)
+    lines.push(
+      `  ${id.padEnd(15)} ${k.moves} moves in ${k.cycles} cycles (${k.twinLifts} twin-20), ${k.grossMovesPerHour ?? '–'} gross moves/h, rail wait ${k.railWaitS} s`,
+    )
+  const s3 = (x: number | null) => (x === null ? '–' : `${x} s`)
   for (const [id, v] of Object.entries(s.kpis.vessels))
-    lines.push(`  ${id.padEnd(15)} turnaround ${v.turnaroundS === null ? '–' : `${v.turnaroundS} s`}`)
+    lines.push(
+      `  ${id.padEnd(15)} ${v.sizeClass}, berth ${v.berthX === null ? '–' : `${v.berthX} m`}, anchorage ${s3(v.anchorageWaitS)}, turnaround ${s3(v.turnaroundS)}, STS ${v.sts.join(' ') || '–'}`,
+    )
+  lines.push(
+    `Quay:             ${s.kpis.quay.vesselsWaited} vessel(s) waited at anchorage, max ${s.kpis.quay.anchorageWaitS.max} s, mean ${s.kpis.quay.anchorageWaitS.mean} s`,
+  )
   const hz = s.kpis.horizontal
   if (hz) {
     lines.push(`Horizontal:       ${hz.boxesToWtp} boxes to WTP pads`)

@@ -60,8 +60,8 @@ test('the SHC fixture runs in the browser: golden hash, custody chain, rendered 
 
 test('paused mid-trip, the scene shows each SHC and box where the engine has them', async ({ page }) => {
   await openShc(page)
-  await page.evaluate(() => window.__tt!.pause())
-  await page.evaluate(() => window.__tt!.runTo(240))
+  // Stop while the first box is on its way to the WTP pad (runUntil pauses at the engine time).
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingLoaded' }))
   const state = await page.evaluate(() => window.__tt!.sceneState())
   const boxes = await page.evaluate(() =>
     window.__tt!.query<{ id: string; custody: { kind: string; id: string } }[]>('containers'),
@@ -98,9 +98,8 @@ async function sampleFrames(page: Page, ms: number) {
 
 test('SHCs animate smoothly at ×1 and keep animating every frame at ×600', async ({ page }) => {
   await openShc(page)
-  // Start just after SHC01 sets off empty towards the first box.
-  await page.evaluate(() => window.__tt!.pause())
-  await page.evaluate(() => window.__tt!.runTo(160))
+  // Start as SHC01 sets off empty towards the first box.
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingEmpty' }))
   await page.evaluate(() => window.__tt!.setSpeed(1))
   const slow = await sampleFrames(page, 2000)
   const vMax = 8.3 // m/s, default empty SHC speed
@@ -134,8 +133,10 @@ test('SHCs animate smoothly at ×1 and keep animating every frame at ×600', asy
 test('lane-graph and reservation overlays toggle on and off', async ({ page }) => {
   const errors = collectErrors(page)
   await openShc(page)
+  // 15 s into SHC01's first trip, paused: it holds reservations on the zones ahead of it.
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingEmpty' }))
+  await page.evaluate(() => window.__tt!.runTo(window.__tt!.clock().displayTime + 15))
   await page.evaluate(() => window.__tt!.pause())
-  await page.evaluate(() => window.__tt!.runTo(170))
   const lanes = page.getByRole('button', { name: 'Lane graph' })
   const reservations = page.getByRole('button', { name: 'Reservations' })
   await expect(lanes).toHaveAttribute('aria-pressed', 'false')

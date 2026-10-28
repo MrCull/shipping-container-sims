@@ -72,18 +72,48 @@ export type DecisionResolvedPayload = {
 
 export interface EventPayloads {
   ScenarioStarted: { scenario: string; seed: number }
+  /** The vessel reached the port; it asks for a berth (berthAllocation). */
+  VesselArrived: { vesselId: string }
+  /** No berth was free on arrival: the vessel waits at anchorage until one is allocated. */
+  VesselAtAnchorage: { vesselId: string }
+  /** Berth allocated: the quay stretch is taken from now; mooring starts. */
+  BerthAllocated: { vesselId: string; berthX: number; anchorageWaitS: number }
+  /** All fast: the crane split is asked next. */
   VesselBerthed: { vesselId: string; berthX: number }
-  /** STS is free and takes the next box of its vessel's discharge sequence. */
-  StsMoveStarted: { stsId: string; vesselId: string; segments: MotionSegment[] }
-  /** Spreader locked on the box: custody vessel slot → STS. */
-  StsPicked: { stsId: string; containerId: string; from: CustodyRef; segments: MotionSegment[] }
+  /**
+   * The STS takes its next box (two for a twin-20 lift) and moves to it:
+   * gantry to the bay (rail reserved), trolley out, hoist down, lock.
+   */
+  StsMoveStarted: { stsId: string; vesselId: string; containerIds: string[]; segments: MotionSegment[] }
+  /** The STS cannot gantry to its next bay yet: a neighbouring crane is in the way. */
+  StsWaitingForRail: { stsId: string; targetX: number; blockedBy: string }
+  /** A free STS gantries out of a neighbour's way. */
+  StsRepositionStarted: { stsId: string; toX: number }
+  StsRepositionCompleted: { stsId: string; gantryX: number; segments: MotionSegment[] }
+  /**
+   * Spreader locked: custody vessel slot → STS. A twin-20 lift picks a
+   * second box (`twin`) in the same cycle.
+   */
+  StsPicked: {
+    stsId: string
+    containerId: string
+    from: CustodyRef
+    twin?: { containerId: string; from: CustodyRef }
+    segments: MotionSegment[]
+  }
   /** Box released on an STS ground position: custody STS → ground position. */
-  StsGrounded: { stsId: string; containerId: string; groundPositionId: string; segments: MotionSegment[] }
+  StsGrounded: {
+    stsId: string
+    containerId: string
+    groundPositionId: string
+    /** X along the quay where the box was set down (gantry ± twin-20 offset). */
+    x: number
+    segments: MotionSegment[]
+  }
   /** The ground-position decision returned no position; the STS holds the box and idles. */
   StsWaitingForGroundPosition: { stsId: string; containerId: string }
   /** A ground position freed up; the waiting STS asks for one again. */
   StsGroundPositionWaitEnded: { stsId: string; containerId: string; waitedS: number }
-  StsWorkComplete: { stsId: string; vesselId: string }
   /**
    * The SHC dispatch reply claimed a job: the whole trip (pickup, drop at the
    * WTP pad, clearing) is planned and its conflict zones reserved. The SHC
@@ -119,6 +149,11 @@ export interface EventPayloads {
   AscPicked: { ascId: string; blockId: string; containerId: string; wtpPadId: string }
   /** ASC set the box down in the stack: custody ASC → yard slot. */
   AscStacked: { ascId: string; blockId: string; containerId: string; yardSlotId: string }
+  /** The STS finished its bays of the vessel and is free again. */
+  StsWorkComplete: { stsId: string; vesselId: string }
+  /** All the vessel's moves are done: unmooring starts. */
+  VesselWorkComplete: { vesselId: string }
+  /** The vessel has left; its quay stretch is free. */
   VesselDeparted: { vesselId: string }
   DecisionRequested: DecisionRequestedPayload
   /** The handler timed out or returned an error; the fallback strategy answers next. */

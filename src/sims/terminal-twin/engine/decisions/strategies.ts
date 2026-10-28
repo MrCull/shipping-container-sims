@@ -7,6 +7,7 @@
  * identical runs. A strategy that needs randomness must take it from the
  * request, never from Math.random.
  */
+import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
 import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchPad, ShcDispatchRequest } from './types'
 
 const isFree = (p: ShcDispatchPad) => p.occupiedBy === null && p.claimedBy === null
@@ -86,6 +87,32 @@ export const strategies: StrategyRegistry = {
       },
     },
   },
+  berthAllocation: {
+    default: 'first-fit',
+    strategies: {
+      'first-fit': {
+        description: 'Lowest stern position along the quay where the vessel fits.',
+        handler: (msg) => firstFitBerth(msg.payload),
+      },
+      'best-fit': {
+        description: 'The free quay gap that leaves the least unused length.',
+        handler: (msg) => bestFitBerth(msg.payload),
+      },
+    },
+  },
+  craneSplit: {
+    default: 'balanced-moves',
+    strategies: {
+      'balanced-moves': {
+        description: 'Up to max STS free cranes nearest the vessel; contiguous bay ranges with near-equal moves.',
+        handler: (msg) => balancedMovesSplit(msg.payload),
+      },
+      'equal-bays': {
+        description: 'Up to max STS free cranes nearest the vessel; contiguous bay ranges with equal numbers of bays.',
+        handler: (msg) => equalBaysSplit(msg.payload),
+      },
+    },
+  },
 }
 
 /** Look up a built-in strategy; throws with the available names if unknown. */
@@ -100,4 +127,6 @@ export function getStrategy<K extends DecisionPointId>(dp: K, name: string): Dec
 export const defaultHandlers: HandlerSet = {
   stsGroundPosition: getStrategy('stsGroundPosition', strategies.stsGroundPosition.default),
   shcDispatch: getStrategy('shcDispatch', strategies.shcDispatch.default),
+  berthAllocation: getStrategy('berthAllocation', strategies.berthAllocation.default),
+  craneSplit: getStrategy('craneSplit', strategies.craneSplit.default),
 }
