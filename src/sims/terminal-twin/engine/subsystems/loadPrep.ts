@@ -51,6 +51,7 @@ export function pumpLoadPrep(ctx: EngineContext): void {
     if (!next) continue
     if (waiting && state.workPackages[next.packageId].seq > waiting.seq) continue
     const box = state.containers[next.containerId]
+    if (box.custody.kind !== 'yardSlot') continue // an empty start: the booked box has not been delivered and stacked yet (asked again when it is)
     if (box.onwardVesselId && box.readyAt == null) continue // transshipment box still dwelling (or still on its first vessel)
     next.stage = 'gp-asked'
     requestGroundPosition(ctx, sts, next.containerId, 'load')

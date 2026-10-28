@@ -54,6 +54,7 @@ import { makeIso6346Id } from '../../scenario/iso6346'
 import { LINE_OWNER_PREFIX } from '../../scenario/lines'
 import { pickWeighted, POOL_VESSEL_ID } from '../../scenario/bayPlan'
 import { sampleDwell } from '../../scenario/dwell'
+import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import type { ContainerSize, LandsideConfig, TruckTransactionKind } from '../../scenario/types'
 import { DEFAULT_LANDSIDE } from '../../scenario/builder'
 import { maybeDispatchAsc, pumpAllocation } from './asc'
@@ -130,11 +131,40 @@ export function eligiblePickups(state: SimState, full: boolean): ContainerState[
   return out.sort((a, b) => (a.id < b.id ? -1 : 1))
 }
 
-/** Vessels inside their export window now, with the number of export boxes to deliver (weights). */
+/** An empty or warm-up yard start (TT-14): the boxes booked to the vessels are delivered by trucks. */
+export const trucksDeliverBookings = (config: { yardStart?: { mode: string } }): boolean =>
+  config.yardStart?.mode === 'empty' || config.yardStart?.mode === 'warmup'
+
+/** Boxes booked to a vessel that no truck has delivered yet, in load sequence (empty start only). */
+export function undeliveredBookings(ctx: EngineContext, vesselId: string): ContainerState[] {
+  if (!trucksDeliverBookings(ctx.config)) return []
+  const { state } = ctx
+  const found: { key: number[]; box: ContainerState }[] = []
+  for (const slot of Object.values(state.vesselSlots)) {
+    if (slot.vesselId !== vesselId || !slot.plannedContainerId || slot.containerId !== null) continue
+    const box = state.containers[slot.plannedContainerId]
+    if (box && box.custody.kind === 'external' && box.truckClaim === undefined) found.push({ key: loadSequenceKey(slot), box })
+  }
+  return found.sort((a, b) => compareKeys(a.key, b.key)).map((f) => f.box)
+}
+
+/**
+ * Vessels a truck may deliver an export box for now, with the number of boxes to deliver (weights). Normally the
+ * vessels inside their export window; with an empty start, any vessel that still lacks booked boxes and whose
+ * window has opened (also after it arrived: its load waits for the trucks).
+ */
 export function exportVessels(ctx: EngineContext): { vesselId: string; weight: number }[] {
   const cfg = landsideOf(ctx.config)
   const { state } = ctx
   const out: { vesselId: string; weight: number }[] = []
+  if (trucksDeliverBookings(ctx.config)) {
+    for (const v of ctx.config.vessels) {
+      if (state.vessels[v.id].status === 'departed') continue
+      const n = undeliveredBookings(ctx, v.id).length
+      if (n > 0 && v.arrivalS - state.now <= cfg.exportWindow.maxBeforeEtaS) out.push({ vesselId: v.id, weight: n })
+    }
+    return out
+  }
   for (const v of ctx.config.vessels) {
     if (state.vessels[v.id].status !== 'scheduled') continue
     const untilEta = v.arrivalS - state.now
@@ -216,7 +246,14 @@ function makeLegs(ctx: EngineContext, truck: string, transaction: TruckTransacti
           break
         }
       }
-      const box = newBox(ctx, truck, true, chosen.vesselId)
+      const open = undeliveredBookings(ctx, chosen.vesselId)
+      const booked: ContainerState | undefined = open[open.length - 1]
+      if (booked) {
+        // an empty start: the truck brings the box booked to the vessel (the last in load sequence first, so the box loaded first ends up on top)
+        booked.truckClaim = truck
+        ctx.transferCustody(booked.id, { kind: 'truck', id: truck })
+      }
+      const box = booked ?? newBox(ctx, truck, true, chosen.vesselId)
       legs.push({ kind: 'drop', purpose, containerId: box.id, vesselId: chosen.vesselId, done: false })
     } else {
       const box = newBox(ctx, truck, false, POOL_VESSEL_ID)

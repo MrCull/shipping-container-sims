@@ -7,7 +7,7 @@ import { browserDisplayDefaults } from '../../i18n/display'
 import { travelTime, type AxisProfile } from '../../engine'
 import { DEFAULT_ASC_KINEMATICS, DEFAULT_SHC_KINEMATICS, type YardSetup } from '../../scenario/builder'
 import { applyOverrides, LIMITS, validateOverrides, type OverrideCheck, type ScenarioOverrides } from '../../scenario/overrides'
-import type { AscKinematics, ShcKinematics, UnitSystem, VesselConfig } from '../../scenario/types'
+import { DEFAULT_WARM_UP_S, DEFAULT_YARD_TARGET_PCT, type AscKinematics, type ShcKinematics, type UnitSystem, type VesselConfig, type YardStartMode } from '../../scenario/types'
 import { DEFAULT_TRANSSHIPMENT } from '../../scenario/dwell'
 import VesselTable from '../setup/VesselTable.vue'
 import { endConditionsFromFields, endFieldsOf, type EndFields } from '../../modules/endConditions'
@@ -180,6 +180,18 @@ const yardBlocks = ref<BlockDraft[]>([])
 const ascK = ref<AscKinematics>(copy(DEFAULT_ASC_KINEMATICS))
 /** ASCs per block; the dialog defaults to two (TTI Algeciras), the engine config to one. */
 const ascsPerBlock = ref<1 | 2>(2)
+/** Yard start (TT-14): pre-filled (default), warm-up or empty; empty and warm-up need the landside (export boxes arrive by truck). */
+const YARD_START_MODES: YardStartMode[] = ['prefilled', 'warmup', 'empty']
+const startMode = ref<YardStartMode>('prefilled')
+const startTargetPct = ref(DEFAULT_YARD_TARGET_PCT)
+const startWarmUpH = ref(DEFAULT_WARM_UP_S / 3600)
+const scenarioHasLandside = computed(() => {
+  try {
+    return resolveScenario(name.value).landside !== undefined
+  } catch {
+    return false
+  }
+})
 function loadYardDefaults(): void {
   let base: ReturnType<typeof resolveScenario> | null
   try {
@@ -198,6 +210,10 @@ function loadYardDefaults(): void {
     }))
   ascK.value = copy(previous?.asc ?? base?.kinematics.asc ?? DEFAULT_ASC_KINEMATICS)
   ascsPerBlock.value = previous?.ascsPerBlock ?? 2
+  startMode.value = previous?.start?.mode ?? 'prefilled'
+  startTargetPct.value = previous?.start?.targetPct ?? DEFAULT_YARD_TARGET_PCT
+  startWarmUpH.value = (previous?.start?.warmUpS ?? DEFAULT_WARM_UP_S) / 3600
+  if (startMode.value !== 'prefilled' && !scenarioHasLandside.value) startMode.value = 'prefilled'
 }
 loadYardDefaults()
 watch(name, loadYardDefaults)
@@ -329,6 +345,14 @@ async function submit(): Promise<void> {
       formError.value = t('setup.yard.errorKinematics')
       return
     }
+    if (startMode.value === 'prefilled' && !(startTargetPct.value >= 0 && startTargetPct.value <= 100)) {
+      formError.value = t('setup.yard.errorTarget')
+      return
+    }
+    if (startMode.value === 'warmup' && !(startWarmUpH.value >= 1 && startWarmUpH.value <= 720)) {
+      formError.value = t('setup.yard.errorWarmUp')
+      return
+    }
   }
   const end = endEdited.value ? endConditionsFromFields(endFields.value, vessels.value.length) : null
   if (end && !end.ok) {
@@ -344,7 +368,20 @@ async function submit(): Promise<void> {
       startDateTime: startAt.toISOString(),
       overrides: JSON.parse(JSON.stringify(overrides.value)),
       shc: scenarioShcs.value > 0 ? { count: shcCount.value, kinematics: copy(shcK.value) } : undefined,
-      yard: scenarioBlocks.value > 0 ? { blocks: copy(yardBlocks.value), asc: copy(ascK.value), ascsPerBlock: ascsPerBlock.value } : undefined,
+      yard:
+        scenarioBlocks.value > 0
+          ? {
+              blocks: copy(yardBlocks.value),
+              asc: copy(ascK.value),
+              ascsPerBlock: ascsPerBlock.value,
+              start:
+                startMode.value === 'prefilled'
+                  ? { mode: 'prefilled', targetPct: startTargetPct.value }
+                  : startMode.value === 'warmup'
+                    ? { mode: 'warmup', warmUpS: Math.round(startWarmUpH.value * 3600) }
+                    : { mode: 'empty' },
+            }
+          : undefined,
     })
     .catch(() => {})
 }
@@ -794,6 +831,65 @@ async function submit(): Promise<void> {
             {{ t('setup.yard.ascsTwo') }}
           </label>
         </div>
+        <div
+          class="grid"
+          role="radiogroup"
+          :aria-label="t('setup.yard.start')"
+          data-testid="tt-yard-start"
+        >
+          <span class="blockname">{{ t('setup.yard.start') }}</span>
+          <label
+            v-for="m in YARD_START_MODES"
+            :key="m"
+            class="unit-choice"
+          >
+            <input
+              v-model="startMode"
+              type="radio"
+              name="yard-start"
+              :value="m"
+              :disabled="m !== 'prefilled' && !scenarioHasLandside"
+              :data-testid="`tt-yard-start-${m}`"
+            >
+            {{ t(`setup.yard.start.${m}`) }}
+          </label>
+          <label
+            v-if="startMode === 'prefilled'"
+            class="mini"
+          >
+            <span>{{ t('setup.yard.targetPct') }}</span>
+            <input
+              v-model.number="startTargetPct"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              name="yard-target"
+              data-testid="tt-yard-target"
+            >
+          </label>
+          <label
+            v-if="startMode === 'warmup'"
+            class="mini"
+          >
+            <span>{{ t('setup.yard.warmUpH') }}</span>
+            <input
+              v-model.number="startWarmUpH"
+              type="number"
+              min="1"
+              max="720"
+              step="1"
+              name="yard-warmup"
+              data-testid="tt-yard-warmup"
+            >
+          </label>
+        </div>
+        <p
+          v-if="!scenarioHasLandside"
+          class="hint"
+        >
+          {{ t('setup.yard.startNoLandside') }}
+        </p>
         <div class="grid">
           <label
             v-for="f in yardSpeedFields"

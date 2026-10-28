@@ -14,7 +14,10 @@ import { nextRandom, seedState } from './rng'
 import { ascStartZ, blockSpecs, PARK_UNTIL_S, railSegmentIds, travelHoistM } from './yardLayout'
 import { planCargo, POOL_VESSEL_ID, type SlotPurpose } from '../scenario/bayPlan'
 import { sampleDwell } from '../scenario/dwell'
-import { planExportYard } from '../scenario/exportYard'
+import { planExportYard, type ExportPlacement } from '../scenario/exportYard'
+import { prefillOf } from './prefill'
+import type { DecisionHandler } from './decisions/types'
+import { DEFAULT_WARM_UP_S } from '../scenario/types'
 import type { ContainerSize, ScenarioConfig, SubsystemMode, TruckTransactionKind, VesselSizeClass } from '../scenario/types'
 import { vesselSlotId as makeVesselSlotId, type CellHalf } from '../scenario/vesselClasses'
 
@@ -671,6 +674,17 @@ export interface BerthState {
   splitting: string | null
 }
 
+/** Warm-up start (TT-14): KPIs and end-condition counters restart at `durationS` (`WarmUpEnded`). */
+export interface WarmUpState {
+  durationS: number
+  ended: boolean
+  /** Counters at the end of the warm-up (the default end condition counts the vessels still to complete). */
+  vesselsCompletedBefore: number
+  movesBefore: number
+  /** Yard cells (20 ft) per block when the measured period began (the KPI series' starting gauge). */
+  cellsAtEnd?: Record<string, number>
+}
+
 export interface SimState {
   now: number
   nextEventId: number
@@ -706,6 +720,8 @@ export interface SimState {
   trucks: Record<string, TruckState>
   /** Gate and stall state (present when the landside is on). */
   landside: LandsideState | null
+  /** Warm-up start (TT-14): null for every other start. */
+  warmUp: WarmUpState | null
   subsystems: ResolvedSubsystemModes
   kpis: KpiCounters
   /** Decision points: correlation counter, injector RNG, pending decisions, handler KPIs. */
@@ -782,7 +798,7 @@ function initLandside(state: SimState, config: ScenarioConfig, seed: number): vo
     return v
   }
   for (const box of Object.values(state.containers))
-    if (box.vesselId === POOL_VESSEL_ID && box.yardSince !== undefined) box.pickupReadyAt = box.yardSince + sampleDwell(landside.importDwell, rng)
+    if (box.vesselId === POOL_VESSEL_ID && box.yardSince !== undefined && box.pickupReadyAt === undefined) box.pickupReadyAt = box.yardSince + sampleDwell(landside.importDwell, rng)
   state.landside = ls
   state.kpis.landside = {
     trucksIn: 0,
@@ -809,6 +825,8 @@ export function createInitialState(
   config: ScenarioConfig,
   seed: number,
   subsystems: ResolvedSubsystemModes = resolveSubsystemModes(config),
+  /** A custom yardAllocation handler (synchronous), used for the pre-fill placement. */
+  yardAllocation?: DecisionHandler<'yardAllocation'>,
 ): SimState {
   validateRail(config)
   const state: SimState = {
@@ -842,6 +860,10 @@ export function createInitialState(
     nextReservationId: 0,
     trucks: {},
     landside: null,
+    warmUp:
+      config.yardStart?.mode === 'warmup'
+        ? { durationS: config.yardStart.warmUpS ?? DEFAULT_WARM_UP_S, ended: false, vesselsCompletedBefore: 0, movesBefore: 0 }
+        : null,
     subsystems,
     kpis: {
       movesCompleted: 0,
@@ -875,14 +897,24 @@ export function createInitialState(
   for (const s of plan.slots) state.vesselSlots[s.id] = { ...s, containerId: null }
   const loading = subsystems.shc !== 'off' && subsystems.asc !== 'off'
   for (const s of plan.slots) if (s.emptyReq && loading) state.vessels[s.vesselId].remainingLoad++
-  const exportPlacement = new Map(planExportYard(config, plan).map((p) => [p.containerId, p]))
+  const startMode = config.yardStart?.mode
+  const emptyStart = startMode === 'empty' || startMode === 'warmup'
+  const hasYard = blockSpecs(config).length > 0
+  if (emptyStart && hasYard && loading && plan.containers.some((c) => c.flow === 'load') && (subsystems.landside === 'off' || !config.landside))
+    throw new Error('An empty or warm-up yard start needs the landside: export boxes arrive by truck (add config.landside, or use a pre-filled start)')
+  const prefill = prefillOf(config, plan, seed, yardAllocation, state)
+  const placements: ExportPlacement[] = prefill ? prefill.placements : emptyStart && hasYard ? [] : planExportYard(config, plan)
+  const exportPlacement = new Map(placements.map((p) => [p.containerId, p]))
+  const outside: CustodyRef = { kind: 'external', id: 'outside' }
   for (const c of plan.containers) {
     let owner: CustodyRef
     if (c.flow === 'load') {
       state.vesselSlots[c.slotId].plannedContainerId = c.id
       if (loading) state.vessels[c.vesselId].remainingLoad++
-      owner = { kind: 'yardSlot', id: (exportPlacement.get(c.id) as { slotId: string }).slotId }
+      // an empty start: the booked box is still outside, a truck brings it during the run
+      owner = emptyStart && hasYard ? { ...outside } : { kind: 'yardSlot', id: (exportPlacement.get(c.id) as { slotId: string }).slotId }
     } else if (c.flow === 'pool') {
+      if (emptyStart && hasYard) continue // no empty pool at the start: empties arrive by truck
       owner = { kind: 'yardSlot', id: (exportPlacement.get(c.id) as { slotId: string }).slotId }
     } else {
       state.vesselSlots[c.slotId].containerId = c.id
@@ -907,6 +939,20 @@ export function createInitialState(
         readyAt: null,
       })
       if (loading) state.vessels[c.transshipment.onwardVesselId].remainingLoad++
+    }
+  }
+  for (const imp of prefill?.imports ?? []) {
+    const owner: CustodyRef = { kind: 'yardSlot', id: (exportPlacement.get(imp.id) as { slotId: string }).slotId }
+    state.containers[imp.id] = {
+      id: imp.id,
+      size: imp.size,
+      full: true,
+      line: imp.line,
+      vesselId: POOL_VESSEL_ID,
+      custody: owner,
+      custodyHistory: [{ t: 0, owner, eventId: null }],
+      yardSince: -imp.ageS,
+      pickupReadyAt: imp.pickupReadyAt,
     }
   }
   config.sts.forEach((s, railIndex) => {

@@ -444,6 +444,16 @@ Branch `tt/45-landside-trucks`. Guide: `terminal-twin-AGENTS.md` § "Landside (T
 - **Browser:** `Delta.newContainers` (optional), entity kind `truck`; `containerIds` grows during the run (instancer capacity gets extra room for landside scenarios); `modules/landsideRenderer.ts`; truck kind registered in picking, inspector, labels, catalogue. Fixtures `dual-truck-transaction`, `truck-gate-queue`, `landside-morning-peak`.
 - **Gotchas:** the hourly profile uses `kpi.startTimeOfDayS`, so the browser start time changes truck counts (not other subsystems). A yard block without room for a delivery holds the truck at its stall. The default yard strategy piles imports at the waterside end, where the landside ASC cannot reach while the waterside ASC works pads: pickups wait (see `landside-morning-peak`). Pick jobs exist from arrival, so rehandles start while the truck is still at the gate. The truck turn counts from gate-in; a truck waiting for a stall holds its gate lane.
 - **Follow-ups:** setup dialog fields for the landside; TT-14 pre-fill should set `pickupReadyAt` for its boxes (`initLandside` does it for the empty pool only); TT-26/TT-28 replace the procedural truck and gate; delivered exports are not loaded onto their vessel.
+
+### ticket-46 (TT-14): yard start modes
+
+Branch `tt/46-yard-start-modes`. Guide: `terminal-twin-AGENTS.md` § "Yard start modes (TT-14)". Glossary: Yard start. ENGINE_VERSION unchanged (0.7.0; legacy start is byte-identical).
+
+- **Engine:** `config.yardStart`, `engine/prefill.ts` (`planPrefill`, `prefillOf`, `yardPlacerOf`, `yardCapacityCells`; exported from `engine/index.ts`), `engine/subsystems/warmUp.ts` (`WarmUpEnded`, `resetCounters`), `SimState.warmUp`, `createInitialState(..., yardAllocation?)`, `landside.ts` `undeliveredBookings`/`trucksDeliverBookings`, `loadPrep.ts` waits for a box that is not in a stack, `asc.ts` pumps load prep after a stack. KPI report gains `warmUp`; `simTimeS` is measured time.
+- **Browser:** `SceneModel` uses the same planner (imports become scene containers; empty start has booked boxes with custody `external:outside`); setup dialog "Yard start" (default Pre-filled 60 %); `YardSetup.start`.
+- **Gotchas:** the legacy start (no `yardStart`) is what every existing fixture uses; only the dialog defaults to pre-filled. A heavy truck load (about 20 trucks/h) on a small yard stalls retrievals with the legacy start too (rehandles behind truck-claimed boxes; seen in a 2 x 12 bay yard): pre-existing TT-12/TT-13 interplay, not changed here. The empty start delivers a vessel's booked boxes last-loaded first. Pre-fill imports are `vesselId 'POOL'` and `full`.
+- **Follow-ups:** TT-15 presets should choose a start mode per preset; a warm-up indicator in the UI.
+
 ### ticket-47 (TT-26): truck tractor and skeletal chassis models
 
 Branch `tt/47-truck-models`. Guide: `terminal-twin-AGENTS.md` § "Truck models (TT-26)". Glossary: Truck model, Fifth wheel, Chassis pin, Truck livery.
