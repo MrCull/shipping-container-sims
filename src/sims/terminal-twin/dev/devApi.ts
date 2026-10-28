@@ -13,13 +13,14 @@
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
  *   __tt.select('STS01'); __tt.cameraTo('STS01'); __tt.setSpeed(600); __tt.pause(); __tt.clock()
  *   __tt.overlays({ laneGraph: true, reservations: true })   // 3D debug overlays
+ *   await __tt.query('ascList'); await __tt.query('yardSlots', 'B01'); __tt.sceneState().ascs   // yard (TT-06)
  *   __tt.setDisplay({ locale: 'de-DE', units: 'imperial' }); __tt.display(); __tt.config(); __tt.ui()
  */
 import type { ScenarioOverrides } from '../scenario/overrides'
 import type { DisplaySettings, ScenarioConfig } from '../scenario/types'
 import type { CustodyRef, EngineEvent, EventPayloads, EventSubjects, EventType, RunResult, SimSnapshot } from '../engine'
 import type { OverlayState, RenderedLivery, SceneStats } from '../modules/sceneRenderer'
-import type { ShcPose, StsPose } from '../modules/sceneModel'
+import type { AscPose, ShcPose, StsPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
 import { resolveScenario, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
 import type { EngineInfo, EventSummary, QueryKind, WorkerRunCondition } from '../worker/protocol'
@@ -44,6 +45,7 @@ export interface TwinDevApi {
       autoplay?: boolean
       overrides?: ScenarioOverrides
       shc?: ScenarioChoice['shc']
+      yard?: ScenarioChoice['yard']
     },
   ): Promise<EngineInfo | null>
   step(): Promise<EventSummary | null>
@@ -92,6 +94,8 @@ export interface SceneState {
   containers: Record<string, CustodyRef | null>
   sts: Record<string, { status: string } & StsPose>
   shcs: Record<string, { status: string } & ShcPose>
+  /** One ASC per yard block: status and spreader pose (gantry Z, trolley X, hoist height). */
+  ascs: Record<string, { status: string } & AscPose>
   vessels: Record<string, { status: string }>
   /** Conflict zones reserved at the displayed time (zone → holder). */
   reservations: Record<string, string>
@@ -129,6 +133,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
           startDateTime: options.startDateTime ?? store.choice.startDateTime,
           overrides: options.overrides,
           shc: options.shc,
+          yard: options.yard,
         },
         { autoplay: options.autoplay ?? false },
       )
@@ -176,6 +181,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         containers: Object.fromEntries(model.containerIds.map((id) => [id, model.custodyAt(id, t)])),
         sts: Object.fromEntries(model.stsIds.map((id) => [id, { status: model.statusAt('sts', id, t), ...model.stsPose(id, t) }])),
         shcs: Object.fromEntries(model.shcIds.map((id) => [id, { status: model.statusAt('shc', id, t), ...model.shcPose(id, t) }])),
+        ascs: Object.fromEntries(model.ascIds.map((id) => [id, { status: model.statusAt('asc', id, t), ...model.ascPose(id, t) }])),
         reservations: model.activeReservations(t),
         vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
         liveries: store.view()?.liveries() ?? {},

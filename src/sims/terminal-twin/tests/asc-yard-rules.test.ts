@@ -328,6 +328,37 @@ describe('stack invariants hold', () => {
   })
 })
 
+describe('stress: scarce pads, many SHCs, slow TOS', () => {
+  it('2 pads, 4 SHCs and 30 boxes: the ASC and SHCs share the pads without a violation', () => {
+    const cfg = withStrategy('random')
+    cfg.vessels[0].discharge = 30
+    cfg.yard!.blocks[0].wtpPads = 2
+    cfg.kinematics.shc = { ...cfg.kinematics.shc!, driveEmpty: { vMax: 8, accel: 2, decel: 2 }, driveLoaded: { vMax: 7, accel: 2, decel: 2 } }
+    cfg.shcs = ['SHC01', 'SHC02', 'SHC03', 'SHC04'].map((id) => ({ id }))
+    cfg.endConditions = { simDurationS: 5000 }
+    const sim = createSimulation(cfg)
+    sim.runUntil()
+    expect(sim.firstError).toBeNull()
+    expect(sim.query.yardSlots()).toHaveLength(30)
+  })
+
+  it('a slow yardAllocation reply (keep-running) never stacks a box before an older claim below it', () => {
+    const cfg = withStrategy('group-by-vessel')
+    cfg.decisions = {
+      asyncMode: 'keep-running',
+      simSecondsPerWallSecond: 1,
+      points: { yardAllocation: { strategy: 'group-by-vessel', latency: { delay: { kind: 'uniform', minMs: 0, maxMs: 40000 } }, timeoutMs: 60000 } },
+    }
+    cfg.vessels[0].discharge = 25
+    cfg.endConditions = { simDurationS: 6000 }
+    const sim = createSimulation(cfg)
+    sim.runUntil()
+    expect(sim.firstError).toBeNull()
+    expect(sim.invariantReport().violations).toEqual([])
+    expect(sim.query.yardSlots()).toHaveLength(25)
+  })
+})
+
 describe('yard KPIs, modes, determinism', () => {
   it('reports boxes stacked, block fill and ASC travel', () => {
     const sim = createSimulation(fixture)

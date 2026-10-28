@@ -236,6 +236,12 @@ export interface AscJob {
   containerId: string
   wtpPadId: string
   vesselId: string
+  /**
+   * yardAllocation progress: waiting (one request per block at a time, in drop
+   * order, so each sees the stacks the previous reply claimed), asked, claimed,
+   * or full (the reply had no slot: the box stays on its pad).
+   */
+  allocation: 'waiting' | 'asked' | 'claimed' | 'full'
   /** Allocated slot (anchor cell id), null until yardAllocation answers. */
   yardSlotId: string | null
   /** Order in which slots were allocated (stacks are filled in this order). */

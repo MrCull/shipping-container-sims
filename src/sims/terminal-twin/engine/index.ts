@@ -31,6 +31,7 @@ export {
   TIER_PITCH_M,
   blockSpec,
   blockSpecs,
+  boxSpan,
   candidateSlots,
   parseYardSlotId,
   yardSlotId,
@@ -42,6 +43,7 @@ export {
 } from './yardLayout'
 export type { BlockSpec, YardCandidate, YardStacks } from './yardLayout'
 export { ascPoseAt } from './subsystems/asc'
+export { ascIdOf } from './state'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
 export type { Reservation } from './reservations'

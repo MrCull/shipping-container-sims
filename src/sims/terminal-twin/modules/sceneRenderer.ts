@@ -1,6 +1,6 @@
 /**
- * Phase 1 procedural low-poly scene: quay, water, STS cranes on their rail and
- * vessel hulls. Containers are drawn by the ContainerInstancer: procedural
+ * Phase 1 procedural low-poly scene: quay, water, STS cranes on their rail,
+ * vessel hulls, yard blocks (rails, bay marks, WTP pads, transfer stalls) and ASCs. Containers are drawn by the ContainerInstancer: procedural
  * placeholder boxes at once, then the phase 2 GLB LODs (LOD0 near the camera,
  * LOD1 elsewhere) with a per-instance livery as soon as they load. Shared
  * geometries and materials; nothing here is reactive (never put these in Vue state).
@@ -9,6 +9,7 @@
  * SceneModel timelines.
  */
 import * as THREE from 'three'
+import { BAY_PITCH_M as YARD_BAY_PITCH_M, ROW_PITCH_M as YARD_ROW_PITCH_M, rowX, travelHoistM } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 import { ContainerInstancer } from './containerInstancer'
@@ -29,6 +30,8 @@ const STS = {
 
 /** [A] Shuttle-carrier proportions (m): length along travel, width across, height. */
 const SHC = { length: 9.2, width: 4.9, height: 6.2, leg: 0.6, beam: 0.7 }
+/** [A] ASC proportions (m): span between the rails (25.4 m), leg and girder sizes. */
+const ASC = { span: 25.4, legLength: 5, legWidth: 1, girderDepth: 4, girderHeight: 1.4 }
 
 export interface OverlayState {
   /** Lane graph (one-way edges) drawn on the ground. */
@@ -44,6 +47,8 @@ export interface SceneStats {
   sts: number
   /** SHC objects in the scene. */
   shcs: number
+  /** ASC objects in the scene (one per yard block). */
+  ascs: number
   /** Vessel hulls currently visible. */
   vessels: number
   overlays: OverlayState
@@ -80,6 +85,7 @@ export class SceneRenderer {
   private sts = new Map<string, StsParts>()
   private vessels = new Map<string, THREE.Group>()
   private shcs = new Map<string, { group: THREE.Group; spreader: THREE.Mesh }>()
+  private ascs = new Map<string, { group: THREE.Group; trolley: THREE.Mesh; spreader: THREE.Mesh; ropes: THREE.Mesh; blockX: number; height: number }>()
   private laneOverlay: THREE.Group
   private zoneMeshes = new Map<string, THREE.Mesh>()
   private overlays: OverlayState = { laneGraph: false, reservations: false }
@@ -98,6 +104,7 @@ export class SceneRenderer {
     for (const v of config.vessels) this.addVessel(v.id)
     this.addYard()
     for (const id of model.shcIds) this.addShc(id)
+    for (const id of model.ascIds) this.addAsc(id)
     this.laneOverlay = this.buildLaneOverlay()
     this.buildZoneMeshes()
 
@@ -287,23 +294,50 @@ export class SceneRenderer {
     this.vessels.set(id, group)
   }
 
-  /** WTP pad markings and block footprints (the ASC itself arrives with TT-06). */
+  /** Blocks: paved slab, ASC rails, bay marks and transfer stalls; WTP pad markings. */
   private addYard(): void {
     const { graph } = this.model
     const slab = this.track(new THREE.MeshStandardMaterial({ color: '#b4b6b3', roughness: 0.95 }))
     const rail = this.track(new THREE.MeshStandardMaterial({ color: '#4b4f55', roughness: 0.8 }))
-    for (const b of this.model.config.yard?.blocks ?? []) {
-      const depth = 140
-      const z0 = graph.layout.wtpZ + 7
-      const m = new THREE.Mesh(this.track(new THREE.PlaneGeometry(28, depth)), slab)
+    const mark = this.track(new THREE.MeshBasicMaterial({ color: '#8d9091' }))
+    const stall = this.track(new THREE.MeshStandardMaterial({ color: '#f2c94c', roughness: 0.8 }))
+    for (const b of this.model.blockList) {
+      const z0 = b.wtpZ + 7
+      const endZ = b.firstBayZ + (b.bays - 0.5) * YARD_BAY_PITCH_M
+      const depth = endZ - z0 + 22
+      const m = new THREE.Mesh(this.track(new THREE.PlaneGeometry(ASC.span + 3.6, depth)), slab)
       m.rotation.x = -Math.PI / 2
       m.position.set(b.x, 0.02, z0 + depth / 2)
       m.receiveShadow = true
       this.scene.add(m)
-      for (const dx of [-14.2, 14.2]) {
-        const r = new THREE.Mesh(this.track(new THREE.BoxGeometry(0.4, 0.2, depth + 10)), rail)
-        r.position.set(b.x + dx, 0.1, z0 + depth / 2 - 5)
+      for (const dx of [-ASC.span / 2, ASC.span / 2]) {
+        const r = new THREE.Mesh(this.track(new THREE.BoxGeometry(0.4, 0.2, depth)), rail)
+        r.position.set(b.x + dx, 0.1, z0 + depth / 2)
         this.scene.add(r)
+      }
+      // row lines (between the rows) and bay ticks along the block
+      const lines = new THREE.BufferGeometry()
+      const pts: number[] = []
+      for (let r = 0; r <= b.rows; r++) {
+        const x = rowX(b, r + 0.5)
+        pts.push(x, 0.05, z0 + 1, x, 0.05, endZ + 3.35)
+      }
+      lines.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+      this.track(lines)
+      this.scene.add(new THREE.LineSegments(lines, this.track(new THREE.LineBasicMaterial({ color: '#8d9091' }))))
+      for (let bay = 0; bay <= b.bays; bay++) {
+        const tick = new THREE.Mesh(this.track(new THREE.PlaneGeometry(b.rows * YARD_ROW_PITCH_M, 0.12)), mark)
+        tick.rotation.x = -Math.PI / 2
+        tick.position.set(b.x, 0.04, b.firstBayZ + (bay - 0.5) * YARD_BAY_PITCH_M)
+        this.scene.add(tick)
+      }
+      // transfer stalls (truck handover, TT-13) at the landside end
+      for (let k = 0; k < b.transferStalls; k++) {
+        const x = b.x + (k - (b.transferStalls - 1) / 2) * 5.5
+        const outline = new THREE.Mesh(this.track(new THREE.PlaneGeometry(3.2, 13)), stall)
+        outline.rotation.x = -Math.PI / 2
+        outline.position.set(x, 0.03, endZ + 14)
+        this.scene.add(outline)
       }
     }
     const padMat = this.track(new THREE.MeshStandardMaterial({ color: '#f2c94c', roughness: 0.8 }))
@@ -354,6 +388,41 @@ export class SceneRenderer {
     const spreader = box(6.4, 0.35, 2.6, this.track(new THREE.MeshStandardMaterial({ color: '#f2b705' })), 0, 0, 0)
     this.scene.add(group)
     this.shcs.set(id, { group, spreader })
+  }
+
+  /**
+   * Procedural ASC: a portal on two rails that spans the rows (legs at the
+   * rails, a girder across), a trolley on the girder and a hoisted spreader.
+   * The group sits at the gantry Z; the trolley and spreader move in local X.
+   */
+  private addAsc(id: string): void {
+    const block = this.model.blockOfAsc(id)
+    const height = travelHoistM(block) + CONTAINER_DIMS['40HC'].height + 3
+    const group = new THREE.Group()
+    group.name = id
+    const frame = this.track(new THREE.MeshStandardMaterial({ color: '#2f6fb3', roughness: 0.55, metalness: 0.25 }))
+    const accent = this.track(new THREE.MeshStandardMaterial({ color: '#f2b705', roughness: 0.6 }))
+    const dark = this.track(new THREE.MeshStandardMaterial({ color: '#23272e', roughness: 0.8 }))
+    const box = (w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number) => {
+      const m = new THREE.Mesh(this.track(new THREE.BoxGeometry(w, h, d)), mat)
+      m.position.set(x, y, z)
+      m.castShadow = true
+      group.add(m)
+      return m
+    }
+    for (const side of [-1, 1]) {
+      const x = (side * ASC.span) / 2
+      box(ASC.legWidth, height, ASC.legWidth, frame, x, height / 2, -ASC.legLength / 2 + 0.5)
+      box(ASC.legWidth, height, ASC.legWidth, frame, x, height / 2, ASC.legLength / 2 - 0.5)
+      box(ASC.legWidth * 1.4, 0.6, ASC.legLength + 1, dark, x, 0.4, 0) // bogie
+      box(ASC.legWidth, 0.8, ASC.legLength, accent, x, height * 0.55, 0) // leg tie
+    }
+    box(ASC.span + 6, ASC.girderHeight, ASC.girderDepth, frame, 0, height + ASC.girderHeight / 2, 0)
+    const trolley = box(3.2, 1.2, ASC.girderDepth - 0.4, accent, 0, height + ASC.girderHeight + 0.6, 0)
+    const ropes = box(0.12, 1, 0.12, dark, 0, 0, 0)
+    const spreader = box(6.4, 0.35, 2.6, accent, 0, 0, 0)
+    this.scene.add(group)
+    this.ascs.set(id, { group, trolley, spreader, ropes, blockX: block.x, height: height + ASC.girderHeight })
   }
 
   /** Lane-graph overlay: every one-way edge with a chevron at its midpoint, plus node markers. */
@@ -443,6 +512,17 @@ export class SceneRenderer {
       // the spreader sits on top of the (possible) box: box bottom = lift
       parts.spreader.position.y = pose.lift + CONTAINER_DIMS['40'].height + 0.2
     }
+    for (const [id, parts] of this.ascs) {
+      const pose = model.ascPose(id, t)
+      const lx = pose.x - parts.blockX
+      parts.group.position.set(parts.blockX, 0, pose.z)
+      parts.trolley.position.x = lx
+      const spreaderY = pose.hoistY + CONTAINER_DIMS['40HC'].height + 0.2
+      parts.spreader.position.set(lx, spreaderY, 0)
+      const ropeLen = Math.max(0.1, parts.height - spreaderY)
+      parts.ropes.scale.y = ropeLen
+      parts.ropes.position.set(lx, parts.height - ropeLen / 2, 0)
+    }
     this.reservedZones = 0
     const active = this.overlays.reservations ? model.activeReservations(t) : {}
     for (const [zone, mesh] of this.zoneMeshes) {
@@ -479,6 +559,10 @@ export class SceneRenderer {
       this.selection.scale.set(SHC.length + 1, SHC.height + 3, SHC.width + 1)
       this.selection.position.set(pose.x, (SHC.height + 3) / 2, pose.z)
       this.selection.rotation.y = pose.heading === 'z' ? Math.PI / 2 : 0
+    } else if (this.ascs.has(id)) {
+      const parts = this.ascs.get(id)!
+      this.selection.scale.set(ASC.span + 6, parts.height + 2, ASC.legLength + 2)
+      this.selection.position.set(parts.blockX, (parts.height + 2) / 2, this.model.ascPose(id, t).z)
     } else if (this.sts.has(id)) {
       this.selection.scale.set(STS.legSpacingX + 4, STS.apexY + 2, STS.gauge + 6)
       this.selection.position.set(centre.x, (STS.apexY + 2) / 2, STS.waterRailZ + STS.gauge / 2)
@@ -507,6 +591,7 @@ export class SceneRenderer {
       containers: c.drawn,
       sts: this.sts.size,
       shcs: this.shcs.size,
+      ascs: this.ascs.size,
       vessels,
       overlays: { ...this.overlays },
       reservedZones: this.reservedZones,

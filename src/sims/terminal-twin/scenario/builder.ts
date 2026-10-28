@@ -90,6 +90,42 @@ export function withShcFleet(config: ScenarioConfig, count: number, kinematics?:
   return next
 }
 
+/** Distance between neighbouring blocks' centres added by the setup dialog (m): the 25.4 m span plus a road. */
+export const BLOCK_PITCH_M = 40
+
+/** The setup dialog's yard fields: one entry per block, plus the ASC kinematics (one ASC per block). */
+export interface YardSetup {
+  blocks: { bays: number; tiers: number; wtpPads: number; transferStalls: number }[]
+  asc: AscKinematics
+}
+
+/**
+ * Replace a config's yard blocks and ASC kinematics (setup dialog). Existing
+ * blocks keep their id and position; extra blocks are added east of the last
+ * one. Returns a new config; the input is not modified.
+ */
+export function withYard(config: ScenarioConfig, setup: YardSetup): ScenarioConfig {
+  const next: ScenarioConfig = JSON.parse(JSON.stringify(config)) // also copies Vue reactive proxies
+  const old = config.yard?.blocks ?? []
+  let lastX = old[0]?.x ?? 0
+  next.yard = {
+    blocks: setup.blocks.map((b, i) => {
+      const kept = old[i]
+      lastX = kept?.x ?? lastX + BLOCK_PITCH_M
+      return {
+        id: kept?.id ?? `B${String(i + 1).padStart(2, '0')}`,
+        x: lastX,
+        wtpPads: b.wtpPads,
+        bays: b.bays,
+        tiers: b.tiers,
+        transferStalls: b.transferStalls,
+      }
+    }),
+  }
+  next.kinematics.asc = JSON.parse(JSON.stringify(setup.asc))
+  return next
+}
+
 export const DEFAULT_LAYOUT: LayoutConfig = {
   stsGroundLaneZ0M: 8,
   stsGroundLaneSpacingM: 3,

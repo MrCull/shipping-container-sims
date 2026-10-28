@@ -301,6 +301,20 @@ export function maybeDispatchAsc(ctx: EngineContext, blockId: string): void {
   if (next) startJob(ctx, asc, next)
 }
 
+/**
+ * Ask yardAllocation for the oldest waiting box of the block, if no request is
+ * pending: one at a time per block, so a slow TOS never answers from stale stacks.
+ */
+function pumpAllocation(ctx: EngineContext, blockId: string): void {
+  const { state } = ctx
+  const jobs = Object.values(state.ascJobs).filter((j) => j.blockId === blockId)
+  if (jobs.some((j) => j.allocation === 'asked')) return
+  const next = jobs.find((j) => j.allocation === 'waiting')
+  if (!next) return
+  next.allocation = 'asked'
+  requestAllocation(ctx, next)
+}
+
 /** Ask the yardAllocation decision point for a slot for the box on the pad. */
 function requestAllocation(ctx: EngineContext, job: AscJob): void {
   const { state } = ctx
@@ -382,13 +396,14 @@ export const ascReactors: ReactorMap = {
       containerId: box.id,
       wtpPadId: pad.id,
       vesselId: parseVesselSlotId(box.custodyHistory[0].owner.id).vesselId,
+      allocation: 'waiting',
       yardSlotId: null,
       claimSeq: null,
       cleared: false,
       ascId: null,
     }
     state.ascJobs[job.id] = job
-    requestAllocation(ctx, job)
+    pumpAllocation(ctx, job.blockId)
   },
 
   DecisionResolved: (e, ctx) => {
@@ -398,10 +413,13 @@ export const ascReactors: ReactorMap = {
     if (!job) return
     const { slotId } = e.payload.reply
     if (slotId === null) {
+      job.allocation = 'full' // the block is full: the box stays on its pad
       if (state.kpis.yard) state.kpis.yard.allocationFailures++
-      return // the block is full: the box stays on its pad
+    } else {
+      claimSlot(ctx, job, slotId)
+      job.allocation = 'claimed'
     }
-    claimSlot(ctx, job, slotId)
+    pumpAllocation(ctx, job.blockId)
     maybeDispatchAsc(ctx, job.blockId)
   },
 
