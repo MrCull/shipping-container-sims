@@ -205,6 +205,14 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Instance culling:** boxes outside the camera frustum are not written to the instanced meshes.
 - **Static batch:** scenery that never moves, merged into one mesh per material to save draw calls.
 - **Yard index:** the per-block and per-column lookup of yard slots that keeps rehandle queries off a whole-yard scan.
+
+## Atmosphere (TT-21)
+
+- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On by default in the Stress test preset.
+- **Night mode:** the cheaper lighting at night: no sun shadow pass, floodlight glow on high masts and emissive equipment lights instead of real lights.
+- **Backdrop:** the distant low-poly scenery: Algeciras (Rock of Gibraltar, hills, North Quay) for the TTI preset, a generic coastline otherwise.
+- **North Quay:** TTI's 550 m of quay beside the working berths, drawn idle (non-operational).
+- **Cue:** a moment (box landed, vessel horn, scenario complete) that may make a sound or banner when the display clock reaches it.
 ## Persistence (TT-17)
 
 - **Config save:** the scenario as run (layout, equipment, kinematics, vessels, landside, strategies and latency, end conditions, start date/time, locale and units) plus the seed. Small; re-running it reproduces the run.

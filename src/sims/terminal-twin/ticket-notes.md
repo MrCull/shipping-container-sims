@@ -483,9 +483,18 @@ Branch `tt/50-perf-quality`. Guide: `terminal-twin-AGENTS.md` § "Performance an
 
 - **Benchmark:** `npm run tt:bench` (`cli/benchmark.ts`, `cli/benchCli.ts`), baseline `perf/baseline.json`, flag above 20% worse, `--slow-ms` self-test. TTI and Stress test 24 h recorded.
 - **Engine speedups:** `engine/yardIndex.ts` (call `indexYardSlotAdded` / `indexYardSlotRemoved` whenever `state.yardSlots` gains or loses an entry), `suggestedInvariantEvery(config)` used by the worker. Next hot spot: `scanPickups` in `subsystems/landside.ts`.
-- **Quality:** `modules/quality.ts` (profiles, `AutoQuality`, `FpsMeter`), `store/perfStore.ts`, `components/PerfPanel.vue` (key P), `SceneRenderer.setQuality` / `qualityProfile` (night-light budget `nightLights` is for the atmosphere ticket to read), `ContainerInstancer.end(camera, frustum)` culling, `modules/staticBatch.ts` for static scenery.
+- **Quality:** `modules/quality.ts` (profiles, `AutoQuality`, `FpsMeter`), `store/perfStore.ts`, `components/PerfPanel.vue` (key P), `SceneRenderer.setQuality` (calls `AtmosphereRig.setQuality`: shadow switch and mast glow-point budget `nightLights`), `ContainerInstancer.end(camera, frustum)` culling, `modules/staticBatch.ts` for static scenery.
 - **Dev API:** `perf`, `setQuality`, `perfOverlay`, `setFrameLoad`, `setAutoThresholds`, `drawBreakdown`.
 - **Gotchas:** headless SwiftShader cannot show real fps (about 1 fps at TTI), so the frame-rate target is documented as not measurable here; use the overlay on a real GPU. `scene().containerLods` gained `culled` (lod0 + lod1 still equals the box count).
+
+### ticket-51 (TT-21): atmosphere and polish
+
+Branch `tt/51-atmosphere-polish`. Guide: `terminal-twin-AGENTS.md` § "Atmosphere and polish (TT-21)". Glossary: Atmosphere.
+
+- **APIs:** `modules/atmosphere.ts` (`lightingFor`, `hourOfDay`), `atmosphereRig.ts`, `backdrop.ts`, `cues.ts`, `soundPlayer.ts`, `microcopy.ts`; store `soundOn`, `sounds`, `lockDaylight`, `banner`, `toggleSound`, `toggleLockDaylight`; `TwinView.atmosphere()`; `__tt.atmosphere()`; `SceneRenderer.setLighting` / `atmosphereState`; `TTI_PRESET_NAME` / `STRESS_PRESET_NAME` in `scenario/presets.ts`.
+- **Home card:** `SimDefinition.cardImage` (optional) drawn faintly behind `SimCard` text; `npm run tt:card` regenerates `assets/home-card.png`.
+- **Gotchas:** the scene's lights, background and fog now live in `AtmosphereRig` (`SceneRenderer.addLights` is gone). Camera far plane is 14 000 and near 1. Water plane is 40 km x 12 km. Cues come from `delta.events` (capped at 200 per batch), so flat-out runs drop most of them by design. Per-frame cue release is in `store.sync()`.
+- **Follow-ups:** night lights on trucks; real-GPU night fps against the TT-19 budget; seasonal sunrise/sunset.
 ### ticket-49 (TT-17): persistence, snapshots, rewind
 
 Branch `tt/49-persistence`. Guide: `terminal-twin-AGENTS.md` § "Persistence: saves, snapshots and rewind (TT-17)". Glossary: Persistence.

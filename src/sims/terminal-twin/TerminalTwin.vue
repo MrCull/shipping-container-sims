@@ -2,6 +2,7 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import FinalReport from './components/FinalReport.vue'
 import KpiStrip from './components/KpiStrip.vue'
+import DepartureBanner from './components/DepartureBanner.vue'
 import EventFeedPanel from './components/debug/EventFeedPanel.vue'
 import InspectorPanel from './components/debug/InspectorPanel.vue'
 import OverlayToggles from './components/OverlayToggles.vue'
@@ -15,6 +16,7 @@ import { useTwinShortcuts } from './composables/useTwinShortcuts'
 import { useTwinStore } from './store/twinStore'
 import { describeEndReason } from './modules/endReason'
 import { t } from './i18n/messages'
+import { quayNote } from './modules/microcopy'
 
 const store = useTwinStore()
 // Dev-only asset viewer: /sim/terminal-twin?viewer=<asset>|yard (stripped from production builds).
@@ -30,6 +32,16 @@ let uninstallDevApi: (() => void) | null = null
 let unmounted = false
 
 const ended = computed(() => store.runEnded)
+
+/** Friendly note while the quay is empty (re-evaluated every 30 sim seconds, not every frame). */
+const quietNote = computed(() => {
+  const model = store.controller()?.model
+  if (!store.hasScenario || !model || store.runEnded) return null
+  const note = quayNote(model, Math.floor(store.displayTime / 30) * 30)
+  if (!note) return null
+  const time = note.etaS === undefined ? '' : store.fmt.clock(store.choice.startDateTime, note.etaS).time
+  return t(note.key, { time })
+})
 
 onMounted(async () => {
   if (import.meta.env.DEV) {
@@ -62,6 +74,14 @@ onBeforeUnmount(() => {
       data-testid="tt-scene"
     >
       <KpiStrip v-if="store.hasScenario" />
+      <DepartureBanner v-if="store.hasScenario" />
+      <p
+        v-if="quietNote"
+        class="quiet-note"
+        data-testid="tt-quiet-note"
+      >
+        {{ quietNote }}
+      </p>
       <FinalReport v-if="store.hasScenario && store.phase === 'running' && !store.dashboardOpen" />
       <OverlayToggles v-if="store.hasScenario && !webglFailed" />
       <PerfPanel v-if="store.hasScenario && !webglFailed" />
@@ -83,6 +103,7 @@ onBeforeUnmount(() => {
       <div
         v-else-if="ended && store.info"
         class="banner"
+        :class="{ 'banner-complete': store.info.status === 'ended' }"
         role="status"
       >
         <template v-if="store.info.status === 'ended'">
@@ -161,6 +182,26 @@ onBeforeUnmount(() => {
 .banner {
   bottom: 3.4rem;
   border-color: var(--color-success);
+}
+
+.banner-complete {
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
+  animation: tt-toast-in 0.4s ease-out;
+}
+
+.quiet-note {
+  position: absolute;
+  left: 0.9rem;
+  bottom: 0.9rem;
+  z-index: 4;
+  margin: 0;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: rgba(17, 24, 39, 0.82);
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  pointer-events: none;
 }
 
 .toast {

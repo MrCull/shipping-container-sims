@@ -77,6 +77,10 @@ function hubVessels(count: number, intervalS: number, jitterS: number, movesScal
 }
 
 /** Presets whose bay count is derived from the published TTI capacity (the UI marks it as an assumption). */
+/** Preset names other modules key on (TT-21: the Algeciras backdrop, the daylight-lock default). */
+export const TTI_PRESET_NAME = 'TTI Algeciras baseline'
+export const STRESS_PRESET_NAME = 'Stress test'
+
 export const TTI_DERIVED_BAYS_PRESETS = ['TTI Algeciras baseline', 'Stress test']
 
 export const presets: Record<string, () => ScenarioConfig> = {

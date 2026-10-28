@@ -183,6 +183,26 @@ async function submitRunTo(): Promise<void> {
         {{ t('topbar.dashboard') }}
       </button>
       <button
+        class="action-btn"
+        :class="{ active: store.lockDaylight }"
+        :aria-pressed="store.lockDaylight"
+        :title="t('topbar.daylightHint')"
+        data-testid="tt-daylight-toggle"
+        @click="store.toggleLockDaylight()"
+      >
+        {{ t('topbar.daylight') }}
+      </button>
+      <button
+        class="action-btn"
+        :class="{ active: store.soundOn }"
+        :aria-pressed="store.soundOn"
+        :title="t('topbar.soundHint')"
+        data-testid="tt-sound-toggle"
+        @click="store.toggleSound()"
+      >
+        {{ t('topbar.sound') }}
+      </button>
+      <button
         class="action-btn help-btn"
         :title="t('topbar.shortcuts')"
         :aria-label="t('topbar.shortcuts')"

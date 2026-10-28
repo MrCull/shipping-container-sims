@@ -29,15 +29,15 @@ export interface QualityProfile {
   resolutionScale: number
   /** Water plane subdivisions per side (1 = a flat quad); also picks the water material. */
   oceanSegments: number
-  /** Most lamp lights the atmosphere (night lighting) may add; 0 = ambient only. */
+  /** Most high-mast glow points night mode draws (the atmosphere adds no real lights; 400 = every mast). */
   nightLights: number
   /** Antialiasing is chosen at renderer creation, so it is not part of a live profile. */
 }
 
 export const QUALITY_PROFILES: Readonly<Record<QualityLevel, QualityProfile>> = {
-  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 0 },
-  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 8 },
-  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 24 },
+  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24 },
+  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120 },
+  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400 },
 }
 
 export const profileFor = (level: QualityLevel): QualityProfile => QUALITY_PROFILES[level]

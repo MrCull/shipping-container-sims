@@ -35,6 +35,11 @@ import type { ShcRigState } from '../modules/shcAssets'
 import type { TruckRigState } from '../modules/truckAssets'
 import type { AscRigState } from '../modules/ascAssets'
 import type { StsRenderState } from '../modules/stsAssets'
+import { CuePlanner } from '../modules/cues'
+import { SoundPlayer } from '../modules/soundPlayer'
+import type { AtmosphereState } from '../modules/atmosphereRig'
+import type { BackdropKind } from '../modules/backdrop'
+import { daylightLockDefault } from '../modules/atmosphere'
 
 export type TwinPhase = 'setup' | 'running'
 export type DashboardTab = 'charts' | 'report'
@@ -103,6 +108,15 @@ export interface TwinView {
   vesselHulls(): Record<string, VesselHullState> | null
   /** Where the draw calls go: visible drawables per scene group and geometry type (TT-19 perf tool); null without a 3D view. */
   drawBreakdown(): Record<string, { objects: number; triangles: number }> | null
+  /** Time-of-day lighting state and the backdrop in use (TT-21); null without a 3D view. */
+  atmosphere(): (AtmosphereState & { backdrop: { kind: BackdropKind; parts: string[] } }) | null
+}
+
+/** The banner shown on a vessel departure or when the scenario completes (TT-21). */
+export interface TwinBanner {
+  id: number
+  kind: 'departure' | 'complete'
+  vesselName: string
 }
 
 /** The last rendered frame (main pass + shadow pass), from `renderer.info`. */
@@ -218,6 +232,16 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const entityView = shallowRef<EntityView | null>(null)
   let nextBreakpointId = 1
 
+  /** Sound effects (TT-21): off by default; the player only exists to be used while on. */
+  const soundOn = ref(false)
+  const sounds = markRaw(new SoundPlayer())
+  /** Keep the sun daylight all day (default on for the Stress test preset). */
+  const lockDaylight = ref(false)
+  const banner = ref<TwinBanner | null>(null)
+  const cues = markRaw(new CuePlanner())
+  let bannerTimer: ReturnType<typeof setTimeout> | null = null
+  let bannerId = 0
+
   /** Saves and rewind (TT-17). */
   const savesOpen = ref(false)
   const saves = shallowRef<SaveMeta[]>([])
@@ -242,6 +266,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   function onDelta(delta: Delta): void {
     if (delta.events.length === 0) return
+    cues.ingest(delta.events)
     const list = recentEvents.value
     list.push(...delta.events)
     if (list.length > RECENT_EVENTS_CAP) list.splice(0, list.length - RECENT_EVENTS_CAP)
@@ -253,6 +278,34 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     return controller
   }
 
+  function showBanner(kind: TwinBanner['kind'], vesselId: string | undefined): void {
+    const name = config.value?.vessels.find((v) => v.id === vesselId)?.name ?? ''
+    banner.value = { id: ++bannerId, kind, vesselName: name }
+    if (bannerTimer) clearTimeout(bannerTimer)
+    bannerTimer = setTimeout(() => {
+      banner.value = null
+    }, 3500)
+  }
+
+  /** Cues the display clock has reached: banners always, sounds only when the toggle is on. */
+  function releaseCues(displayT: number, playSpeed: number, flatOut: boolean): void {
+    const due = cues.drain(displayT, playSpeed)
+    for (const c of due) {
+      if (c.banner === 'departure') showBanner('departure', c.vesselId)
+      if (!flatOut && soundOn.value) sounds.play(c, playSpeed, performance.now())
+    }
+  }
+
+  function toggleSound(): void {
+    soundOn.value = !soundOn.value
+    showToast(soundOn.value ? 'twin.toast.soundOn' : 'twin.toast.soundOff')
+  }
+
+  function toggleLockDaylight(): void {
+    lockDaylight.value = !lockDaylight.value
+    showToast(lockDaylight.value ? 'twin.toast.daylightLocked' : 'twin.toast.daylightFollows')
+  }
+
   /** Copy the controller's playback state into reactive refs (once per frame and after actions). */
   function sync(): void {
     if (!controller) return
@@ -261,6 +314,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     paused.value = controller.paused
     busy.value = controller.busy
     if (info.value !== controller.info) info.value = controller.info
+    releaseCues(controller.displayTime, controller.speed, controller.busy)
     if (breakHit.value !== controller.breakHit) {
       breakHit.value = controller.breakHit
       if (controller.breakHit) {
@@ -407,6 +461,14 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       inspectedEvent.value = null
       following.value = false
       hasScenario.value = true
+      cues.reset()
+      cues.setVesselSize((id) => {
+        const cls = runConfig.vessels.find((v) => v.id === id)?.sizeClass
+        return cls !== undefined && cls !== 'feeder' && cls !== 'feedermax'
+      })
+      sounds.reset()
+      banner.value = null
+      lockDaylight.value = daylightLockDefault(next.name)
       hasShcs.value = (runConfig.shcs?.length ?? 0) > 0
       phase.value = 'running'
       if (options.autoplay ?? true) ctl().play()
@@ -421,6 +483,9 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   async function reset(): Promise<void> {
     await run(() => ctl().reset())
+    cues.reset()
+    sounds.reset()
+    banner.value = null
     recentEvents.value = markRaw([])
     resetKpis()
     rewindPoints.value = []
@@ -760,6 +825,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     if (!point || !c) return false
     const matched = await run(() => c.rewind(point))
     recentEvents.value = markRaw([])
+    cues.reset()
+    banner.value = null
     resetKpis()
     rewindEvents = -1
     inspectedEvent.value = null
@@ -807,6 +874,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     const id = (toast.value?.id ?? 0) + 1
     toast.value = { id, text: t(key, params) }
     if (toastTimer) clearTimeout(toastTimer)
+    if (bannerTimer) clearTimeout(bannerTimer)
+    banner.value = null
     toastTimer = setTimeout(() => {
       if (toast.value?.id === id) toast.value = null
     }, TOAST_MS)
@@ -906,6 +975,12 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     setDashboardTab,
     refreshDashboard,
     helpOpen,
+    soundOn,
+    sounds,
+    toggleSound,
+    lockDaylight,
+    toggleLockDaylight,
+    banner,
     toast,
     kpi,
     finalReport,
