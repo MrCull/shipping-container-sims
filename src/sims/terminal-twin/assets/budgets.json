@@ -22,9 +22,9 @@
       "requiredNodes": ["LOD0", "LOD1", "LOD2", "gantry", "trolley", "hoist", "spreader"]
     },
     "shc": {
-      "lods": { "LOD0": { "maxTriangles": 12000, "maxDrawCalls": 10 }, "LOD1": { "maxTriangles": 3000, "maxDrawCalls": 6 }, "LOD2": { "maxTriangles": 400, "maxDrawCalls": 3 } },
+      "lods": { "LOD0": { "maxTriangles": 12000, "maxDrawCalls": 16 }, "LOD1": { "maxTriangles": 3000, "maxDrawCalls": 12 }, "LOD2": { "maxTriangles": 400, "maxDrawCalls": 3 } },
       "maxFileBytes": 1500000,
-      "requiredNodes": ["LOD0", "LOD1", "LOD2", "hoist", "spreader"]
+      "requiredNodes": ["LOD0", "LOD1", "LOD2", "frame", "hoist", "spreader", "steer_fl", "steer_fr", "steer_rl", "steer_rr", "wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr", "twistlock_fl", "twistlock_fr", "twistlock_rl", "twistlock_rr"]
     },
     "truck": {
       "lods": { "LOD0": { "maxTriangles": 8000, "maxDrawCalls": 8 }, "LOD1": { "maxTriangles": 2000, "maxDrawCalls": 4 }, "LOD2": { "maxTriangles": 300, "maxDrawCalls": 2 } },

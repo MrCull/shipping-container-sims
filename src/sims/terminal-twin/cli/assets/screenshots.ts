@@ -76,8 +76,9 @@ async function main(): Promise<number> {
     await page.waitForFunction(() => !!window.__ttAssets, undefined, { timeout: 60_000 })
     const names = await page.evaluate(() => window.__ttAssets!.list())
     for (const name of names) {
-      for (const lod of ['LOD0', 'LOD1'] as const) {
+      for (const lod of ['LOD0', 'LOD1', 'LOD2'] as const) {
         const s = await page.evaluate(([n, l]) => window.__ttAssets!.show(n, { lod: l }), [name, lod] as const)
+        if (!(lod in s.lods)) continue // this asset has no such LOD
         await page.waitForTimeout(300)
         const file = join(outDir, `${name}-${lod.toLowerCase()}.png`)
         await page.screenshot({ path: file })

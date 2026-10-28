@@ -188,7 +188,7 @@ onBeforeUnmount(() => {
           </template>
         </dl>
         <p class="hint">
-          {{ t('assetViewer.referenceHint') }}
+          {{ t(stats.kind === 'shc' ? 'assetViewer.referenceHintShc' : 'assetViewer.referenceHint') }}
         </p>
       </template>
       <dl v-if="yardStats">

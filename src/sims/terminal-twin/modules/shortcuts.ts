@@ -13,6 +13,8 @@ export type ShortcutAction =
   | { kind: 'escape' }
   | { kind: 'dashboard' }
   | { kind: 'overlays' }
+  | { kind: 'feed' }
+  | { kind: 'inspector' }
   | { kind: 'help' }
 
 export interface ShortcutHelpRow {
@@ -32,6 +34,8 @@ export const SHORTCUT_HELP: readonly ShortcutHelpRow[] = [
   { keys: 'shortcuts.key.esc', action: 'shortcuts.deselect' },
   { keys: 'shortcuts.key.d', action: 'shortcuts.dashboard' },
   { keys: 'shortcuts.key.o', action: 'shortcuts.overlays' },
+  { keys: 'shortcuts.key.e', action: 'shortcuts.feed' },
+  { keys: 'shortcuts.key.i', action: 'shortcuts.inspector' },
   { keys: 'shortcuts.key.help', action: 'shortcuts.help' },
 ]
 
@@ -70,6 +74,10 @@ export function shortcutFor(e: KeyLike): ShortcutAction | null {
       return { kind: 'dashboard' }
     case 'o':
       return { kind: 'overlays' }
+    case 'e':
+      return { kind: 'feed' }
+    case 'i':
+      return { kind: 'inspector' }
     default:
       return null
   }

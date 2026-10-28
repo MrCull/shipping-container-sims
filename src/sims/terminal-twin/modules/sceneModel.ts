@@ -99,11 +99,42 @@ export interface ShcPose {
   lift: number
   /** Direction of travel: along X (yaw 0) or along Z (yaw π/2). */
   heading: 'x' | 'z'
+  /** Body yaw (rad about +Y, three.js sense; 0 = front towards +X, -π/2 = towards +Z), swinging through corners. */
+  yaw: number
+  /** Steering angle of the front wheel pairs (rad); the rear pairs steer the opposite way. */
+  steerRad: number
+  /** Signed distance rolled along the heading since the start (m): wheel roll angle = odometerM / tyre radius. */
+  odometerM: number
+  /** True while an X or Z motion segment is in progress. */
+  travelling: boolean
 }
+
+/** [A] A corner takes this long to swing through (shortened on very short legs); peak steer angle. */
+const TURN_S = 2
+const MAX_STEER_RAD = (35 * Math.PI) / 180
+
+/** One X/Z leg with the heading it was driven at, precomputed on ingest. */
+interface DriveLeg {
+  t0: number
+  t1: number
+  axis: 'x' | 'z'
+  from: number
+  to: number
+  yaw0: number
+  yaw1: number
+  /** +1 driving forwards, -1 backing up (a reversal of more than 135° is driven in reverse). */
+  fwd: 1 | -1
+  odoStart: number
+  seg: MotionSegment
+}
+
+const wrapPi = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a))
 
 /** A container's centre and its yaw (0 = length along X, π/2 = along Z). */
 export interface ContainerPose extends Vec3 {
   yaw: number
+  /** SHC id when the container is carried by an SHC (the renderer hangs it from that SHC's spreader). */
+  carriedBy?: string
 }
 
 const emptyAxes = (): Record<Axis, MotionSegment[]> => ({ gantry: [], trolley: [], hoist: [], x: [], z: [], lift: [] })
@@ -139,6 +170,7 @@ export class SceneModel {
   private readonly initialAsc: Record<string, AscPose> = {}
   private reservations: Record<string, Reservation[]> = {}
   private axisSegments: Record<string, Record<Axis, MotionSegment[]>> = {}
+  private drives: Record<string, DriveLeg[]> = {}
   private custody: Record<string, CustodyEntry[]> = {}
   private status: Record<string, StatusEntry[]> = {}
 
@@ -171,6 +203,7 @@ export class SceneModel {
     this.initialShc = {}
     for (const shc of config.shcs ?? []) {
       this.axisSegments[shc.id] = emptyAxes()
+      this.drives[shc.id] = []
       const n = this.graph.nodes[this.graph.parkingNode[shc.id]]
       this.initialShc[shc.id] = { x: n.x, z: n.z }
       this.status[`shc:${shc.id}`] = [{ t: 0, status: 'parked' }]
@@ -218,13 +251,41 @@ export class SceneModel {
     for (const plan of delta.motion) {
       const axes = this.axisSegments[plan.entityId]
       if (!axes) continue
-      for (const seg of plan.segments) axes[seg.axis].push(seg)
+      for (const seg of plan.segments) {
+        axes[seg.axis].push(seg)
+        if (this.drives[plan.entityId] && (seg.axis === 'x' || seg.axis === 'z')) this.addDrive(plan.entityId, seg)
+      }
     }
     for (const c of delta.custody) {
       this.custody[c.containerId]?.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
     }
     for (const e of delta.entities) this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX })
     for (const r of delta.reservations ?? []) (this.reservations[r.zone] ??= []).push(r)
+  }
+
+  /** Records an X/Z leg with its heading, swing and direction of rolling (legs arrive in time order). */
+  private addDrive(shcId: string, seg: MotionSegment): void {
+    const list = this.drives[shcId]
+    const d = seg.to - seg.from
+    if (d === 0) return
+    const prev = list[list.length - 1]
+    const yawPrev = prev ? prev.yaw1 : 0
+    const target = seg.axis === 'x' ? (d > 0 ? 0 : Math.PI) : d > 0 ? -Math.PI / 2 : Math.PI / 2
+    const delta = wrapPi(target - yawPrev)
+    const reverse = Math.abs(delta) > (3 * Math.PI) / 4
+    const odoPrev = prev ? prev.odoStart + prev.fwd * Math.abs(prev.to - prev.from) : 0
+    list.push({
+      t0: seg.t0,
+      t1: seg.t1,
+      axis: seg.axis as 'x' | 'z',
+      from: seg.from,
+      to: seg.to,
+      yaw0: yawPrev,
+      yaw1: reverse ? yawPrev : yawPrev + delta,
+      fwd: reverse ? -1 : 1,
+      odoStart: odoPrev,
+      seg,
+    })
   }
 
   /** Reservations active at `time` (zone → holder). */
@@ -248,6 +309,10 @@ export class SceneModel {
     }
     for (const list of [...Object.values(this.custody), ...Object.values(this.status)]) {
       const i = lastAtOrBefore(list, time, (e: { t: number }) => e.t)
+      if (i > 0) list.splice(0, i)
+    }
+    for (const list of Object.values(this.drives)) {
+      const i = lastAtOrBefore(list, time, (l) => l.t0)
       if (i > 0) list.splice(0, i)
     }
     for (const [zone, list] of Object.entries(this.reservations)) this.reservations[zone] = list.filter((r) => r.to >= time)
@@ -274,6 +339,27 @@ export class SceneModel {
       z: value('z', start.z),
       lift: value('lift', 0),
       heading: tz > tx ? 'z' : 'x',
+      ...this.driveState(shcId, time),
+    }
+  }
+
+  /** Yaw, steering, wheel odometer and whether the SHC is driving, from the precomputed legs. */
+  private driveState(shcId: string, time: number): Pick<ShcPose, 'yaw' | 'steerRad' | 'odometerM' | 'travelling'> {
+    const list = this.drives[shcId] ?? []
+    const i = lastAtOrBefore(list, time, (l) => l.t0)
+    if (i < 0) return { yaw: 0, steerRad: 0, odometerM: 0, travelling: false }
+    const leg = list[i]
+    const swing = leg.yaw1 - leg.yaw0
+    const turnS = Math.max(1e-6, Math.min(TURN_S, (leg.t1 - leg.t0) * 0.6))
+    const p = Math.min(1, Math.max(0, (time - leg.t0) / turnS))
+    const smooth = p * p * (3 - 2 * p)
+    const turning = Math.abs(swing) > 1e-6 && p < 1
+    const travelled = Math.abs(positionAt(leg.seg, time) - leg.from)
+    return {
+      yaw: leg.yaw0 + swing * smooth,
+      steerRad: turning ? Math.sign(swing) * MAX_STEER_RAD * Math.sin(Math.PI * p) : 0,
+      odometerM: leg.odoStart + leg.fwd * travelled,
+      travelling: time < leg.t1,
     }
   }
 
@@ -353,7 +439,7 @@ export class SceneModel {
     const alongZ = Math.PI / 2
     if (kind === 'shc') {
       const p = this.shcPose(id, time)
-      return { x: p.x, y: p.lift + dims.height / 2, z: p.z, yaw: p.heading === 'z' ? alongZ : 0 }
+      return { x: p.x, y: p.lift + dims.height / 2, z: p.z, yaw: p.yaw, carriedBy: id }
     }
     if (kind === 'wtpPad') {
       const pad = this.graph.pads.find((p) => p.id === id)

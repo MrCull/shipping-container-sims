@@ -93,6 +93,15 @@ async function submitRunTo(): Promise<void> {
     </div>
 
     <div class="actions">
+      <button
+        class="action-btn"
+        data-testid="tt-topbar-step"
+        :disabled="store.busy"
+        :title="t('debug.stepHint')"
+        @click="store.step().catch(() => {})"
+      >
+        {{ t('debug.step') }}
+      </button>
       <div class="run-to">
         <button
           class="action-btn"
