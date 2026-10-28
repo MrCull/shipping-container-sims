@@ -14,7 +14,8 @@
  */
 import type { EventPayloads, EventSubjects, EventType, RunResult } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
-import type { BreakpointHit, Delta, EngineInfo, EventSummary, QueryKind, WorkerRequest, WorkerRunCondition } from '../worker/protocol'
+import type { SimSnapshot } from '../engine'
+import type { BreakpointHit, Checkpoint, Delta, EngineInfo, EventSummary, QueryKind, ReplayResult, WorkerRequest, WorkerRunCondition } from '../worker/protocol'
 import type { Breakpoint } from './breakpoints'
 import { EngineClient, type EngineResponse } from './engineClient'
 import { SceneModel } from './sceneModel'
@@ -85,7 +86,27 @@ export class TwinController {
     await this.restart({ op: 'reset' }, this.model.config, this.model.seed)
   }
 
-  private async restart(req: WorkerRequest, config: ScenarioConfig, seed: number): Promise<void> {
+  /** Resume from a snapshot of this engine version: the display starts at the snapshot's sim time, paused. Returns whether the replay matched. */
+  async restore(snapshot: SimSnapshot): Promise<boolean> {
+    const res = await this.restart({ op: 'restore', snapshot }, snapshot.config, snapshot.seed)
+    this.displayTime = Math.min(snapshot.state.now, this.limit)
+    return res?.hashMatched ?? false
+  }
+
+  /** Jump back to a rewind point of the loaded scenario (paused there); running on reproduces the original run. */
+  async rewind(point: Checkpoint): Promise<boolean> {
+    if (!this.model) throw new Error('No scenario loaded')
+    const res = await this.restart({ op: 'rewind', events: point.events, hash: point.hash }, this.model.config, this.model.seed)
+    this.displayTime = Math.min(point.t, this.limit)
+    return res?.hashMatched ?? false
+  }
+
+  /** Automatic rewind points every `seconds` of sim time; applies from the next load, reset, restore or rewind. */
+  async setCheckpointInterval(seconds: number): Promise<void> {
+    await this.client.request({ op: 'setCheckpointInterval', seconds })
+  }
+
+  private async restart(req: WorkerRequest, config: ScenarioConfig, seed: number): Promise<ReplayResult | null> {
     this.generation++
     this.inflight = false
     this.busy = false
@@ -95,7 +116,8 @@ export class TwinController {
     this.displayTime = 0
     this.info = null
     this.model = new SceneModel(config, seed)
-    await this.call(req)
+    const res = await this.call<ReplayResult | null>(req)
+    return res?.result ?? null
   }
 
   /** Advance the playback clock; call once per animation frame. */

@@ -165,6 +165,15 @@ async function submitRunTo(): Promise<void> {
       </button>
       <button
         class="action-btn"
+        data-testid="tt-saves-button"
+        :disabled="store.busy"
+        :title="t('topbar.savesHint')"
+        @click="store.openSaves()"
+      >
+        {{ t('topbar.saves') }}
+      </button>
+      <button
+        class="action-btn"
         :class="{ active: store.dashboardOpen }"
         :aria-pressed="store.dashboardOpen"
         :title="t('topbar.dashboardHint')"

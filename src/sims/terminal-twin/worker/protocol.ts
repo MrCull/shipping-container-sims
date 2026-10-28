@@ -16,6 +16,7 @@ import type {
   KpiSeriesReport,
   Reservation,
   RunCondition,
+  SimSnapshot,
   TimelineReport,
 } from '../engine'
 import type { Breakpoint } from '../modules/breakpoints'
@@ -63,6 +64,8 @@ export type QueryKind =
   | 'summary'
   | 'invariants'
   | 'eventLog'
+  /** `Checkpoint[]`: the rewind points of the current timeline. */
+  | 'checkpoints'
 
 export type WorkerRequest =
   | { op: 'load'; config: ScenarioConfig; seed: number }
@@ -75,6 +78,12 @@ export type WorkerRequest =
   | { op: 'query'; kind: QueryKind; id?: string }
   | { op: 'inject'; type: EventType; at: number; subjects: EventSubjects; payload: EventPayloads[EventType] }
   | { op: 'snapshot' }
+  /** Resume from a snapshot (same engine version): replays its event log so the scene learns the history, then restores its exact state. Result `ReplayResult`. */
+  | { op: 'restore'; snapshot: SimSnapshot }
+  /** Back to a rewind point: restart the loaded scenario and replay `events` events. Result `ReplayResult`. */
+  | { op: 'rewind'; events: number; hash: string }
+  /** Automatic rewind points every `seconds` of sim time (default `DEFAULT_CHECKPOINT_S`); kept across load/reset. */
+  | { op: 'setCheckpointInterval'; seconds: number }
   | { op: 'why'; eventId: number }
   /** The KPI report or the full event log as a JSON/CSV string. */
   | { op: 'export'; kind: ExportKind }
@@ -82,6 +91,20 @@ export type WorkerRequest =
   | { op: 'setBreakpoints'; breakpoints: Breakpoint[] }
 
 export type WorkerRequestMessage = WorkerRequest & { rid: number }
+
+/** A rewind point: `events` events have been processed (all before `t`), and the log hash then was `hash`. */
+export interface Checkpoint {
+  t: number
+  events: number
+  hash: string
+}
+
+export const DEFAULT_CHECKPOINT_S = 900
+
+/** Result of `restore` and `rewind`: did the replayed log hash equal the expected one (false only if the run had events a replay cannot make, e.g. injected ones). */
+export interface ReplayResult {
+  hashMatched: boolean
+}
 
 /** A new motion plan of one crane, SHC or ASC (all axes, sequential). */
 export interface MotionPlan {

@@ -203,4 +203,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Backdrop:** the distant low-poly scenery: Algeciras (Rock of Gibraltar, hills, North Quay) for the TTI preset, a generic coastline otherwise.
 - **North Quay:** TTI's 550 m of quay beside the working berths, drawn idle (non-operational).
 - **Cue:** a moment (box landed, vessel horn, scenario complete) that may make a sound or banner when the display clock reaches it.
+## Persistence (TT-17)
+
+- **Config save:** the scenario as run (layout, equipment, kinematics, vessels, landside, strategies and latency, end conditions, start date/time, locale and units) plus the seed. Small; re-running it reproduces the run.
+- **Snapshot save:** the engine's full state mid-run (containers, equipment, motion segments, event queue, reservations, KPIs, RNG, event log). Loading it resumes exactly where the run left off.
+- **Save schema version:** the version of the save file format; older files migrate forward on load. A snapshot also records the **engine version** that wrote it.
+- **Rewind point:** an automatic checkpoint (every 15 sim-minutes by default) the user can jump back to; running on from it reproduces the original events.
 

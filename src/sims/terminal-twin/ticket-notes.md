@@ -483,4 +483,11 @@ Branch `tt/51-atmosphere-polish`. Guide: `terminal-twin-AGENTS.md` § "Atmospher
 - **Home card:** `SimDefinition.cardImage` (optional) drawn faintly behind `SimCard` text; `npm run tt:card` regenerates `assets/home-card.png`.
 - **Gotchas:** the scene's lights, background and fog now live in `AtmosphereRig` (`SceneRenderer.addLights` is gone). Camera far plane is 14 000 and near 1. Water plane is 40 km x 12 km. Cues come from `delta.events` (capped at 200 per batch), so flat-out runs drop most of them by design. Per-frame cue release is in `store.sync()`.
 - **Follow-ups:** night lights on trucks; real-GPU night fps against the TT-19 budget; seasonal sunrise/sunset.
+### ticket-49 (TT-17): persistence, snapshots, rewind
+
+Branch `tt/49-persistence`. Guide: `terminal-twin-AGENTS.md` § "Persistence: saves, snapshots and rewind (TT-17)". Glossary: Persistence.
+
+- **APIs:** `persistence/saves.ts` (`makeConfigSave`, `makeSnapshotSave`, `parseSaveFile`, `planLoad`, `migrateScenarioConfig`, `SAVE_SCHEMA_VERSION`), `persistence/saveStore.ts` (`openSaveStore`); worker ops `restore`, `rewind`, `setCheckpointInterval`, query `checkpoints`; `TwinController.restore/rewind/setCheckpointInterval`; store `launch()` (shared by `startScenario` and loads), `saveToBrowser`, `exportToFile`, `importSaveText`, `rewindTo`; `engine` now exports `hashDigest`.
+- **Gotchas:** restore/rewind replay events (cost grows with run length). Settings ops (`setCheckpointInterval`) are served before a scenario is loaded (host returns empty `EngineInfo`). A loaded config's `display` becomes the UI's locale and units.
+- **Follow-ups:** new scenario fields only need a migration when the scenario schema version bumps. Snapshots with dev-injected events lose their scene history on load (state stays exact).
 

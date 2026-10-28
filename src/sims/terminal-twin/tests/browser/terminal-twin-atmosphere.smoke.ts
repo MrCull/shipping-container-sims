@@ -100,7 +100,7 @@ test('with sound on, effects play, and are throttled at x600', async ({ page }) 
   await page.getByTestId('tt-sound-toggle').click()
   await page.evaluate(() => window.__tt!.setSpeed(10))
   await page.evaluate(() => window.__tt!.play())
-  await page.waitForFunction(() => window.__tt!.atmosphere().sound.played > 0)
+  await page.waitForFunction(() => window.__tt!.atmosphere().sound.recent.some((s) => s.kind === 'landed'))
   const first = (await atmosphere(page)).sound.recent.map((s) => s.kind)
   expect(first).toContain('landed')
   expect(await page.evaluate(() => (window as unknown as { __audioCreated: number }).__audioCreated)).toBeGreaterThan(0)
@@ -125,6 +125,7 @@ test('a departure shows a banner that does not block clicks', async ({ page }) =
   await page.evaluate(() => window.__tt!.play())
   const banner = page.getByTestId('tt-departure-banner')
   await expect(banner).toBeVisible({ timeout: 60_000 })
+  expect((await atmosphere(page)).banner?.kind).toBe('departure')
   expect(await banner.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none')
   // clicks go through it: the element at its centre is not the banner
   const blocked = await banner.evaluate((el) => {
@@ -132,5 +133,4 @@ test('a departure shows a banner that does not block clicks', async ({ page }) =
     return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === el
   })
   expect(blocked).toBe(false)
-  expect((await atmosphere(page)).banner?.kind).toBe('departure')
 })

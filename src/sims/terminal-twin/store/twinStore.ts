@@ -14,13 +14,15 @@ import { composeScenario } from '../scenario/compose'
 import { presets } from '../scenario/presets'
 import type { YardSetup } from '../scenario/builder'
 import type { DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
-import { EXPORT_FILES, ScenarioValidationError, validateScenario, type EngineEvent, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport } from '../engine'
-import type { BreakpointHit, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
+import { EXPORT_FILES, ScenarioValidationError, validateScenario, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport } from '../engine'
+import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { describeEntity, entityKind, entityQueryKind, type EntityView } from '../modules/entityInspector'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
 import { FEED_BUFFER_CAP } from '../modules/eventFeed'
 import type { Bucketing, KpiGroupId } from '../modules/dashboardModel'
+import { makeConfigSave, makeSnapshotSave, parseSaveFile, planLoad, saveFileName, SaveFormatError, type SaveFile, type SaveMeta, type SaveType } from '../persistence/saves'
+import { openSaveStore, StorageUnavailableError, type SaveStore } from '../persistence/saveStore'
 import { SPEEDS, TwinController } from '../modules/twinController'
 import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/display'
 import { createFormatter } from '../i18n/format'
@@ -238,6 +240,20 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   let bannerTimer: ReturnType<typeof setTimeout> | null = null
   let bannerId = 0
 
+  /** Saves and rewind (TT-17). */
+  const savesOpen = ref(false)
+  const saves = shallowRef<SaveMeta[]>([])
+  /** IndexedDB state: unknown until first opened; `unavailable` means file export/import only. */
+  const storage = ref<'unknown' | 'ok' | 'unavailable'>('unknown')
+  const savesMessage = ref<{ kind: 'info' | 'error'; text: string } | null>(null)
+  /** A snapshot from another engine version waits here for the user's choice: restart from its config, or cancel. */
+  const versionPrompt = shallowRef<{ name: string; savedEngineVersion: string; currentEngineVersion: string; config: ScenarioConfig; seed: number } | null>(null)
+  /** Automatic rewind points of the current timeline; the interval (sim-minutes) applies from the next load, reset or rewind. */
+  const rewindPoints = shallowRef<Checkpoint[]>([])
+  const rewindIntervalMin = ref(15)
+  let saveStore: Promise<SaveStore | null> | null = null
+  let rewindEvents = -1
+
   let controller: TwinController | null = null
   let view: TwinView | null = null
   let kpiTimer: ReturnType<typeof setInterval> | null = null
@@ -362,6 +378,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       if (!c || c.busy || !c.info) return
       if (c.info.eventsTotal !== kpiEvents) void refreshKpis()
       if (dashboardOpen.value && c.info.eventsTotal !== dashEvents) void refreshDashboard()
+      if (c.info.eventsTotal !== rewindEvents) void refreshRewind()
     }, KPI_POLL_MS)
   }
 
@@ -416,6 +433,11 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   async function startScenario(next: ScenarioChoice, options: { autoplay?: boolean } = {}): Promise<void> {
     const base = composeScenario(resolveScenario(next.name), next)
     const runConfig = runConfigFor(base, next.startDateTime, display.value)
+    await launch(runConfig, next, (c) => c.load(runConfig, next.seed), options)
+  }
+
+  /** Start a run from a ready config: validate, load through `load`, and reset the run's UI state. */
+  async function launch(runConfig: ScenarioConfig, next: ScenarioChoice, load: (c: TwinController) => Promise<unknown>, options: { autoplay?: boolean } = {}): Promise<void> {
     choice.value = { ...next }
     loading.value = true
     try {
@@ -423,11 +445,15 @@ export const useTwinStore = defineStore('terminal-twin', () => {
         // impossible configurations never reach the engine
         const { errors } = validateScenario(runConfig)
         if (errors.length > 0) throw new ScenarioValidationError(errors)
-        return ctl().load(runConfig, next.seed)
+        const c = ctl()
+        await c.setCheckpointInterval(rewindIntervalMin.value * 60)
+        return load(c)
       })
       config.value = markRaw(runConfig)
       recentEvents.value = markRaw([])
       resetKpis()
+      rewindPoints.value = []
+      rewindEvents = -1
       selectedId.value = null
       entityView.value = null
       inspectedEvent.value = null
@@ -446,6 +472,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       if (options.autoplay ?? true) ctl().play()
       startKpiPolling()
       void refreshKpis()
+      void refreshRewind()
     } finally {
       loading.value = false
       sync()
@@ -459,6 +486,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     banner.value = null
     recentEvents.value = markRaw([])
     resetKpis()
+    rewindPoints.value = []
+    rewindEvents = -1
     void refreshKpis()
     inspectedEvent.value = null
     void refreshEntity()
@@ -578,6 +607,240 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     inspectorOpen.value = !inspectorOpen.value
   }
 
+  // ---- Saves and rewind (TT-17) ----
+
+  function savesError(err: unknown): void {
+    if (err instanceof SaveFormatError) savesMessage.value = { kind: 'error', text: t(err.key, err.params) }
+    else if (err instanceof StorageUnavailableError) savesMessage.value = { kind: 'error', text: t('saves.storageUnavailable') }
+    else savesMessage.value = { kind: 'error', text: t('saves.failed', { error: err instanceof Error ? err.message : String(err) }) }
+  }
+
+  function savesInfo(key: MessageKey, params?: MessageParams): void {
+    savesMessage.value = { kind: 'info', text: t(key, params) }
+  }
+
+  /** The IndexedDB store, opened once; null where it is unavailable (the UI then says so). */
+  function openStore(): Promise<SaveStore | null> {
+    saveStore ??= openSaveStore().then(
+      (s) => {
+        storage.value = 'ok'
+        return s
+      },
+      () => {
+        storage.value = 'unavailable'
+        return null
+      },
+    )
+    return saveStore
+  }
+
+  async function refreshSaves(): Promise<void> {
+    const s = await openStore()
+    if (!s) return
+    try {
+      saves.value = markRaw(await s.list())
+    } catch (err) {
+      savesError(err)
+    }
+  }
+
+  async function openSaves(): Promise<void> {
+    savesOpen.value = true
+    savesMessage.value = null
+    versionPrompt.value = null
+    await refreshSaves()
+  }
+
+  function closeSaves(): void {
+    savesOpen.value = false
+  }
+
+  async function refreshRewind(): Promise<void> {
+    const c = controller
+    if (!c?.info) return
+    const at = c.info.eventsTotal
+    try {
+      rewindPoints.value = markRaw(await c.query<Checkpoint[]>('checkpoints'))
+      rewindEvents = at
+    } catch {
+      // the scenario was replaced meanwhile: the next poll catches up
+    }
+  }
+
+  function defaultSaveName(type: SaveType): string {
+    const base = `${choice.value.name} / seed ${choice.value.seed}`
+    return type === 'snapshot' ? `${base} / ${fmt.value.clock(choice.value.startDateTime, displayTime.value).elapsed}` : base
+  }
+
+  /** The save document of the current run: its config, or the engine's full snapshot. */
+  async function buildSave(type: SaveType, name?: string): Promise<SaveFile> {
+    const c = controller
+    const cfg = config.value
+    if (!c?.model || !cfg) throw new Error('No scenario loaded')
+    const label = name?.trim() || defaultSaveName(type)
+    if (type === 'config') return makeConfigSave(label, cfg, c.model.seed)
+    const snapshot = await c.passthrough<SimSnapshot>({ op: 'snapshot' })
+    return makeSnapshotSave(label, { ...snapshot, config: cfg }, new Date())
+  }
+
+  /** Save the current run to the browser's IndexedDB list. Null (with a message) where storage is unavailable. */
+  async function saveToBrowser(type: SaveType, name?: string): Promise<SaveMeta | null> {
+    savesMessage.value = null
+    try {
+      const file = await buildSave(type, name)
+      const s = await openStore()
+      if (!s) {
+        savesMessage.value = { kind: 'error', text: t('saves.storageUnavailable') }
+        return null
+      }
+      const meta = await s.put(file)
+      await refreshSaves()
+      savesInfo('saves.saved', { name: meta.name })
+      return meta
+    } catch (err) {
+      savesError(err)
+      return null
+    }
+  }
+
+  function download(file: SaveFile): void {
+    const blob = new Blob([JSON.stringify(file)], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = saveFileName(file)
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  }
+
+  /** Download the current run as a JSON file (works without IndexedDB). */
+  async function exportToFile(type: SaveType, name?: string): Promise<void> {
+    savesMessage.value = null
+    try {
+      const file = await buildSave(type, name)
+      download(file)
+      savesInfo('saves.exported', { name: file.name })
+    } catch (err) {
+      savesError(err)
+    }
+  }
+
+  async function exportSaved(id: string): Promise<void> {
+    try {
+      const file = await (await openStore())?.get(id)
+      if (file) download(file)
+    } catch (err) {
+      savesError(err)
+    }
+  }
+
+  async function deleteSaved(id: string): Promise<void> {
+    try {
+      await (await openStore())?.remove(id)
+      await refreshSaves()
+    } catch (err) {
+      savesError(err)
+    }
+  }
+
+  /** Make a save's locale and units the UI's. */
+  function adoptDisplay(cfg: ScenarioConfig): ScenarioConfig {
+    if (cfg.display) {
+      display.value = { ...cfg.display }
+      saveDisplaySettings(browserStorage(), display.value)
+      return cfg
+    }
+    return { ...cfg, display: { ...display.value } }
+  }
+
+  /** Start a run from a config and seed (paused at t = 0). */
+  async function startFromConfig(cfg: ScenarioConfig, seed: number): Promise<void> {
+    const runConfig = adoptDisplay(JSON.parse(JSON.stringify(cfg)) as ScenarioConfig)
+    await launch(runConfig, { name: runConfig.name, seed, startDateTime: runConfig.startDateTime }, (c) => c.load(runConfig, seed), { autoplay: false })
+  }
+
+  /** Apply a parsed save: start the config, resume the snapshot, or (other engine version) ask first. */
+  async function applySave(file: SaveFile): Promise<'loaded' | 'version-mismatch'> {
+    const plan = planLoad(file)
+    versionPrompt.value = null
+    if (plan.action === 'config') {
+      await startFromConfig(plan.config, plan.seed)
+      savesInfo('saves.loadedConfig', { name: file.name })
+      return 'loaded'
+    }
+    if (plan.action === 'snapshot-mismatch') {
+      versionPrompt.value = { name: file.name, savedEngineVersion: plan.savedEngineVersion, currentEngineVersion: plan.currentEngineVersion, config: plan.config, seed: plan.seed }
+      return 'version-mismatch'
+    }
+    const snap = plan.snapshot
+    const runConfig = adoptDisplay(JSON.parse(JSON.stringify(snap.config)) as ScenarioConfig)
+    await launch(runConfig, { name: runConfig.name, seed: snap.seed, startDateTime: runConfig.startDateTime }, (c) => c.restore({ ...snap, config: runConfig }), { autoplay: false })
+    savesInfo('saves.loadedSnapshot', { name: file.name })
+    return 'loaded'
+  }
+
+  async function guarded<T>(action: () => Promise<T>): Promise<T | null> {
+    savesMessage.value = null
+    try {
+      return await action()
+    } catch (err) {
+      savesError(err)
+      return null
+    }
+  }
+
+  async function loadSaved(id: string): Promise<'loaded' | 'version-mismatch' | null> {
+    return guarded(async () => {
+      const file = await (await openStore())?.get(id)
+      if (!file) throw new Error('Save not found')
+      return applySave(file)
+    })
+  }
+
+  /** Load a save from the text of a file the user picked (or the dev API passes). */
+  async function importSaveText(text: string): Promise<'loaded' | 'version-mismatch' | null> {
+    return guarded(() => applySave(parseSaveFile(text)))
+  }
+
+  /** After a version-mismatch warning: start the snapshot's embedded config from t = 0 instead. */
+  async function restartFromEmbeddedConfig(): Promise<void> {
+    const p = versionPrompt.value
+    if (!p) return
+    versionPrompt.value = null
+    await guarded(async () => {
+      await startFromConfig(p.config, p.seed)
+      savesInfo('saves.restarted', { name: p.name })
+    })
+  }
+
+  function dismissVersionPrompt(): void {
+    versionPrompt.value = null
+  }
+
+  /** Jump back to a rewind point (paused there); running on reproduces the original run. */
+  async function rewindTo(index: number): Promise<boolean> {
+    const point = rewindPoints.value[index]
+    const c = controller
+    if (!point || !c) return false
+    const matched = await run(() => c.rewind(point))
+    recentEvents.value = markRaw([])
+    cues.reset()
+    banner.value = null
+    resetKpis()
+    rewindEvents = -1
+    inspectedEvent.value = null
+    void refreshKpis()
+    void refreshRewind()
+    void refreshEntity()
+    return matched
+  }
+
+  /** Rewind interval in sim-minutes (applies from the next load, reset or rewind). */
+  async function setRewindInterval(minutes: number): Promise<void> {
+    if (!(minutes > 0)) return
+    rewindIntervalMin.value = minutes
+    await controller?.setCheckpointInterval(minutes * 60)
+  }
+
   /** Change locale and/or units: applies live, is remembered, and is stored with the scenario config. */
   function setDisplay(next: Partial<DisplaySettings>): void {
     display.value = { ...display.value, ...next }
@@ -655,6 +918,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     if (toastTimer) clearTimeout(toastTimer)
     toast.value = null
     config.value = null
+    savesOpen.value = false
     breakpoints.value = []
     breakHit.value = null
     inspectedEvent.value = null
@@ -735,6 +999,28 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     runTo,
     select,
     setDisplay,
+    savesOpen,
+    saves,
+    storage,
+    savesMessage,
+    versionPrompt,
+    rewindPoints,
+    rewindIntervalMin,
+    openSaves,
+    closeSaves,
+    refreshSaves,
+    refreshRewind,
+    buildSave,
+    saveToBrowser,
+    exportToFile,
+    exportSaved,
+    deleteSaved,
+    loadSaved,
+    importSaveText,
+    restartFromEmbeddedConfig,
+    dismissVersionPrompt,
+    rewindTo,
+    setRewindInterval,
     setSpeedStep,
     pause,
     step,
