@@ -13,14 +13,13 @@ Handover for the next agent continuing the Terminal Twin build (the `/implement-
 
 ## Ticket status
 
-Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration branch: #25–#35, #38, #39 (TT-01–09, 18, 20, 22, 25). `npm run verify` passes (319 tests).
+Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration branch: #25–#35, #38, #39, #41 (TT-01–09, 16, 18, 20, 22, 25). `npm run verify` passes (345 tests).
 
 | Ticket | Issue | State |
 |---|---|---|
 | TT-23 STS model | #36 | WIP, uncommitted files in worktree; branch `tt/36-sts-model` still at 95e15d6. Not yet resumed |
 | TT-27 vessel hulls | #37 | WIP, uncommitted files in worktree; branch `tt/37-vessel-hulls` still at 95e15d6. Not yet resumed |
 | TT-10 export load flow | #40 | started (implementer on `tt/40-export-load-flow`) |
-| TT-16 dashboard | #41 | started (implementer on `tt/41-dashboard`) |
 | #42–#52 | | not started (#42 is unblocked) |
 
 **WIP is NOT on GitHub.** It lives only in git worktrees under `.claude/worktrees/agent-*` of the orchestrating session's container (branches `tt/36…`–`tt/39…` above; the merged `tt/33`, `tt/34`, `tt/35` branches are also there). A 5-hour API rate limit stopped all six implementers at once (limit reset at 12:10 UTC). If you can't see those branches, restart those tickets from the integration tip. Implementer subagents can be resumed with SendMessage if the session is still alive.
@@ -34,7 +33,7 @@ Updated 2026-10-28 (after merging TT-18 and TT-25). Merged on the integration br
 48←46  49←48  50←48  51←48  52←32,45,51
 ```
 
-Frontier: #36, #37, #40, #41, #42. After #38: #41. Then follow the graph.
+Frontier: #36, #37, #40, #42. After #38: #41. Then follow the graph.
 
 ## Process that worked
 
@@ -68,6 +67,7 @@ Frontier: #36, #37, #40, #41, #42. After #38: #41. Then follow the graph.
 
 ## Open follow-ups noted by implementers
 
+- **Stale/failing smoke tests (fix in the final review pass):** `terminal-twin-shc.smoke.ts` "lane-graph and reservation overlays toggle" expects an overlay object without `ascRail` (TT-08 added it); `terminal-twin-debugger.smoke.ts` "clicking a container in 3D selects it" fails at the final empty-sky click; `container-assets.smoke.ts` 18k-yard budget sees 26 draw calls vs limit 20 (cause unconfirmed, possibly SHC models); the ×600 frame-count test is load-flaky.
 - **SHC cornering:** SHCs stop at every turn instead of cornering at speed.
 - **WTP pad choice:** it is part of the `shcDispatch` reply; there is no separate decision point.
 - **Container orientation:** containers are drawn with position plus optional yaw only.
@@ -506,3 +506,11 @@ Merged. Guide: `terminal-twin-AGENTS.md` § "KPIs, end conditions and final repo
 - **UI:** `components/KpiStrip.vue` (thresholds are illustrative, not from the spec), `components/FinalReport.vue` (docked panel, JSON/CSV exports via `engine/export.ts`), setup "End conditions" fieldset (`modules/endConditions.ts`). `store.runEnded` is the single "run over" flag: any new transport or time control must no-op when true.
 - **CLI:** `--kpi-json --kpi-csv --events-json --events-csv`, `--end moves:n|vessels:n|time:s`, `Headline KPIs:` block.
 - **Gotchas:** an unreachable end condition just idles. Setup number inputs must not carry `min`/`step` (native validation hides the catalogue errors).
+
+### ticket-41 (TT-16): dashboard tab
+
+Merged. Guide: `terminal-twin-AGENTS.md` § "Dashboard (TT-16)".
+
+- `D` / top-bar button opens it (Charts + Final report tabs); it auto-opens on the report tab once when a run ends. `echarts@6` is lazy via `modules/chartLib.ts` (own 646 kB chunk; a source-scan test and a prod smoke test guard that it is not fetched until opened). Worker query `dashboard`; `engine/kpi/timeline.ts` `buildTimeline(events, now)` feeds the Gantt. Dev API `__tt.openDashboard({tab, group, bucketing})`, `__tt.dashboard()`.
+- **New KPI row** in `KPI_DEFS` fails `tests/dashboard-model.test.ts` until listed in `KPI_GROUPS` (`modules/dashboardModel.ts`) and given a `dashboard.kpi.<id>` catalogue key. New equipment kinds need nothing. New Gantt phases: extend `buildTimeline`, `PHASE_COLOURS/PATTERNS`, `dashboard.gantt.*` keys, and re-validate the palette (dark-only, validated with the dataviz validator).
+- The dashboard overlay is z-index 8 over `.scene`, below the top bar; the docked `FinalReport` is hidden while it is open. Yard fill heatmap uses `blockFillPct` (drops on retrieval); the KPI `yard.fill-pct` gauge still only grows.
