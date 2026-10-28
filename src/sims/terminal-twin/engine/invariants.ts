@@ -7,11 +7,13 @@
  * ticket adds a new custody owner kind, extend `custodyHolders`.
  */
 import { laneGraphOf } from './laneGraph'
+import { hasLandside, landsideGraphOf } from './landsideGraph'
 import { overlappingReservations } from './reservations'
 import { ascIndexOf, type AscState, type CustodyRef, type SimState } from './state'
 import { ascPoseAt } from './subsystems/asc'
 import { gantryPositionAt, railOrder } from './subsystems/rail'
 import { shcPositionAt } from './subsystems/shc'
+import { truckPositionAt } from './subsystems/landside'
 import { ASC_MIN_SEPARATION_M, blockSpecs, travelHoistM } from './yardLayout'
 import type { ScenarioConfig } from '../scenario/types'
 import { vesselClass } from '../scenario/vesselClasses'
@@ -50,6 +52,11 @@ function custodyHolders(state: SimState): { owner: CustodyRef; containerId: stri
     if (a.carrying) holders.push({ owner: { kind: 'asc', id: a.id }, containerId: a.carrying })
   for (const y of Object.values(state.yardSlots))
     if (y.containerId) holders.push({ owner: { kind: 'yardSlot', id: y.id }, containerId: y.containerId })
+  for (const t of Object.values(state.trucks))
+    if (t.carrying) holders.push({ owner: { kind: 'truck', id: t.id }, containerId: t.carrying })
+  // boxes that left the terminal on a truck are held by "outside"
+  for (const c of Object.values(state.containers))
+    if (c.custody.kind === 'external') holders.push({ owner: { ...c.custody }, containerId: c.id })
   return holders
 }
 
@@ -307,6 +314,44 @@ export const INVARIANTS: Invariant[] = [
         const below = filled.get(`${s.vesselId}:${s.bay}:${s.row}:${s.tier - 1}`) ?? []
         if (!below.some((h) => h === null || s.half === null || h === s.half))
           messages.push(`box ${s.containerId} in ${s.id} lies above an empty cell (bay ${s.bay} row ${s.row} tier ${s.tier - 1})`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'landside.segregation',
+    description:
+      'Safety segregation: external trucks only ever stand on landside road nodes and never come within the waterside network ' +
+      '(landside of every block stack at all times, now and at every breakpoint of their planned motion), and SHCs only stand on ' +
+      'waterside lane-graph nodes, so they never use the public gate or the landside roads.',
+    check(state, config) {
+      const messages: string[] = []
+      const trucks = Object.values(state.trucks)
+      const lanes = laneGraphOf(config)
+      if (trucks.length > 0 && hasLandside(config)) {
+        const graph = landsideGraphOf(config)
+        const landsideZ = Math.min(...graph.stalls.map((s) => s.z)) - 1e-6
+        for (const t of trucks) {
+          if (!graph.nodes[t.nodeId]) {
+            if (lanes.nodes[t.nodeId]) messages.push(`${t.id} is on the waterside lane graph (node ${t.nodeId})`)
+            messages.push(`${t.id} is at ${t.nodeId}, which is not a landside road node`)
+            continue
+          }
+          const times = new Set<number>([state.now])
+          for (const s of t.motion) for (const at of [s.t0, s.t1]) if (at >= state.now) times.add(at)
+          for (const at of [...times].sort((a, b) => a - b)) {
+            const p = truckPositionAt(graph, t, at)
+            if (p.z < landsideZ) {
+              messages.push(`${t.id} reaches Z ${p.z.toFixed(1)} m at t=${at.toFixed(1)} s, inside the waterside area (landside starts at Z ${landsideZ.toFixed(1)} m)`)
+              break
+            }
+          }
+        }
+      }
+      const gateZ = hasLandside(config) ? Math.min(...landsideGraphOf(config).stalls.map((s) => s.z)) - 1e-6 : Infinity
+      for (const shc of Object.values(state.shcs)) {
+        if (shc.nodeId.startsWith('ls:') || !lanes.nodes[shc.nodeId]) messages.push(`${shc.id} is at ${shc.nodeId}, which is not a waterside lane node (SHCs never use the public gate)`)
+        else if (lanes.nodes[shc.nodeId].z >= gateZ) messages.push(`${shc.id} is at ${shc.nodeId}, in the landside area`)
       }
       return messages
     },

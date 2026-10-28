@@ -16,7 +16,7 @@ export interface KpiGroup {
   kpis: readonly string[]
 }
 
-/** KPI groups of the dashboard, in tab order. Landside has no KPIs until the truck flow exists. */
+/** KPI groups of the dashboard, in tab order. */
 export const KPI_GROUPS: readonly KpiGroup[] = [
   {
     id: 'quay',
@@ -49,7 +49,17 @@ export const KPI_GROUPS: readonly KpiGroup[] = [
     ],
   },
   { id: 'yard', kpis: ['asc.utilisation-pct', 'asc.cycle-time-s', 'asc.jobs', 'yard.fill-pct', 'yard.rehandles-per-move'] },
-  { id: 'landside', kpis: [] },
+  {
+    id: 'landside',
+    kpis: [
+      'landside.truck-turn-s',
+      'landside.gate-queue',
+      'landside.gate-wait-s',
+      'landside.stall-wait-s',
+      'landside.trucks-in',
+      'landside.trucks-out',
+    ],
+  },
   {
     id: 'handlers',
     kpis: ['handler.calls', 'handler.mean-latency-s', 'handler.fallbacks', 'handler.failures', 'handler.backlog'],

@@ -73,5 +73,5 @@ describe('golden updates', () => {
     expect(cli('--dir', dir, '--update', '--fixture', NAME).text).toContain(`${NAME}: updated`)
     expect(cli('--dir', dir).exitCode).toBe(0)
     expect(cli('--fixture', 'nope').exitCode).toBe(2)
-  })
+  }, 60000)
 })

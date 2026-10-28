@@ -21,6 +21,11 @@ export type {
   AscState,
   AscStatus,
   AscJob,
+  TruckState,
+  TruckLeg,
+  TruckStatus,
+  TransferStallState,
+  LandsideState,
   YardBlockState,
   YardSlotState,
 } from './state'
@@ -47,14 +52,23 @@ export {
   railSegmentIds,
   railSegmentSpan,
   railStartZ,
+  transferStallLayout,
+  transferStallId,
+  transferStallZ,
+  STALL_PITCH_M,
+  STALL_LENGTH_M,
+  TRUCK_DECK_M,
 } from './yardLayout'
-export type { BlockSpec, YardCandidate, YardStacks } from './yardLayout'
+export type { BlockSpec, YardCandidate, YardStacks, TransferStallLayout } from './yardLayout'
 export { ascPoseAt } from './subsystems/asc'
 export { ascIdOf, ascIndexOf } from './state'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
+export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, QUEUE_PITCH_M, GATE_LANE_W_M } from './landsideGraph'
+export type { LandsideGraph, LandsideNode, LandsideEdge, LandsideZone, GateLaneLayout } from './landsideGraph'
+export { truckPositionAt } from './subsystems/landside'
 export type { Reservation } from './reservations'
-export type { ShcPhasePayload, AscPhasePayload } from './events'
+export type { ShcPhasePayload, AscPhasePayload, TruckLegInfo } from './events'
 export { defaultHandlers } from './handlers'
 export type { HandlerSet, GroundPositionRequest, GroundPositionReply } from './handlers'
 export {
@@ -76,6 +90,12 @@ export type {
   AscDispatchCandidate,
   AscDispatchReply,
   AscDispatchRequest,
+  GateLaneAssignmentReply,
+  GateLaneAssignmentRequest,
+  GateLaneOption,
+  TransferStallOption,
+  TransferStallSelectionReply,
+  TransferStallSelectionRequest,
   ShcDispatchJob,
   ShcDispatchPad,
   ShcDispatchReply,
@@ -95,7 +115,7 @@ export type { DecisionRequestedPayload, DecisionResolvedPayload } from './events
 export type { HandlerKpiReport } from './kpis'
 export type { SimQuery } from './query'
 export type { InvariantViolation } from './invariants'
-export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport } from './kpis'
+export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport, LandsideKpiReport } from './kpis'
 export type { WorkPackage, WorkPackageKind, WorkPackageStatus, LoadOrder } from './state'
 export {
   createSimulation,

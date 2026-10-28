@@ -11,6 +11,7 @@ import { minFutureRehandles, nearestValidRehandle } from './rehandleStrategies'
 import { balancedAscDispatch, watersideFirstDispatch } from './ascStrategies'
 import { groupByVesselSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
 import { nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
+import { leastLoadedBlockStall, leastUsedLane, lowestFreeLane, nearestToBoxStall } from './landsideStrategies'
 import { justInTimeRelease, keepKAheadRelease } from './workPackageStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
 import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchPad, ShcDispatchRequest } from './types'
@@ -164,6 +165,32 @@ export const strategies: StrategyRegistry = {
       },
     },
   },
+  gateLaneAssignment: {
+    default: 'lowest-free-lane',
+    strategies: {
+      'lowest-free-lane': {
+        description: 'The free inbound lane with the lowest index (west first).',
+        handler: (msg) => lowestFreeLane(msg.payload),
+      },
+      'least-used-lane': {
+        description: 'The free inbound lane that has processed the fewest trucks, spreading the work.',
+        handler: (msg) => leastUsedLane(msg.payload),
+      },
+    },
+  },
+  transferStallSelection: {
+    default: 'nearest-to-box',
+    strategies: {
+      'nearest-to-box': {
+        description: 'A free stall in the block that holds the box to pick (drops: nearest the gate), nearest the gate within the block.',
+        handler: (msg) => nearestToBoxStall(msg.payload),
+      },
+      'least-loaded-block': {
+        description: 'A free stall in the block with the fewest trucks holding or waiting for a stall, whatever the box.',
+        handler: (msg) => leastLoadedBlockStall(msg.payload),
+      },
+    },
+  },
   berthAllocation: {
     default: 'first-fit',
     strategies: {
@@ -211,4 +238,6 @@ export const defaultHandlers: HandlerSet = {
   workPackageRelease: getStrategy('workPackageRelease', strategies.workPackageRelease.default),
   emptyAllocation: getStrategy('emptyAllocation', strategies.emptyAllocation.default),
   rehandleTarget: getStrategy('rehandleTarget', strategies.rehandleTarget.default),
+  gateLaneAssignment: getStrategy('gateLaneAssignment', strategies.gateLaneAssignment.default),
+  transferStallSelection: getStrategy('transferStallSelection', strategies.transferStallSelection.default),
 }

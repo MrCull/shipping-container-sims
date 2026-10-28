@@ -22,6 +22,8 @@ import {
   type BlockConfig,
   type CargoConfig,
   type EndConditions,
+  type GateConfig,
+  type LandsideConfig,
   type LayoutConfig,
   type QuayConfig,
   type ScenarioConfig,
@@ -72,6 +74,27 @@ export const DEFAULT_ASC_KINEMATICS: AscKinematics = {
   hoistEmpty: { vMax: 1, accel: 0.5, decel: 0.5 },
   lockS: 2,
   unlockS: 2,
+}
+
+/** [A] Trucks per hour by clock hour: quiet nights, a morning peak (07–10) and an afternoon peak (14–17). */
+export const DEFAULT_HOURLY_PROFILE: number[] = [
+  4, 3, 3, 3, 4, 8, 20, 40, 48, 44, 30, 24, 22, 28, 38, 46, 42, 30, 18, 12, 10, 8, 6, 5,
+]
+
+/** [A] Gate: four lanes each way, 40 s to process an inbound truck (documents, OCR, seal check), 20 s outbound. */
+export const DEFAULT_GATE: GateConfig = { inLanes: 4, outLanes: 4, inProcessingS: 40, outProcessingS: 20, processingVariationPct: 0, oogLane: true }
+
+/**
+ * [A] Landside defaults: the hourly profile above, a mix dominated by single moves with 20% dual transactions,
+ * lognormal import dwell with a 3-day median, exports delivered 1 to 5 days before the vessel's ETA, 8 m/s trucks.
+ */
+export const DEFAULT_LANDSIDE: LandsideConfig = {
+  hourlyProfile: DEFAULT_HOURLY_PROFILE,
+  mix: { dropExport: 0.25, pickImport: 0.3, dropEmpty: 0.1, pickEmpty: 0.1, dual: 0.25 },
+  importDwell: { kind: 'lognormal', medianS: 3 * 86400, sigma: 0.6 },
+  exportWindow: { minBeforeEtaS: 86400, maxBeforeEtaS: 5 * 86400 },
+  gate: DEFAULT_GATE,
+  drive: { vMax: 8, accel: 1, decel: 1.5 },
 }
 
 /** SHC ids: SHC01, SHC02, … */
@@ -303,6 +326,24 @@ export class ScenarioBuilder {
 
   subsystems(modes: SubsystemModes): this {
     this.config.subsystems = { ...this.config.subsystems, ...modes }
+    return this
+  }
+
+  /** Where the scenario clock sits at t = 0 (seconds since midnight): aligns the hourly truck profile and the KPI buckets. */
+  clockStart(startTimeOfDayS: number): this {
+    this.config.kpi = { ...this.config.kpi, startTimeOfDayS }
+    return this
+  }
+
+  /** Landside (TT-13): trucks, gate and transfer stalls; unspecified fields take `DEFAULT_LANDSIDE`. */
+  landside(opts: Partial<Omit<LandsideConfig, 'gate'>> & { gate?: Partial<GateConfig> } = {}): this {
+    const { gate, ...rest } = opts
+    this.config.landside = structuredClone({
+      ...DEFAULT_LANDSIDE,
+      ...this.config.landside,
+      ...rest,
+      gate: { ...DEFAULT_GATE, ...this.config.landside?.gate, ...gate },
+    })
     return this
   }
 

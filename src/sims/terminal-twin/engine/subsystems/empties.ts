@@ -36,7 +36,7 @@ export function emptyCandidates(ctx: EngineContext, size: ContainerSize, line: s
   for (const slot of Object.values(state.yardSlots)) {
     if (!slot.containerId) continue
     const box = state.containers[slot.containerId]
-    if (box.full || box.size !== size || box.line !== line || box.allocatedTo !== undefined) continue
+    if (box.full || box.size !== size || box.line !== line || box.allocatedTo !== undefined || box.truckClaim !== undefined) continue
     if (box.custody.kind !== 'yardSlot' || box.custody.id !== slot.id || !onTop(state, slot)) continue
     const spec = specs.get(slot.blockId)
     if (!spec) continue

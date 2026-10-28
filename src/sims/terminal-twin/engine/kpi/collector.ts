@@ -254,6 +254,31 @@ export const KPI_DEFS: KpiDef[] = [
     entities: blockIds,
     value: (w, id, c) => ratio(100 * w.gauge('yard.cells', id), c.capacityCells[id]),
   },
+  // Landside
+  { id: 'landside.trucks-in', unit: 'count', entityKind: 'terminal', entities: () => TERMINAL, value: (w) => w.sum('ls.in', 'terminal') },
+  { id: 'landside.trucks-out', unit: 'count', entityKind: 'terminal', entities: () => TERMINAL, value: (w) => w.sum('ls.out', 'terminal') },
+  {
+    id: 'landside.truck-turn-s',
+    unit: 's',
+    entityKind: 'terminal',
+    entities: () => TERMINAL,
+    value: (w) => ratio(w.sum('ls.turnS', 'terminal'), w.sum('ls.out', 'terminal')),
+  },
+  { id: 'landside.gate-queue', unit: 'count', entityKind: 'terminal', entities: () => TERMINAL, value: (w) => w.gauge('ls.queue', 'terminal') },
+  {
+    id: 'landside.gate-wait-s',
+    unit: 's',
+    entityKind: 'terminal',
+    entities: () => TERMINAL,
+    value: (w) => ratio(w.sum('ls.gateWaitS', 'terminal'), w.sum('ls.gateStarted', 'terminal')),
+  },
+  {
+    id: 'landside.stall-wait-s',
+    unit: 's',
+    entityKind: 'terminal',
+    entities: () => TERMINAL,
+    value: (w) => ratio(w.sum('ls.stallWaitS', 'terminal'), w.sum('ls.stallServed', 'terminal')),
+  },
   // TOS handlers
   { id: 'handler.calls', unit: 'count', entityKind: 'handler', entities: (c) => c.decisionPoints, value: (w, id) => w.sum('handler.calls', id) },
   {
@@ -290,6 +315,7 @@ export const KPI_DEFS: KpiDef[] = [
 function defApplies(def: KpiDef, config: ScenarioConfig, ctx: DefContext): boolean {
   if (def.id.startsWith('shc.') || def.id.startsWith('wtp.')) return (config.shcs?.length ?? 0) > 0
   if (def.id.startsWith('asc.') || def.id.startsWith('yard.')) return Object.keys(ctx.capacityCells).length > 0
+  if (def.id.startsWith('landside.')) return config.landside !== undefined && Object.keys(ctx.capacityCells).length > 0
   return true
 }
 
@@ -343,6 +369,8 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
   const cells: Record<string, number> = { ...(info.initialCells ?? {}) }
   for (const [block, n] of Object.entries(cells)) acc.gauge('yard.cells', block, 0, n)
   const seenDecisionPoints = new Set<string>()
+  const atStallAt: Record<string, number> = {}
+  const servedTrucks = new Set<string>()
 
   function flushRail(upTo: number): void {
     for (const id of Object.keys(railEnd)) {
@@ -488,6 +516,33 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         break
       case 'AscJobAssigned':
         ascBusy[e.payload.ascId] = { since: e.payload.departAt }
+        if (e.payload.truckId && !servedTrucks.has(e.payload.truckId)) {
+          servedTrucks.add(e.payload.truckId)
+          acc.add('ls.stallWaitS', 'terminal', h, e.payload.departAt - (atStallAt[e.payload.truckId] ?? e.t))
+          acc.add('ls.stallServed', 'terminal', h, 1)
+        }
+        break
+      case 'TruckArrived':
+        acc.gauge('ls.queue', 'terminal', h, e.payload.queueLength)
+        break
+      case 'TruckGateStarted':
+        acc.gauge('ls.queue', 'terminal', h, e.payload.queueLength)
+        acc.add('ls.gateWaitS', 'terminal', h, e.payload.queueWaitS)
+        acc.add('ls.gateStarted', 'terminal', h, 1)
+        break
+      case 'TruckGateIn':
+        acc.add('ls.in', 'terminal', h, 1)
+        break
+      case 'TruckAtStall':
+        atStallAt[e.payload.truckId] = e.t
+        break
+      case 'TruckGateOut':
+        acc.add('ls.out', 'terminal', h, 1)
+        acc.add('ls.turnS', 'terminal', h, e.payload.turnS)
+        break
+      case 'TruckDeparted':
+        delete atStallAt[e.payload.truckId]
+        servedTrucks.delete(e.payload.truckId)
         break
       case 'AscPicked': {
         const dropped = wtpDropAt[e.payload.containerId]
@@ -564,7 +619,8 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         acc.gauge('yard.cells', block, hourOf(e.t), cells[block])
       }
       if (e.type === 'AscStacked' && e.payload.rehandle) acc.add('yard.rehandles', e.payload.blockId, hourOf(e.t), 1)
-      else if (e.type === 'AscStacked' || e.type === 'AscDroppedAtWtp') acc.add('yard.moves', e.payload.blockId, hourOf(e.t), 1)
+      else if (e.type === 'AscStacked' || e.type === 'AscDroppedAtWtp' || e.type === 'AscDroppedAtStall')
+        acc.add('yard.moves', e.payload.blockId, hourOf(e.t), 1)
       if (e.type === 'AscStacked') {
         const block = e.payload.blockId
         cells[block] = (cells[block] ?? 0) + boxSpan(info.containerSize(e.payload.containerId))

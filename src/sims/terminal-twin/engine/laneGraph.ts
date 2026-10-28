@@ -295,8 +295,14 @@ export function laneZonesAt(graph: LaneGraph, lane: number, x: number, halfLengt
   return out
 }
 
+/** What path finding needs of a graph: waterside lane graph and landside road graph both satisfy it. */
+export interface PathGraph {
+  nodes: Record<string, { x: number; z: number }>
+  out: Record<string, { from: string; to: string; lengthM: number; zone: string | null }[]>
+}
+
 const graphCache = new WeakMap<ScenarioConfig, LaneGraph>()
-const pathCache = new WeakMap<LaneGraph, Map<string, string[] | null>>()
+const pathCache = new WeakMap<PathGraph, Map<string, string[] | null>>()
 
 /** The (cached) lane graph of a config object. */
 export function laneGraphOf(config: ScenarioConfig): LaneGraph {
@@ -309,7 +315,7 @@ export function laneGraphOf(config: ScenarioConfig): LaneGraph {
 }
 
 /** Shortest path (node ids, inclusive) by length; ties broken by node id. Null if unreachable. */
-export function shortestPath(graph: LaneGraph, from: string, to: string): string[] | null {
+export function shortestPath(graph: PathGraph, from: string, to: string): string[] | null {
   let cache = pathCache.get(graph)
   if (!cache) {
     cache = new Map()
@@ -377,7 +383,7 @@ export function shortestPath(graph: LaneGraph, from: string, to: string): string
   return path
 }
 
-export function pathLength(graph: LaneGraph, path: string[]): number {
+export function pathLength(graph: PathGraph, path: string[]): number {
   let total = 0
   for (let i = 1; i < path.length; i++) {
     const a = graph.nodes[path[i - 1]]
@@ -388,7 +394,7 @@ export function pathLength(graph: LaneGraph, path: string[]): number {
 }
 
 /** The edge from → to (throws if absent). */
-export function edgeBetween(graph: LaneGraph, from: string, to: string): LaneEdge {
+export function edgeBetween<G extends PathGraph>(graph: G, from: string, to: string): G['out'][string][number] {
   const e = graph.out[from]?.find((x) => x.to === to)
   if (!e) throw new Error(`No lane edge ${from} → ${to}`)
   return e

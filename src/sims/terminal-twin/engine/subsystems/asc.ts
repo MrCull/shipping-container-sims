@@ -39,6 +39,7 @@ import {
   stackIndex,
   tierBaseY,
   travelHoistM,
+  TRUCK_DECK_M,
   type BlockSpec,
 } from '../yardLayout'
 import { DEFAULT_ASC_KINEMATICS } from '../../scenario/builder'
@@ -46,6 +47,8 @@ import { blockersOf, nextBlocker, rehandleCandidates, retrievalRanks, retrievalS
 import type { AscKinematics } from '../../scenario/types'
 import { parseVesselSlotId } from '../../scenario/vesselClasses'
 import { maybeDispatch } from './shc'
+import { landsideGraphOf } from '../landsideGraph'
+import { truckReadyForPick } from './landside'
 import { slotGantryX } from './loadPrep'
 import {
   isBlockedStart,
@@ -76,6 +79,12 @@ const STATUS_AFTER: Record<PlannedType, AscStatus> = {
   AscUnlocking: 'unlocking',
   AscStacked: 'releasing',
   AscReady: 'idle',
+  AscRoutingToTruck: 'routing-to-pad',
+  AscPositioningAtTruck: 'positioning-at-pad',
+  AscPickedFromTruck: 'lifting',
+  AscRoutingToStall: 'routing-to-pad',
+  AscPositioningAtStall: 'positioning-at-pad',
+  AscDroppedAtStall: 'releasing',
 }
 
 const kinematics = (ctx: EngineContext): AscKinematics => ctx.config.kinematics.asc ?? DEFAULT_ASC_KINEMATICS
@@ -220,6 +229,10 @@ function scheduleNext(ctx: EngineContext, asc: AscState): void {
     case 'AscDroppedAtWtp':
       ctx.schedule(next.type, next.at, subjects, { ...base, wtpPadId: job.wtpPadId })
       break
+    case 'AscPickedFromTruck':
+    case 'AscDroppedAtStall':
+      ctx.schedule(next.type, next.at, subjects, { ...base, stallId: job.stallId as string, truckId: job.truckId as string })
+      break
     default:
       ctx.schedule(next.type, next.at, subjects, base)
   }
@@ -326,8 +339,85 @@ function buildRehandleTrip(ctx: EngineContext, asc: AscState, job: AscJob): { tr
   return { trip, padId: '' }
 }
 
+/** A truck's transfer stall (landside), from the landside graph. */
+function stallOf(ctx: EngineContext, stallId: string): { id: string; x: number; z: number } {
+  const stall = landsideGraphOf(ctx.config).stalls.find((s) => s.id === stallId)
+  if (!stall) throw new Error(`Unknown transfer stall ${stallId}`)
+  return stall
+}
+
+/** A truck job: its box is on a truck chassis at the stall (drop) or goes to it (pick). */
+export const isTruckJob = (job: AscJob): boolean => job.truckId !== undefined
+
+/** Truck drop as a relative trip: stall → lock → lift off the chassis → slot → set down → spreader up. */
+function buildTruckDropTrip(ctx: EngineContext, asc: AscState, job: AscJob): { trip: AscTrip; padId: string } {
+  const { state } = ctx
+  const k = kinematics(ctx)
+  const block = blockOf(ctx, asc.blockId)
+  const stall = stallOf(ctx, job.stallId as string)
+  const cell = parseYardSlotId(job.yardSlotId ?? '')
+  const span = boxSpan(state.containers[job.containerId].size)
+  const travel = travelHoistM(block)
+  const trip = new AscTrip(asc.id, { z: asc.gantryZ, x: asc.trolleyX, hoistY: asc.hoistY }, state.subsystems.asc === 'instant')
+  trip.mark('AscRoutingToTruck')
+  trip.hoistTo(travel, k.hoistEmpty)
+  trip.moveTo(stall.z, stall.x, k.gantry, k.trolley)
+  trip.padFrom = trip.t
+  trip.mark('AscPositioningAtTruck')
+  trip.hoistTo(TRUCK_DECK_M, k.hoistEmpty)
+  trip.mark('AscLocking')
+  trip.dwell(k.lockS)
+  trip.mark('AscPickedFromTruck')
+  trip.mark('AscRoutingToSlot')
+  trip.hoistTo(travel, k.hoistLoaded)
+  trip.padTo = trip.t
+  trip.moveTo(slotZ(block, cell.bay, span), rowX(block, cell.row), k.gantry, k.trolley)
+  trip.mark('AscPositioningAtSlot')
+  trip.hoistTo(tierBaseY(cell.tier), k.hoistLoaded)
+  trip.mark('AscUnlocking')
+  trip.dwell(k.unlockS)
+  trip.mark('AscStacked')
+  trip.hoistTo(travel, k.hoistEmpty)
+  trip.mark('AscReady')
+  return { trip, padId: stall.id }
+}
+
+/** Truck pick as a relative trip: stack → lock → lift → stall → set down on the chassis → spreader up. */
+function buildTruckPickTrip(ctx: EngineContext, asc: AscState, job: AscJob): { trip: AscTrip; padId: string } {
+  const { state } = ctx
+  const k = kinematics(ctx)
+  const block = blockOf(ctx, asc.blockId)
+  const stall = stallOf(ctx, job.stallId as string)
+  const cell = parseYardSlotId(job.yardSlotId ?? '')
+  const span = boxSpan(state.containers[job.containerId].size)
+  const travel = travelHoistM(block)
+  const trip = new AscTrip(asc.id, { z: asc.gantryZ, x: asc.trolleyX, hoistY: asc.hoistY }, state.subsystems.asc === 'instant')
+  trip.mark('AscRoutingToStack')
+  trip.hoistTo(travel, k.hoistEmpty)
+  trip.moveTo(slotZ(block, cell.bay, span), rowX(block, cell.row), k.gantry, k.trolley)
+  trip.mark('AscPositioningAtStack')
+  trip.hoistTo(tierBaseY(cell.tier), k.hoistEmpty)
+  trip.mark('AscLocking')
+  trip.dwell(k.lockS)
+  trip.mark('AscRetrieved')
+  trip.mark('AscRoutingToStall')
+  trip.hoistTo(travel, k.hoistLoaded)
+  trip.moveTo(stall.z, stall.x, k.gantry, k.trolley)
+  trip.padFrom = trip.t
+  trip.mark('AscPositioningAtStall')
+  trip.hoistTo(TRUCK_DECK_M, k.hoistLoaded)
+  trip.mark('AscUnlocking')
+  trip.dwell(k.unlockS)
+  trip.mark('AscDroppedAtStall')
+  trip.hoistTo(travel, k.hoistEmpty)
+  trip.padTo = trip.t
+  trip.mark('AscReady')
+  return { trip, padId: stall.id }
+}
+
 /** The ASC's whole cycle for `job` as a relative trip (pad → lift → slot → set down → spreader up). */
 function buildJobTrip(ctx: EngineContext, asc: AscState, job: AscJob): { trip: AscTrip; padId: string } {
+  if (isTruckJob(job)) return job.kind === 'retrieve' ? buildTruckPickTrip(ctx, asc, job) : buildTruckDropTrip(ctx, asc, job)
   if (job.kind === 'retrieve') return buildRetrieveTrip(ctx, asc, job)
   if (job.kind === 'rehandle') return buildRehandleTrip(ctx, asc, job)
   const { state } = ctx
@@ -490,7 +580,7 @@ function startJob(ctx: EngineContext, asc: AscState, job: AscJob, plan: JobPlan)
 
   job.ascId = asc.id
   asc.jobId = job.id
-  if (job.kind === 'retrieve') state.wtpPads[job.wtpPadId].claimedBy = asc.id
+  if (job.kind === 'retrieve' && !isTruckJob(job)) state.wtpPads[job.wtpPadId].claimedBy = asc.id
   if (job.kind === 'retrieve' || job.kind === 'rehandle') lockStack(state, job)
   state.reservations = truncateParkHolds(state.reservations, asc.id, start)
   const reservations = reserve(state, asc.id, plan.padWindows.concat(plan.railWindows), start)
@@ -524,6 +614,7 @@ function startJob(ctx: EngineContext, asc: AscState, job: AscJob, plan: JobPlan)
     reservations,
     ...(twin ? { railWaitS: Math.round(plan.railWaitS * 1000) / 1000 } : {}),
     ...(job.kind === 'rehandle' ? { rehandle: true as const, targetSlotId: job.targetSlotId ?? '' } : {}),
+    ...(isTruckJob(job) ? { stallId: job.stallId as string, truckId: job.truckId as string } : {}),
   })
 }
 
@@ -537,21 +628,6 @@ function lockStack(state: SimState, job: AscJob): void {
   if (!slot) return
   const yard = state.yardBlocks[slot.blockId]
   for (let k = 0; k < slot.span; k++) yard.heights[stackIndex(yard, slot.bay + k, slot.row)] = yard.tiers
-}
-
-/** Next open job of the block: allocated, cleared, oldest claim, not blocked by an older claim on its stacks. */
-function nextOpenJob(state: SimState, blockId: string): AscJob | undefined {
-  const open = Object.values(state.ascJobs)
-    .filter((j) => j.kind === undefined && j.blockId === blockId && j.ascId === null && j.cleared && j.claimSeq !== null)
-    .sort((a, b) => (a.claimSeq as number) - (b.claimSeq as number))
-  return open.find((j) => !blockedByOlderClaim(state, j))
-}
-
-/** The block's next rehandle that can start: target claimed, no older claim below it unfilled. */
-function nextRehandle(state: SimState, blockId: string): AscJob | undefined {
-  return Object.values(state.ascJobs).find(
-    (j) => j.kind === 'rehandle' && j.blockId === blockId && j.ascId === null && j.targetSlotId && !blockedByOlderClaim(state, j),
-  )
 }
 
 /** A free pad of the block for an export box, nearest to its stack's row; null if every pad is busy. */
@@ -576,10 +652,24 @@ function isRetrievable(state: SimState, job: AscJob): boolean {
   return true
 }
 
-/** Next export retrieval of the block that can start now: oldest first, box on top, a pad free (set on the job). */
-function nextRetrieval(ctx: EngineContext, blockId: string): AscJob | undefined {
+/** Truck pick retrievals that can start now: the truck stands at its stall with a free chassis, the box is on top of its stack. */
+function readyTruckPicks(state: SimState, blockId: string): AscJob[] {
+  return Object.values(state.ascJobs).filter(
+    (j) =>
+      j.kind === 'retrieve' &&
+      isTruckJob(j) &&
+      j.blockId === blockId &&
+      j.ascId === null &&
+      truckReadyForPick(state, j) &&
+      isRetrievable(state, j) &&
+      !Object.values(state.ascJobs).some((r) => r.kind === 'rehandle' && r.containerId === j.containerId),
+  )
+}
+
+/** Next export retrieval to a WTP pad that can start now: oldest first, box on top, a pad free (set on the job). */
+function nextPadRetrieval(ctx: EngineContext, blockId: string): AscJob | undefined {
   const { state } = ctx
-  const open = Object.values(state.ascJobs).filter((j) => j.kind === 'retrieve' && j.blockId === blockId && j.ascId === null)
+  const open = Object.values(state.ascJobs).filter((j) => j.kind === 'retrieve' && j.blockId === blockId && j.ascId === null && !isTruckJob(j))
   for (const job of open) {
     if (!isRetrievable(state, job)) continue
     if (Object.values(state.ascJobs).some((j) => j.kind === 'rehandle' && j.containerId === job.containerId)) continue
@@ -591,8 +681,23 @@ function nextRetrieval(ctx: EngineContext, blockId: string): AscJob | undefined 
   return undefined
 }
 
-const nextJob = (ctx: EngineContext, blockId: string): AscJob | undefined =>
-  nextOpenJob(ctx.state, blockId) ?? nextRehandle(ctx.state, blockId) ?? nextRetrieval(ctx, blockId)
+/**
+ * The block's jobs that can start now, in priority order: stacking jobs (oldest claim first), rehandles, truck picks,
+ * then the next pad retrieval. The first is what a single-ASC block works on next; a twin block takes the first one an
+ * idle ASC can serve (a pad job the waterside ASC is in the way of does not hold up the landside ASC's truck work).
+ */
+function candidateJobs(ctx: EngineContext, blockId: string): AscJob[] {
+  const { state } = ctx
+  const stacks = Object.values(state.ascJobs)
+    .filter((j) => j.kind === undefined && j.blockId === blockId && j.ascId === null && j.cleared && j.claimSeq !== null)
+    .sort((a, b) => (a.claimSeq as number) - (b.claimSeq as number))
+    .filter((j) => !blockedByOlderClaim(state, j))
+  const rehandles = Object.values(state.ascJobs).filter(
+    (j) => j.kind === 'rehandle' && j.blockId === blockId && j.ascId === null && j.targetSlotId && !blockedByOlderClaim(state, j),
+  )
+  const pad = nextPadRetrieval(ctx, blockId)
+  return [...stacks, ...rehandles, ...readyTruckPicks(state, blockId), ...(pad ? [pad] : [])]
+}
 
 const ascsOfBlock = (state: SimState, blockId: string): AscState[] =>
   Object.values(state.ascs)
@@ -610,22 +715,25 @@ export function maybeDispatchAsc(ctx: EngineContext, blockId: string): void {
   if (idle.length === 0) return
   pumpRehandle(ctx, blockId)
   if (ascs.length === 1) {
-    const next = nextJob(ctx, blockId)
+    const next = candidateJobs(ctx, blockId)[0]
     if (next) startJob(ctx, idle[0], next, planJob(ctx, idle[0], next) as JobPlan)
     return
   }
   if (Object.values(state.ascJobs).some((j) => j.blockId === blockId && j.dispatch === 'asked')) return
-  const job = nextJob(ctx, blockId)
-  if (!job) return
+  const jobs = candidateJobs(ctx, blockId)
+  if (jobs.length === 0) return
+  // with trucks, the landside ASC may have work the waterside ASC's pad job cannot start yet: take the first job an idle ASC can serve
+  const job = (state.subsystems.landside !== 'off' ? jobs.find((j) => idle.some((a) => planJob(ctx, a, j) !== null)) : undefined) ?? jobs[0]
   requestDispatch(ctx, job, ascs, idle)
 }
 
 function requestDispatch(ctx: EngineContext, job: AscJob, ascs: AscState[], idle: AscState[]): void {
   const { state } = ctx
   const block = blockOf(ctx, job.blockId)
+  const stall = isTruckJob(job) ? stallOf(ctx, job.stallId as string) : null
   const pad = laneGraphOf(ctx.config).pads.find((p) => p.id === job.wtpPadId)
-  if (!pad && job.kind !== 'rehandle') throw new Error(`Unknown WTP pad ${job.wtpPadId}`)
-  const cell = parseYardSlotId(job.yardSlotId ?? '')
+  if (!pad && !stall && job.kind !== 'rehandle') throw new Error(`Unknown WTP pad ${job.wtpPadId}`)
+  const cell = job.yardSlotId ? parseYardSlotId(job.yardSlotId) : { bay: 1, row: 1, tier: 1 }
   const span = boxSpan(state.containers[job.containerId].size)
   const sideOf = (a: AscState) => (ascIndexOf(a.id) === 1 ? 'waterside' : 'landside') as 'waterside' | 'landside'
   job.dispatch = 'asked'
@@ -636,10 +744,11 @@ function requestDispatch(ctx: EngineContext, job: AscJob, ascs: AscState[], idle
       job: {
         jobId: job.id,
         containerId: job.containerId,
-        kind: job.kind ?? 'wtp',
+        kind: stall ? 'transfer' : (job.kind ?? 'wtp'),
+        ...(stall ? { stallId: stall.id } : {}),
         wtpPadId: job.wtpPadId,
         yardSlotId: job.yardSlotId ?? '',
-        padZ: pad?.z ?? slotZ(block, cell.bay, span),
+        padZ: stall?.z ?? pad?.z ?? slotZ(block, cell.bay, span),
         slotZ: slotZ(block, cell.bay, span),
       },
       candidates: idle.map((a) => {
@@ -782,6 +891,13 @@ function resolveRehandleTarget(ctx: EngineContext, request: DecisionRequests['re
     return
   }
   const block = blockOf(ctx, job.blockId)
+  const top = state.yardBlocks[job.blockId]
+  if (![...Array(blocker.span).keys()].every((k) => top.heights[stackIndex(top, blocker.bay + k, blocker.row)] === blocker.tier)) {
+    // an allocation answered at the same instant put a box on the blocker (it is no longer on top): the new box blocks too, so start over
+    delete state.ascJobs[job.id]
+    maybeDispatchAsc(ctx, job.blockId)
+    return
+  }
   if (!rehandleCandidates(state, ctx.config, block, blocker, digging).some((c) => c.slotId === slotId)) {
     requestRehandleTarget(ctx, job, retr) // the slot was taken while the reply was on its way (latency)
     return
@@ -795,6 +911,8 @@ function resolveRehandleTarget(ctx: EngineContext, request: DecisionRequests['re
   }
   job.targetSlotId = slotId
   job.claimSeq = state.nextClaimSeq++
+  // the blocker stays put until an ASC is free: close its stack now, so no allocation lands on it meanwhile (it would float once the blocker leaves)
+  lockStack(state, job)
   maybeDispatchAsc(ctx, job.blockId)
 }
 
@@ -811,7 +929,10 @@ function resolveDispatch(ctx: EngineContext, jobId: string, ascId: string | null
     maybeDispatchAsc(ctx, job.blockId) // the reply was stale (keep-running latency)
     return
   }
-  if (job.kind === 'retrieve') {
+  if (job.kind === 'retrieve' && isTruckJob(job)) {
+    // the reply may be late: the box may have been rehandled or the chassis may be taken
+    if (!isRetrievable(state, job) || !truckReadyForPick(state, job)) return
+  } else if (job.kind === 'retrieve') {
     // the reply may be late (keep-running latency): the pad or the stack may have changed meanwhile
     const pad = state.wtpPads[job.wtpPadId]
     if (!isRetrievable(state, job) || pad.containerId !== null || pad.claimedBy !== null) {
@@ -830,7 +951,7 @@ function resolveDispatch(ctx: EngineContext, jobId: string, ascId: string | null
  * Ask yardAllocation for the oldest waiting box of the block, if no request is
  * pending: one at a time per block, so a slow TOS never answers from stale stacks.
  */
-function pumpAllocation(ctx: EngineContext, blockId: string): void {
+export function pumpAllocation(ctx: EngineContext, blockId: string): void {
   const { state } = ctx
   const jobs = Object.values(state.ascJobs).filter((j) => j.blockId === blockId)
   if (jobs.some((j) => j.allocation === 'asked')) return
@@ -840,14 +961,31 @@ function pumpAllocation(ctx: EngineContext, blockId: string): void {
   requestAllocation(ctx, next)
 }
 
+/**
+ * Stack heights as the allocation decision sees them: a stack holding a box a truck is coming for (TT-13) reads
+ * full, so no box is piled on it (the TOS knows the pickup; otherwise the truck would wait for a rehandle).
+ */
+function withoutPendingPickups(state: SimState, blockId: string, yard: SimState['yardBlocks'][string]): number[] {
+  const heights = yard.heights.slice()
+  for (const j of Object.values(state.ascJobs)) {
+    if (j.kind !== 'retrieve' || j.truckId === undefined || j.blockId !== blockId) continue
+    const slot = state.yardSlots[j.yardSlotId ?? '']
+    if (!slot || slot.containerId !== j.containerId) continue
+    for (let k = 0; k < slot.span; k++) heights[stackIndex(yard, slot.bay + k, slot.row)] = yard.tiers
+  }
+  return heights
+}
+
 /** Ask the yardAllocation decision point for a slot for the box on the pad. */
 function requestAllocation(ctx: EngineContext, job: AscJob): void {
   const { state } = ctx
   const box = state.containers[job.containerId]
   const block = blockOf(ctx, job.blockId)
   const yard = state.yardBlocks[job.blockId]
-  const pad = laneGraphOf(ctx.config).pads.find((p) => p.id === job.wtpPadId)
-  if (!pad) throw new Error(`Unknown WTP pad ${job.wtpPadId}`)
+  const stall = isTruckJob(job) ? stallOf(ctx, job.stallId as string) : null
+  const pad = stall ? null : laneGraphOf(ctx.config).pads.find((p) => p.id === job.wtpPadId)
+  if (!pad && !stall) throw new Error(`Unknown WTP pad ${job.wtpPadId}`)
+  const from = (stall ?? pad) as { x: number; z: number }
   ctx.requestDecision(
     'yardAllocation',
     {
@@ -856,16 +994,17 @@ function requestAllocation(ctx: EngineContext, job: AscJob): void {
       full: box.full,
       line: box.line,
       vesselId: job.vesselId,
-      wtpPadId: pad.id,
+      wtpPadId: pad?.id ?? '',
+      ...(stall ? { stallId: stall.id } : {}),
       blockId: block.id,
       bays: block.bays,
       rows: block.rows,
       tiers: block.tiers,
       blockX: block.x,
       firstBayZ: block.firstBayZ,
-      wtpX: pad.x,
-      wtpZ: pad.z,
-      heights: yard.heights.slice(),
+      wtpX: from.x,
+      wtpZ: from.z,
+      heights: withoutPendingPickups(state, block.id, yard),
       topVessels: yard.topVessels.slice(),
       random: ctx.random(),
     },
@@ -976,6 +1115,12 @@ export const ascReactors: ReactorMap = {
         throw new Error(`${e.payload.ascId}: box ${job.containerId} is not in ${job.yardSlotId}`)
       return
     }
+    if (isTruckJob(job)) {
+      const truck = ctx.state.trucks[job.truckId as string]
+      if (truck?.carrying !== job.containerId)
+        throw new Error(`${e.payload.ascId}: box ${job.containerId} is not on the chassis of ${job.truckId} (found ${truck?.carrying ?? 'nothing'})`)
+      return
+    }
     const pad = ctx.state.wtpPads[job.wtpPadId]
     if (pad.containerId !== job.containerId)
       throw new Error(`${e.payload.ascId}: box ${job.containerId} is not on ${pad.id} (found ${pad.containerId ?? 'nothing'})`)
@@ -1040,6 +1185,27 @@ export const ascReactors: ReactorMap = {
       wtpPadId: pad.id,
     }
     maybeDispatch(ctx)
+  }),
+  AscRoutingToTruck: phase(),
+  AscPositioningAtTruck: phase(),
+  /** Truck drop: the box is lifted off the chassis. */
+  AscPickedFromTruck: phase((e, ctx, asc) => {
+    asc.carrying = e.payload.containerId
+    ctx.transferCustody(e.payload.containerId, { kind: 'asc', id: asc.id })
+  }),
+  AscRoutingToStall: phase(),
+  AscPositioningAtStall: phase(),
+  /** Truck pick: the box stands on the chassis. */
+  AscDroppedAtStall: phase((e, ctx, asc) => {
+    const { state } = ctx
+    asc.carrying = null
+    asc.jobId = null
+    delete state.ascJobs[e.payload.jobId]
+    if (state.kpis.yard) {
+      state.kpis.yard.productiveMoves++
+      state.kpis.yard.perBlock[asc.blockId].productiveMoves++
+    }
+    ctx.transferCustody(e.payload.containerId, { kind: 'truck', id: e.payload.truckId })
   }),
   AscRoutingToSlot: phase(),
   AscPositioningAtSlot: phase(),

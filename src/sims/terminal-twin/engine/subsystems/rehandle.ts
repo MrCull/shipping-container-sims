@@ -122,6 +122,13 @@ export function rehandleCandidates(
     tops[i] = vesselBelow(state, block.id, blocker.bay + k, blocker.row, blocker.tier)
   }
   const forbidden = new Set([digging, ...blockersOf(state, digging)].flatMap(columnsOfSlot))
+  // a box a truck is coming for (TT-13) is never buried again: its stack is no target either (else digging for
+  // one truck's box would bury the next truck's box, and the blockers would shuttle between the stacks)
+  for (const job of Object.values(state.ascJobs)) {
+    if (job.kind !== 'retrieve' || job.truckId === undefined || job.ascId !== null) continue
+    const slot = state.yardSlots[job.yardSlotId ?? '']
+    if (slot && slot.containerId === job.containerId) for (const c of columnsOfSlot(slot)) forbidden.add(c)
+  }
   const ranks = retrievalRanks(state, config, block.id)
   const soonest = new Map<string, number>()
   for (const y of Object.values(state.yardSlots)) {

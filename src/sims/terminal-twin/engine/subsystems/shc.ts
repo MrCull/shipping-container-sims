@@ -27,7 +27,7 @@
 import type { EngineContext, ReactorMap } from '../context'
 import type { EventOf, ShcPhasePayload } from '../events'
 import { planSegment, positionAt, type AxisProfile, type MotionSegment } from '../kinematics'
-import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph } from '../laneGraph'
+import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph, type PathGraph } from '../laneGraph'
 import { earliestStart, mergeWindows, reserve, type WindowSpec } from '../reservations'
 import type { ShcJob, ShcPlannedEvent, ShcState, ShcStatus, SimState } from '../state'
 import { DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
@@ -87,7 +87,7 @@ function driverFactor(ctx: EngineContext): number {
   return 1 + ((ctx.random() * 2 - 1) * pct) / 100
 }
 
-interface Waypoint {
+export interface Waypoint {
   nodeId: string
   x: number
   z: number
@@ -102,21 +102,21 @@ interface Waypoint {
  * and the conflict-zone windows it needs. Straight collinear stretches are
  * one rest-to-rest move; the SHC stops at every turn.
  */
-class TripBuilder {
+export class TripBuilder<M extends string = PlannedType> {
   t = 0
   s = 0
   x: number
   z: number
   lift: number
   readonly segments: MotionSegment[] = []
-  readonly marks: { type: PlannedType; at: number }[] = []
+  readonly marks: { type: M; at: number }[] = []
   /** Driven runs: path distance ↔ time. */
   private runs: { s0: number; s1: number; seg: MotionSegment }[] = []
   /** Zone visits as path-distance intervals. */
   private visits: { zone: string; s0: number; s1: number }[] = []
 
   constructor(
-    private graph: LaneGraph,
+    private graph: { layout: { zoneClearanceM: number } },
     private shcId: string,
     start: Waypoint,
     private instant: boolean,
@@ -141,7 +141,7 @@ class TripBuilder {
     else this.visits.push({ zone, s0, s1 })
   }
 
-  mark(type: PlannedType): void {
+  mark(type: M): void {
     this.marks.push({ type, at: this.t })
   }
 
@@ -159,7 +159,7 @@ class TripBuilder {
    * Drive through `points` (the first is the next waypoint after the current
    * position). `lastRunMark` is marked when the final straight run starts.
    */
-  driveThrough(points: Waypoint[], profile: AxisProfile, lastRunMark?: PlannedType): void {
+  driveThrough(points: Waypoint[], profile: AxisProfile, lastRunMark?: M): void {
     // Split into straight runs.
     const runs: Waypoint[][] = []
     let pending: Waypoint[] = []
@@ -239,7 +239,7 @@ class TripBuilder {
 }
 
 /** Waypoints of a node path, with node and edge zones. */
-function waypoints(graph: LaneGraph, path: string[]): Waypoint[] {
+export function waypoints(graph: PathGraph & { nodes: Record<string, { zone: string | null }> }, path: string[]): Waypoint[] {
   return path.map((id, i) => ({
     nodeId: id,
     x: graph.nodes[id].x,

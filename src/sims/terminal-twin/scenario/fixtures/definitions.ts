@@ -215,6 +215,100 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .endWhen({ vesselsCompleted: 2 })
       .build(),
 
+  /**
+   * TT-13 dual truck transaction: a feeder discharges 8 boxes (imports, 5 min yard dwell), and one
+   * scripted truck arrives later to drop an export box for the second vessel (inside its export
+   * window) and pick up one import in the same visit. Two ASCs per block: the landside ASC serves the stall.
+   */
+  'dual-truck-transaction': () =>
+    new ScenarioBuilder('dual-truck-transaction', 'One truck drops an export and picks up an import in a single visit')
+      .seed(3)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 8, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', arrivalS: 20000, maxSts: 1 })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 0),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 2, outLanes: 2 },
+        scripted: [{ atS: 3000, transaction: 'dual' }],
+      })
+      .endWhen({ simDurationS: 4500 })
+      .build(),
+
+  /**
+   * TT-13 gate queue: the same terminal with 16 imports and a burst of 14 scripted trucks (one inbound lane,
+   * two outbound lanes) so a queue forms at the gate and trucks wait for transfer stalls.
+   */
+  'truck-gate-queue': () =>
+    new ScenarioBuilder('truck-gate-queue', 'A burst of 14 trucks queues at a one-lane gate and fills the transfer stalls')
+      .seed(8)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 16, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', arrivalS: 20000, maxSts: 1 })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3, transferStalls: 2 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 0),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 1, outLanes: 2, inProcessingS: 45, outProcessingS: 20 },
+        scripted: [
+          { atS: 3000, transaction: 'pickImport' },
+          { atS: 3010, transaction: 'dropExport' },
+          { atS: 3020, transaction: 'dual' },
+          { atS: 3030, transaction: 'dropEmpty' },
+          { atS: 3040, transaction: 'pickImport' },
+          { atS: 3050, transaction: 'dropExport' },
+          { atS: 3060, transaction: 'dual' },
+          { atS: 3070, transaction: 'dropEmpty' },
+          { atS: 3080, transaction: 'pickImport' },
+          { atS: 3090, transaction: 'dropExport' },
+          { atS: 3100, transaction: 'dual' },
+          { atS: 3110, transaction: 'dropEmpty' },
+          { atS: 3120, transaction: 'pickEmpty' },
+          { atS: 3130, transaction: 'pickImport' },
+        ],
+      })
+      .endWhen({ simDurationS: 9000 })
+      .build(),
+
+  /**
+   * TT-13 morning peak: two blocks, a feeder discharging 24 boxes, and the 07:00 truck profile (Poisson,
+   * 40 to 48 trucks an hour) with the default transaction mix and a 10 minute import dwell.
+   */
+  'landside-morning-peak': () =>
+    new ScenarioBuilder('landside-morning-peak', 'Poisson truck arrivals through a 4-lane gate to two blocks with paired ASCs')
+      .seed(21)
+      .moveVariation(10)
+      .driverVariability(10)
+      .startAt('2026-01-05T07:00:00Z')
+      .clockStart(7 * 3600)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 24, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', arrivalS: 30000, maxSts: 1 })
+      .shcs(3)
+      .block('B01', { x: 20, bays: 12, tiers: 3 })
+      .block('B02', { x: 60, bays: 12, tiers: 3 })
+      .ascsPerBlock(2)
+      .landside({
+        importDwell: { kind: 'fixed', s: 600 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 40000 },
+      })
+      .endWhen({ simDurationS: 5400 })
+      .build(),
+
   /** Livery smoke test (TT-22): 12 boxes over all ten lines (equal weights) and all three sizes. */
   'liveries-mixed': () =>
     new ScenarioBuilder('liveries-mixed', '1 STS discharges 12 boxes of mixed lines and sizes')

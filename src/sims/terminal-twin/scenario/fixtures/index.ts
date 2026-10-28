@@ -7,6 +7,9 @@ import type { ScenarioConfig } from '../types'
 import asc1Sts10Boxes1Block from './asc-1sts-10-boxes-1block.json'
 import asc2AscBlockConflict from './asc-2asc-block-conflict.json'
 import craneSplit4Sts from './crane-split-4sts.json'
+import dualTruck from './dual-truck-transaction.json'
+import truckGateQueue from './truck-gate-queue.json'
+import landsideMorningPeak from './landside-morning-peak.json'
 import loadFixture from './load-1sts-10-boxes-1block.json'
 import liveriesMixed from './liveries-mixed.json'
 import mixedFixture from './mixed-discharge-then-load.json'
@@ -32,4 +35,7 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'transshipment-a-to-b': transshipmentAToB as ScenarioConfig,
   'empties-load-4-of-16': emptiesLoad as ScenarioConfig,
   'rehandle-random-yard': rehandleRandomYard as ScenarioConfig,
+  'dual-truck-transaction': dualTruck as ScenarioConfig,
+  'truck-gate-queue': truckGateQueue as ScenarioConfig,
+  'landside-morning-peak': landsideMorningPeak as ScenarioConfig,
 }

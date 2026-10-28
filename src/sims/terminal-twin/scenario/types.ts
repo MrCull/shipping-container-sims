@@ -117,6 +117,8 @@ export interface SubsystemModes {
   shc?: SubsystemMode
   /** ASC yard cranes (default real when SHCs and blocks exist). */
   asc?: SubsystemMode
+  /** Landside: trucks, gate and transfer stalls (TT-13; default real when `landside` is configured and a block has stalls). */
+  landside?: SubsystemMode
 }
 
 /** STS cranes are listed in rail order (ascending `gantryX`); they never pass each other. */
@@ -295,6 +297,55 @@ export interface ScenarioConfig {
   workPackages?: { releaseAhead?: number }
   /** KPI bucket clock (optional; defaults come from `startDateTime`, see `engine/kpi/clock.ts`). */
   kpi?: KpiClockConfig
+  /** Landside: external trucks, gate and transfer stalls (TT-13); optional (no trucks without it). */
+  landside?: LandsideConfig
+}
+
+/** A truck's transaction: one drop or pick, or `dual` (drop an export and pick an import in one visit). */
+export type TruckTransactionKind = 'dropExport' | 'pickImport' | 'dropEmpty' | 'pickEmpty' | 'dual'
+
+/** Gate: lanes and their processing times. The out-of-gauge (OOG) lane is drawn but never used. */
+export interface GateConfig {
+  /** Inbound lanes (default 4). */
+  inLanes: number
+  /** Outbound lanes (default 4). */
+  outLanes: number
+  /** Mean processing time of an inbound truck at its lane (s, default 40). */
+  inProcessingS: number
+  /** Mean processing time of an outbound truck at its lane (s, default 20). */
+  outProcessingS: number
+  /** ± % random variation of each processing time (default 0). */
+  processingVariationPct?: number
+  /** Draw the (unused) out-of-gauge lane (default true). */
+  oogLane?: boolean
+}
+
+/** Truck arrivals earlier than the vessel's ETA by `minBeforeEtaS` to `maxBeforeEtaS` may deliver its exports. */
+export interface ExportWindow {
+  minBeforeEtaS: number
+  maxBeforeEtaS: number
+}
+
+/** A truck that arrives at a fixed time (fixtures and tests), in addition to the hourly profile. */
+export interface ScriptedTruck {
+  atS: number
+  transaction: TruckTransactionKind
+}
+
+export interface LandsideConfig {
+  /** Trucks arriving per hour for each clock hour 0–23 (Poisson arrivals); the clock comes from `kpi.startTimeOfDayS`. */
+  hourlyProfile: number[]
+  /** Transaction weights (normalised over the transactions the yard can serve when the truck arrives). */
+  mix: Weights<TruckTransactionKind>
+  /** How long an import box stands in the yard before a truck may collect it (default lognormal, median 3 days). */
+  importDwell: DwellDistribution
+  /** When a truck may deliver an export box for a vessel (default 1–5 days before its ETA). */
+  exportWindow: ExportWindow
+  gate: GateConfig
+  /** Truck drive profile along the landside roads (default 8 m/s). */
+  drive?: AxisProfile
+  /** Trucks that arrive at fixed times. */
+  scripted?: ScriptedTruck[]
 }
 
 /** Where the scenario clock sits, so hour and shift buckets line up with the clock the user sees. */

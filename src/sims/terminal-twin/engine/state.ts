@@ -8,16 +8,18 @@ import type { EngineEvent } from './events'
 import { HASH_SEED, type HashState } from './hash'
 import type { MotionSegment } from './kinematics'
 import { laneGraphOf, validateLaneLayout } from './laneGraph'
+import { hasLandside, landsideGraphOf } from './landsideGraph'
 import type { Reservation } from './reservations'
-import { seedState } from './rng'
+import { nextRandom, seedState } from './rng'
 import { ascStartZ, blockSpecs, PARK_UNTIL_S, railSegmentIds, travelHoistM } from './yardLayout'
-import { planCargo, type SlotPurpose } from '../scenario/bayPlan'
+import { planCargo, POOL_VESSEL_ID, type SlotPurpose } from '../scenario/bayPlan'
+import { sampleDwell } from '../scenario/dwell'
 import { planExportYard } from '../scenario/exportYard'
-import type { ContainerSize, ScenarioConfig, SubsystemMode, VesselSizeClass } from '../scenario/types'
+import type { ContainerSize, ScenarioConfig, SubsystemMode, TruckTransactionKind, VesselSizeClass } from '../scenario/types'
 import { vesselSlotId as makeVesselSlotId, type CellHalf } from '../scenario/vesselClasses'
 
-/** Kinds of custody owner. Later tickets add 'truck'. */
-export type CustodyKind = 'vesselSlot' | 'sts' | 'groundPosition' | 'shc' | 'wtpPad' | 'asc' | 'yardSlot'
+/** Kinds of custody owner. `external`: the box left the terminal on a truck (id = the truck). */
+export type CustodyKind = 'vesselSlot' | 'sts' | 'groundPosition' | 'shc' | 'wtpPad' | 'asc' | 'yardSlot' | 'truck' | 'external'
 
 export interface CustodyRef {
   kind: CustodyKind
@@ -52,6 +54,13 @@ export interface ContainerState {
   yardSince?: number
   /** Empty allocated to a load work package (TT-11): the package id. */
   allocatedTo?: string
+  /**
+   * Import and empty boxes (TT-13): when a truck may collect it (stacked time + import dwell). Absent = never
+   * collected (transshipment boxes and export boxes).
+   */
+  pickupReadyAt?: number
+  /** A truck leg has claimed this box (TT-13): the truck id. Claimed boxes are not offered to other trucks or to empty allocation. */
+  truckClaim?: string
 }
 
 export interface VesselSlotState {
@@ -241,6 +250,12 @@ export interface AscPlannedEvent {
     | 'AscUnlocking'
     | 'AscStacked'
     | 'AscReady'
+    | 'AscRoutingToTruck'
+    | 'AscPositioningAtTruck'
+    | 'AscPickedFromTruck'
+    | 'AscRoutingToStall'
+    | 'AscPositioningAtStall'
+    | 'AscDroppedAtStall'
   at: number
   /** The motion leading up to this event (its payload `segments`). */
   segments: MotionSegment[]
@@ -306,6 +321,12 @@ export interface AscJob {
   forJobId?: string
   /** Retrieval jobs: a RehandleRequired event has been sent; 'full' = no slot could take a blocker (no more tries). */
   rehandle?: 'required' | 'full'
+  /**
+   * Truck interchange (TT-13): the job works a transfer stall. A drop job (`kind` absent) lifts the truck's box off the
+   * chassis and stacks it; a pick job (`kind` 'retrieve') takes a box out of the stack onto the chassis.
+   */
+  stallId?: string
+  truckId?: string
 }
 
 /** Stack heights of a block. Claimed slots count: a slot is claimed when allocated, stacked later. */
@@ -335,6 +356,124 @@ export interface YardSlotState {
 export interface ResolvedSubsystemModes {
   shc: SubsystemMode
   asc: SubsystemMode
+  /** Trucks, gate and transfer stalls (TT-13). */
+  landside: SubsystemMode
+}
+
+// ── landside (TT-13) ───────────────────────────────────────────────────────
+
+/** One thing a truck does at its stall: bring a box (drop) or collect one (pick). */
+export interface TruckLeg {
+  kind: 'drop' | 'pick'
+  purpose: 'export' | 'import' | 'empty'
+  /** The box: created at arrival for a drop (it rides the chassis), chosen at arrival for a pick (in the yard). */
+  containerId: string
+  /** Export drops: the vessel the box is booked to (its export window was open on arrival). */
+  vesselId?: string
+  done: boolean
+}
+
+/**
+ * queued (gate queue) → in-lane (driving to the kiosk, being processed) → waiting-for-stall → routing-to-stall → at-stall
+ * → being-served (the landside ASC works the chassis) → routing-to-exit → (gone: removed at TruckDeparted).
+ */
+export type TruckStatus =
+  | 'queued'
+  | 'in-lane'
+  | 'waiting-for-stall'
+  | 'routing-to-stall'
+  | 'at-stall'
+  | 'being-served'
+  | 'routing-to-exit'
+
+/** One planned phase event of a truck's trip (the next one is scheduled by the previous). */
+export interface TruckPlannedEvent {
+  type: 'TruckGateIn' | 'TruckRoutingToStall' | 'TruckAtStall' | 'TruckRoutingToExit' | 'TruckGateOut' | 'TruckDeparted'
+  at: number
+  segments: MotionSegment[]
+  /** TruckGateIn: the processing time spent at the kiosk (s). */
+  processingS?: number
+}
+
+export interface TruckState {
+  id: string
+  transaction: TruckTransactionKind
+  legs: TruckLeg[]
+  status: TruckStatus
+  arrivedAt: number
+  /** Gate queue position while queued (0 = head). */
+  queueIndex: number
+  laneId: string | null
+  outLaneId: string | null
+  stallId: string | null
+  /** Landside-graph node the truck is at, or will be at the end of its planned motion. */
+  nodeId: string
+  /** The box on the chassis. */
+  carrying: string | null
+  gateStartedAt: number | null
+  gateInAt: number | null
+  stallAssignedAt: number | null
+  atStallAt: number | null
+  serviceStartedAt: number | null
+  interchangeDoneAt: number | null
+  motion: MotionSegment[]
+  plan: TruckPlannedEvent[]
+}
+
+export interface TransferStallState {
+  id: string
+  blockId: string
+  x: number
+  z: number
+  /** The truck that holds the stall, from its stall assignment until it has reversed clear. */
+  truckId: string | null
+}
+
+export interface LandsideState {
+  /** Own RNG stream (arrivals, transactions, boxes, dwell): the landside never disturbs the other subsystems' draws. */
+  rngState: number
+  nextTruck: number
+  nextBox: number
+  /** Index of the next scripted truck. */
+  nextScripted: number
+  /** Trucks waiting at the gate, in arrival order (the head is served first). */
+  queue: string[]
+  /** Inbound lanes: the truck being processed, or null when free. */
+  inLanes: Record<string, { truckId: string | null; processed: number }>
+  /** The truck whose gateLaneAssignment decision is pending. */
+  laneAsking: string | null
+  stalls: Record<string, TransferStallState>
+  /** Trucks through the gate processing but without a stall, in order. */
+  stallWaiting: string[]
+  /** The truck whose transferStallSelection decision is pending. */
+  stallAsking: string | null
+}
+
+export interface LandsideKpiCounters {
+  trucksIn: number
+  trucksOut: number
+  /** Trucks that left the terminal: turn time sums (gate-in → gate-out). */
+  turnSumS: number
+  turnMaxS: number
+  /** Queue wait: arrival → lane assigned. */
+  gateWaitSumS: number
+  gateWaitMaxS: number
+  gateQueueMax: number
+  /** Gate-in → stall assigned (a stall was free). */
+  stallAllocWaitSumS: number
+  stallAllocWaitMaxS: number
+  /** At the stall until the landside ASC starts on the truck. */
+  stallWaitSumS: number
+  stallWaitMaxS: number
+  stallWaitCount: number
+  /** Time at the stall from arrival to the interchange being done. */
+  serviceSumS: number
+  /** Arrivals by transaction kind. */
+  transactions: Record<TruckTransactionKind, number>
+  boxesDropped: number
+  boxesPicked: number
+  /** Arrivals whose drawn transaction could not be served (no eligible box / vessel), served as a drop empty. */
+  fallbacks: number
 }
 
 export interface StsDrop {
@@ -471,6 +610,8 @@ export interface KpiCounters {
   yard?: YardKpiCounters
   /** Work packages (TT-10). */
   workPackages: WorkPackageKpiCounters
+  /** Trucks and the gate (present when the landside is on). */
+  landside?: LandsideKpiCounters
 }
 
 export interface WorkPackageKpiCounters {
@@ -561,6 +702,10 @@ export interface SimState {
   loadOrders: Record<string, LoadOrder>
   reservations: Reservation[]
   nextReservationId: number
+  /** Trucks in the terminal (removed when they leave), TT-13. */
+  trucks: Record<string, TruckState>
+  /** Gate and stall state (present when the landside is on). */
+  landside: LandsideState | null
   subsystems: ResolvedSubsystemModes
   kpis: KpiCounters
   /** Decision points: correlation counter, injector RNG, pending decisions, handler KPIs. */
@@ -602,15 +747,62 @@ function validateRail(config: ScenarioConfig): void {
 /** Subsystem modes: config, then overrides. SHC defaults to real when SHCs and blocks exist. */
 export function resolveSubsystemModes(
   config: ScenarioConfig,
-  overrides: { shc?: SubsystemMode; asc?: SubsystemMode } = {},
+  overrides: { shc?: SubsystemMode; asc?: SubsystemMode; landside?: SubsystemMode } = {},
 ): ResolvedSubsystemModes {
   const hasShc = (config.shcs?.length ?? 0) > 0 && (config.yard?.blocks.length ?? 0) > 0
   const modes = {
     shc: overrides.shc ?? config.subsystems?.shc ?? (hasShc ? 'real' : 'off'),
     asc: overrides.asc ?? config.subsystems?.asc ?? (hasShc ? 'real' : 'off'),
+    landside: overrides.landside ?? config.subsystems?.landside ?? (hasLandside(config) ? 'real' : 'off'),
   }
   if (!hasShc) modes.shc = 'off'
+  if (!hasLandside(config) || modes.asc === 'off') modes.landside = 'off'
   return modes
+}
+
+/** Landside state: own RNG stream, the gate lanes, the stalls, KPI counters; pool boxes get their pickup dwell. */
+function initLandside(state: SimState, config: ScenarioConfig, seed: number): void {
+  const graph = landsideGraphOf(config)
+  const landside = config.landside as NonNullable<ScenarioConfig['landside']>
+  const ls: LandsideState = {
+    rngState: seedState((seed ^ 0x5bd1e995) >>> 0),
+    nextTruck: 0,
+    nextBox: 0,
+    nextScripted: 0,
+    queue: [],
+    inLanes: Object.fromEntries(graph.inLanes.map((l) => [l.id, { truckId: null, processed: 0 }])),
+    laneAsking: null,
+    stalls: Object.fromEntries(graph.stalls.map((st) => [st.id, { id: st.id, blockId: st.blockId, x: st.x, z: st.z, truckId: null }])),
+    stallWaiting: [],
+    stallAsking: null,
+  }
+  const rng = () => {
+    const [v, next] = nextRandom(ls.rngState)
+    ls.rngState = next
+    return v
+  }
+  for (const box of Object.values(state.containers))
+    if (box.vesselId === POOL_VESSEL_ID && box.yardSince !== undefined) box.pickupReadyAt = box.yardSince + sampleDwell(landside.importDwell, rng)
+  state.landside = ls
+  state.kpis.landside = {
+    trucksIn: 0,
+    trucksOut: 0,
+    turnSumS: 0,
+    turnMaxS: 0,
+    gateWaitSumS: 0,
+    gateWaitMaxS: 0,
+    gateQueueMax: 0,
+    stallAllocWaitSumS: 0,
+    stallAllocWaitMaxS: 0,
+    stallWaitSumS: 0,
+    stallWaitMaxS: 0,
+    stallWaitCount: 0,
+    serviceSumS: 0,
+    transactions: { dropExport: 0, pickImport: 0, dropEmpty: 0, pickEmpty: 0, dual: 0 },
+    boxesDropped: 0,
+    boxesPicked: 0,
+    fallbacks: 0,
+  }
 }
 
 export function createInitialState(
@@ -648,6 +840,8 @@ export function createInitialState(
     loadOrders: {},
     reservations: [],
     nextReservationId: 0,
+    trucks: {},
+    landside: null,
     subsystems,
     kpis: {
       movesCompleted: 0,
@@ -810,6 +1004,7 @@ export function createInitialState(
     }
     state.kpis.yard = yard
     state.kpis.horizontal = horizontal
+    if (subsystems.landside !== 'off' && config.landside) initLandside(state, config, seed)
     // export boxes booked to the vessels start in the stacks
     for (const p of exportPlacement.values()) {
       const blk = state.yardBlocks[p.blockId]

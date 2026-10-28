@@ -24,14 +24,15 @@ import { workPackageReactors } from './subsystems/workPackages'
 import { emptiesReactors } from './subsystems/empties'
 import { transshipmentReactors } from './subsystems/transshipment'
 import { shcReactors } from './subsystems/shc'
+import { landsideReactors } from './subsystems/landside'
 import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.6.0'
+export const ENGINE_VERSION = '0.7.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
-const REACTORS: ReactorMap[] = [berthReactors, workPackageReactors, quayReactors, loadPrepReactors, shcReactors, ascReactors, emptiesReactors, transshipmentReactors]
+const REACTORS: ReactorMap[] = [berthReactors, workPackageReactors, quayReactors, loadPrepReactors, shcReactors, ascReactors, emptiesReactors, transshipmentReactors, landsideReactors]
 
 export interface SimulationOptions {
   /** Overrides `config.seed`. */

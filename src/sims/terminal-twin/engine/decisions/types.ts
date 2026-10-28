@@ -15,7 +15,7 @@
  */
 import type { SimQuery } from '../query'
 import type { YardCandidate, YardStacks } from '../yardLayout'
-import type { ContainerSize } from '../../scenario/types'
+import type { ContainerSize, TruckTransactionKind } from '../../scenario/types'
 
 // ── stsGroundPosition ──────────────────────────────────────────────────────
 
@@ -99,9 +99,15 @@ export interface YardAllocationRequest extends YardStacks {
   size: ContainerSize
   full: boolean
   line: string
-  /** Vessel the box was discharged from. */
+  /** Vessel the box was discharged from, or (an export delivered by a truck) the vessel it is booked to. */
   vesselId: string
+  /**
+   * The WTP pad the box stands on; for a box delivered by a truck (TT-13) empty, with `stallId` set instead
+   * (and `wtpX`/`wtpZ` = the stall, so distance-based strategies measure from where the box is).
+   */
   wtpPadId: string
+  /** TT-13: the transfer stall the delivering truck stands in. */
+  stallId?: string
   /** Uniform [0, 1) drawn from the engine's seeded RNG (the only source of randomness for strategies). */
   random: number
 }
@@ -142,6 +148,8 @@ export interface AscDispatchRequest {
     containerId: string
     /** wtp: stack a box from a pad; transfer: truck handover (TT-13); retrieve: export box from the stack to a pad (TT-10; `yardSlotId` is its source, `wtpPadId` its destination). */
     kind: 'wtp' | 'transfer' | 'retrieve' | 'rehandle'
+    /** `transfer` (TT-13): a truck at a transfer stall; `stallId` is its stall, `wtpPadId` is empty. */
+    stallId?: string
     wtpPadId: string
     yardSlotId: string
     /** Gantry Z of the pad and of the slot (m). */
@@ -321,6 +329,64 @@ export interface RehandleTargetReply {
   slotId: string | null
 }
 
+// ── gateLaneAssignment ─────────────────────────────────────────────────────
+
+export interface GateLaneOption {
+  laneId: string
+  /** 0-based position across the gate (west to east). */
+  index: number
+  /** Free now: no truck is being processed in it. */
+  free: boolean
+  /** Trucks this lane has processed so far. */
+  processed: number
+}
+
+/** The truck at the head of the gate queue and at least one free inbound lane: which lane processes it? */
+export interface GateLaneAssignmentRequest {
+  truckId: string
+  transaction: TruckTransactionKind
+  /** Trucks in the queue, this one included. */
+  queueLength: number
+  /** Seconds this truck has waited at the gate. */
+  waitedS: number
+  /** Every inbound lane, west to east. */
+  lanes: GateLaneOption[]
+}
+
+export interface GateLaneAssignmentReply {
+  /** A free inbound lane (`lanes[].laneId`), or null to leave the truck in the queue for now (asked again when something changes). */
+  laneId: string | null
+}
+
+// ── transferStallSelection ─────────────────────────────────────────────────
+
+export interface TransferStallOption {
+  stallId: string
+  blockId: string
+  x: number
+  z: number
+  /** A truck holds the stall (it is assigned or standing there). */
+  occupiedBy: string | null
+  /** Road distance from the gate kiosk (m). */
+  distanceM: number
+}
+
+/** A truck is through the gate and at least one transfer stall is free: which stall does it go to? */
+export interface TransferStallSelectionRequest {
+  truckId: string
+  transaction: TruckTransactionKind
+  /** What the truck does at the stall; `blockId` = where the box is (a pick) or null (a drop). */
+  legs: { kind: 'drop' | 'pick'; purpose: 'export' | 'import' | 'empty'; containerId: string; size: ContainerSize; blockId: string | null }[]
+  stalls: TransferStallOption[]
+  /** Per block: trucks that hold a stall or wait for one (the ASC work queue the truck would join). */
+  blockLoad: Record<string, number>
+}
+
+export interface TransferStallSelectionReply {
+  /** A free stall (`stalls[].stallId`), or null to hold the truck at the gate for now (asked again when a stall frees up). */
+  stallId: string | null
+}
+
 // ── catalogue ──────────────────────────────────────────────────────────────
 
 export interface DecisionRequests {
@@ -333,6 +399,8 @@ export interface DecisionRequests {
   workPackageRelease: WorkPackageReleaseRequest
   emptyAllocation: EmptyAllocationRequest
   rehandleTarget: RehandleTargetRequest
+  gateLaneAssignment: GateLaneAssignmentRequest
+  transferStallSelection: TransferStallSelectionRequest
 }
 
 export interface DecisionReplies {
@@ -345,6 +413,8 @@ export interface DecisionReplies {
   workPackageRelease: WorkPackageReleaseReply
   emptyAllocation: EmptyAllocationReply
   rehandleTarget: RehandleTargetReply
+  gateLaneAssignment: GateLaneAssignmentReply
+  transferStallSelection: TransferStallSelectionReply
 }
 
 export type DecisionPointId = keyof DecisionRequests
@@ -360,6 +430,8 @@ export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   workPackageRelease: 1,
   emptyAllocation: 1,
   rehandleTarget: 1,
+  gateLaneAssignment: 1,
+  transferStallSelection: 1,
 }
 
 export const DECISION_POINT_IDS = Object.keys(DECISION_CONTRACT_VERSIONS) as DecisionPointId[]

@@ -63,6 +63,34 @@ export interface KpiReport {
   yard?: YardKpiReport
   /** Work packages (only when some were released). */
   workPackages?: WorkPackageKpiReport
+  /** Trucks and the gate (only when the landside is on). */
+  landside?: LandsideKpiReport
+}
+
+export interface LandsideKpiReport {
+  /** Trucks that completed gate processing / left through an outbound lane. */
+  trucksIn: number
+  trucksOut: number
+  /** Trucks in the terminal now, and queued at the gate now / at most. */
+  trucksInside: number
+  gateQueue: number
+  gateQueueMax: number
+  /** Truck turn time: gate-in to gate-out (s), over the trucks that left. */
+  turnTimeS: { mean: number; max: number }
+  /** Gate queue wait: arrival to lane assignment (s), over the trucks that got a lane. */
+  gateWaitS: { mean: number; max: number }
+  /** Stall allocation wait: gate-in to stall assigned (s). */
+  stallAllocWaitS: { mean: number; max: number }
+  /** Transfer-stall wait: standing at the stall until the ASC starts on the truck (s). */
+  stallWaitS: { mean: number; max: number }
+  /** Time at the stall from arrival to the interchange being done, mean (s). */
+  serviceS: number
+  /** Arrivals by transaction kind. */
+  transactions: Record<string, number>
+  boxesDropped: number
+  boxesPicked: number
+  /** Arrivals that could not get the drawn transaction and came to drop an empty. */
+  fallbacks: number
 }
 
 export interface WorkPackageKpiReport {
@@ -128,6 +156,16 @@ export interface HorizontalKpiReport {
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000
+
+/** Trucks that have been given an inbound lane (arrived minus those still queued). */
+const gateServed = (state: SimState): number => {
+  const k = state.kpis.landside
+  if (!k) return 0
+  return Object.values(k.transactions).reduce((a, b) => a + b, 0) - (state.landside?.queue.length ?? 0)
+}
+
+/** Trucks that have been given a stall (through the gate minus those still waiting for one). */
+const stallsAssigned = (state: SimState): number => (state.kpis.landside?.trucksIn ?? 0) - (state.landside?.stallWaiting.length ?? 0)
 
 export function buildKpiReport(state: SimState, eventsProcessed: number): KpiReport {
   const sts: KpiReport['sts'] = {}
@@ -206,7 +244,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
   const y = state.kpis.yard
   const yard: YardKpiReport | undefined = y && {
     boxesStacked: y.boxesStacked,
-    boxesInTransit: Object.values(state.ascJobs).filter((j) => j.kind !== 'rehandle').length,
+    boxesInTransit: Object.values(state.ascJobs).filter((j) => j.kind !== 'rehandle' && j.truckId === undefined).length,
     allocationFailures: y.allocationFailures,
     rehandles: {
       total: y.rehandles,
@@ -246,6 +284,23 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
       ]),
     ),
   }
+  const ls = state.kpis.landside
+  const landside: LandsideKpiReport | undefined = ls && {
+    trucksIn: ls.trucksIn,
+    trucksOut: ls.trucksOut,
+    trucksInside: Object.keys(state.trucks).length,
+    gateQueue: state.landside?.queue.length ?? 0,
+    gateQueueMax: ls.gateQueueMax,
+    turnTimeS: { mean: ls.trucksOut > 0 ? r3(ls.turnSumS / ls.trucksOut) : 0, max: r3(ls.turnMaxS) },
+    gateWaitS: { mean: gateServed(state) > 0 ? r3(ls.gateWaitSumS / gateServed(state)) : 0, max: r3(ls.gateWaitMaxS) },
+    stallAllocWaitS: { mean: ls.trucksIn > 0 ? r3(ls.stallAllocWaitSumS / Math.max(1, stallsAssigned(state))) : 0, max: r3(ls.stallAllocWaitMaxS) },
+    stallWaitS: { mean: ls.stallWaitCount > 0 ? r3(ls.stallWaitSumS / ls.stallWaitCount) : 0, max: r3(ls.stallWaitMaxS) },
+    serviceS: ls.trucksOut > 0 ? r3(ls.serviceSumS / ls.trucksOut) : 0,
+    transactions: { ...ls.transactions },
+    boxesDropped: ls.boxesDropped,
+    boxesPicked: ls.boxesPicked,
+    fallbacks: ls.fallbacks,
+  }
   return {
     simTimeS: r3(state.now),
     eventsProcessed,
@@ -257,6 +312,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     handlers,
     ...(horizontal ? { horizontal } : {}),
     ...(yard ? { yard } : {}),
+    ...(landside ? { landside } : {}),
     ...(state.kpis.workPackages.released > 0
       ? {
           workPackages: {

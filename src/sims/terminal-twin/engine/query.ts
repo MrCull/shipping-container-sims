@@ -15,6 +15,8 @@ import type {
   ShcState,
   SimState,
   StsState,
+  TruckState,
+  TransferStallState,
   VesselSlotState,
   VesselState,
   WtpPadState,
@@ -55,6 +57,13 @@ export interface SimQuery {
   workPackages(stsId?: string): readonly Readonly<WorkPackage>[]
   /** Export boxes in load preparation (released, not yet picked by their crane), in crane then load order. */
   loadOrders(): readonly Readonly<LoadOrder>[]
+  /** Trucks in the terminal (queued at the gate to leaving), TT-13. */
+  trucks(): readonly Readonly<TruckState>[]
+  truck(id: string): Readonly<TruckState>
+  /** Transfer stalls with the truck that holds each (empty when the landside is off). */
+  transferStalls(): readonly Readonly<TransferStallState>[]
+  /** Trucks waiting at the gate, head of the queue first. */
+  gateQueue(): readonly string[]
 }
 
 function get<T>(record: Record<string, T>, id: string, what: string): T {
@@ -97,6 +106,10 @@ export function createQuery(getState: () => SimState): SimQuery {
       const all = Object.values(getState().workPackages)
       return stsId === undefined ? all : all.filter((p) => p.stsId === stsId)
     },
+    trucks: () => Object.values(getState().trucks),
+    truck: (id) => get(getState().trucks, id, 'truck'),
+    transferStalls: () => Object.values(getState().landside?.stalls ?? {}),
+    gateQueue: () => getState().landside?.queue ?? [],
     loadOrders: () => Object.values(getState().loadOrders).sort((a, b) => (a.stsId < b.stsId ? -1 : a.stsId > b.stsId ? 1 : a.seq - b.seq)),
   }
 }

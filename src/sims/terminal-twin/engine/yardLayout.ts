@@ -216,3 +216,36 @@ export function railSegmentSpan(block: Pick<BlockSpec, 'wtpZ'>, k: number): [num
 export function ascStartZ(block: BlockSpec, index: number): number {
   return index === 1 ? block.wtpZ : Math.max(block.firstBayZ + (block.bays - 1) * BAY_PITCH_M, block.wtpZ + ASC_MIN_SEPARATION_M + RAIL_SEGMENT_M + 1)
 }
+
+/** [A] Pitch of the transfer stalls across a block (m). */
+export const STALL_PITCH_M = 5.5
+/** [A] Length of a transfer stall along Z (m): a 40 ft box on a chassis. */
+export const STALL_LENGTH_M = 13
+/** Z of the transfer stall centres: the box on the chassis stands within the rail margin past the last bay. */
+export const transferStallZ = (block: Pick<BlockSpec, 'firstBayZ' | 'bays'>): number => block.firstBayZ + (block.bays - 1) * BAY_PITCH_M + 15
+
+export function transferStallId(blockId: string, index: number): string {
+  return `${blockId}-TS${index + 1}`
+}
+
+export interface TransferStallLayout {
+  id: string
+  blockId: string
+  index: number
+  x: number
+  z: number
+}
+
+/** Transfer stalls of a block, centred across it (trucks stand along Z, cab towards the stacks). */
+export function transferStallLayout(block: BlockSpec): TransferStallLayout[] {
+  return Array.from({ length: block.transferStalls }, (_, k) => ({
+    id: transferStallId(block.id, k),
+    blockId: block.id,
+    index: k,
+    x: Math.round((block.x + (k - (block.transferStalls - 1) / 2) * STALL_PITCH_M) * 1000) / 1000,
+    z: Math.round(transferStallZ(block) * 1000) / 1000,
+  }))
+}
+
+/** [A] Height of the box bottom on a truck chassis (m). */
+export const TRUCK_DECK_M = 1.3
