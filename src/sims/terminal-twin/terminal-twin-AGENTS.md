@@ -222,7 +222,7 @@ Deliberately not built, or built differently from the spec (the code review acce
 
 - **Extra shortcuts** E, I and P and the ASC yield moves go beyond the spec (accepted scope).
 - **Handler wall latency** is a run total in `kpiReport()` and the final report, not a time series (it is not in the event log).
-- **Hub files** `SetupDialog.vue`, `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass. The per-kind renderer, dev-API and inspector wiring left the hubs in V11-01 (see Extending); `SetupDialog.vue` is still to split (#68); the ASC subsystem split into `asc.ts` / `ascStorage.ts` / `ascReservations.ts` / `ascDispatch.ts` (+ pure `ascRail.ts`) in V11-09.
+- **Hub files** `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass. The per-kind renderer, dev-API and inspector wiring left the hubs in V11-01 (see Extending); `SetupDialog.vue` is a shell (V11-08, #68): `composables/useSetupDraft.ts` holds the draft and provides it, one `components/setup/Setup<Section>Section.vue` per section (layout, vessels, display, STS, landside, SHC, yard, modes, decisions) edits its part, and `components/setup/*Validation.ts` hold each section's readout and submit message (the shell runs them in order); the shell keeps the end-conditions fieldset inline because `tests/setup-inputs.test.ts` reads it from `SetupDialog.vue`, so a new setup section is a component plus a draft field plus a validator; the ASC subsystem split into `asc.ts` / `ascStorage.ts` / `ascReservations.ts` / `ascDispatch.ts` (+ pure `ascRail.ts`) in V11-09.
 
 ## Known behaviours and pitfalls
 
