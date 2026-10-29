@@ -47,6 +47,7 @@ const en = {
   'topbar.speed': '×{speed}',
   'topbar.runTo': 'Run to…',
   'topbar.runToTarget': 'Target sim time',
+  'topbar.runToDeparture': 'Next vessel departure',
   'topbar.runToMissing': 'Enter a date and time',
   'topbar.runToPast': 'Pick a time after the current sim time',
   'topbar.run': 'Run',

@@ -25,10 +25,10 @@ function inProcessClient() {
   }
 }
 
-async function loaded() {
+async function loaded(cfg = config) {
   const events: EventSummary[] = []
   const ctl = new TwinController((d) => events.push(...d.events), inProcessClient())
-  await ctl.load(config, config.seed)
+  await ctl.load(cfg, cfg.seed)
   return { ctl, events }
 }
 
@@ -85,6 +85,25 @@ describe('breakpoints pause playback', () => {
     await ctl.runUntil({})
     expect(ctl.breakHit).toBeNull()
     expect(ctl.info!.status).toBe('ended')
+  })
+})
+
+describe('Run to the next vessel departure', () => {
+  const twoVessels = fixtures['two-vessels-compete-for-berth']
+
+  it('runs flat out to the departure and shows that instant; running again goes to the next one', async () => {
+    const { ctl, events } = await loaded(twoVessels)
+    const wasPaused = ctl.paused
+    await ctl.runToNextDeparture()
+    const first = events.filter((e) => e.type === 'VesselDeparted')
+    expect(first).toHaveLength(1)
+    expect(ctl.displayTime).toBe(first[0].t)
+    expect(ctl.info!.now).toBe(first[0].t)
+    expect(ctl.paused).toBe(wasPaused) // playback resumes at the current speed, like Run to…
+    await ctl.runToNextDeparture()
+    const both = events.filter((e) => e.type === 'VesselDeparted')
+    expect(both).toHaveLength(2)
+    expect(ctl.displayTime).toBe(both[1].t)
   })
 })
 

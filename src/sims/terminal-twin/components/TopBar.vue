@@ -31,6 +31,11 @@ function openRunTo(): void {
   }
 }
 
+async function submitRunToDeparture(): Promise<void> {
+  runToOpen.value = false
+  await store.runToNextDeparture().catch(() => {})
+}
+
 async function submitRunTo(): Promise<void> {
   const target = fromLocalInputValue(runToValue.value)
   if (!target) {
@@ -125,6 +130,14 @@ async function submitRunTo(): Promise<void> {
               required
             >
           </label>
+          <button
+            type="button"
+            class="action-btn"
+            data-testid="tt-run-to-departure"
+            @click="submitRunToDeparture"
+          >
+            {{ t('topbar.runToDeparture') }}
+          </button>
           <p
             v-if="runToError"
             class="error"

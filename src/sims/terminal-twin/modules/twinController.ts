@@ -195,6 +195,14 @@ export class TwinController {
     return this.flatOut<RunResult>({ op: 'run', condition: { time } }, () => time)
   }
 
+  /** "Run to… next vessel departure": run flat out until the next `VesselDeparted`, then resume at the current speed. */
+  async runToNextDeparture(): Promise<RunResult> {
+    if (!this.info) throw new Error('No scenario loaded')
+    this.breakHit = null
+    this.pendingBreak = null
+    return this.flatOut<RunResult>({ op: 'run', condition: { eventType: 'VesselDeparted' } }, (info) => info.now)
+  }
+
   /** Dev API: run flat out until a condition, then pause at the engine time. */
   async runUntil(condition: WorkerRunCondition = {}): Promise<RunResult> {
     this.paused = true

@@ -524,6 +524,11 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     return run(() => ctl().runTo(time).then((r) => (void refreshKpis(), r)))
   }
 
+  function runToNextDeparture() {
+    if (runEnded.value) return Promise.resolve(null)
+    return run(() => ctl().runToNextDeparture().then((r) => (void refreshKpis(), r)))
+  }
+
   function setOverlays(next: Partial<OverlayState>): OverlayState {
     overlays.value = { ...overlays.value, ...next }
     return { ...overlays.value }
@@ -999,6 +1004,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     setSpeed,
     togglePause,
     runTo,
+    runToNextDeparture,
     select,
     setDisplay,
     savesOpen,
