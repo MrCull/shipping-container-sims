@@ -49,6 +49,9 @@ export function useTwinShortcuts(): void {
       case 'perf':
         perf.toggleOverlay()
         break
+      case 'view':
+        store.setViewPreset(action.preset)
+        break
       case 'help':
         store.setHelpOpen(!store.helpOpen)
         break

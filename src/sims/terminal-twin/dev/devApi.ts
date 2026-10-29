@@ -27,6 +27,7 @@
  *   await __tt.saves.rewindPoints(); await __tt.saves.rewindTo(0)        // automatic rewind points (default every 15 sim-minutes)
  *   __tt.screenPoint('STS01'); __tt.pickAt(x, y)                         // 3D picking, client coordinates
  */
+import { isViewPreset } from '../modules/viewPresets'
 import { readHudLayout, type HudLayout } from '../modules/hudLayout'
 import type { ScenarioOverrides } from '../scenario/overrides'
 import type { DisplaySettings, ScenarioConfig } from '../scenario/types'
@@ -102,6 +103,8 @@ export interface TwinDevApi {
   select(entityId: string | null): void
   /** Point the camera at an entity (container, STS or vessel id), optionally from `distanceM`; false if unknown. */
   cameraTo(entityId: string, distanceM?: number): boolean
+  /** Frame a view preset by name ('quay' | 'yard' | 'gate' | 'overview'); false for an unknown name or a region the scene lacks. */
+  viewPreset(name: string): boolean
   setSpeed(speed: number): void
   pause(): void
   play(): void
@@ -329,6 +332,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     why: (eventId) => ctl().passthrough<EngineEvent[]>({ op: 'why', eventId }),
     select: (id) => store.select(id),
     cameraTo: (id, distanceM) => store.view()?.cameraTo(id, distanceM) ?? false,
+    viewPreset: (name) => (isViewPreset(name) ? store.setViewPreset(name) : false),
     setSpeed: (s) => store.setSpeed(s),
     pause: () => {
       ctl().pause()

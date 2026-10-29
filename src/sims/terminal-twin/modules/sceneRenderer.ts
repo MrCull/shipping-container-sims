@@ -17,7 +17,7 @@ import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 import { ASC, STS } from './equipmentDims'
 import { entityBounds } from './picking'
-import { OverlayLayers, type OverlayLayerStats } from './overlayLayers'
+import { OverlayLayers, type LabelScreen, type OverlayLayerStats } from './overlayLayers'
 import { NO_OVERLAYS, type OverlayState } from './overlays'
 
 export type { OverlayState }
@@ -418,7 +418,7 @@ export class SceneRenderer {
     this.laneOverlay.visible = next.laneGraph
   }
 
-  update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3, frustum?: THREE.Frustum): void {
+  update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3, frustum?: THREE.Frustum, screen?: LabelScreen): void {
     const model = this.model
     const containers = this.containers
     // Containers first: what each spreader carries decides its configuration (20 / 40 / twin-20).
@@ -464,7 +464,7 @@ export class SceneRenderer {
         mesh.material = this.railMaterials[ascIndexOf(holder) === 1 ? 0 : 1]
       }
     }
-    this.layers.update(t, this.overlays)
+    this.layers.update(t, this.overlays, screen, selectedId)
     this.updateSelection(selectedId, t)
   }
 

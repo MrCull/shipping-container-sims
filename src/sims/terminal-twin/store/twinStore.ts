@@ -6,6 +6,7 @@
  * reactivity (closure variables / markRaw); large collections such as the
  * recent-event buffer use shallowRef + triggerRef (Box Empire pattern).
  */
+import type { ViewPresetName } from '../modules/viewPresets'
 import { defineStore } from 'pinia'
 import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
@@ -82,6 +83,8 @@ export interface FinalReportData extends KpiHeadlineState {
 export interface TwinView {
   /** Aim at an entity, keeping the view direction (and, if given, at `distanceM`). */
   cameraTo(entityId: string, distanceM?: number): boolean
+  /** Frame a view preset (V11-05); false when the scene has no such region (no landside for the gate view). */
+  viewPreset(preset: ViewPresetName): boolean
   /** The entity under a viewport point (client coordinates) at the displayed time, or null. */
   pickAt(clientX: number, clientY: number): string | null
   /** Viewport (client) coordinates of an entity's centre; null when it is not drawn or off screen. */
@@ -900,6 +903,18 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     helpOpen.value = open
   }
 
+  /** Frame a view preset (shortcut, button, dev API). Stops following, since the preset sets the camera itself. */
+  function setViewPreset(preset: ViewPresetName): boolean {
+    if (!view) return false
+    const ok = view.viewPreset(preset)
+    if (!ok) {
+      showToast('view.unavailable')
+      return false
+    }
+    following.value = false
+    return true
+  }
+
   function attachView(v: TwinView | null): void {
     view = v ? markRaw(v) : null
   }
@@ -1024,6 +1039,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     toggleOverlays,
     toggleDashboard,
     setHelpOpen,
+    setViewPreset,
     attachView,
     dispose,
   }

@@ -109,6 +109,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Event feed:** the left panel's live list of recent events, newest first, filterable and capped. At high speed it **summarises bursts** (runs of the same event type) into one row.
 - **Event inspector:** the right panel's view of one event: payload, subjects, a decision's handler, request and reply, and its **cause chain**.
 - **Cause chain:** the events that led to one, from the event back to the root, as returned by the engine's `why`. Clicking an entry inspects it.
+- **View preset:** a one-click or one-key camera pose computed from the layout: Quay (Q), Yard (Y), Landside/Gate (G) or Overview (V). The pose's target lies inside the region it names, so it fits every preset and fixture; the Gate view needs a landside. **Label declutter** hides any Labels-overlay label that would overlap a higher-priority one on screen (the selection first, then equipment-kind registry order).
 - **Selection:** the container, equipment or vessel picked in the 3D view (or by an id in the feed or inspector). The **inspector** shows its current state, current job and history, and the **follow camera** can track it.
 - **Picking:** finding the entity under a click by testing the view ray against each entity's bounding box (containers first).
 - **Occupancy overlay:** plates over WTP pads and STS ground positions, free or occupied at the displayed time. The **labels overlay** floats each crane, carrier and vessel's status above it.

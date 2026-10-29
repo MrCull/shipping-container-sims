@@ -3,6 +3,7 @@
  * overlay, so the overlay always lists exactly what works.
  */
 import type { MessageKey } from '../i18n/messages'
+import type { ViewPresetName } from './viewPresets'
 
 export type ShortcutAction =
   | { kind: 'togglePause' }
@@ -16,6 +17,7 @@ export type ShortcutAction =
   | { kind: 'feed' }
   | { kind: 'inspector' }
   | { kind: 'perf' }
+  | { kind: 'view'; preset: ViewPresetName }
   | { kind: 'help' }
 
 export interface ShortcutHelpRow {
@@ -38,6 +40,10 @@ export const SHORTCUT_HELP: readonly ShortcutHelpRow[] = [
   { keys: 'shortcuts.key.e', action: 'shortcuts.feed' },
   { keys: 'shortcuts.key.i', action: 'shortcuts.inspector' },
   { keys: 'shortcuts.key.p', action: 'shortcuts.perf' },
+  { keys: 'shortcuts.key.q', action: 'shortcuts.viewQuay' },
+  { keys: 'shortcuts.key.y', action: 'shortcuts.viewYard' },
+  { keys: 'shortcuts.key.g', action: 'shortcuts.viewGate' },
+  { keys: 'shortcuts.key.v', action: 'shortcuts.viewOverview' },
   { keys: 'shortcuts.key.help', action: 'shortcuts.help' },
 ]
 
@@ -82,6 +88,14 @@ export function shortcutFor(e: KeyLike): ShortcutAction | null {
       return { kind: 'inspector' }
     case 'p':
       return { kind: 'perf' }
+    case 'q':
+      return { kind: 'view', preset: 'quay' }
+    case 'y':
+      return { kind: 'view', preset: 'yard' }
+    case 'g':
+      return { kind: 'view', preset: 'gate' }
+    case 'v':
+      return { kind: 'view', preset: 'overview' }
     default:
       return null
   }

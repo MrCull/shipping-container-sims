@@ -10,6 +10,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { NO_OVERLAYS } from '../modules/overlays'
 import { pickEntity } from '../modules/picking'
+import { viewPresetPose, type ViewPresetName } from '../modules/viewPresets'
 import { hourOfDay, lightingFor } from '../modules/atmosphere'
 import { SceneRenderer } from '../modules/sceneRenderer'
 import type { SceneModel } from '../modules/sceneModel'
@@ -169,7 +170,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     camera.updateMatrixWorld()
     frustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
     const cpuStart = performance.now()
-    view.update(controller.displayTime, store.selectedId, camera.position, frustum)
+    view.update(controller.displayTime, store.selectedId, camera.position, frustum, { camera, width: host.value?.clientWidth || 1, height: host.value?.clientHeight || 1 })
     const poseDone = performance.now()
     poseMs = poseMs === 0 ? poseDone - cpuStart : poseMs * 0.9 + (poseDone - cpuStart) * 0.1
     if (import.meta.env.DEV && perf.debugLoadMs > 0) {
@@ -238,6 +239,17 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         const centre = controller?.model?.entityCentre(entityId, controller.displayTime)
         if (!centre) return false
         aim(centre, true, distanceM)
+        return true
+      },
+      viewPreset(preset: ViewPresetName) {
+        const model = store.controller()?.model
+        if (!model || !camera || !controls) return false
+        const pose = viewPresetPose(model, preset, camera.aspect)
+        if (!pose) return false
+        const offset = new THREE.Vector3(pose.direction.x, pose.direction.y, pose.direction.z).multiplyScalar(pose.distanceM)
+        controls.target.set(pose.target.x, pose.target.y, pose.target.z)
+        camera.position.copy(controls.target).add(offset)
+        controls.update()
         return true
       },
       pickAt,
