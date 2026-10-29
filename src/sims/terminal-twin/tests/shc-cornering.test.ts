@@ -106,16 +106,19 @@ describe('SHC cornering at speed', () => {
     for (const e of shcEvents(slow.eventLog())) for (const s of segmentsOf(e)) expect(s.v1 ?? 0).toBeLessThanOrEqual(cap + 1e-9)
   })
 
-  it('planned segment end times equal the event log: every drive ends at or before its phase event, and arrival events fire when the last drive ends plus handling', () => {
+  it('planned segment end times equal the event log: an event that carries segments fires exactly when its last planned segment ends', () => {
     const sim = run(base)
+    let checked = 0
     for (const e of shcEvents(sim.eventLog())) {
       const segs = segmentsOf(e)
       if (segs.length === 0) continue
       const end = Math.max(...segs.map((s) => s.t1))
-      expect(e.t).toBeGreaterThanOrEqual(end - 1e-9)
-      // handling (lock, unlock, lift) after the last segment is short and fixed
-      expect(e.t - end).toBeLessThanOrEqual(DEFAULT_SHC_KINEMATICS.lockS + DEFAULT_SHC_KINEMATICS.unlockS + 4)
+      // The engine schedules the arrival event at the plan's own end time (handling such as lock,
+      // unlock and lift is a separate phase with its own event), so there is no slack to allow.
+      expect(Math.abs(e.t - end), `${e.type} at ${e.t}`).toBeLessThanOrEqual(1e-6)
+      checked++
     }
+    expect(checked).toBeGreaterThan(0)
     // positions are continuous where one run hands over to the next
     const byShc = new Map<string, MotionSegment[]>()
     for (const e of shcEvents(sim.eventLog()))
