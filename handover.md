@@ -27,7 +27,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-07 load-proof smoke | #67 | open | |
 | V11-08 split setup dialog | #68 | open | |
 | V11-09 split ASC | #69 | merged | |
-| V11-10 subsystem modes | #70 | merged (dialog smoke spec follow-up in progress) | |
+| V11-10 subsystem modes | #70 | merged | |
 | V11-11 wtpPadSelection | #71 | open | |
 | V11-12 SHC cornering | #72 | open | |
 | V11-13 pre-fill decisions | #73 | open | |
