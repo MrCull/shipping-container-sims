@@ -28,7 +28,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-08 split setup dialog | #68 | open | |
 | V11-09 split ASC | #69 | merged | |
 | V11-10 subsystem modes | #70 | merged | |
-| V11-11 wtpPadSelection | #71 | open | |
+| V11-11 wtpPadSelection | #71 | in progress | session_018sev (agent) |
 | V11-12 SHC cornering | #72 | open | |
 | V11-13 pre-fill decisions | #73 | open | |
 | V11-14 truck exports | #74 | blocked by 73 | |
