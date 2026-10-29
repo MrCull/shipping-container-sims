@@ -59,3 +59,11 @@ export function lightingFor(hour: number, lockDaylight: boolean): Lighting {
 export function daylightLockDefault(scenarioName: string): boolean {
   return scenarioName === STRESS_PRESET_NAME
 }
+
+/**
+ * Hemisphere (ambient) light intensity at a daylight level (0 to 1). The night colours are dim, so the night intensity
+ * is higher than the day's: boxes, trucks, the gate and equipment must stay distinguishable from the ground (V11-03).
+ */
+export function ambientIntensity(daylight: number): number {
+  return 1.4 + 0.5 * (1 - daylight)
+}

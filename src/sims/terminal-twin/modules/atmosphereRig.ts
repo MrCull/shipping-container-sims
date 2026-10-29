@@ -5,13 +5,13 @@
  * glow point too (a second draw call). Colours blend between day and night.
  */
 import * as THREE from 'three'
-import type { Lighting } from './atmosphere'
+import { ambientIntensity, type Lighting } from './atmosphere'
 import type { QualityProfile } from './quality'
 import type { SceneModel } from './sceneModel'
 import { MAX_MASTS, mastSpots } from './infrastructureLayout'
 
 const DAY = { sky: new THREE.Color('#a9bfd3'), hemiSky: new THREE.Color('#dfe9f5'), hemiGround: new THREE.Color('#5a5248'), sun: new THREE.Color('#fff4e0') }
-const NIGHT = { sky: new THREE.Color('#0b1424'), hemiSky: new THREE.Color('#5b73a6'), hemiGround: new THREE.Color('#2a2c36'), sun: new THREE.Color('#8fa6d6') }
+const NIGHT = { sky: new THREE.Color('#0b1424'), hemiSky: new THREE.Color('#7088bd'), hemiGround: new THREE.Color('#454859'), sun: new THREE.Color('#8fa6d6') }
 const DUSK_SUN = new THREE.Color('#ffb070')
 
 export interface MastLayout {
@@ -143,11 +143,11 @@ export class AtmosphereRig {
     this.fog.color.copy(this.background)
     this.hemi.color.lerpColors(NIGHT.hemiSky, DAY.hemiSky, d)
     this.hemi.groundColor.lerpColors(NIGHT.hemiGround, DAY.hemiGround, d)
-    this.hemi.intensity = 1.1 + 0.3 * d
+    this.hemi.intensity = ambientIntensity(d)
     const warm = Math.max(0, 1 - Math.abs(l.sun.y - 40) / 90) * (l.mode === 'dusk' ? 1 : 0)
     this.sun.color.lerpColors(NIGHT.sun, DAY.sun, d).lerp(DUSK_SUN, warm * 0.6)
     // At night the "sun" is a dim moon: same light, no shadow pass.
-    this.sun.intensity = 0.9 + 1.3 * d
+    this.sun.intensity = 1.2 + 1.0 * d
     this.sun.castShadow = l.shadows && this.shadowsAllowed
     this.sun.position.set(l.sun.x, Math.max(30, l.sun.y), l.sun.z)
     const on = l.floodGlow > 0.02
