@@ -2,8 +2,13 @@ name: PR checks
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     branches:
       - main
+  # Browser smoke tests are slow (software WebGL, ~15 min) and bill Actions minutes per run, so they do not run on every push:
+  # start them from the Actions tab ("Run workflow"), or add the `smoke` label to a PR (they re-run on pushes while it is set).
+  workflow_dispatch:
+  # Label events must be listed here for the label gate below to see them.
 
 concurrency:
   group: pr-checks-${{ github.ref }}
@@ -11,6 +16,8 @@ concurrency:
 
 jobs:
   verify:
+    # Adding the `smoke` label re-triggers this workflow; skip the fast checks then, they just ran.
+    if: github.event.action != 'labeled'
     runs-on: ubuntu-latest
     name: Lint, build and test
     steps:
@@ -37,37 +44,15 @@ jobs:
       - name: Asset budgets (Terminal Twin GLBs + sidecars; no Blender needed)
         run: npm run tt:assets:check
 
-  changes:
-    runs-on: ubuntu-latest
-    name: Detect browser-relevant changes
-    outputs:
-      browser: ${{ steps.filter.outputs.browser }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Did the change touch code the browser smoke specs exercise?
-        id: filter
-        run: |
-          base="origin/${{ github.base_ref }}"
-          if git diff --name-only "$base"...HEAD | grep -qE '^(src/|public/|index.html|package(-lock)?.json|vite.config.ts|playwright.config.ts|\.github/workflows/)'; then
-            echo "browser=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "browser=false" >> "$GITHUB_OUTPUT"
-          fi
-
   smoke:
-    needs: changes
-    if: needs.changes.outputs.browser == 'true'
+    # Required before merging a change that touches the browser UI: run it by hand or label the PR `smoke`.
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'smoke')
     runs-on: ubuntu-latest
-    name: Browser smoke tests (shard ${{ matrix.shard }}/3)
-    # Required. The Playwright suite is slow (software WebGL), so it runs as three parallel shards, and only when a change
-    # touches code the specs exercise. Frame-based assertions are ratios over a wall-clock window (tests/browser/frameSampling.ts),
-    # so they hold on a loaded 2-core runner. `@load` specs (need a real frame rate) are not run in CI: run them locally.
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
+    name: Browser smoke tests (Terminal Twin)
+    timeout-minutes: 40
+    # One job, not shards: sharding runs the same specs but bills the npm and Chromium installs once per shard.
+    # Frame-based assertions are ratios over a wall-clock window (tests/browser/frameSampling.ts), so they hold on a loaded
+    # 2-core runner. `@load` specs (need a real frame rate) are not run in CI: run them locally.
     steps:
       - uses: actions/checkout@v4
 
@@ -84,4 +69,4 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Smoke tests
-        run: npm run test:smoke -- --grep-invert @load --shard=${{ matrix.shard }}/3
+        run: npm run test:smoke -- --grep-invert @load

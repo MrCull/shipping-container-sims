@@ -9,6 +9,15 @@ on:
     types: [opened, synchronize, reopened, closed]
     branches:
       - main
+    # Docs-only changes have nothing new to preview.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+# A newer push to the same PR cancels the deploy still running for it (never cancels a production deploy).
+concurrency:
+  group: azure-swa-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build_and_deploy_job:
