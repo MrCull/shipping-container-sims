@@ -40,6 +40,13 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 
 Start order: #61, #62, #63 first (prefactor and visible fixes), then the rest of the frontier by conflict risk. #79 needs a human with a GPU.
 
+## v1.1 review pass (in progress)
+
+- Full smoke run on the integration tip: 110 passed, 3 failed (debugger breakpoints stop, debugger overlay labels vs label declutter, follow-truck second `N`). Agent `a3dbe216ec8d1cd68` (branch `tt/smoke-fixes`) is fixing them and checking the Run to... button click blocked by the canvas.
+- `/code-review` done (standards + spec). Fixed by me: stray `date-input.png`, unrelated box-empire reformat, CSS tokens. Agent `ae118a4654bfa6f3b` (branch `tt/review-fixes`) does: tighter cornering test, camera smoke ids, `cameraTo` doc, post-#78 benchmark numbers, Known-gaps note for accepted smells.
+- Merge both with `scripts/merge-ticket.sh`, push, then: mark PR #80 ready, add `Closes #60..#78` to its body, comment on and close #55-#59 (not #55 until #79), remove worktrees with `scripts/remove-worktree.sh`.
+- Review notes accepted without a change: #70 yard `instant` only changes the ASC (landside stays real); two SHCs can get the same pad with injected latency (documented); saves from engine 0.7.1 trigger the version warning; `cameraTo` is false for a truck not yet arrived or gone.
+
 ## v1.1 wrap-up state (written when the session neared its usage limit)
 
 **Merged on `claude/cool-maxwell-6dmsl9` (draft PR #80, base `claude/fervent-dijkstra-cmzk4u`):** #61-#66, #68-#76 (see the table). Engine is 0.12.0. `npm run lint`, build and Vitest (764 tests, run with `--testTimeout=90000` because of machine load) pass at the last merge.
