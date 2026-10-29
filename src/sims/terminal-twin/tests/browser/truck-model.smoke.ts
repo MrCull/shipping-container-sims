@@ -58,21 +58,22 @@ test('trucks in the twin use the GLB models with cab and livery variety and LOD 
 })
 
 test('trucks roll, steer, articulate through turns and carry their box on the chassis attach point', async ({ page }) => {
+  test.slow()
   const { errors } = watch(page)
   await openTrucks(page)
-  await page.evaluate(() => window.__tt!.setSpeed(60))
+  await page.evaluate(() => window.__tt!.setSpeed(10))
   const samples = await page.evaluate(async () => {
     const tt = window.__tt!
     tt.play()
     const out: { id: string; steer: number; artic: number; roll: number }[] = []
-    // Load-proof (V11-07): the window is 480 sim seconds (8 s at x60 on an idle machine), not 8 wall seconds, so a
-    // slow runner sees the same stretch of the run; the wall cap only stops a stalled page.
-    const sim0 = tt.clock().displayTime
+    // Load-proof (V11-07): a turn lasts a few sim seconds, so a loaded runner with few frames must keep sampling at a low
+    // speed until it has seen a steered and articulated frame; the wall cap only stops a stalled page.
     const t0 = performance.now()
     await new Promise<void>((resolve) => {
       const tick = () => {
         for (const [id, r] of Object.entries(tt.sceneState()!.truckRigs)) out.push({ id, steer: r.steerRad, artic: r.articulationRad, roll: r.wheelRollRad })
-        if (tt.clock().displayTime - sim0 < 480 && performance.now() - t0 < 90_000) requestAnimationFrame(tick)
+        const seen = out.some((s) => Math.abs(s.steer) > 0.05) && out.some((s) => Math.abs(s.artic) > 0.05) && out.some((s) => Math.abs(s.roll) > 1)
+        if (!seen && performance.now() - t0 < 100_000) requestAnimationFrame(tick)
         else resolve()
       }
       requestAnimationFrame(tick)
