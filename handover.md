@@ -18,15 +18,15 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 
 | Ticket | Issue | State | Claimed by |
 |---|---|---|---|
-| V11-01 registry | #61 | in progress | session_018sev (agent) |
+| V11-01 registry | #61 | merged | |
 | V11-02 HUD | #62 | in progress | session_018sev (agent) |
-| V11-03 daylight + masts | #63 | in progress | session_018sev (agent) |
-| V11-04 camera | #64 | blocked by 61 | |
+| V11-03 daylight + masts | #63 | merged | |
+| V11-04 camera | #64 | in progress | session_018sev (agent) |
 | V11-05 view presets | #65 | blocked by 64 | |
 | V11-06 follow next truck | #66 | blocked by 64 | |
 | V11-07 load-proof smoke | #67 | open | |
 | V11-08 split setup dialog | #68 | open | |
-| V11-09 split ASC | #69 | open | |
+| V11-09 split ASC | #69 | in progress | session_018sev (agent) |
 | V11-10 subsystem modes | #70 | blocked by 69 | |
 | V11-11 wtpPadSelection | #71 | open | |
 | V11-12 SHC cornering | #72 | open | |
