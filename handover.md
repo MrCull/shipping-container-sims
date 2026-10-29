@@ -14,7 +14,7 @@ Another session may have pushed while you were stopped. Two sessions once built 
 
 ## v1.1 work (spec #60, tickets #61-#79) — read this first
 
-Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc`; PR #54 is still open, so the v1.1 PR targets `claude/fervent-dijkstra-cmzk4u`). Orchestration steps: `docs/agents/implementing.md` (use `/implement-spec`). Max 3 implementers at once; spawn nothing near the usage limit. Claim a ticket here (commit and push) before starting it. Resume protocol above applies to branch `claude/cool-maxwell-6dmsl9`.
+Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc`; PR #54 is still open, so the v1.1 PR targets `claude/fervent-dijkstra-cmzk4u`). Process, merge script and gotchas: `docs/agents/implementing.md`. Claim a ticket here before starting it. The resume protocol above applies to branch `claude/cool-maxwell-6dmsl9`.
 
 | Ticket | Issue | State | Claimed by |
 |---|---|---|---|
@@ -54,7 +54,7 @@ Start order: #61, #62, #63 first (prefactor and visible fixes), then the rest of
 3. #79 (real-GPU fps) needs a human with a GPU laptop: stats overlay (P), record numbers in `src/sims/terminal-twin/docs/scene-quality-atmosphere.md`.
 4. Run the `code-review` skill on `claude/cool-maxwell-6dmsl9` against `claude/fervent-dijkstra-cmzk4u` (spec #60), fix its findings in one implementer, re-verify.
 5. Mark PR #80 ready, add `Closes #60..#79` (minus #79 if not done) to its body, comment on and close #55-#59 as covered (#55 only when #79 is done). Retarget #80 to `main` once PR #54 merges.
-6. Remove worktrees one at a time with `git worktree remove .claude/worktrees/agent-<id>` (no `--force` needed once clean; a blanket `rm -rf` is blocked by the permission classifier). Delete this file before PR #54 merges to `main`.
+6. Remove worktrees with `scripts/remove-worktree.sh <agent-id>`. Delete this file before PR #54 merges to `main`.
 
 **Open points to remember:**
 - `perf/baseline.json` needs re-recording on a quiet machine (#78 changed invariant cost).
@@ -62,8 +62,6 @@ Start order: #61, #62, #63 first (prefactor and visible fixes), then the rest of
 - Async `yardAllocation` handler on a pre-filled start can still give a `custody.single-owner` violation from stale in-run replies (existing async behaviour; not ticketed).
 - #68: end-conditions fieldset stays inline in `SetupDialog.vue` because `tests/setup-inputs.test.ts` reads it there.
 - #65: the Gate view looks tight on the small landside fixture.
-- `npm run verify` at the default 5 s Vitest timeout fails on `benchmark`, `perf-structures` and a few heavy tests when the machine is loaded; they pass with a longer timeout. Consider raising `testTimeout` in the Vitest config.
-- Disk: each worktree is about 1.2 GB with `node_modules`; remove finished worktrees promptly.
 
 ## State of PR #54 (updated 2026-10-29)
 

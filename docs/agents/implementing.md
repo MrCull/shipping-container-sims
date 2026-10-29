@@ -6,10 +6,10 @@ For the orchestrator running `/implement-spec`, and the brief each **implementer
 
 1. **Resume first.** Another session may have pushed. `git fetch`, read `git log HEAD..origin/<integration-branch>` and the `handover.md` diff, pull, `npm install`, then work from the merged state. Claim a ticket in `handover.md` (commit and push) before starting it.
 2. **Frontier.** Start one implementer per unblocked ticket, in its own worktree (`isolation: worktree`) on `tt/<issue>-<slug>`, in the background. Keep to about three at once: each worktree carries its own `node_modules`, builds and browser artefacts, and the container's disk is shared.
-3. **Merge.** When one reports, merge its branch into the integration branch (fast-forward when possible, otherwise a merge commit; a handover commit in between forces a merge commit), `npm install`, `npm run verify`, push. Keep both sides of additive conflicts (decision-point registries, fixture lists, guide sections).
-4. **Warn.** A ticket that changes the engine contract (decision-point shapes, event payloads, `ENGINE_VERSION`) gets a `SendMessage` to the agents still running so they merge the tip early.
+3. **Merge.** When one reports, run `scripts/merge-ticket.sh tt/<N>-<slug>`: it merges the branch, stops on a conflict, and runs `npm run verify` (which also fails on leftover conflict markers). Keep both sides of additive conflicts (decision-point registries, fixture lists, guide sections), then `git add`, commit and re-run verify. Update the `handover.md` table, push, then free the disk with `scripts/remove-worktree.sh <agent-id>`.
+4. **Warn.** A ticket that changes the engine contract (decision-point shapes, event payloads, `ENGINE_VERSION`) gets a `SendMessage` to the agents still running so they merge the tip early. Assign each such ticket its own `ENGINE_VERSION` in its brief (two agents once both claimed the same number).
 5. **Rate limits** end agents mid-ticket with work uncommitted. Resume the same agent with `SendMessage` after the reset rather than starting a new one; its worktree keeps the work.
-6. **Finish.** `/code-review` the integration branch, fix the findings in one implementer, mark the draft PR ready, remove worktrees (`git worktree remove --force`), delete `handover.md`.
+6. **Finish.** `/code-review` the integration branch, fix the findings in one implementer, mark the draft PR ready, remove the remaining worktrees with `scripts/remove-worktree.sh`, delete `handover.md`.
 
 ## Implementer brief
 
@@ -25,6 +25,7 @@ For the orchestrator running `/implement-spec`, and the brief each **implementer
 
 - Run anything longer than about a minute in the background with its output in a log file. A foreground command past the tool timeout leaves no output.
 - Never `pkill -f`; free a port with `fuser -k <port>/tcp`.
-- On finish, remove your worktree's `node_modules`, `.smoke-dist` and `.smoke-results` if disk is short.
+- Disk is shared: a worktree with `node_modules` is about 1.2 GB. Implementers delete their worktree's `node_modules`, `.smoke-dist` and `.smoke-results` before reporting; the orchestrator removes the worktree after the merge. Remove worktrees with `git worktree remove` (never a blanket `rm -rf`, which the permission classifier blocks).
+- Vitest's timeout is 60 s (`vitest.config.ts`), so `npm run verify` runs green on a busy machine; a timeout failure there is a real hang.
 - Regenerate goldens only on purpose (`UPDATE_GOLDEN=1 npm test`) and say why in the commit.
 - Never commit `.blend` files or reference photos.
