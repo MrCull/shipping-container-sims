@@ -4,19 +4,25 @@
     "TTI Algeciras baseline|24h": {
       "preset": "TTI Algeciras baseline",
       "simHours": 24,
-      "invariantsEvery": 144,
-      "events": 28938,
-      "wallMs": 17012.500248,
-      "eventsPerSec": 1700.9845453728628,
-      "wallMsPerSimHour": 708.854177,
-      "peakMemoryMb": 433.73046875,
-      "status": "ready",
+      "sweepEvery": 1000,
+      "events": 38164,
+      "wallMs": 24661.6576,
+      "eventsPerSec": 1547.503441131224,
+      "wallMsPerSimHour": 1027.5690666666667,
+      "peakMemoryMb": 404.33203125,
+      "status": "ended",
       "invariantViolations": 0,
+      "invariantMs": 11692.963699999771,
+      "invariantMsPerEvent": 0.30638726810606254,
+      "invariantChecks": {
+        "incremental": 38125,
+        "sweeps": 40
+      },
       "firstError": null,
       "env": {
-        "node": "v22.22.0",
-        "cpu": "Intel(R) Xeon(R) Processor x4",
-        "load1": 4.9
+        "node": "v22.23.2",
+        "cpu": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz x8",
+        "load1": 0
       }
     },
     "Stress test|24h": {
