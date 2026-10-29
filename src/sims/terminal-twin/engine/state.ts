@@ -18,7 +18,7 @@ import { planExportYard, type ExportPlacement } from '../scenario/exportYard'
 import { prefillOf } from './prefill'
 import type { DecisionHandler } from './decisions/types'
 import { DEFAULT_WARM_UP_S } from '../scenario/types'
-import type { ContainerSize, ScenarioConfig, SubsystemMode, TruckTransactionKind, VesselSizeClass } from '../scenario/types'
+import type { ContainerSize, ScenarioConfig, SubsystemMode, SubsystemModes, TruckTransactionKind, VesselSizeClass } from '../scenario/types'
 import { vesselSlotId as makeVesselSlotId, type CellHalf } from '../scenario/vesselClasses'
 
 /** Kinds of custody owner. `external`: the box left the terminal on a truck (id = the truck). */
@@ -357,6 +357,12 @@ export interface YardSlotState {
 }
 
 export interface ResolvedSubsystemModes {
+  /** STS cranes (V11-10). */
+  quay: SubsystemMode
+  /** Berth allocation and mooring (V11-10). */
+  berth: SubsystemMode
+  /** The yard: blocks, ASCs and everything behind them (V11-10). */
+  yard: SubsystemMode
   shc: SubsystemMode
   asc: SubsystemMode
   /** Trucks, gate and transfer stalls (TT-13). */
@@ -760,18 +766,24 @@ function validateRail(config: ScenarioConfig): void {
   })
 }
 
-/** Subsystem modes: config, then overrides. SHC defaults to real when SHCs and blocks exist. */
-export function resolveSubsystemModes(
-  config: ScenarioConfig,
-  overrides: { shc?: SubsystemMode; asc?: SubsystemMode; landside?: SubsystemMode } = {},
-): ResolvedSubsystemModes {
+/** Subsystem modes: config, then overrides. Each defaults to real when its equipment exists. `yard` caps the ASC and landside modes. */
+export function resolveSubsystemModes(config: ScenarioConfig, overrides: SubsystemModes = {}): ResolvedSubsystemModes {
   const hasShc = (config.shcs?.length ?? 0) > 0 && (config.yard?.blocks.length ?? 0) > 0
-  const modes = {
-    shc: overrides.shc ?? config.subsystems?.shc ?? (hasShc ? 'real' : 'off'),
-    asc: overrides.asc ?? config.subsystems?.asc ?? (hasShc ? 'real' : 'off'),
-    landside: overrides.landside ?? config.subsystems?.landside ?? (hasLandside(config) ? 'real' : 'off'),
+  const hasYard = (config.yard?.blocks.length ?? 0) > 0
+  const pick = (key: keyof SubsystemModes, fallback: SubsystemMode): SubsystemMode => overrides[key] ?? config.subsystems?.[key] ?? fallback
+  const modes: ResolvedSubsystemModes = {
+    quay: pick('quay', config.sts.length > 0 ? 'real' : 'off'),
+    berth: pick('berth', 'real'),
+    yard: pick('yard', hasYard ? 'real' : 'off'),
+    shc: pick('shc', hasShc ? 'real' : 'off'),
+    asc: pick('asc', hasShc ? 'real' : 'off'),
+    landside: pick('landside', hasLandside(config) ? 'real' : 'off'),
   }
+  if (!hasYard) modes.yard = 'off'
+  if (config.sts.length === 0) modes.quay = 'off'
   if (!hasShc) modes.shc = 'off'
+  if (modes.yard === 'off') modes.asc = 'off'
+  else if (modes.yard === 'instant' && modes.asc === 'real') modes.asc = 'instant'
   if (!hasLandside(config) || modes.asc === 'off') modes.landside = 'off'
   return modes
 }

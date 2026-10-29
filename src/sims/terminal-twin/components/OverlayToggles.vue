@@ -21,6 +21,7 @@ function toggle(key: keyof OverlayState): void {
 <template>
   <div
     class="overlays"
+    data-hud-region="overlayBar"
     role="group"
     :aria-label="t('overlays.group')"
   >
@@ -46,12 +47,17 @@ function toggle(key: keyof OverlayState): void {
 
 <style scoped>
 .overlays {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 1rem;
+  grid-column: 2;
+  grid-row: 3;
+  justify-self: center;
+  align-self: end;
+  position: relative;
+  max-width: calc(100% - 1.6rem);
+  margin-bottom: 1rem;
   z-index: 6;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 0.4rem;
   padding: 0.35rem 0.5rem;

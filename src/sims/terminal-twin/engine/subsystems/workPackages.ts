@@ -19,8 +19,8 @@ import { continueWork } from './quay'
 import { pumpLoadPrep } from './loadPrep'
 import { raiseEmptiesRequired } from './empties'
 
-/** Export boxes are loaded only when the SHC and ASC subsystems run (they carry and fetch the boxes). */
-export const loadActive = (state: SimState): boolean => state.subsystems.shc !== 'off' && state.subsystems.asc !== 'off'
+/** Export boxes are loaded only when the quay, SHC and ASC subsystems run (they carry and fetch the boxes). */
+export const loadActive = (state: SimState): boolean => state.subsystems.quay !== 'off' && state.subsystems.shc !== 'off' && state.subsystems.asc !== 'off'
 
 /** Packages kept released ahead of the active one (`config.workPackages.releaseAhead`, default 2). */
 export const releaseAhead = (ctx: EngineContext): number => ctx.config.workPackages?.releaseAhead ?? 2

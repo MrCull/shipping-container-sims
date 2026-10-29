@@ -46,6 +46,7 @@ onBeforeUnmount(() => {
 <template>
   <aside
     class="inspector"
+    data-hud-region="rightPanel"
     data-testid="tt-inspector"
   >
     <button
@@ -341,10 +342,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .inspector {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
+  /* Side panel region: a full-height grid column, as wide as its tab or its open body. */
+  grid-column: 3;
+  grid-row: 1 / -1;
+  position: relative;
+  display: flex;
+  min-height: 0;
   z-index: 7;
   pointer-events: none;
   font-size: 0.8rem;
@@ -356,9 +359,8 @@ onBeforeUnmount(() => {
 }
 
 .tab {
-  position: absolute;
-  right: 0;
-  top: 0.8rem;
+  align-self: flex-start;
+  margin-top: 0.8rem;
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--color-border);
   border-right: none;
@@ -380,7 +382,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 0.6rem;
   width: 22rem;
-  height: 100%;
+  flex: none;
+  min-height: 0;
   padding: 0.6rem 0.7rem;
   border-left: 1px solid var(--color-border);
   background: rgba(17, 24, 39, 0.94);

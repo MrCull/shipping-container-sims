@@ -8,7 +8,7 @@ import type { MessageKey, MessageParams } from '../i18n/messages'
 import { t } from '../i18n/messages'
 import { BLOCK_FRONTAGE_M, SCALE_LIMITS, STRESS_SCALE } from './limits'
 import { validateOverrides, type CheckMessage, type OverrideCheck } from './overrides'
-import type { ScenarioConfig } from './types'
+import type { ScenarioConfig, SubsystemModes } from './types'
 
 export type ScenarioCheck = OverrideCheck
 
@@ -17,9 +17,26 @@ export function peakTrucksPerHour(config: ScenarioConfig): number {
   return Math.max(0, ...(config.landside?.hourlyProfile ?? []))
 }
 
-export function validateScenario(config: ScenarioConfig): ScenarioCheck {
+/**
+ * Impossible subsystem-mode combinations (V11-10): an instant mode that needs equipment the scenario lacks (real is the default and falls back to off), and a running
+ * ASC or landside behind a yard that is off. `overrides` (CLI, options) win over `config.subsystems`.
+ */
+export function validateSubsystemModes(config: ScenarioConfig, overrides: SubsystemModes = {}): CheckMessage[] {
+  const modes = { ...config.subsystems, ...overrides }
+  const out: CheckMessage[] = []
+  if (modes.quay === 'instant' && config.sts.length === 0) out.push({ key: 'setup.check.modeNoSts' })
+  if (modes.yard === 'instant' && (config.yard?.blocks.length ?? 0) === 0) out.push({ key: 'setup.check.modeNoBlocks' })
+  if (modes.yard === 'off') {
+    if (modes.asc !== undefined && modes.asc !== 'off') out.push({ key: 'setup.check.modeYardOff', params: { other: 'ASC' } })
+    if (modes.landside !== undefined && modes.landside !== 'off') out.push({ key: 'setup.check.modeYardOff', params: { other: 'landside' } })
+  }
+  return out
+}
+
+export function validateScenario(config: ScenarioConfig, overrides: SubsystemModes = {}): ScenarioCheck {
   const { errors, warnings } = validateOverrides(config)
   const err = (key: MessageKey, params?: MessageParams) => errors.push({ key, params })
+  errors.push(...validateSubsystemModes(config, overrides))
   const warn = (key: MessageKey, params?: MessageParams) => warnings.push({ key, params })
   const blocks = config.yard?.blocks ?? []
   const L = config.quay.lengthM
@@ -82,9 +99,12 @@ const ENGINE_ERROR_KEYS: readonly MessageKey[] = [
   'setup.check.trucks',
   'setup.check.frontage',
   'setup.check.startNeedsLandside',
+  'setup.check.modeNoSts',
+  'setup.check.modeNoBlocks',
+  'setup.check.modeYardOff',
 ]
 
-export function assertValidScenario(config: ScenarioConfig): void {
-  const errors = validateScenario(config).errors.filter((e) => ENGINE_ERROR_KEYS.includes(e.key))
+export function assertValidScenario(config: ScenarioConfig, overrides: SubsystemModes = {}): void {
+  const errors = validateScenario(config, overrides).errors.filter((e) => ENGINE_ERROR_KEYS.includes(e.key))
   if (errors.length > 0) throw new ScenarioValidationError(errors)
 }

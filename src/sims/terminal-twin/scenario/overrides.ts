@@ -5,7 +5,7 @@
  */
 import type { MessageKey, MessageParams } from '../i18n/messages'
 import type { DecisionsConfig } from '../engine/decisions/types'
-import type { ScenarioConfig, StsConfig, StsKinematics, VesselConfig } from './types'
+import type { ScenarioConfig, StsConfig, StsKinematics, SubsystemModes, VesselConfig } from './types'
 import { DEFAULT_TRANSSHIPMENT } from './dwell'
 import { cellCapacity, vesselClass } from './vesselClasses'
 import { SCALE_LIMITS } from './limits'
@@ -31,6 +31,8 @@ export interface ScenarioOverrides {
   gate?: { inLanes: number; outLanes: number }
   /** Decision points: async mode, strategy per point and latency injection; replaces the scenario's. */
   decisions?: DecisionsConfig
+  /** Subsystem modes (V11-10: quay, berth, yard; merged over the scenario's own). */
+  subsystems?: SubsystemModes
   /** Derive the STS and block positions from the counts and the quay length (presets); fixtures keep their layout. */
   derive?: boolean
 }
@@ -59,6 +61,7 @@ export function applyOverrides(base: ScenarioConfig, o: ScenarioOverrides): Scen
       config.landside.hourlyProfile = config.landside.hourlyProfile.map((n) => Math.round((n * o.peakTrucksPerHour!) / peak))
     if (o.gate) config.landside.gate = { ...config.landside.gate, ...o.gate }
   }
+  if (o.subsystems) config.subsystems = { ...config.subsystems, ...o.subsystems }
   if (o.decisions) config.decisions = JSON.parse(JSON.stringify(o.decisions))
   if (o.vessels) config.vessels = JSON.parse(JSON.stringify(o.vessels))
   if (o.dwellMedianS !== undefined) {

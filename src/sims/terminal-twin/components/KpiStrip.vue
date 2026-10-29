@@ -77,6 +77,7 @@ onBeforeUnmount(() => {
   <ul
     v-if="items.length"
     class="kpi-strip"
+    data-hud-region="kpiStrip"
     data-testid="tt-kpi-strip"
     :aria-label="t('kpi.strip')"
   >
@@ -97,15 +98,18 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .kpi-strip {
-  position: absolute;
-  top: 0.6rem;
-  left: 0.8rem;
+  /* Grid cell between the side panels; wraps onto more rows rather than overflowing. */
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: start;
+  position: relative;
   z-index: 4;
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  max-width: calc(100% - 1.6rem);
-  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0.6rem 0.8rem 0;
   padding: 0;
   list-style: none;
   pointer-events: none;

@@ -59,6 +59,7 @@ watch(() => [store.feedOpen, store.feedFilter, store.paused, summarised.value], 
 <template>
   <aside
     class="feed"
+    data-hud-region="leftPanel"
     :class="{ open: store.feedOpen }"
     data-testid="tt-feed-panel"
   >
@@ -261,10 +262,12 @@ watch(() => [store.feedOpen, store.feedFilter, store.paused, summarised.value], 
 
 <style scoped>
 .feed {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  /* Side panel region: a full-height grid column, as wide as its tab or its open body. */
+  grid-column: 1;
+  grid-row: 1 / -1;
+  position: relative;
+  display: flex;
+  min-height: 0;
   z-index: 7;
   pointer-events: none;
   font-size: 0.8rem;
@@ -276,9 +279,8 @@ watch(() => [store.feedOpen, store.feedFilter, store.paused, summarised.value], 
 }
 
 .tab {
-  position: absolute;
-  left: 0;
-  top: 0.8rem;
+  align-self: flex-start;
+  margin-top: 0.8rem;
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--color-border);
   border-left: none;
@@ -299,7 +301,8 @@ watch(() => [store.feedOpen, store.feedFilter, store.paused, summarised.value], 
   flex-direction: column;
   gap: 0.5rem;
   width: 21rem;
-  height: 100%;
+  flex: none;
+  min-height: 0;
   padding: 0.6rem 0.7rem;
   border-right: 1px solid var(--color-border);
   background: rgba(17, 24, 39, 0.94);

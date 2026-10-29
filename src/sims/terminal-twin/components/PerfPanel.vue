@@ -85,34 +85,30 @@ const store = useTwinStore()
 </template>
 
 <style scoped>
+/* Graphics settings: part of the top bar's settings region, so Quality never covers the KPI strip. */
 .perf {
-  position: absolute;
-  top: 0.8rem;
-  right: 6.2rem; /* clear of the Inspector tab on the right edge */
-  z-index: 6;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.35rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
   font-size: 0.78rem;
   color: var(--color-text);
 }
 
-.row,
-.readout {
+.row {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.3rem 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: rgba(17, 24, 39, 0.88);
 }
 
 .readout {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 0.1rem 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -121,8 +117,8 @@ const store = useTwinStore()
 }
 
 .v {
-  text-align: right;
   font-weight: 600;
+  margin-right: 0.3rem;
 }
 
 .label {
@@ -153,5 +149,10 @@ const store = useTwinStore()
 .opt.on {
   border-color: var(--color-accent);
   background: rgba(245, 158, 11, 0.12);
+}
+
+/* State by shape as well as colour. */
+.opt.on::before {
+  content: '✓ ';
 }
 </style>
