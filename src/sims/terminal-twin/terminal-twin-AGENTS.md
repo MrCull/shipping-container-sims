@@ -85,7 +85,10 @@ terminal-twin/
 │   │                         ground-position wait/resume; lane reservation while setting down (with SHCs)
 │   ├── subsystems/rail.ts    Shared STS rail: reservations, waiting for the rail, free cranes stepping aside
 │   ├── subsystems/shc.ts     SHC jobs, pull dispatch, whole-trip planning, parking (TT-05)
-│   ├── subsystems/asc.ts     ASC block storage: allocation on pad drop, job pick order, whole-cycle planning, pad reservation (TT-06)
+│   ├── subsystems/asc.ts     ASC event reactors + phase chain; the subsystem's public exports (TT-06, split in V11-09)
+│   ├── subsystems/ascStorage.ts      ASC stack storage: allocation/claim, stack lock, retrievable test, rehandle generation, slot add/remove, block/stall lookups
+│   ├── subsystems/ascReservations.ts ASC trips (per job kind), rail/pad planning, partner step-aside commit, `ascPoseAt`
+│   ├── subsystems/ascDispatch.ts     ASC job selection, ascDispatch decision, starting a planned job
 │   ├── subsystems/ascRail.ts Shared ASC rail of twin blocks: occupancy pieces, rail-segment windows, park holds, step-aside target (TT-08)
 │   ├── yardLayout.ts         Block geometry, slot ids (`B01:03-5-2`), `candidateSlots` (pure)
 │   ├── laneGraph.ts          Waterside one-way lane graph from config + shortest paths (cached per config)
@@ -224,7 +227,7 @@ Deliberately not built, or built differently from the spec (the code review acce
 - **Handler wall latency** is a run total in `kpiReport()` and the final report, not a time series (it is not in the event log).
 - **Truck-delivered exports with a legacy/prefilled start** are new boxes outside the bay plan and are never loaded; only the `empty`/`warmup` start delivers the booked boxes.
 - **SHC cornering:** SHCs stop at every turn.
-- **Hub files** `SetupDialog.vue`, `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass. The per-kind renderer, dev-API and inspector wiring left the hubs in V11-01 (see Extending); `SetupDialog.vue` and the ASC subsystem are still to split (#68, #69).
+- **Hub files** `SetupDialog.vue`, `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass. The per-kind renderer, dev-API and inspector wiring left the hubs in V11-01 (see Extending); `SetupDialog.vue` is still to split (#68); the ASC subsystem split into `asc.ts` / `ascStorage.ts` / `ascReservations.ts` / `ascDispatch.ts` (+ pure `ascRail.ts`) in V11-09.
 
 ## Known behaviours and pitfalls
 
