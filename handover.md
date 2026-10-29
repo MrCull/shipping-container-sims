@@ -40,6 +40,31 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 
 Start order: #61, #62, #63 first (prefactor and visible fixes), then the rest of the frontier by conflict risk. #79 needs a human with a GPU.
 
+## v1.1 wrap-up state (written when the session neared its usage limit)
+
+**Merged on `claude/cool-maxwell-6dmsl9` (draft PR #80, base `claude/fervent-dijkstra-cmzk4u`):** #61-#66, #68-#76 (see the table). Engine is 0.12.0. `npm run lint`, build and Vitest (764 tests, run with `--testTimeout=90000` because of machine load) pass at the last merge.
+
+**Still running when the session stopped (no new agents were started near the limit):**
+- **#67 smoke triage + load-proof smoke** (agent `a5a792d6910d9652f`, worktree `.claude/worktrees/agent-a5a792d6910d9652f`, branch `tt/67-smoke`). It was told to run the whole smoke suite, fix every failure at its root (known: `terminal-twin-kpi.smoke` "an end condition ends the run" fails on PR #54's tip; `terminal-twin-dashboard.smoke` "D opens" and "final report opens as the dashboard report tab" may be #62 HUD regressions), then make frame-ratio specs load-proof and move the x600 test into the required CI job. Its work may be uncommitted: look in its worktree (`git -C <worktree> status`, `git log tt/67-smoke`), then merge the branch if it has commits.
+- **#77 locale dates** (agent `a526b8cba41ba9a11`, branch `tt/77-locale-dates`). Merge it when it has a commit and verify passes.
+
+**Do next, in order:**
+1. Resume protocol (top of this file). Check `git branch --list 'tt/*'` for finished agent branches not yet merged (#67, #77) and merge them (one `git merge --no-edit tt/<branch>`, then check `git diff --name-only --diff-filter=U` and `grep -rn '^<<<<<<<' src docs` BEFORE committing; run lint, build and `npx vitest run --testTimeout=90000`).
+2. If #67 never reports: run `npm run test:smoke` yourself (background, log file), fix failing specs at the root (see list above). Tag only genuinely hardware-bound specs `@load`.
+3. #79 (real-GPU fps) needs a human with a GPU laptop: stats overlay (P), record numbers in `src/sims/terminal-twin/docs/scene-quality-atmosphere.md`.
+4. Run the `code-review` skill on `claude/cool-maxwell-6dmsl9` against `claude/fervent-dijkstra-cmzk4u` (spec #60), fix its findings in one implementer, re-verify.
+5. Mark PR #80 ready, add `Closes #60..#79` (minus #79 if not done) to its body, comment on and close #55-#59 as covered (#55 only when #79 is done). Retarget #80 to `main` once PR #54 merges.
+6. Remove worktrees one at a time with `git worktree remove .claude/worktrees/agent-<id>` (no `--force` needed once clean; a blanket `rm -rf` is blocked by the permission classifier). Delete this file before PR #54 merges to `main`.
+
+**Open points to remember:**
+- `perf/baseline.json` needs re-recording on a quiet machine (#78 changed invariant cost).
+- #70: off modes drop their own events by design; dialog fieldset has a smoke spec.
+- Async `yardAllocation` handler on a pre-filled start can still give a `custody.single-owner` violation from stale in-run replies (existing async behaviour; not ticketed).
+- #68: end-conditions fieldset stays inline in `SetupDialog.vue` because `tests/setup-inputs.test.ts` reads it there.
+- #65: the Gate view looks tight on the small landside fixture.
+- `npm run verify` at the default 5 s Vitest timeout fails on `benchmark`, `perf-structures` and a few heavy tests when the machine is loaded; they pass with a longer timeout. Consider raising `testTimeout` in the Vitest config.
+- Disk: each worktree is about 1.2 GB with `node_modules`; remove finished worktrees promptly.
+
 ## State of PR #54 (updated 2026-10-29)
 
 **Every ticket (#25–#52) is merged on `claude/fervent-dijkstra-cmzk4u`, the code review is done and its fixes are in, and PR #54 is marked ready for review.** `npm run verify`: 0 lint errors (4 old box-empire warnings), build OK, 619 Vitest tests. Nothing is claimed or in progress.
