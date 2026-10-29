@@ -40,35 +40,11 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 
 Start order: #61, #62, #63 first (prefactor and visible fixes), then the rest of the frontier by conflict risk. #79 needs a human with a GPU.
 
-## v1.1 review pass (in progress)
+## v1.1 review pass (done)
 
-- Full smoke run on the integration tip: 110 passed, 3 failed (debugger breakpoints stop, debugger overlay labels vs label declutter, follow-truck second `N`). Agent `a3dbe216ec8d1cd68` (branch `tt/smoke-fixes`) is fixing them and checking the Run to... button click blocked by the canvas.
-- `/code-review` done (standards + spec). Fixed by me: stray `date-input.png`, unrelated box-empire reformat, CSS tokens. Agent `ae118a4654bfa6f3b` (branch `tt/review-fixes`) does: tighter cornering test, camera smoke ids, `cameraTo` doc, post-#78 benchmark numbers, Known-gaps note for accepted smells.
-- Merge both with `scripts/merge-ticket.sh`, push, then: mark PR #80 ready, add `Closes #60..#78` to its body, comment on and close #55-#59 (not #55 until #79), remove worktrees with `scripts/remove-worktree.sh`.
-- Review notes accepted without a change: #70 yard `instant` only changes the ASC (landside stays real); two SHCs can get the same pad with injected latency (documented); saves from engine 0.7.1 trigger the version warning; `cameraTo` is false for a truck not yet arrived or gone.
+All v1.1 tickets (#61-#78) are merged and the code review fixes are in (`npm run verify`: 770 tests, lint 0 errors). The three failing smoke specs were fixed (two stale specs, one spec bug); the real bug found was the Run to... popup hidden under the canvas (top bar z-index). Draft PR #80 is marked ready for review. Accepted review notes: #70 yard `instant` only changes the ASC; two SHCs can get the same pad with injected latency (documented); saves from engine 0.7.1 trigger the version warning; `cameraTo` is false for a truck not yet arrived or gone; accepted code smells are in the sim guide's Known gaps.
 
-## v1.1 wrap-up state (written when the session neared its usage limit)
-
-**Merged on `claude/cool-maxwell-6dmsl9` (draft PR #80, base `claude/fervent-dijkstra-cmzk4u`):** #61-#66, #68-#76 (see the table). Engine is 0.12.0. `npm run lint`, build and Vitest (764 tests, run with `--testTimeout=90000` because of machine load) pass at the last merge.
-
-**Still running when the session stopped (no new agents were started near the limit):**
-- **#67 smoke triage:** merged. The whole smoke suite was NOT re-run after the final changes (only the affected specs): run `npm run test:smoke` once (background, log file) and check the required CI job on PR #80.
-- **#77 locale dates:** merged. Follow-up seen by its agent: in the Run to... popup, clicking the Run button was intercepted by the canvas in a smoke test (it pressed Enter instead). May be a #62 HUD z-index bug: check.
-
-**Do next, in order:**
-1. Resume protocol (top of this file). All v1.1 tickets except #79 are merged; check `git branch --list "tt/*"` for anything unmerged anyway.
-2. If #67 never reports: run `npm run test:smoke` yourself (background, log file), fix failing specs at the root (see list above). Tag only genuinely hardware-bound specs `@load`.
-3. #79 (real-GPU fps) needs a human with a GPU laptop: stats overlay (P), record numbers in `src/sims/terminal-twin/docs/scene-quality-atmosphere.md`.
-4. Run the `code-review` skill on `claude/cool-maxwell-6dmsl9` against `claude/fervent-dijkstra-cmzk4u` (spec #60), fix its findings in one implementer, re-verify.
-5. Mark PR #80 ready, add `Closes #60..#79` (minus #79 if not done) to its body, comment on and close #55-#59 as covered (#55 only when #79 is done). Retarget #80 to `main` once PR #54 merges.
-6. Remove worktrees with `scripts/remove-worktree.sh <agent-id>`. Delete this file before PR #54 merges to `main`.
-
-**Open points to remember:**
-- `perf/baseline.json` needs re-recording on a quiet machine (#78 changed invariant cost).
-- #70: off modes drop their own events by design; dialog fieldset has a smoke spec.
-- Async `yardAllocation` handler on a pre-filled start can still give a `custody.single-owner` violation from stale in-run replies (existing async behaviour; not ticketed).
-- #68: end-conditions fieldset stays inline in `SetupDialog.vue` because `tests/setup-inputs.test.ts` reads it there.
-- #65: the Gate view looks tight on the small landside fixture.
+**Still to do:** #79 (real-GPU fps, human); re-record `perf/baseline.json` on a quiet machine (the bench reports REGRESSION against the old baseline because the TTI event count grew); merge PR #54 first, then retarget #80 to `main`; delete this file before PR #54 merges to `main`. CI has not run on #80 (its base is not `main`): check the required smoke job after retargeting.
 
 ## State of PR #54 (updated 2026-10-29)
 
