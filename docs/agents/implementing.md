@@ -4,6 +4,8 @@ For the orchestrator running `/implement-spec`, and the brief each **implementer
 
 ## Orchestrator
 
+`handover.md` is a per-run tracking file at the repo root, not a permanent doc: create it when a run may span sessions (a ticket table with a Claimed by column, the next steps, open points), keep it current after every merge, and delete it before the PR merges to `main`. Terminal Twin's last version is in git history (`git log --diff-filter=D -- handover.md`).
+
 1. **Resume first.** Another session may have pushed. `git fetch`, read `git log HEAD..origin/<integration-branch>` and the `handover.md` diff, pull, `npm install`, then work from the merged state. Claim a ticket in `handover.md` (commit and push) before starting it.
 2. **Frontier.** Start one implementer per unblocked ticket, in its own worktree (`isolation: worktree`) on `tt/<issue>-<slug>`, in the background. Keep to about three at once: each worktree carries its own `node_modules`, builds and browser artefacts, and the container's disk is shared.
 3. **Merge.** When one reports, run `scripts/merge-ticket.sh tt/<N>-<slug>`: it merges the branch, stops on a conflict, and runs `npm run verify` (which also fails on leftover conflict markers). Keep both sides of additive conflicts (decision-point registries, fixture lists, guide sections), then `git add`, commit and re-run verify. Update the `handover.md` table, push, then free the disk with `scripts/remove-worktree.sh <agent-id>`.
