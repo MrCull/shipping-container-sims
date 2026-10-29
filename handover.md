@@ -12,7 +12,35 @@ Another session may have pushed while you were stopped. Two sessions once built 
 4. Tell every agent you resume or start to do the same: fetch the branch, read this file's diff and the new commits, and merge the tip before carrying on.
 5. If work remains, claim it here (name your session, commit and push this file) before you start, and skip anything another session has claimed.
 
-## State (updated 2026-10-29)
+## v1.1 work (spec #60, tickets #61-#79) — read this first
+
+Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc`; PR #54 is still open, so the v1.1 PR targets `claude/fervent-dijkstra-cmzk4u`). Orchestration steps: `docs/agents/implementing.md` (use `/implement-spec`). Max 3 implementers at once; spawn nothing near the usage limit. Claim a ticket here (commit and push) before starting it. Resume protocol above applies to branch `claude/cool-maxwell-6dmsl9`.
+
+| Ticket | Issue | State | Claimed by |
+|---|---|---|---|
+| V11-01 registry | #61 | open | |
+| V11-02 HUD | #62 | open | |
+| V11-03 daylight + masts | #63 | open | |
+| V11-04 camera | #64 | blocked by 61 | |
+| V11-05 view presets | #65 | blocked by 64 | |
+| V11-06 follow next truck | #66 | blocked by 64 | |
+| V11-07 load-proof smoke | #67 | open | |
+| V11-08 split setup dialog | #68 | open | |
+| V11-09 split ASC | #69 | open | |
+| V11-10 subsystem modes | #70 | blocked by 69 | |
+| V11-11 wtpPadSelection | #71 | open | |
+| V11-12 SHC cornering | #72 | open | |
+| V11-13 pre-fill decisions | #73 | blocked by 69 | |
+| V11-14 truck exports | #74 | blocked by 73 | |
+| V11-15 STS ground wake-up | #75 | open | |
+| V11-16 latency series | #76 | open | |
+| V11-17 locale dates | #77 | blocked by 68 | |
+| V11-18 incremental invariants | #78 | open | |
+| V11-19 real-GPU fps (human) | #79 | blocked by 62, 63, 78 | |
+
+Start order: #61, #62, #63 first (prefactor and visible fixes), then the rest of the frontier by conflict risk. #79 needs a human with a GPU.
+
+## State of PR #54 (updated 2026-10-29)
 
 **Every ticket (#25–#52) is merged on `claude/fervent-dijkstra-cmzk4u`, the code review is done and its fixes are in, and PR #54 is marked ready for review.** `npm run verify`: 0 lint errors (4 old box-empire warnings), build OK, 619 Vitest tests. Nothing is claimed or in progress.
 
