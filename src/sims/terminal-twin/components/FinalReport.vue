@@ -298,7 +298,7 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
 .report {
   position: absolute;
   top: 0.6rem;
-  right: 3.4rem;
+  right: 5rem;
   bottom: 0.8rem;
   z-index: 7;
   width: min(26rem, calc(100% - 1.6rem));
