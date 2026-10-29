@@ -59,6 +59,20 @@ const cranes = computed(() => {
   }))
 })
 
+const handlers = computed(() => {
+  const r = report.value
+  if (!r) return []
+  return Object.entries(r.kpis.handlers).map(([id, h]) => ({
+    id,
+    handler: h.handler,
+    calls: fmt.value.number(h.calls, 0),
+    fallbacks: fmt.value.number(h.fallbacks + h.timeouts + h.errors, 0),
+    simLatency: fmt.value.duration(h.simLatencyS.mean),
+    wallLatency: fmt.value.duration(h.wallLatencyMs.mean / 1000),
+    idle: fmt.value.duration(h.equipmentIdleS),
+  }))
+})
+
 const vessels = computed(() => {
   const r = report.value
   if (!r) return []
@@ -216,6 +230,44 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
               <td>{{ v.sizeClass }}</td>
               <td>{{ v.anchorage }}</td>
               <td>{{ v.turnaround }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section
+        v-if="handlers.length > 0"
+        class="card"
+        data-testid="tt-report-handlers"
+      >
+        <h3>{{ t('report.handlers') }}</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('report.col.handler') }}</th>
+              <th>{{ t('report.col.calls') }}</th>
+              <th>{{ t('report.col.fallbacks') }}</th>
+              <th>{{ t('report.col.simLatency') }}</th>
+              <th>{{ t('report.col.wallLatency') }}</th>
+              <th>{{ t('report.col.equipmentIdle') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="h in handlers"
+              :key="h.id"
+            >
+              <th
+                scope="row"
+                :title="h.handler"
+              >
+                {{ h.id }}
+              </th>
+              <td>{{ h.calls }}</td>
+              <td>{{ h.fallbacks }}</td>
+              <td>{{ h.simLatency }}</td>
+              <td>{{ h.wallLatency }}</td>
+              <td>{{ h.idle }}</td>
             </tr>
           </tbody>
         </table>

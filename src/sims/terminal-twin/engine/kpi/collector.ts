@@ -178,6 +178,20 @@ export const KPI_DEFS: KpiDef[] = [
     entities: (c) => c.config.vessels.map((v) => v.id),
     value: (w, id) => w.gauge('vessel.remaining', id),
   },
+  {
+    id: 'vessel.turnaround-s',
+    unit: 's',
+    entityKind: 'vessel',
+    entities: (c) => c.config.vessels.map((v) => v.id),
+    value: (w, id) => ratio(w.sum('vessel.turnS', id), w.sum('vessel.departed', id)),
+  },
+  {
+    id: 'vessel.anchorage-wait-s',
+    unit: 's',
+    entityKind: 'vessel',
+    entities: (c) => c.config.vessels.map((v) => v.id),
+    value: (w, id) => ratio(w.sum('vessel.anchorageS', id), w.sum('vessel.allocated', id)),
+  },
   // Horizontal transport
   {
     id: 'shc.loaded-pct',
@@ -309,6 +323,13 @@ export const KPI_DEFS: KpiDef[] = [
     entities: (c) => c.decisionPoints,
     value: (w, id) => w.gauge('handler.backlog', id),
   },
+  {
+    id: 'handler.equipment-idle-s',
+    unit: 's',
+    entityKind: 'handler',
+    entities: (c) => c.decisionPoints,
+    value: (w, id) => r3(w.sum('handler.idleS', id)),
+  },
 ]
 
 /** KPI groups that only exist when the scenario has the subsystem. */
@@ -364,6 +385,7 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
   const berthedSince: Record<string, number> = {}
   const wtpDropAt: Record<string, number> = {}
   const requestedAt: Record<string, number> = {}
+  const berthedAt: Record<string, number> = {}
   const pending: Record<string, number> = {}
   const picked: Record<string, number> = {}
   const cells: Record<string, number> = { ...(info.initialCells ?? {}) }
@@ -475,9 +497,22 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         acc.add('sts.moves', e.payload.stsId, h, 1)
         acc.add('berth.moves', 'terminal', h, 1)
         break
+      case 'BerthAllocated':
+        acc.add('vessel.anchorageS', e.payload.vesselId, h, e.payload.anchorageWaitS)
+        acc.add('vessel.allocated', e.payload.vesselId, h, 1)
+        break
       case 'VesselBerthed':
         berthedSince[e.payload.vesselId] = e.t
+        berthedAt[e.payload.vesselId] = e.t
         break
+      case 'VesselDeparted': {
+        const at = berthedAt[e.payload.vesselId]
+        if (at !== undefined) {
+          acc.add('vessel.turnS', e.payload.vesselId, h, e.t - at)
+          acc.add('vessel.departed', e.payload.vesselId, h, 1)
+        }
+        break
+      }
       case 'VesselWorkComplete': {
         const since = berthedSince[e.payload.vesselId]
         if (since !== undefined) acc.interval(clock, 'berth.berthedS', 'terminal', since, e.t)
@@ -582,7 +617,9 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         const asked = requestedAt[e.payload.correlationId]
         delete requestedAt[e.payload.correlationId]
         acc.add('handler.resolved', dp, h, 1)
-        acc.add('handler.latencyS', dp, h, asked === undefined ? 0 : e.t - asked)
+        const latencyS = asked === undefined ? 0 : e.t - asked
+        acc.add('handler.latencyS', dp, h, latencyS)
+        acc.add('handler.idleS', dp, h, latencyS * (e.subjects.equipment?.length ?? 0))
         if (e.payload.outcome === 'fallback') acc.add('handler.fallbacks', dp, h, 1)
         pending[dp] = Math.max(0, (pending[dp] ?? 1) - 1)
         acc.gauge('handler.backlog', dp, h, pending[dp])

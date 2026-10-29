@@ -32,6 +32,8 @@ export const KPI_GROUPS: readonly KpiGroup[] = [
       'sts.wait-rail-s',
       'berth.moves-per-hour',
       'vessel.remaining-moves',
+      'vessel.turnaround-s',
+      'vessel.anchorage-wait-s',
     ],
   },
   {
@@ -62,7 +64,7 @@ export const KPI_GROUPS: readonly KpiGroup[] = [
   },
   {
     id: 'handlers',
-    kpis: ['handler.calls', 'handler.mean-latency-s', 'handler.fallbacks', 'handler.failures', 'handler.backlog'],
+    kpis: ['handler.calls', 'handler.mean-latency-s', 'handler.fallbacks', 'handler.failures', 'handler.backlog', 'handler.equipment-idle-s'],
   },
 ]
 

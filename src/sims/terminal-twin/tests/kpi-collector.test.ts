@@ -88,6 +88,29 @@ describe('KPI collector on real runs', () => {
     }
   })
 
+  it('handlers: idle-caused equipment time is a time series that matches the TT-03 KPIs', () => {
+    const config = { ...fixtures['tracer-1sts-10-boxes'], decisions: { points: { stsGroundPosition: { timeoutMs: 60_000, latency: { delay: { kind: 'fixed' as const, ms: 20_000 } } } } } }
+    const sim = createSimulation(config)
+    sim.runUntil()
+    const h = sim.kpiReport().handlers.stsGroundPosition
+    const series = sim.kpiSeries()
+    expect(h.equipmentIdleS).toBeGreaterThan(0)
+    expect(total(series, 'handler.equipment-idle-s', 'stsGroundPosition')).toBeCloseTo(h.equipmentIdleS, 2)
+    expect(sumHourly(series, 'handler.equipment-idle-s', 'stsGroundPosition')).toBeCloseTo(h.equipmentIdleS, 2)
+    // the wall latency is not in the event log (the log is latency-independent), so it is a run total in kpiReport only
+    expect(h.wallLatencyMs.mean).toBe(20_000)
+  })
+
+  it('vessels: turnaround and anchorage wait are time series (counted in the hour the vessel departs / gets its berth)', () => {
+    const sim = run('two-vessels-compete-for-berth')
+    const series = sim.kpiSeries()
+    for (const [id, v] of Object.entries(sim.kpiReport().vessels)) {
+      expect(total(series, 'vessel.turnaround-s', id), id).toBeCloseTo(v.turnaroundS as number, 2)
+      expect(total(series, 'vessel.anchorage-wait-s', id), id).toBeCloseTo(v.anchorageWaitS as number, 2)
+    }
+    expect(sumHourly(series, 'vessel.turnaround-s', 'V001')).toBeCloseTo(total(series, 'vessel.turnaround-s', 'V001') as number, 2)
+  })
+
   it('is deterministic and identical after a snapshot restore (the collector is rebuilt from the log)', () => {
     const a = createSimulation(fixtures['asc-1sts-10-boxes-1block'])
     a.runUntil({ time: 600 })
