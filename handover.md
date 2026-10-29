@@ -21,21 +21,21 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-01 registry | #61 | merged | |
 | V11-02 HUD | #62 | in progress | session_018sev (agent) |
 | V11-03 daylight + masts | #63 | merged | |
-| V11-04 camera | #64 | in progress | session_018sev (agent) |
-| V11-05 view presets | #65 | blocked by 64 | |
-| V11-06 follow next truck | #66 | blocked by 64 | |
+| V11-04 camera | #64 | merged | |
+| V11-05 view presets | #65 | open | |
+| V11-06 follow next truck | #66 | open | |
 | V11-07 load-proof smoke | #67 | open | |
 | V11-08 split setup dialog | #68 | open | |
-| V11-09 split ASC | #69 | in progress | session_018sev (agent) |
-| V11-10 subsystem modes | #70 | blocked by 69 | |
+| V11-09 split ASC | #69 | merged | |
+| V11-10 subsystem modes | #70 | in progress | session_018sev (agent) |
 | V11-11 wtpPadSelection | #71 | open | |
 | V11-12 SHC cornering | #72 | open | |
-| V11-13 pre-fill decisions | #73 | blocked by 69 | |
+| V11-13 pre-fill decisions | #73 | open | |
 | V11-14 truck exports | #74 | blocked by 73 | |
 | V11-15 STS ground wake-up | #75 | open | |
 | V11-16 latency series | #76 | open | |
 | V11-17 locale dates | #77 | blocked by 68 | |
-| V11-18 incremental invariants | #78 | open | |
+| V11-18 incremental invariants | #78 | in progress | session_018sev (agent) |
 | V11-19 real-GPU fps (human) | #79 | blocked by 62, 63, 78 | |
 
 Start order: #61, #62, #63 first (prefactor and visible fixes), then the rest of the frontier by conflict risk. #79 needs a human with a GPU.
