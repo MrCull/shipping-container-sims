@@ -38,6 +38,10 @@ export interface ShcKinematics {
   lockS: number
   /** Spreader twist-lock unlock time (s). */
   unlockS: number
+  /** Assumed turn radius (m) for cornering at speed; default `DEFAULT_SHC_CORNER`; 0 = stop at every turn. */
+  cornerRadiusM?: number
+  /** Lateral acceleration (m/s²) the SHC tolerates in a turn; with the radius it caps the corner speed. */
+  maxLateralAccel?: number
 }
 
 export interface ShcConfig {

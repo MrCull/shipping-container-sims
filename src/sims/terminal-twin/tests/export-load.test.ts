@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { createSimulation, restoreSimulation, type EngineEvent, type Simulation } from '../engine'
-import { ScenarioBuilder, withShcFleet } from '../scenario/builder'
+import { DEFAULT_SHC_KINEMATICS, ScenarioBuilder, withShcFleet } from '../scenario/builder'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
 
@@ -182,7 +182,9 @@ describe('work-package release', () => {
 describe('STS waiting for the SHC', () => {
   it('waiting time rises when the SHC count is reduced', () => {
     const waitOf = (shcs: number): number => {
-      const config = withShcFleet(stackedLoad({ load: 24, shcs: 6 }), shcs)
+      // slow SHCs: with cornering at speed (V11-12) one default SHC keeps up with this crane
+      const slow = { ...DEFAULT_SHC_KINEMATICS, driveEmpty: { vMax: 3, accel: 0.4, decel: 0.5 }, driveLoaded: { vMax: 3, accel: 0.4, decel: 0.5 } }
+      const config = withShcFleet(stackedLoad({ load: 24, shcs: 6 }), shcs, slow)
       const sim = run(config)
       expect(sim.firstError).toBeNull()
       expect(sim.status).toBe('ended')

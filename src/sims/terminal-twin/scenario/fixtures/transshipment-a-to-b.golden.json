@@ -3,9 +3,9 @@
   "seed": 5,
   "status": "ended",
   "endReason": "vesselsCompleted >= 2",
-  "eventLogHash": "1a0f7a65b0e7ac",
+  "eventLogHash": "1451d7a8e70423",
   "kpis": {
-    "simTimeS": 3263.422,
+    "simTimeS": 3191.67,
     "eventsProcessed": 622,
     "movesCompleted": 16,
     "vesselsCompleted": 2,
@@ -14,7 +14,7 @@
         "moves": 16,
         "cycles": 16,
         "twinLifts": 0,
-        "grossMovesPerHour": 18.43,
+        "grossMovesPerHour": 18.864,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1294.874,
-        "turnaroundS": 1234.874,
+        "departedAtS": 1289.891,
+        "turnaroundS": 1229.891,
         "sts": [
           "STS01"
         ]
@@ -37,8 +37,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 1560,
-        "departedAtS": 3263.422,
-        "turnaroundS": 1703.422,
+        "departedAtS": 3191.67,
+        "turnaroundS": 1631.67,
         "sts": [
           "STS01"
         ]
@@ -205,20 +205,20 @@
       "boxesToWtp": 8,
       "shcs": {
         "SHC01": {
-          "jobs": 13,
-          "emptyDistanceM": 3013,
-          "loadedDistanceM": 1524,
+          "jobs": 15,
+          "emptyDistanceM": 3506.5,
+          "loadedDistanceM": 1838.5,
           "reservationWaitS": 0
         },
         "SHC02": {
-          "jobs": 3,
-          "emptyDistanceM": 794.5,
-          "loadedDistanceM": 387.5,
+          "jobs": 1,
+          "emptyDistanceM": 247,
+          "loadedDistanceM": 87,
           "reservationWaitS": 0
         }
       },
       "stsGroundPositionWaitS": {
-        "STS01": 368.523
+        "STS01": 307.708
       }
     },
     "yard": {
@@ -245,8 +245,8 @@
       "ascs": {
         "B01-ASC1": {
           "jobs": 16,
-          "gantryM": 494.6,
-          "trolleyM": 201.5,
+          "gantryM": 548.2,
+          "trolleyM": 172.1,
           "hoistM": 223.744,
           "padWaitS": 0
         }
@@ -256,8 +256,8 @@
       "released": 14,
       "started": 14,
       "completed": 14,
-      "leadTimeMeanS": 341.138,
-      "leadTimeMaxS": 860.715,
+      "leadTimeMeanS": 330.312,
+      "leadTimeMaxS": 794.465,
       "boxesLoaded": 8
     }
   },

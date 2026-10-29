@@ -54,6 +54,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Pull dispatch:** free equipment asks the dispatch decision point (`shcDispatch`) for its next job from the released pool, rather than jobs being pushed to equipment.
 - **Pad selection:** the decision point (`wtpPadSelection`) an SHC asks, after dispatch gave it a discharge job, for the WTP pad to set the box on. Built-in strategies: first-free, nearest-box, last-free.
 - **Trip:** an SHC's planned drive with its phases (routing empty, positioning at pickup, locking, lifting, routing loaded, positioning at drop-off, lowering, unlocking, clearing), or its drive to its parking spot.
+- **Cornering (corner speed):** an SHC takes a right-angle turn at a capped speed (`sqrt(lateral acceleration x assumed radius)`) instead of stopping; the run before and after share that **entry/exit speed** (`v1`/`v0` on the motion segments). Reversals still stop.
 - **Clear position (pad clear position):** where an SHC reverses to after setting a box down on a WTP pad, clear of the pad. *Avoid:* "exit".
 - **Parking spot:** an SHC's own rest position off the apron, where idle SHCs return.
 - **Driver variability:** a ± % random factor on each SHC trip's drive times.

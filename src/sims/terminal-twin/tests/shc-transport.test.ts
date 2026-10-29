@@ -51,8 +51,8 @@ describe('SHC fixture: 1 STS → 2 SHC → 1 WTP strip', () => {
       expect(typeOf(history[4].eventId)).toBe('ShcDroppedAtWtp')
       for (let i = 1; i < history.length; i++) expect(history[i].t).toBeGreaterThanOrEqual(history[i - 1].t)
     }
-    // both SHCs did work
-    expect([...shcIds].sort()).toEqual(['SHC01', 'SHC02'])
+    // with cornering at speed (V11-12) one SHC keeps up with this crane and takes every box
+    expect([...shcIds].sort()).toEqual(['SHC01'])
   })
 
   it('an SHC trip runs through the whole state machine in order, each phase caused by the previous', () => {
