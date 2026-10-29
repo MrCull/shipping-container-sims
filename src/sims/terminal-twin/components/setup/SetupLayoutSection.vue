@@ -178,7 +178,7 @@ const summary = computed(() => {
 
 .choice.active {
   border-color: var(--color-primary);
-  background: rgba(59, 130, 246, 0.1);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .choice-name {
