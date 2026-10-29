@@ -67,7 +67,8 @@ test('breakpoints on container, equipment and decision point stop at matching ev
   const boxes = await page.evaluate(() => window.__tt!.query<{ id: string }[]>('containers'))
   const cases: { kind: 'container' | 'equipment' | 'decision'; value: string; check: (e: EngineEvent) => boolean }[] = [
     { kind: 'container', value: boxes[2].id, check: (e) => e.subjects.containers?.includes(boxes[2].id) ?? false },
-    { kind: 'equipment', value: 'SHC02', check: (e) => e.subjects.equipment?.includes('SHC02') ?? false },
+    // SHC01 only: with the default oldest-job dispatch the first idle SHC takes every job, so SHC02 has no events in this fixture.
+    { kind: 'equipment', value: 'SHC01', check: (e) => e.subjects.equipment?.includes('SHC01') ?? false },
     { kind: 'decision', value: 'shcDispatch', check: (e) => e.type.startsWith('Decision') && (e.payload as { decisionPoint: string }).decisionPoint === 'shcDispatch' },
   ]
   for (const c of cases) {
