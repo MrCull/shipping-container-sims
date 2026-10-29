@@ -40,7 +40,28 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     name: Browser smoke tests (Terminal Twin)
-    # Advisory until the load-sensitive frame-rate and 18k-yard draw-call tests are stabilised.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke tests
+        run: npm run test:smoke -- --grep-invert @load
+
+  smoke-load:
+    runs-on: ubuntu-latest
+    name: Load-sensitive smoke tests (advisory)
+    # Frame-rate and draw-call checks depend on the runner's CPU; they report but never block.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -58,4 +79,4 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Smoke tests
-        run: npm run test:smoke
+        run: npm run test:smoke -- --grep @load

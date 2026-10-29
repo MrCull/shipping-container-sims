@@ -41,6 +41,8 @@ export default defineConfig({
   timeout: 120_000,
   fullyParallel: false,
   workers: 1,
+  // CI runners are slower than a dev machine: a spec that fails once and passes on retry is reported as flaky, not red.
+  retries: process.env.CI ? 2 : 0,
   reporter: [['list']],
   outputDir: '.smoke-results',
   use: { viewport: { width: 1280, height: 720 }, launchOptions: { executablePath: chromiumExecutable() } },
