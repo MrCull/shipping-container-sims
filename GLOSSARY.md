@@ -8,6 +8,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **ASC (automated stacking crane):** a rail-mounted gantry crane serving one yard block. Each block has 1–2 ASCs, which never pass each other. The waterside ASC prefers WTP work and the landside ASC prefers truck work.
 - **SHC (shuttle carrier):** a straddle-type vehicle that carries one container at a time between STS ground positions and WTP pads. It sets a box down and drives clear before the box can be picked up again. *Avoid:* "straddle carrier" for this role.
 - **Spreader:** the lifting frame on an STS or ASC hoist. It grips a container with twist-locks (**lock** and **unlock** times).
+- **Equipment kind (registry):** one of STS, SHC, ASC, truck or vessel, registered in its own module under `modules/equipmentKinds/` (ids, bounds, dev-API state, inspector view, scene renderer). The renderer, dev API, picking, labels and inspector iterate `EQUIPMENT_KINDS`, so a new kind is a module plus one entry.
 
 ## Places
 
@@ -51,7 +52,9 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Rehandle:** a non-productive ASC move needed to reach a buried box.
 - **Job (SHC job):** one box to move from an STS ground position to a WTP pad. Grounding a box **releases** a job into the **released pool**; a job is **open** until an SHC **claims** it.
 - **Pull dispatch:** free equipment asks the dispatch decision point (`shcDispatch`) for its next job from the released pool, rather than jobs being pushed to equipment.
+- **Pad selection:** the decision point (`wtpPadSelection`) an SHC asks, after dispatch gave it a discharge job, for the WTP pad to set the box on. Built-in strategies: first-free, nearest-box, last-free.
 - **Trip:** an SHC's planned drive with its phases (routing empty, positioning at pickup, locking, lifting, routing loaded, positioning at drop-off, lowering, unlocking, clearing), or its drive to its parking spot.
+- **Cornering (corner speed):** an SHC takes a right-angle turn at a capped speed (`sqrt(lateral acceleration x assumed radius)`) instead of stopping; the run before and after share that **entry/exit speed** (`v1`/`v0` on the motion segments). Reversals still stop.
 - **Clear position (pad clear position):** where an SHC reverses to after setting a box down on a WTP pad, clear of the pad. *Avoid:* "exit".
 - **Parking spot:** an SHC's own rest position off the apron, where idle SHCs return.
 - **Driver variability:** a ± % random factor on each SHC trip's drive times.
@@ -75,7 +78,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Fallback:** the built-in strategy that answers when a handler times out or errors (`DecisionFailed` → `DecisionResolved` with outcome `fallback`).
 - **Idle time caused:** sim seconds that equipment spent waiting on a decision, attributed to that decision point's handler.
 - **Motion segment:** a planned rest-to-rest move of one equipment axis with a known start and end time. It uses an accelerate/cruise/decelerate (trapezoidal) or short-move (triangular) profile.
-- **Invariant:** a rule that must hold after every event (for example `custody.single-owner`). **Fail-fast** stops the run at the first violation.
+- **Invariant:** a rule that must hold after every event (for example `custody.single-owner`). **Fail-fast** stops the run at the first violation. Checking is **incremental** (only the invariants and entities an event touched, by the entity kinds each invariant `reads`), with a full **sweep** every N events and at the end of each run.
 - **Snapshot:** a full JSON copy of a run's state (queue, RNG, log), used to resume the run exactly.
 - **Event-log hash:** a deterministic hash of every committed event. The same seed and config always give the same hash.
 - **Structured log:** JSON-lines records derived from committed events (`t`, `eventId`, `seq`, `subsystem`, `level`, …), filtered by **per-subsystem verbosity** (`sts=debug,*=warn`).
@@ -100,13 +103,14 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Rail segment:** a half-bay slice of a block's ASC rail (zone `<block>:R<k>`). A crane's footprint is its position plus half the **minimum separation** (12 m between centres: 8 m portal + 4 m safe gap) either side; it holds the segments the footprint touches.
 - **Park hold:** the open-ended reservation of the segments around an ASC that stands still. It ends when the crane's next trip starts. A trip that conflicts with the other ASC's trip waits (**rail wait**); one that conflicts with its parked position makes it **step aside** (yield) if idle, or cannot start until it is idle.
 - **ASC dispatch:** the decision point (`ascDispatch`) that picks which idle ASC of a twin block takes the oldest ready box. Built-in strategies: `waterside-first` (default: WTP work to the waterside ASC, transfer-stall work to the landside ASC, the other crane only when no step-aside is needed) and `balanced` (fewest jobs so far).
-- **Subsystem mode:** how a subsystem runs: **real**, **instant** (a stub that raises the same events with zero durations) or **off**.
+- **Subsystem mode:** how a subsystem runs: **real**, **instant** (a stub that raises the same events with zero durations) or **off**. Six subsystems have one: quay (STS cranes), berth, yard, SHC, ASC, landside. The yard mode caps the ASC and landside modes (yard off turns both off; yard instant makes the ASC instant).
 - **Overlay (3D debug overlay):** an optional drawing over the 3D view: lane graph, active reservations, occupancy, state labels, **ASC rail** (reserved and parked rail segments, waterside ASC blue and landside ASC red). Each toggles independently; `O` hides or shows them all.
 - **Breakpoint:** a debugger rule that pauses the sim right after an event that matches it: an event type, a container id, an equipment id or a decision point. Set from the event feed panel or `__tt.addBreakpoint`.
 - **Single-step:** process exactly one engine event and pause, at any speed setting.
 - **Event feed:** the left panel's live list of recent events, newest first, filterable and capped. At high speed it **summarises bursts** (runs of the same event type) into one row.
 - **Event inspector:** the right panel's view of one event: payload, subjects, a decision's handler, request and reply, and its **cause chain**.
 - **Cause chain:** the events that led to one, from the event back to the root, as returned by the engine's `why`. Clicking an entry inspects it.
+- **View preset:** a one-click or one-key camera pose computed from the layout: Quay (Q), Yard (Y), Landside/Gate (G) or Overview (V). The pose's target lies inside the region it names, so it fits every preset and fixture; the Gate view needs a landside. **Label declutter** hides any Labels-overlay label that would overlap a higher-priority one on screen (the selection first, then equipment-kind registry order).
 - **Selection:** the container, equipment or vessel picked in the 3D view (or by an id in the feed or inspector). The **inspector** shows its current state, current job and history, and the **follow camera** can track it.
 - **Picking:** finding the entity under a click by testing the view ray against each entity's bounding box (containers first).
 - **Occupancy overlay:** plates over WTP pads and STS ground positions, free or occupied at the displayed time. The **labels overlay** floats each crane, carrier and vessel's status above it.
@@ -151,6 +155,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Fifth wheel:** the articulation pivot between tractor and chassis (the kingpin axis). **Articulation** is the tractor's yaw against the chassis through a turn.
 - **Chassis pin:** a twist-lock housing on the chassis at an ISO 1161 casting centre (`pin_40_*`, `pin_20_mid_*`). A **load position** (`load_40`, `load_20_front`, `load_20_rear`) is where the bottom centre of a box sits.
 - **Truck livery:** a tile of the truck atlas: cab colour, maker wordmark (Volvo, Scania, DAF, MAN, Mercedes-Benz) and chassis colour. The truck's id picks its cab shape and livery.
+- **Follow next truck:** the camera action that selects the next truck to arrive at or after the display time and follows it through the gate and its transfer stall until it leaves (button, `N`, `__tt.followNextTruck()`). Waits while no arrival is known yet.
 - **Asset viewer:** the dev-only page `/sim/terminal-twin?viewer=<asset>` (or `?viewer=yard`), with its API `window.__ttAssets`.
 - **Hull asset:** the generated GLB of a vessel size class (`vessel-ulcv`, …), with nodes `hull`, `hatch_covers`, `lashing_bridges` and `bay_grid`. Its **bay grid** (in the sidecar) is the origin and pitches that put a deck or hold slot exactly where the engine's bay plan does.
 - **Vessel livery:** the hull colour, funnel mark and hull-side wordmark of a shipping line, from the **vessel livery atlas** (one tile per line, like the container atlas). The line comes from `VesselConfig.line` or from the vessel name's style ("HMM Tarifa").
@@ -186,6 +191,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Yard start mode:** how the yard looks at t = 0: **pre-filled** (default; exports, empty pool and imports placed through the selected yard-allocation strategy up to a target % of the cells), **warm-up** (starts empty; a warm-up period of truck and vessel activity runs first and is excluded from KPIs and end conditions) or **empty** (starts empty; exports arrive by truck during the run).
 - **Pre-fill:** the starting population of a pre-filled yard: boxes booked to the scenario's vessels, imports awaiting pickup with their dwell partly elapsed, and the empty pool.
+- **Pre-run:** the phase before `ScenarioStarted` in which a pre-filled start asks `yardAllocation` for each starting box through the decision runtime. Its decision events carry `preRun: true`, sit at sim time 0 and are not in the KPI series.
 - **Warm-up / measured period:** the first `warmUpS` of a warm-up start / everything after it. At `WarmUpEnded` the KPI and end-condition counters restart at zero.
 
 ## Presets and layout (TT-15)

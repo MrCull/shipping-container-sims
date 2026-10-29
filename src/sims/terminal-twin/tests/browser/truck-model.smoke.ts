@@ -58,18 +58,22 @@ test('trucks in the twin use the GLB models with cab and livery variety and LOD 
 })
 
 test('trucks roll, steer, articulate through turns and carry their box on the chassis attach point', async ({ page }) => {
+  test.slow()
   const { errors } = watch(page)
   await openTrucks(page)
-  await page.evaluate(() => window.__tt!.setSpeed(60))
+  await page.evaluate(() => window.__tt!.setSpeed(10))
   const samples = await page.evaluate(async () => {
     const tt = window.__tt!
     tt.play()
     const out: { id: string; steer: number; artic: number; roll: number }[] = []
+    // Load-proof (V11-07): a turn lasts a few sim seconds, so a loaded runner with few frames must keep sampling at a low
+    // speed until it has seen a steered and articulated frame; the wall cap only stops a stalled page.
     const t0 = performance.now()
     await new Promise<void>((resolve) => {
       const tick = () => {
         for (const [id, r] of Object.entries(tt.sceneState()!.truckRigs)) out.push({ id, steer: r.steerRad, artic: r.articulationRad, roll: r.wheelRollRad })
-        if (performance.now() - t0 < 8000) requestAnimationFrame(tick)
+        const seen = out.some((s) => Math.abs(s.steer) > 0.05) && out.some((s) => Math.abs(s.artic) > 0.05) && out.some((s) => Math.abs(s.roll) > 1)
+        if (!seen && performance.now() - t0 < 100_000) requestAnimationFrame(tick)
         else resolve()
       }
       requestAnimationFrame(tick)
@@ -87,6 +91,9 @@ test('trucks roll, steer, articulate through turns and carry their box on the ch
   // A box on a chassis sits on the model's twist-lock attach point (centre of the box on the pins, bottom on the deck).
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'TruckAtStall' }))
   await page.waitForFunction(() => Object.values(window.__tt!.sceneState()?.truckRigs ?? {}).length > 0)
+  // let the scene draw the paused instant before comparing it with the engine (slow frames on a loaded runner)
+  const drawn = await page.evaluate(() => window.__tt!.scene()!.frames)
+  await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 2, drawn)
   const check = await page.evaluate(async () => {
     const tt = window.__tt!
     const boxes = (await tt.query<{ id: string; custody: { kind: string; id: string } }[]>('containers')).filter((b) => b.custody.kind === 'truck')

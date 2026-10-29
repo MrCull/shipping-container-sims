@@ -61,6 +61,7 @@ function planSequence(
   t0: number,
   f: number,
   moves: { axis: Axis; to: number; profile: AxisProfile }[],
+  instant = false,
 ): { segments: MotionSegment[]; end: number } {
   const segments: MotionSegment[] = []
   let t = t0
@@ -68,6 +69,7 @@ function planSequence(
     const key = m.axis === 'gantry' ? 'gantryX' : m.axis === 'trolley' ? 'trolleyZ' : 'hoistY'
     if (sts[key] === m.to) continue
     const seg = planSegment(sts.id, m.axis, sts[key], m.to, t, scaled(m.profile, f))
+    if (instant) seg.t1 = seg.t0 // quay mode instant: the move happens at once
     segments.push(seg)
     sts[key] = m.to
     t = seg.t1
@@ -140,10 +142,22 @@ export function continueWork(ctx: EngineContext, sts: StsState, at: number, segm
   })
 }
 
+/** Quay mode instant: crane motions, locks and unlocks take no time (same events, zero durations). */
+const isInstant = (ctx: EngineContext): boolean => ctx.state.subsystems.quay === 'instant'
+
+/** Kinematics with lock/unlock times zeroed in quay mode instant. */
+function stsKinematics(ctx: EngineContext) {
+  const k = ctx.config.kinematics.sts
+  return isInstant(ctx) ? { ...k, lockS: 0, unlockS: 0 } : k
+}
+
 /** Run the rail wake-up after a rail change. */
 function wake(ctx: EngineContext): void {
   wakeRail(ctx, (sts) => continueWork(ctx, sts, ctx.state.now))
 }
+
+/** Default back-off (s) before a waiting STS asks for a ground position again. */
+const DEFAULT_STS_GROUND_RETRY_S = 30
 
 export function requestGroundPosition(ctx: EngineContext, sts: StsState, containerId: string, direction?: 'load'): void {
   const { state } = ctx
@@ -173,7 +187,7 @@ function spreaderOffset(sts: StsState, containerId: string): number {
 /** Carry the next box to its chosen ground position and set it down. */
 function planDrop(ctx: EngineContext, sts: StsState, t0: number, drop: StsDrop, liftFirst: number): void {
   const { config, state } = ctx
-  const k = config.kinematics.sts
+  const k = stsKinematics(ctx)
   const box = state.containers[drop.containerId]
   const gp = state.groundPositions[drop.groundPositionId]
   const f = variation(ctx)
@@ -186,7 +200,7 @@ function planDrop(ctx: EngineContext, sts: StsState, t0: number, drop: StsDrop, 
   // section is free for the whole carry and set-down (an SHC may still be driving out of it).
   let start = t0
   if (state.subsystems.shc !== 'off') {
-    const dry = planSequence({ ...sts }, 0, f, moves)
+    const dry = planSequence({ ...sts }, 0, f, moves, isInstant(ctx))
     const x = sts.gantryX + spreaderOffset(sts, box.id)
     const windows = laneZonesAt(laneGraphOf(config), gp.lane, x, CONTAINER_LENGTH_M[box.size] / 2).map((zone) => ({
       zone,
@@ -196,7 +210,7 @@ function planDrop(ctx: EngineContext, sts: StsState, t0: number, drop: StsDrop, 
     start = earliestStart(state, windows, t0)
     reserve(state, sts.id, windows, start)
   }
-  const { segments, end } = planSequence(sts, start, f, moves)
+  const { segments, end } = planSequence(sts, start, f, moves, isInstant(ctx))
   ctx.schedule('StsGrounded', end + k.unlockS, { equipment: [sts.id], containers: [box.id] }, {
     stsId: sts.id,
     containerId: box.id,
@@ -269,7 +283,7 @@ export const quayReactors: ReactorMap = {
     sts.status = 'loading'
     kpi.firstMoveStartS ??= e.t
     kpi.cycles++
-    const k = config.kinematics.sts
+    const k = stsKinematics(ctx)
     const f = variation(ctx)
     const height = CONTAINER_HEIGHT_M[box.size]
     const moves = [
@@ -282,8 +296,10 @@ export const quayReactors: ReactorMap = {
     // the box down has driven out of it, and holds it until the box is lifted clear.
     let begin = e.t
     if (state.subsystems.shc !== 'off') {
-      const dry = planSequence({ ...sts }, 0, f, moves)
-      const lift = planSegment(sts.id, 'hoist', height, config.layout.stsSafeHoistM, 0, k.hoistLoaded).t1 * (1 + config.moveVariationPct / 100)
+      const dry = planSequence({ ...sts }, 0, f, moves, isInstant(ctx))
+      const lift = isInstant(ctx)
+        ? 0
+        : planSegment(sts.id, 'hoist', height, config.layout.stsSafeHoistM, 0, k.hoistLoaded).t1 * (1 + config.moveVariationPct / 100)
       const windows = laneZonesAt(laneGraphOf(config), gp.lane, targetX, CONTAINER_LENGTH_M[box.size] / 2).map((zone) => ({
         zone,
         from: 0,
@@ -292,7 +308,7 @@ export const quayReactors: ReactorMap = {
       begin = earliestStart(state, windows, e.t)
       reserve(state, sts.id, windows, begin)
     }
-    const { segments, end } = planSequence(sts, begin, f, moves)
+    const { segments, end } = planSequence(sts, begin, f, moves, isInstant(ctx))
     ctx.schedule('StsLoadPicked', end + k.lockS, { equipment: [sts.id], containers: [box.id] }, {
       stsId: sts.id,
       containerId: box.id,
@@ -327,12 +343,12 @@ export const quayReactors: ReactorMap = {
     releaseRail(sts)
     const slot = state.vesselSlots[order.slotId]
     const spec = vesselClass(state.vessels[slot.vesselId].sizeClass)
-    const k = config.kinematics.sts
+    const k = stsKinematics(ctx)
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
       { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: k.hoistLoaded },
       { axis: 'trolley', to: slotZ(spec, slot.row), profile: k.trolley },
       { axis: 'hoist', to: tierBaseY(spec, slot.tier) + CONTAINER_HEIGHT_M[box.size], profile: k.hoistLoaded },
-    ])
+    ], isInstant(ctx))
     ctx.schedule('StsLoaded', end + k.unlockS, { equipment: [sts.id], containers: [box.id], vessels: [slot.vesselId] }, {
       stsId: sts.id,
       vesselId: slot.vesselId,
@@ -363,7 +379,7 @@ export const quayReactors: ReactorMap = {
     sts.status = 'returning'
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
       { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: config.kinematics.sts.hoistEmpty },
-    ])
+    ], isInstant(ctx))
     continueWork(ctx, sts, end, segments)
   },
 
@@ -399,13 +415,13 @@ export const quayReactors: ReactorMap = {
     const box = state.containers[ids[0]]
     const slot = state.vesselSlots[box.custody.id]
     const tallest = Math.max(...ids.map((id) => CONTAINER_HEIGHT_M[state.containers[id].size]))
-    const k = config.kinematics.sts
+    const k = stsKinematics(ctx)
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
       { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: k.hoistEmpty },
       { axis: 'gantry', to: targetX, profile: k.gantry },
       { axis: 'trolley', to: slotZ(spec, slot.row), profile: k.trolley },
       { axis: 'hoist', to: tierBaseY(spec, slot.tier) + tallest, profile: k.hoistEmpty },
-    ])
+    ], isInstant(ctx))
     const twin = ids[1] ? { containerId: ids[1], from: { ...state.containers[ids[1]].custody } } : undefined
     ctx.schedule('StsPicked', end + k.lockS, { equipment: [sts.id], containers: ids, vessels: [vessel.id] }, {
       stsId: sts.id,
@@ -435,6 +451,13 @@ export const quayReactors: ReactorMap = {
     wake(ctx)
   },
 
+  /** Back-off elapsed: ask again unless a freed position already ended this wait. */
+  StsGroundPositionWaitBackoff: (e, ctx) => {
+    const sts = ctx.state.sts[e.payload.stsId]
+    if (sts.waitingSince !== e.payload.waitSince) return
+    resumeStsWaitingForGroundPosition(ctx, sts.id)
+  },
+
   StsGroundPositionWaitEnded: (e, ctx) => {
     const { state } = ctx
     const sts = state.sts[e.payload.stsId]
@@ -458,6 +481,13 @@ export const quayReactors: ReactorMap = {
         stsId: sts.id,
         containerId: box.id,
       })
+      const backoff = config.layout.stsGroundRetryS ?? DEFAULT_STS_GROUND_RETRY_S
+      if (backoff > 0)
+        ctx.schedule('StsGroundPositionWaitBackoff', e.t + backoff, { equipment: [sts.id], containers: [box.id] }, {
+          stsId: sts.id,
+          containerId: box.id,
+          waitSince: e.t,
+        })
       return
     }
     if (!state.groundPositions[reply.groundPositionId])
@@ -495,7 +525,7 @@ export const quayReactors: ReactorMap = {
     sts.status = 'returning'
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
       { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: config.kinematics.sts.hoistEmpty },
-    ])
+    ], isInstant(ctx))
     continueWork(ctx, sts, end, segments)
   },
 

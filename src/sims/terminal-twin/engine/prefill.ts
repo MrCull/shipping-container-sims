@@ -1,6 +1,8 @@
 /**
  * Yard pre-fill (TT-14): the starting population of a `prefilled` yard, placed box by box through the selected
- * yardAllocation strategy, so the starting stacks reflect the strategy under test. Pure and seeded (own RNG
+ * yardAllocation strategy, so the starting stacks reflect the strategy under test. The engine asks the handler
+ * through the decision runtime in its pre-run phase (V11-13, `subsystems/prefill.ts`) using `prefillSteps`;
+ * `planPrefill` is the same computation answered synchronously, for the scene model. Pure and seeded (own RNG
  * stream): the same config, seed and strategy give an identical yard. The engine's initial state and the browser
  * scene model both call `planPrefill`.
  *
@@ -57,7 +59,7 @@ export function yardPlacerOf(config: ScenarioConfig, custom?: DecisionHandler<'y
   return (message, query) => {
     const reply = handler(message, query)
     if (reply && typeof (reply as { then?: unknown }).then === 'function')
-      throw new Error('A yard pre-fill needs a synchronous yardAllocation handler: the starting yard is placed before the run starts, outside the decision runtime (no DecisionRequested/Resolved events, latency injection or handler KPIs). Use yardStart mode "warmup" or "empty" to run an asynchronous handler')
+      throw new Error('The synchronous pre-fill plan (planPrefill, used by the scene model) needs a synchronous yardAllocation handler; the engine itself asks the handler through the decision runtime in its pre-run phase')
     return (reply as { slotId: string | null }).slotId
   }
 }
@@ -65,7 +67,17 @@ export function yardPlacerOf(config: ScenarioConfig, custom?: DecisionHandler<'y
 /** Cells (20 ft each) of the whole yard. */
 export const yardCapacityCells = (config: ScenarioConfig): number => blockSpecs(config).reduce((n, b) => n + b.bays * b.rows * b.tiers, 0)
 
-export function planPrefill(config: ScenarioConfig, plan: CargoPlan, seed: number, place: YardPlacer, query: SimQuery): PrefillPlan {
+/**
+ * The pre-fill as a resumable computation: yields one `yardAllocation` request at a time and receives the reply's
+ * slot id (or null), then continues; `out` fills up as boxes are placed. Pure and seeded: the same replies in the
+ * same order rebuild the same state, which is how a snapshot taken mid pre-run is resumed.
+ */
+export function* prefillSteps(
+  config: ScenarioConfig,
+  plan: CargoPlan,
+  seed: number,
+  out: PrefillPlan = { placements: [], imports: [] },
+): Generator<YardAllocationRequest, PrefillPlan, string | null> {
   const blocks = blockSpecs(config).map((spec) => ({
     spec,
     capacity: spec.bays * spec.rows * spec.tiers,
@@ -73,7 +85,6 @@ export function planPrefill(config: ScenarioConfig, plan: CargoPlan, seed: numbe
     heights: new Array<number>(spec.bays * spec.rows).fill(0),
     tops: new Array<string | null>(spec.bays * spec.rows).fill(null),
   }))
-  const out: PrefillPlan = { placements: [], imports: [] }
   if (blocks.length === 0) return out
   let rngState = seedState((seed ^ PREFILL_SALT) >>> 0)
   const rng = () => {
@@ -81,37 +92,30 @@ export function planPrefill(config: ScenarioConfig, plan: CargoPlan, seed: numbe
     rngState = next
     return v
   }
-  let n = 0
-  const tryPlace = (box: { id: string; size: ContainerSize; full: boolean; line: string; vesselId: string }): ExportPlacement | null => {
+  function* tryPlace(box: { id: string; size: ContainerSize; full: boolean; line: string; vesselId: string }): Generator<YardAllocationRequest, ExportPlacement | null, string | null> {
     // lowest fill first; a block without a legal slot passes the box on
     const order = blocks.map((b, i) => ({ b, i })).sort((x, y) => x.b.used / x.b.capacity - y.b.used / y.b.capacity || x.i - y.i)
     for (const { b } of order) {
-      const message: DecisionRequestMessage<'yardAllocation'> = {
-        correlationId: `yardAllocation-prefill-${n++}`,
-        decisionPoint: 'yardAllocation',
-        version: 1,
-        t: 0,
-        payload: {
-          containerId: box.id,
-          size: box.size,
-          full: box.full,
-          line: box.line,
-          vesselId: box.vesselId,
-          wtpPadId: '',
-          blockId: b.spec.id,
-          bays: b.spec.bays,
-          rows: b.spec.rows,
-          tiers: b.spec.tiers,
-          blockX: b.spec.x,
-          firstBayZ: b.spec.firstBayZ,
-          wtpX: b.spec.x,
-          wtpZ: b.spec.wtpZ,
-          heights: b.heights.slice(),
-          topVessels: b.tops.slice(),
-          random: rng(),
-        } satisfies YardAllocationRequest,
+      const request: YardAllocationRequest = {
+        containerId: box.id,
+        size: box.size,
+        full: box.full,
+        line: box.line,
+        vesselId: box.vesselId,
+        wtpPadId: '',
+        blockId: b.spec.id,
+        bays: b.spec.bays,
+        rows: b.spec.rows,
+        tiers: b.spec.tiers,
+        blockX: b.spec.x,
+        firstBayZ: b.spec.firstBayZ,
+        wtpX: b.spec.x,
+        wtpZ: b.spec.wtpZ,
+        heights: b.heights.slice(),
+        topVessels: b.tops.slice(),
+        random: rng(),
       }
-      const slotId = place(message, query)
+      const slotId = yield request
       if (slotId === null) continue
       const cell = parseYardSlotId(slotId)
       const span = boxSpan(box.size)
@@ -124,7 +128,9 @@ export function planPrefill(config: ScenarioConfig, plan: CargoPlan, seed: numbe
         b.tops[i] = box.vesselId
       }
       b.used += span
-      return { containerId: box.id, vesselId: box.vesselId, size: box.size, blockId: b.spec.id, slotId, bay: cell.bay, row: cell.row, tier: cell.tier, span }
+      const placement: ExportPlacement = { containerId: box.id, vesselId: box.vesselId, size: box.size, blockId: b.spec.id, slotId, bay: cell.bay, row: cell.row, tier: cell.tier, span }
+      out.placements.push(placement)
+      return placement
     }
     return null
   }
@@ -139,9 +145,8 @@ export function planPrefill(config: ScenarioConfig, plan: CargoPlan, seed: numbe
     .map((x) => x.c)
   const pool = plan.containers.filter((c) => c.flow === 'pool').sort((a, b) => (b.ageS ?? 0) - (a.ageS ?? 0) || (a.id < b.id ? -1 : 1))
   for (const c of [...exports, ...pool]) {
-    const p = tryPlace(c)
+    const p = yield* tryPlace(c)
     if (!p) throw new Error(`The yard has no room for ${c.flow === 'load' ? 'export box' : 'empty'} ${c.id} (add yard blocks, bays or tiers)`)
-    out.placements.push(p)
   }
 
   // 3: imports up to the target
@@ -158,17 +163,39 @@ export function planPrefill(config: ScenarioConfig, plan: CargoPlan, seed: numbe
     let id = makeIso6346Id(LINE_OWNER_PREFIX[line], serial)
     while (ids.has(id)) id = makeIso6346Id(LINE_OWNER_PREFIX[line], ++serial)
     ids.add(id)
-    let p = tryPlace({ id, size, full: true, line, vesselId: POOL_VESSEL_ID })
+    // recorded before its placement is announced, so a consumer sees the import together with its slot
+    const imp: PrefillImport = { id, size, line, ageS, pickupReadyAt: d - ageS }
+    out.imports.push(imp)
+    let p = yield* tryPlace({ id, size, full: true, line, vesselId: POOL_VESSEL_ID })
     if (!p && boxSpan(size) === 2) {
-      size = '20' // no pair of equal stacks for a 40 ft box: a 20 ft box may still fit
-      p = tryPlace({ id, size, full: true, line, vesselId: POOL_VESSEL_ID })
+      imp.size = '20' // no pair of equal stacks for a 40 ft box: a 20 ft box may still fit
+      p = yield* tryPlace({ id, size: '20', full: true, line, vesselId: POOL_VESSEL_ID })
     }
-    if (!p) break // the yard is full
+    if (!p) {
+      out.imports.pop()
+      break // the yard is full
+    }
     placed += p.span
-    out.placements.push(p)
-    out.imports.push({ id, size, line, ageS, pickupReadyAt: d - ageS })
   }
   return out
+}
+
+/** The whole pre-fill at once, asking `place` synchronously (the browser scene model, which mirrors the engine's default start). */
+export function planPrefill(config: ScenarioConfig, plan: CargoPlan, seed: number, place: YardPlacer, query: SimQuery): PrefillPlan {
+  const steps = prefillSteps(config, plan, seed)
+  let n = 0
+  let step = steps.next()
+  while (!step.done) {
+    const message: DecisionRequestMessage<'yardAllocation'> = {
+      correlationId: `yardAllocation-prefill-${n++}`,
+      decisionPoint: 'yardAllocation',
+      version: 1,
+      t: 0,
+      payload: step.value,
+    }
+    step = steps.next(place(message, query))
+  }
+  return step.value
 }
 
 /** The pre-fill of a configured start: only for `yardStart.mode === 'prefilled'` with yard blocks. */

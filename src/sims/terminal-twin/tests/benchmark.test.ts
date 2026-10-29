@@ -3,12 +3,15 @@ import { compareToBaseline, formatReport, runBenchmark, type BenchReport } from 
 import { benchMain } from '../cli/benchCli'
 
 const env = { node: 'test', cpu: 'test', load1: 0 }
-const small = { preset: 'Small automated', simHours: 1, invariantsEvery: 0 }
+const small = { preset: 'Small automated', simHours: 1, sweepEvery: 0 }
 
 const fake = (over: Partial<BenchReport>): BenchReport => ({
   preset: 'x',
   simHours: 24,
-  invariantsEvery: 1,
+  sweepEvery: 1,
+  invariantMs: 0,
+  invariantMsPerEvent: 0,
+  invariantChecks: { incremental: 0, sweeps: 0 },
   events: 1000,
   wallMs: 1000,
   eventsPerSec: 1000,

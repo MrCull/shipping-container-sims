@@ -80,9 +80,35 @@ export interface ShcDispatchRequest {
 }
 
 export interface ShcDispatchReply {
-  /** The job to take, or null (the SHC parks). */
+  /**
+   * The job to take, or null (the SHC parks). A discharge job then triggers a `wtpPadSelection` request
+   * for its pad (V11-11); a load job carries its own pad.
+   */
   jobId: string | null
-  /** WTP pad to deliver to (required with a job). */
+}
+
+// ── wtpPadSelection ────────────────────────────────────────────────────────
+
+/**
+ * SHC dispatch picked a discharge job (V11-11): which WTP pad does the SHC set the box down on?
+ * The SHC holds the job (it is no longer open) while the request is pending. Load jobs never ask:
+ * they name the pad the box stands on.
+ */
+export interface WtpPadSelectionRequest {
+  shcId: string
+  jobId: string
+  containerId: string
+  stsId: string
+  groundPositionId: string
+  /** Where the box stands now (m): the crane's ground position. */
+  x: number
+  z: number
+  /** Every pad, in list order, with its occupancy and claim at the time of the request. */
+  wtpPads: ShcDispatchPad[]
+}
+
+export interface WtpPadSelectionReply {
+  /** A free pad (`wtpPads[]` with no occupant and no claim), or null: none now (the SHC releases the job and parks). */
   wtpPadId: string | null
 }
 
@@ -392,6 +418,7 @@ export interface TransferStallSelectionReply {
 export interface DecisionRequests {
   stsGroundPosition: GroundPositionRequest
   shcDispatch: ShcDispatchRequest
+  wtpPadSelection: WtpPadSelectionRequest
   yardAllocation: YardAllocationRequest
   ascDispatch: AscDispatchRequest
   berthAllocation: BerthAllocationRequest
@@ -406,6 +433,7 @@ export interface DecisionRequests {
 export interface DecisionReplies {
   stsGroundPosition: GroundPositionReply
   shcDispatch: ShcDispatchReply
+  wtpPadSelection: WtpPadSelectionReply
   yardAllocation: YardAllocationReply
   ascDispatch: AscDispatchReply
   berthAllocation: BerthAllocationReply
@@ -422,7 +450,8 @@ export type DecisionPointId = keyof DecisionRequests
 /** Bump a decision point's version when its request or reply shape changes. */
 export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   stsGroundPosition: 1,
-  shcDispatch: 1,
+  shcDispatch: 2,
+  wtpPadSelection: 1,
   yardAllocation: 1,
   ascDispatch: 1,
   berthAllocation: 1,

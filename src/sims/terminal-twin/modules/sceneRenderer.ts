@@ -15,22 +15,17 @@ import * as THREE from 'three'
 import { ascIndexOf, BAY_PITCH_M as YARD_BAY_PITCH_M, ROW_PITCH_M as YARD_ROW_PITCH_M, rowX, transferStallLayout, STALL_LENGTH_M } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
-import { ASC, ascHeightM, SHC, STS } from './equipmentDims'
+import { ASC, STS } from './equipmentDims'
 import { entityBounds } from './picking'
-import { OverlayLayers, type OverlayLayerStats } from './overlayLayers'
+import { OverlayLayers, type LabelScreen, type OverlayLayerStats } from './overlayLayers'
 import { NO_OVERLAYS, type OverlayState } from './overlays'
 
 export type { OverlayState }
 import { ContainerInstancer } from './containerInstancer'
-import { loadShcModel, ShcRig, SHC_RIG, type ShcRigState } from './shcAssets'
-import { AscRig, loadAscModel, type AscRigState } from './ascAssets'
-import { HC_HEIGHT_M } from './ascRig'
 import { liveryIndexForLine, loadContainerAssets } from './containerAssets'
-import { loadStsTemplate, StsModel, type SpreaderMode, type StsRenderState } from './stsAssets'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
-import { VesselHulls, type VesselHullState } from './vesselRenderer'
-import { LandsideScene, type LandsideStats } from './landsideRenderer'
-import { loadTruckModels, type TruckRigState } from './truckAssets'
+import type { LandsideStats } from './landsideRenderer'
+import { EQUIPMENT_KINDS, type EquipmentKindDef, type KindFrame, type KindRenderer, type KindRendererHost } from './equipmentKinds'
 import { GROUND_ROTATION_X, StaticBatch } from './staticBatch'
 import { QUALITY_PROFILES, type QualityProfile } from './quality'
 import { AtmosphereRig, type AtmosphereState } from './atmosphereRig'
@@ -39,10 +34,6 @@ import { BACKDROP_MODEL_ASSETS, backdropKindFor, buildBackdrop, type Backdrop, t
 import { InfrastructureScene, type InfrastructureStats } from './infrastructureRenderer'
 import { loadInfrastructureAssets } from './infrastructureAssets'
 
-/** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
-const EMPTY_HOIST_MPS = 1.5
-/** Height of the spreader's twist-lock plane when an empty SHC is not driving: the top of a standard box on the ground. */
-const EMPTY_SPREADER_DOWN_Y = CONTAINER_DIMS['40'].height
 export interface SceneStats {
   /** Container instances drawn. */
   containers: number
@@ -97,13 +88,6 @@ export interface RenderedLivery {
   centre: Vec3
 }
 
-interface StsParts {
-  group: THREE.Group
-  trolley: THREE.Mesh
-  ropes: THREE.Mesh
-  spreader: THREE.Mesh
-}
-
 const LAND_RAIL_Z = STS.waterRailZ + STS.gauge
 
 export class SceneRenderer {
@@ -111,15 +95,8 @@ export class SceneRenderer {
   private containers: ContainerInstancer
   private containerLivery: number[]
   private disposed = false
-  private sts = new Map<string, StsParts>()
-  private stsModels = new Map<string, StsModel>()
-  private lastSpreader = new Map<string, SpreaderMode>()
-  private vessels: VesselHulls
-  private landside: LandsideScene
   private lastT = 0
-  private shcs = new Map<string, { group: THREE.Group; spreader: THREE.Mesh; rig?: ShcRig }>()
-  private hoistEase = new Map<string, { t: number; y: number }>()
-  private ascs = new Map<string, { group: THREE.Group; trolley: THREE.Mesh; spreader: THREE.Mesh; ropes: THREE.Mesh; blockX: number; height: number; tiers: number; rig?: AscRig }>()
+  private renderers: { def: EquipmentKindDef; renderer: KindRenderer }[] = []
   private laneOverlay: THREE.Group
   private zoneMeshes = new Map<string, THREE.Mesh>()
   private overlays: OverlayState = { ...NO_OVERLAYS }
@@ -147,22 +124,9 @@ export class SceneRenderer {
     this.addGround(config)
     this.backdrop = buildBackdrop(backdropKindFor(config.name), config.quay.lengthM)
     this.scene.add(this.backdrop.group)
-    for (const s of config.sts) this.addSts(s.id)
-    this.vessels = new VesselHulls(model)
-    this.scene.add(this.vessels.group)
     this.addYard()
-    this.landside = new LandsideScene(model)
-    this.scene.add(this.landside.group)
-    if (config.landside) {
-      loadTruckModels().then(
-        (models) => {
-          if (!this.disposed) this.landside.setTruckModels(models)
-        },
-        (err: unknown) => console.warn('Terminal Twin: truck GLBs failed to load; keeping procedural trucks', err),
-      )
-    }
-    for (const id of model.shcIds) this.addShc(id)
-    for (const id of model.ascIds) this.addAsc(id)
+    const host: KindRendererHost = { scene: this.scene, model, track: (thing) => this.track(thing), isDisposed: () => this.disposed }
+    for (const def of EQUIPMENT_KINDS) this.renderers.push({ def, renderer: def.createRenderer(host) })
     this.infrastructure = new InfrastructureScene({ config, landside: model.landside, pads: model.graph.pads, blocks: model.blockList })
     this.scene.add(this.infrastructure.group)
     const infraNames = [...new Set([...this.infrastructure.assetNames(), ...BACKDROP_MODEL_ASSETS[this.backdrop.kind]])]
@@ -171,7 +135,7 @@ export class SceneRenderer {
         if (this.disposed) return
         this.infrastructure.setAssets(assets)
         this.backdrop.useModels(assets)
-        this.landside.useGateModels()
+        for (const r of this.renderers) r.renderer.onInfrastructureLoaded?.()
         this.atmosphere.useMastModels()
         for (const o of this.infraPlaceholders) o.visible = false
       },
@@ -200,48 +164,6 @@ export class SceneRenderer {
       },
       (err: unknown) => console.warn('Terminal Twin: container GLBs failed to load; keeping placeholders', err),
     )
-
-    if (model.shcIds.length > 0) {
-      loadShcModel().then(
-        (shcModel) => {
-          if (this.disposed) return
-          for (const [id, entry] of this.shcs) {
-            entry.rig = new ShcRig(shcModel, id)
-            entry.group.visible = false
-            this.scene.add(entry.rig.root)
-          }
-        },
-        (err: unknown) => console.warn('Terminal Twin: SHC GLB failed to load; keeping placeholders', err),
-      )
-    }
-    loadStsTemplate().then(
-      (template) => {
-        if (this.disposed) return
-        config.sts.forEach((s, i) => {
-          const m = new StsModel(template, i)
-          m.root.name = `${s.id}-model`
-          this.scene.add(m.root)
-          this.stsModels.set(s.id, m)
-          const placeholder = this.sts.get(s.id)
-          if (placeholder) placeholder.group.visible = false
-        })
-      },
-      (err: unknown) => console.warn('Terminal Twin: STS GLB failed to load; keeping procedural cranes', err),
-    )
-
-    if (model.ascIds.length > 0) {
-      loadAscModel().then(
-        (ascModel) => {
-          if (this.disposed) return
-          for (const [id, entry] of this.ascs) {
-            entry.rig = new AscRig(ascModel, id)
-            entry.group.visible = false
-            this.scene.add(entry.rig.root)
-          }
-        },
-        (err: unknown) => console.warn('Terminal Twin: ASC GLB failed to load; keeping placeholders', err),
-      )
-    }
 
     const box = this.track(new THREE.BoxGeometry(1, 1, 1))
     const edges = this.track(new THREE.EdgesGeometry(box))
@@ -294,44 +216,6 @@ export class SceneRenderer {
     const { stsGroundLaneZ0M: z0, stsGroundLaneSpacingM: dz } = config.layout
     const lanes = Math.max(0, ...config.sts.map((s) => s.groundPositions))
     for (let lane = 0; lane <= lanes; lane++) strip(z0 - dz / 2 + lane * dz, 0.15, '#eef0f2', 0.03)
-  }
-
-  private addSts(id: string): void {
-    const group = new THREE.Group()
-    group.name = id
-    const steel = this.track(new THREE.MeshStandardMaterial({ color: '#dfe4ea', roughness: 0.6, metalness: 0.3 }))
-    const accent = this.track(new THREE.MeshStandardMaterial({ color: '#c0392b', roughness: 0.6 }))
-    const dark = this.track(new THREE.MeshStandardMaterial({ color: '#2b3038', roughness: 0.7 }))
-    const box = (w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number) => {
-      const m = new THREE.Mesh(this.track(new THREE.BoxGeometry(w, h, d)), mat)
-      m.position.set(x, y, z)
-      m.castShadow = true
-      group.add(m)
-      return m
-    }
-    const zW = STS.waterRailZ
-    const zL = LAND_RAIL_Z
-    const hx = STS.legSpacingX / 2
-    for (const x of [-hx, hx]) {
-      for (const z of [zW, zL]) box(STS.legSize, STS.portalY, STS.legSize, steel, x, STS.portalY / 2, z)
-      box(STS.legSize, STS.legSize, zL - zW, steel, x, STS.portalY, (zW + zL) / 2) // portal side beams
-      box(STS.legSize * 0.8, STS.legSize * 0.8, zL - zW, steel, x, 12, (zW + zL) / 2) // sill beams
-      box(STS.legSize * 0.7, STS.apexY - STS.portalY, STS.legSize * 0.7, steel, x, (STS.apexY + STS.portalY) / 2, zL - 4) // A-frame
-    }
-    for (const z of [zW, zL]) box(STS.legSpacingX, STS.legSize, STS.legSize, steel, 0, STS.portalY, z)
-    // Boom (girders on both sides of the trolley path) and the machinery house.
-    const boomLen = STS.boomBackreachZ + zL - STS.boomOutreachZ
-    const boomZ = (STS.boomOutreachZ + zL + STS.boomBackreachZ) / 2
-    for (const x of [-3, 3]) box(1.2, 2.4, boomLen, steel, x, STS.portalY + 4, boomZ)
-    box(7.2, 0.6, 2, accent, 0, STS.portalY + 4, STS.boomOutreachZ + 1) // boom tip
-    box(10, 6, 14, steel, 0, STS.portalY + 9, zL + STS.boomBackreachZ - 8) // machinery house
-    box(STS.legSpacingX + 2, 1.2, 2, accent, 0, STS.portalY + 1.2, zW) // waterside portal accent
-    // Moving parts.
-    const trolley = box(6.4, 2.4, 5, dark, 0, STS.portalY + 1.6, 0)
-    const ropes = box(0.25, 1, 0.25, dark, 0, 0, 0)
-    const spreader = box(12.2, 0.7, 2.5, this.track(new THREE.MeshStandardMaterial({ color: '#f2b705' })), 0, 0, 0)
-    this.scene.add(group)
-    this.sts.set(id, { group, trolley, ropes, spreader })
   }
 
   /** Blocks: paved slab, ASC rails, bay marks and transfer stalls; WTP pad markings. */
@@ -388,77 +272,6 @@ export class SceneRenderer {
       this.scene.add(m)
       this.infraPlaceholders.push(m)
     }
-  }
-
-  /** Procedural low-poly shuttle carrier: four legs, side and cross beams, cab, spreader. Length along local X. */
-  private addShc(id: string): void {
-    const group = new THREE.Group()
-    group.name = id
-    const frame = this.track(new THREE.MeshStandardMaterial({ color: '#e8ebef', roughness: 0.55, metalness: 0.25 }))
-    const accent = this.track(new THREE.MeshStandardMaterial({ color: '#d35400', roughness: 0.6 }))
-    const dark = this.track(new THREE.MeshStandardMaterial({ color: '#23272e', roughness: 0.8 }))
-    const glass = this.track(new THREE.MeshStandardMaterial({ color: '#7fb3d5', roughness: 0.2, metalness: 0.4 }))
-    const box = (w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number) => {
-      const m = new THREE.Mesh(this.track(new THREE.BoxGeometry(w, h, d)), mat)
-      m.position.set(x, y, z)
-      m.castShadow = true
-      group.add(m)
-      return m
-    }
-    const hl = SHC.length / 2 - SHC.leg / 2
-    const hw = SHC.width / 2 - SHC.leg / 2
-    const top = SHC.height - SHC.beam / 2
-    for (const x of [-hl, hl]) {
-      for (const z of [-hw, hw]) {
-        box(SHC.leg, SHC.height - 0.9, SHC.leg, frame, x, (SHC.height - 0.9) / 2 + 0.9, z)
-        box(1.2, 1.2, 0.5, dark, x, 0.6, z) // wheel
-      }
-      box(SHC.leg, SHC.beam, SHC.width, accent, x, top, 0) // cross beam
-    }
-    for (const z of [-hw, hw]) {
-      box(SHC.length, SHC.beam, SHC.leg, frame, 0, top, z) // side beam
-      box(SHC.length * 0.8, 0.5, SHC.leg, accent, 0, 1.3, z) // lower skirt
-    }
-    box(2.2, 1.8, 2, frame, hl - 0.6, SHC.height + 0.9, 0) // cab
-    box(0.1, 1.1, 1.7, glass, hl + 0.52, SHC.height + 1.05, 0)
-    const spreader = box(6.4, 0.35, 2.6, this.track(new THREE.MeshStandardMaterial({ color: '#f2b705' })), 0, 0, 0)
-    this.scene.add(group)
-    this.shcs.set(id, { group, spreader })
-  }
-
-  /**
-   * Procedural ASC: a portal on two rails that spans the rows (legs at the
-   * rails, a girder across), a trolley on the girder and a hoisted spreader.
-   * The group sits at the gantry Z; the trolley and spreader move in local X.
-   */
-  private addAsc(id: string): void {
-    const block = this.model.blockOfAsc(id)
-    const height = ascHeightM(block)
-    const group = new THREE.Group()
-    group.name = id
-    const frame = this.track(new THREE.MeshStandardMaterial({ color: '#2f6fb3', roughness: 0.55, metalness: 0.25 }))
-    const accent = this.track(new THREE.MeshStandardMaterial({ color: '#f2b705', roughness: 0.6 }))
-    const dark = this.track(new THREE.MeshStandardMaterial({ color: '#23272e', roughness: 0.8 }))
-    const box = (w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number) => {
-      const m = new THREE.Mesh(this.track(new THREE.BoxGeometry(w, h, d)), mat)
-      m.position.set(x, y, z)
-      m.castShadow = true
-      group.add(m)
-      return m
-    }
-    for (const side of [-1, 1]) {
-      const x = (side * ASC.span) / 2
-      box(ASC.legWidth, height, ASC.legWidth, frame, x, height / 2, -ASC.legLength / 2 + 0.5)
-      box(ASC.legWidth, height, ASC.legWidth, frame, x, height / 2, ASC.legLength / 2 - 0.5)
-      box(ASC.legWidth * 1.4, 0.6, ASC.legLength + 1, dark, x, 0.4, 0) // bogie
-      box(ASC.legWidth, 0.8, ASC.legLength, accent, x, height * 0.55, 0) // leg tie
-    }
-    box(ASC.span + 6, ASC.girderHeight, ASC.girderDepth, frame, 0, height + ASC.girderHeight / 2, 0)
-    const trolley = box(3.2, 1.2, ASC.girderDepth - 0.4, accent, 0, height + ASC.girderHeight + 0.6, 0)
-    const ropes = box(0.12, 1, 0.12, dark, 0, 0, 0)
-    const spreader = box(6.4, 0.35, 2.6, accent, 0, 0, 0)
-    this.scene.add(group)
-    this.ascs.set(id, { group, trolley, spreader, ropes, blockX: block.x, height: height + ASC.girderHeight, tiers: block.tiers })
   }
 
   /** Lane-graph overlay: every one-way edge with a chevron at its midpoint, plus node markers. */
@@ -605,11 +418,12 @@ export class SceneRenderer {
     this.laneOverlay.visible = next.laneGraph
   }
 
-  update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3, frustum?: THREE.Frustum): void {
+  update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3, frustum?: THREE.Frustum, screen?: LabelScreen): void {
     const model = this.model
     const containers = this.containers
     // Containers first: what each spreader carries decides its configuration (20 / 40 / twin-20).
-    const load = new Map<string, { count: number; size: string }>()
+    const wantsOwners = this.renderers.some((r) => r.renderer.wantsContainerOwners)
+    const loads = new Map<string, { count: number; size: string }>()
     const carried = new Map<string, number>()
     containers.begin()
     model.containerIds.forEach((id, i) => {
@@ -618,40 +432,21 @@ export class SceneRenderer {
       this.containerLivery[i] ??= liveryIndexForLine(model.containerLine[id])
       containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw)
       if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
-      if (this.stsModels.size) {
+      if (wantsOwners) {
         const owner = model.custodyAt(id, t)
-        if (owner?.kind === 'sts') {
-          const l = load.get(owner.id)
-          load.set(owner.id, { count: (l?.count ?? 0) + 1, size: model.containerSize[id] })
+        if (owner) {
+          const key = `${owner.kind}:${owner.id}`
+          const l = loads.get(key)
+          loads.set(key, { count: (l?.count ?? 0) + 1, size: model.containerSize[id] })
         }
       }
     })
     containers.end(cameraPosition, frustum)
 
-    for (const [id, m] of this.stsModels) {
-      const pose = model.stsPose(id, t)
-      const l = load.get(id)
-      const mode: SpreaderMode = !l ? (this.lastSpreader.get(id) ?? '40') : l.count > 1 ? 'twin-20' : l.size === '20' ? '20' : '40'
-      this.lastSpreader.set(id, mode)
-      m.carrying = l?.count ?? 0
-      m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l })
-      m.updateLod(cameraPosition, this.quality.lodScale)
-    }
-    for (const [id, parts] of this.sts) {
-      if (this.stsModels.has(id)) continue
-      const pose = model.stsPose(id, t)
-      parts.group.position.x = pose.gantryX
-      parts.trolley.position.z = pose.trolleyZ
-      parts.spreader.position.set(0, pose.hoistY + 0.35, pose.trolleyZ)
-      const ropeTop = STS.portalY + 0.4
-      const ropeLen = Math.max(0.1, ropeTop - (pose.hoistY + 0.7))
-      parts.ropes.scale.y = ropeLen
-      parts.ropes.position.set(0, ropeTop - ropeLen / 2, pose.trolleyZ)
-    }
     this.lastT = t
     this.atmosphere.update(t)
-    this.vessels.update(t, cameraPosition)
-    this.landside.update(t, cameraPosition)
+    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads }
+    for (const { renderer } of this.renderers) renderer.update(frame)
     this.reservedZones = 0
     const active = this.overlays.reservations ? model.activeReservations(t) : {}
     for (const [zone, mesh] of this.zoneMeshes) {
@@ -669,79 +464,9 @@ export class SceneRenderer {
         mesh.material = this.railMaterials[ascIndexOf(holder) === 1 ? 0 : 1]
       }
     }
-
-
-    for (const [id, parts] of this.ascs) {
-      const pose = model.ascPose(id, t)
-      const lx = pose.x - parts.blockX
-      const boxHeight = carried.get(id)
-      if (parts.rig) {
-        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 12, cameraPosition.z - pose.z) / this.quality.lodScale)
-        // Twist-lock plane: the top of the carried box; empty, where the top of a high-cube box would be.
-        parts.rig.pose({
-          blockX: parts.blockX,
-          trolleyX: lx,
-          gantryZ: pose.z,
-          attachY: pose.hoistY + (boxHeight ?? HC_HEIGHT_M),
-          carrying: boxHeight !== undefined,
-          tiers: parts.tiers,
-        })
-        continue
-      }
-      parts.group.position.set(parts.blockX, 0, pose.z)
-      parts.trolley.position.x = lx
-      const spreaderY = pose.hoistY + CONTAINER_DIMS['40HC'].height + 0.2
-      parts.spreader.position.set(lx, spreaderY, 0)
-      const ropeLen = Math.max(0.1, parts.height - spreaderY)
-      parts.ropes.scale.y = ropeLen
-      parts.ropes.position.set(lx, parts.height - ropeLen / 2, 0)
-    }
-
-    for (const [id, parts] of this.shcs) {
-      const pose = model.shcPose(id, t)
-      if (parts.rig) {
-        const boxHeight = carried.get(id)
-        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 4, cameraPosition.z - pose.z) / this.quality.lodScale)
-        parts.rig.pose({
-          x: pose.x,
-          z: pose.z,
-          yaw: pose.yaw,
-          steerRad: pose.steerRad,
-          odometerM: pose.odometerM,
-          attachY: this.spreaderPlane(id, t, pose.lift, pose.travelling || model.statusAt('shc', id, t) === 'parked', boxHeight),
-          carrying: boxHeight !== undefined,
-        })
-        continue
-      }
-      parts.group.position.set(pose.x, 0, pose.z)
-      parts.group.rotation.y = pose.heading === 'z' ? Math.PI / 2 : 0
-      // the spreader sits on top of the (possible) box: box bottom = lift
-      parts.spreader.position.y = pose.lift + CONTAINER_DIMS['40'].height + 0.2
-    }
-    this.layers.update(t, this.overlays)
+    this.layers.update(t, this.overlays, screen, selectedId)
     this.updateSelection(selectedId, t)
   }
-
-  /**
-   * Height of the spreader's twist-lock plane. Carrying: exactly the box top (it follows the engine's lift
-   * motion). Empty: raised while driving or parked, lowered onto where a box would stand otherwise, eased so it never snaps.
-   */
-  private spreaderPlane(id: string, t: number, lift: number, raised: boolean, boxHeight: number | undefined): number {
-    if (boxHeight !== undefined) {
-      this.hoistEase.delete(id)
-      return lift + boxHeight
-    }
-    const target = raised ? SHC_RIG.attachRestY : lift + EMPTY_SPREADER_DOWN_Y
-    const ease = this.hoistEase.get(id)
-    let y = target
-    if (ease && Math.abs(t - ease.t) < 30) {
-      const step = EMPTY_HOIST_MPS * Math.abs(t - ease.t)
-      y = ease.y + Math.max(-step, Math.min(step, target - ease.y))
-    }
-    this.hoistEase.set(id, { t, y })
-    return y
-  }
-
 
   private updateSelection(id: string | null, t: number): void {
     const b = id ? entityBounds(this.model, id, t) : null
@@ -789,74 +514,24 @@ export class SceneRenderer {
   }
 
   stats(): SceneStats {
-    const v = this.vessels.stats()
     const c = this.containers.stats()
-    const shcLods = { lod0: 0, lod1: 0, lod2: 0 }
-    let rigged = 0
-    for (const { rig } of this.shcs.values()) {
-      if (!rig) continue
-      rigged++
-      shcLods[`lod${rig.rigState.lod}` as keyof typeof shcLods]++
-    }
-    const ascLods = { lod0: 0, lod1: 0, lod2: 0 }
-    let ascRigged = 0
-    for (const { rig } of this.ascs.values()) {
-      if (!rig) continue
-      ascRigged++
-      ascLods[`lod${rig.rigState.lod}` as keyof typeof ascLods]++
-    }
+    const kinds = Object.assign({}, ...this.renderers.map((r) => r.renderer.stats())) as Partial<SceneStats>
     return {
+      ...kinds,
       containers: c.drawn,
-      landside: this.landside.stats(),
       infrastructure: this.infrastructure.stats(),
-      sts: this.sts.size,
-      shcs: this.shcs.size,
-      ascs: this.ascs.size,
-      vessels: v.visible,
-      vesselAssets: v.assets,
-      vesselLods: v.lods,
       overlays: { ...this.overlays },
       reservedZones: this.reservedZones,
       reservedRailSegments: this.reservedRailSegments,
       layers: this.layers.stats(),
       containerLods: { lod0: c.lod0, lod1: c.lod1, culled: c.culled },
       containerAssets: c.assets,
-      shcLods,
-      shcAssets: rigged > 0 ? 'loaded' : 'placeholder',
-      ascLods,
-      ascAssets: ascRigged > 0 ? 'loaded' : 'placeholder',
-      stsAssets: this.stsModels.size ? 'loaded' : 'placeholder',
-      stsLods: {
-        lod0: [...this.stsModels.values()].filter((m) => m.lod === 0).length,
-        lod1: [...this.stsModels.values()].filter((m) => m.lod === 1).length,
-        lod2: [...this.stsModels.values()].filter((m) => m.lod === 2).length,
-      },
-    }
+    } as SceneStats
   }
 
-  /** Per STS: LOD, spreader configuration, boxes carried and the drawn spreader/trolley positions (GLB cranes only). */
-  renderedSts(): Record<string, StsRenderState> {
-    return Object.fromEntries([...this.stsModels].map(([id, m]) => [id, m.renderState()]))
-  }
-
-
-  /** Rig state per SHC at the last update (empty until the SHC GLB has loaded). */
-  renderedShcs(): Record<string, ShcRigState> {
-    const out: Record<string, ShcRigState> = {}
-    for (const [id, { rig }] of this.shcs) if (rig) out[id] = { ...rig.rigState }
-    return out
-  }
-
-  /** Rig state per truck at the last update (empty until the truck GLBs have loaded). */
-  renderedTrucks(): Record<string, TruckRigState> {
-    return this.landside.rigStates()
-  }
-
-  /** Rig state per ASC at the last update (empty until the ASC GLB has loaded). */
-  renderedAscs(): Record<string, AscRigState> {
-    const out: Record<string, AscRigState> = {}
-    for (const [id, { rig }] of this.ascs) if (rig) out[id] = { ...rig.rigState }
-    return out
+  /** Rig state per equipment kind as last drawn (`EquipmentKindDef.rigKey` names it in the dev API); empty until a kind's GLB has loaded. */
+  renderedRigs(): Record<string, Record<string, unknown>> {
+    return Object.fromEntries(this.renderers.map(({ def, renderer }) => [def.kind, renderer.rigState()]))
   }
 
   /** Livery, size and LOD drawn per container id at the last update. */
@@ -870,19 +545,12 @@ export class SceneRenderer {
     return out
   }
 
-  /** Per vessel: class, line, livery, name, LOD and the rendered bay grid (TT-27). */
-  vesselHulls(): Record<string, VesselHullState> {
-    return this.vessels.states()
-  }
-
   dispose(): void {
     this.disposed = true
     this.atmosphere.dispose()
     this.backdrop.dispose()
     this.infrastructure.dispose()
-    for (const m of this.stsModels.values()) m.dispose()
-    this.vessels.dispose()
-    this.landside.dispose()
+    for (const { renderer } of this.renderers) renderer.dispose()
     for (const d of this.disposables) d.dispose()
     this.containers.dispose()
     this.layers.dispose()

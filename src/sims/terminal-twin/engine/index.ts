@@ -61,7 +61,7 @@ export {
 } from './yardLayout'
 export type { BlockSpec, YardCandidate, YardStacks, TransferStallLayout } from './yardLayout'
 export { ascPoseAt } from './subsystems/asc'
-export { ascIdOf, ascIndexOf } from './state'
+export { ascIdOf, ascIndexOf, resolveSubsystemModes } from './state'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, apronLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
 export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, QUEUE_PITCH_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, GATE_ISLAND_W_M } from './landsideGraph'
@@ -100,6 +100,8 @@ export type {
   ShcDispatchPad,
   ShcDispatchReply,
   ShcDispatchRequest,
+  WtpPadSelectionReply,
+  WtpPadSelectionRequest,
   RehandleCandidate,
   RehandleTargetReply,
   RehandleTargetRequest,
@@ -115,7 +117,7 @@ export type { DecisionRequestedPayload, DecisionResolvedPayload } from './events
 export type { HandlerKpiReport } from './kpis'
 export type { SimQuery } from './query'
 export type { InvariantViolation } from './invariants'
-export { suggestedInvariantEvery } from './invariants'
+export { checkInvariants, DEFAULT_SWEEP_EVERY, InvariantTracker } from './invariants'
 export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport, LandsideKpiReport } from './kpis'
 export type { WorkPackage, WorkPackageKind, WorkPackageStatus, LoadOrder } from './state'
 export { hashDigest } from './hash'
@@ -138,6 +140,7 @@ export type {
   RunResult,
   StopReason,
   InvariantReport,
+  InvariantStats,
   EventListener,
 } from './simulation'
 export { parseLogVerbosity, toLogRecord, eventSubsystem, eventLogLevel, LOG_LEVELS } from './logging'
@@ -160,7 +163,7 @@ export { yardCapacityCells, planPrefill, prefillOf, yardPlacerOf } from './prefi
 export { yardIndexOf, indexYardSlotAdded, indexYardSlotRemoved } from './yardIndex'
 export { blockersOf, boxesAbove } from './subsystems/rehandle'
 export type { PrefillPlan, PrefillImport, YardPlacer } from './prefill'
-export { validateScenario, assertValidScenario, ScenarioValidationError, peakTrucksPerHour } from '../scenario/validate'
+export { validateScenario, validateSubsystemModes, assertValidScenario, ScenarioValidationError, peakTrucksPerHour } from '../scenario/validate'
 export type { ScenarioCheck } from '../scenario/validate'
 export { stsCycleGeometry, stsNominalCycle, shcNominalCycle, ascNominalCycle, profileValid } from './cycleTime'
 export type { CycleReadout, StsCycleGeometry } from './cycleTime'

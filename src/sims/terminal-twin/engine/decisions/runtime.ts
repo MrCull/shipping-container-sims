@@ -11,7 +11,7 @@
  *     → DecisionResolved      bookkeeping here, then the asking subsystem's
  *                             DecisionResolved reactor acts on the reply
  *
- * Timing of DecisionResolved/DecisionFailed after the request:
+ * Timing of DecisionResolved/DecisionFailed after the request (a pre-run decision, see subsystems/prefill.ts, always resolves at the same sim time):
  *   - sync handler, no injection: same sim time (same event step);
  *   - injected delay d ms: keep-running → now + d/1000 × simSecondsPerWallSecond;
  *     pause → now (the sim clock is frozen while the decision is pending);
@@ -55,6 +55,10 @@ export interface PendingDecision {
   awaitingExternal: boolean
   /** Wall latency (injected + measured), known once the outcome is scheduled. */
   wallMs: number
+  /** A pre-run decision (before the scenario starts): resolved at the same sim time whatever the latency. */
+  preRun?: true
+  /** Containers the request concerns (from its subjects), carried onto the outcome events. */
+  containers?: string[]
 }
 
 export interface HandlerKpiCounters {
@@ -110,6 +114,9 @@ export function createDecisionState(seed: number): DecisionState {
   return { nextCorrelation: 0, rngState: seedState(seed ^ DECISION_RNG_SALT), pending: {}, kpis }
 }
 
+/** Subjects of a decision's outcome events: the waiting equipment, plus the boxes of a pre-run decision (so invariants see them). */
+const outcomeSubjects = (p: PendingDecision): EventSubjects => (p.containers ? { equipment: p.equipment, containers: p.containers } : { equipment: p.equipment })
+
 type Outcome = { reply: unknown } | { failure: 'timeout' | 'error'; message: string }
 
 type ScheduleFn = <K extends EventType>(type: K, at: number, subjects: EventSubjects, payload: EventPayloads[K]) => void
@@ -140,6 +147,7 @@ export interface DecisionRuntime {
     dp: K,
     request: DecisionRequests[K],
     subjects: EventSubjects,
+    options?: { preRun?: boolean },
   ): string
   /** Schedule outcomes of async handlers that settled since the last call. */
   drain(): void
@@ -189,6 +197,8 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
   }
   labelHandlers()
 
+  const wallField = (ms: number) => (ms > 0 ? { wallLatencyMs: Math.round(ms * 1000) / 1000 } : {})
+
   /** Turn an outcome + injection into a scheduled DecisionResolved or DecisionFailed. */
   function deliver(p: PendingDecision, outcome: Outcome, externalMs: number, schedule: ScheduleFn): void {
     const inj = p.injection
@@ -204,9 +214,10 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
     }
     p.wallMs = delayMs + externalMs
     const state = getState()
-    const at = state.now + (asyncMode === 'keep-running' ? (delayMs / 1000) * scale : 0)
-    const subjects = { equipment: p.equipment }
-    const base = { correlationId: p.correlationId, decisionPoint: p.decisionPoint }
+    // a pre-run decision never moves the sim clock: the wall latency is still measured and counted
+    const at = state.now + (asyncMode === 'keep-running' && !p.preRun ? (delayMs / 1000) * scale : 0)
+    const subjects = outcomeSubjects(p)
+    const base = { correlationId: p.correlationId, decisionPoint: p.decisionPoint, ...(p.preRun ? { preRun: true as const } : {}) }
     if (failure) {
       schedule('DecisionFailed', at, subjects, { ...base, ...failure, fallback: fallbacks[p.decisionPoint].name })
     } else {
@@ -217,6 +228,7 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
         handler: resolved[p.decisionPoint].name,
         request: p.message.payload,
         reply: (outcome as { reply: unknown }).reply,
+        ...wallField(p.wallMs),
       } as EventPayloads['DecisionResolved'])
     }
   }
@@ -286,6 +298,8 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
         injection: drawInjection(pointConfig(dp).latency, timeoutMs(dp), decisionRng(decisions)),
         awaitingExternal: false,
         wallMs: 0,
+        ...(e.payload.preRun ? { preRun: true as const } : {}),
+        ...(e.payload.preRun && e.subjects.containers ? { containers: e.subjects.containers } : {}),
       }
       decisions.pending[p.correlationId] = p
       const kpi = decisions.kpis[dp]
@@ -303,14 +317,16 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
       const fb = fallbacks[p.decisionPoint]
       const reply = fb.fn(p.message as DecisionRequestMessage<DecisionPointId>, query)
       if (isThenable(reply)) throw new Error(`Fallback strategy ${fb.name} must be synchronous`)
-      ctx.schedule('DecisionResolved', e.t, { equipment: p.equipment }, {
+      ctx.schedule('DecisionResolved', e.t, outcomeSubjects(p), {
         correlationId: p.correlationId,
         decisionPoint: p.decisionPoint,
+        ...(p.preRun ? { preRun: true as const } : {}),
         version: p.message.version,
         outcome: 'fallback',
         handler: fb.name,
         request: p.message.payload,
         reply,
+        ...wallField(p.wallMs),
       } as EventPayloads['DecisionResolved'])
     },
 
@@ -335,7 +351,7 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
   return {
     asyncMode,
     reactors,
-    request(ctx, dp, request, subjects) {
+    request(ctx, dp, request, subjects, options) {
       const decisions = ctx.state.decisions
       const correlationId = `${dp}-${++decisions.nextCorrelation}`
       ctx.schedule('DecisionRequested', ctx.state.now, subjects, {
@@ -343,6 +359,7 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
         decisionPoint: dp,
         version: DECISION_CONTRACT_VERSIONS[dp],
         request,
+        ...(options?.preRun ? { preRun: true as const } : {}),
       } as EventPayloads['DecisionRequested'])
       return correlationId
     },

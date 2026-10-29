@@ -37,6 +37,7 @@ async function openAsc(page: Page): Promise<void> {
 }
 
 test('paired ASCs use the GLB with LOD switching and are posed from the engine motion', async ({ page }) => {
+  test.slow() // three camera moves, each waiting on a software-rendered frame
   const { errors, external } = watch(page)
   await openAsc(page)
 

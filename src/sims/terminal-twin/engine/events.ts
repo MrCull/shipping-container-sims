@@ -35,6 +35,8 @@ export interface TruckLegInfo {
   containerId: string
   size: ContainerSize
   vesselId?: string
+  /** An export box booked to a new slot of the vessel's bay plan on arrival (legacy or pre-filled start, V11-14). */
+  slotId?: string
 }
 
 /** Ids of the domain objects an event involves (for filtering and `why`). */
@@ -71,7 +73,14 @@ export interface EventEnvelope<T extends string, P> {
 
 /** A decision request was sent to its handler (see `engine/decisions/`). */
 export type DecisionRequestedPayload = {
-  [K in DecisionPointId]: { correlationId: string; decisionPoint: K; version: number; request: DecisionRequests[K] }
+  [K in DecisionPointId]: {
+    correlationId: string
+    decisionPoint: K
+    version: number
+    request: DecisionRequests[K]
+    /** Set for a decision asked in the pre-run phase, before the scenario starts (the pre-filled yard). */
+    preRun?: true
+  }
 }[DecisionPointId]
 
 /** A decision's reply reached the engine; the waiting equipment acts on it. */
@@ -86,6 +95,14 @@ export type DecisionResolvedPayload = {
     handler: string
     request: DecisionRequests[K]
     reply: DecisionReplies[K]
+    /** Set for a pre-run decision (see DecisionRequested). */
+    preRun?: true
+    /**
+     * Measured wall latency of the reply in ms (injected delay plus the time an async handler took).
+     * Absent when it was 0, so runs without latency keep their logs byte for byte. After a timeout or
+     * error it is the wait before the engine gave up, carried by the fallback's DecisionResolved.
+     */
+    wallLatencyMs?: number
   }
 }[DecisionPointId]
 
@@ -132,6 +149,8 @@ export interface EventPayloads {
   /** The ground-position decision returned no position; the STS holds the box and idles. */
   StsWaitingForGroundPosition: { stsId: string; containerId: string }
   /** A ground position freed up; the waiting STS asks for one again. */
+  /** Back-off timer of a ground-position wait; a no-op unless the crane still waits since `waitSince`. */
+  StsGroundPositionWaitBackoff: { stsId: string; containerId: string; waitSince: number }
   StsGroundPositionWaitEnded: { stsId: string; containerId: string; waitedS: number }
   /**
    * The SHC dispatch reply claimed a job: the whole trip (pickup, drop at the
@@ -338,6 +357,8 @@ export interface EventPayloads {
     message: string
     /** The fallback that will answer, e.g. "fallback:lowest-free-lane". */
     fallback: string
+    /** Set for a pre-run decision (see DecisionRequested). */
+    preRun?: true
   }
   DecisionResolved: DecisionResolvedPayload
   /** The warm-up is over (TT-14): KPIs and end-condition counters restart at zero. */

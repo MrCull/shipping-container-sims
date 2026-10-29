@@ -6,6 +6,7 @@
  * reactivity (closure variables / markRaw); large collections such as the
  * recent-event buffer use shallowRef + triggerRef (Box Empire pattern).
  */
+import type { ViewPresetName } from '../modules/viewPresets'
 import { defineStore } from 'pinia'
 import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
@@ -18,6 +19,7 @@ import { EXPORT_FILES, ScenarioValidationError, validateScenario, type EngineEve
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { describeEntity, entityKind, entityQueryKind, type EntityView } from '../modules/entityInspector'
+import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
 import { FEED_BUFFER_CAP } from '../modules/eventFeed'
 import type { Bucketing, KpiGroupId } from '../modules/dashboardModel'
@@ -30,11 +32,6 @@ import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
 import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
-import type { VesselHullState } from '../modules/vesselRenderer'
-import type { ShcRigState } from '../modules/shcAssets'
-import type { TruckRigState } from '../modules/truckAssets'
-import type { AscRigState } from '../modules/ascAssets'
-import type { StsRenderState } from '../modules/stsAssets'
 import { CuePlanner } from '../modules/cues'
 import { SoundPlayer } from '../modules/soundPlayer'
 import type { AtmosphereState } from '../modules/atmosphereRig'
@@ -86,6 +83,8 @@ export interface FinalReportData extends KpiHeadlineState {
 export interface TwinView {
   /** Aim at an entity, keeping the view direction (and, if given, at `distanceM`). */
   cameraTo(entityId: string, distanceM?: number): boolean
+  /** Frame a view preset (V11-05); false when the scene has no such region (no landside for the gate view). */
+  viewPreset(preset: ViewPresetName): boolean
   /** The entity under a viewport point (client coordinates) at the displayed time, or null. */
   pickAt(clientX: number, clientY: number): string | null
   /** Viewport (client) coordinates of an entity's centre; null when it is not drawn or off screen. */
@@ -96,16 +95,8 @@ export interface TwinView {
   stats(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */
   liveries(): Record<string, RenderedLivery> | null
-  /** Rig state per SHC (LOD, steering, wheel roll, hoist travel, carrying); null without a 3D view. */
-  shcRigs(): Record<string, ShcRigState> | null
-  /** Rig state per truck drawn from the GLB models (LOD, cab shape, livery, steering, articulation, wheel roll); null without a 3D view. */
-  truckRigs(): Record<string, TruckRigState> | null
-  /** Rig state per ASC (LOD, gantry, trolley, hoist, rope scale, carrying); null without a 3D view. */
-  ascRigs(): Record<string, AscRigState> | null
-  /** Per STS: LOD, spreader configuration and drawn positions (GLB cranes); null without a 3D view. */
-  sts(): Record<string, StsRenderState> | null
-  /** Per vessel: hull class, line, livery, name, LOD and rendered bay grid (TT-27); null without a 3D view. */
-  vesselHulls(): Record<string, VesselHullState> | null
+  /** Rig state per entity, per equipment kind (`EquipmentKindDef.rigKey` names the dev-API key); null without a 3D view. */
+  rigs(): Record<string, Record<string, unknown>> | null
   /** Where the draw calls go: visible drawables per scene group and geometry type (TT-19 perf tool); null without a 3D view. */
   drawBreakdown(): Record<string, { objects: number; triangles: number }> | null
   /** Time-of-day lighting state and the backdrop in use (TT-21); null without a 3D view. */
@@ -199,6 +190,9 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const config = shallowRef<ScenarioConfig | null>(null)
   /** Keyboard-driven view state (TT-16 dashboard and TT-18 overlays/follow camera build on these). */
   const following = ref(false)
+  /** "Follow next truck" was asked and no truck arrival at or after `followNextFrom` is known yet (resolved in `sync`). */
+  const followNextPending = ref(false)
+  let followNextFrom = 0
   const overlaysVisible = ref(true)
   const dashboardOpen = ref(false)
   /** Dashboard tab (TT-16): KPI charts, yard heatmap and Gantt, or the final report. */
@@ -310,6 +304,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   function sync(): void {
     if (!controller) return
     displayTime.value = controller.displayTime
+    if (followNextPending.value) resolveFollowNext()
     speed.value = controller.speed
     paused.value = controller.paused
     busy.value = controller.busy
@@ -536,6 +531,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   function select(id: string | null): void {
     selectedId.value = id
+    followNextPending.value = false
     if (!id) {
       following.value = false
       entityView.value = null
@@ -560,9 +556,9 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     }
     try {
       const state = await c.query(entityQueryKind(kind), id)
-      let job
-      if (kind === 'shc') job = (await c.query<{ id: string }[]>('shcJobs')).find((j) => j.id === (state as { jobId: string | null }).jobId)
-      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, { job: job as never }))
+      const def = EQUIPMENT_KINDS.find((d) => d.kind === kind)
+      const extras = (await def?.loadExtras?.(state, (q) => c.query(q))) ?? {}
+      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, extras))
     } catch {
       // The scenario was replaced meanwhile; the next refresh shows the new state.
     }
@@ -887,6 +883,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   function toggleFollow(): void {
+    followNextPending.value = false
     if (following.value) {
       following.value = false
       showToast('twin.toast.followOff')
@@ -896,6 +893,36 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     } else {
       showToast('twin.toast.followNothing')
     }
+  }
+
+  /** Select and follow the truck at `followNextFrom` or later, if the engine already knows one. */
+  function resolveFollowNext(): string | null {
+    const next = controller?.model?.nextTruckArrival(followNextFrom)
+    if (!next) return null
+    select(next.id) // clears the pending flag
+    following.value = true
+    view?.cameraTo('gate') // the follow camera takes over once the truck is at the gate
+    showToast('twin.toast.followNext', { id: next.id })
+    return next.id
+  }
+
+  /**
+   * "Follow next truck" (button, N, dev API): select the next truck to arrive at or after the display time and follow it
+   * through the gate, its stall and out. Returns its id, or null when none is known yet (the request stays pending and
+   * resolves as the engine runs on) or the terminal has no landside.
+   */
+  function followNextTruck(): string | null {
+    const c = controller
+    if (!c?.model) return null
+    if (!c.model.landside) {
+      showToast('followNext.unavailable')
+      return null
+    }
+    followNextFrom = c.displayTime
+    followNextPending.value = true
+    const id = resolveFollowNext()
+    if (!id) showToast('followNext.waiting')
+    return id
   }
 
   function toggleOverlays(): void {
@@ -910,6 +937,19 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   function setHelpOpen(open: boolean): void {
     helpOpen.value = open
+  }
+
+  /** Frame a view preset (shortcut, button, dev API). Stops following, since the preset sets the camera itself. */
+  function setViewPreset(preset: ViewPresetName): boolean {
+    if (!view) return false
+    const ok = view.viewPreset(preset)
+    if (!ok) {
+      showToast('view.unavailable')
+      return false
+    }
+    following.value = false
+    followNextPending.value = false
+    return true
   }
 
   function attachView(v: TwinView | null): void {
@@ -970,6 +1010,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     fmt,
     config,
     following,
+    followNextPending,
+    followNextTruck,
     overlaysVisible,
     dashboardOpen,
     dashboardTab,
@@ -1036,6 +1078,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     toggleOverlays,
     toggleDashboard,
     setHelpOpen,
+    setViewPreset,
     attachView,
     dispose,
   }

@@ -4,6 +4,10 @@ import { useTwinStore } from '../store/twinStore'
 import { SPEEDS } from '../modules/twinController'
 import { fromLocalInputValue, simDate, toLocalInputValue } from '../modules/time'
 import { t } from '../i18n/messages'
+import PerfPanel from './PerfPanel.vue'
+import LocaleDateTimeInput from './LocaleDateTimeInput.vue'
+
+withDefaults(defineProps<{ showGraphics?: boolean }>(), { showGraphics: true })
 
 const store = useTwinStore()
 
@@ -27,7 +31,7 @@ function openRunTo(): void {
   runToOpen.value = !runToOpen.value
   runToError.value = null
   if (runToOpen.value) {
-    runToValue.value = toLocalInputValue(simDate(store.choice.startDateTime, store.displayTime + 600))
+    runToValue.value = toLocalInputValue(simDate(store.choice.startDateTime, store.displayTime + 600), true)
   }
 }
 
@@ -58,143 +62,170 @@ async function submitRunTo(): Promise<void> {
     data-testid="tt-topbar"
   >
     <div
-      class="clock"
-      data-testid="tt-clock"
-      :title="t('topbar.elapsed', { elapsed: clock.elapsed })"
+      class="tt-topbar-main"
+      data-hud-region="topBar"
     >
-      <span class="clock-day">{{ clock.day }}</span>
-      <span class="clock-date">{{ clock.date }}</span>
-      <span class="clock-time">{{ clock.time }}</span>
-      <span class="clock-elapsed">{{ clock.elapsed }}</span>
-    </div>
+      <div
+        class="clock"
+        data-testid="tt-clock"
+        :title="t('topbar.elapsed', { elapsed: clock.elapsed })"
+      >
+        <span class="clock-day">{{ clock.day }}</span>
+        <span class="clock-date">{{ clock.date }}</span>
+        <span class="clock-time">{{ clock.time }}</span>
+        <span class="clock-elapsed">{{ clock.elapsed }}</span>
+      </div>
 
-    <div
-      class="speeds"
-      role="group"
-      :aria-label="t('topbar.speedGroup')"
-    >
-      <button
-        class="speed-btn"
-        :class="{ active: store.paused }"
-        :aria-pressed="store.paused"
-        :disabled="ended"
-        :title="ended ? t('topbar.endedHint') : store.paused ? t('topbar.resume') : t('topbar.pause')"
-        @click="store.togglePause()"
+      <div
+        class="speeds"
+        role="group"
+        :aria-label="t('topbar.speedGroup')"
       >
-        {{ store.paused ? '▶' : '❚❚' }}
-      </button>
-      <button
-        v-for="s in SPEEDS"
-        :key="s"
-        class="speed-btn"
-        :class="{ active: !store.paused && store.speed === s }"
-        :aria-pressed="!store.paused && store.speed === s"
-        :data-speed="s"
-        :disabled="ended"
-        @click="store.setSpeed(s)"
-      >
-        {{ t('topbar.speed', { speed: s }) }}
-      </button>
-    </div>
+        <button
+          class="speed-btn"
+          :class="{ active: store.paused }"
+          :aria-pressed="store.paused"
+          :disabled="ended"
+          :title="ended ? t('topbar.endedHint') : store.paused ? t('topbar.resume') : t('topbar.pause')"
+          @click="store.togglePause()"
+        >
+          {{ store.paused ? '▶' : '❚❚' }}
+        </button>
+        <button
+          v-for="s in SPEEDS"
+          :key="s"
+          class="speed-btn"
+          :class="{ active: !store.paused && store.speed === s }"
+          :aria-pressed="!store.paused && store.speed === s"
+          :data-speed="s"
+          :disabled="ended"
+          @click="store.setSpeed(s)"
+        >
+          {{ t('topbar.speed', { speed: s }) }}
+        </button>
+      </div>
 
-    <div class="actions">
-      <button
-        class="action-btn"
-        data-testid="tt-topbar-step"
-        :disabled="store.busy || ended"
-        :title="t('debug.stepHint')"
-        @click="store.step().catch(() => {})"
-      >
-        {{ t('debug.step') }}
-      </button>
-      <div class="run-to">
+      <div class="actions">
         <button
           class="action-btn"
+          data-testid="tt-topbar-step"
           :disabled="store.busy || ended"
-          :title="ended ? t('topbar.endedHint') : undefined"
-          @click="openRunTo"
+          :title="t('debug.stepHint')"
+          @click="store.step().catch(() => {})"
         >
-          {{ t('topbar.runTo') }}
+          {{ t('debug.step') }}
         </button>
-        <form
-          v-if="runToOpen"
-          class="run-to-pop"
-          @submit.prevent="submitRunTo"
-        >
-          <label>
-            <span>{{ t('topbar.runToTarget') }}</span>
-            <input
-              v-model="runToValue"
-              type="datetime-local"
-              step="1"
-              required
-            >
-          </label>
+        <div class="run-to">
           <button
-            type="button"
             class="action-btn"
-            data-testid="tt-run-to-departure"
-            @click="submitRunToDeparture"
+            :disabled="store.busy || ended"
+            :title="ended ? t('topbar.endedHint') : undefined"
+            @click="openRunTo"
           >
-            {{ t('topbar.runToDeparture') }}
+            {{ t('topbar.runTo') }}
           </button>
-          <p
-            v-if="runToError"
-            class="error"
+          <form
+            v-if="runToOpen"
+            class="run-to-pop"
+            @submit.prevent="submitRunTo"
           >
-            {{ runToError }}
-          </p>
-          <div class="pop-actions">
+            <label>
+              <span>{{ t('topbar.runToTarget') }}</span>
+              <LocaleDateTimeInput
+                v-model="runToValue"
+                seconds
+                required
+                test-id="tt-run-to-input"
+              />
+            </label>
             <button
               type="button"
               class="action-btn"
-              @click="runToOpen = false"
+              data-testid="tt-run-to-departure"
+              @click="submitRunToDeparture"
             >
-              {{ t('setup.cancel') }}
+              {{ t('topbar.runToDeparture') }}
             </button>
-            <button
-              type="submit"
-              class="action-btn primary"
+            <p
+              v-if="runToError"
+              class="error"
             >
-              {{ t('topbar.run') }}
-            </button>
-          </div>
-        </form>
+              {{ runToError }}
+            </p>
+            <div class="pop-actions">
+              <button
+                type="button"
+                class="action-btn"
+                @click="runToOpen = false"
+              >
+                {{ t('setup.cancel') }}
+              </button>
+              <button
+                type="submit"
+                class="action-btn primary"
+              >
+                {{ t('topbar.run') }}
+              </button>
+            </div>
+          </form>
+        </div>
+        <button
+          class="action-btn"
+          :disabled="store.busy"
+          :title="t('topbar.resetHint')"
+          @click="store.reset()"
+        >
+          {{ t('topbar.reset') }}
+        </button>
+        <button
+          class="action-btn"
+          :disabled="store.busy"
+          @click="store.newScenario()"
+        >
+          {{ t('topbar.newScenario') }}
+        </button>
+        <button
+          class="action-btn"
+          data-testid="tt-saves-button"
+          :disabled="store.busy"
+          :title="t('topbar.savesHint')"
+          @click="store.openSaves()"
+        >
+          {{ t('topbar.saves') }}
+        </button>
+        <button
+          class="action-btn"
+          :class="{ active: store.dashboardOpen }"
+          :aria-pressed="store.dashboardOpen"
+          :title="t('topbar.dashboardHint')"
+          data-testid="tt-dashboard-button"
+          @click="store.toggleDashboard()"
+        >
+          {{ t('topbar.dashboard') }}
+        </button>
+        <button
+          class="action-btn help-btn"
+          :title="t('topbar.shortcuts')"
+          :aria-label="t('topbar.shortcuts')"
+          data-testid="tt-help-button"
+          @click="store.setHelpOpen(!store.helpOpen)"
+        >
+          ?
+        </button>
+        <span
+          class="status"
+          :class="status"
+          data-testid="tt-status"
+        >{{ t(`status.${status}`) }}</span>
       </div>
-      <button
-        class="action-btn"
-        :disabled="store.busy"
-        :title="t('topbar.resetHint')"
-        @click="store.reset()"
-      >
-        {{ t('topbar.reset') }}
-      </button>
-      <button
-        class="action-btn"
-        :disabled="store.busy"
-        @click="store.newScenario()"
-      >
-        {{ t('topbar.newScenario') }}
-      </button>
-      <button
-        class="action-btn"
-        data-testid="tt-saves-button"
-        :disabled="store.busy"
-        :title="t('topbar.savesHint')"
-        @click="store.openSaves()"
-      >
-        {{ t('topbar.saves') }}
-      </button>
-      <button
-        class="action-btn"
-        :class="{ active: store.dashboardOpen }"
-        :aria-pressed="store.dashboardOpen"
-        :title="t('topbar.dashboardHint')"
-        data-testid="tt-dashboard-button"
-        @click="store.toggleDashboard()"
-      >
-        {{ t('topbar.dashboard') }}
-      </button>
+    </div>
+    <div
+      class="settings"
+      role="group"
+      :aria-label="t('topbar.settings')"
+      data-hud-region="settings"
+      data-testid="tt-settings"
+    >
       <button
         class="action-btn"
         :class="{ active: store.lockDaylight }"
@@ -215,30 +246,21 @@ async function submitRunTo(): Promise<void> {
       >
         {{ t('topbar.sound') }}
       </button>
-      <button
-        class="action-btn help-btn"
-        :title="t('topbar.shortcuts')"
-        :aria-label="t('topbar.shortcuts')"
-        data-testid="tt-help-button"
-        @click="store.setHelpOpen(!store.helpOpen)"
-      >
-        ?
-      </button>
-      <span
-        class="status"
-        :class="status"
-        data-testid="tt-status"
-      >{{ t(`status.${status}`) }}</span>
+      <PerfPanel v-if="showGraphics" />
     </div>
   </header>
 </template>
 
 <style scoped>
 .tt-topbar {
+  /* Above the scene below it (HUD panels are z 4-8, modals 40+): the Run to… popup hangs out of the bar over the 3D view. */
+  position: relative;
+  z-index: 10;
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex-wrap: nowrap;
   padding: 0.5rem 0.9rem;
   background: rgba(17, 24, 39, 0.92);
   border-bottom: 1px solid var(--color-border);
@@ -247,13 +269,32 @@ async function submitRunTo(): Promise<void> {
   backdrop-filter: blur(6px);
 }
 
+.tt-topbar-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.settings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  max-width: 27rem;
+}
+
 .clock {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
   font-family: var(--tt-font-mono);
   font-variant-numeric: tabular-nums;
-  min-width: 23rem;
+  min-width: 20rem;
 }
 
 .clock-day {
@@ -307,6 +348,11 @@ async function submitRunTo(): Promise<void> {
 .speed-btn.active {
   background: var(--color-primary);
   color: #fff;
+}
+
+/* State by shape as well as colour: an active toggle carries a check mark. */
+.action-btn.active::before {
+  content: '✓ ';
 }
 
 .action-btn.active {

@@ -127,10 +127,6 @@ describe('pre-filled start', () => {
     expect(Object.values(sim.snapshot().state.yardSlots).filter((s) => s.row === 8).length).toBeGreaterThan(10)
   })
 
-  it('rejects an asynchronous yardAllocation handler for the pre-fill', () => {
-    expect(() => createSimulation(config, { yardAllocation: async () => ({ slotId: null }) })).toThrow(/synchronous/)
-  })
-
   it('works with a target below what the booked boxes need: they are still all placed', () => {
     const sim = createSimulation(scenario({ start: { mode: 'prefilled', targetPct: 1 } }))
     expect(sim.query.containers().filter((c) => c.custody.kind === 'yardSlot').length).toBe(26)

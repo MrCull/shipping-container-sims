@@ -38,6 +38,10 @@ export interface ShcKinematics {
   lockS: number
   /** Spreader twist-lock unlock time (s). */
   unlockS: number
+  /** Assumed turn radius (m) for cornering at speed; default `DEFAULT_SHC_CORNER`; 0 = stop at every turn. */
+  cornerRadiusM?: number
+  /** Lateral acceleration (m/s²) the SHC tolerates in a turn; with the radius it caps the corner speed. */
+  maxLateralAccel?: number
 }
 
 export interface ShcConfig {
@@ -113,6 +117,21 @@ export interface ApronLayout {
 export type SubsystemMode = 'real' | 'instant' | 'off'
 
 export interface SubsystemModes {
+  /**
+   * STS cranes (V11-10; default real when STS cranes exist). instant: every crane motion, lock and unlock takes
+   * zero time and raises the same events; off: no crane work, vessels berth and leave with their cargo.
+   */
+  quay?: SubsystemMode
+  /**
+   * Berth allocation (V11-10; default real). instant: zero mooring and unmooring time; off: no `berthAllocation`
+   * decision, each vessel takes the leftmost free stretch (first fit) at once.
+   */
+  berth?: SubsystemMode
+  /**
+   * The yard as a whole (V11-10; default real when blocks exist). instant: the ASC runs instant (unless set
+   * explicitly); off: no yard (ASC and landside off, boxes stay on the pads).
+   */
+  yard?: SubsystemMode
   /** SHC horizontal transport (default real when SHCs are configured). */
   shc?: SubsystemMode
   /** ASC yard cranes (default real when SHCs and blocks exist). */
@@ -273,6 +292,8 @@ export interface LayoutConfig {
   stsGroundLaneSpacingM: number
   /** Spreader travel height for trolley moves (m). */
   stsSafeHoistM: number
+  /** Back-off (s) before an STS whose ground-position reply was null asks again (default 30; 0 = only wake on a freed position). */
+  stsGroundRetryS?: number
 }
 
 export interface ScenarioConfig {

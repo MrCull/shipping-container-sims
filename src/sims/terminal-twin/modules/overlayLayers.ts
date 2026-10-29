@@ -6,8 +6,10 @@
  * SceneRenderer.) Three.js objects stay out of Vue reactivity.
  */
 import * as THREE from 'three'
+import { EQUIPMENT_KINDS, type EquipmentKind } from './equipmentKinds'
 import { entityBounds } from './picking'
 import type { OverlayState } from './overlays'
+import { declutterLabels, type LabelBox } from './labelDeclutter'
 import { CONTAINER_DIMS, type SceneModel } from './sceneModel'
 
 export interface OverlayLayerStats {
@@ -17,8 +19,19 @@ export interface OverlayLayerStats {
   /** Transfer stalls with a truck standing in them / free (zeros without a landside or while occupancy is off). */
   stallsOccupied: number
   stallsFree: number
-  /** Labels currently visible. */
+  /** Labels currently visible (after decluttering). */
   labels: number
+  /** Labels hidden because they would overlap a higher-priority one on screen. */
+  labelsHidden: number
+  /** Screen boxes (px) of the visible labels, when the camera is known (dev API / tests). */
+  labelBoxes: LabelBox[]
+}
+
+/** The camera and viewport the labels are laid out against (screen-space decluttering). */
+export interface LabelScreen {
+  camera: THREE.PerspectiveCamera
+  width: number
+  height: number
 }
 
 const LABEL_W_PX = 320
@@ -34,12 +47,13 @@ export class OverlayLayers {
   private stallPlates = new Map<string, THREE.Mesh>()
   private gpPlates: THREE.Mesh[] = []
   private labels = new Map<string, THREE.Sprite>()
+  private labelKind = new Map<string, EquipmentKind>()
   private labelTextures = new Map<string, THREE.CanvasTexture>()
   private free: THREE.MeshBasicMaterial
   private busy: THREE.MeshBasicMaterial
   private gpMat: THREE.MeshBasicMaterial
   private plane = new THREE.PlaneGeometry(1, 1)
-  private current: OverlayLayerStats = { padsOccupied: 0, padsFree: 0, groundPositionsOccupied: 0, stallsOccupied: 0, stallsFree: 0, labels: 0 }
+  private current: OverlayLayerStats = { padsOccupied: 0, padsFree: 0, groundPositionsOccupied: 0, stallsOccupied: 0, stallsFree: 0, labels: 0, labelsHidden: 0, labelBoxes: [] }
 
   constructor(model: SceneModel) {
     this.model = model
@@ -67,8 +81,9 @@ export class OverlayLayers {
       this.stallPlates.set(stall.id, m)
       this.group.add(m)
     }
-    const labelled = [...model.stsIds, ...model.shcIds, ...model.ascIds, ...model.vesselIds]
-    for (const id of labelled.slice(0, LABEL_CAP)) {
+    const labelled = EQUIPMENT_KINDS.filter((def) => def.labelled).flatMap((def) => def.ids(model).map((id) => ({ id, kind: def.kind })))
+    for (const { id, kind } of labelled.slice(0, LABEL_CAP)) {
+      this.labelKind.set(id, kind)
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false }))
       sprite.scale.set(LABEL_W_M, LABEL_H_M, 1)
       sprite.renderOrder = 10
@@ -105,6 +120,21 @@ export class OverlayLayers {
     return tex
   }
 
+  /** The label's screen rectangle in px (top-left origin), or null when it is behind the camera or off screen. */
+  private screenBox(id: string, position: THREE.Vector3, { camera, width, height }: LabelScreen): LabelBox | null {
+    const v = position.clone().applyMatrix4(camera.matrixWorldInverse)
+    const depth = -v.z
+    if (depth <= camera.near) return null
+    const pxPerM = height / (2 * depth * Math.tan((camera.fov * Math.PI) / 360))
+    const w = LABEL_W_M * pxPerM
+    const h = LABEL_H_M * pxPerM
+    const p = position.clone().project(camera)
+    const cx = ((p.x + 1) / 2) * width
+    const cy = ((1 - p.y) / 2) * height
+    if (cx + w / 2 < 0 || cx - w / 2 > width || cy + h / 2 < 0 || cy - h / 2 > height) return null
+    return { id, x: cx - w / 2, y: cy - h / 2, w, h }
+  }
+
   private gpPlate(i: number): THREE.Mesh {
     let m = this.gpPlates[i]
     if (!m) {
@@ -117,10 +147,10 @@ export class OverlayLayers {
     return m
   }
 
-  update(t: number, overlays: OverlayState): void {
+  update(t: number, overlays: OverlayState, screen?: LabelScreen, selectedId: string | null = null): void {
     const model = this.model
     this.group.visible = overlays.occupancy || overlays.labels
-    const stats = { padsOccupied: 0, padsFree: 0, groundPositionsOccupied: 0, stallsOccupied: 0, stallsFree: 0, labels: 0 }
+    const stats: OverlayLayerStats = { padsOccupied: 0, padsFree: 0, groundPositionsOccupied: 0, stallsOccupied: 0, stallsFree: 0, labels: 0, labelsHidden: 0, labelBoxes: [] }
 
     const occupiedPads = new Set<string>()
     let gps = 0
@@ -168,10 +198,15 @@ export class OverlayLayers {
       }
     }
 
-    for (const [id, sprite] of this.labels) {
-      const kind = model.truckIds.includes(id) ? 'truck' : model.stsIds.includes(id) ? 'sts' : model.shcIds.includes(id) ? 'shc' : model.ascIds.includes(id) ? 'asc' : 'vessel'
+    // Labels: lay out in priority order (selection first, then registry order), then hide any that would overlap a kept one.
+    const shown: { id: string; sprite: THREE.Sprite; box: LabelBox | null }[] = []
+    const order = [...this.labels.keys()]
+    if (selectedId && this.labels.has(selectedId)) order.unshift(selectedId)
+    for (const id of new Set(order)) {
+      const sprite = this.labels.get(id)!
+      const kind = this.labelKind.get(id) ?? 'vessel'
       const b = overlays.labels ? entityBounds(model, id, t) : null
-      sprite.visible = b !== null
+      sprite.visible = false
       if (!b) continue
       const text = `${id} · ${model.statusAt(kind, id, t).replace(/-/g, ' ')}`
       const tex = this.labelTexture(text)
@@ -181,7 +216,17 @@ export class OverlayLayers {
         mat.needsUpdate = true
       }
       sprite.position.set(b.x, b.y + b.sy / 2 + LABEL_H_M, b.z)
-      stats.labels++
+      shown.push({ id, sprite, box: screen ? this.screenBox(id, sprite.position, screen) : null })
+    }
+    const boxes = shown.flatMap((s) => (s.box ? [s.box] : []))
+    const keep = screen ? declutterLabels(boxes) : null
+    for (const s of shown) {
+      // Without a camera nothing can be judged: show it. A label behind the camera or off screen is not drawn anyway.
+      const visible = keep ? (s.box ? keep.has(s.id) : false) : true
+      s.sprite.visible = visible
+      if (visible) stats.labels++
+      else if (s.box) stats.labelsHidden++
+      if (visible && s.box) stats.labelBoxes.push(s.box)
     }
     this.current = stats
   }

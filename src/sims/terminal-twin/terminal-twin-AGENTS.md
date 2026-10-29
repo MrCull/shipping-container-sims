@@ -40,7 +40,7 @@ Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers b
 | Reproduce a late bug | `npm run tt:run -- --fixture <name> --until time:50400 --snapshot /tmp/h14.json`, then `npm run tt:run -- --from-snapshot /tmp/h14.json --until time:54000 --events /tmp/win.jsonl --log /tmp/win.log.jsonl --log-level debug` | the window's events equal that window of the uninterrupted run; re-run the window as often as needed |
 | Check goldens | `npm run tt:golden` (also part of `npm test`) | `<fixture>: match` per fixture, exit 0; drift prints `path: golden X → actual Y` per field and exits 1 |
 | Intentional behaviour change | `npm run tt:golden -- --update` (or `UPDATE_GOLDEN=1 npm test`), then review the `*.golden.json` diff | the golden diff shows only the change you intended |
-| Browser / UI / 3D view | `npm run test:smoke` | Playwright smoke tests in `tests/browser/*.smoke.ts` pass (dev server + a production build). Not part of `npm test` or CI. |
+| Browser / UI / 3D view | `npm run test:smoke` | Playwright smoke tests in `tests/browser/*.smoke.ts` pass (dev server + a production build). Not part of `npm test`; CI runs them in the required `smoke` job (`--grep-invert @load`). Only the Auto-quality fps spec (`terminal-twin-perf.smoke.ts`, tagged `@load`: it needs a real frame rate) is advisory, in `smoke-load`. Write frame-based checks with `tests/browser/frameSampling.ts` (ratios over a minimum wall-clock window, never absolute frame counts). |
 | Look at the 3D view | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('tracer-1sts-10-boxes').then(() => window.__tt.runTo(330)).then(() => window.__tt.pause())"` | PNG in `.screenshots/` shows the STS mid-cycle, no page errors |
 | UI text, locale, units, shortcuts | `npm test` (`display-format`, `display-settings`, `message-catalogue`) + `npx playwright test --project=dev src/sims/terminal-twin/tests/browser/terminal-twin-display.smoke.ts` | catalogue audit lists no hard-coded strings; locale/units/shortcut smoke tests pass |
 | Saves, snapshots, rewind | `npx vitest run src/sims/terminal-twin/tests/{saves,persistence-host,persistence-controller}.test.ts` + `npx playwright test --project=dev src/sims/terminal-twin/tests/browser/terminal-twin-saves.smoke.ts` | formats and migration, replay-based restore and rewind give the original event-log hash; smoke covers reload, file round-trip, version mismatch, no IndexedDB |
@@ -54,7 +54,7 @@ Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers b
 | Twin-20 | `npm run tt:run -- --fixture twin-20-lift` | `4 moves in 2 cycles (2 twin-20)`; `tests/vessels.test.ts` |
 | Vessels in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('crane-split-4sts').then(() => window.__tt.runTo(1500)).then(() => window.__tt.pause()).then(() => window.__tt.cameraTo('V001'))"` | hull at its berth, four STS along it, deck boxes on the hatch covers |
 | SHC transport | `npm run tt:run -- --fixture shc-1sts-2shc-1wtp` | `Horizontal: 10 boxes to WTP pads`, per-SHC jobs/distances/reservation wait, `0 violations` |
-| SHC dispatch strategies | `npm run tt:diff -- --fixture shc-1sts-2shc-1wtp --b-handlers nearest-job` (or `tt:run … --strategy shcDispatch=nearest-job`) | first divergence at the first `shcDispatch` `DecisionResolved` (`payload.reply.wtpPadId`) |
+| SHC dispatch and pad strategies | `npm run tt:diff -- --fixture shc-1sts-2shc-1wtp --b-handlers nearest-job` (nearest job + `wtpPadSelection` `nearest-box`; or `tt:run … --strategy shcDispatch=nearest-job` / `--strategy wtpPadSelection=nearest-box`) | first divergence at the first `wtpPadSelection` `DecisionResolved` (`payload.reply.wtpPadId`); `shcDispatch` replies only `{jobId}` |
 | SHCs in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('shc-1sts-2shc-1wtp').then(() => window.__tt.runTo(300)).then(() => { window.__tt.pause(); window.__tt.overlays({ laneGraph: true, reservations: true }) })"` | SHCs on the apron, boxes on pads/yard, cyan lane graph, amber reserved zones |
 | Smoke tests side by side with another checkout | `SMOKE_DEV_PORT=5299 SMOKE_PROD_PORT=5298 npm run test:smoke` | same as `npm run test:smoke`, on other ports |
 | Asset budgets (CI) | `npm run tt:assets:check` (also in `npm test`) | `ok` per GLB with LOD triangles/draw calls, `Budgets: pass`, exit 0 |
@@ -85,7 +85,10 @@ terminal-twin/
 │   │                         ground-position wait/resume; lane reservation while setting down (with SHCs)
 │   ├── subsystems/rail.ts    Shared STS rail: reservations, waiting for the rail, free cranes stepping aside
 │   ├── subsystems/shc.ts     SHC jobs, pull dispatch, whole-trip planning, parking (TT-05)
-│   ├── subsystems/asc.ts     ASC block storage: allocation on pad drop, job pick order, whole-cycle planning, pad reservation (TT-06)
+│   ├── subsystems/asc.ts     ASC event reactors + phase chain; the subsystem's public exports (TT-06, split in V11-09)
+│   ├── subsystems/ascStorage.ts      ASC stack storage: allocation/claim, stack lock, retrievable test, rehandle generation, slot add/remove, block/stall lookups
+│   ├── subsystems/ascReservations.ts ASC trips (per job kind), rail/pad planning, partner step-aside commit, `ascPoseAt`
+│   ├── subsystems/ascDispatch.ts     ASC job selection, ascDispatch decision, starting a planned job
 │   ├── subsystems/ascRail.ts Shared ASC rail of twin blocks: occupancy pieces, rail-segment windows, park holds, step-aside target (TT-08)
 │   ├── yardLayout.ts         Block geometry, slot ids (`B01:03-5-2`), `candidateSlots` (pure)
 │   ├── laneGraph.ts          Waterside one-way lane graph from config + shortest paths (cached per config)
@@ -145,7 +148,7 @@ terminal-twin/
 ## Public engine API (`engine/index.ts`)
 
 ```ts
-const sim = createSimulation(config, handlers?, { seed?, asyncMode?, invariants?: { enabled?, failFast? },
+const sim = createSimulation(config, handlers?, { seed?, asyncMode?, invariants?: { enabled?, failFast?, sweepEvery? },
                                                  log?: { verbosity?: 'sts=debug,*=warn', write(record) } })
 sim.step(); sim.runUntil({ time?, eventType?, vesselsCompleted?, moves?, maxEvents?, predicate? })
 await sim.runUntilAsync(cond?) // same, but awaits async (Promise) handlers instead of stopping
@@ -156,7 +159,7 @@ sim.query.container(id) / .containers() / .vessel(id) / .vesselSlot(id) / .sts(i
 sim.why(eventId)            // [event, parent, …, ScenarioStarted]
 sim.inject(type, at, subjects, payload) // schedule an external event as an extra root (causedBy null; dev API / tests)
 sim.subscribe(fn, { types? }) // returns unsubscribe
-sim.eventLog(); sim.eventLogHash(); sim.kpiReport(); sim.invariantReport(); sim.status; sim.firstError
+sim.eventLog(); sim.eventLogHash(); sim.kpiReport(); sim.invariantReport(); sim.invariantStats(); sim.status; sim.firstError
 summarizeRun(sim)           // RunSummary = CLI --out and golden format
 diffEventLogs(logA, logB, { context? }) // { diverged, commonEvents, seq, a, b, differences, before, afterA, afterB }
 parseLogVerbosity('asc=debug,*=warn'); toLogRecord(event, verbosity)
@@ -167,12 +170,12 @@ parseLogVerbosity('asc=debug,*=warn'); toLogRecord(event, verbosity)
 - **Engine imports:** `npm run lint` enforces the barrel rule (`eslint.config.js`, `no-restricted-imports`): `engine/` and `scenario/` may deep-import, everything else (modules, components, store, tests) imports engine code from `engine/index.ts`.
 - **New event type:** add it to `EventPayloads` in `events.ts`, and add its reactor to a subsystem `ReactorMap` listed in `REACTORS` (`simulation.ts`).
 - **New subsystem:** create `engine/subsystems/<name>.ts` that exports a `ReactorMap`, then add it to `REACTORS`.
-- **New custody owner kind:** extend `CustodyKind` and add its holders to `custodyHolders()` in `invariants.ts`.
-- **New invariant:** append it to `INVARIANTS` with a dotted id, and add a test that uses a broken handler or reactor to trigger it.
+- **New custody owner kind:** extend `CustodyKind` and add its holders to `custodyHolders()` and `heldAt()` in `invariants.ts`.
+- **New invariant:** append it to `INVARIANTS` with a dotted id and `reads` (the entity kinds it looks at: `container`, `yardSlot`, `vessel`, `equipment`, `reservation`, `time`), and add a test that uses a broken handler or reactor to trigger it. One that reads a lot of state should also set `scoped: true` and honour the `scope` argument (the containers, yard columns, equipment and vessels the last event touched); see the cost pitfall below.
 - **New fixture:** add it to `scenario/fixtures/definitions.ts`, run `npm run tt:fixtures`, import the JSON in `fixtures/index.ts`, then `UPDATE_GOLDEN=1 npm test`.
 - **Logging a new event type:** nothing to do if its name starts with its subsystem (`AscMoveStarted` → `asc`, level `info`). Otherwise, or for a `debug`/`warn`/`error` level, add it to `EVENT_LOG_META` in `engine/logging.ts`.
 - **New CLI strategy for diffs:** add a named handler set to `cli/handlerSets.ts` (or, for one decision point, pass `--strategy <dp>=<name>`; `tt:run` takes the same flag).
-- **New equipment kind** (crane, vehicle, …): add it in `entityBounds` and `pickEntity` (`modules/picking.ts`), `entityKind` and `describeEntity` (`modules/entityInspector.ts`), the label kinds in `modules/overlayLayers.ts`, and catalogue keys `inspector.kind.*` / `inspector.fact.*`. Keep dimensions in `modules/equipmentDims.ts` in sync with the model. `tests/equipment-kinds.test.ts` fails when a kind is missing from one of these.
+- **New equipment kind** (crane, vehicle, …): write `modules/equipmentKinds/<kind>.ts` exporting an `EquipmentKindDef` (`types.ts`: ids, bounds, dev-API state and rig keys, inspector view, optional extra query, scene-renderer factory) and add it to `EQUIPMENT_KINDS` in `modules/equipmentKinds/index.ts`; that is the whole change. The scene renderer (`sceneRenderer.ts`), picking, labels, inspector, store and dev API (`sceneState()` and `view.rigs()`) iterate the registry, so no hub file is edited. Also add the `inspector.kind.<kind>` and `inspector.fact.*` catalogue keys, and keep `modules/equipmentDims.ts` in sync with the model. `tests/equipment-kinds.test.ts` checks the registry (`registrationProblems`) and fails on a half-registered kind. Registry order is the build and update order and the Labels overlay's priority at its cap.
 - **New KPI:** append a row to `KPI_DEFS` and an `observe` case in `engine/kpi/collector.ts`, list it in `KPI_GROUPS` (`modules/dashboardModel.ts`) and add a `dashboard.kpi.<id>` catalogue key.
 - **Hand-built `Delta` in a test:** start from `emptyDelta()` (`tests/delta.ts`) so a new Delta field never breaks it.
 - **New decision point or strategy:** see [Decision points](#decision-points-tos-seams) below.
@@ -203,7 +206,7 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
   - `runUntil` returns `waiting-for-decision` when it cannot proceed, and `runUntilAsync` awaits the reply.
   - A settled reply is applied at the sim time the engine has reached when it next runs (`drain`). With `runUntil({ time })` in keep-running mode, the clock advances past an in-flight reply, which is how a paced host such as the worker shows TOS latency.
   - A snapshot keeps pending decisions, and restore re-sends the in-flight async requests.
-- **KPIs:** `kpiReport().handlers[dp]` holds calls, ok/fallbacks/timeouts/errors/lateReplies, pending/maxPending (backlog), sim latency and wall latency (mean/max; sync handlers count as 0 wall ms), and `equipmentIdleS` (sim latency × waiting equipment). The CLI prints them under `TOS handlers:`.
+- **KPIs:** `kpiReport().handlers[dp]` holds calls, ok/fallbacks/timeouts/errors/lateReplies, pending/maxPending (backlog), sim latency and wall latency (mean/max; sync handlers count as 0 wall ms; also a time series, see below), and `equipmentIdleS` (sim latency × waiting equipment). The CLI prints them under `TOS handlers:`.
 
 **Add a strategy:** add a named entry to `strategies.<dp>.strategies` in `decisions/strategies.ts`. Keep at most 3 per decision point. A strategy must be synchronous and pure, with no `Math.random`. Then add a test that selects it via `config.decisions.points.<dp>.strategy`.
 
@@ -217,26 +220,31 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 
 Deliberately not built, or built differently from the spec (the code review accepted these):
 
-- **Subsystem modes** `real | instant | off` exist for the SHC, ASC and landside subsystems only; quay, berth and yard have no such switch (spec story 104).
-- **No separate WTP pad-selection decision point:** the pad rides in the `shcDispatch` reply (story 61).
 - **Extra shortcuts** E, I and P and the ASC yield moves go beyond the spec (accepted scope).
-- **Yard pre-fill is outside the decision runtime:** no `DecisionRequested/Resolved` events, latency injection or handler KPIs, and an async `yardAllocation` handler is rejected (explicit error). Use a `warmup` or `empty` start to exercise async handlers.
-- **Handler wall latency** is a run total in `kpiReport()` and the final report, not a time series (it is not in the event log).
-- **Truck-delivered exports with a legacy/prefilled start** are new boxes outside the bay plan and are never loaded; only the `empty`/`warmup` start delivers the booked boxes.
-- **SHC cornering:** SHCs stop at every turn.
-- **Hub files** `SetupDialog.vue`, `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass.
+- **Hub files** `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass. The per-kind renderer, dev-API and inspector wiring left the hubs in V11-01 (see Extending); `SetupDialog.vue` is a shell (V11-08, #68): `composables/useSetupDraft.ts` holds the draft and provides it, one `components/setup/Setup<Section>Section.vue` per section (layout, vessels, display, STS, landside, SHC, yard, modes, decisions) edits its part, and `components/setup/*Validation.ts` hold each section's readout and submit message (the shell runs them in order); the shell keeps the end-conditions fieldset inline because `tests/setup-inputs.test.ts` reads it from `SetupDialog.vue`, so a new setup section is a component plus a draft field plus a validator; the ASC subsystem split into `asc.ts` / `ascStorage.ts` / `ascReservations.ts` / `ascDispatch.ts` (+ pure `ascRail.ts`) in V11-09.
+- **Code-review smells accepted for v1.1 (follow-up, not lost):**
+  - Duplicated lock/unlock inputs and readout guards across `SetupStsSection`, `SetupShcSection` and `SetupYardSection`, and across the `*Validation.ts` files. Candidates: a shared `LockUnlockFields` component and a `kinematicsValid` helper.
+  - The `sts.ts` and `asc.ts` subsystems repeat the same equipment-kind skeleton.
+  - Unnamed magic numbers in `yardValidation.ts` and `shcValidation.ts` (for example 8 rows per bay, a nominal 300 m trip); name them as constants next to the rules they feed.
+  - `sceneModel.ts` still has a kind chain (shc, truck, wtpPad, asc, yardSlot, vesselSlot, sts) beside the equipment registry.
+  - `devApi.ts` builds the scene state with `state as unknown as SceneState`; give it a typed builder.
 
 ## Known behaviours and pitfalls
 
 Gotchas specific to one feature sit in its topic doc. These hold across the engine:
 
+- **`wtpPadSelection` (V11-11):** SHC dispatch (`shcDispatch` v2, reply `{jobId}`) picks a job; a discharge job is then held by the SHC (`waiting-for-pad`, no longer open) while `wtpPadSelection` (reply `{wtpPadId}`) answers; load jobs name their own pad and never ask. A `null` pad gives the job back and parks the SHC. Strategies `first-free` (default), `nearest-box`, `last-free`. With latency on it, two SHCs asking at once can get the same pad (a stale reply, like the other points): invariants flag it.
+- **Handler latency series (V11-16, ENGINE_VERSION 0.12.0):** `DecisionResolved.payload.wallLatencyMs` is the measured wall latency of the reply (injected delay + time an async handler took; also on the fallback's `DecisionResolved` after a timeout/error). It is absent when 0, so runs without latency keep their logs and goldens unchanged (no golden changed). In pause mode the log equals the no-latency run apart from this field. The KPI `handler.wall-latency-s` (mean wall latency of the replies resolved in each bucket) is derived from it and shown on the dashboard's TOS handlers tab; a real async handler makes the payload (and series) timing-dependent, as it must.
+- **Truck exports in every start mode (V11-14, ENGINE_VERSION 0.12.0):** with a legacy or pre-filled start a truck-delivered export box is booked on arrival to a new `load` slot of its vessel's bay plan (`bookExtraExport` in `engine/subsystems/landside.ts`, cell from the pure `extraLoadCell` in `scenario/bayPlan.ts`: a stack with no discharge or empties slot, bottom-up, bays with the fewest slots first, a 20 ft box first completes a lone aft half). The slot is added to `state.vesselSlots` with `plannedContainerId`, `vessels[v].remainingLoad++`, and the `TruckArrived` leg carries `slotId`; the vessel has to be `scheduled` (so no work package exists yet) and have room, else it is not offered to export trucks. The KPI collector adds each booked leg to the vessel's moves, so `vessel.remaining-moves` ends at 0. The three landside goldens changed only in `eventLogHash` (leg `slotId`). Empty/warm-up starts still deliver the booked boxes. Test: `tests/truck-exports-booked.test.ts`.
+- **STS ground wake-up (V11-15, ENGINE_VERSION 0.11.0):** an STS in `waiting-for-ground-position` (handler returned `null`) asks again on a freed position (SHC pick, `StsLoadPicked`) or after `layout.stsGroundRetryS` (default 30 s, 0 = timer off) via `StsGroundPositionWaitBackoff` -> `StsGroundPositionWaitEnded` -> a new `stsGroundPosition` request. A handler that always returns `null` keeps asking every back-off. No golden changed.
+- **SHC cornering (V11-12, ENGINE_VERSION 0.9.0):** SHCs take right-angle turns at `min(vMax, sqrt(maxLateralAccel x cornerRadiusM))` (defaults 1.5 m/s², 12 m: about 4.2 m/s) and still stop for reversals, locks and pads. A motion segment carries optional `v0`/`v1` (entry/exit speed); the two runs at a turn share that speed, so every end time is still known at dispatch. `ShcKinematics.cornerRadiusM: 0` restores stop-at-every-turn. Trucks (landside) still stop at turns. All SHC fixture goldens changed on purpose: shorter trips, so one SHC now takes every box on `shc-1sts-2shc-1wtp`.
+- **Pre-run phase (V11-13, ENGINE_VERSION 0.10.0):** a `prefilled` start places its boxes through the decision runtime before the scenario starts. `createSimulation` runs it to the end with a synchronous handler; with an async `yardAllocation` handler it stays in flight (`waiting-for-decision`; `runUntilAsync` completes it). Every pre-run `DecisionRequested`/`DecisionResolved`/`DecisionFailed` has `payload.preRun: true`, is at sim time 0 whatever latency is injected (the wall latency is still recorded in the handler KPIs), and comes before `ScenarioStarted` (which the last pre-run decision schedules). The KPI collector skips pre-run events (series, `yard.fill-pct` etc. start as before). Invariants are swept once at the end of the phase, not per event. A snapshot taken mid pre-run resumes (`state.prefill.replies`). Filter on `payload.preRun` when counting decisions. No fixture uses a pre-filled start, so no golden changed. Details: [docs/yard-and-landside.md](docs/yard-and-landside.md).
 - `kpis.handlers` omits decision points that were never called (so fixtures without SHCs keep their goldens).
 - Shortest paths are cached per lane graph (WeakMap on the config object) and the lane graph per config object: do not mutate a config after `createSimulation`.
 - Every decision adds two events (`DecisionRequested`, `DecisionResolved`) to the log. The tracer golden went from 35 to 55 events in TT-03, with KPIs unchanged. Every run has berthAllocation and craneSplit pairs before the first STS move, so tests must filter on `payload.decisionPoint` (see `gpEvent`/`gpOfType` in `tests/decisions.test.ts`).
 - An injected delay of at least `timeoutMs` (default 5 s) is a timeout. Raise `timeoutMs` when you inject long latencies.
 - A reply computed at request time is delivered later in keep-running mode, so it can be stale. That is realistic: a reply with an invalid ground position surfaces as an invariant violation.
-- If the ground-position handler returns `null`, the STS raises `StsWaitingForGroundPosition` and idles for good. Nothing wakes it yet.
-- Invariants are checked over the whole state after every event (O(state)), which is fine at tracer scale. Revisit before the TTI preset (TT-19).
+- **Invariant cost (V11-18):** invariants are checked incrementally. After an event `InvariantTracker.check` runs only the invariants whose `reads` overlap the event's subjects, and the scoped ones (custody, the five yard rules, reservations, ASC passing, landside segregation, stowage order) look only at the touched boxes, yard columns, equipment and vessels. The tracker remembers each box's last custody owner and yard columns, so a box that left a place still marks it. A full sweep runs on the first check, every `invariants.sweepEvery` events (default 1000, `DEFAULT_SWEEP_EVERY`) and at the end of every run. So an incremental check catches a violation at its exact event, but a violation in state the event did not name (a box changed without being a subject, or a rule broken by the passage of time alone) only surfaces at the next sweep and is attributed to the event where the sweep ran. **When an event changes a container's custody or yard slot, list the container in its `subjects.containers`**; `tests/invariants-incremental.test.ts` guards this on seven fixtures. `sim.invariantStats()` gives incremental checks, sweeps and wall ms; `tt:bench` prints invariant time on its own line.
 - Snapshots embed the full event log. `--from-snapshot` runs write only the window's events/log lines, but KPIs and the event-log hash in the summary are cumulative from t = 0.
 - `--until time:T` leaves `now = T`, so a snapshot taken there resumes at exactly `T`; events at `t ≤ T` are in the snapshot, the window holds `t > T`.
 - Handlers are not in snapshots: pass the same `--handlers` when resuming a window.

@@ -63,6 +63,7 @@ export function releaseRail(sts: StsState): void {
  */
 export function startReposition(ctx: EngineContext, sts: StsState, toX: number): void {
   const seg = planSegment(sts.id, 'gantry', sts.gantryX, toX, ctx.state.now, ctx.config.kinematics.sts.gantry)
+  if (ctx.state.subsystems.quay === 'instant') seg.t1 = seg.t0 // quay mode instant: no travel time
   sts.railLo = Math.min(sts.gantryX, toX)
   sts.railHi = Math.max(sts.gantryX, toX)
   sts.gantryX = toX

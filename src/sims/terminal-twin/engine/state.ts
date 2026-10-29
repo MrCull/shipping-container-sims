@@ -15,10 +15,8 @@ import { ascStartZ, blockSpecs, PARK_UNTIL_S, railSegmentIds, travelHoistM } fro
 import { planCargo, POOL_VESSEL_ID, type SlotPurpose } from '../scenario/bayPlan'
 import { sampleDwell } from '../scenario/dwell'
 import { planExportYard, type ExportPlacement } from '../scenario/exportYard'
-import { prefillOf } from './prefill'
-import type { DecisionHandler } from './decisions/types'
 import { DEFAULT_WARM_UP_S } from '../scenario/types'
-import type { ContainerSize, ScenarioConfig, SubsystemMode, TruckTransactionKind, VesselSizeClass } from '../scenario/types'
+import type { ContainerSize, ScenarioConfig, SubsystemMode, SubsystemModes, TruckTransactionKind, VesselSizeClass } from '../scenario/types'
 import { vesselSlotId as makeVesselSlotId, type CellHalf } from '../scenario/vesselClasses'
 
 /** Kinds of custody owner. `external`: the box left the terminal on a truck (id = the truck). */
@@ -133,7 +131,7 @@ export type StsStatus =
 
 /**
  * SHC state machine (TT-05):
- *   parked → waiting-for-dispatch → job-assigned (waits for its reservations)
+ *   parked → waiting-for-dispatch → (discharge job: waiting-for-pad, V11-11) → job-assigned (waits for its reservations)
  *   → routing-empty → positioning-at-pickup → locking → lifting
  *   → routing-loaded → positioning-at-dropoff → lowering → unlocking
  *   → clearing (reverses clear of the WTP pad) → available
@@ -142,6 +140,7 @@ export type StsStatus =
 export type ShcStatus =
   | 'parked'
   | 'waiting-for-dispatch'
+  | 'waiting-for-pad'
   | 'job-assigned'
   | 'routing-empty'
   | 'positioning-at-pickup'
@@ -357,6 +356,12 @@ export interface YardSlotState {
 }
 
 export interface ResolvedSubsystemModes {
+  /** STS cranes (V11-10). */
+  quay: SubsystemMode
+  /** Berth allocation and mooring (V11-10). */
+  berth: SubsystemMode
+  /** The yard: blocks, ASCs and everything behind them (V11-10). */
+  yard: SubsystemMode
   shc: SubsystemMode
   asc: SubsystemMode
   /** Trucks, gate and transfer stalls (TT-13). */
@@ -373,6 +378,8 @@ export interface TruckLeg {
   containerId: string
   /** Export drops: the vessel the box is booked to (its export window was open on arrival). */
   vesselId?: string
+  /** Export drops with a legacy or pre-filled start (V11-14): the slot added to the vessel's bay plan for the new box. */
+  slotId?: string
   done: boolean
 }
 
@@ -726,6 +733,14 @@ export interface SimState {
   kpis: KpiCounters
   /** Decision points: correlation counter, injector RNG, pending decisions, handler KPIs. */
   decisions: DecisionState
+  /**
+   * Pre-filled start (V11-13): present while the pre-run phase is placing boxes. `replies` are the slot ids the
+   * yardAllocation handler has answered so far (null = no room in that block), in request order; the pre-fill
+   * computation is rebuilt from them after a restore. Removed once the last box is placed.
+   */
+  prefill?: { replies: (string | null)[] }
+  /** Boxes standing in each block at the end of the pre-run, as 20 ft cells (the KPI collector's starting gauge). */
+  prefillCells?: Record<string, number>
   ended: { reason: string; t: number } | null
 }
 
@@ -760,18 +775,24 @@ function validateRail(config: ScenarioConfig): void {
   })
 }
 
-/** Subsystem modes: config, then overrides. SHC defaults to real when SHCs and blocks exist. */
-export function resolveSubsystemModes(
-  config: ScenarioConfig,
-  overrides: { shc?: SubsystemMode; asc?: SubsystemMode; landside?: SubsystemMode } = {},
-): ResolvedSubsystemModes {
+/** Subsystem modes: config, then overrides. Each defaults to real when its equipment exists. `yard` caps the ASC and landside modes. */
+export function resolveSubsystemModes(config: ScenarioConfig, overrides: SubsystemModes = {}): ResolvedSubsystemModes {
   const hasShc = (config.shcs?.length ?? 0) > 0 && (config.yard?.blocks.length ?? 0) > 0
-  const modes = {
-    shc: overrides.shc ?? config.subsystems?.shc ?? (hasShc ? 'real' : 'off'),
-    asc: overrides.asc ?? config.subsystems?.asc ?? (hasShc ? 'real' : 'off'),
-    landside: overrides.landside ?? config.subsystems?.landside ?? (hasLandside(config) ? 'real' : 'off'),
+  const hasYard = (config.yard?.blocks.length ?? 0) > 0
+  const pick = (key: keyof SubsystemModes, fallback: SubsystemMode): SubsystemMode => overrides[key] ?? config.subsystems?.[key] ?? fallback
+  const modes: ResolvedSubsystemModes = {
+    quay: pick('quay', config.sts.length > 0 ? 'real' : 'off'),
+    berth: pick('berth', 'real'),
+    yard: pick('yard', hasYard ? 'real' : 'off'),
+    shc: pick('shc', hasShc ? 'real' : 'off'),
+    asc: pick('asc', hasShc ? 'real' : 'off'),
+    landside: pick('landside', hasLandside(config) ? 'real' : 'off'),
   }
+  if (!hasYard) modes.yard = 'off'
+  if (config.sts.length === 0) modes.quay = 'off'
   if (!hasShc) modes.shc = 'off'
+  if (modes.yard === 'off') modes.asc = 'off'
+  else if (modes.yard === 'instant' && modes.asc === 'real') modes.asc = 'instant'
   if (!hasLandside(config) || modes.asc === 'off') modes.landside = 'off'
   return modes
 }
@@ -825,8 +846,6 @@ export function createInitialState(
   config: ScenarioConfig,
   seed: number,
   subsystems: ResolvedSubsystemModes = resolveSubsystemModes(config),
-  /** A custom yardAllocation handler (synchronous), used for the pre-fill placement. */
-  yardAllocation?: DecisionHandler<'yardAllocation'>,
 ): SimState {
   validateRail(config)
   const state: SimState = {
@@ -902,8 +921,10 @@ export function createInitialState(
   const hasYard = blockSpecs(config).length > 0
   if (emptyStart && hasYard && loading && plan.containers.some((c) => c.flow === 'load') && (subsystems.landside === 'off' || !config.landside))
     throw new Error('An empty or warm-up yard start needs the landside: export boxes arrive by truck (add config.landside, or use a pre-filled start)')
-  const prefill = prefillOf(config, plan, seed, yardAllocation, state)
-  const placements: ExportPlacement[] = prefill ? prefill.placements : emptyStart && hasYard ? [] : planExportYard(config, plan)
+  // a pre-filled start places its boxes in the pre-run phase (engine/subsystems/prefill.ts): until then they are outside
+  const prefilled = startMode === 'prefilled' && hasYard
+  if (prefilled) state.prefill = { replies: [] }
+  const placements: ExportPlacement[] = (emptyStart || prefilled) && hasYard ? [] : planExportYard(config, plan)
   const exportPlacement = new Map(placements.map((p) => [p.containerId, p]))
   const outside: CustodyRef = { kind: 'external', id: 'outside' }
   for (const c of plan.containers) {
@@ -912,10 +933,10 @@ export function createInitialState(
       state.vesselSlots[c.slotId].plannedContainerId = c.id
       if (loading) state.vessels[c.vesselId].remainingLoad++
       // an empty start: the booked box is still outside, a truck brings it during the run
-      owner = emptyStart && hasYard ? { ...outside } : { kind: 'yardSlot', id: (exportPlacement.get(c.id) as { slotId: string }).slotId }
+      owner = (emptyStart || prefilled) && hasYard ? { ...outside } : { kind: 'yardSlot', id: (exportPlacement.get(c.id) as { slotId: string }).slotId }
     } else if (c.flow === 'pool') {
       if (emptyStart && hasYard) continue // no empty pool at the start: empties arrive by truck
-      owner = { kind: 'yardSlot', id: (exportPlacement.get(c.id) as { slotId: string }).slotId }
+      owner = prefilled ? { ...outside } : { kind: 'yardSlot', id: (exportPlacement.get(c.id) as { slotId: string }).slotId }
     } else {
       state.vesselSlots[c.slotId].containerId = c.id
       state.vessels[c.vesselId].remainingDischarge++
@@ -939,20 +960,6 @@ export function createInitialState(
         readyAt: null,
       })
       if (loading) state.vessels[c.transshipment.onwardVesselId].remainingLoad++
-    }
-  }
-  for (const imp of prefill?.imports ?? []) {
-    const owner: CustodyRef = { kind: 'yardSlot', id: (exportPlacement.get(imp.id) as { slotId: string }).slotId }
-    state.containers[imp.id] = {
-      id: imp.id,
-      size: imp.size,
-      full: true,
-      line: imp.line,
-      vesselId: POOL_VESSEL_ID,
-      custody: owner,
-      custodyHistory: [{ t: 0, owner, eventId: null }],
-      yardSince: -imp.ageS,
-      pickupReadyAt: imp.pickupReadyAt,
     }
   }
   config.sts.forEach((s, railIndex) => {

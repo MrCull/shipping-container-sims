@@ -28,7 +28,13 @@ export interface EngineContext {
    * which the asking subsystem handles in its own reactor. `subjects.equipment`
    * is the equipment that idles while waiting (for idle-time KPIs).
    */
-  requestDecision<K extends DecisionPointId>(decisionPoint: K, request: DecisionRequests[K], subjects: EventSubjects): string
+  requestDecision<K extends DecisionPointId>(
+    decisionPoint: K,
+    request: DecisionRequests[K],
+    subjects: EventSubjects,
+    /** `preRun`: the decision belongs to the pre-run phase: its events are marked and it never advances the sim clock. */
+    options?: { preRun?: boolean },
+  ): string
   /** Record a custody change (holders must be updated by the caller). */
   transferCustody(containerId: string, to: CustodyRef): void
 }

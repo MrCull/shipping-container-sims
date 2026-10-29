@@ -27,6 +27,8 @@
  *   await __tt.saves.rewindPoints(); await __tt.saves.rewindTo(0)        // automatic rewind points (default every 15 sim-minutes)
  *   __tt.screenPoint('STS01'); __tt.pickAt(x, y)                         // 3D picking, client coordinates
  */
+import { isViewPreset } from '../modules/viewPresets'
+import { readHudLayout, type HudLayout } from '../modules/hudLayout'
 import type { ScenarioOverrides } from '../scenario/overrides'
 import type { DisplaySettings, ScenarioConfig } from '../scenario/types'
 import type {
@@ -45,6 +47,7 @@ import type { Breakpoint, BreakpointKind } from '../modules/breakpoints'
 import type { OverlayState } from '../modules/overlays'
 import type { QualityLevel, QualitySetting } from '../modules/quality'
 import { usePerfStore, type PerfStats } from '../store/perfStore'
+import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
 import type { TruckRigState } from '../modules/truckAssets'
@@ -100,6 +103,10 @@ export interface TwinDevApi {
   select(entityId: string | null): void
   /** Point the camera at an entity (container, STS or vessel id), optionally from `distanceM`; false if unknown. */
   cameraTo(entityId: string, distanceM?: number): boolean
+  /** Frame a view preset by name ('quay' | 'yard' | 'gate' | 'overview'); false for an unknown name or a region the scene lacks. */
+  viewPreset(name: string): boolean
+  /** Select and follow the next truck to arrive at or after the display time; its id, or null while none is known yet (stays pending; `ui().followNextPending`). */
+  followNextTruck(): string | null
   setSpeed(speed: number): void
   pause(): void
   play(): void
@@ -156,6 +163,8 @@ export interface TwinDevApi {
   screenPoint(entityId: string): { x: number; y: number } | null
   /** Where the orbit camera looks (follow-camera checks). */
   cameraTarget(): { x: number; y: number; z: number } | null
+  /** Bounding box (viewport px) of each named HUD region (`null` when not shown); see modules/hudLayout.ts. */
+  hudLayout(): HudLayout
   /** Saves, snapshots and rewind (TT-17). */
   saves: TwinSavesApi
 }
@@ -223,6 +232,7 @@ export interface TwinAtmosphereState {
 export interface TwinUiState {
   selectedId: string | null
   following: boolean
+  followNextPending: boolean
   overlaysVisible: boolean
   dashboardOpen: boolean
   helpOpen: boolean
@@ -231,7 +241,12 @@ export interface TwinUiState {
   inspectorOpen: boolean
 }
 
+/**
+ * What the dev API reports about the scene. The equipment-kind entries (`sts`, `shcs`, `ascs`, `trucks`, `vessels` and their
+ * rig keys) are filled from the registry (`modules/equipmentKinds/`); a new kind appears under its own keys, typed here only if wanted.
+ */
 export interface SceneState {
+  [kind: string]: unknown
   displayTime: number
   containers: Record<string, CustodyRef | null>
   sts: Record<string, { status: string } & StsPose>
@@ -320,6 +335,8 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     why: (eventId) => ctl().passthrough<EngineEvent[]>({ op: 'why', eventId }),
     select: (id) => store.select(id),
     cameraTo: (id, distanceM) => store.view()?.cameraTo(id, distanceM) ?? false,
+    followNextTruck: () => store.followNextTruck(),
+    viewPreset: (name) => (isViewPreset(name) ? store.setViewPreset(name) : false),
     setSpeed: (s) => store.setSpeed(s),
     pause: () => {
       ctl().pause()
@@ -363,22 +380,19 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       const model = c?.model
       if (!c || !model) return null
       const t = c.displayTime
-      return {
+      const state: Record<string, unknown> = {
         displayTime: t,
         containers: Object.fromEntries(model.containerIds.map((id) => [id, model.custodyAt(id, t)])),
-        sts: Object.fromEntries(model.stsIds.map((id) => [id, { status: model.statusAt('sts', id, t), ...model.stsPose(id, t) }])),
-        shcs: Object.fromEntries(model.shcIds.map((id) => [id, { status: model.statusAt('shc', id, t), ...model.shcPose(id, t) }])),
-        ascs: Object.fromEntries(model.ascIds.map((id) => [id, { status: model.statusAt('asc', id, t), ...model.ascPose(id, t) }])),
-        trucks: Object.fromEntries(model.truckIds.map((id) => [id, { status: model.statusAt('truck', id, t), ...model.truckPose(id, t) }])),
         reservations: model.activeReservations(t),
-        vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
         liveries: store.view()?.liveries() ?? {},
-        shcRigs: store.view()?.shcRigs() ?? {},
-        truckRigs: store.view()?.truckRigs() ?? {},
-        ascRigs: store.view()?.ascRigs() ?? {},
-        stsRendered: store.view()?.sts() ?? {},
-        vesselHulls: store.view()?.vesselHulls() ?? {},
       }
+      // Equipment kinds (modules/equipmentKinds/): status and pose per id, and the rig state as drawn.
+      const rigs = store.view()?.rigs()
+      for (const def of EQUIPMENT_KINDS) {
+        state[def.sceneKey] = Object.fromEntries(def.ids(model).map((id) => [id, def.sceneState(model, id, t)]))
+        state[def.rigKey] = rigs?.[def.kind] ?? {}
+      }
+      return state as unknown as SceneState
     },
     display: () => ({ ...store.display }),
     setDisplay: (next) => {
@@ -405,6 +419,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     ui: () => ({
       selectedId: store.selectedId,
       following: store.following,
+      followNextPending: store.followNextPending,
       overlaysVisible: store.overlaysVisible,
       dashboardOpen: store.dashboardOpen,
       helpOpen: store.helpOpen,
@@ -454,6 +469,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     pickAt: (x, y) => store.view()?.pickAt(x, y) ?? null,
     screenPoint: (id) => store.view()?.screenPoint(id) ?? null,
     cameraTarget: () => store.view()?.cameraTarget() ?? null,
+    hudLayout: () => readHudLayout(document, { width: window.innerWidth, height: window.innerHeight }),
     saves: {
       fileText: async (type, name) => JSON.stringify(await store.buildSave(type, name)),
       saveToBrowser: (type, name) => store.saveToBrowser(type, name),

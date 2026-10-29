@@ -57,15 +57,36 @@ function runAlongZ(key: InfraKey, z0: number, z1: number, x: number, segment: nu
   return Array.from({ length: n }, (_, i) => place(key, x, z0 + (i + 0.5) * len, -Math.PI / 2, 0, len / segment))
 }
 
-/** High-mast positions (also used by the atmosphere's night glow): the quay row, then each block's length. */
+/** Half the width of a yard block's footprint across X (m): the ASC rail span plus the leg width. No mast stands inside it. */
+export const BLOCK_FOOTPRINT_HALF_X_M = ASC.span / 2 + ASC.legWidth
+/** How far a mast stands outside a block's footprint when there is no neighbour to share the gap with (m). */
+const MAST_SIDE_CLEARANCE_M = 6
+
+/**
+ * High-mast positions (also used by the atmosphere's night glow): the quay row, then the yard. Yard masts stand only
+ * in the gaps between neighbouring blocks (mid-gap) and beside the outermost blocks, never inside a block footprint:
+ * a block's centre line is where its ASCs travel (V11-03). Each gap lights both blocks beside it.
+ */
 export function mastSpots(input: Pick<InfraLayoutInput, 'config' | 'blocks'>, quayZ: number): [number, number][] {
   const spots: [number, number][] = []
   const quayLen = input.config.quay.lengthM
   for (let x = -40; x <= quayLen + 40; x += MAST_PITCH_M) spots.push([x, quayZ])
-  for (const b of input.blocks) {
-    const z0 = b.wtpZ + 7
+  const blocks = [...input.blocks].sort((a, b) => a.x - b.x)
+  const zsOf = (b: BlockSpec): number[] => {
+    const out: number[] = []
     const endZ = b.firstBayZ + (b.bays - 0.5) * 6.7
-    for (let z = z0 + 25; z <= endZ; z += 70) spots.push([b.x, z])
+    for (let z = b.wtpZ + 7 + 25; z <= endZ; z += 70) out.push(z)
+    return out
+  }
+  for (let i = 0; blocks.length > 0 && i <= blocks.length; i++) {
+    const west = blocks[i - 1]
+    const east = blocks[i]
+    let x: number
+    if (!west) x = east.x - BLOCK_FOOTPRINT_HALF_X_M - MAST_SIDE_CLEARANCE_M
+    else if (!east) x = west.x + BLOCK_FOOTPRINT_HALF_X_M + MAST_SIDE_CLEARANCE_M
+    else x = Math.min((west.x + east.x) / 2, west.x + BLOCK_FOOTPRINT_HALF_X_M + 20)
+    const zs = new Set<number>([...(west ? zsOf(west) : []), ...(east ? zsOf(east) : [])])
+    for (const z of [...zs].sort((a, b) => a - b)) spots.push([x, z])
   }
   return spots.slice(0, MAX_MASTS)
 }

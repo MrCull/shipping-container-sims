@@ -10,6 +10,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { NO_OVERLAYS } from '../modules/overlays'
 import { pickEntity } from '../modules/picking'
+import { viewPresetPose, type ViewPresetName } from '../modules/viewPresets'
 import { hourOfDay, lightingFor } from '../modules/atmosphere'
 import { SceneRenderer } from '../modules/sceneRenderer'
 import type { SceneModel } from '../modules/sceneModel'
@@ -156,6 +157,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       // Follow camera (F): keep the selection centred, keeping the user's viewing offset.
       const centre = controller.model?.entityCentre(store.selectedId, controller.displayTime)
       if (centre) aim(centre, true)
+      else if (controller.model?.truckPhase(store.selectedId, controller.displayTime) !== 'waiting') store.toggleFollow() // a truck still to arrive keeps the camera where it is; otherwise the followed entity left the scene (a truck exited the gate): release, the view stays put
     }
     // Time of day: the sun follows the sim clock (re-applied when the clock moves a minute or the lock changes).
     const hour = hourOfDay(store.choice.startDateTime, controller.displayTime)
@@ -168,7 +170,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     camera.updateMatrixWorld()
     frustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
     const cpuStart = performance.now()
-    view.update(controller.displayTime, store.selectedId, camera.position, frustum)
+    view.update(controller.displayTime, store.selectedId, camera.position, frustum, { camera, width: host.value?.clientWidth || 1, height: host.value?.clientHeight || 1 })
     const poseDone = performance.now()
     poseMs = poseMs === 0 ? poseDone - cpuStart : poseMs * 0.9 + (poseDone - cpuStart) * 0.1
     if (import.meta.env.DEV && perf.debugLoadMs > 0) {
@@ -239,16 +241,23 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         aim(centre, true, distanceM)
         return true
       },
+      viewPreset(preset: ViewPresetName) {
+        const model = store.controller()?.model
+        if (!model || !camera || !controls) return false
+        const pose = viewPresetPose(model, preset, camera.aspect)
+        if (!pose) return false
+        const offset = new THREE.Vector3(pose.direction.x, pose.direction.y, pose.direction.z).multiplyScalar(pose.distanceM)
+        controls.target.set(pose.target.x, pose.target.y, pose.target.z)
+        camera.position.copy(controls.target).add(offset)
+        controls.update()
+        return true
+      },
       pickAt,
       screenPoint,
       cameraTarget: () => (controls ? { x: controls.target.x, y: controls.target.y, z: controls.target.z } : null),
       stats: () => (view ? { ...view.stats(), frames: framesRendered, render: { ...lastRender } } : null),
       liveries: () => view?.renderedLiveries() ?? null,
-      shcRigs: () => view?.renderedShcs() ?? null,
-      truckRigs: () => view?.renderedTrucks() ?? null,
-      ascRigs: () => view?.renderedAscs() ?? null,
-      sts: () => view?.renderedSts() ?? null,
-      vesselHulls: () => view?.vesselHulls() ?? null,
+      rigs: () => view?.renderedRigs() ?? null,
       drawBreakdown: () => (view ? view.drawBreakdown(frustum) : null),
       atmosphere: () => view?.atmosphereState() ?? null,
     })

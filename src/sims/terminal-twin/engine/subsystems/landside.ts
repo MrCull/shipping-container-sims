@@ -52,11 +52,12 @@ import { blockSpecs, parseYardSlotId } from '../yardLayout'
 import { kpiClockOf, HOUR_S } from '../kpi/clock'
 import { makeIso6346Id } from '../../scenario/iso6346'
 import { LINE_OWNER_PREFIX } from '../../scenario/lines'
-import { pickWeighted, POOL_VESSEL_ID } from '../../scenario/bayPlan'
+import { extraLoadCell, pickWeighted, POOL_VESSEL_ID } from '../../scenario/bayPlan'
 import { sampleDwell } from '../../scenario/dwell'
 import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import type { ContainerSize, LandsideConfig, TruckTransactionKind } from '../../scenario/types'
 import { DEFAULT_LANDSIDE } from '../../scenario/builder'
+import { vesselSlotId } from '../../scenario/vesselClasses'
 import { maybeDispatchAsc, pumpAllocation } from './asc'
 import { TripBuilder, waypoints } from './shc'
 
@@ -185,10 +186,28 @@ export function exportVessels(ctx: EngineContext): { vesselId: string; weight: n
   for (const v of ctx.config.vessels) {
     if (state.vessels[v.id].status !== 'scheduled') continue
     const untilEta = v.arrivalS - state.now
-    if (v.load > 0 && untilEta >= cfg.exportWindow.minBeforeEtaS && untilEta <= cfg.exportWindow.maxBeforeEtaS)
+    if (v.load > 0 && untilEta >= cfg.exportWindow.minBeforeEtaS && untilEta <= cfg.exportWindow.maxBeforeEtaS && extraLoadCellOf(ctx, v.id, '40'))
       out.push({ vesselId: v.id, weight: v.load })
   }
   return out
+}
+
+/** The next free cell of a vessel's bay plan for a delivered export box (legacy or pre-filled start), or null when full. */
+function extraLoadCellOf(ctx: EngineContext, vesselId: string, size: ContainerSize) {
+  return extraLoadCell(ctx.state.vessels[vesselId].sizeClass, Object.values(ctx.state.vesselSlots).filter((s) => s.vesselId === vesselId), size)
+}
+
+/**
+ * V11-14: book a box a truck delivers (legacy or pre-filled start) against the vessel's bay plan: a new load slot
+ * above the vessel's other load boxes, so the load flow fetches it like a booked one. Returns the slot id.
+ */
+function bookExtraExport(ctx: EngineContext, box: ContainerState, vesselId: string): string {
+  const { state } = ctx
+  const cell = extraLoadCellOf(ctx, vesselId, box.size) as NonNullable<ReturnType<typeof extraLoadCellOf>>
+  const id = vesselSlotId(vesselId, cell.bay, cell.row, cell.tier, cell.half)
+  state.vesselSlots[id] = { id, vesselId, ...cell, purpose: 'load', containerId: null, plannedContainerId: box.id }
+  if (state.subsystems.shc !== 'off' && state.subsystems.asc !== 'off') state.vessels[vesselId].remainingLoad++
+  return id
 }
 
 function newBox(ctx: EngineContext, owner: string, full: boolean, vesselId: string): ContainerState {
@@ -271,7 +290,8 @@ function makeLegs(ctx: EngineContext, truck: string, transaction: TruckTransacti
         ctx.transferCustody(booked.id, { kind: 'truck', id: truck })
       }
       const box = booked ?? newBox(ctx, truck, true, chosen.vesselId)
-      legs.push({ kind: 'drop', purpose, containerId: box.id, vesselId: chosen.vesselId, done: false })
+      const slotId = booked ? undefined : bookExtraExport(ctx, box, chosen.vesselId)
+      legs.push({ kind: 'drop', purpose, containerId: box.id, vesselId: chosen.vesselId, ...(slotId ? { slotId } : {}), done: false })
     } else {
       const box = newBox(ctx, truck, false, POOL_VESSEL_ID)
       legs.push({ kind: 'drop', purpose, containerId: box.id, done: false })
@@ -801,6 +821,7 @@ export const landsideReactors: ReactorMap = {
       containerId: l.containerId,
       size: state.containers[l.containerId].size,
       ...(l.vesselId ? { vesselId: l.vesselId } : {}),
+      ...(l.slotId ? { slotId: l.slotId } : {}),
     }))
     ctx.schedule('TruckArrived', e.t, { equipment: [id], containers: legs.map((l) => l.containerId) }, {
       truckId: id,

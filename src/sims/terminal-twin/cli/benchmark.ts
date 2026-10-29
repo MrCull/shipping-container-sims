@@ -3,7 +3,7 @@
  * wall-ms per sim-hour and peak memory; compare against a committed baseline.
  * Local only (CI timing is too noisy): `npm run tt:bench`. Entry point: `bench.ts`.
  */
-import { createSimulation, suggestedInvariantEvery } from '../engine'
+import { createSimulation, DEFAULT_SWEEP_EVERY } from '../engine'
 import { presets } from '../scenario/presets'
 
 export const REGRESSION_THRESHOLD = 0.2
@@ -11,8 +11,8 @@ export const REGRESSION_THRESHOLD = 0.2
 export interface BenchOptions {
   preset: string
   simHours: number
-  /** Check invariants every N events; default = what the browser worker uses for this scenario. */
-  invariantsEvery?: number
+  /** Full invariant sweep every N events (between sweeps events are checked incrementally); 0 = invariants off. Default = the engine's. */
+  sweepEvery?: number
   /** Self-test: busy-wait this many ms per processed event, to prove the regression flag trips. */
   slowMsPerEvent?: number
   /** Injectable clock and memory probe (tests). */
@@ -23,7 +23,8 @@ export interface BenchOptions {
 export interface BenchReport {
   preset: string
   simHours: number
-  invariantsEvery: number
+  /** Full sweep interval (0 = invariants off). */
+  sweepEvery: number
   events: number
   wallMs: number
   eventsPerSec: number
@@ -31,6 +32,11 @@ export interface BenchReport {
   peakMemoryMb: number
   status: string
   invariantViolations: number
+  /** Wall time spent in invariant checks, ms, and per processed event (reported separately from the engine's own time). */
+  invariantMs: number
+  invariantMsPerEvent: number
+  /** Events checked incrementally and full sweeps run. */
+  invariantChecks: { incremental: number; sweeps: number }
   firstError: string | null
   /** Environment the numbers were taken on (timings only compare on a like machine). */
   env: { node: string; cpu: string; load1: number }
@@ -63,8 +69,8 @@ export function runBenchmark(options: BenchOptions, env: BenchReport['env']): Be
   const now = options.now ?? (() => performance.now())
   const memoryMb = options.memoryMb ?? defaultMemoryMb
   const config = build()
-  const every = options.invariantsEvery ?? suggestedInvariantEvery(config)
-  const sim = createSimulation(config, {}, { invariants: every <= 0 ? { enabled: false } : { every } })
+  const every = options.sweepEvery ?? DEFAULT_SWEEP_EVERY
+  const sim = createSimulation(config, {}, { invariants: every <= 0 ? { enabled: false } : { sweepEvery: every } })
   const slow = options.slowMsPerEvent ?? 0
   if (slow > 0)
     sim.subscribe(() => {
@@ -84,10 +90,11 @@ export function runBenchmark(options: BenchOptions, env: BenchReport['env']): Be
   }
   const wallMs = Math.max(1e-6, now() - start)
   const report = sim.invariantReport()
+  const stats = sim.invariantStats()
   return {
     preset: options.preset,
     simHours: options.simHours,
-    invariantsEvery: every,
+    sweepEvery: every,
     events,
     wallMs,
     eventsPerSec: events / (wallMs / 1000),
@@ -95,6 +102,9 @@ export function runBenchmark(options: BenchOptions, env: BenchReport['env']): Be
     peakMemoryMb: peak,
     status: sim.status,
     invariantViolations: report.violations.length,
+    invariantMs: stats.wallMs,
+    invariantMsPerEvent: events > 0 ? stats.wallMs / events : 0,
+    invariantChecks: { incremental: stats.incremental, sweeps: stats.sweeps },
     firstError: sim.firstError ? String(sim.firstError.message ?? sim.firstError) : null,
     env,
   }
@@ -113,10 +123,11 @@ export function compareToBaseline(current: BenchReport, baseline: BenchReport, t
 
 export function formatReport(report: BenchReport, comparison?: Comparison): string[] {
   const lines = [
-    `Benchmark: ${report.preset}, ${report.simHours} sim-hours, invariants every ${report.invariantsEvery} events`,
+    `Benchmark: ${report.preset}, ${report.simHours} sim-hours, invariants: incremental, full sweep every ${report.sweepEvery} events`,
     `  events           ${report.events} in ${(report.wallMs / 1000).toFixed(2)} s wall`,
     `  events/sec       ${report.eventsPerSec.toFixed(0)}`,
     `  wall-ms/sim-hour ${report.wallMsPerSimHour.toFixed(0)}`,
+    `  invariants       ${report.invariantMs.toFixed(0)} ms (${(report.invariantMsPerEvent * 1000).toFixed(0)} us/event; ${report.invariantChecks.incremental} incremental, ${report.invariantChecks.sweeps} sweeps), included above`,
     `  peak memory      ${report.peakMemoryMb.toFixed(0)} MB (rss)`,
     `  status           ${report.status}, ${report.invariantViolations} invariant violations${report.firstError ? `, first error: ${report.firstError}` : ''}`,
     `  machine          node ${report.env.node}, ${report.env.cpu}, load ${report.env.load1.toFixed(2)}`,
