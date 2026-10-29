@@ -120,6 +120,31 @@ test('Run to… jumps to the target and the scene matches the engine there', asy
   expect(errors).toEqual([])
 })
 
+test('the Run to… popup sits above the 3D view: its buttons take real clicks and Run runs', async ({ page }) => {
+  const errors = collectErrors(page)
+  for (const size of [
+    { width: 1280, height: 720 },
+    { width: 1920, height: 1080 },
+  ]) {
+    await page.setViewportSize(size)
+    await openTracer(page)
+    await page.getByRole('button', { name: /run to/i }).first().click()
+    const run = page.locator('.run-to-pop button[type="submit"]')
+    await expect(run).toBeVisible()
+    // nothing but the button (or its label) is at its centre: the canvas must not cover the popup
+    const topmost = await run.evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+      return hit === el || el.contains(hit)
+    })
+    expect(topmost, `${size.width}x${size.height}`).toBe(true)
+    await run.click({ timeout: 5000 }) // a real click, no force: fails if the canvas intercepts it
+    await expect(page.locator('.run-to-pop')).toBeHidden()
+    await page.waitForFunction(() => window.__tt!.clock().displayTime >= 600)
+  }
+  expect(errors).toEqual([])
+})
+
 test('Reset returns to t = 0 with the same seed; New Scenario reopens the setup dialog', async ({ page }) => {
   await openTracer(page)
   await page.evaluate(() => window.__tt!.runTo(500))

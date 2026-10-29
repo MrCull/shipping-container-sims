@@ -253,6 +253,9 @@ async function submitRunTo(): Promise<void> {
 
 <style scoped>
 .tt-topbar {
+  /* Above the scene below it (HUD panels are z 4-8, modals 40+): the Run to… popup hangs out of the bar over the 3D view. */
+  position: relative;
+  z-index: 10;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
