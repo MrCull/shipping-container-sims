@@ -45,6 +45,19 @@ describe('SHC model asset', () => {
     }
   })
 
+  it('keeps rig nodes exact: they are empties, with the meshes in `_geo` children (compression puts its transform on mesh nodes)', () => {
+    const json = readGlbJson(join(DIR, 'shc.glb'))
+    const rig = /^(steer_|wheel_|twistlock_)(fl|fr|rl|rr)$|^(hoist|spreader)$/
+    const nodes = (json.nodes ?? []) as { name?: string; mesh?: number; scale?: number[] }[]
+    const rigNodes = nodes.filter((n) => rig.test(n.name ?? ''))
+    expect(rigNodes.length).toBeGreaterThanOrEqual(2 * 12)
+    for (const n of rigNodes) {
+      expect(n.mesh, n.name).toBeUndefined()
+      expect(n.scale, n.name).toBeUndefined()
+    }
+    expect(nodes.filter((n) => n.name?.endsWith('_geo') && n.mesh !== undefined).length).toBeGreaterThanOrEqual(rigNodes.length - 3)
+  })
+
   it('records rig travel limits with pivots at the mechanical axes, and the container attach point', () => {
     const m = meta()
     expect(m.travelLimits.steer_fl).toMatchObject({ type: 'rotation', axis: '+Y' })

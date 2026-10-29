@@ -437,6 +437,7 @@ Most of each container file is the embedded 2048² livery atlas. The renderer sh
 ### Rig and sidecar conventions (all assets)
 
 - **Hierarchy:** the root node is the asset name, with children `LOD0` and `LOD1` (plus `LOD2` for big equipment). Movable parts are named nodes under the LOD with their **origin at the mechanical pivot**. Use the spec's names: `gantry`, `trolley`, `hoist`, `spreader`, twist-locks, `wheel_*`, `steer_*`, `boom`. Containers have `LOD0/{body, door_left, door_right}` and a `LOD1` mesh.
+- **Rig nodes are empties** (ASC, STS and SHC alike): the mesh of a rig node lives in a `<name>_geo` child, because meshopt puts its dequantisation transform on mesh nodes, which would offset a pivot. Static meshes (`frame`, `body`) may be mesh nodes. Each asset test guards this (`_geo`).
 - **Axes (glTF):** +Y up, metres, origin at the ground-contact point (bottom centre for containers), length along +X (container doors at +X), width along Z. Blender authoring is Z-up, and the exporter converts (glTF Z = −Blender Y).
 - **Sidecar `<asset>.meta.json`:**
   - `asset`, and `kind` (the budget key);

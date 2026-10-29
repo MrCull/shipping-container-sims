@@ -99,6 +99,9 @@ def sidecar(info):
         nodes.append({'name': f'twistlock_{n}', 'parent': 'spreader', 'role': 'rig',
                       'pivot': _gl((sx * TWISTLOCK_X, sy * TWISTLOCK_Y, ATTACH_Z)), 'axis': '+Y',
                       'description': 'twist-lock; 0 = unlocked, 90 degrees = locked'})
+    # Every rig node is an empty at its pivot; the mesh is its `<name>_geo` child (LOD2 keeps only a bare spreader plate).
+    for rig in [n for n in nodes if n['role'] == 'rig']:
+        nodes.append({'name': rig['name'] + '_geo', 'parent': rig['name'], 'role': 'mesh', 'description': 'mesh of ' + rig['name']})
     limits = {}
     for n, _, _ in CORNERS:
         limits[f'steer_{n}'] = {'type': 'rotation', 'axis': '+Y', 'minDeg': -35, 'maxDeg': 35, 'rest': 0, 'tag': 'A'}

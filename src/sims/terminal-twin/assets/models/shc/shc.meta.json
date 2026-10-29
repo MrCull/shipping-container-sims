@@ -212,6 +212,90 @@
       ],
       "axis": "+Y",
       "description": "twist-lock; 0 = unlocked, 90 degrees = locked"
+    },
+    {
+      "name": "steer_fl_geo",
+      "parent": "steer_fl",
+      "role": "mesh",
+      "description": "mesh of steer_fl"
+    },
+    {
+      "name": "wheel_fl_geo",
+      "parent": "wheel_fl",
+      "role": "mesh",
+      "description": "mesh of wheel_fl"
+    },
+    {
+      "name": "steer_fr_geo",
+      "parent": "steer_fr",
+      "role": "mesh",
+      "description": "mesh of steer_fr"
+    },
+    {
+      "name": "wheel_fr_geo",
+      "parent": "wheel_fr",
+      "role": "mesh",
+      "description": "mesh of wheel_fr"
+    },
+    {
+      "name": "steer_rl_geo",
+      "parent": "steer_rl",
+      "role": "mesh",
+      "description": "mesh of steer_rl"
+    },
+    {
+      "name": "wheel_rl_geo",
+      "parent": "wheel_rl",
+      "role": "mesh",
+      "description": "mesh of wheel_rl"
+    },
+    {
+      "name": "steer_rr_geo",
+      "parent": "steer_rr",
+      "role": "mesh",
+      "description": "mesh of steer_rr"
+    },
+    {
+      "name": "wheel_rr_geo",
+      "parent": "wheel_rr",
+      "role": "mesh",
+      "description": "mesh of wheel_rr"
+    },
+    {
+      "name": "hoist_geo",
+      "parent": "hoist",
+      "role": "mesh",
+      "description": "mesh of hoist"
+    },
+    {
+      "name": "spreader_geo",
+      "parent": "spreader",
+      "role": "mesh",
+      "description": "mesh of spreader"
+    },
+    {
+      "name": "twistlock_fl_geo",
+      "parent": "twistlock_fl",
+      "role": "mesh",
+      "description": "mesh of twistlock_fl"
+    },
+    {
+      "name": "twistlock_fr_geo",
+      "parent": "twistlock_fr",
+      "role": "mesh",
+      "description": "mesh of twistlock_fr"
+    },
+    {
+      "name": "twistlock_rl_geo",
+      "parent": "twistlock_rl",
+      "role": "mesh",
+      "description": "mesh of twistlock_rl"
+    },
+    {
+      "name": "twistlock_rr_geo",
+      "parent": "twistlock_rr",
+      "role": "mesh",
+      "description": "mesh of twistlock_rr"
     }
   ],
   "travelLimits": {

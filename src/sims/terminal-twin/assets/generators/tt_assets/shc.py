@@ -349,7 +349,13 @@ def build_lod(root, level, material):
         nonlocal tris
         tris += part.triangles
         parts[name] = part.triangles
-        return _obj(part, name + suffix, material, parent, loc)
+        if name == 'frame':
+            return _obj(part, name + suffix, material, parent, loc)
+        # a rig node: an empty at the mechanical pivot, with its mesh in the child `<name>_geo` (the compression step puts its
+        # dequantisation transform on mesh nodes, which must never be rig nodes)
+        rig = empty(name + suffix, parent, loc)
+        _obj(part, name + '_geo' + suffix, material, rig)
+        return rig
 
     if level == 2:
         add(lod2_mesh(), 'frame', lod)
