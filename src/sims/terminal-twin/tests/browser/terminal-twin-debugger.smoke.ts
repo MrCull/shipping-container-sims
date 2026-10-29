@@ -267,16 +267,28 @@ test('each overlay toggles independently and reflects live engine state', async 
   expect(occ.layers.groundPositionsOccupied).toBe(occ.onGp)
   expect(occ.layers.labels).toBe(0)
 
-  // Labels: one per crane, carrier and visible vessel; occupancy plates are off again.
+  // Labels: one per crane, carrier and visible vessel; occupancy plates are off again. Declutter (#65) hides labels
+  // that would overlap a higher-priority one, so visible + hidden = expected and no two visible boxes overlap.
   await page.evaluate(() => window.__tt!.overlays({ occupancy: false, labels: true }))
+  await page.evaluate(() => window.__tt!.viewPreset('overview')) // every entity on screen: off-screen labels count as neither shown nor hidden
   await page.waitForFunction(() => window.__tt!.scene()!.layers.labels > 0)
+  await page.waitForTimeout(500)
   const labels = await page.evaluate(() => {
     const scene = window.__tt!.scene()!
     const state = window.__tt!.sceneState()!
     const visibleVessels = Object.values(state.vessels).filter((v) => ['mooring', 'berthed', 'unmooring', 'at-anchorage'].includes(v.status)).length
-    return { shown: scene.layers.labels, expected: scene.sts + scene.shcs + scene.ascs + visibleVessels, pads: scene.layers.padsOccupied + scene.layers.padsFree }
+    return { shown: scene.layers.labels, hidden: scene.layers.labelsHidden, boxes: scene.layers.labelBoxes, expected: scene.sts + scene.shcs + scene.ascs + visibleVessels, pads: scene.layers.padsOccupied + scene.layers.padsFree }
   })
-  expect(labels.shown).toBe(labels.expected)
+  expect(labels.shown).toBeGreaterThan(0)
+  expect(labels.shown + labels.hidden).toBe(labels.expected)
+  expect(labels.boxes.length).toBe(labels.shown)
+  for (let i = 0; i < labels.boxes.length; i++)
+    for (let j = i + 1; j < labels.boxes.length; j++) {
+      const a = labels.boxes[i]
+      const b = labels.boxes[j]
+      const apart = a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y
+      expect(apart, `${a.id} and ${b.id}`).toBe(true)
+    }
   expect(labels.pads).toBe(0)
 
   // The O shortcut is the master switch: everything hidden, counts go to zero.
