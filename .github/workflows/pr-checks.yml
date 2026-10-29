@@ -40,6 +40,8 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     name: Browser smoke tests (Terminal Twin)
+    # Required. Frame-based assertions are ratios over a wall-clock window (tests/browser/frameSampling.ts), so the x600
+    # animation specs and the draw/triangle budgets hold on a loaded 2-core runner. Everything except `@load` runs here.
     steps:
       - uses: actions/checkout@v4
 
@@ -61,7 +63,8 @@ jobs:
   smoke-load:
     runs-on: ubuntu-latest
     name: Load-sensitive smoke tests (advisory)
-    # Frame-rate and draw-call checks depend on the runner's CPU; they report but never block.
+    # Advisory. Only specs that need a real frame rate stay here: the Auto-quality spec (steps quality down below a
+    # target fps and back up), which software WebGL on a shared runner cannot judge. They report but never block.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4

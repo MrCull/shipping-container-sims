@@ -33,6 +33,7 @@ async function setPanels(page: Page, feed: boolean, inspector: boolean): Promise
 for (const viewport of VIEWPORTS) {
   for (const preset of PRESETS) {
     test(`no two HUD regions overlap: ${preset} at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+      test.slow() // software WebGL at 1920x1080 on the big presets renders a frame in seconds on a loaded runner
       await page.setViewportSize(viewport)
       await open(page, preset)
       for (const [feed, inspector] of [

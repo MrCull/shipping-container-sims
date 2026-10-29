@@ -82,7 +82,7 @@ test('Auto steps quality down under sustained load, shows it in the overlay, and
   expect(errors).toEqual([])
 })
 
-test('TTI preset at overview zoom: instanced containers are culled and the draw budget holds @load', async ({ page }) => {
+test('TTI preset at overview zoom: instanced containers are culled and the draw budget holds', async ({ page }) => {
   test.setTimeout(240_000)
   const errors = watch(page)
   await open(page, 'TTI Algeciras baseline')
@@ -103,7 +103,9 @@ test('TTI preset at overview zoom: instanced containers are culled and the draw 
   expect(scene.containers).toBeGreaterThan(10_000)
   // main pass + shadow pass; the unbatched ground alone used to cost ~1,300 draw calls here
   expect(scene.render.calls).toBeLessThan(450)
-  expect(scene.render.triangles).toBeLessThan(1_000_000)
+  // Main + shadow pass. 1M was set before the TT-28 infrastructure models (about 680k of the total: yard fences, ASC rails,
+  // masts); the geometry is deterministic, so this is a real budget, not a frame-rate check.
+  expect(scene.render.triangles).toBeLessThan(2_000_000)
   // zoomed in on one crane, nearly all of the 10,000+ stacked boxes are outside the frustum and are not drawn
   await page.evaluate(() => window.__tt!.cameraTo('STS104', 60))
   const f2 = await page.evaluate(() => window.__tt!.scene()!.frames)
