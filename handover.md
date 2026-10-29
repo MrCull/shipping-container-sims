@@ -24,7 +24,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-04 camera | #64 | merged | |
 | V11-05 view presets | #65 | merged | |
 | V11-06 follow next truck | #66 | merged | |
-| V11-07 load-proof smoke | #67 | in progress (also triages the full smoke suite; terminal-twin-kpi "end condition" highlights test already fails on PR #54 tip) | session_018sev (agent) |
+| V11-07 load-proof smoke | #67 | merged (smoke triage root causes: lazy dashboard chunk slow under load -> expect timeout 20 s; software-WebGL specs test.slow(); draw budget cap 2M; frame ratios via frameSampling.ts; x600 + yard budget specs now required, only Auto-quality fps stays @load) | |
 | V11-08 split setup dialog | #68 | merged (end-conditions fieldset still inline in the shell: setup-inputs test reads it there) | |
 | V11-09 split ASC | #69 | merged | |
 | V11-10 subsystem modes | #70 | merged | |
@@ -45,11 +45,11 @@ Start order: #61, #62, #63 first (prefactor and visible fixes), then the rest of
 **Merged on `claude/cool-maxwell-6dmsl9` (draft PR #80, base `claude/fervent-dijkstra-cmzk4u`):** #61-#66, #68-#76 (see the table). Engine is 0.12.0. `npm run lint`, build and Vitest (764 tests, run with `--testTimeout=90000` because of machine load) pass at the last merge.
 
 **Still running when the session stopped (no new agents were started near the limit):**
-- **#67 smoke triage + load-proof smoke** (agent `a5a792d6910d9652f`, worktree `.claude/worktrees/agent-a5a792d6910d9652f`, branch `tt/67-smoke`). It was told to run the whole smoke suite, fix every failure at its root (known: `terminal-twin-kpi.smoke` "an end condition ends the run" fails on PR #54's tip; `terminal-twin-dashboard.smoke` "D opens" and "final report opens as the dashboard report tab" may be #62 HUD regressions), then make frame-ratio specs load-proof and move the x600 test into the required CI job. Its work may be uncommitted: look in its worktree (`git -C <worktree> status`, `git log tt/67-smoke`), then merge the branch if it has commits.
+- **#67 smoke triage:** merged. The whole smoke suite was NOT re-run after the final changes (only the affected specs): run `npm run test:smoke` once (background, log file) and check the required CI job on PR #80.
 - **#77 locale dates:** merged. Follow-up seen by its agent: in the Run to... popup, clicking the Run button was intercepted by the canvas in a smoke test (it pressed Enter instead). May be a #62 HUD z-index bug: check.
 
 **Do next, in order:**
-1. Resume protocol (top of this file). Check `git branch --list 'tt/*'` for finished agent branches not yet merged (#67) and merge them (one `git merge --no-edit tt/<branch>`, then check `git diff --name-only --diff-filter=U` and `grep -rn '^<<<<<<<' src docs` BEFORE committing; run lint, build and `npx vitest run --testTimeout=90000`).
+1. Resume protocol (top of this file). All v1.1 tickets except #79 are merged; check `git branch --list "tt/*"` for anything unmerged anyway.
 2. If #67 never reports: run `npm run test:smoke` yourself (background, log file), fix failing specs at the root (see list above). Tag only genuinely hardware-bound specs `@load`.
 3. #79 (real-GPU fps) needs a human with a GPU laptop: stats overlay (P), record numbers in `src/sims/terminal-twin/docs/scene-quality-atmosphere.md`.
 4. Run the `code-review` skill on `claude/cool-maxwell-6dmsl9` against `claude/fervent-dijkstra-cmzk4u` (spec #60), fix its findings in one implementer, re-verify.
