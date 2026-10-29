@@ -103,7 +103,7 @@ __tt.sceneState()  // what the scene shows: custody per box, status + pose per S
                    //   ascRigs: { [ascId]: { lod, gantryZ, trolleyX, hoistM, ropeScale, scaleY, carrying } } as drawn
 __tt.followNextTruck()  // select and follow the next truck to arrive at or after the display time (V11-06); its id, or null while none is known yet (ui().followNextPending stays true until it resolves)
 __tt.viewPreset('quay' | 'yard' | 'gate' | 'overview')  // frame a view preset (V11-05); false for an unknown name or no landside (gate)
-__tt.cameraTo(id, distanceM?)  // aim at any entity the inspector shows (also a block, transfer stall, WTP pad, 'gate'; false only for unknown ids), optionally from a distance (60 → LOD0, 600 → LOD1)
+__tt.cameraTo(id, distanceM?)  // aim at any entity the inspector shows (also a block, transfer stall, WTP pad, 'gate'; returns false for an unknown id and for a truck that has not yet arrived or has already left, by design: follow releases at that point), optionally from a distance (60 → LOD0, 600 → LOD1)
 __tt.display(); __tt.setDisplay({ locale: 'de-DE', units: 'imperial' })  // live locale/units
 __tt.config()      // loaded scenario config (SI) + current display settings
 __tt.ui()          // { selectedId, following, overlaysVisible, dashboardOpen, helpOpen, feedOpen, inspectorOpen }
