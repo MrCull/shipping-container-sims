@@ -33,7 +33,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-13 pre-fill decisions | #73 | merged (engine 0.10.0 pre-run phase) | |
 | V11-14 truck exports | #74 | merged (engine 0.12.0; if #76 also bumps, reconcile) | |
 | V11-15 STS ground wake-up | #75 | merged (engine 0.11.0 after merge; adds StsGroundPositionWaitBackoff) | |
-| V11-16 latency series | #76 | in progress | session_018sev (agent) |
+| V11-16 latency series | #76 | merged | |
 | V11-17 locale dates | #77 | blocked by 68 | |
 | V11-18 incremental invariants | #78 | merged (perf/baseline.json to re-record on a quiet machine) | |
 | V11-19 real-GPU fps (human) | #79 | blocked by 62, 63, 78 | |
