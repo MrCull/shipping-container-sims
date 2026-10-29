@@ -92,7 +92,7 @@
       "arrivalS": 20000,
       "sizeClass": "feeder",
       "discharge": 0,
-      "load": 0,
+      "load": 4,
       "transshipment": 0,
       "maxSts": 1
     }

@@ -57,7 +57,7 @@ export function yardPlacerOf(config: ScenarioConfig, custom?: DecisionHandler<'y
   return (message, query) => {
     const reply = handler(message, query)
     if (reply && typeof (reply as { then?: unknown }).then === 'function')
-      throw new Error('A yard pre-fill needs a synchronous yardAllocation handler (the starting yard is placed before the run starts)')
+      throw new Error('A yard pre-fill needs a synchronous yardAllocation handler: the starting yard is placed before the run starts, outside the decision runtime (no DecisionRequested/Resolved events, latency injection or handler KPIs). Use yardStart mode "warmup" or "empty" to run an asynchronous handler')
     return (reply as { slotId: string | null }).slotId
   }
 }

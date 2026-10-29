@@ -224,6 +224,21 @@ describe('empty start', () => {
     expect(sim.query.containers().filter((c) => c.vesselId === 'V001' && c.full).length).toBe(4 + 5)
   })
 
+  it("delivers a vessel's exports inside its export window (a late vessel's trucks wait for it) and never between the window's close and its arrival", () => {
+    const config = empty({ scripted: Array.from({ length: 50 }, (_, i) => ({ atS: 60 + i * 600, transaction: 'dropExport' as const })), endWhen: { simDurationS: 9 * HOUR } })
+    ;(config.landside as NonNullable<typeof config.landside>).exportWindow = { minBeforeEtaS: HOUR, maxBeforeEtaS: 3 * HOUR }
+    const sim = createSimulation(config)
+    sim.runUntil()
+    const drops = ofType(sim, 'TruckArrived').flatMap((e) => e.payload.legs.filter((l) => l.purpose === 'export').map((l) => ({ t: e.t, vesselId: l.vesselId })))
+    const v2 = drops.filter((d) => d.vesselId === 'V002')
+    expect(v2.length).toBeGreaterThan(0)
+    for (const d of v2) {
+      const until = 6 * HOUR - d.t
+      expect(until <= 3 * HOUR && (until >= HOUR || until <= 0), `t=${d.t}`).toBe(true)
+    }
+    expect(v2.some((d) => d.t < 3 * HOUR)).toBe(false) // window not open yet
+  })
+
   it('the vessel waits (no completion) while no truck delivers', () => {
     const sim = createSimulation(empty({ scripted: [], endWhen: { simDurationS: 6 * HOUR } }))
     sim.runUntil()

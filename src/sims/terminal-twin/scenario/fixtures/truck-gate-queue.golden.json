@@ -3,10 +3,10 @@
   "seed": 8,
   "status": "ended",
   "endReason": "simDurationS >= 9000",
-  "eventLogHash": "08b0ea4b2fe192",
+  "eventLogHash": "0fa856e7534637",
   "kpis": {
     "simTimeS": 9000,
-    "eventsProcessed": 1224,
+    "eventsProcessed": 1220,
     "movesCompleted": 16,
     "vesselsCompleted": 1,
     "sts": {
@@ -116,9 +116,9 @@
       },
       "ascDispatch": {
         "handler": "strategy:waterside-first",
-        "calls": 73,
-        "resolved": 73,
-        "ok": 73,
+        "calls": 71,
+        "resolved": 71,
+        "ok": 71,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -294,8 +294,8 @@
       },
       "blocks": {
         "B01": {
-          "boxes": 17,
-          "cells": 26,
+          "boxes": 21,
+          "cells": 32,
           "capacityCells": 240,
           "maxHeight": 3,
           "rehandles": 7,
@@ -317,11 +317,11 @@
         "B01-ASC2": {
           "jobs": 17,
           "gantryM": 1349.7,
-          "trolleyM": 163.65,
-          "hoistM": 558.424,
+          "trolleyM": 184.25,
+          "hoistM": 546.84,
           "padWaitS": 0,
           "railWaitS": 30.218,
-          "busyS": 1656.524,
+          "busyS": 1640.71,
           "yields": 0
         }
       }
@@ -333,22 +333,22 @@
       "gateQueue": 0,
       "gateQueueMax": 12,
       "turnTimeS": {
-        "mean": 379.89,
+        "mean": 377.729,
         "max": 554.322
       },
       "gateWaitS": {
-        "mean": 730.313,
-        "max": 1516.57
+        "mean": 706.938,
+        "max": 1410.888
       },
       "stallAllocWaitS": {
-        "mean": 65.733,
+        "mean": 65.83,
         "max": 260.236
       },
       "stallWaitS": {
-        "mean": 89.76,
+        "mean": 91.654,
         "max": 310.342
       },
-      "serviceS": 208.672,
+      "serviceS": 206.413,
       "transactions": {
         "dropExport": 3,
         "pickImport": 4,
@@ -371,7 +371,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 1223,
+    "checks": 1219,
     "violations": 0,
     "first": null
   },

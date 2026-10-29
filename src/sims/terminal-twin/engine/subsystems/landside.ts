@@ -164,8 +164,8 @@ export function undeliveredBookings(ctx: EngineContext, vesselId: string): Conta
 
 /**
  * Vessels a truck may deliver an export box for now, with the number of boxes to deliver (weights). Normally the
- * vessels inside their export window; with an empty start, any vessel that still lacks booked boxes and whose
- * window has opened (also after it arrived: its load waits for the trucks).
+ * vessels inside their export window that load something; with an empty start, any vessel that still lacks booked
+ * boxes and whose window is open (min to max before ETA), or that has arrived (its load waits for the trucks).
  */
 export function exportVessels(ctx: EngineContext): { vesselId: string; weight: number }[] {
   const cfg = landsideOf(ctx.config)
@@ -175,15 +175,18 @@ export function exportVessels(ctx: EngineContext): { vesselId: string; weight: n
     for (const v of ctx.config.vessels) {
       if (state.vessels[v.id].status === 'departed') continue
       const n = undeliveredBookings(ctx, v.id).length
-      if (n > 0 && v.arrivalS - state.now <= cfg.exportWindow.maxBeforeEtaS) out.push({ vesselId: v.id, weight: n })
+      const untilEta = v.arrivalS - state.now
+      // inside the window; once the vessel has arrived its load waits for the remaining boxes, so late trucks still count
+      const inWindow = untilEta <= cfg.exportWindow.maxBeforeEtaS && (untilEta >= cfg.exportWindow.minBeforeEtaS || untilEta <= 0)
+      if (n > 0 && inWindow) out.push({ vesselId: v.id, weight: n })
     }
     return out
   }
   for (const v of ctx.config.vessels) {
     if (state.vessels[v.id].status !== 'scheduled') continue
     const untilEta = v.arrivalS - state.now
-    if (untilEta >= cfg.exportWindow.minBeforeEtaS && untilEta <= cfg.exportWindow.maxBeforeEtaS)
-      out.push({ vesselId: v.id, weight: Math.max(1, v.load) })
+    if (v.load > 0 && untilEta >= cfg.exportWindow.minBeforeEtaS && untilEta <= cfg.exportWindow.maxBeforeEtaS)
+      out.push({ vesselId: v.id, weight: v.load })
   }
   return out
 }

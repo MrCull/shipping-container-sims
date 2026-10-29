@@ -37,6 +37,8 @@ interface YardOpts {
   /** Vessel calls: V001 discharges `imports` boxes at t = 0; extra export vessels arrive at the given times. */
   imports?: number
   exportEtas?: number[]
+  /** Boxes each export vessel loads (default 6; 0 = a vessel that takes no exports). */
+  exportLoad?: number
   pool?: { count: number; maxAgeS: number }
   blocks?: number
   clockStart?: number
@@ -56,7 +58,7 @@ function yardScenario(o: YardOpts): ScenarioConfig {
     .clockStart(o.clockStart ?? 0)
     .endWhen({ simDurationS: o.durationS })
   if ((o.imports ?? 0) > 0) b.vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: o.imports, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
-  ;(o.exportEtas ?? []).forEach((eta, i) => b.vesselCall(`X00${i + 1}`, { name: `Export Star ${i + 1}`, sizeClass: 'feeder', arrivalS: eta, maxSts: 1 }))
+  ;(o.exportEtas ?? []).forEach((eta, i) => b.vesselCall(`X00${i + 1}`, { name: `Export Star ${i + 1}`, sizeClass: 'feeder', arrivalS: eta, load: o.exportLoad ?? 6, maxSts: 1 }))
   for (let i = 0; i < (o.blocks ?? 1); i++) b.block(`B0${i + 1}`, { x: 20 + 40 * i, bays: 30, tiers: 3 })
   if (o.pool) b.emptyPool({ count: o.pool.count, sizeMix: { '40': 1 }, maxAgeS: o.pool.maxAgeS })
   b.landside({
@@ -293,6 +295,17 @@ describe('demand consistency', () => {
     const outside = ofType(sim, 'TruckArrived').filter((e) => e.t < 1000 || e.t > 3400)
     expect(outside.length).toBeGreaterThan(20)
     expect(outside.every((e) => e.payload.transaction === 'dropEmpty')).toBe(true)
+  })
+
+  it('delivers no exports for a vessel that loads nothing', () => {
+    const sim = finished(
+      createSimulation(
+        yardScenario({ durationS: HOUR, profile: flat(60), mix: { dropExport: 1, dropEmpty: 0.3 }, exportEtas: [4000], exportLoad: 0, window: { minBeforeEtaS: 600, maxBeforeEtaS: 3600 } }),
+      ),
+    )
+    const drops = ofType(sim, 'TruckArrived').flatMap((e) => e.payload.legs.filter((l) => l.purpose === 'export'))
+    expect(drops).toEqual([])
+    expect(ofType(sim, 'TruckArrived').length).toBeGreaterThan(20)
   })
 
   it('never generates an import pickup when no box has finished its dwell (falls back to a drop empty, counted)', () => {

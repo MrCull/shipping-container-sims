@@ -3,7 +3,7 @@
   "seed": 3,
   "status": "ended",
   "endReason": "simDurationS >= 4500",
-  "eventLogHash": "0fe946d613a3df",
+  "eventLogHash": "1037d9d428066a",
   "kpis": {
     "simTimeS": 4500,
     "eventsProcessed": 356,
@@ -273,8 +273,8 @@
       },
       "blocks": {
         "B01": {
-          "boxes": 8,
-          "cells": 10,
+          "boxes": 12,
+          "cells": 18,
           "capacityCells": 240,
           "maxHeight": 2,
           "rehandles": 0,
@@ -297,10 +297,10 @@
           "jobs": 2,
           "gantryM": 165.6,
           "trolleyM": 30.1,
-          "hoistM": 69.104,
+          "hoistM": 63.312,
           "padWaitS": 0,
           "railWaitS": 12.973,
-          "busyS": 203.342,
+          "busyS": 194.654,
           "yields": 0
         }
       }
@@ -312,8 +312,8 @@
       "gateQueue": 0,
       "gateQueueMax": 1,
       "turnTimeS": {
-        "mean": 313.876,
-        "max": 313.876
+        "mean": 305.188,
+        "max": 305.188
       },
       "gateWaitS": {
         "mean": 0,
@@ -327,7 +327,7 @@
         "mean": 0,
         "max": 0
       },
-      "serviceS": 206.327,
+      "serviceS": 197.639,
       "transactions": {
         "dropExport": 0,
         "pickImport": 0,
