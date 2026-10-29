@@ -551,6 +551,10 @@ export class SceneModel {
     return this.vesselPlacement(id, time) !== null
   }
 
+  /** Poses of stacked boxes by `${slotId}|${size}` (read-only; shared between frames). */
+  private readonly yardPoses = new Map<string, ContainerPose>()
+  private readonly vesselSlotCells = new Map<string, ReturnType<typeof parseVesselSlotId>>()
+
   custodyAt(containerId: string, time: number): CustodyRef | null {
     const list = this.custody[containerId] ?? []
     const i = lastAtOrBefore(list, time, (e) => e.t)
@@ -590,19 +594,26 @@ export class SceneModel {
       return { x: p.x, y: p.hoistY + dims.height / 2, z: p.z, yaw: alongZ, carriedBy: id }
     }
     if (kind === 'yardSlot') {
+      // A stacked box never moves: its pose is parsed once per slot and size (tens of thousands of boxes are posed every frame).
+      const size = this.containerSize[containerId]
+      const cacheKey = `${id}|${size}`
+      const hit = this.yardPoses.get(cacheKey)
+      if (hit) return hit
       const cell = parseYardSlotId(id)
       const block = this.blocks[cell.blockId]
       if (!block) return null
-      const span = boxSpan(this.containerSize[containerId])
-      return {
+      const pose: ContainerPose = {
         x: rowX(block, cell.row),
         y: tierBaseY(cell.tier) + dims.height / 2,
-        z: slotZ(block, cell.bay, span),
+        z: slotZ(block, cell.bay, boxSpan(size)),
         yaw: alongZ,
       }
+      this.yardPoses.set(cacheKey, pose)
+      return pose
     }
     if (kind === 'vesselSlot') {
-      const slot = parseVesselSlotId(id)
+      let slot = this.vesselSlotCells.get(id)
+      if (!slot) this.vesselSlotCells.set(id, (slot = parseVesselSlotId(id)))
       const placement = this.vesselPlacement(slot.vesselId, time)
       if (!placement) return null
       const c = slotCentre(this.specs[slot.vesselId], placement.x, slot, this.containerSize[containerId])

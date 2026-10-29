@@ -31,6 +31,8 @@ import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { VesselHulls, type VesselHullState } from './vesselRenderer'
 import { LandsideScene, type LandsideStats } from './landsideRenderer'
 import { loadTruckModels, type TruckRigState } from './truckAssets'
+import { GROUND_ROTATION_X, StaticBatch } from './staticBatch'
+import { QUALITY_PROFILES, type QualityProfile } from './quality'
 import { AtmosphereRig, type AtmosphereState } from './atmosphereRig'
 import type { Lighting } from './atmosphere'
 import { BACKDROP_MODEL_ASSETS, backdropKindFor, buildBackdrop, type Backdrop, type BackdropKind } from './backdrop'
@@ -68,7 +70,7 @@ export interface SceneStats {
   /** Occupancy and label overlay counts (zeros while those overlays are off). */
   layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
-  containerLods: { lod0: number; lod1: number }
+  containerLods: { lod0: number; lod1: number; culled: number }
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -129,6 +131,10 @@ export class SceneRenderer {
   private readonly matrix = new THREE.Matrix4()
   private selection: THREE.LineSegments
   private disposables: { dispose(): void }[] = []
+  private water!: THREE.Mesh
+  private waterSegments = 0
+  private waterBase!: THREE.BufferGeometry
+  private quality: QualityProfile = QUALITY_PROFILES.high
   private atmosphere: AtmosphereRig
   private backdrop: Backdrop
   private infrastructure: InfrastructureScene
@@ -251,10 +257,12 @@ export class SceneRenderer {
 
   private addGround(config: ScenarioConfig): void {
     const length = config.quay.lengthM
-    const water = new THREE.Mesh(
+    const water = (this.water = new THREE.Mesh(
       this.track(new THREE.PlaneGeometry(40000, 12000)),
       this.track(new THREE.MeshStandardMaterial({ color: '#2d5873', roughness: 0.35, metalness: 0.1 })),
-    )
+    ))
+    this.waterBase = water.geometry
+    this.waterSegments = 1
     water.rotation.x = -Math.PI / 2
     water.position.set(length / 2, -QUAY_ABOVE_WATER_M, -6000)
     water.receiveShadow = true
@@ -333,20 +341,23 @@ export class SceneRenderer {
     const rail = this.track(new THREE.MeshStandardMaterial({ color: '#4b4f55', roughness: 0.8 }))
     const mark = this.track(new THREE.MeshBasicMaterial({ color: '#8d9091' }))
     const stall = this.track(new THREE.MeshStandardMaterial({ color: '#f2c94c', roughness: 0.8 }))
+    // every flat piece below is merged per material (StaticBatch): ~1,300 meshes at TTI scale become a handful of draw calls
+    const batch = new StaticBatch()
+    const ph = new StaticBatch() // phase 1 rails and ground markings: hidden once the phase 2 infrastructure draws (TT-28)
+    const flat = (w: number, d: number, x: number, y: number, z: number, mat: THREE.Material, receiveShadow = false, into: StaticBatch = batch) => {
+      const geo = new THREE.PlaneGeometry(w, d)
+      into.add(geo, mat, { x, y, z }, { rotationX: GROUND_ROTATION_X, receiveShadow })
+      geo.dispose()
+    }
     for (const b of this.model.blockList) {
       const z0 = b.wtpZ + 7
       const endZ = b.firstBayZ + (b.bays - 0.5) * YARD_BAY_PITCH_M
       const depth = endZ - z0 + 22
-      const m = new THREE.Mesh(this.track(new THREE.PlaneGeometry(ASC.span + 3.6, depth)), slab)
-      m.rotation.x = -Math.PI / 2
-      m.position.set(b.x, 0.02, z0 + depth / 2)
-      m.receiveShadow = true
-      this.scene.add(m)
+      flat(ASC.span + 3.6, depth, b.x, 0.02, z0 + depth / 2, slab, true)
       for (const dx of [-ASC.span / 2, ASC.span / 2]) {
-        const r = new THREE.Mesh(this.track(new THREE.BoxGeometry(0.4, 0.2, depth)), rail)
-        r.position.set(b.x + dx, 0.1, z0 + depth / 2)
-        this.scene.add(r)
-        this.infraPlaceholders.push(r)
+        const geo = new THREE.BoxGeometry(0.4, 0.2, depth)
+        ph.add(geo, rail, { x: b.x + dx, y: 0.1, z: z0 + depth / 2 })
+        geo.dispose()
       }
       // row lines (between the rows) and bay ticks along the block
       const lines = new THREE.BufferGeometry()
@@ -359,33 +370,23 @@ export class SceneRenderer {
       this.track(lines)
       this.scene.add(new THREE.LineSegments(lines, this.track(new THREE.LineBasicMaterial({ color: '#8d9091' }))))
       for (let bay = 0; bay <= b.bays; bay++) {
-        const tick = new THREE.Mesh(this.track(new THREE.PlaneGeometry(b.rows * YARD_ROW_PITCH_M, 0.12)), mark)
-        tick.rotation.x = -Math.PI / 2
-        tick.position.set(b.x, 0.04, b.firstBayZ + (bay - 0.5) * YARD_BAY_PITCH_M)
-        this.scene.add(tick)
+        flat(b.rows * YARD_ROW_PITCH_M, 0.12, b.x, 0.04, b.firstBayZ + (bay - 0.5) * YARD_BAY_PITCH_M, mark)
       }
       // transfer stalls (truck handover, TT-13) at the landside end
       for (const st of transferStallLayout(b)) {
-        const outline = new THREE.Mesh(this.track(new THREE.PlaneGeometry(3.2, STALL_LENGTH_M)), stall)
-        outline.rotation.x = -Math.PI / 2
-        outline.position.set(st.x, 0.03, st.z)
-        this.scene.add(outline)
-        this.infraPlaceholders.push(outline)
+        flat(3.2, STALL_LENGTH_M, st.x, 0.03, st.z, stall, false, ph)
       }
     }
     const padMat = this.track(new THREE.MeshStandardMaterial({ color: '#f2c94c', roughness: 0.8 }))
     const padInner = this.track(new THREE.MeshStandardMaterial({ color: '#8f918f', roughness: 0.95 }))
     for (const p of graph.pads) {
-      const outline = new THREE.Mesh(this.track(new THREE.PlaneGeometry(3.2, 13)), padMat)
-      outline.rotation.x = -Math.PI / 2
-      outline.position.set(p.x, 0.03, p.z)
-      this.scene.add(outline)
-      this.infraPlaceholders.push(outline)
-      const inner = new THREE.Mesh(this.track(new THREE.PlaneGeometry(2.8, 12.6)), padInner)
-      inner.rotation.x = -Math.PI / 2
-      inner.position.set(p.x, 0.035, p.z)
-      this.scene.add(inner)
-      this.infraPlaceholders.push(inner)
+      flat(3.2, 13, p.x, 0.03, p.z, padMat, false, ph)
+      flat(2.8, 12.6, p.x, 0.035, p.z, padInner, false, ph)
+    }
+    for (const m of batch.build((x) => this.track(x))) this.scene.add(m)
+    for (const m of ph.build((x) => this.track(x))) {
+      this.scene.add(m)
+      this.infraPlaceholders.push(m)
     }
   }
 
@@ -551,6 +552,45 @@ export class SceneRenderer {
     }
   }
 
+  /**
+   * Applies a quality profile (TT-19): sun shadow on/off and map size, container LOD range, ocean
+   * detail, night-glow budget. Render resolution and the shadow switch of the renderer itself are
+   * applied by `useTwinScene`; the sun shadow and the glow points are the atmosphere's (`AtmosphereRig.setQuality`).
+   */
+  setQuality(profile: QualityProfile): void {
+    this.quality = profile
+    this.atmosphere.setQuality(profile)
+    this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap })
+    this.setOceanDetail(profile.oceanSegments)
+  }
+
+  get qualityProfile(): QualityProfile {
+    return this.quality
+  }
+
+  /** Water: a flat Lambert quad at the lowest detail, else the standard material on a gently displaced grid of `segments` per side. */
+  private setOceanDetail(segments: number): void {
+    if (segments === this.waterSegments) return
+    this.waterSegments = segments
+    const old = this.water.geometry
+    const oldMat = this.water.material as THREE.Material
+    if (segments <= 1) {
+      this.water.geometry = this.waterBase
+      this.water.material = this.track(new THREE.MeshLambertMaterial({ color: '#2d5873' }))
+    } else {
+      const { width, height } = (this.waterBase as THREE.PlaneGeometry).parameters
+      const geo = this.track(new THREE.PlaneGeometry(width, height, segments, Math.max(1, Math.round(segments / 3))))
+      const pos = geo.getAttribute('position')
+      // a long, low swell: wavelengths of about 1.6 km and 1 km, 0.18 m high
+      for (let i = 0; i < pos.count; i++) pos.setZ(i, 0.18 * Math.sin(pos.getX(i) * 0.0039) * Math.cos(pos.getY(i) * 0.0063))
+      geo.computeVertexNormals()
+      this.water.geometry = geo
+      this.water.material = this.track(new THREE.MeshStandardMaterial({ color: '#2d5873', roughness: 0.35, metalness: 0.1 }))
+    }
+    if (old !== this.waterBase) old.dispose()
+    oldMat.dispose()
+  }
+
   /** Apply the time-of-day lighting (day/dusk/night; cheap, call when it changes). */
   setLighting(l: Lighting): void {
     this.atmosphere.apply(l)
@@ -565,7 +605,7 @@ export class SceneRenderer {
     this.laneOverlay.visible = next.laneGraph
   }
 
-  update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3): void {
+  update(t: number, selectedId: string | null, cameraPosition: THREE.Vector3, frustum?: THREE.Frustum): void {
     const model = this.model
     const containers = this.containers
     // Containers first: what each spreader carries decides its configuration (20 / 40 / twin-20).
@@ -586,7 +626,7 @@ export class SceneRenderer {
         }
       }
     })
-    containers.end(cameraPosition)
+    containers.end(cameraPosition, frustum)
 
     for (const [id, m] of this.stsModels) {
       const pose = model.stsPose(id, t)
@@ -595,7 +635,7 @@ export class SceneRenderer {
       this.lastSpreader.set(id, mode)
       m.carrying = l?.count ?? 0
       m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l })
-      m.updateLod(cameraPosition)
+      m.updateLod(cameraPosition, this.quality.lodScale)
     }
     for (const [id, parts] of this.sts) {
       if (this.stsModels.has(id)) continue
@@ -636,7 +676,7 @@ export class SceneRenderer {
       const lx = pose.x - parts.blockX
       const boxHeight = carried.get(id)
       if (parts.rig) {
-        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 12, cameraPosition.z - pose.z))
+        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 12, cameraPosition.z - pose.z) / this.quality.lodScale)
         // Twist-lock plane: the top of the carried box; empty, where the top of a high-cube box would be.
         parts.rig.pose({
           blockX: parts.blockX,
@@ -661,7 +701,7 @@ export class SceneRenderer {
       const pose = model.shcPose(id, t)
       if (parts.rig) {
         const boxHeight = carried.get(id)
-        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 4, cameraPosition.z - pose.z))
+        parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 4, cameraPosition.z - pose.z) / this.quality.lodScale)
         parts.rig.pose({
           x: pose.x,
           z: pose.z,
@@ -724,6 +764,30 @@ export class SceneRenderer {
     return { x, y: 10, z: 5 }
   }
 
+  /**
+   * Where the draw calls go (dev/perf tool): visible, in-frustum drawables grouped by top-level
+   * scene child (its name, else its type) and geometry type, with object and triangle counts.
+   * Shadow-pass draws are not counted, so the main-pass total is what `renderer.info` reports without shadows.
+   */
+  drawBreakdown(frustum: THREE.Frustum): Record<string, { objects: number; triangles: number }> {
+    const out: Record<string, { objects: number; triangles: number }> = {}
+    for (const top of this.scene.children) {
+      const label = top.name || top.type
+      top.traverseVisible((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh && !(o as THREE.Line).isLine && !(o as THREE.Points).isPoints) return
+        if (m.frustumCulled && !frustum.intersectsObject(m)) return
+        const key = `${label}/${m.geometry.type}`
+        const g = m.geometry
+        const tris = (g.index ? g.index.count : g.getAttribute('position').count) / 3
+        const entry = (out[key] ??= { objects: 0, triangles: 0 })
+        entry.objects++
+        entry.triangles += tris * ((o as THREE.InstancedMesh).isInstancedMesh ? (o as THREE.InstancedMesh).count : 1)
+      })
+    }
+    return out
+  }
+
   stats(): SceneStats {
     const v = this.vessels.stats()
     const c = this.containers.stats()
@@ -755,7 +819,7 @@ export class SceneRenderer {
       reservedZones: this.reservedZones,
       reservedRailSegments: this.reservedRailSegments,
       layers: this.layers.stats(),
-      containerLods: { lod0: c.lod0, lod1: c.lod1 },
+      containerLods: { lod0: c.lod0, lod1: c.lod1, culled: c.culled },
       containerAssets: c.assets,
       shcLods,
       shcAssets: rigged > 0 ? 'loaded' : 'placeholder',

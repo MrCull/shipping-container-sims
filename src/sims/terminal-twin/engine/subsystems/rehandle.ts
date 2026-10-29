@@ -14,6 +14,7 @@ import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import type { ScenarioConfig } from '../../scenario/types'
 import type { AscJob, SimState, YardSlotState } from '../state'
 import { candidateSlots, stackIndex, type BlockSpec } from '../yardLayout'
+import { columnKey, yardIndexOf } from '../yardIndex'
 
 /** Columns ("bay-row") a slot covers. */
 export const columnsOfSlot = (s: Pick<YardSlotState, 'bay' | 'row' | 'span'>): string[] =>
@@ -21,10 +22,11 @@ export const columnsOfSlot = (s: Pick<YardSlotState, 'bay' | 'row' | 'span'>): s
 
 /** Boxes standing on `slot` (any bay it covers), top first (tier ↓, then bay, row). */
 export function boxesAbove(state: SimState, slot: YardSlotState): YardSlotState[] {
-  const mine = new Set(columnsOfSlot(slot))
-  return Object.values(state.yardSlots)
-    .filter((s) => s.blockId === slot.blockId && s.tier > slot.tier && columnsOfSlot(s).some((c) => mine.has(c)))
-    .sort((a, b) => b.tier - a.tier || a.bay - b.bay || a.row - b.row)
+  const { byColumn } = yardIndexOf(state)
+  const found = new Set<YardSlotState>()
+  for (let k = 0; k < slot.span; k++)
+    for (const s of byColumn.get(columnKey(slot.blockId, slot.bay + k, slot.row)) ?? []) if (s.tier > slot.tier) found.add(s)
+  return [...found].sort((a, b) => b.tier - a.tier || a.bay - b.bay || a.row - b.row)
 }
 
 /**
@@ -83,8 +85,8 @@ export function retrievalRanks(state: SimState, config: ScenarioConfig, blockId:
   for (const s of Object.values(state.vesselSlots)) if (s.plannedContainerId) slotOfBox.set(s.plannedContainerId, s)
   const vesselIndex = new Map(config.vessels.map((v, i) => [v.id, i]))
   const boxes: { id: string; key: number[] }[] = []
-  for (const y of Object.values(state.yardSlots)) {
-    if (y.blockId !== blockId || !y.containerId) continue
+  for (const y of yardIndexOf(state).byBlock.get(blockId) ?? []) {
+    if (!y.containerId) continue
     const vs = slotOfBox.get(y.containerId)
     if (!vs) continue // an import box: never retrieved
     boxes.push({ id: y.containerId, key: [vesselIndex.get(vs.vesselId) ?? 0, ...loadSequenceKey({ ...vs, half: vs.half })] })
@@ -95,9 +97,9 @@ export function retrievalRanks(state: SimState, config: ScenarioConfig, blockId:
 
 /** Vessel of the box directly below `tier` in the column, or null. */
 function vesselBelow(state: SimState, blockId: string, bay: number, row: number, tier: number): string | null {
-  const below = Object.values(state.yardSlots).find(
-    (s) => s.blockId === blockId && s.row === row && s.tier === tier - 1 && s.bay <= bay && bay < s.bay + s.span,
-  )
+  const below = yardIndexOf(state)
+    .byColumn.get(columnKey(blockId, bay, row))
+    ?.find((s) => s.tier === tier - 1)
   return below?.containerId ? state.containers[below.containerId].vesselId : null
 }
 
@@ -131,8 +133,8 @@ export function rehandleCandidates(
   }
   const ranks = retrievalRanks(state, config, block.id)
   const soonest = new Map<string, number>()
-  for (const y of Object.values(state.yardSlots)) {
-    if (y.blockId !== block.id || !y.containerId) continue
+  for (const y of yardIndexOf(state).byBlock.get(block.id) ?? []) {
+    if (!y.containerId) continue
     const rank = ranks.get(y.containerId)
     if (rank === undefined) continue
     for (const c of columnsOfSlot(y)) soonest.set(c, Math.min(soonest.get(c) ?? Infinity, rank))

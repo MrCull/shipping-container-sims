@@ -6,10 +6,12 @@
  */
 import { onBeforeUnmount, onMounted } from 'vue'
 import { shortcutFor, type ShortcutAction } from '../modules/shortcuts'
+import { usePerfStore } from '../store/perfStore'
 import { useTwinStore } from '../store/twinStore'
 
 export function useTwinShortcuts(): void {
   const store = useTwinStore()
+  const perf = usePerfStore()
 
   function perform(action: ShortcutAction): void {
     switch (action.kind) {
@@ -43,6 +45,9 @@ export function useTwinShortcuts(): void {
         break
       case 'inspector':
         store.toggleInspector()
+        break
+      case 'perf':
+        perf.toggleOverlay()
         break
       case 'help':
         store.setHelpOpen(!store.helpOpen)

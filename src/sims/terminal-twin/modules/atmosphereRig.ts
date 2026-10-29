@@ -6,6 +6,7 @@
  */
 import * as THREE from 'three'
 import type { Lighting } from './atmosphere'
+import type { QualityProfile } from './quality'
 import type { SceneModel } from './sceneModel'
 import { MAX_MASTS, mastSpots } from './infrastructureLayout'
 
@@ -53,6 +54,9 @@ export class AtmosphereRig {
   private equipCount = 0
   private mastCount = 0
   private lighting: Lighting | null = null
+  /** Quality (TT-19): the sun may cast shadows, and how many mast glow points night mode draws. */
+  private shadowsAllowed = true
+  private mastGlowLimit = Infinity
   private disposables: { dispose(): void }[] = []
 
   constructor(
@@ -144,13 +148,27 @@ export class AtmosphereRig {
     this.sun.color.lerpColors(NIGHT.sun, DAY.sun, d).lerp(DUSK_SUN, warm * 0.6)
     // At night the "sun" is a dim moon: same light, no shadow pass.
     this.sun.intensity = 0.9 + 1.3 * d
-    this.sun.castShadow = l.shadows
+    this.sun.castShadow = l.shadows && this.shadowsAllowed
     this.sun.position.set(l.sun.x, Math.max(30, l.sun.y), l.sun.z)
     const on = l.floodGlow > 0.02
     this.mastGlow.visible = on
+    this.mastGlow.geometry.setDrawRange(0, Math.min(this.mastCount, this.mastGlowLimit))
     this.equipGlow.visible = on
     ;(this.mastGlow.material as THREE.PointsMaterial).opacity = Math.min(1, l.floodGlow)
     ;(this.equipGlow.material as THREE.PointsMaterial).opacity = Math.min(1, l.floodGlow)
+  }
+
+  /** Applies the quality profile (TT-19): shadows on/off, shadow map size, and the night glow-point budget on the masts. */
+  setQuality(profile: QualityProfile): void {
+    this.shadowsAllowed = profile.shadows
+    this.mastGlowLimit = profile.nightLights
+    if (this.sun.shadow.mapSize.x !== profile.shadowMapSize) {
+      this.sun.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize)
+      this.sun.shadow.map?.dispose()
+      this.sun.shadow.map = null
+    }
+    if (this.lighting) this.apply(this.lighting)
+    else this.sun.castShadow = profile.shadows
   }
 
   /** Follow the equipment with its glow points (only while the glow is visible). */
@@ -182,7 +200,7 @@ export class AtmosphereRig {
       mode: l.mode,
       daylight: l.daylight,
       shadows: this.sun.castShadow,
-      masts: this.mastGlow.visible ? this.mastCount : 0,
+      masts: this.mastGlow.visible ? Math.min(this.mastCount, this.mastGlowLimit) : 0,
       equipmentLights: this.equipGlow.visible ? this.equipCount : 0,
     }
   }

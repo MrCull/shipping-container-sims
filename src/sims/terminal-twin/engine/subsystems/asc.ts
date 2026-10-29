@@ -27,7 +27,7 @@ import type { EventOf } from '../events'
 import { planSegment, positionAt, type AxisProfile, type MotionSegment } from '../kinematics'
 import { laneGraphOf } from '../laneGraph'
 import { earliestStart, earliestStartAmong, reserve, type Reservation, type WindowSpec } from '../reservations'
-import { ascIndexOf, type AscJob, type AscPlannedEvent, type AscState, type AscStatus, type SimState } from '../state'
+import { ascIndexOf, type AscJob, type AscPlannedEvent, type AscState, type AscStatus, type SimState, type YardSlotState } from '../state'
 import {
   ASC_MIN_SEPARATION_M,
   PARK_UNTIL_S,
@@ -43,6 +43,7 @@ import {
   type BlockSpec,
 } from '../yardLayout'
 import { DEFAULT_ASC_KINEMATICS } from '../../scenario/builder'
+import { columnKey, indexYardSlotAdded, indexYardSlotRemoved, yardIndexOf } from '../yardIndex'
 import { blockersOf, nextBlocker, rehandleCandidates, retrievalRanks, retrievalSlot } from './rehandle'
 import type { AscKinematics } from '../../scenario/types'
 import { parseVesselSlotId } from '../../scenario/vesselClasses'
@@ -1141,12 +1142,13 @@ export const ascReactors: ReactorMap = {
     const slot = state.yardSlots[e.payload.yardSlotId]
     const yard = state.yardBlocks[slot.blockId]
     delete state.yardSlots[slot.id]
+    indexYardSlotRemoved(state, slot)
     for (let k = 0; k < slot.span; k++) {
       const i = stackIndex(yard, slot.bay + k, slot.row)
       yard.heights[i] = slot.tier - 1
-      const below = Object.values(state.yardSlots).find(
-        (s) => s.blockId === slot.blockId && s.row === slot.row && s.tier === slot.tier - 1 && s.bay <= slot.bay + k && slot.bay + k < s.bay + s.span,
-      )
+      const below = yardIndexOf(state)
+        .byColumn.get(columnKey(slot.blockId, slot.bay + k, slot.row))
+        ?.find((s) => s.tier === slot.tier - 1)
       yard.topVessels[i] = below?.containerId ? state.containers[below.containerId].vesselId : null
     }
     asc.carrying = e.payload.containerId
@@ -1214,7 +1216,7 @@ export const ascReactors: ReactorMap = {
     const { state } = ctx
     const cell = parseYardSlotId(e.payload.yardSlotId)
     const span = boxSpan(state.containers[e.payload.containerId].size)
-    state.yardSlots[e.payload.yardSlotId] = {
+    const placed: YardSlotState = {
       id: e.payload.yardSlotId,
       blockId: asc.blockId,
       bay: cell.bay,
@@ -1223,6 +1225,8 @@ export const ascReactors: ReactorMap = {
       span,
       containerId: e.payload.containerId,
     }
+    state.yardSlots[placed.id] = placed
+    indexYardSlotAdded(state, placed)
     asc.carrying = null
     asc.jobId = null
     const rehandle = state.ascJobs[e.payload.jobId]?.kind === 'rehandle'

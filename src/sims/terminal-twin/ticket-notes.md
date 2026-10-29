@@ -475,6 +475,18 @@ Branch `tt/48-presets-validation`. Guide: `terminal-twin-AGENTS.md` § "Presets,
 - **Open defect:** pre-filled yard deadlock (ASCs idle, `planJob` null) seen with Small automated at 50% fill; see the guide. Small preset uses 30%.
 - **Follow-ups:** persistence (TT-17) should store the new overrides; dialog tests for decisions are smoke-only.
 
+### ticket-50
+
+### Ticket 50 (TT-19): performance benchmark and graphics quality
+
+Branch `tt/50-perf-quality`. Guide: `terminal-twin-AGENTS.md` § "Performance and graphics quality (TT-19)".
+
+- **Benchmark:** `npm run tt:bench` (`cli/benchmark.ts`, `cli/benchCli.ts`), baseline `perf/baseline.json`, flag above 20% worse, `--slow-ms` self-test. TTI and Stress test 24 h recorded.
+- **Engine speedups:** `engine/yardIndex.ts` (call `indexYardSlotAdded` / `indexYardSlotRemoved` whenever `state.yardSlots` gains or loses an entry), `suggestedInvariantEvery(config)` used by the worker. Next hot spot: `scanPickups` in `subsystems/landside.ts`.
+- **Quality:** `modules/quality.ts` (profiles, `AutoQuality`, `FpsMeter`), `store/perfStore.ts`, `components/PerfPanel.vue` (key P), `SceneRenderer.setQuality` (calls `AtmosphereRig.setQuality`: shadow switch and mast glow-point budget `nightLights`), `ContainerInstancer.end(camera, frustum)` culling, `modules/staticBatch.ts` for static scenery.
+- **Dev API:** `perf`, `setQuality`, `perfOverlay`, `setFrameLoad`, `setAutoThresholds`, `drawBreakdown`.
+- **Gotchas:** headless SwiftShader cannot show real fps (about 1 fps at TTI), so the frame-rate target is documented as not measurable here; use the overlay on a real GPU. `scene().containerLods` gained `culled` (lod0 + lod1 still equals the box count).
+
 ### ticket-51 (TT-21): atmosphere and polish
 
 Branch `tt/51-atmosphere-polish`. Guide: `terminal-twin-AGENTS.md` § "Atmosphere and polish (TT-21)". Glossary: Atmosphere.

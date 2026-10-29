@@ -25,7 +25,7 @@ Small preset at 50% fill (and a few other seeds/layouts) deadlocks: both ASCs of
 
 ## Ticket status
 
-Updated 2026-10-28. Merged: #25–#49, #51. Remaining: #50, #52, then the code-review pass. Open tickets are not yet commented or closed on GitHub; resolve them (comment, then close) when PR #54 is marked ready.
+Updated 2026-10-28. Merged: #25–#51. Remaining: #52, then the code-review pass. Open tickets are not yet commented or closed on GitHub; resolve them (comment, then close) when PR #54 is marked ready.
 
 | Ticket | Issue | State | Claimed by |
 |---|---|---|---|
@@ -34,7 +34,7 @@ Updated 2026-10-28. Merged: #25–#49, #51. Remaining: #50, #52, then the code-r
 | TT-26 truck/chassis models | #47 | MERGED | |
 | TT-15 presets/layout | #48 | MERGED | |
 | TT-17 persistence | #49 | MERGED | |
-| TT-19 performance | #50 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
+| TT-19 performance | #50 | MERGED (real-GPU fps still to be read: key P overlay, record in guide) | |
 | TT-21 atmosphere/polish | #51 | MERGED | |
 | TT-28 infrastructure models | #52 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
 

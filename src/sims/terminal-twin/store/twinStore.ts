@@ -106,6 +106,8 @@ export interface TwinView {
   sts(): Record<string, StsRenderState> | null
   /** Per vessel: hull class, line, livery, name, LOD and rendered bay grid (TT-27); null without a 3D view. */
   vesselHulls(): Record<string, VesselHullState> | null
+  /** Where the draw calls go: visible drawables per scene group and geometry type (TT-19 perf tool); null without a 3D view. */
+  drawBreakdown(): Record<string, { objects: number; triangles: number }> | null
   /** Time-of-day lighting state and the backdrop in use (TT-21); null without a 3D view. */
   atmosphere(): (AtmosphereState & { backdrop: { kind: BackdropKind; parts: string[] } }) | null
 }

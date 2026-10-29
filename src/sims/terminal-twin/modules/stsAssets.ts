@@ -145,10 +145,10 @@ export class StsModel {
   }
 
   /** Picks the LOD by camera distance to the crane's centre (with hysteresis towards finer LODs). */
-  updateLod(camera: THREE.Vector3): StsLod {
+  updateLod(camera: THREE.Vector3, lodScale = 1): StsLod {
     const gantryX = this.rig.values.gantry ?? 0
     this.centre.set(gantryX, 30, STS_WATER_RAIL_Z + STS_RAIL_GAUGE / 2)
-    const d = camera.distanceTo(this.centre)
+    const d = camera.distanceTo(this.centre) / lodScale
     let lod: StsLod = d <= LOD_DISTANCES[0] ? 0 : d <= LOD_DISTANCES[1] ? 1 : 2
     if (lod > this.lod && d <= LOD_DISTANCES[this.lod] * STS_LOD_HYSTERESIS) lod = this.lod
     if (lod !== this.lod) this.setLod(lod)

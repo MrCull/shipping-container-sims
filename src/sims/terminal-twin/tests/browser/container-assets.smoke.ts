@@ -54,7 +54,7 @@ test('the twin renders containers from the GLBs with each box in its own line li
 
   // Close up, the boxes use LOD0; from far away, LOD1 (and the liveries stay put).
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 60))
-  await page.waitForFunction(() => window.__tt!.scene()!.containerLods.lod0 === window.__tt!.scene()!.containers)
+  await page.waitForFunction(() => window.__tt!.scene()!.containerLods.lod0 + window.__tt!.scene()!.containerLods.culled === window.__tt!.scene()!.containers) // boxes outside the view are culled, not LOD0
   await page.waitForTimeout(400)
   await page.screenshot({ path: '.screenshots/assets/twin-liveries-near.png' })
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 600))
