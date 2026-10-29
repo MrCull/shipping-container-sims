@@ -25,7 +25,7 @@ Small preset at 50% fill (and a few other seeds/layouts) deadlocks: both ASCs of
 
 ## Ticket status
 
-Updated 2026-10-28. Merged: #25–#51. Remaining: #52, then the code-review pass. Open tickets are not yet commented or closed on GitHub; resolve them (comment, then close) when PR #54 is marked ready.
+Updated 2026-10-28. Merged: #25–#52 (all tickets). Remaining: the code-review pass (in progress). Open tickets are not yet commented or closed on GitHub; resolve them (comment, then close) when PR #54 is marked ready.
 
 | Ticket | Issue | State | Claimed by |
 |---|---|---|---|
@@ -36,7 +36,7 @@ Updated 2026-10-28. Merged: #25–#51. Remaining: #52, then the code-review pass
 | TT-17 persistence | #49 | MERGED | |
 | TT-19 performance | #50 | MERGED (real-GPU fps still to be read: key P overlay, record in guide) | |
 | TT-21 atmosphere/polish | #51 | MERGED | |
-| TT-28 infrastructure models | #52 | in progress | session_0155BNjwYFnoWyKFHuSZhUEE |
+| TT-28 infrastructure models | #52 | MERGED | |
 
 Obsolete: the first session's worktrees under `.claude/worktrees/agent-*` (local to its container; its tickets were merged or redone as `-v2` branches). Remove them at the end with `git worktree remove --force`.
 
