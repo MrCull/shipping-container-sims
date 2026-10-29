@@ -3,12 +3,12 @@
  * Locale-aware clock text lives in `i18n/format.ts` (`Formatter.clock`).
  */
 
-/** Monday 06:00 (local time) of the week containing `now`. */
+/** Monday 08:00 (local time, daylight) of the week containing `now`. */
 export function defaultStartDate(now = new Date()): Date {
   const d = new Date(now)
   const sinceMonday = (d.getDay() + 6) % 7
   d.setDate(d.getDate() - sinceMonday)
-  d.setHours(6, 0, 0, 0)
+  d.setHours(8, 0, 0, 0)
   return d
 }
 

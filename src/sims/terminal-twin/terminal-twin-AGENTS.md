@@ -85,7 +85,10 @@ terminal-twin/
 │   │                         ground-position wait/resume; lane reservation while setting down (with SHCs)
 │   ├── subsystems/rail.ts    Shared STS rail: reservations, waiting for the rail, free cranes stepping aside
 │   ├── subsystems/shc.ts     SHC jobs, pull dispatch, whole-trip planning, parking (TT-05)
-│   ├── subsystems/asc.ts     ASC block storage: allocation on pad drop, job pick order, whole-cycle planning, pad reservation (TT-06)
+│   ├── subsystems/asc.ts     ASC event reactors + phase chain; the subsystem's public exports (TT-06, split in V11-09)
+│   ├── subsystems/ascStorage.ts      ASC stack storage: allocation/claim, stack lock, retrievable test, rehandle generation, slot add/remove, block/stall lookups
+│   ├── subsystems/ascReservations.ts ASC trips (per job kind), rail/pad planning, partner step-aside commit, `ascPoseAt`
+│   ├── subsystems/ascDispatch.ts     ASC job selection, ascDispatch decision, starting a planned job
 │   ├── subsystems/ascRail.ts Shared ASC rail of twin blocks: occupancy pieces, rail-segment windows, park holds, step-aside target (TT-08)
 │   ├── yardLayout.ts         Block geometry, slot ids (`B01:03-5-2`), `candidateSlots` (pure)
 │   ├── laneGraph.ts          Waterside one-way lane graph from config + shortest paths (cached per config)
@@ -172,7 +175,7 @@ parseLogVerbosity('asc=debug,*=warn'); toLogRecord(event, verbosity)
 - **New fixture:** add it to `scenario/fixtures/definitions.ts`, run `npm run tt:fixtures`, import the JSON in `fixtures/index.ts`, then `UPDATE_GOLDEN=1 npm test`.
 - **Logging a new event type:** nothing to do if its name starts with its subsystem (`AscMoveStarted` → `asc`, level `info`). Otherwise, or for a `debug`/`warn`/`error` level, add it to `EVENT_LOG_META` in `engine/logging.ts`.
 - **New CLI strategy for diffs:** add a named handler set to `cli/handlerSets.ts` (or, for one decision point, pass `--strategy <dp>=<name>`; `tt:run` takes the same flag).
-- **New equipment kind** (crane, vehicle, …): add it in `entityBounds` and `pickEntity` (`modules/picking.ts`), `entityKind` and `describeEntity` (`modules/entityInspector.ts`), the label kinds in `modules/overlayLayers.ts`, and catalogue keys `inspector.kind.*` / `inspector.fact.*`. Keep dimensions in `modules/equipmentDims.ts` in sync with the model. `tests/equipment-kinds.test.ts` fails when a kind is missing from one of these.
+- **New equipment kind** (crane, vehicle, …): write `modules/equipmentKinds/<kind>.ts` exporting an `EquipmentKindDef` (`types.ts`: ids, bounds, dev-API state and rig keys, inspector view, optional extra query, scene-renderer factory) and add it to `EQUIPMENT_KINDS` in `modules/equipmentKinds/index.ts`; that is the whole change. The scene renderer (`sceneRenderer.ts`), picking, labels, inspector, store and dev API (`sceneState()` and `view.rigs()`) iterate the registry, so no hub file is edited. Also add the `inspector.kind.<kind>` and `inspector.fact.*` catalogue keys, and keep `modules/equipmentDims.ts` in sync with the model. `tests/equipment-kinds.test.ts` checks the registry (`registrationProblems`) and fails on a half-registered kind. Registry order is the build and update order and the Labels overlay's priority at its cap.
 - **New KPI:** append a row to `KPI_DEFS` and an `observe` case in `engine/kpi/collector.ts`, list it in `KPI_GROUPS` (`modules/dashboardModel.ts`) and add a `dashboard.kpi.<id>` catalogue key.
 - **Hand-built `Delta` in a test:** start from `emptyDelta()` (`tests/delta.ts`) so a new Delta field never breaks it.
 - **New decision point or strategy:** see [Decision points](#decision-points-tos-seams) below.
@@ -224,7 +227,7 @@ Deliberately not built, or built differently from the spec (the code review acce
 - **Handler wall latency** is a run total in `kpiReport()` and the final report, not a time series (it is not in the event log).
 - **Truck-delivered exports with a legacy/prefilled start** are new boxes outside the bay plan and are never loaded; only the `empty`/`warmup` start delivers the booked boxes.
 - **SHC cornering:** SHCs stop at every turn.
-- **Hub files** `SetupDialog.vue`, `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass.
+- **Hub files** `SetupDialog.vue`, `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass. The per-kind renderer, dev-API and inspector wiring left the hubs in V11-01 (see Extending); `SetupDialog.vue` is still to split (#68); the ASC subsystem split into `asc.ts` / `ascStorage.ts` / `ascReservations.ts` / `ascDispatch.ts` (+ pure `ascRail.ts`) in V11-09.
 
 ## Known behaviours and pitfalls
 

@@ -6,6 +6,7 @@
  * SceneRenderer.) Three.js objects stay out of Vue reactivity.
  */
 import * as THREE from 'three'
+import { EQUIPMENT_KINDS, type EquipmentKind } from './equipmentKinds'
 import { entityBounds } from './picking'
 import type { OverlayState } from './overlays'
 import { CONTAINER_DIMS, type SceneModel } from './sceneModel'
@@ -34,6 +35,7 @@ export class OverlayLayers {
   private stallPlates = new Map<string, THREE.Mesh>()
   private gpPlates: THREE.Mesh[] = []
   private labels = new Map<string, THREE.Sprite>()
+  private labelKind = new Map<string, EquipmentKind>()
   private labelTextures = new Map<string, THREE.CanvasTexture>()
   private free: THREE.MeshBasicMaterial
   private busy: THREE.MeshBasicMaterial
@@ -67,8 +69,9 @@ export class OverlayLayers {
       this.stallPlates.set(stall.id, m)
       this.group.add(m)
     }
-    const labelled = [...model.stsIds, ...model.shcIds, ...model.ascIds, ...model.vesselIds]
-    for (const id of labelled.slice(0, LABEL_CAP)) {
+    const labelled = EQUIPMENT_KINDS.filter((def) => def.labelled).flatMap((def) => def.ids(model).map((id) => ({ id, kind: def.kind })))
+    for (const { id, kind } of labelled.slice(0, LABEL_CAP)) {
+      this.labelKind.set(id, kind)
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false }))
       sprite.scale.set(LABEL_W_M, LABEL_H_M, 1)
       sprite.renderOrder = 10
@@ -169,7 +172,7 @@ export class OverlayLayers {
     }
 
     for (const [id, sprite] of this.labels) {
-      const kind = model.truckIds.includes(id) ? 'truck' : model.stsIds.includes(id) ? 'sts' : model.shcIds.includes(id) ? 'shc' : model.ascIds.includes(id) ? 'asc' : 'vessel'
+      const kind = this.labelKind.get(id) ?? 'vessel'
       const b = overlays.labels ? entityBounds(model, id, t) : null
       sprite.visible = b !== null
       if (!b) continue

@@ -156,6 +156,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       // Follow camera (F): keep the selection centred, keeping the user's viewing offset.
       const centre = controller.model?.entityCentre(store.selectedId, controller.displayTime)
       if (centre) aim(centre, true)
+      else store.toggleFollow() // the followed entity left the scene (a truck exited the gate): release, the view stays put
     }
     // Time of day: the sun follows the sim clock (re-applied when the clock moves a minute or the lock changes).
     const hour = hourOfDay(store.choice.startDateTime, controller.displayTime)
@@ -244,11 +245,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       cameraTarget: () => (controls ? { x: controls.target.x, y: controls.target.y, z: controls.target.z } : null),
       stats: () => (view ? { ...view.stats(), frames: framesRendered, render: { ...lastRender } } : null),
       liveries: () => view?.renderedLiveries() ?? null,
-      shcRigs: () => view?.renderedShcs() ?? null,
-      truckRigs: () => view?.renderedTrucks() ?? null,
-      ascRigs: () => view?.renderedAscs() ?? null,
-      sts: () => view?.renderedSts() ?? null,
-      vesselHulls: () => view?.vesselHulls() ?? null,
+      rigs: () => view?.renderedRigs() ?? null,
       drawBreakdown: () => (view ? view.drawBreakdown(frustum) : null),
       atmosphere: () => view?.atmosphereState() ?? null,
     })

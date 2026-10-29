@@ -36,7 +36,7 @@ The Web Worker host, the main-thread modules, locale and units, the `window.__tt
 │   ├── overlayLayers.ts      Three.js occupancy plates and state labels (read the SceneModel at display time)
 │   ├── equipmentDims.ts      STS / SHC proportions shared by the renderer and picking
 │   ├── shortcuts.ts          SHORTCUT_HELP table + shortcutFor(key event) (ignores typing targets)
-│   └── time.ts               Start date default (Mon 06:00), datetime-local helpers
+│   └── time.ts               Start date default (Mon 08:00), datetime-local helpers
 ├── store/twinStore.ts        Pinia facade (small reactive UI state; controller/view kept raw)
 ├── worker/                   Engine Web Worker (same ESLint bans as engine/)
 │   ├── engine.worker.ts      Entry; serialises requests
@@ -53,7 +53,7 @@ The Web Worker host, the main-thread modules, locale and units, the `window.__tt
 - **Flat-out runs.** "Run to…", `__tt.runUntil` and `__tt.step` send `run`/`step`. Rendering is skipped while `busy`. The delta is compacted to the latest plan, custody and status per entity, and the display jumps to the target (Run to…) or to the engine time (runUntil/step, which also pause). The Run to… popover also has "Next vessel departure" (`TwinController.runToNextDeparture`, `store.runToNextDeparture`, `data-testid="tt-run-to-departure"`): flat out to the next `VesselDeparted` the engine has not yet processed (the engine may be a look-ahead ahead of the display), then playback resumes.
 - **Scene model.** `SceneModel` keeps per-axis segment lists and custody/status timelines and prunes history older than the display time. `positionAt` interpolates the crane, and a carried box follows the spreader. Display time never goes backwards, except on reset/load, which build a new model; a generation counter drops replies that belong to the old scenario.
 - **Rendering.** Containers are drawn by `ContainerInstancer`: procedural boxes until the GLBs load, then one `InstancedMesh` per size × LOD with a livery per instance (see [Phase 2 asset pipeline](assets-pipeline.md#phase-2-asset-pipeline)). STS, hulls and the quay are shared low-poly boxes. Three.js objects never enter Vue reactivity; the store mirrors only the clock, speed, engine info and selection.
-- **Setup dialog.** It lists fixtures plus the `presets` registry, with an editable seed (re-roll) and start date/time (default Monday 06:00 of the current week, local time). Start = `store.startScenario({ name, seed, startDateTime })`. The start date changes only the clock, not the run.
+- **Setup dialog.** It lists fixtures plus the `presets` registry, with an editable seed (re-roll) and start date/time (default Monday 08:00 of the current week, local time). Start = `store.startScenario({ name, seed, startDateTime })`. The start date changes only the clock, not the run.
 
 - Browser: `runUntil({ time })` leaves `now = time`, so the engine horizon is exact. Playback in time slices gives the same hash as one run (`tests/live-driving.test.ts`).
 - Browser: injected events are extra roots, so `why` on them (or their descendants) ends at the injected event, not at `ScenarioStarted`.
@@ -100,7 +100,7 @@ __tt.sceneState()  // what the scene shows: custody per box, status + pose per S
                    //   active reservations, liveries: { [containerId]: { index (atlas tile), size, lod } } as drawn,
                    //   shcRigs: { [shcId]: { lod, steerRad, wheelRollRad, hoistM, carrying } } as drawn,
                    //   ascRigs: { [ascId]: { lod, gantryZ, trolleyX, hoistM, ropeScale, scaleY, carrying } } as drawn
-__tt.cameraTo(id, distanceM?)  // aim at an entity, optionally from a distance (60 → LOD0, 600 → LOD1)
+__tt.cameraTo(id, distanceM?)  // aim at any entity the inspector shows (also a block, transfer stall, WTP pad, 'gate'; false only for unknown ids), optionally from a distance (60 → LOD0, 600 → LOD1)
 __tt.display(); __tt.setDisplay({ locale: 'de-DE', units: 'imperial' })  // live locale/units
 __tt.config()      // loaded scenario config (SI) + current display settings
 __tt.ui()          // { selectedId, following, overlaysVisible, dashboardOpen, helpOpen, feedOpen, inspectorOpen }

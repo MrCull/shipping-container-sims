@@ -8,6 +8,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **ASC (automated stacking crane):** a rail-mounted gantry crane serving one yard block. Each block has 1–2 ASCs, which never pass each other. The waterside ASC prefers WTP work and the landside ASC prefers truck work.
 - **SHC (shuttle carrier):** a straddle-type vehicle that carries one container at a time between STS ground positions and WTP pads. It sets a box down and drives clear before the box can be picked up again. *Avoid:* "straddle carrier" for this role.
 - **Spreader:** the lifting frame on an STS or ASC hoist. It grips a container with twist-locks (**lock** and **unlock** times).
+- **Equipment kind (registry):** one of STS, SHC, ASC, truck or vessel, registered in its own module under `modules/equipmentKinds/` (ids, bounds, dev-API state, inspector view, scene renderer). The renderer, dev API, picking, labels and inspector iterate `EQUIPMENT_KINDS`, so a new kind is a module plus one entry.
 
 ## Places
 

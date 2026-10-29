@@ -36,6 +36,14 @@ describe('presets', () => {
     expect(Math.max(...stress.landside!.hourlyProfile)).toBeGreaterThan(2 * Math.max(...tti.landside!.hourlyProfile))
   })
 
+  it('V11-03: every preset starts at 08:00 local (daylight), in the sim clock and the wall-clock start', () => {
+    for (const build of Object.values(presets)) {
+      const c = build()
+      expect(c.startDateTime).toMatch(/T08:00:00Z$/)
+      expect(c.kpi?.startTimeOfDayS).toBe(8 * 3600)
+    }
+  })
+
   it('each preset picks a yard start mode', () => {
     for (const build of Object.values(presets)) expect(build().yardStart?.mode).toBeDefined()
   })
