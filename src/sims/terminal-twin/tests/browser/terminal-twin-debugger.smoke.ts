@@ -171,7 +171,7 @@ test('clicking a container in 3D selects it and shows its custody history', asyn
 
   // A click on empty sky deselects.
   const sky = await page.evaluate(() => {
-    for (let y = 130; y < 700; y += 40) for (let x = 440; x < 840; x += 40) if (window.__tt!.pickAt(x, y) === null) return { x, y }
+    for (let y = 130; y < 700; y += 40) for (let x = 440; x < 840; x += 40) if (window.__tt!.pickAt(x, y) === null && document.elementFromPoint(x, y)?.tagName === 'CANVAS') return { x, y } // on the 3D canvas, not a panel over it
     return null
   })
   expect(sky, 'an empty spot in the view').not.toBeNull()

@@ -80,8 +80,11 @@ test('the asset viewer loads every container asset, switches LODs and moves the 
     expect(lod0.asset).toBe(name)
     expect(lod0.triangles).toBe(lod0.lods.LOD0.triangles)
     expect(lod0.referenceContainer).toBe(true)
-    const lod1 = await page.evaluate(() => window.__ttAssets!.setLod('LOD1'))
-    expect(lod1.triangles).toBe(lod1.lods.LOD1.triangles)
+    // later groups (buildings, signs) ship a single LOD: only switch where the asset has one
+    if ('LOD1' in lod0.lods) {
+      const lod1 = await page.evaluate(() => window.__ttAssets!.setLod('LOD1'))
+      expect(lod1.triangles).toBe(lod1.lods.LOD1.triangles)
+    }
     await page.evaluate(() => window.__ttAssets!.setLod('LOD0'))
     for (const rig of lod0.rig) {
       const moved = await page.evaluate(([n, v]) => window.__ttAssets!.setRig(n as string, v as number), [rig.node, rig.max] as const)
