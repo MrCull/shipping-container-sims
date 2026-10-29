@@ -222,6 +222,12 @@ Deliberately not built, or built differently from the spec (the code review acce
 
 - **Extra shortcuts** E, I and P and the ASC yield moves go beyond the spec (accepted scope).
 - **Hub files** `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass. The per-kind renderer, dev-API and inspector wiring left the hubs in V11-01 (see Extending); `SetupDialog.vue` is a shell (V11-08, #68): `composables/useSetupDraft.ts` holds the draft and provides it, one `components/setup/Setup<Section>Section.vue` per section (layout, vessels, display, STS, landside, SHC, yard, modes, decisions) edits its part, and `components/setup/*Validation.ts` hold each section's readout and submit message (the shell runs them in order); the shell keeps the end-conditions fieldset inline because `tests/setup-inputs.test.ts` reads it from `SetupDialog.vue`, so a new setup section is a component plus a draft field plus a validator; the ASC subsystem split into `asc.ts` / `ascStorage.ts` / `ascReservations.ts` / `ascDispatch.ts` (+ pure `ascRail.ts`) in V11-09.
+- **Code-review smells accepted for v1.1 (follow-up, not lost):**
+  - Duplicated lock/unlock inputs and readout guards across `SetupSts`, `SetupShc` and `YardSection`, and across the `*Validation.ts` files. Candidates: a shared `LockUnlockFields` component and a `kinematicsValid` helper.
+  - The `sts.ts` and `asc.ts` subsystems repeat the same equipment-kind skeleton.
+  - Unnamed magic numbers in `yardValidation.ts` and `shcValidation.ts` (for example 8 rows per bay, a nominal 300 m trip); name them as constants next to the rules they feed.
+  - `sceneModel.ts` still has a kind chain (shc, truck, wtpPad, asc, yardSlot, vesselSlot, sts) beside the equipment registry.
+  - `devApi.ts` builds the scene state with `state as unknown as SceneState`; give it a typed builder.
 
 ## Known behaviours and pitfalls
 
