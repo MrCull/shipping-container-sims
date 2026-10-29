@@ -39,6 +39,8 @@ function chromiumExecutable(): string | undefined {
 export default defineConfig({
   testDir: './src',
   timeout: 120_000,
+  // Dev-server chunks (the lazy dashboard, GLBs) and software-WebGL frames are slow on a loaded 2-core runner.
+  expect: { timeout: 20_000 },
   fullyParallel: false,
   workers: 1,
   // CI runners are slower than a dev machine: a spec that fails once and passes on retry is reported as flaky, not red.

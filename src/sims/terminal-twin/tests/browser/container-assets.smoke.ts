@@ -97,7 +97,7 @@ test('the asset viewer loads every container asset, switches LODs and moves the 
   expect(errors).toEqual([])
 })
 
-test('a TTI-size yard of instanced containers stays within the triangle and draw-call budget @load', async ({ page }) => {
+test('a TTI-size yard of instanced containers stays within the triangle and draw-call budget', async ({ page }) => {
   const { errors } = watch(page)
   await page.goto('/sim/terminal-twin?viewer=yard')
   await page.waitForFunction(() => !!window.__ttAssets)

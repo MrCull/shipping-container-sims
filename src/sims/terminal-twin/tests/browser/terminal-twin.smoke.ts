@@ -6,6 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/tracer-1sts-10-boxes.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
+import { sampleFrames, simPerWallSecond, stalledFrames } from './frameSampling'
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = []
@@ -66,43 +67,23 @@ test('the tracer fixture runs to completion in the browser: golden hash, rendere
   expect(errors).toEqual([])
 })
 
-test('×1 runs one sim second per wall second; ×600 keeps animating every frame @load', async ({ page }) => {
+test('×1 runs one sim second per wall second; ×600 keeps animating every frame', async ({ page }) => {
   await openTracer(page)
+  // Load-proof (V11-07): ratios over a minimum wall-clock window sampled on animation frames, never absolute frame counts.
   await page.evaluate(() => window.__tt!.setSpeed(1))
-  const ratio1 = await page.evaluate(async () => {
-    const tt = window.__tt!
-    const a = { sim: tt.clock().displayTime, wall: performance.now() }
-    await new Promise((r) => setTimeout(r, 4000))
-    const b = { sim: tt.clock().displayTime, wall: performance.now() }
-    return (b.sim - a.sim) / ((b.wall - a.wall) / 1000)
-  })
+  const slow = await sampleFrames(page, { minWallMs: 4000 })
+  const ratio1 = simPerWallSecond(slow)
   expect(ratio1).toBeGreaterThan(0.95)
   expect(ratio1).toBeLessThan(1.05)
 
   await page.evaluate(() => window.__tt!.setSpeed(600))
-  const frames = await page.evaluate(async () => {
-    const tt = window.__tt!
-    const samples: { sim: number; wall: number; frames: number }[] = []
-    const t0 = performance.now()
-    await new Promise<void>((resolve) => {
-      const tick = () => {
-        samples.push({ sim: tt.clock().displayTime, wall: performance.now(), frames: tt.scene()?.frames ?? 0 })
-        if (performance.now() - t0 < 1000) requestAnimationFrame(tick)
-        else resolve()
-      }
-      requestAnimationFrame(tick)
-    })
-    return samples
-  })
-  const first = frames[0]
-  const last = frames[frames.length - 1]
-  // Software WebGL on a loaded machine may render only a few frames a second, so the frame count is not the assertion:
-  // the display clock must advance on every rendered frame and at ~x600 (below), whatever the frame rate.
-  expect(last.frames - first.frames).toBeGreaterThanOrEqual(3)
-  expect(frames.length).toBeGreaterThanOrEqual(3)
-  // Display time advanced on every frame (never stalled waiting for the engine) at ~×600.
-  for (let i = 1; i < frames.length; i++) expect(frames[i].sim).toBeGreaterThan(frames[i - 1].sim)
-  const rate = (last.sim - first.sim) / ((last.wall - first.wall) / 1000)
+  const fast = await sampleFrames(page, { minWallMs: 2000 })
+  expect(fast.length).toBeGreaterThanOrEqual(3)
+  expect(fast[fast.length - 1].frames).toBeGreaterThan(fast[0].frames)
+  // Display time advanced on every frame (never stalled waiting for the engine) at ~×600, whatever the frame rate.
+  expect(stalledFrames(fast)).toEqual([])
+  for (let i = 1; i < fast.length; i++) expect(fast[i].sim).toBeGreaterThan(fast[i - 1].sim)
+  const rate = simPerWallSecond(fast)
   expect(rate).toBeGreaterThan(600 * 0.9)
   expect(rate).toBeLessThan(600 * 1.1)
 })
