@@ -207,7 +207,10 @@ describe('SHC invariants hold for every fixture and stress variant', () => {
 
 describe('waiting when SHCs are scarce', () => {
   it('the STS waits for a free ground position, and the wait is recorded', () => {
-    const sim = createSimulation(scarce())
+    // back-off timer off: only a freed position (an SHC pick) wakes the crane
+    const config = scarce()
+    config.layout = { ...config.layout, stsGroundRetryS: 0 }
+    const sim = createSimulation(config)
     expect(sim.runUntil().reason).toBe('ended')
     const log = sim.eventLog()
     const started = log.filter((e) => e.type === 'StsWaitingForGroundPosition')
@@ -220,6 +223,13 @@ describe('waiting when SHCs are scarce', () => {
     // the wait ends because an SHC picked a box from that crane's ground position
     expect(sim.why(ended[0].id)[1].type).toBe('ShcPicked')
     // and every box still reaches the WTP pad
+    expect(sim.kpiReport().horizontal!.boxesToWtp).toBe(10)
+  })
+
+  it('with the default back-off the crane also re-asks on a timer and every box still arrives', () => {
+    const sim = createSimulation(scarce())
+    expect(sim.runUntil().reason).toBe('ended')
+    expect(sim.invariantReport().violations).toEqual([])
     expect(sim.kpiReport().horizontal!.boxesToWtp).toBe(10)
   })
 })
