@@ -26,9 +26,9 @@ describe('eventMatchesFilter', () => {
   })
 
   it('several space-separated terms must all match', () => {
-    const both = events.filter((e) => eventMatchesFilter(e, 'Shc SHC02'))
+    const both = events.filter((e) => eventMatchesFilter(e, 'Shc SHC01'))
     expect(both.length).toBeGreaterThan(0)
-    expect(both.every((e) => e.subjects.equipment?.includes('SHC02'))).toBe(true)
+    expect(both.every((e) => e.subjects.equipment?.includes('SHC01'))).toBe(true)
   })
 })
 

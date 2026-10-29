@@ -4,7 +4,7 @@
  * injector, timeouts/errors with fallback, and per-handler KPIs.
  */
 import { describe, expect, it } from 'vitest'
-import { createSimulation, restoreSimulation, strategies, type EngineEvent, type EventOf, type HandlerSet } from '../engine'
+import { createSimulation, diffEventLogs, restoreSimulation, strategies, type EngineEvent, type EventOf, type HandlerSet } from '../engine'
 import { ScenarioBuilder } from '../scenario/builder'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
@@ -198,8 +198,18 @@ describe('pause mode with injected latency', () => {
     sim.runUntil()
 
     for (const { req, res } of pairs(sim)) expect(res.t).toBe(req.t)
-    expect(sim.eventLogHash()).toBe(plain.eventLogHash())
-    expect(sim.eventLog()).toEqual(plain.eventLog())
+    // the measured wall latency rides on DecisionResolved (V11-16); everything else is identical
+    const withoutWall = (log: readonly EngineEvent[]) =>
+      log.map((e) => {
+        if (e.type !== 'DecisionResolved') return e
+        const payload = { ...e.payload }
+        delete payload.wallLatencyMs
+        return { ...e, payload }
+      })
+    expect(withoutWall(sim.eventLog())).toEqual(withoutWall(plain.eventLog()))
+    expect(sim.eventLogHash()).toBe(plain.eventLogHash()) // the hash leaves the measurement out
+    expect(diffEventLogs(sim.eventLog(), plain.eventLog()).diverged).toBe(false)
+    expect(sim.eventLog().some((e) => e.type === 'DecisionResolved' && (e.payload.wallLatencyMs ?? 0) > 0)).toBe(true)
     const h = sim.kpiReport().handlers.stsGroundPosition
     expect(h.simLatencyS).toEqual({ mean: 0, max: 0 })
     expect(h.equipmentIdleS).toBe(0)
@@ -283,9 +293,14 @@ describe('injected timeouts and errors', () => {
 })
 
 describe('async (Promise) handlers', () => {
-  /** The event log with DecisionResolved.handler blanked ("custom" vs "strategy:…" is the only expected difference). */
+  /** The event log with DecisionResolved.handler blanked ("custom" vs "strategy:…" is the only expected difference) and the measured wall latency dropped. */
   const withoutHandlerLabel = (sim: { eventLog(): readonly EngineEvent[] }) =>
-    sim.eventLog().map((e) => (e.type === 'DecisionResolved' ? { ...e, payload: { ...e.payload, handler: '' } } : e))
+    sim.eventLog().map((e) => {
+      if (e.type !== 'DecisionResolved') return e
+      const payload = { ...e.payload, handler: '' }
+      delete payload.wallLatencyMs
+      return { ...e, payload }
+    })
 
   /** A scripted remote TOS: answers after `ms` of wall time. */
   const remote = (ms: number): Partial<HandlerSet> => ({

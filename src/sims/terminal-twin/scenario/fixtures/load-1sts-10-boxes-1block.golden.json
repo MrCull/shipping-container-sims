@@ -3,9 +3,9 @@
   "seed": 42,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "1018c7edc9e338",
+  "eventLogHash": "047e0e3b283ca4",
   "kpis": {
-    "simTimeS": 1763.539,
+    "simTimeS": 1748.088,
     "eventsProcessed": 352,
     "movesCompleted": 10,
     "vesselsCompleted": 1,
@@ -14,7 +14,7 @@
         "moves": 10,
         "cycles": 10,
         "twinLifts": 0,
-        "grossMovesPerHour": 24.896,
+        "grossMovesPerHour": 24.752,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1763.539,
-        "turnaroundS": 1703.539,
+        "departedAtS": 1748.088,
+        "turnaroundS": 1688.088,
         "sts": [
           "STS01"
         ]
@@ -151,20 +151,20 @@
       "boxesToWtp": 0,
       "shcs": {
         "SHC01": {
-          "jobs": 7,
-          "emptyDistanceM": 1776,
-          "loadedDistanceM": 748,
+          "jobs": 10,
+          "emptyDistanceM": 2469.5,
+          "loadedDistanceM": 1035.5,
           "reservationWaitS": 0
         },
         "SHC02": {
-          "jobs": 3,
-          "emptyDistanceM": 729.5,
-          "loadedDistanceM": 287.5,
-          "reservationWaitS": 11.009
+          "jobs": 0,
+          "emptyDistanceM": 0,
+          "loadedDistanceM": 0,
+          "reservationWaitS": 0
         }
       },
       "stsGroundPositionWaitS": {
-        "STS01": 178.74
+        "STS01": 154.882
       }
     },
     "yard": {
@@ -202,8 +202,8 @@
       "released": 7,
       "started": 7,
       "completed": 7,
-      "leadTimeMeanS": 405.876,
-      "leadTimeMaxS": 633.552,
+      "leadTimeMeanS": 401.461,
+      "leadTimeMaxS": 608.317,
       "boxesLoaded": 10
     }
   },

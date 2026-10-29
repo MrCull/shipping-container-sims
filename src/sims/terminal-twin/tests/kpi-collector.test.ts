@@ -96,8 +96,30 @@ describe('KPI collector on real runs', () => {
     expect(h.equipmentIdleS).toBeGreaterThan(0)
     expect(total(series, 'handler.equipment-idle-s', 'stsGroundPosition')).toBeCloseTo(h.equipmentIdleS, 2)
     expect(sumHourly(series, 'handler.equipment-idle-s', 'stsGroundPosition')).toBeCloseTo(h.equipmentIdleS, 2)
-    // the wall latency is not in the event log (the log is latency-independent), so it is a run total in kpiReport only
     expect(h.wallLatencyMs.mean).toBe(20_000)
+  })
+
+  it('handlers: wall latency is carried by DecisionResolved and is a time series (works after a restore, i.e. from the log)', () => {
+    const config = { ...fixtures['tracer-1sts-10-boxes'], decisions: { points: { stsGroundPosition: { timeoutMs: 60_000, latency: { delay: { kind: 'fixed' as const, ms: 20_000 } } } } } }
+    const sim = createSimulation(config)
+    sim.runUntil()
+    const resolved = sim.eventLog().filter((e) => e.type === 'DecisionResolved' && e.payload.decisionPoint === 'stsGroundPosition')
+    expect(resolved.length).toBeGreaterThan(0)
+    for (const e of resolved) expect(e.type === 'DecisionResolved' && e.payload.wallLatencyMs).toBe(20_000)
+    const series = sim.kpiSeries()
+    expect(series.series['handler.wall-latency-s'].unit).toBe('s')
+    const hourly = series.series['handler.wall-latency-s'].entities.stsGroundPosition.hourly.filter((v) => v !== null)
+    expect(hourly.length).toBeGreaterThan(0)
+    for (const v of hourly) expect(v).toBeCloseTo(20, 3)
+    expect(total(series, 'handler.wall-latency-s', 'stsGroundPosition')).toBeCloseTo(sim.kpiReport().handlers.stsGroundPosition.wallLatencyMs.mean / 1000, 3)
+    const rebuilt = restoreSimulation(sim.snapshot())
+    expect(rebuilt.kpiSeries().series['handler.wall-latency-s']).toEqual(series.series['handler.wall-latency-s'])
+  })
+
+  it('handlers: a run without injected latency carries no wall latency in its events and the series is 0', () => {
+    const sim = run('tracer-1sts-10-boxes')
+    for (const e of sim.eventLog()) if (e.type === 'DecisionResolved') expect(e.payload.wallLatencyMs).toBeUndefined()
+    expect(total(sim.kpiSeries(), 'handler.wall-latency-s', 'stsGroundPosition')).toBe(0)
   })
 
   it('vessels: turnaround and anchorage wait are time series (counted in the hour the vessel departs / gets its berth)', () => {

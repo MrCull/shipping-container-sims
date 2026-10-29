@@ -206,6 +206,8 @@ export class SceneModel {
   readonly truckIds: string[] = []
   /** Size of the box each truck brings or collects (its first leg), as the worker reported it. */
   private truckLoad: Record<string, ContainerSize> = {}
+  /** When each known truck first appeared (its arrival at the gate); kept after the status history is pruned. */
+  private truckArrival: Record<string, number> = {}
   private readonly vessels: Record<string, VesselConfig>
   private readonly blocks: Record<string, BlockSpec>
   private readonly specs: Record<string, VesselClassSpec>
@@ -363,6 +365,7 @@ export class SceneModel {
     }
     for (const e of delta.entities) {
       this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX })
+      if (e.kind === 'truck') this.truckArrival[e.id] ??= e.t
       if (e.kind === 'truck' && e.loadSize) this.truckLoad[e.id] = e.loadSize
     }
     for (const r of delta.reservations ?? []) (this.reservations[r.zone] ??= []).push(r)
@@ -428,6 +431,7 @@ export class SceneModel {
       if (!last || last.status !== 'gone' || last.t >= time) continue
       this.truckIds.splice(this.truckIds.indexOf(id), 1)
       delete this.truckLoad[id]
+      delete this.truckArrival[id]
       delete this.axisSegments[id]
       delete this.drives[id]
       delete this.status[`truck:${id}`]
@@ -452,6 +456,25 @@ export class SceneModel {
     const articulationRad = Math.max(-MAX_ARTICULATION_RAD, Math.min(MAX_ARTICULATION_RAD, resting.steerRad * ARTICULATION_GAIN))
     const loadOffsetM = this.truckLoad[id] === '20' ? -TRUCK_BOX20_OFFSET_M : 0
     return { x: value('x', gate?.queueX ?? 0), z: value('z', gate?.spawnZ ?? 0), ...resting, visible, articulationRad, loadOffsetM }
+  }
+
+  /** The truck that arrives next at or after `time` (earliest known arrival; the engine may already be ahead of the display), or null when none is known yet. */
+  nextTruckArrival(time: number): { id: string; t: number } | null {
+    let best: { id: string; t: number } | null = null
+    for (const id of this.truckIds) {
+      const t = this.truckArrival[id]
+      if (t !== undefined && t >= time && (!best || t < best.t)) best = { id, t }
+    }
+    return best
+  }
+
+  /** Where a truck is in its visit at `time`: not yet arrived, in the terminal, or gone (also for an id the scene does not know). */
+  truckPhase(id: string, time: number): 'waiting' | 'present' | 'gone' {
+    if (!this.truckIds.includes(id)) return 'gone'
+    const list = this.status[`truck:${id}`] ?? []
+    const i = lastAtOrBefore(list, time, (e) => e.t)
+    if (i < 0) return 'waiting'
+    return list[i].status === 'gone' ? 'gone' : 'present'
   }
 
   shcPose(shcId: string, time: number): ShcPose {

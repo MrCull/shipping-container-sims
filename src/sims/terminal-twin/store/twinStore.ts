@@ -6,6 +6,7 @@
  * reactivity (closure variables / markRaw); large collections such as the
  * recent-event buffer use shallowRef + triggerRef (Box Empire pattern).
  */
+import type { ViewPresetName } from '../modules/viewPresets'
 import { defineStore } from 'pinia'
 import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
@@ -82,6 +83,8 @@ export interface FinalReportData extends KpiHeadlineState {
 export interface TwinView {
   /** Aim at an entity, keeping the view direction (and, if given, at `distanceM`). */
   cameraTo(entityId: string, distanceM?: number): boolean
+  /** Frame a view preset (V11-05); false when the scene has no such region (no landside for the gate view). */
+  viewPreset(preset: ViewPresetName): boolean
   /** The entity under a viewport point (client coordinates) at the displayed time, or null. */
   pickAt(clientX: number, clientY: number): string | null
   /** Viewport (client) coordinates of an entity's centre; null when it is not drawn or off screen. */
@@ -187,6 +190,9 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const config = shallowRef<ScenarioConfig | null>(null)
   /** Keyboard-driven view state (TT-16 dashboard and TT-18 overlays/follow camera build on these). */
   const following = ref(false)
+  /** "Follow next truck" was asked and no truck arrival at or after `followNextFrom` is known yet (resolved in `sync`). */
+  const followNextPending = ref(false)
+  let followNextFrom = 0
   const overlaysVisible = ref(true)
   const dashboardOpen = ref(false)
   /** Dashboard tab (TT-16): KPI charts, yard heatmap and Gantt, or the final report. */
@@ -298,6 +304,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   function sync(): void {
     if (!controller) return
     displayTime.value = controller.displayTime
+    if (followNextPending.value) resolveFollowNext()
     speed.value = controller.speed
     paused.value = controller.paused
     busy.value = controller.busy
@@ -524,6 +531,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   function select(id: string | null): void {
     selectedId.value = id
+    followNextPending.value = false
     if (!id) {
       following.value = false
       entityView.value = null
@@ -875,6 +883,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   function toggleFollow(): void {
+    followNextPending.value = false
     if (following.value) {
       following.value = false
       showToast('twin.toast.followOff')
@@ -884,6 +893,36 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     } else {
       showToast('twin.toast.followNothing')
     }
+  }
+
+  /** Select and follow the truck at `followNextFrom` or later, if the engine already knows one. */
+  function resolveFollowNext(): string | null {
+    const next = controller?.model?.nextTruckArrival(followNextFrom)
+    if (!next) return null
+    select(next.id) // clears the pending flag
+    following.value = true
+    view?.cameraTo('gate') // the follow camera takes over once the truck is at the gate
+    showToast('twin.toast.followNext', { id: next.id })
+    return next.id
+  }
+
+  /**
+   * "Follow next truck" (button, N, dev API): select the next truck to arrive at or after the display time and follow it
+   * through the gate, its stall and out. Returns its id, or null when none is known yet (the request stays pending and
+   * resolves as the engine runs on) or the terminal has no landside.
+   */
+  function followNextTruck(): string | null {
+    const c = controller
+    if (!c?.model) return null
+    if (!c.model.landside) {
+      showToast('followNext.unavailable')
+      return null
+    }
+    followNextFrom = c.displayTime
+    followNextPending.value = true
+    const id = resolveFollowNext()
+    if (!id) showToast('followNext.waiting')
+    return id
   }
 
   function toggleOverlays(): void {
@@ -898,6 +937,19 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   function setHelpOpen(open: boolean): void {
     helpOpen.value = open
+  }
+
+  /** Frame a view preset (shortcut, button, dev API). Stops following, since the preset sets the camera itself. */
+  function setViewPreset(preset: ViewPresetName): boolean {
+    if (!view) return false
+    const ok = view.viewPreset(preset)
+    if (!ok) {
+      showToast('view.unavailable')
+      return false
+    }
+    following.value = false
+    followNextPending.value = false
+    return true
   }
 
   function attachView(v: TwinView | null): void {
@@ -958,6 +1010,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     fmt,
     config,
     following,
+    followNextPending,
+    followNextTruck,
     overlaysVisible,
     dashboardOpen,
     dashboardTab,
@@ -1024,6 +1078,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     toggleOverlays,
     toggleDashboard,
     setHelpOpen,
+    setViewPreset,
     attachView,
     dispose,
   }

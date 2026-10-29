@@ -45,3 +45,31 @@ describe('kinematic profile', () => {
     expect(positionAt(seg, 2)).toBeCloseTo(2, 9)
   })
 })
+
+describe('segments with entry and exit speeds (V11-12 cornering)', () => {
+  const p = { vMax: 4, accel: 1, decel: 1 }
+
+  it('a run that enters at 2 m/s and leaves at 2 m/s skips the standing start and stop', () => {
+    // 2 -> 4 m/s: 2 s / 6 m; 4 -> 2 m/s: 2 s / 6 m; 88 m cruise = 22 s
+    const s = planSegment('X', 'x', 0, 100, 10, p, 2, 2)
+    expect(s.t1 - s.t0).toBeCloseTo(26, 9)
+    expect(s.v0).toBe(2)
+    expect(s.v1).toBe(2)
+    expect(positionAt(s, 10)).toBeCloseTo(0, 9)
+    expect(positionAt(s, 12)).toBeCloseTo(6, 9)
+    expect(positionAt(s, 36)).toBeCloseTo(100, 9)
+    expect(positionAt(s, 34)).toBeCloseTo(94, 9)
+  })
+
+  it('a short run with a triangular profile still ends at its target at the exit speed', () => {
+    const s = planSegment('X', 'x', 0, 9, 0, p, 1, 3)
+    // peak: v^2 = (2*9 + 1 + 9) / 2 = 14
+    expect(s.vPeak).toBeCloseTo(Math.sqrt(14), 9)
+    expect(positionAt(s, s.t1 - 1e-6)).toBeCloseTo(9, 4)
+    expect(positionAt(s, s.t1)).toBe(9)
+  })
+
+  it('defaults to rest-to-rest', () => {
+    expect(planSegment('X', 'x', 0, 100, 0, p).t1).toBeCloseTo(travelTime(100, p), 9)
+  })
+})

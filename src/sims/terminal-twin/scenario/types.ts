@@ -38,6 +38,10 @@ export interface ShcKinematics {
   lockS: number
   /** Spreader twist-lock unlock time (s). */
   unlockS: number
+  /** Assumed turn radius (m) for cornering at speed; default `DEFAULT_SHC_CORNER`; 0 = stop at every turn. */
+  cornerRadiusM?: number
+  /** Lateral acceleration (m/s²) the SHC tolerates in a turn; with the radius it caps the corner speed. */
+  maxLateralAccel?: number
 }
 
 export interface ShcConfig {
@@ -288,6 +292,8 @@ export interface LayoutConfig {
   stsGroundLaneSpacingM: number
   /** Spreader travel height for trolley moves (m). */
   stsSafeHoistM: number
+  /** Back-off (s) before an STS whose ground-position reply was null asks again (default 30; 0 = only wake on a freed position). */
+  stsGroundRetryS?: number
 }
 
 export interface ScenarioConfig {

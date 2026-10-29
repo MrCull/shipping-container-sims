@@ -3,10 +3,10 @@
   "seed": 3,
   "status": "ended",
   "endReason": "simDurationS >= 4500",
-  "eventLogHash": "1037d9d428066a",
+  "eventLogHash": "06d473435a7794",
   "kpis": {
     "simTimeS": 4500,
-    "eventsProcessed": 356,
+    "eventsProcessed": 372,
     "movesCompleted": 8,
     "vesselsCompleted": 1,
     "sts": {
@@ -14,7 +14,7 @@
         "moves": 8,
         "cycles": 5,
         "twinLifts": 3,
-        "grossMovesPerHour": 36.509,
+        "grossMovesPerHour": 35.633,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 929.12,
-        "turnaroundS": 869.12,
+        "departedAtS": 948.498,
+        "turnaroundS": 888.498,
         "sts": [
           "STS01"
         ]
@@ -74,6 +74,27 @@
       },
       "shcDispatch": {
         "handler": "strategy:oldest-job",
+        "calls": 8,
+        "resolved": 8,
+        "ok": 8,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "wtpPadSelection": {
+        "handler": "strategy:first-free",
         "calls": 8,
         "resolved": 8,
         "ok": 8,
@@ -252,9 +273,9 @@
         },
         "SHC02": {
           "jobs": 3,
-          "emptyDistanceM": 681,
-          "loadedDistanceM": 357,
-          "reservationWaitS": 2.702
+          "emptyDistanceM": 675.5,
+          "loadedDistanceM": 362.5,
+          "reservationWaitS": 0
         }
       },
       "stsGroundPositionWaitS": {
@@ -343,14 +364,14 @@
       "released": 5,
       "started": 5,
       "completed": 5,
-      "leadTimeMeanS": 222.155,
-      "leadTimeMaxS": 345.496,
+      "leadTimeMeanS": 223.929,
+      "leadTimeMaxS": 354.161,
       "boxesLoaded": 0
     }
   },
   "invariants": {
     "enabled": true,
-    "checks": 355,
+    "checks": 371,
     "violations": 0,
     "first": null
   },

@@ -303,6 +303,14 @@ export const KPI_DEFS: KpiDef[] = [
     value: (w, id) => ratio(w.sum('handler.latencyS', id), w.sum('handler.resolved', id)),
   },
   {
+    // measured wall latency of the replies resolved in the bucket, read from DecisionResolved.wallLatencyMs
+    id: 'handler.wall-latency-s',
+    unit: 's',
+    entityKind: 'handler',
+    entities: (c) => c.decisionPoints,
+    value: (w, id) => ratio(w.sum('handler.wallS', id), w.sum('handler.resolved', id)),
+  },
+  {
     id: 'handler.fallbacks',
     unit: 'count',
     entityKind: 'handler',
@@ -366,7 +374,8 @@ export interface KpiStaticInfo {
 }
 
 export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo): KpiCollector {
-  const vesselBoxes = info.vesselBoxes
+  // a copy: boxes booked after the start (truck-delivered exports, V11-14) are added as their TruckArrived events are fed
+  const vesselBoxes = { ...info.vesselBoxes }
   const clock = kpiClockOf(config)
   const acc = new Acc()
   const hourOf = (t: number) => Math.max(0, hourIndexOf(clock, t))
@@ -559,6 +568,7 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         break
       case 'TruckArrived':
         acc.gauge('ls.queue', 'terminal', h, e.payload.queueLength)
+        for (const l of e.payload.legs) if (l.slotId && l.vesselId) vesselBoxes[l.vesselId] = (vesselBoxes[l.vesselId] ?? 0) + 1
         break
       case 'TruckGateStarted':
         acc.gauge('ls.queue', 'terminal', h, e.payload.queueLength)
@@ -619,6 +629,7 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         acc.add('handler.resolved', dp, h, 1)
         const latencyS = asked === undefined ? 0 : e.t - asked
         acc.add('handler.latencyS', dp, h, latencyS)
+        acc.add('handler.wallS', dp, h, (e.payload.wallLatencyMs ?? 0) / 1000)
         acc.add('handler.idleS', dp, h, latencyS * (e.subjects.equipment?.length ?? 0))
         if (e.payload.outcome === 'fallback') acc.add('handler.fallbacks', dp, h, 1)
         pending[dp] = Math.max(0, (pending[dp] ?? 1) - 1)

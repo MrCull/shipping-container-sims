@@ -5,7 +5,7 @@
  */
 import { firstBreakpointHit, type Breakpoint } from '../modules/breakpoints'
 import { blockFillPct } from '../modules/dashboardModel'
-import { buildTimeline, createSimulation, hashDigest, exportRun, headlineKpis, highlightsOf, summarizeRun, suggestedInvariantEvery, type EngineEvent, type Simulation } from '../engine'
+import { buildTimeline, createSimulation, hashDigest, exportRun, headlineKpis, highlightsOf, summarizeRun, type EngineEvent, type Simulation } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import { HALF_OFFSET_M } from '../scenario/vesselClasses'
 import {
@@ -193,7 +193,7 @@ export function createEngineHost() {
   }
 
   function start(config: ScenarioConfig, seed: number): void {
-    sim = createSimulation(config, {}, { seed, invariants: { every: suggestedInvariantEvery(config) } })
+    sim = createSimulation(config, {}, { seed })
     loaded = { config, seed }
     announced.clear()
     checkpoints = []

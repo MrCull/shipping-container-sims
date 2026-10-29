@@ -100,6 +100,8 @@ export type {
   ShcDispatchPad,
   ShcDispatchReply,
   ShcDispatchRequest,
+  WtpPadSelectionReply,
+  WtpPadSelectionRequest,
   RehandleCandidate,
   RehandleTargetReply,
   RehandleTargetRequest,
@@ -115,7 +117,7 @@ export type { DecisionRequestedPayload, DecisionResolvedPayload } from './events
 export type { HandlerKpiReport } from './kpis'
 export type { SimQuery } from './query'
 export type { InvariantViolation } from './invariants'
-export { suggestedInvariantEvery } from './invariants'
+export { checkInvariants, DEFAULT_SWEEP_EVERY, InvariantTracker } from './invariants'
 export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport, LandsideKpiReport } from './kpis'
 export type { WorkPackage, WorkPackageKind, WorkPackageStatus, LoadOrder } from './state'
 export { hashDigest } from './hash'
@@ -138,6 +140,7 @@ export type {
   RunResult,
   StopReason,
   InvariantReport,
+  InvariantStats,
   EventListener,
 } from './simulation'
 export { parseLogVerbosity, toLogRecord, eventSubsystem, eventLogLevel, LOG_LEVELS } from './logging'

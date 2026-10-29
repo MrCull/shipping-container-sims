@@ -1,7 +1,7 @@
 /**
  * Run diff: find the first event at which two event logs differ (two seeds,
  * two strategies or two code versions). Events are compared in `seq` order
- * by their full JSON envelope.
+ * by their full JSON envelope (without the measured wall latency).
  */
 import type { EngineEvent } from './events'
 
@@ -34,7 +34,9 @@ export type RunDiff =
       afterB: EngineEvent[]
     }
 
-const same = (x: unknown, y: unknown): boolean => JSON.stringify(x) === JSON.stringify(y)
+/** JSON for comparing events: a measured wall latency (DecisionResolved) is not reproducible, so it never counts as a difference. */
+const comparable = (x: unknown): string => JSON.stringify(x, (k, v) => (k === 'wallLatencyMs' ? undefined : v))
+const same = (x: unknown, y: unknown): boolean => comparable(x) === comparable(y)
 
 /** Dotted paths at which two JSON values differ (leaf-most). */
 export function jsonDifferences(a: unknown, b: unknown, path = ''): string[] {
