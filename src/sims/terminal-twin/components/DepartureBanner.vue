@@ -28,10 +28,12 @@ const text = computed(() => {
 <style scoped>
 /* Decorative and click-through: it never blocks the 3D view or the controls beneath it. */
 .departure-banner {
-  position: absolute;
-  top: 3.2rem;
-  left: 50%;
-  transform: translateX(-50%);
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  justify-self: center;
+  position: relative;
+  margin-top: 0.6rem;
   z-index: 7;
   pointer-events: none;
   padding: 0.45rem 1.2rem;
@@ -47,12 +49,12 @@ const text = computed(() => {
 @keyframes tt-banner {
   0% {
     opacity: 0;
-    transform: translate(-50%, -0.8rem);
+    transform: translateY(-0.8rem);
   }
   10%,
   80% {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translateY(0);
   }
   100% {
     opacity: 0;

@@ -6,7 +6,6 @@ import DepartureBanner from './components/DepartureBanner.vue'
 import EventFeedPanel from './components/debug/EventFeedPanel.vue'
 import InspectorPanel from './components/debug/InspectorPanel.vue'
 import OverlayToggles from './components/OverlayToggles.vue'
-import PerfPanel from './components/PerfPanel.vue'
 import TopBar from './components/TopBar.vue'
 import SetupDialog from './components/modals/SetupDialog.vue'
 import SavesDialog from './components/modals/SavesDialog.vue'
@@ -67,7 +66,10 @@ onBeforeUnmount(() => {
     v-else
     class="terminal-twin"
   >
-    <TopBar v-if="store.hasScenario" />
+    <TopBar
+      v-if="store.hasScenario"
+      :show-graphics="!webglFailed"
+    />
     <div
       ref="sceneHost"
       class="scene"
@@ -84,7 +86,6 @@ onBeforeUnmount(() => {
       </p>
       <FinalReport v-if="store.hasScenario && store.phase === 'running' && !store.dashboardOpen" />
       <OverlayToggles v-if="store.hasScenario && !webglFailed" />
-      <PerfPanel v-if="store.hasScenario && !webglFailed" />
       <EventFeedPanel v-if="store.hasScenario" />
       <InspectorPanel v-if="store.hasScenario" />
       <div
@@ -144,9 +145,15 @@ onBeforeUnmount(() => {
 
 .scene {
   position: relative;
-  flex: 1;
+  /* 0px basis (not 0%): the side panels' content must never grow the scene past the viewport. */
+  flex: 1 1 0px;
   min-height: 0;
   overflow: hidden;
+  /* HUD regions: left panel | KPI strip over the free scene over the overlay bar | right panel. The KPI strip gets
+     the width left between the side panels, so it can never sit underneath them. */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .scene :deep(.tt-canvas) {
@@ -180,7 +187,7 @@ onBeforeUnmount(() => {
 }
 
 .banner {
-  bottom: 3.4rem;
+  bottom: 4.6rem;
   border-color: var(--color-success);
 }
 
@@ -190,11 +197,13 @@ onBeforeUnmount(() => {
 }
 
 .quiet-note {
-  position: absolute;
-  left: 0.9rem;
-  bottom: 0.9rem;
+  grid-column: 2;
+  grid-row: 2;
+  align-self: end;
+  justify-self: start;
+  position: relative;
+  margin: 0 0 0.6rem 0.9rem;
   z-index: 4;
-  margin: 0;
   padding: 0.3rem 0.75rem;
   border-radius: 999px;
   border: 1px solid var(--color-border);
@@ -207,7 +216,7 @@ onBeforeUnmount(() => {
 .toast {
   position: absolute;
   left: 50%;
-  bottom: 1.2rem;
+  bottom: 7.4rem;
   transform: translateX(-50%);
   z-index: 6;
   padding: 0.4rem 0.9rem;

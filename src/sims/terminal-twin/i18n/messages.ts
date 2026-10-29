@@ -57,6 +57,7 @@ const en = {
   'topbar.dashboard': 'Dashboard',
   'topbar.dashboardHint': 'Open or close the dashboard tab (D)',
   'topbar.shortcuts': 'Keyboard shortcuts (?)',
+  'topbar.settings': 'Settings',
   'topbar.sound': 'Sound',
   'topbar.soundHint': 'Sound effects on or off (horns, box landings). Off by default, no music.',
   'topbar.daylight': 'Daylight',
