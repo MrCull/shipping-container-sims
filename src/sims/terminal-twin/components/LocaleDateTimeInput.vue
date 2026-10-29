@@ -102,7 +102,7 @@ function commit(): void {
 }
 
 .locale-datetime[aria-invalid='true'] {
-  border-color: var(--color-danger, #e5484d);
-  outline: 1px solid var(--color-danger, #e5484d);
+  border-color: var(--color-danger);
+  outline: 1px solid var(--color-danger);
 }
 </style>
