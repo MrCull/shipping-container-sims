@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { daylightLockDefault, hourOfDay, lightingFor } from '../modules/atmosphere'
+import { ambientIntensity, daylightLockDefault, hourOfDay, lightingFor } from '../modules/atmosphere'
+
+describe('night stays readable (V11-03)', () => {
+  it('keeps a night ambient level at least as strong as the day one', () => {
+    expect(ambientIntensity(lightingFor(0, false).daylight)).toBeGreaterThanOrEqual(ambientIntensity(lightingFor(13, false).daylight))
+    expect(ambientIntensity(0)).toBeGreaterThanOrEqual(1.4)
+  })
+})
 
 describe('lighting follows the sim clock', () => {
   it('is bright at noon and dark at midnight', () => {
