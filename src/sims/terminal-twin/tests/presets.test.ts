@@ -63,4 +63,19 @@ describe('presets', () => {
     expect(sim.invariantReport().violations).toEqual([])
     expect(sim.invariantReport().checks).toBeGreaterThan(0)
   }, 600_000)
+
+  it('regression: a pre-filled Small automated at 50% fill completes (no idle ASCs beside open jobs, no rehandle shuttling)', () => {
+    const config = presets['Small automated']()
+    config.yardStart = { mode: 'prefilled', targetPct: 50 }
+    const sim = createSimulation(config, {}, { invariants: { every: 500 } })
+    const r = sim.runUntil({ maxEvents: 60_000 })
+    expect(r.reason).toBe('ended')
+    expect(sim.kpiReport().vesselsCompleted).toBe(3)
+    const yard = sim.kpiReport().yard!
+    expect(yard.rehandles.perProductiveMove).toBeLessThan(3) // 7.5 while a blocker shuttled between two stacks
+  }, 120_000)
+
+  it('Small automated is pre-filled to 60%', () => {
+    expect(presets['Small automated']().yardStart).toEqual({ mode: 'prefilled', targetPct: 60 })
+  })
 })

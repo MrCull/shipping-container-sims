@@ -786,7 +786,12 @@ function pumpRehandle(ctx: EngineContext, blockId: string): void {
   for (const retr of jobs) {
     if (retr.kind !== 'retrieve' || retr.ascId !== null || retr.dispatch === 'asked' || retr.rehandle === 'full') continue
     const blocker = nextBlocker(state, retr)
-    if (!blocker) continue
+    // an earlier export retrieval that is free to go runs before any later dig: otherwise a blocker is shuttled between
+    // the stacks of two pending retrievals (each dig buries the other box) and neither is ever retrieved
+    if (!blocker) {
+      if (!isTruckJob(retr) && isRetrievable(state, retr)) return
+      continue
+    }
     const box = state.containers[blocker.containerId as string]
     const job: AscJob = {
       id: `A${++state.nextAscJob}`,
@@ -932,13 +937,20 @@ function resolveDispatch(ctx: EngineContext, jobId: string, ascId: string | null
   }
   if (job.kind === 'retrieve' && isTruckJob(job)) {
     // the reply may be late: the box may have been rehandled or the chassis may be taken
-    if (!isRetrievable(state, job) || !truckReadyForPick(state, job)) return
+    if (!isRetrievable(state, job) || !truckReadyForPick(state, job)) {
+      maybeDispatchAsc(ctx, job.blockId) // the job is no longer a candidate: the idle ASC must look at the block's other work
+      return
+    }
   } else if (job.kind === 'retrieve') {
     // the reply may be late (keep-running latency): the pad or the stack may have changed meanwhile
     const pad = state.wtpPads[job.wtpPadId]
     if (!isRetrievable(state, job) || pad.containerId !== null || pad.claimedBy !== null) {
       const again = freePadFor(ctx, job)
-      if (!isRetrievable(state, job) || !again) return
+      if (!isRetrievable(state, job) || !again) {
+        // e.g. a rehandle target claimed on top of the box at the same instant: without this the idle ASCs would never look at the block again
+        maybeDispatchAsc(ctx, job.blockId)
+        return
+      }
       job.wtpPadId = again
     }
   }

@@ -125,7 +125,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
         sizeMix: { feedermax: 2, panamax: 2, feeder: 1 },
         flowMix: { import: 30, export: 30, transshipment: 40 },
       }),
-      yardStart: { mode: 'prefilled', targetPct: 30 },
+      yardStart: { mode: 'prefilled', targetPct: 60 },
       truckScale: 0.4,
     }),
   'Stress test': () =>
