@@ -56,6 +56,19 @@ test('D opens the dashboard, which loads ECharts only then, and D closes it', as
   expect(errors).toEqual([])
 })
 
+test('the TOS handlers tab draws the handler wall latency over time with latency injection on', async ({ page }) => {
+  const errors = collectErrors(page)
+  const decisions = { points: { stsGroundPosition: { timeoutMs: 60_000, latency: { delay: { kind: 'uniform', minMs: 200, maxMs: 1200 } } } } }
+  await open(page, ASC, { endConditions: { simDurationS: 3 * 3600 }, overrides: { decisions } as never })
+  await page.evaluate(() => window.__tt!.runUntil())
+  await showCharts(page, 'handlers')
+  await page.waitForFunction(() => window.__tt!.dashboard().rendered?.charts.some((c) => c.kpiId === 'handler.wall-latency-s' && c.drawn))
+  const chart = (await page.evaluate(() => window.__tt!.dashboard().rendered!)).charts.find((c) => c.kpiId === 'handler.wall-latency-s')!
+  expect(chart.drawn).toBe(true)
+  await expect(page.getByTestId('tt-chart-handler.wall-latency-s').locator('canvas').first()).toBeVisible()
+  expect(errors).toEqual([])
+})
+
 test('a 24 h run draws hourly series that zoom', async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, ASC, { endConditions: { simDurationS: 24 * 3600 } })

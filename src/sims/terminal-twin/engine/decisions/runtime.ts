@@ -197,6 +197,8 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
   }
   labelHandlers()
 
+  const wallField = (ms: number) => (ms > 0 ? { wallLatencyMs: Math.round(ms * 1000) / 1000 } : {})
+
   /** Turn an outcome + injection into a scheduled DecisionResolved or DecisionFailed. */
   function deliver(p: PendingDecision, outcome: Outcome, externalMs: number, schedule: ScheduleFn): void {
     const inj = p.injection
@@ -226,6 +228,7 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
         handler: resolved[p.decisionPoint].name,
         request: p.message.payload,
         reply: (outcome as { reply: unknown }).reply,
+        ...wallField(p.wallMs),
       } as EventPayloads['DecisionResolved'])
     }
   }
@@ -323,6 +326,7 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
         handler: fb.name,
         request: p.message.payload,
         reply,
+        ...wallField(p.wallMs),
       } as EventPayloads['DecisionResolved'])
     },
 

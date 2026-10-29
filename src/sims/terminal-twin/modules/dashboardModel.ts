@@ -64,7 +64,7 @@ export const KPI_GROUPS: readonly KpiGroup[] = [
   },
   {
     id: 'handlers',
-    kpis: ['handler.calls', 'handler.mean-latency-s', 'handler.fallbacks', 'handler.failures', 'handler.backlog', 'handler.equipment-idle-s'],
+    kpis: ['handler.calls', 'handler.mean-latency-s', 'handler.wall-latency-s', 'handler.fallbacks', 'handler.failures', 'handler.backlog', 'handler.equipment-idle-s'],
   },
 ]
 

@@ -616,6 +616,7 @@ const en = {
   'dashboard.kpi.landside.trucks-out': 'Trucks out per hour',
   'dashboard.kpi.handler.calls': 'TOS handler calls',
   'dashboard.kpi.handler.mean-latency-s': 'TOS handler mean latency',
+  'dashboard.kpi.handler.wall-latency-s': 'TOS handler reply time (wall clock, mean)',
   'dashboard.kpi.handler.fallbacks': 'TOS handler fallbacks',
   'dashboard.kpi.handler.failures': 'TOS handler failures',
   'dashboard.kpi.handler.equipment-idle-s': 'Equipment idle waiting for TOS',

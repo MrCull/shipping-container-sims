@@ -303,6 +303,14 @@ export const KPI_DEFS: KpiDef[] = [
     value: (w, id) => ratio(w.sum('handler.latencyS', id), w.sum('handler.resolved', id)),
   },
   {
+    // measured wall latency of the replies resolved in the bucket, read from DecisionResolved.wallLatencyMs
+    id: 'handler.wall-latency-s',
+    unit: 's',
+    entityKind: 'handler',
+    entities: (c) => c.decisionPoints,
+    value: (w, id) => ratio(w.sum('handler.wallS', id), w.sum('handler.resolved', id)),
+  },
+  {
     id: 'handler.fallbacks',
     unit: 'count',
     entityKind: 'handler',
@@ -619,6 +627,7 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         acc.add('handler.resolved', dp, h, 1)
         const latencyS = asked === undefined ? 0 : e.t - asked
         acc.add('handler.latencyS', dp, h, latencyS)
+        acc.add('handler.wallS', dp, h, (e.payload.wallLatencyMs ?? 0) / 1000)
         acc.add('handler.idleS', dp, h, latencyS * (e.subjects.equipment?.length ?? 0))
         if (e.payload.outcome === 'fallback') acc.add('handler.fallbacks', dp, h, 1)
         pending[dp] = Math.max(0, (pending[dp] ?? 1) - 1)

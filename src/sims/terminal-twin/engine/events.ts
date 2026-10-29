@@ -95,6 +95,12 @@ export type DecisionResolvedPayload = {
     reply: DecisionReplies[K]
     /** Set for a pre-run decision (see DecisionRequested). */
     preRun?: true
+    /**
+     * Measured wall latency of the reply in ms (injected delay plus the time an async handler took).
+     * Absent when it was 0, so runs without latency keep their logs byte for byte. After a timeout or
+     * error it is the wait before the engine gave up, carried by the fallback's DecisionResolved.
+     */
+    wallLatencyMs?: number
   }
 }[DecisionPointId]
 

@@ -32,7 +32,7 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.11.0'
+export const ENGINE_VERSION = '0.12.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
@@ -304,13 +304,21 @@ export function createSimulation(
     heapPush(state.queue, ev)
   }
 
+  /** The event's JSON for the log hash. A measured wall latency is not reproducible with a real async handler, so it is not hashed. */
+  function hashedJson(ev: EngineEvent): string {
+    if (ev.type === 'DecisionResolved' && ev.payload.wallLatencyMs !== undefined) {
+      return JSON.stringify(ev, (k, v) => (k === 'wallLatencyMs' ? undefined : v))
+    }
+    return JSON.stringify(ev)
+  }
+
   /** Append a processed event to the log, hash it and notify subscribers. */
   function commit(ev: EngineEvent): void {
     ev.seq = state.nextSeq++
     log.push(ev)
     byId.set(ev.id, ev)
     feed(ev)
-    state.logHash = hashUpdate(state.logHash, JSON.stringify(ev))
+    state.logHash = hashUpdate(state.logHash, hashedJson(ev))
     for (const l of listeners) if (!l.types || l.types.has(ev.type)) l.fn(ev)
   }
 
