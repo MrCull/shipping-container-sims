@@ -105,6 +105,8 @@ export interface TwinDevApi {
   cameraTo(entityId: string, distanceM?: number): boolean
   /** Frame a view preset by name ('quay' | 'yard' | 'gate' | 'overview'); false for an unknown name or a region the scene lacks. */
   viewPreset(name: string): boolean
+  /** Select and follow the next truck to arrive at or after the display time; its id, or null while none is known yet (stays pending; `ui().followNextPending`). */
+  followNextTruck(): string | null
   setSpeed(speed: number): void
   pause(): void
   play(): void
@@ -230,6 +232,7 @@ export interface TwinAtmosphereState {
 export interface TwinUiState {
   selectedId: string | null
   following: boolean
+  followNextPending: boolean
   overlaysVisible: boolean
   dashboardOpen: boolean
   helpOpen: boolean
@@ -332,6 +335,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     why: (eventId) => ctl().passthrough<EngineEvent[]>({ op: 'why', eventId }),
     select: (id) => store.select(id),
     cameraTo: (id, distanceM) => store.view()?.cameraTo(id, distanceM) ?? false,
+    followNextTruck: () => store.followNextTruck(),
     viewPreset: (name) => (isViewPreset(name) ? store.setViewPreset(name) : false),
     setSpeed: (s) => store.setSpeed(s),
     pause: () => {
@@ -415,6 +419,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     ui: () => ({
       selectedId: store.selectedId,
       following: store.following,
+      followNextPending: store.followNextPending,
       overlaysVisible: store.overlaysVisible,
       dashboardOpen: store.dashboardOpen,
       helpOpen: store.helpOpen,

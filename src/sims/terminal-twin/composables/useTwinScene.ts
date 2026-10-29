@@ -157,7 +157,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       // Follow camera (F): keep the selection centred, keeping the user's viewing offset.
       const centre = controller.model?.entityCentre(store.selectedId, controller.displayTime)
       if (centre) aim(centre, true)
-      else store.toggleFollow() // the followed entity left the scene (a truck exited the gate): release, the view stays put
+      else if (controller.model?.truckPhase(store.selectedId, controller.displayTime) !== 'waiting') store.toggleFollow() // a truck still to arrive keeps the camera where it is; otherwise the followed entity left the scene (a truck exited the gate): release, the view stays put
     }
     // Time of day: the sun follows the sim clock (re-applied when the clock moves a minute or the lock changes).
     const hour = hourOfDay(store.choice.startDateTime, controller.displayTime)

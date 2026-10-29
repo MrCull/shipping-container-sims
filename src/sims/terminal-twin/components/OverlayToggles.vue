@@ -66,6 +66,21 @@ function toggle(key: keyof OverlayState): void {
     >
       {{ t(item.label) }}
     </button>
+    <button
+      type="button"
+      class="toggle view"
+      :class="{ on: store.followNextPending }"
+      :aria-pressed="store.followNextPending"
+      data-testid="tt-follow-next-truck"
+      :title="t('followNext.hint')"
+      @click="store.followNextTruck()"
+    >
+      <span
+        class="dot"
+        aria-hidden="true"
+      />
+      {{ t('followNext.label') }}
+    </button>
   </div>
 </template>
 

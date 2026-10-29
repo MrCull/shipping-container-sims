@@ -30,6 +30,9 @@ export function useTwinShortcuts(): void {
       case 'follow':
         store.toggleFollow()
         break
+      case 'followNextTruck':
+        store.followNextTruck()
+        break
       case 'escape':
         if (store.helpOpen) store.setHelpOpen(false)
         else store.select(null)
