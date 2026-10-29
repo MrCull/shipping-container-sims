@@ -46,6 +46,7 @@ const en = {
   'topbar.resume': 'Resume',
   'topbar.speed': '×{speed}',
   'topbar.runTo': 'Run to…',
+  'dateInput.hint': 'Date and time as {pattern}',
   'topbar.runToTarget': 'Target sim time',
   'topbar.runToDeparture': 'Next vessel departure',
   'topbar.runToMissing': 'Enter a date and time',

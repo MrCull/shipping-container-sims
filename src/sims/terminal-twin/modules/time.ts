@@ -14,12 +14,13 @@ export function defaultStartDate(now = new Date()): Date {
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
-/** `YYYY-MM-DDTHH:mm` in local time, for `<input type="datetime-local">`. */
-export function toLocalInputValue(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+/** `YYYY-MM-DDTHH:mm[:ss]` in local time: the value a date field holds (`LocaleDateTimeInput` shows it in the chosen locale). */
+export function toLocalInputValue(d: Date, seconds = false): string {
+  const base = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return seconds ? `${base}:${pad(d.getSeconds())}` : base
 }
 
-/** Parse a datetime-local value (local time); null if invalid. */
+/** Parse a local date-time value (local time); null if invalid. */
 export function fromLocalInputValue(value: string): Date | null {
   const d = new Date(value)
   return Number.isNaN(d.getTime()) ? null : d

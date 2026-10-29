@@ -37,7 +37,7 @@ The Web Worker host, the main-thread modules, locale and units, the `window.__tt
 │   ├── equipmentDims.ts      STS / SHC proportions shared by the renderer and picking
 │   ├── viewPresets.ts        View preset poses from the layout (Quay/Yard/Gate/Overview); labelDeclutter.ts hides overlapping labels
 │   ├── shortcuts.ts          SHORTCUT_HELP table + shortcutFor(key event) (ignores typing targets)
-│   └── time.ts               Start date default (Mon 08:00), datetime-local helpers
+│   └── time.ts               Start date default (Mon 08:00), local ISO value helpers
 ├── store/twinStore.ts        Pinia facade (small reactive UI state; controller/view kept raw)
 ├── worker/                   Engine Web Worker (same ESLint bans as engine/)
 │   ├── engine.worker.ts      Entry; serialises requests
@@ -73,7 +73,7 @@ The Web Worker host, the main-thread modules, locale and units, the `window.__tt
 - **Shortcuts** (`modules/shortcuts.ts` table → `composables/useTwinShortcuts.ts`): Space pause/resume, 1–9 = ×1…×600, 0 = pause, `.` single-step (`store.step()`, pauses), F follow selection (`store.following`; the scene loop re-aims the camera each frame), Esc closes help else deselects (stops following), D `store.toggleDashboard()` (the dashboard tab, TT-16), O `store.overlaysVisible` (master switch of the TT-18 overlays, plus a toast), E / I toggle the event feed and inspector panels (TT-18), N follow the next truck (V11-06, below), Q / Y / G / V view presets (V11-05, below), `?` help overlay (`store.helpOpen`; also the top bar `?` button). Ignored with Ctrl/Meta/Alt, in inputs/selects/textareas/contenteditable, on key repeat (except `.`), and while the setup dialog is open. Space calls `preventDefault` so a focused button is not also clicked. The help overlay renders `SHORTCUT_HELP`, so add new shortcuts there.
 - **God mode:** the shared `useGodModeHotkey` ("god" typed anywhere) is not mounted by Terminal Twin. Don't add it: its `o`/`d` keys would also toggle overlays and the dashboard.
 
-- Locale: `<input type="datetime-local">` (setup start, Run to…) is rendered by the browser in the *browser's* locale, not the chosen one; the clock, preview and readouts follow the chosen locale.
+- Locale-aware date entry (V11-17): setup start, the vessel arrival/first-arrival fields and Run to… use `components/LocaleDateTimeInput.vue`, a text field that shows and parses the *chosen* locale's order, separators and 12/24 h (`i18n/dateInput.ts`: `formatDateInput`, `parseDateInput`, `dateInputPattern`, built from `Intl.DateTimeFormat#formatToParts`). The model stays the local ISO string (`modules/time.ts`); unparseable text emits `''` and sets `aria-invalid`. Never use `datetime-local` (it follows the browser's locale, not ours). Test ids: `tt-setup-start`, `tt-run-to-input`.
 - ICU differences: `de` weekday "Mo" vs "Mo." (match loosely in tests). Node 22 lacks `Intl.Locale#getWeekInfo`, so `i18n/format.ts` falls back to a region table.
 
 ### Dev API (`window.__tt`, dev builds only)

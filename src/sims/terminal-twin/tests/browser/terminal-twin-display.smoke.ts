@@ -110,6 +110,38 @@ test.describe('British browser', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Scenario complete' })).toContainText('10 moves')
   })
 
+  test('setup start and Run to… read and parse in the chosen locale', async ({ page }) => {
+    await openSim(page)
+    await loadTracerAt(page, 17 * 60 + 3) // 14:02:03 UTC; start is Mon 26 Oct 2026 13:45
+
+    await page.getByRole('button', { name: 'New Scenario' }).click()
+    const start = page.getByTestId('tt-setup-start')
+    await expect(start).toHaveValue('26/10/2026, 13:45')
+
+    await page.getByTestId('tt-locale').selectOption('en-US')
+    await expect(start).toHaveValue(/^10\/26\/2026, 1:45.PM$/)
+    // 03/04 is 3 April in en-GB but 4 March in en-US: the typed text follows the chosen locale.
+    await start.fill('03/04/2026, 9:30 AM')
+    await start.blur()
+    await expect(start).toHaveValue(/^03\/04\/2026, 9:30.AM$/)
+    await expect(start).not.toHaveAttribute('aria-invalid', 'true')
+    await page.getByTestId('tt-locale').selectOption('de-DE')
+    await expect(start).toHaveValue('04.03.2026, 09:30')
+    await start.fill('31.02.2026, 09:30')
+    await start.blur()
+    await expect(start).toHaveAttribute('aria-invalid', 'true')
+    await page.getByRole('button', { name: 'Cancel' }).click()
+
+    // Run to…: pre-filled with the chosen locale (de-DE now, seconds shown), parsed the same way.
+    await page.getByRole('button', { name: 'Run to…' }).click()
+    const runTo = page.getByTestId('tt-run-to-input')
+    await expect(runTo).toHaveValue('26.10.2026, 14:12:03')
+    await runTo.fill('26.10.2026, 14:03:30')
+    await runTo.blur()
+    await runTo.press('Enter')
+    await expect.poll(async () => (await page.evaluate(() => window.__tt!.clock())).displayTime).toBeCloseTo(18 * 60 + 30, 0)
+  })
+
   test('keyboard shortcuts drive the sim, the help overlay lists them, typing in a field does not', async ({ page }) => {
     await openSim(page)
     await loadTracerAt(page, 60)

@@ -34,7 +34,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-14 truck exports | #74 | merged (engine 0.12.0; if #76 also bumps, reconcile) | |
 | V11-15 STS ground wake-up | #75 | merged (engine 0.11.0 after merge; adds StsGroundPositionWaitBackoff) | |
 | V11-16 latency series | #76 | merged | |
-| V11-17 locale dates | #77 | in progress | session_018sev (agent) |
+| V11-17 locale dates | #77 | done on `tt/77-locale-dates`, not merged | session_018sev (agent) |
 | V11-18 incremental invariants | #78 | merged (perf/baseline.json to re-record on a quiet machine) | |
 | V11-19 real-GPU fps (human) | #79 | blocked by 62, 63, 78 | |
 
@@ -69,5 +69,5 @@ Logged as GitHub issues on 2026-10-29 (not in PR #54): #55 real-GPU frame rate, 
 - **Container orientation:** position plus optional yaw only.
 - **Frame rate:** an 18k-box yard is unconfirmed on real GPU hardware (TT-19).
 - **Invariant cost:** done in V11-18 (incremental checks plus periodic sweeps).
-- **Date pickers:** `datetime-local` inputs show the browser locale, not the chosen one.
+- **Date pickers:** fixed in V11-17 (`LocaleDateTimeInput`).
 - **Per-kind renderer registry** (#57): `tests/equipment-kinds.test.ts` guards kind registration meanwhile.

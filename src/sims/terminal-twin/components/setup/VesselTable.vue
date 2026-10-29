@@ -11,6 +11,7 @@ import type { VesselConfig, VesselSizeClass } from '../../scenario/types'
 import { VESSEL_CLASSES, VESSEL_SIZE_CLASSES } from '../../scenario/vesselClasses'
 import { flowMixOf, generateVessels, TTI_FLOW_MIX } from '../../scenario/vesselGenerator'
 import { fromLocalInputValue, toLocalInputValue } from '../../modules/time'
+import LocaleDateTimeInput from '../LocaleDateTimeInput.vue'
 
 const props = defineProps<{ startDateTime: Date | null }>()
 const vessels = defineModel<VesselConfig[]>({ required: true })
@@ -162,12 +163,11 @@ function generate(): void {
               <span class="name">{{ v.name }}</span>
             </td>
             <td>
-              <input
-                type="datetime-local"
-                :value="arrivalInput(v)"
+              <LocaleDateTimeInput
+                :model-value="arrivalInput(v)"
                 :aria-label="t('vessels.field', { id: v.id, field: t('vessels.col.arrival') })"
-                @change="setArrival(v, ($event.target as HTMLInputElement).value)"
-              >
+                @update:model-value="setArrival(v, $event)"
+              />
             </td>
             <td>
               <select
@@ -253,10 +253,7 @@ function generate(): void {
         </label>
         <label>
           <span>{{ t('vessels.generate.firstArrival') }}</span>
-          <input
-            v-model="gen.start"
-            type="datetime-local"
-          >
+          <LocaleDateTimeInput v-model="gen.start" />
         </label>
         <label>
           <span>{{ t('vessels.generate.intervalH') }}</span>

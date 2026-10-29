@@ -6,6 +6,7 @@ import { useTwinStore } from '../../store/twinStore'
 import { LIMITS } from '../../scenario/overrides'
 import { TTI_DERIVED_BAYS_PRESETS } from '../../scenario/presets'
 import PlanPreview from './PlanPreview.vue'
+import LocaleDateTimeInput from '../LocaleDateTimeInput.vue'
 
 const d = useSetupDraft()
 const store = useTwinStore()
@@ -109,12 +110,12 @@ const summary = computed(() => {
       </label>
       <label class="field">
         <span>{{ t('setup.start') }}</span>
-        <input
+        <LocaleDateTimeInput
           v-model="d.start"
-          type="datetime-local"
           name="start"
           required
-        >
+          test-id="tt-setup-start"
+        />
       </label>
     </div>
 

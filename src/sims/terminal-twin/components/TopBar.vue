@@ -5,6 +5,7 @@ import { SPEEDS } from '../modules/twinController'
 import { fromLocalInputValue, simDate, toLocalInputValue } from '../modules/time'
 import { t } from '../i18n/messages'
 import PerfPanel from './PerfPanel.vue'
+import LocaleDateTimeInput from './LocaleDateTimeInput.vue'
 
 withDefaults(defineProps<{ showGraphics?: boolean }>(), { showGraphics: true })
 
@@ -30,7 +31,7 @@ function openRunTo(): void {
   runToOpen.value = !runToOpen.value
   runToError.value = null
   if (runToOpen.value) {
-    runToValue.value = toLocalInputValue(simDate(store.choice.startDateTime, store.displayTime + 600))
+    runToValue.value = toLocalInputValue(simDate(store.choice.startDateTime, store.displayTime + 600), true)
   }
 }
 
@@ -130,12 +131,12 @@ async function submitRunTo(): Promise<void> {
           >
             <label>
               <span>{{ t('topbar.runToTarget') }}</span>
-              <input
+              <LocaleDateTimeInput
                 v-model="runToValue"
-                type="datetime-local"
-                step="1"
+                seconds
                 required
-              >
+                test-id="tt-run-to-input"
+              />
             </label>
             <button
               type="button"
