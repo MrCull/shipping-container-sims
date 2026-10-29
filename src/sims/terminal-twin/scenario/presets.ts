@@ -43,8 +43,8 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
     .seed(spec.seed)
     .moveVariation(10)
     .driverVariability(10)
-    .startAt('2026-01-05T06:00:00Z')
-    .clockStart(6 * 3600)
+    .startAt('2026-01-05T08:00:00Z') // daylight start (V11-03); fixtures keep 06:00 so goldens don't change
+    .clockStart(8 * 3600)
     .quay(spec.quayM, { mooringS: 1800, unmooringS: 1200 })
     .vessels(spec.vessels)
     .shcs(spec.shc)

@@ -9,10 +9,10 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { checkAssetLibrary, MODELS_DIR } from '../cli/assets/budgetCheck'
 import { readGlbJson } from '../cli/assets/glb'
-import { blockSpecs, buildLandsideGraph, GATE_ISLAND_W_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, wtpPadLayout, type LandsideGraph } from '../engine'
+import { blockSpecs, buildLandsideGraph, railEndZ, GATE_ISLAND_W_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, wtpPadLayout, type LandsideGraph } from '../engine'
 import { BACKDROP_MODEL_ASSETS, backdropKindFor, buildBackdrop } from '../modules/backdrop'
 import { INFRA, INFRA_ASSET_NAMES, type InfraAssets, type InfraKey } from '../modules/infrastructureAssets'
-import { buildingPlacements, countByKey, gateLaneSlots, gatePlacements, infrastructurePlacements, mastSpots, quayPlacements, type InfraLayoutInput } from '../modules/infrastructureLayout'
+import { BLOCK_FOOTPRINT_HALF_X_M, buildingPlacements, countByKey, gateLaneSlots, gatePlacements, infrastructurePlacements, mastSpots, quayPlacements, type InfraLayoutInput } from '../modules/infrastructureLayout'
 import { assetNamesFor, InfrastructureScene } from '../modules/infrastructureRenderer'
 import { presets, TTI_PRESET_NAME } from '../scenario/presets'
 import { fixtures } from '../scenario/fixtures'
@@ -198,6 +198,32 @@ describe('instancing and draw calls', () => {
     expect(new Set(q.filter((p) => p.key === 'quay-rail').map((p) => p.z))).toEqual(new Set([3, 3 + 30.48]))
     const masts = infrastructurePlacements(input).filter((p) => p.key === 'yard-mast')
     expect(masts.map((p) => [p.x, p.z])).toEqual(mastSpots(input, 3 + 30.48 + 6))
+  })
+
+  describe('V11-03: light masts stay outside the yard blocks', () => {
+    const configs: [string, ScenarioConfig][] = [
+      ...Object.entries(presets).map(([n, b]) => [n, b()] as [string, ScenarioConfig]),
+      ...Object.entries(fixtures).filter(([, c]) => (c.yard?.blocks.length ?? 0) > 0),
+    ]
+    it('has presets and fixtures with blocks to check', () => {
+      expect(configs.length).toBeGreaterThan(8)
+    })
+    it.each(configs)('%s: no mast inside any block footprint (block width plus ASC rail span, over all bays)', (_name, config) => {
+      const i = layoutInput(config)
+      const spots = mastSpots(i, 3 + 30.48 + 6)
+      for (const b of i.blocks) {
+        const inside = spots.filter(([x, z]) => Math.abs(x - b.x) < BLOCK_FOOTPRINT_HALF_X_M && z >= b.wtpZ - 16 && z <= railEndZ(b))
+        expect(inside, `${b.id}`).toEqual([])
+      }
+    })
+    it.each(configs)('%s: every block still has masts along at least one side', (_name, config) => {
+      const i = layoutInput(config)
+      const spots = mastSpots(i, 3 + 30.48 + 6)
+      for (const b of i.blocks) {
+        const beside = spots.filter(([x, z]) => Math.abs(x - b.x) >= BLOCK_FOOTPRINT_HALF_X_M && Math.abs(x - b.x) <= BLOCK_FOOTPRINT_HALF_X_M + 40 && z >= b.wtpZ && z <= railEndZ(b))
+        expect(beside.length, `${b.id}`).toBeGreaterThan(0)
+      }
+    })
   })
 
   it('draws ASC rails along each block and a WTP pad and transfer stall marking per engine pad and stall', () => {
