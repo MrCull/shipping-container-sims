@@ -71,7 +71,14 @@ export interface EventEnvelope<T extends string, P> {
 
 /** A decision request was sent to its handler (see `engine/decisions/`). */
 export type DecisionRequestedPayload = {
-  [K in DecisionPointId]: { correlationId: string; decisionPoint: K; version: number; request: DecisionRequests[K] }
+  [K in DecisionPointId]: {
+    correlationId: string
+    decisionPoint: K
+    version: number
+    request: DecisionRequests[K]
+    /** Set for a decision asked in the pre-run phase, before the scenario starts (the pre-filled yard). */
+    preRun?: true
+  }
 }[DecisionPointId]
 
 /** A decision's reply reached the engine; the waiting equipment acts on it. */
@@ -86,6 +93,8 @@ export type DecisionResolvedPayload = {
     handler: string
     request: DecisionRequests[K]
     reply: DecisionReplies[K]
+    /** Set for a pre-run decision (see DecisionRequested). */
+    preRun?: true
   }
 }[DecisionPointId]
 
@@ -338,6 +347,8 @@ export interface EventPayloads {
     message: string
     /** The fallback that will answer, e.g. "fallback:lowest-free-lane". */
     fallback: string
+    /** Set for a pre-run decision (see DecisionRequested). */
+    preRun?: true
   }
   DecisionResolved: DecisionResolvedPayload
   /** The warm-up is over (TT-14): KPIs and end-condition counters restart at zero. */

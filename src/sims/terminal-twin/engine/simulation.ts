@@ -14,6 +14,7 @@ import { buildKpiReport, type KpiReport } from './kpis'
 import { kpiClockOf } from './kpi/clock'
 import { createKpiCollector, type KpiSeriesReport } from './kpi/collector'
 import { warmUpReactors } from './subsystems/warmUp'
+import { createPrefillDriver } from './subsystems/prefill'
 import { createEventLogger, type LogOptions } from './logging'
 import { createQuery, type SimQuery } from './query'
 import { nextRandom } from './rng'
@@ -31,7 +32,7 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.9.0'
+export const ENGINE_VERSION = '0.10.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
@@ -60,6 +61,11 @@ export interface SimulationOptions {
    * exist; ASC defaults to real when blocks exist.
    */
   subsystems?: SubsystemModes
+  /**
+   * Skip the pre-run phase of a pre-filled start (V11-13): the caller is about to `restore` a snapshot, which
+   * brings its own state, so no handler is asked. Used by `restoreSimulation`.
+   */
+  skipPreRun?: boolean
   /** Structured logging: each committed event that passes the verbosity filter is written as a `LogRecord`. */
   log?: LogOptions
 }
@@ -227,7 +233,7 @@ export function createSimulation(
   let invariantWallMs = 0
   let sinceSweep = 0
 
-  let state = createInitialState(config, seed, resolveSubsystemModes(config, options.subsystems), handlers.yardAllocation)
+  let state = createInitialState(config, seed, resolveSubsystemModes(config, options.subsystems))
   let log: EngineEvent[] = []
   let byId = new Map<number, EngineEvent>()
   let status: SimStatus = 'ready'
@@ -243,16 +249,19 @@ export function createSimulation(
     query,
     scheduleFrom: (causedBy, type, at, subjects, payload) => schedule(makeEvent(type, at, causedBy, subjects, payload) as EngineEvent),
   })
-  const reactorMaps: ReactorMap[] = [decisions.reactors, ...REACTORS]
+  const prefill = createPrefillDriver(() => state, config, seed)
+  const reactorMaps: ReactorMap[] = [decisions.reactors, ...REACTORS, prefill.reactors]
   const vesselBoxes = Object.fromEntries(Object.values(state.vessels).map((v) => [v.id, v.remainingDischarge + v.remainingLoad]))
-  const initialCells: Record<string, number> = {}
-  for (const s of Object.values(state.yardSlots)) initialCells[s.blockId] = (initialCells[s.blockId] ?? 0) + s.span
+  const startCells: Record<string, number> = {}
+  for (const s of Object.values(state.yardSlots)) startCells[s.blockId] = (startCells[s.blockId] ?? 0) + s.span
+  // a pre-filled start places its boxes in the pre-run phase: its stacks are counted once the last one is placed
+  const initialCells = (): Record<string, number> => state.prefillCells ?? startCells
   // a warm-up start (TT-14): the KPI series start when the measured period does, on a clock moved by the warm-up
   const warmUpS = (): number => (state.warmUp?.ended ? state.warmUp.durationS : 0)
   const newCollector = () => {
     const w = state.warmUp
     if (!w?.ended)
-      return createKpiCollector(config, { vesselBoxes, containerSize: (id) => state.containers[id].size, initialCells })
+      return createKpiCollector(config, { vesselBoxes, containerSize: (id) => state.containers[id].size, initialCells: initialCells() })
     const clock = kpiClockOf(config)
     return createKpiCollector(
       { ...config, kpi: { ...config.kpi, startTimeOfDayS: clock.startTimeOfDayS + w.durationS } },
@@ -261,12 +270,22 @@ export function createSimulation(
   }
   /** Feed the collector: warm-up events are dropped; measured events are shifted to the measured clock. */
   const feed = (ev: EngineEvent): void => {
+    // the pre-run phase is not part of the measured run: its decisions are in the log but not in the KPI series.
+    // The collector starts from the stacks the pre-run built, so it is renewed once the last box is placed.
+    if ((ev.payload as { preRun?: boolean }).preRun) {
+      if (state.prefillCells && !collectorSeeded) {
+        collectorSeeded = true
+        collector = newCollector()
+      }
+      return
+    }
     const w = state.warmUp
     if (!w) return collector.ingest(ev)
     if (ev.type === 'WarmUpEnded') collector = newCollector()
     if (!w.ended || ev.t < w.durationS) return
     collector.ingest(shiftEvent(ev, w.durationS))
   }
+  let collectorSeeded = false
   let collector = newCollector()
   if (options.log) listeners.add({ fn: createEventLogger(options.log) })
 
@@ -338,7 +357,7 @@ export function createSimulation(
         schedule(ev as EngineEvent)
         return ev
       },
-      requestDecision: (dp, request, subjects) => decisions.request(ctx, dp, request, subjects),
+      requestDecision: (dp, request, subjects, opts) => decisions.request(ctx, dp, request, subjects, opts),
       random: () => {
         const [value, next] = nextRandom(state.rngState)
         state.rngState = next
@@ -411,7 +430,11 @@ export function createSimulation(
     }
     commit(ev)
     const endReason = endConditionMet()
-    if (invariantsEnabled && checkInvariants(ev, Boolean(endReason))) return ev
+    // the pre-run phase builds the yard box by box: nothing runs yet, so its events are not checked one by one;
+    // the last pre-run event is swept (the whole starting state)
+    const midPreRun = state.prefill !== undefined
+    const endsPreRun = !midPreRun && (ev.payload as { preRun?: boolean }).preRun === true
+    if (invariantsEnabled && !midPreRun && checkInvariants(ev, Boolean(endReason) || endsPreRun)) return ev
     if (endReason) endScenario(endReason, ev.t, ev.id)
     return ev
   }
@@ -457,8 +480,26 @@ export function createSimulation(
     }
   }
 
-  // Root event: everything else descends from it.
-  schedule(makeEvent('ScenarioStarted', 0, null, {}, { scenario: config.name, seed }))
+  // Root event: everything else descends from it. A pre-filled start runs its pre-run phase first (the last
+  // pre-run decision schedules ScenarioStarted); a synchronous handler completes it right here, an async one
+  // leaves it in flight (the run then reports `waiting-for-decision`).
+  if (!state.prefill) schedule(makeEvent('ScenarioStarted', 0, null, {}, { scenario: config.name, seed }))
+  else if (!options.skipPreRun) {
+    const rootEvent = { id: -1, seq: -1, t: 0, type: 'ScenarioStarted', causedBy: null, subjects: {}, payload: { scenario: config.name, seed } } as EngineEvent
+    const root: EngineContext = {
+      ...makeContext(rootEvent),
+      schedule: (type, at, subjects, payload) => {
+        const ev = makeEvent(type, at, null, subjects, payload)
+        schedule(ev as EngineEvent)
+        return ev
+      },
+      requestDecision: (dp, request, subjects, opts) => decisions.request(root, dp, request, subjects, opts),
+    }
+    prefill.start(root)
+    while (status === 'ready' && state.prefill && step()) {
+      // run the pre-run phase while it needs no async reply
+    }
+  }
 
   return {
     config,
@@ -504,6 +545,8 @@ export function createSimulation(
       invariants = { ...copy.invariants, enabled: invariantsEnabled }
       tracker.reset()
       decisions.reset()
+      prefill.reset()
+      collectorSeeded = Boolean(state.prefillCells)
       collector = newCollector()
       for (const ev of log) feed(ev)
     },
@@ -542,7 +585,7 @@ export function restoreSimulation(
   handlers: Partial<HandlerSet> = {},
   options: Omit<SimulationOptions, 'seed'> = {},
 ): Simulation {
-  const sim = createSimulation(snapshot.config, handlers, { ...options, seed: snapshot.seed })
+  const sim = createSimulation(snapshot.config, handlers, { ...options, seed: snapshot.seed, skipPreRun: true })
   sim.restore(snapshot)
   return sim
 }
