@@ -124,11 +124,14 @@ export {
   restoreSimulation,
   ENGINE_VERSION,
   SNAPSHOT_SCHEMA_VERSION,
+  checkSnapshotCompat,
+  SnapshotCompatError,
 } from './simulation'
 export type {
   Simulation,
   SimulationOptions,
   SimSnapshot,
+  SnapshotCompat,
   SimStatus,
   SimError,
   RunCondition,

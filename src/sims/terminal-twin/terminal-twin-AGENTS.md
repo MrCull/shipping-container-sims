@@ -638,6 +638,7 @@ sim.step(); sim.runUntil({ time?, eventType?, vesselsCompleted?, moves?, maxEven
 await sim.runUntilAsync(cond?) // same, but awaits async (Promise) handlers instead of stopping
 sim.asyncMode               // 'keep-running' | 'pause'
 sim.snapshot(); sim.restore(snap); restoreSimulation(snap, handlers?, options?)
+// restore throws SnapshotCompatError (engine/schema version, not a snapshot); checkSnapshotCompat(snap) -> {ok:true} | {ok:false, reason, savedEngineVersion, currentEngineVersion} without throwing (planLoad reuses it)
 sim.query.container(id) / .containers() / .vessel(id) / .vesselSlot(id) / .sts(id) / .groundPosition(id)
 sim.why(eventId)            // [event, parent, …, ScenarioStarted]
 sim.inject(type, at, subjects, payload) // schedule an external event as an extra root (causedBy null; dev API / tests)

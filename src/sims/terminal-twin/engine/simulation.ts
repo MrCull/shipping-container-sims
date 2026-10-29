@@ -102,6 +102,45 @@ export interface InvariantReport {
   violations: InvariantViolation[]
 }
 
+/** Why a snapshot cannot be restored by this engine. */
+export type SnapshotCompat =
+  | { ok: true }
+  | {
+      ok: false
+      reason: 'not-a-snapshot' | 'engine-version' | 'schema-version'
+      savedEngineVersion?: string
+      currentEngineVersion: string
+    }
+
+/** Whether `snapshot` can be restored by this engine (does not throw; `restore` throws a `SnapshotCompatError` for the same cases). */
+export function checkSnapshotCompat(snapshot: SimSnapshot): SnapshotCompat {
+  if (snapshot?.kind !== 'terminal-twin-snapshot') return { ok: false, reason: 'not-a-snapshot', currentEngineVersion: ENGINE_VERSION }
+  if (snapshot.engineVersion !== ENGINE_VERSION)
+    return { ok: false, reason: 'engine-version', savedEngineVersion: snapshot.engineVersion, currentEngineVersion: ENGINE_VERSION }
+  if (snapshot.schemaVersion !== SNAPSHOT_SCHEMA_VERSION)
+    return { ok: false, reason: 'schema-version', savedEngineVersion: snapshot.engineVersion, currentEngineVersion: ENGINE_VERSION }
+  return { ok: true }
+}
+
+export class SnapshotCompatError extends Error {
+  readonly reason: 'not-a-snapshot' | 'engine-version' | 'schema-version'
+  readonly savedEngineVersion?: string
+  readonly currentEngineVersion: string
+  constructor(c: Extract<SnapshotCompat, { ok: false }>) {
+    super(
+      c.reason === 'not-a-snapshot'
+        ? 'Not a Terminal Twin snapshot'
+        : c.reason === 'engine-version'
+          ? `Snapshot engine version ${c.savedEngineVersion} != ${c.currentEngineVersion}`
+          : `Snapshot schema version differs from this engine's (${SNAPSHOT_SCHEMA_VERSION})`,
+    )
+    this.name = 'SnapshotCompatError'
+    this.reason = c.reason
+    this.savedEngineVersion = c.savedEngineVersion
+    this.currentEngineVersion = c.currentEngineVersion
+  }
+}
+
 export interface SimSnapshot {
   kind: 'terminal-twin-snapshot'
   schemaVersion: typeof SNAPSHOT_SCHEMA_VERSION
@@ -428,9 +467,8 @@ export function createSimulation(
         log,
       }),
     restore(snapshot) {
-      if (snapshot.kind !== 'terminal-twin-snapshot') throw new Error('Not a Terminal Twin snapshot')
-      if (snapshot.engineVersion !== ENGINE_VERSION)
-        throw new Error(`Snapshot engine version ${snapshot.engineVersion} != ${ENGINE_VERSION}`)
+      const compat = checkSnapshotCompat(snapshot)
+      if (!compat.ok) throw new SnapshotCompatError(compat)
       const copy = clone(snapshot)
       state = copy.state
       log = copy.log

@@ -4,7 +4,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { createSimulation, ENGINE_VERSION } from '../engine'
+import { checkSnapshotCompat, createSimulation, ENGINE_VERSION, restoreSimulation, SnapshotCompatError } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import { makeConfigSave, makeSnapshotSave, migrateScenarioConfig, parseSaveFile, planLoad, SAVE_SCHEMA_VERSION, SaveFormatError } from '../persistence/saves'
 
@@ -83,5 +83,39 @@ describe('snapshot save', () => {
     expect(plan.savedEngineVersion).toBe('0.0.1')
     expect(plan.currentEngineVersion).toBe(ENGINE_VERSION)
     expect(runHash(plan.config, plan.seed)).toBe(runHash())
+  })
+})
+
+describe('snapshot compatibility (engine API)', () => {
+  const snapshot = () => {
+    const sim = createSimulation(fixtures[FIXTURE])
+    sim.runUntil({ maxEvents: 40 })
+    return sim.snapshot()
+  }
+
+  it('checkSnapshotCompat reports ok, an engine-version mismatch, a schema mismatch and a foreign object without throwing', () => {
+    expect(checkSnapshotCompat(snapshot())).toEqual({ ok: true })
+    expect(checkSnapshotCompat({ ...snapshot(), engineVersion: '0.0.1' })).toEqual({
+      ok: false,
+      reason: 'engine-version',
+      savedEngineVersion: '0.0.1',
+      currentEngineVersion: ENGINE_VERSION,
+    })
+    const schema = checkSnapshotCompat({ ...snapshot(), schemaVersion: 99 as never })
+    expect(schema).toMatchObject({ ok: false, reason: 'schema-version' })
+    expect(checkSnapshotCompat({ kind: 'other' } as never)).toMatchObject({ ok: false, reason: 'not-a-snapshot' })
+  })
+
+  it('restore still throws on a mismatch, with a typed error that carries both versions', () => {
+    const old = { ...snapshot(), engineVersion: '0.0.1' }
+    let caught: unknown
+    try {
+      restoreSimulation(old)
+    } catch (e) {
+      caught = e
+    }
+    expect(caught).toBeInstanceOf(SnapshotCompatError)
+    expect(caught).toMatchObject({ reason: 'engine-version', savedEngineVersion: '0.0.1', currentEngineVersion: ENGINE_VERSION })
+    expect((caught as Error).message).toMatch(/engine version 0\.0\.1/)
   })
 })

@@ -14,7 +14,7 @@
  * `migrateScenarioConfig`. A snapshot also names the engine version that wrote it:
  * `planLoad` reports a mismatch so the UI can warn and offer a restart from its config.
  */
-import { ENGINE_VERSION, SNAPSHOT_SCHEMA_VERSION, type SimSnapshot } from '../engine'
+import { checkSnapshotCompat, ENGINE_VERSION, type SimSnapshot } from '../engine'
 import type { MessageKey, MessageParams } from '../i18n/messages'
 import { SCENARIO_SCHEMA_VERSION, type DisplaySettings, type ScenarioConfig } from '../scenario/types'
 
@@ -165,7 +165,7 @@ export type LoadPlan =
 export function planLoad(file: SaveFile): LoadPlan {
   if (file.type === 'config' || !file.snapshot) return { action: 'config', config: file.config, seed: file.seed }
   const snap = file.snapshot
-  if (snap.engineVersion !== ENGINE_VERSION || snap.schemaVersion !== SNAPSHOT_SCHEMA_VERSION)
+  if (!checkSnapshotCompat(snap).ok)
     return { action: 'snapshot-mismatch', savedEngineVersion: snap.engineVersion, currentEngineVersion: ENGINE_VERSION, config: file.config, seed: file.seed }
   return { action: 'snapshot', snapshot: snap }
 }
