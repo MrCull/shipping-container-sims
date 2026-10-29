@@ -18,9 +18,9 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 
 | Ticket | Issue | State | Claimed by |
 |---|---|---|---|
-| V11-01 registry | #61 | open | |
-| V11-02 HUD | #62 | open | |
-| V11-03 daylight + masts | #63 | open | |
+| V11-01 registry | #61 | in progress | session_018sev (agent) |
+| V11-02 HUD | #62 | in progress | session_018sev (agent) |
+| V11-03 daylight + masts | #63 | in progress | session_018sev (agent) |
 | V11-04 camera | #64 | blocked by 61 | |
 | V11-05 view presets | #65 | blocked by 64 | |
 | V11-06 follow next truck | #66 | blocked by 64 | |
