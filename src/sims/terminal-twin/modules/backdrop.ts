@@ -6,6 +6,7 @@
  */
 import * as THREE from 'three'
 import { TTI_PRESET_NAME } from '../scenario/presets'
+import type { InfraAssetName, InfraAssets } from './infrastructureAssets'
 
 export type BackdropKind = 'tti' | 'generic'
 
@@ -20,6 +21,16 @@ export const BACKDROP_PARTS: Record<BackdropKind, string[]> = {
   generic: ['land', 'coast', 'headland'],
 }
 
+/**
+ * TT-28: the phase 2 backdrop GLBs (low-poly Rock, hills and coastline) replace these procedural parts for the TTI
+ * preset only; every other preset keeps its generic procedural coastline.
+ */
+export const BACKDROP_MODEL_ASSETS: Record<BackdropKind, InfraAssetName[]> = {
+  tti: ['backdrop-rock', 'backdrop-hills', 'backdrop-coast'],
+  generic: [],
+}
+const MODEL_OF_PART: Record<string, InfraAssetName> = { rock: 'backdrop-rock', hills: 'backdrop-hills', coast: 'backdrop-coast' }
+
 /** Length of TTI's North Quay (m): [V] from the reference pack; shown idle. */
 export const NORTH_QUAY_LENGTH_M = 550
 
@@ -27,6 +38,10 @@ export interface Backdrop {
   kind: BackdropKind
   group: THREE.Group
   parts: string[]
+  /** 'procedural' until `useModels` swaps in the GLB meshes (TTI only). */
+  models: 'procedural' | 'glb'
+  /** Swaps the Rock, hills and coast for the phase 2 meshes (no-op for the generic backdrop). */
+  useModels(assets: InfraAssets): void
   dispose(): void
 }
 
@@ -131,12 +146,26 @@ export function buildBackdrop(kind: BackdropKind, quayLengthM: number): Backdrop
     add('coast', ridge(jaggedRidge(14000, 400, 10, 60, 3), 600), flat('#7f8a74'), midX, -0.5, -4200)
     add('headland', ridge([[-900, 0], [-600, 40], [-250, 95], [150, 120], [500, 70], [900, 0]], 500), flat('#76826a'), midX + 2600, -0.5, -3300)
   }
-  return {
+  const backdrop: Backdrop = {
     kind,
     group,
     parts: BACKDROP_PARTS[kind],
+    models: 'procedural',
+    useModels: (assets) => {
+      if (kind !== 'tti' || backdrop.models === 'glb') return
+      for (const [part, asset] of Object.entries(MODEL_OF_PART)) {
+        const mesh = group.getObjectByName(part) as THREE.Mesh | undefined
+        const geometry = assets.geometries[asset]
+        if (!mesh || !geometry) continue
+        mesh.geometry.dispose()
+        mesh.geometry = geometry // shared with the loader's cache: not disposed here
+        mesh.material = assets.material
+      }
+      backdrop.models = 'glb'
+    },
     dispose: () => {
       for (const d of disposables) d.dispose()
     },
   }
+  return backdrop
 }

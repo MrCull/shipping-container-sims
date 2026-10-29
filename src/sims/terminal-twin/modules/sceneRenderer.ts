@@ -33,7 +33,9 @@ import { LandsideScene, type LandsideStats } from './landsideRenderer'
 import { loadTruckModels, type TruckRigState } from './truckAssets'
 import { AtmosphereRig, type AtmosphereState } from './atmosphereRig'
 import type { Lighting } from './atmosphere'
-import { backdropKindFor, buildBackdrop, type Backdrop, type BackdropKind } from './backdrop'
+import { BACKDROP_MODEL_ASSETS, backdropKindFor, buildBackdrop, type Backdrop, type BackdropKind } from './backdrop'
+import { InfrastructureScene, type InfrastructureStats } from './infrastructureRenderer'
+import { loadInfrastructureAssets } from './infrastructureAssets'
 
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
 const EMPTY_HOIST_MPS = 1.5
@@ -44,6 +46,8 @@ export interface SceneStats {
   containers: number
   /** Trucks drawn and queued at the gate (TT-13). */
   landside: LandsideStats
+  /** Phase 2 infrastructure (TT-28): instanced gate, quay, yard and building models. */
+  infrastructure: InfrastructureStats
   /** STS crane objects in the scene. */
   sts: number
   /** SHC objects in the scene. */
@@ -127,6 +131,9 @@ export class SceneRenderer {
   private disposables: { dispose(): void }[] = []
   private atmosphere: AtmosphereRig
   private backdrop: Backdrop
+  private infrastructure: InfrastructureScene
+  /** Phase 1 procedural quay lines, ASC rails and ground markings: hidden once the phase 2 infrastructure draws. */
+  private infraPlaceholders: THREE.Object3D[] = []
 
   constructor(private model: SceneModel) {
     const { config } = model
@@ -150,6 +157,20 @@ export class SceneRenderer {
     }
     for (const id of model.shcIds) this.addShc(id)
     for (const id of model.ascIds) this.addAsc(id)
+    this.infrastructure = new InfrastructureScene({ config, landside: model.landside, pads: model.graph.pads, blocks: model.blockList })
+    this.scene.add(this.infrastructure.group)
+    const infraNames = [...new Set([...this.infrastructure.assetNames(), ...BACKDROP_MODEL_ASSETS[this.backdrop.kind]])]
+    loadInfrastructureAssets(infraNames).then(
+      (assets) => {
+        if (this.disposed) return
+        this.infrastructure.setAssets(assets)
+        this.backdrop.useModels(assets)
+        this.landside.useGateModels()
+        this.atmosphere.useMastModels()
+        for (const o of this.infraPlaceholders) o.visible = false
+      },
+      (err: unknown) => console.warn('Terminal Twin: infrastructure GLBs failed to load; keeping procedural infrastructure', err),
+    )
     this.laneOverlay = this.buildLaneOverlay()
     this.buildZoneMeshes()
     this.layers = new OverlayLayers(model)
@@ -248,7 +269,7 @@ export class SceneRenderer {
     apron.receiveShadow = true
     this.scene.add(apron)
 
-    const strip = (z: number, width: number, colour: string, y = 0.02) => {
+    const strip = (z: number, width: number, colour: string, y = 0.02, placeholder = false) => {
       const m = new THREE.Mesh(
         this.track(new THREE.PlaneGeometry(length + 80, width)),
         this.track(new THREE.MeshStandardMaterial({ color: colour, roughness: 0.9 })),
@@ -257,10 +278,11 @@ export class SceneRenderer {
       m.position.set(length / 2, y, z)
       m.receiveShadow = true
       this.scene.add(m)
+      if (placeholder) this.infraPlaceholders.push(m)
     }
-    strip(0.6, 1.2, '#e5c84a') // quay edge
-    strip(STS.waterRailZ, 0.5, '#4b4f55', 0.04) // STS rails
-    strip(LAND_RAIL_Z, 0.5, '#4b4f55', 0.04)
+    strip(0.6, 1.2, '#e5c84a', 0.02, true) // quay edge
+    strip(STS.waterRailZ, 0.5, '#4b4f55', 0.04, true) // STS rails
+    strip(LAND_RAIL_Z, 0.5, '#4b4f55', 0.04, true)
     const { stsGroundLaneZ0M: z0, stsGroundLaneSpacingM: dz } = config.layout
     const lanes = Math.max(0, ...config.sts.map((s) => s.groundPositions))
     for (let lane = 0; lane <= lanes; lane++) strip(z0 - dz / 2 + lane * dz, 0.15, '#eef0f2', 0.03)
@@ -324,6 +346,7 @@ export class SceneRenderer {
         const r = new THREE.Mesh(this.track(new THREE.BoxGeometry(0.4, 0.2, depth)), rail)
         r.position.set(b.x + dx, 0.1, z0 + depth / 2)
         this.scene.add(r)
+        this.infraPlaceholders.push(r)
       }
       // row lines (between the rows) and bay ticks along the block
       const lines = new THREE.BufferGeometry()
@@ -347,6 +370,7 @@ export class SceneRenderer {
         outline.rotation.x = -Math.PI / 2
         outline.position.set(st.x, 0.03, st.z)
         this.scene.add(outline)
+        this.infraPlaceholders.push(outline)
       }
     }
     const padMat = this.track(new THREE.MeshStandardMaterial({ color: '#f2c94c', roughness: 0.8 }))
@@ -356,10 +380,12 @@ export class SceneRenderer {
       outline.rotation.x = -Math.PI / 2
       outline.position.set(p.x, 0.03, p.z)
       this.scene.add(outline)
+      this.infraPlaceholders.push(outline)
       const inner = new THREE.Mesh(this.track(new THREE.PlaneGeometry(2.8, 12.6)), padInner)
       inner.rotation.x = -Math.PI / 2
       inner.position.set(p.x, 0.035, p.z)
       this.scene.add(inner)
+      this.infraPlaceholders.push(inner)
     }
   }
 
@@ -530,8 +556,8 @@ export class SceneRenderer {
     this.atmosphere.apply(l)
   }
 
-  atmosphereState(): AtmosphereState & { backdrop: { kind: BackdropKind; parts: string[] } } {
-    return { ...this.atmosphere.state(), backdrop: { kind: this.backdrop.kind, parts: [...this.backdrop.parts] } }
+  atmosphereState(): AtmosphereState & { backdrop: { kind: BackdropKind; parts: string[]; models: Backdrop['models'] } } {
+    return { ...this.atmosphere.state(), backdrop: { kind: this.backdrop.kind, parts: [...this.backdrop.parts], models: this.backdrop.models } }
   }
 
   setOverlays(next: OverlayState): void {
@@ -718,6 +744,7 @@ export class SceneRenderer {
     return {
       containers: c.drawn,
       landside: this.landside.stats(),
+      infrastructure: this.infrastructure.stats(),
       sts: this.sts.size,
       shcs: this.shcs.size,
       ascs: this.ascs.size,
@@ -788,6 +815,7 @@ export class SceneRenderer {
     this.disposed = true
     this.atmosphere.dispose()
     this.backdrop.dispose()
+    this.infrastructure.dispose()
     for (const m of this.stsModels.values()) m.dispose()
     this.vessels.dispose()
     this.landside.dispose()

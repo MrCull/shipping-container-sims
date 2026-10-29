@@ -1,0 +1,59 @@
+{
+  "asset": "building-substation",
+  "kind": "building",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 9.0,
+    "widthM": 5.5,
+    "heightM": 5.1,
+    "tag": "A",
+    "reason": "generic substation"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "building-substation",
+      "role": "lod",
+      "description": "small electrical substation / services building; origin at the floor centre, door faces +Z"
+    },
+    {
+      "name": "building",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "substation block with two doors and roof plant"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 80,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "generic substation 9 x 5.5 x 4 m",
+      "tag": "A"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ]
+}

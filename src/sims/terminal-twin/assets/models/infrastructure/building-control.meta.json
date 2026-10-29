@@ -1,0 +1,71 @@
+{
+  "asset": "building-control",
+  "kind": "building",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 26.0,
+    "widthM": 13.0,
+    "heightM": 13.9,
+    "tag": "A",
+    "reason": "generic office / control building"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "building-control",
+      "role": "lod",
+      "description": "two-storey terminal office / control building with window bands, roof plant and a mast; origin at the floor centre, main facade faces +Z"
+    },
+    {
+      "name": "building",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "office block: facade, window bands, entrance canopy, roof plant, antenna"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "entrance",
+      "node": "LOD0",
+      "position": [
+        0,
+        0,
+        6.5
+      ],
+      "tag": "A"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 184,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "generic two-storey office / control building, 26 x 13 x 8.4 m",
+      "tag": "A",
+      "reason": "ticket: office/control building module"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ]
+}

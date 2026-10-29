@@ -3,7 +3,7 @@
   "seed": 8,
   "status": "ended",
   "endReason": "simDurationS >= 9000",
-  "eventLogHash": "1019c74f54786f",
+  "eventLogHash": "08b0ea4b2fe192",
   "kpis": {
     "simTimeS": 9000,
     "eventsProcessed": 1224,
@@ -333,8 +333,8 @@
       "gateQueue": 0,
       "gateQueueMax": 12,
       "turnTimeS": {
-        "mean": 379.763,
-        "max": 554.185
+        "mean": 379.89,
+        "max": 554.322
       },
       "gateWaitS": {
         "mean": 730.313,
@@ -345,10 +345,10 @@
         "max": 260.236
       },
       "stallWaitS": {
-        "mean": 90.735,
-        "max": 311.317
+        "mean": 89.76,
+        "max": 310.342
       },
-      "serviceS": 209.647,
+      "serviceS": 208.672,
       "transactions": {
         "dropExport": 3,
         "pickImport": 4,

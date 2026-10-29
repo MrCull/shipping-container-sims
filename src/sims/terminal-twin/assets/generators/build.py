@@ -6,7 +6,7 @@ copies everything into assets/models/). Direct use:
     python build.py --out <staging dir> [--only containers] [--no-previews]
     blender --background --python build.py -- --out <staging dir>
 
-Groups: containers, shc, asc, sts, trucks, vessels (needs --vessel-classes <json>: the engine class table + bay grid). Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
+Groups: containers, shc, asc, sts, trucks, vessels, infrastructure (needs --vessel-classes <json>: the engine class table + bay grid). Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
 Writes, under <staging>/sts/:
     sts-malaccamax.glb / .meta.json   rigged Malaccamax quay crane (LOD0-2)
     sts-atlas.json                    paint/branding atlas layout (crane-number plates)
@@ -43,9 +43,11 @@ from tt_assets import vessel_liveries as VLV  # noqa: E402
 from tt_assets import vessels as VS  # noqa: E402
 from tt_assets import truck as TR  # noqa: E402
 from tt_assets import truck_meta as TM  # noqa: E402
+from tt_assets import infrastructure as INF  # noqa: E402
+from tt_assets import infrastructure_meta as INFM  # noqa: E402
 
 FONTS = os.path.join(HERE, 'fonts')
-GROUPS = ('containers', 'shc', 'asc', 'sts', 'vessels', 'trucks')
+GROUPS = ('containers', 'shc', 'asc', 'sts', 'vessels', 'trucks', 'infrastructure')
 from tt_assets import sts as STS  # noqa: E402
 from tt_assets import sts_atlas as STSA  # noqa: E402
 
@@ -395,6 +397,36 @@ def build_trucks(out_dir, previews=True, samples=48):
             B.render_preview(cam, loc, tgt, os.path.join(preview_dir, f'{name}-{view}.webp'), samples=samples)
 
 
+def build_infrastructure(out_dir, previews=True, samples=24):
+    """Gate modules, quay furniture, yard infrastructure, buildings and backdrop meshes (TT-28); one shared atlas."""
+    os.makedirs(out_dir, exist_ok=True)
+    preview_dir = os.path.join(out_dir, 'previews')
+    os.makedirs(preview_dir, exist_ok=True)
+    tmp = os.path.join(out_dir, '.work')
+    os.makedirs(tmp, exist_ok=True)
+    atlas_png = os.path.join(tmp, 'infra-atlas.png')
+    print('[infrastructure] rendering atlas', flush=True)
+    INFM.render_atlas(atlas_png, FONTS)
+    write_json(os.path.join(out_dir, 'infra-atlas.json'), INFM.atlas_manifest())
+    if previews:
+        save_atlas_preview(atlas_png, os.path.join(preview_dir, 'infra-atlas.webp'))
+    for name, builder, views, ground in INF.ASSETS:
+        B.reset_scene()
+        atlas = B.load_image(atlas_png, name='infra-atlas')
+        root, info = builder(atlas)
+        print(f'[infrastructure] {name}: {info["triangles"]["LOD0"]} tris', flush=True)
+        glb = os.path.join(out_dir, f'{name}.glb')
+        B.export_glb(root, glb)
+        strip_lod_suffix(glb)
+        write_json(os.path.join(out_dir, f'{name}.meta.json'), INFM.sidecar(info))
+        if not previews:
+            continue
+        cam, _ = B.setup_preview_stage(ground_size=ground)
+        cam.data.clip_end = max(500.0, ground * 1.5)
+        for i, (loc, tgt) in enumerate(views):
+            B.render_preview(cam, INF.gv(loc), INF.gv(tgt), os.path.join(preview_dir, f'{name}-{i + 1}.webp'), samples=samples)
+
+
 def main(argv):
     p = argparse.ArgumentParser(description='Generate Terminal Twin assets with Blender (bpy).')
     p.add_argument('--out', required=True, help='staging directory')
@@ -415,6 +447,8 @@ def main(argv):
         build_sts(os.path.join(args.out, 'sts'), previews=not args.no_previews, samples=args.samples)
     if 'trucks' in groups:
         build_trucks(os.path.join(args.out, 'trucks'), previews=not args.no_previews, samples=args.samples)
+    if 'infrastructure' in groups:
+        build_infrastructure(os.path.join(args.out, 'infrastructure'), previews=not args.no_previews, samples=min(args.samples, 32))
     if 'vessels' in groups:
         if not args.vessel_classes:
             p.error('--vessel-classes is required for the vessels group')

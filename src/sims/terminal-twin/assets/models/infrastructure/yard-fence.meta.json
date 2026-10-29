@@ -1,0 +1,62 @@
+{
+  "asset": "yard-fence",
+  "kind": "yard",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 5.0,
+    "widthM": 0.3,
+    "heightM": 2.65,
+    "tag": "A",
+    "reason": "typical security fence"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "yard-fence",
+      "role": "lod",
+      "description": "5 m security fence panel: posts, rails and pickets; origin at the panel centre on the ground, runs along X"
+    },
+    {
+      "name": "panel",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "fence panel"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 264,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "2.5 m fence with outriggers",
+      "tag": "A"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "segment": {
+    "lengthM": 5.0
+  }
+}

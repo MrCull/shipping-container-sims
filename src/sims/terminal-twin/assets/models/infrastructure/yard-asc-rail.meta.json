@@ -1,0 +1,62 @@
+{
+  "asset": "yard-asc-rail",
+  "kind": "yard",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 10.0,
+    "widthM": 0.9,
+    "heightM": 0.24,
+    "tag": "A",
+    "reason": "simplified crane rail on a concrete beam"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "yard-asc-rail",
+      "role": "lod",
+      "description": "10 m inset ASC rail on a concrete beam; origin at the segment centre on the rail centre line, runs along Z in the yard (authored along X)"
+    },
+    {
+      "name": "rail",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "ASC rail on its beam"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 48,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "ASC rail head 0.24 m above the yard surface",
+      "tag": "A"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "segment": {
+    "lengthM": 10.0
+  }
+}

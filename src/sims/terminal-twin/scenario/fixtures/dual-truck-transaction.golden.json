@@ -3,7 +3,7 @@
   "seed": 3,
   "status": "ended",
   "endReason": "simDurationS >= 4500",
-  "eventLogHash": "09528d95b98446",
+  "eventLogHash": "0fe946d613a3df",
   "kpis": {
     "simTimeS": 4500,
     "eventsProcessed": 356,
@@ -312,8 +312,8 @@
       "gateQueue": 0,
       "gateQueueMax": 1,
       "turnTimeS": {
-        "mean": 312.626,
-        "max": 312.626
+        "mean": 313.876,
+        "max": 313.876
       },
       "gateWaitS": {
         "mean": 0,

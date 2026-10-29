@@ -1,0 +1,140 @@
+{
+  "asset": "gate-lane-oog",
+  "kind": "gate",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 12.0,
+    "widthM": 8.0,
+    "heightM": 6.3,
+    "laneWidthM": 8.0,
+    "tag": "V",
+    "reason": "8 m out-of-gauge lane width is the ticket figure (TT-28)"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "gate-lane-oog",
+      "role": "lod",
+      "description": "one 8 m out-of-gauge gate lane module: pavement markings, barrier boom, camera and canopy segment; faces +Z, origin at the lane centre on the kiosk line"
+    },
+    {
+      "name": "pavement",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "lane slab with edge lines, stop line and the painted lane arrow (hazard hatch on the out-of-gauge lane)"
+    },
+    {
+      "name": "canopy",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "overhead canopy segment: roof, fascia girders, lights, lane sign and plate-camera housing"
+    },
+    {
+      "name": "boom_housing",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "barrier housing"
+    },
+    {
+      "name": "boom",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        3.82,
+        0.95,
+        1.2
+      ],
+      "axis": "+Z",
+      "description": "barrier boom hinge; rotates about +Z: 0 = closed across the lane, -88 deg = raised"
+    },
+    {
+      "name": "boom_geo",
+      "parent": "boom",
+      "role": "mesh",
+      "description": "striped red/white boom arm"
+    }
+  ],
+  "travelLimits": {
+    "boom": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -88,
+      "maxDeg": 0,
+      "rest": 0,
+      "tag": "A"
+    }
+  },
+  "attachPoints": [
+    {
+      "name": "lane_centre",
+      "node": "LOD0",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "tag": "V",
+      "description": "lane centre on the kiosk line (engine kioskZ)"
+    },
+    {
+      "name": "stop_line",
+      "node": "LOD0",
+      "position": [
+        0,
+        0.09,
+        -1.325
+      ],
+      "tag": "A",
+      "description": "painted stop line"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 340,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "8 m wide out-of-gauge lane",
+      "tag": "V",
+      "source": "ticket TT-28 (#52): 3.5 m truck lanes and an 8 m OOG lane"
+    },
+    {
+      "fact": "canopy height 6.3 m, 10 m deep, lane arrow/cross signs, under-canopy lights, plate-recognition camera housing",
+      "tag": "A",
+      "reason": "typical truck gate gantry; no drawing in the repo"
+    },
+    {
+      "fact": "barrier boom as one rig node (rotation about +Z); the renderer bakes the raised pose (closed on the unused OOG lane)",
+      "tag": "M",
+      "reason": "instancing"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "module": {
+    "laneWidthM": 8.0,
+    "lane": "oog",
+    "lengthM": 12.0,
+    "faces": "+Z",
+    "islandWidthM": 1.2
+  }
+}

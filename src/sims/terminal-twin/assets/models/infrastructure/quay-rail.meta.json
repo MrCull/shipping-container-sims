@@ -1,0 +1,73 @@
+{
+  "asset": "quay-rail",
+  "kind": "quay",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 10.0,
+    "widthM": 1.3,
+    "heightM": 0.24,
+    "tag": "A",
+    "reason": "rail section is a simplified crane rail"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "quay-rail",
+      "role": "lod",
+      "description": "10 m inset STS crane rail: concrete frame, dark channel, rail on clips; origin at the segment centre on the rail centre line"
+    },
+    {
+      "name": "rail",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "rail in its inset channel"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "rail_top",
+      "node": "rail",
+      "position": [
+        0,
+        0.23,
+        0
+      ],
+      "tag": "A"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 50,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "crane rail inset in a concrete channel, top about 0.24 m above the apron",
+      "tag": "A"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "segment": {
+    "lengthM": 10.0
+  }
+}

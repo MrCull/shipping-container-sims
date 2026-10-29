@@ -1,0 +1,71 @@
+{
+  "asset": "building-workshop",
+  "kind": "building",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 40.0,
+    "widthM": 20.0,
+    "heightM": 12.0,
+    "tag": "A",
+    "reason": "generic SHC / equipment maintenance workshop"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "building-workshop",
+      "role": "lod",
+      "description": "workshop / SHC maintenance hall: portal-frame shed with roller doors and a clerestory; origin at the floor centre, doors face +Z"
+    },
+    {
+      "name": "building",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "portal-frame workshop: walls, gabled roof, roller doors, windows, vents"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "door_row",
+      "node": "LOD0",
+      "position": [
+        0,
+        0,
+        10.0
+      ],
+      "tag": "A"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 202,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "generic workshop 40 x 20 m, four 6 x 7 m roller doors",
+      "tag": "A",
+      "reason": "ticket: workshop / SHC maintenance module"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ]
+}

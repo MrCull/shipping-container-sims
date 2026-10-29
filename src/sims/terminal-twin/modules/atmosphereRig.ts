@@ -7,6 +7,7 @@
 import * as THREE from 'three'
 import type { Lighting } from './atmosphere'
 import type { SceneModel } from './sceneModel'
+import { MAX_MASTS, mastSpots } from './infrastructureLayout'
 
 const DAY = { sky: new THREE.Color('#a9bfd3'), hemiSky: new THREE.Color('#dfe9f5'), hemiGround: new THREE.Color('#5a5248'), sun: new THREE.Color('#fff4e0') }
 const NIGHT = { sky: new THREE.Color('#0b1424'), hemiSky: new THREE.Color('#5b73a6'), hemiGround: new THREE.Color('#2a2c36'), sun: new THREE.Color('#8fa6d6') }
@@ -76,15 +77,8 @@ export class AtmosphereRig {
     scene.add(this.hemi, this.sun, this.sun.target)
 
     // High-mast poles (always visible) and their glow (night only).
-    const spots: [number, number][] = []
-    const quayLen = model.config.quay.lengthM
-    for (let x = -40; x <= quayLen + 40; x += 90) spots.push([x, layout.quayZ])
-    for (const b of model.blockList) {
-      const z0 = b.wtpZ + 7
-      const endZ = b.firstBayZ + (b.bays - 0.5) * 6.7
-      for (let z = z0 + 25; z <= endZ; z += 70) spots.push([b.x, z])
-    }
-    this.mastCount = Math.min(spots.length, 400)
+    const spots = mastSpots({ config: model.config, blocks: model.blockList }, layout.quayZ) // same spots as the phase 2 mast models (TT-28)
+    this.mastCount = Math.min(spots.length, MAX_MASTS)
     const poleGeo = new THREE.CylinderGeometry(0.35, 0.6, 30, 6)
     poleGeo.translate(0, 15, 0)
     const poleMat = new THREE.MeshStandardMaterial({ color: '#6b7078', roughness: 0.7 })
@@ -130,6 +124,11 @@ export class AtmosphereRig {
     this.disposables.push(poleGeo, poleMat, this.masts, mastGeo, equipGeo, this.mastGlow.material as THREE.Material, this.equipGlow.material as THREE.Material)
     if (tex) this.disposables.push(tex)
     this.apply(lightingDay)
+  }
+
+  /** The phase 2 high-mast models (TT-28) draw the poles: hide the procedural ones (the night glow stays). */
+  useMastModels(): void {
+    this.masts.visible = false
   }
 
   /** Apply a lighting state (cheap: only recolours and toggles). */

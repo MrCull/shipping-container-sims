@@ -1,0 +1,73 @@
+{
+  "asset": "quay-edge",
+  "kind": "quay",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 10.0,
+    "widthM": 1.0,
+    "heightM": 2.62,
+    "tag": "A",
+    "reason": "coping and ladder recess are approximations; the 2.5 m quay-above-water height is the engine figure"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "quay-edge",
+      "role": "lod",
+      "description": "10 m quay edge coping with yellow safety line and a ladder recess; origin at the segment centre on the edge line (z = 0)"
+    },
+    {
+      "name": "edge",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "quay coping, yellow line, ladder recess"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "edge_line",
+      "node": "edge",
+      "position": [
+        0,
+        0.125,
+        0.35
+      ],
+      "tag": "A"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 28,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "coping with yellow edge line; ladder recess to the water (2.5 m)",
+      "tag": "A"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "segment": {
+    "lengthM": 10.0
+  }
+}

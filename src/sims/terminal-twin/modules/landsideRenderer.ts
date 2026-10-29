@@ -1,7 +1,8 @@
 /**
  * Landside scene (TT-13): the truck roads, the gate complex (lanes, kiosks, canopy, barriers, the unused
- * out-of-gauge lane), the transfer stalls and the trucks. Procedural low-poly; the phase 2 gate model (TT-28)
- * replaces the gate. Trucks use the phase 2 GLBs (TT-26: `truckAssets.ts`, LOD switching, articulation) once they have
+ * out-of-gauge lane), the transfer stalls and the trucks. Procedural low-poly. The phase 2 gate modules (TT-28,
+ * `infrastructureRenderer.ts`) replace the gate furniture: the procedural gate stays in `gatePlaceholder` until they
+ * have loaded (`useGateModels`); the road asphalt, queue approach and stall spurs stay procedural. Trucks use the phase 2 GLBs (TT-26: `truckAssets.ts`, LOD switching, articulation) once they have
  * loaded; until then (and if loading fails) a truck is a handful of merged procedural meshes (skeletal chassis, tractor,
  * cab, glass, wheels). The box on the chassis is drawn by the ContainerInstancer. Nothing here is reactive.
  */
@@ -47,9 +48,13 @@ export class LandsideScene {
   private wheelMat: THREE.MeshStandardMaterial
   private current: LandsideStats = { trucks: 0, queued: 0, lods: { lod0: 0, lod1: 0, lod2: 0 }, assets: 'placeholder' }
   private models: TruckModels | null = null
+  /** Procedural gate furniture (lane lines, islands, kiosks, canopy, barriers, office, OOG lane); hidden once the phase 2 gate models draw. */
+  readonly gatePlaceholder = new THREE.Group()
 
   constructor(private model: SceneModel) {
     this.group.name = 'landside'
+    this.gatePlaceholder.name = 'gate-placeholder'
+    this.group.add(this.gatePlaceholder)
     this.darkMat = this.track(new THREE.MeshStandardMaterial({ color: '#30353c', roughness: 0.7, metalness: 0.3 }))
     this.glassMat = this.track(new THREE.MeshStandardMaterial({ color: '#7fb3d5', roughness: 0.2, metalness: 0.4 }))
     this.wheelMat = this.track(new THREE.MeshStandardMaterial({ color: '#15171a', roughness: 0.9 }))
@@ -102,6 +107,11 @@ export class LandsideScene {
 
   private static readonly FRONT_AXLE_X = 9.6
 
+  /** The phase 2 gate modules draw the gate: hide the procedural gate furniture. */
+  useGateModels(): void {
+    this.gatePlaceholder.visible = false
+  }
+
   /** The GLB models have loaded: trucks are drawn from them from the next update on. */
   setTruckModels(models: TruckModels): void {
     this.models = models
@@ -141,18 +151,19 @@ export class LandsideScene {
     const asphalt = this.track(new THREE.MeshStandardMaterial({ color: '#4a4d52', roughness: 0.95 }))
     const line = this.track(new THREE.MeshBasicMaterial({ color: '#e8e8e8' }))
     const yellow = this.track(new THREE.MeshStandardMaterial({ color: '#f2c94c', roughness: 0.8 }))
-    const plane = (w: number, d: number, x: number, z: number, mat: THREE.Material, y: number, shadow = false) => {
+    const gate = this.gatePlaceholder
+    const plane = (w: number, d: number, x: number, z: number, mat: THREE.Material, y: number, shadow = false, into: THREE.Object3D = this.group) => {
       const m = new THREE.Mesh(this.track(new THREE.PlaneGeometry(w, d)), mat)
       m.rotation.x = -Math.PI / 2
       m.position.set(x, y, z)
       m.receiveShadow = shadow
-      this.group.add(m)
+      into.add(m)
     }
-    const slab = (w: number, h: number, d: number, x: number, y: number, z: number, mat: THREE.Material) => {
+    const slab = (w: number, h: number, d: number, x: number, y: number, z: number, mat: THREE.Material, into: THREE.Object3D = this.group) => {
       const m = new THREE.Mesh(this.track(new THREE.BoxGeometry(w, h, d)), mat)
       m.position.set(x, y, z)
       m.castShadow = true
-      this.group.add(m)
+      into.add(m)
       return m
     }
     const { roadInZ, roadOutZ, eastX, westX, kioskZ, entryZ } = g.gate
@@ -172,22 +183,23 @@ export class LandsideScene {
       plane(3.2, STALL_LENGTH_M - 0.5, s.x, s.z, asphalt, 0.075)
     }
     // gate: lane pavement from the roads to the queue, lane lines, kiosks and a canopy over the kiosk row
-    const laneW = 3.6
+    const laneW = 3.6 // placeholder lane pitch (the engine pitch is GATE_LANE_W_M plus islands; the placeholder is only an approximation)
     const lanes = [...g.inLanes, ...g.outLanes]
-    const x0 = Math.min(...lanes.map((l) => l.x), g.oogX ?? Infinity) - laneW / 2
-    const x1 = Math.max(...lanes.map((l) => l.x), g.oogX ?? -Infinity) + laneW / 2
+    const x0 = Math.min(...lanes.map((l) => l.x), g.oogX ?? Infinity) - 3 // 3 m: the end islands of the phase 2 gate sit on this pavement
+    const x1 = Math.max(...lanes.map((l) => l.x), g.oogX ?? -Infinity) + 3
     const depth = entryZ + 8 - roadInZ
     plane(x1 - x0, depth, (x0 + x1) / 2, roadInZ + depth / 2, asphalt, 0.05, true)
-    plane(laneW * g.inLanes.length, 70, g.gate.queueX, entryZ + 8 + 35, asphalt, 0.05, true) // approach (the queue)
+    const inXs = g.inLanes.map((l) => l.x)
+    plane(Math.max(...inXs) - Math.min(...inXs) + 4.7, 70, g.gate.queueX, entryZ + 8 + 35, asphalt, 0.05, true) // approach (the queue)
     const edges = [...lanes.map((l) => l.x - laneW / 2), x1]
     if (g.oogX !== null) edges.push(g.oogX - laneW / 2, g.oogX + laneW / 2)
-    for (const x of new Set(edges)) plane(0.12, depth, x, roadInZ + depth / 2, line, 0.06)
+    for (const x of new Set(edges)) plane(0.12, depth, x, roadInZ + depth / 2, line, 0.06, false, gate)
     const red = this.track(new THREE.MeshStandardMaterial({ color: '#b03a2e', roughness: 0.8 }))
     const hatch = this.track(new THREE.MeshStandardMaterial({ color: '#f4f4f4', roughness: 0.8 }))
     if (g.oogX !== null) {
-      plane(laneW - 0.4, depth, g.oogX, roadInZ + depth / 2, red, 0.065) // out-of-gauge lane: drawn, never routed
-      for (let z = roadOutZ + 2; z < entryZ + 6; z += 4) plane(laneW - 0.4, 1, g.oogX, z, hatch, 0.07)
-      slab(laneW - 0.6, 1.1, 0.25, g.oogX, 0.6, kioskZ - 3.5, red) // closed barrier
+      plane(laneW - 0.4, depth, g.oogX, roadInZ + depth / 2, red, 0.065, false, gate) // out-of-gauge lane: drawn, never routed
+      for (let z = roadOutZ + 2; z < entryZ + 6; z += 4) plane(laneW - 0.4, 1, g.oogX, z, hatch, 0.07, false, gate)
+      slab(laneW - 0.6, 1.1, 0.25, g.oogX, 0.6, kioskZ - 3.5, red, gate) // closed barrier
     }
     const concrete = this.track(new THREE.MeshStandardMaterial({ color: '#c9c9c4', roughness: 0.9 }))
     const glass = this.track(new THREE.MeshStandardMaterial({ color: '#7fb3d5', roughness: 0.2, metalness: 0.4 }))
@@ -199,16 +211,16 @@ export class LandsideScene {
       kioskX.push((lanes[i].x + lanes[i + 1].x) / 2)
     }
     for (const x of kioskX) {
-      slab(1.6, 0.3, 4.5, x, 0.15, kioskZ, concrete) // island
-      slab(1.4, 2.6, 3.4, x, 1.6, kioskZ, concrete) // kiosk
-      slab(1.46, 0.9, 2.4, x, 2.0, kioskZ, glass)
+      slab(1.6, 0.3, 4.5, x, 0.15, kioskZ, concrete, gate) // island
+      slab(1.4, 2.6, 3.4, x, 1.6, kioskZ, concrete, gate) // kiosk
+      slab(1.46, 0.9, 2.4, x, 2.0, kioskZ, glass, gate)
     }
-    for (const l of lanes) slab(laneW - 0.6, 0.15, 0.15, l.x, 1.2, kioskZ - 2.6, arm) // barrier arms
+    for (const l of lanes) slab(laneW - 0.6, 0.15, 0.15, l.x, 1.2, kioskZ - 2.6, arm, gate) // barrier arms
     const width = x1 - x0
-    slab(width + 2, 0.5, 12, (x0 + x1) / 2, 6, kioskZ, concrete) // canopy
-    for (const x of [x0 - 1, x1 + 1]) for (const dz of [-5, 5]) slab(0.5, 6, 0.5, x, 3, kioskZ + dz, concrete)
-    slab(14, 4, 8, westX - 14, 2, kioskZ + 6, concrete) // gatehouse office
-    slab(14.2, 1, 0.1, westX - 14, 2.6, kioskZ + 1.95, glass)
+    slab(width + 2, 0.5, 12, (x0 + x1) / 2, 6, kioskZ, concrete, gate) // canopy
+    for (const x of [x0 - 1, x1 + 1]) for (const dz of [-5, 5]) slab(0.5, 6, 0.5, x, 3, kioskZ + dz, concrete, gate)
+    slab(14, 4, 8, westX - 14, 2, kioskZ + 6, concrete, gate) // gatehouse office
+    slab(14.2, 1, 0.1, westX - 14, 2.6, kioskZ + 1.95, glass, gate)
   }
 
   update(t: number, cameraPosition: THREE.Vector3): void {

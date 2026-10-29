@@ -31,8 +31,12 @@ import type { GateConfig, ScenarioConfig } from '../scenario/types'
 
 export const DEFAULT_GATE_LAYOUT: GateConfig = { inLanes: 4, outLanes: 4, inProcessingS: 40, outProcessingS: 20, processingVariationPct: 0, oogLane: true }
 
-/** [A] Width of a gate lane (m). */
-export const GATE_LANE_W_M = 3.6
+/** Width of a gate truck lane (m): 3.5 m [V] (TT-28 gate modules use the same). */
+export const GATE_LANE_W_M = 3.5
+/** Width of the out-of-gauge lane (m): 8 m [V]. */
+export const GATE_OOG_LANE_W_M = 8
+/** [A] Width of the concrete island (kiosk pedestal) between two neighbouring gate lanes (m). */
+export const GATE_ISLAND_W_M = 1.2
 /** [A] Distance kept between consecutive trucks of the gate queue (head to head, m). */
 export const QUEUE_PITCH_M = 19
 /** [A] Distance a vehicle reserves before and after a conflict point (m): roughly a truck length. */
@@ -167,10 +171,22 @@ export function buildLandsideGraph(config: ScenarioConfig): LandsideGraph {
   const queueHeadZ = r3(entryZ + 8)
   const minX = Math.min(...stalls.map((s) => s.x)) - 3
   const maxX = Math.max(...stalls.map((s) => s.x)) + 3
-  const lanes = gate.inLanes + (gate.oogLane === false ? 0 : 1) + gate.outLanes
   const clusterRight = minX - GATE_WEST_GAP_M
-  const clusterLeft = clusterRight - (lanes - 1) * GATE_LANE_W_M
-  const laneX = (i: number) => r3(clusterLeft + i * GATE_LANE_W_M)
+  // lane centres west to east: in lanes, the out-of-gauge lane, out lanes, an island between neighbours; the last lane ends the cluster
+  const widths = [
+    ...Array<number>(gate.inLanes).fill(GATE_LANE_W_M),
+    ...(gate.oogLane === false ? [] : [GATE_OOG_LANE_W_M]),
+    ...Array<number>(gate.outLanes).fill(GATE_LANE_W_M),
+  ]
+  const centres: number[] = []
+  {
+    let x = clusterRight
+    for (let i = widths.length - 1; i >= 0; i--) {
+      centres[i] = x
+      if (i > 0) x -= widths[i] / 2 + GATE_ISLAND_W_M + widths[i - 1] / 2
+    }
+  }
+  const laneX = (i: number) => r3(centres[i])
   const inX = (k: number) => laneX(k)
   const oogX = gate.oogLane === false ? null : laneX(gate.inLanes)
   const outX = (j: number) => laneX(gate.inLanes + (oogX === null ? 0 : 1) + j)
