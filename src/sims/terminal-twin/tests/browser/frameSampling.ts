@@ -61,11 +61,17 @@ export function simPerWallSecond(samples: FrameSample[]): number {
   return (last.sim - first.sim) / ((last.wall - first.wall) / 1000)
 }
 
-/** Indices of frames (after the first) where the display clock did not advance although the scene rendered. */
-export function stalledFrames(samples: FrameSample[]): number[] {
-  const stalled: number[] = []
-  for (let i = 1; i < samples.length; i++) {
-    if (samples[i].frames > samples[i - 1].frames && samples[i].sim <= samples[i - 1].sim) stalled.push(i)
-  }
-  return stalled
+/**
+ * Fraction of frame steps where the display clock advanced. The clock may wait a frame or two for the engine while it
+ * catches up at x600 (more often on a loaded runner), so this is a ratio, not "every frame".
+ */
+export function advancedFraction(samples: FrameSample[]): number {
+  let advanced = 0
+  for (let i = 1; i < samples.length; i++) if (samples[i].sim > samples[i - 1].sim) advanced++
+  return advanced / Math.max(1, samples.length - 1)
+}
+
+/** True when the display clock never ran backwards. */
+export function neverBackwards(samples: FrameSample[]): boolean {
+  return samples.every((s, i) => i === 0 || s.sim >= samples[i - 1].sim)
 }

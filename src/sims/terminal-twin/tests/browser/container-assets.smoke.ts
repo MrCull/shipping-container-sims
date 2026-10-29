@@ -69,6 +69,7 @@ test('the twin renders containers from the GLBs with each box in its own line li
 })
 
 test('the asset viewer loads every container asset, switches LODs and moves the rig', async ({ page }) => {
+  test.slow() // shows and screenshots every asset in the pack, each on software WebGL
   const { errors, external } = watch(page)
   await page.goto('/sim/terminal-twin?viewer=container-20')
   await page.waitForFunction(() => !!window.__ttAssets)
@@ -98,6 +99,7 @@ test('the asset viewer loads every container asset, switches LODs and moves the 
 })
 
 test('a TTI-size yard of instanced containers stays within the triangle and draw-call budget', async ({ page }) => {
+  test.slow() // 18,000 instances render at under 1 fps on software WebGL
   const { errors } = watch(page)
   await page.goto('/sim/terminal-twin?viewer=yard')
   await page.waitForFunction(() => !!window.__ttAssets)

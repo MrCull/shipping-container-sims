@@ -90,6 +90,9 @@ test('trucks roll, steer, articulate through turns and carry their box on the ch
   // A box on a chassis sits on the model's twist-lock attach point (centre of the box on the pins, bottom on the deck).
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'TruckAtStall' }))
   await page.waitForFunction(() => Object.values(window.__tt!.sceneState()?.truckRigs ?? {}).length > 0)
+  // let the scene draw the paused instant before comparing it with the engine (slow frames on a loaded runner)
+  const drawn = await page.evaluate(() => window.__tt!.scene()!.frames)
+  await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 2, drawn)
   const check = await page.evaluate(async () => {
     const tt = window.__tt!
     const boxes = (await tt.query<{ id: string; custody: { kind: string; id: string } }[]>('containers')).filter((b) => b.custody.kind === 'truck')
