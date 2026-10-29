@@ -35,6 +35,8 @@ export interface TruckLegInfo {
   containerId: string
   size: ContainerSize
   vesselId?: string
+  /** An export box booked to a new slot of the vessel's bay plan on arrival (legacy or pre-filled start, V11-14). */
+  slotId?: string
 }
 
 /** Ids of the domain objects an event involves (for filtering and `why`). */

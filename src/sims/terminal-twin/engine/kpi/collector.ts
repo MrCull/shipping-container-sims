@@ -374,7 +374,8 @@ export interface KpiStaticInfo {
 }
 
 export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo): KpiCollector {
-  const vesselBoxes = info.vesselBoxes
+  // a copy: boxes booked after the start (truck-delivered exports, V11-14) are added as their TruckArrived events are fed
+  const vesselBoxes = { ...info.vesselBoxes }
   const clock = kpiClockOf(config)
   const acc = new Acc()
   const hourOf = (t: number) => Math.max(0, hourIndexOf(clock, t))
@@ -567,6 +568,7 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         break
       case 'TruckArrived':
         acc.gauge('ls.queue', 'terminal', h, e.payload.queueLength)
+        for (const l of e.payload.legs) if (l.slotId && l.vesselId) vesselBoxes[l.vesselId] = (vesselBoxes[l.vesselId] ?? 0) + 1
         break
       case 'TruckGateStarted':
         acc.gauge('ls.queue', 'terminal', h, e.payload.queueLength)
