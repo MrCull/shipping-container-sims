@@ -34,10 +34,12 @@ Another session may have pushed while you were stopped. Two sessions once built 
 
 ## Open follow-ups
 
+Logged as GitHub issues on 2026-10-29 (not in PR #54): #55 real-GPU frame rate, #56 HUD panels overlap the KPI strip, #57 per-kind renderer registry, #58 known gaps (cornering, WTP pad decision, subsystem modes), #59 load-proof x600 smoke test. The 18k-yard draw-call failure is fixed: the viewer's total included the shadow pass (container layers use 6 calls), so the spec now checks `containerDrawCalls < 20` and the total `< 40`.
+
 - **Known gaps (accepted, also in the sim guide):** subsystem modes real/instant/off for quay, berth and yard (story 104); no separate WTP pad-selection decision point (story 61); extra shortcuts E/I/P and ASC yield moves; yard pre-fill bypasses the decision runtime (no async handler); handler wall latency has no time series; `SetupDialog.vue`, `twinStore.ts`, `asc.ts` not split.
 - **SHC cornering:** SHCs stop at every turn instead of cornering at speed.
 - **Container orientation:** position plus optional yaw only.
 - **Frame rate:** an 18k-box yard is unconfirmed on real GPU hardware (TT-19).
 - **Invariant cost:** invariants scan the whole state after every event. Revisit in TT-19.
 - **Date pickers:** `datetime-local` inputs show the browser locale, not the chosen one.
-- **Not done from the retro:** a per-kind renderer registry in `sceneRenderer.ts`/`devApi.ts`/`twinStore.ts` (hub files that conflict on most merges). `tests/equipment-kinds.test.ts` guards kind registration meanwhile.
+- **Per-kind renderer registry** (#57): `tests/equipment-kinds.test.ts` guards kind registration meanwhile.

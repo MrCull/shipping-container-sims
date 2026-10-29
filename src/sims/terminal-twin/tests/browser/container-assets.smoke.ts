@@ -106,7 +106,9 @@ test('a TTI-size yard of instanced containers stays within the triangle and draw
   expect(yard.lod0).toBeGreaterThan(0)
   expect(yard.lod0).toBeLessThanOrEqual(yard.lod0Cap)
   expect(yard.lod1).toBe(18000 - yard.lod0)
-  expect(yard.drawCalls).toBeLessThan(20)
+  // Container layers alone must stay small; the viewer's total also counts the sun's shadow pass and the floor.
+  expect(yard.containerDrawCalls).toBeLessThan(20)
+  expect(yard.drawCalls).toBeLessThan(40)
   expect(yard.triangles).toBeLessThan(1_500_000)
   console.log(`yard: ${JSON.stringify(yard)}`)
   await page.screenshot({ path: '.screenshots/assets/yard.png' })
