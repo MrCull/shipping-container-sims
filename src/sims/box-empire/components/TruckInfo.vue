@@ -30,8 +30,12 @@ function stateLabel(state: string): string {
   >
     <div class="info-header">
       <div>
-        <div class="info-id">{{ truck.id }}</div>
-        <div class="truck-type">{{ truck.visitType === 'import_pickup' ? 'Import Pickup' : 'Export Delivery' }}</div>
+        <div class="info-id">
+          {{ truck.id }}
+        </div>
+        <div class="truck-type">
+          {{ truck.visitType === 'import_pickup' ? 'Import Pickup' : 'Export Delivery' }}
+        </div>
       </div>
       <button
         class="close-btn"
