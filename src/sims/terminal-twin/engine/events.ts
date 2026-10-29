@@ -132,6 +132,8 @@ export interface EventPayloads {
   /** The ground-position decision returned no position; the STS holds the box and idles. */
   StsWaitingForGroundPosition: { stsId: string; containerId: string }
   /** A ground position freed up; the waiting STS asks for one again. */
+  /** Back-off timer of a ground-position wait; a no-op unless the crane still waits since `waitSince`. */
+  StsGroundPositionWaitBackoff: { stsId: string; containerId: string; waitSince: number }
   StsGroundPositionWaitEnded: { stsId: string; containerId: string; waitedS: number }
   /**
    * The SHC dispatch reply claimed a job: the whole trip (pickup, drop at the

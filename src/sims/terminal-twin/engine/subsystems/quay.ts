@@ -156,6 +156,9 @@ function wake(ctx: EngineContext): void {
   wakeRail(ctx, (sts) => continueWork(ctx, sts, ctx.state.now))
 }
 
+/** Default back-off (s) before a waiting STS asks for a ground position again. */
+const DEFAULT_STS_GROUND_RETRY_S = 30
+
 export function requestGroundPosition(ctx: EngineContext, sts: StsState, containerId: string, direction?: 'load'): void {
   const { state } = ctx
   const reserved = new Map(sts.drops.map((d) => [d.groundPositionId, d.containerId]))
@@ -448,6 +451,13 @@ export const quayReactors: ReactorMap = {
     wake(ctx)
   },
 
+  /** Back-off elapsed: ask again unless a freed position already ended this wait. */
+  StsGroundPositionWaitBackoff: (e, ctx) => {
+    const sts = ctx.state.sts[e.payload.stsId]
+    if (sts.waitingSince !== e.payload.waitSince) return
+    resumeStsWaitingForGroundPosition(ctx, sts.id)
+  },
+
   StsGroundPositionWaitEnded: (e, ctx) => {
     const { state } = ctx
     const sts = state.sts[e.payload.stsId]
@@ -471,6 +481,13 @@ export const quayReactors: ReactorMap = {
         stsId: sts.id,
         containerId: box.id,
       })
+      const backoff = config.layout.stsGroundRetryS ?? DEFAULT_STS_GROUND_RETRY_S
+      if (backoff > 0)
+        ctx.schedule('StsGroundPositionWaitBackoff', e.t + backoff, { equipment: [sts.id], containers: [box.id] }, {
+          stsId: sts.id,
+          containerId: box.id,
+          waitSince: e.t,
+        })
       return
     }
     if (!state.groundPositions[reply.groundPositionId])

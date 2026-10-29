@@ -292,6 +292,8 @@ export interface LayoutConfig {
   stsGroundLaneSpacingM: number
   /** Spreader travel height for trolley moves (m). */
   stsSafeHoistM: number
+  /** Back-off (s) before an STS whose ground-position reply was null asks again (default 30; 0 = only wake on a freed position). */
+  stsGroundRetryS?: number
 }
 
 export interface ScenarioConfig {
