@@ -100,6 +100,8 @@ export type {
   ShcDispatchPad,
   ShcDispatchReply,
   ShcDispatchRequest,
+  WtpPadSelectionReply,
+  WtpPadSelectionRequest,
   RehandleCandidate,
   RehandleTargetReply,
   RehandleTargetRequest,

@@ -31,7 +31,7 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.7.1'
+export const ENGINE_VERSION = '0.8.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */

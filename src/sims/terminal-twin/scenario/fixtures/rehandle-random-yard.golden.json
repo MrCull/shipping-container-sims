@@ -3,10 +3,10 @@
   "seed": 2,
   "status": "ended",
   "endReason": "vesselsCompleted >= 2",
-  "eventLogHash": "0693dacf1e5f0a",
+  "eventLogHash": "05d4fbb6991899",
   "kpis": {
     "simTimeS": 9956.839,
-    "eventsProcessed": 2247,
+    "eventsProcessed": 2319,
     "movesCompleted": 60,
     "vesselsCompleted": 2,
     "sts": {
@@ -79,6 +79,27 @@
         "calls": 60,
         "resolved": 60,
         "ok": 60,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "wtpPadSelection": {
+        "handler": "strategy:first-free",
+        "calls": 36,
+        "resolved": 36,
+        "ok": 36,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -269,7 +290,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 2246,
+    "checks": 2318,
     "violations": 0,
     "first": null
   },

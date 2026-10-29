@@ -14,17 +14,17 @@ import { nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
 import { leastLoadedBlockStall, leastUsedLane, lowestFreeLane, nearestToBoxStall } from './landsideStrategies'
 import { justInTimeRelease, keepKAheadRelease } from './workPackageStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
-import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchPad, ShcDispatchRequest } from './types'
+import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchPad, WtpPadSelectionRequest } from './types'
 
 const isFree = (p: ShcDispatchPad) => p.occupiedBy === null && p.claimedBy === null
 
 /** First free pad in list order. */
-function firstFreePad(req: ShcDispatchRequest): string | null {
+function firstFreePad(req: WtpPadSelectionRequest): string | null {
   return req.wtpPads.find(isFree)?.id ?? null
 }
 
 /** Free pad closest (plan distance) to a point; ties by list order. */
-function nearestFreePad(req: ShcDispatchRequest, x: number, z: number): string | null {
+function nearestFreePad(req: WtpPadSelectionRequest, x: number, z: number): string | null {
   let best: ShcDispatchPad | null = null
   let bestD = Infinity
   for (const p of req.wtpPads) {
@@ -74,24 +74,37 @@ export const strategies: StrategyRegistry = {
     default: 'oldest-job',
     strategies: {
       'oldest-job': {
-        description: 'Oldest open job first (FIFO by grounding time); first free WTP pad.',
+        description: 'Oldest open job first (FIFO by grounding time).',
         handler: (msg) => {
           const job = [...msg.payload.jobs].sort((a, b) => a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1))[0]
-          if (job?.kind === 'load') return { jobId: job.jobId, wtpPadId: job.padId ?? null }
-          const pad = job ? firstFreePad(msg.payload) : null
-          return job && pad ? { jobId: job.jobId, wtpPadId: pad } : { jobId: null, wtpPadId: null }
+          return { jobId: job?.jobId ?? null }
         },
       },
       'nearest-job': {
-        description: 'Nearest open job by route length; the free WTP pad nearest to that box.',
+        description: 'Nearest open job by route length.',
         handler: (msg) => {
           const job = [...msg.payload.jobs].sort(
             (a, b) => a.distanceM - b.distanceM || a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1),
           )[0]
-          if (job?.kind === 'load') return { jobId: job.jobId, wtpPadId: job.padId ?? null }
-          const pad = job ? nearestFreePad(msg.payload, job.x, job.z) : null
-          return job && pad ? { jobId: job.jobId, wtpPadId: pad } : { jobId: null, wtpPadId: null }
+          return { jobId: job?.jobId ?? null }
         },
+      },
+    },
+  },
+  wtpPadSelection: {
+    default: 'first-free',
+    strategies: {
+      'first-free': {
+        description: 'The first free WTP pad in list order.',
+        handler: (msg) => ({ wtpPadId: firstFreePad(msg.payload) }),
+      },
+      'nearest-box': {
+        description: 'The free WTP pad nearest (plan distance) to where the box stands.',
+        handler: (msg) => ({ wtpPadId: nearestFreePad(msg.payload, msg.payload.x, msg.payload.z) }),
+      },
+      'last-free': {
+        description: 'The last free WTP pad in list order (fills the yard from the far end).',
+        handler: (msg) => ({ wtpPadId: [...msg.payload.wtpPads].reverse().find(isFree)?.id ?? null }),
       },
     },
   },
@@ -231,6 +244,7 @@ export function getStrategy<K extends DecisionPointId>(dp: K, name: string): Dec
 export const defaultHandlers: HandlerSet = {
   stsGroundPosition: getStrategy('stsGroundPosition', strategies.stsGroundPosition.default),
   shcDispatch: getStrategy('shcDispatch', strategies.shcDispatch.default),
+  wtpPadSelection: getStrategy('wtpPadSelection', strategies.wtpPadSelection.default),
   yardAllocation: getStrategy('yardAllocation', strategies.yardAllocation.default),
   ascDispatch: getStrategy('ascDispatch', strategies.ascDispatch.default),
   berthAllocation: getStrategy('berthAllocation', strategies.berthAllocation.default),

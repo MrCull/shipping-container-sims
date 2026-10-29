@@ -133,7 +133,7 @@ export type StsStatus =
 
 /**
  * SHC state machine (TT-05):
- *   parked → waiting-for-dispatch → job-assigned (waits for its reservations)
+ *   parked → waiting-for-dispatch → (discharge job: waiting-for-pad, V11-11) → job-assigned (waits for its reservations)
  *   → routing-empty → positioning-at-pickup → locking → lifting
  *   → routing-loaded → positioning-at-dropoff → lowering → unlocking
  *   → clearing (reverses clear of the WTP pad) → available
@@ -142,6 +142,7 @@ export type StsStatus =
 export type ShcStatus =
   | 'parked'
   | 'waiting-for-dispatch'
+  | 'waiting-for-pad'
   | 'job-assigned'
   | 'routing-empty'
   | 'positioning-at-pickup'
