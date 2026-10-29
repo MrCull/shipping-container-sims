@@ -45,6 +45,7 @@ import type { Breakpoint, BreakpointKind } from '../modules/breakpoints'
 import type { OverlayState } from '../modules/overlays'
 import type { QualityLevel, QualitySetting } from '../modules/quality'
 import { usePerfStore, type PerfStats } from '../store/perfStore'
+import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import type { ShcRigState } from '../modules/shcAssets'
 import type { TruckRigState } from '../modules/truckAssets'
@@ -231,7 +232,12 @@ export interface TwinUiState {
   inspectorOpen: boolean
 }
 
+/**
+ * What the dev API reports about the scene. The equipment-kind entries (`sts`, `shcs`, `ascs`, `trucks`, `vessels` and their
+ * rig keys) are filled from the registry (`modules/equipmentKinds/`); a new kind appears under its own keys, typed here only if wanted.
+ */
 export interface SceneState {
+  [kind: string]: unknown
   displayTime: number
   containers: Record<string, CustodyRef | null>
   sts: Record<string, { status: string } & StsPose>
@@ -363,22 +369,19 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       const model = c?.model
       if (!c || !model) return null
       const t = c.displayTime
-      return {
+      const state: Record<string, unknown> = {
         displayTime: t,
         containers: Object.fromEntries(model.containerIds.map((id) => [id, model.custodyAt(id, t)])),
-        sts: Object.fromEntries(model.stsIds.map((id) => [id, { status: model.statusAt('sts', id, t), ...model.stsPose(id, t) }])),
-        shcs: Object.fromEntries(model.shcIds.map((id) => [id, { status: model.statusAt('shc', id, t), ...model.shcPose(id, t) }])),
-        ascs: Object.fromEntries(model.ascIds.map((id) => [id, { status: model.statusAt('asc', id, t), ...model.ascPose(id, t) }])),
-        trucks: Object.fromEntries(model.truckIds.map((id) => [id, { status: model.statusAt('truck', id, t), ...model.truckPose(id, t) }])),
         reservations: model.activeReservations(t),
-        vessels: Object.fromEntries(model.vesselIds.map((id) => [id, { status: model.statusAt('vessel', id, t) }])),
         liveries: store.view()?.liveries() ?? {},
-        shcRigs: store.view()?.shcRigs() ?? {},
-        truckRigs: store.view()?.truckRigs() ?? {},
-        ascRigs: store.view()?.ascRigs() ?? {},
-        stsRendered: store.view()?.sts() ?? {},
-        vesselHulls: store.view()?.vesselHulls() ?? {},
       }
+      // Equipment kinds (modules/equipmentKinds/): status and pose per id, and the rig state as drawn.
+      const rigs = store.view()?.rigs()
+      for (const def of EQUIPMENT_KINDS) {
+        state[def.sceneKey] = Object.fromEntries(def.ids(model).map((id) => [id, def.sceneState(model, id, t)]))
+        state[def.rigKey] = rigs?.[def.kind] ?? {}
+      }
+      return state as unknown as SceneState
     },
     display: () => ({ ...store.display }),
     setDisplay: (next) => {

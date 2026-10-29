@@ -6,9 +6,7 @@
  * it hits; if it hits none, the nearest equipment or vessel box. Containers
  * win because crane and hull boxes enclose the boxes they carry.
  */
-import { FENDER_GAP_M } from '../scenario/vesselClasses'
-import { SHC, STS, TRUCK } from './equipmentDims'
-import { ASC_MODEL, ascScaleY } from './ascRig'
+import { EQUIPMENT_KINDS } from './equipmentKinds'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 
 export interface Ray {
@@ -26,7 +24,7 @@ export interface EntityBounds extends Vec3 {
 
 const SELECT_MARGIN_M = 0.6
 
-/** The bounding box of a container, SHC, STS or vessel at `time`; null if it is not in the scene. */
+/** The bounding box of a container or a registered equipment kind at `time`; null if it is not in the scene. */
 export function entityBounds(model: SceneModel, id: string, time: number): EntityBounds | null {
   const size = model.containerSize[id]
   if (size) {
@@ -35,36 +33,7 @@ export function entityBounds(model: SceneModel, id: string, time: number): Entit
     const d = CONTAINER_DIMS[size]
     return { x: pose.x, y: pose.y, z: pose.z, sx: d.length + SELECT_MARGIN_M, sy: d.height + SELECT_MARGIN_M, sz: d.width + SELECT_MARGIN_M, yaw: pose.yaw }
   }
-  if (model.shcIds.includes(id)) {
-    const p = model.shcPose(id, time)
-    const height = SHC.height + 3
-    return { x: p.x, y: height / 2, z: p.z, sx: SHC.length + 1, sy: height, sz: SHC.width + 1, yaw: p.heading === 'z' ? Math.PI / 2 : 0 }
-  }
-  if (model.ascIds.includes(id)) {
-    // The ASC GLB's overall box (rails to e-house roof), stretched for blocks taller than the model's design stack.
-    const block = model.blockOfAsc(id)
-    const height = ASC_MODEL.heightM * ascScaleY(block.tiers)
-    return { x: block.x, y: height / 2, z: model.ascPose(id, time).z, sx: ASC_MODEL.widthM, sy: height, sz: ASC_MODEL.lengthM, yaw: 0 }
-  }
-  if (model.truckIds.includes(id)) {
-    const p = model.truckPose(id, time)
-    if (!p.visible) return null
-    // the box on the chassis stands at the origin; the cab is ahead along the body's heading
-    const cx = p.x + Math.cos(p.yaw) * ((TRUCK.rearX + TRUCK.frontX) / 2)
-    const cz = p.z - Math.sin(p.yaw) * ((TRUCK.rearX + TRUCK.frontX) / 2)
-    return { x: cx, y: TRUCK.height / 2, z: cz, sx: TRUCK.frontX - TRUCK.rearX + 0.6, sy: TRUCK.height, sz: TRUCK.width + 0.6, yaw: p.yaw }
-  }
-  if (model.stsIds.includes(id)) {
-    const p = model.stsPose(id, time)
-    const height = STS.apexY + 1.3
-    return { x: p.gantryX, y: height / 2, z: STS.waterRailZ + STS.gauge / 2, sx: STS.legSpacingX + 4, sy: height, sz: STS.gauge + 6, yaw: 0 }
-  }
-  if (model.vesselIds.includes(id)) {
-    const centre = model.entityCentre(id, time)
-    if (!centre) return null
-    const spec = model.vesselSpec(id)
-    return { x: centre.x, y: spec.deckHeightM / 2, z: centre.z - FENDER_GAP_M, sx: spec.loaM + 2, sy: spec.deckHeightM + 14, sz: spec.beamM + 2, yaw: 0 }
-  }
+  for (const def of EQUIPMENT_KINDS) if (def.ids(model).includes(id)) return def.bounds(model, id, time)
   return null
 }
 
@@ -105,7 +74,7 @@ export function pickEntity(model: SceneModel, time: number, ray: Ray): string | 
     if (dist !== null && dist !== undefined && (!best || dist < best.dist)) best = { id, dist }
   }
   if (best) return best.id
-  for (const id of [...model.shcIds, ...model.ascIds, ...model.truckIds, ...model.stsIds, ...model.vesselIds]) {
+  for (const id of EQUIPMENT_KINDS.flatMap((def) => def.ids(model))) {
     const b = entityBounds(model, id, time)
     const dist = b && rayBox(ray, b)
     if (dist !== null && dist !== undefined && (!best || dist < best.dist)) best = { id, dist }

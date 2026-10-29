@@ -18,6 +18,7 @@ import { EXPORT_FILES, ScenarioValidationError, validateScenario, type EngineEve
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { describeEntity, entityKind, entityQueryKind, type EntityView } from '../modules/entityInspector'
+import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
 import { FEED_BUFFER_CAP } from '../modules/eventFeed'
 import type { Bucketing, KpiGroupId } from '../modules/dashboardModel'
@@ -30,11 +31,6 @@ import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
 import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
-import type { VesselHullState } from '../modules/vesselRenderer'
-import type { ShcRigState } from '../modules/shcAssets'
-import type { TruckRigState } from '../modules/truckAssets'
-import type { AscRigState } from '../modules/ascAssets'
-import type { StsRenderState } from '../modules/stsAssets'
 import { CuePlanner } from '../modules/cues'
 import { SoundPlayer } from '../modules/soundPlayer'
 import type { AtmosphereState } from '../modules/atmosphereRig'
@@ -96,16 +92,8 @@ export interface TwinView {
   stats(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */
   liveries(): Record<string, RenderedLivery> | null
-  /** Rig state per SHC (LOD, steering, wheel roll, hoist travel, carrying); null without a 3D view. */
-  shcRigs(): Record<string, ShcRigState> | null
-  /** Rig state per truck drawn from the GLB models (LOD, cab shape, livery, steering, articulation, wheel roll); null without a 3D view. */
-  truckRigs(): Record<string, TruckRigState> | null
-  /** Rig state per ASC (LOD, gantry, trolley, hoist, rope scale, carrying); null without a 3D view. */
-  ascRigs(): Record<string, AscRigState> | null
-  /** Per STS: LOD, spreader configuration and drawn positions (GLB cranes); null without a 3D view. */
-  sts(): Record<string, StsRenderState> | null
-  /** Per vessel: hull class, line, livery, name, LOD and rendered bay grid (TT-27); null without a 3D view. */
-  vesselHulls(): Record<string, VesselHullState> | null
+  /** Rig state per entity, per equipment kind (`EquipmentKindDef.rigKey` names the dev-API key); null without a 3D view. */
+  rigs(): Record<string, Record<string, unknown>> | null
   /** Where the draw calls go: visible drawables per scene group and geometry type (TT-19 perf tool); null without a 3D view. */
   drawBreakdown(): Record<string, { objects: number; triangles: number }> | null
   /** Time-of-day lighting state and the backdrop in use (TT-21); null without a 3D view. */
@@ -560,9 +548,9 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     }
     try {
       const state = await c.query(entityQueryKind(kind), id)
-      let job
-      if (kind === 'shc') job = (await c.query<{ id: string }[]>('shcJobs')).find((j) => j.id === (state as { jobId: string | null }).jobId)
-      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, { job: job as never }))
+      const def = EQUIPMENT_KINDS.find((d) => d.kind === kind)
+      const extras = (await def?.loadExtras?.(state, (q) => c.query(q))) ?? {}
+      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, extras))
     } catch {
       // The scenario was replaced meanwhile; the next refresh shows the new state.
     }

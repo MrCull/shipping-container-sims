@@ -3,21 +3,17 @@
  * container, STS, SHC or vessel, from the engine's query results. Pure TS; the
  * component formats values with the display formatter and the catalogue.
  */
-import type { AscState, ContainerState, ShcJob, ShcState, StsState, TruckState, VesselState } from '../engine'
+import type { ContainerState, ShcJob } from '../engine'
+import { EQUIPMENT_KINDS, kindOfEntity, type EquipmentKind } from './equipmentKinds'
 import type { MessageKey } from '../i18n/messages'
 import type { EventSummary, QueryKind } from '../worker/protocol'
 import type { SceneModel } from './sceneModel'
 
-export type EntityKind = 'container' | 'sts' | 'shc' | 'asc' | 'truck' | 'vessel'
+export type EntityKind = 'container' | EquipmentKind
 
 export function entityKind(model: SceneModel, id: string): EntityKind | null {
   if (model.containerSize[id]) return 'container'
-  if (model.shcIds.includes(id)) return 'shc'
-  if (model.ascIds.includes(id)) return 'asc'
-  if (model.truckIds.includes(id)) return 'truck'
-  if (model.stsIds.includes(id)) return 'sts'
-  if (model.vesselIds.includes(id)) return 'vessel'
-  return null
+  return kindOfEntity(model, id)
 }
 
 /** The worker query that returns the state of an entity of this kind. */
@@ -56,6 +52,8 @@ export interface EntityView {
 export interface EntityExtras {
   /** SHC: the job it holds, from the `shcJobs` query. */
   job?: Readonly<ShcJob>
+  /** Extras of other kinds (see `EquipmentKindDef.loadExtras`). */
+  [key: string]: unknown
 }
 
 function containerView(box: Readonly<ContainerState>): EntityView {
@@ -74,124 +72,12 @@ function containerView(box: Readonly<ContainerState>): EntityView {
   }
 }
 
-function shcView(shc: Readonly<ShcState>, job?: Readonly<ShcJob>): EntityView {
-  const facts: Fact[] = [
-    { label: 'inspector.fact.status', value: shc.status },
-    { label: 'inspector.fact.node', value: shc.nodeId },
-    { label: 'inspector.fact.carrying', value: shc.carrying, link: shc.carrying !== null },
-  ]
-  const working = shc.jobId !== null
-  return {
-    kind: 'shc',
-    id: shc.id,
-    facts,
-    job: working
-      ? [
-          { label: 'inspector.fact.job', value: shc.jobId },
-          { label: 'inspector.fact.container', value: job?.containerId ?? shc.carrying, link: true },
-          { label: 'inspector.fact.fromPosition', value: job?.groundPositionId ?? null },
-          { label: 'inspector.fact.toPad', value: job?.wtpPadId ?? null },
-        ]
-      : null,
-    custody: [],
-  }
-}
-
-function ascView(asc: Readonly<AscState>): EntityView {
-  return {
-    kind: 'asc',
-    id: asc.id,
-    facts: [
-      { label: 'inspector.fact.status', value: asc.status },
-      { label: 'inspector.fact.block', value: asc.blockId },
-      { label: 'inspector.fact.stacked', value: asc.stacked },
-      { label: 'inspector.fact.carrying', value: asc.carrying, link: asc.carrying !== null },
-    ],
-    job:
-      asc.jobId !== null
-        ? [
-            { label: 'inspector.fact.job', value: asc.jobId },
-            { label: 'inspector.fact.container', value: asc.carrying, link: asc.carrying !== null },
-          ]
-        : null,
-    custody: [],
-  }
-}
-
-function truckView(truck: Readonly<TruckState>): EntityView {
-  const open = truck.legs.filter((l) => !l.done)
-  return {
-    kind: 'truck',
-    id: truck.id,
-    facts: [
-      { label: 'inspector.fact.status', value: truck.status },
-      { label: 'inspector.fact.transaction', value: truck.transaction },
-      { label: 'inspector.fact.stall', value: truck.stallId },
-      { label: 'inspector.fact.carrying', value: truck.carrying, link: truck.carrying !== null },
-    ],
-    job:
-      open.length > 0
-        ? open.map((l) => ({ label: 'inspector.fact.container' as const, value: l.containerId, link: true }))
-        : null,
-    custody: [],
-  }
-}
-
-function stsView(sts: Readonly<StsState>): EntityView {
-  const working = sts.carrying.length > 0 || sts.workQueue.length > 0
-  return {
-    kind: 'sts',
-    id: sts.id,
-    facts: [
-      { label: 'inspector.fact.status', value: sts.status },
-      { label: 'inspector.fact.vessel', value: sts.vesselId, link: sts.vesselId !== null },
-      { label: 'inspector.fact.gantry', value: sts.gantryX, unit: 'length' },
-      { label: 'inspector.fact.bays', value: sts.bays.join(', ') || null },
-    ],
-    job: working
-      ? [
-          { label: 'inspector.fact.carryingBoxes', value: sts.carrying.join(', ') || null },
-          { label: 'inspector.fact.nextBox', value: sts.workQueue[0] ?? null, link: sts.workQueue.length > 0 },
-          { label: 'inspector.fact.queued', value: sts.workQueue.length },
-        ]
-      : null,
-    custody: [],
-  }
-}
-
-function vesselView(v: Readonly<VesselState>): EntityView {
-  return {
-    kind: 'vessel',
-    id: v.id,
-    facts: [
-      { label: 'inspector.fact.status', value: v.status },
-      { label: 'inspector.fact.class', value: v.sizeClass },
-      { label: 'inspector.fact.berthX', value: v.berthX, unit: 'length' },
-      { label: 'inspector.fact.stsAssigned', value: v.stsIds.join(', ') || null },
-      { label: 'inspector.fact.remaining', value: v.remainingDischarge },
-      { label: 'inspector.fact.anchorageWait', value: v.anchorageWaitS, unit: 'time' },
-    ],
-    job: null,
-    custody: [],
-  }
-}
-
-/** Turn a query result into the inspector view of its kind. */
+/** Turn a query result into the inspector view of its kind (equipment kinds describe themselves: `modules/equipmentKinds/`). */
 export function describeEntity(kind: EntityKind, state: unknown, extras: EntityExtras = {}): EntityView {
-  switch (kind) {
-    case 'container':
-      return containerView(state as ContainerState)
-    case 'shc':
-      return shcView(state as ShcState, extras.job)
-    case 'sts':
-      return stsView(state as StsState)
-    case 'asc':
-      return ascView(state as AscState)
-    case 'truck':
-      return truckView(state as TruckState)
-    case 'vessel':
-      return vesselView(state as VesselState)
-  }
+  if (kind === 'container') return containerView(state as ContainerState)
+  const def = EQUIPMENT_KINDS.find((d) => d.kind === kind)
+  if (!def) throw new Error(`Unknown entity kind: ${kind}`)
+  return def.describe(state, extras)
 }
 
 /** The newest `limit` events that name `id` in any subject list, oldest first. */
