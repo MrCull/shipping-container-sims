@@ -34,7 +34,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-14 truck exports | #74 | merged (engine 0.12.0; if #76 also bumps, reconcile) | |
 | V11-15 STS ground wake-up | #75 | merged (engine 0.11.0 after merge; adds StsGroundPositionWaitBackoff) | |
 | V11-16 latency series | #76 | merged | |
-| V11-17 locale dates | #77 | done on `tt/77-locale-dates`, not merged | session_018sev (agent) |
+| V11-17 locale dates | #77 | merged | |
 | V11-18 incremental invariants | #78 | merged (perf/baseline.json to re-record on a quiet machine) | |
 | V11-19 real-GPU fps (human) | #79 | blocked by 62, 63, 78 | |
 
@@ -46,10 +46,10 @@ Start order: #61, #62, #63 first (prefactor and visible fixes), then the rest of
 
 **Still running when the session stopped (no new agents were started near the limit):**
 - **#67 smoke triage + load-proof smoke** (agent `a5a792d6910d9652f`, worktree `.claude/worktrees/agent-a5a792d6910d9652f`, branch `tt/67-smoke`). It was told to run the whole smoke suite, fix every failure at its root (known: `terminal-twin-kpi.smoke` "an end condition ends the run" fails on PR #54's tip; `terminal-twin-dashboard.smoke` "D opens" and "final report opens as the dashboard report tab" may be #62 HUD regressions), then make frame-ratio specs load-proof and move the x600 test into the required CI job. Its work may be uncommitted: look in its worktree (`git -C <worktree> status`, `git log tt/67-smoke`), then merge the branch if it has commits.
-- **#77 locale dates** (agent `a526b8cba41ba9a11`, branch `tt/77-locale-dates`). Merge it when it has a commit and verify passes.
+- **#77 locale dates:** merged. Follow-up seen by its agent: in the Run to... popup, clicking the Run button was intercepted by the canvas in a smoke test (it pressed Enter instead). May be a #62 HUD z-index bug: check.
 
 **Do next, in order:**
-1. Resume protocol (top of this file). Check `git branch --list 'tt/*'` for finished agent branches not yet merged (#67, #77) and merge them (one `git merge --no-edit tt/<branch>`, then check `git diff --name-only --diff-filter=U` and `grep -rn '^<<<<<<<' src docs` BEFORE committing; run lint, build and `npx vitest run --testTimeout=90000`).
+1. Resume protocol (top of this file). Check `git branch --list 'tt/*'` for finished agent branches not yet merged (#67) and merge them (one `git merge --no-edit tt/<branch>`, then check `git diff --name-only --diff-filter=U` and `grep -rn '^<<<<<<<' src docs` BEFORE committing; run lint, build and `npx vitest run --testTimeout=90000`).
 2. If #67 never reports: run `npm run test:smoke` yourself (background, log file), fix failing specs at the root (see list above). Tag only genuinely hardware-bound specs `@load`.
 3. #79 (real-GPU fps) needs a human with a GPU laptop: stats overlay (P), record numbers in `src/sims/terminal-twin/docs/scene-quality-atmosphere.md`.
 4. Run the `code-review` skill on `claude/cool-maxwell-6dmsl9` against `claude/fervent-dijkstra-cmzk4u` (spec #60), fix its findings in one implementer, re-verify.
