@@ -220,3 +220,9 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Save schema version:** the version of the save file format; older files migrate forward on load. A snapshot also records the **engine version** that wrote it.
 - **Rewind point:** an automatic checkpoint (every 15 sim-minutes by default) the user can jump back to; running on from it reproduces the original events.
 
+
+## Infrastructure models (TT-28)
+
+- **Gate module:** a generated GLB that tiles into the gate complex: a 3.5 m truck lane, the 8 m out-of-gauge lane, a 1.2 m island (kerb stripes, kiosk, camera post, canopy columns) between and beside lanes, and the control office.
+- **Island:** the concrete strip between two gate lanes; the engine lane pitch is lane half-width + island + lane half-width.
+- **Instanced infrastructure:** bollards, fenders, quay and ASC rail segments, fence panels, masts, ground markings and gate modules drawn as one InstancedMesh per model (one draw call each).

@@ -503,3 +503,12 @@ Branch `tt/49-persistence`. Guide: `terminal-twin-AGENTS.md` § "Persistence: sa
 - **Gotchas:** restore/rewind replay events (cost grows with run length). Settings ops (`setCheckpointInterval`) are served before a scenario is loaded (host returns empty `EngineInfo`). A loaded config's `display` becomes the UI's locale and units.
 - **Follow-ups:** new scenario fields only need a migration when the scenario schema version bumps. Snapshots with dev-injected events lose their scene history on load (state stays exact).
 
+
+### ticket-52 (TT-28): infrastructure models
+
+Branch `tt/52-infrastructure-models`. Guide: `terminal-twin-AGENTS.md` § "Infrastructure models (TT-28)". Glossary: Infrastructure models. ENGINE_VERSION 0.7.1.
+
+- **Engine change:** gate lanes are now 3.5 m, the OOG slot 8 m, islands 1.2 m (`landsideGraph.ts`); in-lane x positions moved, so the three landside goldens were regenerated.
+- **Assets/APIs:** `tt:assets -- --only infrastructure`; `infrastructureLayout/Assets/Renderer.ts`; `SceneStats.infrastructure`; `Backdrop.useModels`.
+- **Gotchas:** `yard-markings.glb` holds two markings side by side (parts re-centred by the loader). Triangle counts are far under the ~5k targets (simple modules). Generic presets keep the procedural coastline; the coast GLB is used for the TTI isthmus only.
+- **Follow-ups:** gate booms are static; trucks do not trigger them.

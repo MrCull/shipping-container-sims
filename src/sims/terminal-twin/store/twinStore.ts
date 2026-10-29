@@ -109,7 +109,7 @@ export interface TwinView {
   /** Where the draw calls go: visible drawables per scene group and geometry type (TT-19 perf tool); null without a 3D view. */
   drawBreakdown(): Record<string, { objects: number; triangles: number }> | null
   /** Time-of-day lighting state and the backdrop in use (TT-21); null without a 3D view. */
-  atmosphere(): (AtmosphereState & { backdrop: { kind: BackdropKind; parts: string[] } }) | null
+  atmosphere(): (AtmosphereState & { backdrop: { kind: BackdropKind; parts: string[]; models: 'procedural' | 'glb' } }) | null
 }
 
 /** The banner shown on a vessel departure or when the scenario completes (TT-21). */
