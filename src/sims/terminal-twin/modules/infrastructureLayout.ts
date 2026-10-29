@@ -78,7 +78,7 @@ export function mastSpots(input: Pick<InfraLayoutInput, 'config' | 'blocks'>, qu
     for (let z = b.wtpZ + 7 + 25; z <= endZ; z += 70) out.push(z)
     return out
   }
-  for (let i = 0; i <= blocks.length; i++) {
+  for (let i = 0; blocks.length > 0 && i <= blocks.length; i++) {
     const west = blocks[i - 1]
     const east = blocks[i]
     let x: number

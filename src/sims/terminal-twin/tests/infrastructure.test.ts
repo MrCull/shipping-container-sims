@@ -205,6 +205,11 @@ describe('instancing and draw calls', () => {
       ...Object.entries(presets).map(([n, b]) => [n, b()] as [string, ScenarioConfig]),
       ...Object.entries(fixtures).filter(([, c]) => (c.yard?.blocks.length ?? 0) > 0),
     ]
+    it('a scenario without blocks only gets the quay row', () => {
+      const spots = mastSpots({ config: tti, blocks: [] }, 39.5)
+      expect(spots.length).toBeGreaterThan(0)
+      expect(spots.every(([, z]) => z === 39.5)).toBe(true)
+    })
     it('has presets and fixtures with blocks to check', () => {
       expect(configs.length).toBeGreaterThan(8)
     })
