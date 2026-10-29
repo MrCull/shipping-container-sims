@@ -6,35 +6,21 @@ A Vue 3 + TypeScript web app that hosts shipping-container-themed simulations an
 
 ## Tech stack
 
-- **Vue 3** — Composition API, `<script setup lang="ts">`
-- **Vite** — dev server & build
-- **TypeScript** — strict mode
-- **Pinia** — state management
-- **Vue Router** — SPA routing (`/` home, `/sim/:simId` game page)
-- **Three.js** — 3D rendering (shared via `useThreeScene` composable)
-- **ESLint** — static analysis for JS/TS/Vue (`eslint.config.js`; Vue + TypeScript recommended presets)
-- **Vitest** — unit/integration tests (`pnpm test`); **tsx** — runs headless TypeScript CLIs
+Vue 3 (Composition API, `<script setup lang="ts">`), Vite, strict TypeScript, Pinia, Vue Router (`/` home, `/sim/:simId` game page), Three.js (shared via the `useThreeScene` composable), ESLint, Vitest, tsx for headless CLIs. Package manager: **pnpm**. Versions and scripts: `package.json`.
 
-## Linting and verification
+## Verification
 
-After making substantive code changes, run **`pnpm run lint`** to catch issues.
+Before handing work back after code changes, run **`pnpm run verify`** (dependency check, lint, build, tests). Pull requests to `main` run the same checks in CI (`.github/workflows/pr-checks.yml`). Use `pnpm run lint:fix` for ESLint auto-fixes.
 
-Before handing work back after code changes, run **`pnpm run verify`**: the dependency check (`node scripts/check-deps.mjs`), then lint, then build (catches TypeScript or Vite errors that linting may miss), then tests when a `test` script exists. Pull requests to `main` run the same checks in CI (`.github/workflows/pr-checks.yml`).
-
-**Tests:** `pnpm test` runs **Vitest** (`*.test.ts` under `src/`, Node environment); `pnpm run test:watch` for watch mode. Test files (`*.test.ts`, `*.smoke.ts`) and Node-only CLI code (`src/sims/*/cli/`) are type-checked by `tsconfig.tools.json` (Node types; DOM lib only for `page.evaluate` callbacks) and excluded from `tsconfig.app.json`. Headless TypeScript scripts run with **`tsx`** (e.g. `pnpm run tt:run -- --help`).
-
-**Terminal Twin scripts** (`pnpm run tt:*`: headless runs, goldens, benchmark, asset pipeline): the sim guide's "How to prove a change works" lists them.
-
-To apply ESLint auto-fixes (including many Vue template and style rules), use **`pnpm run lint:fix`**.
-
-**Script arguments and `--fix`:** Arguments after `pnpm run <script>` are **not** passed to the underlying command unless you insert **`--`**. For example, **`pnpm run lint --fix`** only runs `eslint .` — it does **not** pass `--fix` to ESLint. Either run **`pnpm run lint:fix`**, or pass the flag explicitly: **`pnpm run lint -- --fix`**.
+- **Script arguments:** pnpm passes arguments after the script name straight through (`pnpm run lint --fix` works), and a `--` is handed to the script literally. In `.claude/launch.json` and similar, write `pnpm exec vite --port 5174`, not `pnpm run dev --port 5174`.
+- **Where checks run:** test files (`*.test.ts`, `*.smoke.ts`) and Node-only CLI code (`src/sims/*/cli/`) are type-checked by `tsconfig.tools.json`, not `tsconfig.app.json`. Terminal Twin scripts (`pnpm run tt:*`): the sim guide's "How to prove a change works" lists them.
+- **Browser smoke tests** (`pnpm run test:smoke`, Playwright, `src/**/*.smoke.ts`) are not part of `verify`. CI runs them from the Actions tab ("Run workflow") or while a PR carries the `smoke` label, and they should be green before merging UI changes. Specs titled `@load` need a real frame rate and never run in CI. Frame assertions are ratios over a minimum wall-clock window (`tests/browser/frameSampling.ts`), never absolute counts. The `dev` project uses a Vite dev server (dev-only APIs work); the `prod` project (`*.prod.smoke.ts`) uses a production build. Ports default to 5199 / 5198 (`SMOKE_DEV_PORT` / `SMOKE_PROD_PORT`).
 
 ## Agent tooling
 
-- **Cloud sessions**: a SessionStart hook (`.claude/hooks/session-start.sh`) runs `pnpm install` in Claude Code cloud sessions, so lint/build/test work immediately. It does nothing locally.
-- **Visual checks**: `pnpm run screenshot -- --path /sim/<sim-id> --wait 8000` starts a Vite dev server on a free port, opens the route in headless Chromium (WebGL works via software rendering), saves a PNG to `.screenshots/` (git-ignored) and reports page errors. Use `--out <file>`, `--wait-for <selector>`, `--eval "<js>"` (e.g. drive a dev-only debug API before the shot), `--full-page`, `--fail-on-error`, or `--base <url>` to use an already-running server. If Playwright's bundled Chromium isn't installed it falls back to `CHROMIUM_PATH` or the cloud image's preinstalled `/opt/pw-browsers/chromium`.
-- **Browser smoke tests**: `pnpm run test:smoke` runs Playwright specs `src/**/*.smoke.ts` (`playwright.config.ts`). The `dev` project uses a Vite dev server, so dev-only APIs work; the `prod` project (`*.prod.smoke.ts`) uses a fresh production build served by `vite preview`. They are not part of `pnpm test`/`verify`; CI does not run them on every push (they take about 15 minutes and bill Actions minutes): the `smoke` job in `.github/workflows/pr-checks.yml` runs from the Actions tab ("Run workflow") or while a PR carries the `smoke` label, and should be green before merging UI changes; specs titled `@load` (they need a real frame rate) never run in CI, so run them locally. Frame-based assertions are ratios over a minimum wall-clock window (`tests/browser/frameSampling.ts`), never absolute frame counts, so they hold on a loaded 2-core runner. Ports default to 5199 (dev) / 5198 (prod); set `SMOKE_DEV_PORT` / `SMOKE_PROD_PORT` to run two checkouts at once. Chromium falls back the same way as the screenshot tool.
-- **README media**: `pnpm run capture-readme-media` (needs `pnpm run build && pnpm run preview` first) regenerates the README screenshots.
+- **Cloud sessions:** a SessionStart hook (`.claude/hooks/session-start.sh`) runs `pnpm install`; it does nothing locally.
+- **Visual checks:** `pnpm run screenshot --path /sim/<sim-id> --wait 8000` saves a PNG to `.screenshots/` and reports page errors (headless Chromium, software WebGL, so no real frame rates). Options: header of `scripts/screenshot.mjs`.
+- **README media:** `pnpm run capture-readme-media` (after `pnpm run build && pnpm run preview`).
 
 ## Project structure
 

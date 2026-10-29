@@ -85,7 +85,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Subsystem (logging):** the part of the sim an event belongs to (`scenario`, `vessel`, `sts`, `invariants`; later `asc`, `shc`, …), normally the first word of its event type.
 - **Run diff:** a comparison of two event logs that reports the **first diverging event** (its `seq`, the differing fields and both events).
 - **Time window:** a run resumed from a snapshot that processes only events after the snapshot's time, up to a stop condition.
-- **Golden update:** an explicit rewrite of golden summaries (`pnpm run tt:golden -- --update`). Without it, any difference from a golden is **drift** and fails.
+- **Golden update:** an explicit rewrite of golden summaries (`pnpm run tt:golden --update`). Without it, any difference from a golden is **drift** and fails.
 - **Engine horizon:** in the browser, the sim time up to which the worker's engine has processed events. The displayed time never passes it.
 - **Display time:** the sim time the 3D view and clock show. It advances with wall time × **speed** (×1 = real time) and is drawn by interpolating motion segments.
 - **Look-ahead:** how far the engine runs ahead of the display time while playing, so that the motion for the displayed instant is already known.

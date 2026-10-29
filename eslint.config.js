@@ -80,6 +80,21 @@ export default tseslint.config(
     },
   },
 
+  // Spawning 'npx'/'npm' by name fails on Windows (no shell, the shims are .cmd files): run Node binaries
+  // through process.execPath, e.g. [process.execPath, '--import', 'tsx', entry].
+  {
+    files: ['**/*.{ts,mjs}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.name=/^(execFileSync|execFile|spawnSync|spawn)$/][arguments.0.value=/^(npx|npm|pnpm)$/]",
+          message: "Do not spawn npx/npm/pnpm by name (ENOENT on Windows). Use process.execPath with the tool's JS entry.",
+        },
+      ],
+    },
+  },
+
   {
     rules: {
       'vue/multi-word-component-names': 'off',

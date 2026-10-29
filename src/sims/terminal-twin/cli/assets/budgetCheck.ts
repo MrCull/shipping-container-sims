@@ -1,5 +1,5 @@
 /**
- * Phase 2 asset budget check (`npm run tt:assets:check`, also a Vitest suite
+ * Phase 2 asset budget check (`pnpm run tt:assets:check`, also a Vitest suite
  * and a PR CI step). Inspects every committed GLB under `assets/models/` and
  * its `.meta.json` sidecar: triangles and draw calls per LOD, file size,
  * required rig node names, sidecar fields, and the library total.
@@ -127,7 +127,7 @@ export function checkAssetLibrary(dir = MODELS_DIR, budgets = loadBudgets()): Li
   return { ok: problems.length === 0, assets, libraryBytes, problems }
 }
 
-const USAGE = `Usage: npm run tt:assets:check [-- --dir <models dir>] [--budgets <budgets.json>]
+const USAGE = `Usage: pnpm run tt:assets:check [-- --dir <models dir>] [--budgets <budgets.json>]
 Checks every GLB + .meta.json sidecar against assets/budgets.json. Exit 0 ok, 1 over budget, 2 usage.`
 
 export function runBudgetCli(argv: string[], print: (line: string) => void = console.log): number {

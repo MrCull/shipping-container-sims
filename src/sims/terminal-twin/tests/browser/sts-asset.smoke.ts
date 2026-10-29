@@ -3,7 +3,7 @@
  * rig sliders drive the crane, a reference container hangs under the
  * spreader at true scale, and the twin draws every STS from the GLB with LOD
  * switching, animated from the engine's motion segments (twin-20 included).
- * Run with `npm run test:smoke`.
+ * Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import meta from '../../assets/models/sts/sts-malaccamax.meta.json' with { type: 'json' }

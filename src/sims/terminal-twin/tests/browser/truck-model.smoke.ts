@@ -2,7 +2,7 @@
  * TT-26 browser smoke tests (seams 3 + 4): the truck GLBs in the twin (LOD switching, wheel roll and steering,
  * articulation through turns, boxes on the attach points, no external requests) and in the dev asset viewer
  * (rig sliders, 20 ft and 40 ft reference boxes on the chassis twist-locks). Screenshots go to .screenshots/assets/.
- * Run with `npm run test:smoke`.
+ * Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

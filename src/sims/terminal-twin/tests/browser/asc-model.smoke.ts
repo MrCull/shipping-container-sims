@@ -3,7 +3,7 @@
  * (LOD switching, paired ASCs, animation from the engine's motion segments, the
  * carried box under the spreader) and in the dev asset viewer (rig sliders, 8
  * rows of reference containers under the span at a 5-high stack). Screenshots
- * go to .screenshots/assets/. Run with `npm run test:smoke`.
+ * go to .screenshots/assets/. Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import fixture from '../../scenario/fixtures/asc-2asc-block-conflict.json' with { type: 'json' }

@@ -1,5 +1,5 @@
 /**
- * `npm run tt:assets` — regenerates the phase 2 asset library from scratch:
+ * `pnpm run tt:assets` — regenerates the phase 2 asset library from scratch:
  *   1. runs the Blender (bpy) generators headless into a temporary staging folder,
  *   2. post-processes each GLB with gltf-transform (meshopt geometry compression;
  *      textures are already WebP from the Blender exporter),

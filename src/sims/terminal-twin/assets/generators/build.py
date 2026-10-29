@@ -1,6 +1,6 @@
 """Terminal Twin asset generator (Blender bpy, headless).
 
-Normally run through `npm run tt:assets` (which also compresses the GLBs and
+Normally run through `pnpm run tt:assets` (which also compresses the GLBs and
 copies everything into assets/models/). Direct use:
 
     python build.py --out <staging dir> [--only containers] [--no-previews]

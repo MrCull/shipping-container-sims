@@ -3,7 +3,7 @@
  * the twin's instanced renderer uses the GLBs (LOD0 near, LOD1 far, livery per
  * line), assets load without any external request, and the dev-only asset
  * viewer shows every asset (screenshots in .screenshots/assets/).
- * Run with `npm run test:smoke`.
+ * Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import atlas from '../../assets/models/containers/livery-atlas.json' with { type: 'json' }

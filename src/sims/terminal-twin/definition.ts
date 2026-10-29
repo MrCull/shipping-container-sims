@@ -1,5 +1,5 @@
 import type { SimDefinition } from '@/types/sim'
-// Regenerate with `npm run tt:card` whenever the visuals change.
+// Regenerate with `pnpm run tt:card` whenever the visuals change.
 import cardImage from './assets/home-card.png?url'
 
 // Keep this file light: it is eagerly imported for the home page. Everything

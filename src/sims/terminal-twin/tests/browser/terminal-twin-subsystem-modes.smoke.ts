@@ -1,6 +1,6 @@
 /**
  * V11-10 browser smoke test: the setup dialog's Subsystem modes fieldset.
- * Run with `npm run test:smoke` (not part of `npm test`).
+ * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

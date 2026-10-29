@@ -1,6 +1,6 @@
 /**
  * Fixture definitions. Each entry builds one small focused scenario.
- * `npm run tt:fixtures` writes them to `<name>.json` next to this file;
+ * `pnpm run tt:fixtures` writes them to `<name>.json` next to this file;
  * a test fails if the committed JSON drifts from these definitions.
  *
  * Nothing clears STS ground positions until SHCs arrive (TT-05), so these

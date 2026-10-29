@@ -1,5 +1,5 @@
 {
-  "$comment": "Phase 2 asset budgets (spec #24, 'Phase 2 asset pipeline'). Checked by `npm run tt:assets:check` and tests/asset-budgets.test.ts. Triangles and draw calls are per LOD subtree; maxFileBytes is per GLB; libraryMaxBytes is all GLBs together.",
+  "$comment": "Phase 2 asset budgets (spec #24, 'Phase 2 asset pipeline'). Checked by `pnpm run tt:assets:check` and tests/asset-budgets.test.ts. Triangles and draw calls are per LOD subtree; maxFileBytes is per GLB; libraryMaxBytes is all GLBs together.",
   "libraryMaxBytes": 15000000,
   "requiredMetaFields": [
     "asset",

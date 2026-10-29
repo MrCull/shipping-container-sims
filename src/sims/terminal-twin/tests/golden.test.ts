@@ -2,7 +2,7 @@
  * Golden summaries: each fixture's KPIs + event-log hash are committed next
  * to it as `<name>.golden.json`. Drift fails here with a field-by-field diff.
  * Regenerate ONLY on an intentional behaviour change, with an explicit flag:
- *   npm run tt:golden -- --update      (or UPDATE_GOLDEN=1 npm test)
+ *   pnpm run tt:golden --update      (or UPDATE_GOLDEN=1 pnpm test)
  */
 import { describe, it } from 'vitest'
 import { checkFixtureGolden } from '../cli/golden'

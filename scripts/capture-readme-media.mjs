@@ -3,7 +3,7 @@
  * Requires: pnpm run build && pnpm run preview (default http://127.0.0.1:4173)
  * Usage: BASE_URL=http://127.0.0.1:4173 node scripts/capture-readme-media.mjs
  */
-import { chromium } from 'playwright'
+import { chromium } from '@playwright/test'
 import { mkdir, rm } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'

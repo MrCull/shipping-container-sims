@@ -2,7 +2,7 @@
 with three LODs, built on the engine's bay grid.
 
 The class table (LOA, beam, bays, rows, tiers, deck height) and the bay-plan
-pitches come from `scenario/vesselClasses.ts`: `npm run tt:assets` writes them
+pitches come from `scenario/vesselClasses.ts`: `pnpm run tt:assets` writes them
 to a JSON file and passes `--vessel-classes`. So the hatch covers, lashing
 bridges and the `bay_grid` marker sit exactly where the engine puts the slots.
 

@@ -2,7 +2,7 @@
  * TT-19 browser smoke tests: the FPS / draw-call / triangle overlay, the quality settings, Auto quality
  * stepping down under load and recovering, and the TTI preset at overview zoom (draw budget + frame CPU time).
  * Headless Chromium renders with SwiftShader, so frame RATES here say nothing about a real GPU: the
- * assertions are about draw calls, triangles, culling and the Auto controller. Run with `npm run test:smoke`.
+ * assertions are about draw calls, triangles, culling and the Auto controller. Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

@@ -1,6 +1,6 @@
 /**
  * Committed scenario fixtures, loadable by the UI, CLI and tests.
- * Add a fixture: define it in `definitions.ts`, run `npm run tt:fixtures`,
+ * Add a fixture: define it in `definitions.ts`, run `pnpm run tt:fixtures`,
  * then import the JSON here.
  */
 import type { ScenarioConfig } from '../types'

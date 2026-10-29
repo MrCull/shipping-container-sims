@@ -1,6 +1,6 @@
 /**
  * Locale, units and keyboard shortcuts (seam 3: UI + dev API `window.__tt`).
- * Run with `npm run test:smoke`.
+ * Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import fixture from '../../scenario/fixtures/tracer-1sts-10-boxes.json' with { type: 'json' }

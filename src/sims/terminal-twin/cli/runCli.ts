@@ -1,11 +1,11 @@
 /**
  * Headless CLI runner (logic; `run.ts` is the process entry point).
  *
- *   npm run tt:run -- --fixture tracer-1sts-10-boxes [--seed 7] [--until moves:5]
+ *   pnpm run tt:run --fixture tracer-1sts-10-boxes [--seed 7] [--until moves:5]
  *                     [--out summary.json] [--events events.jsonl] [--handlers default]
  *                     [--async-mode keep-running|pause] [--strategy dp=name] [--latency dp=spec]
  *                     [--log run.log.jsonl --log-level sts=debug,*=warn] [--snapshot s.json]
- *   npm run tt:run -- --from-snapshot s.json --until time:900   (run only a window)
+ *   pnpm run tt:run --from-snapshot s.json --until time:900   (run only a window)
  *
  * Exit codes: 0 ok, 1 invariant violation or engine error, 2 usage error.
  */
@@ -39,7 +39,7 @@ import { validateSubsystemModes } from '../scenario/validate'
 import { t } from '../i18n/messages'
 import { handlerSets } from './handlerSets'
 
-export const USAGE = `Usage: npm run tt:run -- (--fixture <name|file.json> | --preset <name> | --from-snapshot <file>) [options]
+export const USAGE = `Usage: pnpm run tt:run (--fixture <name|file.json> | --preset <name> | --from-snapshot <file>) [options]
 
   --fixture <name|path>  Scenario fixture name (${Object.keys(fixtures).join(', ')}) or a ScenarioConfig JSON file
   --preset <name>        Scenario preset (${Object.keys(presets).join(', ') || 'none yet'})

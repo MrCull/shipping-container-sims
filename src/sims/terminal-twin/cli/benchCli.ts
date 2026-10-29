@@ -1,9 +1,9 @@
 /**
  * Process entry for the engine benchmark (local only, not in CI):
- *   npm run tt:bench                       TTI preset, 24 sim-hours, compared with perf/baseline.json
- *   npm run tt:bench -- --preset "Stress test"
- *   npm run tt:bench -- --update-baseline  record this run as the baseline for the preset
- *   npm run tt:bench -- --slow-ms 1        self-test: slow every event, the regression flag must trip
+ *   pnpm run tt:bench                       TTI preset, 24 sim-hours, compared with perf/baseline.json
+ *   pnpm run tt:bench --preset "Stress test"
+ *   pnpm run tt:bench --update-baseline  record this run as the baseline for the preset
+ *   pnpm run tt:bench --slow-ms 1        self-test: slow every event, the regression flag must trip
  * Exit codes: 0 ok, 1 regression or engine failure, 2 usage.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -51,7 +51,7 @@ export function benchMain(argv: string[], print: (line: string) => void = consol
     : { note: '', reports: {} }
   const key = `${preset}|${hours}h`
   if (values['update-baseline']) {
-    baseline.note = 'Engine benchmark baseline (npm run tt:bench). Timings only compare on a like machine: re-record with --update-baseline when the reference machine changes.'
+    baseline.note = 'Engine benchmark baseline (pnpm run tt:bench). Timings only compare on a like machine: re-record with --update-baseline when the reference machine changes.'
     baseline.reports[key] = report
     writeFileSync(BASELINE_URL, `${JSON.stringify(baseline, null, 2)}\n`)
     for (const line of formatReport(report)) print(line)

@@ -1,6 +1,6 @@
 /**
  * TT-13 browser smoke test: trucks queue at the gate, stand in transfer stalls, and leave.
- * Run with `npm run test:smoke` (not part of `npm test`).
+ * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

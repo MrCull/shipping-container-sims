@@ -1,6 +1,6 @@
 /**
  * Regenerate scenario fixture JSON from `scenario/fixtures/definitions.ts`.
- *   npm run tt:fixtures
+ *   pnpm run tt:fixtures
  */
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'

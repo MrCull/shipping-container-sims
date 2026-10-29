@@ -1,7 +1,7 @@
 /**
  * V11-06 browser smoke: "Follow next truck" on the landside fixture. While paused it waits for an arrival and resolves
  * once the engine runs on; the camera tracks the truck until it is gone, then follow releases (here at x60).
- * Dev-only `window.__tt` API. Run with `npm run test:smoke`.
+ * Dev-only `window.__tt` API. Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import { overlappingRegions } from '../../modules/hudLayout'

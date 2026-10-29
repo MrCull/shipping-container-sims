@@ -1,7 +1,7 @@
 /**
  * TT-16 browser smoke tests: the dashboard tab (lazy ECharts, KPI time series,
  * yard heatmap, Gantt timeline, final report tab).
- * Run with `npm run test:smoke` (not part of `npm test`).
+ * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

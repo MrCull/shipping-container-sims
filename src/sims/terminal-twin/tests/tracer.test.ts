@@ -9,7 +9,7 @@ const tracer = fixtures['tracer-1sts-10-boxes']
 describe('tracer fixture: 1 STS discharges 10 boxes to ground positions', () => {
   it('committed fixture JSON matches its builder definition', () => {
     for (const [name, build] of Object.entries(fixtureDefinitions)) {
-      expect(fixtures[name], `fixture ${name}: run npm run tt:fixtures`).toEqual(build())
+      expect(fixtures[name], `fixture ${name}: run pnpm run tt:fixtures`).toEqual(build())
     }
   })
 

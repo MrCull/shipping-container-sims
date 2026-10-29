@@ -22,16 +22,16 @@ Blender (`bpy`) Python generators → raw GLB → gltf-transform (meshopt) → c
 ### Setup (once)
 
 - Python **3.13** in a venv (the `bpy` 5.2 wheels target 3.13 only): `python3.13 -m venv .venv-bpy`, then `.venv-bpy/bin/pip install -r src/sims/terminal-twin/assets/generators/requirements.txt`. On Windows: `py -3.13 -m venv .venv-bpy`, then `.venv-bpy\Scripts\pip install -r ...`. `.venv-bpy/` is git-ignored.
-- A Blender install can run the generator too (`blender --background --python src/sims/terminal-twin/assets/generators/build.py -- --out <dir>`), but then you compress the GLBs yourself. `npm run tt:assets` needs a Python that can `import bpy`.
-- The Node dependencies (`@gltf-transform/*`, `meshoptimizer`) come with `npm install`.
+- A Blender install can run the generator too (`blender --background --python src/sims/terminal-twin/assets/generators/build.py -- --out <dir>`), but then you compress the GLBs yourself. `pnpm run tt:assets` needs a Python that can `import bpy`.
+- The Node dependencies (`@gltf-transform/*`, `meshoptimizer`) come with `pnpm install`.
 
 ### Regenerate (one command, also on Windows)
 
 ```
-npm run tt:assets -- --python .venv-bpy/bin/python      # or set TT_BPY_PYTHON; Windows: .venv-bpy\Scripts\python.exe
-npm run tt:assets -- --check --python ...               # regenerate into a temp dir and byte-compare with the commit
-npm run tt:assets -- --no-previews --python ...         # fast iteration (keeps the committed previews)
-npm run tt:assets -- --only asc --python ...            # one group only (containers | shc | asc | sts | vessels); the other groups' files are untouched
+pnpm run tt:assets --python .venv-bpy/bin/python      # or set TT_BPY_PYTHON; Windows: .venv-bpy\Scripts\python.exe
+pnpm run tt:assets --check --python ...               # regenerate into a temp dir and byte-compare with the commit
+pnpm run tt:assets --no-previews --python ...         # fast iteration (keeps the committed previews)
+pnpm run tt:assets --only asc --python ...            # one group only (containers | shc | asc | sts | vessels); the other groups' files are untouched
 ```
 
 What `cli/assets/build.ts` does:
@@ -55,7 +55,7 @@ It takes about 80 s for containers, mostly the Cycles previews. Two runs give by
 
 `assets/budgets.json` holds the budgets per asset kind and the library total (15 MB). Containers are used now; the STS/ASC/SHC/truck/vessel/building numbers from the spec are pre-filled for later tickets.
 
-`npm run tt:assets:check` (`cli/assets/budgetCheck.ts`) reads only each GLB's JSON chunk. It also runs as a Vitest suite (`tests/asset-budgets.test.ts`) and as a step in `.github/workflows/pr-checks.yml`. It fails on:
+`pnpm run tt:assets:check` (`cli/assets/budgetCheck.ts`) reads only each GLB's JSON chunk. It also runs as a Vitest suite (`tests/asset-budgets.test.ts`) and as a step in `.github/workflows/pr-checks.yml`. It fails on:
 
 - triangles or draw calls (primitives) per `LODn` subtree over budget;
 - file size over `maxFileBytes`, or the library over `libraryMaxBytes`;
@@ -108,7 +108,7 @@ Most of each container file is the embedded 2048² livery atlas. The renderer sh
   - Headless SwiftShader renders this at well under 1 fps, which says nothing about real frame rate.
   - The frame-rate target and what was measured are in § Performance and graphics quality (TT-19). Check fps on a real GPU in the viewer's readout.
 
-- Assets: run the generators only through `npm run tt:assets`; it replaces `assets/models/<group>/` wholesale, so hand edits to a committed GLB or sidecar are lost.
+- Assets: run the generators only through `pnpm run tt:assets`; it replaces `assets/models/<group>/` wholesale, so hand edits to a committed GLB or sidecar are lost.
 - Assets: the viewer and the twin share one cached `loadContainerAssets()` promise; never dispose its materials or textures from a renderer.
 - Assets: container shadows need `shadow.normalBias` (0.35 in the twin) or the corrugation shows shadow acne.
 - Fixture `liveries-mixed` (12 generated boxes, equal weights over all ten lines → 8 lines with seed 7, all three sizes) exists for the livery smoke test.
@@ -117,5 +117,5 @@ Most of each container file is the embedded 2048² livery atlas. The renderer sh
 
 1. Add `generators/tt_assets/<kind>.py` (use `tt_assets/parts.py`: `Atlas` for the swatch/region atlas, `Part` for boxes, beams, plates and revolves), and wire a group into `build.py` (`GROUPS`) and `cli/assets/build.ts` (`GROUPS`).
 2. Follow the rig and sidecar conventions above, and tag every dimension `V`, `P`, `A` or `M`.
-3. Check or tune its entry in `budgets.json` and run `npm run tt:assets`. Look at the previews and at `?viewer=<asset>`, then run `npm run tt:assets:shots`.
+3. Check or tune its entry in `budgets.json` and run `pnpm run tt:assets`. Look at the previews and at `?viewer=<asset>`, then run `pnpm run tt:assets:shots`.
 4. Commit the generators, GLBs, sidecars and previews (never `.blend` files or photos).

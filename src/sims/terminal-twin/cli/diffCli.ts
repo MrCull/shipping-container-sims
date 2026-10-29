@@ -2,9 +2,9 @@
  * Run diff CLI (logic; `diff.ts` is the process entry point). Reports the
  * first event at which two runs differ.
  *
- *   npm run tt:diff -- a.jsonl b.jsonl                    two saved event logs (or snapshot .json files)
- *   npm run tt:diff -- --fixture <name> --b-seed 7        two seeds of one scenario
- *   npm run tt:diff -- --fixture <name> --b-handlers highest-free-lane   two strategies
+ *   pnpm run tt:diff a.jsonl b.jsonl                    two saved event logs (or snapshot .json files)
+ *   pnpm run tt:diff --fixture <name> --b-seed 7        two seeds of one scenario
+ *   pnpm run tt:diff --fixture <name> --b-handlers highest-free-lane   two strategies
  *
  * Exit codes: 0 no divergence, 1 diverged, 2 usage error.
  */
@@ -14,8 +14,8 @@ import { createSimulation, diffEventLogs, type EngineEvent, type SimSnapshot } f
 import { handlerSets } from './handlerSets'
 import { formatSimTime, loadScenario, parseUntil, UsageError } from './runCli'
 
-export const DIFF_USAGE = `Usage: npm run tt:diff -- <a.jsonl|a.snapshot.json> <b.jsonl|b.snapshot.json> [--context n]
-       npm run tt:diff -- (--fixture <name|file.json> | --preset <name>) [options]
+export const DIFF_USAGE = `Usage: pnpm run tt:diff <a.jsonl|a.snapshot.json> <b.jsonl|b.snapshot.json> [--context n]
+       pnpm run tt:diff (--fixture <name|file.json> | --preset <name>) [options]
 
   Two files: event logs written by tt:run --events (JSON lines), or snapshots
   written by tt:run --snapshot (their embedded log is compared).

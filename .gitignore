@@ -154,7 +154,7 @@ __pycache__/
 *.blend
 *.blend1
 
-# Browser smoke tests (npm run test:smoke)
+# Browser smoke tests (pnpm run test:smoke)
 .smoke-dist/
 .smoke-results/
 test-results/

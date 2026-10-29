@@ -1,11 +1,11 @@
 /**
  * Golden summaries: check (default) or regenerate (`--update` only) each
  * fixture's `<name>.golden.json`. Used by `tests/golden.test.ts` and the
- * `npm run tt:golden` command (entry: `golden-cli.ts`).
+ * `pnpm run tt:golden` command (entry: `golden-cli.ts`).
  *
- *   npm run tt:golden                         check every fixture; exit 1 on drift or a missing golden
- *   npm run tt:golden -- --update             rewrite goldens to the current outcome (intentional changes only)
- *   npm run tt:golden -- --fixture <name>     one fixture
+ *   pnpm run tt:golden                         check every fixture; exit 1 on drift or a missing golden
+ *   pnpm run tt:golden --update             rewrite goldens to the current outcome (intentional changes only)
+ *   pnpm run tt:golden --fixture <name>     one fixture
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -52,7 +52,7 @@ export function checkGolden(file: string, summary: RunSummary, { update }: { upd
       write()
       return { status: 'created', report: `created ${file}` }
     }
-    return { status: 'missing', report: `missing ${file}\n  create it with: npm run tt:golden -- --update` }
+    return { status: 'missing', report: `missing ${file}\n  create it with: pnpm run tt:golden --update` }
   }
   const golden = JSON.parse(readFileSync(file, 'utf8')) as unknown
   const lines = goldenDiffLines(golden, summary)
@@ -67,8 +67,8 @@ export function checkGolden(file: string, summary: RunSummary, { update }: { upd
       `drifted from ${file}:`,
       ...lines.map((l) => `  ${l}`),
       'Find the first diverging event: write the event log before and after your change',
-      '  (npm run tt:run -- --fixture <name> --events before.jsonl) and run npm run tt:diff -- before.jsonl after.jsonl.',
-      'If the change is intended: npm run tt:golden -- --update (or UPDATE_GOLDEN=1 npm test), review the diff, explain it in the commit.',
+      '  (pnpm run tt:run --fixture <name> --events before.jsonl) and run pnpm run tt:diff before.jsonl after.jsonl.',
+      'If the change is intended: pnpm run tt:golden --update (or UPDATE_GOLDEN=1 pnpm test), review the diff, explain it in the commit.',
     ].join('\n'),
   }
 }
@@ -82,7 +82,7 @@ export function checkFixtureGolden(name: string, options: { update: boolean; dir
   return checkGolden(join(options.dir ?? GOLDEN_DIR, `${name}.golden.json`), summarizeRun(sim), options)
 }
 
-export const GOLDEN_USAGE = `Usage: npm run tt:golden -- [--update] [--fixture <name>] [--dir <folder>]
+export const GOLDEN_USAGE = `Usage: pnpm run tt:golden [--update] [--fixture <name>] [--dir <folder>]
 
   (no flags)        Check every fixture's golden summary; exit 1 on drift or a missing golden
   --update          Rewrite the goldens to the current outcome (intentional behaviour changes only)

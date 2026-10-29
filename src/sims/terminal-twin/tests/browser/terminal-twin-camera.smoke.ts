@@ -1,6 +1,6 @@
 /**
  * V11-04 browser smoke: `cameraTo` aims at every entity kind and follow releases when a truck leaves.
- * Dev-only `window.__tt` API. Run with `npm run test:smoke`.
+ * Dev-only `window.__tt` API. Run with `pnpm run test:smoke`.
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

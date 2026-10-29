@@ -1,7 +1,7 @@
 /**
  * TT-08 browser smoke tests: two ASCs per block, the ASC rail overlay and the
  * setup dialog's "ASCs per block" field, through the dev-only `window.__tt` API.
- * Run with `npm run test:smoke` (not part of `npm test`).
+ * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
 import { expect, test, type Page } from '@playwright/test'
 import type { RunSummary } from '../../engine'

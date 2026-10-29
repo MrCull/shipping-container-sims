@@ -1,7 +1,7 @@
 /**
  * TT-18 browser smoke tests: breakpoints, single-step, cause chain, click
  * selection, follow camera, feed throttling and the live overlays, driven by
- * the dev-only `window.__tt` API plus real clicks. Run with `npm run test:smoke`.
+ * the dev-only `window.__tt` API plus real clicks. Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type { EngineEvent } from '../../engine'

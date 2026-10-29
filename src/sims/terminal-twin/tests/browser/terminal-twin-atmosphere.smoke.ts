@@ -1,6 +1,6 @@
 /**
  * Atmosphere and polish (TT-21): day/night, daylight lock, backdrops, sound, departure banner.
- * Seam: UI + dev API `window.__tt` (`__tt.atmosphere()`). Run with `npm run test:smoke`.
+ * Seam: UI + dev API `window.__tt` (`__tt.atmosphere()`). Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

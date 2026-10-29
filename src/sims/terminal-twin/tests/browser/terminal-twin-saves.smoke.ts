@@ -1,7 +1,7 @@
 /**
  * TT-17 browser smoke tests: saves (IndexedDB and files), snapshot resume, version mismatch,
  * rewind and storage resilience, through the top-bar dialog and the dev API `window.__tt.saves`.
- * Run with `npm run test:smoke`.
+ * Run with `pnpm run test:smoke`.
  */
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'

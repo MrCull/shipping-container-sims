@@ -3,7 +3,7 @@
  * (LOD switching, carried box at the attach point, wheels rolling, steering,
  * hoist from the lift motion) and in the dev asset viewer (rig sliders, a 40 ft
  * box inside the tunnel at true scale). Screenshots go to .screenshots/assets/.
- * Run with `npm run test:smoke`.
+ * Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

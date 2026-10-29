@@ -1,6 +1,6 @@
 /**
  * TT-14 browser smoke test: the setup dialog's yard start modes through the real dialog.
- * Run with `npm run test:smoke` (not part of `npm test`).
+ * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

@@ -1,6 +1,6 @@
 /**
  * TT-15 browser smoke test: presets, the live plan preview, validation and the kinematics readouts through the real
- * setup dialog; the TTI preset runs in the browser. Run with `npm run test:smoke` (not part of `npm test`).
+ * setup dialog; the TTI preset runs in the browser. Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

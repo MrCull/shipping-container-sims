@@ -3,7 +3,7 @@
  * renders from its GLB, deck containers sit on the rendered hull's bay grid,
  * the livery and name follow the vessel's line, and the hulls switch LOD at
  * berth and at anchorage. Screenshots go to .screenshots/assets/vessel-*.png.
- * Run with `npm run test:smoke`.
+ * Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import atlas from '../../assets/models/vessels/vessel-livery-atlas.json' with { type: 'json' }

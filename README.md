@@ -75,7 +75,7 @@ Requires a production preview and **ffmpeg** (for the Contenga GIF). Default wai
 
 ```bash
 pnpm run build
-pnpm run preview -- --host 127.0.0.1 --port 4173
+pnpm run preview --host 127.0.0.1 --port 4173
 # in another terminal:
 pnpm run capture-readme-media
 # optional: BASE_URL=http://127.0.0.1:4173 GAMEPLAY_WAIT_MS=12000 STOWAGE_MASTER_WAIT_MS=18000 pnpm run capture-readme-media

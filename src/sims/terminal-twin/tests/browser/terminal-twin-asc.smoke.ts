@@ -1,6 +1,6 @@
 /**
  * TT-06 browser smoke tests: ASC block storage through the dev-only `window.__tt` API.
- * Run with `npm run test:smoke` (not part of `npm test`).
+ * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
 import { expect, test, type Page } from '@playwright/test'
 import type { ContainerState, RunSummary } from '../../engine'

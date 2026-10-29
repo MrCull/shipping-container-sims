@@ -1,5 +1,5 @@
 {
-  "note": "Engine benchmark baseline (npm run tt:bench). Timings only compare on a like machine: re-record with --update-baseline when the reference machine changes.",
+  "note": "Engine benchmark baseline (pnpm run tt:bench). Timings only compare on a like machine: re-record with --update-baseline when the reference machine changes.",
   "reports": {
     "TTI Algeciras baseline|24h": {
       "preset": "TTI Algeciras baseline",

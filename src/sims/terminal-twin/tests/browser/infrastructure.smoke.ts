@@ -2,7 +2,7 @@
  * TT-28 browser smoke tests (seam 3): the infrastructure GLBs in the twin (gate modules, quay furniture, yard
  * infrastructure, buildings) are instanced within the draw-call budget, replace the procedural placeholders, make no
  * external requests, and the Algeciras backdrop meshes apply to the TTI preset only. Screenshots: .screenshots/assets/.
- * Run with `npm run test:smoke`.
+ * Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing

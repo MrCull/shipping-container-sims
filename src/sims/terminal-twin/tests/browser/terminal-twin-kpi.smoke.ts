@@ -1,6 +1,6 @@
 /**
  * TT-07 browser smoke tests: KPI strip, end conditions, final report and export.
- * Run with `npm run test:smoke` (not part of `npm test`).
+ * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
 import { expect, test, type Page } from '@playwright/test'
 import type { HeadlineKpis } from '../../engine'

@@ -1,7 +1,7 @@
 /**
  * Engine benchmark (TT-19): run a preset for N sim-hours headless and report events/sec,
  * wall-ms per sim-hour and peak memory; compare against a committed baseline.
- * Local only (CI timing is too noisy): `npm run tt:bench`. Entry point: `bench.ts`.
+ * Local only (CI timing is too noisy): `pnpm run tt:bench`. Entry point: `bench.ts`.
  */
 import { createSimulation, DEFAULT_SWEEP_EVERY } from '../engine'
 import { presets } from '../scenario/presets'

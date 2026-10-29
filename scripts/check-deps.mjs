@@ -4,7 +4,12 @@ import { existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 
 if (!existsSync(new URL('../node_modules/.bin/eslint', import.meta.url))) {
-  console.error('node_modules is missing or incomplete. Run `ppnpm install` first, then re-run `ppnpm run verify`.')
+  console.error('node_modules is missing or incomplete. Run `pnpm install` first, then re-run `pnpm run verify`.')
+  process.exit(1)
+}
+
+if (existsSync(new URL('../package-lock.json', import.meta.url)) || existsSync(new URL('../yarn.lock', import.meta.url))) {
+  console.error('This repo uses pnpm: delete package-lock.json / yarn.lock and use `pnpm install` (lockfile: pnpm-lock.yaml).')
   process.exit(1)
 }
 
@@ -22,6 +27,6 @@ for (const f of files) {
   if (marker.test(text)) dirty.push(f)
 }
 if (dirty.length > 0) {
-  console.error(`Unresolved merge conflict markers in:\n  ${dirty.join('\n  ')}\nResolve them, then re-run \`ppnpm run verify\`.`)
+  console.error(`Unresolved merge conflict markers in:\n  ${dirty.join('\n  ')}\nResolve them, then re-run \`pnpm run verify\`.`)
   process.exit(1)
 }

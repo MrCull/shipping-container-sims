@@ -32,7 +32,7 @@ describe('golden updates', () => {
     expect(result.status).toBe('drift')
     expect(result.report).toContain('kpis.movesCompleted: golden 9 → actual 10')
     expect(result.report).toContain(`eventLogHash: golden "00000000000000" → actual "${actual.eventLogHash}"`)
-    expect(result.report).toMatch(/tt:golden -- --update/)
+    expect(result.report).toMatch(/tt:golden --update/)
     expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(stale)
   })
 

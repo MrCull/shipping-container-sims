@@ -1,5 +1,5 @@
 /**
- * `npm run tt:assets:shots` — screenshots every asset in the dev asset viewer
+ * `pnpm run tt:assets:shots` — screenshots every asset in the dev asset viewer
  * from headless Chromium (WebGL via SwiftShader), at each LOD, plus the
  * instanced yard stress test. Output: `.screenshots/assets/` (git-ignored).
  *

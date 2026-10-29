@@ -1,7 +1,7 @@
 /**
  * V11-02 browser smoke test: the HUD is a set of named regions that never overlap (1280x720 and 1920x1080, every
  * preset, Events and Inspector panels open or closed) and every KPI card is fully visible. Driven by the dev-only
- * `window.__tt.hudLayout()` query. Run with `npm run test:smoke`.
+ * `window.__tt.hudLayout()` query. Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import { overlappingRegions } from '../../modules/hudLayout'
