@@ -6,7 +6,6 @@ import {
   createSimulation,
   indexYardSlotAdded,
   indexYardSlotRemoved,
-  suggestedInvariantEvery,
   yardIndexOf,
   type YardSlotState,
 } from '../engine'
@@ -36,19 +35,11 @@ describe('yard index (TT-19)', () => {
 
   it('a run with the index in place keeps the engine deterministic (same hash twice)', () => {
     const run = () => {
-      const sim = createSimulation(presets['Small automated'](), {}, { invariants: { every: 25 } })
+      const sim = createSimulation(presets['Small automated'](), {}, { invariants: { sweepEvery: 25 } })
       sim.runUntil({ time: 3600 })
       return sim.eventLogHash()
     }
     expect(run()).toBe(run())
-  })
-})
-
-describe('invariant cadence for large yards', () => {
-  it('checks every event for small scenarios and sparsely at TTI scale', () => {
-    expect(suggestedInvariantEvery(presets['Small automated']())).toBeGreaterThan(1)
-    expect(suggestedInvariantEvery(presets['TTI Algeciras baseline']())).toBeGreaterThan(100)
-    expect(suggestedInvariantEvery(presets['TTI Algeciras baseline']())).toBeLessThanOrEqual(500)
   })
 })
 

@@ -55,7 +55,7 @@ describe('presets', () => {
   /**
    * Full-length TTI and Stress runs take minutes (tens of thousands of events on a 28,800-cell yard), so those two
    * run to a shortened end condition (10 productive moves); Small automated runs to its own (all vessels departed).
-   * Invariants are checked every 500th event and at the end.
+   * Invariants are checked incrementally, with a full sweep every 500th event and at the end.
    */
   it.each([
     ['Small automated', undefined],
@@ -64,7 +64,7 @@ describe('presets', () => {
   ] as const)('%s runs headless to its end condition with all invariants passing', (name, end) => {
     const config = presets[name]()
     if (end) config.endConditions = { ...end }
-    const sim = createSimulation(config, {}, { invariants: { every: 500 } })
+    const sim = createSimulation(config, {}, { invariants: { sweepEvery: 500 } })
     sim.runUntil()
     expect(sim.firstError).toBeNull()
     expect(sim.status).toBe('ended')
@@ -75,7 +75,7 @@ describe('presets', () => {
   it('regression: a pre-filled Small automated at 50% fill completes (no idle ASCs beside open jobs, no rehandle shuttling)', () => {
     const config = presets['Small automated']()
     config.yardStart = { mode: 'prefilled', targetPct: 50 }
-    const sim = createSimulation(config, {}, { invariants: { every: 500 } })
+    const sim = createSimulation(config, {}, { invariants: { sweepEvery: 500 } })
     const r = sim.runUntil({ maxEvents: 60_000 })
     expect(r.reason).toBe('ended')
     expect(sim.kpiReport().vesselsCompleted).toBe(3)

@@ -21,7 +21,7 @@ export function benchMain(argv: string[], print: (line: string) => void = consol
       options: {
         preset: { type: 'string', default: 'TTI Algeciras baseline' },
         hours: { type: 'string', default: '24' },
-        'invariants-every': { type: 'string' },
+        'sweep-every': { type: 'string' },
         'slow-ms': { type: 'string' },
         'update-baseline': { type: 'boolean', default: false },
         out: { type: 'string' },
@@ -41,7 +41,7 @@ export function benchMain(argv: string[], print: (line: string) => void = consol
     {
       preset,
       simHours: hours,
-      invariantsEvery: values['invariants-every'] === undefined ? undefined : Number(values['invariants-every']),
+      sweepEvery: values['sweep-every'] === undefined ? undefined : Number(values['sweep-every']),
       slowMsPerEvent: values['slow-ms'] === undefined ? undefined : Number(values['slow-ms']),
     },
     { node: process.version, cpu: `${cpus()[0]?.model ?? 'cpu'} x${cpus().length}`, load1: loadavg()[0] },
