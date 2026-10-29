@@ -11,6 +11,7 @@ export type ShortcutAction =
   | { kind: 'pause' }
   | { kind: 'step' }
   | { kind: 'follow' }
+  | { kind: 'followNextTruck' }
   | { kind: 'escape' }
   | { kind: 'dashboard' }
   | { kind: 'overlays' }
@@ -34,6 +35,7 @@ export const SHORTCUT_HELP: readonly ShortcutHelpRow[] = [
   { keys: 'shortcuts.key.zero', action: 'shortcuts.pause' },
   { keys: 'shortcuts.key.period', action: 'shortcuts.step' },
   { keys: 'shortcuts.key.f', action: 'shortcuts.follow' },
+  { keys: 'shortcuts.key.n', action: 'shortcuts.followNextTruck' },
   { keys: 'shortcuts.key.esc', action: 'shortcuts.deselect' },
   { keys: 'shortcuts.key.d', action: 'shortcuts.dashboard' },
   { keys: 'shortcuts.key.o', action: 'shortcuts.overlays' },
@@ -78,6 +80,8 @@ export function shortcutFor(e: KeyLike): ShortcutAction | null {
   switch (key.toLowerCase()) {
     case 'f':
       return { kind: 'follow' }
+    case 'n':
+      return { kind: 'followNextTruck' }
     case 'd':
       return { kind: 'dashboard' }
     case 'o':

@@ -23,7 +23,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-03 daylight + masts | #63 | merged | |
 | V11-04 camera | #64 | merged | |
 | V11-05 view presets | #65 | merged | |
-| V11-06 follow next truck | #66 | in progress | session_018sev (agent) |
+| V11-06 follow next truck | #66 | merged | |
 | V11-07 load-proof smoke | #67 | in progress (also triages the full smoke suite; terminal-twin-kpi "end condition" highlights test already fails on PR #54 tip) | session_018sev (agent) |
 | V11-08 split setup dialog | #68 | open | |
 | V11-09 split ASC | #69 | merged | |
@@ -32,7 +32,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-12 SHC cornering | #72 | merged (engine 0.9.0, SHC goldens regenerated) | |
 | V11-13 pre-fill decisions | #73 | done on `tt/73-prefill-decisions` (ENGINE_VERSION 0.10.0, no golden changed), not merged | session_018sev (agent) |
 | V11-14 truck exports | #74 | blocked by 73 | |
-| V11-15 STS ground wake-up | #75 | open | |
+| V11-15 STS ground wake-up | #75 | in progress | session_018sev (agent) |
 | V11-16 latency series | #76 | open | |
 | V11-17 locale dates | #77 | blocked by 68 | |
 | V11-18 incremental invariants | #78 | merged (perf/baseline.json to re-record on a quiet machine) | |
