@@ -31,7 +31,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-11 wtpPadSelection | #71 | done on `tt/71-wtp-pad-selection` (ENGINE_VERSION 0.8.0, shcDispatch v2), not merged | session_018sev (agent) |
 | V11-12 SHC cornering | #72 | merged (engine 0.9.0, SHC goldens regenerated) | |
 | V11-13 pre-fill decisions | #73 | merged (engine 0.10.0 pre-run phase) | |
-| V11-14 truck exports | #74 | in progress | session_018sev (agent) |
+| V11-14 truck exports | #74 | done on `tt/74-truck-exports` (engine 0.12.0), not merged | session_018sev (agent) |
 | V11-15 STS ground wake-up | #75 | merged (engine 0.11.0 after merge; adds StsGroundPositionWaitBackoff) | |
 | V11-16 latency series | #76 | in progress | session_018sev (agent) |
 | V11-17 locale dates | #77 | blocked by 68 | |

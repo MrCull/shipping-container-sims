@@ -378,6 +378,8 @@ export interface TruckLeg {
   containerId: string
   /** Export drops: the vessel the box is booked to (its export window was open on arrival). */
   vesselId?: string
+  /** Export drops with a legacy or pre-filled start (V11-14): the slot added to the vessel's bay plan for the new box. */
+  slotId?: string
   done: boolean
 }
 

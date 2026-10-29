@@ -330,6 +330,55 @@ function planVessel(
   }
 }
 
+/** A cell of a vessel's bay plan for a box booked after the plan was made (V11-14). */
+export interface ExtraLoadCell {
+  bay: number
+  row: number
+  tier: number
+  deck: boolean
+  half: CellHalf
+}
+
+/**
+ * The cell for one more export box booked to a vessel after planning (a box a truck delivers with any yard start).
+ * Same rule as the planner: a stack that holds no discharge box and no empties slot, filled bottom-up, so the load
+ * order (bay, hold before deck, tier) never leaves a box floating. A 20 ft box first completes a lone aft half.
+ * Spreads over the bays (fewest slots first). Null when the vessel has no such cell left.
+ */
+export function extraLoadCell(
+  sizeClass: VesselConfig['sizeClass'],
+  slots: readonly Pick<PlannedSlot, 'bay' | 'row' | 'tier' | 'deck' | 'half' | 'purpose' | 'emptyReq'>[],
+  size: ContainerSize,
+): ExtraLoadCell | null {
+  const spec = vesselClass(sizeClass)
+  const tiers = spec.holdTiers + spec.deckTiers
+  if (size === '20') {
+    const lone = slots
+      .filter((s) => s.half === 'aft' && s.purpose === 'load' && !s.emptyReq)
+      .sort((a, b) => a.bay - b.bay || Number(a.deck) - Number(b.deck) || a.tier - b.tier || a.row - b.row)
+      .find((s) => !slots.some((o) => o !== s && o.bay === s.bay && o.row === s.row && o.deck === s.deck && o.tier >= s.tier))
+    if (lone) return { bay: lone.bay, row: lone.row, tier: lone.tier, deck: lone.deck, half: 'fore' }
+  }
+  const perBay = new Array<number>(spec.bays).fill(0)
+  for (const s of slots) perBay[s.bay]++
+  const bays = [...perBay.keys()].sort((a, b) => perBay[a] - perBay[b] || a - b)
+  for (const bay of bays)
+    for (const deck of [false, true]) {
+      const from = deck ? spec.holdTiers : 0
+      const to = deck ? tiers : spec.holdTiers
+      let best: ExtraLoadCell | null = null
+      for (let row = 0; row < spec.rows; row++) {
+        const stack = slots.filter((s) => s.bay === bay && s.row === row && s.deck === deck)
+        if (stack.some((s) => s.purpose === 'discharge' || s.emptyReq)) continue
+        const tier = stack.reduce((m, s) => Math.max(m, s.tier + 1), from)
+        if (tier >= to) continue
+        if (!best || tier < best.tier) best = { bay, row, tier, deck, half: size === '20' ? 'aft' : null }
+      }
+      if (best) return best
+    }
+  return null
+}
+
 /**
  * Generate every vessel's bay plan and boxes (vessel table order), then link transshipment boxes to their onward
  * vessels and add the empty pool.
