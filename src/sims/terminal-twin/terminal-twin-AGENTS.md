@@ -6,7 +6,7 @@ Per-ticket implementation notes (what each merged ticket built, and gotchas for 
 
 **Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root — use its terms in code, tests and docs.
 
-**Status:** headless engine tracer (TT-01), the decision-point framework (TT-03) and headless debug tooling — structured logs, run diff, snapshot time windows, golden updates (TT-04). It also has the browser tracer (TT-02): a home card, a setup dialog shell, the engine in a Web Worker, a procedural 3D quay with time controls, and the dev-only `window.__tt` API. TT-20 added locale and units, the message catalogue and keyboard shortcuts. Phase 2 has started with the asset pipeline and container models (TT-22): Blender-generated GLBs with LODs and a livery atlas, instanced in the 3D view, plus a dev asset viewer and an asset budget check in CI. See [Phase 2 asset pipeline](#phase-2-asset-pipeline). TT-09 added real vessel calls: five size classes, generated bay plans, a continuous quay with berth allocation and anchorage, STS cranes on one rail with a crane split, twin-20 lifts, and the setup dialog's vessel table and generator. TT-05 adds SHC horizontal transport (STS ground position → WTP pad) over a generated lane graph with conflict-zone reservations, the `shcDispatch` decision point, an instant ASC stub, subsystem modes, SHC setup fields and 3D lane/reservation overlays. TT-06 replaces the stub with real block storage: yard blocks (8 rows, configurable bays/tiers), one ASC per block with gantry/trolley/hoist motion, the `yardAllocation` decision point, stack and ASC/SHC handover invariants, yard setup fields and 3D blocks, ASCs and stacked boxes. See [ASC block storage](#asc-block-storage-tt-06). TT-25 replaced the procedural shuttle carrier with a rigged Kalmar-style GLB model (see [SHC model](#shc-model-tt-25)). TT-08 adds a second ASC per block on a shared rail with no-passing reservations and the `ascDispatch` decision point. See [Paired ASCs](#paired-ascs-tt-08). TT-23 replaced the procedural STS with a rigged Malaccamax GLB (see [STS model](#sts-model-tt-23)). TT-07 added the KPI collector (hourly and per-shift series), end conditions, the KPI strip, the final report and JSON/CSV export (see [KPIs, end conditions and final report](#kpis-end-conditions-and-final-report-tt-07)). TT-24 replaced the procedural stacking crane with a rigged ZPMC-style ASC GLB (see [ASC model](#asc-model-tt-24)). TT-13 adds landside trucks, the gate and ASC truck interchange (see [Landside](#landside-trucks-gate-and-transfer-stalls-tt-13)). TT-26 replaced the procedural trucks with rigged tractor and skeletal chassis GLBs (see [Truck models](#truck-models-tt-26)). TT-14 adds the yard start modes (see [Yard start modes](#yard-start-modes-tt-14)).
+**Status:** all spec tickets (TT-01 to TT-28) are merged and the code-review fixes are in. The headless engine covers vessels and berthing, STS cranes, SHC transport, paired ASC block storage, export load, transshipment and empties, rehandles, landside trucks, the yard start modes, KPIs and end conditions, and the TOS decision points. The browser host has a Web Worker engine, a 3D scene with the Phase 2 GLB assets, debugger, dashboard, saves and rewind, and locale and units. Per-ticket detail is in [ticket-notes.md](ticket-notes.md); known limits are under [Known gaps](#known-gaps).
 
 **Sim ID:** `terminal-twin`
 
@@ -699,6 +699,19 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 2. `decisions/strategies.ts`: register 1–3 strategies and a `default`, and add it to `defaultHandlers`.
 3. In the asking reactor, call `ctx.requestDecision(dp, request, { equipment: [...] })`, set the equipment to a waiting status, and act on the reply in the subsystem's `DecisionResolved` reactor.
 4. Test it in `tests/decisions.test.ts` style: strategy selection, a scripted handler, and a latency case. Then `UPDATE_GOLDEN=1 npm test` if fixtures use it.
+
+## Known gaps
+
+Deliberately not built, or built differently from the spec (the code review accepted these):
+
+- **Subsystem modes** `real | instant | off` exist for the SHC, ASC and landside subsystems only; quay, berth and yard have no such switch (spec story 104).
+- **No separate WTP pad-selection decision point:** the pad rides in the `shcDispatch` reply (story 61).
+- **Extra shortcuts** E, I and P and the ASC yield moves go beyond the spec (accepted scope).
+- **Yard pre-fill is outside the decision runtime:** no `DecisionRequested/Resolved` events, latency injection or handler KPIs, and an async `yardAllocation` handler is rejected (explicit error). Use a `warmup` or `empty` start to exercise async handlers.
+- **Handler wall latency** is a run total in `kpiReport()` and the final report, not a time series (it is not in the event log).
+- **Truck-delivered exports with a legacy/prefilled start** are new boxes outside the bay plan and are never loaded; only the `empty`/`warmup` start delivers the booked boxes.
+- **SHC cornering:** SHCs stop at every turn.
+- **Hub files** `SetupDialog.vue`, `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass.
 
 ## Known behaviours and pitfalls
 

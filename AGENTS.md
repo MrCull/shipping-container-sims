@@ -19,9 +19,11 @@ A Vue 3 + TypeScript web app that hosts shipping-container-themed simulations an
 
 After making substantive code changes, run **`npm run lint`** to catch issues.
 
-Before handing work back after code changes, run **`npm run verify`**: lint, then build (catches TypeScript or Vite errors that linting may miss), then tests when a `test` script exists. Pull requests to `main` run the same checks in CI (`.github/workflows/pr-checks.yml`).
+Before handing work back after code changes, run **`npm run verify`**: the dependency check (`node scripts/check-deps.mjs`), then lint, then build (catches TypeScript or Vite errors that linting may miss), then tests when a `test` script exists. Pull requests to `main` run the same checks in CI (`.github/workflows/pr-checks.yml`).
 
 **Tests:** `npm test` runs **Vitest** (`*.test.ts` under `src/`, Node environment); `npm run test:watch` for watch mode. Test files (`*.test.ts`, `*.smoke.ts`) and Node-only CLI code (`src/sims/*/cli/`) are type-checked by `tsconfig.tools.json` (Node types; DOM lib only for `page.evaluate` callbacks) and excluded from `tsconfig.app.json`. Headless TypeScript scripts run with **`tsx`** (e.g. `npm run tt:run -- --help`).
+
+**Terminal Twin scripts** (details in the sim guide, "How to prove a change works"): `npm run tt:run` (headless scenario run), `tt:fixtures` (rebuild fixture JSON), `tt:golden` (check or `--update` golden summaries), `tt:diff` (first diverging event of two logs), `tt:bench` (engine benchmark, local only), `tt:assets` / `tt:assets:check` / `tt:assets:shots` (Blender asset pipeline, budget check, previews), `tt:card` (home card image).
 
 To apply ESLint auto-fixes (including many Vue template and style rules), use **`npm run lint:fix`**.
 

@@ -12,9 +12,9 @@ Another session may have pushed while you were stopped. Two sessions once built 
 4. Tell every agent you resume or start to do the same: fetch the branch, read this file's diff and the new commits, and merge the tip before carrying on.
 5. Claim a ticket before you start it: put your session in the Claimed by column, commit and push this file. Skip tickets another session has claimed or merged.
 
-## Known engine bug (open)
+## Review pass (done on `tt/review-fixes`)
 
-Small preset at 50% fill (and a few other seeds/layouts) deadlocks: both ASCs of a twin block sit idle with retrieve/rehandle jobs open, `planJob` returns null and `resolveDispatch` does not retry. Repro is in the sim guide (TT-15 section). Presets use 30% fill for Small. Owner: TT-08/TT-12 code (`engine/subsystems/asc.ts`). Fix in the review pass if not earlier.
+Fixed: the Small-at-50% dispatch stall and rehandle shuttling (`asc.ts`), landside export window and zero-load vessels, invariant injection tests, handler/vessel KPI series and final-report handler table, Run to next vessel departure, `checkSnapshotCompat`, barrel imports, SHC `_geo` rig nodes, stale smoke tests, docs. Remaining gaps are listed in the sim guide's "Known gaps" section.
 
 ## Where things are
 
@@ -83,7 +83,7 @@ Frontier: #45. Then #46 and #47; then #48; then #49, #50, #51; then #52.
 
 ## Open follow-ups
 
-- **Failing/flaky smoke tests (fix in the final review pass):** `terminal-twin-debugger.smoke.ts` "clicking a container in 3D selects it" fails at the final empty-sky click; `container-assets.smoke.ts` 18k-yard budget sees 26 draw calls vs limit 20 (cause unconfirmed, possibly SHC models); the ×600 frame-count test is load-flaky.
+- **Known gaps (accepted, also in the sim guide):** subsystem modes real/instant/off for quay, berth and yard (story 104); no separate WTP pad-selection decision point (story 61); extra shortcuts E/I/P and ASC yield moves; yard pre-fill bypasses the decision runtime (no async handler); handler wall latency has no time series; `SetupDialog.vue`, `twinStore.ts`, `asc.ts` not split.
 - **SHC cornering:** SHCs stop at every turn instead of cornering at speed.
 - **WTP pad choice:** part of the `shcDispatch` reply; no separate decision point.
 - **Container orientation:** position plus optional yaw only.
