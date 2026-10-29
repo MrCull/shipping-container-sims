@@ -25,7 +25,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-05 view presets | #65 | merged | |
 | V11-06 follow next truck | #66 | merged | |
 | V11-07 load-proof smoke | #67 | in progress (also triages the full smoke suite; terminal-twin-kpi "end condition" highlights test already fails on PR #54 tip) | session_018sev (agent) |
-| V11-08 split setup dialog | #68 | in progress | session_018sev (agent) |
+| V11-08 split setup dialog | #68 | merged (end-conditions fieldset still inline in the shell: setup-inputs test reads it there) | |
 | V11-09 split ASC | #69 | merged | |
 | V11-10 subsystem modes | #70 | merged | |
 | V11-11 wtpPadSelection | #71 | done on `tt/71-wtp-pad-selection` (ENGINE_VERSION 0.8.0, shcDispatch v2), not merged | session_018sev (agent) |
@@ -34,7 +34,7 @@ Integration branch: `claude/cool-maxwell-6dmsl9` (based on PR #54's tip `2d077cc
 | V11-14 truck exports | #74 | merged (engine 0.12.0; if #76 also bumps, reconcile) | |
 | V11-15 STS ground wake-up | #75 | merged (engine 0.11.0 after merge; adds StsGroundPositionWaitBackoff) | |
 | V11-16 latency series | #76 | merged | |
-| V11-17 locale dates | #77 | blocked by 68 | |
+| V11-17 locale dates | #77 | in progress | session_018sev (agent) |
 | V11-18 incremental invariants | #78 | merged (perf/baseline.json to re-record on a quiet machine) | |
 | V11-19 real-GPU fps (human) | #79 | blocked by 62, 63, 78 | |
 
