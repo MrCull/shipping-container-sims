@@ -61,9 +61,13 @@ test('the button and N work, and the HUD regions still do not overlap', async ({
   await expect.poll(async () => (await ui(page)).following).toBe(true)
   await page.keyboard.press('Escape')
   expect((await ui(page)).following).toBe(false)
-  await page.keyboard.press('n') // a second arrival is already known or comes as the engine runs on
-  await page.evaluate(() => window.__tt!.runUntil({ maxEvents: 400 }))
+  // N takes the next arrival at or after the display time. The first truck arrived exactly at that time, so it is already
+  // known and follow starts at once (nothing pending). Running on would release follow again: the truck leaves the terminal.
+  await page.keyboard.press('n')
   await expect.poll(async () => (await ui(page)).following).toBe(true)
+  const second = await ui(page)
+  expect(second.followNextPending).toBe(false)
+  expect(second.selectedId).toMatch(/^T\d+$/)
   await page.keyboard.press('?')
   await expect(page.getByRole('dialog')).toContainText('Follow the next truck to arrive')
   await page.keyboard.press('Escape')
