@@ -6,15 +6,29 @@
  * - `prod` project: a production build served by `vite preview` (specs named
  *   `*.prod.smoke.ts`), for checks that dev-only code is absent.
  *
+ * Tests titled `@load` measure frame rate or draw calls and are load-sensitive: CI runs them as an advisory job
+ * (`npm run test:smoke -- --grep @load`); everything else is a required check (`--grep-invert @load`).
+ *
  * Uses Playwright's bundled Chromium, or falls back to CHROMIUM_PATH or the
  * cloud image's preinstalled /opt/pw-browsers/chromium (like scripts/screenshot.mjs).
  */
 import { chromium, defineConfig } from '@playwright/test'
 import { existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 
-// Override with SMOKE_DEV_PORT / SMOKE_PROD_PORT to run several checkouts side by side.
-const DEV_PORT = Number(process.env.SMOKE_DEV_PORT ?? 5199)
-const PROD_PORT = Number(process.env.SMOKE_PROD_PORT ?? 5198)
+/**
+ * Free ports by default, so parallel checkouts and stale servers from a killed run never collide. The choice is
+ * written back to the environment because Playwright re-evaluates this file in every worker process.
+ * Set SMOKE_DEV_PORT / SMOKE_PROD_PORT to pin a port.
+ */
+function freePort(): number {
+  const script = "const s=require('node:net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"
+  return Number(execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' }).trim())
+}
+process.env.SMOKE_DEV_PORT ??= String(freePort())
+process.env.SMOKE_PROD_PORT ??= String(freePort())
+const DEV_PORT = Number(process.env.SMOKE_DEV_PORT)
+const PROD_PORT = Number(process.env.SMOKE_PROD_PORT)
 const vite = 'node node_modules/vite/bin/vite.js'
 
 function chromiumExecutable(): string | undefined {

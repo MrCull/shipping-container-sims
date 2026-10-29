@@ -96,7 +96,7 @@ async function sampleFrames(page: Page, ms: number) {
   }, ms)
 }
 
-test('SHCs animate smoothly at ×1 and keep animating every frame at ×600', async ({ page }) => {
+test('SHCs animate smoothly at ×1 and keep animating every frame at ×600 @load', async ({ page }) => {
   await openShc(page)
   // Start as SHC01 sets off empty towards the first box.
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingEmpty' }))

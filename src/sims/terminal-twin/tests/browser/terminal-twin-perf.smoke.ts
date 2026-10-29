@@ -58,7 +58,7 @@ test('fixed quality levels change what is drawn: Low draws less than High', asyn
   expect(errors).toEqual([])
 })
 
-test('Auto steps quality down under sustained load, shows it in the overlay, and steps back up when the load ends', async ({ page }) => {
+test('Auto steps quality down under sustained load, shows it in the overlay, and steps back up when the load ends @load', async ({ page }) => {
   test.setTimeout(180_000)
   const errors = watch(page)
   await open(page, 'tracer-1sts-10-boxes')
@@ -82,7 +82,7 @@ test('Auto steps quality down under sustained load, shows it in the overlay, and
   expect(errors).toEqual([])
 })
 
-test('TTI preset at overview zoom: instanced containers are culled and the draw budget holds', async ({ page }) => {
+test('TTI preset at overview zoom: instanced containers are culled and the draw budget holds @load', async ({ page }) => {
   test.setTimeout(240_000)
   const errors = watch(page)
   await open(page, 'TTI Algeciras baseline')

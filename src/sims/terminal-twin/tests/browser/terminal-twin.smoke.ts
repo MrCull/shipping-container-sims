@@ -66,7 +66,7 @@ test('the tracer fixture runs to completion in the browser: golden hash, rendere
   expect(errors).toEqual([])
 })
 
-test('×1 runs one sim second per wall second; ×600 keeps animating every frame', async ({ page }) => {
+test('×1 runs one sim second per wall second; ×600 keeps animating every frame @load', async ({ page }) => {
   await openTracer(page)
   await page.evaluate(() => window.__tt!.setSpeed(1))
   const ratio1 = await page.evaluate(async () => {

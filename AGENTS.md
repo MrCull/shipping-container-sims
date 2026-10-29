@@ -23,7 +23,7 @@ Before handing work back after code changes, run **`npm run verify`**: the depen
 
 **Tests:** `npm test` runs **Vitest** (`*.test.ts` under `src/`, Node environment); `npm run test:watch` for watch mode. Test files (`*.test.ts`, `*.smoke.ts`) and Node-only CLI code (`src/sims/*/cli/`) are type-checked by `tsconfig.tools.json` (Node types; DOM lib only for `page.evaluate` callbacks) and excluded from `tsconfig.app.json`. Headless TypeScript scripts run with **`tsx`** (e.g. `npm run tt:run -- --help`).
 
-**Terminal Twin scripts** (details in the sim guide, "How to prove a change works"): `npm run tt:run` (headless scenario run), `tt:fixtures` (rebuild fixture JSON), `tt:golden` (check or `--update` golden summaries), `tt:diff` (first diverging event of two logs), `tt:bench` (engine benchmark, local only), `tt:assets` / `tt:assets:check` / `tt:assets:shots` (Blender asset pipeline, budget check, previews), `tt:card` (home card image).
+**Terminal Twin scripts** (`npm run tt:*`: headless runs, goldens, benchmark, asset pipeline): the sim guide's "How to prove a change works" lists them.
 
 To apply ESLint auto-fixes (including many Vue template and style rules), use **`npm run lint:fix`**.
 
@@ -85,7 +85,7 @@ Each sim that has grown beyond a trivial prototype maintains its own agent guide
 - **Composition API only**: Always use `<script setup lang="ts">`. No Options API.
 - **Strict TypeScript**: `noUnusedLocals`, `noUnusedParameters`, `strict` are all enabled.
 - **Scoped styles**: Use `<style scoped>` in all components.
-- **CSS variables**: Use the design tokens defined in `src/assets/main.css` (e.g. `--color-primary`, `--font-retro`).
+- **CSS variables**: Use the design tokens defined in `src/assets/main.css` (e.g. `--color-primary`).
 - **Keep this guide current**: When project-wide details change or new tooling, conventions, or structure are added that affect how agents or contributors work, update **AGENTS.md** in the same change (or a follow-up) so it stays accurate.
 
 ## Plans
@@ -100,20 +100,7 @@ New skills go under **`.agents/skills/`** instead — the repo's new top-level n
 
 **`.claude/skills/`** holds Matt Pocock's engineering-workflow skills (vendored from upstream, see `.claude/skills/UPSTREAM.md`), invoked as slash commands in Claude Code: e.g. `/grill-me`, `/to-spec`, `/to-tickets`, `/implement`, `/tdd`, `/diagnosing-bugs`, `/code-review`, `/pr`. They read their per-repo configuration from `docs/agents/` (see § Agent skills).
 
-**Skill index** (every `SKILL.md` in `.ai/skills/`):
-
-- [adding-a-sim](.ai/skills/adding-a-sim/SKILL.md)
-- [container-cargo-entities](.ai/skills/container-cargo-entities/SKILL.md)
-- [terminal-economics](.ai/skills/terminal-economics/SKILL.md)
-- [terminal-equipment-entities](.ai/skills/terminal-equipment-entities/SKILL.md)
-- [terminal-infrastructure](.ai/skills/terminal-infrastructure/SKILL.md)
-- [terminal-operations](.ai/skills/terminal-operations/SKILL.md)
-- [threejs-vue3-animation](.ai/skills/threejs-vue3-animation/SKILL.md)
-- [vessel-entities](.ai/skills/vessel-entities/SKILL.md)
-
-**Skill index** (every `SKILL.md` in `.agents/skills/`):
-
-- [jev-integration](.agents/skills/jev-integration/SKILL.md) — Using Jev (TypeSafe System One), a bounded-decision model: typed questions (Choice/Score/Noul), state design, API access, and interpreting/applying judgments.
+Each folder holds one `SKILL.md` per topic with its own description: list them with `ls .ai/skills .agents/skills`.
 
 ### Project workflow
 
@@ -147,6 +134,10 @@ Issues and specs live in GitHub Issues on `MrCull/shipping-container-sims`. See 
 ### Triage labels
 
 The default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Implementing a spec
+
+For `/implement-spec`, the orchestrator steps and the implementer brief are in `docs/agents/implementing.md`.
 
 ### Domain docs
 

@@ -3,6 +3,20 @@ import pluginVue from 'eslint-plugin-vue'
 import tseslint from 'typescript-eslint'
 import globals from 'globals'
 
+const GOD_MODE_HOTKEY = {
+  group: ['**/useGodModeHotkey'],
+  message: 'Do not mount useGodModeHotkey in Terminal Twin: it clashes with the D/O shortcuts.',
+}
+const ENGINE_BARREL_ONLY = {
+  group: ['**/engine/**', '!**/engine/index'],
+  message: 'Import Terminal Twin engine code only from engine/index.ts (the public API).',
+}
+const ENGINE_PURITY = [
+  { group: ['vue', 'pinia', 'vue-router', 'three', 'three/*'], message: 'The Terminal Twin engine must stay UI-free.' },
+  { group: ['node:*', 'fs', 'path', 'url', 'os', 'child_process'], message: 'The Terminal Twin engine must not use Node built-ins.' },
+  { group: ['@/*', '**/cli/**'], message: 'The Terminal Twin engine may only import engine/ and scenario/ code.' },
+]
+
 export default tseslint.config(
   { ignores: ['dist/**', 'node_modules/**', 'scripts/**', '.claude/**', '.smoke-dist/**', '.smoke-results/**'] },
 
@@ -41,38 +55,28 @@ export default tseslint.config(
     },
   },
 
-  // Terminal Twin engine, scenario and worker code must run in Node and a Web Worker:
-  // no DOM, Vue, Three.js or Node built-ins.
-  {
-    files: [
-      'src/sims/terminal-twin/engine/**/*.ts',
-      'src/sims/terminal-twin/scenario/**/*.ts',
-      'src/sims/terminal-twin/worker/**/*.ts',
-    ],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            { group: ['vue', 'pinia', 'vue-router', 'three', 'three/*'], message: 'The Terminal Twin engine must stay UI-free.' },
-            { group: ['node:*', 'fs', 'path', 'url', 'os', 'child_process'], message: 'The Terminal Twin engine must not use Node built-ins.' },
-            { group: ['@/*', '**/cli/**'], message: 'The Terminal Twin engine may only import engine/ and scenario/ code.' },
-          ],
-        },
-      ],
-      'no-restricted-globals': ['error', 'window', 'document', 'localStorage', 'process'],
-      'no-restricted-properties': ['error', { object: 'Math', property: 'random', message: 'Use EngineContext.random() (seeded).' }],
-    },
-  },
-
-  // useGodModeHotkey clashes with the Terminal Twin D/O shortcuts.
+  // Terminal Twin restricted imports. Flat config replaces a rule's options block by block (the last matching
+  // block wins), so every block below lists all the patterns that apply to its files.
+  // - Everyone: no useGodModeHotkey (it clashes with the D/O shortcuts).
+  // - Everyone outside engine/ and scenario/: import the engine only through engine/index.ts.
+  // - engine/, scenario/ and worker/: no DOM, Vue, Three.js or Node built-ins.
   {
     files: ['src/sims/terminal-twin/**/*.{ts,vue}'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [GOD_MODE_HOTKEY, ENGINE_BARREL_ONLY] }] },
+  },
+  {
+    files: ['src/sims/terminal-twin/engine/**/*.ts', 'src/sims/terminal-twin/scenario/**/*.ts'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [GOD_MODE_HOTKEY, ...ENGINE_PURITY] }] },
+  },
+  {
+    files: ['src/sims/terminal-twin/worker/**/*.ts'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [GOD_MODE_HOTKEY, ENGINE_BARREL_ONLY, ...ENGINE_PURITY] }] },
+  },
+  {
+    files: ['src/sims/terminal-twin/engine/**/*.ts', 'src/sims/terminal-twin/scenario/**/*.ts', 'src/sims/terminal-twin/worker/**/*.ts'],
     rules: {
-      'no-restricted-imports': [
-        'error',
-        { patterns: [{ group: ['**/useGodModeHotkey'], message: 'Do not mount useGodModeHotkey in Terminal Twin: it clashes with the D/O shortcuts.' }] },
-      ],
+      'no-restricted-globals': ['error', 'window', 'document', 'localStorage', 'process'],
+      'no-restricted-properties': ['error', { object: 'Math', property: 'random', message: 'Use EngineContext.random() (seeded).' }],
     },
   },
 
