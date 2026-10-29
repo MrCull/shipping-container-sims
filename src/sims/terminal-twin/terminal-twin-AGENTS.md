@@ -54,7 +54,7 @@ Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers b
 | Twin-20 | `npm run tt:run -- --fixture twin-20-lift` | `4 moves in 2 cycles (2 twin-20)`; `tests/vessels.test.ts` |
 | Vessels in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('crane-split-4sts').then(() => window.__tt.runTo(1500)).then(() => window.__tt.pause()).then(() => window.__tt.cameraTo('V001'))"` | hull at its berth, four STS along it, deck boxes on the hatch covers |
 | SHC transport | `npm run tt:run -- --fixture shc-1sts-2shc-1wtp` | `Horizontal: 10 boxes to WTP pads`, per-SHC jobs/distances/reservation wait, `0 violations` |
-| SHC dispatch strategies | `npm run tt:diff -- --fixture shc-1sts-2shc-1wtp --b-handlers nearest-job` (or `tt:run … --strategy shcDispatch=nearest-job`) | first divergence at the first `shcDispatch` `DecisionResolved` (`payload.reply.wtpPadId`) |
+| SHC dispatch and pad strategies | `npm run tt:diff -- --fixture shc-1sts-2shc-1wtp --b-handlers nearest-job` (nearest job + `wtpPadSelection` `nearest-box`; or `tt:run … --strategy shcDispatch=nearest-job` / `--strategy wtpPadSelection=nearest-box`) | first divergence at the first `wtpPadSelection` `DecisionResolved` (`payload.reply.wtpPadId`); `shcDispatch` replies only `{jobId}` |
 | SHCs in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('shc-1sts-2shc-1wtp').then(() => window.__tt.runTo(300)).then(() => { window.__tt.pause(); window.__tt.overlays({ laneGraph: true, reservations: true }) })"` | SHCs on the apron, boxes on pads/yard, cyan lane graph, amber reserved zones |
 | Smoke tests side by side with another checkout | `SMOKE_DEV_PORT=5299 SMOKE_PROD_PORT=5298 npm run test:smoke` | same as `npm run test:smoke`, on other ports |
 | Asset budgets (CI) | `npm run tt:assets:check` (also in `npm test`) | `ok` per GLB with LOD triangles/draw calls, `Budgets: pass`, exit 0 |
@@ -220,7 +220,6 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 
 Deliberately not built, or built differently from the spec (the code review accepted these):
 
-- **No separate WTP pad-selection decision point:** the pad rides in the `shcDispatch` reply (story 61).
 - **Extra shortcuts** E, I and P and the ASC yield moves go beyond the spec (accepted scope).
 - **Yard pre-fill is outside the decision runtime:** no `DecisionRequested/Resolved` events, latency injection or handler KPIs, and an async `yardAllocation` handler is rejected (explicit error). Use a `warmup` or `empty` start to exercise async handlers.
 - **Handler wall latency** is a run total in `kpiReport()` and the final report, not a time series (it is not in the event log).
@@ -232,6 +231,7 @@ Deliberately not built, or built differently from the spec (the code review acce
 
 Gotchas specific to one feature sit in its topic doc. These hold across the engine:
 
+- **`wtpPadSelection` (V11-11):** SHC dispatch (`shcDispatch` v2, reply `{jobId}`) picks a job; a discharge job is then held by the SHC (`waiting-for-pad`, no longer open) while `wtpPadSelection` (reply `{wtpPadId}`) answers; load jobs name their own pad and never ask. A `null` pad gives the job back and parks the SHC. Strategies `first-free` (default), `nearest-box`, `last-free`. With latency on it, two SHCs asking at once can get the same pad (a stale reply, like the other points): invariants flag it.
 - `kpis.handlers` omits decision points that were never called (so fixtures without SHCs keep their goldens).
 - Shortest paths are cached per lane graph (WeakMap on the config object) and the lane graph per config object: do not mutate a config after `createSimulation`.
 - Every decision adds two events (`DecisionRequested`, `DecisionResolved`) to the log. The tracer golden went from 35 to 55 events in TT-03, with KPIs unchanged. Every run has berthAllocation and craneSplit pairs before the first STS move, so tests must filter on `payload.decisionPoint` (see `gpEvent`/`gpOfType` in `tests/decisions.test.ts`).

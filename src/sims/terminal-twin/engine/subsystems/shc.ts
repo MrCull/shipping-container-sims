@@ -29,6 +29,7 @@ import type { EventOf, ShcPhasePayload } from '../events'
 import { planSegment, positionAt, type AxisProfile, type MotionSegment } from '../kinematics'
 import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph, type PathGraph } from '../laneGraph'
 import { earliestStart, mergeWindows, reserve, type WindowSpec } from '../reservations'
+import type { ShcDispatchPad } from '../decisions/types'
 import type { ShcJob, ShcPlannedEvent, ShcState, ShcStatus, SimState } from '../state'
 import { DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
 import type { ShcKinematics } from '../../scenario/types'
@@ -386,7 +387,17 @@ function requestDispatch(ctx: EngineContext, shc: ShcState): void {
         distanceM: Math.round((pathLength(graph, route(graph, shc.nodeId, entry.id)) + (j.x - entry.x)) * 1000) / 1000,
       }
     })
-  const wtpPads = graph.pads.map((p) => ({
+  ctx.requestDecision(
+    'shcDispatch',
+    { shcId: shc.id, nodeId: shc.nodeId, x: here.x, z: here.z, jobs, wtpPads: padOptions(ctx) },
+    { equipment: [shc.id] },
+  )
+}
+
+/** Every pad with its occupancy and claim now (the pad list of the dispatch and pad-selection requests). */
+function padOptions(ctx: EngineContext): ShcDispatchPad[] {
+  const { state } = ctx
+  return laneGraphOf(ctx.config).pads.map((p) => ({
     id: p.id,
     blockId: p.blockId,
     x: p.x,
@@ -394,9 +405,30 @@ function requestDispatch(ctx: EngineContext, shc: ShcState): void {
     occupiedBy: state.wtpPads[p.id].containerId,
     claimedBy: state.wtpPads[p.id].claimedBy,
   }))
+}
+
+/**
+ * V11-11: dispatch picked a discharge job. The SHC holds it (no longer open) and asks `wtpPadSelection`
+ * for the pad; the trip is planned in that decision's reactor.
+ */
+function requestPadSelection(ctx: EngineContext, shc: ShcState, job: ShcJob): void {
+  const { state } = ctx
+  const graph = laneGraphOf(ctx.config)
+  job.shcId = shc.id
+  shc.jobId = job.id
+  shc.status = 'waiting-for-pad'
   ctx.requestDecision(
-    'shcDispatch',
-    { shcId: shc.id, nodeId: shc.nodeId, x: here.x, z: here.z, jobs, wtpPads },
+    'wtpPadSelection',
+    {
+      shcId: shc.id,
+      jobId: job.id,
+      containerId: job.containerId,
+      stsId: job.stsId,
+      groundPositionId: job.groundPositionId,
+      x: job.x,
+      z: graph.laneZ[state.groundPositions[job.groundPositionId].lane],
+      wtpPads: padOptions(ctx),
+    },
     { equipment: [shc.id] },
   )
 }
@@ -436,7 +468,7 @@ function assignJob(ctx: EngineContext, shc: ShcState, jobId: string, padId: stri
     return
   }
   const pad = state.wtpPads[padId]
-  if (!pad) throw new Error(`shcDispatch handler returned unknown WTP pad ${padId}`)
+  if (!pad) throw new Error(`wtpPadSelection handler returned unknown WTP pad ${padId}`)
   // The engine trusts the TOS reply; invariants catch double claims and double occupancy.
   job.shcId = shc.id
   job.wtpPadId = pad.id
@@ -607,16 +639,38 @@ export const shcReactors: ReactorMap = {
   },
 
   DecisionResolved: (e, ctx) => {
-    if (e.payload.decisionPoint !== 'shcDispatch') return
-    const { request, reply } = e.payload
-    const shc = ctx.state.shcs[request.shcId]
-    if (reply.jobId === null || reply.wtpPadId === null) {
-      shc.status = 'available'
-      goPark(ctx, shc)
+    if (e.payload.decisionPoint === 'shcDispatch') {
+      const { request, reply } = e.payload
+      const shc = ctx.state.shcs[request.shcId]
+      if (reply.jobId === null) {
+        shc.status = 'available'
+        goPark(ctx, shc)
+        return
+      }
+      const job = ctx.state.shcJobs[reply.jobId]
+      if (!job) throw new Error(`shcDispatch handler returned unknown job ${reply.jobId}`)
+      if (job.kind === 'load') {
+        assignJob(ctx, shc, reply.jobId, '')
+        maybeDispatch(ctx)
+      } else {
+        requestPadSelection(ctx, shc, job)
+      }
       return
     }
-    assignJob(ctx, shc, reply.jobId, reply.wtpPadId)
-    maybeDispatch(ctx)
+    if (e.payload.decisionPoint === 'wtpPadSelection') {
+      const { request, reply } = e.payload
+      const shc = ctx.state.shcs[request.shcId]
+      if (reply.wtpPadId === null) {
+        // No pad: the SHC gives the job back (open again) and parks.
+        ctx.state.shcJobs[request.jobId].shcId = null
+        shc.jobId = null
+        shc.status = 'available'
+        goPark(ctx, shc)
+        return
+      }
+      assignJob(ctx, shc, request.jobId, reply.wtpPadId)
+      maybeDispatch(ctx)
+    }
   },
 
   ShcJobAssigned: (e, ctx) => scheduleNext(ctx, ctx.state.shcs[e.payload.shcId]),

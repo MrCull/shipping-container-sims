@@ -52,6 +52,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Rehandle:** a non-productive ASC move needed to reach a buried box.
 - **Job (SHC job):** one box to move from an STS ground position to a WTP pad. Grounding a box **releases** a job into the **released pool**; a job is **open** until an SHC **claims** it.
 - **Pull dispatch:** free equipment asks the dispatch decision point (`shcDispatch`) for its next job from the released pool, rather than jobs being pushed to equipment.
+- **Pad selection:** the decision point (`wtpPadSelection`) an SHC asks, after dispatch gave it a discharge job, for the WTP pad to set the box on. Built-in strategies: first-free, nearest-box, last-free.
 - **Trip:** an SHC's planned drive with its phases (routing empty, positioning at pickup, locking, lifting, routing loaded, positioning at drop-off, lowering, unlocking, clearing), or its drive to its parking spot.
 - **Clear position (pad clear position):** where an SHC reverses to after setting a box down on a WTP pad, clear of the pad. *Avoid:* "exit".
 - **Parking spot:** an SHC's own rest position off the apron, where idle SHCs return.

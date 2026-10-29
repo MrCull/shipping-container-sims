@@ -11,6 +11,8 @@ import {
   summarizeRun,
   type ShcDispatchReply,
   type ShcDispatchRequest,
+  type WtpPadSelectionReply,
+  type WtpPadSelectionRequest,
   type Simulation,
 } from '../engine'
 import { ScenarioBuilder, withShcFleet } from '../scenario/builder'
@@ -173,7 +175,7 @@ describe('SHC invariants hold for every fixture and stress variant', () => {
     const sim = createSimulation(crowded(), {
       shcDispatch: (msg, query) => {
         if (!first || !query.shcJobs().some((j) => j.id === first)) first = msg.payload.jobs[0]?.jobId ?? null
-        return { jobId: first, wtpPadId: msg.payload.wtpPads[0].id }
+        return { jobId: first }
       },
     })
     expect(sim.runUntil().reason).toBe('failed')
@@ -183,7 +185,7 @@ describe('SHC invariants hold for every fixture and stress variant', () => {
   it('a broken dispatch handler that always picks pad 1 (ASC off) double-occupies it', () => {
     const sim = createSimulation(
       shcFixture,
-      { shcDispatch: (msg) => ({ jobId: msg.payload.jobs[0]?.jobId ?? null, wtpPadId: msg.payload.wtpPads[0].id }) },
+      { wtpPadSelection: (msg) => ({ wtpPadId: msg.payload.wtpPads[0].id }) },
       { subsystems: { asc: 'off' } },
     )
     expect(sim.runUntil().reason).toBe('failed')
@@ -225,7 +227,7 @@ describe('waiting when SHCs are scarce', () => {
 describe('shcDispatch decision point', () => {
   const withStrategy = (strategy: string): ScenarioConfig => ({
     ...shcFixture,
-    decisions: { points: { shcDispatch: { strategy } } },
+    decisions: { points: { shcDispatch: { strategy }, wtpPadSelection: { strategy: strategy === 'nearest-job' ? 'nearest-box' : 'first-free' } } },
   })
 
   it('offers at least two built-in strategies', () => {
@@ -242,7 +244,7 @@ describe('shcDispatch decision point', () => {
     const b = summarizeRun(nearest)
     expect(a.eventLogHash).not.toBe(b.eventLogHash)
     expect(a.kpis.horizontal).not.toEqual(b.kpis.horizontal)
-    // nearest-job delivers to the pad nearest the crane (block B01 is west of STS01)
+    // nearest-job + nearest-box deliver to the pad nearest the crane (block B01 is west of STS01)
     const pads = (sim: Simulation) =>
       new Set(sim.eventLog().flatMap((e) => (e.type === 'ShcDroppedAtWtp' ? [e.payload.wtpPadId] : [])))
     expect([...pads(oldest)]).toContain('B01-WTP1')
@@ -281,6 +283,92 @@ describe('shcDispatch decision point', () => {
     expect(k.equipmentIdleS).toBeCloseTo(3 * k.resolved, 6)
     expect(sim.invariantReport().violations).toEqual([])
     expect(sim.kpiReport().horizontal!.boxesToWtp).toBe(10)
+  })
+})
+
+describe('wtpPadSelection decision point (V11-11)', () => {
+  const padChoices = (sim: Simulation) =>
+    sim.eventLog().flatMap((e) =>
+      e.type === 'DecisionResolved' && e.payload.decisionPoint === 'wtpPadSelection' ? [e.payload.reply.wtpPadId] : [],
+    )
+  const resolved = (sim: Simulation, dp: 'shcDispatch' | 'wtpPadSelection') =>
+    sim.eventLog().flatMap((e) => (e.type === 'DecisionResolved' && e.payload.decisionPoint === dp ? [e] : []))
+  const withPad = (extra: object): ScenarioConfig => ({ ...shcFixture, decisions: { points: { wtpPadSelection: extra } } })
+
+  it('is its own decision point with first-free as default and 2+ strategies', () => {
+    expect(strategies.wtpPadSelection.default).toBe('first-free')
+    expect(Object.keys(strategies.wtpPadSelection.strategies).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('SHC dispatch picks the job, then the pad is asked once per discharge job (default: first free pad)', () => {
+    const sim = createSimulation(shcFixture)
+    sim.runUntil()
+    const dispatch = resolved(sim, 'shcDispatch')[0]
+    expect((dispatch.payload as { reply: unknown }).reply).toEqual({ jobId: 'J1' })
+    expect(padChoices(sim)).toHaveLength(10)
+    expect(padChoices(sim)[0]).toBe('B01-WTP1')
+    // the pad decision follows its dispatch decision, and the trip is planned from the pad reply
+    const firstPad = resolved(sim, 'wtpPadSelection')[0]
+    expect(firstPad.id).toBeGreaterThan(dispatch.id)
+    expect(sim.kpiReport().handlers.wtpPadSelection.calls).toBe(10)
+    expect(sim.invariantReport().violations).toEqual([])
+  })
+
+  it('the request names the job, the box position and every pad', () => {
+    const seen: WtpPadSelectionRequest[] = []
+    const first = getStrategy('wtpPadSelection', 'first-free')
+    const sim = createSimulation(shcFixture, {
+      wtpPadSelection: (msg, query) => {
+        seen.push(msg.payload)
+        return first(msg, query) as WtpPadSelectionReply
+      },
+    })
+    sim.runUntil()
+    expect(seen[0]).toMatchObject({ shcId: 'SHC01', jobId: 'J1', stsId: 'STS01', groundPositionId: 'STS01-GP1' })
+    expect(seen[0].wtpPads.map((p) => p.id)).toEqual(['B01-WTP1', 'B01-WTP2', 'B01-WTP3', 'B01-WTP4'])
+  })
+
+  it('an alternative strategy diverges at the first wtpPadSelection decision', () => {
+    const a = createSimulation(shcFixture)
+    const b = createSimulation(withPad({ strategy: 'nearest-box' }))
+    a.runUntil()
+    b.runUntil()
+    const ra = resolved(a, 'wtpPadSelection')
+    const rb = resolved(b, 'wtpPadSelection')
+    expect((rb[0].payload as { reply: unknown }).reply).not.toEqual((ra[0].payload as { reply: unknown }).reply)
+    // everything before that first pad decision is identical
+    const idx = a.eventLog().findIndex((e) => e.id === ra[0].id)
+    expect(b.eventLog().slice(0, idx).map((e) => [e.type, e.t])).toEqual(a.eventLog().slice(0, idx).map((e) => [e.type, e.t]))
+    expect(summarizeRun(a).eventLogHash).not.toBe(summarizeRun(b).eventLogHash)
+    expect(b.invariantReport().violations).toEqual([])
+  })
+
+  it('latency on wtpPadSelection idles the SHC waiting for its pad', () => {
+    const sim = createSimulation(withPad({ latency: { delay: { kind: 'fixed', ms: 2000 } } }))
+    sim.runUntil()
+    const k = sim.kpiReport().handlers.wtpPadSelection
+    expect(k.simLatencyS.mean).toBeCloseTo(2, 6)
+    expect(k.equipmentIdleS).toBeCloseTo(2 * k.resolved, 6)
+    expect(sim.kpiReport().horizontal!.boxesToWtp).toBe(10)
+    expect(sim.invariantReport().violations).toEqual([])
+  })
+
+  it('a timeout falls back to the default strategy', () => {
+    const sim = createSimulation(withPad({ strategy: 'last-free', latency: { timeoutPct: 100 }, fallbackStrategy: 'first-free' }))
+    sim.runUntil()
+    expect(sim.kpiReport().handlers.wtpPadSelection.timeouts).toBe(10)
+    expect(padChoices(sim)[0]).toBe('B01-WTP1')
+    expect(sim.kpiReport().horizontal!.boxesToWtp).toBe(10)
+  })
+
+  it('a null reply gives the job back (open again) and parks the SHC', () => {
+    const sim = createSimulation(shcFixture, { wtpPadSelection: () => ({ wtpPadId: null }) })
+    const resolved = () =>
+      sim.eventLog().some((e) => e.type === 'DecisionResolved' && e.payload.decisionPoint === 'wtpPadSelection')
+    while (!resolved()) sim.step()
+    expect(sim.query.shcJobs().find((j) => j.id === 'J1')).toMatchObject({ shcId: null })
+    expect(sim.query.shcs().find((x) => x.id === 'SHC01')).toMatchObject({ status: 'parked', jobId: null })
+    expect(sim.firstError).toBeNull()
   })
 })
 
