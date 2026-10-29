@@ -5,8 +5,7 @@
  * them against `SceneModel`). Plan coordinates are scene metres: X along the quay,
  * Z from the quay edge (0) towards the yard, the sea at negative Z.
  */
-import { BAY_PITCH_M, blockSpecs, BLOCK_ROWS, ROW_PITCH_M, hasLandside, landsideGraphOf, transferStallLayout, wtpPadLayout } from '../engine'
-import { apronLayout } from '../engine/laneGraph'
+import { BAY_PITCH_M, blockSpecs, BLOCK_ROWS, ROW_PITCH_M, hasLandside, landsideGraphOf, transferStallLayout, wtpPadLayout, apronLayout } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 
 export interface PlanRect {

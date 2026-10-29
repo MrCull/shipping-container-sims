@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hourBuckets, hourIndexOf, kpiClockOf, shiftBuckets } from '../engine/kpi/clock'
+import { hourBuckets, hourIndexOf, kpiClockOf, shiftBuckets } from '../engine'
 import { ScenarioBuilder } from '../scenario/builder'
 
 const clock = (startTimeOfDayS: number, shiftStartHour = 6) => ({ startTimeOfDayS, shiftStartHour })

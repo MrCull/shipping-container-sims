@@ -4,8 +4,7 @@
  * hand-computed literals from synthetic events.
  */
 import { describe, expect, it } from 'vitest'
-import { createSimulation, restoreSimulation, type EngineEvent, type Simulation } from '../engine'
-import { createKpiCollector, type KpiSeriesReport } from '../engine/kpi/collector'
+import { createKpiCollector, createSimulation, restoreSimulation, type EngineEvent, type KpiSeriesReport, type Simulation } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import { ScenarioBuilder } from '../scenario/builder'
 

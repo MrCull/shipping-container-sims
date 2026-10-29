@@ -22,6 +22,7 @@ import {
   railSegmentIds,
   railSegmentSpan,
   railStartZ,
+  prefillOf,
   rowX,
   slotZ,
   tierBaseY,
@@ -37,7 +38,6 @@ import {
 } from '../engine'
 import { planCargo } from '../scenario/bayPlan'
 import { planExportYard } from '../scenario/exportYard'
-import { prefillOf } from '../engine/prefill'
 import type { ContainerSize, ScenarioConfig, VesselConfig } from '../scenario/types'
 import {
   parseVesselSlotId,

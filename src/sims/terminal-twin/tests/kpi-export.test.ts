@@ -1,8 +1,6 @@
 /** KPI headline, highlights and JSON/CSV export (TT-07). */
 import { describe, expect, it } from 'vitest'
-import { createSimulation, type Simulation } from '../engine'
-import { eventLogCsv, eventLogJson, kpiReportCsv, kpiReportJson } from '../engine/export'
-import { headlineKpis, highlightsOf } from '../engine/kpi/headline'
+import { createSimulation, eventLogCsv, eventLogJson, headlineKpis, highlightsOf, kpiReportCsv, kpiReportJson, type Simulation } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 
 function finished(name: string): Simulation {

@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { createSimulation, suggestedInvariantEvery } from '../engine'
-import { indexYardSlotAdded, indexYardSlotRemoved, yardIndexOf } from '../engine/yardIndex'
-import type { YardSlotState } from '../engine/state'
-import { blockersOf, boxesAbove } from '../engine/subsystems/rehandle'
+import {
+  blockersOf,
+  boxesAbove,
+  createSimulation,
+  indexYardSlotAdded,
+  indexYardSlotRemoved,
+  suggestedInvariantEvery,
+  yardIndexOf,
+  type YardSlotState,
+} from '../engine'
 import { StaticBatch } from '../modules/staticBatch'
 import { presets } from '../scenario/presets'
 
