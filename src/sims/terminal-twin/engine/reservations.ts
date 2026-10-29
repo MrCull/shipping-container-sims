@@ -105,3 +105,17 @@ export function overlappingReservations(list: Reservation[]): [Reservation, Rese
   }
   return pairs
 }
+
+/** Overlapping pairs that involve a reservation with `id >= fromId` (those made since the last check). */
+export function overlappingNewReservations(list: Reservation[], fromId: number): [Reservation, Reservation][] {
+  const pairs: [Reservation, Reservation][] = []
+  for (const r of list) {
+    if (r.id < fromId) continue
+    for (const o of list) {
+      if (o === r || o.zone !== r.zone || !overlaps(r.from, r.to, o.from, o.to)) continue
+      if (o.id >= fromId && o.id < r.id) continue // a pair of two new ones is reported once
+      pairs.push(r.from < o.from || (r.from === o.from && r.id < o.id) ? [r, o] : [o, r])
+    }
+  }
+  return pairs
+}

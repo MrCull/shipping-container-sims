@@ -77,7 +77,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Fallback:** the built-in strategy that answers when a handler times out or errors (`DecisionFailed` → `DecisionResolved` with outcome `fallback`).
 - **Idle time caused:** sim seconds that equipment spent waiting on a decision, attributed to that decision point's handler.
 - **Motion segment:** a planned rest-to-rest move of one equipment axis with a known start and end time. It uses an accelerate/cruise/decelerate (trapezoidal) or short-move (triangular) profile.
-- **Invariant:** a rule that must hold after every event (for example `custody.single-owner`). **Fail-fast** stops the run at the first violation.
+- **Invariant:** a rule that must hold after every event (for example `custody.single-owner`). **Fail-fast** stops the run at the first violation. Checking is **incremental** (only the invariants and entities an event touched, by the entity kinds each invariant `reads`), with a full **sweep** every N events and at the end of each run.
 - **Snapshot:** a full JSON copy of a run's state (queue, RNG, log), used to resume the run exactly.
 - **Event-log hash:** a deterministic hash of every committed event. The same seed and config always give the same hash.
 - **Structured log:** JSON-lines records derived from committed events (`t`, `eventId`, `seq`, `subsystem`, `level`, …), filtered by **per-subsystem verbosity** (`sts=debug,*=warn`).

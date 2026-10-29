@@ -68,6 +68,6 @@ Logged as GitHub issues on 2026-10-29 (not in PR #54): #55 real-GPU frame rate, 
 - **SHC cornering:** SHCs stop at every turn instead of cornering at speed.
 - **Container orientation:** position plus optional yaw only.
 - **Frame rate:** an 18k-box yard is unconfirmed on real GPU hardware (TT-19).
-- **Invariant cost:** invariants scan the whole state after every event. Revisit in TT-19.
+- **Invariant cost:** done in V11-18 (incremental checks plus periodic sweeps).
 - **Date pickers:** `datetime-local` inputs show the browser locale, not the chosen one.
 - **Per-kind renderer registry** (#57): `tests/equipment-kinds.test.ts` guards kind registration meanwhile.

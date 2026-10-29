@@ -148,7 +148,7 @@ terminal-twin/
 ## Public engine API (`engine/index.ts`)
 
 ```ts
-const sim = createSimulation(config, handlers?, { seed?, asyncMode?, invariants?: { enabled?, failFast? },
+const sim = createSimulation(config, handlers?, { seed?, asyncMode?, invariants?: { enabled?, failFast?, sweepEvery? },
                                                  log?: { verbosity?: 'sts=debug,*=warn', write(record) } })
 sim.step(); sim.runUntil({ time?, eventType?, vesselsCompleted?, moves?, maxEvents?, predicate? })
 await sim.runUntilAsync(cond?) // same, but awaits async (Promise) handlers instead of stopping
@@ -159,7 +159,7 @@ sim.query.container(id) / .containers() / .vessel(id) / .vesselSlot(id) / .sts(i
 sim.why(eventId)            // [event, parent, …, ScenarioStarted]
 sim.inject(type, at, subjects, payload) // schedule an external event as an extra root (causedBy null; dev API / tests)
 sim.subscribe(fn, { types? }) // returns unsubscribe
-sim.eventLog(); sim.eventLogHash(); sim.kpiReport(); sim.invariantReport(); sim.status; sim.firstError
+sim.eventLog(); sim.eventLogHash(); sim.kpiReport(); sim.invariantReport(); sim.invariantStats(); sim.status; sim.firstError
 summarizeRun(sim)           // RunSummary = CLI --out and golden format
 diffEventLogs(logA, logB, { context? }) // { diverged, commonEvents, seq, a, b, differences, before, afterA, afterB }
 parseLogVerbosity('asc=debug,*=warn'); toLogRecord(event, verbosity)
@@ -170,8 +170,8 @@ parseLogVerbosity('asc=debug,*=warn'); toLogRecord(event, verbosity)
 - **Engine imports:** `npm run lint` enforces the barrel rule (`eslint.config.js`, `no-restricted-imports`): `engine/` and `scenario/` may deep-import, everything else (modules, components, store, tests) imports engine code from `engine/index.ts`.
 - **New event type:** add it to `EventPayloads` in `events.ts`, and add its reactor to a subsystem `ReactorMap` listed in `REACTORS` (`simulation.ts`).
 - **New subsystem:** create `engine/subsystems/<name>.ts` that exports a `ReactorMap`, then add it to `REACTORS`.
-- **New custody owner kind:** extend `CustodyKind` and add its holders to `custodyHolders()` in `invariants.ts`.
-- **New invariant:** append it to `INVARIANTS` with a dotted id, and add a test that uses a broken handler or reactor to trigger it.
+- **New custody owner kind:** extend `CustodyKind` and add its holders to `custodyHolders()` and `heldAt()` in `invariants.ts`.
+- **New invariant:** append it to `INVARIANTS` with a dotted id and `reads` (the entity kinds it looks at: `container`, `yardSlot`, `vessel`, `equipment`, `reservation`, `time`), and add a test that uses a broken handler or reactor to trigger it. One that reads a lot of state should also set `scoped: true` and honour the `scope` argument (the containers, yard columns, equipment and vessels the last event touched); see the cost pitfall below.
 - **New fixture:** add it to `scenario/fixtures/definitions.ts`, run `npm run tt:fixtures`, import the JSON in `fixtures/index.ts`, then `UPDATE_GOLDEN=1 npm test`.
 - **Logging a new event type:** nothing to do if its name starts with its subsystem (`AscMoveStarted` → `asc`, level `info`). Otherwise, or for a `debug`/`warn`/`error` level, add it to `EVENT_LOG_META` in `engine/logging.ts`.
 - **New CLI strategy for diffs:** add a named handler set to `cli/handlerSets.ts` (or, for one decision point, pass `--strategy <dp>=<name>`; `tt:run` takes the same flag).
@@ -238,7 +238,7 @@ Gotchas specific to one feature sit in its topic doc. These hold across the engi
 - An injected delay of at least `timeoutMs` (default 5 s) is a timeout. Raise `timeoutMs` when you inject long latencies.
 - A reply computed at request time is delivered later in keep-running mode, so it can be stale. That is realistic: a reply with an invalid ground position surfaces as an invariant violation.
 - If the ground-position handler returns `null`, the STS raises `StsWaitingForGroundPosition` and idles for good. Nothing wakes it yet.
-- Invariants are checked over the whole state after every event (O(state)), which is fine at tracer scale. Revisit before the TTI preset (TT-19).
+- **Invariant cost (V11-18):** invariants are checked incrementally. After an event `InvariantTracker.check` runs only the invariants whose `reads` overlap the event's subjects, and the scoped ones (custody, the five yard rules, reservations, ASC passing, landside segregation, stowage order) look only at the touched boxes, yard columns, equipment and vessels. The tracker remembers each box's last custody owner and yard columns, so a box that left a place still marks it. A full sweep runs on the first check, every `invariants.sweepEvery` events (default 1000, `DEFAULT_SWEEP_EVERY`) and at the end of every run. So an incremental check catches a violation at its exact event, but a violation in state the event did not name (a box changed without being a subject, or a rule broken by the passage of time alone) only surfaces at the next sweep and is attributed to the event where the sweep ran. **When an event changes a container's custody or yard slot, list the container in its `subjects.containers`**; `tests/invariants-incremental.test.ts` guards this on seven fixtures. `sim.invariantStats()` gives incremental checks, sweeps and wall ms; `tt:bench` prints invariant time on its own line.
 - Snapshots embed the full event log. `--from-snapshot` runs write only the window's events/log lines, but KPIs and the event-log hash in the summary are cumulative from t = 0.
 - `--until time:T` leaves `now = T`, so a snapshot taken there resumes at exactly `T`; events at `t ≤ T` are in the snapshot, the window holds `t > T`.
 - Handlers are not in snapshots: pass the same `--handlers` when resuming a window.

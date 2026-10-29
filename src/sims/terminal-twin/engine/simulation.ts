@@ -9,7 +9,7 @@ import { heapPop, heapPush } from './eventQueue'
 import type { EngineEvent, EventOf, EventPayloads, EventSubjects, EventType } from './events'
 import type { HandlerSet } from './handlers'
 import { hashDigest, hashUpdate } from './hash'
-import { checkInvariants, type InvariantViolation } from './invariants'
+import { DEFAULT_SWEEP_EVERY, InvariantTracker, type InvariantViolation } from './invariants'
 import { buildKpiReport, type KpiReport } from './kpis'
 import { kpiClockOf } from './kpi/clock'
 import { createKpiCollector, type KpiSeriesReport } from './kpi/collector'
@@ -47,8 +47,12 @@ export interface SimulationOptions {
     enabled?: boolean
     /** Stop the run at the first violation (default true). */
     failFast?: boolean
-    /** Check after every Nth event instead of every event (default 1); the event that ends the run is always checked. For long runs of big scenarios. */
-    every?: number
+    /**
+     * Run a full sweep of every invariant every Nth event (default 1000). Between sweeps each event is checked
+     * incrementally (only the invariants and entities it touched); the event that ends the run is always swept.
+     * `1` sweeps after every event.
+     */
+    sweepEvery?: number
   }
   /**
    * Subsystem modes (override `config.subsystems`): real, instant (same
@@ -97,7 +101,7 @@ export interface SimError {
 
 export interface InvariantReport {
   enabled: boolean
-  /** Number of events after which all invariants were checked. */
+  /** Number of events after which invariants were checked (incrementally or by a full sweep). */
   checks: number
   violations: InvariantViolation[]
 }
@@ -186,6 +190,16 @@ export interface Simulation {
   /** Every KPI as hourly, per-shift and whole-run series (the collector behind the KPI strip, report and exports). */
   kpiSeries(): KpiSeriesReport
   invariantReport(): InvariantReport
+  /** Cost of invariant checking so far (not part of the report or snapshots: wall time is not deterministic). */
+  invariantStats(): InvariantStats
+}
+
+export interface InvariantStats {
+  /** Events checked incrementally, and full sweeps run (the first check after a restore is a sweep). */
+  incremental: number
+  sweeps: number
+  /** Wall time spent in invariant checks, ms. */
+  wallMs: number
 }
 
 /** The event as the measured clock sees it (warm-up removed): its time and any planned motion segments move back. */
@@ -208,8 +222,10 @@ export function createSimulation(
   const seed = options.seed ?? config.seed
   const invariantsEnabled = options.invariants?.enabled ?? true
   const failFast = options.invariants?.failFast ?? true
-  const invariantEvery = Math.max(1, Math.floor(options.invariants?.every ?? 1))
-  let sinceInvariantCheck = 0
+  const sweepEvery = Math.max(1, Math.floor(options.invariants?.sweepEvery ?? DEFAULT_SWEEP_EVERY))
+  const tracker = new InvariantTracker()
+  let invariantWallMs = 0
+  let sinceSweep = 0
 
   let state = createInitialState(config, seed, resolveSubsystemModes(config, options.subsystems), handlers.yardAllocation)
   let log: EngineEvent[] = []
@@ -346,6 +362,31 @@ export function createSimulation(
     }
   }
 
+  /**
+   * Check the invariants after `ev`: incrementally, or by a full sweep when one is due or `forceSweep` is set.
+   * Violations are logged; returns true when a fail-fast violation stopped the run.
+   */
+  function checkInvariants(ev: EngineEvent, forceSweep: boolean, counted = true): boolean {
+    const started = performance.now()
+    const sweep = ++sinceSweep >= sweepEvery || forceSweep
+    if (sweep) sinceSweep = 0
+    if (counted) invariants.checks++ // `checks` is in the golden summaries: the closing sweep of a duration-ended run is not an event check
+    const violations = sweep ? tracker.sweep(state, config) : tracker.check(state, config, ev)
+    invariantWallMs += performance.now() - started
+    for (const v of violations) {
+      invariants.violations.push({ ...v, eventId: ev.id, t: ev.t })
+      commit(
+        makeEvent('InvariantViolated', ev.t, ev.id, {}, {
+          invariant: v.invariant,
+          message: v.message,
+          offendingEventId: ev.id,
+        }),
+      )
+      if (failFast) fail({ eventId: ev.id, t: ev.t, message: `[${v.invariant}] ${v.message}` })
+    }
+    return violations.length > 0 && failFast
+  }
+
   function step(): EngineEvent | null {
     if (status !== 'ready') return null
     decisions.drain()
@@ -353,6 +394,8 @@ export function createSimulation(
     const next = state.queue[0]
     const duration = durationEnd()
     if (duration !== undefined && (!next || next.t > duration)) {
+      // the run's last event is always swept, even when the run ends on its duration instead of on an event
+      if (invariantsEnabled && sinceSweep > 0 && log.length > 0 && checkInvariants(log[log.length - 1], true, false)) return log[log.length - 1]
       endScenario(`simDurationS >= ${config.endConditions.simDurationS}`, Math.max(state.now, duration), null)
       return log[log.length - 1]
     }
@@ -368,24 +411,7 @@ export function createSimulation(
     }
     commit(ev)
     const endReason = endConditionMet()
-    if (invariantsEnabled && (++sinceInvariantCheck >= invariantEvery || endReason)) {
-      sinceInvariantCheck = 0
-      invariants.checks++
-      const violations = checkInvariants(state, config)
-      for (const v of violations) {
-        const violation = { ...v, eventId: ev.id, t: ev.t }
-        invariants.violations.push(violation)
-        commit(
-          makeEvent('InvariantViolated', ev.t, ev.id, {}, {
-            invariant: v.invariant,
-            message: v.message,
-            offendingEventId: ev.id,
-          }),
-        )
-        if (failFast) fail({ eventId: ev.id, t: ev.t, message: `[${v.invariant}] ${v.message}` })
-      }
-      if (violations.length > 0 && failFast) return ev
-    }
+    if (invariantsEnabled && checkInvariants(ev, Boolean(endReason))) return ev
     if (endReason) endScenario(endReason, ev.t, ev.id)
     return ev
   }
@@ -476,6 +502,7 @@ export function createSimulation(
       status = copy.status
       firstError = copy.firstError
       invariants = { ...copy.invariants, enabled: invariantsEnabled }
+      tracker.reset()
       decisions.reset()
       collector = newCollector()
       for (const ev of log) feed(ev)
@@ -505,6 +532,7 @@ export function createSimulation(
     kpiReport: () => buildKpiReport(state, log.length),
     kpiSeries: () => collector.report(Math.max(0, state.now - warmUpS())),
     invariantReport: () => clone(invariants),
+    invariantStats: () => ({ ...tracker.stats, wallMs: invariantWallMs }),
   }
 }
 
