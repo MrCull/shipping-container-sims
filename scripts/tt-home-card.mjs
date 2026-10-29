@@ -2,7 +2,7 @@
  * Regenerates the Terminal Twin home-page card image: the TTI Algeciras preset
  * mid-run, overview angle, 3D view only (no UI). Re-run whenever the visuals change:
  *
- *   npm run tt:card
+ *   pnpm run tt:card
  *
  * Output: src/sims/terminal-twin/assets/home-card.png (committed; the definition imports it).
  * It drives scripts/screenshot.mjs (headless Chromium, software WebGL), so it needs no running server.

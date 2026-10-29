@@ -13,28 +13,28 @@ A Vue 3 + TypeScript web app that hosts shipping-container-themed simulations an
 - **Vue Router** — SPA routing (`/` home, `/sim/:simId` game page)
 - **Three.js** — 3D rendering (shared via `useThreeScene` composable)
 - **ESLint** — static analysis for JS/TS/Vue (`eslint.config.js`; Vue + TypeScript recommended presets)
-- **Vitest** — unit/integration tests (`npm test`); **tsx** — runs headless TypeScript CLIs
+- **Vitest** — unit/integration tests (`pnpm test`); **tsx** — runs headless TypeScript CLIs
 
 ## Linting and verification
 
-After making substantive code changes, run **`npm run lint`** to catch issues.
+After making substantive code changes, run **`pnpm run lint`** to catch issues.
 
-Before handing work back after code changes, run **`npm run verify`**: the dependency check (`node scripts/check-deps.mjs`), then lint, then build (catches TypeScript or Vite errors that linting may miss), then tests when a `test` script exists. Pull requests to `main` run the same checks in CI (`.github/workflows/pr-checks.yml`).
+Before handing work back after code changes, run **`pnpm run verify`**: the dependency check (`node scripts/check-deps.mjs`), then lint, then build (catches TypeScript or Vite errors that linting may miss), then tests when a `test` script exists. Pull requests to `main` run the same checks in CI (`.github/workflows/pr-checks.yml`).
 
-**Tests:** `npm test` runs **Vitest** (`*.test.ts` under `src/`, Node environment); `npm run test:watch` for watch mode. Test files (`*.test.ts`, `*.smoke.ts`) and Node-only CLI code (`src/sims/*/cli/`) are type-checked by `tsconfig.tools.json` (Node types; DOM lib only for `page.evaluate` callbacks) and excluded from `tsconfig.app.json`. Headless TypeScript scripts run with **`tsx`** (e.g. `npm run tt:run -- --help`).
+**Tests:** `pnpm test` runs **Vitest** (`*.test.ts` under `src/`, Node environment); `pnpm run test:watch` for watch mode. Test files (`*.test.ts`, `*.smoke.ts`) and Node-only CLI code (`src/sims/*/cli/`) are type-checked by `tsconfig.tools.json` (Node types; DOM lib only for `page.evaluate` callbacks) and excluded from `tsconfig.app.json`. Headless TypeScript scripts run with **`tsx`** (e.g. `pnpm run tt:run -- --help`).
 
-**Terminal Twin scripts** (`npm run tt:*`: headless runs, goldens, benchmark, asset pipeline): the sim guide's "How to prove a change works" lists them.
+**Terminal Twin scripts** (`pnpm run tt:*`: headless runs, goldens, benchmark, asset pipeline): the sim guide's "How to prove a change works" lists them.
 
-To apply ESLint auto-fixes (including many Vue template and style rules), use **`npm run lint:fix`**.
+To apply ESLint auto-fixes (including many Vue template and style rules), use **`pnpm run lint:fix`**.
 
-**npm and `--fix`:** Arguments after `npm run <script>` are **not** passed to the underlying command unless you insert **`--`**. For example, **`npm run lint --fix`** only runs `eslint .` — it does **not** pass `--fix` to ESLint. Either run **`npm run lint:fix`**, or pass the flag explicitly: **`npm run lint -- --fix`**.
+**Script arguments and `--fix`:** Arguments after `pnpm run <script>` are **not** passed to the underlying command unless you insert **`--`**. For example, **`pnpm run lint --fix`** only runs `eslint .` — it does **not** pass `--fix` to ESLint. Either run **`pnpm run lint:fix`**, or pass the flag explicitly: **`pnpm run lint -- --fix`**.
 
 ## Agent tooling
 
-- **Cloud sessions**: a SessionStart hook (`.claude/hooks/session-start.sh`) runs `npm install` in Claude Code cloud sessions, so lint/build/test work immediately. It does nothing locally.
-- **Visual checks**: `npm run screenshot -- --path /sim/<sim-id> --wait 8000` starts a Vite dev server on a free port, opens the route in headless Chromium (WebGL works via software rendering), saves a PNG to `.screenshots/` (git-ignored) and reports page errors. Use `--out <file>`, `--wait-for <selector>`, `--eval "<js>"` (e.g. drive a dev-only debug API before the shot), `--full-page`, `--fail-on-error`, or `--base <url>` to use an already-running server. If Playwright's bundled Chromium isn't installed it falls back to `CHROMIUM_PATH` or the cloud image's preinstalled `/opt/pw-browsers/chromium`.
-- **Browser smoke tests**: `npm run test:smoke` runs Playwright specs `src/**/*.smoke.ts` (`playwright.config.ts`). The `dev` project uses a Vite dev server, so dev-only APIs work; the `prod` project (`*.prod.smoke.ts`) uses a fresh production build served by `vite preview`. They are not part of `npm test`/`verify`; CI does not run them on every push (they take about 15 minutes and bill Actions minutes): the `smoke` job in `.github/workflows/pr-checks.yml` runs from the Actions tab ("Run workflow") or while a PR carries the `smoke` label, and should be green before merging UI changes; specs titled `@load` (they need a real frame rate) never run in CI, so run them locally. Frame-based assertions are ratios over a minimum wall-clock window (`tests/browser/frameSampling.ts`), never absolute frame counts, so they hold on a loaded 2-core runner. Ports default to 5199 (dev) / 5198 (prod); set `SMOKE_DEV_PORT` / `SMOKE_PROD_PORT` to run two checkouts at once. Chromium falls back the same way as the screenshot tool.
-- **README media**: `npm run capture-readme-media` (needs `npm run build && npm run preview` first) regenerates the README screenshots.
+- **Cloud sessions**: a SessionStart hook (`.claude/hooks/session-start.sh`) runs `pnpm install` in Claude Code cloud sessions, so lint/build/test work immediately. It does nothing locally.
+- **Visual checks**: `pnpm run screenshot -- --path /sim/<sim-id> --wait 8000` starts a Vite dev server on a free port, opens the route in headless Chromium (WebGL works via software rendering), saves a PNG to `.screenshots/` (git-ignored) and reports page errors. Use `--out <file>`, `--wait-for <selector>`, `--eval "<js>"` (e.g. drive a dev-only debug API before the shot), `--full-page`, `--fail-on-error`, or `--base <url>` to use an already-running server. If Playwright's bundled Chromium isn't installed it falls back to `CHROMIUM_PATH` or the cloud image's preinstalled `/opt/pw-browsers/chromium`.
+- **Browser smoke tests**: `pnpm run test:smoke` runs Playwright specs `src/**/*.smoke.ts` (`playwright.config.ts`). The `dev` project uses a Vite dev server, so dev-only APIs work; the `prod` project (`*.prod.smoke.ts`) uses a fresh production build served by `vite preview`. They are not part of `pnpm test`/`verify`; CI does not run them on every push (they take about 15 minutes and bill Actions minutes): the `smoke` job in `.github/workflows/pr-checks.yml` runs from the Actions tab ("Run workflow") or while a PR carries the `smoke` label, and should be green before merging UI changes; specs titled `@load` (they need a real frame rate) never run in CI, so run them locally. Frame-based assertions are ratios over a minimum wall-clock window (`tests/browser/frameSampling.ts`), never absolute frame counts, so they hold on a loaded 2-core runner. Ports default to 5199 (dev) / 5198 (prod); set `SMOKE_DEV_PORT` / `SMOKE_PROD_PORT` to run two checkouts at once. Chromium falls back the same way as the screenshot tool.
+- **README media**: `pnpm run capture-readme-media` (needs `pnpm run build && pnpm run preview` first) regenerates the README screenshots.
 
 ## Project structure
 
@@ -76,7 +76,7 @@ Each sim that has grown beyond a trivial prototype maintains its own agent guide
 - **[Box Empire](src/sims/box-empire/box-empire-AGENTS.md)** — Terminal operations tycoon sim. Architecture, modules, components, composables, layout, assets, shipping-line liveries, and known behaviours.
 - **[Container Stack / Contenga](src/sims/container-stack/AGENTS.md)** — 3D Jenga-style container stacking game. Phase state machine, Three.js rendering split, pointer interaction, stability physics, scoring, level timers, audio, and known pitfalls.
 - **[Stowage Master](src/sims/stowage-master/stowage-master-AGENTS.md)** — Container stowage puzzle sim. Phase state machine, physics (list/trim/VCG), scoring, disaster system, 10 levels, ship presets, rendering modules, optional Jev assist, and known pitfalls.
-- **[Terminal Twin](src/sims/terminal-twin/terminal-twin-AGENTS.md)** — Event-driven automated-terminal digital twin / TOS test bench. Headless engine API, events and causality, invariants, fixtures and golden summaries, CLI runner, browser host (Web Worker, 3D view, time controls, `window.__tt` dev API), phase 2 asset pipeline (Blender `bpy` generators, `npm run tt:assets`, asset budget check in CI, dev asset viewer), and "How to prove a change works". Per-topic detail is in its `docs/` folder, reached by pointers in the guide. Domain terms: **[GLOSSARY.md](GLOSSARY.md)**.
+- **[Terminal Twin](src/sims/terminal-twin/terminal-twin-AGENTS.md)** — Event-driven automated-terminal digital twin / TOS test bench. Headless engine API, events and causality, invariants, fixtures and golden summaries, CLI runner, browser host (Web Worker, 3D view, time controls, `window.__tt` dev API), phase 2 asset pipeline (Blender `bpy` generators, `pnpm run tt:assets`, asset budget check in CI, dev asset viewer), and "How to prove a change works". Per-topic detail is in its `docs/` folder, reached by pointers in the guide. Domain terms: **[GLOSSARY.md](GLOSSARY.md)**.
 
 ## Key conventions
 

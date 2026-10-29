@@ -3,9 +3,9 @@
  * Starts a Vite dev server on a free port unless --base is given, so dev-only APIs are available.
  *
  * Usage:
- *   npm run screenshot -- --path /sim/box-empire --wait 8000 --out .screenshots/box-empire.png
- *   npm run screenshot -- --base http://127.0.0.1:4173 --path / --full-page
- *   npm run screenshot -- --path /sim/x --wait-for "canvas" --eval "window.__tt?.step()"
+ *   pnpm run screenshot -- --path /sim/box-empire --wait 8000 --out .screenshots/box-empire.png
+ *   pnpm run screenshot -- --base http://127.0.0.1:4173 --path / --full-page
+ *   pnpm run screenshot -- --path /sim/x --wait-for "canvas" --eval "window.__tt?.step()"
  *
  * Options:
  *   --path <route>        Route to open (default "/")

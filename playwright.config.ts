@@ -1,5 +1,5 @@
 /**
- * Browser smoke tests (`npm run test:smoke`), kept out of `npm test` so CI
+ * Browser smoke tests (`pnpm run test:smoke`), kept out of `pnpm test` so CI
  * does not need a browser. Specs: `src/sims/<sim>/tests/browser/*.smoke.ts`.
  *
  * - `dev` project: Vite dev server, so dev-only APIs such as `window.__tt` exist.
@@ -7,7 +7,7 @@
  *   `*.prod.smoke.ts`), for checks that dev-only code is absent.
  *
  * Tests titled `@load` need a real frame rate (only the Auto-quality fps spec today): CI runs them as an advisory job
- * (`npm run test:smoke -- --grep @load`); everything else is a required check (`--grep-invert @load`). Frame-based
+ * (`pnpm run test:smoke -- --grep @load`); everything else is a required check (`--grep-invert @load`). Frame-based
  * assertions elsewhere use ratios over a wall-clock window (see tests/browser/frameSampling.ts), so they are load-proof.
  *
  * Uses Playwright's bundled Chromium, or falls back to CHROMIUM_PATH or the

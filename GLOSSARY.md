@@ -85,7 +85,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Subsystem (logging):** the part of the sim an event belongs to (`scenario`, `vessel`, `sts`, `invariants`; later `asc`, `shc`, …), normally the first word of its event type.
 - **Run diff:** a comparison of two event logs that reports the **first diverging event** (its `seq`, the differing fields and both events).
 - **Time window:** a run resumed from a snapshot that processes only events after the snapshot's time, up to a stop condition.
-- **Golden update:** an explicit rewrite of golden summaries (`npm run tt:golden -- --update`). Without it, any difference from a golden is **drift** and fails.
+- **Golden update:** an explicit rewrite of golden summaries (`pnpm run tt:golden -- --update`). Without it, any difference from a golden is **drift** and fails.
 - **Engine horizon:** in the browser, the sim time up to which the worker's engine has processed events. The displayed time never passes it.
 - **Display time:** the sim time the 3D view and clock show. It advances with wall time × **speed** (×1 = real time) and is drawn by interpolating motion segments.
 - **Look-ahead:** how far the engine runs ahead of the display time while playing, so that the motion for the displayed instant is already known.
@@ -144,7 +144,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Provenance tag:** how a value is known: `V` verified, `P` photo-supported, `A` approximated, `M` intentional modification. These are the TTI reference pack's tags.
 - **Livery:** a shipping line's container colours and wordmark. The **livery atlas** has one tile per line, and an instance's **livery index** is its tile.
 - **Wordmark:** the line's name set in a close open-licence typeface and the brand colours, standing in for the official logo.
-- **Asset budget:** the triangle, draw-call and file-size limits per asset kind (`assets/budgets.json`), enforced by the **budget check** (`npm run tt:assets:check`).
+- **Asset budget:** the triangle, draw-call and file-size limits per asset kind (`assets/budgets.json`), enforced by the **budget check** (`pnpm run tt:assets:check`).
 - **SHC model:** the rigged Kalmar-style shuttle carrier asset `shc` (nodes `steer_*`, `wheel_*`, `hoist`, `spreader`, `twistlock_*`). Its **tunnel** is the open space between the legs that a box is carried through, and its **container attach point** is the centre of the twist-lock plane (the top of the carried box). *Avoid:* "SHC mesh".
 - **STS model:** the rigged Malaccamax quay-crane asset `sts-malaccamax` (nodes `gantry`, `trolley`, `hoist`, `spreader`, `boom`, twist-locks). Its **container attach point** is the spreader's seat for the top of a box; a **spreader mode** (`20`, `40`, `twin-20`) sets the telescope and twin-lock positions. *Avoid:* "crane mesh".
 - **Hoist travel:** how far the SHC's `hoist` node moves down from rest (0 to −3.1 m); equal to the carried box's top height minus 6.0 m.
@@ -204,7 +204,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Performance and quality (TT-19)
 
-- **Engine benchmark:** `npm run tt:bench`, a headless run of a preset for N sim-hours that reports events/sec, wall-ms per sim-hour and peak memory and compares them with the committed baseline (a metric over 20% worse is a regression). Local only.
+- **Engine benchmark:** `pnpm run tt:bench`, a headless run of a preset for N sim-hours that reports events/sec, wall-ms per sim-hour and peak memory and compares them with the committed baseline (a metric over 20% worse is a regression). Local only.
 - **Quality level / quality setting:** Low, Medium or High is a level (a bundle of shadows, LOD distances, resolution, ocean detail and night-light budget); the setting is a level or Auto (default).
 - **Auto quality:** steps the level down when the frame rate stays under 45 fps and back up when there is headroom, with a back-off against oscillation.
 - **Performance overlay:** the toggleable (key P) readout of FPS, draw calls, triangles, frame CPU time and the quality in force.

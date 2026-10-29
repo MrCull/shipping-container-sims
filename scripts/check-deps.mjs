@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 
 if (!existsSync(new URL('../node_modules/.bin/eslint', import.meta.url))) {
-  console.error('node_modules is missing or incomplete. Run `npm install` first, then re-run `npm run verify`.')
+  console.error('node_modules is missing or incomplete. Run `ppnpm install` first, then re-run `ppnpm run verify`.')
   process.exit(1)
 }
 
@@ -22,6 +22,6 @@ for (const f of files) {
   if (marker.test(text)) dirty.push(f)
 }
 if (dirty.length > 0) {
-  console.error(`Unresolved merge conflict markers in:\n  ${dirty.join('\n  ')}\nResolve them, then re-run \`npm run verify\`.`)
+  console.error(`Unresolved merge conflict markers in:\n  ${dirty.join('\n  ')}\nResolve them, then re-run \`ppnpm run verify\`.`)
   process.exit(1)
 }

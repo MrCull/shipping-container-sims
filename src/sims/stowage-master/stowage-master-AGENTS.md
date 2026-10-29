@@ -485,7 +485,7 @@ displays a rationale for Jev's choice, because Jev doesn't return one.
 ### Manual QA checklist
 
 There is no automated test runner in this repo, and Jev needs a live browser session (an
-OpenRouter key, `npm run dev`) to exercise — this cannot be verified by lint/build/type-check
+OpenRouter key, `pnpm run dev`) to exercise — this cannot be verified by lint/build/type-check
 alone. The checklist below has **not been run** as part of this change; run it in Chrome (plus
 Firefox for the key dialog and CORS) before relying on Jev in a real session:
 
@@ -511,7 +511,7 @@ Firefox for the key dialog and CORS) before relying on Jev in a real session:
   24K; if the estimate is far off, adjust the divisor in `jevStateBuilder.ts`.
 - **Regression:** normal mouse play on L1, L4, L5 and L8 is unchanged with Jev disabled **and**
   enabled-but-idle.
-- **Build:** `npm run lint` and `npm run build` pass (verified for this change; see repo history).
+- **Build:** `pnpm run lint` and `pnpm run build` pass (verified for this change; see repo history).
 
 ### Evaluation baseline (not yet recorded)
 

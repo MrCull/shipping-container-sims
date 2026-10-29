@@ -105,11 +105,11 @@ describe('CLI runner', () => {
 
   it('the npm entry point runs under tsx and sets the process exit code', () => {
     const entry = fileURLToPath(new URL('../cli/run.ts', import.meta.url))
-    const stdout = execFileSync('npx', ['tsx', entry, '--fixture', 'tracer-1sts-10-boxes'], { encoding: 'utf8' })
+    const stdout = execFileSync(process.execPath, ['--import', 'tsx', entry, '--fixture', 'tracer-1sts-10-boxes'], { encoding: 'utf8' })
     expect(stdout).toContain(golden.eventLogHash)
     let status = 0
     try {
-      execFileSync('npx', ['tsx', entry, '--fixture', 'tracer-1sts-10-boxes', '--handlers', 'broken-first-lane'], {
+      execFileSync(process.execPath, ['--import', 'tsx', entry, '--fixture', 'tracer-1sts-10-boxes', '--handlers', 'broken-first-lane'], {
         stdio: 'pipe',
       })
     } catch (err) {

@@ -25,43 +25,43 @@ Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers b
 
 | Kind of change | Command | What "works" looks like |
 |---|---|---|
-| Anything | `npm run verify` | lint, build (incl. `vue-tsc` for engine, CLI and tests) and `npm test` all pass |
-| Engine behaviour | `npm test` | all Vitest suites pass, including golden summaries |
-| One scenario, by hand | `npm run tt:run -- --fixture tracer-1sts-10-boxes` | `Stopped: ended`, `0 violations`, `First error: none`, exit code 0 |
-| Partial run | `npm run tt:run -- --fixture <name> --until time:600` (or `moves:5`, `vessels:1`, `event:StsPicked`) | stops at the condition |
-| Another seed | `npm run tt:run -- --fixture <name> --seed 7` | runs to the end; hash differs from the golden |
-| Inspect events | `npm run tt:run -- --fixture <name> --events /tmp/ev.jsonl --out /tmp/summary.json` | one JSON event per line; summary = golden format |
-| Failure path | `npm run tt:run -- --fixture <name> --handlers broken-first-lane` | exit 1, first error names `custody.single-owner` at the offending event |
-| Decision points / TOS latency | `npm run tt:run -- --fixture <name> --strategy stsGroundPosition=highest-free-lane --latency stsGroundPosition=exp:2000,timeout:10,error:10 [--async-mode pause]` | `TOS handlers:` block shows calls, fallbacks, latency, backlog, idle caused; invariants still 0 |
-| Structured logs | `npm run tt:run -- --fixture <name> --log /tmp/run.log.jsonl --log-level "sts=debug,vessel=warn,*=info"` | one JSON object per line with `t`, `eventId`, `seq`, `subsystem`, `level`, `type`, `subjects` (+ `causedBy`, `payload` at `debug`); `grep '"subsystem":"sts"'` |
-| Two strategies diverge where? | `npm run tt:diff -- --fixture <name> --b-handlers highest-free-lane` | exit 1; `First divergence at seq N`, differing fields, context and both payloads (exit 0 + `No divergence` if identical) |
-| Two seeds | `npm run tt:diff -- --fixture <name> --a-seed 1 --b-seed 2` | same report |
-| Two code versions | before: `npm run tt:run -- --fixture <name> --events /tmp/before.jsonl`; after your change: `… --events /tmp/after.jsonl`; then `npm run tt:diff -- /tmp/before.jsonl /tmp/after.jsonl` | first diverging event = first effect of your change |
-| Reproduce a late bug | `npm run tt:run -- --fixture <name> --until time:50400 --snapshot /tmp/h14.json`, then `npm run tt:run -- --from-snapshot /tmp/h14.json --until time:54000 --events /tmp/win.jsonl --log /tmp/win.log.jsonl --log-level debug` | the window's events equal that window of the uninterrupted run; re-run the window as often as needed |
-| Check goldens | `npm run tt:golden` (also part of `npm test`) | `<fixture>: match` per fixture, exit 0; drift prints `path: golden X → actual Y` per field and exits 1 |
-| Intentional behaviour change | `npm run tt:golden -- --update` (or `UPDATE_GOLDEN=1 npm test`), then review the `*.golden.json` diff | the golden diff shows only the change you intended |
-| Browser / UI / 3D view | `npm run test:smoke` | Playwright smoke tests in `tests/browser/*.smoke.ts` pass (dev server + a production build). Not part of `npm test`; CI runs them in the required `smoke` job (`--grep-invert @load`). Only the Auto-quality fps spec (`terminal-twin-perf.smoke.ts`, tagged `@load`: it needs a real frame rate) is advisory, in `smoke-load`. Write frame-based checks with `tests/browser/frameSampling.ts` (ratios over a minimum wall-clock window, never absolute frame counts). |
-| Look at the 3D view | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('tracer-1sts-10-boxes').then(() => window.__tt.runTo(330)).then(() => window.__tt.pause())"` | PNG in `.screenshots/` shows the STS mid-cycle, no page errors |
-| UI text, locale, units, shortcuts | `npm test` (`display-format`, `display-settings`, `message-catalogue`) + `npx playwright test --project=dev src/sims/terminal-twin/tests/browser/terminal-twin-display.smoke.ts` | catalogue audit lists no hard-coded strings; locale/units/shortcut smoke tests pass |
+| Anything | `pnpm run verify` | lint, build (incl. `vue-tsc` for engine, CLI and tests) and `pnpm test` all pass |
+| Engine behaviour | `pnpm test` | all Vitest suites pass, including golden summaries |
+| One scenario, by hand | `pnpm run tt:run -- --fixture tracer-1sts-10-boxes` | `Stopped: ended`, `0 violations`, `First error: none`, exit code 0 |
+| Partial run | `pnpm run tt:run -- --fixture <name> --until time:600` (or `moves:5`, `vessels:1`, `event:StsPicked`) | stops at the condition |
+| Another seed | `pnpm run tt:run -- --fixture <name> --seed 7` | runs to the end; hash differs from the golden |
+| Inspect events | `pnpm run tt:run -- --fixture <name> --events /tmp/ev.jsonl --out /tmp/summary.json` | one JSON event per line; summary = golden format |
+| Failure path | `pnpm run tt:run -- --fixture <name> --handlers broken-first-lane` | exit 1, first error names `custody.single-owner` at the offending event |
+| Decision points / TOS latency | `pnpm run tt:run -- --fixture <name> --strategy stsGroundPosition=highest-free-lane --latency stsGroundPosition=exp:2000,timeout:10,error:10 [--async-mode pause]` | `TOS handlers:` block shows calls, fallbacks, latency, backlog, idle caused; invariants still 0 |
+| Structured logs | `pnpm run tt:run -- --fixture <name> --log /tmp/run.log.jsonl --log-level "sts=debug,vessel=warn,*=info"` | one JSON object per line with `t`, `eventId`, `seq`, `subsystem`, `level`, `type`, `subjects` (+ `causedBy`, `payload` at `debug`); `grep '"subsystem":"sts"'` |
+| Two strategies diverge where? | `pnpm run tt:diff -- --fixture <name> --b-handlers highest-free-lane` | exit 1; `First divergence at seq N`, differing fields, context and both payloads (exit 0 + `No divergence` if identical) |
+| Two seeds | `pnpm run tt:diff -- --fixture <name> --a-seed 1 --b-seed 2` | same report |
+| Two code versions | before: `pnpm run tt:run -- --fixture <name> --events /tmp/before.jsonl`; after your change: `… --events /tmp/after.jsonl`; then `pnpm run tt:diff -- /tmp/before.jsonl /tmp/after.jsonl` | first diverging event = first effect of your change |
+| Reproduce a late bug | `pnpm run tt:run -- --fixture <name> --until time:50400 --snapshot /tmp/h14.json`, then `pnpm run tt:run -- --from-snapshot /tmp/h14.json --until time:54000 --events /tmp/win.jsonl --log /tmp/win.log.jsonl --log-level debug` | the window's events equal that window of the uninterrupted run; re-run the window as often as needed |
+| Check goldens | `pnpm run tt:golden` (also part of `pnpm test`) | `<fixture>: match` per fixture, exit 0; drift prints `path: golden X → actual Y` per field and exits 1 |
+| Intentional behaviour change | `pnpm run tt:golden -- --update` (or `UPDATE_GOLDEN=1 pnpm test`), then review the `*.golden.json` diff | the golden diff shows only the change you intended |
+| Browser / UI / 3D view | `pnpm run test:smoke` | Playwright smoke tests in `tests/browser/*.smoke.ts` pass (dev server + a production build). Not part of `pnpm test`; CI runs them in the required `smoke` job (`--grep-invert @load`). Only the Auto-quality fps spec (`terminal-twin-perf.smoke.ts`, tagged `@load`: it needs a real frame rate) is advisory, in `smoke-load`. Write frame-based checks with `tests/browser/frameSampling.ts` (ratios over a minimum wall-clock window, never absolute frame counts). |
+| Look at the 3D view | `pnpm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('tracer-1sts-10-boxes').then(() => window.__tt.runTo(330)).then(() => window.__tt.pause())"` | PNG in `.screenshots/` shows the STS mid-cycle, no page errors |
+| UI text, locale, units, shortcuts | `pnpm test` (`display-format`, `display-settings`, `message-catalogue`) + `npx playwright test --project=dev src/sims/terminal-twin/tests/browser/terminal-twin-display.smoke.ts` | catalogue audit lists no hard-coded strings; locale/units/shortcut smoke tests pass |
 | Saves, snapshots, rewind | `npx vitest run src/sims/terminal-twin/tests/{saves,persistence-host,persistence-controller}.test.ts` + `npx playwright test --project=dev src/sims/terminal-twin/tests/browser/terminal-twin-saves.smoke.ts` | formats and migration, replay-based restore and rewind give the original event-log hash; smoke covers reload, file round-trip, version mismatch, no IndexedDB |
 | Debugger and inspector (breakpoints, step, cause chain, picking, follow, overlays) | `npx vitest run src/sims/terminal-twin/tests/{breakpoints,debugger-host,debugger-controller,event-feed,event-inspector,entity-inspector,picking}.test.ts` + `npx playwright test --project=dev src/sims/terminal-twin/tests/browser/terminal-twin-debugger.smoke.ts` | Vitest proves the logic through the worker host and an in-process controller; the smoke spec clicks, steps, pauses at breakpoints and checks the overlays against `sceneState()` |
-| Debugger in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 2500 --fail-on-error --eval "window.__tt.load('shc-1sts-2shc-1wtp').then(async () => { await window.__tt.addBreakpoint('eventType','ShcDroppedAtWtp'); await window.__tt.runTo(1e5); window.__tt.overlays({occupancy:true,labels:true}); window.__tt.select('SHC01'); window.dispatchEvent(new KeyboardEvent('keydown',{key:'e'})) })"` | feed on the left with the breakpoint hit highlighted, inspector on the right (event, payload, cause chain), labels and pad plates in the scene |
-| KPIs, end conditions, report, export | `npm run tt:run -- --fixture asc-1sts-10-boxes-1block --end moves:5 --kpi-csv /tmp/k.csv --kpi-json /tmp/k.json` + `npx vitest run src/sims/terminal-twin/tests/{kpi-*,end-*,cli-kpi}.test.ts` + `npx playwright test terminal-twin-kpi` | `Headline KPIs:` block, `Stopped: ended (moves >= 5)`; files parse; smoke shows the strip, the report and downloads |
+| Debugger in 3D | `pnpm run screenshot -- --path /sim/terminal-twin --wait 2500 --fail-on-error --eval "window.__tt.load('shc-1sts-2shc-1wtp').then(async () => { await window.__tt.addBreakpoint('eventType','ShcDroppedAtWtp'); await window.__tt.runTo(1e5); window.__tt.overlays({occupancy:true,labels:true}); window.__tt.select('SHC01'); window.dispatchEvent(new KeyboardEvent('keydown',{key:'e'})) })"` | feed on the left with the breakpoint hit highlighted, inspector on the right (event, payload, cause chain), labels and pad plates in the scene |
+| KPIs, end conditions, report, export | `pnpm run tt:run -- --fixture asc-1sts-10-boxes-1block --end moves:5 --kpi-csv /tmp/k.csv --kpi-json /tmp/k.json` + `npx vitest run src/sims/terminal-twin/tests/{kpi-*,end-*,cli-kpi}.test.ts` + `npx playwright test terminal-twin-kpi` | `Headline KPIs:` block, `Stopped: ended (moves >= 5)`; files parse; smoke shows the strip, the report and downloads |
 | Dashboard (charts, heatmap, Gantt, lazy ECharts) | `npx vitest run src/sims/terminal-twin/tests/dashboard` + `npx playwright test dashboard` (dev and prod projects) | Vitest: timeline, palette, view models, options, host query, lazy-import scan; smoke: ECharts chunk absent until D, 24 h series zoom, heatmap = engine fill, Gantt windows = vessel state, final report tab |
-| Fixture definition change | `npm run tt:fixtures`, then `npm run tt:golden -- --update` | committed fixture JSON matches `definitions.ts` |
-| Berthing / anchorage | `npm run tt:run -- --fixture two-vessels-compete-for-berth` | V002 `anchorage` > 0 s, `Quay: 1 vessel(s) waited`; `tests/berthing.test.ts` |
-| Crane split / rail order | `npm run tt:run -- --fixture crane-split-4sts --strategy craneSplit=equal-bays` (vs the default `balanced-moves`) | 4 STS lines with different move counts, 0 violations (`sts.rail-order` is checked after every event); `tests/crane-split.test.ts` |
-| Twin-20 | `npm run tt:run -- --fixture twin-20-lift` | `4 moves in 2 cycles (2 twin-20)`; `tests/vessels.test.ts` |
-| Vessels in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('crane-split-4sts').then(() => window.__tt.runTo(1500)).then(() => window.__tt.pause()).then(() => window.__tt.cameraTo('V001'))"` | hull at its berth, four STS along it, deck boxes on the hatch covers |
-| SHC transport | `npm run tt:run -- --fixture shc-1sts-2shc-1wtp` | `Horizontal: 10 boxes to WTP pads`, per-SHC jobs/distances/reservation wait, `0 violations` |
-| SHC dispatch and pad strategies | `npm run tt:diff -- --fixture shc-1sts-2shc-1wtp --b-handlers nearest-job` (nearest job + `wtpPadSelection` `nearest-box`; or `tt:run … --strategy shcDispatch=nearest-job` / `--strategy wtpPadSelection=nearest-box`) | first divergence at the first `wtpPadSelection` `DecisionResolved` (`payload.reply.wtpPadId`); `shcDispatch` replies only `{jobId}` |
-| SHCs in 3D | `npm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('shc-1sts-2shc-1wtp').then(() => window.__tt.runTo(300)).then(() => { window.__tt.pause(); window.__tt.overlays({ laneGraph: true, reservations: true }) })"` | SHCs on the apron, boxes on pads/yard, cyan lane graph, amber reserved zones |
-| Smoke tests side by side with another checkout | `SMOKE_DEV_PORT=5299 SMOKE_PROD_PORT=5298 npm run test:smoke` | same as `npm run test:smoke`, on other ports |
-| Asset budgets (CI) | `npm run tt:assets:check` (also in `npm test`) | `ok` per GLB with LOD triangles/draw calls, `Budgets: pass`, exit 0 |
-| Regenerate assets (needs bpy) | `npm run tt:assets -- --python <venv python>` | GLBs, sidecars, atlas, previews rewritten; budget check passes; `git diff` shows only intended changes |
-| Generator is deterministic | `npm run tt:assets -- --check --python <venv python>` | `Regenerated assets are identical to the committed ones`, exit 0 |
-| Assets in the real renderer | `npm run tt:assets:shots` | PNG per asset × LOD + `yard.png` in `.screenshots/assets/`, no page errors |
-| Look at one asset | `npm run dev`, open `/sim/terminal-twin?viewer=container-40` (or `?viewer=yard`) | viewer with LOD buttons, livery picker, rig sliders, 20 ft reference box |
+| Fixture definition change | `pnpm run tt:fixtures`, then `pnpm run tt:golden -- --update` | committed fixture JSON matches `definitions.ts` |
+| Berthing / anchorage | `pnpm run tt:run -- --fixture two-vessels-compete-for-berth` | V002 `anchorage` > 0 s, `Quay: 1 vessel(s) waited`; `tests/berthing.test.ts` |
+| Crane split / rail order | `pnpm run tt:run -- --fixture crane-split-4sts --strategy craneSplit=equal-bays` (vs the default `balanced-moves`) | 4 STS lines with different move counts, 0 violations (`sts.rail-order` is checked after every event); `tests/crane-split.test.ts` |
+| Twin-20 | `pnpm run tt:run -- --fixture twin-20-lift` | `4 moves in 2 cycles (2 twin-20)`; `tests/vessels.test.ts` |
+| Vessels in 3D | `pnpm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('crane-split-4sts').then(() => window.__tt.runTo(1500)).then(() => window.__tt.pause()).then(() => window.__tt.cameraTo('V001'))"` | hull at its berth, four STS along it, deck boxes on the hatch covers |
+| SHC transport | `pnpm run tt:run -- --fixture shc-1sts-2shc-1wtp` | `Horizontal: 10 boxes to WTP pads`, per-SHC jobs/distances/reservation wait, `0 violations` |
+| SHC dispatch and pad strategies | `pnpm run tt:diff -- --fixture shc-1sts-2shc-1wtp --b-handlers nearest-job` (nearest job + `wtpPadSelection` `nearest-box`; or `tt:run … --strategy shcDispatch=nearest-job` / `--strategy wtpPadSelection=nearest-box`) | first divergence at the first `wtpPadSelection` `DecisionResolved` (`payload.reply.wtpPadId`); `shcDispatch` replies only `{jobId}` |
+| SHCs in 3D | `pnpm run screenshot -- --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('shc-1sts-2shc-1wtp').then(() => window.__tt.runTo(300)).then(() => { window.__tt.pause(); window.__tt.overlays({ laneGraph: true, reservations: true }) })"` | SHCs on the apron, boxes on pads/yard, cyan lane graph, amber reserved zones |
+| Smoke tests side by side with another checkout | `SMOKE_DEV_PORT=5299 SMOKE_PROD_PORT=5298 pnpm run test:smoke` | same as `pnpm run test:smoke`, on other ports |
+| Asset budgets (CI) | `pnpm run tt:assets:check` (also in `pnpm test`) | `ok` per GLB with LOD triangles/draw calls, `Budgets: pass`, exit 0 |
+| Regenerate assets (needs bpy) | `pnpm run tt:assets -- --python <venv python>` | GLBs, sidecars, atlas, previews rewritten; budget check passes; `git diff` shows only intended changes |
+| Generator is deterministic | `pnpm run tt:assets -- --check --python <venv python>` | `Regenerated assets are identical to the committed ones`, exit 0 |
+| Assets in the real renderer | `pnpm run tt:assets:shots` | PNG per asset × LOD + `yard.png` in `.screenshots/assets/`, no page errors |
+| Look at one asset | `pnpm run dev`, open `/sim/terminal-twin?viewer=container-40` (or `?viewer=yard`) | viewer with LOD buttons, livery picker, rig sliders, 20 ft reference box |
 
 Never regenerate goldens to make a failing test pass unless the behaviour change is intended and explained in the commit. Without `--update` / `UPDATE_GOLDEN=1` nothing ever rewrites a golden.
 
@@ -75,7 +75,7 @@ terminal-twin/
 ├── terminal-twin-AGENTS.md   This guide
 ├── docs/                     Topic docs (see the pointers above)
 ├── engine/                   Headless engine — NO DOM/Vue/Three/Node imports (ESLint-enforced)
-│   ├── index.ts              Public API barrel: `npm run lint` enforces that everything outside engine/ and scenario/ imports engine code only from here (eslint.config.js, no-restricted-imports). Exception, one line: scenario/ deep-imports a few leaf engine files because the engine imports scenario/ (barrel cycles)
+│   ├── index.ts              Public API barrel: `pnpm run lint` enforces that everything outside engine/ and scenario/ imports engine code only from here (eslint.config.js, no-restricted-imports). Exception, one line: scenario/ deep-imports a few leaf engine files because the engine imports scenario/ (barrel cycles)
 
 │   ├── simulation.ts         createSimulation / restoreSimulation, run loop, snapshot, why, subscribe
 │   ├── events.ts             Event envelope + EventPayloads catalogue
@@ -130,7 +130,7 @@ terminal-twin/
 ├── cli/                      Node-only: run.ts→runCli.ts (tt:run), diff.ts→diffCli.ts (tt:diff),
 │                             golden-cli.ts→golden.ts (tt:golden), handlerSets.ts, build-fixtures.ts, assets/ (tt:assets*)
 ├── persistence/              Saves: saves.ts (formats, migrations, planLoad), saveStore.ts (IndexedDB)
-└── tests/                    Vitest suites (Node-only); tests/browser/*.smoke.ts = Playwright (npm run test:smoke)
+└── tests/                    Vitest suites (Node-only); tests/browser/*.smoke.ts = Playwright (pnpm run test:smoke)
 ```
 
 `cli/`, `*.test.ts` and `*.smoke.ts` are type-checked by `tsconfig.tools.json` (Node types + DOM for `page.evaluate`); everything else by `tsconfig.app.json`.
@@ -167,12 +167,12 @@ parseLogVerbosity('asc=debug,*=warn'); toLogRecord(event, verbosity)
 
 ## Extending
 
-- **Engine imports:** `npm run lint` enforces the barrel rule (`eslint.config.js`, `no-restricted-imports`): `engine/` and `scenario/` may deep-import, everything else (modules, components, store, tests) imports engine code from `engine/index.ts`.
+- **Engine imports:** `pnpm run lint` enforces the barrel rule (`eslint.config.js`, `no-restricted-imports`): `engine/` and `scenario/` may deep-import, everything else (modules, components, store, tests) imports engine code from `engine/index.ts`.
 - **New event type:** add it to `EventPayloads` in `events.ts`, and add its reactor to a subsystem `ReactorMap` listed in `REACTORS` (`simulation.ts`).
 - **New subsystem:** create `engine/subsystems/<name>.ts` that exports a `ReactorMap`, then add it to `REACTORS`.
 - **New custody owner kind:** extend `CustodyKind` and add its holders to `custodyHolders()` and `heldAt()` in `invariants.ts`.
 - **New invariant:** append it to `INVARIANTS` with a dotted id and `reads` (the entity kinds it looks at: `container`, `yardSlot`, `vessel`, `equipment`, `reservation`, `time`), and add a test that uses a broken handler or reactor to trigger it. One that reads a lot of state should also set `scoped: true` and honour the `scope` argument (the containers, yard columns, equipment and vessels the last event touched); see the cost pitfall below.
-- **New fixture:** add it to `scenario/fixtures/definitions.ts`, run `npm run tt:fixtures`, import the JSON in `fixtures/index.ts`, then `UPDATE_GOLDEN=1 npm test`.
+- **New fixture:** add it to `scenario/fixtures/definitions.ts`, run `pnpm run tt:fixtures`, import the JSON in `fixtures/index.ts`, then `UPDATE_GOLDEN=1 pnpm test`.
 - **Logging a new event type:** nothing to do if its name starts with its subsystem (`AscMoveStarted` → `asc`, level `info`). Otherwise, or for a `debug`/`warn`/`error` level, add it to `EVENT_LOG_META` in `engine/logging.ts`.
 - **New CLI strategy for diffs:** add a named handler set to `cli/handlerSets.ts` (or, for one decision point, pass `--strategy <dp>=<name>`; `tt:run` takes the same flag).
 - **New equipment kind** (crane, vehicle, …): write `modules/equipmentKinds/<kind>.ts` exporting an `EquipmentKindDef` (`types.ts`: ids, bounds, dev-API state and rig keys, inspector view, optional extra query, scene-renderer factory) and add it to `EQUIPMENT_KINDS` in `modules/equipmentKinds/index.ts`; that is the whole change. The scene renderer (`sceneRenderer.ts`), picking, labels, inspector, store and dev API (`sceneState()` and `view.rigs()`) iterate the registry, so no hub file is edited. Also add the `inspector.kind.<kind>` and `inspector.fact.*` catalogue keys, and keep `modules/equipmentDims.ts` in sync with the model. `tests/equipment-kinds.test.ts` checks the registry (`registrationProblems`) and fails on a half-registered kind. Registry order is the build and update order and the Labels overlay's priority at its cap.
@@ -214,7 +214,7 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 1. `decisions/types.ts`: add its request to `DecisionRequests`, its reply to `DecisionReplies`, and its version to `DECISION_CONTRACT_VERSIONS`. Bump the version whenever the shape changes.
 2. `decisions/strategies.ts`: register 1–3 strategies and a `default`, and add it to `defaultHandlers`.
 3. In the asking reactor, call `ctx.requestDecision(dp, request, { equipment: [...] })`, set the equipment to a waiting status, and act on the reply in the subsystem's `DecisionResolved` reactor.
-4. Test it in `tests/decisions.test.ts` style: strategy selection, a scripted handler, and a latency case. Then `UPDATE_GOLDEN=1 npm test` if fixtures use it.
+4. Test it in `tests/decisions.test.ts` style: strategy selection, a scripted handler, and a latency case. Then `UPDATE_GOLDEN=1 pnpm test` if fixtures use it.
 
 ## Known gaps
 
