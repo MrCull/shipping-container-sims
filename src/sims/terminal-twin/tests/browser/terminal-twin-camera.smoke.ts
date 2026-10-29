@@ -18,7 +18,7 @@ test('cameraTo works for every entity kind and follow ends when the truck leaves
     const s = window.__tt!.sceneState()!
     return { truck: Object.keys(s.trucks)[0], sts: Object.keys(s.sts)[0], shc: Object.keys(s.shcs)[0], asc: Object.keys(s.ascs)[0], vessel: Object.keys(s.vessels)[0] }
   })
-  for (const id of [ids.truck, ids.sts, ids.shc, ids.asc, ids.vessel, 'gate', 'stalls:B01', 'B01']) {
+  for (const id of [ids.truck, ids.sts, ids.shc, ids.asc, ids.vessel, 'gate', 'stalls:B01', 'B01', 'B01-WTP1', 'B01-TS1']) {
     expect(await page.evaluate((i) => window.__tt!.cameraTo(i), id), id).toBe(true)
   }
   expect(await page.evaluate(() => window.__tt!.cameraTo('NOPE'))).toBe(false)
