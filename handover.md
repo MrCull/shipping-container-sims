@@ -20,7 +20,7 @@ Fixed: the Small-at-50% dispatch stall and rehandle shuttling (`asc.ts`), landsi
 
 - **Spec:** MrCull/shipping-container-sims#24. **Tickets:** #25–#52 (each has `## Blocked by`).
 - **Integration branch:** `claude/fervent-dijkstra-cmzk4u`. **Draft PR:** #54. It closes #24–#52 and stays a draft until every ticket is in and the code review is done.
-- **Sim code:** `src/sims/terminal-twin/`. **Sim guide:** `src/sims/terminal-twin/terminal-twin-AGENTS.md` (read first; has "How to prove a change works" and "Extending"). **Ticket notes:** `src/sims/terminal-twin/ticket-notes.md`. **Glossary:** `GLOSSARY.md`. **Reference packs (not committed):** `docs/reference/`.
+- **Sim code:** `src/sims/terminal-twin/`. **Sim guide:** `src/sims/terminal-twin/terminal-twin-AGENTS.md` (read first; has "How to prove a change works" and "Extending"). **Topic docs:** `src/sims/terminal-twin/docs/` (pointers in the guide). **Glossary:** `GLOSSARY.md`. **Reference packs (not committed):** `docs/reference/`.
 - **Checks:** `npm run verify` (lint, build, Vitest; 4 old box-empire lint warnings are expected). `npm run test:smoke` is the Playwright suite; CI runs it as an advisory job.
 
 ## Ticket status
@@ -61,15 +61,15 @@ Frontier: #45. Then #46 and #47; then #48; then #49, #50, #51; then #52.
 
 ### Implementer brief (give this to each subagent)
 
-- **Read first:** issue #24, the ticket issue, the sim guide, `ticket-notes.md` sections for the tickets you depend on, and `GLOSSARY.md`. If the GitHub MCP server fails, read issues with `gh api repos/MrCull/shipping-container-sims/issues/<n>`.
+- **Read first:** issue #24, the ticket issue, the sim guide, the topic docs under `src/sims/terminal-twin/docs/` that its pointers name for your ticket, and `GLOSSARY.md`. If the GitHub MCP server fails, read issues with `gh api repos/MrCull/shipping-container-sims/issues/<n>`.
 - **Resume check:** if you are resumed or start late, `git fetch origin claude/fervent-dijkstra-cmzk4u`, read the new commits and the `handover.md` diff, and merge the tip before carrying on.
 - **Branch:** confirm the worktree is based on the integration tip, then create `tt/<N>-<slug>`.
 - **Build:** `npm install`, then call the `tdd` skill and build test-first through the public seams: the engine API, decision-point handlers, the browser dev API `window.__tt`, and asset outputs.
-- **Isolation:** keep everything inside `src/sims/terminal-twin/`. Update the sim guide and glossary, and add a `### ticket-<N>` section to `ticket-notes.md` (only what later tickets need).
+- **Isolation:** keep everything inside `src/sims/terminal-twin/`. Update the sim guide, the matching topic doc under `src/sims/terminal-twin/docs/`, and the glossary.
 - **Verify:** `npm run verify` must pass. UI tickets also run `SMOKE_DEV_PORT=$((5200+RANDOM%500)) SMOKE_PROD_PORT=$((5800+RANDOM%500)) npm run test:smoke > <unique-file> 2>&1` (it is slow; wait for completion) and check `npm run screenshot -- --path /sim/terminal-twin`.
 - **Worktree hygiene:** unique names for scratch files (agents share the scratchpad); one command per shell call.
 - **Commits:** commit early with the session's attribution trailer. Don't push and don't touch issues; the orchestrator does that.
-- **Report once, at most 25 lines:** branch, final commit, verify result, problems. Stop background jobs first. Notes for later tickets go in `ticket-notes.md`, not in the report.
+- **Report once, at most 25 lines:** branch, final commit, verify result, problems. Stop background jobs first. Notes for later tickets go in the topic docs, not in the report.
 
 ### Standing rules
 
