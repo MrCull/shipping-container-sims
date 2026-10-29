@@ -12,6 +12,7 @@ import {
   ascIdOf,
   ascStartZ,
   blockSpecs,
+  BAY_PITCH_M,
   boxSpan,
   buildLaneGraph,
   hasLandside,
@@ -540,11 +541,13 @@ export class SceneModel {
     if (i < 0) return null
     const { status, berthX } = list[i]
     if (ON_QUAY.has(status) && berthX !== null && berthX !== undefined) return { x: berthX, zOffset: 0, status }
-    if (status === 'at-anchorage') {
-      const x = this.config.quay.lengthM + 200 + (this.anchorageSlot[id] % 4) * ANCHORAGE_SPACING_M
-      return { x, zOffset: ANCHORAGE_Z - Math.floor(this.anchorageSlot[id] / 4) * 120, status }
-    }
+    if (status === 'at-anchorage') return this.anchoragePlacement(id, status)
     return null
+  }
+
+  private anchoragePlacement(id: string, status = 'at-anchorage'): VesselPlacement {
+    const x = this.config.quay.lengthM + 200 + (this.anchorageSlot[id] % 4) * ANCHORAGE_SPACING_M
+    return { x, zOffset: ANCHORAGE_Z - Math.floor(this.anchorageSlot[id] / 4) * 120, status }
   }
 
   vesselVisible(id: string, time: number): boolean {
@@ -634,7 +637,10 @@ export class SceneModel {
     }
   }
 
-  /** Where the camera should look for an entity id (container, STS, SHC or vessel). */
+  /**
+   * Where the camera should look for an entity id: a container, STS, SHC, ASC, vessel, truck, yard block, transfer stall
+   * (`<block>-TS<n>` or `stalls:<block>` for the block's first), WTP pad or the `gate`. Null for an unknown id, and for a truck that has left.
+   */
   entityCentre(id: string, time: number): Vec3 | null {
     if (this.containerSize[id]) return this.containerCentre(id, time)
     if (this.initialShc[id]) {
@@ -650,6 +656,15 @@ export class SceneModel {
       const stalls = this.landside.stalls.filter((s) => s.blockId === id.slice(7))
       return stalls.length ? { x: stalls[0].x, y: 3, z: stalls[0].z } : null
     }
+    const block = this.blocks[id]
+    if (block) {
+      const mid = block.firstBayZ + ((block.bays - 1) * BAY_PITCH_M) / 2
+      return { x: block.x, y: 3, z: mid }
+    }
+    const stall = this.landside?.stalls.find((s) => s.id === id)
+    if (stall) return { x: stall.x, y: 3, z: stall.z }
+    const pad = this.graph.pads.find((p) => p.id === id)
+    if (pad) return { x: pad.x, y: 2, z: pad.z }
     if (this.truckIds.includes(id)) {
       const p = this.truckPose(id, time)
       return p.visible ? { x: p.x, y: 2, z: p.z } : null
@@ -660,8 +675,8 @@ export class SceneModel {
     }
     const spec = this.specs[id]
     if (spec) {
-      const p = this.vesselPlacement(id, time)
-      if (!p) return null
+      // Not yet arrived (or departed): aim at its anchorage berth so a camera jump still works.
+      const p = this.vesselPlacement(id, time) ?? this.anchoragePlacement(id)
       return { x: p.x + spec.loaM / 2, y: spec.deckHeightM, z: p.zOffset - spec.beamM / 2 }
     }
     return null

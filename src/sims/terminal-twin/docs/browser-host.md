@@ -100,7 +100,7 @@ __tt.sceneState()  // what the scene shows: custody per box, status + pose per S
                    //   active reservations, liveries: { [containerId]: { index (atlas tile), size, lod } } as drawn,
                    //   shcRigs: { [shcId]: { lod, steerRad, wheelRollRad, hoistM, carrying } } as drawn,
                    //   ascRigs: { [ascId]: { lod, gantryZ, trolleyX, hoistM, ropeScale, scaleY, carrying } } as drawn
-__tt.cameraTo(id, distanceM?)  // aim at an entity, optionally from a distance (60 → LOD0, 600 → LOD1)
+__tt.cameraTo(id, distanceM?)  // aim at any entity the inspector shows (also a block, transfer stall, WTP pad, 'gate'; false only for unknown ids), optionally from a distance (60 → LOD0, 600 → LOD1)
 __tt.display(); __tt.setDisplay({ locale: 'de-DE', units: 'imperial' })  // live locale/units
 __tt.config()      // loaded scenario config (SI) + current display settings
 __tt.ui()          // { selectedId, following, overlaysVisible, dashboardOpen, helpOpen, feedOpen, inspectorOpen }
