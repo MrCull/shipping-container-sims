@@ -49,10 +49,13 @@ export const DEFAULT_STS_KINEMATICS: StsKinematics = {
   unlockS: 3,
 }
 
+/** [A] SHC cornering: assumed 12 m turn radius, 1.5 m/s² lateral acceleration, so a right-angle turn is taken at about 4.2 m/s (15 km/h). */
+export const DEFAULT_SHC_CORNER = { radiusM: 12, lateralAccel: 1.5 }
+
 /**
  * [A] Shuttle-carrier (1-over-0/1) kinematics: ~30 km/h empty, ~25 km/h loaded.
- * SHCs stop at every turn of the lane graph, so short runs never reach top
- * speed: acceleration matters as much as vMax.
+ * Short runs between turns rarely reach top speed, so acceleration matters
+ * as much as vMax. Turns are taken at a capped speed (`DEFAULT_SHC_CORNER`).
  */
 export const DEFAULT_SHC_KINEMATICS: ShcKinematics = {
   driveEmpty: { vMax: 8.3, accel: 1.0, decel: 1.2 },

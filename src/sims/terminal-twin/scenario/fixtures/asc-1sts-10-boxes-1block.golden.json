@@ -3,7 +3,7 @@
   "seed": 42,
   "status": "ended",
   "endReason": "simDurationS >= 1800",
-  "eventLogHash": "1df2f85a54f3bb",
+  "eventLogHash": "1f168554425fc4",
   "kpis": {
     "simTimeS": 1800,
     "eventsProcessed": 390,
@@ -14,7 +14,7 @@
         "moves": 10,
         "cycles": 8,
         "twinLifts": 2,
-        "grossMovesPerHour": 30.775,
+        "grossMovesPerHour": 31.802,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1310.055,
-        "turnaroundS": 1250.055,
+        "departedAtS": 1272.263,
+        "turnaroundS": 1212.263,
         "sts": [
           "STS01"
         ]
@@ -193,16 +193,16 @@
       "boxesToWtp": 10,
       "shcs": {
         "SHC01": {
-          "jobs": 7,
-          "emptyDistanceM": 1604,
-          "loadedDistanceM": 920,
+          "jobs": 8,
+          "emptyDistanceM": 1849.5,
+          "loadedDistanceM": 1070.5,
           "reservationWaitS": 0
         },
         "SHC02": {
-          "jobs": 3,
-          "emptyDistanceM": 748.5,
-          "loadedDistanceM": 395.5,
-          "reservationWaitS": 4.284
+          "jobs": 2,
+          "emptyDistanceM": 488.5,
+          "loadedDistanceM": 253.5,
+          "reservationWaitS": 0
         }
       },
       "stsGroundPositionWaitS": {
@@ -234,7 +234,7 @@
         "B01-ASC1": {
           "jobs": 10,
           "gantryM": 279.3,
-          "trolleyM": 82.95,
+          "trolleyM": 93.95,
           "hoistM": 354.144,
           "padWaitS": 0
         }
@@ -244,8 +244,8 @@
       "released": 8,
       "started": 8,
       "completed": 8,
-      "leadTimeMeanS": 238.037,
-      "leadTimeMaxS": 329.401,
+      "leadTimeMeanS": 230.026,
+      "leadTimeMaxS": 314.919,
       "boxesLoaded": 0
     }
   },

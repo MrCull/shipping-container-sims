@@ -26,12 +26,12 @@
  */
 import type { EngineContext, ReactorMap } from '../context'
 import type { EventOf, ShcPhasePayload } from '../events'
-import { planSegment, positionAt, type AxisProfile, type MotionSegment } from '../kinematics'
+import { cornerSpeedCap, planSegment, positionAt, type AxisProfile, type CornerModel, type MotionSegment } from '../kinematics'
 import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph, type PathGraph } from '../laneGraph'
 import { earliestStart, mergeWindows, reserve, type WindowSpec } from '../reservations'
 import type { ShcDispatchPad } from '../decisions/types'
 import type { ShcJob, ShcPlannedEvent, ShcState, ShcStatus, SimState } from '../state'
-import { DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
+import { DEFAULT_SHC_CORNER, DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
 import type { ShcKinematics } from '../../scenario/types'
 import { resumeStsWaitingForBox, resumeStsWaitingForGroundPosition } from './quay'
 import { maybeDispatchAsc } from './asc'
@@ -76,6 +76,12 @@ function kinematics(ctx: EngineContext): ShcKinematics {
   return ctx.config.kinematics.shc ?? DEFAULT_SHC_KINEMATICS
 }
 
+/** The SHC's turn model (assumed radius and lateral acceleration); radius 0 turns cornering off. */
+export function cornerOf(ctx: EngineContext): CornerModel {
+  const k = kinematics(ctx)
+  return { radiusM: k.cornerRadiusM ?? DEFAULT_SHC_CORNER.radiusM, lateralAccel: k.maxLateralAccel ?? DEFAULT_SHC_CORNER.lateralAccel }
+}
+
 /** Scale a profile so every travel time is multiplied by `f`. */
 function scaled(p: AxisProfile, f: number): AxisProfile {
   return { vMax: p.vMax / f, accel: p.accel / (f * f), decel: p.decel / (f * f) }
@@ -101,7 +107,10 @@ export interface Waypoint {
 /**
  * Builds one trip as motion segments (relative times from 0), phase marks
  * and the conflict-zone windows it needs. Straight collinear stretches are
- * one rest-to-rest move; the SHC stops at every turn.
+ * one move. Without a `corner` model every run is rest to rest (trucks, and
+ * SHCs with cornering off); with one, the vehicle takes each turn at a speed
+ * capped by the turn angle and radius (`cornerSpeedCap`) and the two runs
+ * share that speed, so end times are still known when the trip is planned.
  */
 export class TripBuilder<M extends string = PlannedType> {
   t = 0
@@ -121,6 +130,7 @@ export class TripBuilder<M extends string = PlannedType> {
     private shcId: string,
     start: Waypoint,
     private instant: boolean,
+    private corner?: CornerModel,
   ) {
     this.x = start.x
     this.z = start.z
@@ -128,8 +138,8 @@ export class TripBuilder<M extends string = PlannedType> {
     if (start.zone) this.addVisit(start.zone, 0, 0)
   }
 
-  private plan(axis: 'x' | 'z' | 'lift', from: number, to: number, profile: AxisProfile): MotionSegment {
-    const seg = planSegment(this.shcId, axis, from, to, this.t, profile)
+  private plan(axis: 'x' | 'z' | 'lift', from: number, to: number, profile: AxisProfile, v0 = 0, v1 = 0): MotionSegment {
+    const seg = planSegment(this.shcId, axis, from, to, this.t, profile, v0, v1)
     if (this.instant) seg.t1 = seg.t0
     this.segments.push(seg)
     this.t = seg.t1
@@ -183,12 +193,13 @@ export class TripBuilder<M extends string = PlannedType> {
       dir = d
       prev = p
     }
+    const speeds = this.cornerSpeeds(runs, profile)
     runs.forEach((run, i) => {
       if (i === runs.length - 1 && lastRunMark) this.mark(lastRunMark)
       const end = run[run.length - 1]
       const axis = end.x !== this.x ? 'x' : 'z'
       const s0 = this.s
-      const seg = this.plan(axis, axis === 'x' ? this.x : this.z, axis === 'x' ? end.x : end.z, profile)
+      const seg = this.plan(axis, axis === 'x' ? this.x : this.z, axis === 'x' ? end.x : end.z, profile, speeds[i], speeds[i + 1])
       // zone visits along the run, waypoint by waypoint
       let px = this.x
       let pz = this.z
@@ -205,6 +216,36 @@ export class TripBuilder<M extends string = PlannedType> {
       this.z = end.z
     })
     if (runs.length === 0 && lastRunMark) this.mark(lastRunMark)
+  }
+
+  /**
+   * Speed at the start of each run and after the last one (`runs.length + 1`
+   * entries; the first and last are 0, the trip starts and ends at rest).
+   * A corner is capped by its turn angle, by the profile's top speed and by
+   * what the shorter neighbouring run can accelerate or brake to.
+   */
+  private cornerSpeeds(runs: Waypoint[][], profile: AxisProfile): number[] {
+    const speeds = new Array<number>(runs.length + 1).fill(0)
+    if (!this.corner || this.instant) return speeds
+    const dirs: { axis: 'x' | 'z'; len: number }[] = []
+    let px = this.x
+    let pz = this.z
+    for (const run of runs) {
+      const end = run[run.length - 1]
+      const dx = end.x - px
+      const dz = end.z - pz
+      dirs.push(dx !== 0 ? { axis: 'x', len: Math.abs(dx) } : { axis: 'z', len: Math.abs(dz) })
+      px = end.x
+      pz = end.z
+    }
+    const a = Math.min(profile.accel, profile.decel)
+    for (let i = 1; i < runs.length; i++) {
+      const prev = dirs[i - 1]
+      const next = dirs[i]
+      const angle = prev.axis === next.axis ? Math.PI : Math.PI / 2
+      speeds[i] = Math.min(cornerSpeedCap(angle, this.corner), profile.vMax, Math.sqrt(a * prev.len), Math.sqrt(a * next.len))
+    }
+    return speeds
   }
 
   /** First time (relative) the SHC reaches path distance `s`. */
@@ -328,7 +369,7 @@ function goPark(ctx: EngineContext, shc: ShcState): void {
   }
   const instant = ctx.state.subsystems.shc === 'instant'
   const k = kinematics(ctx)
-  const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant)
+  const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant, cornerOf(ctx))
   const path = route(graph, shc.nodeId, target)
   trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx)))
   trip.mark('ShcParked')
@@ -494,7 +535,7 @@ function assignJob(ctx: EngineContext, shc: ShcState, jobId: string, padId: stri
     edgeZone: edgeBetween(graph, walk[before], walk[before + 1]).zone,
   }
   const toPad = route(graph, walk[walk.length - 1], pNode)
-  const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant)
+  const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant, cornerOf(ctx))
   trip.mark('ShcRoutingEmpty')
   trip.driveThrough(
     [...waypoints(graph, toEntry).slice(1), ...lane.slice(1, before + 1), pickup],
@@ -586,7 +627,7 @@ function assignLoadJob(ctx: EngineContext, shc: ShcState, job: ShcJob): void {
     zone: null,
     edgeZone: edgeBetween(graph, walk[before], walk[before + 1]).zone,
   }
-  const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant)
+  const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant, cornerOf(ctx))
   trip.mark('ShcRoutingEmpty')
   trip.driveThrough(waypoints(graph, route(graph, shc.nodeId, pNode)).slice(1), empty, 'ShcPositioningAtPickup')
   trip.mark('ShcLocking')

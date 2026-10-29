@@ -224,7 +224,6 @@ Deliberately not built, or built differently from the spec (the code review acce
 - **Yard pre-fill is outside the decision runtime:** no `DecisionRequested/Resolved` events, latency injection or handler KPIs, and an async `yardAllocation` handler is rejected (explicit error). Use a `warmup` or `empty` start to exercise async handlers.
 - **Handler wall latency** is a run total in `kpiReport()` and the final report, not a time series (it is not in the event log).
 - **Truck-delivered exports with a legacy/prefilled start** are new boxes outside the bay plan and are never loaded; only the `empty`/`warmup` start delivers the booked boxes.
-- **SHC cornering:** SHCs stop at every turn.
 - **Hub files** `SetupDialog.vue`, `twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope for the review pass. The per-kind renderer, dev-API and inspector wiring left the hubs in V11-01 (see Extending); `SetupDialog.vue` is still to split (#68); the ASC subsystem split into `asc.ts` / `ascStorage.ts` / `ascReservations.ts` / `ascDispatch.ts` (+ pure `ascRail.ts`) in V11-09.
 
 ## Known behaviours and pitfalls
@@ -232,6 +231,7 @@ Deliberately not built, or built differently from the spec (the code review acce
 Gotchas specific to one feature sit in its topic doc. These hold across the engine:
 
 - **`wtpPadSelection` (V11-11):** SHC dispatch (`shcDispatch` v2, reply `{jobId}`) picks a job; a discharge job is then held by the SHC (`waiting-for-pad`, no longer open) while `wtpPadSelection` (reply `{wtpPadId}`) answers; load jobs name their own pad and never ask. A `null` pad gives the job back and parks the SHC. Strategies `first-free` (default), `nearest-box`, `last-free`. With latency on it, two SHCs asking at once can get the same pad (a stale reply, like the other points): invariants flag it.
+- **SHC cornering (V11-12, ENGINE_VERSION 0.9.0):** SHCs take right-angle turns at `min(vMax, sqrt(maxLateralAccel x cornerRadiusM))` (defaults 1.5 m/s², 12 m: about 4.2 m/s) and still stop for reversals, locks and pads. A motion segment carries optional `v0`/`v1` (entry/exit speed); the two runs at a turn share that speed, so every end time is still known at dispatch. `ShcKinematics.cornerRadiusM: 0` restores stop-at-every-turn. Trucks (landside) still stop at turns. All SHC fixture goldens changed on purpose: shorter trips, so one SHC now takes every box on `shc-1sts-2shc-1wtp`.
 - `kpis.handlers` omits decision points that were never called (so fixtures without SHCs keep their goldens).
 - Shortest paths are cached per lane graph (WeakMap on the config object) and the lane graph per config object: do not mutate a config after `createSimulation`.
 - Every decision adds two events (`DecisionRequested`, `DecisionResolved`) to the log. The tracer golden went from 35 to 55 events in TT-03, with KPIs unchanged. Every run has berthAllocation and craneSplit pairs before the first STS move, so tests must filter on `payload.decisionPoint` (see `gpEvent`/`gpOfType` in `tests/decisions.test.ts`).
