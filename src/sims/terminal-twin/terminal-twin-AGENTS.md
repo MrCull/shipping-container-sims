@@ -220,7 +220,6 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 
 Deliberately not built, or built differently from the spec (the code review accepted these):
 
-- **Subsystem modes** `real | instant | off` exist for the SHC, ASC and landside subsystems only; quay, berth and yard have no such switch (spec story 104).
 - **No separate WTP pad-selection decision point:** the pad rides in the `shcDispatch` reply (story 61).
 - **Extra shortcuts** E, I and P and the ASC yield moves go beyond the spec (accepted scope).
 - **Yard pre-fill is outside the decision runtime:** no `DecisionRequested/Resolved` events, latency injection or handler KPIs, and an async `yardAllocation` handler is rejected (explicit error). Use a `warmup` or `empty` start to exercise async handlers.

@@ -204,7 +204,7 @@ export function createSimulation(
   handlers: Partial<HandlerSet> = {},
   options: SimulationOptions = {},
 ): Simulation {
-  assertValidScenario(config)
+  assertValidScenario(config, options.subsystems)
   const seed = options.seed ?? config.seed
   const invariantsEnabled = options.invariants?.enabled ?? true
   const failFast = options.invariants?.failFast ?? true

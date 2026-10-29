@@ -34,7 +34,9 @@ import {
 } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
-import type { EndConditions, ScenarioConfig } from '../scenario/types'
+import type { EndConditions, ScenarioConfig, SubsystemMode, SubsystemModes } from '../scenario/types'
+import { validateSubsystemModes } from '../scenario/validate'
+import { t } from '../i18n/messages'
 import { handlerSets } from './handlerSets'
 
 export const USAGE = `Usage: npm run tt:run -- (--fixture <name|file.json> | --preset <name> | --from-snapshot <file>) [options]
@@ -52,6 +54,9 @@ export const USAGE = `Usage: npm run tt:run -- (--fixture <name|file.json> | --p
                          then optional ,timeout:<pct> ,error:<pct> ,timeoutMs:<ms>
                          e.g. stsGroundPosition=fixed:1500,timeout:5
                          Decision points: ${DECISION_POINT_IDS.join(', ')}
+  --subsystem <name>=<mode>  Subsystem mode (repeatable): real | instant | off for quay, berth, yard, shc, asc, landside.
+                         instant keeps the events with zero durations; off removes the subsystem. Impossible
+                         combinations (e.g. yard=off with asc=real) exit with code 2
   --no-fail-fast         Keep running after an invariant violation
   --end <cond>           End condition (repeatable; the first one met ends the run): moves:<n> | vessels:<n> | time:<s>
   --out <file>           Write the run summary JSON
@@ -105,6 +110,22 @@ function endConditionsFromArgs(args: string[]): EndConditions | undefined {
     else if (kind === 'vessels') out.vesselsCompleted = n
     else if (kind === 'time') out.simDurationS = n
     else throw new UsageError(`Bad --end "${arg}" (moves:<n> | vessels:<n> | time:<s>)`)
+  }
+  return out
+}
+
+const SUBSYSTEM_NAMES = ['quay', 'berth', 'yard', 'shc', 'asc', 'landside'] as const
+
+/** `--subsystem quay=instant`: merged over the scenario's own `subsystems`; impossible combinations are usage errors. */
+function subsystemsFromArgs(base: SubsystemModes | undefined, args: string[]): SubsystemModes | undefined {
+  if (args.length === 0) return base
+  const out: SubsystemModes = { ...base }
+  for (const arg of args) {
+    const [name, mode] = arg.split('=')
+    if (!(SUBSYSTEM_NAMES as readonly string[]).includes(name))
+      throw new UsageError(`Bad --subsystem "${arg}" (subsystems: ${SUBSYSTEM_NAMES.join(', ')})`)
+    if (mode !== 'real' && mode !== 'instant' && mode !== 'off') throw new UsageError(`Bad --subsystem "${arg}" (modes: real, instant, off)`)
+    out[name as (typeof SUBSYSTEM_NAMES)[number]] = mode as SubsystemMode
   }
   return out
 }
@@ -268,6 +289,7 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
         until: { type: 'string' },
         handlers: { type: 'string', default: 'default' },
         'no-fail-fast': { type: 'boolean', default: false },
+        subsystem: { type: 'string', multiple: true, default: [] },
         out: { type: 'string' },
         events: { type: 'string' },
         'async-mode': { type: 'string' },
@@ -302,6 +324,12 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
     if (endConditions) config = { ...config, endConditions }
     const decisions = decisionsFromArgs(config.decisions, values['async-mode'], values.strategy, values.latency)
     if (decisions !== config.decisions) config = { ...config, decisions }
+    if (values.subsystem.length > 0) {
+      if (start) throw new UsageError('--from-snapshot takes subsystem modes from the snapshot: drop --subsystem')
+      config = { ...config, subsystems: subsystemsFromArgs(config.subsystems, values.subsystem) }
+      const problems = validateSubsystemModes(config)
+      if (problems.length > 0) throw new UsageError(problems.map((p) => t(p.key, p.params)).join('; '))
+    }
     const seed = values.seed === undefined ? undefined : Number(values.seed)
     if (seed !== undefined && !Number.isInteger(seed)) throw new UsageError(`Bad --seed "${values.seed}"`)
     const handlers = handlerSets[values.handlers]

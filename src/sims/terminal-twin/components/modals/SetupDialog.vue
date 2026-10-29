@@ -12,7 +12,7 @@ import { peakTrucksPerHour } from '../../scenario/validate'
 import { SCALE_LIMITS } from '../../scenario/limits'
 import { LIMITS, type ScenarioOverrides } from '../../scenario/overrides'
 import { TTI_DERIVED_BAYS_PRESETS } from '../../scenario/presets'
-import { DEFAULT_WARM_UP_S, DEFAULT_YARD_TARGET_PCT, type AscKinematics, type ScenarioConfig, type ShcKinematics, type StsKinematics, type UnitSystem, type VesselConfig, type YardStartMode } from '../../scenario/types'
+import { DEFAULT_WARM_UP_S, DEFAULT_YARD_TARGET_PCT, type AscKinematics, type ScenarioConfig, type ShcKinematics, type StsKinematics, type SubsystemMode, type UnitSystem, type VesselConfig, type YardStartMode } from '../../scenario/types'
 import { DEFAULT_TRANSSHIPMENT } from '../../scenario/dwell'
 import VesselTable from '../setup/VesselTable.vue'
 import PlanPreview from '../setup/PlanPreview.vue'
@@ -78,6 +78,10 @@ const peakTrucks = ref(0)
 const gateIn = ref(0)
 const gateOut = ref(0)
 const decisions = ref<DecisionsConfig>({})
+/** Subsystem modes the dialog edits (V11-10); the rest stay as the scenario has them. */
+const MODE_ROWS = ['quay', 'berth', 'yard'] as const
+const MODES = ['real', 'instant', 'off'] as const
+const modes = ref<Record<(typeof MODE_ROWS)[number], SubsystemMode>>({ quay: 'real', berth: 'real', yard: 'real' })
 
 function loadDraft(scenario: string, overrides: ScenarioOverrides = {}): void {
   try {
@@ -97,6 +101,7 @@ function loadDraft(scenario: string, overrides: ScenarioOverrides = {}): void {
     gateIn.value = config.landside?.gate.inLanes ?? 0
     gateOut.value = config.landside?.gate.outLanes ?? 0
     decisions.value = JSON.parse(JSON.stringify(config.decisions ?? {}))
+    modes.value = { quay: config.subsystems?.quay ?? 'real', berth: config.subsystems?.berth ?? 'real', yard: config.subsystems?.yard ?? 'real' }
   } catch {
     vessels.value = []
   }
@@ -134,6 +139,7 @@ const overrides = computed<ScenarioOverrides>(() => ({
     ? { peakTrucksPerHour: peakTrucks.value, gate: { inLanes: gateIn.value, outLanes: gateOut.value } }
     : {}),
   decisions: decisions.value,
+  subsystems: { ...modes.value },
   derive: isPreset.value,
 }))
 function yardStartConfig(): NonNullable<YardSetup['start']> {
@@ -1175,6 +1181,39 @@ async function submit(): Promise<void> {
         >
           {{ yardReadout }}
         </p>
+      </fieldset>
+
+      <fieldset
+        class="field"
+        data-testid="tt-subsystem-modes"
+      >
+        <legend>{{ t('setup.modes.title') }}</legend>
+        <p class="hint">
+          {{ t('setup.modes.note') }}
+        </p>
+        <div
+          v-for="row in MODE_ROWS"
+          :key="row"
+          class="grid"
+          role="radiogroup"
+          :aria-label="t(`setup.modes.${row}`)"
+        >
+          <span class="blockname">{{ t(`setup.modes.${row}`) }}</span>
+          <label
+            v-for="m in MODES"
+            :key="m"
+            class="unit-choice"
+          >
+            <input
+              v-model="modes[row]"
+              type="radio"
+              :name="`mode-${row}`"
+              :value="m"
+              :data-testid="`tt-mode-${row}-${m}`"
+            >
+            {{ t(`setup.modes.${m}`) }}
+          </label>
+        </div>
       </fieldset>
 
       <fieldset class="field">

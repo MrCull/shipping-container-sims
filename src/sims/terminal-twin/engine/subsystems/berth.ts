@@ -39,6 +39,10 @@ function occupied(ctx: EngineContext): BerthAllocationRequest['occupied'] {
 function tryAllocateBerth(ctx: EngineContext): void {
   const { berth, vessels } = ctx.state
   if (berth.allocating !== null || berth.queue.length === 0) return
+  if (ctx.state.subsystems.berth === 'off') {
+    placeFirstFit(ctx)
+    return
+  }
   const vessel = vessels[berth.queue[0]]
   berth.allocating = vessel.id
   ctx.requestDecision(
@@ -54,6 +58,54 @@ function tryAllocateBerth(ctx: EngineContext): void {
     },
     { vessels: [vessel.id] },
   )
+}
+
+/** Mooring and unmooring take no time in the instant and off modes. */
+const mooringS = (ctx: EngineContext): number => (ctx.state.subsystems.berth === 'real' ? ctx.config.quay.mooringS : 0)
+const unmooringS = (ctx: EngineContext): number => (ctx.state.subsystems.berth === 'real' ? ctx.config.quay.unmooringS : 0)
+
+/** Leftmost stretch where `vessel` fits clear of the vessels on the quay, or null. */
+function firstFitBerth(ctx: EngineContext, vessel: VesselState): number | null {
+  const loa = vesselClass(vessel.sizeClass).loaM
+  const { lengthM, berthGapM } = ctx.config.quay
+  const candidates = [0, ...occupied(ctx).map((o) => o.toX + berthGapM)]
+  for (const x of candidates.sort((a, b) => a - b)) {
+    if (x + loa > lengthM + 1e-9) continue
+    if (occupied(ctx).every((o) => x >= o.toX + berthGapM - 1e-9 || x + loa <= o.fromX - berthGapM + 1e-9)) return x
+  }
+  return null
+}
+
+/** Berth mode off: no TOS decision, vessels take the first free stretch in arrival order. */
+function placeFirstFit(ctx: EngineContext): void {
+  const { berth, vessels } = ctx.state
+  while (berth.queue.length > 0) {
+    const vessel = vessels[berth.queue[0]]
+    const x = firstFitBerth(ctx, vessel)
+    if (x === null) {
+      if (!vessel.anchored) {
+        vessel.anchored = true
+        ctx.schedule('VesselAtAnchorage', ctx.state.now, { vessels: [vessel.id] }, { vesselId: vessel.id })
+      }
+      return
+    }
+    assignBerth(ctx, vessel, x, ctx.state.now)
+  }
+}
+
+/** Take the berth: the vessel leaves the queue, starts mooring and BerthAllocated is raised. */
+function assignBerth(ctx: EngineContext, vessel: VesselState, berthX: number, t: number): void {
+  const { state } = ctx
+  state.berth.queue = state.berth.queue.filter((id) => id !== vessel.id)
+  vessel.status = 'mooring'
+  vessel.berthX = berthX
+  vessel.berthAllocatedAt = t
+  vessel.anchorageWaitS = t - (vessel.arrivedAt ?? t)
+  ctx.schedule('BerthAllocated', t, { vessels: [vessel.id] }, {
+    vesselId: vessel.id,
+    berthX,
+    anchorageWaitS: vessel.anchorageWaitS,
+  })
 }
 
 function validateBerth(ctx: EngineContext, vessel: VesselState, berthX: number): void {
@@ -176,16 +228,7 @@ export const berthReactors: ReactorMap = {
         return // first come, first served: the queue waits until a vessel departs
       }
       validateBerth(ctx, vessel, berthX)
-      state.berth.queue = state.berth.queue.filter((id) => id !== vessel.id)
-      vessel.status = 'mooring'
-      vessel.berthX = berthX
-      vessel.berthAllocatedAt = e.t
-      vessel.anchorageWaitS = e.t - (vessel.arrivedAt ?? e.t)
-      ctx.schedule('BerthAllocated', e.t, { vessels: [vessel.id] }, {
-        vesselId: vessel.id,
-        berthX,
-        anchorageWaitS: vessel.anchorageWaitS,
-      })
+      assignBerth(ctx, vessel, berthX, e.t)
       tryAllocateBerth(ctx)
       return
     }
@@ -221,7 +264,7 @@ export const berthReactors: ReactorMap = {
   },
 
   BerthAllocated: (e, ctx) => {
-    ctx.schedule('VesselBerthed', e.t + ctx.config.quay.mooringS, { vessels: [e.payload.vesselId] }, {
+    ctx.schedule('VesselBerthed', e.t + mooringS(ctx), { vessels: [e.payload.vesselId] }, {
       vesselId: e.payload.vesselId,
       berthX: e.payload.berthX,
     })
@@ -231,7 +274,7 @@ export const berthReactors: ReactorMap = {
     const vessel = ctx.state.vessels[e.payload.vesselId]
     vessel.status = 'berthed'
     vessel.berthedAt = e.t
-    if (vessel.remainingDischarge === 0 && (vessel.remainingLoad === 0 || !loadActive(ctx.state))) {
+    if (ctx.state.subsystems.quay === 'off' || (vessel.remainingDischarge === 0 && (vessel.remainingLoad === 0 || !loadActive(ctx.state)))) {
       ctx.schedule('VesselWorkComplete', e.t, { vessels: [vessel.id] }, { vesselId: vessel.id })
       return
     }
@@ -258,7 +301,7 @@ export const berthReactors: ReactorMap = {
     const vessel = ctx.state.vessels[e.payload.vesselId]
     vessel.status = 'unmooring'
     vessel.workCompletedAt = e.t
-    ctx.schedule('VesselDeparted', e.t + ctx.config.quay.unmooringS, { vessels: [vessel.id] }, { vesselId: vessel.id })
+    ctx.schedule('VesselDeparted', e.t + unmooringS(ctx), { vessels: [vessel.id] }, { vesselId: vessel.id })
   },
 
   VesselDeparted: (e, ctx) => {

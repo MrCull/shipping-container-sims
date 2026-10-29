@@ -113,6 +113,21 @@ export interface ApronLayout {
 export type SubsystemMode = 'real' | 'instant' | 'off'
 
 export interface SubsystemModes {
+  /**
+   * STS cranes (V11-10; default real when STS cranes exist). instant: every crane motion, lock and unlock takes
+   * zero time and raises the same events; off: no crane work, vessels berth and leave with their cargo.
+   */
+  quay?: SubsystemMode
+  /**
+   * Berth allocation (V11-10; default real). instant: zero mooring and unmooring time; off: no `berthAllocation`
+   * decision, each vessel takes the leftmost free stretch (first fit) at once.
+   */
+  berth?: SubsystemMode
+  /**
+   * The yard as a whole (V11-10; default real when blocks exist). instant: the ASC runs instant (unless set
+   * explicitly); off: no yard (ASC and landside off, boxes stay on the pads).
+   */
+  yard?: SubsystemMode
   /** SHC horizontal transport (default real when SHCs are configured). */
   shc?: SubsystemMode
   /** ASC yard cranes (default real when SHCs and blocks exist). */
