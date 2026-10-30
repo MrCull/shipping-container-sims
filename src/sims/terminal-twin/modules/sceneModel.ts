@@ -41,6 +41,7 @@ import {
   type Reservation,
 } from '../engine'
 import { planCargo } from '../scenario/bayPlan'
+import { isoTypeOf } from '../scenario/containerProps'
 import type { RobBox } from '../scenario/robBays'
 import { planExportYard } from '../scenario/exportYard'
 import type { ContainerSize, ScenarioConfig, VesselConfig } from '../scenario/types'
@@ -222,12 +223,20 @@ function lastAtOrBefore<T>(list: T[], time: number, getT: (item: T) => number): 
   return found
 }
 
+export interface ContainerDetail {
+  laden: boolean
+  isoType: string
+  heavy: boolean
+}
+
 export class SceneModel {
   readonly config: ScenarioConfig
   readonly seed: number
   readonly containerIds: string[]
   readonly containerSize: Record<string, ContainerSize>
   readonly containerLine: Record<string, string>
+  /** What the close-up markings need beyond size and line (#119). */
+  readonly containerDetail: Record<string, ContainerDetail>
   readonly graph: LaneGraph
   /** Landside roads, gate and stalls (null without a landside). */
   readonly landside: LandsideGraph | null
@@ -270,10 +279,14 @@ export class SceneModel {
     this.containerIds = cargo.containers.map((c) => c.id)
     this.containerSize = Object.fromEntries(cargo.containers.map((c) => [c.id, c.size]))
     this.containerLine = Object.fromEntries(cargo.containers.map((c) => [c.id, c.line]))
+    this.containerDetail = Object.fromEntries(
+      cargo.containers.map((c) => [c.id, { laden: c.full, isoType: c.props?.isoType ?? isoTypeOf(c.size, c.reefer === true), heavy: c.props?.weightClass === 'HEAVY' }]),
+    )
     for (const imp of prefill?.imports ?? []) {
       this.containerIds.push(imp.id)
       this.containerSize[imp.id] = imp.size
       this.containerLine[imp.id] = imp.line
+      this.containerDetail[imp.id] = { laden: true, isoType: isoTypeOf(imp.size, imp.reefer === true), heavy: false }
     }
     this.vessels = Object.fromEntries(config.vessels.map((v) => [v.id, v]))
     this.specs = Object.fromEntries(config.vessels.map((v) => [v.id, vesselClass(v.sizeClass)]))
@@ -401,6 +414,7 @@ export class SceneModel {
     this.containerIds.push(c.id)
     this.containerSize[c.id] = c.size
     this.containerLine[c.id] = c.line
+    this.containerDetail[c.id] = { laden: c.full ?? true, isoType: c.isoType ?? isoTypeOf(c.size, false), heavy: c.heavy ?? false }
     this.custody[c.id] = []
   }
 

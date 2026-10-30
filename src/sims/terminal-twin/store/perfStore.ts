@@ -36,6 +36,8 @@ export interface PerfStats {
   cpuMs: number
   /** The part of cpuMs spent posing the scene from the sim state (instanced boxes, rigs), before the render submit. */
   poseMs: number
+  /** Container boxes currently drawn as close-ups with markings (#119). */
+  closeup: number
 }
 
 export const usePerfStore = defineStore('terminal-twin-perf', () => {
@@ -44,7 +46,7 @@ export const usePerfStore = defineStore('terminal-twin-perf', () => {
   /** The level in force: the fixed setting, or what Auto currently picked. */
   const effective = ref<QualityLevel>(setting.value === 'auto' ? 'high' : setting.value)
   const overlayVisible = ref(read(KEY_OVERLAY) === '1')
-  const stats = ref<PerfStats>({ fps: 0, calls: 0, triangles: 0, cpuMs: 0, poseMs: 0 })
+  const stats = ref<PerfStats>({ fps: 0, calls: 0, triangles: 0, cpuMs: 0, poseMs: 0, closeup: 0 })
   /** How many times Auto changed the level (dev API / tests). */
   const autoChanges = ref(0)
   /** Dev only: busy-wait this many ms every frame, to prove Auto steps down and recovers. */

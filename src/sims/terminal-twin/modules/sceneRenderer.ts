@@ -22,7 +22,8 @@ import { NO_OVERLAYS, type OverlayState } from './overlays'
 
 export type { OverlayState }
 import { ContainerInstancer } from './containerInstancer'
-import { liveryIndexForLine, loadContainerAssets } from './containerAssets'
+import { describeMarkings } from './containerMarkings'
+import { liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import type { LandsideStats } from './landsideRenderer'
 import { EQUIPMENT_KINDS, type EquipmentKindDef, type KindFrame, type KindRenderer, type KindRendererHost } from './equipmentKinds'
@@ -63,7 +64,7 @@ export interface SceneStats {
   /** Occupancy and label overlay counts (zeros while those overlays are off). */
   layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
-  containerLods: { lod0: number; lod1: number; culled: number }
+  containerLods: { lod0: number; lod1: number; closeup: number; culled: number }
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -158,6 +159,14 @@ export class SceneRenderer {
       for (const size of ['20', '40', '40HC'] as const) capacity[size] = (capacity[size] ?? 0) + extra
     }
     this.containers = new ContainerInstancer(capacity)
+    this.containers.setMarkingsSource((i) => {
+      const id = model.containerIds[i]
+      const d = model.containerDetail[id]
+      return {
+        markings: describeMarkings({ id, size: model.containerSize[id], line: model.containerLine[id], isoType: d?.isoType, laden: d?.laden ?? true, heavy: d?.heavy }),
+        bodyColour: liveryBodyColour(this.containerLivery[i]),
+      }
+    })
     this.containerLivery = model.containerIds.map((id) => liveryIndexForLine(model.containerLine[id]))
     this.scene.add(this.containers.group)
     loadContainerAssets().then(
@@ -388,7 +397,7 @@ export class SceneRenderer {
   setQuality(profile: QualityProfile): void {
     this.quality = profile
     this.atmosphere.setQuality(profile)
-    this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap })
+    this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap, closeupDistanceM: profile.closeupDistanceM, closeupCap: profile.closeupCap })
     this.setOceanDetail(profile.oceanSegments)
   }
 
@@ -528,6 +537,11 @@ export class SceneRenderer {
     return out
   }
 
+  /** Boxes drawn as close-ups with markings last frame (#119). */
+  closeupCount(): number {
+    return this.containers.stats().closeup
+  }
+
   stats(): SceneStats {
     const c = this.containers.stats()
     const kinds = Object.assign({}, ...this.renderers.map((r) => r.renderer.stats())) as Partial<SceneStats>
@@ -539,7 +553,7 @@ export class SceneRenderer {
       reservedZones: this.reservedZones,
       reservedRailSegments: this.reservedRailSegments,
       layers: this.layers.stats(),
-      containerLods: { lod0: c.lod0, lod1: c.lod1, culled: c.culled },
+      containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, culled: c.culled },
       containerAssets: c.assets,
     } as SceneStats
   }
