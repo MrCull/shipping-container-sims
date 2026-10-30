@@ -80,7 +80,7 @@ Code: `engine/predictions.ts` (`predictedReady`), `predictedGroundings` in `subs
 - **Fixture.** `shc-prepositioning` (2 STS with one ground position each, 4 SHCs, 3 pads, queue areas 3/3, margin 15 s): total STS ground-position wait drops against the same scenario with `chained-nearest` (about 80 s to 0). Prove with `pnpm run tt:run --fixture shc-prepositioning` and again with `--strategy shcDispatch=chained-nearest`.
 - **Limits.** Upcoming-box estimates ignore rail waits, SHC shortage and move variation. Predictions are re-evaluated on events, not on a timer, so a long quiet period delays a send. The TTI presets still use `chained-nearest`. No new KPI: count `ShcRoutingToParking` events with `predicted`.
 
-## Paired discharge/load dispatch (TT-R14, ENGINE_VERSION 0.22.0)
+## Paired discharge/load dispatch (TT-R14, ENGINE_VERSION 0.23.0)
 
 Code: strategy `paired-dual-cycle` in `engine/decisions/strategies.ts` (`PAIRING_RADIUS_M`), `isPaired` and the `ShcCleared` / `requestDispatch` changes in `subsystems/shc.ts`. Terms: [GLOSSARY.md](../../../../GLOSSARY.md) (paired dispatch).
 
