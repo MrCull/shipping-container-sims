@@ -15,7 +15,7 @@
  */
 import type { SimQuery } from '../query'
 import type { YardCandidate, YardStacks } from '../yardLayout'
-import type { ContainerSize, TruckTransactionKind } from '../../scenario/types'
+import type { ContainerSize, TransitDirection, TruckTransactionKind } from '../../scenario/types'
 
 // ── stsGroundPosition ──────────────────────────────────────────────────────
 
@@ -125,6 +125,24 @@ export interface WtpPadSelectionReply {
  * (exported from the engine), which keeps the request small: per-stack heights
  * instead of a candidate list.
  */
+/**
+ * What the `grouped` yard strategy needs to know about a box (spec #106, #111): the stored properties that
+ * decide which group it belongs to and where it stands in that group's stacking order.
+ */
+export interface YardBoxView {
+  direction: TransitDirection
+  line: string
+  size: ContainerSize
+  /** ISO type code (e.g. 22G1, 45R1). */
+  isoType: string
+  /** Outbound vessel of an export or transshipment box (absent: it leaves by truck or on a call outside the scenario). */
+  outboundVesselId?: string
+  pod: string
+  weightClass: 'LIGHT' | 'MEDIUM' | 'HEAVY'
+  /** Sim time (s) the box is planned to leave. */
+  plannedDepartureS: number
+}
+
 export interface YardAllocationRequest extends YardStacks {
   containerId: string
   size: ContainerSize
@@ -139,6 +157,13 @@ export interface YardAllocationRequest extends YardStacks {
   wtpPadId: string
   /** TT-13: the transfer stall the delivering truck stands in. */
   stallId?: string
+  /**
+   * The box's grouping properties and the top box of every stack (same indexing as `heights`, null = empty). Sent
+   * only when the active strategy is `grouped` (so the event log of every other run stays as it was); absent in
+   * the pre-fill, whose boxes do not exist yet.
+   */
+  box?: YardBoxView
+  stackTops?: (YardBoxView | null)[]
   /** Uniform [0, 1) drawn from the engine's seeded RNG (the only source of randomness for strategies). */
   random: number
 }

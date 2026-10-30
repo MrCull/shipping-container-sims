@@ -23,7 +23,8 @@ import {
   type BlockSpec,
 } from '../yardLayout'
 import { DEFAULT_ASC_KINEMATICS } from '../../scenario/builder'
-import { columnKey, indexYardSlotAdded, indexYardSlotRemoved, stackSpansOf, yardIndexOf } from '../yardIndex'
+import { columnKey, indexYardSlotAdded, indexYardSlotRemoved, stackSpansOf, stackTopsOf, yardIndexOf } from '../yardIndex'
+import { yardBoxView, yardGroupBreak, yardGroupKey, yardGroupingOn } from '../decisions/yardGrouping'
 import { blockersOf, nextBlocker, rehandleCandidates, retrievalRanks, retrievalSlot } from './rehandle'
 import type { AscKinematics } from '../../scenario/types'
 import { landsideGraphOf } from '../landsideGraph'
@@ -328,10 +329,52 @@ function requestAllocation(ctx: EngineContext, job: AscJob): void {
       topVessels: yard.topVessels.slice(),
       stackSpans: stackSpansOf(state, block.id),
       ...reeferFields(block, box.reefer),
+      ...(yardGroupingOn(ctx.config) ? { box: yardBoxView(box), stackTops: stackTopsOf(state, block.id) } : {}),
       random: ctx.random(),
     },
     { containers: [box.id] },
   )
+}
+
+/**
+ * Grouped decking only: count the grouping preferences the claimed slot breaks. On top of a box: another group
+ * (`mixedStack`) or the right group in the wrong order (`orderBroken`); opening a stack in a bay whose stacks
+ * all belong to other groups (`mixedBay`).
+ */
+function countGroupingBreaks(
+  state: SimState,
+  job: AscJob,
+  cell: { bay: number; row: number; tier: number },
+  span: number,
+  k: NonNullable<NonNullable<SimState['kpis']['yard']>['grouping']>,
+): void {
+  const box = yardBoxView(state.containers[job.containerId])
+  const tops = stackTopsOf(state, job.blockId)
+  const yard = state.yardBlocks[job.blockId]
+  k.placements++
+  if (cell.tier > 1) {
+    let worst: 'none' | 'order' | 'mixed' = 'none'
+    for (let b = 0; b < span; b++) {
+      const below = tops[(cell.bay + b - 1) * yard.rows + (cell.row - 1)]
+      if (!below) continue
+      const br = yardGroupBreak(box, below)
+      if (br === 'mixed' || (br === 'order' && worst === 'none')) worst = br
+    }
+    if (worst === 'mixed') k.mixedStack++
+    else if (worst === 'order') k.orderBroken++
+    return
+  }
+  const key = yardGroupKey(box)
+  let foreign = false
+  let own = false
+  for (let b = 0; b < span; b++)
+    for (let r = 1; r <= yard.rows; r++) {
+      const t = tops[(cell.bay + b - 1) * yard.rows + (r - 1)]
+      if (!t) continue
+      if (yardGroupKey(t) === key) own = true
+      else foreign = true
+    }
+  if (foreign && !own) k.mixedBay++
 }
 
 /** Claim the slot a yardAllocation reply named (the engine trusts the TOS; invariants catch bad replies). */
@@ -349,6 +392,8 @@ export function claimSlot(ctx: EngineContext, job: AscJob, slotId: string): void
     cell.tier < 1
   )
     throw new Error(`yardAllocation handler returned slot ${slotId}, which is outside block ${job.blockId} for a ${span * 20} ft box`)
+  const grouping = state.kpis.yard?.grouping
+  if (grouping) countGroupingBreaks(state, job, cell, span, grouping)
   for (let b = 0; b < span; b++) {
     const i = stackIndex(yard, cell.bay + b, cell.row)
     yard.heights[i] = Math.max(yard.heights[i], cell.tier)

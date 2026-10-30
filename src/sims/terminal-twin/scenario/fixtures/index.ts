@@ -28,6 +28,7 @@ import transshipmentAToB from './transshipment-a-to-b.json'
 import emptiesLoad from './empties-load-4-of-16.json'
 import stowMixed from './stow-mixed-20-40.json'
 import reeferPoweredRows from './reefer-powered-rows.json'
+import yardGrouped from './yard-grouped.json'
 import yardNoMixedLength from './yard-no-mixed-length.json'
 import twin20Lift from './twin-20-lift.json'
 import twoVesselsCompeteForBerth from './two-vessels-compete-for-berth.json'
@@ -57,6 +58,7 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'truck-appointment-windows': truckAppointmentWindows as ScenarioConfig,
   'truck-holding-overflow': truckHoldingOverflow as ScenarioConfig,
   'asc-pre-retrieval': ascPreRetrieval as ScenarioConfig,
+  'yard-grouped': yardGrouped as ScenarioConfig,
   'yard-no-mixed-length': yardNoMixedLength as ScenarioConfig,
   'reefer-powered-rows': reeferPoweredRows as ScenarioConfig,
   'stow-mixed-20-40': stowMixed as ScenarioConfig,

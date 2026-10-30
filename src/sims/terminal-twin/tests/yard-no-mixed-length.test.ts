@@ -103,7 +103,7 @@ describe('yard.no-mixed-length-stack', () => {
 
 describe('no mixed stacks', () => {
   it('with every built-in strategy on mixed 20/40 discharge into a pre-filled yard', () => {
-    for (const strategy of ['nearest-wtp', 'random', 'group-by-vessel']) {
+    for (const strategy of ['nearest-wtp', 'random', 'grouped']) {
       const c = JSON.parse(JSON.stringify(fixtures['yard-no-mixed-length'])) as ScenarioConfig
       c.decisions = { points: { yardAllocation: { strategy } } }
       const sim = createSimulation(c)

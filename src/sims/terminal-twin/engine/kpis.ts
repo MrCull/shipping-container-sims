@@ -169,6 +169,12 @@ export interface YardKpiReport {
   /** yardAllocation replies with no slot (block full). */
   allocationFailures: number
   /**
+   * Grouped decking only (absent for other strategies): how often a grouping preference was broken. `mixedStack`:
+   * a box stacked on another group's box; `orderBroken`: on its own group in the wrong order (later departure above
+   * earlier, heavier export above lighter); `mixedBay`: a new stack in a bay of other groups only.
+   */
+  grouping?: { placements: number; mixedStack: number; orderBroken: number; mixedBay: number }
+  /**
    * Rehandles (blocker moves, TT-12) against productive ASC moves (stack + retrieve);
    * `perProductiveMove` is null until a productive move is done.
    */
@@ -352,6 +358,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     boxesStacked: y.boxesStacked,
     boxesInTransit: Object.values(state.ascJobs).filter((j) => j.kind !== 'rehandle' && j.truckId === undefined).length,
     allocationFailures: y.allocationFailures,
+    ...(y.grouping ? { grouping: { ...y.grouping } } : {}),
     rehandles: {
       total: y.rehandles,
       productiveMoves: y.productiveMoves,

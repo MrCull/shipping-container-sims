@@ -86,7 +86,7 @@ describe('fixture reefer-powered-rows', () => {
   }
 
   it('keeps every reefer, pre-filled or discharged, in rows 1-2 on tiers 1-4, with every built-in strategy', () => {
-    for (const strategy of ['nearest-wtp', 'random', 'group-by-vessel']) {
+    for (const strategy of ['nearest-wtp', 'random', 'grouped']) {
       const sim = run(strategy)
       expect(sim.firstError).toBeNull()
       expect(sim.invariantReport().violations).toEqual([])

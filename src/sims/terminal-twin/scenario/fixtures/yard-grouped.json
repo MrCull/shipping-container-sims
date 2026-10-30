@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "name": "yard-grouped",
+  "description": "Grouped yard decking: imports by line, exports by vessel and POD, transshipment and empties in their own groups",
+  "seed": 31,
+  "startDateTime": "2026-01-05T06:00:00Z",
+  "quay": {
+    "lengthM": 400,
+    "berthGapM": 15,
+    "mooringS": 60,
+    "unmooringS": 60,
+    "stsMinSpacingM": 27,
+    "twinLift": true
+  },
+  "layout": {
+    "stsGroundLaneZ0M": 8,
+    "stsGroundLaneSpacingM": 3,
+    "stsSafeHoistM": 50
+  },
+  "kinematics": {
+    "sts": {
+      "gantry": {
+        "vMax": 0.75,
+        "accel": 0.25,
+        "decel": 0.25
+      },
+      "trolley": {
+        "vMax": 4,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "hoistLoaded": {
+        "vMax": 1.5,
+        "accel": 0.6,
+        "decel": 0.6
+      },
+      "hoistEmpty": {
+        "vMax": 3,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "lockS": 3,
+      "unlockS": 3
+    },
+    "shc": {
+      "driveEmpty": {
+        "vMax": 8.3,
+        "accel": 1,
+        "decel": 1.2
+      },
+      "driveLoaded": {
+        "vMax": 6.9,
+        "accel": 0.7,
+        "decel": 0.9
+      },
+      "lift": {
+        "vMax": 0.4,
+        "accel": 0.4,
+        "decel": 0.4
+      },
+      "liftHeightM": 1,
+      "lockS": 2,
+      "unlockS": 2
+    }
+  },
+  "moveVariationPct": 10,
+  "sts": [
+    {
+      "id": "STS01",
+      "gantryX": 60,
+      "groundPositions": 3
+    }
+  ],
+  "vessels": [
+    {
+      "id": "V001",
+      "name": "Group Star",
+      "arrivalS": 0,
+      "sizeClass": "feeder",
+      "discharge": 40,
+      "load": 0,
+      "transshipment": 0,
+      "maxSts": 1,
+      "dischargeTransshipment": 10
+    },
+    {
+      "id": "V002",
+      "name": "Deck Star",
+      "arrivalS": 9000,
+      "sizeClass": "feeder",
+      "discharge": 0,
+      "load": 16,
+      "transshipment": 10,
+      "maxSts": 1
+    }
+  ],
+  "cargo": {
+    "lines": {
+      "HMM": 3,
+      "MSC": 2,
+      "Maersk": 2
+    },
+    "sizeMix": {
+      "20": 1,
+      "40": 1
+    },
+    "emptyShare": 0.1
+  },
+  "endConditions": {
+    "vesselsCompleted": 2
+  },
+  "hatch": {
+    "enabled": false
+  },
+  "driverVariabilityPct": 10,
+  "transshipment": {
+    "dwell": {
+      "kind": "fixed",
+      "s": 600
+    }
+  },
+  "emptyPool": {
+    "count": 12,
+    "sizeMix": {
+      "20": 1,
+      "40": 1
+    },
+    "lines": {
+      "HMM": 1,
+      "MSC": 1
+    }
+  },
+  "decisions": {
+    "points": {
+      "yardAllocation": {
+        "strategy": "grouped"
+      }
+    }
+  },
+  "shcs": [
+    {
+      "id": "SHC01"
+    },
+    {
+      "id": "SHC02"
+    },
+    {
+      "id": "SHC03"
+    }
+  ],
+  "yard": {
+    "blocks": [
+      {
+        "id": "B01",
+        "x": 20,
+        "bays": 14,
+        "tiers": 4,
+        "wtpPads": 5
+      }
+    ],
+    "ascsPerBlock": 2
+  },
+  "landside": {
+    "hourlyProfile": [
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15
+    ],
+    "mix": {
+      "dropExport": 0.25,
+      "pickImport": 0.3,
+      "dropEmpty": 0.1,
+      "pickEmpty": 0.1,
+      "dual": 0.25
+    },
+    "importDwell": {
+      "kind": "fixed",
+      "s": 1800
+    },
+    "exportWindow": {
+      "minBeforeEtaS": 3600,
+      "maxBeforeEtaS": 8000
+    },
+    "gate": {
+      "inLanes": 4,
+      "outLanes": 4,
+      "inProcessingS": 40,
+      "outProcessingS": 20,
+      "processingVariationPct": 0,
+      "oogLane": true
+    },
+    "drive": {
+      "vMax": 8,
+      "accel": 1,
+      "decel": 1.5
+    }
+  }
+}
