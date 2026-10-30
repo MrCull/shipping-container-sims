@@ -6,10 +6,10 @@ Reference photos: `/home/user/shipping-container-sims/docs/reference/tti-algecir
 | Ticket | Blocked by | Claimed by | Status |
 |---|---|---|---|
 | #117 throughput | none | session 018sev | merged (diagnosis only) |
-| #118 volume + FPS | none | session 018sev | running |
-| #119 close-up containers | none | session 018sev | running |
-| #120 folder + Rock | none | | todo |
-| #121 SHC model | none | | todo |
+| #118 volume + FPS | none | session 018sev | built, awaiting merge |
+| #119 close-up containers | none | session 018sev | merged |
+| #120 folder + Rock | none | session 018sev | built, awaiting merge |
+| #121 SHC model | none | session 018sev | built, awaiting merge |
 | #122 skin + landing | #118 | | todo |
 | #123 surroundings | #120 | | todo |
 | #124 STS model | #121 | | todo |
