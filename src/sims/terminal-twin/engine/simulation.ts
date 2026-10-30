@@ -580,7 +580,13 @@ export function createSimulation(
     },
     eventLog: () => log,
     eventLogHash: () => hashDigest(state.logHash),
-    kpiReport: () => buildKpiReport(state, log.length),
+    kpiReport: () => {
+      const report = buildKpiReport(state, log.length)
+      // time per operational state and handovers come from the collector (measured period)
+      const totals = collector.shcTotals(Math.max(0, state.now - warmUpS()))
+      for (const [id, k] of Object.entries(report.horizontal?.shcs ?? {})) Object.assign(k, totals[id])
+      return report
+    },
     kpiSeries: () => collector.report(Math.max(0, state.now - warmUpS())),
     invariantReport: () => clone(invariants),
     invariantStats: () => ({ ...tracker.stats, wallMs: invariantWallMs }),

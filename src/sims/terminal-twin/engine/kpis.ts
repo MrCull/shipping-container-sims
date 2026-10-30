@@ -2,6 +2,7 @@
  * KPI report: a plain, rounded (3 dp) summary derived from SimState. Later
  * tickets (TT-07) add time series, hourly/shift buckets and more groups.
  */
+import { SHC_OPERATIONAL_STATES, type ShcOperationalState } from './shcStates'
 import type { AppointmentBook, SimState } from './state'
 
 /** Per-decision-point (TOS handler) KPIs. Latencies are per resolved decision. */
@@ -155,12 +156,26 @@ export interface YardKpiReport {
 export interface HorizontalKpiReport {
   /** Boxes SHCs delivered to WTP pads. */
   boxesToWtp: number
-  shcs: Record<string, { jobs: number; emptyDistanceM: number; loadedDistanceM: number; reservationWaitS: number }>
+  shcs: Record<
+    string,
+    {
+      jobs: number
+      emptyDistanceM: number
+      loadedDistanceM: number
+      reservationWaitS: number
+      /** Seconds in each operational state over the measured run (TT-R11; from the KPI collector). */
+      stateS: Record<ShcOperationalState, number>
+      /** Custody changes at buffers: one per box picked up and one per box put down (TT-R11). */
+      handovers: number
+    }
+  >
   /** STS seconds spent waiting for a free ground position (SHCs too slow). */
   stsGroundPositionWaitS: Record<string, number>
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000
+
+const zeroStateS = (): Record<ShcOperationalState, number> => Object.fromEntries(SHC_OPERATIONAL_STATES.map((op) => [op, 0])) as Record<ShcOperationalState, number>
 
 /** Trucks that have been given an inbound lane (arrived minus those still queued). */
 const gateServed = (state: SimState): number => {
@@ -254,6 +269,8 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
           emptyDistanceM: r3(k.emptyDistanceM),
           loadedDistanceM: r3(k.loadedDistanceM),
           reservationWaitS: r3(k.reservationWaitS),
+          stateS: zeroStateS(),
+          handovers: 0,
         },
       ]),
     ),

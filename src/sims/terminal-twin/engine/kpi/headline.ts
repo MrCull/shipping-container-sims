@@ -4,6 +4,7 @@
  * KpiReport, so the CLI and the UI show the same numbers for the same run.
  */
 import type { KpiReport } from '../kpis'
+import { SHC_OPERATIONAL_STATES, type ShcOperationalState } from '../shcStates'
 import type { KpiSeriesReport } from './collector'
 
 export interface HeadlineKpis {
@@ -16,6 +17,12 @@ export interface HeadlineKpis {
   shcEmptyTravelRatio: number | null
   /** Mean over the SHCs of the time spent moving (loaded + empty). */
   shcBusyPct: number | null
+  /** Total empty travel of all SHCs (m); null without SHCs. */
+  shcEmptyDistanceM: number | null
+  /** Handovers of all SHCs (a box picked up or put down is one each); null without SHCs. */
+  shcHandovers: number | null
+  /** Mean seconds an SHC spent in each operational state; null without SHCs. */
+  shcStateS: Record<ShcOperationalState, number> | null
   /** Mean over the ASCs. */
   ascUtilisationPct: number | null
   /** Mean over the blocks. */
@@ -36,6 +43,16 @@ function totals(series: KpiSeriesReport, kpi: string): number[] {
 const sum = (xs: number[]) => (xs.length ? r3(xs.reduce((a, b) => a + b, 0)) : null)
 const mean = (xs: number[]) => (xs.length ? r3(xs.reduce((a, b) => a + b, 0) / xs.length) : null)
 
+function shcStateS(series: KpiSeriesReport): Record<ShcOperationalState, number> | null {
+  const out = {} as Record<ShcOperationalState, number>
+  for (const op of SHC_OPERATIONAL_STATES) {
+    const m = mean(totals(series, `shc.state.${op}-s`))
+    if (m === null) return null
+    out[op] = m
+  }
+  return out
+}
+
 export function headlineKpis(series: KpiSeriesReport, report: KpiReport): HeadlineKpis {
   const loaded = totals(series, 'shc.loaded-pct')
   const empty = totals(series, 'shc.empty-pct')
@@ -45,6 +62,9 @@ export function headlineKpis(series: KpiSeriesReport, report: KpiReport): Headli
     grossMovesPerHour: sum(totals(series, 'sts.gross-moves-per-hour')),
     netMovesPerHour: sum(totals(series, 'sts.net-moves-per-hour')),
     shcEmptyTravelRatio: mean(totals(series, 'shc.empty-travel-ratio')),
+    shcEmptyDistanceM: sum(totals(series, 'shc.empty-distance-m')),
+    shcHandovers: sum(totals(series, 'shc.handovers')),
+    shcStateS: shcStateS(series),
     shcBusyPct: loaded.length && loaded.length === empty.length ? r3((mean(loaded) ?? 0) + (mean(empty) ?? 0)) : null,
     ascUtilisationPct: mean(totals(series, 'asc.utilisation-pct')),
     yardFillPct: mean(totals(series, 'yard.fill-pct')),
