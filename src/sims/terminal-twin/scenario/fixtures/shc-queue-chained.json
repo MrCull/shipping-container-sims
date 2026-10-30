@@ -149,6 +149,9 @@
     "points": {
       "shcDispatch": {
         "strategy": "chained-nearest"
+      },
+      "yardAllocation": {
+        "strategy": "nearest-wtp"
       }
     }
   }

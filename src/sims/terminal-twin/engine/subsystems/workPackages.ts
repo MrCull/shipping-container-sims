@@ -17,7 +17,7 @@ import type { SimState, StsState, VesselSlotState, WorkPackage } from '../state'
 import { hatchPanelOfRow, vesselClass } from '../../scenario/vesselClasses'
 import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import { resolveContainerProps } from '../../scenario/containerProps'
-import { countDischargeSplits, countLoadBreaks, orderDischarge, orderLoad } from '../vesselOrdering'
+import { countDischargeSplits, countLoadBreaks, orderDischarge, orderLoad, vesselOrderingOf } from '../vesselOrdering'
 import { continueWork } from './quay'
 import { pumpLoadPrep } from './loadPrep'
 import { raiseEmptiesRequired } from './empties'
@@ -61,7 +61,7 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
         .filter(isLoadSlot)
         .sort((a, b) => compareKeys(loadSequenceKey(a), loadSequenceKey(b)))
     : []
-  if (ctx.config.vesselPlanning?.ordering === 'pod-weight') {
+  if (vesselOrderingOf(ctx.config) === 'pod-weight') {
     const ports = resolveContainerProps(ctx.config).portRotation.ports
     const entry = (id: string | null | undefined) => (id ? state.containers[id] : undefined)
     const dischargeSeq = orderDischarge(

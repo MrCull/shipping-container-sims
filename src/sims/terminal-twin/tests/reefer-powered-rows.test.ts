@@ -108,6 +108,13 @@ describe('fixture reefer-powered-rows', () => {
     expect(plain.filter((s) => s.row <= 2).length / plain.length).toBeLessThan(0.25)
   })
 
+  it.each(['grouped', 'nearest-wtp'])('%s leaves the plugs to reefers in the pre-fill too: no plain box in rows 1-2 while others have room', (strategy) => {
+    const sim = run(strategy)
+    const boxes = new Map(sim.query.containers().map((b) => [b.id, b]))
+    const plain = sim.query.yardSlots().filter((s) => s.containerId && !boxes.get(s.containerId)?.reefer)
+    expect(plain.filter((s) => s.row <= 2)).toEqual([])
+  })
+
   it('trips yard.reefer-powered when a TOS puts a reefer in an unpowered row', () => {
     const c = JSON.parse(JSON.stringify(fixtures['reefer-powered-rows'])) as ScenarioConfig
     const sim = createSimulation(c, {

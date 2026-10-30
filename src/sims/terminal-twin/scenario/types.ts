@@ -289,7 +289,7 @@ export interface WeightClassBands {
 export type VesselOrdering = 'as-today' | 'pod-weight'
 
 export interface VesselPlanningConfig {
-  /** Default `as-today`. */
+  /** Default `pod-weight` (since ENGINE_VERSION 0.25.0); `as-today` is the rollback. */
   ordering?: VesselOrdering
 }
 

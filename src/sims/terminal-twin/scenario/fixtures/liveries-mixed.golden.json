@@ -147,6 +147,17 @@
       "leadTimeMeanS": 291.065,
       "leadTimeMaxS": 466.041,
       "boxesLoaded": 0
+    },
+    "ordering": {
+      "discharge": {
+        "boxes": 12,
+        "groupSplits": 0
+      },
+      "load": {
+        "boxes": 0,
+        "podOnEarlier": 0,
+        "heavyOnLight": 0
+      }
     }
   },
   "invariants": {

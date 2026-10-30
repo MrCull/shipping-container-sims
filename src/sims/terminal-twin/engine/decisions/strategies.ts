@@ -145,7 +145,7 @@ export const strategies: StrategyRegistry = {
     },
   },
   yardAllocation: {
-    default: 'nearest-wtp',
+    default: 'grouped',
     strategies: {
       random: {
         description: 'A random legal slot (from the seeded RNG).',
@@ -195,7 +195,7 @@ export const strategies: StrategyRegistry = {
     },
   },
   emptyAllocation: {
-    default: 'nearest-wtp',
+    default: 'iso-type-best-position',
     strategies: {
       'nearest-wtp': {
         description: 'The matching empties nearest the WTP pads (shortest trips), lowest tier first.',
@@ -207,7 +207,7 @@ export const strategies: StrategyRegistry = {
       },
       'iso-type-best-position': {
         description:
-          'Opt-in (spec #106). Matches the requested ISO type (any line; `emptyAllocation.matchLine` restricts to the requesting line) and picks the best yard position: fewest boxes on top, then nearest the WTP of the block serving the vessel, then next to other allocated empties.',
+          'Default (spec #106). Matches the requested ISO type (any line; `emptyAllocation.matchLine` restricts to the requesting line) and picks the best yard position: fewest boxes on top, then nearest the WTP of the block serving the vessel, then next to other allocated empties.',
         handler: (msg) => isoTypeBestPositionEmpties(msg.payload),
       },
     },

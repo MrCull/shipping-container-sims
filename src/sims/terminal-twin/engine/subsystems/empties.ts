@@ -19,6 +19,7 @@ import type { EmptiesRequirement, SimState, WorkPackage, YardSlotState } from '.
 import { blockSpecs, rowX, slotZ, stackIndex } from '../yardLayout'
 import { allocateEmptyProps, isoTypeOf } from '../../scenario/containerProps'
 import type { ContainerSize } from '../../scenario/types'
+import { strategies } from '../decisions/strategies'
 import { continueWork } from './quay'
 import { blockersOf } from './rehandle'
 import { pumpLoadPrep } from './loadPrep'
@@ -31,7 +32,8 @@ function onTop(state: SimState, slot: YardSlotState): boolean {
 }
 
 /** The `iso-type-best-position` strategy is selected: requests carry the ISO type, buried empties and position data. */
-export const isoAllocation = (ctx: EngineContext): boolean => ctx.config.decisions?.points?.emptyAllocation?.strategy === 'iso-type-best-position'
+export const isoAllocation = (ctx: EngineContext): boolean =>
+  (ctx.config.decisions?.points?.emptyAllocation?.strategy ?? strategies.emptyAllocation.default) === 'iso-type-best-position'
 
 /** What an empties requirement asks for. */
 export interface EmptyMatch {

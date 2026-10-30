@@ -57,9 +57,9 @@ function request(me: YardBoxView, stacks?: Record<string, YardBoxView[]>, closeO
 }
 
 describe('the grouped strategy (pure)', () => {
-  it('replaces group-by-vessel: three strategies, nearest-wtp stays the default until the default flip', () => {
+  it('replaces group-by-vessel: three strategies, grouped is the default (nearest-wtp the rollback)', () => {
     expect(Object.keys(strategies.yardAllocation.strategies).sort()).toEqual(['grouped', 'nearest-wtp', 'random'])
-    expect(strategies.yardAllocation.default).toBe('nearest-wtp')
+    expect(strategies.yardAllocation.default).toBe('grouped')
   })
 
   it('stacks an import on a box of its own line rather than on another line', () => {

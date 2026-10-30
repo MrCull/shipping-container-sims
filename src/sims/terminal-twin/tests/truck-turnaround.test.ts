@@ -135,7 +135,7 @@ describe('appointments: rejected and delayed', () => {
     }
     expect(k?.appointments?.delayed).toBe(delayed)
     expect(k?.appointments?.rejected).toBe(12)
-    expect(k?.appointments?.delayed).toBe(2)
+    expect(k?.appointments?.delayed).toBe(1) // 2 before the default flip (#114): fewer rehandles delay fewer trucks
     const series = sim.kpiSeries().series['landside.appointments-delayed'].entities.terminal.total
     expect(series).toBe(delayed)
   })

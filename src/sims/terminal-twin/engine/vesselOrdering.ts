@@ -8,6 +8,13 @@
  */
 import type { ContainerProps, WeightClass } from '../scenario/containerProps'
 import { grossKgOf } from '../scenario/containerProps'
+import type { ScenarioConfig, VesselOrdering } from '../scenario/types'
+
+/** The default work order (spec #106, #114): `as-today` stays selectable through `vesselPlanning.ordering` / `--ordering`. */
+export const DEFAULT_VESSEL_ORDERING: VesselOrdering = 'pod-weight'
+
+/** The work order a scenario runs with. */
+export const vesselOrderingOf = (config: ScenarioConfig): VesselOrdering => config.vesselPlanning?.ordering ?? DEFAULT_VESSEL_ORDERING
 
 /** A vessel cell as the ordering sees it. */
 export interface OrderCell {

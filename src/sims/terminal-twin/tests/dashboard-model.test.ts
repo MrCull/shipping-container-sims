@@ -141,7 +141,7 @@ describe('landside group and summary (TT-R18)', () => {
     expect(plain.map((r) => r.id)).not.toContain('holdingUtilisation')
     const appts = buildLandsideSummary(run('truck-appointment-windows').kpiReport().landside)
     expect(appts.find((r) => r.id === 'appointmentsRejected')?.value).toBe(12)
-    expect(appts.find((r) => r.id === 'appointmentsDelayed')?.value).toBe(2)
+    expect(appts.find((r) => r.id === 'appointmentsDelayed')?.value).toBe(1)
     expect(buildLandsideSummary(null)).toEqual([])
   })
 

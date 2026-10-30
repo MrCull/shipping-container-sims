@@ -364,7 +364,7 @@ export class ScenarioBuilder {
     return this
   }
 
-  /** Vessel Planning options (spec #106): `ordering` is `as-today` (default) or `pod-weight`. */
+  /** Vessel Planning options (spec #106): `ordering` is `pod-weight` (default) or `as-today` (rollback). */
   vesselPlanning(options: VesselPlanningConfig): this {
     this.config.vesselPlanning = { ...this.config.vesselPlanning, ...options }
     return this

@@ -109,7 +109,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Lane graph:** the generated one-way graph SHCs route over (apron loop, STS lanes, WTP spurs, parking spurs). Edges run along X or Z.
 - **Conflict zone:** a part of the lane graph only one vehicle may use at a time: an intersection, an STS lane section (ground position) or a WTP pad with its spur.
 - **Reservation:** a time window `[from, to)` on a conflict zone held by one piece of equipment. Trips reserve all their zones before departing and depart later if any window is taken.
-- **Yard allocation:** the decision point (`yardAllocation`) that picks a box's slot in the block of the pad it was dropped on. Built-in strategies: random, nearest-wtp, grouped (opt-in; groups by direction, line, outbound vessel, POD and weight class, mismatch costs score and never removes a slot). Candidates keep each stack to one length.
+- **Yard allocation:** the decision point (`yardAllocation`) that picks a box's slot in the block of the pad it was dropped on. Built-in strategies: random, nearest-wtp, grouped (the default; groups by direction, line, outbound vessel, POD and weight class, mismatch costs score and never removes a slot). Candidates keep each stack to one length.
 - **Claim (slot claim):** a slot is claimed when allocation answers and stacked later. Stacks fill in claim order: an ASC does not stack a box before an older claim in the same stack.
 - **ASC job:** one box to move from a WTP pad to its slot. It is **ready** once its slot is allocated and its SHC has released the box and cleared the pad.
 - **Lifting envelope (of a WTP pad):** the space over the pad where an ASC spreader is below travel height. An ASC never enters it while an SHC is on the pad (the pad zone's **handover**).
@@ -190,7 +190,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Transshipment box:** a box discharged from one vessel that another vessel loads. It carries an **onward-vessel link** (`onwardVesselId`), stands in the yard for its **dwell** (sampled from the transshipment dwell distribution once it is stacked), then flows like an export box. *Avoid:* "transfer box".
 - **Flow mix:** a vessel's moves split into import, export and transshipment percent (`flowMixOf`); the vessel generator can be given one (`flowMix`).
 - **Empty:** an unladen container (`full = false`), distinct by size and shipping line. The **empty pool** is the empties standing in the yard at the start.
-- **Empties required:** the event raised when a released load work package needs N empties of a size and line; the **empty-allocation** decision point (`emptyAllocation`) then assigns which yard empties go (strategies `nearest-wtp`, `oldest-first` and the opt-in `iso-type-best-position`, which matches on ISO type and picks the best yard position).
+- **Empties required:** the event raised when a released load work package needs N empties of a size and line; the **empty-allocation** decision point (`emptyAllocation`) then assigns which yard empties go (strategies `nearest-wtp`, `oldest-first` and `iso-type-best-position` (the default), which matches on ISO type and picks the best yard position).
 
 ## Landside (TT-13)
 
@@ -274,4 +274,4 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Dwell:** seconds a box has been on the terminal: from its first terminal custody (or its pre-aged `yardSince`) to its departure from terminal custody, else to now (`dwellS`). The KPI report's `dwell` groups it by transit direction (count, boxes that have left, mean, max). Not the same as the transshipment or import dwell (`dwellS` on a box, the *planned* yard time).
 
 
-- **Vessel ordering (`pod-weight`):** the opt-in work order inside a package (`vesselPlanning.ordering`): discharge stack by stack in yard-group order, load bottom-up with later PODs and heavier boxes first. POD and weight are soft preferences; stacking order is the only hard rule. A *broken ordering preference* is a box with a later POD, or a heavier weight class, than the box under it (or a yard group split in the discharge sequence); counted in `kpis.ordering`.
+- **Vessel ordering (`pod-weight`):** the default work order inside a package (`as-today` is the rollback) (`vesselPlanning.ordering`): discharge stack by stack in yard-group order, load bottom-up with later PODs and heavier boxes first. POD and weight are soft preferences; stacking order is the only hard rule. A *broken ordering preference* is a box with a later POD, or a heavier weight class, than the box under it (or a yard group split in the discharge sequence); counted in `kpis.ordering`.

@@ -150,6 +150,9 @@
     "points": {
       "shcDispatch": {
         "strategy": "predispatch"
+      },
+      "yardAllocation": {
+        "strategy": "nearest-wtp"
       }
     }
   }

@@ -107,7 +107,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .shcs(4)
       .block('B01', { x: 20, bays: 8, tiers: 3, wtpPads: 1 })
       .queueAreas({ stsCapacity: 2, blockCapacity: 2 })
-      .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' } } })
+      .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' }, yardAllocation: { strategy: 'nearest-wtp' } } }) // SHC fixtures isolate dispatch from yard decking (#114)
       .build(),
 
   /**
@@ -129,7 +129,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .shcs(4)
       .block('B01', { x: 20, bays: 8, tiers: 3, wtpPads: 3 })
       .queueAreas({ stsCapacity: 3, blockCapacity: 3, predispatchMarginS: 15 })
-      .decisions({ points: { shcDispatch: { strategy: 'predispatch' } } })
+      .decisions({ points: { shcDispatch: { strategy: 'predispatch' }, yardAllocation: { strategy: 'nearest-wtp' } } }) // SHC fixtures isolate dispatch from yard decking (#114)
       .build(),
 
   /**
@@ -152,7 +152,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .shcs(3)
       .block('B01', { x: 150, bays: 10, tiers: 3, wtpPads: 2 })
       .queueAreas({ stsCapacity: 2, blockCapacity: 2 })
-      .decisions({ points: { shcDispatch: { strategy: 'paired-dual-cycle' } } })
+      .decisions({ points: { shcDispatch: { strategy: 'paired-dual-cycle' }, yardAllocation: { strategy: 'nearest-wtp' } } }) // SHC fixtures isolate dispatch from yard decking (#114)
       .endWhen({ vesselsCompleted: 2 })
       .build(),
 

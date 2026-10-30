@@ -59,7 +59,7 @@ export const USAGE = `Usage: pnpm run tt:run (--fixture <name|file.json> | --pre
   --subsystem <name>=<mode>  Subsystem mode (repeatable): real | instant | off for quay, berth, yard, shc, asc, landside.
                          instant keeps the events with zero durations; off removes the subsystem. Impossible
                          combinations (e.g. yard=off with asc=real) exit with code 2
-  --ordering <name>      Vessel Planning work order inside a package: as-today (default) | pod-weight
+  --ordering <name>      Vessel Planning work order inside a package: pod-weight (default) | as-today
   --no-fail-fast         Keep running after an invariant violation
   --end <cond>           End condition (repeatable; the first one met ends the run): moves:<n> | vessels:<n> | time:<s>
   --out <file>           Write the run summary JSON

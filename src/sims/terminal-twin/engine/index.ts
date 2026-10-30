@@ -118,7 +118,7 @@ export type {
   YardAllocationRequest,
   YardBoxView,
 } from './decisions/types'
-export { yardGroupKey, yardGroupBreak } from './decisions/yardGrouping'
+export { yardGroupKey, yardGroupBreak, yardGroupingOn } from './decisions/yardGrouping'
 export type { YardGroupBreak } from './decisions/yardGrouping'
 export { strategies, getStrategy } from './decisions/strategies'
 export type { StrategyDefinition, StrategyRegistry, DecisionPointStrategies } from './decisions/strategies'
@@ -182,4 +182,4 @@ export { validateScenario, validateSubsystemModes, assertValidScenario, Scenario
 export type { ScenarioCheck } from '../scenario/validate'
 export { stsCycleGeometry, stsNominalCycle, shcNominalCycle, ascNominalCycle, profileValid } from './cycleTime'
 export type { CycleReadout, StsCycleGeometry } from './cycleTime'
-export { orderDischarge, orderLoad, countDischargeSplits, type OrderBox, type OrderCell, type OrderEntry } from './vesselOrdering'
+export { orderDischarge, orderLoad, countDischargeSplits, DEFAULT_VESSEL_ORDERING, vesselOrderingOf, type OrderBox, type OrderCell, type OrderEntry } from './vesselOrdering'
