@@ -36,7 +36,7 @@ import {
 } from './types'
 import { DEFAULT_WTP_PADS } from '../engine/yardLayout'
 import type { DecisionsConfig } from '../engine/decisions/types'
-import type { ContainerPropsConfig, DwellDistribution, EmptyPoolConfig, HatchConfig, VesselSizeClass, YardStartConfig } from './types'
+import type { ContainerPropsConfig, DwellDistribution, EmptyPoolConfig, HatchConfig, VesselPlanningConfig, VesselSizeClass, YardStartConfig } from './types'
 
 export { LINE_OWNER_PREFIX }
 
@@ -361,6 +361,12 @@ export class ScenarioBuilder {
   /** Hatch cover settings (TT-R09): `{ enabled: false }` leaves them out; the other values override the vessel class. */
   hatch(hatch: HatchConfig): this {
     this.config.hatch = { ...this.config.hatch, ...hatch }
+    return this
+  }
+
+  /** Vessel Planning options (spec #106): `ordering` is `as-today` (default) or `pod-weight`. */
+  vesselPlanning(options: VesselPlanningConfig): this {
+    this.config.vesselPlanning = { ...this.config.vesselPlanning, ...options }
     return this
   }
 

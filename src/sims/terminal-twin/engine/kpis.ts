@@ -69,6 +69,8 @@ export interface KpiReport {
   yard?: YardKpiReport
   /** Work packages (only when some were released). */
   workPackages?: WorkPackageKpiReport
+  /** Broken ordering preferences (only when `vesselPlanning.ordering` is `pod-weight`). */
+  ordering?: OrderingKpiReport
   /** Hatch cover moves of the STS cranes (only when a hatch move has started). */
   hatch?: HatchKpiReport
   /** Trucks and the gate (only when the landside is on). */
@@ -162,6 +164,23 @@ export interface HatchKpiReport {
   waitS: number
   /** Per STS: hatch moves, their time and waiting. */
   sts: Record<string, { moves: number; timeS: number; waitS: number }>
+}
+
+export interface OrderingKpiReport {
+  discharge: {
+    /** Boxes in the discharge packages built. */
+    boxes: number
+    /** Yard-group changes beyond one run per group (0 = each group came off in one run). */
+    groupSplits: number
+  }
+  load: {
+    /** Booked boxes in the load packages built. */
+    boxes: number
+    /** Boxes with a later POD than the box under them. */
+    podOnEarlier: number
+    /** Boxes in a heavier weight class than the box under them. */
+    heavyOnLight: number
+  }
 }
 
 export interface WorkPackageKpiReport {
@@ -498,5 +517,6 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
           },
         }
       : {}),
+    ...(state.kpis.ordering ? { ordering: structuredClone(state.kpis.ordering) } : {}),
   }
 }
