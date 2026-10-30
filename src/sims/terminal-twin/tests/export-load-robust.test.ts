@@ -8,7 +8,7 @@ import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
 
 function build(seed: number, opts: { asc: 1 | 2; sts: number; discharge: number; load: number; shcs: number }): ScenarioConfig {
-  const b = new ScenarioBuilder('robust', 'mixed call on several cranes')
+  const b = new ScenarioBuilder('robust', 'mixed call on several cranes').hatch({ enabled: false })
     .seed(seed)
     .moveVariation(10)
     .driverVariability(10)

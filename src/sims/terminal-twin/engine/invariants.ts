@@ -20,14 +20,23 @@ import { hasLandside, landsideGraphOf } from './landsideGraph'
 import { overlappingNewReservations, overlappingReservations } from './reservations'
 import type { EngineEvent } from './events'
 import { columnKey, yardIndexOf } from './yardIndex'
-import { ascIndexOf, type AscState, type CustodyRef, type SimState, type YardSlotState } from './state'
+import {
+  ascIndexOf,
+  type AscState,
+  type CustodyRef,
+  type HatchPanelState,
+  type SimState,
+  type VesselSlotState,
+  type YardSlotState,
+} from './state'
 import { ascPoseAt } from './subsystems/asc'
 import { gantryPositionAt, railOrder } from './subsystems/rail'
 import { shcPositionAt } from './subsystems/shc'
 import { truckPositionAt } from './subsystems/landside'
 import { ASC_MIN_SEPARATION_M, blockSpecs, travelHoistM } from './yardLayout'
 import type { ScenarioConfig } from '../scenario/types'
-import { vesselClass } from '../scenario/vesselClasses'
+import { hatchPanelId, hatchPanelOfRow, vesselClass, vesselSlotId } from '../scenario/vesselClasses'
+import { hatchSettings } from './hatch'
 
 export interface InvariantViolation {
   invariant: string
@@ -128,6 +137,25 @@ function heldAt(state: SimState, owner: CustodyRef): string[] {
 const parseRefKey = (key: string): CustodyRef => {
   const i = key.indexOf(':')
   return { kind: key.slice(0, i) as CustodyRef['kind'], id: key.slice(i + 1) }
+}
+
+/** The boxes standing on a hatch panel (deck slots above its rows), found by direct slot lookup. */
+function deckBoxesOn(state: SimState, panel: HatchPanelState): { slot: VesselSlotState; containerId: string }[] {
+  const spec = vesselClass(state.vessels[panel.vesselId].sizeClass)
+  const out: { slot: VesselSlotState; containerId: string }[] = []
+  for (let row = panel.rowFrom; row < panel.rowTo; row++)
+    for (let tier = spec.holdTiers; tier < spec.holdTiers + spec.deckTiers; tier++)
+      for (const half of [null, 'aft', 'fore'] as const) {
+        const slot = state.vesselSlots[vesselSlotId(panel.vesselId, panel.bay, row, tier, half)]
+        if (slot?.containerId) out.push({ slot, containerId: slot.containerId })
+      }
+  return out
+}
+
+/** Panels to check: those the last event named (hatch events list their panel as equipment), or every panel. */
+function panelsToCheck(state: SimState, scope?: InvariantScope): HatchPanelState[] {
+  if (!scope) return Object.values(state.hatchPanels)
+  return [...scope.equipment].map((id) => state.hatchPanels[id]).filter((p): p is HatchPanelState => !!p)
 }
 
 /** Occupied slots covering one bay-row-tier cell of a block. */
@@ -534,6 +562,226 @@ export const INVARIANTS: Invariant[] = [
       for (const shc of Object.values(state.shcs)) {
         if (shc.nodeId.startsWith('ls:') || !lanes.nodes[shc.nodeId]) messages.push(`${shc.id} is at ${shc.nodeId}, which is not a waterside lane node (SHCs never use the public gate)`)
         else if (lanes.nodes[shc.nodeId].z >= gateZ) messages.push(`${shc.id} is at ${shc.nodeId}, in the landside area`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'landside.stall-exclusive',
+    reads: ['equipment'],
+    description:
+      'No two trucks claim the same transfer stall (or holding position): a stall is reserved for one truck from its admission until ' +
+      'it has reversed clear, the stall records that truck, and the truck records the stall (TT-R16).',
+    check(state) {
+      const messages: string[] = []
+      const ls = state.landside
+      if (!ls) return messages
+      // a truck that has reversed out of its stall keeps `stallId` for its exit trip but no longer holds it
+      const claims = (key: 'stallId' | 'holdingId') => {
+        const by = new Map<string, string[]>()
+        for (const t of Object.values(state.trucks)) {
+          const id = t[key]
+          if (id === null || (key === 'stallId' && t.status === 'routing-to-exit')) continue
+          by.set(id, [...(by.get(id) ?? []), t.id])
+        }
+        return by
+      }
+      for (const [key, what, table] of [
+        ['stallId', 'stall', ls.stalls],
+        ['holdingId', 'holding position', ls.holding],
+      ] as const) {
+        for (const [id, trucks] of claims(key))
+          if (trucks.length > 1) messages.push(`${what} ${id} is claimed by ${trucks.join(' and ')}`)
+          else if (table[id]?.truckId !== trucks[0]) messages.push(`${trucks[0]} claims ${what} ${id}, which records ${table[id]?.truckId ?? 'nobody'}`)
+        for (const entry of Object.values(table)) {
+          if (entry.truckId === null) continue
+          const truck = state.trucks[entry.truckId]
+          if (!truck || truck[key] !== entry.id) messages.push(`${what} ${entry.id} records ${entry.truckId}, which does not claim it`)
+        }
+      }
+      return messages
+    },
+  },
+  {
+    id: 'landside.waiting-off-road',
+    reads: ['equipment', 'time'],
+    description:
+      'A truck that is waiting (in the gate queue, at a kiosk, in a holding position) never stands on a road or a junction: ' +
+      'queued trucks stand on queue nodes, kiosk waiters on lane nodes and holding trucks on their own holding spur (TT-R16).',
+    check(state, config) {
+      const messages: string[] = []
+      if (!hasLandside(config)) return messages
+      const graph = landsideGraphOf(config)
+      const waiting = new Set(['queued', 'in-lane', 'waiting-for-stall', 'holding'])
+      for (const t of Object.values(state.trucks)) {
+        if (!waiting.has(t.status)) continue
+        const node = graph.nodes[t.nodeId]
+        if (node?.kind === 'road') messages.push(`${t.id} (${t.status}) waits on the road node ${t.nodeId}`)
+        // standing still now (no planned segment under way): its position must lie outside every road and junction
+        if (t.motion.some((s) => s.t0 <= state.now && state.now < s.t1)) continue
+        const p = truckPositionAt(graph, t, state.now)
+        if (t.status === 'holding') {
+          // it keeps its holding position (its node is already the stall once the stall is assigned) until it drives out
+          const h = graph.holding.find((x) => x.id === t.holdingId)
+          if (!h || Math.abs(p.x - h.x) > 1e-6 || Math.abs(p.z - h.z) > 1e-6)
+            messages.push(`${t.id} is holding but stands at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}), not in its holding position ${t.holdingId ?? 'none'}`)
+        }
+        for (const zone of Object.values(graph.zones)) {
+          if (zone.kind !== 'road' && zone.kind !== 'intersection') continue
+          if (p.x > zone.x0 && p.x < zone.x1 && p.z > zone.z0 && p.z < zone.z1) {
+            messages.push(`${t.id} (${t.status}) stands at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}) inside ${zone.kind} zone ${zone.id}`)
+            break
+          }
+        }
+      }
+      return messages
+    },
+  },
+  {
+    id: 'landside.leaves-complete',
+    reads: ['equipment'],
+    description: 'A truck drives out of the terminal only after all its transfers are complete: every drop and pick leg is done before it reverses out of its stall (TT-R16).',
+    check(state) {
+      const messages: string[] = []
+      for (const t of Object.values(state.trucks)) {
+        if (t.status !== 'routing-to-exit') continue
+        const open = t.legs.filter((l) => !l.done)
+        if (open.length > 0) messages.push(`${t.id} is leaving with ${open.length} unfinished transfer(s): ${open.map((l) => `${l.kind} ${l.containerId}`).join(', ')}`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.no-removal-with-boxes-on-top',
+    reads: ['equipment'],
+    description:
+      'A hatch panel is only lifted off once the boxes stowed on it are gone: a panel that is lifted or in laydown has no discharge box on it.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const p of panelsToCheck(state, scope)) {
+        if (p.status !== 'lifted' && p.status !== 'in-laydown') continue
+        const boxes = deckBoxesOn(state, p).filter((b) => b.slot.purpose === 'discharge')
+        if (boxes.length > 0)
+          messages.push(`hatch panel ${p.id} was lifted with ${boxes.length} box(es) on top (${boxes[0].containerId} in ${boxes[0].slot.id})`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.no-lift-before-lashing-release',
+    reads: ['equipment'],
+    description:
+      'A hatch panel is lifted only after its lashing was released: a lifted, laid-down or replaced panel has a lashing release at or before its lift.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const p of panelsToCheck(state, scope)) {
+        if (p.status !== 'lifted' && p.status !== 'in-laydown' && p.status !== 'replaced') continue
+        if (p.lashingReleasedAt === null || p.liftedAt === null || p.lashingReleasedAt > p.liftedAt)
+          messages.push(
+            `hatch panel ${p.id} is ${p.status} but its lashing was not released before the lift (released ${p.lashingReleasedAt}, lifted ${p.liftedAt})`,
+          )
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.no-hold-access-through-closed-hatch',
+    reads: ['equipment'],
+    description:
+      'No hold access through a closed hatch: an STS spreader never goes below the hatch plane over a panel that is secured, unsecured or ' +
+      'replaced (positions are the end of the planned motion).',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const sts of Object.values(state.sts)) {
+        if (!sts.vesselId || (scope && !scope.equipment.has(sts.id))) continue
+        const vessel = state.vessels[sts.vesselId]
+        if (!vessel.hatchPanelIds) continue
+        const spec = vesselClass(vessel.sizeClass)
+        for (const bay of sts.bays) {
+          for (let i = 0; i < spec.hatch.panels; i++) {
+            const p = state.hatchPanels[hatchPanelId(vessel.id, bay, i)]
+            if (!p || p.status === 'lifted' || p.status === 'in-laydown') continue
+            const over = Math.abs(sts.gantryX - p.home.x) <= p.lengthM / 2 && Math.abs(sts.trolleyZ - p.home.z) <= p.widthM / 2
+            if (over && sts.hoistY < p.home.y - 0.25)
+              messages.push(
+                `${sts.id} reaches into the hold of bay ${bay} through the ${p.status} hatch panel ${p.id} (hoist ${sts.hoistY.toFixed(2)} m, hatch ${p.home.y} m)`,
+              )
+          }
+        }
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.no-deck-load-on-missing-hatch',
+    reads: ['container'],
+    description: 'A box is loaded on deck only onto a hatch panel that is in place and secured.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      const boxes = scope ? scope.containers : Object.values(state.vesselSlots).map((s) => s.containerId ?? '')
+      for (const id of boxes) {
+        const box = id ? state.containers[id] : undefined
+        if (box?.custody.kind !== 'vesselSlot') continue
+        const slot = state.vesselSlots[box.custody.id]
+        if (!slot?.deck || (slot.purpose !== 'load' && slot.purpose !== 'transshipment')) continue
+        const spec = vesselClass(state.vessels[slot.vesselId].sizeClass)
+        const panel = state.hatchPanels[hatchPanelId(slot.vesselId, slot.bay, hatchPanelOfRow(spec, slot.row))]
+        if (panel && panel.status !== 'secured') messages.push(`box ${id} was loaded in ${slot.id} onto the ${panel.status} hatch panel ${panel.id}`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.replace-own-hatch',
+    reads: ['equipment'],
+    description:
+      'A hatch panel is only ever set back on its own hatch (same vessel, bay and place across the beam), where it lies at its home position.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const p of panelsToCheck(state, scope)) {
+        const on = p.placedOn
+        if (on && (on.vesselId !== p.vesselId || on.bay !== p.bay || on.index !== p.index))
+          messages.push(`hatch panel ${p.id} was set on hatch ${on.vesselId} bay ${on.bay} panel ${on.index}, not its own`)
+        if ((p.status === 'replaced' || p.status === 'secured') && (p.pos.x !== p.home.x || p.pos.z !== p.home.z || p.pos.y !== p.home.y))
+          messages.push(`hatch panel ${p.id} is ${p.status} away from its home position`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.laydown-stack-limit',
+    reads: ['equipment'],
+    description: "A quay laydown bay holds at most the vessel class's `laydownStackLimit` panels (default 3), all of one hatch.",
+    check(state, config) {
+      const messages: string[] = []
+      for (const site of Object.values(state.hatchLaydown)) {
+        if (site.panelIds.length === 0) continue
+        const first = state.hatchPanels[site.panelIds[0]]
+        const limit = hatchSettings(config, state.vessels[first.vesselId].sizeClass).laydownStackLimit
+        if (site.panelIds.length > limit) messages.push(`laydown bay ${site.id} holds ${site.panelIds.length} panels, over the limit of ${limit}`)
+        const mixed = site.panelIds.map((id) => state.hatchPanels[id]).find((p) => p.vesselId !== first.vesselId || p.bay !== first.bay)
+        if (mixed) messages.push(`laydown bay ${site.id} mixes panels of hatches ${first.id} and ${mixed.id}`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.no-departure-open',
+    reads: ['vessel'],
+    description: 'A vessel does not leave (work complete, unmooring, departed) with a hatch panel off, unsecured or not yet secured.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const v of Object.values(state.vessels)) {
+        if (!v.hatchPanelIds || (v.status !== 'unmooring' && v.status !== 'departed')) continue
+        if (scope && !scope.vessels.has(v.id)) continue
+        const open = v.hatchPanelIds.map((id) => state.hatchPanels[id]).filter((p) => p.status !== 'secured')
+        if (open.length > 0) messages.push(`${v.id} is ${v.status} with ${open.length} hatch panel(s) not secured (${open[0].id} is ${open[0].status})`)
       }
       return messages
     },

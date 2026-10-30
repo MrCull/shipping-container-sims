@@ -34,6 +34,7 @@ import {
 import { releaseRail, reserveRail, startReposition, wakeRail } from './rail'
 import { pumpLoadPrep, slotGantryX } from './loadPrep'
 import { prepareNextPackage } from './workPackages'
+import { deckBoxChanged } from './hatch'
 import { laneGraphOf, laneZonesAt } from '../laneGraph'
 import { earliestStart, reserve } from '../reservations'
 
@@ -41,7 +42,7 @@ import { earliestStart, reserve } from '../reservations'
 const CONTAINER_LENGTH_M = { '20': 6.058, '40': 12.192, '40HC': 12.192 } as const
 
 /** Random duration factor for one move phase (1 ± moveVariationPct %). */
-function variation(ctx: EngineContext): number {
+export function variation(ctx: EngineContext): number {
   const pct = ctx.config.moveVariationPct
   if (pct === 0) return 1
   return 1 + ((ctx.random() * 2 - 1) * pct) / 100
@@ -56,7 +57,7 @@ function scaled(p: AxisProfile, f: number): AxisProfile {
  * Plan sequential axis moves starting at `t0`; updates the crane's axis
  * positions and live `motion`. Returns the segments and the end time.
  */
-function planSequence(
+export function planSequence(
   sts: StsState,
   t0: number,
   f: number,
@@ -120,6 +121,17 @@ export function continueWork(ctx: EngineContext, sts: StsState, at: number, segm
     return
   }
   const active = ctx.state.workPackages[sts.activePackageId as string]
+  if (active.hatchPanelId) {
+    ctx.schedule('StsHatchStarted', at, { equipment: [sts.id, active.hatchPanelId], vessels: [vesselId] }, {
+      stsId: sts.id,
+      vesselId,
+      packageId: active.id,
+      panelId: active.hatchPanelId,
+      op: active.kind === 'hatch-remove' ? 'remove' : 'replace',
+      segments,
+    })
+    return
+  }
   if (active.kind === 'load') {
     const containerId = sts.workQueue[0]
     const order = ctx.state.loadOrders[containerId]
@@ -143,10 +155,10 @@ export function continueWork(ctx: EngineContext, sts: StsState, at: number, segm
 }
 
 /** Quay mode instant: crane motions, locks and unlocks take no time (same events, zero durations). */
-const isInstant = (ctx: EngineContext): boolean => ctx.state.subsystems.quay === 'instant'
+export const isInstant = (ctx: EngineContext): boolean => ctx.state.subsystems.quay === 'instant'
 
 /** Kinematics with lock/unlock times zeroed in quay mode instant. */
-function stsKinematics(ctx: EngineContext) {
+export function stsKinematics(ctx: EngineContext) {
   const k = ctx.config.kinematics.sts
   return isInstant(ctx) ? { ...k, lockS: 0, unlockS: 0 } : k
 }
@@ -370,6 +382,7 @@ export const quayReactors: ReactorMap = {
     slot.containerId = box.id
     sts.carrying = []
     ctx.transferCustody(box.id, { kind: 'vesselSlot', id: slot.id })
+    if (slot.deck) deckBoxChanged(ctx, slot.vesselId, slot.bay, slot.row, 1)
     state.vessels[slot.vesselId].remainingLoad--
     state.kpis.movesCompleted++
     state.kpis.workPackages.boxesLoaded++
@@ -442,7 +455,9 @@ export const quayReactors: ReactorMap = {
     sts.drops = []
     sts.status = 'waiting-for-decision'
     for (const p of picks) {
-      state.vesselSlots[p.from.id].containerId = null
+      const pickedSlot = state.vesselSlots[p.from.id]
+      pickedSlot.containerId = null
+      if (pickedSlot.deck) deckBoxChanged(ctx, pickedSlot.vesselId, pickedSlot.bay, pickedSlot.row, -1)
       const vessel = state.vessels[state.vesselSlots[p.from.id].vesselId]
       vessel.remainingDischarge--
       ctx.transferCustody(p.containerId, { kind: 'sts', id: sts.id })

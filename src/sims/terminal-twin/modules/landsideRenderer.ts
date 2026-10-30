@@ -19,6 +19,10 @@ export interface LandsideStats {
   trucks: number
   /** Trucks standing in the gate queue (status queued). */
   queued: number
+  /** Holding positions drawn (TT-R16; zero without `config.landside.holding`). */
+  holdingPositions: number
+  /** Trucks standing in a holding position at the last update. */
+  holding: number
   /** Trucks drawn from the GLB models per LOD (zero until they load). */
   lods: { lod0: number; lod1: number; lod2: number }
   assets: 'placeholder' | 'loaded'
@@ -47,7 +51,7 @@ export class LandsideScene {
   private darkMat: THREE.MeshStandardMaterial
   private glassMat: THREE.MeshStandardMaterial
   private wheelMat: THREE.MeshStandardMaterial
-  private current: LandsideStats = { trucks: 0, queued: 0, lods: { lod0: 0, lod1: 0, lod2: 0 }, assets: 'placeholder' }
+  private current: LandsideStats = { trucks: 0, queued: 0, holdingPositions: 0, holding: 0, lods: { lod0: 0, lod1: 0, lod2: 0 }, assets: 'placeholder' }
   private models: TruckModels | null = null
   /** Procedural gate furniture (lane lines, islands, kiosks, canopy, barriers, office, OOG lane); hidden once the phase 2 gate models draw. */
   readonly gatePlaceholder = new THREE.Group()
@@ -181,6 +185,14 @@ export class LandsideScene {
       plane(3.6, STALL_LENGTH_M, s.x, s.z, yellow, 0.07)
       plane(3.2, STALL_LENGTH_M - 0.5, s.x, s.z, asphalt, 0.075)
     }
+    // holding positions (TT-R16): a spur off the inbound road with a blue-edged bay at its end, well clear of the roads
+    const blue = this.track(new THREE.MeshStandardMaterial({ color: '#2e86c1', roughness: 0.8 }))
+    for (const h of g.holding) {
+      plane(3.6, g.gate.roadInZ - h.z + 1, h.x, (h.z + g.gate.roadInZ) / 2, asphalt, 0.05, true)
+      plane(3.6, STALL_LENGTH_M, h.x, h.z, blue, 0.07)
+      plane(3.2, STALL_LENGTH_M - 0.5, h.x, h.z, asphalt, 0.075)
+      plane(2.4, 0.5, h.x, h.z + STALL_LENGTH_M / 2 - 1.5, blue, 0.08) // stop bar at the end of the bay
+    }
     // gate: lane pavement from the roads to the queue, lane lines, kiosks and a canopy over the kiosk row
     const laneW = 3.6 // placeholder lane pitch (the engine pitch is GATE_LANE_W_M plus islands; the placeholder is only an approximation)
     const lanes = [...g.inLanes, ...g.outLanes]
@@ -228,6 +240,7 @@ export class LandsideScene {
     const model = this.model
     let drawn = 0
     let queued = 0
+    let holding = 0
     const lods = { lod0: 0, lod1: 0, lod2: 0 }
     const seen = new Set<string>()
     for (const id of model.truckIds) {
@@ -241,7 +254,9 @@ export class LandsideScene {
       meshes.group.visible = pose.visible
       if (!pose.visible) continue
       drawn++
-      if (model.statusAt('truck', id, t) === 'queued') queued++
+      const status = model.statusAt('truck', id, t)
+      if (status === 'queued') queued++
+      else if (status === 'holding') holding++
       if (meshes.rig) {
         meshes.rig.pose(pose)
         const lod = meshes.rig.chooseLod(Math.hypot(pose.x - cameraPosition.x, cameraPosition.y, pose.z - cameraPosition.z))
@@ -257,7 +272,7 @@ export class LandsideScene {
         this.group.remove(meshes.group)
         this.trucks.delete(id)
       }
-    this.current = { trucks: drawn, queued, lods, assets: this.models ? 'loaded' : 'placeholder' }
+    this.current = { trucks: drawn, queued, holdingPositions: this.model.landside?.holding.length ?? 0, holding, lods, assets: this.models ? 'loaded' : 'placeholder' }
   }
 
   /** Rig state per truck drawn from the GLB models at the last update (empty until they have loaded). */

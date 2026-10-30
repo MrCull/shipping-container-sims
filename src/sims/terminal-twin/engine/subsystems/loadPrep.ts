@@ -31,8 +31,9 @@ export function slotGantryX(state: SimState, slotId: string): number {
   return slotX(vesselClass(vessel.sizeClass), vessel.berthX ?? 0, slot.bay, slot.half)
 }
 
-const dischargeDone = (state: SimState, sts: StsState): boolean =>
-  packagesOf(state, sts).every((p) => p.kind !== 'discharge' || p.status === 'complete')
+/** Every discharge package the crane works before package `seq` is complete (with hatch covers a bay's load follows its own discharge). */
+const dischargeDone = (state: SimState, sts: StsState, seq = Infinity): boolean =>
+  packagesOf(state, sts).every((p) => p.kind !== 'discharge' || p.seq > seq || p.status === 'complete')
 
 /** Start the next ground-position request of every crane that may stage another export box. */
 export function pumpLoadPrep(ctx: EngineContext): void {
@@ -42,13 +43,13 @@ export function pumpLoadPrep(ctx: EngineContext): void {
     const orders = Object.values(state.loadOrders)
       .filter((o) => o.stsId === sts.id)
       .sort((a, b) => a.seq - b.seq)
-    if (orders.length === 0 || !dischargeDone(state, sts)) continue
+    if (orders.length === 0) continue
     if (orders.some((o) => o.stage === 'gp-asked')) continue
     // an earlier empties package whose empties are not allocated yet keeps the later boxes back (load sequence)
     const waiting = packagesOf(state, sts).find((p) => p.emptyReq && p.emptyReq.stage !== 'allocated' && p.status === 'released')
     if (orders.filter((o) => STAGED.has(o.stage)).length >= sts.groundPositionIds.length) continue
     const next = orders.find((o) => o.stage === 'released')
-    if (!next) continue
+    if (!next || !dischargeDone(state, sts, state.workPackages[next.packageId].seq)) continue
     if (waiting && state.workPackages[next.packageId].seq > waiting.seq) continue
     const box = state.containers[next.containerId]
     if (box.custody.kind !== 'yardSlot') continue // an empty start: the booked box has not been delivered and stacked yet (asked again when it is)

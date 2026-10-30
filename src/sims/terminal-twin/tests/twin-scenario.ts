@@ -5,7 +5,7 @@ import type { ScenarioConfig } from '../scenario/types'
 export function twinScenario(
   opts: { ascs?: 1 | 2; boxes?: number; allocation?: string; dispatch?: string; seed?: number } = {},
 ): ScenarioConfig {
-  const b = new ScenarioBuilder('twin', 'two ASCs per block')
+  const b = new ScenarioBuilder('twin', 'two ASCs per block').hatch({ enabled: false })
     .seed(opts.seed ?? 5)
     .moveVariation(10)
     .driverVariability(10)

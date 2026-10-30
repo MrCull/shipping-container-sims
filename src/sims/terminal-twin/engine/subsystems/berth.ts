@@ -18,6 +18,7 @@ import { slotX, vesselClass } from '../../scenario/vesselClasses'
 import { continueWork, wakeQuayRail } from './quay'
 import { askRelease, createPackages, isLoadSlot, loadActive } from './workPackages'
 import { railOrder } from './rail'
+import { positionHatchPanels } from '../hatch'
 
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
 
@@ -100,6 +101,7 @@ function assignBerth(ctx: EngineContext, vessel: VesselState, berthX: number, t:
   vessel.status = 'mooring'
   vessel.berthX = berthX
   vessel.berthAllocatedAt = t
+  positionHatchPanels(state, vessel.id, berthX)
   vessel.anchorageWaitS = t - (vessel.arrivedAt ?? t)
   ctx.schedule('BerthAllocated', t, { vessels: [vessel.id] }, {
     vesselId: vessel.id,
@@ -258,8 +260,10 @@ export const berthReactors: ReactorMap = {
           // a repositioning crane starts its work at StsRepositionCompleted
         }
         vessel.stsIds.sort((p, q) => state.sts[p].railIndex - state.sts[q].railIndex)
+        trySplit(ctx) // the next vessel in the queue
       }
-      trySplit(ctx)
+      // An empty split keeps the vessel at the head of the queue; it is asked again when a crane is freed (StsWorkComplete)
+      // or a vessel is berthed. Asking again here would loop at one instant while a free crane cannot take the vessel.
     }
   },
 

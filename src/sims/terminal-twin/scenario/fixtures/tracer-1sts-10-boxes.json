@@ -88,5 +88,8 @@
   },
   "endConditions": {
     "vesselsCompleted": 1
+  },
+  "hatch": {
+    "enabled": false
   }
 }

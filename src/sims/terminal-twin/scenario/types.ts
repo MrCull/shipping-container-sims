@@ -188,6 +188,11 @@ export interface VesselConfig {
    */
   dischargeTransshipment?: number
   /**
+   * Stow the discharge boxes on deck only, as far as the deck has room (default false: shared out between hold and
+   * deck in proportion to their tiers). A vessel with nothing in its hold opens no hatch (TT-R09).
+   */
+  deckOnly?: boolean
+  /**
    * Empty containers this vessel loads (TT-11): N empties of a size and shipping line per entry.
    * Releasing the work package that carries them raises "empties required" and asks the
    * `emptyAllocation` decision point which empties in the yard go.
@@ -339,10 +344,30 @@ export interface ScenarioConfig {
   emptyPool?: EmptyPoolConfig
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
+  /**
+   * Hatch covers (TT-R09); optional. Panel counts, sizes and weights come from the vessel class
+   * (`VESSEL_CLASSES[...].hatch`); these override the timings and the laydown stack limit for every class.
+   * `enabled: false` leaves the hatch covers out (no hatch moves, the old discharge-then-load work order).
+   */
+  hatch?: HatchConfig
   /** KPI bucket clock (optional; defaults come from `startDateTime`, see `engine/kpi/clock.ts`). */
   kpi?: KpiClockConfig
   /** Landside: external trucks, gate and transfer stalls (TT-13); optional (no trucks without it). */
   landside?: LandsideConfig
+}
+
+/** Scenario-level hatch cover settings (TT-R09). All optional; the vessel class supplies the defaults. */
+export interface HatchConfig {
+  /** Default true. */
+  enabled?: boolean
+  /** Lashing release delay (s) once the deck boxes above a hatch panel are gone. */
+  lashingReleaseS?: number
+  /** Securing time (s) of a replaced panel. */
+  lashingSecureS?: number
+  /** STS cycle time of one hatch move (s). */
+  cycleS?: number
+  /** Panels per laydown stack. */
+  laydownStackLimit?: number
 }
 
 /** A truck's transaction: one drop or pick, or `dual` (drop an export and pick an import in one visit). */
@@ -403,6 +428,24 @@ export interface AppointmentConfig {
   unverified?: boolean
 }
 
+/** What happens to a truck at the gate when no stall can take it and every holding position is full (TT-R16). */
+export type HoldingOverflowPolicy = 'wait-outside'
+
+/**
+ * Stall admission and holding (TT-R16). With this set, the gate admits the truck at the head of the queue only when a
+ * transfer stall can take it (the stall is reserved before the truck is sent) or a holding position is free; an
+ * admitted truck without a stall waits in a holding position; with holding full the truck waits outside the gate.
+ * Absent = the truck is processed whenever a lane is free and waits at the kiosk for a stall (the older behaviour).
+ */
+export interface HoldingConfig {
+  /** Dedicated holding positions on spurs of the inbound road, clear of roads, junctions and gate exits. */
+  positions: number
+  /** Overflow procedure when holding is full (default and only policy: the truck waits outside the gate). */
+  overflow?: HoldingOverflowPolicy
+  /** True when the numbers come from the TTI research and are not publicly verified. */
+  unverified?: boolean
+}
+
 export interface LandsideConfig {
   /** Trucks arriving per hour for each clock hour 0–23 (Poisson arrivals); the clock comes from `kpi.startTimeOfDayS`. */
   hourlyProfile: number[]
@@ -419,6 +462,8 @@ export interface LandsideConfig {
   scripted?: ScriptedTruck[]
   /** Appointment windows replace the Poisson arrivals (TT-R15); absent = Poisson. */
   appointments?: AppointmentConfig
+  /** Stall admission and holding positions (TT-R16); absent = trucks wait at the gate kiosk for a stall. */
+  holding?: HoldingConfig
 }
 
 /** Where the scenario clock sits, so hour and shift buckets line up with the clock the user sees. */

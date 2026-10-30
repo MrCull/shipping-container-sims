@@ -22,6 +22,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Ground position (STS ground position):** a buffer lane under an STS where discharged boxes are set down and from which load boxes are picked (`<stsId>-GP<n>`).
 - **WTP (waterside transfer point) pad:** a buffer position at the waterside end of a yard block. SHCs drop boxes there, and the ASC picks them up (and the reverse).
 - **Transfer stall (landside transfer stall):** a truck position at the landside end of a block where the ASC serves external trucks.
+- **Hatch laydown (laydown bay):** a place on the quay under an STS's backreach where removed hatch panels are stacked (`LD@<x>`): the gap between two SHC spines, landside of the last ground lane and clear of the landside STS rail. One laydown bay holds one stack of at most `laydownStackLimit` (default 3) panels of one hatch.
 - **Block:** one yard block, perpendicular to the quay. It has 8 rows (fixed by the 25.4 m ASC span), with configurable bays and tiers.
 - **Bay (yard bay):** one 20 ft position along a block (6.7 m). A 40 ft box covers two bays.
 - **Row:** one of the 8 lines across a block, under the ASC span.
@@ -40,15 +41,19 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Crane split:** which STS cranes work which bays of a vessel (a decision point). Cranes keep rail order, so bay ranges follow crane order.
 - **Twin-20 lift:** an STS lift of the two 20 ft boxes of one cell in one cycle; each box gets its own ground position.
 - **Deck before hold:** within a bay, an STS discharges the deck stacks (top tier first) before the hold.
+- **Bay work order (with hatch covers):** within a 40 ft bay: deck discharge → hatch removal → hold discharge → hold load → hatch replacement → deck load. A hatch is opened only when its bay has hold work under it.
 - **Move:** one productive container transfer by an STS (a discharge or a load). This is the unit of moves per hour.
 - **Cycle:** one complete loop of a crane: start, pick, carry, ground, return.
-- **Work package:** one STS's moves for one bay section (deck or hold, discharge or load) of one vessel. A package is `planned`, then `released` by the `workPackageRelease` decision point, `active` while its crane works it, then `complete`. A crane works its packages in sequence: discharge packages first, then load packages.
+- **Work package:** one STS's moves for one bay section (deck or hold, discharge or load) of one vessel, or one **hatch move** (`hatch-remove` / `hatch-replace`, see below). A package is `planned`, then `released` by the `workPackageRelease` decision point, `active` while its crane works it, then `complete`. A crane works its packages in sequence: with hatch covers (the default) bay by bay, without them all discharge packages first and then all load packages.
 - **Release ahead (K):** how many packages the default release strategy keeps released behind the one the crane is working (default 2). The **release lead time** is the time from a package's release to the start of its work.
 - **Export box:** a box booked to a vessel for loading. It starts in the yard (pre-filled from the bay plan) and is loaded into its **load slot**, the empty slot the bay plan booked for it.
 - **Load flow:** the reverse of discharge: stack → ASC → WTP pad → SHC → STS ground position → STS → vessel slot. The ASC step is a **retrieval**.
 - **Load order:** the yard work of one export box from its package's release to its ground position (claim a ground position, retrieve, carry). A crane **stages** at most as many boxes as it has ground positions, in load sequence.
 - **Load sequence:** the order a crane loads a vessel: bay by bay, hold before deck, bottom tier before upper tier, then row, aft half before fore half.
 - **Stowage order:** a box is never loaded into a slot whose lower tier (in the same stack) is still empty. Checked by the invariant `stowage.order`.
+- **Hatch panel (hatch cover panel):** one lift-away cover of a vessel's hatch. Each 40 ft bay has one hatch of N panels across the beam (N and the panel size and weight come from the vessel class). A panel has an id (`V001:H04-1`: bay, index from the quay side), dimensions, weight, a position and a **panel state**: `secured` → `unsecured` (lashing released) → `lifted` → `in-laydown` → `lifted` → `replaced` → `secured`. Panels are **not containers**: never in custody, yard slots or container counts. Deck boxes rest on a panel, so it only comes off when they are gone. *Avoid:* "hatch cover" for a single panel.
+- **Hatch move (`hatch-remove`, `hatch-replace`):** an STS job that lifts one panel off its hatch into the laydown, or back onto its own hatch. It takes the **hatch cycle time** (default about 4 minutes), counts as STS time and as vessel turnaround, and is not a move (not counted in moves per hour).
+- **Lashing release / securing:** the crew work around a hatch panel: the cleats are released a (configurable) delay after the deck boxes above it are gone, before the crane may lift it; a replaced panel is secured a delay after it is set back, before deck boxes may be loaded on it and before the vessel may leave. The crane idles (`StsWaitingForHatch`) when it has to wait.
 - **No 20 on a 40 (stowage):** on board a 20 ft box never sits on a 40 ft box, and a 40 ft box rests only on a 40 ft box or on two filled 20 ft halves. A stack reads, bottom up, twin-20 cells, then 40 ft cells or lone 20 ft halves. The structural 40-on-20 exception is not modelled. Checked by `stowage.order`; the bay plan only produces such stows (`stackAccepts`).
 - **Rehandle:** a non-productive ASC move needed to reach a buried box.
 - **Job (SHC job):** one box to move from an STS ground position to a WTP pad. Grounding a box **releases** a job into the **released pool**; a job is **open** until an SHC **claims** it.
@@ -190,6 +195,9 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Import dwell / export window:** how long an import stands in the yard before a truck may collect it (default lognormal, median 3 days); the period before a vessel's ETA (default 1 to 5 days) in which trucks may deliver its exports.
 - **Segregation:** trucks never enter the waterside network and SHCs never use the gate (invariant `landside.segregation`).
 - **Truck turn time:** gate-in to gate-out.
+- **Holding position:** a dead-end spur off the inbound road (`landside.holding.positions`, nodes `ls:H<n>`) where an admitted truck waits for a transfer stall. It never lies on a road, junction or gate exit (invariant `landside.waiting-off-road`).
+- **Stall admission:** the gate lets the head of the queue through only when a transfer stall can take it (the stall is reserved first, so no two trucks claim one stall: `landside.stall-exclusive`) or a holding position is free.
+- **Overflow (holding):** when no stall and no holding position is free, the truck waits outside the gate in the queue (`TruckHeldOutside`).
 - **Appointment window:** a slot of the truck booking system (default 30 min, `landside.appointments.windowS`). A truck books a window and arrives at a random time inside it; bookings per window are capped by gate and transfer stall capacity (`appointmentCap`), so demand above the cap is rejected. A peak is bunched bookings (`bunching` spans). Each **appointment** carries one transaction (its transport orders: export delivery, import collection or both = dual). No ANPR, no early, late or invalid arrivals.
 
 ## Yard start (TT-14)

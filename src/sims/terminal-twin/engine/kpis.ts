@@ -3,7 +3,7 @@
  * tickets (TT-07) add time series, hourly/shift buckets and more groups.
  */
 import { SHC_OPERATIONAL_STATES, type ShcOperationalState } from './shcStates'
-import type { AppointmentBook, SimState } from './state'
+import type { AppointmentBook, LandsideKpiCounters, LandsideState, SimState } from './state'
 
 /** Per-decision-point (TOS handler) KPIs. Latencies are per resolved decision. */
 export interface HandlerKpiReport {
@@ -67,6 +67,8 @@ export interface KpiReport {
   yard?: YardKpiReport
   /** Work packages (only when some were released). */
   workPackages?: WorkPackageKpiReport
+  /** Hatch cover moves of the STS cranes (only when a hatch move has started). */
+  hatch?: HatchKpiReport
   /** Trucks and the gate (only when the landside is on). */
   landside?: LandsideKpiReport
 }
@@ -97,6 +99,32 @@ export interface LandsideKpiReport {
   fallbacks: number
   /** Appointment system (only with `config.landside.appointments`, TT-R15). */
   appointments?: { windowS: number; capPerWindow: number; windows: number; booked: number; rejected: number; maxBookedPerWindow: number }
+  /** Stall admission and holding (only with `config.landside.holding`, TT-R16). */
+  holding?: {
+    positions: number
+    admittedToStall: number
+    admittedToHolding: number
+    /** Trucks that waited outside the gate because no stall and no holding position was free. */
+    heldOutside: number
+    /** Holding positions in use now, and at most. */
+    inUse: number
+    maxInUse: number
+    /** Standing in a holding position until its stall is assigned (s). */
+    waitS: { mean: number; max: number }
+  }
+}
+
+export interface HatchKpiReport {
+  /** Hatch moves: panels lifted off and put back. */
+  moves: number
+  removes: number
+  replaces: number
+  /** STS time spent on hatch moves, start of a move to the panel set down (s). */
+  stsTimeS: number
+  /** Crane idle time waiting for a lashing release or a securing (s). */
+  waitS: number
+  /** Per STS: hatch moves, their time and waiting. */
+  sts: Record<string, { moves: number; timeS: number; waitS: number }>
 }
 
 export interface WorkPackageKpiReport {
@@ -195,6 +223,19 @@ function appointmentReport(book: AppointmentBook): NonNullable<LandsideKpiReport
     booked: book.list.length,
     rejected: book.rejected,
     maxBookedPerWindow: Math.max(0, ...perWindow.values()),
+  }
+}
+
+function holdingReport(ls: LandsideState, k: LandsideKpiCounters): NonNullable<LandsideKpiReport['holding']> {
+  const positions = Object.values(ls.holding)
+  return {
+    positions: positions.length,
+    admittedToStall: k.admittedToStall,
+    admittedToHolding: k.admittedToHolding,
+    heldOutside: k.heldOutside,
+    inUse: positions.filter((h) => h.truckId !== null).length,
+    maxInUse: k.holdingMax,
+    waitS: { mean: k.holdingWaitCount > 0 ? r3(k.holdingWaitSumS / k.holdingWaitCount) : 0, max: r3(k.holdingWaitMaxS) },
   }
 }
 
@@ -336,6 +377,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     boxesPicked: ls.boxesPicked,
     fallbacks: ls.fallbacks,
     ...(state.landside?.appointments ? { appointments: appointmentReport(state.landside.appointments) } : {}),
+    ...(state.landside && Object.keys(state.landside.holding).length > 0 ? { holding: holdingReport(state.landside, ls) } : {}),
   }
   return {
     simTimeS: r3(state.now - (state.warmUp?.ended ? state.warmUp.durationS : 0)),
@@ -350,6 +392,20 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     ...(horizontal ? { horizontal } : {}),
     ...(yard ? { yard } : {}),
     ...(landside ? { landside } : {}),
+    ...(state.kpis.hatch
+      ? {
+          hatch: {
+            moves: state.kpis.hatch.removes + state.kpis.hatch.replaces,
+            removes: state.kpis.hatch.removes,
+            replaces: state.kpis.hatch.replaces,
+            stsTimeS: r3(state.kpis.hatch.stsTimeS),
+            waitS: r3(state.kpis.hatch.waitS),
+            sts: Object.fromEntries(
+              Object.entries(state.kpis.hatch.perSts).map(([id, k]) => [id, { moves: k.moves, timeS: r3(k.timeS), waitS: r3(k.waitS) }]),
+            ),
+          },
+        }
+      : {}),
     ...(state.kpis.workPackages.released > 0
       ? {
           workPackages: {

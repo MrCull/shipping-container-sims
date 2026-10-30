@@ -35,7 +35,7 @@ import {
 } from './types'
 import { DEFAULT_WTP_PADS } from '../engine/yardLayout'
 import type { DecisionsConfig } from '../engine/decisions/types'
-import type { DwellDistribution, EmptyPoolConfig, VesselSizeClass, YardStartConfig } from './types'
+import type { DwellDistribution, EmptyPoolConfig, HatchConfig, VesselSizeClass, YardStartConfig } from './types'
 
 export { LINE_OWNER_PREFIX }
 
@@ -200,6 +200,7 @@ export function makeVesselCall(id: string, opts: VesselCallOptions): VesselConfi
   if (opts.sizeMix) v.sizeMix = { ...opts.sizeMix }
   if (opts.dischargeTransshipment) v.dischargeTransshipment = opts.dischargeTransshipment
   if (opts.empties?.length) v.empties = structuredClone(opts.empties)
+  if (opts.deckOnly) v.deckOnly = true
   return v
 }
 
@@ -327,6 +328,12 @@ export class ScenarioBuilder {
 
   driverVariability(pct: number): this {
     this.config.driverVariabilityPct = pct
+    return this
+  }
+
+  /** Hatch cover settings (TT-R09): `{ enabled: false }` leaves them out; the other values override the vessel class. */
+  hatch(hatch: HatchConfig): this {
+    this.config.hatch = { ...this.config.hatch, ...hatch }
     return this
   }
 

@@ -248,7 +248,8 @@ export interface CraneSplitReply {
 /** One of a crane's work packages as the release decision sees it. */
 export interface WorkPackageInfo {
   packageId: string
-  kind: 'discharge' | 'load'
+  /** `hatch-remove` / `hatch-replace` (TT-R09) are hatch cover moves: `moves` 0, section `deck`. */
+  kind: 'discharge' | 'load' | 'hatch-remove' | 'hatch-replace'
   section: 'deck' | 'hold'
   bay: number
   moves: number
@@ -456,7 +457,7 @@ export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   ascDispatch: 1,
   berthAllocation: 1,
   craneSplit: 1,
-  workPackageRelease: 1,
+  workPackageRelease: 2,
   emptyAllocation: 1,
   rehandleTarget: 1,
   gateLaneAssignment: 1,

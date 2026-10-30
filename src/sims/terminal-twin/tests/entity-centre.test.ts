@@ -62,6 +62,21 @@ describe.each(cases)('entityCentre on the %s', (_name, make) => {
   })
 })
 
+describe('entityCentre on holding positions (TT-R16)', () => {
+  const model = new SceneModel(fixtures['truck-holding-overflow'])
+
+  it('aims at one holding position or at the middle of all of them', () => {
+    const [h1, h2] = (model.landside as NonNullable<typeof model.landside>).holding
+    expect(model.entityCentre('H1', 0)).toMatchObject({ x: h1.x, z: h1.z })
+    expect(model.entityCentre('holding', 0)).toMatchObject({ x: (h1.x + h2.x) / 2, z: h1.z })
+  })
+
+  it('is null for a holding position that does not exist, and for a scene without holding', () => {
+    expect(model.entityCentre('H9', 0)).toBeNull()
+    expect(new SceneModel(fixtures['truck-gate-queue']).entityCentre('holding', 0)).toBeNull()
+  })
+})
+
 describe('entityCentre of a truck that left', () => {
   it('is null once the truck is gone', () => {
     const model = new SceneModel(fixtures['landside-morning-peak'])

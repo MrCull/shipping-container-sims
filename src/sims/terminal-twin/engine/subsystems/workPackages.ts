@@ -14,10 +14,12 @@
  */
 import type { EngineContext, ReactorMap } from '../context'
 import type { SimState, StsState, VesselSlotState, WorkPackage } from '../state'
+import { hatchPanelOfRow, vesselClass } from '../../scenario/vesselClasses'
 import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import { continueWork } from './quay'
 import { pumpLoadPrep } from './loadPrep'
 import { raiseEmptiesRequired } from './empties'
+import { hatchActive, hatchBlocker, hatchOpenPanel, openingPanels, prepareHatches, startHatchJob, waitForHatch } from './hatch'
 
 /** Export boxes are loaded only when the quay, SHC and ASC subsystems run (they carry and fetch the boxes). */
 export const loadActive = (state: SimState): boolean => state.subsystems.quay !== 'off' && state.subsystems.shc !== 'off' && state.subsystems.asc !== 'off'
@@ -30,7 +32,7 @@ export const isLoadSlot = (s: VesselSlotState): boolean =>
   (s.purpose === 'load' || s.purpose === 'transshipment') && s.containerId === null && (!!s.plannedContainerId || !!s.emptyReq)
 
 /** Boxes a package moves (an empties package counts its required empties before they are allocated). */
-export const packageMoves = (p: WorkPackage): number => (p.emptyReq ? p.emptyReq.count : p.containerIds.length)
+export const packageMoves = (p: WorkPackage): number => (p.emptyReq ? p.emptyReq.count : p.containerIds.length) // 0 for a hatch package
 
 const section = (deck: boolean): 'deck' | 'hold' => (deck ? 'deck' : 'hold')
 
@@ -59,7 +61,27 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
     : []
   sts.packageIds = []
   sts.activePackageId = null
-  const add = (kind: 'discharge' | 'load', group: typeof slots) => {
+  const make = (kind: WorkPackage['kind'], bay: number, sec: 'deck' | 'hold'): WorkPackage => {
+    const pkg: WorkPackage = {
+      id: `WP${++state.nextWorkPackage}`,
+      stsId: sts.id,
+      vesselId,
+      kind,
+      section: sec,
+      bay,
+      containerIds: [],
+      seq: 0,
+      status: 'planned',
+      releasedAt: null,
+      startedAt: null,
+      completedAt: null,
+    }
+    state.workPackages[pkg.id] = pkg
+    return pkg
+  }
+  /** Group consecutive slots of the same bay section (and empties requirement) into packages. */
+  const add = (kind: 'discharge' | 'load', group: typeof slots): WorkPackage[] => {
+    const made: WorkPackage[] = []
     let current: WorkPackage | null = null
     for (const s of group) {
       if (
@@ -68,33 +90,54 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
         current.section !== section(s.deck) ||
         (current.emptyReq?.index ?? -1) !== (s.emptyReq?.index ?? -1)
       ) {
-        current = {
-          id: `WP${++state.nextWorkPackage}`,
-          stsId: sts.id,
-          vesselId,
-          kind,
-          section: section(s.deck),
-          bay: s.bay,
-          containerIds: [],
-          seq: sts.packageIds.length,
-          status: 'planned',
-          releasedAt: null,
-          startedAt: null,
-          completedAt: null,
-        }
+        current = make(kind, s.bay, section(s.deck))
         if (s.emptyReq)
           current.emptyReq = { index: s.emptyReq.index, size: s.emptyReq.size, line: s.emptyReq.line, count: 0, slotIds: [], stage: 'pending' }
-        state.workPackages[current.id] = current
-        sts.packageIds.push(current.id)
+        made.push(current)
       }
       if (current.emptyReq) {
         current.emptyReq.count++
         current.emptyReq.slotIds.push(s.id)
       } else current.containerIds.push((kind === 'discharge' ? s.containerId : s.plannedContainerId) as string)
     }
+    return made
   }
-  add('discharge', discharge)
-  add('load', load)
+  const dischargePkgs = add('discharge', discharge)
+  const loadPkgs = add('load', load)
+  let ordered = [...dischargePkgs, ...loadPkgs]
+  if (hatchActive(ctx)) {
+    // hatch covers: bay by bay, deck discharge → remove → hold discharge → hold load → replace → deck load
+    const spec = vesselClass(state.vessels[vesselId].sizeClass)
+    const holdWork = new Set<string>()
+    for (const s of slots)
+      if (!s.deck && ((s.purpose === 'discharge' && s.containerId !== null) || (loadActive(state) && isLoadSlot(s))))
+        holdWork.add(`${s.bay}:${hatchPanelOfRow(spec, s.row)}`)
+    const opening = openingPanels(ctx, vesselId, bays, (bay, row) => holdWork.has(`${bay}:${hatchPanelOfRow(spec, row)}`))
+    const hatchOf = (kind: 'hatch-remove' | 'hatch-replace', bay: number) =>
+      opening
+        .filter((p) => p.bay === bay)
+        .sort((a, b) => (kind === 'hatch-remove' ? a.index - b.index : b.index - a.index))
+        .map((p) => {
+          const pkg = make(kind, bay, 'deck')
+          pkg.hatchPanelId = p.id
+          return pkg
+        })
+    ordered = []
+    for (const bay of [...bays].sort((a, b) => a - b)) {
+      const of = (list: WorkPackage[], sec: 'deck' | 'hold') => list.filter((p) => p.bay === bay && p.section === sec)
+      ordered.push(
+        ...of(dischargePkgs, 'deck'),
+        ...hatchOf('hatch-remove', bay),
+        ...of(dischargePkgs, 'hold'),
+        ...of(loadPkgs, 'hold'),
+        ...hatchOf('hatch-replace', bay),
+        ...of(loadPkgs, 'deck'),
+      )
+    }
+    prepareHatches(ctx, vesselId, bays, opening)
+  }
+  ordered.forEach((p, i) => (p.seq = i))
+  sts.packageIds = ordered.map((p) => p.id)
 }
 
 /** Ask the release decision for the crane, unless a request is pending. */
@@ -134,7 +177,7 @@ export type PackageStep = 'ready' | 'waiting' | 'done'
  */
 export function prepareNextPackage(ctx: EngineContext, sts: StsState, at: number): PackageStep {
   const { state } = ctx
-  if (sts.workQueue.length > 0) return 'ready'
+  if (sts.workQueue.length > 0 || sts.hatchJob) return 'ready'
   if (sts.activePackageId) {
     const done = state.workPackages[sts.activePackageId]
     done.status = 'complete'
@@ -152,16 +195,33 @@ export function prepareNextPackage(ctx: EngineContext, sts: StsState, at: number
     pumpLoadPrep(ctx) // the crane may have finished its discharge: load preparation can start
   }
   const next = packagesOf(state, sts).find((p) => p.status !== 'complete')
-  if (!next) return 'done'
+  if (!next) {
+    // the crane is through, but the vessel may not leave while a panel it replaced is not secured yet
+    const open = hatchOpenPanel(ctx, sts)
+    if (open) {
+      waitForHatch(ctx, sts, open, 'securing', at)
+      return 'waiting'
+    }
+    return 'done'
+  }
   if (next.status === 'planned') {
     askRelease(ctx, sts)
     return 'waiting'
   }
   if (next.emptyReq && next.emptyReq.stage !== 'allocated') return 'waiting' // released, but its empties are not allocated yet
+  if (next.kind === 'load' && next.section === 'deck') {
+    // deck boxes go onto a closed hatch: the crane waits until the bay's replaced panels are secured
+    const blocker = hatchBlocker(ctx, next)
+    if (blocker) {
+      waitForHatch(ctx, sts, blocker, 'securing', at)
+      return 'waiting'
+    }
+  }
   next.status = 'active'
   next.startedAt = at
   sts.activePackageId = next.id
   sts.workQueue = [...next.containerIds]
+  if (next.hatchPanelId) sts.hatchJob = startHatchJob(ctx, next)
   const lead = at - (next.releasedAt ?? at)
   const k = state.kpis.workPackages
   k.started++

@@ -9,7 +9,7 @@
  *
  * Rules [A]:
  * - Discharge boxes are spread unevenly over the bays (seeded weights). Within a bay
- *   they are split between hold and deck in proportion to their tiers and
+ *   they are split between hold and deck in proportion to their tiers (all on deck with `deckOnly`) and
  *   stacked from the bottom (hold floor / hatch cover) up, so nothing floats.
  * - 20 ft boxes are paired fore/aft in one cell (a twin-20 candidate); an odd
  *   one out takes the aft half of a cell alone. 40 ft and HC fill a cell.
@@ -245,7 +245,7 @@ function planVessel(
   perBay.forEach((q, bay) => {
     const holdCap = spec.rows * spec.holdTiers
     const deckCap = spec.rows * spec.deckTiers
-    let deck = Math.min(deckCap, Math.round((q * spec.deckTiers) / tiers))
+    let deck = Math.min(deckCap, v.deckOnly ? q : Math.round((q * spec.deckTiers) / tiers))
     let hold = q - deck
     if (hold > holdCap) {
       deck += hold - holdCap

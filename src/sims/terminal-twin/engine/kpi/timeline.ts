@@ -26,7 +26,7 @@ export interface TimelinePackage extends TimelineWindow {
 export interface TimelineWorkPackage extends TimelineWindow {
   packageId: string
   stsId: string
-  kind: 'discharge' | 'load'
+  kind: 'discharge' | 'load' | 'hatch-remove' | 'hatch-replace'
   section: 'deck' | 'hold'
   bay: number
   moves: number
