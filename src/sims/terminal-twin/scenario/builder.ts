@@ -36,7 +36,7 @@ import {
 } from './types'
 import { DEFAULT_WTP_PADS } from '../engine/yardLayout'
 import type { DecisionsConfig } from '../engine/decisions/types'
-import type { DwellDistribution, EmptyPoolConfig, HatchConfig, VesselSizeClass, YardStartConfig } from './types'
+import type { ContainerPropsConfig, DwellDistribution, EmptyPoolConfig, HatchConfig, VesselSizeClass, YardStartConfig } from './types'
 
 export { LINE_OWNER_PREFIX }
 
