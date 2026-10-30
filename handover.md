@@ -23,7 +23,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 | #97 | R15 Truck appointments | | 0.18.0 | wave 1 | merged |
 | #98 | R16 Stall admission, holding | #97 | 0.19.0 | wave 2 | merged |
 | #99 | R17 ASC pre-retrieval | #98 | 0.20.0 | | todo |
-| #100 | R18 Truck metrics | #98 | n/a (KPI fields only) | | todo |
+| #100 | R18 Truck metrics | #98 | n/a (KPI fields only) | wave 3 | merged |
 | #101 | R19 Reefers | #87, #88 | 0.21.0 | | todo |
 
 ## Notes
@@ -34,8 +34,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 
 ## Status at pause (budget limit; no new tickets started)
 
-- Merged and pushed: #88, #85, #97, #89, #98, #91, #84.
-- Reported, merge pending: #100 (`tt/100-truck-metrics`, 20cb3bf, KPI fields only, ENGINE_VERSION stays 0.19.0).
+- Merged and pushed: #88, #85, #97, #89, #98, #91, #84, #100.
 - Still running when paused: #93 (branch `tt/93-shc-states-metrics`). When they report, merge with `scripts/merge-ticket.sh`, update this table, push, then `scripts/remove-worktree.sh <agent-id>`.
 - Not started: #86, #87, #90, #92 (unblocked by #91), #94-#96 (after #93), #99 (after #98, now unblocked), #101 (after #87).
 - Deviations to review: #91 uses 2 panels (feeder) and 4 (ULCV), not 1 and 3, because panels must fit the laydown strip (about 15 m across); SHC scenarios with more than 3 ground positions per STS throw at start unless `hatch.enabled` is false. Hatch moves count in turnaround and `kpiReport().hatch`, not in STS moves or gross moves/h.
