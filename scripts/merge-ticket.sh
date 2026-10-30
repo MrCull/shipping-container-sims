@@ -11,8 +11,9 @@ git merge --ff-only "origin/$current" >/dev/null 2>&1 || true
 if ! git merge --no-edit "$branch"; then
   echo "CONFLICT merging $branch into $current. Unmerged files:" >&2
   git diff --name-only --diff-filter=U >&2
-  echo "Resolve them (keep both sides of additive changes), 'git add', 'git commit', then run 'pnpm run verify'." >&2
+  echo "Resolve them (keep both sides of additive changes, the higher ENGINE_VERSION), 'git add', 'git commit', then run 'scripts/check-engine-version.sh' and 'pnpm run verify'." >&2
   exit 1
 fi
+scripts/check-engine-version.sh
 pnpm run verify
 echo "OK: $branch merged into $current and verified. Update handover.md, then git push."
