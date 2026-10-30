@@ -66,7 +66,7 @@ export class ContainerCloseups {
       const material = new THREE.MeshStandardMaterial({
         map: texture,
         normalMap: maps?.normal ?? null,
-        normalScale: new THREE.Vector2(1, 1),
+        normalScale: new THREE.Vector2(0.45, 0.45),
         roughnessMap: maps?.roughness ?? null,
         roughness: 0.85,
         metalness: 0.15,

@@ -141,19 +141,19 @@ export function paintContainer(ctx: CanvasRenderingContext2D, markings: Containe
     ctx.fillRect(0, 0, W, 0.14) // header and sill
     ctx.fillRect(0, H - 0.14, W, 0.14)
     // identity, top of the right leaf
-    text(ctx, `${door.ownerPrefix} ${door.serial}`, W * 0.53, 0.36, 0.14, ink, '600')
-    text(ctx, String(door.checkDigit), W * 0.93, 0.31, 0.1, ink, '600', 'center')
+    text(ctx, `${door.ownerPrefix} ${door.serial}`, W * 0.51, 0.4, 0.16, ink, '600')
+    text(ctx, String(door.checkDigit), W * 0.94, 0.36, 0.11, ink, '600', 'center')
     ctx.strokeStyle = ink
     ctx.lineWidth = 0.008
-    ctx.strokeRect(W * 0.93 - 0.06, 0.31 - 0.07, 0.12, 0.14)
-    text(ctx, door.isoType, W * 0.53, 0.55, 0.14, ink, '600')
+    ctx.strokeRect(W * 0.94 - 0.065, 0.36 - 0.08, 0.13, 0.16)
+    text(ctx, door.isoType, W * 0.51, 0.64, 0.16, ink, '600')
     // weight plate, right leaf, below the identity
     const rows = plateRows(door.plate)
     rows.forEach(([label, kg, lbs], i) => {
-      const y = H * 0.4 + i * 0.27
-      text(ctx, label, W * 0.54, y + 0.06, 0.065, ink, '500')
-      text(ctx, kg, W * 0.92, y, 0.065, ink, '500', 'right')
-      text(ctx, lbs, W * 0.92, y + 0.12, 0.065, ink, '500', 'right')
+      const y = H * 0.33 + i * 0.27
+      text(ctx, label, W * 0.52, y + 0.06, 0.08, ink, '500')
+      text(ctx, kg, W * 0.96, y, 0.08, ink, '500', 'right')
+      text(ctx, lbs, W * 0.96, y + 0.12, 0.08, ink, '500', 'right')
     })
     // CSC approval plate, left leaf, and the corten steel roundel
     ctx.fillStyle = '#8f9396'

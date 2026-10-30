@@ -97,7 +97,7 @@ __tt.overlays({ laneGraph?, reservations?, occupancy?, labels? })   // toggles 3
 await __tt.load('shc-1sts-2shc-1wtp', { shc: { count: 3, kinematics } })  // SHC fleet override, like the setup dialog
 __tt.clock()       // { displayTime, speed, paused, busy, engine: EngineInfo }
 __tt.scene()       // rendered { containers, sts, shcs, vessels, overlays, reservedZones, frames,
-                   //   containerLods: { lod0, lod1 }, containerAssets: 'placeholder'|'loaded',
+                   //   containerLods: { lod0, lod1, closeup, culled }, containerAssets: 'placeholder'|'loaded',
                    //   shcLods: { lod0, lod1, lod2 }, shcAssets: 'placeholder'|'loaded',
                    //   ascLods: { lod0, lod1, lod2 }, ascAssets: 'placeholder'|'loaded' }
 __tt.sceneState()  // what the scene shows: custody per box, status + pose per STS and SHC, status per vessel,
