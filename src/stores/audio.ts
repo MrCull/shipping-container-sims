@@ -16,6 +16,18 @@ export const useAudioStore = defineStore('audio', () => {
     }))
   }
 
+  const volume = ref(persistedStorage.global.volume)
+  /** The one gain every sim's playback is scaled by: 0 while muted. */
+  const masterGain = computed(() => (soundMuted.value ? 0 : volume.value))
+
+  function setVolume(value: number): void {
+    volume.value = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0
+    updateSiteStorage(storage => ({
+      ...storage,
+      global: { ...storage.global, volume: volume.value },
+    }))
+  }
+
   function setSoundMuted(value: boolean): void {
     soundMuted.value = value
     persistSoundMuted()
@@ -39,6 +51,9 @@ export const useAudioStore = defineStore('audio', () => {
 
   return {
     soundMuted,
+    volume,
+    masterGain,
+    setVolume,
     setSoundMuted,
     toggleSound,
     musicMuted,

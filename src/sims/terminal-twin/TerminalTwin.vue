@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
+import FpsChip from './components/FpsChip.vue'
 import FinalReport from './components/FinalReport.vue'
 import KpiStrip from './components/KpiStrip.vue'
 import BayViewer from './components/BayViewer.vue'
@@ -30,6 +31,9 @@ useTwinShortcuts()
 
 let uninstallDevApi: (() => void) | null = null
 let unmounted = false
+
+/** SimPage's top-right slot (beside the shared audio control) takes the FPS chip. */
+const hasHeaderSlot = !!document.getElementById('sim-header-slot')
 
 const ended = computed(() => store.runEnded)
 
@@ -67,6 +71,12 @@ onBeforeUnmount(() => {
     v-else
     class="terminal-twin"
   >
+    <Teleport
+      v-if="hasHeaderSlot && !webglFailed"
+      to="#sim-header-slot"
+    >
+      <FpsChip />
+    </Teleport>
     <TopBar
       v-if="store.hasScenario"
       :show-graphics="!webglFailed"
