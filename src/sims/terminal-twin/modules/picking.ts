@@ -74,6 +74,13 @@ export function pickEntity(model: SceneModel, time: number, ray: Ray): string | 
     if (dist !== null && dist !== undefined && (!best || dist < best.dist)) best = { id, dist }
   }
   if (best) return best.id
+  // Hatch panels (TT-R10) lie inside the vessel's box and hang inside the STS's, so they win over equipment like containers do.
+  for (const id of model.hatchPanelIds) {
+    const b = entityBounds(model, id, time)
+    const dist = b && rayBox(ray, b)
+    if (dist !== null && dist !== undefined && (!best || dist < best.dist)) best = { id, dist }
+  }
+  if (best) return best.id
   for (const id of EQUIPMENT_KINDS.flatMap((def) => def.ids(model))) {
     const b = entityBounds(model, id, time)
     const dist = b && rayBox(ray, b)

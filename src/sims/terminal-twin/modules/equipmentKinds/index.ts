@@ -6,6 +6,7 @@
  */
 import type { SceneModel } from '../sceneModel'
 import { ascKind } from './asc'
+import { hatchKind } from './hatch'
 import { shcKind } from './shc'
 import { stsKind } from './sts'
 import { truckKind } from './truck'
@@ -14,7 +15,7 @@ import { vesselKind } from './vessel'
 
 export type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
 
-export const EQUIPMENT_KINDS = [stsKind, shcKind, ascKind, truckKind, vesselKind] as const
+export const EQUIPMENT_KINDS = [stsKind, shcKind, ascKind, truckKind, vesselKind, hatchKind] as const
 
 export type EquipmentKind = (typeof EQUIPMENT_KINDS)[number]['kind']
 
