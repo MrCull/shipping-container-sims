@@ -236,6 +236,11 @@ export interface EmptyRequirement {
   /** Shipping line (a key of `LINE_OWNER_PREFIX`). */
   line: string
   count: number
+  /**
+   * ISO type the empties must have (e.g. `22G1`, `42G1`, `45G1`; spec #106). Default: the dry-box code of `size`.
+   * The `iso-type-best-position` strategy matches on it; the older strategies match on size and line.
+   */
+  isoType?: string
 }
 
 /** A vessel's flow mix as shares of its box moves (percent, summing to 100). */
@@ -425,6 +430,11 @@ export interface ScenarioConfig {
   containerProps?: ContainerPropsConfig
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
+  /**
+   * Empty allocation options (spec #106); optional. `matchLine: true` restricts the `iso-type-best-position`
+   * strategy to empties of the requesting line (default false: any line's empty of the right ISO type may go).
+   */
+  emptyAllocation?: { matchLine?: boolean }
   /**
    * Hatch covers (TT-R09); optional. Panel counts, sizes and weights come from the vessel class
    * (`VESSEL_CLASSES[...].hatch`); these override the timings and the laydown stack limit for every class.

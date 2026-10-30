@@ -297,6 +297,17 @@ export interface EmptyCandidate {
   distanceM: number
   /** Sim time since which the box has stood in the yard (negative for pre-filled boxes). */
   yardSince: number
+  /**
+   * Set only when the `iso-type-best-position` strategy is selected (spec #106; the request shape of the older
+   * strategies is unchanged): the box's ISO type and line, how many boxes stand on it (0 = on top, reachable; more
+   * means the ASC rehandles them first), the rank of its block by WTP pad distance to the crane's gantry (0 = the block
+   * serving the vessel) and how many neighbouring stacks hold an empty already allocated to a package.
+   */
+  isoType?: string
+  line?: string
+  boxesOnTop?: number
+  blockRank?: number
+  adjacentAllocated?: number
 }
 
 /**
@@ -310,6 +321,12 @@ export interface EmptyAllocationRequest {
   size: ContainerSize
   line: string
   count: number
+  /**
+   * Set only with `iso-type-best-position`: the ISO type the empties must have, and whether the line must match
+   * (`config.emptyAllocation.matchLine`). The candidates then include buried empties (see `EmptyCandidate.boxesOnTop`).
+   */
+  isoType?: string
+  matchLine?: boolean
   /** Matching empties in the yard, in container id order. */
   candidates: EmptyCandidate[]
 }

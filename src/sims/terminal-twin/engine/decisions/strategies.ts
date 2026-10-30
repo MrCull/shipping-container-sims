@@ -10,7 +10,7 @@
 import { minFutureRehandles, nearestValidRehandle } from './rehandleStrategies'
 import { balancedAscDispatch, preRetrievalDispatch, watersideFirstDispatch } from './ascStrategies'
 import { groupByVesselSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
-import { nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
+import { isoTypeBestPositionEmpties, nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
 import { leastLoadedBlockStall, leastUsedLane, lowestFreeLane, nearestToBoxStall } from './landsideStrategies'
 import { justInTimeRelease, keepKAheadRelease } from './workPackageStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
@@ -203,6 +203,11 @@ export const strategies: StrategyRegistry = {
       'oldest-first': {
         description: 'The matching empties that have stood in the yard longest.',
         handler: (msg) => oldestFirstEmpties(msg.payload),
+      },
+      'iso-type-best-position': {
+        description:
+          'Opt-in (spec #106). Matches the requested ISO type (any line; `emptyAllocation.matchLine` restricts to the requesting line) and picks the best yard position: fewest boxes on top, then nearest the WTP of the block serving the vessel, then next to other allocated empties.',
+        handler: (msg) => isoTypeBestPositionEmpties(msg.payload),
       },
     },
   },

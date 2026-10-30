@@ -276,6 +276,28 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * Spec #106 (#112): the opt-in `iso-type-best-position` empty allocation. A feeder loads 18 empty 40 ft boxes (ISO 42G1)
+   * for MSC; the yard holds 24 empty 40s of MSC and Maersk stacked up to 2 high, plus 6 empty 20s that never match. The line
+   * is ignored, so Maersk empties go too, and the boxes with the fewest boxes on top are picked first; the buried ones
+   * picked last are dug out by the ASC (rehandles).
+   */
+  'empty-allocation-iso': () =>
+    new ScenarioBuilder('empty-allocation-iso', 'A feeder loads 18 empty 40 ft boxes picked by ISO type and best yard position (any line)')
+      .hatch({ enabled: false })
+      .seed(12)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Iso Star', sizeClass: 'feeder', maxSts: 1, empties: [{ size: '40', line: 'MSC', count: 18 }] })
+      .emptyPool({ count: 30, sizeMix: { '40': 4, '20': 1 }, lines: { MSC: 1, Maersk: 1 } })
+      .decisions({ points: { emptyAllocation: { strategy: 'iso-type-best-position' } } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 4, tiers: 2 })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /**
    * TT-R07: mixed 20 and 40 ft stows across hold and deck. A feeder discharges 140 mixed boxes (an odd number of 20s
    * is possible), loads 40 export boxes and 6 empty 20s: on board no 20 ft box sits on a 40 ft box and a 40 ft box
    * rests only on a 40 or on two filled 20 ft halves (`stowage.order`).

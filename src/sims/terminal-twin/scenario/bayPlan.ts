@@ -27,7 +27,7 @@ import { sampleDwell, transshipmentConfig } from './dwell'
 import type { ContainerSize, ScenarioConfig, VesselConfig, Weights } from './types'
 import { cellCapacity, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
 import { makePlannedContainer } from './containerFactory'
-import { drawContainerProps, type ContainerProps } from './containerProps'
+import { drawContainerProps, isoTypeOf, type ContainerProps } from './containerProps'
 
 export type SlotPurpose = 'discharge' | 'load' | 'transshipment'
 
@@ -42,7 +42,7 @@ export interface PlannedSlot {
   half: CellHalf
   purpose: SlotPurpose
   /** Empty-container slot (TT-11): which requirement (index in `VesselConfig.empties`) it is booked for. */
-  emptyReq?: { index: number; size: ContainerSize; line: string }
+  emptyReq?: { index: number; size: ContainerSize; line: string; isoType?: string }
   /** Transshipment slot linked to a box that arrives on an earlier vessel (TT-11). */
   plannedContainerId?: string
 }
@@ -306,6 +306,7 @@ function planVessel(
       line: string
       kind: 'export' | 'ts' | 'empty'
       req?: number
+      isoType?: string
     }
     interface LoadUnit {
       boxes: LoadBox[]
@@ -332,7 +333,7 @@ function planVessel(
     }
     ;(v.empties ?? []).forEach((e, index) => {
       if (!(e.line in LINE_OWNER_PREFIX)) throw new Error(`Unknown shipping line ${e.line} (no owner prefix)`)
-      const boxes: LoadBox[] = Array.from({ length: e.count }, () => ({ size: e.size, full: false, line: e.line, kind: 'empty' as const, req: index }))
+      const boxes: LoadBox[] = Array.from({ length: e.count }, () => ({ size: e.size, full: false, line: e.line, kind: 'empty' as const, req: index, isoType: e.isoType ?? isoTypeOf(e.size, false) }))
       addGroup(boxes, loadUnits)
     })
     interface Stack {
@@ -385,7 +386,7 @@ function planVessel(
         const half: CellHalf = box.size === '20' ? (k === 0 ? 'aft' : 'fore') : null
         const slotId = addSlot(b, cell.row, cell.tier, half, box.kind === 'ts' ? 'transshipment' : 'load')
         if (box.kind === 'empty') {
-          plan.slots[plan.slots.length - 1].emptyReq = { index: box.req as number, size: box.size, line: box.line }
+          plan.slots[plan.slots.length - 1].emptyReq = { index: box.req as number, size: box.size, line: box.line, isoType: box.isoType as string }
           return
         }
         const prefix = LINE_OWNER_PREFIX[box.line]
