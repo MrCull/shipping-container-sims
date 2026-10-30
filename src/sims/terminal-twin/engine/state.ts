@@ -44,6 +44,8 @@ export interface ContainerState {
   vesselId: string
   custody: CustodyRef
   custodyHistory: CustodyRecord[]
+  /** Reefer (R19): only in powered yard rows, at most `REEFER_MAX_TIERS` high. Absent = not a reefer. */
+  reefer?: true
   /** Transshipment box (TT-11): the vessel that will load it (null/absent = not a linked transshipment box). */
   onwardVesselId?: string
   /** Transshipment box: slot on the onward vessel it is booked to. */
@@ -1159,6 +1161,7 @@ export function createInitialState(
       custody: owner,
       custodyHistory: [{ t: 0, owner, eventId: null }],
     }
+    if (c.reefer) state.containers[c.id].reefer = true
     if (c.flow === 'pool') state.containers[c.id].yardSince = -(c.ageS ?? 0)
     if (c.transshipment) {
       Object.assign(state.containers[c.id], {

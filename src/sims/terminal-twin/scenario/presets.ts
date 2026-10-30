@@ -19,6 +19,12 @@ export const TTI_TIERS = 5
  */
 export const TTI_BAYS = Math.round(TTI_YARD_TEU / (TTI_BLOCKS * TTI_ROWS * TTI_TIERS))
 
+/**
+ * [A] unverified (R19): TTI's real reefer share and plug layout are not public. 8% of the full boxes are reefers and
+ * rows 1-2 of every block are powered (the first two of the 8 rows across the ASC span).
+ */
+const TTI_REEFERS = { share: 0.08, poweredRows: [1, 2] }
+
 interface TerminalSpec {
   name: string
   description: string
@@ -39,6 +45,8 @@ interface TerminalSpec {
   /** Truck appointment windows (TT-R15); absent = Poisson arrivals. */
   appointments?: AppointmentConfig
   holding?: HoldingConfig
+  /** Reefers (R19): share of full boxes and the powered rows of every block; absent = none. */
+  reefers?: { share: number; poweredRows: number[] }
 }
 
 function terminal(spec: TerminalSpec): ScenarioConfig {
@@ -55,6 +63,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
     .queueAreas({ stsCapacity: 3, blockCapacity: 3 })
     .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' } } })
     .ascsPerBlock(2)
+    .cargo(spec.reefers ? { reeferShare: spec.reefers.share } : {})
     .yardStart(spec.yardStart)
     .landside({
       hourlyProfile: DEFAULT_HOURLY_PROFILE.map((n) => Math.round(n * spec.truckScale)),
@@ -66,7 +75,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
   const base = b.build()
   const sts = deriveSts({ ...base, sts: [{ id: `STS${spec.stsFirst}`, gantryX: 0, groundPositions: 3 }] }, spec.sts, spec.quayM)
   for (const s of sts) b.sts(s.id, { gantryX: s.gantryX, groundPositions: s.groundPositions })
-  deriveBlockXs(spec.quayM, spec.blocks).forEach((x, i) => b.block(`B${String(i + 1).padStart(2, '0')}`, { x, bays: spec.bays, tiers: spec.tiers }))
+  deriveBlockXs(spec.quayM, spec.blocks).forEach((x, i) => b.block(`B${String(i + 1).padStart(2, '0')}`, { x, bays: spec.bays, tiers: spec.tiers, ...(spec.reefers ? { poweredRows: spec.reefers.poweredRows } : {}) }))
   return b.build()
 }
 
@@ -109,6 +118,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       vessels: hubVessels(4, 3 * 3600, 900, 0.05, 11),
       yardStart: { mode: 'prefilled', targetPct: 60 },
       truckScale: 1,
+      reefers: TTI_REEFERS,
     }),
   'Small automated': () =>
     terminal({
@@ -157,5 +167,6 @@ export const presets: Record<string, () => ScenarioConfig> = {
       appointments: { windowS: 1800, bunching: [{ fromS: 0, toS: 7200, factor: 1.5 }], unverified: true },
       // [A] unverified: TTI's real number of holding positions is not public.
       holding: { positions: 6, unverified: true },
+      reefers: TTI_REEFERS,
     }),
 }

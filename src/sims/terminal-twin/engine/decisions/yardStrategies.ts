@@ -24,6 +24,13 @@ function pairingCost(req: YardAllocationRequest, c: YardCandidate): number {
   return req.heights[(mate - 1) * req.rows + (c.row - 1)] === 0 ? BREAK_EMPTY_PAIR_COST_M : 0
 }
 
+/** Cost of a plain box taking a powered row (m of plan distance): plugs stay free for reefers when anything else fits (R19). */
+const POWERED_ROW_COST_M = 60
+
+function poweredRowCost(req: YardAllocationRequest, c: YardCandidate): number {
+  return !req.reefer && req.poweredRows?.includes(c.row) ? POWERED_ROW_COST_M : 0
+}
+
 const none: YardAllocationReply = { slotId: null }
 
 /** Candidate with the lowest cost; ties by bay, row, tier. */
@@ -47,7 +54,7 @@ export function randomSlot(req: YardAllocationRequest): YardAllocationReply {
 }
 
 export function nearestWtpSlot(req: YardAllocationRequest): YardAllocationReply {
-  const best = cheapest(candidateSlots(req), (c) => c.distanceM + TIER_COST_M * (c.tier - 1) + pairingCost(req, c))
+  const best = cheapest(candidateSlots(req), (c) => c.distanceM + TIER_COST_M * (c.tier - 1) + pairingCost(req, c) + poweredRowCost(req, c))
   return { slotId: best?.slotId ?? null }
 }
 

@@ -11,7 +11,7 @@
  *   So tier 1 fills before anything is stacked, and where boxes are stacked the
  *   one loaded first is on top: no rehandle is needed in load order.
  */
-import { blockSpecs, boxSpan, candidateSlots, parseYardSlotId, type YardStacks } from '../engine/yardLayout'
+import { blockSpecs, boxSpan, candidateSlots, parseYardSlotId, reeferFields, type YardStacks } from '../engine/yardLayout'
 import type { CargoPlan } from './bayPlan'
 import type { ContainerSize, ScenarioConfig } from './types'
 
@@ -83,6 +83,7 @@ export function planExportYard(config: ScenarioConfig, plan: CargoPlan): ExportP
         heights: blk.heights,
         topVessels: blk.tops,
         stackSpans: blk.spans,
+        ...reeferFields(blk.spec, c.reefer),
       }
       const best = candidateSlots(stacks).sort((a, b) => a.tier - b.tier || b.bay - a.bay || a.row - b.row)[0]
       if (!best) continue

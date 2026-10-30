@@ -80,6 +80,6 @@ Deliberate differences between the sim and the terminal described above:
 2. **Internal slot ids are kept.** Maritime notation is display only; no migration of ids.
 3. **No structural 40-on-20 exception on board.** The sim never stows a 40 on a 20 (`stowage.order`); real stowage allows it where the structure permits.
 4. **No ANPR and no early/late arrival handling.** Trucks arrive in time within their window (or are delayed or rejected by the window cap); identification is a fixed kiosk time.
-5. **Reefers arrive in a later ticket.** No reefer racks, plugs or monitoring yet.
+5. **Reefers are plugged rows only.** A share of the full boxes (`cargo.reeferShare`) are reefers; they go only to the powered rows of a block (`BlockConfig.poweredRows`) and stack at most 4 high (`yard.reefer-powered`). No plug monitoring, no temperature or power-cut events, no reefer racks (gantry-served frames), no vessel reefer plugs or plug-count limits on board, and no separate reefer handling times. TTI's real reefer share and plug layout are [U]: the TTI presets use 8% reefers and powered rows 1-2 of every block as unverified assumptions [A].
 6. **Hatch panels per class and times are sim configuration** (see section 1), and the 3D view does not draw the panels yet (#92).
 7. **Out of scope:** dangerous goods segregation, weight stacking, rail, the "8 big blocks" scenario.
