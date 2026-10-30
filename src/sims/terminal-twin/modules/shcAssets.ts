@@ -34,6 +34,33 @@ export const SHC_RIG = {
 /** [A] LOD switch distances (m) from the camera, with 15% hysteresis. */
 export const SHC_LOD_DISTANCES = { lod0: 110, lod1: 380, hysteresis: 1.15 }
 
+/** The fleet number in an SHC id (`SHC07` -> 7), or null when the id carries none. */
+export function shcFleetNumber(id: string): number | null {
+  const m = /(\d+)$/.exec(id)
+  return m ? Number(m[1]) : null
+}
+
+/**
+ * A copy of the plate material whose UVs point at the fleet-number tile of SHC `number` (1 = tile 0). The
+ * GLB authors the plate UVs for tile 0; the tile grid comes from the sidecar. Numbers beyond the plate
+ * count wrap, and an id without a number shows tile 0.
+ */
+export function shcPlateMaterial(source: THREE.MeshStandardMaterial, number: number | null): THREE.MeshStandardMaterial {
+  const p = meta.branding.fleetNumbers
+  const mat = source.clone()
+  const i = (((number ?? 1) - p.first) % p.count + p.count) % p.count
+  const offset = new THREE.Vector2((i % p.cols) * p.tileSizeUv[0], Math.floor(i / p.cols) * p.tileSizeUv[1])
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.plateOffset = { value: offset }
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform vec2 plateOffset;')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_MAP\n  vMapUv += plateOffset;\n#endif')
+  }
+  mat.customProgramCacheKey = () => 'tt-shc-plate'
+  mat.userData.plateIndex = i
+  return mat
+}
+
 const CORNERS = ['fl', 'fr', 'rl', 'rr'] as const
 
 export interface ShcRigPose {
@@ -94,11 +121,13 @@ export class ShcRig {
   private readonly hoist: THREE.Object3D[] = []
   private readonly hoistRestY: number[] = []
   private readonly twistlocks: THREE.Object3D[] = []
+  private readonly plates: THREE.Material[] = []
   private lod: 0 | 1 | 2 = 0
   private state: ShcRigState = { lod: 0, steerRad: 0, wheelRollRad: 0, hoistM: 0, carrying: false }
 
   constructor(model: ShcModel, id: string) {
     this.root.name = id
+    const fleetNumber = shcFleetNumber(id)
     const clone = model.source.clone(true)
     this.steer = { fl: [], fr: [], rl: [], rr: [] }
     this.wheel = { fl: [], fr: [], rl: [], rr: [] }
@@ -108,7 +137,13 @@ export class ShcRig {
       this.lods.push(lod)
       lod.traverse((o) => {
         const mesh = o as THREE.Mesh
-        if (mesh.isMesh) mesh.castShadow = n !== 'LOD2'
+        if (mesh.isMesh) {
+          mesh.castShadow = n !== 'LOD2'
+          if (!Array.isArray(mesh.material) && mesh.material.name === 'shc_plate') {
+            mesh.material = shcPlateMaterial(mesh.material as THREE.MeshStandardMaterial, fleetNumber)
+            this.plates.push(mesh.material)
+          }
+        }
         const name = nodeName(o)
         for (const c of CORNERS) {
           if (name === 'steer_' + c) this.steer[c].push(o)
@@ -154,6 +189,12 @@ export class ShcRig {
     this.hoist.forEach((n, i) => (n.position.y = this.hoistRestY[i] + hoistM))
     for (const n of this.twistlocks) n.rotation.y = p.carrying ? SHC_RIG.twistLockedRad : 0
     this.state = { lod: this.lod, steerRad: p.steerRad, wheelRollRad: roll, hoistM, carrying: p.carrying }
+  }
+
+  /** Frees this SHC's own plate materials (geometry and the atlas material are shared). */
+  dispose(): void {
+    for (const m of this.plates) m.dispose()
+    this.plates.length = 0
   }
 
   get rigState(): ShcRigState {

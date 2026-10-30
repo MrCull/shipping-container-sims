@@ -82,11 +82,28 @@ describe('SHC model asset', () => {
     expect(box.length).toBeGreaterThan(t.frameLengthM) // the box overhangs the frame fore and aft, as on a real SHC
   })
 
-  it('tags approximations and the Kalmar branding in provenance, with no operator branding', () => {
+  it('tags approximations and carries the Kalmar wordmark, the TTI Algeciras livery and per-SHC fleet-number plates', () => {
     const m = meta()
     expect(m.provenance.some((p: { tag: string }) => p.tag === 'A')).toBe(true)
     expect(JSON.stringify(m.branding)).toMatch(/KALMAR/)
-    expect(m.branding.operatorBranding).toBe(false)
-    expect(JSON.stringify(m)).not.toMatch(/TTI|Algeciras/i)
+    expect(m.branding.operatorBranding).toBe(true)
+    expect(JSON.stringify(m.branding)).toMatch(/TTI ALGECIRAS/)
+    expect(m.branding.fleetNumbers).toMatchObject({ first: 1, count: 120, material: 'shc_plate' })
+    expect(m.branding.fleetNumbers.cols * m.branding.fleetNumbers.rows).toBeGreaterThanOrEqual(120)
+    expect(m.branding).not.toHaveProperty('unitNumber') // the baked-in `SC 108` is gone
+  })
+
+  it('has large single tyres, as on the TTI Kalmar SHCs', () => {
+    const m = meta()
+    expect(m.wheel.tyresPerCorner).toBe(1)
+    expect(m.wheel.radiusM).toBeGreaterThanOrEqual(0.85)
+    expect(m.wheel.tyreWidthM).toBeGreaterThanOrEqual(0.65)
+  })
+
+  it('has a second, plate-only material so each SHC can show its own fleet number', () => {
+    const json = readGlbJson(join(DIR, 'shc.glb'))
+    const names = (json.materials ?? []).map((x: { name?: string }) => x.name)
+    expect(names).toContain('shc_plate')
+    expect(names).toContain('shc_atlas')
   })
 })
