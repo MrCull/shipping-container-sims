@@ -134,7 +134,8 @@ class ShcRenderer implements KindRenderer {
   }
 
   dispose(): void {
-    // shared geometry and materials are disposed through the host's track()
+    // shared geometry and materials are disposed through the host's track(); each rig frees its own plate material
+    for (const { rig } of this.shcs.values()) rig?.dispose()
   }
 }
 
