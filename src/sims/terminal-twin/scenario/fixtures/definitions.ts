@@ -107,7 +107,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .shcs(4)
       .block('B01', { x: 20, bays: 8, tiers: 3, wtpPads: 1 })
       .queueAreas({ stsCapacity: 2, blockCapacity: 2 })
-      .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' } } })
+      .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' }, yardAllocation: { strategy: 'nearest-wtp' } } }) // SHC fixtures isolate dispatch from yard decking (#114)
       .build(),
 
   /**
@@ -129,7 +129,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .shcs(4)
       .block('B01', { x: 20, bays: 8, tiers: 3, wtpPads: 3 })
       .queueAreas({ stsCapacity: 3, blockCapacity: 3, predispatchMarginS: 15 })
-      .decisions({ points: { shcDispatch: { strategy: 'predispatch' } } })
+      .decisions({ points: { shcDispatch: { strategy: 'predispatch' }, yardAllocation: { strategy: 'nearest-wtp' } } }) // SHC fixtures isolate dispatch from yard decking (#114)
       .build(),
 
   /**
@@ -152,7 +152,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .shcs(3)
       .block('B01', { x: 150, bays: 10, tiers: 3, wtpPads: 2 })
       .queueAreas({ stsCapacity: 2, blockCapacity: 2 })
-      .decisions({ points: { shcDispatch: { strategy: 'paired-dual-cycle' } } })
+      .decisions({ points: { shcDispatch: { strategy: 'paired-dual-cycle' }, yardAllocation: { strategy: 'nearest-wtp' } } }) // SHC fixtures isolate dispatch from yard decking (#114)
       .endWhen({ vesselsCompleted: 2 })
       .build(),
 
@@ -276,6 +276,28 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * Spec #106 (#112): the opt-in `iso-type-best-position` empty allocation. A feeder loads 18 empty 40 ft boxes (ISO 42G1)
+   * for MSC; the yard holds 24 empty 40s of MSC and Maersk stacked up to 2 high, plus 6 empty 20s that never match. The line
+   * is ignored, so Maersk empties go too, and the boxes with the fewest boxes on top are picked first; the buried ones
+   * picked last are dug out by the ASC (rehandles).
+   */
+  'empty-allocation-iso': () =>
+    new ScenarioBuilder('empty-allocation-iso', 'A feeder loads 18 empty 40 ft boxes picked by ISO type and best yard position (any line)')
+      .hatch({ enabled: false })
+      .seed(12)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Iso Star', sizeClass: 'feeder', maxSts: 1, empties: [{ size: '40', line: 'MSC', count: 18 }] })
+      .emptyPool({ count: 30, sizeMix: { '40': 4, '20': 1 }, lines: { MSC: 1, Maersk: 1 } })
+      .decisions({ points: { emptyAllocation: { strategy: 'iso-type-best-position' } } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 4, tiers: 2 })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /**
    * TT-R07: mixed 20 and 40 ft stows across hold and deck. A feeder discharges 140 mixed boxes (an odd number of 20s
    * is possible), loads 40 export boxes and 6 empty 20s: on board no 20 ft box sits on a 40 ft box and a 40 ft box
    * rests only on a 40 or on two filled 20 ft halves (`stowage.order`).
@@ -305,6 +327,35 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * Spec #106 (#113): `vesselPlanning.ordering = 'pod-weight'` on a feeder that discharges 60 mixed boxes and loads 40
+   * (hold and deck, hatch covers on, empties included): stack-by-stack discharge in yard-group order, bottom-up
+   * POD- and weight-aware load. Zero invariant violations; the KPI report counts the broken preferences.
+   */
+  'vessel-ordering-pod-weight': () =>
+    new ScenarioBuilder('vessel-ordering-pod-weight', 'A feeder discharges and loads with the pod-weight work order: stacks by yard group, later PODs and heavy boxes low')
+      .seed(7)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', {
+        name: 'Ordering Star',
+        sizeClass: 'feeder',
+        discharge: 60,
+        load: 40,
+        maxSts: 1,
+        sizeMix: { '20': 2, '40': 1, '40HC': 1 },
+        empties: [{ size: '20', line: 'MSC', count: 4 }],
+      })
+      .emptyPool({ count: 8, sizeMix: { '20': 1 }, lines: { MSC: 1 } })
+      .vesselPlanning({ ordering: 'pod-weight' })
+      .shcs(3)
+      .block('B01', { x: 20, bays: 20, tiers: 4 })
+      .ascsPerBlock(2)
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /**
    * TT-R06: a yard stack takes the length of its bottom box. A 50% pre-filled block (mixed 20 and 40 ft boxes,
    * 8 bays x 3 tiers) receives 24 more mixed boxes through the default `nearest-wtp` allocation: no stack ever
    * holds both lengths (`yard.no-mixed-length-stack`), and 40 ft boxes keep to adjacent bay pairs.
@@ -322,6 +373,38 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .block('B01', { x: 20, bays: 8, tiers: 3 })
       .yardStart({ mode: 'prefilled', targetPct: 50 })
       .endWhen({ simDurationS: 3600 })
+      .build(),
+
+  /**
+   * Spec #106 (#111): grouped yard decking. V001 discharges 40 boxes of three lines (10 of them transshipment boxes
+   * for V002), trucks bring export boxes for V002 and storage empties wait in the yard, all decked by the opt-in
+   * `grouped` strategy (imports by line, exports by vessel and POD with heavy at the bottom, transshipment by onward
+   * vessel and POD, empties by line, size and type). Zero invariant violations; the KPI report counts the grouping
+   * preferences the placements broke.
+   */
+  'yard-grouped': () =>
+    new ScenarioBuilder('yard-grouped', 'Grouped yard decking: imports by line, exports by vessel and POD, transshipment and empties in their own groups')
+      .hatch({ enabled: false })
+      .seed(31)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .cargo({ lines: { HMM: 3, MSC: 2, Maersk: 2 }, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V001', { name: 'Group Star', sizeClass: 'feeder', discharge: 40, dischargeTransshipment: 10, maxSts: 1 })
+      .vesselCall('V002', { name: 'Deck Star', sizeClass: 'feeder', arrivalS: 9000, discharge: 0, load: 16, transshipment: 10, maxSts: 1 })
+      .transshipmentDwell({ kind: 'fixed', s: 600 })
+      .emptyPool({ count: 12, sizeMix: { '20': 1, '40': 1 }, lines: { HMM: 1, MSC: 1 } })
+      .decisions({ points: { yardAllocation: { strategy: 'grouped' } } })
+      .shcs(3)
+      .block('B01', { x: 20, bays: 14, tiers: 4 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: new Array<number>(24).fill(15),
+        importDwell: { kind: 'fixed', s: 1800 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 8000 },
+      })
+      .endWhen({ vesselsCompleted: 2 })
       .build(),
 
   /**
@@ -605,5 +688,32 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .sts('STS01', { gantryX: 60, groundPositions: 10 })
       .vesselCall('V001', { name: 'Deck Runner', sizeClass: 'feeder', discharge: 6, maxSts: 1, sizeMix: { '40': 1 }, deckOnly: true })
       .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /**
+   * Spec #106 ROB bays: 3 of a feeder's 7 bays are held back as remain-on-board. They hold display-only boxes for later
+   * ports (70% full, hold and deck) but are never worked: no discharge, no reserved load slot, no truck export, and
+   * their hatch covers stay closed. Hatch covers are on, so the working bays run the full cover cycle beside them.
+   */
+  'rob-bays': () =>
+    new ScenarioBuilder('rob-bays', 'A feeder keeps 3 of 7 bays as remain-on-board: never worked, hatch covers closed')
+      .seed(31)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Remain Star', sizeClass: 'feeder', discharge: 16, load: 6, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', arrivalS: 20000, load: 4, maxSts: 1 })
+      .robBays(0.43, 0.7)
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3, transferStalls: 2 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 16),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 2, outLanes: 2, inProcessingS: 45, outProcessingS: 20 },
+      })
+      .endWhen({ vesselsCompleted: 2 })
       .build(),
 }

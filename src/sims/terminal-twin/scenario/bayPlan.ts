@@ -25,7 +25,11 @@ import { LINE_OWNER_PREFIX } from './lines'
 import { isReefer } from './reefer'
 import { sampleDwell, transshipmentConfig } from './dwell'
 import type { ContainerSize, ScenarioConfig, VesselConfig, Weights } from './types'
-import { cellCapacity, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
+import { vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
+import { makePlannedContainer } from './containerFactory'
+import { drawContainerProps, isoTypeOf, resolveContainerProps, type ContainerProps } from './containerProps'
+import { fillRobBays, pickRobBays, robBayFractionOf, workableCells, type RobBox } from './robBays'
+import { stowByPodWeight, vesselOrderingOf, type StowItem } from '../engine/vesselOrdering'
 
 export type SlotPurpose = 'discharge' | 'load' | 'transshipment'
 
@@ -40,7 +44,7 @@ export interface PlannedSlot {
   half: CellHalf
   purpose: SlotPurpose
   /** Empty-container slot (TT-11): which requirement (index in `VesselConfig.empties`) it is booked for. */
-  emptyReq?: { index: number; size: ContainerSize; line: string }
+  emptyReq?: { index: number; size: ContainerSize; line: string; isoType?: string }
   /** Transshipment slot linked to a box that arrives on an earlier vessel (TT-11). */
   plannedContainerId?: string
 }
@@ -64,6 +68,8 @@ export interface PlannedContainer {
   ageS?: number
   /** Reefer (R19): needs a powered yard row, at most `REEFER_MAX_TIERS` high. Absent = not a reefer. */
   reefer?: true
+  /** Stored properties (spec #106); `planCargo` sets them on every container before it returns. */
+  props?: ContainerProps
 }
 
 /** True when export boxes exist: the load flow needs yard blocks and SHCs to carry them. */
@@ -74,6 +80,10 @@ export function loadFlowEnabled(config: ScenarioConfig): boolean {
 export interface CargoPlan {
   slots: PlannedSlot[]
   containers: PlannedContainer[]
+  /** ROB bays by vessel id (spec #106): never worked, no slot or container in them. Only vessels that have some. */
+  robBays: Record<string, number[]>
+  /** The display-only ROB boxes of those bays (not containers). */
+  rob: RobBox[]
 }
 
 /** `ContainerState.vesselId` of empty-pool boxes (they belong to no vessel). */
@@ -195,6 +205,7 @@ function planVessel(
   loadRng: Rng,
   dwellRng: Rng,
   tsSources: PlannedContainer[],
+  robBays: ReadonlySet<number>,
 ): void {
   const spec = vesselClass(v.sizeClass)
   const tiers = spec.holdTiers + spec.deckTiers
@@ -222,10 +233,13 @@ function planVessel(
   }
   const withLoad = loadFlowEnabled(config)
   const reserved = withLoad ? 0 : v.load + v.transshipment
-  const capacity = cellCapacity(spec)
+  const capacity = workableCells(v, [...robBays])
   if (units.length + reserved > capacity)
     throw new Error(
-      `Vessel ${v.id} (${spec.label}): ${units.length} discharge cells + ${reserved} load/transshipment slots do not fit (capacity ${capacity} cells)`,
+      `Vessel ${v.id} (${spec.label}): ${units.length} discharge cells + ${reserved} load/transshipment slots do not fit (capacity ${capacity} cells)` +
+        (robBays.size > 0
+          ? `; ${robBays.size} bay(s) are set aside for ROB (robBayFraction ${robBayFractionOf(config)}), lower robBayFraction`
+          : ''),
     )
 
   // 2. Discharge cells: spread over bays with jitter, hold/deck in proportion, bottom-up.
@@ -235,7 +249,7 @@ function planVessel(
     units.length,
     // uneven: some bays carry much more discharge than others
     Array.from({ length: spec.bays }, () => 0.1 + 1.9 * rng() ** 2),
-    Array.from({ length: spec.bays }, () => spec.rows * tiers),
+    Array.from({ length: spec.bays }, (_, bay) => (robBays.has(bay) ? 0 : spec.rows * tiers)),
   )
   const fill = (bay: number, fromTier: number, toTier: number, n: number) => {
     for (let tier = fromTier; tier < toTier && n > 0; tier++)
@@ -279,8 +293,8 @@ function planVessel(
       const serial = (serials.get(prefix) ?? 100000 + Math.floor(rng() * 400000)) + 1 + Math.floor(rng() * 5)
       if (serial > 999999) throw new Error(`Owner prefix ${prefix} ran out of serial numbers`)
       serials.set(prefix, serial)
-      const planned: PlannedContainer = { id: makeIso6346Id(prefix, serial), ...box, vesselId: v.id, slotId, flow: 'discharge' }
-      if (isReefer(cargo, planned.id, planned.full)) planned.reefer = true
+      const id = makeIso6346Id(prefix, serial)
+      const planned = makePlannedContainer({ id, size: box.size, full: box.full, line: box.line, vesselId: v.id, slotId, flow: 'discharge', reefer: isReefer(cargo, id, box.full) })
       plan.containers.push(planned)
       if (tsBoxes.has(box)) tsSources.push(planned)
     })
@@ -302,6 +316,7 @@ function planVessel(
       line: string
       kind: 'export' | 'ts' | 'empty'
       req?: number
+      isoType?: string
     }
     interface LoadUnit {
       boxes: LoadBox[]
@@ -328,7 +343,7 @@ function planVessel(
     }
     ;(v.empties ?? []).forEach((e, index) => {
       if (!(e.line in LINE_OWNER_PREFIX)) throw new Error(`Unknown shipping line ${e.line} (no owner prefix)`)
-      const boxes: LoadBox[] = Array.from({ length: e.count }, () => ({ size: e.size, full: false, line: e.line, kind: 'empty' as const, req: index }))
+      const boxes: LoadBox[] = Array.from({ length: e.count }, () => ({ size: e.size, full: false, line: e.line, kind: 'empty' as const, req: index, isoType: e.isoType ?? isoTypeOf(e.size, false) }))
       addGroup(boxes, loadUnits)
     })
     interface Stack {
@@ -339,7 +354,7 @@ function planVessel(
     const clean: { row: number; tier: number; deck: boolean }[][] = []
     for (let bay = 0; bay < spec.bays; bay++) {
       const list: { row: number; tier: number; deck: boolean }[] = []
-      for (const deck of [false, true]) {
+      for (const deck of robBays.has(bay) ? [] : [false, true]) {
         const from = deck ? spec.holdTiers : 0
         for (let tier = from; tier < (deck ? tiers : spec.holdTiers); tier++)
           for (let row = 0; row < spec.rows; row++)
@@ -381,7 +396,7 @@ function planVessel(
         const half: CellHalf = box.size === '20' ? (k === 0 ? 'aft' : 'fore') : null
         const slotId = addSlot(b, cell.row, cell.tier, half, box.kind === 'ts' ? 'transshipment' : 'load')
         if (box.kind === 'empty') {
-          plan.slots[plan.slots.length - 1].emptyReq = { index: box.req as number, size: box.size, line: box.line }
+          plan.slots[plan.slots.length - 1].emptyReq = { index: box.req as number, size: box.size, line: box.line, isoType: box.isoType as string }
           return
         }
         const prefix = LINE_OWNER_PREFIX[box.line]
@@ -389,8 +404,8 @@ function planVessel(
         const serial = (serials.get(prefix) ?? 100000 + Math.floor(loadRng() * 400000)) + 1 + Math.floor(loadRng() * 5)
         if (serial > 999999) throw new Error(`Owner prefix ${prefix} ran out of serial numbers`)
         serials.set(prefix, serial)
-        const loadBox: PlannedContainer = { id: makeIso6346Id(prefix, serial), size: box.size, full: box.full, line: box.line, vesselId: v.id, slotId, flow: 'load' }
-        if (isReefer(config.cargo, loadBox.id, loadBox.full)) loadBox.reefer = true
+        const id = makeIso6346Id(prefix, serial)
+        const loadBox = makePlannedContainer({ id, size: box.size, full: box.full, line: box.line, vesselId: v.id, slotId, flow: 'load', reefer: isReefer(config.cargo, id, box.full) })
         plan.containers.push(loadBox)
       })
       if (unit.boxes[0].kind !== 'empty') b = (b + 1) % spec.bays // empties of a requirement share a bay: one package
@@ -404,7 +419,7 @@ function planVessel(
   const freeByBay: { row: number; tier: number }[][] = []
   for (let bay = 0; bay < spec.bays; bay++) {
     const free: { row: number; tier: number }[] = []
-    for (let tier = 0; tier < tiers; tier++)
+    for (let tier = 0; tier < (robBays.has(bay) ? 0 : tiers); tier++)
       for (let row = 0; row < spec.rows; row++)
         if (!occupied.has(`${bay}:${row}:${tier}`) && !loneStacks.has(`${bay}:${row}:${tier >= spec.holdTiers}`)) free.push({ row, tier })
     freeByBay.push(free)
@@ -441,6 +456,7 @@ export function extraLoadCell(
   sizeClass: VesselConfig['sizeClass'],
   slots: readonly Pick<PlannedSlot, 'bay' | 'row' | 'tier' | 'deck' | 'half' | 'purpose' | 'emptyReq'>[],
   size: ContainerSize,
+  robBays: readonly number[] = [],
 ): ExtraLoadCell | null {
   const spec = vesselClass(sizeClass)
   const tiers = spec.holdTiers + spec.deckTiers
@@ -453,7 +469,7 @@ export function extraLoadCell(
   }
   const perBay = new Array<number>(spec.bays).fill(0)
   for (const s of slots) perBay[s.bay]++
-  const bays = [...perBay.keys()].sort((a, b) => perBay[a] - perBay[b] || a - b)
+  const bays = [...perBay.keys()].filter((b) => !robBays.includes(b)).sort((a, b) => perBay[a] - perBay[b] || a - b)
   const kind: CellKind = size === '20' ? 'lone' : 'full'
   for (const bay of bays)
     for (const deck of [false, true]) {
@@ -494,14 +510,75 @@ export function planCargo(config: ScenarioConfig, seed: number): CargoPlan {
   const loadRng = makeRng(seed ^ 0x51ed270b)
   const dwellRng = makeRng(seed ^ 0x7a3b9c11)
   const serials = new Map<string, number>()
-  const plan: CargoPlan = { slots: [], containers: [] }
+  const plan: CargoPlan = { slots: [], containers: [], robBays: {}, rob: [] }
   const tsSources: PlannedContainer[] = []
-  for (const v of config.vessels) planVessel(config, v, rng, serials, plan, loadRng, dwellRng, tsSources)
+  for (const v of config.vessels) {
+    const robBays = pickRobBays(config, seed, v)
+    if (robBays.length > 0) plan.robBays[v.id] = robBays
+    planVessel(config, v, rng, serials, plan, loadRng, dwellRng, tsSources, new Set(robBays))
+    plan.rob.push(...fillRobBays(config, seed, v, robBays))
+  }
   if (loadFlowEnabled(config)) {
     linkTransshipment(config, plan, tsSources)
     addEmptyPool(config, seed, plan, serials)
   } else for (const c of tsSources) delete c.ageS
+  assignProps(config, seed, plan, new Set(tsSources.map((c) => c.id)))
+  if (vesselOrderingOf(config) === 'pod-weight') stowLoadByPodWeight(config, plan)
   return plan
+}
+
+/**
+ * `pod-weight` stowage (spec #106): within a bay section, boxes for later PODs and heavier boxes are booked to the
+ * lower tiers. Same-size, same-reefer-ness boxes trade booked cells; the slots, their purposes and every other
+ * box stay as planned. Runs after the properties are drawn (it reads POD and weight) and draws nothing itself.
+ */
+function stowLoadByPodWeight(config: ScenarioConfig, plan: CargoPlan): void {
+  const slots = new Map(plan.slots.map((s) => [s.id, s]))
+  const items: StowItem[] = []
+  for (const c of plan.containers) {
+    const slot = slots.get(c.slotId)
+    if (c.flow !== 'load' || !slot || slot.purpose !== 'load' || slot.emptyReq) continue
+    items.push({ boxId: c.id, slotId: slot.id, cell: slot, size: c.size, reefer: c.reefer === true, props: c.props })
+  }
+  const moved = stowByPodWeight(items, resolveContainerProps(config).portRotation.ports)
+  for (const c of plan.containers) {
+    const to = moved.get(c.id)
+    if (to) c.slotId = to
+  }
+}
+
+/**
+ * Stored properties (spec #106) of every planned container, drawn from the property stream (keyed by seed and box id),
+ * after the plan is final: a discharge box is an import, or transshipment when it was discharged as such; a load box
+ * is an export, or a transshipment box already in the yard for its slot; a pool box is storage.
+ */
+function assignProps(config: ScenarioConfig, seed: number, plan: CargoPlan, tsIds: Set<string>): void {
+  const slots = new Map(plan.slots.map((s) => [s.id, s]))
+  const arrival = new Map(config.vessels.map((v) => [v.id, v.arrivalS]))
+  for (const c of plan.containers) {
+    const base = { id: c.id, size: c.size, full: c.full, line: c.line, reefer: c.reefer === true }
+    if (c.flow === 'discharge') {
+      const ts = tsIds.has(c.id)
+      c.props = drawContainerProps(config, seed, {
+        ...base,
+        direction: ts ? 'TRANSSHIPMENT' : c.full ? 'IMPORT' : null,
+        inbound: { kind: 'vessel', id: c.vesselId },
+        outboundVesselId: c.transshipment?.onwardVesselId,
+        arrivalS: arrival.get(c.vesselId) ?? 0,
+      })
+    } else if (c.flow === 'load') {
+      const ts = slots.get(c.slotId)?.purpose === 'transshipment'
+      c.props = drawContainerProps(config, seed, {
+        ...base,
+        direction: ts ? 'TRANSSHIPMENT' : 'EXPORT',
+        inbound: ts ? { kind: 'vessel' } : { kind: 'truck' },
+        outboundVesselId: c.vesselId,
+        arrivalS: 0,
+      })
+    } else {
+      c.props = drawContainerProps(config, seed, { ...base, direction: 'STORAGE', inbound: { kind: 'truck' }, arrivalS: -(c.ageS ?? 0) })
+    }
+  }
 }
 
 function linkTransshipment(config: ScenarioConfig, plan: CargoPlan, sources: PlannedContainer[]): void {
@@ -545,15 +622,9 @@ function addEmptyPool(config: ScenarioConfig, seed: number, plan: CargoPlan, ser
     const serial = (serials.get(prefix) ?? 100000 + Math.floor(rng() * 400000)) + 1 + Math.floor(rng() * 5)
     if (serial > 999999) throw new Error(`Owner prefix ${prefix} ran out of serial numbers`)
     serials.set(prefix, serial)
-    plan.containers.push({
-      id: makeIso6346Id(prefix, serial),
-      size,
-      full: false,
-      line,
-      vesselId: POOL_VESSEL_ID,
-      slotId: '',
-      flow: 'pool',
-      ageS: Math.round(rng() * (pool.maxAgeS ?? 7 * 86400)),
-    })
+    const id = makeIso6346Id(prefix, serial)
+    plan.containers.push(
+      makePlannedContainer({ id, size, full: false, line, vesselId: POOL_VESSEL_ID, slotId: '', flow: 'pool', ageS: Math.round(rng() * (pool.maxAgeS ?? 7 * 86400)) }),
+    )
   }
 }

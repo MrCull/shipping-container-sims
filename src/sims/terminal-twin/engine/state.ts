@@ -4,6 +4,7 @@
  * includes the event queue, RNG state and running event-log hash.
  */
 import { createDecisionState, type DecisionState } from './decisions/runtime'
+import { yardGroupingOn } from './decisions/yardGrouping'
 import type { EngineEvent } from './events'
 import { HASH_SEED, type HashState } from './hash'
 import type { MotionSegment } from './kinematics'
@@ -14,6 +15,9 @@ import type { Reservation } from './reservations'
 import { nextRandom, seedState } from './rng'
 import { ascStartZ, blockSpecs, PARK_UNTIL_S, railSegmentIds, travelHoistM } from './yardLayout'
 import { planCargo, POOL_VESSEL_ID, type SlotPurpose } from '../scenario/bayPlan'
+import type { RobBox } from '../scenario/robBays'
+import { makeContainerState } from '../scenario/containerFactory'
+import type { ContainerProps } from '../scenario/containerProps'
 import { sampleDwell } from '../scenario/dwell'
 import { planExportYard, type ExportPlacement } from '../scenario/exportYard'
 import { DEFAULT_WARM_UP_S } from '../scenario/types'
@@ -65,6 +69,8 @@ export interface ContainerState {
   pickupReadyAt?: number
   /** A truck leg has claimed this box (TT-13): the truck id. Claimed boxes are not offered to other trucks or to empty allocation. */
   truckClaim?: string
+  /** Stored properties set once at creation (spec #106): direction, ISO type, POL/POD, weights, carriers, booking. */
+  props: ContainerProps
 }
 
 export interface VesselSlotState {
@@ -83,7 +89,7 @@ export interface VesselSlotState {
   /** Load slots: the export box booked to this slot (it is `containerId` once loaded). */
   plannedContainerId?: string | null
   /** Empty-container slot (TT-11): requirement it is booked for; `plannedContainerId` is set when an empty is allocated. */
-  emptyReq?: { index: number; size: ContainerSize; line: string }
+  emptyReq?: { index: number; size: ContainerSize; line: string; isoType?: string }
 }
 
 /**
@@ -114,6 +120,10 @@ export interface VesselState {
   stsHistory: string[]
   /** Hatch panels of the vessel's bays (TT-R09), ids into `SimState.hatchPanels`. */
   hatchPanelIds?: string[]
+  /** ROB bays (spec #106): never worked, no slots in them, hatch covers stay closed. Absent without ROB bays. */
+  robBays?: number[]
+  /** The display-only ROB boxes in those bays (slot data, not containers: nothing but the renderers reads them). */
+  robBoxes?: RobBox[]
   /** Discharge boxes still on board. */
   remainingDischarge: number
   /** Export boxes still to be loaded (TT-10). */
@@ -743,6 +753,8 @@ export interface EmptiesRequirement {
   index: number
   size: ContainerSize
   line: string
+  /** ISO type the empties must have (`iso-type-best-position`); absent in a snapshot from before spec #106 (derive it from `size`). */
+  isoType?: string
   count: number
   /** The package's booked slots in load sequence. */
   slotIds: string[]
@@ -800,10 +812,17 @@ export interface KpiCounters {
   yard?: YardKpiCounters
   /** Work packages (TT-10). */
   workPackages: WorkPackageKpiCounters
+  /** Broken `pod-weight` ordering preferences (spec #106; present only when that ordering is selected and a package was built). */
+  ordering?: OrderingKpiCounters
   /** Hatch moves (TT-R09; present once one has started). */
   hatch?: HatchKpiCounters
   /** Trucks and the gate (present when the landside is on). */
   landside?: LandsideKpiCounters
+}
+
+export interface OrderingKpiCounters {
+  discharge: { boxes: number; groupSplits: number }
+  load: { boxes: number; podOnEarlier: number; heavyOnLight: number }
 }
 
 export interface WorkPackageKpiCounters {
@@ -842,6 +861,11 @@ export interface YardKpiCounters {
   rehandleFailures: number
   /** yardAllocation replies with no slot (block full). */
   allocationFailures: number
+  /**
+   * Grouped decking only (absent for every other strategy): placements priced against the grouping preferences, and
+   * how many broke one: on another group's box, in the wrong order, or opening a stack in a bay of other groups.
+   */
+  grouping?: { placements: number; mixedStack: number; orderBroken: number; mixedBay: number }
   perAsc: Record<string, AscKpiCounters>
 }
 
@@ -879,6 +903,8 @@ export interface SimState {
   nextEventId: number
   nextSeq: number
   rngState: number
+  /** Seed of the container-property streams (spec #106); they are keyed by it and the container id. */
+  propsSeed: number
   logHash: HashState
   /** Pending events (binary heap; seq is -1 until processed). */
   queue: EngineEvent[]
@@ -1062,6 +1088,7 @@ export function createInitialState(
     nextEventId: 0,
     nextSeq: 0,
     rngState: seedState(seed),
+    propsSeed: seed,
     logHash: [...HASH_SEED],
     queue: [],
     containers: {},
@@ -1125,6 +1152,10 @@ export function createInitialState(
       remainingLoad: 0,
     }
   }
+  for (const [id, bays] of Object.entries(plan.robBays)) {
+    state.vessels[id].robBays = [...bays]
+    state.vessels[id].robBoxes = plan.rob.filter((b) => b.vesselId === id)
+  }
   for (const s of plan.slots) state.vesselSlots[s.id] = { ...s, containerId: null }
   const hatchCovers = hatchEnabled(config) && subsystems.quay !== 'off'
   if (hatchCovers) createHatchPanels(state, config)
@@ -1156,24 +1187,21 @@ export function createInitialState(
       state.vessels[c.vesselId].remainingDischarge++
       owner = { kind: 'vesselSlot', id: c.slotId }
     }
-    state.containers[c.id] = {
+    state.containers[c.id] = makeContainerState({
       id: c.id,
       size: c.size,
       full: c.full,
       line: c.line,
       vesselId: c.vesselId,
-      custody: owner,
-      custodyHistory: [{ t: 0, owner, eventId: null }],
-    }
-    if (c.reefer) state.containers[c.id].reefer = true
-    if (c.flow === 'pool') state.containers[c.id].yardSince = -(c.ageS ?? 0)
+      owner,
+      t: 0,
+      eventId: null,
+      reefer: c.reefer,
+      props: c.props as ContainerProps,
+      yardSince: c.flow === 'pool' ? -(c.ageS ?? 0) : undefined,
+      transshipment: c.transshipment,
+    })
     if (c.transshipment) {
-      Object.assign(state.containers[c.id], {
-        onwardVesselId: c.transshipment.onwardVesselId,
-        onwardSlotId: c.transshipment.onwardSlotId,
-        dwellS: c.transshipment.dwellS,
-        readyAt: null,
-      })
       if (loading) state.vessels[c.transshipment.onwardVesselId].remainingLoad++
     }
   }
@@ -1241,6 +1269,7 @@ export function createInitialState(
     for (const s of config.sts) horizontal.stsGroundPositionWaitS[s.id] = 0
     for (const p of graph.pads) state.wtpPads[p.id] = { id: p.id, blockId: p.blockId, containerId: null, claimedBy: null }
     const yard: YardKpiCounters = { boxesStacked: 0, rehandles: 0, productiveMoves: 0, perBlock: {}, rehandleFailures: 0, allocationFailures: 0, perAsc: {} }
+    if (yardGroupingOn(config)) yard.grouping = { placements: 0, mixedStack: 0, orderBroken: 0, mixedBay: 0 }
     for (const b of blockSpecs(config)) {
       yard.perBlock[b.id] = { rehandles: 0, productiveMoves: 0 }
       state.yardBlocks[b.id] = {

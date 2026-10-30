@@ -13,7 +13,7 @@ const fixture = fixtures[FIXTURE]
 
 const withStrategy = (config: ScenarioConfig, strategy: string): ScenarioConfig => ({
   ...structuredClone(config),
-  decisions: { points: { shcDispatch: { strategy } } },
+  decisions: { ...config.decisions, points: { ...config.decisions?.points, shcDispatch: { strategy } } },
 })
 
 const shcs = (sim: Simulation) => Object.values(sim.kpiReport().horizontal?.shcs ?? {})

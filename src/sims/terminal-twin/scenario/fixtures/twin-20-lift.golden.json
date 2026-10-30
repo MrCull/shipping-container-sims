@@ -126,6 +126,14 @@
         "equipmentIdleS": 0
       }
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 4,
+        "departed": 0,
+        "meanS": 291.758,
+        "maxS": 411.021
+      }
+    },
     "workPackages": {
       "released": 2,
       "started": 2,
@@ -133,6 +141,17 @@
       "leadTimeMeanS": 83.482,
       "leadTimeMaxS": 166.964,
       "boxesLoaded": 0
+    },
+    "ordering": {
+      "discharge": {
+        "boxes": 4,
+        "groupSplits": 0
+      },
+      "load": {
+        "boxes": 0,
+        "podOnEarlier": 0,
+        "heavyOnLight": 0
+      }
     }
   },
   "invariants": {

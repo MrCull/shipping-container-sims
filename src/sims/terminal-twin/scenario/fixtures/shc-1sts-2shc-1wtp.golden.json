@@ -3,7 +3,7 @@
   "seed": 42,
   "status": "ended",
   "endReason": "simDurationS >= 1800",
-  "eventLogHash": "14da37a3c1872c",
+  "eventLogHash": "14aab6cda7eb2d",
   "kpis": {
     "simTimeS": 1800,
     "eventsProcessed": 394,
@@ -14,7 +14,7 @@
         "moves": 10,
         "cycles": 10,
         "twinLifts": 0,
-        "grossMovesPerHour": 25.832,
+        "grossMovesPerHour": 25.986,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1534.926,
-        "turnaroundS": 1474.926,
+        "departedAtS": 1526.667,
+        "turnaroundS": 1466.667,
         "sts": [
           "STS01"
         ]
@@ -105,7 +105,7 @@
         "equipmentIdleS": 0
       },
       "yardAllocation": {
-        "handler": "strategy:nearest-wtp",
+        "handler": "strategy:grouped",
         "calls": 10,
         "resolved": 10,
         "ok": 10,
@@ -237,6 +237,12 @@
       "boxesStacked": 10,
       "boxesInTransit": 0,
       "allocationFailures": 0,
+      "grouping": {
+        "placements": 10,
+        "mixedStack": 0,
+        "orderBroken": 0,
+        "mixedBay": 4
+      },
       "rehandles": {
         "total": 0,
         "productiveMoves": 10,
@@ -248,7 +254,7 @@
           "boxes": 10,
           "cells": 20,
           "capacityCells": 800,
-          "maxHeight": 2,
+          "maxHeight": 1,
           "rehandles": 0,
           "productiveMoves": 10,
           "rehandlesPerProductiveMove": 0
@@ -257,20 +263,39 @@
       "ascs": {
         "B01-ASC1": {
           "jobs": 10,
-          "gantryM": 279.3,
-          "trolleyM": 100.45,
-          "hoistM": 580.032,
+          "gantryM": 373.1,
+          "trolleyM": 116.95,
+          "hoistM": 603.2,
           "padWaitS": 0
         }
+      }
+    },
+    "dwell": {
+      "IMPORT": {
+        "count": 10,
+        "departed": 0,
+        "meanS": 1063.615,
+        "maxS": 1663.704
       }
     },
     "workPackages": {
       "released": 8,
       "started": 8,
       "completed": 8,
-      "leadTimeMeanS": 296.281,
-      "leadTimeMaxS": 506.225,
+      "leadTimeMeanS": 294.217,
+      "leadTimeMaxS": 497.966,
       "boxesLoaded": 0
+    },
+    "ordering": {
+      "discharge": {
+        "boxes": 10,
+        "groupSplits": 0
+      },
+      "load": {
+        "boxes": 0,
+        "podOnEarlier": 0,
+        "heavyOnLight": 0
+      }
     }
   },
   "invariants": {

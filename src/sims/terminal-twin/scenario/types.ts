@@ -236,6 +236,11 @@ export interface EmptyRequirement {
   /** Shipping line (a key of `LINE_OWNER_PREFIX`). */
   line: string
   count: number
+  /**
+   * ISO type the empties must have (e.g. `22G1`, `42G1`, `45G1`; spec #106). Default: the dry-box code of `size`.
+   * The `iso-type-best-position` strategy matches on it; the older strategies match on size and line.
+   */
+  isoType?: string
 }
 
 /** A vessel's flow mix as shares of its box moves (percent, summing to 100). */
@@ -254,6 +259,56 @@ export type DwellDistribution =
 /** Transshipment boxes dwell in the yard before they load onto their onward vessel (TT-11). */
 export interface TransshipmentConfig {
   dwell: DwellDistribution
+}
+
+/** Why a box is on the terminal (spec #106). STORAGE boxes are always empty; an allocated empty becomes EXPORT. */
+export type TransitDirection = 'IMPORT' | 'EXPORT' | 'TRANSSHIPMENT' | 'STORAGE'
+
+/** The scenario's port rotation (spec #106): the service's calls in order, as UN/LOCODEs, and which one is this terminal. */
+export interface PortRotation {
+  /** This terminal's UN/LOCODE; must be one of `ports`. */
+  terminal: string
+  /** The rotation in call order (cyclic), including `terminal`. POL and POD of every box come from it. */
+  ports: string[]
+}
+
+/** Laden cargo weight of one size: a lognormal around `medianKg` (sigma of the underlying normal), clipped at `maxKg`. */
+export interface CargoWeightSpec {
+  medianKg: number
+  sigma: number
+  maxKg: number
+}
+
+/** Gross-weight band limits (kg): up to `lightMaxKg` is LIGHT, up to `mediumMaxKg` MEDIUM, above it HEAVY. */
+export interface WeightClassBands {
+  lightMaxKg: number
+  mediumMaxKg: number
+}
+
+/** Work order within a package: `as-today` (stack geometry only) or `pod-weight` (POD- and weight-aware soft preferences). */
+export type VesselOrdering = 'as-today' | 'pod-weight'
+
+export interface VesselPlanningConfig {
+  /** Default `pod-weight` (since ENGINE_VERSION 0.25.0); `as-today` is the rollback. */
+  ordering?: VesselOrdering
+}
+
+/**
+ * Stored container properties (spec #106). Every field optional; the defaults in `scenario/containerProps.ts`
+ * apply. All draws come from their own RNG stream (keyed by seed and container id), so adding or changing these
+ * never moves any other draw.
+ */
+export interface ContainerPropsConfig {
+  portRotation?: PortRotation
+  /**
+   * Direction of an empty box that is discharged but not transshipment: a draw over `IMPORT` (returning empty) and
+   * `STORAGE` (stays as a storage empty). Other directions are set by the box's flow, not drawn.
+   */
+  directionMix?: Weights<TransitDirection>
+  cargoWeight?: Partial<Record<ContainerSize, CargoWeightSpec>>
+  weightClassBands?: WeightClassBands
+  /** Expected dwell by direction, the planned departure of a box with no outbound vessel ETD or truck appointment. */
+  expectedDwell?: Partial<Record<TransitDirection, DwellDistribution>>
 }
 
 /** Empty containers standing in the yard when the scenario starts (TT-11), by size and line. */
@@ -379,8 +434,24 @@ export interface ScenarioConfig {
   transshipment?: TransshipmentConfig
   /** Empty pool pre-filled into the yard (TT-11); optional. */
   emptyPool?: EmptyPoolConfig
+  /** Stored container properties: port rotation, direction mix, cargo weights, weight classes, expected dwell (spec #106); optional. */
+  containerProps?: ContainerPropsConfig
+  /**
+   * Share (0-1, default 0) of each vessel's bays set aside as ROB (remain on board) bays (spec #106): display-only
+   * boxes for later ports, never worked here. Which bays come from the property RNG stream (`scenario/robBays.ts`).
+   */
+  robBayFraction?: number
+  /** Fill level (0-1, default 0.7) of the ROB bays: share of their hold and deck cells that hold a box. */
+  robFill?: number
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
+  /** Vessel Planning options (spec #106); optional. */
+  vesselPlanning?: VesselPlanningConfig
+  /**
+   * Empty allocation options (spec #106); optional. `matchLine: true` restricts the `iso-type-best-position`
+   * strategy to empties of the requesting line (default false: any line's empty of the right ISO type may go).
+   */
+  emptyAllocation?: { matchLine?: boolean }
   /**
    * Hatch covers (TT-R09); optional. Panel counts, sizes and weights come from the vessel class
    * (`VESSEL_CLASSES[...].hatch`); these override the timings and the laydown stack limit for every class.

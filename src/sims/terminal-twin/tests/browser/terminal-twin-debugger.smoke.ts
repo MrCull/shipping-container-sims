@@ -169,6 +169,15 @@ test('clicking a container in 3D selects it and shows its custody history', asyn
   await expect(history.first()).toContainText('VESSEL.V')
   const box = await page.evaluate((id) => window.__tt!.query<{ custodyHistory: unknown[] }>('container', id), target!.id)
   expect(await history.count()).toBe(box.custodyHistory.length)
+  // Derived, never stored (#109): a box set down on a WTP pad is on the terminal, and the tooltip carries the same facts.
+  const facts = page.getByTestId('tt-entity-inspector').locator('dl.facts').first()
+  await expect(facts).toContainText('Transit status')
+  await expect(facts).toContainText('On terminal')
+  await expect(facts).toContainText('Content status')
+  await expect(facts).toContainText('Dwell on terminal')
+  const tip = await page.getByTestId('tt-entity-heading').getAttribute('title')
+  expect(tip).toContain('Transit status: On terminal')
+  expect(tip).toContain('Dwell on terminal:')
 
   // A click on empty sky deselects.
   const sky = await page.evaluate(() => {

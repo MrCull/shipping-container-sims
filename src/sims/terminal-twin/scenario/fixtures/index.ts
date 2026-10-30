@@ -26,9 +26,13 @@ import shcPairedDualCycle from './shc-paired-dual-cycle.json'
 import tracer1Sts10Boxes from './tracer-1sts-10-boxes.json'
 import transshipmentAToB from './transshipment-a-to-b.json'
 import emptiesLoad from './empties-load-4-of-16.json'
+import emptyAllocationIso from './empty-allocation-iso.json'
 import stowMixed from './stow-mixed-20-40.json'
 import reeferPoweredRows from './reefer-powered-rows.json'
+import robBays from './rob-bays.json'
+import yardGrouped from './yard-grouped.json'
 import yardNoMixedLength from './yard-no-mixed-length.json'
+import vesselOrderingPodWeight from './vessel-ordering-pod-weight.json'
 import twin20Lift from './twin-20-lift.json'
 import twoVesselsCompeteForBerth from './two-vessels-compete-for-berth.json'
 
@@ -36,6 +40,7 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'tracer-1sts-10-boxes': tracer1Sts10Boxes as ScenarioConfig,
   'two-vessels-compete-for-berth': twoVesselsCompeteForBerth as ScenarioConfig,
   'crane-split-4sts': craneSplit4Sts as ScenarioConfig,
+  'vessel-ordering-pod-weight': vesselOrderingPodWeight as ScenarioConfig,
   'twin-20-lift': twin20Lift as ScenarioConfig,
   'shc-1sts-2shc-1wtp': shc1Sts2Shc1Wtp as ScenarioConfig,
   'shc-queue-chained': shcQueueChained as ScenarioConfig,
@@ -48,6 +53,7 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'mixed-discharge-then-load': mixedFixture as ScenarioConfig,
   'transshipment-a-to-b': transshipmentAToB as ScenarioConfig,
   'empties-load-4-of-16': emptiesLoad as ScenarioConfig,
+  'empty-allocation-iso': emptyAllocationIso as ScenarioConfig,
   'rehandle-random-yard': rehandleRandomYard as ScenarioConfig,
   'dual-truck-transaction': dualTruck as ScenarioConfig,
   'truck-gate-queue': truckGateQueue as ScenarioConfig,
@@ -57,7 +63,9 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'truck-appointment-windows': truckAppointmentWindows as ScenarioConfig,
   'truck-holding-overflow': truckHoldingOverflow as ScenarioConfig,
   'asc-pre-retrieval': ascPreRetrieval as ScenarioConfig,
+  'yard-grouped': yardGrouped as ScenarioConfig,
   'yard-no-mixed-length': yardNoMixedLength as ScenarioConfig,
   'reefer-powered-rows': reeferPoweredRows as ScenarioConfig,
+  'rob-bays': robBays as ScenarioConfig,
   'stow-mixed-20-40': stowMixed as ScenarioConfig,
 }

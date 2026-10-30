@@ -8,6 +8,8 @@
  * span never change and the index holds the slot objects themselves, so a `containerId` change needs no call.
  */
 import type { SimState, YardSlotState } from './state'
+import { yardBoxView } from './decisions/yardGrouping'
+import type { YardBoxView } from './decisions/types'
 import { boxSpan, parseYardSlotId } from './yardLayout'
 
 export interface YardIndex {
@@ -85,4 +87,37 @@ export function stackSpansOf(state: SimState, blockId: string, without?: YardSlo
     }
   }
   return spans
+}
+
+/**
+ * The top box of every stack of a block as the grouped yard strategy sees it (same indexing as `heights`; null =
+ * empty): placed boxes and claimed slots, so a box still on its way counts. Derived from the stack contents, never stored.
+ */
+export function stackTopsOf(state: SimState, blockId: string): (YardBoxView | null)[] {
+  const yard = state.yardBlocks[blockId]
+  const tops = new Array<YardBoxView | null>(yard.bays * yard.rows).fill(null)
+  const tiers = new Array<number>(yard.bays * yard.rows).fill(0)
+  const put = (bay: number, row: number, tier: number, containerId: string): void => {
+    const box = state.containers[containerId]
+    if (!box) return
+    const span = boxSpan(box.size)
+    const view = yardBoxView(box)
+    for (let k = 0; k < span; k++) {
+      const i = (bay + k - 1) * yard.rows + (row - 1)
+      if (i < tops.length && tier >= tiers[i]) {
+        tiers[i] = tier
+        tops[i] = view
+      }
+    }
+  }
+  for (const s of yardIndexOf(state).byBlock.get(blockId) ?? []) if (s.containerId) put(s.bay, s.row, s.tier, s.containerId)
+  for (const j of Object.values(state.ascJobs)) {
+    if (j.blockId !== blockId) continue
+    for (const id of [j.kind === undefined ? j.yardSlotId : undefined, j.targetSlotId]) {
+      if (!id) continue
+      const cell = parseYardSlotId(id)
+      if (cell.blockId === blockId) put(cell.bay, cell.row, cell.tier, j.containerId)
+    }
+  }
+  return tops
 }

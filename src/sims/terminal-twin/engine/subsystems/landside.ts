@@ -55,6 +55,8 @@ import { makeIso6346Id } from '../../scenario/iso6346'
 import { LINE_OWNER_PREFIX } from '../../scenario/lines'
 import { isReefer } from '../../scenario/reefer'
 import { extraLoadCell, pickWeighted, POOL_VESSEL_ID } from '../../scenario/bayPlan'
+import { makeContainerState } from '../../scenario/containerFactory'
+import { drawContainerProps } from '../../scenario/containerProps'
 import { sampleDwell } from '../../scenario/dwell'
 import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import type { ContainerSize, LandsideConfig, TruckTransactionKind } from '../../scenario/types'
@@ -199,7 +201,7 @@ export function exportVessels(ctx: EngineContext): { vesselId: string; weight: n
 
 /** The next free cell of a vessel's bay plan for a delivered export box (legacy or pre-filled start), or null when full. */
 function extraLoadCellOf(ctx: EngineContext, vesselId: string, size: ContainerSize) {
-  return extraLoadCell(ctx.state.vessels[vesselId].sizeClass, Object.values(ctx.state.vesselSlots).filter((s) => s.vesselId === vesselId), size)
+  return extraLoadCell(ctx.state.vessels[vesselId].sizeClass, Object.values(ctx.state.vesselSlots).filter((s) => s.vesselId === vesselId), size, ctx.state.vessels[vesselId].robBays)
 }
 
 /**
@@ -224,17 +226,30 @@ function newBox(ctx: EngineContext, owner: string, full: boolean, vesselId: stri
   let id = makeIso6346Id(LINE_OWNER_PREFIX[line], 500000 + ls.nextBox++)
   while (state.containers[id]) id = makeIso6346Id(LINE_OWNER_PREFIX[line], 500000 + ls.nextBox++)
   const custody = { kind: 'truck' as const, id: owner }
-  const box: ContainerState = {
+  const reefer = isReefer(config.cargo, id, full)
+  const box = makeContainerState({
     id,
     size,
     full,
     line,
     vesselId,
-    custody,
-    custodyHistory: [{ t: state.now, owner: { ...custody }, eventId: ctx.current.id }],
+    owner: custody,
+    t: state.now,
+    eventId: ctx.current.id,
     truckClaim: owner,
-  }
-  if (isReefer(config.cargo, id, full)) box.reefer = true
+    reefer,
+    props: drawContainerProps(config, state.propsSeed, {
+      id,
+      size,
+      full,
+      line,
+      reefer,
+      direction: full ? 'EXPORT' : 'STORAGE', // a truck brings either an export (booked to `vesselId`) or an empty for storage
+      inbound: { kind: 'truck', id: owner },
+      outboundVesselId: full ? vesselId : undefined,
+      arrivalS: state.now,
+    }),
+  })
   state.containers[id] = box
   return box
 }

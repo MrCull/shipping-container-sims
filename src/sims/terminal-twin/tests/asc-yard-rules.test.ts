@@ -179,7 +179,7 @@ describe('ASC/SHC handover', () => {
 })
 
 describe('yardAllocation strategies', () => {
-  const names = ['random', 'nearest-wtp', 'group-by-vessel']
+  const names = ['random', 'nearest-wtp', 'grouped']
 
   it('each built-in strategy produces a valid yard', () => {
     for (const name of names) {
@@ -200,7 +200,7 @@ describe('yardAllocation strategies', () => {
     expect(new Set(patterns).size).toBe(3)
   })
 
-  it('the registry lists exactly random, nearest-wtp and group-by-vessel', () => {
+  it('the registry lists exactly random, nearest-wtp and grouped', () => {
     expect(Object.keys(strategies.yardAllocation.strategies).sort()).toEqual([...names].sort())
   })
 
@@ -214,13 +214,13 @@ describe('yardAllocation strategies', () => {
     expect(run(43)).not.toEqual(run(42))
   })
 
-  it('group-by-vessel packs a vessel into no more bays than random', () => {
+  it('grouped packs a vessel into no more bays than random', () => {
     const bays = (name: string) => {
       const sim = createSimulation(withStrategy(name))
       sim.runUntil()
       return new Set(sim.query.yardSlots().flatMap((s) => (s.span === 2 ? [s.bay, s.bay + 1] : [s.bay]))).size
     }
-    expect(bays('group-by-vessel')).toBeLessThanOrEqual(bays('random'))
+    expect(bays('grouped')).toBeLessThanOrEqual(bays('random'))
   })
 
   it('candidateSlots gives legal slots only: 40 ft needs two stacks of equal height, nothing above the tier limit', () => {
@@ -317,7 +317,7 @@ describe('stack invariants hold', () => {
   }
 
   it('with every strategy on a bigger run of 40 boxes', () => {
-    for (const name of ['random', 'nearest-wtp', 'group-by-vessel']) {
+    for (const name of ['random', 'nearest-wtp', 'grouped']) {
       const cfg = withStrategy(name)
       cfg.vessels[0].discharge = 40
       cfg.endConditions = { simDurationS: 6000 }
@@ -344,11 +344,11 @@ describe('stress: scarce pads, many SHCs, slow TOS', () => {
   })
 
   it('a slow yardAllocation reply (keep-running) never stacks a box before an older claim below it', () => {
-    const cfg = withStrategy('group-by-vessel')
+    const cfg = withStrategy('grouped')
     cfg.decisions = {
       asyncMode: 'keep-running',
       simSecondsPerWallSecond: 1,
-      points: { yardAllocation: { strategy: 'group-by-vessel', latency: { delay: { kind: 'uniform', minMs: 0, maxMs: 40000 } }, timeoutMs: 60000 } },
+      points: { yardAllocation: { strategy: 'grouped', latency: { delay: { kind: 'uniform', minMs: 0, maxMs: 40000 } }, timeoutMs: 60000 } },
     }
     cfg.vessels[0].discharge = 25
     cfg.endConditions = { simDurationS: 6000 }

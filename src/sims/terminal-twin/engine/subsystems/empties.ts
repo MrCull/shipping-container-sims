@@ -15,10 +15,13 @@
  */
 import type { EngineContext, ReactorMap } from '../context'
 import type { EmptyCandidate } from '../decisions/types'
-import type { SimState, WorkPackage, YardSlotState } from '../state'
+import type { EmptiesRequirement, SimState, WorkPackage, YardSlotState } from '../state'
 import { blockSpecs, rowX, slotZ, stackIndex } from '../yardLayout'
+import { allocateEmptyProps, isoTypeOf } from '../../scenario/containerProps'
 import type { ContainerSize } from '../../scenario/types'
+import { strategies } from '../decisions/strategies'
 import { continueWork } from './quay'
+import { blockersOf } from './rehandle'
 import { pumpLoadPrep } from './loadPrep'
 import { createLoadOrders } from './workPackages'
 
@@ -28,16 +31,55 @@ function onTop(state: SimState, slot: YardSlotState): boolean {
   return true
 }
 
-/** Matching empties an ASC could take now, in container id order. */
-export function emptyCandidates(ctx: EngineContext, size: ContainerSize, line: string): EmptyCandidate[] {
+/** The `iso-type-best-position` strategy is selected: requests carry the ISO type, buried empties and position data. */
+export const isoAllocation = (ctx: EngineContext): boolean =>
+  (ctx.config.decisions?.points?.emptyAllocation?.strategy ?? strategies.emptyAllocation.default) === 'iso-type-best-position'
+
+/** What an empties requirement asks for. */
+export interface EmptyMatch {
+  size: ContainerSize
+  line: string
+  /** `iso-type-best-position` only: match the ISO type (the line only with `matchLine`) and include buried empties. */
+  iso?: { isoType: string; matchLine: boolean; stsId: string }
+}
+
+/** The match of a package's requirement under the selected strategy. */
+export function matchOf(ctx: EngineContext, pkg: WorkPackage): EmptyMatch {
+  const req = pkg.emptyReq as EmptiesRequirement
+  if (!isoAllocation(ctx)) return { size: req.size, line: req.line }
+  return {
+    size: req.size,
+    line: req.line,
+    iso: { isoType: req.isoType ?? isoTypeOf(req.size, false), matchLine: ctx.config.emptyAllocation?.matchLine === true, stsId: pkg.stsId },
+  }
+}
+
+/** Matching empties an ASC could take now (with `iso`: also buried ones), in container id order. */
+export function emptyCandidates(ctx: EngineContext, match: EmptyMatch): EmptyCandidate[] {
   const { state } = ctx
+  const { size, line, iso } = match
   const specs = new Map(blockSpecs(ctx.config).map((b) => [b.id, b]))
   const out: EmptyCandidate[] = []
+  let rank: Map<string, number> | null = null
+  let allocated: YardSlotState[] = []
+  if (iso) {
+    const gantryX = state.sts[iso.stsId]?.gantryX ?? 0
+    rank = new Map(
+      [...specs.values()].sort((a, b) => Math.abs(a.x - gantryX) - Math.abs(b.x - gantryX) || (a.id < b.id ? -1 : 1)).map((b, i) => [b.id, i]),
+    )
+    allocated = Object.values(state.yardSlots).filter(
+      (s) => s.containerId && state.containers[s.containerId].allocatedTo !== undefined && state.containers[s.containerId].custody.kind === 'yardSlot',
+    )
+  }
   for (const slot of Object.values(state.yardSlots)) {
     if (!slot.containerId) continue
     const box = state.containers[slot.containerId]
-    if (box.full || box.size !== size || box.line !== line || box.allocatedTo !== undefined || box.truckClaim !== undefined) continue
-    if (box.custody.kind !== 'yardSlot' || box.custody.id !== slot.id || !onTop(state, slot)) continue
+    if (box.full || box.allocatedTo !== undefined || box.truckClaim !== undefined) continue
+    if (iso) {
+      if ((box.props?.isoType ?? isoTypeOf(box.size, false)) !== iso.isoType || (iso.matchLine && box.line !== line)) continue
+    } else if (box.size !== size || box.line !== line) continue
+    if (box.custody.kind !== 'yardSlot' || box.custody.id !== slot.id) continue
+    if (!iso && !onTop(state, slot)) continue
     const spec = specs.get(slot.blockId)
     if (!spec) continue
     out.push({
@@ -49,6 +91,17 @@ export function emptyCandidates(ctx: EngineContext, size: ContainerSize, line: s
       tier: slot.tier,
       distanceM: Math.round((Math.abs(rowX(spec, slot.row) - spec.x) + Math.abs(slotZ(spec, slot.bay, slot.span) - spec.wtpZ)) * 1000) / 1000,
       yardSince: box.yardSince ?? 0,
+      ...(iso && rank
+        ? {
+            isoType: box.props?.isoType ?? isoTypeOf(box.size, false),
+            line: box.line,
+            boxesOnTop: blockersOf(state, slot).length,
+            blockRank: rank.get(slot.blockId) ?? 0,
+            adjacentAllocated: allocated.filter(
+              (o) => o.blockId === slot.blockId && o.id !== slot.id && Math.abs(o.row - slot.row) <= 1 && Math.abs(o.bay - slot.bay) <= 2,
+            ).length,
+          }
+        : {}),
     })
   }
   return out.sort((a, b) => (a.containerId < b.containerId ? -1 : 1))
@@ -65,7 +118,7 @@ export function raiseEmptiesRequired(ctx: EngineContext, pkg: WorkPackage): void
     size: req.size,
     line: req.line,
     count: req.count,
-    available: emptyCandidates(ctx, req.size, req.line).length,
+    available: emptyCandidates(ctx, matchOf(ctx, pkg)).length,
   })
 }
 
@@ -76,13 +129,23 @@ function tryAllocate(ctx: EngineContext): void {
   for (const pkg of Object.values(state.workPackages)) {
     const req = pkg.emptyReq
     if (!req || req.stage !== 'pending' || pkg.status !== 'released') continue
-    const candidates = emptyCandidates(ctx, req.size, req.line)
+    const match = matchOf(ctx, pkg)
+    const candidates = emptyCandidates(ctx, match)
     if (candidates.length < req.count) continue
     req.stage = 'asked'
     state.emptiesAsking = pkg.id
     ctx.requestDecision(
       'emptyAllocation',
-      { packageId: pkg.id, stsId: pkg.stsId, vesselId: pkg.vesselId, size: req.size, line: req.line, count: req.count, candidates },
+      {
+        packageId: pkg.id,
+        stsId: pkg.stsId,
+        vesselId: pkg.vesselId,
+        size: req.size,
+        line: req.line,
+        count: req.count,
+        ...(match.iso ? { isoType: match.iso.isoType, matchLine: match.iso.matchLine } : {}),
+        candidates,
+      },
       { vessels: [pkg.vesselId] },
     )
     return
@@ -103,7 +166,7 @@ export const emptiesReactors: ReactorMap = {
     if (!req) throw new Error(`emptyAllocation: ${pkg.id} requires no empties`)
     state.emptiesAsking = null
     const ids = reply.containerIds
-    const valid = new Set(emptyCandidates(ctx, req.size, req.line).map((c) => c.containerId))
+    const valid = new Set(emptyCandidates(ctx, matchOf(ctx, pkg)).map((c) => c.containerId))
     if (ids.length !== req.count || new Set(ids).size !== ids.length)
       throw new Error(`emptyAllocation for ${pkg.id}: expected exactly ${req.count} distinct empties, got ${ids.length}`)
     for (const id of ids)
@@ -111,6 +174,7 @@ export const emptiesReactors: ReactorMap = {
     ids.forEach((id, i) => {
       state.vesselSlots[req.slotIds[i]].plannedContainerId = id
       state.containers[id].allocatedTo = pkg.id
+      state.containers[id].props = allocateEmptyProps(ctx.config, state.propsSeed, id, state.containers[id].props, pkg.vesselId)
     })
     pkg.containerIds = [...ids]
     req.stage = 'allocated'

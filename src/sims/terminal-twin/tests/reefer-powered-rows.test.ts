@@ -86,7 +86,7 @@ describe('fixture reefer-powered-rows', () => {
   }
 
   it('keeps every reefer, pre-filled or discharged, in rows 1-2 on tiers 1-4, with every built-in strategy', () => {
-    for (const strategy of ['nearest-wtp', 'random', 'group-by-vessel']) {
+    for (const strategy of ['nearest-wtp', 'random', 'grouped']) {
       const sim = run(strategy)
       expect(sim.firstError).toBeNull()
       expect(sim.invariantReport().violations).toEqual([])
@@ -106,6 +106,13 @@ describe('fixture reefer-powered-rows', () => {
     const plain = sim.query.yardSlots().filter((s) => s.containerId && !boxes.get(s.containerId)?.reefer)
     expect(plain.length).toBeGreaterThan(5)
     expect(plain.filter((s) => s.row <= 2).length / plain.length).toBeLessThan(0.25)
+  })
+
+  it.each(['grouped', 'nearest-wtp'])('%s leaves the plugs to reefers in the pre-fill too: no plain box in rows 1-2 while others have room', (strategy) => {
+    const sim = run(strategy)
+    const boxes = new Map(sim.query.containers().map((b) => [b.id, b]))
+    const plain = sim.query.yardSlots().filter((s) => s.containerId && !boxes.get(s.containerId)?.reefer)
+    expect(plain.filter((s) => s.row <= 2)).toEqual([])
   })
 
   it('trips yard.reefer-powered when a TOS puts a reefer in an unpowered row', () => {

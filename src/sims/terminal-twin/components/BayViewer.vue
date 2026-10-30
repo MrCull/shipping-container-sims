@@ -1,0 +1,816 @@
+<script setup lang="ts">
+/**
+ * Bay viewer popup (spec #106, #115): one bay of a vessel at a time as hold and deck cross-sections (row x tier),
+ * prev/next buttons and a bay strip, a hover tooltip with the box's properties and a side list of the bay's work
+ * packages. All the grouping and status logic is the pure view-model in `modules/bayView.ts`; this only draws it.
+ * Refreshes a few times a second while open (never per frame).
+ */
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { buildBayView, COLOUR_MODES, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
+import { useTwinStore } from '../store/twinStore'
+import { t, type MessageKey } from '../i18n/messages'
+
+const store = useTwinStore()
+
+const REFRESH_MS = 1000
+/** Widest a cross-section may get (px); a cell is as large as fits, up to MAX_CELL_PX. */
+const SECTION_WIDTH_PX = 440
+const MAX_CELL_PX = 26
+const PALETTE_SIZE = 8
+
+let timer: ReturnType<typeof setInterval> | null = null
+
+const vesselName = computed(() => store.config?.vessels.find((v) => v.id === store.bayViewerVesselId)?.name ?? store.bayViewerVesselId ?? '')
+
+const view = computed<BayView | null>(() => {
+  const data = store.bayViewData
+  if (!data) return null
+  const locate = (id: string): string => store.locations.vesselSlot(id)?.notation ?? id
+  try {
+    return buildBayView(data, store.bayViewerBay, { colourMode: store.bayViewerColour, locate })
+  } catch {
+    return null
+  }
+})
+
+const pad2 = (n: number): string => String(n).padStart(2, '0')
+const cellPx = computed(() => {
+  const rows = view.value?.sections[0].rowNumbers.length ?? 8
+  return Math.max(9, Math.min(MAX_CELL_PX, Math.floor((SECTION_WIDTH_PX - 2 * (rows - 1)) / rows)))
+})
+
+function cellClass(c: BayCell): string[] {
+  const out = [`st-${c.status}`]
+  if (store.bayViewerColour !== 'status' && c.colourIndex !== null) out.push(`p${c.colourIndex % PALETTE_SIZE}`)
+  return out
+}
+
+const statusText = (s: CellStatus): string => t(`bayViewer.status.${s}` as MessageKey)
+const stripTitle = (e: BayView['strip'][number]): string =>
+  `${t('bayViewer.stripBay', { bay: pad2(e.number), state: t(`bayViewer.stripState.${e.state}` as MessageKey) })}${e.total > 0 ? ` · ${t('bayViewer.stripProgress', { done: e.done, total: e.total })}` : ''}`
+
+function legendText(key: string): string {
+  if (store.bayViewerColour === 'status') return statusText(key as CellStatus)
+  if (store.bayViewerColour === 'weight') return t(`inspector.weightClass.${key}` as MessageKey)
+  return key
+}
+
+/** Hover: the cell under the pointer and where to draw its tooltip (client coordinates). */
+const hovered = ref<{ cell: BayCell; x: number; y: number } | null>(null)
+function hover(cell: BayCell, e: MouseEvent): void {
+  hovered.value = { cell, x: e.clientX, y: e.clientY }
+}
+
+const tipRows = computed(() => {
+  const h = hovered.value
+  if (!h) return []
+  const d = h.cell.details
+  const rows: { label: string; value: string }[] = [
+    { label: t('bayViewer.tip.location'), value: d.location },
+    { label: t('bayViewer.tip.status'), value: statusText(d.status) },
+  ]
+  if (d.boxId) rows.push({ label: t('bayViewer.tip.container'), value: d.boxId })
+  if (d.size) rows.push({ label: t('inspector.fact.size'), value: d.size })
+  if (d.isoType) rows.push({ label: t('inspector.fact.isoType'), value: d.isoType })
+  if (d.line) rows.push({ label: t('inspector.fact.line'), value: d.line })
+  if (d.direction) rows.push({ label: t('inspector.fact.direction'), value: t(`inspector.direction.${d.direction}` as MessageKey) })
+  if (d.pol) rows.push({ label: t('inspector.fact.pol'), value: d.pol })
+  if (d.pod) rows.push({ label: t('inspector.fact.pod'), value: d.pod })
+  if (d.grossKg !== undefined) rows.push({ label: t('inspector.fact.grossWeight'), value: t('inspector.kg', { n: store.fmt.number(d.grossKg, 0) }) })
+  if (d.weightClass) rows.push({ label: t('inspector.fact.weightClass'), value: t(`inspector.weightClass.${d.weightClass}` as MessageKey) })
+  if (d.full !== undefined) rows.push({ label: t('inspector.fact.load'), value: t(`inspector.load.${d.full ? 'full' : 'empty'}` as MessageKey) })
+  if (d.emptyFor) rows.push({ label: t('bayViewer.tip.emptyFor'), value: [d.emptyFor.isoType ?? d.emptyFor.size, d.emptyFor.line].join(' · ') })
+  return rows
+})
+
+const tipStyle = computed(() => {
+  const h = hovered.value
+  if (!h) return {}
+  const x = Math.min(h.x + 14, window.innerWidth - 250)
+  const y = Math.min(h.y + 14, window.innerHeight - 260)
+  return { left: `${x}px`, top: `${y}px` }
+})
+
+function go(bay: number | null): void {
+  if (bay !== null) store.setBayViewerBay(bay)
+}
+
+onMounted(() => {
+  timer = setInterval(() => {
+    if (store.bayViewerVesselId && !store.busy) void store.refreshBayView()
+  }, REFRESH_MS)
+})
+onBeforeUnmount(() => {
+  if (timer) clearInterval(timer)
+})
+</script>
+
+<template>
+  <section
+    class="bay-viewer"
+    data-testid="tt-bay-viewer"
+    role="dialog"
+    :aria-label="t('bayViewer.title')"
+    @mouseleave="hovered = null"
+  >
+    <header class="head">
+      <h2 data-testid="tt-bay-heading">
+        {{ view ? t('bayViewer.heading', { vessel: vesselName, bay: pad2(view.bayNumber) }) : t('bayViewer.title') }}
+      </h2>
+      <button
+        type="button"
+        class="icon-btn"
+        data-testid="tt-bay-close"
+        :title="t('bayViewer.close')"
+        :aria-label="t('bayViewer.close')"
+        @click="store.closeBayViewer()"
+      >
+        ✕
+      </button>
+    </header>
+
+    <p
+      v-if="!view"
+      class="muted"
+    >
+      {{ t('bayViewer.noVessel') }}
+    </p>
+
+    <template v-else>
+      <div class="nav">
+        <button
+          type="button"
+          class="btn"
+          data-testid="tt-bay-prev"
+          :disabled="view.prev === null"
+          :title="t('bayViewer.prev')"
+          :aria-label="t('bayViewer.prev')"
+          @click="go(view.prev)"
+        >
+          ◀ {{ t('bayViewer.prevShort') }}
+        </button>
+        <button
+          type="button"
+          class="btn"
+          data-testid="tt-bay-next"
+          :disabled="view.next === null"
+          :title="t('bayViewer.next')"
+          :aria-label="t('bayViewer.next')"
+          @click="go(view.next)"
+        >
+          {{ t('bayViewer.nextShort') }} ▶
+        </button>
+        <div
+          class="modes"
+          role="group"
+          :aria-label="t('bayViewer.colourBy')"
+        >
+          <button
+            v-for="m in COLOUR_MODES"
+            :key="m"
+            type="button"
+            class="mode"
+            :data-testid="`tt-bay-mode-${m}`"
+            :aria-pressed="store.bayViewerColour === m"
+            @click="store.setBayViewerColour(m)"
+          >
+            {{ t(`bayViewer.mode.${m}` as MessageKey) }}
+          </button>
+        </div>
+      </div>
+
+      <ol
+        class="strip"
+        data-testid="tt-bay-strip"
+        :aria-label="t('bayViewer.strip')"
+      >
+        <li
+          v-for="e in view.strip"
+          :key="e.bay"
+        >
+          <button
+            type="button"
+            class="strip-bay"
+            :class="[`state-${e.state}`, { current: e.bay === view.bay }]"
+            :data-testid="`tt-bay-strip-${e.bay}`"
+            :data-state="e.state"
+            :aria-current="e.bay === view.bay ? 'true' : undefined"
+            :title="stripTitle(e)"
+            @click="go(e.bay)"
+          >
+            <span class="strip-no">{{ pad2(e.number) }}</span>
+            <span
+              class="strip-bar"
+              :style="{ '--done': e.total > 0 ? `${Math.round((100 * e.done) / e.total)}%` : '0%' }"
+            />
+          </button>
+        </li>
+      </ol>
+
+      <div class="body">
+        <div class="plan">
+          <p
+            v-if="view.rob"
+            class="rob-note"
+            data-testid="tt-bay-rob-note"
+          >
+            {{ t('bayViewer.robBay') }}
+          </p>
+          <template
+            v-for="(section, si) in view.sections"
+            :key="section.deck ? 'deck' : 'hold'"
+          >
+            <h3 class="section-title">
+              {{ section.deck ? t('bayViewer.deck') : t('bayViewer.hold') }}
+            </h3>
+            <div
+              class="section"
+              :data-testid="section.deck ? 'tt-bay-deck' : 'tt-bay-hold'"
+              :style="{ '--cols': section.rowNumbers.length, '--cell': `${cellPx}px` }"
+            >
+              <div
+                v-if="si === 0"
+                class="axis"
+                :aria-label="t('bayViewer.rowsAxis')"
+              >
+                <span class="tier-no" />
+                <span
+                  v-for="(n, i) in section.rowNumbers"
+                  :key="i"
+                  class="row-no"
+                >{{ pad2(n) }}</span>
+              </div>
+              <div
+                v-for="tier in section.tiers"
+                :key="tier.tier"
+                class="tier"
+              >
+                <span class="tier-no">{{ pad2(tier.number) }}</span>
+                <div
+                  v-for="p in tier.positions"
+                  :key="p.row"
+                  class="pos"
+                >
+                  <span
+                    v-for="c in p.cells"
+                    :key="c.slotId"
+                    class="cell"
+                    :class="cellClass(c)"
+                    data-testid="tt-bay-cell"
+                    :data-slot="c.slotId"
+                    :data-status="c.status"
+                    :data-key="c.colourKey ?? ''"
+                    @mouseenter="hover(c, $event)"
+                    @mousemove="hover(c, $event)"
+                  />
+                </div>
+              </div>
+            </div>
+            <div
+              v-if="si === 0"
+              class="hatch-line"
+              aria-hidden="true"
+            />
+          </template>
+        </div>
+
+        <aside class="side">
+          <h3 class="section-title">
+            {{ t('bayViewer.packages') }}
+          </h3>
+          <p
+            v-if="view.packages.length === 0"
+            class="muted"
+          >
+            {{ t('bayViewer.noPackages') }}
+          </p>
+          <ul
+            v-else
+            class="packages"
+            data-testid="tt-bay-packages"
+          >
+            <li
+              v-for="p in view.packages"
+              :key="p.id"
+              class="pkg"
+              :data-package="p.id"
+              :data-status="p.status"
+            >
+              <div class="pkg-head">
+                <span class="pkg-kind">{{ t('bayViewer.pkgLine', { kind: t(`bayViewer.pkg.${p.kind}` as MessageKey), section: p.section === 'deck' ? t('bayViewer.deck') : t('bayViewer.hold') }) }}</span>
+                <span
+                  class="badge"
+                  :class="`badge-${p.status}`"
+                >{{ t(`bayViewer.pkgState.${p.status}` as MessageKey) }}</span>
+              </div>
+              <div class="pkg-meta">
+                <span>{{ t('bayViewer.pkgSts', { sts: p.stsId }) }}</span>
+                <span v-if="p.total !== null">{{ t('bayViewer.progress', { done: p.done ?? 0, total: p.total }) }}</span>
+              </div>
+              <div
+                v-if="p.total"
+                class="pkg-bar"
+                :style="{ '--done': `${Math.round((100 * (p.done ?? 0)) / p.total)}%` }"
+              />
+            </li>
+          </ul>
+
+          <h3 class="section-title">
+            {{ t('bayViewer.legend') }}
+          </h3>
+          <ul
+            class="legend"
+            data-testid="tt-bay-legend"
+          >
+            <li
+              v-for="l in view.legend"
+              :key="l.key"
+            >
+              <span
+                class="cell swatch"
+                :class="[l.index === null ? `st-${l.key}` : `p${l.index % PALETTE_SIZE}`, store.bayViewerColour === 'status' ? '' : 'st-planned-discharge']"
+              />
+              <span>{{ legendText(l.key) }}</span>
+              <span
+                v-if="store.bayViewerColour === 'status'"
+                class="count"
+              >{{ view.counts[l.key as CellStatus] }}</span>
+            </li>
+          </ul>
+        </aside>
+      </div>
+    </template>
+
+    <div
+      v-if="hovered"
+      class="tip"
+      data-testid="tt-bay-tooltip"
+      :style="tipStyle"
+    >
+      <dl>
+        <template
+          v-for="r in tipRows"
+          :key="r.label"
+        >
+          <dt>{{ r.label }}</dt>
+          <dd>{{ r.value }}</dd>
+        </template>
+      </dl>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.bay-viewer {
+  --bv-planned-discharge: #f59e0b;
+  --bv-planned-load: #3b82f6;
+  --bv-in-progress: #34d399;
+  --bv-done: #4b5563;
+  --bv-rob: #64748b;
+  --p0: #4c9be8;
+  --p1: #e8a33c;
+  --p2: #5cc08a;
+  --p3: #d9627a;
+  --p4: #9a7be0;
+  --p5: #3fb8c4;
+  --p6: #c9c04a;
+  --p7: #e07c4c;
+  position: absolute;
+  top: 3.6rem;
+  left: 0.9rem;
+  z-index: 8;
+  width: min(46rem, calc(100% - 1.8rem));
+  max-height: calc(100% - 8.2rem);
+  overflow-y: auto;
+  padding: 0.7rem 0.85rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: rgba(17, 24, 39, 0.96);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+h2 {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.icon-btn {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: 6px;
+  width: 1.7rem;
+  height: 1.7rem;
+  line-height: 1;
+}
+
+.icon-btn:hover {
+  color: var(--color-text);
+  background: var(--color-bg-card-hover);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.btn,
+.mode {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  color: var(--color-text);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.btn:hover:not(:disabled),
+.mode:hover {
+  background: var(--color-bg-card-hover);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.modes {
+  margin-left: auto;
+  display: inline-flex;
+}
+
+.mode {
+  border-radius: 0;
+  margin-left: -1px;
+}
+
+.mode:first-child {
+  border-radius: 6px 0 0 6px;
+  margin-left: 0;
+}
+
+.mode:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.mode[aria-pressed='true'] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.strip {
+  list-style: none;
+  display: flex;
+  gap: 3px;
+  margin-bottom: 0.6rem;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.strip li {
+  flex: 1 0 1.9rem;
+  min-width: 1.9rem;
+}
+
+.strip-bay {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 3px 2px 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+}
+
+.strip-bay.current {
+  border-color: var(--color-primary-glow);
+  color: var(--color-text);
+  box-shadow: 0 0 0 1px var(--color-primary-glow);
+}
+
+.strip-no {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.strip-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: #1f2937;
+  background-image: linear-gradient(to right, var(--bv-in-progress) var(--done), transparent var(--done));
+}
+
+.state-rob .strip-bar {
+  background-image: repeating-linear-gradient(45deg, var(--bv-rob) 0 3px, transparent 3px 6px);
+}
+
+.state-empty {
+  opacity: 0.55;
+}
+
+.state-complete .strip-bar {
+  background: var(--color-success);
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(11rem, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.plan {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.rob-note {
+  margin-bottom: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  border: 1px dashed var(--bv-rob);
+  color: var(--color-text-muted);
+  max-width: 28rem;
+}
+
+.section-title {
+  margin: 0.2rem 0 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.section {
+  width: max-content;
+  padding: 4px;
+  border-radius: 6px;
+  background: #0b1220;
+  border: 1px solid var(--color-border);
+}
+
+.axis,
+.tier {
+  display: grid;
+  grid-template-columns: 1.4rem repeat(var(--cols), var(--cell));
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.tier-no,
+.row-no {
+  font-size: 0.6rem;
+  line-height: var(--cell);
+  color: var(--color-text-muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.axis .row-no {
+  line-height: 1.1;
+  margin-bottom: 1px;
+}
+
+.hatch-line {
+  height: 5px;
+  margin: 4px 0 0;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, #6b7280 0 10px, #4b5563 10px 12px);
+}
+
+.pos {
+  display: flex;
+  gap: 1px;
+  height: var(--cell);
+}
+
+.cell {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cell.st-empty {
+  border-color: rgba(255, 255, 255, 0.11);
+}
+
+/* Fill: by state, or by the colour mode's palette (a property of the box). */
+.cell.st-planned-discharge {
+  background: var(--bv-planned-discharge);
+}
+.cell.st-planned-load {
+  background: var(--bv-planned-load);
+}
+.cell.st-in-progress {
+  background: var(--bv-in-progress);
+}
+.cell.st-done {
+  background: var(--bv-done);
+}
+.cell.st-rob {
+  background: var(--bv-rob);
+}
+.cell.p0 { background: var(--p0); }
+.cell.p1 { background: var(--p1); }
+.cell.p2 { background: var(--p2); }
+.cell.p3 { background: var(--p3); }
+.cell.p4 { background: var(--p4); }
+.cell.p5 { background: var(--p5); }
+.cell.p6 { background: var(--p6); }
+.cell.p7 { background: var(--p7); }
+
+/* State marks that survive any fill: outline = planned discharge, dashed = planned load, glow = in progress, faded = done, stripes = ROB. */
+.cell.st-planned-discharge {
+  border-color: rgba(255, 255, 255, 0.85);
+}
+.cell.st-planned-load {
+  border: 1px dashed rgba(255, 255, 255, 0.85);
+}
+.cell.st-in-progress {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55), 0 0 8px 2px var(--bv-in-progress);
+  z-index: 1;
+  animation: bv-pulse 1s ease-in-out infinite alternate;
+}
+.cell.st-done {
+  opacity: 0.4;
+}
+.cell.st-rob {
+  background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.35) 0 2px, transparent 2px 5px);
+}
+.cell.st-rob.p0, .cell.st-rob.p1, .cell.st-rob.p2, .cell.st-rob.p3, .cell.st-rob.p4, .cell.st-rob.p5, .cell.st-rob.p6, .cell.st-rob.p7 {
+  border-color: rgba(0, 0, 0, 0.4);
+}
+.cell.st-done::after {
+  content: '';
+  position: absolute;
+  left: 25%;
+  top: 15%;
+  width: 28%;
+  height: 48%;
+  border: solid rgba(255, 255, 255, 0.9);
+  border-width: 0 2px 2px 0;
+  transform: rotate(40deg);
+}
+
+@keyframes bv-pulse {
+  to {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3), 0 0 3px 1px var(--bv-in-progress);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell.st-in-progress {
+    animation: none;
+  }
+}
+
+.side {
+  min-width: 0;
+}
+
+.packages,
+.legend {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.7rem;
+}
+
+.pkg {
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.pkg-head,
+.pkg-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.pkg-kind {
+  font-weight: 600;
+}
+
+.pkg-meta {
+  margin-top: 0.15rem;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.pkg-bar {
+  height: 3px;
+  margin-top: 0.3rem;
+  border-radius: 2px;
+  background: #1f2937 linear-gradient(to right, var(--bv-in-progress) var(--done), transparent var(--done));
+}
+
+.badge {
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.badge-active {
+  color: #052e1c;
+  background: var(--bv-in-progress);
+  border-color: var(--bv-in-progress);
+  font-weight: 600;
+}
+
+.badge-released {
+  color: var(--color-accent-glow);
+  border-color: var(--color-accent);
+}
+
+.badge-complete {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.swatch {
+  flex: 0 0 14px;
+  height: 14px;
+}
+
+.legend .count {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tip {
+  position: fixed;
+  z-index: 20;
+  min-width: 11rem;
+  max-width: 16rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: rgba(10, 14, 26, 0.97);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  font-size: 0.74rem;
+}
+
+.tip dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.1rem 0.6rem;
+}
+
+.tip dt {
+  color: var(--color-text-muted);
+}
+
+.tip dd {
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+</style>

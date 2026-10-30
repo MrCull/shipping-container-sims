@@ -170,6 +170,8 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 5 || performance.now() - p.at > 600) return
     const id = pickAt(e.clientX, e.clientY)
     store.select(id)
+    // a click on a vessel also opens the bay viewer (spec #106, #115)
+    if (id && store.controller()?.model?.vesselIds.includes(id)) void store.openBayViewer(id)
   }
 
   function rebuild(model: SceneModel | null): void {

@@ -16,6 +16,8 @@ import type { EngineContext, ReactorMap } from '../context'
 import type { SimState, StsState, VesselSlotState, WorkPackage } from '../state'
 import { hatchPanelOfRow, vesselClass } from '../../scenario/vesselClasses'
 import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
+import { resolveContainerProps } from '../../scenario/containerProps'
+import { countDischargeSplits, countLoadBreaks, orderDischarge, orderLoad, vesselOrderingOf } from '../vesselOrdering'
 import { continueWork } from './quay'
 import { pumpLoadPrep } from './loadPrep'
 import { raiseEmptiesRequired } from './empties'
@@ -44,7 +46,7 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
   const { state } = ctx
   const inBays = new Set(bays)
   const slots = Object.values(state.vesselSlots).filter((s) => s.vesselId === vesselId && inBays.has(s.bay))
-  const discharge = slots
+  let discharge = slots
     .filter((s) => s.purpose === 'discharge' && s.containerId !== null)
     .sort(
       (a, b) =>
@@ -54,11 +56,32 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
         a.row - b.row ||
         (a.half === 'fore' ? 1 : 0) - (b.half === 'fore' ? 1 : 0),
     )
-  const load = loadActive(state)
+  let load = loadActive(state)
     ? slots
         .filter(isLoadSlot)
         .sort((a, b) => compareKeys(loadSequenceKey(a), loadSequenceKey(b)))
     : []
+  if (vesselOrderingOf(ctx.config) === 'pod-weight') {
+    const ports = resolveContainerProps(ctx.config).portRotation.ports
+    const entry = (id: string | null | undefined) => (id ? state.containers[id] : undefined)
+    const dischargeSeq = orderDischarge(
+      discharge.map((slot) => ({ slot, box: entry(slot.containerId) })),
+      ports,
+    )
+    const loadSeq = orderLoad(
+      load.map((slot) => ({ slot, box: entry(slot.plannedContainerId) })),
+      ports,
+    )
+    const k = (state.kpis.ordering ??= { discharge: { boxes: 0, groupSplits: 0 }, load: { boxes: 0, podOnEarlier: 0, heavyOnLight: 0 } })
+    k.discharge.boxes += dischargeSeq.length
+    k.discharge.groupSplits += countDischargeSplits(dischargeSeq, ports)
+    const breaks = countLoadBreaks(loadSeq, ports)
+    k.load.boxes += loadSeq.filter((e) => e.box).length
+    k.load.podOnEarlier += breaks.podOnEarlier
+    k.load.heavyOnLight += breaks.heavyOnLight
+    discharge = dischargeSeq.map((e) => e.slot)
+    load = loadSeq.map((e) => e.slot)
+  }
   sts.packageIds = []
   sts.activePackageId = null
   const make = (kind: WorkPackage['kind'], bay: number, sec: 'deck' | 'hold'): WorkPackage => {
@@ -92,7 +115,7 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
       ) {
         current = make(kind, s.bay, section(s.deck))
         if (s.emptyReq)
-          current.emptyReq = { index: s.emptyReq.index, size: s.emptyReq.size, line: s.emptyReq.line, count: 0, slotIds: [], stage: 'pending' }
+          current.emptyReq = { index: s.emptyReq.index, size: s.emptyReq.size, line: s.emptyReq.line, isoType: s.emptyReq.isoType, count: 0, slotIds: [], stage: 'pending' }
         made.push(current)
       }
       if (current.emptyReq) {

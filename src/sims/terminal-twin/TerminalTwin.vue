@@ -2,6 +2,7 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import FinalReport from './components/FinalReport.vue'
 import KpiStrip from './components/KpiStrip.vue'
+import BayViewer from './components/BayViewer.vue'
 import DepartureBanner from './components/DepartureBanner.vue'
 import EventFeedPanel from './components/debug/EventFeedPanel.vue'
 import InspectorPanel from './components/debug/InspectorPanel.vue'
@@ -88,6 +89,7 @@ onBeforeUnmount(() => {
       <OverlayToggles v-if="store.hasScenario && !webglFailed" />
       <EventFeedPanel v-if="store.hasScenario" />
       <InspectorPanel v-if="store.hasScenario" />
+      <BayViewer v-if="store.hasScenario && store.bayViewerVesselId" />
       <div
         v-if="webglFailed"
         class="notice"

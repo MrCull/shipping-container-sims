@@ -18,6 +18,8 @@ import type { YardAllocationRequest } from '../decisions/types'
 import { indexYardSlotAdded } from '../yardIndex'
 import { prefillSteps, type PrefillImport, type PrefillPlan } from '../prefill'
 import { POOL_VESSEL_ID, planCargo } from '../../scenario/bayPlan'
+import { makeContainerState } from '../../scenario/containerFactory'
+import { drawContainerProps } from '../../scenario/containerProps'
 import type { ScenarioConfig } from '../../scenario/types'
 import type { ExportPlacement } from '../../scenario/exportYard'
 import type { SimState } from '../state'
@@ -70,18 +72,29 @@ export function createPrefillDriver(getState: () => SimState, config: ScenarioCo
     }
     if (!imp) throw new Error(`Pre-fill placed unknown box ${p.containerId}`)
     // an import box: it was discharged before the scenario starts, so it comes into being in its slot
-    state.containers[imp.id] = {
+    state.containers[imp.id] = makeContainerState({
       id: imp.id,
       size: imp.size,
       full: true,
       line: imp.line,
       vesselId: POOL_VESSEL_ID,
-      custody: owner,
-      custodyHistory: [{ t: state.now, owner: { ...owner }, eventId: ctx.current.id }],
+      owner,
+      t: state.now,
+      eventId: ctx.current.id,
       yardSince: -imp.ageS,
       pickupReadyAt: imp.pickupReadyAt,
-      ...(imp.reefer ? { reefer: true as const } : {}),
-    }
+      reefer: imp.reefer,
+      props: drawContainerProps(ctx.config, state.propsSeed, {
+        id: imp.id,
+        size: imp.size,
+        full: true,
+        line: imp.line,
+        reefer: imp.reefer === true,
+        direction: 'IMPORT',
+        inbound: { kind: 'vessel' }, // discharged before the scenario starts, from a vessel outside it
+        arrivalS: -imp.ageS,
+      }),
+    })
   }
 
   function finish(ctx: EngineContext): void {

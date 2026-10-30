@@ -9,8 +9,8 @@
  */
 import { minFutureRehandles, nearestValidRehandle } from './rehandleStrategies'
 import { balancedAscDispatch, preRetrievalDispatch, watersideFirstDispatch } from './ascStrategies'
-import { groupByVesselSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
-import { nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
+import { groupedSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
+import { isoTypeBestPositionEmpties, nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
 import { leastLoadedBlockStall, leastUsedLane, lowestFreeLane, nearestToBoxStall } from './landsideStrategies'
 import { justInTimeRelease, keepKAheadRelease } from './workPackageStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
@@ -145,7 +145,7 @@ export const strategies: StrategyRegistry = {
     },
   },
   yardAllocation: {
-    default: 'nearest-wtp',
+    default: 'grouped',
     strategies: {
       random: {
         description: 'A random legal slot (from the seeded RNG).',
@@ -155,9 +155,10 @@ export const strategies: StrategyRegistry = {
         description: 'The legal slot nearest the WTP pad, spreading over low tiers before stacking high.',
         handler: (msg) => nearestWtpSlot(msg.payload),
       },
-      'group-by-vessel': {
-        description: "Keeps a vessel's boxes together: its own bays first, then the lowest empty bay.",
-        handler: (msg) => groupByVesselSlot(msg.payload),
+      grouped: {
+        description:
+          'Groups boxes: imports by line (earlier departure higher), exports by outbound vessel and POD (heavy at the bottom), transshipment by onward vessel and POD, storage empties by line, size and type. A mismatch costs score, never a slot.',
+        handler: (msg) => groupedSlot(msg.payload),
       },
     },
   },
@@ -194,7 +195,7 @@ export const strategies: StrategyRegistry = {
     },
   },
   emptyAllocation: {
-    default: 'nearest-wtp',
+    default: 'iso-type-best-position',
     strategies: {
       'nearest-wtp': {
         description: 'The matching empties nearest the WTP pads (shortest trips), lowest tier first.',
@@ -203,6 +204,11 @@ export const strategies: StrategyRegistry = {
       'oldest-first': {
         description: 'The matching empties that have stood in the yard longest.',
         handler: (msg) => oldestFirstEmpties(msg.payload),
+      },
+      'iso-type-best-position': {
+        description:
+          'Default (spec #106). Matches the requested ISO type (any line; `emptyAllocation.matchLine` restricts to the requesting line) and picks the best yard position: fewest boxes on top, then nearest the WTP of the block serving the vessel, then next to other allocated empties.',
+        handler: (msg) => isoTypeBestPositionEmpties(msg.payload),
       },
     },
   },

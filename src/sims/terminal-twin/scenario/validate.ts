@@ -6,6 +6,8 @@
  */
 import type { MessageKey, MessageParams } from '../i18n/messages'
 import { t } from '../i18n/messages'
+import { validateContainerProps } from './containerProps'
+import { validateRob } from './robBays'
 import { BLOCK_ROWS } from '../engine/yardLayout'
 import { BLOCK_FRONTAGE_M, SCALE_LIMITS, STRESS_SCALE } from './limits'
 import { validateOverrides, type CheckMessage, type OverrideCheck } from './overrides'
@@ -65,6 +67,10 @@ export function validateScenario(config: ScenarioConfig, overrides: SubsystemMod
   const reeferShare = config.cargo.reeferShare ?? 0
   if (!(reeferShare >= 0 && reeferShare <= 1)) err('setup.check.reeferShare')
   else if (reeferShare > 0 && blocks.length > 0 && !blocks.some((b) => (b.poweredRows ?? []).length > 0)) err('setup.check.reeferNoPower')
+  for (const detail of [...validateContainerProps(config.containerProps), ...validateRob(config)]) err('setup.check.containerProps', { detail })
+  const ordering = config.vesselPlanning?.ordering
+  if (ordering !== undefined && ordering !== 'as-today' && ordering !== 'pod-weight')
+    err('setup.check.containerProps', { detail: `vesselPlanning.ordering must be as-today or pod-weight, got ${String(ordering)}` })
   const shc = config.shcs?.length ?? 0
   if (shc > lim.shc.max) err('setup.check.shcCount', { min: lim.shc.min, max: lim.shc.max })
   const peak = peakTrucksPerHour(config)

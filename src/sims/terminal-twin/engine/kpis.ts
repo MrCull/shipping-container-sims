@@ -2,7 +2,9 @@
  * KPI report: a plain, rounded (3 dp) summary derived from SimState. Later
  * tickets (TT-07) add time series, hourly/shift buckets and more groups.
  */
+import type { TransitDirection } from '../scenario/types'
 import { zeroStateS, type ShcOperationalState } from './shcStates'
+import { dwellS, isTerminalCustody } from './transit'
 import type { AppointmentBook, LandsideKpiCounters, LandsideState, SimState } from './state'
 
 /** Per-decision-point (TOS handler) KPIs. Latencies are per resolved decision. */
@@ -67,10 +69,24 @@ export interface KpiReport {
   yard?: YardKpiReport
   /** Work packages (only when some were released). */
   workPackages?: WorkPackageKpiReport
+  /** Broken ordering preferences (only when the ordering is `pod-weight`, the default). */
+  ordering?: OrderingKpiReport
   /** Hatch cover moves of the STS cranes (only when a hatch move has started). */
   hatch?: HatchKpiReport
   /** Trucks and the gate (only when the landside is on). */
   landside?: LandsideKpiReport
+  /** Dwell on the terminal by transit direction (spec #106); directions with no box that has arrived are omitted. */
+  dwell?: Partial<Record<TransitDirection, DwellKpi>>
+}
+
+/** Time on the terminal of the boxes of one direction: arrival to departure, or to now for a box still here. */
+export interface DwellKpi {
+  /** Boxes that have arrived on the terminal. */
+  count: number
+  /** Of those, boxes that have left it. */
+  departed: number
+  meanS: number
+  maxS: number
 }
 
 export interface LandsideKpiReport {
@@ -150,6 +166,23 @@ export interface HatchKpiReport {
   sts: Record<string, { moves: number; timeS: number; waitS: number }>
 }
 
+export interface OrderingKpiReport {
+  discharge: {
+    /** Boxes in the discharge packages built. */
+    boxes: number
+    /** Yard-group changes beyond one run per group (0 = each group came off in one run). */
+    groupSplits: number
+  }
+  load: {
+    /** Booked boxes in the load packages built. */
+    boxes: number
+    /** Boxes with a later POD than the box under them. */
+    podOnEarlier: number
+    /** Boxes in a heavier weight class than the box under them. */
+    heavyOnLight: number
+  }
+}
+
 export interface WorkPackageKpiReport {
   released: number
   started: number
@@ -168,6 +201,12 @@ export interface YardKpiReport {
   boxesInTransit: number
   /** yardAllocation replies with no slot (block full). */
   allocationFailures: number
+  /**
+   * Grouped decking only (absent for other strategies): how often a grouping preference was broken. `mixedStack`:
+   * a box stacked on another group's box; `orderBroken`: on its own group in the wrong order (later departure above
+   * earlier, heavier export above lighter); `mixedBay`: a new stack in a bay of other groups only.
+   */
+  grouping?: { placements: number; mixedStack: number; orderBroken: number; mixedBay: number }
   /**
    * Rehandles (blocker moves, TT-12) against productive ASC moves (stack + retrieve);
    * `perProductiveMove` is null until a productive move is done.
@@ -269,6 +308,26 @@ function holdingReport(ls: LandsideState, k: LandsideKpiCounters, now: number): 
 
 const stallsAssigned = (state: SimState): number => (state.kpis.landside?.trucksIn ?? 0) - (state.landside?.stallWaiting.length ?? 0)
 
+function dwellReport(state: SimState): KpiReport['dwell'] {
+  const sums: Partial<Record<TransitDirection, { count: number; departed: number; sumS: number; maxS: number }>> = {}
+  for (const box of Object.values(state.containers)) {
+    if (!box.props) continue // a snapshot from before the properties
+    const d = dwellS(box, state.now)
+    if (d === null) continue
+    const k = (sums[box.props.direction] ??= { count: 0, departed: 0, sumS: 0, maxS: 0 })
+    k.count++
+    if (!isTerminalCustody(box.custody.kind)) k.departed++
+    k.sumS += d
+    k.maxS = Math.max(k.maxS, d)
+  }
+  const out: NonNullable<KpiReport['dwell']> = {}
+  for (const dir of ['IMPORT', 'EXPORT', 'TRANSSHIPMENT', 'STORAGE'] as const) {
+    const k = sums[dir]
+    if (k) out[dir] = { count: k.count, departed: k.departed, meanS: r3(k.sumS / k.count), maxS: r3(k.maxS) }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 export function buildKpiReport(state: SimState, eventsProcessed: number): KpiReport {
   const sts: KpiReport['sts'] = {}
   for (const [id, k] of Object.entries(state.kpis.perSts)) {
@@ -352,6 +411,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     boxesStacked: y.boxesStacked,
     boxesInTransit: Object.values(state.ascJobs).filter((j) => j.kind !== 'rehandle' && j.truckId === undefined).length,
     allocationFailures: y.allocationFailures,
+    ...(y.grouping ? { grouping: { ...y.grouping } } : {}),
     rehandles: {
       total: y.rehandles,
       productiveMoves: y.productiveMoves,
@@ -416,6 +476,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     ...(state.landside?.appointments ? { appointments: appointmentReport(state.landside.appointments, ls) } : {}),
     ...(state.landside && Object.keys(state.landside.holding).length > 0 ? { holding: holdingReport(state.landside, ls, state.now) } : {}),
   }
+  const dwell = dwellReport(state)
   return {
     simTimeS: r3(state.now - (state.warmUp?.ended ? state.warmUp.durationS : 0)),
     ...(state.warmUp ? { warmUp: { durationS: state.warmUp.durationS, ended: state.warmUp.ended } } : {}),
@@ -429,6 +490,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     ...(horizontal ? { horizontal } : {}),
     ...(yard ? { yard } : {}),
     ...(landside ? { landside } : {}),
+    ...(dwell ? { dwell } : {}),
     ...(state.kpis.hatch
       ? {
           hatch: {
@@ -455,5 +517,6 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
           },
         }
       : {}),
+    ...(state.kpis.ordering ? { ordering: structuredClone(state.kpis.ordering) } : {}),
   }
 }

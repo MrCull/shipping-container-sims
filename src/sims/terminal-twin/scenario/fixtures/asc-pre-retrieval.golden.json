@@ -3,7 +3,7 @@
   "seed": 8,
   "status": "ended",
   "endReason": "simDurationS >= 6500",
-  "eventLogHash": "0656a83319ddad",
+  "eventLogHash": "134092f3ee7a20",
   "kpis": {
     "simTimeS": 6500,
     "eventsProcessed": 504,
@@ -105,7 +105,7 @@
         "equipmentIdleS": 0
       },
       "yardAllocation": {
-        "handler": "strategy:nearest-wtp",
+        "handler": "strategy:grouped",
         "calls": 8,
         "resolved": 8,
         "ok": 8,
@@ -300,6 +300,12 @@
       "boxesStacked": 8,
       "boxesInTransit": 0,
       "allocationFailures": 0,
+      "grouping": {
+        "placements": 8,
+        "mixedStack": 0,
+        "orderBroken": 0,
+        "mixedBay": 3
+      },
       "rehandles": {
         "total": 0,
         "productiveMoves": 14,
@@ -320,22 +326,22 @@
       "ascs": {
         "B01-ASC1": {
           "jobs": 8,
-          "gantryM": 252.6,
-          "trolleyM": 96.35,
+          "gantryM": 346.4,
+          "trolleyM": 63.85,
           "hoistM": 111.872,
           "padWaitS": 0,
           "railWaitS": 0,
-          "busyS": 475.771,
+          "busyS": 496.602,
           "yields": 2
         },
         "B01-ASC2": {
           "jobs": 6,
-          "gantryM": 835,
-          "trolleyM": 52.95,
+          "gantryM": 781.4,
+          "trolleyM": 61.95,
           "hoistM": 68.304,
           "padWaitS": 0,
-          "railWaitS": 15.883,
-          "busyS": 487.206,
+          "railWaitS": 18.464,
+          "busyS": 473.806,
           "yields": 0
         }
       }
@@ -347,8 +353,8 @@
       "gateQueue": 0,
       "gateQueueMax": 1,
       "turnTimeS": {
-        "mean": 147.556,
-        "max": 153.257
+        "mean": 145.753,
+        "max": 155.315
       },
       "gateWaitS": {
         "mean": 0,
@@ -371,14 +377,14 @@
         "max": 29.291
       },
       "totalTurnaroundS": {
-        "mean": 223.686,
-        "max": 229.388
+        "mean": 221.883,
+        "max": 231.445
       },
       "road": {
         "meanTrucks": 0.086,
         "maxTrucks": 1
       },
-      "serviceS": 50.361,
+      "serviceS": 48.558,
       "transactions": {
         "dropExport": 0,
         "pickImport": 6,
@@ -403,6 +409,20 @@
         "utilisationPct": 0
       }
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 6,
+        "departed": 6,
+        "meanS": 3292.303,
+        "maxS": 4137.977
+      },
+      "STORAGE": {
+        "count": 2,
+        "departed": 0,
+        "meanS": 5946.585,
+        "maxS": 6238.683
+      }
+    },
     "workPackages": {
       "released": 6,
       "started": 6,
@@ -410,6 +430,17 @@
       "leadTimeMeanS": 229.307,
       "leadTimeMaxS": 327.712,
       "boxesLoaded": 0
+    },
+    "ordering": {
+      "discharge": {
+        "boxes": 8,
+        "groupSplits": 0
+      },
+      "load": {
+        "boxes": 0,
+        "podOnEarlier": 0,
+        "heavyOnLight": 0
+      }
     }
   },
   "invariants": {

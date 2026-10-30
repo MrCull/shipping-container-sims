@@ -3,7 +3,7 @@
   "seed": 42,
   "status": "ended",
   "endReason": "vesselsCompleted >= 2",
-  "eventLogHash": "036cb7de013465",
+  "eventLogHash": "05f69fbd7f3284",
   "kpis": {
     "simTimeS": 3610.08,
     "eventsProcessed": 1185,
@@ -32,8 +32,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 2303.482,
-        "turnaroundS": 2243.482,
+        "departedAtS": 2303.473,
+        "turnaroundS": 2243.473,
         "sts": [
           "STS01"
         ]
@@ -302,13 +302,38 @@
         }
       }
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 16,
+        "departed": 0,
+        "meanS": 2475.357,
+        "maxS": 3477.893
+      },
+      "EXPORT": {
+        "count": 16,
+        "departed": 16,
+        "meanS": 2078.94,
+        "maxS": 3528.954
+      }
+    },
     "workPackages": {
       "released": 18,
       "started": 18,
       "completed": 18,
-      "leadTimeMeanS": 546.149,
+      "leadTimeMeanS": 546.148,
       "leadTimeMaxS": 1555.653,
       "boxesLoaded": 16
+    },
+    "ordering": {
+      "discharge": {
+        "boxes": 16,
+        "groupSplits": 0
+      },
+      "load": {
+        "boxes": 16,
+        "podOnEarlier": 0,
+        "heavyOnLight": 0
+      }
     }
   },
   "invariants": {

@@ -6,7 +6,7 @@
 import { DEFAULT_HOURLY_PROFILE, ScenarioBuilder } from './builder'
 import { deriveBlockXs, deriveSts } from './layout'
 import { TTI_FLOW_MIX, generateVessels } from './vesselGenerator'
-import type { AppointmentConfig, HoldingConfig, ScenarioConfig, VesselConfig, YardStartConfig } from './types'
+import type { AppointmentConfig, FlowMix, HoldingConfig, PortRotation, ScenarioConfig, VesselConfig, YardStartConfig } from './types'
 
 /** TTI Algeciras' published capacity (TEU): the source of the bay count. */
 export const TTI_YARD_TEU = 28647
@@ -47,6 +47,10 @@ interface TerminalSpec {
   holding?: HoldingConfig
   /** Reefers (R19): share of full boxes and the powered rows of every block; absent = none. */
   reefers?: { share: number; poweredRows: number[] }
+  /** Port rotation of the service (spec #106): sets POL and POD; absent = the generic default rotation. */
+  portRotation?: PortRotation
+  /** ROB bays (spec #106): share of each vessel's bays held back as remain-on-board and their fill level; absent = none. */
+  rob?: { bayFraction: number; fill: number }
 }
 
 function terminal(spec: TerminalSpec): ScenarioConfig {
@@ -72,6 +76,8 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
       ...(spec.holding ? { holding: spec.holding } : {}),
     })
     .endWhen({ vesselsCompleted: spec.vessels.length })
+  if (spec.portRotation) b.containerProps({ portRotation: spec.portRotation })
+  if (spec.rob) b.robBays(spec.rob.bayFraction, spec.rob.fill)
   const base = b.build()
   const sts = deriveSts({ ...base, sts: [{ id: `STS${spec.stsFirst}`, gantryX: 0, groundPositions: 3 }] }, spec.sts, spec.quayM)
   for (const s of sts) b.sts(s.id, { gantryX: s.gantryX, groundPositions: s.groundPositions })
@@ -80,7 +86,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
 }
 
 /** Vessel calls for a TTI-style hub: ~85% transshipment, a spread of sizes. */
-function hubVessels(count: number, intervalS: number, jitterS: number, movesScale: number, seed: number): VesselConfig[] {
+function hubVessels(count: number, intervalS: number, jitterS: number, movesScale: number, seed: number, flowMix: FlowMix = TTI_FLOW_MIX): VesselConfig[] {
   return generateVessels({
     count,
     startS: 0,
@@ -89,9 +95,19 @@ function hubVessels(count: number, intervalS: number, jitterS: number, movesScal
     seed,
     movesScale,
     sizeMix: { ulcv: 2, 'neo-panamax': 3, panamax: 3, feedermax: 2 },
-    flowMix: TTI_FLOW_MIX,
+    flowMix,
   })
 }
+
+/**
+ * [A] unverified (spec #106): the peak-day service rotation, an Asia - Mediterranean loop (UN/LOCODEs: Shanghai, Singapore,
+ * Algeciras, Tanger Med, Valencia, Fos-sur-Mer, Genoa). TTI's real services and call order are not public.
+ */
+export const PEAK_DAY_ROTATION: PortRotation = { terminal: 'ESALG', ports: ['CNSHA', 'SGSIN', 'ESALG', 'MAPTM', 'ESVLC', 'FRFOS', 'ITGOA'] }
+/** [A] unverified: a peak day at a hub is even more transshipment-heavy than the baseline (89% of moves). */
+export const PEAK_DAY_FLOW_MIX: FlowMix = { import: 6, export: 5, transshipment: 89 }
+/** [A] unverified: 30% of every vessel's bays carries boxes for later ports, 70% full. */
+export const PEAK_DAY_ROB = { bayFraction: 0.3, fill: 0.7 }
 
 /** Presets whose bay count is derived from the published TTI capacity (the UI marks it as an assumption). */
 /** Preset names other modules key on (TT-21: the Algeciras backdrop, the daylight-lock default). */
@@ -150,7 +166,8 @@ export const presets: Record<string, () => ScenarioConfig> = {
   'TTI Algeciras — peak day': () =>
     terminal({
       name: 'TTI Algeciras — peak day',
-      description: 'TTI layout; 5 vessels arrive within 40 minutes; heavy truck peak (about 3x the default profile)',
+      description:
+        'TTI layout; 5 vessels arrive within 40 minutes; heavy truck peak (about 3x the default profile); Asia-Mediterranean port rotation, ~89% transshipment and 30% of each vessel kept as remain-on-board bays (all unverified assumptions)',
       seed: 99,
       quayM: 850,
       stsFirst: 101,
@@ -160,7 +177,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       tiers: TTI_TIERS,
       shc: 23,
       gate: { inLanes: 3, outLanes: 3 },
-      vessels: hubVessels(5, 600, 300, 0.05, 21),
+      vessels: hubVessels(5, 600, 300, 0.05, 21, PEAK_DAY_FLOW_MIX),
       yardStart: { mode: 'prefilled', targetPct: 75 },
       truckScale: 3,
       // Peak day: appointments bunched into the first two hours (x1.5, 4 windows). [A] unverified: TTI's real window
@@ -169,5 +186,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       // [A] unverified: TTI's real number of holding positions is not public.
       holding: { positions: 6, unverified: true },
       reefers: TTI_REEFERS,
+      portRotation: PEAK_DAY_ROTATION,
+      rob: PEAK_DAY_ROB,
     }),
 }

@@ -36,7 +36,7 @@ import {
 } from './types'
 import { DEFAULT_WTP_PADS } from '../engine/yardLayout'
 import type { DecisionsConfig } from '../engine/decisions/types'
-import type { DwellDistribution, EmptyPoolConfig, HatchConfig, VesselSizeClass, YardStartConfig } from './types'
+import type { ContainerPropsConfig, DwellDistribution, EmptyPoolConfig, HatchConfig, VesselPlanningConfig, VesselSizeClass, YardStartConfig } from './types'
 
 export { LINE_OWNER_PREFIX }
 
@@ -292,6 +292,25 @@ export class ScenarioBuilder {
     return this
   }
 
+  /** Empty allocation options: `matchLine` restricts `iso-type-best-position` to the requesting line (spec #106). */
+  emptyAllocation(options: { matchLine?: boolean }): this {
+    this.config.emptyAllocation = { ...options }
+    return this
+  }
+
+  /** Stored container properties: port rotation, direction mix, cargo weights, weight classes, expected dwell (spec #106). */
+  containerProps(props: ContainerPropsConfig): this {
+    this.config.containerProps = structuredClone(props)
+    return this
+  }
+
+  /** ROB bays (spec #106): the share of each vessel's bays held back as display-only remain-on-board boxes, and how full they are (default 0.7). */
+  robBays(fraction: number, fill?: number): this {
+    this.config.robBayFraction = fraction
+    if (fill !== undefined) this.config.robFill = fill
+    return this
+  }
+
   decisions(decisions: DecisionsConfig): this {
     this.config.decisions = structuredClone(decisions)
     return this
@@ -342,6 +361,12 @@ export class ScenarioBuilder {
   /** Hatch cover settings (TT-R09): `{ enabled: false }` leaves them out; the other values override the vessel class. */
   hatch(hatch: HatchConfig): this {
     this.config.hatch = { ...this.config.hatch, ...hatch }
+    return this
+  }
+
+  /** Vessel Planning options (spec #106): `ordering` is `pod-weight` (default) or `as-today` (rollback). */
+  vesselPlanning(options: VesselPlanningConfig): this {
+    this.config.vesselPlanning = { ...this.config.vesselPlanning, ...options }
     return this
   }
 

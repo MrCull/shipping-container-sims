@@ -6,6 +6,7 @@
  * `engine/` (enforced by ESLint) so it runs in Node and in a Web Worker.
  */
 export * from './kinematics'
+export * from './transit'
 export type { EngineEvent, EventEnvelope, EventOf, EventPayloads, EventSubjects, EventType } from './events'
 export type {
   CustodyKind,
@@ -14,6 +15,7 @@ export type {
   ContainerState,
   StsState,
   VesselState,
+  VesselSlotState,
   ShcState,
   ShcStatus,
   ShcJob,
@@ -24,6 +26,7 @@ export type {
   TruckState,
   TruckLeg,
   TruckStatus,
+  VesselStatus,
   TransferStallState,
   HoldingPositionState,
   LandsideState,
@@ -113,7 +116,10 @@ export type {
   WorkPackageReleaseRequest,
   YardAllocationReply,
   YardAllocationRequest,
+  YardBoxView,
 } from './decisions/types'
+export { yardGroupKey, yardGroupBreak, yardGroupingOn } from './decisions/yardGrouping'
+export type { YardGroupBreak } from './decisions/yardGrouping'
 export { strategies, getStrategy } from './decisions/strategies'
 export type { StrategyDefinition, StrategyRegistry, DecisionPointStrategies } from './decisions/strategies'
 export type { DecisionRequestedPayload, DecisionResolvedPayload } from './events'
@@ -122,7 +128,7 @@ export type { SimQuery } from './query'
 export type { InvariantViolation } from './invariants'
 export type { PredictedReady } from './predictions'
 export { checkInvariants, DEFAULT_SWEEP_EVERY, InvariantTracker } from './invariants'
-export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport, LandsideKpiReport } from './kpis'
+export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport, OrderingKpiReport, LandsideKpiReport } from './kpis'
 export type { WorkPackage, WorkPackageKind, WorkPackageStatus, LoadOrder } from './state'
 export type { HatchPanelState, HatchPanelStatus, HatchLaydownSite } from './state'
 export type { HatchKpiReport } from './kpis'
@@ -176,3 +182,4 @@ export { validateScenario, validateSubsystemModes, assertValidScenario, Scenario
 export type { ScenarioCheck } from '../scenario/validate'
 export { stsCycleGeometry, stsNominalCycle, shcNominalCycle, ascNominalCycle, profileValid } from './cycleTime'
 export type { CycleReadout, StsCycleGeometry } from './cycleTime'
+export { orderDischarge, orderLoad, countDischargeSplits, DEFAULT_VESSEL_ORDERING, vesselOrderingOf, type OrderBox, type OrderCell, type OrderEntry } from './vesselOrdering'

@@ -3,9 +3,9 @@
   "seed": 1,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "043be2ea39bf08",
+  "eventLogHash": "11f1fd1a139d63",
   "kpis": {
-    "simTimeS": 3364.614,
+    "simTimeS": 3366.322,
     "eventsProcessed": 455,
     "movesCompleted": 60,
     "vesselsCompleted": 1,
@@ -14,28 +14,28 @@
         "moves": 14,
         "cycles": 10,
         "twinLifts": 4,
-        "grossMovesPerHour": 35.025,
+        "grossMovesPerHour": 35.062,
         "railWaitS": 0
       },
       "STS02": {
         "moves": 14,
         "cycles": 12,
         "twinLifts": 2,
-        "grossMovesPerHour": 29.484,
+        "grossMovesPerHour": 29.458,
         "railWaitS": 0
       },
       "STS03": {
         "moves": 16,
         "cycles": 14,
         "twinLifts": 2,
-        "grossMovesPerHour": 27.234,
+        "grossMovesPerHour": 27.231,
         "railWaitS": 0
       },
       "STS04": {
         "moves": 16,
         "cycles": 15,
         "twinLifts": 1,
-        "grossMovesPerHour": 26.851,
+        "grossMovesPerHour": 26.83,
         "railWaitS": 0
       }
     },
@@ -46,8 +46,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 600,
-        "departedAtS": 3364.614,
-        "turnaroundS": 2764.614,
+        "departedAtS": 3366.322,
+        "turnaroundS": 2766.322,
         "sts": [
           "STS01",
           "STS02",
@@ -150,13 +150,38 @@
         "equipmentIdleS": 0
       }
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 58,
+        "departed": 0,
+        "meanS": 1866.918,
+        "maxS": 2724.887
+      },
+      "STORAGE": {
+        "count": 2,
+        "departed": 0,
+        "meanS": 2485.106,
+        "maxS": 2695.554
+      }
+    },
     "workPackages": {
       "released": 30,
       "started": 30,
       "completed": 30,
-      "leadTimeMeanS": 377.988,
-      "leadTimeMaxS": 798.899,
+      "leadTimeMeanS": 378.01,
+      "leadTimeMaxS": 800.606,
       "boxesLoaded": 0
+    },
+    "ordering": {
+      "discharge": {
+        "boxes": 60,
+        "groupSplits": 0
+      },
+      "load": {
+        "boxes": 0,
+        "podOnEarlier": 0,
+        "heavyOnLight": 0
+      }
     }
   },
   "invariants": {

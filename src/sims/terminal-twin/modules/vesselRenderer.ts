@@ -19,6 +19,7 @@ import type { SceneModel, Vec3 } from './sceneModel'
 import { hullMeta, loadHullModel, VESSEL_LIVERY_ATLAS, vesselHullColour, vesselLiveryIndex, type HullModel } from './vesselAssets'
 import { hullHatchOpenings, hullWithOpenHatches } from './hullHatchOpening'
 import { hullPlacement, type HullMeta } from './vesselHull'
+import { buildRobMesh } from './robBoxes'
 
 /** LOD switch distances (m, camera to the hull's bounding box) and hysteresis factor. */
 export const DEFAULT_VESSEL_LOD = { lod1M: 300, lod2M: 1100, hysteresis: 1.1 }
@@ -37,6 +38,8 @@ export interface VesselHullState {
   lod: 0 | 1 | 2 | null
   /** Triangles of the hull drawn at that LOD (null like `lod`). With hatch panels drawn by the twin (TT-R10) the hull has none baked in over their bays, so this is below the sidecar's count for LOD0 and LOD1. */
   triangles: number | null
+  /** ROB boxes (spec #106) drawn in this vessel's hull: display-only remain-on-board boxes of its ROB bays. */
+  robBoxes: number
   /** The rendered hull's bay grid in world coordinates (from the GLB's bay_grid node); null when not in the scene. */
   bayGrid: {
     origin: Vec3
@@ -63,6 +66,7 @@ interface VesselEntry {
   marker: THREE.Object3D | null
   lod: 0 | 1 | 2
   disposables: { dispose(): void }[]
+  robBoxes: number
 }
 
 export class VesselHulls {
@@ -100,6 +104,13 @@ export class VesselHulls {
         marker: null,
         lod: 0,
         disposables: [],
+        robBoxes: 0,
+      }
+      const rob = buildRobMesh(this.model.vesselSpec(v.id), model.robBoxes.filter((b) => b.vesselId === v.id))
+      if (rob) {
+        entry.root.add(rob.mesh)
+        entry.robBoxes = rob.count
+        entry.disposables.push(rob)
       }
       entry.root.name = v.id
       entry.root.visible = false
@@ -344,6 +355,7 @@ export class VesselHulls {
         assets: e.hull ? 'loaded' : 'placeholder',
         lod: e.hull && e.root.visible ? e.lod : null,
         triangles: e.hull && e.root.visible ? this.triangles(e) : null,
+        robBoxes: e.robBoxes,
         bayGrid,
       }
     }
