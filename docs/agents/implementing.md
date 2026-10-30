@@ -11,7 +11,7 @@ For the orchestrator running `/implement-spec`, and the brief each **implementer
 3. **Merge.** When one reports, run `scripts/merge-ticket.sh tt/<N>-<slug>`: it merges the branch, stops on a conflict, and runs `pnpm run verify` (which also fails on leftover conflict markers). Keep both sides of additive conflicts (decision-point registries, fixture lists, guide sections), then `git add`, commit and re-run verify. Update the `handover.md` table, push, then free the disk with `scripts/remove-worktree.sh <agent-id>`.
 4. **Warn.** A ticket that changes the engine contract (decision-point shapes, event payloads, `ENGINE_VERSION`) gets a `SendMessage` to the agents still running so they merge the tip early. Assign each such ticket its own `ENGINE_VERSION` in its brief (two agents once both claimed the same number).
 5. **Rate limits** end agents mid-ticket with work uncommitted. Resume the same agent with `SendMessage` after the reset rather than starting a new one; its worktree keeps the work.
-6. **Finish.** `/code-review` the integration branch, fix the findings in one implementer, mark the draft PR ready, remove the remaining worktrees with `scripts/remove-worktree.sh`, delete `handover.md`.
+6. **Finish.** `/code-review` the integration branch, fix the findings in one implementer, make the PR body say `Closes #<n>` for the spec and every ticket the branch finishes (GitHub closes only those on merge), mark the draft PR ready, remove the remaining worktrees with `scripts/remove-worktree.sh`, delete `handover.md`.
 
 ## Implementer brief
 
