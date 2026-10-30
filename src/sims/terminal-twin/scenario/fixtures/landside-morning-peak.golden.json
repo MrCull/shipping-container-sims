@@ -468,6 +468,26 @@
       "boxesPicked": 14,
       "fallbacks": 0
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 21,
+        "departed": 11,
+        "meanS": 3357.489,
+        "maxS": 5112.614
+      },
+      "EXPORT": {
+        "count": 30,
+        "departed": 0,
+        "meanS": 2896.167,
+        "maxS": 5400
+      },
+      "STORAGE": {
+        "count": 8,
+        "departed": 3,
+        "meanS": 2444.547,
+        "maxS": 4434.732
+      }
+    },
     "workPackages": {
       "released": 10,
       "started": 10,

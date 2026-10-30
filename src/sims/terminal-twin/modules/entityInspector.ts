@@ -3,7 +3,7 @@
  * container, STS, SHC or vessel, from the engine's query results. Pure TS; the
  * component formats values with the display formatter and the catalogue.
  */
-import type { ContainerState, ShcJob } from '../engine'
+import { contentStatus, dwellS, transitStatus, type ContainerState, type ShcJob, type TransitWorld, type TruckStatus, type VesselStatus } from '../engine'
 import type { CarrierRef, ContainerProps } from '../scenario/containerProps'
 import { EQUIPMENT_KINDS, kindOfEntity, type EquipmentKind } from './equipmentKinds'
 import type { ContainerSize } from '../scenario/types'
@@ -28,9 +28,9 @@ export interface Fact {
   label: MessageKey
   value: string | number | null
   link?: boolean
-  unit?: 'length' | 'time' | 'mass'
+  unit?: 'length' | 'time' | 'mass' | 'duration'
   /** The value is a token with catalogue texts `inspector.<token>.<value>` (otherwise shown as is). */
-  token?: 'load' | 'shcState' | 'direction' | 'weightClass'
+  token?: 'load' | 'shcState' | 'direction' | 'weightClass' | 'transitStatus' | 'contentStatus'
   /** The value is a custody owner; the UI shows a slot in maritime notation (`modules/locationNotation.ts`). */
   owner?: { kind: string; id: string; size: ContainerSize }
 }
@@ -60,10 +60,19 @@ export interface EntityView {
 export interface EntityExtras {
   /** SHC: sim time the view is for (an assigned SHC queues until its trip starts); without it the status alone decides. */
   now?: number
+  /** Container: the carriers' state, for the derived transit status (absent = not shown). */
+  transit?: TransitWorld
   /** SHC: the job it holds, from the `shcJobs` query. */
   job?: Readonly<ShcJob>
   /** Extras of other kinds (see `EquipmentKindDef.loadExtras`). */
   [key: string]: unknown
+}
+
+/** The carriers' state from the worker's `vessels` and `trucks` query results (the main thread has no engine state). */
+export function transitWorldOf(vessels: readonly { id: string; status: VesselStatus }[], trucks: readonly { id: string; status: TruckStatus }[]): TransitWorld {
+  const v = new Map(vessels.map((x) => [x.id, x.status]))
+  const t = new Map(trucks.map((x) => [x.id, x.status]))
+  return { vesselStatus: (id) => v.get(id), truckStatus: (id) => t.get(id) }
 }
 
 const carrierText = (c: CarrierRef): string => (c.id ? `${c.kind}:${c.id}` : c.kind)
@@ -94,9 +103,20 @@ function propFacts(box: Readonly<ContainerState>): { all: Fact[]; tooltip: Fact[
   return { all, tooltip }
 }
 
-function containerView(box: Readonly<ContainerState>): EntityView {
+/** Derived, never stored (#109): transit status (needs the carriers' state), content status and dwell (needs the time). */
+function derivedFacts(box: Readonly<ContainerState>, extras: EntityExtras): Fact[] {
+  const dwell = extras.now === undefined ? undefined : dwellS(box, extras.now)
+  return [
+    ...(extras.transit ? [{ label: 'inspector.fact.transitStatus' as const, value: transitStatus(box, extras.transit), token: 'transitStatus' as const }] : []),
+    { label: 'inspector.fact.contentStatus', value: contentStatus(box), token: 'contentStatus' },
+    ...(dwell === undefined ? [] : [{ label: 'inspector.fact.dwell' as const, value: dwell, unit: 'duration' as const }]),
+  ]
+}
+
+function containerView(box: Readonly<ContainerState>, extras: EntityExtras): EntityView {
   const history = box.custodyHistory
   const props = propFacts(box)
+  const derived = derivedFacts(box, extras)
   return {
     kind: 'container',
     id: box.id,
@@ -105,9 +125,10 @@ function containerView(box: Readonly<ContainerState>): EntityView {
       { label: 'inspector.fact.size', value: box.size },
       { label: 'inspector.fact.load', value: box.full ? 'full' : 'empty', token: 'load' },
       { label: 'inspector.fact.custody', value: `${box.custody.kind}:${box.custody.id}`, owner: { kind: box.custody.kind, id: box.custody.id, size: box.size } },
+      ...derived,
       ...props.all,
     ],
-    tooltip: props.tooltip,
+    tooltip: props.tooltip.length > 0 ? [...derived, ...props.tooltip] : [],
     job: null,
     custody: history.map((h, i) => ({ t: h.t, ownerKind: h.owner.kind, ownerId: h.owner.id, eventId: h.eventId, current: i === history.length - 1, size: box.size })),
   }
@@ -115,7 +136,7 @@ function containerView(box: Readonly<ContainerState>): EntityView {
 
 /** Turn a query result into the inspector view of its kind (equipment kinds describe themselves: `modules/equipmentKinds/`). */
 export function describeEntity(kind: EntityKind, state: unknown, extras: EntityExtras = {}): EntityView {
-  if (kind === 'container') return containerView(state as ContainerState)
+  if (kind === 'container') return containerView(state as ContainerState, extras)
   const def = EQUIPMENT_KINDS.find((d) => d.kind === kind)
   if (!def) throw new Error(`Unknown entity kind: ${kind}`)
   return def.describe(state, extras)

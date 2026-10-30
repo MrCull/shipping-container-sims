@@ -276,6 +276,14 @@
         }
       }
     },
+    "dwell": {
+      "TRANSSHIPMENT": {
+        "count": 8,
+        "departed": 8,
+        "meanS": 1920.276,
+        "maxS": 2108.13
+      }
+    },
     "workPackages": {
       "released": 14,
       "started": 14,

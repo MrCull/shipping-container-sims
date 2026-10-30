@@ -302,6 +302,20 @@
         }
       }
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 16,
+        "departed": 0,
+        "meanS": 2475.485,
+        "maxS": 3477.893
+      },
+      "EXPORT": {
+        "count": 16,
+        "departed": 16,
+        "meanS": 2078.94,
+        "maxS": 3528.954
+      }
+    },
     "workPackages": {
       "released": 18,
       "started": 18,

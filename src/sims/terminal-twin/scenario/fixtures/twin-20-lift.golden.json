@@ -126,6 +126,14 @@
         "equipmentIdleS": 0
       }
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 4,
+        "departed": 0,
+        "meanS": 291.758,
+        "maxS": 411.021
+      }
+    },
     "workPackages": {
       "released": 2,
       "started": 2,

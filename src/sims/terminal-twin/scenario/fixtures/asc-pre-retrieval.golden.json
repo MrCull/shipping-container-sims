@@ -403,6 +403,20 @@
         "utilisationPct": 0
       }
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 6,
+        "departed": 6,
+        "meanS": 3294.106,
+        "maxS": 4150.168
+      },
+      "STORAGE": {
+        "count": 2,
+        "departed": 0,
+        "meanS": 5946.585,
+        "maxS": 6238.683
+      }
+    },
     "workPackages": {
       "released": 6,
       "started": 6,

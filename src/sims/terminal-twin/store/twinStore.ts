@@ -17,11 +17,11 @@ import { composeScenario } from '../scenario/compose'
 import { presets } from '../scenario/presets'
 import type { YardSetup } from '../scenario/builder'
 import type { ContainerSize, DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
-import { EXPORT_FILES, ScenarioValidationError, validateScenario, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport } from '../engine'
+import { EXPORT_FILES, ScenarioValidationError, validateScenario, type ContainerState, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport, type TruckState, type VesselState } from '../engine'
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { createLocationNotation } from '../modules/locationNotation'
-import { describeEntity, entityKind, entityQueryKind, type EntityView } from '../modules/entityInspector'
+import { describeEntity, entityKind, entityQueryKind, transitWorldOf, type EntityExtras, type EntityView } from '../modules/entityInspector'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
 import { FEED_BUFFER_CAP } from '../modules/eventFeed'
@@ -568,7 +568,13 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     try {
       const state = await c.query(entityQueryKind(kind), id)
       const def = EQUIPMENT_KINDS.find((d) => d.kind === kind)
-      const extras = (await def?.loadExtras?.(state, (q) => c.query(q))) ?? {}
+      const extras: EntityExtras = (await def?.loadExtras?.(state, (q) => c.query(q))) ?? {}
+      if (kind === 'container') {
+        // transit status is derived from the carriers' state; trucks matter only while the box is on one
+        const onTruck = (state as ContainerState).custody.kind === 'truck'
+        const [vessels, trucks] = await Promise.all([c.query<VesselState[]>('vessels'), onTruck ? c.query<TruckState[]>('trucks') : Promise.resolve([] as TruckState[])])
+        extras.transit = transitWorldOf(vessels, trucks)
+      }
       if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, { ...extras, now: displayTime.value }))
     } catch {
       // The scenario was replaced meanwhile; the next refresh shows the new state.

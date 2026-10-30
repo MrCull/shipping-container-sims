@@ -67,12 +67,37 @@ describe('describeEntity', () => {
     expect(value('inspector.fact.grossWeight')).toBe(box.props.tareKg + box.props.cargoKg)
     expect(value('inspector.fact.direction')).toBe('IMPORT')
     expect(view.tooltip!.map((f) => f.label)).toEqual(
-      ['direction', 'isoType', 'pol', 'pod', 'grossWeight', 'weightClass'].map((k) => `inspector.fact.${k}`),
+      ['contentStatus', 'direction', 'isoType', 'pol', 'pod', 'grossWeight', 'weightClass'].map((k) => `inspector.fact.${k}`),
     )
+    // transit status and dwell need the sim state: without it they are left out
+    expect(labels).not.toContain('inspector.fact.transitStatus')
+    expect(labels).not.toContain('inspector.fact.dwell')
     for (const f of view.tooltip!) expect(view.facts).toContainEqual(f)
     // a restored box that predates the properties still describes itself
     const old = { ...box, props: undefined }
     expect(describeEntity('container', old).tooltip).toEqual([])
+  })
+
+  it('a container shows transit status, content status and dwell, in the tooltip too (#109)', () => {
+    const sim = createSimulation(config)
+    const world = { vesselStatus: (id: string) => sim.query.vessel(id).status, truckStatus: () => undefined }
+    const id = model.containerIds[0]
+    const at = (t: number) => {
+      sim.runUntil({ time: t })
+      const view = describeEntity('container', sim.query.container(id), { transit: world, now: sim.query.now() })
+      const f = (l: string) => view.facts.find((x) => x.label === l)?.value
+      return { view, transit: f('inspector.fact.transitStatus'), content: f('inspector.fact.contentStatus'), dwell: f('inspector.fact.dwell') }
+    }
+    const start = at(0)
+    expect(start.transit).toBe('ADVISED')
+    expect(start.content).toBe(sim.query.container(id).full ? 'LADEN' : 'EMPTY')
+    expect(start.dwell).toBeNull()
+    const later = at(1e6)
+    expect(later.transit).not.toBe('ADVISED')
+    expect(typeof later.dwell).toBe('number')
+    const tip = later.view.tooltip!.map((f) => f.label)
+    expect(tip).toEqual(expect.arrayContaining(['inspector.fact.transitStatus', 'inspector.fact.contentStatus', 'inspector.fact.dwell']))
+    for (const f of later.view.tooltip!) expect(later.view.facts).toContainEqual(f)
   })
 
   it('a reefer shows its setpoint', () => {

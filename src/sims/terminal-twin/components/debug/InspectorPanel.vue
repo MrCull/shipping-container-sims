@@ -32,6 +32,7 @@ function factText(f: Fact): string {
   if (f.token) return t(`inspector.${f.token}.${f.value}` as MessageKey)
   if (typeof f.value === 'number' && f.unit === 'length') return store.fmt.length(f.value)
   if (typeof f.value === 'number' && f.unit === 'mass') return t('inspector.kg', { n: store.fmt.number(f.value, 0) })
+  if (typeof f.value === 'number' && f.unit === 'duration') return store.fmt.duration(f.value)
   if (typeof f.value === 'number' && f.unit === 'time') return t('inspector.seconds', { n: store.fmt.number(f.value, 0) })
   return String(f.value)
 }

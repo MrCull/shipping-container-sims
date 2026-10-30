@@ -222,6 +222,14 @@
         }
       }
     },
+    "dwell": {
+      "EXPORT": {
+        "count": 10,
+        "departed": 10,
+        "meanS": 1009.48,
+        "maxS": 1669.317
+      }
+    },
     "workPackages": {
       "released": 7,
       "started": 7,

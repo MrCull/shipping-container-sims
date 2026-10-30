@@ -434,6 +434,26 @@
         "utilisationPct": 10.904
       }
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 14,
+        "departed": 5,
+        "meanS": 6208.325,
+        "maxS": 8873.846
+      },
+      "EXPORT": {
+        "count": 8,
+        "departed": 0,
+        "meanS": 7261.714,
+        "maxS": 9000
+      },
+      "STORAGE": {
+        "count": 4,
+        "departed": 1,
+        "meanS": 5617.222,
+        "maxS": 8018.572
+      }
+    },
     "workPackages": {
       "released": 11,
       "started": 11,

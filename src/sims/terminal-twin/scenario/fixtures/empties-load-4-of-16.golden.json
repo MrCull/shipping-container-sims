@@ -243,6 +243,20 @@
         }
       }
     },
+    "dwell": {
+      "EXPORT": {
+        "count": 4,
+        "departed": 4,
+        "meanS": 57562.743,
+        "maxS": 136617.22
+      },
+      "STORAGE": {
+        "count": 12,
+        "departed": 0,
+        "meanS": 339487.505,
+        "maxS": 562493.171
+      }
+    },
     "workPackages": {
       "released": 1,
       "started": 1,

@@ -337,6 +337,26 @@
         }
       }
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 129,
+        "departed": 0,
+        "meanS": 15925.769,
+        "maxS": 22957.594
+      },
+      "EXPORT": {
+        "count": 46,
+        "departed": 46,
+        "meanS": 47267.577,
+        "maxS": 610442.283
+      },
+      "STORAGE": {
+        "count": 13,
+        "departed": 0,
+        "meanS": 104409.42,
+        "maxS": 516734.825
+      }
+    },
     "workPackages": {
       "released": 21,
       "started": 21,

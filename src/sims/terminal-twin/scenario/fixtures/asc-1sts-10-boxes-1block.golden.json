@@ -264,6 +264,14 @@
         }
       }
     },
+    "dwell": {
+      "IMPORT": {
+        "count": 10,
+        "departed": 0,
+        "meanS": 1203.872,
+        "maxS": 1667.813
+      }
+    },
     "workPackages": {
       "released": 8,
       "started": 8,

@@ -35,3 +35,8 @@ The KPI collector, end conditions, final report and the dashboard tab. Guide: [t
 The KPI collector derives the time in each state from the same events (no event-log change, no `ENGINE_VERSION` bump): `shc.state.<state>-s` series per SHC, `shc.handovers` (ShcPicked, ShcPickedAtWtp, ShcDroppedAtWtp, ShcDroppedAtGround), and `shc.empty-distance-m` (existing). `kpiReport().horizontal.shcs[id]` gains `stateS` and `handovers` (read from the collector over the measured period, so after a warm-up they cover the measured run); the headline adds `shcEmptyDistanceM`, `shcHandovers` and `shcStateS` (mean seconds per SHC). The CLI prints them per SHC and in the headline; the JSON export carries them in `kpis`, `series` and `headline`, the CSV in the series rows. The dashboard's horizontal group lists the new series; the inspector shows an "Operational state" fact first.
 
 TT-R12 adds per-SHC `parkingReturns` (drives back to the parking spot) and `queueArrivals` (arrivals at a queue spot) to `kpiReport().horizontal.shcs` (engine counters, not collector series; the CLI prints them). Time waiting at a queue spot is in `queuing-to-deliver` (loaded) and `queuing-to-collect` (empty).
+
+## Dwell by direction (spec #106, #109)
+
+`KpiReport.dwell` is `Partial<Record<TransitDirection, { count, departed, meanS, maxS }>>`, built in `buildKpiReport` from the containers (`dwellS` in `engine/transit.ts`): arrival on the terminal to departure from terminal custody, or to now for a box still here. Directions with no arrived box are omitted. It is a report field only (no collector series, no dashboard tile yet); the CLI prints it under `Dwell on terminal:`. Boxes restored from a snapshot that predates `props` are skipped.
+
