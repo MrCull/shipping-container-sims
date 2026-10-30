@@ -29,6 +29,8 @@ function webglAvailable(): boolean {
   }
 }
 
+const ORIGIN = { x: 0, y: 0, z: 0 }
+
 export function useTwinScene(host: Ref<HTMLElement | null>) {
   const store = useTwinStore()
   const perf = usePerfStore()
@@ -175,6 +177,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   }
 
   function rebuild(model: SceneModel | null): void {
+    store.positional.update(ORIGIN, []) // the old scene's voices end with it
     view?.dispose()
     view = null
     builtFor = model
@@ -218,7 +221,9 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     camera.updateMatrixWorld()
     frustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
     const cpuStart = performance.now()
+    view.live = !controller.paused
     view.update(controller.displayTime, store.selectedId, camera.position, frustum, { camera, width: host.value?.clientWidth || 1, height: host.value?.clientHeight || 1 })
+    store.positional.update(camera.position, view.soundSources())
     const poseDone = performance.now()
     poseMs = poseMs === 0 ? poseDone - cpuStart : poseMs * 0.9 + (poseDone - cpuStart) * 0.1
     if (import.meta.env.DEV && perf.debugLoadMs > 0) {
@@ -316,6 +321,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     cancelAnimationFrame(frame)
     resizeObserver?.disconnect()
     store.attachView(null)
+    store.positional.update(ORIGIN, [])
     view?.dispose()
     renderer?.domElement.removeEventListener('pointerdown', onPointerDown)
     renderer?.domElement.removeEventListener('pointerup', onPointerUp)

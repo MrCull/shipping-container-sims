@@ -25,6 +25,8 @@
     "test:smoke": "playwright test",
     "tt:assets": "tsx src/sims/terminal-twin/cli/assets/build.ts",
     "tt:assets:check": "tsx src/sims/terminal-twin/cli/assets/check.ts",
+    "tt:sounds": "tsx src/sims/terminal-twin/cli/sounds/build.ts",
+    "tt:sounds:check": "tsx src/sims/terminal-twin/cli/sounds/build.ts --check",
     "tt:assets:shots": "tsx src/sims/terminal-twin/cli/assets/screenshots.ts"
   },
   "dependencies": {

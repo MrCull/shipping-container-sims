@@ -23,7 +23,11 @@ class AscRenderer implements KindRenderer {
   private ascs = new Map<string, AscParts>()
 
   constructor(private host: KindRendererHost) {
-    for (const id of host.model.ascIds) this.addAsc(id)
+    for (const id of host.model.ascIds) {
+      this.addAsc(id)
+      // Amber beacons at the four leg bases, on the rails.
+      host.beacons.add(id, [-1, 1].flatMap((sx) => [-1, 1].map((sz) => ({ x: (sx * ASC.span) / 2, y: 2.5, z: (sz * ASC.legLength) / 2 }))))
+    }
     if (host.model.ascIds.length > 0) {
       loadAscModel().then(
         (ascModel) => {
@@ -80,6 +84,9 @@ class AscRenderer implements KindRenderer {
     const { t, cameraPosition } = frame
     for (const [id, parts] of this.ascs) {
       const pose = model.ascPose(id, t)
+      const gantrying = frame.live && model.isGantrying(id, t)
+      this.host.beacons.update(id, { x: parts.blockX, y: 0, z: pose.z }, gantrying, frame.flashOn)
+      frame.sounds.push({ id, machine: 'asc', x: parts.blockX, y: 8, z: pose.z, motion: gantrying ? 'gantrying' : 'idle' })
       const lx = pose.x - parts.blockX
       const boxHeight = frame.carried.get(id)
       if (parts.rig) {
@@ -160,7 +167,7 @@ export const ascKind: EquipmentKindDef<'asc'> = {
     const height = ASC_MODEL.heightM * ascScaleY(block.tiers)
     return { x: block.x, y: height / 2, z: model.ascPose(id, time).z, sx: ASC_MODEL.widthM, sy: height, sz: ASC_MODEL.lengthM, yaw: 0 }
   },
-  sceneState: (model, id, t) => ({ status: model.statusAt('asc', id, t), ...model.ascPose(id, t) }),
+  sceneState: (model, id, t) => ({ status: model.statusAt('asc', id, t), ...model.ascPose(id, t), gantrying: model.isGantrying(id, t) }),
   describe: (state) => ascView(state as AscState),
   createRenderer: (host) => new AscRenderer(host),
 }

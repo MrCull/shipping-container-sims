@@ -25,6 +25,8 @@ import { ContainerInstancer } from './containerInstancer'
 import { describeMarkings } from './containerMarkings'
 import { liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
+import { beaconFlashOn, GantryBeacons } from './gantryBeacons'
+import type { SoundSource } from './soundMixer'
 import type { LandsideStats } from './landsideRenderer'
 import { EQUIPMENT_KINDS, type EquipmentKindDef, type KindFrame, type KindRenderer, type KindRendererHost } from './equipmentKinds'
 import { GROUND_ROTATION_X, StaticBatch } from './staticBatch'
@@ -44,6 +46,8 @@ export interface SceneStats {
   infrastructure: InfrastructureStats
   /** Hatch panels drawn (TT-R10): on their hatch, on a spreader or in the laydown. */
   hatchPanels: number
+  /** Gantry beacons (#125): machines gantrying (their beacons flash) and those whose lamps are lit this instant. */
+  gantryBeacons: { gantrying: string[]; lit: string[] }
   /** STS crane objects in the scene. */
   sts: number
   /** SHC objects in the scene. */
@@ -100,6 +104,10 @@ export class SceneRenderer {
   private disposed = false
   private lastT = 0
   private renderers: { def: EquipmentKindDef; renderer: KindRenderer }[] = []
+  private beacons: GantryBeacons
+  private sounds: SoundSource[] = []
+  /** True while the sim clock runs: cranes only gantry (alarm, beacons) when time moves. */
+  live = false
   private laneOverlay: THREE.Group
   private zoneMeshes = new Map<string, THREE.Mesh>()
   private overlays: OverlayState = { ...NO_OVERLAYS }
@@ -128,7 +136,8 @@ export class SceneRenderer {
     this.backdrop = buildBackdrop(backdropKindFor(config.name), config.quay.lengthM)
     this.scene.add(this.backdrop.group)
     this.addYard()
-    const host: KindRendererHost = { scene: this.scene, model, track: (thing) => this.track(thing), isDisposed: () => this.disposed }
+    this.beacons = new GantryBeacons(this.scene, (thing) => this.track(thing))
+    const host: KindRendererHost = { scene: this.scene, model, track: (thing) => this.track(thing), isDisposed: () => this.disposed, beacons: this.beacons }
     for (const def of EQUIPMENT_KINDS) this.renderers.push({ def, renderer: def.createRenderer(host) })
     this.infrastructure = new InfrastructureScene({ config, landside: model.landside, pads: model.graph.pads, blocks: model.blockList })
     this.scene.add(this.infrastructure.group)
@@ -469,7 +478,8 @@ export class SceneRenderer {
 
     this.lastT = t
     this.atmosphere.update(t)
-    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads }
+    this.sounds.length = 0
+    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), sounds: this.sounds }
     for (const { renderer } of this.renderers) renderer.update(frame)
     this.reservedZones = 0
     const active = this.overlays.reservations ? model.activeReservations(t) : {}
@@ -542,6 +552,11 @@ export class SceneRenderer {
     return this.containers.stats().closeup
   }
 
+  /** Sound sources of the last frame (machine positions and motion states) for the sound mixer. */
+  soundSources(): readonly SoundSource[] {
+    return this.sounds
+  }
+
   stats(): SceneStats {
     const c = this.containers.stats()
     const kinds = Object.assign({}, ...this.renderers.map((r) => r.renderer.stats())) as Partial<SceneStats>
@@ -549,6 +564,7 @@ export class SceneRenderer {
       ...kinds,
       containers: c.drawn,
       infrastructure: this.infrastructure.stats(),
+      gantryBeacons: this.beacons.stats(),
       overlays: { ...this.overlays },
       reservedZones: this.reservedZones,
       reservedRailSegments: this.reservedRailSegments,

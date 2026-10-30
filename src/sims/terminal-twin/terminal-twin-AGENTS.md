@@ -68,6 +68,7 @@ Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers b
 | Bay viewer | `pnpm run screenshot --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('crane-split-4sts').then(() => window.__tt.runTo(1500)).then(() => window.__tt.pause()).then(() => window.__tt.select('V001')).then(() => new Promise(r => setTimeout(r, 800))).then(() => document.querySelector('[data-testid=tt-open-bay-viewer]').click())"` + `npx vitest run src/sims/terminal-twin/tests/bay-view.test.ts` + `pnpm run test:smoke --project=dev --grep "bay viewer"` | popup top left: deck and hold of one bay, bay strip with progress, work packages with state, key; Vitest proves cells, states, colour modes, ROB cells and navigation, the smoke spec clicks the vessel, steps bays and sees a cell go planned to done |
 | Hatch panels in 3D | `pnpm run screenshot --path /sim/terminal-twin --wait 4000 --fail-on-error --eval "window.__tt.load('hatch-cover-cycle').then(() => window.__tt.runTo(1000)).then(() => window.__tt.pause()).then(() => window.__tt.cameraTo('V001:H00-0', 90))"` (`runTo(590)` for a panel in the air) | the two panels of bay 0 stacked on the quay between the STS legs, the bay a dark pit with its coaming, the other bays still covered; `sceneState().hatchRigs` has every panel drawn |
 | Asset budgets (CI) | `pnpm run tt:assets:check` (also in `pnpm test`) | `ok` per GLB with LOD triangles/draw calls, `Budgets: pass`, exit 0 |
+| Synthesized sounds (CI) | `pnpm run tt:sounds:check` (regenerate with `pnpm run tt:sounds`; also in `pnpm test`) | `Sounds are up to date.`, exit 0; drift names the file |
 | Regenerate assets (needs bpy) | `pnpm run tt:assets --python <venv python>` | GLBs, sidecars, atlas, previews rewritten; budget check passes; `git diff` shows only intended changes |
 | Generator is deterministic | `pnpm run tt:assets --check --python <venv python>` | `Regenerated assets are identical to the committed ones`, exit 0 |
 | Assets in the real renderer | `pnpm run tt:assets:shots` | PNG per asset × LOD + `yard.png` in `.screenshots/assets/`, no page errors |
@@ -143,7 +144,7 @@ terminal-twin/
 ├── dev/                      devApi.ts (window.__tt), AssetViewer.vue (?viewer=<asset>|yard)
 ├── assets/                   Phase 2 asset library: budgets.json, generators/ (bpy), models/<group>/ (docs/assets-pipeline.md)
 ├── cli/                      Node-only: run.ts→runCli.ts (tt:run), diff.ts→diffCli.ts (tt:diff),
-│                             golden-cli.ts→golden.ts (tt:golden), handlerSets.ts, build-fixtures.ts, assets/ (tt:assets*)
+│                             golden-cli.ts→golden.ts (tt:golden), handlerSets.ts, build-fixtures.ts, assets/ (tt:assets*), sounds/ (tt:sounds*)
 ├── persistence/              Saves: saves.ts (formats, migrations, planLoad), saveStore.ts (IndexedDB)
 └── tests/                    Vitest suites (Node-only); tests/browser/*.smoke.ts = Playwright (pnpm run test:smoke)
 ```

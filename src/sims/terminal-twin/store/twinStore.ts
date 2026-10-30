@@ -39,6 +39,7 @@ import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import { CuePlanner } from '../modules/cues'
 import { SoundPlayer } from '../modules/soundPlayer'
+import { PositionalSound } from '../modules/positionalSound'
 import type { AtmosphereState } from '../modules/atmosphereRig'
 import type { BackdropKind } from '../modules/backdrop'
 import { daylightLockDefault } from '../modules/atmosphere'
@@ -285,7 +286,15 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   /** Sound effects (TT-21): one master gain, the shared volume and mute (`stores/audio.ts`), scales all playback. */
   const audio = useAudioStore()
   const sounds = markRaw(new SoundPlayer(() => audio.masterGain))
-  watch(() => audio.masterGain, () => sounds.applyGain())
+  /** Positional sound (#125): looping voices placed by the sound mixer, through the same master gain. */
+  const positional = markRaw(new PositionalSound(() => audio.masterGain))
+  watch(
+    () => audio.masterGain,
+    () => {
+      sounds.applyGain()
+      positional.applyGain()
+    },
+  )
   /** Keep the sun daylight all day (default on for the TTI Algeciras — peak day preset). */
   const lockDaylight = ref(false)
   const banner = ref<TwinBanner | null>(null)
@@ -1105,6 +1114,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     refreshDashboard,
     helpOpen,
     sounds,
+    positional,
     lockDaylight,
     toggleLockDaylight,
     banner,
