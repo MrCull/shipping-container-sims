@@ -524,6 +524,7 @@ const en = {
   'inspector.custodyHistory': 'Custody history',
   'inspector.custodyRow': '{time} · {owner}',
   'inspector.custodyNow': 'now',
+  'inspector.locations': 'Locations',
   'inspector.recentEvents': 'Recent events',
   'inspector.noEvents': 'Nothing has happened to this yet. Give it a moment.',
   'inspector.follow': 'Follow',

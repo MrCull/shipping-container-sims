@@ -16,10 +16,11 @@ import { type ScenarioOverrides } from '../scenario/overrides'
 import { composeScenario } from '../scenario/compose'
 import { presets } from '../scenario/presets'
 import type { YardSetup } from '../scenario/builder'
-import type { DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
+import type { ContainerSize, DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
 import { EXPORT_FILES, ScenarioValidationError, validateScenario, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport } from '../engine'
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
+import { createLocationNotation } from '../modules/locationNotation'
 import { describeEntity, entityKind, entityQueryKind, type EntityView } from '../modules/entityInspector'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
@@ -190,6 +191,10 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const display = ref<DisplaySettings>(loadDisplaySettings(browserStorage(), browserLanguages()))
   /** Formatter for the current display settings (Intl objects; rebuilt when they change). */
   const fmt = computed(() => markRaw(createFormatter(display.value)))
+  /** Size of a container of the loaded run (for the yard bay number of a slot). */
+  const containerSizeOf = (id: string): ContainerSize | undefined => controller?.model?.containerSize[id]
+  /** Maritime notation of the loaded scenario's slots (display only; ids stay internal). */
+  const locations = computed(() => markRaw(createLocationNotation(config.value ?? { vessels: [] })))
   /** The SI config of the loaded scenario, with the current display settings (what a save stores). */
   const config = shallowRef<ScenarioConfig | null>(null)
   /** Keyboard-driven view state (TT-16 dashboard and TT-18 overlays/follow camera build on these). */
@@ -1024,6 +1029,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     display,
     fmt,
     config,
+    locations,
+    containerSizeOf,
     following,
     followNextPending,
     followNextTruck,
