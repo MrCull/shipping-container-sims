@@ -75,7 +75,8 @@ describe('empties fixture: a work package requires N empties of a size and line'
     expect(new Set(ids).size).toBe(4)
     for (const id of ids) {
       const box = sim.query.container(id)
-      expect(box).toMatchObject({ size: '40', line: 'MSC', full: false })
+      // iso-type-best-position (the default) matches the ISO type and ignores the line unless `matchLine` is set
+      expect(box).toMatchObject({ size: '40', full: false })
       expect(box.custody.kind).toBe('vesselSlot')
     }
     expect(ofType(sim, 'StsLoaded').map((e) => e.payload.containerId).sort()).toEqual([...ids].sort())

@@ -216,6 +216,12 @@
       "boxesStacked": 0,
       "boxesInTransit": 0,
       "allocationFailures": 0,
+      "grouping": {
+        "placements": 0,
+        "mixedStack": 0,
+        "orderBroken": 0,
+        "mixedBay": 0
+      },
       "rehandles": {
         "total": 0,
         "productiveMoves": 18,
@@ -264,6 +270,17 @@
       "leadTimeMeanS": 0,
       "leadTimeMaxS": 0,
       "boxesLoaded": 18
+    },
+    "ordering": {
+      "discharge": {
+        "boxes": 0,
+        "groupSplits": 0
+      },
+      "load": {
+        "boxes": 0,
+        "podOnEarlier": 0,
+        "heavyOnLight": 0
+      }
     }
   },
   "invariants": {

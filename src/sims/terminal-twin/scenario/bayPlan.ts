@@ -29,7 +29,7 @@ import { vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
 import { makePlannedContainer } from './containerFactory'
 import { drawContainerProps, isoTypeOf, resolveContainerProps, type ContainerProps } from './containerProps'
 import { fillRobBays, pickRobBays, workableCells, type RobBox } from './robBays'
-import { stowByPodWeight, type StowItem } from '../engine/vesselOrdering'
+import { stowByPodWeight, vesselOrderingOf, type StowItem } from '../engine/vesselOrdering'
 
 export type SlotPurpose = 'discharge' | 'load' | 'transshipment'
 
@@ -520,7 +520,7 @@ export function planCargo(config: ScenarioConfig, seed: number): CargoPlan {
     addEmptyPool(config, seed, plan, serials)
   } else for (const c of tsSources) delete c.ageS
   assignProps(config, seed, plan, new Set(tsSources.map((c) => c.id)))
-  if (config.vesselPlanning?.ordering === 'pod-weight') stowLoadByPodWeight(config, plan)
+  if (vesselOrderingOf(config) === 'pod-weight') stowLoadByPodWeight(config, plan)
   return plan
 }
 

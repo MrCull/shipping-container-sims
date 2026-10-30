@@ -195,6 +195,7 @@ describe('strategy selection', () => {
 
   it('leaves the request of the older strategies unchanged (no new fields)', () => {
     const config = structuredClone(fixtures['empties-load-4-of-16'])
+    config.decisions = { points: { emptyAllocation: { strategy: 'nearest-wtp' } } }
     const req = requestOf(run(config))
     expect(req.isoType).toBeUndefined()
     expect(req.matchLine).toBeUndefined()

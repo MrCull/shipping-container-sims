@@ -69,7 +69,7 @@ export interface KpiReport {
   yard?: YardKpiReport
   /** Work packages (only when some were released). */
   workPackages?: WorkPackageKpiReport
-  /** Broken ordering preferences (only when `vesselPlanning.ordering` is `pod-weight`). */
+  /** Broken ordering preferences (only when the ordering is `pod-weight`, the default). */
   ordering?: OrderingKpiReport
   /** Hatch cover moves of the STS cranes (only when a hatch move has started). */
   hatch?: HatchKpiReport

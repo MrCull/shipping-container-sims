@@ -161,6 +161,9 @@
     "points": {
       "shcDispatch": {
         "strategy": "paired-dual-cycle"
+      },
+      "yardAllocation": {
+        "strategy": "nearest-wtp"
       }
     }
   }

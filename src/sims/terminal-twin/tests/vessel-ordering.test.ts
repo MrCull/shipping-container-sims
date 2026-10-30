@@ -191,12 +191,13 @@ describe('vessel-ordering-pod-weight fixture', () => {
 })
 
 describe('selecting the ordering', () => {
-  it('as-today (explicit or absent) leaves every existing fixture identical', () => {
+  it('an absent ordering is pod-weight (the default since #114); as-today reports no ordering KPIs', () => {
     for (const name of ['mixed-discharge-then-load', 'stow-mixed-20-40']) {
       const absent = run(fixtures[name])
-      const explicit = run(withOrdering(fixtures[name], 'as-today'))
+      const explicit = run(withOrdering(fixtures[name], 'pod-weight'))
       expect(explicit.eventLogHash(), name).toBe(absent.eventLogHash())
-      expect(absent.kpiReport().ordering).toBeUndefined()
+      expect(absent.kpiReport().ordering).toBeDefined()
+      expect(run(withOrdering(fixtures[name], 'as-today')).kpiReport().ordering, name).toBeUndefined()
     }
   })
 
