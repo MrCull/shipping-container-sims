@@ -28,7 +28,7 @@ import type { ContainerSize, ScenarioConfig, VesselConfig, Weights } from './typ
 import { vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
 import { makePlannedContainer } from './containerFactory'
 import { drawContainerProps, isoTypeOf, resolveContainerProps, type ContainerProps } from './containerProps'
-import { fillRobBays, pickRobBays, workableCells, type RobBox } from './robBays'
+import { fillRobBays, pickRobBays, robBayFractionOf, workableCells, type RobBox } from './robBays'
 import { stowByPodWeight, vesselOrderingOf, type StowItem } from '../engine/vesselOrdering'
 
 export type SlotPurpose = 'discharge' | 'load' | 'transshipment'
@@ -236,7 +236,10 @@ function planVessel(
   const capacity = workableCells(v, [...robBays])
   if (units.length + reserved > capacity)
     throw new Error(
-      `Vessel ${v.id} (${spec.label}): ${units.length} discharge cells + ${reserved} load/transshipment slots do not fit (capacity ${capacity} cells)`,
+      `Vessel ${v.id} (${spec.label}): ${units.length} discharge cells + ${reserved} load/transshipment slots do not fit (capacity ${capacity} cells)` +
+        (robBays.size > 0
+          ? `; ${robBays.size} bay(s) are set aside for ROB (robBayFraction ${robBayFractionOf(config)}), lower robBayFraction`
+          : ''),
     )
 
   // 2. Discharge cells: spread over bays with jitter, hold/deck in proportion, bottom-up.

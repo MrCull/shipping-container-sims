@@ -6,8 +6,8 @@
  * bottom-up on load. POD and weight are soft preferences: they only choose between orders the stacking allows,
  * and the broken ones are counted (`kpis.ordering`), never refused. Packages stay one per bay section.
  */
-import type { ContainerProps, WeightClass } from '../scenario/containerProps'
-import { grossKgOf } from '../scenario/containerProps'
+import type { ContainerProps } from '../scenario/containerProps'
+import { grossKgOf, WEIGHT_RANK } from '../scenario/containerProps'
 import type { ScenarioConfig, VesselOrdering } from '../scenario/types'
 
 /** The default work order (spec #106, #114): `as-today` stays selectable through `vesselPlanning.ordering` / `--ordering`. */
@@ -39,7 +39,6 @@ export interface OrderEntry<S extends OrderCell> {
   box: OrderBox | undefined
 }
 
-const WEIGHT_RANK: Record<WeightClass, number> = { LIGHT: 0, MEDIUM: 1, HEAVY: 2 }
 
 /** Position of a POD in the port rotation (later port = larger). A POD outside the rotation ranks as the terminal. */
 export function podRank(ports: readonly string[], pod: string | undefined): number {

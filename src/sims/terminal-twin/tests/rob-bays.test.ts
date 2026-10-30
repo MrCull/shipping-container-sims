@@ -134,7 +134,7 @@ describe('ROB bay planning', () => {
 
   it('throws when the working bays cannot hold the discharge', () => {
     const tight = { ...withFraction(rob, 0.86), vessels: rob.vessels.map((v) => ({ ...v, discharge: 300, load: 0 })) }
-    expect(() => planCargo(tight, tight.seed)).toThrow(/do not fit/)
+    expect(() => planCargo(tight, tight.seed)).toThrow(/do not fit.*robBayFraction 0\.86\), lower robBayFraction/)
   })
 })
 

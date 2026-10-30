@@ -27,6 +27,9 @@ export type { TransitDirection } from './types'
 
 export type WeightClass = 'LIGHT' | 'MEDIUM' | 'HEAVY'
 
+/** Heavier ranks higher: vessel-ordering heavy-on-light checks and yard-grouping heavy-at-the-bottom compare it. */
+export const WEIGHT_RANK: Record<WeightClass, number> = { LIGHT: 0, MEDIUM: 1, HEAVY: 2 }
+
 /** Who brings a box in or takes it out: a vessel (`id` absent = a call outside this scenario) or a truck. */
 export interface CarrierRef {
   kind: 'vessel' | 'truck'

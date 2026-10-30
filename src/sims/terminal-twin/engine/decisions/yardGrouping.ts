@@ -7,12 +7,11 @@
  * to powered rows through `candidateSlots`, as for every strategy. All of it is a preference: a mismatch costs
  * score, it never removes a slot.
  */
+import { WEIGHT_RANK } from '../../scenario/containerProps'
 import type { ScenarioConfig } from '../../scenario/types'
 import type { ContainerState } from '../state'
 import { strategies } from './strategies'
 import type { YardBoxView } from './types'
-
-const WEIGHT_RANK = { LIGHT: 0, MEDIUM: 1, HEAVY: 2 } as const
 
 /** The group a box belongs to: boxes with the same key belong together. */
 export function yardGroupKey(b: YardBoxView): string {
