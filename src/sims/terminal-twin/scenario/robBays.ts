@@ -112,7 +112,6 @@ function stackHeights(total: number, n: number, cap: number, rng: () => number):
 export function fillRobBays(config: ScenarioConfig, seed: number, v: VesselConfig, robBays: readonly number[]): RobBox[] {
   if (robBays.length === 0) return []
   const spec = vesselClass(v.sizeClass)
-  const tiers = spec.holdTiers + spec.deckTiers
   const fill = robFillOf(config)
   const ports = laterPorts(resolveContainerProps(config).portRotation)
   const rng = propsStream(seed, `rob-fill:${v.id}`)
