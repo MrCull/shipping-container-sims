@@ -111,6 +111,52 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * SHC pre-dispatch (TT-R13): 2 STS with one ground position each (so a box left waiting blocks the crane), 4 SHCs
+   * and a 3-pad block. With the `predispatch` strategy idle SHCs are sent to the STS queue area when a box is
+   * predicted ready within their travel time plus `predispatchMarginS`, so they are there when it lands; the
+   * `chained-nearest` baseline (same scenario) leaves the cranes waiting for SHCs.
+   */
+  'shc-prepositioning': () =>
+    new ScenarioBuilder('shc-prepositioning', '2 STS (1 ground position) → 4 SHC → 3 pads: pre-dispatch on predicted ready time')
+      .hatch({ enabled: false })
+      .seed(42)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 1 })
+      .sts('STS02', { gantryX: 110, groundPositions: 1 })
+      .vesselCall('V001', { name: 'Pre Star', sizeClass: 'feeder', discharge: 24, maxSts: 2, sizeMix: { '40': 1 } })
+      .shcs(4)
+      .block('B01', { x: 20, bays: 8, tiers: 3, wtpPads: 3 })
+      .queueAreas({ stsCapacity: 3, blockCapacity: 3, predispatchMarginS: 15 })
+      .decisions({ points: { shcDispatch: { strategy: 'predispatch' } } })
+      .build(),
+
+  /**
+   * Paired dispatch (TT-R14): one feeder discharges at STS01 while another loads at STS02 (so discharge and load jobs
+   * are open together), 3 SHCs and a 2-pad block 150 m from the quay start. With `paired-dual-cycle` an SHC that just
+   * set a box down on a pad takes a nearby load pickup (and after a load drop at the quay a discharge box), so it
+   * drives loaded more often; the `chained-nearest` baseline (same scenario) drives more empty.
+   */
+  'shc-paired-dual-cycle': () =>
+    new ScenarioBuilder('shc-paired-dual-cycle', '2 STS (one discharges, one loads) → 3 SHC → 2 pads: paired discharge/load dispatch')
+      .hatch({ enabled: false })
+      .seed(42)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(500, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 4 })
+      .sts('STS02', { gantryX: 110, groundPositions: 4 })
+      .vesselCall('V001', { name: 'Dis Star', sizeClass: 'feeder', arrivalS: 0, discharge: 16, maxSts: 1, sizeMix: { '40': 1 } })
+      .vesselCall('V002', { name: 'Load Star', sizeClass: 'feeder', arrivalS: 0, load: 16, maxSts: 1, sizeMix: { '40': 1 } })
+      .shcs(3)
+      .block('B01', { x: 150, bays: 10, tiers: 3, wtpPads: 2 })
+      .queueAreas({ stsCapacity: 2, blockCapacity: 2 })
+      .decisions({ points: { shcDispatch: { strategy: 'paired-dual-cycle' } } })
+      .endWhen({ vesselsCompleted: 2 })
+      .build(),
+
+  /**
    * ASC block storage (TT-06): the import flow from vessel to stack. One STS
    * discharges 10 boxes (20 ft and 40 ft mixed) to 2 SHCs; the block (8 bays,
    * 3 tiers, 5 WTP pads) has one ASC that stacks them. Ends at a fixed time,
@@ -275,6 +321,27 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .shcs(2)
       .block('B01', { x: 20, bays: 8, tiers: 3 })
       .yardStart({ mode: 'prefilled', targetPct: 50 })
+      .endWhen({ simDurationS: 3600 })
+      .build(),
+
+  /**
+   * TT-R19: 30% of the full boxes are reefers. The block has plugs in rows 1 and 2 only (an unverified, TTI-like
+   * layout), so every reefer, discharged or pre-filled, stands in those rows at most 4 tiers high
+   * (`yard.reefer-powered`) while plain boxes avoid the powered rows when anything else fits.
+   */
+  'reefer-powered-rows': () =>
+    new ScenarioBuilder('reefer-powered-rows', 'A third of the boxes are reefers: they stack only in the powered rows, at most 4 high')
+      .hatch({ enabled: false })
+      .seed(19)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Cold Star', sizeClass: 'feeder', discharge: 24, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .cargo({ reeferShare: 0.3 })
+      .block('B01', { x: 20, bays: 8, tiers: 5, poweredRows: [1, 2] })
+      .yardStart({ mode: 'prefilled', targetPct: 40 })
       .endWhen({ simDurationS: 3600 })
       .build(),
 

@@ -28,12 +28,13 @@ import { hatchReactors } from './subsystems/hatch'
 import { emptiesReactors } from './subsystems/empties'
 import { transshipmentReactors } from './subsystems/transshipment'
 import { shcReactors } from './subsystems/shc'
+import { predictedReady, type PredictedReady } from './predictions'
 import { landsideReactors } from './subsystems/landside'
 import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.20.0'
+export const ENGINE_VERSION = '0.23.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
@@ -197,6 +198,8 @@ export interface Simulation {
   /** Every KPI as hourly, per-shift and whole-run series (the collector behind the KPI strip, report and exports). */
   kpiSeries(): KpiSeriesReport
   invariantReport(): InvariantReport
+  /** Predicted ready times of upcoming boxes (STS ground positions, WTP pads), soonest first (TT-R13). */
+  predictedReady(): PredictedReady[]
   /** Cost of invariant checking so far (not part of the report or snapshots: wall time is not deterministic). */
   invariantStats(): InvariantStats
 }
@@ -590,6 +593,7 @@ export function createSimulation(
     },
     kpiSeries: () => collector.report(Math.max(0, state.now - warmUpS())),
     invariantReport: () => clone(invariants),
+    predictedReady: () => predictedReady({ state, config }),
     invariantStats: () => ({ ...tracker.stats, wallMs: invariantWallMs }),
   }
 }

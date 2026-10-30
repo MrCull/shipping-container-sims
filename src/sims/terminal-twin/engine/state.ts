@@ -44,6 +44,8 @@ export interface ContainerState {
   vesselId: string
   custody: CustodyRef
   custodyHistory: CustodyRecord[]
+  /** Reefer (R19): only in powered yard rows, at most `REEFER_MAX_TIERS` high. Absent = not a reefer. */
+  reefer?: true
   /** Transshipment box (TT-11): the vessel that will load it (null/absent = not a linked transshipment box). */
   onwardVesselId?: string
   /** Transshipment box: slot on the onward vessel it is booked to. */
@@ -190,6 +192,8 @@ export interface ShcState {
   nodeId: string
   carrying: string | null
   jobId: string | null
+  /** Kind of the last delivered job; set only under `paired-dual-cycle` (TT-R14). */
+  lastJobKind?: 'discharge' | 'load'
   /** Current trip's motion (axes x, z, lift); the renderer interpolates from these. */
   motion: MotionSegment[]
   /** Remaining phase events of the current trip. */
@@ -572,6 +576,8 @@ export interface LandsideKpiCounters {
 export interface StsDrop {
   containerId: string
   groundPositionId: string
+  /** When the set-down is planned to end (the scheduled `StsGrounded`); set once the carry is planned (TT-R13). */
+  groundAt?: number
 }
 
 export interface StsState {
@@ -1159,6 +1165,7 @@ export function createInitialState(
       custody: owner,
       custodyHistory: [{ t: 0, owner, eventId: null }],
     }
+    if (c.reefer) state.containers[c.id].reefer = true
     if (c.flow === 'pool') state.containers[c.id].yardSince = -(c.ageS ?? 0)
     if (c.transshipment) {
       Object.assign(state.containers[c.id], {

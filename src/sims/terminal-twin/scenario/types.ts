@@ -77,6 +77,12 @@ export interface BlockConfig {
   tiers?: number
   /** Transfer stalls at the landside end (default 5; used by TT-13). */
   transferStalls?: number
+  /**
+   * Rows (1-8, counted across X like the yard's other row numbers) with reefer plugs (R19). Reefers are only
+   * allocated to these rows, at most `REEFER_MAX_TIERS` high. Default none: a block without powered rows takes no
+   * reefer. The TTI preset values are unverified (`knowledge-base/dk_ops__tti_algeciras_operations.md`).
+   */
+  poweredRows?: number[]
 }
 
 export interface YardConfig {
@@ -127,7 +133,15 @@ export interface QueueAreasConfig {
   stsCapacity?: number
   /** Spots in the queue area near each block's WTP pads (0 = none). */
   blockCapacity?: number
+  /**
+   * Pre-dispatch lead margin (s, TT-R13; default `DEFAULT_PREDISPATCH_MARGIN_S`). With the `predispatch` strategy an SHC
+   * is sent to a queue area when a box there is predicted ready within the SHC's travel time plus this margin.
+   */
+  predispatchMarginS?: number
 }
+
+/** Default pre-dispatch margin (s). */
+export const DEFAULT_PREDISPATCH_MARGIN_S = 15
 
 /** Subsystem modes: real behaviour, an "instant" stub raising the same events, or off. */
 export type SubsystemMode = 'real' | 'instant' | 'off'
@@ -275,6 +289,11 @@ export interface CargoConfig {
   sizeMix: Weights<ContainerSize>
   /** Share of empty boxes (0–1). */
   emptyShare: number
+  /**
+   * Share of the full boxes that are reefers (0-1, default 0), R19. Drawn per box from its container id (a hash,
+   * not an RNG stream), so a share of 0 leaves every other draw, and every golden, unchanged.
+   */
+  reeferShare?: number
 }
 
 /**

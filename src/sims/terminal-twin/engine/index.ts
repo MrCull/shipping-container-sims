@@ -39,6 +39,7 @@ export {
   blockSpecs,
   boxSpan,
   candidateSlots,
+  REEFER_MAX_TIERS,
   parseYardSlotId,
   yardSlotId,
   rowX,
@@ -119,6 +120,7 @@ export type { DecisionRequestedPayload, DecisionResolvedPayload } from './events
 export type { HandlerKpiReport } from './kpis'
 export type { SimQuery } from './query'
 export type { InvariantViolation } from './invariants'
+export type { PredictedReady } from './predictions'
 export { checkInvariants, DEFAULT_SWEEP_EVERY, InvariantTracker } from './invariants'
 export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport, LandsideKpiReport } from './kpis'
 export type { WorkPackage, WorkPackageKind, WorkPackageStatus, LoadOrder } from './state'

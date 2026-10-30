@@ -14,6 +14,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Quay:** the continuous berth face at Z = 0. Sea is at negative Z and the yard at positive Z, with X running along the quay.
 - **Vessel slot:** a bay/row/tier position on a vessel (`<vesselId>:<bay>-<row>-<tier>`, plus `a`/`f` for the aft/fore 20 ft half of a cell). Its **purpose** is discharge, load or transshipment.
+- **Maritime location notation (TT-R08):** how the UI names a slot, display only (internal ids, the engine API, saves and goldens keep the internal form). Vessel: `VESSEL.V<nn>.<bay>.<row>.<tier>`, e.g. `VESSEL.V01.04.02.82`, shown with the vessel name ("MSC Aurora · VESSEL.V01.04.02.82"). Bays count from the bow: odd = a 20 ft half cell, even = the 40 ft cell between its two odd halves. Row 00 is the centreline of an odd beam, starboard odd, port even (the quay side is port). Tiers: hold 02, 04, ...; deck 82, 84, .... Yard: `YARD.B<nn>.<bay>.<row>.<tier>`, e.g. `YARD.B01.03.02.1` (same bay convention, two-digit row, one-digit tier).
 - **Cell:** one bay/row/tier position of a vessel. It holds one 40 ft box or two 20 ft boxes (aft and fore half).
 - **Bay plan:** a vessel's slots and the boxes in them, generated from the vessel call and the seed. Bays are 40 ft bays counted from aft. Tiers count from the hold floor; tiers above the hatch covers are **on deck**, the rest **in the hold**.
 - **Berth:** a vessel's stretch of the continuous quay, from its stern (`berthX`) to its bow (LOA). Vessels keep a **berth gap** apart.
@@ -32,6 +33,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Yard slot (slot):** a 20 ft cell `<block>:<bay>-<row>-<tier>` that holds a box. A 40 ft box is named by its lower bay (its **anchor**) and also covers the next bay.
 - **Stack:** the boxes in one bay and row. A box above tier 1 must rest on boxes (no **floating** box). A stack takes the **length** of its bottom box (20 or 40 ft) and accepts only that length until it is empty; a 40 ft box **40-locks** both stacks it covers. The lock is derived from the contents, never stored. Checked by `yard.no-mixed-length-stack`.
 - **Yard slot:** a bay/row/tier position in a block.
+- **Reefer:** a refrigerated box (`ContainerState.reefer`), a share of the full boxes (`cargo.reeferShare`, default 0). It needs a plug: it is only allocated to a **powered row** of its block (`BlockConfig.poweredRows`, rows 1-8) and stacks at most **`REEFER_MAX_TIERS`** (4) high. A block without powered rows takes no reefer. Plain boxes may use powered rows, but `nearest-wtp` avoids them. Checked by `yard.reefer-powered`.
 
 ## Operations
 
@@ -252,3 +254,6 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Gate module:** a generated GLB that tiles into the gate complex: a 3.5 m truck lane, the 8 m out-of-gauge lane, a 1.2 m island (kerb stripes, kiosk, camera post, canopy columns) between and beside lanes, and the control office.
 - **Island:** the concrete strip between two gate lanes; the engine lane pitch is lane half-width + island + lane half-width.
 - **Instanced infrastructure:** bollards, fenders, quay and ASC rail segments, fence panels, masts, ground markings and gate modules drawn as one InstancedMesh per model (one draw call each).
+- **Predicted ready time:** when a box is expected to be physically available for an SHC to collect: a ground-position box's planned set-down (exact) or the crane's estimated next one (nominal cycle plus hatch cycle), published by the quay subsystem; a WTP pad box's planned set-down by the ASC subsystem. `sim.predictedReady()`.
+- **Pre-dispatch (`predispatch`):** the `shcDispatch` strategy that sends an idle SHC to the queue area of a box predicted ready within the SHC's travel time plus `queueAreas.predispatchMarginS`. The SHC holds a queue spot, not a job, so no box is collected before it exists. *Avoid:* "early pick-up".
+- **Paired dispatch (`paired-dual-cycle`):** the `shcDispatch` strategy that, after an SHC delivers a discharge box to a WTP pad, prefers a nearby load pickup (and after a load delivery at the quay a discharge pickup), so the SHC drives loaded more often and less empty. Chained dispatch otherwise. The SHC's last delivery is `lastJobKind` on the dispatch request.

@@ -26,13 +26,14 @@
  */
 import type { EngineContext, ReactorMap } from '../context'
 import type { EventOf, ShcPhasePayload } from '../events'
-import { cornerSpeedCap, planSegment, positionAt, type AxisProfile, type CornerModel, type MotionSegment } from '../kinematics'
-import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph, type PathGraph } from '../laneGraph'
+import { cornerSpeedCap, planSegment, positionAt, travelTime, type AxisProfile, type CornerModel, type MotionSegment } from '../kinematics'
+import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph, type PathGraph, type QueueArea } from '../laneGraph'
 import { earliestStart, mergeWindows, reserve, type WindowSpec } from '../reservations'
 import type { ShcDispatchPad } from '../decisions/types'
 import type { ShcJob, ShcPlannedEvent, ShcState, ShcStatus, SimState } from '../state'
 import { DEFAULT_SHC_CORNER, DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
-import type { ShcKinematics } from '../../scenario/types'
+import { DEFAULT_PREDISPATCH_MARGIN_S, type ShcKinematics } from '../../scenario/types'
+import { predictedReady } from '../predictions'
 import { resumeStsWaitingForBox, resumeStsWaitingForGroundPosition } from './quay'
 import { maybeDispatchAsc } from './asc'
 import { pumpLoadPrep } from './loadPrep'
@@ -408,7 +409,18 @@ function goPark(ctx: EngineContext, shc: ShcState): void {
 
 /** True when the shcDispatch decision point runs the `chained-nearest` strategy (SHCs take work straight away and park only without work). */
 export function isChained(ctx: EngineContext): boolean {
-  return ctx.config.decisions?.points?.shcDispatch?.strategy === 'chained-nearest'
+  const strategy = ctx.config.decisions?.points?.shcDispatch?.strategy
+  return strategy === 'chained-nearest' || strategy === 'predispatch' || strategy === 'paired-dual-cycle'
+}
+
+/** True when the shcDispatch strategy is `paired-dual-cycle` (chained dispatch that pairs a discharge delivery with a nearby load pickup and back, TT-R14). */
+export function isPaired(ctx: EngineContext): boolean {
+  return ctx.config.decisions?.points?.shcDispatch?.strategy === 'paired-dual-cycle'
+}
+
+/** True when the shcDispatch strategy is `predispatch` (chained dispatch plus SHCs sent ahead of predicted ready times, TT-R13). */
+export function isPredispatch(ctx: EngineContext): boolean {
+  return ctx.config.decisions?.points?.shcDispatch?.strategy === 'predispatch'
 }
 
 /** Is there still work an idle SHC could be asked to do soon: an open job, or a vessel at the berth? */
@@ -457,6 +469,15 @@ function goIdle(ctx: EngineContext, shc: ShcState): void {
       shc.status = 'queuing-for-work'
       return
     }
+    if (isPredispatch(ctx)) {
+      // wait where the next box is predicted rather than at the nearest area
+      const target = predictionDeficits(ctx).deficits[0]
+      const spot = target ? freeQueueSlot(ctx.state, target.area.nodes) : null
+      if (target && spot) {
+        goQueue(ctx, shc, spot, { areaId: target.area.id, readyAt: target.pred.readyAt, source: target.pred.source })
+        return
+      }
+    }
     const spot = nearestQueueSpot(ctx, shc.nodeId, ['sts', 'block'])
     if (spot) {
       goQueue(ctx, shc, spot)
@@ -467,7 +488,7 @@ function goIdle(ctx: EngineContext, shc: ShcState): void {
 }
 
 /** Drive an empty SHC to a queue spot and wait there (it holds the spot from now on). */
-function goQueue(ctx: EngineContext, shc: ShcState, spot: string): void {
+function goQueue(ctx: EngineContext, shc: ShcState, spot: string, predicted?: ShcRoutingPredicted): void {
   const graph = laneGraphOf(ctx.config)
   releaseQueue(ctx.state, shc.id)
   if (shc.nodeId === spot) {
@@ -491,7 +512,83 @@ function goQueue(ctx: EngineContext, shc: ShcState, spot: string): void {
   const kpi = shcKpi(ctx.state, shc.id)
   kpi.emptyDistanceM += pathLength(graph, path)
   kpi.reservationWaitS += start - ctx.state.now
-  ctx.schedule('ShcRoutingToParking', ctx.state.now, { equipment: [shc.id] }, { shcId: shc.id, departAt: start, reservations })
+  ctx.schedule('ShcRoutingToParking', ctx.state.now, { equipment: [shc.id] }, {
+    shcId: shc.id,
+    departAt: start,
+    reservations,
+    ...(predicted ? { predicted } : {}),
+  })
+}
+
+type ShcRoutingPredicted = NonNullable<EventOf<'ShcRoutingToParking'>['payload']['predicted']>
+
+// ── Pre-dispatch (TT-R13) ───────────────────────────────────────────────────
+
+interface PredictionDeficit {
+  pred: ReturnType<typeof predictedReady>[number]
+  area: QueueArea
+}
+
+/**
+ * Predictions no idle SHC covers yet, soonest first, and the idle SHCs that could be sent: parked ones and those
+ * waiting at an area with more idle SHCs than predicted boxes. A prediction is covered by an idle SHC that waits at
+ * (or drives to) its queue area. Loaded SHCs and SHCs holding a job are never candidates.
+ */
+function predictionDeficits(ctx: EngineContext): { deficits: PredictionDeficit[]; spare: ShcState[] } {
+  const { state } = ctx
+  const graph = laneGraphOf(ctx.config)
+  const areaOf = (source: 'sts' | 'asc', ownerId: string) => graph.queueAreas.find((a) => a.kind === (source === 'sts' ? 'sts' : 'block') && a.ownerId === ownerId)
+  const idleAt = new Map<string, ShcState[]>()
+  for (const [spot, shcId] of Object.entries(state.queueClaims)) {
+    const shc = state.shcs[shcId]
+    if (shc.carrying !== null || shc.jobId !== null) continue
+    const area = graph.queueAreaOf[spot]
+    idleAt.set(area, [...(idleAt.get(area) ?? []), shc])
+  }
+  const deficits: PredictionDeficit[] = []
+  const demand = new Map<string, number>()
+  for (const pred of predictedReady(ctx)) {
+    const area = areaOf(pred.source, pred.ownerId)
+    if (!area) continue
+    const n = (demand.get(area.id) ?? 0) + 1
+    demand.set(area.id, n)
+    if ((idleAt.get(area.id)?.length ?? 0) < n) deficits.push({ pred, area })
+  }
+  const spare: ShcState[] = Object.values(state.shcs).filter((s) => s.status === 'parked' && s.plan.length === 0)
+  for (const [area, shcs] of idleAt) {
+    const settled = shcs.filter((s) => s.status === 'queuing-for-work' && s.plan.length === 0).sort((a, b) => (a.id < b.id ? -1 : 1))
+    spare.push(...settled.slice(demand.get(area) ?? 0))
+  }
+  return { deficits, spare: spare.sort((a, b) => (a.id < b.id ? -1 : 1)) }
+}
+
+/**
+ * Pre-dispatch: send an idle SHC to a queue area when a box there is predicted ready within the SHC's travel time
+ * plus `queueAreas.predispatchMarginS`. The SHC claims a queue spot, not a job: the box is dispatched only once it
+ * exists, so nothing is collected early and STS/ASC set-downs never wait for an SHC (they need only a free buffer).
+ */
+export function maybePredispatch(ctx: EngineContext): void {
+  const { state } = ctx
+  if (!isPredispatch(ctx) || state.subsystems.shc === 'off') return
+  const graph = laneGraphOf(ctx.config)
+  if (graph.queueAreas.length === 0) return
+  const margin = ctx.config.queueAreas?.predispatchMarginS ?? DEFAULT_PREDISPATCH_MARGIN_S
+  const empty = kinematics(ctx).driveEmpty
+  const { deficits, spare } = predictionDeficits(ctx)
+  for (const { pred, area } of deficits) {
+    const spot = freeQueueSlot(state, area.nodes)
+    if (!spot) continue
+    let best: { shc: ShcState; travelS: number } | null = null
+    for (const shc of spare) {
+      const path = shortestPath(graph, shc.nodeId, spot)
+      if (!path) continue
+      const travelS = travelTime(pathLength(graph, path), empty)
+      if (!best || travelS < best.travelS - 1e-9) best = { shc, travelS }
+    }
+    if (!best || pred.readyAt - state.now > best.travelS + margin) continue
+    spare.splice(spare.indexOf(best.shc), 1)
+    goQueue(ctx, best.shc, spot, { areaId: area.id, readyAt: pred.readyAt, source: pred.source })
+  }
 }
 
 /** Queued SHCs carrying a box ask `wtpPadSelection` again while a free pad is not already being asked for. */
@@ -551,7 +648,15 @@ function requestDispatch(ctx: EngineContext, shc: ShcState): void {
     })
   ctx.requestDecision(
     'shcDispatch',
-    { shcId: shc.id, nodeId: shc.nodeId, x: here.x, z: here.z, jobs, wtpPads: padOptions(ctx) },
+    {
+      shcId: shc.id,
+      nodeId: shc.nodeId,
+      x: here.x,
+      z: here.z,
+      ...(isPaired(ctx) && shc.lastJobKind ? { lastJobKind: shc.lastJobKind } : {}),
+      jobs,
+      wtpPads: padOptions(ctx),
+    },
     { equipment: [shc.id] },
   )
 }
@@ -620,6 +725,7 @@ export function maybeDispatch(ctx: EngineContext): void {
     requestDispatch(ctx, shc)
     asking++
   }
+  maybePredispatch(ctx)
 }
 
 /** Plan a whole job trip for `shc` (origin → box → WTP pad → clear position). */
@@ -935,6 +1041,10 @@ export const shcReactors: ReactorMap = {
       }
       return
     }
+    if (e.payload.decisionPoint === 'stsGroundPosition') {
+      maybePredispatch(ctx) // the crane has planned its set-down: a new exact prediction
+      return
+    }
     if (e.payload.decisionPoint === 'wtpPadSelection') {
       const { request, reply } = e.payload
       const shc = ctx.state.shcs[request.shcId]
@@ -960,6 +1070,11 @@ export const shcReactors: ReactorMap = {
       maybeDispatch(ctx)
     }
   },
+
+  // Predictions change when a crane plans a carry or a hatch move, and when an ASC plans a retrieval.
+  StsMoveStarted: (_e, ctx) => maybePredispatch(ctx),
+  StsHatchStarted: (_e, ctx) => maybePredispatch(ctx),
+  AscJobAssigned: (_e, ctx) => maybePredispatch(ctx),
 
   ShcJobAssigned: (e, ctx) => scheduleNext(ctx, ctx.state.shcs[e.payload.shcId]),
   ShcRoutingToParking: (e, ctx) => scheduleNext(ctx, ctx.state.shcs[e.payload.shcId]),
@@ -1038,6 +1153,7 @@ export const shcReactors: ReactorMap = {
     if (state.kpis.horizontal) state.kpis.horizontal.boxesToWtp++
   }),
   ShcCleared: phase((e, ctx, shc) => {
+    if (isPaired(ctx)) shc.lastJobKind = ctx.state.shcJobs[e.payload.jobId]?.kind === 'load' ? 'load' : 'discharge'
     delete ctx.state.shcJobs[e.payload.jobId]
     shc.jobId = null
     maybeDispatch(ctx)
