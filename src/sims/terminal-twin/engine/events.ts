@@ -253,13 +253,13 @@ export interface EventPayloads {
    * The truck arrival process fired (hourly Poisson profile, or a scripted truck with `transaction`): the truck's
    * transaction is drawn from the demand the terminal can serve now, then `TruckArrived` follows.
    */
-  TruckArrivalDue: { transaction?: TruckTransactionKind }
+  TruckArrivalDue: { transaction?: TruckTransactionKind; appointmentId?: string }
   /**
    * A truck reached the gate and joined the queue. `transaction` is what it came for; each leg names its box (a drop
    * brings a new box that rides the chassis, a pick collects a box that is in the yard with its dwell elapsed).
    * `fallback` = the drawn transaction could not be served (no eligible box or vessel) and it came to drop an empty.
    */
-  TruckArrived: { truckId: string; transaction: TruckTransactionKind; legs: TruckLegInfo[]; queueLength: number; fallback?: true }
+  TruckArrived: { truckId: string; transaction: TruckTransactionKind; legs: TruckLegInfo[]; queueLength: number; fallback?: true; appointmentId?: string }
   /** The gateLaneAssignment decision gave the head of the queue a free inbound lane; it drives to the kiosk. */
   TruckGateStarted: { truckId: string; laneId: string; queueWaitS: number; queueLength: number }
   /** Gate processing is done (the truck is in); a transfer stall is allocated next. */
