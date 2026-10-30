@@ -6,7 +6,7 @@ A Vue 3 + TypeScript web app that hosts shipping-container-themed simulations an
 
 ## Tech stack
 
-Vue 3 (Composition API, `<script setup lang="ts">`), Vite, strict TypeScript, Pinia, Vue Router (`/` home, `/sim/:simId` game page), Three.js (shared via the `useThreeScene` composable), ESLint, Vitest, tsx for headless CLIs. Package manager: **pnpm**. Versions and scripts: `package.json`.
+Package manager: **pnpm**. Stack, versions and scripts: `package.json`.
 
 ## Verification
 
@@ -25,15 +25,7 @@ Before handing work back after code changes, run **`pnpm run verify`** (dependen
 ## Project structure
 
 ```
-src/
-├── assets/              Global CSS & fonts
-├── components/          Shared UI components (SimCard, HeroBackground)
-├── composables/         Shared composables (useThreeScene, useSimRegistry, useMenuMusic)
-├── pages/               Route-level views (HomePage, SimPage)
-├── router/              Vue Router config
-├── stores/              Shared Pinia stores
-├── types/               Shared TypeScript interfaces (SimDefinition)
-└── sims/                ★ Each sim/game gets its own self-contained sub-folder
+src/sims/                ★ Each sim/game gets its own self-contained sub-folder
     └── <sim-id>/
         ├── definition.ts        Metadata (SimDefinition) — auto-discovered
         ├── <SimName>.vue        Root component for the game
@@ -67,9 +59,7 @@ Each sim that has grown beyond a trivial prototype maintains its own agent guide
 ## Key conventions
 
 - **Auto-discovery**: Sims are registered via `import.meta.glob('@/sims/*/definition.ts')`. No manual imports needed — just add a folder.
-- **Sim isolation**: All sim-specific code, components, composables, stores, types, and media stay inside `src/sims/<sim-id>/`. Use the sub-folder layout (`components/`, `composables/`, `modules/`, `store/`, `types/`, `assets/`) to keep things organised. Only logic genuinely reused by multiple sims belongs in top-level `src/composables/` or `src/components/`.
 - **Composition API only**: Always use `<script setup lang="ts">`. No Options API.
-- **Strict TypeScript**: `noUnusedLocals`, `noUnusedParameters`, `strict` are all enabled.
 - **Scoped styles**: Use `<style scoped>` in all components.
 - **CSS variables**: Use the design tokens defined in `src/assets/main.css` (e.g. `--color-primary`).
 - **Keep this guide current**: When project-wide details change or new tooling, conventions, or structure are added that affect how agents or contributors work, update **AGENTS.md** in the same change (or a follow-up) so it stays accurate.
