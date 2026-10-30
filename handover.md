@@ -12,6 +12,6 @@ Spec and ticket copies: scratchpad `spec-106.md`, `tickets106/<n>.md`. Implement
 | #112 | Empty allocation `iso-type-best-position` (opt-in) | #108 | merged | done |
 | #113 | Vessel `pod-weight` ordering (opt-in) | #108 | merged | done |
 | #114 | Flip defaults, one golden regeneration | #109 #111 #112 #113 | merged | done |
-| #115 | Bay viewer popup | #109 #110 | implementer (tt/115-bay-viewer) | in progress |
+| #115 | Bay viewer popup | #109 #110 | merged | done |
 
-Merge #114 and #115 as they report (#114 regenerates goldens: merge before #115 if both are done, or regenerate on the merged tree). Then full smoke once, /code-review, finish.
+All tickets merged; full dev smoke 122 passed (41 min). Next: /code-review, fix findings in one implementer, PR body Closes lines, delete this file before merge.
