@@ -36,6 +36,22 @@ describe('presets', () => {
     expect(Math.max(...stress.landside!.hourlyProfile)).toBeGreaterThan(2 * Math.max(...tti.landside!.hourlyProfile))
   })
 
+  it('peak day has a realistic port rotation, a transshipment-heavy mix and ROB bays (spec #106); the other presets keep none', () => {
+    const peak = presets['TTI Algeciras — peak day']()
+    expect(peak.containerProps?.portRotation?.terminal).toBe('ESALG')
+    expect(peak.containerProps?.portRotation?.ports).toContain('ESALG')
+    expect(peak.containerProps!.portRotation!.ports.length).toBeGreaterThanOrEqual(5)
+    const moves = peak.vessels.reduce((n, v) => n + v.discharge + v.load + v.transshipment, 0)
+    const ts = peak.vessels.reduce((n, v) => n + (v.dischargeTransshipment ?? 0) + v.transshipment, 0)
+    expect(ts / moves).toBeGreaterThan(0.85)
+    expect(peak.robBayFraction).toBeGreaterThan(0)
+    expect(peak.description).toMatch(/unverified/)
+    for (const name of ['TTI Algeciras baseline', 'Small automated']) {
+      expect(presets[name]().robBayFraction).toBeUndefined()
+      expect(presets[name]().containerProps).toBeUndefined()
+    }
+  })
+
   it('V11-03: every preset starts at 08:00 local (daylight), in the sim clock and the wall-clock start', () => {
     for (const build of Object.values(presets)) {
       const c = build()

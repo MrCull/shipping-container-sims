@@ -423,6 +423,13 @@ export interface ScenarioConfig {
   emptyPool?: EmptyPoolConfig
   /** Stored container properties: port rotation, direction mix, cargo weights, weight classes, expected dwell (spec #106); optional. */
   containerProps?: ContainerPropsConfig
+  /**
+   * Share (0-1, default 0) of each vessel's bays set aside as ROB (remain on board) bays (spec #106): display-only
+   * boxes for later ports, never worked here. Which bays come from the property RNG stream (`scenario/robBays.ts`).
+   */
+  robBayFraction?: number
+  /** Fill level (0-1, default 0.7) of the ROB bays: share of their hold and deck cells that hold a box. */
+  robFill?: number
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
   /**

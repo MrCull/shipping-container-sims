@@ -201,7 +201,7 @@ export function exportVessels(ctx: EngineContext): { vesselId: string; weight: n
 
 /** The next free cell of a vessel's bay plan for a delivered export box (legacy or pre-filled start), or null when full. */
 function extraLoadCellOf(ctx: EngineContext, vesselId: string, size: ContainerSize) {
-  return extraLoadCell(ctx.state.vessels[vesselId].sizeClass, Object.values(ctx.state.vesselSlots).filter((s) => s.vesselId === vesselId), size)
+  return extraLoadCell(ctx.state.vessels[vesselId].sizeClass, Object.values(ctx.state.vesselSlots).filter((s) => s.vesselId === vesselId), size, ctx.state.vessels[vesselId].robBays)
 }
 
 /**

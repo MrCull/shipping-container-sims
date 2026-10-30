@@ -25,9 +25,10 @@ import { LINE_OWNER_PREFIX } from './lines'
 import { isReefer } from './reefer'
 import { sampleDwell, transshipmentConfig } from './dwell'
 import type { ContainerSize, ScenarioConfig, VesselConfig, Weights } from './types'
-import { cellCapacity, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
+import { vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
 import { makePlannedContainer } from './containerFactory'
 import { drawContainerProps, type ContainerProps } from './containerProps'
+import { fillRobBays, pickRobBays, workableCells, type RobBox } from './robBays'
 
 export type SlotPurpose = 'discharge' | 'load' | 'transshipment'
 
@@ -78,6 +79,10 @@ export function loadFlowEnabled(config: ScenarioConfig): boolean {
 export interface CargoPlan {
   slots: PlannedSlot[]
   containers: PlannedContainer[]
+  /** ROB bays by vessel id (spec #106): never worked, no slot or container in them. Only vessels that have some. */
+  robBays: Record<string, number[]>
+  /** The display-only ROB boxes of those bays (not containers). */
+  rob: RobBox[]
 }
 
 /** `ContainerState.vesselId` of empty-pool boxes (they belong to no vessel). */
@@ -199,6 +204,7 @@ function planVessel(
   loadRng: Rng,
   dwellRng: Rng,
   tsSources: PlannedContainer[],
+  robBays: ReadonlySet<number>,
 ): void {
   const spec = vesselClass(v.sizeClass)
   const tiers = spec.holdTiers + spec.deckTiers
@@ -226,7 +232,7 @@ function planVessel(
   }
   const withLoad = loadFlowEnabled(config)
   const reserved = withLoad ? 0 : v.load + v.transshipment
-  const capacity = cellCapacity(spec)
+  const capacity = workableCells(v, [...robBays])
   if (units.length + reserved > capacity)
     throw new Error(
       `Vessel ${v.id} (${spec.label}): ${units.length} discharge cells + ${reserved} load/transshipment slots do not fit (capacity ${capacity} cells)`,
@@ -239,7 +245,7 @@ function planVessel(
     units.length,
     // uneven: some bays carry much more discharge than others
     Array.from({ length: spec.bays }, () => 0.1 + 1.9 * rng() ** 2),
-    Array.from({ length: spec.bays }, () => spec.rows * tiers),
+    Array.from({ length: spec.bays }, (_, bay) => (robBays.has(bay) ? 0 : spec.rows * tiers)),
   )
   const fill = (bay: number, fromTier: number, toTier: number, n: number) => {
     for (let tier = fromTier; tier < toTier && n > 0; tier++)
@@ -343,7 +349,7 @@ function planVessel(
     const clean: { row: number; tier: number; deck: boolean }[][] = []
     for (let bay = 0; bay < spec.bays; bay++) {
       const list: { row: number; tier: number; deck: boolean }[] = []
-      for (const deck of [false, true]) {
+      for (const deck of robBays.has(bay) ? [] : [false, true]) {
         const from = deck ? spec.holdTiers : 0
         for (let tier = from; tier < (deck ? tiers : spec.holdTiers); tier++)
           for (let row = 0; row < spec.rows; row++)
@@ -408,7 +414,7 @@ function planVessel(
   const freeByBay: { row: number; tier: number }[][] = []
   for (let bay = 0; bay < spec.bays; bay++) {
     const free: { row: number; tier: number }[] = []
-    for (let tier = 0; tier < tiers; tier++)
+    for (let tier = 0; tier < (robBays.has(bay) ? 0 : tiers); tier++)
       for (let row = 0; row < spec.rows; row++)
         if (!occupied.has(`${bay}:${row}:${tier}`) && !loneStacks.has(`${bay}:${row}:${tier >= spec.holdTiers}`)) free.push({ row, tier })
     freeByBay.push(free)
@@ -445,6 +451,7 @@ export function extraLoadCell(
   sizeClass: VesselConfig['sizeClass'],
   slots: readonly Pick<PlannedSlot, 'bay' | 'row' | 'tier' | 'deck' | 'half' | 'purpose' | 'emptyReq'>[],
   size: ContainerSize,
+  robBays: readonly number[] = [],
 ): ExtraLoadCell | null {
   const spec = vesselClass(sizeClass)
   const tiers = spec.holdTiers + spec.deckTiers
@@ -457,7 +464,7 @@ export function extraLoadCell(
   }
   const perBay = new Array<number>(spec.bays).fill(0)
   for (const s of slots) perBay[s.bay]++
-  const bays = [...perBay.keys()].sort((a, b) => perBay[a] - perBay[b] || a - b)
+  const bays = [...perBay.keys()].filter((b) => !robBays.includes(b)).sort((a, b) => perBay[a] - perBay[b] || a - b)
   const kind: CellKind = size === '20' ? 'lone' : 'full'
   for (const bay of bays)
     for (const deck of [false, true]) {
@@ -498,9 +505,14 @@ export function planCargo(config: ScenarioConfig, seed: number): CargoPlan {
   const loadRng = makeRng(seed ^ 0x51ed270b)
   const dwellRng = makeRng(seed ^ 0x7a3b9c11)
   const serials = new Map<string, number>()
-  const plan: CargoPlan = { slots: [], containers: [] }
+  const plan: CargoPlan = { slots: [], containers: [], robBays: {}, rob: [] }
   const tsSources: PlannedContainer[] = []
-  for (const v of config.vessels) planVessel(config, v, rng, serials, plan, loadRng, dwellRng, tsSources)
+  for (const v of config.vessels) {
+    const robBays = pickRobBays(config, seed, v)
+    if (robBays.length > 0) plan.robBays[v.id] = robBays
+    planVessel(config, v, rng, serials, plan, loadRng, dwellRng, tsSources, new Set(robBays))
+    plan.rob.push(...fillRobBays(config, seed, v, robBays))
+  }
   if (loadFlowEnabled(config)) {
     linkTransshipment(config, plan, tsSources)
     addEmptyPool(config, seed, plan, serials)

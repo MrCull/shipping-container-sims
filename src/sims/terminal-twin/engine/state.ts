@@ -14,6 +14,7 @@ import type { Reservation } from './reservations'
 import { nextRandom, seedState } from './rng'
 import { ascStartZ, blockSpecs, PARK_UNTIL_S, railSegmentIds, travelHoistM } from './yardLayout'
 import { planCargo, POOL_VESSEL_ID, type SlotPurpose } from '../scenario/bayPlan'
+import type { RobBox } from '../scenario/robBays'
 import { makeContainerState } from '../scenario/containerFactory'
 import type { ContainerProps } from '../scenario/containerProps'
 import { sampleDwell } from '../scenario/dwell'
@@ -118,6 +119,10 @@ export interface VesselState {
   stsHistory: string[]
   /** Hatch panels of the vessel's bays (TT-R09), ids into `SimState.hatchPanels`. */
   hatchPanelIds?: string[]
+  /** ROB bays (spec #106): never worked, no slots in them, hatch covers stay closed. Absent without ROB bays. */
+  robBays?: number[]
+  /** The display-only ROB boxes in those bays (slot data, not containers: nothing but the renderers reads them). */
+  robBoxes?: RobBox[]
   /** Discharge boxes still on board. */
   remainingDischarge: number
   /** Export boxes still to be loaded (TT-10). */
@@ -1131,6 +1136,10 @@ export function createInitialState(
       remainingDischarge: 0,
       remainingLoad: 0,
     }
+  }
+  for (const [id, bays] of Object.entries(plan.robBays)) {
+    state.vessels[id].robBays = [...bays]
+    state.vessels[id].robBoxes = plan.rob.filter((b) => b.vesselId === id)
   }
   for (const s of plan.slots) state.vesselSlots[s.id] = { ...s, containerId: null }
   const hatchCovers = hatchEnabled(config) && subsystems.quay !== 'off'

@@ -606,4 +606,31 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .vesselCall('V001', { name: 'Deck Runner', sizeClass: 'feeder', discharge: 6, maxSts: 1, sizeMix: { '40': 1 }, deckOnly: true })
       .endWhen({ vesselsCompleted: 1 })
       .build(),
+
+  /**
+   * Spec #106 ROB bays: 3 of a feeder's 7 bays are held back as remain-on-board. They hold display-only boxes for later
+   * ports (70% full, hold and deck) but are never worked: no discharge, no reserved load slot, no truck export, and
+   * their hatch covers stay closed. Hatch covers are on, so the working bays run the full cover cycle beside them.
+   */
+  'rob-bays': () =>
+    new ScenarioBuilder('rob-bays', 'A feeder keeps 3 of 7 bays as remain-on-board: never worked, hatch covers closed')
+      .seed(31)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Remain Star', sizeClass: 'feeder', discharge: 16, load: 6, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', arrivalS: 20000, load: 4, maxSts: 1 })
+      .robBays(0.43, 0.7)
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3, transferStalls: 2 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 16),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 2, outLanes: 2, inProcessingS: 45, outProcessingS: 20 },
+      })
+      .endWhen({ vesselsCompleted: 2 })
+      .build(),
 }
