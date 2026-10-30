@@ -13,7 +13,7 @@
  *                                              //   stsAssets, stsLods, render: { calls, triangles } }
  *   await __tt.step(); await __tt.why(id); await __tt.snapshot()
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
- *   __tt.select('STS01'); __tt.cameraTo('STS01');   // also 'gate' and 'stalls:B01' (landside, TT-13); __tt.sceneState().trucks
+ *   __tt.select('STS01'); __tt.cameraTo('STS01');   // also 'gate', 'stalls:B01' (landside, TT-13) and 'holding' / 'H1' (holding positions, TT-R16); __tt.sceneState().trucks
  * __tt.setSpeed(600); __tt.pause(); __tt.clock()
  *   __tt.overlays({ laneGraph: true, reservations: true })   // 3D debug overlays
  *   await __tt.query('ascList'); await __tt.query('yardSlots', 'B01'); __tt.sceneState().ascs   // yard (TT-06)

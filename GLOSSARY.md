@@ -187,6 +187,9 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Import dwell / export window:** how long an import stands in the yard before a truck may collect it (default lognormal, median 3 days); the period before a vessel's ETA (default 1 to 5 days) in which trucks may deliver its exports.
 - **Segregation:** trucks never enter the waterside network and SHCs never use the gate (invariant `landside.segregation`).
 - **Truck turn time:** gate-in to gate-out.
+- **Holding position:** a dead-end spur off the inbound road (`landside.holding.positions`, nodes `ls:H<n>`) where an admitted truck waits for a transfer stall. It never lies on a road, junction or gate exit (invariant `landside.waiting-off-road`).
+- **Stall admission:** the gate lets the head of the queue through only when a transfer stall can take it (the stall is reserved first, so no two trucks claim one stall: `landside.stall-exclusive`) or a holding position is free.
+- **Overflow (holding):** when no stall and no holding position is free, the truck waits outside the gate in the queue (`TruckHeldOutside`).
 - **Appointment window:** a slot of the truck booking system (default 30 min, `landside.appointments.windowS`). A truck books a window and arrives at a random time inside it; bookings per window are capped by gate and transfer stall capacity (`appointmentCap`), so demand above the cap is rejected. A peak is bunched bookings (`bunching` spans). Each **appointment** carries one transaction (its transport orders: export delivery, import collection or both = dual). No ANPR, no early, late or invalid arrivals.
 
 ## Yard start (TT-14)

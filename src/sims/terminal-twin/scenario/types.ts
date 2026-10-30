@@ -403,6 +403,24 @@ export interface AppointmentConfig {
   unverified?: boolean
 }
 
+/** What happens to a truck at the gate when no stall can take it and every holding position is full (TT-R16). */
+export type HoldingOverflowPolicy = 'wait-outside'
+
+/**
+ * Stall admission and holding (TT-R16). With this set, the gate admits the truck at the head of the queue only when a
+ * transfer stall can take it (the stall is reserved before the truck is sent) or a holding position is free; an
+ * admitted truck without a stall waits in a holding position; with holding full the truck waits outside the gate.
+ * Absent = the truck is processed whenever a lane is free and waits at the kiosk for a stall (the older behaviour).
+ */
+export interface HoldingConfig {
+  /** Dedicated holding positions on spurs of the inbound road, clear of roads, junctions and gate exits. */
+  positions: number
+  /** Overflow procedure when holding is full (default and only policy: the truck waits outside the gate). */
+  overflow?: HoldingOverflowPolicy
+  /** True when the numbers come from the TTI research and are not publicly verified. */
+  unverified?: boolean
+}
+
 export interface LandsideConfig {
   /** Trucks arriving per hour for each clock hour 0–23 (Poisson arrivals); the clock comes from `kpi.startTimeOfDayS`. */
   hourlyProfile: number[]
@@ -419,6 +437,8 @@ export interface LandsideConfig {
   scripted?: ScriptedTruck[]
   /** Appointment windows replace the Poisson arrivals (TT-R15); absent = Poisson. */
   appointments?: AppointmentConfig
+  /** Stall admission and holding positions (TT-R16); absent = trucks wait at the gate kiosk for a stall. */
+  holding?: HoldingConfig
 }
 
 /** Where the scenario clock sits, so hour and shift buckets line up with the clock the user sees. */

@@ -10,6 +10,7 @@ import craneSplit4Sts from './crane-split-4sts.json'
 import dualTruck from './dual-truck-transaction.json'
 import truckGateQueue from './truck-gate-queue.json'
 import truckAppointmentWindows from './truck-appointment-windows.json'
+import truckHoldingOverflow from './truck-holding-overflow.json'
 import landsideMorningPeak from './landside-morning-peak.json'
 import loadFixture from './load-1sts-10-boxes-1block.json'
 import liveriesMixed from './liveries-mixed.json'
@@ -41,5 +42,6 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'truck-gate-queue': truckGateQueue as ScenarioConfig,
   'landside-morning-peak': landsideMorningPeak as ScenarioConfig,
   'truck-appointment-windows': truckAppointmentWindows as ScenarioConfig,
+  'truck-holding-overflow': truckHoldingOverflow as ScenarioConfig,
   'yard-no-mixed-length': yardNoMixedLength as ScenarioConfig,
 }
