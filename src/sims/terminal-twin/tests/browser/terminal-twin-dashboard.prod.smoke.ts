@@ -16,7 +16,7 @@ test('ECharts is not in the initial load and is fetched when the dashboard first
   await page.waitForTimeout(800)
   expect(scripts.filter((u) => /chartLib|echarts|DashboardTab/i.test(u))).toEqual([])
 
-  await page.keyboard.press('d')
+  await page.keyboard.press('b')
   await expect(page.getByTestId('tt-dashboard')).toBeVisible()
   await expect.poll(() => scripts.some((u) => /chartLib/i.test(u))).toBe(true)
   // none of the initially loaded scripts contain the library

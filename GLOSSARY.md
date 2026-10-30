@@ -110,6 +110,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Event feed:** the left panel's live list of recent events, newest first, filterable and capped. At high speed it **summarises bursts** (runs of the same event type) into one row.
 - **Event inspector:** the right panel's view of one event: payload, subjects, a decision's handler, request and reply, and its **cause chain**.
 - **Cause chain:** the events that led to one, from the event back to the root, as returned by the engine's `why`. Clicking an entry inspects it.
+- **Keyboard camera:** the held-key camera controls: W/A/S/D or arrows pan along the camera heading (speed scales with distance), Shift + A/D (or ←/→) orbits, Shift + W/S (or ↑/↓) tilts, `=`/`-` zoom, all within the orbit limits. Any camera key ends **follow** mode. Read through `__tt.cameraPose()` (target, distance, azimuth, polar angle).
 - **View preset:** a one-click or one-key camera pose computed from the layout: Quay (Q), Yard (Y), Landside/Gate (G) or Overview (V). The pose's target lies inside the region it names, so it fits every preset and fixture; the Gate view needs a landside. **Label declutter** hides any Labels-overlay label that would overlap a higher-priority one on screen (the selection first, then equipment-kind registry order).
 - **Selection:** the container, equipment or vessel picked in the 3D view (or by an id in the feed or inspector). The **inspector** shows its current state, current job and history, and the **follow camera** can track it.
 - **Picking:** finding the entity under a click by testing the view ray against each entity's bounding box (containers first).
@@ -162,7 +163,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Dashboard (TT-16)
 
-- **Dashboard:** the full-screen tab (D) with the KPI time-series charts, the yard heatmap, the Gantt timeline and the final report. It loads Apache ECharts lazily on first open. *Avoid:* "KPI strip" (that is the small always-visible bar over the 3D view).
+- **Dashboard:** the full-screen tab (B) with the KPI time-series charts, the yard heatmap, the Gantt timeline and the final report. It loads Apache ECharts lazily on first open. *Avoid:* "KPI strip" (that is the small always-visible bar over the 3D view).
 - **KPI group:** a set of KPI charts shown together: Quay, Horizontal transport, Yard, Landside (when it has data) or TOS handlers.
 - **Bucketing:** whether the dashboard charts show one point per clock hour or per 8-hour shift (the same series the collector builds).
 - **Yard heatmap:** yard fill % per block (rows) per hour (columns), plus each block's fill now.

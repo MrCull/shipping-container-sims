@@ -10,6 +10,8 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { NO_OVERLAYS } from '../modules/overlays'
 import { pickEntity } from '../modules/picking'
+import { cameraMotion } from '../modules/shortcuts'
+import { stepCameraPose, type CameraPose } from '../modules/cameraKeys'
 import { viewPresetPose, type ViewPresetName } from '../modules/viewPresets'
 import { hourOfDay, lightingFor } from '../modules/atmosphere'
 import { SceneRenderer } from '../modules/sceneRenderer'
@@ -88,6 +90,49 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     controls.update()
   }
 
+  const offsetScratch = new THREE.Vector3()
+  const sphericalScratch = new THREE.Spherical()
+
+  /** The orbit camera as target, distance, heading and angle from straight up. */
+  function readPose(): CameraPose | null {
+    if (!camera || !controls) return null
+    sphericalScratch.setFromVector3(offsetScratch.copy(camera.position).sub(controls.target))
+    return {
+      target: { x: controls.target.x, y: controls.target.y, z: controls.target.z },
+      distance: sphericalScratch.radius,
+      azimuth: sphericalScratch.theta,
+      polar: sphericalScratch.phi,
+    }
+  }
+
+  function writePose(pose: CameraPose): void {
+    if (!camera || !controls) return
+    controls.target.set(pose.target.x, pose.target.y, pose.target.z)
+    sphericalScratch.set(pose.distance, pose.polar, pose.azimuth)
+    camera.position.copy(controls.target).add(offsetScratch.setFromSpherical(sphericalScratch))
+    controls.update()
+  }
+
+  let lastFrameMs = 0
+
+  /** Held camera keys (TT-R03) move the camera every frame, by elapsed time, so the speed does not depend on the frame rate. */
+  function applyCameraKeys(nowMs: number): void {
+    const dt = lastFrameMs === 0 ? 0 : Math.min((nowMs - lastFrameMs) / 1000, 0.1)
+    lastFrameMs = nowMs
+    if (!controls || store.cameraKeys.held.size === 0 || dt === 0) return
+    const pose = readPose()
+    if (!pose) return
+    const motion = cameraMotion(store.cameraKeys.held, store.cameraKeys.shift)
+    writePose(
+      stepCameraPose(pose, motion, dt, {
+        minDistance: controls.minDistance,
+        maxDistance: controls.maxDistance,
+        minPolar: 0.01,
+        maxPolar: controls.maxPolarAngle,
+      }),
+    )
+  }
+
   /** The entity under a viewport point (client coordinates) at the displayed time, or null. */
   function pickAt(clientX: number, clientY: number): string | null {
     const controller = store.controller()
@@ -153,6 +198,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       overlaysApplied = overlays
       view.setOverlays(overlays)
     }
+    applyCameraKeys(now)
     if (store.following && store.selectedId) {
       // Follow camera (F): keep the selection centred, keeping the user's viewing offset.
       const centre = controller.model?.entityCentre(store.selectedId, controller.displayTime)
@@ -254,7 +300,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       },
       pickAt,
       screenPoint,
-      cameraTarget: () => (controls ? { x: controls.target.x, y: controls.target.y, z: controls.target.z } : null),
+      cameraPose: readPose,
       stats: () => (view ? { ...view.stats(), frames: framesRendered, render: { ...lastRender } } : null),
       liveries: () => view?.renderedLiveries() ?? null,
       rigs: () => view?.renderedRigs() ?? null,

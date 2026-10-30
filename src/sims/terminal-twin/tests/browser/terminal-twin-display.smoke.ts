@@ -177,10 +177,10 @@ test.describe('British browser', () => {
     await expect.poll(async () => (await clock()).engine!.eventsTotal).toBe(before + 1)
     expect((await clock()).paused).toBe(true)
 
-    // D: dashboard tab
-    await page.keyboard.press('d')
+    // B: dashboard tab
+    await page.keyboard.press('b')
     await expect(page.getByTestId('tt-dashboard')).toBeVisible()
-    await page.keyboard.press('d')
+    await page.keyboard.press('b')
     await expect(page.getByTestId('tt-dashboard')).toBeHidden()
 
     // O: overlays
@@ -205,8 +205,8 @@ test.describe('British browser', () => {
     await page.keyboard.press('?')
     const help = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
     await expect(help).toBeVisible()
-    for (const key of ['Space', '1–9', '0', '.', 'F', 'Esc', 'D', 'O', '?']) {
-      await expect(help.locator('kbd', { hasText: new RegExp(`^${key.replace(/[.?]/g, '\\$&')}$`) })).toHaveCount(1)
+    for (const key of ['Space', '1–9', '0', '.', 'F', 'Esc', 'B', 'O', '?', 'W A S D / arrows', '= + / -']) {
+      await expect(help.locator('kbd', { hasText: new RegExp(`^${key.replace(/[.?+]/g, '\\$&')}$`) })).toHaveCount(1)
     }
     await page.keyboard.press('Escape')
     await expect(help).toBeHidden()
@@ -219,7 +219,7 @@ test.describe('British browser', () => {
     await page.getByRole('button', { name: 'Run to…' }).click()
     const field = page.getByLabel('Target sim time')
     await field.focus()
-    for (const key of ['Space', '3', '0', '.', 'f', 'd', 'o', '?', 'Escape']) await field.press(key)
+    for (const key of ['Space', '3', '0', '.', 'f', 'b', 'w', 'a', 'o', '?', 'Escape']) await field.press(key)
     const after = await clock()
     expect(after.paused).toBe(stateBefore.clock.paused)
     expect(after.speed).toBe(stateBefore.clock.speed)

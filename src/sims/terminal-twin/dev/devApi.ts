@@ -27,6 +27,7 @@
  *   await __tt.saves.rewindPoints(); await __tt.saves.rewindTo(0)        // automatic rewind points (default every 15 sim-minutes)
  *   __tt.screenPoint('STS01'); __tt.pickAt(x, y)                         // 3D picking, client coordinates
  */
+import type { CameraPose } from '../modules/cameraKeys'
 import { isViewPreset } from '../modules/viewPresets'
 import { readHudLayout, type HudLayout } from '../modules/hudLayout'
 import type { ScenarioOverrides } from '../scenario/overrides'
@@ -161,8 +162,8 @@ export interface TwinDevApi {
   pickAt(clientX: number, clientY: number): string | null
   /** Viewport (client) coordinates of an entity's centre, or null when it is not drawn or off screen. */
   screenPoint(entityId: string): { x: number; y: number } | null
-  /** Where the orbit camera looks (follow-camera checks). */
-  cameraTarget(): { x: number; y: number; z: number } | null
+  /** The orbit camera (follow-camera and keyboard-camera checks): target, distance (m), azimuth and polar angle (radians from straight up). */
+  cameraPose(): CameraPose | null
   /** Bounding box (viewport px) of each named HUD region (`null` when not shown); see modules/hudLayout.ts. */
   hudLayout(): HudLayout
   /** Saves, snapshots and rewind (TT-17). */
@@ -468,7 +469,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     },
     pickAt: (x, y) => store.view()?.pickAt(x, y) ?? null,
     screenPoint: (id) => store.view()?.screenPoint(id) ?? null,
-    cameraTarget: () => store.view()?.cameraTarget() ?? null,
+    cameraPose: () => store.view()?.cameraPose() ?? null,
     hudLayout: () => readHudLayout(document, { width: window.innerWidth, height: window.innerHeight }),
     saves: {
       fileText: async (type, name) => JSON.stringify(await store.buildSave(type, name)),

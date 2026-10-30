@@ -199,7 +199,7 @@ test('the follow camera tracks a moving SHC smoothly', async ({ page }) => {
   let start: { x: number; z: number } | null = null
   for (let i = 0; i < 25; i++) {
     await page.waitForTimeout(120)
-    const s = await page.evaluate((id) => ({ cam: window.__tt!.cameraTarget()!, shc: window.__tt!.sceneState()!.shcs[id] }), shcId)
+    const s = await page.evaluate((id) => ({ cam: window.__tt!.cameraPose()!.target, shc: window.__tt!.sceneState()!.shcs[id] }), shcId)
     start ??= { x: s.shc.x, z: s.shc.z }
     samples.push({
       dx: Math.abs(s.cam.x - s.shc.x),
