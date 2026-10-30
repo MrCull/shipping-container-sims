@@ -233,7 +233,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   /** Sound effects (TT-21): off by default; the player only exists to be used while on. */
   const soundOn = ref(false)
   const sounds = markRaw(new SoundPlayer())
-  /** Keep the sun daylight all day (default on for the Stress test preset). */
+  /** Keep the sun daylight all day (default on for the TTI Algeciras — peak day preset). */
   const lockDaylight = ref(false)
   const banner = ref<TwinBanner | null>(null)
   const cues = markRaw(new CuePlanner())

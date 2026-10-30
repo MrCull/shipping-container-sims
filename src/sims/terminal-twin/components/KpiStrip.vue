@@ -91,7 +91,10 @@ onBeforeUnmount(() => {
       :data-pulse="pulsing[item.id] ? 'on' : 'off'"
     >
       <span class="label">{{ t(item.labelKey) }}</span>
-      <span class="value" :style="{ minWidth: `${item.minWidthCh}ch` }">{{ shown[item.id] === undefined ? t('unit.none') : item.format(store.fmt, shown[item.id] as number) }}</span>
+      <span
+        class="value"
+        :style="{ minWidth: `${item.minWidthCh}ch` }"
+      >{{ shown[item.id] === undefined ? t('unit.none') : item.format(store.fmt, shown[item.id] as number) }}</span>
     </li>
   </ul>
 </template>

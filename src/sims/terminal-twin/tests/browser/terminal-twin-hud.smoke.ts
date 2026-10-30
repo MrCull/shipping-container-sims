@@ -7,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
 
-const PRESETS = ['TTI Algeciras baseline', 'Small automated', 'Stress test']
+const PRESETS = ['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras — peak day']
 const VIEWPORTS = [
   { width: 1280, height: 720 },
   { width: 1920, height: 1080 },

@@ -5,6 +5,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import fixture from '../../scenario/fixtures/tracer-1sts-10-boxes.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openAdvanced } from './scenarioPicker'
 
 const TRACER = 'tracer-1sts-10-boxes'
 // Monday 26 Oct 2026, 13:45 UTC; the browser runs in UTC (timezoneId below).
@@ -115,6 +116,7 @@ test.describe('British browser', () => {
     await loadTracerAt(page, 17 * 60 + 3) // 14:02:03 UTC; start is Mon 26 Oct 2026 13:45
 
     await page.getByRole('button', { name: 'New Scenario' }).click()
+    await openAdvanced(page)
     const start = page.getByTestId('tt-setup-start')
     await expect(start).toHaveValue('26/10/2026, 13:45')
 

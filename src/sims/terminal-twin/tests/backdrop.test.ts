@@ -5,7 +5,7 @@ import { presets } from '../scenario/presets'
 describe('backdrop', () => {
   it('uses the Algeciras backdrop for the TTI preset only', () => {
     const kinds = Object.fromEntries(Object.keys(presets).map((name) => [name, backdropKindFor(name)]))
-    expect(kinds).toEqual({ 'TTI Algeciras baseline': 'tti', 'Small automated': 'generic', 'Stress test': 'generic' })
+    expect(kinds).toEqual({ 'TTI Algeciras baseline': 'tti', 'Small automated': 'generic', 'TTI Algeciras — peak day': 'generic' })
     expect(backdropKindFor('tracer')).toBe('generic')
   })
 

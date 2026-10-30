@@ -1,5 +1,5 @@
 /**
- * Scenario presets (TT-15): TTI Algeciras baseline, Small automated, Stress test.
+ * Scenario presets (TT-15): TTI Algeciras baseline, Small automated, TTI Algeciras — peak day.
  * Every value is overridable in the setup dialog. The layout is derived from the
  * counts (`scenario/layout.ts`), not placed by hand.
  */
@@ -84,9 +84,9 @@ function hubVessels(count: number, intervalS: number, jitterS: number, movesScal
 /** Presets whose bay count is derived from the published TTI capacity (the UI marks it as an assumption). */
 /** Preset names other modules key on (TT-21: the Algeciras backdrop, the daylight-lock default). */
 export const TTI_PRESET_NAME = 'TTI Algeciras baseline'
-export const STRESS_PRESET_NAME = 'Stress test'
+export const PEAK_DAY_PRESET_NAME = 'TTI Algeciras — peak day'
 
-export const TTI_DERIVED_BAYS_PRESETS = ['TTI Algeciras baseline', 'Stress test']
+export const TTI_DERIVED_BAYS_PRESETS = ['TTI Algeciras baseline', 'TTI Algeciras — peak day']
 
 export const presets: Record<string, () => ScenarioConfig> = {
   'TTI Algeciras baseline': () =>
@@ -133,9 +133,9 @@ export const presets: Record<string, () => ScenarioConfig> = {
       yardStart: { mode: 'prefilled', targetPct: 60 },
       truckScale: 0.4,
     }),
-  'Stress test': () =>
+  'TTI Algeciras — peak day': () =>
     terminal({
-      name: 'Stress test',
+      name: 'TTI Algeciras — peak day',
       description: 'TTI layout; 5 vessels arrive within 40 minutes; heavy truck peak (about 3x the default profile)',
       seed: 99,
       quayM: 850,
