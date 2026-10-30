@@ -39,6 +39,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Custody:** the single owner that currently holds a container (vessel slot, STS, ground position, SHC, WTP pad, ASC, yard slot or truck). Custody changes only at a confirmed grip or release. Each container keeps a **custody history**.
 - **Handover:** a custody change between two pieces of equipment via a ground buffer, never directly.
+- **Gross moves per STS-hour:** boxes grounded or loaded by a crane per hour of its window, from its first work package to the end of the measurement (waits included). **STS time bucket** (`engine/stsProductivity.ts`, `pnpm run tt:sts`): what a crane was doing in each second of that window: `cycle`, `hatch`, `lashing`, `ground`, `box`, `rail`, `reposition` or `done`. *Avoid:* "idle" without saying which bucket.
 - **Discharge / load:** a vessel-to-quay move / a quay-to-vessel move.
 - **Vessel call:** one vessel's visit: arrival, size class (Feeder, Feedermax, Panamax, Neo-Panamax, ULCV), discharge/load/transshipment counts and max STS. The **vessel table** lists the calls.
 - **Mooring / unmooring:** the time from berth allocation to all-fast, and from the last move to departure.
