@@ -63,14 +63,13 @@ Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers b
 | SHC paired dispatch | `pnpm run tt:run --fixture shc-paired-dual-cycle` (then again with `--strategy shcDispatch=chained-nearest`) | `SHC empty travel` and the empty travel ratio are lower with `paired-dual-cycle` (about 7364 m vs 7665 m); `0 violations`; `lastJobKind` on `shcDispatch` requests in the event log |
 | SHCs in 3D | `pnpm run screenshot --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('shc-1sts-2shc-1wtp').then(() => window.__tt.runTo(300)).then(() => { window.__tt.pause(); window.__tt.overlays({ laneGraph: true, reservations: true }) })"` | SHCs on the apron, boxes on pads/yard, cyan lane graph, amber reserved zones |
 | Hatch panels in 3D | `pnpm run screenshot --path /sim/terminal-twin --wait 4000 --fail-on-error --eval "window.__tt.load('hatch-cover-cycle').then(() => window.__tt.runTo(1000)).then(() => window.__tt.pause()).then(() => window.__tt.cameraTo('V001:H00-0', 90))"` (`runTo(590)` for a panel in the air) | the two panels of bay 0 stacked on the quay between the STS legs, the bay a dark pit with its coaming, the other bays still covered; `sceneState().hatchRigs` has every panel drawn |
-| Smoke tests side by side with another checkout | `SMOKE_DEV_PORT=5299 SMOKE_PROD_PORT=5298 pnpm run test:smoke` | same as `pnpm run test:smoke`, on other ports |
 | Asset budgets (CI) | `pnpm run tt:assets:check` (also in `pnpm test`) | `ok` per GLB with LOD triangles/draw calls, `Budgets: pass`, exit 0 |
 | Regenerate assets (needs bpy) | `pnpm run tt:assets --python <venv python>` | GLBs, sidecars, atlas, previews rewritten; budget check passes; `git diff` shows only intended changes |
 | Generator is deterministic | `pnpm run tt:assets --check --python <venv python>` | `Regenerated assets are identical to the committed ones`, exit 0 |
 | Assets in the real renderer | `pnpm run tt:assets:shots` | PNG per asset × LOD + `yard.png` in `.screenshots/assets/`, no page errors |
 | Look at one asset | `pnpm run dev`, open `/sim/terminal-twin?viewer=container-40` (or `?viewer=yard`) | viewer with LOD buttons, livery picker, rig sliders, 20 ft reference box |
 
-Never regenerate goldens to make a failing test pass unless the behaviour change is intended and explained in the commit. Without `--update` / `UPDATE_GOLDEN=1` nothing ever rewrites a golden.
+Never regenerate goldens to make a failing test pass unless the behaviour change is intended and explained in the commit. Without `--update` / `UPDATE_GOLDEN=1` nothing ever rewrites a golden. Two branches that both regenerate a golden conflict on merge: regenerate on the merged tree instead of hand-merging, and plan a change that moves every golden (a default flip) as its own ticket (`docs/agents/implementing.md`).
 
 All three commands print usage with `--help`. Exit codes: `tt:run` 0 ok / 1 violation or error / 2 usage; `tt:diff` 0 identical / 1 diverged / 2 usage; `tt:golden` 0 all match / 1 drift or missing / 2 usage.
 
