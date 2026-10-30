@@ -3,8 +3,7 @@
  * invariant checker.
  */
 import { describe, expect, it } from 'vitest'
-import { createSimulation, restoreSimulation, type EngineEvent, type Simulation } from '../engine'
-import { buildLaneGraph } from '../engine/laneGraph'
+import { buildLaneGraph, createSimulation, restoreSimulation, type EngineEvent, type Simulation } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
 import type { ScenarioConfig } from '../scenario/types'
