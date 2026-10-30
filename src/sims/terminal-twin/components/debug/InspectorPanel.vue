@@ -18,10 +18,17 @@ const inspected = computed(() => {
 
 const view = computed(() => store.entityView)
 
+/** Slot ids in the inspected event's payload, in maritime notation. */
+const payloadLocations = computed(() => {
+  const e = inspected.value
+  return e ? store.locations.scan(e.current.payloadJson, store.containerSizeOf) : []
+})
+
 const recent = computed(() => (store.selectedId ? eventsInvolving(store.recentEvents, store.selectedId, 12) : []))
 
 function factText(f: Fact): string {
   if (f.value === null) return t('inspector.none')
+  if (f.owner) return store.locations.owner(f.owner.kind, f.owner.id, f.owner.size)
   if (f.token) return t(`inspector.${f.token}.${f.value}` as MessageKey)
   if (typeof f.value === 'number' && f.unit === 'length') return store.fmt.length(f.value)
   if (typeof f.value === 'number' && f.unit === 'time') return t('inspector.seconds', { n: store.fmt.number(f.value, 0) })
@@ -162,6 +169,21 @@ onBeforeUnmount(() => {
 
         <h3>{{ t('inspector.payload') }}</h3>
         <pre data-testid="tt-event-payload">{{ inspected.current.payloadJson }}</pre>
+        <template v-if="payloadLocations.length > 0">
+          <h3>{{ t('inspector.locations') }}</h3>
+          <dl
+            class="facts"
+            data-testid="tt-event-locations"
+          >
+            <template
+              v-for="l in payloadLocations"
+              :key="l.id"
+            >
+              <dt>{{ l.id }}</dt>
+              <dd>{{ l.text }}</dd>
+            </template>
+          </dl>
+        </template>
 
         <h3>{{ t('inspector.causeChain') }}</h3>
         <p class="muted">
@@ -291,7 +313,7 @@ onBeforeUnmount(() => {
               :key="i"
               :class="{ current: c.current }"
             >
-              {{ t('inspector.custodyRow', { time: elapsed(c.t), owner: `${c.ownerKind}:${c.ownerId}` }) }}
+              {{ t('inspector.custodyRow', { time: elapsed(c.t), owner: store.locations.owner(c.ownerKind, c.ownerId, c.size) }) }}
               <span
                 v-if="c.current"
                 class="now"

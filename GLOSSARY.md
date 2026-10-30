@@ -14,6 +14,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Quay:** the continuous berth face at Z = 0. Sea is at negative Z and the yard at positive Z, with X running along the quay.
 - **Vessel slot:** a bay/row/tier position on a vessel (`<vesselId>:<bay>-<row>-<tier>`, plus `a`/`f` for the aft/fore 20 ft half of a cell). Its **purpose** is discharge, load or transshipment.
+- **Maritime location notation (TT-R08):** how the UI names a slot, display only (internal ids, the engine API, saves and goldens keep the internal form). Vessel: `VESSEL.V<nn>.<bay>.<row>.<tier>`, e.g. `VESSEL.V01.04.02.82`, shown with the vessel name ("MSC Aurora · VESSEL.V01.04.02.82"). Bays count from the bow: odd = a 20 ft half cell, even = the 40 ft cell between its two odd halves. Row 00 is the centreline of an odd beam, starboard odd, port even (the quay side is port). Tiers: hold 02, 04, ...; deck 82, 84, .... Yard: `YARD.B<nn>.<bay>.<row>.<tier>`, e.g. `YARD.B01.03.02.1` (same bay convention, two-digit row, one-digit tier).
 - **Cell:** one bay/row/tier position of a vessel. It holds one 40 ft box or two 20 ft boxes (aft and fore half).
 - **Bay plan:** a vessel's slots and the boxes in them, generated from the vessel call and the seed. Bays are 40 ft bays counted from aft. Tiers count from the hold floor; tiers above the hatch covers are **on deck**, the rest **in the hold**.
 - **Berth:** a vessel's stretch of the continuous quay, from its stern (`berthX`) to its bow (LOA). Vessels keep a **berth gap** apart.
