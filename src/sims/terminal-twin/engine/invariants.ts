@@ -204,6 +204,28 @@ const doubleOccupied = (state: SimState, columns?: ReadonlySet<string>): string[
 const mixedLengthOverlap = (state: SimState, columns?: ReadonlySet<string>): string[] =>
   sharedCells(state, columns, (cell, slots, mixed) => (mixed ? `cell ${cell}: a 40 ft box overlaps a 20 ft box (${slots.map((x) => x.id).join(', ')})` : null))
 
+/**
+ * A stack takes the length of its bottom box: every box in a stack (one row x one 20 ft bay position) has the span of
+ * the box at tier 1. A 40 ft box counts in both stacks it covers.
+ */
+function mixedLengthStack(state: SimState, columns?: ReadonlySet<string>): string[] {
+  const messages: string[] = []
+  const index = yardIndexOf(state)
+  const seen = new Set<string>()
+  for (const s of slotsToCheck(state, columns))
+    for (let b = 0; b < s.span; b++) {
+      const key = columnKey(s.blockId, s.bay + b, s.row)
+      if (seen.has(key) || (columns && !columns.has(key))) continue
+      seen.add(key)
+      const boxes = (index.byColumn.get(key) ?? []).filter((x) => x.containerId).sort((x, y) => x.tier - y.tier)
+      const bottom = boxes[0]
+      const other = bottom && boxes.find((x) => x.span !== bottom.span)
+      if (bottom && other)
+        messages.push(`stack ${key.replace('|', ' bay-row ')}: ${bottom.span * 20} ft box ${bottom.containerId} at the bottom, ${other.span * 20} ft box ${other.containerId} above it (${other.id})`)
+    }
+  return messages
+}
+
 /** The custody check for the owners a set of touched boxes left or entered: each owner holds exactly the boxes recorded there. */
 function custodyScoped(state: SimState, scope: InvariantScope): string[] {
   const messages: string[] = []
@@ -342,6 +364,13 @@ export const INVARIANTS: Invariant[] = [
     description: 'A 40 ft box never overlaps a 20 ft box in the same cell.',
     scoped: true,
     check: (state, _config, scope) => mixedLengthOverlap(state, scope?.yardColumns),
+  },
+  {
+    id: 'yard.no-mixed-length-stack',
+    reads: ['yardSlot'],
+    description: 'A yard stack (one row x one 20 ft bay position) holds boxes of one length only: the length of its bottom box.',
+    scoped: true,
+    check: (state, _config, scope) => mixedLengthStack(state, scope?.yardColumns),
   },
   {
     id: 'asc.wtp-handover',

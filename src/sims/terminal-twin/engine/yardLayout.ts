@@ -147,11 +147,18 @@ export interface YardStacks {
   heights: number[]
   /** Vessel of each stack's top box (null if empty), same indexing. */
   topVessels: (string | null)[]
+  /**
+   * Length of each stack, same indexing: the span of its bottom box (1 = 20 ft, 2 = a 40 ft box, which locks both
+   * of its stacks), 0 = empty. Derived from the stack contents (`stackSpansOf`), never stored: a stack takes the
+   * length of its bottom box until it is empty again.
+   */
+  stackSpans: number[]
 }
 
 /**
- * Every slot a box of `stacks.size` can legally take: on top of a stack below
- * the tier limit; a 40 ft box needs two neighbouring stacks of equal height.
+ * Every slot a box of `stacks.size` can legally take: on top of a stack below the tier limit that holds boxes of
+ * the same length or nothing; a 40 ft box needs two neighbouring stacks that are both empty or both 40-locked, of
+ * equal height.
  */
 export function candidateSlots(stacks: YardStacks): YardCandidate[] {
   const span = boxSpan(stacks.size)
@@ -172,6 +179,9 @@ export function candidateSlots(stacks: YardStacks): YardCandidate[] {
       const h = stacks.heights[i]
       if (h >= stacks.tiers) continue
       if (span === 2 && stacks.heights[i + stacks.rows] !== h) continue
+      // a stack takes the length of its bottom box: only that length goes on it until it is empty
+      if (stacks.stackSpans[i] !== 0 && stacks.stackSpans[i] !== span) continue
+      if (span === 2 && stacks.stackSpans[i + stacks.rows] !== stacks.stackSpans[i]) continue
       const x = rowX({ x: stacks.blockX }, row)
       const z = slotZ({ firstBayZ: stacks.firstBayZ }, bay, span)
       out.push({
