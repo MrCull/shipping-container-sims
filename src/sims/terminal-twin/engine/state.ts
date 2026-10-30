@@ -190,6 +190,8 @@ export interface ShcState {
   nodeId: string
   carrying: string | null
   jobId: string | null
+  /** Kind of the last delivered job; set only under `paired-dual-cycle` (TT-R14). */
+  lastJobKind?: 'discharge' | 'load'
   /** Current trip's motion (axes x, z, lift); the renderer interpolates from these. */
   motion: MotionSegment[]
   /** Remaining phase events of the current trip. */

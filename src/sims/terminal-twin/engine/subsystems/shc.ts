@@ -410,7 +410,12 @@ function goPark(ctx: EngineContext, shc: ShcState): void {
 /** True when the shcDispatch decision point runs the `chained-nearest` strategy (SHCs take work straight away and park only without work). */
 export function isChained(ctx: EngineContext): boolean {
   const strategy = ctx.config.decisions?.points?.shcDispatch?.strategy
-  return strategy === 'chained-nearest' || strategy === 'predispatch'
+  return strategy === 'chained-nearest' || strategy === 'predispatch' || strategy === 'paired-dual-cycle'
+}
+
+/** True when the shcDispatch strategy is `paired-dual-cycle` (chained dispatch that pairs a discharge delivery with a nearby load pickup and back, TT-R14). */
+export function isPaired(ctx: EngineContext): boolean {
+  return ctx.config.decisions?.points?.shcDispatch?.strategy === 'paired-dual-cycle'
 }
 
 /** True when the shcDispatch strategy is `predispatch` (chained dispatch plus SHCs sent ahead of predicted ready times, TT-R13). */
@@ -643,7 +648,15 @@ function requestDispatch(ctx: EngineContext, shc: ShcState): void {
     })
   ctx.requestDecision(
     'shcDispatch',
-    { shcId: shc.id, nodeId: shc.nodeId, x: here.x, z: here.z, jobs, wtpPads: padOptions(ctx) },
+    {
+      shcId: shc.id,
+      nodeId: shc.nodeId,
+      x: here.x,
+      z: here.z,
+      ...(isPaired(ctx) && shc.lastJobKind ? { lastJobKind: shc.lastJobKind } : {}),
+      jobs,
+      wtpPads: padOptions(ctx),
+    },
     { equipment: [shc.id] },
   )
 }
@@ -1140,6 +1153,7 @@ export const shcReactors: ReactorMap = {
     if (state.kpis.horizontal) state.kpis.horizontal.boxesToWtp++
   }),
   ShcCleared: phase((e, ctx, shc) => {
+    if (isPaired(ctx)) shc.lastJobKind = ctx.state.shcJobs[e.payload.jobId]?.kind === 'load' ? 'load' : 'discharge'
     delete ctx.state.shcJobs[e.payload.jobId]
     shc.jobId = null
     maybeDispatch(ctx)

@@ -74,6 +74,11 @@ export interface ShcDispatchRequest {
   nodeId: string
   x: number
   z: number
+  /**
+   * Kind of the job this SHC delivered last ('discharge': it just set a box down on a WTP pad; 'load': on an STS ground
+   * position). Only sent under the `paired-dual-cycle` strategy (TT-R14), so other event logs are unchanged.
+   */
+  lastJobKind?: 'discharge' | 'load'
   /** Open (unclaimed) jobs, oldest first. */
   jobs: ShcDispatchJob[]
   wtpPads: ShcDispatchPad[]

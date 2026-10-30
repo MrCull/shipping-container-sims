@@ -21,6 +21,7 @@ import rehandleRandomYard from './rehandle-random-yard.json'
 import shc1Sts2Shc1Wtp from './shc-1sts-2shc-1wtp.json'
 import shcQueueChained from './shc-queue-chained.json'
 import shcPrepositioning from './shc-prepositioning.json'
+import shcPairedDualCycle from './shc-paired-dual-cycle.json'
 import tracer1Sts10Boxes from './tracer-1sts-10-boxes.json'
 import transshipmentAToB from './transshipment-a-to-b.json'
 import emptiesLoad from './empties-load-4-of-16.json'
@@ -37,6 +38,7 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'shc-1sts-2shc-1wtp': shc1Sts2Shc1Wtp as ScenarioConfig,
   'shc-queue-chained': shcQueueChained as ScenarioConfig,
   'shc-prepositioning': shcPrepositioning as ScenarioConfig,
+  'shc-paired-dual-cycle': shcPairedDualCycle as ScenarioConfig,
   'liveries-mixed': liveriesMixed as ScenarioConfig,
   'asc-1sts-10-boxes-1block': asc1Sts10Boxes1Block as ScenarioConfig,
   'asc-2asc-block-conflict': asc2AscBlockConflict as ScenarioConfig,
