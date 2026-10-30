@@ -42,3 +42,10 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 - Deviations to review: #91 uses 2 panels (feeder) and 4 (ULCV), not 1 and 3, because panels must fit the laydown strip (about 15 m across); SHC scenarios with more than 3 ground positions per STS throw at start unless `hatch.enabled` is false. Hatch moves count in turnaround and `kpiReport().hatch`, not in STS moves or gross moves/h.
 - Open follow-ups: setup-dialog fields for hatch and holding; 2D plan preview lacks holding positions; gate queue is strictly FIFO; KPI_DEFS series row for hatch time; #84 gross/net tiles reserve 15ch. `invariants-incremental.test.ts` timed out once in a parallel run (passes alone and in verify).
 - Next ENGINE_VERSION numbers: tip is 0.19.0. #94 0.16.0, #95 0.17.0, #99 0.20.0, #101 0.21.0 were pre-assigned; on merge keep the highest number on the tip.
+
+## Environment changes after the retro
+
+- `scripts/check-engine-version.sh` (run by `merge-ticket.sh`) fails when a merge lowers `ENGINE_VERSION`. Tickets no longer get a pre-assigned version: each takes the next minor above the tip when it merges the tip.
+- `scripts/merge-ticket.sh [--push]` logs to `.merge-ticket.log` (last line `EXIT <code>`) and can push on success. Run it in the background.
+- `docs/agents/implementing.md`: implementers read spec/ticket files named in the brief (orchestrator saves them from GitHub); each uses its own `SMOKE_DEV_PORT`/`SMOKE_PROD_PORT`; at most three implementers at once; one PR when the spec asks for per-slice PRs.
+- The version numbers pre-assigned in the table above are now only hints.

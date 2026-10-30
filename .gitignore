@@ -162,3 +162,4 @@ test-results/
 # User-supplied reference material (e.g. the TTI Algeciras pack); never commit
 docs/reference/*
 !docs/reference/README.md
+.merge-ticket.log
