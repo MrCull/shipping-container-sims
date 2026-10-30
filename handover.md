@@ -8,7 +8,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 | Ticket | Title | Blocked by | ENGINE_VERSION | Claimed by | Status |
 |---|---|---|---|---|---|
 | #84 | R02 Fixed-width KPI strip | | n/a | | todo |
-| #85 | R03 Keyboard camera | | n/a | wave 1 | in progress |
+| #85 | R03 Keyboard camera | | n/a | wave 1 | merged |
 | #86 | R04 Scenario picker | | n/a | | todo |
 | #87 | R05 TTI research KB | | n/a | | todo |
 | #88 | R06 Yard no mixed 20/40 | | 0.13.0 | wave 1 | merged (ee888ee) |
@@ -20,7 +20,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 | #94 | R12 SHC queue areas, chaining | #93 | 0.16.0 | | todo |
 | #95 | R13 SHC pre-dispatch | #94, #91 | 0.17.0 | | todo |
 | #96 | R14 Paired dispatch | #94 | n/a | | todo |
-| #97 | R15 Truck appointments | | 0.18.0 | wave 1 | in progress |
+| #97 | R15 Truck appointments | | 0.18.0 | wave 1 | reported, merging |
 | #98 | R16 Stall admission, holding | #97 | 0.19.0 | | todo |
 | #99 | R17 ASC pre-retrieval | #98 | 0.20.0 | | todo |
 | #100 | R18 Truck metrics | #98 | n/a (KPI fields only) | | todo |
