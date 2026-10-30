@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "name": "stow-mixed-20-40",
+  "description": "A feeder stows mixed 20 and 40 ft boxes in hold and on deck: never a 20 on a 40",
+  "seed": 7,
+  "startDateTime": "2026-01-05T06:00:00Z",
+  "quay": {
+    "lengthM": 400,
+    "berthGapM": 15,
+    "mooringS": 60,
+    "unmooringS": 60,
+    "stsMinSpacingM": 27,
+    "twinLift": true
+  },
+  "layout": {
+    "stsGroundLaneZ0M": 8,
+    "stsGroundLaneSpacingM": 3,
+    "stsSafeHoistM": 50
+  },
+  "kinematics": {
+    "sts": {
+      "gantry": {
+        "vMax": 0.75,
+        "accel": 0.25,
+        "decel": 0.25
+      },
+      "trolley": {
+        "vMax": 4,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "hoistLoaded": {
+        "vMax": 1.5,
+        "accel": 0.6,
+        "decel": 0.6
+      },
+      "hoistEmpty": {
+        "vMax": 3,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "lockS": 3,
+      "unlockS": 3
+    },
+    "shc": {
+      "driveEmpty": {
+        "vMax": 8.3,
+        "accel": 1,
+        "decel": 1.2
+      },
+      "driveLoaded": {
+        "vMax": 6.9,
+        "accel": 0.7,
+        "decel": 0.9
+      },
+      "lift": {
+        "vMax": 0.4,
+        "accel": 0.4,
+        "decel": 0.4
+      },
+      "liftHeightM": 1,
+      "lockS": 2,
+      "unlockS": 2
+    }
+  },
+  "moveVariationPct": 10,
+  "sts": [
+    {
+      "id": "STS01",
+      "gantryX": 60,
+      "groundPositions": 3
+    }
+  ],
+  "vessels": [
+    {
+      "id": "V001",
+      "name": "Mixed Star",
+      "arrivalS": 0,
+      "sizeClass": "feeder",
+      "discharge": 140,
+      "load": 40,
+      "transshipment": 0,
+      "maxSts": 1,
+      "sizeMix": {
+        "20": 2,
+        "40": 1,
+        "40HC": 1
+      },
+      "empties": [
+        {
+          "size": "20",
+          "line": "MSC",
+          "count": 6
+        }
+      ]
+    }
+  ],
+  "cargo": {
+    "lines": {
+      "HMM": 30,
+      "MSC": 15,
+      "Maersk": 12,
+      "CMA CGM": 10,
+      "Hapag-Lloyd": 8,
+      "ONE": 7,
+      "Evergreen": 6,
+      "COSCO": 6,
+      "ZIM": 3,
+      "Yang Ming": 3
+    },
+    "sizeMix": {
+      "20": 0.3,
+      "40": 0.25,
+      "40HC": 0.45
+    },
+    "emptyShare": 0.1
+  },
+  "endConditions": {
+    "vesselsCompleted": 1
+  },
+  "driverVariabilityPct": 10,
+  "emptyPool": {
+    "count": 8,
+    "sizeMix": {
+      "20": 1
+    },
+    "lines": {
+      "MSC": 1
+    }
+  },
+  "shcs": [
+    {
+      "id": "SHC01"
+    },
+    {
+      "id": "SHC02"
+    },
+    {
+      "id": "SHC03"
+    }
+  ],
+  "yard": {
+    "blocks": [
+      {
+        "id": "B01",
+        "x": 20,
+        "bays": 20,
+        "tiers": 4,
+        "wtpPads": 5
+      }
+    ],
+    "ascsPerBlock": 2
+  }
+}
