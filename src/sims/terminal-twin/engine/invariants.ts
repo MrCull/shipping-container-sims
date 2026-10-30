@@ -462,18 +462,31 @@ export const INVARIANTS: Invariant[] = [
     reads: ['vessel', 'container'],
     description:
       'Stowage order: a box on board never lies above an empty cell. Every filled load slot above the bottom tier of its ' +
-      'section (hold floor or hatch cover) has a box directly below it, so lower tiers are loaded before upper tiers.',
+      'section (hold floor or hatch cover) has a box directly below it, so lower tiers are loaded before upper tiers. ' +
+      'A 20 ft box never sits on a 40 ft box, and a 40 ft box rests only on a 40 ft box or on two filled 20 ft halves.',
     scoped: true,
     check(state, _config, scope) {
       const messages: string[] = []
       const filled = new Map<string, ('aft' | 'fore' | null)[]>()
       const loads = []
+      const boxes = []
       for (const s of Object.values(state.vesselSlots)) {
         if (!s.containerId) continue
         if (scope && !scope.vessels.has(s.vesselId)) continue
         const key = `${s.vesselId}:${s.bay}:${s.row}:${s.tier}`
         filled.set(key, [...(filled.get(key) ?? []), s.half])
+        boxes.push(s)
         if (s.purpose === 'load' || s.purpose === 'transshipment') loads.push(s)
+      }
+      // TT-R07: no 20 ft box on a 40 ft box; a 40 ft box only on a 40 ft box or on two 20 ft halves (cell-level, per section)
+      for (const s of boxes) {
+        const holdTiers = vesselClass(state.vessels[s.vesselId].sizeClass).holdTiers
+        if (s.tier === 0 || s.tier === holdTiers) continue
+        const below = filled.get(`${s.vesselId}:${s.bay}:${s.row}:${s.tier - 1}`) ?? []
+        if (s.half !== null && below.includes(null))
+          messages.push(`20 ft box ${s.containerId} in ${s.id} sits on a 40 ft box (bay ${s.bay} row ${s.row} tier ${s.tier - 1})`)
+        else if (s.half === null && below.length === 1 && below[0] !== null)
+          messages.push(`40 ft box ${s.containerId} in ${s.id} sits on a single 20 ft half (bay ${s.bay} row ${s.row} tier ${s.tier - 1})`)
       }
       for (const s of loads) {
         const holdTiers = vesselClass(state.vessels[s.vesselId].sizeClass).holdTiers

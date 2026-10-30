@@ -18,6 +18,7 @@ import shc1Sts2Shc1Wtp from './shc-1sts-2shc-1wtp.json'
 import tracer1Sts10Boxes from './tracer-1sts-10-boxes.json'
 import transshipmentAToB from './transshipment-a-to-b.json'
 import emptiesLoad from './empties-load-4-of-16.json'
+import stowMixed from './stow-mixed-20-40.json'
 import yardNoMixedLength from './yard-no-mixed-length.json'
 import twin20Lift from './twin-20-lift.json'
 import twoVesselsCompeteForBerth from './two-vessels-compete-for-berth.json'
@@ -40,4 +41,5 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'truck-gate-queue': truckGateQueue as ScenarioConfig,
   'landside-morning-peak': landsideMorningPeak as ScenarioConfig,
   'yard-no-mixed-length': yardNoMixedLength as ScenarioConfig,
+  'stow-mixed-20-40': stowMixed as ScenarioConfig,
 }
