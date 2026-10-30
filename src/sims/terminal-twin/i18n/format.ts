@@ -28,6 +28,8 @@ export interface Formatter {
   dateTime(date: Date): { date: string; time: string }
   /** Locale number formatting (grouping, decimal separator). */
   number(value: number, maxFractionDigits?: number): string
+  /** Locale number with exactly `digits` fraction digits (min = max), for values that must not change width. */
+  fixed(value: number, digits: number): string
   /** A length in metres, shown in m or ft. */
   length(metres: number): string
   /** A speed in m/s, shown in km/h or mi/h (never "mph": that is crane moves per hour). */
@@ -116,6 +118,16 @@ export function createFormatter(settings: DisplaySettings): Formatter {
     return fmt.format(value)
   }
 
+  const fixedFmts = new Map<number, Intl.NumberFormat>()
+  const fixed = (value: number, digits: number): string => {
+    let fmt = fixedFmts.get(digits)
+    if (!fmt) {
+      fmt = new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits })
+      fixedFmts.set(digits, fmt)
+    }
+    return fmt.format(value)
+  }
+
   return {
     settings: { locale, units: settings.units },
     clock(startIso, simTimeS) {
@@ -132,6 +144,7 @@ export function createFormatter(settings: DisplaySettings): Formatter {
     },
     dateTime: (date) => ({ date: dateFmt.format(date), time: timeFmt.format(date) }),
     number,
+    fixed,
     length: (m) => (imperial ? t('unit.ft', { value: number(m / M_PER_FT, 0) }) : t('unit.m', { value: number(m, 1) })),
     speed: (mps) =>
       imperial

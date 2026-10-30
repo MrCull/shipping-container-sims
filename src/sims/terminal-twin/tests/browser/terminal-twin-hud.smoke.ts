@@ -76,6 +76,22 @@ test('every KPI card shows its label and value in full at 1280x720, with both pa
   }
 })
 
+test('KPI values keep a fixed minimum width and tabular figures so the strip does not shift', async ({ page }) => {
+  await open(page, 'TTI Algeciras baseline')
+  const values = await page.getByTestId('tt-kpi-strip').locator('.value').evaluateAll((els) =>
+    els.map((el) => {
+      const cs = getComputedStyle(el)
+      return { min: parseFloat(cs.minWidth), width: el.getBoundingClientRect().width, tabular: cs.fontVariantNumeric.includes('tabular-nums') }
+    }),
+  )
+  expect(values.length).toBeGreaterThan(3)
+  for (const v of values) {
+    expect(v.min).toBeGreaterThan(30)
+    expect(v.width).toBeGreaterThanOrEqual(v.min - 1)
+    expect(v.tabular).toBe(true)
+  }
+})
+
 test('the Quality control sits in the settings region beside Daylight and Sound', async ({ page }) => {
   await open(page, 'Small automated')
   const settings = page.locator('[data-hud-region="settings"]')

@@ -32,6 +32,32 @@ describe('KPI strip', () => {
     expect(items.dwell.format(fmt, 80)).toBe('1 min 20 s')
   })
 
+  it('formats every metric with a fixed number of fraction digits so the strip does not shift', () => {
+    const items = Object.fromEntries(
+      stripItems(headline({ shcBusyPct: 40, shcEmptyTravelRatio: 0.5, ascUtilisationPct: 55, yardFillPct: 3, wtpDwellS: 80 })).map((i) => [i.id, i]),
+    )
+    expect(items.moves.format(fmt, 12)).toBe('12')
+    expect(items.vessels.format(fmt, 1.4)).toBe('1')
+    expect(items.gross.format(fmt, 12)).toBe('12.0 moves/h')
+    expect(items.gross.format(fmt, 12.34)).toBe('12.3 moves/h')
+    expect(items.net.format(fmt, 0)).toBe('0.0 moves/h')
+    expect(items.shcBusy.format(fmt, 40)).toBe('40.0 %')
+    expect(items.shcEmpty.format(fmt, 0.5)).toBe('50.0 %')
+    expect(items.asc.format(fmt, 100)).toBe('100.0 %')
+    expect(items.yard.format(fmt, 3)).toBe('3.0 %')
+    expect(fmt.fixed(7, 1)).toBe('7.0')
+    expect(createFormatter({ locale: 'de-DE', units: 'metric' }).fixed(7, 1)).toBe('7,0')
+  })
+
+  it('gives every tile value a fixed minimum width in ch', () => {
+    const items = stripItems(headline({ shcBusyPct: 40, shcEmptyTravelRatio: 0.5, ascUtilisationPct: 55, yardFillPct: 3, wtpDwellS: 80 }))
+    for (const i of items) expect(i.minWidthCh, i.id).toBeGreaterThanOrEqual(4)
+    // wide enough for the longest value the unit can show
+    const byId = Object.fromEntries(items.map((i) => [i.id, i]))
+    expect(byId.gross.minWidthCh).toBeGreaterThanOrEqual(fmt.movesPerHour(1000).length)
+    expect(byId.asc.minWidthCh).toBeGreaterThanOrEqual('100.0 %'.length)
+  })
+
   it('detects a threshold crossing in either direction, never from or to "no data"', () => {
     expect(crossedThreshold(80, 90, 85)).toBe(true)
     expect(crossedThreshold(90, 80, 85)).toBe(true)
