@@ -4,11 +4,15 @@
  */
 import { describe, expect, it } from 'vitest'
 import { createSimulation, getStrategy, strategies, type YardAllocationRequest, type YardBoxView } from '../engine'
-import { groupedSlot } from '../engine/decisions/yardStrategies'
-import { candidateSlots } from '../engine'
 import { runCli } from '../cli/runCli'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
+
+/** The registered strategy, called on a bare request (a strategy is a pure function of its message). */
+function groupedSlot(payload: YardAllocationRequest): { slotId: string | null } {
+  const handler = getStrategy('yardAllocation', 'grouped')
+  return handler({ correlationId: 'test', decisionPoint: 'yardAllocation', version: 1, t: 0, payload }, undefined as never) as { slotId: string | null }
+}
 
 const BAYS = 6
 const ROWS = 8

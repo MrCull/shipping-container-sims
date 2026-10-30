@@ -109,7 +109,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Lane graph:** the generated one-way graph SHCs route over (apron loop, STS lanes, WTP spurs, parking spurs). Edges run along X or Z.
 - **Conflict zone:** a part of the lane graph only one vehicle may use at a time: an intersection, an STS lane section (ground position) or a WTP pad with its spur.
 - **Reservation:** a time window `[from, to)` on a conflict zone held by one piece of equipment. Trips reserve all their zones before departing and depart later if any window is taken.
-- **Yard allocation:** the decision point (`yardAllocation`) that picks a box's slot in the block of the pad it was dropped on. Built-in strategies: random, nearest-wtp, group-by-vessel. Candidates keep each stack to one length.
+- **Yard allocation:** the decision point (`yardAllocation`) that picks a box's slot in the block of the pad it was dropped on. Built-in strategies: random, nearest-wtp, grouped (opt-in; groups by direction, line, outbound vessel, POD and weight class, mismatch costs score and never removes a slot). Candidates keep each stack to one length.
 - **Claim (slot claim):** a slot is claimed when allocation answers and stacked later. Stacks fill in claim order: an ASC does not stack a box before an older claim in the same stack.
 - **ASC job:** one box to move from a WTP pad to its slot. It is **ready** once its slot is allocated and its SHC has released the box and cleared the pad.
 - **Lifting envelope (of a WTP pad):** the space over the pad where an ASC spreader is below travel height. An ASC never enters it while an SHC is on the pad (the pad zone's **handover**).
