@@ -13,6 +13,7 @@ The Web Worker host, the main-thread modules, locale and units, the `window.__tt
 ├── components/               TopBar.vue (clock, speeds, Step, Run to…, Reset, New Scenario, ?), OverlayToggles.vue,
 │                             debug/EventFeedPanel.vue (left: step/continue, breakpoints, filterable feed),
 │                             debug/InspectorPanel.vue (right: event inspector + selection inspector),
+│                             BayViewer.vue (bay viewer popup, spec #106: modules/bayView.ts + bayViewData.ts),
 │                             modals/SetupDialog.vue (shell: provides composables/useSetupDraft.ts, composes setup/Setup*Section.vue + *Validation.ts),
 │                             modals/ShortcutHelp.vue, setup/VesselTable.vue (vessel table + "Generate N vessels")
 ├── composables/useTwinShortcuts.ts  Window keydown → store actions (table in modules/shortcuts.ts)
