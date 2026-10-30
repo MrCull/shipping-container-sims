@@ -205,7 +205,7 @@ test.describe('British browser', () => {
     await page.keyboard.press('?')
     const help = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
     await expect(help).toBeVisible()
-    for (const key of ['Space', '1–9', '0', '.', 'F', 'Esc', 'B', 'O', '?', 'W A S D / arrows', '= + / -']) {
+    for (const key of ['Space', '1–9', '0', '.', 'F', 'Esc', 'B', 'O', '?', 'WASD', 'Shift + AD', 'Shift + WS', '= / -']) {
       await expect(help.locator('kbd', { hasText: new RegExp(`^${key.replace(/[.?+]/g, '\\$&')}$`) })).toHaveCount(1)
     }
     await page.keyboard.press('Escape')
