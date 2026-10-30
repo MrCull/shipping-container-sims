@@ -82,6 +82,17 @@ export interface LandsideKpiReport {
   turnTimeS: { mean: number; max: number }
   /** Gate queue wait: arrival to lane assignment (s), over the trucks that got a lane. */
   gateWaitS: { mean: number; max: number }
+  /** Kiosk processing at the in gate (s), over the trucks that got through. */
+  gateProcessingS: { mean: number; max: number }
+  /**
+   * Internal drive time (s) over the trucks that left: the inbound drive from the kiosk to the stall (through the holding
+   * position when there was one). Standing time (holding, at the stall) and the way out are not in it.
+   */
+  internalDriveS: { mean: number; max: number }
+  /** Total truck turnaround: arrival at the gate to gate-out (s), so it includes the wait outside and in holding. */
+  totalTurnaroundS: { mean: number; max: number }
+  /** Road use: trucks driving on the internal roads (inbound legs and the way out), time-weighted mean over the run and peak. */
+  road: { meanTrucks: number; maxTrucks: number }
   /** Stall allocation wait: gate-in to stall assigned (s). */
   stallAllocWaitS: { mean: number; max: number }
   /** Transfer-stall wait: standing at the stall until the ASC starts on the truck (s). */
@@ -95,7 +106,17 @@ export interface LandsideKpiReport {
   /** Arrivals that could not get the drawn transaction and came to drop an empty. */
   fallbacks: number
   /** Appointment system (only with `config.landside.appointments`, TT-R15). */
-  appointments?: { windowS: number; capPerWindow: number; windows: number; booked: number; rejected: number; maxBookedPerWindow: number }
+  appointments?: {
+    windowS: number
+    capPerWindow: number
+    windows: number
+    booked: number
+    /** Bookings refused because their window was full. */
+    rejected: number
+    maxBookedPerWindow: number
+    /** Booked trucks that passed the gate after the end of their window (TT-R18). */
+    delayed: number
+  }
   /** Stall admission and holding (only with `config.landside.holding`, TT-R16). */
   holding?: {
     positions: number
@@ -108,6 +129,8 @@ export interface LandsideKpiReport {
     maxInUse: number
     /** Standing in a holding position until its stall is assigned (s). */
     waitS: { mean: number; max: number }
+    /** Occupied position-seconds (reserved until the truck drives out) over positions x run time, in % (TT-R18). */
+    utilisationPct: number
   }
 }
 
@@ -183,7 +206,7 @@ const gateServed = (state: SimState): number => {
 }
 
 /** Trucks that have been given a stall (through the gate minus those still waiting for one). */
-function appointmentReport(book: AppointmentBook): NonNullable<LandsideKpiReport['appointments']> {
+function appointmentReport(book: AppointmentBook, k: LandsideKpiCounters): NonNullable<LandsideKpiReport['appointments']> {
   const perWindow = new Map<number, number>()
   for (const a of book.list) perWindow.set(a.windowIndex, (perWindow.get(a.windowIndex) ?? 0) + 1)
   return {
@@ -193,10 +216,11 @@ function appointmentReport(book: AppointmentBook): NonNullable<LandsideKpiReport
     booked: book.list.length,
     rejected: book.rejected,
     maxBookedPerWindow: Math.max(0, ...perWindow.values()),
+    delayed: k.appointmentsDelayed,
   }
 }
 
-function holdingReport(ls: LandsideState, k: LandsideKpiCounters): NonNullable<LandsideKpiReport['holding']> {
+function holdingReport(ls: LandsideState, k: LandsideKpiCounters, now: number): NonNullable<LandsideKpiReport['holding']> {
   const positions = Object.values(ls.holding)
   return {
     positions: positions.length,
@@ -206,6 +230,7 @@ function holdingReport(ls: LandsideState, k: LandsideKpiCounters): NonNullable<L
     inUse: positions.filter((h) => h.truckId !== null).length,
     maxInUse: k.holdingMax,
     waitS: { mean: k.holdingWaitCount > 0 ? r3(k.holdingWaitSumS / k.holdingWaitCount) : 0, max: r3(k.holdingWaitMaxS) },
+    utilisationPct: now > 0 ? r3((100 * (k.holdBusyS + positions.filter((h) => h.truckId !== null).length * (now - k.holdLastT))) / (positions.length * now)) : 0,
   }
 }
 
@@ -339,13 +364,20 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     gateWaitS: { mean: gateServed(state) > 0 ? r3(ls.gateWaitSumS / gateServed(state)) : 0, max: r3(ls.gateWaitMaxS) },
     stallAllocWaitS: { mean: ls.trucksIn > 0 ? r3(ls.stallAllocWaitSumS / Math.max(1, stallsAssigned(state))) : 0, max: r3(ls.stallAllocWaitMaxS) },
     stallWaitS: { mean: ls.stallWaitCount > 0 ? r3(ls.stallWaitSumS / ls.stallWaitCount) : 0, max: r3(ls.stallWaitMaxS) },
+    gateProcessingS: { mean: ls.trucksIn > 0 ? r3(ls.gateProcSumS / ls.trucksIn) : 0, max: r3(ls.gateProcMaxS) },
+    internalDriveS: { mean: ls.trucksOut > 0 ? r3(ls.driveSumS / ls.trucksOut) : 0, max: r3(ls.driveMaxS) },
+    totalTurnaroundS: { mean: ls.trucksOut > 0 ? r3(ls.totalTurnSumS / ls.trucksOut) : 0, max: r3(ls.totalTurnMaxS) },
+    road: {
+      meanTrucks: state.now > 0 ? r3((ls.roadBusyS + ls.roadNow * (state.now - ls.roadLastT)) / state.now) : 0,
+      maxTrucks: ls.roadMax,
+    },
     serviceS: ls.trucksOut > 0 ? r3(ls.serviceSumS / ls.trucksOut) : 0,
     transactions: { ...ls.transactions },
     boxesDropped: ls.boxesDropped,
     boxesPicked: ls.boxesPicked,
     fallbacks: ls.fallbacks,
-    ...(state.landside?.appointments ? { appointments: appointmentReport(state.landside.appointments) } : {}),
-    ...(state.landside && Object.keys(state.landside.holding).length > 0 ? { holding: holdingReport(state.landside, ls) } : {}),
+    ...(state.landside?.appointments ? { appointments: appointmentReport(state.landside.appointments, ls) } : {}),
+    ...(state.landside && Object.keys(state.landside.holding).length > 0 ? { holding: holdingReport(state.landside, ls, state.now) } : {}),
   }
   return {
     simTimeS: r3(state.now - (state.warmUp?.ended ? state.warmUp.durationS : 0)),

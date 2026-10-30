@@ -433,6 +433,11 @@ export interface TruckState {
   gateStartedAt: number | null
   gateInAt: number | null
   stallAssignedAt: number | null
+  /** TT-R18: the truck holds an appointment (it came from the booking system). */
+  booked: boolean
+  /** TT-R18: seconds spent driving inside so far, and when the current drive began (null while standing). */
+  driveS: number
+  driveSince: number | null
   atStallAt: number | null
   serviceStartedAt: number | null
   interchangeDoneAt: number | null
@@ -535,6 +540,25 @@ export interface LandsideKpiCounters {
   holdingWaitSumS: number
   holdingWaitMaxS: number
   holdingWaitCount: number
+  /** TT-R18: kiosk processing at the in gate (s), over the trucks that got through (`trucksIn`). */
+  gateProcSumS: number
+  gateProcMaxS: number
+  /** Driving inside the terminal before service (gate to holding position and stall, standing time excluded), per truck that left. */
+  driveSumS: number
+  driveMaxS: number
+  /** Arrival at the gate to gate-out, per truck that left. */
+  totalTurnSumS: number
+  totalTurnMaxS: number
+  /** Trucks driving on the internal roads now / at most, and the integral of the count over time (truck-seconds up to `roadLastT`). */
+  roadNow: number
+  roadMax: number
+  roadBusyS: number
+  roadLastT: number
+  /** Holding positions occupied (reserved to driving out), integrated over time (position-seconds up to `holdLastT`). */
+  holdBusyS: number
+  holdLastT: number
+  /** Booked trucks that passed the gate after the end of their appointment window. */
+  appointmentsDelayed: number
 }
 
 export interface StsDrop {
@@ -898,6 +922,19 @@ function initLandside(state: SimState, config: ScenarioConfig, seed: number): vo
     holdingWaitSumS: 0,
     holdingWaitMaxS: 0,
     holdingWaitCount: 0,
+    gateProcSumS: 0,
+    gateProcMaxS: 0,
+    driveSumS: 0,
+    driveMaxS: 0,
+    totalTurnSumS: 0,
+    totalTurnMaxS: 0,
+    roadNow: 0,
+    roadMax: 0,
+    roadBusyS: 0,
+    roadLastT: 0,
+    holdBusyS: 0,
+    holdLastT: 0,
+    appointmentsDelayed: 0,
   }
 }
 

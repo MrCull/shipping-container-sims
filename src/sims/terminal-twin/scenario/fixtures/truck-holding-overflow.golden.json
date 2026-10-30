@@ -369,6 +369,22 @@
         "mean": 96.518,
         "max": 241.837
       },
+      "gateProcessingS": {
+        "mean": 30,
+        "max": 30
+      },
+      "internalDriveS": {
+        "mean": 42.651,
+        "max": 47.109
+      },
+      "totalTurnaroundS": {
+        "mean": 853.991,
+        "max": 1349.704
+      },
+      "road": {
+        "meanTrucks": 0.118,
+        "maxTrucks": 4
+      },
       "serviceS": 203.921,
       "transactions": {
         "dropExport": 2,
@@ -390,7 +406,8 @@
         "waitS": {
           "mean": 173.558,
           "max": 295.933
-        }
+        },
+        "utilisationPct": 10.904
       }
     },
     "workPackages": {

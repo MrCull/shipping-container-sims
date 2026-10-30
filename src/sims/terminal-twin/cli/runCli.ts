@@ -263,6 +263,18 @@ function formatSummary(s: RunSummary, headline: HeadlineKpis, stopped: string, s
   if (h.wtpDwellS !== null) lines.push(`  WTP pad dwell:    ${num(h.wtpDwellS, ' s')}`)
   if (h.ascUtilisationPct !== null) lines.push(`  ASC utilisation:  ${num(h.ascUtilisationPct, ' %')}`)
   if (h.yardFillPct !== null) lines.push(`  Yard fill:        ${num(h.yardFillPct, ' %')}`)
+  if (h.truckTurnaroundS !== null) lines.push(`  Truck turnaround: ${num(h.truckTurnaroundS, ' s')}  (mean, arrival at the gate to gate-out)`)
+  const ls = s.kpis.landside
+  if (ls) {
+    lines.push(
+      `Landside:         ${ls.trucksIn} in, ${ls.trucksOut} out, gate queue max ${ls.gateQueueMax}`,
+      `  gate wait ${ls.gateWaitS.mean} s mean / ${ls.gateWaitS.max} s max, gate processing ${ls.gateProcessingS.mean} s, internal drive ${ls.internalDriveS.mean} s, stall wait ${ls.stallWaitS.mean} s`,
+      `  turnaround ${ls.totalTurnaroundS.mean} s mean / ${ls.totalTurnaroundS.max} s max, trucks on roads ${ls.road.meanTrucks} mean / ${ls.road.maxTrucks} max`,
+    )
+    if (ls.holding)
+      lines.push(`  holding: ${ls.holding.positions} positions, ${ls.holding.utilisationPct} % used (max ${ls.holding.maxInUse}), ${ls.holding.heldOutside} trucks waited outside`)
+    if (ls.appointments) lines.push(`  appointments: ${ls.appointments.booked} booked, ${ls.appointments.rejected} rejected, ${ls.appointments.delayed} delayed`)
+  }
   lines.push('TOS handlers:')
   for (const [dp, h] of Object.entries(s.kpis.handlers)) {
     lines.push(
