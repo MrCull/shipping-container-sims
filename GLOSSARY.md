@@ -121,7 +121,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **KPI series:** one KPI for one entity (a crane, a block, the terminal) with an **hourly** value per hour bucket, a value per **shift** and a **total**.
 - **Hour bucket / shift bucket:** an hour cut on the scenario clock, and a run of 8 whole hours (3 per day; default 06-14, 14-22, 22-06). A night shift belongs to the day it starts.
 - **Gross / net moves per hour:** a crane's moves divided by the hours it was on a vessel (gross) or on a vessel and not waiting for an SHC or the rail (net).
-- **Headline KPIs:** the few numbers on the **KPI strip** and in the CLI summary.
+- **Headline KPIs:** the few numbers on the **KPI strip** and in the CLI summary. The strip shows them fixed-width: fixed fraction digits (one decimal for rates and percentages), tabular figures and a minimum width per tile.
 - **End condition:** a rule that ends the run: N vessels completed (default all scheduled), sim duration or total moves. The first one met wins.
 - **Final report:** the panel shown when a run ends: reason, **highlights**, headline KPIs, tables and export buttons. The scene stays inspectable; only Reset and New Scenario remain of the time controls.
 - **Highlights:** friendly facts in the final report: hardest-working crane, busiest block, longest wait.
