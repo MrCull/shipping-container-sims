@@ -22,22 +22,22 @@ test('presets frame each region; the dev API, buttons and shortcuts set them', a
   const targets: Record<string, { x: number; z: number }> = {}
   for (const name of ['quay', 'yard', 'gate', 'overview']) {
     expect(await page.evaluate((n) => window.__tt!.viewPreset(n), name), name).toBe(true)
-    targets[name] = (await page.evaluate(() => window.__tt!.cameraTarget()))!
+    targets[name] = (await page.evaluate(() => window.__tt!.cameraPose()!.target))
   }
   expect(await page.evaluate(() => window.__tt!.viewPreset('nope'))).toBe(false)
   // the quay view looks at the water side of the yard view
   expect(targets.quay.z).toBeLessThan(targets.yard.z)
 
   await page.getByTestId('tt-view-yard').click()
-  const yard = (await page.evaluate(() => window.__tt!.cameraTarget()))!
+  const yard = (await page.evaluate(() => window.__tt!.cameraPose()!.target))
   expect(yard.z).toBeCloseTo(targets.yard.z, 3)
   await page.getByTestId('tt-view-quay').click()
-  expect((await page.evaluate(() => window.__tt!.cameraTarget()))!.z).toBeCloseTo(targets.quay.z, 3)
+  expect((await page.evaluate(() => window.__tt!.cameraPose()!.target)).z).toBeCloseTo(targets.quay.z, 3)
 
   await page.keyboard.press('g')
-  expect((await page.evaluate(() => window.__tt!.cameraTarget()))!.x).toBeCloseTo(targets.gate.x, 3)
+  expect((await page.evaluate(() => window.__tt!.cameraPose()!.target)).x).toBeCloseTo(targets.gate.x, 3)
   await page.keyboard.press('v')
-  expect((await page.evaluate(() => window.__tt!.cameraTarget()))!.x).toBeCloseTo(targets.overview.x, 3)
+  expect((await page.evaluate(() => window.__tt!.cameraPose()!.target)).x).toBeCloseTo(targets.overview.x, 3)
 
   // listed in the ? help
   await page.keyboard.press('?')

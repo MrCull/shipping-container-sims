@@ -5,6 +5,7 @@
  */
 import type { Reservation } from './reservations'
 import type {
+  Appointment,
   AscJob,
   AscState,
   ContainerState,
@@ -64,6 +65,8 @@ export interface SimQuery {
   transferStalls(): readonly Readonly<TransferStallState>[]
   /** Trucks waiting at the gate, head of the queue first. */
   gateQueue(): readonly string[]
+  /** Booked truck appointments, in arrival order (empty without `config.landside.appointments`), TT-R15. */
+  appointments(): readonly Readonly<Appointment>[]
 }
 
 function get<T>(record: Record<string, T>, id: string, what: string): T {
@@ -110,6 +113,7 @@ export function createQuery(getState: () => SimState): SimQuery {
     truck: (id) => get(getState().trucks, id, 'truck'),
     transferStalls: () => Object.values(getState().landside?.stalls ?? {}),
     gateQueue: () => getState().landside?.queue ?? [],
+    appointments: () => getState().landside?.appointments?.list ?? [],
     loadOrders: () => Object.values(getState().loadOrders).sort((a, b) => (a.stsId < b.stsId ? -1 : a.stsId > b.stsId ? 1 : a.seq - b.seq)),
   }
 }

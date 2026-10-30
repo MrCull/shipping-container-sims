@@ -7,6 +7,8 @@
  * recent-event buffer use shallowRef + triggerRef (Box Empire pattern).
  */
 import type { ViewPresetName } from '../modules/viewPresets'
+import type { CameraPose } from '../modules/cameraKeys'
+import type { CameraKey } from '../modules/shortcuts'
 import { defineStore } from 'pinia'
 import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
@@ -89,8 +91,8 @@ export interface TwinView {
   pickAt(clientX: number, clientY: number): string | null
   /** Viewport (client) coordinates of an entity's centre; null when it is not drawn or off screen. */
   screenPoint(entityId: string): { x: number; y: number } | null
-  /** Where the orbit camera currently looks. */
-  cameraTarget(): { x: number; y: number; z: number } | null
+  /** The orbit camera: where it looks, how far, the heading and the angle from straight up; null without a 3D view. */
+  cameraPose(): CameraPose | null
   /** Rendered entity counts plus frames rendered so far and the last frame's draw calls/triangles; null without a 3D view. */
   stats(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */
@@ -252,6 +254,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   let controller: TwinController | null = null
   let view: TwinView | null = null
+  /** Camera keys currently held (TT-R03) and whether Shift is down; read by the scene loop each frame. Not reactive on purpose. */
+  const cameraKeys = { held: new Set<CameraKey>(), shift: false }
   let kpiTimer: ReturnType<typeof setInterval> | null = null
   let kpiEvents = -1
   let kpiBusy = false
@@ -939,6 +943,15 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     helpOpen.value = open
   }
 
+  /** A camera key was pressed: the user steers by hand now, so follow mode (and a pending follow-next-truck) ends. */
+  function releaseFollow(): void {
+    followNextPending.value = false
+    if (following.value) {
+      following.value = false
+      showToast('twin.toast.followOff')
+    }
+  }
+
   /** Frame a view preset (shortcut, button, dev API). Stops following, since the preset sets the camera itself. */
   function setViewPreset(preset: ViewPresetName): boolean {
     if (!view) return false
@@ -1075,6 +1088,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     pause,
     step,
     toggleFollow,
+    releaseFollow,
+    cameraKeys,
     toggleOverlays,
     toggleDashboard,
     setHelpOpen,

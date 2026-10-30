@@ -209,6 +209,55 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * TT-R07: mixed 20 and 40 ft stows across hold and deck. A feeder discharges 140 mixed boxes (an odd number of 20s
+   * is possible), loads 40 export boxes and 6 empty 20s: on board no 20 ft box sits on a 40 ft box and a 40 ft box
+   * rests only on a 40 or on two filled 20 ft halves (`stowage.order`).
+   */
+  'stow-mixed-20-40': () =>
+    new ScenarioBuilder('stow-mixed-20-40', 'A feeder stows mixed 20 and 40 ft boxes in hold and on deck: never a 20 on a 40')
+      .hatch({ enabled: false })
+      .seed(7)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', {
+        name: 'Mixed Star',
+        sizeClass: 'feeder',
+        discharge: 140,
+        load: 40,
+        maxSts: 1,
+        sizeMix: { '20': 2, '40': 1, '40HC': 1 },
+        empties: [{ size: '20', line: 'MSC', count: 6 }],
+      })
+      .emptyPool({ count: 8, sizeMix: { '20': 1 }, lines: { MSC: 1 } })
+      .shcs(3)
+      .block('B01', { x: 20, bays: 20, tiers: 4 })
+      .ascsPerBlock(2)
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /**
+   * TT-R06: a yard stack takes the length of its bottom box. A 50% pre-filled block (mixed 20 and 40 ft boxes,
+   * 8 bays x 3 tiers) receives 24 more mixed boxes through the default `nearest-wtp` allocation: no stack ever
+   * holds both lengths (`yard.no-mixed-length-stack`), and 40 ft boxes keep to adjacent bay pairs.
+   */
+  'yard-no-mixed-length': () =>
+    new ScenarioBuilder('yard-no-mixed-length', 'A pre-filled yard takes mixed 20 and 40 ft boxes: every stack keeps one length')
+      .hatch({ enabled: false })
+      .seed(6)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Length Star', sizeClass: 'feeder', discharge: 24, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 8, tiers: 3 })
+      .yardStart({ mode: 'prefilled', targetPct: 50 })
+      .endWhen({ simDurationS: 3600 })
+      .build(),
+
+  /**
    * TT-12 rehandle fixture: a random yard. Vessel V001 discharges 36 boxes into block B01 with
    * the `random` allocation, so imports land on the stacks where the export boxes of V002
    * (arriving later) stand. V002's retrievals then find buried boxes: every blocker is
@@ -298,6 +347,34 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
         ],
       })
       .endWhen({ simDurationS: 9000 })
+      .build(),
+
+  /**
+   * TT-R15 appointment windows: the gate-queue terminal (2 transfer stalls, 2 inbound lanes) with trucks booked in
+   * 30 minute windows. Demand is 16 trucks/h, bunched x3 in the second window, so that window hits its cap
+   * (2 stalls x 1800 s / 300 s = 12) and the surplus bookings are rejected. The numbers are not TTI values.
+   */
+  'truck-appointment-windows': () =>
+    new ScenarioBuilder('truck-appointment-windows', 'Trucks book 30-minute windows; a bunched window hits its booking cap')
+      .hatch({ enabled: false })
+      .seed(12)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 16, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', arrivalS: 20000, load: 4, maxSts: 1 })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3, transferStalls: 2 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 16),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 2, outLanes: 2, inProcessingS: 45, outProcessingS: 20 },
+        appointments: { windowS: 1800, bunching: [{ fromS: 1800, toS: 3600, factor: 3 }] },
+      })
+      .endWhen({ simDurationS: 7200 })
       .build(),
 
   /**

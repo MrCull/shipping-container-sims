@@ -28,7 +28,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Row:** one of the 8 lines across a block, under the ASC span.
 - **Tier:** a level in a stack, from 1 at the ground. A block has a **tier limit**.
 - **Yard slot (slot):** a 20 ft cell `<block>:<bay>-<row>-<tier>` that holds a box. A 40 ft box is named by its lower bay (its **anchor**) and also covers the next bay.
-- **Stack:** the boxes in one bay and row. A box above tier 1 must rest on boxes (no **floating** box).
+- **Stack:** the boxes in one bay and row. A box above tier 1 must rest on boxes (no **floating** box). A stack takes the **length** of its bottom box (20 or 40 ft) and accepts only that length until it is empty; a 40 ft box **40-locks** both stacks it covers. The lock is derived from the contents, never stored. Checked by `yard.no-mixed-length-stack`.
 - **Yard slot:** a bay/row/tier position in a block.
 
 ## Operations
@@ -54,6 +54,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Hatch panel (hatch cover panel):** one lift-away cover of a vessel's hatch. Each 40 ft bay has one hatch of N panels across the beam (N and the panel size and weight come from the vessel class). A panel has an id (`V001:H04-1`: bay, index from the quay side), dimensions, weight, a position and a **panel state**: `secured` → `unsecured` (lashing released) → `lifted` → `in-laydown` → `lifted` → `replaced` → `secured`. Panels are **not containers**: never in custody, yard slots or container counts. Deck boxes rest on a panel, so it only comes off when they are gone. *Avoid:* "hatch cover" for a single panel.
 - **Hatch move (`hatch-remove`, `hatch-replace`):** an STS job that lifts one panel off its hatch into the laydown, or back onto its own hatch. It takes the **hatch cycle time** (default about 4 minutes), counts as STS time and as vessel turnaround, and is not a move (not counted in moves per hour).
 - **Lashing release / securing:** the crew work around a hatch panel: the cleats are released a (configurable) delay after the deck boxes above it are gone, before the crane may lift it; a replaced panel is secured a delay after it is set back, before deck boxes may be loaded on it and before the vessel may leave. The crane idles (`StsWaitingForHatch`) when it has to wait.
+- **No 20 on a 40 (stowage):** on board a 20 ft box never sits on a 40 ft box, and a 40 ft box rests only on a 40 ft box or on two filled 20 ft halves. A stack reads, bottom up, twin-20 cells, then 40 ft cells or lone 20 ft halves. The structural 40-on-20 exception is not modelled. Checked by `stowage.order`; the bay plan only produces such stows (`stackAccepts`).
 - **Rehandle:** a non-productive ASC move needed to reach a buried box.
 - **Job (SHC job):** one box to move from an STS ground position to a WTP pad. Grounding a box **releases** a job into the **released pool**; a job is **open** until an SHC **claims** it.
 - **Pull dispatch:** free equipment asks the dispatch decision point (`shcDispatch`) for its next job from the released pool, rather than jobs being pushed to equipment.
@@ -100,7 +101,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Lane graph:** the generated one-way graph SHCs route over (apron loop, STS lanes, WTP spurs, parking spurs). Edges run along X or Z.
 - **Conflict zone:** a part of the lane graph only one vehicle may use at a time: an intersection, an STS lane section (ground position) or a WTP pad with its spur.
 - **Reservation:** a time window `[from, to)` on a conflict zone held by one piece of equipment. Trips reserve all their zones before departing and depart later if any window is taken.
-- **Yard allocation:** the decision point (`yardAllocation`) that picks a box's slot in the block of the pad it was dropped on. Built-in strategies: random, nearest-wtp, group-by-vessel.
+- **Yard allocation:** the decision point (`yardAllocation`) that picks a box's slot in the block of the pad it was dropped on. Built-in strategies: random, nearest-wtp, group-by-vessel. Candidates keep each stack to one length.
 - **Claim (slot claim):** a slot is claimed when allocation answers and stacked later. Stacks fill in claim order: an ASC does not stack a box before an older claim in the same stack.
 - **ASC job:** one box to move from a WTP pad to its slot. It is **ready** once its slot is allocated and its SHC has released the box and cleared the pad.
 - **Lifting envelope (of a WTP pad):** the space over the pad where an ASC spreader is below travel height. An ASC never enters it while an SHC is on the pad (the pad zone's **handover**).
@@ -115,6 +116,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Event feed:** the left panel's live list of recent events, newest first, filterable and capped. At high speed it **summarises bursts** (runs of the same event type) into one row.
 - **Event inspector:** the right panel's view of one event: payload, subjects, a decision's handler, request and reply, and its **cause chain**.
 - **Cause chain:** the events that led to one, from the event back to the root, as returned by the engine's `why`. Clicking an entry inspects it.
+- **Keyboard camera:** the held-key camera controls: W/A/S/D or arrows pan along the camera heading (speed scales with distance), Shift + A/D (or ←/→) orbits, Shift + W/S (or ↑/↓) tilts, `=`/`-` zoom, all within the orbit limits. Any camera key ends **follow** mode. Read through `__tt.cameraPose()` (target, distance, azimuth, polar angle).
 - **View preset:** a one-click or one-key camera pose computed from the layout: Quay (Q), Yard (Y), Landside/Gate (G) or Overview (V). The pose's target lies inside the region it names, so it fits every preset and fixture; the Gate view needs a landside. **Label declutter** hides any Labels-overlay label that would overlap a higher-priority one on screen (the selection first, then equipment-kind registry order).
 - **Selection:** the container, equipment or vessel picked in the 3D view (or by an id in the feed or inspector). The **inspector** shows its current state, current job and history, and the **follow camera** can track it.
 - **Picking:** finding the entity under a click by testing the view ray against each entity's bounding box (containers first).
@@ -167,7 +169,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Dashboard (TT-16)
 
-- **Dashboard:** the full-screen tab (D) with the KPI time-series charts, the yard heatmap, the Gantt timeline and the final report. It loads Apache ECharts lazily on first open. *Avoid:* "KPI strip" (that is the small always-visible bar over the 3D view).
+- **Dashboard:** the full-screen tab (B) with the KPI time-series charts, the yard heatmap, the Gantt timeline and the final report. It loads Apache ECharts lazily on first open. *Avoid:* "KPI strip" (that is the small always-visible bar over the 3D view).
 - **KPI group:** a set of KPI charts shown together: Quay, Horizontal transport, Yard, Landside (when it has data) or TOS handlers.
 - **Bucketing:** whether the dashboard charts show one point per clock hour or per 8-hour shift (the same series the collector builds).
 - **Yard heatmap:** yard fill % per block (rows) per hour (columns), plus each block's fill now.
@@ -191,6 +193,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Import dwell / export window:** how long an import stands in the yard before a truck may collect it (default lognormal, median 3 days); the period before a vessel's ETA (default 1 to 5 days) in which trucks may deliver its exports.
 - **Segregation:** trucks never enter the waterside network and SHCs never use the gate (invariant `landside.segregation`).
 - **Truck turn time:** gate-in to gate-out.
+- **Appointment window:** a slot of the truck booking system (default 30 min, `landside.appointments.windowS`). A truck books a window and arrives at a random time inside it; bookings per window are capped by gate and transfer stall capacity (`appointmentCap`), so demand above the cap is rejected. A peak is bunched bookings (`bunching` spans). Each **appointment** carries one transaction (its transport orders: export delivery, import collection or both = dual). No ANPR, no early, late or invalid arrivals.
 
 ## Yard start (TT-14)
 

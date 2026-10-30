@@ -32,7 +32,7 @@ async function showCharts(page: Page, group: string, bucketing: 'hour' | 'shift'
   await expect(page.getByTestId('tt-dashboard-charts')).toBeVisible()
 }
 
-test('D opens the dashboard, which loads ECharts only then, and D closes it', async ({ page }) => {
+test('B opens the dashboard, which loads ECharts only then, and B closes it', async ({ page }) => {
   const errors = collectErrors(page)
   const chartChunks: string[] = []
   page.on('request', (r) => {
@@ -42,14 +42,14 @@ test('D opens the dashboard, which loads ECharts only then, and D closes it', as
   await page.evaluate(() => window.__tt!.runTo(1200))
   await page.waitForTimeout(500)
   expect(chartChunks).toEqual([]) // the 3D view never pays for the chart library
-  await page.keyboard.press('d')
+  await page.keyboard.press('b')
   await expect(page.getByTestId('tt-dashboard')).toBeVisible()
   await expect(page.getByTestId('tt-chart-sts.gross-moves-per-hour')).toBeVisible()
   await page.waitForFunction(() => window.__tt!.dashboard().rendered?.chartLibLoaded === true)
   await page.waitForFunction(() => window.__tt!.dashboard().rendered?.charts.every((c) => c.drawn))
   expect(chartChunks.length).toBeGreaterThan(0)
   await expect(page.getByTestId('tt-chart-sts.gross-moves-per-hour').locator('canvas').first()).toBeVisible()
-  await page.keyboard.press('d')
+  await page.keyboard.press('b')
   await expect(page.getByTestId('tt-dashboard')).toBeHidden()
   await page.getByTestId('tt-dashboard-button').click()
   await expect(page.getByTestId('tt-dashboard')).toBeVisible()

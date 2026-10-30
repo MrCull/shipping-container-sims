@@ -64,6 +64,7 @@ export function planExportYard(config: ScenarioConfig, plan: CargoPlan): ExportP
     spec: b,
     heights: new Array<number>(b.bays * b.rows).fill(0),
     tops: new Array<string | null>(b.bays * b.rows).fill(null),
+    spans: new Array<number>(b.bays * b.rows).fill(0),
   }))
   const out: ExportPlacement[] = []
   for (const { c } of [...boxes, ...pool.map((c) => ({ c }))]) {
@@ -81,6 +82,7 @@ export function planExportYard(config: ScenarioConfig, plan: CargoPlan): ExportP
         wtpZ: blk.spec.wtpZ,
         heights: blk.heights,
         topVessels: blk.tops,
+        stackSpans: blk.spans,
       }
       const best = candidateSlots(stacks).sort((a, b) => a.tier - b.tier || b.bay - a.bay || a.row - b.row)[0]
       if (!best) continue
@@ -89,6 +91,7 @@ export function planExportYard(config: ScenarioConfig, plan: CargoPlan): ExportP
         const i = (cell.bay + k - 1) * blk.spec.rows + (cell.row - 1)
         blk.heights[i] = cell.tier
         blk.tops[i] = c.vesselId
+        blk.spans[i] = boxSpan(c.size)
       }
       out.push({
         containerId: c.id,

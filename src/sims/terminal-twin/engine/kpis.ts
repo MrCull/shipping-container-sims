@@ -2,7 +2,7 @@
  * KPI report: a plain, rounded (3 dp) summary derived from SimState. Later
  * tickets (TT-07) add time series, hourly/shift buckets and more groups.
  */
-import type { SimState } from './state'
+import type { AppointmentBook, SimState } from './state'
 
 /** Per-decision-point (TOS handler) KPIs. Latencies are per resolved decision. */
 export interface HandlerKpiReport {
@@ -96,6 +96,8 @@ export interface LandsideKpiReport {
   boxesPicked: number
   /** Arrivals that could not get the drawn transaction and came to drop an empty. */
   fallbacks: number
+  /** Appointment system (only with `config.landside.appointments`, TT-R15). */
+  appointments?: { windowS: number; capPerWindow: number; windows: number; booked: number; rejected: number; maxBookedPerWindow: number }
 }
 
 export interface HatchKpiReport {
@@ -183,6 +185,19 @@ const gateServed = (state: SimState): number => {
 }
 
 /** Trucks that have been given a stall (through the gate minus those still waiting for one). */
+function appointmentReport(book: AppointmentBook): NonNullable<LandsideKpiReport['appointments']> {
+  const perWindow = new Map<number, number>()
+  for (const a of book.list) perWindow.set(a.windowIndex, (perWindow.get(a.windowIndex) ?? 0) + 1)
+  return {
+    windowS: book.windowS,
+    capPerWindow: book.capPerWindow,
+    windows: book.windows,
+    booked: book.list.length,
+    rejected: book.rejected,
+    maxBookedPerWindow: Math.max(0, ...perWindow.values()),
+  }
+}
+
 const stallsAssigned = (state: SimState): number => (state.kpis.landside?.trucksIn ?? 0) - (state.landside?.stallWaiting.length ?? 0)
 
 export function buildKpiReport(state: SimState, eventsProcessed: number): KpiReport {
@@ -318,6 +333,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     boxesDropped: ls.boxesDropped,
     boxesPicked: ls.boxesPicked,
     fallbacks: ls.fallbacks,
+    ...(state.landside?.appointments ? { appointments: appointmentReport(state.landside.appointments) } : {}),
   }
   return {
     simTimeS: r3(state.now - (state.warmUp?.ended ? state.warmUp.durationS : 0)),

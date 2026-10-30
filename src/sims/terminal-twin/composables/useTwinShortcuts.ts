@@ -5,7 +5,7 @@
  * sim, so its "god" sequence never collides with D/O here.
  */
 import { onBeforeUnmount, onMounted } from 'vue'
-import { shortcutFor, type ShortcutAction } from '../modules/shortcuts'
+import { cameraKeyFor, shortcutFor, type ShortcutAction } from '../modules/shortcuts'
 import { usePerfStore } from '../store/perfStore'
 import { useTwinStore } from '../store/twinStore'
 
@@ -62,7 +62,18 @@ export function useTwinShortcuts(): void {
   }
 
   function onKeydown(event: KeyboardEvent): void {
+    store.cameraKeys.shift = event.shiftKey // pressing Shift with a key already held switches pan to orbit
     if (store.phase !== 'running' || !store.hasScenario) return
+    // Camera keys are held state (moved each frame by the scene loop), not key repeat.
+    const cameraKey = cameraKeyFor(event)
+    if (cameraKey) {
+      event.preventDefault() // arrows would scroll the page
+      if (!event.repeat) {
+        store.cameraKeys.held.add(cameraKey)
+        store.releaseFollow()
+      }
+      return
+    }
     const action = shortcutFor(event)
     if (!action) return
     // Space would otherwise also click a focused button or scroll the page.
@@ -70,6 +81,28 @@ export function useTwinShortcuts(): void {
     perform(action)
   }
 
-  onMounted(() => window.addEventListener('keydown', onKeydown))
-  onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+  function onKeyup(event: KeyboardEvent): void {
+    store.cameraKeys.shift = event.shiftKey
+    // Releasing Shift first turns 'W' into 'w' (and '+' into '='), so match on the camera key, not the character.
+    const cameraKey = cameraKeyFor({ key: event.key, ctrlKey: false, metaKey: false, altKey: false, target: null })
+    if (cameraKey) store.cameraKeys.held.delete(cameraKey)
+  }
+
+  /** Focus left the page or a field took the keys: no key may stay stuck down. */
+  function releaseCameraKeys(): void {
+    store.cameraKeys.held.clear()
+    store.cameraKeys.shift = false
+  }
+
+  onMounted(() => {
+    window.addEventListener('keydown', onKeydown)
+    window.addEventListener('keyup', onKeyup)
+    window.addEventListener('blur', releaseCameraKeys)
+  })
+  onBeforeUnmount(() => {
+    window.removeEventListener('keydown', onKeydown)
+    window.removeEventListener('keyup', onKeyup)
+    window.removeEventListener('blur', releaseCameraKeys)
+    releaseCameraKeys()
+  })
 }

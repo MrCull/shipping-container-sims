@@ -460,6 +460,25 @@ export interface LandsideState {
   stallWaiting: string[]
   /** The truck whose transferStallSelection decision is pending. */
   stallAsking: string | null
+  /** Booked appointment windows (TT-R15); present only when `config.landside.appointments` is set, filled at ScenarioStarted. */
+  appointments?: AppointmentBook
+}
+
+/** One booked truck visit: its window, its arrival inside the window and the transport orders it carries. */
+export interface Appointment {
+  id: string
+  windowIndex: number
+  arriveAtS: number
+  transaction: TruckTransactionKind
+}
+
+export interface AppointmentBook {
+  windowS: number
+  capPerWindow: number
+  windows: number
+  /** Bookings refused because their window was full. */
+  rejected: number
+  list: Appointment[]
 }
 
 export interface LandsideKpiCounters {
