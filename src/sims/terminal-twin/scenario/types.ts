@@ -133,7 +133,15 @@ export interface QueueAreasConfig {
   stsCapacity?: number
   /** Spots in the queue area near each block's WTP pads (0 = none). */
   blockCapacity?: number
+  /**
+   * Pre-dispatch lead margin (s, TT-R13; default `DEFAULT_PREDISPATCH_MARGIN_S`). With the `predispatch` strategy an SHC
+   * is sent to a queue area when a box there is predicted ready within the SHC's travel time plus this margin.
+   */
+  predispatchMarginS?: number
 }
+
+/** Default pre-dispatch margin (s). */
+export const DEFAULT_PREDISPATCH_MARGIN_S = 15
 
 /** Subsystem modes: real behaviour, an "instant" stub raising the same events, or off. */
 export type SubsystemMode = 'real' | 'instant' | 'off'
