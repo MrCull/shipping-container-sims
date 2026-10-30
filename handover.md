@@ -34,9 +34,11 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 
 ## Status at pause (budget limit; no new tickets started)
 
-- Merged and pushed: #88, #85, #97, #89, #98, #91, #84, #100.
-- Still running when paused: #93 (branch `tt/93-shc-states-metrics`). When they report, merge with `scripts/merge-ticket.sh`, update this table, push, then `scripts/remove-worktree.sh <agent-id>`.
-- Not started: #86, #87, #90, #92 (unblocked by #91), #94-#96 (after #93), #99 (after #98, now unblocked), #101 (after #87).
+- Merged and pushed: #88, #85, #97, #89, #98, #91, #84, #100, #93.
+- Nothing is running. No implementers are active.
+- Not started: #86, #87, #90, #92 (unblocked), #94 (unblocked), #95-#96 (after #94), #99 (unblocked), #101 (after #87).
+- ENGINE_VERSION on the tip is 0.19.0 (merging #91 had lowered it to 0.15.0; restored in the #93 merge). Keep the highest number on the tip when merging.
+- #93 definitions came from the ticket text only (its implementer could not read spec #82): check them against the spec. A handover is one SHC pick-up or put-down; `queuing-to-deliver` stays 0 until #94.
 - Deviations to review: #91 uses 2 panels (feeder) and 4 (ULCV), not 1 and 3, because panels must fit the laydown strip (about 15 m across); SHC scenarios with more than 3 ground positions per STS throw at start unless `hatch.enabled` is false. Hatch moves count in turnaround and `kpiReport().hatch`, not in STS moves or gross moves/h.
 - Open follow-ups: setup-dialog fields for hatch and holding; 2D plan preview lacks holding positions; gate queue is strictly FIFO; KPI_DEFS series row for hatch time; #84 gross/net tiles reserve 15ch. `invariants-incremental.test.ts` timed out once in a parallel run (passes alone and in verify).
 - Next ENGINE_VERSION numbers: tip is 0.19.0. #94 0.16.0, #95 0.17.0, #99 0.20.0, #101 0.21.0 were pre-assigned; on merge keep the highest number on the tip.
