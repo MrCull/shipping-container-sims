@@ -195,6 +195,25 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * TT-R06: a yard stack takes the length of its bottom box. A 50% pre-filled block (mixed 20 and 40 ft boxes,
+   * 8 bays x 3 tiers) receives 24 more mixed boxes through the default `nearest-wtp` allocation: no stack ever
+   * holds both lengths (`yard.no-mixed-length-stack`), and 40 ft boxes keep to adjacent bay pairs.
+   */
+  'yard-no-mixed-length': () =>
+    new ScenarioBuilder('yard-no-mixed-length', 'A pre-filled yard takes mixed 20 and 40 ft boxes: every stack keeps one length')
+      .seed(6)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Length Star', sizeClass: 'feeder', discharge: 24, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 8, tiers: 3 })
+      .yardStart({ mode: 'prefilled', targetPct: 50 })
+      .endWhen({ simDurationS: 3600 })
+      .build(),
+
+  /**
    * TT-12 rehandle fixture: a random yard. Vessel V001 discharges 36 boxes into block B01 with
    * the `random` allocation, so imports land on the stacks where the export boxes of V002
    * (arriving later) stand. V002's retrievals then find buried boxes: every blocker is

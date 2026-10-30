@@ -8,6 +8,22 @@ import type { YardAllocationReply, YardAllocationRequest } from './types'
 /** Extra cost per tier (m of plan distance): spreads boxes over nearby stacks before stacking high. */
 const TIER_COST_M = 6
 
+/**
+ * Bay pairs: bays (1,2), (3,4), ... A 40 ft box prefers an aligned pair (anchor on an odd bay) and a 20 ft box
+ * prefers not to open a stack in a pair whose two stacks are both empty, so 20 ft and 40 ft areas form naturally.
+ * Costs in m of plan distance: a preference, not zoning (every legal slot stays available).
+ */
+const MISALIGNED_40_COST_M = 30
+const BREAK_EMPTY_PAIR_COST_M = 12
+
+function pairingCost(req: YardAllocationRequest, c: YardCandidate): number {
+  if (c.span === 2) return c.bay % 2 === 1 ? 0 : MISALIGNED_40_COST_M
+  if (c.tier > 1) return 0
+  const mate = c.bay % 2 === 1 ? c.bay + 1 : c.bay - 1
+  if (mate < 1 || mate > req.bays) return 0
+  return req.heights[(mate - 1) * req.rows + (c.row - 1)] === 0 ? BREAK_EMPTY_PAIR_COST_M : 0
+}
+
 const none: YardAllocationReply = { slotId: null }
 
 /** Candidate with the lowest cost; ties by bay, row, tier. */
@@ -31,7 +47,7 @@ export function randomSlot(req: YardAllocationRequest): YardAllocationReply {
 }
 
 export function nearestWtpSlot(req: YardAllocationRequest): YardAllocationReply {
-  const best = cheapest(candidateSlots(req), (c) => c.distanceM + TIER_COST_M * (c.tier - 1))
+  const best = cheapest(candidateSlots(req), (c) => c.distanceM + TIER_COST_M * (c.tier - 1) + pairingCost(req, c))
   return { slotId: best?.slotId ?? null }
 }
 

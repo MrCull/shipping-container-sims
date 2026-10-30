@@ -3,9 +3,9 @@
   "seed": 7,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "115d759ff628ac",
+  "eventLogHash": "1c12e64852ff12",
   "kpis": {
-    "simTimeS": 2591.106,
+    "simTimeS": 2590.687,
     "eventsProcessed": 601,
     "movesCompleted": 16,
     "vesselsCompleted": 1,
@@ -14,7 +14,7 @@
         "moves": 16,
         "cycles": 15,
         "twinLifts": 1,
-        "grossMovesPerHour": 23.508,
+        "grossMovesPerHour": 23.512,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 2591.106,
-        "turnaroundS": 2531.106,
+        "departedAtS": 2590.687,
+        "turnaroundS": 2530.687,
         "sts": [
           "STS01"
         ]
@@ -206,7 +206,7 @@
         }
       },
       "stsGroundPositionWaitS": {
-        "STS01": 186.704
+        "STS01": 183.373
       }
     },
     "yard": {
@@ -224,7 +224,7 @@
           "boxes": 8,
           "cells": 13,
           "capacityCells": 240,
-          "maxHeight": 3,
+          "maxHeight": 2,
           "rehandles": 0,
           "productiveMoves": 16,
           "rehandlesPerProductiveMove": 0
@@ -234,8 +234,8 @@
         "B01-ASC1": {
           "jobs": 16,
           "gantryM": 1269.2,
-          "trolleyM": 146.9,
-          "hoistM": 571.264,
+          "trolleyM": 152.7,
+          "hoistM": 577.056,
           "padWaitS": 0
         }
       }
@@ -244,8 +244,8 @@
       "released": 14,
       "started": 14,
       "completed": 14,
-      "leadTimeMeanS": 318.854,
-      "leadTimeMaxS": 576.61,
+      "leadTimeMeanS": 318.794,
+      "leadTimeMaxS": 573.279,
       "boxesLoaded": 8
     }
   },

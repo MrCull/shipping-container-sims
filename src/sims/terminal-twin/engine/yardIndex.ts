@@ -8,6 +8,7 @@
  * span never change and the index holds the slot objects themselves, so a `containerId` change needs no call.
  */
 import type { SimState, YardSlotState } from './state'
+import { boxSpan, parseYardSlotId } from './yardLayout'
 
 export interface YardIndex {
   byBlock: Map<string, YardSlotState[]>
@@ -57,4 +58,31 @@ export function indexYardSlotRemoved(state: Pick<SimState, 'yardSlots'>, slot: Y
   if (!index) return
   removeFrom(index.byBlock.get(slot.blockId), slot)
   for (let k = 0; k < slot.span; k++) removeFrom(index.byColumn.get(columnKey(slot.blockId, slot.bay + k, slot.row)), slot)
+}
+
+/**
+ * Length of every stack of a block (`YardStacks.stackSpans`), derived from what is in it: the span of the tier-1 box,
+ * stacked or claimed (a claimed slot is in an ASC job, not yet in `yardSlots`). 0 = empty. Nothing is stored, so
+ * the lock lifts the moment a stack's bottom box leaves.
+ * `without`: a slot to leave out, for the block as it looks once that box has been lifted (rehandle targets).
+ */
+export function stackSpansOf(state: SimState, blockId: string, without?: YardSlotState): number[] {
+  const yard = state.yardBlocks[blockId]
+  const spans = new Array<number>(yard.bays * yard.rows).fill(0)
+  const mark = (bay: number, row: number, span: number): void => {
+    for (let k = 0; k < span; k++) spans[(bay + k - 1) * yard.rows + (row - 1)] = span
+  }
+  for (const s of yardIndexOf(state).byBlock.get(blockId) ?? []) if (s.tier === 1 && s.containerId && s !== without) mark(s.bay, s.row, s.span)
+  for (const j of Object.values(state.ascJobs)) {
+    if (j.blockId !== blockId) continue
+    // a stacking job's `yardSlotId` is its claim; a retrieve job's and a rehandle job's is the box being lifted (already
+    // in `yardSlots`, or gone after the lift), so only a rehandle's `targetSlotId` is a claim there
+    for (const id of [j.kind === undefined ? j.yardSlotId : undefined, j.targetSlotId]) {
+      if (!id || id === without?.id) continue
+      const cell = parseYardSlotId(id)
+      const box = state.containers[j.containerId]
+      if (cell.blockId === blockId && cell.tier === 1 && box) mark(cell.bay, cell.row, boxSpan(box.size))
+    }
+  }
+  return spans
 }

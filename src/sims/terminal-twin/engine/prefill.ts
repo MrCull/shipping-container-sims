@@ -84,6 +84,7 @@ export function* prefillSteps(
     used: 0,
     heights: new Array<number>(spec.bays * spec.rows).fill(0),
     tops: new Array<string | null>(spec.bays * spec.rows).fill(null),
+    spans: new Array<number>(spec.bays * spec.rows).fill(0),
   }))
   if (blocks.length === 0) return out
   let rngState = seedState((seed ^ PREFILL_SALT) >>> 0)
@@ -113,6 +114,7 @@ export function* prefillSteps(
         wtpZ: b.spec.wtpZ,
         heights: b.heights.slice(),
         topVessels: b.tops.slice(),
+        stackSpans: b.spans.slice(),
         random: rng(),
       }
       const slotId = yield request
@@ -126,6 +128,7 @@ export function* prefillSteps(
         if (b.heights[i] !== cell.tier - 1) throw new Error(`yardAllocation handler returned slot ${slotId}, which does not sit on its stack (pre-fill)`)
         b.heights[i] = cell.tier
         b.tops[i] = box.vesselId
+        b.spans[i] = span
       }
       b.used += span
       const placement: ExportPlacement = { containerId: box.id, vesselId: box.vesselId, size: box.size, blockId: b.spec.id, slotId, bay: cell.bay, row: cell.row, tier: cell.tier, span }

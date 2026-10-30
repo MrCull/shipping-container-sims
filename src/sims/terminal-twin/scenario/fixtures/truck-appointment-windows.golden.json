@@ -3,10 +3,10 @@
   "seed": 12,
   "status": "ended",
   "endReason": "simDurationS >= 7200",
-  "eventLogHash": "169982357649bf",
+  "eventLogHash": "00bfba2870da59",
   "kpis": {
     "simTimeS": 7200,
-    "eventsProcessed": 1906,
+    "eventsProcessed": 2002,
     "movesCompleted": 16,
     "vesselsCompleted": 1,
     "sts": {
@@ -14,7 +14,7 @@
         "moves": 16,
         "cycles": 11,
         "twinLifts": 5,
-        "grossMovesPerHour": 36.317,
+        "grossMovesPerHour": 36.504,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1725.654,
-        "turnaroundS": 1665.654,
+        "departedAtS": 1717.036,
+        "turnaroundS": 1657.036,
         "sts": [
           "STS01"
         ]
@@ -137,9 +137,9 @@
       },
       "ascDispatch": {
         "handler": "strategy:waterside-first",
-        "calls": 125,
-        "resolved": 125,
-        "ok": 125,
+        "calls": 142,
+        "resolved": 142,
+        "ok": 142,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -221,9 +221,9 @@
       },
       "rehandleTarget": {
         "handler": "strategy:nearest-valid",
-        "calls": 3,
-        "resolved": 3,
-        "ok": 3,
+        "calls": 7,
+        "resolved": 7,
+        "ok": 7,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -288,14 +288,14 @@
       "shcs": {
         "SHC01": {
           "jobs": 11,
-          "emptyDistanceM": 2522.933,
-          "loadedDistanceM": 1517.067,
+          "emptyDistanceM": 2511.933,
+          "loadedDistanceM": 1528.067,
           "reservationWaitS": 0
         },
         "SHC02": {
           "jobs": 5,
-          "emptyDistanceM": 1144.5,
-          "loadedDistanceM": 585.5,
+          "emptyDistanceM": 1155.5,
+          "loadedDistanceM": 574.5,
           "reservationWaitS": 0
         }
       },
@@ -308,9 +308,9 @@
       "boxesInTransit": 0,
       "allocationFailures": 0,
       "rehandles": {
-        "total": 3,
+        "total": 7,
         "productiveMoves": 57,
-        "perProductiveMove": 0.053,
+        "perProductiveMove": 0.123,
         "failures": 0
       },
       "blocks": {
@@ -319,30 +319,30 @@
           "cells": 55,
           "capacityCells": 240,
           "maxHeight": 3,
-          "rehandles": 3,
+          "rehandles": 7,
           "productiveMoves": 57,
-          "rehandlesPerProductiveMove": 0.053
+          "rehandlesPerProductiveMove": 0.123
         }
       },
       "ascs": {
         "B01-ASC1": {
-          "jobs": 19,
-          "gantryM": 555.9,
-          "trolleyM": 183.75,
-          "hoistM": 653.76,
+          "jobs": 23,
+          "gantryM": 593.3,
+          "trolleyM": 190.75,
+          "hoistM": 709.696,
           "padWaitS": 0,
-          "railWaitS": 0,
-          "busyS": 1686.068,
-          "yields": 5
+          "railWaitS": 84.593,
+          "busyS": 1888.193,
+          "yields": 7
         },
         "B01-ASC2": {
           "jobs": 41,
-          "gantryM": 2897.9,
-          "trolleyM": 408.35,
-          "hoistM": 1271.832,
+          "gantryM": 2894.4,
+          "trolleyM": 406.35,
+          "hoistM": 1254.456,
           "padWaitS": 0,
-          "railWaitS": 48.125,
-          "busyS": 3796.306,
+          "railWaitS": 58.238,
+          "busyS": 3770.218,
           "yields": 0
         }
       }
@@ -352,24 +352,24 @@
       "trucksOut": 35,
       "trucksInside": 1,
       "gateQueue": 0,
-      "gateQueueMax": 2,
+      "gateQueueMax": 3,
       "turnTimeS": {
-        "mean": 338.133,
-        "max": 1105.784
+        "mean": 429.309,
+        "max": 1295.396
       },
       "gateWaitS": {
-        "mean": 20.783,
-        "max": 458.916
+        "mean": 53.738,
+        "max": 517.525
       },
       "stallAllocWaitS": {
-        "mean": 65.482,
-        "max": 710.591
+        "mean": 126.218,
+        "max": 769.2
       },
       "stallWaitS": {
-        "mean": 87.455,
-        "max": 898.562
+        "mean": 104.49,
+        "max": 1077.115
       },
-      "serviceS": 165.861,
+      "serviceS": 195.016,
       "transactions": {
         "dropExport": 9,
         "pickImport": 8,
@@ -393,14 +393,14 @@
       "released": 9,
       "started": 9,
       "completed": 9,
-      "leadTimeMeanS": 312.879,
+      "leadTimeMeanS": 311.405,
       "leadTimeMaxS": 541.352,
       "boxesLoaded": 0
     }
   },
   "invariants": {
     "enabled": true,
-    "checks": 1905,
+    "checks": 2001,
     "violations": 0,
     "first": null
   },
