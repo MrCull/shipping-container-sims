@@ -181,7 +181,13 @@ export interface EventPayloads {
   /** The SHC reversed clear of the pad and is available. */
   ShcCleared: ShcPhasePayload & { nodeId: string }
   /** An idle SHC heads for its parking spot. */
-  ShcRoutingToParking: { shcId: string; departAt: number; reservations: Reservation[] }
+  ShcRoutingToParking: {
+    shcId: string
+    departAt: number
+    reservations: Reservation[]
+    /** TT-R13: the drive is a pre-dispatch to the queue area `areaId`, where a box is predicted ready at `readyAt`. */
+    predicted?: { areaId: string; readyAt: number; source: 'sts' | 'asc' }
+  }
   ShcParked: { shcId: string; nodeId: string; segments: MotionSegment[] }
   /**
    * The SHC reached a queue spot (TT-R12) and waits there: loaded (a box, waiting for a free WTP pad) or empty

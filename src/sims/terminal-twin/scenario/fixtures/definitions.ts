@@ -111,6 +111,28 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * SHC pre-dispatch (TT-R13): 2 STS with one ground position each (so a box left waiting blocks the crane), 4 SHCs
+   * and a 3-pad block. With the `predispatch` strategy idle SHCs are sent to the STS queue area when a box is
+   * predicted ready within their travel time plus `predispatchMarginS`, so they are there when it lands; the
+   * `chained-nearest` baseline (same scenario) leaves the cranes waiting for SHCs.
+   */
+  'shc-prepositioning': () =>
+    new ScenarioBuilder('shc-prepositioning', '2 STS (1 ground position) → 4 SHC → 3 pads: pre-dispatch on predicted ready time')
+      .hatch({ enabled: false })
+      .seed(42)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 1 })
+      .sts('STS02', { gantryX: 110, groundPositions: 1 })
+      .vesselCall('V001', { name: 'Pre Star', sizeClass: 'feeder', discharge: 24, maxSts: 2, sizeMix: { '40': 1 } })
+      .shcs(4)
+      .block('B01', { x: 20, bays: 8, tiers: 3, wtpPads: 3 })
+      .queueAreas({ stsCapacity: 3, blockCapacity: 3, predispatchMarginS: 15 })
+      .decisions({ points: { shcDispatch: { strategy: 'predispatch' } } })
+      .build(),
+
+  /**
    * ASC block storage (TT-06): the import flow from vessel to stack. One STS
    * discharges 10 boxes (20 ft and 40 ft mixed) to 2 SHCs; the block (8 bays,
    * 3 tiers, 5 WTP pads) has one ASC that stacks them. Ends at a fixed time,

@@ -32,6 +32,9 @@ import {
   vesselClass,
 } from '../../scenario/vesselClasses'
 import { releaseRail, reserveRail, startReposition, wakeRail } from './rail'
+import type { PredictedReady } from '../predictions'
+import { stsCycleGeometry, stsNominalCycle } from '../cycleTime'
+import { hatchEnabled, hatchSettings } from '../hatch'
 import { pumpLoadPrep, slotGantryX } from './loadPrep'
 import { prepareNextPackage } from './workPackages'
 import { deckBoxChanged } from './hatch'
@@ -155,7 +158,7 @@ export function continueWork(ctx: EngineContext, sts: StsState, at: number, segm
 }
 
 /** Quay mode instant: crane motions, locks and unlocks take no time (same events, zero durations). */
-export const isInstant = (ctx: EngineContext): boolean => ctx.state.subsystems.quay === 'instant'
+export const isInstant = (ctx: Pick<EngineContext, 'state'>): boolean => ctx.state.subsystems.quay === 'instant'
 
 /** Kinematics with lock/unlock times zeroed in quay mode instant. */
 export function stsKinematics(ctx: EngineContext) {
@@ -223,6 +226,7 @@ function planDrop(ctx: EngineContext, sts: StsState, t0: number, drop: StsDrop, 
     reserve(state, sts.id, windows, start)
   }
   const { segments, end } = planSequence(sts, start, f, moves, isInstant(ctx))
+  drop.groundAt = end + k.unlockS
   ctx.schedule('StsGrounded', end + k.unlockS, { equipment: [sts.id], containers: [box.id] }, {
     stsId: sts.id,
     containerId: box.id,
@@ -230,6 +234,51 @@ function planDrop(ctx: EngineContext, sts: StsState, t0: number, drop: StsDrop, 
     x: sts.gantryX + spreaderOffset(sts, box.id),
     segments,
   })
+}
+
+/** How many upcoming boxes per crane the quay predicts beyond those already in flight (TT-R13). */
+const PREDICTED_UPCOMING = 2
+
+/**
+ * TT-R13: when boxes are expected on the STS ground positions. In flight (the carry is planned): the planned set-down
+ * time, exact. Upcoming (next boxes of the work packages): the time the crane is free plus the nominal cycle per box,
+ * plus the hatch cycle for each hatch package in front of them. Discharge only; load work needs no SHC at the quay.
+ */
+export function predictedGroundings(ctx: Pick<EngineContext, 'state' | 'config'>): PredictedReady[] {
+  const { state, config } = ctx
+  if (state.subsystems.quay === 'off') return []
+  const out: PredictedReady[] = []
+  const cycleS = isInstant(ctx) ? 0 : stsNominalCycle(config.kinematics.sts, config.layout.stsSafeHoistM, stsCycleGeometry(config)).cycleS
+  for (const sts of Object.values(state.sts)) {
+    if (!sts.vesselId) continue
+    let t = state.now
+    for (const d of sts.drops) {
+      if (d.groundAt == null) continue
+      out.push({ source: 'sts', ownerId: sts.id, readyAt: d.groundAt, containerId: d.containerId, exact: true })
+      t = Math.max(t, d.groundAt)
+    }
+    const hatchS = isInstant(ctx) ? 0 : hatchSettings(config, state.vessels[sts.vesselId].sizeClass).cycleS
+    const carried = new Set(sts.carrying)
+    let upcoming = 0
+    for (const id of sts.packageIds) {
+      const pkg = state.workPackages[id]
+      if (pkg.status === 'complete') continue
+      if (pkg.kind === 'load') break
+      if (pkg.kind !== 'discharge') {
+        if (hatchEnabled(config)) t += hatchS
+        continue
+      }
+      const boxes = pkg.id === sts.activePackageId ? sts.workQueue : pkg.containerIds
+      for (const boxId of boxes) {
+        if (carried.has(boxId) || upcoming >= PREDICTED_UPCOMING) continue
+        t += cycleS
+        upcoming++
+        out.push({ source: 'sts', ownerId: sts.id, readyAt: t, containerId: boxId, exact: false })
+      }
+      if (upcoming >= PREDICTED_UPCOMING) break
+    }
+  }
+  return out
 }
 
 /**

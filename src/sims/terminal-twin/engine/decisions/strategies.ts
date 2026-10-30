@@ -99,6 +99,16 @@ export const strategies: StrategyRegistry = {
           return { jobId: job?.jobId ?? null }
         },
       },
+      predispatch: {
+        description:
+          'chained-nearest plus pre-dispatch (TT-R13, engine side): idle SHCs are sent to the queue area of a box predicted ready within their travel time plus queueAreas.predispatchMarginS (default 15 s). The SHC claims a queue spot, never a job, so nothing is collected before the box exists. Needs queueAreas.',
+        handler: (msg) => {
+          const job = [...msg.payload.jobs].sort(
+            (a, b) => a.distanceM - b.distanceM || a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1),
+          )[0]
+          return { jobId: job?.jobId ?? null }
+        },
+      },
     },
   },
   wtpPadSelection: {

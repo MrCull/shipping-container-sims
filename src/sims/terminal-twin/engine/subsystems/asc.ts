@@ -31,6 +31,7 @@ import { maybeDispatchAsc, resolveDispatch } from './ascDispatch'
 import { claimSlot, placeInStack, removeFromStack, jobOfBox, isTruckJob, pumpAllocation, resolveRehandleTarget } from './ascStorage'
 export { ascPoseAt, maybeDispatchAsc, pumpAllocation, isTruckJob }
 import type { EventOf } from '../events'
+import type { PredictedReady } from '../predictions'
 import { type AscJob, type AscState, type AscStatus } from '../state'
 import { parseVesselSlotId } from '../../scenario/vesselClasses'
 import { maybeDispatch } from './shc'
@@ -58,6 +59,21 @@ const STATUS_AFTER: Record<PlannedType, AscStatus> = {
   AscRoutingToStall: 'routing-to-pad',
   AscPositioningAtStall: 'positioning-at-pad',
   AscDroppedAtStall: 'releasing',
+}
+
+/**
+ * TT-R13: when export boxes are expected on WTP pads. An ASC retrieval whose cycle is planned has its set-down time
+ * (`AscDroppedAtWtp`, exact); the box then becomes a load job for an SHC.
+ */
+export function predictedPadReady(ctx: Pick<EngineContext, 'state'>): PredictedReady[] {
+  const out: PredictedReady[] = []
+  for (const asc of Object.values(ctx.state.ascs)) {
+    const drop = asc.plan.find((p) => p.type === 'AscDroppedAtWtp')
+    const job = asc.jobId ? ctx.state.ascJobs[asc.jobId] : null
+    if (!drop || !job || job.kind !== 'retrieve') continue
+    out.push({ source: 'asc', ownerId: asc.blockId, readyAt: drop.at, containerId: job.containerId, exact: true })
+  }
+  return out
 }
 
 function scheduleNext(ctx: EngineContext, asc: AscState): void {
