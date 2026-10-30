@@ -250,6 +250,18 @@ Every container carries `ContainerState.props` (`scenario/containerProps.ts`), s
 - **Inspector and tooltip:** `modules/entityInspector.ts` lists the properties as facts; `EntityView.tooltip` is the key subset, shown as the hover `title` of the selection heading. There is no 3D hover tooltip in the app.
 - **Goldens:** unchanged (they hash events and KPIs, and props enter no event). `ENGINE_VERSION` not bumped. A snapshot restored from before #108 has no `props`; the inspector tolerates that.
 
+## ROB bays (spec #106, #110)
+
+`ScenarioConfig.robBayFraction` (default 0; builder `.robBays(fraction, fill?)`) sets aside `round(fraction x bays)` of each vessel's bays (never all) as **ROB (remain on board) bays**; `robFill` (default 0.7) is how full they are. All in `scenario/robBays.ts`.
+
+- **Not worked:** `planCargo` picks the bays (`pickRobBays`, property stream keyed by seed and vessel id, so no engine or bay-plan stream moves) and `planVessel` leaves them out of the discharge spread, the clean stacks for load/transshipment/empties and the reserved-slot search; the capacity check counts only the working bays. `extraLoadCell` (truck exports) takes `VesselState.robBays` and skips them. So ROB bays have no `vesselSlots`, no work packages, no moves. Their hatch panels are still created (`createHatchPanels`, and the scene model's) and stay `secured` for the whole run: nothing opens a panel for a bay without work.
+- **Display-only contents:** `plan.rob` / `VesselState.robBoxes` are `RobBox` entries (slot id, bay/row/tier, deck, half, size, ISO type, POD, line, weight class, gross kg, full), not containers: not in `state.containers`, invariants, KPIs, yard, landside, work packages or cranes. Only `VesselHulls` (`modules/robBoxes.ts`, one InstancedMesh per vessel, coloured by POD; `sceneState().vesselHulls[id].robBoxes` counts them) reads them, and the bay viewer will (#115).
+- **Fill rules [A]:** per bay, hold and deck each get `round(fill x rows x tiers)` cells, spread unevenly over the rows; a stack is built bottom up from the floor or hatch cover with twin-20 cells first, then 40 ft cells (`stackAccepts`, never a 20 on a 40, no gaps), the heaviest first within a kind. PODs come from the ports after the terminal in the rotation (`laterPorts`; all others when the terminal is last). Lines and empty share follow `config.cargo`.
+- **Capacity:** a vessel whose working bays cannot hold its discharge and load throws at planning ("do not fit"); lower the fraction.
+- **Goldens:** existing fixtures keep fraction 0 and are unchanged; the new fixture `rob-bays` (3 of a feeder's 7 bays, hatch covers on, landside exports) has its own golden. `ENGINE_VERSION` not bumped (no event or decision-point change; an old snapshot just has no `robBays`). `validateRob` runs in `validateScenario`.
+- **Peak-day preset:** `PEAK_DAY_ROTATION` (CNSHA, SGSIN, ESALG, MAPTM, ESVLC, FRFOS, ITGOA), `PEAK_DAY_FLOW_MIX` (89% transshipment) and `PEAK_DAY_ROB` (30% of bays, 70% full), all marked unverified in its description. Presets have no golden; `tests/presets.test.ts` and `tests/rob-bays.test.ts` cover it.
+- **Proof:** `tests/rob-bays.test.ts` (plan, stacking, fill, PODs, headless run of `rob-bays` with zero violations, no event or slot in a ROB bay, hatches closed); smoke `tests/browser/rob-bays.smoke.ts` (hull draws the boxes, screenshot `.screenshots/assets/rob-bays.png`).
+
 ## Known gaps
 
 Deliberately not built, or built differently from the spec (the code review accepted these):
