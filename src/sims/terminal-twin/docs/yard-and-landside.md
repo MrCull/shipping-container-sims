@@ -138,7 +138,7 @@ External trucks bring boxes in and take them out. Terms (truck transaction, gate
 - **Fixture:** `reefer-powered-rows` (30% reefers, rows 1-2 powered, pre-filled 40%) + golden. TTI presets use 8% reefers and rows 1-2 (unverified assumptions, see the KB's Sim deviations).
 - **Not yet:** no plug monitoring, power events or reefer-specific handling times; vessel reefer plugs are not modelled; no setup-dialog fields for powered rows.
 
-## ASC pre-retrieval (TT-R17, ENGINE_VERSION 0.23.0)
+## ASC pre-retrieval (TT-R17, ENGINE_VERSION 0.24.0)
 
 The `pre-retrieval` strategy of the `ascDispatch` decision point (`decisions/ascStrategies.ts`, select with `config.decisions.points.ascDispatch.strategy`) lets an ASC fetch an import box to the truck's transfer stall **before the truck arrives**, so the stall service time (`TruckAtStall` to `TruckInterchangeDone`) drops. Default and other strategies are untouched: the engine offers an early job only when this strategy is selected (`preRetrievalOn` in `subsystems/landside.ts`), so no earlier golden moved.
 

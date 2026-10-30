@@ -133,6 +133,30 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * Paired dispatch (TT-R14): one feeder discharges at STS01 while another loads at STS02 (so discharge and load jobs
+   * are open together), 3 SHCs and a 2-pad block 150 m from the quay start. With `paired-dual-cycle` an SHC that just
+   * set a box down on a pad takes a nearby load pickup (and after a load drop at the quay a discharge box), so it
+   * drives loaded more often; the `chained-nearest` baseline (same scenario) drives more empty.
+   */
+  'shc-paired-dual-cycle': () =>
+    new ScenarioBuilder('shc-paired-dual-cycle', '2 STS (one discharges, one loads) → 3 SHC → 2 pads: paired discharge/load dispatch')
+      .hatch({ enabled: false })
+      .seed(42)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(500, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 4 })
+      .sts('STS02', { gantryX: 110, groundPositions: 4 })
+      .vesselCall('V001', { name: 'Dis Star', sizeClass: 'feeder', arrivalS: 0, discharge: 16, maxSts: 1, sizeMix: { '40': 1 } })
+      .vesselCall('V002', { name: 'Load Star', sizeClass: 'feeder', arrivalS: 0, load: 16, maxSts: 1, sizeMix: { '40': 1 } })
+      .shcs(3)
+      .block('B01', { x: 150, bays: 10, tiers: 3, wtpPads: 2 })
+      .queueAreas({ stsCapacity: 2, blockCapacity: 2 })
+      .decisions({ points: { shcDispatch: { strategy: 'paired-dual-cycle' } } })
+      .endWhen({ vesselsCompleted: 2 })
+      .build(),
+
+  /**
    * ASC block storage (TT-06): the import flow from vessel to stack. One STS
    * discharges 10 boxes (20 ft and 40 ft mixed) to 2 SHCs; the block (8 bays,
    * 3 tiers, 5 WTP pads) has one ASC that stacks them. Ends at a fixed time,

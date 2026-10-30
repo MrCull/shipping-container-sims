@@ -14,7 +14,10 @@ import { nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
 import { leastLoadedBlockStall, leastUsedLane, lowestFreeLane, nearestToBoxStall } from './landsideStrategies'
 import { justInTimeRelease, keepKAheadRelease } from './workPackageStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
-import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchPad, WtpPadSelectionRequest } from './types'
+import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchJob, ShcDispatchPad, WtpPadSelectionRequest } from './types'
+
+/** `paired-dual-cycle` takes the paired job only when it is at most this far (route length, m) from the SHC; beyond that the nearest job wins. [assumed] */
+export const PAIRING_RADIUS_M = 150
 
 const isFree = (p: ShcDispatchPad) => p.occupiedBy === null && p.claimedBy === null
 
@@ -96,6 +99,19 @@ export const strategies: StrategyRegistry = {
           const job = [...msg.payload.jobs].sort(
             (a, b) => a.distanceM - b.distanceM || a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1),
           )[0]
+          return { jobId: job?.jobId ?? null }
+        },
+      },
+      'paired-dual-cycle': {
+        description:
+          'chained-nearest with pairing (TT-R14): after delivering a discharge box to a WTP pad the SHC prefers an open load pickup, and after delivering a load box at the quay it prefers an open discharge pickup, when that job is within PAIRING_RADIUS_M of it (else the nearest job). SHCs drive loaded more often; they are reassigned freely between STS cranes and blocks. Needs queueAreas for the waiting behaviour of chained-nearest.',
+        handler: (msg) => {
+          const byNearest = (a: ShcDispatchJob, b: ShcDispatchJob) =>
+            a.distanceM - b.distanceM || a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1)
+          const { lastJobKind, jobs } = msg.payload
+          const wantLoad = lastJobKind === 'discharge'
+          const paired = lastJobKind ? jobs.filter((j) => (j.kind === 'load') === wantLoad).sort(byNearest)[0] : undefined
+          const job = paired && paired.distanceM <= PAIRING_RADIUS_M ? paired : [...jobs].sort(byNearest)[0]
           return { jobId: job?.jobId ?? null }
         },
       },
