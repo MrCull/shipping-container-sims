@@ -33,7 +33,7 @@ import { ascPoseAt } from './subsystems/asc'
 import { gantryPositionAt, railOrder } from './subsystems/rail'
 import { shcPositionAt } from './subsystems/shc'
 import { truckPositionAt } from './subsystems/landside'
-import { ASC_MIN_SEPARATION_M, blockSpecs, travelHoistM } from './yardLayout'
+import { ASC_MIN_SEPARATION_M, blockSpecs, REEFER_MAX_TIERS, travelHoistM } from './yardLayout'
 import type { ScenarioConfig } from '../scenario/types'
 import { hatchPanelId, hatchPanelOfRow, vesselClass, vesselSlotId } from '../scenario/vesselClasses'
 import { hatchSettings } from './hatch'
@@ -254,6 +254,19 @@ function mixedLengthStack(state: SimState, columns?: ReadonlySet<string>): strin
   return messages
 }
 
+/** R19: every reefer stands in a powered row of its block, at most REEFER_MAX_TIERS high. */
+function reeferPowered(state: SimState, config: ScenarioConfig, columns?: ReadonlySet<string>): string[] {
+  const messages: string[] = []
+  const blocks = blockSpecsById(config)
+  for (const s of slotsToCheck(state, columns)) {
+    const box = s.containerId ? state.containers[s.containerId] : undefined
+    if (!box?.reefer) continue
+    if (!blocks[s.blockId]?.poweredRows.includes(s.row)) messages.push(`reefer ${box.id} at ${s.id} stands in row ${s.row}, which has no reefer plugs`)
+    if (s.tier > REEFER_MAX_TIERS) messages.push(`reefer ${box.id} at ${s.id} is on tier ${s.tier}, above the reefer limit of ${REEFER_MAX_TIERS}`)
+  }
+  return messages
+}
+
 /** The custody check for the owners a set of touched boxes left or entered: each owner holds exactly the boxes recorded there. */
 function custodyScoped(state: SimState, scope: InvariantScope): string[] {
   const messages: string[] = []
@@ -426,6 +439,13 @@ export const INVARIANTS: Invariant[] = [
     description: 'A yard stack (one row x one 20 ft bay position) holds boxes of one length only: the length of its bottom box.',
     scoped: true,
     check: (state, _config, scope) => mixedLengthStack(state, scope?.yardColumns),
+  },
+  {
+    id: 'yard.reefer-powered',
+    reads: ['yardSlot'],
+    description: `Every reefer stands in a powered row of its block (reefer plugs) and at most ${REEFER_MAX_TIERS} tiers high.`,
+    scoped: true,
+    check: (state, config, scope) => reeferPowered(state, config, scope?.yardColumns),
   },
   {
     id: 'asc.wtp-handover',

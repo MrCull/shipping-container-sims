@@ -33,6 +33,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Yard slot (slot):** a 20 ft cell `<block>:<bay>-<row>-<tier>` that holds a box. A 40 ft box is named by its lower bay (its **anchor**) and also covers the next bay.
 - **Stack:** the boxes in one bay and row. A box above tier 1 must rest on boxes (no **floating** box). A stack takes the **length** of its bottom box (20 or 40 ft) and accepts only that length until it is empty; a 40 ft box **40-locks** both stacks it covers. The lock is derived from the contents, never stored. Checked by `yard.no-mixed-length-stack`.
 - **Yard slot:** a bay/row/tier position in a block.
+- **Reefer:** a refrigerated box (`ContainerState.reefer`), a share of the full boxes (`cargo.reeferShare`, default 0). It needs a plug: it is only allocated to a **powered row** of its block (`BlockConfig.poweredRows`, rows 1-8) and stacks at most **`REEFER_MAX_TIERS`** (4) high. A block without powered rows takes no reefer. Plain boxes may use powered rows, but `nearest-wtp` avoids them. Checked by `yard.reefer-powered`.
 
 ## Operations
 

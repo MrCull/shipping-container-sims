@@ -325,6 +325,27 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * TT-R19: 30% of the full boxes are reefers. The block has plugs in rows 1 and 2 only (an unverified, TTI-like
+   * layout), so every reefer, discharged or pre-filled, stands in those rows at most 4 tiers high
+   * (`yard.reefer-powered`) while plain boxes avoid the powered rows when anything else fits.
+   */
+  'reefer-powered-rows': () =>
+    new ScenarioBuilder('reefer-powered-rows', 'A third of the boxes are reefers: they stack only in the powered rows, at most 4 high')
+      .hatch({ enabled: false })
+      .seed(19)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Cold Star', sizeClass: 'feeder', discharge: 24, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .cargo({ reeferShare: 0.3 })
+      .block('B01', { x: 20, bays: 8, tiers: 5, poweredRows: [1, 2] })
+      .yardStart({ mode: 'prefilled', targetPct: 40 })
+      .endWhen({ simDurationS: 3600 })
+      .build(),
+
+  /**
    * TT-12 rehandle fixture: a random yard. Vessel V001 discharges 36 boxes into block B01 with
    * the `random` allocation, so imports land on the stacks where the export boxes of V002
    * (arriving later) stand. V002's retrievals then find buried boxes: every blocker is

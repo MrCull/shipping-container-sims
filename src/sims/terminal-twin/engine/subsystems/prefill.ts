@@ -80,6 +80,7 @@ export function createPrefillDriver(getState: () => SimState, config: ScenarioCo
       custodyHistory: [{ t: state.now, owner: { ...owner }, eventId: ctx.current.id }],
       yardSince: -imp.ageS,
       pickupReadyAt: imp.pickupReadyAt,
+      ...(imp.reefer ? { reefer: true as const } : {}),
     }
   }
 

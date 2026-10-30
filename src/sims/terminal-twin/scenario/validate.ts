@@ -6,6 +6,7 @@
  */
 import type { MessageKey, MessageParams } from '../i18n/messages'
 import { t } from '../i18n/messages'
+import { BLOCK_ROWS } from '../engine/yardLayout'
 import { BLOCK_FRONTAGE_M, SCALE_LIMITS, STRESS_SCALE } from './limits'
 import { validateOverrides, type CheckMessage, type OverrideCheck } from './overrides'
 import type { ScenarioConfig, SubsystemModes } from './types'
@@ -58,8 +59,12 @@ export function validateScenario(config: ScenarioConfig, overrides: SubsystemMod
       if (bad)
         err('setup.check.block', { n: i + 1, maxBays: lim.bays.max, maxTiers: lim.tiers.max, maxPads: lim.pads, maxStalls: lim.stalls })
       if (b.x < 0 || b.x > L) warn('setup.check.blockOffQuay', { n: i + 1 })
+      if ((b.poweredRows ?? []).some((r) => !Number.isInteger(r) || r < 1 || r > BLOCK_ROWS)) err('setup.check.poweredRows', { n: i + 1, rows: BLOCK_ROWS })
     })
   }
+  const reeferShare = config.cargo.reeferShare ?? 0
+  if (!(reeferShare >= 0 && reeferShare <= 1)) err('setup.check.reeferShare')
+  else if (reeferShare > 0 && blocks.length > 0 && !blocks.some((b) => (b.poweredRows ?? []).length > 0)) err('setup.check.reeferNoPower')
   const shc = config.shcs?.length ?? 0
   if (shc > lim.shc.max) err('setup.check.shcCount', { min: lim.shc.min, max: lim.shc.max })
   const peak = peakTrucksPerHour(config)

@@ -39,6 +39,7 @@ export {
   blockSpecs,
   boxSpan,
   candidateSlots,
+  REEFER_MAX_TIERS,
   parseYardSlotId,
   yardSlotId,
   rowX,

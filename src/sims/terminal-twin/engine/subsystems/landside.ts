@@ -53,6 +53,7 @@ import { blockSpecs, parseYardSlotId } from '../yardLayout'
 import { kpiClockOf, HOUR_S } from '../kpi/clock'
 import { makeIso6346Id } from '../../scenario/iso6346'
 import { LINE_OWNER_PREFIX } from '../../scenario/lines'
+import { isReefer } from '../../scenario/reefer'
 import { extraLoadCell, pickWeighted, POOL_VESSEL_ID } from '../../scenario/bayPlan'
 import { sampleDwell } from '../../scenario/dwell'
 import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
@@ -233,6 +234,7 @@ function newBox(ctx: EngineContext, owner: string, full: boolean, vesselId: stri
     custodyHistory: [{ t: state.now, owner: { ...custody }, eventId: ctx.current.id }],
     truckClaim: owner,
   }
+  if (isReefer(config.cargo, id, full)) box.reefer = true
   state.containers[id] = box
   return box
 }

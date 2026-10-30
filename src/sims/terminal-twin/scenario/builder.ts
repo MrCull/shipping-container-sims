@@ -150,6 +150,7 @@ export function withYard(config: ScenarioConfig, setup: YardSetup): ScenarioConf
         bays: b.bays,
         tiers: b.tiers,
         transferStalls: b.transferStalls,
+        ...(kept?.poweredRows ? { poweredRows: [...kept.poweredRows] } : {}),
       }
     }),
   }
