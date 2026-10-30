@@ -28,7 +28,7 @@ export interface Fact {
   link?: boolean
   unit?: 'length' | 'time'
   /** The value is a token with catalogue texts `inspector.<token>.<value>` (otherwise shown as is). */
-  token?: 'load'
+  token?: 'load' | 'shcState'
 }
 
 export interface CustodyRow {
@@ -50,6 +50,8 @@ export interface EntityView {
 }
 
 export interface EntityExtras {
+  /** SHC: sim time the view is for (an assigned SHC queues until its trip starts); without it the status alone decides. */
+  now?: number
   /** SHC: the job it holds, from the `shcJobs` query. */
   job?: Readonly<ShcJob>
   /** Extras of other kinds (see `EquipmentKindDef.loadExtras`). */

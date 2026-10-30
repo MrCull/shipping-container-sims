@@ -238,19 +238,49 @@
           "jobs": 154,
           "emptyDistanceM": 35514.866,
           "loadedDistanceM": 18285.134,
-          "reservationWaitS": 427.391
+          "reservationWaitS": 427.391,
+          "stateS": {
+            "parked": 8186.889,
+            "moving-to-collect": 3769.541,
+            "queuing-to-collect": 37.86,
+            "collecting": 4128.71,
+            "moving-to-deliver": 539,
+            "queuing-to-deliver": 0,
+            "delivering": 6418.825
+          },
+          "handovers": 308
         },
         "SHC02": {
           "jobs": 32,
           "emptyDistanceM": 7781.134,
           "loadedDistanceM": 3710.866,
-          "reservationWaitS": 149.901
+          "reservationWaitS": 149.901,
+          "stateS": {
+            "parked": 19900.927,
+            "moving-to-collect": 845.414,
+            "queuing-to-collect": 2.456,
+            "collecting": 922.717,
+            "moving-to-deliver": 112,
+            "queuing-to-deliver": 0,
+            "delivering": 1297.311
+          },
+          "handovers": 64
         },
         "SHC03": {
           "jobs": 0,
           "emptyDistanceM": 0,
           "loadedDistanceM": 0,
-          "reservationWaitS": 0
+          "reservationWaitS": 0,
+          "stateS": {
+            "parked": 23080.825,
+            "moving-to-collect": 0,
+            "queuing-to-collect": 0,
+            "collecting": 0,
+            "moving-to-deliver": 0,
+            "queuing-to-deliver": 0,
+            "delivering": 0
+          },
+          "handovers": 0
         }
       },
       "stsGroundPositionWaitS": {

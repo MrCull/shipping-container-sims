@@ -562,7 +562,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       const state = await c.query(entityQueryKind(kind), id)
       const def = EQUIPMENT_KINDS.find((d) => d.kind === kind)
       const extras = (await def?.loadExtras?.(state, (q) => c.query(q))) ?? {}
-      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, extras))
+      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, { ...extras, now: displayTime.value }))
     } catch {
       // The scenario was replaced meanwhile; the next refresh shows the new state.
     }
