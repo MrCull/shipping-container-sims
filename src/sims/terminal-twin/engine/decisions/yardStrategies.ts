@@ -3,6 +3,7 @@
  * `candidateSlots(request)`; all are pure (randomness comes from `request.random`).
  */
 import { candidateSlots, type YardCandidate } from '../yardLayout'
+import { yardGroupBreak, yardGroupKey } from './yardGrouping'
 import type { YardAllocationReply, YardAllocationRequest } from './types'
 
 /** Extra cost per tier (m of plan distance): spreads boxes over nearby stacks before stacking high. */
@@ -61,9 +62,10 @@ export function nearestWtpSlot(req: YardAllocationRequest): YardAllocationReply 
 /**
  * Keep a vessel's boxes together: first on top of this vessel's own stacks
  * (lowest bay first), then in a bay holding only this vessel's boxes, then in
- * the lowest empty bay; otherwise like nearest-wtp.
+ * the lowest empty bay; otherwise like nearest-wtp. The `grouped` strategy's fallback for a box without
+ * properties (the pre-fill: its boxes do not exist yet).
  */
-export function groupByVesselSlot(req: YardAllocationRequest): YardAllocationReply {
+function vesselGroupedSlot(req: YardAllocationRequest): YardAllocationReply {
   const list = candidateSlots(req)
   const mine = (c: YardCandidate) => c.bayVesselIds.includes(req.vesselId)
   const own = list.filter((c) => c.bayVesselIds.length > 0 && c.bayVesselIds.every((v) => v === req.vesselId))
@@ -75,4 +77,49 @@ export function groupByVesselSlot(req: YardAllocationRequest): YardAllocationRep
   const shared = cheapest(list.filter(mine), (c) => c.bay * 1000 + c.tier * 20 + c.row)
   if (shared) return { slotId: shared.slotId }
   return nearestWtpSlot(req)
+}
+
+/** Costs of a grouping mismatch (m of plan distance, like the other preferences): they outweigh a few bays of walking, never a slot's legality. */
+const MIXED_STACK_COST_M = 90
+const ORDER_BROKEN_COST_M = 45
+const FOREIGN_BAY_COST_M = 25
+const OWN_BAY_BONUS_M = 10
+
+/**
+ * Group boxes (spec #106, #111): imports by line (earlier planned departure higher), exports by outbound vessel and
+ * POD (heavy at the bottom), transshipment boxes by onward vessel and POD, storage empties by line, size and type.
+ * Prices every legal slot like nearest-wtp and adds the cost of the grouping preferences it would break: standing
+ * on another group's box, standing in the wrong order, or opening a stack in a bay of other groups. A mismatch
+ * costs score and never removes a slot, so a slot is found whenever one is legal. A request without box
+ * properties (the pre-fill) falls back to keeping a vessel's boxes together.
+ */
+export function groupedSlot(req: YardAllocationRequest): YardAllocationReply {
+  const box = req.box
+  const tops = req.stackTops
+  if (!box || !tops) return vesselGroupedSlot(req)
+  const key = yardGroupKey(box)
+  const topKeys = tops.map((t) => (t ? yardGroupKey(t) : null))
+  const cost = (c: YardCandidate): number => {
+    let group = 0
+    if (c.tier > 1) {
+      for (let k = 0; k < c.span; k++) {
+        const below = tops[(c.bay + k - 1) * req.rows + (c.row - 1)]
+        if (below) group = Math.max(group, { none: 0, order: ORDER_BROKEN_COST_M, mixed: MIXED_STACK_COST_M }[yardGroupBreak(box, below)])
+      }
+    } else {
+      // opening a stack: prefer a bay that already holds this group, avoid a bay of other groups
+      let foreign = false
+      let own = false
+      for (let b = 0; b < c.span; b++)
+        for (let r = 1; r <= req.rows; r++) {
+          const t = topKeys[(c.bay + b - 1) * req.rows + (r - 1)]
+          if (t === null) continue
+          if (t === key) own = true
+          else foreign = true
+        }
+      group = own ? -OWN_BAY_BONUS_M : foreign ? FOREIGN_BAY_COST_M : 0
+    }
+    return c.distanceM + TIER_COST_M * (c.tier - 1) + pairingCost(req, c) + poweredRowCost(req, c) + group
+  }
+  return { slotId: cheapest(candidateSlots(req), cost)?.slotId ?? null }
 }

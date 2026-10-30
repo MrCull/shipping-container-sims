@@ -9,7 +9,7 @@
  */
 import { minFutureRehandles, nearestValidRehandle } from './rehandleStrategies'
 import { balancedAscDispatch, preRetrievalDispatch, watersideFirstDispatch } from './ascStrategies'
-import { groupByVesselSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
+import { groupedSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
 import { nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
 import { leastLoadedBlockStall, leastUsedLane, lowestFreeLane, nearestToBoxStall } from './landsideStrategies'
 import { justInTimeRelease, keepKAheadRelease } from './workPackageStrategies'
@@ -155,9 +155,10 @@ export const strategies: StrategyRegistry = {
         description: 'The legal slot nearest the WTP pad, spreading over low tiers before stacking high.',
         handler: (msg) => nearestWtpSlot(msg.payload),
       },
-      'group-by-vessel': {
-        description: "Keeps a vessel's boxes together: its own bays first, then the lowest empty bay.",
-        handler: (msg) => groupByVesselSlot(msg.payload),
+      grouped: {
+        description:
+          'Groups boxes: imports by line (earlier departure higher), exports by outbound vessel and POD (heavy at the bottom), transshipment by onward vessel and POD, storage empties by line, size and type. A mismatch costs score, never a slot.',
+        handler: (msg) => groupedSlot(msg.payload),
       },
     },
   },

@@ -34,7 +34,7 @@ function minGapAfterEveryEvent(sim: Simulation): { minGapM: number; events: numb
 const SCENARIOS: [string, Parameters<typeof twinScenario>[0]][] = [
   ['default dispatch, nearest-wtp slots', {}],
   ['balanced dispatch, random slots', { dispatch: 'balanced', allocation: 'random', seed: 11 }],
-  ['balanced dispatch, group-by-vessel, 30 boxes', { dispatch: 'balanced', allocation: 'group-by-vessel', boxes: 30, seed: 3 }],
+  ['balanced dispatch, grouped, 30 boxes', { dispatch: 'balanced', allocation: 'grouped', boxes: 30, seed: 3 }],
 ]
 
 describe('no passing', () => {

@@ -4,6 +4,7 @@
  * includes the event queue, RNG state and running event-log hash.
  */
 import { createDecisionState, type DecisionState } from './decisions/runtime'
+import { yardGroupingOn } from './decisions/yardGrouping'
 import type { EngineEvent } from './events'
 import { HASH_SEED, type HashState } from './hash'
 import type { MotionSegment } from './kinematics'
@@ -851,6 +852,11 @@ export interface YardKpiCounters {
   rehandleFailures: number
   /** yardAllocation replies with no slot (block full). */
   allocationFailures: number
+  /**
+   * Grouped decking only (absent for every other strategy): placements priced against the grouping preferences, and
+   * how many broke one: on another group's box, in the wrong order, or opening a stack in a bay of other groups.
+   */
+  grouping?: { placements: number; mixedStack: number; orderBroken: number; mixedBay: number }
   perAsc: Record<string, AscKpiCounters>
 }
 
@@ -1254,6 +1260,7 @@ export function createInitialState(
     for (const s of config.sts) horizontal.stsGroundPositionWaitS[s.id] = 0
     for (const p of graph.pads) state.wtpPads[p.id] = { id: p.id, blockId: p.blockId, containerId: null, claimedBy: null }
     const yard: YardKpiCounters = { boxesStacked: 0, rehandles: 0, productiveMoves: 0, perBlock: {}, rehandleFailures: 0, allocationFailures: 0, perAsc: {} }
+    if (yardGroupingOn(config)) yard.grouping = { placements: 0, mixedStack: 0, orderBroken: 0, mixedBay: 0 }
     for (const b of blockSpecs(config)) {
       yard.perBlock[b.id] = { rehandles: 0, productiveMoves: 0 }
       state.yardBlocks[b.id] = {

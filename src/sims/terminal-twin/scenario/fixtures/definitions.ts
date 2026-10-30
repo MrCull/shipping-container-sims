@@ -325,6 +325,38 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * Spec #106 (#111): grouped yard decking. V001 discharges 40 boxes of three lines (10 of them transshipment boxes
+   * for V002), trucks bring export boxes for V002 and storage empties wait in the yard, all decked by the opt-in
+   * `grouped` strategy (imports by line, exports by vessel and POD with heavy at the bottom, transshipment by onward
+   * vessel and POD, empties by line, size and type). Zero invariant violations; the KPI report counts the grouping
+   * preferences the placements broke.
+   */
+  'yard-grouped': () =>
+    new ScenarioBuilder('yard-grouped', 'Grouped yard decking: imports by line, exports by vessel and POD, transshipment and empties in their own groups')
+      .hatch({ enabled: false })
+      .seed(31)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .cargo({ lines: { HMM: 3, MSC: 2, Maersk: 2 }, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V001', { name: 'Group Star', sizeClass: 'feeder', discharge: 40, dischargeTransshipment: 10, maxSts: 1 })
+      .vesselCall('V002', { name: 'Deck Star', sizeClass: 'feeder', arrivalS: 9000, discharge: 0, load: 16, transshipment: 10, maxSts: 1 })
+      .transshipmentDwell({ kind: 'fixed', s: 600 })
+      .emptyPool({ count: 12, sizeMix: { '20': 1, '40': 1 }, lines: { HMM: 1, MSC: 1 } })
+      .decisions({ points: { yardAllocation: { strategy: 'grouped' } } })
+      .shcs(3)
+      .block('B01', { x: 20, bays: 14, tiers: 4 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: new Array<number>(24).fill(15),
+        importDwell: { kind: 'fixed', s: 1800 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 8000 },
+      })
+      .endWhen({ vesselsCompleted: 2 })
+      .build(),
+
+  /**
    * TT-R19: 30% of the full boxes are reefers. The block has plugs in rows 1 and 2 only (an unverified, TTI-like
    * layout), so every reefer, discharged or pre-filled, stands in those rows at most 4 tiers high
    * (`yard.reefer-powered`) while plain boxes avoid the powered rows when anything else fits.

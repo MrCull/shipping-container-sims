@@ -115,7 +115,10 @@ export type {
   WorkPackageReleaseRequest,
   YardAllocationReply,
   YardAllocationRequest,
+  YardBoxView,
 } from './decisions/types'
+export { yardGroupKey, yardGroupBreak } from './decisions/yardGrouping'
+export type { YardGroupBreak } from './decisions/yardGrouping'
 export { strategies, getStrategy } from './decisions/strategies'
 export type { StrategyDefinition, StrategyRegistry, DecisionPointStrategies } from './decisions/strategies'
 export type { DecisionRequestedPayload, DecisionResolvedPayload } from './events'

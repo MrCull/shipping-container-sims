@@ -237,10 +237,10 @@ describe('allocation comparison on an export-heavy fixture', () => {
     return sim.kpiReport().yard?.rehandles
   }
 
-  it('random allocation has a higher rehandle ratio than group-by-vessel', () => {
+  it('random allocation has a higher rehandle ratio than grouped', () => {
     for (const seed of [1, 2, 3]) {
       const random = ratio('random', seed)
-      const grouped = ratio('group-by-vessel', seed)
+      const grouped = ratio('grouped', seed)
       expect(random?.total, `seed ${seed}`).toBeGreaterThan(0)
       expect(random?.perProductiveMove, `seed ${seed}`).toBeGreaterThan(grouped?.perProductiveMove as number)
     }
