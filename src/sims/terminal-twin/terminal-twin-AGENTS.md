@@ -12,6 +12,7 @@ Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers b
 
 **Topic docs** (read the one that matches what you are changing; each holds that topic's rules and gotchas):
 
+- Background on the real terminal (hatch covers, ASC stacking, SHC dispatch, road trucks, which figures are unverified, and the sim's deliberate deviations): [knowledge-base/dk_ops__tti_algeciras_operations.md](../../../knowledge-base/dk_ops__tti_algeciras_operations.md).
 - Changing berthing, crane split, the STS rail, hatch covers, SHC dispatch, lane graph or reservations: read [docs/quay-and-horizontal.md](docs/quay-and-horizontal.md).
 - Changing ASC storage or rail, yard allocation, export load, transshipment, empties, rehandles, landside trucks, gate or yard start modes: read [docs/yard-and-landside.md](docs/yard-and-landside.md).
 - Changing KPIs, end conditions, the final report, exports or the dashboard: read [docs/kpis-dashboard.md](docs/kpis-dashboard.md).
