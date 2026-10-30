@@ -212,7 +212,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Presets and layout (TT-15)
 
-- **Preset:** a named full scenario (TTI Algeciras baseline, Small automated, TTI Algeciras — peak day); every value stays overridable.
+- **Preset:** a named full scenario (TTI Algeciras baseline, Small automated, TTI Algeciras — peak day); every value stays overridable. Shown as a hero card in the setup dialog, with chips and a layout sketch derived from its config. The 16 test scenarios are **engine test fixtures**, listed in a collapsed table.
 - **Derived layout:** block and STS positions computed from the counts and the quay length, in the TTI functional order (quay, STS rail, apron and WTP pads, blocks, stalls, roads, gate).
 - **Frontage:** the quay length a block needs (32 m); blocks need count x 32 m.
 - **Scale limits / stress-test scale:** hard maxima (errors) and the softer size above which the dialog warns the run may be slow.

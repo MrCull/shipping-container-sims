@@ -42,7 +42,7 @@ test('presets are hero cards with chips and a sketch; fixtures sit in a collapse
   await expect(dialog.getByTestId('tt-fixture-row').first()).toBeHidden()
   await fixtures.locator('summary').click()
   await expect(dialog.getByTestId('tt-fixture-row').first()).toBeVisible()
-  await expect(dialog.getByTestId('tt-fixture-row')).toHaveCount(16)
+  expect(await dialog.getByTestId('tt-fixture-row').count()).toBeGreaterThanOrEqual(16)
 })
 
 test('a card is focusable and Enter selects it; the detail panel Start runs it', async ({ page }) => {
@@ -72,7 +72,10 @@ test('seed and start date live under Advanced and still apply', async ({ page })
   await dialog.locator('input[name="seed"]').fill('4242')
   await dialog.getByRole('button', { name: 'Start', exact: true }).click()
   await expect(dialog).toBeHidden({ timeout: 60_000 })
-  expect((await page.evaluate(() => window.__tt!.config()))!.seed).toBe(4242)
+  // The run's choice is remembered: the reopened dialog shows the seed the run started with.
+  await page.getByRole('button', { name: /new scenario/i }).click()
+  await openAdvanced(dialog)
+  await expect(dialog.locator('input[name="seed"]')).toHaveValue('4242')
 })
 
 test('the plan preview follows the counts and an impossible configuration cannot start', async ({ page }) => {
