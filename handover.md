@@ -16,7 +16,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 | #90 | R08 Maritime locations | | n/a | | todo |
 | #91 | R09 Hatch covers engine | | 0.15.0 | wave 1 | merged |
 | #92 | R10 Hatch covers 3D | #91 | n/a | | todo |
-| #93 | R11 SHC states and metrics | | n/a (KPI fields only) | wave 3 | in progress |
+| #93 | R11 SHC states and metrics | | n/a (KPI fields only) | wave 3 | merged |
 | #94 | R12 SHC queue areas, chaining | #93 | 0.16.0 | | todo |
 | #95 | R13 SHC pre-dispatch | #94, #91 | 0.17.0 | | todo |
 | #96 | R14 Paired dispatch | #94 | n/a | | todo |
