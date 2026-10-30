@@ -9,8 +9,8 @@ Spec and ticket copies: scratchpad `spec-106.md`, `tickets106/<n>.md`. Implement
 | #109 | Derived transit status, content status, dwell | #108 | merged | done |
 | #110 | ROB bays | #108 | merged | done |
 | #111 | Yard `grouped` (opt-in) | #108 | merged | done |
-| #112 | Empty allocation `iso-type-best-position` (opt-in) | #108 | | |
-| #113 | Vessel `pod-weight` ordering (opt-in) | #108 | | |
+| #112 | Empty allocation `iso-type-best-position` (opt-in) | #108 | merged | done |
+| #113 | Vessel `pod-weight` ordering (opt-in) | #108 | merged | done |
 | #114 | Flip defaults, one golden regeneration | #109 #111 #112 #113 | implementer (tt/114-flip-defaults) | in progress |
 | #115 | Bay viewer popup | #109 #110 | implementer (tt/115-bay-viewer) | in progress |
 
