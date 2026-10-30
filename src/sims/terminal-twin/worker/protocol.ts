@@ -179,6 +179,10 @@ export interface NewContainer {
   id: string
   size: ContainerSize
   line: string
+  /** Laden, ISO type and heavy rating, for the close-up markings (#119). Absent = laden general-purpose box. */
+  full?: boolean
+  isoType?: string
+  heavy?: boolean
 }
 
 export interface Delta {

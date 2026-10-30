@@ -231,6 +231,8 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Quality level / quality setting:** Low, Medium or High is a level (a bundle of shadows, LOD distances, resolution, ocean detail and night-light budget); the setting is a level or Auto (default).
 - **Auto quality:** steps the level down when the frame rate stays under 45 fps and back up when there is headroom, with a back-off against oscillation.
 - **Performance overlay:** the toggleable (key P) readout of FPS, draw calls, triangles, frame CPU time and the quality in force.
+- **Close-up LOD:** the detail level above LOD0 (about 35 m, at most 48 boxes, with hysteresis): individual meshes with door rods, corner castings, corrugation and a per-box texture, instead of instances.
+- **Container markings:** the face-by-face description of what is printed on one box (door end with ISO id, weight plate, SUPER HEAVY triangle, CSC plate, laden-only bolt seal; box number and line name on sides and roof; seeded wear), a pure function of the box's data (`describeMarkings`).
 - **Instance culling:** boxes outside the camera frustum are not written to the instanced meshes.
 - **Static batch:** scenery that never moves, merged into one mesh per material to save draw calls.
 - **Yard index:** the per-block and per-column lookup of yard slots that keeps rehandle queries off a whole-yard scan.
