@@ -244,6 +244,9 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Backdrop:** the distant low-poly scenery: Algeciras (Rock of Gibraltar, hills, North Quay) for the TTI preset, a generic coastline otherwise.
 - **North Quay:** TTI's 550 m of quay beside the working berths, drawn idle (non-operational).
 - **Cue:** a moment (box landed, vessel horn, scenario complete) that may make a sound or banner when the display clock reaches it.
+- **Master gain:** the single level every Terminal Twin sound is scaled by: the shared volume, or 0 while muted.
+- **FPS chip:** the always-visible frames-per-second readout beside the volume control (amber below 30, red below 20); clicking it toggles the perf panel.
+
 ## Persistence (TT-17)
 
 - **Config save:** the scenario as run (layout, equipment, kinematics, vessels, landside, strategies and latency, end conditions, start date/time, locale and units) plus the seed. Small; re-running it reproduces the run.

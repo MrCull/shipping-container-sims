@@ -10,7 +10,8 @@ import type { ViewPresetName } from '../modules/viewPresets'
 import type { CameraPose } from '../modules/cameraKeys'
 import type { CameraKey } from '../modules/shortcuts'
 import { defineStore } from 'pinia'
-import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
+import { computed, markRaw, ref, shallowRef, triggerRef, watch } from 'vue'
+import { useAudioStore } from '@/stores/audio'
 import { fixtures } from '../scenario/fixtures'
 import { type ScenarioOverrides } from '../scenario/overrides'
 import { composeScenario } from '../scenario/compose'
@@ -281,9 +282,10 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayViewerColour.value = mode
   }
 
-  /** Sound effects (TT-21): off by default; the player only exists to be used while on. */
-  const soundOn = ref(false)
-  const sounds = markRaw(new SoundPlayer())
+  /** Sound effects (TT-21): one master gain, the shared volume and mute (`stores/audio.ts`), scales all playback. */
+  const audio = useAudioStore()
+  const sounds = markRaw(new SoundPlayer(() => audio.masterGain))
+  watch(() => audio.masterGain, () => sounds.applyGain())
   /** Keep the sun daylight all day (default on for the TTI Algeciras — peak day preset). */
   const lockDaylight = ref(false)
   const banner = ref<TwinBanner | null>(null)
@@ -338,18 +340,13 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     }, 3500)
   }
 
-  /** Cues the display clock has reached: banners always, sounds only when the toggle is on. */
+  /** Cues the display clock has reached: banners always, sounds scaled by the shared volume (silent when muted). */
   function releaseCues(displayT: number, playSpeed: number, flatOut: boolean): void {
     const due = cues.drain(displayT, playSpeed)
     for (const c of due) {
       if (c.banner === 'departure') showBanner('departure', c.vesselId)
-      if (!flatOut && soundOn.value) sounds.play(c, playSpeed, performance.now())
+      if (!flatOut) sounds.play(c, playSpeed, performance.now())
     }
-  }
-
-  function toggleSound(): void {
-    soundOn.value = !soundOn.value
-    showToast(soundOn.value ? 'twin.toast.soundOn' : 'twin.toast.soundOff')
   }
 
   function toggleLockDaylight(): void {
@@ -1107,9 +1104,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     setDashboardTab,
     refreshDashboard,
     helpOpen,
-    soundOn,
     sounds,
-    toggleSound,
     lockDaylight,
     toggleLockDaylight,
     banner,

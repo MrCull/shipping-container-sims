@@ -236,16 +236,6 @@ async function submitRunTo(): Promise<void> {
       >
         {{ t('topbar.daylight') }}
       </button>
-      <button
-        class="action-btn"
-        :class="{ active: store.soundOn }"
-        :aria-pressed="store.soundOn"
-        :title="t('topbar.soundHint')"
-        data-testid="tt-sound-toggle"
-        @click="store.toggleSound()"
-      >
-        {{ t('topbar.sound') }}
-      </button>
       <PerfPanel v-if="showGraphics" />
     </div>
   </header>
