@@ -280,6 +280,14 @@ export interface WeightClassBands {
   mediumMaxKg: number
 }
 
+/** Work order within a package: `as-today` (stack geometry only) or `pod-weight` (POD- and weight-aware soft preferences). */
+export type VesselOrdering = 'as-today' | 'pod-weight'
+
+export interface VesselPlanningConfig {
+  /** Default `as-today`. */
+  ordering?: VesselOrdering
+}
+
 /**
  * Stored container properties (spec #106). Every field optional; the defaults in `scenario/containerProps.ts`
  * apply. All draws come from their own RNG stream (keyed by seed and container id), so adding or changing these
@@ -425,6 +433,8 @@ export interface ScenarioConfig {
   containerProps?: ContainerPropsConfig
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
+  /** Vessel Planning options (spec #106); optional. */
+  vesselPlanning?: VesselPlanningConfig
   /**
    * Hatch covers (TT-R09); optional. Panel counts, sizes and weights come from the vessel class
    * (`VESSEL_CLASSES[...].hatch`); these override the timings and the laydown stack limit for every class.

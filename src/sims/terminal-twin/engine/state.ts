@@ -804,10 +804,17 @@ export interface KpiCounters {
   yard?: YardKpiCounters
   /** Work packages (TT-10). */
   workPackages: WorkPackageKpiCounters
+  /** Broken `pod-weight` ordering preferences (spec #106; present only when that ordering is selected and a package was built). */
+  ordering?: OrderingKpiCounters
   /** Hatch moves (TT-R09; present once one has started). */
   hatch?: HatchKpiCounters
   /** Trucks and the gate (present when the landside is on). */
   landside?: LandsideKpiCounters
+}
+
+export interface OrderingKpiCounters {
+  discharge: { boxes: number; groupSplits: number }
+  load: { boxes: number; podOnEarlier: number; heavyOnLight: number }
 }
 
 export interface WorkPackageKpiCounters {

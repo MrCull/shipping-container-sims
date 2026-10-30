@@ -27,7 +27,8 @@ import { sampleDwell, transshipmentConfig } from './dwell'
 import type { ContainerSize, ScenarioConfig, VesselConfig, Weights } from './types'
 import { cellCapacity, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
 import { makePlannedContainer } from './containerFactory'
-import { drawContainerProps, type ContainerProps } from './containerProps'
+import { drawContainerProps, resolveContainerProps, type ContainerProps } from './containerProps'
+import { stowByPodWeight, type StowItem } from '../engine/vesselOrdering'
 
 export type SlotPurpose = 'discharge' | 'load' | 'transshipment'
 
@@ -506,7 +507,28 @@ export function planCargo(config: ScenarioConfig, seed: number): CargoPlan {
     addEmptyPool(config, seed, plan, serials)
   } else for (const c of tsSources) delete c.ageS
   assignProps(config, seed, plan, new Set(tsSources.map((c) => c.id)))
+  if (config.vesselPlanning?.ordering === 'pod-weight') stowLoadByPodWeight(config, plan)
   return plan
+}
+
+/**
+ * `pod-weight` stowage (spec #106): within a bay section, boxes for later PODs and heavier boxes are booked to the
+ * lower tiers. Same-size, same-reefer-ness boxes trade booked cells; the slots, their purposes and every other
+ * box stay as planned. Runs after the properties are drawn (it reads POD and weight) and draws nothing itself.
+ */
+function stowLoadByPodWeight(config: ScenarioConfig, plan: CargoPlan): void {
+  const slots = new Map(plan.slots.map((s) => [s.id, s]))
+  const items: StowItem[] = []
+  for (const c of plan.containers) {
+    const slot = slots.get(c.slotId)
+    if (c.flow !== 'load' || !slot || slot.purpose !== 'load' || slot.emptyReq) continue
+    items.push({ boxId: c.id, slotId: slot.id, cell: slot, size: c.size, reefer: c.reefer === true, props: c.props })
+  }
+  const moved = stowByPodWeight(items, resolveContainerProps(config).portRotation.ports)
+  for (const c of plan.containers) {
+    const to = moved.get(c.id)
+    if (to) c.slotId = to
+  }
 }
 
 /**

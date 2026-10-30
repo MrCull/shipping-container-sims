@@ -52,6 +52,7 @@ Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers b
 | Dashboard (charts, heatmap, Gantt, lazy ECharts) | `npx vitest run src/sims/terminal-twin/tests/dashboard` + `npx playwright test dashboard` (dev and prod projects) | Vitest: timeline, palette, view models, options, host query, lazy-import scan; smoke: ECharts chunk absent until B, 24 h series zoom, heatmap = engine fill, Gantt windows = vessel state, final report tab |
 | Fixture definition change | `pnpm run tt:fixtures`, then `pnpm run tt:golden --update` | committed fixture JSON matches `definitions.ts` |
 | Hatch covers | `pnpm run tt:run --fixture hatch-cover-cycle` (and `--fixture hatch-deck-only-no-open`) + `npx vitest run src/sims/terminal-twin/tests/hatch.test.ts` (3D: `tests/hatch-scene.test.ts`, `pnpm run test:smoke terminal-twin-hatch`, screenshot below) | `Hatch covers:` block with moves, STS time and lashing wait, `0 violations`; deck-only run has no `Hatch covers:` line; the test file proves event order and causality, laydown clear of the lane graph, KPIs and all seven `hatch.*` invariants on tampered snapshots |
+| Vessel ordering (`pod-weight`) | `pnpm run tt:run --fixture vessel-ordering-pod-weight` (also `--fixture <any> --ordering pod-weight`) + `npx vitest run src/sims/terminal-twin/tests/vessel-ordering.test.ts` | `0 violations`; the test proves stack order (top-down discharge, bottom-up load), unchanged packages and hatch steps, a load that completes with trucks delivering out of order, config/CLI selection and that `as-today` leaves the event-log hash alone |
 | Berthing / anchorage | `pnpm run tt:run --fixture two-vessels-compete-for-berth` | V002 `anchorage` > 0 s, `Quay: 1 vessel(s) waited`; `tests/berthing.test.ts` |
 | Crane split / rail order | `pnpm run tt:run --fixture crane-split-4sts --strategy craneSplit=equal-bays` (vs the default `balanced-moves`) | 4 STS lines with different move counts, 0 violations (`sts.rail-order` is checked after every event); `tests/crane-split.test.ts` |
 | Twin-20 | `pnpm run tt:run --fixture twin-20-lift` | `4 moves in 2 cycles (2 twin-20)`; `tests/vessels.test.ts` |
@@ -234,7 +235,7 @@ Documentation only (spec #106): the TOS is a set of **modules**, each a grouping
 |---|---|---|
 | Yard | `yardAllocation` (where a box stacks), `rehandleTarget` (where a blocker goes) | `engine/decisions/strategies.ts`, `engine/yardStacks.ts`, `engine/subsystems/rehandle.ts` |
 | Container Allocation | `emptyAllocation` (which empties a load package takes) | `engine/subsystems/empties.ts` |
-| Vessel Planning | `craneSplit`, package creation and sequence (`createPackages`, `createLoadOrders`), hatch steps; later the `vesselPlanning.ordering` option | `engine/subsystems/workPackages.ts`, `engine/subsystems/berth.ts` |
+| Vessel Planning | `craneSplit`, package creation and sequence (`createPackages`, `createLoadOrders`), hatch steps, the `vesselPlanning.ordering` option (`engine/vesselOrdering.ts`) | `engine/subsystems/workPackages.ts`, `engine/vesselOrdering.ts`, `engine/subsystems/berth.ts` |
 | Move Scheduler | `workPackageRelease`, ASC pre-dispatch and pre-retrieval | `engine/subsystems/workPackages.ts`, `engine/subsystems/ascDispatch.ts` |
 | Equipment | `berthAllocation`, `stsGroundPosition`, `shcDispatch`, `wtpPadSelection`, `ascDispatch`, `gateLaneAssignment`, `transferStallSelection` | `engine/decisions/`, the equipment subsystems |
 
@@ -249,6 +250,18 @@ Every container carries `ContainerState.props` (`scenario/containerProps.ts`), s
 - **Config** (`ScenarioConfig.containerProps`, all optional, defaults in `containerProps.ts`; scenario config only, not the setup dialog; builder `.containerProps()`): `portRotation {terminal, ports[]}` (default ESALG rotation, [A]); `directionMix` (IMPORT vs STORAGE for discharged empties, default 1:3); `cargoWeight` per size (lognormal median, sigma, max); `weightClassBands {lightMaxKg, mediumMaxKg}` (default 12 t / 24 t gross); `expectedDwell` per direction (`DwellDistribution`; imports 3-7 days, storage 5-20 days). `validateContainerProps` runs in `validateScenario`.
 - **Inspector and tooltip:** `modules/entityInspector.ts` lists the properties as facts; `EntityView.tooltip` is the key subset, shown as the hover `title` of the selection heading. There is no 3D hover tooltip in the app.
 - **Goldens:** unchanged (they hash events and KPIs, and props enter no event). `ENGINE_VERSION` not bumped. A snapshot restored from before #108 has no `props`; the inspector tolerates that.
+
+## Vessel Planning ordering (spec #106, #113)
+
+`config.vesselPlanning.ordering` (builder `.vesselPlanning({ ordering })`, CLI `--ordering as-today|pod-weight`) is a planning option, not a decision point: no contract, no event or decision payload changed. `as-today` is the default until the default-flip ticket; with it nothing differs and no `kpis.ordering` appears.
+
+- **Where:** `engine/vesselOrdering.ts` (pure, plain data) is called by `createPackages` (`workPackages.ts`) for the discharge and load slot lists, and by `bayPlan.planCargo` for the plan-time stowage. Packages stay one per bay section, the package sequence and the hatch steps are built from the reordered lists exactly as before.
+- **Discharge:** stack by stack (a stack is a row of the bay section), each stack top-down. The first stack is the first in yard-group order; each next one continues the group just worked, else takes the next group. The group key mirrors yard grouping: imports by line, transshipments by outbound vessel and POD, storage empties by line, size and ISO type; ties by planned departure, then row.
+- **Load:** bottom-up by tier (so a stack is never loaded out of order); inside a tier the later POD first (POD rank = position in the port rotation), then the heavier box, then row and half. Empties requirements keep their place after the section's boxes.
+- **Stowage ("where the slots allow"):** after the properties are drawn, booked export boxes of the same bay section, size and reefer-ness trade cells so later PODs and heavier boxes sit low (`stowByPodWeight`; no random draw; transshipment and empties slots are untouched). Only the box-to-cell booking changes, so the yard pre-fill (which follows the plan) stays consistent.
+- **Soft:** nothing refuses or waits for POD or weight; a box that arrives late is simply loaded when it is there, as today.
+- **KPIs:** `kpiReport().ordering` (only with `pod-weight`): `discharge {boxes, groupSplits}` (yard-group changes beyond one run per group, per bay section) and `load {boxes, podOnEarlier, heavyOnLight}` (boxes whose POD is later than the box under them, and boxes in a heavier weight class than the box under them, in the same row). Counted when the packages are built.
+- **Fixture:** `vessel-ordering-pod-weight` (feeder, hatch covers on, hold and deck, empties, 60 discharged and 40 loaded). Hatch job restarts after a lashing wait are timing dependent, so compare hatch steps as distinct (panel, op) pairs.
 
 ## Known gaps
 

@@ -305,6 +305,35 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * Spec #106 (#113): `vesselPlanning.ordering = 'pod-weight'` on a feeder that discharges 60 mixed boxes and loads 40
+   * (hold and deck, hatch covers on, empties included): stack-by-stack discharge in yard-group order, bottom-up
+   * POD- and weight-aware load. Zero invariant violations; the KPI report counts the broken preferences.
+   */
+  'vessel-ordering-pod-weight': () =>
+    new ScenarioBuilder('vessel-ordering-pod-weight', 'A feeder discharges and loads with the pod-weight work order: stacks by yard group, later PODs and heavy boxes low')
+      .seed(7)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', {
+        name: 'Ordering Star',
+        sizeClass: 'feeder',
+        discharge: 60,
+        load: 40,
+        maxSts: 1,
+        sizeMix: { '20': 2, '40': 1, '40HC': 1 },
+        empties: [{ size: '20', line: 'MSC', count: 4 }],
+      })
+      .emptyPool({ count: 8, sizeMix: { '20': 1 }, lines: { MSC: 1 } })
+      .vesselPlanning({ ordering: 'pod-weight' })
+      .shcs(3)
+      .block('B01', { x: 20, bays: 20, tiers: 4 })
+      .ascsPerBlock(2)
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /**
    * TT-R06: a yard stack takes the length of its bottom box. A 50% pre-filled block (mixed 20 and 40 ft boxes,
    * 8 bays x 3 tiers) receives 24 more mixed boxes through the default `nearest-wtp` allocation: no stack ever
    * holds both lengths (`yard.no-mixed-length-stack`), and 40 ft boxes keep to adjacent bay pairs.

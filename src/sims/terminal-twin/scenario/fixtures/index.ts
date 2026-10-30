@@ -29,6 +29,7 @@ import emptiesLoad from './empties-load-4-of-16.json'
 import stowMixed from './stow-mixed-20-40.json'
 import reeferPoweredRows from './reefer-powered-rows.json'
 import yardNoMixedLength from './yard-no-mixed-length.json'
+import vesselOrderingPodWeight from './vessel-ordering-pod-weight.json'
 import twin20Lift from './twin-20-lift.json'
 import twoVesselsCompeteForBerth from './two-vessels-compete-for-berth.json'
 
@@ -36,6 +37,7 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'tracer-1sts-10-boxes': tracer1Sts10Boxes as ScenarioConfig,
   'two-vessels-compete-for-berth': twoVesselsCompeteForBerth as ScenarioConfig,
   'crane-split-4sts': craneSplit4Sts as ScenarioConfig,
+  'vessel-ordering-pod-weight': vesselOrderingPodWeight as ScenarioConfig,
   'twin-20-lift': twin20Lift as ScenarioConfig,
   'shc-1sts-2shc-1wtp': shc1Sts2Shc1Wtp as ScenarioConfig,
   'shc-queue-chained': shcQueueChained as ScenarioConfig,
