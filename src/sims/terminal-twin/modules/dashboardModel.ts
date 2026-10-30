@@ -4,7 +4,13 @@
  * option building lives in `dashboardOptions.ts`, which is the only code that
  * touches the (lazy) chart library.
  */
-import type { KpiSeries, KpiSeriesReport, KpiUnit, LandsideKpiReport } from '../engine'
+import {
+  SHC_OPERATIONAL_STATES,
+  type KpiSeries,
+  type KpiSeriesReport,
+  type KpiUnit,
+  type LandsideKpiReport,
+} from '../engine'
 import type { MessageKey } from '../i18n/messages'
 import { MAX_SERIES } from './dashboardPalette'
 
@@ -47,6 +53,8 @@ export const KPI_GROUPS: readonly KpiGroup[] = [
       'shc.jobs',
       'shc.empty-distance-m',
       'shc.loaded-distance-m',
+      'shc.handovers',
+      ...SHC_OPERATIONAL_STATES.map((op) => `shc.state.${op}-s`),
       'wtp.dwell-s',
     ],
   },

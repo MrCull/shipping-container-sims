@@ -62,6 +62,8 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Trip:** an SHC's planned drive with its phases (routing empty, positioning at pickup, locking, lifting, routing loaded, positioning at drop-off, lowering, unlocking, clearing), or its drive to its parking spot.
 - **Cornering (corner speed):** an SHC takes a right-angle turn at a capped speed (`sqrt(lateral acceleration x assumed radius)`) instead of stopping; the run before and after share that **entry/exit speed** (`v1`/`v0` on the motion segments). Reversals still stop.
 - **Clear position (pad clear position):** where an SHC reverses to after setting a box down on a WTP pad, clear of the pad. *Avoid:* "exit".
+- **SHC operational state:** a coarse view of an SHC's `ShcStatus`, one of seven: parked, moving to collect, queuing to collect, collecting, moving to deliver, queuing to deliver, delivering. Each status maps to exactly one (`engine/shcStates.ts`); statuses are not renamed. Shown in the inspector, summed per state in the KPIs. *Avoid:* "SHC status" for the seven.
+- **SHC handover (KPI):** one custody change between an SHC and a ground buffer (an STS ground position or a WTP pad): one per box picked up and one per box put down, so a job is two. Counted per SHC as `shc.handovers`.
 - **Parking spot:** an SHC's own rest position off the apron, where idle SHCs return.
 - **Driver variability:** a ± % random factor on each SHC trip's drive times.
 - **Transshipment:** a box that goes vessel → yard → another vessel.

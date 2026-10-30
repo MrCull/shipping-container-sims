@@ -19,6 +19,7 @@ import {
   getStrategy,
   parseLogVerbosity,
   restoreSimulation,
+  SHC_OPERATIONAL_STATES,
   summarizeRun,
   type AsyncMode,
   type DecisionPointId,
@@ -254,7 +255,10 @@ function formatSummary(s: RunSummary, headline: HeadlineKpis, stopped: string, s
     lines.push(`Horizontal:       ${hz.boxesToWtp} boxes to WTP pads`)
     for (const [id, k] of Object.entries(hz.shcs))
       lines.push(
-        `  ${id.padEnd(15)} ${k.jobs} jobs, ${k.loadedDistanceM} m loaded / ${k.emptyDistanceM} m empty, reservation wait ${k.reservationWaitS} s`,
+        `  ${id.padEnd(15)} ${k.jobs} jobs, ${k.loadedDistanceM} m loaded / ${k.emptyDistanceM} m empty, reservation wait ${k.reservationWaitS} s, ${k.handovers} handovers`,
+        `  ${''.padEnd(15)} state time: ${SHC_OPERATIONAL_STATES.filter((op) => k.stateS[op] > 0)
+          .map((op) => `${op} ${k.stateS[op]} s`)
+          .join(', ')}`,
       )
     for (const [id, w] of Object.entries(hz.stsGroundPositionWaitS))
       lines.push(`  ${id.padEnd(15)} waited ${w} s for a free ground position`)
@@ -267,6 +271,11 @@ function formatSummary(s: RunSummary, headline: HeadlineKpis, stopped: string, s
     `  Net moves/h:      ${num(h.netMovesPerHour)}`,
   )
   if (h.shcBusyPct !== null) lines.push(`  SHC busy:         ${num(h.shcBusyPct, ' %')}  (empty travel ratio ${num(h.shcEmptyTravelRatio)})`)
+  if (h.shcStateS !== null && h.shcEmptyDistanceM !== null)
+    lines.push(
+      `  SHC empty travel: ${num(h.shcEmptyDistanceM, ' m')}, ${num(h.shcHandovers)} handovers`,
+      `  SHC state time:   ${SHC_OPERATIONAL_STATES.map((op) => `${op} ${h.shcStateS![op]} s`).join(', ')}  (mean per SHC)`,
+    )
   if (h.wtpDwellS !== null) lines.push(`  WTP pad dwell:    ${num(h.wtpDwellS, ' s')}`)
   if (h.ascUtilisationPct !== null) lines.push(`  ASC utilisation:  ${num(h.ascUtilisationPct, ' %')}`)
   if (h.yardFillPct !== null) lines.push(`  Yard fill:        ${num(h.yardFillPct, ' %')}`)

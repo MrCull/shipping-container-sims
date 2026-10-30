@@ -14,6 +14,7 @@ import type { EngineEvent } from '../events'
 import { DECISION_POINT_IDS } from '../decisions/types'
 import { appointmentWindowS } from '../appointments'
 import { ascIdOf } from '../state'
+import { SHC_OPERATIONAL_STATES, type ShcOperationalState } from '../shcStates'
 import { blockSpecs, boxSpan } from '../yardLayout'
 import type { ContainerSize, ScenarioConfig } from '../../scenario/types'
 import {
@@ -58,6 +59,8 @@ export interface KpiCollector {
   ingest(event: EngineEvent): void
   /** Every KPI as hourly, per-shift and total series at sim time `now`. */
   report(now: number): KpiSeriesReport
+  /** Run totals per SHC at `now`: seconds in each operational state and handovers (cheap; no series). */
+  shcTotals(now: number): Record<string, { stateS: Record<ShcOperationalState, number>; handovers: number }>
 }
 
 // ---------------------------------------------------------------- accumulators
@@ -224,6 +227,16 @@ export const KPI_DEFS: KpiDef[] = [
   },
   { id: 'shc.empty-distance-m', unit: 'm', entityKind: 'shc', entities: shcIds, value: (w, id) => r3(w.sum('shc.emptyM', id)) },
   { id: 'shc.loaded-distance-m', unit: 'm', entityKind: 'shc', entities: shcIds, value: (w, id) => r3(w.sum('shc.loadedM', id)) },
+  ...SHC_OPERATIONAL_STATES.map(
+    (op): KpiDef => ({
+      id: `shc.state.${op}-s`,
+      unit: 's',
+      entityKind: 'shc',
+      entities: shcIds,
+      value: (w, id) => r3(w.sum(`shc.state.${op}`, id)),
+    }),
+  ),
+  { id: 'shc.handovers', unit: 'count', entityKind: 'shc', entities: shcIds, value: (w, id) => w.sum('shc.handovers', id) },
   { id: 'shc.jobs', unit: 'count', entityKind: 'shc', entities: shcIds, value: (w, id) => w.sum('shc.cycles', id) },
   {
     id: 'shc.cycle-time-s',
@@ -438,6 +451,10 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
   const railEnd: Record<string, number | null> = {}
   const shcOpen: Record<string, Open | null> = {}
   const shcDepart: Record<string, number> = {}
+  /** Operational state of each SHC since when (closed into `shc.state.<op>` on every change). */
+  const shcOp: Record<string, { op: ShcOperationalState; since: number }> = Object.fromEntries(
+    (config.shcs ?? []).map((s) => [s.id, { op: 'parked', since: 0 }]),
+  )
   const ascBusy: Record<string, { since: number } | null> = {}
   const berthedSince: Record<string, number> = {}
   const wtpDropAt: Record<string, number> = {}
@@ -489,6 +506,13 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
     const open = shcOpen[id]
     if (open) acc.interval(clock, open.kind === 'empty' ? 'shc.emptyS' : 'shc.loadedS', id, open.since, closeAt)
     shcOpen[id] = kind ? { kind, since: openAt } : null
+  }
+
+  /** The SHC enters operational state `op` at `at` (a later `at` than the event time is a state that starts then). */
+  function shcState(id: string, op: ShcOperationalState, at: number): void {
+    const open = shcOp[id]
+    if (open) acc.interval(clock, `shc.state.${open.op}`, id, open.since, at)
+    shcOp[id] = { op, since: at }
   }
 
   function distance(id: string, comp: string, segments: { axis: string; from: number; to: number; t0: number; t1: number }[]): void {
@@ -602,31 +626,46 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
       case 'ShcJobAssigned': {
         const id = e.payload.shcId
         shcDepart[id] = e.payload.departAt
+        shcState(id, 'queuing-to-collect', e.t)
+        shcState(id, 'moving-to-collect', e.payload.departAt)
         shcTransition(id, 'empty', e.t, e.payload.departAt)
         break
       }
       case 'ShcRoutingToParking':
+        shcState(e.payload.shcId, 'moving-to-collect', e.t)
         shcTransition(e.payload.shcId, 'empty', e.t, e.payload.departAt)
+        break
+      case 'ShcRoutingEmpty':
+        shcState(e.payload.shcId, 'collecting', e.t)
+        break
+      case 'ShcRoutingLoaded':
+        shcState(e.payload.shcId, 'delivering', e.t)
         break
       case 'ShcPicked':
       case 'ShcPickedAtWtp':
+        shcState(e.payload.shcId, 'moving-to-deliver', e.t)
+        acc.add('shc.handovers', e.payload.shcId, h, 1)
         shcTransition(e.payload.shcId, 'loaded', e.t)
         break
       case 'ShcDroppedAtGround':
+        acc.add('shc.handovers', e.payload.shcId, h, 1)
         shcTransition(e.payload.shcId, 'empty', e.t)
         break
       case 'ShcDroppedAtWtp':
+        acc.add('shc.handovers', e.payload.shcId, h, 1)
         shcTransition(e.payload.shcId, 'empty', e.t)
         wtpDropAt[e.payload.containerId] = e.t
         break
       case 'ShcCleared': {
         const id = e.payload.shcId
+        shcState(id, 'parked', e.t)
         shcTransition(id, null, e.t)
         acc.add('shc.cycleS', id, h, e.t - (shcDepart[id] ?? e.t))
         acc.add('shc.cycles', id, h, 1)
         break
       }
       case 'ShcParked':
+        shcState(e.payload.shcId, 'parked', e.t)
         shcTransition(e.payload.shcId, null, e.t)
         break
       case 'AscJobAssigned':
@@ -710,6 +749,7 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
       }
       case 'DecisionRequested': {
         const dp = decisionPoint(e.payload.decisionPoint)
+        if (e.payload.decisionPoint === 'wtpPadSelection') shcState(e.payload.request.shcId, 'queuing-to-collect', e.t)
         acc.add('handler.calls', dp, h, 1)
         requestedAt[e.payload.correlationId] = e.t
         pending[dp] = (pending[dp] ?? 0) + 1
@@ -723,6 +763,9 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
       }
       case 'DecisionResolved': {
         const dp = decisionPoint(e.payload.decisionPoint)
+        // a dispatch or pad decision with no taker leaves the SHC idle
+        if (e.payload.decisionPoint === 'wtpPadSelection' && e.payload.reply.wtpPadId === null) shcState(e.payload.request.shcId, 'parked', e.t)
+        else if (e.payload.decisionPoint === 'shcDispatch' && e.payload.reply.jobId === null) shcState(e.payload.request.shcId, 'parked', e.t)
         const asked = requestedAt[e.payload.correlationId]
         delete requestedAt[e.payload.correlationId]
         acc.add('handler.resolved', dp, h, 1)
@@ -775,6 +818,20 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
       }
     },
 
+    shcTotals(now) {
+      const out: ReturnType<KpiCollector['shcTotals']> = {}
+      for (const [id, o] of Object.entries(shcOp)) {
+        const stateS = Object.fromEntries(SHC_OPERATIONAL_STATES.map((op) => [op, 0])) as Record<ShcOperationalState, number>
+        for (const op of SHC_OPERATIONAL_STATES) for (const v of acc.sums[`shc.state.${op}`]?.[id] ?? []) stateS[op] += v ?? 0
+        if (now > o.since) stateS[o.op] += now - o.since
+        for (const op of SHC_OPERATIONAL_STATES) stateS[op] = r3(stateS[op])
+        let handovers = 0
+        for (const v of acc.sums['shc.handovers']?.[id] ?? []) handovers += v ?? 0
+        out[id] = { stateS, handovers }
+      }
+      return out
+    },
+
     report(now) {
       const copy = acc.clone()
       // close the open states at `now`
@@ -786,6 +843,7 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
       }
       for (const [id, open] of Object.entries(shcOpen))
         if (open) copy.interval(clock, open.kind === 'empty' ? 'shc.emptyS' : 'shc.loadedS', id, open.since, now)
+      for (const [id, o] of Object.entries(shcOp)) copy.interval(clock, `shc.state.${o.op}`, id, o.since, now)
       for (const [id, busy] of Object.entries(ascBusy)) if (busy) copy.interval(clock, 'asc.busyS', id, busy.since, now)
       for (const since of Object.values(driveSince)) copy.interval(clock, 'ls.roadS', 'terminal', since, now)
       for (const since of Object.values(holdSince)) copy.interval(clock, 'ls.holdS', 'terminal', since, now)

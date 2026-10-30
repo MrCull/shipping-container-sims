@@ -1,6 +1,6 @@
 /** Shuttle carrier (SHC): bounds, inspector view, dev-API state and its scene renderer (procedural placeholder, then the rigged GLB). */
 import * as THREE from 'three'
-import type { ShcJob, ShcState } from '../../engine'
+import { shcOperationalState, type ShcJob, type ShcState } from '../../engine'
 import type { EntityView } from '../entityInspector'
 import { SHC } from '../equipmentDims'
 import { CONTAINER_DIMS } from '../sceneModel'
@@ -138,8 +138,9 @@ class ShcRenderer implements KindRenderer {
   }
 }
 
-function shcView(shc: Readonly<ShcState>, job?: Readonly<ShcJob>): EntityView {
+function shcView(shc: Readonly<ShcState>, job?: Readonly<ShcJob>, now?: number): EntityView {
   const facts: EntityView['facts'] = [
+    { label: 'inspector.fact.operationalState', value: shcOperationalState(shc, now ?? -Infinity), token: 'shcState' },
     { label: 'inspector.fact.status', value: shc.status },
     { label: 'inspector.fact.node', value: shc.nodeId },
     { label: 'inspector.fact.carrying', value: shc.carrying, link: shc.carrying !== null },
@@ -173,7 +174,7 @@ export const shcKind: EquipmentKindDef<'shc'> = {
     return { x: p.x, y: height / 2, z: p.z, sx: SHC.length + 1, sy: height, sz: SHC.width + 1, yaw: p.heading === 'z' ? Math.PI / 2 : 0 }
   },
   sceneState: (model, id, t) => ({ status: model.statusAt('shc', id, t), ...model.shcPose(id, t) }),
-  describe: (state, extras) => shcView(state as ShcState, extras.job),
+  describe: (state, extras) => shcView(state as ShcState, extras.job, extras.now),
   async loadExtras(state, query) {
     const jobId = (state as { jobId: string | null }).jobId
     return { job: (await query<{ id: string }[]>('shcJobs')).find((j) => j.id === jobId) as ShcJob | undefined }

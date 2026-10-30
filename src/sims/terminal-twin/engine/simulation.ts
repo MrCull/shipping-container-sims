@@ -33,7 +33,7 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.15.0'
+export const ENGINE_VERSION = '0.19.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
@@ -581,7 +581,13 @@ export function createSimulation(
     },
     eventLog: () => log,
     eventLogHash: () => hashDigest(state.logHash),
-    kpiReport: () => buildKpiReport(state, log.length),
+    kpiReport: () => {
+      const report = buildKpiReport(state, log.length)
+      // time per operational state and handovers come from the collector (measured period)
+      const totals = collector.shcTotals(Math.max(0, state.now - warmUpS()))
+      for (const [id, k] of Object.entries(report.horizontal?.shcs ?? {})) Object.assign(k, totals[id])
+      return report
+    },
     kpiSeries: () => collector.report(Math.max(0, state.now - warmUpS())),
     invariantReport: () => clone(invariants),
     invariantStats: () => ({ ...tracker.stats, wallMs: invariantWallMs }),

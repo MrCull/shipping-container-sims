@@ -196,13 +196,33 @@
           "jobs": 15,
           "emptyDistanceM": 3698.433,
           "loadedDistanceM": 1893.567,
-          "reservationWaitS": 0
+          "reservationWaitS": 0,
+          "stateS": {
+            "parked": 1141.793,
+            "moving-to-collect": 368.124,
+            "queuing-to-collect": 0,
+            "collecting": 390.37,
+            "moving-to-deliver": 52.5,
+            "queuing-to-deliver": 0,
+            "delivering": 637.9
+          },
+          "handovers": 30
         },
         "SHC02": {
           "jobs": 1,
           "emptyDistanceM": 234.5,
           "loadedDistanceM": 111.5,
-          "reservationWaitS": 0
+          "reservationWaitS": 0,
+          "stateS": {
+            "parked": 2498.237,
+            "moving-to-collect": 17.994,
+            "queuing-to-collect": 0,
+            "collecting": 30.692,
+            "moving-to-deliver": 3.5,
+            "queuing-to-deliver": 0,
+            "delivering": 40.264
+          },
+          "handovers": 2
         }
       },
       "stsGroundPositionWaitS": {
