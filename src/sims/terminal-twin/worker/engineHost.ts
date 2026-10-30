@@ -10,6 +10,7 @@ import type { ScenarioConfig } from '../scenario/types'
 import { HALF_OFFSET_M } from '../scenario/vesselClasses'
 import {
   EVENT_SUMMARY_CAP,
+  hatchChangeOf,
   summarizeEvent,
   DEFAULT_CHECKPOINT_S,
   type Checkpoint,
@@ -122,6 +123,8 @@ export function createEngineHost() {
         delta.custody.push(change)
       }
     }
+    const hatchChange = hatchChangeOf(ev)
+    if (hatchChange) (delta.hatch ??= []).push(hatchChange)
     for (const s of sim.config.sts) {
       const sts = sim.query.sts(s.id)
       if (motionRefs.get(s.id) !== sts.motion) {
@@ -226,6 +229,7 @@ export function createEngineHost() {
   function compactDelta(): void {
     delta.motion = compactMotion(delta.motion)
     delta.custody = latestBy(delta.custody, (c) => c.containerId)
+    if (delta.hatch) delta.hatch = latestBy(delta.hatch, (c) => c.panelId)
     delta.entities = latestBy(delta.entities, (e) => `${e.kind}:${e.id}`)
     delta.reservations = delta.reservations.filter((r) => r.to > requireSim().now)
   }
@@ -360,6 +364,10 @@ export function createEngineHost() {
         return s.query.truck(need())
       case 'trucks':
         return s.query.trucks()
+      case 'hatch':
+        return s.query.hatchPanel(need())
+      case 'hatchList':
+        return s.query.hatchPanels()
       case 'transferStalls':
         return s.query.transferStalls()
       case 'yardBlocks':

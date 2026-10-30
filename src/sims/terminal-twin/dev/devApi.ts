@@ -54,6 +54,7 @@ import type { ShcRigState } from '../modules/shcAssets'
 import type { TruckRigState } from '../modules/truckAssets'
 import type { AscRigState } from '../modules/ascAssets'
 import type { VesselHullState } from '../modules/vesselRenderer'
+import type { HatchRigState } from '../modules/equipmentKinds/hatch'
 import type { AscPose, ShcPose, StsPose, TruckPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
 import type { StsRenderState } from '../modules/stsAssets'
@@ -271,6 +272,10 @@ export interface SceneState {
   stsRendered: Record<string, StsRenderState>
   /** Per vessel: hull class, line, livery tile, name, hull LOD and the rendered bay grid (TT-27). */
   vesselHulls: Record<string, VesselHullState>
+  /** Per hatch panel (TT-R10): engine-driven state and the centre (top face minus half the thickness) it should be drawn at, null while its vessel is not in the scene. */
+  hatchPanels: Record<string, { status: string; x: number | null; y: number | null; z: number | null; lengthM: number | null; widthM: number | null; stsId: string | null }>
+  /** Per hatch panel the renderer drew at the last frame: status and centre (absent while not drawn). */
+  hatchRigs: Record<string, HatchRigState>
 }
 
 declare global {

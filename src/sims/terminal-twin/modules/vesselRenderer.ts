@@ -16,6 +16,7 @@ import { vesselLine } from '../scenario/vesselNames'
 import { liveryMaterial } from './containerAssets'
 import type { SceneModel, Vec3 } from './sceneModel'
 import { hullMeta, loadHullModel, VESSEL_LIVERY_ATLAS, vesselHullColour, vesselLiveryIndex, type HullModel } from './vesselAssets'
+import { hullHatchOpenings, hullWithOpenHatches } from './hullHatchOpening'
 import { hullPlacement, type HullMeta } from './vesselHull'
 
 /** LOD switch distances (m, camera to the hull's bounding box) and hysteresis factor. */
@@ -33,6 +34,8 @@ export interface VesselHullState {
   assets: 'placeholder' | 'loaded'
   /** LOD drawn (null while the placeholder shows or the vessel is not in the scene). */
   lod: 0 | 1 | 2 | null
+  /** Triangles of the hull drawn at that LOD (null like `lod`). With hatch panels drawn by the twin (TT-R10) the hull has none baked in over their bays, so this is below the sidecar's count for LOD0 and LOD1. */
+  triangles: number | null
   /** The rendered hull's bay grid in world coordinates (from the GLB's bay_grid node); null when not in the scene. */
   bayGrid: {
     origin: Vec3
@@ -67,9 +70,18 @@ export class VesselHulls {
   private shared: { dispose(): void }[] = []
   private disposed = false
   private readonly box = new THREE.Box3()
+  /** Per vessel, the bays whose hatch panels the twin draws itself (TT-R10): the hull drawn here has no baked covers over them. */
+  private readonly panelBays = new Map<string, Set<number>>()
 
   constructor(private model: SceneModel) {
     this.group.name = 'vessels'
+    for (const id of model.hatchPanelIds) {
+      const panel = model.hatchPanelSpec(id)
+      if (!panel) continue
+      let bays = this.panelBays.get(panel.vesselId)
+      if (!bays) this.panelBays.set(panel.vesselId, (bays = new Set()))
+      bays.add(panel.bay)
+    }
     for (const v of model.config.vessels) {
       const line = vesselLine(v) ?? null
       const liveryIndex = vesselLiveryIndex(line)
@@ -146,6 +158,7 @@ export class VesselHulls {
     const hatchMat = this.track(new THREE.MeshStandardMaterial({ color: '#5b6470', roughness: 0.8 }))
     const hatchGeo = this.track(new THREE.BoxGeometry(BAY_PITCH_M - 1.2, 0.8, spec.rows * ROW_PITCH_M))
     for (let bay = 0; bay < spec.bays; bay++) {
+      if (this.panelBays.get(id)?.has(bay)) continue // drawn as panels (HatchPanels)
       const hatch = new THREE.Mesh(hatchGeo, hatchMat)
       hatch.position.set(slotX(spec, 0, bay), spec.deckHeightM - 0.4, slotZ(spec, (spec.rows - 1) / 2))
       group.add(hatch)
@@ -164,7 +177,22 @@ export class VesselHulls {
     const p = hullPlacement(model.meta, 0)
     hull.position.set(p.x, p.y, p.z)
     const boards = this.nameBoards(e, model.meta)
-    e.levels = model.lods.map((geometry, i) => {
+    const panelBays = this.panelBays.get(e.id)
+    e.levels = model.lods.map((lodGeometry, i) => {
+      let geometry = lodGeometry
+      if (panelBays && i < 2) {
+        // the twin draws this vessel's hatch panels itself: this copy of the hull has no baked covers over their bays, and a hole in the deck
+        const attributes = Object.fromEntries(
+          Object.entries(lodGeometry.attributes).map(([name, a]) => [name, { array: a.array as ArrayLike<number>, itemSize: a.itemSize }]),
+        )
+        const index = lodGeometry.getIndex()
+        const open = hullWithOpenHatches(model.meta, i as 0 | 1, { index: index ? (index.array as ArrayLike<number>) : null, attributes }, panelBays)
+        geometry = new THREE.BufferGeometry()
+        for (const [name, array] of Object.entries(open)) geometry.setAttribute(name, new THREE.BufferAttribute(array, lodGeometry.attributes[name].itemSize))
+        geometry.computeBoundingBox()
+        geometry.computeBoundingSphere()
+        e.disposables.push(geometry)
+      }
       const level = new THREE.Group()
       level.name = `LOD${i}`
       const mesh = new THREE.Mesh(geometry, material)
@@ -180,11 +208,29 @@ export class VesselHulls {
     marker.name = 'bay_grid'
     marker.position.copy(model.bayGrid)
     hull.add(marker)
+    if (panelBays) hull.add(this.holdLiners(model.meta, panelBays))
     e.marker = marker
     e.hull = hull
     e.lod = 0
     e.root.remove(e.placeholder)
     e.root.add(hull)
+  }
+
+  /** Dark pits inside the coamings of the bays whose deck is open (TT-R10): the hold seen through a lifted panel. Inside faces only. */
+  private holdLiners(meta: HullMeta, bays: ReadonlySet<number>): THREE.Group {
+    const group = new THREE.Group()
+    group.name = 'hold_liners'
+    const geometry = this.track(new THREE.BoxGeometry(1, 1, 1))
+    const material = this.track(new THREE.MeshStandardMaterial({ color: '#272d35', roughness: 0.9, side: THREE.BackSide }))
+    for (const o of hullHatchOpenings(meta, bays)) {
+      // a little inside the coaming so the walls do not fight with it
+      const liner = new THREE.Mesh(geometry, material)
+      liner.scale.set(o.x1 - o.x0 - 0.04, o.coamingTopY - o.floorY, o.zQuay - o.zSea - 0.04)
+      liner.position.set((o.x0 + o.x1) / 2, (o.coamingTopY + o.floorY) / 2, (o.zQuay + o.zSea) / 2)
+      liner.receiveShadow = true
+      group.add(liner)
+    }
+    return group
   }
 
   /** Name boards from the sidecar's `nameboard_*` attach points: the vessel name in capitals, white or dark by hull colour. */
@@ -299,10 +345,20 @@ export class VesselHulls {
         name: e.name,
         assets: e.hull ? 'loaded' : 'placeholder',
         lod: e.hull && e.root.visible ? e.lod : null,
+        triangles: e.hull && e.root.visible ? this.triangles(e) : null,
         bayGrid,
       }
     }
     return out
+  }
+
+  private triangles(e: VesselEntry): number {
+    let n = 0
+    e.levels[e.lod].traverse((o) => {
+      const g = (o as THREE.Mesh).geometry as THREE.BufferGeometry | undefined
+      if (g && o.name === '' && (o as THREE.Mesh).isMesh) n += (g.index ? g.index.count : g.getAttribute('position').count) / 3
+    })
+    return n
   }
 
   dispose(): void {

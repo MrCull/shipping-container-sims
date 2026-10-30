@@ -16,6 +16,7 @@ import type { Delta, WorkerRequest } from '../worker/protocol'
 
 const shcConfig = fixtures['shc-1sts-2shc-1wtp']
 const truckConfig = fixtures['dual-truck-transaction']
+const hatchConfig = fixtures['hatch-cover-cycle']
 const TIME_S = 400
 
 /** A model after the engine has run for a while: a vessel alongside, an STS, SHCs and ASCs at work. */
@@ -43,10 +44,10 @@ function modelWithTruck(): SceneModel {
 const catalogue = readFileSync(new URL('../i18n/messages.ts', import.meta.url), 'utf8')
 
 describe('equipment-kind registry', () => {
-  it('registers the five kinds once each', () => {
+  it('registers the six kinds once each', () => {
     const names = EQUIPMENT_KINDS.map((k) => k.kind)
     expect(new Set(names).size).toBe(names.length)
-    expect([...names].sort()).toEqual(['asc', 'shc', 'sts', 'truck', 'vessel'])
+    expect([...names].sort()).toEqual(['asc', 'hatch', 'shc', 'sts', 'truck', 'vessel'])
   })
 
   for (const def of EQUIPMENT_KINDS) {
@@ -60,14 +61,17 @@ describe('equipment-kind registry', () => {
       })
 
       it('is found by id, has bounds, and scene state for the dev API', async () => {
-        const model = def.kind === 'truck' ? modelWithTruck() : await modelAfterRun()
+        const model = def.kind === 'truck' ? modelWithTruck() : def.kind === 'hatch' ? new SceneModel(hatchConfig) : await modelAfterRun()
         const ids = def.ids(model)
         expect(ids.length).toBeGreaterThan(0)
         const id = ids[0]!
         expect(kindOfEntity(model, id)).toBe(def.kind)
         expect(entityKind(model, id)).toBe(def.kind)
-        expect(entityBounds(model, id, TIME_S)).not.toBeNull()
-        expect(def.sceneState(model, id, TIME_S)).toHaveProperty('status')
+        // a hatch panel lies on its hatch only while its vessel is alongside
+        const t = def.kind === 'hatch' ? 0 : TIME_S
+        if (def.kind === 'hatch') model.apply(emptyDelta({ entities: [{ kind: 'vessel', id: 'V001', t: 0, status: 'berthed', berthX: 50 }] }))
+        expect(entityBounds(model, id, t)).not.toBeNull()
+        expect(def.sceneState(model, id, t)).toHaveProperty('status')
         expect(def.sceneKey).not.toBe(def.rigKey)
       })
     })

@@ -17,6 +17,7 @@ import type {
   SimState,
   StsState,
   TruckState,
+  HatchPanelState,
   TransferStallState,
   HoldingPositionState,
   VesselSlotState,
@@ -62,6 +63,9 @@ export interface SimQuery {
   /** Trucks in the terminal (queued at the gate to leaving), TT-13. */
   trucks(): readonly Readonly<TruckState>[]
   truck(id: string): Readonly<TruckState>
+  /** Hatch panels (TT-R09; empty with hatch covers off): one vessel's, or all, in id order. */
+  hatchPanels(vesselId?: string): readonly Readonly<HatchPanelState>[]
+  hatchPanel(id: string): Readonly<HatchPanelState>
   /** Transfer stalls with the truck that holds each (empty when the landside is off). */
   transferStalls(): readonly Readonly<TransferStallState>[]
   /** Holding positions with the truck that holds each (empty without `config.landside.holding`), TT-R16. */
@@ -114,6 +118,11 @@ export function createQuery(getState: () => SimState): SimQuery {
     },
     trucks: () => Object.values(getState().trucks),
     truck: (id) => get(getState().trucks, id, 'truck'),
+    hatchPanels: (vesselId) => {
+      const all = Object.values(getState().hatchPanels)
+      return vesselId === undefined ? all : all.filter((p) => p.vesselId === vesselId)
+    },
+    hatchPanel: (id) => get(getState().hatchPanels, id, 'hatch panel'),
     transferStalls: () => Object.values(getState().landside?.stalls ?? {}),
     holdingPositions: () => Object.values(getState().landside?.holding ?? {}),
     gateQueue: () => getState().landside?.queue ?? [],

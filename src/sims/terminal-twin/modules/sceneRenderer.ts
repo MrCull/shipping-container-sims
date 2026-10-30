@@ -41,6 +41,8 @@ export interface SceneStats {
   landside: LandsideStats
   /** Phase 2 infrastructure (TT-28): instanced gate, quay, yard and building models. */
   infrastructure: InfrastructureStats
+  /** Hatch panels drawn (TT-R10): on their hatch, on a spreader or in the laydown. */
+  hatchPanels: number
   /** STS crane objects in the scene. */
   sts: number
   /** SHC objects in the scene. */
