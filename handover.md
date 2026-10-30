@@ -7,11 +7,11 @@ Spec and ticket copies: scratchpad `spec-106.md`, `tickets106/<n>.md`. Implement
 | #107 | Single container factory | - | merged 132e368 | done |
 | #108 | Stored properties, port rotation, inspector, docs | #107 | merged | done |
 | #109 | Derived transit status, content status, dwell | #108 | merged | done |
-| #110 | ROB bays | #108 | implementer (tt/110-rob-bays) | built, awaiting merge |
-| #111 | Yard `grouped` (opt-in) | #108 | implementer (tt/111-yard-grouped) | built, awaiting merge |
+| #110 | ROB bays | #108 | merged | done |
+| #111 | Yard `grouped` (opt-in) | #108 | merged | done |
 | #112 | Empty allocation `iso-type-best-position` (opt-in) | #108 | | |
 | #113 | Vessel `pod-weight` ordering (opt-in) | #108 | | |
-| #114 | Flip defaults, one golden regeneration | #109 #111 #112 #113 | | |
-| #115 | Bay viewer popup | #109 #110 | | |
+| #114 | Flip defaults, one golden regeneration | #109 #111 #112 #113 | implementer (tt/114-flip-defaults) | in progress |
+| #115 | Bay viewer popup | #109 #110 | implementer (tt/115-bay-viewer) | in progress |
 
-Built, awaiting merge (in order): #110, #111, #112, #113 (branches tt/110-rob-bays, tt/111-yard-grouped, tt/112-empty-allocation-iso, tt/113-pod-weight-ordering). #112/#113 goldens need regenerating on merged tree (kpis.dwell from #109). Note: shc-model smoke spec timed out once under a full run and passed alone (load flake).
+Merge #114 and #115 as they report (#114 regenerates goldens: merge before #115 if both are done, or regenerate on the merged tree). Then full smoke once, /code-review, finish.
