@@ -10,7 +10,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 | #84 | R02 Fixed-width KPI strip | | n/a | wave 2 | merged |
 | #85 | R03 Keyboard camera | | n/a | wave 1 | merged |
 | #86 | R04 Scenario picker | | n/a | wave 4 | claimed |
-| #87 | R05 TTI research KB | | n/a | wave 4 | claimed |
+| #87 | R05 TTI research KB | | n/a | wave 4 | merged |
 | #88 | R06 Yard no mixed 20/40 | | 0.13.0 | wave 1 | merged (ee888ee) |
 | #89 | R07 Vessel no 20 on 40 | #88 | 0.14.0 (merged as 0.18.0 tip) | wave 2 | merged |
 | #90 | R08 Maritime locations | | n/a | | todo |

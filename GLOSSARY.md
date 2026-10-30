@@ -22,6 +22,8 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Ground position (STS ground position):** a buffer lane under an STS where discharged boxes are set down and from which load boxes are picked (`<stsId>-GP<n>`).
 - **WTP (waterside transfer point) pad:** a buffer position at the waterside end of a yard block. SHCs drop boxes there, and the ASC picks them up (and the reverse).
 - **Transfer stall (landside transfer stall):** a truck position at the landside end of a block where the ASC serves external trucks.
+- **Queue area:** a waiting place for SHCs near each STS and each block's WTP pads (slice D, #94), separate from parking spots, ground positions and pads. An SHC dispatched before its box is ready waits there. Capacity is configurable.
+- **Maritime location notation:** a location written the way a vessel bay plan writes it (bay, row, tier; ISO 9711), used for display. The sim's internal slot ids (`<block>:<bay>-<row>-<tier>`) are kept unchanged. See `knowledge-base/dk_ops__tti_algeciras_operations.md`.
 - **Hatch laydown (laydown bay):** a place on the quay under an STS's backreach where removed hatch panels are stacked (`LD@<x>`): the gap between two SHC spines, landside of the last ground lane and clear of the landside STS rail. One laydown bay holds one stack of at most `laydownStackLimit` (default 3) panels of one hatch.
 - **Block:** one yard block, perpendicular to the quay. It has 8 rows (fixed by the 25.4 m ASC span), with configurable bays and tiers.
 - **Bay (yard bay):** one 20 ft position along a block (6.7 m). A 40 ft box covers two bays.
