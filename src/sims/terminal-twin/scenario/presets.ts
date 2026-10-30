@@ -6,7 +6,7 @@
 import { DEFAULT_HOURLY_PROFILE, ScenarioBuilder } from './builder'
 import { deriveBlockXs, deriveSts } from './layout'
 import { TTI_FLOW_MIX, generateVessels } from './vesselGenerator'
-import type { AppointmentConfig, ScenarioConfig, VesselConfig, YardStartConfig } from './types'
+import type { AppointmentConfig, HoldingConfig, ScenarioConfig, VesselConfig, YardStartConfig } from './types'
 
 /** TTI Algeciras' published capacity (TEU): the source of the bay count. */
 export const TTI_YARD_TEU = 28647
@@ -38,6 +38,7 @@ interface TerminalSpec {
   truckScale: number
   /** Truck appointment windows (TT-R15); absent = Poisson arrivals. */
   appointments?: AppointmentConfig
+  holding?: HoldingConfig
 }
 
 function terminal(spec: TerminalSpec): ScenarioConfig {
@@ -56,6 +57,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
       hourlyProfile: DEFAULT_HOURLY_PROFILE.map((n) => Math.round(n * spec.truckScale)),
       gate: { inLanes: spec.gate.inLanes, outLanes: spec.gate.outLanes, oogLane: true },
       ...(spec.appointments ? { appointments: spec.appointments } : {}),
+      ...(spec.holding ? { holding: spec.holding } : {}),
     })
     .endWhen({ vesselsCompleted: spec.vessels.length })
   const base = b.build()
@@ -150,5 +152,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       // Peak day: appointments bunched into the first two hours (x1.5, 4 windows). [A] unverified: TTI's real window
       // length, caps and peak shape are not public; the cap itself comes from the gate and stall counts.
       appointments: { windowS: 1800, bunching: [{ fromS: 0, toS: 7200, factor: 1.5 }], unverified: true },
+      // [A] unverified: TTI's real number of holding positions is not public.
+      holding: { positions: 6, unverified: true },
     }),
 }

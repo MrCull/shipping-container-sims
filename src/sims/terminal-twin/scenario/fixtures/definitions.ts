@@ -378,6 +378,37 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * TT-R16 stall admission and holding: the gate-queue terminal (2 transfer stalls) with 2 holding positions. A burst
+   * of 10 trucks 5 s apart: the first two are admitted with a reserved stall, the next two wait in the holding
+   * positions, and the rest wait outside the gate (overflow) until holding frees up. The numbers are not TTI values.
+   */
+  'truck-holding-overflow': () =>
+    new ScenarioBuilder('truck-holding-overflow', 'A burst of 10 trucks: stalls reserved at the gate, 2 holding positions, the rest wait outside')
+      .hatch({ enabled: false })
+      .seed(8)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 16, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', arrivalS: 20000, load: 4, maxSts: 1 })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3, transferStalls: 2 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 0),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 2, outLanes: 2, inProcessingS: 30, outProcessingS: 20 },
+        holding: { positions: 2 },
+        scripted: (['pickImport', 'dropExport', 'dual', 'dropEmpty', 'pickImport', 'dropExport', 'dual', 'dropEmpty', 'pickEmpty', 'pickImport'] as const).map(
+          (transaction, i) => ({ atS: 3000 + i * 5, transaction }),
+        ),
+      })
+      .endWhen({ simDurationS: 9000 })
+      .build(),
+
+  /**
    * TT-13 morning peak: two blocks, a feeder discharging 24 boxes, and the 07:00 truck profile (Poisson,
    * 40 to 48 trucks an hour) with the default transaction mix and a 10 minute import dwell.
    */

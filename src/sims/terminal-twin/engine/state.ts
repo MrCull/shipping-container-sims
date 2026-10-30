@@ -389,11 +389,15 @@ export interface TruckLeg {
 /**
  * queued (gate queue) → in-lane (driving to the kiosk, being processed) → waiting-for-stall → routing-to-stall → at-stall
  * → being-served (the landside ASC works the chassis) → routing-to-exit → (gone: removed at TruckDeparted).
+ * With stall admission (TT-R16, `config.landside.holding`) a truck with a reserved stall goes on to routing-to-stall at
+ * once, and one without drives to a holding position: in-lane → routing-to-holding → holding → routing-to-stall.
  */
 export type TruckStatus =
   | 'queued'
   | 'in-lane'
   | 'waiting-for-stall'
+  | 'routing-to-holding'
+  | 'holding'
   | 'routing-to-stall'
   | 'at-stall'
   | 'being-served'
@@ -401,7 +405,7 @@ export type TruckStatus =
 
 /** One planned phase event of a truck's trip (the next one is scheduled by the previous). */
 export interface TruckPlannedEvent {
-  type: 'TruckGateIn' | 'TruckRoutingToStall' | 'TruckAtStall' | 'TruckRoutingToExit' | 'TruckGateOut' | 'TruckDeparted'
+  type: 'TruckGateIn' | 'TruckRoutingToHolding' | 'TruckAtHolding' | 'TruckRoutingToStall' | 'TruckAtStall' | 'TruckRoutingToExit' | 'TruckGateOut' | 'TruckDeparted'
   at: number
   segments: MotionSegment[]
   /** TruckGateIn: the processing time spent at the kiosk (s). */
@@ -419,6 +423,12 @@ export interface TruckState {
   laneId: string | null
   outLaneId: string | null
   stallId: string | null
+  /** The holding position reserved for the truck from admission until it has left it (TT-R16), else null. */
+  holdingId: string | null
+  /** When the truck stood in its holding position (TT-R16). */
+  holdingAt: number | null
+  /** The truck has been reported waiting outside the gate (holding full, TT-R16): reported once per truck. */
+  heldOutside: boolean
   /** Landside-graph node the truck is at, or will be at the end of its planned motion. */
   nodeId: string
   /** The box on the chassis. */
@@ -442,6 +452,14 @@ export interface TransferStallState {
   truckId: string | null
 }
 
+/** A holding position (TT-R16) and the truck that holds it, from its admission until it has driven out. */
+export interface HoldingPositionState {
+  id: string
+  x: number
+  z: number
+  truckId: string | null
+}
+
 export interface LandsideState {
   /** Own RNG stream (arrivals, transactions, boxes, dwell): the landside never disturbs the other subsystems' draws. */
   rngState: number
@@ -460,6 +478,8 @@ export interface LandsideState {
   stallWaiting: string[]
   /** The truck whose transferStallSelection decision is pending. */
   stallAsking: string | null
+  /** Holding positions (TT-R16; empty without `config.landside.holding`). */
+  holding: Record<string, HoldingPositionState>
   /** Booked appointment windows (TT-R15); present only when `config.landside.appointments` is set, filled at ScenarioStarted. */
   appointments?: AppointmentBook
 }
@@ -506,6 +526,18 @@ export interface LandsideKpiCounters {
   boxesPicked: number
   /** Arrivals whose drawn transaction could not be served (no eligible box / vessel), served as a drop empty. */
   fallbacks: number
+  /** Trucks admitted past the gate with a stall reserved (TT-R16; this and the counters below stay 0 without `config.landside.holding`). */
+  admittedToStall: number
+  /** Trucks admitted to a holding position (no stall could take them). */
+  admittedToHolding: number
+  /** Trucks that waited outside the gate because no stall and no holding position was free (counted once each). */
+  heldOutside: number
+  /** Most holding positions in use at once (reserved, driving there or standing). */
+  holdingMax: number
+  /** Standing in a holding position until its stall is assigned (s), over the trucks that got one. */
+  holdingWaitSumS: number
+  holdingWaitMaxS: number
+  holdingWaitCount: number
 }
 
 export interface StsDrop {
@@ -931,6 +963,7 @@ function initLandside(state: SimState, config: ScenarioConfig, seed: number): vo
     stalls: Object.fromEntries(graph.stalls.map((st) => [st.id, { id: st.id, blockId: st.blockId, x: st.x, z: st.z, truckId: null }])),
     stallWaiting: [],
     stallAsking: null,
+    holding: Object.fromEntries(graph.holding.map((h) => [h.id, { id: h.id, x: h.x, z: h.z, truckId: null }])),
   }
   const rng = () => {
     const [v, next] = nextRandom(ls.rngState)
@@ -958,6 +991,13 @@ function initLandside(state: SimState, config: ScenarioConfig, seed: number): vo
     boxesDropped: 0,
     boxesPicked: 0,
     fallbacks: 0,
+    admittedToStall: 0,
+    admittedToHolding: 0,
+    heldOutside: 0,
+    holdingMax: 0,
+    holdingWaitSumS: 0,
+    holdingWaitMaxS: 0,
+    holdingWaitCount: 0,
   }
 }
 

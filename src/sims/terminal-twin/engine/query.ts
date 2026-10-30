@@ -18,6 +18,7 @@ import type {
   StsState,
   TruckState,
   TransferStallState,
+  HoldingPositionState,
   VesselSlotState,
   VesselState,
   WtpPadState,
@@ -63,6 +64,8 @@ export interface SimQuery {
   truck(id: string): Readonly<TruckState>
   /** Transfer stalls with the truck that holds each (empty when the landside is off). */
   transferStalls(): readonly Readonly<TransferStallState>[]
+  /** Holding positions with the truck that holds each (empty without `config.landside.holding`), TT-R16. */
+  holdingPositions(): readonly Readonly<HoldingPositionState>[]
   /** Trucks waiting at the gate, head of the queue first. */
   gateQueue(): readonly string[]
   /** Booked truck appointments, in arrival order (empty without `config.landside.appointments`), TT-R15. */
@@ -112,6 +115,7 @@ export function createQuery(getState: () => SimState): SimQuery {
     trucks: () => Object.values(getState().trucks),
     truck: (id) => get(getState().trucks, id, 'truck'),
     transferStalls: () => Object.values(getState().landside?.stalls ?? {}),
+    holdingPositions: () => Object.values(getState().landside?.holding ?? {}),
     gateQueue: () => getState().landside?.queue ?? [],
     appointments: () => getState().landside?.appointments?.list ?? [],
     loadOrders: () => Object.values(getState().loadOrders).sort((a, b) => (a.stsId < b.stsId ? -1 : a.stsId > b.stsId ? 1 : a.seq - b.seq)),

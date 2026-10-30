@@ -12,6 +12,7 @@ import truckGateQueue from './truck-gate-queue.json'
 import hatchCoverCycle from './hatch-cover-cycle.json'
 import hatchDeckOnly from './hatch-deck-only-no-open.json'
 import truckAppointmentWindows from './truck-appointment-windows.json'
+import truckHoldingOverflow from './truck-holding-overflow.json'
 import landsideMorningPeak from './landside-morning-peak.json'
 import loadFixture from './load-1sts-10-boxes-1block.json'
 import liveriesMixed from './liveries-mixed.json'
@@ -46,6 +47,7 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'hatch-cover-cycle': hatchCoverCycle as ScenarioConfig,
   'hatch-deck-only-no-open': hatchDeckOnly as ScenarioConfig,
   'truck-appointment-windows': truckAppointmentWindows as ScenarioConfig,
+  'truck-holding-overflow': truckHoldingOverflow as ScenarioConfig,
   'yard-no-mixed-length': yardNoMixedLength as ScenarioConfig,
   'stow-mixed-20-40': stowMixed as ScenarioConfig,
 }
