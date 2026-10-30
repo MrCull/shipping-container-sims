@@ -160,6 +160,8 @@ export { parseLogVerbosity, toLogRecord, eventSubsystem, eventLogLevel, LOG_LEVE
 export type { LogLevel, LogRecord, LogOptions, LogVerbosity } from './logging'
 export { diffEventLogs, jsonDifferences } from './runDiff'
 export type { RunDiff, RunDiffOptions } from './runDiff'
+export { stsProductivity, formatStsProductivity, STS_TIME_BUCKETS } from './stsProductivity'
+export type { StsProductivityReport, StsTimeRow, StsTimeBucket } from './stsProductivity'
 export { summarizeRun } from './summary'
 export type { RunSummary } from './summary'
 export { SHC_OPERATIONAL_STATES, SHC_STATUSES, shcOperationalState } from './shcStates'
