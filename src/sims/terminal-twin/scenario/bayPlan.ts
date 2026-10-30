@@ -26,6 +26,7 @@ import { isReefer } from './reefer'
 import { sampleDwell, transshipmentConfig } from './dwell'
 import type { ContainerSize, ScenarioConfig, VesselConfig, Weights } from './types'
 import { cellCapacity, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
+import { makePlannedContainer } from './containerFactory'
 
 export type SlotPurpose = 'discharge' | 'load' | 'transshipment'
 
@@ -279,8 +280,8 @@ function planVessel(
       const serial = (serials.get(prefix) ?? 100000 + Math.floor(rng() * 400000)) + 1 + Math.floor(rng() * 5)
       if (serial > 999999) throw new Error(`Owner prefix ${prefix} ran out of serial numbers`)
       serials.set(prefix, serial)
-      const planned: PlannedContainer = { id: makeIso6346Id(prefix, serial), ...box, vesselId: v.id, slotId, flow: 'discharge' }
-      if (isReefer(cargo, planned.id, planned.full)) planned.reefer = true
+      const id = makeIso6346Id(prefix, serial)
+      const planned = makePlannedContainer({ id, size: box.size, full: box.full, line: box.line, vesselId: v.id, slotId, flow: 'discharge', reefer: isReefer(cargo, id, box.full) })
       plan.containers.push(planned)
       if (tsBoxes.has(box)) tsSources.push(planned)
     })
@@ -389,8 +390,8 @@ function planVessel(
         const serial = (serials.get(prefix) ?? 100000 + Math.floor(loadRng() * 400000)) + 1 + Math.floor(loadRng() * 5)
         if (serial > 999999) throw new Error(`Owner prefix ${prefix} ran out of serial numbers`)
         serials.set(prefix, serial)
-        const loadBox: PlannedContainer = { id: makeIso6346Id(prefix, serial), size: box.size, full: box.full, line: box.line, vesselId: v.id, slotId, flow: 'load' }
-        if (isReefer(config.cargo, loadBox.id, loadBox.full)) loadBox.reefer = true
+        const id = makeIso6346Id(prefix, serial)
+        const loadBox = makePlannedContainer({ id, size: box.size, full: box.full, line: box.line, vesselId: v.id, slotId, flow: 'load', reefer: isReefer(config.cargo, id, box.full) })
         plan.containers.push(loadBox)
       })
       if (unit.boxes[0].kind !== 'empty') b = (b + 1) % spec.bays // empties of a requirement share a bay: one package
@@ -545,15 +546,9 @@ function addEmptyPool(config: ScenarioConfig, seed: number, plan: CargoPlan, ser
     const serial = (serials.get(prefix) ?? 100000 + Math.floor(rng() * 400000)) + 1 + Math.floor(rng() * 5)
     if (serial > 999999) throw new Error(`Owner prefix ${prefix} ran out of serial numbers`)
     serials.set(prefix, serial)
-    plan.containers.push({
-      id: makeIso6346Id(prefix, serial),
-      size,
-      full: false,
-      line,
-      vesselId: POOL_VESSEL_ID,
-      slotId: '',
-      flow: 'pool',
-      ageS: Math.round(rng() * (pool.maxAgeS ?? 7 * 86400)),
-    })
+    const id = makeIso6346Id(prefix, serial)
+    plan.containers.push(
+      makePlannedContainer({ id, size, full: false, line, vesselId: POOL_VESSEL_ID, slotId: '', flow: 'pool', ageS: Math.round(rng() * (pool.maxAgeS ?? 7 * 86400)) }),
+    )
   }
 }

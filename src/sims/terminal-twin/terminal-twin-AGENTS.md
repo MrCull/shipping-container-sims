@@ -125,6 +125,7 @@ terminal-twin/
 │   ├── lines.ts              Shipping lines: owner prefixes, default weights, default cargo mix
 │   ├── vesselClasses.ts      VESSEL_CLASSES (Feeder → ULCV) + bay-plan geometry (slotX/Z, tierBaseY, slot ids)
 │   ├── bayPlan.ts            planCargo(config, seed): slots + discharge boxes (engine AND scene model call it)
+│   ├── containerFactory.ts   makePlannedContainer / makeContainerState: the ONLY place a container is built (guarded by tests/containerFactory.test.ts); add new container properties here
 │   ├── vesselGenerator.ts    generateVessels(...): "Generate N vessels"
 │   ├── overrides.ts          Setup-dialog edits (quay length, STS count, vessel table) + validation
 │   ├── presets.ts            Preset registry

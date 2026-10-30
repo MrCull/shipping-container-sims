@@ -14,6 +14,7 @@ import type { Reservation } from './reservations'
 import { nextRandom, seedState } from './rng'
 import { ascStartZ, blockSpecs, PARK_UNTIL_S, railSegmentIds, travelHoistM } from './yardLayout'
 import { planCargo, POOL_VESSEL_ID, type SlotPurpose } from '../scenario/bayPlan'
+import { makeContainerState } from '../scenario/containerFactory'
 import { sampleDwell } from '../scenario/dwell'
 import { planExportYard, type ExportPlacement } from '../scenario/exportYard'
 import { DEFAULT_WARM_UP_S } from '../scenario/types'
@@ -1156,24 +1157,20 @@ export function createInitialState(
       state.vessels[c.vesselId].remainingDischarge++
       owner = { kind: 'vesselSlot', id: c.slotId }
     }
-    state.containers[c.id] = {
+    state.containers[c.id] = makeContainerState({
       id: c.id,
       size: c.size,
       full: c.full,
       line: c.line,
       vesselId: c.vesselId,
-      custody: owner,
-      custodyHistory: [{ t: 0, owner, eventId: null }],
-    }
-    if (c.reefer) state.containers[c.id].reefer = true
-    if (c.flow === 'pool') state.containers[c.id].yardSince = -(c.ageS ?? 0)
+      owner,
+      t: 0,
+      eventId: null,
+      reefer: c.reefer,
+      yardSince: c.flow === 'pool' ? -(c.ageS ?? 0) : undefined,
+      transshipment: c.transshipment,
+    })
     if (c.transshipment) {
-      Object.assign(state.containers[c.id], {
-        onwardVesselId: c.transshipment.onwardVesselId,
-        onwardSlotId: c.transshipment.onwardSlotId,
-        dwellS: c.transshipment.dwellS,
-        readyAt: null,
-      })
       if (loading) state.vessels[c.transshipment.onwardVesselId].remainingLoad++
     }
   }
