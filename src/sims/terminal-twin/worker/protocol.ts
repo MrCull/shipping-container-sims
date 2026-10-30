@@ -14,6 +14,7 @@ import type {
   ExportKind,
   MotionSegment,
   KpiSeriesReport,
+  LandsideKpiReport,
   Reservation,
   RunCondition,
   SimSnapshot,
@@ -31,6 +32,8 @@ export interface DashboardData {
   timeline: TimelineReport
   /** Current fill of each yard block (% of cells holding a box). */
   yard: { id: string; fillPct: number }[]
+  /** Whole-run truck and gate numbers (TT-R18); null without a landside. */
+  landside: LandsideKpiReport | null
 }
 
 export type QueryKind =

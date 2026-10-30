@@ -187,7 +187,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Interchange:** the ASC lifting a box off a chassis (drop) or setting one on it (pick) at a stall.
 - **Import dwell / export window:** how long an import stands in the yard before a truck may collect it (default lognormal, median 3 days); the period before a vessel's ETA (default 1 to 5 days) in which trucks may deliver its exports.
 - **Segregation:** trucks never enter the waterside network and SHCs never use the gate (invariant `landside.segregation`).
-- **Truck turn time:** gate-in to gate-out.
+- **Truck turn time:** gate-in to gate-out. **Total truck turnaround** (TT-R18) is arrival at the gate to gate-out, so it includes the wait outside the gate and in holding.
+- **Internal drive time:** the time a truck spends driving inside the terminal on its inbound leg (kiosk to stall, through a holding position if any), without the time it stands waiting. Reported per truck as mean and max.
+- **Road use:** how many trucks are driving on the internal landside roads (inbound legs and the way out): time-weighted mean over the run and the peak. **Holding utilisation** is the share of holding position-time that was occupied.
+- **Delayed appointment:** a booked truck that passed the gate after the end of its appointment window. **Rejected appointment:** a booking refused because its window was at capacity.
 - **Holding position:** a dead-end spur off the inbound road (`landside.holding.positions`, nodes `ls:H<n>`) where an admitted truck waits for a transfer stall. It never lies on a road, junction or gate exit (invariant `landside.waiting-off-road`).
 - **Stall admission:** the gate lets the head of the queue through only when a transfer stall can take it (the stall is reserved first, so no two trucks claim one stall: `landside.stall-exclusive`) or a holding position is free.
 - **Overflow (holding):** when no stall and no holding position is free, the truck waits outside the gate in the queue (`TruckHeldOutside`).
