@@ -4,8 +4,8 @@ Spec and ticket copies: scratchpad `spec-106.md`, `tickets106/<n>.md`. Implement
 
 | Ticket | Title | Blocked by | Claimed by | Status |
 |---|---|---|---|---|
-| #107 | Single container factory | - | orchestrator session | in progress |
-| #108 | Stored properties, port rotation, inspector, docs | #107 | | |
+| #107 | Single container factory | - | merged 132e368 | done |
+| #108 | Stored properties, port rotation, inspector, docs | #107 | implementer (tt/108-container-properties) | in progress |
 | #109 | Derived transit status, content status, dwell | #108 | | |
 | #110 | ROB bays | #108 | | |
 | #111 | Yard `grouped` (opt-in) | #108 | | |
@@ -14,4 +14,4 @@ Spec and ticket copies: scratchpad `spec-106.md`, `tickets106/<n>.md`. Implement
 | #114 | Flip defaults, one golden regeneration | #109 #111 #112 #113 | | |
 | #115 | Bay viewer popup | #109 #110 | | |
 
-Next: merge #107, then start #108.
+Next: merge #108, then start #109-#113 (max three at once).
