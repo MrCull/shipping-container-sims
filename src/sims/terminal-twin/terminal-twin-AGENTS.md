@@ -274,6 +274,17 @@ Every container carries `ContainerState.props` (`scenario/containerProps.ts`), s
 - **Peak-day preset:** `PEAK_DAY_ROTATION` (CNSHA, SGSIN, ESALG, MAPTM, ESVLC, FRFOS, ITGOA), `PEAK_DAY_FLOW_MIX` (89% transshipment) and `PEAK_DAY_ROB` (30% of bays, 70% full), all marked unverified in its description. Presets have no golden; `tests/presets.test.ts` and `tests/rob-bays.test.ts` cover it.
 - **Proof:** `tests/rob-bays.test.ts` (plan, stacking, fill, PODs, headless run of `rob-bays` with zero violations, no event or slot in a ROB bay, hatches closed); smoke `tests/browser/rob-bays.smoke.ts` (hull draws the boxes, screenshot `.screenshots/assets/rob-bays.png`).
 
+## Empty allocation by ISO type (spec #106, #112)
+
+`emptyAllocation` has a third, **opt-in** strategy, `iso-type-best-position` (the default stays `nearest-wtp` until the default-flip ticket). Select it with `config.decisions.points.emptyAllocation.strategy` or `--strategy emptyAllocation=iso-type-best-position`; `nearest-wtp` and `oldest-first` stay selectable.
+
+- **Requirement:** `EmptyRequirement.isoType` (optional, default the dry-box code of `size`, `isoTypeOf`) is carried in `PlannedSlot.emptyReq`, `VesselSlotState.emptyReq` and `EmptiesRequirement.isoType` (optional there: older snapshots derive it from `size`).
+- **Match:** the ISO type (`ContainerState.props.isoType`) must equal the requirement's; the line is ignored unless `config.emptyAllocation.matchLine` is true (builder `.emptyAllocation({ matchLine })`, CLI `--match-line`). Not allocated, not claimed by a truck, still in its yard slot.
+- **Buried empties are candidates** (the older strategies see only top-of-stack boxes). `EmptyCandidate.boxesOnTop` counts the boxes above (`blockersOf`); an ASC rehandles them when a pick is buried (the usual `rehandleTarget` flow).
+- **Best position** (`isoTypeBestPositionEmpties`, greedy one pick at a time): fewest `boxesOnTop`; then `blockRank` (0 = the block whose x is nearest the crane's gantry, the block serving the vessel) and `distanceM` to that block's WTP pad; then most neighbouring allocated or already picked empties (`adjacentAllocated`, same block, row +-1, bay +-2), then container id. The reply lists picks with fewer boxes on top first, so a pick standing on another is loaded first and nothing is rehandled for it.
+- **Contract (additive, `emptyAllocation` stays version 1):** only while this strategy is selected (`isoAllocation(ctx)`) the request gains `isoType` and `matchLine` and each candidate gains `isoType`, `line`, `boxesOnTop`, `blockRank`, `adjacentAllocated`, and the candidate set widens as above. With any other strategy request, event payloads and goldens are byte-identical. A custom handler on this point gets the old shape; a timeout fallback to the default strategy sees the widened candidates, which are all valid. No new event; `ENGINE_VERSION` unchanged.
+- **Fixture:** `empty-allocation-iso` (18 empty 40s from a 30-box mixed 20/40, MSC/Maersk pool; zero invariant violations). Tests: `tests/empty-allocation-iso.test.ts`.
+
 ## Known gaps
 
 Deliberately not built, or built differently from the spec (the code review accepted these):

@@ -92,7 +92,7 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
       ) {
         current = make(kind, s.bay, section(s.deck))
         if (s.emptyReq)
-          current.emptyReq = { index: s.emptyReq.index, size: s.emptyReq.size, line: s.emptyReq.line, count: 0, slotIds: [], stage: 'pending' }
+          current.emptyReq = { index: s.emptyReq.index, size: s.emptyReq.size, line: s.emptyReq.line, isoType: s.emptyReq.isoType, count: 0, slotIds: [], stage: 'pending' }
         made.push(current)
       }
       if (current.emptyReq) {

@@ -292,6 +292,12 @@ export class ScenarioBuilder {
     return this
   }
 
+  /** Empty allocation options: `matchLine` restricts `iso-type-best-position` to the requesting line (spec #106). */
+  emptyAllocation(options: { matchLine?: boolean }): this {
+    this.config.emptyAllocation = { ...options }
+    return this
+  }
+
   /** Stored container properties: port rotation, direction mix, cargo weights, weight classes, expected dwell (spec #106). */
   containerProps(props: ContainerPropsConfig): this {
     this.config.containerProps = structuredClone(props)

@@ -26,6 +26,7 @@ import shcPairedDualCycle from './shc-paired-dual-cycle.json'
 import tracer1Sts10Boxes from './tracer-1sts-10-boxes.json'
 import transshipmentAToB from './transshipment-a-to-b.json'
 import emptiesLoad from './empties-load-4-of-16.json'
+import emptyAllocationIso from './empty-allocation-iso.json'
 import stowMixed from './stow-mixed-20-40.json'
 import reeferPoweredRows from './reefer-powered-rows.json'
 import robBays from './rob-bays.json'
@@ -50,6 +51,7 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'mixed-discharge-then-load': mixedFixture as ScenarioConfig,
   'transshipment-a-to-b': transshipmentAToB as ScenarioConfig,
   'empties-load-4-of-16': emptiesLoad as ScenarioConfig,
+  'empty-allocation-iso': emptyAllocationIso as ScenarioConfig,
   'rehandle-random-yard': rehandleRandomYard as ScenarioConfig,
   'dual-truck-transaction': dualTruck as ScenarioConfig,
   'truck-gate-queue': truckGateQueue as ScenarioConfig,

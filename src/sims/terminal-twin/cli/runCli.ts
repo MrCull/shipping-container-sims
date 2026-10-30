@@ -51,6 +51,7 @@ export const USAGE = `Usage: pnpm run tt:run (--fixture <name|file.json> | --pre
   --handlers <name>      Handler set: ${Object.keys(handlerSets).join(', ')}
   --async-mode <mode>    keep-running (default) | pause
   --strategy <dp>=<name> Built-in strategy for a decision point (repeatable)
+  --match-line           Restrict the emptyAllocation=iso-type-best-position strategy to empties of the requesting line
   --latency <dp>=<spec>  Latency injector (repeatable). spec = none | fixed:<ms> | uniform:<min>-<max> | exp:<mean>
                          then optional ,timeout:<pct> ,error:<pct> ,timeoutMs:<ms>
                          e.g. stsGroundPosition=fixed:1500,timeout:5
@@ -323,6 +324,7 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
         'async-mode': { type: 'string' },
         strategy: { type: 'string', multiple: true, default: [] },
         latency: { type: 'string', multiple: true, default: [] },
+        'match-line': { type: 'boolean', default: false },
         snapshot: { type: 'string' },
         log: { type: 'string' },
         'log-level': { type: 'string' },
@@ -352,6 +354,10 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
     if (endConditions) config = { ...config, endConditions }
     const decisions = decisionsFromArgs(config.decisions, values['async-mode'], values.strategy, values.latency)
     if (decisions !== config.decisions) config = { ...config, decisions }
+    if (values['match-line']) {
+      if (start) throw new UsageError('--from-snapshot takes the empty allocation options from the snapshot: drop --match-line')
+      config = { ...config, emptyAllocation: { ...config.emptyAllocation, matchLine: true } }
+    }
     if (values.subsystem.length > 0) {
       if (start) throw new UsageError('--from-snapshot takes subsystem modes from the snapshot: drop --subsystem')
       config = { ...config, subsystems: subsystemsFromArgs(config.subsystems, values.subsystem) }

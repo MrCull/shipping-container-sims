@@ -89,7 +89,7 @@ export interface VesselSlotState {
   /** Load slots: the export box booked to this slot (it is `containerId` once loaded). */
   plannedContainerId?: string | null
   /** Empty-container slot (TT-11): requirement it is booked for; `plannedContainerId` is set when an empty is allocated. */
-  emptyReq?: { index: number; size: ContainerSize; line: string }
+  emptyReq?: { index: number; size: ContainerSize; line: string; isoType?: string }
 }
 
 /**
@@ -753,6 +753,8 @@ export interface EmptiesRequirement {
   index: number
   size: ContainerSize
   line: string
+  /** ISO type the empties must have (`iso-type-best-position`); absent in a snapshot from before spec #106 (derive it from `size`). */
+  isoType?: string
   count: number
   /** The package's booked slots in load sequence. */
   slotIds: string[]
