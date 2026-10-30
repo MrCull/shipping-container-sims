@@ -6,6 +6,7 @@
  * `engine/` (enforced by ESLint) so it runs in Node and in a Web Worker.
  */
 export * from './kinematics'
+export * from './transit'
 export type { EngineEvent, EventEnvelope, EventOf, EventPayloads, EventSubjects, EventType } from './events'
 export type {
   CustodyKind,
@@ -24,6 +25,7 @@ export type {
   TruckState,
   TruckLeg,
   TruckStatus,
+  VesselStatus,
   TransferStallState,
   HoldingPositionState,
   LandsideState,
