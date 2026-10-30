@@ -63,8 +63,11 @@ export class AtmosphereRig {
     scene: THREE.Scene,
     private model: SceneModel,
     layout: MastLayout,
+    /** Fog far distance (m): the scenery's own, so the farthest backdrop piece stays hazy rather than erased. */
+    fogFarM = 9000,
   ) {
     scene.background = this.background
+    this.fog.far = fogFarM
     scene.fog = this.fog
     this.sun.castShadow = true
     this.sun.shadow.mapSize.set(2048, 2048)

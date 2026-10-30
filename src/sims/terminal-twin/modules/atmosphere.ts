@@ -4,7 +4,7 @@
  * At night the scene switches to a cheaper mode: no shadow pass, floodlight
  * glow and emissive equipment lights instead of real lights.
  */
-import { PEAK_DAY_PRESET_NAME } from '../scenario/presets'
+import { terminalPresetInfo } from '../terminals'
 
 export const SUNRISE_H = 6.5
 export const SUNSET_H = 19.5
@@ -55,9 +55,9 @@ export function lightingFor(hour: number, lockDaylight: boolean): Lighting {
   }
 }
 
-/** Whether the daylight lock starts on: yes for the TTI Algeciras — peak day preset (a long run should stay readable). */
+/** Whether the daylight lock starts on: the terminal's preset says (TTI peak day: a long run should stay readable). */
 export function daylightLockDefault(scenarioName: string): boolean {
-  return scenarioName === PEAK_DAY_PRESET_NAME
+  return terminalPresetInfo(scenarioName)?.daylightLockDefault === true
 }
 
 /**

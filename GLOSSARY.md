@@ -239,7 +239,8 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On by default in the TTI Algeciras — peak day preset.
 - **Night mode:** the cheaper lighting at night: no sun shadow pass, floodlight glow on high masts and emissive equipment lights instead of real lights.
-- **Backdrop:** the distant low-poly scenery: Algeciras (Rock of Gibraltar, hills, North Quay) for the TTI preset, a generic coastline otherwise.
+- **Backdrop:** the distant low-poly scenery: a terminal's own scenery (TTI Algeciras: the Rock of Gibraltar at true scale, hills, North Quay) when a terminal folder owns the scenario, a generic coastline otherwise.
+- **Terminal folder:** `terminals/<id>/`, the home of one real terminal's constants, preset presentation and scenery; generic modules reach it through the registry in `terminals/index.ts`.
 - **North Quay:** TTI's 550 m of quay beside the working berths, drawn idle (non-operational).
 - **Cue:** a moment (box landed, vessel horn, scenario complete) that may make a sound or banner when the display clock reaches it.
 ## Persistence (TT-17)

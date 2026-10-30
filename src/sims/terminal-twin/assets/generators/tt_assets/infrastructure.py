@@ -531,46 +531,63 @@ def _heightfield(p, xs, zs, height, colour):
                 p.m.ngon([gv(t) for t in tri], [p.atlas.swatch_uv(sw)] * 3, outward=gv((nx, ny, nz)))
 
 
+# The Rock of Gibraltar at true scale (spec #116, ticket #120). Repeats `ROCK` in
+# src/sims/terminal-twin/terminals/tti-algeciras/constants.ts: change both together.
+ROCK_LENGTH, ROCK_WIDTH, ROCK_HEIGHT, ROCK_DISTANCE = 5200.0, 1200.0, 426.0, 9200.0
+ROCK_PROFILE = [(-2600, 0), (-2570, 70), (-2500, 250), (-2420, 370), (-2250, 420), (-1900, 426), (-1400, 405), (-900, 392), (-300, 415),
+                (300, 330), (800, 255), (1200, 185), (1500, 110), (1800, 62), (2300, 48), (2480, 38), (2600, 0)]
+
+
 def build_backdrop_rock(atlas_image):
-    a = Asset('backdrop-rock', 'backdrop', make_material(atlas_image, 1.0), 'low-poly Rock of Gibraltar silhouette (about 1.4 km long, 426 m high); origin at the base centre, crest on the far (-Z) side, gentle slopes toward +Z')
+    a = Asset('backdrop-rock', 'backdrop', make_material(atlas_image, 1.0), 'low-poly Rock of Gibraltar at true scale (5.2 km north-south along X, 1.2 km wide, 426 m high); origin at the base centre, steep east face on the far (-Z) side, gentler west slope toward +Z')
     rnd = _lcg(21)
-    prof = [(-700, 0), (-680, 30), (-560, 120), (-380, 230), (-180, 330), (20, 390), (160, 426), (300, 410), (420, 330), (520, 160), (600, 50), (720, 0)]
+    prof = ROCK_PROFILE
 
     def ridge_h(x):
         for (x0, h0), (x1, h1) in zip(prof, prof[1:]):
             if x0 <= x <= x1:
                 return h0 + (h1 - h0) * (x - x0) / (x1 - x0)
         return 0.0
-    xs = [-710 + i * 1420 / 40 for i in range(41)]
-    zs = [-260 + j * 520 / 12 for j in range(13)]
+    nx, nz = 80, 18
+    xs = [-ROCK_LENGTH / 2 + i * ROCK_LENGTH / nx for i in range(nx + 1)]
+    zs = [-ROCK_WIDTH / 2 + j * ROCK_WIDTH / nz for j in range(nz + 1)]
     noise = [[rnd() for _ in zs] for _ in xs]
-    crest_z = -110.0
+    half = ROCK_WIDTH / 2
+    crest_z = -250.0  # the crest sits toward the east (-Z): steep east face, gentler west slope toward Algeciras
 
-    def section(z):
-        if z <= crest_z:
-            t = (z + 260) / (crest_z + 260)
-            return t ** 0.7 if t > 0 else 0.0
-        t = (z - crest_z) / (260 - crest_z)
-        return max(0.0, 1 - t) ** 1.15
+    def narrow(x):
+        # the Rock tapers toward Europa Point and is a little narrower at the north face
+        if x > 1200:
+            return 1.0 - 0.55 * min(1.0, (x - 1200) / 1400)
+        return 0.85 + 0.15 * min(1.0, (x + 2600) / 800)
+
+    def section(z, x):
+        zn = z / narrow(x)
+        if zn <= -half or zn >= half:
+            return 0.0
+        if zn <= crest_z:
+            return ((zn + half) / (crest_z + half)) ** 0.7
+        return max(0.0, 1 - (zn - crest_z) / (half - crest_z)) ** 1.15
 
     def height(i, j):
-        h = ridge_h(xs[i]) * section(zs[j])
+        h = ridge_h(xs[i]) * section(zs[j], xs[i])
         if h > 0:
-            h *= 0.88 + 0.24 * noise[i][j]
-        return max(0.0, h)
+            h *= 0.9 + 0.2 * noise[i][j]
+        return min(ROCK_HEIGHT, max(0.0, h))
 
     def colour(h, slope):
-        if h < 60:
+        if h < 70:
             return 'scrub'
         if slope > 0.34 and h > 120:
             return 'rock_dark'
-        return 'rock_light' if h > 220 else 'hill_dry'
+        return 'rock_light' if h > 260 else 'hill_dry'
     p = GPart(ATLAS_OBJ)
     _heightfield(p, xs, zs, height, colour)
-    a.mesh('rock', p, 'faceted limestone ridge')
-    dims = {'lengthM': 1420, 'widthM': 520, 'heightM': 426, 'tag': 'V', 'reason': 'Rock of Gibraltar: about 1.4 km long and 426 m high (the renderer applies the same 1.25 vertical exaggeration as the TT-21 backdrop)'}
-    return a.root, a.info(dims, [{'fact': 'ridge profile 1.4 km long, 426 m summit toward the north end', 'tag': 'V', 'source': 'public elevation data (summary figures)'},
-                                 {'fact': 'cross-section and facet noise', 'tag': 'A', 'reason': 'silhouette only'}], limits={}, attach=[], backdrop={'distanceM': 6200})
+    a.mesh('rock', p, 'faceted limestone ridge with scrub on the lower slopes')
+    dims = {'lengthM': 5200, 'widthM': 1200, 'heightM': 426, 'tag': 'V', 'reason': 'Rock of Gibraltar: about 5.2 km north to south, about 1.2 km wide, 426 m high (true scale, no vertical exaggeration)'}
+    return a.root, a.info(dims, [{'fact': 'about 5.2 km long north to south, about 1.2 km wide, 426 m summit', 'tag': 'V', 'source': 'public elevation data and the reference map and photos (summary figures)'},
+                                 {'fact': 'steep north face, summit ridge in the north half, stepped fall to Europa Point, steeper east face', 'tag': 'V', 'source': 'reference photo from the Algeciras hills'},
+                                 {'fact': 'cross-section taper and facet noise', 'tag': 'A', 'reason': 'silhouette only'}], limits={}, attach=[], backdrop={'distanceM': 9200})
 
 
 def build_backdrop_hills(atlas_image):
@@ -643,7 +660,7 @@ ASSETS = [
     ('building-control', build_building_control, [((40, 20, 40), (0, 5, 0))], 120.0),
     ('building-workshop', build_building_workshop, [((55, 25, 60), (0, 5, 0))], 150.0),
     ('building-substation', build_building_substation, [((16, 8, 16), (0, 2, 0))], 60.0),
-    ('backdrop-rock', build_backdrop_rock, [((0, 250, 1500), (0, 150, 0))], 4000.0),
+    ('backdrop-rock', build_backdrop_rock, [((0, 1800, 7000), (0, 150, 0)), ((-1500, 300, 3200), (-500, 200, 0))], 14000.0),
     ('backdrop-hills', build_backdrop_hills, [((0, 700, 6500), (0, 150, 0))], 20000.0),
     ('backdrop-coast', build_backdrop_coast, [((0, 120, 4000), (0, 0, 0))], 10000.0),
 ]

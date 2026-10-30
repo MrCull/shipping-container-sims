@@ -51,6 +51,10 @@ It takes about 80 s for containers, mostly the Cycles previews. Two runs give by
 - `tt:assets` is slow when several Blender jobs share the CPU; regenerate one group with `--only <group>`.
 - A new asset group must be added to `GROUPS` in both `cli/assets/build.ts` and `assets/generators/build.py`.
 
+### Terminal-specific assets
+
+Scenery that belongs to one real terminal is described in that terminal's folder (`terminals/<id>/`, see [scene-quality-atmosphere.md](scene-quality-atmosphere.md#per-terminal-folders-terminals)); the generator group that builds its GLBs stays `infrastructure`. The TTI Rock (`backdrop-rock`) is built to true scale by `build_backdrop_rock` from the same profile as `terminals/tti-algeciras/constants.ts` `ROCK` (keep both in step), inside the `backdrop` budget (4 000 triangles, one draw call). Generators never read the reference photos: they are git-ignored, absent in CI, and `docs/reference/tti-algeciras/PHOTOS.md` records which photo informed which model.
+
 ### Budgets and the check
 
 `assets/budgets.json` holds the budgets per asset kind and the library total (15 MB). Containers are used now; the STS/ASC/SHC/truck/vessel/building numbers from the spec are pre-filled for later tickets.

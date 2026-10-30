@@ -5,7 +5,8 @@
  */
 import type { MessageKey } from '../i18n/messages'
 import { planOf } from './planModel'
-import { PEAK_DAY_PRESET_NAME, SMALL_PRESET_NAME, TTI_PRESET_NAME } from '../scenario/presets'
+import { SMALL_PRESET_NAME } from '../scenario/presets'
+import { terminalPresetInfo } from '../terminals'
 import type { ScenarioConfig } from '../scenario/types'
 
 export interface ScenarioStats {
@@ -66,8 +67,8 @@ export function fixtureRow(name: string, config: ScenarioConfig): FixtureRow {
 
 /** Catalogue keys of a preset's tagline and plain-language description; null for a preset without copy. */
 export function presetCopy(name: string): { tagline: MessageKey; description: MessageKey } | null {
-  if (name === TTI_PRESET_NAME) return { tagline: 'preset.baseline.tagline', description: 'preset.baseline.description' }
-  if (name === PEAK_DAY_PRESET_NAME) return { tagline: 'preset.peakDay.tagline', description: 'preset.peakDay.description' }
+  const terminalPreset = terminalPresetInfo(name)
+  if (terminalPreset) return terminalPreset.copy
   if (name === SMALL_PRESET_NAME) return { tagline: 'preset.small.tagline', description: 'preset.small.description' }
   return null
 }
