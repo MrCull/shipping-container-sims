@@ -7,6 +7,7 @@ import { createDecisionState, type DecisionState } from './decisions/runtime'
 import type { EngineEvent } from './events'
 import { HASH_SEED, type HashState } from './hash'
 import type { MotionSegment } from './kinematics'
+import { createHatchPanels, hatchEnabled, hatchLaydownProblems } from './hatch'
 import { laneGraphOf, validateLaneLayout } from './laneGraph'
 import { hasLandside, landsideGraphOf } from './landsideGraph'
 import type { Reservation } from './reservations'
@@ -109,6 +110,8 @@ export interface VesselState {
   stsIds: string[]
   /** Every STS that has worked (or is working) this vessel, in assignment order. */
   stsHistory: string[]
+  /** Hatch panels of the vessel's bays (TT-R09), ids into `SimState.hatchPanels`. */
+  hatchPanelIds?: string[]
   /** Discharge boxes still on board. */
   remainingDischarge: number
   /** Export boxes still to be loaded (TT-10). */
@@ -513,6 +516,8 @@ export interface StsState {
   railHi: number
   /** Gantry target the crane is waiting to reach (status `waiting-for-rail`). */
   railTargetX: number | null
+  /** A second gantry position the waiting move needs as well (a hatch move visiting the laydown, TT-R09). */
+  railAlsoX?: number | null
   /** Boxes on the spreader (two for a twin-20 lift), aft first. */
   carrying: string[]
   /** Ground positions chosen for the carried boxes, in set-down order. */
@@ -528,6 +533,82 @@ export interface StsState {
   activePackageId: string | null
   /** A work-package-release decision is pending for this crane. */
   releasing?: boolean
+  /**
+   * The hatch move being worked (TT-R09), from the start of a `hatch-remove` / `hatch-replace` package until the panel
+   * is set down. `waiting` = the crane idles for the panel's lashing release.
+   */
+  hatchJob?: HatchJob | null
+  /** The hatch panel on the spreader (never a container, so never in `carrying`). */
+  carryingPanel?: string | null
+  /** The crane idles until this panel is secured (deck load onto a replaced hatch). */
+  hatchWaitPanel?: string | null
+  /** Since when the crane has waited for a hatch (lashing release or securing). */
+  hatchWaitSince?: number | null
+}
+
+/** One hatch move of an STS. */
+export interface HatchJob {
+  panelId: string
+  op: 'remove' | 'replace'
+  packageId: string
+  /** The crane idles until the panel's lashing is released. */
+  waiting: boolean
+  /** Handling time (s) added on each side of the carry so the move takes the hatch cycle time. */
+  padS: number
+  /** Laydown bay of the move. */
+  siteId: string | null
+  startedAt: number | null
+  /** The hatch the panel is carried to when replaced (always its own). */
+  target: { vesselId: string; bay: number; index: number }
+}
+
+/** secured → unsecured (lashing released) → lifted → in-laydown → lifted → replaced → secured. */
+export type HatchPanelStatus = 'secured' | 'unsecured' | 'lifted' | 'in-laydown' | 'replaced'
+
+/**
+ * One hatch panel of a vessel bay (TT-R09). Panels are not containers: no custody, no yard slot, never counted as a
+ * box. `home` is where the panel lies on the hatch (centre of its top face); `pos` is where it is now (at rest;
+ * while `lifted` it is on the spreader of `stsId`).
+ */
+export interface HatchPanelState {
+  id: string
+  vesselId: string
+  bay: number
+  /** Index across the beam, 0 on the quay side. */
+  index: number
+  /** Rows covered: `rowFrom` inclusive, `rowTo` exclusive. */
+  rowFrom: number
+  rowTo: number
+  lengthM: number
+  widthM: number
+  weightT: number
+  home: { x: number; y: number; z: number }
+  pos: { x: number; y: number; z: number }
+  status: HatchPanelStatus
+  /** The bay has hold work under this panel, so it will be opened. */
+  opens: boolean
+  /** A lashing release is already scheduled for this opening. */
+  lashingScheduled: boolean
+  lashingReleasedAt: number | null
+  liftedAt: number | null
+  /** The crane that has lifted it. */
+  stsId: string | null
+  /** The laydown bay the panel is claimed for / lies in, and its level in the stack (0 = bottom). */
+  siteId: string | null
+  level: number | null
+  /** Completed open and close cycles. */
+  cycles: number
+  /** Deck boxes standing on the panel (kept for panels that open). */
+  deckBoxes: number
+  /** The hatch the panel was last set down on: set by a replacement, must be its own. */
+  placedOn: { vesselId: string; bay: number; index: number } | null
+}
+
+/** A laydown bay: one stack of panels of one hatch, bottom first. */
+export interface HatchLaydownSite {
+  id: string
+  x: number
+  panelIds: string[]
 }
 
 export interface GroundPositionState {
@@ -539,7 +620,7 @@ export interface GroundPositionState {
   claimedBy: string | null
 }
 
-export type WorkPackageKind = 'discharge' | 'load'
+export type WorkPackageKind = 'discharge' | 'load' | 'hatch-remove' | 'hatch-replace'
 /** planned (not yet released) → released → active (the STS works it) → complete. */
 export type WorkPackageStatus = 'planned' | 'released' | 'active' | 'complete'
 
@@ -568,6 +649,8 @@ export interface WorkPackage {
    * package is released. `containerIds` stays empty until `stage` is 'allocated'.
    */
   emptyReq?: EmptiesRequirement
+  /** Hatch packages (TT-R09): the panel this package removes or replaces. */
+  hatchPanelId?: string
 }
 
 export interface EmptiesRequirement {
@@ -610,6 +693,17 @@ export interface StsKpiCounters {
   railWaitSince: number | null
 }
 
+/** Hatch moves of the STS cranes (TT-R09); present once the first one starts. */
+export interface HatchKpiCounters {
+  removes: number
+  replaces: number
+  /** STS time on hatch moves (s): start of the move to the panel set down. */
+  stsTimeS: number
+  /** Crane idle time waiting for a lashing release or a securing (s). */
+  waitS: number
+  perSts: Record<string, { moves: number; timeS: number; waitS: number }>
+}
+
 export interface KpiCounters {
   movesCompleted: number
   vesselsCompleted: number
@@ -620,6 +714,8 @@ export interface KpiCounters {
   yard?: YardKpiCounters
   /** Work packages (TT-10). */
   workPackages: WorkPackageKpiCounters
+  /** Hatch moves (TT-R09; present once one has started). */
+  hatch?: HatchKpiCounters
   /** Trucks and the gate (present when the landside is on). */
   landside?: LandsideKpiCounters
 }
@@ -718,6 +814,10 @@ export interface SimState {
   yardSlots: Record<string, YardSlotState>
   workPackages: Record<string, WorkPackage>
   nextWorkPackage: number
+  /** Hatch panels of the vessels' bays, by id (TT-R09). Not containers. */
+  hatchPanels: Record<string, HatchPanelState>
+  /** Laydown bays in use on the quay (created on first use). */
+  hatchLaydown: Record<string, HatchLaydownSite>
   /** Empties package whose `emptyAllocation` decision is pending (one at a time), or null. */
   emptiesAsking: string | null
   loadOrders: Record<string, LoadOrder>
@@ -873,6 +973,8 @@ export function createInitialState(
     yardSlots: {},
     workPackages: {},
     nextWorkPackage: 0,
+    hatchPanels: {},
+    hatchLaydown: {},
     emptiesAsking: null,
     loadOrders: {},
     reservations: [],
@@ -914,6 +1016,8 @@ export function createInitialState(
     }
   }
   for (const s of plan.slots) state.vesselSlots[s.id] = { ...s, containerId: null }
+  const hatchCovers = hatchEnabled(config) && subsystems.quay !== 'off'
+  if (hatchCovers) createHatchPanels(state, config)
   const loading = subsystems.shc !== 'off' && subsystems.asc !== 'off'
   for (const s of plan.slots) if (s.emptyReq && loading) state.vessels[s.vesselId].remainingLoad++
   const startMode = config.yardStart?.mode
@@ -1001,6 +1105,14 @@ export function createInitialState(
   })
   if ((config.shcs?.length ?? 0) > 0 && (config.yard?.blocks.length ?? 0) > 0) {
     validateLaneLayout(config)
+    if (hatchCovers) {
+      const problems = hatchLaydownProblems(config)
+      if (problems.length > 0)
+        throw new Error(
+          `The hatch cover laydown does not fit between the ground lanes and the STS rail without touching the SHC lane graph ` +
+            `(use at most 3 ground positions per STS, or set hatch.enabled to false): ${problems.slice(0, 3).join('; ')}`,
+        )
+    }
     const graph = laneGraphOf(config)
     const horizontal: HorizontalKpiCounters = { boxesToWtp: 0, perShc: {}, stsGroundPositionWaitS: {} }
     for (const shc of config.shcs ?? []) {

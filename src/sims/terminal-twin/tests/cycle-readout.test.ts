@@ -5,7 +5,7 @@ import type { StsKinematics } from '../scenario/types'
 import { DEFAULT_ASC_KINEMATICS, DEFAULT_SHC_KINEMATICS, ScenarioBuilder } from '../scenario/builder'
 
 function singleCraneRun(stsOverride?: Partial<StsKinematics>) {
-  const b = new ScenarioBuilder('cycle', 'one crane (SHCs clear its ground positions), no variation')
+  const b = new ScenarioBuilder('cycle', 'one crane (SHCs clear its ground positions), no variation').hatch({ enabled: false })
     .seed(3)
     .quay(400, { mooringS: 60, unmooringS: 60, twinLift: false })
     .sts('STS01', { gantryX: 100, groundPositions: 3 })

@@ -66,6 +66,8 @@ export interface KpiReport {
   yard?: YardKpiReport
   /** Work packages (only when some were released). */
   workPackages?: WorkPackageKpiReport
+  /** Hatch cover moves of the STS cranes (only when a hatch move has started). */
+  hatch?: HatchKpiReport
   /** Trucks and the gate (only when the landside is on). */
   landside?: LandsideKpiReport
 }
@@ -94,6 +96,19 @@ export interface LandsideKpiReport {
   boxesPicked: number
   /** Arrivals that could not get the drawn transaction and came to drop an empty. */
   fallbacks: number
+}
+
+export interface HatchKpiReport {
+  /** Hatch moves: panels lifted off and put back. */
+  moves: number
+  removes: number
+  replaces: number
+  /** STS time spent on hatch moves, start of a move to the panel set down (s). */
+  stsTimeS: number
+  /** Crane idle time waiting for a lashing release or a securing (s). */
+  waitS: number
+  /** Per STS: hatch moves, their time and waiting. */
+  sts: Record<string, { moves: number; timeS: number; waitS: number }>
 }
 
 export interface WorkPackageKpiReport {
@@ -317,6 +332,20 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     ...(horizontal ? { horizontal } : {}),
     ...(yard ? { yard } : {}),
     ...(landside ? { landside } : {}),
+    ...(state.kpis.hatch
+      ? {
+          hatch: {
+            moves: state.kpis.hatch.removes + state.kpis.hatch.replaces,
+            removes: state.kpis.hatch.removes,
+            replaces: state.kpis.hatch.replaces,
+            stsTimeS: r3(state.kpis.hatch.stsTimeS),
+            waitS: r3(state.kpis.hatch.waitS),
+            sts: Object.fromEntries(
+              Object.entries(state.kpis.hatch.perSts).map(([id, k]) => [id, { moves: k.moves, timeS: r3(k.timeS), waitS: r3(k.waitS) }]),
+            ),
+          },
+        }
+      : {}),
     ...(state.kpis.workPackages.released > 0
       ? {
           workPackages: {

@@ -120,6 +120,9 @@ export type { InvariantViolation } from './invariants'
 export { checkInvariants, DEFAULT_SWEEP_EVERY, InvariantTracker } from './invariants'
 export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport, LandsideKpiReport } from './kpis'
 export type { WorkPackage, WorkPackageKind, WorkPackageStatus, LoadOrder } from './state'
+export type { HatchPanelState, HatchPanelStatus, HatchLaydownSite } from './state'
+export type { HatchKpiReport } from './kpis'
+export { hatchEnabled, hatchSettings, hatchLaydownProblems, laydownSites, laydownRect, laydownCentreZ, laydownTopY } from './hatch'
 export { hashDigest } from './hash'
 export {
   createSimulation,

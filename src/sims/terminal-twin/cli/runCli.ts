@@ -242,6 +242,13 @@ function formatSummary(s: RunSummary, headline: HeadlineKpis, stopped: string, s
   lines.push(
     `Quay:             ${s.kpis.quay.vesselsWaited} vessel(s) waited at anchorage, max ${s.kpis.quay.anchorageWaitS.max} s, mean ${s.kpis.quay.anchorageWaitS.mean} s`,
   )
+  const hatch = s.kpis.hatch
+  if (hatch) {
+    lines.push(
+      `Hatch covers:     ${hatch.moves} moves (${hatch.removes} off, ${hatch.replaces} on), ${hatch.stsTimeS} s of STS time, ${hatch.waitS} s waiting for lashing`,
+    )
+    for (const [id, k] of Object.entries(hatch.sts)) lines.push(`  ${id.padEnd(15)} ${k.moves} hatch moves, ${k.timeS} s, waited ${k.waitS} s`)
+  }
   const hz = s.kpis.horizontal
   if (hz) {
     lines.push(`Horizontal:       ${hz.boxesToWtp} boxes to WTP pads`)

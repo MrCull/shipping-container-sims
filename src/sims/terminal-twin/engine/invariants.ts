@@ -20,14 +20,23 @@ import { hasLandside, landsideGraphOf } from './landsideGraph'
 import { overlappingNewReservations, overlappingReservations } from './reservations'
 import type { EngineEvent } from './events'
 import { columnKey, yardIndexOf } from './yardIndex'
-import { ascIndexOf, type AscState, type CustodyRef, type SimState, type YardSlotState } from './state'
+import {
+  ascIndexOf,
+  type AscState,
+  type CustodyRef,
+  type HatchPanelState,
+  type SimState,
+  type VesselSlotState,
+  type YardSlotState,
+} from './state'
 import { ascPoseAt } from './subsystems/asc'
 import { gantryPositionAt, railOrder } from './subsystems/rail'
 import { shcPositionAt } from './subsystems/shc'
 import { truckPositionAt } from './subsystems/landside'
 import { ASC_MIN_SEPARATION_M, blockSpecs, travelHoistM } from './yardLayout'
 import type { ScenarioConfig } from '../scenario/types'
-import { vesselClass } from '../scenario/vesselClasses'
+import { hatchPanelId, hatchPanelOfRow, vesselClass, vesselSlotId } from '../scenario/vesselClasses'
+import { hatchSettings } from './hatch'
 
 export interface InvariantViolation {
   invariant: string
@@ -128,6 +137,25 @@ function heldAt(state: SimState, owner: CustodyRef): string[] {
 const parseRefKey = (key: string): CustodyRef => {
   const i = key.indexOf(':')
   return { kind: key.slice(0, i) as CustodyRef['kind'], id: key.slice(i + 1) }
+}
+
+/** The boxes standing on a hatch panel (deck slots above its rows), found by direct slot lookup. */
+function deckBoxesOn(state: SimState, panel: HatchPanelState): { slot: VesselSlotState; containerId: string }[] {
+  const spec = vesselClass(state.vessels[panel.vesselId].sizeClass)
+  const out: { slot: VesselSlotState; containerId: string }[] = []
+  for (let row = panel.rowFrom; row < panel.rowTo; row++)
+    for (let tier = spec.holdTiers; tier < spec.holdTiers + spec.deckTiers; tier++)
+      for (const half of [null, 'aft', 'fore'] as const) {
+        const slot = state.vesselSlots[vesselSlotId(panel.vesselId, panel.bay, row, tier, half)]
+        if (slot?.containerId) out.push({ slot, containerId: slot.containerId })
+      }
+  return out
+}
+
+/** Panels to check: those the last event named (hatch events list their panel as equipment), or every panel. */
+function panelsToCheck(state: SimState, scope?: InvariantScope): HatchPanelState[] {
+  if (!scope) return Object.values(state.hatchPanels)
+  return [...scope.equipment].map((id) => state.hatchPanels[id]).filter((p): p is HatchPanelState => !!p)
 }
 
 /** Occupied slots covering one bay-row-tier cell of a block. */
@@ -492,6 +520,141 @@ export const INVARIANTS: Invariant[] = [
       for (const shc of Object.values(state.shcs)) {
         if (shc.nodeId.startsWith('ls:') || !lanes.nodes[shc.nodeId]) messages.push(`${shc.id} is at ${shc.nodeId}, which is not a waterside lane node (SHCs never use the public gate)`)
         else if (lanes.nodes[shc.nodeId].z >= gateZ) messages.push(`${shc.id} is at ${shc.nodeId}, in the landside area`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.no-removal-with-boxes-on-top',
+    reads: ['equipment'],
+    description:
+      'A hatch panel is only lifted off once the boxes stowed on it are gone: a panel that is lifted or in laydown has no discharge box on it.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const p of panelsToCheck(state, scope)) {
+        if (p.status !== 'lifted' && p.status !== 'in-laydown') continue
+        const boxes = deckBoxesOn(state, p).filter((b) => b.slot.purpose === 'discharge')
+        if (boxes.length > 0)
+          messages.push(`hatch panel ${p.id} was lifted with ${boxes.length} box(es) on top (${boxes[0].containerId} in ${boxes[0].slot.id})`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.no-lift-before-lashing-release',
+    reads: ['equipment'],
+    description:
+      'A hatch panel is lifted only after its lashing was released: a lifted, laid-down or replaced panel has a lashing release at or before its lift.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const p of panelsToCheck(state, scope)) {
+        if (p.status !== 'lifted' && p.status !== 'in-laydown' && p.status !== 'replaced') continue
+        if (p.lashingReleasedAt === null || p.liftedAt === null || p.lashingReleasedAt > p.liftedAt)
+          messages.push(
+            `hatch panel ${p.id} is ${p.status} but its lashing was not released before the lift (released ${p.lashingReleasedAt}, lifted ${p.liftedAt})`,
+          )
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.no-hold-access-through-closed-hatch',
+    reads: ['equipment'],
+    description:
+      'No hold access through a closed hatch: an STS spreader never goes below the hatch plane over a panel that is secured, unsecured or ' +
+      'replaced (positions are the end of the planned motion).',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const sts of Object.values(state.sts)) {
+        if (!sts.vesselId || (scope && !scope.equipment.has(sts.id))) continue
+        const vessel = state.vessels[sts.vesselId]
+        if (!vessel.hatchPanelIds) continue
+        const spec = vesselClass(vessel.sizeClass)
+        for (const bay of sts.bays) {
+          for (let i = 0; i < spec.hatch.panels; i++) {
+            const p = state.hatchPanels[hatchPanelId(vessel.id, bay, i)]
+            if (!p || p.status === 'lifted' || p.status === 'in-laydown') continue
+            const over = Math.abs(sts.gantryX - p.home.x) <= p.lengthM / 2 && Math.abs(sts.trolleyZ - p.home.z) <= p.widthM / 2
+            if (over && sts.hoistY < p.home.y - 0.25)
+              messages.push(
+                `${sts.id} reaches into the hold of bay ${bay} through the ${p.status} hatch panel ${p.id} (hoist ${sts.hoistY.toFixed(2)} m, hatch ${p.home.y} m)`,
+              )
+          }
+        }
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.no-deck-load-on-missing-hatch',
+    reads: ['container'],
+    description: 'A box is loaded on deck only onto a hatch panel that is in place and secured.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      const boxes = scope ? scope.containers : Object.values(state.vesselSlots).map((s) => s.containerId ?? '')
+      for (const id of boxes) {
+        const box = id ? state.containers[id] : undefined
+        if (box?.custody.kind !== 'vesselSlot') continue
+        const slot = state.vesselSlots[box.custody.id]
+        if (!slot?.deck || (slot.purpose !== 'load' && slot.purpose !== 'transshipment')) continue
+        const spec = vesselClass(state.vessels[slot.vesselId].sizeClass)
+        const panel = state.hatchPanels[hatchPanelId(slot.vesselId, slot.bay, hatchPanelOfRow(spec, slot.row))]
+        if (panel && panel.status !== 'secured') messages.push(`box ${id} was loaded in ${slot.id} onto the ${panel.status} hatch panel ${panel.id}`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.replace-own-hatch',
+    reads: ['equipment'],
+    description:
+      'A hatch panel is only ever set back on its own hatch (same vessel, bay and place across the beam), where it lies at its home position.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const p of panelsToCheck(state, scope)) {
+        const on = p.placedOn
+        if (on && (on.vesselId !== p.vesselId || on.bay !== p.bay || on.index !== p.index))
+          messages.push(`hatch panel ${p.id} was set on hatch ${on.vesselId} bay ${on.bay} panel ${on.index}, not its own`)
+        if ((p.status === 'replaced' || p.status === 'secured') && (p.pos.x !== p.home.x || p.pos.z !== p.home.z || p.pos.y !== p.home.y))
+          messages.push(`hatch panel ${p.id} is ${p.status} away from its home position`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.laydown-stack-limit',
+    reads: ['equipment'],
+    description: "A quay laydown bay holds at most the vessel class's `laydownStackLimit` panels (default 3), all of one hatch.",
+    check(state, config) {
+      const messages: string[] = []
+      for (const site of Object.values(state.hatchLaydown)) {
+        if (site.panelIds.length === 0) continue
+        const first = state.hatchPanels[site.panelIds[0]]
+        const limit = hatchSettings(config, state.vessels[first.vesselId].sizeClass).laydownStackLimit
+        if (site.panelIds.length > limit) messages.push(`laydown bay ${site.id} holds ${site.panelIds.length} panels, over the limit of ${limit}`)
+        const mixed = site.panelIds.map((id) => state.hatchPanels[id]).find((p) => p.vesselId !== first.vesselId || p.bay !== first.bay)
+        if (mixed) messages.push(`laydown bay ${site.id} mixes panels of hatches ${first.id} and ${mixed.id}`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hatch.no-departure-open',
+    reads: ['vessel'],
+    description: 'A vessel does not leave (work complete, unmooring, departed) with a hatch panel off, unsecured or not yet secured.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const v of Object.values(state.vessels)) {
+        if (!v.hatchPanelIds || (v.status !== 'unmooring' && v.status !== 'departed')) continue
+        if (scope && !scope.vessels.has(v.id)) continue
+        const open = v.hatchPanelIds.map((id) => state.hatchPanels[id]).filter((p) => p.status !== 'secured')
+        if (open.length > 0) messages.push(`${v.id} is ${v.status} with ${open.length} hatch panel(s) not secured (${open[0].id} is ${open[0].status})`)
       }
       return messages
     },

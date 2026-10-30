@@ -690,6 +690,14 @@ export const shcReactors: ReactorMap = {
       }
       const job = ctx.state.shcJobs[reply.jobId]
       if (!job) throw new Error(`shcDispatch handler returned unknown job ${reply.jobId}`)
+      if (job.shcId !== null && e.payload.handler.startsWith('strategy:')) {
+        // Two SHCs asked at the same sim time and a built-in strategy named the job the other one took (its request was
+        // built before the other's reply): ask again with the jobs that are left. A custom handler is trusted, as ever.
+        shc.status = 'available'
+        maybeDispatch(ctx)
+        if (shc.status === 'available') goPark(ctx, shc)
+        return
+      }
       if (job.kind === 'load') {
         assignJob(ctx, shc, reply.jobId, '')
         maybeDispatch(ctx)
@@ -707,6 +715,12 @@ export const shcReactors: ReactorMap = {
         shc.jobId = null
         shc.status = 'available'
         goPark(ctx, shc)
+        return
+      }
+      const pad = ctx.state.wtpPads[reply.wtpPadId]
+      if (pad && (pad.claimedBy !== null || pad.containerId !== null) && e.payload.handler.startsWith('strategy:')) {
+        // Same race as for jobs: another SHC took the pad a built-in strategy chose from a request built before. Ask again.
+        requestPadSelection(ctx, shc, ctx.state.shcJobs[request.jobId])
         return
       }
       assignJob(ctx, shc, request.jobId, reply.wtpPadId)

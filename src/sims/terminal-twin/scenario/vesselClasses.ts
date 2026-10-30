@@ -25,15 +25,50 @@ export interface VesselClassSpec {
   deckTiers: number
   /** Top of the hatch covers (deck stack base) above quay level (m). */
   deckHeightM: number
+  /** Hatch covers over each 40 ft bay (TT-R09). */
+  hatch: HatchClassSpec
+}
+
+/**
+ * Hatch covers of a vessel class (TT-R09, all [A]). Each 40 ft bay has one hatch of `panels` lift-away panels
+ * across the beam; a panel covers a share of the rows. Panel width follows from its rows (row pitch less a coaming
+ * gap), length from the bay pitch. A panel must fit the quay laydown bay between two SHC spines (about 14.3 m
+ * along the quay) and between the last ground lane and the landside STS rail (about 15 m across), which is why the
+ * feeder classes have 2 panels and the ULCV 4 (the spec's example counts 1 and 3 give panels up to 20 m wide).
+ */
+export interface HatchClassSpec {
+  /** Panels across the beam. */
+  panels: number
+  /** Length of a panel along the ship (m). */
+  panelLengthM: number
+  /** Weight of one panel (t). */
+  panelWeightT: number
+  /** Lashing crew time to release a hatch's cleats once the deck boxes above it are gone (s). */
+  lashingReleaseS: number
+  /** Time to secure a replaced panel before deck boxes may be loaded on it (s). */
+  lashingSecureS: number
+  /** STS cycle time of one hatch move: hook up, lift, carry, set down, release (s). */
+  cycleS: number
+  /** Panels stacked on one another in laydown. */
+  laydownStackLimit: number
+}
+
+/** [A] Default hatch values shared by every class (override per class below or with `ScenarioConfig.hatch`). */
+const HATCH_DEFAULTS = {
+  panelLengthM: 13.5,
+  lashingReleaseS: 300,
+  lashingSecureS: 180,
+  cycleS: 240,
+  laydownStackLimit: 3,
 }
 
 /** [A] Size classes, smallest first. */
 export const VESSEL_CLASSES: Record<VesselSizeClass, VesselClassSpec> = {
-  feeder: { label: 'Feeder', loaM: 140, beamM: 23, bays: 7, rows: 8, holdTiers: 4, deckTiers: 3, deckHeightM: 12 },
-  feedermax: { label: 'Feedermax', loaM: 180, beamM: 28, bays: 10, rows: 10, holdTiers: 5, deckTiers: 4, deckHeightM: 14 },
-  panamax: { label: 'Panamax', loaM: 294, beamM: 32.3, bays: 17, rows: 12, holdTiers: 7, deckTiers: 5, deckHeightM: 18 },
-  'neo-panamax': { label: 'Neo-Panamax', loaM: 366, beamM: 48.2, bays: 20, rows: 18, holdTiers: 8, deckTiers: 7, deckHeightM: 20 },
-  ulcv: { label: 'ULCV', loaM: 400, beamM: 61.5, bays: 24, rows: 23, holdTiers: 10, deckTiers: 9, deckHeightM: 22 },
+  feeder: { label: 'Feeder', loaM: 140, beamM: 23, bays: 7, rows: 8, holdTiers: 4, deckTiers: 3, deckHeightM: 12, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 12 } },
+  feedermax: { label: 'Feedermax', loaM: 180, beamM: 28, bays: 10, rows: 10, holdTiers: 5, deckTiers: 4, deckHeightM: 14, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 16 } },
+  panamax: { label: 'Panamax', loaM: 294, beamM: 32.3, bays: 17, rows: 12, holdTiers: 7, deckTiers: 5, deckHeightM: 18, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 24 } },
+  'neo-panamax': { label: 'Neo-Panamax', loaM: 366, beamM: 48.2, bays: 20, rows: 18, holdTiers: 8, deckTiers: 7, deckHeightM: 20, hatch: { ...HATCH_DEFAULTS, panels: 3, panelWeightT: 28 } },
+  ulcv: { label: 'ULCV', loaM: 400, beamM: 61.5, bays: 24, rows: 23, holdTiers: 10, deckTiers: 9, deckHeightM: 22, hatch: { ...HATCH_DEFAULTS, panels: 4, panelWeightT: 32 } },
 }
 
 export const VESSEL_SIZE_CLASSES = Object.keys(VESSEL_CLASSES) as VesselSizeClass[]
@@ -50,6 +85,11 @@ export const FENDER_GAP_M = 2
 export const QUAY_ABOVE_WATER_M = 2.5
 /** Distance from a 40 ft cell centre to the centre of each 20 ft half (m). */
 export const HALF_OFFSET_M = 3.067
+
+/** Gap between neighbouring hatch panels and between a panel and the coaming (m). */
+export const HATCH_GAP_M = 0.3
+/** [A] Thickness of a hatch panel (m): the stack height in laydown. */
+export const HATCH_THICKNESS_M = 0.45
 
 /** [A] Container heights (m). */
 export const CONTAINER_HEIGHT_M: Record<ContainerSize, number> = { '20': 2.591, '40': 2.591, '40HC': 2.896 }
@@ -135,4 +175,38 @@ export function parseVesselSlotId(id: string): { vesselId: string } & SlotPositi
     tier: Number(m[3]),
     half: m[4] === 'a' ? 'aft' : m[4] === 'f' ? 'fore' : null,
   }
+}
+
+/** Panel index (0 = quay side) of a row: rows are shared out evenly across the beam. */
+export function hatchPanelOfRow(spec: VesselClassSpec, row: number): number {
+  return Math.min(spec.hatch.panels - 1, Math.floor((row * spec.hatch.panels) / spec.rows))
+}
+
+/** First row (inclusive) and end row (exclusive) a hatch panel covers. */
+export function hatchPanelRows(spec: VesselClassSpec, index: number): { from: number; to: number } {
+  let from = -1
+  let to = -1
+  for (let r = 0; r < spec.rows; r++)
+    if (hatchPanelOfRow(spec, r) === index) {
+      if (from < 0) from = r
+      to = r + 1
+    }
+  return { from, to }
+}
+
+/** Hatch panel id: `<vesselId>:H<bay>-<index>` (bay two digits, index across the beam from the quay side). */
+export function hatchPanelId(vesselId: string, bay: number, index: number): string {
+  return `${vesselId}:H${String(bay).padStart(2, '0')}-${index}`
+}
+
+/** Width of a hatch panel across the beam (m): its rows less the coaming gap. */
+export function hatchPanelWidthM(spec: VesselClassSpec, index: number): number {
+  const { from, to } = hatchPanelRows(spec, index)
+  return (to - from) * ROW_PITCH_M - HATCH_GAP_M
+}
+
+/** Z of the centre of a hatch panel. */
+export function hatchPanelZ(spec: VesselClassSpec, index: number): number {
+  const { from, to } = hatchPanelRows(spec, index)
+  return (slotZ(spec, from) + slotZ(spec, to - 1)) / 2
 }

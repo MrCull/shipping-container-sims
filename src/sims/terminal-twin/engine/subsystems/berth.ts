@@ -18,6 +18,7 @@ import { slotX, vesselClass } from '../../scenario/vesselClasses'
 import { continueWork, wakeQuayRail } from './quay'
 import { askRelease, createPackages, isLoadSlot, loadActive } from './workPackages'
 import { railOrder } from './rail'
+import { positionHatchPanels } from '../hatch'
 
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
 
@@ -100,6 +101,7 @@ function assignBerth(ctx: EngineContext, vessel: VesselState, berthX: number, t:
   vessel.status = 'mooring'
   vessel.berthX = berthX
   vessel.berthAllocatedAt = t
+  positionHatchPanels(state, vessel.id, berthX)
   vessel.anchorageWaitS = t - (vessel.arrivedAt ?? t)
   ctx.schedule('BerthAllocated', t, { vessels: [vessel.id] }, {
     vesselId: vessel.id,

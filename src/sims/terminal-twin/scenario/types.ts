@@ -188,6 +188,11 @@ export interface VesselConfig {
    */
   dischargeTransshipment?: number
   /**
+   * Stow the discharge boxes on deck only, as far as the deck has room (default false: shared out between hold and
+   * deck in proportion to their tiers). A vessel with nothing in its hold opens no hatch (TT-R09).
+   */
+  deckOnly?: boolean
+  /**
    * Empty containers this vessel loads (TT-11): N empties of a size and shipping line per entry.
    * Releasing the work package that carries them raises "empties required" and asks the
    * `emptyAllocation` decision point which empties in the yard go.
@@ -339,10 +344,30 @@ export interface ScenarioConfig {
   emptyPool?: EmptyPoolConfig
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
+  /**
+   * Hatch covers (TT-R09); optional. Panel counts, sizes and weights come from the vessel class
+   * (`VESSEL_CLASSES[...].hatch`); these override the timings and the laydown stack limit for every class.
+   * `enabled: false` leaves the hatch covers out (no hatch moves, the old discharge-then-load work order).
+   */
+  hatch?: HatchConfig
   /** KPI bucket clock (optional; defaults come from `startDateTime`, see `engine/kpi/clock.ts`). */
   kpi?: KpiClockConfig
   /** Landside: external trucks, gate and transfer stalls (TT-13); optional (no trucks without it). */
   landside?: LandsideConfig
+}
+
+/** Scenario-level hatch cover settings (TT-R09). All optional; the vessel class supplies the defaults. */
+export interface HatchConfig {
+  /** Default true. */
+  enabled?: boolean
+  /** Lashing release delay (s) once the deck boxes above a hatch panel are gone. */
+  lashingReleaseS?: number
+  /** Securing time (s) of a replaced panel. */
+  lashingSecureS?: number
+  /** STS cycle time of one hatch move (s). */
+  cycleS?: number
+  /** Panels per laydown stack. */
+  laydownStackLimit?: number
 }
 
 /** A truck's transaction: one drop or pick, or `dual` (drop an export and pick an import in one visit). */

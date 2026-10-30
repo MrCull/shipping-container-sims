@@ -3,7 +3,7 @@
   "seed": 42,
   "status": "ended",
   "endReason": "simDurationS >= 1800",
-  "eventLogHash": "1f168554425fc4",
+  "eventLogHash": "096f562b16481e",
   "kpis": {
     "simTimeS": 1800,
     "eventsProcessed": 390,
