@@ -750,6 +750,7 @@ function planStallTrip(ctx: EngineContext, truck: TruckState, stallId: string): 
     waitedS: r3(waited),
     reservations,
   })
+  if (preRetrievalOn(ctx.config)) maybeDispatchAsc(ctx, stall.blockId) // the box may be fetched before the truck arrives
 }
 
 /** Plan and reserve the trip from the kiosk to the truck's holding position (reserved at admission). */
@@ -815,6 +816,32 @@ export function truckReadyForPick(state: SimState, job: AscJob): boolean {
   if (!truck || (truck.status !== 'at-stall' && truck.status !== 'being-served')) return false
   if (truck.carrying !== null) return false
   return truck.legs.every((l) => l.kind !== 'drop' || l.done)
+}
+
+/** TT-R17 [A]: an ASC only starts an early retrieval when the truck is at most this many seconds from its stall (bounds the hover). */
+export const PRE_RETRIEVAL_MAX_LEAD_S = 150
+
+/** TT-R17: the ascDispatch strategy `pre-retrieval` is selected, so the dispatch may start pick retrievals before the truck is at its stall. */
+export function preRetrievalOn(config: EngineContext['config']): boolean {
+  return config.decisions?.points?.ascDispatch?.strategy === 'pre-retrieval'
+}
+
+/** When the truck is planned to stand in its stall (TruckAtStall), or null before its trip is planned or once it is there. */
+export function truckStallEta(state: SimState, truckId: string | undefined): number | null {
+  return state.trucks[truckId ?? '']?.plan.find((p) => p.type === 'TruckAtStall')?.at ?? null
+}
+
+/**
+ * TT-R17: a pick retrieval that may start before the truck stands in its stall: the stall is reserved and the trip planned
+ * (`stallId` set, TruckAtStall planned), the truck is within `PRE_RETRIEVAL_MAX_LEAD_S` of arriving, its chassis is empty and
+ * it has nothing to drop (a dual transaction drops first, so it never qualifies).
+ */
+export function earlyPickReady(state: SimState, job: AscJob): boolean {
+  const truck = state.trucks[job.truckId ?? '']
+  if (!truck || job.stallId === undefined || truck.stallId !== job.stallId || truck.carrying !== null) return false
+  if (truck.legs.some((l) => l.kind === 'drop')) return false
+  const eta = truckStallEta(state, truck.id)
+  return eta !== null && eta - state.now <= PRE_RETRIEVAL_MAX_LEAD_S
 }
 
 function newJobId(state: SimState): string {
@@ -1070,6 +1097,13 @@ export const landsideReactors: ReactorMap = {
     const truck = advance(ctx, e)
     driveStep(ctx.state, truck, -1, true)
     truck.atStallAt = e.t
+    if (Object.values(ctx.state.ascJobs).some((j) => j.truckId === truck.id && j.ascId !== null)) {
+      // TT-R17: the box was fetched ahead of the truck, so service starts at once and the stall wait is zero
+      truck.serviceStartedAt = e.t
+      truck.status = 'being-served'
+      const k = counters(ctx.state)
+      k.stallWaitCount++
+    }
     startInterchange(ctx, truck)
   },
 
@@ -1080,6 +1114,7 @@ export const landsideReactors: ReactorMap = {
     const { state } = ctx
     const truck = state.trucks[truckId]
     if (truck.serviceStartedAt !== null) return
+    if (e.payload.early) return // TT-R17: the ASC fetches the box ahead of the truck; service starts when the truck is at its stall
     truck.serviceStartedAt = e.payload.departAt
     truck.status = 'being-served'
     const waited = e.payload.departAt - (truck.atStallAt as number)
@@ -1099,6 +1134,7 @@ export const landsideReactors: ReactorMap = {
   /** The ASC set the box on the chassis. */
   AscDroppedAtStall: (e, ctx) => {
     const truck = ctx.state.trucks[e.payload.truckId]
+    if (truck.atStallAt === null) throw new Error(`${truck.id}: ${e.payload.containerId} set down on a chassis that is not at its stall`)
     truck.carrying = e.payload.containerId
     legDone(ctx, truck.id, e.payload.containerId)
   },

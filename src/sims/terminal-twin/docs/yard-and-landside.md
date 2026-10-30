@@ -114,7 +114,7 @@ External trucks bring boxes in and take them out. Terms (truck transaction, gate
 - **Booking:** per window, expected demand = hourly profile rate (clock hour of the window start) x window length x bunching, rounded with one draw; each booking gets an arrival uniform in the window and a transaction drawn from `mix` (its transport orders; `dual` = export plus import). All draws use the landside RNG stream. At arrival the transaction is forced like a scripted truck: infeasible ones still fall back to `dropEmpty` (`TruckArrived.fallback`). No Poisson re-arming when appointments are on; scripted trucks still work.
 - **Events and state:** `TruckArrivalDue` and `TruckArrived` carry `appointmentId` (only when booked). `state.landside.appointments` = `{windowS, capPerWindow, windows, rejected, list}`; query `appointments()`. KPI `kpiReport().landside.appointments` = `{windowS, capPerWindow, windows, booked, rejected, maxBookedPerWindow}` (present only with appointments).
 - **Fixture:** `truck-appointment-windows` (2 stalls, cap 12, window 2 bunched x3: 36 booked, 12 rejected) + golden. Test: `tests/truck-appointments.test.ts`. The dual-transaction fixture stays on scripted arrivals and unchanged.
-- **Not yet (later tickets of spec #82):** ASC pre-retrieval (R17). Deliberately absent: ANPR, early/late arrivals. Truck turnaround metrics: see the section at the end of this file (TT-R18).
+- **Not yet:** Deliberately absent: ANPR, early/late arrivals. Truck turnaround metrics: see the section at the end of this file (TT-R18).
 
 ## Stall admission and holding positions (TT-R16, ENGINE_VERSION 0.19.0)
 
@@ -137,6 +137,18 @@ External trucks bring boxes in and take them out. Terms (truck transaction, gate
 - **Invariant** `yard.reefer-powered` (scoped per column): every reefer stands in a powered row of its block on tier 4 or below. Negative test: a handler that ignores the rule (`tests/reefer-powered-rows.test.ts`).
 - **Fixture:** `reefer-powered-rows` (30% reefers, rows 1-2 powered, pre-filled 40%) + golden. TTI presets use 8% reefers and rows 1-2 (unverified assumptions, see the KB's Sim deviations).
 - **Not yet:** no plug monitoring, power events or reefer-specific handling times; vessel reefer plugs are not modelled; no setup-dialog fields for powered rows.
+
+## ASC pre-retrieval (TT-R17, ENGINE_VERSION 0.23.0)
+
+The `pre-retrieval` strategy of the `ascDispatch` decision point (`decisions/ascStrategies.ts`, select with `config.decisions.points.ascDispatch.strategy`) lets an ASC fetch an import box to the truck's transfer stall **before the truck arrives**, so the stall service time (`TruckAtStall` to `TruckInterchangeDone`) drops. Default and other strategies are untouched: the engine offers an early job only when this strategy is selected (`preRetrievalOn` in `subsystems/landside.ts`), so no earlier golden moved.
+
+- **When a pick is early** (`earlyPickReady`): the truck's stall is reserved and its trip planned (`TruckStallAssigned`, so `TruckAtStall` has a planned time), the truck is at most `PRE_RETRIEVAL_MAX_LEAD_S` (150 s [A]) from it, its chassis is empty and it has no drop leg (a dual transaction never qualifies), the box is on top of its stack and no rehandle is pending (`earlyTruckPicks` in `ascDispatch.ts`). The engine asks for dispatch again when the trip is planned (`planStallTrip`).
+- **Safe:** early picks are the lowest priority candidate (after stacking, rehandle, ready truck picks and pad retrievals), only an idle ASC takes one, and the box is a normal pick job (stack locked from the start, so no rehandle digs under it).
+- **Decision:** the request job is `kind 'transfer'` with `early: true` (additive field, contract stays v1). `pre-retrieval` answers like `waterside-first` (landside ASC). It is also used for a one-ASC block, but only for an early job (everything else stays decision-free there). A null reply leaves the job open.
+- **Motion:** `buildTruckPickTrip` makes the ASC hover over the stall (box on the spreader, custody `asc`) until the truck's planned `TruckAtStall` (`AscTrip.wait`, which also waits in instant mode), then lowers and sets the box on the chassis. `AscDroppedAtStall` throws if the truck is not at its stall.
+- **Events and state:** `AscJobAssigned.early` (only when true). The truck is not `being-served` until `TruckAtStall`, where service starts at once and the stall wait counts as 0 (`kpis.landside` stall wait, collector `ls.stallWaitS`).
+- **Fixture:** `asc-pre-retrieval` (one-tier yard, 6 import pickups 250 s apart, paired ASCs, strategy `pre-retrieval`) + golden. Test `tests/asc-pre-retrieval.test.ts` runs it with and without the strategy: mean stall service about 50 s against about 80 s, plus single-ASC, dual and invariant cases.
+- **Not yet:** the fetch starts when the truck's trip is planned at gate-in (the ETA is unknown at stall reservation), so the saving is about the drive from kiosk to stall (30 s here); a buried box is dug out first, not fetched early; no early fetch when the ASC is busy until after the truck arrived.
 
 ## Truck turnaround metrics (TT-R18, ENGINE_VERSION stays 0.19.0)
 

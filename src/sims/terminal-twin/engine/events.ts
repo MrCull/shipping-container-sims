@@ -218,6 +218,8 @@ export interface EventPayloads {
     /** Truck interchange (TT-13): the stall and truck the job serves (`wtpPadId` is empty then). */
     stallId?: string
     truckId?: string
+    /** TT-R17: the pick retrieval starts before the truck stands in its stall (pre-retrieval); present only then. */
+    early?: true
   }
   /**
    * Twin-ASC blocks: the ASC steps aside along the rail so the other ASC can

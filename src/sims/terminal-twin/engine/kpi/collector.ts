@@ -680,7 +680,7 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         ascBusy[e.payload.ascId] = { since: e.payload.departAt }
         if (e.payload.truckId && !servedTrucks.has(e.payload.truckId)) {
           servedTrucks.add(e.payload.truckId)
-          acc.add('ls.stallWaitS', 'terminal', h, e.payload.departAt - (atStallAt[e.payload.truckId] ?? e.t))
+          acc.add('ls.stallWaitS', 'terminal', h, e.payload.early ? 0 : e.payload.departAt - (atStallAt[e.payload.truckId] ?? e.t))
           acc.add('ls.stallServed', 'terminal', h, 1)
         }
         break

@@ -473,6 +473,36 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * TT-R17 ASC pre-retrieval: one block with paired ASCs and 2 stalls, 16 imports discharged, then 6 import pickups 100 s
+   * apart. The `pre-retrieval` ascDispatch strategy fetches each box to its stall while the truck is still driving in, so
+   * the stall service time drops (the same scenario with the default strategy is the comparison in the test). The numbers
+   * are not TTI values.
+   */
+  'asc-pre-retrieval': () =>
+    new ScenarioBuilder('asc-pre-retrieval', 'Import pickups with the pre-retrieval ASC strategy: the box waits at the stall for the truck')
+      .hatch({ enabled: false })
+      .seed(8)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 8, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 1, transferStalls: 2 })
+      .ascsPerBlock(2)
+      .decisions({ points: { ascDispatch: { strategy: 'pre-retrieval' } } })
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 0),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 2, outLanes: 2, inProcessingS: 30, outProcessingS: 20 },
+        holding: { positions: 2 },
+        scripted: Array.from({ length: 6 }, (_, i) => ({ atS: 3000 + i * 250, transaction: 'pickImport' as const })),
+      })
+      .endWhen({ simDurationS: 6500 })
+      .build(),
+
+  /**
    * TT-13 morning peak: two blocks, a feeder discharging 24 boxes, and the 07:00 truck profile (Poisson,
    * 40 to 48 trucks an hour) with the default transaction mix and a 10 minute import dwell.
    */

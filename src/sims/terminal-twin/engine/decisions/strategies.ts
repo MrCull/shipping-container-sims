@@ -8,7 +8,7 @@
  * request, never from Math.random.
  */
 import { minFutureRehandles, nearestValidRehandle } from './rehandleStrategies'
-import { balancedAscDispatch, watersideFirstDispatch } from './ascStrategies'
+import { balancedAscDispatch, preRetrievalDispatch, watersideFirstDispatch } from './ascStrategies'
 import { groupByVesselSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
 import { nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
 import { leastLoadedBlockStall, leastUsedLane, lowestFreeLane, nearestToBoxStall } from './landsideStrategies'
@@ -152,6 +152,11 @@ export const strategies: StrategyRegistry = {
         description:
           'WTP work goes to the waterside ASC, transfer-stall work to the landside ASC; the other crane helps when the separation permits (no step-aside needed).',
         handler: (msg) => watersideFirstDispatch(msg.payload),
+      },
+      'pre-retrieval': {
+        description:
+          'As waterside-first, and the ASC fetches an import box to the transfer stall before its truck arrives, once the stall is reserved and the truck is close (idle ASC only, never ahead of stacking, rehandle or pad work).',
+        handler: (msg) => preRetrievalDispatch(msg.payload),
       },
       balanced: {
         description: 'The serviceable idle ASC with the fewest jobs so far (ties: nearest the pad), stepping the other aside if needed.',

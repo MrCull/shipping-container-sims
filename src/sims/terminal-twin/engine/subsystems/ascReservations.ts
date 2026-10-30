@@ -8,6 +8,7 @@
  */
 import type { EngineContext } from '../context'
 import { ascKpi, blockOf, isTruckJob, kinematics, partnerOf, stallOf } from './ascStorage'
+import { truckStallEta } from './landside'
 import { planSegment, positionAt, type AxisProfile, type MotionSegment } from '../kinematics'
 import { laneGraphOf } from '../laneGraph'
 import { earliestStart, earliestStartAmong, reserve, type Reservation, type WindowSpec } from '../reservations'
@@ -91,6 +92,11 @@ export class AscTrip {
 
   mark(type: PlannedType): void {
     this.marks.push({ type, at: this.t })
+  }
+
+  /** Stand still even in instant mode (waiting for a truck, not working). */
+  wait(seconds: number): void {
+    this.t += seconds
   }
 
   dwell(seconds: number): void {
@@ -251,6 +257,9 @@ function buildTruckPickTrip(ctx: EngineContext, asc: AscState, job: AscJob): { t
   trip.hoistTo(travel, k.hoistLoaded)
   trip.moveTo(stall.z, stall.x, k.gantry, k.trolley)
   trip.padFrom = trip.t
+  // TT-R17: fetched ahead of the truck: hover over the stall until it is planned to stand there
+  const eta = truckStallEta(state, job.truckId)
+  if (eta !== null && state.trucks[job.truckId as string].atStallAt === null) trip.wait(Math.max(0, eta - (state.now + trip.t)))
   trip.mark('AscPositioningAtStall')
   trip.hoistTo(TRUCK_DECK_M, k.hoistLoaded)
   trip.mark('AscUnlocking')

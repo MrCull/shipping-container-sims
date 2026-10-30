@@ -176,6 +176,8 @@ export interface AscDispatchRequest {
     kind: 'wtp' | 'transfer' | 'retrieve' | 'rehandle'
     /** `transfer` (TT-13): a truck at a transfer stall; `stallId` is its stall, `wtpPadId` is empty. */
     stallId?: string
+    /** TT-R17: a `transfer` pick retrieval the truck has not yet arrived for (its stall is reserved); only offered with the `pre-retrieval` strategy. */
+    early?: true
     wtpPadId: string
     yardSlotId: string
     /** Gantry Z of the pad and of the slot (m). */
