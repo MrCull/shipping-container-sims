@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildLaneGraph, createSimulation, restoreSimulation, type EngineEvent, type Simulation } from '../engine'
 import { fixtures } from '../scenario/fixtures'
-import { presets } from '../scenario/presets'
+import { PEAK_DAY_PRESET_NAME, presets } from '../scenario/presets'
 import type { ScenarioConfig } from '../scenario/types'
 
 const FIXTURE = 'shc-queue-chained'
@@ -49,7 +49,7 @@ describe('queue areas in the lane graph', () => {
   })
 
   it('the TTI presets set queue areas, and the graph has one per STS and block', () => {
-    for (const name of ['TTI Algeciras baseline', 'Small automated', 'Stress test']) {
+    for (const name of ['TTI Algeciras baseline', 'Small automated', PEAK_DAY_PRESET_NAME]) {
       const config = presets[name]()
       expect(config.queueAreas, name).toEqual({ stsCapacity: 3, blockCapacity: 3 })
       const g = buildLaneGraph(config)

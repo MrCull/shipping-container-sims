@@ -9,7 +9,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 |---|---|---|---|---|---|
 | #84 | R02 Fixed-width KPI strip | | n/a | wave 2 | merged |
 | #85 | R03 Keyboard camera | | n/a | wave 1 | merged |
-| #86 | R04 Scenario picker | | n/a | wave 4 | claimed |
+| #86 | R04 Scenario picker | | n/a | wave 4 | merged |
 | #87 | R05 TTI research KB | | n/a | wave 4 | merged |
 | #88 | R06 Yard no mixed 20/40 | | 0.13.0 | wave 1 | merged (ee888ee) |
 | #89 | R07 Vessel no 20 on 40 | #88 | 0.14.0 (merged as 0.18.0 tip) | wave 2 | merged |
@@ -17,7 +17,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 | #91 | R09 Hatch covers engine | | 0.15.0 | wave 1 | merged |
 | #92 | R10 Hatch covers 3D | #91 | n/a | | todo |
 | #93 | R11 SHC states and metrics | | n/a (KPI fields only) | wave 3 | merged |
-| #94 | R12 SHC queue areas, chaining | #93 | next minor | wave 4 | claimed |
+| #94 | R12 SHC queue areas, chaining | #93 | 0.20.0 | wave 4 | merged |
 | #95 | R13 SHC pre-dispatch | #94, #91 | 0.17.0 | | todo |
 | #96 | R14 Paired dispatch | #94 | n/a | | todo |
 | #97 | R15 Truck appointments | | 0.18.0 | wave 1 | merged |
@@ -37,7 +37,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 - Merged and pushed: #88, #85, #97, #89, #98, #91, #84, #100, #93.
 - Nothing is running. No implementers are active.
 - Not started: #86, #87, #90, #92 (unblocked), #94 (unblocked), #95-#96 (after #94), #99 (unblocked), #101 (after #87).
-- ENGINE_VERSION on the tip is 0.19.0 (merging #91 had lowered it to 0.15.0; restored in the #93 merge). Keep the highest number on the tip when merging.
+- ENGINE_VERSION on the tip is 0.20.0 (after #94). Keep the highest number on the tip when merging.
 - #93 definitions came from the ticket text only (its implementer could not read spec #82): check them against the spec. A handover is one SHC pick-up or put-down; `queuing-to-deliver` stays 0 until #94.
 - Deviations to review: #91 uses 2 panels (feeder) and 4 (ULCV), not 1 and 3, because panels must fit the laydown strip (about 15 m across); SHC scenarios with more than 3 ground positions per STS throw at start unless `hatch.enabled` is false. Hatch moves count in turnaround and `kpiReport().hatch`, not in STS moves or gross moves/h.
 - Open follow-ups: setup-dialog fields for hatch and holding; 2D plan preview lacks holding positions; gate queue is strictly FIFO; KPI_DEFS series row for hatch time; #84 gross/net tiles reserve 15ch. `invariants-incremental.test.ts` timed out once in a parallel run (passes alone and in verify).
