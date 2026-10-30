@@ -17,6 +17,9 @@
  *               crossovers both ways at every apron X (they make the loop).
  *   WTP spurs   eastbound node → pad clear position C → WTP pad P and back.
  *   parking     spurs off the eastbound lane, west of everything, one per SHC.
+ *   queue areas (TT-R12, `config.queueAreas`) spurs off the eastbound lane at `queueZ`: a row of spots per
+ *               STS (`QS:<stsId>`, near its start gantry X) and per block (`QB:<blockId>`, beside its pads).
+ *               Queue spots are rest nodes only (kind 'queue', no conflict zone), like parking.
  *
  * Conflict zones: every apron and spine node (intersections), every STS lane
  * section between two lane nodes (`L<j>@<x>`; the STS reserves the sections it
@@ -34,6 +37,8 @@ export const DEFAULT_APRON_LAYOUT: ApronLayout = {
   stationSpacingM: 25,
   parkingPitchM: 6,
   zoneClearanceM: 4,
+  queueZ: 58,
+  queuePitchM: 8,
 }
 
 /** Offset of a station's up spine from its down spine (m). */
@@ -41,7 +46,7 @@ const UP_SPINE_OFFSET_M = 5
 /** STS lanes start this far before the quay and end this far past it (m). */
 const LANE_MARGIN_M = 15
 
-export type LaneNodeKind = 'apron' | 'laneDown' | 'laneUp' | 'padClear' | 'wtpPad' | 'parking'
+export type LaneNodeKind = 'apron' | 'laneDown' | 'laneUp' | 'padClear' | 'wtpPad' | 'parking' | 'queue'
 
 export interface LaneNode {
   id: string
@@ -52,7 +57,7 @@ export interface LaneNode {
   zone: string | null
 }
 
-export type LaneEdgeKind = 'apron' | 'crossover' | 'spine' | 'stsLane' | 'wtpSpur' | 'parkingSpur'
+export type LaneEdgeKind = 'apron' | 'crossover' | 'spine' | 'stsLane' | 'wtpSpur' | 'parkingSpur' | 'queueSpur'
 
 export interface LaneEdge {
   from: string
@@ -83,6 +88,16 @@ export interface WtpPadLayout {
   z: number
 }
 
+/** A queue area (TT-R12): where SHCs wait near an STS (empty, for work) or a block (loaded, for a free pad). */
+export interface QueueArea {
+  id: string
+  kind: 'sts' | 'block'
+  /** The STS or block id. */
+  ownerId: string
+  /** Spot node ids, in order of use. */
+  nodes: string[]
+}
+
 export interface LaneGraph {
   layout: ApronLayout
   nodes: Record<string, LaneNode>
@@ -99,6 +114,10 @@ export interface LaneGraph {
   padClearNode: Record<string, string>
   /** SHC id → its parking spot node. */
   parkingNode: Record<string, string>
+  /** Queue areas (TT-R12), STS areas first. */
+  queueAreas: QueueArea[]
+  /** Queue spot node id → its area id. */
+  queueAreaOf: Record<string, string>
 }
 
 export function apronLayout(config: ScenarioConfig): ApronLayout {
@@ -161,6 +180,8 @@ export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
     padNode: {},
     padClearNode: {},
     parkingNode: {},
+    queueAreas: [],
+    queueAreaOf: {},
   }
   const half = 2
   const node = (id: string, x: number, z: number, kind: LaneNodeKind, zone: string | null) => {
@@ -193,6 +214,34 @@ export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
   const westmost = Math.min(...xs, Infinity)
   const parkingX = (i: number) => r3((Number.isFinite(westmost) ? westmost : 0) - 20 - i * layout.parkingPitchM)
   shcs.forEach((_, i) => xs.add(parkingX(i)))
+  // Queue areas (TT-R12): rows of spots clear of every pad column and of each other.
+  const qa = config.queueAreas
+  const takenX: number[] = graph.pads.map((p) => p.x)
+  const queueXs = (want: number, count: number): number[] => {
+    const out: number[] = []
+    let x = want
+    const clear = (v: number) => takenX.every((t) => Math.abs(t - v) >= layout.queuePitchM * 0.75)
+    for (let k = 0; k < count; k++) {
+      while (!clear(x)) x += layout.queuePitchM
+      out.push(r3(x))
+      takenX.push(x)
+      x += layout.queuePitchM
+    }
+    return out
+  }
+  const queuePlan: { id: string; kind: 'sts' | 'block'; owner: string; xs: number[] }[] = []
+  if (shcs.length > 0 && qa) {
+    for (const s of config.sts) {
+      const n = qa.stsCapacity ?? 0
+      if (n > 0) queuePlan.push({ id: `QS:${s.id}`, kind: 'sts', owner: s.id, xs: queueXs(s.gantryX + layout.queuePitchM, n) })
+    }
+    for (const b of config.yard?.blocks ?? []) {
+      const n = qa.blockCapacity ?? 0
+      const east = b.x + (b.wtpPads / 2) * layout.padPitchM + layout.queuePitchM / 2
+      if (n > 0) queuePlan.push({ id: `QB:${b.id}`, kind: 'block', owner: b.id, xs: queueXs(east, n) })
+    }
+  }
+  for (const q of queuePlan) for (const x of q.xs) xs.add(x)
   const sorted = [...xs].sort((a, b) => a - b)
 
   for (const x of sorted) {
@@ -254,6 +303,20 @@ export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
     edge(apronId('E', x), id, 'parkingSpur')
     edge(id, apronId('E', x), 'parkingSpur')
   })
+
+  // Queue spots (TT-R12).
+  for (const q of queuePlan) {
+    const area: QueueArea = { id: q.id, kind: q.kind, ownerId: q.owner, nodes: [] }
+    q.xs.forEach((x, k) => {
+      const id = `${q.id}:${k + 1}`
+      node(id, x, layout.queueZ, 'queue', null)
+      edge(apronId('E', x), id, 'queueSpur')
+      edge(id, apronId('E', x), 'queueSpur')
+      area.nodes.push(id)
+      graph.queueAreaOf[id] = q.id
+    })
+    graph.queueAreas.push(area)
+  }
 
   for (const id of Object.keys(nodes)) graph.out[id] = []
   for (const e of edges) graph.out[e.from].push(e)

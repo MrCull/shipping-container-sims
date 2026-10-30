@@ -111,6 +111,22 @@ export interface ApronLayout {
   parkingPitchM: number
   /** Distance either side of a conflict point that a passing vehicle reserves. */
   zoneClearanceM: number
+  /** Z of the queue area spots (TT-R12), landside of the pad clear positions. */
+  queueZ: number
+  /** Spacing of the spots of one queue area along X. */
+  queuePitchM: number
+}
+
+/**
+ * SHC queue areas (TT-R12): lane-graph spots where an SHC waits when its pickup or drop-off is not ready,
+ * separate from parking spots, ground positions and WTP pads. One area per STS (empty SHCs wait for work)
+ * and one per block (SHCs carrying a box wait for a free WTP pad). Absent = no queue areas (the old behaviour).
+ */
+export interface QueueAreasConfig {
+  /** Spots in the queue area near each STS (0 = none). */
+  stsCapacity?: number
+  /** Spots in the queue area near each block's WTP pads (0 = none). */
+  blockCapacity?: number
 }
 
 /** Subsystem modes: real behaviour, an "instant" stub raising the same events, or off. */
@@ -327,6 +343,8 @@ export interface ScenarioConfig {
   yardStart?: YardStartConfig
   /** Waterside lane-graph geometry overrides. */
   apron?: Partial<ApronLayout>
+  /** SHC queue areas near each STS and each block's WTP pads (TT-R12); optional (none). */
+  queueAreas?: QueueAreasConfig
   /** ± % random variation of each SHC trip (driver variability; 0 = none). */
   driverVariabilityPct?: number
   /** Subsystem modes (overridable with `SimulationOptions.subsystems`). */

@@ -53,6 +53,7 @@ const STATUS_AFTER: Record<PlannedType, ShcStatus> = {
   ShcDroppedAtGround: 'clearing',
   ShcCleared: 'available',
   ShcParked: 'parked',
+  ShcQueued: 'queuing-for-work',
 }
 
 /** Where an SHC is at `t` (plan view), from its current trip's motion; at rest it is at its node. */
@@ -324,6 +325,18 @@ function scheduleNext(ctx: EngineContext, shc: ShcState): void {
     ctx.schedule('ShcParked', next.at, { equipment: [shc.id] }, { shcId: shc.id, nodeId: shc.nodeId, segments: next.segments })
     return
   }
+  if (next.type === 'ShcQueued') {
+    const areaId = laneGraphOf(ctx.config).queueAreaOf[shc.nodeId]
+    ctx.schedule('ShcQueued', next.at, { equipment: [shc.id], containers: shc.carrying ? [shc.carrying] : undefined, jobs: shc.jobId ? [shc.jobId] : undefined }, {
+      shcId: shc.id,
+      nodeId: shc.nodeId,
+      areaId,
+      jobId: shc.jobId,
+      loaded: shc.carrying !== null,
+      segments: next.segments,
+    })
+    return
+  }
   const job = shc.jobId ? ctx.state.shcJobs[shc.jobId] : null
   if (!job) throw new Error(`${shc.id}: ${next.type} without a job`)
   const base: ShcPhasePayload = { shcId: shc.id, jobId: job.id, containerId: job.containerId, segments: next.segments }
@@ -363,6 +376,7 @@ function advance(ctx: EngineContext, e: EventOf<PlannedType>): ShcState {
 function goPark(ctx: EngineContext, shc: ShcState): void {
   const graph = laneGraphOf(ctx.config)
   const target = graph.parkingNode[shc.id]
+  releaseQueue(ctx.state, shc.id)
   if (shc.nodeId === target) {
     shc.status = 'parked'
     return
@@ -382,11 +396,118 @@ function goPark(ctx: EngineContext, shc: ShcState): void {
   const kpi = shcKpi(ctx.state, shc.id)
   kpi.emptyDistanceM += pathLength(graph, path)
   kpi.reservationWaitS += start - ctx.state.now
+  kpi.parkingReturns++
   ctx.schedule('ShcRoutingToParking', ctx.state.now, { equipment: [shc.id] }, {
     shcId: shc.id,
     departAt: start,
     reservations,
   })
+}
+
+// ── Queue areas and chained dispatch (TT-R12) ─────────────────────────────
+
+/** True when the shcDispatch decision point runs the `chained-nearest` strategy (SHCs take work straight away and park only without work). */
+export function isChained(ctx: EngineContext): boolean {
+  return ctx.config.decisions?.points?.shcDispatch?.strategy === 'chained-nearest'
+}
+
+/** Is there still work an idle SHC could be asked to do soon: an open job, or a vessel at the berth? */
+export function workRemains(state: SimState): boolean {
+  if (Object.values(state.shcJobs).some((j) => j.shcId === null)) return true
+  return Object.values(state.vessels).some((v) => v.status === 'berthed' || v.status === 'mooring')
+}
+
+function releaseQueue(state: SimState, shcId: string): void {
+  for (const [node, holder] of Object.entries(state.queueClaims)) if (holder === shcId) delete state.queueClaims[node]
+}
+
+function freeQueueSlot(state: SimState, nodes: string[]): string | null {
+  return nodes.find((n) => state.queueClaims[n] === undefined) ?? null
+}
+
+/** Free queue spots in the block areas (where loaded SHCs wait for a pad). */
+function freeBlockQueueSlots(ctx: EngineContext): number {
+  const { state } = ctx
+  let n = 0
+  for (const a of laneGraphOf(ctx.config).queueAreas) if (a.kind === 'block') n += a.nodes.filter((id) => state.queueClaims[id] === undefined).length
+  return n
+}
+
+/** The free queue spot nearest by route to `from` (first free spot of each area; ties by id), or null. */
+function nearestQueueSpot(ctx: EngineContext, from: string, kinds: ('sts' | 'block')[]): string | null {
+  const graph = laneGraphOf(ctx.config)
+  let best: { node: string; d: number } | null = null
+  for (const area of graph.queueAreas) {
+    if (!kinds.includes(area.kind)) continue
+    const node = freeQueueSlot(ctx.state, area.nodes)
+    if (!node) continue
+    const path = shortestPath(graph, from, node)
+    if (!path) continue
+    const d = pathLength(graph, path)
+    if (!best || d < best.d - 1e-9 || (Math.abs(d - best.d) <= 1e-9 && node < best.node)) best = { node, d }
+  }
+  return best?.node ?? null
+}
+
+/** An idle SHC with no job: chained dispatch waits at the nearest queue spot while there is work, otherwise it parks. */
+function goIdle(ctx: EngineContext, shc: ShcState): void {
+  const { state } = ctx
+  if (isChained(ctx) && workRemains(state)) {
+    if (state.queueClaims[shc.nodeId] === shc.id) {
+      shc.status = 'queuing-for-work'
+      return
+    }
+    const spot = nearestQueueSpot(ctx, shc.nodeId, ['sts', 'block'])
+    if (spot) {
+      goQueue(ctx, shc, spot)
+      return
+    }
+  }
+  goPark(ctx, shc)
+}
+
+/** Drive an empty SHC to a queue spot and wait there (it holds the spot from now on). */
+function goQueue(ctx: EngineContext, shc: ShcState, spot: string): void {
+  const graph = laneGraphOf(ctx.config)
+  releaseQueue(ctx.state, shc.id)
+  if (shc.nodeId === spot) {
+    ctx.state.queueClaims[spot] = shc.id
+    shc.status = 'queuing-for-work'
+    return
+  }
+  const instant = ctx.state.subsystems.shc === 'instant'
+  const k = kinematics(ctx)
+  const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant, cornerOf(ctx))
+  const path = route(graph, shc.nodeId, spot)
+  trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx)))
+  trip.mark('ShcQueued')
+  const windows = trip.windows()
+  const start = earliestStart(ctx.state, windows, ctx.state.now)
+  const reservations = reserve(ctx.state, shc.id, windows, start)
+  install(shc, trip, start)
+  shc.nodeId = spot
+  ctx.state.queueClaims[spot] = shc.id
+  shc.status = 'routing-to-parking'
+  const kpi = shcKpi(ctx.state, shc.id)
+  kpi.emptyDistanceM += pathLength(graph, path)
+  kpi.reservationWaitS += start - ctx.state.now
+  ctx.schedule('ShcRoutingToParking', ctx.state.now, { equipment: [shc.id] }, { shcId: shc.id, departAt: start, reservations })
+}
+
+/** Queued SHCs carrying a box ask `wtpPadSelection` again while a free pad is not already being asked for. */
+function serveQueues(ctx: EngineContext): void {
+  const { state } = ctx
+  const waiting = Object.values(state.shcs)
+    .filter((s) => s.status === 'queuing-for-pad' && s.plan.length === 0)
+    .sort((a, b) => (a.id < b.id ? -1 : 1))
+  if (waiting.length === 0) return
+  const freePads = Object.values(state.wtpPads).filter((p) => p.containerId === null && p.claimedBy === null).length
+  let asking = Object.values(state.shcs).filter((s) => s.status === 'waiting-for-pad' && s.carrying).length
+  for (const shc of waiting) {
+    if (asking >= freePads) break
+    requestPadSelection(ctx, shc, state.shcJobs[shc.jobId as string])
+    asking++
+  }
 }
 
 /** Ask the dispatch decision point on behalf of one free SHC. */
@@ -482,17 +603,20 @@ function requestPadSelection(ctx: EngineContext, shc: ShcState, job: ShcJob): vo
 export function maybeDispatch(ctx: EngineContext): void {
   const { state } = ctx
   if (state.subsystems.shc === 'off') return
+  serveQueues(ctx)
   const shcs = Object.values(state.shcs)
   const openJobs = Object.values(state.shcJobs).filter((j) => j.shcId === null)
   const open = openJobs.filter((j) => j.kind !== 'load').length
   const openLoad = openJobs.length - open
   const freePads = Object.values(state.wtpPads).filter((p) => p.containerId === null && p.claimedBy === null).length
+  const queueFree = freeBlockQueueSlots(ctx)
   let asking = shcs.filter((s) => s.status === 'waiting-for-dispatch').length
+  const rank = (s: ShcState) => (s.status === 'available' ? 0 : s.status === 'queuing-for-work' ? 1 : 2)
   const free = shcs
-    .filter((s) => s.status === 'available' || s.status === 'parked')
-    .sort((a, b) => (a.status === b.status ? (a.id < b.id ? -1 : 1) : a.status === 'available' ? -1 : 1))
+    .filter((s) => s.status === 'available' || s.status === 'parked' || s.status === 'queuing-for-work')
+    .sort((a, b) => rank(a) - rank(b) || (a.id < b.id ? -1 : 1))
   for (const shc of free) {
-    if (asking >= Math.min(open, freePads) + openLoad) break
+    if (asking >= Math.min(open, freePads + queueFree) + openLoad) break
     requestDispatch(ctx, shc)
     asking++
   }
@@ -510,6 +634,11 @@ function assignJob(ctx: EngineContext, shc: ShcState, jobId: string, padId: stri
   }
   const pad = state.wtpPads[padId]
   if (!pad) throw new Error(`wtpPadSelection handler returned unknown WTP pad ${padId}`)
+  if (shc.carrying) {
+    resumeFromQueue(ctx, shc, job, pad.id)
+    return
+  }
+  releaseQueue(state, shc.id)
   // The engine trusts the TOS reply; invariants catch double claims and double occupancy.
   job.shcId = shc.id
   job.wtpPadId = pad.id
@@ -575,6 +704,7 @@ function commitTrip(
   loadedM: number,
   padId: string,
   endNode: string,
+  resumed = false,
 ): void {
   const { state } = ctx
   const windows = trip.windows()
@@ -582,8 +712,24 @@ function commitTrip(
   const reservations = reserve(state, shc.id, windows, start)
   install(shc, trip, start)
   shc.nodeId = endNode
-  shc.status = 'job-assigned'
   const kpi = shcKpi(state, shc.id)
+  if (resumed) {
+    // The loaded leg from a queue spot (TT-R12): the job and its empty drive were counted when it was assigned.
+    shc.status = 'queuing-for-pad'
+    kpi.loadedDistanceM += loadedM
+    kpi.reservationWaitS += start - state.now
+    ctx.schedule('ShcQueueDeparted', state.now, { equipment: [shc.id], containers: [job.containerId], jobs: [job.id] }, {
+      shcId: shc.id,
+      jobId: job.id,
+      wtpPadId: padId,
+      nodeId: shc.nodeId,
+      departAt: start,
+      distanceM: Math.round(trip.s * 1000) / 1000,
+      reservations,
+    })
+    return
+  }
+  shc.status = 'job-assigned'
   kpi.jobs++
   kpi.emptyDistanceM += emptyM + (trip.s - emptyM - loadedM)
   kpi.loadedDistanceM += loadedM
@@ -601,6 +747,78 @@ function commitTrip(
 }
 
 /**
+ * TT-R12: a discharge job taken while no WTP pad is free. The SHC fetches the box and carries it to a queue spot of
+ * a block (the nearest area with room, held from now on) and waits there, loaded, until a pad frees.
+ */
+function assignQueuedJob(ctx: EngineContext, shc: ShcState, job: ShcJob, spot: string): void {
+  const { state } = ctx
+  const graph = laneGraphOf(ctx.config)
+  releaseQueue(state, shc.id)
+  state.queueClaims[spot] = shc.id
+  job.shcId = shc.id
+  shc.jobId = job.id
+  const k = kinematics(ctx)
+  const f = driverFactor(ctx)
+  const empty = scaled(k.driveEmpty, f)
+  const loaded = scaled(k.driveLoaded, f)
+  const instant = state.subsystems.shc === 'instant'
+  const { walk, before } = laneAccess(graph, state.groundPositions[job.groundPositionId].lane, job.x)
+  const toEntry = route(graph, shc.nodeId, walk[0])
+  const lane = waypoints(graph, walk)
+  const pickup: Waypoint = {
+    nodeId: walk[before],
+    x: job.x,
+    z: lane[before].z,
+    zone: null,
+    edgeZone: edgeBetween(graph, walk[before], walk[before + 1]).zone,
+  }
+  const toSpot = route(graph, walk[walk.length - 1], spot)
+  const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant, cornerOf(ctx))
+  trip.mark('ShcRoutingEmpty')
+  trip.driveThrough([...waypoints(graph, toEntry).slice(1), ...lane.slice(1, before + 1), pickup], empty, 'ShcPositioningAtPickup')
+  trip.mark('ShcLocking')
+  trip.dwell(k.lockS)
+  trip.mark('ShcPicked')
+  trip.liftTo(k.liftHeightM, k.lift)
+  trip.mark('ShcRoutingLoaded')
+  const emptyM = trip.s
+  trip.driveThrough([{ ...lane[before + 1], edgeZone: pickup.edgeZone }, ...lane.slice(before + 2), ...waypoints(graph, toSpot).slice(1)], loaded)
+  const loadedM = trip.s - emptyM
+  trip.mark('ShcQueued')
+  commitTrip(ctx, shc, job, trip, emptyM, loadedM, '', spot)
+}
+
+/** TT-R12: a queued SHC with a box got a free pad: plan the loaded drive from its queue spot, the drop and the reverse out. */
+function resumeFromQueue(ctx: EngineContext, shc: ShcState, job: ShcJob, padId: string): void {
+  const { state } = ctx
+  const graph = laneGraphOf(ctx.config)
+  const pad = state.wtpPads[padId]
+  job.wtpPadId = pad.id
+  pad.claimedBy = shc.id
+  releaseQueue(state, shc.id)
+  const k = kinematics(ctx)
+  const f = driverFactor(ctx)
+  const empty = scaled(k.driveEmpty, f)
+  const loaded = scaled(k.driveLoaded, f)
+  const instant = state.subsystems.shc === 'instant'
+  const pNode = graph.padNode[pad.id]
+  const cNode = graph.padClearNode[pad.id]
+  const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant, cornerOf(ctx))
+  trip.lift = k.liftHeightM
+  trip.mark('ShcRoutingLoaded')
+  trip.driveThrough(waypoints(graph, route(graph, shc.nodeId, pNode)).slice(1), loaded, 'ShcPositioningAtDropoff')
+  const loadedM = trip.s
+  trip.mark('ShcLowering')
+  trip.liftTo(0, k.lift)
+  trip.mark('ShcUnlocking')
+  trip.dwell(k.unlockS)
+  trip.mark('ShcDroppedAtWtp')
+  trip.driveThrough(waypoints(graph, [pNode, cNode]).slice(1), empty)
+  trip.mark('ShcCleared')
+  commitTrip(ctx, shc, job, trip, 0, loadedM, pad.id, cNode, true)
+}
+
+/**
  * Plan an export load job: the SHC drives to the WTP pad, lifts the box,
  * carries it along its STS lane to the drop X and puts it down, then leaves the
  * lane at the next up spine (where it rests: lane exits are conflict zones, but
@@ -611,6 +829,7 @@ function assignLoadJob(ctx: EngineContext, shc: ShcState, job: ShcJob): void {
   const graph = laneGraphOf(ctx.config)
   job.shcId = shc.id
   shc.jobId = job.id
+  releaseQueue(state, shc.id)
   const k = kinematics(ctx)
   const f = driverFactor(ctx)
   const empty = scaled(k.driveEmpty, f)
@@ -685,7 +904,7 @@ export const shcReactors: ReactorMap = {
       const shc = ctx.state.shcs[request.shcId]
       if (reply.jobId === null) {
         shc.status = 'available'
-        goPark(ctx, shc)
+        goIdle(ctx, shc)
         return
       }
       const job = ctx.state.shcJobs[reply.jobId]
@@ -695,26 +914,40 @@ export const shcReactors: ReactorMap = {
         // built before the other's reply): ask again with the jobs that are left. A custom handler is trusted, as ever.
         shc.status = 'available'
         maybeDispatch(ctx)
-        if (shc.status === 'available') goPark(ctx, shc)
+        if (shc.status === 'available') goIdle(ctx, shc)
         return
       }
       if (job.kind === 'load') {
         assignJob(ctx, shc, reply.jobId, '')
         maybeDispatch(ctx)
-      } else {
+      } else if (Object.values(ctx.state.wtpPads).some((p) => p.containerId === null && p.claimedBy === null)) {
         requestPadSelection(ctx, shc, job)
+      } else {
+        // No pad is free: take the box and wait with it at a block queue spot (TT-R12), or leave the job open.
+        const spot = nearestQueueSpot(ctx, laneGraphOf(ctx.config).laneNodes[ctx.state.groundPositions[job.groundPositionId].lane][0], ['block'])
+        if (spot) {
+          assignQueuedJob(ctx, shc, job, spot)
+          maybeDispatch(ctx)
+        } else {
+          shc.status = 'available'
+          goIdle(ctx, shc)
+        }
       }
       return
     }
     if (e.payload.decisionPoint === 'wtpPadSelection') {
       const { request, reply } = e.payload
       const shc = ctx.state.shcs[request.shcId]
+      if (reply.wtpPadId === null && shc.carrying) {
+        shc.status = 'queuing-for-pad' // asked from a queue spot: keep waiting there
+        return
+      }
       if (reply.wtpPadId === null) {
         // No pad: the SHC gives the job back (open again) and parks.
         ctx.state.shcJobs[request.jobId].shcId = null
         shc.jobId = null
         shc.status = 'available'
-        goPark(ctx, shc)
+        goIdle(ctx, shc)
         return
       }
       const pad = ctx.state.wtpPads[reply.wtpPadId]
@@ -730,6 +963,18 @@ export const shcReactors: ReactorMap = {
 
   ShcJobAssigned: (e, ctx) => scheduleNext(ctx, ctx.state.shcs[e.payload.shcId]),
   ShcRoutingToParking: (e, ctx) => scheduleNext(ctx, ctx.state.shcs[e.payload.shcId]),
+  ShcQueueDeparted: (e, ctx) => scheduleNext(ctx, ctx.state.shcs[e.payload.shcId]),
+  ShcQueued: phase((e, ctx, shc) => {
+    const kpi = shcKpi(ctx.state, shc.id)
+    kpi.queueArrivals++
+    if (e.payload.loaded) shc.status = 'queuing-for-pad'
+    maybeDispatch(ctx) // a pad may be free already; a job may have appeared
+  }),
+  VesselWorkComplete: (_e, ctx) => {
+    // Chained dispatch parks only when there is no work left.
+    if (workRemains(ctx.state)) return
+    for (const shc of Object.values(ctx.state.shcs)) if (shc.status === 'queuing-for-work' && shc.plan.length === 0) goPark(ctx, shc)
+  },
 
   ShcRoutingEmpty: phase(),
   ShcPositioningAtPickup: phase(),
@@ -796,7 +1041,7 @@ export const shcReactors: ReactorMap = {
     delete ctx.state.shcJobs[e.payload.jobId]
     shc.jobId = null
     maybeDispatch(ctx)
-    if (shc.status === 'available') goPark(ctx, shc)
+    if (shc.status === 'available') goIdle(ctx, shc)
   }),
   ShcParked: phase((_e, ctx) => maybeDispatch(ctx)),
 }

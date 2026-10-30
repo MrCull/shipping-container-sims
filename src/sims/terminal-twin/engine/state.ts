@@ -156,6 +156,10 @@ export type ShcStatus =
   | 'clearing'
   | 'available'
   | 'routing-to-parking'
+  /** Resting at a queue spot with a box, waiting for a free WTP pad (TT-R12). */
+  | 'queuing-for-pad'
+  /** Resting at a queue spot, empty, waiting for work (TT-R12, chained dispatch). */
+  | 'queuing-for-work'
 
 /** One planned phase event of an SHC trip (the next one is scheduled by the previous). */
 export interface ShcPlannedEvent {
@@ -173,6 +177,7 @@ export interface ShcPlannedEvent {
     | 'ShcDroppedAtGround'
     | 'ShcCleared'
     | 'ShcParked'
+    | 'ShcQueued'
   at: number
   /** The motion leading up to this event (its payload `segments`). */
   segments: MotionSegment[]
@@ -836,7 +841,7 @@ export interface YardKpiCounters {
 
 export interface HorizontalKpiCounters {
   boxesToWtp: number
-  perShc: Record<string, { jobs: number; emptyDistanceM: number; loadedDistanceM: number; reservationWaitS: number }>
+  perShc: Record<string, { jobs: number; emptyDistanceM: number; loadedDistanceM: number; reservationWaitS: number; parkingReturns: number; queueArrivals: number }>
   /** STS seconds spent waiting for a free ground position. */
   stsGroundPositionWaitS: Record<string, number>
 }
@@ -880,6 +885,8 @@ export interface SimState {
   shcs: Record<string, ShcState>
   shcJobs: Record<string, ShcJob>
   nextShcJob: number
+  /** Queue spot node id -> the SHC that holds it (TT-R12). Exclusive; a spot is held from assignment to departure. */
+  queueClaims: Record<string, string>
   wtpPads: Record<string, WtpPadState>
   ascs: Record<string, AscState>
   ascJobs: Record<string, AscJob>
@@ -1060,6 +1067,7 @@ export function createInitialState(
     shcs: {},
     shcJobs: {},
     nextShcJob: 0,
+    queueClaims: {},
     wtpPads: {},
     ascs: {},
     ascJobs: {},
@@ -1221,7 +1229,7 @@ export function createInitialState(
         motion: [],
         plan: [],
       }
-      horizontal.perShc[shc.id] = { jobs: 0, emptyDistanceM: 0, loadedDistanceM: 0, reservationWaitS: 0 }
+      horizontal.perShc[shc.id] = { jobs: 0, emptyDistanceM: 0, loadedDistanceM: 0, reservationWaitS: 0, parkingReturns: 0, queueArrivals: 0 }
     }
     for (const s of config.sts) horizontal.stsGroundPositionWaitS[s.id] = 0
     for (const p of graph.pads) state.wtpPads[p.id] = { id: p.id, blockId: p.blockId, containerId: null, claimedBy: null }

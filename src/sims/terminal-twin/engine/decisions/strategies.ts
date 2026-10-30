@@ -89,6 +89,16 @@ export const strategies: StrategyRegistry = {
           return { jobId: job?.jobId ?? null }
         },
       },
+      'chained-nearest': {
+        description:
+          'Nearest open job by route length, and (engine side, TT-R12) after a delivery the SHC asks again at once and, with no job, waits at the nearest queue area while there is work, parking only when there is none.',
+        handler: (msg) => {
+          const job = [...msg.payload.jobs].sort(
+            (a, b) => a.distanceM - b.distanceM || a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1),
+          )[0]
+          return { jobId: job?.jobId ?? null }
+        },
+      },
     },
   },
   wtpPadSelection: {

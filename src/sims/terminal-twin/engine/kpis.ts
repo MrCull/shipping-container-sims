@@ -218,6 +218,10 @@ export interface HorizontalKpiReport {
       stateS: Record<ShcOperationalState, number>
       /** Custody changes at buffers: one per box picked up and one per box put down (TT-R11). */
       handovers: number
+      /** Drives back to the parking spot (TT-R12): fewer when SHCs chain jobs instead of parking. */
+      parkingReturns: number
+      /** Arrivals at a queue spot (TT-R12). */
+      queueArrivals: number
     }
   >
   /** STS seconds spent waiting for a free ground position (SHCs too slow). */
@@ -337,6 +341,8 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
           reservationWaitS: r3(k.reservationWaitS),
           stateS: zeroStateS(),
           handovers: 0,
+          parkingReturns: k.parkingReturns,
+          queueArrivals: k.queueArrivals,
         },
       ]),
     ),

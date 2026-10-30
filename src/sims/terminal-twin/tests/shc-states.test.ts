@@ -42,6 +42,8 @@ const EXPECTED: Record<ShcStatus, string> = {
   lowering: 'delivering',
   unlocking: 'delivering',
   clearing: 'delivering',
+  'queuing-for-pad': 'queuing-to-deliver',
+  'queuing-for-work': 'queuing-to-collect',
 }
 
 describe('SHC operational states', () => {

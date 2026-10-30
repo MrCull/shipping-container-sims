@@ -300,7 +300,9 @@
             "queuing-to-deliver": 0,
             "delivering": 784.708
           },
-          "handovers": 36
+          "handovers": 36,
+          "parkingReturns": 18,
+          "queueArrivals": 0
         },
         "SHC02": {
           "jobs": 6,
@@ -316,7 +318,9 @@
             "queuing-to-deliver": 0,
             "delivering": 257.801
           },
-          "handovers": 12
+          "handovers": 12,
+          "parkingReturns": 6,
+          "queueArrivals": 0
         },
         "SHC03": {
           "jobs": 0,
@@ -332,7 +336,9 @@
             "queuing-to-deliver": 0,
             "delivering": 0
           },
-          "handovers": 0
+          "handovers": 0,
+          "parkingReturns": 0,
+          "queueArrivals": 0
         }
       },
       "stsGroundPositionWaitS": {

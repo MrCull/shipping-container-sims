@@ -18,6 +18,7 @@ import { DEFAULT_CARGO, LINE_OWNER_PREFIX } from './lines'
 import {
   SCENARIO_SCHEMA_VERSION,
   type ApronLayout,
+  type QueueAreasConfig,
   type AscKinematics,
   type BlockConfig,
   type CargoConfig,
@@ -318,6 +319,12 @@ export class ScenarioBuilder {
   /** ASC kinematics. */
   ascKinematics(k: Partial<AscKinematics>): this {
     this.config.kinematics.asc = structuredClone({ ...(this.config.kinematics.asc ?? DEFAULT_ASC_KINEMATICS), ...k })
+    return this
+  }
+
+  /** SHC queue areas (TT-R12): spots per STS (empty SHCs wait for work) and per block (loaded SHCs wait for a pad). */
+  queueAreas(areas: QueueAreasConfig): this {
+    this.config.queueAreas = { ...areas }
     return this
   }
 
