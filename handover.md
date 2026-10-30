@@ -9,15 +9,15 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 |---|---|---|---|---|---|
 | #84 | R02 Fixed-width KPI strip | | n/a | wave 2 | merged |
 | #85 | R03 Keyboard camera | | n/a | wave 1 | merged |
-| #86 | R04 Scenario picker | | n/a | | todo |
-| #87 | R05 TTI research KB | | n/a | | todo |
+| #86 | R04 Scenario picker | | n/a | wave 4 | claimed |
+| #87 | R05 TTI research KB | | n/a | wave 4 | claimed |
 | #88 | R06 Yard no mixed 20/40 | | 0.13.0 | wave 1 | merged (ee888ee) |
 | #89 | R07 Vessel no 20 on 40 | #88 | 0.14.0 (merged as 0.18.0 tip) | wave 2 | merged |
 | #90 | R08 Maritime locations | | n/a | | todo |
 | #91 | R09 Hatch covers engine | | 0.15.0 | wave 1 | merged |
 | #92 | R10 Hatch covers 3D | #91 | n/a | | todo |
 | #93 | R11 SHC states and metrics | | n/a (KPI fields only) | wave 3 | merged |
-| #94 | R12 SHC queue areas, chaining | #93 | 0.16.0 | | todo |
+| #94 | R12 SHC queue areas, chaining | #93 | next minor | wave 4 | claimed |
 | #95 | R13 SHC pre-dispatch | #94, #91 | 0.17.0 | | todo |
 | #96 | R14 Paired dispatch | #94 | n/a | | todo |
 | #97 | R15 Truck appointments | | 0.18.0 | wave 1 | merged |
