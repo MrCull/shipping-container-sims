@@ -44,5 +44,16 @@ describe('dashboard query', () => {
     const data = (await call({ op: 'query', kind: 'dashboard' })).result as DashboardData
     expect(data.yard).toEqual([])
     expect(data.timeline.vessels).toHaveLength(2)
+    expect(data.landside).toBeNull()
+  })
+
+  it('carries the landside report for the truck turnaround summary (TT-R18)', async () => {
+    const fixture = 'truck-holding-overflow'
+    const call = await hostRun(fixture)
+    const sim = createSimulation(fixtures[fixture])
+    sim.runUntil()
+    const data = (await call({ op: 'query', kind: 'dashboard' })).result as DashboardData
+    expect(data.landside).toEqual(sim.kpiReport().landside)
+    expect(data.series.series['landside.total-turnaround-s']).toBeDefined()
   })
 })

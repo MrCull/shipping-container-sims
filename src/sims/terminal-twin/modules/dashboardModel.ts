@@ -4,7 +4,7 @@
  * option building lives in `dashboardOptions.ts`, which is the only code that
  * touches the (lazy) chart library.
  */
-import type { KpiSeries, KpiSeriesReport, KpiUnit } from '../engine'
+import type { KpiSeries, KpiSeriesReport, KpiUnit, LandsideKpiReport } from '../engine'
 import type { MessageKey } from '../i18n/messages'
 import { MAX_SERIES } from './dashboardPalette'
 
@@ -60,6 +60,12 @@ export const KPI_GROUPS: readonly KpiGroup[] = [
       'landside.stall-wait-s',
       'landside.trucks-in',
       'landside.trucks-out',
+      'landside.gate-processing-s',
+      'landside.internal-drive-s',
+      'landside.total-turnaround-s',
+      'landside.road-trucks',
+      'landside.holding-utilisation-pct',
+      'landside.appointments-delayed',
     ],
   },
   {
@@ -166,4 +172,54 @@ export function blockFillPct(
   if (capacity <= 0) return 0
   const cells = slots.reduce((n, s) => n + s.span, 0)
   return Math.round((100 * cells / capacity) * 1000) / 1000
+}
+
+// ------------------------------------------------------------ landside summary
+
+export interface LandsideSummaryRow {
+  /** Catalogue key suffix: `dashboard.landside.<id>`. */
+  id: string
+  value: number
+  unit: KpiUnit
+}
+
+/**
+ * The whole-run landside numbers as table rows (TT-R18): the series charts show them over time, this table adds the
+ * ones that have no per-hour series (rejected appointments) and the maxima. Rows for holding and appointments exist
+ * only when the scenario has them.
+ */
+export function buildLandsideSummary(k: LandsideKpiReport | null | undefined): LandsideSummaryRow[] {
+  if (!k) return []
+  const rows: LandsideSummaryRow[] = [
+    { id: 'trucksOut', value: k.trucksOut, unit: 'count' },
+    { id: 'gateQueueMax', value: k.gateQueueMax, unit: 'count' },
+    { id: 'gateWaitMean', value: k.gateWaitS.mean, unit: 's' },
+    { id: 'gateWaitMax', value: k.gateWaitS.max, unit: 's' },
+    { id: 'gateProcessing', value: k.gateProcessingS.mean, unit: 's' },
+    { id: 'internalDrive', value: k.internalDriveS.mean, unit: 's' },
+    { id: 'stallWaitMean', value: k.stallWaitS.mean, unit: 's' },
+    { id: 'stallWaitMax', value: k.stallWaitS.max, unit: 's' },
+    { id: 'turnaroundMean', value: k.totalTurnaroundS.mean, unit: 's' },
+    { id: 'turnaroundMax', value: k.totalTurnaroundS.max, unit: 's' },
+    { id: 'roadMean', value: k.road.meanTrucks, unit: 'ratio' },
+    { id: 'roadMax', value: k.road.maxTrucks, unit: 'count' },
+  ]
+  if (k.holding)
+    rows.push(
+      { id: 'holdingUtilisation', value: k.holding.utilisationPct, unit: 'pct' },
+      { id: 'holdingMax', value: k.holding.maxInUse, unit: 'count' },
+      { id: 'heldOutside', value: k.holding.heldOutside, unit: 'count' },
+    )
+  if (k.appointments)
+    rows.push(
+      { id: 'appointmentsBooked', value: k.appointments.booked, unit: 'count' },
+      { id: 'appointmentsRejected', value: k.appointments.rejected, unit: 'count' },
+      { id: 'appointmentsDelayed', value: k.appointments.delayed, unit: 'count' },
+    )
+  return rows
+}
+
+/** Catalogue key of a landside summary row. */
+export function landsideLabelKey(id: string): MessageKey {
+  return `dashboard.landside.${id}` as MessageKey
 }

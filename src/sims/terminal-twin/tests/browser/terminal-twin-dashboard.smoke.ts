@@ -175,3 +175,25 @@ test('the final report opens as the dashboard report tab when the scenario ends 
   expect((await page.evaluate(() => window.__tt!.dashboard())).open).toBe(true)
   expect(errors).toEqual([])
 })
+
+test('the Landside group charts the truck turnaround metrics and its summary table matches the engine report (TT-R18)', async ({ page }) => {
+  const errors = collectErrors(page)
+  await open(page, 'truck-holding-overflow')
+  await page.evaluate(() => window.__tt!.runUntil())
+  await showCharts(page, 'landside')
+  await expect(page.getByTestId('tt-dashboard-landside')).toBeVisible()
+  await page.waitForFunction(() => !!window.__tt!.dashboard().rendered?.landside)
+  for (const id of ['landside.gate-processing-s', 'landside.internal-drive-s', 'landside.total-turnaround-s', 'landside.road-trucks', 'landside.holding-utilisation-pct'])
+    await expect(page.getByTestId(`tt-chart-${id}`)).toBeVisible()
+  const { rows, report } = await page.evaluate(async () => {
+    const tt = window.__tt!
+    const report = await tt.query<{ landside: { totalTurnaroundS: { mean: number }; road: { maxTrucks: number }; holding: { heldOutside: number } } }>('kpis')
+    return { rows: Object.fromEntries(tt.dashboard().rendered!.landside!.map((r) => [r.id, r.value])), report }
+  })
+  expect(rows.turnaroundMean).toBe(report.landside.totalTurnaroundS.mean)
+  expect(rows.roadMax).toBe(report.landside.road.maxTrucks)
+  expect(rows.heldOutside).toBe(report.landside.holding.heldOutside)
+  await expect(page.locator('[data-testid="tt-dashboard-landside"] [data-metric="turnaroundMean"]')).toContainText(/\d/)
+  await page.screenshot({ path: '.screenshots/tt-r18-landside-dashboard.png' })
+  expect(errors).toEqual([])
+})

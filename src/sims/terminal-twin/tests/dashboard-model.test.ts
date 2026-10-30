@@ -14,6 +14,8 @@ import {
   buildYardHeatmap,
   downsampleEvery,
   groupsWithData,
+  buildLandsideSummary,
+  landsideLabelKey,
 } from '../modules/dashboardModel'
 
 function run(name: string, until?: number) {
@@ -102,5 +104,49 @@ describe('KPI coverage', () => {
       expect(grouped.has(def.id), def.id).toBe(true)
       expect(catalogues.en[kpiLabelKey(def.id)], def.id).toBeTruthy()
     }
+  })
+})
+
+describe('landside group and summary (TT-R18)', () => {
+  const sim = run('truck-holding-overflow')
+  const k = sim.kpiReport().landside!
+
+  it('offers the landside group with a chart for every truck turnaround metric', () => {
+    const series = sim.kpiSeries()
+    expect(groupsWithData(series)).toContain('landside')
+    const ids = buildGroupCharts(series, 'landside', 'hour').map((c) => c.kpiId)
+    for (const id of [
+      'landside.gate-queue',
+      'landside.gate-wait-s',
+      'landside.gate-processing-s',
+      'landside.internal-drive-s',
+      'landside.stall-wait-s',
+      'landside.total-turnaround-s',
+      'landside.road-trucks',
+      'landside.holding-utilisation-pct',
+    ])
+      expect(ids, id).toContain(id)
+  })
+
+  it('lists the whole-run numbers of the KPI report, with holding rows only when holding is configured', () => {
+    const rows = Object.fromEntries(buildLandsideSummary(k).map((r) => [r.id, r]))
+    expect(rows.turnaroundMean.value).toBe(k.totalTurnaroundS.mean)
+    expect(rows.gateProcessing.value).toBe(k.gateProcessingS.mean)
+    expect(rows.internalDrive.value).toBe(k.internalDriveS.mean)
+    expect(rows.roadMax.value).toBe(k.road.maxTrucks)
+    expect(rows.holdingUtilisation.value).toBe(k.holding!.utilisationPct)
+    expect(rows.heldOutside.value).toBe(6)
+    expect(rows.appointmentsRejected).toBeUndefined()
+    const plain = buildLandsideSummary(run('truck-gate-queue').kpiReport().landside)
+    expect(plain.map((r) => r.id)).not.toContain('holdingUtilisation')
+    const appts = buildLandsideSummary(run('truck-appointment-windows').kpiReport().landside)
+    expect(appts.find((r) => r.id === 'appointmentsRejected')?.value).toBe(12)
+    expect(appts.find((r) => r.id === 'appointmentsDelayed')?.value).toBe(2)
+    expect(buildLandsideSummary(null)).toEqual([])
+  })
+
+  it('has a catalogue label for every row', () => {
+    for (const r of buildLandsideSummary(k)) expect(catalogues.en[landsideLabelKey(r.id)], r.id).toBeTruthy()
+    for (const id of ['appointmentsBooked', 'appointmentsRejected', 'appointmentsDelayed']) expect(catalogues.en[landsideLabelKey(id)], id).toBeTruthy()
   })
 })

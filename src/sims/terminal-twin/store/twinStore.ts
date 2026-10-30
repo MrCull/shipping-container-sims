@@ -50,6 +50,8 @@ export interface DashboardRendered {
   charts: { kpiId: string; lines: string[]; points: number; zoom: { start: number; end: number } | null; drawn: boolean }[]
   heatmap: { blocks: string[]; hours: number[]; values: Record<string, (number | null)[]>; liveFill: Record<string, number> } | null
   gantt: { rows: string[]; bars: { row: string; phase: string; startS: number; endS: number }[] } | null
+  /** The landside summary table rows (TT-R18), only while the Landside group is shown. */
+  landside: { id: string; value: number; unit: string }[] | null
 }
 
 export interface ScenarioChoice {

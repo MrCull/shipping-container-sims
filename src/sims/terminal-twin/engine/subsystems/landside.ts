@@ -623,6 +623,27 @@ function pumpStalls(ctx: EngineContext): void {
 /** True when the scenario has holding positions: the gate then admits trucks against stall and holding capacity. */
 const holdingOn = (ctx: EngineContext): boolean => Object.keys(landside(ctx.state).holding).length > 0
 
+/** TT-R18: close the holding-use integral up to now; call before the occupied count changes. */
+function touchHolding(state: SimState): void {
+  const k = counters(state)
+  k.holdBusyS += holdingInUse(state) * (state.now - k.holdLastT)
+  k.holdLastT = state.now
+}
+
+/** TT-R18: a truck starts (`+1`) or ends (`-1`) a drive on the internal roads; `driveS` accumulates its inbound driving. */
+function driveStep(state: SimState, truck: TruckState, delta: 1 | -1, inbound: boolean): void {
+  const k = counters(state)
+  k.roadBusyS += k.roadNow * (state.now - k.roadLastT)
+  k.roadLastT = state.now
+  k.roadNow += delta
+  k.roadMax = Math.max(k.roadMax, k.roadNow)
+  if (delta === 1) truck.driveSince = state.now
+  else {
+    if (inbound && truck.driveSince !== null) truck.driveS += state.now - truck.driveSince
+    truck.driveSince = null
+  }
+}
+
 const holdingInUse = (state: SimState): number => Object.values(landside(state).holding).filter((h) => h.truckId !== null).length
 
 /**
@@ -641,6 +662,7 @@ function admit(ctx: EngineContext, truck: TruckState): boolean {
   }
   const free = Object.values(ls.holding).find((h) => h.truckId === null)
   if (free) {
+    touchHolding(state)
     free.truckId = truck.id
     truck.holdingId = free.id
     const k = counters(state)
@@ -912,6 +934,9 @@ export const landsideReactors: ReactorMap = {
       gateStartedAt: null,
       gateInAt: null,
       stallAssignedAt: null,
+      booked: e.payload.appointmentId !== undefined,
+      driveS: 0,
+      driveSince: null,
       atStallAt: null,
       serviceStartedAt: null,
       interchangeDoneAt: null,
@@ -965,6 +990,9 @@ export const landsideReactors: ReactorMap = {
 
   TruckGateStarted: (e, ctx) => {
     const truck = ctx.state.trucks[e.payload.truckId]
+    const book = ctx.state.landside?.appointments
+    // TT-R18: a booked truck is delayed when it passes the gate after the end of its window
+    if (truck.booked && book && e.t >= (Math.floor(truck.arrivedAt / book.windowS) + 1) * book.windowS) counters(ctx.state).appointmentsDelayed++
     scheduleNext(ctx, truck)
     pumpGate(ctx) // another lane may be free for the next truck
   },
@@ -975,7 +1003,10 @@ export const landsideReactors: ReactorMap = {
     const truck = advance(ctx, e)
     truck.gateInAt = e.t
     landside(state).inLanes[e.payload.laneId].processed++
-    counters(state).trucksIn++
+    const kIn = counters(state)
+    kIn.trucksIn++
+    kIn.gateProcSumS += e.payload.processingS
+    kIn.gateProcMaxS = Math.max(kIn.gateProcMaxS, e.payload.processingS)
     const ls = landside(state)
     if (holdingOn(ctx)) {
       // TT-R16: the stall was reserved before the gate (go to it) or a holding position was (go and wait there)
@@ -1002,7 +1033,8 @@ export const landsideReactors: ReactorMap = {
   /** The truck leaves the kiosk for its holding position: the lane is free for the next truck. */
   TruckRoutingToHolding: (e, ctx) => {
     const { state } = ctx
-    advance(ctx, e)
+    const truck = advance(ctx, e)
+    driveStep(state, truck, 1, true)
     landside(state).inLanes[e.payload.laneId].truckId = null
     pumpGate(ctx)
   },
@@ -1010,6 +1042,7 @@ export const landsideReactors: ReactorMap = {
   /** The truck stands in its holding position (off every road) and waits for a stall. */
   TruckAtHolding: (e, ctx) => {
     const truck = advance(ctx, e)
+    driveStep(ctx.state, truck, -1, true)
     truck.holdingAt = e.t
     landside(ctx.state).stallWaiting.push(truck.id)
     pumpStalls(ctx)
@@ -1020,8 +1053,10 @@ export const landsideReactors: ReactorMap = {
     const { state } = ctx
     const truck = advance(ctx, e)
     const ls = landside(state)
+    driveStep(state, truck, 1, true)
     if (ls.inLanes[e.payload.laneId].truckId === truck.id) ls.inLanes[e.payload.laneId].truckId = null
     if (truck.holdingId !== null) {
+      touchHolding(state)
       // driving out of the holding position frees it for the next admission
       ls.holding[truck.holdingId].truckId = null
       truck.holdingId = null
@@ -1031,6 +1066,7 @@ export const landsideReactors: ReactorMap = {
 
   TruckAtStall: (e, ctx) => {
     const truck = advance(ctx, e)
+    driveStep(ctx.state, truck, -1, true)
     truck.atStallAt = e.t
     startInterchange(ctx, truck)
   },
@@ -1074,6 +1110,7 @@ export const landsideReactors: ReactorMap = {
   TruckRoutingToExit: (e, ctx) => {
     const { state } = ctx
     const truck = advance(ctx, e)
+    driveStep(state, truck, 1, false)
     const stall = landside(state).stalls[e.payload.stallId]
     if (stall.truckId === truck.id) stall.truckId = null
     pumpStalls(ctx)
@@ -1082,9 +1119,15 @@ export const landsideReactors: ReactorMap = {
 
   TruckGateOut: (e, ctx) => {
     const { state } = ctx
-    advance(ctx, e)
+    const truck = advance(ctx, e)
+    driveStep(state, truck, -1, false)
     const k = counters(state)
     k.trucksOut++
+    k.driveSumS += truck.driveS
+    k.driveMaxS = Math.max(k.driveMaxS, truck.driveS)
+    const totalS = e.t - truck.arrivedAt
+    k.totalTurnSumS += totalS
+    k.totalTurnMaxS = Math.max(k.totalTurnMaxS, totalS)
     k.turnSumS += e.payload.turnS
     k.turnMaxS = Math.max(k.turnMaxS, e.payload.turnS)
   },

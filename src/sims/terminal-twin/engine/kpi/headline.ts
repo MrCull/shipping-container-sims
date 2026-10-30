@@ -22,6 +22,8 @@ export interface HeadlineKpis {
   yardFillPct: number | null
   /** Mean WTP pad dwell over the blocks (s). */
   wtpDwellS: number | null
+  /** Mean truck turnaround, arrival at the gate to gate-out (s); null without a landside or before a truck has left. */
+  truckTurnaroundS: number | null
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000
@@ -49,6 +51,7 @@ export function headlineKpis(series: KpiSeriesReport, report: KpiReport): Headli
     ascUtilisationPct: mean(totals(series, 'asc.utilisation-pct')),
     yardFillPct: mean(totals(series, 'yard.fill-pct')),
     wtpDwellS: mean(totals(series, 'wtp.dwell-s')),
+    truckTurnaroundS: report.landside && report.landside.trucksOut > 0 ? report.landside.totalTurnaroundS.mean : null,
   }
 }
 

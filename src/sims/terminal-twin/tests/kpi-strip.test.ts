@@ -14,6 +14,7 @@ const headline = (over: Partial<HeadlineKpis> = {}): HeadlineKpis => ({
   ascUtilisationPct: null,
   yardFillPct: null,
   wtpDwellS: null,
+  truckTurnaroundS: null,
   ...over,
 })
 

@@ -382,6 +382,7 @@ export function createEngineHost() {
           series: s.kpiSeries(),
           timeline: buildTimeline(s.eventLog(), s.now),
           yard: s.query.yardBlocks().map((b) => ({ id: b.id, fillPct: blockFillPct(b, s.query.yardSlots(b.id)) })),
+          landside: s.kpiReport().landside ?? null,
         }
         return data
       }

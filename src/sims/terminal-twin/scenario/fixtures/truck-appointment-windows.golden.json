@@ -369,6 +369,22 @@
         "mean": 104.49,
         "max": 1077.115
       },
+      "gateProcessingS": {
+        "mean": 45,
+        "max": 45
+      },
+      "internalDriveS": {
+        "mean": 29.309,
+        "max": 29.979
+      },
+      "totalTurnaroundS": {
+        "mean": 563.923,
+        "max": 1386.526
+      },
+      "road": {
+        "meanTrucks": 0.457,
+        "maxTrucks": 3
+      },
       "serviceS": 195.016,
       "transactions": {
         "dropExport": 9,
@@ -386,7 +402,8 @@
         "windows": 4,
         "booked": 36,
         "rejected": 12,
-        "maxBookedPerWindow": 12
+        "maxBookedPerWindow": 12,
+        "delayed": 2
       }
     },
     "workPackages": {
