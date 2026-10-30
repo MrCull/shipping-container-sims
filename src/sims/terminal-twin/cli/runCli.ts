@@ -59,6 +59,7 @@ export const USAGE = `Usage: pnpm run tt:run (--fixture <name|file.json> | --pre
   --subsystem <name>=<mode>  Subsystem mode (repeatable): real | instant | off for quay, berth, yard, shc, asc, landside.
                          instant keeps the events with zero durations; off removes the subsystem. Impossible
                          combinations (e.g. yard=off with asc=real) exit with code 2
+  --ordering <name>      Vessel Planning work order inside a package: as-today (default) | pod-weight
   --no-fail-fast         Keep running after an invariant violation
   --end <cond>           End condition (repeatable; the first one met ends the run): moves:<n> | vessels:<n> | time:<s>
   --out <file>           Write the run summary JSON
@@ -319,6 +320,7 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
         handlers: { type: 'string', default: 'default' },
         'no-fail-fast': { type: 'boolean', default: false },
         subsystem: { type: 'string', multiple: true, default: [] },
+        ordering: { type: 'string' },
         out: { type: 'string' },
         events: { type: 'string' },
         'async-mode': { type: 'string' },
@@ -363,6 +365,12 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
       config = { ...config, subsystems: subsystemsFromArgs(config.subsystems, values.subsystem) }
       const problems = validateSubsystemModes(config)
       if (problems.length > 0) throw new UsageError(problems.map((p) => t(p.key, p.params)).join('; '))
+    }
+    if (values.ordering !== undefined) {
+      if (start) throw new UsageError('--from-snapshot takes the ordering from the snapshot: drop --ordering')
+      if (values.ordering !== 'as-today' && values.ordering !== 'pod-weight')
+        throw new UsageError(`Bad --ordering "${values.ordering}" (as-today | pod-weight)`)
+      config = { ...config, vesselPlanning: { ...config.vesselPlanning, ordering: values.ordering } }
     }
     const seed = values.seed === undefined ? undefined : Number(values.seed)
     if (seed !== undefined && !Number.isInteger(seed)) throw new UsageError(`Bad --seed "${values.seed}"`)

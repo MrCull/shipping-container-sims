@@ -285,6 +285,14 @@ export interface WeightClassBands {
   mediumMaxKg: number
 }
 
+/** Work order within a package: `as-today` (stack geometry only) or `pod-weight` (POD- and weight-aware soft preferences). */
+export type VesselOrdering = 'as-today' | 'pod-weight'
+
+export interface VesselPlanningConfig {
+  /** Default `as-today`. */
+  ordering?: VesselOrdering
+}
+
 /**
  * Stored container properties (spec #106). Every field optional; the defaults in `scenario/containerProps.ts`
  * apply. All draws come from their own RNG stream (keyed by seed and container id), so adding or changing these
@@ -437,6 +445,8 @@ export interface ScenarioConfig {
   robFill?: number
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
+  /** Vessel Planning options (spec #106); optional. */
+  vesselPlanning?: VesselPlanningConfig
   /**
    * Empty allocation options (spec #106); optional. `matchLine: true` restricts the `iso-type-best-position`
    * strategy to empties of the requesting line (default false: any line's empty of the right ISO type may go).

@@ -271,3 +271,5 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Content status:** EMPTY or LADEN, derived from the stored `full` flag (`contentStatus`). *Avoid:* "load status".
 - **Dwell:** seconds a box has been on the terminal: from its first terminal custody (or its pre-aged `yardSince`) to its departure from terminal custody, else to now (`dwellS`). The KPI report's `dwell` groups it by transit direction (count, boxes that have left, mean, max). Not the same as the transshipment or import dwell (`dwellS` on a box, the *planned* yard time).
 
+
+- **Vessel ordering (`pod-weight`):** the opt-in work order inside a package (`vesselPlanning.ordering`): discharge stack by stack in yard-group order, load bottom-up with later PODs and heavier boxes first. POD and weight are soft preferences; stacking order is the only hard rule. A *broken ordering preference* is a box with a later POD, or a heavier weight class, than the box under it (or a yard group split in the discharge sequence); counted in `kpis.ordering`.
