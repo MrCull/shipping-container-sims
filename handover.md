@@ -13,7 +13,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 | #87 | R05 TTI research KB | | n/a | wave 4 | merged |
 | #88 | R06 Yard no mixed 20/40 | | 0.13.0 | wave 1 | merged (ee888ee) |
 | #89 | R07 Vessel no 20 on 40 | #88 | 0.14.0 (merged as 0.18.0 tip) | wave 2 | merged |
-| #90 | R08 Maritime locations | | n/a | wave 5 | claimed |
+| #90 | R08 Maritime locations | | n/a | wave 5 | merged |
 | #91 | R09 Hatch covers engine | | 0.15.0 | wave 1 | merged |
 | #92 | R10 Hatch covers 3D | #91 | n/a | wave 5 | claimed |
 | #93 | R11 SHC states and metrics | | n/a (KPI fields only) | wave 3 | merged |
@@ -24,7 +24,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 | #98 | R16 Stall admission, holding | #97 | 0.19.0 | wave 2 | merged |
 | #99 | R17 ASC pre-retrieval | #98 | 0.20.0 | | todo |
 | #100 | R18 Truck metrics | #98 | n/a (KPI fields only) | wave 3 | merged |
-| #101 | R19 Reefers | #87, #88 | 0.21.0 | | todo |
+| #101 | R19 Reefers | #87, #88 | next minor | wave 5 | claimed |
 
 ## Notes
 
