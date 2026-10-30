@@ -31,6 +31,27 @@ export function scenarioStats(config: ScenarioConfig): ScenarioStats {
   }
 }
 
+/** Productive moves per STS per hour assumed by the run-length estimate (a typical gross crane rate). */
+const ESTIMATE_MOVES_PER_STS_HOUR = 25
+/** Mooring time before a berthed vessel starts working (s). */
+const ESTIMATE_MOORING_S = 1800
+
+/**
+ * Run length shown on a scenario card (s): the stated end time when the scenario has one, else an estimate of when
+ * the last vessel is done (its arrival, mooring, then its moves at the assumed rate over its crane limit).
+ */
+export function scenarioDurationS(config: ScenarioConfig): number {
+  const stated = config.endConditions.simDurationS
+  if (stated !== undefined) return stated
+  let end = 0
+  for (const v of config.vessels) {
+    const moves = v.discharge + v.load + v.transshipment
+    const workS = (moves / (Math.max(1, v.maxSts) * ESTIMATE_MOVES_PER_STS_HOUR)) * 3600
+    end = Math.max(end, v.arrivalS + ESTIMATE_MOORING_S + workS)
+  }
+  return end
+}
+
 export interface ChipSpec {
   id: 'blocks' | 'vessels' | 'sts' | 'shcs' | 'trucks' | 'fill'
   key: MessageKey

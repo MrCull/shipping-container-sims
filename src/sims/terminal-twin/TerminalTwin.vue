@@ -143,16 +143,18 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
+<!-- The skin tokens (unscoped: the FPS chip is teleported out of this component). -->
+<style src="./skin.css"></style>
+
 <style scoped>
 .terminal-twin {
-  --tt-font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 52px);
-  font-family: var(--font-body);
-  background: var(--color-bg);
+  font-family: var(--tt-font);
+  background: var(--tt-bg);
 }
 
 .scene {
@@ -184,9 +186,11 @@ onBeforeUnmount(() => {
   z-index: 5;
   padding: 0.5rem 1rem;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: rgba(17, 24, 39, 0.9);
-  color: var(--color-text);
+  border: 1px solid var(--tt-border);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  color: var(--tt-text);
   font-size: 0.9rem;
 }
 
@@ -195,16 +199,16 @@ onBeforeUnmount(() => {
 }
 
 .notice.busy {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .banner {
   bottom: 4.6rem;
-  border-color: var(--color-success);
+  border-color: var(--tt-success);
 }
 
 .banner-complete {
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
+  box-shadow: var(--tt-shadow);
   animation: tt-toast-in 0.4s ease-out;
 }
 
@@ -218,9 +222,11 @@ onBeforeUnmount(() => {
   z-index: 4;
   padding: 0.3rem 0.75rem;
   border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: rgba(17, 24, 39, 0.82);
-  color: var(--color-text-muted);
+  border: 1px solid var(--tt-border);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  color: var(--tt-text-muted);
   font-size: 0.82rem;
   pointer-events: none;
 }
@@ -233,9 +239,11 @@ onBeforeUnmount(() => {
   z-index: 6;
   padding: 0.4rem 0.9rem;
   border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: rgba(17, 24, 39, 0.92);
-  color: var(--color-text);
+  border: 1px solid var(--tt-border);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  color: var(--tt-text);
   font-size: 0.82rem;
   animation: tt-toast-in 0.15s ease-out;
 }

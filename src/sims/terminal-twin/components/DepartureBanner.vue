@@ -38,11 +38,13 @@ const text = computed(() => {
   pointer-events: none;
   padding: 0.45rem 1.2rem;
   border-radius: 999px;
-  border: 1px solid var(--color-accent);
-  background: rgba(17, 24, 39, 0.88);
-  color: var(--color-text);
+  border: 1px solid var(--tt-accent);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  color: var(--tt-text);
   font-size: 0.9rem;
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
+  box-shadow: var(--tt-shadow);
   animation: tt-banner 3.5s ease-in-out forwards;
 }
 
