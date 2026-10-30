@@ -33,6 +33,7 @@ import {
   landsideRoute,
   queueSlotZ,
   type GateLaneLayout,
+  type HoldingLayout,
   type LandsideGraph,
 } from '../landsideGraph'
 import { earliestStart, mergeWindows, reserve, type WindowSpec } from '../reservations'
@@ -58,6 +59,7 @@ import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import type { ContainerSize, LandsideConfig, TruckTransactionKind } from '../../scenario/types'
 import { DEFAULT_LANDSIDE } from '../../scenario/builder'
 import { vesselSlotId } from '../../scenario/vesselClasses'
+import { appointmentWindowS, planAppointments } from '../appointments'
 import { maybeDispatchAsc, pumpAllocation } from './asc'
 import { TripBuilder, waypoints } from './shc'
 
@@ -65,6 +67,8 @@ type PlannedType = TruckPlannedEvent['type']
 
 const STATUS_AFTER: Record<PlannedType, TruckStatus | null> = {
   TruckGateIn: 'waiting-for-stall',
+  TruckRoutingToHolding: 'routing-to-holding',
+  TruckAtHolding: 'holding',
   TruckRoutingToStall: 'routing-to-stall',
   TruckAtStall: 'at-stall',
   TruckRoutingToExit: 'routing-to-exit',
@@ -372,6 +376,12 @@ function scheduleNext(ctx: EngineContext, truck: TruckState): void {
     case 'TruckGateIn':
       ctx.schedule(next.type, next.at, subjects, { ...base, laneId: truck.laneId as string, processingS: next.processingS ?? 0 })
       break
+    case 'TruckRoutingToHolding':
+      ctx.schedule(next.type, next.at, subjects, { ...base, holdingId: truck.holdingId as string, laneId: truck.laneId as string })
+      break
+    case 'TruckAtHolding':
+      ctx.schedule(next.type, next.at, subjects, { ...base, holdingId: truck.holdingId as string })
+      break
     case 'TruckRoutingToStall':
       ctx.schedule(next.type, next.at, subjects, { ...base, stallId: truck.stallId as string, laneId: truck.laneId as string })
       break
@@ -436,6 +446,11 @@ function pumpGate(ctx: EngineContext): void {
   const graph = graphOf(ctx)
   if (!graph.inLanes.some((l) => ls.inLanes[l.id].truckId === null)) return
   const truck = state.trucks[ls.queue[0]]
+  if (holdingOn(ctx)) {
+    // TT-R16: a truck passes the gate only with a stall or a holding position reserved; one decision at a time
+    if (ls.stallAsking !== null) return
+    if (truck.stallId === null && truck.holdingId === null && !admit(ctx, truck)) return
+  }
   ls.laneAsking = truck.id
   ctx.requestDecision(
     'gateLaneAssignment',
@@ -550,6 +565,40 @@ function legalBlocks(ctx: EngineContext, truck: TruckState): Set<string> | null 
   return blocks.size > 0 ? blocks : null
 }
 
+/** Ask transferStallSelection for `truck` (one request at a time): the stalls it may use, from where it stands now. */
+function askStall(ctx: EngineContext, truck: TruckState): void {
+  const { state } = ctx
+  const ls = landside(state)
+  const blocks = legalBlocks(ctx, truck)
+  const blockLoad: Record<string, number> = Object.fromEntries(blockSpecs(ctx.config).map((b) => [b.id, 0]))
+  for (const st of Object.values(ls.stalls)) if (st.truckId !== null) blockLoad[st.blockId]++
+  for (const other of ls.stallWaiting.includes(truck.id) ? ls.stallWaiting : [...ls.stallWaiting, truck.id]) {
+    const b = legalBlocks(ctx, state.trucks[other])
+    if (b !== null) for (const x of b) blockLoad[x]++
+  }
+  ls.stallAsking = truck.id
+  ctx.requestDecision(
+    'transferStallSelection',
+    {
+      truckId: truck.id,
+      transaction: truck.transaction,
+      legs: truck.legs.map((l) => {
+        const box = state.containers[l.containerId]
+        return {
+          kind: l.kind,
+          purpose: l.purpose,
+          containerId: l.containerId,
+          size: box.size,
+          blockId: l.kind === 'pick' && box.custody.kind === 'yardSlot' ? blockOfSlot(box.custody.id) : null,
+        }
+      }),
+      stalls: stallOptions(ctx, truck.nodeId).filter((o) => blocks === null || blocks.has(o.blockId)),
+      blockLoad,
+    },
+    { equipment: [truck.id] },
+  )
+}
+
 /**
  * Ask transferStallSelection for the first waiting truck that has a free stall it may use (one request at a
  * time). A truck whose block has no free stall does not hold up the trucks behind it.
@@ -564,36 +613,48 @@ function pumpStalls(ctx: EngineContext): void {
     const blocks = legalBlocks(ctx, truck)
     const legal = graph.stalls.filter((s) => (blocks === null || blocks.has(s.blockId)))
     if (!legal.some((s) => ls.stalls[s.id].truckId === null)) continue
-    const lane = graph.inLanes.find((l) => l.id === truck.laneId) as GateLaneLayout
-    const blockLoad: Record<string, number> = Object.fromEntries(blockSpecs(ctx.config).map((b) => [b.id, 0]))
-    for (const st of Object.values(ls.stalls)) if (st.truckId !== null) blockLoad[st.blockId]++
-    for (const other of ls.stallWaiting) {
-      const b = legalBlocks(ctx, state.trucks[other])
-      if (b !== null) for (const x of b) blockLoad[x]++
-    }
-    ls.stallAsking = truck.id
-    ctx.requestDecision(
-      'transferStallSelection',
-      {
-        truckId: truck.id,
-        transaction: truck.transaction,
-        legs: truck.legs.map((l) => {
-          const box = state.containers[l.containerId]
-          return {
-            kind: l.kind,
-            purpose: l.purpose,
-            containerId: l.containerId,
-            size: box.size,
-            blockId: l.kind === 'pick' && box.custody.kind === 'yardSlot' ? blockOfSlot(box.custody.id) : null,
-          }
-        }),
-        stalls: stallOptions(ctx, lane.kioskNode).filter((o) => blocks === null || blocks.has(o.blockId)),
-        blockLoad,
-      },
-      { equipment: [truck.id] },
-    )
+    askStall(ctx, truck)
     return
   }
+}
+
+// ── stall admission and holding (TT-R16) ────────────────────────────────────
+
+/** True when the scenario has holding positions: the gate then admits trucks against stall and holding capacity. */
+const holdingOn = (ctx: EngineContext): boolean => Object.keys(landside(ctx.state).holding).length > 0
+
+const holdingInUse = (state: SimState): number => Object.values(landside(state).holding).filter((h) => h.truckId !== null).length
+
+/**
+ * Admission of the head of the gate queue (called with a free inbound lane). A stall that can take it is reserved first
+ * (the transferStallSelection decision, answered later: returns false and the reply re-runs the gate); with none free a
+ * free holding position is reserved (true: the truck may go through); with holding full the truck stays outside the gate.
+ */
+function admit(ctx: EngineContext, truck: TruckState): boolean {
+  const { state } = ctx
+  const ls = landside(state)
+  const graph = graphOf(ctx)
+  const blocks = legalBlocks(ctx, truck)
+  if (graph.stalls.some((s) => (blocks === null || blocks.has(s.blockId)) && ls.stalls[s.id].truckId === null)) {
+    askStall(ctx, truck)
+    return false
+  }
+  const free = Object.values(ls.holding).find((h) => h.truckId === null)
+  if (free) {
+    free.truckId = truck.id
+    truck.holdingId = free.id
+    const k = counters(state)
+    k.admittedToHolding++
+    k.holdingMax = Math.max(k.holdingMax, holdingInUse(state))
+    ctx.schedule('TruckHoldingAssigned', state.now, { equipment: [truck.id] }, { truckId: truck.id, holdingId: free.id, holdingInUse: holdingInUse(state) })
+    return true
+  }
+  if (!truck.heldOutside) {
+    truck.heldOutside = true
+    counters(state).heldOutside++
+    ctx.schedule('TruckHeldOutside', state.now, { equipment: [truck.id] }, { truckId: truck.id, queueLength: ls.queue.length })
+  }
+  return false
 }
 
 function resolveStall(ctx: EngineContext, truckId: string, stallId: string | null): void {
@@ -601,25 +662,49 @@ function resolveStall(ctx: EngineContext, truckId: string, stallId: string | nul
   const ls = landside(state)
   ls.stallAsking = null
   if (stallId === null) return
-  const graph = graphOf(ctx)
   const stall = ls.stalls[stallId]
   if (!stall) throw new Error(`transferStallSelection handler returned ${stallId}, which is not a transfer stall`)
   if (stall.truckId !== null) throw new Error(`transferStallSelection handler returned ${stallId} for ${truckId}, but ${stall.truckId} holds it`)
-  if (!ls.stallWaiting.includes(truckId)) {
+  const truck = state.trucks[truckId]
+  const admitting = holdingOn(ctx) && truck?.status === 'queued' && ls.queue[0] === truckId
+  if (!admitting && !ls.stallWaiting.includes(truckId)) {
     pumpStalls(ctx)
     return
   }
-  const truck = state.trucks[truckId]
   const allowed = legalBlocks(ctx, truck)
   if (allowed !== null && !allowed.has(stall.blockId))
     throw new Error(`transferStallSelection handler returned ${stallId} for ${truckId}, but its box is in ${[...allowed].join(', ')} (an ASC only serves the stalls of its own block)`)
-  ls.stallWaiting.splice(ls.stallWaiting.indexOf(truckId), 1)
   stall.truckId = truckId
   truck.stallId = stallId
+  if (admitting) {
+    // reserved before the truck is sent: the trip is planned when it is through the gate (TruckGateIn)
+    counters(state).admittedToStall++
+    ctx.schedule('TruckStallReserved', state.now, { equipment: [truck.id] }, { truckId, stallId, blockId: stall.blockId })
+    pumpGate(ctx)
+    return
+  }
+  ls.stallWaiting.splice(ls.stallWaiting.indexOf(truckId), 1)
+  if (truck.holdingAt !== null) {
+    const k = counters(state)
+    const held = state.now - truck.holdingAt
+    k.holdingWaitSumS += held
+    k.holdingWaitMaxS = Math.max(k.holdingWaitMaxS, held)
+    k.holdingWaitCount++
+  }
+  planStallTrip(ctx, truck, stallId)
+  pumpStalls(ctx)
+  if (holdingOn(ctx)) pumpGate(ctx)
+}
+
+/** Plan and reserve the truck's trip from where it stands to its stall (reserved already) and announce it. */
+function planStallTrip(ctx: EngineContext, truck: TruckState, stallId: string): void {
+  const { state } = ctx
+  const graph = graphOf(ctx)
+  const stall = landside(state).stalls[stallId]
+  const truckId = truck.id
   truck.stallAssignedAt = state.now
-  const lane = graph.inLanes.find((l) => l.id === truck.laneId) as GateLaneLayout
-  const trip = new TripBuilder<PlannedType>(graph, truck.id, waypoints(graph, [lane.kioskNode])[0], isInstant(state))
-  const path = landsideRoute(graph, lane.kioskNode, graph.stallNode[stallId])
+  const trip = new TripBuilder<PlannedType>(graph, truck.id, waypoints(graph, [truck.nodeId])[0], isInstant(state))
+  const path = landsideRoute(graph, truck.nodeId, graph.stallNode[stallId])
   trip.mark('TruckRoutingToStall')
   trip.driveThrough(waypoints(graph, path).slice(1), driveOf(ctx))
   trip.mark('TruckAtStall')
@@ -641,7 +726,25 @@ function resolveStall(ctx: EngineContext, truckId: string, stallId: string | nul
     waitedS: r3(waited),
     reservations,
   })
-  pumpStalls(ctx)
+}
+
+/** Plan and reserve the trip from the kiosk to the truck's holding position (reserved at admission). */
+function planHoldingTrip(ctx: EngineContext, truck: TruckState): void {
+  const { state } = ctx
+  const graph = graphOf(ctx)
+  const lane = graph.inLanes.find((l) => l.id === truck.laneId) as GateLaneLayout
+  const holding = graph.holding.find((h) => h.id === truck.holdingId) as HoldingLayout
+  const trip = new TripBuilder<PlannedType>(graph, truck.id, waypoints(graph, [lane.kioskNode])[0], isInstant(state))
+  const path = landsideRoute(graph, lane.kioskNode, holding.nodeId)
+  trip.mark('TruckRoutingToHolding')
+  trip.driveThrough(waypoints(graph, path).slice(1), driveOf(ctx))
+  trip.mark('TruckAtHolding')
+  const windows = trip.windows()
+  const start = earliestStart(state, windows, state.now)
+  reserve(state, truck.id, windows, start)
+  install(truck, trip, start)
+  truck.nodeId = holding.nodeId
+  scheduleNext(ctx, truck)
 }
 
 // ── exit ────────────────────────────────────────────────────────────────────
@@ -771,8 +874,15 @@ export const landsideReactors: ReactorMap = {
   ScenarioStarted: (_e, ctx) => {
     const { state } = ctx
     if (state.subsystems.landside === 'off') return
-    const next = nextPoissonArrival(ctx, 0)
-    if (next !== null) ctx.schedule('TruckArrivalDue', next, {}, {})
+    if (landsideOf(ctx.config).appointments) {
+      // TT-R15: appointment windows replace the Poisson arrivals; every booking is one arrival at its time
+      const plan = planAppointments(ctx.config, () => landsideRandom(state))
+      landside(state).appointments = { windowS: appointmentWindowS(ctx.config), capPerWindow: plan.capPerWindow, windows: plan.windows, rejected: plan.rejected, list: plan.appointments }
+      for (const a of plan.appointments) ctx.schedule('TruckArrivalDue', a.arriveAtS, {}, { transaction: a.transaction, appointmentId: a.id })
+    } else {
+      const next = nextPoissonArrival(ctx, 0)
+      if (next !== null) ctx.schedule('TruckArrivalDue', next, {}, {})
+    }
     for (const s of landsideOf(ctx.config).scripted ?? []) ctx.schedule('TruckArrivalDue', s.atS, {}, { transaction: s.transaction })
   },
 
@@ -794,6 +904,9 @@ export const landsideReactors: ReactorMap = {
       laneId: null,
       outLaneId: null,
       stallId: null,
+      holdingId: null,
+      holdingAt: null,
+      heldOutside: false,
       nodeId: graph.gate.queueHeadNode,
       carrying: legs.find((l) => l.kind === 'drop')?.containerId ?? null,
       gateStartedAt: null,
@@ -829,9 +942,10 @@ export const landsideReactors: ReactorMap = {
       legs: infos,
       queueLength: ls.queue.length,
       ...(plan.fallback ? { fallback: true as const } : {}),
+      ...(e.payload.appointmentId ? { appointmentId: e.payload.appointmentId } : {}),
     })
     // the next arrival of the Poisson process (scripted trucks were scheduled at the start)
-    if (e.payload.transaction === undefined) {
+    if (e.payload.transaction === undefined && !landsideOf(ctx.config).appointments) {
       const next = nextPoissonArrival(ctx, e.t)
       if (next !== null) ctx.schedule('TruckArrivalDue', next, {}, {})
     }
@@ -863,6 +977,13 @@ export const landsideReactors: ReactorMap = {
     landside(state).inLanes[e.payload.laneId].processed++
     counters(state).trucksIn++
     const ls = landside(state)
+    if (holdingOn(ctx)) {
+      // TT-R16: the stall was reserved before the gate (go to it) or a holding position was (go and wait there)
+      if (truck.stallId !== null) {
+        planStallTrip(ctx, truck, truck.stallId)
+      } else planHoldingTrip(ctx, truck)
+      return
+    }
     ls.stallWaiting.push(truck.id)
     if (!landsideHasFreeStall(ctx)) ctx.schedule('TruckWaitingForStall', e.t, { equipment: [truck.id] }, { truckId: truck.id })
     pumpStalls(ctx)
@@ -872,11 +993,39 @@ export const landsideReactors: ReactorMap = {
 
   TruckStallAssigned: (e, ctx) => scheduleNext(ctx, ctx.state.trucks[e.payload.truckId]),
 
-  /** The truck leaves the kiosk: the lane is free for the next truck. */
-  TruckRoutingToStall: (e, ctx) => {
+  TruckStallReserved: () => {},
+
+  TruckHoldingAssigned: () => {},
+
+  TruckHeldOutside: () => {},
+
+  /** The truck leaves the kiosk for its holding position: the lane is free for the next truck. */
+  TruckRoutingToHolding: (e, ctx) => {
     const { state } = ctx
     advance(ctx, e)
     landside(state).inLanes[e.payload.laneId].truckId = null
+    pumpGate(ctx)
+  },
+
+  /** The truck stands in its holding position (off every road) and waits for a stall. */
+  TruckAtHolding: (e, ctx) => {
+    const truck = advance(ctx, e)
+    truck.holdingAt = e.t
+    landside(ctx.state).stallWaiting.push(truck.id)
+    pumpStalls(ctx)
+  },
+
+  /** The truck leaves the kiosk: the lane is free for the next truck. */
+  TruckRoutingToStall: (e, ctx) => {
+    const { state } = ctx
+    const truck = advance(ctx, e)
+    const ls = landside(state)
+    if (ls.inLanes[e.payload.laneId].truckId === truck.id) ls.inLanes[e.payload.laneId].truckId = null
+    if (truck.holdingId !== null) {
+      // driving out of the holding position frees it for the next admission
+      ls.holding[truck.holdingId].truckId = null
+      truck.holdingId = null
+    }
     pumpGate(ctx)
   },
 
@@ -928,6 +1077,7 @@ export const landsideReactors: ReactorMap = {
     const stall = landside(state).stalls[e.payload.stallId]
     if (stall.truckId === truck.id) stall.truckId = null
     pumpStalls(ctx)
+    if (holdingOn(ctx)) pumpGate(ctx)
   },
 
   TruckGateOut: (e, ctx) => {

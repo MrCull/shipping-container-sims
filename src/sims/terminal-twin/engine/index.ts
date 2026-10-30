@@ -25,6 +25,7 @@ export type {
   TruckLeg,
   TruckStatus,
   TransferStallState,
+  HoldingPositionState,
   LandsideState,
   YardBlockState,
   YardSlotState,
@@ -64,9 +65,10 @@ export { ascPoseAt } from './subsystems/asc'
 export { ascIdOf, ascIndexOf, resolveSubsystemModes } from './state'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, apronLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
-export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, QUEUE_PITCH_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, GATE_ISLAND_W_M } from './landsideGraph'
-export type { LandsideGraph, LandsideNode, LandsideEdge, LandsideZone, GateLaneLayout } from './landsideGraph'
+export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, QUEUE_PITCH_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, GATE_ISLAND_W_M, HOLDING_PITCH_M } from './landsideGraph'
+export type { LandsideGraph, LandsideNode, LandsideEdge, LandsideZone, GateLaneLayout, HoldingLayout } from './landsideGraph'
 export { truckPositionAt } from './subsystems/landside'
+export { appointmentCap, planAppointments, appointmentWindowS, DEFAULT_APPOINTMENT_WINDOW_S } from './appointments'
 export type { Reservation } from './reservations'
 export type { ShcPhasePayload, AscPhasePayload, TruckLegInfo } from './events'
 export { defaultHandlers } from './handlers'

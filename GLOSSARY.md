@@ -49,6 +49,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Load order:** the yard work of one export box from its package's release to its ground position (claim a ground position, retrieve, carry). A crane **stages** at most as many boxes as it has ground positions, in load sequence.
 - **Load sequence:** the order a crane loads a vessel: bay by bay, hold before deck, bottom tier before upper tier, then row, aft half before fore half.
 - **Stowage order:** a box is never loaded into a slot whose lower tier (in the same stack) is still empty. Checked by the invariant `stowage.order`.
+- **No 20 on a 40 (stowage):** on board a 20 ft box never sits on a 40 ft box, and a 40 ft box rests only on a 40 ft box or on two filled 20 ft halves. A stack reads, bottom up, twin-20 cells, then 40 ft cells or lone 20 ft halves. The structural 40-on-20 exception is not modelled. Checked by `stowage.order`; the bay plan only produces such stows (`stackAccepts`).
 - **Rehandle:** a non-productive ASC move needed to reach a buried box.
 - **Job (SHC job):** one box to move from an STS ground position to a WTP pad. Grounding a box **releases** a job into the **released pool**; a job is **open** until an SHC **claims** it.
 - **Pull dispatch:** free equipment asks the dispatch decision point (`shcDispatch`) for its next job from the released pool, rather than jobs being pushed to equipment.
@@ -187,6 +188,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Import dwell / export window:** how long an import stands in the yard before a truck may collect it (default lognormal, median 3 days); the period before a vessel's ETA (default 1 to 5 days) in which trucks may deliver its exports.
 - **Segregation:** trucks never enter the waterside network and SHCs never use the gate (invariant `landside.segregation`).
 - **Truck turn time:** gate-in to gate-out.
+- **Holding position:** a dead-end spur off the inbound road (`landside.holding.positions`, nodes `ls:H<n>`) where an admitted truck waits for a transfer stall. It never lies on a road, junction or gate exit (invariant `landside.waiting-off-road`).
+- **Stall admission:** the gate lets the head of the queue through only when a transfer stall can take it (the stall is reserved first, so no two trucks claim one stall: `landside.stall-exclusive`) or a holding position is free.
+- **Overflow (holding):** when no stall and no holding position is free, the truck waits outside the gate in the queue (`TruckHeldOutside`).
+- **Appointment window:** a slot of the truck booking system (default 30 min, `landside.appointments.windowS`). A truck books a window and arrives at a random time inside it; bookings per window are capped by gate and transfer stall capacity (`appointmentCap`), so demand above the cap is rejected. A peak is bunched bookings (`bunching` spans). Each **appointment** carries one transaction (its transport orders: export delivery, import collection or both = dual). No ANPR, no early, late or invalid arrivals.
 
 ## Yard start (TT-14)
 

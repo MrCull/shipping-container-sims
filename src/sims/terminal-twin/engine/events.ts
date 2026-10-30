@@ -253,17 +253,30 @@ export interface EventPayloads {
    * The truck arrival process fired (hourly Poisson profile, or a scripted truck with `transaction`): the truck's
    * transaction is drawn from the demand the terminal can serve now, then `TruckArrived` follows.
    */
-  TruckArrivalDue: { transaction?: TruckTransactionKind }
+  TruckArrivalDue: { transaction?: TruckTransactionKind; appointmentId?: string }
   /**
    * A truck reached the gate and joined the queue. `transaction` is what it came for; each leg names its box (a drop
    * brings a new box that rides the chassis, a pick collects a box that is in the yard with its dwell elapsed).
    * `fallback` = the drawn transaction could not be served (no eligible box or vessel) and it came to drop an empty.
    */
-  TruckArrived: { truckId: string; transaction: TruckTransactionKind; legs: TruckLegInfo[]; queueLength: number; fallback?: true }
+  TruckArrived: { truckId: string; transaction: TruckTransactionKind; legs: TruckLegInfo[]; queueLength: number; fallback?: true; appointmentId?: string }
   /** The gateLaneAssignment decision gave the head of the queue a free inbound lane; it drives to the kiosk. */
   TruckGateStarted: { truckId: string; laneId: string; queueWaitS: number; queueLength: number }
   /** Gate processing is done (the truck is in); a transfer stall is allocated next. */
   TruckGateIn: { truckId: string; laneId: string; processingS: number; segments: MotionSegment[] }
+  /**
+   * Stall admission (TT-R16): the transferStallSelection decision reserved `stallId` for the head of the gate queue before
+   * the truck is sent through the gate. The trip to it is planned at gate-in (`TruckStallAssigned`).
+   */
+  TruckStallReserved: { truckId: string; stallId: string; blockId: string }
+  /** Stall admission (TT-R16): no stall can take the head of the queue, so a free holding position is reserved for it. */
+  TruckHoldingAssigned: { truckId: string; holdingId: string; holdingInUse: number }
+  /** Stall admission (TT-R16): no stall and no holding position is free; the head of the queue waits outside the gate (reported once per truck). */
+  TruckHeldOutside: { truckId: string; queueLength: number }
+  /** The truck leaves the gate lane for its holding position (TT-R16). */
+  TruckRoutingToHolding: { truckId: string; holdingId: string; laneId: string; segments: MotionSegment[] }
+  /** The truck stands in its holding position and waits for a stall (TT-R16). */
+  TruckAtHolding: { truckId: string; holdingId: string; segments: MotionSegment[] }
   /** The truck has no stall yet (every stall is taken): it waits at the kiosk. */
   TruckWaitingForStall: { truckId: string }
   /** The transferStallSelection decision gave the truck a stall; the trip over the landside roads is planned and reserved. */

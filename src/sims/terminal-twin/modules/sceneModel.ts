@@ -662,7 +662,7 @@ export class SceneModel {
 
   /**
    * Where the camera should look for an entity id: a container, STS, SHC, ASC, vessel, truck, yard block, transfer stall
-   * (`<block>-TS<n>` or `stalls:<block>` for the block's first), WTP pad or the `gate`. Null for an unknown id, and for a truck that has left.
+   * (`<block>-TS<n>` or `stalls:<block>` for the block's first), WTP pad, `holding` / `H<n>` (holding positions) or the `gate`. Null for an unknown id, and for a truck that has left.
    */
   entityCentre(id: string, time: number): Vec3 | null {
     if (this.containerSize[id]) return this.containerCentre(id, time)
@@ -678,6 +678,11 @@ export class SceneModel {
     if (this.landside && id.startsWith('stalls:')) {
       const stalls = this.landside.stalls.filter((s) => s.blockId === id.slice(7))
       return stalls.length ? { x: stalls[0].x, y: 3, z: stalls[0].z } : null
+    }
+    if (this.landside && (id === 'holding' || /^H\d+$/.test(id))) {
+      // `holding` = the middle of the holding positions (TT-R16), `H<n>` one position
+      const list = id === 'holding' ? this.landside.holding : this.landside.holding.filter((h) => h.id === id)
+      if (list.length > 0) return { x: list.reduce((sum, h) => sum + h.x, 0) / list.length, y: 3, z: list[0].z }
     }
     const block = this.blocks[id]
     if (block) {

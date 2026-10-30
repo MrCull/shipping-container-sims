@@ -376,6 +376,51 @@ export interface ScriptedTruck {
   transaction: TruckTransactionKind
 }
 
+/** Demand multiplier for the windows that overlap `[fromS, toS)` (sim seconds): how a peak is expressed. */
+export interface BunchingSpan {
+  fromS: number
+  toS: number
+  factor: number
+}
+
+/**
+ * Truck appointment system (TT-R15). When present, trucks arrive against booked windows instead of the raw Poisson
+ * process: demand per window follows `hourlyProfile` x `bunching`, bookings stop at the window's cap, arrivals are spread
+ * uniformly inside the window. No ANPR and no early, late or invalid arrivals.
+ */
+export interface AppointmentConfig {
+  /** Window length (s, default 1800). */
+  windowS?: number
+  /** Extra cap on bookings per window; the cap is also limited by gate and transfer stall capacity. */
+  maxPerWindow?: number
+  /** [A] Mean time a truck occupies a transfer stall (s, default 300): sets the stall capacity per window. */
+  stallServiceS?: number
+  /** Windows whose demand is multiplied (a peak is bunched bookings). */
+  bunching?: BunchingSpan[]
+  /** How long to book ahead (s; default the run's `simDurationS` plus warm-up, else 24 h). */
+  horizonS?: number
+  /** True when the numbers come from the TTI research and are not publicly verified. */
+  unverified?: boolean
+}
+
+/** What happens to a truck at the gate when no stall can take it and every holding position is full (TT-R16). */
+export type HoldingOverflowPolicy = 'wait-outside'
+
+/**
+ * Stall admission and holding (TT-R16). With this set, the gate admits the truck at the head of the queue only when a
+ * transfer stall can take it (the stall is reserved before the truck is sent) or a holding position is free; an
+ * admitted truck without a stall waits in a holding position; with holding full the truck waits outside the gate.
+ * Absent = the truck is processed whenever a lane is free and waits at the kiosk for a stall (the older behaviour).
+ */
+export interface HoldingConfig {
+  /** Dedicated holding positions on spurs of the inbound road, clear of roads, junctions and gate exits. */
+  positions: number
+  /** Overflow procedure when holding is full (default and only policy: the truck waits outside the gate). */
+  overflow?: HoldingOverflowPolicy
+  /** True when the numbers come from the TTI research and are not publicly verified. */
+  unverified?: boolean
+}
+
 export interface LandsideConfig {
   /** Trucks arriving per hour for each clock hour 0–23 (Poisson arrivals); the clock comes from `kpi.startTimeOfDayS`. */
   hourlyProfile: number[]
@@ -390,6 +435,10 @@ export interface LandsideConfig {
   drive?: AxisProfile
   /** Trucks that arrive at fixed times. */
   scripted?: ScriptedTruck[]
+  /** Appointment windows replace the Poisson arrivals (TT-R15); absent = Poisson. */
+  appointments?: AppointmentConfig
+  /** Stall admission and holding positions (TT-R16); absent = trucks wait at the gate kiosk for a stall. */
+  holding?: HoldingConfig
 }
 
 /** Where the scenario clock sits, so hour and shift buckets line up with the clock the user sees. */

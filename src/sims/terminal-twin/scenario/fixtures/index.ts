@@ -9,6 +9,8 @@ import asc2AscBlockConflict from './asc-2asc-block-conflict.json'
 import craneSplit4Sts from './crane-split-4sts.json'
 import dualTruck from './dual-truck-transaction.json'
 import truckGateQueue from './truck-gate-queue.json'
+import truckAppointmentWindows from './truck-appointment-windows.json'
+import truckHoldingOverflow from './truck-holding-overflow.json'
 import landsideMorningPeak from './landside-morning-peak.json'
 import loadFixture from './load-1sts-10-boxes-1block.json'
 import liveriesMixed from './liveries-mixed.json'
@@ -18,6 +20,7 @@ import shc1Sts2Shc1Wtp from './shc-1sts-2shc-1wtp.json'
 import tracer1Sts10Boxes from './tracer-1sts-10-boxes.json'
 import transshipmentAToB from './transshipment-a-to-b.json'
 import emptiesLoad from './empties-load-4-of-16.json'
+import stowMixed from './stow-mixed-20-40.json'
 import yardNoMixedLength from './yard-no-mixed-length.json'
 import twin20Lift from './twin-20-lift.json'
 import twoVesselsCompeteForBerth from './two-vessels-compete-for-berth.json'
@@ -39,5 +42,8 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'dual-truck-transaction': dualTruck as ScenarioConfig,
   'truck-gate-queue': truckGateQueue as ScenarioConfig,
   'landside-morning-peak': landsideMorningPeak as ScenarioConfig,
+  'truck-appointment-windows': truckAppointmentWindows as ScenarioConfig,
+  'truck-holding-overflow': truckHoldingOverflow as ScenarioConfig,
   'yard-no-mixed-length': yardNoMixedLength as ScenarioConfig,
+  'stow-mixed-20-40': stowMixed as ScenarioConfig,
 }

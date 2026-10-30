@@ -50,10 +50,15 @@ const ENTRY_DZ = 26
 const DESPAWN_DZ = 60
 /** Distance west of the first block that the gate cluster ends (m). */
 const GATE_WEST_GAP_M = 40
+/** [A] Pitch of the holding positions along the inbound road (m): the stall pitch. */
+export const HOLDING_PITCH_M = 5.5
+/** First holding spur this far west of the westmost stall spur, and the gate cluster keeps this clear of the last one (m). */
+const HOLDING_EAST_GAP_M = 8
+const HOLDING_WEST_CLEAR_M = 12
 /** The roads extend this far east of the last block (m). */
 const ROAD_EAST_GAP_M = 20
 
-export type LandsideNodeKind = 'road' | 'queue' | 'inEntry' | 'inKiosk' | 'outKiosk' | 'outExit' | 'despawn' | 'stall'
+export type LandsideNodeKind = 'road' | 'queue' | 'inEntry' | 'inKiosk' | 'outKiosk' | 'outExit' | 'despawn' | 'stall' | 'holding'
 
 export interface LandsideNode {
   id: string
@@ -73,7 +78,7 @@ export interface LandsideEdge {
 
 export interface LandsideZone {
   id: string
-  kind: 'intersection' | 'road' | 'stall' | 'gateLane'
+  kind: 'intersection' | 'road' | 'stall' | 'gateLane' | 'holding'
   x0: number
   x1: number
   z0: number
@@ -94,6 +99,17 @@ export interface GateLaneLayout {
   kioskZ: number
 }
 
+/** A holding position (TT-R16): a dead-end spur off the inbound road, west of every stall spur. */
+export interface HoldingLayout {
+  /** `H<n>`; its node is `ls:H<n>`. */
+  id: string
+  x: number
+  z: number
+  nodeId: string
+  /** The road node its spur starts at. */
+  junction: string
+}
+
 export interface LandsideGraph {
   layout: { zoneClearanceM: number }
   nodes: Record<string, LandsideNode>
@@ -105,6 +121,8 @@ export interface LandsideGraph {
   stallNode: Record<string, string>
   /** Stall id → the road node its spur starts at. */
   stallJunction: Record<string, string>
+  /** Holding positions (empty without `config.landside.holding`). */
+  holding: HoldingLayout[]
   inLanes: GateLaneLayout[]
   outLanes: GateLaneLayout[]
   /** Out-of-gauge lane centre X (rendered, never routed); null when disabled. */
@@ -171,7 +189,10 @@ export function buildLandsideGraph(config: ScenarioConfig): LandsideGraph {
   const queueHeadZ = r3(entryZ + 8)
   const minX = Math.min(...stalls.map((s) => s.x)) - 3
   const maxX = Math.max(...stalls.map((s) => s.x)) + 3
-  const clusterRight = minX - GATE_WEST_GAP_M
+  const holdingCount = Math.max(0, Math.floor(config.landside?.holding?.positions ?? 0))
+  // holding spurs lie between the gate and the first stall spur: widen that gap only when holding is configured
+  const westGap = holdingCount > 0 ? Math.max(GATE_WEST_GAP_M, HOLDING_EAST_GAP_M + HOLDING_WEST_CLEAR_M + holdingCount * HOLDING_PITCH_M) : GATE_WEST_GAP_M
+  const clusterRight = minX - westGap
   // lane centres west to east: in lanes, the out-of-gauge lane, out lanes, an island between neighbours; the last lane ends the cluster
   const widths = [
     ...Array<number>(gate.inLanes).fill(GATE_LANE_W_M),
@@ -198,6 +219,9 @@ export function buildLandsideGraph(config: ScenarioConfig): LandsideGraph {
   for (let k = 0; k < gate.inLanes; k++) riXs.add(inX(k))
   for (const s of stalls) riXs.add(s.x)
   riXs.add(eastX)
+  const firstStallX = Math.min(...stalls.map((s) => s.x))
+  const holdingXs = Array.from({ length: holdingCount }, (_, k) => r3(firstStallX - HOLDING_EAST_GAP_M - k * HOLDING_PITCH_M))
+  for (const x of holdingXs) riXs.add(x)
   const roIds = new Set<number>()
   for (let j = 0; j < gate.outLanes; j++) roIds.add(outX(j))
   roIds.add(eastX)
@@ -237,6 +261,18 @@ export function buildLandsideGraph(config: ScenarioConfig): LandsideGraph {
     edge(roadId('I', s.x), `ls:${s.id}`, s.id)
     edge(`ls:${s.id}`, roadId('I', s.x), s.id)
   }
+
+  // holding positions: a spur off the inbound road west of every stall spur (so a truck can reach every stall from
+  // any of them), in and out (the truck reverses out); they never lie on a road, a junction or a gate exit
+  const holding: HoldingLayout[] = holdingXs.map((x, k) => {
+    const id = `H${k + 1}`
+    const z = r3(stallZmax)
+    node(`ls:${id}`, x, z, 'holding', id)
+    zone(id, 'holding', x - 1.8, x + 1.8, z - 8.5, roadInZ + 2)
+    edge(roadId('I', x), `ls:${id}`, id)
+    edge(`ls:${id}`, roadId('I', x), id)
+    return { id, x, z, nodeId: `ls:${id}`, junction: roadId('I', x) }
+  })
 
   // gate: in lanes (queue → entry → kiosk → inbound road), out lanes (outbound road → kiosk → exit → despawn)
   node('ls:QH', queueX, queueHeadZ, 'queue', null)
@@ -280,6 +316,7 @@ export function buildLandsideGraph(config: ScenarioConfig): LandsideGraph {
     stalls,
     stallNode,
     stallJunction,
+    holding,
     inLanes,
     outLanes,
     oogX,

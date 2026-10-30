@@ -462,18 +462,31 @@ export const INVARIANTS: Invariant[] = [
     reads: ['vessel', 'container'],
     description:
       'Stowage order: a box on board never lies above an empty cell. Every filled load slot above the bottom tier of its ' +
-      'section (hold floor or hatch cover) has a box directly below it, so lower tiers are loaded before upper tiers.',
+      'section (hold floor or hatch cover) has a box directly below it, so lower tiers are loaded before upper tiers. ' +
+      'A 20 ft box never sits on a 40 ft box, and a 40 ft box rests only on a 40 ft box or on two filled 20 ft halves.',
     scoped: true,
     check(state, _config, scope) {
       const messages: string[] = []
       const filled = new Map<string, ('aft' | 'fore' | null)[]>()
       const loads = []
+      const boxes = []
       for (const s of Object.values(state.vesselSlots)) {
         if (!s.containerId) continue
         if (scope && !scope.vessels.has(s.vesselId)) continue
         const key = `${s.vesselId}:${s.bay}:${s.row}:${s.tier}`
         filled.set(key, [...(filled.get(key) ?? []), s.half])
+        boxes.push(s)
         if (s.purpose === 'load' || s.purpose === 'transshipment') loads.push(s)
+      }
+      // TT-R07: no 20 ft box on a 40 ft box; a 40 ft box only on a 40 ft box or on two 20 ft halves (cell-level, per section)
+      for (const s of boxes) {
+        const holdTiers = vesselClass(state.vessels[s.vesselId].sizeClass).holdTiers
+        if (s.tier === 0 || s.tier === holdTiers) continue
+        const below = filled.get(`${s.vesselId}:${s.bay}:${s.row}:${s.tier - 1}`) ?? []
+        if (s.half !== null && below.includes(null))
+          messages.push(`20 ft box ${s.containerId} in ${s.id} sits on a 40 ft box (bay ${s.bay} row ${s.row} tier ${s.tier - 1})`)
+        else if (s.half === null && below.length === 1 && below[0] !== null)
+          messages.push(`40 ft box ${s.containerId} in ${s.id} sits on a single 20 ft half (bay ${s.bay} row ${s.row} tier ${s.tier - 1})`)
       }
       for (const s of loads) {
         const holdTiers = vesselClass(state.vessels[s.vesselId].sizeClass).holdTiers
@@ -521,6 +534,91 @@ export const INVARIANTS: Invariant[] = [
       for (const shc of Object.values(state.shcs)) {
         if (shc.nodeId.startsWith('ls:') || !lanes.nodes[shc.nodeId]) messages.push(`${shc.id} is at ${shc.nodeId}, which is not a waterside lane node (SHCs never use the public gate)`)
         else if (lanes.nodes[shc.nodeId].z >= gateZ) messages.push(`${shc.id} is at ${shc.nodeId}, in the landside area`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'landside.stall-exclusive',
+    reads: ['equipment'],
+    description:
+      'No two trucks claim the same transfer stall (or holding position): a stall is reserved for one truck from its admission until ' +
+      'it has reversed clear, the stall records that truck, and the truck records the stall (TT-R16).',
+    check(state) {
+      const messages: string[] = []
+      const ls = state.landside
+      if (!ls) return messages
+      // a truck that has reversed out of its stall keeps `stallId` for its exit trip but no longer holds it
+      const claims = (key: 'stallId' | 'holdingId') => {
+        const by = new Map<string, string[]>()
+        for (const t of Object.values(state.trucks)) {
+          const id = t[key]
+          if (id === null || (key === 'stallId' && t.status === 'routing-to-exit')) continue
+          by.set(id, [...(by.get(id) ?? []), t.id])
+        }
+        return by
+      }
+      for (const [key, what, table] of [
+        ['stallId', 'stall', ls.stalls],
+        ['holdingId', 'holding position', ls.holding],
+      ] as const) {
+        for (const [id, trucks] of claims(key))
+          if (trucks.length > 1) messages.push(`${what} ${id} is claimed by ${trucks.join(' and ')}`)
+          else if (table[id]?.truckId !== trucks[0]) messages.push(`${trucks[0]} claims ${what} ${id}, which records ${table[id]?.truckId ?? 'nobody'}`)
+        for (const entry of Object.values(table)) {
+          if (entry.truckId === null) continue
+          const truck = state.trucks[entry.truckId]
+          if (!truck || truck[key] !== entry.id) messages.push(`${what} ${entry.id} records ${entry.truckId}, which does not claim it`)
+        }
+      }
+      return messages
+    },
+  },
+  {
+    id: 'landside.waiting-off-road',
+    reads: ['equipment', 'time'],
+    description:
+      'A truck that is waiting (in the gate queue, at a kiosk, in a holding position) never stands on a road or a junction: ' +
+      'queued trucks stand on queue nodes, kiosk waiters on lane nodes and holding trucks on their own holding spur (TT-R16).',
+    check(state, config) {
+      const messages: string[] = []
+      if (!hasLandside(config)) return messages
+      const graph = landsideGraphOf(config)
+      const waiting = new Set(['queued', 'in-lane', 'waiting-for-stall', 'holding'])
+      for (const t of Object.values(state.trucks)) {
+        if (!waiting.has(t.status)) continue
+        const node = graph.nodes[t.nodeId]
+        if (node?.kind === 'road') messages.push(`${t.id} (${t.status}) waits on the road node ${t.nodeId}`)
+        // standing still now (no planned segment under way): its position must lie outside every road and junction
+        if (t.motion.some((s) => s.t0 <= state.now && state.now < s.t1)) continue
+        const p = truckPositionAt(graph, t, state.now)
+        if (t.status === 'holding') {
+          // it keeps its holding position (its node is already the stall once the stall is assigned) until it drives out
+          const h = graph.holding.find((x) => x.id === t.holdingId)
+          if (!h || Math.abs(p.x - h.x) > 1e-6 || Math.abs(p.z - h.z) > 1e-6)
+            messages.push(`${t.id} is holding but stands at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}), not in its holding position ${t.holdingId ?? 'none'}`)
+        }
+        for (const zone of Object.values(graph.zones)) {
+          if (zone.kind !== 'road' && zone.kind !== 'intersection') continue
+          if (p.x > zone.x0 && p.x < zone.x1 && p.z > zone.z0 && p.z < zone.z1) {
+            messages.push(`${t.id} (${t.status}) stands at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}) inside ${zone.kind} zone ${zone.id}`)
+            break
+          }
+        }
+      }
+      return messages
+    },
+  },
+  {
+    id: 'landside.leaves-complete',
+    reads: ['equipment'],
+    description: 'A truck drives out of the terminal only after all its transfers are complete: every drop and pick leg is done before it reverses out of its stall (TT-R16).',
+    check(state) {
+      const messages: string[] = []
+      for (const t of Object.values(state.trucks)) {
+        if (t.status !== 'routing-to-exit') continue
+        const open = t.legs.filter((l) => !l.done)
+        if (open.length > 0) messages.push(`${t.id} is leaving with ${open.length} unfinished transfer(s): ${open.map((l) => `${l.kind} ${l.containerId}`).join(', ')}`)
       }
       return messages
     },
