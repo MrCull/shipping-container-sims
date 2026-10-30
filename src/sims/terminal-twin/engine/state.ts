@@ -15,6 +15,7 @@ import { nextRandom, seedState } from './rng'
 import { ascStartZ, blockSpecs, PARK_UNTIL_S, railSegmentIds, travelHoistM } from './yardLayout'
 import { planCargo, POOL_VESSEL_ID, type SlotPurpose } from '../scenario/bayPlan'
 import { makeContainerState } from '../scenario/containerFactory'
+import type { ContainerProps } from '../scenario/containerProps'
 import { sampleDwell } from '../scenario/dwell'
 import { planExportYard, type ExportPlacement } from '../scenario/exportYard'
 import { DEFAULT_WARM_UP_S } from '../scenario/types'
@@ -66,6 +67,8 @@ export interface ContainerState {
   pickupReadyAt?: number
   /** A truck leg has claimed this box (TT-13): the truck id. Claimed boxes are not offered to other trucks or to empty allocation. */
   truckClaim?: string
+  /** Stored properties set once at creation (spec #106): direction, ISO type, POL/POD, weights, carriers, booking. */
+  props: ContainerProps
 }
 
 export interface VesselSlotState {
@@ -880,6 +883,8 @@ export interface SimState {
   nextEventId: number
   nextSeq: number
   rngState: number
+  /** Seed of the container-property streams (spec #106); they are keyed by it and the container id. */
+  propsSeed: number
   logHash: HashState
   /** Pending events (binary heap; seq is -1 until processed). */
   queue: EngineEvent[]
@@ -1063,6 +1068,7 @@ export function createInitialState(
     nextEventId: 0,
     nextSeq: 0,
     rngState: seedState(seed),
+    propsSeed: seed,
     logHash: [...HASH_SEED],
     queue: [],
     containers: {},
@@ -1167,6 +1173,7 @@ export function createInitialState(
       t: 0,
       eventId: null,
       reefer: c.reefer,
+      props: c.props as ContainerProps,
       yardSince: c.flow === 'pool' ? -(c.ageS ?? 0) : undefined,
       transshipment: c.transshipment,
     })

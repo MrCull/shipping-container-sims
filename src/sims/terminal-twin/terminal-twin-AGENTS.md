@@ -226,6 +226,30 @@ ctx.requestDecision → DecisionRequested (handler called) → [DecisionFailed] 
 3. In the asking reactor, call `ctx.requestDecision(dp, request, { equipment: [...] })`, set the equipment to a waiting status, and act on the reply in the subsystem's `DecisionResolved` reactor.
 4. Test it in `tests/decisions.test.ts` style: strategy selection, a scripted handler, and a latency case. Then `UPDATE_GOLDEN=1 pnpm test` if fixtures use it.
 
+## TOS module map
+
+Documentation only (spec #106): the TOS is a set of **modules**, each a grouping of existing decision points and functions. No files move. To replace a module, swap its strategy or pass a custom handler (see below); nothing else changes.
+
+| Module | Decision points and functions | Where |
+|---|---|---|
+| Yard | `yardAllocation` (where a box stacks), `rehandleTarget` (where a blocker goes) | `engine/decisions/strategies.ts`, `engine/yardStacks.ts`, `engine/subsystems/rehandle.ts` |
+| Container Allocation | `emptyAllocation` (which empties a load package takes) | `engine/subsystems/empties.ts` |
+| Vessel Planning | `craneSplit`, package creation and sequence (`createPackages`, `createLoadOrders`), hatch steps; later the `vesselPlanning.ordering` option | `engine/subsystems/workPackages.ts`, `engine/subsystems/berth.ts` |
+| Move Scheduler | `workPackageRelease`, ASC pre-dispatch and pre-retrieval | `engine/subsystems/workPackages.ts`, `engine/subsystems/ascDispatch.ts` |
+| Equipment | `berthAllocation`, `stsGroundPosition`, `shcDispatch`, `wtpPadSelection`, `ascDispatch`, `gateLaneAssignment`, `transferStallSelection` | `engine/decisions/`, the equipment subsystems |
+
+## Stored container properties (spec #106, #108)
+
+Every container carries `ContainerState.props` (`scenario/containerProps.ts`), set once at creation and never recomputed: transit direction (IMPORT / EXPORT / TRANSSHIPMENT / STORAGE), ISO type (`22G1`, `45R1`, ...), POL and POD (UN/LOCODEs), tare and cargo weight (kg; an empty box weighs its tare only) and weight class, planned departure (sim s), inbound and outbound carrier, reefer setpoint (reefers only), booking reference, `holds` (always `[]`, carried not enforced). Transit status, content status and dwell are not stored (#109 derives them).
+
+- **Creators:** only `scenario/containerFactory.ts` builds containers. `makeContainerState` requires `props`; the bay plan assigns `PlannedContainer.props` in `assignProps` (end of `planCargo`); pre-filled imports (`prefill.ts`) and truck drops (`landside.ts newBox`) call `drawContainerProps` themselves. Direction by flow: discharge = IMPORT (TRANSSHIPMENT when discharged as such; an empty non-transshipment box is drawn IMPORT/STORAGE from `directionMix`), booked export or truck export = EXPORT, empty pool or truck-dropped empty = STORAGE.
+- **Allocation:** when `emptyAllocation` resolves, `allocateEmptyProps` turns the empty into an EXPORT for the package's vessel (still empty, outbound = that vessel, planned departure = its ETD).
+- **RNG:** `propsStream(seed, id)` is a stream keyed by seed and container id (like the reefer hash), so it consumes no engine or bay-plan stream and is independent of creation order. `SimState.propsSeed` carries the seed. Draw order inside `drawContainerProps` is fixed (direction, POL, POD, weight, setpoint, booking, dwell): do not reorder it.
+- **Planned departure:** outbound vessel ETD (`vesselEtdS`, an estimate: arrival + moves at 25 per STS-hour + 30 min, [A]), else a truck appointment (`PropsInput.appointmentS`; no creator knows one yet), else arrival + expected dwell by direction.
+- **Config** (`ScenarioConfig.containerProps`, all optional, defaults in `containerProps.ts`; scenario config only, not the setup dialog; builder `.containerProps()`): `portRotation {terminal, ports[]}` (default ESALG rotation, [A]); `directionMix` (IMPORT vs STORAGE for discharged empties, default 1:3); `cargoWeight` per size (lognormal median, sigma, max); `weightClassBands {lightMaxKg, mediumMaxKg}` (default 12 t / 24 t gross); `expectedDwell` per direction (`DwellDistribution`; imports 3-7 days, storage 5-20 days). `validateContainerProps` runs in `validateScenario`.
+- **Inspector and tooltip:** `modules/entityInspector.ts` lists the properties as facts; `EntityView.tooltip` is the key subset, shown as the hover `title` of the selection heading. There is no 3D hover tooltip in the app.
+- **Goldens:** unchanged (they hash events and KPIs, and props enter no event). `ENGINE_VERSION` not bumped. A snapshot restored from before #108 has no `props`; the inspector tolerates that.
+
 ## Known gaps
 
 Deliberately not built, or built differently from the spec (the code review accepted these):

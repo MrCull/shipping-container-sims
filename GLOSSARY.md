@@ -258,3 +258,11 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Pre-dispatch (`predispatch`):** the `shcDispatch` strategy that sends an idle SHC to the queue area of a box predicted ready within the SHC's travel time plus `queueAreas.predispatchMarginS`. The SHC holds a queue spot, not a job, so no box is collected before it exists. *Avoid:* "early pick-up".
 - **Pre-retrieval:** the `pre-retrieval` `ascDispatch` strategy: once an import truck's stall is reserved and its trip planned, an idle ASC fetches the box to the stall before the truck arrives (an early job, `AscJobAssigned.early`) and hovers over it until the truck is there, so the stall service time drops. Never for a dual transaction or a buried box.
 - **Paired dispatch (`paired-dual-cycle`):** the `shcDispatch` strategy that, after an SHC delivers a discharge box to a WTP pad, prefers a nearby load pickup (and after a load delivery at the quay a discharge pickup), so the SHC drives loaded more often and less empty. Chained dispatch otherwise. The SHC's last delivery is `lastJobKind` on the dispatch request.
+
+## Container properties (spec #106)
+
+- **Transit direction:** why a box is on the terminal: IMPORT, EXPORT, TRANSSHIPMENT or STORAGE (`ContainerProps.direction`). Storage boxes are always empty. An empty allocated to a vessel becomes EXPORT while it stays empty. *Avoid:* "flow" for this (flow is the bay-plan role discharge/load/pool).
+- **Weight class:** LIGHT, MEDIUM or HEAVY, from gross weight (tare + cargo) against the scenario's `weightClassBands`.
+- **Port rotation:** the scenario's ordered list of port calls (UN/LOCODEs) with this terminal marked; POL and POD of every box come from it (`containerProps.portRotation`).
+- **POL / POD (port of loading / port of discharge):** UN/LOCODEs. Imports and storage boxes end at this terminal; exports start here; transshipment boxes neither start nor end here.
+- **Planned departure:** the sim time a box is planned to leave: outbound vessel ETD, else truck appointment, else arrival plus an expected dwell by direction.

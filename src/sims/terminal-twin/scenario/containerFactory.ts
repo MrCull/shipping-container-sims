@@ -10,6 +10,7 @@
 import type { ContainerSize } from './types'
 import type { PlannedContainer } from './bayPlan'
 import type { ContainerState, CustodyRef } from '../engine/state'
+import type { ContainerProps } from './containerProps'
 
 export interface PlannedContainerInit {
   id: string
@@ -51,6 +52,8 @@ export interface ContainerStateInit {
   t: number
   eventId: number | null
   reefer?: boolean
+  /** Stored properties (spec #106); required, so a creator cannot forget them. */
+  props: ContainerProps
   yardSince?: number
   pickupReadyAt?: number
   truckClaim?: string
@@ -60,7 +63,7 @@ export interface ContainerStateInit {
 
 /** A live container, in its initial custody. */
 export function makeContainerState(init: ContainerStateInit): ContainerState {
-  const c: ContainerState = {
+  const c = {
     id: init.id,
     size: init.size,
     full: init.full,
@@ -68,7 +71,7 @@ export function makeContainerState(init: ContainerStateInit): ContainerState {
     vesselId: init.vesselId,
     custody: init.owner,
     custodyHistory: [{ t: init.t, owner: { ...init.owner }, eventId: init.eventId }],
-  }
+  } as ContainerState
   if (init.reefer) c.reefer = true
   if (init.yardSince !== undefined) c.yardSince = init.yardSince
   if (init.pickupReadyAt !== undefined) c.pickupReadyAt = init.pickupReadyAt
@@ -79,5 +82,6 @@ export function makeContainerState(init: ContainerStateInit): ContainerState {
     c.dwellS = init.transshipment.dwellS
     c.readyAt = null
   }
+  c.props = init.props
   return c
 }

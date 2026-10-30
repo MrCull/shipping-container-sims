@@ -17,6 +17,7 @@ import type { EngineContext, ReactorMap } from '../context'
 import type { EmptyCandidate } from '../decisions/types'
 import type { SimState, WorkPackage, YardSlotState } from '../state'
 import { blockSpecs, rowX, slotZ, stackIndex } from '../yardLayout'
+import { allocateEmptyProps } from '../../scenario/containerProps'
 import type { ContainerSize } from '../../scenario/types'
 import { continueWork } from './quay'
 import { pumpLoadPrep } from './loadPrep'
@@ -111,6 +112,7 @@ export const emptiesReactors: ReactorMap = {
     ids.forEach((id, i) => {
       state.vesselSlots[req.slotIds[i]].plannedContainerId = id
       state.containers[id].allocatedTo = pkg.id
+      state.containers[id].props = allocateEmptyProps(ctx.config, state.propsSeed, id, state.containers[id].props, pkg.vesselId)
     })
     pkg.containerIds = [...ids]
     req.stage = 'allocated'

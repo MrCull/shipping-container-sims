@@ -2,6 +2,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { makeContainerState, makePlannedContainer } from '../scenario/containerFactory'
+import { drawContainerProps } from '../scenario/containerProps'
+import { fixtures } from '../scenario/fixtures'
 
 const ROOT = join(__dirname, '..')
 
@@ -30,8 +32,9 @@ describe('container factory (#107)', () => {
 
   it('keeps property order and optional fields stable', () => {
     const owner = { kind: 'truck' as const, id: 'T1' }
-    const c = makeContainerState({ id: 'A', size: '20', full: true, line: 'MSK', vesselId: 'V', owner, t: 5, eventId: 3, truckClaim: 'T1', reefer: true })
-    expect(Object.keys(c)).toEqual(['id', 'size', 'full', 'line', 'vesselId', 'custody', 'custodyHistory', 'reefer', 'truckClaim'])
+    const props = drawContainerProps(fixtures['tracer-1sts-10-boxes'], 1, { id: 'A', size: '20', full: true, line: 'MSK', reefer: true, direction: 'EXPORT', inbound: { kind: 'truck' }, arrivalS: 5 })
+    const c = makeContainerState({ id: 'A', size: '20', full: true, line: 'MSK', vesselId: 'V', owner, t: 5, eventId: 3, truckClaim: 'T1', reefer: true, props })
+    expect(Object.keys(c)).toEqual(['id', 'size', 'full', 'line', 'vesselId', 'custody', 'custodyHistory', 'reefer', 'truckClaim', 'props'])
     expect(c.custodyHistory[0]).toEqual({ t: 5, owner, eventId: 3 })
     expect(c.custodyHistory[0].owner).not.toBe(c.custody)
     const p = makePlannedContainer({ id: 'A', size: '40', full: false, line: 'MSK', vesselId: 'V', slotId: '', flow: 'pool', ageS: 0 })

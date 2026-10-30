@@ -256,6 +256,48 @@ export interface TransshipmentConfig {
   dwell: DwellDistribution
 }
 
+/** Why a box is on the terminal (spec #106). STORAGE boxes are always empty; an allocated empty becomes EXPORT. */
+export type TransitDirection = 'IMPORT' | 'EXPORT' | 'TRANSSHIPMENT' | 'STORAGE'
+
+/** The scenario's port rotation (spec #106): the service's calls in order, as UN/LOCODEs, and which one is this terminal. */
+export interface PortRotation {
+  /** This terminal's UN/LOCODE; must be one of `ports`. */
+  terminal: string
+  /** The rotation in call order (cyclic), including `terminal`. POL and POD of every box come from it. */
+  ports: string[]
+}
+
+/** Laden cargo weight of one size: a lognormal around `medianKg` (sigma of the underlying normal), clipped at `maxKg`. */
+export interface CargoWeightSpec {
+  medianKg: number
+  sigma: number
+  maxKg: number
+}
+
+/** Gross-weight band limits (kg): up to `lightMaxKg` is LIGHT, up to `mediumMaxKg` MEDIUM, above it HEAVY. */
+export interface WeightClassBands {
+  lightMaxKg: number
+  mediumMaxKg: number
+}
+
+/**
+ * Stored container properties (spec #106). Every field optional; the defaults in `scenario/containerProps.ts`
+ * apply. All draws come from their own RNG stream (keyed by seed and container id), so adding or changing these
+ * never moves any other draw.
+ */
+export interface ContainerPropsConfig {
+  portRotation?: PortRotation
+  /**
+   * Direction of an empty box that is discharged but not transshipment: a draw over `IMPORT` (returning empty) and
+   * `STORAGE` (stays as a storage empty). Other directions are set by the box's flow, not drawn.
+   */
+  directionMix?: Weights<TransitDirection>
+  cargoWeight?: Partial<Record<ContainerSize, CargoWeightSpec>>
+  weightClassBands?: WeightClassBands
+  /** Expected dwell by direction, the planned departure of a box with no outbound vessel ETD or truck appointment. */
+  expectedDwell?: Partial<Record<TransitDirection, DwellDistribution>>
+}
+
 /** Empty containers standing in the yard when the scenario starts (TT-11), by size and line. */
 export interface EmptyPoolConfig {
   count: number
@@ -379,6 +421,8 @@ export interface ScenarioConfig {
   transshipment?: TransshipmentConfig
   /** Empty pool pre-filled into the yard (TT-11); optional. */
   emptyPool?: EmptyPoolConfig
+  /** Stored container properties: port rotation, direction mix, cargo weights, weight classes, expected dwell (spec #106); optional. */
+  containerProps?: ContainerPropsConfig
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
   /**

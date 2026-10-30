@@ -27,6 +27,7 @@ import { sampleDwell, transshipmentConfig } from './dwell'
 import type { ContainerSize, ScenarioConfig, VesselConfig, Weights } from './types'
 import { cellCapacity, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
 import { makePlannedContainer } from './containerFactory'
+import { drawContainerProps, type ContainerProps } from './containerProps'
 
 export type SlotPurpose = 'discharge' | 'load' | 'transshipment'
 
@@ -65,6 +66,8 @@ export interface PlannedContainer {
   ageS?: number
   /** Reefer (R19): needs a powered yard row, at most `REEFER_MAX_TIERS` high. Absent = not a reefer. */
   reefer?: true
+  /** Stored properties (spec #106); `planCargo` sets them on every container before it returns. */
+  props?: ContainerProps
 }
 
 /** True when export boxes exist: the load flow needs yard blocks and SHCs to carry them. */
@@ -502,7 +505,42 @@ export function planCargo(config: ScenarioConfig, seed: number): CargoPlan {
     linkTransshipment(config, plan, tsSources)
     addEmptyPool(config, seed, plan, serials)
   } else for (const c of tsSources) delete c.ageS
+  assignProps(config, seed, plan, new Set(tsSources.map((c) => c.id)))
   return plan
+}
+
+/**
+ * Stored properties (spec #106) of every planned container, drawn from the property stream (keyed by seed and box id),
+ * after the plan is final: a discharge box is an import, or transshipment when it was discharged as such; a load box
+ * is an export, or a transshipment box already in the yard for its slot; a pool box is storage.
+ */
+function assignProps(config: ScenarioConfig, seed: number, plan: CargoPlan, tsIds: Set<string>): void {
+  const slots = new Map(plan.slots.map((s) => [s.id, s]))
+  const arrival = new Map(config.vessels.map((v) => [v.id, v.arrivalS]))
+  for (const c of plan.containers) {
+    const base = { id: c.id, size: c.size, full: c.full, line: c.line, reefer: c.reefer === true }
+    if (c.flow === 'discharge') {
+      const ts = tsIds.has(c.id)
+      c.props = drawContainerProps(config, seed, {
+        ...base,
+        direction: ts ? 'TRANSSHIPMENT' : c.full ? 'IMPORT' : null,
+        inbound: { kind: 'vessel', id: c.vesselId },
+        outboundVesselId: c.transshipment?.onwardVesselId,
+        arrivalS: arrival.get(c.vesselId) ?? 0,
+      })
+    } else if (c.flow === 'load') {
+      const ts = slots.get(c.slotId)?.purpose === 'transshipment'
+      c.props = drawContainerProps(config, seed, {
+        ...base,
+        direction: ts ? 'TRANSSHIPMENT' : 'EXPORT',
+        inbound: ts ? { kind: 'vessel' } : { kind: 'truck' },
+        outboundVesselId: c.vesselId,
+        arrivalS: 0,
+      })
+    } else {
+      c.props = drawContainerProps(config, seed, { ...base, direction: 'STORAGE', inbound: { kind: 'truck' }, arrivalS: -(c.ageS ?? 0) })
+    }
+  }
 }
 
 function linkTransshipment(config: ScenarioConfig, plan: CargoPlan, sources: PlannedContainer[]): void {

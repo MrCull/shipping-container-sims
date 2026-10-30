@@ -31,9 +31,13 @@ function factText(f: Fact): string {
   if (f.owner) return store.locations.owner(f.owner.kind, f.owner.id, f.owner.size)
   if (f.token) return t(`inspector.${f.token}.${f.value}` as MessageKey)
   if (typeof f.value === 'number' && f.unit === 'length') return store.fmt.length(f.value)
+  if (typeof f.value === 'number' && f.unit === 'mass') return t('inspector.kg', { n: store.fmt.number(f.value, 0) })
   if (typeof f.value === 'number' && f.unit === 'time') return t('inspector.seconds', { n: store.fmt.number(f.value, 0) })
   return String(f.value)
 }
+
+/** Hover text of the selected container: its key stored properties (the same facts the list below shows). */
+const tooltipText = computed(() => (view.value?.tooltip ?? []).map((f) => `${t(f.label)}: ${factText(f)}`).join('\n') || undefined)
 
 function selectable(kind: string): boolean {
   return kind === 'container' || kind === 'equipment' || kind === 'vessel'
@@ -225,6 +229,7 @@ onBeforeUnmount(() => {
         <p
           class="heading"
           data-testid="tt-entity-heading"
+          :title="tooltipText"
         >
           {{ t('inspector.selectionHeading', { kind: t(`inspector.kind.${view.kind}` as MessageKey), id: view.id }) }}
         </p>

@@ -292,6 +292,12 @@ export class ScenarioBuilder {
     return this
   }
 
+  /** Stored container properties: port rotation, direction mix, cargo weights, weight classes, expected dwell (spec #106). */
+  containerProps(props: ContainerPropsConfig): this {
+    this.config.containerProps = structuredClone(props)
+    return this
+  }
+
   decisions(decisions: DecisionsConfig): this {
     this.config.decisions = structuredClone(decisions)
     return this

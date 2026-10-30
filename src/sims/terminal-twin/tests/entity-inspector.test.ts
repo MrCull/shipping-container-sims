@@ -40,6 +40,49 @@ describe('describeEntity', () => {
     expect(view.facts.map((f) => f.label)).toEqual(expect.arrayContaining(['inspector.fact.line', 'inspector.fact.size', 'inspector.fact.custody']))
   })
 
+  it('a container lists its stored properties, and its tooltip the key ones (spec #106)', () => {
+    const sim = simAt(0)
+    const box = sim.query.container(model.containerIds[0])
+    const view = describeEntity('container', box)
+    const labels = view.facts.map((f) => f.label)
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        'inspector.fact.direction',
+        'inspector.fact.isoType',
+        'inspector.fact.pol',
+        'inspector.fact.pod',
+        'inspector.fact.grossWeight',
+        'inspector.fact.tareWeight',
+        'inspector.fact.cargoWeight',
+        'inspector.fact.weightClass',
+        'inspector.fact.plannedDeparture',
+        'inspector.fact.inbound',
+        'inspector.fact.outbound',
+        'inspector.fact.booking',
+        'inspector.fact.holds',
+      ]),
+    )
+    const value = (l: string) => view.facts.find((f) => f.label === l)!.value
+    expect(value('inspector.fact.pod')).toBe(box.props.pod)
+    expect(value('inspector.fact.grossWeight')).toBe(box.props.tareKg + box.props.cargoKg)
+    expect(value('inspector.fact.direction')).toBe('IMPORT')
+    expect(view.tooltip!.map((f) => f.label)).toEqual(
+      ['direction', 'isoType', 'pol', 'pod', 'grossWeight', 'weightClass'].map((k) => `inspector.fact.${k}`),
+    )
+    for (const f of view.tooltip!) expect(view.facts).toContainEqual(f)
+    // a restored box that predates the properties still describes itself
+    const old = { ...box, props: undefined }
+    expect(describeEntity('container', old).tooltip).toEqual([])
+  })
+
+  it('a reefer shows its setpoint', () => {
+    const config = fixtures['reefer-powered-rows']
+    const sim = createSimulation(config)
+    const reefer = sim.query.containers().find((c) => c.reefer)!
+    const view = describeEntity('container', reefer)
+    expect(view.facts.find((f) => f.label === 'inspector.fact.setpoint')!.value).toBe(reefer.props.reeferSetpointC)
+  })
+
   it('an SHC that is on a job shows the job, the box it carries and its target pad', () => {
     const sim = createSimulation(config)
     sim.runUntil({ eventType: 'ShcRoutingLoaded' })
