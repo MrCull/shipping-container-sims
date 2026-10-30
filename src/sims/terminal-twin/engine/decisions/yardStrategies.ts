@@ -66,7 +66,10 @@ export function nearestWtpSlot(req: YardAllocationRequest): YardAllocationReply 
  * properties (the pre-fill: its boxes do not exist yet).
  */
 function vesselGroupedSlot(req: YardAllocationRequest): YardAllocationReply {
-  const list = candidateSlots(req)
+  // a plain box keeps out of the powered rows while anything else fits (R19; the pre-fill would otherwise fill the plugs, #114)
+  const all = candidateSlots(req)
+  const unpowered = req.reefer ? all : all.filter((c) => !req.poweredRows?.includes(c.row))
+  const list = unpowered.length > 0 ? unpowered : all
   const mine = (c: YardCandidate) => c.bayVesselIds.includes(req.vesselId)
   const own = list.filter((c) => c.bayVesselIds.length > 0 && c.bayVesselIds.every((v) => v === req.vesselId))
   const sameBay = own.length > 0 ? cheapest(own, (c) => c.bay * 1000 + c.tier * 20 + c.row) : null
