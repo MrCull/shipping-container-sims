@@ -42,6 +42,8 @@ export type QueryKind =
   | 'vessel'
   | 'vessels'
   | 'vesselSlots'
+  /** `BayViewData` of one vessel (spec #106, #115): slots, their boxes, work packages and ROB boxes. */
+  | 'bayView'
   | 'sts'
   | 'stsList'
   | 'groundPosition'

@@ -21,6 +21,7 @@ import { EXPORT_FILES, ScenarioValidationError, validateScenario, type Container
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { createLocationNotation } from '../modules/locationNotation'
+import { defaultBay, type BayViewData, type ColourMode } from '../modules/bayView'
 import { describeEntity, entityKind, entityQueryKind, transitWorldOf, type EntityExtras, type EntityView } from '../modules/entityInspector'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
@@ -234,6 +235,51 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const inspectedEvent = shallowRef<InspectedEvent | null>(null)
   const entityView = shallowRef<EntityView | null>(null)
   let nextBreakpointId = 1
+
+  /** Bay viewer (spec #106, #115): the vessel it shows, the bay (internal index), the colour mode and the vessel's data. */
+  const bayViewerVesselId = ref<string | null>(null)
+  const bayViewerBay = ref(0)
+  const bayViewerColour = ref<ColourMode>('status')
+  const bayViewData = shallowRef<BayViewData | null>(null)
+  let bayViewBusy = false
+
+  /** Re-read the shown vessel from the engine (the viewer calls this at a low rate while open). */
+  async function refreshBayView(): Promise<void> {
+    const id = bayViewerVesselId.value
+    const c = controller
+    if (!id || !c?.model || bayViewBusy) return
+    bayViewBusy = true
+    try {
+      const data = await c.query<BayViewData>('bayView', id)
+      if (bayViewerVesselId.value === id) bayViewData.value = markRaw(data)
+    } catch {
+      // the scenario was replaced meanwhile: the next refresh shows the new state
+    } finally {
+      bayViewBusy = false
+    }
+  }
+
+  /** Open the bay viewer on a vessel, at its first bay with work to do (the bay stays when the same vessel is reopened). */
+  async function openBayViewer(vesselId: string): Promise<void> {
+    const same = bayViewerVesselId.value === vesselId
+    bayViewerVesselId.value = vesselId
+    if (!same) bayViewData.value = null
+    await refreshBayView()
+    if (!same && bayViewData.value) bayViewerBay.value = defaultBay(bayViewData.value)
+  }
+
+  function closeBayViewer(): void {
+    bayViewerVesselId.value = null
+    bayViewData.value = null
+  }
+
+  function setBayViewerBay(bay: number): void {
+    bayViewerBay.value = bay
+  }
+
+  function setBayViewerColour(mode: ColourMode): void {
+    bayViewerColour.value = mode
+  }
 
   /** Sound effects (TT-21): off by default; the player only exists to be used while on. */
   const soundOn = ref(false)
@@ -464,6 +510,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       rewindEvents = -1
       selectedId.value = null
       entityView.value = null
+      closeBayViewer()
       inspectedEvent.value = null
       following.value = false
       hasScenario.value = true
@@ -996,6 +1043,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     breakHit.value = null
     inspectedEvent.value = null
     entityView.value = null
+    closeBayViewer()
     hasScenario.value = false
     phase.value = 'setup'
     info.value = null
@@ -1023,6 +1071,15 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     inspectedEvent,
     entityView,
     refreshEntity,
+    bayViewerVesselId,
+    bayViewerBay,
+    bayViewerColour,
+    bayViewData,
+    openBayViewer,
+    closeBayViewer,
+    refreshBayView,
+    setBayViewerBay,
+    setBayViewerColour,
     inspectEvent,
     addBreakpoint,
     removeBreakpoint,

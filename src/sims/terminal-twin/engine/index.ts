@@ -15,6 +15,7 @@ export type {
   ContainerState,
   StsState,
   VesselState,
+  VesselSlotState,
   ShcState,
   ShcStatus,
   ShcJob,

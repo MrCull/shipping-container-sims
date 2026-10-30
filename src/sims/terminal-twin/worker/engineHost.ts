@@ -4,6 +4,7 @@
  * Web Worker entry (`engine.worker.ts`); it has no worker or DOM globals.
  */
 import { firstBreakpointHit, type Breakpoint } from '../modules/breakpoints'
+import { collectBayViewData } from '../modules/bayViewData'
 import { blockFillPct } from '../modules/dashboardModel'
 import { buildTimeline, createSimulation, hashDigest, exportRun, headlineKpis, highlightsOf, summarizeRun, type EngineEvent, type Simulation } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
@@ -340,6 +341,8 @@ export function createEngineHost() {
         return s.query.vessel(need())
       case 'vessels':
         return s.config.vessels.map((v) => s.query.vessel(v.id))
+      case 'bayView':
+        return collectBayViewData(s.query, need())
       case 'vesselSlots':
         return s.query.vesselSlots(id)
       case 'sts':

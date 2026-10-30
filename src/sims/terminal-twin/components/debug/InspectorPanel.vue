@@ -245,6 +245,15 @@ onBeforeUnmount(() => {
             {{ store.following ? t('inspector.unfollow') : t('inspector.follow') }}
           </button>
           <button
+            v-if="view.kind === 'vessel'"
+            type="button"
+            class="btn"
+            data-testid="tt-open-bay-viewer"
+            @click="store.openBayViewer(view.id)"
+          >
+            {{ t('inspector.openBayViewer') }}
+          </button>
+          <button
             type="button"
             class="btn"
             @click="store.select(null)"

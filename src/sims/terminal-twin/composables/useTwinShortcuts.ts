@@ -35,6 +35,7 @@ export function useTwinShortcuts(): void {
         break
       case 'escape':
         if (store.helpOpen) store.setHelpOpen(false)
+        else if (store.bayViewerVesselId) store.closeBayViewer()
         else store.select(null)
         break
       case 'dashboard':
