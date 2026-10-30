@@ -129,7 +129,7 @@ External trucks bring boxes in and take them out. Terms (truck transaction, gate
 - **Fixture:** `truck-holding-overflow` (2 stalls, 2 holding positions, 10 trucks 5 s apart: the first two reserve the stalls, the next two hold, six wait outside, and every later truck finds both stalls still reserved and goes through holding) + golden. Tests: `tests/truck-holding.test.ts`, `tests/entity-centre.test.ts`.
 - **Deliberately simple:** a truck declined by the stall decision (`stallId: null`) at admission waits for the next gate event; there is no priority between a holding truck and a new arrival beyond holding trucks being served first; a truck always drives to its holding position even when a stall frees up on the way.
 
-## Reefers and powered rows (R19, ENGINE_VERSION 0.21.0)
+## Reefers and powered rows (R19, ENGINE_VERSION 0.22.0)
 
 - **Cargo:** `CargoConfig.reeferShare` (0-1, default 0) makes that share of the full boxes reefers; empties never are. The draw is a hash of the container id (`scenario/reefer.ts` `isReefer`), not an RNG stream, so a scenario without reefers keeps every draw and golden. `PlannedContainer.reefer` and `ContainerState.reefer` are set only when true (absent otherwise); discharge boxes, export boxes, pre-filled imports (`PrefillImport.reefer`) and truck drops (`landside.ts newBox`) are all drawn.
 - **Powered rows:** `BlockConfig.poweredRows` (rows 1-8, default none; copied into `BlockSpec.poweredRows`, kept by the setup dialog's `withYard`). `validateScenario` rejects rows outside 1-8, a share outside 0-1, and reefers with no powered row in any block.
