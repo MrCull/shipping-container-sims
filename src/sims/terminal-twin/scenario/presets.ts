@@ -97,6 +97,7 @@ function hubVessels(count: number, intervalS: number, jitterS: number, movesScal
 /** Preset names other modules key on (TT-21: the Algeciras backdrop, the daylight-lock default). */
 export const TTI_PRESET_NAME = 'TTI Algeciras baseline'
 export const PEAK_DAY_PRESET_NAME = 'TTI Algeciras — peak day'
+export const SMALL_PRESET_NAME = 'Small automated'
 
 export const TTI_DERIVED_BAYS_PRESETS = ['TTI Algeciras baseline', 'TTI Algeciras — peak day']
 
@@ -120,9 +121,9 @@ export const presets: Record<string, () => ScenarioConfig> = {
       truckScale: 1,
       reefers: TTI_REEFERS,
     }),
-  'Small automated': () =>
+  [SMALL_PRESET_NAME]: () =>
     terminal({
-      name: 'Small automated',
+      name: SMALL_PRESET_NAME,
       description: '400 m quay, 3 STS, 6 blocks, 8 SHC: a small automated terminal',
       seed: 7,
       quayM: 400,

@@ -125,7 +125,7 @@ h3 {
   background: var(--color-primary);
   border: 1px solid var(--color-primary);
   border-radius: 8px;
-  color: #fff;
+  color: var(--color-text);
   font-size: 1rem;
   font-weight: 700;
 }

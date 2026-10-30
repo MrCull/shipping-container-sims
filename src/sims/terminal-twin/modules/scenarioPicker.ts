@@ -5,7 +5,7 @@
  */
 import type { MessageKey } from '../i18n/messages'
 import { planOf } from './planModel'
-import { PEAK_DAY_PRESET_NAME, TTI_PRESET_NAME } from '../scenario/presets'
+import { PEAK_DAY_PRESET_NAME, SMALL_PRESET_NAME, TTI_PRESET_NAME } from '../scenario/presets'
 import type { ScenarioConfig } from '../scenario/types'
 
 export interface ScenarioStats {
@@ -68,7 +68,7 @@ export function fixtureRow(name: string, config: ScenarioConfig): FixtureRow {
 export function presetCopy(name: string): { tagline: MessageKey; description: MessageKey } | null {
   if (name === TTI_PRESET_NAME) return { tagline: 'preset.baseline.tagline', description: 'preset.baseline.description' }
   if (name === PEAK_DAY_PRESET_NAME) return { tagline: 'preset.peakDay.tagline', description: 'preset.peakDay.description' }
-  if (name === 'Small automated') return { tagline: 'preset.small.tagline', description: 'preset.small.description' }
+  if (name === SMALL_PRESET_NAME) return { tagline: 'preset.small.tagline', description: 'preset.small.description' }
   return null
 }
 

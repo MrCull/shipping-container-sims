@@ -24,6 +24,10 @@ export const SHC_OPERATIONAL_STATES = [
 
 export type ShcOperationalState = (typeof SHC_OPERATIONAL_STATES)[number]
 
+/** A fresh seconds-per-operational-state record, all zero. */
+export const zeroStateS = (): Record<ShcOperationalState, number> =>
+  Object.fromEntries(SHC_OPERATIONAL_STATES.map((op) => [op, 0])) as Record<ShcOperationalState, number>
+
 /** Every SHC status (the type's members, so a new status fails the compiler until it is mapped). */
 const STATUS_STATE: Record<ShcStatus, ShcOperationalState> = {
   parked: 'parked',

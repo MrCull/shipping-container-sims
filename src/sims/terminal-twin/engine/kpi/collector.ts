@@ -14,7 +14,7 @@ import type { EngineEvent } from '../events'
 import { DECISION_POINT_IDS } from '../decisions/types'
 import { appointmentWindowS } from '../appointments'
 import { ascIdOf } from '../state'
-import { SHC_OPERATIONAL_STATES, type ShcOperationalState } from '../shcStates'
+import { SHC_OPERATIONAL_STATES, zeroStateS, type ShcOperationalState } from '../shcStates'
 import { blockSpecs, boxSpan } from '../yardLayout'
 import type { ContainerSize, ScenarioConfig } from '../../scenario/types'
 import {
@@ -832,7 +832,7 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
     shcTotals(now) {
       const out: ReturnType<KpiCollector['shcTotals']> = {}
       for (const [id, o] of Object.entries(shcOp)) {
-        const stateS = Object.fromEntries(SHC_OPERATIONAL_STATES.map((op) => [op, 0])) as Record<ShcOperationalState, number>
+        const stateS = zeroStateS()
         for (const op of SHC_OPERATIONAL_STATES) for (const v of acc.sums[`shc.state.${op}`]?.[id] ?? []) stateS[op] += v ?? 0
         if (now > o.since) stateS[o.op] += now - o.since
         for (const op of SHC_OPERATIONAL_STATES) stateS[op] = r3(stateS[op])

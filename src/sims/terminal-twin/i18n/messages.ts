@@ -303,7 +303,7 @@ const en = {
   'setup.check.modeNoSts': 'The quay mode needs STS cranes; set it to off or add a crane',
   'setup.check.modeNoBlocks': 'The yard mode needs yard blocks; set it to off or add a block',
   'setup.check.modeYardOff': 'With the yard off, the {other} cannot run: set the {other} to off too',
-  'setup.check.heavy': 'This is above stress-test scale: the run may be slow',
+  'setup.check.heavy': 'This is above peak-day scale: the run may be slow',
   'setup.check.dwell': 'The transshipment dwell median must be positive',
   'setup.check.pool': 'The empty pool must have a non-negative number of boxes',
 
