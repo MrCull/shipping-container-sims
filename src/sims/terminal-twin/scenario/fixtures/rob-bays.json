@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "name": "rob-bays",
+  "description": "A feeder keeps 3 of 7 bays as remain-on-board: never worked, hatch covers closed",
+  "seed": 31,
+  "startDateTime": "2026-01-05T06:00:00Z",
+  "quay": {
+    "lengthM": 400,
+    "berthGapM": 15,
+    "mooringS": 60,
+    "unmooringS": 60,
+    "stsMinSpacingM": 27,
+    "twinLift": true
+  },
+  "layout": {
+    "stsGroundLaneZ0M": 8,
+    "stsGroundLaneSpacingM": 3,
+    "stsSafeHoistM": 50
+  },
+  "kinematics": {
+    "sts": {
+      "gantry": {
+        "vMax": 0.75,
+        "accel": 0.25,
+        "decel": 0.25
+      },
+      "trolley": {
+        "vMax": 4,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "hoistLoaded": {
+        "vMax": 1.5,
+        "accel": 0.6,
+        "decel": 0.6
+      },
+      "hoistEmpty": {
+        "vMax": 3,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "lockS": 3,
+      "unlockS": 3
+    },
+    "shc": {
+      "driveEmpty": {
+        "vMax": 8.3,
+        "accel": 1,
+        "decel": 1.2
+      },
+      "driveLoaded": {
+        "vMax": 6.9,
+        "accel": 0.7,
+        "decel": 0.9
+      },
+      "lift": {
+        "vMax": 0.4,
+        "accel": 0.4,
+        "decel": 0.4
+      },
+      "liftHeightM": 1,
+      "lockS": 2,
+      "unlockS": 2
+    }
+  },
+  "moveVariationPct": 10,
+  "sts": [
+    {
+      "id": "STS01",
+      "gantryX": 60,
+      "groundPositions": 3
+    }
+  ],
+  "vessels": [
+    {
+      "id": "V001",
+      "name": "Remain Star",
+      "arrivalS": 0,
+      "sizeClass": "feeder",
+      "discharge": 16,
+      "load": 6,
+      "transshipment": 0,
+      "maxSts": 1,
+      "sizeMix": {
+        "20": 1,
+        "40": 1
+      }
+    },
+    {
+      "id": "V002",
+      "name": "Export Star",
+      "arrivalS": 20000,
+      "sizeClass": "feeder",
+      "discharge": 0,
+      "load": 4,
+      "transshipment": 0,
+      "maxSts": 1
+    }
+  ],
+  "cargo": {
+    "lines": {
+      "HMM": 30,
+      "MSC": 15,
+      "Maersk": 12,
+      "CMA CGM": 10,
+      "Hapag-Lloyd": 8,
+      "ONE": 7,
+      "Evergreen": 6,
+      "COSCO": 6,
+      "ZIM": 3,
+      "Yang Ming": 3
+    },
+    "sizeMix": {
+      "20": 0.3,
+      "40": 0.25,
+      "40HC": 0.45
+    },
+    "emptyShare": 0.1
+  },
+  "endConditions": {
+    "vesselsCompleted": 2
+  },
+  "driverVariabilityPct": 10,
+  "robBayFraction": 0.43,
+  "robFill": 0.7,
+  "shcs": [
+    {
+      "id": "SHC01"
+    },
+    {
+      "id": "SHC02"
+    }
+  ],
+  "yard": {
+    "blocks": [
+      {
+        "id": "B01",
+        "x": 20,
+        "bays": 10,
+        "tiers": 3,
+        "transferStalls": 2,
+        "wtpPads": 5
+      }
+    ],
+    "ascsPerBlock": 2
+  },
+  "landside": {
+    "hourlyProfile": [
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16
+    ],
+    "mix": {
+      "dropExport": 0.25,
+      "pickImport": 0.3,
+      "dropEmpty": 0.1,
+      "pickEmpty": 0.1,
+      "dual": 0.25
+    },
+    "importDwell": {
+      "kind": "fixed",
+      "s": 300
+    },
+    "exportWindow": {
+      "minBeforeEtaS": 3600,
+      "maxBeforeEtaS": 36000
+    },
+    "gate": {
+      "inLanes": 2,
+      "outLanes": 2,
+      "inProcessingS": 45,
+      "outProcessingS": 20,
+      "processingVariationPct": 0,
+      "oogLane": true
+    },
+    "drive": {
+      "vMax": 8,
+      "accel": 1,
+      "decel": 1.5
+    }
+  }
+}

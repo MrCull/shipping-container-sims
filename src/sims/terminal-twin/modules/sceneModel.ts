@@ -41,6 +41,7 @@ import {
   type Reservation,
 } from '../engine'
 import { planCargo } from '../scenario/bayPlan'
+import type { RobBox } from '../scenario/robBays'
 import { planExportYard } from '../scenario/exportYard'
 import type { ContainerSize, ScenarioConfig, VesselConfig } from '../scenario/types'
 import {
@@ -250,6 +251,8 @@ export class SceneModel {
   private status: Record<string, StatusEntry[]> = {}
   /** Hatch panels of the vessels' bays (TT-R10), in id order; empty with hatch covers off. */
   readonly hatchPanelIds: string[] = []
+  /** Display-only ROB boxes of all vessels (spec #106), drawn in the hulls by `VesselHulls`. */
+  readonly robBoxes: readonly RobBox[]
   private readonly hatchSpecs: Record<string, HatchPanelSpec> = {}
   /** Per panel: its state changes in time order (a panel with none is secured on its hatch). */
   private hatchTimeline: Record<string, HatchPanelChange[]> = {}
@@ -315,18 +318,24 @@ export class SceneModel {
       this.custody[c.id] = [{ t: 0, owner }]
     }
     for (const imp of prefill?.imports ?? []) this.custody[imp.id] = [{ t: 0, owner: { kind: 'yardSlot', id: exportSlot.get(imp.id) as string } }]
-    if (hatchEnabled(config)) this.createHatchPanels(cargo.slots)
+    this.robBoxes = cargo.rob
+    if (hatchEnabled(config)) this.createHatchPanels(cargo.slots, cargo.robBays)
     for (const v of config.vessels) this.status[`vessel:${v.id}`] = [{ t: 0, status: 'scheduled' }]
     for (const s of config.sts) this.status[`sts:${s.id}`] = [{ t: 0, status: 'idle' }]
   }
 
   /** One panel per hatch panel position of every bay that has a slot (the engine's `createHatchPanels`). */
-  private createHatchPanels(slots: readonly { vesselId: string; bay: number }[]): void {
+  private createHatchPanels(slots: readonly { vesselId: string; bay: number }[], robBays: Record<string, number[]>): void {
     const bays = new Map<string, Set<number>>()
     for (const slot of slots) {
       let set = bays.get(slot.vesselId)
       if (!set) bays.set(slot.vesselId, (set = new Set()))
       set.add(slot.bay)
+    }
+    for (const [id, list] of Object.entries(robBays)) {
+      let set = bays.get(id)
+      if (!set) bays.set(id, (set = new Set()))
+      for (const bay of list) set.add(bay)
     }
     for (const v of this.config.vessels) {
       const spec = this.specs[v.id]

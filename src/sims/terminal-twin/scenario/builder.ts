@@ -298,6 +298,13 @@ export class ScenarioBuilder {
     return this
   }
 
+  /** ROB bays (spec #106): the share of each vessel's bays held back as display-only remain-on-board boxes, and how full they are (default 0.7). */
+  robBays(fraction: number, fill?: number): this {
+    this.config.robBayFraction = fraction
+    if (fill !== undefined) this.config.robFill = fill
+    return this
+  }
+
   decisions(decisions: DecisionsConfig): this {
     this.config.decisions = structuredClone(decisions)
     return this

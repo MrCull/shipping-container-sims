@@ -172,7 +172,8 @@ export function createHatchPanels(state: SimState, config: ScenarioConfig): void
   for (const v of Object.values(state.vessels)) {
     const spec = vesselClass(v.sizeClass)
     const settings = hatchSettings(config, v.sizeClass)
-    for (const bay of [...(bays.get(v.id) ?? [])].sort((a, b) => a - b)) {
+    // ROB bays have no slots but a closed hatch: the panels are drawn and stay secured (never opened)
+    for (const bay of [...new Set([...(bays.get(v.id) ?? []), ...(v.robBays ?? [])])].sort((a, b) => a - b)) {
       for (let index = 0; index < settings.panels; index++) {
         const { from, to } = hatchPanelRows(spec, index)
         const home = { x: slotX(spec, 0, bay), y: spec.deckHeightM, z: hatchPanelZ(spec, index) }
