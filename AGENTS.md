@@ -6,29 +6,21 @@ A Vue 3 + TypeScript web app that hosts shipping-container-themed simulations an
 
 ## Tech stack
 
-- **Vue 3** — Composition API, `<script setup lang="ts">`
-- **Vite** — dev server & build
-- **TypeScript** — strict mode
-- **Pinia** — state management
-- **Vue Router** — SPA routing (`/` home, `/sim/:simId` game page)
-- **Three.js** — 3D rendering (shared via `useThreeScene` composable)
-- **ESLint** — static analysis for JS/TS/Vue (`eslint.config.js`; Vue + TypeScript recommended presets)
+Vue 3 (Composition API, `<script setup lang="ts">`), Vite, strict TypeScript, Pinia, Vue Router (`/` home, `/sim/:simId` game page), Three.js (shared via the `useThreeScene` composable), ESLint, Vitest, tsx for headless CLIs. Package manager: **pnpm**. Versions and scripts: `package.json`.
 
-## Linting and verification
+## Verification
 
-After making substantive code changes, run **`npm run lint`** to catch issues.
+Before handing work back after code changes, run **`pnpm run verify`** (dependency check, lint, build, tests). Pull requests to `main` run the same checks in CI (`.github/workflows/pr-checks.yml`). Use `pnpm run lint:fix` for ESLint auto-fixes.
 
-Before handing work back after code changes, run **`npm run verify`**: lint, then build (catches TypeScript or Vite errors that linting may miss), then tests when a `test` script exists. Pull requests to `main` run the same checks in CI (`.github/workflows/pr-checks.yml`).
-
-To apply ESLint auto-fixes (including many Vue template and style rules), use **`npm run lint:fix`**.
-
-**npm and `--fix`:** Arguments after `npm run <script>` are **not** passed to the underlying command unless you insert **`--`**. For example, **`npm run lint --fix`** only runs `eslint .` — it does **not** pass `--fix` to ESLint. Either run **`npm run lint:fix`**, or pass the flag explicitly: **`npm run lint -- --fix`**.
+- **Script arguments:** pnpm passes arguments after the script name straight through (`pnpm run lint --fix` works), and a `--` is handed to the script literally. In `.claude/launch.json` and similar, write `pnpm exec vite --port 5174`, not `pnpm run dev --port 5174`.
+- **Where checks run:** test files (`*.test.ts`, `*.smoke.ts`) and Node-only CLI code (`src/sims/*/cli/`) are type-checked by `tsconfig.tools.json`, not `tsconfig.app.json`. Terminal Twin scripts (`pnpm run tt:*`): the sim guide's "How to prove a change works" lists them.
+- **Browser smoke tests** (`pnpm run test:smoke`, Playwright, `src/**/*.smoke.ts`) are not part of `verify`. CI runs them from the Actions tab ("Run workflow") or while a PR carries the `smoke` label, and they should be green before merging UI changes. Specs titled `@load` need a real frame rate and never run in CI. Frame assertions are ratios over a minimum wall-clock window (`tests/browser/frameSampling.ts`), never absolute counts. The `dev` project uses a Vite dev server (dev-only APIs work); the `prod` project (`*.prod.smoke.ts`) uses a production build. Ports default to 5199 / 5198 (`SMOKE_DEV_PORT` / `SMOKE_PROD_PORT`).
 
 ## Agent tooling
 
-- **Cloud sessions**: a SessionStart hook (`.claude/hooks/session-start.sh`) runs `npm install` in Claude Code cloud sessions, so lint/build/test work immediately. It does nothing locally.
-- **Visual checks**: `npm run screenshot -- --path /sim/<sim-id> --wait 8000` starts a Vite dev server on a free port, opens the route in headless Chromium (WebGL works via software rendering), saves a PNG to `.screenshots/` (git-ignored) and reports page errors. Use `--out <file>`, `--wait-for <selector>`, `--eval "<js>"` (e.g. drive a dev-only debug API before the shot), `--full-page`, `--fail-on-error`, or `--base <url>` to use an already-running server. If Playwright's bundled Chromium isn't installed it falls back to `CHROMIUM_PATH` or the cloud image's preinstalled `/opt/pw-browsers/chromium`.
-- **README media**: `npm run capture-readme-media` (needs `npm run build && npm run preview` first) regenerates the README screenshots.
+- **Cloud sessions:** a SessionStart hook (`.claude/hooks/session-start.sh`) runs `pnpm install`; it does nothing locally.
+- **Visual checks:** `pnpm run screenshot --path /sim/<sim-id> --wait 8000` saves a PNG to `.screenshots/` and reports page errors (headless Chromium, software WebGL, so no real frame rates). Options: header of `scripts/screenshot.mjs`.
+- **README media:** `pnpm run capture-readme-media` (after `pnpm run build && pnpm run preview`).
 
 ## Project structure
 
@@ -55,7 +47,7 @@ src/
         └── assets/              Sim-specific media (3D models, sounds, textures)
 
 available-media/
-├── 3d-models/       Pre-sourced 3D assets (see § Available media below)
+├── 3d-models/       Pre-sourced 3D assets (inventory: `available-media/README.md`)
 └── sound-samples/   Sound effects for gameplay feedback
 
 knowledge-base/      Domain knowledge reference files (dk_*.md)
@@ -70,6 +62,7 @@ Each sim that has grown beyond a trivial prototype maintains its own agent guide
 - **[Box Empire](src/sims/box-empire/box-empire-AGENTS.md)** — Terminal operations tycoon sim. Architecture, modules, components, composables, layout, assets, shipping-line liveries, and known behaviours.
 - **[Container Stack / Contenga](src/sims/container-stack/AGENTS.md)** — 3D Jenga-style container stacking game. Phase state machine, Three.js rendering split, pointer interaction, stability physics, scoring, level timers, audio, and known pitfalls.
 - **[Stowage Master](src/sims/stowage-master/stowage-master-AGENTS.md)** — Container stowage puzzle sim. Phase state machine, physics (list/trim/VCG), scoring, disaster system, 10 levels, ship presets, rendering modules, optional Jev assist, and known pitfalls.
+- **[Terminal Twin](src/sims/terminal-twin/terminal-twin-AGENTS.md)** — Event-driven automated-terminal digital twin / TOS test bench. Headless engine API, events and causality, invariants, fixtures and golden summaries, CLI runner, browser host (Web Worker, 3D view, time controls, `window.__tt` dev API), phase 2 asset pipeline (Blender `bpy` generators, `pnpm run tt:assets`, asset budget check in CI, dev asset viewer), and "How to prove a change works". Per-topic detail is in its `docs/` folder, reached by pointers in the guide. Domain terms: **[GLOSSARY.md](GLOSSARY.md)**.
 
 ## Key conventions
 
@@ -78,7 +71,7 @@ Each sim that has grown beyond a trivial prototype maintains its own agent guide
 - **Composition API only**: Always use `<script setup lang="ts">`. No Options API.
 - **Strict TypeScript**: `noUnusedLocals`, `noUnusedParameters`, `strict` are all enabled.
 - **Scoped styles**: Use `<style scoped>` in all components.
-- **CSS variables**: Use the design tokens defined in `src/assets/main.css` (e.g. `--color-primary`, `--font-retro`).
+- **CSS variables**: Use the design tokens defined in `src/assets/main.css` (e.g. `--color-primary`).
 - **Keep this guide current**: When project-wide details change or new tooling, conventions, or structure are added that affect how agents or contributors work, update **AGENTS.md** in the same change (or a follow-up) so it stays accurate.
 
 ## Plans
@@ -93,20 +86,7 @@ New skills go under **`.agents/skills/`** instead — the repo's new top-level n
 
 **`.claude/skills/`** holds Matt Pocock's engineering-workflow skills (vendored from upstream, see `.claude/skills/UPSTREAM.md`), invoked as slash commands in Claude Code: e.g. `/grill-me`, `/to-spec`, `/to-tickets`, `/implement`, `/tdd`, `/diagnosing-bugs`, `/code-review`, `/pr`. They read their per-repo configuration from `docs/agents/` (see § Agent skills).
 
-**Skill index** (every `SKILL.md` in `.ai/skills/`):
-
-- [adding-a-sim](.ai/skills/adding-a-sim/SKILL.md)
-- [container-cargo-entities](.ai/skills/container-cargo-entities/SKILL.md)
-- [terminal-economics](.ai/skills/terminal-economics/SKILL.md)
-- [terminal-equipment-entities](.ai/skills/terminal-equipment-entities/SKILL.md)
-- [terminal-infrastructure](.ai/skills/terminal-infrastructure/SKILL.md)
-- [terminal-operations](.ai/skills/terminal-operations/SKILL.md)
-- [threejs-vue3-animation](.ai/skills/threejs-vue3-animation/SKILL.md)
-- [vessel-entities](.ai/skills/vessel-entities/SKILL.md)
-
-**Skill index** (every `SKILL.md` in `.agents/skills/`):
-
-- [jev-integration](.agents/skills/jev-integration/SKILL.md) — Using Jev (TypeSafe System One), a bounded-decision model: typed questions (Choice/Score/Noul), state design, API access, and interpreting/applying judgments.
+Each folder holds one `SKILL.md` per topic with its own description: list them with `ls .ai/skills .agents/skills`.
 
 ### Project workflow
 
@@ -141,64 +121,14 @@ Issues and specs live in GitHub Issues on `MrCull/shipping-container-sims`. See 
 
 The default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
 
+### Implementing a spec
+
+For `/implement-spec`, the orchestrator steps and the implementer brief are in `docs/agents/implementing.md`.
+
 ### Domain docs
 
-Single-context: one root `GLOSSARY.md` plus `docs/adr/`, created lazily. See `docs/agents/domain.md`.
+Single-context: one root [`GLOSSARY.md`](GLOSSARY.md) (currently Terminal Twin terms) plus `docs/adr/`, created lazily. See `docs/agents/domain.md`.
 
 ## Available media
 
-The `available-media/` folder contains pre-sourced assets that can be copied into a sim's folder or referenced at build time. Assets are **not** bundled automatically — import only what a sim needs.
-
-### 3D models (`available-media/3d-models/`)
-
-| Asset | Format | Description |
-|-------|--------|-------------|
-| `20-foot-container.obj`, `20-foot-container-2.obj` | OBJ | Basic 20ft container geometry |
-| `20-foor-container-blue.FBX` | FBX | Blue 20ft container |
-| `20-foot-container-green.fbx` | FBX | Green 20ft container |
-| `20-foot-container-reefer-white-dirty.fbx` | FBX | White reefer container (weathered) |
-| `20-foot-container-damaged.fbx` | FBX | Damaged 20ft container (large file ~75 MB) |
-| `20-foot-containers-various-colors.fbx` | FBX | Multiple colour variants in one file (~70 MB) |
-| `20-foot-shipping-container-old.FBX` | FBX | Aged/rusted 20ft container |
-| `container-on-trailer-all-white.glb` | GLB | Container mounted on a trailer chassis |
-| `container-trailer-chassis-empty.glb` | GLB | Empty trailer chassis (~45 MB) |
-| `container-ship-large-empty-no-containers.glb` | GLB | Large vessel hull (no cargo) |
-| `container-ship-small-empty-no-containers.glb` | GLB | Small vessel hull (no cargo, ~17 MB) |
-| `container-ship-large/` | FBX + textures | Large container ship with full PBR texture set (hull, bridge, containers) |
-| `container-ship-medium-with-own-cranes/` | GLB + textures | Medium vessel with onboard cranes and branded container textures |
-| `quay-cranes-six-different-types.glb` | GLB | Six STS quay crane variants (~56 MB) |
-| `crane-rubber-tired-gantry-rtd.glb` | GLB | RTG yard crane (~36 MB) |
-| `reach-stacker-spreaker.glb` | GLB | Reach stacker with spreader (~47 MB) |
-| `truck-no-trailer.glb`, `truck-no-trailer2.glb` | GLB | Terminal tractor / truck cab (no chassis) |
-| `toll-which-might-be-able-to-be-used-as-gatehouse.glb` | GLB | Toll booth structure, usable as a gatehouse (~37 MB) |
-
-**Format notes:** GLB files can be loaded directly with Three.js `GLTFLoader`. FBX files need `FBXLoader`. OBJ files use `OBJLoader`. For best runtime performance, convert FBX/OBJ assets to GLB with Draco compression before bundling into a sim (see the [Three.js + Vue 3 Animation skill](.ai/skills/threejs-vue3-animation/SKILL.md) for pipeline guidance).
-
-### Sound effects (`available-media/sound-samples/`)
-
-| Asset | Description |
-|-------|-------------|
-| `container-loaded-to-ship.mp3` | Metallic thud — container placed on vessel |
-| `large-ship-three-horns-in-a-row.mp3` | Three deep ship horn blasts |
-| `small-ship-three-horns-in-a-row.mp3` | Three higher-pitched ship horn blasts |
-| `quiet-truck-engine.mp3` | Idling truck / terminal tractor engine loop |
-| `correct-ding.mp3` | Short success chime |
-| `gaming-bonus-sound.mp3` | Bonus / power-up jingle |
-| `gaming-negative-event-sound.mp3` | Negative event / error tone |
-| `group-yay-cheer.mp3` | Crowd cheer for big achievements |
-| `horns-level-up.mp3` | Fanfare — level completion |
-| `level-passed-ok.mp3` | Subtle level-passed confirmation |
-| `level-up.mp3`, `level-up2.mp3`, `level-up-quick-sound.mp3` | Level-up stingers (varying lengths) |
-| `money-increase-ca-ching-.mp3` | Cash register / revenue earned |
-| `money-increase-game-sound.mp3` | Coin / money gain |
-
-### What else could go here
-
-As new sims are developed, `available-media/` is the right place for additional pre-sourced assets that may be shared across sims:
-
-- **More 3D models** — 40ft / 45ft / high-cube containers, ASC (automated stacking crane), RMG (rail-mounted gantry), AGVs, straddle carriers, empty handlers, forklifts, fender systems, bollards, lashing bridges, hatch covers, buildings (office, workshop, control tower), yard lighting masts, road barriers, rail tracks, berth/quay wall sections, water/sea plane meshes.
-- **Textures & materials** — Shipping line liveries (Maersk blue, Evergreen green, MSC navy, Hapag-Lloyd orange), rust/weathering overlays, concrete/asphalt ground, water surfaces, hazmat placards (IMDG diamond labels), container ISO markings decals, night-time emissive textures for lights/signals.
-- **Skyboxes / HDR environments** — Port-side panoramas, overcast maritime, clear day, night with port lighting, sunset/golden hour.
-- **Sound effects** — Crane motor hum, spreader lock/unlock clank, container touchdown impact, hatch cover slide, lashing chains, reversing beeper, gate barrier lift, rain/wind ambient, seagulls, port ambient, radio chatter, alarm/siren.
-- **UI assets** — Container status icons, equipment silhouettes for dashboards, hazmat class diamond PNGs, map/minimap tiles, font files.
-- **Animation data** — Pre-baked crane cycle animations, truck driving loops, wave motion for vessels at berth, smoke/exhaust particle sprite sheets.
+Pre-sourced 3D models and sound effects live in `available-media/`; copy only what a sim needs into its own `assets/`. Inventory, format notes and ideas for more: [available-media/README.md](available-media/README.md).

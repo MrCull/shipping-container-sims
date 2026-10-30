@@ -1,0 +1,68 @@
+{
+  "asset": "backdrop-rock",
+  "kind": "backdrop",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 1420,
+    "widthM": 520,
+    "heightM": 426,
+    "tag": "V",
+    "reason": "Rock of Gibraltar: about 1.4 km long and 426 m high (the renderer applies the same 1.25 vertical exaggeration as the TT-21 backdrop)"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "backdrop-rock",
+      "role": "lod",
+      "description": "low-poly Rock of Gibraltar silhouette (about 1.4 km long, 426 m high); origin at the base centre, crest on the far (-Z) side, gentle slopes toward +Z"
+    },
+    {
+      "name": "rock",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "faceted limestone ridge"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 960,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "ridge profile 1.4 km long, 426 m summit toward the north end",
+      "tag": "V",
+      "source": "public elevation data (summary figures)"
+    },
+    {
+      "fact": "cross-section and facet noise",
+      "tag": "A",
+      "reason": "silhouette only"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "backdrop": {
+    "distanceM": 6200
+  }
+}

@@ -1,0 +1,169 @@
+{
+  "scenario": "crane-split-4sts",
+  "seed": 1,
+  "status": "ended",
+  "endReason": "vesselsCompleted >= 1",
+  "eventLogHash": "0e5a25219c47bb",
+  "kpis": {
+    "simTimeS": 3364.614,
+    "eventsProcessed": 455,
+    "movesCompleted": 60,
+    "vesselsCompleted": 1,
+    "sts": {
+      "STS01": {
+        "moves": 14,
+        "cycles": 10,
+        "twinLifts": 4,
+        "grossMovesPerHour": 35.025,
+        "railWaitS": 0
+      },
+      "STS02": {
+        "moves": 14,
+        "cycles": 12,
+        "twinLifts": 2,
+        "grossMovesPerHour": 29.484,
+        "railWaitS": 0
+      },
+      "STS03": {
+        "moves": 16,
+        "cycles": 14,
+        "twinLifts": 2,
+        "grossMovesPerHour": 27.234,
+        "railWaitS": 0
+      },
+      "STS04": {
+        "moves": 16,
+        "cycles": 15,
+        "twinLifts": 1,
+        "grossMovesPerHour": 26.851,
+        "railWaitS": 0
+      }
+    },
+    "vessels": {
+      "V001": {
+        "sizeClass": "neo-panamax",
+        "arrivedAtS": 0,
+        "anchorageWaitS": 0,
+        "berthX": 0,
+        "berthedAtS": 600,
+        "departedAtS": 3364.614,
+        "turnaroundS": 2764.614,
+        "sts": [
+          "STS01",
+          "STS02",
+          "STS03",
+          "STS04"
+        ]
+      }
+    },
+    "quay": {
+      "vesselsWaited": 0,
+      "anchorageWaitS": {
+        "total": 0,
+        "mean": 0,
+        "max": 0
+      }
+    },
+    "handlers": {
+      "stsGroundPosition": {
+        "handler": "strategy:lowest-free-lane",
+        "calls": 60,
+        "resolved": 60,
+        "ok": 60,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "berthAllocation": {
+        "handler": "strategy:first-fit",
+        "calls": 1,
+        "resolved": 1,
+        "ok": 1,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "craneSplit": {
+        "handler": "strategy:balanced-moves",
+        "calls": 1,
+        "resolved": 1,
+        "ok": 1,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "workPackageRelease": {
+        "handler": "strategy:keep-k-ahead",
+        "calls": 34,
+        "resolved": 34,
+        "ok": 34,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 4,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      }
+    },
+    "workPackages": {
+      "released": 30,
+      "started": 30,
+      "completed": 30,
+      "leadTimeMeanS": 377.988,
+      "leadTimeMaxS": 798.899,
+      "boxesLoaded": 0
+    }
+  },
+  "invariants": {
+    "enabled": true,
+    "checks": 454,
+    "violations": 0,
+    "first": null
+  },
+  "firstError": null
+}

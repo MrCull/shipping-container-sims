@@ -1,0 +1,309 @@
+{
+  "$comment": "Phase 2 asset budgets (spec #24, 'Phase 2 asset pipeline'). Checked by `pnpm run tt:assets:check` and tests/asset-budgets.test.ts. Triangles and draw calls are per LOD subtree; maxFileBytes is per GLB; libraryMaxBytes is all GLBs together.",
+  "libraryMaxBytes": 15000000,
+  "requiredMetaFields": [
+    "asset",
+    "kind",
+    "dimensions",
+    "axes",
+    "nodes",
+    "travelLimits",
+    "attachPoints",
+    "groundContact",
+    "provenance"
+  ],
+  "kinds": {
+    "container": {
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 450,
+          "maxDrawCalls": 3
+        },
+        "LOD1": {
+          "maxTriangles": 12,
+          "maxDrawCalls": 1
+        }
+      },
+      "maxFileBytes": 400000,
+      "requiredNodes": [
+        "LOD0",
+        "LOD1",
+        "body",
+        "door_left",
+        "door_right"
+      ]
+    },
+    "sts": {
+      "$comment": "TT-23. One mesh node per rig part (each a draw call): LOD0 = 10 parts + 8 twist-locks + the crane-number plate material; LOD1 drops the twist-locks; LOD2 keeps gantry, boom, trolley, ropes and spreader.",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 40000,
+          "maxDrawCalls": 20
+        },
+        "LOD1": {
+          "maxTriangles": 8000,
+          "maxDrawCalls": 10
+        },
+        "LOD2": {
+          "maxTriangles": 1000,
+          "maxDrawCalls": 6
+        }
+      },
+      "maxFileBytes": 3000000,
+      "requiredNodes": [
+        "LOD0",
+        "LOD1",
+        "LOD2",
+        "gantry",
+        "trolley",
+        "hoist",
+        "spreader",
+        "boom",
+        "ropes",
+        "spreader_tele_fore",
+        "spreader_tele_aft",
+        "twin_locks",
+        "twistlock_fore_land",
+        "twistlock_fore_sea",
+        "twistlock_aft_land",
+        "twistlock_aft_sea",
+        "twistlock_twin_aft_land",
+        "twistlock_twin_aft_sea",
+        "twistlock_twin_fore_land",
+        "twistlock_twin_fore_sea",
+        "gantry_lod1",
+        "trolley_lod1",
+        "hoist_lod1",
+        "spreader_lod1",
+        "boom_lod1",
+        "ropes_lod1",
+        "spreader_tele_fore_lod1",
+        "spreader_tele_aft_lod1",
+        "twin_locks_lod1",
+        "gantry_lod2",
+        "trolley_lod2",
+        "hoist_lod2",
+        "spreader_lod2",
+        "boom_lod2",
+        "ropes_lod2",
+        "spreader_tele_fore_lod2",
+        "spreader_tele_aft_lod2",
+        "twin_locks_lod2"
+      ]
+    },
+    "asc": {
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 15000,
+          "maxDrawCalls": 10
+        },
+        "LOD1": {
+          "maxTriangles": 4000,
+          "maxDrawCalls": 6
+        },
+        "LOD2": {
+          "maxTriangles": 600,
+          "maxDrawCalls": 3
+        }
+      },
+      "maxFileBytes": 1500000,
+      "requiredNodes": [
+        "LOD0",
+        "LOD1",
+        "LOD2",
+        "gantry",
+        "trolley",
+        "hoist",
+        "spreader"
+      ]
+    },
+    "shc": {
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 12000,
+          "maxDrawCalls": 16
+        },
+        "LOD1": {
+          "maxTriangles": 3000,
+          "maxDrawCalls": 12
+        },
+        "LOD2": {
+          "maxTriangles": 400,
+          "maxDrawCalls": 3
+        }
+      },
+      "maxFileBytes": 1500000,
+      "requiredNodes": [
+        "LOD0",
+        "LOD1",
+        "LOD2",
+        "frame",
+        "hoist",
+        "spreader",
+        "steer_fl",
+        "steer_fr",
+        "steer_rl",
+        "steer_rr",
+        "wheel_fl",
+        "wheel_fr",
+        "wheel_rl",
+        "wheel_rr",
+        "twistlock_fl",
+        "twistlock_fr",
+        "twistlock_rl",
+        "twistlock_rr"
+      ]
+    },
+    "truck": {
+      "$comment": "TT-26: tractor + chassis per cab variant. One mesh node per rolling axle (wheel_fl, wheel_fr, wheel_r, wheel_t1-3) plus chassis and tractor = 8 draw calls at LOD0 and LOD1 (the rig is kept); LOD2 merges the wheels (chassis + tractor).",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 8000,
+          "maxDrawCalls": 8
+        },
+        "LOD1": {
+          "maxTriangles": 2000,
+          "maxDrawCalls": 8
+        },
+        "LOD2": {
+          "maxTriangles": 300,
+          "maxDrawCalls": 2
+        }
+      },
+      "maxFileBytes": 1000000,
+      "requiredNodes": [
+        "LOD0",
+        "LOD1",
+        "LOD2",
+        "chassis",
+        "tractor",
+        "fifth_wheel",
+        "steer_fl",
+        "steer_fr",
+        "wheel_fl",
+        "wheel_fr",
+        "wheel_r",
+        "wheel_t1",
+        "wheel_t2",
+        "wheel_t3"
+      ]
+    },
+    "chassis": {
+      "$comment": "TT-26: the skeletal container chassis alone (the tractor's trailer).",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 4000,
+          "maxDrawCalls": 4
+        },
+        "LOD1": {
+          "maxTriangles": 1000,
+          "maxDrawCalls": 4
+        },
+        "LOD2": {
+          "maxTriangles": 150,
+          "maxDrawCalls": 1
+        }
+      },
+      "maxFileBytes": 600000,
+      "requiredNodes": [
+        "LOD0",
+        "LOD1",
+        "LOD2",
+        "chassis",
+        "wheel_t1",
+        "wheel_t2",
+        "wheel_t3"
+      ]
+    },
+    "vessel": {
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 20000,
+          "maxDrawCalls": 10
+        },
+        "LOD1": {
+          "maxTriangles": 5000,
+          "maxDrawCalls": 6
+        },
+        "LOD2": {
+          "maxTriangles": 800,
+          "maxDrawCalls": 3
+        }
+      },
+      "maxFileBytes": 2000000,
+      "requiredNodes": [
+        "LOD0",
+        "LOD1",
+        "LOD2",
+        "hull",
+        "hatch_covers",
+        "lashing_bridges",
+        "bay_grid"
+      ]
+    },
+    "building": {
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 5000,
+          "maxDrawCalls": 8
+        }
+      },
+      "maxFileBytes": 1000000,
+      "requiredNodes": [
+        "LOD0"
+      ]
+    },
+    "gate": {
+      "$comment": "TT-28: gate complex modules (lane, OOG lane, island, office), ~5k triangles each, no LOD; a module has a handful of mesh nodes on one material.",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 5000,
+          "maxDrawCalls": 8
+        }
+      },
+      "maxFileBytes": 600000,
+      "requiredNodes": [
+        "LOD0"
+      ]
+    },
+    "quay": {
+      "$comment": "TT-28: quay furniture, instanced by the renderer (bollard, fender, edge and rail segments).",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 1200,
+          "maxDrawCalls": 2
+        }
+      },
+      "maxFileBytes": 150000,
+      "requiredNodes": [
+        "LOD0"
+      ]
+    },
+    "yard": {
+      "$comment": "TT-28: yard infrastructure (high mast, fence panel, ASC rail segment, ground markings), instanced.",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 1500,
+          "maxDrawCalls": 3
+        }
+      },
+      "maxFileBytes": 200000,
+      "requiredNodes": [
+        "LOD0"
+      ]
+    },
+    "backdrop": {
+      "$comment": "TT-28: distant low-poly backdrop meshes (Rock, hills, coastline).",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 4000,
+          "maxDrawCalls": 1
+        }
+      },
+      "maxFileBytes": 400000,
+      "requiredNodes": [
+        "LOD0"
+      ]
+    }
+  }
+}

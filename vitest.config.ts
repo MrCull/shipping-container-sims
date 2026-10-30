@@ -1,0 +1,17 @@
+import { defineConfig } from 'vitest/config'
+import { fileURLToPath } from 'node:url'
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  test: {
+    // Only this checkout's sources (never .claude/worktrees/*).
+    include: ['src/**/*.test.ts'],
+    environment: 'node',
+    // Heavy engine runs (TTI preset, goldens, benchmarks) exceed the 5 s default when the machine is busy (parallel agents, CI).
+    testTimeout: 60_000,
+  },
+})

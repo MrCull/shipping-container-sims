@@ -1,0 +1,63 @@
+{
+  "asset": "backdrop-hills",
+  "kind": "backdrop",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 9000,
+    "widthM": 900,
+    "heightM": 480,
+    "tag": "A",
+    "reason": "silhouette of the hills behind Algeciras, not a survey"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "backdrop-hills",
+      "role": "lod",
+      "description": "low-poly Algeciras hills behind the terminal (9 km long, 150-480 m); origin at the base centre"
+    },
+    {
+      "name": "hills",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "faceted hill range"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 590,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "hill range 9 km long, 150-480 m",
+      "tag": "A",
+      "reason": "matches the TT-21 backdrop figures"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "backdrop": {
+    "distanceM": 4300
+  }
+}

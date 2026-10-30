@@ -1,0 +1,70 @@
+{
+  "asset": "quay-bollard",
+  "kind": "quay",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 1.4,
+    "widthM": 1.0,
+    "heightM": 0.7,
+    "tag": "A",
+    "reason": "typical 100 t double bollard"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "quay-bollard",
+      "role": "lod",
+      "description": "double-bitt mooring bollard on a base plate (about 100 t); origin at the base centre"
+    },
+    {
+      "name": "bollard",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "double-bitt bollard"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "line",
+      "node": "bollard",
+      "position": [
+        0,
+        0.5,
+        0
+      ],
+      "tag": "A"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 136,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "double-bitt bollard 1.4 m long, 0.7 m high",
+      "tag": "A"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ]
+}

@@ -2,8 +2,13 @@ name: PR checks
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     branches:
       - main
+  # Browser smoke tests are slow (software WebGL, ~15 min) and bill Actions minutes per run, so they do not run on every push:
+  # start them from the Actions tab ("Run workflow"), or add the `smoke` label to a PR (they re-run on pushes while it is set).
+  workflow_dispatch:
+  # Label events must be listed here for the label gate below to see them.
 
 concurrency:
   group: pr-checks-${{ github.ref }}
@@ -11,6 +16,8 @@ concurrency:
 
 jobs:
   verify:
+    # Adding the `smoke` label re-triggers this workflow; skip the fast checks then, they just ran.
+    if: github.event.action != 'labeled'
     runs-on: ubuntu-latest
     name: Lint, build and test
     steps:
@@ -20,16 +27,49 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
+
+      - name: Check dependencies and lockfile
+        run: node scripts/check-deps.mjs
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Test
-        run: npm test --if-present
+        run: pnpm test
+
+      - name: Asset budgets (Terminal Twin GLBs + sidecars; no Blender needed)
+        run: pnpm run tt:assets:check
+
+  smoke:
+    # Required before merging a change that touches the browser UI: run it by hand or label the PR `smoke`.
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'smoke')
+    runs-on: ubuntu-latest
+    name: Browser smoke tests (Terminal Twin)
+    timeout-minutes: 40
+    # One job, not shards: sharding runs the same specs but bills the npm and Chromium installs once per shard.
+    # Frame-based assertions are ratios over a wall-clock window (tests/browser/frameSampling.ts), so they hold on a loaded
+    # 2-core runner. `@load` specs (need a real frame rate) are not run in CI: run them locally.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Smoke tests
+        run: pnpm run test:smoke --grep-invert @load

@@ -1,0 +1,83 @@
+/**
+ * 3D picking (TT-18): pure maths over the SceneModel, no Three.js.
+ *
+ * Every selectable thing has an oriented bounding box (`entityBounds`; also
+ * what the selection outline draws). A click ray picks the nearest container
+ * it hits; if it hits none, the nearest equipment or vessel box. Containers
+ * win because crane and hull boxes enclose the boxes they carry.
+ */
+import { EQUIPMENT_KINDS } from './equipmentKinds'
+import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
+
+export interface Ray {
+  origin: Vec3
+  dir: Vec3
+}
+
+/** Centre, full extents (X, Y, Z before yaw) and yaw about Y of a pickable thing. */
+export interface EntityBounds extends Vec3 {
+  sx: number
+  sy: number
+  sz: number
+  yaw: number
+}
+
+const SELECT_MARGIN_M = 0.6
+
+/** The bounding box of a container or a registered equipment kind at `time`; null if it is not in the scene. */
+export function entityBounds(model: SceneModel, id: string, time: number): EntityBounds | null {
+  const size = model.containerSize[id]
+  if (size) {
+    const pose = model.containerPose(id, time)
+    if (!pose) return null
+    const d = CONTAINER_DIMS[size]
+    return { x: pose.x, y: pose.y, z: pose.z, sx: d.length + SELECT_MARGIN_M, sy: d.height + SELECT_MARGIN_M, sz: d.width + SELECT_MARGIN_M, yaw: pose.yaw }
+  }
+  for (const def of EQUIPMENT_KINDS) if (def.ids(model).includes(id)) return def.bounds(model, id, time)
+  return null
+}
+
+/** Distance along the ray to the box, or null on a miss (slab test in the box's own frame). */
+function rayBox(ray: Ray, b: EntityBounds): number | null {
+  const cos = Math.cos(b.yaw)
+  const sin = Math.sin(b.yaw)
+  // World → box frame: translate, then rotate by -yaw about Y.
+  const local = (x: number, z: number): [number, number] => [x * cos - z * sin, x * sin + z * cos]
+  const [ox, oz] = local(ray.origin.x - b.x, ray.origin.z - b.z)
+  const [dx, dz] = local(ray.dir.x, ray.dir.z)
+  const o = [ox, ray.origin.y - b.y, oz]
+  const d = [dx, ray.dir.y, dz]
+  const half = [b.sx / 2, b.sy / 2, b.sz / 2]
+  let near = 0
+  let far = Infinity
+  for (let i = 0; i < 3; i++) {
+    if (Math.abs(d[i]) < 1e-12) {
+      if (Math.abs(o[i]) > half[i]) return null
+      continue
+    }
+    let t0 = (-half[i] - o[i]) / d[i]
+    let t1 = (half[i] - o[i]) / d[i]
+    if (t0 > t1) [t0, t1] = [t1, t0]
+    near = Math.max(near, t0)
+    far = Math.min(far, t1)
+    if (near > far) return null
+  }
+  return near
+}
+
+/** The id under the ray at `time`, or null. */
+export function pickEntity(model: SceneModel, time: number, ray: Ray): string | null {
+  let best: { id: string; dist: number } | null = null
+  for (const id of model.containerIds) {
+    const b = entityBounds(model, id, time)
+    const dist = b && rayBox(ray, b)
+    if (dist !== null && dist !== undefined && (!best || dist < best.dist)) best = { id, dist }
+  }
+  if (best) return best.id
+  for (const id of EQUIPMENT_KINDS.flatMap((def) => def.ids(model))) {
+    const b = entityBounds(model, id, time)
+    const dist = b && rayBox(ray, b)
+    if (dist !== null && dist !== undefined && (!best || dist < best.dist)) best = { id, dist }
+  }
+  return best?.id ?? null
+}

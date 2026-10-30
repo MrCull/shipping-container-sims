@@ -63,7 +63,6 @@ onUnmounted(() => {
           class="back-btn"
           @click="handleMenuClick"
         >
-          <span class="menu-icon">MENU</span>
           <span class="back-arrow">&lt;</span>
           <span>MENU</span>
         </button>
@@ -85,7 +84,7 @@ onUnmounted(() => {
     </header>
 
     <div
-      v-if="simId !== 'box-empire'"
+      v-if="simId !== 'box-empire' && simId !== 'terminal-twin'"
       class="top-right-controls"
     >
       <div
@@ -227,11 +226,6 @@ onUnmounted(() => {
 .back-btn:hover {
   border-color: var(--color-primary);
   color: var(--color-text);
-}
-
-.menu-icon {
-  font-size: 0.5rem;
-  line-height: 1;
 }
 
 .back-arrow {

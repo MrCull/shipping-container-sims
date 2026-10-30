@@ -1,0 +1,72 @@
+{
+  "asset": "gate-office",
+  "kind": "gate",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 12.0,
+    "widthM": 6.0,
+    "heightM": 5.6,
+    "tag": "A",
+    "reason": "small gate control office"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "gate-office",
+      "role": "lod",
+      "description": "small gate control office with a flat roof, window band towards the lanes and a door; origin at the floor centre, windows face +Z"
+    },
+    {
+      "name": "office",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "office box, roof, windows, door, AC unit, antenna"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "door",
+      "node": "LOD0",
+      "position": [
+        5.0,
+        0,
+        3.0
+      ],
+      "tag": "A",
+      "description": "entrance"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 88,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "small gate control office, 12 x 6 x 3.4 m",
+      "tag": "A",
+      "reason": "ticket: a small control office"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ]
+}

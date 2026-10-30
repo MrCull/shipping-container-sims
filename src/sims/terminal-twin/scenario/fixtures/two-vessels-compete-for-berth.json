@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "name": "two-vessels-compete-for-berth",
+  "description": "Two Panamax calls compete for one berth on a 450 m quay",
+  "seed": 7,
+  "startDateTime": "2026-01-05T06:00:00Z",
+  "quay": {
+    "lengthM": 450,
+    "berthGapM": 15,
+    "mooringS": 600,
+    "unmooringS": 600,
+    "stsMinSpacingM": 27,
+    "twinLift": true
+  },
+  "layout": {
+    "stsGroundLaneZ0M": 8,
+    "stsGroundLaneSpacingM": 3,
+    "stsSafeHoistM": 50
+  },
+  "kinematics": {
+    "sts": {
+      "gantry": {
+        "vMax": 0.75,
+        "accel": 0.25,
+        "decel": 0.25
+      },
+      "trolley": {
+        "vMax": 4,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "hoistLoaded": {
+        "vMax": 1.5,
+        "accel": 0.6,
+        "decel": 0.6
+      },
+      "hoistEmpty": {
+        "vMax": 3,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "lockS": 3,
+      "unlockS": 3
+    }
+  },
+  "moveVariationPct": 0,
+  "sts": [
+    {
+      "id": "STS01",
+      "gantryX": 80,
+      "groundPositions": 24
+    },
+    {
+      "id": "STS02",
+      "gantryX": 220,
+      "groundPositions": 24
+    }
+  ],
+  "vessels": [
+    {
+      "id": "V001",
+      "name": "HMM Tarifa",
+      "arrivalS": 0,
+      "sizeClass": "panamax",
+      "discharge": 12,
+      "load": 10,
+      "transshipment": 0,
+      "maxSts": 2
+    },
+    {
+      "id": "V002",
+      "name": "Maersk Alboran",
+      "arrivalS": 300,
+      "sizeClass": "panamax",
+      "discharge": 12,
+      "load": 10,
+      "transshipment": 0,
+      "maxSts": 2
+    }
+  ],
+  "cargo": {
+    "lines": {
+      "HMM": 30,
+      "MSC": 15,
+      "Maersk": 12,
+      "CMA CGM": 10,
+      "Hapag-Lloyd": 8,
+      "ONE": 7,
+      "Evergreen": 6,
+      "COSCO": 6,
+      "ZIM": 3,
+      "Yang Ming": 3
+    },
+    "sizeMix": {
+      "20": 0.3,
+      "40": 0.25,
+      "40HC": 0.45
+    },
+    "emptyShare": 0.1
+  },
+  "endConditions": {
+    "vesselsCompleted": 2
+  }
+}

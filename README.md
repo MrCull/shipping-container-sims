@@ -57,16 +57,16 @@ Below you will see the **home portal** first, then each game with **live gamepla
 ## Run locally
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 Open `http://localhost:5173/`. The home page lists every sim; open any card to play.
 
 ```bash
-npm run build      # Production build
-npm run lint       # ESLint checks
-npm run lint:fix   # ESLint with auto-fixes
+pnpm run build      # Production build
+pnpm run lint       # ESLint checks
+pnpm run lint:fix   # ESLint with auto-fixes
 ```
 
 ### Regenerate README screenshots
@@ -74,11 +74,11 @@ npm run lint:fix   # ESLint with auto-fixes
 Requires a production preview and **ffmpeg** (for the Contenga GIF). Default wait is **10 seconds** for Contenga and Box Empire; **Stowage Master** waits **15 seconds** so the README frame shows richer 3D gameplay (override with `STOWAGE_MASTER_WAIT_MS`).
 
 ```bash
-npm run build
-npm run preview -- --host 127.0.0.1 --port 4173
+pnpm run build
+pnpm run preview --host 127.0.0.1 --port 4173
 # in another terminal:
-npm run capture-readme-media
-# optional: BASE_URL=http://127.0.0.1:4173 GAMEPLAY_WAIT_MS=12000 STOWAGE_MASTER_WAIT_MS=18000 npm run capture-readme-media
+pnpm run capture-readme-media
+# optional: BASE_URL=http://127.0.0.1:4173 GAMEPLAY_WAIT_MS=12000 STOWAGE_MASTER_WAIT_MS=18000 pnpm run capture-readme-media
 ```
 
 ## For developers

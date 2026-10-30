@@ -1,0 +1,104 @@
+{
+  "asset": "gate-island",
+  "kind": "gate",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 12.0,
+    "widthM": 1.2,
+    "heightM": 6.3,
+    "tag": "A",
+    "reason": "island width and length are approximations"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "gate-island",
+      "role": "lod",
+      "description": "concrete island 1.2 m wide between two gate lanes: black-and-yellow kerbs, yellow pedestal kiosk, camera post, canopy columns and the canopy segment above; origin at the island centre on the kiosk line"
+    },
+    {
+      "name": "island",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "concrete island with black-and-yellow kerb stripes"
+    },
+    {
+      "name": "kiosk",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "yellow pedestal kiosk with screens and card reader facing both lanes"
+    },
+    {
+      "name": "camera_post",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "plate-camera post and nose guards"
+    },
+    {
+      "name": "canopy",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "canopy segment above the island with its two steel columns"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "kiosk",
+      "node": "kiosk",
+      "position": [
+        0,
+        1.5,
+        0
+      ],
+      "tag": "A",
+      "description": "pedestal head (driver window height)"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 260,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "island 1.2 m wide, 0.22 m high kerb with black-and-yellow stripes (0.75 m period)",
+      "tag": "A",
+      "reason": "typical gate island"
+    },
+    {
+      "fact": "yellow pedestal kiosk with two screens and card readers (one per neighbouring lane)",
+      "tag": "A",
+      "reason": "ticket: yellow pedestal kiosks"
+    },
+    {
+      "fact": "steel canopy columns at both ends of the island carry the long canopy",
+      "tag": "A"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "module": {
+    "islandWidthM": 1.2,
+    "lengthM": 12.0,
+    "faces": "+Z"
+  }
+}

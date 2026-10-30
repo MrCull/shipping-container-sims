@@ -1,0 +1,87 @@
+{
+  "asset": "yard-markings",
+  "kind": "yard",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 13.0,
+    "widthM": 3.2,
+    "heightM": 0.01,
+    "tag": "V",
+    "reason": "matches the engine stall (3.2 x 13 m)"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "yard-markings",
+      "role": "lod",
+      "description": "flat ground markings: WTP pad (waterside transfer pad) and truck transfer stall; origins at the marking centres, length along Z"
+    },
+    {
+      "name": "wtp_pad",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "waterside transfer pad: yellow outline on a darker surface; the mesh sits at x = -2.5 so both markings show side by side (the renderer re-centres each)"
+    },
+    {
+      "name": "transfer_stall",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "truck transfer stall: yellow outline with hazard end bars and a centre tick; the mesh sits at x = +2.5"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "wtp_pad",
+      "node": "wtp_pad",
+      "position": [
+        -2.5,
+        0,
+        0
+      ],
+      "tag": "V"
+    },
+    {
+      "name": "transfer_stall",
+      "node": "transfer_stall",
+      "position": [
+        2.5,
+        0,
+        0
+      ],
+      "tag": "V"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 24,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "WTP pad and transfer stall markings 3.2 x 13 m (engine pad and STALL_LENGTH_M)",
+      "tag": "V",
+      "source": "engine yardLayout.ts"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ]
+}

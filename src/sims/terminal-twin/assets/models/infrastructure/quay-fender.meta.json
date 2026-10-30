@@ -1,0 +1,70 @@
+{
+  "asset": "quay-fender",
+  "kind": "quay",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 0.9,
+    "widthM": 0.6,
+    "heightM": 1.65,
+    "tag": "A",
+    "reason": "simplified fender"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "quay-fender",
+      "role": "lod",
+      "description": "cylindrical rubber fender on a steel mount hung on the quay face; origin on the quay edge line at deck level"
+    },
+    {
+      "name": "fender",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "rubber cylinder fender with panel"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "mount",
+      "node": "fender",
+      "position": [
+        0,
+        -0.3,
+        -0.3
+      ],
+      "tag": "A"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 76,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "rubber cylinder fender, 0.6 m diameter, hung on the quay face",
+      "tag": "A"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ]
+}

@@ -1,0 +1,158 @@
+{
+  "asset": "infra-atlas",
+  "sizePx": 2048,
+  "cellPx": 128,
+  "swatches": {
+    "concrete": {
+      "index": 0,
+      "colour": "#b9b9b3"
+    },
+    "concrete_dark": {
+      "index": 1,
+      "colour": "#8e908d"
+    },
+    "asphalt": {
+      "index": 2,
+      "colour": "#4a4d52"
+    },
+    "steel": {
+      "index": 3,
+      "colour": "#8b9198"
+    },
+    "steel_dark": {
+      "index": 4,
+      "colour": "#3a3f46"
+    },
+    "zinc": {
+      "index": 5,
+      "colour": "#a8adb3"
+    },
+    "yellow": {
+      "index": 6,
+      "colour": "#f2b705"
+    },
+    "black": {
+      "index": 7,
+      "colour": "#101113"
+    },
+    "white": {
+      "index": 8,
+      "colour": "#f1f1ef"
+    },
+    "red": {
+      "index": 9,
+      "colour": "#c0302a"
+    },
+    "green": {
+      "index": 10,
+      "colour": "#2e8b57"
+    },
+    "blue": {
+      "index": 11,
+      "colour": "#2b5b98"
+    },
+    "glass": {
+      "index": 12,
+      "colour": "#5d86a0"
+    },
+    "lamp": {
+      "index": 13,
+      "colour": "#fff2c4"
+    },
+    "rubber": {
+      "index": 14,
+      "colour": "#1a1a1c"
+    },
+    "rock_light": {
+      "index": 15,
+      "colour": "#9d9d94"
+    },
+    "rock_dark": {
+      "index": 16,
+      "colour": "#6d706b"
+    },
+    "scrub": {
+      "index": 17,
+      "colour": "#6f7d52"
+    },
+    "soil": {
+      "index": 18,
+      "colour": "#8a7a60"
+    },
+    "hill_green": {
+      "index": 19,
+      "colour": "#6a7658"
+    },
+    "hill_dry": {
+      "index": 20,
+      "colour": "#8c8a68"
+    },
+    "sand": {
+      "index": 21,
+      "colour": "#b9ae8a"
+    },
+    "roof_grey": {
+      "index": 22,
+      "colour": "#7d8590"
+    },
+    "wall_cream": {
+      "index": 23,
+      "colour": "#d8d2c0"
+    },
+    "door_blue": {
+      "index": 24,
+      "colour": "#2f4f7f"
+    },
+    "orange": {
+      "index": 25,
+      "colour": "#e8641b"
+    },
+    "wall_grey": {
+      "index": 26,
+      "colour": "#aab0b6"
+    },
+    "light_grey": {
+      "index": 27,
+      "colour": "#d0d3d6"
+    }
+  },
+  "regions": {
+    "hazard": [
+      0,
+      1024,
+      1024,
+      1152
+    ],
+    "road_arrow": [
+      0,
+      1152,
+      512,
+      2048
+    ],
+    "sign_arrow": [
+      512,
+      1152,
+      768,
+      1408
+    ],
+    "sign_cross": [
+      768,
+      1152,
+      1024,
+      1408
+    ],
+    "sign_gate": [
+      1024,
+      1152,
+      2048,
+      1408
+    ],
+    "sign_oog": [
+      1024,
+      1408,
+      2048,
+      1664
+    ]
+  },
+  "note": "one atlas shared by every infrastructure asset (flat swatches plus hazard stripes, lane arrows and gate signs)"
+}

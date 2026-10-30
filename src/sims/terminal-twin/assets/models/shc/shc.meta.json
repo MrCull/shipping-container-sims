@@ -1,0 +1,561 @@
+{
+  "asset": "shc",
+  "kind": "shc",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only shc",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 8.3,
+    "widthM": 5.8,
+    "heightM": 9.7,
+    "wheelbaseM": 6.6,
+    "trackM": 4.7,
+    "tag": "A",
+    "reason": "proportions of a Kalmar shuttle carrier from public photographs (not committed); no manufacturer drawing was available"
+  },
+  "axes": {
+    "up": "+Y",
+    "length": "+X (front, cab end)",
+    "width": "+Z",
+    "origin": "ground contact below the frame centre",
+    "handedness": "right-handed, glTF"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "shc",
+      "role": "lod",
+      "description": "full detail, nearest SHCs"
+    },
+    {
+      "name": "LOD1",
+      "parent": "shc",
+      "role": "lod",
+      "description": "simplified, rig kept (wheels, steering, hoist, spreader)"
+    },
+    {
+      "name": "LOD2",
+      "parent": "shc",
+      "role": "lod",
+      "description": "silhouette boxes plus a static spreader plate at the raised position"
+    },
+    {
+      "name": "frame",
+      "parent": "LOD*",
+      "role": "mesh",
+      "description": "static welded gantry, engine/hoist assembly, cab, ladder, rails, stripes, branding"
+    },
+    {
+      "name": "steer_fl",
+      "parent": "LOD*",
+      "role": "rig",
+      "pivot": [
+        3.3,
+        0.85,
+        -2.35
+      ],
+      "axis": "+Y",
+      "description": "steering knuckle and fork; pivot on the steer axis at axle height"
+    },
+    {
+      "name": "wheel_fl",
+      "parent": "steer_fl",
+      "role": "rig",
+      "pivot": [
+        3.3,
+        0.85,
+        -2.35
+      ],
+      "axis": "+Z",
+      "description": "dual tyres; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
+    },
+    {
+      "name": "steer_fr",
+      "parent": "LOD*",
+      "role": "rig",
+      "pivot": [
+        3.3,
+        0.85,
+        2.35
+      ],
+      "axis": "+Y",
+      "description": "steering knuckle and fork; pivot on the steer axis at axle height"
+    },
+    {
+      "name": "wheel_fr",
+      "parent": "steer_fr",
+      "role": "rig",
+      "pivot": [
+        3.3,
+        0.85,
+        2.35
+      ],
+      "axis": "+Z",
+      "description": "dual tyres; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
+    },
+    {
+      "name": "steer_rl",
+      "parent": "LOD*",
+      "role": "rig",
+      "pivot": [
+        -3.3,
+        0.85,
+        -2.35
+      ],
+      "axis": "+Y",
+      "description": "steering knuckle and fork; pivot on the steer axis at axle height"
+    },
+    {
+      "name": "wheel_rl",
+      "parent": "steer_rl",
+      "role": "rig",
+      "pivot": [
+        -3.3,
+        0.85,
+        -2.35
+      ],
+      "axis": "+Z",
+      "description": "dual tyres; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
+    },
+    {
+      "name": "steer_rr",
+      "parent": "LOD*",
+      "role": "rig",
+      "pivot": [
+        -3.3,
+        0.85,
+        2.35
+      ],
+      "axis": "+Y",
+      "description": "steering knuckle and fork; pivot on the steer axis at axle height"
+    },
+    {
+      "name": "wheel_rr",
+      "parent": "steer_rr",
+      "role": "rig",
+      "pivot": [
+        -3.3,
+        0.85,
+        2.35
+      ],
+      "axis": "+Z",
+      "description": "dual tyres; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
+    },
+    {
+      "name": "hoist",
+      "parent": "LOD*",
+      "role": "rig",
+      "pivot": [
+        0,
+        6.0,
+        0.0
+      ],
+      "axis": "+Y",
+      "description": "lifting frame on the leg guides; pivot = container attach plane at rest (raised); travels down (negative)"
+    },
+    {
+      "name": "spreader",
+      "parent": "hoist",
+      "role": "rig",
+      "pivot": [
+        0,
+        6.0,
+        0.0
+      ],
+      "axis": "+Y",
+      "description": "telescopic 40 ft spreader hung from the hoist frame; small float travel"
+    },
+    {
+      "name": "twistlock_fl",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        6.0,
+        6.0,
+        -1.138
+      ],
+      "axis": "+Y",
+      "description": "twist-lock; 0 = unlocked, 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_fr",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        6.0,
+        6.0,
+        1.138
+      ],
+      "axis": "+Y",
+      "description": "twist-lock; 0 = unlocked, 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_rl",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        -6.0,
+        6.0,
+        -1.138
+      ],
+      "axis": "+Y",
+      "description": "twist-lock; 0 = unlocked, 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_rr",
+      "parent": "spreader",
+      "role": "rig",
+      "pivot": [
+        -6.0,
+        6.0,
+        1.138
+      ],
+      "axis": "+Y",
+      "description": "twist-lock; 0 = unlocked, 90 degrees = locked"
+    },
+    {
+      "name": "steer_fl_geo",
+      "parent": "steer_fl",
+      "role": "mesh",
+      "description": "mesh of steer_fl"
+    },
+    {
+      "name": "wheel_fl_geo",
+      "parent": "wheel_fl",
+      "role": "mesh",
+      "description": "mesh of wheel_fl"
+    },
+    {
+      "name": "steer_fr_geo",
+      "parent": "steer_fr",
+      "role": "mesh",
+      "description": "mesh of steer_fr"
+    },
+    {
+      "name": "wheel_fr_geo",
+      "parent": "wheel_fr",
+      "role": "mesh",
+      "description": "mesh of wheel_fr"
+    },
+    {
+      "name": "steer_rl_geo",
+      "parent": "steer_rl",
+      "role": "mesh",
+      "description": "mesh of steer_rl"
+    },
+    {
+      "name": "wheel_rl_geo",
+      "parent": "wheel_rl",
+      "role": "mesh",
+      "description": "mesh of wheel_rl"
+    },
+    {
+      "name": "steer_rr_geo",
+      "parent": "steer_rr",
+      "role": "mesh",
+      "description": "mesh of steer_rr"
+    },
+    {
+      "name": "wheel_rr_geo",
+      "parent": "wheel_rr",
+      "role": "mesh",
+      "description": "mesh of wheel_rr"
+    },
+    {
+      "name": "hoist_geo",
+      "parent": "hoist",
+      "role": "mesh",
+      "description": "mesh of hoist"
+    },
+    {
+      "name": "spreader_geo",
+      "parent": "spreader",
+      "role": "mesh",
+      "description": "mesh of spreader"
+    },
+    {
+      "name": "twistlock_fl_geo",
+      "parent": "twistlock_fl",
+      "role": "mesh",
+      "description": "mesh of twistlock_fl"
+    },
+    {
+      "name": "twistlock_fr_geo",
+      "parent": "twistlock_fr",
+      "role": "mesh",
+      "description": "mesh of twistlock_fr"
+    },
+    {
+      "name": "twistlock_rl_geo",
+      "parent": "twistlock_rl",
+      "role": "mesh",
+      "description": "mesh of twistlock_rl"
+    },
+    {
+      "name": "twistlock_rr_geo",
+      "parent": "twistlock_rr",
+      "role": "mesh",
+      "description": "mesh of twistlock_rr"
+    }
+  ],
+  "travelLimits": {
+    "steer_fl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -35,
+      "maxDeg": 35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "wheel_fl": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "twistlock_fl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A"
+    },
+    "steer_fr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -35,
+      "maxDeg": 35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "wheel_fr": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "twistlock_fr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A"
+    },
+    "steer_rl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -35,
+      "maxDeg": 35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "wheel_rl": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "twistlock_rl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A"
+    },
+    "steer_rr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -35,
+      "maxDeg": 35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "wheel_rr": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "twistlock_rr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A"
+    },
+    "hoist": {
+      "type": "translation",
+      "axis": "+Y",
+      "minM": -3.1,
+      "maxM": 0,
+      "rest": 0,
+      "tag": "A"
+    },
+    "spreader": {
+      "type": "translation",
+      "axis": "+Y",
+      "minM": 0,
+      "maxM": 0.35,
+      "rest": 0,
+      "tag": "A"
+    }
+  },
+  "attachPoints": [
+    {
+      "name": "container_attach",
+      "parent": "hoist",
+      "position": [
+        0,
+        6.0,
+        0.0
+      ],
+      "description": "centre of the twist-lock plane, i.e. the TOP of the carried box. At hoist 0 it is 6.0 m above the ground; hoist = (box bottom + box height) - 6.0",
+      "tag": "A"
+    },
+    {
+      "name": "twistlock_fl",
+      "position": [
+        6.0,
+        6.0,
+        -1.138
+      ],
+      "parent": "hoist",
+      "tag": "V",
+      "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
+    },
+    {
+      "name": "twistlock_fr",
+      "position": [
+        6.0,
+        6.0,
+        1.138
+      ],
+      "parent": "hoist",
+      "tag": "V",
+      "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
+    },
+    {
+      "name": "twistlock_rl",
+      "position": [
+        -6.0,
+        6.0,
+        -1.138
+      ],
+      "parent": "hoist",
+      "tag": "V",
+      "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
+    },
+    {
+      "name": "twistlock_rr",
+      "position": [
+        -6.0,
+        6.0,
+        1.138
+      ],
+      "parent": "hoist",
+      "tag": "V",
+      "source": "ISO 1161 casting centres of a 40 ft box (twist-lock positions at hoist rest)"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "wheel_fl",
+      "wheel_fr",
+      "wheel_rl",
+      "wheel_rr"
+    ],
+    "tag": "V"
+  },
+  "wheel": {
+    "radiusM": 0.85,
+    "tyreWidthM": 0.5,
+    "tyresPerCorner": 2,
+    "steeredCorners": 4,
+    "tag": "A",
+    "note": "roll angle = distance / radius; the rear corners steer opposite to the front"
+  },
+  "tunnel": {
+    "clearWidthM": 3.6,
+    "clearHeightM": 6.4,
+    "frameLengthM": 8.2,
+    "openEnds": true,
+    "tag": "A",
+    "note": "a 40 ft box (12.19 m) is longer than the frame and overhangs it fore and aft, as on a real shuttle carrier; width clearance is measured between the inner tyre faces"
+  },
+  "branding": {
+    "wordmark": "KALMAR",
+    "unitNumber": "SC 108",
+    "operatorBranding": false,
+    "tag": "A",
+    "note": "wordmark set in Montserrat ExtraBold on the red atlas; no official logo artwork; no operator branding"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 11016,
+      "material": "shc_atlas"
+    },
+    "LOD1": {
+      "triangles": 2532,
+      "material": "shc_atlas"
+    },
+    "LOD2": {
+      "triangles": 342,
+      "material": "shc_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "red Kalmar-style shuttle carrier: tall welded gantry, open tunnel, dual tyres on four steered legs",
+      "tag": "P",
+      "source": "public Kalmar shuttle-carrier photographs (not committed)"
+    },
+    {
+      "fact": "frame, tyre, cab, engine and ladder proportions",
+      "tag": "A",
+      "reason": "no manufacturer drawing; sized so a 40 ft HC box fits the tunnel with margin"
+    },
+    {
+      "fact": "clear height 6.4 m (one box over a stacked box), clear width 3.6 m between tyres",
+      "tag": "A"
+    },
+    {
+      "fact": "40 ft spreader with end beams, telescopic tubes and four twist-locks at the ISO 1161 casting centres",
+      "tag": "V",
+      "source": "ISO 1161 / ISO 668"
+    },
+    {
+      "fact": "white diagonal warning stripes on the lower legs, glazed cab offset to the -Z side at the front, ladder and handrails",
+      "tag": "P"
+    },
+    {
+      "fact": "all-wheel steering at +-35 degrees (rear opposite to front)",
+      "tag": "A"
+    },
+    {
+      "fact": "KALMAR wordmark and unit number baked into the atlas; no operator branding",
+      "tag": "A"
+    },
+    {
+      "fact": "tyre tread as 32-segment lugs, weld seams as flat strips",
+      "tag": "M",
+      "reason": "triangle budget"
+    }
+  ]
+}

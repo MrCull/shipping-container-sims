@@ -1,0 +1,576 @@
+{
+  "asset": "truck-cab-day",
+  "kind": "truck",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only trucks",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 16.02,
+    "widthM": 2.55,
+    "heightM": 3.15,
+    "tag": "A",
+    "reason": "generic European tractor and 3-axle 40 ft skeletal chassis; no manufacturer drawing (rear of chassis to cab bumper, within the 16.5 m EU limit)"
+  },
+  "axes": {
+    "up": "+Y",
+    "length": "+X (cab end)",
+    "width": "+Z",
+    "origin": "ground contact below the centre of a 40 ft box on the chassis",
+    "handedness": "right-handed, glTF"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "truck-cab-day",
+      "role": "lod",
+      "description": "full detail"
+    },
+    {
+      "name": "LOD1",
+      "parent": "truck-cab-day",
+      "role": "lod",
+      "description": "simplified, rig kept (wheels, steering, fifth wheel)"
+    },
+    {
+      "name": "LOD2",
+      "parent": "truck-cab-day",
+      "role": "lod",
+      "description": "silhouette: chassis (wheels merged in) and tractor on the fifth wheel pivot"
+    },
+    {
+      "name": "chassis",
+      "parent": "LOD*",
+      "role": "mesh",
+      "description": "rails, gooseneck, cross members, twist-lock housings, landing legs, lights"
+    },
+    {
+      "name": "wheel_t1",
+      "parent": "LOD*",
+      "role": "rig",
+      "pivot": [
+        -3.4,
+        0.5,
+        0.0
+      ],
+      "axis": "+Z",
+      "description": "trailer axle, tyres both sides; pivot on the axle; travelling towards +X is a negative rotation about +Z"
+    },
+    {
+      "name": "wheel_t2",
+      "parent": "LOD*",
+      "role": "rig",
+      "pivot": [
+        -4.7,
+        0.5,
+        0.0
+      ],
+      "axis": "+Z",
+      "description": "trailer axle, tyres both sides; pivot on the axle; travelling towards +X is a negative rotation about +Z"
+    },
+    {
+      "name": "wheel_t3",
+      "parent": "LOD*",
+      "role": "rig",
+      "pivot": [
+        -6.0,
+        0.5,
+        0.0
+      ],
+      "axis": "+Z",
+      "description": "trailer axle, tyres both sides; pivot on the axle; travelling towards +X is a negative rotation about +Z"
+    },
+    {
+      "name": "fifth_wheel",
+      "parent": "LOD*",
+      "role": "rig",
+      "pivot": [
+        4.9,
+        0,
+        0.0
+      ],
+      "axis": "+Y",
+      "description": "articulation pivot: vertical axis through the kingpin; the tractor turns about it relative to the chassis. Positive = the tractor yaws to the left"
+    },
+    {
+      "name": "tractor",
+      "parent": "fifth_wheel",
+      "role": "mesh",
+      "description": "frame, fifth wheel, tanks, cab, mirrors, lights, bumper"
+    },
+    {
+      "name": "steer_fl",
+      "parent": "fifth_wheel",
+      "role": "rig",
+      "pivot": [
+        8.4,
+        0.5,
+        -1.0
+      ],
+      "axis": "+Y",
+      "description": "steering knuckle, vertical axis at the wheel centre; positive = turns left"
+    },
+    {
+      "name": "wheel_fl",
+      "parent": "steer_fl",
+      "role": "rig",
+      "pivot": [
+        8.4,
+        0.5,
+        -1.0
+      ],
+      "axis": "+Z",
+      "description": "front tyre; pivot on the axle; travelling towards +X is a negative rotation about +Z"
+    },
+    {
+      "name": "steer_fr",
+      "parent": "fifth_wheel",
+      "role": "rig",
+      "pivot": [
+        8.4,
+        0.5,
+        1.0
+      ],
+      "axis": "+Y",
+      "description": "steering knuckle, vertical axis at the wheel centre; positive = turns left"
+    },
+    {
+      "name": "wheel_fr",
+      "parent": "steer_fr",
+      "role": "rig",
+      "pivot": [
+        8.4,
+        0.5,
+        1.0
+      ],
+      "axis": "+Z",
+      "description": "front tyre; pivot on the axle; travelling towards +X is a negative rotation about +Z"
+    },
+    {
+      "name": "wheel_r",
+      "parent": "fifth_wheel",
+      "role": "rig",
+      "pivot": [
+        4.7,
+        0.5,
+        0.0
+      ],
+      "axis": "+Z",
+      "description": "drive axle, dual tyres both sides; pivot on the axle; travelling towards +X is a negative rotation about +Z"
+    }
+  ],
+  "travelLimits": {
+    "wheel_t1": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "wheel_t2": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "wheel_t3": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "fifth_wheel": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -40,
+      "maxDeg": 40,
+      "rest": 0,
+      "tag": "A"
+    },
+    "steer_fl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -35,
+      "maxDeg": 35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "wheel_fl": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "steer_fr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -35,
+      "maxDeg": 35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "wheel_fr": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "wheel_r": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    }
+  },
+  "attachPoints": [
+    {
+      "name": "load_40",
+      "position": [
+        0,
+        1.3,
+        0.0
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "description": "bottom centre of a 40 ft box (20 ft + 20 ft pairs use load_20_twin_*); the model origin is directly below it"
+    },
+    {
+      "name": "load_20_front",
+      "position": [
+        3.0675,
+        1.3,
+        0.0
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "description": "bottom centre of a single 20 ft box on the front pins (the pin at the centre line plus the front end pins)"
+    },
+    {
+      "name": "load_20_rear",
+      "position": [
+        -3.0675,
+        1.3,
+        0.0
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "description": "a single 20 ft box on the rear pins"
+    },
+    {
+      "name": "load_20_twin_a",
+      "position": [
+        3.0675,
+        1.3,
+        0.0
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "description": "front 20 ft box of a twin pair"
+    },
+    {
+      "name": "load_20_twin_b",
+      "position": [
+        -3.0675,
+        1.3,
+        0.0
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "description": "rear 20 ft box of a twin pair"
+    },
+    {
+      "name": "pin_40_fl",
+      "position": [
+        5.9925,
+        1.3,
+        -1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "ISO 1161 corner casting centres of a 40 ft box"
+    },
+    {
+      "name": "pin_40_fr",
+      "position": [
+        5.9925,
+        1.3,
+        1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "ISO 1161 corner casting centres of a 40 ft box"
+    },
+    {
+      "name": "pin_40_rl",
+      "position": [
+        -5.9925,
+        1.3,
+        -1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "ISO 1161 corner casting centres of a 40 ft box"
+    },
+    {
+      "name": "pin_40_rr",
+      "position": [
+        -5.9925,
+        1.3,
+        1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "ISO 1161 corner casting centres of a 40 ft box"
+    },
+    {
+      "name": "pin_20_mid_fl",
+      "position": [
+        0.1405,
+        1.3,
+        -1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "inner castings of two 20 ft boxes standing end to end (76 mm gap)"
+    },
+    {
+      "name": "pin_20_mid_fr",
+      "position": [
+        0.1405,
+        1.3,
+        1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "inner castings of two 20 ft boxes standing end to end (76 mm gap)"
+    },
+    {
+      "name": "pin_20_mid_rl",
+      "position": [
+        -0.1405,
+        1.3,
+        -1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "inner castings of two 20 ft boxes standing end to end (76 mm gap)"
+    },
+    {
+      "name": "pin_20_mid_rr",
+      "position": [
+        -0.1405,
+        1.3,
+        1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "inner castings of two 20 ft boxes standing end to end (76 mm gap)"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "wheel_fl",
+      "wheel_fr",
+      "wheel_r",
+      "wheel_t1",
+      "wheel_t2",
+      "wheel_t3"
+    ],
+    "tag": "V"
+  },
+  "wheel": {
+    "radiusM": 0.5,
+    "tyreWidthM": {
+      "front": 0.315,
+      "drive": 0.295,
+      "trailer": 0.385
+    },
+    "tag": "A",
+    "note": "roll angle = -distance / radius about +Z"
+  },
+  "chassis": {
+    "deckY": 1.3,
+    "kingpin": [
+      4.9,
+      1.3,
+      0.0
+    ],
+    "axlesX": [
+      -3.4,
+      -4.7,
+      -6.0
+    ],
+    "rearX": -6.55,
+    "frontPinX": 5.9925,
+    "tag": "A",
+    "note": "box bottom sits on the twist-lock housings at deckY; a 20 ft box on the front pins has its centre 3.0675 m ahead of the model origin"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 6364,
+      "material": "truck_atlas"
+    },
+    "LOD1": {
+      "triangles": 1790,
+      "material": "truck_atlas"
+    },
+    "LOD2": {
+      "triangles": 248,
+      "material": "truck_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "twist-lock housings at the ISO 1161 casting centres: 11.985 m x 2.259 m for a 40 ft box, 5.853 m for a 20 ft box",
+      "tag": "V",
+      "source": "ISO 1161 / ISO 668"
+    },
+    {
+      "fact": "deck height 1.3 m, tyre radius 0.5 m, tri-axle trailer group, 3.7 m tractor wheelbase",
+      "tag": "A",
+      "reason": "typical European 40 ft skeletal chassis and 4x2 tractor; engine TRUCK_DECK_M = 1.3"
+    },
+    {
+      "fact": "gooseneck chassis with a kingpin 1.1 m behind the front pins",
+      "tag": "A"
+    },
+    {
+      "fact": "rigid tyre tread lugs and rim details are low-poly",
+      "tag": "M",
+      "reason": "triangle budget"
+    },
+    {
+      "fact": "cab-over cab shapes (high sleeper, mid sleeper, day cab) with maker wordmarks",
+      "tag": "P",
+      "source": "public photographs of Volvo, Scania, DAF, MAN and Mercedes-Benz tractors (not committed)"
+    },
+    {
+      "fact": "steering to 35 degrees, articulation up to 40 degrees",
+      "tag": "A"
+    }
+  ],
+  "liveries": [
+    {
+      "index": 0,
+      "maker": "Volvo",
+      "cabColour": "#1f4e9c",
+      "chassisColour": "#2b2e33",
+      "typeface": "Montserrat-SemiBold",
+      "tag": "A"
+    },
+    {
+      "index": 1,
+      "maker": "Scania",
+      "cabColour": "#b3122b",
+      "chassisColour": "#3a3f45",
+      "typeface": "Archivo-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 2,
+      "maker": "DAF",
+      "cabColour": "#f1f1ef",
+      "chassisColour": "#5a6169",
+      "typeface": "Archivo-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 3,
+      "maker": "MAN",
+      "cabColour": "#2c3f4e",
+      "chassisColour": "#2b2e33",
+      "typeface": "Montserrat-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 4,
+      "maker": "Mercedes-Benz",
+      "cabColour": "#b7bcc2",
+      "chassisColour": "#2b2e33",
+      "typeface": "Montserrat-SemiBold",
+      "tag": "A"
+    },
+    {
+      "index": 5,
+      "maker": "Volvo",
+      "cabColour": "#e9eaec",
+      "chassisColour": "#1f4e9c",
+      "typeface": "Montserrat-SemiBold",
+      "tag": "A"
+    },
+    {
+      "index": 6,
+      "maker": "Scania",
+      "cabColour": "#16294d",
+      "chassisColour": "#16294d",
+      "typeface": "Archivo-ExtraBold",
+      "tag": "A"
+    },
+    {
+      "index": 7,
+      "maker": "DAF",
+      "cabColour": "#d65a1a",
+      "chassisColour": "#3a3f45",
+      "typeface": "Archivo-ExtraBold",
+      "tag": "A"
+    }
+  ],
+  "atlas": {
+    "image": "embedded in each truck GLB (material truck_atlas baseColorTexture)",
+    "size": [
+      2048,
+      1024
+    ],
+    "tileCols": 4,
+    "tileRows": 2,
+    "tileSizeUv": [
+      0.25,
+      0.5
+    ],
+    "uvConvention": "glTF TEXCOORD_0 is authored for tile 0; shift by (index % tileCols, floor(index / tileCols)) * tileSizeUv"
+  },
+  "fifthWheel": {
+    "node": "fifth_wheel",
+    "pivot": [
+      4.9,
+      0,
+      0.0
+    ],
+    "maxArticulationDeg": 40,
+    "tag": "A"
+  },
+  "branding": {
+    "wordmarks": [
+      "DAF",
+      "MAN",
+      "Mercedes-Benz",
+      "Scania",
+      "Volvo"
+    ],
+    "operatorBranding": false,
+    "tag": "A",
+    "note": "truck maker names set in open-licence typefaces on the grille and doors; no logo artwork; no haulier names"
+  },
+  "cab": {
+    "shape": "day",
+    "heightM": 3.15,
+    "tag": "A"
+  }
+}

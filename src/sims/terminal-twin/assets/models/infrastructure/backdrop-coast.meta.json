@@ -1,0 +1,62 @@
+{
+  "asset": "backdrop-coast",
+  "kind": "backdrop",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 6000,
+    "widthM": 500,
+    "heightM": 26,
+    "tag": "A",
+    "reason": "generic low coastline"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "backdrop-coast",
+      "role": "lod",
+      "description": "low-poly generic coastline: a low isthmus with a few dunes (6 km long, up to 26 m); origin at the base centre"
+    },
+    {
+      "name": "coast",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "low coastline strip"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 472,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "generic coastline strip, 6 km long, 6-26 m",
+      "tag": "A"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "backdrop": {
+    "distanceM": 6200
+  }
+}

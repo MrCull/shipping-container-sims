@@ -1,0 +1,72 @@
+{
+  "asset": "yard-mast",
+  "kind": "yard",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 3.0,
+    "widthM": 3.0,
+    "heightM": 30.2,
+    "tag": "A",
+    "reason": "matches the 30 m mast poles of the TT-21 atmosphere"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "yard-mast",
+      "role": "lod",
+      "description": "30 m high-mast lighting tower with a ring platform and a lamp head; origin at the base centre"
+    },
+    {
+      "name": "mast",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "pole, ladder rail, platform ring and lamp head"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [
+    {
+      "name": "lamp_ring",
+      "node": "mast",
+      "position": [
+        0,
+        29.2,
+        0
+      ],
+      "tag": "A",
+      "description": "night glow sits here"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 284,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "30 m high-mast tower, six lamp heads",
+      "tag": "A",
+      "reason": "TT-21 mast height"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ]
+}

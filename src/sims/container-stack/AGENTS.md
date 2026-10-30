@@ -117,8 +117,8 @@ Avoid scattering tuning constants through Vue components. If a visual depends on
 After substantive changes, run the root project checks:
 
 ```
-npm run lint
-npm run build
+pnpm run lint
+pnpm run build
 ```
 
 For gameplay or rendering changes, also smoke-test `/sim/container-stack` in a browser. Check pointer removal, placement markers, Escape pause, level completion, timeout failure, collapse, and audio startup.

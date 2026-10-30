@@ -10,6 +10,8 @@ export interface SimDefinition {
   icon: string
   /** Optional raster/vector URL for home cards and in-sim branding (Vite: `?url` import). */
   logoSrc?: string
+  /** Optional card artwork (Vite: `?url` import): shown faintly behind the home card's text. */
+  cardImage?: string
   status: SimStatus
   color: string
   tags: string[]
