@@ -572,6 +572,8 @@ export interface LandsideKpiCounters {
 export interface StsDrop {
   containerId: string
   groundPositionId: string
+  /** When the set-down is planned to end (the scheduled `StsGrounded`); set once the carry is planned (TT-R13). */
+  groundAt?: number
 }
 
 export interface StsState {
