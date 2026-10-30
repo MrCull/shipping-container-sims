@@ -3,6 +3,9 @@ import { provideSetupDraft } from '../../composables/useSetupDraft'
 import { t } from '../../i18n/messages'
 import { useTwinStore } from '../../store/twinStore'
 import { endConditionsFromFields } from '../../modules/endConditions'
+import ScenarioPicker from '../setup/ScenarioPicker.vue'
+import ScenarioDetail from '../setup/ScenarioDetail.vue'
+import SetupSeedStart from '../setup/SetupSeedStart.vue'
 import SetupLayoutSection from '../setup/SetupLayoutSection.vue'
 import SetupVesselsSection from '../setup/SetupVesselsSection.vue'
 import SetupDisplaySection from '../setup/SetupDisplaySection.vue'
@@ -76,50 +79,62 @@ async function submit(): Promise<void> {
         {{ t('setup.intro') }}
       </p>
 
+      <ScenarioPicker />
+      <ScenarioDetail :error="formError" />
       <SetupLayoutSection />
       <SetupVesselsSection />
 
-      <fieldset
-        class="field"
-        data-testid="tt-end-conditions"
+      <details
+        class="advanced"
+        data-testid="tt-advanced"
       >
-        <legend>{{ t('setup.end.title') }}</legend>
+        <summary>{{ t('setup.advanced') }}</summary>
         <p class="hint">
-          {{ t('setup.end.hint') }}
+          {{ t('setup.advancedHint') }}
         </p>
-        <div class="grid">
-          <label class="mini">
-            <span>{{ t('setup.end.vessels') }}</span>
-            <input
-              v-model="d.endFields.vessels"
-              type="number"
-              step="any"
-              name="end-vessels"
-              :placeholder="t('setup.end.vesselsPlaceholder')"
-            >
-          </label>
-          <label class="mini">
-            <span>{{ t('setup.end.hours') }}</span>
-            <input
-              v-model="d.endFields.hours"
-              type="number"
-              step="any"
-              name="end-hours"
-              :placeholder="t('setup.end.off')"
-            >
-          </label>
-          <label class="mini">
-            <span>{{ t('setup.end.moves') }}</span>
-            <input
-              v-model="d.endFields.moves"
-              type="number"
-              step="any"
-              name="end-moves"
-              :placeholder="t('setup.end.off')"
-            >
-          </label>
-        </div>
-      </fieldset>
+        <SetupSeedStart />
+        <fieldset
+          class="field"
+          data-testid="tt-end-conditions"
+        >
+          <legend>{{ t('setup.end.title') }}</legend>
+          <p class="hint">
+            {{ t('setup.end.hint') }}
+          </p>
+          <div class="grid">
+            <label class="mini">
+              <span>{{ t('setup.end.vessels') }}</span>
+              <input
+                v-model="d.endFields.vessels"
+                type="number"
+                step="any"
+                name="end-vessels"
+                :placeholder="t('setup.end.vesselsPlaceholder')"
+              >
+            </label>
+            <label class="mini">
+              <span>{{ t('setup.end.hours') }}</span>
+              <input
+                v-model="d.endFields.hours"
+                type="number"
+                step="any"
+                name="end-hours"
+                :placeholder="t('setup.end.off')"
+              >
+            </label>
+            <label class="mini">
+              <span>{{ t('setup.end.moves') }}</span>
+              <input
+                v-model="d.endFields.moves"
+                type="number"
+                step="any"
+                name="end-moves"
+                :placeholder="t('setup.end.off')"
+              >
+            </label>
+          </div>
+        </fieldset>
+      </details>
 
       <ul
         v-if="d.check.errors.length || d.check.warnings.length"
@@ -149,28 +164,16 @@ async function submit(): Promise<void> {
       <SetupModesSection />
       <SetupDecisionsSection />
 
-      <p
-        v-if="formError || store.error"
-        class="error"
+      <div
+        v-if="store.hasScenario"
+        class="buttons"
       >
-        {{ formError ?? store.error }}
-      </p>
-
-      <div class="buttons">
         <button
-          v-if="store.hasScenario"
           type="button"
           class="btn"
           @click="store.cancelSetup()"
         >
           {{ t('setup.cancel') }}
-        </button>
-        <button
-          type="submit"
-          class="btn primary"
-          :disabled="store.loading || d.check.errors.length > 0"
-        >
-          {{ store.loading ? t('setup.starting') : t('setup.startButton') }}
         </button>
       </div>
     </form>
@@ -233,12 +236,22 @@ h2 {
   border-color: var(--color-primary);
 }
 
-.btn.primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
-  font-weight: 600;
-  min-width: 6rem;
+.advanced > summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.advanced[open] > summary {
+  margin-bottom: 0.5rem;
+}
+
+.advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
 }
 
 .buttons {

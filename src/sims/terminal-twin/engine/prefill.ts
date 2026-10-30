@@ -19,13 +19,14 @@ import { getStrategy, strategies } from './decisions/strategies'
 import { createQuery, type SimQuery } from './query'
 import { nextRandom, seedState } from './rng'
 import type { SimState } from './state'
-import { blockSpecs, boxSpan, parseYardSlotId } from './yardLayout'
+import { blockSpecs, boxSpan, parseYardSlotId, reeferFields } from './yardLayout'
 import { pickWeighted, POOL_VESSEL_ID, type CargoPlan } from '../scenario/bayPlan'
 import { sampleDwell } from '../scenario/dwell'
 import { DEFAULT_LANDSIDE } from '../scenario/builder'
 import { compareKeys, loadSequenceKey, type ExportPlacement } from '../scenario/exportYard'
 import { makeIso6346Id } from '../scenario/iso6346'
 import { LINE_OWNER_PREFIX } from '../scenario/lines'
+import { isReefer } from '../scenario/reefer'
 import { DEFAULT_YARD_TARGET_PCT, type ContainerSize, type ScenarioConfig } from '../scenario/types'
 
 /** Asks the yardAllocation handler for a slot (synchronously). */
@@ -40,6 +41,8 @@ export interface PrefillImport {
   ageS: number
   /** Sim time from which a truck may collect it. */
   pickupReadyAt: number
+  /** Reefer (R19): placed in a powered row. */
+  reefer?: true
 }
 
 export interface PrefillPlan {
@@ -84,6 +87,7 @@ export function* prefillSteps(
     used: 0,
     heights: new Array<number>(spec.bays * spec.rows).fill(0),
     tops: new Array<string | null>(spec.bays * spec.rows).fill(null),
+    spans: new Array<number>(spec.bays * spec.rows).fill(0),
   }))
   if (blocks.length === 0) return out
   let rngState = seedState((seed ^ PREFILL_SALT) >>> 0)
@@ -92,7 +96,7 @@ export function* prefillSteps(
     rngState = next
     return v
   }
-  function* tryPlace(box: { id: string; size: ContainerSize; full: boolean; line: string; vesselId: string }): Generator<YardAllocationRequest, ExportPlacement | null, string | null> {
+  function* tryPlace(box: { id: string; size: ContainerSize; full: boolean; line: string; vesselId: string; reefer?: true }): Generator<YardAllocationRequest, ExportPlacement | null, string | null> {
     // lowest fill first; a block without a legal slot passes the box on
     const order = blocks.map((b, i) => ({ b, i })).sort((x, y) => x.b.used / x.b.capacity - y.b.used / y.b.capacity || x.i - y.i)
     for (const { b } of order) {
@@ -113,6 +117,8 @@ export function* prefillSteps(
         wtpZ: b.spec.wtpZ,
         heights: b.heights.slice(),
         topVessels: b.tops.slice(),
+        stackSpans: b.spans.slice(),
+        ...reeferFields(b.spec, box.reefer),
         random: rng(),
       }
       const slotId = yield request
@@ -126,6 +132,7 @@ export function* prefillSteps(
         if (b.heights[i] !== cell.tier - 1) throw new Error(`yardAllocation handler returned slot ${slotId}, which does not sit on its stack (pre-fill)`)
         b.heights[i] = cell.tier
         b.tops[i] = box.vesselId
+        b.spans[i] = span
       }
       b.used += span
       const placement: ExportPlacement = { containerId: box.id, vesselId: box.vesselId, size: box.size, blockId: b.spec.id, slotId, bay: cell.bay, row: cell.row, tier: cell.tier, span }
@@ -165,11 +172,12 @@ export function* prefillSteps(
     ids.add(id)
     // recorded before its placement is announced, so a consumer sees the import together with its slot
     const imp: PrefillImport = { id, size, line, ageS, pickupReadyAt: d - ageS }
+    if (isReefer(config.cargo, id, true)) imp.reefer = true
     out.imports.push(imp)
-    let p = yield* tryPlace({ id, size, full: true, line, vesselId: POOL_VESSEL_ID })
+    let p = yield* tryPlace({ id, size, full: true, line, vesselId: POOL_VESSEL_ID, reefer: imp.reefer })
     if (!p && boxSpan(size) === 2) {
       imp.size = '20' // no pair of equal stacks for a 40 ft box: a 20 ft box may still fit
-      p = yield* tryPlace({ id, size: '20', full: true, line, vesselId: POOL_VESSEL_ID })
+      p = yield* tryPlace({ id, size: '20', full: true, line, vesselId: POOL_VESSEL_ID, reefer: imp.reefer })
     }
     if (!p) {
       out.imports.pop()

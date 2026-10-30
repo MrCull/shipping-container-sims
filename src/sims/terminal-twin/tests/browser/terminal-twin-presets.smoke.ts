@@ -4,6 +4,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openAdvanced, pickScenario } from './scenarioPicker'
 
 async function openDialog(page: Page) {
   await page.goto('/sim/terminal-twin')
@@ -17,8 +18,10 @@ async function openDialog(page: Page) {
 
 test('the dialog offers the three presets and marks the TTI bay count as an assumption', async ({ page }) => {
   const dialog = await openDialog(page)
-  for (const name of ['TTI Algeciras baseline', 'Small automated', 'Stress test']) await expect(dialog.getByText(name, { exact: true })).toBeVisible()
-  await dialog.getByText('TTI Algeciras baseline', { exact: true }).click()
+  for (const name of ['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras — peak day']) {
+    await expect(dialog.locator(`[data-testid="tt-preset-card"][data-scenario="${name}"]`)).toBeVisible()
+  }
+  await pickScenario(dialog, 'TTI Algeciras baseline')
   await expect(dialog.getByTestId('tt-bays-assumption')).toBeVisible()
   await expect(dialog.getByTestId('tt-summary-sts')).toHaveText('8')
   await expect(dialog.locator('[data-testid^="tt-plan-block-"]')).toHaveCount(16)
@@ -26,9 +29,58 @@ test('the dialog offers the three presets and marks the TTI bay count as an assu
   await expect(dialog.getByTestId('tt-yard-start-prefilled')).toBeChecked()
 })
 
+test('presets are hero cards with chips and a sketch; fixtures sit in a collapsed table', async ({ page }) => {
+  const dialog = await openDialog(page)
+  const cards = dialog.getByTestId('tt-preset-card')
+  await expect(cards).toHaveCount(3)
+  const peak = dialog.locator('[data-testid="tt-preset-card"][data-scenario="TTI Algeciras — peak day"]')
+  await expect(peak.getByTestId('tt-chip-sts')).toHaveText('8 STS')
+  await expect(peak.getByTestId('tt-chip-fill')).toHaveText('yard 75% full')
+  await expect(peak.locator('svg.sketch')).toBeVisible()
+  const fixtures = dialog.getByTestId('tt-fixtures')
+  await expect(fixtures).not.toHaveAttribute('open', '')
+  await expect(dialog.getByTestId('tt-fixture-row').first()).toBeHidden()
+  await fixtures.locator('summary').click()
+  await expect(dialog.getByTestId('tt-fixture-row').first()).toBeVisible()
+  expect(await dialog.getByTestId('tt-fixture-row').count()).toBeGreaterThanOrEqual(16)
+})
+
+test('a card is focusable and Enter selects it; the detail panel Start runs it', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(err.message))
+  const dialog = await openDialog(page)
+  const card = dialog.locator('[data-testid="tt-preset-card"][data-scenario="Small automated"]')
+  await card.focus()
+  await expect(card).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(card).toHaveAttribute('aria-checked', 'true')
+  await expect(dialog.getByTestId('tt-detail-name')).toHaveText('Small automated')
+  await expect(dialog.getByTestId('tt-scenario-detail').getByRole('button', { name: 'Start', exact: true })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click()
+  await expect(dialog).toBeHidden({ timeout: 60_000 })
+  await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5, undefined, { timeout: 60_000 })
+  expect((await page.evaluate(() => window.__tt!.config()))!.name).toBe('Small automated')
+  expect(errors).toEqual([])
+})
+
+test('seed and start date live under Advanced and still apply', async ({ page }) => {
+  const dialog = await openDialog(page)
+  await expect(dialog.locator('input[name="seed"]')).toBeHidden()
+  await openAdvanced(dialog)
+  await dialog.locator('input[name="seed"]').fill('4242')
+  await pickScenario(dialog, 'Small automated')
+  await dialog.locator('input[name="seed"]').fill('4242')
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click()
+  await expect(dialog).toBeHidden({ timeout: 60_000 })
+  // The run's choice is remembered: the reopened dialog shows the seed the run started with.
+  await page.getByRole('button', { name: /new scenario/i }).click()
+  await openAdvanced(dialog)
+  await expect(dialog.locator('input[name="seed"]')).toHaveValue('4242')
+})
+
 test('the plan preview follows the counts and an impossible configuration cannot start', async ({ page }) => {
   const dialog = await openDialog(page)
-  await dialog.getByText('TTI Algeciras baseline', { exact: true }).click()
+  await pickScenario(dialog, 'TTI Algeciras baseline')
   await dialog.locator('input[name="stsCount"]').fill('10')
   await expect(dialog.locator('[data-testid^="tt-plan-sts-"]')).toHaveCount(10)
   await dialog.locator('input[name="yard-blocks"]').fill('12')
@@ -46,7 +98,7 @@ test('the plan preview follows the counts and an impossible configuration cannot
 
 test('the STS cycle readout follows the kinematics', async ({ page }) => {
   const dialog = await openDialog(page)
-  await dialog.getByText('TTI Algeciras baseline', { exact: true }).click()
+  await pickScenario(dialog, 'TTI Algeciras baseline')
   const readout = dialog.getByTestId('tt-sts-readout')
   const before = await readout.textContent()
   await dialog.locator('input[name="sts-v-trolley"]').fill('1')
@@ -55,7 +107,7 @@ test('the STS cycle readout follows the kinematics', async ({ page }) => {
 
 test('the decision-point settings are exposed', async ({ page }) => {
   const dialog = await openDialog(page)
-  await dialog.getByText('Small automated', { exact: true }).click()
+  await pickScenario(dialog, 'Small automated')
   await dialog.getByTestId('tt-decisions-details').locator('summary').click()
   await expect(dialog.getByTestId('tt-async-pause')).toBeVisible()
   await expect(dialog.getByTestId('tt-dp-stsGroundPosition').locator('select').first()).toBeVisible()
@@ -65,7 +117,7 @@ test('the TTI preset runs in the browser', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   const dialog = await openDialog(page)
-  await dialog.getByText('TTI Algeciras baseline', { exact: true }).click()
+  await pickScenario(dialog, 'TTI Algeciras baseline')
   await dialog.getByRole('button', { name: 'Start', exact: true }).click()
   await expect(dialog).toBeHidden({ timeout: 60_000 })
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5, undefined, { timeout: 60_000 })

@@ -2,7 +2,8 @@
  * KPI report: a plain, rounded (3 dp) summary derived from SimState. Later
  * tickets (TT-07) add time series, hourly/shift buckets and more groups.
  */
-import type { SimState } from './state'
+import { zeroStateS, type ShcOperationalState } from './shcStates'
+import type { AppointmentBook, LandsideKpiCounters, LandsideState, SimState } from './state'
 
 /** Per-decision-point (TOS handler) KPIs. Latencies are per resolved decision. */
 export interface HandlerKpiReport {
@@ -66,6 +67,8 @@ export interface KpiReport {
   yard?: YardKpiReport
   /** Work packages (only when some were released). */
   workPackages?: WorkPackageKpiReport
+  /** Hatch cover moves of the STS cranes (only when a hatch move has started). */
+  hatch?: HatchKpiReport
   /** Trucks and the gate (only when the landside is on). */
   landside?: LandsideKpiReport
 }
@@ -82,6 +85,17 @@ export interface LandsideKpiReport {
   turnTimeS: { mean: number; max: number }
   /** Gate queue wait: arrival to lane assignment (s), over the trucks that got a lane. */
   gateWaitS: { mean: number; max: number }
+  /** Kiosk processing at the in gate (s), over the trucks that got through. */
+  gateProcessingS: { mean: number; max: number }
+  /**
+   * Internal drive time (s) over the trucks that left: the inbound drive from the kiosk to the stall (through the holding
+   * position when there was one). Standing time (holding, at the stall) and the way out are not in it.
+   */
+  internalDriveS: { mean: number; max: number }
+  /** Total truck turnaround: arrival at the gate to gate-out (s), so it includes the wait outside and in holding. */
+  totalTurnaroundS: { mean: number; max: number }
+  /** Road use: trucks driving on the internal roads (inbound legs and the way out), time-weighted mean over the run and peak. */
+  road: { meanTrucks: number; maxTrucks: number }
   /** Stall allocation wait: gate-in to stall assigned (s). */
   stallAllocWaitS: { mean: number; max: number }
   /** Transfer-stall wait: standing at the stall until the ASC starts on the truck (s). */
@@ -94,6 +108,46 @@ export interface LandsideKpiReport {
   boxesPicked: number
   /** Arrivals that could not get the drawn transaction and came to drop an empty. */
   fallbacks: number
+  /** Appointment system (only with `config.landside.appointments`, TT-R15). */
+  appointments?: {
+    windowS: number
+    capPerWindow: number
+    windows: number
+    booked: number
+    /** Bookings refused because their window was full. */
+    rejected: number
+    maxBookedPerWindow: number
+    /** Booked trucks that passed the gate after the end of their window (TT-R18). */
+    delayed: number
+  }
+  /** Stall admission and holding (only with `config.landside.holding`, TT-R16). */
+  holding?: {
+    positions: number
+    admittedToStall: number
+    admittedToHolding: number
+    /** Trucks that waited outside the gate because no stall and no holding position was free. */
+    heldOutside: number
+    /** Holding positions in use now, and at most. */
+    inUse: number
+    maxInUse: number
+    /** Standing in a holding position until its stall is assigned (s). */
+    waitS: { mean: number; max: number }
+    /** Occupied position-seconds (reserved until the truck drives out) over positions x run time, in % (TT-R18). */
+    utilisationPct: number
+  }
+}
+
+export interface HatchKpiReport {
+  /** Hatch moves: panels lifted off and put back. */
+  moves: number
+  removes: number
+  replaces: number
+  /** STS time spent on hatch moves, start of a move to the panel set down (s). */
+  stsTimeS: number
+  /** Crane idle time waiting for a lashing release or a securing (s). */
+  waitS: number
+  /** Per STS: hatch moves, their time and waiting. */
+  sts: Record<string, { moves: number; timeS: number; waitS: number }>
 }
 
 export interface WorkPackageKpiReport {
@@ -153,12 +207,29 @@ export interface YardKpiReport {
 export interface HorizontalKpiReport {
   /** Boxes SHCs delivered to WTP pads. */
   boxesToWtp: number
-  shcs: Record<string, { jobs: number; emptyDistanceM: number; loadedDistanceM: number; reservationWaitS: number }>
+  shcs: Record<
+    string,
+    {
+      jobs: number
+      emptyDistanceM: number
+      loadedDistanceM: number
+      reservationWaitS: number
+      /** Seconds in each operational state over the measured run (TT-R11; from the KPI collector). */
+      stateS: Record<ShcOperationalState, number>
+      /** Custody changes at buffers: one per box picked up and one per box put down (TT-R11). */
+      handovers: number
+      /** Drives back to the parking spot (TT-R12): fewer when SHCs chain jobs instead of parking. */
+      parkingReturns: number
+      /** Arrivals at a queue spot (TT-R12). */
+      queueArrivals: number
+    }
+  >
   /** STS seconds spent waiting for a free ground position (SHCs too slow). */
   stsGroundPositionWaitS: Record<string, number>
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000
+
 
 /** Trucks that have been given an inbound lane (arrived minus those still queued). */
 const gateServed = (state: SimState): number => {
@@ -168,6 +239,34 @@ const gateServed = (state: SimState): number => {
 }
 
 /** Trucks that have been given a stall (through the gate minus those still waiting for one). */
+function appointmentReport(book: AppointmentBook, k: LandsideKpiCounters): NonNullable<LandsideKpiReport['appointments']> {
+  const perWindow = new Map<number, number>()
+  for (const a of book.list) perWindow.set(a.windowIndex, (perWindow.get(a.windowIndex) ?? 0) + 1)
+  return {
+    windowS: book.windowS,
+    capPerWindow: book.capPerWindow,
+    windows: book.windows,
+    booked: book.list.length,
+    rejected: book.rejected,
+    maxBookedPerWindow: Math.max(0, ...perWindow.values()),
+    delayed: k.appointmentsDelayed,
+  }
+}
+
+function holdingReport(ls: LandsideState, k: LandsideKpiCounters, now: number): NonNullable<LandsideKpiReport['holding']> {
+  const positions = Object.values(ls.holding)
+  return {
+    positions: positions.length,
+    admittedToStall: k.admittedToStall,
+    admittedToHolding: k.admittedToHolding,
+    heldOutside: k.heldOutside,
+    inUse: positions.filter((h) => h.truckId !== null).length,
+    maxInUse: k.holdingMax,
+    waitS: { mean: k.holdingWaitCount > 0 ? r3(k.holdingWaitSumS / k.holdingWaitCount) : 0, max: r3(k.holdingWaitMaxS) },
+    utilisationPct: now > 0 ? r3((100 * (k.holdBusyS + positions.filter((h) => h.truckId !== null).length * (now - k.holdLastT))) / (positions.length * now)) : 0,
+  }
+}
+
 const stallsAssigned = (state: SimState): number => (state.kpis.landside?.trucksIn ?? 0) - (state.landside?.stallWaiting.length ?? 0)
 
 export function buildKpiReport(state: SimState, eventsProcessed: number): KpiReport {
@@ -239,6 +338,10 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
           emptyDistanceM: r3(k.emptyDistanceM),
           loadedDistanceM: r3(k.loadedDistanceM),
           reservationWaitS: r3(k.reservationWaitS),
+          stateS: zeroStateS(),
+          handovers: 0,
+          parkingReturns: k.parkingReturns,
+          queueArrivals: k.queueArrivals,
         },
       ]),
     ),
@@ -298,11 +401,20 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     gateWaitS: { mean: gateServed(state) > 0 ? r3(ls.gateWaitSumS / gateServed(state)) : 0, max: r3(ls.gateWaitMaxS) },
     stallAllocWaitS: { mean: ls.trucksIn > 0 ? r3(ls.stallAllocWaitSumS / Math.max(1, stallsAssigned(state))) : 0, max: r3(ls.stallAllocWaitMaxS) },
     stallWaitS: { mean: ls.stallWaitCount > 0 ? r3(ls.stallWaitSumS / ls.stallWaitCount) : 0, max: r3(ls.stallWaitMaxS) },
+    gateProcessingS: { mean: ls.trucksIn > 0 ? r3(ls.gateProcSumS / ls.trucksIn) : 0, max: r3(ls.gateProcMaxS) },
+    internalDriveS: { mean: ls.trucksOut > 0 ? r3(ls.driveSumS / ls.trucksOut) : 0, max: r3(ls.driveMaxS) },
+    totalTurnaroundS: { mean: ls.trucksOut > 0 ? r3(ls.totalTurnSumS / ls.trucksOut) : 0, max: r3(ls.totalTurnMaxS) },
+    road: {
+      meanTrucks: state.now > 0 ? r3((ls.roadBusyS + ls.roadNow * (state.now - ls.roadLastT)) / state.now) : 0,
+      maxTrucks: ls.roadMax,
+    },
     serviceS: ls.trucksOut > 0 ? r3(ls.serviceSumS / ls.trucksOut) : 0,
     transactions: { ...ls.transactions },
     boxesDropped: ls.boxesDropped,
     boxesPicked: ls.boxesPicked,
     fallbacks: ls.fallbacks,
+    ...(state.landside?.appointments ? { appointments: appointmentReport(state.landside.appointments, ls) } : {}),
+    ...(state.landside && Object.keys(state.landside.holding).length > 0 ? { holding: holdingReport(state.landside, ls, state.now) } : {}),
   }
   return {
     simTimeS: r3(state.now - (state.warmUp?.ended ? state.warmUp.durationS : 0)),
@@ -317,6 +429,20 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     ...(horizontal ? { horizontal } : {}),
     ...(yard ? { yard } : {}),
     ...(landside ? { landside } : {}),
+    ...(state.kpis.hatch
+      ? {
+          hatch: {
+            moves: state.kpis.hatch.removes + state.kpis.hatch.replaces,
+            removes: state.kpis.hatch.removes,
+            replaces: state.kpis.hatch.replaces,
+            stsTimeS: r3(state.kpis.hatch.stsTimeS),
+            waitS: r3(state.kpis.hatch.waitS),
+            sts: Object.fromEntries(
+              Object.entries(state.kpis.hatch.perSts).map(([id, k]) => [id, { moves: k.moves, timeS: r3(k.timeS), waitS: r3(k.waitS) }]),
+            ),
+          },
+        }
+      : {}),
     ...(state.kpis.workPackages.released > 0
       ? {
           workPackages: {

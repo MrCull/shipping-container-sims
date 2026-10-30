@@ -77,6 +77,12 @@ export interface BlockConfig {
   tiers?: number
   /** Transfer stalls at the landside end (default 5; used by TT-13). */
   transferStalls?: number
+  /**
+   * Rows (1-8, counted across X like the yard's other row numbers) with reefer plugs (R19). Reefers are only
+   * allocated to these rows, at most `REEFER_MAX_TIERS` high. Default none: a block without powered rows takes no
+   * reefer. The TTI preset values are unverified (`knowledge-base/dk_ops__tti_algeciras_operations.md`).
+   */
+  poweredRows?: number[]
 }
 
 export interface YardConfig {
@@ -111,7 +117,31 @@ export interface ApronLayout {
   parkingPitchM: number
   /** Distance either side of a conflict point that a passing vehicle reserves. */
   zoneClearanceM: number
+  /** Z of the queue area spots (TT-R12), landside of the pad clear positions. */
+  queueZ: number
+  /** Spacing of the spots of one queue area along X. */
+  queuePitchM: number
 }
+
+/**
+ * SHC queue areas (TT-R12): lane-graph spots where an SHC waits when its pickup or drop-off is not ready,
+ * separate from parking spots, ground positions and WTP pads. One area per STS (empty SHCs wait for work)
+ * and one per block (SHCs carrying a box wait for a free WTP pad). Absent = no queue areas (the old behaviour).
+ */
+export interface QueueAreasConfig {
+  /** Spots in the queue area near each STS (0 = none). */
+  stsCapacity?: number
+  /** Spots in the queue area near each block's WTP pads (0 = none). */
+  blockCapacity?: number
+  /**
+   * Pre-dispatch lead margin (s, TT-R13; default `DEFAULT_PREDISPATCH_MARGIN_S`). With the `predispatch` strategy an SHC
+   * is sent to a queue area when a box there is predicted ready within the SHC's travel time plus this margin.
+   */
+  predispatchMarginS?: number
+}
+
+/** Default pre-dispatch margin (s). */
+export const DEFAULT_PREDISPATCH_MARGIN_S = 15
 
 /** Subsystem modes: real behaviour, an "instant" stub raising the same events, or off. */
 export type SubsystemMode = 'real' | 'instant' | 'off'
@@ -188,6 +218,11 @@ export interface VesselConfig {
    */
   dischargeTransshipment?: number
   /**
+   * Stow the discharge boxes on deck only, as far as the deck has room (default false: shared out between hold and
+   * deck in proportion to their tiers). A vessel with nothing in its hold opens no hatch (TT-R09).
+   */
+  deckOnly?: boolean
+  /**
    * Empty containers this vessel loads (TT-11): N empties of a size and shipping line per entry.
    * Releasing the work package that carries them raises "empties required" and asks the
    * `emptyAllocation` decision point which empties in the yard go.
@@ -254,6 +289,11 @@ export interface CargoConfig {
   sizeMix: Weights<ContainerSize>
   /** Share of empty boxes (0–1). */
   emptyShare: number
+  /**
+   * Share of the full boxes that are reefers (0-1, default 0), R19. Drawn per box from its container id (a hash,
+   * not an RNG stream), so a share of 0 leaves every other draw, and every golden, unchanged.
+   */
+  reeferShare?: number
 }
 
 /**
@@ -322,6 +362,8 @@ export interface ScenarioConfig {
   yardStart?: YardStartConfig
   /** Waterside lane-graph geometry overrides. */
   apron?: Partial<ApronLayout>
+  /** SHC queue areas near each STS and each block's WTP pads (TT-R12); optional (none). */
+  queueAreas?: QueueAreasConfig
   /** ± % random variation of each SHC trip (driver variability; 0 = none). */
   driverVariabilityPct?: number
   /** Subsystem modes (overridable with `SimulationOptions.subsystems`). */
@@ -339,10 +381,30 @@ export interface ScenarioConfig {
   emptyPool?: EmptyPoolConfig
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
+  /**
+   * Hatch covers (TT-R09); optional. Panel counts, sizes and weights come from the vessel class
+   * (`VESSEL_CLASSES[...].hatch`); these override the timings and the laydown stack limit for every class.
+   * `enabled: false` leaves the hatch covers out (no hatch moves, the old discharge-then-load work order).
+   */
+  hatch?: HatchConfig
   /** KPI bucket clock (optional; defaults come from `startDateTime`, see `engine/kpi/clock.ts`). */
   kpi?: KpiClockConfig
   /** Landside: external trucks, gate and transfer stalls (TT-13); optional (no trucks without it). */
   landside?: LandsideConfig
+}
+
+/** Scenario-level hatch cover settings (TT-R09). All optional; the vessel class supplies the defaults. */
+export interface HatchConfig {
+  /** Default true. */
+  enabled?: boolean
+  /** Lashing release delay (s) once the deck boxes above a hatch panel are gone. */
+  lashingReleaseS?: number
+  /** Securing time (s) of a replaced panel. */
+  lashingSecureS?: number
+  /** STS cycle time of one hatch move (s). */
+  cycleS?: number
+  /** Panels per laydown stack. */
+  laydownStackLimit?: number
 }
 
 /** A truck's transaction: one drop or pick, or `dual` (drop an export and pick an import in one visit). */
@@ -376,6 +438,51 @@ export interface ScriptedTruck {
   transaction: TruckTransactionKind
 }
 
+/** Demand multiplier for the windows that overlap `[fromS, toS)` (sim seconds): how a peak is expressed. */
+export interface BunchingSpan {
+  fromS: number
+  toS: number
+  factor: number
+}
+
+/**
+ * Truck appointment system (TT-R15). When present, trucks arrive against booked windows instead of the raw Poisson
+ * process: demand per window follows `hourlyProfile` x `bunching`, bookings stop at the window's cap, arrivals are spread
+ * uniformly inside the window. No ANPR and no early, late or invalid arrivals.
+ */
+export interface AppointmentConfig {
+  /** Window length (s, default 1800). */
+  windowS?: number
+  /** Extra cap on bookings per window; the cap is also limited by gate and transfer stall capacity. */
+  maxPerWindow?: number
+  /** [A] Mean time a truck occupies a transfer stall (s, default 300): sets the stall capacity per window. */
+  stallServiceS?: number
+  /** Windows whose demand is multiplied (a peak is bunched bookings). */
+  bunching?: BunchingSpan[]
+  /** How long to book ahead (s; default the run's `simDurationS` plus warm-up, else 24 h). */
+  horizonS?: number
+  /** True when the numbers come from the TTI research and are not publicly verified. */
+  unverified?: boolean
+}
+
+/** What happens to a truck at the gate when no stall can take it and every holding position is full (TT-R16). */
+export type HoldingOverflowPolicy = 'wait-outside'
+
+/**
+ * Stall admission and holding (TT-R16). With this set, the gate admits the truck at the head of the queue only when a
+ * transfer stall can take it (the stall is reserved before the truck is sent) or a holding position is free; an
+ * admitted truck without a stall waits in a holding position; with holding full the truck waits outside the gate.
+ * Absent = the truck is processed whenever a lane is free and waits at the kiosk for a stall (the older behaviour).
+ */
+export interface HoldingConfig {
+  /** Dedicated holding positions on spurs of the inbound road, clear of roads, junctions and gate exits. */
+  positions: number
+  /** Overflow procedure when holding is full (default and only policy: the truck waits outside the gate). */
+  overflow?: HoldingOverflowPolicy
+  /** True when the numbers come from the TTI research and are not publicly verified. */
+  unverified?: boolean
+}
+
 export interface LandsideConfig {
   /** Trucks arriving per hour for each clock hour 0–23 (Poisson arrivals); the clock comes from `kpi.startTimeOfDayS`. */
   hourlyProfile: number[]
@@ -390,6 +497,10 @@ export interface LandsideConfig {
   drive?: AxisProfile
   /** Trucks that arrive at fixed times. */
   scripted?: ScriptedTruck[]
+  /** Appointment windows replace the Poisson arrivals (TT-R15); absent = Poisson. */
+  appointments?: AppointmentConfig
+  /** Stall admission and holding positions (TT-R16); absent = trucks wait at the gate kiosk for a stall. */
+  holding?: HoldingConfig
 }
 
 /** Where the scenario clock sits, so hour and shift buckets line up with the clock the user sees. */

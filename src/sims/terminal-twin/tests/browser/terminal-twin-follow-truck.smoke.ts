@@ -41,7 +41,7 @@ test('paused: waits for the next arrival, then follows that truck until it is go
   await expect
     .poll(
       async () => {
-        const s = await page.evaluate(() => ({ cam: window.__tt!.cameraTarget(), trucks: window.__tt!.sceneState()!.trucks, ui: window.__tt!.ui() }))
+        const s = await page.evaluate(() => ({ cam: window.__tt!.cameraPose()?.target, trucks: window.__tt!.sceneState()!.trucks, ui: window.__tt!.ui() }))
         const pose = s.trucks[truck]
         if (s.ui.following && pose?.visible && s.cam && Math.hypot(s.cam.x - pose.x, s.cam.z - pose.z) < 40) tracked++
         return s.ui.following

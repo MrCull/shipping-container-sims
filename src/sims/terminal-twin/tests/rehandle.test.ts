@@ -40,7 +40,7 @@ function buryExports(pick: (stacks: { bay: number; row: number }[], random: numb
 
 /** Mixed call: `discharge` imports first (all stacked on export boxes by the handler), then `load` exports. */
 function buried(opts: { discharge: number; load: number; tiers: number; strategy?: string; seed?: number; sizeMix?: Record<string, number> }): ScenarioConfig {
-  const b = new ScenarioBuilder('buried', 'export boxes buried under imports')
+  const b = new ScenarioBuilder('buried', 'export boxes buried under imports').hatch({ enabled: false })
     .seed(opts.seed ?? 4)
     .moveVariation(10)
     .driverVariability(10)
@@ -214,7 +214,7 @@ describe('rehandle strategies on a longer fixture', () => {
 describe('allocation comparison on an export-heavy fixture', () => {
   /** V001 discharges first; V002 (arriving later) loads export boxes seeded in the same block. */
   function exportHeavy(allocation: string, seed: number): ScenarioConfig {
-    return new ScenarioBuilder('export-heavy', 'imports of one vessel pile up where exports of the next stand')
+    return new ScenarioBuilder('export-heavy', 'imports of one vessel pile up where exports of the next stand').hatch({ enabled: false })
       .seed(seed)
       .moveVariation(10)
       .driverVariability(10)

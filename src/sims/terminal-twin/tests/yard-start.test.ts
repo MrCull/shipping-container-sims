@@ -25,7 +25,7 @@ interface Opts {
 }
 
 function scenario(o: Opts = {}): ScenarioConfig {
-  const b = new ScenarioBuilder('yard-start', 'yard start test')
+  const b = new ScenarioBuilder('yard-start', 'yard start test').hatch({ enabled: false })
     .seed(o.seed ?? 7)
     .moveVariation(10)
     .quay(400, { mooringS: 60, unmooringS: 60 })

@@ -100,5 +100,8 @@
   },
   "endConditions": {
     "vesselsCompleted": 2
+  },
+  "hatch": {
+    "enabled": false
   }
 }

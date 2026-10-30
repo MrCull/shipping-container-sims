@@ -7,6 +7,7 @@ import type { RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/tracer-1sts-10-boxes.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import { sampleFrames, simPerWallSecond, advancedFraction, neverBackwards } from './frameSampling'
+import { openAdvanced } from './scenarioPicker'
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = []
@@ -163,7 +164,8 @@ test('Reset returns to t = 0 with the same seed; New Scenario reopens the setup 
   await page.getByRole('button', { name: 'New Scenario' }).click()
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await expect(dialog).toBeVisible()
-  // Start a different seed through the dialog itself.
+  // Start a different seed through the dialog itself (seed lives under Advanced).
+  await openAdvanced(dialog)
   await dialog.getByRole('spinbutton', { name: /^Seed/ }).fill('7')
   await dialog.getByRole('button', { name: 'Start' }).click()
   await expect(dialog).toBeHidden()

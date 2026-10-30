@@ -13,8 +13,8 @@ import type { RehandleCandidate } from '../decisions/types'
 import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import type { ScenarioConfig } from '../../scenario/types'
 import type { AscJob, SimState, YardSlotState } from '../state'
-import { candidateSlots, stackIndex, type BlockSpec } from '../yardLayout'
-import { columnKey, yardIndexOf } from '../yardIndex'
+import { candidateSlots, reeferFields, stackIndex, type BlockSpec } from '../yardLayout'
+import { columnKey, stackSpansOf, yardIndexOf } from '../yardIndex'
 
 /** Columns ("bay-row") a slot covers. */
 export const columnsOfSlot = (s: Pick<YardSlotState, 'bay' | 'row' | 'span'>): string[] =>
@@ -152,6 +152,8 @@ export function rehandleCandidates(
     wtpZ: block.wtpZ,
     heights,
     topVessels: tops,
+    stackSpans: stackSpansOf(state, block.id, blocker),
+    ...reeferFields(block, box.reefer),
   }
   const out: RehandleCandidate[] = []
   for (const c of candidateSlots(stacks)) {

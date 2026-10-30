@@ -83,11 +83,11 @@ describe('built-in strategies', () => {
     expect(gpOfType(sim, 'DecisionResolved')[0].payload.handler).toBe('strategy:highest-free-lane')
   })
 
-  it('the registry lists 1–3 strategies per decision point, and an unknown name fails at creation', () => {
+  it('the registry lists 1–5 strategies per decision point, and an unknown name fails at creation', () => {
     for (const entry of Object.values(strategies)) {
       const n = Object.keys(entry.strategies).length
       expect(n).toBeGreaterThanOrEqual(1)
-      expect(n).toBeLessThanOrEqual(3)
+      expect(n).toBeLessThanOrEqual(5) // shcDispatch grew past 3 with chained-nearest and predispatch
       expect(entry.strategies[entry.default]).toBeDefined()
     }
     expect(() =>
@@ -115,7 +115,7 @@ describe('built-in strategies', () => {
 })
 
 /** Two STS on one vessel, no move variation: one crane's pending decision does not stop the other. */
-const twoCranes = new ScenarioBuilder('two-sts', '2 STS share one vessel')
+const twoCranes = new ScenarioBuilder('two-sts', '2 STS share one vessel').hatch({ enabled: false })
   .seed(3)
   .quay(400, { mooringS: 60, unmooringS: 60 })
   .sts('STS01', { gantryX: 30, groundPositions: 10 })

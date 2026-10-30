@@ -5,6 +5,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import fixture from '../../scenario/fixtures/tracer-1sts-10-boxes.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openAdvanced } from './scenarioPicker'
 
 const TRACER = 'tracer-1sts-10-boxes'
 // Monday 26 Oct 2026, 13:45 UTC; the browser runs in UTC (timezoneId below).
@@ -115,6 +116,7 @@ test.describe('British browser', () => {
     await loadTracerAt(page, 17 * 60 + 3) // 14:02:03 UTC; start is Mon 26 Oct 2026 13:45
 
     await page.getByRole('button', { name: 'New Scenario' }).click()
+    await openAdvanced(page)
     const start = page.getByTestId('tt-setup-start')
     await expect(start).toHaveValue('26/10/2026, 13:45')
 
@@ -177,10 +179,10 @@ test.describe('British browser', () => {
     await expect.poll(async () => (await clock()).engine!.eventsTotal).toBe(before + 1)
     expect((await clock()).paused).toBe(true)
 
-    // D: dashboard tab
-    await page.keyboard.press('d')
+    // B: dashboard tab
+    await page.keyboard.press('b')
     await expect(page.getByTestId('tt-dashboard')).toBeVisible()
-    await page.keyboard.press('d')
+    await page.keyboard.press('b')
     await expect(page.getByTestId('tt-dashboard')).toBeHidden()
 
     // O: overlays
@@ -205,8 +207,8 @@ test.describe('British browser', () => {
     await page.keyboard.press('?')
     const help = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
     await expect(help).toBeVisible()
-    for (const key of ['Space', '1–9', '0', '.', 'F', 'Esc', 'D', 'O', '?']) {
-      await expect(help.locator('kbd', { hasText: new RegExp(`^${key.replace(/[.?]/g, '\\$&')}$`) })).toHaveCount(1)
+    for (const key of ['Space', '1–9', '0', '.', 'F', 'Esc', 'B', 'O', '?', 'WASD', 'Shift + AD', 'Shift + WS', '= / -']) {
+      await expect(help.locator('kbd', { hasText: new RegExp(`^${key.replace(/[.?+]/g, '\\$&')}$`) })).toHaveCount(1)
     }
     await page.keyboard.press('Escape')
     await expect(help).toBeHidden()
@@ -219,7 +221,7 @@ test.describe('British browser', () => {
     await page.getByRole('button', { name: 'Run to…' }).click()
     const field = page.getByLabel('Target sim time')
     await field.focus()
-    for (const key of ['Space', '3', '0', '.', 'f', 'd', 'o', '?', 'Escape']) await field.press(key)
+    for (const key of ['Space', '3', '0', '.', 'f', 'b', 'w', 'a', 'o', '?', 'Escape']) await field.press(key)
     const after = await clock()
     expect(after.paused).toBe(stateBefore.clock.paused)
     expect(after.speed).toBe(stateBefore.clock.speed)

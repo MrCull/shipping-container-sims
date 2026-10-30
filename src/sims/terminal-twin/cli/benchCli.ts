@@ -1,7 +1,7 @@
 /**
  * Process entry for the engine benchmark (local only, not in CI):
  *   pnpm run tt:bench                       TTI preset, 24 sim-hours, compared with perf/baseline.json
- *   pnpm run tt:bench --preset "Stress test"
+ *   pnpm run tt:bench --preset "TTI Algeciras — peak day"
  *   pnpm run tt:bench --update-baseline  record this run as the baseline for the preset
  *   pnpm run tt:bench --slow-ms 1        self-test: slow every event, the regression flag must trip
  * Exit codes: 0 ok, 1 regression or engine failure, 2 usage.

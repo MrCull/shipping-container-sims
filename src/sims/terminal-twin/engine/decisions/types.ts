@@ -74,6 +74,11 @@ export interface ShcDispatchRequest {
   nodeId: string
   x: number
   z: number
+  /**
+   * Kind of the job this SHC delivered last ('discharge': it just set a box down on a WTP pad; 'load': on an STS ground
+   * position). Only sent under the `paired-dual-cycle` strategy (TT-R14), so other event logs are unchanged.
+   */
+  lastJobKind?: 'discharge' | 'load'
   /** Open (unclaimed) jobs, oldest first. */
   jobs: ShcDispatchJob[]
   wtpPads: ShcDispatchPad[]
@@ -176,6 +181,8 @@ export interface AscDispatchRequest {
     kind: 'wtp' | 'transfer' | 'retrieve' | 'rehandle'
     /** `transfer` (TT-13): a truck at a transfer stall; `stallId` is its stall, `wtpPadId` is empty. */
     stallId?: string
+    /** TT-R17: a `transfer` pick retrieval the truck has not yet arrived for (its stall is reserved); only offered with the `pre-retrieval` strategy. */
+    early?: true
     wtpPadId: string
     yardSlotId: string
     /** Gantry Z of the pad and of the slot (m). */
@@ -248,7 +255,8 @@ export interface CraneSplitReply {
 /** One of a crane's work packages as the release decision sees it. */
 export interface WorkPackageInfo {
   packageId: string
-  kind: 'discharge' | 'load'
+  /** `hatch-remove` / `hatch-replace` (TT-R09) are hatch cover moves: `moves` 0, section `deck`. */
+  kind: 'discharge' | 'load' | 'hatch-remove' | 'hatch-replace'
   section: 'deck' | 'hold'
   bay: number
   moves: number
@@ -456,7 +464,7 @@ export const DECISION_CONTRACT_VERSIONS: Record<DecisionPointId, number> = {
   ascDispatch: 1,
   berthAllocation: 1,
   craneSplit: 1,
-  workPackageRelease: 1,
+  workPackageRelease: 2,
   emptyAllocation: 1,
   rehandleTarget: 1,
   gateLaneAssignment: 1,

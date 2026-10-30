@@ -9,15 +9,26 @@ import asc2AscBlockConflict from './asc-2asc-block-conflict.json'
 import craneSplit4Sts from './crane-split-4sts.json'
 import dualTruck from './dual-truck-transaction.json'
 import truckGateQueue from './truck-gate-queue.json'
+import hatchCoverCycle from './hatch-cover-cycle.json'
+import hatchDeckOnly from './hatch-deck-only-no-open.json'
+import truckAppointmentWindows from './truck-appointment-windows.json'
+import truckHoldingOverflow from './truck-holding-overflow.json'
+import ascPreRetrieval from './asc-pre-retrieval.json'
 import landsideMorningPeak from './landside-morning-peak.json'
 import loadFixture from './load-1sts-10-boxes-1block.json'
 import liveriesMixed from './liveries-mixed.json'
 import mixedFixture from './mixed-discharge-then-load.json'
 import rehandleRandomYard from './rehandle-random-yard.json'
 import shc1Sts2Shc1Wtp from './shc-1sts-2shc-1wtp.json'
+import shcQueueChained from './shc-queue-chained.json'
+import shcPrepositioning from './shc-prepositioning.json'
+import shcPairedDualCycle from './shc-paired-dual-cycle.json'
 import tracer1Sts10Boxes from './tracer-1sts-10-boxes.json'
 import transshipmentAToB from './transshipment-a-to-b.json'
 import emptiesLoad from './empties-load-4-of-16.json'
+import stowMixed from './stow-mixed-20-40.json'
+import reeferPoweredRows from './reefer-powered-rows.json'
+import yardNoMixedLength from './yard-no-mixed-length.json'
 import twin20Lift from './twin-20-lift.json'
 import twoVesselsCompeteForBerth from './two-vessels-compete-for-berth.json'
 
@@ -27,6 +38,9 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'crane-split-4sts': craneSplit4Sts as ScenarioConfig,
   'twin-20-lift': twin20Lift as ScenarioConfig,
   'shc-1sts-2shc-1wtp': shc1Sts2Shc1Wtp as ScenarioConfig,
+  'shc-queue-chained': shcQueueChained as ScenarioConfig,
+  'shc-prepositioning': shcPrepositioning as ScenarioConfig,
+  'shc-paired-dual-cycle': shcPairedDualCycle as ScenarioConfig,
   'liveries-mixed': liveriesMixed as ScenarioConfig,
   'asc-1sts-10-boxes-1block': asc1Sts10Boxes1Block as ScenarioConfig,
   'asc-2asc-block-conflict': asc2AscBlockConflict as ScenarioConfig,
@@ -38,4 +52,12 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'dual-truck-transaction': dualTruck as ScenarioConfig,
   'truck-gate-queue': truckGateQueue as ScenarioConfig,
   'landside-morning-peak': landsideMorningPeak as ScenarioConfig,
+  'hatch-cover-cycle': hatchCoverCycle as ScenarioConfig,
+  'hatch-deck-only-no-open': hatchDeckOnly as ScenarioConfig,
+  'truck-appointment-windows': truckAppointmentWindows as ScenarioConfig,
+  'truck-holding-overflow': truckHoldingOverflow as ScenarioConfig,
+  'asc-pre-retrieval': ascPreRetrieval as ScenarioConfig,
+  'yard-no-mixed-length': yardNoMixedLength as ScenarioConfig,
+  'reefer-powered-rows': reeferPoweredRows as ScenarioConfig,
+  'stow-mixed-20-40': stowMixed as ScenarioConfig,
 }

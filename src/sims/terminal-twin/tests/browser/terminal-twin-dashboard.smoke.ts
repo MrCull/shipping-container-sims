@@ -32,7 +32,7 @@ async function showCharts(page: Page, group: string, bucketing: 'hour' | 'shift'
   await expect(page.getByTestId('tt-dashboard-charts')).toBeVisible()
 }
 
-test('D opens the dashboard, which loads ECharts only then, and D closes it', async ({ page }) => {
+test('B opens the dashboard, which loads ECharts only then, and B closes it', async ({ page }) => {
   const errors = collectErrors(page)
   const chartChunks: string[] = []
   page.on('request', (r) => {
@@ -42,14 +42,14 @@ test('D opens the dashboard, which loads ECharts only then, and D closes it', as
   await page.evaluate(() => window.__tt!.runTo(1200))
   await page.waitForTimeout(500)
   expect(chartChunks).toEqual([]) // the 3D view never pays for the chart library
-  await page.keyboard.press('d')
+  await page.keyboard.press('b')
   await expect(page.getByTestId('tt-dashboard')).toBeVisible()
   await expect(page.getByTestId('tt-chart-sts.gross-moves-per-hour')).toBeVisible()
   await page.waitForFunction(() => window.__tt!.dashboard().rendered?.chartLibLoaded === true)
   await page.waitForFunction(() => window.__tt!.dashboard().rendered?.charts.every((c) => c.drawn))
   expect(chartChunks.length).toBeGreaterThan(0)
   await expect(page.getByTestId('tt-chart-sts.gross-moves-per-hour').locator('canvas').first()).toBeVisible()
-  await page.keyboard.press('d')
+  await page.keyboard.press('b')
   await expect(page.getByTestId('tt-dashboard')).toBeHidden()
   await page.getByTestId('tt-dashboard-button').click()
   await expect(page.getByTestId('tt-dashboard')).toBeVisible()
@@ -173,5 +173,27 @@ test('the final report opens as the dashboard report tab when the scenario ends 
   await expect(page.getByTestId('tt-report-moves')).toHaveText('4')
   // charts keep the run's data after the end
   expect((await page.evaluate(() => window.__tt!.dashboard())).open).toBe(true)
+  expect(errors).toEqual([])
+})
+
+test('the Landside group charts the truck turnaround metrics and its summary table matches the engine report (TT-R18)', async ({ page }) => {
+  const errors = collectErrors(page)
+  await open(page, 'truck-holding-overflow')
+  await page.evaluate(() => window.__tt!.runUntil())
+  await showCharts(page, 'landside')
+  await expect(page.getByTestId('tt-dashboard-landside')).toBeVisible()
+  await page.waitForFunction(() => !!window.__tt!.dashboard().rendered?.landside)
+  for (const id of ['landside.gate-processing-s', 'landside.internal-drive-s', 'landside.total-turnaround-s', 'landside.road-trucks', 'landside.holding-utilisation-pct'])
+    await expect(page.getByTestId(`tt-chart-${id}`)).toBeVisible()
+  const { rows, report } = await page.evaluate(async () => {
+    const tt = window.__tt!
+    const report = await tt.query<{ landside: { totalTurnaroundS: { mean: number }; road: { maxTrucks: number }; holding: { heldOutside: number } } }>('kpis')
+    return { rows: Object.fromEntries(tt.dashboard().rendered!.landside!.map((r) => [r.id, r.value])), report }
+  })
+  expect(rows.turnaroundMean).toBe(report.landside.totalTurnaroundS.mean)
+  expect(rows.roadMax).toBe(report.landside.road.maxTrucks)
+  expect(rows.heldOutside).toBe(report.landside.holding.heldOutside)
+  await expect(page.locator('[data-testid="tt-dashboard-landside"] [data-metric="turnaroundMean"]')).toContainText(/\d/)
+  await page.screenshot({ path: '.screenshots/tt-r18-landside-dashboard.png' })
   expect(errors).toEqual([])
 })

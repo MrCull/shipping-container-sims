@@ -120,6 +120,9 @@
   "endConditions": {
     "simDurationS": 4500
   },
+  "hatch": {
+    "enabled": false
+  },
   "driverVariabilityPct": 10,
   "shcs": [
     {

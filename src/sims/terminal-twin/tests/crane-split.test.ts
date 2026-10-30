@@ -57,7 +57,7 @@ describe('STS cranes on one rail', () => {
   })
 
   it('a free crane in the way steps aside, and the working crane waits for the rail meanwhile', () => {
-    const config = new ScenarioBuilder('yield', 'STS02 is parked inside the vessel span of STS01')
+    const config = new ScenarioBuilder('yield', 'STS02 is parked inside the vessel span of STS01').hatch({ enabled: false })
       .quay(500, { mooringS: 60, unmooringS: 60 })
       .sts('STS01', { gantryX: 50, groundPositions: 30 })
       .sts('STS02', { gantryX: 100, groundPositions: 30 })
@@ -129,7 +129,7 @@ describe('crane split decision point', () => {
   })
 
   it('splits cranes between adjacent vessels by position: each vessel gets the cranes on its side', () => {
-    const config = new ScenarioBuilder('adjacent', 'two feeders side by side, four cranes')
+    const config = new ScenarioBuilder('adjacent', 'two feeders side by side, four cranes').hatch({ enabled: false })
       .quay(400, { mooringS: 60, unmooringS: 60, berthGapM: 20 })
       .sts('STS01', { gantryX: 30, groundPositions: 20 })
       .sts('STS02', { gantryX: 120, groundPositions: 20 })
@@ -165,7 +165,7 @@ describe('crane split decision point', () => {
   })
 
   it('a vessel without cranes waits berthed and is split again when a crane becomes free', () => {
-    const config = new ScenarioBuilder('no-cranes', 'one crane, two vessels at once')
+    const config = new ScenarioBuilder('no-cranes', 'one crane, two vessels at once').hatch({ enabled: false })
       .quay(600, { mooringS: 60, unmooringS: 60 })
       .sts('STS01', { gantryX: 50, groundPositions: 30 })
       .vesselCall('V001', { sizeClass: 'feeder', discharge: 6, maxSts: 1 })

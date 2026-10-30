@@ -6,6 +6,9 @@
  * Nothing clears STS ground positions until SHCs arrive (TT-05), so these
  * fixtures give each crane enough ground positions for all its boxes
  * (real cranes have ~3).
+ *
+ * Hatch covers (TT-R09) are on by default. Every fixture here except the two `hatch-*` ones turns them off
+ * (`.hatch({ enabled: false })`): they test other subsystems and their goldens and tests are about those.
  */
 import { ScenarioBuilder } from '../builder'
 import { SHIPPING_LINES } from '../lines'
@@ -15,6 +18,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
   /** TT-01 tracer: 1 STS discharges 10 × 40 ft boxes from a feeder onto its ground positions. */
   'tracer-1sts-10-boxes': () =>
     new ScenarioBuilder('tracer-1sts-10-boxes', '1 STS discharges 10 boxes to ground positions')
+      .hatch({ enabled: false })
       .seed(42)
       .moveVariation(10)
       .quay(400, { mooringS: 60, unmooringS: 60 })
@@ -29,6 +33,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'two-vessels-compete-for-berth': () =>
     new ScenarioBuilder('two-vessels-compete-for-berth', 'Two Panamax calls compete for one berth on a 450 m quay')
+      .hatch({ enabled: false })
       .seed(7)
       .quay(450, { mooringS: 600, unmooringS: 600 })
       .sts('STS01', { gantryX: 80, groundPositions: 24 })
@@ -41,6 +46,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
   /** One Neo-Panamax worked by 4 STS: the crane split decides who works which bays. */
   'crane-split-4sts': () =>
     new ScenarioBuilder('crane-split-4sts', '4 STS share one Neo-Panamax call (crane split, rail order)')
+      .hatch({ enabled: false })
       .seed(1)
       .quay(600, { mooringS: 600, unmooringS: 600 })
       .sts('STS01', { gantryX: 40, groundPositions: 30 })
@@ -54,6 +60,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
   /** Twin-20: 4 × 20 ft boxes in two cells, discharged in two twin lifts. */
   'twin-20-lift': () =>
     new ScenarioBuilder('twin-20-lift', '1 STS discharges two pairs of 20 ft boxes with twin-20 lifts')
+      .hatch({ enabled: false })
       .seed(5)
       .quay(400, { mooringS: 60, unmooringS: 60, twinLift: true })
       .sts('STS01', { gantryX: 60, groundPositions: 6 })
@@ -69,6 +76,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'shc-1sts-2shc-1wtp': () =>
     new ScenarioBuilder('shc-1sts-2shc-1wtp', '1 STS → 2 SHC → 1 WTP strip: SHCs carry each box to a WTP pad')
+      .hatch({ enabled: false })
       .seed(42)
       .moveVariation(10)
       .driverVariability(10)
@@ -82,6 +90,73 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * SHC queue areas and chained dispatch (TT-R12): 2 STS discharge 24 boxes with 4 SHCs to a block with
+   * 1 WTP pad and a real ASC, so pads are scarce: SHCs carrying a box wait at the block queue area for a pad,
+   * and with `chained-nearest` idle SHCs wait at the STS queue area instead of driving back to parking.
+   */
+  'shc-queue-chained': () =>
+    new ScenarioBuilder('shc-queue-chained', '2 STS → 4 SHC → 1 WTP pad: queue areas and chained-nearest dispatch')
+      .hatch({ enabled: false })
+      .seed(42)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .sts('STS02', { gantryX: 110, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Queue Star', sizeClass: 'feeder', discharge: 24, maxSts: 2, sizeMix: { '40': 1 } })
+      .shcs(4)
+      .block('B01', { x: 20, bays: 8, tiers: 3, wtpPads: 1 })
+      .queueAreas({ stsCapacity: 2, blockCapacity: 2 })
+      .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' } } })
+      .build(),
+
+  /**
+   * SHC pre-dispatch (TT-R13): 2 STS with one ground position each (so a box left waiting blocks the crane), 4 SHCs
+   * and a 3-pad block. With the `predispatch` strategy idle SHCs are sent to the STS queue area when a box is
+   * predicted ready within their travel time plus `predispatchMarginS`, so they are there when it lands; the
+   * `chained-nearest` baseline (same scenario) leaves the cranes waiting for SHCs.
+   */
+  'shc-prepositioning': () =>
+    new ScenarioBuilder('shc-prepositioning', '2 STS (1 ground position) → 4 SHC → 3 pads: pre-dispatch on predicted ready time')
+      .hatch({ enabled: false })
+      .seed(42)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 1 })
+      .sts('STS02', { gantryX: 110, groundPositions: 1 })
+      .vesselCall('V001', { name: 'Pre Star', sizeClass: 'feeder', discharge: 24, maxSts: 2, sizeMix: { '40': 1 } })
+      .shcs(4)
+      .block('B01', { x: 20, bays: 8, tiers: 3, wtpPads: 3 })
+      .queueAreas({ stsCapacity: 3, blockCapacity: 3, predispatchMarginS: 15 })
+      .decisions({ points: { shcDispatch: { strategy: 'predispatch' } } })
+      .build(),
+
+  /**
+   * Paired dispatch (TT-R14): one feeder discharges at STS01 while another loads at STS02 (so discharge and load jobs
+   * are open together), 3 SHCs and a 2-pad block 150 m from the quay start. With `paired-dual-cycle` an SHC that just
+   * set a box down on a pad takes a nearby load pickup (and after a load drop at the quay a discharge box), so it
+   * drives loaded more often; the `chained-nearest` baseline (same scenario) drives more empty.
+   */
+  'shc-paired-dual-cycle': () =>
+    new ScenarioBuilder('shc-paired-dual-cycle', '2 STS (one discharges, one loads) → 3 SHC → 2 pads: paired discharge/load dispatch')
+      .hatch({ enabled: false })
+      .seed(42)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(500, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 4 })
+      .sts('STS02', { gantryX: 110, groundPositions: 4 })
+      .vesselCall('V001', { name: 'Dis Star', sizeClass: 'feeder', arrivalS: 0, discharge: 16, maxSts: 1, sizeMix: { '40': 1 } })
+      .vesselCall('V002', { name: 'Load Star', sizeClass: 'feeder', arrivalS: 0, load: 16, maxSts: 1, sizeMix: { '40': 1 } })
+      .shcs(3)
+      .block('B01', { x: 150, bays: 10, tiers: 3, wtpPads: 2 })
+      .queueAreas({ stsCapacity: 2, blockCapacity: 2 })
+      .decisions({ points: { shcDispatch: { strategy: 'paired-dual-cycle' } } })
+      .endWhen({ vesselsCompleted: 2 })
+      .build(),
+
+  /**
    * ASC block storage (TT-06): the import flow from vessel to stack. One STS
    * discharges 10 boxes (20 ft and 40 ft mixed) to 2 SHCs; the block (8 bays,
    * 3 tiers, 5 WTP pads) has one ASC that stacks them. Ends at a fixed time,
@@ -89,6 +164,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'asc-1sts-10-boxes-1block': () =>
     new ScenarioBuilder('asc-1sts-10-boxes-1block', '1 STS discharges 10 boxes to 1 block: vessel → STS → SHC → WTP pad → ASC → stack')
+      .hatch({ enabled: false })
       .seed(42)
       .moveVariation(10)
       .driverVariability(10)
@@ -108,6 +184,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'asc-2asc-block-conflict': () =>
     new ScenarioBuilder('asc-2asc-block-conflict', 'Two ASCs share one block rail: overlapping rail needs, waits and step-asides')
+      .hatch({ enabled: false })
       .seed(3)
       .moveVariation(10)
       .driverVariability(10)
@@ -128,6 +205,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'load-1sts-10-boxes-1block': () =>
     new ScenarioBuilder('load-1sts-10-boxes-1block', '1 STS loads 10 export boxes from 1 block: stack → ASC → WTP pad → SHC → STS → vessel')
+      .hatch({ enabled: false })
       .seed(42)
       .moveVariation(10)
       .driverVariability(10)
@@ -146,6 +224,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'mixed-discharge-then-load': () =>
     new ScenarioBuilder('mixed-discharge-then-load', '1 STS discharges 8 boxes, then loads 8 export boxes, and the vessel departs')
+      .hatch({ enabled: false })
       .seed(7)
       .moveVariation(10)
       .driverVariability(10)
@@ -163,6 +242,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'transshipment-a-to-b': () =>
     new ScenarioBuilder('transshipment-a-to-b', 'Vessel A discharges 8 transshipment boxes; vessel B loads them after a 10 minute yard dwell')
+      .hatch({ enabled: false })
       .seed(5)
       .moveVariation(10)
       .driverVariability(10)
@@ -182,6 +262,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'empties-load-4-of-16': () =>
     new ScenarioBuilder('empties-load-4-of-16', 'A feeder loads 4 empty 40 ft MSC containers picked from a pool of 16 empties')
+      .hatch({ enabled: false })
       .seed(11)
       .moveVariation(10)
       .driverVariability(10)
@@ -195,6 +276,76 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * TT-R07: mixed 20 and 40 ft stows across hold and deck. A feeder discharges 140 mixed boxes (an odd number of 20s
+   * is possible), loads 40 export boxes and 6 empty 20s: on board no 20 ft box sits on a 40 ft box and a 40 ft box
+   * rests only on a 40 or on two filled 20 ft halves (`stowage.order`).
+   */
+  'stow-mixed-20-40': () =>
+    new ScenarioBuilder('stow-mixed-20-40', 'A feeder stows mixed 20 and 40 ft boxes in hold and on deck: never a 20 on a 40')
+      .hatch({ enabled: false })
+      .seed(7)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', {
+        name: 'Mixed Star',
+        sizeClass: 'feeder',
+        discharge: 140,
+        load: 40,
+        maxSts: 1,
+        sizeMix: { '20': 2, '40': 1, '40HC': 1 },
+        empties: [{ size: '20', line: 'MSC', count: 6 }],
+      })
+      .emptyPool({ count: 8, sizeMix: { '20': 1 }, lines: { MSC: 1 } })
+      .shcs(3)
+      .block('B01', { x: 20, bays: 20, tiers: 4 })
+      .ascsPerBlock(2)
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /**
+   * TT-R06: a yard stack takes the length of its bottom box. A 50% pre-filled block (mixed 20 and 40 ft boxes,
+   * 8 bays x 3 tiers) receives 24 more mixed boxes through the default `nearest-wtp` allocation: no stack ever
+   * holds both lengths (`yard.no-mixed-length-stack`), and 40 ft boxes keep to adjacent bay pairs.
+   */
+  'yard-no-mixed-length': () =>
+    new ScenarioBuilder('yard-no-mixed-length', 'A pre-filled yard takes mixed 20 and 40 ft boxes: every stack keeps one length')
+      .hatch({ enabled: false })
+      .seed(6)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Length Star', sizeClass: 'feeder', discharge: 24, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 8, tiers: 3 })
+      .yardStart({ mode: 'prefilled', targetPct: 50 })
+      .endWhen({ simDurationS: 3600 })
+      .build(),
+
+  /**
+   * TT-R19: 30% of the full boxes are reefers. The block has plugs in rows 1 and 2 only (an unverified, TTI-like
+   * layout), so every reefer, discharged or pre-filled, stands in those rows at most 4 tiers high
+   * (`yard.reefer-powered`) while plain boxes avoid the powered rows when anything else fits.
+   */
+  'reefer-powered-rows': () =>
+    new ScenarioBuilder('reefer-powered-rows', 'A third of the boxes are reefers: they stack only in the powered rows, at most 4 high')
+      .hatch({ enabled: false })
+      .seed(19)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Cold Star', sizeClass: 'feeder', discharge: 24, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .cargo({ reeferShare: 0.3 })
+      .block('B01', { x: 20, bays: 8, tiers: 5, poweredRows: [1, 2] })
+      .yardStart({ mode: 'prefilled', targetPct: 40 })
+      .endWhen({ simDurationS: 3600 })
+      .build(),
+
+  /**
    * TT-12 rehandle fixture: a random yard. Vessel V001 discharges 36 boxes into block B01 with
    * the `random` allocation, so imports land on the stacks where the export boxes of V002
    * (arriving later) stand. V002's retrievals then find buried boxes: every blocker is
@@ -202,6 +353,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'rehandle-random-yard': () =>
     new ScenarioBuilder('rehandle-random-yard', 'Random yard allocation buries export boxes: the ASC rehandles blockers before each retrieval')
+      .hatch({ enabled: false })
       .seed(2)
       .moveVariation(10)
       .driverVariability(10)
@@ -222,6 +374,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'dual-truck-transaction': () =>
     new ScenarioBuilder('dual-truck-transaction', 'One truck drops an export and picks up an import in a single visit')
+      .hatch({ enabled: false })
       .seed(3)
       .moveVariation(10)
       .driverVariability(10)
@@ -248,6 +401,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
    */
   'truck-gate-queue': () =>
     new ScenarioBuilder('truck-gate-queue', 'A burst of 14 trucks queues at a one-lane gate and fills the transfer stalls')
+      .hatch({ enabled: false })
       .seed(8)
       .moveVariation(10)
       .driverVariability(10)
@@ -284,11 +438,101 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * TT-R15 appointment windows: the gate-queue terminal (2 transfer stalls, 2 inbound lanes) with trucks booked in
+   * 30 minute windows. Demand is 16 trucks/h, bunched x3 in the second window, so that window hits its cap
+   * (2 stalls x 1800 s / 300 s = 12) and the surplus bookings are rejected. The numbers are not TTI values.
+   */
+  'truck-appointment-windows': () =>
+    new ScenarioBuilder('truck-appointment-windows', 'Trucks book 30-minute windows; a bunched window hits its booking cap')
+      .hatch({ enabled: false })
+      .seed(12)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 16, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', arrivalS: 20000, load: 4, maxSts: 1 })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3, transferStalls: 2 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 16),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 2, outLanes: 2, inProcessingS: 45, outProcessingS: 20 },
+        appointments: { windowS: 1800, bunching: [{ fromS: 1800, toS: 3600, factor: 3 }] },
+      })
+      .endWhen({ simDurationS: 7200 })
+      .build(),
+
+  /**
+   * TT-R16 stall admission and holding: the gate-queue terminal (2 transfer stalls) with 2 holding positions. A burst
+   * of 10 trucks 5 s apart: the first two are admitted with a reserved stall, the next two wait in the holding
+   * positions, and the rest wait outside the gate (overflow) until holding frees up. The numbers are not TTI values.
+   */
+  'truck-holding-overflow': () =>
+    new ScenarioBuilder('truck-holding-overflow', 'A burst of 10 trucks: stalls reserved at the gate, 2 holding positions, the rest wait outside')
+      .hatch({ enabled: false })
+      .seed(8)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 16, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', arrivalS: 20000, load: 4, maxSts: 1 })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3, transferStalls: 2 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 0),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 2, outLanes: 2, inProcessingS: 30, outProcessingS: 20 },
+        holding: { positions: 2 },
+        scripted: (['pickImport', 'dropExport', 'dual', 'dropEmpty', 'pickImport', 'dropExport', 'dual', 'dropEmpty', 'pickEmpty', 'pickImport'] as const).map(
+          (transaction, i) => ({ atS: 3000 + i * 5, transaction }),
+        ),
+      })
+      .endWhen({ simDurationS: 9000 })
+      .build(),
+
+  /**
+   * TT-R17 ASC pre-retrieval: one block with paired ASCs and 2 stalls, 16 imports discharged, then 6 import pickups 100 s
+   * apart. The `pre-retrieval` ascDispatch strategy fetches each box to its stall while the truck is still driving in, so
+   * the stall service time drops (the same scenario with the default strategy is the comparison in the test). The numbers
+   * are not TTI values.
+   */
+  'asc-pre-retrieval': () =>
+    new ScenarioBuilder('asc-pre-retrieval', 'Import pickups with the pre-retrieval ASC strategy: the box waits at the stall for the truck')
+      .hatch({ enabled: false })
+      .seed(8)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 8, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 1, transferStalls: 2 })
+      .ascsPerBlock(2)
+      .decisions({ points: { ascDispatch: { strategy: 'pre-retrieval' } } })
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 0),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 2, outLanes: 2, inProcessingS: 30, outProcessingS: 20 },
+        holding: { positions: 2 },
+        scripted: Array.from({ length: 6 }, (_, i) => ({ atS: 3000 + i * 250, transaction: 'pickImport' as const })),
+      })
+      .endWhen({ simDurationS: 6500 })
+      .build(),
+
+  /**
    * TT-13 morning peak: two blocks, a feeder discharging 24 boxes, and the 07:00 truck profile (Poisson,
    * 40 to 48 trucks an hour) with the default transaction mix and a 10 minute import dwell.
    */
   'landside-morning-peak': () =>
     new ScenarioBuilder('landside-morning-peak', 'Poisson truck arrivals through a 4-lane gate to two blocks with paired ASCs')
+      .hatch({ enabled: false })
       .seed(21)
       .moveVariation(10)
       .driverVariability(10)
@@ -312,6 +556,7 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
   /** Livery smoke test (TT-22): 12 boxes over all ten lines (equal weights) and all three sizes. */
   'liveries-mixed': () =>
     new ScenarioBuilder('liveries-mixed', '1 STS discharges 12 boxes of mixed lines and sizes')
+      .hatch({ enabled: false })
       .seed(7)
       .moveVariation(10)
       .quay(400, { mooringS: 30, unmooringS: 30, twinLift: false })
@@ -321,6 +566,44 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
         sizeMix: { '20': 1, '40': 1, '40HC': 1 },
       })
       .vesselCall('V001', { name: 'Livery Trader', sizeClass: 'feeder', discharge: 12, maxSts: 1 })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /**
+   * TT-R09 hatch cover cycle: a feeder discharges 8 boxes and loads 28 empty 40 ft boxes. Bay 0 has all four sections
+   * (deck discharge, hold discharge, hold load, deck load): its panels are lashed off, lifted by the STS to the quay laydown
+   * once the deck boxes are gone, the hold is worked, the panels go back and are secured before the deck boxes are loaded.
+   * The empties are what fills a bay's hold and then its deck (export boxes spread over the bays, one cell each).
+   */
+  'hatch-cover-cycle': () =>
+    new ScenarioBuilder('hatch-cover-cycle', 'Hatch covers: deck discharge, panels off, hold discharge and load, panels on, deck load in one bay')
+      .seed(8)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', {
+        name: 'Hatch Star',
+        sizeClass: 'feeder',
+        discharge: 8,
+        maxSts: 1,
+        sizeMix: { '40': 1 },
+        empties: [{ size: '40', line: 'MSC', count: 28 }],
+      })
+      .emptyPool({ count: 40, sizeMix: { '40': 1 }, lines: { MSC: 1 } })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3 })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+
+  /** TT-R09: a feeder with 6 boxes on deck and nothing in the hold opens no hatch: no hatch moves, no hatch time. */
+  'hatch-deck-only-no-open': () =>
+    new ScenarioBuilder('hatch-deck-only-no-open', 'Deck-only discharge: no hold work, so no hatch cover is ever lifted')
+      .seed(42)
+      .moveVariation(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 10 })
+      .vesselCall('V001', { name: 'Deck Runner', sizeClass: 'feeder', discharge: 6, maxSts: 1, sizeMix: { '40': 1 }, deckOnly: true })
       .endWhen({ vesselsCompleted: 1 })
       .build(),
 }

@@ -41,6 +41,8 @@ export interface SceneStats {
   landside: LandsideStats
   /** Phase 2 infrastructure (TT-28): instanced gate, quay, yard and building models. */
   infrastructure: InfrastructureStats
+  /** Hatch panels drawn (TT-R10): on their hatch, on a spreader or in the laydown. */
+  hatchPanels: number
   /** STS crane objects in the scene. */
   sts: number
   /** SHC objects in the scene. */
@@ -267,6 +269,19 @@ export class SceneRenderer {
       flat(3.2, 13, p.x, 0.03, p.z, padMat, false, ph)
       flat(2.8, 12.6, p.x, 0.035, p.z, padInner, false, ph)
     }
+    // SHC parking spots and queue areas (TT-R12): painted bays beside the pads, tinted by what waits there
+    const bayMat = {
+      parking: this.track(new THREE.MeshStandardMaterial({ color: '#9aa0a6', roughness: 0.9 })),
+      sts: this.track(new THREE.MeshStandardMaterial({ color: '#3b82c4', roughness: 0.9 })),
+      block: this.track(new THREE.MeshStandardMaterial({ color: '#e08a2c', roughness: 0.9 })),
+    }
+    const bay = (id: string, kind: keyof typeof bayMat) => {
+      const n = graph.nodes[id]
+      flat(3.6, 13.6, n.x, 0.03, n.z, bayMat[kind])
+      flat(3.2, 13.2, n.x, 0.035, n.z, padInner)
+    }
+    for (const id of Object.values(graph.parkingNode)) bay(id, 'parking')
+    for (const area of graph.queueAreas) for (const id of area.nodes) bay(id, area.kind)
     for (const m of batch.build((x) => this.track(x))) this.scene.add(m)
     for (const m of ph.build((x) => this.track(x))) {
       this.scene.add(m)

@@ -14,6 +14,7 @@ import type {
   ExportKind,
   MotionSegment,
   KpiSeriesReport,
+  LandsideKpiReport,
   Reservation,
   RunCondition,
   SimSnapshot,
@@ -31,6 +32,8 @@ export interface DashboardData {
   timeline: TimelineReport
   /** Current fill of each yard block (% of cells holding a box). */
   yard: { id: string; fillPct: number }[]
+  /** Whole-run truck and gate numbers (TT-R18); null without a landside. */
+  landside: LandsideKpiReport | null
 }
 
 export type QueryKind =
@@ -50,6 +53,9 @@ export type QueryKind =
   | 'ascList'
   | 'truck'
   | 'trucks'
+  /** A hatch panel (TT-R10), and all of them. */
+  | 'hatch'
+  | 'hatchList'
   | 'transferStalls'
   | 'yardBlocks'
   | 'yardSlots'
@@ -123,6 +129,22 @@ export interface CustodyChange {
   dx?: number
 }
 
+/**
+ * A hatch panel changes state (TT-R10): from a hatch event of the panel. The scene draws a `lifted` panel from its
+ * crane's pose, a panel `in-laydown` at `x` and `level` of its laydown bay, and any other panel on its own hatch.
+ */
+export interface HatchPanelChange {
+  panelId: string
+  t: number
+  status: 'secured' | 'unsecured' | 'lifted' | 'in-laydown' | 'replaced'
+  /** `lifted`: the crane that holds it. */
+  stsId?: string
+  /** `in-laydown`: the laydown bay, its X along the quay and the panel's level in the stack (0 = bottom). */
+  siteId?: string
+  x?: number
+  level?: number
+}
+
 export interface EntityStateChange {
   kind: 'sts' | 'vessel' | 'shc' | 'asc' | 'truck'
   id: string
@@ -162,6 +184,8 @@ export interface Delta {
   newContainers?: NewContainer[]
   motion: MotionPlan[]
   custody: CustodyChange[]
+  /** Hatch panel state changes in this batch (TT-R10; absent when none). */
+  hatch?: HatchPanelChange[]
   entities: EntityStateChange[]
   /** Conflict-zone reservations made in this batch (overlay). */
   reservations: Reservation[]
@@ -195,4 +219,22 @@ export const EVENT_SUMMARY_CAP = 200
 
 export function summarizeEvent(e: EngineEvent): EventSummary {
   return { id: e.id, seq: e.seq, t: e.t, type: e.type, causedBy: e.causedBy, subjects: e.subjects }
+}
+
+/** The panel change a hatch event makes (null for events that do not change what the scene draws). */
+export function hatchChangeOf(e: EngineEvent): HatchPanelChange | null {
+  switch (e.type) {
+    case 'HatchLashingReleased':
+      return { panelId: e.payload.panelId, t: e.t, status: 'unsecured' }
+    case 'HatchLifted':
+      return { panelId: e.payload.panelId, t: e.t, status: 'lifted', stsId: e.payload.stsId }
+    case 'HatchSetInLaydown':
+      return { panelId: e.payload.panelId, t: e.t, status: 'in-laydown', siteId: e.payload.siteId, x: e.payload.x, level: e.payload.level }
+    case 'HatchReplaced':
+      return { panelId: e.payload.panelId, t: e.t, status: 'replaced' }
+    case 'HatchSecured':
+      return { panelId: e.payload.panelId, t: e.t, status: 'secured' }
+    default:
+      return null
+  }
 }

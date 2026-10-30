@@ -32,12 +32,13 @@ export function gantryPositionAt(sts: StsState, t: number): number {
 }
 
 /**
- * Reserve the rail for a gantry move of a stationary crane to `targetX`.
+ * Reserve the rail for a gantry move of a stationary crane to `targetX` (and on to `alsoX` for a hatch move that visits
+ * the laydown, TT-R09).
  * Returns null on success, else the id of the crane in the way (or 'quay-end').
  */
-export function reserveRail(state: SimState, config: ScenarioConfig, sts: StsState, targetX: number): string | null {
-  const lo = Math.min(sts.gantryX, targetX)
-  const hi = Math.max(sts.gantryX, targetX)
+export function reserveRail(state: SimState, config: ScenarioConfig, sts: StsState, targetX: number, alsoX?: number | null): string | null {
+  const lo = Math.min(sts.gantryX, targetX, alsoX ?? Infinity)
+  const hi = Math.max(sts.gantryX, targetX, alsoX ?? -Infinity)
   if (lo < -EPS || hi > config.quay.lengthM + EPS) return 'quay-end'
   const order = railOrder(state)
   const left = order[sts.railIndex - 1]
@@ -106,9 +107,11 @@ export function wakeRail(ctx: EngineContext, startMove: (sts: StsState) => void)
     for (const sts of railOrder(state)) {
       if (sts.status !== 'waiting-for-rail' || sts.railTargetX === null) continue
       const target = sts.railTargetX
-      const blockedBy = reserveRail(state, config, sts, target)
+      const also = sts.railAlsoX ?? null
+      const blockedBy = reserveRail(state, config, sts, target, also)
       if (blockedBy === null) {
         sts.railTargetX = null
+        sts.railAlsoX = null
         changed = true
         if (sts.vesselId !== null) {
           sts.status = 'moving-to-pick'
@@ -118,7 +121,9 @@ export function wakeRail(ctx: EngineContext, startMove: (sts: StsState) => void)
           ctx.schedule('StsRepositionStarted', state.now, { equipment: [sts.id] }, { stsId: sts.id, toX: target })
         }
       } else if (blockedBy !== 'quay-end') {
-        if (askToYield(ctx, state.sts[blockedBy], sts, target)) changed = true
+        const blocker = state.sts[blockedBy]
+        const reach = also === null ? target : blocker.railIndex > sts.railIndex ? Math.max(target, also) : Math.min(target, also)
+        if (askToYield(ctx, blocker, sts, reach)) changed = true
       }
     }
     if (!changed) return

@@ -18,6 +18,7 @@ import { DEFAULT_CARGO, LINE_OWNER_PREFIX } from './lines'
 import {
   SCENARIO_SCHEMA_VERSION,
   type ApronLayout,
+  type QueueAreasConfig,
   type AscKinematics,
   type BlockConfig,
   type CargoConfig,
@@ -35,7 +36,7 @@ import {
 } from './types'
 import { DEFAULT_WTP_PADS } from '../engine/yardLayout'
 import type { DecisionsConfig } from '../engine/decisions/types'
-import type { DwellDistribution, EmptyPoolConfig, VesselSizeClass, YardStartConfig } from './types'
+import type { DwellDistribution, EmptyPoolConfig, HatchConfig, VesselSizeClass, YardStartConfig } from './types'
 
 export { LINE_OWNER_PREFIX }
 
@@ -149,6 +150,7 @@ export function withYard(config: ScenarioConfig, setup: YardSetup): ScenarioConf
         bays: b.bays,
         tiers: b.tiers,
         transferStalls: b.transferStalls,
+        ...(kept?.poweredRows ? { poweredRows: [...kept.poweredRows] } : {}),
       }
     }),
   }
@@ -200,6 +202,7 @@ export function makeVesselCall(id: string, opts: VesselCallOptions): VesselConfi
   if (opts.sizeMix) v.sizeMix = { ...opts.sizeMix }
   if (opts.dischargeTransshipment) v.dischargeTransshipment = opts.dischargeTransshipment
   if (opts.empties?.length) v.empties = structuredClone(opts.empties)
+  if (opts.deckOnly) v.deckOnly = true
   return v
 }
 
@@ -320,6 +323,12 @@ export class ScenarioBuilder {
     return this
   }
 
+  /** SHC queue areas (TT-R12): spots per STS (empty SHCs wait for work) and per block (loaded SHCs wait for a pad). */
+  queueAreas(areas: QueueAreasConfig): this {
+    this.config.queueAreas = { ...areas }
+    return this
+  }
+
   apron(layout: Partial<ApronLayout>): this {
     this.config.apron = { ...this.config.apron, ...layout }
     return this
@@ -327,6 +336,12 @@ export class ScenarioBuilder {
 
   driverVariability(pct: number): this {
     this.config.driverVariabilityPct = pct
+    return this
+  }
+
+  /** Hatch cover settings (TT-R09): `{ enabled: false }` leaves them out; the other values override the vessel class. */
+  hatch(hatch: HatchConfig): this {
+    this.config.hatch = { ...this.config.hatch, ...hatch }
     return this
   }
 

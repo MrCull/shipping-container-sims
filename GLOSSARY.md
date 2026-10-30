@@ -14,6 +14,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Quay:** the continuous berth face at Z = 0. Sea is at negative Z and the yard at positive Z, with X running along the quay.
 - **Vessel slot:** a bay/row/tier position on a vessel (`<vesselId>:<bay>-<row>-<tier>`, plus `a`/`f` for the aft/fore 20 ft half of a cell). Its **purpose** is discharge, load or transshipment.
+- **Maritime location notation (TT-R08):** how the UI names a slot, display only (internal ids, the engine API, saves and goldens keep the internal form). Vessel: `VESSEL.V<nn>.<bay>.<row>.<tier>`, e.g. `VESSEL.V01.04.02.82`, shown with the vessel name ("MSC Aurora · VESSEL.V01.04.02.82"). Bays count from the bow: odd = a 20 ft half cell, even = the 40 ft cell between its two odd halves. Row 00 is the centreline of an odd beam, starboard odd, port even (the quay side is port). Tiers: hold 02, 04, ...; deck 82, 84, .... Yard: `YARD.B<nn>.<bay>.<row>.<tier>`, e.g. `YARD.B01.03.02.1` (same bay convention, two-digit row, one-digit tier).
 - **Cell:** one bay/row/tier position of a vessel. It holds one 40 ft box or two 20 ft boxes (aft and fore half).
 - **Bay plan:** a vessel's slots and the boxes in them, generated from the vessel call and the seed. Bays are 40 ft bays counted from aft. Tiers count from the hold floor; tiers above the hatch covers are **on deck**, the rest **in the hold**.
 - **Berth:** a vessel's stretch of the continuous quay, from its stern (`berthX`) to its bow (LOA). Vessels keep a **berth gap** apart.
@@ -22,13 +23,17 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Ground position (STS ground position):** a buffer lane under an STS where discharged boxes are set down and from which load boxes are picked (`<stsId>-GP<n>`).
 - **WTP (waterside transfer point) pad:** a buffer position at the waterside end of a yard block. SHCs drop boxes there, and the ASC picks them up (and the reverse).
 - **Transfer stall (landside transfer stall):** a truck position at the landside end of a block where the ASC serves external trucks.
+- **Queue area:** a waiting place for SHCs near each STS and each block's WTP pads (slice D, #94), separate from parking spots, ground positions and pads. An SHC dispatched before its box is ready waits there. Capacity is configurable.
+- **Maritime location notation:** a location written the way a vessel bay plan writes it (bay, row, tier; ISO 9711), used for display. The sim's internal slot ids (`<block>:<bay>-<row>-<tier>`) are kept unchanged. See `knowledge-base/dk_ops__tti_algeciras_operations.md`.
+- **Hatch laydown (laydown bay):** a place on the quay under an STS's backreach where removed hatch panels are stacked (`LD@<x>`): the gap between two SHC spines, landside of the last ground lane and clear of the landside STS rail. One laydown bay holds one stack of at most `laydownStackLimit` (default 3) panels of one hatch.
 - **Block:** one yard block, perpendicular to the quay. It has 8 rows (fixed by the 25.4 m ASC span), with configurable bays and tiers.
 - **Bay (yard bay):** one 20 ft position along a block (6.7 m). A 40 ft box covers two bays.
 - **Row:** one of the 8 lines across a block, under the ASC span.
 - **Tier:** a level in a stack, from 1 at the ground. A block has a **tier limit**.
 - **Yard slot (slot):** a 20 ft cell `<block>:<bay>-<row>-<tier>` that holds a box. A 40 ft box is named by its lower bay (its **anchor**) and also covers the next bay.
-- **Stack:** the boxes in one bay and row. A box above tier 1 must rest on boxes (no **floating** box).
+- **Stack:** the boxes in one bay and row. A box above tier 1 must rest on boxes (no **floating** box). A stack takes the **length** of its bottom box (20 or 40 ft) and accepts only that length until it is empty; a 40 ft box **40-locks** both stacks it covers. The lock is derived from the contents, never stored. Checked by `yard.no-mixed-length-stack`.
 - **Yard slot:** a bay/row/tier position in a block.
+- **Reefer:** a refrigerated box (`ContainerState.reefer`), a share of the full boxes (`cargo.reeferShare`, default 0). It needs a plug: it is only allocated to a **powered row** of its block (`BlockConfig.poweredRows`, rows 1-8) and stacks at most **`REEFER_MAX_TIERS`** (4) high. A block without powered rows takes no reefer. Plain boxes may use powered rows, but `nearest-wtp` avoids them. Checked by `yard.reefer-powered`.
 
 ## Operations
 
@@ -40,15 +45,20 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Crane split:** which STS cranes work which bays of a vessel (a decision point). Cranes keep rail order, so bay ranges follow crane order.
 - **Twin-20 lift:** an STS lift of the two 20 ft boxes of one cell in one cycle; each box gets its own ground position.
 - **Deck before hold:** within a bay, an STS discharges the deck stacks (top tier first) before the hold.
+- **Bay work order (with hatch covers):** within a 40 ft bay: deck discharge → hatch removal → hold discharge → hold load → hatch replacement → deck load. A hatch is opened only when its bay has hold work under it.
 - **Move:** one productive container transfer by an STS (a discharge or a load). This is the unit of moves per hour.
 - **Cycle:** one complete loop of a crane: start, pick, carry, ground, return.
-- **Work package:** one STS's moves for one bay section (deck or hold, discharge or load) of one vessel. A package is `planned`, then `released` by the `workPackageRelease` decision point, `active` while its crane works it, then `complete`. A crane works its packages in sequence: discharge packages first, then load packages.
+- **Work package:** one STS's moves for one bay section (deck or hold, discharge or load) of one vessel, or one **hatch move** (`hatch-remove` / `hatch-replace`, see below). A package is `planned`, then `released` by the `workPackageRelease` decision point, `active` while its crane works it, then `complete`. A crane works its packages in sequence: with hatch covers (the default) bay by bay, without them all discharge packages first and then all load packages.
 - **Release ahead (K):** how many packages the default release strategy keeps released behind the one the crane is working (default 2). The **release lead time** is the time from a package's release to the start of its work.
 - **Export box:** a box booked to a vessel for loading. It starts in the yard (pre-filled from the bay plan) and is loaded into its **load slot**, the empty slot the bay plan booked for it.
 - **Load flow:** the reverse of discharge: stack → ASC → WTP pad → SHC → STS ground position → STS → vessel slot. The ASC step is a **retrieval**.
 - **Load order:** the yard work of one export box from its package's release to its ground position (claim a ground position, retrieve, carry). A crane **stages** at most as many boxes as it has ground positions, in load sequence.
 - **Load sequence:** the order a crane loads a vessel: bay by bay, hold before deck, bottom tier before upper tier, then row, aft half before fore half.
 - **Stowage order:** a box is never loaded into a slot whose lower tier (in the same stack) is still empty. Checked by the invariant `stowage.order`.
+- **Hatch panel (hatch cover panel):** one lift-away cover of a vessel's hatch. Each 40 ft bay has one hatch of N panels across the beam (N and the panel size and weight come from the vessel class). A panel has an id (`V001:H04-1`: bay, index from the quay side), dimensions, weight, a position and a **panel state**: `secured` → `unsecured` (lashing released) → `lifted` → `in-laydown` → `lifted` → `replaced` → `secured`. Panels are **not containers**: never in custody, yard slots or container counts. Deck boxes rest on a panel, so it only comes off when they are gone. *Avoid:* "hatch cover" for a single panel. In the 3D view a panel is its own mesh: on its hatch, hanging from the STS spreader while lifted, or stacked in its laydown bay; the deck under a lifted panel shows the open hold.
+- **Hatch move (`hatch-remove`, `hatch-replace`):** an STS job that lifts one panel off its hatch into the laydown, or back onto its own hatch. It takes the **hatch cycle time** (default about 4 minutes), counts as STS time and as vessel turnaround, and is not a move (not counted in moves per hour).
+- **Lashing release / securing:** the crew work around a hatch panel: the cleats are released a (configurable) delay after the deck boxes above it are gone, before the crane may lift it; a replaced panel is secured a delay after it is set back, before deck boxes may be loaded on it and before the vessel may leave. The crane idles (`StsWaitingForHatch`) when it has to wait.
+- **No 20 on a 40 (stowage):** on board a 20 ft box never sits on a 40 ft box, and a 40 ft box rests only on a 40 ft box or on two filled 20 ft halves. A stack reads, bottom up, twin-20 cells, then 40 ft cells or lone 20 ft halves. The structural 40-on-20 exception is not modelled. Checked by `stowage.order`; the bay plan only produces such stows (`stackAccepts`).
 - **Rehandle:** a non-productive ASC move needed to reach a buried box.
 - **Job (SHC job):** one box to move from an STS ground position to a WTP pad. Grounding a box **releases** a job into the **released pool**; a job is **open** until an SHC **claims** it.
 - **Pull dispatch:** free equipment asks the dispatch decision point (`shcDispatch`) for its next job from the released pool, rather than jobs being pushed to equipment.
@@ -56,6 +66,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Trip:** an SHC's planned drive with its phases (routing empty, positioning at pickup, locking, lifting, routing loaded, positioning at drop-off, lowering, unlocking, clearing), or its drive to its parking spot.
 - **Cornering (corner speed):** an SHC takes a right-angle turn at a capped speed (`sqrt(lateral acceleration x assumed radius)`) instead of stopping; the run before and after share that **entry/exit speed** (`v1`/`v0` on the motion segments). Reversals still stop.
 - **Clear position (pad clear position):** where an SHC reverses to after setting a box down on a WTP pad, clear of the pad. *Avoid:* "exit".
+- **SHC operational state:** a coarse view of an SHC's `ShcStatus`, one of seven: parked, moving to collect, queuing to collect, collecting, moving to deliver, queuing to deliver, delivering. Each status maps to exactly one (`engine/shcStates.ts`); statuses are not renamed. Shown in the inspector, summed per state in the KPIs. *Avoid:* "SHC status" for the seven.
+- **Queue area (queue spot):** lane-graph rest spots (`QS:<stsId>:<k>`, `QB:<blockId>:<k>`, node kind `queue`) where an SHC waits when its drop-off or its next job is not ready: an area near each STS (empty SHCs wait for work) and one near each block's WTP pads (SHCs carrying a box wait for a free pad). Configured by `config.queueAreas` (capacity per area), separate from parking spots, ground positions and WTP pads; a spot is held by one SHC from assignment to departure (`state.queueClaims`). *Avoid:* "buffer" (that is a ground position or pad), "parking" (the SHC's own spot).
+- **Chained dispatch (`chained-nearest`):** the `shcDispatch` strategy that takes the nearest open job and, after a delivery, asks for the next job at once; with none it waits at the nearest queue area while there is work, and parks only when there is none. Counted by the `parkingReturns` KPI (drives back to the parking spot).
+- **SHC handover (KPI):** one custody change between an SHC and a ground buffer (an STS ground position or a WTP pad): one per box picked up and one per box put down, so a job is two. Counted per SHC as `shc.handovers`.
 - **Parking spot:** an SHC's own rest position off the apron, where idle SHCs return.
 - **Driver variability:** a ± % random factor on each SHC trip's drive times.
 - **Transshipment:** a box that goes vessel → yard → another vessel.
@@ -95,7 +109,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Lane graph:** the generated one-way graph SHCs route over (apron loop, STS lanes, WTP spurs, parking spurs). Edges run along X or Z.
 - **Conflict zone:** a part of the lane graph only one vehicle may use at a time: an intersection, an STS lane section (ground position) or a WTP pad with its spur.
 - **Reservation:** a time window `[from, to)` on a conflict zone held by one piece of equipment. Trips reserve all their zones before departing and depart later if any window is taken.
-- **Yard allocation:** the decision point (`yardAllocation`) that picks a box's slot in the block of the pad it was dropped on. Built-in strategies: random, nearest-wtp, group-by-vessel.
+- **Yard allocation:** the decision point (`yardAllocation`) that picks a box's slot in the block of the pad it was dropped on. Built-in strategies: random, nearest-wtp, group-by-vessel. Candidates keep each stack to one length.
 - **Claim (slot claim):** a slot is claimed when allocation answers and stacked later. Stacks fill in claim order: an ASC does not stack a box before an older claim in the same stack.
 - **ASC job:** one box to move from a WTP pad to its slot. It is **ready** once its slot is allocated and its SHC has released the box and cleared the pad.
 - **Lifting envelope (of a WTP pad):** the space over the pad where an ASC spreader is below travel height. An ASC never enters it while an SHC is on the pad (the pad zone's **handover**).
@@ -110,6 +124,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Event feed:** the left panel's live list of recent events, newest first, filterable and capped. At high speed it **summarises bursts** (runs of the same event type) into one row.
 - **Event inspector:** the right panel's view of one event: payload, subjects, a decision's handler, request and reply, and its **cause chain**.
 - **Cause chain:** the events that led to one, from the event back to the root, as returned by the engine's `why`. Clicking an entry inspects it.
+- **Keyboard camera:** the held-key camera controls: W/A/S/D or arrows pan along the camera heading (speed scales with distance), Shift + A/D (or ←/→) orbits, Shift + W/S (or ↑/↓) tilts, `=`/`-` zoom, all within the orbit limits. Any camera key ends **follow** mode. Read through `__tt.cameraPose()` (target, distance, azimuth, polar angle).
 - **View preset:** a one-click or one-key camera pose computed from the layout: Quay (Q), Yard (Y), Landside/Gate (G) or Overview (V). The pose's target lies inside the region it names, so it fits every preset and fixture; the Gate view needs a landside. **Label declutter** hides any Labels-overlay label that would overlap a higher-priority one on screen (the selection first, then equipment-kind registry order).
 - **Selection:** the container, equipment or vessel picked in the 3D view (or by an id in the feed or inspector). The **inspector** shows its current state, current job and history, and the **follow camera** can track it.
 - **Picking:** finding the entity under a click by testing the view ray against each entity's bounding box (containers first).
@@ -120,7 +135,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **KPI series:** one KPI for one entity (a crane, a block, the terminal) with an **hourly** value per hour bucket, a value per **shift** and a **total**.
 - **Hour bucket / shift bucket:** an hour cut on the scenario clock, and a run of 8 whole hours (3 per day; default 06-14, 14-22, 22-06). A night shift belongs to the day it starts.
 - **Gross / net moves per hour:** a crane's moves divided by the hours it was on a vessel (gross) or on a vessel and not waiting for an SHC or the rail (net).
-- **Headline KPIs:** the few numbers on the **KPI strip** and in the CLI summary.
+- **Headline KPIs:** the few numbers on the **KPI strip** and in the CLI summary. The strip shows them fixed-width: fixed fraction digits (one decimal for rates and percentages), tabular figures and a minimum width per tile.
 - **End condition:** a rule that ends the run: N vessels completed (default all scheduled), sim duration or total moves. The first one met wins.
 - **Final report:** the panel shown when a run ends: reason, **highlights**, headline KPIs, tables and export buttons. The scene stays inspectable; only Reset and New Scenario remain of the time controls.
 - **Highlights:** friendly facts in the final report: hardest-working crane, busiest block, longest wait.
@@ -162,7 +177,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Dashboard (TT-16)
 
-- **Dashboard:** the full-screen tab (D) with the KPI time-series charts, the yard heatmap, the Gantt timeline and the final report. It loads Apache ECharts lazily on first open. *Avoid:* "KPI strip" (that is the small always-visible bar over the 3D view).
+- **Dashboard:** the full-screen tab (B) with the KPI time-series charts, the yard heatmap, the Gantt timeline and the final report. It loads Apache ECharts lazily on first open. *Avoid:* "KPI strip" (that is the small always-visible bar over the 3D view).
 - **KPI group:** a set of KPI charts shown together: Quay, Horizontal transport, Yard, Landside (when it has data) or TOS handlers.
 - **Bucketing:** whether the dashboard charts show one point per clock hour or per 8-hour shift (the same series the collector builds).
 - **Yard heatmap:** yard fill % per block (rows) per hour (columns), plus each block's fill now.
@@ -185,7 +200,14 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Interchange:** the ASC lifting a box off a chassis (drop) or setting one on it (pick) at a stall.
 - **Import dwell / export window:** how long an import stands in the yard before a truck may collect it (default lognormal, median 3 days); the period before a vessel's ETA (default 1 to 5 days) in which trucks may deliver its exports.
 - **Segregation:** trucks never enter the waterside network and SHCs never use the gate (invariant `landside.segregation`).
-- **Truck turn time:** gate-in to gate-out.
+- **Truck turn time:** gate-in to gate-out. **Total truck turnaround** (TT-R18) is arrival at the gate to gate-out, so it includes the wait outside the gate and in holding.
+- **Internal drive time:** the time a truck spends driving inside the terminal on its inbound leg (kiosk to stall, through a holding position if any), without the time it stands waiting. Reported per truck as mean and max.
+- **Road use:** how many trucks are driving on the internal landside roads (inbound legs and the way out): time-weighted mean over the run and the peak. **Holding utilisation** is the share of holding position-time that was occupied.
+- **Delayed appointment:** a booked truck that passed the gate after the end of its appointment window. **Rejected appointment:** a booking refused because its window was at capacity.
+- **Holding position:** a dead-end spur off the inbound road (`landside.holding.positions`, nodes `ls:H<n>`) where an admitted truck waits for a transfer stall. It never lies on a road, junction or gate exit (invariant `landside.waiting-off-road`).
+- **Stall admission:** the gate lets the head of the queue through only when a transfer stall can take it (the stall is reserved first, so no two trucks claim one stall: `landside.stall-exclusive`) or a holding position is free.
+- **Overflow (holding):** when no stall and no holding position is free, the truck waits outside the gate in the queue (`TruckHeldOutside`).
+- **Appointment window:** a slot of the truck booking system (default 30 min, `landside.appointments.windowS`). A truck books a window and arrives at a random time inside it; bookings per window are capped by gate and transfer stall capacity (`appointmentCap`), so demand above the cap is rejected. A peak is bunched bookings (`bunching` spans). Each **appointment** carries one transaction (its transport orders: export delivery, import collection or both = dual). No ANPR, no early, late or invalid arrivals.
 
 ## Yard start (TT-14)
 
@@ -196,10 +218,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Presets and layout (TT-15)
 
-- **Preset:** a named full scenario (TTI Algeciras baseline, Small automated, Stress test); every value stays overridable.
+- **Preset:** a named full scenario (TTI Algeciras baseline, Small automated, TTI Algeciras — peak day); every value stays overridable. Shown as a hero card in the setup dialog, with chips and a layout sketch derived from its config. The 16 test scenarios are **engine test fixtures**, listed in a collapsed table.
 - **Derived layout:** block and STS positions computed from the counts and the quay length, in the TTI functional order (quay, STS rail, apron and WTP pads, blocks, stalls, roads, gate).
 - **Frontage:** the quay length a block needs (32 m); blocks need count x 32 m.
-- **Scale limits / stress-test scale:** hard maxima (errors) and the softer size above which the dialog warns the run may be slow.
+- **Scale limits / peak-day scale:** hard maxima (errors) and the softer size above which the dialog warns the run may be slow.
 - **Nominal cycle:** the derived cycle time and moves per hour of one crane from its kinematics, without variation or waiting.
 
 ## Performance and quality (TT-19)
@@ -214,7 +236,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Atmosphere (TT-21)
 
-- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On by default in the Stress test preset.
+- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On by default in the TTI Algeciras — peak day preset.
 - **Night mode:** the cheaper lighting at night: no sun shadow pass, floodlight glow on high masts and emissive equipment lights instead of real lights.
 - **Backdrop:** the distant low-poly scenery: Algeciras (Rock of Gibraltar, hills, North Quay) for the TTI preset, a generic coastline otherwise.
 - **North Quay:** TTI's 550 m of quay beside the working berths, drawn idle (non-operational).
@@ -232,3 +254,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Gate module:** a generated GLB that tiles into the gate complex: a 3.5 m truck lane, the 8 m out-of-gauge lane, a 1.2 m island (kerb stripes, kiosk, camera post, canopy columns) between and beside lanes, and the control office.
 - **Island:** the concrete strip between two gate lanes; the engine lane pitch is lane half-width + island + lane half-width.
 - **Instanced infrastructure:** bollards, fenders, quay and ASC rail segments, fence panels, masts, ground markings and gate modules drawn as one InstancedMesh per model (one draw call each).
+- **Predicted ready time:** when a box is expected to be physically available for an SHC to collect: a ground-position box's planned set-down (exact) or the crane's estimated next one (nominal cycle plus hatch cycle), published by the quay subsystem; a WTP pad box's planned set-down by the ASC subsystem. `sim.predictedReady()`.
+- **Pre-dispatch (`predispatch`):** the `shcDispatch` strategy that sends an idle SHC to the queue area of a box predicted ready within the SHC's travel time plus `queueAreas.predispatchMarginS`. The SHC holds a queue spot, not a job, so no box is collected before it exists. *Avoid:* "early pick-up".
+- **Pre-retrieval:** the `pre-retrieval` `ascDispatch` strategy: once an import truck's stall is reserved and its trip planned, an idle ASC fetches the box to the stall before the truck arrives (an early job, `AscJobAssigned.early`) and hovers over it until the truck is there, so the stall service time drops. Never for a dual transaction or a buried box.
+- **Paired dispatch (`paired-dual-cycle`):** the `shcDispatch` strategy that, after an SHC delivers a discharge box to a WTP pad, prefers a nearby load pickup (and after a load delivery at the quay a discharge pickup), so the SHC drives loaded more often and less empty. Chained dispatch otherwise. The SHC's last delivery is `lastJobKind` on the dispatch request.

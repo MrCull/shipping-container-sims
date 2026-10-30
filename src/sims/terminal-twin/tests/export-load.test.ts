@@ -78,7 +78,7 @@ describe('mixed fixture: discharge then load on one vessel', () => {
 
 /** A feeder with `load` 40 ft export boxes: stacks two high on board. */
 function stackedLoad(opts: { load: number; shcs?: number }): ScenarioConfig {
-  const config = new ScenarioBuilder('stacked-load', 'export boxes stacked on board')
+  const config = new ScenarioBuilder('stacked-load', 'export boxes stacked on board').hatch({ enabled: false })
     .seed(3)
     .moveVariation(10)
     .quay(400, { mooringS: 60, unmooringS: 60 })

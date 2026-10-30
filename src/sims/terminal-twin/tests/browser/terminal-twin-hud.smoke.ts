@@ -7,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
 
-const PRESETS = ['TTI Algeciras baseline', 'Small automated', 'Stress test']
+const PRESETS = ['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras — peak day']
 const VIEWPORTS = [
   { width: 1280, height: 720 },
   { width: 1920, height: 1080 },
@@ -73,6 +73,22 @@ test('every KPI card shows its label and value in full at 1280x720, with both pa
     expect(c.right, c.text).toBeLessThanOrEqual(strip.x + strip.width + 1)
     expect(c.bottom, c.text).toBeLessThanOrEqual(strip.y + strip.height + 1)
     expect(c.parts.every((p) => !p.clipped), c.text).toBe(true)
+  }
+})
+
+test('KPI values keep a fixed minimum width and tabular figures so the strip does not shift', async ({ page }) => {
+  await open(page, 'TTI Algeciras baseline')
+  const values = await page.getByTestId('tt-kpi-strip').locator('.value').evaluateAll((els) =>
+    els.map((el) => {
+      const cs = getComputedStyle(el)
+      return { min: parseFloat(cs.minWidth), width: el.getBoundingClientRect().width, tabular: cs.fontVariantNumeric.includes('tabular-nums') }
+    }),
+  )
+  expect(values.length).toBeGreaterThan(3)
+  for (const v of values) {
+    expect(v.min).toBeGreaterThan(30)
+    expect(v.width).toBeGreaterThanOrEqual(v.min - 1)
+    expect(v.tabular).toBe(true)
   }
 })
 

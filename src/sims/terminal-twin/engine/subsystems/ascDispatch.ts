@@ -18,7 +18,7 @@ import {
   parseYardSlotId,
   slotZ,
 } from '../yardLayout'
-import { truckReadyForPick } from './landside'
+import { earlyPickReady, preRetrievalOn, truckReadyForPick } from './landside'
 import { truncateParkHolds } from './ascRail'
 
 /** Commit a planned job: reserve, install the plan, update KPIs, announce. */
@@ -65,7 +65,32 @@ export function startJob(ctx: EngineContext, asc: AscState, job: AscJob, plan: J
     ...(twin ? { railWaitS: Math.round(plan.railWaitS * 1000) / 1000 } : {}),
     ...(job.kind === 'rehandle' ? { rehandle: true as const, targetSlotId: job.targetSlotId ?? '' } : {}),
     ...(isTruckJob(job) ? { stallId: job.stallId as string, truckId: job.truckId as string } : {}),
+    ...(isEarly(state, job) ? { early: true as const } : {}),
   })
+}
+
+/** TT-R17: a pick retrieval that starts before its truck stands in its stall (the truck is still driving in). */
+export function isEarly(state: SimState, job: AscJob): boolean {
+  return job.kind === 'retrieve' && isTruckJob(job) && state.trucks[job.truckId as string]?.atStallAt === null
+}
+
+/**
+ * TT-R17: pick retrievals the ASC may start ahead of the truck (only with the `pre-retrieval` ascDispatch strategy): the
+ * stall is reserved, the truck is close, the box is on top of its stack and nothing digs it out.
+ */
+function earlyTruckPicks(ctx: EngineContext, blockId: string): AscJob[] {
+  const { state } = ctx
+  if (!preRetrievalOn(ctx.config)) return []
+  return Object.values(state.ascJobs).filter(
+    (j) =>
+      j.kind === 'retrieve' &&
+      isTruckJob(j) &&
+      j.blockId === blockId &&
+      j.ascId === null &&
+      earlyPickReady(state, j) &&
+      isRetrievable(state, j) &&
+      !Object.values(state.ascJobs).some((r) => r.kind === 'rehandle' && r.containerId === j.containerId),
+  )
 }
 
 /** Truck pick retrievals that can start now: the truck stands at its stall with a free chassis, the box is on top of its stack. */
@@ -112,7 +137,7 @@ function candidateJobs(ctx: EngineContext, blockId: string): AscJob[] {
     (j) => j.kind === 'rehandle' && j.blockId === blockId && j.ascId === null && j.targetSlotId && !blockedByOlderClaim(state, j),
   )
   const pad = nextPadRetrieval(ctx, blockId)
-  return [...stacks, ...rehandles, ...readyTruckPicks(state, blockId), ...(pad ? [pad] : [])]
+  return [...stacks, ...rehandles, ...readyTruckPicks(state, blockId), ...(pad ? [pad] : []), ...earlyTruckPicks(ctx, blockId)]
 }
 
 /**
@@ -127,7 +152,13 @@ export function maybeDispatchAsc(ctx: EngineContext, blockId: string): void {
   pumpRehandle(ctx, blockId)
   if (ascs.length === 1) {
     const next = candidateJobs(ctx, blockId)[0]
-    if (next) startJob(ctx, idle[0], next, planJob(ctx, idle[0], next) as JobPlan)
+    if (!next) return
+    if (isEarly(state, next)) {
+      // TT-R17: a retrieval ahead of the truck is the strategy's call, even with one ASC
+      if (next.dispatch !== 'asked' && planJob(ctx, idle[0], next) !== null) requestDispatch(ctx, next, ascs, idle)
+      return
+    }
+    startJob(ctx, idle[0], next, planJob(ctx, idle[0], next) as JobPlan)
     return
   }
   if (Object.values(state.ascJobs).some((j) => j.blockId === blockId && j.dispatch === 'asked')) return
@@ -157,6 +188,7 @@ function requestDispatch(ctx: EngineContext, job: AscJob, ascs: AscState[], idle
         containerId: job.containerId,
         kind: stall ? 'transfer' : (job.kind ?? 'wtp'),
         ...(stall ? { stallId: stall.id } : {}),
+        ...(isEarly(state, job) ? { early: true as const } : {}),
         wtpPadId: job.wtpPadId,
         yardSlotId: job.yardSlotId ?? '',
         padZ: stall?.z ?? pad?.z ?? slotZ(block, cell.bay, span),
@@ -197,7 +229,7 @@ export function resolveDispatch(ctx: EngineContext, jobId: string, ascId: string
   }
   if (job.kind === 'retrieve' && isTruckJob(job)) {
     // the reply may be late: the box may have been rehandled or the chassis may be taken
-    if (!isRetrievable(state, job) || !truckReadyForPick(state, job)) {
+    if (!isRetrievable(state, job) || !(truckReadyForPick(state, job) || (preRetrievalOn(ctx.config) && earlyPickReady(state, job)))) {
       maybeDispatchAsc(ctx, job.blockId) // the job is no longer a candidate: the idle ASC must look at the block's other work
       return
     }

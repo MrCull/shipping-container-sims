@@ -8,7 +8,7 @@
 import type { DecisionPointId, DecisionReplies, DecisionRequests } from './decisions/types'
 import type { MotionSegment } from './kinematics'
 import type { Reservation } from './reservations'
-import type { CustodyRef } from './state'
+import type { CustodyRef, WorkPackageKind } from './state'
 import type { ContainerSize, TruckTransactionKind } from '../scenario/types'
 
 /** Common payload of the SHC trip phase events. `segments` = the motion that led up to the event. */
@@ -181,8 +181,21 @@ export interface EventPayloads {
   /** The SHC reversed clear of the pad and is available. */
   ShcCleared: ShcPhasePayload & { nodeId: string }
   /** An idle SHC heads for its parking spot. */
-  ShcRoutingToParking: { shcId: string; departAt: number; reservations: Reservation[] }
+  ShcRoutingToParking: {
+    shcId: string
+    departAt: number
+    reservations: Reservation[]
+    /** TT-R13: the drive is a pre-dispatch to the queue area `areaId`, where a box is predicted ready at `readyAt`. */
+    predicted?: { areaId: string; readyAt: number; source: 'sts' | 'asc' }
+  }
   ShcParked: { shcId: string; nodeId: string; segments: MotionSegment[] }
+  /**
+   * The SHC reached a queue spot (TT-R12) and waits there: loaded (a box, waiting for a free WTP pad) or empty
+   * (waiting for work, chained dispatch).
+   */
+  ShcQueued: { shcId: string; nodeId: string; areaId: string; jobId: string | null; loaded: boolean; segments: MotionSegment[] }
+  /** A queued SHC with a box got a pad: its loaded trip from the queue spot is planned (it departs at `departAt`). */
+  ShcQueueDeparted: { shcId: string; jobId: string; wtpPadId: string; nodeId: string; departAt: number; distanceM: number; reservations: Reservation[] }
   /**
    * The ASC took the oldest stackable box (allocated, SHC cleared): the whole
    * cycle (pad, lift, slot, set down) is planned and the pad zone reserved.
@@ -205,6 +218,8 @@ export interface EventPayloads {
     /** Truck interchange (TT-13): the stall and truck the job serves (`wtpPadId` is empty then). */
     stallId?: string
     truckId?: string
+    /** TT-R17: the pick retrieval starts before the truck stands in its stall (pre-retrieval); present only then. */
+    early?: true
   }
   /**
    * Twin-ASC blocks: the ASC steps aside along the rail so the other ASC can
@@ -253,17 +268,30 @@ export interface EventPayloads {
    * The truck arrival process fired (hourly Poisson profile, or a scripted truck with `transaction`): the truck's
    * transaction is drawn from the demand the terminal can serve now, then `TruckArrived` follows.
    */
-  TruckArrivalDue: { transaction?: TruckTransactionKind }
+  TruckArrivalDue: { transaction?: TruckTransactionKind; appointmentId?: string }
   /**
    * A truck reached the gate and joined the queue. `transaction` is what it came for; each leg names its box (a drop
    * brings a new box that rides the chassis, a pick collects a box that is in the yard with its dwell elapsed).
    * `fallback` = the drawn transaction could not be served (no eligible box or vessel) and it came to drop an empty.
    */
-  TruckArrived: { truckId: string; transaction: TruckTransactionKind; legs: TruckLegInfo[]; queueLength: number; fallback?: true }
+  TruckArrived: { truckId: string; transaction: TruckTransactionKind; legs: TruckLegInfo[]; queueLength: number; fallback?: true; appointmentId?: string }
   /** The gateLaneAssignment decision gave the head of the queue a free inbound lane; it drives to the kiosk. */
   TruckGateStarted: { truckId: string; laneId: string; queueWaitS: number; queueLength: number }
   /** Gate processing is done (the truck is in); a transfer stall is allocated next. */
   TruckGateIn: { truckId: string; laneId: string; processingS: number; segments: MotionSegment[] }
+  /**
+   * Stall admission (TT-R16): the transferStallSelection decision reserved `stallId` for the head of the gate queue before
+   * the truck is sent through the gate. The trip to it is planned at gate-in (`TruckStallAssigned`).
+   */
+  TruckStallReserved: { truckId: string; stallId: string; blockId: string }
+  /** Stall admission (TT-R16): no stall can take the head of the queue, so a free holding position is reserved for it. */
+  TruckHoldingAssigned: { truckId: string; holdingId: string; holdingInUse: number }
+  /** Stall admission (TT-R16): no stall and no holding position is free; the head of the queue waits outside the gate (reported once per truck). */
+  TruckHeldOutside: { truckId: string; queueLength: number }
+  /** The truck leaves the gate lane for its holding position (TT-R16). */
+  TruckRoutingToHolding: { truckId: string; holdingId: string; laneId: string; segments: MotionSegment[] }
+  /** The truck stands in its holding position and waits for a stall (TT-R16). */
+  TruckAtHolding: { truckId: string; holdingId: string; segments: MotionSegment[] }
   /** The truck has no stall yet (every stall is taken): it waits at the kiosk. */
   TruckWaitingForStall: { truckId: string }
   /** The transferStallSelection decision gave the truck a stall; the trip over the landside roads is planned and reserved. */
@@ -312,16 +340,16 @@ export interface EventPayloads {
     packageId: string
     stsId: string
     vesselId: string
-    kind: 'discharge' | 'load'
+    kind: WorkPackageKind
     section: 'deck' | 'hold'
     bay: number
     moves: number
     ahead: number
   }
   /** The STS starts its next released package; `leadTimeS` = time since its release. */
-  WorkPackageStarted: { packageId: string; stsId: string; vesselId: string; kind: 'discharge' | 'load'; moves: number; leadTimeS: number }
+  WorkPackageStarted: { packageId: string; stsId: string; vesselId: string; kind: WorkPackageKind; moves: number; leadTimeS: number }
   /** The package's last move is done. */
-  WorkPackageCompleted: { packageId: string; stsId: string; vesselId: string; kind: 'discharge' | 'load'; moves: number; durationS: number }
+  WorkPackageCompleted: { packageId: string; stsId: string; vesselId: string; kind: WorkPackageKind; moves: number; durationS: number }
   /**
    * A released load package needs N empty containers of a size and line (TT-11). `available` = matching empties in
    * the yard that an ASC could take now; with fewer than `count` the package waits for more (asked again when an
@@ -344,6 +372,26 @@ export interface EventPayloads {
   StsLoaded: { stsId: string; vesselId: string; containerId: string; slotId: string; segments: MotionSegment[] }
   /** The STS finished its bays of the vessel and is free again. */
   StsWorkComplete: { stsId: string; vesselId: string }
+
+  // ── Hatch covers (TT-R09) ────────────────────────────────────────────────────────────────────────────────
+  /**
+   * The crane starts a hatch move (a `hatch-remove` or `hatch-replace` package): gantry to the panel (or its laydown
+   * bay), trolley out, hoist down, lock. Raised again after a rail wait or a lashing wait. `siteId` = the laydown bay
+   * once claimed. `segments` = the motion that led up to the event (the crane's previous move).
+   */
+  StsHatchStarted: { stsId: string; vesselId: string; packageId: string; panelId: string; op: 'remove' | 'replace'; segments: MotionSegment[] }
+  /** The crane idles: the panel's lashing is not released yet (`lashing`) or a replaced panel is not secured yet (`securing`). */
+  StsWaitingForHatch: { stsId: string; vesselId: string; panelId: string; reason: 'lashing' | 'securing' }
+  /** The lashing crew released the cleats of a panel `delayS` after the deck boxes above it were gone: it is `unsecured`. */
+  HatchLashingReleased: { vesselId: string; bay: number; panelId: string; delayS: number }
+  /** Spreader locked on the panel and it is lifted (`from` the hatch for a removal, from the laydown for a replacement). */
+  HatchLifted: { stsId: string; vesselId: string; panelId: string; from: 'hatch' | 'laydown'; weightT: number; segments: MotionSegment[] }
+  /** The panel is set down in a laydown bay (`level` 0 = bottom of the stack) and the spreader unlocked. */
+  HatchSetInLaydown: { stsId: string; vesselId: string; panelId: string; siteId: string; level: number; x: number; segments: MotionSegment[] }
+  /** The panel is set back on `hatch` (the hatch it was placed on: always its own) and the spreader unlocked; securing starts. */
+  HatchReplaced: { stsId: string; vesselId: string; panelId: string; hatch: { vesselId: string; bay: number; index: number }; segments: MotionSegment[] }
+  /** The lashing crew secured a replaced panel `delayS` after it was set back: deck boxes may be loaded on it. */
+  HatchSecured: { vesselId: string; bay: number; panelId: string; delayS: number }
   /** All the vessel's moves are done: unmooring starts. */
   VesselWorkComplete: { vesselId: string }
   /** The vessel has left; its quay stretch is free. */

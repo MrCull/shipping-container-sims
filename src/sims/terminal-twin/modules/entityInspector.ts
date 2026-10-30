@@ -5,6 +5,7 @@
  */
 import type { ContainerState, ShcJob } from '../engine'
 import { EQUIPMENT_KINDS, kindOfEntity, type EquipmentKind } from './equipmentKinds'
+import type { ContainerSize } from '../scenario/types'
 import type { MessageKey } from '../i18n/messages'
 import type { EventSummary, QueryKind } from '../worker/protocol'
 import type { SceneModel } from './sceneModel'
@@ -28,7 +29,9 @@ export interface Fact {
   link?: boolean
   unit?: 'length' | 'time'
   /** The value is a token with catalogue texts `inspector.<token>.<value>` (otherwise shown as is). */
-  token?: 'load'
+  token?: 'load' | 'shcState'
+  /** The value is a custody owner; the UI shows a slot in maritime notation (`modules/locationNotation.ts`). */
+  owner?: { kind: string; id: string; size: ContainerSize }
 }
 
 export interface CustodyRow {
@@ -37,6 +40,8 @@ export interface CustodyRow {
   ownerId: string
   eventId: number | null
   current: boolean
+  /** The box's size, for the yard bay number of a slot owner. */
+  size: ContainerSize
 }
 
 export interface EntityView {
@@ -50,6 +55,8 @@ export interface EntityView {
 }
 
 export interface EntityExtras {
+  /** SHC: sim time the view is for (an assigned SHC queues until its trip starts); without it the status alone decides. */
+  now?: number
   /** SHC: the job it holds, from the `shcJobs` query. */
   job?: Readonly<ShcJob>
   /** Extras of other kinds (see `EquipmentKindDef.loadExtras`). */
@@ -65,10 +72,10 @@ function containerView(box: Readonly<ContainerState>): EntityView {
       { label: 'inspector.fact.line', value: box.line },
       { label: 'inspector.fact.size', value: box.size },
       { label: 'inspector.fact.load', value: box.full ? 'full' : 'empty', token: 'load' },
-      { label: 'inspector.fact.custody', value: `${box.custody.kind}:${box.custody.id}` },
+      { label: 'inspector.fact.custody', value: `${box.custody.kind}:${box.custody.id}`, owner: { kind: box.custody.kind, id: box.custody.id, size: box.size } },
     ],
     job: null,
-    custody: history.map((h, i) => ({ t: h.t, ownerKind: h.owner.kind, ownerId: h.owner.id, eventId: h.eventId, current: i === history.length - 1 })),
+    custody: history.map((h, i) => ({ t: h.t, ownerKind: h.owner.kind, ownerId: h.owner.id, eventId: h.eventId, current: i === history.length - 1, size: box.size })),
   }
 }
 

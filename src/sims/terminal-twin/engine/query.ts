@@ -5,6 +5,7 @@
  */
 import type { Reservation } from './reservations'
 import type {
+  Appointment,
   AscJob,
   AscState,
   ContainerState,
@@ -16,7 +17,9 @@ import type {
   SimState,
   StsState,
   TruckState,
+  HatchPanelState,
   TransferStallState,
+  HoldingPositionState,
   VesselSlotState,
   VesselState,
   WtpPadState,
@@ -60,10 +63,17 @@ export interface SimQuery {
   /** Trucks in the terminal (queued at the gate to leaving), TT-13. */
   trucks(): readonly Readonly<TruckState>[]
   truck(id: string): Readonly<TruckState>
+  /** Hatch panels (TT-R09; empty with hatch covers off): one vessel's, or all, in id order. */
+  hatchPanels(vesselId?: string): readonly Readonly<HatchPanelState>[]
+  hatchPanel(id: string): Readonly<HatchPanelState>
   /** Transfer stalls with the truck that holds each (empty when the landside is off). */
   transferStalls(): readonly Readonly<TransferStallState>[]
+  /** Holding positions with the truck that holds each (empty without `config.landside.holding`), TT-R16. */
+  holdingPositions(): readonly Readonly<HoldingPositionState>[]
   /** Trucks waiting at the gate, head of the queue first. */
   gateQueue(): readonly string[]
+  /** Booked truck appointments, in arrival order (empty without `config.landside.appointments`), TT-R15. */
+  appointments(): readonly Readonly<Appointment>[]
 }
 
 function get<T>(record: Record<string, T>, id: string, what: string): T {
@@ -108,8 +118,15 @@ export function createQuery(getState: () => SimState): SimQuery {
     },
     trucks: () => Object.values(getState().trucks),
     truck: (id) => get(getState().trucks, id, 'truck'),
+    hatchPanels: (vesselId) => {
+      const all = Object.values(getState().hatchPanels)
+      return vesselId === undefined ? all : all.filter((p) => p.vesselId === vesselId)
+    },
+    hatchPanel: (id) => get(getState().hatchPanels, id, 'hatch panel'),
     transferStalls: () => Object.values(getState().landside?.stalls ?? {}),
+    holdingPositions: () => Object.values(getState().landside?.holding ?? {}),
     gateQueue: () => getState().landside?.queue ?? [],
+    appointments: () => getState().landside?.appointments?.list ?? [],
     loadOrders: () => Object.values(getState().loadOrders).sort((a, b) => (a.stsId < b.stsId ? -1 : a.stsId > b.stsId ? 1 : a.seq - b.seq)),
   }
 }

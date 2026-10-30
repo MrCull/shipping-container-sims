@@ -13,7 +13,7 @@
  *                                              //   stsAssets, stsLods, render: { calls, triangles } }
  *   await __tt.step(); await __tt.why(id); await __tt.snapshot()
  *   await __tt.inject('VesselBerthed', 120, { vessels: ['V001'] }, { vesselId: 'V001', berthX: 50 })
- *   __tt.select('STS01'); __tt.cameraTo('STS01');   // also 'gate' and 'stalls:B01' (landside, TT-13); __tt.sceneState().trucks
+ *   __tt.select('STS01'); __tt.cameraTo('STS01');   // also 'gate', 'stalls:B01' (landside, TT-13) and 'holding' / 'H1' (holding positions, TT-R16); __tt.sceneState().trucks
  * __tt.setSpeed(600); __tt.pause(); __tt.clock()
  *   __tt.overlays({ laneGraph: true, reservations: true })   // 3D debug overlays
  *   await __tt.query('ascList'); await __tt.query('yardSlots', 'B01'); __tt.sceneState().ascs   // yard (TT-06)
@@ -27,6 +27,7 @@
  *   await __tt.saves.rewindPoints(); await __tt.saves.rewindTo(0)        // automatic rewind points (default every 15 sim-minutes)
  *   __tt.screenPoint('STS01'); __tt.pickAt(x, y)                         // 3D picking, client coordinates
  */
+import type { CameraPose } from '../modules/cameraKeys'
 import { isViewPreset } from '../modules/viewPresets'
 import { readHudLayout, type HudLayout } from '../modules/hudLayout'
 import type { ScenarioOverrides } from '../scenario/overrides'
@@ -53,6 +54,7 @@ import type { ShcRigState } from '../modules/shcAssets'
 import type { TruckRigState } from '../modules/truckAssets'
 import type { AscRigState } from '../modules/ascAssets'
 import type { VesselHullState } from '../modules/vesselRenderer'
+import type { HatchRigState } from '../modules/equipmentKinds/hatch'
 import type { AscPose, ShcPose, StsPose, TruckPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
 import type { StsRenderState } from '../modules/stsAssets'
@@ -161,8 +163,8 @@ export interface TwinDevApi {
   pickAt(clientX: number, clientY: number): string | null
   /** Viewport (client) coordinates of an entity's centre, or null when it is not drawn or off screen. */
   screenPoint(entityId: string): { x: number; y: number } | null
-  /** Where the orbit camera looks (follow-camera checks). */
-  cameraTarget(): { x: number; y: number; z: number } | null
+  /** The orbit camera (follow-camera and keyboard-camera checks): target, distance (m), azimuth and polar angle (radians from straight up). */
+  cameraPose(): CameraPose | null
   /** Bounding box (viewport px) of each named HUD region (`null` when not shown); see modules/hudLayout.ts. */
   hudLayout(): HudLayout
   /** Saves, snapshots and rewind (TT-17). */
@@ -270,6 +272,10 @@ export interface SceneState {
   stsRendered: Record<string, StsRenderState>
   /** Per vessel: hull class, line, livery tile, name, hull LOD and the rendered bay grid (TT-27). */
   vesselHulls: Record<string, VesselHullState>
+  /** Per hatch panel (TT-R10): engine-driven state and the centre (top face minus half the thickness) it should be drawn at, null while its vessel is not in the scene. */
+  hatchPanels: Record<string, { status: string; x: number | null; y: number | null; z: number | null; lengthM: number | null; widthM: number | null; stsId: string | null }>
+  /** Per hatch panel the renderer drew at the last frame: status and centre (absent while not drawn). */
+  hatchRigs: Record<string, HatchRigState>
 }
 
 declare global {
@@ -468,7 +474,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     },
     pickAt: (x, y) => store.view()?.pickAt(x, y) ?? null,
     screenPoint: (id) => store.view()?.screenPoint(id) ?? null,
-    cameraTarget: () => store.view()?.cameraTarget() ?? null,
+    cameraPose: () => store.view()?.cameraPose() ?? null,
     hudLayout: () => readHudLayout(document, { width: window.innerWidth, height: window.innerHeight }),
     saves: {
       fileText: async (type, name) => JSON.stringify(await store.buildSave(type, name)),

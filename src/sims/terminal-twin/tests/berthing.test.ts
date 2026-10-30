@@ -63,7 +63,7 @@ describe('berthing on a continuous quay', () => {
   })
 
   it('vessels that fit berth side by side at different positions (first-fit)', () => {
-    const config = new ScenarioBuilder('side-by-side', 'two feeders on a long quay')
+    const config = new ScenarioBuilder('side-by-side', 'two feeders on a long quay').hatch({ enabled: false })
       .quay(600, { mooringS: 100, unmooringS: 100, berthGapM: 20 })
       .sts('STS01', { gantryX: 50, groundPositions: 10 })
       .sts('STS02', { gantryX: 300, groundPositions: 10 })
@@ -85,7 +85,7 @@ describe('berthing on a continuous quay', () => {
     // V001 [0,140] and V003 [454,594] stay long; V002 [150,444] leaves early.
     // V004 then sees a 314 m gap mid-quay and a 166 m gap at the end of the 760 m quay.
     const config = (strategy: string) =>
-      new ScenarioBuilder('fit', 'first-fit vs best-fit')
+      new ScenarioBuilder('fit', 'first-fit vs best-fit').hatch({ enabled: false })
         .quay(760, { mooringS: 100, unmooringS: 100, berthGapM: 10 })
         .sts('STS01', { gantryX: 50, groundPositions: 40 })
         .sts('STS02', { gantryX: 300, groundPositions: 40 })
@@ -108,7 +108,7 @@ describe('berthing on a continuous quay', () => {
   })
 
   it('a scripted berth handler is obeyed; an overlapping berth is rejected', () => {
-    const config = new ScenarioBuilder('scripted', 'scripted berths')
+    const config = new ScenarioBuilder('scripted', 'scripted berths').hatch({ enabled: false })
       .quay(600, { mooringS: 100, unmooringS: 100, berthGapM: 10 })
       .sts('STS01', { gantryX: 100, groundPositions: 10 })
       .sts('STS02', { gantryX: 400, groundPositions: 10 })

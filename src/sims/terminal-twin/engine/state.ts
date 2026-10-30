@@ -7,6 +7,7 @@ import { createDecisionState, type DecisionState } from './decisions/runtime'
 import type { EngineEvent } from './events'
 import { HASH_SEED, type HashState } from './hash'
 import type { MotionSegment } from './kinematics'
+import { createHatchPanels, hatchEnabled, hatchLaydownProblems } from './hatch'
 import { laneGraphOf, validateLaneLayout } from './laneGraph'
 import { hasLandside, landsideGraphOf } from './landsideGraph'
 import type { Reservation } from './reservations'
@@ -43,6 +44,8 @@ export interface ContainerState {
   vesselId: string
   custody: CustodyRef
   custodyHistory: CustodyRecord[]
+  /** Reefer (R19): only in powered yard rows, at most `REEFER_MAX_TIERS` high. Absent = not a reefer. */
+  reefer?: true
   /** Transshipment box (TT-11): the vessel that will load it (null/absent = not a linked transshipment box). */
   onwardVesselId?: string
   /** Transshipment box: slot on the onward vessel it is booked to. */
@@ -109,6 +112,8 @@ export interface VesselState {
   stsIds: string[]
   /** Every STS that has worked (or is working) this vessel, in assignment order. */
   stsHistory: string[]
+  /** Hatch panels of the vessel's bays (TT-R09), ids into `SimState.hatchPanels`. */
+  hatchPanelIds?: string[]
   /** Discharge boxes still on board. */
   remainingDischarge: number
   /** Export boxes still to be loaded (TT-10). */
@@ -153,6 +158,10 @@ export type ShcStatus =
   | 'clearing'
   | 'available'
   | 'routing-to-parking'
+  /** Resting at a queue spot with a box, waiting for a free WTP pad (TT-R12). */
+  | 'queuing-for-pad'
+  /** Resting at a queue spot, empty, waiting for work (TT-R12, chained dispatch). */
+  | 'queuing-for-work'
 
 /** One planned phase event of an SHC trip (the next one is scheduled by the previous). */
 export interface ShcPlannedEvent {
@@ -170,6 +179,7 @@ export interface ShcPlannedEvent {
     | 'ShcDroppedAtGround'
     | 'ShcCleared'
     | 'ShcParked'
+    | 'ShcQueued'
   at: number
   /** The motion leading up to this event (its payload `segments`). */
   segments: MotionSegment[]
@@ -182,6 +192,8 @@ export interface ShcState {
   nodeId: string
   carrying: string | null
   jobId: string | null
+  /** Kind of the last delivered job; set only under `paired-dual-cycle` (TT-R14). */
+  lastJobKind?: 'discharge' | 'load'
   /** Current trip's motion (axes x, z, lift); the renderer interpolates from these. */
   motion: MotionSegment[]
   /** Remaining phase events of the current trip. */
@@ -386,11 +398,15 @@ export interface TruckLeg {
 /**
  * queued (gate queue) → in-lane (driving to the kiosk, being processed) → waiting-for-stall → routing-to-stall → at-stall
  * → being-served (the landside ASC works the chassis) → routing-to-exit → (gone: removed at TruckDeparted).
+ * With stall admission (TT-R16, `config.landside.holding`) a truck with a reserved stall goes on to routing-to-stall at
+ * once, and one without drives to a holding position: in-lane → routing-to-holding → holding → routing-to-stall.
  */
 export type TruckStatus =
   | 'queued'
   | 'in-lane'
   | 'waiting-for-stall'
+  | 'routing-to-holding'
+  | 'holding'
   | 'routing-to-stall'
   | 'at-stall'
   | 'being-served'
@@ -398,7 +414,7 @@ export type TruckStatus =
 
 /** One planned phase event of a truck's trip (the next one is scheduled by the previous). */
 export interface TruckPlannedEvent {
-  type: 'TruckGateIn' | 'TruckRoutingToStall' | 'TruckAtStall' | 'TruckRoutingToExit' | 'TruckGateOut' | 'TruckDeparted'
+  type: 'TruckGateIn' | 'TruckRoutingToHolding' | 'TruckAtHolding' | 'TruckRoutingToStall' | 'TruckAtStall' | 'TruckRoutingToExit' | 'TruckGateOut' | 'TruckDeparted'
   at: number
   segments: MotionSegment[]
   /** TruckGateIn: the processing time spent at the kiosk (s). */
@@ -416,6 +432,12 @@ export interface TruckState {
   laneId: string | null
   outLaneId: string | null
   stallId: string | null
+  /** The holding position reserved for the truck from admission until it has left it (TT-R16), else null. */
+  holdingId: string | null
+  /** When the truck stood in its holding position (TT-R16). */
+  holdingAt: number | null
+  /** The truck has been reported waiting outside the gate (holding full, TT-R16): reported once per truck. */
+  heldOutside: boolean
   /** Landside-graph node the truck is at, or will be at the end of its planned motion. */
   nodeId: string
   /** The box on the chassis. */
@@ -423,6 +445,11 @@ export interface TruckState {
   gateStartedAt: number | null
   gateInAt: number | null
   stallAssignedAt: number | null
+  /** TT-R18: the truck holds an appointment (it came from the booking system). */
+  booked: boolean
+  /** TT-R18: seconds spent driving inside so far, and when the current drive began (null while standing). */
+  driveS: number
+  driveSince: number | null
   atStallAt: number | null
   serviceStartedAt: number | null
   interchangeDoneAt: number | null
@@ -436,6 +463,14 @@ export interface TransferStallState {
   x: number
   z: number
   /** The truck that holds the stall, from its stall assignment until it has reversed clear. */
+  truckId: string | null
+}
+
+/** A holding position (TT-R16) and the truck that holds it, from its admission until it has driven out. */
+export interface HoldingPositionState {
+  id: string
+  x: number
+  z: number
   truckId: string | null
 }
 
@@ -457,6 +492,27 @@ export interface LandsideState {
   stallWaiting: string[]
   /** The truck whose transferStallSelection decision is pending. */
   stallAsking: string | null
+  /** Holding positions (TT-R16; empty without `config.landside.holding`). */
+  holding: Record<string, HoldingPositionState>
+  /** Booked appointment windows (TT-R15); present only when `config.landside.appointments` is set, filled at ScenarioStarted. */
+  appointments?: AppointmentBook
+}
+
+/** One booked truck visit: its window, its arrival inside the window and the transport orders it carries. */
+export interface Appointment {
+  id: string
+  windowIndex: number
+  arriveAtS: number
+  transaction: TruckTransactionKind
+}
+
+export interface AppointmentBook {
+  windowS: number
+  capPerWindow: number
+  windows: number
+  /** Bookings refused because their window was full. */
+  rejected: number
+  list: Appointment[]
 }
 
 export interface LandsideKpiCounters {
@@ -484,11 +540,44 @@ export interface LandsideKpiCounters {
   boxesPicked: number
   /** Arrivals whose drawn transaction could not be served (no eligible box / vessel), served as a drop empty. */
   fallbacks: number
+  /** Trucks admitted past the gate with a stall reserved (TT-R16; this and the counters below stay 0 without `config.landside.holding`). */
+  admittedToStall: number
+  /** Trucks admitted to a holding position (no stall could take them). */
+  admittedToHolding: number
+  /** Trucks that waited outside the gate because no stall and no holding position was free (counted once each). */
+  heldOutside: number
+  /** Most holding positions in use at once (reserved, driving there or standing). */
+  holdingMax: number
+  /** Standing in a holding position until its stall is assigned (s), over the trucks that got one. */
+  holdingWaitSumS: number
+  holdingWaitMaxS: number
+  holdingWaitCount: number
+  /** TT-R18: kiosk processing at the in gate (s), over the trucks that got through (`trucksIn`). */
+  gateProcSumS: number
+  gateProcMaxS: number
+  /** Driving inside the terminal before service (gate to holding position and stall, standing time excluded), per truck that left. */
+  driveSumS: number
+  driveMaxS: number
+  /** Arrival at the gate to gate-out, per truck that left. */
+  totalTurnSumS: number
+  totalTurnMaxS: number
+  /** Trucks driving on the internal roads now / at most, and the integral of the count over time (truck-seconds up to `roadLastT`). */
+  roadNow: number
+  roadMax: number
+  roadBusyS: number
+  roadLastT: number
+  /** Holding positions occupied (reserved to driving out), integrated over time (position-seconds up to `holdLastT`). */
+  holdBusyS: number
+  holdLastT: number
+  /** Booked trucks that passed the gate after the end of their appointment window. */
+  appointmentsDelayed: number
 }
 
 export interface StsDrop {
   containerId: string
   groundPositionId: string
+  /** When the set-down is planned to end (the scheduled `StsGrounded`); set once the carry is planned (TT-R13). */
+  groundAt?: number
 }
 
 export interface StsState {
@@ -513,6 +602,8 @@ export interface StsState {
   railHi: number
   /** Gantry target the crane is waiting to reach (status `waiting-for-rail`). */
   railTargetX: number | null
+  /** A second gantry position the waiting move needs as well (a hatch move visiting the laydown, TT-R09). */
+  railAlsoX?: number | null
   /** Boxes on the spreader (two for a twin-20 lift), aft first. */
   carrying: string[]
   /** Ground positions chosen for the carried boxes, in set-down order. */
@@ -528,6 +619,82 @@ export interface StsState {
   activePackageId: string | null
   /** A work-package-release decision is pending for this crane. */
   releasing?: boolean
+  /**
+   * The hatch move being worked (TT-R09), from the start of a `hatch-remove` / `hatch-replace` package until the panel
+   * is set down. `waiting` = the crane idles for the panel's lashing release.
+   */
+  hatchJob?: HatchJob | null
+  /** The hatch panel on the spreader (never a container, so never in `carrying`). */
+  carryingPanel?: string | null
+  /** The crane idles until this panel is secured (deck load onto a replaced hatch). */
+  hatchWaitPanel?: string | null
+  /** Since when the crane has waited for a hatch (lashing release or securing). */
+  hatchWaitSince?: number | null
+}
+
+/** One hatch move of an STS. */
+export interface HatchJob {
+  panelId: string
+  op: 'remove' | 'replace'
+  packageId: string
+  /** The crane idles until the panel's lashing is released. */
+  waiting: boolean
+  /** Handling time (s) added on each side of the carry so the move takes the hatch cycle time. */
+  padS: number
+  /** Laydown bay of the move. */
+  siteId: string | null
+  startedAt: number | null
+  /** The hatch the panel is carried to when replaced (always its own). */
+  target: { vesselId: string; bay: number; index: number }
+}
+
+/** secured → unsecured (lashing released) → lifted → in-laydown → lifted → replaced → secured. */
+export type HatchPanelStatus = 'secured' | 'unsecured' | 'lifted' | 'in-laydown' | 'replaced'
+
+/**
+ * One hatch panel of a vessel bay (TT-R09). Panels are not containers: no custody, no yard slot, never counted as a
+ * box. `home` is where the panel lies on the hatch (centre of its top face); `pos` is where it is now (at rest;
+ * while `lifted` it is on the spreader of `stsId`).
+ */
+export interface HatchPanelState {
+  id: string
+  vesselId: string
+  bay: number
+  /** Index across the beam, 0 on the quay side. */
+  index: number
+  /** Rows covered: `rowFrom` inclusive, `rowTo` exclusive. */
+  rowFrom: number
+  rowTo: number
+  lengthM: number
+  widthM: number
+  weightT: number
+  home: { x: number; y: number; z: number }
+  pos: { x: number; y: number; z: number }
+  status: HatchPanelStatus
+  /** The bay has hold work under this panel, so it will be opened. */
+  opens: boolean
+  /** A lashing release is already scheduled for this opening. */
+  lashingScheduled: boolean
+  lashingReleasedAt: number | null
+  liftedAt: number | null
+  /** The crane that has lifted it. */
+  stsId: string | null
+  /** The laydown bay the panel is claimed for / lies in, and its level in the stack (0 = bottom). */
+  siteId: string | null
+  level: number | null
+  /** Completed open and close cycles. */
+  cycles: number
+  /** Deck boxes standing on the panel (kept for panels that open). */
+  deckBoxes: number
+  /** The hatch the panel was last set down on: set by a replacement, must be its own. */
+  placedOn: { vesselId: string; bay: number; index: number } | null
+}
+
+/** A laydown bay: one stack of panels of one hatch, bottom first. */
+export interface HatchLaydownSite {
+  id: string
+  x: number
+  panelIds: string[]
 }
 
 export interface GroundPositionState {
@@ -539,7 +706,7 @@ export interface GroundPositionState {
   claimedBy: string | null
 }
 
-export type WorkPackageKind = 'discharge' | 'load'
+export type WorkPackageKind = 'discharge' | 'load' | 'hatch-remove' | 'hatch-replace'
 /** planned (not yet released) → released → active (the STS works it) → complete. */
 export type WorkPackageStatus = 'planned' | 'released' | 'active' | 'complete'
 
@@ -568,6 +735,8 @@ export interface WorkPackage {
    * package is released. `containerIds` stays empty until `stage` is 'allocated'.
    */
   emptyReq?: EmptiesRequirement
+  /** Hatch packages (TT-R09): the panel this package removes or replaces. */
+  hatchPanelId?: string
 }
 
 export interface EmptiesRequirement {
@@ -610,6 +779,17 @@ export interface StsKpiCounters {
   railWaitSince: number | null
 }
 
+/** Hatch moves of the STS cranes (TT-R09); present once the first one starts. */
+export interface HatchKpiCounters {
+  removes: number
+  replaces: number
+  /** STS time on hatch moves (s): start of the move to the panel set down. */
+  stsTimeS: number
+  /** Crane idle time waiting for a lashing release or a securing (s). */
+  waitS: number
+  perSts: Record<string, { moves: number; timeS: number; waitS: number }>
+}
+
 export interface KpiCounters {
   movesCompleted: number
   vesselsCompleted: number
@@ -620,6 +800,8 @@ export interface KpiCounters {
   yard?: YardKpiCounters
   /** Work packages (TT-10). */
   workPackages: WorkPackageKpiCounters
+  /** Hatch moves (TT-R09; present once one has started). */
+  hatch?: HatchKpiCounters
   /** Trucks and the gate (present when the landside is on). */
   landside?: LandsideKpiCounters
 }
@@ -665,7 +847,7 @@ export interface YardKpiCounters {
 
 export interface HorizontalKpiCounters {
   boxesToWtp: number
-  perShc: Record<string, { jobs: number; emptyDistanceM: number; loadedDistanceM: number; reservationWaitS: number }>
+  perShc: Record<string, { jobs: number; emptyDistanceM: number; loadedDistanceM: number; reservationWaitS: number; parkingReturns: number; queueArrivals: number }>
   /** STS seconds spent waiting for a free ground position. */
   stsGroundPositionWaitS: Record<string, number>
 }
@@ -709,6 +891,8 @@ export interface SimState {
   shcs: Record<string, ShcState>
   shcJobs: Record<string, ShcJob>
   nextShcJob: number
+  /** Queue spot node id -> the SHC that holds it (TT-R12). Exclusive; a spot is held from assignment to departure. */
+  queueClaims: Record<string, string>
   wtpPads: Record<string, WtpPadState>
   ascs: Record<string, AscState>
   ascJobs: Record<string, AscJob>
@@ -718,6 +902,10 @@ export interface SimState {
   yardSlots: Record<string, YardSlotState>
   workPackages: Record<string, WorkPackage>
   nextWorkPackage: number
+  /** Hatch panels of the vessels' bays, by id (TT-R09). Not containers. */
+  hatchPanels: Record<string, HatchPanelState>
+  /** Laydown bays in use on the quay (created on first use). */
+  hatchLaydown: Record<string, HatchLaydownSite>
   /** Empties package whose `emptyAllocation` decision is pending (one at a time), or null. */
   emptiesAsking: string | null
   loadOrders: Record<string, LoadOrder>
@@ -812,6 +1000,7 @@ function initLandside(state: SimState, config: ScenarioConfig, seed: number): vo
     stalls: Object.fromEntries(graph.stalls.map((st) => [st.id, { id: st.id, blockId: st.blockId, x: st.x, z: st.z, truckId: null }])),
     stallWaiting: [],
     stallAsking: null,
+    holding: Object.fromEntries(graph.holding.map((h) => [h.id, { id: h.id, x: h.x, z: h.z, truckId: null }])),
   }
   const rng = () => {
     const [v, next] = nextRandom(ls.rngState)
@@ -839,6 +1028,26 @@ function initLandside(state: SimState, config: ScenarioConfig, seed: number): vo
     boxesDropped: 0,
     boxesPicked: 0,
     fallbacks: 0,
+    admittedToStall: 0,
+    admittedToHolding: 0,
+    heldOutside: 0,
+    holdingMax: 0,
+    holdingWaitSumS: 0,
+    holdingWaitMaxS: 0,
+    holdingWaitCount: 0,
+    gateProcSumS: 0,
+    gateProcMaxS: 0,
+    driveSumS: 0,
+    driveMaxS: 0,
+    totalTurnSumS: 0,
+    totalTurnMaxS: 0,
+    roadNow: 0,
+    roadMax: 0,
+    roadBusyS: 0,
+    roadLastT: 0,
+    holdBusyS: 0,
+    holdLastT: 0,
+    appointmentsDelayed: 0,
   }
 }
 
@@ -864,6 +1073,7 @@ export function createInitialState(
     shcs: {},
     shcJobs: {},
     nextShcJob: 0,
+    queueClaims: {},
     wtpPads: {},
     ascs: {},
     ascJobs: {},
@@ -873,6 +1083,8 @@ export function createInitialState(
     yardSlots: {},
     workPackages: {},
     nextWorkPackage: 0,
+    hatchPanels: {},
+    hatchLaydown: {},
     emptiesAsking: null,
     loadOrders: {},
     reservations: [],
@@ -914,6 +1126,8 @@ export function createInitialState(
     }
   }
   for (const s of plan.slots) state.vesselSlots[s.id] = { ...s, containerId: null }
+  const hatchCovers = hatchEnabled(config) && subsystems.quay !== 'off'
+  if (hatchCovers) createHatchPanels(state, config)
   const loading = subsystems.shc !== 'off' && subsystems.asc !== 'off'
   for (const s of plan.slots) if (s.emptyReq && loading) state.vessels[s.vesselId].remainingLoad++
   const startMode = config.yardStart?.mode
@@ -951,6 +1165,7 @@ export function createInitialState(
       custody: owner,
       custodyHistory: [{ t: 0, owner, eventId: null }],
     }
+    if (c.reefer) state.containers[c.id].reefer = true
     if (c.flow === 'pool') state.containers[c.id].yardSince = -(c.ageS ?? 0)
     if (c.transshipment) {
       Object.assign(state.containers[c.id], {
@@ -1001,6 +1216,14 @@ export function createInitialState(
   })
   if ((config.shcs?.length ?? 0) > 0 && (config.yard?.blocks.length ?? 0) > 0) {
     validateLaneLayout(config)
+    if (hatchCovers) {
+      const problems = hatchLaydownProblems(config)
+      if (problems.length > 0)
+        throw new Error(
+          `The hatch cover laydown does not fit between the ground lanes and the STS rail without touching the SHC lane graph ` +
+            `(use at most 3 ground positions per STS, or set hatch.enabled to false): ${problems.slice(0, 3).join('; ')}`,
+        )
+    }
     const graph = laneGraphOf(config)
     const horizontal: HorizontalKpiCounters = { boxesToWtp: 0, perShc: {}, stsGroundPositionWaitS: {} }
     for (const shc of config.shcs ?? []) {
@@ -1013,7 +1236,7 @@ export function createInitialState(
         motion: [],
         plan: [],
       }
-      horizontal.perShc[shc.id] = { jobs: 0, emptyDistanceM: 0, loadedDistanceM: 0, reservationWaitS: 0 }
+      horizontal.perShc[shc.id] = { jobs: 0, emptyDistanceM: 0, loadedDistanceM: 0, reservationWaitS: 0, parkingReturns: 0, queueArrivals: 0 }
     }
     for (const s of config.sts) horizontal.stsGroundPositionWaitS[s.id] = 0
     for (const p of graph.pads) state.wtpPads[p.id] = { id: p.id, blockId: p.blockId, containerId: null, claimedBy: null }

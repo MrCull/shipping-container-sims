@@ -1,0 +1,422 @@
+{
+  "scenario": "asc-pre-retrieval",
+  "seed": 8,
+  "status": "ended",
+  "endReason": "simDurationS >= 6500",
+  "eventLogHash": "0656a83319ddad",
+  "kpis": {
+    "simTimeS": 6500,
+    "eventsProcessed": 504,
+    "movesCompleted": 8,
+    "vesselsCompleted": 1,
+    "sts": {
+      "STS01": {
+        "moves": 8,
+        "cycles": 6,
+        "twinLifts": 2,
+        "grossMovesPerHour": 32.704,
+        "railWaitS": 0
+      }
+    },
+    "vessels": {
+      "V001": {
+        "sizeClass": "feeder",
+        "arrivedAtS": 0,
+        "anchorageWaitS": 0,
+        "berthX": 0,
+        "berthedAtS": 60,
+        "departedAtS": 1020.772,
+        "turnaroundS": 960.772,
+        "sts": [
+          "STS01"
+        ]
+      }
+    },
+    "quay": {
+      "vesselsWaited": 0,
+      "anchorageWaitS": {
+        "total": 0,
+        "mean": 0,
+        "max": 0
+      }
+    },
+    "handlers": {
+      "stsGroundPosition": {
+        "handler": "strategy:lowest-free-lane",
+        "calls": 8,
+        "resolved": 8,
+        "ok": 8,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "shcDispatch": {
+        "handler": "strategy:oldest-job",
+        "calls": 8,
+        "resolved": 8,
+        "ok": 8,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "wtpPadSelection": {
+        "handler": "strategy:first-free",
+        "calls": 8,
+        "resolved": 8,
+        "ok": 8,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "yardAllocation": {
+        "handler": "strategy:nearest-wtp",
+        "calls": 8,
+        "resolved": 8,
+        "ok": 8,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "ascDispatch": {
+        "handler": "strategy:pre-retrieval",
+        "calls": 16,
+        "resolved": 16,
+        "ok": 16,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "berthAllocation": {
+        "handler": "strategy:first-fit",
+        "calls": 1,
+        "resolved": 1,
+        "ok": 1,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "craneSplit": {
+        "handler": "strategy:balanced-moves",
+        "calls": 1,
+        "resolved": 1,
+        "ok": 1,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "workPackageRelease": {
+        "handler": "strategy:keep-k-ahead",
+        "calls": 7,
+        "resolved": 7,
+        "ok": 7,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "gateLaneAssignment": {
+        "handler": "strategy:lowest-free-lane",
+        "calls": 6,
+        "resolved": 6,
+        "ok": 6,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "transferStallSelection": {
+        "handler": "strategy:nearest-to-box",
+        "calls": 6,
+        "resolved": 6,
+        "ok": 6,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      }
+    },
+    "horizontal": {
+      "boxesToWtp": 8,
+      "shcs": {
+        "SHC01": {
+          "jobs": 6,
+          "emptyDistanceM": 1460,
+          "loadedDistanceM": 880,
+          "reservationWaitS": 0,
+          "stateS": {
+            "parked": 5904.455,
+            "moving-to-collect": 106.891,
+            "queuing-to-collect": 0,
+            "collecting": 196.71,
+            "moving-to-deliver": 21,
+            "queuing-to-deliver": 0,
+            "delivering": 270.944
+          },
+          "handovers": 12,
+          "parkingReturns": 6,
+          "queueArrivals": 0
+        },
+        "SHC02": {
+          "jobs": 2,
+          "emptyDistanceM": 525,
+          "loadedDistanceM": 267,
+          "reservationWaitS": 2.645,
+          "stateS": {
+            "parked": 6304.642,
+            "moving-to-collect": 38.709,
+            "queuing-to-collect": 2.645,
+            "collecting": 64.827,
+            "moving-to-deliver": 7,
+            "queuing-to-deliver": 0,
+            "delivering": 82.177
+          },
+          "handovers": 4,
+          "parkingReturns": 2,
+          "queueArrivals": 0
+        }
+      },
+      "stsGroundPositionWaitS": {
+        "STS01": 0
+      }
+    },
+    "yard": {
+      "boxesStacked": 8,
+      "boxesInTransit": 0,
+      "allocationFailures": 0,
+      "rehandles": {
+        "total": 0,
+        "productiveMoves": 14,
+        "perProductiveMove": 0,
+        "failures": 0
+      },
+      "blocks": {
+        "B01": {
+          "boxes": 2,
+          "cells": 2,
+          "capacityCells": 80,
+          "maxHeight": 1,
+          "rehandles": 0,
+          "productiveMoves": 14,
+          "rehandlesPerProductiveMove": 0
+        }
+      },
+      "ascs": {
+        "B01-ASC1": {
+          "jobs": 8,
+          "gantryM": 252.6,
+          "trolleyM": 96.35,
+          "hoistM": 111.872,
+          "padWaitS": 0,
+          "railWaitS": 0,
+          "busyS": 475.771,
+          "yields": 2
+        },
+        "B01-ASC2": {
+          "jobs": 6,
+          "gantryM": 835,
+          "trolleyM": 52.95,
+          "hoistM": 68.304,
+          "padWaitS": 0,
+          "railWaitS": 15.883,
+          "busyS": 487.206,
+          "yields": 0
+        }
+      }
+    },
+    "landside": {
+      "trucksIn": 6,
+      "trucksOut": 6,
+      "trucksInside": 0,
+      "gateQueue": 0,
+      "gateQueueMax": 1,
+      "turnTimeS": {
+        "mean": 147.556,
+        "max": 153.257
+      },
+      "gateWaitS": {
+        "mean": 0,
+        "max": 0
+      },
+      "stallAllocWaitS": {
+        "mean": 0,
+        "max": 0
+      },
+      "stallWaitS": {
+        "mean": 0,
+        "max": 0
+      },
+      "gateProcessingS": {
+        "mean": 30,
+        "max": 30
+      },
+      "internalDriveS": {
+        "mean": 29.291,
+        "max": 29.291
+      },
+      "totalTurnaroundS": {
+        "mean": 223.686,
+        "max": 229.388
+      },
+      "road": {
+        "meanTrucks": 0.086,
+        "maxTrucks": 1
+      },
+      "serviceS": 50.361,
+      "transactions": {
+        "dropExport": 0,
+        "pickImport": 6,
+        "dropEmpty": 0,
+        "pickEmpty": 0,
+        "dual": 0
+      },
+      "boxesDropped": 0,
+      "boxesPicked": 6,
+      "fallbacks": 0,
+      "holding": {
+        "positions": 2,
+        "admittedToStall": 6,
+        "admittedToHolding": 0,
+        "heldOutside": 0,
+        "inUse": 0,
+        "maxInUse": 0,
+        "waitS": {
+          "mean": 0,
+          "max": 0
+        },
+        "utilisationPct": 0
+      }
+    },
+    "workPackages": {
+      "released": 6,
+      "started": 6,
+      "completed": 6,
+      "leadTimeMeanS": 229.307,
+      "leadTimeMaxS": 327.712,
+      "boxesLoaded": 0
+    }
+  },
+  "invariants": {
+    "enabled": true,
+    "checks": 503,
+    "violations": 0,
+    "first": null
+  },
+  "firstError": null
+}

@@ -25,6 +25,7 @@ export type {
   TruckLeg,
   TruckStatus,
   TransferStallState,
+  HoldingPositionState,
   LandsideState,
   YardBlockState,
   YardSlotState,
@@ -38,6 +39,7 @@ export {
   blockSpecs,
   boxSpan,
   candidateSlots,
+  REEFER_MAX_TIERS,
   parseYardSlotId,
   yardSlotId,
   rowX,
@@ -64,9 +66,10 @@ export { ascPoseAt } from './subsystems/asc'
 export { ascIdOf, ascIndexOf, resolveSubsystemModes } from './state'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, apronLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
-export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, QUEUE_PITCH_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, GATE_ISLAND_W_M } from './landsideGraph'
-export type { LandsideGraph, LandsideNode, LandsideEdge, LandsideZone, GateLaneLayout } from './landsideGraph'
+export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, QUEUE_PITCH_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, GATE_ISLAND_W_M, HOLDING_PITCH_M } from './landsideGraph'
+export type { LandsideGraph, LandsideNode, LandsideEdge, LandsideZone, GateLaneLayout, HoldingLayout } from './landsideGraph'
 export { truckPositionAt } from './subsystems/landside'
+export { appointmentCap, planAppointments } from './appointments'
 export type { Reservation } from './reservations'
 export type { ShcPhasePayload, AscPhasePayload, TruckLegInfo } from './events'
 export { defaultHandlers } from './handlers'
@@ -117,9 +120,13 @@ export type { DecisionRequestedPayload, DecisionResolvedPayload } from './events
 export type { HandlerKpiReport } from './kpis'
 export type { SimQuery } from './query'
 export type { InvariantViolation } from './invariants'
+export type { PredictedReady } from './predictions'
 export { checkInvariants, DEFAULT_SWEEP_EVERY, InvariantTracker } from './invariants'
 export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport, LandsideKpiReport } from './kpis'
 export type { WorkPackage, WorkPackageKind, WorkPackageStatus, LoadOrder } from './state'
+export type { HatchPanelState, HatchPanelStatus, HatchLaydownSite } from './state'
+export type { HatchKpiReport } from './kpis'
+export { hatchEnabled, hatchSettings, hatchLaydownProblems, laydownSites, laydownRect, laydownCentreZ, laydownTopY } from './hatch'
 export { hashDigest } from './hash'
 export {
   createSimulation,
@@ -149,6 +156,8 @@ export { diffEventLogs, jsonDifferences } from './runDiff'
 export type { RunDiff, RunDiffOptions } from './runDiff'
 export { summarizeRun } from './summary'
 export type { RunSummary } from './summary'
+export { SHC_OPERATIONAL_STATES, SHC_STATUSES, shcOperationalState } from './shcStates'
+export type { ShcOperationalState } from './shcStates'
 export { createKpiCollector, KPI_DEFS } from './kpi/collector'
 export type { KpiSeries, KpiSeriesEntity, KpiSeriesReport, KpiCollector, KpiUnit, KpiEntityKind } from './kpi/collector'
 export { hourBuckets, shiftBuckets, hourIndexOf, kpiClockOf, HOUR_S, SHIFT_S } from './kpi/clock'

@@ -16,7 +16,10 @@ import {
   boxSpan,
   buildLaneGraph,
   hasLandside,
+  hatchEnabled,
   landsideGraphOf,
+  laydownCentreZ,
+  laydownTopY,
   parseYardSlotId,
   positionAt,
   railEndZ,
@@ -41,12 +44,17 @@ import { planCargo } from '../scenario/bayPlan'
 import { planExportYard } from '../scenario/exportYard'
 import type { ContainerSize, ScenarioConfig, VesselConfig } from '../scenario/types'
 import {
+  HATCH_THICKNESS_M,
+  hatchPanelId,
+  hatchPanelWidthM,
+  hatchPanelZ,
   parseVesselSlotId,
   slotCentre,
+  slotX,
   vesselClass,
   type VesselClassSpec,
 } from '../scenario/vesselClasses'
-import type { Delta, NewContainer } from '../worker/protocol'
+import type { Delta, HatchPanelChange, NewContainer } from '../worker/protocol'
 
 /** [A] ISO container outer dimensions (m): length, height, width. */
 export const CONTAINER_DIMS: Record<ContainerSize, { length: number; height: number; width: number }> = {
@@ -169,6 +177,26 @@ export const TRUCK_BOX20_OFFSET_M = 3.0675
 const ARTICULATION_GAIN = 1.15
 export const MAX_ARTICULATION_RAD = (40 * Math.PI) / 180
 
+/** A hatch panel as the scene draws it (TT-R10): centre, size (length along X, width along Z) and the state it is in. */
+export interface HatchPanelPose extends Vec3 {
+  status: HatchPanelChange['status']
+  lengthM: number
+  widthM: number
+  thicknessM: number
+  /** `lifted`: the crane that holds it. */
+  stsId: string | null
+}
+
+/** What the scene knows of a hatch panel before any event: its place on the vessel. */
+export interface HatchPanelSpec {
+  id: string
+  vesselId: string
+  bay: number
+  index: number
+  lengthM: number
+  widthM: number
+}
+
 /** A container's centre and its yaw (0 = length along X, π/2 = along Z). */
 export interface ContainerPose extends Vec3 {
   yaw: number
@@ -220,6 +248,11 @@ export class SceneModel {
   private drives: Record<string, DriveLeg[]> = {}
   private custody: Record<string, CustodyEntry[]> = {}
   private status: Record<string, StatusEntry[]> = {}
+  /** Hatch panels of the vessels' bays (TT-R10), in id order; empty with hatch covers off. */
+  readonly hatchPanelIds: string[] = []
+  private readonly hatchSpecs: Record<string, HatchPanelSpec> = {}
+  /** Per panel: its state changes in time order (a panel with none is secured on its hatch). */
+  private hatchTimeline: Record<string, HatchPanelChange[]> = {}
 
   /** The bay plan is regenerated here from config + seed (the same pure generator the engine uses). */
   constructor(config: ScenarioConfig, seed: number = config.seed) {
@@ -282,8 +315,31 @@ export class SceneModel {
       this.custody[c.id] = [{ t: 0, owner }]
     }
     for (const imp of prefill?.imports ?? []) this.custody[imp.id] = [{ t: 0, owner: { kind: 'yardSlot', id: exportSlot.get(imp.id) as string } }]
+    if (hatchEnabled(config)) this.createHatchPanels(cargo.slots)
     for (const v of config.vessels) this.status[`vessel:${v.id}`] = [{ t: 0, status: 'scheduled' }]
     for (const s of config.sts) this.status[`sts:${s.id}`] = [{ t: 0, status: 'idle' }]
+  }
+
+  /** One panel per hatch panel position of every bay that has a slot (the engine's `createHatchPanels`). */
+  private createHatchPanels(slots: readonly { vesselId: string; bay: number }[]): void {
+    const bays = new Map<string, Set<number>>()
+    for (const slot of slots) {
+      let set = bays.get(slot.vesselId)
+      if (!set) bays.set(slot.vesselId, (set = new Set()))
+      set.add(slot.bay)
+    }
+    for (const v of this.config.vessels) {
+      const spec = this.specs[v.id]
+      const settings = spec.hatch // the scenario overrides only timings and the stack limit, never the panels
+      for (const bay of [...(bays.get(v.id) ?? [])].sort((a, b) => a - b)) {
+        for (let index = 0; index < settings.panels; index++) {
+          const id = hatchPanelId(v.id, bay, index)
+          this.hatchPanelIds.push(id)
+          this.hatchSpecs[id] = { id, vesselId: v.id, bay, index, lengthM: settings.panelLengthM, widthM: hatchPanelWidthM(spec, index) }
+          this.hatchTimeline[id] = []
+        }
+      }
+    }
   }
 
   get stsIds(): string[] {
@@ -369,6 +425,7 @@ export class SceneModel {
       if (e.kind === 'truck' && e.loadSize) this.truckLoad[e.id] = e.loadSize
     }
     for (const r of delta.reservations ?? []) (this.reservations[r.zone] ??= []).push(r)
+    for (const h of delta.hatch ?? []) this.hatchTimeline[h.panelId]?.push(h)
   }
 
   /** Records an X/Z leg with its heading, swing and direction of rolling (legs arrive in time order). */
@@ -414,6 +471,10 @@ export class SceneModel {
         const i = lastAtOrBefore(list, time, (s) => s.t0)
         if (i > 0) list.splice(0, i)
       }
+    }
+    for (const list of Object.values(this.hatchTimeline)) {
+      const i = lastAtOrBefore(list, time, (e) => e.t)
+      if (i > 0) list.splice(0, i)
     }
     for (const list of [...Object.values(this.custody), ...Object.values(this.status)]) {
       const i = lastAtOrBefore(list, time, (e: { t: number }) => e.t)
@@ -551,7 +612,50 @@ export class SceneModel {
     }
   }
 
-  statusAt(kind: 'sts' | 'vessel' | 'shc' | 'asc' | 'truck', id: string, time: number): string {
+  /** The panel's state change in force at `time` (undefined = secured since the start). */
+  private hatchEntry(id: string, time: number): HatchPanelChange | undefined {
+    const list = this.hatchTimeline[id] ?? []
+    const i = lastAtOrBefore(list, time, (e) => e.t)
+    return i < 0 ? undefined : list[i]
+  }
+
+  hatchPanelSpec(id: string): HatchPanelSpec | undefined {
+    return this.hatchSpecs[id]
+  }
+
+  /**
+   * Where a hatch panel is at `time` (TT-R10), or null when its vessel is not in the scene. Panel state is the engine's:
+   * on its hatch (secured, unsecured, replaced), hanging from its crane's spreader (lifted: the panel's top face is at
+   * the spreader height), or stacked in its laydown bay.
+   */
+  hatchPanelPose(id: string, time: number): HatchPanelPose | null {
+    const panel = this.hatchSpecs[id]
+    if (!panel) return null
+    const entry = this.hatchEntry(id, time)
+    const status = entry?.status ?? 'secured'
+    const base = { status, lengthM: panel.lengthM, widthM: panel.widthM, thicknessM: HATCH_THICKNESS_M }
+    const half = HATCH_THICKNESS_M / 2
+    if (status === 'lifted' && entry?.stsId) {
+      const p = this.stsPose(entry.stsId, time)
+      return { ...base, x: p.gantryX, y: p.hoistY - half, z: p.trolleyZ, stsId: entry.stsId }
+    }
+    if (status === 'in-laydown' && entry) {
+      return { ...base, x: entry.x ?? 0, y: laydownTopY((entry.level ?? 0) + 1) - half, z: laydownCentreZ(this.config, panel.widthM), stsId: null }
+    }
+    const placement = this.vesselPlacement(panel.vesselId, time)
+    if (!placement) return null
+    const spec = this.specs[panel.vesselId]
+    return {
+      ...base,
+      x: slotX(spec, placement.x, panel.bay),
+      y: spec.deckHeightM - half,
+      z: hatchPanelZ(spec, panel.index) + placement.zOffset,
+      stsId: null,
+    }
+  }
+
+  statusAt(kind: 'sts' | 'vessel' | 'shc' | 'asc' | 'truck' | 'hatch', id: string, time: number): string {
+    if (kind === 'hatch') return this.hatchEntry(id, time)?.status ?? 'secured'
     const list = this.status[`${kind}:${id}`] ?? []
     const i = lastAtOrBefore(list, time, (e) => e.t)
     return i < 0 ? 'unknown' : list[i].status
@@ -662,10 +766,11 @@ export class SceneModel {
 
   /**
    * Where the camera should look for an entity id: a container, STS, SHC, ASC, vessel, truck, yard block, transfer stall
-   * (`<block>-TS<n>` or `stalls:<block>` for the block's first), WTP pad or the `gate`. Null for an unknown id, and for a truck that has left.
+   * (`<block>-TS<n>` or `stalls:<block>` for the block's first), WTP pad, `holding` / `H<n>` (holding positions) or the `gate`. Null for an unknown id, and for a truck that has left.
    */
   entityCentre(id: string, time: number): Vec3 | null {
     if (this.containerSize[id]) return this.containerCentre(id, time)
+    if (this.hatchSpecs[id]) return this.hatchPanelPose(id, time)
     if (this.initialShc[id]) {
       const p = this.shcPose(id, time)
       return { x: p.x, y: 3, z: p.z }
@@ -678,6 +783,11 @@ export class SceneModel {
     if (this.landside && id.startsWith('stalls:')) {
       const stalls = this.landside.stalls.filter((s) => s.blockId === id.slice(7))
       return stalls.length ? { x: stalls[0].x, y: 3, z: stalls[0].z } : null
+    }
+    if (this.landside && (id === 'holding' || /^H\d+$/.test(id))) {
+      // `holding` = the middle of the holding positions (TT-R16), `H<n>` one position
+      const list = id === 'holding' ? this.landside.holding : this.landside.holding.filter((h) => h.id === id)
+      if (list.length > 0) return { x: list.reduce((sum, h) => sum + h.x, 0) / list.length, y: 3, z: list[0].z }
     }
     const block = this.blocks[id]
     if (block) {

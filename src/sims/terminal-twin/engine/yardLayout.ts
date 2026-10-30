@@ -28,6 +28,8 @@ export const DEFAULT_BLOCK_BAYS = 20
 export const DEFAULT_BLOCK_TIERS = 5
 export const DEFAULT_WTP_PADS = 5
 export const DEFAULT_TRANSFER_STALLS = 5
+/** Reefers stack at most this many tiers high (R19; the plug racks and the reefer stacking rule of the TOS). */
+export const REEFER_MAX_TIERS = 4
 /** Travel clearance of the spreader above the top tier (m). */
 const TRAVEL_CLEARANCE_M = 0.6
 
@@ -52,6 +54,8 @@ export interface BlockSpec {
   tiers: number
   wtpPads: number
   transferStalls: number
+  /** Rows with reefer plugs (R19), ascending; empty when the block has none. */
+  poweredRows: number[]
   /** Z of the WTP pad centres. */
   wtpZ: number
   /** Z of the centre of bay 1. */
@@ -68,6 +72,7 @@ export function blockSpec(config: ScenarioConfig, block: BlockConfig): BlockSpec
     tiers: block.tiers ?? DEFAULT_BLOCK_TIERS,
     wtpPads: block.wtpPads,
     transferStalls: block.transferStalls ?? DEFAULT_TRANSFER_STALLS,
+    poweredRows: [...new Set(block.poweredRows ?? [])].sort((a, b) => a - b),
     wtpZ,
     firstBayZ: wtpZ + FIRST_BAY_GAP_M + BAY_PITCH_M / 2,
   }
@@ -147,11 +152,27 @@ export interface YardStacks {
   heights: number[]
   /** Vessel of each stack's top box (null if empty), same indexing. */
   topVessels: (string | null)[]
+  /**
+   * Length of each stack, same indexing: the span of its bottom box (1 = 20 ft, 2 = a 40 ft box, which locks both
+   * of its stacks), 0 = empty. Derived from the stack contents (`stackSpansOf`), never stored: a stack takes the
+   * length of its bottom box until it is empty again.
+   */
+  stackSpans: number[]
+  /** The box being placed is a reefer (R19): it goes only to `poweredRows`, below tier `REEFER_MAX_TIERS` + 1. */
+  reefer?: boolean
+  /** Rows with reefer plugs (R19); absent or empty = none. */
+  poweredRows?: number[]
+}
+
+/** The request fields a reefer-aware placement needs: spread them into a `YardStacks` (nothing is added without reefers or powered rows). */
+export function reeferFields(block: Pick<BlockSpec, 'poweredRows'>, reefer: boolean | undefined): Pick<YardStacks, 'reefer' | 'poweredRows'> {
+  return { ...(reefer ? { reefer: true } : {}), ...(block.poweredRows.length > 0 ? { poweredRows: block.poweredRows.slice() } : {}) }
 }
 
 /**
- * Every slot a box of `stacks.size` can legally take: on top of a stack below
- * the tier limit; a 40 ft box needs two neighbouring stacks of equal height.
+ * Every slot a box of `stacks.size` can legally take: on top of a stack below the tier limit that holds boxes of
+ * the same length or nothing; a 40 ft box needs two neighbouring stacks that are both empty or both 40-locked, of
+ * equal height.
  */
 export function candidateSlots(stacks: YardStacks): YardCandidate[] {
   const span = boxSpan(stacks.size)
@@ -171,7 +192,12 @@ export function candidateSlots(stacks: YardStacks): YardCandidate[] {
       const i = (bay - 1) * stacks.rows + (row - 1)
       const h = stacks.heights[i]
       if (h >= stacks.tiers) continue
+      // a reefer needs a plug (powered row) and goes at most REEFER_MAX_TIERS high
+      if (stacks.reefer && (h >= REEFER_MAX_TIERS || !stacks.poweredRows?.includes(row))) continue
       if (span === 2 && stacks.heights[i + stacks.rows] !== h) continue
+      // a stack takes the length of its bottom box: only that length goes on it until it is empty
+      if (stacks.stackSpans[i] !== 0 && stacks.stackSpans[i] !== span) continue
+      if (span === 2 && stacks.stackSpans[i + stacks.rows] !== stacks.stackSpans[i]) continue
       const x = rowX({ x: stacks.blockX }, row)
       const z = slotZ({ firstBayZ: stacks.firstBayZ }, bay, span)
       out.push({

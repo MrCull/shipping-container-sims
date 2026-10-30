@@ -7,6 +7,8 @@
  * recent-event buffer use shallowRef + triggerRef (Box Empire pattern).
  */
 import type { ViewPresetName } from '../modules/viewPresets'
+import type { CameraPose } from '../modules/cameraKeys'
+import type { CameraKey } from '../modules/shortcuts'
 import { defineStore } from 'pinia'
 import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
 import { fixtures } from '../scenario/fixtures'
@@ -14,10 +16,11 @@ import { type ScenarioOverrides } from '../scenario/overrides'
 import { composeScenario } from '../scenario/compose'
 import { presets } from '../scenario/presets'
 import type { YardSetup } from '../scenario/builder'
-import type { DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
+import type { ContainerSize, DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
 import { EXPORT_FILES, ScenarioValidationError, validateScenario, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport } from '../engine'
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
+import { createLocationNotation } from '../modules/locationNotation'
 import { describeEntity, entityKind, entityQueryKind, type EntityView } from '../modules/entityInspector'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
@@ -48,6 +51,8 @@ export interface DashboardRendered {
   charts: { kpiId: string; lines: string[]; points: number; zoom: { start: number; end: number } | null; drawn: boolean }[]
   heatmap: { blocks: string[]; hours: number[]; values: Record<string, (number | null)[]>; liveFill: Record<string, number> } | null
   gantt: { rows: string[]; bars: { row: string; phase: string; startS: number; endS: number }[] } | null
+  /** The landside summary table rows (TT-R18), only while the Landside group is shown. */
+  landside: { id: string; value: number; unit: string }[] | null
 }
 
 export interface ScenarioChoice {
@@ -89,8 +94,8 @@ export interface TwinView {
   pickAt(clientX: number, clientY: number): string | null
   /** Viewport (client) coordinates of an entity's centre; null when it is not drawn or off screen. */
   screenPoint(entityId: string): { x: number; y: number } | null
-  /** Where the orbit camera currently looks. */
-  cameraTarget(): { x: number; y: number; z: number } | null
+  /** The orbit camera: where it looks, how far, the heading and the angle from straight up; null without a 3D view. */
+  cameraPose(): CameraPose | null
   /** Rendered entity counts plus frames rendered so far and the last frame's draw calls/triangles; null without a 3D view. */
   stats(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */
@@ -186,6 +191,10 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const display = ref<DisplaySettings>(loadDisplaySettings(browserStorage(), browserLanguages()))
   /** Formatter for the current display settings (Intl objects; rebuilt when they change). */
   const fmt = computed(() => markRaw(createFormatter(display.value)))
+  /** Size of a container of the loaded run (for the yard bay number of a slot). */
+  const containerSizeOf = (id: string): ContainerSize | undefined => controller?.model?.containerSize[id]
+  /** Maritime notation of the loaded scenario's slots (display only; ids stay internal). */
+  const locations = computed(() => markRaw(createLocationNotation(config.value ?? { vessels: [] })))
   /** The SI config of the loaded scenario, with the current display settings (what a save stores). */
   const config = shallowRef<ScenarioConfig | null>(null)
   /** Keyboard-driven view state (TT-16 dashboard and TT-18 overlays/follow camera build on these). */
@@ -229,7 +238,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   /** Sound effects (TT-21): off by default; the player only exists to be used while on. */
   const soundOn = ref(false)
   const sounds = markRaw(new SoundPlayer())
-  /** Keep the sun daylight all day (default on for the Stress test preset). */
+  /** Keep the sun daylight all day (default on for the TTI Algeciras — peak day preset). */
   const lockDaylight = ref(false)
   const banner = ref<TwinBanner | null>(null)
   const cues = markRaw(new CuePlanner())
@@ -252,6 +261,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   let controller: TwinController | null = null
   let view: TwinView | null = null
+  /** Camera keys currently held (TT-R03) and whether Shift is down; read by the scene loop each frame. Not reactive on purpose. */
+  const cameraKeys = { held: new Set<CameraKey>(), shift: false }
   let kpiTimer: ReturnType<typeof setInterval> | null = null
   let kpiEvents = -1
   let kpiBusy = false
@@ -558,7 +569,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       const state = await c.query(entityQueryKind(kind), id)
       const def = EQUIPMENT_KINDS.find((d) => d.kind === kind)
       const extras = (await def?.loadExtras?.(state, (q) => c.query(q))) ?? {}
-      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, extras))
+      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, { ...extras, now: displayTime.value }))
     } catch {
       // The scenario was replaced meanwhile; the next refresh shows the new state.
     }
@@ -939,6 +950,15 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     helpOpen.value = open
   }
 
+  /** A camera key was pressed: the user steers by hand now, so follow mode (and a pending follow-next-truck) ends. */
+  function releaseFollow(): void {
+    followNextPending.value = false
+    if (following.value) {
+      following.value = false
+      showToast('twin.toast.followOff')
+    }
+  }
+
   /** Frame a view preset (shortcut, button, dev API). Stops following, since the preset sets the camera itself. */
   function setViewPreset(preset: ViewPresetName): boolean {
     if (!view) return false
@@ -1009,6 +1029,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     display,
     fmt,
     config,
+    locations,
+    containerSizeOf,
     following,
     followNextPending,
     followNextTruck,
@@ -1075,6 +1097,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     pause,
     step,
     toggleFollow,
+    releaseFollow,
+    cameraKeys,
     toggleOverlays,
     toggleDashboard,
     setHelpOpen,

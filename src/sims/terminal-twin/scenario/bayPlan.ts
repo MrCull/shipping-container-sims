@@ -9,16 +9,20 @@
  *
  * Rules [A]:
  * - Discharge boxes are spread unevenly over the bays (seeded weights). Within a bay
- *   they are split between hold and deck in proportion to their tiers and
+ *   they are split between hold and deck in proportion to their tiers (all on deck with `deckOnly`) and
  *   stacked from the bottom (hold floor / hatch cover) up, so nothing floats.
  * - 20 ft boxes are paired fore/aft in one cell (a twin-20 candidate); an odd
  *   one out takes the aft half of a cell alone. 40 ft and HC fill a cell.
+ * - Stowage (TT-R07): a 20 ft box never sits on a 40 ft box, and a 40 ft box rests only on a 40 or on two filled
+ *   20 ft halves. A stack (one bay x row x hold/deck section) therefore reads, bottom up, twin-20 cells, then either
+ *   40 ft cells or lone 20 ft halves ({@link stackAccepts}).
  * - Load and transshipment slots are reserved (empty, purpose set) in free
  *   cells, spread round-robin over the bays, hold first.
  */
 import { nextRandom } from '../engine/rng'
 import { makeIso6346Id } from './iso6346'
 import { LINE_OWNER_PREFIX } from './lines'
+import { isReefer } from './reefer'
 import { sampleDwell, transshipmentConfig } from './dwell'
 import type { ContainerSize, ScenarioConfig, VesselConfig, Weights } from './types'
 import { cellCapacity, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
@@ -58,6 +62,8 @@ export interface PlannedContainer {
   transshipment?: { onwardVesselId: string; onwardSlotId: string; dwellS: number }
   /** Empty-pool boxes (TT-11): how long the box has stood in the yard at t = 0 (s). Internal scratch for transshipment dwell. */
   ageS?: number
+  /** Reefer (R19): needs a powered yard row, at most `REEFER_MAX_TIERS` high. Absent = not a reefer. */
+  reefer?: true
 }
 
 /** True when export boxes exist: the load flow needs yard blocks and SHCs to carry them. */
@@ -104,6 +110,21 @@ interface Unit {
   boxes: { size: ContainerSize; full: boolean; line: string }[]
 }
 
+/** What a cell of a stack holds: two 20 ft halves, a 40 ft box (or HC), or a single 20 ft half. */
+export type CellKind = 'pair' | 'full' | 'lone'
+/** Stowage state of a stack, bottom up: twin-20 cells only (`open`), then 40 ft cells (`full`) or lone halves (`lone`). */
+export type StackState = 'open' | 'full' | 'lone'
+
+/** The state after `kind` goes on top of a stack in `state`, or null when that would put a 20 on a 40 or a 40 on a lone half. */
+export function stackAccepts(state: StackState, kind: CellKind): StackState | null {
+  if (state === 'open') return kind === 'pair' ? 'open' : kind
+  return state === kind ? state : null
+}
+
+function cellKindOf(boxes: readonly { size: ContainerSize }[]): CellKind {
+  return boxes[0].size !== '20' ? 'full' : boxes.length === 2 ? 'pair' : 'lone'
+}
+
 /** Split `total` over buckets in proportion to `weights`, capped per bucket (largest remainder). */
 function apportion(total: number, weights: number[], caps: number[]): number[] {
   const out = weights.map(() => 0)
@@ -132,6 +153,37 @@ function apportion(total: number, weights: number[], caps: number[]): number[] {
     if (given === 0) break
   }
   return out
+}
+
+/**
+ * Reorders the discharge cells of every stack so nothing breaks the stowage rule (TT-R07): twin-20 cells at the
+ * bottom, then the 40 ft cells or the lone 20 ft half, never both. `units[i]` sits in `cells[i]`; units only
+ * move within a stack, except the odd lone half, which swaps into a stack that has no 40 ft box when its own has one.
+ */
+function stowDischarge(units: Unit[], cells: { bay: number; row: number; tier: number }[], holdTiers: number): void {
+  const stackOf = (i: number) => `${cells[i].bay}:${cells[i].row}:${cells[i].tier >= holdTiers}`
+  const members = new Map<string, number[]>()
+  cells.forEach((_, i) => members.set(stackOf(i), [...(members.get(stackOf(i)) ?? []), i]))
+  const kinds = (idx: number[]) => idx.map((i) => cellKindOf(units[i].boxes))
+  const lone = units.findIndex((u) => cellKindOf(u.boxes) === 'lone')
+  if (lone >= 0 && kinds(members.get(stackOf(lone)) as number[]).includes('full')) {
+    const swap = (a: number, b: number) => ([units[a], units[b]] = [units[b], units[a]])
+    const groups = [...members.values()]
+    const clean = groups.find((g) => !kinds(g).includes('full') && !kinds(g).includes('lone'))
+    if (clean) swap(lone, clean[0])
+    else {
+      // every stack holds a 40 ft box: trade places with the only 40 ft box of a stack
+      const single = groups.find((g) => kinds(g).filter((k) => k === 'full').length === 1 && !kinds(g).includes('lone'))
+      if (!single) throw new Error('No legal cell for the odd 20 ft box: every stack holds 40 ft boxes (a 20 never sits on a 40)')
+      swap(lone, single[kinds(single).indexOf('full')] as number)
+    }
+  }
+  const rank = { pair: 0, full: 1, lone: 1 }
+  for (const idx of members.values()) {
+    const sorted = [...idx].sort((a, b) => cells[a].tier - cells[b].tier)
+    const ordered = sorted.map((i) => units[i]).sort((a, b) => rank[cellKindOf(a.boxes)] - rank[cellKindOf(b.boxes)])
+    sorted.forEach((i, k) => (units[i] = ordered[k]))
+  }
 }
 
 function planVessel(
@@ -196,7 +248,7 @@ function planVessel(
   perBay.forEach((q, bay) => {
     const holdCap = spec.rows * spec.holdTiers
     const deckCap = spec.rows * spec.deckTiers
-    let deck = Math.min(deckCap, Math.round((q * spec.deckTiers) / tiers))
+    let deck = Math.min(deckCap, v.deckOnly ? q : Math.round((q * spec.deckTiers) / tiers))
     let hold = q - deck
     if (hold > holdCap) {
       deck += hold - holdCap
@@ -205,6 +257,12 @@ function planVessel(
     fill(bay, spec.holdTiers, tiers, deck)
     fill(bay, 0, spec.holdTiers, hold)
   })
+
+  stowDischarge(units, cells, spec.holdTiers)
+  /** Stacks that end in a lone 20 ft half: nothing but another half may go on top. */
+  const loneStacks = new Set(
+    units.flatMap((u, i) => (cellKindOf(u.boxes) === 'lone' ? [`${cells[i].bay}:${cells[i].row}:${cells[i].tier >= spec.holdTiers}`] : [])),
+  )
 
   const addSlot = (bay: number, row: number, tier: number, half: CellHalf, purpose: SlotPurpose): string => {
     const id = vesselSlotId(v.id, bay, row, tier, half)
@@ -222,6 +280,7 @@ function planVessel(
       if (serial > 999999) throw new Error(`Owner prefix ${prefix} ran out of serial numbers`)
       serials.set(prefix, serial)
       const planned: PlannedContainer = { id: makeIso6346Id(prefix, serial), ...box, vesselId: v.id, slotId, flow: 'discharge' }
+      if (isReefer(cargo, planned.id, planned.full)) planned.reefer = true
       plan.containers.push(planned)
       if (tsBoxes.has(box)) tsSources.push(planned)
     })
@@ -272,21 +331,51 @@ function planVessel(
       const boxes: LoadBox[] = Array.from({ length: e.count }, () => ({ size: e.size, full: false, line: e.line, kind: 'empty' as const, req: index }))
       addGroup(boxes, loadUnits)
     })
-    const clean: { row: number; tier: number }[][] = []
+    interface Stack {
+      next: number
+      state: StackState
+    }
+    const stacks = new Map<string, Stack>()
+    const clean: { row: number; tier: number; deck: boolean }[][] = []
     for (let bay = 0; bay < spec.bays; bay++) {
-      const list: { row: number; tier: number }[] = []
-      for (const deck of [false, true])
-        for (let tier = deck ? spec.holdTiers : 0; tier < (deck ? tiers : spec.holdTiers); tier++)
-          for (let row = 0; row < spec.rows; row++) if (!stackHasDischarge(bay, row, deck)) list.push({ row, tier })
+      const list: { row: number; tier: number; deck: boolean }[] = []
+      for (const deck of [false, true]) {
+        const from = deck ? spec.holdTiers : 0
+        for (let tier = from; tier < (deck ? tiers : spec.holdTiers); tier++)
+          for (let row = 0; row < spec.rows; row++)
+            if (!stackHasDischarge(bay, row, deck)) {
+              list.push({ row, tier, deck })
+              stacks.set(`${bay}:${row}:${deck}`, { next: from, state: 'open' })
+            }
+      }
       clean.push(list)
     }
     const room = clean.reduce((n, l) => n + l.length, 0)
     if (loadUnits.length > room)
       throw new Error(`Vessel ${v.id} (${spec.label}): ${loadUnits.length} export cells do not fit beside the discharge boxes (room for ${room})`)
+    /** First cell of a bay (lowest tier first) whose stack takes this kind of cell on top (TT-R07: no 20 on a 40). */
+    const findCell = (bay: number, kind: CellKind): number => {
+      for (let i = 0; i < clean[bay].length; i++) {
+        const c = clean[bay][i]
+        const st = stacks.get(`${bay}:${c.row}:${c.deck}`) as Stack
+        if (st.next === c.tier && stackAccepts(st.state, kind)) return i
+      }
+      return -1
+    }
     let b = 0
     for (const unit of loadUnits) {
-      while (clean[b].length === 0) b = (b + 1) % spec.bays
-      const cell = clean[b].shift() as { row: number; tier: number }
+      const kind = cellKindOf(unit.boxes)
+      let tries = 0
+      while (tries < spec.bays && findCell(b, kind) < 0) {
+        b = (b + 1) % spec.bays
+        tries++
+      }
+      const at = findCell(b, kind)
+      if (at < 0) throw new Error(`Vessel ${v.id} (${spec.label}): no legal cell left for a ${kind === 'full' ? '40 ft' : '20 ft'} export box (a 20 never sits on a 40)`)
+      const cell = clean[b].splice(at, 1)[0]
+      const st = stacks.get(`${b}:${cell.row}:${cell.deck}`) as Stack
+      st.next++
+      st.state = stackAccepts(st.state, kind) as StackState
       occupied.add(`${b}:${cell.row}:${cell.tier}`)
       unit.boxes.forEach((box, k) => {
         const half: CellHalf = box.size === '20' ? (k === 0 ? 'aft' : 'fore') : null
@@ -300,7 +389,9 @@ function planVessel(
         const serial = (serials.get(prefix) ?? 100000 + Math.floor(loadRng() * 400000)) + 1 + Math.floor(loadRng() * 5)
         if (serial > 999999) throw new Error(`Owner prefix ${prefix} ran out of serial numbers`)
         serials.set(prefix, serial)
-        plan.containers.push({ id: makeIso6346Id(prefix, serial), size: box.size, full: box.full, line: box.line, vesselId: v.id, slotId, flow: 'load' })
+        const loadBox: PlannedContainer = { id: makeIso6346Id(prefix, serial), size: box.size, full: box.full, line: box.line, vesselId: v.id, slotId, flow: 'load' }
+        if (isReefer(config.cargo, loadBox.id, loadBox.full)) loadBox.reefer = true
+        plan.containers.push(loadBox)
       })
       if (unit.boxes[0].kind !== 'empty') b = (b + 1) % spec.bays // empties of a requirement share a bay: one package
     }
@@ -314,7 +405,8 @@ function planVessel(
   for (let bay = 0; bay < spec.bays; bay++) {
     const free: { row: number; tier: number }[] = []
     for (let tier = 0; tier < tiers; tier++)
-      for (let row = 0; row < spec.rows; row++) if (!occupied.has(`${bay}:${row}:${tier}`)) free.push({ row, tier })
+      for (let row = 0; row < spec.rows; row++)
+        if (!occupied.has(`${bay}:${row}:${tier}`) && !loneStacks.has(`${bay}:${row}:${tier >= spec.holdTiers}`)) free.push({ row, tier })
     freeByBay.push(free)
   }
   const purposes: SlotPurpose[] = [
@@ -362,6 +454,7 @@ export function extraLoadCell(
   const perBay = new Array<number>(spec.bays).fill(0)
   for (const s of slots) perBay[s.bay]++
   const bays = [...perBay.keys()].sort((a, b) => perBay[a] - perBay[b] || a - b)
+  const kind: CellKind = size === '20' ? 'lone' : 'full'
   for (const bay of bays)
     for (const deck of [false, true]) {
       const from = deck ? spec.holdTiers : 0
@@ -372,6 +465,13 @@ export function extraLoadCell(
         if (stack.some((s) => s.purpose === 'discharge' || s.emptyReq)) continue
         const tier = stack.reduce((m, s) => Math.max(m, s.tier + 1), from)
         if (tier >= to) continue
+        // TT-R07: a 40 never goes on a lone half, a 20 never on a 40
+        let state: StackState | null = 'open'
+        for (let t = from; t < tier && state; t++) {
+          const halves = stack.filter((s) => s.tier === t)
+          state = stackAccepts(state, cellKindOf(halves[0]?.half === null ? [{ size: '40' }] : halves.length === 2 ? [{ size: '20' }, { size: '20' }] : [{ size: '20' }]))
+        }
+        if (!state || !stackAccepts(state, kind)) continue
         if (!best || tier < best.tier) best = { bay, row, tier, deck, half: size === '20' ? 'aft' : null }
       }
       if (best) return best

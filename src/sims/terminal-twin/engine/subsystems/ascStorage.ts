@@ -16,13 +16,14 @@ import {
   blockSpec,
   boxSpan,
   parseYardSlotId,
+  reeferFields,
   rowX,
   slotZ,
   stackIndex,
   type BlockSpec,
 } from '../yardLayout'
 import { DEFAULT_ASC_KINEMATICS } from '../../scenario/builder'
-import { columnKey, indexYardSlotAdded, indexYardSlotRemoved, yardIndexOf } from '../yardIndex'
+import { columnKey, indexYardSlotAdded, indexYardSlotRemoved, stackSpansOf, yardIndexOf } from '../yardIndex'
 import { blockersOf, nextBlocker, rehandleCandidates, retrievalRanks, retrievalSlot } from './rehandle'
 import type { AscKinematics } from '../../scenario/types'
 import { landsideGraphOf } from '../landsideGraph'
@@ -325,6 +326,8 @@ function requestAllocation(ctx: EngineContext, job: AscJob): void {
       wtpZ: from.z,
       heights: withoutPendingPickups(state, block.id, yard),
       topVessels: yard.topVessels.slice(),
+      stackSpans: stackSpansOf(state, block.id),
+      ...reeferFields(block, box.reefer),
       random: ctx.random(),
     },
     { containers: [box.id] },

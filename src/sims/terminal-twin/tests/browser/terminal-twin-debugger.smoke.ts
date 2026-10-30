@@ -165,8 +165,8 @@ test('clicking a container in 3D selects it and shows its custody history', asyn
   const history = page.getByTestId('tt-custody-history').locator('li')
   expect(await history.count()).toBeGreaterThanOrEqual(2)
   await expect(history.last()).toContainText('now')
-  // The shown history is the engine's, including the first custody (vessel slot).
-  await expect(history.first()).toContainText('vesselSlot')
+  // The shown history is the engine's, including the first custody (vessel slot, shown in maritime notation).
+  await expect(history.first()).toContainText('VESSEL.V')
   const box = await page.evaluate((id) => window.__tt!.query<{ custodyHistory: unknown[] }>('container', id), target!.id)
   expect(await history.count()).toBe(box.custodyHistory.length)
 
@@ -199,7 +199,7 @@ test('the follow camera tracks a moving SHC smoothly', async ({ page }) => {
   let start: { x: number; z: number } | null = null
   for (let i = 0; i < 25; i++) {
     await page.waitForTimeout(120)
-    const s = await page.evaluate((id) => ({ cam: window.__tt!.cameraTarget()!, shc: window.__tt!.sceneState()!.shcs[id] }), shcId)
+    const s = await page.evaluate((id) => ({ cam: window.__tt!.cameraPose()!.target, shc: window.__tt!.sceneState()!.shcs[id] }), shcId)
     start ??= { x: s.shc.x, z: s.shc.z }
     samples.push({
       dx: Math.abs(s.cam.x - s.shc.x),

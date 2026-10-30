@@ -5,6 +5,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { HeadlineKpis } from '../../engine'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openAdvanced, pickScenario } from './scenarioPicker'
 
 const FIXTURE = 'asc-1sts-10-boxes-1block'
 
@@ -115,7 +116,8 @@ test('the report exports the KPI report and the event log as JSON and CSV downlo
 test('the setup dialog end conditions stop the run at the first one met', async ({ page }) => {
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
-  await page.getByRole('radio', { name: new RegExp(FIXTURE) }).check()
+  await pickScenario(page, FIXTURE)
+  await openAdvanced(page)
   await page.locator('input[name="end-moves"]').fill('3')
   await page.locator('input[name="end-hours"]').fill('10')
   await page.getByRole('button', { name: 'Start' }).click()
@@ -125,6 +127,7 @@ test('the setup dialog end conditions stop the run at the first one met', async 
   expect((await page.evaluate(() => window.__tt!.config()))!.endConditions).toEqual({ vesselsCompleted: 1, simDurationS: 36000, moves: 3 })
 
   await page.getByRole('button', { name: 'New Scenario' }).click()
+  await openAdvanced(page)
   await page.locator('input[name="end-moves"]').fill('0')
   await page.getByRole('button', { name: 'Start' }).click()
   await expect(page.getByText('Total moves must be a whole number')).toBeVisible()

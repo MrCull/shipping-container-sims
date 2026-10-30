@@ -11,9 +11,11 @@ import { useTwinStore, type DashboardRendered } from '../store/twinStore'
 import FinalReport from './FinalReport.vue'
 import {
   buildGroupCharts,
+  buildLandsideSummary,
   buildYardHeatmap,
   groupsWithData,
   kpiLabelKey,
+  landsideLabelKey,
   type Bucketing,
   type KpiGroupId,
 } from '../modules/dashboardModel'
@@ -62,6 +64,8 @@ const liveFill = computed(() => data.value?.yard ?? [])
 
 const showYard = computed(() => group.value === 'yard')
 const showGantt = computed(() => group.value === 'quay')
+const showLandside = computed(() => group.value === 'landside')
+const landsideRows = computed(() => buildLandsideSummary(data.value?.landside))
 
 // ----------------------------------------------------------------- formatting
 
@@ -162,6 +166,7 @@ function publish(): void {
             liveFill: Object.fromEntries(liveFill.value.map((y) => [y.id, y.fillPct])),
           }
         : null,
+    landside: showLandside.value ? landsideRows.value.map((r) => ({ id: r.id, value: r.value, unit: r.unit })) : null,
     gantt:
       showGantt.value && gantt.value
         ? {
@@ -440,6 +445,28 @@ const tabs: ('charts' | 'report')[] = ['charts', 'report']
               :aria-label="t('dashboard.yard.title')"
             />
           </template>
+        </section>
+
+        <section
+          v-if="showLandside && landsideRows.length > 0"
+          class="panel wide"
+          data-testid="tt-dashboard-landside"
+        >
+          <h3>{{ t('dashboard.landside.title') }}</h3>
+          <table>
+            <tbody>
+              <tr
+                v-for="r in landsideRows"
+                :key="r.id"
+                :data-metric="r.id"
+              >
+                <th scope="row">
+                  {{ t(landsideLabelKey(r.id)) }}
+                </th>
+                <td>{{ chartFormat.value(r.unit, r.value) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </section>
 
         <div class="grid">

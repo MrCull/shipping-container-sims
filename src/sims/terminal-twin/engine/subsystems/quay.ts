@@ -32,8 +32,12 @@ import {
   vesselClass,
 } from '../../scenario/vesselClasses'
 import { releaseRail, reserveRail, startReposition, wakeRail } from './rail'
+import type { PredictedReady } from '../predictions'
+import { stsCycleGeometry, stsNominalCycle } from '../cycleTime'
+import { hatchEnabled, hatchSettings } from '../hatch'
 import { pumpLoadPrep, slotGantryX } from './loadPrep'
 import { prepareNextPackage } from './workPackages'
+import { deckBoxChanged } from './hatch'
 import { laneGraphOf, laneZonesAt } from '../laneGraph'
 import { earliestStart, reserve } from '../reservations'
 
@@ -41,7 +45,7 @@ import { earliestStart, reserve } from '../reservations'
 const CONTAINER_LENGTH_M = { '20': 6.058, '40': 12.192, '40HC': 12.192 } as const
 
 /** Random duration factor for one move phase (1 ± moveVariationPct %). */
-function variation(ctx: EngineContext): number {
+export function variation(ctx: EngineContext): number {
   const pct = ctx.config.moveVariationPct
   if (pct === 0) return 1
   return 1 + ((ctx.random() * 2 - 1) * pct) / 100
@@ -56,7 +60,7 @@ function scaled(p: AxisProfile, f: number): AxisProfile {
  * Plan sequential axis moves starting at `t0`; updates the crane's axis
  * positions and live `motion`. Returns the segments and the end time.
  */
-function planSequence(
+export function planSequence(
   sts: StsState,
   t0: number,
   f: number,
@@ -120,6 +124,17 @@ export function continueWork(ctx: EngineContext, sts: StsState, at: number, segm
     return
   }
   const active = ctx.state.workPackages[sts.activePackageId as string]
+  if (active.hatchPanelId) {
+    ctx.schedule('StsHatchStarted', at, { equipment: [sts.id, active.hatchPanelId], vessels: [vesselId] }, {
+      stsId: sts.id,
+      vesselId,
+      packageId: active.id,
+      panelId: active.hatchPanelId,
+      op: active.kind === 'hatch-remove' ? 'remove' : 'replace',
+      segments,
+    })
+    return
+  }
   if (active.kind === 'load') {
     const containerId = sts.workQueue[0]
     const order = ctx.state.loadOrders[containerId]
@@ -143,10 +158,10 @@ export function continueWork(ctx: EngineContext, sts: StsState, at: number, segm
 }
 
 /** Quay mode instant: crane motions, locks and unlocks take no time (same events, zero durations). */
-const isInstant = (ctx: EngineContext): boolean => ctx.state.subsystems.quay === 'instant'
+export const isInstant = (ctx: Pick<EngineContext, 'state'>): boolean => ctx.state.subsystems.quay === 'instant'
 
 /** Kinematics with lock/unlock times zeroed in quay mode instant. */
-function stsKinematics(ctx: EngineContext) {
+export function stsKinematics(ctx: EngineContext) {
   const k = ctx.config.kinematics.sts
   return isInstant(ctx) ? { ...k, lockS: 0, unlockS: 0 } : k
 }
@@ -211,6 +226,7 @@ function planDrop(ctx: EngineContext, sts: StsState, t0: number, drop: StsDrop, 
     reserve(state, sts.id, windows, start)
   }
   const { segments, end } = planSequence(sts, start, f, moves, isInstant(ctx))
+  drop.groundAt = end + k.unlockS
   ctx.schedule('StsGrounded', end + k.unlockS, { equipment: [sts.id], containers: [box.id] }, {
     stsId: sts.id,
     containerId: box.id,
@@ -218,6 +234,51 @@ function planDrop(ctx: EngineContext, sts: StsState, t0: number, drop: StsDrop, 
     x: sts.gantryX + spreaderOffset(sts, box.id),
     segments,
   })
+}
+
+/** How many upcoming boxes per crane the quay predicts beyond those already in flight (TT-R13). */
+const PREDICTED_UPCOMING = 2
+
+/**
+ * TT-R13: when boxes are expected on the STS ground positions. In flight (the carry is planned): the planned set-down
+ * time, exact. Upcoming (next boxes of the work packages): the time the crane is free plus the nominal cycle per box,
+ * plus the hatch cycle for each hatch package in front of them. Discharge only; load work needs no SHC at the quay.
+ */
+export function predictedGroundings(ctx: Pick<EngineContext, 'state' | 'config'>): PredictedReady[] {
+  const { state, config } = ctx
+  if (state.subsystems.quay === 'off') return []
+  const out: PredictedReady[] = []
+  const cycleS = isInstant(ctx) ? 0 : stsNominalCycle(config.kinematics.sts, config.layout.stsSafeHoistM, stsCycleGeometry(config)).cycleS
+  for (const sts of Object.values(state.sts)) {
+    if (!sts.vesselId) continue
+    let t = state.now
+    for (const d of sts.drops) {
+      if (d.groundAt == null) continue
+      out.push({ source: 'sts', ownerId: sts.id, readyAt: d.groundAt, containerId: d.containerId, exact: true })
+      t = Math.max(t, d.groundAt)
+    }
+    const hatchS = isInstant(ctx) ? 0 : hatchSettings(config, state.vessels[sts.vesselId].sizeClass).cycleS
+    const carried = new Set(sts.carrying)
+    let upcoming = 0
+    for (const id of sts.packageIds) {
+      const pkg = state.workPackages[id]
+      if (pkg.status === 'complete') continue
+      if (pkg.kind === 'load') break
+      if (pkg.kind !== 'discharge') {
+        if (hatchEnabled(config)) t += hatchS
+        continue
+      }
+      const boxes = pkg.id === sts.activePackageId ? sts.workQueue : pkg.containerIds
+      for (const boxId of boxes) {
+        if (carried.has(boxId) || upcoming >= PREDICTED_UPCOMING) continue
+        t += cycleS
+        upcoming++
+        out.push({ source: 'sts', ownerId: sts.id, readyAt: t, containerId: boxId, exact: false })
+      }
+      if (upcoming >= PREDICTED_UPCOMING) break
+    }
+  }
+  return out
 }
 
 /**
@@ -370,6 +431,7 @@ export const quayReactors: ReactorMap = {
     slot.containerId = box.id
     sts.carrying = []
     ctx.transferCustody(box.id, { kind: 'vesselSlot', id: slot.id })
+    if (slot.deck) deckBoxChanged(ctx, slot.vesselId, slot.bay, slot.row, 1)
     state.vessels[slot.vesselId].remainingLoad--
     state.kpis.movesCompleted++
     state.kpis.workPackages.boxesLoaded++
@@ -442,7 +504,9 @@ export const quayReactors: ReactorMap = {
     sts.drops = []
     sts.status = 'waiting-for-decision'
     for (const p of picks) {
-      state.vesselSlots[p.from.id].containerId = null
+      const pickedSlot = state.vesselSlots[p.from.id]
+      pickedSlot.containerId = null
+      if (pickedSlot.deck) deckBoxChanged(ctx, pickedSlot.vesselId, pickedSlot.bay, pickedSlot.row, -1)
       const vessel = state.vessels[state.vesselSlots[p.from.id].vesselId]
       vessel.remainingDischarge--
       ctx.transferCustody(p.containerId, { kind: 'sts', id: sts.id })

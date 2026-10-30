@@ -19,6 +19,13 @@ export function watersideFirstDispatch(req: AscDispatchRequest): AscDispatchRepl
 }
 
 /**
+ * TT-R17 pre-retrieval: like `waterside-first`, and the only built-in strategy that is offered pick retrievals ahead of
+ * the truck (`job.early`): the engine offers them only when this strategy is selected. The landside ASC fetches the box so
+ * it hovers over the stall when the truck arrives. The other strategies never see an early job.
+ */
+export const preRetrievalDispatch = watersideFirstDispatch
+
+/**
  * Even out the work: the serviceable idle ASC with the fewest jobs (ties: the
  * one nearest the pad, then waterside). Used to compare against the
  * side-preference default.

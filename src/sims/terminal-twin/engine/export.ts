@@ -49,6 +49,10 @@ export function kpiReportCsv(sim: Simulation): string {
       out += row([...head, 'total', '', 0, report.elapsedS, e.total])
     }
   }
+  // appointment counts come from the booking plan, not from events, so they have a whole-run row only
+  const appointments = sim.kpiReport().landside?.appointments
+  if (appointments)
+    out += row(['landside.appointments-rejected', 'count', 'terminal', 'terminal', 'total', '', 0, report.elapsedS, appointments.rejected])
   return out
 }
 

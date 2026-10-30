@@ -3,7 +3,7 @@
   "seed": 11,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "16d9595571be64",
+  "eventLogHash": "0a03c0af8827d5",
   "kpis": {
     "simTimeS": 852.171,
     "eventsProcessed": 146,
@@ -175,13 +175,37 @@
           "jobs": 4,
           "emptyDistanceM": 859.5,
           "loadedDistanceM": 347.5,
-          "reservationWaitS": 0
+          "reservationWaitS": 0,
+          "stateS": {
+            "parked": 500.451,
+            "moving-to-collect": 96.082,
+            "queuing-to-collect": 0,
+            "collecting": 88.095,
+            "moving-to-deliver": 14,
+            "queuing-to-deliver": 0,
+            "delivering": 153.543
+          },
+          "handovers": 8,
+          "parkingReturns": 4,
+          "queueArrivals": 0
         },
         "SHC02": {
           "jobs": 0,
           "emptyDistanceM": 0,
           "loadedDistanceM": 0,
-          "reservationWaitS": 0
+          "reservationWaitS": 0,
+          "stateS": {
+            "parked": 852.171,
+            "moving-to-collect": 0,
+            "queuing-to-collect": 0,
+            "collecting": 0,
+            "moving-to-deliver": 0,
+            "queuing-to-deliver": 0,
+            "delivering": 0
+          },
+          "handovers": 0,
+          "parkingReturns": 0,
+          "queueArrivals": 0
         }
       },
       "stsGroundPositionWaitS": {

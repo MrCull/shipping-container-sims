@@ -61,7 +61,7 @@ describe('validateScenario', () => {
     expect(keys(validateScenario(c).errors)).toContain('setup.check.trucks')
   })
 
-  it('warns above stress-test scale and still allows the run', () => {
+  it('warns above peak-day scale and still allows the run', () => {
     const c = withBlocks(base(), 30, 3000)
     const check = validateScenario(c)
     expect(keys(check.warnings)).toContain('setup.check.heavy')

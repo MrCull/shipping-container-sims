@@ -25,8 +25,8 @@
         "load1": 0
       }
     },
-    "Stress test|24h": {
-      "preset": "Stress test",
+    "TTI Algeciras — peak day|24h": {
+      "preset": "TTI Algeciras — peak day",
       "simHours": 24,
       "invariantsEvery": 144,
       "events": 78057,
