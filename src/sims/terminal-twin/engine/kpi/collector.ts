@@ -668,6 +668,14 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         shcState(e.payload.shcId, 'parked', e.t)
         shcTransition(e.payload.shcId, null, e.t)
         break
+      case 'ShcQueued':
+        // TT-R12: waiting at a queue spot, loaded (for a pad) or empty (for work)
+        shcState(e.payload.shcId, e.payload.loaded ? 'queuing-to-deliver' : 'queuing-to-collect', e.t)
+        if (!e.payload.loaded) shcTransition(e.payload.shcId, null, e.t)
+        break
+      case 'ShcQueueDeparted':
+        shcState(e.payload.shcId, 'queuing-to-deliver', e.t)
+        break
       case 'AscJobAssigned':
         ascBusy[e.payload.ascId] = { since: e.payload.departAt }
         if (e.payload.truckId && !servedTrucks.has(e.payload.truckId)) {
@@ -801,6 +809,9 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
         case 'ShcCleared':
         case 'ShcParked':
           distance(e.payload.shcId, LOADED_SHC_EVENTS.has(e.type) ? 'shc.loadedM' : 'shc.emptyM', e.payload.segments)
+          break
+        case 'ShcQueued':
+          distance(e.payload.shcId, e.payload.loaded ? 'shc.loadedM' : 'shc.emptyM', e.payload.segments)
           break
       }
       if (e.type === 'AscRetrieved') {

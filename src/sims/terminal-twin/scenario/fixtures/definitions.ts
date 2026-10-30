@@ -90,6 +90,27 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * SHC queue areas and chained dispatch (TT-R12): 2 STS discharge 24 boxes with 4 SHCs to a block with
+   * 1 WTP pad and a real ASC, so pads are scarce: SHCs carrying a box wait at the block queue area for a pad,
+   * and with `chained-nearest` idle SHCs wait at the STS queue area instead of driving back to parking.
+   */
+  'shc-queue-chained': () =>
+    new ScenarioBuilder('shc-queue-chained', '2 STS → 4 SHC → 1 WTP pad: queue areas and chained-nearest dispatch')
+      .hatch({ enabled: false })
+      .seed(42)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .sts('STS02', { gantryX: 110, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Queue Star', sizeClass: 'feeder', discharge: 24, maxSts: 2, sizeMix: { '40': 1 } })
+      .shcs(4)
+      .block('B01', { x: 20, bays: 8, tiers: 3, wtpPads: 1 })
+      .queueAreas({ stsCapacity: 2, blockCapacity: 2 })
+      .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' } } })
+      .build(),
+
+  /**
    * ASC block storage (TT-06): the import flow from vessel to stack. One STS
    * discharges 10 boxes (20 ft and 40 ft mixed) to 2 SHCs; the block (8 bays,
    * 3 tiers, 5 WTP pads) has one ASC that stacks them. Ends at a fixed time,

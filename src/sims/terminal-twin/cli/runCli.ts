@@ -252,10 +252,10 @@ function formatSummary(s: RunSummary, headline: HeadlineKpis, stopped: string, s
   }
   const hz = s.kpis.horizontal
   if (hz) {
-    lines.push(`Horizontal:       ${hz.boxesToWtp} boxes to WTP pads`)
+    lines.push(`Horizontal:       ${hz.boxesToWtp} boxes to WTP pads, ${Object.values(hz.shcs).reduce((a, k) => a + k.parkingReturns, 0)} parking returns`)
     for (const [id, k] of Object.entries(hz.shcs))
       lines.push(
-        `  ${id.padEnd(15)} ${k.jobs} jobs, ${k.loadedDistanceM} m loaded / ${k.emptyDistanceM} m empty, reservation wait ${k.reservationWaitS} s, ${k.handovers} handovers`,
+        `  ${id.padEnd(15)} ${k.jobs} jobs, ${k.loadedDistanceM} m loaded / ${k.emptyDistanceM} m empty, reservation wait ${k.reservationWaitS} s, ${k.handovers} handovers, ${k.parkingReturns} parking returns, ${k.queueArrivals} queue arrivals`,
         `  ${''.padEnd(15)} state time: ${SHC_OPERATIONAL_STATES.filter((op) => k.stateS[op] > 0)
           .map((op) => `${op} ${k.stateS[op]} s`)
           .join(', ')}`,

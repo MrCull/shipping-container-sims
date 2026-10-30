@@ -51,6 +51,9 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
     .quay(spec.quayM, { mooringS: 1800, unmooringS: 1200 })
     .vessels(spec.vessels)
     .shcs(spec.shc)
+    // TT-R12: queue areas near every STS and every block's pads, and chained dispatch. Capacities are assumptions [unverified].
+    .queueAreas({ stsCapacity: 3, blockCapacity: 3 })
+    .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' } } })
     .ascsPerBlock(2)
     .yardStart(spec.yardStart)
     .landside({

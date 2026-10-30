@@ -359,6 +359,33 @@ export const INVARIANTS: Invariant[] = [
     },
   },
   {
+    id: 'shc.waiting-positions',
+    reads: ['equipment'],
+    description:
+      'A waiting SHC stands only on a queue spot it holds or on its parking spot (never on a ground position, WTP pad or active lane), and a queue spot holds one SHC.',
+    check(state, config) {
+      const messages: string[] = []
+      const graph = laneGraphOf(config)
+      const claims = state.queueClaims ?? {}
+      for (const shc of Object.values(state.shcs)) {
+        const node = graph.nodes[shc.nodeId]
+        if (!node) continue // not on the waterside graph (landside.segregation reports it)
+        const at = node.kind
+        const resting = shc.plan.length === 0
+        if (shc.status === 'parked' && at !== 'parking') messages.push(`${shc.id} is parked on ${shc.nodeId} (${at}), not on a parking spot`)
+        const queuing = shc.status === 'queuing-for-pad' || shc.status === 'queuing-for-work' || (shc.status === 'waiting-for-pad' && shc.carrying !== null)
+        if (queuing && resting && at !== 'queue') messages.push(`${shc.id} waits (${shc.status}) on ${shc.nodeId} (${at}), not on a queue spot`)
+        if (at === 'queue' && claims[shc.nodeId] !== shc.id)
+          messages.push(`${shc.id} stands on queue spot ${shc.nodeId}, which is held by ${claims[shc.nodeId] ?? 'nobody'}`)
+      }
+      for (const [spot, holder] of Object.entries(claims)) {
+        if (!graph.nodes[spot] || graph.nodes[spot].kind !== 'queue') messages.push(`${holder} holds ${spot}, which is not a queue spot`)
+        else if (state.shcs[holder]?.nodeId !== spot) messages.push(`${holder} holds queue spot ${spot} but is at ${state.shcs[holder]?.nodeId ?? 'unknown'}`)
+      }
+      return messages
+    },
+  },
+  {
     id: 'yard.slot-bounds',
     reads: ['yardSlot'],
     description: 'Every stacked box lies inside its block: bays, rows and tiers within the block, a 40 ft box on two bays.',

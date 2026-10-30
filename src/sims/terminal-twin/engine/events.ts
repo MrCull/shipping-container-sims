@@ -184,6 +184,13 @@ export interface EventPayloads {
   ShcRoutingToParking: { shcId: string; departAt: number; reservations: Reservation[] }
   ShcParked: { shcId: string; nodeId: string; segments: MotionSegment[] }
   /**
+   * The SHC reached a queue spot (TT-R12) and waits there: loaded (a box, waiting for a free WTP pad) or empty
+   * (waiting for work, chained dispatch).
+   */
+  ShcQueued: { shcId: string; nodeId: string; areaId: string; jobId: string | null; loaded: boolean; segments: MotionSegment[] }
+  /** A queued SHC with a box got a pad: its loaded trip from the queue spot is planned (it departs at `departAt`). */
+  ShcQueueDeparted: { shcId: string; jobId: string; wtpPadId: string; nodeId: string; departAt: number; distanceM: number; reservations: Reservation[] }
+  /**
    * The ASC took the oldest stackable box (allocated, SHC cleared): the whole
    * cycle (pad, lift, slot, set down) is planned and the pad zone reserved.
    * The ASC departs at `departAt` (later than now if the pad zone is busy).
