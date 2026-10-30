@@ -7,7 +7,7 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 
 | Ticket | Title | Blocked by | ENGINE_VERSION | Claimed by | Status |
 |---|---|---|---|---|---|
-| #84 | R02 Fixed-width KPI strip | | n/a | wave 2 | reported (branch tt/84-kpi-strip-fixed-width, 7e0737a), merging |
+| #84 | R02 Fixed-width KPI strip | | n/a | wave 2 | merged |
 | #85 | R03 Keyboard camera | | n/a | wave 1 | merged |
 | #86 | R04 Scenario picker | | n/a | | todo |
 | #87 | R05 TTI research KB | | n/a | | todo |
@@ -34,9 +34,9 @@ Engine base version: `0.12.0`. Each engine-changing ticket gets its own `ENGINE_
 
 ## Status at pause (budget limit; no new tickets started)
 
-- Merged and pushed: #88, #85, #97, #89, #98, #91.
-- Reported, merge in progress or pending: #84.
-- Still running when paused: #93 (branch `tt/93-shc-states-metrics`), #100 (branch `tt/100-truck-metrics`). When they report, merge with `scripts/merge-ticket.sh`, update this table, push, then `scripts/remove-worktree.sh <agent-id>`.
+- Merged and pushed: #88, #85, #97, #89, #98, #91, #84.
+- Reported, merge pending: #100 (`tt/100-truck-metrics`, 20cb3bf, KPI fields only, ENGINE_VERSION stays 0.19.0).
+- Still running when paused: #93 (branch `tt/93-shc-states-metrics`). When they report, merge with `scripts/merge-ticket.sh`, update this table, push, then `scripts/remove-worktree.sh <agent-id>`.
 - Not started: #86, #87, #90, #92 (unblocked by #91), #94-#96 (after #93), #99 (after #98, now unblocked), #101 (after #87).
 - Deviations to review: #91 uses 2 panels (feeder) and 4 (ULCV), not 1 and 3, because panels must fit the laydown strip (about 15 m across); SHC scenarios with more than 3 ground positions per STS throw at start unless `hatch.enabled` is false. Hatch moves count in turnaround and `kpiReport().hatch`, not in STS moves or gross moves/h.
 - Open follow-ups: setup-dialog fields for hatch and holding; 2D plan preview lacks holding positions; gate queue is strictly FIFO; KPI_DEFS series row for hatch time; #84 gross/net tiles reserve 15ch. `invariants-incremental.test.ts` timed out once in a parallel run (passes alone and in verify).
