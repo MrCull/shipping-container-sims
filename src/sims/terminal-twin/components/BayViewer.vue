@@ -620,11 +620,11 @@ h2 {
   min-width: 0;
   border-radius: 2px;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .cell.st-empty {
-  border-color: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.11);
 }
 
 /* Fill: by state, or by the colour mode's palette (a property of the box). */
