@@ -10,6 +10,7 @@
  * Nothing here is reactive (never put these objects in Vue state).
  */
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { VesselSizeClass } from '../scenario/types'
 import { aftOffsetM, BAY_PITCH_M, FENDER_GAP_M, ROW_PITCH_M, slotX, slotZ, TIER_PITCH_M } from '../scenario/vesselClasses'
 import { vesselLine } from '../scenario/vesselNames'
@@ -216,21 +217,18 @@ export class VesselHulls {
     e.root.add(hull)
   }
 
-  /** Dark pits inside the coamings of the bays whose deck is open (TT-R10): the hold seen through a lifted panel. Inside faces only. */
-  private holdLiners(meta: HullMeta, bays: ReadonlySet<number>): THREE.Group {
-    const group = new THREE.Group()
-    group.name = 'hold_liners'
-    const geometry = this.track(new THREE.BoxGeometry(1, 1, 1))
-    const material = this.track(new THREE.MeshStandardMaterial({ color: '#272d35', roughness: 0.9, side: THREE.BackSide }))
-    for (const o of hullHatchOpenings(meta, bays)) {
-      // a little inside the coaming so the walls do not fight with it
-      const liner = new THREE.Mesh(geometry, material)
-      liner.scale.set(o.x1 - o.x0 - 0.04, o.coamingTopY - o.floorY, o.zQuay - o.zSea - 0.04)
-      liner.position.set((o.x0 + o.x1) / 2, (o.coamingTopY + o.floorY) / 2, (o.zQuay + o.zSea) / 2)
-      liner.receiveShadow = true
-      group.add(liner)
-    }
-    return group
+  /** Dark pits inside the coamings of the bays whose deck is open (TT-R10): the hold seen through a lifted panel. One mesh, inside faces only. */
+  private holdLiners(meta: HullMeta, bays: ReadonlySet<number>): THREE.Mesh {
+    // a little inside the coaming so the walls do not fight with it
+    const boxes = hullHatchOpenings(meta, bays).map((o) =>
+      new THREE.BoxGeometry(o.x1 - o.x0 - 0.04, o.coamingTopY - o.floorY, o.zQuay - o.zSea - 0.04).translate((o.x0 + o.x1) / 2, (o.coamingTopY + o.floorY) / 2, (o.zQuay + o.zSea) / 2),
+    )
+    const geometry = this.track(mergeGeometries(boxes) as THREE.BufferGeometry)
+    for (const b of boxes) b.dispose()
+    const liner = new THREE.Mesh(geometry, this.track(new THREE.MeshStandardMaterial({ color: '#272d35', roughness: 0.9, side: THREE.BackSide })))
+    liner.name = 'hold_liners'
+    liner.receiveShadow = true
+    return liner
   }
 
   /** Name boards from the sidecar's `nameboard_*` attach points: the vessel name in capitals, white or dark by hull colour. */
