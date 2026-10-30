@@ -49,6 +49,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Load order:** the yard work of one export box from its package's release to its ground position (claim a ground position, retrieve, carry). A crane **stages** at most as many boxes as it has ground positions, in load sequence.
 - **Load sequence:** the order a crane loads a vessel: bay by bay, hold before deck, bottom tier before upper tier, then row, aft half before fore half.
 - **Stowage order:** a box is never loaded into a slot whose lower tier (in the same stack) is still empty. Checked by the invariant `stowage.order`.
+- **No 20 on a 40 (stowage):** on board a 20 ft box never sits on a 40 ft box, and a 40 ft box rests only on a 40 ft box or on two filled 20 ft halves. A stack reads, bottom up, twin-20 cells, then 40 ft cells or lone 20 ft halves. The structural 40-on-20 exception is not modelled. Checked by `stowage.order`; the bay plan only produces such stows (`stackAccepts`).
 - **Rehandle:** a non-productive ASC move needed to reach a buried box.
 - **Job (SHC job):** one box to move from an STS ground position to a WTP pad. Grounding a box **releases** a job into the **released pool**; a job is **open** until an SHC **claims** it.
 - **Pull dispatch:** free equipment asks the dispatch decision point (`shcDispatch`) for its next job from the released pool, rather than jobs being pushed to equipment.
