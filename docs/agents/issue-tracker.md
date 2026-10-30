@@ -13,10 +13,11 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: post the explanation with `gh issue comment <number> --body "..."`, then `gh issue close <number>`. On an already-closed issue, `gh issue close --comment` drops the comment and still exits 0.
+- **After merging a PR**: GitHub closes the PR's `closingIssuesReferences` (`gh pr view <n> --json closingIssuesReferences`) on its own, but asynchronously, over a minute or so for a long list. Re-list open issues after that, and close by hand only finished issues missing from that list.
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone. This repo is `MrCull/shipping-container-sims`.
 
-**Claude Code cloud sessions**: prefer the GitHub MCP tools (`issue_write`, `issue_read`, `list_issues`, `search_issues`, `add_issue_comment`; `issue_write` with `parent_issue_number` creates a sub-issue). If the MCP server fails to connect (e.g. "Authorization header is badly formatted"), fall back to `gh api repos/MrCull/shipping-container-sims/issues/<n>`, which has worked in cloud sessions. Neither can set native issue dependencies, so tickets created there record blockers as a `## Blocked by` section listing the blocking issues; treat that section as authoritative alongside any native dependencies.
+**GitHub MCP tools** (`issue_write`, `issue_read`, `list_issues`, `search_issues`, `add_issue_comment`; `issue_write` with `parent_issue_number` creates a sub-issue): prefer them in Claude Code cloud sessions. The MCP server can fail to connect in any session, local or cloud (e.g. "Authorization header is badly formatted"); then use `gh` as above, or `gh api repos/MrCull/shipping-container-sims/issues/<n>` where only the API works. Neither can set native issue dependencies, so tickets created there record blockers as a `## Blocked by` section listing the blocking issues; treat that section as authoritative alongside any native dependencies.
 
 File issues only into the user's own repo. Never file into `mattpocock/skills` (the repo these skills come from) unless the user owns it. In a fork, `gh` can default to the upstream parent, so before the first `gh issue create` of a session, check the target with `gh repo view --json nameWithOwner` and confirm it with the user if it is not their repo.
 

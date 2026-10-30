@@ -29,6 +29,9 @@ jobs:
         with:
           submodules: true
           lfs: false
+      # Before setup-node: its pnpm cache needs the pnpm binary. Version comes from package.json `packageManager`.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
