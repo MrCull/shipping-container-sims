@@ -239,6 +239,7 @@ describe('yardAllocation strategies', () => {
       wtpZ: 64,
       heights,
       topVessels: heights.map((h) => (h > 0 ? 'V001' : null)),
+      stackSpans: heights.map((h) => (h > 0 ? 1 : 0)),
     }
     const c20 = candidateSlots({ ...base, size: '20' })
     expect(c20.find((c) => c.bay === 1 && c.row === 2)).toBeUndefined()
