@@ -58,6 +58,7 @@ import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import type { ContainerSize, LandsideConfig, TruckTransactionKind } from '../../scenario/types'
 import { DEFAULT_LANDSIDE } from '../../scenario/builder'
 import { vesselSlotId } from '../../scenario/vesselClasses'
+import { appointmentWindowS, planAppointments } from '../appointments'
 import { maybeDispatchAsc, pumpAllocation } from './asc'
 import { TripBuilder, waypoints } from './shc'
 
@@ -771,8 +772,15 @@ export const landsideReactors: ReactorMap = {
   ScenarioStarted: (_e, ctx) => {
     const { state } = ctx
     if (state.subsystems.landside === 'off') return
-    const next = nextPoissonArrival(ctx, 0)
-    if (next !== null) ctx.schedule('TruckArrivalDue', next, {}, {})
+    if (landsideOf(ctx.config).appointments) {
+      // TT-R15: appointment windows replace the Poisson arrivals; every booking is one arrival at its time
+      const plan = planAppointments(ctx.config, () => landsideRandom(state))
+      landside(state).appointments = { windowS: appointmentWindowS(ctx.config), capPerWindow: plan.capPerWindow, windows: plan.windows, rejected: plan.rejected, list: plan.appointments }
+      for (const a of plan.appointments) ctx.schedule('TruckArrivalDue', a.arriveAtS, {}, { transaction: a.transaction, appointmentId: a.id })
+    } else {
+      const next = nextPoissonArrival(ctx, 0)
+      if (next !== null) ctx.schedule('TruckArrivalDue', next, {}, {})
+    }
     for (const s of landsideOf(ctx.config).scripted ?? []) ctx.schedule('TruckArrivalDue', s.atS, {}, { transaction: s.transaction })
   },
 
@@ -829,9 +837,10 @@ export const landsideReactors: ReactorMap = {
       legs: infos,
       queueLength: ls.queue.length,
       ...(plan.fallback ? { fallback: true as const } : {}),
+      ...(e.payload.appointmentId ? { appointmentId: e.payload.appointmentId } : {}),
     })
     // the next arrival of the Poisson process (scripted trucks were scheduled at the start)
-    if (e.payload.transaction === undefined) {
+    if (e.payload.transaction === undefined && !landsideOf(ctx.config).appointments) {
       const next = nextPoissonArrival(ctx, e.t)
       if (next !== null) ctx.schedule('TruckArrivalDue', next, {}, {})
     }

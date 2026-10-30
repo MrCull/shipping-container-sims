@@ -284,6 +284,33 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = {
       .build(),
 
   /**
+   * TT-R15 appointment windows: the gate-queue terminal (2 transfer stalls, 2 inbound lanes) with trucks booked in
+   * 30 minute windows. Demand is 16 trucks/h, bunched x3 in the second window, so that window hits its cap
+   * (2 stalls x 1800 s / 300 s = 12) and the surplus bookings are rejected. The numbers are not TTI values.
+   */
+  'truck-appointment-windows': () =>
+    new ScenarioBuilder('truck-appointment-windows', 'Trucks book 30-minute windows; a bunched window hits its booking cap')
+      .seed(12)
+      .moveVariation(10)
+      .driverVariability(10)
+      .quay(400, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 16, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+      .vesselCall('V002', { name: 'Export Star', sizeClass: 'feeder', arrivalS: 20000, load: 4, maxSts: 1 })
+      .shcs(2)
+      .block('B01', { x: 20, bays: 10, tiers: 3, transferStalls: 2 })
+      .ascsPerBlock(2)
+      .landside({
+        hourlyProfile: Array.from({ length: 24 }, () => 16),
+        importDwell: { kind: 'fixed', s: 300 },
+        exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+        gate: { inLanes: 2, outLanes: 2, inProcessingS: 45, outProcessingS: 20 },
+        appointments: { windowS: 1800, bunching: [{ fromS: 1800, toS: 3600, factor: 3 }] },
+      })
+      .endWhen({ simDurationS: 7200 })
+      .build(),
+
+  /**
    * TT-13 morning peak: two blocks, a feeder discharging 24 boxes, and the 07:00 truck profile (Poisson,
    * 40 to 48 trucks an hour) with the default transaction mix and a 10 minute import dwell.
    */

@@ -9,6 +9,7 @@ import asc2AscBlockConflict from './asc-2asc-block-conflict.json'
 import craneSplit4Sts from './crane-split-4sts.json'
 import dualTruck from './dual-truck-transaction.json'
 import truckGateQueue from './truck-gate-queue.json'
+import truckAppointmentWindows from './truck-appointment-windows.json'
 import landsideMorningPeak from './landside-morning-peak.json'
 import loadFixture from './load-1sts-10-boxes-1block.json'
 import liveriesMixed from './liveries-mixed.json'
@@ -38,4 +39,5 @@ export const fixtures: Record<string, ScenarioConfig> = {
   'dual-truck-transaction': dualTruck as ScenarioConfig,
   'truck-gate-queue': truckGateQueue as ScenarioConfig,
   'landside-morning-peak': landsideMorningPeak as ScenarioConfig,
+  'truck-appointment-windows': truckAppointmentWindows as ScenarioConfig,
 }
