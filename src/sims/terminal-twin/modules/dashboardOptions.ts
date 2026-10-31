@@ -23,9 +23,10 @@ export interface ChartFormat {
   value(unit: KpiUnit, v: number): string
 }
 
-const TEXT = '#e5e7eb'
-const MUTED = '#9ca3af'
-const GRID = 'rgba(156, 163, 175, 0.18)'
+/** Chart ink on the light surface (skin.css: --tt-text, a secondary ink that clears AA for axis text, hairline grid). */
+const TEXT = '#14253f'
+const MUTED = '#52514e'
+const GRID = '#e1e0d9'
 
 const textStyle = { color: MUTED, fontFamily: 'inherit' }
 
@@ -36,8 +37,8 @@ const axisCommon = {
 }
 
 const tooltipCommon = {
-  backgroundColor: '#111827',
-  borderColor: '#374151',
+  backgroundColor: '#fcfcfb',
+  borderColor: '#d3dae6',
   textStyle: { color: TEXT },
   confine: true,
 }
@@ -123,7 +124,7 @@ export function heatmapOption(heat: YardHeatmap, fmt: ChartFormat): EChartsCoreO
     heat.values[b].forEach((v, col) => {
       const value = v === null ? null : Math.round(v * 10) / 10
       // dark text on the light steps, light text on the dark ones
-      data.push({ value: [col, row, value], label: { color: value !== null && value >= 50 ? '#f0efec' : '#0b0b0b' } })
+      data.push({ value: [col, row, value], label: { color: value !== null && value >= 50 ? '#ffffff' : '#0b0b0b' } })
     })
   })
   return {

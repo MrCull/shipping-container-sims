@@ -2,10 +2,13 @@ import type { SiteStorageData } from '@/types/local-storage'
 
 const STORAGE_KEY = 'shipping-container-sims'
 
+export const DEFAULT_VOLUME = 0.4
+
 const DEFAULT_STORAGE: SiteStorageData = {
   version: 1,
   global: {
     soundMuted: false,
+    volume: DEFAULT_VOLUME,
     godModeEnabled: false,
   },
   sims: {},
@@ -36,6 +39,9 @@ function sanitizeStorage(raw: unknown): SiteStorageData {
 
   if (isRecord(raw.global) && typeof raw.global.soundMuted === 'boolean') {
     storage.global.soundMuted = raw.global.soundMuted
+  }
+  if (isRecord(raw.global) && typeof raw.global.volume === 'number' && Number.isFinite(raw.global.volume)) {
+    storage.global.volume = Math.min(1, Math.max(0, raw.global.volume))
   }
   if (isRecord(raw.global) && typeof raw.global.godModeEnabled === 'boolean') {
     storage.global.godModeEnabled = raw.global.godModeEnabled

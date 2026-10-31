@@ -24,8 +24,15 @@ export interface KindBudget {
   maxFileBytes: number
   requiredNodes: string[]
 }
+/** A named set of assets drawn together (a terminal's surroundings): the totals over all their LODs. */
+export interface GroupBudget {
+  assets: string[]
+  maxTriangles: number
+  maxDrawCalls: number
+}
 export interface Budgets {
   libraryMaxBytes: number
+  groups?: Record<string, GroupBudget>
   requiredMetaFields: string[]
   kinds: Record<string, KindBudget>
 }
@@ -123,6 +130,25 @@ export function checkAssetLibrary(dir = MODELS_DIR, budgets = loadBudgets()): Li
   const problems = assets.flatMap((a) => a.problems)
   if (libraryBytes > budgets.libraryMaxBytes) {
     problems.push(`library is ${libraryBytes} bytes (budget ${budgets.libraryMaxBytes})`)
+  }
+  for (const [group, limit] of Object.entries(budgets.groups ?? {})) {
+    // A library that holds none of a group's assets (a partial or test library) has nothing to cap.
+    if (!limit.assets.some((name) => assets.some((a) => a.name === name))) continue
+    let triangles = 0
+    let drawCalls = 0
+    for (const name of limit.assets) {
+      const asset = assets.find((a) => a.name === name)
+      if (!asset) {
+        problems.push(`group ${group}: no asset named "${name}"`)
+        continue
+      }
+      for (const stats of Object.values(asset.lods)) {
+        triangles += stats.triangles
+        drawCalls += stats.drawCalls
+      }
+    }
+    if (triangles > limit.maxTriangles) problems.push(`group ${group}: ${triangles} triangles (budget ${limit.maxTriangles})`)
+    if (drawCalls > limit.maxDrawCalls) problems.push(`group ${group}: ${drawCalls} draw calls (budget ${limit.maxDrawCalls})`)
   }
   return { ok: problems.length === 0, assets, libraryBytes, problems }
 }

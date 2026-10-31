@@ -5,6 +5,7 @@ import { AscRig, loadAscModel } from '../ascAssets'
 import { ASC_MODEL, ascScaleY, HC_HEIGHT_M } from '../ascRig'
 import type { EntityView } from '../entityInspector'
 import { ASC, ascHeightM } from '../equipmentDims'
+import { ascBeaconOffsets } from '../gantryBeacons'
 import { CONTAINER_DIMS } from '../sceneModel'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
 
@@ -23,7 +24,11 @@ class AscRenderer implements KindRenderer {
   private ascs = new Map<string, AscParts>()
 
   constructor(private host: KindRendererHost) {
-    for (const id of host.model.ascIds) this.addAsc(id)
+    for (const id of host.model.ascIds) {
+      this.addAsc(id)
+      // Amber beacons at the model's `beaconMounts` (outer face of each leg), stretched with the model for tall blocks.
+      host.beacons.add(id, ascBeaconOffsets(ascScaleY(host.model.blockOfAsc(id).tiers)))
+    }
     if (host.model.ascIds.length > 0) {
       loadAscModel().then(
         (ascModel) => {
@@ -80,6 +85,10 @@ class AscRenderer implements KindRenderer {
     const { t, cameraPosition } = frame
     for (const [id, parts] of this.ascs) {
       const pose = model.ascPose(id, t)
+      const gantrying = frame.live && model.isGantrying(id, t)
+      this.host.beacons.update(id, { x: parts.blockX, y: 0, z: pose.z }, gantrying, frame.flashOn)
+      frame.sounds.push({ id, machine: 'asc', x: parts.blockX, y: 8, z: pose.z, motion: gantrying ? 'gantrying' : 'idle' })
+      if (frame.live && model.isWorking(id, t)) frame.sounds.push({ id, machine: 'asc', x: pose.x, y: parts.height, z: pose.z, motion: 'working' })
       const lx = pose.x - parts.blockX
       const boxHeight = frame.carried.get(id)
       if (parts.rig) {
@@ -160,7 +169,7 @@ export const ascKind: EquipmentKindDef<'asc'> = {
     const height = ASC_MODEL.heightM * ascScaleY(block.tiers)
     return { x: block.x, y: height / 2, z: model.ascPose(id, time).z, sx: ASC_MODEL.widthM, sy: height, sz: ASC_MODEL.lengthM, yaw: 0 }
   },
-  sceneState: (model, id, t) => ({ status: model.statusAt('asc', id, t), ...model.ascPose(id, t) }),
+  sceneState: (model, id, t) => ({ status: model.statusAt('asc', id, t), ...model.ascPose(id, t), gantrying: model.isGantrying(id, t) }),
   describe: (state) => ascView(state as AscState),
   createRenderer: (host) => new AscRenderer(host),
 }

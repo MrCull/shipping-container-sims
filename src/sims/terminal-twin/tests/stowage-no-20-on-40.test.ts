@@ -5,14 +5,14 @@ import { planCargo, type PlannedSlot } from '../scenario/bayPlan'
 import { ScenarioBuilder } from '../scenario/builder'
 import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
-import { vesselClass } from '../scenario/vesselClasses'
+import { isStackBase, vesselClass } from '../scenario/vesselClasses'
 import type { ScenarioConfig } from '../scenario/types'
 
 /** Independent check of a plan: every pair of stacked cells (same section) obeys the rule. */
 function violations(config: ScenarioConfig, slots: readonly PlannedSlot[]): string[] {
   const out: string[] = []
   for (const v of config.vessels) {
-    const holdTiers = vesselClass(v.sizeClass).holdTiers
+    const spec = vesselClass(v.sizeClass)
     const cells = new Map<string, Map<number, PlannedSlot['half'][]>>()
     for (const s of slots.filter((x) => x.vesselId === v.id)) {
       const key = `${s.bay}:${s.row}:${s.deck}`
@@ -22,7 +22,7 @@ function violations(config: ScenarioConfig, slots: readonly PlannedSlot[]): stri
     }
     for (const [key, tiers] of cells)
       for (const [tier, halves] of tiers) {
-        if (tier === 0 || tier === holdTiers) continue
+        if (isStackBase(spec, Number(key.split(':')[1]), tier)) continue
         const below = tiers.get(tier - 1) ?? []
         if (halves.includes(null) && !(below.includes(null) || below.length === 2)) out.push(`${v.id} ${key} tier ${tier}: 40 over ${below.length === 1 ? 'a single 20 half' : 'nothing'}`)
         if (!halves.includes(null) && below.includes(null)) out.push(`${v.id} ${key} tier ${tier}: 20 over a 40`)

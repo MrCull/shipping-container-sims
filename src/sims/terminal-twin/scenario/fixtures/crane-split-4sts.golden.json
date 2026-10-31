@@ -3,9 +3,9 @@
   "seed": 1,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "11f1fd1a139d63",
+  "eventLogHash": "0b8122bbb891c9",
   "kpis": {
-    "simTimeS": 3366.322,
+    "simTimeS": 3424.146,
     "eventsProcessed": 455,
     "movesCompleted": 60,
     "vesselsCompleted": 1,
@@ -14,28 +14,28 @@
         "moves": 14,
         "cycles": 10,
         "twinLifts": 4,
-        "grossMovesPerHour": 35.062,
+        "grossMovesPerHour": 34.299,
         "railWaitS": 0
       },
       "STS02": {
         "moves": 14,
         "cycles": 12,
         "twinLifts": 2,
-        "grossMovesPerHour": 29.458,
+        "grossMovesPerHour": 28.604,
         "railWaitS": 0
       },
       "STS03": {
         "moves": 16,
         "cycles": 14,
         "twinLifts": 2,
-        "grossMovesPerHour": 27.231,
+        "grossMovesPerHour": 26.432,
         "railWaitS": 0
       },
       "STS04": {
         "moves": 16,
         "cycles": 15,
         "twinLifts": 1,
-        "grossMovesPerHour": 26.83,
+        "grossMovesPerHour": 26.126,
         "railWaitS": 0
       }
     },
@@ -46,8 +46,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 600,
-        "departedAtS": 3366.322,
-        "turnaroundS": 2766.322,
+        "departedAtS": 3424.146,
+        "turnaroundS": 2824.146,
         "sts": [
           "STS01",
           "STS02",
@@ -154,22 +154,22 @@
       "IMPORT": {
         "count": 58,
         "departed": 0,
-        "meanS": 1866.918,
-        "maxS": 2724.887
+        "meanS": 1901.297,
+        "maxS": 2782.711
       },
       "STORAGE": {
         "count": 2,
         "departed": 0,
-        "meanS": 2485.106,
-        "maxS": 2695.554
+        "meanS": 2534.863,
+        "maxS": 2753.377
       }
     },
     "workPackages": {
       "released": 30,
       "started": 30,
       "completed": 30,
-      "leadTimeMeanS": 378.01,
-      "leadTimeMaxS": 800.606,
+      "leadTimeMeanS": 387.839,
+      "leadTimeMaxS": 819.731,
       "boxesLoaded": 0
     },
     "ordering": {

@@ -25,7 +25,7 @@ import { LINE_OWNER_PREFIX } from './lines'
 import { isReefer } from './reefer'
 import { sampleDwell, transshipmentConfig } from './dwell'
 import type { ContainerSize, ScenarioConfig, VesselConfig, Weights } from './types'
-import { vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
+import { cellsPerBay, holdCellsPerBay, isCellUsable, rowRange, stackBaseTier, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
 import { makePlannedContainer } from './containerFactory'
 import { drawContainerProps, isoTypeOf, resolveContainerProps, type ContainerProps } from './containerProps'
 import { fillRobBays, pickRobBays, robBayFractionOf, workableCells, type RobBox } from './robBays'
@@ -249,18 +249,18 @@ function planVessel(
     units.length,
     // uneven: some bays carry much more discharge than others
     Array.from({ length: spec.bays }, () => 0.1 + 1.9 * rng() ** 2),
-    Array.from({ length: spec.bays }, (_, bay) => (robBays.has(bay) ? 0 : spec.rows * tiers)),
+    Array.from({ length: spec.bays }, (_, bay) => (robBays.has(bay) ? 0 : cellsPerBay(spec))),
   )
   const fill = (bay: number, fromTier: number, toTier: number, n: number) => {
     for (let tier = fromTier; tier < toTier && n > 0; tier++)
-      for (let row = 0; row < spec.rows && n > 0; row++) {
+      for (let row = rowRange(spec, tier).from; row < rowRange(spec, tier).to && n > 0; row++) {
         cells.push({ bay, row, tier })
         occupied.add(`${bay}:${row}:${tier}`)
         n--
       }
   }
   perBay.forEach((q, bay) => {
-    const holdCap = spec.rows * spec.holdTiers
+    const holdCap = holdCellsPerBay(spec)
     const deckCap = spec.rows * spec.deckTiers
     let deck = Math.min(deckCap, v.deckOnly ? q : Math.round((q * spec.deckTiers) / tiers))
     let hold = q - deck
@@ -357,10 +357,10 @@ function planVessel(
       for (const deck of robBays.has(bay) ? [] : [false, true]) {
         const from = deck ? spec.holdTiers : 0
         for (let tier = from; tier < (deck ? tiers : spec.holdTiers); tier++)
-          for (let row = 0; row < spec.rows; row++)
+          for (let row = rowRange(spec, tier).from; row < rowRange(spec, tier).to; row++)
             if (!stackHasDischarge(bay, row, deck)) {
               list.push({ row, tier, deck })
-              stacks.set(`${bay}:${row}:${deck}`, { next: from, state: 'open' })
+              stacks.set(`${bay}:${row}:${deck}`, { next: stackBaseTier(spec, row, deck), state: 'open' })
             }
       }
       clean.push(list)
@@ -420,7 +420,7 @@ function planVessel(
   for (let bay = 0; bay < spec.bays; bay++) {
     const free: { row: number; tier: number }[] = []
     for (let tier = 0; tier < (robBays.has(bay) ? 0 : tiers); tier++)
-      for (let row = 0; row < spec.rows; row++)
+      for (let row = rowRange(spec, tier).from; row < rowRange(spec, tier).to; row++)
         if (!occupied.has(`${bay}:${row}:${tier}`) && !loneStacks.has(`${bay}:${row}:${tier >= spec.holdTiers}`)) free.push({ row, tier })
     freeByBay.push(free)
   }
@@ -473,17 +473,17 @@ export function extraLoadCell(
   const kind: CellKind = size === '20' ? 'lone' : 'full'
   for (const bay of bays)
     for (const deck of [false, true]) {
-      const from = deck ? spec.holdTiers : 0
       const to = deck ? tiers : spec.holdTiers
       let best: ExtraLoadCell | null = null
       for (let row = 0; row < spec.rows; row++) {
         const stack = slots.filter((s) => s.bay === bay && s.row === row && s.deck === deck)
         if (stack.some((s) => s.purpose === 'discharge' || s.emptyReq)) continue
-        const tier = stack.reduce((m, s) => Math.max(m, s.tier + 1), from)
-        if (tier >= to) continue
+        const base = stackBaseTier(spec, row, deck)
+        const tier = stack.reduce((m, s) => Math.max(m, s.tier + 1), base)
+        if (tier >= to || !isCellUsable(spec, row, tier)) continue
         // TT-R07: a 40 never goes on a lone half, a 20 never on a 40
         let state: StackState | null = 'open'
-        for (let t = from; t < tier && state; t++) {
+        for (let t = base; t < tier && state; t++) {
           const halves = stack.filter((s) => s.tier === t)
           state = stackAccepts(state, cellKindOf(halves[0]?.half === null ? [{ size: '40' }] : halves.length === 2 ? [{ size: '20' }, { size: '20' }] : [{ size: '20' }]))
         }

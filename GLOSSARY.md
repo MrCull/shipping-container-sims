@@ -7,6 +7,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **STS (ship-to-shore crane, quay crane):** a rail-mounted crane on the quay that moves containers between a vessel and its STS ground positions. STS cranes share one rail and never pass each other. Its axes are **gantry** (X, along the quay), **trolley** (Z, waterside to landside) and **hoist** (Y). *Avoid:* "QC" in code.
 - **ASC (automated stacking crane):** a rail-mounted gantry crane serving one yard block. Each block has 1–2 ASCs, which never pass each other. The waterside ASC prefers WTP work and the landside ASC prefers truck work.
 - **SHC (shuttle carrier):** a straddle-type vehicle that carries one container at a time between STS ground positions and WTP pads. It sets a box down and drives clear before the box can be picked up again. *Avoid:* "straddle carrier" for this role.
+- **Fleet number:** the number an SHC shows on its livery panel and sills ("SHC 07"), taken from its id (`SHC07`). It is a plate in its own material, offset per SHC by the renderer (see `docs/equipment-models.md`).
 - **Spreader:** the lifting frame on an STS or ASC hoist. It grips a container with twist-locks (**lock** and **unlock** times).
 - **Equipment kind (registry):** one of STS, SHC, ASC, truck or vessel, registered in its own module under `modules/equipmentKinds/` (ids, bounds, dev-API state, inspector view, scene renderer). The renderer, dev API, picking, labels and inspector iterate `EQUIPMENT_KINDS`, so a new kind is a module plus one entry.
 
@@ -39,9 +40,11 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Custody:** the single owner that currently holds a container (vessel slot, STS, ground position, SHC, WTP pad, ASC, yard slot or truck). Custody changes only at a confirmed grip or release. Each container keeps a **custody history**.
 - **Handover:** a custody change between two pieces of equipment via a ground buffer, never directly.
+- **Gross moves per STS-hour:** boxes grounded or loaded by a crane per hour of its window, from its first work package to the end of the measurement (waits included). **STS time bucket** (`engine/stsProductivity.ts`, `pnpm run tt:sts`): what a crane was doing in each second of that window: `cycle`, `hatch`, `lashing`, `ground`, `box`, `rail`, `reposition` or `done`. *Avoid:* "idle" without saying which bucket.
 - **Discharge / load:** a vessel-to-quay move / a quay-to-vessel move.
 - **Vessel call:** one vessel's visit: arrival, size class (Feeder, Feedermax, Panamax, Neo-Panamax, ULCV), discharge/load/transshipment counts and max STS. The **vessel table** lists the calls.
 - **Mooring / unmooring:** the time from berth allocation to all-fast, and from the last move to departure.
+- **Vessel status (#126):** the view of one vessel the popup and label show: phase (approaching, waiting for berth, mooring, working, unmooring, departed), ETA, **operations start** (the berth time once berthed, else berth allocation plus the mooring time, an estimate; unknown while waiting) and the **countdown** to it, and moves done and remaining per STS. Display only: not in the event log.
 - **Crane split:** which STS cranes work which bays of a vessel (a decision point). Cranes keep rail order, so bay ranges follow crane order.
 - **Twin-20 lift:** an STS lift of the two 20 ft boxes of one cell in one cycle; each box gets its own ground position.
 - **Deck before hold:** within a bay, an STS discharges the deck stacks (top tier first) before the hold.
@@ -230,6 +233,8 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Quality level / quality setting:** Low, Medium or High is a level (a bundle of shadows, LOD distances, resolution, ocean detail and night-light budget); the setting is a level or Auto (default).
 - **Auto quality:** steps the level down when the frame rate stays under 45 fps and back up when there is headroom, with a back-off against oscillation.
 - **Performance overlay:** the toggleable (key P) readout of FPS, draw calls, triangles, frame CPU time and the quality in force.
+- **Close-up LOD:** the detail level above LOD0 (about 35 m, at most 48 boxes, with hysteresis): individual meshes with door rods, corner castings, corrugation and a per-box texture, instead of instances.
+- **Container markings:** the face-by-face description of what is printed on one box (door end with ISO id, weight plate, SUPER HEAVY triangle, CSC plate, laden-only bolt seal; box number and line name on sides and roof; seeded wear), a pure function of the box's data (`describeMarkings`).
 - **Instance culling:** boxes outside the camera frustum are not written to the instanced meshes.
 - **Static batch:** scenery that never moves, merged into one mesh per material to save draw calls.
 - **Yard index:** the per-block and per-column lookup of yard slots that keeps rehandle queries off a whole-yard scan.
@@ -238,9 +243,18 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On by default in the TTI Algeciras — peak day preset.
 - **Night mode:** the cheaper lighting at night: no sun shadow pass, floodlight glow on high masts and emissive equipment lights instead of real lights.
-- **Backdrop:** the distant low-poly scenery: Algeciras (Rock of Gibraltar, hills, North Quay) for the TTI preset, a generic coastline otherwise.
+- **Backdrop:** the distant low-poly scenery: a terminal's own scenery (TTI Algeciras: the Rock of Gibraltar at true scale, hills, North Quay, and the surroundings) when a terminal folder owns the scenario, a generic coastline otherwise.
+- **Surroundings:** the TTI Algeciras scenery beyond the Rock and hills: the Gibraltar and La Línea shore, vessels at anchor, storage tanks, the Isla Verde road and rail with warehouses, and Algeciras town blocks. Five merged `scenery-*` GLBs, one draw call each, inside the `tti-surroundings` group budget.
+- **Group budget:** a cap in `assets/budgets.json` (`groups`) on the summed triangles and draw calls of a named set of assets, checked by `tt:assets:check` beside the per-asset budgets.
+- **Terminal folder:** `terminals/<id>/`, the home of one real terminal's constants, preset presentation and scenery; generic modules reach it through the registry in `terminals/index.ts`.
 - **North Quay:** TTI's 550 m of quay beside the working berths, drawn idle (non-operational).
 - **Cue:** a moment (box landed, vessel horn, scenario complete) that may make a sound or banner when the display clock reaches it.
+- **Master gain:** the single level every Terminal Twin sound is scaled by: the shared volume, or 0 while muted.
+- **Sound mixer:** the pure module (`modules/soundMixer.ts`) that maps the camera and the active sound sources (machine position plus motion state) to *voices* with gains: distance attenuation, at most 12 voices (loudest first). `positionalSound.ts` plays them through Web Audio. *Avoid:* "audio engine".
+- **Sound shot:** a short sound moment (twistlock clunk, landing thud, air brake) rather than a state: `SceneModel.shotsBetween` reports it in the display-time window since the last frame and `ShotTracker` keeps it as a mixer source for a wall-clock beat, so it is heard at any playback speed.
+- **Gantrying:** an STS or ASC travelling along its rails (a gantry-axis motion segment in progress, `SceneModel.isGantrying`). Only then do it sound the gantry alarm and flash its amber beacons.
+- **FPS chip:** the always-visible frames-per-second readout beside the volume control (amber below 30, red below 20); clicking it toggles the perf panel.
+
 ## Persistence (TT-17)
 
 - **Config save:** the scenario as run (layout, equipment, kinematics, vessels, landside, strategies and latency, end conditions, start date/time, locale and units) plus the seed. Small; re-running it reproduces the run.
@@ -265,8 +279,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Weight class:** LIGHT, MEDIUM or HEAVY, from gross weight (tare + cargo) against the scenario's `weightClassBands`.
 - **Port rotation:** the scenario's ordered list of port calls (UN/LOCODEs) with this terminal marked; POL and POD of every box come from it (`containerProps.portRotation`).
 - **ROB (remain on board) bays:** the share of each vessel's bays (`robBayFraction`) set aside and never worked at this terminal: no discharge, load or truck export, hatch covers closed. They hold **ROB boxes**: display-only slot data (slot, ISO type, POD, line, weight class) for later ports, not containers, drawn in the 3D hull and in the bay viewer. *Avoid:* "ROB containers".
+- **Hull profile:** the usable rows per below-deck tier of a vessel class (`holdRows`): the lower hold tiers lose their outer rows, so a bay's hold cross-section is a V narrowing towards the keel. Cells outside it do not exist (no slot, no box, not drawn); deck tiers are full width. Assumed values [A]. A hold stack in an outer row starts above tier 0. *Avoid:* "hold shape", "hull lines" (the baked 3D hull skin is a separate asset).
 - **Bay viewer:** the popup that shows one bay of a vessel at a time as a deck and a hold cross-section (row x tier), with a bay strip, a hover tooltip and the bay's work packages (`components/BayViewer.vue`, pure model `modules/bayView.ts`). Opens from a vessel in 3D or the vessel inspector.
-- **Cell status (bay viewer):** `planned-discharge` (box still in its slot), `planned-load` (slot booked, not loaded yet), `in-progress` (the box hangs from an STS spreader), `done` (discharged slot empty again, or load slot holding its box), `rob` (a ROB box) or `empty` (nothing planned). Cells can instead be coloured by POD, weight class or line (colour mode).
+- **Bay panel / continuation (bay viewer):** the viewer shows a 40 ft bay as two panels, its two 20 ft (odd) bays (01 and 03 under 02). A 20 ft box is drawn in its half's panel; a 40 ft box spans both, its second half in the aft panel marked as a **continuation** (hatched, "40′ ▸"). The engine's cell model is unchanged.
+- **Cell status (bay viewer):** `planned-discharge` (box still in its slot), `planned-load` (slot booked, not loaded yet), `in-progress` (the box hangs from an STS spreader), `done` (discharged slot empty again, or load slot holding its box), `rob` (a ROB box) or `empty` (nothing planned). Cells can instead be coloured by any other colour mode.
 - **POL / POD (port of loading / port of discharge):** UN/LOCODEs. Imports and storage boxes end at this terminal; exports start here; transshipment boxes neither start nor end here.
 - **Planned departure:** the sim time a box is planned to leave: outbound vessel ETD, else truck appointment, else arrival plus an expected dwell by direction.
 - **Transit status:** where a box is in its journey through the terminal: ADVISED (never held here; its inbound carrier has not arrived: a vessel not yet at berth, a truck outside the gate, or a box still outside), ARRIVED (inbound carrier here, box not off yet), ON_TERMINAL (terminal custody), LOADED (on its outbound carrier, which has not left) and DEPARTED (the outbound carrier has left). One pure function of the box and the carriers' state (`engine/transit.ts transitStatus`), never stored, no event of its own. *Avoid:* "container status", "lifecycle state" (the latter is the older entity-skill model).
@@ -275,3 +291,6 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 
 - **Vessel ordering (`pod-weight`):** the default work order inside a package (`as-today` is the rollback) (`vesselPlanning.ordering`): discharge stack by stack in yard-group order, load bottom-up with later PODs and heavier boxes first. POD and weight are soft preferences; stacking order is the only hard rule. A *broken ordering preference* is a box with a later POD, or a heavier weight class, than the box under it (or a yard group split in the discharge sequence); counted in `kpis.ordering`.
+- **Skin:** the light Terminal Twin look: `--tt-*` design tokens in `skin.css`, frosted panels, navy text, one TTI-blue accent, amber and red only for alerts. Scoped to the sim; other sims keep the global dark tokens.
+- **Frosted panel:** an off-white, translucent surface with a backdrop blur (`--tt-panel`, `--tt-blur`) that floats over the 3D view: top bar, side panels, popups, KPI strip.
+- **Colour mode (colour by):** what the containers are coloured by, chosen in the Colour by menu: `default` (the line's livery), `line`, `pod`, `weight`, `iso`, `special` (reefer, hazardous, out of gauge), `flow`, `dwell`, `departure`, `transit` or `call` (`modules/colourBy.ts`). One mode colours the 3D boxes (yard, vessel, vehicle) and the bay viewer, with one legend; the bay viewer shows cell state in `default`. `dwell`, `departure` and `transit` change with the sim time. The `flow` mode is the transit direction with empties split out (import, export, transshipment, empty); it is not the bay-plan role. Hide ROB (same menu) hides the ROB boxes on vessels in 3D only.

@@ -9,7 +9,7 @@ import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from
 class TruckRenderer implements KindRenderer {
   private landside: LandsideScene
 
-  constructor(host: KindRendererHost) {
+  constructor(private host: KindRendererHost) {
     this.landside = new LandsideScene(host.model)
     host.scene.add(this.landside.group)
     if (host.model.config.landside) {
@@ -24,6 +24,15 @@ class TruckRenderer implements KindRenderer {
 
   update(frame: KindFrame): void {
     this.landside.update(frame.t, frame.cameraPosition)
+    if (!frame.live) return
+    const { model } = this.host
+    for (const id of model.truckIds) {
+      const p = model.truckPose(id, frame.t)
+      if (!p.visible) continue
+      const reversing = model.isReversing(id, frame.t)
+      frame.sounds.push({ id, machine: 'truck', x: p.x, y: 2, z: p.z, motion: model.isDriving(id, frame.t) ? 'driving' : 'idle' })
+      if (reversing) frame.sounds.push({ id, machine: 'truck', x: p.x, y: 2, z: p.z, motion: 'reversing' })
+    }
   }
 
   onInfrastructureLoaded(): void {

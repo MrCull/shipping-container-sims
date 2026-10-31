@@ -92,7 +92,7 @@ const store = useTwinStore()
   align-items: center;
   gap: 0.35rem 0.5rem;
   font-size: 0.78rem;
-  color: var(--color-text);
+  color: var(--tt-text);
 }
 
 .row {
@@ -106,14 +106,14 @@ const store = useTwinStore()
   align-items: center;
   gap: 0.25rem 0.5rem;
   padding: 0.2rem 0.5rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg);
+  background: var(--tt-bg);
   font-variant-numeric: tabular-nums;
 }
 
 .k {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .v {
@@ -122,7 +122,7 @@ const store = useTwinStore()
 }
 
 .label {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -135,24 +135,33 @@ const store = useTwinStore()
 
 .opt {
   padding: 0.25rem 0.5rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--tt-bg);
+  color: var(--tt-text);
   font-size: 0.76rem;
 }
 
 .opt:hover {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .opt.on {
-  border-color: var(--color-accent);
-  background: rgba(245, 158, 11, 0.12);
+  border-color: var(--tt-accent);
+  background: var(--tt-accent-soft);
 }
 
 /* State by shape as well as colour. */
 .opt.on::before {
-  content: '✓ ';
+  --tt-mark: var(--tt-glyph-check);
+  content: '';
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.3em;
+  vertical-align: -0.12em;
+  background: currentColor;
+  -webkit-mask: var(--tt-mark) center / contain no-repeat;
+  mask: var(--tt-mark) center / contain no-repeat;
 }
 </style>

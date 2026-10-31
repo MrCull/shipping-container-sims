@@ -5,11 +5,11 @@
   "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
   "units": "m",
   "dimensions": {
-    "lengthM": 1420,
-    "widthM": 520,
+    "lengthM": 5200,
+    "widthM": 1200,
     "heightM": 426,
     "tag": "V",
-    "reason": "Rock of Gibraltar: about 1.4 km long and 426 m high (the renderer applies the same 1.25 vertical exaggeration as the TT-21 backdrop)"
+    "reason": "Rock of Gibraltar: about 5.2 km north to south, about 1.2 km wide, 426 m high (true scale, no vertical exaggeration)"
   },
   "axes": {
     "up": "+Y",
@@ -22,13 +22,13 @@
       "name": "LOD0",
       "parent": "backdrop-rock",
       "role": "lod",
-      "description": "low-poly Rock of Gibraltar silhouette (about 1.4 km long, 426 m high); origin at the base centre, crest on the far (-Z) side, gentle slopes toward +Z"
+      "description": "low-poly Rock of Gibraltar at true scale (5.2 km north-south along X, 1.2 km wide, 426 m high); origin at the base centre, steep east face on the far (-Z) side, gentler west slope toward +Z"
     },
     {
       "name": "rock",
       "parent": "LOD0",
       "role": "mesh",
-      "description": "faceted limestone ridge"
+      "description": "faceted limestone ridge with scrub on the lower slopes"
     }
   ],
   "travelLimits": {},
@@ -41,18 +41,23 @@
   },
   "lods": {
     "LOD0": {
-      "triangles": 960,
+      "triangles": 2880,
       "material": "infra_atlas"
     }
   },
   "provenance": [
     {
-      "fact": "ridge profile 1.4 km long, 426 m summit toward the north end",
+      "fact": "about 5.2 km long north to south, about 1.2 km wide, 426 m summit",
       "tag": "V",
-      "source": "public elevation data (summary figures)"
+      "source": "public elevation data and the reference map and photos (summary figures)"
     },
     {
-      "fact": "cross-section and facet noise",
+      "fact": "steep north face, summit ridge in the north half, stepped fall to Europa Point, steeper east face",
+      "tag": "V",
+      "source": "reference photo from the Algeciras hills"
+    },
+    {
+      "fact": "cross-section taper and facet noise",
       "tag": "A",
       "reason": "silhouette only"
     },
@@ -63,6 +68,6 @@
     }
   ],
   "backdrop": {
-    "distanceM": 6200
+    "distanceM": 9200
   }
 }

@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
   padding: 0;
   list-style: none;
   pointer-events: none;
-  font-family: var(--font-body);
+  font-family: var(--tt-font);
 }
 
 .kpi {
@@ -125,9 +125,11 @@ onBeforeUnmount(() => {
   min-width: 5.6rem;
   padding: 0.3rem 0.6rem;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: rgba(17, 24, 39, 0.82);
-  color: var(--color-text);
+  border: 1px solid var(--tt-border);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  color: var(--tt-text);
   backdrop-filter: blur(4px);
 }
 
@@ -135,7 +137,7 @@ onBeforeUnmount(() => {
   font-size: 0.66rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .value {
@@ -152,19 +154,19 @@ onBeforeUnmount(() => {
 
 @keyframes tt-kpi-pulse {
   0% {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+    border-color: var(--tt-accent);
+    box-shadow: 0 0 0 0 var(--tt-focus);
   }
   100% {
-    border-color: var(--color-border);
-    box-shadow: 0 0 0 0.9rem rgba(245, 158, 11, 0);
+    border-color: var(--tt-border);
+    box-shadow: 0 0 0 0.9rem transparent;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .kpi.pulse {
     animation: none;
-    border-color: var(--color-accent);
+    border-color: var(--tt-accent);
   }
 }
 </style>

@@ -1,7 +1,7 @@
 /**
  * Dashboard palette (seam: dashboardPalette module). The categorical steps were
- * validated with the dataviz skill's validate_palette.js (dark mode, surface
- * #1a1a19): all checks PASS (worst adjacent CVD dE 8.4, normal vision 19.3).
+ * validated with the dataviz skill's validate_palette.js (light mode, surface
+ * #fcfcfb): all checks PASS (worst adjacent CVD dE 8.4, normal vision 19.3).
  * This test pins those exact validated values and the non-colour channels.
  */
 import { describe, expect, it } from 'vitest'
@@ -17,9 +17,9 @@ import {
 } from '../modules/dashboardPalette'
 
 describe('dashboard palette', () => {
-  it('is exactly the validated dark categorical set, in order', () => {
-    expect(SURFACE).toBe('#1a1a19')
-    expect([...SERIES_COLOURS].join(',')).toBe('#3987e5,#d95926,#199e70,#c98500,#d55181,#008300,#9085e9,#e66767')
+  it('is exactly the validated light categorical set, in order', () => {
+    expect(SURFACE).toBe('#fcfcfb')
+    expect([...SERIES_COLOURS].join(',')).toBe('#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300,#6250d6,#e34948')
   })
 
   it('gives every series slot a distinct marker symbol as well as a colour', () => {
@@ -30,7 +30,7 @@ describe('dashboard palette', () => {
   })
 
   it('assigns styles by slot and clamps beyond the last', () => {
-    expect(seriesStyle(0).colour).toBe('#3987e5')
+    expect(seriesStyle(0).colour).toBe('#2a78d6')
     expect(seriesStyle(99).colour).toBe(SERIES_COLOURS[MAX_SERIES - 1])
   })
 

@@ -18,7 +18,7 @@
  */
 import type { ContainerSize, PortRotation, ScenarioConfig, VesselConfig } from './types'
 import { drawContainerProps, grossKgOf, propsStream, resolveContainerProps, type WeightClass } from './containerProps'
-import { cellCapacity, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
+import { cellCapacity, cellsPerBay, stackBaseTier, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
 
 /** [A] Default fill level of the ROB bays. */
 export const DEFAULT_ROB_FILL = 0.7
@@ -80,7 +80,7 @@ export function pickRobBays(config: Pick<ScenarioConfig, 'robBayFraction'>, seed
 /** Cells the vessel can work once its ROB bays are set aside. */
 export const workableCells = (v: Pick<VesselConfig, 'sizeClass'>, robBays: readonly unknown[]): number => {
   const spec = vesselClass(v.sizeClass)
-  return cellCapacity(spec) - robBays.length * spec.rows * (spec.holdTiers + spec.deckTiers)
+  return cellCapacity(spec) - robBays.length * cellsPerBay(spec)
 }
 
 function weighted<K extends string>(weights: Partial<Record<K, number>>, draw: number): K | null {
@@ -94,13 +94,22 @@ function weighted<K extends string>(weights: Partial<Record<K, number>>, draw: n
   return entries[entries.length - 1][0]
 }
 
-/** Split `total` cells over `n` stacks of at most `cap`: an even share, then random moves of one cell between stacks. */
-function stackHeights(total: number, n: number, cap: number, rng: () => number): number[] {
-  const h = Array.from({ length: n }, (_, i) => Math.floor(total / n) + (i < total % n ? 1 : 0))
+/** Split `total` cells over stacks of at most `caps[i]` (the hull profile shortens the outer hold stacks): an even share, then random moves of one cell between stacks. */
+function stackHeights(total: number, caps: readonly number[], rng: () => number): number[] {
+  const n = caps.length
+  const h = Array.from({ length: n }, (_, i) => Math.min(caps[i], Math.floor(total / n) + (i < total % n ? 1 : 0)))
+  let left = total - h.reduce((a, b) => a + b, 0)
+  for (let i = 0; left > 0 && i < n * 64; i++) {
+    const r = i % n
+    if (h[r] < caps[r]) {
+      h[r]++
+      left--
+    }
+  }
   for (let k = 0; k < n * 2; k++) {
     const a = Math.floor(rng() * n)
     const b = Math.floor(rng() * n)
-    if (a !== b && h[a] > 0 && h[b] < cap) {
+    if (a !== b && h[a] > 0 && h[b] < caps[b]) {
       h[a]--
       h[b]++
     }
@@ -134,10 +143,10 @@ export function fillRobBays(config: ScenarioConfig, seed: number, v: VesselConfi
 
   for (const bay of robBays) {
     for (const deck of [false, true]) {
-      const from = deck ? spec.holdTiers : 0
-      const cap = deck ? spec.deckTiers : spec.holdTiers
-      const heights = stackHeights(Math.round(fill * spec.rows * cap), spec.rows, cap, rng)
+      const caps = Array.from({ length: spec.rows }, (_, row) => (deck ? spec.holdTiers + spec.deckTiers : spec.holdTiers) - stackBaseTier(spec, row, deck))
+      const heights = stackHeights(Math.round(fill * caps.reduce((a, b) => a + b, 0)), caps, rng)
       for (let row = 0; row < spec.rows; row++) {
+        const from = stackBaseTier(spec, row, deck)
         // cells bottom-up: some twin-20 cells, then 40 ft cells; each group drawn heaviest first
         const h = heights[row]
         let pairs = 0

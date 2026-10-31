@@ -1,93 +1,68 @@
 /**
- * Distant backdrop (TT-21): a handful of flat-shaded low-poly meshes, no textures.
- * The TTI preset gets Algeciras (the Rock of Gibraltar across the bay, the
- * Algeciras hills, the 550 m North Quay rendered non-operational); every other
- * preset gets a generic coastline. Scene axes: quay along +x, water towards -z.
+ * Distant backdrop (TT-21): a handful of flat-shaded low-poly meshes, no textures. The generic backdrop is a coastline;
+ * a scenario that belongs to a terminal (`terminals/`) gets that terminal's scenery instead (TTI Algeciras: the Rock of
+ * Gibraltar, the hills, the North Quay). This module never names a terminal or a preset. Scene axes: quay along +x,
+ * water towards -z.
  */
 import * as THREE from 'three'
-import { TTI_PRESET_NAME } from '../scenario/presets'
+import { terminalForScenario } from '../terminals'
+import type { SceneryContext, TerminalScenery } from '../terminals/types'
+import { jaggedRidge, ridge } from './backdropGeometry'
 import type { InfraAssetName, InfraAssets } from './infrastructureAssets'
 
-export type BackdropKind = 'tti' | 'generic'
+/** `generic`, or the kind of a terminal's scenery (`tti`). */
+export type BackdropKind = string
 
-/** The backdrop for a scenario name: Algeciras for the TTI preset only. */
-export function backdropKindFor(scenarioName: string): BackdropKind {
-  return scenarioName === TTI_PRESET_NAME ? 'tti' : 'generic'
+/** Camera-far-safe fog far distance of the generic backdrop (m). */
+export const GENERIC_FOG_FAR_M = 9000
+
+/** The coastline every scenario without terminal scenery gets. */
+export const GENERIC_SCENERY: TerminalScenery = {
+  kind: 'generic',
+  parts: ['land', 'coast', 'headland'],
+  modelParts: {},
+  fogFarM: GENERIC_FOG_FAR_M,
+  build(ctx) {
+    const midX = ctx.quayLengthM / 2
+    ctx.add('coast', ridge(jaggedRidge(14000, 400, 10, 60, 3), 600), ctx.flat('#7f8a74'), midX, -0.5, -4200)
+    ctx.add('headland', ridge([[-900, 0], [-600, 40], [-250, 95], [150, 120], [500, 70], [900, 0]], 500), ctx.flat('#76826a'), midX + 2600, -0.5, -3300)
+  },
 }
 
-/** Named parts of each backdrop (dev API / tests). */
-export const BACKDROP_PARTS: Record<BackdropKind, string[]> = {
-  tti: ['land', 'coast', 'rock', 'hills', 'northQuay'],
-  generic: ['land', 'coast', 'headland'],
+/** The scenery for a scenario name: its terminal's, else the generic coastline. */
+export function sceneryFor(scenarioName: string): TerminalScenery {
+  return terminalForScenario(scenarioName)?.scenery ?? GENERIC_SCENERY
 }
 
 /**
- * TT-28: the phase 2 backdrop GLBs (low-poly Rock, hills and coastline) replace these procedural parts for the TTI
- * preset only; every other preset keeps its generic procedural coastline.
+ * TT-28: the phase 2 backdrop GLBs replace the procedural parts a terminal's scenery names (`modelParts`); the
+ * generic backdrop keeps its procedural coastline.
  */
-export const BACKDROP_MODEL_ASSETS: Record<BackdropKind, InfraAssetName[]> = {
-  tti: ['backdrop-rock', 'backdrop-hills', 'backdrop-coast'],
-  generic: [],
+export function backdropModelAssets(scenery: TerminalScenery): InfraAssetName[] {
+  return Object.values(scenery.modelParts).filter((a): a is InfraAssetName => a !== undefined)
 }
-const MODEL_OF_PART: Record<string, InfraAssetName> = { rock: 'backdrop-rock', hills: 'backdrop-hills', coast: 'backdrop-coast' }
-
-/** Length of TTI's North Quay (m): [V] from the reference pack; shown idle. */
-export const NORTH_QUAY_LENGTH_M = 550
 
 export interface Backdrop {
   kind: BackdropKind
   group: THREE.Group
   parts: string[]
-  /** 'procedural' until `useModels` swaps in the GLB meshes (TTI only). */
+  /** 'procedural' until `useModels` swaps in the GLB meshes (terminal scenery with `modelParts` only). */
   models: 'procedural' | 'glb'
-  /** Swaps the Rock, hills and coast for the phase 2 meshes (no-op for the generic backdrop). */
+  /** Swaps the parts the scenery names for the phase 2 meshes (no-op without `modelParts`). */
   useModels(assets: InfraAssets): void
   dispose(): void
 }
 
-/** Tiny deterministic generator: the backdrop looks the same every run. */
-function lcg(seed: number): () => number {
-  let s = seed >>> 0
-  return () => {
-    s = (Math.imul(s, 1664525) + 1013904223) >>> 0
-    return s / 4294967296
-  }
-}
-
-/** A silhouette (x along the ridge, height y) extruded `depth` metres along z, centred on z. */
-function ridge(points: [number, number][], depth: number): THREE.BufferGeometry {
-  const shape = new THREE.Shape()
-  shape.moveTo(points[0][0], 0)
-  for (const [x, y] of points) shape.lineTo(x, y)
-  shape.lineTo(points[points.length - 1][0], 0)
-  shape.closePath()
-  const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false })
-  g.translate(0, 0, -depth / 2)
-  return g
-}
-
-/** A jagged ridge of the given length with heights between `lo` and `hi`. */
-function jaggedRidge(length: number, step: number, lo: number, hi: number, seed: number): [number, number][] {
-  const rnd = lcg(seed)
-  const pts: [number, number][] = []
-  let h = (lo + hi) / 2
-  for (let x = -length / 2; x <= length / 2; x += step) {
-    h = Math.min(hi, Math.max(lo, h + (rnd() - 0.5) * (hi - lo) * 0.7))
-    pts.push([x, h])
-  }
-  return pts
-}
-
-export function buildBackdrop(kind: BackdropKind, quayLengthM: number): Backdrop {
+export function buildBackdrop(scenery: TerminalScenery, quayLengthM: number): Backdrop {
   const group = new THREE.Group()
-  group.name = `backdrop-${kind}`
+  group.name = `backdrop-${scenery.kind}`
   const disposables: { dispose(): void }[] = []
   const flat = (color: string) => {
     const m = new THREE.MeshLambertMaterial({ color, flatShading: true })
     disposables.push(m)
     return m
   }
-  const add = (name: string, geometry: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number): THREE.Mesh => {
+  const add: SceneryContext['add'] = (name, geometry, material, x, y, z) => {
     disposables.push(geometry)
     const mesh = new THREE.Mesh(geometry, material)
     mesh.name = name
@@ -97,63 +72,22 @@ export function buildBackdrop(kind: BackdropKind, quayLengthM: number): Backdrop
     group.add(mesh)
     return mesh
   }
-  const midX = quayLengthM / 2
 
   // Hinterland behind the terminal, so the yard does not float in the void.
   const land = new THREE.PlaneGeometry(40000, 12000)
   land.rotateX(-Math.PI / 2)
-  add('land', land, flat(kind === 'tti' ? '#7b8068' : '#80866f'), midX, -1.2, 900 + 6000)
+  add('land', land, flat(scenery.kind === 'generic' ? '#80866f' : '#7b8068'), quayLengthM / 2, -1.2, 900 + 6000)
 
-  if (kind === 'tti') {
-    // The Rock of Gibraltar: ~1.4 km long, 426 m high at its northern end, steep east face, low to the south.
-    const rock = add(
-      'rock',
-      ridge(
-        [[-700, 0], [-680, 30], [-560, 120], [-380, 230], [-180, 330], [20, 390], [160, 426], [300, 410], [420, 330], [520, 160], [600, 50], [720, 0]],
-        520,
-      ),
-      flat('#8f9288'),
-      midX + 3400,
-      0,
-      -6200,
-    )
-    rock.scale.y = 1.25
-    // The low isthmus and Spanish coast running away from the Rock.
-    add('coast', ridge(jaggedRidge(6000, 300, 6, 26, 11), 500), flat('#8a8f77'), midX + 7200, -0.5, -6200)
-    // The Algeciras hills behind the terminal.
-    add('hills', ridge(jaggedRidge(9000, 450, 150, 480, 7), 900), flat('#6a7358'), midX - 800, -1, 4300)
-    // North Quay: 550 m of bare quay beside the working berths, no cranes, no lights.
-    const north = new THREE.Group()
-    north.name = 'northQuay'
-    const x0 = quayLengthM + 70 + NORTH_QUAY_LENGTH_M / 2
-    const slabGeo = new THREE.BoxGeometry(NORTH_QUAY_LENGTH_M, 0.3, 70)
-    const slab = new THREE.Mesh(slabGeo, flat('#838a93'))
-    slab.position.set(x0, 0.06, 38)
-    slab.receiveShadow = true
-    const edgeGeo = new THREE.BoxGeometry(NORTH_QUAY_LENGTH_M, 0.32, 1)
-    const edge = new THREE.Mesh(edgeGeo, flat('#6f6a55'))
-    edge.position.set(x0, 0.08, 2)
-    const posts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.4, 0.5, 1.1, 6), flat('#4a4d52'), 12)
-    const m = new THREE.Matrix4()
-    for (let i = 0; i < 12; i++) {
-      m.makeTranslation(x0 - NORTH_QUAY_LENGTH_M / 2 + 25 + i * 45, 0.7, 4)
-      posts.setMatrixAt(i, m)
-    }
-    disposables.push(slabGeo, edgeGeo, posts.geometry)
-    north.add(slab, edge, posts)
-    group.add(north)
-  } else {
-    add('coast', ridge(jaggedRidge(14000, 400, 10, 60, 3), 600), flat('#7f8a74'), midX, -0.5, -4200)
-    add('headland', ridge([[-900, 0], [-600, 40], [-250, 95], [150, 120], [500, 70], [900, 0]], 500), flat('#76826a'), midX + 2600, -0.5, -3300)
-  }
+  scenery.build({ group, quayLengthM, flat, add, track: (thing) => disposables.push(thing) })
+  const modelParts = Object.entries(scenery.modelParts) as [string, InfraAssetName][]
   const backdrop: Backdrop = {
-    kind,
+    kind: scenery.kind,
     group,
-    parts: BACKDROP_PARTS[kind],
+    parts: scenery.parts,
     models: 'procedural',
     useModels: (assets) => {
-      if (kind !== 'tti' || backdrop.models === 'glb') return
-      for (const [part, asset] of Object.entries(MODEL_OF_PART)) {
+      if (modelParts.length === 0 || backdrop.models === 'glb') return
+      for (const [part, asset] of modelParts) {
         const mesh = group.getObjectByName(part) as THREE.Mesh | undefined
         const geometry = assets.geometries[asset]
         if (!mesh || !geometry) continue

@@ -5,7 +5,8 @@
  */
 import type { MessageKey } from '../i18n/messages'
 import { planOf } from './planModel'
-import { PEAK_DAY_PRESET_NAME, SMALL_PRESET_NAME, TTI_PRESET_NAME } from '../scenario/presets'
+import { SMALL_PRESET_NAME } from '../scenario/presets'
+import { terminalPresetInfo } from '../terminals'
 import type { ScenarioConfig } from '../scenario/types'
 
 export interface ScenarioStats {
@@ -29,6 +30,27 @@ export function scenarioStats(config: ScenarioConfig): ScenarioStats {
     trucksPerHour: Math.max(0, ...(config.landside?.hourlyProfile ?? [])),
     yardFillPct: start?.mode === 'prefilled' ? (start.targetPct ?? 60) : null,
   }
+}
+
+/** Productive moves per STS per hour assumed by the run-length estimate (a typical gross crane rate). */
+const ESTIMATE_MOVES_PER_STS_HOUR = 25
+/** Mooring time before a berthed vessel starts working (s). */
+const ESTIMATE_MOORING_S = 1800
+
+/**
+ * Run length shown on a scenario card (s): the stated end time when the scenario has one, else an estimate of when
+ * the last vessel is done (its arrival, mooring, then its moves at the assumed rate over its crane limit).
+ */
+export function scenarioDurationS(config: ScenarioConfig): number {
+  const stated = config.endConditions.simDurationS
+  if (stated !== undefined) return stated
+  let end = 0
+  for (const v of config.vessels) {
+    const moves = v.discharge + v.load + v.transshipment
+    const workS = (moves / (Math.max(1, v.maxSts) * ESTIMATE_MOVES_PER_STS_HOUR)) * 3600
+    end = Math.max(end, v.arrivalS + ESTIMATE_MOORING_S + workS)
+  }
+  return end
 }
 
 export interface ChipSpec {
@@ -66,8 +88,8 @@ export function fixtureRow(name: string, config: ScenarioConfig): FixtureRow {
 
 /** Catalogue keys of a preset's tagline and plain-language description; null for a preset without copy. */
 export function presetCopy(name: string): { tagline: MessageKey; description: MessageKey } | null {
-  if (name === TTI_PRESET_NAME) return { tagline: 'preset.baseline.tagline', description: 'preset.baseline.description' }
-  if (name === PEAK_DAY_PRESET_NAME) return { tagline: 'preset.peakDay.tagline', description: 'preset.peakDay.description' }
+  const terminalPreset = terminalPresetInfo(name)
+  if (terminalPreset) return terminalPreset.copy
   if (name === SMALL_PRESET_NAME) return { tagline: 'preset.small.tagline', description: 'preset.small.description' }
   return null
 }

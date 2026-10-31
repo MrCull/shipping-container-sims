@@ -15,7 +15,7 @@ fieldset {
 
 legend,
 .field > span {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -23,7 +23,7 @@ legend,
 }
 
 .hint {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.85rem;
   line-height: 1.5;
 }
@@ -61,15 +61,15 @@ legend,
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.75rem;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .mini input {
   padding: 0.4rem 0.5rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-family: var(--tt-font-mono);
   color-scheme: dark;
   min-width: 0;
@@ -94,10 +94,10 @@ input[type='number'],
 input[type='datetime-local'],
 select {
   padding: 0.45rem 0.6rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-family: var(--tt-font-mono);
   color-scheme: dark;
   min-width: 0;

@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { t } from '../../i18n/messages'
 import { useSetupDraft } from '../../composables/useSetupDraft'
 import { useTwinStore } from '../../store/twinStore'
-import { TTI_DERIVED_BAYS_PRESETS } from '../../scenario/presets'
+import { terminalPresetInfo } from '../../terminals'
 import { presetCopy } from '../../modules/scenarioPicker'
 
 /** Detail panel of the selected scenario (TT-R04): description, key figures and the one prominent Start button. */
@@ -13,7 +13,7 @@ const d = useSetupDraft()
 const store = useTwinStore()
 
 /** The preset's bay count comes from a published capacity, not a layout drawing: say so. */
-const derivedBaysNote = computed(() => TTI_DERIVED_BAYS_PRESETS.includes(d.name))
+const derivedBaysNote = computed(() => terminalPresetInfo(d.name)?.derivedBays === true)
 
 const description = computed(() => {
   const copy = presetCopy(d.name)
@@ -103,9 +103,14 @@ const summary = computed(() => {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.8rem 1rem;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--tt-accent);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  background: var(--tt-surface);
+  /* The one Start action stays in view while the long form scrolls under it. */
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  box-shadow: var(--tt-shadow);
 }
 
 .head {
@@ -122,12 +127,16 @@ h3 {
 
 .start {
   padding: 0.65rem 2.2rem;
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  border-radius: 8px;
-  color: var(--color-text);
+  background: var(--tt-accent);
+  border: 1px solid var(--tt-accent);
+  border-radius: var(--tt-radius);
+  color: var(--tt-on-accent);
   font-size: 1rem;
   font-weight: 700;
+}
+
+.start:hover:not(:disabled) {
+  background: var(--tt-accent-hover);
 }
 
 .start:disabled {
@@ -148,7 +157,7 @@ h3 {
 }
 
 .summary dt {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.72rem;
 }
 
@@ -159,7 +168,7 @@ h3 {
 }
 
 .error {
-  color: var(--color-danger);
+  color: var(--tt-danger);
   font-size: 0.85rem;
 }
 </style>

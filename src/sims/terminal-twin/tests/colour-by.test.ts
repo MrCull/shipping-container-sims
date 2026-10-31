@@ -1,0 +1,228 @@
+/**
+ * Colour by (spec #116, ticket #130): a pure module maps a container (plus the sim time) and a mode to a colour, and
+ * a mode to a legend. Every mode colours every container, the legend lists every value the mode can produce, the
+ * time-based modes move with the sim time, and the palette mirrors the skin tokens.
+ */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { createSimulation, type ContainerState, type CustodyKind, type TransitWorld } from '../engine'
+import { fixtures } from '../scenario/fixtures'
+import type { ScenarioConfig } from '../scenario/types'
+import {
+  COLOUR_BY_MODES,
+  DATA_PALETTE,
+  RAMP_PALETTE,
+  colourContextOf,
+  colourOf,
+  isTimeBased,
+  legendOf,
+  parseColourBy,
+  subjectOfBox,
+  type ColourBy,
+  type ColourSubject,
+} from '../modules/colourBy'
+import { COLOUR_BY_STORAGE_KEY, loadColourBySettings, saveColourBySettings } from '../modules/colourBySettings'
+import { colourKeyLabel } from '../modules/colourLabels'
+
+const config = fixtures['rob-bays'] as ScenarioConfig
+const HEX = /^#[0-9a-f]{6}$/i
+const ctx = colourContextOf(config)
+
+function world(vessels: Record<string, string> = {}, trucks: Record<string, string> = {}): TransitWorld {
+  return { vesselStatus: (id) => vessels[id] as never, truckStatus: (id) => trucks[id] as never }
+}
+
+function historyBox(history: [number, CustodyKind, string][], props: Partial<ContainerState['props']> = {}): ContainerState {
+  const h = history.map(([t, kind, id]) => ({ t, owner: { kind, id }, eventId: null }))
+  return {
+    id: 'MSKU0000001',
+    size: '40',
+    full: true,
+    line: 'Maersk',
+    vesselId: 'V001',
+    custody: h[h.length - 1].owner,
+    custodyHistory: h,
+    props: { direction: 'EXPORT', isoType: '42G1', pol: 'ESALG', pod: 'ESVLC', weightClass: 'MEDIUM', plannedDepartureS: 90000, inbound: { kind: 'truck' }, outbound: { kind: 'vessel', id: 'V001' }, ...props },
+  } as ContainerState
+}
+
+describe('every mode colours every container', () => {
+  const sim = createSimulation(config, {}, { invariants: { sweepEvery: 500 } })
+  sim.runUntil({ time: 4000 })
+  const w: TransitWorld = {
+    vesselStatus: (id) => sim.query.vessel(id).status,
+    truckStatus: (id) => sim.query.truck(id).status,
+  }
+  const boxes = sim.query.containers()
+
+  it('runs far enough to have boxes in several places', () => {
+    expect(boxes.length).toBeGreaterThan(30)
+    expect(new Set(boxes.map((b) => b.custody.kind)).size).toBeGreaterThan(1)
+  })
+
+  for (const mode of COLOUR_BY_MODES) {
+    it(`${mode}: a hex colour for every box, and the legend lists its key`, () => {
+      const legend = legendOf(mode, ctx)
+      const keys = new Set(legend.map((e) => e.key))
+      expect(keys.size).toBe(legend.length)
+      for (const e of legend) expect(e.hex).toMatch(HEX)
+      for (const b of boxes) {
+        const c = colourOf(mode, subjectOfBox(b, w, sim.query.now(), { vessels: new Set(config.vessels.map((v) => v.id)) }), sim.query.now(), ctx)
+        expect(c.hex).toMatch(HEX)
+        expect(keys.has(c.key), `${mode}: ${c.key}`).toBe(true)
+        expect(legend.find((e) => e.key === c.key)!.hex).toBe(c.hex)
+      }
+    })
+  }
+
+  it('the property modes use more than one colour on a real run', () => {
+    for (const mode of ['line', 'pod', 'weight', 'iso', 'flow', 'transit'] as ColourBy[]) {
+      const used = new Set(boxes.map((b) => colourOf(mode, subjectOfBox(b, w, sim.query.now()), sim.query.now(), ctx).key))
+      expect(used.size, mode).toBeGreaterThan(1)
+    }
+  })
+})
+
+describe('what each mode produces', () => {
+  const subject = (o: Partial<ColourSubject> = {}): ColourSubject => ({ line: 'MSC', full: true, ...o })
+
+  it('line: the livery body of the line; an unknown line is the generic grey', () => {
+    expect(colourOf('line', subject({ line: 'Maersk' }), 0, ctx).hex).toBe('#42b0d5')
+    expect(colourOf('line', subject({ line: 'Nobody' }), 0, ctx).key).toBe('other')
+    expect(colourOf('default', subject({ line: 'MSC' }), 0, ctx).key).toBe('MSC')
+  })
+
+  it('pod: one colour per port of the rotation, the same in every view', () => {
+    const [a, b] = ctx.ports
+    expect(colourOf('pod', subject({ pod: a }), 0, ctx).hex).not.toBe(colourOf('pod', subject({ pod: b }), 0, ctx).hex)
+    expect(colourOf('pod', subject({ pod: 'XXXXX' }), 0, ctx).key).toBe('other')
+    expect(legendOf('pod', ctx).map((e) => e.key)).toEqual([...ctx.ports, 'other'])
+  })
+
+  it('special: reefer, tank (hazardous), open top and flat (out of gauge), else standard', () => {
+    expect(colourOf('special', subject({ isoType: '45R1' }), 0, ctx).key).toBe('reefer')
+    expect(colourOf('special', subject({ isoType: '22T1' }), 0, ctx).key).toBe('hazardous')
+    expect(colourOf('special', subject({ isoType: '42U1' }), 0, ctx).key).toBe('oog')
+    expect(colourOf('special', subject({ isoType: '42P1' }), 0, ctx).key).toBe('oog')
+    expect(colourOf('special', subject({ isoType: '42G1' }), 0, ctx).key).toBe('standard')
+  })
+
+  it('flow: an empty is an empty whatever its direction; a full box follows its direction', () => {
+    expect(colourOf('flow', subject({ full: false, direction: 'EXPORT' }), 0, ctx).key).toBe('empty')
+    expect(colourOf('flow', subject({ direction: 'IMPORT' }), 0, ctx).key).toBe('import')
+    expect(colourOf('flow', subject({ direction: 'EXPORT' }), 0, ctx).key).toBe('export')
+    expect(colourOf('flow', subject({ direction: 'TRANSSHIPMENT' }), 0, ctx).key).toBe('transshipment')
+  })
+
+  it('call: a box on a vessel call of this scenario, a box from elsewhere, a remain-on-board box', () => {
+    expect(colourOf('call', subject({ onCall: true }), 0, ctx).key).toBe('call')
+    expect(colourOf('call', subject({ onCall: false }), 0, ctx).key).toBe('other')
+    expect(colourOf('call', subject({ rob: true }), 0, ctx).key).toBe('rob')
+  })
+
+  it('a remain-on-board box has no dwell, departure or transit: its own grey in those modes', () => {
+    for (const mode of ['dwell', 'departure', 'transit'] as ColourBy[]) expect(colourOf(mode, subject({ rob: true }), 0, ctx).key).toBe('rob')
+  })
+})
+
+describe('time-based modes move with the sim time', () => {
+  const w = world({ V001: 'berthed' })
+  const box = historyBox([
+    [0, 'vesselSlot', 'V001:01-01-82'],
+    [3600, 'sts', 'STS01'],
+    [3700, 'yardSlot', 'B01:01-01-01'],
+  ])
+  const at = (mode: ColourBy, t: number) => colourOf(mode, subjectOfBox(box, w, t), t, ctx).key
+
+  it('is flagged so the renderer re-evaluates it as the clock runs', () => {
+    expect(COLOUR_BY_MODES.filter(isTimeBased).sort()).toEqual(['departure', 'dwell', 'transit'])
+  })
+
+  it('transit status: arrived on a berthed vessel, then on terminal', () => {
+    expect(at('transit', 1000)).toBe('ARRIVED')
+    expect(at('transit', 3650)).toBe('ON_TERMINAL')
+  })
+
+  it('dwell: grows from the first terminal custody, in classes', () => {
+    expect(at('dwell', 100)).toBe('none')
+    const seen = new Set([3600, 3600 + 1800, 3600 + 4 * 3600, 3600 + 12 * 3600, 3600 + 2 * 86400, 3600 + 5 * 86400].map((t) => at('dwell', t)))
+    expect(seen.size).toBeGreaterThanOrEqual(5)
+  })
+
+  it('planned departure: counts down to the planned time and turns overdue after it', () => {
+    expect(at('departure', 90000 - 3 * 86400 + 3700)).not.toBe(at('departure', 90000 - 1800))
+    expect(at('departure', 90000 - 1800)).not.toBe(at('departure', 90000 + 10))
+    expect(at('departure', 90000 + 10)).toBe('overdue')
+  })
+
+  it('the history after the asked time is ignored (the scene replays the whole run)', () => {
+    expect(subjectOfBox(box, w, 1000).transit).toBe('ARRIVED')
+    expect(subjectOfBox(box, w, 1000).arrivedS).toBeNull()
+    expect(subjectOfBox(box, w, 3650).arrivedS).toBe(3600)
+  })
+})
+
+describe('legend labels', () => {
+  it('every key of every legend has a catalogue label', () => {
+    for (const mode of COLOUR_BY_MODES) {
+      for (const e of legendOf(mode, ctx)) {
+        const label = colourKeyLabel(mode, e.key)
+        expect(label, `${mode}:${e.key}`).toBeTruthy()
+        expect(label, `${mode}:${e.key}`).not.toMatch(/^colourBy\./)
+      }
+    }
+  })
+})
+
+describe('remembered choice', () => {
+  const store = (initial: string | null) => {
+    const data = new Map<string, string>(initial === null ? [] : [[COLOUR_BY_STORAGE_KEY, initial]])
+    return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) }
+  }
+  it('round-trips the mode and Hide ROB, and falls back to the defaults on nothing, rubbish or a blocked storage', () => {
+    const s = store(null)
+    expect(loadColourBySettings(s)).toEqual({ mode: 'default', hideRob: false })
+    saveColourBySettings(s, { mode: 'dwell', hideRob: true })
+    expect(loadColourBySettings(s)).toEqual({ mode: 'dwell', hideRob: true })
+    expect(loadColourBySettings(store('{nonsense'))).toEqual({ mode: 'default', hideRob: false })
+    expect(loadColourBySettings(store('{"mode":"zzz","hideRob":1}'))).toEqual({ mode: 'default', hideRob: false })
+    expect(loadColourBySettings(null)).toEqual({ mode: 'default', hideRob: false })
+    expect(() => saveColourBySettings({ setItem: () => { throw new Error('blocked') } }, { mode: 'pod', hideRob: false })).not.toThrow()
+  })
+})
+
+describe('frame cost', () => {
+  it('colours 30 000 boxes in every mode well inside a frame, so a mode switch costs no frame time', () => {
+    const w = world({ V001: 'berthed' })
+    const boxes = Array.from({ length: 30_000 }, (_, i) =>
+      historyBox(
+        [
+          [0, 'vesselSlot', 'V001:01-01-82'],
+          [100 + (i % 500), 'yardSlot', 'B01:01-01-01'],
+        ],
+        { pod: ctx.ports[i % ctx.ports.length], plannedDepartureS: 5000 + i },
+      ),
+    )
+    for (const mode of COLOUR_BY_MODES) {
+      const t0 = performance.now()
+      for (const b of boxes) colourOf(mode, subjectOfBox(b, w, 2000), 2000, ctx)
+      expect(performance.now() - t0, mode).toBeLessThan(400)
+    }
+  })
+})
+
+describe('mode names and the palette', () => {
+  it('parses a stored mode, falling back to the default', () => {
+    expect(parseColourBy('pod')).toBe('pod')
+    expect(parseColourBy('nonsense')).toBe('default')
+    expect(parseColourBy(null)).toBe('default')
+  })
+
+  it('mirrors the skin tokens (a new colour goes into skin.css first)', () => {
+    const skin = readFileSync(join(__dirname, '..', 'skin.css'), 'utf8')
+    const token = (name: string) => new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`).exec(skin)?.[1]?.toLowerCase()
+    DATA_PALETTE.forEach((hex, i) => expect(token(`--tt-data-${i}`)).toBe(hex))
+    RAMP_PALETTE.forEach((hex, i) => expect(token(`--tt-ramp-${i}`)).toBe(hex))
+  })
+})

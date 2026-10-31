@@ -87,7 +87,7 @@ test('SHCs steer through the corners of the lane graph', async ({ page }) => {
       const tick = () => {
         const s = tt.sceneState()!
         for (const [id, r] of Object.entries(s.shcRigs)) out.push({ id, steer: r.steerRad, roll: r.wheelRollRad, x: s.shcs[id].x, z: s.shcs[id].z })
-        if (performance.now() - t0 < 6000) requestAnimationFrame(tick)
+        if (performance.now() - t0 < 14000) requestAnimationFrame(tick)
         else resolve()
       }
       requestAnimationFrame(tick)

@@ -6,16 +6,18 @@ import { describe, expect, it } from 'vitest'
 import { createSimulation, type Simulation } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
-import { VESSEL_CLASSES } from '../scenario/vesselClasses'
-import { buildBayView, bayOrder, CELL_STATUSES, defaultBay, slotStatus, stepBay, stripOf, type BayCell, type BayView, type BayViewData, type ColourMode } from '../modules/bayView'
+import { VESSEL_CLASSES, vesselSlotId } from '../scenario/vesselClasses'
+import type { VesselSlotState } from '../engine'
+import { buildBayView, bayOrder, CELL_STATUSES, defaultBay, slotStatus, stepBay, stripOf, type BayBox, type BayCell, type BayView, type BayViewData, type ColourMode } from '../modules/bayView'
 import { collectBayViewData } from '../modules/bayViewData'
+import { COLOUR_BY_MODES, colourContextOf, legendOf } from '../modules/colourBy'
 import { createLocationNotation } from '../modules/locationNotation'
 
 const config = fixtures['rob-bays'] as ScenarioConfig
 const spec = VESSEL_CLASSES.feeder
 const make = (): Simulation => createSimulation(config, {}, { invariants: { sweepEvery: 500 } })
 
-const dataOf = (sim: Simulation, vesselId = 'V001'): BayViewData => collectBayViewData(sim.query, vesselId)
+const dataOf = (sim: Simulation, vesselId = 'V001'): BayViewData => collectBayViewData(sim.query, vesselId, config)
 const allCells = (v: BayView): BayCell[] => v.sections.flatMap((s) => s.tiers.flatMap((t) => t.positions.flatMap((p) => p.cells)))
 const view = (data: BayViewData, bay: number, colourMode: ColourMode = 'status'): BayView => buildBayView(data, bay, { colourMode })
 /** Every bay's cells, summed over the statuses. */
@@ -144,7 +146,23 @@ describe('colour modes', () => {
       expect(coloured).toBeGreaterThan(0)
       if (mode !== 'weight') expect(seen.size).toBeGreaterThan(1)
     }
-    expect(view(data, bay, 'weight').legend.map((l) => l.key)).toEqual(['LIGHT', 'MEDIUM', 'HEAVY'])
+    expect(view(data, bay, 'weight').legend.map((l) => l.key)).toEqual(['LIGHT', 'MEDIUM', 'HEAVY', 'unknown'])
+  })
+
+  it('every colour-by mode fills the coloured cells with the colour of the shared module, and lists the same legend', () => {
+    const ctx = colourContextOf(config)
+    for (const mode of COLOUR_BY_MODES.filter((m) => m !== 'default')) {
+      const v = view(data, bay, mode)
+      expect(v.legend.map((l) => [l.key, l.hex])).toEqual(legendOf(mode, ctx).map((e) => [e.key, e.hex]))
+      const coloured = allCells(v).filter((c) => c.colour !== null)
+      expect(coloured.length, mode).toBeGreaterThan(0)
+      for (const c of coloured) expect(v.legend.find((l) => l.key === c.colourKey)?.hex, `${mode}:${c.colourKey}`).toBe(c.colour)
+    }
+  })
+
+  it('the time-based modes read the data time: the same box is in another dwell class a day later', () => {
+    const dwellKeys = (now: number): Set<string | null> => new Set(allCells(view({ ...data, now }, bay, 'dwell')).filter((c) => c.status !== 'rob').map((c) => c.colourKey))
+    expect(dwellKeys(0)).not.toEqual(dwellKeys(5 * 86400))
   })
 
   it('ROB cells follow the colour mode too, so later ports show as groups', () => {
@@ -221,5 +239,74 @@ describe('location notation', () => {
     }
     // the whole 40 ft cells of the bay carry the bay's even number
     expect(allCells(v).some((c) => c.half === null && c.details.location.split('.')[2] === String(v.bayNumber).padStart(2, '0'))).toBe(true)
+  })
+})
+
+describe('paired-bay panels (#127)', () => {
+  // Hand-made data: bay 3 of a feeder; hold tier 0 (feeder: rows 2 to 5 exist): row 2 a 40, row 3 two 20s, row 4 one lone aft 20, row 5 a ROB 40.
+  const vesselId = 'V9'
+  const bay = 3
+  const slot = (row: number, half: 'aft' | 'fore' | null, containerId: string | null): VesselSlotState => ({
+    id: vesselSlotId(vesselId, bay, row, 0, half),
+    vesselId,
+    bay,
+    row,
+    tier: 0,
+    deck: false,
+    half,
+    purpose: 'discharge',
+    containerId,
+  })
+  const box = (id: string, size: '20' | '40'): BayBox => ({ id, size, line: 'MSC', full: true, custody: 'vesselSlot' })
+  const slots = [slot(2, null, 'A40'), slot(3, 'aft', 'B20'), slot(3, 'fore', 'C20'), slot(4, 'aft', 'D20')]
+  const data: BayViewData = {
+    vesselId,
+    sizeClass: 'feeder',
+    status: 'berthed',
+    slots,
+    boxes: { [slots[0].id]: box('A40', '40'), [slots[1].id]: box('B20', '20'), [slots[2].id]: box('C20', '20'), [slots[3].id]: box('D20', '20') },
+    packages: [],
+    robBoxes: [
+      { slotId: vesselSlotId(vesselId, bay, 5, 0, null), vesselId, bay, row: 5, tier: 0, deck: false, half: null, size: '40', isoType: '42G1', pod: 'ESVLC', line: 'MSC', weightClass: 'LIGHT', grossKg: 9000, full: true },
+    ],
+  }
+  const v = buildBayView(data, bay, { colourMode: 'status' })
+  const holdRow = (panel: number): BayCell[] => v.panels[panel].sections[1].tiers.find((t) => t.tier === 0)!.cells
+
+  it('has two panels, the two odd bays of the 40 ft bay, fore (lower number) first', () => {
+    expect(v.panels.map((p) => p.half)).toEqual(['fore', 'aft'])
+    expect(v.panels.map((p) => p.bayNumber)).toEqual([v.bayNumber - 1, v.bayNumber + 1])
+    expect(v.panels[0].sections.map((s) => s.deck)).toEqual([true, false])
+  })
+
+  it('draws each 20 ft box in the panel of its half', () => {
+    expect(holdRow(0)[3].details.boxId).toBe('C20') // fore
+    expect(holdRow(1)[3].details.boxId).toBe('B20') // aft
+    expect(holdRow(0)[3].continuation).toBe(false)
+    expect(holdRow(1)[3].continuation).toBe(false)
+  })
+
+  it('shows a lone 20 only in its half; the other panel has an empty cell', () => {
+    expect(holdRow(1)[4].details.boxId).toBe('D20')
+    expect(holdRow(0)[4].status).toBe('empty')
+    expect(holdRow(0)[4].details.boxId).toBeUndefined()
+  })
+
+  it('spans a 40 over both panels, the second half flagged as the continuation', () => {
+    expect(holdRow(0)[2]).toMatchObject({ continuation: false, details: { boxId: 'A40', size: '40' } })
+    expect(holdRow(1)[2]).toMatchObject({ continuation: true, status: 'planned-discharge', details: { boxId: 'A40' } })
+  })
+
+  it('flags ROB boxes (and their continuation) and keeps them in the panels', () => {
+    expect(holdRow(0)[5]).toMatchObject({ rob: true, status: 'rob', continuation: false })
+    expect(holdRow(1)[5]).toMatchObject({ rob: true, status: 'rob', continuation: true })
+    expect(holdRow(0)[2].rob).toBe(false)
+  })
+
+  it('counts a 40 once, however many panels show it, and steps by 40 ft bay', () => {
+    expect(v.counts['planned-discharge']).toBe(4)
+    expect(v.counts.rob).toBe(1)
+    expect(v.prev).toBe(4)
+    expect(v.next).toBe(2)
   })
 })

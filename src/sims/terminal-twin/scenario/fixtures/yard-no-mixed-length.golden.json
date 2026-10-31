@@ -3,7 +3,7 @@
   "seed": 6,
   "status": "ended",
   "endReason": "simDurationS >= 3600",
-  "eventLogHash": "03a3fb9f7cb5ec",
+  "eventLogHash": "168afba95b1d49",
   "kpis": {
     "simTimeS": 3600,
     "eventsProcessed": 977,
@@ -14,7 +14,7 @@
         "moves": 24,
         "cycles": 18,
         "twinLifts": 6,
-        "grossMovesPerHour": 34.762,
+        "grossMovesPerHour": 34.337,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 2626.831,
-        "turnaroundS": 2566.831,
+        "departedAtS": 2657.596,
+        "turnaroundS": 2597.596,
         "sts": [
           "STS01"
         ]
@@ -198,13 +198,13 @@
           "loadedDistanceM": 2353.5,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 1882.27,
-            "moving-to-collect": 326.552,
+            "parked": 1882.646,
+            "moving-to-collect": 326.658,
             "queuing-to-collect": 0,
             "collecting": 557.625,
             "moving-to-deliver": 63,
             "queuing-to-deliver": 0,
-            "delivering": 770.553
+            "delivering": 770.071
           },
           "handovers": 36,
           "parkingReturns": 18,
@@ -212,17 +212,17 @@
         },
         "SHC02": {
           "jobs": 6,
-          "emptyDistanceM": 1490.5,
-          "loadedDistanceM": 735.5,
+          "emptyDistanceM": 1479.5,
+          "loadedDistanceM": 746.5,
           "reservationWaitS": 0.565,
           "stateS": {
-            "parked": 3029.902,
-            "moving-to-collect": 119.471,
+            "parked": 3029.587,
+            "moving-to-collect": 118.256,
             "queuing-to-collect": 0,
             "collecting": 185.038,
             "moving-to-deliver": 21,
             "queuing-to-deliver": 0,
-            "delivering": 244.589
+            "delivering": 246.12
           },
           "handovers": 12,
           "parkingReturns": 6,
@@ -239,9 +239,9 @@
       "allocationFailures": 0,
       "grouping": {
         "placements": 24,
-        "mixedStack": 0,
+        "mixedStack": 1,
         "orderBroken": 1,
-        "mixedBay": 8
+        "mixedBay": 7
       },
       "rehandles": {
         "total": 0,
@@ -263,8 +263,8 @@
       "ascs": {
         "B01-ASC1": {
           "jobs": 24,
-          "gantryM": 2285.5,
-          "trolleyM": 359.35,
+          "gantryM": 2258.7,
+          "trolleyM": 376.75,
           "hoistM": 874.272,
           "padWaitS": 0
         }
@@ -274,22 +274,22 @@
       "IMPORT": {
         "count": 80,
         "departed": 0,
-        "meanS": 107950.451,
+        "meanS": 107946.716,
         "maxS": 633534
       },
       "STORAGE": {
         "count": 1,
         "departed": 0,
-        "meanS": 2521.377,
-        "maxS": 2521.377
+        "meanS": 2508.679,
+        "maxS": 2508.679
       }
     },
     "workPackages": {
       "released": 9,
       "started": 9,
       "completed": 9,
-      "leadTimeMeanS": 491.893,
-      "leadTimeMaxS": 810.789,
+      "leadTimeMeanS": 497.445,
+      "leadTimeMaxS": 819.016,
       "boxesLoaded": 0
     },
     "ordering": {

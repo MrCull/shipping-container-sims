@@ -10,7 +10,8 @@ import type { ViewPresetName } from '../modules/viewPresets'
 import type { CameraPose } from '../modules/cameraKeys'
 import type { CameraKey } from '../modules/shortcuts'
 import { defineStore } from 'pinia'
-import { computed, markRaw, ref, shallowRef, triggerRef } from 'vue'
+import { computed, markRaw, ref, shallowRef, triggerRef, watch } from 'vue'
+import { useAudioStore } from '@/stores/audio'
 import { fixtures } from '../scenario/fixtures'
 import { type ScenarioOverrides } from '../scenario/overrides'
 import { composeScenario } from '../scenario/compose'
@@ -21,7 +22,8 @@ import { EXPORT_FILES, ScenarioValidationError, validateScenario, type Container
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { createLocationNotation } from '../modules/locationNotation'
-import { defaultBay, type BayViewData, type ColourMode } from '../modules/bayView'
+import { defaultBay, type BayViewData } from '../modules/bayView'
+import { loadColourBySettings, saveColourBySettings, type ColourBy } from '../modules/colourBySettings'
 import { describeEntity, entityKind, entityQueryKind, transitWorldOf, type EntityExtras, type EntityView } from '../modules/entityInspector'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
@@ -38,6 +40,7 @@ import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import { CuePlanner } from '../modules/cues'
 import { SoundPlayer } from '../modules/soundPlayer'
+import { PositionalSound } from '../modules/positionalSound'
 import type { AtmosphereState } from '../modules/atmosphereRig'
 import type { BackdropKind } from '../modules/backdrop'
 import { daylightLockDefault } from '../modules/atmosphere'
@@ -239,7 +242,6 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   /** Bay viewer (spec #106, #115): the vessel it shows, the bay (internal index), the colour mode and the vessel's data. */
   const bayViewerVesselId = ref<string | null>(null)
   const bayViewerBay = ref(0)
-  const bayViewerColour = ref<ColourMode>('status')
   const bayViewData = shallowRef<BayViewData | null>(null)
   let bayViewBusy = false
 
@@ -277,13 +279,33 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayViewerBay.value = bay
   }
 
-  function setBayViewerColour(mode: ColourMode): void {
-    bayViewerColour.value = mode
+  /** Colour by (#130): one mode for the 3D boxes and the bay viewer, and Hide ROB for the vessels in 3D; both remembered (a per-viewer convenience). */
+  const colourBySettings = loadColourBySettings(browserStorage())
+  const colourBy = ref<ColourBy>(colourBySettings.mode)
+  const hideRob = ref(colourBySettings.hideRob)
+
+  function setColourBy(mode: ColourBy): void {
+    colourBy.value = mode
+    saveColourBySettings(browserStorage(), { mode, hideRob: hideRob.value })
   }
 
-  /** Sound effects (TT-21): off by default; the player only exists to be used while on. */
-  const soundOn = ref(false)
-  const sounds = markRaw(new SoundPlayer())
+  function setHideRob(hide: boolean): void {
+    hideRob.value = hide
+    saveColourBySettings(browserStorage(), { mode: colourBy.value, hideRob: hide })
+  }
+
+  /** Sound effects (TT-21): one master gain, the shared volume and mute (`stores/audio.ts`), scales all playback. */
+  const audio = useAudioStore()
+  const sounds = markRaw(new SoundPlayer(() => audio.masterGain))
+  /** Positional sound (#125): looping voices placed by the sound mixer, through the same master gain. */
+  const positional = markRaw(new PositionalSound(() => audio.masterGain))
+  watch(
+    () => audio.masterGain,
+    () => {
+      sounds.applyGain()
+      positional.applyGain()
+    },
+  )
   /** Keep the sun daylight all day (default on for the TTI Algeciras — peak day preset). */
   const lockDaylight = ref(false)
   const banner = ref<TwinBanner | null>(null)
@@ -338,18 +360,13 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     }, 3500)
   }
 
-  /** Cues the display clock has reached: banners always, sounds only when the toggle is on. */
+  /** Cues the display clock has reached: banners always, sounds scaled by the shared volume (silent when muted). */
   function releaseCues(displayT: number, playSpeed: number, flatOut: boolean): void {
     const due = cues.drain(displayT, playSpeed)
     for (const c of due) {
       if (c.banner === 'departure') showBanner('departure', c.vesselId)
-      if (!flatOut && soundOn.value) sounds.play(c, playSpeed, performance.now())
+      if (!flatOut) sounds.play(c, playSpeed, performance.now())
     }
-  }
-
-  function toggleSound(): void {
-    soundOn.value = !soundOn.value
-    showToast(soundOn.value ? 'twin.toast.soundOn' : 'twin.toast.soundOff')
   }
 
   function toggleLockDaylight(): void {
@@ -615,7 +632,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     try {
       const state = await c.query(entityQueryKind(kind), id)
       const def = EQUIPMENT_KINDS.find((d) => d.kind === kind)
-      const extras: EntityExtras = (await def?.loadExtras?.(state, (q) => c.query(q))) ?? {}
+      const extras: EntityExtras = (await def?.loadExtras?.(state, (q, qid) => c.query(q, qid))) ?? {}
       if (kind === 'container') {
         // transit status is derived from the carriers' state; trucks matter only while the box is on one
         const onTruck = (state as ContainerState).custody.kind === 'truck'
@@ -1073,13 +1090,15 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     refreshEntity,
     bayViewerVesselId,
     bayViewerBay,
-    bayViewerColour,
+    colourBy,
+    hideRob,
+    setColourBy,
+    setHideRob,
     bayViewData,
     openBayViewer,
     closeBayViewer,
     refreshBayView,
     setBayViewerBay,
-    setBayViewerColour,
     inspectEvent,
     addBreakpoint,
     removeBreakpoint,
@@ -1107,9 +1126,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     setDashboardTab,
     refreshDashboard,
     helpOpen,
-    soundOn,
     sounds,
-    toggleSound,
+    positional,
     lockDaylight,
     toggleLockDaylight,
     banner,
