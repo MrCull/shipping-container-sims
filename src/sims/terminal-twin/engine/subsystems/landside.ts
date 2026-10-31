@@ -27,7 +27,7 @@
  */
 import type { EngineContext, ReactorMap } from '../context'
 import type { EventOf, TruckLegInfo } from '../events'
-import { planSegment, positionAt, type AxisProfile, type MotionSegment } from '../kinematics'
+import { cornerSpeedCap, planSegment, positionAt, type AxisProfile, type CornerModel, type MotionSegment } from '../kinematics'
 import {
   landsideGraphOf,
   landsideRoute,
@@ -86,6 +86,9 @@ export const landsideOf = (config: { landside?: LandsideConfig }): LandsideConfi
 
 const landside = (state: SimState): LandsideState => state.landside as LandsideState
 const counters = (state: SimState): LandsideKpiCounters => state.kpis.landside as LandsideKpiCounters
+/** [A] Trucks take the access-road turn and the loop corners at speed: radius and lateral acceleration of a tractor-trailer. */
+const TRUCK_CORNER: CornerModel = { radiusM: 12, lateralAccel: 1.5 }
+
 const driveOf = (ctx: EngineContext): AxisProfile => ctx.config.landside?.drive ?? DEFAULT_DRIVE
 const isInstant = (state: SimState): boolean => state.subsystems.landside === 'instant'
 const r3 = (n: number) => Math.round(n * 1000) / 1000
@@ -437,6 +440,33 @@ function processingTime(ctx: EngineContext, meanS: number): number {
 
 // ── gate queue ──────────────────────────────────────────────────────────────
 
+/**
+ * How a truck gets from where it appears to its queue slot. Generic: it appears on the terminal road at the spawn point
+ * and drives to the slot. With an access road (#146) it appears at the south end of the road, drives north to the
+ * gate junction and takes the right turn (east, towards the water) into the terminal road without stopping.
+ */
+function arrivalMotion(ctx: EngineContext, id: string, slot: number, t: number): MotionSegment[] {
+  const graph = graphOf(ctx)
+  const instant = isInstant(ctx.state)
+  const drive = driveOf(ctx)
+  const access = graph.access
+  if (!access) {
+    const seg = planSegment(id, 'z', graph.gate.spawnZ, slot, t, drive)
+    if (instant) seg.t1 = seg.t0
+    return [seg]
+  }
+  const queueX = graph.gate.queueX
+  // a slot beyond the junction (a very long queue) is reached by reversing, so no turn at speed then
+  const turn = slot < access.z ? Math.min(cornerSpeedCap(Math.PI / 2, TRUCK_CORNER), drive.vMax, Math.sqrt(Math.min(drive.accel, drive.decel) * Math.min(Math.abs(access.fromX - queueX), Math.abs(access.z - slot)))) : 0
+  const along = planSegment(id, 'x', access.fromX, queueX, t, drive, 0, turn)
+  const into = planSegment(id, 'z', access.z, slot, along.t1, drive, turn, 0)
+  if (instant) {
+    along.t1 = along.t0
+    into.t0 = into.t1 = along.t0
+  }
+  return [along, into]
+}
+
 /** The queued trucks' motion: each moves up to its slot (rest to rest, starting once its last move is over). */
 function planQueueMoves(ctx: EngineContext): void {
   const { state } = ctx
@@ -451,7 +481,8 @@ function planQueueMoves(ctx: EngineContext): void {
     if (Math.abs(from - target) < 1e-9) return
     const seg = planSegment(id, 'z', from, target, Math.max(state.now, rest?.at ?? state.now), driveOf(ctx))
     if (isInstant(state)) seg.t1 = seg.t0
-    truck.motion = [seg]
+    // with an access road the truck keeps the drive that brought it to the gate (it may still be under way)
+    truck.motion = graph.access ? [...truck.motion, seg] : [seg]
   })
 }
 
@@ -742,7 +773,7 @@ function planStallTrip(ctx: EngineContext, truck: TruckState, stallId: string): 
   const stall = landside(state).stalls[stallId]
   const truckId = truck.id
   truck.stallAssignedAt = state.now
-  const trip = new TripBuilder<PlannedType>(graph, truck.id, waypoints(graph, [truck.nodeId])[0], isInstant(state))
+  const trip = new TripBuilder<PlannedType>(graph, truck.id, waypoints(graph, [truck.nodeId])[0], isInstant(state), undefined, TRUCK_CORNER)
   const path = landsideRoute(graph, truck.nodeId, graph.stallNode[stallId])
   trip.mark('TruckRoutingToStall')
   trip.driveThrough(waypoints(graph, path).slice(1), driveOf(ctx))
@@ -796,7 +827,7 @@ function planExit(ctx: EngineContext, truck: TruckState): void {
   const stallNode = graph.stallNode[truck.stallId as string]
   let best: { trip: TripBuilder<PlannedType>; lane: GateLaneLayout; windows: WindowSpec[]; start: number } | null = null
   for (const lane of graph.outLanes) {
-    const trip = new TripBuilder<PlannedType>(graph, truck.id, waypoints(graph, [stallNode])[0], isInstant(state))
+    const trip = new TripBuilder<PlannedType>(graph, truck.id, waypoints(graph, [stallNode])[0], isInstant(state), undefined, TRUCK_CORNER)
     trip.mark('TruckRoutingToExit')
     const path = landsideRoute(graph, stallNode, lane.kioskNode)
     trip.driveThrough(waypoints(graph, path).slice(1), driveOf(ctx))
@@ -994,9 +1025,7 @@ export const landsideReactors: ReactorMap = {
     if (plan.fallback) k.fallbacks++
     k.gateQueueMax = Math.max(k.gateQueueMax, ls.queue.length)
     const slot = queueSlotZ(graph, truck.queueIndex)
-    const seg = planSegment(id, 'z', graph.gate.spawnZ, slot, e.t, driveOf(ctx))
-    if (isInstant(state)) seg.t1 = seg.t0
-    truck.motion = [seg]
+    truck.motion = arrivalMotion(ctx, id, slot, e.t)
     const infos: TruckLegInfo[] = legs.map((l) => ({
       kind: l.kind,
       purpose: l.purpose,

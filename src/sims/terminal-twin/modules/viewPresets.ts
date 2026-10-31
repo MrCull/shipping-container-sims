@@ -74,8 +74,8 @@ function yardRegion(model: SceneModel): ViewRegion | null {
 function gateRegion(model: SceneModel): ViewRegion | null {
   const ls = model.landside
   if (!ls) return null
-  const xs = [ls.gate.westX, ls.gate.eastX, ls.gate.queueX + 20, ...ls.stalls.map((s) => s.x)]
-  const zs = [ls.gate.kioskZ, ls.gate.entryZ, ls.gate.roadInZ, ls.gate.roadOutZ, ...ls.stalls.map((s) => s.z)]
+  const xs = [ls.gate.westX, ls.gate.eastX, ls.gate.queueX + 20, ...ls.stalls.map((s) => s.x), ...ls.loop.map((p) => p.x)]
+  const zs = [ls.gate.kioskZ, ls.gate.entryZ, ls.gate.roadInZ, ls.gate.roadOutZ, ...ls.stalls.map((s) => s.z), ...ls.loop.map((p) => p.z)]
   return {
     minX: Math.min(...xs) - GATE_MARGIN_M,
     maxX: Math.max(...xs) + GATE_MARGIN_M,

@@ -176,7 +176,32 @@ export class LandsideScene {
     plane(eastX - inX0 + w, w, (eastX + inX0) / 2, roadInZ, asphalt, 0.05, true)
     const outX0 = g.outLanes[0].x
     plane(eastX - outX0 + w, w, (eastX + outX0) / 2, roadOutZ, asphalt, 0.05, true)
-    plane(w, roadOutZ - roadInZ + w, eastX, (roadInZ + roadOutZ) / 2, asphalt, 0.05, true)
+    if (g.loop.length === 0) plane(w, roadOutZ - roadInZ + w, eastX, (roadInZ + roadOutZ) / 2, asphalt, 0.05, true)
+    // teardrop loop (#146): the road drawn along the very corners the trucks drive, rounded at every vertex
+    if (g.loop.length > 0) {
+      const path = [{ x: eastX, z: roadInZ }, ...g.loop, { x: eastX, z: roadOutZ }]
+      for (let i = 0; i + 1 < path.length; i++) {
+        const a = path[i]
+        const b = path[i + 1]
+        plane(Math.abs(b.x - a.x) + (a.x === b.x ? w : 0), Math.abs(b.z - a.z) + (a.z === b.z ? w : 0), (a.x + b.x) / 2, (a.z + b.z) / 2, asphalt, 0.05, true)
+        plane(Math.abs(b.x - a.x) || 0.15, Math.abs(b.z - a.z) || 0.15, (a.x + b.x) / 2, (a.z + b.z) / 2, line, 0.06)
+      }
+      for (const p of path.slice(1, -1)) {
+        const disc = new THREE.CircleGeometry(w / 2, 20)
+        batch.add(disc, asphalt, { x: p.x, y: 0.05, z: p.z }, { rotationX: GROUND_ROTATION_X, receiveShadow: true })
+        disc.dispose()
+      }
+    }
+    // access road (#146): from the south end along the Isla Verde carriageway, then right into the terminal road at the gate
+    if (g.access) {
+      const { z: az, fromX } = g.access
+      const gx = g.gate.queueX
+      const roadEnd = entryZ + 8 + 70 // where the gate approach pavement ends
+      plane(fromX - gx + w, w, (fromX + gx) / 2, az, asphalt, 0.05, true)
+      plane(fromX - gx, 0.15, (fromX + gx) / 2, az, line, 0.06)
+      plane(w, az - roadEnd + w / 2, gx, (az + w / 2 + roadEnd) / 2, asphalt, 0.05, true)
+      plane(0.15, az - roadEnd, gx, (az + roadEnd) / 2, line, 0.06)
+    }
     plane(eastX - inX0, 0.15, (eastX + inX0) / 2, roadInZ, line, 0.06) // centre lines
     plane(eastX - outX0, 0.15, (eastX + outX0) / 2, roadOutZ, line, 0.06)
     // stall spurs

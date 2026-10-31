@@ -6,12 +6,14 @@
 import { DEFAULT_HOURLY_PROFILE, ScenarioBuilder } from './builder'
 import { deriveBlockXs, deriveSts } from './layout'
 import { TTI_FLOW_MIX, generateVessels } from './vesselGenerator'
-import type { AppointmentConfig, FlowMix, HoldingConfig, PortRotation, ScenarioConfig, VesselConfig, YardStartConfig } from './types'
+import type { AccessRoadConfig, AppointmentConfig, FlowMix, HoldingConfig, PortRotation, ScenarioConfig, VesselConfig, YardStartConfig } from './types'
 import {
   PEAK_DAY_FLOW_MIX,
   PEAK_DAY_PRESET_NAME,
   PEAK_DAY_ROB,
   PEAK_DAY_ROTATION,
+  TTI_ACCESS_ROAD_RUNUP_M,
+  TTI_ACCESS_ROAD_Z,
   TTI_BAYS,
   TTI_BLOCKS,
   TTI_PRESET_NAME,
@@ -42,6 +44,8 @@ interface TerminalSpec {
   /** Truck appointment windows (TT-R15); absent = Poisson arrivals. */
   appointments?: AppointmentConfig
   holding?: HoldingConfig
+  /** The terminal's access road and teardrop loop (#146); absent = the generic landside layout. */
+  accessRoad?: AccessRoadConfig
   /** Reefers (R19): share of full boxes and the powered rows of every block; absent = none. */
   reefers?: { share: number; poweredRows: number[] }
   /** Port rotation of the service (spec #106): sets POL and POD; absent = the generic default rotation. */
@@ -49,6 +53,9 @@ interface TerminalSpec {
   /** ROB bays (spec #106): share of each vessel's bays held back as remain-on-board and their fill level; absent = none. */
   rob?: { bayFraction: number; fill: number }
 }
+
+/** TTI's access road (#146): the Isla Verde carriageway, entered `TTI_ACCESS_ROAD_RUNUP_M` south of the quay's end. */
+const ttiAccessRoad = (quayM: number): AccessRoadConfig => ({ z: TTI_ACCESS_ROAD_Z, fromX: quayM + TTI_ACCESS_ROAD_RUNUP_M })
 
 function terminal(spec: TerminalSpec): ScenarioConfig {
   const b = new ScenarioBuilder(spec.name, spec.description)
@@ -71,6 +78,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
       gate: { inLanes: spec.gate.inLanes, outLanes: spec.gate.outLanes, oogLane: true },
       ...(spec.appointments ? { appointments: spec.appointments } : {}),
       ...(spec.holding ? { holding: spec.holding } : {}),
+      ...(spec.accessRoad ? { accessRoad: spec.accessRoad, teardropLoop: true } : {}),
     })
     .endWhen({ vesselsCompleted: spec.vessels.length })
   if (spec.portRotation) b.containerProps({ portRotation: spec.portRotation })
@@ -117,6 +125,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       vessels: hubVessels(4, 3 * 3600, 900, 0.05, 11),
       yardStart: { mode: 'prefilled', targetPct: 60 },
       truckScale: 1,
+      accessRoad: ttiAccessRoad(850),
       reefers: TTI_REEFERS,
     }),
   [SMALL_PRESET_NAME]: () =>
@@ -167,6 +176,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       appointments: { windowS: 1800, bunching: [{ fromS: 0, toS: 7200, factor: 1.5 }], unverified: true },
       // [A] unverified: TTI's real number of holding positions is not public.
       holding: { positions: 6, unverified: true },
+      accessRoad: ttiAccessRoad(850),
       reefers: TTI_REEFERS,
       portRotation: PEAK_DAY_ROTATION,
       rob: PEAK_DAY_ROB,
