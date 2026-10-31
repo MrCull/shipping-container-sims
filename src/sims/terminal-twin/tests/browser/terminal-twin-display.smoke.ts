@@ -163,13 +163,11 @@ test.describe('British browser', () => {
     await page.keyboard.press('Space')
     expect((await clock()).paused).toBe(true)
 
-    // 1–9: speed steps (plays); 0: pause
-    await page.keyboard.press('3')
+    // Digit keys 1-9 no longer change speed (#138); the top bar buttons do; 0: pause
+    await page.getByRole('button', { name: '×5', exact: true }).click()
     expect(await clock()).toMatchObject({ speed: 5, paused: false })
-    await page.keyboard.press('9')
-    expect((await clock()).speed).toBe(600)
-    await page.keyboard.press('1')
-    expect((await clock()).speed).toBe(1)
+    for (const d of ['3', '9', '1']) await page.keyboard.press(d)
+    expect(await clock()).toMatchObject({ speed: 5, paused: false })
     await page.keyboard.press('0')
     expect((await clock()).paused).toBe(true)
 

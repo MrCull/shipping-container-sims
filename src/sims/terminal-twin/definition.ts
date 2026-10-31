@@ -10,7 +10,7 @@ export const definition: SimDefinition = {
   tagline: 'An event-driven digital twin of an automated container terminal',
   description:
     'A TOS test bench: watch ship-to-shore cranes work a vessel in 3D, run ' +
-    'reproducible seeded scenarios from real time up to ×600, and jump ahead ' +
+    'reproducible seeded scenarios from real time up to ×3600, and jump ahead ' +
     'with "Run to…". Built for trying terminal operating system logic.',
   icon: '🏗️',
   status: 'playable',

@@ -31,7 +31,7 @@ import { FEED_BUFFER_CAP } from '../modules/eventFeed'
 import type { Bucketing, KpiGroupId } from '../modules/dashboardModel'
 import { makeConfigSave, makeSnapshotSave, parseSaveFile, planLoad, saveFileName, SaveFormatError, type SaveFile, type SaveMeta, type SaveType } from '../persistence/saves'
 import { openSaveStore, StorageUnavailableError, type SaveStore } from '../persistence/saveStore'
-import { SPEEDS, TwinController } from '../modules/twinController'
+import { TwinController } from '../modules/twinController'
 import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/display'
 import { createFormatter } from '../i18n/format'
 import { t, type MessageKey, type MessageParams } from '../i18n/messages'
@@ -932,12 +932,6 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     if (config.value) config.value = markRaw({ ...config.value, display: { ...display.value } })
   }
 
-  /** Speed step by index into SPEEDS (keyboard 1–9); out of range is ignored. */
-  function setSpeedStep(index: number): void {
-    const s = SPEEDS[index]
-    if (s !== undefined) setSpeed(s)
-  }
-
   function pause(): void {
     ctl().pause()
     sync()
@@ -1174,7 +1168,6 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     dismissVersionPrompt,
     rewindTo,
     setRewindInterval,
-    setSpeedStep,
     pause,
     step,
     toggleFollow,
