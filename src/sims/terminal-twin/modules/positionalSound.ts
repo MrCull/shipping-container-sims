@@ -5,11 +5,19 @@
  * master gain 0 all voices are stopped and no AudioContext is created. A blocked or failing context is swallowed:
  * sound is never worth an error.
  */
-import { diffVoices, mixSources, type SoundKind, type SoundSource, type Vec3, type Voice } from './soundMixer'
+import { diffVoices, mixSources, SOUND_PROFILES, type SoundKind, type SoundSource, type Vec3, type Voice } from './soundMixer'
 
 const urls: Record<SoundKind, string> = {
   gantryAlarm: new URL('../assets/sounds/gantry-alarm.wav', import.meta.url).href,
+  motorWhine: new URL('../assets/sounds/motor-whine.wav', import.meta.url).href,
+  twistlock: new URL('../assets/sounds/twistlock.wav', import.meta.url).href,
+  landingThud: new URL('../assets/sounds/landing-thud.wav', import.meta.url).href,
+  reverseBeeper: new URL('../assets/sounds/reverse-beeper.wav', import.meta.url).href,
+  truckEngine: new URL('../assets/sounds/truck-engine.wav', import.meta.url).href,
+  airBrake: new URL('../assets/sounds/air-brake.wav', import.meta.url).href,
+  harbourAmbience: new URL('../assets/sounds/harbour-ambience.wav', import.meta.url).href,
 }
+const ALL_SOUNDS = Object.keys(urls) as SoundKind[]
 
 /** The parts of an AudioContext this layer uses (a fake stands in for it in tests). */
 export interface AudioContextLike {
@@ -90,6 +98,7 @@ export class PositionalSound {
     } catch {
       return null // no audio support
     }
+    for (const sound of ALL_SOUNDS) this.load(this.ctx, sound) // small files: ready before a short one-shot needs them
     return this.ctx
   }
 
@@ -105,7 +114,7 @@ export class PositionalSound {
     )
   }
 
-  /** Play what the mixer says for this frame. Cheap when nothing gantries: no voices, no work beyond the mix. */
+  /** Play what the mixer says for this frame. Cheap when nothing sounds: no voices, no work beyond the mix. */
   update(camera: Vec3, sources: readonly SoundSource[]): void {
     if (this.disposed) return
     if (this.clampedGain() <= 0) {
@@ -132,7 +141,7 @@ export class PositionalSound {
       const source = ctx.createBufferSource()
       const gain = ctx.createGain()
       source.buffer = buffer
-      source.loop = true
+      source.loop = SOUND_PROFILES[voice.sound].loop
       gain.gain.value = 0
       gain.gain.setTargetAtTime(voice.gain, ctx.currentTime, SMOOTH_S)
       source.connect(gain)
@@ -155,6 +164,14 @@ export class PositionalSound {
     const r = this.running.get(key)
     if (!r) return
     this.running.delete(key)
+    if (!SOUND_PROFILES[r.voice.sound].loop) {
+      // a one-shot rings out; only its nodes are freed when it ends
+      r.source.onended = () => {
+        r.source.disconnect()
+        r.gain.disconnect()
+      }
+      return
+    }
     try {
       if (this.ctx) r.gain.gain.setTargetAtTime(0, this.ctx.currentTime, SMOOTH_S / 2)
       r.source.stop((this.ctx?.currentTime ?? 0) + 0.12)

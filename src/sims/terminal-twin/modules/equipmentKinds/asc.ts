@@ -87,6 +87,7 @@ class AscRenderer implements KindRenderer {
       const gantrying = frame.live && model.isGantrying(id, t)
       this.host.beacons.update(id, { x: parts.blockX, y: 0, z: pose.z }, gantrying, frame.flashOn)
       frame.sounds.push({ id, machine: 'asc', x: parts.blockX, y: 8, z: pose.z, motion: gantrying ? 'gantrying' : 'idle' })
+      if (frame.live && model.isWorking(id, t)) frame.sounds.push({ id, machine: 'asc', x: pose.x, y: parts.height, z: pose.z, motion: 'working' })
       const lx = pose.x - parts.blockX
       const boxHeight = frame.carried.get(id)
       if (parts.rig) {

@@ -83,6 +83,28 @@ export interface StsPose {
   hoistY: number
 }
 
+/** A short sound moment (#129): a spreader locking or unlocking, a box landing, a truck braking to a stop. */
+export interface SoundShot {
+  t: number
+  machine: 'sts' | 'asc' | 'shc' | 'truck'
+  id: string
+  motion: 'locking' | 'unlocking' | 'landing' | 'braking'
+  x: number
+  y: number
+  z: number
+}
+
+interface Handoff {
+  t: number
+  containerId: string
+  from: CustodyRef | null
+  to: CustodyRef
+}
+
+const CARRIER_KINDS = new Set(['sts', 'asc', 'shc'])
+/** Handoffs are kept this long (s) behind the display time. */
+const HANDOFF_KEEP_S = 5
+
 interface CustodyEntry {
   t: number
   owner: CustodyRef
@@ -256,6 +278,8 @@ export class SceneModel {
   private reservations: Record<string, Reservation[]> = {}
   private axisSegments: Record<string, Record<Axis, MotionSegment[]>> = {}
   private drives: Record<string, DriveLeg[]> = {}
+  /** Custody changes in time order, for the sound shots; trimmed by `prune`. */
+  private handoffs: Handoff[] = []
   private custody: Record<string, CustodyEntry[]> = {}
   private status: Record<string, StatusEntry[]> = {}
   /** Hatch panels of the vessels' bays (TT-R10), in id order; empty with hatch covers off. */
@@ -440,7 +464,10 @@ export class SceneModel {
       }
     }
     for (const c of delta.custody) {
-      this.custody[c.containerId]?.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
+      const list = this.custody[c.containerId]
+      if (!list) continue
+      this.handoffs.push({ t: c.t, containerId: c.containerId, from: list.length > 0 ? list[list.length - 1].owner : null, to: c.owner })
+      list.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
     }
     for (const e of delta.entities) {
       this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX })
@@ -507,6 +534,8 @@ export class SceneModel {
       const i = lastAtOrBefore(list, time, (l) => l.t0)
       if (i > 0) list.splice(0, i)
     }
+    const keep = this.handoffs.findIndex((h) => h.t >= time - HANDOFF_KEEP_S)
+    if (keep !== 0) this.handoffs.splice(0, keep < 0 ? this.handoffs.length : keep)
     for (const [zone, list] of Object.entries(this.reservations)) this.reservations[zone] = list.filter((r) => r.to >= time)
     // trucks that left before `time` are not drawn any more: forget them
     for (const id of [...this.truckIds]) {
@@ -623,6 +652,70 @@ export class SceneModel {
     const list = this.axisSegments[id]?.gantry ?? []
     const i = lastAtOrBefore(list, time, (s) => s.t0)
     return i >= 0 && time < list[i].t1 && list[i].from !== list[i].to
+  }
+
+  /** True while an STS or ASC trolley or hoist segment is in progress at `time` (the motor and cable whine). */
+  isWorking(id: string, time: number): boolean {
+    const axes = this.axisSegments[id]
+    if (!axes) return false
+    return (['trolley', 'hoist'] as const).some((axis) => {
+      const list = axes[axis]
+      const i = lastAtOrBefore(list, time, (s) => s.t0)
+      return i >= 0 && time < list[i].t1 && list[i].from !== list[i].to
+    })
+  }
+
+  private driveLegAt(id: string, time: number): DriveLeg | null {
+    const list = this.drives[id]
+    if (!list) return null
+    const i = lastAtOrBefore(list, time, (l) => l.t0)
+    return i >= 0 && time < list[i].t1 ? list[i] : null
+  }
+
+  /** True while an SHC or truck is under way (a drive leg is in progress). */
+  isDriving(id: string, time: number): boolean {
+    return this.driveLegAt(id, time) !== null
+  }
+
+  /** True while an SHC or truck backs up (a drive leg against its heading, with no turn): the reversing beeper. */
+  isReversing(id: string, time: number): boolean {
+    return this.driveLegAt(id, time)?.fwd === -1
+  }
+
+  /**
+   * The sound moments in `(t0, t1]`: a box picked up (spreader locks) or set down (unlocks and lands) by an STS, ASC
+   * or SHC, and a truck's drive leg ending (air brake). Windowed rather than asked at a time, so a short sound is
+   * still found when playback is fast and a frame spans many seconds.
+   */
+  shotsBetween(t0: number, t1: number): SoundShot[] {
+    const out: SoundShot[] = []
+    let lo = 0
+    let hi = this.handoffs.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (this.handoffs[mid].t <= t0) lo = mid + 1
+      else hi = mid
+    }
+    for (let i = lo; i < this.handoffs.length && this.handoffs[i].t <= t1; i++) {
+      const h = this.handoffs[i]
+      const fromCarrier = h.from && CARRIER_KINDS.has(h.from.kind) && !(h.to.kind === h.from.kind && h.to.id === h.from.id)
+      const toCarrier = CARRIER_KINDS.has(h.to.kind) && !(h.from && h.to.kind === h.from.kind && h.to.id === h.from.id)
+      const at = this.containerCentre(h.containerId, h.t) // where the box is at the change: under the new owner
+      if (!at) continue
+      if (toCarrier) out.push({ t: h.t, machine: h.to.kind as SoundShot['machine'], id: h.to.id, motion: 'locking', ...at })
+      if (fromCarrier && h.from) {
+        out.push({ t: h.t, machine: h.from.kind as SoundShot['machine'], id: h.from.id, motion: 'unlocking', ...at })
+        if (!toCarrier) out.push({ t: h.t, machine: h.from.kind as SoundShot['machine'], id: h.from.id, motion: 'landing', ...at })
+      }
+    }
+    for (const id of this.truckIds) {
+      for (const leg of this.drives[id] ?? []) {
+        if (leg.t1 <= t0 || leg.t1 > t1) continue
+        const p = this.truckPose(id, leg.t1)
+        out.push({ t: leg.t1, machine: 'truck', id, motion: 'braking', x: p.x, y: 1.5, z: p.z })
+      }
+    }
+    return out
   }
 
   stsPose(stsId: string, time: number): StsPose {

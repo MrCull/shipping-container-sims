@@ -75,6 +75,7 @@ class ShcRenderer implements KindRenderer {
     const { t, cameraPosition } = frame
     for (const [id, parts] of this.shcs) {
       const pose = model.shcPose(id, t)
+      if (frame.live && model.isReversing(id, t)) frame.sounds.push({ id, machine: 'shc', x: pose.x, y: 3, z: pose.z, motion: 'reversing' })
       if (parts.rig) {
         const boxHeight = frame.carried.get(id)
         parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 4, cameraPosition.z - pose.z) / frame.lodScale)

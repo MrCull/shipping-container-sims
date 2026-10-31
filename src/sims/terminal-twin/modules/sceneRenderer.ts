@@ -27,6 +27,7 @@ import { liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './con
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { beaconFlashOn, GantryBeacons } from './gantryBeacons'
 import type { SoundSource } from './soundMixer'
+import { ShotTracker } from './soundShots'
 import type { LandsideStats } from './landsideRenderer'
 import { EQUIPMENT_KINDS, type EquipmentKindDef, type KindFrame, type KindRenderer, type KindRendererHost } from './equipmentKinds'
 import { GROUND_ROTATION_X, StaticBatch } from './staticBatch'
@@ -98,6 +99,9 @@ export interface RenderedLivery {
 
 const LAND_RAIL_Z = STS.waterRailZ + STS.gauge
 
+/** The scene's ambience (gulls, water, wind): not a machine, the same level everywhere. */
+const HARBOUR_SOURCE: SoundSource = { id: 'harbour', machine: 'harbour', x: 0, y: 0, z: 0, motion: 'idle' }
+
 export class SceneRenderer {
   readonly scene = new THREE.Scene()
   private containers: ContainerInstancer
@@ -107,6 +111,7 @@ export class SceneRenderer {
   private renderers: { def: EquipmentKindDef; renderer: KindRenderer }[] = []
   private beacons: GantryBeacons
   private sounds: SoundSource[] = []
+  private shots = new ShotTracker()
   /** True while the sim clock runs: cranes only gantry (alarm, beacons) when time moves. */
   live = false
   private laneOverlay: THREE.Group
@@ -484,6 +489,8 @@ export class SceneRenderer {
     this.sounds.length = 0
     const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), sounds: this.sounds }
     for (const { renderer } of this.renderers) renderer.update(frame)
+    this.shots.update(model, t, this.live, performance.now(), this.sounds) // twistlock clunk, landing thud, air brake
+    this.sounds.push(HARBOUR_SOURCE) // harbour ambience: not positional, always faint
     this.reservedZones = 0
     const active = this.overlays.reservations ? model.activeReservations(t) : {}
     for (const [zone, mesh] of this.zoneMeshes) {
