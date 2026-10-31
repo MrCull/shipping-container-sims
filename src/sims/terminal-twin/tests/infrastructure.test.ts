@@ -242,7 +242,7 @@ describe('instancing and draw calls', () => {
 
 describe('backdrop scope', () => {
   it('replaces the procedural backdrop with the GLB meshes for the TTI presets only', () => {
-    expect(backdropModelAssets(sceneryFor(TTI_PRESET_NAME))).toEqual(['backdrop-rock', 'backdrop-hills', 'backdrop-coast'])
+    expect(backdropModelAssets(sceneryFor(TTI_PRESET_NAME)).slice(0, 3)).toEqual(['backdrop-rock', 'backdrop-hills', 'backdrop-coast']) // the surroundings follow (surroundings.test.ts)
     expect(backdropModelAssets(sceneryFor('Small automated'))).toEqual([])
     const assets: InfraAssets = {
       material: new THREE.MeshStandardMaterial(),

@@ -1,6 +1,19 @@
 {
-  "$comment": "Phase 2 asset budgets (spec #24, 'Phase 2 asset pipeline'). Checked by `pnpm run tt:assets:check` and tests/asset-budgets.test.ts. Triangles and draw calls are per LOD subtree; maxFileBytes is per GLB; libraryMaxBytes is all GLBs together.",
+  "$comment": "Phase 2 asset budgets (spec #24, 'Phase 2 asset pipeline'). Groups (#123): named sets of assets whose totals over all LODs are capped together; tti-surroundings must equal SURROUNDINGS in terminals/tti-algeciras/constants.ts. Checked by `pnpm run tt:assets:check` and tests/asset-budgets.test.ts. Triangles and draw calls are per LOD subtree; maxFileBytes is per GLB; libraryMaxBytes is all GLBs together.",
   "libraryMaxBytes": 15000000,
+  "groups": {
+    "tti-surroundings": {
+      "assets": [
+        "scenery-shore",
+        "scenery-anchorage",
+        "scenery-tanks",
+        "scenery-landside",
+        "scenery-town"
+      ],
+      "maxTriangles": 8000,
+      "maxDrawCalls": 5
+    }
+  },
   "requiredMetaFields": [
     "asset",
     "kind",
@@ -288,6 +301,19 @@
         }
       },
       "maxFileBytes": 200000,
+      "requiredNodes": [
+        "LOD0"
+      ]
+    },
+    "scenery": {
+      "$comment": "Spec #116 / #123: one merged mesh (one draw call) per piece of a terminal's surroundings; the group budget below caps the whole set.",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 5000,
+          "maxDrawCalls": 1
+        }
+      },
+      "maxFileBytes": 250000,
       "requiredNodes": [
         "LOD0"
       ]

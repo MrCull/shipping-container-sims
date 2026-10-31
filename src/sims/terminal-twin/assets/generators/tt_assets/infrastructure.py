@@ -643,6 +643,256 @@ def build_backdrop_coast(atlas_image):
     return a.root, a.info(dims, [{'fact': 'generic coastline strip, 6 km long, 6-26 m', 'tag': 'A'}], limits={}, attach=[], backdrop={'distanceM': 6200})
 
 
+
+# ---- TTI Algeciras surroundings (spec #116, ticket #123) -----------------------
+# Five merged meshes, one draw call each, flat swatches only: the shoreline of Gibraltar and La Linea, vessels at anchor,
+# the storage tanks, the Isla Verde road and rail with warehouses, and Algeciras town blocks inland. Every asset has its
+# origin where the renderer places it (src/sims/terminal-twin/terminals/tti-algeciras/constants.ts `SURROUNDINGS`):
+# scene axes, +x south along the quay, +z landward (west), water towards -z (east); y = 0 is the asset's own base (sea
+# level for the shore and the anchorage). Everything is seeded: no photo is read, the generator runs without them.
+TOWN_SIDES = ['wall_cream', 'light_grey', 'wall_grey', 'white', 'sand']
+TOWN_ROOFS = ['soil', 'roof_grey', 'soil', 'orange']
+
+
+def _poly_prism(p, pts, y0, y1, side, top=None):
+    """Convex footprint `pts` ((x, z) in glTF axes, any winding) extruded from y0 to y1: side faces and a top, no bottom."""
+    n = len(pts)
+    cx = sum(q[0] for q in pts) / n
+    cz = sum(q[1] for q in pts) / n
+    for i in range(n):
+        (x0, z0), (x1, z1) = pts[i], pts[(i + 1) % n]
+        mx, mz = (x0 + x1) / 2 - cx, (z0 + z1) / 2 - cz
+        p.m.quad([gv((x0, y0, z0)), gv((x1, y0, z1)), gv((x1, y1, z1)), gv((x0, y1, z0))], [p.atlas.swatch_uv(side)] * 4, outward=gv((mx, 0, mz)))
+    p.m.ngon([gv((x, y1, z)) for x, z in pts], [p.atlas.swatch_uv(top or side)] * n, outward=gv((0, 1, 0)))
+
+
+def _rot(x, z, ang):
+    c, s = math.cos(ang), math.sin(ang)
+    return (x * c + z * s, -x * s + z * c)
+
+
+def _obox(p, cx, cz, lx, lz, ang, y0, y1, side, top=None):
+    """A box of footprint lx (along the heading) by lz, centred at (cx, cz) and turned by `ang` about +Y."""
+    pts = []
+    for sx, sz in ((-1, -1), (-1, 1), (1, 1), (1, -1)):
+        rx, rz = _rot(sx * lx / 2, sz * lz / 2, ang)
+        pts.append((cx + rx, cz + rz))
+    _poly_prism(p, pts, y0, y1, side, top)
+
+
+def _building(p, x0, z0, x1, z1, y0, y1, side, roof):
+    p.gbox((x0, y0, z0), (x1, y1, z1), side, ('+x', '-x', '+z', '-z'))
+    p.gbox((x0, y1, z0), (x1, y1 + 0.01, z1), roof, ('+y',))
+
+
+def _gable(p, x0, z0, x1, z1, y0, y1, ridge, side, roof):
+    """A warehouse: walls and a gabled roof whose ridge runs along x."""
+    zm = (z0 + z1) / 2
+    p.gbox((x0, y0, z0), (x1, y1, z1), side, ('+x', '-x', '+z', '-z'))
+    sw = p.atlas.swatch_uv(roof)
+    p.m.quad([gv((x0, y1, z0)), gv((x1, y1, z0)), gv((x1, ridge, zm)), gv((x0, ridge, zm))], [sw] * 4, outward=gv((0, 1, -1)))
+    p.m.quad([gv((x0, y1, z1)), gv((x1, y1, z1)), gv((x1, ridge, zm)), gv((x0, ridge, zm))], [sw] * 4, outward=gv((0, 1, 1)))
+    for xx, nx in ((x0, -1), (x1, 1)):
+        p.m.ngon([gv((xx, y1, z0)), gv((xx, y1, z1)), gv((xx, ridge, zm))], [p.atlas.swatch_uv(side)] * 3, outward=gv((nx, 0, 0)))
+
+
+def _town_blocks(p, rnd, x0, x1, z0, z1, count, hmin, hmax, ground, keep=None):
+    """`count` low blocks scattered over the rectangle; `ground(x, z)` is the terrain height they stand on."""
+    for _ in range(count):
+        x, z = x0 + rnd() * (x1 - x0), z0 + rnd() * (z1 - z0)
+        w, d, h = 22 + rnd() * 30, 22 + rnd() * 34, hmin + rnd() * (hmax - hmin)
+        side = TOWN_SIDES[int(rnd() * len(TOWN_SIDES))]
+        roof = TOWN_ROOFS[int(rnd() * len(TOWN_ROOFS))]
+        if keep and not keep(x, z):
+            continue
+        g = ground(x, z)
+        _building(p, x - w / 2, z - d / 2, x + w / 2, z + d / 2, g - 1.0, g + h, side, roof)
+
+
+def build_scenery_shore(atlas_image):
+    a = Asset('scenery-shore', 'scenery', make_material(atlas_image, 1.0), 'low shoreline of Gibraltar and La Linea below the Rock (origin = the Rock\'s centre at sea level; -x north, +z west toward Algeciras)')
+    rnd = _lcg(31)
+    p = GPart(ATLAS_OBJ)
+    # Gibraltar town strip along the Rock's west foot, and the isthmus north of it (flat, the airfield runs across it)
+    xs = [-3500 + i * 5900 / 40 for i in range(41)]
+    zs = [300, 470, 640, 760]
+
+    def foot(i, j):
+        x = xs[i]
+        if x < -2550:  # isthmus: flat and level with the sea wall
+            return 3.0 if j < 3 else 1.0
+        return (9.0 - 2.6 * j) * (0.6 + 0.4 * min(1.0, (x + 2550) / 500))
+
+    _heightfield(p, xs, zs, foot, lambda h, s: 'sand' if h < 4 else 'scrub')
+    # La Linea: a low town on the flat land north-west of the isthmus
+    lx = [-6400 + i * 2900 / 14 for i in range(15)]
+    lz = [300 + j * 1500 / 6 for j in range(7)]
+
+    def linea_h(i, j):
+        return 2.0 + 6.0 * min(1.0, (lz[j] - 300) / 900.0) + (lx[i] + 6400) * 0.0005
+
+    def linea_at(x, z):
+        return linea_h(min(14, max(0, round((x + 6400) / (2900 / 14)))), min(6, max(0, round((z - 300) / (1500 / 6)))))
+
+    _heightfield(p, lx, lz, linea_h, lambda h, s: 'sand' if h < 3.5 else 'scrub')
+    _town_blocks(p, rnd, -6300, -3600, 380, 1650, 70, 9, 24, linea_at)
+    _town_blocks(p, rnd, -2300, 2100, 340, 640, 56, 8, 22, lambda x, z: 6.0)
+    # airfield runway across the isthmus (runs east-west = along z) and Gibraltar's long moles into the bay
+    p.gbox((-3050, 3.0, 20), (-2980, 3.06, 1500), 'asphalt', ('+y',))
+    p.gbox((-1700, 0.0, 700), (-1640, 4.0, 2300), 'concrete', ('+x', '-x', '+y', '+z'))
+    p.gbox((300, 0.0, 700), (350, 4.0, 1700), 'concrete', ('+x', '-x', '+y', '+z'))
+    a.mesh('shore', p, 'faceted shoreline strip with small town blocks, the airfield runway and two moles')
+    dims = {'lengthM': 9400, 'widthM': 2100, 'heightM': 34, 'tag': 'A', 'reason': 'silhouette of the Gibraltar and La Linea shore, not a survey'}
+    return a.root, a.info(dims, [{'fact': 'Gibraltar town on the Rock\'s west foot, the isthmus and airfield to its north, La Linea beyond', 'tag': 'V', 'source': 'reference aerial and map (what lies where)'},
+                                 {'fact': 'block sizes, heights and street pattern are seeded noise', 'tag': 'A', 'reason': 'silhouette only'}],
+                  limits={}, attach=[], scenery={'terminal': 'tti-algeciras', 'distanceM': 9200})
+
+
+def _ship(p, cx, cz, length, beam, ang, kind, rnd):
+    """A vessel at anchor: hull (pointed bow along +heading), deck, aft bridge house and funnel, and cargo by `kind`."""
+    fb = 6.0 + beam * 0.18
+    hull_col = {'tanker': 'black', 'bulk': 'blue', 'container': 'red', 'ferry': 'white'}[kind]
+    pts = []
+    for hx, hz in ((-length / 2, -beam / 2), (-length / 2, beam / 2), (length * 0.22, beam / 2), (length / 2, 0.0), (length * 0.22, -beam / 2)):
+        rx, rz = _rot(hx, hz, ang)
+        pts.append((cx + rx, cz + rz))
+    _poly_prism(p, pts, -3.0, fb, hull_col, 'steel_dark' if kind != 'ferry' else 'light_grey')
+    ax, az = _rot(-length * 0.36, 0.0, ang)
+    _obox(p, cx + ax, cz + az, length * 0.075, beam * 0.8, ang, fb, fb + 14, 'white', 'light_grey')
+    _obox(p, cx + ax, cz + az, length * 0.04, beam * 0.9, ang, fb + 14, fb + 17, 'white', 'light_grey')
+    fx, fz = _rot(-length * 0.41, 0.0, ang)
+    _obox(p, cx + fx, cz + fz, length * 0.025, beam * 0.2, ang, fb + 14, fb + 24, 'orange' if kind != 'container' else 'red', 'black')
+    if kind == 'container':
+        cols = ['orange', 'blue', 'red', 'green', 'light_grey', 'white']
+        for k in range(4):
+            bx, bz = _rot(-length * 0.2 + k * length * 0.15, 0.0, ang)
+            _obox(p, cx + bx, cz + bz, length * 0.125, beam * 0.8, ang, fb, fb + 7 + rnd() * 6, cols[int(rnd() * len(cols))], cols[int(rnd() * len(cols))])
+    elif kind == 'bulk':
+        for k in range(5):
+            bx, bz = _rot(-length * 0.22 + k * length * 0.15, 0.0, ang)
+            _obox(p, cx + bx, cz + bz, length * 0.1, beam * 0.55, ang, fb, fb + 2.2, 'steel', 'zinc')
+    elif kind == 'tanker':
+        _obox(p, cx, cz, length * 0.62, 2.0, ang, fb, fb + 2.0, 'zinc', 'zinc')
+
+
+# name, kind, x, z, length, beam, heading (rad): anchored ships swing to the same wind, mostly head to the south-east
+ANCHORAGE = [
+    ('a1', 'tanker', -2900, -900, 245, 42, 0.35), ('a2', 'bulk', -2100, 700, 190, 32, 0.30),
+    ('a3', 'container', -1200, -1500, 300, 46, 0.40), ('a4', 'tanker', -300, 1300, 330, 58, 0.25),
+    ('a5', 'bulk', 600, -700, 225, 32, 0.38), ('a6', 'container', 1500, 1500, 260, 40, 0.30),
+    ('a7', 'tanker', 2300, -300, 183, 32, 0.42), ('a8', 'bulk', 3100, 900, 200, 32, 0.28),
+    ('a9', 'ferry', -3600, 400, 140, 24, 0.50),
+]
+
+
+def build_scenery_anchorage(atlas_image):
+    a = Asset('scenery-anchorage', 'scenery', make_material(atlas_image, 1.0), 'nine vessels at anchor in the bay (origin at sea level, in the middle of the anchorage)')
+    rnd = _lcg(41)
+    p = GPart(ATLAS_OBJ)
+    for _name, kind, x, z, length, beam, ang in ANCHORAGE:
+        _ship(p, x, z, length, beam, ang, kind, rnd)
+    a.mesh('anchorage', p, 'tankers, bulk carriers, two container ships and a ferry on the roads')
+    dims = {'lengthM': 6900, 'widthM': 3000, 'heightM': 45, 'tag': 'A', 'reason': 'positions are illustrative: the anchorage is a handful of ships scattered over the bay'}
+    return a.root, a.info(dims, [{'fact': 'vessels at anchor scattered across the bay, none in the berth approach', 'tag': 'V', 'source': 'reference aerial of the bay'},
+                                 {'fact': 'ship lengths 140-330 m, beams 24-58 m, headings near-parallel', 'tag': 'A', 'reason': 'typical bay traffic'}],
+                  limits={}, attach=[], scenery={'terminal': 'tti-algeciras', 'ships': len(ANCHORAGE)})
+
+
+def build_scenery_tanks(atlas_image):
+    a = Asset('scenery-tanks', 'scenery', make_material(atlas_image, 1.0), 'storage tank farm south-west of the terminal (origin at ground level in the middle of the farm)')
+    rnd = _lcg(51)
+    p = GPart(ATLAS_OBJ)
+    p.gbox((-210, -1.3, -120), (210, 0.05, 120), 'concrete_dark', ('+x', '-x', '+y', '+z', '-z'))
+    walls = ['white', 'light_grey', 'white', 'wall_grey']
+    k = 0
+    for ix in range(6):
+        for iz in range(2):
+            x, z = -165 + ix * 66, -62 + iz * 124
+            r = 15 + 8 * rnd() if ix % 3 else 11 + 4 * rnd()
+            h = 14 + 10 * rnd()
+            wall = walls[k % len(walls)]
+            k += 1
+            p.grevolve((x, 0.05, z), 'y', [(r, 0.0, 'r', wall), (r, h, 'a+', 'roof_grey'), (0, h + r * 0.07, 'a+', 'roof_grey')], 16)
+    # bund walls and a pipe rack between the rows
+    p.gbox((-205, 0.05, -112), (205, 1.2, -108), 'concrete', ('+x', '-x', '+y', '+z', '-z'))
+    p.gbox((-205, 0.05, 108), (205, 1.2, 112), 'concrete', ('+x', '-x', '+y', '+z', '-z'))
+    p.gbox((-200, 5.0, -1.0), (200, 5.6, 1.0), 'steel_dark')
+    a.mesh('tanks', p, 'twelve cone-roofed storage tanks with bund walls and a pipe rack')
+    dims = {'lengthM': 420, 'widthM': 240, 'heightM': 30, 'tag': 'A', 'reason': 'tank count and sizes read from the reference aerial, not surveyed'}
+    return a.root, a.info(dims, [{'fact': 'white cone-roofed storage tanks beside the Isla Verde road at the terminal\'s south-west corner', 'tag': 'V', 'source': 'reference aerial of the terminal'},
+                                 {'fact': 'twelve tanks, 11-23 m radius, 14-24 m high', 'tag': 'A', 'reason': 'silhouette only'}],
+                  limits={}, attach=[], scenery={'terminal': 'tti-algeciras'})
+
+
+def build_scenery_landside(atlas_image):
+    a = Asset('scenery-landside', 'scenery', make_material(atlas_image, 1.0), 'Isla Verde road and rail along the landside with a freight train and warehouses (origin at ground level on the road line, x = the terminal\'s middle)')
+    rnd = _lcg(61)
+    p = GPart(ATLAS_OBJ)
+    X0, X1 = -2800.0, 3200.0
+    # raised embankment under the whole run so it never floats over the lower ground beyond the apron
+    p.gbox((X0, -1.3, -34), (X1, -0.02, 22), 'concrete_dark', ('+x', '-x', '+z', '-z'))
+    p.gbox((X0, -0.02, -34), (X1, 0.04, -4), 'asphalt', ('+y',))          # the road, 30 m with its verge
+    p.gbox((X0, 0.04, -20), (X1, 0.06, -19.8), 'white', ('+y',))           # edge lines and the centre line
+    p.gbox((X0, 0.04, -5.2), (X1, 0.06, -5.0), 'white', ('+y',))
+    p.gbox((X0, 0.04, -19.1), (X1, 0.06, -18.9), 'yellow', ('+y',))
+    p.gbox((X0, -0.02, 4), (X1, 0.14, 20), 'soil', ('+y',))                # ballast
+    for rz in (7.2, 8.65, 15.2, 16.65):                                      # two tracks
+        p.gbox((X0, 0.14, rz), (X1, 0.3, rz + 0.12), 'steel', ('+y', '+z', '-z'))
+    # a freight train of flat wagons carrying boxes on the inner track
+    colours = ['orange', 'blue', 'red', 'green', 'light_grey', 'white']
+    x = 380.0
+    for w in range(14):
+        x = 380 + w * 20.0
+        p.gbox((x, 0.5, 7.0), (x + 18.5, 1.1, 8.9), 'steel_dark', ('+x', '-x', '+y', '+z', '-z'))
+        for c in range(2):
+            col = colours[int(rnd() * len(colours))]
+            p.gbox((x + 0.4 + c * 9.0, 1.1, 7.1), (x + 8.9 + c * 9.0, 3.7, 8.8), col, ('+x', '-x', '+y', '+z', '-z'))
+    p.gbox((x + 21.0, 0.5, 7.0), (x + 29.0, 4.2, 8.9), 'red', ('+x', '-x', '+y', '+z', '-z'))   # the locomotive
+    # warehouses on the inland side of the road, clear of the terminal's own yard and gate
+    xw = X0 + 200
+    while xw < X1 - 300:
+        if 100 < xw < 900:
+            xw = 900.0
+            continue
+        w, d = 70 + rnd() * 90, 40 + rnd() * 50
+        z0 = 70 + rnd() * 60
+        _gable(p, xw, z0, xw + w, z0 + d, -0.5, 9 + rnd() * 5, 13 + rnd() * 6, TOWN_SIDES[int(rnd() * 3)], 'roof_grey' if rnd() < 0.7 else 'soil')
+        xw += w + 40 + rnd() * 160
+    a.mesh('landside', p, 'embankment with road, rail, a freight train and warehouses')
+    dims = {'lengthM': 6000, 'widthM': 190, 'heightM': 20, 'tag': 'A', 'reason': 'a road and a two-track rail line beside the terminal, as in the reference aerial'}
+    return a.root, a.info(dims, [{'fact': 'the Isla Verde road and rail run along the terminal\'s landside, parallel to the quay', 'tag': 'V', 'source': 'reference aerial of the terminal'},
+                                 {'fact': 'road 30 m with verge, two tracks at standard gauge, warehouse sizes seeded', 'tag': 'A', 'reason': 'silhouette only'}],
+                  limits={}, attach=[], scenery={'terminal': 'tti-algeciras'})
+
+
+def build_scenery_town(atlas_image):
+    a = Asset('scenery-town', 'scenery', make_material(atlas_image, 1.0), 'low-detail Algeciras town blocks on rising ground inland (origin at the ground\'s toe, x = the terminal\'s middle)')
+    rnd = _lcg(71)
+    p = GPart(ATLAS_OBJ)
+    xs = [-3200 + i * 7000 / 28 for i in range(29)]
+    zs = [j * 2600 / 10 for j in range(11)]
+    noise = [[rnd() for _ in zs] for _ in xs]
+
+    def ground(x, z):
+        return 4.0 + z * 0.05 + 8.0 * math.sin(x / 700.0) * math.sin(z / 500.0)
+
+    def height(i, j):
+        return ground(xs[i], zs[j]) + noise[i][j] * 3.0
+
+    _heightfield(p, xs, zs, height, lambda h, s: 'hill_green' if h > 45 else 'scrub')
+
+    def keep(x, z):
+        # dense toward the north (-x) and the coast road, thinning to the south and uphill
+        return rnd() < 1.0 - 0.45 * ((x + 3200) / 7000) - 0.5 * (z / 2600)
+
+    _town_blocks(p, rnd, -3100, 3600, 60, 2400, 340, 12, 38, ground, keep)
+    a.mesh('town', p, 'faceted rising ground with low blocks of flats')
+    dims = {'lengthM': 7000, 'widthM': 2600, 'heightM': 140, 'tag': 'A', 'reason': 'low-detail town, not a street plan'}
+    return a.root, a.info(dims, [{'fact': 'Algeciras lies inland of the terminal, dense to the north and west, thinning up the slopes', 'tag': 'V', 'source': 'reference aerial of the bay and the view from the Algeciras hills'},
+                                 {'fact': 'block footprints 22-52 m, heights 12-38 m', 'tag': 'A', 'reason': 'silhouette only'}],
+                  limits={}, attach=[], scenery={'terminal': 'tti-algeciras'})
+
+
 # name, builder, preview views (each ((x, y, z) camera, (x, y, z) target) in glTF axes), ground size
 ASSETS = [
     ('gate-lane', lambda img: build_gate_lane(img, False), [((8, 6.5, -14), (0, 2.5, 0)), ((0, 2.2, -16), (0, 2.5, 0))], 40.0),
@@ -663,4 +913,9 @@ ASSETS = [
     ('backdrop-rock', build_backdrop_rock, [((0, 1800, 7000), (0, 150, 0)), ((-1500, 300, 3200), (-500, 200, 0))], 14000.0),
     ('backdrop-hills', build_backdrop_hills, [((0, 700, 6500), (0, 150, 0))], 20000.0),
     ('backdrop-coast', build_backdrop_coast, [((0, 120, 4000), (0, 0, 0))], 10000.0),
+    ('scenery-shore', build_scenery_shore, [((-1500, 900, 4500), (-1500, 0, 0)), ((-4800, 300, 3000), (-4800, 0, 1000))], 14000.0),
+    ('scenery-anchorage', build_scenery_anchorage, [((0, 1600, 5200), (0, 0, 0)), ((-1200, 300, 500), (-1200, 10, -1500))], 14000.0),
+    ('scenery-tanks', build_scenery_tanks, [((0, 220, 560), (0, 8, 0)), ((120, 40, 200), (0, 10, 0))], 700.0),
+    ('scenery-landside', build_scenery_landside, [((200, 400, 700), (200, 0, 0)), ((420, 12, 60), (420, 2, 8))], 7000.0),
+    ('scenery-town', build_scenery_town, [((0, 1700, 4800), (0, 40, 1300))], 14000.0),
 ]

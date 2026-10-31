@@ -1,0 +1,68 @@
+{
+  "asset": "scenery-town",
+  "kind": "scenery",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 7000,
+    "widthM": 2600,
+    "heightM": 140,
+    "tag": "A",
+    "reason": "low-detail town, not a street plan"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "scenery-town",
+      "role": "lod",
+      "description": "low-detail Algeciras town blocks on rising ground inland (origin at the ground's toe, x = the terminal's middle)"
+    },
+    {
+      "name": "town",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "faceted rising ground with low blocks of flats"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 2380,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "Algeciras lies inland of the terminal, dense to the north and west, thinning up the slopes",
+      "tag": "V",
+      "source": "reference aerial of the bay and the view from the Algeciras hills"
+    },
+    {
+      "fact": "block footprints 22-52 m, heights 12-38 m",
+      "tag": "A",
+      "reason": "silhouette only"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "scenery": {
+    "terminal": "tti-algeciras"
+  }
+}

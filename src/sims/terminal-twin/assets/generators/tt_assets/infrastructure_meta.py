@@ -9,6 +9,7 @@ KIND_NOTES = {
     'yard': 'yard infrastructure (instanced)',
     'building': 'generic building',
     'backdrop': 'distant low-poly backdrop',
+    'scenery': 'per-terminal surroundings (shore, anchorage, tanks, landside, town)',
 }
 
 

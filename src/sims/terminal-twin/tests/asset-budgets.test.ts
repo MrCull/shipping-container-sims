@@ -108,6 +108,20 @@ describe('asset budget check', () => {
     expect(big.problems.join('\n')).toMatch(/container-x: file is \d+ bytes \(budget 100\)/)
   })
 
+  it('fails a named group whose assets together exceed its triangle or draw-call budget', () => {
+    const dir = library(fakeContainer(380, 12), sidecar())
+    const budgets = loadBudgets()
+    budgets.groups = { pair: { assets: ['container-x'], maxTriangles: 300, maxDrawCalls: 1 } }
+    const over = checkAssetLibrary(dir, budgets)
+    expect(over.ok).toBe(false)
+    expect(over.problems.join('\n')).toMatch(/group pair: 392 triangles \(budget 300\)/)
+    expect(over.problems.join('\n')).toMatch(/group pair: 2 draw calls \(budget 1\)/)
+    budgets.groups = { pair: { assets: ['container-x'], maxTriangles: 400, maxDrawCalls: 2 } }
+    expect(checkAssetLibrary(dir, budgets).problems).toEqual([])
+    budgets.groups = { pair: { assets: ['container-x', 'ghost'], maxTriangles: 400, maxDrawCalls: 2 } }
+    expect(checkAssetLibrary(dir, budgets).problems.join('\n')).toMatch(/group pair: no asset named "ghost"/)
+  })
+
   it('the committed asset library meets its budgets (all three container sizes)', () => {
     const report = checkAssetLibrary()
     expect(report.problems).toEqual([])
