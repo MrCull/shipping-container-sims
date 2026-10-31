@@ -5,11 +5,11 @@
   ],
   "palette": {
     "blue": {
-      "colour": "#1d4596",
+      "colour": "#2150b0",
       "tag": "P"
     },
     "blue_dark": {
-      "colour": "#142f68",
+      "colour": "#183b86",
       "tag": "A"
     },
     "white": {
@@ -35,9 +35,18 @@
     "lamp": {
       "colour": "#fff1c2",
       "tag": "A"
+    },
+    "amber": {
+      "colour": "#ffa000",
+      "tag": "P"
+    },
+    "glass": {
+      "colour": "#2b3a47",
+      "tag": "A"
     }
   },
   "wordmark": "ZPMC",
+  "operator": "TTI ALGECIRAS",
   "plates": {
     "first": 101,
     "count": 24,

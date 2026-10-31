@@ -70,6 +70,15 @@ HEADBLOCK_SHEAVE_Y = 2.25           # rope ends above the spreader underside
 
 TELE_X = TWISTLOCK_X
 
+# Amber gantry-alarm beacon mount points [A, glTF frame, node `gantry`]: the beacon lamp base on each leg (outer X face)
+# and on the portal-beam ends. The gantry alarm ticket attaches its lights here.
+BEACONS = {
+    f'beacon_{where}_{side}_{xs}': (sx * (LEG_X + (1.45 if where == 'leg' else 1.3)), 6.0 if where == 'leg' else PORTAL_Y[1], z)
+    for where in ('leg', 'portal')
+    for side, z in (('sea', 0.0), ('land', RAIL_GAUGE))
+    for xs, sx in (('xneg', -1), ('xpos', 1))
+}
+
 
 def _b(p):
     """glTF (x, y, z) -> Blender (x, -z, y)."""
@@ -300,6 +309,7 @@ def _uvrect(name):
 def gantry_structure(d):
     m = GMesh()
     blue, dblue, white, grey, dark, red, yellow = (P(k) for k in ('blue', 'blue_dark', 'white', 'grey', 'dark', 'red', 'yellow'))
+    amber = P('amber')
     caps = d < 2
     legs = [(sx * LEG_X, z) for sx in (-1, 1) for z in (0.0, RAIL_GAUGE)]
     # Legs, tapered, from the bogie sill to the portal.
@@ -320,6 +330,9 @@ def gantry_structure(d):
         if d < 2:
             # Side-frame diagonal and knee braces.
             m.beam((x, PORTAL_Y[0] - 1.0, RAIL_GAUGE - 1.2), (x, SILL_Y[1] + 0.5, 1.4), 0.9, 0.9, blue, up=(1, 0, 0))
+            # TT-124: the second diagonal makes the side frame an X-braced portal, and a mid-height tie joins the leg pair.
+            m.beam((x, PORTAL_Y[0] - 1.0, 1.2), (x, SILL_Y[1] + 0.5, RAIL_GAUGE - 1.4), 0.9, 0.9, blue, up=(1, 0, 0))
+            m.box((x - 0.4, 33.6, 1.0), (x + 0.4, 34.4, RAIL_GAUGE - 1.0), blue)
             for z in (0.0, RAIL_GAUGE):
                 m.beam((x - sx * 0.8, 46.5, z), (sx * (LEG_X - 2.6), PORTAL_Y[0], z), 0.7, 0.7, blue, up=(0, 0, 1))
                 zz = 1.0 if z == 0 else RAIL_GAUGE - 1.0
@@ -338,6 +351,8 @@ def gantry_structure(d):
             half = 0.95 if d == 0 else 2.0
             m.box((x + ox - half, 1.0, z - 0.55), (x + ox + half, 1.7, z + 0.55), dblue)
             wheels = (-0.5, 0.5) if d == 0 else (-1.0, 1.0)
+            if d == 0:
+                m.box((x + ox - 0.5, 1.7, z + 0.7), (x + ox + 0.5, 2.3, z + 1.15), dark)   # drive motor / gearbox
             for wx in wheels:
                 if d == 0:
                     m.cyl((x + ox + wx, 0.45, z - 0.16), (x + ox + wx, 0.45, z + 0.16), 0.45, 16, dark, up=(1, 0, 0))
@@ -361,13 +376,13 @@ def gantry_structure(d):
         if d == 0:
             z = z0 + 3.0
             while z < z1 - 1:
-                if not 7.0 < z < 25.0:  # leave the wordmark panel clear
+                if not 8.0 < z < 24.0:  # leave the wordmark panel clear
                     xo = x + sx * GIRDER_HALF_W
                     m.box((min(xo, xo + sx * 0.08), GIRDER_Y[0], z - 0.08), (max(xo, xo + sx * 0.08), GIRDER_Y[1], z + 0.08), dblue,
                           faces=['+x', '-x', '+z', '-z'])
                 z += 3.0
-        # ZPMC wordmark (white on blue) on the girder's outer face.
-        m.decal((x + sx * GIRDER_HALF_W, (GIRDER_Y[0] + GIRDER_Y[1]) / 2, 16.0), (sx, 0, 0), 11.2, 2.8, SA.region_uv('zpmc_on_blue'))
+        # TTI ALGECIRAS (white on blue, text only) on the girder's outer face, as on the TTI cranes.
+        m.decal((x + sx * GIRDER_HALF_W, (GIRDER_Y[0] + GIRDER_Y[1]) / 2, 16.0), (sx, 0, 0), 12.8, 1.6, SA.region_uv('tti_on_blue'))
     m.box((-GIRDER_X - GIRDER_HALF_W, GIRDER_Y[0], z1 - 0.8), (GIRDER_X + GIRDER_HALF_W, GIRDER_Y[1], z1), blue)
     # A-frame (apex), its ties, and backstays to the girder end.
     ax, ay, az = APEX
@@ -393,25 +408,27 @@ def gantry_structure(d):
         m.box((-0.15, ay + 0.9, az - 0.15), (0.15, ay + 1.3, az + 0.15), red)  # aviation light
     # Machinery house (white) on the girders at the backreach end.
     hx, (hy0, hy1), (hz0, hz1) = HOUSE['x'], HOUSE['y'], HOUSE['z']
-    m.box((-hx, hy0, hz0), (hx, hy1, hz1), white)
-    m.box((-hx - 0.3, hy1, hz0 - 0.3), (hx + 0.3, hy1 + 0.4, hz1 + 0.3), grey)
+    nose = [(hz0, hy0), (hz1, hy0), (hz1, hy1), (hz0 + 2.0, hy1), (hz0, hy1 - 1.8)]   # (z, y) profile: sloped seaward roof edge
+    m.prism([(-hx, y, z) for z, y in nose], [(hx, y, z) for z, y in nose], white)
+    m.box((-hx - 0.3, hy1, hz0 + 1.7), (hx + 0.3, hy1 + 0.4, hz1 + 0.3), grey)
     for sx in (-1, 1):
-        m.decal((sx * hx, (hy0 + hy1) / 2 + 0.6, (hz0 + hz1) / 2), (sx, 0, 0), 7.2, 1.8, SA.region_uv('zpmc_on_white'))
+        m.decal((sx * hx, (hy0 + hy1) / 2 - 0.2, (hz0 + hz1) / 2), (sx, 0, 0), 5.6, 2.1, SA.region_uv('tti_on_white'), lift=0.03)
+    m.decal((0.0, hy0 + 2.9, hz0), (0, 0, -1), 5.6, 2.1, SA.region_uv('tti_on_white'), lift=0.03)
     if d < 2:
         m.decal((0.0, 62.2, hz1), (0, 0, 1), 3.6, 2.0, SA.plate_uv(), mat=PLATE)
-        m.decal((-3.2, 59.4, hz0), (0, 0, -1), 1.2, 2.2, _uvrect('dark'))
+        m.decal((-4.6, 59.4, hz0), (0, 0, -1), 1.2, 2.2, _uvrect('glass'))
     if d < 2:
         rib = 0.9 if d == 0 else 1.8
         for sx in (-1, 1):
             z = hz0 + 0.45
             while z < hz1 - 0.3:
-                if not (hz0 + 1.9 < z < hz1 - 1.9):
+                if not (hz0 + 1.3 < z < hz1 - 1.3):
                     m.box((sx * hx - 0.05, hy0 + 0.2, z - 0.06), (sx * hx + 0.05, hy1 - 0.1, z + 0.06), white, faces=['+x', '-x', '+z', '-z'])
                 z += rib
         for zf, sz in ((hz0, -1), (hz1, 1)):
             x = -hx + 0.5
             while x < hx - 0.3:
-                if not (-2.2 < x < 2.2):
+                if not (-3.2 < x < 3.2) and not -5.4 < x < -3.8:
                     m.box((x - 0.06, hy0 + 0.2, zf - 0.05), (x + 0.06, hy1 - 0.1, zf + 0.05), white, faces=['+z', '-z', '+x', '-x'])
                 x += rib
     if d == 0:
@@ -421,6 +438,17 @@ def gantry_structure(d):
         m.box((-hx - 1.2, hy0 - 0.15, hz0 - 1.2), (hx + 1.2, hy0, hz1 + 1.2), grey)
         for sx in (-1, 1):
             _handrail(m, sx * (hx + 1.1), hy0, hz0 - 1.1, hz1 + 1.1, d)
+    if d < 2:
+        # ZPMC builder plates on the outward Z face of every leg (white plate, blue text).
+        for x, z in legs:
+            half = (2.4 - 0.6 * (14.0 - BOGIE_TOP) / (PORTAL_Y[0] - BOGIE_TOP)) / 2
+            zn = -1 if z == 0 else 1
+            m.decal((x, 14.0, z + zn * half), (0, 0, zn), 1.8, 0.45, SA.region_uv('zpmc_on_white'), lift=0.03)
+        # Amber gantry-alarm beacons (mount points are in the sidecar's beaconMounts).
+        for name, (bx, by, bz) in BEACONS.items():
+            sx = 1 if bx > 0 else -1
+            m.box((bx - 0.2, by - 0.15, bz - 0.2), (bx + 0.2, by, bz + 0.2), dark)
+            m.cyl((bx, by, bz), (bx, by + 0.42, bz), 0.19, 8, amber, up=(1, 0, 0), r1=0.15)
     # Crane-number plates on the portal beams (seaward and landward faces).
     if d < 2:
         m.decal((0.0, (PORTAL_Y[0] + PORTAL_Y[1]) / 2, -1.1), (0, 0, -1), 3.6, 2.0, SA.plate_uv(), mat=PLATE)
@@ -506,6 +534,10 @@ def boom_structure(d):
         if d == 2:
             break
     m.box((-GIRDER_X - GIRDER_HALF_W, 54.4, tip - 0.8), (GIRDER_X + GIRDER_HALF_W, GIRDER_Y[1], tip), blue)
+    # TT-124: the long forestay tension rods from the apex to the boom nose (a pair per side; twin cables at LOD0).
+    for sx in (-1, 1):
+        for ox in ((-0.25, 0.25) if d == 0 else (0.0,)):
+            m.beam((sx * ax + ox, ay - 1.0, az - 0.6), (sx * GIRDER_X + ox, 58.0, tip + 0.4), 0.3, 0.3, blue, up=(1, 0, 0), caps=d < 2)
     if d == 2:
         return m
     # Hinge lugs and pins.
@@ -545,7 +577,7 @@ def trolley_part(d):
     m.box(cab[0], cab[1], white)
     m.beam((-1.6, y, -2.4), (-1.6, y + 0.5, -2.4), 0.2, 0.2, grey, up=(0, 0, 1))
     m.beam((0.2, y, -2.4), (0.2, y + 0.5, -2.4), 0.2, 0.2, grey, up=(0, 0, 1))
-    win = _uvrect('dark')
+    win = _uvrect('glass')
     m.decal((-0.7, y - 1.3, -3.4), (0, 0, -1), 2.2, 1.4, win)
     m.decal((-2.0, y - 1.3, -2.4), (-1, 0, 0), 1.6, 1.4, win)
     m.decal((0.6, y - 1.3, -2.4), (1, 0, 0), 1.6, 1.4, win)
@@ -820,6 +852,13 @@ def sidecar(info, scene_water_rail_z):
             {'name': 'container_twin_fore', 'node': 'spreader', 'position': [HALF_OFFSET, 0, 0], 'tag': 'A',
              'description': 'top centre of the fore box of a twin-20 lift'},
         ],
+        'beaconMounts': [
+            {'name': name, 'node': 'gantry', 'position': [round(c, 3) for c in pos],
+             'colour': SA.PALETTE['amber'], 'lens': 'amber', 'tag': 'A',
+             'description': ('on the outer X face of a leg at gantry-alarm height' if '_leg_' in name else 'on the end of a portal beam')
+             + f', {"seaward" if "_sea_" in name else "landward"} side; rides with the gantry'}
+            for name, pos in BEACONS.items()
+        ],
         'groundContact': {'y': 0, 'rails': [{'z': 0}, {'z': RAIL_GAUGE}], 'wheelsPerCorner': 8, 'tag': 'A'},
         'lods': {
             'LOD0': {'triangles': tri['LOD0'], 'maxDistanceM': LOD_DISTANCES[0], 'note': 'camera to crane centre; the renderer adds 15 % hysteresis'},
@@ -829,26 +868,31 @@ def sidecar(info, scene_water_rail_z):
         'materials': {'sts_paint': 'palette + wordmarks (sts-atlas)', 'sts_plate': 'crane-number plates; UVs for tile 0 (crane 101)'},
         'branding': {
             'wordmark': SA.WORDMARK,
+            'livery': SA.OPERATOR_NAME,
             'typeface': SA.WORDMARK_FONT.replace('.ttf', ''),
-            'placement': 'machinery house sides (blue on white), main girder outer faces (white on blue)',
+            'placement': 'TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces (white on blue), ZPMC builder plates on the legs',
             'craneNumbers': {
                 'first': SA.PLATE_FIRST, 'count': SA.PLATE_COUNT,
                 'placement': 'seaward and landward portal beams, landside end of the machinery house',
                 **SA.manifest()['plates'],
             },
-            'operatorBranding': 'none',
-            'tag': 'A',
+            'operatorBranding': True,
+            'note': 'text only (open-licence typeface), no logo artwork',
+            'tag': 'P',
         },
         'provenance': [
             {'fact': f'rail gauge {RAIL_GAUGE} m', 'tag': 'V', 'source': 'TTI reference pack, STS table'},
             {'fact': f'{LIFT_ABOVE_RAIL:g} m lift height above rail (hoist travel maximum)', 'tag': 'V', 'source': 'TTI reference pack'},
             {'fact': f'{OUTREACH:g} m seaward outreach from the waterside rail (trolley travel minimum)', 'tag': 'V', 'source': 'TTI reference pack'},
             {'fact': 'Malaccamax geometry on every crane', 'tag': 'M', 'reason': 'builder version: real fleet is 5 Malaccamax + 3 Super Post-Panamax'},
-            {'fact': 'dark royal-blue steelwork, white machinery house, yellow spreader, lattice boom, ties, ladders, catwalks, floodlights',
+            {'fact': 'blue steelwork, white machinery house, yellow spreader, lattice boom, ties, ladders, catwalks, floodlights',
              'tag': 'P', 'source': 'reference photographs (not committed)'},
             {'fact': 'apex, trolley-rail and hinge heights, leg spacing, backreach, bogie layout, house size', 'tag': 'A'},
-            {'fact': 'ZPMC wordmark set in Archivo ExtraBold; crane numbers 101-124 on plates', 'tag': 'A'},
-            {'fact': 'no TTI ALGECIRAS emblem', 'tag': 'M', 'reason': 'spec: manufacturer wordmark and crane numbers only, no operator branding'},
+            {'fact': 'wordmarks set in Archivo ExtraBold; crane numbers 101-124 on plates', 'tag': 'A'},
+            {'fact': 'TTI ALGECIRAS livery: cobalt-blue steel, white machinery house with a sloped seaward nose and TTI / ALGECIRAS text, TTI ALGECIRAS text along the girders, ZPMC plates on the legs, crane number plates, X-braced side frames, long forestay rods from the apex to the boom nose, amber beacons',
+             'tag': 'P', 'source': 'TTI Algeciras reference photographs of the STS cranes (git-ignored, not committed)'},
+            {'fact': 'no TTI emblem or logo artwork', 'tag': 'M', 'reason': 'text names only'},
+            {'fact': 'beacon mount positions', 'tag': 'A', 'reason': 'photos show amber beacons low on the legs; exact heights are estimated'},
             {'fact': 'forestays rotate with the boom (they detach from the apex when the boom is raised)', 'tag': 'M',
              'reason': 'boom raising is a viewer-only pose; real tie bars fold'},
             {'fact': 'ladder cages, handrail posts and festoon loops simplified', 'tag': 'M', 'reason': 'triangle budget'},

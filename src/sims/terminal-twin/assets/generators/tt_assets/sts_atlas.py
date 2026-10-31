@@ -1,16 +1,19 @@
 """STS paint and branding atlas (1024 x 1024 px).
 
 Regions (pixel rects, origin top-left):
-  palette        8 flat swatches in one row: steel blue, shaded blue, white,
-                 galvanised grey, dark, spreader yellow, buffer red, lamp
-  zpmc_on_white  ZPMC wordmark in blue on white (machinery house)
-  zpmc_on_blue   ZPMC wordmark in white on blue (boom and girder sides)
+  palette        16 flat swatches of 64 px in one row: steel blue, shaded blue,
+                 white, galvanised grey, dark, spreader yellow, buffer red,
+                 lamp, beacon amber, window glass
+  tti_on_blue    TTI ALGECIRAS in white on blue (main girder outer faces)
+  zpmc_on_white  ZPMC in blue on white (builder plates on the legs)
+  tti_on_white   TTI over ALGECIRAS in blue on white, two lines (machinery house)
   plates         crane-number plates 101..124: 6 columns x 4 rows; plate
                  faces are UV-mapped to tile 0 and the renderer shifts the UVs
                  by the crane's index (like the container livery tiles)
 
-The wordmark is the manufacturer's name in an open-licence typeface close to
-the brand's, in its colours [A]. No operator branding.
+The wordmarks are text in an open-licence typeface (TT-124): the operator's
+name as painted on the TTI Algeciras cranes [P] and the builder's name [A].
+No logo artwork.
 """
 import bpy
 
@@ -18,24 +21,28 @@ from .blender import hex_to_linear
 from .liveries import _Canvas
 
 ATLAS_SIZE = 1024
-SWATCH = 128
+SWATCH = 64
 PALETTE = {
-    'blue': '#1d4596',        # [P] dark royal / marine blue steelwork
-    'blue_dark': '#142f68',   # shaded blue (undersides, stiffeners)
+    'blue': '#2150b0',        # [P] TTI cobalt blue steelwork
+    'blue_dark': '#183b86',   # shaded blue (undersides, stiffeners)
     'white': '#eef1f4',       # [P] machinery house, trolley, headblock
     'grey': '#a9b0b8',        # galvanised walkways, handrails, wheels
     'dark': '#24282e',        # ropes, cables, rubber, glass frames
     'yellow': '#f2b705',      # [P] spreader
     'red': '#c0392b',         # buffers, warning bands
     'lamp': '#fff1c2',        # floodlight lenses
+    'amber': '#ffa000',       # [P] gantry-alarm beacons
+    'glass': '#2b3a47',       # cab and house windows
 }
 PALETTE_ORDER = list(PALETTE)
 WORDMARK = 'ZPMC'
+OPERATOR_NAME = 'TTI ALGECIRAS'
 WORDMARK_FONT = 'Archivo-ExtraBold.ttf'
-ZPMC_BLUE = '#1d4596'
+ZPMC_BLUE = '#2150b0'
 REGIONS = {
-    'zpmc_on_white': (0, 128, 1024, 384),
-    'zpmc_on_blue': (0, 384, 1024, 640),
+    'tti_on_blue': (0, 64, 1024, 192),      # 8:1
+    'zpmc_on_white': (0, 192, 1024, 448),   # 4:1
+    'tti_on_white': (0, 448, 512, 640),     # 8:3, two lines
 }
 PLATE_COLS = 6
 PLATE_ROWS = 4
@@ -75,8 +82,9 @@ def plate_uv():
 def manifest():
     return {
         'size': [ATLAS_SIZE, ATLAS_SIZE],
-        'palette': {k: {'colour': v, 'tag': 'A' if k not in ('blue', 'white', 'yellow') else 'P'} for k, v in PALETTE.items()},
+        'palette': {k: {'colour': v, 'tag': 'A' if k not in ('blue', 'white', 'yellow', 'amber') else 'P'} for k, v in PALETTE.items()},
         'wordmark': WORDMARK,
+        'operator': OPERATOR_NAME,
         'plates': {
             'first': PLATE_FIRST,
             'count': PLATE_COUNT,
@@ -97,12 +105,16 @@ def render_atlas(path, fonts_dir, samples=16):
     c.rect(0, 0, ATLAS_SIZE, ATLAS_SIZE, '#808080')
     for i, name in enumerate(PALETTE_ORDER):
         c.rect(i * SWATCH, 0, (i + 1) * SWATCH, SWATCH, PALETTE[name])
+    x0, y0, x1, y1 = REGIONS['tti_on_blue']
+    c.rect(x0, y0, x1, y1, PALETTE['blue'])
+    c.text(OPERATOR_NAME, WORDMARK_FONT, '#ffffff', (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.94, (y1 - y0) * 0.7, spacing=1.08)
     x0, y0, x1, y1 = REGIONS['zpmc_on_white']
     c.rect(x0, y0, x1, y1, PALETTE['white'])
     c.text(WORDMARK, WORDMARK_FONT, ZPMC_BLUE, (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.82, (y1 - y0) * 0.7, spacing=1.08)
-    x0, y0, x1, y1 = REGIONS['zpmc_on_blue']
-    c.rect(x0, y0, x1, y1, PALETTE['blue'])
-    c.text(WORDMARK, WORDMARK_FONT, '#ffffff', (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.82, (y1 - y0) * 0.7, spacing=1.08)
+    x0, y0, x1, y1 = REGIONS['tti_on_white']
+    c.rect(x0, y0, x1, y1, PALETTE['white'])
+    c.text('TTI', WORDMARK_FONT, ZPMC_BLUE, (x0 + x1) / 2, y0 + (y1 - y0) * 0.34, (x1 - x0) * 0.5, (y1 - y0) * 0.5, spacing=1.1)
+    c.text('ALGECIRAS', WORDMARK_FONT, ZPMC_BLUE, (x0 + x1) / 2, y0 + (y1 - y0) * 0.76, (x1 - x0) * 0.86, (y1 - y0) * 0.26, spacing=1.08)
     for i in range(PLATE_COUNT):
         x0, y0, x1, y1 = plate_tile_rect(i)
         c.rect(x0, y0, x1, y1, '#1b2a4a')
