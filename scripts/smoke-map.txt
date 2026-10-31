@@ -19,3 +19,4 @@ components/setup/|(^|/)scenarioPicker|(^|/)scenario/ => terminal-twin-presets te
 skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => terminal-twin-hud terminal-twin-views
 (^|/)[A-Za-z-]*(camera|Camera)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-camera terminal-twin-keyboard-camera
 (^|/)(i18n|LocaleDate)[A-Za-z/-]*\.(ts|vue)$|/i18n/ => terminal-twin-display
+(^|/)(vesselStatus|vesselCountdownLabels|InspectorPanel)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-vessel-status bay-viewer

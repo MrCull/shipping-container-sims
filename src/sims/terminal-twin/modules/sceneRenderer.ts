@@ -17,6 +17,7 @@ import type { ScenarioConfig } from '../scenario/types'
 import { CONTAINER_DIMS, type SceneModel, type Vec3 } from './sceneModel'
 import { ASC, STS } from './equipmentDims'
 import { entityBounds } from './picking'
+import type { VesselLabelState } from './vesselCountdownLabels'
 import { OverlayLayers, type LabelScreen, type OverlayLayerStats } from './overlayLayers'
 import { NO_OVERLAYS, type OverlayState } from './overlays'
 
@@ -61,6 +62,8 @@ export interface SceneStats {
   vesselAssets: 'placeholder' | 'loaded'
   /** Visible vessels per hull LOD (placeholders not counted). */
   vesselLods: { lod0: number; lod1: number; lod2: number }
+  /** Floating status labels shown over vessels that are not yet working (#126), with their text and countdown. */
+  vesselLabels: VesselLabelState[]
   overlays: OverlayState
   /** Reserved zones highlighted (0 when the reservations overlay is off). */
   reservedZones: number

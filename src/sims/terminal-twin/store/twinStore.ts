@@ -621,7 +621,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     try {
       const state = await c.query(entityQueryKind(kind), id)
       const def = EQUIPMENT_KINDS.find((d) => d.kind === kind)
-      const extras: EntityExtras = (await def?.loadExtras?.(state, (q) => c.query(q))) ?? {}
+      const extras: EntityExtras = (await def?.loadExtras?.(state, (q, qid) => c.query(q, qid))) ?? {}
       if (kind === 'container') {
         // transit status is derived from the carriers' state; trucks matter only while the box is on one
         const onTruck = (state as ContainerState).custody.kind === 'truck'

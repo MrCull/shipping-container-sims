@@ -613,6 +613,27 @@ const en = {
   'inspector.seconds': '{n} s',
   'inspector.openBayViewer': 'Open bay viewer',
 
+  // Vessel status and countdown (spec #116, #126)
+  'vesselStatus.heading': 'Vessel status',
+  'vesselStatus.phase.approaching': 'Approaching',
+  'vesselStatus.phase.waiting': 'Waiting for berth',
+  'vesselStatus.phase.mooring': 'Mooring',
+  'vesselStatus.phase.working': 'Working',
+  'vesselStatus.phase.unmooring': 'Unmooring',
+  'vesselStatus.phase.departed': 'Departed',
+  'vesselStatus.eta': 'ETA',
+  'vesselStatus.etaIn': '{time} (in {countdown})',
+  'vesselStatus.opsStart': 'Operations start',
+  'vesselStatus.opsStartEstimate': '{time} (estimated)',
+  'vesselStatus.opsStartActual': '{time}',
+  'vesselStatus.countdown': 'Countdown',
+  'vesselStatus.unknown': 'Unknown until a berth is allocated',
+  'vesselStatus.moves': 'Moves',
+  'vesselStatus.movesValue': '{done} done, {remaining} remaining',
+  'vesselStatus.perSts': '{id}: {done} done, {remaining} remaining',
+  'vesselStatus.label': '{id} · {phase} · {countdown}',
+  'vesselStatus.labelNoCountdown': '{id} · {phase}',
+
   // Bay viewer (spec #106, #115)
   'bayViewer.title': 'Bay viewer',
   'bayViewer.heading': '{vessel} · bay {bay}',
