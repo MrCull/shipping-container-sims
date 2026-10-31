@@ -1,5 +1,5 @@
 /**
- * Terminal Twin engine — the single public entry point.
+ * Terminal Twin engine, the single public entry point.
  *
  * Everything outside `engine/` (CLI, tests, Web Worker host, dev API) imports
  * from here only. No DOM, Vue, Three.js or Node imports are allowed inside

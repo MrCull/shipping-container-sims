@@ -182,7 +182,7 @@ export const NARRATOR_GROUPS: NarratorGroup[] = [
       {
         audioFile: '',
         lines: [
-          "All import containers are off the vessel — holds are clear.",
+          "All import containers are off the vessel, holds are clear.",
           "Loading begins automatically. The reach stacker will stage exports to the quay, then the crane will load them aboard.",
         ],
       },

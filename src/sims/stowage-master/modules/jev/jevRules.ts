@@ -1,4 +1,4 @@
-// Builds the Jev "briefing" block — the rules/context text sent with every request.
+// Builds the Jev "briefing" block, the rules/context text sent with every request.
 // Every numeric value here MUST come from `PHYSICS` / `SCORING` / the ship preset. Never
 // hand-type a threshold or point value that exists as a named constant in `config.ts`.
 //
@@ -7,7 +7,7 @@
 // exported as named `SCORING.*` constants, so they are transcribed here to match that source of
 // truth exactly. The hazmat-explosion distances (bay diff < 4, adjacent row, tier diff < 4) are
 // likewise inline in `physics.ts` (`wouldCauseHazmatExplosion`) rather than driven by the unused
-// `HAZMAT` constants in `config.ts` (which do not match the actual check) — the text below
+// `HAZMAT` constants in `config.ts` (which do not match the actual check), the text below
 // mirrors the real check in `physics.ts`, not the `HAZMAT` object.
 //
 // See .ai/plans/stowage-master/02-jev-state-and-questions.md §2.2.
@@ -15,7 +15,7 @@
 import type { ShipPreset } from '../../types'
 import { PHYSICS, SCORING } from '../config'
 
-/** Bump whenever the wording below changes — versions questions/criteria per the Jev skill. */
+/** Bump whenever the wording below changes, versions questions/criteria per the Jev skill. */
 export const JEV_RULES_VERSION = 'sm-jev-rules-v1'
 
 export interface JevRulesBlock {

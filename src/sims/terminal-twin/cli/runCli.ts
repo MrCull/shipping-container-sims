@@ -224,7 +224,7 @@ export function formatSimTime(seconds: number): string {
 
 function formatSummary(s: RunSummary, headline: HeadlineKpis, stopped: string, started: string, processed: number, asyncMode: AsyncMode): string[] {
   const lines = [
-    `Terminal Twin — ${s.scenario} (seed ${s.seed})`,
+    `Terminal Twin, ${s.scenario} (seed ${s.seed})`,
     `Started:          ${started}  [${processed} events processed in this run]`,
     `Stopped:          ${stopped}${s.endReason ? ` (${s.endReason})` : ''}`,
     `Async mode:       ${asyncMode}`,

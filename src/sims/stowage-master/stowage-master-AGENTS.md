@@ -1,4 +1,4 @@
-# Stowage Master — Agent Guide
+# Stowage Master, Agent Guide
 
 ## Overview
 
@@ -15,7 +15,7 @@
 ```
 stowage-master/
 ├── definition.ts               Sim metadata (SimDefinition)
-├── StowageMaster.vue           Root component — mounts canvas + all UI
+├── StowageMaster.vue           Root component, mounts canvas + all UI
 ├── components/
 │   ├── GameCanvas.vue          Three.js canvas + main game loop callback
 │   ├── TopBar.vue              Level name, phase badge, score/target
@@ -41,7 +41,7 @@ stowage-master/
 │   │   ├── LevelComplete.vue   Stars, score, best record, next level
 │   │   ├── LevelFailed.vue     Reason + retry button
 │   │   └── DisasterOverlay.vue Disaster name + dramatic message during FX
-│   └── jev/                    Optional Jev assist UI — see § Jev assist (optional)
+│   └── jev/                    Optional Jev assist UI, see § Jev assist (optional)
 │       ├── JevStartToggle.vue  Low-key link + settings popover on StartScreen
 │       ├── JevKeyDialog.vue    API key entry, disclosure, validation
 │       ├── JevPanel.vue        In-game controls, status and "Details ▸" link
@@ -52,7 +52,7 @@ stowage-master/
 │   ├── useAudio.ts             SFX + synthesised placement tone
 │   ├── useGameMusic.ts         Shared background track (survives rebuilds)
 │   ├── useSlotPicking.ts       Raycasting for slot click/hover
-│   └── useJevController.ts     Jev "next move" / "play all" orchestration — see § Jev assist
+│   └── useJevController.ts     Jev "next move" / "play all" orchestration, see § Jev assist
 ├── modules/
 │   ├── config.ts               All constants (SHIP_PRESETS, PHYSICS, SCORING, etc.)
 │   ├── levels.ts               10 LevelConfig objects (LevelConfig[])
@@ -69,7 +69,7 @@ stowage-master/
 │   ├── craneSystem.ts          STS crane model + placement/discharge animations
 │   ├── truckRenderer.ts        GLB truck assembly + inbound/outbound queue
 │   └── jev/                    Jev client, config, key vault, rules, state/question builders,
-│                               decision validation, summaries — see § Jev assist (optional)
+│                               decision validation, summaries, see § Jev assist (optional)
 ├── store/
 │   ├── gameStore.ts            Central Pinia store (all game state)
 │   └── jevStore.ts             Jev enabled flag, prefs, status, command channel, exchange history
@@ -142,7 +142,7 @@ interface Slot {
 }
 ```
 
-**Slot ID format:** `"BB-RR-TT"` — all three segments zero-padded to 2 digits. Tiers use even numbers (2, 4, 6, 8) to match ISO bay/row/tier conventions.
+**Slot ID format:** `"BB-RR-TT"`, all three segments zero-padded to 2 digits. Tiers use even numbers (2, 4, 6, 8) to match ISO bay/row/tier conventions.
 
 ---
 
@@ -189,13 +189,13 @@ Key actions:
 
 ### `config.ts`
 Single source of truth for all tuning constants. Edit here, not inline:
-- `SHIP_PRESETS` — `small`, `medium`, `medium-carrier`, `large`
-- `PHYSICS` — list/trim warning/critical/disaster thresholds + multipliers
-- `SCORING` — point values for every rule
-- `STAR_THRESHOLDS` — boundaries for 0–5 stars
-- `CONTAINER` — physical size (2.55 × 2.65 × 6.1 units), weight ranges
-- `PORT_SEQUENCES` — port colors per vessel type
-- `CRANE`, `TRUCK`, `OUTBOUND_TRUCK` — animation parameters
+- `SHIP_PRESETS`, `small`, `medium`, `medium-carrier`, `large`
+- `PHYSICS`, list/trim warning/critical/disaster thresholds + multipliers
+- `SCORING`, point values for every rule
+- `STAR_THRESHOLDS`, boundaries for 0–5 stars
+- `CONTAINER`, physical size (2.55 × 2.65 × 6.1 units), weight ranges
+- `PORT_SEQUENCES`, port colors per vessel type
+- `CRANE`, `TRUCK`, `OUTBOUND_TRUCK`, animation parameters
 
 ### `levels.ts`
 Array of 10 `LevelConfig` objects. Each specifies: vessel preset, `importCount`, `transitCount`, `loadCount`, `timerSeconds`, `hazmatRate`, `transitGrouping` (`'random'|'grouped-by-pod'`), `importPlacement` (`'default'|'upper-tiers'`), `placementSpread` (0–1), and multi-page `briefing` with optional sound cues.
@@ -214,13 +214,13 @@ Array of 10 `LevelConfig` objects. Each specifies: vessel preset, `importCount`,
 | 10 | medium-carrier | Endgame (240 containers) |
 
 ### `physics.ts`
-Pure functions — no side effects:
+Pure functions, no side effects:
 - `calculateList(grid, preset)` → signed float (positive = starboard heavy)
 - `calculateTrim(grid, preset)` → signed float (positive = bow heavy)
 - `calculateVCG(grid)` → float
 - `checkDisasters(grid, preset, newContainer, slotId)` → `DisasterType | null`
 
-Disaster thresholds (absolute values, from `config.PHYSICS` — the source of truth):
+Disaster thresholds (absolute values, from `config.PHYSICS`, the source of truth):
 - List: warning ≥ 5, critical ≥ 8, **disaster ≥ 12**
 - Trim: warning ≥ 4, critical ≥ 7, **disaster ≥ 10**
 - Hazmat explosion: two hazmat containers within bay diff < 2, row diff < 1.5, tier diff < 2
@@ -230,14 +230,14 @@ Disaster thresholds (absolute values, from `config.PHYSICS` — the source of tr
 > hardcode older thresholds (list ≥ 8 / ≥ 12, trim ≥ 6 / ≥ 9) instead of reading `PHYSICS`. This
 > means the ship-status warning/critical UI styling can disagree slightly with the disaster
 > thresholds above and with `scoring.ts` (which does use `PHYSICS.*Warning`). This is a **known,
-> separate issue** — not fixed here, since fixing it changes gameplay (when the warning-zone
+> separate issue**, not fixed here, since fixing it changes gameplay (when the warning-zone
 > scoring penalty and status colours kick in). Flagged for a follow-up.
 
 ### `scoring.ts`
 Pure functions returning `{ score, reasons }`:
-- `calculatePlacementScore(container, slotId, grid, shipList, shipTrim, preset)` — penalties for heavy-high, heavy-outboard, warning-zone, hazmat proximity; bonus for safe hazmat placement
-- `calculateDischargeScore(container, slotId, grid, shipList, shipTrim)` — bonuses for top pick, physics improvement, hazmat; penalty for blocked pick
-- `calculateRestowScore(container, newSlotId, grid)` — base −15 pts + bonuses for low placement, safe hazmat; penalty for new overstow
+- `calculatePlacementScore(container, slotId, grid, shipList, shipTrim, preset)`, penalties for heavy-high, heavy-outboard, warning-zone, hazmat proximity; bonus for safe hazmat placement
+- `calculateDischargeScore(container, slotId, grid, shipList, shipTrim)`, bonuses for top pick, physics improvement, hazmat; penalty for blocked pick
+- `calculateRestowScore(container, newSlotId, grid)`, base −15 pts + bonuses for low placement, safe hazmat; penalty for new overstow
 
 ### `dischargeManifest.ts`
 Called by `startLevel()` to fill the grid before play:
@@ -263,10 +263,10 @@ Helpers used during discharge phase:
 
 ### `disasters.ts`
 Four animation factories, each returning `{ update(dt: number): boolean, cleanup(): void }`:
-- `capsize` — roll 75° right + sink 10 m over 5 s
-- `founder` — pitch 50° forward + sink 12 m over 5 s
-- `collapse` — containers explode outward with gravity over 4 s
-- `explosion` — fireball, smoke, shockwave, containers scatter, ship sinks over 6 s
+- `capsize`, roll 75° right + sink 10 m over 5 s
+- `founder`, pitch 50° forward + sink 12 m over 5 s
+- `collapse`, containers explode outward with gravity over 4 s
+- `explosion`, fireball, smoke, shockwave, containers scatter, ship sinks over 6 s
 
 Disaster sound sequences are defined inside this module (timed via `setTimeout`).
 
@@ -276,7 +276,7 @@ Disaster sound sequences are defined inside this module (timed via `setTimeout`)
 - Door ends: panel detail, hazard stripe, CSC plate, height markings.
 - Hazmat: orange band + four rotating diamond symbols (pulsed emissive in game loop).
 - `SHIPPING_LINE_LIVERY` maps port → primary color (Maersk blue, Evergreen green, COSCO red, Hapag orange, HMM purple).
-- Canvas textures cached by color hex — call `disposeContainerMaterials()` on level teardown to free GPU memory.
+- Canvas textures cached by color hex, call `disposeContainerMaterials()` on level teardown to free GPU memory.
 
 ### `sceneBuilder.ts`
 World geometry factories: `createSkyDome()`, `createOcean()`, `createDock()`, `createLighting()`, `createFoamParticles()`. Each returns an animate function or an `{ animate }` object for the game loop.
@@ -284,10 +284,10 @@ World geometry factories: `createSkyDome()`, `createOcean()`, `createDock()`, `c
 Ocean waves: `y = A*sin(kx - ωt) + B*cos(k'z - ω't)` updated per-frame on vertex positions.
 
 ### `shipRenderer.ts`
-- `loadShipGLB(path, preset)` — async load + cache; clone on reuse.
-- `createShip(preset)` — procedural hull (tapered prism, deck, superstructure, hatch covers, masts, rigging, fenders).
-- `updateShipTilt(ship, targetList, targetTrim, dt)` — lerp rotation toward physics target.
-- `snapShipTilt(ship, list, trim)` — instant (used on `startLevel`).
+- `loadShipGLB(path, preset)`, async load + cache; clone on reuse.
+- `createShip(preset)`, procedural hull (tapered prism, deck, superstructure, hatch covers, masts, rigging, fenders).
+- `updateShipTilt(ship, targetList, targetTrim, dt)`, lerp rotation toward physics target.
+- `snapShipTilt(ship, list, trim)`, instant (used on `startLevel`).
 
 **GLB quirk:** Most ships rotate 90° around Y on load (so model's Z → game's X). The `medium-carrier` uses 0° rotation (different export orientation). See `config.SHIP_PRESETS[*].modelRotationY`.
 
@@ -298,9 +298,9 @@ Ocean waves: `y = A*sin(kx - ωt) + B*cos(k'z - ω't)` updated per-frame on vert
 - Returns `{ update(dt): boolean, cleanup() }`.
 
 ### `truckRenderer.ts`
-- `loadTruckGLBs()` — pre-warm trailer + cab into cache.
-- `createTruckGLB()` — assemble trailer + cab with proper offsets.
-- `createOutboundTruckQueue(n)` — spawn N trucks in dock formation; each departs with container after discharge animation.
+- `loadTruckGLBs()`, pre-warm trailer + cab into cache.
+- `createTruckGLB()`, assemble trailer + cab with proper offsets.
+- `createOutboundTruckQueue(n)`, spawn N trucks in dock formation; each departs with container after discharge animation.
 
 ---
 
@@ -325,7 +325,7 @@ Raycast-based click/hover. Searches meshes with `userData.isSlotIndicator` or `u
 
 ## Physics reference
 
-Thresholds below are `config.PHYSICS` — the source of truth for stowage-master's physics.
+Thresholds below are `config.PHYSICS`, the source of truth for stowage-master's physics.
 `store.isWarning` / `isCritical` still hardcode the older values (list ≥ 8 / ≥ 12, trim ≥ 6 / ≥ 9);
 see the callout under § Modules → `physics.ts` above.
 
@@ -375,9 +375,9 @@ Star rating (score / targetScore):
 | Key | Bays | Rows | Tiers | GLB | Notes |
 |---|---|---|---|---|---|
 | `small` | 3 | 3 | 4 | `container-ship-small-empty-no-containers.glb` | Feeder |
-| `medium` | 6 | 5 | 5 | none (procedural) | — |
+| `medium` | 6 | 5 | 5 | none (procedural) | - |
 | `medium-carrier` | 12 (split) | 4 | 4 | `medium-vessel-no-containers.glb` | Bay gap + raised forecastle (bays 10–11 higher Y), 0° model rotation |
-| `large` | 8 | 7 | 6 | none (procedural) | — |
+| `large` | 8 | 7 | 6 | none (procedural) | - |
 
 `medium-carrier` quirks:
 - 12 bays split into two groups (stern 0–5, bow 6–11) separated by `bayXOffsets[]` gap of ~9 units.
@@ -390,7 +390,7 @@ Star rating (score / targetScore):
 
 Stowage Master can optionally hand a phase's move ("which legal slot?") to **Jev**
 (TypeSafe System One, via OpenRouter's Decisions API) instead of the player clicking it
-themselves. Most players never see this — the only visible sign when it's off is a small,
+themselves. Most players never see this, the only visible sign when it's off is a small,
 low-contrast `Jev` link on the Start screen. See [.ai/plans/stowage-master/00-jev-overview.md](../../../.ai/plans/stowage-master/completed/00-jev-overview.md)
 (moved to `completed/` once implemented) for the full design and
 [.agents/skills/jev-integration/SKILL.md](../../../.agents/skills/jev-integration/SKILL.md) for
@@ -426,7 +426,7 @@ click. Instead:
 
 1. The controller snapshots the game, builds the Jev request and validates the response against
    the legal slot set (`store.availableSlots` / `dischargeableSlots` / `availableRestowSlots`).
-2. It calls `jevStore.issueCommand(kind, slotId)`, which sets `jevStore.pendingCommand` — a
+2. It calls `jevStore.issueCommand(kind, slotId)`, which sets `jevStore.pendingCommand`, a
    plain-data command, not a direct mutation.
 3. `GameCanvas.vue` watches `pendingCommand` and executes it through the **same** `execute*`
    functions a mouse click uses (animation, `finalizePlacement`/`finalizeDischarge`/etc.), then
@@ -434,23 +434,23 @@ click. Instead:
 4. The controller awaits the ack (`waitForAck`) before moving on.
 
 Code owns legality, execution, staleness and retries. Jev only answers "which of these legal
-slots?" — never call a `gameStore` mutation from `modules/jev/*` or `useJevController.ts` other
+slots?", never call a `gameStore` mutation from `modules/jev/*` or `useJevController.ts` other
 than through this channel.
 
 ### Key handling
 
-The API key lives **only** in a module-scoped variable in `jevKeyVault.ts` — never in
+The API key lives **only** in a module-scoped variable in `jevKeyVault.ts`, never in
 localStorage, sessionStorage, a Pinia store, a cookie, a file or a log. It is lost on page
 refresh by design (`jevStore.hasKey` becomes `false`; the player is re-prompted). Persisted
 Jev *preferences* (`enabled`, `showInspector`, `settleDelayMs`, `minConfidenceToAutoplay`) live in
-localStorage under `JEV_CONFIG.prefsStorageKey` — the key itself must never be added there.
+localStorage under `JEV_CONFIG.prefsStorageKey`, the key itself must never be added there.
 
 ### The raw-state boundary
 
-Jev is given roughly what a human sees on screen, plus the rules — vessel geometry, current
+Jev is given roughly what a human sees on screen, plus the rules, vessel geometry, current
 list/trim/VCG, the bay plan, the container to move, the load list, and legal slot descriptions.
 Code does **not** precompute per-candidate outcomes (resulting list/trim, disaster flags, score
-previews) and does **not** filter dangerous slots out of the option list — only rule-legal slots
+previews) and does **not** filter dangerous slots out of the option list, only rule-legal slots
 are offered, exactly the slots a human could click, and Jev can still sink the ship. Never add
 predicted-outcome fields to `jevStateBuilder.ts` or `jevQuestionBuilder.ts` without revisiting
 this boundary (see 02 §2.9 for the "assisted mode" idea, deliberately not built).
@@ -459,13 +459,13 @@ this boundary (see 02 §2.9 for the "assisted mode" idea, deliberately not built
 
 Bump these whenever the corresponding shape or wording changes, so historical exchanges and any
 recorded evaluation baseline (§ below) can be told apart from a differently-behaving build:
-- `JEV_CONFIG.stateSchemaVersion` — the `state` object's shape (`jevStateBuilder.ts`)
-- `JEV_CONFIG.questionVersion` — the Choice question's instructions/criteria wording (`jevQuestionBuilder.ts`)
-- `JEV_CONFIG.model` — the pinned Jev model build (`typesafe/jev-1.13` at time of writing)
+- `JEV_CONFIG.stateSchemaVersion`, the `state` object's shape (`jevStateBuilder.ts`)
+- `JEV_CONFIG.questionVersion`, the Choice question's instructions/criteria wording (`jevQuestionBuilder.ts`)
+- `JEV_CONFIG.model`, the pinned Jev model build (`typesafe/jev-1.13` at time of writing)
 
 ### Provider endpoint gotcha
 
-The Decisions API is `POST https://openrouter.ai/api/alpha/decisions` — **`/api/alpha/...`**, not
+The Decisions API is `POST https://openrouter.ai/api/alpha/decisions`, **`/api/alpha/...`**, not
 `/api/v1/...` (the key-check endpoint, `GET /api/v1/key`, is the only `/api/v1/` call this
 integration makes). Hitting `/api/v1/decisions` 404s.
 
@@ -476,16 +476,16 @@ Every request `useJevController.ts` sends is recorded via `jevStore.recordExchan
 as the response, validation, execution and game result arrive (`outcome` becomes one of
 `executed | stale | rejected | error | cancelled | paused_low_confidence`). History is
 newest-first, capped at `JEV_CONFIG.historyLimit` (50), held in `shallowRef` so large request/
-response bodies aren't deep-proxied, and is in-memory only — cleared whenever Jev is disabled.
+response bodies aren't deep-proxied, and is in-memory only, cleared whenever Jev is disabled.
 `JevPanel.vue`'s "Details ▸" link (shown only when the "Show Jev details" preference is on)
 toggles `jevStore.isInspectorOpen`, which `JevInspector.vue` reads to render itself as a drawer.
-The inspector shows the evidence sent and the probabilities returned — it never invents or
+The inspector shows the evidence sent and the probabilities returned, it never invents or
 displays a rationale for Jev's choice, because Jev doesn't return one.
 
 ### Manual QA checklist
 
 There is no automated test runner in this repo, and Jev needs a live browser session (an
-OpenRouter key, `pnpm run dev`) to exercise — this cannot be verified by lint/build/type-check
+OpenRouter key, `pnpm run dev`) to exercise, this cannot be verified by lint/build/type-check
 alone. The checklist below has **not been run** as part of this change; run it in Chrome (plus
 Firefox for the key dialog and CORS) before relying on Jev in a real session:
 
@@ -519,7 +519,7 @@ The skill recommends recording a raw-mode play-quality baseline (play-all 3× ea
 completion rate, disaster rate, average score % of target, average confidence, cost), tagged with
 `stateSchemaVersion`, `questionVersion` and the model build, to judge whether a future "assisted"
 mode (state/02 §2.9) is worth building. This requires the manual QA session above and has not
-been run yet — add the results table here once it has.
+been run yet, add the results table here once it has.
 
 ---
 
@@ -530,11 +530,11 @@ been run yet — add the results table here once it has.
 3. **Tier numbering is even** (2, 4, 6, 8). When iterating tiers arithmetically, use `tierIndex` (0-based) for array ops and `tier` for display/ID only.
 4. **Container material cache.** Call `disposeContainerMaterials()` on level end/restart to avoid GPU memory leaks. The canvas cache survives intentionally (same colors reused across levels).
 5. **GLB model cache.** `shipRenderer` caches loaded GLBs by path. Calling `loadShipGLB()` twice for the same path returns a clone.
-6. **Audio context resume.** Browsers block audio until a user gesture. `useAudio` queues sounds and retries on first interaction — do not assume immediate playback.
+6. **Audio context resume.** Browsers block audio until a user gesture. `useAudio` queues sounds and retries on first interaction, do not assume immediate playback.
 7. **Restow slot validation.** `getRestowSlots()` excludes the same bay/row as imports to prevent creating new overstow chains. Don't bypass this validation.
 8. **Hazmat proximity uses halved thresholds.** Real bay and tier numbers use odd/even spacing; the proximity check compensates by using `bayDiff < 2` and `tierDiff < 2` (not 1).
 9. **`isBeingRestowed` flag.** A shallow copy of the container is created with this flag set during lift. The original slot is cleared. If restow is cancelled, the container must be returned and the flag cleared.
-10. **`perfectScore` recalculation.** After pre-loading the manifest, `hazmatCount` is known — `perfectScore` and `targetScore` are (re)calculated then. Do not cache these before `startLevel` completes.
+10. **`perfectScore` recalculation.** After pre-loading the manifest, `hazmatCount` is known, `perfectScore` and `targetScore` are (re)calculated then. Do not cache these before `startLevel` completes.
 
 ---
 

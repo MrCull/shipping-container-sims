@@ -1,5 +1,5 @@
 /**
- * Canvas-texture based container materials — ported from container-stack sim.
+ * Canvas-texture based container materials, ported from container-stack sim.
  * Produces realistic PBR containers with corrugated side panels, ISO markings,
  * door detail, and per-shipping-line livery colours.
  */

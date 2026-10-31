@@ -1,10 +1,10 @@
-# Terminal Twin — Agent Guide
+# Terminal Twin, Agent Guide
 
 ## Overview
 
 Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers below. Reference packs the user uploaded (not committed): `docs/reference/` at the repo root.
 
-**Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root — use its terms in code, tests and docs.
+**Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root, use its terms in code, tests and docs.
 
 **Status:** all spec tickets (TT-01 to TT-28) are merged and the code-review fixes are in. The headless engine covers vessels and berthing, STS cranes, SHC transport, paired ASC block storage, export load, transshipment and empties, rehandles, landside trucks, the yard start modes, KPIs and end conditions, and the TOS decision points. The browser host has a Web Worker engine, a 3D scene with the Phase 2 GLB assets, debugger, dashboard, saves and rewind, and locale and units. Known limits are under [Known gaps](#known-gaps).
 
@@ -57,7 +57,7 @@ Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers b
 | Berthing / anchorage | `pnpm run tt:run --fixture two-vessels-compete-for-berth` | V002 `anchorage` > 0 s, `Quay: 1 vessel(s) waited`; `tests/berthing.test.ts` |
 | Crane split / rail order | `pnpm run tt:run --fixture crane-split-4sts --strategy craneSplit=equal-bays` (vs the default `balanced-moves`) | 4 STS lines with different move counts, 0 violations (`sts.rail-order` is checked after every event); `tests/crane-split.test.ts` |
 | Twin-20 | `pnpm run tt:run --fixture twin-20-lift` | `4 moves in 2 cycles (2 twin-20)`; `tests/vessels.test.ts` |
-| STS productivity (where crane time goes) | `pnpm run tt:run --preset "TTI Algeciras — peak day" --until time:7200 --events /tmp/peak.jsonl` (about 1 to 4 minutes), then `pnpm run tt:sts /tmp/peak.jsonl --until 7200` | per crane and overall: moves, gross moves per hour and the share of time in `cycle`, `hatch`, `lashing`, `ground`, `box`, `rail`, `reposition`, `done`; `tests/sts-productivity.test.ts` |
+| STS productivity (where crane time goes) | `pnpm run tt:run --preset "TTI Algeciras, peak day" --until time:7200 --events /tmp/peak.jsonl` (about 1 to 4 minutes), then `pnpm run tt:sts /tmp/peak.jsonl --until 7200` | per crane and overall: moves, gross moves per hour and the share of time in `cycle`, `hatch`, `lashing`, `ground`, `box`, `rail`, `reposition`, `done`; `tests/sts-productivity.test.ts` |
 | Vessels in 3D | `pnpm run screenshot --path /sim/terminal-twin --wait 1500 --fail-on-error --eval "window.__tt.load('crane-split-4sts').then(() => window.__tt.runTo(1500)).then(() => window.__tt.pause()).then(() => window.__tt.cameraTo('V001'))"` | hull at its berth, four STS along it, deck boxes on the hatch covers |
 | SHC transport | `pnpm run tt:run --fixture shc-1sts-2shc-1wtp` | `Horizontal: 10 boxes to WTP pads`, per-SHC jobs/distances/reservation wait/handovers and state time (TT-R11, 7 operational states), headline SHC empty travel, handovers and state time, `0 violations` |
 | SHC dispatch and pad strategies | `pnpm run tt:diff --fixture shc-1sts-2shc-1wtp --b-handlers nearest-job` (nearest job + `wtpPadSelection` `nearest-box`; or `tt:run … --strategy shcDispatch=nearest-job` / `--strategy wtpPadSelection=nearest-box`) | first divergence at the first `wtpPadSelection` `DecisionResolved` (`payload.reply.wtpPadId`); `shcDispatch` replies only `{jobId}` |
@@ -86,7 +86,7 @@ All three commands print usage with `--help`. Exit codes: `tt:run` 0 ok / 1 viol
 terminal-twin/
 ├── terminal-twin-AGENTS.md   This guide
 ├── docs/                     Topic docs (see the pointers above)
-├── engine/                   Headless engine — NO DOM/Vue/Three/Node imports (ESLint-enforced)
+├── engine/                   Headless engine, NO DOM/Vue/Three/Node imports (ESLint-enforced)
 │   ├── index.ts              Public API barrel: `pnpm run lint` enforces that everything outside engine/ and scenario/ imports engine code only from here (eslint.config.js, no-restricted-imports). Exception, one line: scenario/ deep-imports a few leaf engine files because the engine imports scenario/ (barrel cycles)
 
 │   ├── simulation.ts         createSimulation / restoreSimulation, run loop, snapshot, why, subscribe
@@ -291,7 +291,7 @@ Every container carries `ContainerState.props` (`scenario/containerProps.ts`), s
 
 ## Peak-day crane productivity (spec #116, #117)
 
-**Verdict: not a defect, no engine change, goldens and `ENGINE_VERSION` untouched.** The peak-day preset looks slow because several modelled limits stack up; none of them is a bug. Measured on `TTI Algeciras — peak day` (seed 99), `pnpm run tt:sts` over the 5,400 s from the first berthing (invariants 0, no engine error):
+**Verdict: not a defect, no engine change, goldens and `ENGINE_VERSION` untouched.** The peak-day preset looks slow because several modelled limits stack up; none of them is a bug. Measured on `TTI Algeciras, peak day` (seed 99), `pnpm run tt:sts` over the 5,400 s from the first berthing (invariants 0, no engine error):
 
 - **Cycle time is right.** Median discharge cycle 122 s (35 s to the pick, 81 s pick to grounded), median load cycle 122 s, so a crane that never waits does about 29 moves/h. Gross over the whole window: 96 moves, **8.8 moves per STS-hour** (75.8 gross moves/h for the 8 cranes in the CLI headline, which also counts the 1,800 s of mooring). Per crane 3.3 to 14.0 moves/h.
 - **Where the crane time goes (8 cranes, 39,365 crane-seconds):** moving boxes `cycle` 33%, hatch cover work 16% plus 6% waiting for lashing, waiting for a load box `box` 22%, waiting for a neighbour on the rail `rail` 18%, stepping aside or finished 5%, waiting for a ground position 0%. So the cranes are not starved by the SHCs or the work-package release (67 work packages released, 0 ground-position waits); they spend two thirds of the time on things other than lifting.

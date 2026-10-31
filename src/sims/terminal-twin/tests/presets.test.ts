@@ -4,8 +4,8 @@ import { createSimulation, validateScenario } from '../engine'
 import { presets, TTI_BAYS } from '../scenario/presets'
 
 describe('presets', () => {
-  it('offers TTI Algeciras baseline, Small automated and TTI Algeciras — peak day', () => {
-    expect(Object.keys(presets)).toEqual(['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras — peak day'])
+  it('offers TTI Algeciras baseline, Small automated and TTI Algeciras, peak day', () => {
+    expect(Object.keys(presets)).toEqual(['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras, peak day'])
   })
 
   it('TTI baseline has the published layout counts', () => {
@@ -25,10 +25,10 @@ describe('presets', () => {
     expect(ts / boxes).toBeLessThan(0.9)
   })
 
-  it('Small automated is 400 m, 3 STS, 6 blocks; TTI Algeciras — peak day has 5 near-simultaneous vessels and a heavy truck peak', () => {
+  it('Small automated is 400 m, 3 STS, 6 blocks; TTI Algeciras, peak day has 5 near-simultaneous vessels and a heavy truck peak', () => {
     const small = presets['Small automated']()
     expect([small.quay.lengthM, small.sts.length, small.yard!.blocks.length]).toEqual([400, 3, 6])
-    const stress = presets['TTI Algeciras — peak day']()
+    const stress = presets['TTI Algeciras, peak day']()
     const tti = presets['TTI Algeciras baseline']()
     expect(stress.yard).toEqual(tti.yard)
     expect(stress.vessels).toHaveLength(5)
@@ -37,7 +37,7 @@ describe('presets', () => {
   })
 
   it('peak day has a realistic port rotation, a transshipment-heavy mix and ROB bays (spec #106); the other presets keep none', () => {
-    const peak = presets['TTI Algeciras — peak day']()
+    const peak = presets['TTI Algeciras, peak day']()
     expect(peak.containerProps?.portRotation?.terminal).toBe('ESALG')
     expect(peak.containerProps?.portRotation?.ports).toContain('ESALG')
     expect(peak.containerProps!.portRotation!.ports.length).toBeGreaterThanOrEqual(5)
@@ -76,7 +76,7 @@ describe('presets', () => {
   it.each([
     ['Small automated', undefined],
     ['TTI Algeciras baseline', { moves: 10 }],
-    ['TTI Algeciras — peak day', { moves: 10 }],
+    ['TTI Algeciras, peak day', { moves: 10 }],
   ] as const)('%s runs headless to its end condition with all invariants passing', (name, end) => {
     const config = presets[name]()
     if (end) config.endConditions = { ...end }

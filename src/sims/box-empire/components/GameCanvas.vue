@@ -89,7 +89,7 @@ defineExpose({ webglFailed })
         <div class="fallback-ground" />
         <div class="fallback-water" />
         <div class="fallback-message">
-          3D rendering unavailable — simulation running in text mode
+          3D rendering unavailable, simulation running in text mode
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Narrator audio playback
+// Box Empire, Narrator audio playback
 //
 // Manages a single HTMLAudioElement for narrator voiceover clips.
 // All MP3s are pre-imported at build time so Vite bundles them correctly.
@@ -8,7 +8,7 @@
 import { ref, onBeforeUnmount } from 'vue'
 import { useAudioStore } from '@/stores/audio'
 
-// Static imports — Vite resolves these at build time
+// Static imports, Vite resolves these at build time
 import n01_01 from '../assets/sounds/narrator/01_01_vx_narrator_intro_welcome_manager.mp3'
 import n01_02 from '../assets/sounds/narrator/01_02_vx_narrator_intro_old_terminal_state.mp3'
 import n01_03 from '../assets/sounds/narrator/01_03_vx_narrator_intro_family_inheritance.mp3'
@@ -105,12 +105,12 @@ export function useNarratorAudio() {
     stopCurrent()
     const url = NARRATOR_URLS[audioFile]
     if (!url) {
-      // No audio — treat as instant "ended" so auto-advance still works
+      // No audio, treat as instant "ended" so auto-advance still works
       if (onEnded) setTimeout(onEnded, 800)
       return
     }
 
-    // Treat narrator as SFX — when muted, don't auto-advance; require manual next
+    // Treat narrator as SFX, when muted, don't auto-advance; require manual next
     if (audioStore.sfxMuted) {
       return
     }
@@ -126,7 +126,7 @@ export function useNarratorAudio() {
     })
 
     audio.play().catch(() => {
-      // Browser blocked autoplay — fire ended after a short delay so
+      // Browser blocked autoplay, fire ended after a short delay so
       // auto-advance still works even without sound
       if (endedCallback) setTimeout(endedCallback, 1200)
     })

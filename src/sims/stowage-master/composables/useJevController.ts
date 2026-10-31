@@ -61,7 +61,7 @@ export function useJevController(): JevController {
 
   let abortController: AbortController | null = null
 
-  /** Snapshot the live game state for one move. Pure data — no Vue reactivity leaks into it. */
+  /** Snapshot the live game state for one move. Pure data, no Vue reactivity leaks into it. */
   function buildSnapshot(kind: JevMoveKind): JevGameSnapshot {
     const legalSlotIds =
       kind === 'load' ? store.availableSlots :
@@ -158,7 +158,7 @@ export function useJevController(): JevController {
     })
   }
 
-  /** Resolves once `store.phase` satisfies `predicate`, or after `timeoutMs` (default 30s — crane
+  /** Resolves once `store.phase` satisfies `predicate`, or after `timeoutMs` (default 30s, crane
    *  animations normally settle in under a second, but the first placement of a level can be slower
    *  while the browser compiles shaders/decodes geometry for the first time). */
   function waitForPhase(predicate: (phase: GamePhase) => boolean, timeoutMs = 30000): Promise<boolean> {
@@ -202,7 +202,7 @@ export function useJevController(): JevController {
       prepared = prepareRequest(snapshot)
     } catch (err) {
       // Any failure while snapshotting the game or building the request (e.g. state that can't
-      // be cloned or serialized) must not become an unhandled rejection — that would silently
+      // be cloned or serialized) must not become an unhandled rejection, that would silently
       // kill the autoplay loop and leave the panel stuck on "Thinking…" forever.
       const jevError = err instanceof JevError
         ? err
@@ -276,7 +276,7 @@ export function useJevController(): JevController {
       }
 
       // Stale guard: discard the answer if the game progressed (or left this phase) while
-      // the request was in flight — the level timer keeps running during Jev requests.
+      // the request was in flight, the level timer keeps running during Jev requests.
       const liveKind = phaseToKind(store.phase)
       const liveSnapshot = liveKind ? buildSnapshot(liveKind) : null
       if (!liveSnapshot || isStaleResponse(moveKey, liveSnapshot)) {

@@ -4,7 +4,7 @@ import { useGameStore } from '../../store/gameStore'
 
 const store = useGameStore()
 
-// Animated container stack — cycles through shipping-line colours
+// Animated container stack, cycles through shipping-line colours
 const COLOURS = ['#e8212b', '#0057a8', '#00843d', '#ff6600', '#ffcc00', '#6a1b9a']
 const stackTick = ref(0)
 let tickInterval: ReturnType<typeof setInterval> | null = null

@@ -6,7 +6,7 @@ description: >-
   stability calculations, or stowage planning logic.
 ---
 
-# Vessel Entities — Agent Skill
+# Vessel Entities, Agent Skill
 
 This skill defines the canonical data structures, defaults, generation algorithms, and factory functions for container vessels used across terminal simulations. All code is TypeScript. Follow these schemas exactly when generating vessel-related entities.
 
@@ -284,11 +284,11 @@ interface StowageSlot {
   slot_id: string;              // formatted "BBB/RR/TT"
   deck_zone: DeckZone;
   cell_guides: boolean;         // under-deck = true, on-deck = false (unless lashed)
-  max_weight_kg: number;        // per-slot weight limit — default 30,480 kg (30t gross)
+  max_weight_kg: number;        // per-slot weight limit, default 30,480 kg (30t gross)
   reefer_power: boolean;        // true if reefer plug available
   hazmat_allowed: boolean;      // false near accommodation/engine room
   max_height_mm: number;        // standard 2,591 mm (8'6"); high-cube 2,896 mm (9'6")
-  stack_weight_limit_kg: number;// cumulative stack weight — default 120,000 kg
+  stack_weight_limit_kg: number;// cumulative stack weight, default 120,000 kg
   lashing_required: boolean;    // true for on-deck tiers above tier 82
   container_ref: string | null; // container_id currently occupying slot, null if empty
 }
@@ -355,11 +355,11 @@ Terminal simulations use simplified centre-of-gravity-based stability checks rat
 ```typescript
 interface VesselStability {
   displacement_t: number;       // total weight (vessel + cargo + ballast)
-  base_gm_m: number;            // metacentric height with no cargo — class-dependent
+  base_gm_m: number;            // metacentric height with no cargo, class-dependent
   cog_x: number;                // centre of gravity longitudinal (m from midship, +ve forward)
   cog_y: number;                // centre of gravity transverse (m from centreline, +ve port)
   cog_z: number;                // centre of gravity vertical (m above keel)
-  stability_factor: number;     // divisor for GM reduction — higher = more stable hull
+  stability_factor: number;     // divisor for GM reduction, higher = more stable hull
   list_factor: number;          // degrees list per metre of transverse COG offset
   trim_factor: number;          // metres trim per metre of longitudinal COG offset
 }
@@ -466,9 +466,9 @@ function checkWeightBalance(
 
 ```typescript
 interface PortCutoffs {
-  gate: string;            // ISO 8601 datetime — last acceptance at gate
-  documentation: string;   // ISO 8601 — shipping instruction deadline
-  vgm: string;             // ISO 8601 — verified gross mass submission deadline
+  gate: string;            // ISO 8601 datetime, last acceptance at gate
+  documentation: string;   // ISO 8601, shipping instruction deadline
+  vgm: string;             // ISO 8601, verified gross mass submission deadline
 }
 
 interface PortCall {

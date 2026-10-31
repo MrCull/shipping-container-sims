@@ -8,7 +8,7 @@ description: >-
 
 # Container & Cargo Entity Data Structures
 
-This skill provides complete TypeScript interfaces, enums, constants, factory functions, and state-machine rules for shipping containers and their cargo in terminal simulations. Use this as the canonical reference when generating container-related code — no external lookup should be needed.
+This skill provides complete TypeScript interfaces, enums, constants, factory functions, and state-machine rules for shipping containers and their cargo in terminal simulations. Use this as the canonical reference when generating container-related code, no external lookup should be needed.
 
 ---
 
@@ -483,7 +483,7 @@ rolled
   → cancelled
 
 departed_terminal
-  (terminal state — no further transitions within this terminal visit)
+  (terminal state, no further transitions within this terminal visit)
 
 misrouted
   → expected               (new visit created at correct terminal)
@@ -841,7 +841,7 @@ export function createHazardousContainer(
     vgmKg: 24000,
     grossWeightKg: 24000,
     sealNumbers: ['HLC-DG-88712', 'HLC-DG-88713'],
-    remarks: ['DG Class 3 — dedicated hazmat zone required', 'Marine pollutant placard applied'],
+    remarks: ['DG Class 3, dedicated hazmat zone required', 'Marine pollutant placard applied'],
     ...overrides,
   })
 }

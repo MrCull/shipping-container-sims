@@ -1,4 +1,4 @@
-// Builds the Jev `state` object from a plain game snapshot. Pure — no store access, no Vue.
+// Builds the Jev `state` object from a plain game snapshot. Pure, no store access, no Vue.
 // The controller (plan 04's `useJevController`) is responsible for building `JevGameSnapshot`
 // from `useGameStore()` and calling `buildJevState()`.
 //
@@ -33,7 +33,7 @@ export interface JevGameSnapshot {
   currentContainer: Container | null
   restowContainer: Container | null
   restowFromSlotId: string | null
-  /** `containers.slice(currentContainerIndex + 1)` — load phase only, but always safe to pass. */
+  /** `containers.slice(currentContainerIndex + 1)`, load phase only, but always safe to pass. */
   upcoming: Container[]
   /** `availableSlots` | `dischargeableSlots` | `availableRestowSlots`, matching `kind`. */
   legalSlotIds: string[]
@@ -309,7 +309,7 @@ function buildState(snapshot: JevGameSnapshot, opts: DegradeOptions): Record<str
 export function buildJevState(snapshot: JevGameSnapshot, options: { mode?: 'raw' } = {}): BuildJevStateResult {
   const mode = options.mode ?? 'raw'
   if (mode !== 'raw') {
-    // See plan 02 §2.9 — "assisted" mode is documented but not built.
+    // See plan 02 §2.9, "assisted" mode is documented but not built.
     throw new Error(`buildJevState: mode "${mode}" is not implemented`)
   }
 

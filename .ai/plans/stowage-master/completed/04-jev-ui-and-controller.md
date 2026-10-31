@@ -1,4 +1,4 @@
-# 04 — Jev UI and controller (next move / play all)
+# 04, Jev UI and controller (next move / play all)
 
 > Part of the **Stowage Master × Jev** plan set. Read [00-jev-overview.md](00-jev-overview.md) first.
 > Depends on: 01, 02, 03. Blocks: 05.
@@ -53,7 +53,7 @@ Shown when `jev.enabled` and `store.phase` is `discharge_selecting`, `discharge_
   ```
   ┌ JEV ─────────────────── ⚙ ┐
   │ [ Next move (J) ] [ ▶ Play all (⇧J) ] │   ← Play all becomes [ ■ Stop ] while running
-  │ Thinking… / Moving 07-02-04 / Paused: Rate limited — [Resume] │
+  │ Thinking… / Moving 07-02-04 / Paused: Rate limited, [Resume] │
   │ Jev moves: 14 · Session cost: $0.0041 │
   │ [Details ▸] (only if showInspector)   │
   └───────────────────────────┘

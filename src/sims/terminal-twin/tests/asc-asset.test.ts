@@ -1,5 +1,5 @@
 /**
- * Seam 4 — the ASC model (TT-24). Reads only the committed GLB, its sidecar and
+ * Seam 4, the ASC model (TT-24). Reads only the committed GLB, its sidecar and
  * previews (no Blender), like the CI budget check.
  */
 import { existsSync, readFileSync } from 'node:fs'

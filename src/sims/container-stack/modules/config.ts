@@ -43,7 +43,7 @@ export const PHYSICS = {
   /** Cumulative drag jitter (px) needed with low stability to force-collapse */
   shakyCollapseJitterThreshold: 420,
   criticalRemovalImpulseScale: 2.2,
-  /** Lean past this (rad) triggers collapse — higher = harder to tip */
+  /** Lean past this (rad) triggers collapse, higher = harder to tip */
   maxAngle: 0.55,
   collapseGravity: 18,
   collapseAngularScatter: 4,

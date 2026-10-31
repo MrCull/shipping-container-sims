@@ -141,7 +141,7 @@ function jobStatusColor(status: string): string {
         <span class="value">{{ equipment.carriedContainerId ? equipment.carriedContainerId.slice(-8) : 'None' }}</span>
       </div>
 
-      <!-- Crane mode — only for MHC -->
+      <!-- Crane mode, only for MHC -->
       <div
         v-if="equipment.type === 'mobile_harbor_crane'"
         class="info-row crane-mode-row"

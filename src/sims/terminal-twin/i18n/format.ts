@@ -1,6 +1,6 @@
 /**
  * Display formatting: locale (dates, times, numbers, first day of week) and
- * units (metric / imperial). Display only — the engine, scenario configs and
+ * units (metric / imperial). Display only, the engine, scenario configs and
  * saves stay SI. Everything goes through the browser's built-in `Intl`.
  */
 import type { DisplaySettings } from '../scenario/types'

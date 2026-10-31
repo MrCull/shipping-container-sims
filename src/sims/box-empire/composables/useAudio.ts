@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Sound effect management
+// Box Empire, Sound effect management
 // ---------------------------------------------------------------------------
 
 import { onBeforeUnmount, watch } from 'vue'

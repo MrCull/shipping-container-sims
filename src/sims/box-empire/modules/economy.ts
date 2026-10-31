@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Economy / revenue tracking
+// Box Empire, Economy / revenue tracking
 // ---------------------------------------------------------------------------
 
 import type { Transaction, TransactionType } from '../types'

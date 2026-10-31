@@ -29,7 +29,7 @@ export function useMenuMusic() {
       return
     }
     void audio.play().catch(() => {
-      // Autoplay blocked — wait for first user interaction then retry once
+      // Autoplay blocked, wait for first user interaction then retry once
       const onGesture = () => {
         void audio.play()
         window.removeEventListener('click', onGesture)

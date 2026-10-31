@@ -1,5 +1,5 @@
 /**
- * Scenario presets (TT-15): TTI Algeciras baseline, Small automated, TTI Algeciras — peak day.
+ * Scenario presets (TT-15): TTI Algeciras baseline, Small automated, TTI Algeciras, peak day.
  * Every value is overridable in the setup dialog. The layout is derived from the
  * counts (`scenario/layout.ts`), not placed by hand.
  */
@@ -145,9 +145,9 @@ export const presets: Record<string, () => ScenarioConfig> = {
       yardStart: { mode: 'prefilled', targetPct: 60 },
       truckScale: 0.4,
     }),
-  'TTI Algeciras — peak day': () =>
+  'TTI Algeciras, peak day': () =>
     terminal({
-      name: 'TTI Algeciras — peak day',
+      name: 'TTI Algeciras, peak day',
       description:
         'TTI layout; 5 vessels arrive within 40 minutes; heavy truck peak (about 3x the default profile); Asia-Mediterranean port rotation, ~89% transshipment and 30% of each vessel kept as remain-on-board bays (all unverified assumptions)',
       seed: 99,

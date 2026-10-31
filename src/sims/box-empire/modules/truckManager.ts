@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Truck lifecycle with axis-aligned movement and unified gates
+// Box Empire, Truck lifecycle with axis-aligned movement and unified gates
 // ---------------------------------------------------------------------------
 //
 // Gate design:
@@ -585,7 +585,7 @@ export function startTruckReturnToGate(
 export function startTruckDeparture(truck: TruckVisit, simTime: number): void {
   truck.state = 'departing'
   truck.stateStartTime = simTime
-  // Landward (+Z), away from berth / quay (−Z) — not out the terminal side toward the sea
+  // Landward (+Z), away from berth / quay (−Z), not out the terminal side toward the sea
   const exitPos: Position3D = { x: GATE_OUTGATE_POSITION.x, y: 0, z: GATE_OUTGATE_POSITION.z + 45 }
   truck.waypoints = buildWaypoints(truck.position, exitPos)
   truck.waypointIndex = 0

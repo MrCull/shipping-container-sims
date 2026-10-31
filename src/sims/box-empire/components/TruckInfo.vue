@@ -66,7 +66,7 @@ function stateLabel(state: string): string {
         class="info-row"
       >
         <span class="label">Container</span>
-        <span class="value">—</span>
+        <span class="value">, </span>
       </div>
 
       <div

@@ -100,7 +100,7 @@ That composable should:
 
 ## Suggested folder structure
 
-This project hosts **many independent sims** under `src/sims/`. Each sim is fully self-contained — all code, components, composables, stores, types, and media live inside its own sub-folder. Nothing sim-specific goes into the top-level `src/` directories.
+This project hosts **many independent sims** under `src/sims/`. Each sim is fully self-contained, all code, components, composables, stores, types, and media live inside its own sub-folder. Nothing sim-specific goes into the top-level `src/` directories.
 
 ### Per-sim layout (everything lives under `src/sims/<sim-id>/`)
 

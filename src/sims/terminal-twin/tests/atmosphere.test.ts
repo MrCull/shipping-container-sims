@@ -49,8 +49,8 @@ describe('lighting follows the sim clock', () => {
     expect(hourOfDay(start, 20 * 3600)).toBeCloseTo(2, 5)
   })
 
-  it('locks daylight by default only for the TTI Algeciras — peak day preset', () => {
-    expect(daylightLockDefault('TTI Algeciras — peak day')).toBe(true)
+  it('locks daylight by default only for the TTI Algeciras, peak day preset', () => {
+    expect(daylightLockDefault('TTI Algeciras, peak day')).toBe(true)
     expect(daylightLockDefault('TTI Algeciras baseline')).toBe(false)
     expect(daylightLockDefault('Small automated')).toBe(false)
   })

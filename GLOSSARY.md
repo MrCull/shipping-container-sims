@@ -221,7 +221,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Presets and layout (TT-15)
 
-- **Preset:** a named full scenario (TTI Algeciras baseline, Small automated, TTI Algeciras — peak day); every value stays overridable. Shown as a hero card in the setup dialog, with chips and a layout sketch derived from its config. The 16 test scenarios are **engine test fixtures**, listed in a collapsed table.
+- **Preset:** a named full scenario (TTI Algeciras baseline, Small automated, TTI Algeciras, peak day); every value stays overridable. Shown as a hero card in the setup dialog, with chips and a layout sketch derived from its config. The 16 test scenarios are **engine test fixtures**, listed in a collapsed table.
 - **Derived layout:** block and STS positions computed from the counts and the quay length, in the TTI functional order (quay, STS rail, apron and WTP pads, blocks, stalls, roads, gate).
 - **Frontage:** the quay length a block needs (32 m); blocks need count x 32 m.
 - **Scale limits / peak-day scale:** hard maxima (errors) and the softer size above which the dialog warns the run may be slow.
@@ -241,7 +241,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Atmosphere (TT-21)
 
-- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On by default in the TTI Algeciras — peak day preset.
+- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On by default in the TTI Algeciras, peak day preset.
 - **Night mode:** the cheaper lighting at night: no sun shadow pass, floodlight glow on high masts and emissive equipment lights instead of real lights.
 - **Backdrop:** the distant low-poly scenery: a terminal's own scenery (TTI Algeciras: the Rock of Gibraltar at true scale, hills, North Quay, and the surroundings) when a terminal folder owns the scenario, a generic coastline otherwise.
 - **Surroundings:** the TTI Algeciras scenery beyond the Rock and hills: the Gibraltar and La Línea shore, vessels at anchor, storage tanks, the Isla Verde road and rail with warehouses, and Algeciras town blocks. Five merged `scenery-*` GLBs, one draw call each, inside the `tti-surroundings` group budget.

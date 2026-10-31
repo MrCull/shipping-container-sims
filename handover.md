@@ -1,6 +1,6 @@
 # Handover: spec #134 (Terminal Twin polish, round 2)
 
-**Status: spec and tickets written, no code started.** A new session implements them with `/implement-spec` on #134. Delete this file in the PR that finishes the spec.
+**Status: #135 (em dash sweep) merged in the integration branch `claude/stoic-hypatia-tk68z1`; #136 onward not started.** A new session implements them with `/implement-spec` on #134. Delete this file in the PR that finishes the spec.
 
 ## Where things are
 

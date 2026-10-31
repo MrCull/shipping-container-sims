@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Fixed-step simulation tick + RAF render loop
+// Box Empire, Fixed-step simulation tick + RAF render loop
 // ---------------------------------------------------------------------------
 
 import { ref, onBeforeUnmount } from 'vue'

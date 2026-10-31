@@ -38,7 +38,7 @@ export function useAudio() {
           const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
           buffers.set(key, audioBuffer)
         } catch {
-          // Audio files are optional — degrade silently
+          // Audio files are optional, degrade silently
         }
       })
     )

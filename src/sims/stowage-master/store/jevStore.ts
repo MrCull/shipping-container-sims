@@ -52,7 +52,7 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
   const minConfidenceToAutoplay = ref<number | null>(initialPrefs.minConfidenceToAutoplay) // null = off
 
   // --- Session state (not persisted) ---
-  const hasKey = ref(hasApiKey()) // boolean mirror of the vault — the key itself never lands here
+  const hasKey = ref(hasApiKey()) // boolean mirror of the vault, the key itself never lands here
   const keyLimitRemaining = ref<number | null>(null)
   const status = ref<JevControllerStatus>('idle')
   const autoPlay = ref(false)
@@ -124,7 +124,7 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
 
   /**
    * Stores an already-validated key in the in-memory vault and updates the store's boolean
-   * mirror. Callers must have already called `validateApiKey()` (jevClient.ts) successfully —
+   * mirror. Callers must have already called `validateApiKey()` (jevClient.ts) successfully,
    * this function does not itself validate the key.
    */
   function setKey(key: string, limitRemaining: number | null): void {
@@ -147,7 +147,7 @@ export const useJevStore = defineStore('stowage-master-jev', () => {
 
   /**
    * Stops auto-play, forgets the key and disables Jev. Aborting any in-flight request is the
-   * controller's responsibility (plan 04's `useJevController`) — this store has no request
+   * controller's responsibility (plan 04's `useJevController`), this store has no request
    * in flight to cancel on its own.
    */
   function disable(): void {

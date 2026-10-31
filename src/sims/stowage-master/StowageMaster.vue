@@ -34,13 +34,13 @@ useGameMusic()
 useGodModeHotkey()
 
 onMounted(() => {
-  // Reset to the start screen every time this component mounts — handles
+  // Reset to the start screen every time this component mounts, handles
   // returning from the main menu mid-game.
   store.setPhase('start')
 })
 
 // Reset Jev's per-level counters whenever a new level's briefing begins (covers both a fresh
-// startLevel() and a replay). Runs regardless of jev.enabled — harmless when Jev is off.
+// startLevel() and a replay). Runs regardless of jev.enabled, harmless when Jev is off.
 watch(() => store.phase, (phase) => {
   if (phase === 'briefing') {
     jev.resetLevelCounters()

@@ -1,4 +1,4 @@
-# 02 — Jev state, questions, validation and policy
+# 02, Jev state, questions, validation and policy
 
 > Part of the **Stowage Master × Jev** plan set. Read [00-jev-overview.md](00-jev-overview.md) first.
 > Depends on: 01 (types, config). Blocks: 04.
@@ -201,8 +201,8 @@ An `assisted` state mode could add per-candidate predicted list, trim, stack wei
 
 Pure functions producing short human-readable strings for the inspector (05):
 
-- `summarizeRequest(snapshot, body)` produces, for example: `"LOAD MSCU1234565 · 24 t heavy · Rotterdam (#1) · HAZMAT — 17 legal slots — list 3.4° stbd, trim 1.2° stern (normal) — bay plan 34/48 slots filled — next 12 of 18 queued shown — ≈ 9.8K tokens"`.
-- `summarizeResponse(result)` produces, for example: `"Chose 07-02-02 (p 0.41, confidence 0.28 — low). Next: 07-03-02 0.22 · 09-02-02 0.12 · 05-02-02 0.07. 1.9 s · $0.00041 · jev-1.13-20260917"`.
+- `summarizeRequest(snapshot, body)` produces, for example: `"LOAD MSCU1234565 · 24 t heavy · Rotterdam (#1) · HAZMAT, 17 legal slots, list 3.4° stbd, trim 1.2° stern (normal), bay plan 34/48 slots filled, next 12 of 18 queued shown, ≈ 9.8K tokens"`.
+- `summarizeResponse(result)` produces, for example: `"Chose 07-02-02 (p 0.41, confidence 0.28, low). Next: 07-03-02 0.22 · 09-02-02 0.12 · 05-02-02 0.07. 1.9 s · $0.00041 · jev-1.13-20260917"`.
 - Label confidence using the TypeSafe bands: <0.5 "low", 0.5–0.9 "moderate", >0.9 "high".
 - **Never** write text that implies Jev's reasoning (e.g. "Jev chose this because…").
 

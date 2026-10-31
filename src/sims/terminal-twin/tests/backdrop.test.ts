@@ -5,7 +5,7 @@ import { presets } from '../scenario/presets'
 describe('backdrop', () => {
   it('uses the Algeciras backdrop for the TTI presets only', () => {
     const kinds = Object.fromEntries(Object.keys(presets).map((name) => [name, sceneryFor(name).kind]))
-    expect(kinds).toEqual({ 'TTI Algeciras baseline': 'tti', 'Small automated': 'generic', 'TTI Algeciras — peak day': 'tti' })
+    expect(kinds).toEqual({ 'TTI Algeciras baseline': 'tti', 'Small automated': 'generic', 'TTI Algeciras, peak day': 'tti' })
     expect(sceneryFor('tracer').kind).toBe('generic')
   })
 

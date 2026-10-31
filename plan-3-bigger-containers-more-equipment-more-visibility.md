@@ -1,4 +1,4 @@
-# Box Empire — Plan 3: Bigger Containers, More Equipment, More Visibility
+# Box Empire, Plan 3: Bigger Containers, More Equipment, More Visibility
 
 > **Status:** Not started
 > **Dependencies:** Plan 2 (purchase system, yard configuration, save/load, expanded operations)
@@ -12,30 +12,30 @@ Introduce 40ft containers (unlocked at a money milestone), RMG yard cranes for e
 
 ---
 
-## Prerequisites — Read Before Implementing
+## Prerequisites, Read Before Implementing
 
-1. **AGENTS.md** — Project conventions, linting
-2. **`src/sims/box-empire/box-empire-AGENTS.md`** — Architecture decisions from Plans 1–2
-3. **Master roadmap** — `create-five-other-plans-with-combined-will-result-in-a-full-game.md` §6 (Plan 3)
+1. **AGENTS.md**, Project conventions, linting
+2. **`src/sims/box-empire/box-empire-AGENTS.md`**, Architecture decisions from Plans 1–2
+3. **Master roadmap**, `create-five-other-plans-with-combined-will-result-in-a-full-game.md` §6 (Plan 3)
 4. **Skill files:**
-   - `.ai/skills/container-cargo-entities/SKILL.md` — Container physical specs (40ft: 12.19m × 2.44m × 2.59m, tare 3700kg, TEU 2)
-   - `.ai/skills/terminal-equipment-entities/SKILL.md` — RMG crane specs, four-lens model, animation states
-   - `.ai/skills/vessel-entities/SKILL.md` — Larger vessel classes (feedermax), bay-row-tier with even bay 40ft semantics
-   - `.ai/skills/terminal-operations/SKILL.md` — KPIs with target ranges, crane utilization, congestion model
-   - `.ai/skills/terminal-economics/SKILL.md` — 40ft vs 20ft charge differentials
-   - `.ai/skills/terminal-infrastructure/SKILL.md` — Yard block dimensions, inter-block gaps, truck lane widths
+   - `.ai/skills/container-cargo-entities/SKILL.md`, Container physical specs (40ft: 12.19m × 2.44m × 2.59m, tare 3700kg, TEU 2)
+   - `.ai/skills/terminal-equipment-entities/SKILL.md`, RMG crane specs, four-lens model, animation states
+   - `.ai/skills/vessel-entities/SKILL.md`, Larger vessel classes (feedermax), bay-row-tier with even bay 40ft semantics
+   - `.ai/skills/terminal-operations/SKILL.md`, KPIs with target ranges, crane utilization, congestion model
+   - `.ai/skills/terminal-economics/SKILL.md`, 40ft vs 20ft charge differentials
+   - `.ai/skills/terminal-infrastructure/SKILL.md`, Yard block dimensions, inter-block gaps, truck lane widths
 5. **Knowledge base files:**
-   - `knowledge-base/dk_equipment__rmg_cranes.md` — RMG classes, spans, speeds, event sequences
-   - `knowledge-base/dk_vessels__physical_classes_and_structure.md` — Vessel size classes, bay-row-tier details
-   - `knowledge-base/dk_vessels__stowage_locations_and_bayplan.md` — Even/odd bay numbering for 20ft/40ft
-   - `knowledge-base/dk_ops__dashboards_kpis.md` — KPI definitions, target ranges
-   - `knowledge-base/dk_yard__stacking_strategies_rehandles.md` — Rehandle calculation, stacking rules
+   - `knowledge-base/dk_equipment__rmg_cranes.md`, RMG classes, spans, speeds, event sequences
+   - `knowledge-base/dk_vessels__physical_classes_and_structure.md`, Vessel size classes, bay-row-tier details
+   - `knowledge-base/dk_vessels__stowage_locations_and_bayplan.md`, Even/odd bay numbering for 20ft/40ft
+   - `knowledge-base/dk_ops__dashboards_kpis.md`, KPI definitions, target ranges
+   - `knowledge-base/dk_yard__stacking_strategies_rehandles.md`, Rehandle calculation, stacking rules
 
 ---
 
 ## Player Experience
 
-1. Upon reaching **$50,000** balance, 40ft containers are unlocked — milestone notification appears
+1. Upon reaching **$50,000** balance, 40ft containers are unlocked, milestone notification appears
 2. Upon reaching **$75,000** balance, RMG cranes become available for purchase
 3. Player can now purchase RMG cranes to automate yard stack operations (much faster than reach stackers)
 4. Player can purchase additional gatehouses for parallel truck processing
@@ -128,7 +128,7 @@ interface MilestoneReward {
 
 ### 3. RMG Yard Crane
 
-From `terminal-equipment-entities` skill — standard yard RMG:
+From `terminal-equipment-entities` skill, standard yard RMG:
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
@@ -211,7 +211,7 @@ KPIs drawn from `terminal-operations` skill and `dk_ops__dashboards_kpis.md`:
 | Crane utilization | `busy_time / total_time × 100` per crane | 70–90% | Bar per crane |
 | Truck turn time | `gate_out_time - gate_in_time` (average) | 25–45 min sim-time | Average + trend |
 | Revenue per day | `daily_revenue` (rolling 24h sim-time) | Growing | Line chart |
-| Containers handled | Total containers completed (import out + export loaded) | — | Counter |
+| Containers handled | Total containers completed (import out + export loaded) | - | Counter |
 | Rehandle rate | `rehandles / total_moves` | < 0.40 | Percentage |
 
 **Congestion multiplier** (from `terminal-operations` skill):
@@ -304,28 +304,28 @@ src/sims/box-empire/
 │   ├── kpiTracker.ts                 # KPI computation and history (NEW)
 │   ├── rmgController.ts             # RMG crane state machine and movement (NEW)
 │   ├── rmgRenderer.ts               # RMG Three.js mesh and animation (NEW)
-│   ├── containerRenderer.ts          # MODIFIED — 40ft InstancedMesh support
-│   ├── vesselRenderer.ts             # MODIFIED — multi-bay vessel rendering
-│   ├── yardManager.ts                # MODIFIED — 40ft double-bay placement, mixed stacking rules
-│   ├── vesselManager.ts              # MODIFIED — bay-row-tier stowage with even/odd bay logic
-│   ├── vesselScheduler.ts            # MODIFIED — larger vessels, scaling frequency
-│   ├── jobScheduler.ts               # MODIFIED — RMG job assignment (yard-internal moves)
-│   ├── equipmentController.ts        # MODIFIED — add RMG equipment type
-│   ├── economy.ts                    # MODIFIED — 40ft charge rates
-│   ├── purchaseSystem.ts             # MODIFIED — RMG in catalog, milestone-gated items
-│   ├── terminalMap.ts                # MODIFIED — multiple gatehouse nodes
-│   └── config.ts                     # MODIFIED — RMG specs, 40ft dimensions, milestone thresholds
+│   ├── containerRenderer.ts          # MODIFIED, 40ft InstancedMesh support
+│   ├── vesselRenderer.ts             # MODIFIED, multi-bay vessel rendering
+│   ├── yardManager.ts                # MODIFIED, 40ft double-bay placement, mixed stacking rules
+│   ├── vesselManager.ts              # MODIFIED, bay-row-tier stowage with even/odd bay logic
+│   ├── vesselScheduler.ts            # MODIFIED, larger vessels, scaling frequency
+│   ├── jobScheduler.ts               # MODIFIED, RMG job assignment (yard-internal moves)
+│   ├── equipmentController.ts        # MODIFIED, add RMG equipment type
+│   ├── economy.ts                    # MODIFIED, 40ft charge rates
+│   ├── purchaseSystem.ts             # MODIFIED, RMG in catalog, milestone-gated items
+│   ├── terminalMap.ts                # MODIFIED, multiple gatehouse nodes
+│   └── config.ts                     # MODIFIED, RMG specs, 40ft dimensions, milestone thresholds
 ├── store/
-│   └── gameStore.ts                  # MODIFIED — milestones, KPI history, unlock state
+│   └── gameStore.ts                  # MODIFIED, milestones, KPI history, unlock state
 ├── types/
-│   └── index.ts                      # MODIFIED — Milestone, KPISnapshot, RMG interfaces
+│   └── index.ts                      # MODIFIED, Milestone, KPISnapshot, RMG interfaces
 ```
 
 ---
 
 ## Implementation Order (Recommended)
 
-### Phase A — 40ft Container Foundation
+### Phase A, 40ft Container Foundation
 1. Extend `ContainerSize` type to include `'40ft'`
 2. Add 40ft physical specs to `config.ts`
 3. Update `yardManager.ts` for double-bay placement and mixed stacking rules
@@ -333,37 +333,37 @@ src/sims/box-empire/
 5. Update `containerRenderer.ts` for 40ft mesh (double-length box)
 6. Update `economy.ts` with 40ft charge rates
 
-### Phase B — Milestone System
+### Phase B, Milestone System
 7. Implement `modules/milestones.ts` (definitions, condition checks, reward application)
 8. Add milestone state to store
 9. Implement `components/MilestoneNotification.vue` and `components/modals/MilestoneUnlock.vue`
 10. Wire milestone checks into game loop (check every sim-minute)
 
-### Phase C — RMG Crane
+### Phase C, RMG Crane
 11. Implement `modules/rmgController.ts` (state machine, gantry/trolley/hoist movement)
 12. Implement `modules/rmgRenderer.ts` (portal frame, trolley, hoist, spreader meshes)
 13. Update `jobScheduler.ts` to assign yard-internal moves to RMG when available
 14. Update `purchaseSystem.ts` to add RMG to catalog (milestone-gated)
 15. Update `equipmentController.ts` to handle RMG equipment type
 
-### Phase D — Multiple Gatehouses
+### Phase D, Multiple Gatehouses
 16. Update `purchaseSystem.ts` for gatehouse purchasing (milestone-gated)
 17. Update `terminalMap.ts` for multiple gate nodes
 18. Update `truckManager.ts` for multi-gatehouse queue assignment (shortest queue)
 19. Update gate rendering to show multiple gatehouses
 
-### Phase E — Larger Vessels
+### Phase E, Larger Vessels
 20. Update `vesselScheduler.ts` for feedermax-class vessels (30–100 containers)
 21. Update `vesselRenderer.ts` for multi-bay vessel rendering
 22. Update `vesselManager.ts` for multi-crane simultaneous operations
 
-### Phase F — Dashboard
+### Phase F, Dashboard
 23. Implement `modules/kpiTracker.ts` (computation, rolling history)
 24. Implement `components/Dashboard.vue` (overlay panel)
 25. Implement `components/ui/KPIGauge.vue`, `KPIChart.vue`, `CraneUtilization.vue`
 26. Add congestion multiplier to yard move times based on occupancy
 
-### Phase G — Integration and Testing
+### Phase G, Integration and Testing
 27. Test 40ft placement in yard (double-bay, mixed stacking)
 28. Test 40ft on vessel (even bay stowage)
 29. Test milestone triggers and unlocks

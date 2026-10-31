@@ -77,7 +77,7 @@ function createAvailableDischargeJobsForVessel(
   vessel: BoxEmpireState['vesselVisits'][number],
   indexes?: SimulationIndexes,
 ): void {
-  // One active discharge job per bay — prevents duplicate MHC moves for the same bay
+  // One active discharge job per bay, prevents duplicate MHC moves for the same bay
   const baysInFlight = new Set<number>()
   for (const job of state.jobs) {
     if (job.status !== 'pending' && job.status !== 'assigned' && job.status !== 'in_progress') continue
@@ -306,7 +306,7 @@ function continueExportStagingAndLoading(
     }
   }
 
-  // No exports remain anywhere — all loading vessels can depart
+  // No exports remain anywhere, all loading vessels can depart
   const noExportsLeft = !state.containers.some(
     c => c.visitType === 'export' && ['in_yard', 'at_gate', 'staged_for_loading'].includes(c.lifecycleState),
   )
@@ -323,7 +323,7 @@ function continueExportStagingAndLoading(
         vessel.state = 'departing'
         callbacks.emitEvent('vessel.departing', `${vessel.name} is departing`)
       }
-      // vessel still in 'discharging' — discharge takes priority, don't depart yet
+      // vessel still in 'discharging', discharge takes priority, don't depart yet
       continue
     }
 

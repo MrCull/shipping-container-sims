@@ -306,7 +306,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       positional.applyGain()
     },
   )
-  /** Keep the sun daylight all day (default on for the TTI Algeciras — peak day preset). */
+  /** Keep the sun daylight all day (default on for the TTI Algeciras, peak day preset). */
   const lockDaylight = ref(false)
   const banner = ref<TwinBanner | null>(null)
   const cues = markRaw(new CuePlanner())

@@ -1,6 +1,6 @@
 /**
  * TT-06: slots, ASC motion, ASC/SHC handover, allocation strategies, stack
- * invariants, KPIs and modes — through the public engine API and the
+ * invariants, KPIs and modes, through the public engine API and the
  * yardAllocation decision point.
  */
 import { describe, expect, it } from 'vitest'

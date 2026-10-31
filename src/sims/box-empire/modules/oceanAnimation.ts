@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Ocean mesh registration + vertex animation (used by render loop)
+// Box Empire, Ocean mesh registration + vertex animation (used by render loop)
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
@@ -58,7 +58,7 @@ export function animateOcean(time: number): void {
   // PlaneGeometry rotated flat (rotation.x = -π/2):
   //   local X  →  world X   (unchanged)
   //   local Y  →  world -Z  (the depth/spread of the plane)
-  //   local Z  →  world Y   (vertical height — this is what we animate)
+  //   local Z  →  world Y   (vertical height, this is what we animate)
   // So we read local X and local Y for wave sampling, and write local Z for height.
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i)   // local X = world X

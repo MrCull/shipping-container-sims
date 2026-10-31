@@ -38,7 +38,7 @@ const jev = useJevStore()
 const { getScene, getCamera, isReady, render, setCameraForShip, applyKeyboardCamera } = useGameThreeScene(canvasRef)
 const audio = useAudio()
 
-// Plain variables — Three.js objects must never be wrapped in Vue reactivity
+// Plain variables, Three.js objects must never be wrapped in Vue reactivity
 let shipGroup: THREE.Group | null = null
 let craneObj: CraneObject | null = null
 let ocean: THREE.Mesh | null = null
@@ -84,7 +84,7 @@ const sailAway = { active: false, elapsed: 0, delay: 0.5 }
 // Sail-in animation state (ship arrives from off-screen left)
 const sailIn = { active: false, elapsed: 0, startX: -200, targetX: 0, duration: 4.0 }
 
-// Timer warning sound state — track whether we've played each threshold warning
+// Timer warning sound state, track whether we've played each threshold warning
 let timerWarnedAt30pct = false
 let timerWarnedAt15pct = false
 
@@ -252,7 +252,7 @@ const { start: startLoop } = useGameLoop((deltaTime, time) => {
           disposeGroup(anim.truck, scene)
           if (anim.container) disposeGroup(anim.container, scene)
         } else {
-          // Advancing truck — ensure it is fully opaque after animation completes
+          // Advancing truck, ensure it is fully opaque after animation completes
           setGroupOpacity(anim.truck, 1.0)
         }
         return false
@@ -268,12 +268,12 @@ onMounted(async () => {
   await audio.init()
 })
 
-// Choose horn sample based on vessel preset — small feeder uses small horn
+// Choose horn sample based on vessel preset, small feeder uses small horn
 function hornSound(): string {
   return store.shipConfig?.name === 'small' ? 'shipHornSmall' : 'shipHornLarge'
 }
 
-// Single phase watcher — handles both scene rebuilds and audio/animation triggers
+// Single phase watcher, handles both scene rebuilds and audio/animation triggers
 watch(() => store.phase, (newPhase, oldPhase) => {
   const isSceneRebuildTrigger =
     newPhase === 'briefing' &&
@@ -293,7 +293,7 @@ watch(() => store.phase, (newPhase, oldPhase) => {
     audio.stopAmbientSeagulls()
   }
 
-  // Briefing dismissed on a load-only level — show green slot indicators
+  // Briefing dismissed on a load-only level, show green slot indicators
   if (newPhase === 'selecting' && oldPhase === 'briefing') {
     if (shipGroup && store.shipConfig) {
       createSlotIndicators(
@@ -344,7 +344,7 @@ watch(() => store.phase, (newPhase, oldPhase) => {
     }
   }
 
-  // Transit container picked for restow — show cyan restow destination indicators
+  // Transit container picked for restow, show cyan restow destination indicators
   if (newPhase === 'restow_selecting' && oldPhase === 'discharge_selecting') {
     if (shipGroup && store.shipConfig) {
       removeImportSlotIndicators(shipGroup)
@@ -457,7 +457,7 @@ watch(() => store.disasterType, (type) => {
 watch(() => store.lastPlacement, (placement) => {
   if (!placement) return
   if (placement.score >= 100) {
-    // Perfect placement — cash register sound
+    // Perfect placement, cash register sound
     audio.playSound('caChing', 0.7)
   } else if (placement.score >= 80) {
     audio.playSound('correctDing', 0.6)
@@ -498,7 +498,7 @@ async function buildScene(): Promise<void> {
 
   // Load real GLB model for presets with glbPath, procedural for all others
   if (store.shipConfig.glbPath) {
-    store.loadingMessage = 'Vessel inbound — tug assist in progress…'
+    store.loadingMessage = 'Vessel inbound, tug assist in progress…'
     shipGroup = await loadShipGLB(scene, store.shipConfig)
   } else {
     shipGroup = createShip(scene, store.shipConfig)
@@ -545,7 +545,7 @@ async function buildScene(): Promise<void> {
     await updateHoistMesh(store.currentContainer)
     updateQueueMeshes(store.nextThreeContainers)
   } else {
-    // Load-only level — no slot indicators yet; added when briefing is dismissed
+    // Load-only level, no slot indicators yet; added when briefing is dismissed
     await updateHoistMesh(store.currentContainer)
     updateQueueMeshes(store.nextThreeContainers)
   }
@@ -729,7 +729,7 @@ function executeDischargePick(slotId: string): boolean {
   const deckY = cfg.deckOffsetY ?? cfg.height * 0.3
 
   if (result.isRestow) {
-    // Transit container — store already removed it from grid, phase is now restow_selecting.
+    // Transit container, store already removed it from grid, phase is now restow_selecting.
     // Pull the mesh out of the ship group and keep a reference for the pending restow click.
     const containerMesh = removeImportContainerMesh(shipGroup!, slotId)
       ?? createContainerMesh(result.container)

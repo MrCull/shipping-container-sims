@@ -1,5 +1,5 @@
 /**
- * TT-25: how the renderer's scene model poses an SHC for the 3D model — wheel
+ * TT-25: how the renderer's scene model poses an SHC for the 3D model, wheel
  * roll from travel distance, steering from path curvature, spreader height from
  * the lift segments. Driven with motion plans through `SceneModel.apply`, the
  * same Delta the worker sends (seam 3 data, no Three.js).

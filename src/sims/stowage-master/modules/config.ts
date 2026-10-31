@@ -15,19 +15,19 @@ export const SHIP_PRESETS: Record<string, ShipPreset> = {
     // trim moment without making the whole lightship act like aft ballast.
     emptyTrimMoment: -260,
     maxStackWeight: 120,
-    // 3 bays: cellX = 18.8/3 = 6.27m > container length 5.9m — no bay overlap.
+    // 3 bays: cellX = 18.8/3 = 6.27m > container length 5.9m, no bay overlap.
     // cargoXOffsetFraction=0.095 centres the 3-bay grid between fwd mast and aft
     // superstructure (cargo zone midpoint ~3.8m bow-ward of midship).
     cargoLengthFraction: 0.47,
     cargoXOffsetFraction: 0.095,
     // 3 rows: cellZ = 12*0.60/3 = 2.40m. Container width 2.55m → 0.15m overlap (imperceptible).
-    // Outer row centres at ±2.40m, container edges at ±3.68m — within visual hull ±3.76m.
+    // Outer row centres at ±2.40m, container edges at ±3.68m, within visual hull ±3.76m.
     cargoWidthFraction: 0.60,
     sternBlockedBays: 0,
     // GLB model fields
     glbPath: 'small-feeder',
     deckOffsetY: 1.5,   // raised with glbYOffset so containers stay on deck
-    glbYOffset: 3.3,    // small raise above original 3.0 — hull waterline visible above ocean
+    glbYOffset: 3.3,    // small raise above original 3.0, hull waterline visible above ocean
   },
   medium: {
     name: 'medium',
@@ -76,15 +76,15 @@ export const SHIP_PRESETS: Record<string, ShipPreset> = {
     // Two groups of 6 with a ~9-unit gap (≈1.5 container lengths) between groups.
     // Spacing within each group: 6.3 units (≈container length + gap).
     bayXOffsets: [
-      // Stern group (bays 0–5) — shifted back ½ container length (−3.05)
+      // Stern group (bays 0–5), shifted back ½ container length (−3.05)
       -34.55, -28.25, -21.95, -15.65, -9.35, -3.05,
-      // Bow group (bays 6–11) — shifted forward ½ container length (+3.05)
+      // Bow group (bays 6–11), shifted forward ½ container length (+3.05)
       12.50, 18.80, 25.10, 31.40, 37.70, 44.00,
     ],
     bayYBaseOffsets: [
-      1.86, 1.86, 1.86, 1.86, 1.86, 1.86,  // stern 6 — prev 1.33 + 0.53 (2/10 container height)
-      2.12, 2.12, 2.12, 2.12,               // mid bow 4 — 8/10 container height
-      4.07, 4.07,                            // forecastle pair — minus 1/3 container height
+      1.86, 1.86, 1.86, 1.86, 1.86, 1.86,  // stern 6, prev 1.33 + 0.53 (2/10 container height)
+      2.12, 2.12, 2.12, 2.12,               // mid bow 4, 8/10 container height
+      4.07, 4.07,                            // forecastle pair, minus 1/3 container height
     ],
   },
   large: {
@@ -236,7 +236,7 @@ export const OUTBOUND_TRUCK = {
   /**
    * Z offset from crane dock position.
    * Crane dockZ is already negative (land side). A negative offset pushes outbound
-   * trucks further into the land side — the far lane away from the ship.
+   * trucks further into the land side, the far lane away from the ship.
    */
   dockZOffset: -14,
   /** Spacing between outbound truck group origins along X. */

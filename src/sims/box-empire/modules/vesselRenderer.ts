@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Vessel mesh (inspired by stowage-master shipRenderer.ts)
+// Box Empire, Vessel mesh (inspired by stowage-master shipRenderer.ts)
 // Procedural ship with tapered hull, antifouling band, hatch covers,
 // accommodation block, funnel, and deck fittings.
 // ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ export const VESSEL_GLB_URL = new URL('../assets/models/container-ship-small-emp
 function buildVesselGLBHull(glbRoot: THREE.Group, loa: number): THREE.Group {
   glbRoot.rotation.y = VESSEL_GLB.rotationY
 
-  // After rotation the length axis is X — scale to match loa
+  // After rotation the length axis is X, scale to match loa
   const box = new THREE.Box3().setFromObject(glbRoot)
   const size = new THREE.Vector3()
   box.getSize(size)
@@ -68,7 +68,7 @@ function makeDeckContainer(container: Container): THREE.Group {
   return g
 }
 
-// Shared materials — allocated once, reused
+// Shared materials, allocated once, reused
 let hullMat: THREE.MeshPhongMaterial | null = null
 let antifoulMat: THREE.MeshPhongMaterial | null = null
 let deckMat: THREE.MeshPhongMaterial | null = null
@@ -130,7 +130,7 @@ function buildHull(group: THREE.Group, L: number, W: number, H: number, mats: Re
   mid.castShadow = true; mid.receiveShadow = true
   group.add(mid)
 
-  // Bow — tapered prism pointing in +X direction (bow faces +X on our rotated vessel)
+  // Bow, tapered prism pointing in +X direction (bow faces +X on our rotated vessel)
   const bow = makeTaperedPrism(bowLen, depth, W, 1.8, 0, hullMat)  // widened from 0.6 to 1.8
   bow.position.set(hullCenterX + midLen / 2 + bowLen / 2, -depth * 0.5 + deckY, 0)
   group.add(bow)
@@ -150,7 +150,7 @@ function buildHull(group: THREE.Group, L: number, W: number, H: number, mats: Re
   wl.position.set(hullCenterX, -depth * 0.5 + deckY - depth * 0.35, 0)
   group.add(wl)
 
-  // Bulwarks — raised hull lip above deck level along both sides
+  // Bulwarks, raised hull lip above deck level along both sides
   const bulwarkLen = midLen + bowLen * 0.6
   const bulwarkMat = hullMat
   for (const sign of [-1, 1]) {
@@ -159,7 +159,7 @@ function buildHull(group: THREE.Group, L: number, W: number, H: number, mats: Re
     group.add(bw)
   }
 
-  // Hull panel lines — thin darker horizontal strips on hull sides
+  // Hull panel lines, thin darker horizontal strips on hull sides
   const panelLineMat = new THREE.MeshPhongMaterial({ color: 0x0f1a28 })
   for (const sign of [-1, 1]) {
     for (const frac of [0.25, 0.55]) {
@@ -197,7 +197,7 @@ function buildDeck(group: THREE.Group, L: number, W: number, mats: ReturnType<ty
     group.add(coam)
   }
 
-  // Lashing bridges — transverse frames between each pair of hatches
+  // Lashing bridges, transverse frames between each pair of hatches
   for (let i = 0; i < numHatches - 1; i++) {
     const lx = (hatchXPositions[i] + hatchXPositions[i + 1]) / 2
     // Cross-beam
@@ -213,7 +213,7 @@ function buildDeck(group: THREE.Group, L: number, W: number, mats: ReturnType<ty
     topRail.position.set(lx, deckY + 1.95, 0); group.add(topRail)
   }
 
-  // Mooring bollards — bow (4) and stern (2)
+  // Mooring bollards, bow (4) and stern (2)
   const bollardBodyGeo = new THREE.CylinderGeometry(0.20, 0.28, 0.8, 10)
   const bollardCapGeo  = new THREE.SphereGeometry(0.24, 10, 8)
   const bowBollards: [number, number][] = [
@@ -233,7 +233,7 @@ function buildDeck(group: THREE.Group, L: number, W: number, mats: ReturnType<ty
     cap.position.set(-L * 0.44, deckY + 1.0, sign * W * 0.28); group.add(cap)
   }
 
-  // Windlass at bow — anchor chain winch
+  // Windlass at bow, anchor chain winch
   const windlassDrum = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.2, 12), windlassMat)
   windlassDrum.rotation.z = Math.PI / 2
   windlassDrum.position.set(L * 0.36, deckY + 0.65, 0); group.add(windlassDrum)
@@ -260,7 +260,7 @@ function buildSuperstructure(group: THREE.Group, L: number, W: number, H: number
     group.add(m)
 
     // Windows on all 4 faces
-    // Front (+X face — existing)
+    // Front (+X face, existing)
     const winFront = new THREE.Mesh(new THREE.BoxGeometry(f.l * 0.09, f.h * 0.30, f.w * 0.88), glassMat)
     winFront.position.set(sternX + f.l * 0.54, accY + f.h * 0.62, 0); group.add(winFront)
     // Back (-X face)
@@ -276,7 +276,7 @@ function buildSuperstructure(group: THREE.Group, L: number, W: number, H: number
     accY += f.h
   }
 
-  // Bridge wings — platforms extending from sides of the top floor
+  // Bridge wings, platforms extending from sides of the top floor
   // accY is now at the top of floor 3. Top floor center Y = accY - floors[2].h/2
   const topFloor = floors[2]
   const topFloorCenterY = accY - topFloor.h / 2
@@ -313,7 +313,7 @@ function buildSuperstructure(group: THREE.Group, L: number, W: number, H: number
   const funnelCap = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.85, 0.4, 12), funnelMat)
   funnelCap.position.set(sternX, funnelTopY, 0); group.add(funnelCap)
 
-  // Mast — kept short and proportional for a small feeder
+  // Mast, kept short and proportional for a small feeder
   const mastHeight = H * 0.9
   const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, mastHeight, 8), metalMat)
   mast.position.set(sternX, accY + mastHeight / 2, 0)
@@ -340,7 +340,7 @@ function buildSuperstructure(group: THREE.Group, L: number, W: number, H: number
     group.add(lifeboat)
   }
 
-  // Rudder — flat plate behind propeller
+  // Rudder, flat plate behind propeller
   const rudder = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.0, 1.5), mats.hullMat)
   rudder.position.set(-L * 0.49, deckY - 2.5, 0); group.add(rudder)
 
@@ -401,7 +401,7 @@ function buildDeckFittings(group: THREE.Group, L: number, W: number, mats: Retur
     group.add(fair)
   }
 
-  // Hawse pipes — short cylinders angled into hull near bow
+  // Hawse pipes, short cylinders angled into hull near bow
   for (const sign of [-1, 1]) {
     const hwp = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.2, 8), metalMat)
     hwp.rotation.x = Math.PI / 4; hwp.rotation.z = sign * 0.3
@@ -426,7 +426,7 @@ function buildDeckFittings(group: THREE.Group, L: number, W: number, mats: Retur
   const sternLight = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), navWhiteMat)
   sternLight.position.set(-L * 0.46, deckY + 1.0, 0); group.add(sternLight)
 
-  // Stern name plate — subtle panel on stern face below deck
+  // Stern name plate, subtle panel on stern face below deck
   const namePlateMat = new THREE.MeshPhongMaterial({ color: 0x2a3545, emissive: 0x0a0f15, emissiveIntensity: 0.15 })
   const namePlate = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.5, W * 0.45), namePlateMat)
   namePlate.position.set(-L * 0.465, deckY - 1.5, 0); group.add(namePlate)

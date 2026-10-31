@@ -1,4 +1,4 @@
-# Box Empire — Plan 5: Multi-Berth and Simultaneous Vessels
+# Box Empire, Plan 5: Multi-Berth and Simultaneous Vessels
 
 > **Status:** Not started
 > **Dependencies:** Plan 4 (STS cranes, reefer/DG containers, Panamax vessels, hatch cover logic)
@@ -8,41 +8,41 @@
 
 ## Objective
 
-Introduce multiple berths that can host vessels simultaneously, creating resource contention and requiring sophisticated planning. This is the **culminating plan** — it brings together every system built in Plans 1–4 and layers on the highest-complexity gameplay: berth allocation, crane sharing on shared rails, equipment prioritization across competing vessel operations, and inter-berth horizontal transport. The player's terminal becomes a full-scale port capable of handling concurrent vessel operations.
+Introduce multiple berths that can host vessels simultaneously, creating resource contention and requiring sophisticated planning. This is the **culminating plan**, it brings together every system built in Plans 1–4 and layers on the highest-complexity gameplay: berth allocation, crane sharing on shared rails, equipment prioritization across competing vessel operations, and inter-berth horizontal transport. The player's terminal becomes a full-scale port capable of handling concurrent vessel operations.
 
 ---
 
-## Prerequisites — Read Before Implementing
+## Prerequisites, Read Before Implementing
 
-1. **AGENTS.md** — Project conventions, linting
-2. **`src/sims/box-empire/box-empire-AGENTS.md`** — Architecture decisions from Plans 1–4
-3. **Master roadmap** — `create-five-other-plans-with-combined-will-result-in-a-full-game.md` §8 (Plan 5)
+1. **AGENTS.md**, Project conventions, linting
+2. **`src/sims/box-empire/box-empire-AGENTS.md`**, Architecture decisions from Plans 1–4
+3. **Master roadmap**, `create-five-other-plans-with-combined-will-result-in-a-full-game.md` §8 (Plan 5)
 4. **Skill files:**
-   - `.ai/skills/terminal-infrastructure/SKILL.md` — Berth infrastructure (berth_length_m, design_depth_m, apron_width_m, crane_rail, fender_system, mooring_points), typical berth dimensions by vessel class
-   - `.ai/skills/terminal-equipment-entities/SKILL.md` — STS crane specs, stop conditions, weather thresholds (wind ≥ 20 m/s cease operations)
-   - `.ai/skills/vessel-entities/SKILL.md` — Vessel classes from feeder to Panamax, berth allocation by LOA/draft
-   - `.ai/skills/terminal-operations/SKILL.md` — Crane cycle model (net 25 moves/hr), congestion multiplier, vessel turnaround KPIs
-   - `.ai/skills/terminal-economics/SKILL.md` — Berth-related charges, express handling surcharge (+150%)
+   - `.ai/skills/terminal-infrastructure/SKILL.md`, Berth infrastructure (berth_length_m, design_depth_m, apron_width_m, crane_rail, fender_system, mooring_points), typical berth dimensions by vessel class
+   - `.ai/skills/terminal-equipment-entities/SKILL.md`, STS crane specs, stop conditions, weather thresholds (wind ≥ 20 m/s cease operations)
+   - `.ai/skills/vessel-entities/SKILL.md`, Vessel classes from feeder to Panamax, berth allocation by LOA/draft
+   - `.ai/skills/terminal-operations/SKILL.md`, Crane cycle model (net 25 moves/hr), congestion multiplier, vessel turnaround KPIs
+   - `.ai/skills/terminal-economics/SKILL.md`, Berth-related charges, express handling surcharge (+150%)
 5. **Knowledge base files:**
-   - `knowledge-base/dk_infra__quay_berth_mooring.md` — Berth design, mooring, fender systems, bollard SWL
-   - `knowledge-base/dk_infra__terminal_layouts_and_roads.md` — Road network model, node-graph pathfinding, congestion model, choke-point scoring
-   - `knowledge-base/dk_equipment__quay_cranes_sts.md` — Crane rail sharing, anti-collision, storm locking
-   - `knowledge-base/dk_ops__vessel_loading_unloading.md` — Multi-crane splits, bay assignment, sequence planning
-   - `knowledge-base/dk_equipment__terminal_tractors.md` — Horizontal transport speeds, coupling/decoupling times
+   - `knowledge-base/dk_infra__quay_berth_mooring.md`, Berth design, mooring, fender systems, bollard SWL
+   - `knowledge-base/dk_infra__terminal_layouts_and_roads.md`, Road network model, node-graph pathfinding, congestion model, choke-point scoring
+   - `knowledge-base/dk_equipment__quay_cranes_sts.md`, Crane rail sharing, anti-collision, storm locking
+   - `knowledge-base/dk_ops__vessel_loading_unloading.md`, Multi-crane splits, bay assignment, sequence planning
+   - `knowledge-base/dk_equipment__terminal_tractors.md`, Horizontal transport speeds, coupling/decoupling times
 
 ---
 
 ## Player Experience
 
 1. At some point in late gameplay the player can purchase a **second berth** ($200,000)
-2. Multiple vessels can now be at the terminal **simultaneously** — one at each berth
+2. Multiple vessels can now be at the terminal **simultaneously**, one at each berth
 3. Player must manage:
    - **Berth allocation**: Which vessel goes to which berth (based on LOA/draft fit)
-   - **Crane sharing**: STS cranes run on shared quay rails — cranes **cannot pass each other**
+   - **Crane sharing**: STS cranes run on shared quay rails, cranes **cannot pass each other**
    - **Equipment prioritization**: Which vessel gets service first when equipment is scarce
    - **Inter-berth horizontal transport**: Reach stackers and trucks must travel between berths via road network
 4. Significantly higher operational complexity creates both challenges and earning potential
-5. The full terminal — multiple berths, STS cranes, RMG cranes, gatehouses, reefer/DG zones — operates as an integrated system
+5. The full terminal, multiple berths, STS cranes, RMG cranes, gatehouses, reefer/DG zones, operates as an integrated system
 
 ---
 
@@ -57,9 +57,9 @@ interface Berth {
   id: string
   name: string  // e.g., "Berth 1", "Berth 2"
   position: { x: number; z: number }  // quay position (Z ≈ 0, X varies)
-  length: number  // meters — determines max vessel LOA
-  depth: number  // meters — determines max vessel draft
-  apronWidth: number  // meters — working area between quay edge and yard
+  length: number  // meters, determines max vessel LOA
+  depth: number  // meters, determines max vessel draft
+  apronWidth: number  // meters, working area between quay edge and yard
   currentVessel: string | null  // vessel visit ID
   status: 'available' | 'occupied' | 'maintenance'
   assignedCraneIds: string[]  // STS cranes currently serving this berth
@@ -88,7 +88,7 @@ interface Berth {
 1. When a vessel is announced, check available berths
 2. Match vessel LOA ≤ berth length and vessel draft ≤ berth depth
 3. If multiple berths fit, prefer the berth with the most available STS cranes nearby
-4. If no berth is available, vessel waits at anchor (queue) — visible offshore
+4. If no berth is available, vessel waits at anchor (queue), visible offshore
 5. Player can manually override berth assignment
 
 ```typescript
@@ -130,7 +130,7 @@ interface CraneOnRail {
 ```
 
 **Crane ordering rules:**
-- Cranes maintain a fixed left-to-right order — crane A is always left of crane B
+- Cranes maintain a fixed left-to-right order, crane A is always left of crane B
 - Crane A can never move past crane B's position (and vice versa)
 - Minimum safe distance: **10m** between adjacent cranes
 - If a crane needs to reach a bay that's behind an adjacent crane, the adjacent crane must move first
@@ -184,7 +184,7 @@ interface VesselPriority {
 
 **Player controls:**
 - Click on a vessel → set priority (high/normal/low)
-- Priority changes take effect immediately — job scheduler recalculates
+- Priority changes take effect immediately, job scheduler recalculates
 - Express priority option: +150% surcharge on all handling charges for that vessel
 
 ### 4. Inter-Berth Horizontal Transport
@@ -210,9 +210,9 @@ interface TerminalMapExpansion {
   interBerthRoad: PathEdge  // connects Berth 1 area to Berth 2 area
 
   // Speed limits
-  mainCorridorSpeed: 6.5  // m/s (~23 km/h) — from knowledge base
-  localManeuverSpeed: 3.0  // m/s (~11 km/h) — near equipment
-  interBerthSpeed: 5.0  // m/s (~18 km/h) — inter-berth road
+  mainCorridorSpeed: 6.5  // m/s (~23 km/h), from knowledge base
+  localManeuverSpeed: 3.0  // m/s (~11 km/h), near equipment
+  interBerthSpeed: 5.0  // m/s (~18 km/h), inter-berth road
 }
 ```
 
@@ -336,9 +336,9 @@ src/sims/box-empire/
 │   ├── CraneRailPanel.vue           # Crane rail positions and assignments (NEW)
 │   ├── VesselPriorityControl.vue    # Per-vessel priority setting (NEW)
 │   ├── VesselQueue.vue              # Vessel waiting queue (NEW)
-│   ├── Dashboard.vue                # MODIFIED — new KPIs (berth util, wait time, congestion)
-│   ├── PurchaseMenu.vue             # MODIFIED — berth in catalog
-│   └── TopBar.vue                   # MODIFIED — berth status indicators
+│   ├── Dashboard.vue                # MODIFIED, new KPIs (berth util, wait time, congestion)
+│   ├── PurchaseMenu.vue             # MODIFIED, berth in catalog
+│   └── TopBar.vue                   # MODIFIED, berth status indicators
 ├── modules/
 │   ├── berthManager.ts              # Berth allocation, vessel berthing/unberthing (NEW)
 │   ├── craneRailManager.ts          # Rail sharing, ordering, deadlock prevention (NEW)
@@ -347,29 +347,29 @@ src/sims/box-empire/
 │   ├── congestionModel.ts           # Traffic density, effective speed, choke scoring (NEW)
 │   ├── berthRenderer.ts             # Berth 2 quay, apron, bollards rendering (NEW)
 │   ├── queuedVesselRenderer.ts      # Anchored vessels at sea rendering (NEW)
-│   ├── stsController.ts             # MODIFIED — rail position tracking, blocking logic
-│   ├── stsRenderer.ts               # MODIFIED — crane position on shared rail
-│   ├── jobScheduler.ts              # MODIFIED — multi-vessel priority, crane assignment
-│   ├── equipmentController.ts       # MODIFIED — inter-berth dispatch
-│   ├── terminalMap.ts               # MODIFIED — Berth 2 nodes, inter-berth edges
-│   ├── pathfinding.ts               # MODIFIED — congestion-aware edge weights
-│   ├── vesselScheduler.ts           # MODIFIED — multiple concurrent vessels
-│   ├── vesselManager.ts             # MODIFIED — multi-berth vessel lifecycle
-│   ├── economy.ts                   # MODIFIED — express surcharge, berth maintenance
-│   ├── sceneBuilder.ts              # MODIFIED — expanded terminal, Berth 2 area
-│   ├── kpiTracker.ts                # MODIFIED — berth utilization, congestion, wait time KPIs
-│   └── config.ts                    # MODIFIED — berth specs, rail parameters, congestion constants
+│   ├── stsController.ts             # MODIFIED, rail position tracking, blocking logic
+│   ├── stsRenderer.ts               # MODIFIED, crane position on shared rail
+│   ├── jobScheduler.ts              # MODIFIED, multi-vessel priority, crane assignment
+│   ├── equipmentController.ts       # MODIFIED, inter-berth dispatch
+│   ├── terminalMap.ts               # MODIFIED, Berth 2 nodes, inter-berth edges
+│   ├── pathfinding.ts               # MODIFIED, congestion-aware edge weights
+│   ├── vesselScheduler.ts           # MODIFIED, multiple concurrent vessels
+│   ├── vesselManager.ts             # MODIFIED, multi-berth vessel lifecycle
+│   ├── economy.ts                   # MODIFIED, express surcharge, berth maintenance
+│   ├── sceneBuilder.ts              # MODIFIED, expanded terminal, Berth 2 area
+│   ├── kpiTracker.ts                # MODIFIED, berth utilization, congestion, wait time KPIs
+│   └── config.ts                    # MODIFIED, berth specs, rail parameters, congestion constants
 ├── store/
-│   └── gameStore.ts                 # MODIFIED — berths, rail system, priorities, queue
+│   └── gameStore.ts                 # MODIFIED, berths, rail system, priorities, queue
 ├── types/
-│   └── index.ts                     # MODIFIED — Berth, CraneRailSystem, VesselPriority, etc.
+│   └── index.ts                     # MODIFIED, Berth, CraneRailSystem, VesselPriority, etc.
 ```
 
 ---
 
 ## Implementation Order (Recommended)
 
-### Phase A — Berth Infrastructure
+### Phase A, Berth Infrastructure
 1. Define berth interfaces in `types/index.ts`
 2. Add berth config to `config.ts` (dimensions, prices, Berth 1 defaults)
 3. Implement `modules/berthManager.ts` (allocation logic, vessel LOA/draft check)
@@ -377,40 +377,40 @@ src/sims/box-empire/
 5. Add berth to purchase catalog in `purchaseSystem.ts`
 6. Implement `modules/berthRenderer.ts` (quay, apron, water rendering for Berth 2)
 
-### Phase B — Crane Rail System
+### Phase B, Crane Rail System
 7. Implement `modules/craneRailManager.ts` (rail model, ordering constraint, minimum distance)
 8. Update `stsController.ts` to track rail positions and handle blocking
 9. Implement crane assignment algorithm (non-overlapping bay ranges, deadlock prevention)
 10. Update `stsRenderer.ts` to show crane positions on shared rail
 11. Implement `components/CraneRailPanel.vue`
 
-### Phase C — Multi-Vessel Operations
+### Phase C, Multi-Vessel Operations
 12. Update `vesselScheduler.ts` to generate concurrent vessel arrivals
 13. Implement `modules/vesselQueueManager.ts` (anchor queue, FIFO, reordering)
 14. Update `vesselManager.ts` for multi-berth vessel lifecycle
 15. Implement `modules/queuedVesselRenderer.ts` (anchored vessels at sea)
 16. Implement `components/VesselQueue.vue`
 
-### Phase D — Priority System
+### Phase D, Priority System
 17. Implement `modules/vesselPriority.ts` (priority levels, auto-escalation, express surcharge)
 18. Update `jobScheduler.ts` for multi-vessel priority-based scheduling
 19. Update `equipmentController.ts` for inter-berth dispatch decisions
 20. Implement `components/VesselPriorityControl.vue`
 21. Update `economy.ts` with express surcharge (+150%)
 
-### Phase E — Congestion Model
+### Phase E, Congestion Model
 22. Implement `modules/congestionModel.ts` (density ratio, effective speed, choke scoring)
 23. Update `pathfinding.ts` for congestion-aware edge weights
 24. Update road rendering to show congestion (green/yellow/red coloring)
 25. Add congestion indicators to dashboard
 
-### Phase F — Berth Overview UI
+### Phase F, Berth Overview UI
 26. Implement `components/BerthOverview.vue`
 27. Update `Dashboard.vue` with berth utilization, wait time, crane conflicts, congestion KPIs
 28. Update `TopBar.vue` with berth status indicators
 29. Update `PurchaseMenu.vue` with berth infrastructure
 
-### Phase G — Integration and Testing
+### Phase G, Integration and Testing
 30. Test berth allocation (vessel fits berth length/draft)
 31. Test crane rail ordering (cranes cannot pass, minimum distance)
 32. Test crane blocking and re-planning
@@ -433,7 +433,7 @@ src/sims/box-empire/
 The biggest technical risk in Plan 5. Scenarios to test:
 
 1. **Basic blocking**: Crane A at X=100 needs to reach X=400, but Crane B is at X=300. Crane B must move to X=410+ first.
-2. **Mutual blocking**: Crane A needs to go right, Crane B needs to go left — both blocked. Resolution: prioritize the crane with the higher-priority vessel.
+2. **Mutual blocking**: Crane A needs to go right, Crane B needs to go left, both blocked. Resolution: prioritize the crane with the higher-priority vessel.
 3. **Three-crane pileup**: With 3+ cranes, ensure the algorithm handles cascading repositioning.
 
 **Mitigation**: Start with 2 cranes maximum for testing. The algorithm should work with 3+ but 2 is the common case.

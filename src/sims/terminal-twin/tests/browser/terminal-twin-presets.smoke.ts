@@ -18,7 +18,7 @@ async function openDialog(page: Page) {
 
 test('the dialog offers the three presets and marks the TTI bay count as an assumption', async ({ page }) => {
   const dialog = await openDialog(page)
-  for (const name of ['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras — peak day']) {
+  for (const name of ['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras, peak day']) {
     await expect(dialog.locator(`[data-testid="tt-preset-card"][data-scenario="${name}"]`)).toBeVisible()
   }
   await pickScenario(dialog, 'TTI Algeciras baseline')
@@ -33,7 +33,7 @@ test('presets are hero cards with chips and a sketch; fixtures sit in a collapse
   const dialog = await openDialog(page)
   const cards = dialog.getByTestId('tt-preset-card')
   await expect(cards).toHaveCount(3)
-  const peak = dialog.locator('[data-testid="tt-preset-card"][data-scenario="TTI Algeciras — peak day"]')
+  const peak = dialog.locator('[data-testid="tt-preset-card"][data-scenario="TTI Algeciras, peak day"]')
   await expect(peak.getByTestId('tt-chip-sts')).toHaveText('8 STS')
   await expect(peak.getByTestId('tt-chip-fill')).toHaveText('yard 75% full')
   await expect(peak.locator('svg.sketch')).toBeVisible()

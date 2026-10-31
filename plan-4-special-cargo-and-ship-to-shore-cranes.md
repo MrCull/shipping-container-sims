@@ -1,4 +1,4 @@
-# Box Empire — Plan 4: Special Cargo and Ship-to-Shore Cranes
+# Box Empire, Plan 4: Special Cargo and Ship-to-Shore Cranes
 
 > **Status:** Not started
 > **Dependencies:** Plan 3 (40ft support, RMG cranes, dashboards, milestone system)
@@ -12,38 +12,38 @@ Add reefer (refrigerated) and hazardous (DG) containers with their specialized h
 
 ---
 
-## Prerequisites — Read Before Implementing
+## Prerequisites, Read Before Implementing
 
-1. **AGENTS.md** — Project conventions, linting
-2. **`src/sims/box-empire/box-empire-AGENTS.md`** — Architecture decisions from Plans 1–3
-3. **Master roadmap** — `create-five-other-plans-with-combined-will-result-in-a-full-game.md` §7 (Plan 4)
+1. **AGENTS.md**, Project conventions, linting
+2. **`src/sims/box-empire/box-empire-AGENTS.md`**, Architecture decisions from Plans 1–3
+3. **Master roadmap**, `create-five-other-plans-with-combined-will-result-in-a-full-game.md` §7 (Plan 4)
 4. **Skill files:**
-   - `.ai/skills/container-cargo-entities/SKILL.md` — Reefer fields, hazmat model (IMDG classes, segregation profiles, incident states), `createHazardousContainer` factory
-   - `.ai/skills/terminal-equipment-entities/SKILL.md` — STS crane specs (5 size classes), cycle phases, stop conditions, `createSTSCrane` factory
-   - `.ai/skills/vessel-entities/SKILL.md` — Panamax class defaults (LOA 294m, beam 32.2m, 4500 TEU), stability model, hatch cover logic
-   - `.ai/skills/terminal-economics/SKILL.md` — Reefer surcharge ($50/day monitoring + $65/day power), hazmat surcharge (+75%), overweight surcharge (+35%)
-   - `.ai/skills/terminal-infrastructure/SKILL.md` — Reefer power points per block, hazmat-allowed block designation
-   - `.ai/skills/terminal-operations/SKILL.md` — DG cutoff times, crane cycle model (30 gross moves/hr, 25 net), hatch cover time (4 min)
+   - `.ai/skills/container-cargo-entities/SKILL.md`, Reefer fields, hazmat model (IMDG classes, segregation profiles, incident states), `createHazardousContainer` factory
+   - `.ai/skills/terminal-equipment-entities/SKILL.md`, STS crane specs (5 size classes), cycle phases, stop conditions, `createSTSCrane` factory
+   - `.ai/skills/vessel-entities/SKILL.md`, Panamax class defaults (LOA 294m, beam 32.2m, 4500 TEU), stability model, hatch cover logic
+   - `.ai/skills/terminal-economics/SKILL.md`, Reefer surcharge ($50/day monitoring + $65/day power), hazmat surcharge (+75%), overweight surcharge (+35%)
+   - `.ai/skills/terminal-infrastructure/SKILL.md`, Reefer power points per block, hazmat-allowed block designation
+   - `.ai/skills/terminal-operations/SKILL.md`, DG cutoff times, crane cycle model (30 gross moves/hr, 25 net), hatch cover time (4 min)
 5. **Knowledge base files:**
-   - `knowledge-base/dk_sse__hazardous_containers_imdg.md` — Full IMDG class hierarchy, segregation table, stowage categories, DG yard rules
-   - `knowledge-base/dk_equipment__quay_cranes_sts.md` — STS size classes, reach/height/speed specs, cycle breakdown, stop conditions, weather thresholds
-   - `knowledge-base/dk_vessels__physical_classes_and_structure.md` — Panamax dimensions, bay counts, hatch structure
-   - `knowledge-base/dk_vessels__stowage_locations_and_bayplan.md` — On-deck vs under-deck tiers, hatch cover positions
-   - `knowledge-base/dk_vessels__stability_and_loading_rules.md` — Weight distribution, GM stability
+   - `knowledge-base/dk_sse__hazardous_containers_imdg.md`, Full IMDG class hierarchy, segregation table, stowage categories, DG yard rules
+   - `knowledge-base/dk_equipment__quay_cranes_sts.md`, STS size classes, reach/height/speed specs, cycle breakdown, stop conditions, weather thresholds
+   - `knowledge-base/dk_vessels__physical_classes_and_structure.md`, Panamax dimensions, bay counts, hatch structure
+   - `knowledge-base/dk_vessels__stowage_locations_and_bayplan.md`, On-deck vs under-deck tiers, hatch cover positions
+   - `knowledge-base/dk_vessels__stability_and_loading_rules.md`, Weight distribution, GM stability
 
 ---
 
 ## Player Experience
 
 1. New container types start appearing in vessel manifests:
-   - **Reefer containers** — visually distinct (with power cable icon), need powered yard slots, temperature monitoring
-   - **Hazardous containers** — visually distinct (hazmat diamond icons), need segregation, DG-designated yard zones
+   - **Reefer containers**, visually distinct (with power cable icon), need powered yard slots, temperature monitoring
+   - **Hazardous containers**, visually distinct (hazmat diamond icons), need segregation, DG-designated yard zones
 2. Player must designate reefer and DG yard zones:
    - Existing blocks can be upgraded with reefer power points ($500 per point)
    - New blocks can be designated as DG zones during purchase
 3. Player can purchase **STS gantry cranes** for dramatically faster quayside operations
-4. **Panamax-class vessels** (~5000 TEU) can now arrive — requiring STS cranes to service efficiently
-5. Hatch covers must be managed — under-deck containers only accessible after hatch removal
+4. **Panamax-class vessels** (~5000 TEU) can now arrive, requiring STS cranes to service efficiently
+5. Hatch covers must be managed, under-deck containers only accessible after hatch removal
 6. New revenue streams: reefer power surcharges and DG handling surcharges
 
 ---
@@ -59,7 +59,7 @@ interface Container {
   // ... existing fields ...
   isReefer: boolean
   reeferSetPoint?: number  // target temperature in °C (e.g., -18 for frozen, +2 for chilled)
-  reeferActualTemp?: number  // current temperature — drifts if not powered
+  reeferActualTemp?: number  // current temperature, drifts if not powered
   reeferPowered?: boolean  // currently connected to power
 }
 ```
@@ -77,7 +77,7 @@ interface Container {
 - On placement: `reeferPowered = true`, temperature holds at set point
 - If no powered slot available: placed in regular slot, `reeferPowered = false`, temperature drifts +0.5°C per sim-minute
 - Temperature alarm if `actualTemp > setPoint + 5°C`
-- Critical alarm if `actualTemp > setPoint + 10°C` — container at risk, negative event sound
+- Critical alarm if `actualTemp > setPoint + 10°C`, container at risk, negative event sound
 
 **Reefer yard block upgrade:**
 ```typescript
@@ -100,7 +100,7 @@ interface YardBlockConfig {
 
 ### 2. Hazardous Container Support
 
-**Simplified IMDG model** (from `dk_sse__hazardous_containers_imdg.md` — simplified for gameplay):
+**Simplified IMDG model** (from `dk_sse__hazardous_containers_imdg.md`, simplified for gameplay):
 
 ```typescript
 type HazmatClass = 'flammable' | 'toxic' | 'corrosive' | 'general_dg'
@@ -156,7 +156,7 @@ So a 20ft DG import gate-out: $100 base + $75 surcharge = $175 total.
 
 ### 3. STS Gantry Crane
 
-From `terminal-equipment-entities` skill — Panamax class STS:
+From `terminal-equipment-entities` skill, Panamax class STS:
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
@@ -172,7 +172,7 @@ From `terminal-equipment-entities` skill — Panamax class STS:
 | Rail gauge | ~30.48 m (100 ft) | Standard |
 | Max operating wind | 20 m/s | From skill stop conditions |
 
-**STS cycle phases** (from skill — 62s baseline):
+**STS cycle phases** (from skill, 62s baseline):
 
 | Phase | Duration | Description |
 |-------|----------|-------------|
@@ -200,12 +200,12 @@ type STSPhase =
   | 'hoist_clear'        // Lifting spreader clear
 ```
 
-**STS Three.js rendering — 4 articulated parts:**
+**STS Three.js rendering, 4 articulated parts:**
 
-1. **Gantry base/legs** — Travels along quay rail (X axis). Two portal legs connected by horizontal boom.
-2. **Boom/girder** — Fixed to gantry, extends waterside (outreach) and landside (backreach)
-3. **Trolley** — Moves along boom (Z axis, toward/away from water)
-4. **Spreader + hoist** — Hangs from trolley, moves vertically (Y axis). Spreader locks/unlocks on containers.
+1. **Gantry base/legs**, Travels along quay rail (X axis). Two portal legs connected by horizontal boom.
+2. **Boom/girder**, Fixed to gantry, extends waterside (outreach) and landside (backreach)
+3. **Trolley**, Moves along boom (Z axis, toward/away from water)
+4. **Spreader + hoist**, Hangs from trolley, moves vertically (Y axis). Spreader locks/unlocks on containers.
 
 Each part animates independently based on current `STSPhase`.
 
@@ -263,7 +263,7 @@ interface VesselBay {
 
 ### 5. Panamax Vessels
 
-From `vessel-entities` skill — Panamax class:
+From `vessel-entities` skill, Panamax class:
 
 | Parameter | Value |
 |-----------|-------|
@@ -355,9 +355,9 @@ Add new KPIs:
 
 | KPI | Formula | Target |
 |-----|---------|--------|
-| Reefer containers in yard | Count of powered reefer containers | — |
+| Reefer containers in yard | Count of powered reefer containers | - |
 | Reefer alarm count | Active temperature alarms | 0 |
-| DG containers in yard | Count of DG containers | — |
+| DG containers in yard | Count of DG containers | - |
 | DG violations | Active segregation violations | 0 |
 | STS utilization | STS busy time / total time | 70–90% |
 | Vessel turnaround time | Vessel depart time - arrive time | Decreasing with STS |
@@ -373,38 +373,38 @@ src/sims/box-empire/
 │   ├── DGViolationPanel.vue          # DG segregation violations (NEW)
 │   ├── VesselStability.vue           # Stability gauge during loading (NEW)
 │   ├── CargoManifest.vue             # Vessel container breakdown (NEW)
-│   ├── ContainerInfo.vue             # MODIFIED — reefer/DG indicators
-│   ├── EquipmentInfo.vue             # MODIFIED — STS crane info
-│   ├── Dashboard.vue                 # MODIFIED — new KPIs
-│   ├── YardBlockConfigurator.vue     # MODIFIED — reefer/DG upgrades
-│   └── PurchaseMenu.vue              # MODIFIED — STS crane, reefer/DG block upgrades
+│   ├── ContainerInfo.vue             # MODIFIED, reefer/DG indicators
+│   ├── EquipmentInfo.vue             # MODIFIED, STS crane info
+│   ├── Dashboard.vue                 # MODIFIED, new KPIs
+│   ├── YardBlockConfigurator.vue     # MODIFIED, reefer/DG upgrades
+│   └── PurchaseMenu.vue              # MODIFIED, STS crane, reefer/DG block upgrades
 ├── modules/
 │   ├── stsController.ts              # STS crane state machine, cycle phases (NEW)
-│   ├── stsRenderer.ts                # STS Three.js mesh — gantry, boom, trolley, spreader (NEW)
+│   ├── stsRenderer.ts                # STS Three.js mesh, gantry, boom, trolley, spreader (NEW)
 │   ├── reeferManager.ts              # Temperature monitoring, power tracking, alarms (NEW)
 │   ├── hazmatManager.ts              # DG zone enforcement, segregation checks (NEW)
 │   ├── hatchCoverManager.ts          # Hatch cover state, removal/replacement timing (NEW)
 │   ├── vesselStability.ts            # Simplified stability model, weight balance (NEW)
-│   ├── containerRenderer.ts          # MODIFIED — reefer/DG visual variants
-│   ├── vesselRenderer.ts             # MODIFIED — hatch covers, larger vessel, bay-row-tier
-│   ├── vesselManager.ts              # MODIFIED — hatch cover sequencing, Panamax support
-│   ├── yardManager.ts                # MODIFIED — reefer power slot tracking, DG zone enforcement
-│   ├── jobScheduler.ts               # MODIFIED — STS job assignment, hatch cover jobs
-│   ├── equipmentController.ts        # MODIFIED — STS equipment type
-│   ├── economy.ts                    # MODIFIED — reefer/DG surcharges
-│   ├── purchaseSystem.ts             # MODIFIED — STS crane, reefer/DG upgrades in catalog
-│   └── config.ts                     # MODIFIED — STS specs, reefer/DG parameters, Panamax vessel
+│   ├── containerRenderer.ts          # MODIFIED, reefer/DG visual variants
+│   ├── vesselRenderer.ts             # MODIFIED, hatch covers, larger vessel, bay-row-tier
+│   ├── vesselManager.ts              # MODIFIED, hatch cover sequencing, Panamax support
+│   ├── yardManager.ts                # MODIFIED, reefer power slot tracking, DG zone enforcement
+│   ├── jobScheduler.ts               # MODIFIED, STS job assignment, hatch cover jobs
+│   ├── equipmentController.ts        # MODIFIED, STS equipment type
+│   ├── economy.ts                    # MODIFIED, reefer/DG surcharges
+│   ├── purchaseSystem.ts             # MODIFIED, STS crane, reefer/DG upgrades in catalog
+│   └── config.ts                     # MODIFIED, STS specs, reefer/DG parameters, Panamax vessel
 ├── store/
-│   └── gameStore.ts                  # MODIFIED — reefer alarms, DG violations, STS state
+│   └── gameStore.ts                  # MODIFIED, reefer alarms, DG violations, STS state
 ├── types/
-│   └── index.ts                      # MODIFIED — reefer/DG/STS/hatch cover interfaces
+│   └── index.ts                      # MODIFIED, reefer/DG/STS/hatch cover interfaces
 ```
 
 ---
 
 ## Implementation Order (Recommended)
 
-### Phase A — Reefer Containers
+### Phase A, Reefer Containers
 1. Extend `Container` interface with reefer fields
 2. Implement `modules/reeferManager.ts` (temperature drift, power tracking, alarms)
 3. Extend `YardBlockConfig` with `reeferPowerPoints`
@@ -413,7 +413,7 @@ src/sims/box-empire/
 6. Update `economy.ts` with reefer surcharges ($50/day monitoring + $65/day power)
 7. Implement `components/ReeferAlarmPanel.vue`
 
-### Phase B — Hazardous Containers
+### Phase B, Hazardous Containers
 8. Extend `Container` interface with hazmat fields
 9. Implement `modules/hazmatManager.ts` (zone enforcement, segregation checks)
 10. Extend `YardBlockConfig` with `hazmatAllowed`
@@ -422,7 +422,7 @@ src/sims/box-empire/
 13. Update `economy.ts` with DG surcharge (+75%)
 14. Implement `components/DGViolationPanel.vue`
 
-### Phase C — STS Gantry Crane
+### Phase C, STS Gantry Crane
 15. Define STS interfaces and specs in `types/index.ts` and `config.ts`
 16. Implement `modules/stsController.ts` (full state machine with cycle phases)
 17. Implement `modules/stsRenderer.ts` (4-part articulated mesh: gantry, boom, trolley, spreader)
@@ -430,7 +430,7 @@ src/sims/box-empire/
 19. Update `equipmentController.ts` to handle STS equipment type
 20. Add STS to purchase catalog ($100,000)
 
-### Phase D — Hatch Covers and Panamax Vessels
+### Phase D, Hatch Covers and Panamax Vessels
 21. Implement `modules/hatchCoverManager.ts` (state machine, timing)
 22. Implement `modules/vesselStability.ts` (simplified weight balance)
 23. Update `vesselManager.ts` for Panamax support and hatch cover sequencing
@@ -438,16 +438,16 @@ src/sims/box-empire/
 25. Update `vesselScheduler.ts` to generate Panamax vessels (100–300 containers)
 26. Implement `components/VesselStability.vue` and `components/CargoManifest.vue`
 
-### Phase E — Yard Configuration Updates
+### Phase E, Yard Configuration Updates
 27. Update `YardBlockConfigurator.vue` for reefer power point and DG zone upgrades
 28. Update `PurchaseMenu.vue` with new items (STS, reefer upgrade, DG upgrade)
 29. Update `sceneBuilder.ts` for reefer/DG block visual styling
 
-### Phase F — Dashboard and KPI Updates
+### Phase F, Dashboard and KPI Updates
 30. Update `kpiTracker.ts` with reefer/DG/STS KPIs
 31. Update `Dashboard.vue` with new KPI widgets
 
-### Phase G — Integration and Testing
+### Phase G, Integration and Testing
 32. Test reefer temperature drift and alarms
 33. Test DG zone enforcement and segregation
 34. Test STS crane full cycle (pick from vessel, set on buffer)
@@ -488,7 +488,7 @@ src/sims/box-empire/
 - Multiple berths
 - Multiple simultaneous vessels at different berths
 - Advanced automation (ASC)
-- Crane rail contention (STS cranes don't share rails yet — only 1 STS per berth)
+- Crane rail contention (STS cranes don't share rails yet, only 1 STS per berth)
 - Rail intermodal
 - Barge operations
 

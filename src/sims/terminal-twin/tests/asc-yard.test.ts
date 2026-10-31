@@ -1,5 +1,5 @@
 /**
- * TT-06: ASC block storage — import flow from vessel to yard stack, through
+ * TT-06: ASC block storage, import flow from vessel to yard stack, through
  * the public engine API (seam 1) and the yardAllocation decision point (seam 2).
  */
 import { describe, expect, it } from 'vitest'

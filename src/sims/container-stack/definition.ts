@@ -7,7 +7,7 @@ export const definition: SimDefinition = {
   tagline: 'How high can you stack before the tower falls?',
   description:
     'Contenga is a 3D Jenga-style game with shipping containers. Slide blocks out, stack them on top, ' +
-    'and keep the tower balanced — poor support under the stack will bring it down.',
+    'and keep the tower balanced, poor support under the stack will bring it down.',
   icon: '🏗️',
   status: 'playable',
   order: 2,

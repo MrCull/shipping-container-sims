@@ -1,11 +1,11 @@
-# 03 — Move execution bridge (GameCanvas refactor)
+# 03, Move execution bridge (GameCanvas refactor)
 
 > Part of the **Stowage Master × Jev** plan set. Read [00-jev-overview.md](00-jev-overview.md) first.
 > Depends on: nothing (can be done in parallel with 01/02). Blocks: 04.
 
 ## Goal
 
-Let non-pointer code (the Jev controller) perform **exactly the same move** a mouse click performs — same store actions, same crane animation, same trucks, same sounds, same scoring — by slot ID. No duplicate game logic.
+Let non-pointer code (the Jev controller) perform **exactly the same move** a mouse click performs, same store actions, same crane animation, same trucks, same sounds, same scoring, by slot ID. No duplicate game logic.
 
 ## Why this is needed
 

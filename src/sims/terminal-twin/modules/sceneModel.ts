@@ -2,7 +2,7 @@
  * Scene model: the renderer's view of the run, built from worker Deltas.
  * Pure TS (no Three.js). It keeps per-entity timelines (motion segments per
  * crane axis, custody per container, status per vessel/STS) so any display
- * time at or before the engine horizon can be drawn exactly — that is what
+ * time at or before the engine horizon can be drawn exactly, that is what
  * keeps animation smooth at any speed.
  *
  * Scene conventions: 1 unit = 1 m, Y up, quay edge at Z = 0, sea at -Z,

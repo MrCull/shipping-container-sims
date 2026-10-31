@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Yard slot management
+// Box Empire, Yard slot management
 // ---------------------------------------------------------------------------
 
 import type { YardBlock, YardSlot, YardSlotRef, Position3D } from '../types'
@@ -87,7 +87,7 @@ export function findAvailableSlot(
   const oppositeType = preferredVisitType === 'import' ? 'export' : 'import'
 
   if (preferredVisitType && containers) {
-    // Pass 1: bays that already have the same type — stack same-type containers together
+    // Pass 1: bays that already have the same type, stack same-type containers together
     for (let bay = 1; bay <= block.bays; bay++) {
       if (bayHasContainerOfType(bay, preferredVisitType)) {
         for (let row = 1; row <= block.rows; row++) {
@@ -97,7 +97,7 @@ export function findAvailableSlot(
       }
     }
 
-    // Pass 2: empty bays — start a new stack when no same-type bay has room
+    // Pass 2: empty bays, start a new stack when no same-type bay has room
     for (let bay = 1; bay <= block.bays; bay++) {
       if (!bayHasAnyContainer(bay)) {
         for (let row = 1; row <= block.rows; row++) {

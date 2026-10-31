@@ -30,7 +30,7 @@ function next(): void {
           Click to Control Equipment
         </h3>
         <p class="onboard-body">
-          Click on any piece of equipment — a Reach Stacker, Mobile Harbor Crane, or Gatehouse — to open its settings panel.
+          Click on any piece of equipment, a Reach Stacker, Mobile Harbor Crane, or Gatehouse, to open its settings panel.
           From there you can enable or disable it, change which side it serves, and set vessel permissions for cranes.
         </p>
       </template>
@@ -57,7 +57,7 @@ function next(): void {
           </li>
         </ul>
         <p class="onboard-hint">
-          There are no objectives — experiment freely!
+          There are no objectives, experiment freely!
         </p>
       </template>
 
@@ -65,7 +65,7 @@ function next(): void {
         class="onboard-btn"
         @click="next"
       >
-        {{ step === 1 ? 'Next →' : 'Got it — Start!' }}
+        {{ step === 1 ? 'Next →' : 'Got it, Start!' }}
       </button>
       <div class="onboard-dots">
         <span :class="['dot', { active: step === 1 }]" />

@@ -27,13 +27,13 @@ const title = computed(() => {
 const body = computed(() => {
   switch (store.careerIntroPage) {
     case 1:
-      return 'A letter arrives from a solicitor you never expected to hear from. A relative you barely knew has passed away, and among the paperwork is a deed to a small container terminal on the coast — yours now, free and clear.'
+      return 'A letter arrives from a solicitor you never expected to hear from. A relative you barely knew has passed away, and among the paperwork is a deed to a small container terminal on the coast, yours now, free and clear.'
     case 2:
       return 'They loved the idea of the port life, but the books tell a gentler story: years of thin margins, aging cranes, and vessels that only called when larger terminals were full. The yard has heart, but it has not been a winning business.'
     case 3:
-      return 'That changes with you. You will earn money one job at a time, keep the gate and quay humming, and reinvest over time — refurbishing tired equipment, buying better tools when you can afford them, and eventually welcoming more boxes and bigger ships. Small wins first; ambition later.'
+      return 'That changes with you. You will earn money one job at a time, keep the gate and quay humming, and reinvest over time, refurbishing tired equipment, buying better tools when you can afford them, and eventually welcoming more boxes and bigger ships. Small wins first; ambition later.'
     case 4:
-      return 'The full career campaign — upgrades, deeper economics, escalating traffic, and those larger vessels — is still in development. Thank you for playing the tutorial; the rest of the story will dock here when it is ready.'
+      return 'The full career campaign, upgrades, deeper economics, escalating traffic, and those larger vessels, is still in development. Thank you for playing the tutorial; the rest of the story will dock here when it is ready.'
     default:
       return ''
   }

@@ -5,7 +5,7 @@
 import type { FlowMix, PortRotation } from '../../scenario/types'
 
 export const TTI_PRESET_NAME = 'TTI Algeciras baseline'
-export const PEAK_DAY_PRESET_NAME = 'TTI Algeciras — peak day'
+export const PEAK_DAY_PRESET_NAME = 'TTI Algeciras, peak day'
 
 /** TTI Algeciras' published capacity (TEU): the source of the bay count. */
 export const TTI_YARD_TEU = 28647

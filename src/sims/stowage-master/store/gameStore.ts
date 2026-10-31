@@ -36,7 +36,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const events = ref<GameEvent[]>([])
   const disasterType = ref<DisasterType | null>(null)
   const lastPlacement = ref<PlacementResult | null>(null)
-  const perfectScore = ref(0)   // containerCount × 100 — theoretical maximum
+  const perfectScore = ref(0)   // containerCount × 100, theoretical maximum
   const targetScore = ref(0)    // pass threshold = perfectScore × 0.70
   const totalSlots = ref(0)
   const timerTotal = ref(0)     // total seconds for the level (0 = no timer)
@@ -46,7 +46,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const completedLevelIds = ref<number[]>(loadProgress().completedLevelIds)
   const isGodMode = computed(() => globalSettings.godModeEnabled)
 
-  // Scene loading state — shown while 3D assets are downloading
+  // Scene loading state, shown while 3D assets are downloading
   const isLoading = ref(false)
   const loadingMessage = ref('')
 
@@ -56,7 +56,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
   const dischargeScore = ref(0)
   const lastDischarge = ref<PlacementResult | null>(null)
 
-  // Restow state — transit container currently lifted and awaiting placement
+  // Restow state, transit container currently lifted and awaiting placement
   const restowContainer = ref<Container | null>(null)
   const restowFromSlotId = ref<string | null>(null)
   const restowSlots = ref<string[]>([])
@@ -267,7 +267,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     } else {
       // phase set by confirmBriefing after briefing is dismissed
     }
-    // Always show briefing first — confirmBriefing() will advance to the real phase
+    // Always show briefing first, confirmBriefing() will advance to the real phase
     phase.value = 'briefing'
   }
 
@@ -306,7 +306,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
 
     // 30% remaining warning
     if (prevPct > 0.30 && pct <= 0.30) return 'warn30pct'
-    // 15% remaining warning (critical — more urgent)
+    // 15% remaining warning (critical, more urgent)
     if (prevPct > 0.15 && pct <= 0.15) return 'warn15pct'
 
     return null
@@ -330,7 +330,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     if (!slot || !slot.container) return null
 
     if (slot.container.isTransit) {
-      // Transit container blocking an import — initiate restow
+      // Transit container blocking an import, initiate restow
       restowContainer.value = { ...slot.container, isBeingRestowed: true }
       restowFromSlotId.value = slotId
       restowSlots.value = getRestowSlots(grid.value, shipConfig.value!, slotId)
@@ -340,7 +340,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
       grid.value[slotId] = { ...slot }
 
       phase.value = 'restow_selecting'
-      addEvent('Transit container lifted — select a new position', 'info')
+      addEvent('Transit container lifted, select a new position', 'info')
       return { container: restowContainer.value, slot, isRestow: true }
     }
 
@@ -609,7 +609,7 @@ export const useGameStore = defineStore('stowage-master-game', () => {
     restowSlots.value = []
   }
 
-  /** Called when the player dismisses the level briefing — advances to the real first phase. */
+  /** Called when the player dismisses the level briefing, advances to the real first phase. */
   function confirmBriefing(): void {
     if (dischargeCount.value > 0) {
       phase.value = 'discharge_selecting'

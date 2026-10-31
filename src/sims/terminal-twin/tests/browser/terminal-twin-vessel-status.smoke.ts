@@ -1,12 +1,12 @@
 /**
- * Spec #116 / #126: vessel status popup and floating countdown label. "TTI Algeciras — peak day" (V001 arrives at
+ * Spec #116 / #126: vessel status popup and floating countdown label. "TTI Algeciras, peak day" (V001 arrives at
  * 08:00 and moors for 30 min; V002 arrives 767 s later; V003 at 1,284 s finds no berth and waits). Driven through
  * `window.__tt` (select, runTo, scene().vesselLabels). Run with `pnpm run test:smoke --project=dev --grep "vessel status"`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 
-const PEAK = 'TTI Algeciras — peak day'
+const PEAK = 'TTI Algeciras, peak day'
 
 async function open(page: Page): Promise<void> {
   const errors: string[] = []

@@ -1,5 +1,5 @@
 /**
- * Seam 4 — phase 2 asset outputs, vessel hulls (TT-27). Reads the committed
+ * Seam 4, phase 2 asset outputs, vessel hulls (TT-27). Reads the committed
  * GLBs and sidecars (no Blender) and cross-checks them against the engine's
  * bay plan (`scenario/vesselClasses.ts`): a container in any slot, placed on
  * the hull through the sidecar's bay grid, must land where the engine puts it.

@@ -96,7 +96,7 @@ export type JevExchangeOutcome =
 
 /**
  * One Jev request/response pair plus its outcome, recorded for the inspector (plan 05 §5.2).
- * Held in `jevStore.history`, newest first, capped at `JEV_CONFIG.historyLimit`. In-memory only —
+ * Held in `jevStore.history`, newest first, capped at `JEV_CONFIG.historyLimit`. In-memory only,
  * never persisted, cleared on disable.
  */
 export interface JevExchange {
