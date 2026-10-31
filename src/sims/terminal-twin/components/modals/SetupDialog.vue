@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from '../ui/TtIcon.vue'
 import { provideSetupDraft } from '../../composables/useSetupDraft'
 import { t } from '../../i18n/messages'
 import { useTwinStore } from '../../store/twinStore'
@@ -20,6 +21,7 @@ import { validateSts } from '../setup/stsValidation'
 import { validateShc } from '../setup/shcValidation'
 import { validateYard } from '../setup/yardValidation'
 import { ref } from 'vue'
+import heroImage from '../../assets/home-card.png?url'
 
 /**
  * Shell of the setup dialog: owns the draft (`useSetupDraft`), composes one component per section
@@ -72,12 +74,31 @@ async function submit(): Promise<void> {
       aria-labelledby="tt-setup-title"
       @submit.prevent="submit"
     >
-      <h2 id="tt-setup-title">
-        {{ t('setup.title') }}
-      </h2>
-      <p class="intro">
-        {{ t('setup.intro') }}
-      </p>
+      <header
+        class="hero"
+        :class="{ compact: store.hasScenario }"
+        data-testid="tt-setup-hero"
+      >
+        <img
+          v-if="!store.hasScenario"
+          class="hero-img"
+          :src="heroImage"
+          :alt="t('setup.heroAlt')"
+          width="1200"
+          height="630"
+        >
+        <div class="hero-text tt-frost">
+          <p class="kicker">
+            {{ t('setup.heroKicker') }}
+          </p>
+          <h2 id="tt-setup-title">
+            {{ t('setup.title') }}
+          </h2>
+          <p class="intro">
+            {{ t('setup.intro') }}
+          </p>
+        </div>
+      </header>
 
       <ScenarioPicker />
       <ScenarioDetail :error="formError" />
@@ -145,14 +166,14 @@ async function submit(): Promise<void> {
           :key="`e${i}`"
           class="error"
         >
-          ⛔ {{ t(e.key, e.params) }}
+          <TtIcon name="alert" /> {{ t(e.key, e.params) }}
         </li>
         <li
           v-for="(w, i) in d.check.warnings"
           :key="`w${i}`"
           class="warning"
         >
-          ⚠ {{ t(w.key, w.params) }}
+          <TtIcon name="warn" /> {{ t(w.key, w.params) }}
         </li>
       </ul>
 
@@ -191,54 +212,100 @@ async function submit(): Promise<void> {
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(10, 14, 26, 0.72);
-  backdrop-filter: blur(3px);
+  background: var(--tt-scrim);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
 }
 
 .dialog {
-  width: min(52rem, 100%);
+  width: min(56rem, 100%);
   max-height: 100%;
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   padding: 1.4rem 1.5rem;
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  font-family: var(--font-body);
-  color: var(--color-text);
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius-lg);
+  box-shadow: var(--tt-shadow-lg);
+  font-family: var(--tt-font);
+  color: var(--tt-text);
+}
+
+.hero {
+  position: relative;
+  flex: none;
+  margin: -1.4rem -1.5rem 0;
+  border-radius: var(--tt-radius-lg) var(--tt-radius-lg) 0 0;
+  overflow: hidden;
+  background: var(--tt-surface-sunken);
+}
+
+.hero-img {
+  display: block;
+  width: 100%;
+  height: 15rem;
+  object-fit: cover;
+  object-position: 50% 40%;
+}
+
+.hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.9rem 1.5rem;
+  border-width: 1px 0 0;
+}
+
+.hero:not(.compact) .hero-text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.hero.compact {
+  border-radius: var(--tt-radius-lg) var(--tt-radius-lg) 0 0;
+}
+
+.kicker {
+  color: var(--tt-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 h2 {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .intro {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.85rem;
   line-height: 1.5;
 }
 
 .btn {
   padding: 0.45rem 0.9rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-size: 0.85rem;
   white-space: nowrap;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .advanced > summary {
   cursor: pointer;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -261,7 +328,7 @@ h2 {
 }
 
 .error {
-  color: var(--color-danger);
+  color: var(--tt-danger);
   font-size: 0.85rem;
 }
 
@@ -275,7 +342,7 @@ h2 {
 }
 
 .warning {
-  color: var(--color-accent);
+  color: var(--tt-warn);
   font-size: 0.85rem;
 }
 </style>

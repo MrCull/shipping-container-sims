@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from '../ui/TtIcon.vue'
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { eventsInvolving, type Fact } from '../../modules/entityInspector'
 import { useTwinStore } from '../../store/twinStore'
@@ -89,7 +90,7 @@ onBeforeUnmount(() => {
           aria-expanded="true"
           @click="store.toggleInspector()"
         >
-          ▶
+          <TtIcon name="next" />
         </button>
       </header>
 
@@ -388,7 +389,7 @@ onBeforeUnmount(() => {
   z-index: 7;
   pointer-events: none;
   font-size: 0.8rem;
-  color: var(--color-text);
+  color: var(--tt-text);
 }
 
 .inspector > * {
@@ -399,11 +400,13 @@ onBeforeUnmount(() => {
   align-self: flex-start;
   margin-top: 0.8rem;
   padding: 0.45rem 0.7rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-right: none;
   border-radius: 8px 0 0 8px;
-  background: rgba(17, 24, 39, 0.9);
-  color: var(--color-text);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  color: var(--tt-text);
   font-size: 0.8rem;
 }
 
@@ -411,7 +414,7 @@ onBeforeUnmount(() => {
 .btn:hover,
 .icon-btn:hover,
 .chip:hover {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .body {
@@ -422,8 +425,10 @@ onBeforeUnmount(() => {
   flex: none;
   min-height: 0;
   padding: 0.6rem 0.7rem;
-  border-left: 1px solid var(--color-border);
-  background: rgba(17, 24, 39, 0.94);
+  border-left: 1px solid var(--tt-border);
+  background: var(--tt-panel-strong);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
   overflow-y: auto;
 }
 
@@ -442,7 +447,7 @@ h3 {
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .block {
@@ -450,7 +455,7 @@ h3 {
   flex-direction: column;
   gap: 0.3rem;
   padding-bottom: 0.6rem;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--tt-border);
 }
 
 .heading {
@@ -459,7 +464,7 @@ h3 {
 }
 
 .muted {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.75rem;
 }
 
@@ -474,10 +479,10 @@ h3 {
 .icon-btn,
 .chip {
   padding: 0.2rem 0.55rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--tt-bg);
+  color: var(--tt-text);
   font-size: 0.75rem;
 }
 
@@ -487,7 +492,7 @@ h3 {
 }
 
 .chip.plain {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .facts {
@@ -497,7 +502,7 @@ h3 {
 }
 
 .facts dt {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .facts dd {
@@ -509,9 +514,9 @@ pre {
   max-height: 14rem;
   overflow: auto;
   padding: 0.4rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg);
+  background: var(--tt-bg);
   font-family: var(--tt-font-mono);
   font-size: 0.7rem;
 }
@@ -533,22 +538,22 @@ pre {
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: var(--color-text);
+  color: var(--tt-text);
   text-align: left;
   font-size: 0.75rem;
 }
 
 .chain-row:hover {
-  background: var(--color-bg-card-hover);
+  background: var(--tt-surface-hover);
 }
 
 .chain-row.current {
-  border-color: var(--color-accent);
+  border-color: var(--tt-accent);
 }
 
 .num {
   font-family: var(--tt-font-mono);
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .type {
@@ -557,7 +562,7 @@ pre {
 
 .root {
   margin-left: auto;
-  color: var(--color-accent);
+  color: var(--tt-accent);
   font-size: 0.7rem;
   text-transform: uppercase;
 }
@@ -572,11 +577,11 @@ pre {
 }
 
 .history li.current {
-  color: var(--color-accent);
+  color: var(--tt-accent);
 }
 
 .now {
-  font-family: var(--font-body);
+  font-family: var(--tt-font);
   text-transform: uppercase;
   font-size: 0.65rem;
 }

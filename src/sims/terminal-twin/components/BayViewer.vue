@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from './ui/TtIcon.vue'
 /**
  * Bay viewer popup (spec #106, #115): one bay of a vessel at a time as hold and deck cross-sections (row x tier),
  * prev/next buttons and a bay strip, a hover tooltip with the box's properties and a side list of the bay's work
@@ -125,7 +126,7 @@ onBeforeUnmount(() => {
         :aria-label="t('bayViewer.close')"
         @click="store.closeBayViewer()"
       >
-        ✕
+        <TtIcon name="close" />
       </button>
     </header>
 
@@ -147,7 +148,7 @@ onBeforeUnmount(() => {
           :aria-label="t('bayViewer.prev')"
           @click="go(view.prev)"
         >
-          ◀ {{ t('bayViewer.prevShort') }}
+          <TtIcon name="prev" /> {{ t('bayViewer.prevShort') }}
         </button>
         <button
           type="button"
@@ -158,7 +159,7 @@ onBeforeUnmount(() => {
           :aria-label="t('bayViewer.next')"
           @click="go(view.next)"
         >
-          {{ t('bayViewer.nextShort') }} ▶
+          {{ t('bayViewer.nextShort') }} <TtIcon name="next" />
         </button>
         <div
           class="modes"
@@ -362,19 +363,19 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .bay-viewer {
-  --bv-planned-discharge: #f59e0b;
-  --bv-planned-load: #3b82f6;
-  --bv-in-progress: #34d399;
-  --bv-done: #4b5563;
-  --bv-rob: #64748b;
-  --p0: #4c9be8;
-  --p1: #e8a33c;
-  --p2: #5cc08a;
-  --p3: #d9627a;
-  --p4: #9a7be0;
-  --p5: #3fb8c4;
-  --p6: #c9c04a;
-  --p7: #e07c4c;
+  --bv-planned-discharge: var(--tt-data-discharge);
+  --bv-planned-load: var(--tt-data-load);
+  --bv-in-progress: var(--tt-data-active);
+  --bv-done: var(--tt-data-done);
+  --bv-rob: var(--tt-data-rob);
+  --p0: var(--tt-data-0);
+  --p1: var(--tt-data-1);
+  --p2: var(--tt-data-2);
+  --p3: var(--tt-data-3);
+  --p4: var(--tt-data-4);
+  --p5: var(--tt-data-5);
+  --p6: var(--tt-data-6);
+  --p7: var(--tt-data-7);
   position: absolute;
   top: 3.6rem;
   left: 0.9rem;
@@ -384,11 +385,13 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   padding: 0.7rem 0.85rem 0.85rem;
   border-radius: 10px;
-  border: 1px solid var(--color-border);
-  background: rgba(17, 24, 39, 0.96);
-  color: var(--color-text);
+  border: 1px solid var(--tt-border);
+  background: var(--tt-panel-strong);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  color: var(--tt-text);
   font-size: 0.8rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--tt-shadow);
   pointer-events: auto;
 }
 
@@ -406,9 +409,9 @@ h2 {
 }
 
 .icon-btn {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   border-radius: 6px;
   width: 1.7rem;
   height: 1.7rem;
@@ -416,12 +419,12 @@ h2 {
 }
 
 .icon-btn:hover {
-  color: var(--color-text);
-  background: var(--color-bg-card-hover);
+  color: var(--tt-text);
+  background: var(--tt-surface-hover);
 }
 
 .muted {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .nav {
@@ -434,9 +437,9 @@ h2 {
 
 .btn,
 .mode {
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-card);
-  color: var(--color-text);
+  border: 1px solid var(--tt-border);
+  background: var(--tt-surface);
+  color: var(--tt-text);
   border-radius: 6px;
   padding: 0.25rem 0.6rem;
   font-size: 0.78rem;
@@ -444,7 +447,7 @@ h2 {
 
 .btn:hover:not(:disabled),
 .mode:hover {
-  background: var(--color-bg-card-hover);
+  background: var(--tt-surface-hover);
 }
 
 .btn:disabled {
@@ -472,9 +475,9 @@ h2 {
 }
 
 .mode[aria-pressed='true'] {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
+  background: var(--tt-accent);
+  border-color: var(--tt-accent);
+  color: var(--tt-on-accent);
 }
 
 .strip {
@@ -498,17 +501,17 @@ h2 {
   align-items: stretch;
   gap: 2px;
   padding: 3px 2px 2px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 5px;
-  background: var(--color-bg);
-  color: var(--color-text-muted);
+  background: var(--tt-bg);
+  color: var(--tt-text-muted);
   font-size: 0.68rem;
 }
 
 .strip-bay.current {
-  border-color: var(--color-primary-glow);
-  color: var(--color-text);
-  box-shadow: 0 0 0 1px var(--color-primary-glow);
+  border-color: var(--tt-accent-hover);
+  color: var(--tt-text);
+  box-shadow: 0 0 0 1px var(--tt-accent-hover);
 }
 
 .strip-no {
@@ -519,7 +522,7 @@ h2 {
 .strip-bar {
   height: 4px;
   border-radius: 2px;
-  background: #1f2937;
+  background: var(--tt-border);
   background-image: linear-gradient(to right, var(--bv-in-progress) var(--done), transparent var(--done));
 }
 
@@ -532,7 +535,7 @@ h2 {
 }
 
 .state-complete .strip-bar {
-  background: var(--color-success);
+  background: var(--tt-success);
 }
 
 .body {
@@ -558,7 +561,7 @@ h2 {
   padding: 0.3rem 0.5rem;
   border-radius: 6px;
   border: 1px dashed var(--bv-rob);
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   max-width: 28rem;
 }
 
@@ -568,15 +571,15 @@ h2 {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .section {
   width: max-content;
   padding: 4px;
   border-radius: 6px;
-  background: #0b1220;
-  border: 1px solid var(--color-border);
+  background: var(--tt-surface-sunken);
+  border: 1px solid var(--tt-border);
 }
 
 .axis,
@@ -591,7 +594,7 @@ h2 {
 .row-no {
   font-size: 0.6rem;
   line-height: var(--cell);
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -605,7 +608,7 @@ h2 {
   height: 5px;
   margin: 4px 0 0;
   border-radius: 2px;
-  background: repeating-linear-gradient(90deg, #6b7280 0 10px, #4b5563 10px 12px);
+  background: repeating-linear-gradient(90deg, var(--tt-border-strong) 0 10px, var(--tt-text-muted) 10px 12px);
 }
 
 .pos {
@@ -620,11 +623,11 @@ h2 {
   min-width: 0;
   border-radius: 2px;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--tt-surface-sunken);
 }
 
 .cell.st-empty {
-  border-color: rgba(255, 255, 255, 0.11);
+  border-color: var(--tt-border);
 }
 
 /* Fill: by state, or by the colour mode's palette (a property of the box). */
@@ -654,14 +657,14 @@ h2 {
 
 /* State marks that survive any fill: outline = planned discharge, dashed = planned load, glow = in progress, faded = done, stripes = ROB. */
 .cell.st-planned-discharge {
-  border-color: rgba(255, 255, 255, 0.85);
+  border-color: var(--tt-text);
 }
 .cell.st-planned-load {
-  border: 1px dashed rgba(255, 255, 255, 0.85);
+  border: 1px dashed var(--tt-text);
 }
 .cell.st-in-progress {
-  border-color: #fff;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55), 0 0 8px 2px var(--bv-in-progress);
+  border-color: var(--tt-text);
+  box-shadow: 0 0 0 2px var(--tt-panel-strong), 0 0 8px 2px var(--bv-in-progress);
   z-index: 1;
   animation: bv-pulse 1s ease-in-out infinite alternate;
 }
@@ -669,10 +672,10 @@ h2 {
   opacity: 0.4;
 }
 .cell.st-rob {
-  background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.35) 0 2px, transparent 2px 5px);
+  background-image: repeating-linear-gradient(45deg, var(--tt-hatch) 0 2px, transparent 2px 5px);
 }
 .cell.st-rob.p0, .cell.st-rob.p1, .cell.st-rob.p2, .cell.st-rob.p3, .cell.st-rob.p4, .cell.st-rob.p5, .cell.st-rob.p6, .cell.st-rob.p7 {
-  border-color: rgba(0, 0, 0, 0.4);
+  border-color: var(--tt-border-strong);
 }
 .cell.st-done::after {
   content: '';
@@ -681,14 +684,14 @@ h2 {
   top: 15%;
   width: 28%;
   height: 48%;
-  border: solid rgba(255, 255, 255, 0.9);
+  border: solid var(--tt-text);
   border-width: 0 2px 2px 0;
   transform: rotate(40deg);
 }
 
 @keyframes bv-pulse {
   to {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3), 0 0 3px 1px var(--bv-in-progress);
+    box-shadow: 0 0 0 2px var(--tt-focus), 0 0 3px 1px var(--bv-in-progress);
   }
 }
 
@@ -714,8 +717,8 @@ h2 {
 .pkg {
   padding: 0.35rem 0.5rem;
   border-radius: 6px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
+  border: 1px solid var(--tt-border);
+  background: var(--tt-bg);
 }
 
 .pkg-head,
@@ -732,7 +735,7 @@ h2 {
 
 .pkg-meta {
   margin-top: 0.15rem;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.72rem;
 }
 
@@ -740,32 +743,32 @@ h2 {
   height: 3px;
   margin-top: 0.3rem;
   border-radius: 2px;
-  background: #1f2937 linear-gradient(to right, var(--bv-in-progress) var(--done), transparent var(--done));
+  background: var(--tt-border) linear-gradient(to right, var(--bv-in-progress) var(--done), transparent var(--done));
 }
 
 .badge {
   padding: 0 0.4rem;
   border-radius: 999px;
   font-size: 0.68rem;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
+  border: 1px solid var(--tt-border);
+  color: var(--tt-text-muted);
 }
 
 .badge-active {
-  color: #052e1c;
-  background: var(--bv-in-progress);
-  border-color: var(--bv-in-progress);
+  color: var(--tt-success);
+  background: var(--tt-success-bg);
+  border-color: var(--tt-success-border);
   font-weight: 600;
 }
 
 .badge-released {
-  color: var(--color-accent-glow);
-  border-color: var(--color-accent);
+  color: var(--tt-accent);
+  border-color: var(--tt-accent);
 }
 
 .badge-complete {
-  color: var(--color-success);
-  border-color: var(--color-success);
+  color: var(--tt-success);
+  border-color: var(--tt-success);
 }
 
 .legend li {
@@ -781,7 +784,7 @@ h2 {
 
 .legend .count {
   margin-left: auto;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -792,9 +795,11 @@ h2 {
   max-width: 16rem;
   padding: 0.4rem 0.55rem;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: rgba(10, 14, 26, 0.97);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--tt-border);
+  background: var(--tt-panel-strong);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  box-shadow: var(--tt-shadow);
   pointer-events: none;
   font-size: 0.74rem;
 }
@@ -806,7 +811,7 @@ h2 {
 }
 
 .tip dt {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .tip dd {

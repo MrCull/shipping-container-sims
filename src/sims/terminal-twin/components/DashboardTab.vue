@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from './ui/TtIcon.vue'
 /**
  * Full-screen dashboard tab (TT-16): zoomable KPI time series per group, the
  * yard fill heatmap and a vessel/crane Gantt, plus the final report as a tab.
@@ -255,7 +256,7 @@ const tabs: ('charts' | 'report')[] = ['charts', 'report']
         data-testid="tt-dashboard-close"
         @click="store.toggleDashboard()"
       >
-        ✕
+        <TtIcon name="close" />
       </button>
     </header>
 
@@ -529,9 +530,9 @@ const tabs: ('charts' | 'report')[] = ['charts', 'report']
   z-index: 8;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-body);
+  background: var(--tt-bg);
+  color: var(--tt-text);
+  font-family: var(--tt-font);
   overflow: hidden;
 }
 
@@ -541,7 +542,7 @@ const tabs: ('charts' | 'report')[] = ['charts', 'report']
   gap: 1rem;
   flex-wrap: wrap;
   padding: 0.6rem 1rem;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--tt-border);
 }
 
 h2 {
@@ -553,12 +554,12 @@ h3 {
   font-size: 0.8rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .hint,
 .muted {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.8rem;
 }
 
@@ -568,16 +569,16 @@ h3 {
 
 .close {
   padding: 0.15rem 0.55rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg-card);
-  color: var(--color-text);
+  background: var(--tt-surface);
+  color: var(--tt-text);
   cursor: pointer;
   font: inherit;
 }
 
 .close:hover {
-  background: var(--color-bg-card-hover);
+  background: var(--tt-surface-hover);
 }
 
 .body {
@@ -597,7 +598,7 @@ h3 {
 
 .seg {
   display: inline-flex;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -605,9 +606,9 @@ h3 {
 .seg-btn {
   padding: 0.3rem 0.8rem;
   border: 0;
-  border-right: 1px solid var(--color-border);
-  background: var(--color-bg-card);
-  color: var(--color-text-muted);
+  border-right: 1px solid var(--tt-border);
+  background: var(--tt-surface);
+  color: var(--tt-text-muted);
   cursor: pointer;
   font: inherit;
   font-size: 0.85rem;
@@ -618,13 +619,13 @@ h3 {
 }
 
 .seg-btn:hover {
-  background: var(--color-bg-card-hover);
-  color: var(--color-text);
+  background: var(--tt-surface-hover);
+  color: var(--tt-text);
 }
 
 .seg-btn.active {
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--tt-accent);
+  color: var(--tt-on-accent);
 }
 
 .grid {
@@ -636,8 +637,8 @@ h3 {
 .panel {
   padding: 0.7rem 0.8rem;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: #1a1a19;
+  border: 1px solid var(--tt-border);
+  background: var(--tt-chart-surface);
   min-width: 0;
 }
 
@@ -672,20 +673,20 @@ h3 {
 
 /* Gantt legend swatches carry the same texture as the bars (state is never colour alone) */
 .pattern-anchorage {
-  background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.4) 0 2px, transparent 2px 5px);
+  background-image: repeating-linear-gradient(45deg, var(--tt-hatch) 0 2px, transparent 2px 5px);
 }
 
 .pattern-mooring {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.4) 1.2px, transparent 1.4px);
+  background-image: radial-gradient(var(--tt-hatch) 1.2px, transparent 1.4px);
   background-size: 5px 5px;
 }
 
 .pattern-unmooring {
-  background-image: repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.4) 0 2px, transparent 2px 5px);
+  background-image: repeating-linear-gradient(-45deg, var(--tt-hatch) 0 2px, transparent 2px 5px);
 }
 
 .pattern-package {
-  background-image: linear-gradient(90deg, rgba(0, 0, 0, 0.4) 0 2px, transparent 2px 5px);
+  background-image: linear-gradient(90deg, var(--tt-hatch) 0 2px, transparent 2px 5px);
 }
 
 .table-view {
@@ -695,7 +696,7 @@ h3 {
 
 .table-view summary {
   cursor: pointer;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 table {
@@ -707,7 +708,7 @@ table {
 th,
 td {
   padding: 0.15rem 0.4rem;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--tt-border);
   text-align: left;
   font-weight: 400;
 }

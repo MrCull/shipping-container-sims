@@ -125,45 +125,45 @@ svg {
   display: block;
   width: 100%;
   height: 12rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border, #3a3f4b);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
 }
 
 .sea {
-  fill: #1c3a5a;
+  fill: var(--tt-plan-quay);
 }
 
 .quay-edge {
-  stroke: #9aa4b2;
+  stroke: var(--tt-border-strong);
   stroke-width: 3;
 }
 
 .sts rect {
-  fill: #e7b84a;
+  fill: var(--tt-plan-sts);
 }
 
 .stacks {
-  fill: #4f7cac;
+  fill: var(--tt-plan-block);
   opacity: 0.85;
 }
 
 .pads {
-  fill: #86b6e0;
+  fill: var(--tt-plan-pad);
 }
 
 .stall {
-  fill: #cfd6df;
+  fill: var(--tt-plan-lane);
 }
 
 .roads {
   fill: none;
-  stroke: #6b7280;
+  stroke: var(--tt-plan-line);
   stroke-width: 1.5;
 }
 
 .gate {
-  fill: #c0584a;
+  fill: var(--tt-plan-gate);
 }
 
 .legend {
@@ -173,7 +173,7 @@ svg {
   align-items: center;
   margin-top: 0.3rem;
   font-size: 0.72rem;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .key {
@@ -186,23 +186,23 @@ svg {
 }
 
 .sea-key {
-  background: #1c3a5a;
+  background: var(--tt-plan-quay);
 }
 
 .sts-key {
-  background: #e7b84a;
+  background: var(--tt-plan-sts);
 }
 
 .block-key {
-  background: #4f7cac;
+  background: var(--tt-plan-block);
 }
 
 .gate-key {
-  background: #c0584a;
+  background: var(--tt-plan-gate);
 }
 
 .hint {
   font-size: 0.8rem;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 </style>

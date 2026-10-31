@@ -12,7 +12,7 @@ const label = computed(() => (perf.stats.fps > 0 ? Math.round(perf.stats.fps) : 
 <template>
   <button
     type="button"
-    class="fps-chip"
+    class="fps-chip tt-skin"
     :class="severity"
     :aria-pressed="perf.overlayVisible"
     :title="t('perf.chipHint')"
@@ -32,17 +32,18 @@ const label = computed(() => (perf.stats.fps > 0 ? Math.round(perf.stats.fps) : 
   gap: 0.25rem;
   height: 2rem;
   padding: 0 0.6rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--color-text-muted);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius-sm);
+  background: var(--tt-panel-strong);
+  color: var(--tt-text);
+  font-family: var(--tt-font);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
 
 .fps-chip:hover {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .num {
@@ -52,14 +53,14 @@ const label = computed(() => (perf.stats.fps > 0 ? Math.round(perf.stats.fps) : 
 }
 
 .fps-chip.warn {
-  border-color: #f59e0b;
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
+  border-color: var(--tt-warn-border);
+  background: var(--tt-warn-bg);
+  color: var(--tt-warn);
 }
 
 .fps-chip.bad {
-  border-color: #ef4444;
-  background: rgba(239, 68, 68, 0.18);
-  color: #f87171;
+  border-color: var(--tt-danger-border);
+  background: var(--tt-danger-bg);
+  color: var(--tt-danger);
 }
 </style>
