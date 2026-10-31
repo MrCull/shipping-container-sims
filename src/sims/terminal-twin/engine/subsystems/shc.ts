@@ -104,6 +104,8 @@ export interface Waypoint {
   zone: string | null
   /** Conflict zone of the stretch from the previous waypoint to this one. */
   edgeZone: string | null
+  /** A corner the vehicle takes at speed (the truck loop, #146) even when the trip has no general corner model. */
+  rolling?: true
 }
 
 /**
@@ -133,6 +135,8 @@ export class TripBuilder<M extends string = PlannedType> {
     start: Waypoint,
     private instant: boolean,
     private corner?: CornerModel,
+    /** Turn model for the corners a waypoint marks `rolling` when `corner` is absent (trucks on the teardrop loop). */
+    private rollingCorner?: CornerModel,
   ) {
     this.x = start.x
     this.z = start.z
@@ -228,7 +232,7 @@ export class TripBuilder<M extends string = PlannedType> {
    */
   private cornerSpeeds(runs: Waypoint[][], profile: AxisProfile): number[] {
     const speeds = new Array<number>(runs.length + 1).fill(0)
-    if (!this.corner || this.instant) return speeds
+    if ((!this.corner && !this.rollingCorner) || this.instant) return speeds
     const dirs: { axis: 'x' | 'z'; len: number }[] = []
     let px = this.x
     let pz = this.z
@@ -244,8 +248,10 @@ export class TripBuilder<M extends string = PlannedType> {
     for (let i = 1; i < runs.length; i++) {
       const prev = dirs[i - 1]
       const next = dirs[i]
+      const model = this.corner ?? (runs[i - 1][runs[i - 1].length - 1].rolling ? this.rollingCorner : undefined)
+      if (!model) continue
       const angle = prev.axis === next.axis ? Math.PI : Math.PI / 2
-      speeds[i] = Math.min(cornerSpeedCap(angle, this.corner), profile.vMax, Math.sqrt(a * prev.len), Math.sqrt(a * next.len))
+      speeds[i] = Math.min(cornerSpeedCap(angle, model), profile.vMax, Math.sqrt(a * prev.len), Math.sqrt(a * next.len))
     }
     return speeds
   }
@@ -283,13 +289,14 @@ export class TripBuilder<M extends string = PlannedType> {
 }
 
 /** Waypoints of a node path, with node and edge zones. */
-export function waypoints(graph: PathGraph & { nodes: Record<string, { zone: string | null }> }, path: string[]): Waypoint[] {
+export function waypoints(graph: PathGraph & { nodes: Record<string, { zone: string | null; rolling?: true }> }, path: string[]): Waypoint[] {
   return path.map((id, i) => ({
     nodeId: id,
     x: graph.nodes[id].x,
     z: graph.nodes[id].z,
     zone: graph.nodes[id].zone,
     edgeZone: i === 0 ? null : edgeBetween(graph, path[i - 1], id).zone,
+    ...(graph.nodes[id].rolling ? { rolling: true as const } : {}),
   }))
 }
 

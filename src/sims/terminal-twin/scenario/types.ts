@@ -572,6 +572,21 @@ export interface LandsideConfig {
   appointments?: AppointmentConfig
   /** Stall admission and holding positions (TT-R16); absent = trucks wait at the gate kiosk for a stall. */
   holding?: HoldingConfig
+  /**
+   * An access road (spec #134, #146): trucks come along `z` from the south (`fromX`, beyond the terminal) and turn right
+   * (east, -z) into the terminal road at the gate instead of appearing on the terminal road; absent = they spawn on it.
+   */
+  accessRoad?: AccessRoadConfig
+  /** The two sharp turns at the far end of the terminal road become a teardrop loop trucks drive without stopping (#146). */
+  teardropLoop?: boolean
+}
+
+/** Where the trucks' access road runs (scene metres: +x south along the quay, +z landward). */
+export interface AccessRoadConfig {
+  /** Z of the road's centre line. */
+  z: number
+  /** X where trucks enter it (south of the terminal). */
+  fromX: number
 }
 
 /** Where the scenario clock sits, so hour and shift buckets line up with the clock the user sees. */

@@ -80,8 +80,22 @@ export const SURROUNDINGS = {
   anchorage: { x: 0, y: -2.5, z: -4200 },
   /** [V] the tank farm beside the road at the terminal's south-west corner (the terminal's yard ends near z = 500). */
   tanks: { x: 900, y: 0, z: 780 },
-  /** [V] the Isla Verde road and rail run along the landside, parallel to the quay, beyond the gate and parking. */
-  landside: { x: 0, y: 0, z: 600 },
+  /**
+   * [V] the Isla Verde road and rail run along the landside, parallel to the quay, beyond the gate and parking. Spec #134,
+   * ticket #146: z = 690 puts the road clear of a 12-truck gate queue (the queue ends at z = 646); its carriageway, centred
+   * 10 m nearer the quay than this origin, is the access road the trucks drive (`TTI_ACCESS_ROAD`).
+   */
+  landside: { x: 0, y: 0, z: 690 },
   /** [A] Algeciras rises inland beyond the apron (which ends at z = 900). */
   town: { x: 0, y: -1.2, z: 1000 },
 }
+
+/**
+ * Spec #134, ticket #146: the access road of the engine's landside graph. The trucks come up from the south along the
+ * Isla Verde carriageway (the scenery's `landside` part, whose carriageway centre lies 10 m nearer the quay than its
+ * origin) and turn right (east, towards the water) into the terminal road at the gate; the far end of the terminal road
+ * is a teardrop loop. No THREE here: the engine reads this through the TTI presets.
+ */
+export const TTI_ACCESS_ROAD_Z = SURROUNDINGS.landside.z - 10
+/** [A] The trucks enter the access road this far south of the quay's south end (m): well inside the fog, outside the terminal. */
+export const TTI_ACCESS_ROAD_RUNUP_M = 100

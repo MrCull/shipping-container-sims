@@ -504,8 +504,9 @@ export class SceneModel {
     const d = seg.to - seg.from
     if (d === 0) return
     const prev = list[list.length - 1]
-    const yawPrev = prev ? prev.yaw1 : this.truckIds.includes(shcId) ? Math.PI / 2 : 0
     const target = seg.axis === 'x' ? (d > 0 ? 0 : Math.PI) : d > 0 ? -Math.PI / 2 : Math.PI / 2
+    // a truck appears facing its first drive (the access road, #146: north; the terminal road: towards the gate)
+    const yawPrev = prev ? prev.yaw1 : this.truckIds.includes(shcId) ? (seg.axis === 'x' ? target : Math.PI / 2) : 0
     const delta = wrapPi(target - yawPrev)
     const reverse = Math.abs(delta) > (3 * Math.PI) / 4
     const odoPrev = prev ? prev.odoStart + prev.fwd * Math.abs(prev.to - prev.from) : 0

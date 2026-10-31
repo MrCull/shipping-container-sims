@@ -21,8 +21,10 @@
  *
  * An inbound truck leaves its in lane onto the eastbound road, turns into the
  * spur of its stall (drives in cab first), and reverses out after the
- * interchange. It continues east to the end connector, returns on the westbound
- * road and leaves through an out lane. The out-of-gauge (OOG) lane between the
+ * interchange. It continues east to the end connector (at TTI the teardrop loop,
+ * driven at speed), returns on the westbound road and leaves through an out lane.
+ * With an access road (TTI, #146) trucks come from the south along z = access.z
+ * and turn right (-z) into the queue road at the gate. The out-of-gauge (OOG) lane between the
  * in and out lanes is drawn but never used.
  */
 import { shortestPath, type PathGraph } from './laneGraph'
@@ -57,8 +59,12 @@ const HOLDING_EAST_GAP_M = 8
 const HOLDING_WEST_CLEAR_M = 12
 /** The roads extend this far east of the last block (m). */
 const ROAD_EAST_GAP_M = 20
+/** Teardrop loop (#146), metres: the loop reaches this far beyond the end of the roads, bulges this far past the outbound road, and its return leg stands this far in. */
+export const LOOP_REACH_M = 14
+export const LOOP_BULGE_M = 12
+export const LOOP_RETURN_M = 4
 
-export type LandsideNodeKind = 'road' | 'queue' | 'inEntry' | 'inKiosk' | 'outKiosk' | 'outExit' | 'despawn' | 'stall' | 'holding'
+export type LandsideNodeKind = 'road' | 'access' | 'loop' | 'queue' | 'inEntry' | 'inKiosk' | 'outKiosk' | 'outExit' | 'despawn' | 'stall' | 'holding'
 
 export interface LandsideNode {
   id: string
@@ -66,6 +72,8 @@ export interface LandsideNode {
   z: number
   kind: LandsideNodeKind
   zone: string | null
+  /** A corner a truck takes at speed without stopping (the teardrop loop, #146). */
+  rolling?: true
 }
 
 export interface LandsideEdge {
@@ -112,6 +120,10 @@ export interface HoldingLayout {
 
 export interface LandsideGraph {
   layout: { zoneClearanceM: number }
+  /** The access road (#146): trucks enter at `ls:AS` and turn right (-z) into the terminal road at `ls:AJ`; null = they spawn on the terminal road. */
+  access: { z: number; fromX: number; startNode: string; junctionNode: string } | null
+  /** The teardrop loop at the far end of the terminal road (#146): its corners in driving order; empty = the two end turns. */
+  loop: { x: number; z: number; nodeId: string }[]
   nodes: Record<string, LandsideNode>
   edges: LandsideEdge[]
   out: Record<string, LandsideEdge[]>
@@ -150,6 +162,16 @@ const roadId = (dir: 'I' | 'O', x: number) => `ls:R${dir}@${r3(x)}`
 
 /** Z of queue slot `index` (0 = the head). */
 export const queueSlotZ = (g: LandsideGraph, index: number): number => r3(g.gate.queueHeadZ + index * QUEUE_PITCH_M)
+
+/**
+ * Where queue slot `index` stands. The queue lies along the terminal road at the gate's queue X; with an access road (#146)
+ * a queue longer than the terminal road backs up along the access road (south, +x) instead of running on past it.
+ */
+export function queueSlotAt(g: LandsideGraph, index: number): { x: number; z: number } {
+  const z = queueSlotZ(g, index)
+  if (!g.access || z <= g.access.z) return { x: g.gate.queueX, z }
+  return { x: r3(g.gate.queueX + (z - g.access.z)), z: g.access.z }
+}
 
 export function gateOf(config: ScenarioConfig): GateConfig {
   return { ...DEFAULT_GATE_LAYOUT, ...config.landside?.gate }
@@ -238,11 +260,32 @@ export function buildLandsideGraph(config: ScenarioConfig): LandsideGraph {
     zone(id, 'road', riSorted[i] + 2, riSorted[i + 1] - 2, roadInZ - 2, roadInZ + 2)
     edge(roadId('I', riSorted[i]), roadId('I', riSorted[i + 1]), id)
   }
-  // end connector
-  node('ls:end', eastX, r3((roadInZ + roadOutZ) / 2), 'road', null)
-  zone('ls:end', 'road', eastX - 2, eastX + 2, roadInZ + 2, roadOutZ - 2)
-  edge(roadId('I', eastX), 'ls:end', 'ls:end')
-  edge('ls:end', roadId('O', eastX), 'ls:end')
+  // the far end of the terminal road: two sharp turns (end connector), or at TTI a teardrop loop driven without stopping
+  const loop: LandsideGraph['loop'] = []
+  if (config.landside?.teardropLoop) {
+    // east on the inbound road, north (+z) past the outbound road, back west, south, and west onto the outbound road
+    const topZ = r3(roadOutZ + LOOP_BULGE_M)
+    const pts: [number, number][] = [
+      [eastX + LOOP_REACH_M, roadInZ],
+      [eastX + LOOP_REACH_M, topZ],
+      [eastX + LOOP_RETURN_M, topZ],
+      [eastX + LOOP_RETURN_M, roadOutZ],
+    ]
+    pts.forEach(([x, z], i) => {
+      node(`ls:LP${i + 1}`, x, z, 'loop', 'ls:loop')
+      nodes[`ls:LP${i + 1}`].rolling = true
+      loop.push({ x: r3(x), z: r3(z), nodeId: `ls:LP${i + 1}` })
+    })
+    zone('ls:loop', 'road', eastX + 2, eastX + LOOP_REACH_M + 2, roadInZ + 2, topZ + 2)
+    edge(roadId('I', eastX), 'ls:LP1', 'ls:loop')
+    for (let i = 1; i < pts.length; i++) edge(`ls:LP${i}`, `ls:LP${i + 1}`, 'ls:loop')
+    edge('ls:LP4', roadId('O', eastX), 'ls:loop')
+  } else {
+    node('ls:end', eastX, r3((roadInZ + roadOutZ) / 2), 'road', null)
+    zone('ls:end', 'road', eastX - 2, eastX + 2, roadInZ + 2, roadOutZ - 2)
+    edge(roadId('I', eastX), 'ls:end', 'ls:end')
+    edge('ls:end', roadId('O', eastX), 'ls:end')
+  }
   // westbound outbound road
   for (let i = roSorted.length - 1; i > 0; i--) {
     const id = `ls:SO@${roSorted[i - 1]}`
@@ -304,11 +347,24 @@ export function buildLandsideGraph(config: ScenarioConfig): LandsideGraph {
     outLanes.push({ id: lane, index: j, direction: 'out', x, kioskNode: `ls:OK${j + 1}`, endNode: `ls:OD${j + 1}`, approachNode: roadId('O', x), kioskZ })
   }
 
+  // access road (#146): from the south end along z to the gate's queue X, then right (towards the water) into the terminal road
+  const accessCfg = config.landside?.accessRoad
+  let access: LandsideGraph['access'] = null
+  if (accessCfg) {
+    node('ls:AS', accessCfg.fromX, accessCfg.z, 'access', null)
+    node('ls:AJ', queueX, accessCfg.z, 'access', null)
+    edge('ls:AS', 'ls:AJ')
+    edge('ls:AJ', 'ls:QH')
+    access = { z: r3(accessCfg.z), fromX: r3(accessCfg.fromX), startNode: 'ls:AS', junctionNode: 'ls:AJ' }
+  }
+
   const out: Record<string, LandsideEdge[]> = {}
   for (const id of Object.keys(nodes)) out[id] = []
   for (const e of edges) out[e.from].push(e)
   return {
     layout: { zoneClearanceM: TRUCK_ZONE_CLEARANCE_M },
+    access,
+    loop,
     nodes,
     edges,
     out,
