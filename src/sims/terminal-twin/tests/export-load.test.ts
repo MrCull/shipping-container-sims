@@ -6,6 +6,7 @@ import { createSimulation, restoreSimulation, type EngineEvent, type Simulation 
 import { DEFAULT_SHC_KINEMATICS, ScenarioBuilder, withShcFleet } from '../scenario/builder'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
+import { isCellUsable, isStackBase, vesselClass } from '../scenario/vesselClasses'
 
 function run(config: ScenarioConfig, handlers = {}): Simulation {
   const sim = createSimulation(config, handlers)
@@ -103,7 +104,7 @@ describe('stowage order', () => {
     let stacked = 0
     for (const e of loaded) {
       const slot = sim.query.vesselSlot(e.payload.slotId)
-      if (slot.tier > 0 && slot.tier !== 4) {
+      if (!isStackBase(vesselClass('feeder'), slot.row, slot.tier)) {
         stacked++
         expect(filled.has(`${slot.bay}:${slot.row}:${slot.tier - 1}`), `${slot.id} loaded before the slot below`).toBe(true)
       }
@@ -116,7 +117,7 @@ describe('stowage order', () => {
     const sim = createSimulation(stackedLoad({ load: 70 }))
     sim.runUntil({ eventType: 'BerthAllocated' })
     const snap = sim.snapshot()
-    const upper = Object.values(snap.state.vesselSlots).find((s) => s.purpose === 'load' && s.tier === 1)
+    const upper = Object.values(snap.state.vesselSlots).find((s) => s.purpose === 'load' && s.tier === 1 && isCellUsable(vesselClass('feeder'), s.row, 0))
     expect(upper).toBeDefined()
     // cheat: a box appears in the upper slot while the one below is still empty
     const slot = snap.state.vesselSlots[(upper as { id: string }).id]

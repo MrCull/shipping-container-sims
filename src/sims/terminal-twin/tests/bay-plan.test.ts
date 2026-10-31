@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createSimulation } from '../engine'
 import { ScenarioBuilder, LINE_OWNER_PREFIX } from '../scenario/builder'
 import { isValidIso6346 } from '../scenario/iso6346'
-import { VESSEL_CLASSES } from '../scenario/vesselClasses'
+import { isStackBase, VESSEL_CLASSES } from '../scenario/vesselClasses'
 
 function scenario(seed = 3) {
   return new ScenarioBuilder('bay-plan', 'bay plans of three vessel calls')
@@ -71,7 +71,7 @@ describe('bay plans and containers', () => {
       )
       for (const key of full) {
         const [bay, row, tier] = key.split(':').map(Number)
-        if (tier === 0 || tier === spec.holdTiers) continue
+        if (isStackBase(spec, row, tier)) continue
         expect(full.has(`${bay}:${row}:${tier - 1}`), `${v.id} ${key} floats`).toBe(true)
       }
     }

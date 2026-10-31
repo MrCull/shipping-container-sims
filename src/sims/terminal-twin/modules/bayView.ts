@@ -17,7 +17,7 @@
 import type { CustodyKind, VesselSlotState, VesselStatus, WorkPackage } from '../engine'
 import type { RobBox } from '../scenario/robBays'
 import type { ContainerSize, VesselSizeClass } from '../scenario/types'
-import { vesselSlotId, VESSEL_CLASSES, type CellHalf } from '../scenario/vesselClasses'
+import { isCellUsable, vesselSlotId, VESSEL_CLASSES, type CellHalf } from '../scenario/vesselClasses'
 import { vesselBayNumber, vesselRowNumber, vesselTierNumber } from './locationNotation'
 
 export type CellStatus = 'planned-discharge' | 'planned-load' | 'in-progress' | 'done' | 'rob' | 'empty'
@@ -93,6 +93,8 @@ export interface BayCell {
   rob: boolean
   /** Panels only: the second (aft) panel's view of a 40 ft box, drawn hatched and labelled "40′ ▸". Never set on a cell of `sections`. */
   continuation: boolean
+  /** Outside the hull profile (below deck the hold narrows towards the keel, #131): the cell does not exist and is not drawn. */
+  absent: boolean
 }
 
 /** One tier of a panel: one cell per row, quay side (port) first. */
@@ -311,8 +313,10 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
       details: { slotId, location: locate(slotId), status: 'empty' },
       rob: false,
       continuation: false,
+      absent: false,
     }
   }
+  const absentCell = (row: number, tier: number): BayCell => ({ ...emptyCell(row, tier, null), absent: true })
   const cellOfSlot = (s: VesselSlotState): BayCell => {
     const box = slotBox(data, s)
     const status = slotStatus(s, box)
@@ -335,7 +339,7 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
       details.line = s.emptyReq.line
     }
     const colourKey = status === 'empty' ? null : keyOf(opts.colourMode, status, details)
-    return { slotId: s.id, half: s.half, status, colourKey, colourIndex: indexOf(colourKey), details, rob: false, continuation: false }
+    return { slotId: s.id, half: s.half, status, colourKey, colourIndex: indexOf(colourKey), details, rob: false, continuation: false, absent: false }
   }
   const cellOfRob = (b: RobBox): BayCell => {
     const details: CellDetails = {
@@ -351,10 +355,11 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
       grossKg: b.grossKg,
     }
     const colourKey = keyOf(opts.colourMode, 'rob', details)
-    return { slotId: b.slotId, half: b.half, status: 'rob', colourKey, colourIndex: indexOf(colourKey), details, rob: true, continuation: false }
+    return { slotId: b.slotId, half: b.half, status: 'rob', colourKey, colourIndex: indexOf(colourKey), details, rob: true, continuation: false, absent: false }
   }
 
   const positionOf = (row: number, tier: number, deck: boolean): BayPosition => {
+    if (!isCellUsable(spec, row, tier)) return { row, tier, cells: [absentCell(row, tier)] }
     const k = `${row}:${tier}`
     const own = (slotsHere.get(k) ?? []).map((s) => ({ cell: cellOfSlot(s), purpose: s.purpose as VesselSlotState['purpose'] | null }))
     const rob = (robHere.get(k) ?? []).map((b) => ({ cell: cellOfRob(b), purpose: null as VesselSlotState['purpose'] | null }))
@@ -393,7 +398,7 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
       number: t.number,
       cells: t.positions.map((p) => {
         const whole = p.cells.length === 1 ? p.cells[0] : null
-        if (whole) return half === 'aft' && whole.status !== 'empty' ? { ...whole, continuation: true } : whole
+        if (whole) return half === 'aft' && whole.status !== 'empty' && !whole.absent ? { ...whole, continuation: true } : whole
         return p.cells.find((c) => c.half === half)!
       }),
     })),

@@ -316,6 +316,13 @@ A popup (`components/BayViewer.vue`, mounted in `TerminalTwin.vue`, not a HUD re
 - **Proof:** `tests/bay-view.test.ts` (status table, cells and axes, ROB cells, colour modes, navigation, packages, notation; runs the `rob-bays` fixture headless); smoke `tests/browser/bay-viewer.smoke.ts` (`pnpm run test:smoke --project=dev --grep "bay viewer"`: click the vessel in 3D, hover, step, ROB bay, POD mode, a cell planned to done, the inspector button, Escape; screenshot `.screenshots/bay-viewer.png`).
 - **Limits:** the popup covers part of the 3D view (top left under the KPI strip) and cannot be moved; a snapshot from before spec #106 shows boxes without properties.
 
+## Hull profile: V-shaped holds (spec #116, #131, ENGINE_VERSION 0.26.0)
+
+Below deck the holds narrow towards the keel. `VesselClassSpec.holdRows` ([A], `scenario/vesselClasses.ts`) lists the usable rows per hold tier, bottom first, centred on the beam (feeder 4/6/6/8 of 8 rows, ULCV 11 up to 23 of 23); deck tiers keep every row. The helpers `rowRange`, `isCellUsable`, `stackBaseTier`, `isStackBase`, `cellsPerBay` and `cellCapacity` are the one source: **never enumerate `0..spec.rows` for a hold tier, ask the profile.** A hold stack starts at its row's `stackBaseTier` (above tier 0 in outer rows), so "bottom of the stack" is no longer tier 0 (`stowage.order` and the stowage tests use `isStackBase`).
+- **Used by:** the bay planner (discharge fill, load cells, reserved slots, `extraLoadCell`), ROB fill and `workableCells`, and the scenario validation (`setup.check.capacity` reports the profile capacity). New invariant `hull.profile`: a box on board never sits outside its tier's rows (proved on a tampered snapshot in `tests/hull-profile.test.ts`).
+- **Views:** the bay viewer keeps the row grid for alignment but marks cells outside the profile `BayCell.absent` (not drawn, not counted, no hover; `data-testid=tt-bay-absent`), so the hold reads as a V. The 3D hold liner under open hatches (`holdLinerOutline` in `modules/hullHatchOpening.ts`, extruded in `VesselHulls.holdLiners`) is the same stepped V. **Not done:** the outer GLB hull lines are baked by the Blender generator (`vessels.py`, needs `bpy`, not available to the implementer), so the hull skin itself is unchanged.
+- **Goldens:** every golden with a vessel moved (cell order and counts changed); regenerated once on purpose, KPI comparison in the commit message.
+
 ## Vessel status and countdown (spec #116, #126)
 
 View only: no event, state field or golden changes (the engine's `VesselState` is untouched).

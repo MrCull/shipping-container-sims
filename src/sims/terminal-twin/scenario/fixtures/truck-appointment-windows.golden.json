@@ -3,10 +3,10 @@
   "seed": 12,
   "status": "ended",
   "endReason": "simDurationS >= 7200",
-  "eventLogHash": "06c538102a9d46",
+  "eventLogHash": "0595dfeac387d8",
   "kpis": {
     "simTimeS": 7200,
-    "eventsProcessed": 1901,
+    "eventsProcessed": 1894,
     "movesCompleted": 16,
     "vesselsCompleted": 1,
     "sts": {
@@ -14,7 +14,7 @@
         "moves": 16,
         "cycles": 11,
         "twinLifts": 5,
-        "grossMovesPerHour": 36.556,
+        "grossMovesPerHour": 35.917,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1715.282,
-        "turnaroundS": 1655.282,
+        "departedAtS": 1743.314,
+        "turnaroundS": 1683.314,
         "sts": [
           "STS01"
         ]
@@ -137,9 +137,9 @@
       },
       "ascDispatch": {
         "handler": "strategy:waterside-first",
-        "calls": 137,
-        "resolved": 137,
-        "ok": 137,
+        "calls": 133,
+        "resolved": 133,
+        "ok": 133,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -292,8 +292,8 @@
           "loadedDistanceM": 1517.067,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 6148.713,
-            "moving-to-collect": 191.742,
+            "parked": 6149.45,
+            "moving-to-collect": 191.005,
             "queuing-to-collect": 0,
             "collecting": 338.383,
             "moving-to-deliver": 38.5,
@@ -310,8 +310,8 @@
           "loadedDistanceM": 580,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 6744.183,
-            "moving-to-collect": 95.739,
+            "parked": 6742.766,
+            "moving-to-collect": 97.156,
             "queuing-to-collect": 0,
             "collecting": 144.952,
             "moving-to-deliver": 17.5,
@@ -384,20 +384,20 @@
       "gateQueue": 0,
       "gateQueueMax": 3,
       "turnTimeS": {
-        "mean": 384.338,
-        "max": 1118.084
+        "mean": 386.827,
+        "max": 1123.51
       },
       "gateWaitS": {
-        "mean": 30.572,
-        "max": 471.217
+        "mean": 31.476,
+        "max": 476.642
       },
       "stallAllocWaitS": {
-        "mean": 89.485,
-        "max": 722.891
+        "mean": 91.311,
+        "max": 728.317
       },
       "stallWaitS": {
-        "mean": 100.397,
-        "max": 910.862
+        "mean": 100.992,
+        "max": 916.288
       },
       "gateProcessingS": {
         "mean": 45,
@@ -408,14 +408,14 @@
         "max": 29.979
       },
       "totalTurnaroundS": {
-        "mean": 500.638,
-        "max": 1209.215
+        "mean": 503.902,
+        "max": 1214.641
       },
       "road": {
         "meanTrucks": 0.458,
         "maxTrucks": 3
       },
-      "serviceS": 187.664,
+      "serviceS": 188.276,
       "transactions": {
         "dropExport": 9,
         "pickImport": 8,
@@ -440,19 +440,19 @@
       "IMPORT": {
         "count": 15,
         "departed": 14,
-        "meanS": 2949.509,
-        "maxS": 6089.102
+        "meanS": 2944.347,
+        "maxS": 6077.102
       },
       "EXPORT": {
         "count": 18,
         "departed": 0,
-        "meanS": 4421.223,
+        "meanS": 4417.606,
         "maxS": 7200
       },
       "STORAGE": {
         "count": 13,
         "departed": 1,
-        "meanS": 3280.564,
+        "meanS": 3279.4,
         "maxS": 6921.988
       }
     },
@@ -460,8 +460,8 @@
       "released": 9,
       "started": 9,
       "completed": 9,
-      "leadTimeMeanS": 310.574,
-      "leadTimeMaxS": 539.98,
+      "leadTimeMeanS": 316.136,
+      "leadTimeMaxS": 545.322,
       "boxesLoaded": 0
     },
     "ordering": {
@@ -478,7 +478,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 1900,
+    "checks": 1893,
     "violations": 0,
     "first": null
   },

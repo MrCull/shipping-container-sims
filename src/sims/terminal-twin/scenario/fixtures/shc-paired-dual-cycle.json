@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "shc-paired-dual-cycle",
   "description": "2 STS (one discharges, one loads) → 3 SHC → 2 pads: paired discharge/load dispatch",
-  "seed": 42,
+  "seed": 48,
   "startDateTime": "2026-01-05T06:00:00Z",
   "quay": {
     "lengthM": 500,

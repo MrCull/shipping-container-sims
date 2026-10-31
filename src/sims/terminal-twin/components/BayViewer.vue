@@ -274,6 +274,13 @@ onBeforeUnmount(() => {
                       class="pos"
                     >
                       <span
+                        v-if="c.absent"
+                        class="cell absent"
+                        data-testid="tt-bay-absent"
+                        aria-hidden="true"
+                      />
+                      <span
+                        v-else
                         class="cell"
                         :class="cellClass(c)"
                         data-testid="tt-bay-cell"
@@ -682,6 +689,11 @@ h2 {
 
 .cell.st-empty {
   border-color: var(--tt-border);
+}
+
+/* Outside the hull profile: no cell, so the hold reads as a V (the grid keeps the rows aligned). */
+.cell.absent {
+  visibility: hidden;
 }
 
 /* Fill: by state, or by the colour mode's palette (a property of the box). */
