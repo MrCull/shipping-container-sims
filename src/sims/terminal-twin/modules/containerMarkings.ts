@@ -10,7 +10,8 @@
  *
  * Plate values come from the ISO type. Tare is the same table the box properties use (`tareKgOf`), so a plate and
  * the box's stored tare never disagree. The 45G1 row is the one on the reference photo (Triton 45G1: 32,500 kg
- * max gross, 3,700 kg tare, 76.4 m3); the rest are typical [A] values.
+ * max gross, 3,700 kg tare, 76.4 m3); the rest are typical [A] values. A type with no row in `SPEC` has no plate
+ * (`plateFor` returns null and the door prints no weight lines): a plate never shows another type's numbers.
  */
 import atlas from '../assets/models/containers/livery-atlas.json'
 import { iso6346CheckDigit } from '../scenario/iso6346'
@@ -30,29 +31,38 @@ export interface WeightPlate {
   /** Payload: max gross minus tare. */
   netKg: number
   netLbs: number
-  cuCapM3: number
-  cuCapCuFt: number
+  /** Absent for a platform / flat rack: no enclosed volume. */
+  cuCapM3?: number
+  cuCapCuFt?: number
 }
 
-/** [A] Max gross (kg) and cubic capacity (m3) by ISO size-type code and body (G = general, R = reefer). */
-const SPEC: Record<string, { maxGrossKg: number; cuCapM3: number }> = {
+/**
+ * [A] Max gross (kg), cubic capacity (m3) and, where it is not the box-properties tare, tare (kg) by ISO size-type
+ * code. Type groups: G = general, R = reefer, U = open top, P = platform / flat rack, T = tank. G and R tare comes
+ * from `tareKgOf`; the other groups carry their own [A] tare.
+ */
+const SPEC: Record<string, { maxGrossKg: number; cuCapM3?: number; tareKg?: number }> = {
   '22G1': { maxGrossKg: 30480, cuCapM3: 33.2 },
   '42G1': { maxGrossKg: 30480, cuCapM3: 67.7 },
   '45G1': { maxGrossKg: 32500, cuCapM3: 76.4 },
   '22R1': { maxGrossKg: 30480, cuCapM3: 28.3 },
   '42R1': { maxGrossKg: 34000, cuCapM3: 59.3 },
   '45R1': { maxGrossKg: 34000, cuCapM3: 67.3 },
+  '22U1': { maxGrossKg: 30480, cuCapM3: 32.0, tareKg: 2400 },
+  '42U1': { maxGrossKg: 30480, cuCapM3: 65.0, tareKg: 4100 },
+  '22P1': { maxGrossKg: 30480, tareKg: 2700 },
+  '42P1': { maxGrossKg: 40000, tareKg: 5000 },
+  '22T1': { maxGrossKg: 36000, cuCapM3: 26.0, tareKg: 3700 },
 }
 
 const SIZE_OF_CODE: Record<string, ContainerSize> = { '22': '20', '42': '40', '45': '40HC' }
-const FALLBACK_ISO: Record<ContainerSize, string> = { '20': '22G1', '40': '42G1', '40HC': '45G1' }
 
-/** The plate of an ISO type; an unknown code uses the general-purpose box of its size prefix (else a 40 ft). */
-export function plateFor(isoType: string): WeightPlate {
-  const known = SPEC[isoType] ? isoType : (FALLBACK_ISO[SIZE_OF_CODE[isoType.slice(0, 2)] ?? '40'] ?? '42G1')
-  const spec = SPEC[known]
-  const size = SIZE_OF_CODE[known.slice(0, 2)]
-  const tareKg = tareKgOf(size, known[2] === 'R')
+/** The plate of an ISO type, or null when the type has no row in the table (no weight lines are printed then). */
+export function plateFor(isoType: string): WeightPlate | null {
+  const spec = SPEC[isoType]
+  const size = SIZE_OF_CODE[isoType.slice(0, 2)]
+  if (!spec || !size) return null
+  const tareKg = spec.tareKg ?? tareKgOf(size, isoType[2] === 'R')
   const netKg = spec.maxGrossKg - tareKg
   return {
     maxGrossKg: spec.maxGrossKg,
@@ -61,8 +71,7 @@ export function plateFor(isoType: string): WeightPlate {
     tareLbs: round10(tareKg * KG_TO_LBS),
     netKg,
     netLbs: round10(netKg * KG_TO_LBS),
-    cuCapM3: spec.cuCapM3,
-    cuCapCuFt: round10(spec.cuCapM3 * M3_TO_CUFT),
+    ...(spec.cuCapM3 !== undefined ? { cuCapM3: spec.cuCapM3, cuCapCuFt: round10(spec.cuCapM3 * M3_TO_CUFT) } : {}),
   }
 }
 
@@ -83,7 +92,8 @@ export interface DoorMarkings {
   serial: string
   checkDigit: number
   isoType: string
-  plate: WeightPlate
+  /** Null for an ISO type with no plate row: the door prints no weight lines. */
+  plate: WeightPlate | null
   superHeavy: boolean
   cscPlate: boolean
   /** A bolt seal on the right-hand door handle (as seen from behind the box): laden boxes only. */
@@ -177,8 +187,9 @@ export function describeMarkings(input: MarkingsInput): ContainerMarkings {
   const first10 = input.id.slice(0, 10)
   const ownerPrefix = first10.slice(0, 4)
   const serial = first10.slice(4, 10)
-  const checkDigit = iso6346CheckDigit(first10)
-  const isoType = input.isoType && SPEC[input.isoType] ? input.isoType : isoTypeOf(input.size, false)
+  // The id's own 11th character is the check digit the box carries; compute one only for an id without it.
+  const checkDigit = /^[0-9]$/.test(input.id[10] ?? '') ? Number(input.id[10]) : iso6346CheckDigit(first10)
+  const isoType = input.isoType ?? isoTypeOf(input.size, false)
   const number = `${ownerPrefix} ${serial} ${checkDigit}`
   const livery = atlas.liveries.find((l) => l.line === input.line) ?? atlas.liveries[atlas.genericIndex]
   return {

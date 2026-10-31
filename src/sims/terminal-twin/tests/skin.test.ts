@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { SURFACE } from '../modules/dashboardPalette'
+import { DATA_PALETTE, RAMP_PALETTE } from '../modules/colourBy'
 
 /**
  * Terminal Twin skin (#122): every component takes its colours and fonts from the `--tt-*` tokens in `skin.css`,
@@ -60,6 +61,15 @@ describe('skin tokens', () => {
 
   it('keeps the chart surface of the dashboard palette in step with the token', () => {
     expect(tokens().get('--tt-chart-surface')).toBe(SURFACE)
+  })
+
+  it('keeps the colour-by categorical and ramp palettes in step with the --tt-data-N and --tt-ramp-N tokens', () => {
+    const t = tokens()
+    expect(DATA_PALETTE.map((_, i) => t.get(`--tt-data-${i}`))).toEqual([...DATA_PALETTE])
+    expect(RAMP_PALETTE.map((_, i) => t.get(`--tt-ramp-${i}`))).toEqual([...RAMP_PALETTE])
+    // no extra numbered token without a palette entry
+    expect([...t.keys()].filter((k) => /^--tt-data-\d+$/.test(k))).toHaveLength(DATA_PALETTE.length)
+    expect([...t.keys()].filter((k) => /^--tt-ramp-\d+$/.test(k))).toHaveLength(RAMP_PALETTE.length)
   })
 
   it('is scoped to Terminal Twin (never the :root of the other sims)', () => {

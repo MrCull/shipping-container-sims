@@ -8,7 +8,8 @@
  * Every text token is checked against the panel on light and dark backdrops for WCAG AA (4.5:1) in the same test.
  */
 .terminal-twin,
-.tt-skin {
+.tt-skin,
+body:has(.terminal-twin) {
   /* Type */
   --tt-font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --tt-font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
@@ -112,6 +113,22 @@
 
   font-family: var(--tt-font);
   color: var(--tt-text);
+}
+
+/*
+ * The shared volume popover (src/components/AudioControls.vue) is teleported to <body>, outside `.terminal-twin`, so it
+ * is themed from the body while Terminal Twin is mounted. Other sims leave these unset and keep the global dark look.
+ */
+body:has(.terminal-twin) {
+  --audio-popover-bg: var(--tt-panel-strong);
+  --audio-popover-blur: var(--tt-blur);
+  --audio-popover-border: var(--tt-border);
+  --audio-popover-shadow: var(--tt-shadow);
+  --audio-popover-text: var(--tt-text);
+  --audio-popover-accent: var(--tt-accent);
+  --audio-popover-active-border: var(--tt-warn-border);
+  --audio-popover-active-bg: var(--tt-warn-bg);
+  --audio-popover-font: var(--tt-font);
 }
 
 /* Frosted panel: one class for every floating surface over the 3D view. */

@@ -195,17 +195,21 @@ onBeforeUnmount(close)
   align-items: center;
   gap: 0.6rem;
   padding: 0.6rem 0.75rem;
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
+  /* The popover sits in <body>: a sim themes it through the --audio-popover-* variables (Terminal Twin's skin.css). */
+  background: var(--audio-popover-bg, var(--color-bg-card));
+  -webkit-backdrop-filter: var(--audio-popover-blur, none);
+  backdrop-filter: var(--audio-popover-blur, none);
+  border: 1px solid var(--audio-popover-border, var(--color-border));
   border-radius: 6px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-  color: var(--color-text);
+  box-shadow: var(--audio-popover-shadow, 0 6px 20px rgba(0, 0, 0, 0.5));
+  color: var(--audio-popover-text, var(--color-text));
+  font-family: var(--audio-popover-font, inherit);
   font-size: 0.8rem;
 }
 
 .audio-slider {
   width: 8rem;
-  accent-color: var(--color-primary);
+  accent-color: var(--audio-popover-accent, var(--color-primary));
 }
 
 .audio-percent {
@@ -217,19 +221,19 @@ onBeforeUnmount(close)
 .audio-mute {
   padding: 0.25rem 0.55rem;
   background: transparent;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--audio-popover-border, var(--color-border));
   border-radius: 4px;
-  color: var(--color-text);
+  color: var(--audio-popover-text, var(--color-text));
   font-size: 0.75rem;
   cursor: pointer;
 }
 
 .audio-mute:hover {
-  border-color: var(--color-primary);
+  border-color: var(--audio-popover-accent, var(--color-primary));
 }
 
 .audio-mute.on {
-  border-color: var(--color-accent);
-  background: rgba(245, 158, 11, 0.12);
+  border-color: var(--audio-popover-active-border, var(--color-accent));
+  background: var(--audio-popover-active-bg, rgba(245, 158, 11, 0.12));
 }
 </style>

@@ -3,9 +3,16 @@
  * ISO-type plate, the laden-only seal, the heavy-only SUPER HEAVY triangle and per-box deterministic wear.
  */
 import { describe, expect, it } from 'vitest'
-import { describeMarkings, plateFor, type MarkingsInput } from '../modules/containerMarkings'
+import { describeMarkings, plateFor, type MarkingsInput, type WeightPlate } from '../modules/containerMarkings'
 import { isValidIso6346, iso6346CheckDigit, makeIso6346Id } from '../scenario/iso6346'
 import { isoTypeOf, tareKgOf } from '../scenario/containerProps'
+
+/** The plate of a type that has one. */
+const plateOf = (iso: string): WeightPlate => {
+  const p = plateFor(iso)
+  if (!p) throw new Error(`no plate for ${iso}`)
+  return p
+}
 
 const box = (over: Partial<MarkingsInput> = {}): MarkingsInput => ({
   id: 'CSQU3054383',
@@ -27,7 +34,14 @@ describe('door end identity', () => {
     expect(isValidIso6346(`${d.ownerPrefix}${d.serial}${d.checkDigit}`)).toBe(true)
   })
 
-  it('recomputes the check digit for generated ids', () => {
+  it("uses the id's own check digit when it has one, computing only when absent", () => {
+    // a deliberately wrong 11th character is printed as is; the engine's ids are valid, so they agree with the computation
+    expect(describeMarkings(box({ id: 'CSQU3054380' })).door.checkDigit).toBe(0)
+    expect(describeMarkings(box({ id: 'CSQU3054380' })).side.boxNumber).toBe('CSQU 305438 0')
+    expect(describeMarkings(box({ id: 'CSQU305438' })).door.checkDigit).toBe(3)
+  })
+
+  it('reads the check digit of generated ids', () => {
     for (const serial of [1, 77, 123456, 999999]) {
       const id = makeIso6346Id('HDMU', serial)
       const d = describeMarkings(box({ id })).door
@@ -39,15 +53,15 @@ describe('door end identity', () => {
 
 describe('weight plate', () => {
   it('matches the reference photo for a 45G1', () => {
-    const p = plateFor('45G1')
+    const p = plateOf('45G1')
     expect(p.maxGrossKg).toBe(32500)
     expect(p.maxGrossLbs).toBe(71650)
     expect(p.cuCapM3).toBe(76.4)
     expect(p.cuCapCuFt).toBe(2700)
   })
 
-  it.each(['22G1', '42G1', '45G1', '22R1', '42R1', '45R1'])('%s is consistent: net = max gross - tare, lbs follow kg', (iso) => {
-    const p = plateFor(iso)
+  it.each(['22G1', '42G1', '45G1', '22R1', '42R1', '45R1', '22U1', '42U1', '22P1', '42P1', '22T1'])('%s is consistent: net = max gross - tare, lbs follow kg', (iso) => {
+    const p = plateOf(iso)
     expect(p.netKg).toBe(p.maxGrossKg - p.tareKg)
     for (const [kg, lbs] of [
       [p.maxGrossKg, p.maxGrossLbs],
@@ -57,7 +71,7 @@ describe('weight plate', () => {
       expect(Math.abs(lbs - kg * 2.20462)).toBeLessThanOrEqual(5)
       expect(lbs % 10).toBe(0)
     }
-    expect(Math.abs(p.cuCapCuFt - p.cuCapM3 * 35.3147)).toBeLessThanOrEqual(5)
+    if (p.cuCapM3 !== undefined) expect(Math.abs((p.cuCapCuFt ?? 0) - p.cuCapM3 * 35.3147)).toBeLessThanOrEqual(5)
   })
 
   it('takes tare from the same table as the box properties', () => {
@@ -67,18 +81,31 @@ describe('weight plate', () => {
       ['45G1', '40HC', false],
     ] as const) {
       expect(isoTypeOf(size, reefer)).toBe(iso)
-      expect(plateFor(iso).tareKg).toBe(tareKgOf(size, reefer))
+      expect(plateOf(iso).tareKg).toBe(tareKgOf(size, reefer))
     }
   })
 
   it('differs by ISO type (a 20 ft holds less than a 40 ft HC)', () => {
-    expect(plateFor('22G1').cuCapM3).toBeLessThan(plateFor('45G1').cuCapM3)
-    expect(plateFor('22G1').tareKg).toBeLessThan(plateFor('45G1').tareKg)
+    expect(plateOf('22G1').cuCapM3).toBeLessThan(plateOf('45G1').cuCapM3 ?? 0)
+    expect(plateOf('22G1').tareKg).toBeLessThan(plateOf('45G1').tareKg)
   })
 
-  it('falls back to the size when the ISO type is unknown or absent', () => {
+  it('never shows the dry plate for another type group', () => {
+    const dry = plateOf('22G1')
+    for (const iso of ['22U1', '22P1', '22T1']) expect(plateOf(iso)).not.toEqual(dry)
+    expect(plateOf('22P1').cuCapM3).toBeUndefined() // a flat rack has no volume line
+  })
+
+  it("uses the size's general-purpose type when the ISO type is absent", () => {
     expect(describeMarkings(box({ isoType: undefined, size: '20' })).door.isoType).toBe('22G1')
-    expect(plateFor('ZZZZ').maxGrossKg).toBeGreaterThan(0)
+  })
+
+  it('has no plate for a type without a row, and still prints its code', () => {
+    expect(plateFor('ZZZZ')).toBeNull()
+    expect(plateFor('45T1')).toBeNull()
+    const d = describeMarkings(box({ isoType: '45U1' })).door
+    expect(d.isoType).toBe('45U1')
+    expect(d.plate).toBeNull()
   })
 })
 
