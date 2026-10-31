@@ -46,7 +46,7 @@ describe('scenery by terminal', () => {
     expect(sceneryFor(TTI_PRESET_NAME).kind).toBe('tti')
     expect(sceneryFor(SMALL_PRESET_NAME).kind).toBe('generic')
     expect(sceneryFor('tracer').parts).not.toContain('rock')
-    expect(backdropModelAssets(sceneryFor(TTI_PRESET_NAME))).toEqual(['backdrop-rock', 'backdrop-hills', 'backdrop-coast'])
+    expect(backdropModelAssets(sceneryFor(TTI_PRESET_NAME)).slice(0, 3)).toEqual(['backdrop-rock', 'backdrop-hills', 'backdrop-coast']) // the surroundings follow (surroundings.test.ts)
     expect(backdropModelAssets(sceneryFor(SMALL_PRESET_NAME))).toEqual([])
   })
 
