@@ -41,19 +41,15 @@ Merge order: #121 (finish or redo), #120, #125, then #122 once it reports. Then 
 - Worktrees for #117 and #121 (and #122, #125 while their agents live) are locked; remove them later with `scripts/remove-worktree.sh`.
 - `.merge-ticket.log` is the merge script's log; its last line is `EXIT <code>`.
 
-## Planned, NOT done: speed up per-merge testing
+## Test speed-up (done, unreleased until pushed)
 
-Agreed with the user ("yeah go for it"). Do it after the current merge finishes, then update this section to say done:
-
-- Make `scripts/merge-ticket.sh` run only the unit tests and smoke specs for the paths a merge touches. Run the full suite once at the end of the spec, or in the PR's CI.
-- Move the load-sensitive tests (`golden-update`, `invariants-incremental`) off the per-merge path or shrink them. Keep `@load` specs out of local merges.
-- Tell implementers to run only their own tests and lint.
-- Cap concurrency at two agents plus one merge.
-- Keep lint, typecheck, build, goldens, invariants and `scripts/check-tracked-files.mjs`.
+- `scripts/merge-ticket.sh` now runs only the smoke specs for the paths a merge changed (`scripts/smoke-specs-for.sh`, map in `scripts/smoke-map.txt`). `--smoke-all` runs the whole suite (about 40 minutes on a quiet 4-core machine). Check the map names the specs a new ticket adds.
+- `implementing.md`: implementers run lint, build, their own unit tests and the specs listed for their diff, not the whole suite; concurrency is two implementers plus one merge.
+- Still open: `golden-update` and `invariants-incremental` time out under load on the per-merge path (retro item 3), and the `hud` smoke spec costs about 6 minutes (item 5).
 
 ## Resume steps
 
 1. `git fetch`, read the `handover.md` diff, `pnpm install`.
-2. Check `.merge-ticket.log` for #121 (see the table), then merge #120, #125, #122 with `scripts/merge-ticket.sh --push <branch>` in the background.
+2. Merge #120, #125, #122 with `scripts/merge-ticket.sh --push <branch>` in the background.
 3. Start newly unblocked tickets; keep to three agents.
 4. When all tickets are in: `/code-review` the branch, fix findings in one implementer, mark PR #132 ready, remove worktrees, delete this file.

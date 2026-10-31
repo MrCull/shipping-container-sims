@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened, labeled]
     branches:
       - main
-  # Browser smoke tests are slow (software WebGL, ~15 min) and bill Actions minutes per run, so they do not run on every push:
+  # Browser smoke tests are slow (software WebGL; about 40 min on a 4-core machine, less in CI) and bill Actions minutes per run, so they do not run on every push:
   # start them from the Actions tab ("Run workflow"), or add the `smoke` label to a PR (they re-run on pushes while it is set).
   workflow_dispatch:
   # Label events must be listed here for the label gate below to see them.

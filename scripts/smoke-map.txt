@@ -1,0 +1,21 @@
+# Path pattern (extended regex on a changed file path) => smoke spec names (regex fragments, space separated).
+# scripts/smoke-specs-for.sh prints the specs a diff needs; merge-ticket.sh runs them instead of the whole suite.
+# Patterns match a file or folder name, never a substring of a path (the word "tests" contains "sts").
+# Add a line when a new area gets its own spec. A changed tests/browser/*.smoke.ts always runs itself.
+(^|/)(bay|Bay|rob|Rob|hullProfile)[A-Za-z-]*\.(ts|vue)$ => bay-viewer rob-bays
+(^|/)[A-Za-z-]*(shc|Shc)[A-Za-z-]*\.(ts|vue|py)$|models/shc/ => shc-model terminal-twin-shc
+(^|/)(sts|Sts)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/sts|models/sts/ => sts-asset
+(^|/)(asc|Asc)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/asc|models/asc/ => asc-model terminal-twin-asc terminal-twin-paired-asc
+(^|/)container(Markings|Textures|Closeups|Assets|Lod)[A-Za-z]*\.ts$|models/container/ => container-assets container-closeup
+(^|/)(truck|Truck)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/truck|models/truck/ => truck-model terminal-twin-landside terminal-twin-follow-truck
+(^|/)(vessel|Vessel)[A-Za-z-]*\.(ts|vue|py)$|models/vessel => vessel-hulls
+(^|/)(hatch|Hatch)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-hatch
+(^|/)(Kpi|kpi|Dashboard|dashboard|FinalReport)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-kpi terminal-twin-dashboard\.smoke
+components/debug/ => terminal-twin-debugger
+(^|/)(persistence|saves)/ => terminal-twin-saves
+(^|/)(atmosphere|backdrop)[A-Za-z-]*\.ts$|terminals/ => terminal-twin-atmosphere
+(^|/)(FpsChip|PerfPanel|AudioControls|positionalSound|soundMixer|audio)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-volume-fps
+components/setup/|(^|/)scenarioPicker|(^|/)scenario/ => terminal-twin-presets terminal-twin-yard-start terminal-twin-subsystem-modes
+skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => terminal-twin-hud terminal-twin-views
+(^|/)[A-Za-z-]*(camera|Camera)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-camera terminal-twin-keyboard-camera
+(^|/)(i18n|LocaleDate)[A-Za-z/-]*\.(ts|vue)$|/i18n/ => terminal-twin-display

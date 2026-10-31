@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Merge a finished ticket branch into the current integration branch and verify it.
-# Usage: scripts/merge-ticket.sh [--push] [--smoke] tt/<N>-<slug>
+# Usage: scripts/merge-ticket.sh [--push] [--smoke | --smoke-all] tt/<N>-<slug>
 # Output goes to the terminal and to .merge-ticket.log; the last line is "EXIT <code>", so a background run
 # is finished when `tail -1 .merge-ticket.log` shows it. --push pushes the integration branch after a verified merge.
-# Smoke specs (dev project, no @load) also run when the merge touches UI code (a .vue file, components/, composables/,
-# worker/, store/, i18n/ or tests/browser/), because a UI change breaks specs its own ticket never ran; --smoke forces them.
+# When the merge touches UI code (a .vue file, components/, composables/, worker/, store/, i18n/ or tests/browser/) it runs
+# only the smoke specs for the paths it changed (scripts/smoke-specs-for.sh, map in scripts/smoke-map.txt), not the whole suite
+# (about 40 minutes). --smoke forces that selection; --smoke-all runs every dev spec except @load.
 # Stops (without committing) on a conflict, conflict markers or a failed check; otherwise leaves a verified merge
 # commit locally. The orchestrator then updates handover.md and pushes.
 set -euo pipefail
@@ -17,8 +18,8 @@ if [ -z "${MERGE_TICKET_LOGGING:-}" ]; then
   exit "$code"
 fi
 push="" smoke=""
-while [ "${1:-}" = "--push" ] || [ "${1:-}" = "--smoke" ]; do
-  [ "$1" = "--push" ] && push=1 || smoke=1
+while [ "${1:-}" = "--push" ] || [ "${1:-}" = "--smoke" ] || [ "${1:-}" = "--smoke-all" ]; do
+  case "$1" in --push) push=1 ;; --smoke) smoke=${smoke:-sel} ;; --smoke-all) smoke=all ;; esac
   shift
 done
 branch="${1:?usage: scripts/merge-ticket.sh <ticket-branch>}"
@@ -37,11 +38,15 @@ fi
 scripts/check-engine-version.sh
 pnpm run verify
 if [ -z "$smoke" ] && git diff --name-only HEAD^1 HEAD | grep -qE '\.vue$|/(components|composables|worker|store|i18n)/|tests/browser/'; then
-  smoke=1
-  echo "Merge touches UI code: running the smoke specs."
+  smoke=sel
+  echo "Merge touches UI code: running the smoke specs for the changed paths."
 fi
-if [ -n "$smoke" ]; then
+if [ "$smoke" = "all" ]; then
   pnpm run test:smoke --project dev --grep-invert @load
+elif [ -n "$smoke" ]; then
+  mapfile -t specs < <(scripts/smoke-specs-for.sh HEAD^1 HEAD)
+  echo "Smoke specs: ${specs[*]}"
+  pnpm run test:smoke --project dev --grep-invert @load "${specs[@]}"
 fi
 echo "OK: $branch merged into $current and verified."
 if [ -n "$push" ]; then
