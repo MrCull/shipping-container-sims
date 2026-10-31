@@ -117,9 +117,12 @@ test('bay viewer: opens from a vessel click, steps between bays, shows ROB bays 
   await expect(page.getByTestId('tt-bay-packages')).toBeHidden()
 
   // colour modes: POD colours the cells by port, and the key lists the ports
-  await page.getByTestId('tt-bay-mode-pod').click()
+  // (the mode is the Colour by menu's, shared with the 3D view: #130)
+  await page.getByTestId('tt-colour-by').click()
+  await page.getByTestId('tt-colour-by-select').selectOption('pod')
   await expect(page.getByTestId('tt-bay-legend')).toContainText(/[A-Z]{5}/)
-  await page.getByTestId('tt-bay-mode-status').click()
+  await page.getByTestId('tt-colour-by-select').selectOption('default')
+  await page.getByTestId('tt-colour-by').click()
 
   // back to the bay with work: the cell goes planned -> in progress -> done as the run proceeds
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'StsPicked' }))

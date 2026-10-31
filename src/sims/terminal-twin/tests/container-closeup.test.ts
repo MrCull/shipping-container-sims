@@ -105,6 +105,47 @@ describe('close-up selection', () => {
   })
 })
 
+describe('colour by tint (#130)', () => {
+  const tinted = (inst: ContainerInstancer, n: number, camDist: number, tint: number) => {
+    inst.begin()
+    for (let i = 0; i < n; i++) inst.push(i, '40', i * 13, 1.3, 0, 0, 0, tint)
+    return inst.end(new THREE.Vector3(0, 1.3, camDist))
+  }
+
+  it('reports the tint drawn per box, at LOD1 and as a close-up, and -1 without one', () => {
+    const { inst } = setup(3)
+    tinted(inst, 3, 10, 0x4c9be8)
+    expect(inst.renderedContainer(0)).toMatchObject({ tint: 0x4c9be8, lod: 0 })
+    expect(inst.renderedContainer(2)).toMatchObject({ tint: 0x4c9be8 })
+    frame(inst, 3, 0, 10)
+    expect(inst.renderedContainer(0)?.tint).toBe(-1)
+  })
+
+  it('gives tinted boxes the generic livery tile and an instance colour, plain ones the white livery', () => {
+    const { inst } = setup(60)
+    tinted(inst, 60, 400, 0xe8a33c)
+    const lod1 = inst.group.getObjectByName('containers-40-lod1') as THREE.InstancedMesh
+    const livery = lod1.geometry.getAttribute('liveryIndex')
+    expect(lod1.count).toBe(60)
+    expect(livery.getX(0)).toBe(10) // genericIndex of the atlas
+    expect(lod1.instanceColor).not.toBeNull()
+    frame(inst, 60, 0, 400)
+    expect(livery.getX(0)).toBe(0)
+    const c = new THREE.Color()
+    lod1.getColorAt(0, c)
+    expect([c.r, c.g, c.b]).toEqual([1, 1, 1])
+  })
+
+  it('paints a close-up again when its tint changes, and not while it stays', () => {
+    const { inst, painted } = setup(1)
+    tinted(inst, 1, 10, 0x4c9be8)
+    tinted(inst, 1, 10, 0x4c9be8)
+    expect(painted).toEqual([0])
+    tinted(inst, 1, 10, 0xe8a33c)
+    expect(painted).toEqual([0, 0])
+  })
+})
+
 describe('close-up geometry', () => {
   it('adds corner castings and door rods to the box, with both UV sets', () => {
     const g = closeupGeometry('40HC')

@@ -21,3 +21,4 @@ skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => ter
 (^|/)[A-Za-z-]*(camera|Camera)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-camera terminal-twin-keyboard-camera
 (^|/)(i18n|LocaleDate)[A-Za-z/-]*\.(ts|vue)$|/i18n/ => terminal-twin-display
 (^|/)infrastructure[A-Za-z-]*\.(ts|py)$|models/infrastructure/ => infrastructure\.smoke terminal-twin-atmosphere
+(^|/)(colour|Colour)[A-Za-z-]*\.(ts|vue)$|(^|/)(containerInstancer|robBoxes|sceneRenderer)\.ts$ => colour-by bay-viewer container-closeup rob-bays
