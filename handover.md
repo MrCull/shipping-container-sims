@@ -45,7 +45,7 @@
 
 ## Reference photos
 
-Git-ignored, so they exist only in the container they were uploaded to. The aerial road layout photo for #146 and #147 (`docs/reference/tti-algeciras/aerial-tti-terminal-road-layout.webp`) is on the GitHub conversation only: ask the owner to re-upload it (and `tti1.zip` for the older set) before starting #146 or #147. Never commit photos.
+Committed in `docs/reference/tti-algeciras/` (owner decision). The aerial road layout photo for #146 and #147 is `aerial-tti-terminal-road-layout.webp`; the bay overview and map are there too. Older photos from `tti1.zip` are still missing: ask the owner to upload them if a ticket needs them.
 
 ## Gotchas from the last run
 

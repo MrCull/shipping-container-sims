@@ -46,7 +46,7 @@ It takes about 80 s for containers, mostly the Cycles previews. Two runs give by
 - **No Draco:** the bpy exporter's Draco option silently does nothing.
 - **No KTX2:** no encoder is available. Textures are WebP from the Blender exporter (`EXT_texture_webp`).
 - **Offline:** the meshopt decoder is `three/examples/jsm/libs/meshopt_decoder.module.js` (bundled), and GLB URLs are Vite asset URLs. No CDN is ever contacted (smoke-tested).
-- **Never commit** `.blend` files (git-ignored) or third-party reference photos. Record photo URLs and credits only.
+- **Never commit** `.blend` files (git-ignored). Reference photos live committed in `docs/reference/` (owner decision); do not copy them into asset directories.
 - `.gitignore` ignores `out` (a CRA leftover), `*.blend`, `__pycache__/` and `.venv-bpy/`: never name an asset directory `out`.
 - `tt:assets` is slow when several Blender jobs share the CPU; regenerate one group with `--only <group>`.
 - A new asset group must be added to `GROUPS` in both `cli/assets/build.ts` and `assets/generators/build.py`.

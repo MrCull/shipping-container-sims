@@ -2,7 +2,7 @@
 
 ## Overview
 
-Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers below. Reference packs the user uploaded (not committed): `docs/reference/` at the repo root.
+Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers below. Reference photos the user uploaded (committed): `docs/reference/` at the repo root.
 
 **Terminal Twin** is an event-driven digital twin of a large automated container terminal (reference: TTI Algeciras), built as a TOS test bench. Spec: GitHub issue #24. Vocabulary: [`GLOSSARY.md`](../../../GLOSSARY.md) at the repo root, use its terms in code, tests and docs.
 
