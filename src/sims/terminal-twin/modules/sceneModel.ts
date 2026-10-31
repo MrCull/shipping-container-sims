@@ -804,6 +804,17 @@ export class SceneModel {
     return i < 0 ? 'unknown' : list[i].status
   }
 
+  /** A vessel's status at `time` and when it entered mooring, berthed and departed (null before), from the status timeline (#126). */
+  vesselStatusTimes(id: string, time: number): { status: string; mooringS: number | null; berthedS: number | null; departedS: number | null } {
+    const list = this.status[`vessel:${id}`] ?? []
+    const upTo = lastAtOrBefore(list, time, (e) => e.t)
+    const seen = (status: string): number | null => {
+      for (let i = 0; i <= upTo; i++) if (list[i].status === status) return list[i].t
+      return null
+    }
+    return { status: upTo < 0 ? 'unknown' : list[upTo].status, mooringS: seen('mooring'), berthedS: seen('berthed'), departedS: seen('departed') }
+  }
+
   /** Where a vessel is at `time`: alongside at its berth, at anchorage offshore, or null (not arrived / departed). */
   vesselPlacement(id: string, time: number): VesselPlacement | null {
     const list = this.status[`vessel:${id}`] ?? []
