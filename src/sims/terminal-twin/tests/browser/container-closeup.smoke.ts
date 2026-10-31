@@ -16,6 +16,7 @@ test('boxes within about 35 m become close-ups, from far away none are', async (
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
   await page.evaluate(() => window.localStorage.clear())
+  await page.evaluate(() => window.__tt!.setQuality('high')) // Auto can step down to low under a slow software frame rate, where close-ups are off
   await page.evaluate(() => window.__tt!.load('liveries-mixed'))
   await page.evaluate(() => window.__tt!.runTo(200))
   await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')

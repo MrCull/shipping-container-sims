@@ -24,7 +24,7 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #129 sounds rest | #125 | merged, pushed. Not checked by ear; no perf reading |
 | #130 colour by + hide ROB | #122, #127 | merged, pushed (11 colour modes; bay viewer follows the shared mode; frame-time `@load` proof incomplete; `special` mode classifies by ISO type group [A]) |
 | #131 V holds | #117, #127 | merged, pushed (`ENGINE_VERSION` 0.26.0; 30 goldens regenerated: `rob-bays` moves 62 to 73, rehandles 11 to 29, violations 0; `shc-paired-dual-cycle` fixture seed 42 to 48 because its result was plan-dependent). Unmet: outer GLB hull skin unchanged (needs `bpy`); hold liner V has a unit test but no 3D screenshot |
-| #133 smoke suite + fixes | all others | all build tickets merged; running on an idle machine (agent in a worktree). Do not start other test runs meanwhile |
+| #133 smoke suite + fixes | all others | done: dev 135/136 and prod 4/4 on a quiet machine (50 min). `container-closeup` failed once and passed twice alone; cause was Auto quality stepping down to low (close-ups off), fixed by pinning `setQuality('high')` in the spec. The earlier suspects (debugger follow camera, KPI end condition, Run to… popup) all passed |
 
 Merge order: #124, #123, #129. Smoke no longer runs per merge (see #133). Then start the newly unblocked tickets (#123, #124, #129, then #126/#127 and onward), at most three agents at a time.
 
