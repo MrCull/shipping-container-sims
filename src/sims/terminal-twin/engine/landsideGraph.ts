@@ -21,8 +21,10 @@
  *
  * An inbound truck leaves its in lane onto the eastbound road, turns into the
  * spur of its stall (drives in cab first), and reverses out after the
- * interchange. It continues east to the end connector, returns on the westbound
- * road and leaves through an out lane. The out-of-gauge (OOG) lane between the
+ * interchange. It continues east to the end connector (at TTI the teardrop loop,
+ * driven at speed), returns on the westbound road and leaves through an out lane.
+ * With an access road (TTI, #146) trucks come from the south along z = access.z
+ * and turn right (-z) into the queue road at the gate. The out-of-gauge (OOG) lane between the
  * in and out lanes is drawn but never used.
  */
 import { shortestPath, type PathGraph } from './laneGraph'
@@ -160,6 +162,16 @@ const roadId = (dir: 'I' | 'O', x: number) => `ls:R${dir}@${r3(x)}`
 
 /** Z of queue slot `index` (0 = the head). */
 export const queueSlotZ = (g: LandsideGraph, index: number): number => r3(g.gate.queueHeadZ + index * QUEUE_PITCH_M)
+
+/**
+ * Where queue slot `index` stands. The queue lies along the terminal road at the gate's queue X; with an access road (#146)
+ * a queue longer than the terminal road backs up along the access road (south, +x) instead of running on past it.
+ */
+export function queueSlotAt(g: LandsideGraph, index: number): { x: number; z: number } {
+  const z = queueSlotZ(g, index)
+  if (!g.access || z <= g.access.z) return { x: g.gate.queueX, z }
+  return { x: r3(g.gate.queueX + (z - g.access.z)), z: g.access.z }
+}
 
 export function gateOf(config: ScenarioConfig): GateConfig {
   return { ...DEFAULT_GATE_LAYOUT, ...config.landside?.gate }

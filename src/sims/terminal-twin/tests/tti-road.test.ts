@@ -4,8 +4,9 @@
  * round a teardrop loop at the far end of the terminal road without stopping. Generic presets keep their landside graph.
  */
 import { describe, expect, it } from 'vitest'
-import { buildLandsideGraph, createSimulation, landsideGraphOf, type EngineEvent } from '../engine'
-import type { MotionSegment } from '../engine/kinematics'
+import { buildLandsideGraph, createSimulation, landsideGraphOf, queueSlotAt, type EngineEvent, type Simulation } from '../engine'
+
+type MotionSegment = Readonly<ReturnType<Simulation['query']['truck']>>['motion'][number]
 import { SceneModel } from '../modules/sceneModel'
 import { presets } from '../scenario/presets'
 import { fixtures } from '../scenario/fixtures'
@@ -45,6 +46,18 @@ describe('TTI landside graph', () => {
     // the loop is part of the road: the eastbound road reaches it and it reaches the westbound road
     expect(g.out[`ls:RI@${g.gate.eastX}`].some((e) => g.nodes[e.to].kind === 'loop')).toBe(true)
     expect(g.edges.some((e) => g.nodes[e.from].kind === 'loop' && e.to === `ls:RO@${g.gate.eastX}`)).toBe(true)
+  })
+})
+
+describe('TTI gate queue', () => {
+  const g = buildLandsideGraph(tti())
+  it('stands on the terminal road and backs up along the access road when it is longer', () => {
+    expect(queueSlotAt(g, 0)).toEqual({ x: g.gate.queueX, z: g.gate.queueHeadZ })
+    const far = queueSlotAt(g, 100)
+    expect(far.z).toBe(g.access!.z)
+    expect(far.x).toBeGreaterThan(g.gate.queueX)
+    // no slot lies beyond the access road's carriageway
+    for (let i = 0; i < 200; i++) expect(queueSlotAt(g, i).z).toBeLessThanOrEqual(g.access!.z)
   })
 })
 
