@@ -11,11 +11,11 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #118 volume + FPS | none | merged, pushed |
 | #119 close-up containers | none | merged, pushed |
 | #121 SHC model | none | merged and pushed (`155fc54`). Verified by lint, build, 1265 unit tests and the SHC smoke specs (`shc-model`, `terminal-twin-shc`: 8 of 8 pass; the LOD spec timed out once under load and passed alone in 38 s). The generic smoke run was stopped at 67 passed, 0 failed, by decision. The steering spec's window was widened 6 s to 14 s and not compared with the base |
-| #120 folder + Rock | none | built, awaiting merge: `tt/120-terminal-folder-rock` (c05ed2d) |
-| #125 gantry alarm | #118 | built, awaiting merge: `tt/125-gantry-alarm` (5c85877) |
-| #122 skin + landing | #118 | implementer was still running, had not reported: `tt/122-professional-skin` has commits, tip `e83cda6` (worktree `agent-a355271414bb882d0`, locked). Its verify result is unknown |
-| #123 surroundings | #120 | not started |
-| #124 STS model | #121 | not started |
+| #120 folder + Rock | none | merged, pushed (conflict in `scene-quality-atmosphere.md` resolved by keeping both sides). Follow-up: Rock not visible from the Quay and Overview cameras |
+| #125 gantry alarm | #118 | merged, pushed. Smoke: `terminal-twin.smoke` "Run to… popup" fails under load (also on the commit before #125), passes when quiet |
+| #122 skin + landing | #118 | built, awaiting merge: `tt/122-professional-skin` (e0aeab0) |
+| #123 surroundings | #120 | implementer running (`tt/123-algeciras-surroundings`) |
+| #124 STS model | #121 | implementer running (`tt/124-sts-crane-model`, last seen 51c0225; verifying) |
 | #126 vessel countdown | #122 | not started |
 | #127 paired bays | #122 | not started |
 | #128 ASC + truck | #124 | not started |
