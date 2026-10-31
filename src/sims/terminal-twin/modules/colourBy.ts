@@ -11,15 +11,15 @@
  * keeps them in step).
  *
  * Modes: `default` (the line's livery, textured in 3D), `line`, `pod`, `weight`, `iso`, `special`, `flow`, `dwell`,
- * `departure`, `transit`, `call`. `dwell`, `departure` and `transit` depend on the sim time (`isTimeBased`).
+ * `departure`, `transit`, `call`, `length`. `dwell`, `departure` and `transit` depend on the sim time (`isTimeBased`).
  */
 import atlas from '../assets/models/containers/livery-atlas.json'
 import { terminalArrivalS, terminalExitS, transitStatus, type ContainerState, type TransitStatus, type TransitWorld } from '../engine'
 import { resolveContainerProps, type WeightClass } from '../scenario/containerProps'
 import type { ScenarioConfig } from '../scenario/types'
 
-export type ColourBy = 'default' | 'line' | 'pod' | 'weight' | 'iso' | 'special' | 'flow' | 'dwell' | 'departure' | 'transit' | 'call'
-export const COLOUR_BY_MODES: readonly ColourBy[] = ['default', 'line', 'pod', 'weight', 'iso', 'special', 'flow', 'dwell', 'departure', 'transit', 'call']
+export type ColourBy = 'default' | 'line' | 'pod' | 'weight' | 'iso' | 'special' | 'flow' | 'dwell' | 'departure' | 'transit' | 'call' | 'length'
+export const COLOUR_BY_MODES: readonly ColourBy[] = ['default', 'line', 'pod', 'weight', 'iso', 'length', 'special', 'flow', 'dwell', 'departure', 'transit', 'call']
 export const DEFAULT_COLOUR_BY: ColourBy = 'default'
 
 /** A stored mode (localStorage), or the default for anything else. */
@@ -34,6 +34,10 @@ export const isTimeBased = (mode: ColourBy): boolean => mode === 'dwell' || mode
 export const DATA_PALETTE = ['#4c9be8', '#e8a33c', '#5cc08a', '#d9627a', '#9a7be0', '#3fb8c4', '#c9c04a', '#e07c4c'] as const
 /** `--tt-ramp-0` .. `--tt-ramp-4`: light to dark, for ordered classes. */
 export const RAMP_PALETTE = ['#9ed0f0', '#5aa9e0', '#2f7fc8', '#1f5aa0', '#163c70'] as const
+/** `--tt-dwell-0` .. `--tt-dwell-3` (#140): light traffic-light ramp for dwell, green (under 1 day) to red (over 7 days). */
+export const DWELL_PALETTE = ['#8fdca4', '#cfe77a', '#f6c65f', '#f28b82'] as const
+/** `--tt-length-0` .. `--tt-length-2` (#140): light colours for 20 ft, 40 ft and 45 (40 ft high cube) boxes. */
+export const LENGTH_PALETTE = ['#8ec9f2', '#c5aef0', '#f2aacb'] as const
 /** `--tt-data-done`: no value. */
 const UNKNOWN_HEX = '#8a97ab'
 /** `--tt-data-rob`: a remain-on-board box where the mode has nothing to say about it. */
@@ -122,14 +126,21 @@ function specialOf(iso: string | undefined): 'reefer' | 'hazardous' | 'oog' | 's
 
 const FLOW_KEYS = ['import', 'export', 'transshipment', 'empty'] as const
 const WEIGHT_KEYS = ['LIGHT', 'MEDIUM', 'HEAVY'] as const
-const DWELL_KEYS = ['none', 'lt1h', 'lt6h', 'lt24h', 'lt3d', 'gt3d'] as const
+const DWELL_KEYS = ['none', 'lt1d', 'lt3d', 'lt7d', 'gt7d'] as const
+const LENGTH_KEYS = ['20', '40', '45'] as const
 const DEPARTURE_KEYS = ['overdue', 'lt6h', 'lt24h', 'lt3d', 'later'] as const
 const TRANSIT_KEYS: readonly TransitStatus[] = ['ADVISED', 'ARRIVED', 'ON_TERMINAL', 'LOADED', 'DEPARTED']
 
 function dwellKey(s: ColourSubject, t: number): string {
   if (s.arrivedS === undefined || s.arrivedS === null) return 'none'
   const d = Math.max(0, (s.leftS ?? t) - s.arrivedS)
-  return d < H ? 'lt1h' : d < 6 * H ? 'lt6h' : d < D ? 'lt24h' : d < 3 * D ? 'lt3d' : 'gt3d'
+  return d < D ? 'lt1d' : d < 3 * D ? 'lt3d' : d < 7 * D ? 'lt7d' : 'gt7d'
+}
+
+/** [A] Length class from the ISO size code (first two characters): 22 = 20 ft, 42 = 40 ft, 45 = 40 ft high cube (the twin's "45"). */
+function lengthKey(iso: string | undefined): string {
+  const code = iso?.slice(0, 2)
+  return code === '22' ? '20' : code === '42' ? '40' : code === '45' ? '45' : 'unknown'
 }
 
 function departureKey(s: ColourSubject, t: number): string {
@@ -169,7 +180,12 @@ const MODES: Record<ColourBy, ModeDef> = {
   dwell: {
     keys: () => [...DWELL_KEYS, 'rob'],
     keyOf: (s, t) => (s.rob ? 'rob' : dwellKey(s, t)),
-    hexOf: (key) => (key === 'rob' ? ROB_HEX : key === 'none' ? UNKNOWN_HEX : RAMP_PALETTE[DWELL_KEYS.indexOf(key as (typeof DWELL_KEYS)[number]) - 1]),
+    hexOf: (key) => (key === 'rob' ? ROB_HEX : key === 'none' ? UNKNOWN_HEX : DWELL_PALETTE[DWELL_KEYS.indexOf(key as (typeof DWELL_KEYS)[number]) - 1]),
+  },
+  length: {
+    keys: () => [...LENGTH_KEYS, 'unknown'],
+    keyOf: (s) => lengthKey(s.isoType),
+    hexOf: (key) => (key === 'unknown' ? UNKNOWN_HEX : LENGTH_PALETTE[LENGTH_KEYS.indexOf(key as (typeof LENGTH_KEYS)[number])]),
   },
   departure: {
     keys: () => [...DEPARTURE_KEYS, 'unknown', 'rob'],

@@ -103,6 +103,35 @@ test('colour by: the menu recolours the 3D boxes and the bay viewer, with a lege
   expect(errors).toEqual([])
 })
 
+test('colour by: Length and the light Dwell ramp recolour 3D and the bay viewer (#140)', async ({ page }) => {
+  test.slow()
+  const errors = collectErrors(page)
+  await open(page)
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'VesselBerthed' }))
+  await page.evaluate(() => window.__tt!.select('V001'))
+  await page.getByTestId('tt-open-bay-viewer').click()
+  await expect(page.getByTestId('tt-bay-viewer')).toBeVisible()
+  const cells = page.locator('[data-testid=tt-bay-cell]:not([data-continuation])[data-key]:not([data-key=""])')
+  const fills = () => cells.evaluateAll((els) => [...new Set(els.map((e) => getComputedStyle(e).backgroundColor))].sort())
+
+  await setMode(page, 'length')
+  await expect(page.getByTestId('tt-colour-by-legend')).toContainText('20 ft')
+  await expect(page.getByTestId('tt-colour-by-legend')).toContainText('40 ft')
+  await expect(page.getByTestId('tt-colour-by-legend')).toContainText('45')
+  await expect.poll(async () => new Set(Object.values(await tints(page)).filter((v) => v >= 0)).size).toBeGreaterThan(1)
+  await expect(page.getByTestId('tt-bay-colour-mode')).toContainText('Length')
+  const lengthTints = await tints(page)
+  const lengthFills = await fills()
+  expect(lengthFills.length).toBeGreaterThan(0)
+
+  await setMode(page, 'dwell')
+  await expect(page.getByTestId('tt-colour-by-legend')).toContainText('Over 7 days')
+  await expect.poll(async () => JSON.stringify(await tints(page))).not.toBe(JSON.stringify(lengthTints))
+  await expect(page.getByTestId('tt-bay-colour-mode')).toContainText('Dwell')
+  await expect.poll(async () => JSON.stringify(await fills())).not.toBe(JSON.stringify(lengthFills))
+  expect(errors).toEqual([])
+})
+
 test('colour by: time-based modes follow the sim clock', async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)

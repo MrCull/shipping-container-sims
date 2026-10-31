@@ -12,6 +12,8 @@ import type { ScenarioConfig } from '../scenario/types'
 import {
   COLOUR_BY_MODES,
   DATA_PALETTE,
+  DWELL_PALETTE,
+  LENGTH_PALETTE,
   RAMP_PALETTE,
   colourContextOf,
   colourOf,
@@ -146,8 +148,29 @@ describe('time-based modes move with the sim time', () => {
 
   it('dwell: grows from the first terminal custody, in classes', () => {
     expect(at('dwell', 100)).toBe('none')
-    const seen = new Set([3600, 3600 + 1800, 3600 + 4 * 3600, 3600 + 12 * 3600, 3600 + 2 * 86400, 3600 + 5 * 86400].map((t) => at('dwell', t)))
-    expect(seen.size).toBeGreaterThanOrEqual(5)
+    const seen = new Set([3600, 3600 + 12 * 3600, 3600 + 2 * 86400, 3600 + 5 * 86400, 3600 + 9 * 86400].map((t) => at('dwell', t)))
+    expect(seen.size).toBe(4)
+  })
+
+  it('dwell bands switch at 1, 3 and 7 days (#140)', () => {
+    const D = 86400
+    const key = (d: number) => colourOf('dwell', { line: 'MSC', full: true, arrivedS: 0, leftS: d }, 0, ctx).key
+    expect([key(D - 1), key(D), key(3 * D - 1), key(3 * D), key(7 * D - 1), key(7 * D)]).toEqual(['lt1d', 'lt3d', 'lt3d', 'lt7d', 'lt7d', 'gt7d'])
+    expect(legendOf('dwell', ctx).map((e) => e.key)).toEqual(['none', 'lt1d', 'lt3d', 'lt7d', 'gt7d', 'rob'])
+  })
+
+  it('dwell colours are the light ramp, unknown and ROB stay distinct (#140)', () => {
+    const hexes = legendOf('dwell', ctx).map((e) => e.hex)
+    expect(new Set(hexes).size).toBe(hexes.length)
+    expect(hexes.slice(1, 5)).toEqual([...DWELL_PALETTE])
+  })
+
+  it('length: 20, 40 and 45 in three distinct colours, anything else unknown (#140)', () => {
+    const key = (isoType?: string) => colourOf('length', { line: 'MSC', full: true, ...(isoType ? { isoType } : {}) }, 0, ctx).key
+    expect(['22G1', '22R1', '42G1', '42R1', '45G1', '45R1'].map(key)).toEqual(['20', '20', '40', '40', '45', '45'])
+    expect(key()).toBe('unknown')
+    expect(key('L5G1')).toBe('unknown')
+    expect(legendOf('length', ctx).map((e) => e.hex).slice(0, 3)).toEqual([...LENGTH_PALETTE])
   })
 
   it('planned departure: counts down to the planned time and turns overdue after it', () => {
