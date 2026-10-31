@@ -8,6 +8,8 @@ import type { EntityExtras, EntityView } from '../entityInspector'
 import type { EntityBounds } from '../picking'
 import type { SceneModel } from '../sceneModel'
 import type { SceneStats } from '../sceneRenderer'
+import type { GantryBeacons } from '../gantryBeacons'
+import type { SoundSource } from '../soundMixer'
 
 /** What a kind's renderer gets from the scene renderer when it is built. */
 export interface KindRendererHost {
@@ -17,6 +19,8 @@ export interface KindRendererHost {
   track<T extends { dispose(): void }>(thing: T): T
   /** True once the scene has been disposed (async asset loads must not touch it then). */
   isDisposed(): boolean
+  /** Amber gantry beacons (#125): a kind that gantries registers its lamps here and updates them each frame. */
+  readonly beacons: GantryBeacons
 }
 
 /** Per-frame inputs, computed once by the scene renderer. */
@@ -29,6 +33,12 @@ export interface KindFrame {
   carried: ReadonlyMap<string, number>
   /** Boxes held per custody owner (`<ownerKind>:<ownerId>`), filled only when a renderer sets `wantsContainerOwners`. */
   loads: ReadonlyMap<string, { count: number; size: string }>
+  /** True while the sim clock runs (a paused crane is not gantrying, whatever its last segment says). */
+  live: boolean
+  /** The beacons' flash phase this frame (wall clock). */
+  flashOn: boolean
+  /** Output: a kind that makes positional sound pushes its sources (position and motion state) here. */
+  sounds: SoundSource[]
 }
 
 /** One kind's part of the 3D scene. Nothing here is reactive. */

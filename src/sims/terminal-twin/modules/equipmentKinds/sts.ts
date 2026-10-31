@@ -24,7 +24,12 @@ class StsRenderer implements KindRenderer {
 
   constructor(private host: KindRendererHost) {
     const { config } = host.model
-    for (const s of config.sts) this.addSts(s.id)
+    for (const s of config.sts) {
+      this.addSts(s.id)
+      // Amber beacons at the four leg bases, on the rails.
+      const hx = STS.legSpacingX / 2
+      host.beacons.add(s.id, [-hx, hx].flatMap((x) => [STS.waterRailZ, STS_LAND_RAIL_Z].map((z) => ({ x, y: 7, z }))))
+    }
     loadStsTemplate().then(
       (template) => {
         if (host.isDisposed()) return
@@ -83,6 +88,12 @@ class StsRenderer implements KindRenderer {
   update(frame: KindFrame): void {
     const { model } = this.host
     const { t, cameraPosition } = frame
+    for (const { id } of model.config.sts) {
+      const gantrying = frame.live && model.isGantrying(id, t)
+      const x = model.stsPose(id, t).gantryX
+      this.host.beacons.update(id, { x, y: 0, z: 0 }, gantrying, frame.flashOn)
+      frame.sounds.push({ id, machine: 'sts', x, y: 12, z: STS.waterRailZ + STS.gauge / 2, motion: gantrying ? 'gantrying' : 'idle' })
+    }
     for (const [id, m] of this.stsModels) {
       const pose = model.stsPose(id, t)
       const l = frame.loads.get(`sts:${id}`)
@@ -156,7 +167,7 @@ export const stsKind: EquipmentKindDef<'sts'> = {
     const height = STS.apexY + 1.3
     return { x: p.gantryX, y: height / 2, z: STS.waterRailZ + STS.gauge / 2, sx: STS.legSpacingX + 4, sy: height, sz: STS.gauge + 6, yaw: 0 }
   },
-  sceneState: (model, id, t) => ({ status: model.statusAt('sts', id, t), ...model.stsPose(id, t) }),
+  sceneState: (model, id, t) => ({ status: model.statusAt('sts', id, t), ...model.stsPose(id, t), gantrying: model.isGantrying(id, t) }),
   describe: (state) => stsView(state as StsState),
   createRenderer: (host) => new StsRenderer(host),
 }

@@ -53,6 +53,9 @@ jobs:
       - name: Asset budgets (Terminal Twin GLBs + sidecars; no Blender needed)
         run: pnpm run tt:assets:check
 
+      - name: Sounds (regenerate and compare the synthesized Terminal Twin sounds)
+        run: pnpm run tt:sounds:check
+
   smoke:
     # Required before merging a change that touches the browser UI: run it by hand or label the PR `smoke`.
     if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'smoke')
