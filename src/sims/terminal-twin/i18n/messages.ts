@@ -629,6 +629,8 @@ const en = {
   'bayViewer.stripState.idle': 'not started',
   'bayViewer.stripState.active': 'in progress',
   'bayViewer.stripState.complete': 'complete',
+  'bayViewer.panelBay': 'Bay {bay}',
+  'bayViewer.continuation': '40′ ▸',
   'bayViewer.deck': 'Deck',
   'bayViewer.hold': 'Hold',
   'bayViewer.rowsAxis': 'Rows, port to starboard',
