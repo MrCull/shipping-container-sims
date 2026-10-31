@@ -22,9 +22,9 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #127 paired bays | #122 | merged, pushed |
 | #128 ASC + truck | #124 | merged, pushed. Truck wing guards barely show (same dark colour as chassis); no in-app truck screenshot. STS and ASC beacons now read the sidecar `beaconMounts` |
 | #129 sounds rest | #125 | merged, pushed. Not checked by ear; no perf reading |
-| #130 colour by + hide ROB | #122, #127 | implementer running (`tt/130-colour-by-hide-rob`) |
+| #130 colour by + hide ROB | #122, #127 | merged, pushed (11 colour modes; bay viewer follows the shared mode; frame-time `@load` proof incomplete; `special` mode classifies by ISO type group [A]) |
 | #131 V holds | #117, #127 | merged, pushed (`ENGINE_VERSION` 0.26.0; 30 goldens regenerated: `rob-bays` moves 62 to 73, rehandles 11 to 29, violations 0; `shc-paired-dual-cycle` fixture seed 42 to 48 because its result was plan-dependent). Unmet: outer GLB hull skin unchanged (needs `bpy`); hold liner V has a unit test but no 3D screenshot |
-| #133 smoke suite + fixes | all others | not started; start only when everything else is merged and the machine is idle. Suspects: `terminal-twin-debugger` follow-camera SHC spec, `terminal-twin-kpi` "end condition ends the run" (`toBeEnabled`), `terminal-twin.smoke` Run to… popup (see the issue) |
+| #133 smoke suite + fixes | all others | all build tickets merged; running on an idle machine (agent in a worktree). Do not start other test runs meanwhile |
 
 Merge order: #124, #123, #129. Smoke no longer runs per merge (see #133). Then start the newly unblocked tickets (#123, #124, #129, then #126/#127 and onward), at most three agents at a time.
 
