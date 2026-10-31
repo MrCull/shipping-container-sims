@@ -11,7 +11,13 @@ import GithubRepoLink from '@/components/GithubRepoLink.vue'
 import AudioControls from '@/components/AudioControls.vue'
 import { futureGameTeasers } from '@/data/future-game-teasers'
 import { trackEvent } from '@/utils/analytics'
+import { formatBuildStamp } from '@/utils/buildStamp'
 
+const buildStamp = formatBuildStamp({
+  buildTime: __BUILD_TIME__,
+  commit: __BUILD_COMMIT__,
+  isDev: import.meta.env.DEV,
+})
 const store = useSimsStore()
 const { registerAll } = useSimRegistry()
 const cookieNoticeVisible = ref(false)
@@ -137,6 +143,21 @@ function dismissCookieNotice(): void {
         </p>
         <p class="footer-sub">
           INSERT COIN TO CONTINUE...
+        </p>
+        <p
+          class="build-stamp"
+          data-testid="build-stamp"
+        >
+          {{ buildStamp.text }}
+          <template v-if="buildStamp.commitUrl">
+            &middot;
+            <a
+              :href="buildStamp.commitUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="build-stamp-commit"
+            >{{ buildStamp.commit }}</a>
+          </template>
         </p>
       </footer>
     </main>
@@ -352,6 +373,18 @@ function dismissCookieNotice(): void {
 .footer-github {
   margin: 0;
   line-height: 1.6;
+}
+
+.build-stamp {
+  margin: 0.25rem 0 0;
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  opacity: 0.8;
+}
+
+.build-stamp a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 .footer-sub {
