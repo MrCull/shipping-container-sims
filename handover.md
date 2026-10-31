@@ -14,12 +14,12 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #120 folder + Rock | none | merged, pushed (conflict in `scene-quality-atmosphere.md` resolved by keeping both sides). Follow-up: Rock not visible from the Quay and Overview cameras |
 | #125 gantry alarm | #118 | merged, pushed. Smoke: `terminal-twin.smoke` "Run to… popup" fails under load (also on the commit before #125), passes when quiet |
 | #122 skin + landing | #118 | built, awaiting merge: `tt/122-professional-skin` (e0aeab0) |
-| #123 surroundings | #120 | implementer running (`tt/123-algeciras-surroundings`) |
-| #124 STS model | #121 | implementer running (`tt/124-sts-crane-model`, last seen 51c0225; verifying) |
+| #123 surroundings | #120 | built, awaiting merge: `tt/123-algeciras-surroundings` (e8383be). Open question: North Quay is at +x but +x is south in the scenery axes and the photo shows the quay at the north end |
+| #124 STS model | #121 | built, awaiting merge: `tt/124-sts-crane-model` (1b86326). Follow-up: move #125's STS beacon offsets onto the model's `beaconMounts` |
 | #126 vessel countdown | #122 | not started |
 | #127 paired bays | #122 | not started |
 | #128 ASC + truck | #124 | not started |
-| #129 sounds rest | #125 | not started |
+| #129 sounds rest | #125 | implementer running (`tt/129-positional-sounds`) |
 | #130 colour by + hide ROB | #122, #127 | not started |
 | #131 V holds | #117, #127 | not started |
 
