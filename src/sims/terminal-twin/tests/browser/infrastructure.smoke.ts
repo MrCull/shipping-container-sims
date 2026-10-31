@@ -55,3 +55,23 @@ test('the backdrop meshes replace the procedural backdrop for the TTI preset onl
   await page.waitForFunction(() => window.__tt!.atmosphere().scene?.backdrop.models === 'glb', undefined, { timeout: 90_000 })
   expect(errors).toEqual([])
 })
+
+test('the TTI surroundings draw as five scenery meshes inside the stated budget; a generic preset has none', async ({ page }) => {
+  const { errors } = watch(page)
+  await open(page, 'truck-gate-queue')
+  const generic = await page.evaluate(() => window.__tt!.atmosphere().scene?.backdrop)
+  for (const part of ['shore', 'anchorage', 'tanks', 'landside', 'town']) expect(generic?.parts).not.toContain(part)
+  await page.evaluate(() => window.__tt!.load('TTI Algeciras baseline'))
+  await page.waitForFunction(() => window.__tt!.atmosphere().scene?.backdrop.models === 'glb', undefined, { timeout: 90_000 })
+  const tti = await page.evaluate(() => window.__tt!.atmosphere().scene?.backdrop)
+  expect(tti?.parts).toEqual(expect.arrayContaining(['shore', 'anchorage', 'tanks', 'landside', 'town']))
+  // the GLB geometry is in: a scenery part is many triangles, not the few boxes of its stand-in
+  const tris = await page.evaluate(() => {
+    const breakdown = window.__tt!.drawBreakdown() ?? {}
+    return Object.entries(breakdown)
+      .filter(([k]) => k.startsWith('backdrop-tti/'))
+      .reduce((s, [, v]) => s + v.triangles, 0)
+  })
+  expect(tris).toBeGreaterThan(0)
+  expect(errors).toEqual([])
+})

@@ -1,0 +1,69 @@
+{
+  "asset": "scenery-anchorage",
+  "kind": "scenery",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 6900,
+    "widthM": 3000,
+    "heightM": 45,
+    "tag": "A",
+    "reason": "positions are illustrative: the anchorage is a handful of ships scattered over the bay"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "scenery-anchorage",
+      "role": "lod",
+      "description": "nine vessels at anchor in the bay (origin at sea level, in the middle of the anchorage)"
+    },
+    {
+      "name": "anchorage",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "tankers, bulk carriers, two container ships and a ferry on the roads"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 647,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "vessels at anchor scattered across the bay, none in the berth approach",
+      "tag": "V",
+      "source": "reference aerial of the bay"
+    },
+    {
+      "fact": "ship lengths 140-330 m, beams 24-58 m, headings near-parallel",
+      "tag": "A",
+      "reason": "typical bay traffic"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "scenery": {
+    "terminal": "tti-algeciras",
+    "ships": 9
+  }
+}

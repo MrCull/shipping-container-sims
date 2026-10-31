@@ -1,0 +1,69 @@
+{
+  "asset": "scenery-shore",
+  "kind": "scenery",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 9400,
+    "widthM": 2100,
+    "heightM": 34,
+    "tag": "A",
+    "reason": "silhouette of the Gibraltar and La Linea shore, not a survey"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "scenery-shore",
+      "role": "lod",
+      "description": "low shoreline of Gibraltar and La Linea below the Rock (origin = the Rock's centre at sea level; -x north, +z west toward Algeciras)"
+    },
+    {
+      "name": "shore",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "faceted shoreline strip with small town blocks, the airfield runway and two moles"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 1686,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "Gibraltar town on the Rock's west foot, the isthmus and airfield to its north, La Linea beyond",
+      "tag": "V",
+      "source": "reference aerial and map (what lies where)"
+    },
+    {
+      "fact": "block sizes, heights and street pattern are seeded noise",
+      "tag": "A",
+      "reason": "silhouette only"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "scenery": {
+    "terminal": "tti-algeciras",
+    "distanceM": 9200
+  }
+}

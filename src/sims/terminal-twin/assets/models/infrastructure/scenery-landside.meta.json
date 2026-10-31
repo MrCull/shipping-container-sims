@@ -1,0 +1,68 @@
+{
+  "asset": "scenery-landside",
+  "kind": "scenery",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only infrastructure",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 6000,
+    "widthM": 190,
+    "heightM": 20,
+    "tag": "A",
+    "reason": "a road and a two-track rail line beside the terminal, as in the reference aerial"
+  },
+  "axes": {
+    "up": "+Y",
+    "origin": "ground contact at the module centre (see the node list)",
+    "handedness": "right-handed, glTF",
+    "travel": "+Z (gate modules face the direction a truck drives)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "scenery-landside",
+      "role": "lod",
+      "description": "Isla Verde road and rail along the landside with a freight train and warehouses (origin at ground level on the road line, x = the terminal's middle)"
+    },
+    {
+      "name": "landside",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "embankment with road, rail, a freight train and warehouses"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "LOD0"
+    ]
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 738,
+      "material": "infra_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "the Isla Verde road and rail run along the terminal's landside, parallel to the quay",
+      "tag": "V",
+      "source": "reference aerial of the terminal"
+    },
+    {
+      "fact": "road 30 m with verge, two tracks at standard gauge, warehouse sizes seeded",
+      "tag": "A",
+      "reason": "silhouette only"
+    },
+    {
+      "fact": "one shared swatch atlas; faceted flat shading; no LODs (repeated items are instanced by the renderer)",
+      "tag": "M",
+      "reason": "budget (TT-28)"
+    }
+  ],
+  "scenery": {
+    "terminal": "tti-algeciras"
+  }
+}

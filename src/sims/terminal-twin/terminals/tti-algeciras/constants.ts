@@ -61,3 +61,27 @@ export const ROCK = {
     [300, 330], [800, 255], [1200, 185], [1500, 110], [1800, 62], [2300, 48], [2480, 38], [2600, 0],
   ] as [number, number][],
 }
+
+/**
+ * The surroundings beyond the Rock and the hills (spec #116, ticket #123): one merged GLB per piece, one draw call each.
+ * `assets` and the budget repeat `groups['tti-surroundings']` in `assets/budgets.json` (checked by
+ * `pnpm run tt:assets:check` and `tests/surroundings.test.ts`): change both together. The generator
+ * (`assets/generators/tt_assets/infrastructure.py`, `build_scenery_*`) builds each asset around the origin placed here.
+ * Scene axes: +x south along the quay, +z landward, water towards -z. Positions are relative to the quay's middle (x),
+ * the quay line (z) and y = 0 at the terminal apron; the shore and anchorage stand in the water (y = -2.5).
+ */
+export const SURROUNDINGS = {
+  assets: ['scenery-shore', 'scenery-anchorage', 'scenery-tanks', 'scenery-landside', 'scenery-town'] as const,
+  maxTriangles: 8000,
+  maxDrawCalls: 5,
+  /** [V] Gibraltar and La Linea share the Rock's bearing and distance; the shore asset is centred on the Rock. */
+  shore: { x: ROCK.offsetSouthM, y: -2.5, z: -ROCK.distanceM },
+  /** [A] the anchorage: a handful of ships in the bay, clear of the berth approach (1.5 km out and more). */
+  anchorage: { x: 0, y: -2.5, z: -4200 },
+  /** [V] the tank farm beside the road at the terminal's south-west corner (the terminal's yard ends near z = 500). */
+  tanks: { x: 900, y: 0, z: 780 },
+  /** [V] the Isla Verde road and rail run along the landside, parallel to the quay, beyond the gate and parking. */
+  landside: { x: 0, y: 0, z: 600 },
+  /** [A] Algeciras rises inland beyond the apron (which ends at z = 900). */
+  town: { x: 0, y: -1.2, z: 1000 },
+}

@@ -2,7 +2,7 @@
  * The phase 2 infrastructure models (TT-28): gate modules, quay furniture, yard infrastructure, buildings and the
  * backdrop meshes (`assets/models/infrastructure/*.glb`). Every asset is root > LOD0 > mesh nodes on one shared swatch
  * atlas, so this loader bakes each asset into one geometry (the barrier boom in its renderer pose) and hands every
- * mesh the SAME material and texture: one atlas upload serves all 18 files. Loaded lazily by name, once per page.
+ * mesh the SAME material and texture: one atlas upload serves every file. Loaded lazily by name, once per page.
  */
 import * as THREE from 'three'
 import { bakeLod, loadGltf } from './containerAssets'
@@ -35,6 +35,11 @@ export const INFRA_ASSET_NAMES = [
   'backdrop-rock',
   'backdrop-hills',
   'backdrop-coast',
+  'scenery-shore',
+  'scenery-anchorage',
+  'scenery-tanks',
+  'scenery-landside',
+  'scenery-town',
 ] as const
 export type InfraAssetName = (typeof INFRA_ASSET_NAMES)[number]
 
@@ -57,6 +62,11 @@ export const INFRA_ASSET_URLS: Record<InfraAssetName, string> = {
   'backdrop-rock': new URL('../assets/models/infrastructure/backdrop-rock.glb', import.meta.url).href,
   'backdrop-hills': new URL('../assets/models/infrastructure/backdrop-hills.glb', import.meta.url).href,
   'backdrop-coast': new URL('../assets/models/infrastructure/backdrop-coast.glb', import.meta.url).href,
+  'scenery-shore': new URL('../assets/models/infrastructure/scenery-shore.glb', import.meta.url).href,
+  'scenery-anchorage': new URL('../assets/models/infrastructure/scenery-anchorage.glb', import.meta.url).href,
+  'scenery-tanks': new URL('../assets/models/infrastructure/scenery-tanks.glb', import.meta.url).href,
+  'scenery-landside': new URL('../assets/models/infrastructure/scenery-landside.glb', import.meta.url).href,
+  'scenery-town': new URL('../assets/models/infrastructure/scenery-town.glb', import.meta.url).href,
 }
 
 /** Sidecar facts the layout and renderer need (read from the sidecars, not hard-coded). */
