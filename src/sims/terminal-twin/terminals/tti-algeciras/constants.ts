@@ -38,6 +38,32 @@ export const PEAK_DAY_ROB = { bayFraction: 0.3, fill: 0.7 }
 export const NORTH_QUAY_LENGTH_M = 550
 
 /**
+ * Spec #134, ticket #147: the ground around TTI, from the aerial photo (`docs/reference/tti-algeciras/`). Scene axes:
+ * +x south along the quay, -x north, water towards -z. Scenery only (no engine effect): the North Quay is the terminal's
+ * north apron, facing a channel of sea, and the ground north of it runs grey, then green into hills. [V] layout from the
+ * photo, [A] the metre figures (the ticket's "about 200 m of sea, about 300 m of grey ground").
+ */
+export const TTI_GROUND = {
+  /** The North Quay's water edge, metres north of the terminal's north end (x = -this). */
+  northQuayEdgeM: 70,
+  /** Depth of the North Quay slab (m, along x). */
+  northQuayDepthM: 70,
+  /** Landward start of the quay along the terminal's width (z, m): the 550 m quay sits inside the 900 m apron. */
+  northQuayStartZ: 175,
+  /** Width of the sea channel north of the quay (m). */
+  seaChannelM: 200,
+  /** The shared apron (`sceneRenderer.addGround`) ends this far north of the terminal (m): the grey ground ends here, the green starts. */
+  greenStartM: 600,
+  /** The grey tarmac south of the terminal runs this far past the apron (m). */
+  southTarmacM: 2400,
+  /** Same grey as the shared apron. */
+  tarmacColour: '#9a9c9a',
+  seaColour: '#2d5873',
+  greenColour: '#5f7a45',
+  hillColour: '#4a6339',
+}
+
+/**
  * The Rock of Gibraltar across the bay, true scale (scene axes: +x = south along the quay, water towards -z = east).
  * [V] about 5.2 km north to south, about 1.2 km wide, 426 m high; about 9 km east of TTI (the reference map reads
  * 9 to 9.5 km from the quay to the Rock's centre, with the Rock's centre a little south of the terminal's).
