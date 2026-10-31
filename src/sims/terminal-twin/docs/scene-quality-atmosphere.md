@@ -39,6 +39,17 @@ Engine benchmark, graphics quality settings and renderer budget; time of day, ba
 - **Surroundings cost (#123; TTI baseline preset at 08:00, High, headless SwiftShader at about 0.3 fps, so only draw calls and triangles mean anything; CPU and pose ms below are software-render noise):** before the surroundings, whole terminal in view (`cameraTo('STS104', 1100)`): 277 draw calls, 1,578,380 triangles, frame CPU 88.9 ms, pose 55.2 ms; default camera: 717 calls, 1,870,172 triangles. After: overview 282 calls (+5), 1,584,449 triangles (+6,069, +0.4%), frame CPU 71.8 ms, pose 40.1 ms; default camera 721 calls (+4, the Rock-side parts are in frame), 1,875,623 triangles. The five scenery meshes are static, unlit by shadows (no cast or receive), frustum-culled and share the infrastructure atlas material, so they add no per-frame posing. No meaningful regression; a real-GPU number is still to be read from the P overlay on the reference machine.
 - Smoke: `tests/browser/terminal-twin-perf.smoke.ts` (overlay, Low vs High draw calls, Auto step down and recovery with retuned thresholds, TTI overview budget and culling).
 
+### Close-up faces (#143)
+
+Close-up markings cost one draw call per atlas page (20 to 32 faces), not per box; the budget is `closeupFaceBudget` (Low 0, Medium 120, High 400) in `QUALITY_PROFILES`. Before #143 every close-up box was its own mesh with its own canvas texture (up to 48 draw calls and 48 canvas uploads on High) and a box lost its markings when it fell outside the nearest 48. Frame-time proof is the `@load` spec in `tests/browser/container-closeup.smoke.ts` (the view about 10 boxes wide on the TTI baseline, `cameraTo('B01', 40)`, against the Overview camera; local only, annotation `frame-ms`).
+
+| View (TTI baseline, High) | Before #143 | After #143 |
+| --- | --- | --- |
+| Overview camera | not measured | not measured |
+| About 10 boxes wide | not measured | not measured |
+
+Numbers are to be filled in from a run on a real GPU (the agent that wrote #143 could not run the `@load` spec).
+
 ## Atmosphere and polish (TT-21)
 
 | Piece | Where | Notes |
