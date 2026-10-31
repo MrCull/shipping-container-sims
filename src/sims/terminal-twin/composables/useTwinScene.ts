@@ -251,7 +251,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (appliedLevel !== perf.effective) applyQuality()
     if (now - lastReportAt >= 250) {
       lastReportAt = now
-      perf.report({ fps: meter.fps, calls: lastRender.calls, triangles: lastRender.triangles, cpuMs, poseMs, closeup: view?.closeupCount() ?? 0 })
+      perf.report({ fps: meter.fps, calls: lastRender.calls, triangles: lastRender.triangles, cpuMs, poseMs, closeup: view?.closeupCount() ?? 0, closeupFaces: view?.closeupFaceCount() ?? 0 })
     }
   }
 

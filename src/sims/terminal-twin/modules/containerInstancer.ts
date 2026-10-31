@@ -7,9 +7,10 @@
  *   - LOD0 (~300-440 triangles) for at most `lod0Cap` boxes nearest the camera
  *     and within `lod0DistanceM` (with hysteresis so boxes do not flicker
  *     between LODs at the threshold);
- *   - Close-up (#119) above LOD0: at most `closeupCap` boxes within `closeupDistanceM` are drawn as individual
- *     detailed meshes with textures painted from their markings (`containerCloseups.ts`); they count as LOD0
- *     in the stats and are left out of the instanced layers;
+ *   - Close-up markings (#119, #143) on top of either LOD: the visible faces of boxes within `closeupDistanceM`
+ *     (`exposedFaces.ts`: a stacked yard box hides what its neighbours touch) are drawn as decals from a texture
+ *     atlas, nearest first up to `closeupFaceBudget` faces (`containerCloseups.ts`). The plain instanced box is
+ *     the fallback for every face without one;
  *   - LOD1 (12 triangles, normal-mapped corrugation at the same pitch) for the rest.
  * Each instance carries a `liveryIndex` attribute (atlas tile = shipping line). A box pushed with a `tint` (colour
  * by, #130) takes the generic tile and an instance colour that turns its grey body into the tint, flat in the close-up
@@ -23,6 +24,10 @@ import type { ContainerSize } from '../scenario/types'
 import { liveryBodyColour, LIVERY_ATLAS, type ContainerAssets } from './containerAssets'
 import { CONTAINER_DIMS } from './sceneModel'
 import { ContainerCloseups, type CloseupSource } from './containerCloseups'
+import { exposedFaces, neighboursOf, type ExposedFaces, type PlacedBox } from './exposedFaces'
+
+/** Cell of the grid that finds a yard box's neighbours (a 40 ft box and its gap fit in one). */
+const GRID_CELL_M = 14
 
 const SIZES: ContainerSize[] = ['20', '40', '40HC']
 
@@ -33,16 +38,13 @@ export interface ContainerLodOptions {
   lod0DistanceM: number
   /** A box already at LOD0 keeps it out to lod0DistanceM × this factor. */
   hysteresis: number
-  /** Max boxes drawn as close-ups (0 = off). */
-  closeupCap: number
-  /** Boxes beyond this camera distance are never close-ups (a close-up box keeps it out to this x `hysteresis`). */
+  /** Max close-up marking faces drawn (0 = off). */
+  closeupFaceBudget: number
+  /** Faces beyond this camera distance are never drawn with markings (a drawn face keeps it out to this x `hysteresis`). */
   closeupDistanceM: number
 }
 
-export const DEFAULT_LOD_OPTIONS: ContainerLodOptions = { lod0Cap: 300, lod0DistanceM: 140, hysteresis: 1.15, closeupCap: 48, closeupDistanceM: 35 }
-
-/** Close-up textures kept per box beyond the ones in use. */
-const CLOSEUP_CACHE_CAP = 64
+export const DEFAULT_LOD_OPTIONS: ContainerLodOptions = { lod0Cap: 300, lod0DistanceM: 140, hysteresis: 1.15, closeupFaceBudget: 400, closeupDistanceM: 35 }
 
 export interface ContainerRenderStats {
   /** Boxes posed this frame (visible or not). */
@@ -50,8 +52,10 @@ export interface ContainerRenderStats {
   lod0: number
   /** Everything not at LOD0, culled boxes included, so lod0 + lod1 = drawn. */
   lod1: number
-  /** Of `lod0`: the boxes drawn as close-ups (#119). */
+  /** Boxes with at least one close-up marking face drawn (#119, #143); they keep their LOD. */
   closeup: number
+  /** Close-up marking faces drawn (never above the face budget). */
+  closeupFaces: number
   /** Boxes outside the camera frustum, not written to the GPU (0 without a frustum). */
   culled: number
   assets: 'placeholder' | 'loaded'
@@ -87,12 +91,13 @@ export class ContainerInstancer {
   private zs: number[] = []
   private liveries: number[] = []
   private tints: number[] = []
+  private yards: boolean[] = []
   private yaws: number[] = []
   private dist2: Float64Array = new Float64Array(0)
   /** LOD per key from the previous frame (hysteresis). */
-  private lastLod = new Map<number, 0 | 1 | 2>()
+  private lastLod = new Map<number, 0 | 1>()
   private rendered = new Map<number, RenderedContainer>()
-  private lastStats: ContainerRenderStats = { drawn: 0, lod0: 0, lod1: 0, closeup: 0, culled: 0, assets: 'placeholder' }
+  private lastStats: ContainerRenderStats = { drawn: 0, lod0: 0, lod1: 0, closeup: 0, closeupFaces: 0, culled: 0, assets: 'placeholder' }
   private readonly matrix = new THREE.Matrix4()
   private readonly colour = new THREE.Color()
   /** Linear colour of the generic livery's body: a tint is divided by it, so the grey tile multiplied by the instance colour comes out as the tint. */
@@ -103,7 +108,7 @@ export class ContainerInstancer {
   constructor(
     capacity: Partial<Record<ContainerSize, number>>,
     options: Partial<ContainerLodOptions> = {},
-    closeups: ContainerCloseups = new ContainerCloseups(CLOSEUP_CACHE_CAP),
+    closeups: ContainerCloseups = new ContainerCloseups(),
   ) {
     this.closeups = closeups
     this.group.add(closeups.group)
@@ -167,8 +172,8 @@ export class ContainerInstancer {
     this.n = 0
   }
 
-  /** One box: `key` is a stable id (e.g. container index), centre position in metres, yaw about Y (0 = length along X). */
-  push(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0, tint = -1): void {
+  /** One box: `key` is a stable id (e.g. container index), centre position in metres, yaw about Y (0 = length along X); `yard` marks a stacked yard box (the close-up level hides the faces its neighbours touch). */
+  push(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0, tint = -1, yard = false): void {
     const i = this.n++
     this.keys[i] = key
     this.sizes[i] = size
@@ -178,6 +183,7 @@ export class ContainerInstancer {
     this.liveries[i] = livery
     this.yaws[i] = yaw
     this.tints[i] = tint
+    this.yards[i] = yard
   }
 
   /** What a close-up box is painted from, by the key given to `push` (without one there are no close-ups). */
@@ -218,9 +224,8 @@ export class ContainerInstancer {
 
     const seen = this.cull(frustum)
     let lod0 = 0
-    let closeup = 0
     let culled = 0
-    this.closeups.begin()
+    this.closeups.begin(cameraPosition)
     if (this.lods) {
       const lod = this.chooseLods(cameraPosition, seen)
       for (let i = 0; i < this.n; i++) {
@@ -231,13 +236,7 @@ export class ContainerInstancer {
           continue
         }
         if (level !== 1) lod0++
-        this.lastLod.set(this.keys[i], level as 0 | 1 | 2)
-        if (level === 2) {
-          closeup++
-          const key = this.keys[i]
-          this.closeups.show(key, this.sizes[i], this.xs[i], this.ys[i], this.zs[i], this.yaws[i], () => this.markingsSource!(key)!, this.tints[i])
-          continue
-        }
+        this.lastLod.set(this.keys[i], level as 0 | 1)
         write(this.lods[this.sizes[i]][level], i)
       }
     } else if (this.placeholders) {
@@ -250,6 +249,7 @@ export class ContainerInstancer {
         write(this.placeholders[this.sizes[i]], i)
       }
     }
+    if (this.lods && this.markingsSource && this.options.closeupFaceBudget > 0) this.offerCloseups(cameraPosition, seen)
     this.closeups.end()
     const layers: Layer[] = this.lods
       ? Object.values(this.lods).flat()
@@ -260,7 +260,7 @@ export class ContainerInstancer {
       if (layer.livery) layer.livery.needsUpdate = true
       if (layer.mesh.instanceColor) layer.mesh.instanceColor.needsUpdate = true
     }
-    this.lastStats = { drawn: this.n, lod0, lod1: this.n - lod0, closeup, culled, assets: this.lods ? 'loaded' : 'placeholder' }
+    this.lastStats = { drawn: this.n, lod0, lod1: this.n - lod0, closeup: this.closeups.count, closeupFaces: this.closeups.faces, culled, assets: this.lods ? 'loaded' : 'placeholder' }
     return this.lastStats
   }
 
@@ -280,16 +280,63 @@ export class ContainerInstancer {
 
   private visible: Uint8Array = new Uint8Array(0)
 
+  /**
+   * Offers the close-up level the boxes within range, each with its exposed faces: stacked yard boxes lose the faces their
+   * neighbours touch (a coarse grid of the yard boxes in range finds them), every other box shows all six.
+   */
+  private offerCloseups(cam: THREE.Vector3, seen: Uint8Array | null): void {
+    const { hysteresis, closeupDistanceM, closeupFaceBudget } = this.options
+    this.closeups.setLimits({ budget: closeupFaceBudget, distanceM: closeupDistanceM, hysteresis })
+    // boxes whose faces can be drawn: within the distance (plus the hysteresis band and half a box)
+    const reach = closeupDistanceM * hysteresis + 8
+    const reach2 = reach * reach
+    const grid = new Map<number, PlacedBox[]>()
+    const near: number[] = []
+    const placed: PlacedBox[] = []
+    const cell = (x: number, z: number) => (Math.floor(x / GRID_CELL_M) * 73856093) ^ (Math.floor(z / GRID_CELL_M) * 19349663)
+    for (let i = 0; i < this.n; i++) {
+      const dx = this.xs[i] - cam.x
+      const dy = this.ys[i] - cam.y
+      const dz = this.zs[i] - cam.z
+      if (dx * dx + dy * dy + dz * dz > reach2) continue
+      if (seen && !seen[i]) {
+        // out of view, but a yard box still hides its neighbours' faces
+        if (!this.yards[i]) continue
+      } else near.push(i)
+      if (!this.yards[i]) continue
+      const d = CONTAINER_DIMS[this.sizes[i]]
+      const box: PlacedBox = { x: this.xs[i], y: this.ys[i] + d.height / 2, z: this.zs[i], yaw: this.yaws[i], length: d.length, width: d.width, height: d.height }
+      placed[i] = box
+      const k = cell(box.x, box.z)
+      const list = grid.get(k)
+      if (list) list.push(box)
+      else grid.set(k, [box])
+    }
+    const nearby: PlacedBox[] = []
+    for (const i of near) {
+      let faces: ExposedFaces
+      if (this.yards[i]) {
+        const box = placed[i]
+        nearby.length = 0
+        for (let gx = -1; gx <= 1; gx++) {
+          for (let gz = -1; gz <= 1; gz++) {
+            const list = grid.get(cell(box.x + gx * GRID_CELL_M, box.z + gz * GRID_CELL_M))
+            if (list) for (const o of list) nearby.push(o)
+          }
+        }
+        faces = exposedFaces('yard', neighboursOf(box, nearby))
+      } else faces = exposedFaces('free')
+      const key = this.keys[i]
+      this.closeups.offer(key, this.sizes[i], this.xs[i], this.ys[i], this.zs[i], this.yaws[i], faces, () => this.markingsSource!(key), this.tints[i])
+    }
+  }
+
   /** LOD per pushed box: nearest within range get LOD0, capped at lod0Cap. Culled boxes are never LOD0. */
   private chooseLods(cam: THREE.Vector3, seen: Uint8Array | null): Uint8Array {
-    const { lod0Cap, lod0DistanceM, hysteresis, closeupCap, closeupDistanceM } = this.options
+    const { lod0Cap, lod0DistanceM, hysteresis } = this.options
     if (this.dist2.length < this.n) this.dist2 = new Float64Array(Math.max(this.n, this.dist2.length * 2))
     const lod = new Uint8Array(this.n).fill(1)
     const near: number[] = []
-    const nearest: number[] = []
-    const c2 = closeupDistanceM * closeupDistanceM
-    const c2Sticky = c2 * hysteresis * hysteresis
-    const canCloseup = closeupCap > 0 && this.markingsSource !== null
     const r2 = lod0DistanceM * lod0DistanceM
     const r2Sticky = r2 * hysteresis * hysteresis
     for (let i = 0; i < this.n; i++) {
@@ -299,16 +346,11 @@ export class ContainerInstancer {
       const d2 = dx * dx + dy * dy + dz * dz
       this.dist2[i] = d2
       if (seen && !seen[i]) continue
-      const last = this.lastLod.get(this.keys[i])
-      if (canCloseup && d2 <= (last === 2 ? c2Sticky : c2)) nearest.push(i)
-      const limit = last === 0 || last === 2 ? r2Sticky : r2
+      const limit = this.lastLod.get(this.keys[i]) === 0 ? r2Sticky : r2
       if (d2 <= limit) near.push(i)
     }
-    if (nearest.length > closeupCap) nearest.sort((a, b) => this.dist2[a] - this.dist2[b])
-    for (let k = 0; k < Math.min(closeupCap, nearest.length); k++) lod[nearest[k]] = 2
-    const rest = near.filter((i) => lod[i] !== 2)
-    if (rest.length > lod0Cap) rest.sort((a, b) => this.dist2[a] - this.dist2[b])
-    for (let k = 0; k < Math.min(lod0Cap, rest.length); k++) lod[rest[k]] = 0
+    if (near.length > lod0Cap) near.sort((a, b) => this.dist2[a] - this.dist2[b])
+    for (let k = 0; k < Math.min(lod0Cap, near.length); k++) lod[near[k]] = 0
     return lod
   }
 

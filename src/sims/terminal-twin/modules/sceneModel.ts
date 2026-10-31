@@ -231,6 +231,8 @@ export interface ContainerPose extends Vec3 {
   yaw: number
   /** SHC id when the container is carried by an SHC (the renderer hangs it from that SHC's spreader). */
   carriedBy?: string
+  /** A stacked yard box (its neighbours hide some of its faces, #143). */
+  yard?: true
 }
 
 const emptyAxes = (): Record<Axis, MotionSegment[]> => ({ gantry: [], trolley: [], hoist: [], x: [], z: [], lift: [] })
@@ -930,6 +932,7 @@ export class SceneModel {
         y: tierBaseY(cell.tier) + dims.height / 2,
         z: slotZ(block, cell.bay, boxSpan(size)),
         yaw: alongZ,
+        yard: true,
       }
       this.yardPoses.set(cacheKey, pose)
       return pose

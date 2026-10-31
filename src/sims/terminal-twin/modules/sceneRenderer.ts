@@ -74,7 +74,7 @@ export interface SceneStats {
   /** Occupancy and label overlay counts (zeros while those overlays are off). */
   layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
-  containerLods: { lod0: number; lod1: number; closeup: number; culled: number }
+  containerLods: { lod0: number; lod1: number; closeup: number; closeupFaces: number; culled: number }
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -434,7 +434,7 @@ export class SceneRenderer {
   setQuality(profile: QualityProfile): void {
     this.quality = profile
     this.atmosphere.setQuality(profile)
-    this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap, closeupDistanceM: profile.closeupDistanceM, closeupCap: profile.closeupCap })
+    this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap, closeupDistanceM: profile.closeupDistanceM, closeupFaceBudget: profile.closeupFaceBudget })
     this.setOceanDetail(profile.oceanSegments)
   }
 
@@ -515,7 +515,7 @@ export class SceneRenderer {
       const c = model.containerPose(id, t)
       if (!c) return
       this.containerLivery[i] ??= liveryIndexForLine(model.containerLine[id])
-      containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget))
+      containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget), c.yard === true)
       if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
       if (wantsOwners) {
         const owner = model.custodyAt(id, t)
@@ -606,9 +606,13 @@ export class SceneRenderer {
     return out
   }
 
-  /** Boxes drawn as close-ups with markings last frame (#119). */
+  /** Boxes with close-up markings last frame, and how many marking faces that is (#119, #143). */
   closeupCount(): number {
     return this.containers.stats().closeup
+  }
+
+  closeupFaceCount(): number {
+    return this.containers.stats().closeupFaces
   }
 
   /** Sound sources of the last frame (machine positions and motion states) for the sound mixer. */
@@ -628,7 +632,7 @@ export class SceneRenderer {
       reservedZones: this.reservedZones,
       reservedRailSegments: this.reservedRailSegments,
       layers: this.layers.stats(),
-      containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, culled: c.culled },
+      containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, closeupFaces: c.closeupFaces, culled: c.culled },
       containerAssets: c.assets,
     } as SceneStats
   }
