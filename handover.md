@@ -10,7 +10,7 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #117 throughput | none | merged, pushed (diagnosis only; no engine change) |
 | #118 volume + FPS | none | merged, pushed |
 | #119 close-up containers | none | merged, pushed |
-| #121 SHC model | none | `tt/121-shc-model` (04a7731): merged as `155fc54` and pushed together with this handover. Lint, build and all 1265 unit tests passed; the browser smoke run was **unfinished at the halt** (52 specs passed, none failed). `merge-ticket.sh` may still finish: check `.merge-ticket.log` for `EXIT`. If smoke ends red, re-run the failing specs alone; the SHC spec "SHCs steer through the corners" had its sampling window widened from 6 s to 14 s by the implementer and needs checking against the base |
+| #121 SHC model | none | merged and pushed (`155fc54`). Verified by lint, build, 1265 unit tests and the SHC smoke specs (`shc-model`, `terminal-twin-shc`: 8 of 8 pass; the LOD spec timed out once under load and passed alone in 38 s). The generic smoke run was stopped at 67 passed, 0 failed, by decision. The steering spec's window was widened 6 s to 14 s and not compared with the base |
 | #120 folder + Rock | none | built, awaiting merge: `tt/120-terminal-folder-rock` (c05ed2d) |
 | #125 gantry alarm | #118 | built, awaiting merge: `tt/125-gantry-alarm` (5c85877) |
 | #122 skin + landing | #118 | implementer was still running, had not reported: `tt/122-professional-skin` has commits, tip `e83cda6` (worktree `agent-a355271414bb882d0`, locked). Its verify result is unknown |
