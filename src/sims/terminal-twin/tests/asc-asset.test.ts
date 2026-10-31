@@ -99,15 +99,39 @@ describe('ASC model asset', () => {
     expect(m.dimensions.lengthM).toBeLessThan(12) // fits the 12 m ASC_MIN_SEPARATION_M with a gap
   })
 
-  it('carries ZPMC and "40 t" marks, no operator branding, and tags approximations in provenance', () => {
+  it('carries ZPMC, TTI ALGECIRAS (text only) and "40 t" marks, and tags approximations in provenance', () => {
     const m = meta()
     expect(m.branding.manufacturerWordmark).toBe('ZPMC')
     expect(m.branding.swlMark).toBe('40 t')
-    expect(m.branding.operatorBranding).toBe(false)
+    expect(m.branding.operatorBranding).toBe(true) // TTI ALGECIRAS, as text
     expect(m.provenance.some((p: { tag: string }) => p.tag === 'A')).toBe(true)
-    expect(JSON.stringify(m)).not.toMatch(/TTI|Algeciras/i)
+    expect(m.branding.livery).toBe('TTI ALGECIRAS')
+    expect(m.branding.note).toMatch(/no logo artwork/)
     expect(m.nodes.filter((n: { role: string }) => n.role === 'rig').map((n: { name: string }) => n.name)).toEqual(
       expect.arrayContaining(['gantry', 'trolley', 'hoist', 'spreader']),
     )
+  })
+
+  it('exposes the amber beacon mounts on the gantry, one per leg, on the rail-end face (TT-128)', () => {
+    const mounts = meta().beaconMounts as { name: string; node: string; position: number[]; lens: string }[]
+    expect(mounts).toHaveLength(4)
+    expect(new Set(mounts.map((b) => b.name)).size).toBe(4)
+    for (const b of mounts) {
+      expect(b.node).toBe('gantry')
+      expect(b.lens).toBe('amber')
+      expect(b.position).toHaveLength(3)
+      expect(Math.abs(b.position[0])).toBeGreaterThan(meta().stack.clearSpanM / 2) // outside the stack, on the legs
+      expect(b.position[1]).toBeGreaterThan(2)
+      expect(b.position[1]).toBeLessThan(meta().stack.underBridgeM)
+    }
+    expect(mounts.some((b) => b.position[0] < 0) && mounts.some((b) => b.position[0] > 0)).toBe(true)
+    expect(mounts.some((b) => b.position[2] < 0) && mounts.some((b) => b.position[2] > 0)).toBe(true)
+  })
+
+  it('has portal-frame detail from the TTI photos: stairs on a leg, a girder sign band and rail-bogie hazard bollards', () => {
+    const m = meta()
+    expect(m.branding.placement).toMatch(/TTI ALGECIRAS/)
+    expect(m.branding.signBand).toEqual(expect.arrayContaining(['unit number', 'TTI ALGECIRAS', 'ZPMC', '40 t']))
+    expect(m.nodes.find((n: { name: string }) => n.name === 'gantry').description).toMatch(/stair/)
   })
 })

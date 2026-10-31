@@ -59,24 +59,35 @@ CORNERS = (('fl', 1, 1), ('fr', 1, -1), ('rl', -1, 1), ('rr', -1, -1))  # name, 
 EHOUSE_X = (12.6, 14.4)
 TOTAL_HEIGHT = 24.7
 WHEEL_R, WHEEL_W = 0.45, 0.3
-UNIT_LABEL = 'ASC 12'
+UNIT_LABEL = '111'              # TTI's yard cranes carry three-digit numbers (111, 112, ...)
 SLAT_PITCH = 0.2
 SLATS = int((2 * (RX - 0.8)) / SLAT_PITCH)
-CAGE_HOOPS = 19
+BEACON_Z = 4.5                   # height of the amber gantry-alarm beacons on the legs
+HAUNCH = 1.6                     # portal knee: the leg flares into the girder over this height and width
+SIGN_Z0, SIGN_H = 21.05, 1.0     # sign band on the girder faces (girder top 22.2)
+PANEL_Z0, PANEL_H = 20.25, 0.7   # numbered row panels under the sign band
+# Sign band, left to right as seen from outside each girder: (region, width m, start m from the viewer-left end)
+SIGN_BAND = (('number', 2.4, -11.5), ('tti', 8.0, -8.5), ('zpmc', 2.6, 0.3), ('swl', 2.4, 4.2))
+STAIR_RISE = 0.25
+STAIRS = ((1.9, 8.0), (8.0, 15.0), (15.0, 22.1))   # flights: bottom and top height
+BEACONS = {f'beacon_leg_{n}_{xs}': (sx * RX, sy * (LEG_C + LEG_D / 2 + 0.2), BEACON_Z)
+           for n, sy in (('front', 1), ('rear', -1)) for xs, sx in (('xneg', -1), ('xpos', 1))}
 
 # ---- swatch atlas ----------------------------------------------------------
 ATLAS = 1024
-CELL = 128
+CELL = 64
 SWATCHES = {
     'blue': '#2b5b98', 'blue_dark': '#17345a', 'blue_light': '#4a82c2', 'steel': '#8b9198',
     'dark': '#2a2d33', 'yellow': '#f2b705', 'zinc': '#a8adb3', 'white': '#f1f1ef',
     'black': '#0d0d0e', 'orange': '#e8641b', 'lens_red': '#d11818', 'amber': '#ffb43a',
     'glass': '#7fa6bb', 'rope': '#4a4d52', 'grey': '#b9bdc2', 'rubber': '#18181a',
+    'purple': '#6c5f9e',
 }
 REGIONS = {
-    'zpmc': (0, 512, 1024, 640),       # ZPMC wordmark, white on blue (8:1)
+    'tti': (0, 320, 1024, 448),        # TTI ALGECIRAS sign, navy text on white (8:1), text only
+    'zpmc': (0, 448, 512, 576),        # ZPMC builder plate, dark text on white (4:1)
     'panels': (0, 640, 1024, 768),     # eight numbered bridge panel cells, 1..8
-    'swl': (0, 768, 512, 896),         # "40 t" safe working load mark (4:1)
+    'swl': (0, 768, 512, 896),         # "40 t" safe working load plate, dark text on white (4:1)
     'number': (512, 768, 1024, 896),   # unit number plate (4:1)
     'hazard': (0, 896, 512, 1024),     # yellow/black warning stripes
     'plate': (512, 896, 1024, 1024),   # spec plate
@@ -113,6 +124,50 @@ def wheel_profile(detail):
     return [(0.0, -w, 'a-', 'steel'), (r, -w, 'r', 'dark'), (r, w, 'a+', 'dark'), (0.0, w, 'a+', 'steel')]
 
 
+def sign_band(p, sy, face, regions=None):
+    """The white sign band on one girder face, left to right as seen from outside (unit number, TTI ALGECIRAS, ZPMC, 40 t)."""
+    for region, w, u in SIGN_BAND:
+        if regions is None or region in regions:
+            p.plate((-sy * u, face + sy * 0.08, SIGN_Z0), (-sy, 0, 0), (0, 0, 1), w, SIGN_H, region, normal=(0, sy, 0))
+
+
+def stairs(p, sx, sy, detail):
+    """A three-flight zig-zag stair up the outer X face of a leg to the head-beam deck (TTI's yard cranes have stairs, not ladders)."""
+    lx, ly = sx * (RX + LEG_W / 2 + 0.54), sy * LEG_C   # tread centre; the inner edge is 0.14 m off the leg face
+    ends = (ly - sy * 3.6, ly + sy * 0.6)
+    for i, (z0, z1) in enumerate(STAIRS):
+        ys, ye = ends if i % 2 == 0 else ends[::-1]
+        for dx in (-0.4, 0.4):
+            p.beam((lx + dx, ys, z0), (lx + dx, ye, z1), 0.06, 0.3, 'blue_dark')                            # stringers
+        n = round((z1 - z0) / STAIR_RISE)
+        step = 1 if detail == 0 else 2
+        for k in range(0, n, step):
+            f = (k + 0.5) / n
+            y, z = ys + (ye - ys) * f, z0 + (z1 - z0) * f
+            p.box((lx - 0.4, y - 0.12 * step, z - 0.02), (lx + 0.4, y + 0.12 * step, z + 0.02), 'zinc', ('+z', '+x', '-x') if detail == 0 else ('+z',))
+        rail_x = lx + sx * 0.42
+        p.beam((rail_x, ys, z0 + 0.95), (rail_x, ye, z1 + 0.95), 0.04, 0.04, 'yellow')                      # handrail
+        if detail == 0:
+            for k in range(0, n, 4):
+                f = (k + 0.5) / n
+                y, z = ys + (ye - ys) * f, z0 + (z1 - z0) * f
+                p.box((rail_x - 0.02, y - 0.02, z), (rail_x + 0.02, y + 0.02, z + 0.95), 'yellow')
+        if i < len(STAIRS) - 1:                                                                             # landing where the flight turns
+            y1 = ye + (0.9 if ye > ys else -0.9)
+            p.box((lx - 0.45, min(ye, y1), z1 - 0.04), (lx + 0.45, max(ye, y1), z1 + 0.02), 'zinc')
+            if detail == 0:
+                p.box((rail_x - 0.02, min(ye, y1), z1 + 0.95 - 0.04), (rail_x + 0.02, max(ye, y1), z1 + 0.95), 'yellow')
+
+
+def beacon(p, name):
+    """Amber gantry-alarm beacon on the rail-end face of a leg: dark housing and an amber lens (mount point in the sidecar)."""
+    bx, by, bz = BEACONS[name]
+    sy = 1 if by > 0 else -1
+    face = by - sy * 0.2
+    p.box((bx - 0.17, min(face, face + sy * 0.12), bz - 0.17), (bx + 0.17, max(face, face + sy * 0.12), bz + 0.17), 'dark')
+    p.revolve((bx, face + sy * 0.12, bz), 'y', [(0.15, 0.0, 'r', 'amber'), (0.15, sy * 0.18, 'a+' if sy > 0 else 'a-', 'amber'), (0.0, sy * 0.18, 'a+' if sy > 0 else 'a-', 'amber')], 8, lambda k, e: 'amber')
+
+
 def gantry_mesh(detail):
     p = Part()
     lw, ld = LEG_W / 2, LEG_D / 2
@@ -123,7 +178,7 @@ def gantry_mesh(detail):
         p.box((cx - 0.5, -SILL_HALF, SILL_Z0), (cx + 0.5, SILL_HALF, SILL_Z1), 'blue_dark')
         for sy in (-1, 1):
             cy = sy * LEG_C
-            p.box((cx - 0.42, cy - 1.3, 0.45), (cx + 0.42, cy + 1.3, SILL_Z0), 'dark')               # bogie frame
+            p.box((cx - 0.42, cy - 1.3, 0.45), (cx + 0.42, cy + 1.3, SILL_Z0), 'purple')             # bogie frame (TTI's cranes have violet bogies)
             wsegs = 33 if detail == 0 else (16 if detail == 1 else 8)
             for dy in (-0.8, 0.8):
                 p.revolve((cx, cy + dy, WHEEL_R), 'x', wheel_profile(detail) if detail < 2 else wheel_profile(1), wsegs, lambda k, e: 'dark')
@@ -148,6 +203,9 @@ def gantry_mesh(detail):
                 p.beam((cx, a[0], a[1]), (cx, b[0], b[1]), 0.3, 0.3, 'blue_dark')
             p.beam((cx, -LEG_C + ld, 15.5), (cx, LEG_C - ld, 15.5), 0.35, 0.35, 'blue_dark')
             p.beam((cx, -LEG_C + ld, 2.4), (cx, LEG_C - ld, 2.4), 0.35, 0.35, 'blue_dark')
+        if detail < 2:
+            for sy in (-1, 1):                                                   # portal knee: the leg flares into each girder
+                p.beam((sx * (RX - LEG_W / 2), sy * GIRDER_C, z_top - HAUNCH), (sx * (RX - LEG_W / 2 - HAUNCH), sy * GIRDER_C, z_top), GIRDER_W * 0.85, 0.5, 'blue')
         # head beam across the leg tops, under the bridge
         p.box((cx - 0.7, -HEAD_HALF_Y, z_top), (cx + 0.7, HEAD_HALF_Y, BRIDGE_TOP), 'blue_dark')
         # buffers and rail sweepers on the sill ends
@@ -173,8 +231,8 @@ def gantry_mesh(detail):
             # numbered bridge panels (1..8 over the rows) and the ZPMC wordmark
             for r in range(ROWS):
                 x = (r - (ROWS - 1) / 2) * ROW_PITCH
-                p.plate((x + sy * 0.4, face + sy * 0.07, BRIDGE_UNDER + 0.3), (-sy, 0, 0), (0, 0, 1), 0.8, 0.8, 'panels', normal=(0, sy, 0), cell=(r, ROWS))
-            p.plate((sy * 4.2, face + sy * 0.015, BRIDGE_UNDER + 1.25), (-sy, 0, 0), (0, 0, 1), 8.4, 0.85, 'zpmc', normal=(0, sy, 0))
+                p.plate((x + sy * 0.4, face + sy * 0.07, PANEL_Z0), (-sy, 0, 0), (0, 0, 1), 0.8, PANEL_H, 'panels', normal=(0, sy, 0), cell=(r, ROWS))
+            sign_band(p, sy, face)
             # walkway with handrails
             y0, y1 = (outer, outer + 0.85) if sy > 0 else (-outer - 0.85, -outer)
             p.box((-RX + 0.7, y0, BRIDGE_TOP - 0.1), (RX - 0.7, y1, BRIDGE_TOP), 'zinc')
@@ -196,23 +254,9 @@ def gantry_mesh(detail):
         for i in range(8):
             y = -2.5 + i * 0.7
             p.box((EHOUSE_X[1], y, BRIDGE_TOP + 0.5), (EHOUSE_X[1] + 0.05, y + 0.4, BRIDGE_TOP + 1.8), 'dark', ('+x',))
-        # ladders on two diagonal legs, landings at 8 m and 15 m
+        # stairs up two diagonal legs, landings at 8 m and 15 m
         for sx, sy in ((1, 1), (-1, -1)):
-            lx, ly = sx * (RX + LEG_W / 2 + 0.14), sy * LEG_C
-            for dy in (-0.22, 0.22):
-                p.box((lx - 0.025, ly + dy - 0.025, 1.9), (lx + 0.025, ly + dy + 0.025, BRIDGE_TOP + 0.1), 'yellow')
-            for i in range(80):
-                z = 2.1 + i * 0.25
-                p.box((lx - 0.02, ly - 0.22, z - 0.02), (lx + 0.02, ly + 0.22, z + 0.02), 'zinc')
-            for k in range(CAGE_HOOPS):  # safety cage hoops
-                z = 4.0 + k * 0.95
-                ox = lx + sx * 0.62
-                p.box((lx, ly - 0.36, z), (ox, ly - 0.3, z + 0.05), 'zinc') if sx > 0 else p.box((ox, ly - 0.36, z), (lx, ly - 0.3, z + 0.05), 'zinc')
-                p.box((lx, ly + 0.3, z), (ox, ly + 0.36, z + 0.05), 'zinc') if sx > 0 else p.box((ox, ly + 0.3, z), (lx, ly + 0.36, z + 0.05), 'zinc')
-                p.box((min(ox, ox + sx * 0.05), ly - 0.36, z), (max(ox, ox + sx * 0.05), ly + 0.36, z + 0.05), 'zinc')
-            for z in (8.0, 15.0):
-                p.box((lx - 0.1, ly - 0.75, z - 0.05), (lx + 0.95 * sx, ly + 0.75, z + 0.03), 'zinc')
-                p.box((lx + 0.9 * sx - 0.02, ly - 0.75, z + 0.03), (lx + 0.9 * sx + 0.02, ly + 0.75, z + 1.0), 'yellow')
+            stairs(p, sx, sy, 0)
         # branding on the leg faces: unit number and hazard stripes; spec plate on the head beam
         for sx in (-1, 1):
             for sy in (-1, 1):
@@ -259,16 +303,9 @@ def gantry_mesh(detail):
                 y0, y1 = (outer, outer + 0.85) if sy > 0 else (-outer - 0.85, -outer)
                 p.box((-RX + 0.7, y0, BRIDGE_TOP - 0.1), (RX - 0.7, y1, BRIDGE_TOP), 'zinc')
                 p.box((-RX + 0.9, sy * (outer + 0.82) - 0.03, BRIDGE_TOP + 1.0), (RX - 0.9, sy * (outer + 0.82) + 0.03, BRIDGE_TOP + 1.1), 'yellow')
-                p.plate((sy * 4.2, sy * outer + sy * 0.015, BRIDGE_UNDER + 1.25), (-sy, 0, 0), (0, 0, 1), 8.4, 0.85, 'zpmc', normal=(0, sy, 0))
+                sign_band(p, sy, sy * outer)
             for sx, sy in ((1, 1), (-1, -1)):
-                lx, ly = sx * (RX + LEG_W / 2 + 0.14), sy * LEG_C
-                for dy in (-0.22, 0.22):
-                    p.box((lx - 0.025, ly + dy - 0.025, 1.9), (lx + 0.025, ly + dy + 0.025, BRIDGE_TOP + 0.1), 'yellow', ('+x', '-x', '+y', '-y'))
-                for i in range(41):
-                    z = 2.1 + i * 0.5
-                    p.box((lx - 0.02, ly - 0.22, z - 0.02), (lx + 0.02, ly + 0.22, z + 0.02), 'zinc', ('+x' if sx > 0 else '-x', '+z'))
-                for z in (8.0, 15.0):
-                    p.box((lx - 0.1, ly - 0.75, z - 0.05), (lx + 0.95 * sx, ly + 0.75, z + 0.03), 'zinc')
+                stairs(p, sx, sy, 1)
             outer = GIRDER_C + GIRDER_W / 2
             for sy in (-1, 1):
                 face = sy * outer
@@ -277,7 +314,7 @@ def gantry_mesh(detail):
                     p.box((x - 0.07, min(face, face + sy * 0.07), BRIDGE_UNDER + 0.05), (x + 0.07, max(face, face + sy * 0.07), BRIDGE_TOP - 0.05), 'blue_dark', ('+x', '-x', '+y', '-y'))
                 for r in range(ROWS):
                     x = (r - (ROWS - 1) / 2) * ROW_PITCH
-                    p.plate((x + sy * 0.4, face + sy * 0.07, BRIDGE_UNDER + 0.3), (-sy, 0, 0), (0, 0, 1), 0.8, 0.8, 'panels', normal=(0, sy, 0), cell=(r, ROWS))
+                    p.plate((x + sy * 0.4, face + sy * 0.07, PANEL_Z0), (-sy, 0, 0), (0, 0, 1), 0.8, PANEL_H, 'panels', normal=(0, sy, 0), cell=(r, ROWS))
                 for k in range(11):
                     x = -RX + 0.9 + k * 2.2
                     p.box((x - 0.03, sy * (outer + 0.82) - 0.03, BRIDGE_TOP), (x + 0.03, sy * (outer + 0.82) + 0.03, BRIDGE_TOP + 1.1), 'yellow', ('+x', '-x', '+y', '-y'))
@@ -300,6 +337,9 @@ def gantry_mesh(detail):
                 z = BRIDGE_TOP + 0.5 + k * 0.45
                 for sy in (-1, 1):
                     p.box((EHOUSE_X[0] + 0.2, sy * 3.0, z), (EHOUSE_X[1] - 0.2, sy * 3.0 + sy * 0.04, z + 0.2), 'dark', ('+y' if sy > 0 else '-y',))
+    if detail < 2:
+        for name in BEACONS:
+            beacon(p, name)
     return p
 
 
@@ -467,7 +507,7 @@ def lod2_gantry():
         y0, y1 = (outer, outer + 0.85) if sy > 0 else (-outer - 0.85, -outer)
         p.box((-RX + 0.7, y0, BRIDGE_TOP - 0.1), (RX - 0.7, y1, BRIDGE_TOP), 'zinc', ('+z', '+y', '-y'))
         p.box((-RX + 0.9, sy * (outer + 0.82) - 0.03, BRIDGE_TOP + 1.0), (RX - 0.9, sy * (outer + 0.82) + 0.03, BRIDGE_TOP + 1.1), 'yellow', ('+y', '-y', '+z'))
-        p.plate((sy * 4.2, sy * outer + sy * 0.015, BRIDGE_UNDER + 1.25), (-sy, 0, 0), (0, 0, 1), 8.4, 0.85, 'zpmc', normal=(0, sy, 0))
+        sign_band(p, sy, sy * outer, ('tti',))
     return p
 
 

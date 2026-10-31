@@ -50,7 +50,7 @@
         0.0
       ],
       "axis": "+Z",
-      "description": "portal on the two rails (legs, sills, rail bogies, head beams, bridge, walkways, ladders, e-house); translates along the block rails; pivot at the ground on the span and gantry centre"
+      "description": "portal on the two rails (legs with knees into the girders, sills, violet rail bogies, head beams, bridge with its TTI ALGECIRAS sign band, walkways, stairs, e-house, amber beacons); translates along the block rails; pivot at the ground on the span and gantry centre"
     },
     {
       "name": "trolley",
@@ -152,7 +152,7 @@
       "name": "gantry_geo",
       "parent": "gantry",
       "role": "mesh",
-      "description": "legs, sills, bogies, head beams, bridge girders, walkways, ladders, e-house"
+      "description": "legs, knees, sills, bogies, head beams, bridge girders, sign band, walkways, stairs, e-house, beacons"
     },
     {
       "name": "trolley_geo",
@@ -340,6 +340,60 @@
       "note": "ropes scale Y = (ropes.y - (hoist.y + offsetM)) / unitLengthM, both children of the trolley; 2.2 at rest"
     }
   ],
+  "beaconMounts": [
+    {
+      "name": "beacon_leg_front_xneg",
+      "node": "gantry",
+      "position": [
+        -12.7,
+        4.5,
+        -3.7
+      ],
+      "colour": "#ffb43a",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the rail-end face of a leg at gantry-alarm height (4.5 m), -Z end; rides with the gantry"
+    },
+    {
+      "name": "beacon_leg_front_xpos",
+      "node": "gantry",
+      "position": [
+        12.7,
+        4.5,
+        -3.7
+      ],
+      "colour": "#ffb43a",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the rail-end face of a leg at gantry-alarm height (4.5 m), -Z end; rides with the gantry"
+    },
+    {
+      "name": "beacon_leg_rear_xneg",
+      "node": "gantry",
+      "position": [
+        -12.7,
+        4.5,
+        3.7
+      ],
+      "colour": "#ffb43a",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the rail-end face of a leg at gantry-alarm height (4.5 m), +Z end; rides with the gantry"
+    },
+    {
+      "name": "beacon_leg_rear_xpos",
+      "node": "gantry",
+      "position": [
+        12.7,
+        4.5,
+        3.7
+      ],
+      "colour": "#ffb43a",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the rail-end face of a leg at gantry-alarm height (4.5 m), +Z end; rides with the gantry"
+    }
+  ],
   "groundContact": {
     "y": 0,
     "points": [
@@ -377,21 +431,29 @@
   },
   "branding": {
     "manufacturerWordmark": "ZPMC",
+    "livery": "TTI ALGECIRAS",
     "swlMark": "40 t",
-    "unitNumber": "ASC 12",
+    "unitNumber": "111",
     "bridgePanelNumbers": "1..8",
-    "operatorBranding": false,
-    "tag": "A",
-    "note": "ZPMC wordmark set in Montserrat ExtraBold on the blue atlas (no official logo artwork); numbered bridge panels over the rows; no operator branding"
+    "signBand": [
+      "unit number",
+      "TTI ALGECIRAS",
+      "ZPMC",
+      "40 t"
+    ],
+    "operatorBranding": true,
+    "tag": "P",
+    "placement": "a white sign band along the outer face of both girders, left to right: unit number, TTI ALGECIRAS, ZPMC builder plate, 40 t (dark text on white, as on the real cranes); numbered row panels below it",
+    "note": "text only, set in open-licence typefaces (Archivo ExtraBold, Montserrat ExtraBold): no logo artwork"
   },
   "lods": {
     "LOD0": {
-      "triangles": 14474,
+      "triangles": 12998,
       "material": "asc_atlas",
       "maxDistanceM": 90
     },
     "LOD1": {
-      "triangles": 3624,
+      "triangles": 3844,
       "material": "asc_atlas",
       "maxDistanceM": 300
     },
@@ -407,9 +469,9 @@
       "source": "spec #24 (rails, rows and ASC rating)"
     },
     {
-      "fact": "dark/medium-blue rail-mounted gantry: twin box-beam bridge, vertical legs on sills with rail bogies, trolley with hoist machinery, yellow spreader",
+      "fact": "cobalt-blue rail-mounted gantry: twin box-beam bridge, legs flaring into the girders, violet rail bogies, stairs on two legs, white sign band along the girders, trolley with hoist machinery, yellow spreader",
       "tag": "P",
-      "source": "public ZPMC ASC photographs (not committed)"
+      "source": "TTI Algeciras reference photos asc-* (ignored by version control, never committed; the generator does not read them)"
     },
     {
       "fact": "leg, girder, trolley and e-house proportions; 24.7 m overall height; bridge underside 20.0 m",
@@ -426,8 +488,14 @@
       "source": "ISO 1161 / ISO 668"
     },
     {
-      "fact": "ZPMC wordmark and \"40 t\" baked into the atlas, numbered bridge panels 1..8 over the rows; no operator branding",
-      "tag": "A"
+      "fact": "TTI ALGECIRAS, ZPMC and \"40 t\" plates baked into the atlas (text only), numbered bridge panels 1..8 over the rows",
+      "tag": "P",
+      "source": "asc-* reference photos"
+    },
+    {
+      "fact": "beacon positions: one amber gantry-alarm lamp on the rail-end face of each leg",
+      "tag": "A",
+      "reason": "no beacons are visible in the photos"
     },
     {
       "fact": "rope strands are a scaled node (rest length follows the hoist); stiffener ribs, grating and rungs as boxes",

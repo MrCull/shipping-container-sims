@@ -5,6 +5,7 @@ import { AscRig, loadAscModel } from '../ascAssets'
 import { ASC_MODEL, ascScaleY, HC_HEIGHT_M } from '../ascRig'
 import type { EntityView } from '../entityInspector'
 import { ASC, ascHeightM } from '../equipmentDims'
+import { ascBeaconOffsets } from '../gantryBeacons'
 import { CONTAINER_DIMS } from '../sceneModel'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
 
@@ -25,8 +26,8 @@ class AscRenderer implements KindRenderer {
   constructor(private host: KindRendererHost) {
     for (const id of host.model.ascIds) {
       this.addAsc(id)
-      // Amber beacons at the four leg bases, on the rails.
-      host.beacons.add(id, [-1, 1].flatMap((sx) => [-1, 1].map((sz) => ({ x: (sx * ASC.span) / 2, y: 2.5, z: (sz * ASC.legLength) / 2 }))))
+      // Amber beacons at the model's `beaconMounts` (outer face of each leg), stretched with the model for tall blocks.
+      host.beacons.add(id, ascBeaconOffsets(ascScaleY(host.model.blockOfAsc(id).tiers)))
     }
     if (host.model.ascIds.length > 0) {
       loadAscModel().then(
