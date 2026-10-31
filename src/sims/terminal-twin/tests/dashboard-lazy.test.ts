@@ -36,9 +36,12 @@ describe('chart library loading', () => {
     expect(files.some((f) => /import\(\s*['"][^'"]*chartLib['"]\s*\)/.test(f.text))).toBe(true)
   })
 
-  it('loads the dashboard component itself lazily too', () => {
+  it('loads the dashboard component itself lazily too, through the host that shows load and error states', () => {
+    const host = files.find((f) => f.file === join('components', 'DashboardHost.vue'))!
+    expect(host.text).toMatch(/createLazyComponent\(\(\) => import\('\.\/DashboardTab\.vue'\)\)/)
     const root = files.find((f) => f.file === 'TerminalTwin.vue')!
-    expect(root.text).toMatch(/defineAsyncComponent\(\(\) => import\('\.\/components\/DashboardTab\.vue'\)\)/)
+    expect(root.text).toMatch(/<DashboardHost /)
     expect(root.text).not.toMatch(/^import DashboardTab/m)
+    expect(files.filter((f) => /^\s*import\s[^\n]*from\s+['"][^'"]*DashboardTab(\.vue)?['"]/m.test(f.text)).map((f) => f.file)).toEqual([])
   })
 })
