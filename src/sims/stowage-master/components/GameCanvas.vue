@@ -615,6 +615,14 @@ function getPointerData(event: MouseEvent): { camera: THREE.PerspectiveCamera; s
   return { camera, scene, canvas, mouse }
 }
 
+/**
+ * Picks the slot under the pointer, front to back:
+ * - a solid container in front blocks anything behind it (and is itself the pick when it
+ *   is a selectable import/transit container with an indicator for this phase);
+ * - placeholder silhouettes (slot indicators) only count when they are the nearest thing hit,
+ *   so a click on a placeholder never "steals" from a solid container in front of it, and
+ *   placeholders of other phases are click-through.
+ */
 function pickIndicatorSlot(event: MouseEvent, dataKey: string): string | null {
   const pointer = getPointerData(event)
   if (!pointer) return null
@@ -622,39 +630,46 @@ function pickIndicatorSlot(event: MouseEvent, dataKey: string): string | null {
   const raycaster = new THREE.Raycaster()
   raycaster.params.Line.threshold = 0.12
   raycaster.setFromCamera(pointer.mouse, pointer.camera)
-  const hits = raycaster.intersectObjects(pointer.scene.children, true)
+  const hits = raycaster.intersectObjects(pointer.scene.children, true) // sorted near -> far
 
-  let bestSlotId: string | null = null
-  let bestScore = Number.POSITIVE_INFINITY
+  // Slots that have a pickable indicator in this phase (for resolving container-body hits).
+  const pickable = new Set<string>()
+  shipGroup?.traverse(o => {
+    if (o.userData?.[dataKey]) pickable.add(o.userData['slotId'] as string)
+  })
+
+  // Wire edges are thin; prefer mesh fills, fall back to a wire hit only if nothing else matched.
+  let wireFallback: string | null = null
 
   for (const hit of hits) {
+    if (hit.object instanceof THREE.Sprite) continue
+    if (!hit.object.visible) continue
+
     let obj: THREE.Object3D | null = hit.object
+    let container: THREE.Object3D | null = null
     while (obj) {
       if (obj.userData?.[dataKey]) {
-        const slotId = obj.userData['slotId'] as string
-        const worldPos = new THREE.Vector3()
-        obj.getWorldPosition(worldPos)
-        worldPos.project(pointer.camera)
-
-        const screenX = ((worldPos.x + 1) / 2) * pointer.canvas.clientWidth
-        const screenY = ((-worldPos.y + 1) / 2) * pointer.canvas.clientHeight
-        const mouseX = ((pointer.mouse.x + 1) / 2) * pointer.canvas.clientWidth
-        const mouseY = ((-pointer.mouse.y + 1) / 2) * pointer.canvas.clientHeight
-        const screenDistSq = (screenX - mouseX) ** 2 + (screenY - mouseY) ** 2
-        const wirePenalty = hit.object instanceof THREE.LineSegments ? 400 : 0
-        const score = screenDistSq + wirePenalty + hit.distance * 4
-
-        if (score < bestScore) {
-          bestScore = score
-          bestSlotId = slotId
+        if (hit.object instanceof THREE.LineSegments) {
+          wireFallback ??= obj.userData['slotId'] as string
+          break
         }
-        break
+        return obj.userData['slotId'] as string
       }
+      if (obj.userData?.['isContainer']) container = obj
       obj = obj.parent
     }
+    if (obj) continue // matched an indicator (wire, deferred)
+
+    if (container) {
+      // Solid container in front: it is the pick if selectable, otherwise it blocks the click.
+      const m = /^import-container-(.+)$/.exec(container.name)
+      const slotId = m?.[1]
+      return slotId && pickable.has(slotId) ? slotId : wireFallback
+    }
+    // Other geometry (indicators from other phases, hull, etc.) is ignored / click-through.
   }
 
-  return bestSlotId
+  return wireFallback
 }
 
 function setHoveredIndicator(groupName: string, dataKey: string, slotId: string | null): void {
