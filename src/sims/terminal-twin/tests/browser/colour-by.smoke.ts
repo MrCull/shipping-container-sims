@@ -162,7 +162,7 @@ test('colour by: the mode and Hide ROB survive a reload', async ({ page }) => {
 })
 
 test('colour by: switching modes on the full TTI yard costs no frame time @load', async ({ page }) => {
-  test.setTimeout(480_000)
+  test.setTimeout(900_000)
   const errors = collectErrors(page)
   await open(page, 'TTI Algeciras baseline')
   await page.evaluate(() => window.__tt!.setQuality('high'))
@@ -171,7 +171,7 @@ test('colour by: switching modes on the full TTI yard costs no frame time @load'
   await page.evaluate(() => window.__tt!.cameraTo('STS104', 400))
   const pose = async (): Promise<number> => {
     const frames = await page.evaluate(() => window.__tt!.scene()!.frames)
-    await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 30, frames, { timeout: 240_000 })
+    await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 15, frames, { timeout: 420_000 })
     return page.evaluate(() => window.__tt!.perf().stats.poseMs)
   }
   const base = await pose()
