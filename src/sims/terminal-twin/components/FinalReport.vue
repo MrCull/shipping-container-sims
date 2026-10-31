@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from './ui/TtIcon.vue'
 import { computed } from 'vue'
 import type { ExportKind } from '../engine'
 import { useTwinStore } from '../store/twinStore'
@@ -121,7 +122,7 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
         data-testid="tt-report-close"
         @click="store.reportOpen = false"
       >
-        ✕
+        <TtIcon name="close" />
       </button>
     </header>
     <p
@@ -305,10 +306,12 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
   overflow-y: auto;
   padding: 0.8rem 0.9rem;
   border-radius: 10px;
-  border: 1px solid var(--color-success);
-  background: rgba(17, 24, 39, 0.94);
-  color: var(--color-text);
-  font-family: var(--font-body);
+  border: 1px solid var(--tt-success);
+  background: var(--tt-panel-strong);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  color: var(--tt-text);
+  font-family: var(--tt-font);
   font-size: 0.85rem;
 }
 
@@ -327,7 +330,7 @@ h3 {
   font-size: 0.78rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .report.embedded {
@@ -335,7 +338,7 @@ h3 {
   width: auto;
   max-width: 60rem;
   margin: 0 auto;
-  border-color: var(--color-border);
+  border-color: var(--tt-border);
   background: transparent;
   overflow: visible;
 }
@@ -343,10 +346,10 @@ h3 {
 .close,
 .reopen,
 .export-btn {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg-card);
-  color: var(--color-text);
+  background: var(--tt-surface);
+  color: var(--tt-text);
   cursor: pointer;
   font: inherit;
 }
@@ -358,7 +361,7 @@ h3 {
 .close:hover,
 .reopen:hover,
 .export-btn:hover {
-  background: var(--color-bg-card-hover);
+  background: var(--tt-surface-hover);
 }
 
 .reopen {
@@ -367,7 +370,7 @@ h3 {
   top: 0.6rem;
   z-index: 7;
   padding: 0.35rem 0.8rem;
-  border-color: var(--color-success);
+  border-color: var(--tt-success);
 }
 
 .reason {
@@ -376,7 +379,7 @@ h3 {
 }
 
 .muted {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.8rem;
 }
 
@@ -389,12 +392,12 @@ h3 {
   margin-top: 0.7rem;
   padding: 0.55rem 0.65rem;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: rgba(31, 41, 55, 0.5);
+  border: 1px solid var(--tt-border);
+  background: var(--tt-surface-sunken);
 }
 
 .highlights {
-  border-color: var(--color-accent);
+  border-color: var(--tt-accent);
 }
 
 .highlights ul {
@@ -412,7 +415,7 @@ h3 {
 }
 
 .kpis dt {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .kpis dd {
@@ -441,7 +444,7 @@ th:first-child {
 }
 
 thead th {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-weight: 500;
 }
 

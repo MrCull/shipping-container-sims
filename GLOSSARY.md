@@ -287,3 +287,6 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 
 - **Vessel ordering (`pod-weight`):** the default work order inside a package (`as-today` is the rollback) (`vesselPlanning.ordering`): discharge stack by stack in yard-group order, load bottom-up with later PODs and heavier boxes first. POD and weight are soft preferences; stacking order is the only hard rule. A *broken ordering preference* is a box with a later POD, or a heavier weight class, than the box under it (or a yard group split in the discharge sequence); counted in `kpis.ordering`.
+- **Skin:** the light Terminal Twin look: `--tt-*` design tokens in `skin.css`, frosted panels, navy text, one TTI-blue accent, amber and red only for alerts. Scoped to the sim; other sims keep the global dark tokens.
+- **Frosted panel:** an off-white, translucent surface with a backdrop blur (`--tt-panel`, `--tt-blur`) that floats over the 3D view: top bar, side panels, popups, KPI strip.
+

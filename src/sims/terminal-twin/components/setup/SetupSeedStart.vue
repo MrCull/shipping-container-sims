@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from '../ui/TtIcon.vue'
 import { t } from '../../i18n/messages'
 import { useSetupDraft } from '../../composables/useSetupDraft'
 import LocaleDateTimeInput from '../LocaleDateTimeInput.vue'
@@ -26,7 +27,7 @@ const d = useSetupDraft()
           :title="t('setup.rerollHint')"
           @click="d.reroll()"
         >
-          {{ t('setup.reroll') }}
+          <TtIcon name="refresh" /> {{ t('setup.reroll') }}
         </button>
       </span>
     </label>
@@ -56,15 +57,15 @@ const d = useSetupDraft()
 
 .btn {
   padding: 0.45rem 0.9rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-size: 0.85rem;
   white-space: nowrap;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 </style>
