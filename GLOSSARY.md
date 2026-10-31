@@ -247,6 +247,8 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **North Quay:** TTI's 550 m of quay beside the working berths, drawn idle (non-operational).
 - **Cue:** a moment (box landed, vessel horn, scenario complete) that may make a sound or banner when the display clock reaches it.
 - **Master gain:** the single level every Terminal Twin sound is scaled by: the shared volume, or 0 while muted.
+- **Sound mixer:** the pure module (`modules/soundMixer.ts`) that maps the camera and the active sound sources (machine position plus motion state) to *voices* with gains: distance attenuation, at most 12 voices (loudest first). `positionalSound.ts` plays them through Web Audio. *Avoid:* "audio engine".
+- **Gantrying:** an STS or ASC travelling along its rails (a gantry-axis motion segment in progress, `SceneModel.isGantrying`). Only then do it sound the gantry alarm and flash its amber beacons.
 - **FPS chip:** the always-visible frames-per-second readout beside the volume control (amber below 30, red below 20); clicking it toggles the perf panel.
 
 ## Persistence (TT-17)

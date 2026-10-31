@@ -618,6 +618,13 @@ export class SceneModel {
     return { x: value('trolley', start.x), z: value('gantry', start.z), hoistY: value('hoist', start.hoistY) }
   }
 
+  /** True while the STS or ASC `id` travels along its rails at `time` (a gantry-axis segment is in progress). Drives the gantry alarm and beacons. */
+  isGantrying(id: string, time: number): boolean {
+    const list = this.axisSegments[id]?.gantry ?? []
+    const i = lastAtOrBefore(list, time, (s) => s.t0)
+    return i >= 0 && time < list[i].t1 && list[i].from !== list[i].to
+  }
+
   stsPose(stsId: string, time: number): StsPose {
     const axes = this.axisSegments[stsId]
     const pose = { ...this.initialPose[stsId] }
