@@ -15,6 +15,7 @@ components/debug/ => terminal-twin-debugger
 (^|/)(persistence|saves)/ => terminal-twin-saves
 (^|/)(atmosphere|backdrop)[A-Za-z-]*\.ts$|terminals/ => terminal-twin-atmosphere
 (^|/)(FpsChip|PerfPanel|AudioControls|positionalSound|soundMixer|audio)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-volume-fps
+(^|/)(positionalSound|soundMixer|soundShots|sceneModel|synth)\.ts$|assets/sounds/ => gantry-alarm
 components/setup/|(^|/)scenarioPicker|(^|/)scenario/ => terminal-twin-presets terminal-twin-yard-start terminal-twin-subsystem-modes
 skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => terminal-twin-hud terminal-twin-views
 (^|/)[A-Za-z-]*(camera|Camera)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-camera terminal-twin-keyboard-camera

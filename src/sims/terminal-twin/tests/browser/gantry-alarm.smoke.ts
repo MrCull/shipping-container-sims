@@ -7,6 +7,8 @@ import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 
 const FIXTURE = 'asc-1sts-10-boxes-1block'
+/** The harbour ambience's voice (#129): always on and faint, whatever the cranes do. */
+const AMBIENCE = 'harbourAmbience:harbour'
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = []
@@ -47,10 +49,10 @@ async function playUntilGantrying(page: Page): Promise<string> {
 test('beacons flash only on cranes that are gantrying, and the alarm voice follows the camera', async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
-  // stopped at the start: no beacons, no voices
+  // stopped at the start: no beacons, no machine voices (the harbour ambience may already play, faintly)
   let scene = (await page.evaluate(() => window.__tt!.scene()))!
   expect(scene.gantryBeacons).toEqual({ gantrying: [], lit: [] })
-  expect((await page.evaluate(() => window.__tt!.atmosphere())).positional.voices).toEqual([])
+  expect((await page.evaluate(() => window.__tt!.atmosphere())).positional.voices.filter((v) => v.key !== AMBIENCE)).toEqual([])
 
   const id = await playUntilGantrying(page)
   await page.evaluate((e) => window.__tt!.cameraTo(e, 60), id)
@@ -81,9 +83,9 @@ test('beacons flash only on cranes that are gantrying, and the alarm voice follo
   const near = (await page.evaluate(() => window.__tt!.atmosphere())).positional.voices.find((v) => v.key === `gantryAlarm:${id}`)!
   expect(near.gain).toBeGreaterThan(0.2)
 
-  // pausing stops the crane: no beacons, no voices
+  // pausing stops the crane: no beacons, no machine voices (the ambience stays)
   await page.evaluate(() => window.__tt!.pause())
-  await page.waitForFunction(() => window.__tt!.atmosphere().positional.voices.length === 0 && window.__tt!.scene()!.gantryBeacons.gantrying.length === 0, undefined, { timeout: 10_000 })
+  await page.waitForFunction(() => window.__tt!.atmosphere().positional.voices.every((v) => v.key === 'harbourAmbience:harbour') && window.__tt!.scene()!.gantryBeacons.gantrying.length === 0, undefined, { timeout: 10_000 })
   expect(errors).toEqual([])
 })
 

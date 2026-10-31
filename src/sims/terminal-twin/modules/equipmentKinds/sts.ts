@@ -93,6 +93,11 @@ class StsRenderer implements KindRenderer {
       const x = model.stsPose(id, t).gantryX
       this.host.beacons.update(id, { x, y: 0, z: 0 }, gantrying, frame.flashOn)
       frame.sounds.push({ id, machine: 'sts', x, y: 12, z: STS.waterRailZ + STS.gauge / 2, motion: gantrying ? 'gantrying' : 'idle' })
+      if (frame.live && model.isWorking(id, t)) {
+        // trolley and hoist whine, from the trolley
+        const pose = model.stsPose(id, t)
+        frame.sounds.push({ id, machine: 'sts', x, y: STS.portalY + 4, z: pose.trolleyZ, motion: 'working' })
+      }
     }
     for (const [id, m] of this.stsModels) {
       const pose = model.stsPose(id, t)
