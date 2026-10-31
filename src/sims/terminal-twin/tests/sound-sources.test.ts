@@ -77,7 +77,7 @@ describe('scene model sound shots from custody handoffs', () => {
   it('clunks when a crane picks a box up and when it lets go, and thuds when the box lands', () => {
     const { m, box, sts } = setup()
     const slot = m.custodyAt(box, 0)!
-    m.apply(emptyDelta({ custody: [{ containerId: box, t: 10, owner: { kind: 'sts', id: sts } }, { containerId: box, t: 40, owner: { kind: 'groundPosition', id: 'G1' }, x: 100 }] }))
+    m.apply(emptyDelta({ custody: [{ containerId: box, t: 10, eventId: 0, owner: { kind: 'sts', id: sts } }, { containerId: box, t: 40, eventId: 0, owner: { kind: 'groundPosition', id: 'G1' }, x: 100 }] }))
     const pick = m.shotsBetween(9, 11)
     expect(pick.map((s) => [s.machine, s.id, s.motion])).toEqual([['sts', sts, 'locking']])
     expect(slot).not.toBeNull()
@@ -89,14 +89,14 @@ describe('scene model sound shots from custody handoffs', () => {
 
   it('does not thud for a handover between two carriers, and works for an ASC', () => {
     const { m, box, sts, asc } = setup()
-    m.apply(emptyDelta({ custody: [{ containerId: box, t: 5, owner: { kind: 'asc', id: asc } }, { containerId: box, t: 20, owner: { kind: 'sts', id: sts } }] }))
+    m.apply(emptyDelta({ custody: [{ containerId: box, t: 5, eventId: 0, owner: { kind: 'asc', id: asc } }, { containerId: box, t: 20, eventId: 0, owner: { kind: 'sts', id: sts } }] }))
     expect(m.shotsBetween(4, 6).map((s) => [s.machine, s.motion])).toEqual([['asc', 'locking']])
     expect(m.shotsBetween(19, 21).map((s) => [s.machine, s.id, s.motion]).sort()).toEqual([['asc', asc, 'unlocking'], ['sts', sts, 'locking']].sort())
   })
 
   it('forgets old shots when pruned and reads each shot once per window (t0 exclusive, t1 inclusive)', () => {
     const { m, box, sts } = setup()
-    m.apply(emptyDelta({ custody: [{ containerId: box, t: 10, owner: { kind: 'sts', id: sts } }] }))
+    m.apply(emptyDelta({ custody: [{ containerId: box, t: 10, eventId: 0, owner: { kind: 'sts', id: sts } }] }))
     expect(m.shotsBetween(10, 11)).toEqual([])
     expect(m.shotsBetween(9, 10)).toHaveLength(1)
     m.prune(100)
