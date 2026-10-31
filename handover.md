@@ -18,11 +18,11 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #122 skin + landing | #118 | merged, pushed (verify green; the follow-camera spec failure did not reproduce: agent 5 of 5 pass, my merged-tree runs mixed; smoke is now the final ticket's job) |
 | #123 surroundings | #120 | merged, pushed. Open question: North Quay is at +x but +x is south in the scenery axes and the photo shows the quay at the north end |
 | #124 STS model | #121 | merged, pushed. Follow-up: move #125's STS beacon offsets onto the model's `beaconMounts` |
-| #126 vessel countdown | #122 | built, awaiting merge: `tt/126-vessel-countdown` (67248a4) |
-| #127 paired bays | #122 | built, merging: `tt/127-paired-bay-viewer` (2eadc83) |
-| #128 ASC + truck | #124 | not started |
+| #126 vessel countdown | #122 | merged, pushed. Per-STS "done" is approximate within a work package; approaching vessels have no label |
+| #127 paired bays | #122 | merged, pushed |
+| #128 ASC + truck | #124 | implementer running (`tt/128-asc-truck-models`) |
 | #129 sounds rest | #125 | merged, pushed. Not checked by ear; no perf reading |
-| #130 colour by + hide ROB | #122, #127 | not started |
+| #130 colour by + hide ROB | #122, #127 | implementer running (`tt/130-colour-by-hide-rob`) |
 | #131 V holds | #117, #127 | not started |
 | #133 smoke suite + fixes | all others | not started; start only when everything else is merged and the machine is idle. Suspects: `terminal-twin-debugger` follow-camera SHC spec, `terminal-twin-kpi` "end condition ends the run" (`toBeEnabled`), `terminal-twin.smoke` Run to… popup (see the issue) |
 
