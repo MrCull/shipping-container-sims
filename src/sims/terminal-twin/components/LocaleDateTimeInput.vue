@@ -92,17 +92,17 @@ function commit(): void {
 <style scoped>
 .locale-datetime {
   padding: 0.45rem 0.6rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-family: var(--tt-font-mono);
   min-width: 0;
   width: 100%;
 }
 
 .locale-datetime[aria-invalid='true'] {
-  border-color: var(--color-danger);
-  outline: 1px solid var(--color-danger);
+  border-color: var(--tt-danger);
+  outline: 1px solid var(--tt-danger);
 }
 </style>

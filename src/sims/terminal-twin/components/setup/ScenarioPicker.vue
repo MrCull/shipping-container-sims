@@ -3,13 +3,15 @@ import { computed, ref } from 'vue'
 import { t } from '../../i18n/messages'
 import { useSetupDraft } from '../../composables/useSetupDraft'
 import { resolveScenario } from '../../store/twinStore'
-import { fixtureRow, layoutSketch, presetCopy, scenarioStats, statChips } from '../../modules/scenarioPicker'
+import { fixtureRow, layoutSketch, presetCopy, scenarioDurationS, scenarioStats, statChips } from '../../modules/scenarioPicker'
+import { useTwinStore } from '../../store/twinStore'
 
 /**
  * Scenario picker (TT-R04): presets as hero cards (chips and a layout sketch derived from the config), the engine
  * test fixtures in a collapsed table. Choosing one sets `d.name`; the detail panel (in the dialog shell) shows it.
  */
 const d = useSetupDraft()
+const store = useTwinStore()
 
 const presetCards = computed(() =>
   d.catalogue
@@ -21,7 +23,9 @@ const presetCards = computed(() =>
         name: c.name,
         tagline: copy ? t(copy.tagline) : '',
         description: copy ? t(copy.description) : c.description,
-        chips: statChips(scenarioStats(config)).map((chip) => ({ id: chip.id, label: t(chip.key, { value: chip.value }) })),
+        vessels: config.vessels.length,
+        duration: store.fmt.duration(scenarioDurationS(config)),
+        chips: statChips(scenarioStats(config)).filter((chip) => chip.id !== 'vessels').map((chip) => ({ id: chip.id, label: t(chip.key, { value: chip.value }) })),
         sketch: layoutSketch(config),
       }
     }),
@@ -109,6 +113,17 @@ const select = (name: string): void => {
           </svg>
           <span class="card-name">{{ c.name }}</span>
           <span class="card-tagline">{{ c.tagline }}</span>
+          <span class="card-description">{{ c.description }}</span>
+          <span class="card-meta">
+            <span
+              class="meta-item"
+              data-testid="tt-card-vessels"
+            >{{ t('setup.card.vessels', { value: c.vessels }) }}</span>
+            <span
+              class="meta-item"
+              data-testid="tt-card-duration"
+            >{{ t('setup.card.duration', { value: c.duration }) }}</span>
+          </span>
           <ul class="chips">
             <li
               v-for="chip in c.chips"
@@ -194,79 +209,124 @@ const select = (name: string): void => {
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-@media (max-width: 700px) {
-  .cards {
-    grid-template-columns: 1fr;
-  }
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
 }
 
 .card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  padding: 0.7rem;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-bg);
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  grid-template-areas:
+    'sketch name'
+    'sketch tagline'
+    'sketch description'
+    'sketch meta'
+    'sketch chips';
+  column-gap: 0.9rem;
+  row-gap: 0.25rem;
+  align-items: start;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  background: var(--tt-surface);
   cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+@media (max-width: 700px) {
+  .card {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'name' 'tagline' 'description' 'meta' 'chips';
+  }
+
+  .sketch {
+    display: none;
+  }
 }
 
 .card:hover,
 .card:focus-visible {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
   outline: none;
 }
 
+.card:focus-visible {
+  box-shadow: var(--tt-ring);
+}
+
 .card.active {
-  border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg));
-  box-shadow: 0 0 0 1px var(--color-primary);
+  border-color: var(--tt-accent);
+  background: var(--tt-accent-soft);
+  box-shadow: 0 0 0 1px var(--tt-accent);
 }
 
 .sketch {
+  grid-area: sketch;
   width: 100%;
-  height: 5.5rem;
-  background: var(--color-bg-card);
-  border-radius: 6px;
+  height: 6.5rem;
+  background: var(--tt-surface-sunken);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius-sm);
 }
 
 .sketch .sea {
-  fill: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  fill: var(--tt-accent-soft);
 }
 
 .sketch .quay {
-  stroke: var(--color-text-muted);
+  stroke: var(--tt-text-muted);
   stroke-width: 4;
 }
 
 .sketch .sts {
-  fill: var(--color-accent);
+  fill: var(--tt-accent);
 }
 
 .sketch .block {
-  fill: var(--color-text-muted);
-  opacity: 0.7;
+  fill: var(--tt-text-muted);
+  opacity: 0.55;
 }
 
 .sketch .gate {
-  fill: var(--color-primary);
+  fill: var(--tt-plan-gate);
 }
 
 .card-name {
+  grid-area: name;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .card-tagline {
-  color: var(--color-text-muted);
+  grid-area: tagline;
+  color: var(--tt-accent);
   font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.card-description {
+  grid-area: description;
+  color: var(--tt-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.card-meta {
+  grid-area: meta;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1rem;
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.meta-item {
+  font-variant-numeric: tabular-nums;
 }
 
 .chips {
+  grid-area: chips;
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
@@ -277,16 +337,15 @@ const select = (name: string): void => {
 
 .chip {
   padding: 0.1rem 0.5rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 999px;
-  font-size: 0.7rem;
-  font-family: var(--tt-font-mono);
-  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  color: var(--tt-text-muted);
 }
 
 .fixtures summary {
   cursor: pointer;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -303,7 +362,7 @@ th,
 td {
   padding: 0.3rem 0.5rem;
   text-align: right;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--tt-border);
   font-variant-numeric: tabular-nums;
 }
 
@@ -314,7 +373,7 @@ th:first-child {
 }
 
 thead th {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-weight: 600;
 }
 
@@ -324,11 +383,11 @@ tbody tr {
 
 tbody tr:hover,
 tbody tr:focus-visible {
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--tt-accent) 8%, transparent);
   outline: none;
 }
 
 tbody tr.active {
-  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  background: color-mix(in srgb, var(--tt-accent) 16%, transparent);
 }
 </style>

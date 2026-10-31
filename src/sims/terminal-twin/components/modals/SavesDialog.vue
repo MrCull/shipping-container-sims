@@ -288,7 +288,7 @@ async function applyInterval(): Promise<void> {
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(10, 14, 26, 0.6);
+  background: var(--tt-scrim);
 }
 
 .saves {
@@ -299,12 +299,12 @@ async function applyInterval(): Promise<void> {
   flex-direction: column;
   gap: 0.7rem;
   padding: 1.2rem 1.4rem;
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  color: var(--color-text);
-  font-family: var(--font-body);
+  box-shadow: var(--tt-shadow-lg);
+  color: var(--tt-text);
+  font-family: var(--tt-font);
 }
 
 h2 {
@@ -333,7 +333,7 @@ h3 {
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.78rem;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .field.inline {
@@ -344,10 +344,10 @@ h3 {
 
 .field input {
   padding: 0.35rem 0.5rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-family: var(--tt-font-mono);
 }
 
@@ -361,21 +361,21 @@ h3 {
 
 .btn {
   padding: 0.35rem 0.75rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-size: 0.82rem;
 }
 
 .btn.primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
+  background: var(--tt-accent);
+  border-color: var(--tt-accent);
+  color: var(--tt-on-accent);
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .btn:disabled {
@@ -385,26 +385,26 @@ h3 {
 
 .msg {
   padding: 0.5rem 0.7rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 8px;
   font-size: 0.82rem;
 }
 
 .msg.error {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
+  border-color: var(--tt-danger);
+  color: var(--tt-danger);
 }
 
 .msg.warn {
-  border-color: var(--color-accent);
+  border-color: var(--tt-accent);
 }
 
 .msg.info {
-  border-color: var(--color-success);
+  border-color: var(--tt-success);
 }
 
 .note {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.78rem;
 }
 
@@ -423,13 +423,13 @@ h3 {
   align-items: center;
   gap: 0.5rem;
   padding: 0.3rem 0;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--tt-border);
 }
 
 .kind {
   min-width: 5rem;
   font-size: 0.75rem;
-  color: var(--color-accent);
+  color: var(--tt-accent);
 }
 
 .label {

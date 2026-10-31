@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { catalogues } from '../i18n/messages'
-import { fixtureRow, layoutSketch, presetCopy, scenarioStats, statChips } from '../modules/scenarioPicker'
+import { fixtureRow, layoutSketch, presetCopy, scenarioDurationS, scenarioStats, statChips } from '../modules/scenarioPicker'
 import { PEAK_DAY_PRESET_NAME, presets } from '../scenario/presets'
 import { fixtures } from '../scenario/fixtures'
 
@@ -42,5 +42,13 @@ describe('scenario picker display model', () => {
       expect(catalogues.en[copy!.description].length).toBeGreaterThan(20)
     }
     expect(Object.keys(presets)).not.toContain('Stress test')
+  })
+
+  it('estimates the run length: the stated end time, else the last arrival plus mooring and work', () => {
+    const peak = presets[PEAK_DAY_PRESET_NAME]()
+    const lastArrival = Math.max(...peak.vessels.map((v) => v.arrivalS))
+    expect(scenarioDurationS(peak)).toBeGreaterThan(lastArrival + 1800)
+    expect(scenarioDurationS({ ...peak, endConditions: { simDurationS: 7200 } })).toBe(7200)
+    for (const name of Object.keys(presets)) expect(scenarioDurationS(presets[name]!())).toBeGreaterThan(0)
   })
 })
