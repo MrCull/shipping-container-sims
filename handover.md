@@ -13,7 +13,7 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #121 SHC model | none | merged and pushed (`155fc54`). Verified by lint, build, 1265 unit tests and the SHC smoke specs (`shc-model`, `terminal-twin-shc`: 8 of 8 pass; the LOD spec timed out once under load and passed alone in 38 s). The generic smoke run was stopped at 67 passed, 0 failed, by decision. The steering spec's window was widened 6 s to 14 s and not compared with the base |
 | #120 folder + Rock | none | merged, pushed (conflict in `scene-quality-atmosphere.md` resolved by keeping both sides). Follow-up: Rock not visible from the Quay and Overview cameras |
 | #125 gantry alarm | #118 | merged, pushed. Smoke: `terminal-twin.smoke` "Run to… popup" fails under load (also on the commit before #125), passes when quiet |
-| #122 skin + landing | #118 | built, awaiting merge: `tt/122-professional-skin` (e0aeab0) |
+| #122 skin + landing | #118 | NOT merged: `terminal-twin-debugger` "follow camera tracks a moving SHC smoothly" fails after it (camera jump 44 m vs 40 m limit, quiet machine; passes on 76890a9). Agent a355271 was asked to find the per-frame cost (likely `backdrop-filter` blur) and fix the skin. Merge it FIRST: `tt/123` and `tt/129` were built on its merge (eb45ad3) and carry its commits |
 | #123 surroundings | #120 | built, awaiting merge: `tt/123-algeciras-surroundings` (e8383be). Open question: North Quay is at +x but +x is south in the scenery axes and the photo shows the quay at the north end |
 | #124 STS model | #121 | built, awaiting merge: `tt/124-sts-crane-model` (1b86326). Follow-up: move #125's STS beacon offsets onto the model's `beaconMounts` |
 | #126 vessel countdown | #122 | not started |
@@ -23,7 +23,7 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #130 colour by + hide ROB | #122, #127 | not started |
 | #131 V holds | #117, #127 | not started |
 
-Merge order: #121 (finish or redo), #120, #125, then #122 once it reports. Then start the newly unblocked tickets (#123, #124, #129, then #126/#127 and onward), at most three agents at a time.
+Merge order: #122 (after its fix), then #124, #123, #129. Then start the newly unblocked tickets (#123, #124, #129, then #126/#127 and onward), at most three agents at a time.
 
 ## Open decisions for the user
 
