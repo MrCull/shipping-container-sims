@@ -44,6 +44,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Discharge / load:** a vessel-to-quay move / a quay-to-vessel move.
 - **Vessel call:** one vessel's visit: arrival, size class (Feeder, Feedermax, Panamax, Neo-Panamax, ULCV), discharge/load/transshipment counts and max STS. The **vessel table** lists the calls.
 - **Mooring / unmooring:** the time from berth allocation to all-fast, and from the last move to departure.
+- **Vessel status (#126):** the view of one vessel the popup and label show: phase (approaching, waiting for berth, mooring, working, unmooring, departed), ETA, **operations start** (the berth time once berthed, else berth allocation plus the mooring time, an estimate; unknown while waiting) and the **countdown** to it, and moves done and remaining per STS. Display only: not in the event log.
 - **Crane split:** which STS cranes work which bays of a vessel (a decision point). Cranes keep rail order, so bay ranges follow crane order.
 - **Twin-20 lift:** an STS lift of the two 20 ft boxes of one cell in one cycle; each box gets its own ground position.
 - **Deck before hold:** within a bay, an STS discharges the deck stacks (top tier first) before the hold.
