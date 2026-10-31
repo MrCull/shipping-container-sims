@@ -443,6 +443,13 @@ export interface ScenarioConfig {
   robBayFraction?: number
   /** Fill level (0-1, default 0.7) of the ROB bays: share of their hold and deck cells that hold a box. */
   robFill?: number
+  /**
+   * Arrival stow (spec #134, #148): target share (0-1) of a vessel's cells that hold a box on arrival (discharge boxes
+   * plus ROB boxes). Absent = none: the vessel carries its discharge boxes only, plus whatever `robBayFraction` adds.
+   * With it, `scenario/robBays.ts` sets aside as many extra ROB bays as the vessel's own box counts leave room for,
+   * so a small call still looks like a normally stowed ship. Presets set it; fixtures keep their exact boxes.
+   */
+  arrivalFill?: number
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
   /** Vessel Planning options (spec #106); optional. */

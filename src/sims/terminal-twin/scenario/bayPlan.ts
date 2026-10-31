@@ -27,8 +27,8 @@ import { sampleDwell, transshipmentConfig } from './dwell'
 import type { ContainerSize, ScenarioConfig, VesselConfig, Weights } from './types'
 import { cellsPerBay, holdCellsPerBay, isCellUsable, rowRange, stackBaseTier, vesselClass, vesselSlotId, type CellHalf } from './vesselClasses'
 import { makePlannedContainer } from './containerFactory'
-import { drawContainerProps, isoTypeOf, resolveContainerProps, type ContainerProps } from './containerProps'
-import { fillRobBays, pickRobBays, robBayFractionOf, workableCells, type RobBox } from './robBays'
+import { drawContainerProps, grossKgOf, isoTypeOf, resolveContainerProps, type ContainerProps } from './containerProps'
+import { arrivalRobBayCount, fillRobBays, pickRobBays, robBayFractionOf, workableCells, type RobBox } from './robBays'
 import { stowByPodWeight, vesselOrderingOf, type StowItem } from '../engine/vesselOrdering'
 
 export type SlotPurpose = 'discharge' | 'load' | 'transshipment'
@@ -245,32 +245,70 @@ function planVessel(
   // 2. Discharge cells: spread over bays with jitter, hold/deck in proportion, bottom-up.
   const occupied = new Set<string>()
   const cells: { bay: number; row: number; tier: number }[] = []
-  const perBay = apportion(
-    units.length,
-    // uneven: some bays carry much more discharge than others
-    Array.from({ length: spec.bays }, () => 0.1 + 1.9 * rng() ** 2),
-    Array.from({ length: spec.bays }, (_, bay) => (robBays.has(bay) ? 0 : cellsPerBay(spec))),
-  )
+  // uneven: some bays carry much more discharge than others
+  const bayWeights = Array.from({ length: spec.bays }, () => 0.1 + 1.9 * rng() ** 2)
+  const bayCaps = Array.from({ length: spec.bays }, (_, bay) => (robBays.has(bay) ? 0 : cellsPerBay(spec)))
+  // The odd 20 ft box (a lone half) may not share a stack with a 40, so it gets a stack of its own when one is free
+  // (set last in `units`, placed after the rest); only a vessel with no free stack left falls back to `stowDischarge`.
+  const loneAt = units.findIndex((u) => cellKindOf(u.boxes) === 'lone')
+  if (loneAt >= 0) units.push(...units.splice(loneAt, 1))
+  const spareLone = loneAt >= 0
+  /**
+   * Fill `n` cells of one section (hold or deck) of a bay stack by stack, full height, from the centreline out: a stack
+   * stands on the hull floor or the hatch cover and is complete before the next one starts, so nothing floats and the
+   * outer stacks stay clear for the load boxes.
+   */
   const fill = (bay: number, fromTier: number, toTier: number, n: number) => {
-    for (let tier = fromTier; tier < toTier && n > 0; tier++)
-      for (let row = rowRange(spec, tier).from; row < rowRange(spec, tier).to && n > 0; row++) {
+    const mid = (spec.rows - 1) / 2
+    const rows = Array.from({ length: spec.rows }, (_, row) => row).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b)
+    for (const row of rows) {
+      for (let tier = fromTier; tier < toTier && n > 0; tier++) {
+        if (!isCellUsable(spec, row, tier)) continue
         cells.push({ bay, row, tier })
         occupied.add(`${bay}:${row}:${tier}`)
         n--
       }
-  }
-  perBay.forEach((q, bay) => {
-    const holdCap = holdCellsPerBay(spec)
-    const deckCap = spec.rows * spec.deckTiers
-    let deck = Math.min(deckCap, v.deckOnly ? q : Math.round((q * spec.deckTiers) / tiers))
-    let hold = q - deck
-    if (hold > holdCap) {
-      deck += hold - holdCap
-      hold = holdCap
+      if (n <= 0) break
     }
-    fill(bay, spec.holdTiers, tiers, deck)
-    fill(bay, 0, spec.holdTiers, hold)
-  })
+  }
+  const layOut = (count: number): number[] => {
+    const perBay = apportion(count, bayWeights, bayCaps)
+    perBay.forEach((q, bay) => {
+      const holdCap = holdCellsPerBay(spec)
+      const deckCap = spec.rows * spec.deckTiers
+      let deck = Math.min(deckCap, v.deckOnly ? q : Math.round((q * spec.deckTiers) / tiers))
+      let hold = q - deck
+      if (hold > holdCap) {
+        deck += hold - holdCap
+        hold = holdCap
+      }
+      fill(bay, spec.holdTiers, tiers, deck)
+      fill(bay, 0, spec.holdTiers, hold)
+    })
+    return perBay
+  }
+  const perBay = layOut(units.length - (spareLone ? 1 : 0))
+  if (spareLone) {
+    const mid = (spec.rows - 1) / 2
+    const rowsOut = Array.from({ length: spec.rows }, (_, row) => row).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b)
+    const bays = [...perBay.keys()].filter((b) => bayCaps[b] > 0).sort((a, b) => perBay[b] - perBay[a] || a - b)
+    let found: { bay: number; row: number; tier: number } | null = null
+    for (const bay of bays)
+      for (const deck of [false, true])
+        for (const row of rowsOut) {
+          const tier = stackBaseTier(spec, row, deck)
+          if (!found && tier < tiers && isCellUsable(spec, row, tier) && (tier >= spec.holdTiers) === deck && !occupied.has(`${bay}:${row}:${tier}`)) found = { bay, row, tier }
+        }
+    if (found) {
+      cells.push(found)
+      occupied.add(`${found.bay}:${found.row}:${found.tier}`)
+    } else {
+      // no free stack: lay everything out again with the odd box in the regular order
+      occupied.clear()
+      cells.length = 0
+      layOut(units.length)
+    }
+  }
 
   stowDischarge(units, cells, spec.holdTiers)
   /** Stacks that end in a lone 20 ft half: nothing but another half may go on top. */
@@ -341,6 +379,8 @@ function planVessel(
       const j = Math.floor(loadRng() * (i + 1))
       ;[loadUnits[i], loadUnits[j]] = [loadUnits[j], loadUnits[i]]
     }
+    // twin-20 cells first (stable): they leave their stacks open for the 40 ft cells after them, so no 20 is left without a legal stack
+    loadUnits.sort((a, b) => Number(cellKindOf(a.boxes) === 'full') - Number(cellKindOf(b.boxes) === 'full'))
     ;(v.empties ?? []).forEach((e, index) => {
       if (!(e.line in LINE_OWNER_PREFIX)) throw new Error(`Unknown shipping line ${e.line} (no owner prefix)`)
       const boxes: LoadBox[] = Array.from({ length: e.count }, () => ({ size: e.size, full: false, line: e.line, kind: 'empty' as const, req: index, isoType: e.isoType ?? isoTypeOf(e.size, false) }))
@@ -513,7 +553,8 @@ export function planCargo(config: ScenarioConfig, seed: number): CargoPlan {
   const plan: CargoPlan = { slots: [], containers: [], robBays: {}, rob: [] }
   const tsSources: PlannedContainer[] = []
   for (const v of config.vessels) {
-    const robBays = pickRobBays(config, seed, v)
+    const reserved = v.load + v.transshipment + (v.empties ?? []).reduce((n, e) => n + e.count, 0)
+    const robBays = pickRobBays(config, seed, v, arrivalRobBayCount(config, v, reserved))
     if (robBays.length > 0) plan.robBays[v.id] = robBays
     planVessel(config, v, rng, serials, plan, loadRng, dwellRng, tsSources, new Set(robBays))
     plan.rob.push(...fillRobBays(config, seed, v, robBays))
@@ -523,8 +564,73 @@ export function planCargo(config: ScenarioConfig, seed: number): CargoPlan {
     addEmptyPool(config, seed, plan, serials)
   } else for (const c of tsSources) delete c.ageS
   assignProps(config, seed, plan, new Set(tsSources.map((c) => c.id)))
+  stowArrivalByPolWeight(config, plan)
   if (vesselOrderingOf(config) === 'pod-weight') stowLoadByPodWeight(config, plan)
   return plan
+}
+
+/**
+ * Arrival stow (#148): the discharge boxes of a vessel trade cells so the ship looks really stowed. The cells, their
+ * kinds (twin-20, 40 ft, lone half) and the slot ids stay as planned; only which box sits where changes. Boxes go in
+ * port-of-loading order along the bays (aft to fore), so one POL is a block of neighbouring bays; within a bay the
+ * heavier units take the lower tiers, so weight never grows upwards in a stack of one kind of cell. 20 ft boxes pair
+ * in order (a pair shares a POL and a weight band), the odd one stays in its lone cell. Runs after the properties are
+ * drawn (it reads POL and weight) and draws nothing itself.
+ */
+function stowArrivalByPolWeight(config: ScenarioConfig, plan: CargoPlan): void {
+  const ports = resolveContainerProps(config).portRotation.ports
+  const polRank = (c: PlannedContainer): number => {
+    const i = ports.indexOf(c.props?.pol ?? '')
+    return i < 0 ? ports.length : i
+  }
+  const kg = (c: PlannedContainer): number => (c.props ? grossKgOf(c.props) : 0)
+  const byPolWeight = (a: PlannedContainer, b: PlannedContainer) => polRank(a) - polRank(b) || kg(b) - kg(a) || (a.id < b.id ? -1 : 1)
+  interface Cell {
+    bay: number
+    row: number
+    tier: number
+    kind: CellKind
+    slots: PlannedSlot[]
+  }
+  type Unit = PlannedContainer[]
+  const unitKg = (u: Unit) => u.reduce((n, x) => n + kg(x), 0)
+  /** Units in POL order go to the cells in bay order; then each bay re-sorts its units heavy first onto its low tiers. */
+  const place = (list: Unit[], group: Cell[]): [Unit, Cell][] => {
+    const out: [Unit, Cell][] = []
+    for (const bay of new Set(group.map((c) => c.bay))) {
+      const idx = group.map((c, i) => (c.bay === bay ? i : -1)).filter((i) => i >= 0)
+      const sorted = idx.map((i) => list[i]).sort((a, b) => unitKg(b) - unitKg(a))
+      idx.forEach((i, k) => out.push([sorted[k], group[i]]))
+    }
+    return out
+  }
+  for (const v of config.vessels) {
+    const boxes = plan.containers.filter((c) => c.flow === 'discharge' && c.vesselId === v.id)
+    if (boxes.length < 2) continue
+    const bySlot = new Map(plan.slots.filter((s) => s.vesselId === v.id).map((s) => [s.id, s]))
+    const cellMap = new Map<string, Cell>()
+    for (const c of boxes) {
+      const s = bySlot.get(c.slotId) as PlannedSlot
+      const key = `${s.bay}:${s.row}:${s.tier}`
+      const cell = cellMap.get(key) ?? { bay: s.bay, row: s.row, tier: s.tier, kind: 'full' as CellKind, slots: [] }
+      cell.slots.push(s)
+      cellMap.set(key, cell)
+    }
+    const cells = [...cellMap.values()]
+    for (const cell of cells) {
+      cell.slots.sort((a, b) => (a.half === 'aft' ? 0 : 1) - (b.half === 'aft' ? 0 : 1))
+      cell.kind = cell.slots[0].half === null ? 'full' : cell.slots.length === 2 ? 'pair' : 'lone'
+    }
+    const sortedCells = (kind: CellKind) => cells.filter((c) => c.kind === kind).sort((a, b) => a.bay - b.bay || a.tier - b.tier || a.row - b.row)
+    const twenties = boxes.filter((c) => c.size === '20').sort(byPolWeight)
+    const bigs = boxes.filter((c) => c.size !== '20').sort(byPolWeight)
+    const pairCells = sortedCells('pair')
+    const pairUnits: Unit[] = []
+    for (let i = 0; i + 1 < twenties.length && pairUnits.length < pairCells.length; i += 2) pairUnits.push([twenties[i], twenties[i + 1]])
+    const loneUnits: Unit[] = twenties.slice(pairUnits.length * 2).map((c) => [c])
+    const placements = [...place(pairUnits, pairCells), ...place(bigs.map((c) => [c]), sortedCells('full')), ...place(loneUnits, sortedCells('lone'))]
+    for (const [unit, cell] of placements) unit.forEach((box, k) => (box.slotId = cell.slots[k].id))
+  }
 }
 
 /**

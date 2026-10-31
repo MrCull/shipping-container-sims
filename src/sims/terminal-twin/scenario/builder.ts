@@ -311,6 +311,12 @@ export class ScenarioBuilder {
     return this
   }
 
+  /** Arrival stow (#148): target share of each vessel's cells holding a box on arrival; ROB bays make up what the call's own boxes leave. */
+  arrivalFill(share: number): this {
+    this.config.arrivalFill = share
+    return this
+  }
+
   decisions(decisions: DecisionsConfig): this {
     this.config.decisions = structuredClone(decisions)
     return this
