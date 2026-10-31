@@ -61,7 +61,7 @@ export function terminalArrivalS(box: Readonly<ContainerState>): number | null {
 }
 
 /** When the box left terminal custody for a carrier (sim s), or null while it is still here (or never was). */
-function terminalExitS(box: Readonly<ContainerState>): number | null {
+export function terminalExitS(box: Readonly<ContainerState>): number | null {
   const h = box.custodyHistory
   const i = h.findIndex((r) => isTerminalCustody(r.owner.kind))
   if (i < 0) return null

@@ -24,6 +24,7 @@ import { NO_OVERLAYS, type OverlayState } from './overlays'
 export type { OverlayState }
 import { ContainerInstancer } from './containerInstancer'
 import { describeMarkings } from './containerMarkings'
+import { colourContextOf, colourOf, DEFAULT_COLOUR_BY, hexToInt, isTimeBased, type ColourBy, type ColourContext } from './colourBy'
 import { liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { beaconFlashOn, GantryBeacons } from './gantryBeacons'
@@ -96,11 +97,18 @@ export interface RenderedLivery {
   index: number
   size: string
   lod: 0 | 1
+  /** Colour-by tint (0xRRGGBB) drawn, -1 for the livery. */
+  tint: number
   /** Centre drawn at the last update (m, world). */
   centre: Vec3
 }
 
 const LAND_RAIL_Z = STS.waterRailZ + STS.gauge
+
+/** Time-based colour modes (dwell, planned departure, transit) are re-evaluated per box once per this many sim seconds... */
+const COLOUR_BUCKET_S = 30
+/** ...and at most this many boxes per frame, so a flat-out clock never spends a frame on colours (the rest catch up over the next frames). */
+const COLOUR_BUDGET_PER_FRAME = 4000
 
 /** The scene's ambience (gulls, water, wind): not a machine, the same level everywhere. */
 const HARBOUR_SOURCE: SoundSource = { id: 'harbour', machine: 'harbour', x: 0, y: 0, z: 0, motion: 'idle' }
@@ -109,6 +117,14 @@ export class SceneRenderer {
   readonly scene = new THREE.Scene()
   private containers: ContainerInstancer
   private containerLivery: number[]
+  /** Colour by (#130): the mode, the facts its legend needs, and per box the tint drawn (0xRRGGBB, -1 = livery) with the epoch and time bucket it was computed for. */
+  private colourBy: ColourBy = DEFAULT_COLOUR_BY
+  private hideRob = false
+  private colourCtx: ColourContext
+  private colourEpoch = 1
+  private tint: number[] = []
+  private tintEpoch: number[] = []
+  private tintBucket: number[] = []
   private disposed = false
   private lastT = 0
   private renderers: { def: EquipmentKindDef; renderer: KindRenderer }[] = []
@@ -184,10 +200,11 @@ export class SceneRenderer {
       const d = model.containerDetail[id]
       return {
         markings: describeMarkings({ id, size: model.containerSize[id], line: model.containerLine[id], isoType: d?.isoType, laden: d?.laden ?? true, heavy: d?.heavy }),
-        bodyColour: liveryBodyColour(this.containerLivery[i]),
+        bodyColour: this.tint[i] >= 0 ? `#${this.tint[i].toString(16).padStart(6, '0')}` : liveryBodyColour(this.containerLivery[i]),
       }
     })
     this.containerLivery = model.containerIds.map((id) => liveryIndexForLine(model.containerLine[id]))
+    this.colourCtx = colourContextOf(config)
     this.scene.add(this.containers.group)
     loadContainerAssets().then(
       (assets) => {
@@ -457,6 +474,29 @@ export class SceneRenderer {
     return { ...this.atmosphere.state(), backdrop: { kind: this.backdrop.kind, parts: [...this.backdrop.parts], models: this.backdrop.models } }
   }
 
+  /** Colour by (#130): applies to yard, vessel and vehicle boxes in 3D (all LODs, the close-up too) and to the ROB boxes; `hideRob` hides the ROB boxes on vessels. */
+  setColourBy(mode: ColourBy, hideRob: boolean): void {
+    this.hideRob = hideRob
+    if (mode === this.colourBy) return
+    this.colourBy = mode
+    this.colourEpoch++
+  }
+
+  /** The colour-by tint of box `i` at `t` (0xRRGGBB, -1 = its livery). Static modes are cached per mode; time-based ones per 30 sim seconds, within a per-frame budget. */
+  private tintOf(i: number, id: string, t: number, budget: { left: number }): number {
+    const mode = this.colourBy
+    if (mode === 'default') return -1
+    const timeBased = isTimeBased(mode)
+    const bucket = timeBased ? Math.floor(t / COLOUR_BUCKET_S) : 0
+    if (this.tintEpoch[i] === this.colourEpoch && this.tintBucket[i] === bucket) return this.tint[i]
+    if (timeBased && budget.left <= 0) return this.tintEpoch[i] === this.colourEpoch ? this.tint[i] : -1 // over budget: a bucket stale (or still the livery after a mode switch), refreshed in the next frames
+    budget.left--
+    this.tint[i] = hexToInt(colourOf(mode, this.model.colourSubjectAt(id, t, timeBased), t, this.colourCtx).hex)
+    this.tintEpoch[i] = this.colourEpoch
+    this.tintBucket[i] = bucket
+    return this.tint[i]
+  }
+
   setOverlays(next: OverlayState): void {
     this.overlays = { ...next }
     this.laneOverlay.visible = next.laneGraph
@@ -470,11 +510,12 @@ export class SceneRenderer {
     const loads = new Map<string, { count: number; size: string }>()
     const carried = new Map<string, number>()
     containers.begin()
+    const colourBudget = { left: COLOUR_BUDGET_PER_FRAME }
     model.containerIds.forEach((id, i) => {
       const c = model.containerPose(id, t)
       if (!c) return
       this.containerLivery[i] ??= liveryIndexForLine(model.containerLine[id])
-      containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw)
+      containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget))
       if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
       if (wantsOwners) {
         const owner = model.custodyAt(id, t)
@@ -490,7 +531,7 @@ export class SceneRenderer {
     this.lastT = t
     this.atmosphere.update(t)
     this.sounds.length = 0
-    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), sounds: this.sounds }
+    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), colour: { mode: this.colourBy, hideRob: this.hideRob, ctx: this.colourCtx }, sounds: this.sounds }
     for (const { renderer } of this.renderers) renderer.update(frame)
     this.shots.update(model, t, this.live, performance.now(), this.sounds) // twistlock clunk, landing thud, air brake
     this.sounds.push(HARBOUR_SOURCE) // harbour ambience: not positional, always faint
@@ -603,7 +644,7 @@ export class SceneRenderer {
     this.model.containerIds.forEach((id, i) => {
       const r = this.containers.renderedContainer(i)
       const centre = r && this.model.containerCentre(id, this.lastT)
-      if (r && centre) out[id] = { index: r.livery, size: r.size, lod: r.lod, centre }
+      if (r && centre) out[id] = { index: r.livery, size: r.size, lod: r.lod, tint: r.tint, centre }
     })
     return out
   }

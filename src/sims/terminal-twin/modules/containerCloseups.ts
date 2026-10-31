@@ -29,6 +29,8 @@ interface Entry {
   material: THREE.MeshStandardMaterial
   texture: THREE.Texture
   size: ContainerSize
+  /** The colour-by tint the texture was painted for (-1: the livery). */
+  tint: number
   lastShown: number
 }
 
@@ -56,10 +58,10 @@ export class ContainerCloseups {
     this.shown = 0
   }
 
-  /** Draws box `key` this frame: origin at the bottom centre, yaw about Y. `source` is called only when the box has no cached texture. */
-  show(key: number, size: ContainerSize, x: number, y: number, z: number, yaw: number, source: () => CloseupSource): void {
+  /** Draws box `key` this frame (a changed `tint`, the colour by tint, paints it again): origin at the bottom centre, yaw about Y. `source` is called only when the box has no cached texture. */
+  show(key: number, size: ContainerSize, x: number, y: number, z: number, yaw: number, source: () => CloseupSource, tint = -1): void {
     let e = this.entries.get(key)
-    if (!e || e.size !== size) {
+    if (!e || e.size !== size || e.tint !== tint) {
       if (e) this.drop(key, e)
       const maps = (this.maps ??= this.getMaps())
       const texture = this.makeTexture(source(), size)
@@ -76,7 +78,7 @@ export class ContainerCloseups {
       mesh.receiveShadow = true
       mesh.matrixAutoUpdate = true
       this.group.add(mesh)
-      e = { mesh, material, texture, size, lastShown: 0 }
+      e = { mesh, material, texture, size, tint, lastShown: 0 }
       this.entries.set(key, e)
     }
     e.lastShown = this.frame

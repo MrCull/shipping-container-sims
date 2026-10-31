@@ -19,7 +19,8 @@ import type { SceneModel, Vec3 } from './sceneModel'
 import { hullMeta, loadHullModel, VESSEL_LIVERY_ATLAS, vesselHullColour, vesselLiveryIndex, type HullModel } from './vesselAssets'
 import { holdLinerOutline, hullHatchOpenings, hullWithOpenHatches } from './hullHatchOpening'
 import { hullPlacement, type HullMeta } from './vesselHull'
-import { buildRobMesh } from './robBoxes'
+import { buildRobMesh, type RobMesh } from './robBoxes'
+import type { ColourBy, ColourContext } from './colourBy'
 
 /** LOD switch distances (m, camera to the hull's bounding box) and hysteresis factor. */
 export const DEFAULT_VESSEL_LOD = { lod1M: 300, lod2M: 1100, hysteresis: 1.1 }
@@ -40,6 +41,8 @@ export interface VesselHullState {
   triangles: number | null
   /** ROB boxes (spec #106) drawn in this vessel's hull: display-only remain-on-board boxes of its ROB bays. */
   robBoxes: number
+  /** The ROB boxes are hidden (colour by menu, #130). */
+  robHidden: boolean
   /** The rendered hull's bay grid in world coordinates (from the GLB's bay_grid node); null when not in the scene. */
   bayGrid: {
     origin: Vec3
@@ -67,6 +70,7 @@ interface VesselEntry {
   lod: 0 | 1 | 2
   disposables: { dispose(): void }[]
   robBoxes: number
+  rob: RobMesh | null
 }
 
 export class VesselHulls {
@@ -105,11 +109,13 @@ export class VesselHulls {
         lod: 0,
         disposables: [],
         robBoxes: 0,
+        rob: null,
       }
       const rob = buildRobMesh(this.model.vesselSpec(v.id), model.robBoxes.filter((b) => b.vesselId === v.id))
       if (rob) {
         entry.root.add(rob.mesh)
         entry.robBoxes = rob.count
+        entry.rob = rob
         entry.disposables.push(rob)
       }
       entry.root.name = v.id
@@ -333,6 +339,21 @@ export class VesselHulls {
     return { visible, assets: this.entries.every((e) => e.hull) ? 'loaded' : 'placeholder', lods }
   }
 
+  private colourKey = ''
+
+  /** Colour by (#130): recolours the ROB boxes when the mode changes, hides them with `hideRob` (never drawn, so `robBoxes` reads 0). */
+  setColour(mode: ColourBy, hideRob: boolean, ctx: ColourContext): void {
+    const key = `${mode}:${hideRob}`
+    if (key === this.colourKey) return
+    const modeChanged = !this.colourKey.startsWith(`${mode}:`)
+    this.colourKey = key
+    for (const e of this.entries) {
+      if (!e.rob) continue
+      if (modeChanged) e.rob.setColour(mode, ctx)
+      e.rob.mesh.visible = !hideRob
+    }
+  }
+
   states(): Record<string, VesselHullState> {
     const out: Record<string, VesselHullState> = {}
     for (const e of this.entries) {
@@ -359,7 +380,8 @@ export class VesselHulls {
         assets: e.hull ? 'loaded' : 'placeholder',
         lod: e.hull && e.root.visible ? e.lod : null,
         triangles: e.hull && e.root.visible ? this.triangles(e) : null,
-        robBoxes: e.robBoxes,
+        robBoxes: e.rob && !e.rob.mesh.visible ? 0 : e.robBoxes,
+        robHidden: e.rob ? !e.rob.mesh.visible : false,
         bayGrid,
       }
     }

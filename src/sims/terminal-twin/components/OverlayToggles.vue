@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ColourByMenu from './ColourByMenu.vue'
 import { useTwinStore } from '../store/twinStore'
 import type { OverlayState } from '../modules/overlays'
 import { t, type MessageKey } from '../i18n/messages'
@@ -81,6 +82,11 @@ function toggle(key: keyof OverlayState): void {
       />
       {{ t('followNext.label') }}
     </button>
+    <span
+      class="sep"
+      aria-hidden="true"
+    />
+    <ColourByMenu />
   </div>
 </template>
 
@@ -93,7 +99,8 @@ function toggle(key: keyof OverlayState): void {
   position: relative;
   max-width: calc(100% - 1.6rem);
   margin-bottom: 1rem;
-  z-index: 6;
+  /* above the popups (bay viewer 8): the Colour by panel opens upwards from this bar */
+  z-index: 9;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;

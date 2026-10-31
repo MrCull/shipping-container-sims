@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** Outline icon set of the Terminal Twin skin (24x24 grid, 1.8 stroke, currentColor); decorative unless the parent labels it. */
-defineProps<{ name: 'close' | 'prev' | 'next' | 'play' | 'pause' | 'check' | 'alert' | 'warn' | 'refresh' }>()
+defineProps<{ name: 'close' | 'prev' | 'next' | 'play' | 'pause' | 'check' | 'alert' | 'warn' | 'refresh' | 'layers' }>()
 
 const PATHS: Record<string, string> = {
   close: 'M6 6l12 12M18 6L6 18',
@@ -12,6 +12,7 @@ const PATHS: Record<string, string> = {
   alert: 'M12 3.5l9.5 16.5h-19zM12 10v4.5M12 17.2v.1',
   warn: 'M12 3.5l9.5 16.5h-19zM12 10v4.5M12 17.2v.1',
   refresh: 'M19 12a7 7 0 11-2.1-5M19 4.5V8h-3.5',
+  layers: 'M12 4l8.5 4.5L12 13 3.5 8.5zM3.5 12.5L12 17l8.5-4.5M3.5 16L12 20.5 20.5 16',
 }
 </script>
 

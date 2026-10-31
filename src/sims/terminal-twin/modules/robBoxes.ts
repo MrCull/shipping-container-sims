@@ -7,6 +7,7 @@
 import * as THREE from 'three'
 import type { RobBox } from '../scenario/robBays'
 import { slotCentre, type VesselClassSpec } from '../scenario/vesselClasses'
+import { colourOf, type ColourBy, type ColourContext } from './colourBy'
 import { CONTAINER_DIMS } from './sceneModel'
 
 /** Muted palette (hex) by POD, so ROB boxes stay quieter than the boxes being worked. */
@@ -16,6 +17,8 @@ export interface RobMesh {
   mesh: THREE.InstancedMesh
   /** Boxes drawn. */
   count: number
+  /** Colour by (#130): `default` keeps the muted POD colours, every other mode uses the shared colour of that mode. */
+  setColour(mode: ColourBy, ctx: ColourContext): void
   dispose(): void
 }
 
@@ -31,20 +34,28 @@ export function buildRobMesh(spec: VesselClassSpec, boxes: readonly RobBox[]): R
   const pods = [...new Set(boxes.map((b) => b.pod))].sort()
   const m = new THREE.Matrix4()
   const colour = new THREE.Color()
+  const paint = (mode: ColourBy, ctx: ColourContext): void => {
+    boxes.forEach((b, i) => {
+      if (mode === 'default') colour.set(POD_COLOURS[pods.indexOf(b.pod) % POD_COLOURS.length])
+      else colour.set(colourOf(mode, { line: b.line, full: b.full, isoType: b.isoType, pod: b.pod, weightClass: b.weightClass, direction: 'TRANSSHIPMENT', onCall: false, rob: true }, 0, ctx).hex)
+      mesh.setColorAt(i, colour)
+    })
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+  }
   boxes.forEach((b, i) => {
     const d = CONTAINER_DIMS[b.size]
     const c = slotCentre(spec, 0, b, b.size)
     // a hair smaller than the cell, so neighbouring boxes show a seam
     m.compose(new THREE.Vector3(c.x, c.y, c.z), new THREE.Quaternion(), new THREE.Vector3(d.length - 0.1, d.height - 0.05, d.width - 0.05))
     mesh.setMatrixAt(i, m)
-    mesh.setColorAt(i, colour.set(POD_COLOURS[pods.indexOf(b.pod) % POD_COLOURS.length]))
   })
+  paint('default', { ports: [] })
   mesh.instanceMatrix.needsUpdate = true
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
   mesh.frustumCulled = false
   return {
     mesh,
     count: boxes.length,
+    setColour: paint,
     dispose() {
       geometry.dispose()
       material.dispose()

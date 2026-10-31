@@ -203,6 +203,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       overlaysApplied = overlays
       view.setOverlays(overlays)
     }
+    view.setColourBy(store.colourBy, store.hideRob)
     applyCameraKeys(now)
     if (store.following && store.selectedId) {
       // Follow camera (F): keep the selection centred, keeping the user's viewing offset.

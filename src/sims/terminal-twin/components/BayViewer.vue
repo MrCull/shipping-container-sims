@@ -7,9 +7,10 @@ import TtIcon from './ui/TtIcon.vue'
  * Refreshes a few times a second while open (never per frame).
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { buildBayView, COLOUR_MODES, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
+import { buildBayView, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
 import { useTwinStore } from '../store/twinStore'
 import { t, type MessageKey } from '../i18n/messages'
+import { colourKeyLabel } from '../modules/colourLabels'
 
 const store = useTwinStore()
 
@@ -17,7 +18,6 @@ const REFRESH_MS = 1000
 /** Widest one panel's cross-section may get (px; two panels sit side by side); a cell is as large as fits, up to MAX_CELL_PX. */
 const SECTION_WIDTH_PX = 210
 const MAX_CELL_PX = 24
-const PALETTE_SIZE = 8
 
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -28,7 +28,7 @@ const view = computed<BayView | null>(() => {
   if (!data) return null
   const locate = (id: string): string => store.locations.vesselSlot(id)?.notation ?? id
   try {
-    return buildBayView(data, store.bayViewerBay, { colourMode: store.bayViewerColour, locate })
+    return buildBayView(data, store.bayViewerBay, { colourMode: store.colourBy, locate })
   } catch {
     return null
   }
@@ -42,18 +42,22 @@ const cellPx = computed(() => {
 
 function cellClass(c: BayCell): string[] {
   const out = [`st-${c.status}`]
-  if (store.bayViewerColour !== 'status' && c.colourIndex !== null) out.push(`p${c.colourIndex % PALETTE_SIZE}`)
+  if (c.colour !== null) out.push('coloured')
   return out
 }
+
+/** The property modes fill a cell with the colour the 3D view uses for that value (the state shows in marks over it). */
+const cellStyle = (c: BayCell): { backgroundColor: string } | undefined => (c.colour === null ? undefined : { backgroundColor: c.colour })
+
+/** `default` shows the state of each cell; every other mode is the Colour by menu's. */
+const stateMode = computed(() => store.colourBy === 'default')
 
 const statusText = (s: CellStatus): string => t(`bayViewer.status.${s}` as MessageKey)
 const stripTitle = (e: BayView['strip'][number]): string =>
   `${t('bayViewer.stripBay', { bay: pad2(e.number), state: t(`bayViewer.stripState.${e.state}` as MessageKey) })}${e.total > 0 ? ` · ${t('bayViewer.stripProgress', { done: e.done, total: e.total })}` : ''}`
 
 function legendText(key: string): string {
-  if (store.bayViewerColour === 'status') return statusText(key as CellStatus)
-  if (store.bayViewerColour === 'weight') return t(`inspector.weightClass.${key}` as MessageKey)
-  return key
+  return stateMode.value ? statusText(key as CellStatus) : colourKeyLabel(store.colourBy, key)
 }
 
 /** Hover: the cell under the pointer and where to draw its tooltip (client coordinates). */
@@ -161,23 +165,13 @@ onBeforeUnmount(() => {
         >
           {{ t('bayViewer.nextShort') }} <TtIcon name="next" />
         </button>
-        <div
-          class="modes"
-          role="group"
-          :aria-label="t('bayViewer.colourBy')"
+        <p
+          class="mode-note"
+          data-testid="tt-bay-colour-mode"
+          :title="t('bayViewer.colourFromMenu')"
         >
-          <button
-            v-for="m in COLOUR_MODES"
-            :key="m"
-            type="button"
-            class="mode"
-            :data-testid="`tt-bay-mode-${m}`"
-            :aria-pressed="store.bayViewerColour === m"
-            @click="store.setBayViewerColour(m)"
-          >
-            {{ t(`bayViewer.mode.${m}` as MessageKey) }}
-          </button>
-        </div>
+          {{ t('bayViewer.colourBy') }}: {{ stateMode ? t('bayViewer.mode.status') : t(`colourBy.mode.${store.colourBy}` as MessageKey) }}
+        </p>
       </div>
 
       <ol
@@ -283,6 +277,7 @@ onBeforeUnmount(() => {
                         v-else
                         class="cell"
                         :class="cellClass(c)"
+                        :style="cellStyle(c)"
                         data-testid="tt-bay-cell"
                         :data-slot="c.slotId"
                         :data-status="c.status"
@@ -359,11 +354,12 @@ onBeforeUnmount(() => {
             >
               <span
                 class="cell swatch"
-                :class="[l.index === null ? `st-${l.key}` : `p${l.index % PALETTE_SIZE}`, store.bayViewerColour === 'status' ? '' : 'st-planned-discharge']"
+                :class="[l.index === null ? `st-${l.key}` : 'st-planned-discharge']"
+                :style="l.hex ? { backgroundColor: l.hex } : undefined"
               />
               <span>{{ legendText(l.key) }}</span>
               <span
-                v-if="store.bayViewerColour === 'status'"
+                v-if="stateMode"
                 class="count"
               >{{ view.counts[l.key as CellStatus] }}</span>
             </li>
@@ -398,14 +394,6 @@ onBeforeUnmount(() => {
   --bv-in-progress: var(--tt-data-active);
   --bv-done: var(--tt-data-done);
   --bv-rob: var(--tt-data-rob);
-  --p0: var(--tt-data-0);
-  --p1: var(--tt-data-1);
-  --p2: var(--tt-data-2);
-  --p3: var(--tt-data-3);
-  --p4: var(--tt-data-4);
-  --p5: var(--tt-data-5);
-  --p6: var(--tt-data-6);
-  --p7: var(--tt-data-7);
   position: absolute;
   top: 3.6rem;
   left: 0.9rem;
@@ -465,8 +453,7 @@ h2 {
   margin-bottom: 0.5rem;
 }
 
-.btn,
-.mode {
+.btn {
   border: 1px solid var(--tt-border);
   background: var(--tt-surface);
   color: var(--tt-text);
@@ -475,8 +462,7 @@ h2 {
   font-size: 0.78rem;
 }
 
-.btn:hover:not(:disabled),
-.mode:hover {
+.btn:hover:not(:disabled) {
   background: var(--tt-surface-hover);
 }
 
@@ -485,29 +471,10 @@ h2 {
   cursor: default;
 }
 
-.modes {
+.mode-note {
   margin-left: auto;
-  display: inline-flex;
-}
-
-.mode {
-  border-radius: 0;
-  margin-left: -1px;
-}
-
-.mode:first-child {
-  border-radius: 6px 0 0 6px;
-  margin-left: 0;
-}
-
-.mode:last-child {
-  border-radius: 0 6px 6px 0;
-}
-
-.mode[aria-pressed='true'] {
-  background: var(--tt-accent);
-  border-color: var(--tt-accent);
-  color: var(--tt-on-accent);
+  font-size: 0.78rem;
+  color: var(--tt-text-muted);
 }
 
 .strip {
@@ -696,7 +663,7 @@ h2 {
   visibility: hidden;
 }
 
-/* Fill: by state, or by the colour mode's palette (a property of the box). */
+/* Fill: by state, or inline by the colour mode (the same colours as the 3D view). */
 .cell.st-planned-discharge {
   background: var(--bv-planned-discharge);
 }
@@ -712,14 +679,6 @@ h2 {
 .cell.st-rob {
   background: var(--bv-rob);
 }
-.cell.p0 { background: var(--p0); }
-.cell.p1 { background: var(--p1); }
-.cell.p2 { background: var(--p2); }
-.cell.p3 { background: var(--p3); }
-.cell.p4 { background: var(--p4); }
-.cell.p5 { background: var(--p5); }
-.cell.p6 { background: var(--p6); }
-.cell.p7 { background: var(--p7); }
 
 /* State marks that survive any fill: outline = planned discharge, dashed = planned load, glow = in progress, faded = done, stripes = ROB. */
 .cell.st-planned-discharge {
@@ -740,7 +699,7 @@ h2 {
 .cell.st-rob {
   background-image: repeating-linear-gradient(45deg, var(--tt-hatch) 0 2px, transparent 2px 5px);
 }
-.cell.st-rob.p0, .cell.st-rob.p1, .cell.st-rob.p2, .cell.st-rob.p3, .cell.st-rob.p4, .cell.st-rob.p5, .cell.st-rob.p6, .cell.st-rob.p7 {
+.cell.st-rob.coloured {
   border-color: var(--tt-border-strong);
 }
 .cell.st-done::after {
