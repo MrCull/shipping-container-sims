@@ -21,7 +21,7 @@ import { EngineClient, type EngineResponse } from './engineClient'
 import { SceneModel } from './sceneModel'
 
 /** Speed steps (× real time). Pause is separate. */
-export const SPEEDS = [1, 2, 5, 10, 30, 60, 120, 300, 600] as const
+export const SPEEDS = [1, 2, 5, 10, 30, 60, 120, 300, 600, 1200, 1800, 3600] as const
 
 /** How far (wall seconds of playback) the engine runs ahead of the display. */
 const LOOKAHEAD_WALL_S = 1.5

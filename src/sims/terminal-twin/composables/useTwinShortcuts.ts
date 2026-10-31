@@ -18,9 +18,6 @@ export function useTwinShortcuts(): void {
       case 'togglePause':
         store.togglePause()
         break
-      case 'speedStep':
-        store.setSpeedStep(action.index)
-        break
       case 'pause':
         store.pause()
         break

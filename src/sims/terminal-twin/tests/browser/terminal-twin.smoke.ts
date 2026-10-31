@@ -89,6 +89,25 @@ test('×1 runs one sim second per wall second; ×600 keeps animating every frame
   expect(rate).toBeLessThan(600 * 1.1)
 })
 
+test('×3600 from the top bar advances the sim clock accordingly; digit keys leave the speed unchanged', async ({ page }) => {
+  // A long scenario, so the clock does not hit the scenario end within the window.
+  await page.goto('/sim/terminal-twin')
+  await page.waitForFunction(() => !!window.__tt)
+  await page.evaluate(() => window.__tt!.load('landside-morning-peak'))
+  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
+  await page.getByRole('button', { name: '×3600', exact: true }).click()
+  expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
+  const t0 = await page.evaluate(() => window.__tt!.clock().displayTime)
+  const w0 = Date.now()
+  await page.waitForTimeout(2000)
+  const t1 = await page.evaluate(() => window.__tt!.clock().displayTime)
+  const wallS = (Date.now() - w0) / 1000
+  // Engine-bound on a slow machine, so only require a clear multiple of x600 pace over the window.
+  expect((t1 - t0) / wallS).toBeGreaterThan(600)
+  await page.keyboard.press('2')
+  expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
+})
+
 test('Run to… jumps to the target and the scene matches the engine there', async ({ page }) => {
   const errors = collectErrors(page)
   await openTracer(page)
