@@ -3,6 +3,7 @@
  * Every value is overridable in the setup dialog. The layout is derived from the
  * counts (`scenario/layout.ts`), not placed by hand.
  */
+import { NORMAL_ARRIVAL_FILL } from './robBays'
 import { DEFAULT_HOURLY_PROFILE, ScenarioBuilder } from './builder'
 import { deriveBlockXs, deriveSts } from './layout'
 import { TTI_FLOW_MIX, generateVessels } from './vesselGenerator'
@@ -82,6 +83,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
     })
     .endWhen({ vesselsCompleted: spec.vessels.length })
   if (spec.portRotation) b.containerProps({ portRotation: spec.portRotation })
+  b.arrivalFill(NORMAL_ARRIVAL_FILL)
   if (spec.rob) b.robBays(spec.rob.bayFraction, spec.rob.fill)
   const base = b.build()
   const sts = deriveSts({ ...base, sts: [{ id: `STS${spec.stsFirst}`, gantryX: 0, groundPositions: 3 }] }, spec.sts, spec.quayM)
