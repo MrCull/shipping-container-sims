@@ -1,5 +1,7 @@
 # Handover: spec #116 (Terminal Twin polish)
 
+Progress view: every ticket merged into the integration branch carries the issue label `merged-in-branch` (issues close only when PR #132 merges). Label a ticket after each merge.
+
 Integration branch: `claude/zen-galileo-tp4owk` (PR #132, ready for review once the tickets land; the PR body must say `Closes #116` and every finished ticket). Orchestration steps: `docs/agents/implementing.md`.
 Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-sims/7cb06fff-bd34-5157-967c-2d516a65c2e7/scratchpad/` holds `spec-116.md` and `ticket-<n>.md`. A new session re-fetches them from GitHub issues #116–#131.
 
@@ -14,12 +16,12 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #120 folder + Rock | none | merged, pushed (conflict in `scene-quality-atmosphere.md` resolved by keeping both sides). Follow-up: Rock not visible from the Quay and Overview cameras |
 | #125 gantry alarm | #118 | merged, pushed. Smoke: `terminal-twin.smoke` "Run to… popup" fails under load (also on the commit before #125), passes when quiet |
 | #122 skin + landing | #118 | merged, pushed (verify green; the follow-camera spec failure did not reproduce: agent 5 of 5 pass, my merged-tree runs mixed; smoke is now the final ticket's job) |
-| #123 surroundings | #120 | built, awaiting merge: `tt/123-algeciras-surroundings` (e8383be). Open question: North Quay is at +x but +x is south in the scenery axes and the photo shows the quay at the north end |
-| #124 STS model | #121 | built, awaiting merge: `tt/124-sts-crane-model` (1b86326). Follow-up: move #125's STS beacon offsets onto the model's `beaconMounts` |
-| #126 vessel countdown | #122 | not started |
-| #127 paired bays | #122 | not started |
+| #123 surroundings | #120 | merged, pushed. Open question: North Quay is at +x but +x is south in the scenery axes and the photo shows the quay at the north end |
+| #124 STS model | #121 | merged, pushed. Follow-up: move #125's STS beacon offsets onto the model's `beaconMounts` |
+| #126 vessel countdown | #122 | built, awaiting merge: `tt/126-vessel-countdown` (67248a4) |
+| #127 paired bays | #122 | built, merging: `tt/127-paired-bay-viewer` (2eadc83) |
 | #128 ASC + truck | #124 | not started |
-| #129 sounds rest | #125 | implementer running (`tt/129-positional-sounds`) |
+| #129 sounds rest | #125 | merged, pushed. Not checked by ear; no perf reading |
 | #130 colour by + hide ROB | #122, #127 | not started |
 | #131 V holds | #117, #127 | not started |
 | #133 smoke suite + fixes | all others | not started; start only when everything else is merged and the machine is idle. Suspects: `terminal-twin-debugger` follow-camera SHC spec, `terminal-twin-kpi` "end condition ends the run" (`toBeEnabled`), `terminal-twin.smoke` Run to… popup (see the issue) |
