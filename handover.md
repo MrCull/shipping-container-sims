@@ -1,6 +1,6 @@
 # Handover: spec #134 (Terminal Twin polish, round 2)
 
-**Status: #135, #136, #137, #138, #146 merged in the integration branch `claude/stoic-hypatia-tk68z1`. Not started: #139 to #143, #147, #148, #149, #144/#145 (owner approval), #150.**
+**Status: #135, #136, #137, #138, #143, #146, #148 merged in the integration branch `claude/stoic-hypatia-tk68z1` (PR #152). Run paused by the owner: no further tickets started. Not started: #139, #140, #141, #142, #147, #149, #144/#145 (owner approval), #150.**
 
 ## Where things are
 
@@ -59,3 +59,30 @@ Committed in `docs/reference/tti-algeciras/` (owner decision). The aerial road l
 ## Owner instruction for this run
 
 No unit tests, `pnpm run verify` or browser smoke specs per ticket: the single full run (verify, goldens, smoke) happens at the end, in #150. Merges are plain `git merge` without `scripts/merge-ticket.sh` verification, so #137, #138 and #146 have only the implementers' own verify results (#137 and #146 ran verify green; #138 not confirmed) and the combined tree is unverified. Allowed per ticket: lint, build, targeted tests that take seconds.
+
+## State at pause
+
+| Ticket | State |
+|---|---|
+| #135 em dashes | merged (verified) |
+| #136 build stamp | merged (verified) |
+| #137 audio control | merged (implementer ran verify green) |
+| #138 speed steps | merged, verify not confirmed |
+| #146 TTI road | merged, ENGINE_VERSION 0.27.0, goldens unchanged, KPI comparison in the commit message |
+| #148 arrival stows | merged, ENGINE_VERSION 0.28.0, goldens stale on purpose |
+| #143 close-up faces | merged, no verify, smoke and `@load` specs written but never run, frame times not measured |
+| #139, #140, #141, #142 | not started (any order, two at a time) |
+| #147 scenery and North Quay | not started (unblocked, #146 merged) |
+| #149 yard mix | not started (unblocked, #148 merged; must run alone, it moves goldens) |
+| #144 start screen prototype | not started, needs the owner's approval in a comment before #145 |
+| #145 start screen build | blocked by #144 |
+| #150 smoke suite | last |
+
+The owner paused the run: no further tickets were started after #143.
+
+## To do at the end (in #150 or just before)
+
+1. `pnpm install`, then `pnpm run verify`; fix failures from the unverified merges (#137, #138, #143, #146, #148 touched engine or shared files).
+2. Regenerate goldens once, on purpose, after #149: `UPDATE_GOLDEN=1 pnpm test`; record KPI comparisons (the #148 one is in its commit message; #149 still needs its own).
+3. Run the smoke specs that were never run: build stamp (dev and prod), audio (Terminal Twin and Container Stack), close-up block edge, and the `@load` 10-boxes-wide spec locally only. #143 assumes block `B01` exists in the TTI baseline.
+4. Implementer follow-ups: #148 fill is only 35 to 46% for feeders at full scale (30% test floor), and ROB bays can leave one STS working a call (owner may want a spread rule); #143 dropped the old per-box door rods and corner castings (the GLB LOD0 carries them) and its frame-time table in `docs/scene-quality-atmosphere.md` says "not measured".
