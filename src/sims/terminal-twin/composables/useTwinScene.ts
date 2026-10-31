@@ -79,11 +79,11 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     view?.setQuality(profile)
   }
 
-  function aim(target: { x: number; y: number; z: number }, keepOffset: boolean, distanceM?: number): void {
+  function aim(target: { x: number; y: number; z: number }, keepOffset: boolean, distanceM?: number, openingOffset?: { x: number; y: number; z: number } | null): void {
     if (!camera || !controls) return
     const offset = keepOffset
       ? camera.position.clone().sub(controls.target)
-      : new THREE.Vector3(95, 70, 115)
+      : new THREE.Vector3(openingOffset?.x ?? 95, openingOffset?.y ?? 70, openingOffset?.z ?? 115)
     if (distanceM !== undefined) offset.setLength(Math.max(controls.minDistance, distanceM))
     controls.target.set(target.x, target.y, target.z)
     camera.position.copy(controls.target).add(offset)
@@ -183,7 +183,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     overlaysApplied = null
     view.setQuality(profileFor(perf.effective))
     lightingKey = ''
-    aim(view.overviewTarget(), false)
+    aim(view.overviewTarget(), false, undefined, view.defaultCameraOffset())
   }
 
   function loop(now: number): void {

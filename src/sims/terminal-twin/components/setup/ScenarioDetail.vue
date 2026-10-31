@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { t } from '../../i18n/messages'
 import { useSetupDraft } from '../../composables/useSetupDraft'
 import { useTwinStore } from '../../store/twinStore'
-import { TTI_DERIVED_BAYS_PRESETS } from '../../scenario/presets'
+import { terminalPresetInfo } from '../../terminals'
 import { presetCopy } from '../../modules/scenarioPicker'
 
 /** Detail panel of the selected scenario (TT-R04): description, key figures and the one prominent Start button. */
@@ -13,7 +13,7 @@ const d = useSetupDraft()
 const store = useTwinStore()
 
 /** The preset's bay count comes from a published capacity, not a layout drawing: say so. */
-const derivedBaysNote = computed(() => TTI_DERIVED_BAYS_PRESETS.includes(d.name))
+const derivedBaysNote = computed(() => terminalPresetInfo(d.name)?.derivedBays === true)
 
 const description = computed(() => {
   const copy = presetCopy(d.name)
