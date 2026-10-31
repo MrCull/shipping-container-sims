@@ -63,6 +63,7 @@ Each sim that has grown beyond a trivial prototype maintains its own agent guide
 - **Scoped styles**: Use `<style scoped>` in all components.
 - **CSS variables**: Use the design tokens defined in `src/assets/main.css` (e.g. `--color-primary`).
 - **No em dash**: never write the em dash character (U+2014) in any text (code, strings, comments, docs, commits, issues, PR bodies); use a comma, colon, full stop, brackets or "to". `scripts/check-no-em-dash.mjs` (part of `verify` and CI) fails on it.
+- **Build stamp**: the main menu footer (`src/pages/HomePage.vue` only, never a sim) shows the build time and short commit hash. `vite.config.ts` injects `__BUILD_TIME__` and `__BUILD_COMMIT__` via `define` (commit from `git rev-parse`, else `GITHUB_SHA`, else empty so the stamp shows time only); `src/utils/buildStamp.ts` formats it, and the dev server shows "dev".
 - **Keep this guide current**: When project-wide details change or new tooling, conventions, or structure are added that affect how agents or contributors work, update **AGENTS.md** in the same change (or a follow-up) so it stays accurate.
 
 ## Plans
