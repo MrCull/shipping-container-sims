@@ -124,7 +124,7 @@ terminal-twin/
 │   ├── logging.ts            Structured log records + per-subsystem verbosity (EVENT_LOG_META)
 │   ├── runDiff.ts            diffEventLogs: first diverging event between two logs
 │   └── rng.ts, hash.ts, eventQueue.ts
-├── terminals/                Per-terminal folders (types.ts, index.ts registry, tti-algeciras/: constants, scenery, profile): a real terminal's constants, preset presentation and scenery; generic modules ask the registry, never a preset name (docs/scene-quality-atmosphere.md)
+├── terminals/                Per-terminal folders (types.ts, index.ts registry, tti-algeciras/: constants, scenery, profile): a real terminal's constants, preset presentation and scenery (TTI: Rock, hills, shore, anchorage, tanks, road and rail, town); generic modules ask the registry, never a preset name (docs/scene-quality-atmosphere.md)
 ├── scenario/
 │   ├── types.ts              ScenarioConfig (schemaVersion 1, SI units)
 │   ├── builder.ts            Typed ScenarioBuilder + [A] default kinematics
