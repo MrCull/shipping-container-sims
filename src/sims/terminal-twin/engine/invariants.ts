@@ -35,7 +35,7 @@ import { shcPositionAt } from './subsystems/shc'
 import { truckPositionAt } from './subsystems/landside'
 import { ASC_MIN_SEPARATION_M, blockSpecs, REEFER_MAX_TIERS, travelHoistM } from './yardLayout'
 import type { ScenarioConfig } from '../scenario/types'
-import { hatchPanelId, hatchPanelOfRow, vesselClass, vesselSlotId } from '../scenario/vesselClasses'
+import { hatchPanelId, hatchPanelOfRow, isCellUsable, isStackBase, vesselClass, vesselSlotId } from '../scenario/vesselClasses'
 import { hatchSettings } from './hatch'
 
 export interface InvariantViolation {
@@ -555,8 +555,7 @@ export const INVARIANTS: Invariant[] = [
       }
       // TT-R07: no 20 ft box on a 40 ft box; a 40 ft box only on a 40 ft box or on two 20 ft halves (cell-level, per section)
       for (const s of boxes) {
-        const holdTiers = vesselClass(state.vessels[s.vesselId].sizeClass).holdTiers
-        if (s.tier === 0 || s.tier === holdTiers) continue
+        if (isStackBase(vesselClass(state.vessels[s.vesselId].sizeClass), s.row, s.tier)) continue
         const below = filled.get(`${s.vesselId}:${s.bay}:${s.row}:${s.tier - 1}`) ?? []
         if (s.half !== null && below.includes(null))
           messages.push(`20 ft box ${s.containerId} in ${s.id} sits on a 40 ft box (bay ${s.bay} row ${s.row} tier ${s.tier - 1})`)
@@ -564,11 +563,29 @@ export const INVARIANTS: Invariant[] = [
           messages.push(`40 ft box ${s.containerId} in ${s.id} sits on a single 20 ft half (bay ${s.bay} row ${s.row} tier ${s.tier - 1})`)
       }
       for (const s of loads) {
-        const holdTiers = vesselClass(state.vessels[s.vesselId].sizeClass).holdTiers
-        if (s.tier === 0 || s.tier === holdTiers) continue
+        if (isStackBase(vesselClass(state.vessels[s.vesselId].sizeClass), s.row, s.tier)) continue
         const below = filled.get(`${s.vesselId}:${s.bay}:${s.row}:${s.tier - 1}`) ?? []
         if (!below.some((h) => h === null || s.half === null || h === s.half))
           messages.push(`box ${s.containerId} in ${s.id} lies above an empty cell (bay ${s.bay} row ${s.row} tier ${s.tier - 1})`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'hull.profile',
+    reads: ['vessel', 'container'],
+    description:
+      'Hull profile (spec #116): below deck the holds narrow towards the keel, so a box on board never occupies a cell ' +
+      'outside the usable rows of its tier (`holdRows` of the vessel class). Planning, ROB fill and loading only use cells inside the profile.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      for (const s of Object.values(state.vesselSlots)) {
+        if (!s.containerId) continue
+        if (scope && !scope.vessels.has(s.vesselId)) continue
+        const spec = vesselClass(state.vessels[s.vesselId].sizeClass)
+        if (!isCellUsable(spec, s.row, s.tier))
+          messages.push(`box ${s.containerId} in ${s.id} is outside the ${spec.label} hull profile (bay ${s.bay} row ${s.row} tier ${s.tier})`)
       }
       return messages
     },

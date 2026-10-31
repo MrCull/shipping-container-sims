@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from '../ui/TtIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { BREAKPOINT_KINDS, breakpointLabel, type BreakpointKind } from '../../modules/breakpoints'
 import { buildFeedRows, FEED_MAX_ROWS, FEED_REFRESH_MS, shouldSummarise, type FeedRow } from '../../modules/eventFeed'
@@ -91,7 +92,7 @@ watch(() => [store.feedOpen, store.feedFilter, store.paused, summarised.value], 
           aria-expanded="true"
           @click="store.toggleFeed()"
         >
-          ◀
+          <TtIcon name="prev" />
         </button>
       </header>
 
@@ -271,7 +272,7 @@ watch(() => [store.feedOpen, store.feedFilter, store.paused, summarised.value], 
   z-index: 7;
   pointer-events: none;
   font-size: 0.8rem;
-  color: var(--color-text);
+  color: var(--tt-text);
 }
 
 .feed > * {
@@ -282,18 +283,20 @@ watch(() => [store.feedOpen, store.feedFilter, store.paused, summarised.value], 
   align-self: flex-start;
   margin-top: 0.8rem;
   padding: 0.45rem 0.7rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-left: none;
   border-radius: 0 8px 8px 0;
-  background: rgba(17, 24, 39, 0.9);
-  color: var(--color-text);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  color: var(--tt-text);
   font-size: 0.8rem;
 }
 
 .tab:hover,
 .icon-btn:hover,
 .btn:hover {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .body {
@@ -304,8 +307,10 @@ watch(() => [store.feedOpen, store.feedFilter, store.paused, summarised.value], 
   flex: none;
   min-height: 0;
   padding: 0.6rem 0.7rem;
-  border-right: 1px solid var(--color-border);
-  background: rgba(17, 24, 39, 0.94);
+  border-right: 1px solid var(--tt-border);
+  background: var(--tt-panel-strong);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
   overflow: hidden;
 }
 
@@ -323,7 +328,7 @@ h3 {
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .controls {
@@ -334,10 +339,10 @@ h3 {
 .btn,
 .icon-btn {
   padding: 0.3rem 0.65rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--tt-bg);
+  color: var(--tt-text);
   font-size: 0.8rem;
 }
 
@@ -351,9 +356,9 @@ h3 {
 
 .stopped {
   padding: 0.35rem 0.5rem;
-  border: 1px solid var(--color-accent);
+  border: 1px solid var(--tt-accent);
   border-radius: 6px;
-  background: rgba(245, 158, 11, 0.12);
+  background: var(--tt-accent-soft);
   font-weight: 600;
 }
 
@@ -373,10 +378,10 @@ select,
 input {
   min-width: 0;
   padding: 0.3rem 0.4rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--tt-bg);
+  color: var(--tt-text);
   font-size: 0.8rem;
 }
 
@@ -392,7 +397,7 @@ input {
   align-items: center;
   justify-content: space-between;
   padding: 0.15rem 0.4rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
 }
 
@@ -405,13 +410,13 @@ code {
   align-self: flex-start;
   border: none;
   background: none;
-  color: var(--color-primary);
+  color: var(--tt-accent);
   font-size: 0.75rem;
   text-decoration: underline;
 }
 
 .muted {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.75rem;
 }
 
@@ -437,28 +442,28 @@ code {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--color-text);
+  color: var(--tt-text);
   text-align: left;
   font-size: 0.75rem;
 }
 
 .row:hover {
-  background: var(--color-bg-card-hover);
+  background: var(--tt-surface-hover);
 }
 
 .row.hit {
-  background: rgba(245, 158, 11, 0.2);
+  background: var(--tt-accent-soft);
 }
 
 .row.burst .type {
-  color: var(--color-accent);
+  color: var(--tt-accent);
 }
 
 .time {
   grid-area: time;
   font-family: var(--tt-font-mono);
   font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .type {
@@ -470,7 +475,7 @@ code {
 
 .who {
   grid-area: who;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

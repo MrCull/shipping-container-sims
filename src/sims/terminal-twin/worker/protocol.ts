@@ -22,6 +22,7 @@ import type {
 } from '../engine'
 import type { Breakpoint } from '../modules/breakpoints'
 import type { ContainerSize, ScenarioConfig } from '../scenario/types'
+import type { ContainerProps } from '../scenario/containerProps'
 
 /** Serialisable subset of the engine's RunCondition (no predicate). */
 export type WorkerRunCondition = Omit<RunCondition, 'predicate'>
@@ -44,6 +45,8 @@ export type QueryKind =
   | 'vesselSlots'
   /** `BayViewData` of one vessel (spec #106, #115): slots, their boxes, work packages and ROB boxes. */
   | 'bayView'
+  /** `VesselStatusInput` of one vessel (spec #126): ETA, berth times, mooring time and moves per STS. */
+  | 'vesselStatus'
   | 'sts'
   | 'stsList'
   | 'groundPosition'
@@ -179,6 +182,12 @@ export interface NewContainer {
   id: string
   size: ContainerSize
   line: string
+  /** Laden, ISO type and heavy rating, for the close-up markings (#119). Absent = laden general-purpose box. */
+  full?: boolean
+  isoType?: string
+  heavy?: boolean
+  /** Stored properties, for the colour modes (#130). */
+  props?: ContainerProps
 }
 
 export interface Delta {

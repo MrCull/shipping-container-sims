@@ -84,9 +84,14 @@ onUnmounted(() => {
     </header>
 
     <div
-      v-if="simId !== 'box-empire' && simId !== 'terminal-twin'"
+      v-if="simId !== 'box-empire'"
       class="top-right-controls"
     >
+      <!-- A sim can teleport its own header chips here (Terminal Twin: the FPS chip). -->
+      <div
+        id="sim-header-slot"
+        class="header-slot"
+      />
       <div
         v-if="showGodBadge"
         class="god-badge"
@@ -166,6 +171,12 @@ onUnmounted(() => {
   top: 1rem;
   right: 1rem;
   z-index: 140;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.header-slot {
   display: flex;
   align-items: center;
   gap: 0.45rem;

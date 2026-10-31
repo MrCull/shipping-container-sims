@@ -59,7 +59,7 @@ const store = useTwinStore()
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(10, 14, 26, 0.6);
+  background: var(--tt-scrim);
 }
 
 .help {
@@ -70,12 +70,12 @@ const store = useTwinStore()
   flex-direction: column;
   gap: 0.8rem;
   padding: 1.2rem 1.4rem;
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  color: var(--color-text);
-  font-family: var(--font-body);
+  box-shadow: var(--tt-shadow-lg);
+  color: var(--tt-text);
+  font-family: var(--tt-font);
 }
 
 h2 {
@@ -97,24 +97,24 @@ th {
 
 td {
   padding: 0.3rem 0;
-  color: var(--color-text);
+  color: var(--tt-text);
 }
 
 kbd {
   display: inline-block;
   min-width: 1.6rem;
   padding: 0.1rem 0.45rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-bottom-width: 2px;
   border-radius: 5px;
-  background: var(--color-bg);
+  background: var(--tt-bg);
   font-family: var(--tt-font-mono);
   font-size: 0.78rem;
   text-align: center;
 }
 
 .note {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.78rem;
 }
 
@@ -125,14 +125,14 @@ kbd {
 
 .btn {
   padding: 0.4rem 0.9rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-size: 0.85rem;
 }
 
 .btn:hover {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 </style>

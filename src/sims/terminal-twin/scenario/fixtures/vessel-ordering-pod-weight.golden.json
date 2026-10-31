@@ -3,10 +3,10 @@
   "seed": 7,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "0bebd20268e7d4",
+  "eventLogHash": "1444300975b732",
   "kpis": {
-    "simTimeS": 24586.111,
-    "eventsProcessed": 4461,
+    "simTimeS": 25177.89,
+    "eventsProcessed": 4472,
     "movesCompleted": 104,
     "vesselsCompleted": 1,
     "sts": {
@@ -14,7 +14,7 @@
         "moves": 104,
         "cycles": 87,
         "twinLifts": 17,
-        "grossMovesPerHour": 15.405,
+        "grossMovesPerHour": 15.039,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 24586.111,
-        "turnaroundS": 24526.111,
+        "departedAtS": 25177.89,
+        "turnaroundS": 25117.89,
         "sts": [
           "STS01"
         ]
@@ -43,9 +43,9 @@
     "handlers": {
       "stsGroundPosition": {
         "handler": "strategy:lowest-free-lane",
-        "calls": 122,
-        "resolved": 122,
-        "ok": 122,
+        "calls": 125,
+        "resolved": 125,
+        "ok": 125,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -127,9 +127,9 @@
       },
       "ascDispatch": {
         "handler": "strategy:waterside-first",
-        "calls": 297,
-        "resolved": 297,
-        "ok": 297,
+        "calls": 295,
+        "resolved": 295,
+        "ok": 295,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -190,9 +190,9 @@
       },
       "workPackageRelease": {
         "handler": "strategy:keep-k-ahead",
-        "calls": 51,
-        "resolved": 51,
-        "ok": 51,
+        "calls": 50,
+        "resolved": 50,
+        "ok": 50,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -235,39 +235,39 @@
       "boxesToWtp": 60,
       "shcs": {
         "SHC01": {
-          "jobs": 84,
-          "emptyDistanceM": 20520.067,
-          "loadedDistanceM": 10139.933,
-          "reservationWaitS": 386.488,
+          "jobs": 85,
+          "emptyDistanceM": 20746.567,
+          "loadedDistanceM": 10296.433,
+          "reservationWaitS": 444.361,
           "stateS": {
-            "parked": 16091.651,
-            "moving-to-collect": 2338.844,
-            "queuing-to-collect": 19.497,
-            "collecting": 2255.541,
-            "moving-to-deliver": 294,
+            "parked": 16531.594,
+            "moving-to-collect": 2418.264,
+            "queuing-to-collect": 22.932,
+            "collecting": 2275.415,
+            "moving-to-deliver": 297.5,
             "queuing-to-deliver": 0,
-            "delivering": 3586.578
+            "delivering": 3632.185
           },
-          "handovers": 168,
-          "parkingReturns": 84,
+          "handovers": 170,
+          "parkingReturns": 85,
           "queueArrivals": 0
         },
         "SHC02": {
-          "jobs": 20,
-          "emptyDistanceM": 5164.433,
-          "loadedDistanceM": 2731.567,
-          "reservationWaitS": 224.434,
+          "jobs": 19,
+          "emptyDistanceM": 4914.933,
+          "loadedDistanceM": 2597.067,
+          "reservationWaitS": 150.065,
           "stateS": {
-            "parked": 22349.509,
-            "moving-to-collect": 654.947,
-            "queuing-to-collect": 4.812,
-            "collecting": 626.933,
-            "moving-to-deliver": 70,
+            "parked": 23110.506,
+            "moving-to-collect": 555.122,
+            "queuing-to-collect": 2.119,
+            "collecting": 605.732,
+            "moving-to-deliver": 66.5,
             "queuing-to-deliver": 0,
-            "delivering": 879.911
+            "delivering": 837.91
           },
-          "handovers": 40,
-          "parkingReturns": 20,
+          "handovers": 38,
+          "parkingReturns": 19,
           "queueArrivals": 0
         },
         "SHC03": {
@@ -276,7 +276,7 @@
           "loadedDistanceM": 0,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 24586.111,
+            "parked": 25177.89,
             "moving-to-collect": 0,
             "queuing-to-collect": 0,
             "collecting": 0,
@@ -290,7 +290,7 @@
         }
       },
       "stsGroundPositionWaitS": {
-        "STS01": 3354.002
+        "STS01": 4238.87
       }
     },
     "yard": {
@@ -300,8 +300,8 @@
       "grouping": {
         "placements": 60,
         "mixedStack": 0,
-        "orderBroken": 4,
-        "mixedBay": 16
+        "orderBroken": 1,
+        "mixedBay": 15
       },
       "rehandles": {
         "total": 0,
@@ -323,12 +323,12 @@
       "ascs": {
         "B01-ASC1": {
           "jobs": 104,
-          "gantryM": 13376.4,
-          "trolleyM": 1381.5,
-          "hoistM": 4946.912,
+          "gantryM": 13832,
+          "trolleyM": 1296.2,
+          "hoistM": 4993.248,
           "padWaitS": 0,
           "railWaitS": 19.191,
-          "busyS": 13972.242,
+          "busyS": 14122.067,
           "yields": 0
         },
         "B01-ASC2": {
@@ -347,33 +347,33 @@
       "IMPORT": {
         "count": 55,
         "departed": 0,
-        "meanS": 12620.435,
-        "maxS": 24461.918
+        "meanS": 13099.339,
+        "maxS": 25053.697
       },
       "EXPORT": {
         "count": 44,
         "departed": 44,
-        "meanS": 16524.41,
-        "maxS": 162208.609
+        "meanS": 21061.746,
+        "maxS": 247945.406
       },
       "STORAGE": {
         "count": 9,
         "departed": 0,
-        "meanS": 269553.451,
-        "maxS": 616153.111
+        "meanS": 248455.569,
+        "maxS": 616744.89
       }
     },
     "hatch": {
       "moves": 28,
       "removes": 14,
       "replaces": 14,
-      "stsTimeS": 7284.258,
-      "waitS": 1558.949,
+      "stsTimeS": 7274.453,
+      "waitS": 1393.933,
       "sts": {
         "STS01": {
           "moves": 28,
-          "timeS": 7284.258,
-          "waitS": 1558.949
+          "timeS": 7274.453,
+          "waitS": 1393.933
         }
       }
     },
@@ -381,8 +381,8 @@
       "released": 49,
       "started": 49,
       "completed": 49,
-      "leadTimeMeanS": 979.306,
-      "leadTimeMaxS": 2325.068,
+      "leadTimeMeanS": 1000.093,
+      "leadTimeMaxS": 2860.306,
       "boxesLoaded": 44
     },
     "ordering": {
@@ -392,14 +392,14 @@
       },
       "load": {
         "boxes": 40,
-        "podOnEarlier": 2,
-        "heavyOnLight": 2
+        "podOnEarlier": 1,
+        "heavyOnLight": 4
       }
     }
   },
   "invariants": {
     "enabled": true,
-    "checks": 4460,
+    "checks": 4471,
     "violations": 0,
     "first": null
   },

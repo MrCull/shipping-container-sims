@@ -168,10 +168,28 @@ describe('STS model (Malaccamax quay crane)', () => {
     }
   })
 
-  it('carries a ZPMC wordmark and crane-number plates, and no operator branding', () => {
+  it('carries the TTI ALGECIRAS livery as text, ZPMC plates and crane-number plates', () => {
     expect(meta.branding.wordmark).toBe('ZPMC')
+    expect(meta.branding.livery).toBe('TTI ALGECIRAS')
+    expect(meta.branding.operatorBranding).toBe(true)
+    expect(meta.branding.note).toMatch(/no logo artwork/)
     expect(meta.branding.craneNumbers.first).toBe(101)
     expect(meta.branding.craneNumbers.count).toBeGreaterThanOrEqual(24)
-    expect(JSON.stringify(meta.branding)).not.toMatch(/TTI|ALGECIRAS/i)
+  })
+
+  it('exposes the amber beacon mount points on the gantry, two per leg and two per portal beam', () => {
+    const mounts = meta.beaconMounts as { name: string; node: string; position: number[]; lens: string }[]
+    expect(mounts).toHaveLength(8)
+    expect(new Set(mounts.map((b) => b.name)).size).toBe(8)
+    for (const b of mounts) {
+      expect(b.node).toBe('gantry')
+      expect(b.lens).toBe('amber')
+      expect(b.position).toHaveLength(3)
+    }
+    // Both rails (z = 0 and one gauge landward) and both sides of the crane centre line carry beacons.
+    const zs = new Set(mounts.map((b) => b.position[2]))
+    expect([...zs].sort((a, b) => a - b)).toEqual([0, meta.geometry.railGaugeM.value])
+    expect(mounts.some((b) => b.position[0] < 0) && mounts.some((b) => b.position[0] > 0)).toBe(true)
+    expect(Math.max(...mounts.map((b) => b.position[1]))).toBeGreaterThan(40) // the portal pair sits high
   })
 })

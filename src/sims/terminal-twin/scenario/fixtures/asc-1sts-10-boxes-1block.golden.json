@@ -3,7 +3,7 @@
   "seed": 42,
   "status": "ended",
   "endReason": "simDurationS >= 1800",
-  "eventLogHash": "03660f1a46e5a4",
+  "eventLogHash": "0e6c5e7ae69cb0",
   "kpis": {
     "simTimeS": 1800,
     "eventsProcessed": 390,
@@ -14,7 +14,7 @@
         "moves": 10,
         "cycles": 8,
         "twinLifts": 2,
-        "grossMovesPerHour": 31.802,
+        "grossMovesPerHour": 31.411,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1272.263,
-        "turnaroundS": 1212.263,
+        "departedAtS": 1286.341,
+        "turnaroundS": 1226.341,
         "sts": [
           "STS01"
         ]
@@ -274,7 +274,7 @@
       "IMPORT": {
         "count": 10,
         "departed": 0,
-        "meanS": 1203.872,
+        "meanS": 1197.984,
         "maxS": 1667.813
       }
     },
@@ -282,8 +282,8 @@
       "released": 8,
       "started": 8,
       "completed": 8,
-      "leadTimeMeanS": 230.026,
-      "leadTimeMaxS": 314.919,
+      "leadTimeMeanS": 232.464,
+      "leadTimeMaxS": 317.732,
       "boxesLoaded": 0
     },
     "ordering": {

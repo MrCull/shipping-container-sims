@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ColourByMenu from './ColourByMenu.vue'
 import { useTwinStore } from '../store/twinStore'
 import type { OverlayState } from '../modules/overlays'
 import { t, type MessageKey } from '../i18n/messages'
@@ -81,6 +82,11 @@ function toggle(key: keyof OverlayState): void {
       />
       {{ t('followNext.label') }}
     </button>
+    <span
+      class="sep"
+      aria-hidden="true"
+    />
+    <ColourByMenu />
   </div>
 </template>
 
@@ -93,22 +99,25 @@ function toggle(key: keyof OverlayState): void {
   position: relative;
   max-width: calc(100% - 1.6rem);
   margin-bottom: 1rem;
-  z-index: 6;
+  /* above the popups (bay viewer 8): the Colour by panel opens upwards from this bar */
+  z-index: 9;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 0.4rem;
   padding: 0.35rem 0.5rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 8px;
-  background: rgba(17, 24, 39, 0.88);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
   font-size: 0.8rem;
-  color: var(--color-text);
+  color: var(--tt-text);
 }
 
 .label {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -120,26 +129,26 @@ function toggle(key: keyof OverlayState): void {
   align-items: center;
   gap: 0.35rem;
   padding: 0.3rem 0.6rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--tt-bg);
+  color: var(--tt-text);
   font-size: 0.8rem;
 }
 
 .toggle:hover {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .toggle.on {
-  border-color: var(--color-accent);
-  background: rgba(245, 158, 11, 0.12);
+  border-color: var(--tt-accent);
+  background: var(--tt-accent-soft);
 }
 
 .sep {
   width: 1px;
   align-self: stretch;
-  background: var(--color-border);
+  background: var(--tt-border);
   margin: 0 0.2rem;
 }
 
@@ -147,11 +156,11 @@ function toggle(key: keyof OverlayState): void {
   width: 0.55rem;
   height: 0.55rem;
   border-radius: 50%;
-  border: 1px solid var(--color-text-muted);
+  border: 1px solid var(--tt-text-muted);
 }
 
 .toggle.on .dot {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: var(--tt-accent);
+  border-color: var(--tt-accent);
 }
 </style>

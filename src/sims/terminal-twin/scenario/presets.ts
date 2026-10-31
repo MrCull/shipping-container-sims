@@ -7,23 +7,20 @@ import { DEFAULT_HOURLY_PROFILE, ScenarioBuilder } from './builder'
 import { deriveBlockXs, deriveSts } from './layout'
 import { TTI_FLOW_MIX, generateVessels } from './vesselGenerator'
 import type { AppointmentConfig, FlowMix, HoldingConfig, PortRotation, ScenarioConfig, VesselConfig, YardStartConfig } from './types'
+import {
+  PEAK_DAY_FLOW_MIX,
+  PEAK_DAY_PRESET_NAME,
+  PEAK_DAY_ROB,
+  PEAK_DAY_ROTATION,
+  TTI_BAYS,
+  TTI_BLOCKS,
+  TTI_PRESET_NAME,
+  TTI_REEFERS,
+  TTI_TIERS,
+} from '../terminals/tti-algeciras/constants'
 
-/** TTI Algeciras' published capacity (TEU): the source of the bay count. */
-export const TTI_YARD_TEU = 28647
-export const TTI_BLOCKS = 16
-export const TTI_ROWS = 8
-export const TTI_TIERS = 5
-/**
- * [A] 20 ft bays per block: derived from the published 28,647 TEU capacity (16 blocks x 8 rows x 5 tiers
- * x bays), rounded. The block layout itself is not published, so the UI marks this as an assumption.
- */
-export const TTI_BAYS = Math.round(TTI_YARD_TEU / (TTI_BLOCKS * TTI_ROWS * TTI_TIERS))
-
-/**
- * [A] unverified (R19): TTI's real reefer share and plug layout are not public. 8% of the full boxes are reefers and
- * rows 1-2 of every block are powered (the first two of the 8 rows across the ASC span).
- */
-const TTI_REEFERS = { share: 0.08, poweredRows: [1, 2] }
+// The TTI Algeciras constants live in the terminal folder; re-exported for the code that already imports them from here.
+export { PEAK_DAY_FLOW_MIX, PEAK_DAY_ROB, PEAK_DAY_ROTATION, TTI_BAYS, TTI_BLOCKS, TTI_ROWS, TTI_TIERS, TTI_YARD_TEU } from '../terminals/tti-algeciras/constants'
 
 interface TerminalSpec {
   name: string
@@ -99,23 +96,8 @@ function hubVessels(count: number, intervalS: number, jitterS: number, movesScal
   })
 }
 
-/**
- * [A] unverified (spec #106): the peak-day service rotation, an Asia - Mediterranean loop (UN/LOCODEs: Shanghai, Singapore,
- * Algeciras, Tanger Med, Valencia, Fos-sur-Mer, Genoa). TTI's real services and call order are not public.
- */
-export const PEAK_DAY_ROTATION: PortRotation = { terminal: 'ESALG', ports: ['CNSHA', 'SGSIN', 'ESALG', 'MAPTM', 'ESVLC', 'FRFOS', 'ITGOA'] }
-/** [A] unverified: a peak day at a hub is even more transshipment-heavy than the baseline (89% of moves). */
-export const PEAK_DAY_FLOW_MIX: FlowMix = { import: 6, export: 5, transshipment: 89 }
-/** [A] unverified: 30% of every vessel's bays carries boxes for later ports, 70% full. */
-export const PEAK_DAY_ROB = { bayFraction: 0.3, fill: 0.7 }
-
-/** Presets whose bay count is derived from the published TTI capacity (the UI marks it as an assumption). */
-/** Preset names other modules key on (TT-21: the Algeciras backdrop, the daylight-lock default). */
-export const TTI_PRESET_NAME = 'TTI Algeciras baseline'
-export const PEAK_DAY_PRESET_NAME = 'TTI Algeciras — peak day'
+export { PEAK_DAY_PRESET_NAME, TTI_PRESET_NAME }
 export const SMALL_PRESET_NAME = 'Small automated'
-
-export const TTI_DERIVED_BAYS_PRESETS = ['TTI Algeciras baseline', 'TTI Algeciras — peak day']
 
 export const presets: Record<string, () => ScenarioConfig> = {
   'TTI Algeciras baseline': () =>

@@ -3,7 +3,7 @@
   "seed": 3,
   "status": "ended",
   "endReason": "simDurationS >= 4500",
-  "eventLogHash": "16da4750f83fde",
+  "eventLogHash": "01774b7af6c7ef",
   "kpis": {
     "simTimeS": 4500,
     "eventsProcessed": 376,
@@ -14,7 +14,7 @@
         "moves": 8,
         "cycles": 5,
         "twinLifts": 3,
-        "grossMovesPerHour": 35.633,
+        "grossMovesPerHour": 34.936,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 948.498,
-        "turnaroundS": 888.498,
+        "departedAtS": 964.632,
+        "turnaroundS": 904.632,
         "sts": [
           "STS01"
         ]
@@ -271,8 +271,8 @@
           "loadedDistanceM": 664,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 4024.006,
-            "moving-to-collect": 89.953,
+            "parked": 4025.034,
+            "moving-to-collect": 88.925,
             "queuing-to-collect": 0,
             "collecting": 149.507,
             "moving-to-deliver": 17.5,
@@ -410,7 +410,7 @@
       "IMPORT": {
         "count": 7,
         "departed": 1,
-        "meanS": 3892.047,
+        "meanS": 3884.107,
         "maxS": 4366.197
       },
       "EXPORT": {
@@ -422,16 +422,16 @@
       "STORAGE": {
         "count": 1,
         "departed": 0,
-        "meanS": 4237.474,
-        "maxS": 4237.474
+        "meanS": 4236.133,
+        "maxS": 4236.133
       }
     },
     "workPackages": {
       "released": 5,
       "started": 5,
       "completed": 5,
-      "leadTimeMeanS": 223.929,
-      "leadTimeMaxS": 354.161,
+      "leadTimeMeanS": 228.639,
+      "leadTimeMaxS": 360.152,
       "boxesLoaded": 0
     },
     "ordering": {

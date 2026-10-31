@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from '../ui/TtIcon.vue'
 /**
  * Editable vessel table (one row per vessel call) plus the "Generate N
  * vessels" helper. Arrivals are shown as local date-times relative to the
@@ -216,7 +217,7 @@ function generate(): void {
                 :title="t('vessels.remove', { id: v.id })"
                 @click="removeVessel(i)"
               >
-                ✕
+                <TtIcon name="close" />
               </button>
             </td>
           </tr>
@@ -372,7 +373,7 @@ function generate(): void {
 .table-wrap {
   max-height: 14rem;
   overflow: auto;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 8px;
 }
 
@@ -385,8 +386,8 @@ table {
 th {
   position: sticky;
   top: 0;
-  background: var(--color-bg-card-hover);
-  color: var(--color-text-muted);
+  background: var(--tt-surface-hover);
+  color: var(--tt-text-muted);
   font-weight: 600;
   text-align: left;
   padding: 0.35rem 0.4rem;
@@ -395,7 +396,7 @@ th {
 
 td {
   padding: 0.25rem 0.4rem;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--tt-border);
   vertical-align: middle;
 }
 
@@ -405,7 +406,7 @@ td {
 }
 
 .name {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.72rem;
   white-space: nowrap;
 }
@@ -413,10 +414,10 @@ td {
 input,
 select {
   padding: 0.3rem 0.4rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 5px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-family: var(--tt-font-mono);
   font-size: 0.78rem;
   color-scheme: dark;
@@ -430,17 +431,17 @@ td input[type='number'] {
 .icon {
   background: none;
   border: none;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   cursor: pointer;
   padding: 0.2rem 0.4rem;
 }
 
 .icon:hover {
-  color: var(--color-danger);
+  color: var(--tt-danger);
 }
 
 .empty {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-style: italic;
   text-align: center;
   padding: 0.8rem;
@@ -449,26 +450,26 @@ td input[type='number'] {
 .btn {
   align-self: flex-start;
   padding: 0.35rem 0.75rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-size: 0.8rem;
 }
 
 .btn:hover {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .generator {
-  border: 1px dashed var(--color-border);
+  border: 1px dashed var(--tt-border);
   border-radius: 8px;
   padding: 0.5rem 0.7rem;
 }
 
 .generator summary {
   cursor: pointer;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.8rem;
 }
 
@@ -492,7 +493,7 @@ td input[type='number'] {
 }
 
 .mix legend {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -504,11 +505,11 @@ td input[type='number'] {
   flex-direction: column;
   gap: 0.2rem;
   font-size: 0.74rem;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .error {
-  color: var(--color-danger);
+  color: var(--tt-danger);
   font-size: 0.8rem;
 }
 

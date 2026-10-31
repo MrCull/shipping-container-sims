@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened, labeled]
     branches:
       - main
-  # Browser smoke tests are slow (software WebGL, ~15 min) and bill Actions minutes per run, so they do not run on every push:
+  # Browser smoke tests are slow (software WebGL; about 40 min on a 4-core machine, less in CI) and bill Actions minutes per run, so they do not run on every push:
   # start them from the Actions tab ("Run workflow"), or add the `smoke` label to a PR (they re-run on pushes while it is set).
   workflow_dispatch:
   # Label events must be listed here for the label gate below to see them.
@@ -38,6 +38,8 @@ jobs:
 
       - name: Check dependencies and lockfile
         run: node scripts/check-deps.mjs
+      - name: Check no local-only files are tracked
+        run: node scripts/check-tracked-files.mjs
 
       - name: Lint
         run: pnpm run lint
@@ -50,6 +52,9 @@ jobs:
 
       - name: Asset budgets (Terminal Twin GLBs + sidecars; no Blender needed)
         run: pnpm run tt:assets:check
+
+      - name: Sounds (regenerate and compare the synthesized Terminal Twin sounds)
+        run: pnpm run tt:sounds:check
 
   smoke:
     # Required before merging a change that touches the browser UI: run it by hand or label the PR `smoke`.

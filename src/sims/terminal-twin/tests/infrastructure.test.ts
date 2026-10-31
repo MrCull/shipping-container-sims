@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
 import { checkAssetLibrary, MODELS_DIR } from '../cli/assets/budgetCheck'
 import { readGlbJson } from '../cli/assets/glb'
 import { blockSpecs, buildLandsideGraph, railEndZ, GATE_ISLAND_W_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, wtpPadLayout, type LandsideGraph } from '../engine'
-import { BACKDROP_MODEL_ASSETS, backdropKindFor, buildBackdrop } from '../modules/backdrop'
+import { backdropModelAssets, buildBackdrop, sceneryFor } from '../modules/backdrop'
 import { INFRA, INFRA_ASSET_NAMES, type InfraAssets, type InfraKey } from '../modules/infrastructureAssets'
 import { BLOCK_FOOTPRINT_HALF_X_M, buildingPlacements, countByKey, gateLaneSlots, gatePlacements, infrastructurePlacements, mastSpots, quayPlacements, type InfraLayoutInput } from '../modules/infrastructureLayout'
 import { assetNamesFor, InfrastructureScene } from '../modules/infrastructureRenderer'
@@ -241,19 +241,18 @@ describe('instancing and draw calls', () => {
 })
 
 describe('backdrop scope', () => {
-  it('replaces the procedural backdrop with the GLB meshes for the TTI preset only', () => {
-    expect(BACKDROP_MODEL_ASSETS.tti).toEqual(['backdrop-rock', 'backdrop-hills', 'backdrop-coast'])
-    expect(BACKDROP_MODEL_ASSETS.generic).toEqual([])
+  it('replaces the procedural backdrop with the GLB meshes for the TTI presets only', () => {
+    expect(backdropModelAssets(sceneryFor(TTI_PRESET_NAME)).slice(0, 3)).toEqual(['backdrop-rock', 'backdrop-hills', 'backdrop-coast']) // the surroundings follow (surroundings.test.ts)
+    expect(backdropModelAssets(sceneryFor('Small automated'))).toEqual([])
     const assets: InfraAssets = {
       material: new THREE.MeshStandardMaterial(),
       geometries: { 'backdrop-rock': new THREE.BoxGeometry(1, 1, 1), 'backdrop-hills': new THREE.BoxGeometry(1, 1, 1), 'backdrop-coast': new THREE.BoxGeometry(1, 1, 1) },
     }
     for (const name of Object.keys(presets)) {
-      const kind = backdropKindFor(name)
-      const b = buildBackdrop(kind, 1000)
+      const b = buildBackdrop(sceneryFor(name), 1000)
       const rockBefore = (b.group.getObjectByName('rock') as THREE.Mesh | undefined)?.geometry
       b.useModels(assets)
-      if (name === TTI_PRESET_NAME) {
+      if (sceneryFor(name).kind === 'tti') {
         expect(b.models).toBe('glb')
         expect((b.group.getObjectByName('rock') as THREE.Mesh).geometry).toBe(assets.geometries['backdrop-rock'])
         expect((b.group.getObjectByName('northQuay') as THREE.Group).children.length).toBeGreaterThan(0) // the North Quay stays procedural

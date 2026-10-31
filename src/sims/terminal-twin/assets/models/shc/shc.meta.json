@@ -5,13 +5,13 @@
   "generator": "src/sims/terminal-twin/assets/generators/build.py --only shc",
   "units": "m",
   "dimensions": {
-    "lengthM": 8.3,
-    "widthM": 5.8,
+    "lengthM": 8.5,
+    "widthM": 5.42,
     "heightM": 9.7,
     "wheelbaseM": 6.6,
     "trackM": 4.7,
     "tag": "A",
-    "reason": "proportions of a Kalmar shuttle carrier from public photographs (not committed); no manufacturer drawing was available"
+    "reason": "proportions of the TTI Algeciras Kalmar shuttle carriers from reference photographs (not committed); no manufacturer drawing was available"
   },
   "axes": {
     "up": "+Y",
@@ -43,7 +43,13 @@
       "name": "frame",
       "parent": "LOD*",
       "role": "mesh",
-      "description": "static welded gantry, engine/hoist assembly, cab, ladder, rails, stripes, branding"
+      "description": "static welded gantry, chassis sills, TTI livery panel, engine/hoist assembly, cab, ladders, rails, hazard stripes, wordmarks"
+    },
+    {
+      "name": "plates",
+      "parent": "LOD0|LOD1",
+      "role": "mesh",
+      "description": "fleet-number plates (SHC nn) in the second material shc_plate; LOD2 has none"
     },
     {
       "name": "steer_fl",
@@ -51,7 +57,7 @@
       "role": "rig",
       "pivot": [
         3.3,
-        0.85,
+        0.95,
         -2.35
       ],
       "axis": "+Y",
@@ -63,11 +69,11 @@
       "role": "rig",
       "pivot": [
         3.3,
-        0.85,
+        0.95,
         -2.35
       ],
       "axis": "+Z",
-      "description": "dual tyres; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
+      "description": "one large single tyre on a white rim; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
     },
     {
       "name": "steer_fr",
@@ -75,7 +81,7 @@
       "role": "rig",
       "pivot": [
         3.3,
-        0.85,
+        0.95,
         2.35
       ],
       "axis": "+Y",
@@ -87,11 +93,11 @@
       "role": "rig",
       "pivot": [
         3.3,
-        0.85,
+        0.95,
         2.35
       ],
       "axis": "+Z",
-      "description": "dual tyres; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
+      "description": "one large single tyre on a white rim; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
     },
     {
       "name": "steer_rl",
@@ -99,7 +105,7 @@
       "role": "rig",
       "pivot": [
         -3.3,
-        0.85,
+        0.95,
         -2.35
       ],
       "axis": "+Y",
@@ -111,11 +117,11 @@
       "role": "rig",
       "pivot": [
         -3.3,
-        0.85,
+        0.95,
         -2.35
       ],
       "axis": "+Z",
-      "description": "dual tyres; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
+      "description": "one large single tyre on a white rim; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
     },
     {
       "name": "steer_rr",
@@ -123,7 +129,7 @@
       "role": "rig",
       "pivot": [
         -3.3,
-        0.85,
+        0.95,
         2.35
       ],
       "axis": "+Y",
@@ -135,11 +141,11 @@
       "role": "rig",
       "pivot": [
         -3.3,
-        0.85,
+        0.95,
         2.35
       ],
       "axis": "+Z",
-      "description": "dual tyres; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
+      "description": "one large single tyre on a white rim; pivot on the axle. Travelling towards +X is a negative rotation about +Z"
     },
     {
       "name": "hoist",
@@ -484,15 +490,15 @@
     "tag": "V"
   },
   "wheel": {
-    "radiusM": 0.85,
-    "tyreWidthM": 0.5,
-    "tyresPerCorner": 2,
+    "radiusM": 0.95,
+    "tyreWidthM": 0.72,
+    "tyresPerCorner": 1,
     "steeredCorners": 4,
     "tag": "A",
     "note": "roll angle = distance / radius; the rear corners steer opposite to the front"
   },
   "tunnel": {
-    "clearWidthM": 3.6,
+    "clearWidthM": 3.98,
     "clearHeightM": 6.4,
     "frameLengthM": 8.2,
     "openEnds": true,
@@ -501,38 +507,64 @@
   },
   "branding": {
     "wordmark": "KALMAR",
-    "unitNumber": "SC 108",
-    "operatorBranding": false,
-    "tag": "A",
-    "note": "wordmark set in Montserrat ExtraBold on the red atlas; no official logo artwork; no operator branding"
+    "livery": "TTI ALGECIRAS",
+    "operatorBranding": true,
+    "tag": "P",
+    "note": "KALMAR and TTI ALGECIRAS set as text (Montserrat / Archivo ExtraBold) on the red atlas, as on the real SHCs; no logo artwork. The fleet number \"SHC nn\" is a plate in its own material (shc_plate): the GLB authors its UVs for tile 0 and the renderer offsets them per SHC id.",
+    "fleetNumbers": {
+      "first": 1,
+      "count": 120,
+      "cols": 8,
+      "rows": 15,
+      "tileSizeUv": [
+        0.125,
+        0.0625
+      ],
+      "material": "shc_plate",
+      "uvConvention": "TEXCOORD_0 of material shc_plate is authored for tile 0 (SHC 01); add (index % cols, floor(index / cols)) * tileSizeUv, index = number - first"
+    }
+  },
+  "materials": {
+    "shc_atlas": "palette + hazard stripes + KALMAR and TTI ALGECIRAS wordmarks",
+    "shc_plate": "fleet-number plates (LOD0 and LOD1)"
   },
   "lods": {
     "LOD0": {
-      "triangles": 11016,
+      "triangles": 9856,
       "material": "shc_atlas"
     },
     "LOD1": {
-      "triangles": 2532,
+      "triangles": 2154,
       "material": "shc_atlas"
     },
     "LOD2": {
-      "triangles": 342,
+      "triangles": 358,
       "material": "shc_atlas"
     }
   },
   "provenance": [
     {
-      "fact": "red Kalmar-style shuttle carrier: tall welded gantry, open tunnel, dual tyres on four steered legs",
+      "fact": "red Kalmar shuttle carrier of TTI Algeciras: tall red box-section legs, open tunnel, deep chassis sills, one large single tyre on a white rim per leg, four steered corners",
       "tag": "P",
-      "source": "public Kalmar shuttle-carrier photographs (not committed)"
+      "source": "TTI Algeciras reference photographs of the Kalmar SHC fleet (git-ignored, not committed)"
+    },
+    {
+      "fact": "TTI Algeciras livery: red panel on the front end beam with TTI ALGECIRAS and the fleet number, KALMAR and TTI ALGECIRAS wordmarks and the fleet number on the sill, hazard-striped sill ends and lower legs, white cab",
+      "tag": "P",
+      "source": "the same reference photographs"
+    },
+    {
+      "fact": "elevated glazed cab offset to the +Z side at the front, caged ladder, black handrails and walkways, engine housing and exhaust at the rear",
+      "tag": "P",
+      "source": "the same reference photographs"
     },
     {
       "fact": "frame, tyre, cab, engine and ladder proportions",
       "tag": "A",
-      "reason": "no manufacturer drawing; sized so a 40 ft HC box fits the tunnel with margin"
+      "reason": "no manufacturer drawing; sized from the photographs so a 40 ft HC box fits the tunnel with margin"
     },
     {
-      "fact": "clear height 6.4 m (one box over a stacked box), clear width 3.6 m between tyres",
+      "fact": "clear height 6.4 m (one box over a stacked box), clear width about 4.0 m between tyres",
       "tag": "A"
     },
     {
@@ -541,21 +573,17 @@
       "source": "ISO 1161 / ISO 668"
     },
     {
-      "fact": "white diagonal warning stripes on the lower legs, glazed cab offset to the -Z side at the front, ladder and handrails",
-      "tag": "P"
-    },
-    {
       "fact": "all-wheel steering at +-35 degrees (rear opposite to front)",
       "tag": "A"
     },
     {
-      "fact": "KALMAR wordmark and unit number baked into the atlas; no operator branding",
+      "fact": "fleet numbers SHC 01 to SHC 120 follow the sim SHC ids (SHC01...)",
       "tag": "A"
     },
     {
-      "fact": "tyre tread as 32-segment lugs, weld seams as flat strips",
+      "fact": "tyre tread as 52-segment lugs, weld seams as flat strips, wordmarks as text, no logo artwork",
       "tag": "M",
-      "reason": "triangle budget"
+      "reason": "triangle budget; no logo artwork"
     }
   ]
 }

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import TtIcon from '../ui/TtIcon.vue'
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { eventsInvolving, type Fact } from '../../modules/entityInspector'
+import { buildVesselStatus, formatCountdown } from '../../modules/vesselStatus'
 import { useTwinStore } from '../../store/twinStore'
 import { t, type MessageKey } from '../../i18n/messages'
 
@@ -17,6 +19,16 @@ const inspected = computed(() => {
 })
 
 const view = computed(() => store.entityView)
+
+/** The vessel popup content at the displayed sim time (the view fields refresh a few times a second, the countdown ticks with the clock). */
+const vessel = computed(() => (view.value?.vesselStatus ? buildVesselStatus(view.value.vesselStatus, store.displayTime) : null))
+const clockText = (time: number): string => store.fmt.clock(store.choice.startDateTime, time).time
+const opsStartText = computed(() => {
+  const v = vessel.value
+  if (!v || v.opsStartS === null) return t('vesselStatus.unknown')
+  const time = clockText(v.opsStartS)
+  return v.opsStartEstimated ? t('vesselStatus.opsStartEstimate', { time }) : t('vesselStatus.opsStartActual', { time })
+})
 
 /** Slot ids in the inspected event's payload, in maritime notation. */
 const payloadLocations = computed(() => {
@@ -89,7 +101,7 @@ onBeforeUnmount(() => {
           aria-expanded="true"
           @click="store.toggleInspector()"
         >
-          ▶
+          <TtIcon name="next" />
         </button>
       </header>
 
@@ -261,6 +273,63 @@ onBeforeUnmount(() => {
             {{ t('inspector.deselect') }}
           </button>
         </div>
+        <section
+          v-if="vessel"
+          class="vessel-status"
+          :data-phase="vessel.phase"
+          data-testid="tt-vessel-status"
+          :aria-label="t('vesselStatus.heading')"
+        >
+          <p
+            class="phase"
+            data-testid="tt-vessel-phase"
+          >
+            {{ t(`vesselStatus.phase.${vessel.phase}` as MessageKey) }}
+          </p>
+          <dl class="facts">
+            <dt>{{ t('vesselStatus.eta') }}</dt>
+            <dd data-testid="tt-vessel-eta">
+              {{ vessel.etaS === null ? t('inspector.none') : clockText(vessel.etaS) }}
+            </dd>
+            <dt>{{ t('vesselStatus.opsStart') }}</dt>
+            <dd data-testid="tt-vessel-ops-start">
+              {{ opsStartText }}
+            </dd>
+            <template v-if="vessel.countdownS !== null || vessel.etaCountdownS !== null">
+              <dt>{{ t('vesselStatus.countdown') }}</dt>
+              <dd data-testid="tt-vessel-countdown">
+                {{ formatCountdown(vessel.countdownS ?? vessel.etaCountdownS ?? 0) }}
+              </dd>
+            </template>
+            <dt>{{ t('vesselStatus.moves') }}</dt>
+            <dd data-testid="tt-vessel-moves">
+              {{ t('vesselStatus.movesValue', { done: vessel.moves.done, remaining: vessel.moves.remaining }) }}
+            </dd>
+          </dl>
+          <div
+            v-if="vessel.moves.total > 0"
+            class="progress"
+            role="progressbar"
+            aria-valuemin="0"
+            :aria-valuemax="vessel.moves.total"
+            :aria-valuenow="vessel.moves.done"
+            :aria-label="t('vesselStatus.moves')"
+          >
+            <span :style="{ width: `${(100 * vessel.moves.done) / vessel.moves.total}%` }" />
+          </div>
+          <ul
+            v-if="vessel.perSts.length > 0"
+            class="per-sts"
+            data-testid="tt-vessel-sts-moves"
+          >
+            <li
+              v-for="s in vessel.perSts"
+              :key="s.id"
+            >
+              {{ t('vesselStatus.perSts', { id: s.id, done: s.done, remaining: s.remaining }) }}
+            </li>
+          </ul>
+        </section>
         <h3>{{ t('inspector.state') }}</h3>
         <dl class="facts">
           <template
@@ -388,7 +457,7 @@ onBeforeUnmount(() => {
   z-index: 7;
   pointer-events: none;
   font-size: 0.8rem;
-  color: var(--color-text);
+  color: var(--tt-text);
 }
 
 .inspector > * {
@@ -399,11 +468,13 @@ onBeforeUnmount(() => {
   align-self: flex-start;
   margin-top: 0.8rem;
   padding: 0.45rem 0.7rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-right: none;
   border-radius: 8px 0 0 8px;
-  background: rgba(17, 24, 39, 0.9);
-  color: var(--color-text);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  color: var(--tt-text);
   font-size: 0.8rem;
 }
 
@@ -411,7 +482,7 @@ onBeforeUnmount(() => {
 .btn:hover,
 .icon-btn:hover,
 .chip:hover {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .body {
@@ -422,8 +493,10 @@ onBeforeUnmount(() => {
   flex: none;
   min-height: 0;
   padding: 0.6rem 0.7rem;
-  border-left: 1px solid var(--color-border);
-  background: rgba(17, 24, 39, 0.94);
+  border-left: 1px solid var(--tt-border);
+  background: var(--tt-panel-strong);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
   overflow-y: auto;
 }
 
@@ -442,7 +515,7 @@ h3 {
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .block {
@@ -450,7 +523,7 @@ h3 {
   flex-direction: column;
   gap: 0.3rem;
   padding-bottom: 0.6rem;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--tt-border);
 }
 
 .heading {
@@ -459,7 +532,7 @@ h3 {
 }
 
 .muted {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.75rem;
 }
 
@@ -474,10 +547,10 @@ h3 {
 .icon-btn,
 .chip {
   padding: 0.2rem 0.55rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--tt-bg);
+  color: var(--tt-text);
   font-size: 0.75rem;
 }
 
@@ -487,7 +560,7 @@ h3 {
 }
 
 .chip.plain {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .facts {
@@ -496,8 +569,54 @@ h3 {
   gap: 0.15rem 0.7rem;
 }
 
+.vessel-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--tt-border);
+  border-left: 3px solid var(--tt-accent);
+  border-radius: var(--tt-radius-sm);
+  background: var(--tt-surface);
+}
+
+.vessel-status[data-phase='waiting'],
+.vessel-status[data-phase='mooring'] {
+  border-left-color: var(--tt-warn);
+}
+
+.vessel-status[data-phase='working'] {
+  border-left-color: var(--tt-success);
+}
+
+.phase {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.progress {
+  height: 0.35rem;
+  border-radius: var(--tt-radius-sm);
+  background: var(--tt-surface-sunken);
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--tt-accent);
+}
+
+.per-sts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--tt-font-mono);
+  color: var(--tt-text-muted);
+}
+
 .facts dt {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .facts dd {
@@ -509,9 +628,9 @@ pre {
   max-height: 14rem;
   overflow: auto;
   padding: 0.4rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  background: var(--color-bg);
+  background: var(--tt-bg);
   font-family: var(--tt-font-mono);
   font-size: 0.7rem;
 }
@@ -533,22 +652,22 @@ pre {
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: var(--color-text);
+  color: var(--tt-text);
   text-align: left;
   font-size: 0.75rem;
 }
 
 .chain-row:hover {
-  background: var(--color-bg-card-hover);
+  background: var(--tt-surface-hover);
 }
 
 .chain-row.current {
-  border-color: var(--color-accent);
+  border-color: var(--tt-accent);
 }
 
 .num {
   font-family: var(--tt-font-mono);
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .type {
@@ -557,7 +676,7 @@ pre {
 
 .root {
   margin-left: auto;
-  color: var(--color-accent);
+  color: var(--tt-accent);
   font-size: 0.7rem;
   text-transform: uppercase;
 }
@@ -572,11 +691,11 @@ pre {
 }
 
 .history li.current {
-  color: var(--color-accent);
+  color: var(--tt-accent);
 }
 
 .now {
-  font-family: var(--font-body);
+  font-family: var(--tt-font);
   text-transform: uppercase;
   font-size: 0.65rem;
 }

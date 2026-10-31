@@ -7,16 +7,22 @@
  *   - LOD0 (~300-440 triangles) for at most `lod0Cap` boxes nearest the camera
  *     and within `lod0DistanceM` (with hysteresis so boxes do not flicker
  *     between LODs at the threshold);
+ *   - Close-up (#119) above LOD0: at most `closeupCap` boxes within `closeupDistanceM` are drawn as individual
+ *     detailed meshes with textures painted from their markings (`containerCloseups.ts`); they count as LOD0
+ *     in the stats and are left out of the instanced layers;
  *   - LOD1 (12 triangles, normal-mapped corrugation at the same pitch) for the rest.
- * Each instance carries a `liveryIndex` attribute (atlas tile = shipping line).
+ * Each instance carries a `liveryIndex` attribute (atlas tile = shipping line). A box pushed with a `tint` (colour
+ * by, #130) takes the generic tile and an instance colour that turns its grey body into the tint, flat in the close-up
+ * and the placeholder; no tint (-1) keeps the livery.
  *
  * Per frame: `begin()`, `push(...)` for every visible box, then `end(camera)`.
  * Nothing here is reactive.
  */
 import * as THREE from 'three'
 import type { ContainerSize } from '../scenario/types'
-import { liveryBodyColour, type ContainerAssets } from './containerAssets'
+import { liveryBodyColour, LIVERY_ATLAS, type ContainerAssets } from './containerAssets'
 import { CONTAINER_DIMS } from './sceneModel'
+import { ContainerCloseups, type CloseupSource } from './containerCloseups'
 
 const SIZES: ContainerSize[] = ['20', '40', '40HC']
 
@@ -27,9 +33,16 @@ export interface ContainerLodOptions {
   lod0DistanceM: number
   /** A box already at LOD0 keeps it out to lod0DistanceM × this factor. */
   hysteresis: number
+  /** Max boxes drawn as close-ups (0 = off). */
+  closeupCap: number
+  /** Boxes beyond this camera distance are never close-ups (a close-up box keeps it out to this x `hysteresis`). */
+  closeupDistanceM: number
 }
 
-export const DEFAULT_LOD_OPTIONS: ContainerLodOptions = { lod0Cap: 300, lod0DistanceM: 140, hysteresis: 1.15 }
+export const DEFAULT_LOD_OPTIONS: ContainerLodOptions = { lod0Cap: 300, lod0DistanceM: 140, hysteresis: 1.15, closeupCap: 48, closeupDistanceM: 35 }
+
+/** Close-up textures kept per box beyond the ones in use. */
+const CLOSEUP_CACHE_CAP = 64
 
 export interface ContainerRenderStats {
   /** Boxes posed this frame (visible or not). */
@@ -37,6 +50,8 @@ export interface ContainerRenderStats {
   lod0: number
   /** Everything not at LOD0, culled boxes included, so lod0 + lod1 = drawn. */
   lod1: number
+  /** Of `lod0`: the boxes drawn as close-ups (#119). */
+  closeup: number
   /** Boxes outside the camera frustum, not written to the GPU (0 without a frustum). */
   culled: number
   assets: 'placeholder' | 'loaded'
@@ -52,6 +67,8 @@ export interface RenderedContainer {
   size: ContainerSize
   livery: number
   lod: 0 | 1
+  /** Colour-by tint (0xRRGGBB) the box was drawn in, -1 for its livery. */
+  tint: number
 }
 
 export class ContainerInstancer {
@@ -69,16 +86,27 @@ export class ContainerInstancer {
   private ys: number[] = []
   private zs: number[] = []
   private liveries: number[] = []
+  private tints: number[] = []
   private yaws: number[] = []
   private dist2: Float64Array = new Float64Array(0)
   /** LOD per key from the previous frame (hysteresis). */
-  private lastLod = new Map<number, 0 | 1>()
+  private lastLod = new Map<number, 0 | 1 | 2>()
   private rendered = new Map<number, RenderedContainer>()
-  private lastStats: ContainerRenderStats = { drawn: 0, lod0: 0, lod1: 0, culled: 0, assets: 'placeholder' }
+  private lastStats: ContainerRenderStats = { drawn: 0, lod0: 0, lod1: 0, closeup: 0, culled: 0, assets: 'placeholder' }
   private readonly matrix = new THREE.Matrix4()
   private readonly colour = new THREE.Color()
+  /** Linear colour of the generic livery's body: a tint is divided by it, so the grey tile multiplied by the instance colour comes out as the tint. */
+  private readonly genericBody = new THREE.Color(liveryBodyColour(LIVERY_ATLAS.genericIndex))
+  private readonly closeups: ContainerCloseups
+  private markingsSource: ((key: number) => CloseupSource) | null = null
 
-  constructor(capacity: Partial<Record<ContainerSize, number>>, options: Partial<ContainerLodOptions> = {}) {
+  constructor(
+    capacity: Partial<Record<ContainerSize, number>>,
+    options: Partial<ContainerLodOptions> = {},
+    closeups: ContainerCloseups = new ContainerCloseups(CLOSEUP_CACHE_CAP),
+  ) {
+    this.closeups = closeups
+    this.group.add(closeups.group)
     this.options = { ...DEFAULT_LOD_OPTIONS, ...options }
     this.capacity = { '20': capacity['20'] ?? 0, '40': capacity['40'] ?? 0, '40HC': capacity['40HC'] ?? 0 }
     this.group.name = 'containers'
@@ -118,7 +146,9 @@ export class ContainerInstancer {
         const livery = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, this.capacity[size])), 1)
         livery.setUsage(THREE.DynamicDrawUsage)
         geo.setAttribute('liveryIndex', livery)
-        return { mesh: this.instanced(geo, mat, size, tag), livery }
+        const mesh = this.instanced(geo, mat, size, tag)
+        mesh.setColorAt(0, this.colour.set('#ffffff')) // the instance colour exists from the first frame, so the shader never recompiles when a tint first appears
+        return { mesh, livery }
       }
       const m = assets.sizes[size]
       this.lods[size] = [make(m.lod0, assets.lod0Material, 'lod0'), make(m.lod1, assets.lod1Material, 'lod1')]
@@ -138,7 +168,7 @@ export class ContainerInstancer {
   }
 
   /** One box: `key` is a stable id (e.g. container index), centre position in metres, yaw about Y (0 = length along X). */
-  push(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0): void {
+  push(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0, tint = -1): void {
     const i = this.n++
     this.keys[i] = key
     this.sizes[i] = size
@@ -147,6 +177,12 @@ export class ContainerInstancer {
     this.zs[i] = cz
     this.liveries[i] = livery
     this.yaws[i] = yaw
+    this.tints[i] = tint
+  }
+
+  /** What a close-up box is painted from, by the key given to `push` (without one there are no close-ups). */
+  setMarkingsSource(source: (key: number) => CloseupSource): void {
+    this.markingsSource = source
   }
 
   /** Retune the LOD0 range and cap (quality settings). */
@@ -167,29 +203,46 @@ export class ContainerInstancer {
       counts[layer.mesh.name] = slot + 1
       this.matrix.makeRotationY(this.yaws[i]).setPosition(this.xs[i], this.ys[i], this.zs[i])
       layer.mesh.setMatrixAt(slot, this.matrix)
-      if (layer.livery) layer.livery.setX(slot, this.liveries[i])
-      else layer.mesh.setColorAt(slot, this.colour.set(liveryBodyColour(this.liveries[i])))
+      const tint = this.tints[i]
+      if (layer.livery) {
+        if (tint >= 0) {
+          layer.livery.setX(slot, LIVERY_ATLAS.genericIndex)
+          this.colour.setHex(tint)
+          layer.mesh.setColorAt(slot, this.colour.set(this.colour.r / this.genericBody.r, this.colour.g / this.genericBody.g, this.colour.b / this.genericBody.b))
+        } else {
+          layer.livery.setX(slot, this.liveries[i])
+          layer.mesh.setColorAt(slot, this.colour.setRGB(1, 1, 1))
+        }
+      } else layer.mesh.setColorAt(slot, tint >= 0 ? this.colour.setHex(tint) : this.colour.set(liveryBodyColour(this.liveries[i])))
     }
 
     const seen = this.cull(frustum)
     let lod0 = 0
+    let closeup = 0
     let culled = 0
+    this.closeups.begin()
     if (this.lods) {
       const lod = this.chooseLods(cameraPosition, seen)
       for (let i = 0; i < this.n; i++) {
-        const level = lod[i] as 0 | 1
-        this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: level })
+        const level = lod[i]
+        this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: level === 1 ? 1 : 0, tint: this.tints[i] })
         if (seen && !seen[i]) {
           culled++
           continue
         }
-        if (level === 0) lod0++
+        if (level !== 1) lod0++
+        this.lastLod.set(this.keys[i], level as 0 | 1 | 2)
+        if (level === 2) {
+          closeup++
+          const key = this.keys[i]
+          this.closeups.show(key, this.sizes[i], this.xs[i], this.ys[i], this.zs[i], this.yaws[i], () => this.markingsSource!(key)!, this.tints[i])
+          continue
+        }
         write(this.lods[this.sizes[i]][level], i)
-        this.lastLod.set(this.keys[i], level)
       }
     } else if (this.placeholders) {
       for (let i = 0; i < this.n; i++) {
-        this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: 1 })
+        this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: 1, tint: this.tints[i] })
         if (seen && !seen[i]) {
           culled++
           continue
@@ -197,6 +250,7 @@ export class ContainerInstancer {
         write(this.placeholders[this.sizes[i]], i)
       }
     }
+    this.closeups.end()
     const layers: Layer[] = this.lods
       ? Object.values(this.lods).flat()
       : Object.values(this.placeholders ?? {})
@@ -206,7 +260,7 @@ export class ContainerInstancer {
       if (layer.livery) layer.livery.needsUpdate = true
       if (layer.mesh.instanceColor) layer.mesh.instanceColor.needsUpdate = true
     }
-    this.lastStats = { drawn: this.n, lod0, lod1: this.n - lod0, culled, assets: this.lods ? 'loaded' : 'placeholder' }
+    this.lastStats = { drawn: this.n, lod0, lod1: this.n - lod0, closeup, culled, assets: this.lods ? 'loaded' : 'placeholder' }
     return this.lastStats
   }
 
@@ -228,10 +282,14 @@ export class ContainerInstancer {
 
   /** LOD per pushed box: nearest within range get LOD0, capped at lod0Cap. Culled boxes are never LOD0. */
   private chooseLods(cam: THREE.Vector3, seen: Uint8Array | null): Uint8Array {
-    const { lod0Cap, lod0DistanceM, hysteresis } = this.options
+    const { lod0Cap, lod0DistanceM, hysteresis, closeupCap, closeupDistanceM } = this.options
     if (this.dist2.length < this.n) this.dist2 = new Float64Array(Math.max(this.n, this.dist2.length * 2))
     const lod = new Uint8Array(this.n).fill(1)
     const near: number[] = []
+    const nearest: number[] = []
+    const c2 = closeupDistanceM * closeupDistanceM
+    const c2Sticky = c2 * hysteresis * hysteresis
+    const canCloseup = closeupCap > 0 && this.markingsSource !== null
     const r2 = lod0DistanceM * lod0DistanceM
     const r2Sticky = r2 * hysteresis * hysteresis
     for (let i = 0; i < this.n; i++) {
@@ -241,11 +299,16 @@ export class ContainerInstancer {
       const d2 = dx * dx + dy * dy + dz * dz
       this.dist2[i] = d2
       if (seen && !seen[i]) continue
-      const limit = this.lastLod.get(this.keys[i]) === 0 ? r2Sticky : r2
+      const last = this.lastLod.get(this.keys[i])
+      if (canCloseup && d2 <= (last === 2 ? c2Sticky : c2)) nearest.push(i)
+      const limit = last === 0 || last === 2 ? r2Sticky : r2
       if (d2 <= limit) near.push(i)
     }
-    if (near.length > lod0Cap) near.sort((a, b) => this.dist2[a] - this.dist2[b])
-    for (let k = 0; k < Math.min(lod0Cap, near.length); k++) lod[near[k]] = 0
+    if (nearest.length > closeupCap) nearest.sort((a, b) => this.dist2[a] - this.dist2[b])
+    for (let k = 0; k < Math.min(closeupCap, nearest.length); k++) lod[nearest[k]] = 2
+    const rest = near.filter((i) => lod[i] !== 2)
+    if (rest.length > lod0Cap) rest.sort((a, b) => this.dist2[a] - this.dist2[b])
+    for (let k = 0; k < Math.min(lod0Cap, rest.length); k++) lod[rest[k]] = 0
     return lod
   }
 
@@ -264,7 +327,8 @@ export class ContainerInstancer {
       const g = mesh.geometry
       triangles += ((g.index ? g.index.count : g.getAttribute('position').count) / 3) * mesh.count
     }
-    return { drawCalls, triangles }
+    const c = this.closeups.cost()
+    return { drawCalls: drawCalls + c.drawCalls, triangles: triangles + c.triangles }
   }
 
   renderedContainer(key: number): RenderedContainer | undefined {
@@ -272,6 +336,7 @@ export class ContainerInstancer {
   }
 
   dispose(): void {
+    this.closeups.dispose()
     for (const d of this.disposables) d.dispose()
     this.disposables = []
   }

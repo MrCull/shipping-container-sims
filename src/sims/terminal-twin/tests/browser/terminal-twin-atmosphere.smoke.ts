@@ -9,17 +9,19 @@ const TRACER = 'tracer-1sts-10-boxes'
 
 test.use({ timezoneId: 'UTC' })
 
-/** Count every `new Audio(...)` the page makes (the sound toggle is off by default: expect none). */
+/** Count every `new Audio(...)` the page makes (a muted shared control means none are made). */
 async function spyOnAudio(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const w = window as unknown as { __audioCreated: number; Audio: unknown }
     w.__audioCreated = 0
+    ;(w as unknown as { __audioVolumes: number[] }).__audioVolumes = []
     w.Audio = class {
       volume = 1
       constructor() {
         w.__audioCreated++
       }
       play() {
+        ;(w as unknown as { __audioVolumes: number[] }).__audioVolumes.push(this.volume)
         return Promise.resolve()
       }
       pause() {}
@@ -83,27 +85,35 @@ test('the Algeciras backdrop shows for the TTI preset only', async ({ page }) =>
   expect(a.scene!.backdrop.parts).not.toContain('rock')
 })
 
-test('sound is off by default: nothing plays, no audio is created', async ({ page }) => {
+const audioCreated = (page: Page) => page.evaluate(() => (window as unknown as { __audioCreated: number }).__audioCreated)
+
+test('a global mute set elsewhere is honoured: nothing plays, no audio is created', async ({ page }) => {
   await spyOnAudio(page)
+  await page.addInitScript(() => {
+    window.localStorage.setItem('shipping-container-sims', JSON.stringify({ version: 1, global: { soundMuted: true, godModeEnabled: false, volume: 0.4 }, sims: {} }))
+  })
   await open(page, TRACER, '2026-10-26T13:00:00.000Z')
   await page.evaluate(() => window.__tt!.setSpeed(60))
   await page.evaluate(() => window.__tt!.play())
   await page.waitForFunction(() => window.__tt!.clock().displayTime > 400)
-  expect((await atmosphere(page)).soundOn).toBe(false)
+  expect((await atmosphere(page)).soundGain).toBe(0)
   expect((await atmosphere(page)).sound.played).toBe(0)
-  expect(await page.evaluate(() => (window as unknown as { __audioCreated: number }).__audioCreated)).toBe(0)
+  expect(await audioCreated(page)).toBe(0)
 })
 
-test('with sound on, effects play, and are throttled at x600', async ({ page }) => {
+test('sound is on by default at 40% and follows the shared volume; effects play and are throttled at x600', async ({ page }) => {
   await spyOnAudio(page)
   await open(page, TRACER, '2026-10-26T13:00:00.000Z')
-  await page.getByTestId('tt-sound-toggle').click()
+  expect((await atmosphere(page)).soundGain).toBeCloseTo(0.4)
   await page.evaluate(() => window.__tt!.setSpeed(10))
   await page.evaluate(() => window.__tt!.play())
   await page.waitForFunction(() => window.__tt!.atmosphere().sound.recent.some((s) => s.kind === 'landed'))
   const first = (await atmosphere(page)).sound.recent.map((s) => s.kind)
   expect(first).toContain('landed')
-  expect(await page.evaluate(() => (window as unknown as { __audioCreated: number }).__audioCreated)).toBeGreaterThan(0)
+  expect(await audioCreated(page)).toBeGreaterThan(0)
+  // landings play at 0.35 x the master gain, horns and the chime at 0.5 x
+  const volumes = await page.evaluate(() => (window as unknown as { __audioVolumes: number[] }).__audioVolumes)
+  for (const v of volumes) expect([0.35 * 0.4, 0.5 * 0.4].some((e) => Math.abs(v - e) < 0.005)).toBe(true)
 
   // x600 on a busy preset: many landings per real second would play without the throttle
   await open(page, 'Small automated', '2026-10-26T13:00:00.000Z')

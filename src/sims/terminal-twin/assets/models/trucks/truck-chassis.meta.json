@@ -254,6 +254,63 @@
       "source": "inner castings of two 20 ft boxes standing end to end (76 mm gap)"
     }
   ],
+  "loadConfigurations": [
+    {
+      "mode": "40",
+      "seats": [
+        "load_40"
+      ],
+      "pins": [
+        "pin_40_fl",
+        "pin_40_fr",
+        "pin_40_rl",
+        "pin_40_rr"
+      ],
+      "tag": "V",
+      "description": "one 40 ft box (also 40 ft high-cube) on the four end castings"
+    },
+    {
+      "mode": "20",
+      "seats": [
+        "load_20_front",
+        "load_20_rear"
+      ],
+      "pins": [
+        "pin_40_fl",
+        "pin_40_fr",
+        "pin_20_mid_fl",
+        "pin_20_mid_fr"
+      ],
+      "tag": "V",
+      "description": "one 20 ft box on the front pins (load_20_front) or the rear pins (load_20_rear)"
+    },
+    {
+      "mode": "twin-20",
+      "seats": [
+        "load_20_twin_a",
+        "load_20_twin_b"
+      ],
+      "pins": [
+        "pin_40_fl",
+        "pin_40_fr",
+        "pin_20_mid_fl",
+        "pin_20_mid_fr",
+        "pin_20_mid_rl",
+        "pin_20_mid_rr",
+        "pin_40_rl",
+        "pin_40_rr"
+      ],
+      "tag": "V",
+      "description": "two 20 ft boxes end to end, meeting at the middle castings"
+    }
+  ],
+  "chassisDetail": [
+    "mudguards",
+    "landing legs",
+    "twist-lock levers",
+    "mud flaps",
+    "under-run bar"
+  ],
   "groundContact": {
     "y": 0,
     "points": [
@@ -292,11 +349,11 @@
   },
   "lods": {
     "LOD0": {
-      "triangles": 3364,
+      "triangles": 3636,
       "material": "truck_atlas"
     },
     "LOD1": {
-      "triangles": 912,
+      "triangles": 956,
       "material": "truck_atlas"
     },
     "LOD2": {
@@ -318,6 +375,11 @@
     {
       "fact": "gooseneck chassis with a kingpin 1.1 m behind the front pins",
       "tag": "A"
+    },
+    {
+      "fact": "grey skeletal tri-axle chassis with wing guards over the tyres, landing legs with gearbox, twist-lock levers and a rear under-run bar",
+      "tag": "P",
+      "source": "reference photo container-20ft-side-and-door-on-chassis (ignored by version control, never committed; the generator does not read it)"
     },
     {
       "fact": "rigid tyre tread lugs and rim details are low-poly",

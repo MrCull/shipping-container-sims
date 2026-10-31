@@ -47,6 +47,7 @@ import type {
 import type { Breakpoint, BreakpointKind } from '../modules/breakpoints'
 import type { OverlayState } from '../modules/overlays'
 import type { QualityLevel, QualitySetting } from '../modules/quality'
+import { useAudioStore } from '@/stores/audio'
 import { usePerfStore, type PerfStats } from '../store/perfStore'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
@@ -141,7 +142,7 @@ export interface TwinDevApi {
   config(): ScenarioConfig | null
   /** Keyboard-driven UI state. */
   ui(): TwinUiState
-  /** Atmosphere (TT-21): lighting mode, daylight lock, backdrop, sound toggle and what played, the banner showing. */
+  /** Atmosphere (TT-21): lighting mode, daylight lock, backdrop, master sound gain and what played, the banner showing. */
   atmosphere(): TwinAtmosphereState
   /** Dashboard (TT-16): open it, pick a tab/group/bucketing, read what it rendered. */
   dashboard(): TwinDashboardState
@@ -223,9 +224,12 @@ export interface TwinDashboardState {
 
 export interface TwinAtmosphereState {
   lockDaylight: boolean
-  soundOn: boolean
-  /** Sounds played since the scenario started (0 while the toggle is off). */
+  /** The shared master gain (volume, 0 while muted) that scales all playback. */
+  soundGain: number
+  /** Sounds played since the scenario started (none while muted). */
   sound: { played: number; recent: { kind: string; large: boolean; simT: number }[] }
+  /** Positional sound (#125): the voices playing now (key `<sound>:<machine id>`, gain before the master gain). */
+  positional: { voices: { key: string; gain: number }[] }
   banner: { kind: string; vesselName: string } | null
   /** The 3D view's lighting and backdrop; null without a 3D view. */
   scene: { mode: string; daylight: number; shadows: boolean; masts: number; equipmentLights: number; backdrop: { kind: string; parts: string[]; models: string } } | null
@@ -251,10 +255,10 @@ export interface SceneState {
   [kind: string]: unknown
   displayTime: number
   containers: Record<string, CustodyRef | null>
-  sts: Record<string, { status: string } & StsPose>
+  sts: Record<string, { status: string; gantrying: boolean } & StsPose>
   shcs: Record<string, { status: string } & ShcPose>
   /** The ASCs of every yard block (1 or 2 each): status and spreader pose (gantry Z, trolley X, hoist height). */
-  ascs: Record<string, { status: string } & AscPose>
+  ascs: Record<string, { status: string; gantrying: boolean } & AscPose>
   /** Trucks in the scene (TT-13): status and pose; `visible` false once they have left. */
   trucks: Record<string, { status: string } & TruckPose>
   vessels: Record<string, { status: string }>
@@ -417,8 +421,9 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     },
     atmosphere: () => ({
       lockDaylight: store.lockDaylight,
-      soundOn: store.soundOn,
+      soundGain: useAudioStore().masterGain,
       sound: store.sounds.stats(),
+      positional: store.positional.stats(),
       banner: store.banner ? { kind: store.banner.kind, vesselName: store.banner.vesselName } : null,
       scene: store.view()?.atmosphere() ?? null,
     }),

@@ -945,6 +945,112 @@
       "description": "top centre of the fore box of a twin-20 lift"
     }
   ],
+  "beaconMounts": [
+    {
+      "name": "beacon_leg_sea_xneg",
+      "node": "gantry",
+      "position": [
+        -10.45,
+        6.0,
+        0.0
+      ],
+      "colour": "#ffa000",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the outer X face of a leg at gantry-alarm height, seaward side; rides with the gantry"
+    },
+    {
+      "name": "beacon_leg_sea_xpos",
+      "node": "gantry",
+      "position": [
+        10.45,
+        6.0,
+        0.0
+      ],
+      "colour": "#ffa000",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the outer X face of a leg at gantry-alarm height, seaward side; rides with the gantry"
+    },
+    {
+      "name": "beacon_leg_land_xneg",
+      "node": "gantry",
+      "position": [
+        -10.45,
+        6.0,
+        30.48
+      ],
+      "colour": "#ffa000",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the outer X face of a leg at gantry-alarm height, landward side; rides with the gantry"
+    },
+    {
+      "name": "beacon_leg_land_xpos",
+      "node": "gantry",
+      "position": [
+        10.45,
+        6.0,
+        30.48
+      ],
+      "colour": "#ffa000",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the outer X face of a leg at gantry-alarm height, landward side; rides with the gantry"
+    },
+    {
+      "name": "beacon_portal_sea_xneg",
+      "node": "gantry",
+      "position": [
+        -10.3,
+        54.0,
+        0.0
+      ],
+      "colour": "#ffa000",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the end of a portal beam, seaward side; rides with the gantry"
+    },
+    {
+      "name": "beacon_portal_sea_xpos",
+      "node": "gantry",
+      "position": [
+        10.3,
+        54.0,
+        0.0
+      ],
+      "colour": "#ffa000",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the end of a portal beam, seaward side; rides with the gantry"
+    },
+    {
+      "name": "beacon_portal_land_xneg",
+      "node": "gantry",
+      "position": [
+        -10.3,
+        54.0,
+        30.48
+      ],
+      "colour": "#ffa000",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the end of a portal beam, landward side; rides with the gantry"
+    },
+    {
+      "name": "beacon_portal_land_xpos",
+      "node": "gantry",
+      "position": [
+        10.3,
+        54.0,
+        30.48
+      ],
+      "colour": "#ffa000",
+      "lens": "amber",
+      "tag": "A",
+      "description": "on the end of a portal beam, landward side; rides with the gantry"
+    }
+  ],
   "groundContact": {
     "y": 0,
     "rails": [
@@ -960,16 +1066,16 @@
   },
   "lods": {
     "LOD0": {
-      "triangles": 31132,
+      "triangles": 31690,
       "maxDistanceM": 250,
       "note": "camera to crane centre; the renderer adds 15 % hysteresis"
     },
     "LOD1": {
-      "triangles": 5522,
+      "triangles": 5912,
       "maxDistanceM": 900
     },
     "LOD2": {
-      "triangles": 468
+      "triangles": 490
     }
   },
   "materials": {
@@ -978,8 +1084,9 @@
   },
   "branding": {
     "wordmark": "ZPMC",
+    "livery": "TTI ALGECIRAS",
     "typeface": "Archivo-ExtraBold",
-    "placement": "machinery house sides (blue on white), main girder outer faces (white on blue)",
+    "placement": "TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces (white on blue), ZPMC builder plates on the legs",
     "craneNumbers": {
       "first": 101,
       "count": 24,
@@ -993,8 +1100,9 @@
       "material": "sts_plate",
       "uvConvention": "TEXCOORD_0 of material sts_plate is authored for tile 0 (crane 101); add (index % cols, floor(index / cols)) * tileSizeUv"
     },
-    "operatorBranding": "none",
-    "tag": "A"
+    "operatorBranding": true,
+    "note": "text only (open-licence typeface), no logo artwork",
+    "tag": "P"
   },
   "provenance": [
     {
@@ -1018,7 +1126,7 @@
       "reason": "builder version: real fleet is 5 Malaccamax + 3 Super Post-Panamax"
     },
     {
-      "fact": "dark royal-blue steelwork, white machinery house, yellow spreader, lattice boom, ties, ladders, catwalks, floodlights",
+      "fact": "blue steelwork, white machinery house, yellow spreader, lattice boom, ties, ladders, catwalks, floodlights",
       "tag": "P",
       "source": "reference photographs (not committed)"
     },
@@ -1027,13 +1135,23 @@
       "tag": "A"
     },
     {
-      "fact": "ZPMC wordmark set in Archivo ExtraBold; crane numbers 101-124 on plates",
+      "fact": "wordmarks set in Archivo ExtraBold; crane numbers 101-124 on plates",
       "tag": "A"
     },
     {
-      "fact": "no TTI ALGECIRAS emblem",
+      "fact": "TTI ALGECIRAS livery: cobalt-blue steel, white machinery house with a sloped seaward nose and TTI / ALGECIRAS text, TTI ALGECIRAS text along the girders, ZPMC plates on the legs, crane number plates, X-braced side frames, long forestay rods from the apex to the boom nose, amber beacons",
+      "tag": "P",
+      "source": "TTI Algeciras reference photographs of the STS cranes (git-ignored, not committed)"
+    },
+    {
+      "fact": "no TTI emblem or logo artwork",
       "tag": "M",
-      "reason": "spec: manufacturer wordmark and crane numbers only, no operator branding"
+      "reason": "text names only"
+    },
+    {
+      "fact": "beacon mount positions",
+      "tag": "A",
+      "reason": "photos show amber beacons low on the legs; exact heights are estimated"
     },
     {
       "fact": "forestays rotate with the boom (they detach from the apex when the boom is raised)",

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from './ui/TtIcon.vue'
 import { computed, ref } from 'vue'
 import { useTwinStore } from '../store/twinStore'
 import { SPEEDS } from '../modules/twinController'
@@ -87,9 +88,10 @@ async function submitRunTo(): Promise<void> {
           :aria-pressed="store.paused"
           :disabled="ended"
           :title="ended ? t('topbar.endedHint') : store.paused ? t('topbar.resume') : t('topbar.pause')"
+          :aria-label="store.paused ? t('topbar.resume') : t('topbar.pause')"
           @click="store.togglePause()"
         >
-          {{ store.paused ? '▶' : '❚❚' }}
+          <TtIcon :name="store.paused ? 'play' : 'pause'" />
         </button>
         <button
           v-for="s in SPEEDS"
@@ -236,16 +238,6 @@ async function submitRunTo(): Promise<void> {
       >
         {{ t('topbar.daylight') }}
       </button>
-      <button
-        class="action-btn"
-        :class="{ active: store.soundOn }"
-        :aria-pressed="store.soundOn"
-        :title="t('topbar.soundHint')"
-        data-testid="tt-sound-toggle"
-        @click="store.toggleSound()"
-      >
-        {{ t('topbar.sound') }}
-      </button>
       <PerfPanel v-if="showGraphics" />
     </div>
   </header>
@@ -262,10 +254,12 @@ async function submitRunTo(): Promise<void> {
   gap: 0.5rem 1rem;
   flex-wrap: nowrap;
   padding: 0.5rem 0.9rem;
-  background: rgba(17, 24, 39, 0.92);
-  border-bottom: 1px solid var(--color-border);
-  font-family: var(--font-body);
-  color: var(--color-text);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  border-bottom: 1px solid var(--tt-border);
+  font-family: var(--tt-font);
+  color: var(--tt-text);
   backdrop-filter: blur(6px);
 }
 
@@ -298,7 +292,7 @@ async function submitRunTo(): Promise<void> {
 }
 
 .clock-day {
-  color: var(--color-accent);
+  color: var(--tt-accent);
   font-weight: 600;
 }
 
@@ -309,13 +303,13 @@ async function submitRunTo(): Promise<void> {
 
 .clock-date,
 .clock-elapsed {
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
   font-size: 0.8rem;
 }
 
 .speeds {
   display: flex;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -324,8 +318,8 @@ async function submitRunTo(): Promise<void> {
   padding: 0.3rem 0.5rem;
   background: transparent;
   border: none;
-  border-right: 1px solid var(--color-border);
-  color: var(--color-text-muted);
+  border-right: 1px solid var(--tt-border);
+  color: var(--tt-text-muted);
   font-family: var(--tt-font-mono);
   font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
@@ -341,24 +335,40 @@ async function submitRunTo(): Promise<void> {
 }
 
 .speed-btn:hover:not(:disabled) {
-  background: var(--color-bg-card-hover);
-  color: var(--color-text);
+  background: var(--tt-surface-hover);
+  color: var(--tt-text);
 }
 
 .speed-btn.active {
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--tt-accent);
+  color: var(--tt-on-accent);
 }
 
 /* State by shape as well as colour: an active toggle carries a check mark. */
+.action-btn.active::before,
+.status.live::before,
+.status.paused::before,
+.status.complete::before,
+.status.failed::before {
+  content: '';
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.3em;
+  vertical-align: -0.12em;
+  background: currentColor;
+  -webkit-mask: var(--tt-mark) center / contain no-repeat;
+  mask: var(--tt-mark) center / contain no-repeat;
+}
+
 .action-btn.active::before {
-  content: '✓ ';
+  --tt-mark: var(--tt-glyph-check);
 }
 
 .action-btn.active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
+  background: var(--tt-accent);
+  border-color: var(--tt-accent);
+  color: var(--tt-on-accent);
 }
 
 .actions {
@@ -370,15 +380,15 @@ async function submitRunTo(): Promise<void> {
 
 .action-btn {
   padding: 0.35rem 0.75rem;
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-size: 0.82rem;
 }
 
 .action-btn:hover:not(:disabled) {
-  border-color: var(--color-primary);
+  border-color: var(--tt-accent);
 }
 
 .action-btn:disabled {
@@ -387,9 +397,9 @@ async function submitRunTo(): Promise<void> {
 }
 
 .action-btn.primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
+  background: var(--tt-accent);
+  border-color: var(--tt-accent);
+  color: var(--tt-on-accent);
 }
 
 .run-to {
@@ -406,10 +416,10 @@ async function submitRunTo(): Promise<void> {
   gap: 0.5rem;
   min-width: 16rem;
   padding: 0.75rem;
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
   border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--tt-shadow);
 }
 
 .run-to-pop label {
@@ -417,15 +427,15 @@ async function submitRunTo(): Promise<void> {
   flex-direction: column;
   gap: 0.3rem;
   font-size: 0.78rem;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .run-to-pop input {
   padding: 0.35rem 0.5rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--tt-bg);
+  border: 1px solid var(--tt-border);
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--tt-text);
   font-family: var(--tt-font-mono);
   color-scheme: dark;
 }
@@ -437,7 +447,7 @@ async function submitRunTo(): Promise<void> {
 }
 
 .error {
-  color: var(--color-danger);
+  color: var(--tt-danger);
   font-size: 0.78rem;
 }
 
@@ -449,29 +459,29 @@ async function submitRunTo(): Promise<void> {
 .status {
   min-width: 5.5rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--tt-border);
   border-radius: 999px;
   font-size: 0.75rem;
   text-align: center;
-  color: var(--color-text-muted);
+  color: var(--tt-text-muted);
 }
 
 .status.live::before {
-  content: '● ';
-  color: var(--color-success);
+  --tt-mark: var(--tt-glyph-dot);
+  color: var(--tt-success);
 }
 
 .status.paused::before {
-  content: '❚❚ ';
+  --tt-mark: var(--tt-glyph-pause);
 }
 
 .status.complete::before {
-  content: '✓ ';
-  color: var(--color-success);
+  --tt-mark: var(--tt-glyph-check);
+  color: var(--tt-success);
 }
 
 .status.failed::before {
-  content: '✕ ';
-  color: var(--color-danger);
+  --tt-mark: var(--tt-glyph-close);
+  color: var(--tt-danger);
 }
 </style>

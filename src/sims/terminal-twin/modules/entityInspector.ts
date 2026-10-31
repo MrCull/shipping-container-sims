@@ -10,6 +10,7 @@ import type { ContainerSize } from '../scenario/types'
 import type { MessageKey } from '../i18n/messages'
 import type { EventSummary, QueryKind } from '../worker/protocol'
 import type { SceneModel } from './sceneModel'
+import type { VesselStatusInput } from './vesselStatus'
 
 export type EntityKind = 'container' | EquipmentKind
 
@@ -55,6 +56,8 @@ export interface EntityView {
   custody: CustodyRow[]
   /** Containers only: the stored properties a hover tooltip lists (a subset of `facts`). */
   tooltip?: Fact[]
+  /** Vessels only (#126): the view fields the popup turns into status, ETA, countdown and moves with the live sim time (`buildVesselStatus`). */
+  vesselStatus?: VesselStatusInput
 }
 
 export interface EntityExtras {

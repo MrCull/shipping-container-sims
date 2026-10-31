@@ -92,11 +92,11 @@ test('KPI values keep a fixed minimum width and tabular figures so the strip doe
   }
 })
 
-test('the Quality control sits in the settings region beside Daylight and Sound', async ({ page }) => {
+test('the Quality control sits in the settings region beside Daylight', async ({ page }) => {
   await open(page, 'Small automated')
   const settings = page.locator('[data-hud-region="settings"]')
   await expect(settings.getByTestId('tt-daylight-toggle')).toBeVisible()
-  await expect(settings.getByTestId('tt-sound-toggle')).toBeVisible()
+  await expect(settings.getByTestId('tt-sound-toggle')).toHaveCount(0)
   await expect(settings.getByTestId('tt-quality-auto')).toBeVisible()
   await expect(settings.getByTestId('tt-perf-toggle')).toBeVisible()
 })

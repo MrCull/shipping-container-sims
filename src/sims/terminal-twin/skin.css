@@ -1,0 +1,143 @@
+/*
+ * Terminal Twin skin (#122): the one place that holds the sim's colours, fonts, radii and shadows.
+ * Light, professional: off-white frosted panels over the 3D view, navy text, thin grey borders, TTI crane blue as the
+ * single accent, amber and red only for warnings and alerts, Inter type, outline icons.
+ *
+ * Scoped to `.terminal-twin` (and `.tt-skin` for the FPS chip, which is teleported into the shared page header), so the
+ * other sims keep the global dark tokens of `src/assets/main.css`. Components use `--tt-*` only (tests/skin.test.ts).
+ * Every text token is checked against the panel on light and dark backdrops for WCAG AA (4.5:1) in the same test.
+ */
+.terminal-twin,
+.tt-skin {
+  /* Type */
+  --tt-font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --tt-font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  /* Ink */
+  --tt-text: #14253f;
+  --tt-text-muted: #46556f;
+  --tt-on-accent: #ffffff;
+
+  /* Surfaces: page, opaque card, frosted panel (translucent, blurred over the scene), scrim behind dialogs */
+  --tt-bg: #eef2f7;
+  --tt-surface: #fafbfd;
+  --tt-surface-hover: #e9eff7;
+  --tt-surface-sunken: #f0f3f8;
+  --tt-panel: rgba(250, 251, 253, 0.88);
+  --tt-panel-strong: rgba(250, 251, 253, 0.96);
+  --tt-blur: blur(10px) saturate(1.1);
+  --tt-scrim: rgba(20, 37, 63, 0.38);
+  --tt-chart-surface: #fcfcfb;
+  --tt-border: #d3dae6;
+  --tt-border-strong: #aebad0;
+
+  /* Accent: TTI crane blue */
+  --tt-accent: #0b5cad;
+  --tt-accent-hover: #084a8c;
+  --tt-accent-soft: rgba(11, 92, 173, 0.1);
+  --tt-focus: rgba(11, 92, 173, 0.35);
+
+  /* Status: amber for warnings, red for alerts, green for done */
+  --tt-warn: #8a4a05;
+  --tt-warn-bg: #fdf0d4;
+  --tt-warn-border: #d99a2b;
+  --tt-danger: #b01e1e;
+  --tt-danger-bg: #fde4e4;
+  --tt-danger-border: #d95757;
+  --tt-success: #17653a;
+  --tt-success-bg: #dff3e6;
+  --tt-success-border: #3fa56a;
+
+  /* Shape and depth */
+  --tt-radius-sm: 6px;
+  --tt-radius: 10px;
+  --tt-radius-lg: 14px;
+  --tt-shadow: 0 6px 20px rgba(20, 37, 63, 0.16);
+  --tt-shadow-lg: 0 18px 50px rgba(20, 37, 63, 0.28);
+  --tt-ring: 0 0 0 3px var(--tt-focus);
+  --tt-space-1: 0.25rem;
+  --tt-space-2: 0.5rem;
+  --tt-space-3: 0.75rem;
+  --tt-space-4: 1rem;
+
+  /* Data colours: bay viewer move states and pools, setup plan sketch (decorative, never text on their own) */
+  --tt-data-discharge: #d98a1f;
+  --tt-data-load: #2f6fd0;
+  --tt-data-active: #27a36a;
+  --tt-data-done: #8a97ab;
+  --tt-data-rob: #7a8aa3;
+  --tt-data-0: #4c9be8;
+  --tt-data-1: #e8a33c;
+  --tt-data-2: #5cc08a;
+  --tt-data-3: #d9627a;
+  --tt-data-4: #9a7be0;
+  --tt-data-5: #3fb8c4;
+  --tt-data-6: #c9c04a;
+  --tt-data-7: #e07c4c;
+  --tt-ramp-0: #9ed0f0;
+  --tt-ramp-1: #5aa9e0;
+  --tt-ramp-2: #2f7fc8;
+  --tt-ramp-3: #1f5aa0;
+  --tt-ramp-4: #163c70;
+  --tt-plan-quay: #1c3a5a;
+  --tt-plan-sts: #e7b84a;
+  --tt-plan-block: #4f7cac;
+  --tt-plan-gate: #c0584a;
+  --tt-plan-line: #6b7280;
+  --tt-plan-pad: #86b6e0;
+  --tt-plan-lane: #cfd6df;
+  --tt-hatch: rgba(20, 37, 63, 0.35);
+  --tt-white-line: rgba(255, 255, 255, 0.9);
+
+  /* State glyphs for ::before marks (state by shape as well as colour), drawn as masks so they take the text colour. */
+  --tt-glyph-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+  --tt-glyph-dot: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 9.5v.1M12 12m-3 0a3 3 0 106 0a3 3 0 10-6 0'/%3E%3C/svg%3E");
+  --tt-glyph-pause: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6v12M15 6v12'/%3E%3C/svg%3E");
+  --tt-glyph-close: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");
+
+  /* The shared global tokens, remapped inside the sim so any widget that still reads them stays on the skin. */
+  --color-bg: var(--tt-bg);
+  --color-bg-card: var(--tt-surface);
+  --color-bg-card-hover: var(--tt-surface-hover);
+  --color-primary: var(--tt-accent);
+  --color-primary-glow: var(--tt-accent-hover);
+  --color-accent: var(--tt-warn);
+  --color-accent-glow: var(--tt-warn);
+  --color-text: var(--tt-text);
+  --color-text-muted: var(--tt-text-muted);
+  --color-border: var(--tt-border);
+  --color-success: var(--tt-success);
+  --color-danger: var(--tt-danger);
+  --font-body: var(--tt-font);
+
+  font-family: var(--tt-font);
+  color: var(--tt-text);
+}
+
+/* Frosted panel: one class for every floating surface over the 3D view. */
+.terminal-twin .tt-frost,
+.tt-skin .tt-frost {
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  border: 1px solid var(--tt-border);
+  color: var(--tt-text);
+}
+
+/* Outline icons (TtIcon.vue) */
+.tt-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.18em;
+}
+
+.terminal-twin :focus-visible {
+  outline: 2px solid var(--tt-accent);
+  outline-offset: 1px;
+}

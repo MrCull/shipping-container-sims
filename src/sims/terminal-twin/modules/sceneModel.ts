@@ -34,13 +34,19 @@ import {
   TRUCK_DECK_M,
   type BlockSpec,
   type Axis,
+  type ContainerState,
   type CustodyRef,
+  type TransitWorld,
+  type TruckStatus,
+  type VesselStatus,
   type LaneGraph,
   type LandsideGraph,
   type MotionSegment,
   type Reservation,
 } from '../engine'
 import { planCargo } from '../scenario/bayPlan'
+import { drawContainerProps, isoTypeOf, type ContainerProps } from '../scenario/containerProps'
+import { subjectOfBox, type ColourSubject } from './colourBy'
 import type { RobBox } from '../scenario/robBays'
 import { planExportYard } from '../scenario/exportYard'
 import type { ContainerSize, ScenarioConfig, VesselConfig } from '../scenario/types'
@@ -81,6 +87,28 @@ export interface StsPose {
   /** Spreader (bottom of headblock) height. */
   hoistY: number
 }
+
+/** A short sound moment (#129): a spreader locking or unlocking, a box landing, a truck braking to a stop. */
+export interface SoundShot {
+  t: number
+  machine: 'sts' | 'asc' | 'shc' | 'truck'
+  id: string
+  motion: 'locking' | 'unlocking' | 'landing' | 'braking'
+  x: number
+  y: number
+  z: number
+}
+
+interface Handoff {
+  t: number
+  containerId: string
+  from: CustodyRef | null
+  to: CustodyRef
+}
+
+const CARRIER_KINDS = new Set(['sts', 'asc', 'shc'])
+/** Handoffs are kept this long (s) behind the display time. */
+const HANDOFF_KEEP_S = 5
 
 interface CustodyEntry {
   t: number
@@ -222,12 +250,33 @@ function lastAtOrBefore<T>(list: T[], time: number, getT: (item: T) => number): 
   return found
 }
 
+export interface ContainerDetail {
+  laden: boolean
+  isoType: string
+  heavy: boolean
+  /** Stored properties (colour by, #130); drawn on first use for a pre-filled import. */
+  props?: ContainerProps
+  /** Sim time since which the box has stood in the yard (negative: before the run), as in the engine. */
+  yardSince?: number
+}
+
 export class SceneModel {
   readonly config: ScenarioConfig
   readonly seed: number
   readonly containerIds: string[]
   readonly containerSize: Record<string, ContainerSize>
   readonly containerLine: Record<string, string>
+  /** What the close-up markings need beyond size and line (#119). */
+  readonly containerDetail: Record<string, ContainerDetail>
+  /** Pre-filled imports by id: their properties are drawn when a colour mode first asks. */
+  private readonly prefillImports = new Map<string, { id: string; size: ContainerSize; line: string; ageS: number; reefer?: true }>()
+  private readonly vesselIdSet: ReadonlySet<string>
+  /** The carriers' state at `colourT`, for the transit status of `colourSubjectAt`. */
+  private colourT = 0
+  private readonly colourWorld: TransitWorld = {
+    vesselStatus: (id) => this.statusAt('vessel', id, this.colourT) as VesselStatus,
+    truckStatus: (id) => this.statusAt('truck', id, this.colourT) as TruckStatus,
+  }
   readonly graph: LaneGraph
   /** Landside roads, gate and stalls (null without a landside). */
   readonly landside: LandsideGraph | null
@@ -247,6 +296,8 @@ export class SceneModel {
   private reservations: Record<string, Reservation[]> = {}
   private axisSegments: Record<string, Record<Axis, MotionSegment[]>> = {}
   private drives: Record<string, DriveLeg[]> = {}
+  /** Custody changes in time order, for the sound shots; trimmed by `prune`. */
+  private handoffs: Handoff[] = []
   private custody: Record<string, CustodyEntry[]> = {}
   private status: Record<string, StatusEntry[]> = {}
   /** Hatch panels of the vessels' bays (TT-R10), in id order; empty with hatch covers off. */
@@ -270,12 +321,18 @@ export class SceneModel {
     this.containerIds = cargo.containers.map((c) => c.id)
     this.containerSize = Object.fromEntries(cargo.containers.map((c) => [c.id, c.size]))
     this.containerLine = Object.fromEntries(cargo.containers.map((c) => [c.id, c.line]))
+    this.containerDetail = Object.fromEntries(
+      cargo.containers.map((c) => [c.id, { laden: c.full, isoType: c.props?.isoType ?? isoTypeOf(c.size, c.reefer === true), heavy: c.props?.weightClass === 'HEAVY', props: c.props }]),
+    )
     for (const imp of prefill?.imports ?? []) {
       this.containerIds.push(imp.id)
       this.containerSize[imp.id] = imp.size
       this.containerLine[imp.id] = imp.line
+      this.containerDetail[imp.id] = { laden: true, isoType: isoTypeOf(imp.size, imp.reefer === true), heavy: false, yardSince: -imp.ageS }
+      this.prefillImports.set(imp.id, imp)
     }
     this.vessels = Object.fromEntries(config.vessels.map((v) => [v.id, v]))
+    this.vesselIdSet = new Set(config.vessels.map((v) => v.id))
     this.specs = Object.fromEntries(config.vessels.map((v) => [v.id, vesselClass(v.sizeClass)]))
     this.anchorageSlot = Object.fromEntries(config.vessels.map((v, i) => [v.id, i]))
     this.initialPose = Object.fromEntries(
@@ -401,6 +458,7 @@ export class SceneModel {
     this.containerIds.push(c.id)
     this.containerSize[c.id] = c.size
     this.containerLine[c.id] = c.line
+    this.containerDetail[c.id] = { laden: c.full ?? true, isoType: c.isoType ?? isoTypeOf(c.size, false), heavy: c.heavy ?? false, props: c.props }
     this.custody[c.id] = []
   }
 
@@ -426,7 +484,10 @@ export class SceneModel {
       }
     }
     for (const c of delta.custody) {
-      this.custody[c.containerId]?.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
+      const list = this.custody[c.containerId]
+      if (!list) continue
+      this.handoffs.push({ t: c.t, containerId: c.containerId, from: list.length > 0 ? list[list.length - 1].owner : null, to: c.owner })
+      list.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
     }
     for (const e of delta.entities) {
       this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX })
@@ -493,6 +554,8 @@ export class SceneModel {
       const i = lastAtOrBefore(list, time, (l) => l.t0)
       if (i > 0) list.splice(0, i)
     }
+    const keep = this.handoffs.findIndex((h) => h.t >= time - HANDOFF_KEEP_S)
+    if (keep !== 0) this.handoffs.splice(0, keep < 0 ? this.handoffs.length : keep)
     for (const [zone, list] of Object.entries(this.reservations)) this.reservations[zone] = list.filter((r) => r.to >= time)
     // trucks that left before `time` are not drawn any more: forget them
     for (const id of [...this.truckIds]) {
@@ -604,6 +667,77 @@ export class SceneModel {
     return { x: value('trolley', start.x), z: value('gantry', start.z), hoistY: value('hoist', start.hoistY) }
   }
 
+  /** True while the STS or ASC `id` travels along its rails at `time` (a gantry-axis segment is in progress). Drives the gantry alarm and beacons. */
+  isGantrying(id: string, time: number): boolean {
+    const list = this.axisSegments[id]?.gantry ?? []
+    const i = lastAtOrBefore(list, time, (s) => s.t0)
+    return i >= 0 && time < list[i].t1 && list[i].from !== list[i].to
+  }
+
+  /** True while an STS or ASC trolley or hoist segment is in progress at `time` (the motor and cable whine). */
+  isWorking(id: string, time: number): boolean {
+    const axes = this.axisSegments[id]
+    if (!axes) return false
+    return (['trolley', 'hoist'] as const).some((axis) => {
+      const list = axes[axis]
+      const i = lastAtOrBefore(list, time, (s) => s.t0)
+      return i >= 0 && time < list[i].t1 && list[i].from !== list[i].to
+    })
+  }
+
+  private driveLegAt(id: string, time: number): DriveLeg | null {
+    const list = this.drives[id]
+    if (!list) return null
+    const i = lastAtOrBefore(list, time, (l) => l.t0)
+    return i >= 0 && time < list[i].t1 ? list[i] : null
+  }
+
+  /** True while an SHC or truck is under way (a drive leg is in progress). */
+  isDriving(id: string, time: number): boolean {
+    return this.driveLegAt(id, time) !== null
+  }
+
+  /** True while an SHC or truck backs up (a drive leg against its heading, with no turn): the reversing beeper. */
+  isReversing(id: string, time: number): boolean {
+    return this.driveLegAt(id, time)?.fwd === -1
+  }
+
+  /**
+   * The sound moments in `(t0, t1]`: a box picked up (spreader locks) or set down (unlocks and lands) by an STS, ASC
+   * or SHC, and a truck's drive leg ending (air brake). Windowed rather than asked at a time, so a short sound is
+   * still found when playback is fast and a frame spans many seconds.
+   */
+  shotsBetween(t0: number, t1: number): SoundShot[] {
+    const out: SoundShot[] = []
+    let lo = 0
+    let hi = this.handoffs.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (this.handoffs[mid].t <= t0) lo = mid + 1
+      else hi = mid
+    }
+    for (let i = lo; i < this.handoffs.length && this.handoffs[i].t <= t1; i++) {
+      const h = this.handoffs[i]
+      const fromCarrier = h.from && CARRIER_KINDS.has(h.from.kind) && !(h.to.kind === h.from.kind && h.to.id === h.from.id)
+      const toCarrier = CARRIER_KINDS.has(h.to.kind) && !(h.from && h.to.kind === h.from.kind && h.to.id === h.from.id)
+      const at = this.containerCentre(h.containerId, h.t) // where the box is at the change: under the new owner
+      if (!at) continue
+      if (toCarrier) out.push({ t: h.t, machine: h.to.kind as SoundShot['machine'], id: h.to.id, motion: 'locking', ...at })
+      if (fromCarrier && h.from) {
+        out.push({ t: h.t, machine: h.from.kind as SoundShot['machine'], id: h.from.id, motion: 'unlocking', ...at })
+        if (!toCarrier) out.push({ t: h.t, machine: h.from.kind as SoundShot['machine'], id: h.from.id, motion: 'landing', ...at })
+      }
+    }
+    for (const id of this.truckIds) {
+      for (const leg of this.drives[id] ?? []) {
+        if (leg.t1 <= t0 || leg.t1 > t1) continue
+        const p = this.truckPose(id, leg.t1)
+        out.push({ t: leg.t1, machine: 'truck', id, motion: 'braking', x: p.x, y: 1.5, z: p.z })
+      }
+    }
+    return out
+  }
+
   stsPose(stsId: string, time: number): StsPose {
     const axes = this.axisSegments[stsId]
     const pose = { ...this.initialPose[stsId] }
@@ -670,6 +804,17 @@ export class SceneModel {
     return i < 0 ? 'unknown' : list[i].status
   }
 
+  /** A vessel's status at `time` and when it entered mooring, berthed and departed (null before), from the status timeline (#126). */
+  vesselStatusTimes(id: string, time: number): { status: string; mooringS: number | null; berthedS: number | null; departedS: number | null } {
+    const list = this.status[`vessel:${id}`] ?? []
+    const upTo = lastAtOrBefore(list, time, (e) => e.t)
+    const seen = (status: string): number | null => {
+      for (let i = 0; i <= upTo; i++) if (list[i].status === status) return list[i].t
+      return null
+    }
+    return { status: upTo < 0 ? 'unknown' : list[upTo].status, mooringS: seen('mooring'), berthedS: seen('berthed'), departedS: seen('departed') }
+  }
+
   /** Where a vessel is at `time`: alongside at its berth, at anchorage offshore, or null (not arrived / departed). */
   vesselPlacement(id: string, time: number): VesselPlacement | null {
     const list = this.status[`vessel:${id}`] ?? []
@@ -693,6 +838,44 @@ export class SceneModel {
   /** Poses of stacked boxes by `${slotId}|${size}` (read-only; shared between frames). */
   private readonly yardPoses = new Map<string, ContainerPose>()
   private readonly vesselSlotCells = new Map<string, ReturnType<typeof parseVesselSlotId>>()
+
+  /**
+   * What the colour modes need about a box at `time` (#130). `timeBased` also resolves the transit status and the dwell
+   * (a walk over the box's custody records); the other modes only read its stored properties.
+   */
+  colourSubjectAt(containerId: string, time: number, timeBased: boolean): ColourSubject {
+    const d = this.containerDetail[containerId]
+    const line = this.containerLine[containerId]
+    let props = d?.props
+    if (!props) {
+      const imp = this.prefillImports.get(containerId)
+      if (imp && d) {
+        props = d.props = drawContainerProps(this.config, this.seed, {
+          id: imp.id,
+          size: imp.size,
+          full: true,
+          line: imp.line,
+          reefer: imp.reefer === true,
+          direction: 'IMPORT',
+          inbound: { kind: 'vessel' },
+          arrivalS: -imp.ageS,
+        })
+      }
+    }
+    const full = d?.laden ?? true
+    const list = this.custody[containerId] ?? []
+    if (timeBased && list.length > 0) {
+      this.colourT = time
+      return subjectOfBox({ line, full, props, yardSince: d?.yardSince, custody: list[list.length - 1].owner, custodyHistory: list as unknown as ContainerState['custodyHistory'] }, this.colourWorld, time, { vessels: this.vesselIdSet })
+    }
+    const onCall = (c: { kind: string; id?: string } | undefined): boolean => c?.kind === 'vessel' && c.id !== undefined && this.vesselIdSet.has(c.id)
+    return {
+      line,
+      full,
+      ...(props ? { isoType: props.isoType, pod: props.pod, weightClass: props.weightClass, direction: props.direction, plannedDepartureS: props.plannedDepartureS } : { isoType: d?.isoType }),
+      onCall: props ? onCall(props.inbound) || onCall(props.outbound) : false,
+    }
+  }
 
   custodyAt(containerId: string, time: number): CustodyRef | null {
     const list = this.custody[containerId] ?? []
