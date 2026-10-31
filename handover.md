@@ -20,10 +20,10 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #124 STS model | #121 | merged, pushed. Follow-up: move #125's STS beacon offsets onto the model's `beaconMounts` |
 | #126 vessel countdown | #122 | merged, pushed. Per-STS "done" is approximate within a work package; approaching vessels have no label |
 | #127 paired bays | #122 | merged, pushed |
-| #128 ASC + truck | #124 | implementer running (`tt/128-asc-truck-models`) |
+| #128 ASC + truck | #124 | merged, pushed. Truck wing guards barely show (same dark colour as chassis); no in-app truck screenshot. STS and ASC beacons now read the sidecar `beaconMounts` |
 | #129 sounds rest | #125 | merged, pushed. Not checked by ear; no perf reading |
 | #130 colour by + hide ROB | #122, #127 | implementer running (`tt/130-colour-by-hide-rob`) |
-| #131 V holds | #117, #127 | not started |
+| #131 V holds | #117, #127 | implementer running (`tt/131-v-shaped-holds`; bumps `ENGINE_VERSION`, regenerates goldens) |
 | #133 smoke suite + fixes | all others | not started; start only when everything else is merged and the machine is idle. Suspects: `terminal-twin-debugger` follow-camera SHC spec, `terminal-twin-kpi` "end condition ends the run" (`toBeEnabled`), `terminal-twin.smoke` Run to… popup (see the issue) |
 
 Merge order: #124, #123, #129. Smoke no longer runs per merge (see #133). Then start the newly unblocked tickets (#123, #124, #129, then #126/#127 and onward), at most three agents at a time.
