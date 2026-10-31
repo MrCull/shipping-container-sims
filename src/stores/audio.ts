@@ -33,6 +33,12 @@ export const useAudioStore = defineStore('audio', () => {
     persistSoundMuted()
   }
 
+  /** Any movement of the volume slider means "I want to hear it": it unmutes. */
+  function moveVolumeSlider(value: number): void {
+    setVolume(value)
+    if (soundMuted.value) setSoundMuted(false)
+  }
+
   function toggleSound(): void {
     setSoundMuted(!soundMuted.value)
   }
@@ -55,6 +61,7 @@ export const useAudioStore = defineStore('audio', () => {
     masterGain,
     setVolume,
     setSoundMuted,
+    moveVolumeSlider,
     toggleSound,
     musicMuted,
     sfxMuted,

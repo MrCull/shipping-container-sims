@@ -103,7 +103,6 @@ test('the alarm is quiet when far and silent when muted', async ({ page }) => {
 
   await page.evaluate((e) => window.__tt!.cameraTo(e, 60), id)
   await page.getByTestId('audio-button').click()
-  await page.getByTestId('audio-mute').click()
   await page.waitForFunction(() => window.__tt!.atmosphere().positional.voices.length === 0, undefined, { timeout: 10_000 })
   expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBe(0)
 })

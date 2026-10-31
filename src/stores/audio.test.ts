@@ -70,4 +70,18 @@ describe('shared audio store: volume and mute', () => {
     expect(audio.soundMuted).toBe(true)
     expect(audio.volume).toBe(0.4)
   })
+
+  it('any slider movement unmutes and sets the level', () => {
+    stubStorage()
+    const audio = fresh()
+    audio.setSoundMuted(true)
+    audio.moveVolumeSlider(0.3)
+    expect(audio.soundMuted).toBe(false)
+    expect(audio.volume).toBeCloseTo(0.3)
+    expect(audio.masterGain).toBeCloseTo(0.3)
+    audio.setSoundMuted(true)
+    audio.moveVolumeSlider(0)
+    expect(audio.soundMuted).toBe(false)
+    expect(audio.volume).toBe(0)
+  })
 })

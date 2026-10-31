@@ -31,33 +31,76 @@ test('Terminal Twin shows the shared volume control top-right, with no Sound but
 test('volume and mute drive Terminal Twin playback level, and survive a reload and another sim', async ({ page }) => {
   await open(page)
   expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBeCloseTo(0.4)
-  await page.getByTestId('audio-button').click()
+  await page.getByTestId('audio-menu-button').click()
   await expect(page.getByTestId('audio-volume')).toHaveValue('40')
   await setVolume(page, 75)
   await expect(page.getByTestId('audio-volume-label')).toHaveText('75%')
   expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBeCloseTo(0.75)
-  await page.getByTestId('audio-mute').click()
+  await page.getByTestId('audio-button').click()
   expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBe(0)
 
   await page.reload()
   await page.waitForFunction(() => !!window.__tt)
-  await page.getByTestId('audio-button').click()
+  await expect(page.getByTestId('audio-button')).toHaveAttribute('aria-pressed', 'true')
+  await page.getByTestId('audio-menu-button').click()
   await expect(page.getByTestId('audio-volume')).toHaveValue('75')
-  await expect(page.getByTestId('audio-mute')).toHaveAttribute('aria-pressed', 'true')
 
   // carries across sims: the same setting shows in Container Stack
   await page.goto('/sim/container-stack')
-  await page.getByTestId('audio-button').click()
+  await expect(page.getByTestId('audio-button')).toHaveAttribute('aria-pressed', 'true')
+  await page.getByTestId('audio-menu-button').click()
   await expect(page.getByTestId('audio-volume')).toHaveValue('75')
-  await expect(page.getByTestId('audio-mute')).toHaveAttribute('aria-pressed', 'true')
   // moving the slider up from a mute unmutes
   await setVolume(page, 20)
-  await expect(page.getByTestId('audio-mute')).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByTestId('audio-button')).toHaveAttribute('aria-pressed', 'false')
 
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
   await page.evaluate(() => window.__tt!.load('tracer-1sts-10-boxes'))
   expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBeCloseTo(0.2)
+})
+
+async function speakerClickAndSlider(page: Page): Promise<void> {
+  const speaker = page.getByTestId('audio-button')
+  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('shipping-container-sims') ?? '{}').global?.soundMuted)
+  await expect(speaker).toHaveAttribute('aria-pressed', 'false')
+  await speaker.click()
+  await expect(speaker).toHaveAttribute('aria-pressed', 'true')
+  await expect(speaker).toContainText('🔇')
+  expect(await stored()).toBe(true)
+  await expect(page.getByTestId('audio-popover')).toHaveCount(0)
+  await page.getByTestId('audio-menu-button').click()
+  await expect(page.getByTestId('audio-popover')).toBeVisible()
+  await page.getByTestId('audio-volume').fill('30')
+  await expect(speaker).toHaveAttribute('aria-pressed', 'false')
+  expect(await stored()).toBe(false)
+  await speaker.click()
+  await expect(speaker).toHaveAttribute('aria-pressed', 'true')
+  await speaker.click()
+  await expect(speaker).toHaveAttribute('aria-pressed', 'false')
+}
+
+test('speaker click mutes on the first click, the arrow opens the slider, and the slider unmutes (Terminal Twin)', async ({ page }) => {
+  await open(page)
+  await speakerClickAndSlider(page)
+  expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBeCloseTo(0.3)
+  await page.keyboard.press('Escape')
+  await page.getByTestId('audio-button').click()
+  expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBe(0)
+})
+
+test('speaker click mutes on the first click, the arrow opens the slider, and the slider unmutes (Container Stack)', async ({ page }) => {
+  await page.goto('/sim/container-stack')
+  await speakerClickAndSlider(page)
+})
+
+test('both audio buttons are labelled and reachable by Tab', async ({ page }) => {
+  await open(page)
+  await expect(page.getByRole('button', { name: 'Mute' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Volume' })).toBeVisible()
+  await page.getByTestId('audio-button').focus()
+  await page.keyboard.press('Tab')
+  await expect(page.getByTestId('audio-menu-button')).toBeFocused()
 })
 
 test('the FPS chip shows a live rate, and clicking it opens and closes the perf panel (P still works)', async ({ page }) => {
