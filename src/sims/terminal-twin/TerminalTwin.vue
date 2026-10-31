@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import FpsChip from './components/FpsChip.vue'
+import DashboardHost from './components/DashboardHost.vue'
 import FinalReport from './components/FinalReport.vue'
 import KpiStrip from './components/KpiStrip.vue'
 import BayViewer from './components/BayViewer.vue'
@@ -23,8 +24,6 @@ const store = useTwinStore()
 // Dev-only asset viewer: /sim/terminal-twin?viewer=<asset>|yard (stripped from production builds).
 const assetViewer = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('viewer') : null
 const AssetViewer = import.meta.env.DEV ? defineAsyncComponent(() => import('./dev/AssetViewer.vue')) : null
-/** The dashboard tab (and, through it, ECharts) loads on first open, never with the 3D view. */
-const DashboardTab = defineAsyncComponent(() => import('./components/DashboardTab.vue'))
 const sceneHost = ref<HTMLElement | null>(null)
 const { webglFailed } = useTwinScene(sceneHost)
 useTwinShortcuts()
@@ -135,7 +134,7 @@ onBeforeUnmount(() => {
       >
         {{ store.toast.text }}
       </div>
-      <DashboardTab v-if="store.dashboardOpen && store.hasScenario" />
+      <DashboardHost v-if="store.dashboardOpen && store.hasScenario" />
     </div>
     <ShortcutHelp v-if="store.helpOpen && store.phase === 'running'" />
     <SavesDialog v-if="store.savesOpen && store.phase === 'running'" />

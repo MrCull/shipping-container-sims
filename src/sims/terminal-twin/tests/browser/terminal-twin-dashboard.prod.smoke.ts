@@ -26,3 +26,22 @@ test('ECharts is not in the initial load and is fetched when the dashboard first
     expect(body, url).not.toContain('echarts')
   }
 })
+
+test('the Dashboard button opens the dashboard with its charts in the production build', async ({ page }) => {
+  await page.goto('/sim/terminal-twin')
+  await page.getByRole('button', { name: 'Start' }).click()
+  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
+  await page.getByTestId('tt-dashboard-button').click()
+  await expect(page.getByTestId('tt-dashboard')).toBeVisible()
+  await expect(page.getByTestId('tt-dashboard-charts')).toBeVisible()
+  await expect(page.getByTestId('tt-dashboard-gantt').locator('canvas').first()).toBeVisible()
+})
+
+test('a failed dashboard chunk load shows an error in the production build', async ({ page }) => {
+  await page.goto('/sim/terminal-twin')
+  await page.getByRole('button', { name: 'Start' }).click()
+  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
+  await page.route(/DashboardTab/, (route) => route.abort())
+  await page.getByTestId('tt-dashboard-button').click()
+  await expect(page.getByTestId('tt-dashboard-error')).toBeVisible()
+})

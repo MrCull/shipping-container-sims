@@ -197,3 +197,32 @@ test('the Landside group charts the truck turnaround metrics and its summary tab
   await page.screenshot({ path: '.screenshots/tt-r18-landside-dashboard.png' })
   expect(errors).toEqual([])
 })
+
+test('the Dashboard button opens the dashboard with charts after the run ends, and closes it again', async ({ page }) => {
+  const errors = collectErrors(page)
+  await open(page, TWO_VESSELS, { endConditions: { simDurationS: 1800 } })
+  await page.evaluate(() => window.__tt!.runUntil())
+  await page.waitForFunction(() => window.__tt!.report().reportReady)
+  // the end of the run opens the dashboard on its own (report tab); the button toggles it
+  await expect(page.getByTestId('tt-dashboard')).toBeVisible()
+  await page.getByTestId('tt-dashboard-button').click()
+  await expect(page.getByTestId('tt-dashboard')).toBeHidden()
+  await page.getByTestId('tt-dashboard-button').click()
+  await expect(page.getByTestId('tt-dashboard')).toBeVisible()
+  await page.getByTestId('tt-dashboard-tab-charts').click()
+  await expect(page.getByTestId('tt-chart-sts.gross-moves-per-hour')).toBeVisible()
+  await page.waitForFunction(() => window.__tt!.dashboard().rendered?.charts.every((c) => c.drawn))
+  await expect(page.getByTestId('tt-chart-sts.gross-moves-per-hour').locator('canvas').first()).toBeVisible()
+  expect(errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([])
+})
+
+test('a failed dashboard chunk load shows an error with a retry button', async ({ page }) => {
+  await open(page, TWO_VESSELS)
+  await page.route(/DashboardTab/, (route) => route.abort())
+  await page.getByTestId('tt-dashboard-button').click()
+  await expect(page.getByTestId('tt-dashboard-error')).toBeVisible()
+  await expect(page.getByTestId('tt-dashboard-retry')).toBeVisible()
+  // (a retry in the same page cannot be asserted: Chromium keeps a failed module fetch in its module map)
+  await page.getByTestId('tt-dashboard-close').click()
+  await expect(page.getByTestId('tt-dashboard-pending')).toBeHidden()
+})
