@@ -72,7 +72,7 @@ export interface EquipmentKindDef<K extends string = string> {
   sceneState(model: SceneModel, id: string, time: number): { status: string }
   /** Inspector view from the engine's query result. */
   describe(state: unknown, extras: EntityExtras): EntityView
-  /** Extra engine query the inspector needs besides the entity's state (SHC: its job). */
-  loadExtras?(state: unknown, query: <T>(kind: 'shcJobs') => Promise<T>): Promise<EntityExtras>
+  /** Extra engine query the inspector needs besides the entity's state (SHC: its job; vessel: its status view fields). */
+  loadExtras?(state: unknown, query: <T>(kind: 'shcJobs' | 'vesselStatus', id?: string) => Promise<T>): Promise<EntityExtras>
   createRenderer(host: KindRendererHost): KindRenderer
 }
