@@ -11,14 +11,16 @@
  *     detailed meshes with textures painted from their markings (`containerCloseups.ts`); they count as LOD0
  *     in the stats and are left out of the instanced layers;
  *   - LOD1 (12 triangles, normal-mapped corrugation at the same pitch) for the rest.
- * Each instance carries a `liveryIndex` attribute (atlas tile = shipping line).
+ * Each instance carries a `liveryIndex` attribute (atlas tile = shipping line). A box pushed with a `tint` (colour
+ * by, #130) takes the generic tile and an instance colour that turns its grey body into the tint, flat in the close-up
+ * and the placeholder; no tint (-1) keeps the livery.
  *
  * Per frame: `begin()`, `push(...)` for every visible box, then `end(camera)`.
  * Nothing here is reactive.
  */
 import * as THREE from 'three'
 import type { ContainerSize } from '../scenario/types'
-import { liveryBodyColour, type ContainerAssets } from './containerAssets'
+import { liveryBodyColour, LIVERY_ATLAS, type ContainerAssets } from './containerAssets'
 import { CONTAINER_DIMS } from './sceneModel'
 import { ContainerCloseups, type CloseupSource } from './containerCloseups'
 
@@ -65,6 +67,8 @@ export interface RenderedContainer {
   size: ContainerSize
   livery: number
   lod: 0 | 1
+  /** Colour-by tint (0xRRGGBB) the box was drawn in, -1 for its livery. */
+  tint: number
 }
 
 export class ContainerInstancer {
@@ -82,6 +86,7 @@ export class ContainerInstancer {
   private ys: number[] = []
   private zs: number[] = []
   private liveries: number[] = []
+  private tints: number[] = []
   private yaws: number[] = []
   private dist2: Float64Array = new Float64Array(0)
   /** LOD per key from the previous frame (hysteresis). */
@@ -90,6 +95,8 @@ export class ContainerInstancer {
   private lastStats: ContainerRenderStats = { drawn: 0, lod0: 0, lod1: 0, closeup: 0, culled: 0, assets: 'placeholder' }
   private readonly matrix = new THREE.Matrix4()
   private readonly colour = new THREE.Color()
+  /** Linear colour of the generic livery's body: a tint is divided by it, so the grey tile multiplied by the instance colour comes out as the tint. */
+  private readonly genericBody = new THREE.Color(liveryBodyColour(LIVERY_ATLAS.genericIndex))
   private readonly closeups: ContainerCloseups
   private markingsSource: ((key: number) => CloseupSource) | null = null
 
@@ -139,7 +146,9 @@ export class ContainerInstancer {
         const livery = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, this.capacity[size])), 1)
         livery.setUsage(THREE.DynamicDrawUsage)
         geo.setAttribute('liveryIndex', livery)
-        return { mesh: this.instanced(geo, mat, size, tag), livery }
+        const mesh = this.instanced(geo, mat, size, tag)
+        mesh.setColorAt(0, this.colour.set('#ffffff')) // the instance colour exists from the first frame, so the shader never recompiles when a tint first appears
+        return { mesh, livery }
       }
       const m = assets.sizes[size]
       this.lods[size] = [make(m.lod0, assets.lod0Material, 'lod0'), make(m.lod1, assets.lod1Material, 'lod1')]
@@ -159,7 +168,7 @@ export class ContainerInstancer {
   }
 
   /** One box: `key` is a stable id (e.g. container index), centre position in metres, yaw about Y (0 = length along X). */
-  push(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0): void {
+  push(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0, tint = -1): void {
     const i = this.n++
     this.keys[i] = key
     this.sizes[i] = size
@@ -168,6 +177,7 @@ export class ContainerInstancer {
     this.zs[i] = cz
     this.liveries[i] = livery
     this.yaws[i] = yaw
+    this.tints[i] = tint
   }
 
   /** What a close-up box is painted from, by the key given to `push` (without one there are no close-ups). */
@@ -193,8 +203,17 @@ export class ContainerInstancer {
       counts[layer.mesh.name] = slot + 1
       this.matrix.makeRotationY(this.yaws[i]).setPosition(this.xs[i], this.ys[i], this.zs[i])
       layer.mesh.setMatrixAt(slot, this.matrix)
-      if (layer.livery) layer.livery.setX(slot, this.liveries[i])
-      else layer.mesh.setColorAt(slot, this.colour.set(liveryBodyColour(this.liveries[i])))
+      const tint = this.tints[i]
+      if (layer.livery) {
+        if (tint >= 0) {
+          layer.livery.setX(slot, LIVERY_ATLAS.genericIndex)
+          this.colour.setHex(tint)
+          layer.mesh.setColorAt(slot, this.colour.set(this.colour.r / this.genericBody.r, this.colour.g / this.genericBody.g, this.colour.b / this.genericBody.b))
+        } else {
+          layer.livery.setX(slot, this.liveries[i])
+          layer.mesh.setColorAt(slot, this.colour.setRGB(1, 1, 1))
+        }
+      } else layer.mesh.setColorAt(slot, tint >= 0 ? this.colour.setHex(tint) : this.colour.set(liveryBodyColour(this.liveries[i])))
     }
 
     const seen = this.cull(frustum)
@@ -206,7 +225,7 @@ export class ContainerInstancer {
       const lod = this.chooseLods(cameraPosition, seen)
       for (let i = 0; i < this.n; i++) {
         const level = lod[i]
-        this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: level === 1 ? 1 : 0 })
+        this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: level === 1 ? 1 : 0, tint: this.tints[i] })
         if (seen && !seen[i]) {
           culled++
           continue
@@ -216,14 +235,14 @@ export class ContainerInstancer {
         if (level === 2) {
           closeup++
           const key = this.keys[i]
-          this.closeups.show(key, this.sizes[i], this.xs[i], this.ys[i], this.zs[i], this.yaws[i], () => this.markingsSource!(key)!)
+          this.closeups.show(key, this.sizes[i], this.xs[i], this.ys[i], this.zs[i], this.yaws[i], () => this.markingsSource!(key)!, this.tints[i])
           continue
         }
         write(this.lods[this.sizes[i]][level], i)
       }
     } else if (this.placeholders) {
       for (let i = 0; i < this.n; i++) {
-        this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: 1 })
+        this.rendered.set(this.keys[i], { size: this.sizes[i], livery: this.liveries[i], lod: 1, tint: this.tints[i] })
         if (seen && !seen[i]) {
           culled++
           continue

@@ -22,7 +22,8 @@ import { EXPORT_FILES, ScenarioValidationError, validateScenario, type Container
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { createLocationNotation } from '../modules/locationNotation'
-import { defaultBay, type BayViewData, type ColourMode } from '../modules/bayView'
+import { defaultBay, type BayViewData } from '../modules/bayView'
+import { loadColourBySettings, saveColourBySettings, type ColourBy } from '../modules/colourBySettings'
 import { describeEntity, entityKind, entityQueryKind, transitWorldOf, type EntityExtras, type EntityView } from '../modules/entityInspector'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
@@ -241,7 +242,6 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   /** Bay viewer (spec #106, #115): the vessel it shows, the bay (internal index), the colour mode and the vessel's data. */
   const bayViewerVesselId = ref<string | null>(null)
   const bayViewerBay = ref(0)
-  const bayViewerColour = ref<ColourMode>('status')
   const bayViewData = shallowRef<BayViewData | null>(null)
   let bayViewBusy = false
 
@@ -279,8 +279,19 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayViewerBay.value = bay
   }
 
-  function setBayViewerColour(mode: ColourMode): void {
-    bayViewerColour.value = mode
+  /** Colour by (#130): one mode for the 3D boxes and the bay viewer, and Hide ROB for the vessels in 3D; both remembered (a per-viewer convenience). */
+  const colourBySettings = loadColourBySettings(browserStorage())
+  const colourBy = ref<ColourBy>(colourBySettings.mode)
+  const hideRob = ref(colourBySettings.hideRob)
+
+  function setColourBy(mode: ColourBy): void {
+    colourBy.value = mode
+    saveColourBySettings(browserStorage(), { mode, hideRob: hideRob.value })
+  }
+
+  function setHideRob(hide: boolean): void {
+    hideRob.value = hide
+    saveColourBySettings(browserStorage(), { mode: colourBy.value, hideRob: hide })
   }
 
   /** Sound effects (TT-21): one master gain, the shared volume and mute (`stores/audio.ts`), scales all playback. */
@@ -1079,13 +1090,15 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     refreshEntity,
     bayViewerVesselId,
     bayViewerBay,
-    bayViewerColour,
+    colourBy,
+    hideRob,
+    setColourBy,
+    setHideRob,
     bayViewData,
     openBayViewer,
     closeBayViewer,
     refreshBayView,
     setBayViewerBay,
-    setBayViewerColour,
     inspectEvent,
     addBreakpoint,
     removeBreakpoint,

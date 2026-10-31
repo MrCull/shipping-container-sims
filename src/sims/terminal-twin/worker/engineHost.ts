@@ -106,7 +106,7 @@ export function createEngineHost() {
       const first = box.custodyHistory[0]
       if (first.eventId !== null && !announced.has(id)) {
         announced.add(id)
-        ;(delta.newContainers ??= []).push({ id, size: box.size, line: box.line, full: box.full, isoType: box.props?.isoType, heavy: box.props?.weightClass === 'HEAVY' })
+        ;(delta.newContainers ??= []).push({ id, size: box.size, line: box.line, full: box.full, isoType: box.props?.isoType, heavy: box.props?.weightClass === 'HEAVY', props: box.props })
         delta.custody.push({ containerId: id, t: first.t, owner: { ...first.owner }, eventId: first.eventId })
       }
       const last = box.custodyHistory[box.custodyHistory.length - 1]
@@ -342,7 +342,7 @@ export function createEngineHost() {
       case 'vessels':
         return s.config.vessels.map((v) => s.query.vessel(v.id))
       case 'bayView':
-        return collectBayViewData(s.query, need())
+        return collectBayViewData(s.query, need(), s.config)
       case 'vesselSlots':
         return s.query.vesselSlots(id)
       case 'sts':

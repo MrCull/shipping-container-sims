@@ -22,6 +22,8 @@ import {
   type ColourBy,
   type ColourSubject,
 } from '../modules/colourBy'
+import { COLOUR_BY_STORAGE_KEY, loadColourBySettings, saveColourBySettings } from '../modules/colourBySettings'
+import { colourKeyLabel } from '../modules/colourLabels'
 
 const config = fixtures['rob-bays'] as ScenarioConfig
 const HEX = /^#[0-9a-f]{6}$/i
@@ -158,6 +160,35 @@ describe('time-based modes move with the sim time', () => {
     expect(subjectOfBox(box, w, 1000).transit).toBe('ARRIVED')
     expect(subjectOfBox(box, w, 1000).arrivedS).toBeNull()
     expect(subjectOfBox(box, w, 3650).arrivedS).toBe(3600)
+  })
+})
+
+describe('legend labels', () => {
+  it('every key of every legend has a catalogue label', () => {
+    for (const mode of COLOUR_BY_MODES) {
+      for (const e of legendOf(mode, ctx)) {
+        const label = colourKeyLabel(mode, e.key)
+        expect(label, `${mode}:${e.key}`).toBeTruthy()
+        expect(label, `${mode}:${e.key}`).not.toMatch(/^colourBy\./)
+      }
+    }
+  })
+})
+
+describe('remembered choice', () => {
+  const store = (initial: string | null) => {
+    const data = new Map<string, string>(initial === null ? [] : [[COLOUR_BY_STORAGE_KEY, initial]])
+    return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) }
+  }
+  it('round-trips the mode and Hide ROB, and falls back to the defaults on nothing, rubbish or a blocked storage', () => {
+    const s = store(null)
+    expect(loadColourBySettings(s)).toEqual({ mode: 'default', hideRob: false })
+    saveColourBySettings(s, { mode: 'dwell', hideRob: true })
+    expect(loadColourBySettings(s)).toEqual({ mode: 'dwell', hideRob: true })
+    expect(loadColourBySettings(store('{nonsense'))).toEqual({ mode: 'default', hideRob: false })
+    expect(loadColourBySettings(store('{"mode":"zzz","hideRob":1}'))).toEqual({ mode: 'default', hideRob: false })
+    expect(loadColourBySettings(null)).toEqual({ mode: 'default', hideRob: false })
+    expect(() => saveColourBySettings({ setItem: () => { throw new Error('blocked') } }, { mode: 'pod', hideRob: false })).not.toThrow()
   })
 })
 

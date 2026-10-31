@@ -22,6 +22,7 @@ import type {
 } from '../engine'
 import type { Breakpoint } from '../modules/breakpoints'
 import type { ContainerSize, ScenarioConfig } from '../scenario/types'
+import type { ContainerProps } from '../scenario/containerProps'
 
 /** Serialisable subset of the engine's RunCondition (no predicate). */
 export type WorkerRunCondition = Omit<RunCondition, 'predicate'>
@@ -183,6 +184,8 @@ export interface NewContainer {
   full?: boolean
   isoType?: string
   heavy?: boolean
+  /** Stored properties, for the colour modes (#130). */
+  props?: ContainerProps
 }
 
 export interface Delta {

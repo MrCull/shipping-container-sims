@@ -34,14 +34,19 @@ import {
   TRUCK_DECK_M,
   type BlockSpec,
   type Axis,
+  type ContainerState,
   type CustodyRef,
+  type TransitWorld,
+  type TruckStatus,
+  type VesselStatus,
   type LaneGraph,
   type LandsideGraph,
   type MotionSegment,
   type Reservation,
 } from '../engine'
 import { planCargo } from '../scenario/bayPlan'
-import { isoTypeOf } from '../scenario/containerProps'
+import { drawContainerProps, isoTypeOf, type ContainerProps } from '../scenario/containerProps'
+import { subjectOfBox, type ColourSubject } from './colourBy'
 import type { RobBox } from '../scenario/robBays'
 import { planExportYard } from '../scenario/exportYard'
 import type { ContainerSize, ScenarioConfig, VesselConfig } from '../scenario/types'
@@ -249,6 +254,10 @@ export interface ContainerDetail {
   laden: boolean
   isoType: string
   heavy: boolean
+  /** Stored properties (colour by, #130); drawn on first use for a pre-filled import. */
+  props?: ContainerProps
+  /** Sim time since which the box has stood in the yard (negative: before the run), as in the engine. */
+  yardSince?: number
 }
 
 export class SceneModel {
@@ -259,6 +268,15 @@ export class SceneModel {
   readonly containerLine: Record<string, string>
   /** What the close-up markings need beyond size and line (#119). */
   readonly containerDetail: Record<string, ContainerDetail>
+  /** Pre-filled imports by id: their properties are drawn when a colour mode first asks. */
+  private readonly prefillImports = new Map<string, { id: string; size: ContainerSize; line: string; ageS: number; reefer?: true }>()
+  private readonly vesselIdSet: ReadonlySet<string>
+  /** The carriers' state at `colourT`, for the transit status of `colourSubjectAt`. */
+  private colourT = 0
+  private readonly colourWorld: TransitWorld = {
+    vesselStatus: (id) => this.statusAt('vessel', id, this.colourT) as VesselStatus,
+    truckStatus: (id) => this.statusAt('truck', id, this.colourT) as TruckStatus,
+  }
   readonly graph: LaneGraph
   /** Landside roads, gate and stalls (null without a landside). */
   readonly landside: LandsideGraph | null
@@ -304,15 +322,17 @@ export class SceneModel {
     this.containerSize = Object.fromEntries(cargo.containers.map((c) => [c.id, c.size]))
     this.containerLine = Object.fromEntries(cargo.containers.map((c) => [c.id, c.line]))
     this.containerDetail = Object.fromEntries(
-      cargo.containers.map((c) => [c.id, { laden: c.full, isoType: c.props?.isoType ?? isoTypeOf(c.size, c.reefer === true), heavy: c.props?.weightClass === 'HEAVY' }]),
+      cargo.containers.map((c) => [c.id, { laden: c.full, isoType: c.props?.isoType ?? isoTypeOf(c.size, c.reefer === true), heavy: c.props?.weightClass === 'HEAVY', props: c.props }]),
     )
     for (const imp of prefill?.imports ?? []) {
       this.containerIds.push(imp.id)
       this.containerSize[imp.id] = imp.size
       this.containerLine[imp.id] = imp.line
-      this.containerDetail[imp.id] = { laden: true, isoType: isoTypeOf(imp.size, imp.reefer === true), heavy: false }
+      this.containerDetail[imp.id] = { laden: true, isoType: isoTypeOf(imp.size, imp.reefer === true), heavy: false, yardSince: -imp.ageS }
+      this.prefillImports.set(imp.id, imp)
     }
     this.vessels = Object.fromEntries(config.vessels.map((v) => [v.id, v]))
+    this.vesselIdSet = new Set(config.vessels.map((v) => v.id))
     this.specs = Object.fromEntries(config.vessels.map((v) => [v.id, vesselClass(v.sizeClass)]))
     this.anchorageSlot = Object.fromEntries(config.vessels.map((v, i) => [v.id, i]))
     this.initialPose = Object.fromEntries(
@@ -438,7 +458,7 @@ export class SceneModel {
     this.containerIds.push(c.id)
     this.containerSize[c.id] = c.size
     this.containerLine[c.id] = c.line
-    this.containerDetail[c.id] = { laden: c.full ?? true, isoType: c.isoType ?? isoTypeOf(c.size, false), heavy: c.heavy ?? false }
+    this.containerDetail[c.id] = { laden: c.full ?? true, isoType: c.isoType ?? isoTypeOf(c.size, false), heavy: c.heavy ?? false, props: c.props }
     this.custody[c.id] = []
   }
 
@@ -807,6 +827,44 @@ export class SceneModel {
   /** Poses of stacked boxes by `${slotId}|${size}` (read-only; shared between frames). */
   private readonly yardPoses = new Map<string, ContainerPose>()
   private readonly vesselSlotCells = new Map<string, ReturnType<typeof parseVesselSlotId>>()
+
+  /**
+   * What the colour modes need about a box at `time` (#130). `timeBased` also resolves the transit status and the dwell
+   * (a walk over the box's custody records); the other modes only read its stored properties.
+   */
+  colourSubjectAt(containerId: string, time: number, timeBased: boolean): ColourSubject {
+    const d = this.containerDetail[containerId]
+    const line = this.containerLine[containerId]
+    let props = d?.props
+    if (!props) {
+      const imp = this.prefillImports.get(containerId)
+      if (imp && d) {
+        props = d.props = drawContainerProps(this.config, this.seed, {
+          id: imp.id,
+          size: imp.size,
+          full: true,
+          line: imp.line,
+          reefer: imp.reefer === true,
+          direction: 'IMPORT',
+          inbound: { kind: 'vessel' },
+          arrivalS: -imp.ageS,
+        })
+      }
+    }
+    const full = d?.laden ?? true
+    const list = this.custody[containerId] ?? []
+    if (timeBased && list.length > 0) {
+      this.colourT = time
+      return subjectOfBox({ line, full, props, yardSince: d?.yardSince, custody: list[list.length - 1].owner, custodyHistory: list as unknown as ContainerState['custodyHistory'] }, this.colourWorld, time, { vessels: this.vesselIdSet })
+    }
+    const onCall = (c: { kind: string; id?: string } | undefined): boolean => c?.kind === 'vessel' && c.id !== undefined && this.vesselIdSet.has(c.id)
+    return {
+      line,
+      full,
+      ...(props ? { isoType: props.isoType, pod: props.pod, weightClass: props.weightClass, direction: props.direction, plannedDepartureS: props.plannedDepartureS } : { isoType: d?.isoType }),
+      onCall: props ? onCall(props.inbound) || onCall(props.outbound) : false,
+    }
+  }
 
   custodyAt(containerId: string, time: number): CustodyRef | null {
     const list = this.custody[containerId] ?? []

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ColourByMenu from './ColourByMenu.vue'
 import { useTwinStore } from '../store/twinStore'
 import type { OverlayState } from '../modules/overlays'
 import { t, type MessageKey } from '../i18n/messages'
@@ -81,6 +82,11 @@ function toggle(key: keyof OverlayState): void {
       />
       {{ t('followNext.label') }}
     </button>
+    <span
+      class="sep"
+      aria-hidden="true"
+    />
+    <ColourByMenu />
   </div>
 </template>
 

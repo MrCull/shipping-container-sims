@@ -10,13 +10,14 @@ import { VESSEL_CLASSES, vesselSlotId } from '../scenario/vesselClasses'
 import type { VesselSlotState } from '../engine'
 import { buildBayView, bayOrder, CELL_STATUSES, defaultBay, slotStatus, stepBay, stripOf, type BayBox, type BayCell, type BayView, type BayViewData, type ColourMode } from '../modules/bayView'
 import { collectBayViewData } from '../modules/bayViewData'
+import { COLOUR_BY_MODES, colourContextOf, legendOf } from '../modules/colourBy'
 import { createLocationNotation } from '../modules/locationNotation'
 
 const config = fixtures['rob-bays'] as ScenarioConfig
 const spec = VESSEL_CLASSES.feeder
 const make = (): Simulation => createSimulation(config, {}, { invariants: { sweepEvery: 500 } })
 
-const dataOf = (sim: Simulation, vesselId = 'V001'): BayViewData => collectBayViewData(sim.query, vesselId)
+const dataOf = (sim: Simulation, vesselId = 'V001'): BayViewData => collectBayViewData(sim.query, vesselId, config)
 const allCells = (v: BayView): BayCell[] => v.sections.flatMap((s) => s.tiers.flatMap((t) => t.positions.flatMap((p) => p.cells)))
 const view = (data: BayViewData, bay: number, colourMode: ColourMode = 'status'): BayView => buildBayView(data, bay, { colourMode })
 /** Every bay's cells, summed over the statuses. */
@@ -145,7 +146,23 @@ describe('colour modes', () => {
       expect(coloured).toBeGreaterThan(0)
       if (mode !== 'weight') expect(seen.size).toBeGreaterThan(1)
     }
-    expect(view(data, bay, 'weight').legend.map((l) => l.key)).toEqual(['LIGHT', 'MEDIUM', 'HEAVY'])
+    expect(view(data, bay, 'weight').legend.map((l) => l.key)).toEqual(['LIGHT', 'MEDIUM', 'HEAVY', 'unknown'])
+  })
+
+  it('every colour-by mode fills the coloured cells with the colour of the shared module, and lists the same legend', () => {
+    const ctx = colourContextOf(config)
+    for (const mode of COLOUR_BY_MODES.filter((m) => m !== 'default')) {
+      const v = view(data, bay, mode)
+      expect(v.legend.map((l) => [l.key, l.hex])).toEqual(legendOf(mode, ctx).map((e) => [e.key, e.hex]))
+      const coloured = allCells(v).filter((c) => c.colour !== null)
+      expect(coloured.length, mode).toBeGreaterThan(0)
+      for (const c of coloured) expect(v.legend.find((l) => l.key === c.colourKey)?.hex, `${mode}:${c.colourKey}`).toBe(c.colour)
+    }
+  })
+
+  it('the time-based modes read the data time: the same box is in another dwell class a day later', () => {
+    const dwellKeys = (now: number): Set<string | null> => new Set(allCells(view({ ...data, now }, bay, 'dwell')).filter((c) => c.status !== 'rob').map((c) => c.colourKey))
+    expect(dwellKeys(0)).not.toEqual(dwellKeys(5 * 86400))
   })
 
   it('ROB cells follow the colour mode too, so later ports show as groups', () => {
