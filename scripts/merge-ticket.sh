@@ -3,9 +3,9 @@
 # Usage: scripts/merge-ticket.sh [--push] [--smoke | --smoke-all] tt/<N>-<slug>
 # Output goes to the terminal and to .merge-ticket.log; the last line is "EXIT <code>", so a background run
 # is finished when `tail -1 .merge-ticket.log` shows it. --push pushes the integration branch after a verified merge.
-# When the merge touches UI code (a .vue file, components/, composables/, worker/, store/, i18n/ or tests/browser/) it runs
-# only the smoke specs for the paths it changed (scripts/smoke-specs-for.sh, map in scripts/smoke-map.txt), not the whole suite
-# (about 40 minutes). --smoke forces that selection; --smoke-all runs every dev spec except @load.
+# Smoke specs do not run per merge: the spec's final ticket runs the whole suite once, after every other ticket is merged.
+# --smoke runs only the specs for the paths this merge changed (scripts/smoke-specs-for.sh, map in scripts/smoke-map.txt);
+# --smoke-all runs every dev spec except @load (about 40 minutes).
 # Stops (without committing) on a conflict, conflict markers or a failed check; otherwise leaves a verified merge
 # commit locally. The orchestrator then updates handover.md and pushes.
 set -euo pipefail
@@ -37,10 +37,6 @@ if ! git merge --no-edit "$branch"; then
 fi
 scripts/check-engine-version.sh
 pnpm run verify
-if [ -z "$smoke" ] && git diff --name-only HEAD^1 HEAD | grep -qE '\.vue$|/(components|composables|worker|store|i18n)/|tests/browser/'; then
-  smoke=sel
-  echo "Merge touches UI code: running the smoke specs for the changed paths."
-fi
 if [ "$smoke" = "all" ]; then
   pnpm run test:smoke --project dev --grep-invert @load
 elif [ -n "$smoke" ]; then
