@@ -1,6 +1,6 @@
 # Handover: spec #134 (Terminal Twin polish, round 2)
 
-**Status: #135, #136 merged in the integration branch `claude/stoic-hypatia-tk68z1`. In progress: #146 (road), #137 (audio). Not started: the rest.**
+**Status: #135, #136, #137, #138, #146 merged in the integration branch `claude/stoic-hypatia-tk68z1`. Not started: #139 to #143, #147, #148, #149, #144/#145 (owner approval), #150.**
 
 ## Where things are
 
@@ -55,3 +55,7 @@ Committed in `docs/reference/tti-algeciras/` (owner decision). The aerial road l
 - Container restarts can kill background runs: re-run checks by hand, then push.
 - After a hand-resolved merge, `scripts/merge-ticket.sh` does not auto-push: push once `pnpm run verify` is green.
 - GitHub did not auto-close issues from `Closes` lines when PR #132 merged; close them by hand after merging.
+
+## Owner instruction for this run
+
+No unit tests, `pnpm run verify` or browser smoke specs per ticket: the single full run (verify, goldens, smoke) happens at the end, in #150. Merges are plain `git merge` without `scripts/merge-ticket.sh` verification, so #137, #138 and #146 have only the implementers' own verify results (#137 and #146 ran verify green; #138 not confirmed) and the combined tree is unverified. Allowed per ticket: lint, build, targeted tests that take seconds.
