@@ -22,7 +22,7 @@ Scratchpad (this container only): `/tmp/claude-0/-home-user-shipping-container-s
 | #129 sounds rest | #125 | implementer running (`tt/129-positional-sounds`) |
 | #130 colour by + hide ROB | #122, #127 | not started |
 | #131 V holds | #117, #127 | not started |
-| #133 smoke suite + fixes | all others | not started; start only when everything else is merged and the machine is idle |
+| #133 smoke suite + fixes | all others | not started; start only when everything else is merged and the machine is idle. Suspects: `terminal-twin-debugger` follow-camera SHC spec, `terminal-twin-kpi` "end condition ends the run" (`toBeEnabled`), `terminal-twin.smoke` Run to… popup (see the issue) |
 
 Merge order: #124, #123, #129. Smoke no longer runs per merge (see #133). Then start the newly unblocked tickets (#123, #124, #129, then #126/#127 and onward), at most three agents at a time.
 
