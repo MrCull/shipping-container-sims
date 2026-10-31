@@ -243,7 +243,7 @@ describe('location notation', () => {
 })
 
 describe('paired-bay panels (#127)', () => {
-  // Hand-made data: bay 3 of a feeder; hold tier 0: row 0 a 40, row 1 two 20s, row 2 one lone aft 20, row 3 a ROB 40.
+  // Hand-made data: bay 3 of a feeder; hold tier 0 (feeder: rows 2 to 5 exist): row 2 a 40, row 3 two 20s, row 4 one lone aft 20, row 5 a ROB 40.
   const vesselId = 'V9'
   const bay = 3
   const slot = (row: number, half: 'aft' | 'fore' | null, containerId: string | null): VesselSlotState => ({
@@ -258,7 +258,7 @@ describe('paired-bay panels (#127)', () => {
     containerId,
   })
   const box = (id: string, size: '20' | '40'): BayBox => ({ id, size, line: 'MSC', full: true, custody: 'vesselSlot' })
-  const slots = [slot(0, null, 'A40'), slot(1, 'aft', 'B20'), slot(1, 'fore', 'C20'), slot(2, 'aft', 'D20')]
+  const slots = [slot(2, null, 'A40'), slot(3, 'aft', 'B20'), slot(3, 'fore', 'C20'), slot(4, 'aft', 'D20')]
   const data: BayViewData = {
     vesselId,
     sizeClass: 'feeder',
@@ -267,7 +267,7 @@ describe('paired-bay panels (#127)', () => {
     boxes: { [slots[0].id]: box('A40', '40'), [slots[1].id]: box('B20', '20'), [slots[2].id]: box('C20', '20'), [slots[3].id]: box('D20', '20') },
     packages: [],
     robBoxes: [
-      { slotId: vesselSlotId(vesselId, bay, 3, 0, null), vesselId, bay, row: 3, tier: 0, deck: false, half: null, size: '40', isoType: '42G1', pod: 'ESVLC', line: 'MSC', weightClass: 'LIGHT', grossKg: 9000, full: true },
+      { slotId: vesselSlotId(vesselId, bay, 5, 0, null), vesselId, bay, row: 5, tier: 0, deck: false, half: null, size: '40', isoType: '42G1', pod: 'ESVLC', line: 'MSC', weightClass: 'LIGHT', grossKg: 9000, full: true },
     ],
   }
   const v = buildBayView(data, bay, { colourMode: 'status' })
@@ -280,27 +280,27 @@ describe('paired-bay panels (#127)', () => {
   })
 
   it('draws each 20 ft box in the panel of its half', () => {
-    expect(holdRow(0)[1].details.boxId).toBe('C20') // fore
-    expect(holdRow(1)[1].details.boxId).toBe('B20') // aft
-    expect(holdRow(0)[1].continuation).toBe(false)
-    expect(holdRow(1)[1].continuation).toBe(false)
+    expect(holdRow(0)[3].details.boxId).toBe('C20') // fore
+    expect(holdRow(1)[3].details.boxId).toBe('B20') // aft
+    expect(holdRow(0)[3].continuation).toBe(false)
+    expect(holdRow(1)[3].continuation).toBe(false)
   })
 
   it('shows a lone 20 only in its half; the other panel has an empty cell', () => {
-    expect(holdRow(1)[2].details.boxId).toBe('D20')
-    expect(holdRow(0)[2].status).toBe('empty')
-    expect(holdRow(0)[2].details.boxId).toBeUndefined()
+    expect(holdRow(1)[4].details.boxId).toBe('D20')
+    expect(holdRow(0)[4].status).toBe('empty')
+    expect(holdRow(0)[4].details.boxId).toBeUndefined()
   })
 
   it('spans a 40 over both panels, the second half flagged as the continuation', () => {
-    expect(holdRow(0)[0]).toMatchObject({ continuation: false, details: { boxId: 'A40', size: '40' } })
-    expect(holdRow(1)[0]).toMatchObject({ continuation: true, status: 'planned-discharge', details: { boxId: 'A40' } })
+    expect(holdRow(0)[2]).toMatchObject({ continuation: false, details: { boxId: 'A40', size: '40' } })
+    expect(holdRow(1)[2]).toMatchObject({ continuation: true, status: 'planned-discharge', details: { boxId: 'A40' } })
   })
 
   it('flags ROB boxes (and their continuation) and keeps them in the panels', () => {
-    expect(holdRow(0)[3]).toMatchObject({ rob: true, status: 'rob', continuation: false })
-    expect(holdRow(1)[3]).toMatchObject({ rob: true, status: 'rob', continuation: true })
-    expect(holdRow(0)[0].rob).toBe(false)
+    expect(holdRow(0)[5]).toMatchObject({ rob: true, status: 'rob', continuation: false })
+    expect(holdRow(1)[5]).toMatchObject({ rob: true, status: 'rob', continuation: true })
+    expect(holdRow(0)[2].rob).toBe(false)
   })
 
   it('counts a 40 once, however many panels show it, and steps by 40 ft bay', () => {

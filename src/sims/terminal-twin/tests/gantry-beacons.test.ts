@@ -3,7 +3,11 @@
  */
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { beaconFlashOn, GantryBeacons, BEACON_PERIOD_MS } from '../modules/gantryBeacons'
+import ascMeta from '../assets/models/asc/asc.meta.json'
+import stsMeta from '../assets/models/sts/sts-malaccamax.meta.json'
+import { ascBeaconOffsets, beaconFlashOn, GantryBeacons, BEACON_PERIOD_MS, stsBeaconOffsets } from '../modules/gantryBeacons'
+import { ascScaleY } from '../modules/ascRig'
+import { STS } from '../modules/equipmentDims'
 
 describe('beaconFlashOn', () => {
   it('alternates on and off every half period', () => {
@@ -46,5 +50,26 @@ describe('GantryBeacons', () => {
   it('tracks its geometry and material for disposal', () => {
     const { tracked } = setup()
     expect(tracked.length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('beacon offsets from the model sidecars (#128, follow-up from #124)', () => {
+  it('places the STS lamps at the sidecar mounts, shifted to the waterside rail', () => {
+    const offsets = stsBeaconOffsets()
+    expect(offsets).toHaveLength(stsMeta.beaconMounts.length)
+    stsMeta.beaconMounts.forEach((m, i) => {
+      expect(offsets[i]).toEqual({ x: m.position[0], y: m.position[1], z: m.position[2] + STS.waterRailZ })
+    })
+  })
+
+  it('places the ASC lamps at the sidecar mounts and stretches their height with the model', () => {
+    expect(ascMeta.beaconMounts.length).toBeGreaterThanOrEqual(4)
+    const flat = ascBeaconOffsets(1)
+    const tall = ascBeaconOffsets(ascScaleY(8))
+    expect(ascScaleY(8)).toBeGreaterThan(1)
+    ascMeta.beaconMounts.forEach((m, i) => {
+      expect(flat[i]).toEqual({ x: m.position[0], y: m.position[1], z: m.position[2] })
+      expect(tall[i].y).toBeCloseTo(m.position[1] * ascScaleY(8), 6)
+    })
   })
 })

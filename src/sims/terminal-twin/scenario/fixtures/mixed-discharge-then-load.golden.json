@@ -3,9 +3,9 @@
   "seed": 7,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "1689dfb830723b",
+  "eventLogHash": "06d8e918b8e600",
   "kpis": {
-    "simTimeS": 2592.267,
+    "simTimeS": 2620.764,
     "eventsProcessed": 601,
     "movesCompleted": 16,
     "vesselsCompleted": 1,
@@ -14,7 +14,7 @@
         "moves": 16,
         "cycles": 15,
         "twinLifts": 1,
-        "grossMovesPerHour": 23.497,
+        "grossMovesPerHour": 23.227,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 2592.267,
-        "turnaroundS": 2532.267,
+        "departedAtS": 2620.764,
+        "turnaroundS": 2560.764,
         "sts": [
           "STS01"
         ]
@@ -198,7 +198,7 @@
           "loadedDistanceM": 1893.567,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 1144.403,
+            "parked": 1172.9,
             "moving-to-collect": 367.095,
             "queuing-to-collect": 0,
             "collecting": 390.37,
@@ -216,7 +216,7 @@
           "loadedDistanceM": 111.5,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 2499.817,
+            "parked": 2528.314,
             "moving-to-collect": 17.994,
             "queuing-to-collect": 0,
             "collecting": 30.692,
@@ -230,7 +230,7 @@
         }
       },
       "stsGroundPositionWaitS": {
-        "STS01": 184.101
+        "STS01": 181.296
       }
     },
     "yard": {
@@ -274,28 +274,28 @@
       "IMPORT": {
         "count": 7,
         "departed": 0,
-        "meanS": 2091.013,
-        "maxS": 2481.283
+        "meanS": 2114.168,
+        "maxS": 2508.452
       },
       "EXPORT": {
         "count": 8,
         "departed": 8,
-        "meanS": 1969.954,
-        "maxS": 2511.421
+        "meanS": 1989.034,
+        "maxS": 2539.917
       },
       "STORAGE": {
         "count": 1,
         "departed": 0,
-        "meanS": 2050.944,
-        "maxS": 2050.944
+        "meanS": 2074,
+        "maxS": 2074
       }
     },
     "workPackages": {
       "released": 14,
       "started": 14,
       "completed": 14,
-      "leadTimeMeanS": 319.02,
-      "leadTimeMaxS": 574.859,
+      "leadTimeMeanS": 322.524,
+      "leadTimeMaxS": 575.866,
       "boxesLoaded": 8
     },
     "ordering": {

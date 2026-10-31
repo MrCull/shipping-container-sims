@@ -218,6 +218,23 @@ def chassis_mesh(detail, with_wheels=False):
         if detail == 0:
             p.box((3.3 - 0.09, yl - 0.09, 0.9), (3.3 + 0.09, yl + 0.09, 1.2), 'chassis')
     p.box((3.3 - 0.04, -0.95, 0.6), (3.3 + 0.04, 0.95, 0.68), 'zinc')
+    if detail == 0:
+        # landing-leg gearbox and crank handle on the right leg, and the foot pads' cross stay
+        p.box((3.3 - 0.14, -0.95 - 0.2, 0.85), (3.3 + 0.14, -0.95 + 0.14, 1.12), 'dark')
+        p.beam((3.3, -0.95 - 0.2, 0.98), (3.3, -1.45, 0.98), 0.03, 0.03, 'zinc')
+        p.beam((3.3, -1.45, 0.98), (3.3, -1.45, 0.62), 0.03, 0.03, 'zinc')
+        # twist-lock levers on every housing, pointing outboard
+        for x in PIN_XS:
+            for sy in (-1, 1):
+                p.beam((x, sy * (PIN_Y + 0.11), 1.26), (x, sy * (PIN_Y + 0.42), 1.26), 0.035, 0.035, 'zinc')
+                p.box((x - 0.03, sy * (PIN_Y + 0.42) - 0.03, 1.24), (x + 0.03, sy * (PIN_Y + 0.42) + 0.03, 1.3), 'orange')
+    # tri-axle wing guards over the tyres (grey sheet, outer lip and a raked front end), as on the photographed chassis
+    gx0, gx1 = TRAILER_X[2] - 0.62, TRAILER_X[0] + 0.62
+    for sy in (-1, 1):
+        y0, y1 = (0.74, 1.24) if sy > 0 else (-1.24, -0.74)
+        p.box((gx0, y0, 1.04), (gx1, y1, 1.08), 'chassis', ('+z', '-z', '+x', '-x', '+y', '-y'))
+        p.box((gx0, sy * 1.24 - 0.02, 0.8), (gx1, sy * 1.24 + 0.02, 1.08), 'chassis', ('+y', '-y', '+x', '-x'))
+        p.slant([(gx1, y0, 1.08), (gx1, y1, 1.08), (gx1 + 0.3, y1, 0.9), (gx1 + 0.3, y0, 0.9)], 'chassis', (0.5, 0, 1))
     # rear under-run bar, lamps, plate, mud flaps
     p.box((REAR_X - 0.04, -1.12, 0.45), (REAR_X + 0.06, 1.12, 0.6), 'dark')
     for sy in (-1, 1):
@@ -287,7 +304,18 @@ def tractor_mesh(cab, detail):
             for sx in (-1, 1):
                 p.revolve((3.8, sx * 0.25, 0.86), 'x', [(0.14, -0.5, 'r', 'zinc'), (0.14, 0.5, 'a+', 'zinc'), (0.0, 0.5, 'a+', 'zinc')], 8, lambda k, e: 'zinc')
     # exhaust stack behind the cab, right side
-    p.revolve((x0 - 0.25, -1.0, 1.0), 'z', [(0.06, 0.0, 'r', 'zinc'), (0.06, H - 1.1, 'a+', 'zinc'), (0.0, H - 1.1, 'a+', 'zinc')], 8 if detail == 0 else 4, lambda k, e: 'zinc') if c['sleeper'] and detail < 2 else None
+    p.revolve((x0 - 0.25, -1.0, 1.0), 'z', [(0.06, 0.0, 'r', 'zinc'), (0.06, H - 1.1, 'a+', 'zinc'), (0.0, H - 1.1, 'a+', 'zinc')], 8 if detail == 0 else 4, lambda k, e: 'zinc') if detail < 2 else None
+    if detail == 0:
+        # coiled brake and electrical lines from the cab back to the trailer front, resting on the gooseneck
+        for sy, swatch in ((-0.34, 'lens_red'), (-0.12, 'yellow'), (0.12, 'black'), (0.34, 'lens_red')):
+            p.beam((x0 - 0.04, sy, 1.55), (x0 - 0.45, sy, 1.62), 0.045, 0.045, swatch)
+            p.beam((x0 - 0.45, sy, 1.62), (x0 - 0.95, sy, 1.34), 0.045, 0.045, swatch)
+            p.beam((x0 - 0.95, sy, 1.34), (x0 - 1.4, sy, 1.3), 0.045, 0.045, swatch)
+        # mud flaps behind the drive wheels, straps round the fuel tank
+        for sy in (-1, 1):
+            p.box((DRIVE_X - 0.95, sy * 1.12 - 0.15, 0.25), (DRIVE_X - 0.91, sy * 1.12 + 0.15, 0.7), 'black')
+        for dx in (-0.35, 0.35):
+            p.box((6.0 + dx - 0.02, 0.66, 0.38), (6.0 + dx + 0.02, 1.0, 1.08), 'steel', ('+x', '-x', '+y'))
     # ---- cab ---------------------------------------------------------------
     lower_top = 2.05
     p.box((x0, -1.25, 0.95), (x1, 1.25, lower_top), 'cab')                                  # lower cab: doors, front, rear

@@ -7,6 +7,7 @@
  * baked covers of those bays and with the deck clipped open inside their coamings; the renderer adds a liner inside.
  * Asset frame: see `vesselHull.ts`.
  */
+import { rowRange, vesselClass } from '../scenario/vesselClasses'
 import type { HullMeta } from './vesselHull'
 
 /** [A] Gap between the hatches of neighbouring bays (m): `HATCH_GAP` in `assets/generators/tt_assets/vessels.py`. */
@@ -48,6 +49,30 @@ export function hullHatchOpenings(meta: HullMeta, bays: Iterable<number>): HullH
     coamingTopY: g.holdTopY,
     floorY: g.holdTopY - g.holdTiers * g.tierPitchM,
   }))
+}
+
+/**
+ * Cross-section of a hold under an opening (hull profile, #131), as (z, y) points in the asset frame: the stepped V the
+ * lower tiers make when they lose their outer rows. Starts on the quay-side wall at the floor, goes up that wall, across
+ * the top and down the seaward wall; the renderer extrudes it along the bay. `inset` pulls the walls in so they do not
+ * fight with the hull's own coaming faces.
+ */
+export function holdLinerOutline(meta: HullMeta, o: HullHatchOpening, inset = 0.02): [number, number][] {
+  const g = meta.bayGrid
+  const spec = vesselClass(meta.sizeClass)
+  const oz = g.origin[2]
+  const quay: [number, number][] = []
+  const sea: [number, number][] = []
+  for (let t = 0; t < g.holdTiers; t++) {
+    const { from, to } = rowRange(spec, t)
+    const yb = g.holdTopY - (g.holdTiers - t) * g.tierPitchM
+    const yt = g.holdTopY - (g.holdTiers - t - 1) * g.tierPitchM
+    const zq = (from === 0 ? o.zQuay : oz - from * g.rowPitchM) - inset
+    const zs = (to === spec.rows ? o.zSea : oz - to * g.rowPitchM) + inset
+    quay.push([zq, yb], [zq, yt])
+    sea.push([zs, yb], [zs, yt])
+  }
+  return [...quay, ...sea.reverse()]
 }
 
 /** Vertex data of a hull LOD: attribute arrays by name (`position` is required, 3 floats per vertex), triangles by `index` or in order. */

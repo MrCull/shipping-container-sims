@@ -11,7 +11,7 @@ import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
 import { validateScenario } from '../scenario/validate'
 import type { ScenarioConfig } from '../scenario/types'
-import { vesselClass } from '../scenario/vesselClasses'
+import { holdCellsPerBay, stackBaseTier, vesselClass } from '../scenario/vesselClasses'
 
 const rob = fixtures['rob-bays'] as ScenarioConfig
 const withFraction = (config: ScenarioConfig, robBayFraction: number, robFill?: number): ScenarioConfig => ({ ...config, robBayFraction, ...(robFill ? { robFill } : {}) })
@@ -57,8 +57,10 @@ describe('ROB bay planning', () => {
         const boxes = plan.rob.filter((b) => b.vesselId === v.id)
         for (const deck of [false, true]) {
           const cells = new Set(boxes.filter((b) => b.deck === deck).map((b) => `${b.bay}:${b.row}:${b.tier}`))
-          const capacity = bays.length * spec.rows * (deck ? spec.deckTiers : spec.holdTiers)
-          expect(cells.size, `fill ${fill} ${deck ? 'deck' : 'hold'}`).toBe(Math.round(fill * spec.rows * (deck ? spec.deckTiers : spec.holdTiers)) * bays.length)
+          // the hold counts the hull profile (V-shaped holds, #131), not the full rows x tiers box
+          const perBay = deck ? spec.rows * spec.deckTiers : holdCellsPerBay(spec)
+          const capacity = bays.length * perBay
+          expect(cells.size, `fill ${fill} ${deck ? 'deck' : 'hold'}`).toBe(Math.round(fill * perBay) * bays.length)
           expect(cells.size / capacity).toBeCloseTo(fill, 1)
         }
         expect(boxes.every((b) => bays.includes(b.bay))).toBe(true)
@@ -77,7 +79,7 @@ describe('ROB bay planning', () => {
     expect(stacks.size).toBeGreaterThan(0)
     for (const [key, boxes] of stacks) {
       const tiers = [...new Set(boxes.map((b) => b.tier))].sort((a, b) => a - b)
-      const from = boxes[0].deck ? spec.holdTiers : 0
+      const from = stackBaseTier(spec, boxes[0].row, boxes[0].deck)
       expect(tiers, key).toEqual(tiers.map((_, i) => from + i)) // from the floor or hatch cover up, no gaps
       let state: StackState | null = 'open'
       let lastKind: 'pair' | 'full' | null = null

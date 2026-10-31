@@ -17,7 +17,7 @@ import { vesselLine } from '../scenario/vesselNames'
 import { liveryMaterial } from './containerAssets'
 import type { SceneModel, Vec3 } from './sceneModel'
 import { hullMeta, loadHullModel, VESSEL_LIVERY_ATLAS, vesselHullColour, vesselLiveryIndex, type HullModel } from './vesselAssets'
-import { hullHatchOpenings, hullWithOpenHatches } from './hullHatchOpening'
+import { holdLinerOutline, hullHatchOpenings, hullWithOpenHatches } from './hullHatchOpening'
 import { hullPlacement, type HullMeta } from './vesselHull'
 import { buildRobMesh, type RobMesh } from './robBoxes'
 import type { ColourBy, ColourContext } from './colourBy'
@@ -234,12 +234,16 @@ export class VesselHulls {
     e.root.add(hull)
   }
 
-  /** Dark pits inside the coamings of the bays whose deck is open (TT-R10): the hold seen through a lifted panel. One mesh, inside faces only. */
+  /** Dark pits inside the coamings of the bays whose deck is open (TT-R10): the hold seen through a lifted panel, narrowing towards the keel (hull profile, #131). One mesh, inside faces only. */
   private holdLiners(meta: HullMeta, bays: ReadonlySet<number>): THREE.Mesh {
     // a little inside the coaming so the walls do not fight with it
-    const boxes = hullHatchOpenings(meta, bays).map((o) =>
-      new THREE.BoxGeometry(o.x1 - o.x0 - 0.04, o.coamingTopY - o.floorY, o.zQuay - o.zSea - 0.04).translate((o.x0 + o.x1) / 2, (o.coamingTopY + o.floorY) / 2, (o.zQuay + o.zSea) / 2),
-    )
+    // the section is the hull profile (#131): a stepped V, lower hold tiers narrower than the upper ones
+    const boxes = hullHatchOpenings(meta, bays).map((o) => {
+      const shape = new THREE.Shape(holdLinerOutline(meta, o).map(([z, y]) => new THREE.Vector2(z, y)))
+      const depth = o.x1 - o.x0 - 0.04
+      // shape x = world z, shape y = world y, extruded along local z; rotate that onto +x
+      return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false }).rotateY(-Math.PI / 2).translate(o.x1 - 0.02, 0, 0)
+    })
     const geometry = this.track(mergeGeometries(boxes) as THREE.BufferGeometry)
     for (const b of boxes) b.dispose()
     const liner = new THREE.Mesh(geometry, this.track(new THREE.MeshStandardMaterial({ color: '#272d35', roughness: 0.9, side: THREE.BackSide })))

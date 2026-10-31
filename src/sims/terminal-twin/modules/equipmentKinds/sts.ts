@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import type { StsState } from '../../engine'
 import type { EntityView } from '../entityInspector'
 import { STS } from '../equipmentDims'
+import { stsBeaconOffsets } from '../gantryBeacons'
 import { loadStsTemplate, StsModel, type SpreaderMode } from '../stsAssets'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
 
@@ -26,9 +27,8 @@ class StsRenderer implements KindRenderer {
     const { config } = host.model
     for (const s of config.sts) {
       this.addSts(s.id)
-      // Amber beacons at the four leg bases, on the rails.
-      const hx = STS.legSpacingX / 2
-      host.beacons.add(s.id, [-hx, hx].flatMap((x) => [STS.waterRailZ, STS_LAND_RAIL_Z].map((z) => ({ x, y: 7, z }))))
+      // Amber beacons at the model's `beaconMounts` (legs and portal beam ends).
+      host.beacons.add(s.id, stsBeaconOffsets())
     }
     loadStsTemplate().then(
       (template) => {

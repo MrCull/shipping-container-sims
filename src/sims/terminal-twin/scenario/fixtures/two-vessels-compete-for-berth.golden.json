@@ -3,9 +3,9 @@
   "seed": 7,
   "status": "ended",
   "endReason": "vesselsCompleted >= 2",
-  "eventLogHash": "16a1067f270477",
+  "eventLogHash": "1ff53716c05761",
   "kpis": {
-    "simTimeS": 4243.061,
+    "simTimeS": 4282.239,
     "eventsProcessed": 240,
     "movesCompleted": 24,
     "vesselsCompleted": 2,
@@ -14,14 +14,14 @@
         "moves": 12,
         "cycles": 10,
         "twinLifts": 2,
-        "grossMovesPerHour": 14.288,
+        "grossMovesPerHour": 14.105,
         "railWaitS": 0
       },
       "STS02": {
         "moves": 12,
         "cycles": 9,
         "twinLifts": 3,
-        "grossMovesPerHour": 15.252,
+        "grossMovesPerHour": 15.084,
         "railWaitS": 0
       }
     },
@@ -32,8 +32,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 600,
-        "departedAtS": 2115.875,
-        "turnaroundS": 1515.875,
+        "departedAtS": 2135.927,
+        "turnaroundS": 1535.927,
         "sts": [
           "STS01",
           "STS02"
@@ -42,11 +42,11 @@
       "V002": {
         "sizeClass": "panamax",
         "arrivedAtS": 300,
-        "anchorageWaitS": 1815.875,
+        "anchorageWaitS": 1835.927,
         "berthX": 0,
-        "berthedAtS": 2715.875,
-        "departedAtS": 4243.061,
-        "turnaroundS": 1527.187,
+        "berthedAtS": 2735.927,
+        "departedAtS": 4282.239,
+        "turnaroundS": 1546.312,
         "sts": [
           "STS01",
           "STS02"
@@ -56,9 +56,9 @@
     "quay": {
       "vesselsWaited": 1,
       "anchorageWaitS": {
-        "total": 1815.875,
-        "mean": 907.937,
-        "max": 1815.875
+        "total": 1835.927,
+        "mean": 917.964,
+        "max": 1835.927
       }
     },
     "handlers": {
@@ -151,22 +151,22 @@
       "IMPORT": {
         "count": 21,
         "departed": 0,
-        "meanS": 2125.7,
-        "maxS": 3559.465
+        "meanS": 2145.693,
+        "maxS": 3596.485
       },
       "STORAGE": {
         "count": 3,
         "departed": 0,
-        "meanS": 2497.181,
-        "maxS": 3522.233
+        "meanS": 2520.996,
+        "maxS": 3559.254
       }
     },
     "workPackages": {
       "released": 19,
       "started": 19,
       "completed": 19,
-      "leadTimeMeanS": 245.619,
-      "leadTimeMaxS": 393.07,
+      "leadTimeMeanS": 250.61,
+      "leadTimeMaxS": 396.895,
       "boxesLoaded": 0
     },
     "ordering": {

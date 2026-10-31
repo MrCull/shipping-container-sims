@@ -9,6 +9,11 @@
  * `holdTiers` are in the hold; the rest are on deck (on the hatch covers).
  * A cell holds one 40 ft box or two 20 ft boxes (aft and fore half).
  *
+ * Hull profile (spec #116, ticket #131): below deck the holds narrow towards the keel, so the lower hold tiers lose
+ * their outer rows (`holdRows`, centred on the beam). Deck tiers keep every row. Every enumeration of vessel cells goes
+ * through {@link isCellUsable} / {@link rowRange}, so planning, ROB fill, capacity, stack rules, the viewers and the
+ * invariant agree on which cells exist.
+ *
  * All dimensions are approximations [A] of typical ships of each class.
  */
 import type { ContainerSize, VesselSizeClass } from './types'
@@ -21,6 +26,12 @@ export interface VesselClassSpec {
   /** 40 ft bays. */
   bays: number
   rows: number
+  /**
+   * Hull profile [A]: usable rows per hold tier, bottom (tier 0) first. Centred on the beam (same parity as `rows`),
+   * never narrower than the tier below, and `rows` in the top hold tier. Source quality [A]: typical hold cross
+   * sections, the keel tier about 40 to 50 % of the beam, widening to the full beam under the hatch coamings.
+   */
+  holdRows: readonly number[]
   holdTiers: number
   deckTiers: number
   /** Top of the hatch covers (deck stack base) above quay level (m). */
@@ -64,11 +75,11 @@ const HATCH_DEFAULTS = {
 
 /** [A] Size classes, smallest first. */
 export const VESSEL_CLASSES: Record<VesselSizeClass, VesselClassSpec> = {
-  feeder: { label: 'Feeder', loaM: 140, beamM: 23, bays: 7, rows: 8, holdTiers: 4, deckTiers: 3, deckHeightM: 12, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 12 } },
-  feedermax: { label: 'Feedermax', loaM: 180, beamM: 28, bays: 10, rows: 10, holdTiers: 5, deckTiers: 4, deckHeightM: 14, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 16 } },
-  panamax: { label: 'Panamax', loaM: 294, beamM: 32.3, bays: 17, rows: 12, holdTiers: 7, deckTiers: 5, deckHeightM: 18, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 24 } },
-  'neo-panamax': { label: 'Neo-Panamax', loaM: 366, beamM: 48.2, bays: 20, rows: 18, holdTiers: 8, deckTiers: 7, deckHeightM: 20, hatch: { ...HATCH_DEFAULTS, panels: 3, panelWeightT: 28 } },
-  ulcv: { label: 'ULCV', loaM: 400, beamM: 61.5, bays: 24, rows: 23, holdTiers: 10, deckTiers: 9, deckHeightM: 22, hatch: { ...HATCH_DEFAULTS, panels: 4, panelWeightT: 32 } },
+  feeder: { label: 'Feeder', loaM: 140, beamM: 23, bays: 7, rows: 8, holdRows: [4, 6, 6, 8], holdTiers: 4, deckTiers: 3, deckHeightM: 12, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 12 } },
+  feedermax: { label: 'Feedermax', loaM: 180, beamM: 28, bays: 10, rows: 10, holdRows: [4, 6, 8, 8, 10], holdTiers: 5, deckTiers: 4, deckHeightM: 14, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 16 } },
+  panamax: { label: 'Panamax', loaM: 294, beamM: 32.3, bays: 17, rows: 12, holdRows: [6, 8, 8, 10, 10, 12, 12], holdTiers: 7, deckTiers: 5, deckHeightM: 18, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 24 } },
+  'neo-panamax': { label: 'Neo-Panamax', loaM: 366, beamM: 48.2, bays: 20, rows: 18, holdRows: [8, 10, 12, 14, 14, 16, 18, 18], holdTiers: 8, deckTiers: 7, deckHeightM: 20, hatch: { ...HATCH_DEFAULTS, panels: 3, panelWeightT: 28 } },
+  ulcv: { label: 'ULCV', loaM: 400, beamM: 61.5, bays: 24, rows: 23, holdRows: [11, 13, 15, 17, 17, 19, 21, 21, 23, 23], holdTiers: 10, deckTiers: 9, deckHeightM: 22, hatch: { ...HATCH_DEFAULTS, panels: 4, panelWeightT: 32 } },
 }
 
 export const VESSEL_SIZE_CLASSES = Object.keys(VESSEL_CLASSES) as VesselSizeClass[]
@@ -109,9 +120,45 @@ export function vesselClass(sizeClass: VesselSizeClass): VesselClassSpec {
   return spec
 }
 
-/** Cells per class: bays × rows × (hold + deck tiers). One cell = one 40 ft or two 20 ft boxes. */
+/** First row (inclusive) and end row (exclusive) usable in a tier: the hull profile below deck, every row on deck. */
+export function rowRange(spec: VesselClassSpec, tier: number): { from: number; to: number } {
+  if (tier < 0 || tier >= spec.holdTiers + spec.deckTiers) return { from: 0, to: 0 }
+  const n = tier >= spec.holdTiers ? spec.rows : spec.holdRows[tier]
+  const from = (spec.rows - n) / 2
+  return { from, to: from + n }
+}
+
+/** True when the cell exists: the tier is on the vessel and the row is inside the hull profile of that tier. */
+export function isCellUsable(spec: VesselClassSpec, row: number, tier: number): boolean {
+  const { from, to } = rowRange(spec, tier)
+  return row >= from && row < to
+}
+
+/** Lowest tier of the stack at `row` in a section (the hull profile lifts it above the keel; deck stacks start at the hatch cover). */
+export function stackBaseTier(spec: VesselClassSpec, row: number, deck: boolean): number {
+  if (deck) return spec.holdTiers
+  for (let tier = 0; tier < spec.holdTiers; tier++) if (isCellUsable(spec, row, tier)) return tier
+  return spec.holdTiers
+}
+
+/** True when a box at `tier` of the `row` stack stands on the hull floor or the hatch cover, not on a box below. */
+export function isStackBase(spec: VesselClassSpec, row: number, tier: number): boolean {
+  return tier === spec.holdTiers || !isCellUsable(spec, row, tier - 1)
+}
+
+/** Hold cells per bay: the hull profile summed over the hold tiers. */
+export function holdCellsPerBay(spec: VesselClassSpec): number {
+  return spec.holdRows.reduce((n, r) => n + r, 0)
+}
+
+/** Cells per bay: hold (hull profile) plus deck. */
+export function cellsPerBay(spec: VesselClassSpec): number {
+  return holdCellsPerBay(spec) + spec.rows * spec.deckTiers
+}
+
+/** Cells per class: bays × (hold cells under the hull profile + rows × deck tiers). One cell = one 40 ft or two 20 ft boxes. */
 export function cellCapacity(spec: VesselClassSpec): number {
-  return spec.bays * spec.rows * (spec.holdTiers + spec.deckTiers)
+  return spec.bays * cellsPerBay(spec)
 }
 
 /** Distance from the stern to the aft edge of bay 0 (engine room / accommodation). */

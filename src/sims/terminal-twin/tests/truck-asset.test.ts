@@ -79,4 +79,16 @@ describe('truck models', () => {
     expect(m.travelLimits.wheel_t2).toBeDefined()
     expect(m.travelLimits.fifth_wheel).toBeUndefined()
   })
+
+  it('carries a 20, two 20s or a 40 on the chassis, and lists the load configurations (TT-128)', () => {
+    for (const name of [...CABS, 'truck-chassis']) {
+      const m = meta(name)
+      const modes = m.loadConfigurations as { mode: string; seats: string[] }[]
+      expect(modes.map((x) => x.mode).sort()).toEqual(['20', '40', 'twin-20'])
+      const names = new Set(m.attachPoints.map((a: { name: string }) => a.name))
+      for (const cfg of modes) for (const seat of cfg.seats) expect(names.has(seat), `${name} ${cfg.mode} ${seat}`).toBe(true)
+      expect(m.chassisDetail).toEqual(expect.arrayContaining(['mudguards', 'landing legs', 'twist-lock levers']))
+      expect(m.chassisDetail.includes('air lines')).toBe(name !== 'truck-chassis') // the lines hang on the tractor
+    }
+  })
 })

@@ -4,7 +4,20 @@
  * costs nothing to draw. The flash phase is wall-clock, so it stays readable at any sim speed.
  */
 import * as THREE from 'three'
+import ascMeta from '../assets/models/asc/asc.meta.json'
+import stsMeta from '../assets/models/sts/sts-malaccamax.meta.json'
+import { STS } from './equipmentDims'
 import type { Vec3 } from './soundMixer'
+
+/** STS lamp offsets from the sidecar's `beaconMounts` (model coordinates; the root sits on the waterside rail, so z shifts by it). */
+export function stsBeaconOffsets(): Vec3[] {
+  return stsMeta.beaconMounts.map((m) => ({ x: m.position[0], y: m.position[1], z: m.position[2] + STS.waterRailZ }))
+}
+
+/** ASC lamp offsets from the sidecar's `beaconMounts`; `scaleY` is the model's vertical stretch for tall blocks (`ascScaleY`). */
+export function ascBeaconOffsets(scaleY: number): Vec3[] {
+  return ascMeta.beaconMounts.map((m) => ({ x: m.position[0], y: m.position[1] * scaleY, z: m.position[2] }))
+}
 
 /** One full flash cycle (ms): lit for the first half. */
 export const BEACON_PERIOD_MS = 800

@@ -2,9 +2,9 @@
 import bpy
 
 from .asc import (
-    ATLAS, BRIDGE_TOP, BRIDGE_UNDER, CELL, CORNERS, DESIGN_TIERS, GANTRY_TRAVEL, HC_H, REGIONS, REST_PLANE, ROPE_REST_LEN,
+    ATLAS, BEACONS, BRIDGE_TOP, BRIDGE_UNDER, CELL, CORNERS, DESIGN_TIERS, GANTRY_TRAVEL, HC_H, REGIONS, REST_PLANE, ROPE_REST_LEN,
     ROPE_TOP_Z, ROW_PITCH, ROWS, RX, SPAN, SPREADER_FLOAT, SWATCHES, SWATCH_ORDER, TIER_PITCH, TROLLEY_TRAVEL, TROLLEY_Z, TWIST_DEG,
-    TWIST_X, TWIST_Y, UNIT_LABEL, HEADBLOCK_Z1, LEG_W, SILL_HALF,
+    TWIST_X, TWIST_Y, UNIT_LABEL, BEACON_Z, HEADBLOCK_Z1, LEG_W, SILL_HALF,
 )
 
 
@@ -13,7 +13,7 @@ LOD_MAX_DISTANCE_M = (90, 300)
 
 
 def render_atlas(path, fonts_dir, samples=16):
-    """Swatch grid + ZPMC wordmark + numbered panel cells + "40 t" + unit number + warning stripes + spec plate (Cycles, emission only)."""
+    """Swatch grid + TTI ALGECIRAS sign + ZPMC plate + numbered panel cells + "40 t" + unit number + warning stripes + spec plate (Cycles, emission only)."""
     from .blender import hex_to_linear, reset_scene
     from .liveries import _Canvas
 
@@ -42,9 +42,13 @@ def render_atlas(path, fonts_dir, samples=16):
     x0, y0, x1, y1 = REGIONS['plate']
     c.rect(x0, y0, x1, y1, SWATCHES['dark'])
     c.text('AUTOMATED STACKING CRANE  40 t', 'Archivo-ExtraBold.ttf', '#d9d9d9', (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.9, (y1 - y0) * 0.38)
+    NAVY = '#17345a'
+    x0, y0, x1, y1 = REGIONS['tti']
+    c.rect(x0, y0, x1, y1, SWATCHES['white'])
+    c.text('TTI ALGECIRAS', 'Archivo-ExtraBold.ttf', '#1b4f93', (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.9, (y1 - y0) * 0.6, 1.08)
     x0, y0, x1, y1 = REGIONS['zpmc']
-    c.rect(x0, y0, x1, y1, SWATCHES['blue_dark'])
-    c.text('ZPMC', 'Montserrat-ExtraBold.ttf', '#ffffff', (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.5, (y1 - y0) * 0.66, 1.18)
+    c.rect(x0, y0, x1, y1, SWATCHES['white'])
+    c.text('ZPMC', 'Montserrat-ExtraBold.ttf', '#14161a', (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.62, (y1 - y0) * 0.58, 1.12)
     x0, y0, x1, y1 = REGIONS['panels']
     cw = (x1 - x0) / ROWS
     for i in range(ROWS):
@@ -54,8 +58,7 @@ def render_atlas(path, fonts_dir, samples=16):
         c.text(str(i + 1), 'Archivo-ExtraBold.ttf', '#ffffff', cx0 + cw / 2, (y0 + y1) / 2, cw * 0.5, (y1 - y0) * 0.6)
     x0, y0, x1, y1 = REGIONS['swl']
     c.rect(x0, y0, x1, y1, SWATCHES['white'])
-    c.rect(x0 + 6, y0 + 6, x1 - 6, y1 - 6, SWATCHES['blue_dark'])
-    c.text('40 t', 'Archivo-ExtraBold.ttf', '#ffffff', (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.6, (y1 - y0) * 0.62)
+    c.text('40 t', 'Archivo-ExtraBold.ttf', '#14161a', (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.6, (y1 - y0) * 0.62)
     x0, y0, x1, y1 = REGIONS['number']
     c.rect(x0, y0, x1, y1, SWATCHES['white'])
     c.text(UNIT_LABEL, 'Archivo-ExtraBold.ttf', '#14161a', (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * 0.8, (y1 - y0) * 0.62)
@@ -98,7 +101,7 @@ def sidecar(info):
         {'name': 'LOD1', 'parent': 'asc', 'role': 'lod', 'description': 'simplified, rig kept (gantry, trolley, ropes, hoist, spreader)'},
         {'name': 'LOD2', 'parent': 'asc', 'role': 'lod', 'description': 'silhouette boxes; gantry, trolley, hoist and spreader nodes kept so far cranes still move (spreader has no mesh: merged into hoist)'},
         {'name': 'gantry', 'parent': 'LOD*', 'role': 'rig', 'pivot': _gl((0, 0, 0)), 'axis': '+Z',
-         'description': 'portal on the two rails (legs, sills, rail bogies, head beams, bridge, walkways, ladders, e-house); translates along the block rails; pivot at the ground on the span and gantry centre'},
+         'description': 'portal on the two rails (legs with knees into the girders, sills, violet rail bogies, head beams, bridge with its TTI ALGECIRAS sign band, walkways, stairs, e-house, amber beacons); translates along the block rails; pivot at the ground on the span and gantry centre'},
         {'name': 'trolley', 'parent': 'gantry', 'role': 'rig', 'pivot': _gl((0, 0, TROLLEY_Z)), 'axis': '+X',
          'description': 'trolley frame and hoist machinery on the bridge rails; translates across the rows; pivot at the top of the bridge rails on the centre line'},
         {'name': 'ropes', 'parent': 'trolley', 'role': 'rig', 'pivot': _gl((0, 0, ROPE_TOP_Z)), 'axis': '+Y',
@@ -126,7 +129,7 @@ def sidecar(info):
         limits[f'twistlock_{n}'] = {'type': 'rotation', 'axis': '+Y', 'minDeg': 0, 'maxDeg': TWIST_DEG, 'rest': 0, 'tag': 'A'}
     # Every rig node is an empty at its pivot; the mesh is its `<name>_geo` child (LOD2 has no spreader mesh: it is merged into hoist_geo).
     geo_text = {
-        'gantry': 'legs, sills, bogies, head beams, bridge girders, walkways, ladders, e-house',
+        'gantry': 'legs, knees, sills, bogies, head beams, bridge girders, sign band, walkways, stairs, e-house, beacons',
         'trolley': 'trolley frame, wheels, machinery houses, drums and motors',
         'ropes': 'four rope strands (1 m, scaled by the stretch rule)',
         'hoist': 'head block with sheaves and hangers (LOD2: with the spreader box)',
@@ -155,6 +158,11 @@ def sidecar(info):
                                          'The plane is 18.0 m above the ground at hoist 0: hoist = (box bottom + box height) - 18.0'}] + twist,
         'stretch': [{'node': 'ropes', 'to': 'hoist', 'axis': 'Y', 'offsetM': HEADBLOCK_Z1, 'unitLengthM': 1.0,
                      'note': 'ropes scale Y = (ropes.y - (hoist.y + offsetM)) / unitLengthM, both children of the trolley; 2.2 at rest'}],
+        'beaconMounts': [
+            {'name': name, 'node': 'gantry', 'position': _gl(pos), 'colour': SWATCHES['amber'], 'lens': 'amber', 'tag': 'A',
+             'description': f'on the rail-end face of a leg at gantry-alarm height ({BEACON_Z} m), {"+Z" if pos[1] < 0 else "-Z"} end; rides with the gantry'}
+            for name, pos in BEACONS.items()
+        ],
         'groundContact': {'y': 0, 'points': ['gantry'], 'rails': [{'x': -RX}, {'x': RX}], 'tag': 'V'},
         'hoist': {'restAttachM': REST_PLANE, 'lowestAttachM': HC_H, 'spreaderFloatM': SPREADER_FLOAT, 'tag': 'A',
                   'note': 'lowest plane = top of a 40 ft high-cube box standing on the ground; restAttachM suits a 5-high stack plus the engine travel clearance; '
@@ -163,18 +171,21 @@ def sidecar(info):
                   'clearSpanM': round(SPAN - LEG_W, 3), 'underBridgeM': BRIDGE_UNDER, 'bridgeTopM': BRIDGE_TOP,
                   'carryClearanceM': round(REST_PLANE - HC_H - stack_top, 3), 'referenceContainer': '40HC', 'tag': 'V',
                   'note': '8 rows at 2.9 m pitch inside the 25.4 m span (the engine row pitch); a carried box clears a 5-high stack by the engine travel clearance'},
-        'branding': {'manufacturerWordmark': 'ZPMC', 'swlMark': '40 t', 'unitNumber': UNIT_LABEL, 'bridgePanelNumbers': f'1..{ROWS}', 'operatorBranding': False, 'tag': 'A',
-                     'note': 'ZPMC wordmark set in Montserrat ExtraBold on the blue atlas (no official logo artwork); numbered bridge panels over the rows; no operator branding'},
+        'branding': {'manufacturerWordmark': 'ZPMC', 'livery': 'TTI ALGECIRAS', 'swlMark': '40 t', 'unitNumber': UNIT_LABEL, 'bridgePanelNumbers': f'1..{ROWS}',
+                     'signBand': ['unit number', 'TTI ALGECIRAS', 'ZPMC', '40 t'], 'operatorBranding': True, 'tag': 'P',
+                     'placement': 'a white sign band along the outer face of both girders, left to right: unit number, TTI ALGECIRAS, ZPMC builder plate, 40 t (dark text on white, as on the real cranes); numbered row panels below it',
+                     'note': 'text only, set in open-licence typefaces (Archivo ExtraBold, Montserrat ExtraBold): no logo artwork'},
         'lods': {f'LOD{i}': dict({'triangles': info['triangles'][f'LOD{i}'], 'material': 'asc_atlas'}, **({'maxDistanceM': LOD_MAX_DISTANCE_M[i]} if i < 2 else {})) for i in range(3)},
         'provenance': [
             {'fact': '25.4 m rail span over 8 container rows, 40 t rated load', 'tag': 'V', 'source': 'spec #24 (rails, rows and ASC rating)'},
-            {'fact': 'dark/medium-blue rail-mounted gantry: twin box-beam bridge, vertical legs on sills with rail bogies, trolley with hoist machinery, yellow spreader',
-             'tag': 'P', 'source': 'public ZPMC ASC photographs (not committed)'},
+            {'fact': 'cobalt-blue rail-mounted gantry: twin box-beam bridge, legs flaring into the girders, violet rail bogies, stairs on two legs, white sign band along the girders, trolley with hoist machinery, yellow spreader',
+             'tag': 'P', 'source': 'TTI Algeciras reference photos asc-* (ignored by version control, never committed; the generator does not read them)'},
             {'fact': 'leg, girder, trolley and e-house proportions; 24.7 m overall height; bridge underside 20.0 m', 'tag': 'A',
              'reason': 'no manufacturer drawing in the repo; sized so a 5-high stack plus a carried box fits under the bridge'},
             {'fact': 'portal length 9.4 m (sill) plus buffers, so two ASCs fit the engine 12 m minimum centre separation', 'tag': 'A'},
             {'fact': '40 ft spreader with end beams, telescopic tubes and four twist-locks at the ISO 1161 casting centres', 'tag': 'V', 'source': 'ISO 1161 / ISO 668'},
-            {'fact': 'ZPMC wordmark and "40 t" baked into the atlas, numbered bridge panels 1..8 over the rows; no operator branding', 'tag': 'A'},
+            {'fact': 'TTI ALGECIRAS, ZPMC and "40 t" plates baked into the atlas (text only), numbered bridge panels 1..8 over the rows', 'tag': 'P', 'source': 'asc-* reference photos'},
+            {'fact': 'beacon positions: one amber gantry-alarm lamp on the rail-end face of each leg', 'tag': 'A', 'reason': 'no beacons are visible in the photos'},
             {'fact': 'rope strands are a scaled node (rest length follows the hoist); stiffener ribs, grating and rungs as boxes', 'tag': 'M', 'reason': 'triangle budget'},
         ],
     }

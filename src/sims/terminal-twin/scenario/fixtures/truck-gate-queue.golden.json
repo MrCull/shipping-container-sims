@@ -3,10 +3,10 @@
   "seed": 8,
   "status": "ended",
   "endReason": "simDurationS >= 9000",
-  "eventLogHash": "1643ced4e2d4ff",
+  "eventLogHash": "1d002a129b719d",
   "kpis": {
     "simTimeS": 9000,
-    "eventsProcessed": 1140,
+    "eventsProcessed": 1138,
     "movesCompleted": 16,
     "vesselsCompleted": 1,
     "sts": {
@@ -14,7 +14,7 @@
         "moves": 16,
         "cycles": 13,
         "twinLifts": 3,
-        "grossMovesPerHour": 31.074,
+        "grossMovesPerHour": 30.731,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1992.526,
-        "turnaroundS": 1932.526,
+        "departedAtS": 2013.223,
+        "turnaroundS": 1953.223,
         "sts": [
           "STS01"
         ]
@@ -137,9 +137,9 @@
       },
       "ascDispatch": {
         "handler": "strategy:waterside-first",
-        "calls": 62,
-        "resolved": 62,
-        "ok": 62,
+        "calls": 61,
+        "resolved": 61,
+        "ok": 61,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -289,8 +289,8 @@
           "loadedDistanceM": 362.5,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 8714.908,
-            "moving-to-collect": 53.933,
+            "parked": 8713.598,
+            "moving-to-collect": 55.243,
             "queuing-to-collect": 0,
             "collecting": 91.259,
             "moving-to-deliver": 10.5,
@@ -410,7 +410,7 @@
       "IMPORT": {
         "count": 14,
         "departed": 7,
-        "meanS": 5566.053,
+        "meanS": 5557.004,
         "maxS": 8873.846
       },
       "EXPORT": {
@@ -422,16 +422,16 @@
       "STORAGE": {
         "count": 5,
         "departed": 1,
-        "meanS": 5556.727,
-        "maxS": 8018.616
+        "meanS": 5555.473,
+        "maxS": 8012.345
       }
     },
     "workPackages": {
       "released": 11,
       "started": 11,
       "completed": 11,
-      "leadTimeMeanS": 303.995,
-      "leadTimeMaxS": 437.278,
+      "leadTimeMeanS": 307.255,
+      "leadTimeMaxS": 442.985,
       "boxesLoaded": 0
     },
     "ordering": {
@@ -448,7 +448,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 1139,
+    "checks": 1137,
     "violations": 0,
     "first": null
   },
