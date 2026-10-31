@@ -57,15 +57,28 @@ test('bay viewer: opens from a vessel click, steps between bays, shows ROB bays 
   await expect(page.getByTestId('tt-entity-heading')).toContainText('V001')
 
   // hold and deck cross-sections: 8 rows, 3 deck tiers and 4 hold tiers of cells (some are 20 ft halves)
-  const deck = page.getByTestId('tt-bay-deck')
-  const hold = page.getByTestId('tt-bay-hold')
+  // two panels side by side: the 20 ft (odd) bays either side of the 40 ft bay, e.g. 01 and 03 under 02
+  const fore = page.getByTestId('tt-bay-panel-fore')
+  const aft = page.getByTestId('tt-bay-panel-aft')
+  const deck = fore.getByTestId('tt-bay-deck')
+  const hold = fore.getByTestId('tt-bay-hold')
   await expect(deck.locator('.tier')).toHaveCount(3)
   await expect(hold.locator('.tier')).toHaveCount(4)
   await expect(deck.locator('.tier').first().locator('.pos')).toHaveCount(8)
+  await expect(aft.getByTestId('tt-bay-deck').locator('.tier').first().locator('.pos')).toHaveCount(8)
+  const evenBay = Number((await heading(page).textContent())!.match(/bay (\d\d)/i)![1])
+  expect(Number(await fore.getAttribute('data-bay-number'))).toBe(evenBay - 1)
+  expect(Number(await aft.getAttribute('data-bay-number'))).toBe(evenBay + 1)
+  await expect(fore.getByTestId('tt-bay-panel-title')).toHaveText(`Bay ${String(evenBay - 1).padStart(2, '0')}`)
 
   // opens on a bay with work: planned discharge and planned load cells
-  const planned = page.locator('[data-testid=tt-bay-cell][data-status=planned-discharge]')
+  const planned = page.locator('[data-testid=tt-bay-cell][data-status=planned-discharge]:not([data-continuation])')
   await expect(planned.first()).toBeVisible()
+  // a 40 ft box spans both panels: its second half is a hatched continuation labelled "40′ ▸" in the aft panel
+  const continuation = aft.locator('[data-testid=tt-bay-cell][data-continuation=true]')
+  expect(await continuation.count()).toBeGreaterThan(0)
+  await expect(continuation.first()).toHaveText('40′ ▸')
+  expect(await fore.locator('[data-continuation=true]').count()).toBe(0)
   const bay0 = (await heading(page).textContent())!
   const slot = (await planned.first().getAttribute('data-slot'))!
 
@@ -99,6 +112,7 @@ test('bay viewer: opens from a vessel click, steps between bays, shows ROB bays 
   await robStrip.first().click()
   await expect(page.getByTestId('tt-bay-rob-note')).toBeVisible()
   expect(await page.locator('[data-testid=tt-bay-cell][data-status=rob]').count()).toBeGreaterThan(10)
+  expect(await page.locator('[data-testid=tt-bay-cell][data-rob=true]').count()).toBeGreaterThan(10)
   await expect(page.locator('[data-testid=tt-bay-cell][data-status=planned-discharge]')).toHaveCount(0)
   await expect(page.getByTestId('tt-bay-packages')).toBeHidden()
 
@@ -109,7 +123,7 @@ test('bay viewer: opens from a vessel click, steps between bays, shows ROB bays 
 
   // back to the bay with work: the cell goes planned -> in progress -> done as the run proceeds
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'StsPicked' }))
-  const cell = page.locator(`[data-testid=tt-bay-cell][data-slot="${slot}"]`)
+  const cell = page.locator(`[data-testid=tt-bay-cell][data-slot="${slot}"]:not([data-continuation])`)
   // find the bay of the slot: walk the strip until the cell is on show
   const entries = await strip.count()
   for (let i = 0; i < entries && (await cell.count()) === 0; i++) await strip.nth(i).click()

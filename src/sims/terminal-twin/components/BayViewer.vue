@@ -14,9 +14,9 @@ import { t, type MessageKey } from '../i18n/messages'
 const store = useTwinStore()
 
 const REFRESH_MS = 1000
-/** Widest a cross-section may get (px); a cell is as large as fits, up to MAX_CELL_PX. */
-const SECTION_WIDTH_PX = 440
-const MAX_CELL_PX = 26
+/** Widest one panel's cross-section may get (px; two panels sit side by side); a cell is as large as fits, up to MAX_CELL_PX. */
+const SECTION_WIDTH_PX = 210
+const MAX_CELL_PX = 24
 const PALETTE_SIZE = 8
 
 let timer: ReturnType<typeof setInterval> | null = null
@@ -37,7 +37,7 @@ const view = computed<BayView | null>(() => {
 const pad2 = (n: number): string => String(n).padStart(2, '0')
 const cellPx = computed(() => {
   const rows = view.value?.sections[0].rowNumbers.length ?? 8
-  return Math.max(9, Math.min(MAX_CELL_PX, Math.floor((SECTION_WIDTH_PX - 2 * (rows - 1)) / rows)))
+  return Math.max(8,Math.min(MAX_CELL_PX, Math.floor((SECTION_WIDTH_PX - 2 * (rows - 1)) / rows)))
 })
 
 function cellClass(c: BayCell): string[] {
@@ -217,62 +217,85 @@ onBeforeUnmount(() => {
           >
             {{ t('bayViewer.robBay') }}
           </p>
-          <template
-            v-for="(section, si) in view.sections"
-            :key="section.deck ? 'deck' : 'hold'"
-          >
-            <h3 class="section-title">
-              {{ section.deck ? t('bayViewer.deck') : t('bayViewer.hold') }}
-            </h3>
+          <div class="panels">
             <div
-              class="section"
-              :data-testid="section.deck ? 'tt-bay-deck' : 'tt-bay-hold'"
-              :style="{ '--cols': section.rowNumbers.length, '--cell': `${cellPx}px` }"
+              v-for="(panel, pi) in view.panels"
+              :key="panel.half"
+              class="panel"
+              :class="{ second: pi > 0 }"
+              :data-testid="`tt-bay-panel-${panel.half}`"
+              :data-bay-number="panel.bayNumber"
             >
-              <div
-                v-if="si === 0"
-                class="axis"
-                :aria-label="t('bayViewer.rowsAxis')"
+              <h3
+                class="panel-title"
+                data-testid="tt-bay-panel-title"
               >
-                <span class="tier-no" />
-                <span
-                  v-for="(n, i) in section.rowNumbers"
-                  :key="i"
-                  class="row-no"
-                >{{ pad2(n) }}</span>
-              </div>
-              <div
-                v-for="tier in section.tiers"
-                :key="tier.tier"
-                class="tier"
+                {{ t('bayViewer.panelBay', { bay: pad2(panel.bayNumber) }) }}
+              </h3>
+              <template
+                v-for="(section, si) in panel.sections"
+                :key="section.deck ? 'deck' : 'hold'"
               >
-                <span class="tier-no">{{ pad2(tier.number) }}</span>
+                <h3 class="section-title">
+                  {{ section.deck ? t('bayViewer.deck') : t('bayViewer.hold') }}
+                </h3>
                 <div
-                  v-for="p in tier.positions"
-                  :key="p.row"
-                  class="pos"
+                  class="section"
+                  :data-testid="section.deck ? 'tt-bay-deck' : 'tt-bay-hold'"
+                  :style="{ '--cols': section.rowNumbers.length, '--cell': `${cellPx}px` }"
                 >
-                  <span
-                    v-for="c in p.cells"
-                    :key="c.slotId"
-                    class="cell"
-                    :class="cellClass(c)"
-                    data-testid="tt-bay-cell"
-                    :data-slot="c.slotId"
-                    :data-status="c.status"
-                    :data-key="c.colourKey ?? ''"
-                    @mouseenter="hover(c, $event)"
-                    @mousemove="hover(c, $event)"
-                  />
+                  <div
+                    v-if="si === 0"
+                    class="axis"
+                    :aria-label="t('bayViewer.rowsAxis')"
+                  >
+                    <span
+                      v-if="pi === 0"
+                      class="tier-no"
+                    />
+                    <span
+                      v-for="(n, i) in section.rowNumbers"
+                      :key="i"
+                      class="row-no"
+                    >{{ pad2(n) }}</span>
+                  </div>
+                  <div
+                    v-for="tier in section.tiers"
+                    :key="tier.tier"
+                    class="tier"
+                  >
+                    <span
+                      v-if="pi === 0"
+                      class="tier-no"
+                    >{{ pad2(tier.number) }}</span>
+                    <div
+                      v-for="(c, ci) in tier.cells"
+                      :key="ci"
+                      class="pos"
+                    >
+                      <span
+                        class="cell"
+                        :class="cellClass(c)"
+                        data-testid="tt-bay-cell"
+                        :data-slot="c.slotId"
+                        :data-status="c.status"
+                        :data-key="c.colourKey ?? ''"
+                        :data-continuation="c.continuation ? 'true' : undefined"
+                        :data-rob="c.rob ? 'true' : undefined"
+                        @mouseenter="hover(c, $event)"
+                        @mousemove="hover(c, $event)"
+                      >{{ c.continuation ? t('bayViewer.continuation') : '' }}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+                <div
+                  v-if="si === 0"
+                  class="hatch-line"
+                  aria-hidden="true"
+                />
+              </template>
             </div>
-            <div
-              v-if="si === 0"
-              class="hatch-line"
-              aria-hidden="true"
-            />
-          </template>
+          </div>
         </div>
 
         <aside class="side">
@@ -563,6 +586,37 @@ h2 {
   border: 1px dashed var(--bv-rob);
   color: var(--tt-text-muted);
   max-width: 28rem;
+}
+
+.panels {
+  display: flex;
+  gap: 0.5rem;
+  width: max-content;
+}
+
+.panel-title {
+  margin: 0 0 0.1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--tt-text);
+}
+
+.panel.second .tier,
+.panel.second .axis {
+  grid-template-columns: repeat(var(--cols), var(--cell));
+}
+
+/* The second half of a 40 ft box: hatched and labelled so the two panels read as one box. */
+.cell[data-continuation='true'] {
+  background-image: repeating-linear-gradient(135deg, var(--tt-hatch) 0 2px, transparent 2px 5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 0.5rem;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--tt-text);
 }
 
 .section-title {

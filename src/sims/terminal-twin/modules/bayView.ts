@@ -89,6 +89,33 @@ export interface BayCell {
   /** Stable palette index of the colour key (same key, same index, in every bay of the vessel); null = no colour. */
   colourIndex: number | null
   details: CellDetails
+  /** A ROB box (display only, drawn hatched). */
+  rob: boolean
+  /** Panels only: the second (aft) panel's view of a 40 ft box, drawn hatched and labelled "40′ ▸". Never set on a cell of `sections`. */
+  continuation: boolean
+}
+
+/** One tier of a panel: one cell per row, quay side (port) first. */
+export interface PanelTier {
+  tier: number
+  number: number
+  cells: BayCell[]
+}
+
+export interface PanelSection {
+  deck: boolean
+  rowNumbers: number[]
+  /** Top tier first. */
+  tiers: PanelTier[]
+}
+
+/** One of the two 20 ft (odd) bays that flank a 40 ft bay, as on a real bay plan. */
+export interface BayPanel {
+  half: 'fore' | 'aft'
+  /** Maritime bay number (odd). */
+  bayNumber: number
+  /** Deck first, then hold. */
+  sections: PanelSection[]
 }
 
 /** One (row, tier) position: a whole 40 ft cell (one cell) or two 20 ft halves, aft first. */
@@ -153,6 +180,8 @@ export interface BayView {
   rob: boolean
   /** Deck first, then hold. */
   sections: BaySection[]
+  /** The same cells as two panels, fore (lower bay number, left) then aft: a 20 ft box in its half's panel, a 40 ft box in both (second flagged `continuation`). */
+  panels: BayPanel[]
   counts: Record<CellStatus, number>
   packages: PackageRow[]
   /** Bay strip, bow first (maritime bay number ascending). */
@@ -280,6 +309,8 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
       colourKey: null,
       colourIndex: null,
       details: { slotId, location: locate(slotId), status: 'empty' },
+      rob: false,
+      continuation: false,
     }
   }
   const cellOfSlot = (s: VesselSlotState): BayCell => {
@@ -304,7 +335,7 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
       details.line = s.emptyReq.line
     }
     const colourKey = status === 'empty' ? null : keyOf(opts.colourMode, status, details)
-    return { slotId: s.id, half: s.half, status, colourKey, colourIndex: indexOf(colourKey), details }
+    return { slotId: s.id, half: s.half, status, colourKey, colourIndex: indexOf(colourKey), details, rob: false, continuation: false }
   }
   const cellOfRob = (b: RobBox): BayCell => {
     const details: CellDetails = {
@@ -320,7 +351,7 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
       grossKg: b.grossKg,
     }
     const colourKey = keyOf(opts.colourMode, 'rob', details)
-    return { slotId: b.slotId, half: b.half, status: 'rob', colourKey, colourIndex: indexOf(colourKey), details }
+    return { slotId: b.slotId, half: b.half, status: 'rob', colourKey, colourIndex: indexOf(colourKey), details, rob: true, continuation: false }
   }
 
   const positionOf = (row: number, tier: number, deck: boolean): BayPosition => {
@@ -353,6 +384,26 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
   }
   const sections = [section(true), section(false)]
 
+  // Paired panels: a whole (40 ft) cell is the fore panel's cell and, flagged, the aft panel's continuation; 20 ft halves go to their own panel.
+  const panelSection = (s: BaySection, half: 'fore' | 'aft'): PanelSection => ({
+    deck: s.deck,
+    rowNumbers: s.rowNumbers,
+    tiers: s.tiers.map((t) => ({
+      tier: t.tier,
+      number: t.number,
+      cells: t.positions.map((p) => {
+        const whole = p.cells.length === 1 ? p.cells[0] : null
+        if (whole) return half === 'aft' && whole.status !== 'empty' ? { ...whole, continuation: true } : whole
+        return p.cells.find((c) => c.half === half)!
+      }),
+    })),
+  })
+  const panels: BayPanel[] = (['fore', 'aft'] as const).map((half) => ({
+    half,
+    bayNumber: vesselBayNumber(bay, spec.bays, half),
+    sections: sections.map((s) => panelSection(s, half)),
+  }))
+
   const packages = data.packages
     .filter((p) => p.vesselId === data.vesselId && p.bay === bay)
     .sort((a, b) => (a.stsId < b.stsId ? -1 : a.stsId > b.stsId ? 1 : a.seq - b.seq))
@@ -381,6 +432,7 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
     bayNumber: vesselBayNumber(bay, spec.bays, null),
     rob: strip.find((e) => e.bay === bay)?.rob ?? false,
     sections,
+    panels,
     counts,
     packages,
     strip,
