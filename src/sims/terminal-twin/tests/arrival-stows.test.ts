@@ -107,8 +107,8 @@ describe('normal scenarios arrive 60 to 80 % full', () => {
     })
   }
 
-  // #165: the TTI presets carry full-size calls (moves scale 1), so their load side keeps a share of each hull free and
-  // the arrival fill tops out lower (about 45 to 60 %); the ROB bays shrink to make that room instead of overflowing.
+  // #165: the TTI presets carry larger calls (moves scale 0.1), so their load side keeps a share of each hull free and
+  // the arrival fill can sit lower than Small automated's; the ROB bays shrink to make that room instead of overflowing.
   const fullSize = new Set(['TTI Algeciras baseline', 'TTI Algeciras, peak day'])
   it.each(presetList)('%s', (name, config) => {
     expect(config.arrivalFill).toBe(NORMAL_ARRIVAL_FILL)

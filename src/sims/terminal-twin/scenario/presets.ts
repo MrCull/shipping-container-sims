@@ -72,7 +72,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
     .shcs(spec.shc)
     // TT-R12: queue areas near every STS and every block's pads, and chained dispatch. Capacities are assumptions [unverified].
     .queueAreas({ stsCapacity: 3, blockCapacity: 3 })
-    .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' } } })
+    .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' }, wtpPadSelection: { strategy: 'nearest-box' } } })
     .ascsPerBlock(2)
     .cargo(spec.reefers ? { reeferShare: spec.reefers.share } : {})
     .yardStart(spec.yardStart)
@@ -96,11 +96,13 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
 }
 
 /**
- * Moves scale of the TTI presets (#165): 1 = a typical full-size call per class (`DEFAULT_CALL_MOVES`: a Neo-Panamax
- * discharges about 1,200 and loads about 1,000). It was 0.05 until #165, which left an arriving ship almost all
- * remain-on-board.
+ * Moves scale of the TTI presets (#165): a Feedermax then discharges about 30 and a Neo-Panamax about 120 (it was
+ * 0.05: 14 and 65). Full size (1) and the ticket's floor (0.5) both fail the headless criterion: the baseline does not
+ * reach its end condition within 10 minutes of wall time at 0.15 and above (see the sim guide, "Volumes"), because the
+ * yard side of this model moves only about 35 boxes an hour once the first blocks hold the loads. 0.1 completes in
+ * about 40 s. Raise it again when that throughput limit is fixed.
  */
-export const TTI_MOVES_SCALE = 1
+export const TTI_MOVES_SCALE = 0.1
 
 /** Vessel calls for a TTI-style hub: ~85% transshipment, a spread of sizes. */
 function hubVessels(count: number, intervalS: number, jitterS: number, movesScale: number, seed: number, flowMix: FlowMix = TTI_FLOW_MIX): VesselConfig[] {

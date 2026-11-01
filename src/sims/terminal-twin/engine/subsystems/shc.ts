@@ -668,17 +668,39 @@ function requestDispatch(ctx: EngineContext, shc: ShcState): void {
   )
 }
 
-/** Every pad with its occupancy and claim now (the pad list of the dispatch and pad-selection requests). */
+/** Share of a block's cells kept free for rehandles and the load side: a block below it takes no new discharge box (#165). */
+export const BLOCK_FREE_RESERVE = 0.1
+
+/**
+ * Cells a block can still take for new discharge boxes (#165): its free cells less one per box already on a pad of
+ * the block waiting for a slot (a 40 ft box takes two, so this undercounts a little) and less the reserve. A block at
+ * or below 0 is offered no pad: its boxes would sit on the pad with no slot and no room to rehandle, and the quay
+ * would starve (full-size calls on a 60 % pre-filled yard did this to the first block).
+ */
+function blockRoom(state: SimState, blockId: string): number {
+  const y = state.yardBlocks[blockId]
+  if (!y) return Infinity
+  let free = 0
+  for (const h of y.heights) free += y.tiers - h
+  for (const j of Object.values(state.ascJobs)) if (j.blockId === blockId && j.kind === undefined && (j.allocation === 'waiting' || j.allocation === 'asked' || j.allocation === 'full')) free--
+  return free - BLOCK_FREE_RESERVE * y.heights.length * y.tiers
+}
+
+/** Every pad with its occupancy and claim now (the pad list of the dispatch and pad-selection requests). A pad of a block with no room reads as claimed. */
 function padOptions(ctx: EngineContext): ShcDispatchPad[] {
   const { state } = ctx
-  return laneGraphOf(ctx.config).pads.map((p) => ({
-    id: p.id,
-    blockId: p.blockId,
-    x: p.x,
-    z: p.z,
-    occupiedBy: state.wtpPads[p.id].containerId,
-    claimedBy: state.wtpPads[p.id].claimedBy,
-  }))
+  const room = new Map<string, number>()
+  return laneGraphOf(ctx.config).pads.map((p) => {
+    if (!room.has(p.blockId)) room.set(p.blockId, blockRoom(state, p.blockId))
+    return {
+      id: p.id,
+      blockId: p.blockId,
+      x: p.x,
+      z: p.z,
+      occupiedBy: state.wtpPads[p.id].containerId,
+      claimedBy: state.wtpPads[p.id].claimedBy ?? (room.get(p.blockId)! <= 0 ? 'block-full' : null),
+    }
+  })
 }
 
 /**
