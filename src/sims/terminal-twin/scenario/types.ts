@@ -105,7 +105,7 @@ export interface ApronLayout {
   eastboundZ: number
   /** Z of the clear position an SHC reverses to after a WTP drop. */
   padClearZ: number
-  /** Z of the SHC parking spots. */
+  /** Z of the first row of SHC parking spots (#160: later rows lie further landside). */
   parkingZ: number
   /** Z of the WTP pad centres (boxes lie along Z). */
   wtpZ: number
@@ -113,8 +113,12 @@ export interface ApronLayout {
   padPitchM: number
   /** Spacing along X of the spine stations where SHCs enter and leave the STS lanes. */
   stationSpacingM: number
-  /** Spacing of parking spots along X. */
+  /** Spacing of the parking rows along Z (#160). */
   parkingPitchM: number
+  /** How far west of the westmost apron X (spines, pads) the parking aisle runs (#160). */
+  parkingAisleOffsetM: number
+  /** Distance along X from the parking aisle to the spots either side of it (#160). */
+  parkingSideM: number
   /** Distance either side of a conflict point that a passing vehicle reserves. */
   zoneClearanceM: number
   /** Z of the queue area spots (TT-R12), landside of the pad clear positions. */
