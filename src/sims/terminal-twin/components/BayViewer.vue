@@ -4,10 +4,11 @@ import TtIcon from './ui/TtIcon.vue'
  * Bay viewer popup (spec #106, #115): one bay of a vessel at a time as hold and deck cross-sections (row x tier),
  * prev/next buttons and a bay strip, a hover tooltip with the box's properties and a side list of the bay's work
  * packages. All the grouping and status logic is the pure view-model in `modules/bayView.ts`; this only draws it.
+ * A Load plan | Discharge plan switch (#162) shows one plan at a time (the store keeps the choice for the run).
  * Refreshes a few times a second while open (never per frame).
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { buildBayView, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
+import { BAY_PLANS, buildBayView, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
 import { useTwinStore } from '../store/twinStore'
 import { t, type MessageKey } from '../i18n/messages'
 import { colourKeyLabel } from '../modules/colourLabels'
@@ -28,7 +29,7 @@ const view = computed<BayView | null>(() => {
   if (!data) return null
   const locate = (id: string): string => store.locations.vesselSlot(id)?.notation ?? id
   try {
-    return buildBayView(data, store.bayViewerBay, { colourMode: store.colourBy, locate, hideRob: store.hideRob })
+    return buildBayView(data, store.bayViewerBay, { colourMode: store.colourBy, locate, hideRob: store.hideRob, plan: store.bayPlan })
   } catch {
     return null
   }
@@ -52,7 +53,8 @@ const cellStyle = (c: BayCell): { backgroundColor: string } | undefined => (c.co
 /** `default` shows the state of each cell; every other mode is the Colour by menu's. */
 const stateMode = computed(() => store.colourBy === 'default')
 
-const statusText = (s: CellStatus): string => t(`bayViewer.status.${s}` as MessageKey)
+/** A done cell reads "Loaded" in the load plan and "Discharged" in the discharge plan. */
+const statusText = (s: CellStatus): string => t((s === 'done' ? `bayViewer.status.done.${store.bayPlan}` : `bayViewer.status.${s}`) as MessageKey)
 const stripTitle = (e: BayView['strip'][number]): string =>
   `${t('bayViewer.stripBay', { bay: pad2(e.number), state: t(`bayViewer.stripState.${e.state}` as MessageKey) })}${e.total > 0 ? ` · ${t('bayViewer.stripProgress', { done: e.done, total: e.total })}` : ''}`
 
@@ -165,6 +167,27 @@ onBeforeUnmount(() => {
         >
           {{ t('bayViewer.nextShort') }} <TtIcon name="next" />
         </button>
+        <div
+          class="seg"
+          role="radiogroup"
+          data-testid="tt-bay-plan"
+          :data-plan="store.bayPlan"
+          :aria-label="t('bayViewer.plan')"
+        >
+          <button
+            v-for="p in BAY_PLANS"
+            :key="p"
+            type="button"
+            role="radio"
+            class="seg-btn"
+            :class="{ active: store.bayPlan === p }"
+            :aria-checked="store.bayPlan === p"
+            :data-testid="`tt-bay-plan-${p}`"
+            @click="store.setBayPlan(p)"
+          >
+            {{ t(`bayViewer.plan.${p}` as MessageKey) }}
+          </button>
+        </div>
         <p
           class="mode-note"
           data-testid="tt-bay-colour-mode"
@@ -469,6 +492,37 @@ h2 {
 .btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--tt-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.seg-btn {
+  padding: 0.25rem 0.6rem;
+  border: 0;
+  border-right: 1px solid var(--tt-border);
+  background: var(--tt-surface);
+  color: var(--tt-text-muted);
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.seg-btn:last-child {
+  border-right: 0;
+}
+
+.seg-btn:hover {
+  background: var(--tt-surface-hover);
+  color: var(--tt-text);
+}
+
+.seg-btn.active {
+  background: var(--tt-accent);
+  color: var(--tt-on-accent);
 }
 
 .mode-note {
