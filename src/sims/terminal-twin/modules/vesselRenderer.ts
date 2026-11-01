@@ -111,7 +111,7 @@ export class VesselHulls {
         robBoxes: 0,
         rob: null,
       }
-      const rob = buildRobMesh(this.model.vesselSpec(v.id), model.robBoxes.filter((b) => b.vesselId === v.id))
+      const rob = buildRobMesh(this.model.vesselSpec(v.id), model.robBoxesOf(v.id))
       if (rob) {
         entry.root.add(rob.mesh)
         entry.robBoxes = rob.count
