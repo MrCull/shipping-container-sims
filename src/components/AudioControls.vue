@@ -41,7 +41,10 @@ function onDocumentPointerDown(event: Event): void {
 }
 
 function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') close()
+  if (event.key !== 'Escape') return
+  // Esc closes this open popover and nothing else: stop it reaching a sim's own Esc handling (Terminal Twin, #169).
+  event.stopPropagation()
+  close()
 }
 
 function close(): void {

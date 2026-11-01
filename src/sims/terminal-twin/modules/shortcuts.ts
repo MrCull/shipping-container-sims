@@ -12,7 +12,6 @@ export type ShortcutAction =
   | { kind: 'step' }
   | { kind: 'follow' }
   | { kind: 'followNextTruck' }
-  | { kind: 'escape' }
   | { kind: 'dashboard' }
   | { kind: 'overlays' }
   | { kind: 'feed' }
@@ -77,7 +76,6 @@ export function shortcutFor(e: KeyLike): ShortcutAction | null {
   if (key === ' ' || key === 'Spacebar') return { kind: 'togglePause' }
   if (key === '0') return { kind: 'pause' }
   if (key === '.') return { kind: 'step' }
-  if (key === 'Escape' || key === 'Esc') return { kind: 'escape' }
   if (key === '?') return { kind: 'help' }
   switch (key.toLowerCase()) {
     case 'f':

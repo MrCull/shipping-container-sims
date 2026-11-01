@@ -25,12 +25,13 @@ const status = computed<'running' | 'failed' | 'complete' | 'paused' | 'live'>((
   return store.paused ? 'paused' : 'live'
 })
 
-const runToOpen = ref(false)
+/** The popup's open state is in the store (#169: the shared Esc handling closes it). */
+const runToOpen = computed(() => store.runToOpen)
 const runToValue = ref('')
 const runToError = ref<string | null>(null)
 
 function openRunTo(): void {
-  runToOpen.value = !runToOpen.value
+  store.setRunToOpen(!runToOpen.value)
   runToError.value = null
   if (runToOpen.value) {
     runToValue.value = toLocalInputValue(simDate(store.choice.startDateTime, store.displayTime + 600), true)
@@ -38,7 +39,7 @@ function openRunTo(): void {
 }
 
 async function submitRunToDeparture(): Promise<void> {
-  runToOpen.value = false
+  store.setRunToOpen(false)
   await store.runToNextDeparture().catch(() => {})
 }
 
@@ -53,7 +54,7 @@ async function submitRunTo(): Promise<void> {
     runToError.value = t('topbar.runToPast')
     return
   }
-  runToOpen.value = false
+  store.setRunToOpen(false)
   await store.runTo(simT).catch(() => {})
 }
 </script>
@@ -118,7 +119,10 @@ async function submitRunTo(): Promise<void> {
         >
           {{ t('debug.step') }}
         </button>
-        <div class="run-to">
+        <div
+          class="run-to"
+          data-tt-popup
+        >
           <button
             class="action-btn"
             :disabled="store.busy || ended"
@@ -159,7 +163,7 @@ async function submitRunTo(): Promise<void> {
               <button
                 type="button"
                 class="action-btn"
-                @click="runToOpen = false"
+                @click="store.setRunToOpen(false)"
               >
                 {{ t('setup.cancel') }}
               </button>

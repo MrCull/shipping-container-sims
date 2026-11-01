@@ -246,6 +246,8 @@ export interface TwinUiState {
   reportOpen: boolean
   feedOpen: boolean
   inspectorOpen: boolean
+  colourByOpen: boolean
+  runToOpen: boolean
 }
 
 /**
@@ -441,6 +443,8 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       reportOpen: store.reportOpen,
       feedOpen: store.feedOpen,
       inspectorOpen: store.inspectorOpen,
+      colourByOpen: store.colourByOpen,
+      runToOpen: store.runToOpen,
     }),
     exportRun: (kind) => store.exportRun(kind),
     report: () => ({

@@ -304,6 +304,19 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     saveColourBySettings(browserStorage(), { mode: colourBy.value, robDisplay: display })
   }
 
+  /** The Colour by popup is open (#169: the shared Esc closes it, so its state lives here). */
+  const colourByOpen = ref(false)
+  /** The Run to popup is open (#169: the shared Esc closes it, so its state lives here). */
+  const runToOpen = ref(false)
+
+  function setColourByOpen(open: boolean): void {
+    colourByOpen.value = open
+  }
+
+  function setRunToOpen(open: boolean): void {
+    runToOpen.value = open
+  }
+
   /** Sound effects (TT-21): one master gain, the shared volume and mute (`stores/audio.ts`), scales all playback. */
   const audio = useAudioStore()
   const sounds = markRaw(new SoundPlayer(() => audio.masterGain))
@@ -1062,6 +1075,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     toast.value = null
     config.value = null
     savesOpen.value = false
+    colourByOpen.value = false
+    runToOpen.value = false
     breakpoints.value = []
     breakHit.value = null
     inspectedEvent.value = null
@@ -1102,6 +1117,10 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     robDisplay,
     setColourBy,
     setRobDisplay,
+    colourByOpen,
+    setColourByOpen,
+    runToOpen,
+    setRunToOpen,
     bayViewData,
     openBayViewer,
     closeBayViewer,

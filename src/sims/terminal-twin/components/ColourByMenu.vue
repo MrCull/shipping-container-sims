@@ -13,7 +13,8 @@ import { COLOUR_BY_MODES, colourContextOf, legendOf, type ColourBy } from '../mo
 import { colourKeyLabel } from '../modules/colourLabels'
 
 const store = useTwinStore()
-const open = ref(false)
+/** The open state lives in the store: the shared Esc handling (#169) closes the panel from anywhere. */
+const open = computed(() => store.colourByOpen)
 const root = ref<HTMLElement | null>(null)
 
 const legend = computed(() => {
@@ -23,12 +24,12 @@ const legend = computed(() => {
 
 function onSelect(e: Event): void {
   store.setColourBy((e.target as HTMLSelectElement).value as ColourBy)
-  open.value = false
+  store.setColourByOpen(false)
 }
 
 /** A pointer-down anywhere outside the menu (its button and panel) closes the panel. Capture, so a canvas stopping the event still closes it. */
 function onPointerDown(e: PointerEvent): void {
-  if (open.value && root.value && !root.value.contains(e.target as Node)) open.value = false
+  if (open.value && root.value && !root.value.contains(e.target as Node)) store.setColourByOpen(false)
 }
 
 onMounted(() => document.addEventListener('pointerdown', onPointerDown, true))
@@ -39,7 +40,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onPointerDown,
   <div
     ref="root"
     class="colour-by"
-    @keydown.esc.stop="open = false"
+    data-tt-popup
   >
     <button
       type="button"
@@ -49,7 +50,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onPointerDown,
       aria-haspopup="true"
       data-testid="tt-colour-by"
       :title="t('colourBy.hint')"
-      @click="open = !open"
+      @click="store.setColourByOpen(!open)"
     >
       <TtIcon name="layers" />
       {{ t('colourBy.label') }}
