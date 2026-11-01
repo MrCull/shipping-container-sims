@@ -1,16 +1,21 @@
-import { onUnmounted, watch } from 'vue'
+import { onUnmounted, watch, type WatchStopHandle } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useContainerStackStore } from '../store/gameStore'
-import { useAudioStore } from '@/stores/audio'
+import { followMasterGain, useAudioStore } from '@/stores/audio'
 import gameMusicUrl from '../assets/audio/background-gaming-track-upbeat-techno-fun.mp3'
 
 let sharedAudio: HTMLAudioElement | null = null
+let stopFollow: WatchStopHandle | null = null
+
+/** The music's own gain at full master volume; the element plays at this times the shared master gain. */
+const GAME_MUSIC_VOLUME = 0.3
 
 function getAudio(): HTMLAudioElement {
   if (!sharedAudio) {
     sharedAudio = new Audio(gameMusicUrl)
     sharedAudio.loop = true
-    sharedAudio.volume = 0.3
+    // The slider changes the level of music that is already playing.
+    stopFollow = followMasterGain(sharedAudio, GAME_MUSIC_VOLUME)
   }
   return sharedAudio
 }
@@ -67,5 +72,7 @@ export function useGameMusic(): void {
   onUnmounted(() => {
     sharedAudio?.pause()
     sharedAudio = null
+    stopFollow?.()
+    stopFollow = null
   })
 }

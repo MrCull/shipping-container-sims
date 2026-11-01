@@ -24,3 +24,4 @@ skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => ter
 (^|/)(colour|Colour)[A-Za-z-]*\.(ts|vue)$|(^|/)(containerInstancer|robBoxes|sceneRenderer)\.ts$ => colour-by bay-viewer container-closeup rob-bays
 (^|/)(vesselStatus|vesselCountdownLabels|InspectorPanel)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-vessel-status bay-viewer
 (^|/)(HomePage\.vue|buildStamp\.ts|vite\.config\.ts)$ => build-stamp
+(^|/)(useMenuMusic|AudioControls|audio|HomePage)(\.test)?\.(ts|vue)$ => menu-music-volume
