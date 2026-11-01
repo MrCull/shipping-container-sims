@@ -1,6 +1,20 @@
-# Handover: spec #134 (Terminal Twin polish, round 2)
+# Handover: spec #134 (Terminal Twin polish, round 2) and spec #154 (round 3)
 
-**Status: #135 to #143, #146 to #149 merged in the integration branch `claude/stoic-hypatia-tk68z1` (PR #152). Waiting on the owner: #144 prototype review (comment posted on #144), then #145, then #150.**
+**Status: every #134 ticket except #150 is merged in the integration branch `claude/stoic-hypatia-tk68z1` (PR #152); #144 approved by the owner (variant B), #145 built and merged. Round 3, spec #154 (tickets #155 to #165), runs on the same branch before #150; #150 is blocked by all of them and is also #154's final ticket.**
+
+## Round 3: spec #154
+
+Owner grilled on 2026-11-01 and asked for the recommended answer on every question, then went away: proceed without waiting for approval. Same run rules as round 2 (no verify, unit suite or smoke per ticket; all in #150).
+
+Order (at most two implementers at a time):
+- Start now, independent: #155 master volume, #156 plain names and baseline default, #157 speed reset, #158 face markings, #159 bay view and 3D ROB match, #160 SHC parking (engine 0.30.0).
+- #161 wide tabbed setup dialog after #156. #162 bay view Load/Discharge switch after #159.
+- Engine chain, strictly in sequence: #160 (0.30.0), #163 yard line mix (0.31.0), #164 level arrival stows (0.32.0, also after #159), then #165 realistic volumes.
+- Then #150.
+
+| Ticket | State |
+|---|---|
+| #155 to #165 | not started |
 
 ## Where things are
 
@@ -76,8 +90,8 @@ No unit tests, `pnpm run verify` or browser smoke specs per ticket: the single f
 | #147 scenery, North Quay | merged, scenery only, no frame stats |
 | #148 arrival stows | merged, 0.28.0, goldens stale on purpose |
 | #149 yard mix | merged, 0.29.0, goldens stale, KPI before/after in commit message |
-| #144 start screen prototype | prototype on branch `tt/144-start-screen-prototype` (not merged, throwaway); owner review requested in a comment on #144 |
-| #145 start screen build | blocked by #144 approval |
+| #144 start screen prototype | owner approved variant B (decision comment on #144); prototype branch not merged, worktree still to remove |
+| #145 start screen build | merged, lint, build, picker and catalogue tests only; smoke specs never run |
 | #150 smoke suite | last |
 
 ## To do at the end (in #150 or just before)
