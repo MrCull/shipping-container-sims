@@ -22,7 +22,7 @@ import { EXPORT_FILES, ScenarioValidationError, validateScenario, type Container
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { createLocationNotation } from '../modules/locationNotation'
-import { defaultBay, type BayViewData } from '../modules/bayView'
+import { defaultBay, type BayPlan, type BayViewData } from '../modules/bayView'
 import { bayViewDataAt } from '../modules/bayViewScene'
 import { loadColourBySettings, saveColourBySettings, type ColourBy } from '../modules/colourBySettings'
 import { describeEntity, entityKind, entityQueryKind, transitWorldOf, type EntityExtras, type EntityView } from '../modules/entityInspector'
@@ -246,6 +246,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const bayViewerVesselId = ref<string | null>(null)
   const bayViewerBay = ref(0)
   const bayViewData = shallowRef<BayViewData | null>(null)
+  /** Load plan | Discharge plan (#162): Load on every run start, kept while clicking between vessels in a run. */
+  const bayPlan = ref<BayPlan>('load')
   let bayViewBusy = false
 
   /** Re-read the shown vessel from the engine, at the 3D display time (the viewer calls this at a low rate while open). */
@@ -271,7 +273,11 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayViewerVesselId.value = vesselId
     if (!same) bayViewData.value = null
     await refreshBayView()
-    if (!same && bayViewData.value) bayViewerBay.value = defaultBay(bayViewData.value)
+    if (!same && bayViewData.value) bayViewerBay.value = defaultBay(bayViewData.value, bayPlan.value)
+  }
+
+  function setBayPlan(plan: BayPlan): void {
+    bayPlan.value = plan
   }
 
   function closeBayViewer(): void {
@@ -532,6 +538,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       selectedId.value = null
       entityView.value = null
       closeBayViewer()
+      bayPlan.value = 'load'
       inspectedEvent.value = null
       following.value = false
       hasScenario.value = true
@@ -557,6 +564,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   async function reset(): Promise<void> {
     await run(() => ctl().reset())
+    bayPlan.value = 'load'
     cues.reset()
     sounds.reset()
     banner.value = null
@@ -1088,6 +1096,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     refreshEntity,
     bayViewerVesselId,
     bayViewerBay,
+    bayPlan,
+    setBayPlan,
     colourBy,
     hideRob,
     setColourBy,
