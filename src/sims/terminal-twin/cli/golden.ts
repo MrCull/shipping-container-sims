@@ -90,10 +90,13 @@ export const GOLDEN_USAGE = `Usage: pnpm run tt:golden [--update] [--fixture <na
   --dir <folder>    Golden folder (default: scenario/fixtures/)`
 
 export function runGoldenCli(argv: string[], print: (line: string) => void = console.log): number {
+  // pnpm hands a `--` through literally (`pnpm run tt:golden -- --update`); it is not a flag.
+  let args = argv
+  while (args[0] === '--') args = args.slice(1)
   let values
   try {
     ;({ values } = parseArgs({
-      args: argv,
+      args,
       options: {
         update: { type: 'boolean', default: false },
         fixture: { type: 'string' },
