@@ -29,13 +29,14 @@ import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
 import { FEED_BUFFER_CAP } from '../modules/eventFeed'
 import type { Bucketing, KpiGroupId } from '../modules/dashboardModel'
-import { makeConfigSave, makeSnapshotSave, parseSaveFile, planLoad, saveFileName, SaveFormatError, type SaveFile, type SaveMeta, type SaveType } from '../persistence/saves'
+import { defaultSaveName as plainSaveName, exportFileName, makeConfigSave, makeSnapshotSave, parseSaveFile, planLoad, saveFileName, SaveFormatError, type SaveFile, type SaveMeta, type SaveType } from '../persistence/saves'
 import { openSaveStore, StorageUnavailableError, type SaveStore } from '../persistence/saveStore'
 import { TwinController } from '../modules/twinController'
 import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/display'
 import { createFormatter } from '../i18n/format'
 import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
+import { DEFAULT_SCENARIO_NAME } from '../modules/scenarioPicker'
 import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import { CuePlanner } from '../modules/cues'
@@ -171,9 +172,10 @@ export interface InspectedEvent {
 
 export const useTwinStore = defineStore('terminal-twin', () => {
   const phase = ref<TwinPhase>('setup')
+  // #156: a fresh load selects the TTI baseline preset with its own seed (the picker opens on Scenarios)
   const choice = ref<ScenarioChoice>({
-    name: Object.keys(fixtures)[0] ?? '',
-    seed: fixtures[Object.keys(fixtures)[0]]?.seed ?? 1,
+    name: DEFAULT_SCENARIO_NAME,
+    seed: resolveScenario(DEFAULT_SCENARIO_NAME).seed,
     startDateTime: defaultStartDate().toISOString(),
   })
   /** Whether a scenario has been loaded (so the setup dialog can be cancelled). */
@@ -481,7 +483,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       const blob = new Blob([text], { type: file.mime })
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `${choice.value.name}-seed${choice.value.seed}-${file.suffix}`
+      a.download = exportFileName(choice.value.name, choice.value.seed, file.suffix)
       a.click()
       setTimeout(() => URL.revokeObjectURL(a.href), 1000)
     } catch (err) {
@@ -752,8 +754,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   function defaultSaveName(type: SaveType): string {
-    const base = `${choice.value.name} / seed ${choice.value.seed}`
-    return type === 'snapshot' ? `${base} / ${fmt.value.clock(choice.value.startDateTime, displayTime.value).elapsed}` : base
+    const { name, seed, startDateTime } = choice.value
+    return plainSaveName(name, seed, type === 'snapshot' ? fmt.value.clock(startDateTime, displayTime.value).elapsed : undefined)
   }
 
   /** The save document of the current run: its config, or the engine's full snapshot. */

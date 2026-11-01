@@ -29,7 +29,19 @@ test('the dialog offers the three presets and marks the TTI bay count as an assu
   await expect(dialog.getByTestId('tt-yard-start-prefilled')).toBeChecked()
 })
 
-test('two tabs with counts from the data; the detail pane shows chips, sketch and the technical name', async ({ page }) => {
+test('a fresh load opens on Scenarios with the TTI baseline selected, by its plain name only', async ({ page }) => {
+  const dialog = await openDialog(page)
+  await expect(dialog.getByTestId('tt-tab-scenarios')).toHaveAttribute('aria-selected', 'true')
+  await expect(dialog.locator('[data-testid="tt-preset-card"][data-scenario="TTI Algeciras baseline"]')).toHaveAttribute('aria-checked', 'true')
+  const detail = dialog.getByTestId('tt-scenario-detail')
+  await expect(detail).toHaveAttribute('data-scenario', 'TTI Algeciras baseline')
+  await expect(detail.getByTestId('tt-detail-name')).toHaveText('Algeciras: a normal day')
+  // #156: no technical id as visible text anywhere in the dialog
+  await expect(dialog).not.toContainText('TTI Algeciras baseline')
+  await expect(detail.getByTestId('tt-detail-id')).toHaveCount(0)
+})
+
+test('two tabs with counts from the data; the detail pane shows chips and sketch, never the technical name', async ({ page }) => {
   const dialog = await openDialog(page)
   await dialog.getByTestId('tt-tab-scenarios').click()
   const cards = dialog.getByTestId('tt-preset-card')
@@ -43,7 +55,8 @@ test('two tabs with counts from the data; the detail pane shows chips, sketch an
   await expect(detail.getByTestId('tt-chip-sts')).toHaveText('8 STS')
   await expect(detail.getByTestId('tt-chip-fill')).toHaveText('yard 75% full')
   await expect(detail.locator('svg.sketch')).toBeVisible()
-  await expect(detail.getByTestId('tt-detail-id')).toHaveText('TTI Algeciras, peak day')
+  await expect(detail).toHaveAttribute('data-scenario', 'TTI Algeciras, peak day')
+  await expect(detail).not.toContainText('TTI Algeciras, peak day')
   await expect(detail.getByTestId('tt-detail-watch')).not.toBeEmpty()
   await dialog.getByTestId('tt-tab-benches').click()
   const rows = dialog.getByTestId('tt-fixture-row')
@@ -52,7 +65,9 @@ test('two tabs with counts from the data; the detail pane shows chips, sketch an
   await expect(dialog.getByTestId('tt-count-benches')).toHaveText(String(count))
   await expect(dialog.locator('[data-group]')).toHaveCount(5)
   await rows.first().click()
-  await expect(detail.getByTestId('tt-detail-id')).not.toHaveText('TTI Algeciras, peak day')
+  const benchId = await rows.first().getAttribute('data-scenario')
+  await expect(detail).toHaveAttribute('data-scenario', benchId!)
+  await expect(dialog).not.toContainText(benchId!)
 })
 
 test('a card is focusable and Enter selects it; the detail panel Start runs it', async ({ page }) => {

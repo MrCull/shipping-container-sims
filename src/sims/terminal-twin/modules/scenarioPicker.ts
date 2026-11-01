@@ -6,7 +6,7 @@
 import { t, type MessageKey } from '../i18n/messages'
 import { FIXTURE_GROUPS, fixtureCopy, type FixtureGroupId } from '../scenario/fixtures/definitions'
 import { planOf } from './planModel'
-import { SMALL_PRESET_NAME } from '../scenario/presets'
+import { SMALL_PRESET_NAME, TTI_PRESET_NAME } from '../scenario/presets'
 import { terminalPresetInfo } from '../terminals'
 import type { ScenarioConfig } from '../scenario/types'
 
@@ -84,6 +84,24 @@ export function presetCopy(name: string): { name: MessageKey; tagline: MessageKe
 }
 
 export type PickerSection = 'scenarios' | 'benches'
+
+/** What a fresh start screen selects (#156): the TTI Algeciras baseline preset, on the Scenarios tab. */
+export const DEFAULT_SCENARIO_NAME = TTI_PRESET_NAME
+
+/**
+ * The plain name of a preset or fixture (#156), the only name the UI shows. Technical ids stay in `data-*`
+ * attributes, the dev API, the fixtures and the logs. A name that is neither (a hand-made config) is shown as it is.
+ */
+export function scenarioDisplayName(id: string): string {
+  const preset = presetCopy(id)
+  if (preset) return t(preset.name)
+  return fixtureCopy[id]?.name ?? id
+}
+
+/** The tab that lists a scenario: Scenarios for a preset, Test benches otherwise. */
+export function pickerSectionOf(model: PickerModel, id: string): PickerSection {
+  return model.scenarios.some((i) => i.id === id) ? 'scenarios' : 'benches'
+}
 
 /** One row of the start screen list and the text of its detail pane. `id` is the technical name (what `d.name` holds). */
 export interface PickerItem {

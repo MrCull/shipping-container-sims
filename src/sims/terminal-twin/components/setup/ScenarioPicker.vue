@@ -2,22 +2,19 @@
 import { computed, ref } from 'vue'
 import { t } from '../../i18n/messages'
 import { useSetupDraft } from '../../composables/useSetupDraft'
-import { pickerModel, type PickerItem, type PickerSection } from '../../modules/scenarioPicker'
+import { pickerModel, pickerSectionOf, type PickerItem, type PickerSection } from '../../modules/scenarioPicker'
 
 /**
  * Start screen picker (#145): a Scenarios tab (the presets) and a Test benches tab (the engine fixtures under five
  * headings), each a list of plain names. Choosing a row sets `d.name`; the detail pane (the default slot, shown
- * beside the list and below it on a phone) describes it and holds the one Start button. Technical ids are not shown
- * here, only in the detail pane.
+ * beside the list and below it on a phone) describes it and holds the one Start button. Technical ids are never shown
+ * (#156); rows carry them in `data-scenario`.
  */
 const d = useSetupDraft()
 
 const model = computed(() => pickerModel(d.catalogue))
 
-const sectionOf = (name: string): PickerSection =>
-  model.value.scenarios.some((i) => i.id === name) ? 'scenarios' : 'benches'
-
-const tab = ref<PickerSection>(sectionOf(d.name))
+const tab = ref<PickerSection>(pickerSectionOf(model.value, d.name))
 /** The last choice in each tab, so switching back returns to it. */
 const remembered: Partial<Record<PickerSection, string>> = { [tab.value]: d.name }
 

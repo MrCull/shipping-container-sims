@@ -88,7 +88,6 @@ const en = {
   'setup.detail.size': 'Size of the run',
   'setup.detail.sizeValue': '{vessels} vessels, about {duration} of simulated time',
   'setup.detail.sizeValueOne': '1 vessel, about {duration} of simulated time',
-  'setup.detail.technicalId': 'Technical name',
   'setup.detail.layout': 'Layout',
   'setup.detail.facts': 'Set-up facts',
   'setup.detail.title': 'Selected scenario',
