@@ -176,7 +176,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Truck livery:** a tile of the truck atlas: cab colour, maker wordmark (Volvo, Scania, DAF, MAN, Mercedes-Benz) and chassis colour. The truck's id picks its cab shape and livery.
 - **Follow next truck:** the camera action that selects the next truck to arrive at or after the display time and follows it through the gate and its transfer stall until it leaves (button, `N`, `__tt.followNextTruck()`). Waits while no arrival is known yet.
 - **Asset viewer:** the dev-only page `/sim/terminal-twin?viewer=<asset>` (or `?viewer=yard`), with its API `window.__ttAssets`.
-- **Hull asset:** the generated GLB of a vessel size class (`vessel-ulcv`, …), with nodes `hull`, `hatch_covers`, `lashing_bridges` and `bay_grid`. Its **bay grid** (in the sidecar) is the origin and pitches that put a deck or hold slot exactly where the engine's bay plan does.
+- **Hull asset:** the generated GLB of a vessel size class (`vessel-ulcv`, …), with nodes `hull`, `hatch_covers`, `lashing_bridges` and `bay_grid`. Its **bay grid** (in the sidecar) is the origin and pitches that put a deck or hold slot exactly where the engine's bay plan does. The GLB's baked covers are cut from the drawn hull over its **open bays** (`openHatchBays`): with hatch covers off, every bay at every LOD (#173), so no cover stands over a hold; with them on, the bays with panels.
 - **Vessel livery:** the hull colour, funnel mark and hull-side wordmark of a shipping line, from the **vessel livery atlas** (one tile per line, like the container atlas). The line comes from `VesselConfig.line` or from the vessel name's style ("HMM Tarifa").
 
 ## Dashboard (TT-16)

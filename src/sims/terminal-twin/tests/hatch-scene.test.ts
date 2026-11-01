@@ -3,15 +3,21 @@
  * (as the browser does), feeds every delta to a SceneModel, and checks the panel poses against the engine's panel state at
  * each hatch event: on the hatch, hanging from the crane, stacked in the laydown, back on the hatch.
  */
-import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { NodeIO, type Node as GltfNode } from '@gltf-transform/core'
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
+import { MeshoptDecoder } from 'meshoptimizer'
+import { beforeAll, describe, expect, it } from 'vitest'
 import type { HatchPanelState } from '../engine'
+import { MODELS_DIR } from '../cli/assets/budgetCheck'
 import { entityBounds, pickEntity } from '../modules/picking'
 import { SceneModel } from '../modules/sceneModel'
-import { hullWithOpenHatches, hullHatchOpenings } from '../modules/hullHatchOpening'
-import type { HullMeta } from '../modules/vesselHull'
+import { HULL_COAMING_M, hullWithOpenHatches, hullHatchOpenings, openHatchBays, type HullHatchOpening, type HullMeshData } from '../modules/hullHatchOpening'
+import { HULL_ASSET_FILES, type HullMeta } from '../modules/vesselHull'
 import { fixtures } from '../scenario/fixtures'
-import { HATCH_THICKNESS_M } from '../scenario/vesselClasses'
-import type { ScenarioConfig } from '../scenario/types'
+import { HATCH_THICKNESS_M, VESSEL_CLASSES, VESSEL_SIZE_CLASSES } from '../scenario/vesselClasses'
+import type { ScenarioConfig, VesselSizeClass } from '../scenario/types'
 import { createEngineHost } from '../worker/engineHost'
 import type { Delta, EventSummary, WorkerRequest } from '../worker/protocol'
 
@@ -143,7 +149,7 @@ describe('hull with open hatches', () => {
   /** Two triangles of a flat quad at y spanning [x0, x1] x [z0, z1], positions only. */
   const quad = (x0: number, x1: number, y: number, z0: number, z1: number) => [x0, y, z0, x1, y, z0, x1, y, z1, x0, y, z0, x1, y, z1, x0, y, z1]
   const mesh = (positions: number[]) => ({ index: null, attributes: { position: { array: positions, itemSize: 3 } } })
-  const open = (positions: number[], lod: 0 | 1, bays: number[]) => hullWithOpenHatches(meta, lod, mesh(positions), new Set(bays)).position
+  const open = (positions: number[], lod: 0 | 1 | 2, bays: number[]) => hullWithOpenHatches(meta, lod, mesh(positions), new Set(bays)).position
   const area = (p: Float32Array) => {
     let a = 0
     for (let t = 0; t < p.length; t += 9) a += Math.abs((p[t + 3] - p[t]) * (p[t + 8] - p[t + 2]) - (p[t + 6] - p[t]) * (p[t + 5] - p[t + 2])) / 2
@@ -189,5 +195,114 @@ describe('hull with open hatches', () => {
     const index = Array.from({ length: all.length / 3 }, (_, i) => i)
     const p = hullWithOpenHatches(meta, 1, { index, attributes: { position: { array: all, itemSize: 3 } } }, new Set([0])).position
     expect(p).toHaveLength(0)
+  })
+
+  it('cuts every bay of the class with hatch covers off, and only the bays with panels with them on', () => {
+    expect([...openHatchBays(false, 3, new Set([1]))]).toEqual([0, 1, 2])
+    expect([...openHatchBays(true, 3, new Set([1]))]).toEqual([1])
+    expect(openHatchBays(true, 3, new Set()).size).toBe(0)
+  })
+
+  it('LOD2: the one box over all bays loses its top over each open bay and keeps the rest of it', () => {
+    // three bays, x 10 .. 52: the LOD2 cover spans the hatch span (gap / 2 inside each end), top at the deck-stack base
+    const top = quad(10.7, 51.3, 12, -5.25, 5.25)
+    const openings = hullHatchOpenings(meta, [0, 1, 2])
+    const openArea = (o: HullHatchOpening) => (o.x1 - o.x0) * (o.zQuay - o.zSea)
+    const span = (51.3 - 10.7) * 10.5
+    expect(area(open(top, 2, []))).toBeCloseTo(span, 3)
+    expect(area(open(top, 2, [1]))).toBeCloseTo(span - openArea(openings[1]), 3)
+    expect(area(open(top, 2, [0, 1, 2]))).toBeCloseTo(span - openings.reduce((a, o) => a + openArea(o), 0), 3)
+    // no piece of the top is left over an open bay
+    const p = open(top, 2, [0, 1, 2])
+    expect(insideOpenings(p, openings, 0)).toEqual({ above: 0, deck: 0 })
+  })
+})
+
+/** Triangles of a flat-or-not position list whose centroid lies inside an opening's footprint: above the deck (a cover, a wall) or on the deck. */
+function insideOpenings(p: Float32Array, openings: HullHatchOpening[], deckY: number): { above: number; deck: number } {
+  const n = { above: 0, deck: 0 }
+  for (let t = 0; t + 8 < p.length; t += 9) {
+    const cx = (p[t] + p[t + 3] + p[t + 6]) / 3
+    const cy = (p[t + 1] + p[t + 4] + p[t + 7]) / 3
+    const cz = (p[t + 2] + p[t + 5] + p[t + 8]) / 3
+    for (const o of openings) {
+      // 5 cm inside the footprint: a coaming wall sits on its edge, and the GLB's positions are quantised to a few mm
+      if (!(cx > o.x0 + 0.05 && cx < o.x1 - 0.05 && cz > o.zSea + 0.05 && cz < o.zQuay - 0.05)) continue
+      if (cy > deckY + 0.03) n.above++
+      else if (cy > deckY - 0.03) n.deck++
+    }
+  }
+  return n
+}
+
+describe('hull geometry of the GLBs with hatch covers off', () => {
+  beforeAll(async () => {
+    await MeshoptDecoder.ready
+  })
+
+  /** The three LODs of a hull GLB as non-indexed asset-frame positions (node transforms and meshopt quantisation applied), with its sidecar. */
+  async function hullLods(sizeClass: VesselSizeClass): Promise<{ meta: HullMeta; lods: HullMeshData[] }> {
+    const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder })
+    const doc = await io.read(join(MODELS_DIR, 'vessels', `${HULL_ASSET_FILES[sizeClass]}.glb`))
+    const nodes = doc.getRoot().listNodes()
+    const parent = new Map<GltfNode, GltfNode>()
+    for (const n of nodes) for (const c of n.listChildren()) parent.set(c, n)
+    // scale and translation of a node in the asset frame (the hull GLB has no rotations)
+    const frame = (nd: GltfNode) => {
+      const chain: GltfNode[] = []
+      for (let c: GltfNode | undefined = nd; c; c = parent.get(c)) chain.unshift(c)
+      let s = [1, 1, 1]
+      let t = [0, 0, 0]
+      for (const c of chain) {
+        t = t.map((v, i) => v + s[i] * c.getTranslation()[i])
+        s = s.map((v, i) => v * c.getScale()[i])
+      }
+      return { s, t }
+    }
+    const lod = (name: string): HullMeshData => {
+      const root = nodes.find((n) => n.getName() === name)
+      if (!root) throw new Error(`hull ${sizeClass} has no node ${name}`)
+      const out: number[] = []
+      const walk = (nd: GltfNode) => {
+        const mesh = nd.getMesh()
+        if (mesh) {
+          const { s, t } = frame(nd)
+          for (const prim of mesh.listPrimitives()) {
+            const acc = prim.getAttribute('POSITION')
+            if (!acc) throw new Error(`hull ${sizeClass} ${name} has a primitive without positions`)
+            const pos = acc.getArray()!
+            const unit = acc.getNormalized() ? ({ 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 } as Record<number, number>)[acc.getComponentType()] : 1
+            const idx = prim.getIndices()?.getArray() ?? null
+            const count = idx ? idx.length : pos.length / 3
+            for (let k = 0; k < count; k++) {
+              const v = idx ? idx[k] : k
+              for (let c = 0; c < 3; c++) out.push((pos[v * 3 + c] / unit) * s[c] + t[c])
+            }
+          }
+        }
+        for (const c of nd.listChildren()) walk(c)
+      }
+      walk(root)
+      return { index: null, attributes: { position: { array: Float32Array.from(out), itemSize: 3 } } }
+    }
+    const meta = JSON.parse(readFileSync(join(MODELS_DIR, 'vessels', `${HULL_ASSET_FILES[sizeClass]}.meta.json`), 'utf8')) as HullMeta
+    return { meta, lods: [lod('LOD0'), lod('LOD1'), lod('LOD2')] }
+  }
+
+  it.each(VESSEL_SIZE_CLASSES)('%s: with every bay open no LOD keeps a cover over a bay, and the deck is cut open', async (sizeClass) => {
+    const { meta, lods } = await hullLods(sizeClass)
+    const bays = Array.from({ length: VESSEL_CLASSES[sizeClass].bays }, (_, i) => i)
+    const openings = hullHatchOpenings(meta, bays)
+    const deckY = meta.bayGrid.holdTopY - HULL_COAMING_M
+    for (const lod of [0, 1, 2] as const) {
+      const p = hullWithOpenHatches(meta, lod, lods[lod], new Set(bays)).position
+      expect(insideOpenings(p, openings, deckY), `${sizeClass} LOD${lod}`).toEqual({ above: 0, deck: 0 })
+      // hatch covers on with only bay 0 open: the other bays keep their covers (LOD2's top is two triangles over every bay,
+      // so its centroids say nothing about single bays; the unit test above checks that by area)
+      if (lod < 2) {
+        const kept = hullWithOpenHatches(meta, lod, lods[lod], new Set([0])).position
+        expect(insideOpenings(kept, openings.slice(1), deckY).above, `${sizeClass} LOD${lod} other bays`).toBeGreaterThan(0)
+      }
+    }
   })
 })
