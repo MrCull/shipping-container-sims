@@ -123,6 +123,7 @@ interface StatusEntry {
   t: number
   status: string
   berthX?: number | null
+  firstMoveS?: number | null
 }
 
 /** Where a vessel is drawn: its stern X and the Z offset of its quay-side (0 = alongside). */
@@ -492,7 +493,7 @@ export class SceneModel {
       list.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
     }
     for (const e of delta.entities) {
-      this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX })
+      this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX, firstMoveS: e.firstMoveS })
       if (e.kind === 'truck') this.truckArrival[e.id] ??= e.t
       if (e.kind === 'truck' && e.loadSize) this.truckLoad[e.id] = e.loadSize
     }
@@ -808,14 +809,22 @@ export class SceneModel {
   }
 
   /** A vessel's status at `time` and when it entered mooring, berthed and departed (null before), from the status timeline (#126). */
-  vesselStatusTimes(id: string, time: number): { status: string; mooringS: number | null; berthedS: number | null; departedS: number | null } {
+  vesselStatusTimes(id: string, time: number): { status: string; mooringS: number | null; berthedS: number | null; departedS: number | null; firstMoveS: number | null } {
     const list = this.status[`vessel:${id}`] ?? []
     const upTo = lastAtOrBefore(list, time, (e) => e.t)
     const seen = (status: string): number | null => {
       for (let i = 0; i <= upTo; i++) if (list[i].status === status) return list[i].t
       return null
     }
-    return { status: upTo < 0 ? 'unknown' : list[upTo].status, mooringS: seen('mooring'), berthedS: seen('berthed'), departedS: seen('departed') }
+    return { status: upTo < 0 ? 'unknown' : list[upTo].status, mooringS: seen('mooring'), berthedS: seen('berthed'), departedS: seen('departed'), firstMoveS: this.firstMoveSeen(list, upTo) }
+  }
+
+  private firstMoveSeen(list: StatusEntry[], upTo: number): number | null {
+    for (let i = 0; i <= upTo; i++) {
+      const m = list[i].firstMoveS
+      if (m !== null && m !== undefined) return m
+    }
+    return null
   }
 
   /** Where a vessel is at `time`: alongside at its berth, at anchorage offshore, or null (not arrived / departed). */

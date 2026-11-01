@@ -616,6 +616,7 @@ const en = {
   'vesselStatus.phase.approaching': 'Approaching',
   'vesselStatus.phase.waiting': 'Waiting for berth',
   'vesselStatus.phase.mooring': 'Mooring',
+  'vesselStatus.phase.berthed': 'Berthed, starting soon',
   'vesselStatus.phase.working': 'Working',
   'vesselStatus.phase.unmooring': 'Unmooring',
   'vesselStatus.phase.departed': 'Departed',

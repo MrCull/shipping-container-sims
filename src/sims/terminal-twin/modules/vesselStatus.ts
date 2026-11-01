@@ -10,7 +10,7 @@ import type { SimQuery, VesselStatus } from '../engine'
 import type { ScenarioConfig } from '../scenario/types'
 import type { SceneModel } from './sceneModel'
 
-export type VesselPhase = 'approaching' | 'waiting' | 'mooring' | 'working' | 'unmooring' | 'departed'
+export type VesselPhase = 'approaching' | 'waiting' | 'mooring' | 'berthed' | 'working' | 'unmooring' | 'departed'
 
 export interface VesselStatusInput {
   status: VesselStatus
@@ -21,6 +21,8 @@ export interface VesselStatusInput {
   /** When mooring ended and operations could start, once known. */
   berthedS: number | null
   departedS: number | null
+  /** The first move of any STS working this vessel, null until it happens (view field, #141). */
+  firstMoveS: number | null
   /** The mooring time (s): berth allocation plus this is the estimated operations start. */
   mooringS: number
   /** Boxes to move for this vessel and how many are done. */
@@ -52,7 +54,7 @@ export interface VesselStatusView {
   countdownS: number | null
   moves: MovesCount
   perSts: (MovesCount & { id: string })[]
-  /** Null once the vessel works (or has worked): no label. */
+  /** Null from the first move on (or once the vessel has worked): no label. A berthed vessel without a move yet keeps one. */
   label: VesselLabel | null
 }
 
@@ -71,8 +73,11 @@ const counts = (c: { total: number; done: number }): MovesCount => {
 }
 
 export function buildVesselStatus(input: VesselStatusInput, now: number): VesselStatusView {
-  const phase = PHASE[input.status]
-  const beforeWork = phase === 'approaching' || phase === 'waiting' || phase === 'mooring'
+  let phase = PHASE[input.status]
+  // berthed but no move yet: still explains itself (#141)
+  const idle = phase === 'working' && (input.firstMoveS === null || input.firstMoveS > now)
+  if (idle) phase = 'berthed'
+  const beforeWork = phase === 'approaching' || phase === 'waiting' || phase === 'mooring' || phase === 'berthed'
   let opsStartS: number | null = null
   let opsStartEstimated = false
   if (input.berthedS !== null) opsStartS = input.berthedS
@@ -80,7 +85,7 @@ export function buildVesselStatus(input: VesselStatusInput, now: number): Vessel
     opsStartS = input.berthAllocatedS + input.mooringS
     opsStartEstimated = true
   }
-  const countdownS = beforeWork && opsStartS !== null ? Math.max(0, opsStartS - now) : null
+  const countdownS = beforeWork && phase !== 'berthed' && opsStartS !== null ? Math.max(0, opsStartS - now) : null
   const etaCountdownS = phase === 'approaching' && input.etaS !== null ? Math.max(0, input.etaS - now) : null
   return {
     phase,
@@ -97,7 +102,7 @@ export function buildVesselStatus(input: VesselStatusInput, now: number): Vessel
 
 /** The engine's view of one vessel: its times, and the boxes of its work packages (done = complete packages + progress of the one being worked). */
 export function collectVesselStatusInput(
-  q: Pick<SimQuery, 'vessel' | 'workPackages' | 'sts'>,
+  q: Pick<SimQuery, 'vessel' | 'workPackages' | 'sts' | 'vesselFirstMoveS'>,
   config: Pick<ScenarioConfig, 'vessels' | 'quay'>,
   vesselId: string,
 ): VesselStatusInput {
@@ -129,6 +134,7 @@ export function collectVesselStatusInput(
     berthAllocatedS: v.berthAllocatedAt,
     berthedS: v.berthedAt,
     departedS: v.departedAt,
+    firstMoveS: q.vesselFirstMoveS(vesselId),
     mooringS: config.quay.mooringS,
     moves: { total, done },
     perSts: list,
@@ -153,6 +159,7 @@ export function vesselStatusInputFromModel(model: SceneModel, id: string, t: num
     berthAllocatedS: times.mooringS,
     berthedS: times.berthedS,
     departedS: times.departedS,
+    firstMoveS: times.firstMoveS,
     mooringS: model.config.quay.mooringS,
     moves: { total: 0, done: 0 },
     perSts: [],
