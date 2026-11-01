@@ -5,8 +5,11 @@
 // All MP3s are pre-imported at build time so Vite bundles them correctly.
 // ---------------------------------------------------------------------------
 
-import { ref, onBeforeUnmount } from 'vue'
-import { useAudioStore } from '@/stores/audio'
+import { ref, onBeforeUnmount, type WatchStopHandle } from 'vue'
+import { followMasterGain, useAudioStore } from '@/stores/audio'
+
+/** The narrator's own gain at full master volume. */
+const NARRATOR_VOLUME = 0.94
 
 // Static imports, Vite resolves these at build time
 import n01_01 from '../assets/sounds/narrator/01_01_vx_narrator_intro_welcome_manager.mp3'
@@ -46,6 +49,7 @@ const NARRATOR_URLS: Record<string, string> = {
 export function useNarratorAudio() {
   const audioStore = useAudioStore()
   let currentAudio: HTMLAudioElement | null = null
+  let stopFollow: WatchStopHandle | null = null
 
   // Reactive progress for the optional progress bar (0–1)
   const progress = ref(0)
@@ -77,6 +81,8 @@ export function useNarratorAudio() {
   function stopCurrent(): void {
     stopProgress()
     endedCallback = null
+    stopFollow?.()
+    stopFollow = null
     if (currentAudio) {
       currentAudio.pause()
       currentAudio.currentTime = 0
@@ -116,7 +122,8 @@ export function useNarratorAudio() {
     }
 
     const audio = new Audio(url)
-    audio.volume = 0.94
+    // Follows the master volume while the clip plays.
+    stopFollow = followMasterGain(audio, NARRATOR_VOLUME)
     currentAudio = audio
     // Store callback even if muted, so user can manually skip via next button
     endedCallback = onEnded ?? null

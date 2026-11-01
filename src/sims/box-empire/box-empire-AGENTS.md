@@ -86,7 +86,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 |-----------|---------|
 | `composables/useThreeScene.ts` | Scene setup, renderer instantiation, per-frame `updateEntities()`, `spawnFloatingText()`, `triggerVesselShake()`, tutorial/narrator camera cue pans, animated gate barrier updates, container raycasting, WebGL failure detection (`webglFailed` ref) |
 | `composables/useGameLoop.ts` | RAF loop with fixed-step accumulator; delegates sim ticks to store and render to scene |
-| `composables/useAudio.ts` | Sound effect playback mapped via `SOUND_MAP` in config |
+| `composables/useAudio.ts` | Sound effect playback mapped via `SOUND_MAP` in config; each sound plays at its own gain times the shared master gain (`gainFor`), the background music and the narrator voice (`composables/useNarratorAudio.ts`) follow the volume slider live (`followMasterGain`) |
 | `composables/useInput.ts` | Mouse/pointer event handling for container selection |
 
 ## Simulation Flow (Tutorial)

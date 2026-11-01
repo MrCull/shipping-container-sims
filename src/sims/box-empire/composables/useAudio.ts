@@ -2,8 +2,8 @@
 // Box Empire, Sound effect management
 // ---------------------------------------------------------------------------
 
-import { onBeforeUnmount, watch } from 'vue'
-import { useAudioStore } from '@/stores/audio'
+import { onBeforeUnmount, watch, type WatchStopHandle } from 'vue'
+import { followMasterGain, useAudioStore } from '@/stores/audio'
 import type { GameEventType } from '../types'
 import { SOUND_MAP } from '../modules/config'
 
@@ -29,8 +29,11 @@ const FILE_TO_URL: Record<string, string> = {
   'level-up.mp3': levelUpUrl,
 }
 
+// Per-sound gains at full master volume; each element plays at this times the shared master gain.
 // SFX baseline is 0.4; background music is 50% of that, then reduced a further 40%
+const SFX_VOLUME = 0.4
 const BG_VOLUME = 0.12
+const SEAGULL_VOLUME = 0.3
 
 // Seagull ambient: play roughly every 55 s, jittered ±20 s
 const SEAGULL_BASE_MS  = 55_000
@@ -40,17 +43,18 @@ export function useAudio() {
   const audioStore = useAudioStore()
   const audioPool: HTMLAudioElement[] = []
   let bgAudio: HTMLAudioElement | null = null
+  let stopBgFollow: WatchStopHandle | null = null
   let seagullTimer: ReturnType<typeof setTimeout> | null = null
 
   function play(eventType: GameEventType): void {
-    if (audioStore.sfxMuted) return
+    if (audioStore.masterGain === 0) return
     const fileName = SOUND_MAP[eventType]
     if (!fileName) return
     const url = FILE_TO_URL[fileName]
     if (!url) return
 
     const audio = new Audio(url)
-    audio.volume = 0.4
+    audio.volume = audioStore.gainFor(SFX_VOLUME)
     audio.play().catch(() => { /* user hasn't interacted yet */ })
     audioPool.push(audio)
 
@@ -65,7 +69,8 @@ export function useAudio() {
     if (audioStore.musicMuted) return
     bgAudio = new Audio(bgTrackUrl)
     bgAudio.loop = true
-    bgAudio.volume = BG_VOLUME
+    // The slider changes the level of music that is already playing.
+    stopBgFollow = followMasterGain(bgAudio, BG_VOLUME)
     bgAudio.play().catch(() => { /* autoplay blocked until user interaction */ })
   }
 
@@ -84,9 +89,9 @@ export function useAudio() {
   function scheduleNextSeagull(): void {
     const delay = SEAGULL_BASE_MS + (Math.random() * 2 - 1) * SEAGULL_JITTER_MS
     seagullTimer = setTimeout(() => {
-      if (!audioStore.sfxMuted) {
+      if (audioStore.masterGain > 0) {
         const a = new Audio(seagullUrl)
-        a.volume = 0.30
+        a.volume = audioStore.gainFor(SEAGULL_VOLUME)
         a.play().catch(() => {})
         audioPool.push(a)
         a.addEventListener('ended', () => {
@@ -115,6 +120,10 @@ export function useAudio() {
       bgAudio.pause()
       bgAudio.currentTime = 0
       bgAudio = null
+    }
+    if (stopBgFollow) {
+      stopBgFollow()
+      stopBgFollow = null
     }
     if (seagullTimer !== null) {
       clearTimeout(seagullTimer)

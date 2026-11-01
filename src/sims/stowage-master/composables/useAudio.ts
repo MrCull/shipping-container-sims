@@ -44,8 +44,9 @@ export function useAudio() {
     )
   }
 
+  /** `volume` is the sound's own gain at full master volume; it plays at that times the shared master gain. */
   function playSound(name: string, volume: number = 0.8): void {
-    if (audioStore.sfxMuted) return
+    if (audioStore.masterGain === 0) return
     const ctx = audioContext.value
     if (!ctx || !buffers.has(name)) return
     if (ctx.state === 'suspended') ctx.resume()
@@ -54,7 +55,7 @@ export function useAudio() {
     source.buffer = buffers.get(name)!
 
     const gainNode = ctx.createGain()
-    gainNode.gain.value = volume
+    gainNode.gain.value = audioStore.gainFor(volume)
 
     source.connect(gainNode)
     gainNode.connect(ctx.destination)
@@ -78,7 +79,7 @@ export function useAudio() {
   }
 
   function playPlacementSound(): void {
-    if (audioStore.sfxMuted) return
+    if (audioStore.masterGain === 0) return
     const ctx = audioContext.value
     if (!ctx) return
     if (ctx.state === 'suspended') ctx.resume()
@@ -90,7 +91,7 @@ export function useAudio() {
     oscillator.frequency.setValueAtTime(PLACEMENT_SOUND.startFreq, ctx.currentTime)
     oscillator.frequency.linearRampToValueAtTime(PLACEMENT_SOUND.endFreq, ctx.currentTime + PLACEMENT_SOUND.duration)
 
-    gainNode.gain.setValueAtTime(0.3, ctx.currentTime)
+    gainNode.gain.setValueAtTime(audioStore.gainFor(0.3), ctx.currentTime)
     gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + PLACEMENT_SOUND.duration)
 
     oscillator.connect(gainNode)
@@ -110,7 +111,7 @@ export function useAudio() {
   function scheduleNextSeagull() {
     const delay = SEAGULL_INTERVAL_BASE + (Math.random() * 2 - 1) * SEAGULL_INTERVAL_JITTER
     seagullTimer = setTimeout(() => {
-      if (!audioStore.sfxMuted) playSound('seagulls', 0.35)
+      if (audioStore.masterGain > 0) playSound('seagulls', 0.35)
       scheduleNextSeagull()
     }, delay)
   }

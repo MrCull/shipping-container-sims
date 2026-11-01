@@ -313,10 +313,10 @@ Initializes `WebGLRenderer` (ACES tone mapping, log depth), `PerspectiveCamera` 
 Wraps `requestAnimationFrame`. Caps `deltaTime` at 0.1 s. Provides `start(callback)` / `stop()`. Cleans up on unmount.
 
 ### `useAudio`
-Loads all MP3 assets asynchronously (graceful degradation if load fails). Key methods: `playSound(name, volume)`, `playPlacementSound()` (synthesised 220→110 Hz sweep), `playDisasterSequence(type)`. Ambient seagulls on ~60 s jitter. Respects `globalSettings.soundMuted`.
+Loads all MP3 assets asynchronously (graceful degradation if load fails). Key methods: `playSound(name, volume)`, `playPlacementSound()` (synthesised 220→110 Hz sweep), `playDisasterSequence(type)`. Ambient seagulls on ~60 s jitter. `volume` is the sound's own gain: it plays at that times the shared master gain (`useAudioStore().gainFor`), so it follows the volume slider and is silent when muted. The level briefing voice (`components/modals/LevelBriefing.vue`) does the same.
 
 ### `useGameMusic`
-Single shared `HTMLAudioElement` (persists across level reloads). Auto-plays; falls back to waiting for user gesture. Respects `globalSettings.musicMuted`.
+Single shared `HTMLAudioElement` (persists across level reloads). Auto-plays; falls back to waiting for user gesture. Pauses when muted; its level follows the master volume live (`followMasterGain`).
 
 ### `useSlotPicking`
 Raycast-based click/hover. Searches meshes with `userData.isSlotIndicator` or `userData.isImportContainer`. Attach/detach per phase to enable/disable input. Exposes `hoveredSlotId` for highlight feedback.
