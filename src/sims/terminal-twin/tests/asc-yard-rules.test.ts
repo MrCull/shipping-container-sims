@@ -392,7 +392,7 @@ describe('yard KPIs, modes, determinism', () => {
     for (const t of types(real)) if (t.startsWith('Asc')) expect(types(instant).has(t), t).toBe(true)
   })
 
-  it('a full block leaves the box on its pad and counts an allocation failure', () => {
+  it('a full block is skipped at allocation: the box stays on its pad and no allocation failure is counted', () => {
     const cfg = clone(fixture)
     cfg.yard!.blocks[0].bays = 1
     cfg.yard!.blocks[0].tiers = 1
@@ -400,7 +400,8 @@ describe('yard KPIs, modes, determinism', () => {
     const sim = createSimulation(cfg)
     expect(sim.runUntil().reason).toBe('ended')
     expect(sim.query.yardSlots()).toHaveLength(8)
-    expect(sim.kpiReport().yard!.allocationFailures).toBeGreaterThan(0)
+    // the block-room filter (#165) drops a full block before allocation, so nothing reaches the failure path
+    expect(sim.kpiReport().yard!.allocationFailures).toBe(0)
     expect(sim.invariantReport().violations).toEqual([])
   })
 

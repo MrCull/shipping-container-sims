@@ -7,7 +7,7 @@ import { t, type MessageKey } from '../i18n/messages'
 import { FIXTURE_GROUPS, fixtureCopy, type FixtureGroupId } from '../scenario/fixtures/definitions'
 import { planOf } from './planModel'
 import { SMALL_PRESET_NAME } from '../scenario/presets'
-import { DEFAULT_SCENARIO_NAME, terminalPresetInfo } from '../terminals'
+import { terminalPresetInfo } from '../terminals'
 import type { ScenarioConfig } from '../scenario/types'
 
 export interface ScenarioStats {
