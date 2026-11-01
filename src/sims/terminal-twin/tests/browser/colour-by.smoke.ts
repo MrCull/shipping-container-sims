@@ -159,17 +159,19 @@ test('colour by: Hide ROB removes the ROB boxes from the vessel in 3D and keeps 
   const robCells = page.locator('[data-testid=tt-bay-cell][data-status=rob]')
   const shown = await robCells.count()
   expect(shown).toBeGreaterThan(10)
+  expect(await robCells.first().evaluate((e) => getComputedStyle(e).backgroundImage)).toContain('repeating-linear-gradient')
 
   await openMenu(page)
   await page.getByTestId('tt-hide-rob').check()
   await expect.poll(async () => (await hull()).robBoxes).toBe(0)
   expect((await hull()).robHidden).toBe(true)
-  // the bay viewer keeps them
-  await expect(robCells).toHaveCount(shown)
-  expect(await robCells.first().evaluate((e) => getComputedStyle(e).backgroundImage)).toContain('repeating-linear-gradient')
+  // the bay viewer hides them too (#159), and still marks the ROB bay in its strip
+  await expect(robCells).toHaveCount(0)
+  await expect(page.locator('[data-testid^=tt-bay-strip-][data-state=rob]').first()).toBeVisible()
 
   await page.getByTestId('tt-hide-rob').uncheck()
   await expect.poll(async () => (await hull()).robBoxes).toBeGreaterThan(30)
+  await expect(robCells).toHaveCount(shown)
   expect(errors).toEqual([])
 })
 

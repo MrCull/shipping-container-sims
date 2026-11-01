@@ -15,6 +15,7 @@ import {
   DWELL_PALETTE,
   LENGTH_PALETTE,
   RAMP_PALETTE,
+  ROB_HEX,
   colourContextOf,
   colourOf,
   isTimeBased,
@@ -26,6 +27,10 @@ import {
 } from '../modules/colourBy'
 import { COLOUR_BY_STORAGE_KEY, loadColourBySettings, saveColourBySettings } from '../modules/colourBySettings'
 import { colourKeyLabel } from '../modules/colourLabels'
+import { buildRobMesh } from '../modules/robBoxes'
+import type { RobBox } from '../scenario/robBays'
+import { VESSEL_CLASSES } from '../scenario/vesselClasses'
+import * as THREE from 'three'
 
 const config = fixtures['rob-bays'] as ScenarioConfig
 const HEX = /^#[0-9a-f]{6}$/i
@@ -99,7 +104,7 @@ describe('what each mode produces', () => {
     const [a, b] = ctx.ports
     expect(colourOf('pod', subject({ pod: a }), 0, ctx).hex).not.toBe(colourOf('pod', subject({ pod: b }), 0, ctx).hex)
     expect(colourOf('pod', subject({ pod: 'XXXXX' }), 0, ctx).key).toBe('other')
-    expect(legendOf('pod', ctx).map((e) => e.key)).toEqual([...ctx.ports, 'other'])
+    expect(legendOf('pod', ctx).map((e) => e.key)).toEqual([...ctx.ports, 'other', 'rob'])
   })
 
   it('special: reefer, tank (hazardous), open top and flat (out of gauge), else standard', () => {
@@ -247,5 +252,40 @@ describe('mode names and the palette', () => {
     const token = (name: string) => new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`).exec(skin)?.[1]?.toLowerCase()
     DATA_PALETTE.forEach((hex, i) => expect(token(`--tt-data-${i}`)).toBe(hex))
     RAMP_PALETTE.forEach((hex, i) => expect(token(`--tt-ramp-${i}`)).toBe(hex))
+    expect(token('--tt-data-rob')).toBe(ROB_HEX)
+  })
+})
+
+describe('ROB colour (spec #154, #159)', () => {
+  const subject = (o: Partial<ColourSubject> = {}): ColourSubject => ({ line: 'MSC', full: true, ...o })
+  const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+
+  it('one colour for a remain-on-board box in every mode, listed in every legend', () => {
+    for (const mode of COLOUR_BY_MODES) {
+      expect(colourOf(mode, subject({ rob: true, pod: ctx.ports[0], weightClass: 'HEAVY', isoType: '22R1' }), 0, ctx), mode).toEqual({ key: 'rob', hex: ROB_HEX })
+      expect(legendOf(mode, ctx).filter((e) => e.key === 'rob'), mode).toEqual([{ key: 'rob', hex: ROB_HEX }])
+    }
+  })
+
+  it('is a desaturated light grey, distinct from the no-value grey', () => {
+    const [r, g, b] = rgb(ROB_HEX)
+    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThanOrEqual(12)
+    expect((r + g + b) / 3).toBeGreaterThan(180)
+    for (const mode of COLOUR_BY_MODES) expect(legendOf(mode, ctx).filter((e) => e.key !== 'rob' && e.hex === ROB_HEX), mode).toEqual([])
+  })
+
+  it('the 3D ROB boxes take it in every mode, the default one included', () => {
+    const spec = VESSEL_CLASSES.feeder
+    const box: RobBox = { vesselId: 'V001', slotId: 'V001:00-00-04', bay: 0, row: 0, tier: 4, deck: true, half: null, size: '40', isoType: '42G1', pod: 'ESVLC', line: 'MSC', weightClass: 'HEAVY', grossKg: 20000, full: true }
+    const mesh = buildRobMesh(spec, [box, { ...box, slotId: 'V001:00-01-04', row: 1, pod: 'MAPTM' }])!
+    const c = new THREE.Color()
+    for (const mode of COLOUR_BY_MODES) {
+      mesh.setColour(mode, ctx)
+      for (const i of [0, 1]) {
+        mesh.mesh.getColorAt(i, c)
+        expect(`#${c.getHexString()}`, mode).toBe(ROB_HEX)
+      }
+    }
+    mesh.dispose()
   })
 })

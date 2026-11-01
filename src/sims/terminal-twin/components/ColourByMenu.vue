@@ -2,7 +2,7 @@
 /**
  * Colour by menu (#130, spec #116): a button in the overlay bar that opens a panel with the mode dropdown, the legend
  * of the mode and the Hide ROB checkbox. The mode colours the containers in 3D and the bay viewer; Hide ROB hides the
- * remain-on-board boxes on the vessels in 3D only. Colours and keys come from `modules/colourBy.ts`.
+ * remain-on-board boxes on the vessels in 3D and in the bay viewer (#159). Colours and keys come from `modules/colourBy.ts`.
  */
 import { computed, ref } from 'vue'
 import TtIcon from './ui/TtIcon.vue'

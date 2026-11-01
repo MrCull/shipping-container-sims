@@ -40,8 +40,8 @@ export const DWELL_PALETTE = ['#8fdca4', '#cfe77a', '#f6c65f', '#f28b82'] as con
 export const LENGTH_PALETTE = ['#8ec9f2', '#c5aef0', '#f2aacb'] as const
 /** `--tt-data-done`: no value. */
 const UNKNOWN_HEX = '#8a97ab'
-/** `--tt-data-rob`: a remain-on-board box where the mode has nothing to say about it. */
-const ROB_HEX = '#7a8aa3'
+/** `--tt-data-rob` (#159): every remain-on-board box in every mode, 3D and bay viewer alike; a desaturated light grey, easy to ignore. */
+export const ROB_HEX = '#c8cacd'
 /** `--tt-data-3`: overdue. */
 const OVERDUE_HEX = DATA_PALETTE[3]
 
@@ -178,9 +178,9 @@ const MODES: Record<ColourBy, ModeDef> = {
     hexOf: (key) => (key === 'import' ? DATA_PALETTE[0] : key === 'export' ? DATA_PALETTE[1] : key === 'transshipment' ? DATA_PALETTE[4] : key === 'empty' ? DATA_PALETTE[2] : UNKNOWN_HEX),
   },
   dwell: {
-    keys: () => [...DWELL_KEYS, 'rob'],
-    keyOf: (s, t) => (s.rob ? 'rob' : dwellKey(s, t)),
-    hexOf: (key) => (key === 'rob' ? ROB_HEX : key === 'none' ? UNKNOWN_HEX : DWELL_PALETTE[DWELL_KEYS.indexOf(key as (typeof DWELL_KEYS)[number]) - 1]),
+    keys: () => [...DWELL_KEYS],
+    keyOf: (s, t) => dwellKey(s, t),
+    hexOf: (key) => (key === 'none' ? UNKNOWN_HEX : DWELL_PALETTE[DWELL_KEYS.indexOf(key as (typeof DWELL_KEYS)[number]) - 1]),
   },
   length: {
     keys: () => [...LENGTH_KEYS, 'unknown'],
@@ -188,33 +188,34 @@ const MODES: Record<ColourBy, ModeDef> = {
     hexOf: (key) => (key === 'unknown' ? UNKNOWN_HEX : LENGTH_PALETTE[LENGTH_KEYS.indexOf(key as (typeof LENGTH_KEYS)[number])]),
   },
   departure: {
-    keys: () => [...DEPARTURE_KEYS, 'unknown', 'rob'],
-    keyOf: (s, t) => (s.rob ? 'rob' : departureKey(s, t)),
-    hexOf: (key) => (key === 'rob' ? ROB_HEX : key === 'overdue' ? OVERDUE_HEX : key === 'unknown' ? UNKNOWN_HEX : RAMP_PALETTE[4 - (DEPARTURE_KEYS.indexOf(key as (typeof DEPARTURE_KEYS)[number]) - 1)]),
+    keys: () => [...DEPARTURE_KEYS, 'unknown'],
+    keyOf: (s, t) => departureKey(s, t),
+    hexOf: (key) => (key === 'overdue' ? OVERDUE_HEX : key === 'unknown' ? UNKNOWN_HEX : RAMP_PALETTE[4 - (DEPARTURE_KEYS.indexOf(key as (typeof DEPARTURE_KEYS)[number]) - 1)]),
   },
   transit: {
-    keys: () => [...TRANSIT_KEYS, 'unknown', 'rob'],
-    keyOf: (s) => (s.rob ? 'rob' : (s.transit ?? 'unknown')),
-    hexOf: (key) => (key === 'rob' ? ROB_HEX : key === 'unknown' ? UNKNOWN_HEX : palette(TRANSIT_KEYS.indexOf(key as TransitStatus))),
+    keys: () => [...TRANSIT_KEYS, 'unknown'],
+    keyOf: (s) => s.transit ?? 'unknown',
+    hexOf: (key) => (key === 'unknown' ? UNKNOWN_HEX : palette(TRANSIT_KEYS.indexOf(key as TransitStatus))),
   },
   call: {
-    keys: () => ['call', 'other', 'rob'],
-    keyOf: (s) => (s.rob ? 'rob' : s.onCall ? 'call' : 'other'),
-    hexOf: (key) => (key === 'call' ? DATA_PALETTE[0] : key === 'rob' ? ROB_HEX : UNKNOWN_HEX),
+    keys: () => ['call', 'other'],
+    keyOf: (s) => (s.onCall ? 'call' : 'other'),
+    hexOf: (key) => (key === 'call' ? DATA_PALETTE[0] : UNKNOWN_HEX),
   },
 }
 
-/** The colour of a box in a mode at sim time `t`; its `key` is an entry of `legendOf(mode, ctx)`. */
+/** The colour of a box in a mode at sim time `t`; its `key` is an entry of `legendOf(mode, ctx)`. A ROB box is `rob` in every mode (#159). */
 export function colourOf(mode: ColourBy, subject: ColourSubject, t: number, ctx: ColourContext): ColourEntry {
+  if (subject.rob) return { key: 'rob', hex: ROB_HEX }
   const def = MODES[mode]
   const key = def.keyOf(subject, t, ctx)
   return { key, hex: def.hexOf(key, ctx) }
 }
 
-/** Every value the mode can produce, with its colour. */
+/** Every value the mode can produce, with its colour; `rob` (remain on board) last in every mode. */
 export function legendOf(mode: ColourBy, ctx: ColourContext): ColourEntry[] {
   const def = MODES[mode]
-  return def.keys(ctx).map((key) => ({ key, hex: def.hexOf(key, ctx) }))
+  return [...def.keys(ctx).map((key) => ({ key, hex: def.hexOf(key, ctx) })), { key: 'rob', hex: ROB_HEX }]
 }
 
 /** `#rrggbb` as a number, for three.js. */

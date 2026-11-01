@@ -10,7 +10,7 @@ import { VESSEL_CLASSES, vesselSlotId } from '../scenario/vesselClasses'
 import type { VesselSlotState } from '../engine'
 import { buildBayView, bayOrder, CELL_STATUSES, defaultBay, slotStatus, stepBay, stripOf, type BayBox, type BayCell, type BayView, type BayViewData, type ColourMode } from '../modules/bayView'
 import { collectBayViewData } from '../modules/bayViewData'
-import { COLOUR_BY_MODES, colourContextOf, legendOf } from '../modules/colourBy'
+import { COLOUR_BY_MODES, ROB_HEX, colourContextOf, legendOf } from '../modules/colourBy'
 import { createLocationNotation } from '../modules/locationNotation'
 
 const config = fixtures['rob-bays'] as ScenarioConfig
@@ -136,7 +136,7 @@ describe('colour modes', () => {
             continue
           }
           coloured++
-          expect(c.colourKey).toBe(c.details[prop])
+          expect(c.colourKey).toBe(c.rob ? 'rob' : c.details[prop])
           expect(c.colourIndex).not.toBeNull()
           expect(seen.get(c.colourKey) ?? c.colourIndex).toBe(c.colourIndex)
           seen.set(c.colourKey, c.colourIndex!)
@@ -146,7 +146,7 @@ describe('colour modes', () => {
       expect(coloured).toBeGreaterThan(0)
       if (mode !== 'weight') expect(seen.size).toBeGreaterThan(1)
     }
-    expect(view(data, bay, 'weight').legend.map((l) => l.key)).toEqual(['LIGHT', 'MEDIUM', 'HEAVY', 'unknown'])
+    expect(view(data, bay, 'weight').legend.map((l) => l.key)).toEqual(['LIGHT', 'MEDIUM', 'HEAVY', 'unknown', 'rob'])
   })
 
   it('every colour-by mode fills the coloured cells with the colour of the shared module, and lists the same legend', () => {
@@ -165,10 +165,15 @@ describe('colour modes', () => {
     expect(dwellKeys(0)).not.toEqual(dwellKeys(5 * 86400))
   })
 
-  it('ROB cells follow the colour mode too, so later ports show as groups', () => {
+  it('ROB cells are the one ROB grey in every colour mode, the 3D ROB colour, with a legend entry (#159)', () => {
     const robBay = data.robBoxes[0].bay
-    const cells = allCells(view(data, robBay, 'pod')).filter((c) => c.status === 'rob')
-    expect(cells.every((c) => c.colourKey === c.details.pod && c.colourIndex !== null)).toBe(true)
+    for (const mode of COLOUR_BY_MODES.filter((m) => m !== 'default')) {
+      const v = view(data, robBay, mode)
+      const cells = allCells(v).filter((c) => c.status === 'rob')
+      expect(cells.length).toBeGreaterThan(0)
+      expect(cells.every((c) => c.colourKey === 'rob' && c.colour === ROB_HEX && c.colourIndex === v.legend.findIndex((l) => l.key === 'rob')), mode).toBe(true)
+    }
+    expect(view(data, robBay, 'status').legend.map((l) => l.key)).toContain('rob')
   })
 })
 

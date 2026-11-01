@@ -679,7 +679,7 @@ const en = {
   'colourBy.mode.call': 'This call / ROB',
   'colourBy.legend': 'Legend',
   'colourBy.hideRob': 'Hide ROB',
-  'colourBy.hideRobHint': 'Hide the remain-on-board boxes on the vessels in 3D (the bay viewer keeps them, hatched)',
+  'colourBy.hideRobHint': 'Hide the remain-on-board boxes on the vessels, in 3D and in the bay viewer',
   'colourBy.key.other': 'Other',
   'colourBy.key.unknown': 'Unknown',
   'colourBy.key.rob': 'Remain on board',
