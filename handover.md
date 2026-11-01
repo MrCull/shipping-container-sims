@@ -18,11 +18,11 @@ Ticket texts for implementers: `scratchpad/tickets-r4.md` (scratchpad of the orc
 | #174 | no floating box, tier stow sequence | none | merged in branch | |
 | #175 | trucks never stranded at ASC transfer points | none | merged in branch | |
 | #176 | realistic volumes: blockers measured (narrowed by #178) | | merged in branch (a4f3827) | |
-| #179 | worktrees start on the integration branch (#178) | none | to do | |
+| #179 | worktrees start on the integration branch (#178) | none | in progress | implementer (wave 1) |
 | #180 | workflow docs: ticket files, screenshots, profile first, attribution (#178) | none | to do | |
 | #181 | test:related and tt:golden checks (#178) | none | to do | |
 | #182 | dead worktree cleanup, merge updates handover (#178) | #179 | to do | |
-| #183 | engine: no silent yard deadlock, peak day finishes at 0.1 (#178) | none | to do | |
+| #183 | engine: no silent yard deadlock, peak day finishes at 0.1 (#178) | none | in progress | implementer (wave 1) |
 | #177 | smoke run and regressions | #170 to #173, #183 | to do | |
 
 Phase 2 of #178 (#184 to #189, realistic volumes) starts on a fresh integration branch after the round 4 PR merges; not tracked here.
