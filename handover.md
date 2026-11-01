@@ -1,112 +1,76 @@
-# Handover: spec #134 (Terminal Twin polish, round 2) and spec #154 (round 3)
+# Handover: Terminal Twin polish, rounds 2 and 3 (specs #134 and #154)
 
-**Status: every #134 ticket except #150 is merged in the integration branch `claude/stoic-hypatia-tk68z1` (PR #152); #144 approved by the owner (variant B), #145 built and merged. Round 3, spec #154 (tickets #155 to #165), runs on the same branch before #150; #150 is blocked by all of them and is also #154's final ticket.**
+For the next agent. Read this file, then `docs/agents/implementing.md` (orchestrator and implementer workflow). Delete this file before PR #152 merges to `main`.
 
-## Round 3: spec #154
+## Status (2026-11-01, integration tip 20e7a4b)
 
-Owner grilled on 2026-11-01 and asked for the recommended answer on every question, then went away: proceed without waiting for approval. Same run rules as round 2 (no verify, unit suite or smoke per ticket; all in #150).
+- **Branch:** `claude/stoic-hypatia-tk68z1`, PR [#152](https://github.com/MrCull/shipping-container-sims/pull/152) into `main`. All work merges here; no other worktrees remain.
+- **Round 2, spec [#134](https://github.com/MrCull/shipping-container-sims/issues/134):** tickets #135 to #149 merged (labelled `merged-in-branch`). #144 was a throwaway prototype; the owner approved variant B and #145 built it.
+- **Round 3, spec [#154](https://github.com/MrCull/shipping-container-sims/issues/154):** tickets #155 to #164 merged. **#165 is partly done** (see below) and stays open.
+- **Left:** finish #165, then [#150](https://github.com/MrCull/shipping-container-sims/issues/150) (the one full verify, golden regeneration and smoke run; final ticket of both specs, blocked by all others), then the finish steps.
+- `ENGINE_VERSION` is 0.33.0. Goldens are stale on purpose since #146; #150 regenerates them once.
 
-Order (at most two implementers at a time):
-- Start now, independent: #155 master volume, #156 plain names and baseline default, #157 speed reset, #158 face markings, #159 bay view and 3D ROB match, #160 SHC parking (engine 0.30.0).
-- #161 wide tabbed setup dialog after #156. #162 bay view Load/Discharge switch after #159.
-- Engine chain, strictly in sequence: #160 (0.30.0), #163 yard line mix (0.31.0), #164 level arrival stows (0.32.0, also after #159), then #165 realistic volumes.
-- Then #150.
+## Owner rules for this run (still in force)
 
-| Ticket | State |
-|---|---|
-| #155 master volume | merged (lint, build, 12 tests); menu-music smoke spec never run |
-| #156 plain names, baseline default | merged (lint, build, 33 tests) |
-| #157 speed reset | merged (lint, 22 tests) |
-| #158 face markings | merged; Low had close-ups off, now 48 faces within 18 m |
-| #159 bay view and 3D match, ROB colour | merged; bay view now uses display time |
-| #160 SHC parking | merged, ENGINE_VERSION 0.30.0 |
-| #161 tabbed setup dialog | merged (lint, build, setup-tabs tests) |
-| #162 bay plan switch | merged; bay-viewer.smoke.ts changed, not run |
-| #163 yard line mix | merged, 0.31.0; prefill-decisions.test.ts t=0 yard fill rounding (14.063 vs 14.0625) fails since before #163 |
-| #164 level stows | in progress |
-| #165 realistic volumes | waits on #164 |
+- No `pnpm run verify`, full unit suite or browser smoke per ticket. Allowed per ticket: `pnpm run lint`, `pnpm run build`, targeted vitest files that take seconds, headless `pnpm run tt:*` runs in the background, screenshots. The full run happens once, in #150.
+- Merges are plain `git merge` of `tt/<N>-<slug>` branches (no `scripts/merge-ticket.sh` verify), then push, `scripts/remove-worktree.sh <agent-id>`, label the issue `merged-in-branch`. At most two implementers at a time.
+- Never write the em dash (U+2014) anywhere. Never commit `.blend` files. Reference photos in `docs/reference/` are committed on purpose.
+- The owner may be away: on round 3 they asked for the recommended answer on every question. Make sensible calls and report them.
 
-## Where things are
+## Next: finish #165 (realistic TTI vessel volumes)
 
-- **Spec:** [#134](https://github.com/MrCull/shipping-container-sims/issues/134). Tickets #135 to #150 are its sub-issues; each lists its blockers under `## Blocked by`.
-- **Previous round:** spec #116 (tickets #117 to #133) is merged to `main` via PR #132 and closed.
-- **Branch:** create a fresh integration branch from `main` for this spec and open one PR for it. Tickets merge into it; the PR merges to `main` at the end.
-- **Workflow:** `docs/agents/implementing.md` (orchestrator steps, implementer brief, at most two implementers plus one merge at a time, label merged tickets `merged-in-branch`).
+Owner complaint: TTI baseline calls were tiny (Feedermax 14 discharge, Neo-Panamax 65). Goal: `TTI_MOVES_SCALE` (in `scenario/presets.ts`) at 1, floor 0.5, with the baseline reaching its end condition in under 10 minutes headless and 0 invariant violations.
 
-## Ticket order
+- **Merged (20e7a4b):** scale 0.1 (about double the old counts; baseline finishes in 40 s wall, 18.5 simulated hours, 0 violations). `padOptions` in `engine/subsystems/shc.ts` skips blocks under 10 % free (fixed a B01 fill deadlock at scale 1). TTI presets use `nearest-box` pad selection. New vessel rows default to scale 1.
+- **Diagnosis** (full text in the [#165 comment](https://github.com/MrCull/shipping-container-sims/issues/165)): not a deadlock or an equipment shortage (most ASCs and SHCs idle). The load side is serial: `engine/subsystems/loadPrep.ts` stages at most 3 boxes per crane (the ground positions), one at a time, only after all that crane's discharge is done, capping each STS near 10 loads/h. Per load box about 490 to 570 s; 120 to 140 s of that is waiting for the STS after the SHC clears.
+- **Steps:** deeper load staging (more positions, or WTP pads and queue areas ahead of the crane); start load prep while discharge runs on other bays (mind hatch covers and deadlocks); cut the STS wait; re-run 90-minute invariants on both presets; raise the scale 0.25, 0.5, 1; fix peak day, which never reaches its end condition (ends idle with 1 vessel done, also before #165); bump `ENGINE_VERSION` to 0.34.0 and record a KPI comparison in the commit.
+- At larger scales check the arrival stow still fits (ROB plus discharge within the vessel; `arrival-stows.test.ts` TTI lower bound is now 40 %) and yard fill stays under block capacity.
 
-1. **#135 em dash sweep first, alone.** It touches about 140 files; starting anything else in parallel means conflicts.
-2. Then in parallel (two at a time): #136 build stamp, #137 audio control, #138 speed steps, #139 dashboard, #140 colour by, #141 countdown, #142 spreaders and SHC spawn, #143 close-up faces, #144 start screen prototype, #146 TTI road.
-3. **Engine chain, strictly in sequence** (each bumps `ENGINE_VERSION` and regenerates goldens on top of the previous): #146 road, then #148 arrival stows, then #149 yard mix. #147 scenery waits on #146 (same scenery files).
-4. **#144 needs the owner.** The implementer builds a throwaway prototype and posts screenshots plus the draft test bench names; the owner approves in a comment on #144. Only then start #145.
-5. **#150 smoke suite last**, on an idle machine, after everything else is merged.
+## Then #150 (full run, idle machine, nothing else running)
+
+1. `pnpm install`, `pnpm run verify`; fix what fails. Known failures already:
+   - golden tests (stale on purpose);
+   - `prefill-decisions.test.ts` "keeps t = 0 KPIs unchanged": yard fill 14.063 vs 14.0625 at 5 decimals (rounding, predates #163);
+   - `container-props` test "the bay plan keeps every id, size, line, slot": the #148 POL/weight pass moves slots when props change;
+   - `terminals.test.ts` check on `tests/browser/scenarioPicker.ts` for the TTI presets (since #156).
+2. `UPDATE_GOLDEN=1 pnpm test` once, on purpose; KPI comparison in the commit.
+3. Smoke: `pnpm run test:smoke --project dev --grep-invert @load`, then prod; procedure in the #150 body (re-run failures alone three times, bisect over ticket merge commits, fix in code). Many specs were written or edited but never run: build stamp, audio, menu-music volume (`src/tests/browser/menu-music-volume.smoke.ts`), dashboard, colour-by, vessel countdown, spreader spawn, close-up (Low and High), presets and picker, setup tabs (`scenarioPicker.ts` now has `openSetupTab`), speed reset (in `terminal-twin.smoke.ts`), bay viewer and bay-plan switch, asc, paired-asc, shc, kpi, subsystem-modes, yard-start. Run the `@load` close-up spec locally only.
+4. Load-sensitive specs from earlier runs: "Run to" popup, debugger follow camera, KPI end condition, container close-up.
+
+## Finish (after #150)
+
+`/code-review` the integration branch, fix findings in one implementer, set the PR #152 body to `Closes #134`, `Closes #154` and `Closes #<n>` for every finished ticket (#135 to #150, #155 to #165), ending with the attribution lines; mark it ready; delete this file. GitHub did not auto-close issues on an earlier merge, so close leftovers by hand.
 
 ## Owner decisions (settled, do not re-ask)
 
-- Build stamp only on the app's main menu page (`src/pages/HomePage.vue`), not in any sim.
-- "Right" of the terminal means east. The access road comes from the south and turns right (east) into the terminal road.
-- No keyboard key changes speed at all (digits 1 to 9 lose their speed binding).
-- North Quay moves to the north end, as on the aerial photo.
-- Wordmarks (KALMAR, TTI ALGECIRAS, ZPMC) stay; Rock visibility from Quay/Overview and volume level in other sims are out of scope.
-- Goldens may change for #146, #148, #149 (and #147 if North Quay is engine-side); record a KPI comparison in each commit.
-- Never use the em dash (U+2014) in any text: code, strings, docs, commits, issues, PR bodies.
+- Round 2: build stamp only on `src/pages/HomePage.vue`; "right" of the terminal means east; no keyboard key changes speed; North Quay at the north end; wordmarks stay; goldens may change for engine tickets with a KPI comparison.
+- Start screen: variant B (list plus detail pane), plain names only on screen (ids only in `data-*`, dev API, logs), TTI baseline ("Algeciras: a normal day") selected by default, wide dialog with tabs Scenario, Vessels, Yard and equipment, Advanced, Start in a pinned footer.
+- One master volume for the whole app (`gainFor`, `followMasterGain` in `src/stores/audio.ts`; AGENTS.md "Master volume").
+- Speed resets to x10 on every run start; mid-run choice kept.
+- Bay view: Load plan | Discharge plan switch, default Load; ROB one subtle grey (`ROB_HEX` #c8cacd, `--tt-data-rob`) everywhere, Hide ROB applies to bay view and 3D; bay view reads display-time data so it matches 3D.
+- Arrival stows fill level (lowest stack first within the centreline stacks the planner uses, to leave clear stacks for loads).
+- SHCs park on land (parking area west of the apron, rows added landside); prefill mixes shipping lines.
+- Container face markings show on every quality tier (Low: 48 faces within 18 m).
 
-## Code pointers found while writing the spec
+## Open follow-ups noted by implementers (not blocking)
 
-- **Dashboard (#139):** `TopBar.vue` toggles `store.dashboardOpen`; `TerminalTwin.vue` renders `DashboardTab` via a bare `defineAsyncComponent` with no loading or error component, so a failed chunk load is silent. Layout looked fine on a code read; reproduce in a browser (dev and prod build).
-- **Speeds (#138):** `SPEEDS` in `modules/twinController.ts`; digit bindings in `modules/shortcuts.ts` (`speedStep`), handled in `composables/useTwinShortcuts.ts` and `store/twinStore.ts` `setSpeedStep`.
-- **Spreaders (#142):** only STS telescopes (`modules/equipmentKinds/sts.ts`, `meta.spreaderModes` in `stsAssets.ts`). ASC (`equipmentKinds/asc.ts`) and SHC (`equipmentKinds/shc.ts`) spreaders are fixed 6.4 m boxes.
-- **SHC spawn (#142):** `modules/sceneModel.ts` takes `initialShc[id]` with yaw 0 until the first leg; parking from `engine/laneGraph.ts` `parkingX`.
-- **Close-ups (#143):** `modules/containerCloseups.ts` draws one mesh plus one canvas texture per box (one draw call each); selection in `containerInstancer.ts`; caps in `modules/quality.ts` (`closeupCap` 0/24/48, `closeupDistanceM` 0/25/35).
-- **Truck road (#146):** engine road graph in `engine/landsideGraph.ts` (affects goldens). The rendered access road is scenery only: `terminals/tti-algeciras/scenery.ts` plus `SURROUNDINGS.landside` in `terminals/tti-algeciras/constants.ts`.
-- **Scenery and North Quay (#147):** land plane in `modules/backdrop.ts`; TTI scenery and the North Quay slab (`NORTH_QUAY_LENGTH_M`) in the TTI terminal folder.
-- **Arrival stows (#148):** `scenario/bayPlan.ts` `planCargo`; ROB in `scenario/robBays.ts` (`DEFAULT_ROB_FILL = 0.7`), peak-day ROB in TTI `constants.ts`.
-- **Yard mix (#149):** `engine/prefill.ts` (`planPrefill`), grouping keys in `engine/decisions/yardGrouping.ts`; presets in `scenario/presets.ts` (peak day at 75%).
-- **Start screen (#144/#145):** `components/setup/ScenarioPicker.vue`, model in `modules/scenarioPicker.ts`; fixture names and descriptions in `scenario/fixtures/definitions.ts`.
-- **Countdown (#141):** `modules/vesselStatus.ts` hides the label once berthed; first move time exists only per STS (`firstMoveStartS` in `engine/state.ts`), so it must be added to the vessel status input.
-- **Audio (#137):** `src/components/AudioControls.vue`; the speaker opens the popover today.
-- **Build stamp (#136):** `vite.config.ts` has no `define` yet.
+- #161: on tall content the detail pane scrolls on its own (at 1920x1080 the last row of set-up facts is below its fold); the vessel table scrolls sideways on phones.
+- #158: frame cost of Low's 48 close-up faces on a real laptop not measured.
+- #159: the bay view refreshes once a second, so at high speed it can trail 3D by up to a second; time-based colour modes use engine-time box properties.
+- #163: baseline rehandles rose (94 to 117) in a 90-minute run; check on longer runs.
+- #155: Box Empire's narrator waits for "next" only when muted, not at volume 0.
+- #148: feeder fill only 35 to 46 % at full scale; ROB bays can leave one STS working a call.
+- #139: Retry after a failed chunk can still fail in the same page; the dashboard auto-opens at run end, so the first button click closes it.
+- #141: first-move time falls back to the package's `startedAt` if a crane served an earlier vessel.
+- #142: telescoping scales the whole spreader mesh (end caps may look squashed in 20 ft mode).
+- #147: the sea channel hides the shared apron's northern 600 m.
 
-## Reference photos
+## Gotchas
 
-Committed in `docs/reference/tti-algeciras/` (owner decision). The aerial road layout photo for #146 and #147 is `aerial-tti-terminal-road-layout.webp`; the bay overview and map are there too. Older photos from `tti1.zip` are still missing: ask the owner to upload them if a ticket needs them.
-
-## Gotchas from the last run
-
-- Unit tests take about 2 minutes on a quiet machine and 5 to 6 under load; `golden-update.test.ts` and `invariants-incremental.test.ts` can time out under load, so re-run alone before calling them real.
-- The full smoke suite takes 40 to 50 minutes; run it only in #150. Implementers run lint, build, their own unit tests and only the smoke specs for paths they changed (`scripts/smoke-specs-for.sh`).
-- Load-sensitive smoke specs: the "Run to" popup, the debugger follow camera, the KPI end condition, container close-up. They pass on an idle machine.
-- Container restarts can kill background runs: re-run checks by hand, then push.
-- After a hand-resolved merge, `scripts/merge-ticket.sh` does not auto-push: push once `pnpm run verify` is green.
-- GitHub did not auto-close issues from `Closes` lines when PR #132 merged; close them by hand after merging.
-
-## Owner instruction for this run
-
-No unit tests, `pnpm run verify` or browser smoke specs per ticket: the single full run (verify, goldens, smoke) happens at the end, in #150. Merges are plain `git merge` without `scripts/merge-ticket.sh` verification, so #137, #138 and #146 have only the implementers' own verify results (#137 and #146 ran verify green; #138 not confirmed) and the combined tree is unverified. Allowed per ticket: lint, build, targeted tests that take seconds.
-
-## State
-
-| Ticket | State |
-|---|---|
-| #135, #136 | merged (verified) |
-| #137 audio control | merged (implementer ran verify green) |
-| #138 speed steps | merged, verify not confirmed |
-| #139 dashboard | merged, lint and build only; smoke specs written, never run |
-| #140 colour by | merged, lint and own tests; screenshot not taken |
-| #141 countdown | merged, lint, build, vessel-status tests; smoke spec never run |
-| #142 spreaders, SHC spawn | merged, lint and build; two smoke specs never run |
-| #143 close-up faces | merged, no verify, specs never run, frame times not measured |
-| #146 TTI road | merged, ENGINE_VERSION 0.27.0 |
-| #147 scenery, North Quay | merged, scenery only, no frame stats |
-| #148 arrival stows | merged, 0.28.0, goldens stale on purpose |
-| #149 yard mix | merged, 0.29.0, goldens stale, KPI before/after in commit message |
-| #144 start screen prototype | owner approved variant B (decision comment on #144); prototype branch not merged, worktree still to remove |
-| #145 start screen build | merged, lint, build, picker and catalogue tests only; smoke specs never run |
-| #150 smoke suite | last |
-
-## To do at the end (in #150 or just before)
-
-1. `pnpm install`, then `pnpm run verify`; fix failures from the unverified merges (#137, #138, #143, #146, #148 touched engine or shared files).
-2. Regenerate goldens once, on purpose (#149 is merged): `UPDATE_GOLDEN=1 pnpm test`; record KPI comparisons (the #148 one is in its commit message; #149's is in its commit message).
-3. Run the smoke specs that were never run: build stamp (dev and prod), audio (Terminal Twin and Container Stack), close-up block edge, and the `@load` 10-boxes-wide spec locally only. #143 assumes block `B01` exists in the TTI baseline.
-4. Implementer follow-ups: #148 fill is only 35 to 46% for feeders at full scale (30% test floor), and ROB bays can leave one STS working a call (owner may want a spread rule); #143 dropped the old per-box door rods and corner castings (the GLB LOD0 carries them) and its frame-time table in `docs/scene-quality-atmosphere.md` says "not measured".
+- Unit tests take about 2 minutes idle, 5 to 6 under load; `golden-update` and `invariants-incremental` can time out under load, re-run alone.
+- The full smoke suite takes 40 to 50 minutes.
+- TTI preset runs take minutes: run in the background with `--events` to a file and count event types with `cut | sort | uniq -c`.
+- Rate limits stop agents mid-ticket; resume the same agent with `SendMessage` after the reset (its worktree keeps the work).
+- Container restarts can kill background runs: re-run by hand, then push.
+- A code comment like `(#161)` inside a `<style>` block trips `skin.test.ts` (read as a hex colour); write "ticket 161".
+- Screenshots use software WebGL: no real frame rates. Screenshots of round 3 are in the gitignored `.screenshots/<ticket>/` folders of the main checkout (lost with the container).
