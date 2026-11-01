@@ -14,7 +14,17 @@ Order (at most two implementers at a time):
 
 | Ticket | State |
 |---|---|
-| #155 to #165 | not started |
+| #155 master volume | merged (lint, build, 12 tests); menu-music smoke spec never run |
+| #156 plain names, baseline default | merged (lint, build, 33 tests) |
+| #157 speed reset | merged (lint, 22 tests) |
+| #158 face markings | merged; Low had close-ups off, now 48 faces within 18 m |
+| #159 bay view and 3D match, ROB colour | merged; bay view now uses display time |
+| #160 SHC parking | merged, ENGINE_VERSION 0.30.0 |
+| #161 tabbed setup dialog | merged (lint, build, setup-tabs tests) |
+| #162 bay plan switch | merged; bay-viewer.smoke.ts changed, not run |
+| #163 yard line mix | merged, 0.31.0; prefill-decisions.test.ts t=0 yard fill rounding (14.063 vs 14.0625) fails since before #163 |
+| #164 level stows | in progress |
+| #165 realistic volumes | waits on #164 |
 
 ## Where things are
 

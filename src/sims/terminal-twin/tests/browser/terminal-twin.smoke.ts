@@ -195,6 +195,55 @@ test('Reset returns to t = 0 with the same seed; New Scenario reopens the setup 
   expect(other.eventLogHash).not.toBe(golden.eventLogHash)
 })
 
+test('every run start (Start, Reset, loading a save) resets the speed to ×10; pause and dialogs keep it (#157)', async ({ page }) => {
+  const x600 = page.getByRole('button', { name: '×600', exact: true })
+  const x10 = page.getByRole('button', { name: '×10', exact: true })
+  const speed = () => page.evaluate(() => window.__tt!.clock().speed)
+  const playing = async () => {
+    if (await page.evaluate(() => window.__tt!.clock().paused)) await page.getByRole('button', { name: 'Resume', exact: true }).click()
+  }
+  // A long scenario, so x600 does not reach the scenario end (which disables the speed buttons).
+  await page.goto('/sim/terminal-twin')
+  await page.waitForFunction(() => !!window.__tt)
+  await page.evaluate(() => window.__tt!.load('landside-morning-peak'))
+  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
+
+  // Mid-run speed survives pause, the dashboard and New Scenario then Cancel.
+  await x600.click()
+  await page.getByRole('button', { name: 'Pause', exact: true }).click()
+  await page.getByRole('button', { name: 'Resume', exact: true }).click()
+  await page.getByTestId('tt-dashboard-button').click()
+  await page.getByTestId('tt-dashboard-button').click()
+  await page.getByRole('button', { name: 'New Scenario' }).click()
+  const dialog = page.getByRole('dialog', { name: /new scenario/i })
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dialog).toBeHidden()
+  expect(await speed()).toBe(600)
+
+  // New Scenario then Start.
+  await page.getByRole('button', { name: 'New Scenario' }).click()
+  await dialog.getByTestId('tt-setup-start-button').click()
+  await expect(dialog).toBeHidden()
+  expect(await speed()).toBe(10)
+  await playing()
+  await expect(x10).toHaveAttribute('aria-pressed', 'true')
+
+  // Reset.
+  await x600.click()
+  await page.getByRole('button', { name: 'Reset' }).click()
+  await expect.poll(speed).toBe(10)
+  await playing()
+  await expect(x10).toHaveAttribute('aria-pressed', 'true')
+
+  // Loading a save.
+  const saved = await page.evaluate(() => window.__tt!.saves.saveToBrowser('config', 'Speed reset'))
+  await x600.click()
+  expect(await page.evaluate((id) => window.__tt!.saves.load(id), saved!.id)).toBe('loaded')
+  expect(await speed()).toBe(10)
+  await playing()
+  await expect(x10).toHaveAttribute('aria-pressed', 'true')
+})
+
 test('vessels render at their berth (or anchorage) and STS cranes gantry along the rail to their bays', async ({ page }) => {
   const errors = collectErrors(page)
   await page.goto('/sim/terminal-twin')

@@ -2,7 +2,7 @@
 # scripts/smoke-specs-for.sh prints the specs a diff needs; merge-ticket.sh runs them instead of the whole suite.
 # Patterns match a file or folder name, never a substring of a path (the word "tests" contains "sts").
 # Add a line when a new area gets its own spec. A changed tests/browser/*.smoke.ts always runs itself.
-(^|/)(bay|Bay|rob|Rob|hullProfile)[A-Za-z-]*\.(ts|vue)$ => bay-viewer rob-bays
+(^|/)(bay|Bay|rob|Rob|hullProfile)[A-Za-z-]*\.(ts|vue)$ => bay-viewer rob-bays bay-plan-switch
 (^|/)[A-Za-z-]*(shc|Shc)[A-Za-z-]*\.(ts|vue|py)$|models/shc/ => shc-model terminal-twin-shc
 (^|/)(sts|Sts)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/sts|models/sts/ => sts-asset
 (^|/)(asc|Asc)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/asc|models/asc/ => asc-model terminal-twin-asc terminal-twin-paired-asc
