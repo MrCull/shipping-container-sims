@@ -253,22 +253,30 @@ function planVessel(
   const loneAt = units.findIndex((u) => cellKindOf(u.boxes) === 'lone')
   if (loneAt >= 0) units.push(...units.splice(loneAt, 1))
   const spareLone = loneAt >= 0
+  const mid = (spec.rows - 1) / 2
+  /** Rows from the centreline out (ties: the lower row first). */
+  const rowsOut = Array.from({ length: spec.rows }, (_, row) => row).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b)
   /**
-   * Fill `n` cells of one section (hold or deck) of a bay stack by stack, full height, from the centreline out: a stack
-   * stands on the hull floor or the hatch cover and is complete before the next one starts, so nothing floats and the
-   * outer stacks stay clear for the load boxes.
+   * Fill `n` cells of one section (hold or deck) of a bay, level (#164): the section uses the fewest stacks nearest the
+   * centreline that hold `n` cells, so the outer stacks stay clear for the load boxes, and each next box goes on the
+   * lowest of those stacks (ties nearest the centreline). A stack stands on the hull floor or the hatch cover, so
+   * nothing floats, and the tops of the used stacks differ by at most one tier.
    */
   const fill = (bay: number, fromTier: number, toTier: number, n: number) => {
-    const mid = (spec.rows - 1) / 2
-    const rows = Array.from({ length: spec.rows }, (_, row) => row).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b)
-    for (const row of rows) {
-      for (let tier = fromTier; tier < toTier && n > 0; tier++) {
-        if (!isCellUsable(spec, row, tier)) continue
-        cells.push({ bay, row, tier })
-        occupied.add(`${bay}:${row}:${tier}`)
-        n--
-      }
-      if (n <= 0) break
+    const used: { row: number; next: number }[] = []
+    for (let room = 0; room < n && used.length < rowsOut.length; ) {
+      const row = rowsOut[used.length]
+      const base = stackBaseTier(spec, row, fromTier >= spec.holdTiers)
+      used.push({ row, next: base })
+      room += Math.max(0, toTier - base)
+    }
+    for (; n > 0; n--) {
+      let pick: { row: number; next: number } | null = null
+      for (const s of used) if (s.next < toTier && isCellUsable(spec, s.row, s.next) && (!pick || s.next < pick.next)) pick = s
+      if (!pick) break
+      cells.push({ bay, row: pick.row, tier: pick.next })
+      occupied.add(`${bay}:${pick.row}:${pick.next}`)
+      pick.next++
     }
   }
   const layOut = (count: number): number[] => {
@@ -289,16 +297,51 @@ function planVessel(
   }
   const perBay = layOut(units.length - (spareLone ? 1 : 0))
   if (spareLone) {
-    const mid = (spec.rows - 1) / 2
-    const rowsOut = Array.from({ length: spec.rows }, (_, row) => row).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b)
     const bays = [...perBay.keys()].filter((b) => bayCaps[b] > 0).sort((a, b) => perBay[b] - perBay[a] || a - b)
+    // Level (#164): the odd half goes on top of the lowest stack that has room (a lone half may sit on twin-20 cells
+    // only, so the stack's 40 ft cells first trade places with twin-20 cells of other stacks; only kinds of cell move,
+    // the cells stay), so the section stays level. Else on the floor of the free stack that leaves its section most level.
+    const stacks = new Map<string, { bay: number; row: number; deck: boolean; top: number; members: number[] }>()
+    cells.forEach((c, i) => {
+      const deck = c.tier >= spec.holdTiers
+      const k = `${c.bay}:${c.row}:${deck}`
+      const s = stacks.get(k) ?? { bay: c.bay, row: c.row, deck, top: 0, members: [] }
+      s.top = Math.max(s.top, c.tier + 1)
+      s.members.push(i)
+      stacks.set(k, s)
+    })
+    const isPair = (i: number) => cellKindOf(units[i].boxes) === 'pair'
+    const pairCount = cells.reduce((n, _, i) => n + Number(isPair(i)), 0)
+    const order = (s: { bay: number; row: number; top: number }) => (s.top * spec.rows + rowsOut.indexOf(s.row)) * spec.bays + bays.indexOf(s.bay)
+    const target = [...stacks.values()]
+      .filter((s) => s.top < (s.deck ? tiers : spec.holdTiers) && isCellUsable(spec, s.row, s.top))
+      .filter((s) => s.members.filter((i) => !isPair(i)).length <= pairCount - s.members.filter(isPair).length)
+      .sort((a, b) => order(a) - order(b))[0]
     let found: { bay: number; row: number; tier: number } | null = null
-    for (const bay of bays)
-      for (const deck of [false, true])
-        for (const row of rowsOut) {
-          const tier = stackBaseTier(spec, row, deck)
-          if (!found && tier < tiers && isCellUsable(spec, row, tier) && (tier >= spec.holdTiers) === deck && !occupied.has(`${bay}:${row}:${tier}`)) found = { bay, row, tier }
-        }
+    if (target) {
+      const inTarget = new Set(target.members)
+      const spares = cells.map((_, i) => i).filter((i) => !inTarget.has(i) && isPair(i))
+      for (const i of target.members) {
+        if (isPair(i)) continue
+        const j = spares.shift() as number
+        ;[units[i], units[j]] = [units[j], units[i]]
+      }
+      found = { bay: target.bay, row: target.row, tier: target.top }
+    }
+    // no stack takes it (no twin-20 cell to trade): the floor of the free stack that leaves its section most level
+    const sectionTop = (bay: number, deck: boolean) => [...stacks.values()].reduce((m, s) => (s.bay === bay && s.deck === deck ? Math.max(m, s.top) : m), 0)
+    let leastStep = Infinity
+    if (!found)
+      for (const bay of bays)
+        for (const deck of [false, true])
+          for (const row of rowsOut) {
+            const tier = stackBaseTier(spec, row, deck)
+            const step = Math.max(0, sectionTop(bay, deck) - tier - 1)
+            if (step < leastStep && tier < tiers && isCellUsable(spec, row, tier) && (tier >= spec.holdTiers) === deck && !occupied.has(`${bay}:${row}:${tier}`)) {
+              leastStep = step
+              found = { bay, row, tier }
+            }
+          }
     if (found) {
       cells.push(found)
       occupied.add(`${found.bay}:${found.row}:${found.tier}`)

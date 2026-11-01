@@ -11,7 +11,7 @@ import { presets } from '../scenario/presets'
 import { arrivalRobBayCount, NORMAL_ARRIVAL_FILL, validateRob } from '../scenario/robBays'
 import { generateVessels } from '../scenario/vesselGenerator'
 import type { ScenarioConfig } from '../scenario/types'
-import { cellCapacity, isStackBase, vesselClass } from '../scenario/vesselClasses'
+import { cellCapacity, isStackBase, stackBaseTier, vesselClass } from '../scenario/vesselClasses'
 
 const fixtureList = Object.entries(fixtures) as [string, ScenarioConfig][]
 const presetList = Object.entries(presets).map(([name, make]) => [name, make()] as [string, ScenarioConfig])
@@ -142,5 +142,74 @@ describe('arrival fill sizing', () => {
     expect(validateRob({ arrivalFill: 0.7 })).toEqual([])
     expect(validateRob({ arrivalFill: 1 })).toHaveLength(1)
     expect(validateRob({ arrivalFill: 0 })).toHaveLength(1)
+  })
+})
+
+/**
+ * Level stows (#164): within a bay section (hold or deck) the occupied stacks of an arriving vessel reach about the
+ * same height. Heights are compared as the top tier of each stack, so an outer hold stack that the hull profile starts
+ * higher (a physically shorter row) does not count as low.
+ */
+describe('level arrival stows', () => {
+  type Placed = { bay: number; row: number; tier: number; deck: boolean }
+  /** Top tier of each occupied stack, by bay section (`bay:deck`). */
+  const topsBySection = (cells: readonly Placed[]) => {
+    const tops = new Map<string, Map<number, number>>()
+    for (const c of cells) {
+      const section = `${c.bay}:${c.deck}`
+      const rows = tops.get(section) ?? new Map<number, number>()
+      rows.set(c.row, Math.max(rows.get(c.row) ?? 0, c.tier + 1))
+      tops.set(section, rows)
+    }
+    return tops
+  }
+  /** The largest difference in top tier between occupied stacks of one bay section, over every section. */
+  const worstSpread = (cells: readonly Placed[]) => {
+    let worst = { spread: 0, section: '' }
+    for (const [section, rows] of topsBySection(cells)) {
+      const spread = Math.max(...rows.values()) - Math.min(...rows.values())
+      if (spread > worst.spread) worst = { spread, section }
+    }
+    return worst
+  }
+  const check = (config: ScenarioConfig) => {
+    const plan = planCargo(config, config.seed)
+    for (const v of config.vessels) {
+      const discharge = worstSpread(arrivalCells(plan, v.id))
+      expect(discharge.spread, `${v.id} discharge, bay:deck ${discharge.section}`).toBeLessThanOrEqual(2)
+      const rob = worstSpread(plan.rob.filter((b) => b.vesselId === v.id))
+      expect(rob.spread, `${v.id} ROB, bay:deck ${rob.section}`).toBeLessThanOrEqual(2)
+    }
+  }
+
+  it.each(all)('%s', (_name, config) => check(config))
+
+  it.each([3, 17, 42])('generated full-size calls of every vessel class (seed %i)', (seed) => {
+    const base = presets['TTI Algeciras baseline']()
+    for (const sizeClass of ['feeder', 'feedermax', 'panamax', 'neo-panamax', 'ulcv'] as const) {
+      const vessels = generateVessels({ count: 2, startS: 0, intervalS: 3600, jitterS: 0, seed, sizeMix: { [sizeClass]: 1 }, flowMix: { import: 8, export: 7, transshipment: 85 } })
+      check({ ...base, vessels, seed })
+    }
+  })
+
+  it('keeps the outer stacks of a bay section clear for the load boxes', () => {
+    // a section uses the fewest stacks nearest the centreline that hold its discharge cells (the odd 20 ft box may add one)
+    for (const [name, config] of presetList) {
+      const plan = planCargo(config, config.seed)
+      for (const v of config.vessels) {
+        const spec = vesselClass(v.sizeClass)
+        const mid = (spec.rows - 1) / 2
+        const cells = arrivalCells(plan, v.id)
+        for (const [section, rows] of topsBySection(cells)) {
+          const deck = section.endsWith('true')
+          const count = cells.filter((c) => `${c.bay}:${c.deck}` === section).length
+          const top = deck ? spec.holdTiers + spec.deckTiers : spec.holdTiers
+          const byCentre = Array.from({ length: spec.rows }, (_, row) => row).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b)
+          let need = 0
+          for (let room = 0; room < count && need < byCentre.length; need++) room += top - stackBaseTier(spec, byCentre[need], deck)
+          expect(rows.size, `${name} ${v.id} ${section}`).toBeLessThanOrEqual(need + 1)
+        }
+      }
+    }
   })
 })
