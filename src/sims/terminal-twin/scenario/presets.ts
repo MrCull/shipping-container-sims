@@ -95,6 +95,13 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
   return b.build()
 }
 
+/**
+ * Moves scale of the TTI presets (#165): 1 = a typical full-size call per class (`DEFAULT_CALL_MOVES`: a Neo-Panamax
+ * discharges about 1,200 and loads about 1,000). It was 0.05 until #165, which left an arriving ship almost all
+ * remain-on-board.
+ */
+export const TTI_MOVES_SCALE = 1
+
 /** Vessel calls for a TTI-style hub: ~85% transshipment, a spread of sizes. */
 function hubVessels(count: number, intervalS: number, jitterS: number, movesScale: number, seed: number, flowMix: FlowMix = TTI_FLOW_MIX): VesselConfig[] {
   return generateVessels({
@@ -127,7 +134,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       tiers: TTI_TIERS,
       shc: 23,
       gate: { inLanes: 3, outLanes: 3 },
-      vessels: hubVessels(4, 3 * 3600, 900, 0.05, 11),
+      vessels: hubVessels(4, 3 * 3600, 900, TTI_MOVES_SCALE, 11),
       // #149: a hub yard holds mostly transshipment boxes waiting for their onward vessel, a minority of imports, and an empty depot
       yardStart: { mode: 'prefilled', targetPct: 60, mix: { import: 25, export: 10, transshipment: 65 } },
       truckScale: 1,
@@ -175,7 +182,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       tiers: TTI_TIERS,
       shc: 23,
       gate: { inLanes: 3, outLanes: 3 },
-      vessels: hubVessels(5, 600, 300, 0.05, 21, PEAK_DAY_FLOW_MIX),
+      vessels: hubVessels(5, 600, 300, TTI_MOVES_SCALE, 21, PEAK_DAY_FLOW_MIX),
       yardStart: { mode: 'prefilled', targetPct: 75, mix: { import: 15, export: 8, transshipment: 77 } },
       truckScale: 3,
       // Peak day: appointments bunched into the first two hours (x1.5, 4 windows). [A] unverified: TTI's real window

@@ -107,10 +107,13 @@ describe('normal scenarios arrive 60 to 80 % full', () => {
     })
   }
 
-  it.each(presetList)('%s', (_name, config) => {
+  // #165: the TTI presets carry full-size calls (moves scale 1), so their load side keeps a share of each hull free and
+  // the arrival fill tops out lower (about 45 to 60 %); the ROB bays shrink to make that room instead of overflowing.
+  const fullSize = new Set(['TTI Algeciras baseline', 'TTI Algeciras, peak day'])
+  it.each(presetList)('%s', (name, config) => {
     expect(config.arrivalFill).toBe(NORMAL_ARRIVAL_FILL)
     for (const { id, share } of fill(config)) {
-      expect(share, id).toBeGreaterThanOrEqual(0.6)
+      expect(share, id).toBeGreaterThanOrEqual(fullSize.has(name) ? 0.4 : 0.6)
       expect(share, id).toBeLessThanOrEqual(0.8)
     }
   })

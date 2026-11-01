@@ -10,7 +10,7 @@ import { t, type MessageKey } from '../../i18n/messages'
 import { makeVesselCall } from '../../scenario/builder'
 import type { VesselConfig, VesselSizeClass } from '../../scenario/types'
 import { VESSEL_CLASSES, VESSEL_SIZE_CLASSES } from '../../scenario/vesselClasses'
-import { flowMixOf, generateVessels, TTI_FLOW_MIX } from '../../scenario/vesselGenerator'
+import { DEFAULT_CALL_MOVES, flowMixOf, generateVessels, TTI_FLOW_MIX } from '../../scenario/vesselGenerator'
 import { fromLocalInputValue, toLocalInputValue } from '../../modules/time'
 import LocaleDateTimeInput from '../LocaleDateTimeInput.vue'
 
@@ -62,9 +62,9 @@ function nextId(): string {
 function addVessel(): void {
   const last = vessels.value[vessels.value.length - 1]
   const id = nextId()
-  vessels.value.push(
-    makeVesselCall(id, { name: id, sizeClass: last?.sizeClass ?? 'panamax', arrivalS: (last?.arrivalS ?? 0) + 3600, discharge: 40 }),
-  )
+  const sizeClass = last?.sizeClass ?? 'panamax'
+  // #165: a new row discharges a typical full-size call of its class (moves scale 1)
+  vessels.value.push(makeVesselCall(id, { name: id, sizeClass, arrivalS: (last?.arrivalS ?? 0) + 3600, discharge: DEFAULT_CALL_MOVES[sizeClass].discharge }))
 }
 
 function removeVessel(i: number): void {
@@ -78,7 +78,7 @@ const gen = reactive({
   intervalH: 6,
   jitterMin: 60,
   seed: 1,
-  movesScale: 0.1,
+  movesScale: 1, // #165: full-size calls by default
   mix: Object.fromEntries(VESSEL_SIZE_CLASSES.map((c) => [c, c === 'panamax' || c === 'neo-panamax' ? 1 : 0])) as Record<
     VesselSizeClass,
     number

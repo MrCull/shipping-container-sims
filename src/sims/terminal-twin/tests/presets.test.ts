@@ -25,6 +25,17 @@ describe('presets', () => {
     expect(ts / boxes).toBeLessThan(0.9)
   })
 
+  it.each(['TTI Algeciras baseline', 'TTI Algeciras, peak day'])('#165: %s calls carry full-size volumes (moves scale 1)', (name) => {
+    // A typical call per class [A]: Feedermax about 550 moves, Panamax 1,100, Neo-Panamax 2,200, ULCV 3,400 (discharge plus load),
+    // each drawn from 80 to 120 % of it. At the old scale 0.05 a Neo-Panamax worked about 110.
+    const typical = { feeder: 300, feedermax: 550, panamax: 1100, 'neo-panamax': 2200, ulcv: 3400 }
+    for (const v of presets[name]().vessels) {
+      const moves = v.discharge + v.load + v.transshipment
+      expect(moves, `${v.id} ${v.sizeClass}`).toBeGreaterThanOrEqual(0.79 * typical[v.sizeClass])
+      expect(moves, `${v.id} ${v.sizeClass}`).toBeLessThanOrEqual(1.21 * typical[v.sizeClass])
+    }
+  })
+
   it('Small automated is 400 m, 3 STS, 6 blocks; TTI Algeciras, peak day has 5 near-simultaneous vessels and a heavy truck peak', () => {
     const small = presets['Small automated']()
     expect([small.quay.lengthM, small.sts.length, small.yard!.blocks.length]).toEqual([400, 3, 6])
