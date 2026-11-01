@@ -457,6 +457,11 @@ export class SceneModel {
     return this.specs[id]
   }
 
+  /** The ROB boxes of one vessel (spec #106): what its hull draws. */
+  robBoxesOf(vesselId: string): RobBox[] {
+    return this.robBoxes.filter((b) => b.vesselId === vesselId)
+  }
+
   /** A box created during the run (a truck brought it). */
   private addContainer(c: NewContainer): void {
     if (this.containerSize[c.id]) return

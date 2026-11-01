@@ -23,6 +23,7 @@ import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, Event
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { createLocationNotation } from '../modules/locationNotation'
 import { defaultBay, type BayViewData } from '../modules/bayView'
+import { bayViewDataAt } from '../modules/bayViewScene'
 import { loadColourBySettings, saveColourBySettings, type ColourBy } from '../modules/colourBySettings'
 import { describeEntity, entityKind, entityQueryKind, transitWorldOf, type EntityExtras, type EntityView } from '../modules/entityInspector'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
@@ -247,7 +248,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const bayViewData = shallowRef<BayViewData | null>(null)
   let bayViewBusy = false
 
-  /** Re-read the shown vessel from the engine (the viewer calls this at a low rate while open). */
+  /** Re-read the shown vessel from the engine, at the 3D display time (the viewer calls this at a low rate while open). */
   async function refreshBayView(): Promise<void> {
     const id = bayViewerVesselId.value
     const c = controller
@@ -255,7 +256,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayViewBusy = true
     try {
       const data = await c.query<BayViewData>('bayView', id)
-      if (bayViewerVesselId.value === id) bayViewData.value = markRaw(data)
+      // the engine runs ahead of the display: show the vessel as the 3D scene draws it now (#159)
+      if (bayViewerVesselId.value === id && c.model) bayViewData.value = markRaw(bayViewDataAt(data, c.model, c.displayTime))
     } catch {
       // the scenario was replaced meanwhile: the next refresh shows the new state
     } finally {

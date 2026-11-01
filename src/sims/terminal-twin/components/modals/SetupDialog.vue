@@ -368,7 +368,7 @@ function onTabKey(e: KeyboardEvent, id: SetupTab): void {
   backdrop-filter: var(--tt-blur);
 }
 
-/* About 90% of the sim area wide (max 1440 px) and capped to its height: the dialog itself never scrolls (#161). */
+/* About 90% of the sim area wide (max 1440 px) and capped to its height: the dialog itself never scrolls (ticket 161). */
 .dialog {
   width: min(90vw, 1440px, 100%);
   height: min(100%, 64rem);

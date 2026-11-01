@@ -28,7 +28,7 @@ const view = computed<BayView | null>(() => {
   if (!data) return null
   const locate = (id: string): string => store.locations.vesselSlot(id)?.notation ?? id
   try {
-    return buildBayView(data, store.bayViewerBay, { colourMode: store.colourBy, locate })
+    return buildBayView(data, store.bayViewerBay, { colourMode: store.colourBy, locate, hideRob: store.hideRob })
   } catch {
     return null
   }

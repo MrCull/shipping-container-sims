@@ -74,6 +74,8 @@ export interface BayViewOptions {
   colourMode: ColourMode
   /** Maritime notation of a vessel slot id (default: the id itself). */
   locate?: (slotId: string) => string
+  /** Hide ROB (colour by menu, #159): ROB cells show as empty, as the 3D hull hides its ROB boxes; the strip still marks ROB bays. */
+  hideRob?: boolean
 }
 
 /** What a hover shows. Everything but `slotId`, `location` and `status` is absent when unknown. */
@@ -326,7 +328,7 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
     slotsHere.set(k, [...(slotsHere.get(k) ?? []), s])
   }
   const robHere = new Map<string, RobBox[]>()
-  for (const b of data.robBoxes) {
+  for (const b of opts.hideRob ? [] : data.robBoxes) {
     if (b.bay !== bay) continue
     const k = `${b.row}:${b.tier}`
     robHere.set(k, [...(robHere.get(k) ?? []), b])
