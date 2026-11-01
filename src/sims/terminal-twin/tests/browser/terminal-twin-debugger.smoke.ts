@@ -146,8 +146,8 @@ test('Esc closes one thing per press, in order, the inspector included; it never
   const errors = collectErrors(page)
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcDroppedAtWtp' }))
+  await page.evaluate(() => window.__tt!.setSpeed(60)) // a speed resumes playback, so pause after it
   await page.evaluate(() => window.__tt!.pause())
-  await page.evaluate(() => window.__tt!.setSpeed(60))
   const ui = () => page.evaluate(() => window.__tt!.ui())
   const clockNow = () => page.evaluate(() => window.__tt!.clock())
   const before = await clockNow()
