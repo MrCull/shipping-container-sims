@@ -5,7 +5,7 @@
  *   - Door end: owner prefix, serial, check digit, ISO size-type code, the weight plate (MAX GROSS / TARE / NET /
  *     CU.CAP in kg and lbs), a CSC plate, a SUPER HEAVY triangle when heavy-rated, a bolt seal on the right-hand
  *     door handle when laden.
- *   - Sides and roof: the box number, and the line name as text in the line's colour (no logo artwork).
+ *   - Sides: the box number, and the line name as text in the line's colour (no logo artwork). Roofs carry no text (#170).
  *   - Wear: rust streaks, dents and faded paint, seeded from the box id so a box always looks the same.
  *
  * Plate values come from the ISO type. Tare is the same table the box properties use (`tareKgOf`), so a plate and
@@ -108,10 +108,6 @@ export interface SideMarkings {
   lineColour: string
 }
 
-export interface RoofMarkings {
-  boxNumber: string
-}
-
 export interface RustStreak {
   /** 0..1 along the face. */
   x: number
@@ -140,7 +136,6 @@ export interface Wear {
 export interface ContainerMarkings {
   door: DoorMarkings
   side: SideMarkings
-  roof: RoofMarkings
   wear: Wear
 }
 
@@ -204,7 +199,6 @@ export function describeMarkings(input: MarkingsInput): ContainerMarkings {
       boltSeal: input.laden,
     },
     side: { boxNumber: number, lineName: livery.line ?? input.line, lineColour: livery.text },
-    roof: { boxNumber: number },
     wear: wearFor(input.id),
   }
 }

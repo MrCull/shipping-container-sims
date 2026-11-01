@@ -4,6 +4,8 @@
  */
 import { describe, expect, it } from 'vitest'
 import { describeMarkings, plateFor, type MarkingsInput, type WeightPlate } from '../modules/containerMarkings'
+import { paintContainer } from '../modules/containerTextures'
+import { TEXTURE_LAYOUT } from '../modules/closeupGeometry'
 import { isValidIso6346, iso6346CheckDigit, makeIso6346Id } from '../scenario/iso6346'
 import { isoTypeOf, tareKgOf } from '../scenario/containerProps'
 
@@ -130,10 +132,13 @@ describe('sides and roof', () => {
   it('prints the box number and the line name in the line colour, no logo', () => {
     const m = describeMarkings(box({ line: 'MSC' }))
     expect(m.side.boxNumber).toBe('CSQU 305438 3')
-    expect(m.roof.boxNumber).toBe('CSQU 305438 3')
     expect(m.side.lineName).toBe('MSC')
     expect(m.side.lineColour).toBe('#1d1d1b')
     expect(m.side).not.toHaveProperty('logo')
+  })
+
+  it('describes no roof text at all (a roof is a plain panel, #170)', () => {
+    expect(describeMarkings(box())).not.toHaveProperty('roof')
   })
 
   it('uses the generic grey livery for an unknown line', () => {
@@ -164,5 +169,65 @@ describe('wear', () => {
 
   it('does not depend on the laden state or the line', () => {
     expect(describeMarkings(box({ laden: false, line: 'ZIM' })).wear).toEqual(describeMarkings(box()).wear)
+  })
+})
+
+/**
+ * A 2D context that records every fillText in canvas pixels: it tracks the affine transform the painter sets per
+ * region (translate, scale, save, restore), so the test sees where the text lands on the box canvas.
+ */
+function recordingContext(): { ctx: CanvasRenderingContext2D; texts: { s: string; x: number; y: number }[] } {
+  type M = [number, number, number, number, number, number]
+  const identity: M = [1, 0, 0, 1, 0, 0]
+  let m: M = identity
+  const stack: M[] = []
+  const texts: { s: string; x: number; y: number }[] = []
+  const gradient = { addColorStop: () => undefined }
+  const ctx = {
+    font: '',
+    fillStyle: '',
+    strokeStyle: '',
+    textAlign: 'left',
+    textBaseline: 'alphabetic',
+    lineWidth: 1,
+    save: () => stack.push([...m] as M),
+    restore: () => {
+      m = stack.pop() ?? identity
+    },
+    translate: (tx: number, ty: number) => {
+      m = [m[0], m[1], m[2], m[3], m[0] * tx + m[2] * ty + m[4], m[1] * tx + m[3] * ty + m[5]]
+    },
+    scale: (sx: number, sy: number) => {
+      m = [m[0] * sx, m[1] * sx, m[2] * sy, m[3] * sy, m[4], m[5]]
+    },
+    beginPath: () => undefined,
+    rect: () => undefined,
+    clip: () => undefined,
+    fillRect: () => undefined,
+    clearRect: () => undefined,
+    strokeRect: () => undefined,
+    moveTo: () => undefined,
+    lineTo: () => undefined,
+    closePath: () => undefined,
+    ellipse: () => undefined,
+    fill: () => undefined,
+    stroke: () => undefined,
+    createLinearGradient: () => gradient,
+    createRadialGradient: () => gradient,
+    fillText: (s: string, x: number, y: number) => texts.push({ s, x: m[0] * x + m[2] * y + m[4], y: m[1] * x + m[3] * y + m[5] }),
+  }
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, texts }
+}
+
+describe('painted box', () => {
+  it('paints no text on the roof of any box, and still prints the sides', () => {
+    for (const size of ['20', '40', '40HC'] as const) {
+      const { ctx, texts } = recordingContext()
+      paintContainer(ctx, describeMarkings(box({ size, line: 'MSC', id: 'MSCU3054383' })), size, '#d8c9a3')
+      const r = TEXTURE_LAYOUT.roof
+      const onRoof = texts.filter((t) => t.x >= r.x && t.x <= r.x + r.w && t.y >= r.y && t.y <= r.y + r.h)
+      expect(onRoof).toEqual([])
+      expect(texts.some((t) => t.s === 'MSC' && t.y < r.y)).toBe(true)
+    }
   })
 })
