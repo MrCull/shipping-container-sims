@@ -16,7 +16,11 @@
  *   westbound apron lane (-X) Z = westboundZ; eastbound (+X) Z = eastboundZ;
  *               crossovers both ways at every apron X (they make the loop).
  *   WTP spurs   eastbound node → pad clear position C → WTP pad P and back.
- *   parking     spurs off the eastbound lane, west of everything, one per SHC.
+ *   parking     (#160) a parking area west of everything, on land inside the terminal apron for any
+ *               SHC count: a two-way aisle (`PA:<row>`) runs landside (+Z) from the eastbound lane at
+ *               `parkingAisleOffsetM` west of the westmost apron X, and each row has a spot either side
+ *               of it (`S:<shcId>`, `parkingSideM` away along X, rows `parkingPitchM` apart from
+ *               `parkingZ`). SHCs drive past parked SHCs on the aisle, never through them.
  *   queue areas (TT-R12, `config.queueAreas`) spurs off the eastbound lane at `queueZ`: a row of spots per
  *               STS (`QS:<stsId>`, near its start gantry X) and per block (`QB:<blockId>`, beside its pads).
  *               Queue spots are rest nodes only (kind 'queue', no conflict zone), like parking.
@@ -36,6 +40,8 @@ export const DEFAULT_APRON_LAYOUT: ApronLayout = {
   padPitchM: 5.5,
   stationSpacingM: 25,
   parkingPitchM: 6,
+  parkingAisleOffsetM: 25,
+  parkingSideM: 10,
   zoneClearanceM: 4,
   queueZ: 58,
   queuePitchM: 8,
@@ -46,7 +52,7 @@ const UP_SPINE_OFFSET_M = 5
 /** STS lanes start this far before the quay and end this far past it (m). */
 const LANE_MARGIN_M = 15
 
-export type LaneNodeKind = 'apron' | 'laneDown' | 'laneUp' | 'padClear' | 'wtpPad' | 'parking' | 'queue'
+export type LaneNodeKind = 'apron' | 'laneDown' | 'laneUp' | 'padClear' | 'wtpPad' | 'parking' | 'parkingAisle' | 'queue'
 
 export interface LaneNode {
   id: string
@@ -57,7 +63,7 @@ export interface LaneNode {
   zone: string | null
 }
 
-export type LaneEdgeKind = 'apron' | 'crossover' | 'spine' | 'stsLane' | 'wtpSpur' | 'parkingSpur' | 'queueSpur'
+export type LaneEdgeKind = 'apron' | 'crossover' | 'spine' | 'stsLane' | 'wtpSpur' | 'parkingAisle' | 'parkingSpur' | 'queueSpur'
 
 export interface LaneEdge {
   from: string
@@ -203,7 +209,7 @@ export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
       if (x >= config.quay.lengthM + LANE_MARGIN_M) break
     }
 
-  // Apron X positions: spines, pads, parking spots.
+  // Apron X positions: spines, pads, the parking aisle.
   const xs = new Set<number>()
   for (const x of stations) {
     xs.add(x)
@@ -212,8 +218,11 @@ export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
   for (const p of graph.pads) xs.add(p.x)
   const shcs = config.shcs ?? []
   const westmost = Math.min(...xs, Infinity)
-  const parkingX = (i: number) => r3((Number.isFinite(westmost) ? westmost : 0) - 20 - i * layout.parkingPitchM)
-  shcs.forEach((_, i) => xs.add(parkingX(i)))
+  // #160: one aisle into a parking area that grows landside (+Z) with the fleet, two spots per row (east side first).
+  const aisleX = r3((Number.isFinite(westmost) ? westmost : 0) - layout.parkingAisleOffsetM)
+  const parkingRowZ = (row: number) => r3(layout.parkingZ + row * layout.parkingPitchM)
+  const parkingSpot = (i: number) => ({ row: Math.floor(i / 2), x: r3(aisleX + (i % 2 === 0 ? 1 : -1) * layout.parkingSideM) })
+  if (shcs.length > 0) xs.add(aisleX)
   // Queue areas (TT-R12): rows of spots clear of every pad column and of each other.
   const qa = config.queueAreas
   const takenX: number[] = graph.pads.map((p) => p.x)
@@ -294,14 +303,23 @@ export function buildLaneGraph(config: ScenarioConfig): LaneGraph {
     edge(c, apronId('E', p.x), 'wtpSpur')
   }
 
-  // Parking spurs.
+  // Parking area (#160): the aisle, both ways, then a spur either side of each aisle node.
+  const rows = Math.ceil(shcs.length / 2)
+  let prev = apronId('E', aisleX)
+  for (let row = 0; row < rows; row++) {
+    const id = `PA:${row + 1}`
+    node(id, aisleX, parkingRowZ(row), 'parkingAisle', null)
+    edge(prev, id, 'parkingAisle')
+    edge(id, prev, 'parkingAisle')
+    prev = id
+  }
   shcs.forEach((shc, i) => {
-    const x = parkingX(i)
+    const { row, x } = parkingSpot(i)
     const id = `S:${shc.id}`
-    node(id, x, layout.parkingZ, 'parking', null)
+    node(id, x, parkingRowZ(row), 'parking', null)
     graph.parkingNode[shc.id] = id
-    edge(apronId('E', x), id, 'parkingSpur')
-    edge(id, apronId('E', x), 'parkingSpur')
+    edge(`PA:${row + 1}`, id, 'parkingSpur')
+    edge(id, `PA:${row + 1}`, 'parkingSpur')
   })
 
   // Queue spots (TT-R12).

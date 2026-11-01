@@ -1,7 +1,7 @@
 /**
  * Where a shuttle carrier faces when it appears (#142). It spawns looking down its first leg, so the first move
- * needs no turn on the spot. Before any leg is known it faces along its parking row towards the work: the
- * parking spots lie west of the apron (`laneGraph.ts`), so that is east (+X, yaw 0).
+ * needs no turn on the spot. Before any leg is known it faces along its parking bay towards the work: the
+ * parking area lies west of the apron and its bays run along X (`laneGraph.ts`, #160), so that is east (+X, yaw 0).
  */
 
 /** Yaw (rad about +Y, three.js sense) of a drive along an axis towards `to`: 0 = +X, -pi/2 = +Z, pi/2 = -Z, pi = -X. */

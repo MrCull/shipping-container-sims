@@ -321,10 +321,13 @@ export class SceneRenderer {
       sts: this.track(new THREE.MeshStandardMaterial({ color: '#3b82c4', roughness: 0.9 })),
       block: this.track(new THREE.MeshStandardMaterial({ color: '#e08a2c', roughness: 0.9 })),
     }
+    // a bay lies along the spur an SHC drives in on: parking spots (#160) off the aisle along X, queue spots along Z
     const bay = (id: string, kind: keyof typeof bayMat) => {
       const n = graph.nodes[id]
-      flat(3.6, 13.6, n.x, 0.03, n.z, bayMat[kind])
-      flat(3.2, 13.2, n.x, 0.035, n.z, padInner)
+      const alongX = graph.edges.some((e) => e.to === id && e.axis === 'x')
+      const [w, l] = alongX ? [13.6, 3.6] : [3.6, 13.6]
+      flat(w, l, n.x, 0.03, n.z, bayMat[kind])
+      flat(w - 0.4, l - 0.4, n.x, 0.035, n.z, padInner)
     }
     for (const id of Object.values(graph.parkingNode)) bay(id, 'parking')
     for (const area of graph.queueAreas) for (const id of area.nodes) bay(id, area.kind)
