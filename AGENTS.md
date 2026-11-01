@@ -21,7 +21,7 @@ Before handing work back after code changes, run **`pnpm run verify`** (dependen
 - **Cloud sessions:** a SessionStart hook (`.claude/hooks/session-start.sh`) runs `pnpm install`; it does nothing locally.
 - **Visual checks:** `pnpm run screenshot --path /sim/<sim-id> --wait 8000` saves a PNG to `.screenshots/` and reports page errors (headless Chromium, software WebGL, so no real frame rates). Options: header of `scripts/screenshot.mjs`.
 - **README media:** `pnpm run capture-readme-media` (after `pnpm run build && pnpm run preview`).
-- **Implementer worktrees:** the brief's first step is `scripts/worktree-base.sh <integration-branch>`, which puts the worktree on the integration tip or refuses with a one-line reason (`scripts/test-worktree-base.sh` tests it). Workflow: `docs/agents/implementing.md`.
+- **Implementer worktrees:** the brief's first step is `scripts/worktree-base.sh <integration-branch>`, which puts the worktree on the integration tip or refuses with a one-line reason (`scripts/test-worktree-base.sh` tests it). Workflow: `docs/agents/implementing.md`. `scripts/merge-ticket.sh` sets the ticket's `handover.md` row after a green merge (`scripts/test-merge-ticket.sh`); `scripts/remove-worktree.sh` removes a finished agent's worktree, locked or not, and refuses one in use (`scripts/test-remove-worktree.sh`).
 
 ## Project structure
 
