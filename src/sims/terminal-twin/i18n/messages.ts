@@ -108,7 +108,7 @@ const en = {
   'preset.peakDay.name': 'Algeciras: peak day',
   'preset.peakDay.watch': 'Watch the gate and the yard first: queues form when trucks and ships peak together. This run is long, so use a high speed and keep the daylight lock on.',
   'preset.small.name': 'Small terminal',
-  'preset.small.watch': 'Watch one ship being worked from berthing to departure, and follow a single box from the ship to a yard stack.',
+  'preset.small.watch': 'Watch the ships being worked from berthing to departure, and follow a single box from the ship to a yard stack.',
   'preset.baseline.tagline': 'A normal day at a big hub',
   'preset.baseline.description': 'A big automated container hub with a long quay, a yard of automated stacking cranes and a steady stream of ships and trucks. A good first run.',
   'preset.peakDay.tagline': 'Everything at once',

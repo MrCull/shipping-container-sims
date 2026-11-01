@@ -60,7 +60,7 @@ defineProps<{ sketch: LayoutSketch }>()
 <style scoped>
 .sketch {
   width: 100%;
-  height: 9rem;
+  height: 7rem;
   background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
   border-radius: var(--tt-radius-sm);

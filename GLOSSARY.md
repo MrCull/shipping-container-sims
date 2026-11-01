@@ -81,7 +81,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Scenario config:** the small, serialisable description of a run (layout, equipment, kinematics, vessel table, cargo mix, end conditions, seed; bay plans and containers are generated from it and the seed). It is built with the **scenario builder**.
 - **Fixture:** a small focused scenario config committed as JSON under `scenario/fixtures/`, with a **golden summary** (`*.golden.json`: KPIs plus event-log hash).
-- **Preset:** a full-size scenario config generated in code (the list lives in Terminal Twin's `scenario/presets.ts`).
+- **Preset:** a named full scenario (TTI Algeciras baseline, Small automated, TTI Algeciras, peak day); every value stays overridable. Shown on the start screen's **Scenarios** tab under a plain name ("Small terminal", "Algeciras: a normal day", "Algeciras: peak day"); the technical name stays in the detail pane. The engine **test fixtures** are the **Test benches** tab, grouped under five headings, each with a plain name and description kept with its definition.
 - **Event:** a happening in the sim, wrapped in the common **envelope** (`id`, `seq`, `t`, `type`, `causedBy`, `subjects`, `payload`).
 - **Root event:** an event with no cause: `ScenarioStarted`, plus any event injected through `inject` (dev API / tests).
 - **Cause chain:** an event's `causedBy` links back to the root, as returned by `why(eventId)`.
