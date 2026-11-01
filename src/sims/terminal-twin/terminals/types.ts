@@ -40,8 +40,8 @@ export interface TerminalScenery {
 
 /** How the UI and renderer treat one named preset of a terminal. */
 export interface TerminalPresetInfo {
-  /** Catalogue keys of its tagline and description. */
-  copy: { tagline: MessageKey; description: MessageKey }
+  /** Catalogue keys of its plain name, tagline, description and what to watch (start screen, #145). */
+  copy: { name: MessageKey; tagline: MessageKey; description: MessageKey; watch: MessageKey }
   /** The bay count comes from a published capacity, not a layout drawing: the setup dialog says so. */
   derivedBays?: boolean
   /** The daylight lock starts on (a long run should stay readable). */

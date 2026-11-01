@@ -1,9 +1,10 @@
 /**
  * Pure display model of the setup dialog's scenario picker (TT-R04): stat chips and the layout sketch of a
- * preset, the rows of the engine-test-fixtures table, and the catalogue keys of the preset copy. Everything
+ * preset, the two sections of the start screen (Scenarios, Test benches), and the catalogue keys of the preset copy. Everything
  * numeric is derived from the `ScenarioConfig`, never written by hand.
  */
-import type { MessageKey } from '../i18n/messages'
+import { t, type MessageKey } from '../i18n/messages'
+import { FIXTURE_GROUPS, fixtureCopy, type FixtureGroupId } from '../scenario/fixtures/definitions'
 import { planOf } from './planModel'
 import { SMALL_PRESET_NAME } from '../scenario/presets'
 import { terminalPresetInfo } from '../terminals'
@@ -72,26 +73,76 @@ export function statChips(stats: ScenarioStats): ChipSpec[] {
   return chips.filter((c) => c.value > 0)
 }
 
-export interface FixtureRow {
-  name: string
-  sts: number
-  vessels: number
-  blocks: number
-  shcs: number
-  landside: boolean
-}
-
-export function fixtureRow(name: string, config: ScenarioConfig): FixtureRow {
-  const s = scenarioStats(config)
-  return { name, sts: s.sts, vessels: s.vessels, blocks: s.blocks, shcs: s.shcs, landside: config.landside !== undefined }
-}
-
-/** Catalogue keys of a preset's tagline and plain-language description; null for a preset without copy. */
-export function presetCopy(name: string): { tagline: MessageKey; description: MessageKey } | null {
+/** Catalogue keys of a preset's plain name, tagline, description and watch hint; null for a preset without copy. */
+export function presetCopy(name: string): { name: MessageKey; tagline: MessageKey; description: MessageKey; watch: MessageKey } | null {
   const terminalPreset = terminalPresetInfo(name)
   if (terminalPreset) return terminalPreset.copy
-  if (name === SMALL_PRESET_NAME) return { tagline: 'preset.small.tagline', description: 'preset.small.description' }
+  if (name === SMALL_PRESET_NAME) {
+    return { name: 'preset.small.name', tagline: 'preset.small.tagline', description: 'preset.small.description', watch: 'preset.small.watch' }
+  }
   return null
+}
+
+export type PickerSection = 'scenarios' | 'benches'
+
+/** One row of the start screen list and the text of its detail pane. `id` is the technical name (what `d.name` holds). */
+export interface PickerItem {
+  id: string
+  section: PickerSection
+  name: string
+  summary: string
+  description: string
+  watch: string
+}
+
+export interface PickerBenchGroup {
+  id: FixtureGroupId
+  title: string
+  items: PickerItem[]
+}
+
+export interface PickerModel {
+  scenarios: PickerItem[]
+  benches: PickerBenchGroup[]
+  /** Number of test benches over all groups (the tab count). */
+  benchCount: number
+}
+
+/**
+ * The two sections of the start screen (#145): presets as Scenarios, engine fixtures as Test benches grouped under
+ * five headings. Counts come from the data. A fixture without display copy is a bug, caught by a test, so it is
+ * listed under its technical name rather than hidden.
+ */
+export function pickerModel(catalogue: readonly { name: string; kind: 'fixture' | 'preset'; description: string }[]): PickerModel {
+  const scenarios: PickerItem[] = []
+  const byGroup = new Map<FixtureGroupId, PickerItem[]>(FIXTURE_GROUPS.map((g) => [g.id, []]))
+  for (const c of catalogue) {
+    if (c.kind === 'preset') {
+      const copy = presetCopy(c.name)
+      scenarios.push({
+        id: c.name,
+        section: 'scenarios',
+        name: copy ? t(copy.name) : c.name,
+        summary: copy ? t(copy.tagline) : '',
+        description: copy ? t(copy.description) : c.description,
+        watch: copy ? t(copy.watch) : '',
+      })
+      continue
+    }
+    const copy = fixtureCopy[c.name]
+    byGroup.get(copy?.group ?? 'flows')!.push({
+      id: c.name,
+      section: 'benches',
+      name: copy?.name ?? c.name,
+      summary: copy?.summary ?? '',
+      description: copy?.description ?? c.description,
+      watch: copy?.watch ?? '',
+    })
+  }
+  // The small preset is the quick start: it leads, then the rest in catalogue order.
+  scenarios.sort((x, y) => Number(y.id === SMALL_PRESET_NAME) - Number(x.id === SMALL_PRESET_NAME))
+  const benches = FIXTURE_GROUPS.map((g) => ({ id: g.id, title: g.title, items: byGroup.get(g.id)! })).filter((g) => g.items.length > 0)
+  return { scenarios, benches, benchCount: benches.reduce((n, g) => n + g.items.length, 0) }
 }
 
 export interface SketchRect {

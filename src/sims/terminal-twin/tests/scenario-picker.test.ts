@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { catalogues } from '../i18n/messages'
-import { fixtureRow, layoutSketch, presetCopy, scenarioDurationS, scenarioStats, statChips } from '../modules/scenarioPicker'
+import { layoutSketch, pickerModel, presetCopy, scenarioDurationS, scenarioStats, statChips } from '../modules/scenarioPicker'
 import { PEAK_DAY_PRESET_NAME, presets } from '../scenario/presets'
 import { fixtures } from '../scenario/fixtures'
+import { FIXTURE_GROUPS, fixtureCopy, fixtureDefinitions } from '../scenario/fixtures/definitions'
+import { scenarioCatalogue } from '../store/twinStore'
 
 describe('scenario picker display model', () => {
   it('derives the chips of every preset from its config', () => {
@@ -19,12 +21,43 @@ describe('scenario picker display model', () => {
     expect(statChips(row).map((c) => c.id)).toEqual(['vessels', 'sts'])
   })
 
-  it('builds a fixture row for each fixture', () => {
-    for (const [name, config] of Object.entries(fixtures)) {
-      const row = fixtureRow(name, config)
-      expect(row.sts).toBe(config.sts.length)
-      expect(row.landside).toBe(config.landside !== undefined)
+  it('has a plain name, group, summary, description and watch hint for every fixture', () => {
+    expect(Object.keys(fixtureCopy).sort()).toEqual(Object.keys(fixtures).sort())
+    expect(Object.keys(fixtureDefinitions).sort()).toEqual(Object.keys(fixtures).sort())
+    const groups = new Set<string>(FIXTURE_GROUPS.map((g) => g.id))
+    const names = new Set<string>()
+    for (const [id, copy] of Object.entries(fixtureCopy)) {
+      expect(groups.has(copy.group), id).toBe(true)
+      expect(copy.name.length, id).toBeGreaterThan(3)
+      expect(copy.name, `${id} shows its technical id as a name`).not.toBe(id)
+      expect(copy.summary.length, id).toBeGreaterThan(15)
+      expect(copy.description.length, id).toBeGreaterThan(40)
+      expect(copy.watch.length, id).toBeGreaterThan(15)
+      expect(names.has(copy.name), `duplicate name ${copy.name}`).toBe(false)
+      names.add(copy.name)
     }
+  })
+
+  it('groups the catalogue into Scenarios and Test benches, with counts from the data', () => {
+    const catalogue = scenarioCatalogue()
+    const model = pickerModel(catalogue)
+    expect(model.scenarios.map((s) => s.id).sort()).toEqual(Object.keys(presets).sort())
+    expect(model.scenarios[0]!.id).toBe('Small automated')
+    expect(model.benchCount).toBe(Object.keys(fixtures).length)
+    expect(model.benches.map((g) => g.title)).toEqual(['Container flows', 'Quay and ships', 'Shuttle carriers', 'Yard and cranes', 'Gate and trucks'])
+    expect(model.benches.flatMap((g) => g.items).map((i) => i.id).sort()).toEqual(Object.keys(fixtures).sort())
+    for (const item of [...model.scenarios, ...model.benches.flatMap((g) => g.items)]) {
+      expect(item.name, item.id).not.toBe(item.id)
+      expect(item.description.length, item.id).toBeGreaterThan(40)
+      expect(item.watch.length, item.id).toBeGreaterThan(15)
+    }
+  })
+
+  it('keeps the technical id as the item id, never as its name (names are display only)', () => {
+    const model = pickerModel(scenarioCatalogue())
+    const small = model.scenarios.find((s) => s.id === 'Small automated')!
+    expect(small.name).toBe('Small terminal')
+    expect(presets['Small automated']!().name).toBe('Small automated')
   })
 
   it('sketches quay, blocks, STS and gate from the config', () => {

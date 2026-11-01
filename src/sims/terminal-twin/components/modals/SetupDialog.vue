@@ -100,8 +100,9 @@ async function submit(): Promise<void> {
         </div>
       </header>
 
-      <ScenarioPicker />
-      <ScenarioDetail :error="formError" />
+      <ScenarioPicker>
+        <ScenarioDetail :error="formError" />
+      </ScenarioPicker>
       <SetupLayoutSection />
       <SetupVesselsSection />
 

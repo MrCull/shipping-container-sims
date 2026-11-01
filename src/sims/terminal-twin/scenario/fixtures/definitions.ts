@@ -973,5 +973,5 @@ export const fixtureDefinitions: Record<string, () => ScenarioConfig> = Object.f
 
 /** Display copy by technical id. */
 export const fixtureCopy: Record<string, FixtureCopy> = Object.fromEntries(
-  Object.entries(fixtureEntries).map(([id, { build: _build, ...copy }]) => [id, copy]),
+  Object.entries(fixtureEntries).map(([id, def]) => [id, { group: def.group, name: def.name, summary: def.summary, description: def.description, watch: def.watch }]),
 )
