@@ -12,8 +12,7 @@ For the next agent. Read this file, then `docs/agents/implementing.md` (orchestr
 
 ## Owner rules for this run (still in force)
 
-- No `pnpm run verify`, full unit suite or browser smoke per ticket. Allowed per ticket: `pnpm run lint`, `pnpm run build`, targeted vitest files that take seconds, headless `pnpm run tt:*` runs in the background, screenshots. The full run happens once, in #150.
-- Merges are plain `git merge` of `tt/<N>-<slug>` branches (no `scripts/merge-ticket.sh` verify), then push, `scripts/remove-worktree.sh <agent-id>`, label the issue `merged-in-branch`. At most two implementers at a time.
+- **Fast mode** (`docs/agents/implementing.md`, section "Fast mode"): per ticket lint, build, `pnpm run test:related <integration-branch>`, screenshot; the full verify, goldens and smoke run once, in #150. After each merge run `pnpm run test:related <previous-tip>`. At most two implementers at a time; label merged issues `merged-in-branch`.
 - Never write the em dash (U+2014) anywhere. Never commit `.blend` files. Reference photos in `docs/reference/` are committed on purpose.
 - The owner may be away: on round 3 they asked for the recommended answer on every question. Make sensible calls and report them.
 
@@ -32,7 +31,8 @@ Owner complaint: TTI baseline calls were tiny (Feedermax 14 discharge, Neo-Panam
    - golden tests (stale on purpose);
    - `prefill-decisions.test.ts` "keeps t = 0 KPIs unchanged": yard fill 14.063 vs 14.0625 at 5 decimals (rounding, predates #163);
    - `container-props` test "the bay plan keeps every id, size, line, slot": the #148 POL/weight pass moves slots when props change;
-   - `terminals.test.ts` check on `tests/browser/scenarioPicker.ts` for the TTI presets (since #156).
+   - `terminals.test.ts` "no generic module outside the terminal folder names a TTI preset" (`tests/browser/scenarioPicker.ts`, since #156).
+   - Also red in a `test:related` run from #163 to 20e7a4b (some may be golden-hash fallout; check after the golden regeneration): `asc-yard-rules` (a full block leaves the box on its pad; likely the #165 `padOptions` block-room filter), `cli.test.ts` (3 tests), `dashboard-model` (landside KPI report rows), `live-driving` (start date/time does not change the run), `truck-turnaround` (booked truck counted as delayed).
 2. `UPDATE_GOLDEN=1 pnpm test` once, on purpose; KPI comparison in the commit.
 3. Smoke: `pnpm run test:smoke --project dev --grep-invert @load`, then prod; procedure in the #150 body (re-run failures alone three times, bisect over ticket merge commits, fix in code). Many specs were written or edited but never run: build stamp, audio, menu-music volume (`src/tests/browser/menu-music-volume.smoke.ts`), dashboard, colour-by, vessel countdown, spreader spawn, close-up (Low and High), presets and picker, setup tabs (`scenarioPicker.ts` now has `openSetupTab`), speed reset (in `terminal-twin.smoke.ts`), bay viewer and bay-plan switch, asc, paired-asc, shc, kpi, subsystem-modes, yard-start. Run the `@load` close-up spec locally only.
 4. Load-sensitive specs from earlier runs: "Run to" popup, debugger follow camera, KPI end condition, container close-up.

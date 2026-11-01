@@ -14,12 +14,20 @@ For the orchestrator running `/implement-spec`, and the brief each **implementer
 5. **Rate limits** end agents mid-ticket with work uncommitted. Resume the same agent with `SendMessage` after the reset rather than starting a new one; its worktree keeps the work.
 6. **Finish.** After the smoke ticket is merged, `/code-review` the integration branch, fix the findings in one implementer, and make the PR body say `Closes #<n>` for the spec and every ticket the branch finishes (GitHub closes only those on merge), mark the draft PR ready (a spec that asks for one PR per slice while the session may push only the integration branch gets one PR; tell the user), remove the remaining worktrees with `scripts/remove-worktree.sh`, delete `handover.md`.
 
+## Fast mode
+
+When the owner asks for it (to save wall-clock time on a long spec), a brief that says **fast mode** replaces the full checks:
+
+- **Implementer:** `pnpm run lint`, `pnpm run build`, `pnpm run test:related <integration-branch>` and a screenshot for UI tickets. No `pnpm run verify`, full unit suite or smoke spec; smoke specs it writes or edits wait for the final smoke ticket. Engine tickets still record a KPI comparison and leave goldens alone.
+- **Orchestrator:** merge with plain `git merge`, then run `pnpm run test:related <previous-tip>` on the merged tree before pushing. A red test there belongs to that ticket: send it back, or fix it before the next merge, so failures never pile up for the end. Golden tests stay red on purpose until the final ticket regenerates them once.
+- **Final smoke ticket:** starts with `pnpm run verify` and the single golden regeneration, then the smoke suite as usual.
+
 ## Implementer brief
 
 - **Read first:** the spec and ticket files named in your brief, the sim guide and `GLOSSARY.md`, and the notes the earlier tickets left (`handover.md`, the sim guide's topic docs).
 - **Base:** `git merge-base --is-ancestor <integration-branch> HEAD`; if not, `git reset --hard <integration-branch>`. Then `git checkout -b tt/<N>-<slug>`.
 - **Build test-first** with the `tdd` skill, through the public seams the spec names (engine API, decision-point handlers, `window.__tt`, asset outputs). Meet every acceptance criterion; say exactly why if one is impossible here.
-- **Prove it:** `pnpm run lint`, `pnpm run build` and the unit tests for the files you changed (`pnpm exec vitest run <files>`), then once `pnpm run verify` in the background. UI tickets also a screenshot you look at, and the smoke specs for your diff (`scripts/smoke-specs-for.sh <integration-branch> HEAD`; run those with `pnpm run test:smoke --project=dev <names>`), plus the specs for any shared control you moved (the setup dialog, the scenario picker; `tests/browser/scenarioPicker.ts`). Do not run the whole smoke suite, `@load` specs, or `golden-update` and `invariants-incremental` more than once: the spec's final smoke ticket runs the rest.
+- **Prove it:** `pnpm run lint`, `pnpm run build` and `pnpm run test:related <integration-branch>` (every unit test that imports a file you changed, committed or not), then once `pnpm run verify` in the background. UI tickets also a screenshot you look at, and the smoke specs for your diff (`scripts/smoke-specs-for.sh <integration-branch> HEAD`; run those with `pnpm run test:smoke --project=dev <names>`), plus the specs for any shared control you moved (the setup dialog, the scenario picker; `tests/browser/scenarioPicker.ts`). Do not run the whole smoke suite, `@load` specs, or `golden-update` and `invariants-incremental` more than once: the spec's final smoke ticket runs the rest.
 - **Commit early**, as soon as verify passes, and again at the end. An implementer that stops (rate limit, disk) with uncommitted work costs a full re-triage. Do not push and do not touch GitHub; the orchestrator does that.
 - **Before reporting:** merge the current integration tip, re-run `pnpm run verify`, update the sim guide and `GLOSSARY.md` for what you added.
 - **Report** (at most 12 lines): branch, tip SHA, worktree path, verify result, unmet criteria and follow-ups.

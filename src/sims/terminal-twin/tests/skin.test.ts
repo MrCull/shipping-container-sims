@@ -35,11 +35,16 @@ function styleOf(file: string): string {
   return [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join('\n')
 }
 
+/** Blanks CSS comments, keeping their newlines so line numbers still match: a ticket reference such as `(#161)` in a comment is not a colour. */
+function withoutComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' ')).replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
+
 describe('skin tokens', () => {
   it('leaves no ad-hoc colours, fonts or global tokens in Terminal Twin components', () => {
     const offenders: string[] = []
     for (const file of surfaceFiles) {
-      styleOf(file)
+      withoutComments(styleOf(file))
         .split('\n')
         .forEach((line, i) => {
           const at = `${relative(root, file)}:${i + 1}`
@@ -49,6 +54,12 @@ describe('skin tokens', () => {
         })
     }
     expect(offenders).toEqual([])
+  })
+
+  it('ignores ticket references in CSS comments', () => {
+    const css = '/* wide dialog (#161) */\n.a { color: var(--tt-text); } // see #abc\n.b { color: #fff; }'
+    const lines = withoutComments(css).split('\n')
+    expect(lines.filter((l) => /#[0-9a-fA-F]{3,8}\b/.test(l))).toEqual(['.b { color: #fff; }'])
   })
 
   it('defines Inter as the UI font and one accent, with amber and red apart', () => {
