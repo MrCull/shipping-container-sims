@@ -64,6 +64,14 @@ export const TTI_GROUND = {
 }
 
 /**
+ * Ticket #172: the north end of the Isla Verde road (the scenery's `landside` part, its GLB and its stand-in) in scene x.
+ * It is the terminal's north land edge, the North Quay's water face (x = -northQuayEdgeM); the sea channel lies north of
+ * it, so the road is cut there and never drawn over the water. Its carriageway (z = `SURROUNDINGS.landside.z`) runs inland
+ * from this line to the south end, and the engine's access road junction (x = the gate's queue X, 43 m) is well inside it.
+ */
+export const TTI_ROAD_NORTH_END_X = -TTI_GROUND.northQuayEdgeM
+
+/**
  * The Rock of Gibraltar across the bay, true scale (scene axes: +x = south along the quay, water towards -z = east).
  * [V] about 5.2 km north to south, about 1.2 km wide, 426 m high; about 9 km east of TTI (the reference map reads
  * 9 to 9.5 km from the quay to the Rock's centre, with the Rock's centre a little south of the terminal's).

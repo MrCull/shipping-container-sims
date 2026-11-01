@@ -8,6 +8,7 @@
  * Asset frame: see `vesselHull.ts`.
  */
 import { rowRange, vesselClass } from '../scenario/vesselClasses'
+import { clipPolygon, type HullMeshData, type Polygon, type Vertex } from './meshClip'
 import type { HullMeta } from './vesselHull'
 
 /** [A] Gap between the hatches of neighbouring bays (m): `HATCH_GAP` in `assets/generators/tt_assets/vessels.py`. */
@@ -83,41 +84,23 @@ export function holdLinerOutline(meta: HullMeta, o: HullHatchOpening, inset = 0.
   return [...quay, ...sea.reverse()]
 }
 
-/** Vertex data of a hull LOD: attribute arrays by name (`position` is required, 3 floats per vertex), triangles by `index` or in order. */
-export interface HullMeshData {
-  index: ArrayLike<number> | null
-  attributes: Record<string, { array: ArrayLike<number>; itemSize: number }>
-}
-
-type Vertex = number[]
-type Polygon = Vertex[]
-
-const lerp = (a: Vertex, b: Vertex, t: number): Vertex => a.map((x, i) => x + (b[i] - x) * t)
-
-/** The part of a convex polygon where `side(v) >= 0` (Sutherland-Hodgman); keeps the winding, interpolates every attribute. */
-function clip(poly: Polygon, side: (v: Vertex) => number): Polygon {
-  const out: Polygon = []
-  for (let i = 0; i < poly.length; i++) {
-    const a = poly[i]
-    const b = poly[(i + 1) % poly.length]
-    const da = side(a)
-    const db = side(b)
-    if (da >= 0) out.push(a)
-    if (da >= 0 !== db >= 0) out.push(lerp(a, b, da / (da - db)))
-  }
-  return out
-}
+export type { HullMeshData }
 
 /** The parts of a triangle outside the rectangle of an opening, as triangles. */
 function outsideOpening(tri: Polygon, o: HullHatchOpening): Polygon[] {
   const xs = tri.map((v) => v[0])
   const zs = tri.map((v) => v[2])
   if (Math.max(...xs) <= o.x0 || Math.min(...xs) >= o.x1 || Math.max(...zs) <= o.zSea || Math.min(...zs) >= o.zQuay) return [tri]
-  const strip = clip(
-    clip(tri, (v) => v[0] - o.x0),
+  const strip = clipPolygon(
+    clipPolygon(tri, (v) => v[0] - o.x0),
     (v) => o.x1 - v[0],
   )
-  const parts = [clip(tri, (v) => o.x0 - v[0]), clip(tri, (v) => v[0] - o.x1), clip(strip, (v) => o.zSea - v[2]), clip(strip, (v) => v[2] - o.zQuay)]
+  const parts = [
+    clipPolygon(tri, (v) => o.x0 - v[0]),
+    clipPolygon(tri, (v) => v[0] - o.x1),
+    clipPolygon(strip, (v) => o.zSea - v[2]),
+    clipPolygon(strip, (v) => v[2] - o.zQuay),
+  ]
   const out: Polygon[] = []
   for (const poly of parts) for (let i = 1; i + 1 < poly.length; i++) out.push([poly[0], poly[i], poly[i + 1]])
   return out

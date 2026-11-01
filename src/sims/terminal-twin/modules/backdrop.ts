@@ -8,6 +8,7 @@ import * as THREE from 'three'
 import { terminalForScenario } from '../terminals'
 import type { SceneryContext, TerminalScenery } from '../terminals/types'
 import { jaggedRidge, ridge } from './backdropGeometry'
+import { clipMeshToHalfSpace } from './meshClip'
 import type { InfraAssetName, InfraAssets } from './infrastructureAssets'
 
 /** `generic`, or the kind of a terminal's scenery (`tti`). */
@@ -40,6 +41,27 @@ export function sceneryFor(scenarioName: string): TerminalScenery {
  */
 export function backdropModelAssets(scenery: TerminalScenery): InfraAssetName[] {
   return Object.values(scenery.modelParts).filter((a): a is InfraAssetName => a !== undefined)
+}
+
+/**
+ * Ticket #172: the part of a baked geometry at `x >= minX` (in the geometry's own frame), as a new geometry with every
+ * attribute kept. Triangles that cross the line are cut on it; the shared loader cache's geometry is not touched.
+ */
+function clipGeometryToX(geometry: THREE.BufferGeometry, minX: number): THREE.BufferGeometry {
+  const names = Object.keys(geometry.attributes)
+  const cut = clipMeshToHalfSpace(
+    {
+      index: geometry.index ? (geometry.index.array as ArrayLike<number>) : null,
+      attributes: Object.fromEntries(names.map((n) => [n, { array: geometry.attributes[n].array as ArrayLike<number>, itemSize: geometry.attributes[n].itemSize }])),
+    },
+    0,
+    minX,
+  )
+  const out = new THREE.BufferGeometry()
+  for (const n of names) out.setAttribute(n, new THREE.BufferAttribute(cut[n], geometry.attributes[n].itemSize))
+  out.computeBoundingBox()
+  out.computeBoundingSphere()
+  return out
 }
 
 export interface Backdrop {
@@ -80,6 +102,7 @@ export function buildBackdrop(scenery: TerminalScenery, quayLengthM: number): Ba
 
   scenery.build({ group, quayLengthM, flat, add, track: (thing) => disposables.push(thing) })
   const modelParts = Object.entries(scenery.modelParts) as [string, InfraAssetName][]
+  const modelClipX = scenery.modelClipX ?? {}
   const backdrop: Backdrop = {
     kind: scenery.kind,
     group,
@@ -89,10 +112,16 @@ export function buildBackdrop(scenery: TerminalScenery, quayLengthM: number): Ba
       if (modelParts.length === 0 || backdrop.models === 'glb') return
       for (const [part, asset] of modelParts) {
         const mesh = group.getObjectByName(part) as THREE.Mesh | undefined
-        const geometry = assets.geometries[asset]
+        let geometry = assets.geometries[asset]
         if (!mesh || !geometry) continue
+        const minX = modelClipX[part]
+        if (minX !== undefined) {
+          // the GLB's frame is the mesh's: its origin sits at `mesh.position`
+          geometry = clipGeometryToX(geometry, minX - mesh.position.x)
+          disposables.push(geometry)
+        }
         mesh.geometry.dispose()
-        mesh.geometry = geometry // shared with the loader's cache: not disposed here
+        mesh.geometry = geometry // shared with the loader's cache: not disposed here (a clipped copy is, with the backdrop)
         mesh.material = assets.material
       }
       backdrop.models = 'glb'

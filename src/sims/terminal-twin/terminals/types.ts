@@ -28,6 +28,11 @@ export interface TerminalScenery {
   parts: string[]
   /** Parts a phase 2 GLB replaces once loaded: part name to asset. Parts not listed stay procedural. */
   modelParts: Partial<Record<string, InfraAssetName>>
+  /**
+   * Ticket #172: world x (m) a model part is cut at once its GLB loads: the part keeps the side x >= this value. For a part
+   * whose baked geometry runs past where it should stop (over water), so the GLB matches its stand-in. Parts not listed are not cut.
+   */
+  modelClipX?: Partial<Record<string, number>>
   /** Fog far distance (m): far enough that the farthest scenery is hazy, not erased. */
   fogFarM: number
   /**
