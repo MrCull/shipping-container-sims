@@ -68,6 +68,26 @@ const PREFILL_SALT = 0x2f6e2b1
 /** A grouped box keeps to the blocks that hold its group until they are this full, then it spills to the emptiest block. */
 const GROUP_BLOCK_MAX_FILL = 0.9
 
+/** The line a pre-filled import stacks under (#163): imports stack by flow and departure order, not by line. */
+const ANY_LINE = '*'
+
+/**
+ * The grouping view of a pre-filled box (#163): an import's line is left out, so its stacks (and blocks) mix lines;
+ * every other group is the grouped strategy's own (an empty keeps its line: a stack of empties holds one line's boxes).
+ */
+function prefillView(line: string, size: ContainerSize, props: ContainerProps): YardBoxView {
+  const view = yardViewOfProps(line, size, props)
+  return view.direction === 'IMPORT' ? { ...view, line: ANY_LINE } : view
+}
+
+/**
+ * The group a pre-filled box keeps to the blocks of (#163): its stack group, except that empties of one size and ISO
+ * type share blocks whatever their line, so a block of empties mixes lines while each stack holds one line.
+ */
+function prefillBlockKey(view: YardBoxView): string {
+  return view.direction === 'STORAGE' ? `STO|${view.size}|${view.isoType}` : yardGroupKey(view)
+}
+
 /** The placer for a config: a custom synchronous handler, else the configured (or default) strategy. */
 export function yardPlacerOf(config: ScenarioConfig, custom?: DecisionHandler<'yardAllocation'>): YardPlacer {
   const name = config.decisions?.points?.yardAllocation?.strategy ?? strategies.yardAllocation.default
@@ -116,8 +136,8 @@ export function* prefillSteps(
     box: { id: string; size: ContainerSize; full: boolean; line: string; vesselId: string; reefer?: true; props?: ContainerProps },
     strict = true,
   ): Generator<YardAllocationRequest, ExportPlacement | null, string | null> {
-    const view = grouped && box.props ? yardViewOfProps(box.line, box.size, box.props) : null
-    const key = view ? yardGroupKey(view) : ''
+    const view = grouped && box.props ? prefillView(box.line, box.size, box.props) : null
+    const key = view ? prefillBlockKey(view) : ''
     // lowest fill first (a grouped box: the blocks that hold its group first); a block without a legal slot passes the box on
     const fill = (b: (typeof blocks)[number]) => b.used / b.capacity
     const own = (b: (typeof blocks)[number]) => (view && (b.groups.get(key) ?? 0) > 0 && fill(b) < GROUP_BLOCK_MAX_FILL ? 0 : 1)
