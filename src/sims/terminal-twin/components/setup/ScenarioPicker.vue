@@ -7,8 +7,9 @@ import { pickerModel, pickerSectionOf, type PickerItem, type PickerSection } fro
 /**
  * Start screen picker (#145): a Scenarios tab (the presets) and a Test benches tab (the engine fixtures under five
  * headings), each a list of plain names. Choosing a row sets `d.name`; the detail pane (the default slot, shown
- * beside the list and below it on a phone) describes it and holds the one Start button. Technical ids are never shown
- * (#156); rows carry them in `data-scenario`.
+ * beside the list and below it on a phone) describes it. Start is in the setup dialog's footer (#161). On a wide
+ * screen the picker fills the Scenario tab and the list and the detail scroll on their own. Technical ids are never
+ * shown (#156); rows carry them in `data-scenario`.
  */
 const d = useSetupDraft()
 
@@ -179,6 +180,26 @@ function openTab(next: PickerSection): void {
   align-items: start;
 }
 
+/* Wide: the picker fills the tab body; the list and the detail pane each scroll, the tab body does not. */
+@media (min-width: 761px) {
+  .picker {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .split {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .split > :deep(*) {
+    min-height: 0;
+    overflow: auto;
+  }
+}
+
 @media (max-width: 760px) {
   .split {
     grid-template-columns: minmax(0, 1fr);
@@ -186,7 +207,6 @@ function openTab(next: PickerSection): void {
 }
 
 .list {
-  max-height: 34rem;
   overflow: auto;
   background: var(--tt-surface);
   border: 1px solid var(--tt-border);

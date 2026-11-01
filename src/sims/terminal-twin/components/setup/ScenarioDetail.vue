@@ -9,10 +9,9 @@ import LayoutSketchView from './LayoutSketch.vue'
 
 /**
  * Detail pane of the selected scenario or test bench (start screen, #145): plain name, what it shows and what to
- * watch for, the layout sketch, stat chips, size of the run, the set-up facts and the one prominent Start button.
- * No technical id is shown (#156): it stays in `data-scenario` on the pane.
+ * watch for, the layout sketch, stat chips, size of the run and the set-up facts. Start sits in the setup dialog's pinned
+ * footer (#161). No technical id is shown (#156): it stays in `data-scenario` on the pane.
  */
-defineProps<{ error: string | null }>()
 
 const d = useSetupDraft()
 const store = useTwinStore()
@@ -74,18 +73,9 @@ const summary = computed(() => {
     :aria-label="t('setup.detail.title')"
   >
     <span class="kind">{{ isBench ? t('setup.kind.bench') : t('setup.kind.scenario') }}</span>
-    <div class="head">
-      <h3 data-testid="tt-detail-name">
-        {{ item?.name ?? scenarioDisplayName(d.name) }}
-      </h3>
-      <button
-        type="submit"
-        class="start"
-        :disabled="store.loading || d.check.errors.length > 0"
-      >
-        {{ store.loading ? t('setup.starting') : t('setup.startButton') }}
-      </button>
-    </div>
+    <h3 data-testid="tt-detail-name">
+      {{ item?.name ?? scenarioDisplayName(d.name) }}
+    </h3>
     <p
       v-if="item?.summary"
       class="lead"
@@ -174,13 +164,6 @@ const summary = computed(() => {
         </div>
       </dl>
     </section>
-
-    <p
-      v-if="error || store.error"
-      class="error"
-    >
-      {{ error ?? store.error }}
-    </p>
   </section>
 </template>
 
@@ -198,19 +181,17 @@ const summary = computed(() => {
   background: var(--tt-surface);
 }
 
+/* The pane may scroll on its own (wide Scenario tab): its parts keep their size. */
+.detail > * {
+  flex: none;
+}
+
 .kind {
   color: var(--tt-accent);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
 }
 
 h3 {
@@ -236,25 +217,6 @@ h4 {
 .text {
   font-size: 0.92rem;
   line-height: 1.55;
-}
-
-.start {
-  flex: none;
-  padding: 0.65rem 2.2rem;
-  background: var(--tt-accent);
-  border: 1px solid var(--tt-accent);
-  border-radius: var(--tt-radius);
-  color: var(--tt-on-accent);
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.start:hover:not(:disabled) {
-  background: var(--tt-accent-hover);
-}
-
-.start:disabled {
-  opacity: 0.5;
 }
 
 .chips {
@@ -298,8 +260,4 @@ h4 {
   font-variant-numeric: tabular-nums;
 }
 
-.error {
-  color: var(--tt-danger);
-  font-size: 0.85rem;
-}
 </style>
