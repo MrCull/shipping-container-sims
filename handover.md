@@ -13,8 +13,8 @@ Ticket texts for implementers: `scratchpad/tickets-r4.md` (scratchpad of the orc
 | #169 | Esc order incl. inspector | #168 | merged in branch (36b967a) | |
 | #170 | livery and corrugation at distance, no roof text | none | merged in branch (1c82e5e), partly: wordmark at yard overview open, see the issue | |
 | #171 | daylight start, mute on entry | none | merged in branch (40eed57) | |
-| #172 | scenery road stops at land edge | none | to do | |
-| #173 | no hatch covers when hatch ops off | none | in progress | implementer (wave 3) |
+| #172 | scenery road stops at land edge | none | in progress | implementer (wave 4) |
+| #173 | no hatch covers when hatch ops off | none | merged in branch (9bc2f83) | |
 | #174 | no floating box, tier stow sequence | none | merged in branch | |
 | #175 | trucks never stranded at ASC transfer points | none | merged in branch | |
 | #176 | realistic volumes: blockers measured (narrowed by #178) | | merged in branch (a4f3827) | |
