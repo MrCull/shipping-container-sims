@@ -8,7 +8,7 @@ Ticket texts for implementers: `scratchpad/tickets-r4.md` (scratchpad of the orc
 
 | Ticket | Subject | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
-| #167 | tt:profile | none | to do | |
+| #167 | tt:profile | none | merged in branch (10982ae) | |
 | #168 | ROB switch, popup closes | none | to do | |
 | #169 | Esc order incl. inspector | #168 | to do | |
 | #170 | livery and corrugation at distance, no roof text | none | to do | |
