@@ -11,7 +11,7 @@ Ticket texts for implementers: `scratchpad/tickets-r4.md` (scratchpad of the orc
 | #167 | tt:profile | none | merged in branch (10982ae) | |
 | #168 | ROB switch, popup closes | none | merged in branch | |
 | #169 | Esc order incl. inspector | #168 | merged in branch (36b967a) | |
-| #170 | livery and corrugation at distance, no roof text | none | to do | |
+| #170 | livery and corrugation at distance, no roof text | none | in progress | implementer (wave 3) |
 | #171 | daylight start, mute on entry | none | to do | |
 | #172 | scenery road stops at land edge | none | to do | |
 | #173 | no hatch covers when hatch ops off | none | to do | |
