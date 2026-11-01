@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { SURFACE } from '../modules/dashboardPalette'
-import { DATA_PALETTE, RAMP_PALETTE } from '../modules/colourBy'
+import { DATA_PALETTE, DWELL_PALETTE, LENGTH_PALETTE, RAMP_PALETTE } from '../modules/colourBy'
 
 /**
  * Terminal Twin skin (#122): every component takes its colours and fonts from the `--tt-*` tokens in `skin.css`,
@@ -67,6 +67,10 @@ describe('skin tokens', () => {
     const t = tokens()
     expect(DATA_PALETTE.map((_, i) => t.get(`--tt-data-${i}`))).toEqual([...DATA_PALETTE])
     expect(RAMP_PALETTE.map((_, i) => t.get(`--tt-ramp-${i}`))).toEqual([...RAMP_PALETTE])
+    expect(DWELL_PALETTE.map((_, i) => t.get(`--tt-dwell-${i}`))).toEqual([...DWELL_PALETTE])
+    expect(LENGTH_PALETTE.map((_, i) => t.get(`--tt-length-${i}`))).toEqual([...LENGTH_PALETTE])
+    expect([...t.keys()].filter((k) => /^--tt-dwell-\d+$/.test(k))).toHaveLength(DWELL_PALETTE.length)
+    expect([...t.keys()].filter((k) => /^--tt-length-\d+$/.test(k))).toHaveLength(LENGTH_PALETTE.length)
     // no extra numbered token without a palette entry
     expect([...t.keys()].filter((k) => /^--tt-data-\d+$/.test(k))).toHaveLength(DATA_PALETTE.length)
     expect([...t.keys()].filter((k) => /^--tt-ramp-\d+$/.test(k))).toHaveLength(RAMP_PALETTE.length)
