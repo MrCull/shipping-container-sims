@@ -614,6 +614,11 @@ export interface StsState {
   railTargetX: number | null
   /** A second gantry position the waiting move needs as well (a hatch move visiting the laydown, TT-R09). */
   railAlsoX?: number | null
+  /**
+   * The crane is repositioning out of the way of a waiting neighbour while it still holds vessel work (#174, the bounded
+   * yield in `engine/subsystems/rail.ts`). It resumes that work when the reposition completes. Absent = false.
+   */
+  railYield?: boolean
   /** Boxes on the spreader (two for a twin-20 lift), aft first. */
   carrying: string[]
   /** Ground positions chosen for the carried boxes, in set-down order. */

@@ -3,12 +3,13 @@
  * checks of the ordering functions with plain data.
  */
 import { describe, expect, it } from 'vitest'
-import { countDischargeSplits, createSimulation, orderDischarge, orderLoad, type EngineEvent, type OrderBox, type OrderCell, type OrderEntry, type Simulation } from '../engine'
+import { countDischargeSplits, createSimulation, orderDischarge, orderLoad, stowSequenceOf, type EngineEvent, type OrderBox, type OrderCell, type OrderEntry, type Simulation } from '../engine'
 import { runCli } from '../cli/runCli'
 import { ScenarioBuilder } from '../scenario/builder'
 import type { ContainerProps } from '../scenario/containerProps'
 import { fixtures } from '../scenario/fixtures'
 import { fixtureDefinitions } from '../scenario/fixtures/definitions'
+import { validateScenario } from '../scenario/validate'
 import type { ScenarioConfig, VesselOrdering } from '../scenario/types'
 
 const PORTS = ['ESALG', 'MAPTM', 'ESVLC', 'NLRTM']
@@ -51,7 +52,7 @@ const cell = (row: number, tier: number, half: OrderCell['half'] = null): OrderC
 const seq = (list: OrderEntry<OrderCell>[]) => list.map((e) => `${e.slot.row}/${e.slot.tier}`)
 
 describe('pod-weight ordering functions', () => {
-  it('discharges stack by stack, top-down, the stacks in yard-group order', () => {
+  it('discharges tier by tier across the stacks of a section, highest first (stow sequence tier, #174)', () => {
     const entries: OrderEntry<OrderCell>[] = [
       { slot: cell(1, 1), box: box({ line: 'MSC' }) },
       { slot: cell(1, 2), box: box({ line: 'MSC' }) },
@@ -60,8 +61,21 @@ describe('pod-weight ordering functions', () => {
       { slot: cell(3, 2), box: box({ line: 'MSC' }) },
       { slot: cell(3, 1), box: box({ line: 'MSC' }) },
     ]
-    // imports group by line: CMA before MSC; rows 1 and 3 (both MSC) keep row order; every stack is top-down
-    expect(seq(orderDischarge(entries, PORTS))).toEqual(['2/2', '2/1', '1/2', '1/1', '3/2', '3/1'])
+    // tier 2 first (CMA before MSC by yard group, then row), then tier 1 the same way: no stack is emptied to the floor first
+    expect(seq(orderDischarge(entries, PORTS))).toEqual(['2/2', '1/2', '3/2', '2/1', '1/1', '3/1'])
+  })
+
+  it('discharge tiers never rise within a bay section, whatever the yard groups', () => {
+    const entries: OrderEntry<OrderCell>[] = []
+    for (let tier = 1; tier <= 4; tier++)
+      for (let row = 1; row <= 4; row++) entries.push({ slot: cell(row, tier), box: box({ line: ['MSC', 'CMA', 'ONE'][(tier + row) % 3] }) })
+    const tiers = orderDischarge(entries, PORTS).map((e) => e.slot.tier)
+    expect(tiers).toEqual([...tiers].sort((a, b) => b - a))
+  })
+
+  it('the stow sequence defaults to tier and is read from vesselPlanning.stowSequence', () => {
+    expect(stowSequenceOf(fixtures['vessel-ordering-pod-weight'])).toBe('tier')
+    expect(stowSequenceOf({ ...fixtures['vessel-ordering-pod-weight'], vesselPlanning: { ordering: 'pod-weight', stowSequence: 'tier' } })).toBe('tier')
   })
 
   it('loads bottom-up; inside a tier later PODs first, then heavier boxes', () => {
@@ -190,6 +204,54 @@ describe('vessel-ordering-pod-weight fixture', () => {
   })
 })
 
+describe('tier stow sequence on the vessel-ordering fixture (#174)', () => {
+  const config = fixtures['vessel-ordering-pod-weight']
+  const sim = run(config)
+  const asToday = run(withOrdering(config, 'as-today'))
+  const initial = createSimulation(config)
+  /** Each box's cell (discharge: on board; load: its booked slot). */
+  const cellOfBox = new Map<string, { tier: number }>()
+  for (const s of initial.query.vesselSlots('V001')) {
+    const id = s.purpose === 'discharge' ? s.containerId : s.plannedContainerId
+    if (id) cellOfBox.set(id, s)
+  }
+  const packages = (s: Simulation) => s.query.workPackages().filter((p) => (p.kind === 'discharge' || p.kind === 'load') && !p.emptyReq)
+
+  it('within each bay section discharge tiers do not rise and load tiers do not fall', () => {
+    expect(packages(sim).length).toBeGreaterThan(0)
+    for (const p of packages(sim)) {
+      const tiers = p.containerIds.map((id) => cellOfBox.get(id)!.tier)
+      expect(tiers.length, p.id).toBeGreaterThan(0)
+      const expected = [...tiers].sort((a, b) => (p.kind === 'discharge' ? b - a : a - b))
+      expect(tiers, `${p.id} ${p.kind} bay ${p.bay} ${p.section}`).toEqual(expected)
+    }
+  })
+
+  it('discharge finishes before load in each bay', () => {
+    const order = sim.query.workPackages().filter((p) => p.kind === 'discharge' || p.kind === 'load')
+    for (const bay of new Set(order.map((p) => p.bay))) {
+      const discharge = order.filter((p) => p.bay === bay && p.kind === 'discharge').map((p) => p.seq)
+      const load = order.filter((p) => p.bay === bay && p.kind === 'load').map((p) => p.seq)
+      if (discharge.length > 0 && load.length > 0) expect(Math.max(...discharge), `bay ${bay}`).toBeLessThan(Math.min(...load))
+    }
+  })
+
+  it('keeps the bay order of as-today (discharge packages in the same bays, in the same order)', () => {
+    const bays = (s: Simulation) =>
+      s.query
+        .workPackages()
+        .filter((p) => p.kind === 'discharge')
+        .sort((a, b) => a.seq - b.seq)
+        .map((p) => `${p.bay}:${p.section}`)
+    expect(bays(sim)).toEqual(bays(asToday))
+  })
+
+  it('the default stow sequence is tier: naming it changes nothing', () => {
+    const named = run({ ...config, vesselPlanning: { ordering: 'pod-weight', stowSequence: 'tier' } })
+    expect(named.eventLogHash()).toBe(sim.eventLogHash())
+  })
+})
+
 describe('selecting the ordering', () => {
   it('an absent ordering is pod-weight (the default since #114); as-today reports no ordering KPIs', () => {
     for (const name of ['mixed-discharge-then-load', 'stow-mixed-20-40']) {
@@ -220,6 +282,12 @@ describe('selecting the ordering', () => {
 
   it('the builder sets the option', () => {
     expect(new ScenarioBuilder('x', 'x').vesselPlanning({ ordering: 'pod-weight' }).build().vesselPlanning).toEqual({ ordering: 'pod-weight' })
+  })
+
+  it('a stow sequence other than tier is a setup error', () => {
+    const base = fixtures['tracer-1sts-10-boxes']
+    expect(validateScenario({ ...base, vesselPlanning: { stowSequence: 'tier' } }).errors).toEqual([])
+    expect(validateScenario({ ...base, vesselPlanning: { stowSequence: 'sideways' as 'tier' } }).errors.length).toBeGreaterThan(0)
   })
 })
 

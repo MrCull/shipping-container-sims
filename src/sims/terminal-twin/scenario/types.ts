@@ -292,9 +292,17 @@ export interface WeightClassBands {
 /** Work order within a package: `as-today` (stack geometry only) or `pod-weight` (POD- and weight-aware soft preferences). */
 export type VesselOrdering = 'as-today' | 'pod-weight'
 
+/** Stow sequence policy (#174, ENGINE_VERSION 0.34.0): `tier`, the only value (see `engine/vesselOrdering.ts`). */
+export type StowSequence = 'tier'
+
 export interface VesselPlanningConfig {
   /** Default `pod-weight` (since ENGINE_VERSION 0.25.0); `as-today` is the rollback. */
   ordering?: VesselOrdering
+  /**
+   * Stow sequence (#174, ENGINE_VERSION 0.34.0): the order of a bay section's moves. Only `tier` exists and it is the
+   * default: discharge highest tier first across all stacks, load lowest tier first.
+   */
+  stowSequence?: StowSequence
 }
 
 /**

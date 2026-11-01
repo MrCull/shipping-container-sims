@@ -572,6 +572,43 @@ export const INVARIANTS: Invariant[] = [
     },
   },
   {
+    id: 'stowage.no-floating',
+    reads: ['vessel', 'container'],
+    description:
+      'No floating box (#174): every box on board (discharge, load, transshipment and ROB) above its stack base has a box ' +
+      'directly below it in the same bay and row (a half needs a half or a whole cell below). Stack bases are the hull floor ' +
+      'or hatch cover (`isStackBase`). Checked on arrival and after every vessel move.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      const occupied = new Map<string, ('aft' | 'fore' | null)[]>()
+      const onBoard: { label: string; vesselId: string; bay: number; row: number; tier: number; half: 'aft' | 'fore' | null }[] = []
+      for (const s of Object.values(state.vesselSlots)) {
+        if (!s.containerId) continue
+        if (scope && !scope.vessels.has(s.vesselId)) continue
+        const key = `${s.vesselId}:${s.bay}:${s.row}:${s.tier}`
+        occupied.set(key, [...(occupied.get(key) ?? []), s.half])
+        onBoard.push({ label: `box ${s.containerId} in ${s.id}`, vesselId: s.vesselId, bay: s.bay, row: s.row, tier: s.tier, half: s.half })
+      }
+      for (const vessel of Object.values(state.vessels)) {
+        if (scope && !scope.vessels.has(vessel.id)) continue
+        for (const b of vessel.robBoxes ?? []) {
+          const key = `${vessel.id}:${b.bay}:${b.row}:${b.tier}`
+          occupied.set(key, [...(occupied.get(key) ?? []), b.half])
+          onBoard.push({ label: `ROB box ${b.slotId}`, vesselId: vessel.id, bay: b.bay, row: b.row, tier: b.tier, half: b.half })
+        }
+      }
+      for (const b of onBoard) {
+        const spec = vesselClass(state.vessels[b.vesselId].sizeClass)
+        if (isStackBase(spec, b.row, b.tier)) continue
+        const below = occupied.get(`${b.vesselId}:${b.bay}:${b.row}:${b.tier - 1}`) ?? []
+        if (!below.some((h) => h === null || b.half === null || h === b.half))
+          messages.push(`${b.label} floats (bay ${b.bay} row ${b.row} tier ${b.tier}): nothing below it`)
+      }
+      return messages
+    },
+  },
+  {
     id: 'hull.profile',
     reads: ['vessel', 'container'],
     description:

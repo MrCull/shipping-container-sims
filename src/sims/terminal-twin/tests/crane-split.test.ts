@@ -147,6 +147,23 @@ describe('crane split decision point', () => {
     expect(sim.invariantReport().violations).toEqual([])
   })
 
+  it('runs the adjacent feeders to the end with every move done: no rail stall between two busy cranes (#174)', () => {
+    // a stall passes every invariant (nothing moves, nothing is wrong), so the move count is the check
+    const config = new ScenarioBuilder('adjacent', 'two feeders side by side, four cranes').hatch({ enabled: false })
+      .quay(400, { mooringS: 60, unmooringS: 60, berthGapM: 20 })
+      .sts('STS01', { gantryX: 30, groundPositions: 20 })
+      .sts('STS02', { gantryX: 120, groundPositions: 20 })
+      .sts('STS03', { gantryX: 210, groundPositions: 20 })
+      .sts('STS04', { gantryX: 300, groundPositions: 20 })
+      .vesselCall('V001', { sizeClass: 'feeder', discharge: 20, maxSts: 2 })
+      .vesselCall('V002', { sizeClass: 'feeder', arrivalS: 5, discharge: 20, maxSts: 2 })
+      .build()
+    const sim = createSimulation(config)
+    expect(sim.runUntil().reason).toBe('ended')
+    expect(sim.kpiReport().movesCompleted).toBe(40)
+    expect(sim.invariantReport().violations).toEqual([])
+  })
+
   it('rejects a split whose bay order contradicts the cranes’ rail order', () => {
     const sim = createSimulation(craneSplit, {
       craneSplit: (msg) => {

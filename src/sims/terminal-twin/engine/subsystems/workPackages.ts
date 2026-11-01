@@ -17,7 +17,7 @@ import type { SimState, StsState, VesselSlotState, WorkPackage } from '../state'
 import { hatchPanelOfRow, vesselClass } from '../../scenario/vesselClasses'
 import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import { resolveContainerProps } from '../../scenario/containerProps'
-import { countDischargeSplits, countLoadBreaks, orderDischarge, orderLoad, vesselOrderingOf } from '../vesselOrdering'
+import { countDischargeSplits, countLoadBreaks, orderDischarge, orderLoad, stowSequenceOf, vesselOrderingOf } from '../vesselOrdering'
 import { continueWork } from './quay'
 import { pumpLoadPrep } from './loadPrep'
 import { raiseEmptiesRequired } from './empties'
@@ -67,6 +67,7 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
     const dischargeSeq = orderDischarge(
       discharge.map((slot) => ({ slot, box: entry(slot.containerId) })),
       ports,
+      stowSequenceOf(ctx.config),
     )
     const loadSeq = orderLoad(
       load.map((slot) => ({ slot, box: entry(slot.plannedContainerId) })),

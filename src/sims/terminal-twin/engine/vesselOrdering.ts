@@ -8,13 +8,23 @@
  */
 import type { ContainerProps } from '../scenario/containerProps'
 import { grossKgOf, WEIGHT_RANK } from '../scenario/containerProps'
-import type { ScenarioConfig, VesselOrdering } from '../scenario/types'
+import type { ScenarioConfig, StowSequence, VesselOrdering } from '../scenario/types'
 
 /** The default work order (spec #106, #114): `as-today` stays selectable through `vesselPlanning.ordering` / `--ordering`. */
 export const DEFAULT_VESSEL_ORDERING: VesselOrdering = 'pod-weight'
 
 /** The work order a scenario runs with. */
 export const vesselOrderingOf = (config: ScenarioConfig): VesselOrdering => config.vesselPlanning?.ordering ?? DEFAULT_VESSEL_ORDERING
+
+/**
+ * The stow sequence policy (spec #166, #174, `StowSequence` in scenario/types): the order a bay section's moves take
+ * inside its package. `tier` is the only value: discharge takes the highest tier first across all stacks of the
+ * section, load the lowest tier first (see `orderLoad`). Package order and bay order do not depend on it.
+ */
+export const DEFAULT_STOW_SEQUENCE: StowSequence = 'tier'
+
+/** The stow sequence a scenario runs with (`vesselPlanning.stowSequence`, default `tier`). */
+export const stowSequenceOf = (config: ScenarioConfig): StowSequence => config.vesselPlanning?.stowSequence ?? DEFAULT_STOW_SEQUENCE
 
 /** A vessel cell as the ordering sees it. */
 export interface OrderCell {
@@ -80,34 +90,34 @@ function bySection<T extends { slot: OrderCell }>(list: T[]): T[][] {
 }
 
 /**
- * Discharge order: stack by stack (a stack = one row of the bay section), each stack top-down. The first stack is the
- * first in yard-group order; each next one continues the group just worked when a stack starts with it, else takes the
- * next in yard-group order (the group of the box that comes off first), then by planned departure, then by row.
+ * Discharge order `tier` (#174): highest tier first across all stacks of the section, so no stack is emptied to its
+ * floor while another still stands high. Inside one tier the yard groups come together (the group key, imports by
+ * line, then by planned departure, then row, aft half before fore half), so a tier still runs group by group.
  */
-export function orderDischarge<S extends OrderCell>(entries: OrderEntry<S>[], ports: readonly string[]): OrderEntry<S>[] {
-  const out: OrderEntry<S>[] = []
-  for (const run of bySection(entries)) {
-    const stacks = new Map<number, OrderEntry<S>[]>()
-    for (const e of run) {
-      const list = stacks.get(e.slot.row) ?? []
-      list.push(e)
-      stacks.set(e.slot.row, list)
-    }
-    const ranked = [...stacks.entries()].map(([row, list]) => {
-      list.sort((a, b) => b.slot.tier - a.slot.tier || aftFirst(a.slot.half) - aftFirst(b.slot.half))
-      return { row, list, group: yardGroupOrderKey(list[0].box, ports), dep: list[0].box?.props?.plannedDepartureS ?? 0 }
-    })
-    ranked.sort((a, b) => (a.group < b.group ? -1 : a.group > b.group ? 1 : 0) || a.dep - b.dep || a.row - b.row)
-    // next stack: one whose first box continues the group just worked, else the next in yard-group order
-    let last = ''
-    while (ranked.length > 0) {
-      const at = Math.max(0, ranked.findIndex((r) => r.group === last))
-      const [next] = ranked.splice(at, 1)
-      out.push(...next.list)
-      last = yardGroupOrderKey(next.list[next.list.length - 1].box, ports)
-    }
-  }
-  return out
+function dischargeByTier<S extends OrderCell>(run: OrderEntry<S>[], ports: readonly string[]): OrderEntry<S>[] {
+  const keyed = run.map((e) => ({ e, group: yardGroupOrderKey(e.box, ports), dep: e.box?.props?.plannedDepartureS ?? 0 }))
+  keyed.sort(
+    (a, b) =>
+      b.e.slot.tier - a.e.slot.tier ||
+      (a.group < b.group ? -1 : a.group > b.group ? 1 : 0) ||
+      a.dep - b.dep ||
+      a.e.slot.row - b.e.slot.row ||
+      aftFirst(a.e.slot.half) - aftFirst(b.e.slot.half),
+  )
+  return keyed.map((k) => k.e)
+}
+
+const STOW_SEQUENCE_ORDER: Record<StowSequence, <S extends OrderCell>(run: OrderEntry<S>[], ports: readonly string[]) => OrderEntry<S>[]> = {
+  tier: dischargeByTier,
+}
+
+/**
+ * Discharge order within each bay section (a bay section = one bay of hold or deck), in the stow sequence of the
+ * scenario. Sections keep their input order.
+ */
+export function orderDischarge<S extends OrderCell>(entries: OrderEntry<S>[], ports: readonly string[], sequence: StowSequence = DEFAULT_STOW_SEQUENCE): OrderEntry<S>[] {
+  const order = STOW_SEQUENCE_ORDER[sequence]
+  return bySection(entries).flatMap((run) => order(run, ports))
 }
 
 /**
