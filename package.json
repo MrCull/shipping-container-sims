@@ -22,6 +22,7 @@
     "tt:bench": "tsx src/sims/terminal-twin/cli/bench.ts",
     "tt:diff": "tsx src/sims/terminal-twin/cli/diff.ts",
     "tt:sts": "tsx src/sims/terminal-twin/cli/sts.ts",
+    "tt:profile": "tsx src/sims/terminal-twin/cli/profile.ts",
     "tt:golden": "tsx src/sims/terminal-twin/cli/golden-cli.ts",
     "test:smoke": "playwright test",
     "tt:assets": "tsx src/sims/terminal-twin/cli/assets/build.ts",
