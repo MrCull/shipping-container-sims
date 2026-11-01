@@ -204,13 +204,15 @@ test.describe('British browser', () => {
     await page.keyboard.press('o')
     expect((await ui()).overlaysVisible).toBe(true)
 
-    // F: follow the selection; Esc: deselect (and stop following)
+    // F: follow the selection; Esc: closes the inspector the selection opened, then deselects (and stops following)
     await page.keyboard.press('f')
     await expect(page.getByTestId('tt-toast')).toHaveText('Select something to follow first')
     expect((await ui()).following).toBe(false)
     await page.evaluate(() => window.__tt!.select('STS01'))
     await page.keyboard.press('f')
     expect(await ui()).toMatchObject({ selectedId: 'STS01', following: true })
+    await page.keyboard.press('Escape')
+    expect(await ui()).toMatchObject({ selectedId: 'STS01', inspectorOpen: false, following: true })
     await page.keyboard.press('Escape')
     expect(await ui()).toMatchObject({ selectedId: null, following: false })
 

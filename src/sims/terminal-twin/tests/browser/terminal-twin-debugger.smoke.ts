@@ -136,12 +136,64 @@ test('a decision event shows the handler, its request and its reply', async ({ p
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'DecisionResolved' }))
   const log = await page.evaluate(() => window.__tt!.query<{ id: number; type: string }[]>('eventLog'))
   await page.evaluate((id) => window.__tt!.inspectEvent(id), log[log.length - 1].id)
-  await page.keyboard.press('Escape')
-  if (!(await page.evaluate(() => window.__tt!.ui().inspectorOpen))) await page.keyboard.press('i')
   const decision = page.getByTestId('tt-decision')
   await expect(decision).toContainText('strategy:')
   await expect(page.getByTestId('tt-decision-request')).toBeVisible()
   await expect(page.getByTestId('tt-decision-reply')).toBeVisible()
+})
+
+test('Esc closes one thing per press, in order, the inspector included; it never pauses, steps or changes speed (#169)', async ({ page }) => {
+  const errors = collectErrors(page)
+  await open(page)
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcDroppedAtWtp' }))
+  await page.evaluate(() => window.__tt!.setSpeed(60)) // a speed resumes playback, so pause after it
+  await page.evaluate(() => window.__tt!.pause())
+  const ui = () => page.evaluate(() => window.__tt!.ui())
+  const clockNow = () => page.evaluate(() => window.__tt!.clock())
+  const before = await clockNow()
+
+  // Open in turn: a selection (its inspector comes with it), Colour by and Run to (opened by a click, so focus stays on
+  // their buttons, outside the popups), shortcut help, and the dashboard (B).
+  await page.evaluate(() => window.__tt!.select('SHC01'))
+  await expect.poll(async () => (await ui()).inspectorOpen).toBe(true)
+  await page.getByTestId('tt-colour-by').click()
+  await expect(page.getByTestId('tt-colour-by-panel')).toBeVisible()
+  await page.getByRole('button', { name: 'Run to…' }).click()
+  await expect(page.getByLabel('Target sim time')).toBeVisible()
+  await page.keyboard.press('?')
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible()
+  await page.keyboard.press('b')
+  await expect.poll(async () => (await ui()).dashboardOpen).toBe(true)
+  await expect.poll(ui).toMatchObject({ dashboardOpen: true, colourByOpen: true, runToOpen: true, helpOpen: true, inspectorOpen: true, selectedId: 'SHC01' })
+
+  // One press each: dialog, then popups, then help, then the inspector, then the selection.
+  const steps: { closes: string; state: Record<string, unknown> }[] = [
+    { closes: 'dashboard', state: { dashboardOpen: false, colourByOpen: true, runToOpen: true, helpOpen: true, inspectorOpen: true, selectedId: 'SHC01' } },
+    { closes: 'Colour by', state: { colourByOpen: false, runToOpen: true, helpOpen: true, inspectorOpen: true, selectedId: 'SHC01' } },
+    { closes: 'Run to', state: { runToOpen: false, helpOpen: true, inspectorOpen: true, selectedId: 'SHC01' } },
+    { closes: 'help', state: { helpOpen: false, inspectorOpen: true, selectedId: 'SHC01' } },
+    { closes: 'inspector', state: { inspectorOpen: false, selectedId: 'SHC01' } },
+    { closes: 'selection', state: { selectedId: null, inspectorOpen: false } },
+  ]
+  for (const step of steps) {
+    await page.keyboard.press('Escape')
+    await expect.poll(ui, `Esc closes ${step.closes}`).toMatchObject(step.state)
+    expect(await clockNow(), `Esc closing ${step.closes} leaves the run alone`).toEqual(before)
+  }
+  // Nothing left open: Esc does nothing more.
+  await page.keyboard.press('Escape')
+  expect(await ui()).toMatchObject({ selectedId: null, inspectorOpen: false, helpOpen: false, dashboardOpen: false })
+  expect(await clockNow()).toEqual(before)
+
+  // Typing in a field does not trigger Esc: the feed filter keeps the inspector and the selection.
+  await page.evaluate(() => window.__tt!.select('SHC01'))
+  await page.keyboard.press('e')
+  await expect(page.getByTestId('tt-feed-filter')).toBeVisible()
+  await page.getByTestId('tt-feed-filter').focus()
+  await page.keyboard.press('Escape')
+  expect(await ui()).toMatchObject({ selectedId: 'SHC01', inspectorOpen: true })
+  expect(await clockNow()).toEqual(before)
+  expect(errors).toEqual([])
 })
 
 test('clicking a container in 3D selects it and shows its custody history', async ({ page }) => {

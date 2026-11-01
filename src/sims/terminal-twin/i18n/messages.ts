@@ -359,7 +359,7 @@ const en = {
   'shortcuts.pause': 'Pause',
   'shortcuts.step': 'Single-step to the next event',
   'shortcuts.follow': 'Follow the selection',
-  'shortcuts.deselect': 'Deselect / close',
+  'shortcuts.deselect': 'Close the topmost panel, then deselect',
   'shortcuts.dashboard': 'Dashboard tab',
   'shortcuts.overlays': 'Toggle overlays',
   'shortcuts.help': 'Show this help',
