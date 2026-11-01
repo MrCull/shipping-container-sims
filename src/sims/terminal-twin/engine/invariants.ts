@@ -297,6 +297,23 @@ function blockSpecsById(config: ScenarioConfig) {
   return by
 }
 
+type LandsideGraphOf = ReturnType<typeof landsideGraphOf>
+type RoadZone = LandsideGraphOf['zones'][string]
+const roadZoneCache = new WeakMap<LandsideGraphOf, RoadZone[]>()
+
+/**
+ * TT-176: the road and junction zones of a landside graph, found once: `landside.waiting-off-road` runs after every
+ * event, and scanning every zone of the graph for each waiting truck was half the run time of the peak day.
+ */
+function roadZonesOf(graph: LandsideGraphOf): RoadZone[] {
+  let zones = roadZoneCache.get(graph)
+  if (!zones) {
+    zones = Object.values(graph.zones).filter((z) => z.kind === 'road' || z.kind === 'intersection')
+    roadZoneCache.set(graph, zones)
+  }
+  return zones
+}
+
 /** Half-extent (m) of a WTP pad's lifting envelope across X and along Z. */
 const PAD_HALF_X_M = 1.6
 const PAD_HALF_Z_M = 6.5
@@ -747,8 +764,7 @@ export const INVARIANTS: Invariant[] = [
           if (!h || Math.abs(p.x - h.x) > 1e-6 || Math.abs(p.z - h.z) > 1e-6)
             messages.push(`${t.id} is holding but stands at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}), not in its holding position ${t.holdingId ?? 'none'}`)
         }
-        for (const zone of Object.values(graph.zones)) {
-          if (zone.kind !== 'road' && zone.kind !== 'intersection') continue
+        for (const zone of roadZonesOf(graph)) {
           if (p.x > zone.x0 && p.x < zone.x1 && p.z > zone.z0 && p.z < zone.z1) {
             messages.push(`${t.id} (${t.status}) stands at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}) inside ${zone.kind} zone ${zone.id}`)
             break

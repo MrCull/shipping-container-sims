@@ -97,10 +97,10 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
 
 /**
  * Moves scale of the TTI presets (#165): a Feedermax then discharges about 30 and a Neo-Panamax about 120 (it was
- * 0.05: 14 and 65). Full size (1) and the ticket's floor (0.5) both fail the headless criterion: the baseline does not
- * reach its end condition within 10 minutes of wall time at 0.15 and above (see the sim guide, "Volumes"), because the
- * yard side of this model moves only about 35 boxes an hour once the first blocks hold the loads. 0.1 completes in
- * about 40 s. Raise it again when that throughput limit is fixed.
+ * 0.05: 14 and 65). Full size (1) and the ticket's floor (0.5) both fail: at 0.25 the baseline stops on a stranded truck
+ * about 24 hours into the run (a yard block saturated because loads lag discharge), and the peak day at 0.1 stops idle
+ * with one of five vessels done. The sim guide ("Realistic volumes", #176) has the measurements. 0.1 completes in
+ * about a minute. Raise it again when that saturation is fixed.
  */
 export const TTI_MOVES_SCALE = 0.1
 

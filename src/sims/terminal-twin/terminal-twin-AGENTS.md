@@ -389,6 +389,26 @@ View only: no event, state field or golden changes (the engine's `VesselState` i
 - **Not covered:** a dual transaction's drop has no room filter (its own pick is the only thing that frees a cell in that block, so filtering it would deadlock the gate); a drop refused for geometry while cells are loose waits for a retrieval in its block, and the invariant reports it if none comes.
 - **Proof:** `tests/stranded-trucks.test.ts` (drop-only small block; a refused drop released by a pick; the stall choice across two blocks; the invariant on a truck the TOS never lets stack). The yard rule for a full block is in `tests/asc-yard-rules.test.ts`. Rules and numbers: [docs/yard-and-landside.md](docs/yard-and-landside.md), "Stuck trucks (TT-175)".
 
+## Realistic volumes (spec #165 rest, #176): status and blockers
+
+**Status: the TTI presets stay at `TTI_MOVES_SCALE` 0.1.** Scale 0.25, 0.5 and 1 are not reached. Measured headless on this branch (all with 0 invariant violations until the failures below):
+
+- **Baseline at 0.1** completes: 4 vessels, 462 moves, event-log hash `143661782b5eec`, 47.5 s wall (before the invariant fix below; unchanged after it).
+- **Baseline at 0.25** stops `failed` at sim 87,775 s (day 1 00:22:55) on `landside.stranded-truck` (T0466 at stall B03-TS1). The CLI (`pnpm run tt:run`) and the headless API agree exactly (hash `0e061b5f1d9413`, 97,440 events). The truck is a pick-only truck: its pick needs two rehandles, the second gets no target, and B03 (88 % full, 274 of 360 stacks at full height) has no other job that can move. The invariant is right here: it fires for a stall nothing in the block can clear, and it skips any block with a non-idle ASC, so a queue behind a working ASC is not reported.
+- **Peak day at 0.1** stops `idle` at sim 89,559 s with 1 of 5 vessels done (281 moves, 0 violations). At idle: STS106 waits for a load box of V002 with 81 boxes queued; block B12 holds 314 claimed export retrievals with no WTP pad, both of its ASCs are idle, its 5 pads are empty, and 287 of its 360 stacks are full (1,592 of 1,800 cells). No pending event can move any of it, and no invariant reports it: this is a silent saturation deadlock, the first thing to fix.
+
+**Why the yard saturates:** discharge outruns loads. In 2 h at 0.25 a crane made 26 and 22 moves, with 45 discharge and 3 load boxes. Discharge boxes wait on the WTP pads for an ASC (`yard` path, 330 s mean), and the ASCs spend their time on rehandles: 144 rehandle jobs against 51 pad store and retrieve jobs and 85 truck jobs (`AscJobAssigned`). A crane gets at most `maxSts` cranes per vessel and the crane pitch is 850 m / 8 = 106 m, so a feedermax gets 2 cranes. Ground positions are capped at 3 per crane by the hatch laydown check in `state.ts` (5 is refused with hatch covers on), so deeper load staging cannot come from more lanes.
+
+**Measured and rejected (reverted, not committed):**
+
+- A dual-transaction drop room filter (the #175 gap as first read): the stuck truck is a pick-only truck, and the change left the failing run's event log identical.
+- Load prep during discharge, keeping one ground position free for the crane's discharge: the crane retries `stsGroundPosition` every 30 s with no position free and the event log grows without bound (out of memory at 0.1 within 40,000 s).
+- `workPackages.releaseAhead` 6 instead of 2: identical output for 7,200 s at 0.25, so the knob is not the limit there.
+
+**Performance (kept):** `landside.waiting-off-road` scanned every road and intersection zone of the landside graph for each waiting truck, after every event. Those zones are now found once per graph (`roadZonesOf`, `engine/invariants.ts`). The event log is unchanged (hash checked on the 0.25 and 0.1 baselines). Per-invariant timing on the peak day to 4,000 s: 10.7 s of 21.0 s wall for this check, 1.5 s of 11.8 s after. Remaining hot spots in the CPU profile: landside `scanPickups` (about 8 %), `hashedJson` (7.5 %) and the prefill (6 %). `tt:profile "TTI Algeciras baseline" --until 5400` is identical before and after.
+
+**Next steps (not done):** (1) an invariant for ASC jobs that cannot progress (the B12 deadlock has none); (2) load staging on the WTP pads, not the ground positions; (3) a yard reserve so pre-fill and discharge cannot fill a block to its last stacks; (4) a pick-only truck is admitted to a block only when its rehandles have room. `ENGINE_VERSION` is unchanged: the only engine change is a performance change with the same events.
+
 ## Known gaps
 
 Deliberately not built, or built differently from the spec (the code review accepted these):
