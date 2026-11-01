@@ -41,7 +41,7 @@ Engine benchmark, graphics quality settings and renderer budget; time of day, ba
 
 ### Close-up faces (#143)
 
-Close-up markings cost one draw call per atlas page (20 to 32 faces), not per box; the budget is `closeupFaceBudget` (Low 0, Medium 120, High 400) in `QUALITY_PROFILES`. Before #143 every close-up box was its own mesh with its own canvas texture (up to 48 draw calls and 48 canvas uploads on High) and a box lost its markings when it fell outside the nearest 48. Frame-time proof is the `@load` spec in `tests/browser/container-closeup.smoke.ts` (the view about 10 boxes wide on the TTI baseline, `cameraTo('B01', 40)`, against the Overview camera; local only, annotation `frame-ms`).
+Close-up markings cost one draw call per atlas page (20 to 32 faces), not per box; the budget is `closeupFaceBudget` and the reach `closeupDistanceM` in `QUALITY_PROFILES` (Low 48 faces within 18 m, Medium 120 within 25 m, High 400 within 35 m). Every level draws them (#158). Before #143 every close-up box was its own mesh with its own canvas texture (up to 48 draw calls and 48 canvas uploads on High) and a box lost its markings when it fell outside the nearest 48. Frame-time proof is the `@load` spec in `tests/browser/container-closeup.smoke.ts` (the view about 10 boxes wide on the TTI baseline, `cameraTo('B01', 40)`, against the Overview camera; local only, annotation `frame-ms`).
 
 | View (TTI baseline, High) | Before #143 | After #143 |
 | --- | --- | --- |
@@ -49,6 +49,8 @@ Close-up markings cost one draw call per atlas page (20 to 32 faces), not per bo
 | About 10 boxes wide | not measured | not measured |
 
 Numbers are to be filled in from a run on a real GPU (the agent that wrote #143 could not run the `@load` spec).
+
+**No markings on a laptop (#158), root cause:** Low had close-ups off (budget 0, distance 0), and Auto (the default) settles on Low on a typical laptop: frames there are main-thread bound at about 30 fps (see "Measured on real hardware" above), so Auto steps High > Medium > Low and never steps back up. The owner (Auto, FPS chip 24 to 47) therefore never saw a marking, however close he zoomed. The atlas itself was fine: a pinned High drew markings. Fix: Low draws up to 48 faces within 18 m (the orbit camera stops 8 m from its target, so the boxes beside it are about 10 to 15 m away). Proof: `tests/quality.test.ts` (every level has close-ups, Low shortest and cheapest), `tests/container-closeup.test.ts` "close-up faces per quality level" (per level: a yard stack close up gets markings on exposed faces turned to the camera only, none beyond the distance, the budget caps the count), smoke block-edge spec on Low and High. Not measured: the frame cost of Low's 48 faces on the reference laptop (read `closeupFaces` and fps from the P overlay).
 
 ## Atmosphere and polish (TT-21)
 
