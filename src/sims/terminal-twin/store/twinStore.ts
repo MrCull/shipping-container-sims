@@ -37,7 +37,7 @@ import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/
 import { createFormatter } from '../i18n/format'
 import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
-import { DEFAULT_SCENARIO_NAME } from '../modules/scenarioPicker'
+import { DEFAULT_SCENARIO_NAME } from '../terminals'
 import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import { CuePlanner } from '../modules/cues'
