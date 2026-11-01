@@ -10,6 +10,28 @@ For the next agent. Read this file, then `docs/agents/implementing.md` (orchestr
 - **Left:** finish #165, then [#150](https://github.com/MrCull/shipping-container-sims/issues/150) (the one full verify, golden regeneration and smoke run; final ticket of both specs, blocked by all others), then the finish steps.
 - `ENGINE_VERSION` is 0.33.0. Goldens are stale on purpose since #146; #150 regenerates them once.
 
+## Round 4 decisions (owner grilling, 2026-11-01; owner starts each step)
+
+**Merge path for PR #152 (in order):** stop #165 where it is (merged part stays; close as partly done, the rest moves to round 4); run #150 (verify, fix failures, goldens once, smoke dev and prod); `/code-review` and fix; delete this file; PR body closes #134, #154 and every ticket; merge with a **merge commit** (not squash); restart `claude/stoic-hypatia-tk68z1` from the new `main` for round 4 with a new PR.
+
+**Retro leftovers, done by the orchestrator after the merge:** (4) a helper that starts every worktree on the integration branch, called by the brief; (6) ticket bodies written to files first and posted from the file, noted in `docs/agents/issue-tracker.md`; (7) one screenshot per UI ticket committed under `docs/prototypes/<ticket>/`. Retro item (5), `pnpm run tt:profile`, is round 4's first ticket.
+
+**Round 4 scope (spec issue: see the round 4 spec on GitHub):** #165's rest (blocked by the profiler and the stow work); #81 stays out (needs a real GPU). Requirements, all accepted as recommended:
+- ROB: a separate **ROB: Show | Grey | Hide** switch in the display controls (3D and bay view), default Grey; Show colours ROB by the current colour-by; Colour by loses its Hide ROB and grey ROB entries.
+- Colour by popup closes on pick, outside click and Esc.
+- Far containers carry a small per-line texture (side logo, corrugation) at every distance and tier; close-ups keep the fine detail; frame-time cost on the TTI baseline at most 10 %.
+- No text on container roofs at any distance (plain corrugated roof in line colour).
+- Esc closes the topmost thing: dialog, then popup, then the right inspector; never touches the run.
+- TTI access road cut where land ends north of the terminal; trucks appear and leave there.
+- Bug: trucks wait under the ASC landside transfer points with no job. Reproduce headless on the TTI baseline, add an invariant (truck waits at a transfer point beyond a limit with no job), fix the root cause (suspect the #165 block-room pad filter).
+- Every run starts in daylight; the toggle holds for that run.
+- Arrival stows bottom-up with no gaps; new engine invariant "no floating box" at arrival and after every move.
+- Within a bay: discharge highest tier first, load lowest tier first, discharge finishes before load; bay order unchanged; a named stow-sequence policy `tier`, no UI yet.
+- Hatch covers: with hatch-cover operations off, vessels are drawn without covers; with them on, a crane working below a cover is a bug to fix.
+- Entering Terminal Twin mutes the shared speaker on every entry; unmuting inside works; leaving restores the previous mute state.
+
+**Process:** the owner starts each step (`/to-spec`, `/to-tickets`, `/implement-spec`) or runs `/jfdi` for unattended runs.
+
 ## Owner rules for this run (still in force)
 
 - **Fast mode** (`docs/agents/implementing.md`, section "Fast mode"): per ticket lint, build, `pnpm run test:related <integration-branch>`, screenshot; the full verify, goldens and smoke run once, in #150. After each merge run `pnpm run test:related <previous-tip>`. At most two implementers at a time; label merged issues `merged-in-branch`.

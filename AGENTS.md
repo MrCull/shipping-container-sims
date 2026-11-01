@@ -77,7 +77,7 @@ Agent-facing skill files live in **`.ai/skills/`** at the repo root (Markdown `S
 
 New skills go under **`.agents/skills/`** instead, the repo's new top-level naming/location standard for agent-facing content. Existing `.ai/skills/` entries have not been migrated yet.
 
-**`.claude/skills/`** holds Matt Pocock's engineering-workflow skills (vendored from upstream, see `.claude/skills/UPSTREAM.md`), invoked as slash commands in Claude Code: e.g. `/grill-me`, `/to-spec`, `/to-tickets`, `/implement`, `/tdd`, `/diagnosing-bugs`, `/code-review`, `/pr`. They read their per-repo configuration from `docs/agents/` (see § Agent skills).
+**`.claude/skills/`** holds Matt Pocock's engineering-workflow skills (vendored from upstream, see `.claude/skills/UPSTREAM.md`), invoked as slash commands in Claude Code: e.g. `/grill-me`, `/to-spec`, `/to-tickets`, `/implement`, `/tdd`, `/diagnosing-bugs`, `/code-review`, `/pr`. They read their per-repo configuration from `docs/agents/` (see § Agent skills). `/jfdi` (local) runs grill, spec, tickets, implement and retro unattended, taking the recommended answer to every question.
 
 Each folder holds one `SKILL.md` per topic with its own description: list them with `ls .ai/skills .agents/skills`.
 
