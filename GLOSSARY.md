@@ -221,7 +221,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Presets and layout (TT-15)
 
-- **Preset:** a named full scenario (TTI Algeciras baseline, Small automated, TTI Algeciras, peak day); every value stays overridable. Shown as a hero card in the setup dialog, with chips and a layout sketch derived from its config. The 16 test scenarios are **engine test fixtures**, listed in a collapsed table.
+- **Preset:** a named full scenario (TTI Algeciras baseline, Small automated, TTI Algeciras, peak day); every value stays overridable. Listed on the Scenarios list of the setup dialog's Scenario tab, with chips and a layout sketch derived from its config. The test scenarios are **engine test fixtures**, listed as **test benches**.
 - **Derived layout:** block and STS positions computed from the counts and the quay length, in the TTI functional order (quay, STS rail, apron and WTP pads, blocks, stalls, roads, gate).
 - **Frontage:** the quay length a block needs (32 m); blocks need count x 32 m.
 - **Scale limits / peak-day scale:** hard maxima (errors) and the softer size above which the dialog warns the run may be slow.
@@ -233,7 +233,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Quality level / quality setting:** Low, Medium or High is a level (a bundle of shadows, LOD distances, resolution, ocean detail and night-light budget); the setting is a level or Auto (default).
 - **Auto quality:** steps the level down when the frame rate stays under 45 fps and back up when there is headroom, with a back-off against oscillation.
 - **Performance overlay:** the toggleable (key P) readout of FPS, draw calls, triangles, frame CPU time and the quality in force.
-- **Close-up LOD:** the detail level above the box LODs (about 35 m on High): the visible faces of nearby boxes get their markings (box number, door end, plate, wear) as decals from a texture atlas, up to a **face budget** (High 400, Medium 120, Low none), nearest first, with hysteresis. The plain instanced box underneath is the fallback for every other face.
+- **Close-up LOD:** the detail level above the box LODs (about 35 m on High): the visible faces of nearby boxes get their markings (box number, door end, plate, wear) as decals from a texture atlas, up to a **face budget** (High 400, Medium 120, Low 48 within 18 m), nearest first, with hysteresis. The plain instanced box underneath is the fallback for every other face.
 - **Exposed faces:** which of a box's six faces can be seen. A stacked yard box loses its underside and every face a neighbouring box touches (the top only when nothing is stacked on it); vessel, truck and spreader boxes show all six. The close-up level spends its face budget on exposed faces turned towards the camera.
 - **Container markings:** the face-by-face description of what is printed on one box (door end with ISO id, weight plate, SUPER HEAVY triangle, CSC plate, laden-only bolt seal; box number and line name on sides and roof; seeded wear), a pure function of the box's data (`describeMarkings`).
 - **Instance culling:** boxes outside the camera frustum are not written to the instanced meshes.

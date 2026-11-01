@@ -10,6 +10,7 @@ import type { ContainerAssets } from '../modules/containerAssets'
 import { ContainerCloseups, type AtlasBackend, type PaintJob } from '../modules/containerCloseups'
 import { ContainerInstancer } from '../modules/containerInstancer'
 import { describeMarkings } from '../modules/containerMarkings'
+import { profileFor, QUALITY_LEVELS, type QualityLevel } from '../modules/quality'
 import { makeIso6346Id } from '../scenario/iso6346'
 
 function assets(): ContainerAssets {
@@ -131,6 +132,75 @@ describe('close-up marking faces', () => {
     expect(s.closeup).toBeGreaterThan(1)
     expect(closeups.cost().drawCalls).toBeLessThanOrEqual(2)
     expect(closeups.cost().triangles).toBe(s.closeupFaces * 2)
+  })
+})
+
+/**
+ * #158: markings on every quality level, with that level's limits applied the way `SceneRenderer.setQuality` does.
+ * A yard stack of 3 rows by 2 tiers (length along Z, rows along X, 2.9 m pitch), seen from beyond row 2 and the +Z end.
+ */
+describe('close-up faces per quality level (#158)', () => {
+  const H = 2.591
+  const ROW_M = 2.9
+  function tierSetup(level: QualityLevel) {
+    const p = profileFor(level)
+    const drawn: string[] = []
+    const keyOf = new Map<unknown, number>()
+    const backend: AtlasBackend = {
+      createPage: () => ({ texture: new THREE.Texture(), ctx: null }),
+      paint: (source, _size, jobs) => drawn.push(...jobs.map((j) => `${keyOf.get(source.markings)}:${j.face}`)),
+    }
+    const inst = new ContainerInstancer({ '40': 400 }, {}, new ContainerCloseups(backend, () => null))
+    inst.setAssets(assets())
+    inst.setMarkingsSource((key) => {
+      const markings = describeMarkings({ id: makeIso6346Id('MSCU', key + 1), size: '40', line: 'MSC', laden: true })
+      keyOf.set(markings, key)
+      return { markings, bodyColour: '#d8c9a3' }
+    })
+    inst.setLodOptions({ lod0DistanceM: p.lod0DistanceM, lod0Cap: p.lod0Cap, closeupDistanceM: p.closeupDistanceM, closeupFaceBudget: p.closeupFaceBudget })
+    return { inst, drawn, p }
+  }
+  /** key = tier * 3 + row (tier 0 on the ground). */
+  function stack(inst: ContainerInstancer, cam: THREE.Vector3) {
+    inst.begin()
+    for (let tier = 0; tier < 2; tier++) {
+      for (let row = 0; row < 3; row++) inst.push(tier * 3 + row, '40', row * ROW_M, H / 2 + tier * H, 0, 0, Math.PI / 2, -1, true)
+    }
+    return inst.end(cam)
+  }
+  const nearCam = () => new THREE.Vector3(2 * ROW_M + 8, 8, 9) // about 10 to 16 m from every face it sees
+
+  for (const level of QUALITY_LEVELS) {
+    it(`${level}: zoomed in on the stack, only its exposed faces turned to the camera get markings`, () => {
+      const { inst, drawn } = tierSetup(level)
+      const s = stack(inst, nearCam())
+      // by hand: every box shows its +Z end (front); the top tier its roof; row 2 its +X side (sideP); nothing touching a neighbour
+      expect(drawn.sort()).toEqual(['0:front', '1:front', '2:front', '2:sideP', '3:front', '3:top', '4:front', '4:top', '5:front', '5:sideP', '5:top'])
+      expect(s.closeupFaces).toBe(11)
+      expect(s.closeup).toBe(6)
+    })
+
+    it(`${level}: faces beyond the close-up distance get none`, () => {
+      const { inst, p } = tierSetup(level)
+      const far = p.closeupDistanceM * 1.15 + 20
+      expect(stack(inst, new THREE.Vector3(2 * ROW_M + far, 3, 0)).closeupFaces).toBe(0)
+    })
+
+    it(`${level}: the face budget caps the count`, () => {
+      const { inst, p } = tierSetup(level)
+      inst.begin()
+      // free boxes in a 20 by 20 grid around the camera: far more faces in range than any budget
+      for (let i = 0; i < 400; i++) inst.push(i, '40', ((i % 20) - 10) * 3, H / 2, (Math.floor(i / 20) - 10) * 3, 0, Math.PI / 2)
+      expect(inst.end(new THREE.Vector3(0.5, 6, 0.5)).closeupFaces).toBe(p.closeupFaceBudget)
+    })
+  }
+
+  it('Low reaches less far than High', () => {
+    const low = tierSetup('low')
+    const high = tierSetup('high')
+    const cam = new THREE.Vector3(2 * ROW_M + 26, 8, 9) // the near row's side is about 26 m away
+    expect(stack(low.inst, cam).closeupFaces).toBe(0)
+    expect(stack(high.inst, cam).closeupFaces).toBeGreaterThan(0)
   })
 })
 

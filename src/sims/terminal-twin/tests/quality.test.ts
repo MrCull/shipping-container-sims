@@ -30,6 +30,20 @@ describe('quality profiles', () => {
     expect(low.nightLights).toBeLessThan(high.nightLights)
   })
 
+  it('every level draws close-up markings (#158: Auto settles on Low on a laptop), Low the shortest and cheapest', () => {
+    const [low, med, high] = QUALITY_LEVELS.map((l) => QUALITY_PROFILES[l])
+    for (const p of [low, med, high]) {
+      expect(p.closeupFaceBudget).toBeGreaterThan(0)
+      expect(p.closeupDistanceM).toBeGreaterThan(0)
+    }
+    // the orbit camera stops 8 m from its target, so a box beside the target is about 10 to 15 m away
+    expect(low.closeupDistanceM).toBeGreaterThanOrEqual(15)
+    expect(low.closeupDistanceM).toBeLessThan(med.closeupDistanceM)
+    expect(med.closeupDistanceM).toBeLessThan(high.closeupDistanceM)
+    expect(low.closeupFaceBudget).toBeLessThan(med.closeupFaceBudget)
+    expect(med.closeupFaceBudget).toBeLessThan(high.closeupFaceBudget)
+  })
+
   it('a fixed setting maps to its profile and auto starts at high', () => {
     expect(profileFor('low')).toBe(QUALITY_PROFILES.low)
     expect(new AutoQuality().level).toBe('high')
