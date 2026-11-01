@@ -16,7 +16,7 @@ For the next agent. Read this file, then `docs/agents/implementing.md` (orchestr
 
 **Retro leftovers, done by the orchestrator after the merge:** (4) a helper that starts every worktree on the integration branch, called by the brief; (6) ticket bodies written to files first and posted from the file, noted in `docs/agents/issue-tracker.md`; (7) one screenshot per UI ticket committed under `docs/prototypes/<ticket>/`. Retro item (5), `pnpm run tt:profile`, is round 4's first ticket.
 
-**Round 4 scope (spec issue: see the round 4 spec on GitHub):** #165's rest (blocked by the profiler and the stow work); #81 stays out (needs a real GPU). Requirements, all accepted as recommended:
+**Round 4 scope:** spec #166, tickets #167 to #177 (sub-issues; #177 is the smoke run, blocked by all; #176 is the rest of #165, blocked by #167, #174, #175; #169 blocked by #168; the rest start immediately). #165's rest (blocked by the profiler and the stow work); #81 stays out (needs a real GPU). Requirements, all accepted as recommended:
 - ROB: a separate **ROB: Show | Grey | Hide** switch in the display controls (3D and bay view), default Grey; Show colours ROB by the current colour-by; Colour by loses its Hide ROB and grey ROB entries.
 - Colour by popup closes on pick, outside click and Esc.
 - Far containers carry a small per-line texture (side logo, corrugation) at every distance and tier; close-ups keep the fine detail; frame-time cost on the TTI baseline at most 10 %.
