@@ -1,4 +1,4 @@
-/** Smoke helpers for the setup dialog's scenario picker (TT-R04): choose a scenario or a test bench by technical name. */
+/** Smoke helpers for the setup dialog's scenario picker (TT-R04): choose a scenario or a test bench by technical name (the visible text is plain names only, #156). */
 import type { Locator, Page } from '@playwright/test'
 
 type Scope = Page | Locator

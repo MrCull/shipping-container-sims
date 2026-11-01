@@ -4,13 +4,13 @@ import { t } from '../../i18n/messages'
 import { useSetupDraft } from '../../composables/useSetupDraft'
 import { resolveScenario, useTwinStore } from '../../store/twinStore'
 import { terminalPresetInfo } from '../../terminals'
-import { layoutSketch, pickerModel, scenarioDurationS, scenarioStats, statChips } from '../../modules/scenarioPicker'
+import { layoutSketch, pickerModel, scenarioDisplayName, scenarioDurationS, scenarioStats, statChips } from '../../modules/scenarioPicker'
 import LayoutSketchView from './LayoutSketch.vue'
 
 /**
  * Detail pane of the selected scenario or test bench (start screen, #145): plain name, what it shows and what to
- * watch for, the layout sketch, stat chips, size of the run, the set-up facts, the technical name in small type and
- * the one prominent Start button.
+ * watch for, the layout sketch, stat chips, size of the run, the set-up facts and the one prominent Start button.
+ * No technical id is shown (#156): it stays in `data-scenario` on the pane.
  */
 defineProps<{ error: string | null }>()
 
@@ -70,12 +70,13 @@ const summary = computed(() => {
   <section
     class="detail"
     data-testid="tt-scenario-detail"
+    :data-scenario="d.name"
     :aria-label="t('setup.detail.title')"
   >
     <span class="kind">{{ isBench ? t('setup.kind.bench') : t('setup.kind.scenario') }}</span>
     <div class="head">
       <h3 data-testid="tt-detail-name">
-        {{ item?.name ?? d.name }}
+        {{ item?.name ?? scenarioDisplayName(d.name) }}
       </h3>
       <button
         type="submit"
@@ -179,9 +180,6 @@ const summary = computed(() => {
       class="error"
     >
       {{ error ?? store.error }}
-    </p>
-    <p class="tech">
-      {{ t('setup.detail.technicalId') }}: <code data-testid="tt-detail-id">{{ d.name }}</code>
     </p>
   </section>
 </template>
@@ -298,16 +296,6 @@ h4 {
   margin: 0;
   font-family: var(--tt-font-mono);
   font-variant-numeric: tabular-nums;
-}
-
-.tech {
-  color: var(--tt-text-muted);
-  font-size: 0.72rem;
-}
-
-.tech code {
-  font-family: var(--tt-font-mono);
-  overflow-wrap: anywhere;
 }
 
 .error {

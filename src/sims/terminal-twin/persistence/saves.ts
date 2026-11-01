@@ -16,6 +16,7 @@
  */
 import { checkSnapshotCompat, ENGINE_VERSION, type SimSnapshot } from '../engine'
 import type { MessageKey, MessageParams } from '../i18n/messages'
+import { scenarioDisplayName } from '../modules/scenarioPicker'
 import { SCENARIO_SCHEMA_VERSION, type DisplaySettings, type ScenarioConfig } from '../scenario/types'
 
 /** Bump when the save envelope changes; add a step to `SAVE_MIGRATIONS`. */
@@ -110,7 +111,7 @@ export function parseSaveFile(text: string): SaveFile {
     doc = wrapSnapshot(raw as unknown as SimSnapshot)
   } else if (looksLikeConfig(raw)) {
     const config = raw as unknown as ScenarioConfig
-    doc = { kind: SAVE_KIND, schemaVersion: SAVE_SCHEMA_VERSION, type: 'config', name: config.name, savedAt: new Date(0).toISOString(), config, seed: config.seed }
+    doc = { kind: SAVE_KIND, schemaVersion: SAVE_SCHEMA_VERSION, type: 'config', name: scenarioDisplayName(config.name), savedAt: new Date(0).toISOString(), config, seed: config.seed }
   } else {
     throw new SaveFormatError('saves.error.notASave')
   }
@@ -133,7 +134,7 @@ function wrapSnapshot(snapshot: SimSnapshot): Json {
     kind: SAVE_KIND,
     schemaVersion: SAVE_SCHEMA_VERSION,
     type: 'snapshot',
-    name: snapshot.config.name,
+    name: scenarioDisplayName(snapshot.config.name),
     savedAt: new Date(0).toISOString(),
     config: snapshot.config,
     seed: snapshot.seed,
@@ -185,8 +186,26 @@ export function metaOf(id: string, file: SaveFile): SaveMeta {
   return { id, type: file.type, name: file.name, savedAt: file.savedAt, simTimeS: file.simTimeS, engineVersion: file.engineVersion, schemaVersion: file.schemaVersion }
 }
 
+/** Lower-case ASCII words joined by hyphens, for file names. */
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
 /** File name for an exported save. */
 export function saveFileName(file: SaveFile): string {
-  const slug = file.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'save'
-  return `${slug}.tt-${file.type}.json`
+  return `${slugify(file.name) || 'save'}.tt-${file.type}.json`
+}
+
+/**
+ * Save name used when the name field is blank (#156): the scenario's plain name and seed, plus the elapsed sim
+ * time for a snapshot. `scenario` is the technical id; it is not shown.
+ */
+export function defaultSaveName(scenario: string, seed: number, elapsed?: string): string {
+  const base = `${scenarioDisplayName(scenario)} / seed ${seed}`
+  return elapsed === undefined ? base : `${base} / ${elapsed}`
+}
+
+/** Download file name of a KPI report or event log (#156): the slugified plain scenario name, the seed and the suffix. */
+export function exportFileName(scenario: string, seed: number, suffix: string): string {
+  return `${slugify(scenarioDisplayName(scenario)) || 'run'}-seed${seed}-${suffix}`
 }
