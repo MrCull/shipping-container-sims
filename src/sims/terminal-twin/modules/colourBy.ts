@@ -27,6 +27,20 @@ export function parseColourBy(raw: unknown): ColourBy {
   return COLOUR_BY_MODES.find((m) => m === raw) ?? DEFAULT_COLOUR_BY
 }
 
+/**
+ * How the remain-on-board (ROB) boxes are drawn, in 3D and in the bay viewer (#168): `show` colours them by the colour
+ * mode like any other box, `grey` draws them the ROB grey (`ROB_HEX`), `hide` draws none. Chosen by the ROB control
+ * next to the daylight toggle, remembered with the colour mode.
+ */
+export type RobDisplay = 'show' | 'grey' | 'hide'
+export const ROB_DISPLAY_MODES: readonly RobDisplay[] = ['show', 'grey', 'hide']
+export const DEFAULT_ROB_DISPLAY: RobDisplay = 'grey'
+
+/** A stored ROB display (localStorage), or the default for anything else. */
+export function parseRobDisplay(raw: unknown): RobDisplay {
+  return ROB_DISPLAY_MODES.find((m) => m === raw) ?? DEFAULT_ROB_DISPLAY
+}
+
 /** Modes whose colour changes as the sim clock runs (the renderer re-evaluates them every so often). */
 export const isTimeBased = (mode: ColourBy): boolean => mode === 'dwell' || mode === 'departure' || mode === 'transit'
 
@@ -40,7 +54,7 @@ export const DWELL_PALETTE = ['#8fdca4', '#cfe77a', '#f6c65f', '#f28b82'] as con
 export const LENGTH_PALETTE = ['#8ec9f2', '#c5aef0', '#f2aacb'] as const
 /** `--tt-data-done`: no value. */
 const UNKNOWN_HEX = '#8a97ab'
-/** `--tt-data-rob` (#159): every remain-on-board box in every mode, 3D and bay viewer alike; a desaturated light grey, easy to ignore. */
+/** `--tt-data-rob` (#159): the grey of remain-on-board boxes in `grey` ROB display (#168), 3D and bay viewer alike; a desaturated light grey, easy to ignore. */
 export const ROB_HEX = '#c8cacd'
 /** `--tt-data-3`: overdue. */
 const OVERDUE_HEX = DATA_PALETTE[3]
@@ -62,8 +76,6 @@ export interface ColourSubject {
   leftS?: number | null
   /** The box is on a vessel call of this scenario (its inbound or outbound vessel is one of the scenario's). */
   onCall?: boolean
-  /** A display-only remain-on-board box. */
-  rob?: boolean
 }
 
 /** Scenario facts the legends need: the ports of the rotation, in rotation order. */
@@ -204,18 +216,25 @@ const MODES: Record<ColourBy, ModeDef> = {
   },
 }
 
-/** The colour of a box in a mode at sim time `t`; its `key` is an entry of `legendOf(mode, ctx)`. A ROB box is `rob` in every mode (#159). */
+/** The colour of a box in a mode at sim time `t`; its `key` is an entry of `legendOf(mode, ctx)`. */
 export function colourOf(mode: ColourBy, subject: ColourSubject, t: number, ctx: ColourContext): ColourEntry {
-  if (subject.rob) return { key: 'rob', hex: ROB_HEX }
   const def = MODES[mode]
   const key = def.keyOf(subject, t, ctx)
   return { key, hex: def.hexOf(key, ctx) }
 }
 
-/** Every value the mode can produce, with its colour; `rob` (remain on board) last in every mode. */
+/**
+ * The colour of a remain-on-board box (#168): the ROB grey in `grey` display, else the colour its mode gives any box.
+ * `hide` draws nothing, so the caller does not ask for a colour then.
+ */
+export function robColourOf(display: RobDisplay, mode: ColourBy, subject: ColourSubject, t: number, ctx: ColourContext): ColourEntry {
+  return display === 'grey' ? { key: 'rob', hex: ROB_HEX } : colourOf(mode, subject, t, ctx)
+}
+
+/** Every value the mode can produce, with its colour (the ROB boxes have no legend row: their display is its own control). */
 export function legendOf(mode: ColourBy, ctx: ColourContext): ColourEntry[] {
   const def = MODES[mode]
-  return [...def.keys(ctx).map((key) => ({ key, hex: def.hexOf(key, ctx) })), { key: 'rob', hex: ROB_HEX }]
+  return def.keys(ctx).map((key) => ({ key, hex: def.hexOf(key, ctx) }))
 }
 
 /** `#rrggbb` as a number, for three.js. */

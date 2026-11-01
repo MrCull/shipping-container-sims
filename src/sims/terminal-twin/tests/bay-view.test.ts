@@ -131,12 +131,19 @@ describe('colour modes', () => {
       for (const b of bayOrder('feeder')) {
         const v = view(data, b, mode)
         for (const c of allCells(v)) {
+          if (c.rob) {
+            // ROB grey (the default display, #168): its own key and grey, no legend index
+            expect(c.colourKey).toBe('rob')
+            expect(c.colour).toBe(ROB_HEX)
+            expect(c.colourIndex).toBeNull()
+            continue
+          }
           if (c.colourKey === null) {
             expect(c.colourIndex).toBeNull()
             continue
           }
           coloured++
-          expect(c.colourKey).toBe(c.rob ? 'rob' : c.details[prop])
+          expect(c.colourKey).toBe(c.details[prop])
           expect(c.colourIndex).not.toBeNull()
           expect(seen.get(c.colourKey) ?? c.colourIndex).toBe(c.colourIndex)
           seen.set(c.colourKey, c.colourIndex!)
@@ -146,7 +153,7 @@ describe('colour modes', () => {
       expect(coloured).toBeGreaterThan(0)
       if (mode !== 'weight') expect(seen.size).toBeGreaterThan(1)
     }
-    expect(view(data, bay, 'weight').legend.map((l) => l.key)).toEqual(['LIGHT', 'MEDIUM', 'HEAVY', 'unknown', 'rob'])
+    expect(view(data, bay, 'weight').legend.map((l) => l.key)).toEqual(['LIGHT', 'MEDIUM', 'HEAVY', 'unknown'])
   })
 
   it('every colour-by mode fills the coloured cells with the colour of the shared module, and lists the same legend', () => {
@@ -165,15 +172,35 @@ describe('colour modes', () => {
     expect(dwellKeys(0)).not.toEqual(dwellKeys(5 * 86400))
   })
 
-  it('ROB cells are the one ROB grey in every colour mode, the 3D ROB colour, with a legend entry (#159)', () => {
+  it('grey ROB cells are the one ROB grey in every colour mode, with no legend entry (#159, #168)', () => {
     const robBay = data.robBoxes[0].bay
     for (const mode of COLOUR_BY_MODES.filter((m) => m !== 'default')) {
-      const v = view(data, robBay, mode)
+      const v = buildBayView(data, robBay, { colourMode: mode, robDisplay: 'grey' })
       const cells = allCells(v).filter((c) => c.status === 'rob')
       expect(cells.length).toBeGreaterThan(0)
-      expect(cells.every((c) => c.colourKey === 'rob' && c.colour === ROB_HEX && c.colourIndex === v.legend.findIndex((l) => l.key === 'rob')), mode).toBe(true)
+      expect(cells.every((c) => c.colourKey === 'rob' && c.colour === ROB_HEX && c.colourIndex === null), mode).toBe(true)
+      expect(v.legend.map((l) => l.key), mode).not.toContain('rob')
     }
-    expect(view(data, robBay, 'status').legend.map((l) => l.key)).toContain('rob')
+    // the state view draws grey ROB cells as the hatched state (no fill)
+    const state = buildBayView(data, robBay, { colourMode: 'status', robDisplay: 'grey' })
+    expect(allCells(state).filter((c) => c.status === 'rob').every((c) => c.colourKey === 'rob' && c.colour === null)).toBe(true)
+  })
+
+  it('show ROB cells take the colour their mode gives any box, not the ROB grey (#168)', () => {
+    const robBay = data.robBoxes[0].bay
+    for (const mode of COLOUR_BY_MODES.filter((m) => m !== 'default')) {
+      const cells = allCells(buildBayView(data, robBay, { colourMode: mode, robDisplay: 'show' })).filter((c) => c.status === 'rob')
+      expect(cells.length).toBeGreaterThan(0)
+      expect(cells.every((c) => c.colour !== null && c.colour !== ROB_HEX && c.colourKey !== 'rob'), mode).toBe(true)
+    }
+    // the state view shows a ROB box in the line colour, as the 3D view does in its default mode
+    const state = allCells(buildBayView(data, robBay, { colourMode: 'status', robDisplay: 'show' })).filter((c) => c.status === 'rob')
+    expect(state.every((c) => c.colour !== null && c.colour !== ROB_HEX)).toBe(true)
+  })
+
+  it('hide draws no ROB cell in the bay (the strip still marks the bay, #159)', () => {
+    const robBay = data.robBoxes[0].bay
+    for (const mode of COLOUR_BY_MODES) expect(allCells(buildBayView(data, robBay, { colourMode: mode, robDisplay: 'hide' })).filter((c) => c.rob), mode).toEqual([])
   })
 })
 

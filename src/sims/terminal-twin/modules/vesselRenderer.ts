@@ -20,7 +20,7 @@ import { hullMeta, loadHullModel, VESSEL_LIVERY_ATLAS, vesselHullColour, vesselL
 import { holdLinerOutline, hullHatchOpenings, hullWithOpenHatches } from './hullHatchOpening'
 import { hullPlacement, type HullMeta } from './vesselHull'
 import { buildRobMesh, type RobMesh } from './robBoxes'
-import type { ColourBy, ColourContext } from './colourBy'
+import type { ColourBy, ColourContext, RobDisplay } from './colourBy'
 
 /** LOD switch distances (m, camera to the hull's bounding box) and hysteresis factor. */
 export const DEFAULT_VESSEL_LOD = { lod1M: 300, lod2M: 1100, hysteresis: 1.1 }
@@ -41,7 +41,7 @@ export interface VesselHullState {
   triangles: number | null
   /** ROB boxes (spec #106) drawn in this vessel's hull: display-only remain-on-board boxes of its ROB bays. */
   robBoxes: number
-  /** The ROB boxes are hidden (colour by menu, #130). */
+  /** The ROB boxes are hidden (ROB display `hide`, #168). */
   robHidden: boolean
   /** The rendered hull's bay grid in world coordinates (from the GLB's bay_grid node); null when not in the scene. */
   bayGrid: {
@@ -341,16 +341,15 @@ export class VesselHulls {
 
   private colourKey = ''
 
-  /** Colour by (#130): recolours the ROB boxes when the mode changes, hides them with `hideRob` (never drawn, so `robBoxes` reads 0). */
-  setColour(mode: ColourBy, hideRob: boolean, ctx: ColourContext): void {
-    const key = `${mode}:${hideRob}`
+  /** Colour by (#130) and ROB display (#168): repaints the ROB boxes when the mode or the display changes; `hide` never draws them (`robBoxes` reads 0). */
+  setColour(mode: ColourBy, robDisplay: RobDisplay, ctx: ColourContext): void {
+    const key = `${mode}:${robDisplay}`
     if (key === this.colourKey) return
-    const modeChanged = !this.colourKey.startsWith(`${mode}:`)
     this.colourKey = key
     for (const e of this.entries) {
       if (!e.rob) continue
-      if (modeChanged) e.rob.setColour(mode, ctx)
-      e.rob.mesh.visible = !hideRob
+      e.rob.setColour(mode, robDisplay, ctx)
+      e.rob.mesh.visible = robDisplay !== 'hide'
     }
   }
 

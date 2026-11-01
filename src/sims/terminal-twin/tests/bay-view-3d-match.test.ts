@@ -3,7 +3,7 @@
  * box in the 3D scene at the same bay, row and tier, and every box the 3D scene draws on the vessel (worked cargo and
  * ROB) is an occupied cell of the bay view, at the scene's display time. The engine runs ahead of the display while
  * playing (the controller's lookahead, up to 1.5 wall seconds times the speed), so the bay view's engine data is moved
- * back to the display time with the scene model (`bayViewDataAt`). Hide ROB hides ROB in both.
+ * back to the display time with the scene model (`bayViewDataAt`). The ROB display `hide` removes ROB in both.
  */
 import { describe, expect, it } from 'vitest'
 import { buildBayView, bayOrder, type BayView, type BayViewData } from '../modules/bayView'
@@ -25,10 +25,10 @@ const key = (bay: number, row: number, tier: number, half: 'aft' | 'fore' | null
 }
 
 /** Cells of the bay view that hold a box on board: a box still to discharge, a loaded box, a ROB box. */
-function bayViewCells(data: BayViewData, opts: { hideRob?: boolean } = {}): string[] {
+function bayViewCells(data: BayViewData, opts: { hide?: boolean } = {}): string[] {
   const out: string[] = []
   for (const bay of bayOrder(data.sizeClass)) {
-    const v: BayView = buildBayView(data, bay, { colourMode: 'status', hideRob: opts.hideRob })
+    const v: BayView = buildBayView(data, bay, { colourMode: 'status', robDisplay: opts.hide ? 'hide' : 'grey' })
     for (const s of v.sections)
       for (const t of s.tiers)
         for (const p of t.positions)
@@ -41,7 +41,7 @@ function bayViewCells(data: BayViewData, opts: { hideRob?: boolean } = {}): stri
 }
 
 /** Boxes the 3D scene draws on the vessel at `t`: containers whose custody is one of its slots, plus its ROB boxes. */
-function sceneCells(model: SceneModel, vesselId: string, t: number, opts: { hideRob?: boolean } = {}): string[] {
+function sceneCells(model: SceneModel, vesselId: string, t: number, opts: { hide?: boolean } = {}): string[] {
   const sizeClass = model.vesselConfig(vesselId).sizeClass
   const out: string[] = []
   for (const id of model.containerIds) {
@@ -50,7 +50,7 @@ function sceneCells(model: SceneModel, vesselId: string, t: number, opts: { hide
     const s = parseVesselSlotId(c.id)
     if (s.vesselId === vesselId) out.push(key(s.bay, s.row, s.tier, s.half, sizeClass))
   }
-  if (!opts.hideRob) for (const b of model.robBoxesOf(vesselId)) out.push(key(b.bay, b.row, b.tier, b.half, sizeClass))
+  if (!opts.hide) for (const b of model.robBoxesOf(vesselId)) out.push(key(b.bay, b.row, b.tier, b.half, sizeClass))
   return out.sort()
 }
 
@@ -99,12 +99,12 @@ describe('bay view and 3D vessel show the same boxes (TTI preset)', async () => 
     expect(ids.some((id) => data[id].robBoxes.length > 0)).toBe(true)
   })
 
-  it('Hide ROB hides the ROB cells in the bay view as it hides the ROB boxes in 3D', () => {
+  it('the ROB display hide removes the ROB cells in the bay view as it removes the ROB boxes in 3D', () => {
     for (const id of ids) {
       const synced = bayViewDataAt(data[id], model, ENGINE_S)
-      expect(bayViewCells(synced, { hideRob: true })).toEqual(sceneCells(model, id, ENGINE_S, { hideRob: true }))
+      expect(bayViewCells(synced, { hide: true })).toEqual(sceneCells(model, id, ENGINE_S, { hide: true }))
       if (synced.robBoxes.length === 0) continue
-      const views = bayOrder(synced.sizeClass).map((bay) => buildBayView(synced, bay, { colourMode: 'status', hideRob: true }))
+      const views = bayOrder(synced.sizeClass).map((bay) => buildBayView(synced, bay, { colourMode: 'status', robDisplay: 'hide' }))
       expect(views.reduce((n, v) => n + v.counts.rob, 0)).toBe(0)
       // the strip still marks the ROB bays, so a hidden ROB bay does not read as an empty one
       expect(views[0].strip.some((e) => e.rob)).toBe(true)

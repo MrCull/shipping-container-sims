@@ -24,7 +24,7 @@ import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../m
 import { createLocationNotation } from '../modules/locationNotation'
 import { defaultBay, type BayPlan, type BayViewData } from '../modules/bayView'
 import { bayViewDataAt } from '../modules/bayViewScene'
-import { loadColourBySettings, saveColourBySettings, type ColourBy } from '../modules/colourBySettings'
+import { loadColourBySettings, saveColourBySettings, type ColourBy, type RobDisplay } from '../modules/colourBySettings'
 import { describeEntity, entityKind, entityQueryKind, transitWorldOf, type EntityExtras, type EntityView } from '../modules/entityInspector'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
@@ -289,19 +289,19 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayViewerBay.value = bay
   }
 
-  /** Colour by (#130): one mode for the 3D boxes and the bay viewer, and Hide ROB for the vessels in 3D; both remembered (a per-viewer convenience). */
+  /** Colour by (#130): one mode for the 3D boxes and the bay viewer; the ROB display (#168, show, grey or hide) for the remain-on-board boxes in both. Both remembered (a per-viewer convenience). */
   const colourBySettings = loadColourBySettings(browserStorage())
   const colourBy = ref<ColourBy>(colourBySettings.mode)
-  const hideRob = ref(colourBySettings.hideRob)
+  const robDisplay = ref<RobDisplay>(colourBySettings.robDisplay)
 
   function setColourBy(mode: ColourBy): void {
     colourBy.value = mode
-    saveColourBySettings(browserStorage(), { mode, hideRob: hideRob.value })
+    saveColourBySettings(browserStorage(), { mode, robDisplay: robDisplay.value })
   }
 
-  function setHideRob(hide: boolean): void {
-    hideRob.value = hide
-    saveColourBySettings(browserStorage(), { mode: colourBy.value, hideRob: hide })
+  function setRobDisplay(display: RobDisplay): void {
+    robDisplay.value = display
+    saveColourBySettings(browserStorage(), { mode: colourBy.value, robDisplay: display })
   }
 
   /** Sound effects (TT-21): one master gain, the shared volume and mute (`stores/audio.ts`), scales all playback. */
@@ -1099,9 +1099,9 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayPlan,
     setBayPlan,
     colourBy,
-    hideRob,
+    robDisplay,
     setColourBy,
-    setHideRob,
+    setRobDisplay,
     bayViewData,
     openBayViewer,
     closeBayViewer,
