@@ -255,6 +255,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Group budget:** a cap in `assets/budgets.json` (`groups`) on the summed triangles and draw calls of a named set of assets, checked by `tt:assets:check` beside the per-asset budgets.
 - **Terminal folder:** `terminals/<id>/`, the home of one real terminal's constants, preset presentation and scenery; generic modules reach it through the registry in `terminals/index.ts`.
 - **North Quay:** TTI's 550 m of quay beside the working berths, drawn idle (non-operational).
+- **North land edge:** the terminal's northern limit of land, the North Quay's water face (scene x = -70 m). A 200 m sea channel lies beyond it, so the scenery's Isla Verde road stops there (#172). *Avoid:* "shoreline" for it, since the channel is not the coast.
 - **Cue:** a moment (box landed, vessel horn, scenario complete) that may make a sound or banner when the display clock reaches it.
 - **Master gain:** the single level every Terminal Twin sound is scaled by: the shared volume, or 0 while muted.
 - **Sound mixer:** the pure module (`modules/soundMixer.ts`) that maps the camera and the active sound sources (machine position plus motion state) to *voices* with gains: distance attenuation, at most 12 voices (loudest first). `positionalSound.ts` plays them through Web Audio. *Avoid:* "audio engine".
