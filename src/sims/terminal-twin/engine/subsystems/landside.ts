@@ -50,7 +50,9 @@ import type {
   TruckState,
   TruckStatus,
 } from '../state'
-import { blockSpecs, parseYardSlotId } from '../yardLayout'
+import { blockSpecs, candidateSlots, parseYardSlotId, reeferFields } from '../yardLayout'
+import { stackSpansOf } from '../yardIndex'
+import { withoutPendingPickups } from './ascStorage'
 import { kpiClockOf, HOUR_S } from '../kpi/clock'
 import { makeIso6346Id } from '../../scenario/iso6346'
 import { LINE_OWNER_PREFIX } from '../../scenario/lines'
@@ -65,7 +67,7 @@ import { DEFAULT_LANDSIDE } from '../../scenario/builder'
 import { vesselSlotId } from '../../scenario/vesselClasses'
 import { appointmentWindowS, planAppointments } from '../appointments'
 import { maybeDispatchAsc, pumpAllocation } from './asc'
-import { TripBuilder, waypoints } from './shc'
+import { TripBuilder, blockRoom, waypoints } from './shc'
 
 type PlannedType = TruckPlannedEvent['type']
 
@@ -635,11 +637,64 @@ function legalBlocks(ctx: EngineContext, truck: TruckState): Set<string> | null 
   return blocks.size > 0 ? blocks : null
 }
 
+/**
+ * TT-175: can `blockId` take the box now? The block-room filter the SHC pads use (#165), and a legal slot for the box on
+ * the stacks the TOS would see (`candidateSlots`): a 40 ft box needs two bays free in one row, which a block of loose
+ * cells may not have. The stacks view is the one `yardAllocation` gets, minus the pending pickups it also gets.
+ */
+function blockTakes(ctx: EngineContext, blockId: string, box: ContainerState): boolean {
+  const { state } = ctx
+  const spec = blockSpecs(ctx.config).find((b) => b.id === blockId)
+  const yard = state.yardBlocks[blockId]
+  if (!spec || !yard || blockRoom(state, blockId) <= 0) return false
+  return (
+    candidateSlots({
+      blockId,
+      bays: spec.bays,
+      rows: spec.rows,
+      tiers: spec.tiers,
+      size: box.size,
+      blockX: spec.x,
+      firstBayZ: spec.firstBayZ,
+      wtpX: spec.x,
+      wtpZ: spec.wtpZ,
+      heights: withoutPendingPickups(state, blockId, yard),
+      topVessels: yard.topVessels.slice(),
+      stackSpans: stackSpansOf(state, blockId),
+      ...reeferFields(spec, box.reefer),
+    }).length > 0
+  )
+}
+
+/** `blockTakes` for one decision: each block and box kind is worked out once, however many stalls and trucks ask. */
+function roomReader(ctx: EngineContext): (blockId: string, box: ContainerState) => boolean {
+  const memo = new Map<string, boolean>()
+  return (blockId, box) => {
+    const key = `${blockId}|${box.size}|${box.reefer === true}`
+    let ok = memo.get(key)
+    if (ok === undefined) memo.set(key, (ok = blockTakes(ctx, blockId, box)))
+    return ok
+  }
+}
+
+/**
+ * TT-175: may `truck` take a stall of `blockId`? A truck that picks is bound to the block of its box (an ASC only reaches
+ * its own block's stalls). A drop-only truck needs the block to take every box it drops: a stall is not offered where the
+ * box would meet "full" with the truck standing at the stall.
+ */
+function stallLegal(ctx: EngineContext, truck: TruckState, blockId: string, room: (blockId: string, box: ContainerState) => boolean): boolean {
+  if (truck.legs.some((l) => l.kind === 'pick')) {
+    const blocks = legalBlocks(ctx, truck)
+    return blocks === null || blocks.has(blockId)
+  }
+  return truck.legs.every((l) => l.kind !== 'drop' || room(blockId, ctx.state.containers[l.containerId]))
+}
+
 /** Ask transferStallSelection for `truck` (one request at a time): the stalls it may use, from where it stands now. */
 function askStall(ctx: EngineContext, truck: TruckState): void {
   const { state } = ctx
   const ls = landside(state)
-  const blocks = legalBlocks(ctx, truck)
+  const room = roomReader(ctx)
   const blockLoad: Record<string, number> = Object.fromEntries(blockSpecs(ctx.config).map((b) => [b.id, 0]))
   for (const st of Object.values(ls.stalls)) if (st.truckId !== null) blockLoad[st.blockId]++
   for (const other of ls.stallWaiting.includes(truck.id) ? ls.stallWaiting : [...ls.stallWaiting, truck.id]) {
@@ -662,7 +717,7 @@ function askStall(ctx: EngineContext, truck: TruckState): void {
           blockId: l.kind === 'pick' && box.custody.kind === 'yardSlot' ? blockOfSlot(box.custody.id) : null,
         }
       }),
-      stalls: stallOptions(ctx, truck.nodeId).filter((o) => blocks === null || blocks.has(o.blockId)),
+      stalls: stallOptions(ctx, truck.nodeId).filter((o) => stallLegal(ctx, truck, o.blockId, room)),
       blockLoad,
     },
     { equipment: [truck.id] },
@@ -678,14 +733,20 @@ function pumpStalls(ctx: EngineContext): void {
   const ls = landside(state)
   if (ls.stallAsking !== null || ls.stallWaiting.length === 0) return
   const graph = graphOf(ctx)
+  const room = roomReader(ctx)
   for (const id of ls.stallWaiting) {
     const truck = state.trucks[id]
-    const blocks = legalBlocks(ctx, truck)
-    const legal = graph.stalls.filter((s) => (blocks === null || blocks.has(s.blockId)))
-    if (!legal.some((s) => ls.stalls[s.id].truckId === null)) continue
+    if (!graph.stalls.some((s) => ls.stalls[s.id].truckId === null && stallLegal(ctx, truck, s.blockId, room))) continue
     askStall(ctx, truck)
     return
   }
+}
+
+/** TT-175: a block has room again (an ASC took a box out of its stacks): the trucks waiting for a stall are asked again. */
+export function stallRoomAppeared(ctx: EngineContext): void {
+  if (ctx.state.landside === null) return
+  pumpStalls(ctx)
+  if (holdingOn(ctx)) pumpGate(ctx)
 }
 
 // ── stall admission and holding (TT-R16) ────────────────────────────────────
@@ -725,8 +786,8 @@ function admit(ctx: EngineContext, truck: TruckState): boolean {
   const { state } = ctx
   const ls = landside(state)
   const graph = graphOf(ctx)
-  const blocks = legalBlocks(ctx, truck)
-  if (graph.stalls.some((s) => (blocks === null || blocks.has(s.blockId)) && ls.stalls[s.id].truckId === null)) {
+  const room = roomReader(ctx)
+  if (graph.stalls.some((s) => stallLegal(ctx, truck, s.blockId, room) && ls.stalls[s.id].truckId === null)) {
     askStall(ctx, truck)
     return false
   }

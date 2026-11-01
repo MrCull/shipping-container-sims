@@ -213,6 +213,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Overflow (holding):** when no stall and no holding position is free, the truck waits outside the gate in the queue (`TruckHeldOutside`).
 - **Appointment window:** a slot of the truck booking system (default 30 min, `landside.appointments.windowS`). A truck books a window and arrives at a random time inside it; bookings per window are capped by gate and transfer stall capacity (`appointmentCap`), so demand above the cap is rejected. A peak is bunched bookings (`bunching` spans). Each **appointment** carries one transaction (its transport orders: export delivery, import collection or both = dual). No ANPR, no early, late or invalid arrivals.
 
+- **Stranded truck:** a truck standing at its transfer stall for longer than `STALL_STRAND_LIMIT_S` while no ASC of its block works and no job of the block can start (invariant `landside.stranded-truck`, TT-175). *Avoid:* "stuck" for anything but this bug.
+- **Block room:** whether a yard block can take a drop: its free cells less the boxes already waiting for a slot and a 10 % reserve (the SHC pad filter, #165), and a legal slot for the box's size. A drop-only truck is offered only the stalls of blocks with room (TT-175).
+- **"Full" allocation:** a `yardAllocation` reply with no slot. The stacking job waits on its pad or at the stall and is asked again when a box leaves its block (TT-175).
+
 ## Yard start (TT-14)
 
 - **Yard start mode:** how the yard looks at t = 0: **pre-filled** (default; exports, empty pool and imports placed through the selected yard-allocation strategy up to a target % of the cells), **warm-up** (starts empty; a warm-up period of truck and vessel activity runs first and is excluded from KPIs and end conditions) or **empty** (starts empty; exports arrive by truck during the run).

@@ -22,6 +22,7 @@ import type { EngineEvent } from './events'
 import { columnKey, yardIndexOf } from './yardIndex'
 import {
   ascIndexOf,
+  type AscJob,
   type AscState,
   type CustodyRef,
   type HatchPanelState,
@@ -32,7 +33,7 @@ import {
 import { ascPoseAt } from './subsystems/asc'
 import { gantryPositionAt, railOrder } from './subsystems/rail'
 import { shcPositionAt } from './subsystems/shc'
-import { truckPositionAt } from './subsystems/landside'
+import { truckPositionAt, truckReadyForPick } from './subsystems/landside'
 import { ASC_MIN_SEPARATION_M, blockSpecs, REEFER_MAX_TIERS, travelHoistM } from './yardLayout'
 import type { ScenarioConfig } from '../scenario/types'
 import { hatchPanelId, hatchPanelOfRow, isCellUsable, isStackBase, vesselClass, vesselSlotId } from '../scenario/vesselClasses'
@@ -299,6 +300,25 @@ function blockSpecsById(config: ScenarioConfig) {
 /** Half-extent (m) of a WTP pad's lifting envelope across X and along Z. */
 const PAD_HALF_X_M = 1.6
 const PAD_HALF_Z_M = 6.5
+
+/**
+ * TT-175: how long a truck may stand at its transfer stall with its block's ASCs idle before it counts as stranded
+ * (`landside.stranded-truck`). [A]: a box waiting for an ASC that is busy is not stranded, so only real stalls reach it.
+ */
+export const STALL_STRAND_LIMIT_S = 1800
+
+/**
+ * TT-175: can an open job of its block start (or is it still pending a decision, an earlier job or the trucks' own
+ * progress)? A stacking job whose yardAllocation said "full" cannot; neither can a retrieval that is out of rehandle
+ * targets, or a truck pick held up by its own drop while the truck stands at the stall.
+ */
+function jobCanStart(state: SimState, job: AscJob): boolean {
+  if (job.allocation === 'full') return false
+  if (job.kind === 'retrieve' && job.rehandle === 'full') return false
+  const truck = job.truckId === undefined ? undefined : state.trucks[job.truckId]
+  if (job.kind === 'retrieve' && truck && (truck.status === 'at-stall' || truck.status === 'being-served')) return truckReadyForPick(state, job)
+  return true
+}
 
 export const INVARIANTS: Invariant[] = [
   {
@@ -748,6 +768,37 @@ export const INVARIANTS: Invariant[] = [
         if (t.status !== 'routing-to-exit') continue
         const open = t.legs.filter((l) => !l.done)
         if (open.length > 0) messages.push(`${t.id} is leaving with ${open.length} unfinished transfer(s): ${open.map((l) => `${l.kind} ${l.containerId}`).join(', ')}`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'landside.stranded-truck',
+    reads: ['equipment', 'time'],
+    description:
+      `A truck that has stood at its transfer stall for more than ${STALL_STRAND_LIMIT_S} s is stranded when no ASC of its block is working ` +
+      'and no open job of the block can start (TT-175): a stacking job waiting on "full" is retried when room appears, and a truck never ' +
+      'holds a stall for a drop into a block without room.',
+    check(state, config) {
+      const messages: string[] = []
+      const ls = state.landside
+      if (!ls || !hasLandside(config) || state.subsystems.asc === 'off') return messages
+      for (const t of Object.values(state.trucks)) {
+        if ((t.status !== 'at-stall' && t.status !== 'being-served') || t.stallId === null || t.atStallAt === null) continue
+        // every transfer done: the truck waits for an outbound slot (its exit reservation), not for an ASC
+        if (t.legs.every((l) => l.done)) continue
+        const waitedS = state.now - t.atStallAt
+        if (waitedS <= STALL_STRAND_LIMIT_S) continue
+        const blockId = ls.stalls[t.stallId]?.blockId
+        if (blockId === undefined) continue
+        if (Object.values(state.ascs).some((a) => a.blockId === blockId && a.status !== 'idle')) continue
+        const open = Object.values(state.ascJobs).filter((j) => j.blockId === blockId && j.ascId === null)
+        if (open.some((j) => jobCanStart(state, j))) continue
+        const jobs = open.map((j) => `${j.id} (${j.kind ?? 'stack'}, ${j.allocation})`).join(', ') || 'no open job'
+        messages.push(
+          `${t.id} has waited ${waitedS.toFixed(0)} s at stall ${t.stallId} (limit ${STALL_STRAND_LIMIT_S} s) with no ASC of ${blockId} working ` +
+            `and no job that can start: ${jobs}`,
+        )
       }
       return messages
     },

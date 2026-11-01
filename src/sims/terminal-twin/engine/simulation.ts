@@ -34,7 +34,7 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.34.0'
+export const ENGINE_VERSION = '0.35.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
@@ -425,8 +425,13 @@ export function createSimulation(
     const next = state.queue[0]
     const duration = durationEnd()
     if (duration !== undefined && (!next || next.t > duration)) {
-      // the run's last event is always swept, even when the run ends on its duration instead of on an event
-      if (invariantsEnabled && sinceSweep > 0 && log.length > 0 && checkInvariants(log[log.length - 1], true, false)) return log[log.length - 1]
+      // the run's last event is always swept, even when the run ends on its duration instead of on an event. The clock
+      // moves to the end first, so a time-based invariant sees the time that passed after the last event (TT-175: a truck
+      // silent at its stall until the end, `landside.stranded-truck`)
+      if (invariantsEnabled && log.length > 0 && (sinceSweep > 0 || state.now < duration)) {
+        state.now = Math.max(state.now, duration)
+        if (checkInvariants(log[log.length - 1], true, false)) return log[log.length - 1]
+      }
       endScenario(`simDurationS >= ${config.endConditions.simDurationS}`, Math.max(state.now, duration), null)
       return log[log.length - 1]
     }

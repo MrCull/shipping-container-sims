@@ -283,6 +283,27 @@ export function pumpAllocation(ctx: EngineContext, blockId: string): void {
 }
 
 /**
+ * TT-175: room appeared in a block (an ASC took a box out of its stacks). A stacking job whose allocation said "full" is
+ * asked again, and so is a retrieval whose rehandle found no target (its blocker goes to the next room). Without this a
+ * "full" box and the truck waiting for it stayed stranded for good. Returns true when a job was reopened.
+ */
+export function reopenFullJobs(state: SimState, blockId: string): boolean {
+  let reopened = false
+  for (const j of Object.values(state.ascJobs)) {
+    if (j.blockId !== blockId) continue
+    if (j.allocation === 'full') {
+      j.allocation = 'waiting'
+      reopened = true
+    }
+    if (j.kind === 'retrieve' && j.rehandle === 'full') {
+      j.rehandle = 'required' // the RehandleRequired event was sent once already: the pump only needs a new target
+      reopened = true
+    }
+  }
+  return reopened
+}
+
+/**
  * Stack heights as the allocation decision sees them: a stack holding a box a truck is coming for (TT-13) reads
  * full, so no box is piled on it (the TOS knows the pickup; otherwise the truck would wait for a rehandle).
  */

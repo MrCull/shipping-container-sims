@@ -28,7 +28,8 @@
 import type { EngineContext, ReactorMap } from '../context'
 import { ascPoseAt, type PlannedType } from './ascReservations'
 import { maybeDispatchAsc, resolveDispatch } from './ascDispatch'
-import { claimSlot, placeInStack, removeFromStack, jobOfBox, isTruckJob, pumpAllocation, resolveRehandleTarget } from './ascStorage'
+import { claimSlot, placeInStack, removeFromStack, jobOfBox, isTruckJob, pumpAllocation, reopenFullJobs, resolveRehandleTarget } from './ascStorage'
+import { stallRoomAppeared } from './landside'
 export { ascPoseAt, maybeDispatchAsc, pumpAllocation, isTruckJob }
 import type { EventOf } from '../events'
 import type { PredictedReady } from '../predictions'
@@ -229,6 +230,12 @@ export const ascReactors: ReactorMap = {
     removeFromStack(state, e.payload.yardSlotId)
     asc.carrying = e.payload.containerId
     ctx.transferCustody(e.payload.containerId, { kind: 'asc', id: asc.id })
+    // TT-175: the box leaving frees a cell: jobs refused for lack of room are asked again, and so are trucks waiting for a stall
+    if (reopenFullJobs(state, asc.blockId)) {
+      pumpAllocation(ctx, asc.blockId)
+      maybeDispatchAsc(ctx, asc.blockId)
+    }
+    stallRoomAppeared(ctx)
   }),
   AscRoutingToWtp: phase(),
   AscPositioningAtWtp: phase(),
