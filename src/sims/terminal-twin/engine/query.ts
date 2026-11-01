@@ -39,6 +39,8 @@ export interface SimQuery {
   sts(id: string): Readonly<StsState>
   /** All STS cranes in rail order. */
   stsList(): readonly Readonly<StsState>[]
+  /** The earliest first move of any STS working `vesselId` (view only, #141), null before any move. */
+  vesselFirstMoveS(vesselId: string): number | null
   groundPosition(id: string): Readonly<GroundPositionState>
   shc(id: string): Readonly<ShcState>
   shcs(): readonly Readonly<ShcState>[]
@@ -96,6 +98,19 @@ export function createQuery(getState: () => SimState): SimQuery {
     },
     sts: (id) => get(getState().sts, id, 'STS'),
     stsList: () => Object.values(getState().sts).sort((a, b) => a.railIndex - b.railIndex),
+    vesselFirstMoveS: (vesselId) => {
+      const st = getState()
+      const berthed = st.vessels[vesselId]?.berthedAt ?? null
+      let first: number | null = null
+      for (const p of Object.values(st.workPackages)) {
+        if (p.vesselId !== vesselId) continue
+        let t = st.kpis.perSts[p.stsId]?.firstMoveStartS ?? null
+        // a crane that served an earlier vessel has an earlier first move: then this vessel's own start is its package start
+        if (t !== null && berthed !== null && t < berthed) t = p.startedAt
+        if (t !== null && (first === null || t < first)) first = t
+      }
+      return first
+    },
     groundPosition: (id) => get(getState().groundPositions, id, 'ground position'),
     shc: (id) => get(getState().shcs, id, 'SHC'),
     shcs: () => Object.values(getState().shcs),

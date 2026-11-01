@@ -581,7 +581,8 @@ h3 {
 }
 
 .vessel-status[data-phase='waiting'],
-.vessel-status[data-phase='mooring'] {
+.vessel-status[data-phase='mooring'],
+.vessel-status[data-phase='berthed'] {
   border-left-color: var(--tt-warn);
 }
 
