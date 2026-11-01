@@ -4,7 +4,8 @@ import { computed, ref } from 'vue'
 import { useTwinStore } from '../store/twinStore'
 import { SPEEDS } from '../modules/twinController'
 import { fromLocalInputValue, simDate, toLocalInputValue } from '../modules/time'
-import { t } from '../i18n/messages'
+import { t, type MessageKey } from '../i18n/messages'
+import { ROB_DISPLAY_MODES } from '../modules/colourBy'
 import PerfPanel from './PerfPanel.vue'
 import LocaleDateTimeInput from './LocaleDateTimeInput.vue'
 
@@ -228,6 +229,28 @@ async function submitRunTo(): Promise<void> {
       data-hud-region="settings"
       data-testid="tt-settings"
     >
+      <div
+        class="rob-display"
+        role="group"
+        :aria-label="t('topbar.rob')"
+        :title="t('topbar.robHint')"
+        data-testid="tt-rob-display"
+        :data-mode="store.robDisplay"
+      >
+        <span class="rob-label">{{ t('topbar.rob') }}</span>
+        <button
+          v-for="m in ROB_DISPLAY_MODES"
+          :key="m"
+          type="button"
+          class="action-btn rob-btn"
+          :class="{ active: store.robDisplay === m }"
+          :aria-pressed="store.robDisplay === m"
+          :data-testid="`tt-rob-${m}`"
+          @click="store.setRobDisplay(m)"
+        >
+          {{ t(`topbar.rob.${m}` as MessageKey) }}
+        </button>
+      </div>
       <button
         class="action-btn"
         :class="{ active: store.lockDaylight }"
@@ -270,6 +293,22 @@ async function submitRunTo(): Promise<void> {
   flex: 1 1 0;
   flex-wrap: wrap;
   min-width: 0;
+}
+
+.rob-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.rob-label {
+  color: var(--tt-text-muted);
+  font-size: 0.78rem;
+  margin-right: 0.1rem;
+}
+
+.rob-btn {
+  padding: 0.35rem 0.5rem;
 }
 
 .settings {

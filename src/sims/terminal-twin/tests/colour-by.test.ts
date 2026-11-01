@@ -12,6 +12,7 @@ import type { ScenarioConfig } from '../scenario/types'
 import {
   COLOUR_BY_MODES,
   DATA_PALETTE,
+  DEFAULT_ROB_DISPLAY,
   DWELL_PALETTE,
   LENGTH_PALETTE,
   RAMP_PALETTE,
@@ -21,6 +22,8 @@ import {
   isTimeBased,
   legendOf,
   parseColourBy,
+  parseRobDisplay,
+  robColourOf,
   subjectOfBox,
   type ColourBy,
   type ColourSubject,
@@ -104,7 +107,7 @@ describe('what each mode produces', () => {
     const [a, b] = ctx.ports
     expect(colourOf('pod', subject({ pod: a }), 0, ctx).hex).not.toBe(colourOf('pod', subject({ pod: b }), 0, ctx).hex)
     expect(colourOf('pod', subject({ pod: 'XXXXX' }), 0, ctx).key).toBe('other')
-    expect(legendOf('pod', ctx).map((e) => e.key)).toEqual([...ctx.ports, 'other', 'rob'])
+    expect(legendOf('pod', ctx).map((e) => e.key)).toEqual([...ctx.ports, 'other'])
   })
 
   it('special: reefer, tank (hazardous), open top and flat (out of gauge), else standard', () => {
@@ -122,14 +125,18 @@ describe('what each mode produces', () => {
     expect(colourOf('flow', subject({ direction: 'TRANSSHIPMENT' }), 0, ctx).key).toBe('transshipment')
   })
 
-  it('call: a box on a vessel call of this scenario, a box from elsewhere, a remain-on-board box', () => {
+  it('call: a box on a vessel call of this scenario, a box from elsewhere', () => {
     expect(colourOf('call', subject({ onCall: true }), 0, ctx).key).toBe('call')
     expect(colourOf('call', subject({ onCall: false }), 0, ctx).key).toBe('other')
-    expect(colourOf('call', subject({ rob: true }), 0, ctx).key).toBe('rob')
   })
 
-  it('a remain-on-board box has no dwell, departure or transit: its own grey in those modes', () => {
-    for (const mode of ['dwell', 'departure', 'transit'] as ColourBy[]) expect(colourOf(mode, subject({ rob: true }), 0, ctx).key).toBe('rob')
+  it('a remain-on-board box is coloured by the mode like any box (#168 ROB display): no dwell, departure or transit yet, so the unknown key', () => {
+    const rob = subject({ direction: 'TRANSSHIPMENT' })
+    expect(colourOf('dwell', rob, 0, ctx).key).toBe('none')
+    expect(colourOf('departure', rob, 0, ctx).key).toBe('unknown')
+    expect(colourOf('transit', rob, 0, ctx).key).toBe('unknown')
+    expect(colourOf('flow', rob, 0, ctx).key).toBe('transshipment')
+    expect(colourOf('line', subject({ line: 'Maersk' }), 0, ctx).hex).toBe('#42b0d5')
   })
 })
 
@@ -161,7 +168,7 @@ describe('time-based modes move with the sim time', () => {
     const D = 86400
     const key = (d: number) => colourOf('dwell', { line: 'MSC', full: true, arrivedS: 0, leftS: d }, 0, ctx).key
     expect([key(D - 1), key(D), key(3 * D - 1), key(3 * D), key(7 * D - 1), key(7 * D)]).toEqual(['lt1d', 'lt3d', 'lt3d', 'lt7d', 'lt7d', 'gt7d'])
-    expect(legendOf('dwell', ctx).map((e) => e.key)).toEqual(['none', 'lt1d', 'lt3d', 'lt7d', 'gt7d', 'rob'])
+    expect(legendOf('dwell', ctx).map((e) => e.key)).toEqual(['none', 'lt1d', 'lt3d', 'lt7d', 'gt7d'])
   })
 
   it('dwell colours are the light ramp, unknown and ROB stay distinct (#140)', () => {
@@ -208,15 +215,28 @@ describe('remembered choice', () => {
     const data = new Map<string, string>(initial === null ? [] : [[COLOUR_BY_STORAGE_KEY, initial]])
     return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) }
   }
-  it('round-trips the mode and Hide ROB, and falls back to the defaults on nothing, rubbish or a blocked storage', () => {
+  it('round-trips the mode and the ROB display, and falls back to the defaults on nothing, rubbish or a blocked storage', () => {
     const s = store(null)
-    expect(loadColourBySettings(s)).toEqual({ mode: 'default', hideRob: false })
-    saveColourBySettings(s, { mode: 'dwell', hideRob: true })
-    expect(loadColourBySettings(s)).toEqual({ mode: 'dwell', hideRob: true })
-    expect(loadColourBySettings(store('{nonsense'))).toEqual({ mode: 'default', hideRob: false })
-    expect(loadColourBySettings(store('{"mode":"zzz","hideRob":1}'))).toEqual({ mode: 'default', hideRob: false })
-    expect(loadColourBySettings(null)).toEqual({ mode: 'default', hideRob: false })
-    expect(() => saveColourBySettings({ setItem: () => { throw new Error('blocked') } }, { mode: 'pod', hideRob: false })).not.toThrow()
+    expect(loadColourBySettings(s)).toEqual({ mode: 'default', robDisplay: 'grey' })
+    saveColourBySettings(s, { mode: 'dwell', robDisplay: 'show' })
+    expect(loadColourBySettings(s)).toEqual({ mode: 'dwell', robDisplay: 'show' })
+    expect(loadColourBySettings(store('{nonsense'))).toEqual({ mode: 'default', robDisplay: 'grey' })
+    expect(loadColourBySettings(store('{"mode":"zzz","robDisplay":1}'))).toEqual({ mode: 'default', robDisplay: 'grey' })
+    expect(loadColourBySettings(null)).toEqual({ mode: 'default', robDisplay: 'grey' })
+    expect(() => saveColourBySettings({ setItem: () => { throw new Error('blocked') } }, { mode: 'pod', robDisplay: 'hide' })).not.toThrow()
+  })
+
+  it('an old saved hideRob true reads as Hide; hideRob false (the old default) reads as Grey (#168 migration)', () => {
+    expect(loadColourBySettings(store('{"mode":"flow","hideRob":true}'))).toEqual({ mode: 'flow', robDisplay: 'hide' })
+    expect(loadColourBySettings(store('{"mode":"flow","hideRob":false}'))).toEqual({ mode: 'flow', robDisplay: 'grey' })
+    expect(loadColourBySettings(store('{"mode":"flow","hideRob":true,"robDisplay":"show"}'))).toEqual({ mode: 'flow', robDisplay: 'show' })
+  })
+
+  it('the ROB display parses the three values and falls back to Grey', () => {
+    expect(DEFAULT_ROB_DISPLAY).toBe('grey')
+    expect(['show', 'grey', 'hide'].map(parseRobDisplay)).toEqual(['show', 'grey', 'hide'])
+    expect(parseRobDisplay('zzz')).toBe('grey')
+    expect(parseRobDisplay(undefined)).toBe('grey')
   })
 })
 
@@ -256,35 +276,48 @@ describe('mode names and the palette', () => {
   })
 })
 
-describe('ROB colour (spec #154, #159)', () => {
+describe('ROB colour (spec #154, #159, #168)', () => {
   const subject = (o: Partial<ColourSubject> = {}): ColourSubject => ({ line: 'MSC', full: true, ...o })
   const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  const robSubject = subject({ pod: ctx.ports[0], weightClass: 'HEAVY', isoType: '22R1', direction: 'TRANSSHIPMENT' })
 
-  it('one colour for a remain-on-board box in every mode, listed in every legend', () => {
-    for (const mode of COLOUR_BY_MODES) {
-      expect(colourOf(mode, subject({ rob: true, pod: ctx.ports[0], weightClass: 'HEAVY', isoType: '22R1' }), 0, ctx), mode).toEqual({ key: 'rob', hex: ROB_HEX })
-      expect(legendOf(mode, ctx).filter((e) => e.key === 'rob'), mode).toEqual([{ key: 'rob', hex: ROB_HEX }])
-    }
+  it('grey: every remain-on-board box is the one ROB grey in every mode, whatever its properties', () => {
+    for (const mode of COLOUR_BY_MODES) expect(robColourOf('grey', mode, robSubject, 0, ctx), mode).toEqual({ key: 'rob', hex: ROB_HEX })
   })
 
-  it('is a desaturated light grey, distinct from the no-value grey', () => {
+  it('show: a remain-on-board box takes the colour its mode gives any box (no grey forced on it)', () => {
+    for (const mode of COLOUR_BY_MODES) expect(robColourOf('show', mode, robSubject, 0, ctx), mode).toEqual(colourOf(mode, robSubject, 0, ctx))
+    expect(robColourOf('show', 'line', subject({ line: 'Maersk' }), 0, ctx).hex).toBe('#42b0d5')
+    expect(robColourOf('show', 'pod', robSubject, 0, ctx).hex).not.toBe(ROB_HEX)
+  })
+
+  it('no mode lists a ROB row in its legend (the menu and the bay viewer key have none)', () => {
+    for (const mode of COLOUR_BY_MODES) expect(legendOf(mode, ctx).filter((e) => e.key === 'rob' || e.hex === ROB_HEX), mode).toEqual([])
+  })
+
+  it('the ROB grey is a desaturated light grey, distinct from the no-value grey', () => {
     const [r, g, b] = rgb(ROB_HEX)
     expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThanOrEqual(12)
     expect((r + g + b) / 3).toBeGreaterThan(180)
-    for (const mode of COLOUR_BY_MODES) expect(legendOf(mode, ctx).filter((e) => e.key !== 'rob' && e.hex === ROB_HEX), mode).toEqual([])
   })
 
-  it('the 3D ROB boxes take it in every mode, the default one included', () => {
+  it('the 3D ROB boxes: the grey in grey mode, the mode colour in show', () => {
     const spec = VESSEL_CLASSES.feeder
     const box: RobBox = { vesselId: 'V001', slotId: 'V001:00-00-04', bay: 0, row: 0, tier: 4, deck: true, half: null, size: '40', isoType: '42G1', pod: 'ESVLC', line: 'MSC', weightClass: 'HEAVY', grossKg: 20000, full: true }
-    const mesh = buildRobMesh(spec, [box, { ...box, slotId: 'V001:00-01-04', row: 1, pod: 'MAPTM' }])!
+    const boxes = [box, { ...box, slotId: 'V001:00-01-04', row: 1, pod: 'MAPTM' }]
+    const mesh = buildRobMesh(spec, boxes)!
     const c = new THREE.Color()
-    for (const mode of COLOUR_BY_MODES) {
-      mesh.setColour(mode, ctx)
-      for (const i of [0, 1]) {
+    const drawn = (mode: ColourBy, display: 'show' | 'grey') => {
+      mesh.setColour(mode, display, ctx)
+      return boxes.map((_, i) => {
         mesh.mesh.getColorAt(i, c)
-        expect(`#${c.getHexString()}`, mode).toBe(ROB_HEX)
-      }
+        return `#${c.getHexString()}`
+      })
+    }
+    for (const mode of COLOUR_BY_MODES) expect(drawn(mode, 'grey'), mode).toEqual([ROB_HEX, ROB_HEX])
+    for (const mode of COLOUR_BY_MODES) {
+      const want = colourOf(mode, { line: 'MSC', full: true, isoType: '42G1', pod: 'ESVLC', weightClass: 'HEAVY', direction: 'TRANSSHIPMENT', onCall: false }, 0, ctx).hex
+      expect(drawn(mode, 'show')[0], mode).toBe(want)
     }
     mesh.dispose()
   })

@@ -58,6 +58,7 @@ import type { VesselHullState } from '../modules/vesselRenderer'
 import type { HatchRigState } from '../modules/equipmentKinds/hatch'
 import type { AscPose, ShcPose, StsPose, TruckPose } from '../modules/sceneModel'
 import type { TwinController } from '../modules/twinController'
+import type { ColourBy, RobDisplay } from '../modules/colourBy'
 import type { StsRenderState } from '../modules/stsAssets'
 import { resolveScenario, type DashboardRendered, type RenderInfo, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
 import type { SaveMeta, SaveType } from '../persistence/saves'
@@ -280,6 +281,8 @@ export interface SceneState {
   hatchPanels: Record<string, { status: string; x: number | null; y: number | null; z: number | null; lengthM: number | null; widthM: number | null; stsId: string | null }>
   /** Per hatch panel the renderer drew at the last frame: status and centre (absent while not drawn). */
   hatchRigs: Record<string, HatchRigState>
+  /** Colour by mode and ROB display (#168, show, grey or hide) the 3D view and the bay viewer draw with. */
+  colour: { mode: ColourBy; robDisplay: RobDisplay }
 }
 
 declare global {
@@ -395,6 +398,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
         containers: Object.fromEntries(model.containerIds.map((id) => [id, model.custodyAt(id, t)])),
         reservations: model.activeReservations(t),
         liveries: store.view()?.liveries() ?? {},
+        colour: { mode: store.colourBy, robDisplay: store.robDisplay },
       }
       // Equipment kinds (modules/equipmentKinds/): status and pose per id, and the rig state as drawn.
       const rigs = store.view()?.rigs()

@@ -1,6 +1,6 @@
 /**
  * #162: the bay viewer's Load plan | Discharge plan switch. Load shows planned-load and loaded cells, Discharge shows
- * planned-discharge and discharged cells, ROB shows in both (subject to Hide ROB); a box on a spreader shows in the plan
+ * planned-discharge and discharged cells, ROB shows in both (subject to the ROB display); a box on a spreader shows in the plan
  * of its move. The view-model is the seam for what each plan shows; the twin store (over the engine host in-process) for
  * the default, keeping the choice across vessels and going back to Load on a new run.
  */
@@ -10,6 +10,7 @@ import { createSimulation } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
 import { bayOrder, buildBayView, defaultBay, stripOf, type BayCell, type BayPlan, type BayView, type BayViewData, type CellStatus } from '../modules/bayView'
+import type { RobDisplay } from '../modules/colourBy'
 import { collectBayViewData } from '../modules/bayViewData'
 import type { EngineResponse } from '../modules/engineClient'
 import { createEngineHost } from '../worker/engineHost'
@@ -35,8 +36,8 @@ const sim = createSimulation(config, {}, { invariants: { sweepEvery: 500 } })
 const before: BayViewData = collectBayViewData(sim.query, 'V001', config)
 
 const allCells = (v: BayView): BayCell[] => v.sections.flatMap((s) => s.tiers.flatMap((t) => t.positions.flatMap((p) => p.cells)))
-const cellsOf = (data: BayViewData, plan: BayPlan | undefined, hideRob = false): BayCell[] =>
-  bayOrder(data.sizeClass).flatMap((bay) => allCells(buildBayView(data, bay, { colourMode: 'status', plan, hideRob })))
+const cellsOf = (data: BayViewData, plan: BayPlan | undefined, robDisplay: RobDisplay = 'grey'): BayCell[] =>
+  bayOrder(data.sizeClass).flatMap((bay) => allCells(buildBayView(data, bay, { colourMode: 'status', plan, robDisplay })))
 const statuses = (cells: BayCell[]): Set<CellStatus> => new Set(cells.filter((c) => c.status !== 'empty').map((c) => c.status))
 
 /** The data with one discharge box and one load box on a spreader (in progress), one box discharged and one loaded. */
@@ -93,8 +94,8 @@ describe('Load plan | Discharge plan (view-model)', () => {
     expect(count(dis, 'rob')).toBe(before.robBoxes.length)
   })
 
-  it('Hide ROB hides ROB in both plans', () => {
-    for (const plan of ['load', 'discharge'] as const) expect(cellsOf(before, plan, true).some((c) => c.rob)).toBe(false)
+  it('the ROB display hide removes ROB in both plans', () => {
+    for (const plan of ['load', 'discharge'] as const) expect(cellsOf(before, plan, 'hide').some((c) => c.rob)).toBe(false)
   })
 
   it('the state legend lists only the statuses of the plan, plus ROB', () => {
