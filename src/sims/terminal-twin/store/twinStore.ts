@@ -31,7 +31,7 @@ import { FEED_BUFFER_CAP } from '../modules/eventFeed'
 import type { Bucketing, KpiGroupId } from '../modules/dashboardModel'
 import { defaultSaveName as plainSaveName, exportFileName, makeConfigSave, makeSnapshotSave, parseSaveFile, planLoad, saveFileName, SaveFormatError, type SaveFile, type SaveMeta, type SaveType } from '../persistence/saves'
 import { openSaveStore, StorageUnavailableError, type SaveStore } from '../persistence/saveStore'
-import { TwinController } from '../modules/twinController'
+import { DEFAULT_SPEED, TwinController } from '../modules/twinController'
 import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/display'
 import { createFormatter } from '../i18n/format'
 import { t, type MessageKey, type MessageParams } from '../i18n/messages'
@@ -184,7 +184,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const hasShcs = ref(false)
   const loading = ref(false)
   const displayTime = ref(0)
-  const speed = ref(10)
+  const speed = ref(DEFAULT_SPEED)
   const paused = ref(true)
   const busy = ref(false)
   const info = shallowRef<EngineInfo | null>(null)
