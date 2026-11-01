@@ -118,7 +118,7 @@ export type {
   YardAllocationRequest,
   YardBoxView,
 } from './decisions/types'
-export { yardGroupKey, yardGroupBreak, yardGroupingOn } from './decisions/yardGrouping'
+export { yardGroupKey, yardGroupBreak, yardGroupingOn, yardViewOfProps } from './decisions/yardGrouping'
 export type { YardGroupBreak } from './decisions/yardGrouping'
 export { strategies, getStrategy } from './decisions/strategies'
 export type { StrategyDefinition, StrategyRegistry, DecisionPointStrategies } from './decisions/strategies'

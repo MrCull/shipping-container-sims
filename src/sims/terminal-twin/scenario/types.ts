@@ -367,6 +367,11 @@ export interface YardStartConfig {
   targetPct?: number
   /** Warm-up length (s, default 48 h). */
   warmUpS?: number
+  /**
+   * Pre-fill (#149): weights of the filler boxes added beyond the booked exports, transshipment boxes and the empty pool,
+   * as imports awaiting a truck, exports and transshipment boxes waiting for a vessel outside the scenario. Absent = all imports.
+   */
+  mix?: { import: number; export: number; transshipment: number }
 }
 
 export const DEFAULT_YARD_TARGET_PCT = 60

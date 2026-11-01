@@ -43,11 +43,15 @@ export function yardGroupBreak(box: YardBoxView, below: YardBoxView): YardGroupB
 
 /** The view of a container the grouped strategy works from. */
 export function yardBoxView(box: ContainerState): YardBoxView {
-  const p = box.props
+  return yardViewOfProps(box.line, box.size, box.props)
+}
+
+/** The same view from a box's line, size and stored properties (the pre-fill's boxes have no container state yet). */
+export function yardViewOfProps(line: string, size: ContainerState['size'], p: ContainerState['props']): YardBoxView {
   return {
     direction: p.direction,
-    line: box.line,
-    size: box.size,
+    line,
+    size,
     isoType: p.isoType,
     ...(p.outbound.kind === 'vessel' && p.outbound.id !== undefined ? { outboundVesselId: p.outbound.id } : {}),
     pod: p.pod,

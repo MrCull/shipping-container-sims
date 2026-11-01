@@ -27,6 +27,7 @@ import {
   railSegmentSpan,
   railStartZ,
   prefillOf,
+  type PrefillImport,
   rowX,
   slotZ,
   tierBaseY,
@@ -45,7 +46,7 @@ import {
   type Reservation,
 } from '../engine'
 import { planCargo } from '../scenario/bayPlan'
-import { drawContainerProps, isoTypeOf, type ContainerProps } from '../scenario/containerProps'
+import { isoTypeOf, type ContainerProps } from '../scenario/containerProps'
 import { subjectOfBox, type ColourSubject } from './colourBy'
 import type { RobBox } from '../scenario/robBays'
 import { planExportYard } from '../scenario/exportYard'
@@ -273,7 +274,7 @@ export class SceneModel {
   /** What the close-up markings need beyond size and line (#119). */
   readonly containerDetail: Record<string, ContainerDetail>
   /** Pre-filled imports by id: their properties are drawn when a colour mode first asks. */
-  private readonly prefillImports = new Map<string, { id: string; size: ContainerSize; line: string; ageS: number; reefer?: true }>()
+  private readonly prefillImports = new Map<string, PrefillImport>()
   private readonly vesselIdSet: ReadonlySet<string>
   /** The carriers' state at `colourT`, for the transit status of `colourSubjectAt`. */
   private colourT = 0
@@ -332,7 +333,7 @@ export class SceneModel {
       this.containerIds.push(imp.id)
       this.containerSize[imp.id] = imp.size
       this.containerLine[imp.id] = imp.line
-      this.containerDetail[imp.id] = { laden: true, isoType: isoTypeOf(imp.size, imp.reefer === true), heavy: false, yardSince: -imp.ageS }
+      this.containerDetail[imp.id] = { laden: true, isoType: imp.props.isoType, heavy: imp.props.weightClass === 'HEAVY', yardSince: -imp.ageS, props: imp.props }
       this.prefillImports.set(imp.id, imp)
     }
     this.vessels = Object.fromEntries(config.vessels.map((v) => [v.id, v]))
@@ -864,18 +865,7 @@ export class SceneModel {
     let props = d?.props
     if (!props) {
       const imp = this.prefillImports.get(containerId)
-      if (imp && d) {
-        props = d.props = drawContainerProps(this.config, this.seed, {
-          id: imp.id,
-          size: imp.size,
-          full: true,
-          line: imp.line,
-          reefer: imp.reefer === true,
-          direction: 'IMPORT',
-          inbound: { kind: 'vessel' },
-          arrivalS: -imp.ageS,
-        })
-      }
+      if (imp && d) props = d.props = imp.props
     }
     const full = d?.laden ?? true
     const list = this.custody[containerId] ?? []

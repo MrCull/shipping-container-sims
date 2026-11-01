@@ -160,10 +160,12 @@ export interface YardAllocationRequest extends YardStacks {
   /**
    * The box's grouping properties and the top box of every stack (same indexing as `heights`, null = empty). Sent
    * only when the active strategy is `grouped` (so the event log of every other run stays as it was); absent in
-   * the pre-fill, whose boxes do not exist yet.
+   * the pre-fill, whose boxes do not exist yet (the pre-fill of a grouped yard sends them from the box's planned properties).
    */
   box?: YardBoxView
   stackTops?: (YardBoxView | null)[]
+  /** Pre-fill of a grouped yard (#149): never stack the box on another group (the handler may still return null for a block with no such stack). */
+  sameGroupOnly?: true
   /** Uniform [0, 1) drawn from the engine's seeded RNG (the only source of randomness for strategies). */
   random: number
 }
