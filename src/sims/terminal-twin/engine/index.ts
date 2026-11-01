@@ -1,5 +1,5 @@
 /**
- * Terminal Twin engine — the single public entry point.
+ * Terminal Twin engine, the single public entry point.
  *
  * Everything outside `engine/` (CLI, tests, Web Worker host, dev API) imports
  * from here only. No DOM, Vue, Three.js or Node imports are allowed inside
@@ -69,7 +69,7 @@ export { ascPoseAt } from './subsystems/asc'
 export { ascIdOf, ascIndexOf, resolveSubsystemModes } from './state'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, apronLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
-export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, QUEUE_PITCH_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, GATE_ISLAND_W_M, HOLDING_PITCH_M } from './landsideGraph'
+export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, queueSlotAt, QUEUE_PITCH_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, GATE_ISLAND_W_M, HOLDING_PITCH_M } from './landsideGraph'
 export type { LandsideGraph, LandsideNode, LandsideEdge, LandsideZone, GateLaneLayout, HoldingLayout } from './landsideGraph'
 export { truckPositionAt } from './subsystems/landside'
 export { appointmentCap, planAppointments } from './appointments'
@@ -118,7 +118,7 @@ export type {
   YardAllocationRequest,
   YardBoxView,
 } from './decisions/types'
-export { yardGroupKey, yardGroupBreak, yardGroupingOn } from './decisions/yardGrouping'
+export { yardGroupKey, yardGroupBreak, yardGroupingOn, yardViewOfProps } from './decisions/yardGrouping'
 export type { YardGroupBreak } from './decisions/yardGrouping'
 export { strategies, getStrategy } from './decisions/strategies'
 export type { StrategyDefinition, StrategyRegistry, DecisionPointStrategies } from './decisions/strategies'

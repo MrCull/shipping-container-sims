@@ -3,7 +3,7 @@
   "seed": 42,
   "status": "ended",
   "endReason": "simDurationS >= 1800",
-  "eventLogHash": "1633689435a27b",
+  "eventLogHash": "164ab8ba09c3e6",
   "kpis": {
     "simTimeS": 1800,
     "eventsProcessed": 394,
@@ -14,7 +14,7 @@
         "moves": 10,
         "cycles": 10,
         "twinLifts": 0,
-        "grossMovesPerHour": 25.613,
+        "grossMovesPerHour": 25.23,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1546.797,
-        "turnaroundS": 1486.797,
+        "departedAtS": 1568.162,
+        "turnaroundS": 1508.162,
         "sts": [
           "STS01"
         ]
@@ -194,14 +194,14 @@
       "shcs": {
         "SHC01": {
           "jobs": 10,
-          "emptyDistanceM": 2297.5,
+          "emptyDistanceM": 2597.5,
           "loadedDistanceM": 1302.5,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 845.155,
-            "moving-to-collect": 174.224,
+            "parked": 778.404,
+            "moving-to-collect": 203.677,
             "queuing-to-collect": 0,
-            "collecting": 311.721,
+            "collecting": 349.018,
             "moving-to-deliver": 35,
             "queuing-to-deliver": 0,
             "delivering": 433.901
@@ -263,8 +263,8 @@
       "ascs": {
         "B01-ASC1": {
           "jobs": 10,
-          "gantryM": 373.1,
-          "trolleyM": 116.95,
+          "gantryM": 440.1,
+          "trolleyM": 74.35,
           "hoistM": 603.2,
           "padWaitS": 0
         }
@@ -274,16 +274,16 @@
       "IMPORT": {
         "count": 10,
         "departed": 0,
-        "meanS": 1055.087,
-        "maxS": 1662.202
+        "meanS": 1042.256,
+        "maxS": 1661.534
       }
     },
     "workPackages": {
       "released": 8,
       "started": 8,
       "completed": 8,
-      "leadTimeMeanS": 298.129,
-      "leadTimeMaxS": 503.436,
+      "leadTimeMeanS": 302.971,
+      "leadTimeMaxS": 514.252,
       "boxesLoaded": 0
     },
     "ordering": {

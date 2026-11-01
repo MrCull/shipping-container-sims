@@ -66,7 +66,7 @@ body:has(.terminal-twin) {
   --tt-data-load: #2f6fd0;
   --tt-data-active: #27a36a;
   --tt-data-done: #8a97ab;
-  --tt-data-rob: #7a8aa3;
+  --tt-data-rob: #c8cacd;
   --tt-data-0: #4c9be8;
   --tt-data-1: #e8a33c;
   --tt-data-2: #5cc08a;
@@ -80,6 +80,13 @@ body:has(.terminal-twin) {
   --tt-ramp-2: #2f7fc8;
   --tt-ramp-3: #1f5aa0;
   --tt-ramp-4: #163c70;
+  --tt-dwell-0: #8fdca4;
+  --tt-dwell-1: #cfe77a;
+  --tt-dwell-2: #f6c65f;
+  --tt-dwell-3: #f28b82;
+  --tt-length-0: #8ec9f2;
+  --tt-length-1: #c5aef0;
+  --tt-length-2: #f2aacb;
   --tt-plan-quay: #1c3a5a;
   --tt-plan-sts: #e7b84a;
   --tt-plan-block: #4f7cac;

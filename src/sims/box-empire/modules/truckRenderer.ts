@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Road truck mesh with GLB swap-in
+// Box Empire, Road truck mesh with GLB swap-in
 // Uses truck-no-trailer.glb (pre-warmed at scene init); falls back to
 // procedural geometry while the GLB loads, then swaps in automatically.
 // ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ function buildTruckGroupFromGLB(glbRoot: THREE.Group): THREE.Group {
   // ── Procedural flatbed chassis (behind cab) ──────────────────────────────
   const chassisMat = new THREE.MeshPhongMaterial({ color: 0x1a1c20, specular: 0x222222, shininess: 20 })
   const deckH = 0.22
-  // Main deck plate — slightly wider than container, centered at containerOffsetZ
+  // Main deck plate, slightly wider than container, centered at containerOffsetZ
   const deckPlate = new THREE.Mesh(
     new THREE.BoxGeometry(2.5, deckH, CONTAINER_LENGTH + 1.2),
     chassisMat,
@@ -76,7 +76,7 @@ function buildTruckGroupFromGLB(glbRoot: THREE.Group): THREE.Group {
     group.add(rail)
   }
 
-  // Rear axle only (front axle omitted — looks out of proportion next to GLB cab wheels)
+  // Rear axle only (front axle omitted, looks out of proportion next to GLB cab wheels)
   const axleMat = new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 10 })
   const rimMat  = new THREE.MeshPhongMaterial({ color: 0x888888, specular: 0xffffff, shininess: 90 })
   const rearSz = TRUCK_GLB.containerOffsetZ - CONTAINER_LENGTH / 2 + 0.8
@@ -117,7 +117,7 @@ export class TruckRenderer {
     return this.buildProceduralTruckGroup(visitType)
   }
 
-  /** Original procedural truck — used as fallback while GLB is loading. */
+  /** Original procedural truck, used as fallback while GLB is loading. */
   private buildProceduralTruckGroup(visitType: 'import_pickup' | 'export_delivery'): THREE.Group {
     const group = new THREE.Group()
 
@@ -313,7 +313,7 @@ export class TruckRenderer {
           }
           cg = makeTruckContainerMesh(renderableCarriedContainer)
           cg.userData['containerId'] = renderableCarriedContainer.id
-          // Position on truck bed — use GLB deck height if GLB is loaded, else procedural height
+          // Position on truck bed, use GLB deck height if GLB is loaded, else procedural height
           const deckY = mesh.userData['isGlb'] ? TRUCK_GLB.containerOffsetY : 0.72
           cg.position.set(0, deckY + CONTAINER_HEIGHT / 2, TRUCK_GLB.containerOffsetZ)
           // Container length aligns with truck forward (+Z) when rotation.y = 0 on group.

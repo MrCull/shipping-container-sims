@@ -1,4 +1,4 @@
-# 05 — Jev inspector, documentation, QA and completion
+# 05, Jev inspector, documentation, QA and completion
 
 > Part of the **Stowage Master × Jev** plan set. Read [00-jev-overview.md](00-jev-overview.md) first.
 > Depends on: 04.

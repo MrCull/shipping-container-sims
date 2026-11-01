@@ -1,4 +1,4 @@
-# Stowage Master × Jev — Overview (read first)
+# Stowage Master × Jev, Overview (read first)
 
 > Plan set for adding **Jev** (TypeSafe System One, via OpenRouter) to Stowage Master so it can pick discharge, restow and load moves for the player.
 > Written 2026-09-27. When a numbered plan is fully implemented, move its file into [`completed/`](completed/).
@@ -7,8 +7,8 @@
 
 | # | File | Scope | Depends on |
 |---|---|---|---|
-| 00 | this file | Decisions, architecture, file map, glossary | — |
-| 01 | [01-jev-client-and-key.md](01-jev-client-and-key.md) | Types, config, in-memory key vault, OpenRouter client, error taxonomy, Jev Pinia store | — |
+| 00 | this file | Decisions, architecture, file map, glossary | - |
+| 01 | [01-jev-client-and-key.md](01-jev-client-and-key.md) | Types, config, in-memory key vault, OpenRouter client, error taxonomy, Jev Pinia store | - |
 | 02 | [02-jev-state-and-questions.md](02-jev-state-and-questions.md) | State builder (vessel, stability, bay plan, load list, rules), Choice question builder per phase, response validation and policy, summaries | 01 (types) |
 | 03 | [03-jev-move-execution-bridge.md](03-jev-move-execution-bridge.md) | Refactor `GameCanvas.vue` so moves can run by slot ID; command channel; pointer lock | 01 (store) |
 | 04 | [04-jev-ui-and-controller.md](04-jev-ui-and-controller.md) | Start-screen toggle, key dialog, in-game panel, "next move" and "play all" controller loop | 01, 02, 03 |

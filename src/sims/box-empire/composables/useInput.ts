@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Click input: container and equipment selection
+// Box Empire, Click input: container and equipment selection
 // ---------------------------------------------------------------------------
 // Container selection: use getContainerIdNearScreen (screen-space projection)
 // Equipment selection: standard raycasting against named Group meshes

@@ -13,6 +13,8 @@ export function colourKeyLabel(mode: ColourBy, key: string): string {
       return t(`inspector.transitStatus.${key}` as MessageKey)
     case 'dwell':
       return t(`colourBy.dwell.${key}` as MessageKey)
+    case 'length':
+      return t(`colourBy.length.${key}` as MessageKey)
     case 'departure':
       return t(`colourBy.departure.${key}` as MessageKey)
     case 'special':

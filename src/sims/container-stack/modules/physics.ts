@@ -225,7 +225,7 @@ export function injectJitterImpulse(wobble: WobbleState, jitterMagnitude: number
   wobble.angularVelocity += jitterMagnitude * PHYSICS.jitterToImpulseScale * 0.001
 }
 
-/** Per-frame mouse jitter while extracting — scales up when the tower is already unstable. */
+/** Per-frame mouse jitter while extracting, scales up when the tower is already unstable. */
 export function injectDragFrameWobble(
   wobble: WobbleState,
   frameJitterPx: number,

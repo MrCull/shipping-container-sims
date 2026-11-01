@@ -121,15 +121,15 @@ interface STSCrane extends EquipmentBase {
 
 ### Cycle phases
 
-1. **Trolley align** — position trolley over target bay/cell
-2. **Hoist down** — lower spreader to container
-3. **Lock** — engage twistlocks
-4. **Hoist up** — raise loaded spreader clear of vessel stacks
-5. **Trolley transfer** — move from ship-side to land-side (or reverse)
-6. **Hoist down** — lower to chassis/stack/platform
-7. **Unlock** — disengage twistlocks
-8. **Hoist clear** — raise empty spreader
-9. **Return / Next** — trolley back for next pick
+1. **Trolley align**, position trolley over target bay/cell
+2. **Hoist down**, lower spreader to container
+3. **Lock**, engage twistlocks
+4. **Hoist up**, raise loaded spreader clear of vessel stacks
+5. **Trolley transfer**, move from ship-side to land-side (or reverse)
+6. **Hoist down**, lower to chassis/stack/platform
+7. **Unlock**, disengage twistlocks
+8. **Hoist clear**, raise empty spreader
+9. **Return / Next**, trolley back for next pick
 
 **Baseline single-cycle time ≈ 62 s** (before wait/dwell penalties):
 

@@ -74,12 +74,12 @@ export function animateOcean(ocean: THREE.Mesh | null, time: number): void {
   ocean.geometry.computeVertexNormals()
 }
 
-// Dock / quay wall — proper concrete quay with fenders, bollards, road markings
+// Dock / quay wall, proper concrete quay with fenders, bollards, road markings
 export function createDock(scene: THREE.Scene): THREE.Group {
   const dockGroup = new THREE.Group()
   dockGroup.name = 'dock'
 
-  // Main quay platform — extended to 200m to cover full truck queue area
+  // Main quay platform, extended to 200m to cover full truck queue area
   const platformGeo = new THREE.BoxGeometry(200, 1.2, 34)
   const platformMat = new THREE.MeshPhongMaterial({
     color: 0x7a7a72,
@@ -119,7 +119,7 @@ export function createDock(scene: THREE.Scene): THREE.Group {
     dockGroup.add(fender)
   }
 
-  // Bollards — larger and more realistic
+  // Bollards, larger and more realistic
   const bollardCapGeo = new THREE.SphereGeometry(0.35, 10, 8)
   const bollardBodyGeo = new THREE.CylinderGeometry(0.28, 0.38, 1.1, 10)
   const bollardMat = new THREE.MeshPhongMaterial({ color: 0x2b2b2b, shininess: 40 })
@@ -213,13 +213,13 @@ function addTerminalBuilding(parent: THREE.Group): void {
   parent.add(roof)
 }
 
-// Improved lighting setup — warm sunlight from proper direction
+// Improved lighting setup, warm sunlight from proper direction
 export function createLighting(scene: THREE.Scene): void {
-  // Soft ambient — slightly warm
+  // Soft ambient, slightly warm
   const ambient = new THREE.AmbientLight(0x9090c0, 0.55)
   scene.add(ambient)
 
-  // Main sun — warm afternoon light
+  // Main sun, warm afternoon light
   const sun = new THREE.DirectionalLight(0xfff0cc, 1.8)
   sun.position.set(60, 70, 30)
   sun.castShadow = true
@@ -240,7 +240,7 @@ export function createLighting(scene: THREE.Scene): void {
   fill.position.set(-30, 15, -20)
   scene.add(fill)
 
-  // Hemisphere — sky blue top, warm concrete bottom
+  // Hemisphere, sky blue top, warm concrete bottom
   const hemi = new THREE.HemisphereLight(0x8ab9e0, 0x7a6040, 0.55)
   scene.add(hemi)
 

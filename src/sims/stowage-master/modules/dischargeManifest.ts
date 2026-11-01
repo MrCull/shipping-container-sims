@@ -10,7 +10,7 @@ import { CONTAINER, getPortsForPreset } from './config'
 import { generateContainerId, generateWeight, getWeightCategory } from './containerFactory'
 
 /**
- * The "local port" — Import containers discharged here.
+ * The "local port", Import containers discharged here.
  * Gold colour makes them visually distinct from transit/export cargo.
  */
 const LOCAL_PORT = { name: 'Local', color: 0xffd700, hex: '#ffd700', order: 0 } as const
@@ -69,7 +69,7 @@ function shuffle<T>(arr: T[]): T[] {
 /**
  * Builds a list of all valid slot IDs ordered for pre-placement.
  *
- * spreadFactor 0 = deterministic (lower tiers first, centre rows first — original behaviour).
+ * spreadFactor 0 = deterministic (lower tiers first, centre rows first, original behaviour).
  * spreadFactor 1 = fully shuffled across every tier and row.
  * Values in between partially shuffle within each tier group before merging.
  */
@@ -109,7 +109,7 @@ function buildOrderedSlotIds(
   }
 
   if (spreadFactor >= 1) {
-    // Fully flatten then shuffle — every slot equally likely regardless of tier/row
+    // Fully flatten then shuffle, every slot equally likely regardless of tier/row
     return shuffle(tierBuckets.flat())
   }
 
@@ -410,13 +410,13 @@ function placeBayGroupedContainers(
 /**
  * Generates Import and (optionally) Transit containers and places them into the grid.
  *
- * Import containers (gold) — discharged at this port.
- * Transit containers (port-coloured) — stay on board, but may be stacked on top of
+ * Import containers (gold), discharged at this port.
+ * Transit containers (port-coloured), stay on board, but may be stacked on top of
  * Import containers creating "overstow" that the player must restow.
  *
  * Strategy:
  * 1. Place imports in lower tiers first, spread across bays/rows.
- * 2. Place transit containers in remaining slots — deliberately placing some directly
+ * 2. Place transit containers in remaining slots, deliberately placing some directly
  *    on top of import stacks to create mandatory restow situations.
  */
 export function generateDischargeManifest(
@@ -487,7 +487,7 @@ export function generateDischargeManifest(
     return placed
   }
 
-  // 1 — Place import containers.
+  // 1, Place import containers.
   if (transitGrouping === 'grouped-by-pod') {
     placeBayGroupedContainers(bayPortGroups, grid, importSlotIds, placed, hazmatRate, true)
   } else {
@@ -496,7 +496,7 @@ export function generateDischargeManifest(
 
   if (transitCount <= 0) return placed
 
-  // 2 — Place transit containers.
+  // 2, Place transit containers.
   // First attempt: stack directly on top of import containers to create overstow.
   // Then fill remaining free slots if more transit needed.
   const transitSlots: string[] = []
@@ -563,7 +563,7 @@ export function getDischargeableSlots(grid: Record<string, Slot>, preset: ShipPr
         const container = slot.container
 
         if (container.isImport) {
-          // Top of stack — ready to discharge
+          // Top of stack, ready to discharge
           actionable.push(id)
           break
         }
@@ -574,7 +574,7 @@ export function getDischargeableSlots(grid: Record<string, Slot>, preset: ShipPr
           break
         }
 
-        // Any other container (non-import, non-transit) — skip this stack
+        // Any other container (non-import, non-transit), skip this stack
         break
       }
     }

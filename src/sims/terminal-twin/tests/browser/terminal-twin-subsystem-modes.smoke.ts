@@ -4,6 +4,7 @@
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openSetupTab } from './scenarioPicker'
 
 test('quay, berth and yard modes set in the dialog reach the config and the run ends cleanly', async ({ page }) => {
   const errors: string[] = []
@@ -15,6 +16,7 @@ test('quay, berth and yard modes set in the dialog reach the config and the run 
   await page.getByRole('button', { name: /new scenario/i }).click()
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await expect(dialog).toBeVisible()
+  await openSetupTab(dialog, 'yard')
   const modes = dialog.getByTestId('tt-subsystem-modes')
   await modes.scrollIntoViewIfNeeded()
   await expect(modes.getByTestId('tt-mode-quay-real')).toBeChecked()

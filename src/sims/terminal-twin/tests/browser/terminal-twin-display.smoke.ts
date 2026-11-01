@@ -5,7 +5,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import fixture from '../../scenario/fixtures/tracer-1sts-10-boxes.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
-import { openAdvanced } from './scenarioPicker'
+import { openAdvanced, openSetupTab, pickScenario } from './scenarioPicker'
 
 const TRACER = 'tracer-1sts-10-boxes'
 // Monday 26 Oct 2026, 13:45 UTC; the browser runs in UTC (timezoneId below).
@@ -13,9 +13,11 @@ const START = '2026-10-26T13:45:00.000Z'
 
 test.use({ timezoneId: 'UTC' })
 
+/** Opens the sim and selects the tracer (a fresh load selects the TTI baseline since #156; the expected values are the tracer's). */
 async function openSim(page: Page): Promise<void> {
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
+  await pickScenario(page.getByRole('dialog', { name: /new scenario/i }), TRACER)
 }
 
 async function loadTracerAt(page: Page, simT: number): Promise<void> {
@@ -33,11 +35,14 @@ test.describe('US browser', () => {
     await openSim(page)
     const dialog = page.getByRole('dialog', { name: /new scenario/i })
     await expect(dialog).toBeVisible()
+    // #161: locale and units are on the Advanced tab, the summary on the Scenario tab
+    await openAdvanced(page)
     await expect(page.getByTestId('tt-locale')).toHaveValue('en-US')
     await expect(page.getByTestId('tt-units-imperial')).toBeChecked()
+    await expect(page.getByTestId('tt-display-preview')).toContainText('week starts Sunday')
+    await openSetupTab(page, 'scenario')
     await expect(page.getByTestId('tt-summary-quay')).toHaveText('1,312 ft')
     await expect(page.getByTestId('tt-summary-trolley')).toHaveText('8.9 mi/h')
-    await expect(page.getByTestId('tt-display-preview')).toContainText('week starts Sunday')
   })
 })
 
@@ -46,12 +51,14 @@ test.describe('German browser', () => {
 
   test('defaults to de-DE and metric on first open', async ({ page }) => {
     await openSim(page)
+    await openAdvanced(page)
     await expect(page.getByTestId('tt-locale')).toHaveValue('de-DE')
     await expect(page.getByTestId('tt-units-metric')).toBeChecked()
-    await expect(page.getByTestId('tt-summary-quay')).toHaveText('400 m')
-    await expect(page.getByTestId('tt-summary-trolley')).toHaveText('14,4 km/h')
     // Weekday names are locale-formatted too.
     await expect(page.getByTestId('tt-display-preview')).toContainText('week starts Montag')
+    await openSetupTab(page, 'scenario')
+    await expect(page.getByTestId('tt-summary-quay')).toHaveText('400 m')
+    await expect(page.getByTestId('tt-summary-trolley')).toHaveText('14,4 km/h')
   })
 })
 
@@ -61,10 +68,14 @@ test.describe('British browser', () => {
   test('units switch the displayed values; the saved config and engine stay SI; the choice persists', async ({ page }) => {
     await openSim(page)
     await expect(page.getByTestId('tt-summary-quay')).toHaveText('400 m')
+    await openAdvanced(page)
     await page.getByTestId('tt-units-imperial').check()
+    await openSetupTab(page, 'scenario')
     await expect(page.getByTestId('tt-summary-quay')).toHaveText('1,312 ft')
     await expect(page.getByTestId('tt-summary-gantry')).toHaveText('1.7 mi/h')
+    await openAdvanced(page)
     await page.getByTestId('tt-locale').selectOption('de-DE')
+    await openSetupTab(page, 'scenario')
     await expect(page.getByTestId('tt-summary-quay')).toHaveText('1.312 ft')
 
     await page.getByRole('button', { name: 'Start', exact: true }).click()
@@ -82,6 +93,7 @@ test.describe('British browser', () => {
     // Reopening the sim remembers the choice instead of the browser defaults.
     await page.reload()
     await page.waitForFunction(() => !!window.__tt)
+    await openAdvanced(page)
     await expect(page.getByTestId('tt-locale')).toHaveValue('de-DE')
     await expect(page.getByTestId('tt-units-imperial')).toBeChecked()
   })
@@ -99,6 +111,7 @@ test.describe('British browser', () => {
 
     // Through the setup dialog: changes apply immediately, also to the clock behind it.
     await page.getByRole('button', { name: 'New Scenario' }).click()
+    await openAdvanced(page)
     await page.getByTestId('tt-locale').selectOption('de-DE')
     await page.getByRole('button', { name: 'Cancel' }).click()
     await expect(page.getByTestId('tt-clock')).toContainText('26.10.2026')
@@ -163,13 +176,11 @@ test.describe('British browser', () => {
     await page.keyboard.press('Space')
     expect((await clock()).paused).toBe(true)
 
-    // 1–9: speed steps (plays); 0: pause
-    await page.keyboard.press('3')
+    // Digit keys 1-9 no longer change speed (#138); the top bar buttons do; 0: pause
+    await page.getByRole('button', { name: '×5', exact: true }).click()
     expect(await clock()).toMatchObject({ speed: 5, paused: false })
-    await page.keyboard.press('9')
-    expect((await clock()).speed).toBe(600)
-    await page.keyboard.press('1')
-    expect((await clock()).speed).toBe(1)
+    for (const d of ['3', '9', '1']) await page.keyboard.press(d)
+    expect(await clock()).toMatchObject({ speed: 5, paused: false })
     await page.keyboard.press('0')
     expect((await clock()).paused).toBe(true)
 

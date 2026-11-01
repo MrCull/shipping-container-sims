@@ -1,5 +1,5 @@
 import { onMounted, onUnmounted, watch } from 'vue'
-import { useAudioStore } from '@/stores/audio'
+import { followMasterGain, useAudioStore } from '@/stores/audio'
 import menuMusicUrl from '@/assets/audio/menu-music-loop.mp3'
 
 /**
@@ -10,11 +10,14 @@ import menuMusicUrl from '@/assets/audio/menu-music-loop.mp3'
  */
 let sharedAudio: HTMLAudioElement | null = null
 
+/** The menu music's own level at full master volume; the element's volume is this times the master gain. */
+const MENU_MUSIC_GAIN = 0.35
+
 function getAudio(): HTMLAudioElement {
   if (!sharedAudio) {
     sharedAudio = new Audio(menuMusicUrl)
     sharedAudio.loop = true
-    sharedAudio.volume = 0.35
+    sharedAudio.volume = useAudioStore().gainFor(MENU_MUSIC_GAIN)
   }
   return sharedAudio
 }
@@ -29,7 +32,7 @@ export function useMenuMusic() {
       return
     }
     void audio.play().catch(() => {
-      // Autoplay blocked — wait for first user interaction then retry once
+      // Autoplay blocked, wait for first user interaction then retry once
       const onGesture = () => {
         void audio.play()
         window.removeEventListener('click', onGesture)
@@ -41,6 +44,8 @@ export function useMenuMusic() {
   }
 
   onMounted(() => {
+    // The slider drives the level live while the menu is open (stopped with the component).
+    followMasterGain(getAudio(), MENU_MUSIC_GAIN)
     tryPlay()
     watch(
       () => audioStore.musicMuted,

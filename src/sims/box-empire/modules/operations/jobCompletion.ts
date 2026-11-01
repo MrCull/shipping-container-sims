@@ -28,7 +28,7 @@ function settleYardSlot(state: BoxEmpireState, job: Job): YardSlotRef | null {
     )
     if (slot && slot.containerId === null) return { ...slotRef, tier }
   }
-  return null  // stack full — caller ignores null
+  return null  // stack full, caller ignores null
 }
 
 function createWaitingImportPickupJobIfNeeded(

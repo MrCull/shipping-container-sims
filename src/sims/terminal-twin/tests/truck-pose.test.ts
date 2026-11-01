@@ -1,5 +1,5 @@
 /**
- * TT-26: how the scene model poses a truck for the 3D model — articulation between tractor and chassis through a
+ * TT-26: how the scene model poses a truck for the 3D model, articulation between tractor and chassis through a
  * turn, and where the model sits so its box rests on the right twist-locks. Driven with the same Delta the worker sends.
  */
 import { describe, expect, it } from 'vitest'

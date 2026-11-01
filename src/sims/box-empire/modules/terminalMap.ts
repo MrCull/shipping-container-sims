@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Terminal map / layout definition
+// Box Empire, Terminal map / layout definition
 // ---------------------------------------------------------------------------
 
 import type { PathGraph, PathNode, PathEdge } from '../types'

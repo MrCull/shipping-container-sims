@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Container rendering with canvas-texture materials
+// Box Empire, Container rendering with canvas-texture materials
 // Each container is a THREE.Group with textured BoxGeometry + corner posts.
 // Uses the same approach as stowage-master for realistic container appearance.
 // ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ export class ContainerRenderer {
       // Containers on equipment are rendered by EquipmentRenderer as children of the equipment mesh
       if (c.currentLocation.type === 'equipment') return false
       if (c.lifecycleState === 'returning_to_gate') return false
-      // at_gate containers are either outside the terminal or waiting for a truck —
+      // at_gate containers are either outside the terminal or waiting for a truck,
       // they become visible once they're on a truck (handled by TruckRenderer).
       if (c.lifecycleState === 'at_gate') return false
       return true
@@ -136,7 +136,7 @@ export class ContainerRenderer {
         c.currentLocation.position.z,
       )
 
-      // Rotation — align with truck heading when on a truck
+      // Rotation, align with truck heading when on a truck
       const onTruck = c.currentLocation.type === 'truck' ||
         c.lifecycleState === 'returning_to_gate' ||
         c.lifecycleState === 'at_gate'

@@ -21,7 +21,10 @@ import { EngineClient, type EngineResponse } from './engineClient'
 import { SceneModel } from './sceneModel'
 
 /** Speed steps (× real time). Pause is separate. */
-export const SPEEDS = [1, 2, 5, 10, 30, 60, 120, 300, 600] as const
+export const SPEEDS = [1, 2, 5, 10, 30, 60, 120, 300, 600, 1200, 1800, 3600] as const
+
+/** The speed every run start (load, reset, restore) returns to (#157). A rewind keeps the current speed. */
+export const DEFAULT_SPEED = 10
 
 /** How far (wall seconds of playback) the engine runs ahead of the display. */
 const LOOKAHEAD_WALL_S = 1.5
@@ -37,7 +40,7 @@ export class TwinController {
   model: SceneModel | null = null
   info: EngineInfo | null = null
   displayTime = 0
-  speed = 10
+  speed: number = DEFAULT_SPEED
   paused = true
   /** A flat-out run is in progress (rendering is skipped). */
   busy = false
@@ -77,17 +80,20 @@ export class TwinController {
   }
 
   async load(config: ScenarioConfig, seed: number): Promise<void> {
+    this.speed = DEFAULT_SPEED
     await this.restart({ op: 'load', config, seed }, config, seed)
   }
 
   /** Back to t = 0 with the same config and seed. */
   async reset(): Promise<void> {
     if (!this.model) throw new Error('No scenario loaded')
+    this.speed = DEFAULT_SPEED
     await this.restart({ op: 'reset' }, this.model.config, this.model.seed)
   }
 
   /** Resume from a snapshot of this engine version: the display starts at the snapshot's sim time, paused. Returns whether the replay matched. */
   async restore(snapshot: SimSnapshot): Promise<boolean> {
+    this.speed = DEFAULT_SPEED
     const res = await this.restart({ op: 'restore', snapshot }, snapshot.config, snapshot.seed)
     this.displayTime = Math.min(snapshot.state.now, this.limit)
     return res?.hashMatched ?? false

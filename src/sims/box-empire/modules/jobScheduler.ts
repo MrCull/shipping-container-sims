@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Job scheduler (creation, assignment, cancellation)
+// Box Empire, Job scheduler (creation, assignment, cancellation)
 // ---------------------------------------------------------------------------
 
 import type {
@@ -132,7 +132,7 @@ export function assignPendingJobs(state: BoxEmpireState): void {
     if (!isJobAccessible(job, state)) {
       if (job.pickupLocation.type === 'yard_slot') {
         job.status = 'blocked'
-        job.blockedReason = 'Container buried — waiting for shuffle to clear path'
+        job.blockedReason = 'Container buried, waiting for shuffle to clear path'
       }
       continue
     }

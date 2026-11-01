@@ -22,7 +22,7 @@ export function useThreeScene(
   canvasRef: Ref<HTMLCanvasElement | null>,
   onFrame?: (ctx: ThreeSceneContext, delta: number) => void
 ) {
-  // Plain variable — must NOT be wrapped in ref/shallowRef
+  // Plain variable, must NOT be wrapped in ref/shallowRef
   let ctx: ThreeSceneContext | null = null
   const ready = ref(false)
   let animationId = 0

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Spatial occupancy / soft collision system
+// Box Empire, Spatial occupancy / soft collision system
 // ---------------------------------------------------------------------------
 // Entities register axis-aligned bounding rectangles on the XZ ground plane.
 // Before moving, call canMoveTo() to check for overlaps.  The grid is rebuilt

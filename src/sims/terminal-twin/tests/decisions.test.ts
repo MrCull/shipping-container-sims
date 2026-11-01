@@ -1,5 +1,5 @@
 /**
- * Seam 2 — decision-point handler interfaces (TOS seams), driven through the
+ * Seam 2, decision-point handler interfaces (TOS seams), driven through the
  * public engine API: scripted handlers, strategies, async modes, the latency
  * injector, timeouts/errors with fallback, and per-handler KPIs.
  */

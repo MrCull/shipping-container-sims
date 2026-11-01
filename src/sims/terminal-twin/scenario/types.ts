@@ -105,7 +105,7 @@ export interface ApronLayout {
   eastboundZ: number
   /** Z of the clear position an SHC reverses to after a WTP drop. */
   padClearZ: number
-  /** Z of the SHC parking spots. */
+  /** Z of the first row of SHC parking spots (#160: later rows lie further landside). */
   parkingZ: number
   /** Z of the WTP pad centres (boxes lie along Z). */
   wtpZ: number
@@ -113,8 +113,12 @@ export interface ApronLayout {
   padPitchM: number
   /** Spacing along X of the spine stations where SHCs enter and leave the STS lanes. */
   stationSpacingM: number
-  /** Spacing of parking spots along X. */
+  /** Spacing of the parking rows along Z (#160). */
   parkingPitchM: number
+  /** How far west of the westmost apron X (spines, pads) the parking aisle runs (#160). */
+  parkingAisleOffsetM: number
+  /** Distance along X from the parking aisle to the spots either side of it (#160). */
+  parkingSideM: number
   /** Distance either side of a conflict point that a passing vehicle reserves. */
   zoneClearanceM: number
   /** Z of the queue area spots (TT-R12), landside of the pad clear positions. */
@@ -367,6 +371,11 @@ export interface YardStartConfig {
   targetPct?: number
   /** Warm-up length (s, default 48 h). */
   warmUpS?: number
+  /**
+   * Pre-fill (#149): weights of the filler boxes added beyond the booked exports, transshipment boxes and the empty pool,
+   * as imports awaiting a truck, exports and transshipment boxes waiting for a vessel outside the scenario. Absent = all imports.
+   */
+  mix?: { import: number; export: number; transshipment: number }
 }
 
 export const DEFAULT_YARD_TARGET_PCT = 60
@@ -443,6 +452,13 @@ export interface ScenarioConfig {
   robBayFraction?: number
   /** Fill level (0-1, default 0.7) of the ROB bays: share of their hold and deck cells that hold a box. */
   robFill?: number
+  /**
+   * Arrival stow (spec #134, #148): target share (0-1) of a vessel's cells that hold a box on arrival (discharge boxes
+   * plus ROB boxes). Absent = none: the vessel carries its discharge boxes only, plus whatever `robBayFraction` adds.
+   * With it, `scenario/robBays.ts` sets aside as many extra ROB bays as the vessel's own box counts leave room for,
+   * so a small call still looks like a normally stowed ship. Presets set it; fixtures keep their exact boxes.
+   */
+  arrivalFill?: number
   /** Work packages (TT-10); optional. */
   workPackages?: { releaseAhead?: number }
   /** Vessel Planning options (spec #106); optional. */
@@ -572,6 +588,21 @@ export interface LandsideConfig {
   appointments?: AppointmentConfig
   /** Stall admission and holding positions (TT-R16); absent = trucks wait at the gate kiosk for a stall. */
   holding?: HoldingConfig
+  /**
+   * An access road (spec #134, #146): trucks come along `z` from the south (`fromX`, beyond the terminal) and turn right
+   * (east, -z) into the terminal road at the gate instead of appearing on the terminal road; absent = they spawn on it.
+   */
+  accessRoad?: AccessRoadConfig
+  /** The two sharp turns at the far end of the terminal road become a teardrop loop trucks drive without stopping (#146). */
+  teardropLoop?: boolean
+}
+
+/** Where the trucks' access road runs (scene metres: +x south along the quay, +z landward). */
+export interface AccessRoadConfig {
+  /** Z of the road's centre line. */
+  z: number
+  /** X where trucks enter it (south of the terminal). */
+  fromX: number
 }
 
 /** Where the scenario clock sits, so hour and shift buckets line up with the clock the user sees. */

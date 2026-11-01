@@ -99,7 +99,8 @@ describe('pre-filled start through the decision runtime', () => {
     const fill = sim.kpiSeries().series['yard.fill-pct'].entities
     for (const block of ['B01', 'B02']) {
       const cells = Object.values(sim.snapshot().state.yardSlots).filter((s) => s.blockId === block).reduce((n, s) => n + s.span, 0)
-      expect(fill[block].hourly[0]).toBeCloseTo((100 * cells) / (8 * 8 * 3), 5)
+      // the KPI series stores percentages rounded to 3 decimals
+      expect(fill[block].hourly[0]).toBeCloseTo(Math.round(((100 * cells) / (8 * 8 * 3)) * 1000) / 1000, 5)
     }
   })
 

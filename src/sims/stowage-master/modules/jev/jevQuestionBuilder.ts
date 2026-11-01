@@ -112,7 +112,7 @@ function buildDischargeOption(grid: Record<string, Slot>, slot: Slot, preset: Sh
 /**
  * Builds the one `move` Choice question for the snapshot's phase. Options (criteria) are keyed
  * by slot ID exactly as they appear in `snapshot.legalSlotIds`, sorted, with no "other/none"
- * option — the game always requires a move and every option offered is legal.
+ * option, the game always requires a move and every option offered is legal.
  */
 export function buildMoveQuestion(snapshot: JevGameSnapshot): Record<string, JevChoiceQuestion> {
   const sortedSlotIds = [...snapshot.legalSlotIds].sort()

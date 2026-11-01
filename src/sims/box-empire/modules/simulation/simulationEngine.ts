@@ -271,7 +271,7 @@ function checkYardGravity(state: SimulationTickContext['state'], callbacks: Simu
     const currentSlot = yard.slots.find(
       s => s.bay === slot.bay && s.row === slot.row && s.tier === slot.tier && s.containerId === container.id,
     )
-    if (!currentSlot) continue  // slot data inconsistent — skip safely
+    if (!currentSlot) continue  // slot data inconsistent, skip safely
 
     // Check if the tier directly below is empty
     const belowSlot = yard.slots.find(
@@ -288,12 +288,12 @@ function checkYardGravity(state: SimulationTickContext['state'], callbacks: Simu
         : null
       const rsCommitted = rs && rs.state !== 'assigned' && rs.state !== 'travel_to_pickup'
       if (rsCommitted) {
-        callbacks.emitEvent('yard.gravity.skipped', `Gravity skipped: ${container.id} floating at bay ${slot.bay} tier ${slot.tier} — RS ${rs.id} is ${rs.state}`, { containerId: container.id, bay: slot.bay, tier: slot.tier, jobId: activeJob.id, rsState: rs.state })
+        callbacks.emitEvent('yard.gravity.skipped', `Gravity skipped: ${container.id} floating at bay ${slot.bay} tier ${slot.tier}, RS ${rs.id} is ${rs.state}`, { containerId: container.id, bay: slot.bay, tier: slot.tier, jobId: activeJob.id, rsState: rs.state })
         continue
       }
     }
 
-    // Drop one tier — direct fail-safe, no RS needed
+    // Drop one tier, direct fail-safe, no RS needed
     currentSlot.containerId = null
     belowSlot.containerId = container.id
     const newRef: YardSlotRef = { blockId: slot.blockId, bay: slot.bay, row: slot.row, tier: slot.tier - 1 }

@@ -197,7 +197,7 @@ describe('ROB bays in the headless engine (fixture rob-bays)', () => {
 
 describe('the peak-day preset keeps remain-on-board bays', () => {
   it('sets aside a share of every vessel’s bays, with the figures marked unverified', () => {
-    const c = presets['TTI Algeciras — peak day']()
+    const c = presets['TTI Algeciras, peak day']()
     expect(c.robBayFraction).toBeGreaterThan(0)
     expect(c.robBayFraction).toBeLessThan(0.7)
     expect(validateScenario(c)).toEqual({ errors: [], warnings: [] })

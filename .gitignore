@@ -148,7 +148,7 @@ vite.config.ts.timestamp-*
 .claude/settings.local.json
 
 # Terminal Twin asset generators (Python/bpy): caches, local venvs, Blender files.
-# Never commit .blend files or third-party reference photos.
+# Never commit .blend files (reference photos in docs/reference/ are committed on purpose).
 __pycache__/
 .venv-bpy/
 *.blend
@@ -159,10 +159,4 @@ __pycache__/
 .smoke-results/
 test-results/
 
-# User-supplied reference material (e.g. the TTI Algeciras pack); never commit
-docs/reference/*
-!docs/reference/README.md
-!docs/reference/tti-algeciras/
-docs/reference/tti-algeciras/*
-!docs/reference/tti-algeciras/PHOTOS.md
 .merge-ticket.log

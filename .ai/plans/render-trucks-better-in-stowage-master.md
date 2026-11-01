@@ -13,14 +13,14 @@ Also save a copy of this plan to `.ai/plans/3d-truck-models.md` in the repo.
 | File | Role |
 |---|---|
 | `src/sims/stowage-master/modules/config.ts` | Add `TRUCK` constants block |
-| `src/sims/stowage-master/modules/truckRenderer.ts` | **Create new** — GLB loading, caching, assembly |
+| `src/sims/stowage-master/modules/truckRenderer.ts` | **Create new**, GLB loading, caching, assembly |
 | `src/sims/stowage-master/modules/sceneBuilder.ts` | Add `createTerminalTruckGLB()` async export |
 | `src/sims/stowage-master/components/GameCanvas.vue` | 4 change sites: imports, buildScene, updateQueueMeshes, triggerTruckAdvance |
 | `src/sims/stowage-master/assets/` | Copy 2 GLB files here |
 
 ---
 
-## Step 1 — Copy GLB Assets
+## Step 1, Copy GLB Assets
 
 Copy into `src/sims/stowage-master/assets/` (required for Vite `import.meta.url` bundling):
 - `available-media/3d-models/truck-no-trailer.glb` → `assets/truck-cab.glb`
@@ -28,7 +28,7 @@ Copy into `src/sims/stowage-master/assets/` (required for Vite `import.meta.url`
 
 ---
 
-## Step 2 — Add `TRUCK` Constants to `config.ts`
+## Step 2, Add `TRUCK` Constants to `config.ts`
 
 Append after the `HAZMAT` block:
 
@@ -49,7 +49,7 @@ export const TRUCK = {
 
 ---
 
-## Step 3 — Create `truckRenderer.ts`
+## Step 3, Create `truckRenderer.ts`
 
 New file: `src/sims/stowage-master/modules/truckRenderer.ts`
 
@@ -92,12 +92,12 @@ export async function createTruckGLB(): Promise<THREE.Group> {
     loadAndCache('cab'),
   ])
 
-  // Trailer: long axis is X in GLB — no rotation needed
+  // Trailer: long axis is X in GLB, no rotation needed
   trailerRoot.scale.setScalar(TRUCK.trailerScale)
   const tBox = new THREE.Box3().setFromObject(trailerRoot)
   trailerRoot.position.y = -tBox.min.y
 
-  // Cab: long axis is Z in GLB — rotate 90° so it aligns along game-X
+  // Cab: long axis is Z in GLB, rotate 90° so it aligns along game-X
   cabRoot.rotation.y = Math.PI / 2
   cabRoot.scale.set(TRUCK.cabScale.x, TRUCK.cabScale.y, TRUCK.cabScale.z)
   const cBox = new THREE.Box3().setFromObject(cabRoot)
@@ -114,7 +114,7 @@ export async function createTruckGLB(): Promise<THREE.Group> {
 
 ---
 
-## Step 4 — Update `sceneBuilder.ts`
+## Step 4, Update `sceneBuilder.ts`
 
 Add import and async wrapper alongside the existing `createTerminalTruck()`:
 
@@ -126,11 +126,11 @@ export async function createTerminalTruckGLB(): Promise<THREE.Group> {
 }
 ```
 
-Keep `createTerminalTruck()` untouched (not deleted — it serves as a fallback reference).
+Keep `createTerminalTruck()` untouched (not deleted, it serves as a fallback reference).
 
 ---
 
-## Step 5 — Update `GameCanvas.vue`
+## Step 5, Update `GameCanvas.vue`
 
 ### 5a. Imports (line ~9–13)
 ```typescript
@@ -198,7 +198,7 @@ async function triggerTruckAdvance(): Promise<void> {
 }
 ```
 
-The watch callbacks and `handleClick` call sites do not need `await` — GLBs are pre-warmed before interaction is possible.
+The watch callbacks and `handleClick` call sites do not need `await`, GLBs are pre-warmed before interaction is possible.
 
 ---
 
@@ -217,9 +217,9 @@ Both models grounded via `position.y = -Box3.min.y` (measured after scale, befor
 
 ## Verification
 
-1. `npm run dev` — open the stowage-master game
-2. Start a game — truck queue at the dock should show 3 real GLB truck+trailer assemblies
-3. Click a slot — crane picks up container, GLB truck departs, queue advances (all with GLB models)
+1. `npm run dev`, open the stowage-master game
+2. Start a game, truck queue at the dock should show 3 real GLB truck+trailer assemblies
+3. Click a slot, crane picks up container, GLB truck departs, queue advances (all with GLB models)
 4. Check container height above truck looks correct (containers should sit on trailer deck, not float/clip)
 5. Verify no console errors from GLB loading or bounding-box grounding
-6. `npm run build` — confirm Vite bundles both GLB files into `dist/assets/`
+6. `npm run build`, confirm Vite bundles both GLB files into `dist/assets/`

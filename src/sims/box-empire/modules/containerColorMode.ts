@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { Container } from '../types'
 import type { ContainerColorMode } from '@/stores/globalSettings'
 
-// Shared flat material cache — all renderers share the same instances.
+// Shared flat material cache, all renderers share the same instances.
 const _flatCache = new Map<string, THREE.MeshStandardMaterial>()
 
 function getFlatMaterial(hex: string): THREE.MeshStandardMaterial {

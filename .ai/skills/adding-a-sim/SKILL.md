@@ -10,18 +10,18 @@ description: >-
 
 ## How auto-discovery works
 
-`src/composables/useSimRegistry.ts` uses `import.meta.glob('@/sims/*/definition.ts')` to find every sim at build time. No manual registration is needed — drop a folder and it appears on the menu.
+`src/composables/useSimRegistry.ts` uses `import.meta.glob('@/sims/*/definition.ts')` to find every sim at build time. No manual registration is needed, drop a folder and it appears on the menu.
 
 ## Step-by-step
 
 ### 1. Create the sim folder
 
-Each sim is a self-contained sub-folder. **All** sim-specific code, components, composables, stores, types, and media stay inside this folder — nothing leaks into the top-level `src/` directories.
+Each sim is a self-contained sub-folder. **All** sim-specific code, components, composables, stores, types, and media stay inside this folder, nothing leaks into the top-level `src/` directories.
 
 ```
 src/sims/<sim-id>/
-├── definition.ts            # Required — metadata & lazy component import
-├── <SimName>.vue            # Required — root component for the game
+├── definition.ts            # Required, metadata & lazy component import
+├── <SimName>.vue            # Required, root component for the game
 ├── components/              # Sim-specific Vue components
 │   ├── ui/                  #   UI widgets (meters, popups, overlays)
 │   └── modals/              #   Modal dialogs (start screen, level complete)
@@ -34,7 +34,7 @@ src/sims/<sim-id>/
 
 `<sim-id>` must be lowercase kebab-case (e.g. `cargo-rush`).
 
-**Example** — the existing `stowage-master` sim uses this layout:
+**Example**, the existing `stowage-master` sim uses this layout:
 
 ```
 src/sims/stowage-master/
@@ -121,7 +121,7 @@ The component is rendered inside a flex container that fills the viewport below 
 
 ### 4. Using Three.js
 
-Import the shared composable — it handles setup, resize, render loop, and disposal:
+Import the shared composable, it handles setup, resize, render loop, and disposal:
 
 ```ts
 import { ref } from 'vue'
@@ -154,7 +154,7 @@ Create `composables/useGameMusic.ts` following the pattern in `stowage-master` o
 - Watch `useAudioStore().musicMuted` (not `gameMusicMuted`) to pause/resume the looping background track
 - Use a module-level singleton `HTMLAudioElement` to survive component remounts
 
-`AudioControls.vue` is automatically rendered in the sim header by `SimPage.vue` — no per-sim UI work is needed.
+`AudioControls.vue` is automatically rendered in the sim header by `SimPage.vue`, no per-sim UI work is needed.
 
 #### SFX
 
@@ -164,8 +164,8 @@ In `composables/useAudio.ts` (or equivalent SFX module):
 - For ambient/scheduled sounds (seagulls etc.), check `sfxMuted` at fire time inside the timeout callback rather than cancelling the timer
 
 #### Rules
-- Use `audioStore.musicMuted` and `audioStore.sfxMuted` — do NOT add new flags to the audio store
-- Narrator / voiceover clips are SFX — guard with `sfxMuted`; when muted, still call `onEnded` after a short delay so sequences don't freeze
+- Use `audioStore.musicMuted` and `audioStore.sfxMuted`, do NOT add new flags to the audio store
+- Narrator / voiceover clips are SFX, guard with `sfxMuted`; when muted, still call `onEnded` after a short delay so sequences don't freeze
 
 ## Conventions
 

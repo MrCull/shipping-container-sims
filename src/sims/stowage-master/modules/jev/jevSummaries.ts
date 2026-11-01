@@ -1,5 +1,5 @@
 // Pure functions producing short human-readable strings for the Jev inspector (plan 05).
-// These NEVER invent or imply a rationale for Jev's choice (skill rule) — only the evidence
+// These NEVER invent or imply a rationale for Jev's choice (skill rule), only the evidence
 // sent and the probabilities returned.
 //
 // See .ai/plans/stowage-master/02-jev-state-and-questions.md §2.10.
@@ -71,7 +71,7 @@ export function summarizeRequest(snapshot: JevGameSnapshot, stateResult: BuildJe
 
   segments.push(`≈ ${(stateResult.estimatedTokens / 1000).toFixed(1)}K tokens`)
 
-  return segments.join(' — ')
+  return segments.join(', ')
 }
 
 /** TypeSafe's confidence bands: <0.5 low, 0.5-0.9 moderate, >0.9 high. */
@@ -90,7 +90,7 @@ export interface JevResponseSummaryInput {
 
 /**
  * Summarises what Jev returned for one move, for the inspector's "received" panel. Never states
- * or implies a reason for the choice — only the chosen slot, its probability/confidence, the
+ * or implies a reason for the choice, only the chosen slot, its probability/confidence, the
  * runners-up, latency, cost and model.
  */
 export function summarizeResponse(input: JevResponseSummaryInput): string {
@@ -100,7 +100,7 @@ export function summarizeResponse(input: JevResponseSummaryInput): string {
   const label = confidenceLabel(decision.answer.confidence)
 
   const lines: string[] = [
-    `Chose ${decision.answer.choice} (p ${round2(top?.p ?? 0)}, confidence ${round2(decision.answer.confidence)} — ${label}).`,
+    `Chose ${decision.answer.choice} (p ${round2(top?.p ?? 0)}, confidence ${round2(decision.answer.confidence)}, ${label}).`,
   ]
 
   if (runnersUp.length > 0) {

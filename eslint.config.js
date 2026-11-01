@@ -32,6 +32,9 @@ export default tseslint.config(
       sourceType: 'module',
       globals: {
         ...globals.browser,
+        // Injected by Vite `define` (vite.config.ts), typed in env.d.ts.
+        __BUILD_TIME__: 'readonly',
+        __BUILD_COMMIT__: 'readonly',
       },
     },
   },

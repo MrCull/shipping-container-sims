@@ -1,4 +1,4 @@
-# Stowage Master — Audio Assets
+# Stowage Master, Audio Assets
 
 Place the following `.mp3` files in this directory for disaster sound effects:
 
@@ -10,4 +10,4 @@ Place the following `.mp3` files in this directory for disaster sound effects:
 | `underwater-explosion.mp3`| Muffled underwater explosion       |
 | `water-splash.mp3`        | Water splash impact                |
 
-Audio is optional — the game degrades gracefully if files are missing.
+Audio is optional, the game degrades gracefully if files are missing.

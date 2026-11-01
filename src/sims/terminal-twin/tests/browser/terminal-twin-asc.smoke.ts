@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { ContainerState, RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/asc-1sts-10-boxes-1block.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
-import { pickScenario } from './scenarioPicker'
+import { openSetupTab, pickScenario } from './scenarioPicker'
 
 const FIXTURE = 'asc-1sts-10-boxes-1block'
 
@@ -83,6 +83,7 @@ test('the setup dialog edits blocks, bays, tiers, pads, stalls and ASC speeds', 
   await page.evaluate(() => window.__tt!.newScenario())
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await pickScenario(dialog, 'asc-1sts-10-boxes-1block')
+  await openSetupTab(dialog, 'yard')
   await expect(dialog.getByTestId('tt-yard-readout')).toBeVisible()
   await dialog.locator('input[name="yard-blocks"]').fill('2')
   await dialog.locator('input[name="yard-blocks"]').dispatchEvent('change')

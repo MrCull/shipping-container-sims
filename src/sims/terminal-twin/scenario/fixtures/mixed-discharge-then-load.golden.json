@@ -3,10 +3,10 @@
   "seed": 7,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "06d8e918b8e600",
+  "eventLogHash": "0fc0cbfa0aab69",
   "kpis": {
-    "simTimeS": 2620.764,
-    "eventsProcessed": 601,
+    "simTimeS": 2712.421,
+    "eventsProcessed": 596,
     "movesCompleted": 16,
     "vesselsCompleted": 1,
     "sts": {
@@ -14,7 +14,7 @@
         "moves": 16,
         "cycles": 15,
         "twinLifts": 1,
-        "grossMovesPerHour": 23.227,
+        "grossMovesPerHour": 22.399,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 2620.764,
-        "turnaroundS": 2560.764,
+        "departedAtS": 2712.421,
+        "turnaroundS": 2652.421,
         "sts": [
           "STS01"
         ]
@@ -169,9 +169,9 @@
       },
       "workPackageRelease": {
         "handler": "strategy:keep-k-ahead",
-        "calls": 15,
-        "resolved": 15,
-        "ok": 15,
+        "calls": 14,
+        "resolved": 14,
+        "ok": 14,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -194,17 +194,17 @@
       "shcs": {
         "SHC01": {
           "jobs": 15,
-          "emptyDistanceM": 3698.433,
+          "emptyDistanceM": 4129.433,
           "loadedDistanceM": 1893.567,
-          "reservationWaitS": 0,
+          "reservationWaitS": 3.138,
           "stateS": {
-            "parked": 1172.9,
-            "moving-to-collect": 367.095,
-            "queuing-to-collect": 0,
-            "collecting": 390.37,
+            "parked": 1159.646,
+            "moving-to-collect": 408.385,
+            "queuing-to-collect": 3.138,
+            "collecting": 451.487,
             "moving-to-deliver": 52.5,
             "queuing-to-deliver": 0,
-            "delivering": 637.9
+            "delivering": 637.265
           },
           "handovers": 30,
           "parkingReturns": 15,
@@ -212,17 +212,17 @@
         },
         "SHC02": {
           "jobs": 1,
-          "emptyDistanceM": 234.5,
-          "loadedDistanceM": 111.5,
+          "emptyDistanceM": 280.5,
+          "loadedDistanceM": 133.5,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 2528.314,
-            "moving-to-collect": 17.994,
+            "parked": 2600.714,
+            "moving-to-collect": 23.322,
             "queuing-to-collect": 0,
-            "collecting": 30.692,
+            "collecting": 38.908,
             "moving-to-deliver": 3.5,
             "queuing-to-deliver": 0,
-            "delivering": 40.264
+            "delivering": 45.978
           },
           "handovers": 2,
           "parkingReturns": 1,
@@ -230,7 +230,7 @@
         }
       },
       "stsGroundPositionWaitS": {
-        "STS01": 181.296
+        "STS01": 233.416
       }
     },
     "yard": {
@@ -263,8 +263,8 @@
       "ascs": {
         "B01-ASC1": {
           "jobs": 16,
-          "gantryM": 1349.6,
-          "trolleyM": 152.7,
+          "gantryM": 1409.9,
+          "trolleyM": 123.8,
           "hoistM": 594.432,
           "padWaitS": 0
         }
@@ -272,30 +272,24 @@
     },
     "dwell": {
       "IMPORT": {
-        "count": 7,
+        "count": 8,
         "departed": 0,
-        "meanS": 2114.168,
-        "maxS": 2508.452
+        "meanS": 2139.234,
+        "maxS": 2599.518
       },
       "EXPORT": {
         "count": 8,
         "departed": 8,
-        "meanS": 1989.034,
-        "maxS": 2539.917
-      },
-      "STORAGE": {
-        "count": 1,
-        "departed": 0,
-        "meanS": 2074,
-        "maxS": 2074
+        "meanS": 2073.178,
+        "maxS": 2631.574
       }
     },
     "workPackages": {
-      "released": 14,
-      "started": 14,
-      "completed": 14,
-      "leadTimeMeanS": 322.524,
-      "leadTimeMaxS": 575.866,
+      "released": 13,
+      "started": 13,
+      "completed": 13,
+      "leadTimeMeanS": 361.639,
+      "leadTimeMaxS": 773.2,
       "boxesLoaded": 8
     },
     "ordering": {
@@ -312,7 +306,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 600,
+    "checks": 595,
     "violations": 0,
     "first": null
   },

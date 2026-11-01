@@ -3,12 +3,16 @@
  * scenario belongs to instead of comparing preset names. To add a terminal: a folder `terminals/<id>/` with an
  * `index.ts` exporting a `TerminalProfile`, then list it below.
  */
+import { TTI_PRESET_NAME } from '../scenario/presets'
 import { TTI_ALGECIRAS } from './tti-algeciras'
 import type { TerminalPresetInfo, TerminalProfile } from './types'
 
 export type { TerminalPresetInfo, TerminalProfile, TerminalScenery, SceneryContext } from './types'
 
 export const TERMINALS: readonly TerminalProfile[] = [TTI_ALGECIRAS]
+
+/** What a fresh start screen selects (#156): the TTI Algeciras baseline preset, on the Scenarios tab. */
+export const DEFAULT_SCENARIO_NAME = TTI_PRESET_NAME
 
 /** The terminal that owns a scenario (a preset by name); null for fixtures, custom and generic presets. */
 export function terminalForScenario(scenarioName: string): TerminalProfile | null {

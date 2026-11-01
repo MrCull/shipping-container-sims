@@ -44,11 +44,11 @@ export async function loadShipGLB(
     _cache.set(url, root.clone(true))
   }
 
-  // GLB length axis is Z; game convention is length along X — rotate 90° around Y by default.
+  // GLB length axis is Z; game convention is length along X, rotate 90° around Y by default.
   // Individual presets can override via glbRotationY.
   root.rotation.y = shipConfig.glbRotationY ?? Math.PI / 2
 
-  // After rotation, original Z (length) is now along X — use X for scaling
+  // After rotation, original Z (length) is now along X, use X for scaling
   const box = new THREE.Box3().setFromObject(root)
   const size = new THREE.Vector3()
   box.getSize(size)
@@ -234,7 +234,7 @@ function buildHull(
   const bowLen = length * 0.18
   const sternLen = length * 0.08
 
-  // Main hull body — centre section
+  // Main hull body, centre section
   const midGeo = new THREE.BoxGeometry(midLen, hullDepth, width)
   const mid = new THREE.Mesh(midGeo, hullMat)
   mid.position.set(-length * 0.1, -hullDepth * 0.5 + deckY, 0)
@@ -242,14 +242,14 @@ function buildHull(
   mid.receiveShadow = true
   group.add(mid)
 
-  // Bow — tapered prism (wide at stern side, pointed at bow tip)
+  // Bow, tapered prism (wide at stern side, pointed at bow tip)
   const bowMesh = makeTaperedPrism(bowLen, hullDepth, width, 0.6, 0, hullMat)
   // Position: the wide end butts up against the mid section bow face
   const midBowX = -length * 0.1 + midLen / 2
   bowMesh.position.set(midBowX + bowLen / 2, -hullDepth * 0.5 + deckY, 0)
   group.add(bowMesh)
 
-  // Stern — slightly tapered prism
+  // Stern, slightly tapered prism
   const sternMesh = makeTaperedPrism(sternLen, hullDepth, width, width * 0.72, 0, hullMat)
   const midSternX = -length * 0.1 - midLen / 2
   sternMesh.position.set(midSternX - sternLen / 2, -hullDepth * 0.5 + deckY, 0)
@@ -315,7 +315,7 @@ function addSuperstructure(
   const sternX = -length * 0.38
   const deckY = height * 0.28
 
-  // Deckhouse — stack of 3 levels
+  // Deckhouse, stack of 3 levels
   const floors = [
     { w: width * 0.48, l: length * 0.14, h: height * 1.1, yOff: 0 },
     { w: width * 0.44, l: length * 0.12, h: height * 0.9, yOff: height * 1.1 },
@@ -346,7 +346,7 @@ function addSuperstructure(
   funnel.castShadow = true
   group.add(funnel)
 
-  // Funnel band (coloured livery stripe — yellow like a generic shipping line)
+  // Funnel band (coloured livery stripe, yellow like a generic shipping line)
   const bandGeo = new THREE.CylinderGeometry(0.95, 1.35, 0.6, 12)
   const bandMat = new THREE.MeshPhongMaterial({ color: 0xddaa00, emissive: 0x664400, emissiveIntensity: 0.2 })
   const band = new THREE.Mesh(bandGeo, bandMat)
@@ -412,11 +412,11 @@ function addDeckFittings(
   }
 }
 
-/** Visual exaggeration multiplier — the ship leans more than the raw physics angle
+/** Visual exaggeration multiplier, the ship leans more than the raw physics angle
  *  so even mild imbalance is clearly readable on screen. */
 const VISUAL_TILT_MULTIPLIER = 0.9
 
-/** Instantly snap the ship to the correct tilt angle with no lerp — call once after scene build. */
+/** Instantly snap the ship to the correct tilt angle with no lerp, call once after scene build. */
 export function snapShipTilt(shipGroup: THREE.Group | null, list: number, trim: number): void {
   if (!shipGroup) return
   shipGroup.rotation.x = (list * VISUAL_TILT_MULTIPLIER * Math.PI) / 180

@@ -1,4 +1,4 @@
-# Shipping Container Sims — Agent Guide
+# Shipping Container Sims, Agent Guide
 
 ## Project overview
 
@@ -27,7 +27,7 @@ Before handing work back after code changes, run **`pnpm run verify`** (dependen
 ```
 src/sims/                ★ Each sim/game gets its own self-contained sub-folder
     └── <sim-id>/
-        ├── definition.ts        Metadata (SimDefinition) — auto-discovered
+        ├── definition.ts        Metadata (SimDefinition), auto-discovered
         ├── <SimName>.vue        Root component for the game
         ├── components/          Sim-specific Vue components
         │   ├── ui/              UI widgets (meters, bars, popups)
@@ -51,17 +51,20 @@ knowledge-base/      Domain knowledge reference files (dk_*.md); TTI Algeciras o
 
 Each sim that has grown beyond a trivial prototype maintains its own agent guide alongside its code:
 
-- **[Box Empire](src/sims/box-empire/box-empire-AGENTS.md)** — Terminal operations tycoon sim. Architecture, modules, components, composables, layout, assets, shipping-line liveries, and known behaviours.
-- **[Container Stack / Contenga](src/sims/container-stack/AGENTS.md)** — 3D Jenga-style container stacking game. Phase state machine, Three.js rendering split, pointer interaction, stability physics, scoring, level timers, audio, and known pitfalls.
-- **[Stowage Master](src/sims/stowage-master/stowage-master-AGENTS.md)** — Container stowage puzzle sim. Phase state machine, physics (list/trim/VCG), scoring, disaster system, 10 levels, ship presets, rendering modules, optional Jev assist, and known pitfalls.
-- **[Terminal Twin](src/sims/terminal-twin/terminal-twin-AGENTS.md)** — Event-driven automated-terminal digital twin / TOS test bench. Headless engine API, events and causality, invariants, fixtures and golden summaries, CLI runner, browser host (Web Worker, 3D view, time controls, `window.__tt` dev API), phase 2 asset pipeline (Blender `bpy` generators, `pnpm run tt:assets`, asset budget check in CI, dev asset viewer), and "How to prove a change works". Per-topic detail is in its `docs/` folder, reached by pointers in the guide. Domain terms: **[GLOSSARY.md](GLOSSARY.md)**.
+- **[Box Empire](src/sims/box-empire/box-empire-AGENTS.md)**: Terminal operations tycoon sim. Architecture, modules, components, composables, layout, assets, shipping-line liveries, and known behaviours.
+- **[Container Stack / Contenga](src/sims/container-stack/AGENTS.md)**: 3D Jenga-style container stacking game. Phase state machine, Three.js rendering split, pointer interaction, stability physics, scoring, level timers, audio, and known pitfalls.
+- **[Stowage Master](src/sims/stowage-master/stowage-master-AGENTS.md)**: Container stowage puzzle sim. Phase state machine, physics (list/trim/VCG), scoring, disaster system, 10 levels, ship presets, rendering modules, optional Jev assist, and known pitfalls.
+- **[Terminal Twin](src/sims/terminal-twin/terminal-twin-AGENTS.md)**: Event-driven automated-terminal digital twin / TOS test bench. Headless engine API, events and causality, invariants, fixtures and golden summaries, CLI runner, browser host (Web Worker, 3D view, time controls, `window.__tt` dev API), phase 2 asset pipeline (Blender `bpy` generators, `pnpm run tt:assets`, asset budget check in CI, dev asset viewer), and "How to prove a change works". Per-topic detail is in its `docs/` folder, reached by pointers in the guide. Domain terms: **[GLOSSARY.md](GLOSSARY.md)**.
 
 ## Key conventions
 
-- **Auto-discovery**: Sims are registered via `import.meta.glob('@/sims/*/definition.ts')`. No manual imports needed — just add a folder.
+- **Auto-discovery**: Sims are registered via `import.meta.glob('@/sims/*/definition.ts')`. No manual imports needed, just add a folder.
 - **Composition API only**: Always use `<script setup lang="ts">`. No Options API.
 - **Scoped styles**: Use `<style scoped>` in all components.
 - **CSS variables**: Use the design tokens defined in `src/assets/main.css` (e.g. `--color-primary`).
+- **No em dash**: never write the em dash character (U+2014) in any text (code, strings, comments, docs, commits, issues, PR bodies); use a comma, colon, full stop, brackets or "to". `scripts/check-no-em-dash.mjs` (part of `verify` and CI) fails on it.
+- **Master volume**: the shared audio control (`src/components/AudioControls.vue`) sets one volume and mute in `src/stores/audio.ts`; `masterGain` is the volume, or 0 when muted. Every sound plays at its own gain times the master gain: `gainFor(soundGain)` for a one-shot sound or a Web Audio gain node, `followMasterGain(element, soundGain)` for an element that keeps playing (music, narration), so the slider changes it live. A new sim sound goes through one of these, never a fixed `volume`. Smoke: `src/tests/browser/menu-music-volume.smoke.ts`.
+- **Build stamp**: the main menu footer (`src/pages/HomePage.vue` only, never a sim) shows the build time and short commit hash. `vite.config.ts` injects `__BUILD_TIME__` and `__BUILD_COMMIT__` via `define` (commit from `git rev-parse`, else `GITHUB_SHA`, else empty so the stamp shows time only); `src/utils/buildStamp.ts` formats it, and the dev server shows "dev".
 - **Keep this guide current**: When project-wide details change or new tooling, conventions, or structure are added that affect how agents or contributors work, update **AGENTS.md** in the same change (or a follow-up) so it stays accurate.
 
 ## Plans
@@ -72,34 +75,34 @@ All agent plans should be created in the **`.ai/plans/`** folder at the repo roo
 
 Agent-facing skill files live in **`.ai/skills/`** at the repo root (Markdown `SKILL.md` per topic). Each file documents conventions, schemas, or patterns for this codebase.
 
-New skills go under **`.agents/skills/`** instead — the repo's new top-level naming/location standard for agent-facing content. Existing `.ai/skills/` entries have not been migrated yet.
+New skills go under **`.agents/skills/`** instead, the repo's new top-level naming/location standard for agent-facing content. Existing `.ai/skills/` entries have not been migrated yet.
 
-**`.claude/skills/`** holds Matt Pocock's engineering-workflow skills (vendored from upstream, see `.claude/skills/UPSTREAM.md`), invoked as slash commands in Claude Code: e.g. `/grill-me`, `/to-spec`, `/to-tickets`, `/implement`, `/tdd`, `/diagnosing-bugs`, `/code-review`, `/pr`. They read their per-repo configuration from `docs/agents/` (see § Agent skills).
+**`.claude/skills/`** holds Matt Pocock's engineering-workflow skills (vendored from upstream, see `.claude/skills/UPSTREAM.md`), invoked as slash commands in Claude Code: e.g. `/grill-me`, `/to-spec`, `/to-tickets`, `/implement`, `/tdd`, `/diagnosing-bugs`, `/code-review`, `/pr`. They read their per-repo configuration from `docs/agents/` (see § Agent skills). `/jfdi` (local) runs grill, spec, tickets, implement and retro unattended, taking the recommended answer to every question.
 
 Each folder holds one `SKILL.md` per topic with its own description: list them with `ls .ai/skills .agents/skills`.
 
 ### Project workflow
 
-- **[Adding a sim](.ai/skills/adding-a-sim/SKILL.md)** — How to add a new game or simulation to the project. Follow this when creating, scaffolding, or implementing a new sim.
+- **[Adding a sim](.ai/skills/adding-a-sim/SKILL.md)**: How to add a new game or simulation to the project. Follow this when creating, scaffolding, or implementing a new sim.
 
 ### Domain knowledge & entity design
 
 These skills provide TypeScript interfaces, default value ranges, factory functions, and design guidance drawn from the `knowledge-base/` domain files. Use them when building simulation entities, operational logic, or 3D scenes.
 
-- **[Container & Cargo Entities](.ai/skills/container-cargo-entities/SKILL.md)** — Physical specs (20ft/40ft/HC), ISO 6346 identity, logical attributes, lifecycle state machine, hazardous cargo (IMDG), hold/release logic, yard grouping heuristics, and factory functions.
-- **[Vessel Entities](.ai/skills/vessel-entities/SKILL.md)** — Vessel classes (Feeder → ULCV), bay-row-tier coordinates, stowage slots, simplified stability model, voyage/manifest, vessel generation algorithms, and factory functions.
-- **[Terminal Equipment Entities](.ai/skills/terminal-equipment-entities/SKILL.md)** — STS quay cranes (5 size classes), RMG/ASC/RTG yard cranes, reach stackers, terminal tractors, four-lens model (appearance/movement/capabilities/stop conditions), cycle times, animation state machines, and factory functions.
-- **[Terminal Infrastructure](.ai/skills/terminal-infrastructure/SKILL.md)** — Berths, yard blocks, stacking rules & rehandle model, four layout archetypes (parallel RTG, perpendicular ASC, straddle, U-type), road network model, gatehouse infrastructure, terminal generation presets, and factory functions.
-- **[Terminal Operations](.ai/skills/terminal-operations/SKILL.md)** — End-to-end container flows (import/export/transshipment), vessel loading/discharge sequences, crane cycle model, gatehouse processes, staff roles & shifts, KPIs with target ranges, EDI message types, simulation event system, and factory functions.
-- **[Terminal Economics](.ai/skills/terminal-economics/SKILL.md)** — Tariff structure, base handling charges, surcharges, tiered storage/dwell fees, optional services, cargo-class modifiers, revenue/cost tracking, invoice generation, regional presets (Europe/Asia/Americas), and factory functions.
+- **[Container & Cargo Entities](.ai/skills/container-cargo-entities/SKILL.md)**: Physical specs (20ft/40ft/HC), ISO 6346 identity, logical attributes, lifecycle state machine, hazardous cargo (IMDG), hold/release logic, yard grouping heuristics, and factory functions.
+- **[Vessel Entities](.ai/skills/vessel-entities/SKILL.md)**: Vessel classes (Feeder → ULCV), bay-row-tier coordinates, stowage slots, simplified stability model, voyage/manifest, vessel generation algorithms, and factory functions.
+- **[Terminal Equipment Entities](.ai/skills/terminal-equipment-entities/SKILL.md)**: STS quay cranes (5 size classes), RMG/ASC/RTG yard cranes, reach stackers, terminal tractors, four-lens model (appearance/movement/capabilities/stop conditions), cycle times, animation state machines, and factory functions.
+- **[Terminal Infrastructure](.ai/skills/terminal-infrastructure/SKILL.md)**: Berths, yard blocks, stacking rules & rehandle model, four layout archetypes (parallel RTG, perpendicular ASC, straddle, U-type), road network model, gatehouse infrastructure, terminal generation presets, and factory functions.
+- **[Terminal Operations](.ai/skills/terminal-operations/SKILL.md)**: End-to-end container flows (import/export/transshipment), vessel loading/discharge sequences, crane cycle model, gatehouse processes, staff roles & shifts, KPIs with target ranges, EDI message types, simulation event system, and factory functions.
+- **[Terminal Economics](.ai/skills/terminal-economics/SKILL.md)**: Tariff structure, base handling charges, surcharges, tiered storage/dwell fees, optional services, cargo-class modifiers, revenue/cost tracking, invoice generation, regional presets (Europe/Asia/Americas), and factory functions.
 
 ### Rendering & animation
 
-- **[Three.js + Vue 3 Animation](.ai/skills/threejs-vue3-animation/SKILL.md)** — Four-layer architecture (domain → app state → scene adapter → render loop), scene conventions (units, axes, origins), `InstancedMesh` for containers, asset pipeline (glTF/Draco/KTX2), camera patterns, equipment animation state machines, container stack positioning, lighting, fidelity tiers, data-driven scene generation, and common pitfalls.
+- **[Three.js + Vue 3 Animation](.ai/skills/threejs-vue3-animation/SKILL.md)**: Four-layer architecture (domain → app state → scene adapter → render loop), scene conventions (units, axes, origins), `InstancedMesh` for containers, asset pipeline (glTF/Draco/KTX2), camera patterns, equipment animation state machines, container stack positioning, lighting, fidelity tiers, data-driven scene generation, and common pitfalls.
 
 ### Third-party integrations
 
-- **[Jev integration](.agents/skills/jev-integration/SKILL.md)** — When and how to use Jev (TypeSafe System One) for bounded semantic decisions (Choice/Score/Noul questions), state design, provider API access, and turning judgments into application policy.
+- **[Jev integration](.agents/skills/jev-integration/SKILL.md)**: When and how to use Jev (TypeSafe System One) for bounded semantic decisions (Choice/Score/Noul questions), state design, provider API access, and turning judgments into application policy.
 
 ## Agent skills
 

@@ -23,7 +23,7 @@ export interface Container {
   portOrder: number
   isHazmat: boolean
   isImport: boolean
-  /** Transit container — remains on board, destined for a future port. */
+  /** Transit container, remains on board, destined for a future port. */
   isTransit?: boolean
   /** Set to true while this transit container has been lifted for restow. */
   isBeingRestowed?: boolean
@@ -194,7 +194,7 @@ export interface LevelConfig {
   /**
    * Controls how spread out pre-loaded containers are across tiers and rows.
    * 0 = bottom tiers / centre rows first (default, easy).
-   * 1 = fully random — any tier, any row.
+   * 1 = fully random, any tier, any row.
    */
   placementSpread?: number
   /** Instructional pages shown before gameplay starts. */

@@ -11,6 +11,9 @@
  *  - done: a discharged slot that is empty again, or a load slot that now holds its box;
  *  - ROB: a display-only remain-on-board box (never worked here);
  *  - empty: nothing planned.
+ * Plan (#162): the viewer shows one plan at a time, Load (planned load, in progress, loaded) or Discharge (planned
+ * discharge, in progress, discharged); ROB shows in both. A slot of the other plan's move shows as empty, and a box on a
+ * spreader shows in the plan of its move. Without a plan (tests, the 3D match check) both moves show.
  * Positions use the maritime notation (`modules/locationNotation.ts`): bay, row and tier numbers on the axes, the
  * notation of each slot in the hover details (through the `locate` callback).
  */
@@ -30,6 +33,18 @@ export const CELL_STATUSES: readonly CellStatus[] = ['planned-discharge', 'plann
  */
 export type ColourMode = 'status' | ColourBy
 const byStatus = (mode: ColourMode): boolean => mode === 'status' || mode === 'default'
+
+/** Which plan the viewer shows (#162): the load plan (the default) or the discharge plan. */
+export type BayPlan = 'load' | 'discharge'
+export const BAY_PLANS: readonly BayPlan[] = ['load', 'discharge']
+
+/** The statuses a plan shows, in legend order: its own move's planned, in progress and done, then ROB. */
+export function planStatuses(plan: BayPlan): CellStatus[] {
+  return [plan === 'load' ? 'planned-load' : 'planned-discharge', 'in-progress', 'done', 'rob']
+}
+
+/** The move of a slot: a discharge slot is discharge, every other purpose (export, transshipment, empty) a load. */
+const moveOf = (slot: Pick<VesselSlotState, 'purpose'>): BayPlan => (slot.purpose === 'discharge' ? 'discharge' : 'load')
 
 /** A box in or booked to a slot, as the host reports it (properties are absent on a snapshot from before spec #106). */
 export interface BayBox {
@@ -74,6 +89,10 @@ export interface BayViewOptions {
   colourMode: ColourMode
   /** Maritime notation of a vessel slot id (default: the id itself). */
   locate?: (slotId: string) => string
+  /** Hide ROB (colour by menu, #159): ROB cells show as empty, as the 3D hull hides its ROB boxes; the strip still marks ROB bays. */
+  hideRob?: boolean
+  /** Show one plan (#162): the other move's slots show as empty. Absent: both moves. */
+  plan?: BayPlan
 }
 
 /** What a hover shows. Everything but `slotId`, `location` and `status` is absent when unknown. */
@@ -212,10 +231,13 @@ export interface BayView {
   next: number | null
   legend: LegendEntry[]
   colourMode: ColourMode
+  /** The plan shown, null for both moves. */
+  plan: BayPlan | null
 }
 
-/** Status of a slot (not a ROB box). `box` is the box in or booked to it. */
-export function slotStatus(slot: Pick<VesselSlotState, 'purpose' | 'containerId' | 'plannedContainerId' | 'emptyReq'>, box: Pick<BayBox, 'custody'> | undefined): CellStatus {
+/** Status of a slot (not a ROB box). `box` is the box in or booked to it. With a plan, a slot of the other move is empty. */
+export function slotStatus(slot: Pick<VesselSlotState, 'purpose' | 'containerId' | 'plannedContainerId' | 'emptyReq'>, box: Pick<BayBox, 'custody'> | undefined, plan?: BayPlan): CellStatus {
+  if (plan !== undefined && moveOf(slot) !== plan) return 'empty'
   if (slot.purpose === 'discharge') {
     if (slot.containerId !== null) return 'planned-discharge'
     return box?.custody === 'sts' ? 'in-progress' : 'done'
@@ -239,10 +261,10 @@ export function stepBay(sizeClass: VesselSizeClass, bay: number, direction: -1 |
   return order[i + direction] ?? null
 }
 
-/** The first bay that has work to do (or is being worked), else the bow-most bay: where the viewer opens. */
-export function defaultBay(data: BayViewData): number {
+/** The first bay that has work to do (or is being worked) in the plan, else the bow-most bay: where the viewer opens. */
+export function defaultBay(data: BayViewData, plan?: BayPlan): number {
   const order = bayOrder(data.sizeClass)
-  const entries = stripOf(data)
+  const entries = stripOf(data, plan)
   const active = entries.find((e) => e.state === 'active') ?? entries.find((e) => e.state === 'idle')
   return active ? active.bay : order[0]
 }
@@ -251,14 +273,14 @@ function slotBox(data: BayViewData, slot: VesselSlotState): BayBox | undefined {
   return data.boxes[slot.id]
 }
 
-/** The bay strip: one entry per bay, bow first, with progress. */
-export function stripOf(data: BayViewData): StripEntry[] {
+/** The bay strip: one entry per bay, bow first, with progress (of the plan's move, or both). */
+export function stripOf(data: BayViewData, plan?: BayPlan): StripEntry[] {
   const spec = VESSEL_CLASSES[data.sizeClass]
   const robBays = new Set(data.robBoxes.map((b) => b.bay))
   const total = new Map<number, number>()
   const done = new Map<number, number>()
   for (const s of data.slots) {
-    const st = slotStatus(s, slotBox(data, s))
+    const st = slotStatus(s, slotBox(data, s), plan)
     if (st === 'empty') continue
     total.set(s.bay, (total.get(s.bay) ?? 0) + 1)
     if (st === 'done') done.set(s.bay, (done.get(s.bay) ?? 0) + 1)
@@ -326,7 +348,7 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
     slotsHere.set(k, [...(slotsHere.get(k) ?? []), s])
   }
   const robHere = new Map<string, RobBox[]>()
-  for (const b of data.robBoxes) {
+  for (const b of opts.hideRob ? [] : data.robBoxes) {
     if (b.bay !== bay) continue
     const k = `${b.row}:${b.tier}`
     robHere.set(k, [...(robHere.get(k) ?? []), b])
@@ -353,7 +375,7 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
   const absentCell = (row: number, tier: number): BayCell => ({ ...emptyCell(row, tier, null), absent: true })
   const cellOfSlot = (s: VesselSlotState): BayCell => {
     const box = slotBox(data, s)
-    const status = slotStatus(s, box)
+    const status = slotStatus(s, box, opts.plan)
     const details: CellDetails = { slotId: s.id, location: locate(s.id), status }
     if (box) {
       Object.assign(details, {
@@ -447,6 +469,7 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
 
   const packages = data.packages
     .filter((p) => p.vesselId === data.vesselId && p.bay === bay)
+    .filter((p) => opts.plan === undefined || (opts.plan === 'load' ? p.kind !== 'discharge' : p.kind !== 'load'))
     .sort((a, b) => (a.stsId < b.stsId ? -1 : a.stsId > b.stsId ? 1 : a.seq - b.seq))
     .map((p) => {
       const deck = p.section === 'deck'
@@ -465,8 +488,9 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
       } satisfies PackageRow
     })
 
-  const strip = stripOf(data)
-  const legend: LegendEntry[] = statusMode ? CELL_STATUSES.map((key) => ({ key, index: null, hex: null })) : legendEntries.map((e, index) => ({ key: e.key, index, hex: e.hex }))
+  const strip = stripOf(data, opts.plan)
+  const legendStatuses = opts.plan === undefined ? CELL_STATUSES : planStatuses(opts.plan)
+  const legend: LegendEntry[] = statusMode ? legendStatuses.map((key) => ({ key, index: null, hex: null })) : legendEntries.map((e, index) => ({ key: e.key, index, hex: e.hex }))
   return {
     vesselId: data.vesselId,
     bay,
@@ -481,5 +505,6 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
     next: stepBay(data.sizeClass, bay, 1),
     legend,
     colourMode: opts.colourMode,
+    plan: opts.plan ?? null,
   }
 }

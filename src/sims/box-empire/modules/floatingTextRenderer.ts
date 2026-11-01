@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Floating text popup sprites (money earned, etc.)
+// Box Empire, Floating text popup sprites (money earned, etc.)
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'

@@ -23,9 +23,14 @@ export interface QualityProfile {
   /** Container LOD0 distance (m) and cap on boxes drawn at LOD0. */
   lod0DistanceM: number
   lod0Cap: number
-  /** Container close-up detail (#119): distance (m) and cap on boxes drawn with markings; 0 = off. */
+  /**
+   * Container close-up markings (#119, #143): faces within this camera distance (m) get markings. On on every level
+   * (#158): Auto settles on Low on a typical laptop, and with Low off nobody ever saw a marking. Low has the shortest
+   * reach (the orbit camera stops 8 m from its target) and the smallest budget.
+   */
   closeupDistanceM: number
-  closeupCap: number
+  /** Close-up marking faces drawn at most (#143; 0 = off, which no level uses). */
+  closeupFaceBudget: number
   /** Multiplier on the LOD switch distances of the cranes and carriers (STS, SHC, ASC): below 1 they drop to cheaper LODs sooner. */
   lodScale: number
   /** Multiplier on the device pixel ratio (render resolution), before the cap of 2. */
@@ -38,9 +43,9 @@ export interface QualityProfile {
 }
 
 export const QUALITY_PROFILES: Readonly<Record<QualityLevel, QualityProfile>> = {
-  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 0, closeupCap: 0, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24 },
-  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupCap: 24, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120 },
-  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupCap: 48, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400 },
+  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24 },
+  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120 },
+  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400 },
 }
 
 export const profileFor = (level: QualityLevel): QualityProfile => QUALITY_PROFILES[level]

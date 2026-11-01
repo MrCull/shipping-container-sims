@@ -7,9 +7,9 @@ export const TTI_ALGECIRAS: TerminalProfile = {
   id: 'tti-algeciras',
   label: 'TTI Algeciras',
   presets: {
-    [TTI_PRESET_NAME]: { copy: { tagline: 'preset.baseline.tagline', description: 'preset.baseline.description' }, derivedBays: true },
+    [TTI_PRESET_NAME]: { copy: { name: 'preset.baseline.name', tagline: 'preset.baseline.tagline', description: 'preset.baseline.description', watch: 'preset.baseline.watch' }, derivedBays: true },
     // A long peak-day run should stay readable: the daylight lock starts on.
-    [PEAK_DAY_PRESET_NAME]: { copy: { tagline: 'preset.peakDay.tagline', description: 'preset.peakDay.description' }, derivedBays: true, daylightLockDefault: true },
+    [PEAK_DAY_PRESET_NAME]: { copy: { name: 'preset.peakDay.name', tagline: 'preset.peakDay.tagline', description: 'preset.peakDay.description', watch: 'preset.peakDay.watch' }, derivedBays: true, daylightLockDefault: true },
   },
   scenery: TTI_SCENERY,
 }

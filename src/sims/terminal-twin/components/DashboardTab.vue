@@ -527,7 +527,7 @@ const tabs: ('charts' | 'report')[] = ['charts', 'report']
 .dashboard {
   position: absolute;
   inset: 0;
-  z-index: 8;
+  z-index: 10; /* above the overlay bar (9) */
   display: flex;
   flex-direction: column;
   background: var(--tt-bg);

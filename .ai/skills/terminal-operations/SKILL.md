@@ -10,7 +10,7 @@ description: >-
 
 # Terminal Operations & KPI Tracking
 
-This skill provides complete TypeScript interfaces, event chains, constants, factory functions, and KPI formulas for container terminal operational workflows. Use this as the canonical reference when generating operational logic, event systems, dashboards, or simulation flows — no external lookup should be needed.
+This skill provides complete TypeScript interfaces, event chains, constants, factory functions, and KPI formulas for container terminal operational workflows. Use this as the canonical reference when generating operational logic, event systems, dashboards, or simulation flows, no external lookup should be needed.
 
 ---
 
@@ -265,11 +265,11 @@ export type RestowType = 'onboard_restow' | 'quay_restow'
 | `onboard_restow` | Container stays on vessel, moved to a different slot | 2 moves (lift + set), no quay interaction |
 | `quay_restow` | Offloaded to quay, then reloaded into new slot | 4 moves (discharge + reload), uses quay space |
 
-Restows are unproductive moves — they increase the total move count without adding throughput. Minimising restows is a key planning objective.
+Restows are unproductive moves, they increase the total move count without adding throughput. Minimising restows is a key planning objective.
 
 ### Crane split
 
-When multiple quay cranes are assigned to a vessel, the vessel's bays are divided into contiguous ranges — one per crane. Cranes work their assigned ranges simultaneously, constrained by anti-collision rules (minimum one-bay gap between adjacent cranes).
+When multiple quay cranes are assigned to a vessel, the vessel's bays are divided into contiguous ranges, one per crane. Cranes work their assigned ranges simultaneously, constrained by anti-collision rules (minimum one-bay gap between adjacent cranes).
 
 ```ts
 export interface CraneSplit {
@@ -430,7 +430,7 @@ export type GateRejectionReason =
 
 export const GATE_REJECTION_DESCRIPTIONS: Record<GateRejectionReason, string> = {
   missing_documents: 'Required shipping documents not presented or incomplete',
-  customs_hold: 'Container flagged by customs — cannot proceed without clearance',
+  customs_hold: 'Container flagged by customs, cannot proceed without clearance',
   vgm_missing: 'Verified Gross Mass not submitted (SOLAS requirement)',
   seal_broken: 'Container seal broken, missing, or does not match documentation',
   overweight: 'Gross weight exceeds permitted maximum for road/terminal limits',
@@ -876,7 +876,7 @@ export interface DashboardSnapshot {
 
 | Message | Code | Purpose | Direction | Timing |
 |---------|------|---------|-----------|--------|
-| Bayplan | BAPLIE | Vessel stowage plan — position of every container on board | Vessel → Terminal | Before arrival (6–24 h) |
+| Bayplan | BAPLIE | Vessel stowage plan, position of every container on board | Vessel → Terminal | Before arrival (6–24 h) |
 | Move instructions | MOVINS | Load/discharge sequence orders per bay | Terminal → Vessel | Pre-operations |
 | Container orders | COPRAR | Handling orders for specific containers | Line → Terminal | Pre-operations |
 | Move confirmation | COARRI | Confirmation that a move (load/discharge) completed | Terminal → Line | Post-move (real-time) |
@@ -916,7 +916,7 @@ export interface EDIMessage {
   direction: EDIDirection
   /** Related entity IDs: vessel call, booking, container, B/L, etc. */
   reference_ids: string[]
-  /** Parsed message content — structure varies by message type */
+  /** Parsed message content, structure varies by message type */
   payload: Record<string, unknown>
   /** Processing status within the terminal system */
   processing_status: 'received' | 'validated' | 'applied' | 'rejected' | 'acknowledged'
@@ -1082,7 +1082,7 @@ export class EventHandlerRegistry {
 
 ### Time advance strategies
 
-**Event-driven** — jump simulation time directly to the next event's scheduled time. No idle ticks. Best for fast-forward / non-visual simulations.
+**Event-driven**, jump simulation time directly to the next event's scheduled time. No idle ticks. Best for fast-forward / non-visual simulations.
 
 ```ts
 export function processNextEventDriven(
@@ -1099,7 +1099,7 @@ export function processNextEventDriven(
 }
 ```
 
-**Fixed-tick** — advance time in small fixed increments, processing any events whose time has passed. Best for visual simulations (Three.js render loop).
+**Fixed-tick**, advance time in small fixed increments, processing any events whose time has passed. Best for visual simulations (Three.js render loop).
 
 ```ts
 export function processFixedTick(

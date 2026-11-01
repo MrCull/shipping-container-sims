@@ -1,6 +1,6 @@
 /**
  * STS productivity from a saved event log: `pnpm run tt:sts <events.jsonl> [--until <seconds>]`.
- * Make the log with `pnpm run tt:run --preset "TTI Algeciras — peak day" --until time:7200 --events /tmp/peak.jsonl`.
+ * Make the log with `pnpm run tt:run --preset "TTI Algeciras, peak day" --until time:7200 --events /tmp/peak.jsonl`.
  * Prints each crane's time per bucket (see `engine/stsProductivity.ts`) from its first work package to `--until`
  * (default: the last event).
  */

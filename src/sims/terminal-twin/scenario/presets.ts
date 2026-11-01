@@ -1,17 +1,20 @@
 /**
- * Scenario presets (TT-15): TTI Algeciras baseline, Small automated, TTI Algeciras — peak day.
+ * Scenario presets (TT-15): TTI Algeciras baseline, Small automated, TTI Algeciras, peak day.
  * Every value is overridable in the setup dialog. The layout is derived from the
  * counts (`scenario/layout.ts`), not placed by hand.
  */
+import { NORMAL_ARRIVAL_FILL } from './robBays'
 import { DEFAULT_HOURLY_PROFILE, ScenarioBuilder } from './builder'
 import { deriveBlockXs, deriveSts } from './layout'
 import { TTI_FLOW_MIX, generateVessels } from './vesselGenerator'
-import type { AppointmentConfig, FlowMix, HoldingConfig, PortRotation, ScenarioConfig, VesselConfig, YardStartConfig } from './types'
+import type { AccessRoadConfig, AppointmentConfig, EmptyPoolConfig, FlowMix, HoldingConfig, PortRotation, ScenarioConfig, VesselConfig, YardStartConfig } from './types'
 import {
   PEAK_DAY_FLOW_MIX,
   PEAK_DAY_PRESET_NAME,
   PEAK_DAY_ROB,
   PEAK_DAY_ROTATION,
+  TTI_ACCESS_ROAD_RUNUP_M,
+  TTI_ACCESS_ROAD_Z,
   TTI_BAYS,
   TTI_BLOCKS,
   TTI_PRESET_NAME,
@@ -42,13 +45,20 @@ interface TerminalSpec {
   /** Truck appointment windows (TT-R15); absent = Poisson arrivals. */
   appointments?: AppointmentConfig
   holding?: HoldingConfig
+  /** The terminal's access road and teardrop loop (#146); absent = the generic landside layout. */
+  accessRoad?: AccessRoadConfig
   /** Reefers (R19): share of full boxes and the powered rows of every block; absent = none. */
   reefers?: { share: number; poweredRows: number[] }
   /** Port rotation of the service (spec #106): sets POL and POD; absent = the generic default rotation. */
   portRotation?: PortRotation
   /** ROB bays (spec #106): share of each vessel's bays held back as remain-on-board and their fill level; absent = none. */
   rob?: { bayFraction: number; fill: number }
+  /** Empty pool (#149): the starting stock of empties. */
+  emptyPool?: EmptyPoolConfig
 }
+
+/** TTI's access road (#146): the Isla Verde carriageway, entered `TTI_ACCESS_ROAD_RUNUP_M` south of the quay's end. */
+const ttiAccessRoad = (quayM: number): AccessRoadConfig => ({ z: TTI_ACCESS_ROAD_Z, fromX: quayM + TTI_ACCESS_ROAD_RUNUP_M })
 
 function terminal(spec: TerminalSpec): ScenarioConfig {
   const b = new ScenarioBuilder(spec.name, spec.description)
@@ -62,7 +72,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
     .shcs(spec.shc)
     // TT-R12: queue areas near every STS and every block's pads, and chained dispatch. Capacities are assumptions [unverified].
     .queueAreas({ stsCapacity: 3, blockCapacity: 3 })
-    .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' } } })
+    .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' }, wtpPadSelection: { strategy: 'nearest-box' } } })
     .ascsPerBlock(2)
     .cargo(spec.reefers ? { reeferShare: spec.reefers.share } : {})
     .yardStart(spec.yardStart)
@@ -71,16 +81,28 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
       gate: { inLanes: spec.gate.inLanes, outLanes: spec.gate.outLanes, oogLane: true },
       ...(spec.appointments ? { appointments: spec.appointments } : {}),
       ...(spec.holding ? { holding: spec.holding } : {}),
+      ...(spec.accessRoad ? { accessRoad: spec.accessRoad, teardropLoop: true } : {}),
     })
     .endWhen({ vesselsCompleted: spec.vessels.length })
   if (spec.portRotation) b.containerProps({ portRotation: spec.portRotation })
+  b.arrivalFill(NORMAL_ARRIVAL_FILL)
   if (spec.rob) b.robBays(spec.rob.bayFraction, spec.rob.fill)
+  if (spec.emptyPool) b.emptyPool(spec.emptyPool)
   const base = b.build()
   const sts = deriveSts({ ...base, sts: [{ id: `STS${spec.stsFirst}`, gantryX: 0, groundPositions: 3 }] }, spec.sts, spec.quayM)
   for (const s of sts) b.sts(s.id, { gantryX: s.gantryX, groundPositions: s.groundPositions })
   deriveBlockXs(spec.quayM, spec.blocks).forEach((x, i) => b.block(`B${String(i + 1).padStart(2, '0')}`, { x, bays: spec.bays, tiers: spec.tiers, ...(spec.reefers ? { poweredRows: spec.reefers.poweredRows } : {}) }))
   return b.build()
 }
+
+/**
+ * Moves scale of the TTI presets (#165): a Feedermax then discharges about 30 and a Neo-Panamax about 120 (it was
+ * 0.05: 14 and 65). Full size (1) and the ticket's floor (0.5) both fail the headless criterion: the baseline does not
+ * reach its end condition within 10 minutes of wall time at 0.15 and above (see the sim guide, "Volumes"), because the
+ * yard side of this model moves only about 35 boxes an hour once the first blocks hold the loads. 0.1 completes in
+ * about 40 s. Raise it again when that throughput limit is fixed.
+ */
+export const TTI_MOVES_SCALE = 0.1
 
 /** Vessel calls for a TTI-style hub: ~85% transshipment, a spread of sizes. */
 function hubVessels(count: number, intervalS: number, jitterS: number, movesScale: number, seed: number, flowMix: FlowMix = TTI_FLOW_MIX): VesselConfig[] {
@@ -114,10 +136,13 @@ export const presets: Record<string, () => ScenarioConfig> = {
       tiers: TTI_TIERS,
       shc: 23,
       gate: { inLanes: 3, outLanes: 3 },
-      vessels: hubVessels(4, 3 * 3600, 900, 0.05, 11),
-      yardStart: { mode: 'prefilled', targetPct: 60 },
+      vessels: hubVessels(4, 3 * 3600, 900, TTI_MOVES_SCALE, 11),
+      // #149: a hub yard holds mostly transshipment boxes waiting for their onward vessel, a minority of imports, and an empty depot
+      yardStart: { mode: 'prefilled', targetPct: 60, mix: { import: 25, export: 10, transshipment: 65 } },
       truckScale: 1,
+      accessRoad: ttiAccessRoad(850),
       reefers: TTI_REEFERS,
+      emptyPool: { count: 1200, maxAgeS: 7 * 86400 },
     }),
   [SMALL_PRESET_NAME]: () =>
     terminal({
@@ -145,9 +170,9 @@ export const presets: Record<string, () => ScenarioConfig> = {
       yardStart: { mode: 'prefilled', targetPct: 60 },
       truckScale: 0.4,
     }),
-  'TTI Algeciras — peak day': () =>
+  'TTI Algeciras, peak day': () =>
     terminal({
-      name: 'TTI Algeciras — peak day',
+      name: 'TTI Algeciras, peak day',
       description:
         'TTI layout; 5 vessels arrive within 40 minutes; heavy truck peak (about 3x the default profile); Asia-Mediterranean port rotation, ~89% transshipment and 30% of each vessel kept as remain-on-board bays (all unverified assumptions)',
       seed: 99,
@@ -159,16 +184,18 @@ export const presets: Record<string, () => ScenarioConfig> = {
       tiers: TTI_TIERS,
       shc: 23,
       gate: { inLanes: 3, outLanes: 3 },
-      vessels: hubVessels(5, 600, 300, 0.05, 21, PEAK_DAY_FLOW_MIX),
-      yardStart: { mode: 'prefilled', targetPct: 75 },
+      vessels: hubVessels(5, 600, 300, TTI_MOVES_SCALE, 21, PEAK_DAY_FLOW_MIX),
+      yardStart: { mode: 'prefilled', targetPct: 75, mix: { import: 15, export: 8, transshipment: 77 } },
       truckScale: 3,
       // Peak day: appointments bunched into the first two hours (x1.5, 4 windows). [A] unverified: TTI's real window
       // length, caps and peak shape are not public; the cap itself comes from the gate and stall counts.
       appointments: { windowS: 1800, bunching: [{ fromS: 0, toS: 7200, factor: 1.5 }], unverified: true },
       // [A] unverified: TTI's real number of holding positions is not public.
       holding: { positions: 6, unverified: true },
+      accessRoad: ttiAccessRoad(850),
       reefers: TTI_REEFERS,
       portRotation: PEAK_DAY_ROTATION,
       rob: PEAK_DAY_ROB,
+      emptyPool: { count: 1500, maxAgeS: 7 * 86400 },
     }),
 }

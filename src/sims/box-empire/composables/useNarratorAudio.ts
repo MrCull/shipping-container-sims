@@ -1,14 +1,17 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Narrator audio playback
+// Box Empire, Narrator audio playback
 //
 // Manages a single HTMLAudioElement for narrator voiceover clips.
 // All MP3s are pre-imported at build time so Vite bundles them correctly.
 // ---------------------------------------------------------------------------
 
-import { ref, onBeforeUnmount } from 'vue'
-import { useAudioStore } from '@/stores/audio'
+import { ref, onBeforeUnmount, type WatchStopHandle } from 'vue'
+import { followMasterGain, useAudioStore } from '@/stores/audio'
 
-// Static imports — Vite resolves these at build time
+/** The narrator's own gain at full master volume. */
+const NARRATOR_VOLUME = 0.94
+
+// Static imports, Vite resolves these at build time
 import n01_01 from '../assets/sounds/narrator/01_01_vx_narrator_intro_welcome_manager.mp3'
 import n01_02 from '../assets/sounds/narrator/01_02_vx_narrator_intro_old_terminal_state.mp3'
 import n01_03 from '../assets/sounds/narrator/01_03_vx_narrator_intro_family_inheritance.mp3'
@@ -46,6 +49,7 @@ const NARRATOR_URLS: Record<string, string> = {
 export function useNarratorAudio() {
   const audioStore = useAudioStore()
   let currentAudio: HTMLAudioElement | null = null
+  let stopFollow: WatchStopHandle | null = null
 
   // Reactive progress for the optional progress bar (0–1)
   const progress = ref(0)
@@ -77,6 +81,8 @@ export function useNarratorAudio() {
   function stopCurrent(): void {
     stopProgress()
     endedCallback = null
+    stopFollow?.()
+    stopFollow = null
     if (currentAudio) {
       currentAudio.pause()
       currentAudio.currentTime = 0
@@ -105,18 +111,19 @@ export function useNarratorAudio() {
     stopCurrent()
     const url = NARRATOR_URLS[audioFile]
     if (!url) {
-      // No audio — treat as instant "ended" so auto-advance still works
+      // No audio, treat as instant "ended" so auto-advance still works
       if (onEnded) setTimeout(onEnded, 800)
       return
     }
 
-    // Treat narrator as SFX — when muted, don't auto-advance; require manual next
+    // Treat narrator as SFX, when muted, don't auto-advance; require manual next
     if (audioStore.sfxMuted) {
       return
     }
 
     const audio = new Audio(url)
-    audio.volume = 0.94
+    // Follows the master volume while the clip plays.
+    stopFollow = followMasterGain(audio, NARRATOR_VOLUME)
     currentAudio = audio
     // Store callback even if muted, so user can manually skip via next button
     endedCallback = onEnded ?? null
@@ -126,7 +133,7 @@ export function useNarratorAudio() {
     })
 
     audio.play().catch(() => {
-      // Browser blocked autoplay — fire ended after a short delay so
+      // Browser blocked autoplay, fire ended after a short delay so
       // auto-advance still works even without sound
       if (endedCallback) setTimeout(endedCallback, 1200)
     })

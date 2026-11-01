@@ -3,10 +3,10 @@
   "seed": 7,
   "status": "ended",
   "endReason": "vesselsCompleted >= 2",
-  "eventLogHash": "1ff53716c05761",
+  "eventLogHash": "1b8437e48392bd",
   "kpis": {
-    "simTimeS": 4282.239,
-    "eventsProcessed": 240,
+    "simTimeS": 4387.106,
+    "eventsProcessed": 235,
     "movesCompleted": 24,
     "vesselsCompleted": 2,
     "sts": {
@@ -14,14 +14,14 @@
         "moves": 12,
         "cycles": 10,
         "twinLifts": 2,
-        "grossMovesPerHour": 14.105,
+        "grossMovesPerHour": 13.638,
         "railWaitS": 0
       },
       "STS02": {
         "moves": 12,
         "cycles": 9,
         "twinLifts": 3,
-        "grossMovesPerHour": 15.084,
+        "grossMovesPerHour": 14.39,
         "railWaitS": 0
       }
     },
@@ -32,8 +32,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 600,
-        "departedAtS": 2135.927,
-        "turnaroundS": 1535.927,
+        "departedAtS": 2260.678,
+        "turnaroundS": 1660.678,
         "sts": [
           "STS01",
           "STS02"
@@ -42,11 +42,11 @@
       "V002": {
         "sizeClass": "panamax",
         "arrivedAtS": 300,
-        "anchorageWaitS": 1835.927,
+        "anchorageWaitS": 1960.678,
         "berthX": 0,
-        "berthedAtS": 2735.927,
-        "departedAtS": 4282.239,
-        "turnaroundS": 1546.312,
+        "berthedAtS": 2860.678,
+        "departedAtS": 4387.106,
+        "turnaroundS": 1526.428,
         "sts": [
           "STS01",
           "STS02"
@@ -56,9 +56,9 @@
     "quay": {
       "vesselsWaited": 1,
       "anchorageWaitS": {
-        "total": 1835.927,
-        "mean": 917.964,
-        "max": 1835.927
+        "total": 1960.678,
+        "mean": 980.339,
+        "max": 1960.678
       }
     },
     "handlers": {
@@ -127,9 +127,9 @@
       },
       "workPackageRelease": {
         "handler": "strategy:keep-k-ahead",
-        "calls": 23,
-        "resolved": 23,
-        "ok": 23,
+        "calls": 22,
+        "resolved": 22,
+        "ok": 22,
         "fallbacks": 0,
         "timeouts": 0,
         "errors": 0,
@@ -151,22 +151,22 @@
       "IMPORT": {
         "count": 21,
         "departed": 0,
-        "meanS": 2145.693,
-        "maxS": 3596.485
+        "meanS": 2134.626,
+        "maxS": 3606.845
       },
       "STORAGE": {
         "count": 3,
         "departed": 0,
-        "meanS": 2520.996,
-        "maxS": 3559.254
+        "meanS": 2726.176,
+        "maxS": 3696.953
       }
     },
     "workPackages": {
-      "released": 19,
-      "started": 19,
-      "completed": 19,
-      "leadTimeMeanS": 250.61,
-      "leadTimeMaxS": 396.895,
+      "released": 18,
+      "started": 18,
+      "completed": 18,
+      "leadTimeMeanS": 275.738,
+      "leadTimeMaxS": 513.792,
       "boxesLoaded": 0
     },
     "ordering": {
@@ -183,7 +183,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 239,
+    "checks": 234,
     "violations": 0,
     "first": null
   },

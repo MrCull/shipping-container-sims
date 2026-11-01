@@ -11,6 +11,7 @@ const base: VesselStatusInput = {
   berthAllocatedS: null,
   berthedS: null,
   departedS: null,
+  firstMoveS: null,
   mooringS: 1800,
   moves: { total: 40, done: 0 },
   perSts: [],
@@ -52,8 +53,18 @@ describe('buildVesselStatus', () => {
     expect(buildVesselStatus(input, 2500).countdownS).toBe(0)
   })
 
+  it('berthed with no move yet: the label stays, no countdown (starting soon)', () => {
+    const input = { ...base, status: 'berthed' as const, berthAllocatedS: 100, berthedS: 1900, moves: { total: 40, done: 0 } }
+    const s = buildVesselStatus(input, 2000)
+    expect(s.phase).toBe('berthed')
+    expect(s.countdownS).toBeNull()
+    expect(s.label).toEqual({ phase: 'berthed', countdownS: null })
+    // a first move still in the future does not hide it either
+    expect(buildVesselStatus({ ...input, firstMoveS: 2100 }, 2000).label?.phase).toBe('berthed')
+  })
+
   it('working: the actual berth time is the operations start, no label, no countdown', () => {
-    const s = buildVesselStatus({ ...base, status: 'berthed', berthAllocatedS: 100, berthedS: 1900, moves: { total: 40, done: 10 } }, 2000)
+    const s = buildVesselStatus({ ...base, status: 'berthed', berthAllocatedS: 100, berthedS: 1900, firstMoveS: 1950, moves: { total: 40, done: 10 } }, 2000)
     expect(s.phase).toBe('working')
     expect(s.opsStartS).toBe(1900)
     expect(s.opsStartEstimated).toBe(false)

@@ -124,5 +124,14 @@ export function groupedSlot(req: YardAllocationRequest): YardAllocationReply {
     }
     return c.distanceM + TIER_COST_M * (c.tier - 1) + pairingCost(req, c) + poweredRowCost(req, c) + group
   }
-  return { slotId: cheapest(candidateSlots(req), cost)?.slotId ?? null }
+  const sameGroup = (c: YardCandidate): boolean => {
+    if (c.tier === 1) return true
+    for (let k = 0; k < c.span; k++) {
+      const below = tops[(c.bay + k - 1) * req.rows + (c.row - 1)]
+      if (below && yardGroupKey(below) !== key) return false
+    }
+    return true
+  }
+  const candidates = candidateSlots(req)
+  return { slotId: cheapest(req.sameGroupOnly ? candidates.filter(sameGroup) : candidates, cost)?.slotId ?? null }
 }

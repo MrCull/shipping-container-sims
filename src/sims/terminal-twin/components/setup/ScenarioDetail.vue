@@ -2,22 +2,46 @@
 import { computed } from 'vue'
 import { t } from '../../i18n/messages'
 import { useSetupDraft } from '../../composables/useSetupDraft'
-import { useTwinStore } from '../../store/twinStore'
+import { resolveScenario, useTwinStore } from '../../store/twinStore'
 import { terminalPresetInfo } from '../../terminals'
-import { presetCopy } from '../../modules/scenarioPicker'
+import { layoutSketch, pickerModel, scenarioDisplayName, scenarioDurationS, scenarioStats, statChips } from '../../modules/scenarioPicker'
+import LayoutSketchView from './LayoutSketch.vue'
 
-/** Detail panel of the selected scenario (TT-R04): description, key figures and the one prominent Start button. */
-defineProps<{ error: string | null }>()
+/**
+ * Detail pane of the selected scenario or test bench (start screen, #145): plain name, what it shows and what to
+ * watch for, the layout sketch, stat chips, size of the run and the set-up facts. Start sits in the setup dialog's pinned
+ * footer (#161). No technical id is shown (#156): it stays in `data-scenario` on the pane.
+ */
 
 const d = useSetupDraft()
 const store = useTwinStore()
 
+const item = computed(() => {
+  const model = pickerModel(d.catalogue)
+  return [...model.scenarios, ...model.benches.flatMap((g) => g.items)].find((i) => i.id === d.name) ?? null
+})
+const isBench = computed(() => item.value?.section === 'benches')
+
 /** The preset's bay count comes from a published capacity, not a layout drawing: say so. */
 const derivedBaysNote = computed(() => terminalPresetInfo(d.name)?.derivedBays === true)
 
-const description = computed(() => {
-  const copy = presetCopy(d.name)
-  return copy ? t(copy.description) : (d.selected?.description ?? '')
+/** The chosen scenario as shipped (not as edited): its sketch, chips and run length. */
+const base = computed(() => {
+  try {
+    return resolveScenario(d.name)
+  } catch {
+    return null
+  }
+})
+const sketch = computed(() => (base.value ? layoutSketch(base.value) : null))
+const chips = computed(() => (base.value ? statChips(scenarioStats(base.value)).map((chip) => ({ id: chip.id, label: t(chip.key, { value: chip.value }) })) : []))
+const size = computed(() => {
+  const config = base.value
+  if (!config) return ''
+  const duration = store.fmt.duration(scenarioDurationS(config))
+  return config.vessels.length === 1
+    ? t('setup.detail.sizeValueOne', { duration })
+    : t('setup.detail.sizeValue', { vessels: config.vessels.length, duration })
 })
 
 /** Key figures of the scenario as edited, in the chosen units (the config itself stays SI). */
@@ -45,23 +69,71 @@ const summary = computed(() => {
   <section
     class="detail"
     data-testid="tt-scenario-detail"
+    :data-scenario="d.name"
     :aria-label="t('setup.detail.title')"
   >
-    <div class="head">
-      <h3 data-testid="tt-detail-name">
-        {{ d.name }}
-      </h3>
-      <button
-        type="submit"
-        class="start"
-        :disabled="store.loading || d.check.errors.length > 0"
-      >
-        {{ store.loading ? t('setup.starting') : t('setup.startButton') }}
-      </button>
-    </div>
-    <p class="hint">
-      {{ description }}
+    <span class="kind">{{ isBench ? t('setup.kind.bench') : t('setup.kind.scenario') }}</span>
+    <h3 data-testid="tt-detail-name">
+      {{ item?.name ?? scenarioDisplayName(d.name) }}
+    </h3>
+    <p
+      v-if="item?.summary"
+      class="lead"
+    >
+      {{ item.summary }}
     </p>
+
+    <LayoutSketchView
+      v-if="sketch"
+      :sketch="sketch"
+    />
+    <ul
+      v-if="chips.length"
+      class="chips"
+    >
+      <li
+        v-for="chip in chips"
+        :key="chip.id"
+        class="chip"
+        :data-testid="`tt-chip-${chip.id}`"
+      >
+        {{ chip.label }}
+      </li>
+    </ul>
+
+    <section class="block">
+      <h4>{{ t('setup.detail.shows') }}</h4>
+      <p
+        class="text"
+        data-testid="tt-detail-description"
+      >
+        {{ item?.description ?? d.selected?.description ?? '' }}
+      </p>
+    </section>
+    <section
+      v-if="item?.watch"
+      class="block"
+    >
+      <h4>{{ t('setup.detail.watch') }}</h4>
+      <p
+        class="text"
+        data-testid="tt-detail-watch"
+      >
+        {{ item.watch }}
+      </p>
+    </section>
+    <section
+      v-if="size"
+      class="block"
+    >
+      <h4>{{ t('setup.detail.size') }}</h4>
+      <p
+        class="text"
+        data-testid="tt-detail-size"
+      >
+        {{ size }}
+      </p>
+    </section>
     <p
       v-if="derivedBaysNote"
       class="hint"
@@ -69,29 +141,29 @@ const summary = computed(() => {
     >
       {{ t('setup.preset.baysAssumption') }}
     </p>
-    <dl
+
+    <section
       v-if="summary.length"
-      class="summary"
-      :aria-label="t('setup.summary')"
-      data-testid="tt-setup-summary"
+      class="block"
     >
-      <div
-        v-for="item in summary"
-        :key="item.testid"
-        class="summary-item"
+      <h4>{{ t('setup.detail.facts') }}</h4>
+      <dl
+        class="summary"
+        :aria-label="t('setup.summary')"
+        data-testid="tt-setup-summary"
       >
-        <dt>{{ item.label }}</dt>
-        <dd :data-testid="`tt-summary-${item.testid}`">
-          {{ item.value }}
-        </dd>
-      </div>
-    </dl>
-    <p
-      v-if="error || store.error"
-      class="error"
-    >
-      {{ error ?? store.error }}
-    </p>
+        <div
+          v-for="entry in summary"
+          :key="entry.testid"
+          class="summary-item"
+        >
+          <dt>{{ entry.label }}</dt>
+          <dd :data-testid="`tt-summary-${entry.testid}`">
+            {{ entry.value }}
+          </dd>
+        </div>
+      </dl>
+    </section>
   </section>
 </template>
 
@@ -101,46 +173,67 @@ const summary = computed(() => {
 .detail {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.8rem 1rem;
-  border: 1px solid var(--tt-accent);
-  border-radius: 10px;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
   background: var(--tt-surface);
-  /* The one Start action stays in view while the long form scrolls under it. */
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  box-shadow: var(--tt-shadow);
 }
 
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+/* The pane may scroll on its own (wide Scenario tab): its parts keep their size. */
+.detail > * {
+  flex: none;
+}
+
+.kind {
+  color: var(--tt-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 h3 {
-  font-size: 1.05rem;
+  font-size: 1.25rem;
   font-weight: 700;
+  line-height: 1.25;
 }
 
-.start {
-  padding: 0.65rem 2.2rem;
-  background: var(--tt-accent);
-  border: 1px solid var(--tt-accent);
-  border-radius: var(--tt-radius);
-  color: var(--tt-on-accent);
-  font-size: 1rem;
+h4 {
+  margin-bottom: 0.2rem;
+  color: var(--tt-text-muted);
+  font-size: 0.72rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.start:hover:not(:disabled) {
-  background: var(--tt-accent-hover);
+.lead {
+  font-weight: 600;
+  line-height: 1.45;
 }
 
-.start:disabled {
-  opacity: 0.5;
+.text {
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.chip {
+  padding: 0.1rem 0.6rem;
+  background: var(--tt-accent-soft);
+  border-radius: 999px;
+  color: var(--tt-accent);
+  font-size: 0.78rem;
 }
 
 .summary {
@@ -167,8 +260,4 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
-.error {
-  color: var(--tt-danger);
-  font-size: 0.85rem;
-}
 </style>

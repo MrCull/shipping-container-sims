@@ -1,12 +1,12 @@
 /**
- * Spec #116 / #126: vessel status popup and floating countdown label. "TTI Algeciras — peak day" (V001 arrives at
+ * Spec #116 / #126: vessel status popup and floating countdown label. "TTI Algeciras, peak day" (V001 arrives at
  * 08:00 and moors for 30 min; V002 arrives 767 s later; V003 at 1,284 s finds no berth and waits). Driven through
  * `window.__tt` (select, runTo, scene().vesselLabels). Run with `pnpm run test:smoke --project=dev --grep "vessel status"`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 
-const PEAK = 'TTI Algeciras — peak day'
+const PEAK = 'TTI Algeciras, peak day'
 
 async function open(page: Page): Promise<void> {
   const errors: string[] = []
@@ -52,8 +52,15 @@ test('vessel status: a mooring vessel counts down to 08:30 and a vessel at ancho
   await expect.poll(async () => (await labels(page)).map((l) => `${l.id}:${l.phase}`)).toEqual(['V001:mooring', 'V002:mooring', 'V003:waiting'])
   await page.screenshot({ path: '.screenshots/vessel-status.png' })
 
-  // operations start at 08:30 (1,800 s): V001's label disappears, its popup says Working
-  await page.evaluate(() => window.__tt!.runTo(1900))
+  // berthed at 08:30 (1,800 s) with no move yet: the label stays and says so (#141)
+  await page.evaluate(() => window.__tt!.runTo(1801))
+  await page.evaluate(() => window.__tt!.pause())
+  await select(page, 'V001')
+  await expect(page.getByTestId('tt-vessel-phase')).toHaveText('Berthed, starting soon')
+  await expect.poll(async () => (await labels(page)).map((l) => `${l.id}:${l.phase}`)).toContain('V001:berthed')
+
+  // from the first move on the label disappears and the popup says Working
+  await page.evaluate(() => window.__tt!.runTo(2400))
   await page.evaluate(() => window.__tt!.pause())
   await select(page, 'V001')
   await expect(page.getByTestId('tt-vessel-phase')).toHaveText('Working')

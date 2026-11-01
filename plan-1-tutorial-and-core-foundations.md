@@ -1,8 +1,8 @@
-# Box Empire — Plan 1: Tutorial and Core Simulation Foundations
+# Box Empire, Plan 1: Tutorial and Core Simulation Foundations
 
 > **Status:** Not started
-> **Dependencies:** None — this is the first plan
-> **Estimated scope:** Largest plan — establishes all foundational systems
+> **Dependencies:** None, this is the first plan
+> **Estimated scope:** Largest plan, establishes all foundational systems
 
 ---
 
@@ -14,18 +14,18 @@ This is the **most critical plan** because it creates nearly all foundational sy
 
 ---
 
-## Prerequisites — Read Before Implementing
+## Prerequisites, Read Before Implementing
 
-1. **AGENTS.md** — Project conventions, folder structure, linting rules
+1. **AGENTS.md**, Project conventions, folder structure, linting rules
 2. **Skill files** (see [Appendix A](#appendix-a-skill-file-reference)):
-   - `.ai/skills/adding-a-sim/SKILL.md` — Folder structure, `SimDefinition`, auto-discovery
-   - `.ai/skills/container-cargo-entities/SKILL.md` — Container interfaces, lifecycle states, colors
-   - `.ai/skills/vessel-entities/SKILL.md` — Vessel classes, bay-row-tier coordinates
-   - `.ai/skills/terminal-equipment-entities/SKILL.md` — Equipment four-lens model, state machines, specs
-   - `.ai/skills/terminal-infrastructure/SKILL.md` — Yard blocks, berth model, layout graph
-   - `.ai/skills/terminal-operations/SKILL.md` — Container flows, event types, crane cycle model
-   - `.ai/skills/terminal-economics/SKILL.md` — Handling charges, surcharges, storage fees
-   - `.ai/skills/threejs-vue3-animation/SKILL.md` — Four-layer architecture, InstancedMesh, scene conventions
+   - `.ai/skills/adding-a-sim/SKILL.md`, Folder structure, `SimDefinition`, auto-discovery
+   - `.ai/skills/container-cargo-entities/SKILL.md`, Container interfaces, lifecycle states, colors
+   - `.ai/skills/vessel-entities/SKILL.md`, Vessel classes, bay-row-tier coordinates
+   - `.ai/skills/terminal-equipment-entities/SKILL.md`, Equipment four-lens model, state machines, specs
+   - `.ai/skills/terminal-infrastructure/SKILL.md`, Yard blocks, berth model, layout graph
+   - `.ai/skills/terminal-operations/SKILL.md`, Container flows, event types, crane cycle model
+   - `.ai/skills/terminal-economics/SKILL.md`, Handling charges, surcharges, storage fees
+   - `.ai/skills/threejs-vue3-animation/SKILL.md`, Four-layer architecture, InstancedMesh, scene conventions
 3. **Knowledge base files** (see [Appendix B](#appendix-b-knowledge-base-reference))
 
 ---
@@ -60,20 +60,20 @@ This is the **most critical plan** because it creates nearly all foundational sy
 
 ### Four-Layer Architecture
 
-From the `threejs-vue3-animation` skill — all Box Empire code follows this pattern:
+From the `threejs-vue3-animation` skill, all Box Empire code follows this pattern:
 
 | Layer | Responsibility | Technologies |
 |-------|---------------|--------------|
-| **1 — Domain Model** | Pure TypeScript simulation logic. Containers, equipment, jobs, vessels. No Three.js imports. Driven by simulation tick. | TypeScript modules in `modules/` |
-| **2 — Application State** | Pinia store bridging domain logic and rendering. Holds entity positions, animation targets, UI state. | Pinia store in `store/gameStore.ts` |
-| **3 — Scene Adapter** | Composables that translate Pinia state into Three.js objects. Watchers react to state changes and update meshes. | Composables in `composables/` |
-| **4 — Render Loop** | 60fps `requestAnimationFrame` loop, decoupled from simulation tick. Interpolates between simulation states for smooth visuals. | `useGameLoop.ts` composable |
+| **1, Domain Model** | Pure TypeScript simulation logic. Containers, equipment, jobs, vessels. No Three.js imports. Driven by simulation tick. | TypeScript modules in `modules/` |
+| **2, Application State** | Pinia store bridging domain logic and rendering. Holds entity positions, animation targets, UI state. | Pinia store in `store/gameStore.ts` |
+| **3, Scene Adapter** | Composables that translate Pinia state into Three.js objects. Watchers react to state changes and update meshes. | Composables in `composables/` |
+| **4, Render Loop** | 60fps `requestAnimationFrame` loop, decoupled from simulation tick. Interpolates between simulation states for smooth visuals. | `useGameLoop.ts` composable |
 
 ### Coordinate System
 
 - **1 unit = 1 meter**
 - **X axis**: Along the quay (East–West)
-- **Z axis**: Perpendicular to quay — negative toward water, positive toward yard
+- **Z axis**: Perpendicular to quay, negative toward water, positive toward yard
 - **Y axis**: Up (height)
 - **Quay line**: Z = 0
 - **Water**: Z < 0
@@ -126,7 +126,7 @@ interface Job {
 3. Track job progress as equipment executes
 4. Handle job cancellation and reassignment
 
-**Manual override behavior** (critical — design this correctly from the start):
+**Manual override behavior** (critical, design this correctly from the start):
 1. Cancel any job currently involving that container
 2. Create a new job for the manual destination
 3. Recalculate any dependent jobs (e.g., if the container was next in a load sequence, find a replacement)
@@ -170,9 +170,9 @@ interface PathEdge {
 ```
 
 For the tutorial, the graph is simple:
-- **Gate node** — where trucks arrive/depart
-- **Yard I/O node** — where trucks stop for reach stacker service
-- **Quay buffer node** — where mobile harbor crane places/picks containers
+- **Gate node**, where trucks arrive/depart
+- **Yard I/O node**, where trucks stop for reach stacker service
+- **Quay buffer node**, where mobile harbor crane places/picks containers
 - Connecting edges with appropriate distances
 
 Equipment uses Dijkstra or A* to find the shortest path, then follows the path at the edge speed limit.
@@ -274,9 +274,9 @@ interface YardSlot {
 }
 ```
 
-**Slot assignment strategy:** First-available — find the lowest tier in the first available bay.
+**Slot assignment strategy:** First-available, find the lowest tier in the first available bay.
 
-**Yard slot coordinate format:** `(blockId, bay, row, tier)` — this format is consistent through all plans.
+**Yard slot coordinate format:** `(blockId, bay, row, tier)`, this format is consistent through all plans.
 
 ### 8. Economy
 
@@ -335,7 +335,7 @@ function onEvent(eventType: string, handler: (payload: unknown) => void): void
 
 ### Reach Stacker
 
-From `terminal-equipment-entities` skill — simplified for tutorial:
+From `terminal-equipment-entities` skill, simplified for tutorial:
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
@@ -417,8 +417,8 @@ A small, slow quayside crane for the tutorial (not a full STS gantry crane):
 
 | Modal | Trigger |
 |-------|---------|
-| Start Screen | Game launch — "Start Tutorial" button |
-| Tutorial Complete | All 10 containers processed — celebration with star rating and stats |
+| Start Screen | Game launch, "Start Tutorial" button |
+| Tutorial Complete | All 10 containers processed, celebration with star rating and stats |
 
 ---
 
@@ -461,11 +461,11 @@ interface BoxEmpireState {
 ```
 
 **Derived state (computed):**
-- `activeJobs` — Jobs with status `'assigned'` or `'in_progress'`
-- `pendingJobs` — Jobs with status `'pending'`
-- `yardOccupancy` — Percentage of yard slots filled
-- `equipmentStatus` — Map of equipment ID to current state
-- `currentTutorialPrompt` — Text for current tutorial step
+- `activeJobs`, Jobs with status `'assigned'` or `'in_progress'`
+- `pendingJobs`, Jobs with status `'pending'`
+- `yardOccupancy`, Percentage of yard slots filled
+- `equipmentStatus`, Map of equipment ID to current state
+- `currentTutorialPrompt`, Text for current tutorial step
 
 ---
 
@@ -485,7 +485,7 @@ interface TutorialStep {
 | # | Prompt | Condition to Advance |
 |---|--------|---------------------|
 | 1 | "Welcome to Box Empire! You're the manager of this small container terminal." | Player clicks "Next" |
-| 2 | "This is your yard — containers are stored here in stacks." | Player clicks "Next" |
+| 2 | "This is your yard, containers are stored here in stacks." | Player clicks "Next" |
 | 3 | "Click 'Open Gatehouse' to allow trucks carrying export containers to enter." | `gatehouseOpen === true` |
 | 4 | "Trucks are arriving! Watch as the reach stacker unloads them into the yard." | All 5 export containers are `in_yard` |
 | 5 | "A vessel has been announced! It's approaching the berth with 5 import containers." | Vessel state is `arrived` |
@@ -499,8 +499,8 @@ interface TutorialStep {
 
 ```
 src/sims/box-empire/
-├── BoxEmpire.vue                    # Root component (exists — needs implementation)
-├── definition.ts                     # Sim metadata (exists — update status to 'playable')
+├── BoxEmpire.vue                    # Root component (exists, needs implementation)
+├── definition.ts                     # Sim metadata (exists, update status to 'playable')
 ├── box-empire-AGENTS.md              # Sim-specific agent guidance (create)
 ├── components/
 │   ├── GameCanvas.vue                # 3D viewport wrapper
@@ -566,26 +566,26 @@ src/sims/box-empire/
 
 Build the simulation logic first, then visuals:
 
-### Phase A — Types and Config
+### Phase A, Types and Config
 1. Define all TypeScript interfaces in `types/index.ts`
 2. Set up constants in `modules/config.ts` (dimensions, speeds, cycle times, tutorial scenario data)
 
-### Phase B — Core Simulation Logic (No Rendering)
+### Phase B, Core Simulation Logic (No Rendering)
 3. Implement `modules/pathfinding.ts` and `modules/terminalMap.ts`
 4. Implement `modules/yardManager.ts` (slot assignment, occupancy)
-5. Implement `modules/jobScheduler.ts` (the hardest module — job queue, assignment, cancellation, recalculation)
+5. Implement `modules/jobScheduler.ts` (the hardest module, job queue, assignment, cancellation, recalculation)
 6. Implement `modules/equipmentController.ts` (state machine, movement along paths)
 7. Implement `modules/vesselManager.ts` (vessel visit lifecycle)
 8. Implement `modules/truckManager.ts` (truck gate flow)
 9. Implement `modules/economy.ts` (balance, transactions)
 
-### Phase C — Pinia Store
+### Phase C, Pinia Store
 10. Implement `store/gameStore.ts` with full state, actions, and computed properties
 
-### Phase D — Game Loop
+### Phase D, Game Loop
 11. Implement `composables/useGameLoop.ts` (fixed-step tick + RAF render loop)
 
-### Phase E — Rendering
+### Phase E, Rendering
 12. Implement `modules/sceneBuilder.ts` (ground plane, water, lighting, quay)
 13. Implement `modules/containerRenderer.ts` (InstancedMesh for containers)
 14. Implement `modules/equipmentRenderer.ts` (reach stacker mesh)
@@ -593,7 +593,7 @@ Build the simulation logic first, then visuals:
 16. Implement `modules/truckRenderer.ts` (truck meshes)
 17. Implement `composables/useThreeScene.ts` (wire renderers to Pinia watchers)
 
-### Phase F — UI Components
+### Phase F, UI Components
 18. Implement `components/GameCanvas.vue` (canvas wrapper)
 19. Implement `components/TopBar.vue`, `components/ui/MoneyDisplay.vue`, `components/ui/TimeControls.vue`
 20. Implement `components/EventFeed.vue`
@@ -602,18 +602,18 @@ Build the simulation logic first, then visuals:
 23. Implement `composables/useInput.ts` (click/hover raycasting)
 24. Implement `components/ContainerInfo.vue`, `components/EquipmentInfo.vue`
 
-### Phase G — Audio
+### Phase G, Audio
 25. Implement `composables/useAudio.ts`
 26. Copy sound files from `available-media/sound-samples/`
 
-### Phase H — Tutorial
+### Phase H, Tutorial
 27. Implement `modules/tutorial.ts` (step definitions, conditions, auto-actions)
 
-### Phase I — Integration and Wiring
+### Phase I, Integration and Wiring
 28. Wire everything together in `BoxEmpire.vue`
 29. Update `definition.ts` status to `'playable'`
 
-### Phase J — Polish and Test
+### Phase J, Polish and Test
 30. Test full tutorial flow end-to-end
 31. Test manual override (click container, reassign)
 32. Lint (`npm run lint`) and fix
@@ -626,13 +626,13 @@ Build the simulation logic first, then visuals:
 
 These decisions in Plan 1 affect all future plans. Get them right:
 
-1. **Container `size` field**: Define as `ContainerSize` type (`'20ft'`), not a string literal — Plan 3 adds `'40ft'`
-2. **Equipment base interface**: Use a polymorphic `Equipment` type with `equipmentType` discriminator — Plan 3 adds RMG, Plan 4 adds STS
-3. **Yard slot model**: Use `(blockId, bay, row, tier)` addressing — Plan 3 needs double-bay for 40ft, Plan 4 needs reefer power flags
-4. **Job system**: Support priority levels and equipment capability checks from the start — Plan 5 needs these for multi-vessel contention
-5. **Economy transactions**: Use a generic `recordTransaction()` function — Plans 2–4 add new transaction types
-6. **Event bus**: Use string-based event types — easy to extend per plan
-7. **Terminal map**: Node-graph representation — Plans 2–5 add nodes for new yard blocks, gatehouses, berths
+1. **Container `size` field**: Define as `ContainerSize` type (`'20ft'`), not a string literal, Plan 3 adds `'40ft'`
+2. **Equipment base interface**: Use a polymorphic `Equipment` type with `equipmentType` discriminator, Plan 3 adds RMG, Plan 4 adds STS
+3. **Yard slot model**: Use `(blockId, bay, row, tier)` addressing, Plan 3 needs double-bay for 40ft, Plan 4 needs reefer power flags
+4. **Job system**: Support priority levels and equipment capability checks from the start, Plan 5 needs these for multi-vessel contention
+5. **Economy transactions**: Use a generic `recordTransaction()` function, Plans 2–4 add new transaction types
+6. **Event bus**: Use string-based event types, easy to extend per plan
+7. **Terminal map**: Node-graph representation, Plans 2–5 add nodes for new yard blocks, gatehouses, berths
 
 ---
 

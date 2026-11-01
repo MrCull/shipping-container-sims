@@ -191,10 +191,10 @@ function congestionMultiplier(occupancy: number): number {
 
 | Strategy        | Avg Rehandle Rate | Description                                          |
 |-----------------|-------------------|------------------------------------------------------|
-| Random          | ~0.80             | No logic — worst case baseline                       |
+| Random          | ~0.80             | No logic, worst case baseline                       |
 | FIFO            | ~0.60             | First-in-first-out ordering within bays              |
 | POD Grouping    | ~0.40             | Group by port of discharge                           |
-| Vessel Grouping | ~0.20             | Group by target vessel — strong for transshipment    |
+| Vessel Grouping | ~0.20             | Group by target vessel, strong for transshipment    |
 | Tier-Aware      | ~0.15             | Weight/departure priority placed on top tiers first  |
 
 ```ts
@@ -290,7 +290,7 @@ const LAYOUT_DEFAULTS: Record<LayoutArchetype, LayoutConfig> = {
     block_width_rows: 8,
     block_height_tiers: 5,
     inter_block_gap_m: 4,
-    truck_lane_width_m: 0,  // no truck lanes — ASC handles both sides
+    truck_lane_width_m: 0,  // no truck lanes, ASC handles both sides
     pass_lane_width_m: 18,
     equipment_type: 'ASC',
     automation_level: 'fully_auto',
@@ -848,7 +848,7 @@ function generateRoadNetwork(
   nodes.push({ node_id: 'GATE-OUT', type: 'gate',       x: 0,                     y: config.yard_depth_m,   capacity_veh: 20 })
   nodes.push({ node_id: 'YARD-ENT', type: 'yard_entry', x: config.quay_length_m / 2, y: config.yard_depth_m / 2, capacity_veh: 10 })
 
-  // Block I/O nodes — one per block
+  // Block I/O nodes, one per block
   blocks.forEach((block, i) => {
     const nodeId = `BLK-${block.block_id}`
     const y = 50 + i * (config.pass_lane_width_m + config.inter_block_gap_m)
@@ -872,7 +872,7 @@ function generateRoadNetwork(
     })
   })
 
-  // Quay crane buffer nodes — one per berth position
+  // Quay crane buffer nodes, one per berth position
   const berthSpacing = config.quay_length_m / 3
   for (let i = 0; i < 3; i++) {
     const nodeId = `QC-BUF-${i + 1}`

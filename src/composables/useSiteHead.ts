@@ -14,7 +14,7 @@ const SITE_NAME = 'Shipping Container Sims'
 const DEFAULT_TITLE = `${SITE_NAME} | Port & logistics browser games`
 const DEFAULT_DESCRIPTION =
   'Play free 3D shipping-container games in your browser: stack towers in Contenga, plan vessel stowage in ' +
-  'Stowage Master, and build a logistics empire in Box Empire. Stack, ship, and simulate — no install required.'
+  'Stowage Master, and build a logistics empire in Box Empire. Stack, ship, and simulate, no install required.'
 
 function ensureMeta(attr: 'name' | 'property', key: string): HTMLMetaElement {
   const selector = attr === 'name' ? `meta[name="${key}"]` : `meta[property="${key}"]`

@@ -9,18 +9,25 @@
  * Population, in placement order:
  * 1. export and transshipment-load boxes booked to the scenario's vessels (reverse load sequence);
  * 2. the empty pool (oldest first);
- * 3. import boxes awaiting truck pickup, until the target % of the yard's cells is reached. Each has a dwell
- *    that has already partly elapsed: `pickupReadyAt` = its dwell minus its age (> 0 unless the dwell is 0).
+ * 3. filler boxes until the target % of the yard's cells is reached: imports awaiting truck pickup and (with
+ *    `yardStart.mix`, #149) exports and transshipment boxes waiting for a vessel outside the scenario, in the mix's shares.
+ *    An import has a dwell that has already partly elapsed: `pickupReadyAt` = its dwell minus its age (> 0 unless the
+ *    dwell is 0).
  * The booked boxes are always placed, even when they exceed the target.
- * Boxes go to the block with the lowest fill (ties: first block) that has a legal slot.
+ * A box goes to the block with the lowest fill (ties: first block) that has a legal slot. Under the `grouped` strategy
+ * (#149) the pre-fill stacks like a terminal: every box carries its grouping properties, a box prefers the blocks that
+ * already hold its group (while they are under 90% full), never stands on another group, and the booked exports are
+ * placed group by group, heavy first.
  */
-import type { DecisionHandler, DecisionRequestMessage, YardAllocationRequest } from './decisions/types'
+import type { DecisionHandler, DecisionRequestMessage, YardAllocationRequest, YardBoxView } from './decisions/types'
 import { getStrategy, strategies } from './decisions/strategies'
+import { yardGroupingOn, yardGroupKey, yardViewOfProps } from './decisions/yardGrouping'
 import { createQuery, type SimQuery } from './query'
 import { nextRandom, seedState } from './rng'
 import type { SimState } from './state'
 import { blockSpecs, boxSpan, parseYardSlotId, reeferFields } from './yardLayout'
 import { pickWeighted, POOL_VESSEL_ID, type CargoPlan } from '../scenario/bayPlan'
+import { drawContainerProps, WEIGHT_RANK, type ContainerProps } from '../scenario/containerProps'
 import { sampleDwell } from '../scenario/dwell'
 import { DEFAULT_LANDSIDE } from '../scenario/builder'
 import { compareKeys, loadSequenceKey, type ExportPlacement } from '../scenario/exportYard'
@@ -32,17 +39,21 @@ import { DEFAULT_YARD_TARGET_PCT, type ContainerSize, type ScenarioConfig } from
 /** Asks the yardAllocation handler for a slot (synchronously). */
 export type YardPlacer = (message: DecisionRequestMessage<'yardAllocation'>, query: SimQuery) => string | null
 
-/** An import box created by the pre-fill (no vessel: it was discharged before the scenario starts). */
+/** A filler box created by the pre-fill: an import (the default) or a transshipment box (no vessel: it was discharged before the scenario starts). */
 export interface PrefillImport {
   id: string
   size: ContainerSize
   line: string
   /** Seconds the box has stood in the yard at t = 0. */
   ageS: number
-  /** Sim time from which a truck may collect it. */
-  pickupReadyAt: number
+  /** Sim time from which a truck may collect it (a transshipment box waits for its vessel instead). */
+  pickupReadyAt?: number
   /** Reefer (R19): placed in a powered row. */
   reefer?: true
+  /** Absent = IMPORT. */
+  direction?: 'IMPORT' | 'EXPORT' | 'TRANSSHIPMENT'
+  /** Stored properties, drawn by the pre-fill (same stream as the engine's container state). */
+  props: ContainerProps
 }
 
 export interface PrefillPlan {
@@ -54,6 +65,28 @@ export interface PrefillPlan {
 /** First serial of pre-filled import boxes (landside trucks use 500000+, the cargo plan stays below). */
 const IMPORT_SERIAL0 = 700000
 const PREFILL_SALT = 0x2f6e2b1
+/** A grouped box keeps to the blocks that hold its group until they are this full, then it spills to the emptiest block. */
+const GROUP_BLOCK_MAX_FILL = 0.9
+
+/** The line a pre-filled import stacks under (#163): imports stack by flow and departure order, not by line. */
+const ANY_LINE = '*'
+
+/**
+ * The grouping view of a pre-filled box (#163): an import's line is left out, so its stacks (and blocks) mix lines;
+ * every other group is the grouped strategy's own (an empty keeps its line: a stack of empties holds one line's boxes).
+ */
+function prefillView(line: string, size: ContainerSize, props: ContainerProps): YardBoxView {
+  const view = yardViewOfProps(line, size, props)
+  return view.direction === 'IMPORT' ? { ...view, line: ANY_LINE } : view
+}
+
+/**
+ * The group a pre-filled box keeps to the blocks of (#163): its stack group, except that empties of one size and ISO
+ * type share blocks whatever their line, so a block of empties mixes lines while each stack holds one line.
+ */
+function prefillBlockKey(view: YardBoxView): string {
+  return view.direction === 'STORAGE' ? `STO|${view.size}|${view.isoType}` : yardGroupKey(view)
+}
 
 /** The placer for a config: a custom synchronous handler, else the configured (or default) strategy. */
 export function yardPlacerOf(config: ScenarioConfig, custom?: DecisionHandler<'yardAllocation'>): YardPlacer {
@@ -88,7 +121,10 @@ export function* prefillSteps(
     heights: new Array<number>(spec.bays * spec.rows).fill(0),
     tops: new Array<string | null>(spec.bays * spec.rows).fill(null),
     spans: new Array<number>(spec.bays * spec.rows).fill(0),
+    views: new Array<YardBoxView | null>(spec.bays * spec.rows).fill(null),
+    groups: new Map<string, number>(),
   }))
+  const grouped = yardGroupingOn(config)
   if (blocks.length === 0) return out
   let rngState = seedState((seed ^ PREFILL_SALT) >>> 0)
   const rng = () => {
@@ -96,9 +132,16 @@ export function* prefillSteps(
     rngState = next
     return v
   }
-  function* tryPlace(box: { id: string; size: ContainerSize; full: boolean; line: string; vesselId: string; reefer?: true }): Generator<YardAllocationRequest, ExportPlacement | null, string | null> {
-    // lowest fill first; a block without a legal slot passes the box on
-    const order = blocks.map((b, i) => ({ b, i })).sort((x, y) => x.b.used / x.b.capacity - y.b.used / y.b.capacity || x.i - y.i)
+  function* tryPlace(
+    box: { id: string; size: ContainerSize; full: boolean; line: string; vesselId: string; reefer?: true; props?: ContainerProps },
+    strict = true,
+  ): Generator<YardAllocationRequest, ExportPlacement | null, string | null> {
+    const view = grouped && box.props ? prefillView(box.line, box.size, box.props) : null
+    const key = view ? prefillBlockKey(view) : ''
+    // lowest fill first (a grouped box: the blocks that hold its group first); a block without a legal slot passes the box on
+    const fill = (b: (typeof blocks)[number]) => b.used / b.capacity
+    const own = (b: (typeof blocks)[number]) => (view && (b.groups.get(key) ?? 0) > 0 && fill(b) < GROUP_BLOCK_MAX_FILL ? 0 : 1)
+    const order = blocks.map((b, i) => ({ b, i })).sort((x, y) => own(x.b) - own(y.b) || fill(x.b) - fill(y.b) || x.i - y.i)
     for (const { b } of order) {
       const request: YardAllocationRequest = {
         containerId: box.id,
@@ -118,6 +161,7 @@ export function* prefillSteps(
         heights: b.heights.slice(),
         topVessels: b.tops.slice(),
         stackSpans: b.spans.slice(),
+        ...(view ? { box: view, stackTops: b.views.slice(), ...(strict ? { sameGroupOnly: true as const } : {}) } : {}),
         ...reeferFields(b.spec, box.reefer),
         random: rng(),
       }
@@ -133,7 +177,9 @@ export function* prefillSteps(
         b.heights[i] = cell.tier
         b.tops[i] = box.vesselId
         b.spans[i] = span
+        b.views[i] = view
       }
+      if (view) b.groups.set(key, (b.groups.get(key) ?? 0) + span)
       b.used += span
       const placement: ExportPlacement = { containerId: box.id, vesselId: box.vesselId, size: box.size, blockId: b.spec.id, slotId, bay: cell.bay, row: cell.row, tier: cell.tier, span }
       out.placements.push(placement)
@@ -150,9 +196,17 @@ export function* prefillSteps(
     .map((c) => ({ c, key: [vesselIndex.get(c.vesselId) ?? 0, ...loadSequenceKey(slots.get(c.slotId) as NonNullable<ReturnType<typeof slots.get>>)] }))
     .sort((a, b) => compareKeys(b.key, a.key))
     .map((x) => x.c)
+  if (grouped) {
+    // group by group (vessel and POD), heavy first so the heavy boxes stand at the bottom; ties keep the reverse load sequence
+    const groupOf = (c: (typeof exports)[number]) => (c.props ? yardGroupKey(yardViewOfProps(c.line, c.size, c.props)) : '')
+    const rank = (c: (typeof exports)[number]) => (c.props ? WEIGHT_RANK[c.props.weightClass] : 0)
+    const index = new Map(exports.map((c, i) => [c.id, i]))
+    exports.sort((a, b) => (groupOf(a) < groupOf(b) ? -1 : groupOf(a) > groupOf(b) ? 1 : rank(b) - rank(a) || (index.get(a.id) as number) - (index.get(b.id) as number)))
+  }
   const pool = plan.containers.filter((c) => c.flow === 'pool').sort((a, b) => (b.ageS ?? 0) - (a.ageS ?? 0) || (a.id < b.id ? -1 : 1))
   for (const c of [...exports, ...pool]) {
-    const p = yield* tryPlace(c)
+    let p = yield* tryPlace(c)
+    if (!p && grouped) p = yield* tryPlace(c, false) // a booked box is always placed, even on another group
     if (!p) throw new Error(`The yard has no room for ${c.flow === 'load' ? 'export box' : 'empty'} ${c.id} (add yard blocks, bays or tiers)`)
   }
 
@@ -161,7 +215,9 @@ export function* prefillSteps(
   const dwell = config.landside?.importDwell ?? DEFAULT_LANDSIDE.importDwell
   const ids = new Set(plan.containers.map((c) => c.id))
   let placed = blocks.reduce((s, b) => s + b.used, 0)
+  const mix = config.yardStart?.mix
   for (let serial = IMPORT_SERIAL0; placed < target; serial++) {
+    const direction = (mix ? pickWeighted<string>({ IMPORT: mix.import, EXPORT: mix.export, TRANSSHIPMENT: mix.transshipment }, rng) : 'IMPORT') as NonNullable<PrefillImport['direction']>
     let size = pickWeighted<ContainerSize>(config.cargo.sizeMix, rng)
     const line = pickWeighted<string>(config.cargo.lines, rng)
     if (boxSpan(size) > target - placed) size = '20'
@@ -170,14 +226,18 @@ export function* prefillSteps(
     let id = makeIso6346Id(LINE_OWNER_PREFIX[line], serial)
     while (ids.has(id)) id = makeIso6346Id(LINE_OWNER_PREFIX[line], ++serial)
     ids.add(id)
-    // recorded before its placement is announced, so a consumer sees the import together with its slot
-    const imp: PrefillImport = { id, size, line, ageS, pickupReadyAt: d - ageS }
-    if (isReefer(config.cargo, id, true)) imp.reefer = true
+    const reefer = isReefer(config.cargo, id, true)
+    const propsOf = (sz: ContainerSize) =>
+      drawContainerProps(config, seed, { id, size: sz, full: true, line, reefer, direction, inbound: direction === 'EXPORT' ? { kind: 'truck' } : { kind: 'vessel' }, arrivalS: -ageS }) // an import or transshipment box was discharged before the scenario starts, from a vessel outside it; an export came by truck
+    // recorded before its placement is announced, so a consumer sees the box together with its slot
+    const imp: PrefillImport = { id, size, line, ageS, props: propsOf(size), ...(direction === 'IMPORT' ? { pickupReadyAt: d - ageS } : { direction }) }
+    if (reefer) imp.reefer = true
     out.imports.push(imp)
-    let p = yield* tryPlace({ id, size, full: true, line, vesselId: POOL_VESSEL_ID, reefer: imp.reefer })
+    let p = yield* tryPlace({ id, size, full: true, line, vesselId: POOL_VESSEL_ID, reefer: imp.reefer, props: imp.props })
     if (!p && boxSpan(size) === 2) {
       imp.size = '20' // no pair of equal stacks for a 40 ft box: a 20 ft box may still fit
-      p = yield* tryPlace({ id, size: '20', full: true, line, vesselId: POOL_VESSEL_ID, reefer: imp.reefer })
+      imp.props = propsOf('20')
+      p = yield* tryPlace({ id, size: '20', full: true, line, vesselId: POOL_VESSEL_ID, reefer: imp.reefer, props: imp.props })
     }
     if (!p) {
       out.imports.pop()

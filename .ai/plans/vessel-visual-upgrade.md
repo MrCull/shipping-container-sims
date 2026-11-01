@@ -4,7 +4,7 @@
 The procedural Three.js tutorial vessel in Box Empire is already better than the equipment was before their upgrades, but it's still missing key visual components that make a container ship look realistic: no bulwarks, no lashing bridges between hatch covers, windows only on one face of the superstructure, no bridge wings, no bollards, no navigation lights, no rudder, and the bow tapers to an unrealistic knife-edge. The knowledge base (`dk_vessels__physical_classes_and_structure.md`) lists mandatory visible components that are currently missing.
 
 ## File to modify
-`src/sims/box-empire/modules/vesselRenderer.ts` — the 4 builder functions: `buildHull()`, `buildDeck()`, `buildSuperstructure()`, `buildDeckFittings()`
+`src/sims/box-empire/modules/vesselRenderer.ts`, the 4 builder functions: `buildHull()`, `buildDeck()`, `buildSuperstructure()`, `buildDeckFittings()`
 
 ## What stays unchanged
 - `createVesselMesh()` return type and rotation (group with rotation.y = PI)
@@ -23,18 +23,18 @@ The procedural Three.js tutorial vessel in Box Empire is already better than the
 
 ## Changes by builder function
 
-### 1. `buildHull()` — bulwarks, wider bow, panel lines
+### 1. `buildHull()`, bulwarks, wider bow, panel lines
 
-**Widen bow tip**: Change `makeTaperedPrism` wTip from `0.6` to `1.8` — eliminates unrealistic knife-edge
+**Widen bow tip**: Change `makeTaperedPrism` wTip from `0.6` to `1.8`, eliminates unrealistic knife-edge
 
 **Add bulwarks** (raised hull lip above deck, 2 meshes):
 - BoxGeometry(midLen + bowLen * 0.6, 1.2, 0.25) at (bowLen*0.15 - L*0.09, deckY + 0.6, ±W*0.435) in hullMat
 
 **Add hull panel lines** (4 thin darker strips, 2 per side):
 - BoxGeometry(midLen * 0.95, 0.08, 0.08) at (-L*0.09, deckY - depth*0.25/0.55, ±W*0.502)
-- Material: MeshPhongMaterial({ color: 0x0f1a28 }) — slightly darker than hull
+- Material: MeshPhongMaterial({ color: 0x0f1a28 }), slightly darker than hull
 
-### 2. `buildDeck()` — lashing bridges, bollards, windlass
+### 2. `buildDeck()`, lashing bridges, bollards, windlass
 
 **Lashing bridges** between hatch covers (4 bridges × 3 parts = 12 meshes):
 - Cross-beam: BoxGeometry(0.3, 1.6, W*0.68) at (midpoint between hatches, deckY + 1.07, 0)
@@ -53,14 +53,14 @@ The procedural Three.js tutorial vessel in Box Empire is already better than the
 - Base: BoxGeometry(1.0, 0.4, 1.4) at (L*0.36, deckY+0.20, 0)
 - Material: new `windlassMat` (0x444444)
 
-### 3. `buildSuperstructure()` — all-face windows, bridge wings, funnel detail, lifeboats, rudder, nav light
+### 3. `buildSuperstructure()`, all-face windows, bridge wings, funnel detail, lifeboats, rudder, nav light
 
 **Windows on all 4 faces** of each of 3 floors (+9 meshes, modify existing loop):
 - Back (-X): BoxGeometry(f.l*0.09, f.h*0.30, f.w*0.75) at (sternX - f.l*0.52, ...)
 - Port (-Z): BoxGeometry(f.l*0.75, f.h*0.30, f.w*0.09) at (..., -f.w*0.52)
 - Starboard (+Z): same at +f.w*0.52
 
-**Bridge wings** (6 meshes — platforms + railings, one per side):
+**Bridge wings** (6 meshes, platforms + railings, one per side):
 - Platform: BoxGeometry(2.5, 0.2, 2.0) at (sternX, 14.25, ±3.28) in metalMat
 - Side railing: BoxGeometry(2.5, 0.8, 0.08) at (sternX, 14.65, ±4.28)
 - Front railing: BoxGeometry(0.08, 0.8, 2.0) at (sternX + 1.25, 14.65, ±3.28)
@@ -82,7 +82,7 @@ The procedural Three.js tutorial vessel in Box Empire is already better than the
 **Radar scanner bar** (1 mesh):
 - BoxGeometry(3.5, 0.12, 0.35) at same Y as radar sphere in metalMat
 
-### 4. `buildDeckFittings()` — jackstaff, hawse pipes, nav lights, extended railings, stern name
+### 4. `buildDeckFittings()`, jackstaff, hawse pipes, nav lights, extended railings, stern name
 
 **Jackstaff at bow** (1 mesh):
 - CylinderGeometry(0.04, 0.06, 2.5, 6) at (L*0.42, deckY+1.42, 0)
@@ -91,9 +91,9 @@ The procedural Three.js tutorial vessel in Box Empire is already better than the
 - CylinderGeometry(0.3, 0.3, 1.2, 8) angled into hull at (L*0.41, deckY-0.5, ±W*0.38)
 
 **Navigation lights** (3 meshes):
-- Port (red): SphereGeometry(0.12) at (L*0.30, deckY+1.3, -W*0.44) — emissive red
-- Starboard (green): SphereGeometry(0.12) at (L*0.30, deckY+1.3, +W*0.44) — emissive green
-- Stern (white): SphereGeometry(0.12) at (-L*0.46, deckY+1.0, 0) — emissive white
+- Port (red): SphereGeometry(0.12) at (L*0.30, deckY+1.3, -W*0.44), emissive red
+- Starboard (green): SphereGeometry(0.12) at (L*0.30, deckY+1.3, +W*0.44), emissive green
+- Stern (white): SphereGeometry(0.12) at (-L*0.46, deckY+1.0, 0), emissive white
 
 **Extended railings** (~10 meshes):
 - Forecastle: rail + 2 stanchions per side at X ≈ L*0.35
@@ -101,7 +101,7 @@ The procedural Three.js tutorial vessel in Box Empire is already better than the
 - Stern: short rails aft of superstructure at X ≈ -L*0.44
 
 **Stern name plate** (1 mesh):
-- BoxGeometry(0.08, 1.5, W*0.45) at (-L*0.465, deckY-1.5, 0) — slightly lighter than hull with subtle emissive
+- BoxGeometry(0.08, 1.5, W*0.45) at (-L*0.465, deckY-1.5, 0), slightly lighter than hull with subtle emissive
 
 ## Materials to add to `getMaterials()`
 - `bollardMat` (0x2b2b2b), `lashBridgeMat` (0x5a5a5a), `windlassMat` (0x444444)
@@ -112,7 +112,7 @@ The procedural Three.js tutorial vessel in Box Empire is already better than the
 
 ## Verification
 1. Run `npm run dev` and open Box Empire
-2. Start tutorial — vessel should arrive with visible bulwarks, lashing bridges, bridge wings, bollards, navigation lights
+2. Start tutorial, vessel should arrive with visible bulwarks, lashing bridges, bridge wings, bollards, navigation lights
 3. Verify deck containers still position correctly on hatches
 4. Verify MHC crane can still pick/place containers (no geometry collision)
 5. Verify vessel shake animation still works when containers are placed

@@ -24,7 +24,7 @@ function splitReply(sim: Simulation): Record<string, number[]> {
 }
 
 describe('STS cranes on one rail', () => {
-  it('never pass or come closer than the minimum spacing — checked after every event of the 4-STS fixture', () => {
+  it('never pass or come closer than the minimum spacing, checked after every event of the 4-STS fixture', () => {
     for (const strategy of ['balanced-moves', 'equal-bays']) {
       const sim = createSimulation(withSplit(strategy))
       let checked = 0

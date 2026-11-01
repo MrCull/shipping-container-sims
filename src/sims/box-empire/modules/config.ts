@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Configuration constants
+// Box Empire, Configuration constants
 // ---------------------------------------------------------------------------
 
 import type { Position, Position3D } from '../types'
@@ -182,7 +182,7 @@ export const TRUCK_GLB = {
   rotationY: 7 * Math.PI / 4,
   /** Container deck height (Y) above ground for GLB truck */
   containerOffsetY: 1.4,
-  /** Container Z offset relative to truck group origin — 2m further back from cab */
+  /** Container Z offset relative to truck group origin, 2m further back from cab */
   containerOffsetZ: -4.0,
 } as const
 

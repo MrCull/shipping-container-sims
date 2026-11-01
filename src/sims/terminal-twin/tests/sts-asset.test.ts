@@ -1,5 +1,5 @@
 /**
- * Seam 4 — phase 2 asset outputs for the STS (TT-23): the committed
+ * Seam 4, phase 2 asset outputs for the STS (TT-23): the committed
  * Malaccamax quay-crane GLB, its rig sidecar and its previews.
  * Expected values come from the TTI reference pack (rail gauge, lift height,
  * outreach) and the scenario geometry the engine works in (vessel rows, hold

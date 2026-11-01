@@ -9,7 +9,7 @@ description: >-
 
 # Terminal Economics & Tariff Data Structures
 
-Comprehensive reference for container terminal tariffs, charge calculations, invoicing, and financial tracking. All interfaces are TypeScript-first, strict-mode compatible, and include realistic industry defaults. Use this as the canonical source when generating economics-related code — no external lookup should be needed.
+Comprehensive reference for container terminal tariffs, charge calculations, invoicing, and financial tracking. All interfaces are TypeScript-first, strict-mode compatible, and include realistic industry defaults. Use this as the canonical source when generating economics-related code, no external lookup should be needed.
 
 ---
 
@@ -476,7 +476,7 @@ Cargo class modifiers are applied as multipliers to the base handling rate. They
 
 | Cargo Class | Modifier | Notes |
 |------------|----------|-------|
-| General dry | 1.0x | Base rate — no adjustment |
+| General dry | 1.0x | Base rate, no adjustment |
 | Reefer | 1.3–1.5x | Power connection + monitoring overhead |
 | DG class 1 (explosives) | 2.0–3.0x | Maximum surcharge, segregation required |
 | DG class 2–6 | 1.5–2.0x | Standard dangerous goods handling |
@@ -511,9 +511,9 @@ export interface CargoClassModifier {
 export const CARGO_CLASS_MODIFIERS: CargoClassModifier[] = [
   { cargo_class: 'general_dry',  modifier: 1.0,  notes: 'Base rate' },
   { cargo_class: 'reefer',       modifier: 1.4,  notes: 'Power + monitoring' },
-  { cargo_class: 'dg_class_1',   modifier: 2.5,  notes: 'Explosives — max surcharge' },
+  { cargo_class: 'dg_class_1',   modifier: 2.5,  notes: 'Explosives, max surcharge' },
   { cargo_class: 'dg_class_2_6', modifier: 1.75, notes: 'Standard DG handling' },
-  { cargo_class: 'dg_class_7',   modifier: 3.0,  notes: 'Radioactive — special handling' },
+  { cargo_class: 'dg_class_7',   modifier: 3.0,  notes: 'Radioactive, special handling' },
   { cargo_class: 'dg_class_8_9', modifier: 1.5,  notes: 'Lower-risk DG' },
   { cargo_class: 'out_of_gauge', modifier: 2.0,  notes: 'Special equipment required' },
   { cargo_class: 'empty',        modifier: 0.6,  notes: 'Reduced handling' },
@@ -574,7 +574,7 @@ export interface TerminalFinancials {
 |--------|-----|---------|------|------|
 | Revenue per TEU | 120 | 200 | 300 | USD |
 | Cost per TEU | 80 | 140 | 200 | USD |
-| Profit margin | 15% | 25% | 35% | — |
+| Profit margin | 15% | 25% | 35% | - |
 | Labor cost share | 30% | 38% | 45% | of total cost |
 | Equipment cost share | 20% | 25% | 30% | of total cost |
 | Energy cost share | 10% | 12% | 15% | of total cost |
@@ -731,7 +731,7 @@ export function generateInvoice(
       }
 
       lineItems.push({
-        description: `${event.event_type} — ${event.container_size}`,
+        description: `${event.event_type}, ${event.container_size}`,
         charge_type: 'handling',
         quantity: 1,
         unit_rate: baseAmount,
@@ -767,7 +767,7 @@ export function generateInvoice(
   const storage = calculateStorageCost(arrivalDate, departureDate, containerSize, visitType, tariffBook.storage_policies)
   if (storage.totalCost > 0) {
     lineItems.push({
-      description: `Storage — ${storage.chargeableDays} chargeable day(s) (${visitType})`,
+      description: `Storage, ${storage.chargeableDays} chargeable day(s) (${visitType})`,
       charge_type: 'storage',
       quantity: storage.chargeableDays,
       unit_rate: storage.totalCost / storage.chargeableDays,
@@ -878,7 +878,7 @@ export function createStoragePolicy(
 
 ```ts
 /**
- * Convenience wrapper — builds a tariff book for the given region,
+ * Convenience wrapper, builds a tariff book for the given region,
  * then generates an invoice for a single container visit.
  */
 export function createInvoice(

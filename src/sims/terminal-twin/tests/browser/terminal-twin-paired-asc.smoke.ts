@@ -7,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/asc-2asc-block-conflict.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
-import { pickScenario } from './scenarioPicker'
+import { openSetupTab, pickScenario } from './scenarioPicker'
 
 const FIXTURE = 'asc-2asc-block-conflict'
 
@@ -97,6 +97,7 @@ test('the setup dialog offers 1 or 2 ASCs per block, default 2', async ({ page }
   await page.evaluate(() => window.__tt!.newScenario())
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await pickScenario(dialog, 'asc-1sts-10-boxes-1block')
+  await openSetupTab(dialog, 'yard')
   await expect(dialog.getByTestId('tt-yard-ascs-2')).toBeChecked()
   await dialog.getByTestId('tt-yard-ascs-1').check()
   await dialog.getByRole('button', { name: /start/i }).click()
@@ -108,6 +109,7 @@ test('the setup dialog offers 1 or 2 ASCs per block, default 2', async ({ page }
   // the dialog remembers the last choice for the scenario
   await page.evaluate(() => window.__tt!.newScenario())
   await pickScenario(dialog, 'asc-1sts-10-boxes-1block')
+  await openSetupTab(dialog, 'yard')
   await expect(dialog.getByTestId('tt-yard-ascs-1')).toBeChecked()
   await dialog.getByTestId('tt-yard-ascs-2').check()
   await dialog.getByRole('button', { name: /start/i }).click()

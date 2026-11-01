@@ -1,5 +1,5 @@
 /**
- * Seam 4 — phase 2 asset outputs. The budget check reads committed GLBs and
+ * Seam 4, phase 2 asset outputs. The budget check reads committed GLBs and
  * their `.meta.json` sidecars only (no Blender), so it runs in CI.
  */
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'

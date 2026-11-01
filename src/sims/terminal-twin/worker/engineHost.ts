@@ -190,9 +190,13 @@ export function createEngineHost() {
     for (const v of sim.config.vessels) {
       const vessel = sim.query.vessel(v.id)
       const key = `vessel:${v.id}`
-      if (statusRefs.get(key) !== vessel.status) {
+      const firstMoveS = sim.query.vesselFirstMoveS(v.id)
+      const moveKey = `vesselMove:${v.id}`
+      const moved = firstMoveS !== null && statusRefs.get(moveKey) !== 'seen'
+      if (statusRefs.get(key) !== vessel.status || moved) {
         statusRefs.set(key, vessel.status)
-        delta.entities.push({ kind: 'vessel', id: v.id, t: ev.t, status: vessel.status, berthX: vessel.berthX })
+        if (firstMoveS !== null) statusRefs.set(moveKey, 'seen')
+        delta.entities.push({ kind: 'vessel', id: v.id, t: ev.t, status: vessel.status, berthX: vessel.berthX, firstMoveS })
       }
     }
   }

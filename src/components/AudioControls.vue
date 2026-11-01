@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useAudioStore } from '@/stores/audio'
 import { trackEvent } from '@/utils/analytics'
+import { isSilent, speakerIcon, speakerLabel } from '@/utils/audioControl'
 
 interface Props {
   placement?: 'absolute' | 'inline'
@@ -20,8 +21,9 @@ const popover = ref<HTMLElement | null>(null)
 const popoverStyle = ref<Record<string, string>>({})
 
 const volumePercent = computed(() => Math.round(audioStore.volume * 100))
-const effectivelySilent = computed(() => audioStore.soundMuted || audioStore.volume === 0)
-const icon = computed(() => (effectivelySilent.value ? '🔇' : audioStore.volume < 0.5 ? '🔉' : '🔊'))
+const effectivelySilent = computed(() => isSilent(audioStore.soundMuted, audioStore.volume))
+const icon = computed(() => speakerIcon(audioStore.soundMuted, audioStore.volume))
+const label = computed(() => speakerLabel(audioStore.soundMuted))
 
 function place(): void {
   const rect = root.value?.getBoundingClientRect()
@@ -72,10 +74,7 @@ function handleToggleMute(): void {
 }
 
 function handleVolume(event: Event): void {
-  const value = Number((event.target as HTMLInputElement).value) / 100
-  audioStore.setVolume(value)
-  // Dragging the slider up from a mute means "I want to hear it".
-  if (audioStore.soundMuted && value > 0) audioStore.setSoundMuted(false)
+  audioStore.moveVolumeSlider(Number((event.target as HTMLInputElement).value) / 100)
 }
 
 onBeforeUnmount(close)
@@ -90,14 +89,24 @@ onBeforeUnmount(close)
     <button
       class="audio-btn"
       :class="{ muted: effectivelySilent }"
-      :title="effectivelySilent ? 'Sound is off: open volume' : 'Volume'"
+      :title="label"
+      :aria-pressed="audioStore.soundMuted"
+      aria-label="Mute"
+      data-testid="audio-button"
+      @click="handleToggleMute"
+    >
+      {{ icon }}
+    </button>
+    <button
+      class="audio-btn audio-menu-btn"
+      title="Volume"
       aria-haspopup="true"
       :aria-expanded="open"
       aria-label="Volume"
-      data-testid="audio-button"
+      data-testid="audio-menu-button"
       @click="togglePopover"
     >
-      {{ icon }}
+      ▾
     </button>
     <Teleport to="body">
       <div
@@ -124,15 +133,6 @@ onBeforeUnmount(close)
           class="audio-percent"
           data-testid="audio-volume-label"
         >{{ volumePercent }}%</span>
-        <button
-          class="audio-mute"
-          :class="{ on: audioStore.soundMuted }"
-          :aria-pressed="audioStore.soundMuted"
-          data-testid="audio-mute"
-          @click="handleToggleMute"
-        >
-          {{ audioStore.soundMuted ? 'Unmute' : 'Mute' }}
-        </button>
       </div>
     </Teleport>
   </div>
@@ -141,7 +141,7 @@ onBeforeUnmount(close)
 <style scoped>
 .audio-controls {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.2rem;
 }
 
 .audio-controls.absolute {
@@ -188,6 +188,15 @@ onBeforeUnmount(close)
   background: rgba(59, 130, 246, 0.1);
 }
 
+.audio-menu-btn {
+  padding: 4px 5px;
+  font-size: 0.7rem;
+}
+
+.absolute .audio-menu-btn {
+  width: 1.4rem;
+}
+
 .audio-popover {
   position: fixed;
   z-index: 10000;
@@ -216,24 +225,5 @@ onBeforeUnmount(close)
   min-width: 2.6ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
-}
-
-.audio-mute {
-  padding: 0.25rem 0.55rem;
-  background: transparent;
-  border: 1px solid var(--audio-popover-border, var(--color-border));
-  border-radius: 4px;
-  color: var(--audio-popover-text, var(--color-text));
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.audio-mute:hover {
-  border-color: var(--audio-popover-accent, var(--color-primary));
-}
-
-.audio-mute.on {
-  border-color: var(--audio-popover-active-border, var(--color-accent));
-  background: var(--audio-popover-active-bg, rgba(245, 158, 11, 0.12));
 }
 </style>

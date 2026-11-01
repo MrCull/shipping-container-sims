@@ -1,5 +1,5 @@
 /**
- * Seam 4 — the truck models (TT-26): three tractor cab variants (each with the skeletal chassis) and the
+ * Seam 4, the truck models (TT-26): three tractor cab variants (each with the skeletal chassis) and the
  * standalone chassis. Reads only the committed GLBs, sidecars and previews (no Blender), like the CI budget check.
  */
 import { existsSync, readFileSync } from 'node:fs'

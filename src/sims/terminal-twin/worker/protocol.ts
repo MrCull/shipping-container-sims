@@ -157,6 +157,8 @@ export interface EntityStateChange {
   status: string
   /** Vessels only: stern X along the quay once a berth is allocated (null before). */
   berthX?: number | null
+  /** Vessels only: the first move of any STS working it, once known (#141; a view field, not an event). */
+  firstMoveS?: number | null
   /** Trucks only: size of the box on its first leg (the model's load position: a 20 ft box sits on the front pins). */
   loadSize?: ContainerSize
 }

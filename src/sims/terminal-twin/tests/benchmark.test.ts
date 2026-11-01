@@ -60,11 +60,11 @@ describe('benchmark run', () => {
 })
 
 describe('committed baseline', () => {
-  it('has the TTI and TTI Algeciras — peak day benchmarks recorded', async () => {
+  it('has the TTI and TTI Algeciras, peak day benchmarks recorded', async () => {
     const { readFileSync } = await import('node:fs')
     const { BASELINE_URL } = await import('../cli/benchCli')
     const b = JSON.parse(readFileSync(BASELINE_URL, 'utf8')) as { reports: Record<string, BenchReport> }
-    for (const key of ['TTI Algeciras baseline|24h', 'TTI Algeciras — peak day|24h']) {
+    for (const key of ['TTI Algeciras baseline|24h', 'TTI Algeciras, peak day|24h']) {
       expect(b.reports[key]?.eventsPerSec).toBeGreaterThan(0)
       expect(b.reports[key]?.status).not.toBe('failed')
       expect(b.reports[key]?.invariantViolations).toBe(0)

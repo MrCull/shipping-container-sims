@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Scene graph construction (inspired by stowage-master quality)
+// Box Empire, Scene graph construction (inspired by stowage-master quality)
 // ---------------------------------------------------------------------------
 
 import type { Position3D } from '../types'
@@ -85,7 +85,7 @@ function buildLighting(scene: THREE.Scene): void {
 }
 
 function buildOcean(scene: THREE.Scene): void {
-  // Large ocean plane visible from shore — extends far out to sea (-Z direction)
+  // Large ocean plane visible from shore, extends far out to sea (-Z direction)
   const geometry = new THREE.PlaneGeometry(1200, 400, 120, 60)
   const material = new THREE.MeshPhongMaterial({
     color: 0x0d4f6e,

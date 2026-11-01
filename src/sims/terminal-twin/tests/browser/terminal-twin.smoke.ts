@@ -89,6 +89,25 @@ test('×1 runs one sim second per wall second; ×600 keeps animating every frame
   expect(rate).toBeLessThan(600 * 1.1)
 })
 
+test('×3600 from the top bar advances the sim clock accordingly; digit keys leave the speed unchanged', async ({ page }) => {
+  // A long scenario, so the clock does not hit the scenario end within the window.
+  await page.goto('/sim/terminal-twin')
+  await page.waitForFunction(() => !!window.__tt)
+  await page.evaluate(() => window.__tt!.load('landside-morning-peak'))
+  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
+  await page.getByRole('button', { name: '×3600', exact: true }).click()
+  expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
+  const t0 = await page.evaluate(() => window.__tt!.clock().displayTime)
+  const w0 = Date.now()
+  await page.waitForTimeout(2000)
+  const t1 = await page.evaluate(() => window.__tt!.clock().displayTime)
+  const wallS = (Date.now() - w0) / 1000
+  // Engine-bound on a slow machine, so only require a clear multiple of x600 pace over the window.
+  expect((t1 - t0) / wallS).toBeGreaterThan(600)
+  await page.keyboard.press('2')
+  expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
+})
+
 test('Run to… jumps to the target and the scene matches the engine there', async ({ page }) => {
   const errors = collectErrors(page)
   await openTracer(page)
@@ -174,6 +193,55 @@ test('Reset returns to t = 0 with the same seed; New Scenario reopens the setup 
   expect(other.seed).toBe(7)
   expect(other.status).toBe('ended')
   expect(other.eventLogHash).not.toBe(golden.eventLogHash)
+})
+
+test('every run start (Start, Reset, loading a save) resets the speed to ×10; pause and dialogs keep it (#157)', async ({ page }) => {
+  const x600 = page.getByRole('button', { name: '×600', exact: true })
+  const x10 = page.getByRole('button', { name: '×10', exact: true })
+  const speed = () => page.evaluate(() => window.__tt!.clock().speed)
+  const playing = async () => {
+    if (await page.evaluate(() => window.__tt!.clock().paused)) await page.getByRole('button', { name: 'Resume', exact: true }).click()
+  }
+  // A long scenario, so x600 does not reach the scenario end (which disables the speed buttons).
+  await page.goto('/sim/terminal-twin')
+  await page.waitForFunction(() => !!window.__tt)
+  await page.evaluate(() => window.__tt!.load('landside-morning-peak'))
+  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
+
+  // Mid-run speed survives pause, the dashboard and New Scenario then Cancel.
+  await x600.click()
+  await page.getByRole('button', { name: 'Pause', exact: true }).click()
+  await page.getByRole('button', { name: 'Resume', exact: true }).click()
+  await page.getByTestId('tt-dashboard-button').click()
+  await page.getByTestId('tt-dashboard-button').click()
+  await page.getByRole('button', { name: 'New Scenario' }).click()
+  const dialog = page.getByRole('dialog', { name: /new scenario/i })
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dialog).toBeHidden()
+  expect(await speed()).toBe(600)
+
+  // New Scenario then Start.
+  await page.getByRole('button', { name: 'New Scenario' }).click()
+  await dialog.getByTestId('tt-setup-start-button').click()
+  await expect(dialog).toBeHidden()
+  expect(await speed()).toBe(10)
+  await playing()
+  await expect(x10).toHaveAttribute('aria-pressed', 'true')
+
+  // Reset.
+  await x600.click()
+  await page.getByRole('button', { name: 'Reset' }).click()
+  await expect.poll(speed).toBe(10)
+  await playing()
+  await expect(x10).toHaveAttribute('aria-pressed', 'true')
+
+  // Loading a save.
+  const saved = await page.evaluate(() => window.__tt!.saves.saveToBrowser('config', 'Speed reset'))
+  await x600.click()
+  expect(await page.evaluate((id) => window.__tt!.saves.load(id), saved!.id)).toBe('loaded')
+  expect(await speed()).toBe(10)
+  await playing()
+  await expect(x10).toHaveAttribute('aria-pressed', 'true')
 })
 
 test('vessels render at their berth (or anchorage) and STS cranes gantry along the rail to their bays', async ({ page }) => {

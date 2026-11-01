@@ -2,7 +2,7 @@
  * Scene model: the renderer's view of the run, built from worker Deltas.
  * Pure TS (no Three.js). It keeps per-entity timelines (motion segments per
  * crane axis, custody per container, status per vessel/STS) so any display
- * time at or before the engine horizon can be drawn exactly — that is what
+ * time at or before the engine horizon can be drawn exactly, that is what
  * keeps animation smooth at any speed.
  *
  * Scene conventions: 1 unit = 1 m, Y up, quay edge at Z = 0, sea at -Z,
@@ -27,6 +27,7 @@ import {
   railSegmentSpan,
   railStartZ,
   prefillOf,
+  type PrefillImport,
   rowX,
   slotZ,
   tierBaseY,
@@ -45,10 +46,11 @@ import {
   type Reservation,
 } from '../engine'
 import { planCargo } from '../scenario/bayPlan'
-import { drawContainerProps, isoTypeOf, type ContainerProps } from '../scenario/containerProps'
+import { isoTypeOf, type ContainerProps } from '../scenario/containerProps'
 import { subjectOfBox, type ColourSubject } from './colourBy'
 import type { RobBox } from '../scenario/robBays'
 import { planExportYard } from '../scenario/exportYard'
+import { driveYaw, shcSpawnYaw } from './shcSpawn'
 import type { ContainerSize, ScenarioConfig, VesselConfig } from '../scenario/types'
 import {
   HATCH_THICKNESS_M,
@@ -123,6 +125,7 @@ interface StatusEntry {
   t: number
   status: string
   berthX?: number | null
+  firstMoveS?: number | null
 }
 
 /** Where a vessel is drawn: its stern X and the Z offset of its quay-side (0 = alongside). */
@@ -231,6 +234,8 @@ export interface ContainerPose extends Vec3 {
   yaw: number
   /** SHC id when the container is carried by an SHC (the renderer hangs it from that SHC's spreader). */
   carriedBy?: string
+  /** A stacked yard box (its neighbours hide some of its faces, #143). */
+  yard?: true
 }
 
 const emptyAxes = (): Record<Axis, MotionSegment[]> => ({ gantry: [], trolley: [], hoist: [], x: [], z: [], lift: [] })
@@ -269,7 +274,7 @@ export class SceneModel {
   /** What the close-up markings need beyond size and line (#119). */
   readonly containerDetail: Record<string, ContainerDetail>
   /** Pre-filled imports by id: their properties are drawn when a colour mode first asks. */
-  private readonly prefillImports = new Map<string, { id: string; size: ContainerSize; line: string; ageS: number; reefer?: true }>()
+  private readonly prefillImports = new Map<string, PrefillImport>()
   private readonly vesselIdSet: ReadonlySet<string>
   /** The carriers' state at `colourT`, for the transit status of `colourSubjectAt`. */
   private colourT = 0
@@ -328,7 +333,7 @@ export class SceneModel {
       this.containerIds.push(imp.id)
       this.containerSize[imp.id] = imp.size
       this.containerLine[imp.id] = imp.line
-      this.containerDetail[imp.id] = { laden: true, isoType: isoTypeOf(imp.size, imp.reefer === true), heavy: false, yardSince: -imp.ageS }
+      this.containerDetail[imp.id] = { laden: true, isoType: imp.props.isoType, heavy: imp.props.weightClass === 'HEAVY', yardSince: -imp.ageS, props: imp.props }
       this.prefillImports.set(imp.id, imp)
     }
     this.vessels = Object.fromEntries(config.vessels.map((v) => [v.id, v]))
@@ -452,6 +457,11 @@ export class SceneModel {
     return this.specs[id]
   }
 
+  /** The ROB boxes of one vessel (spec #106): what its hull draws. */
+  robBoxesOf(vesselId: string): RobBox[] {
+    return this.robBoxes.filter((b) => b.vesselId === vesselId)
+  }
+
   /** A box created during the run (a truck brought it). */
   private addContainer(c: NewContainer): void {
     if (this.containerSize[c.id]) return
@@ -490,7 +500,7 @@ export class SceneModel {
       list.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
     }
     for (const e of delta.entities) {
-      this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX })
+      this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX, firstMoveS: e.firstMoveS })
       if (e.kind === 'truck') this.truckArrival[e.id] ??= e.t
       if (e.kind === 'truck' && e.loadSize) this.truckLoad[e.id] = e.loadSize
     }
@@ -504,8 +514,10 @@ export class SceneModel {
     const d = seg.to - seg.from
     if (d === 0) return
     const prev = list[list.length - 1]
-    const yawPrev = prev ? prev.yaw1 : this.truckIds.includes(shcId) ? Math.PI / 2 : 0
-    const target = seg.axis === 'x' ? (d > 0 ? 0 : Math.PI) : d > 0 ? -Math.PI / 2 : Math.PI / 2
+    const target = driveYaw(seg.axis as 'x' | 'z', seg.from, seg.to)
+    // a truck appears facing its first drive (the access road, #146: north; the terminal road: towards the gate);
+    // a shuttle carrier too (#142), so its first move needs no turn on the spot
+    const yawPrev = prev ? prev.yaw1 : this.truckIds.includes(shcId) ? (seg.axis === 'x' ? target : Math.PI / 2) : shcSpawnYaw({ axis: seg.axis as 'x' | 'z', from: seg.from, to: seg.to })
     const delta = wrapPi(target - yawPrev)
     const reverse = Math.abs(delta) > (3 * Math.PI) / 4
     const odoPrev = prev ? prev.odoStart + prev.fwd * Math.abs(prev.to - prev.from) : 0
@@ -639,7 +651,8 @@ export class SceneModel {
   private driveState(shcId: string, time: number): Pick<ShcPose, 'yaw' | 'steerRad' | 'odometerM' | 'travelling'> {
     const list = this.drives[shcId] ?? []
     const i = lastAtOrBefore(list, time, (l) => l.t0)
-    if (i < 0) return { yaw: 0, steerRad: 0, odometerM: 0, travelling: false }
+    // before the first leg: facing it (#142), or along the parking row towards the work when none is known yet
+    if (i < 0) return { yaw: list.length > 0 && !this.truckIds.includes(shcId) ? list[0].yaw0 : shcSpawnYaw(null), steerRad: 0, odometerM: 0, travelling: false }
     const leg = list[i]
     const swing = leg.yaw1 - leg.yaw0
     const turnS = Math.max(1e-6, Math.min(TURN_S, (leg.t1 - leg.t0) * 0.6))
@@ -805,14 +818,22 @@ export class SceneModel {
   }
 
   /** A vessel's status at `time` and when it entered mooring, berthed and departed (null before), from the status timeline (#126). */
-  vesselStatusTimes(id: string, time: number): { status: string; mooringS: number | null; berthedS: number | null; departedS: number | null } {
+  vesselStatusTimes(id: string, time: number): { status: string; mooringS: number | null; berthedS: number | null; departedS: number | null; firstMoveS: number | null } {
     const list = this.status[`vessel:${id}`] ?? []
     const upTo = lastAtOrBefore(list, time, (e) => e.t)
     const seen = (status: string): number | null => {
       for (let i = 0; i <= upTo; i++) if (list[i].status === status) return list[i].t
       return null
     }
-    return { status: upTo < 0 ? 'unknown' : list[upTo].status, mooringS: seen('mooring'), berthedS: seen('berthed'), departedS: seen('departed') }
+    return { status: upTo < 0 ? 'unknown' : list[upTo].status, mooringS: seen('mooring'), berthedS: seen('berthed'), departedS: seen('departed'), firstMoveS: this.firstMoveSeen(list, upTo) }
+  }
+
+  private firstMoveSeen(list: StatusEntry[], upTo: number): number | null {
+    for (let i = 0; i <= upTo; i++) {
+      const m = list[i].firstMoveS
+      if (m !== null && m !== undefined) return m
+    }
+    return null
   }
 
   /** Where a vessel is at `time`: alongside at its berth, at anchorage offshore, or null (not arrived / departed). */
@@ -849,18 +870,7 @@ export class SceneModel {
     let props = d?.props
     if (!props) {
       const imp = this.prefillImports.get(containerId)
-      if (imp && d) {
-        props = d.props = drawContainerProps(this.config, this.seed, {
-          id: imp.id,
-          size: imp.size,
-          full: true,
-          line: imp.line,
-          reefer: imp.reefer === true,
-          direction: 'IMPORT',
-          inbound: { kind: 'vessel' },
-          arrivalS: -imp.ageS,
-        })
-      }
+      if (imp && d) props = d.props = imp.props
     }
     const full = d?.laden ?? true
     const list = this.custody[containerId] ?? []
@@ -929,6 +939,7 @@ export class SceneModel {
         y: tierBaseY(cell.tier) + dims.height / 2,
         z: slotZ(block, cell.bay, boxSpan(size)),
         yaw: alongZ,
+        yard: true,
       }
       this.yardPoses.set(cacheKey, pose)
       return pose

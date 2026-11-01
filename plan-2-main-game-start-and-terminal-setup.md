@@ -1,4 +1,4 @@
-# Box Empire — Plan 2: Main Game Start and Terminal Setup
+# Box Empire, Plan 2: Main Game Start and Terminal Setup
 
 > **Status:** Not started
 > **Dependencies:** Plan 1 (all core systems: job system, equipment state machine, pathfinding, yard model, economy, events)
@@ -12,22 +12,22 @@ Transition from the guided tutorial to open-ended gameplay. The player starts at
 
 ---
 
-## Prerequisites — Read Before Implementing
+## Prerequisites, Read Before Implementing
 
-1. **AGENTS.md** — Project conventions, linting
-2. **`src/sims/box-empire/box-empire-AGENTS.md`** — Architecture decisions and module map from Plan 1
-3. **Master roadmap** — `create-five-other-plans-with-combined-will-result-in-a-full-game.md` §5 (Plan 2)
+1. **AGENTS.md**, Project conventions, linting
+2. **`src/sims/box-empire/box-empire-AGENTS.md`**, Architecture decisions and module map from Plan 1
+3. **Master roadmap**, `create-five-other-plans-with-combined-will-result-in-a-full-game.md` §5 (Plan 2)
 4. **Skill files:**
-   - `.ai/skills/container-cargo-entities/SKILL.md` — Yard grouping heuristic (`computeYardGroupingScore`), priority scoring
-   - `.ai/skills/terminal-infrastructure/SKILL.md` — Yard block model, block types, layout archetypes
-   - `.ai/skills/terminal-economics/SKILL.md` — Base handling charges, maintenance concept
-   - `.ai/skills/terminal-operations/SKILL.md` — Stacking strategies, rehandle rates, congestion model
+   - `.ai/skills/container-cargo-entities/SKILL.md`, Yard grouping heuristic (`computeYardGroupingScore`), priority scoring
+   - `.ai/skills/terminal-infrastructure/SKILL.md`, Yard block model, block types, layout archetypes
+   - `.ai/skills/terminal-economics/SKILL.md`, Base handling charges, maintenance concept
+   - `.ai/skills/terminal-operations/SKILL.md`, Stacking strategies, rehandle rates, congestion model
 5. **Knowledge base files:**
-   - `knowledge-base/dk_yard__storage_blocks_and_locations.md` — Block types, zoning, slot constraints
-   - `knowledge-base/dk_ops__gatehouse_processes.md` — Gate processing, queue management
-   - `knowledge-base/dk_sim__economics_tariffs_costs.md` — Tariff structures, charge bases
-   - `knowledge-base/dk_equipment__reach_stackers.md` — Reach stacker capacity details
-   - `knowledge-base/dk_ops__end_to_end_flows.md` — Import/export container flow details
+   - `knowledge-base/dk_yard__storage_blocks_and_locations.md`, Block types, zoning, slot constraints
+   - `knowledge-base/dk_ops__gatehouse_processes.md`, Gate processing, queue management
+   - `knowledge-base/dk_sim__economics_tariffs_costs.md`, Tariff structures, charge bases
+   - `knowledge-base/dk_equipment__reach_stackers.md`, Reach stacker capacity details
+   - `knowledge-base/dk_ops__end_to_end_flows.md`, Import/export container flow details
 
 ---
 
@@ -168,7 +168,7 @@ interface YardBlockConfig {
 
 The `pod_grouped` strategy uses this scoring function to decide optimal slot placement.
 
-**Block placement:** Auto-assign positions in the yard area. Use a simple grid layout — blocks are placed in rows parallel to the quay, with gaps for truck lanes (4m wide between blocks per `terminal-infrastructure` skill defaults).
+**Block placement:** Auto-assign positions in the yard area. Use a simple grid layout, blocks are placed in rows parallel to the quay, with gaps for truck lanes (4m wide between blocks per `terminal-infrastructure` skill defaults).
 
 ### 3. Expanded Operations
 
@@ -182,12 +182,12 @@ The `pod_grouped` strategy uses this scoring function to decide optimal slot pla
 - Export trucks arrive in batches based on vessel schedule (before vessel arrival)
 - Import trucks arrive after containers are available in yard (after discharge)
 - Multiple trucks may be queued at the gate
-- Gate processing time: 15s per truck (from `dk_ops__gatehouse_processes.md` — simplified from real 30–180s)
+- Gate processing time: 15s per truck (from `dk_ops__gatehouse_processes.md`, simplified from real 30–180s)
 
 **Equipment:**
 - Multiple reach stackers can operate simultaneously
 - Multiple mobile harbor cranes can work the same vessel
-- Equipment may have multiple jobs queued — job scheduler assigns based on proximity and idle status
+- Equipment may have multiple jobs queued, job scheduler assigns based on proximity and idle status
 
 **Maintenance:**
 - Daily maintenance costs deducted at each sim-day boundary
@@ -236,7 +236,7 @@ interface SaveData {
 
 **Trigger:** Money balance goes negative after daily maintenance deduction
 
-**Grace period:** 1 sim-day warning — "Your terminal is losing money! You have 1 day to earn revenue or go bankrupt."
+**Grace period:** 1 sim-day warning, "Your terminal is losing money! You have 1 day to earn revenue or go bankrupt."
 
 **Game over screen:**
 - Final stats: days survived, containers handled, total revenue
@@ -342,49 +342,49 @@ src/sims/box-empire/
 │   ├── saveLoad.ts                   # Serialization/deserialization (NEW)
 │   ├── maintenance.ts                # Daily cost deductions (NEW)
 │   ├── vesselScheduler.ts            # Vessel arrival scheduling for free play (NEW)
-│   ├── terminalMap.ts                # MODIFIED — dynamic node addition
-│   ├── jobScheduler.ts               # MODIFIED — multi-equipment assignment
-│   ├── yardManager.ts                # MODIFIED — multiple blocks, configurable strategies
-│   ├── economy.ts                    # MODIFIED — maintenance costs, bankruptcy check
-│   └── config.ts                     # MODIFIED — catalog prices, vessel parameters
+│   ├── terminalMap.ts                # MODIFIED, dynamic node addition
+│   ├── jobScheduler.ts               # MODIFIED, multi-equipment assignment
+│   ├── yardManager.ts                # MODIFIED, multiple blocks, configurable strategies
+│   ├── economy.ts                    # MODIFIED, maintenance costs, bankruptcy check
+│   └── config.ts                     # MODIFIED, catalog prices, vessel parameters
 ├── store/
-│   └── gameStore.ts                  # MODIFIED — new state fields, purchase actions
+│   └── gameStore.ts                  # MODIFIED, new state fields, purchase actions
 ├── types/
-│   └── index.ts                      # MODIFIED — new interfaces
+│   └── index.ts                      # MODIFIED, new interfaces
 ```
 
 ---
 
 ## Implementation Order (Recommended)
 
-### Phase A — Types and Config Extensions
+### Phase A, Types and Config Extensions
 1. Add new interfaces to `types/index.ts` (PurchaseCatalog, YardBlockConfig, TerminalConfig, SaveData)
 2. Add catalog data to `modules/config.ts` (prices, specs, vessel parameters)
 
-### Phase B — Purchase System
+### Phase B, Purchase System
 3. Implement `modules/purchaseSystem.ts` (buy logic, balance check, entity creation)
 4. Implement `modules/maintenance.ts` (daily cost calculation and deduction)
 5. Update `store/gameStore.ts` with new state fields and purchase actions
 
-### Phase C — Yard Expansion
+### Phase C, Yard Expansion
 6. Update `modules/yardManager.ts` to support multiple blocks with configurable strategies
 7. Implement `modules/yardAssignment.ts` (yard grouping score, POD-grouped placement)
 8. Update `modules/terminalMap.ts` for dynamic node addition/removal
 
-### Phase D — Expanded Operations
+### Phase D, Expanded Operations
 9. Implement `modules/vesselScheduler.ts` (vessel arrival scheduling for free play)
 10. Update `modules/truckManager.ts` for batch arrivals and multi-gatehouse queue assignment
 11. Update `modules/jobScheduler.ts` for multi-equipment assignment optimization
 
-### Phase E — Save/Load
+### Phase E, Save/Load
 12. Implement `modules/saveLoad.ts` (serialize, deserialize, auto-save timer)
 13. Wire save/load into store actions
 
-### Phase F — Game Over
+### Phase F, Game Over
 14. Add bankruptcy detection to `modules/economy.ts`
 15. Add grace period logic and game-over trigger
 
-### Phase G — UI Components
+### Phase G, UI Components
 16. Implement `components/PurchaseMenu.vue`
 17. Implement `components/YardBlockConfigurator.vue`
 18. Implement `components/TerminalOverview.vue`
@@ -393,12 +393,12 @@ src/sims/box-empire/
 21. Update `components/TopBar.vue` (shop button, day counter, maintenance indicator)
 22. Update `components/modals/StartScreen.vue` (skip tutorial, continue game)
 
-### Phase H — Rendering Updates
+### Phase H, Rendering Updates
 23. Update `modules/sceneBuilder.ts` for larger terminal area
 24. Update renderers to handle dynamically added yard blocks and equipment
 25. Add placement preview rendering for purchase system
 
-### Phase I — Integration and Testing
+### Phase I, Integration and Testing
 26. Wire main game flow in `BoxEmpire.vue` (menu → tutorial/skip → main game)
 27. Test purchase flow end-to-end
 28. Test save/load cycle

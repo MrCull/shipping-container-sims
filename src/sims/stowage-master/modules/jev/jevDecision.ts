@@ -19,7 +19,7 @@ export interface ValidatedDecision {
   answer: JevChoiceAnswer
   /** All legal slots, ranked by probability descending (for the inspector and manual fallback). */
   ranked: RankedOption[]
-  /** True when the returned probabilities summed to something far from 1 — logged, not fatal. */
+  /** True when the returned probabilities summed to something far from 1, logged, not fatal. */
   probabilitySumWarning: boolean
 }
 

@@ -1,4 +1,4 @@
-# Plan: Stowage Master — Real GLB Vessel Model (Level 1)
+# Plan: Stowage Master, Real GLB Vessel Model (Level 1)
 
 ## Context
 
@@ -28,7 +28,7 @@ After loading, the model will be uniformly scaled so its Z length = the game's `
 
 ## Step-by-Step Implementation
 
-### Step 1 — Copy Asset
+### Step 1, Copy Asset
 
 Copy:
 ```
@@ -36,7 +36,7 @@ available-media/3d-models/container-ship-small-empty-no-containers.glb
   → src/sims/stowage-master/assets/container-ship-small-empty-no-containers.glb
 ```
 
-### Step 2 — Update `types/index.ts`
+### Step 2, Update `types/index.ts`
 
 Add three optional fields to `ShipPreset`:
 
@@ -56,7 +56,7 @@ deckOffsetY?: number
 glbYOffset?: number
 ```
 
-### Step 3 — Update `config.ts` — small preset
+### Step 3, Update `config.ts`, small preset
 
 ```typescript
 small: {
@@ -80,7 +80,7 @@ small: {
   // GLB model fields
   glbPath: new URL('../sims/stowage-master/assets/container-ship-small-empty-no-containers.glb', import.meta.url).href,
   deckOffsetY: 1.2,   // matches existing slot indicator math (height * 0.3 = 1.2)
-  glbYOffset: 3.0,    // lift model so scaled deck aligns with deckOffsetY — tune at runtime
+  glbYOffset: 3.0,    // lift model so scaled deck aligns with deckOffsetY, tune at runtime
 },
 ```
 
@@ -89,22 +89,22 @@ small: {
 A cleaner approach is to put the URL constant in `shipRenderer.ts` and keep `config.ts` free of import paths:
 
 ```typescript
-// config.ts — just add an identifier string
+// config.ts, just add an identifier string
 glbPath: 'small-feeder',
 
-// shipRenderer.ts — maps identifier to URL
+// shipRenderer.ts, maps identifier to URL
 const GLB_URLS: Record<string, string> = {
   'small-feeder': new URL('./assets/container-ship-small-empty-no-containers.glb', import.meta.url).href,
 }
 ```
 
-Use the identifier approach — it keeps `config.ts` clean and avoids `import.meta.url` path confusion.
+Use the identifier approach, it keeps `config.ts` clean and avoids `import.meta.url` path confusion.
 
-### Step 4 — Update `shipRenderer.ts`
+### Step 4, Update `shipRenderer.ts`
 
 Add async GLB loading. The file continues to export:
-- `createShip()` — synchronous, procedural geometry (used for medium/large presets and as fallback)
-- `loadShipGLB()` — async, returns `Promise<THREE.Group>`
+- `createShip()`, synchronous, procedural geometry (used for medium/large presets and as fallback)
+- `loadShipGLB()`, async, returns `Promise<THREE.Group>`
 
 ```typescript
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
@@ -169,7 +169,7 @@ export async function loadShipGLB(
 
 **Centering note**: Compute the bounding box center after scaling and offset `root.position.x/z` so the ship's midpoint is at (0, 0) in group-local space. This ensures the crane, slot indicators, and sail animations all line up.
 
-### Step 5 — Update `containerRenderer.ts`
+### Step 5, Update `containerRenderer.ts`
 
 Replace the hardcoded `ship.height * 0.3` in slot indicator positioning:
 
@@ -186,7 +186,7 @@ This is backward-compatible: presets without `deckOffsetY` behave exactly as bef
 
 Also apply the same `deckOffsetY` in `GameCanvas.vue` wherever container world positions are computed relative to the deck (search for `ship.height * 0.3` usages in the canvas component).
 
-### Step 6 — Make `buildScene` async in `GameCanvas.vue`
+### Step 6, Make `buildScene` async in `GameCanvas.vue`
 
 ```typescript
 // Change signature:
@@ -214,7 +214,7 @@ async function buildScene(): Promise<void> {
 }
 ```
 
-The `watch` calling `buildScene()` fires it without `await`, which is fine — Vue's reactivity system and the game loop handle timing. The ship will not appear until the GLB finishes loading; while loading, `shipGroup` is null and the game loop's null-checks protect against errors.
+The `watch` calling `buildScene()` fires it without `await`, which is fine, Vue's reactivity system and the game loop handle timing. The ship will not appear until the GLB finishes loading; while loading, `shipGroup` is null and the game loop's null-checks protect against errors.
 
 Optionally add a loading state ref to show a brief spinner in the UI:
 ```typescript
@@ -222,7 +222,7 @@ const sceneLoading = ref(false)
 // set true before await, false after
 ```
 
-### Step 7 — Imports in `GameCanvas.vue`
+### Step 7, Imports in `GameCanvas.vue`
 
 ```typescript
 import { createShip, loadShipGLB, updateShipTilt } from '../modules/shipRenderer'
@@ -244,7 +244,7 @@ The values in Step 3 are initial estimates based on visual inspection of the scr
 
 **Tuning workflow**:
 1. Run `npm run dev`
-2. Load Level 1 — slot indicators should float just above the ship's cargo deck, between the forward mast and the aft accommodation block
+2. Load Level 1, slot indicators should float just above the ship's cargo deck, between the forward mast and the aft accommodation block
 3. If slots are too high/low → adjust `deckOffsetY` and/or `glbYOffset`
 4. If slots extend into the superstructure → reduce `cargoLengthFraction` or increase `cargoXOffsetFraction`
 5. If slots overflow the hull sides → reduce `cargoWidthFraction`
@@ -280,4 +280,4 @@ The existing list/trim/VCG calculations in `physics.ts` use `slot.xOffset` and `
 3. **Container placement**: Place a container → crane animation delivers it to the slot → container sits visually on the deck, not floating in air or sunk into the hull
 4. **Tilt**: Place heavy containers on one side → ship visually tilts; trim/list meters respond correctly
 5. **Level 2 & 3**: Confirm medium and large presets still render the procedural ship (no `glbPath` set)
-6. **Lint**: Run `npm run lint` — no new errors
+6. **Lint**: Run `npm run lint`, no new errors

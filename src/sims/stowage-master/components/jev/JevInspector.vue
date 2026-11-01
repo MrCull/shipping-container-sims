@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Request/response inspector for Jev (plan 05 §5.3). Shows evidence sent and probabilities
-// returned for each recorded exchange — never an invented rationale (skill rule). Reads
+// returned for each recorded exchange, never an invented rationale (skill rule). Reads
 // `jevStore.history`, written by `useJevController.ts`.
 
 import { computed, reactive } from 'vue'
@@ -70,7 +70,7 @@ function formatSignedPoints(points: number): string {
 function outcomeMessage(exchange: JevExchange): string {
   if (exchange.outcome === 'executed' && exchange.gameResult) {
     const reasons = exchange.gameResult.reasons
-    const disaster = exchange.gameResult.disaster ? ` — disaster: ${exchange.gameResult.disaster}` : ''
+    const disaster = exchange.gameResult.disaster ? `, disaster: ${exchange.gameResult.disaster}` : ''
     return `${reasons.length > 0 ? reasons.join('; ') : 'No score reasons recorded.'}${disaster}`
   }
   if (exchange.outcome === 'error' && exchange.error) {
@@ -111,7 +111,7 @@ function othersSum(exchange: JevExchange): number {
 }
 
 /** Defence in depth: the key is never stored in a request/response body, but confirm before
- *  rendering or copying raw JSON anyway (skill rule — never let a key reach the UI). */
+ *  rendering or copying raw JSON anyway (skill rule, never let a key reach the UI). */
 function hasAuthorizationField(value: unknown, depth = 0): boolean {
   if (depth > 8 || value === null || typeof value !== 'object') return false
   for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
@@ -138,7 +138,7 @@ async function copyJson(value: unknown): Promise<void> {
   try {
     await navigator.clipboard.writeText(result.text)
   } catch {
-    // Clipboard access can fail (permissions, insecure context) — non-fatal for an inspector tool.
+    // Clipboard access can fail (permissions, insecure context), non-fatal for an inspector tool.
   }
 }
 
@@ -169,7 +169,7 @@ function close(): void {
         {{ totals.executed }} executed ·
         {{ totals.errors }} error{{ totals.errors === 1 ? '' : 's' }} ·
         ${{ totals.totalCost.toFixed(4) }} total ·
-        avg {{ totals.avgLatencyMs !== null ? (totals.avgLatencyMs / 1000).toFixed(1) + ' s' : '—' }}
+        avg {{ totals.avgLatencyMs !== null ? (totals.avgLatencyMs / 1000).toFixed(1) + ' s' : ', ' }}
       </div>
       <div class="header-row">
         <span class="reminder">Jev returns choices and probabilities, not explanations.</span>
@@ -237,7 +237,7 @@ function close(): void {
                 v-for="[slotId, description] in optionEntries(exchange)"
                 :key="slotId"
               >
-                <strong>{{ slotId }}</strong> — {{ description }}
+                <strong>{{ slotId }}</strong>, {{ description }}
               </li>
             </ul>
           </div>

@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { SURFACE } from '../modules/dashboardPalette'
-import { DATA_PALETTE, RAMP_PALETTE } from '../modules/colourBy'
+import { DATA_PALETTE, DWELL_PALETTE, LENGTH_PALETTE, RAMP_PALETTE } from '../modules/colourBy'
 
 /**
  * Terminal Twin skin (#122): every component takes its colours and fonts from the `--tt-*` tokens in `skin.css`,
@@ -35,11 +35,16 @@ function styleOf(file: string): string {
   return [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join('\n')
 }
 
+/** Blanks CSS comments, keeping their newlines so line numbers still match: a ticket reference such as `(#161)` in a comment is not a colour. */
+function withoutComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' ')).replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
+
 describe('skin tokens', () => {
   it('leaves no ad-hoc colours, fonts or global tokens in Terminal Twin components', () => {
     const offenders: string[] = []
     for (const file of surfaceFiles) {
-      styleOf(file)
+      withoutComments(styleOf(file))
         .split('\n')
         .forEach((line, i) => {
           const at = `${relative(root, file)}:${i + 1}`
@@ -49,6 +54,12 @@ describe('skin tokens', () => {
         })
     }
     expect(offenders).toEqual([])
+  })
+
+  it('ignores ticket references in CSS comments', () => {
+    const css = '/* wide dialog (#161) */\n.a { color: var(--tt-text); } // see #abc\n.b { color: #fff; }'
+    const lines = withoutComments(css).split('\n')
+    expect(lines.filter((l) => /#[0-9a-fA-F]{3,8}\b/.test(l))).toEqual(['.b { color: #fff; }'])
   })
 
   it('defines Inter as the UI font and one accent, with amber and red apart', () => {
@@ -67,6 +78,10 @@ describe('skin tokens', () => {
     const t = tokens()
     expect(DATA_PALETTE.map((_, i) => t.get(`--tt-data-${i}`))).toEqual([...DATA_PALETTE])
     expect(RAMP_PALETTE.map((_, i) => t.get(`--tt-ramp-${i}`))).toEqual([...RAMP_PALETTE])
+    expect(DWELL_PALETTE.map((_, i) => t.get(`--tt-dwell-${i}`))).toEqual([...DWELL_PALETTE])
+    expect(LENGTH_PALETTE.map((_, i) => t.get(`--tt-length-${i}`))).toEqual([...LENGTH_PALETTE])
+    expect([...t.keys()].filter((k) => /^--tt-dwell-\d+$/.test(k))).toHaveLength(DWELL_PALETTE.length)
+    expect([...t.keys()].filter((k) => /^--tt-length-\d+$/.test(k))).toHaveLength(LENGTH_PALETTE.length)
     // no extra numbered token without a palette entry
     expect([...t.keys()].filter((k) => /^--tt-data-\d+$/.test(k))).toHaveLength(DATA_PALETTE.length)
     expect([...t.keys()].filter((k) => /^--tt-ramp-\d+$/.test(k))).toHaveLength(RAMP_PALETTE.length)

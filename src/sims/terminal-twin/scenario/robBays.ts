@@ -11,7 +11,8 @@
  *
  * Rules [A]:
  * - Bays: `round(robBayFraction x bays)` of the vessel's bays, at least one bay always left to work.
- * - Fill: `robFill` (default 70%) of the hold cells and of the deck cells of the ROB bays, spread unevenly over the rows.
+ * - Fill: `robFill` (default 70%) of the hold cells and of the deck cells of the ROB bays, level over the rows (#164:
+ *   the tops of the stacks of a section differ by at most one tier).
  * - Stacking (TT-R07): bottom up, twin-20 cells first, then 40 ft cells, never a 20 on a 40. Heavier boxes lower within
  *   a kind of cell.
  * - POD: a port the service calls after this terminal (the rotation after `terminal`; the others when it is last).
@@ -22,6 +23,9 @@ import { cellCapacity, cellsPerBay, stackBaseTier, vesselClass, vesselSlotId, ty
 
 /** [A] Default fill level of the ROB bays. */
 export const DEFAULT_ROB_FILL = 0.7
+
+/** [A] Target arrival fill of a normally stowed vessel (discharge plus ROB boxes, share of all cells): the middle of a normal 60 to 80 %. */
+export const NORMAL_ARRIVAL_FILL = 0.7
 
 /** One display-only ROB box: its slot, ISO type, POD, line and weight class (plus what the renderers need). */
 export interface RobBox {
@@ -44,6 +48,7 @@ export interface RobBox {
 }
 
 export const robBayFractionOf = (config: Pick<ScenarioConfig, 'robBayFraction'>): number => config.robBayFraction ?? 0
+export const arrivalFillOf = (config: Pick<ScenarioConfig, 'arrivalFill'>): number => config.arrivalFill ?? 0
 export const robFillOf = (config: Pick<ScenarioConfig, 'robFill'>): number => config.robFill ?? DEFAULT_ROB_FILL
 
 /** The ports the service calls after this terminal, in call order; the other ports when the terminal is last. */
@@ -54,19 +59,59 @@ export function laterPorts(rotation: PortRotation): string[] {
 }
 
 /** Validation messages (empty = valid). */
-export function validateRob(config: Pick<ScenarioConfig, 'robBayFraction' | 'robFill'>): string[] {
+export function validateRob(config: Pick<ScenarioConfig, 'robBayFraction' | 'robFill' | 'arrivalFill'>): string[] {
   const out: string[] = []
   const f = config.robBayFraction
   if (f !== undefined && !(f >= 0 && f < 1)) out.push('robBayFraction must be from 0 up to (not including) 1')
   const fill = config.robFill
   if (fill !== undefined && !(fill > 0 && fill <= 1)) out.push('robFill must be above 0 and at most 1')
+  const af = config.arrivalFill
+  if (af !== undefined && !(af > 0 && af < 1)) out.push('arrivalFill must be above 0 and below 1')
   return out
 }
 
-/** The ROB bays of one vessel (sorted bay indices); empty with the default fraction 0. */
-export function pickRobBays(config: Pick<ScenarioConfig, 'robBayFraction'>, seed: number, v: Pick<VesselConfig, 'id' | 'sizeClass'>): number[] {
+/** Cells a box takes on average: a 20 ft box half a cell (twin-20), a 40 or 40HC a whole one. */
+export function cellsOfBoxes(count: number, sizeMix: Partial<Record<ContainerSize, number>>): number {
+  const w20 = sizeMix['20'] ?? 0
+  const wBig = (sizeMix['40'] ?? 0) + (sizeMix['40HC'] ?? 0)
+  const p20 = w20 + wBig > 0 ? w20 / (w20 + wBig) : 0
+  return count * (p20 * 0.5 + (1 - p20))
+}
+
+/**
+ * Extra ROB bays that bring a vessel to the scenario's arrival fill (#148). The working bays must keep room for the
+ * call's discharge cells plus its load, transshipment and empties cells (10 % spare); within that, the count whose fill
+ * (discharge cells plus the filled ROB cells, over every cell of the hull) is nearest `arrivalFill`; ties take fewer bays.
+ * 0 when `arrivalFill` is absent or the call alone already reaches it. `reservedBoxes` is the load side of the call.
+ */
+export function arrivalRobBayCount(
+  config: Pick<ScenarioConfig, 'arrivalFill' | 'robFill' | 'cargo'>,
+  v: Pick<VesselConfig, 'sizeClass' | 'discharge' | 'sizeMix'>,
+  reservedBoxes: number,
+): number {
+  const target = arrivalFillOf(config)
+  if (target <= 0) return 0
+  const spec = vesselClass(v.sizeClass)
+  const mix = v.sizeMix ?? config.cargo.sizeMix
+  const dischargeCells = cellsOfBoxes(v.discharge, mix)
+  const needed = (dischargeCells + cellsOfBoxes(reservedBoxes, mix)) * 1.1
+  const perBay = cellsPerBay(spec)
+  const total = cellCapacity(spec)
+  const maxBays = Math.min(spec.bays - 1, Math.max(0, Math.floor((total - needed) / perBay)))
+  const robPerBay = robFillOf(config) * perBay
+  let best = 0
+  for (let n = 1; n <= maxBays; n++)
+    if (Math.abs((dischargeCells + n * robPerBay) / total - target) < Math.abs((dischargeCells + best * robPerBay) / total - target)) best = n
+  return best
+}
+
+/**
+ * The ROB bays of one vessel (sorted bay indices): `round(robBayFraction x bays)`, or `minBays` (the arrival-fill count)
+ * when that is more; empty with the default fraction 0 and no arrival fill.
+ */
+export function pickRobBays(config: Pick<ScenarioConfig, 'robBayFraction'>, seed: number, v: Pick<VesselConfig, 'id' | 'sizeClass'>, minBays = 0): number[] {
   const bays = vesselClass(v.sizeClass).bays
-  const n = Math.min(bays - 1, Math.max(0, Math.round(robBayFractionOf(config) * bays)))
+  const n = Math.min(bays - 1, Math.max(0, minBays, Math.round(robBayFractionOf(config) * bays)))
   if (n === 0) return []
   const rng = propsStream(seed, `rob-bays:${v.id}`)
   const pool = Array.from({ length: bays }, (_, i) => i)
@@ -94,25 +139,21 @@ function weighted<K extends string>(weights: Partial<Record<K, number>>, draw: n
   return entries[entries.length - 1][0]
 }
 
-/** Split `total` cells over stacks of at most `caps[i]` (the hull profile shortens the outer hold stacks): an even share, then random moves of one cell between stacks. */
-function stackHeights(total: number, caps: readonly number[], rng: () => number): number[] {
-  const n = caps.length
-  const h = Array.from({ length: n }, (_, i) => Math.min(caps[i], Math.floor(total / n) + (i < total % n ? 1 : 0)))
-  let left = total - h.reduce((a, b) => a + b, 0)
-  for (let i = 0; left > 0 && i < n * 64; i++) {
-    const r = i % n
-    if (h[r] < caps[r]) {
-      h[r]++
-      left--
-    }
-  }
-  for (let k = 0; k < n * 2; k++) {
-    const a = Math.floor(rng() * n)
-    const b = Math.floor(rng() * n)
-    if (a !== b && h[a] > 0 && h[b] < caps[b]) {
-      h[a]--
-      h[b]++
-    }
+/**
+ * Split `total` cells over the stacks of a section, level (#164): each next cell goes on the stack whose top is lowest
+ * (ties nearest the centreline). `bases[i]` is the stack's lowest tier (the hull profile lifts the outer hold stacks),
+ * `top` the section's top tier, so the tops of the stacks differ by at most one tier.
+ */
+function stackHeights(total: number, bases: readonly number[], top: number): number[] {
+  const n = bases.length
+  const mid = (n - 1) / 2
+  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b)
+  const h = new Array<number>(n).fill(0)
+  for (let left = total; left > 0; left--) {
+    let pick = -1
+    for (const i of order) if (bases[i] + h[i] < top && (pick < 0 || bases[i] + h[i] < bases[pick] + h[pick])) pick = i
+    if (pick < 0) break
+    h[pick]++
   }
   return h
 }
@@ -143,8 +184,9 @@ export function fillRobBays(config: ScenarioConfig, seed: number, v: VesselConfi
 
   for (const bay of robBays) {
     for (const deck of [false, true]) {
-      const caps = Array.from({ length: spec.rows }, (_, row) => (deck ? spec.holdTiers + spec.deckTiers : spec.holdTiers) - stackBaseTier(spec, row, deck))
-      const heights = stackHeights(Math.round(fill * caps.reduce((a, b) => a + b, 0)), caps, rng)
+      const top = deck ? spec.holdTiers + spec.deckTiers : spec.holdTiers
+      const bases = Array.from({ length: spec.rows }, (_, row) => stackBaseTier(spec, row, deck))
+      const heights = stackHeights(Math.round(fill * bases.reduce((n, base) => n + top - base, 0)), bases, top)
       for (let row = 0; row < spec.rows; row++) {
         const from = stackBaseTier(spec, row, deck)
         // cells bottom-up: some twin-20 cells, then 40 ft cells; each group drawn heaviest first

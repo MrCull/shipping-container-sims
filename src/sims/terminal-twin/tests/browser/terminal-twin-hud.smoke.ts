@@ -7,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
 
-const PRESETS = ['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras — peak day']
+const PRESETS = ['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras, peak day']
 // The tight 1280x720 layout is checked on every preset; 1920x1080 only on the small one (software WebGL makes the
 // big presets at that size take minutes, and the extra room cannot cause an overlap the small viewport does not).
 const CASES = [

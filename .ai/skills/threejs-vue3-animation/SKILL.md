@@ -11,7 +11,7 @@ description: >-
 
 ## 0. Sim-Scoped Folder Layout
 
-This project hosts many independent sims under `src/sims/`. **All** Three.js code, scene composables, renderers, builders, and 3D assets for a sim live inside its own sub-folder — nothing goes into the top-level `src/` directories unless it is genuinely shared by multiple sims.
+This project hosts many independent sims under `src/sims/`. **All** Three.js code, scene composables, renderers, builders, and 3D assets for a sim live inside its own sub-folder, nothing goes into the top-level `src/` directories unless it is genuinely shared by multiple sims.
 
 Recommended layout inside a sim that uses Three.js:
 
@@ -161,9 +161,9 @@ gltfLoader.setDRACOLoader(dracoLoader)
 
 Three useful camera modes:
 
-1. **Overview/Orbit** — `OrbitControls`, centered on terminal. Good for wide views.
-2. **Follow** — Camera tracks a moving entity (crane, truck). Lerp camera position toward target.
-3. **First-person** — Attached to equipment operator position. Good for training sims.
+1. **Overview/Orbit**, `OrbitControls`, centered on terminal. Good for wide views.
+2. **Follow**, Camera tracks a moving entity (crane, truck). Lerp camera position toward target.
+3. **First-person**, Attached to equipment operator position. Good for training sims.
 
 ### Smooth Transitions Between Modes
 
@@ -192,10 +192,10 @@ function transitionCamera(
 ### Time-Based Movement (CRITICAL: never frame-based)
 
 ```ts
-// WRONG — frame-rate dependent:
+// WRONG, frame-rate dependent:
 // position.x += speed
 
-// RIGHT — time-based:
+// RIGHT, time-based:
 // position.x += speed * deltaTime
 ```
 
@@ -327,7 +327,7 @@ watch(
 
 - **Never** create Three.js objects in Vue reactive state (not serializable, memory leaks).
 - **Always** dispose geometries, materials, and textures in `onUnmounted`.
-- Don't use Vue watchers at 60 fps — watchers for state changes, render loop for interpolation.
+- Don't use Vue watchers at 60 fps, watchers for state changes, render loop for interpolation.
 - Use `Object3D` hierarchy for compound equipment (crane = base > boom > trolley > spreader).
 - Keep render loop lean: no allocations, reuse `Vector3` / `Matrix4` instances.
 
@@ -335,10 +335,10 @@ watch(
 
 ## 12. Debug Helpers
 
-- `AxesHelper` — orientation reference
-- `GridHelper` — ground plane reference
-- `Stats.js` — FPS monitoring
-- `lil-gui` — runtime parameter tweaking
-- Wireframe mode — collision debugging
+- `AxesHelper`, orientation reference
+- `GridHelper`, ground plane reference
+- `Stats.js`, FPS monitoring
+- `lil-gui`, runtime parameter tweaking
+- Wireframe mode, collision debugging
 
 All code in this skill assumes Vue 3 Composition API with `<script setup lang="ts">`. File paths in examples are relative to the sim's own folder (`src/sims/<sim-id>/`) unless explicitly prefixed with `@/` or `src/`.

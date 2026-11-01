@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Vessel visit lifecycle
+// Box Empire, Vessel visit lifecycle
 // ---------------------------------------------------------------------------
 
 import type {
@@ -214,7 +214,7 @@ export function dischargeContainerFromVessel(
   if (slot) slot.containerId = null
 }
 
-// 'tier' parameter is actually bay number (API compat — callers use getNextLoadSlot which returns bay)
+// 'tier' parameter is actually bay number (API compat, callers use getNextLoadSlot which returns bay)
 export function loadContainerOnVessel(
   vessel: VesselVisit,
   containerId: string,

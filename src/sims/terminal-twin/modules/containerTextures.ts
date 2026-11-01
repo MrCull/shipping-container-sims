@@ -1,5 +1,5 @@
 /**
- * Close-up container textures (#119): paints one box's `ContainerMarkings` onto a canvas laid out as
+ * Close-up container textures (#119, #143): paints one box's `ContainerMarkings` onto a canvas laid out as
  * `TEXTURE_LAYOUT` (closeupGeometry.ts), plus the two maps every close-up box shares: a corrugation normal map and
  * a roughness map (wear). Needs a DOM canvas, so it is exercised by the browser smoke specs, not Vitest.
  *
@@ -10,6 +10,8 @@ import * as THREE from 'three'
 import type { ContainerSize } from '../scenario/types'
 import type { ContainerMarkings, WeightPlate } from './containerMarkings'
 import { CORRUGATION_PITCH_M, TEXTURE_LAYOUT, TEXTURE_SIZE, type Region } from './closeupGeometry'
+import type { AtlasBackend, AtlasPage, CloseupSource, PaintJob } from './containerCloseups'
+import type { Face } from './exposedFaces'
 
 const DIMS: Record<ContainerSize, { length: number; height: number; width: number }> = {
   '20': { length: 6.058, height: 2.591, width: 2.438 },
@@ -211,15 +213,45 @@ export function paintContainer(ctx: CanvasRenderingContext2D, markings: Containe
   drawWear(ctx, TEXTURE_LAYOUT.front, W, H, markings, paint)
 }
 
-/** A texture for one box (not shared: the instancer caches it per box and disposes it on eviction). */
-export function makeContainerTexture(markings: ContainerMarkings, size: ContainerSize, bodyColour: string): THREE.Texture {
-  const c = canvas(TEXTURE_SIZE.w, TEXTURE_SIZE.h)
-  const ctx = c.getContext('2d')
-  if (ctx) paintContainer(ctx, markings, size, bodyColour)
-  const tex = new THREE.CanvasTexture(c)
-  tex.colorSpace = THREE.SRGBColorSpace
-  tex.anisotropy = 4
-  return tex
+const FACE_REGION: Record<Exclude<Face, 'bottom'>, Region> = {
+  top: TEXTURE_LAYOUT.roof,
+  door: TEXTURE_LAYOUT.door,
+  front: TEXTURE_LAYOUT.front,
+  sideP: TEXTURE_LAYOUT.side,
+  sideN: TEXTURE_LAYOUT.side,
+}
+
+/**
+ * The canvas backend of the close-up face atlas (#143): pages are canvas textures, and a box is painted whole into one
+ * scratch canvas (`paintContainer`) whose face regions are then copied into the atlas tiles.
+ */
+export function canvasAtlasBackend(): AtlasBackend {
+  let scratch: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null = null
+  return {
+    createPage(w: number, h: number): AtlasPage {
+      const c = canvas(w, h)
+      const texture = new THREE.CanvasTexture(c)
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.anisotropy = 4
+      return { texture, ctx: c.getContext('2d') }
+    },
+    paint(source: CloseupSource, size: ContainerSize, jobs: PaintJob[]): void {
+      if (!scratch) {
+        const c = canvas(TEXTURE_SIZE.w, TEXTURE_SIZE.h)
+        const ctx = c.getContext('2d')
+        if (!ctx) return
+        scratch = { canvas: c, ctx }
+      }
+      paintContainer(scratch.ctx, source.markings, size, source.bodyColour)
+      for (const job of jobs) {
+        const dst = job.page.ctx
+        const r = FACE_REGION[job.face as keyof typeof FACE_REGION]
+        if (!dst || !r) continue
+        dst.clearRect(job.rect.x, job.rect.y, job.rect.w, job.rect.h)
+        dst.drawImage(scratch.canvas, r.x, r.y, r.w, r.h, job.rect.x, job.rect.y, job.rect.w, job.rect.h)
+      }
+    },
+  }
 }
 
 let shared: { normal: THREE.Texture; roughness: THREE.Texture } | null = null

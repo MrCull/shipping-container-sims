@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Canvas-texture based container materials
+// Box Empire, Canvas-texture based container materials
 // Ported from stowage-master with adaptation for shipping-line liveries.
 // Produces realistic PBR containers: corrugated sides, ISO markings, door panels.
 // ---------------------------------------------------------------------------

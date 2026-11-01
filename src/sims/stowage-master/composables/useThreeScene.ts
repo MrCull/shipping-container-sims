@@ -7,7 +7,7 @@ const KEY_PAN_SPEED  = 20   // units per second
 const KEY_ZOOM_SPEED = 25    // units per second
 
 export interface GameSceneRefs {
-  /** Plain (non-reactive) Three.js objects — do NOT put these in shallowRef */
+  /** Plain (non-reactive) Three.js objects, do NOT put these in shallowRef */
   getScene: () => THREE.Scene | null
   getCamera: () => THREE.PerspectiveCamera | null
   isReady: Ref<boolean>
@@ -17,7 +17,7 @@ export interface GameSceneRefs {
 }
 
 export function useGameThreeScene(canvasRef: Ref<HTMLCanvasElement | null>): GameSceneRefs {
-  // Plain variables — NOT shallowRef/ref — Three.js objects must never be proxied
+  // Plain variables, NOT shallowRef/ref, Three.js objects must never be proxied
   let renderer: THREE.WebGLRenderer | null = null
   let scene: THREE.Scene | null = null
   let camera: THREE.PerspectiveCamera | null = null

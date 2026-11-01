@@ -90,7 +90,7 @@ Pointer interaction follows this pattern:
 
 ## Audio
 
-Audio assets are local to `assets/audio/`. Add new Contenga sounds there and register them through the existing audio modules. Keep user-gesture/browser autoplay constraints in mind: audio initialization is intentionally triggered from play/interaction paths.
+Audio assets are local to `assets/audio/`. Add new Contenga sounds there and register them through the existing audio modules. Every sound plays at its own gain times the shared master gain from `@/stores/audio`: `playStackSound(name, volume)` uses `gainFor(volume)`, and the music in `useGameMusic.ts` follows the slider live (`followMasterGain`); mute or volume 0 is silent. Keep user-gesture/browser autoplay constraints in mind: audio initialization is intentionally triggered from play/interaction paths.
 
 ## Tuning
 

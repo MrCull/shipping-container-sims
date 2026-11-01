@@ -1,4 +1,4 @@
-// Pure fetch-based client for the OpenRouter Decisions API (Jev). No Vue or Pinia imports here —
+// Pure fetch-based client for the OpenRouter Decisions API (Jev). No Vue or Pinia imports here,
 // keep this module testable in isolation. See .ai/plans/stowage-master/01-jev-client-and-key.md §1.1
 // for the verified provider facts (endpoint, headers, error table) this file implements.
 
@@ -134,7 +134,7 @@ async function fetchWithTimeout(
 
 /**
  * Validates a candidate API key against `GET /api/v1/key`. The key is only passed as a
- * parameter here — it is not read from, or written to, the vault. Callers store the key
+ * parameter here, it is not read from, or written to, the vault. Callers store the key
  * (via `setApiKey`) only after this resolves `ok: true`.
  */
 export async function validateApiKey(

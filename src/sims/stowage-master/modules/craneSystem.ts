@@ -155,7 +155,7 @@ function addAFrameLegs(
   const legMat = new THREE.MeshPhongMaterial({ color, shininess: 30 })
 
   for (const sign of [-1, 1]) {
-    // Outer leg — inclined
+    // Outer leg, inclined
     const legGeo = new THREE.BoxGeometry(1.1, height, 1.1)
     const leg = new THREE.Mesh(legGeo, legMat)
     leg.position.set(0, height / 2, centerZ + sign * spread * 0.5)

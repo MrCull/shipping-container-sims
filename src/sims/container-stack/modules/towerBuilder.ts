@@ -87,7 +87,7 @@ export function countContainersInLayer(layer: TowerLayer): number {
   return layer.slots.filter(s => s !== null).length
 }
 
-/** True when every defined layer is full (no gaps) — starting tower shape. */
+/** True when every defined layer is full (no gaps), starting tower shape. */
 export function isTowerFullyStacked(layers: TowerLayer[]): boolean {
   return layers.length > 0 && layers.every(L => isLayerComplete(L))
 }

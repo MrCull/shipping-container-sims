@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Pathfinding (Dijkstra on the terminal road graph)
+// Box Empire, Pathfinding (Dijkstra on the terminal road graph)
 // ---------------------------------------------------------------------------
 
 import type { PathGraph, Position } from '../types'

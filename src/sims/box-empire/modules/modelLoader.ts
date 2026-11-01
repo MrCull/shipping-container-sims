@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Async GLB model loader with caching
+// Box Empire, Async GLB model loader with caching
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'

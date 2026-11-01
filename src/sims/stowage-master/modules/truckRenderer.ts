@@ -80,7 +80,7 @@ export async function createTruckGLB(): Promise<THREE.Group> {
   trailerRoot.position.z = -tCenter.z   // center on Z
 
   // ── Cab ───────────────────────────────────────────────────────────────────────
-  // Use UNIFORM scale (like the ship renderer) — this is the only way to guarantee
+  // Use UNIFORM scale (like the ship renderer), this is the only way to guarantee
   // no squashing or distortion regardless of rotation angle.
   // Scale is derived from the model's actual bounding box so proportions are preserved.
   cabRoot.rotation.y = TRUCK.cabRotationY

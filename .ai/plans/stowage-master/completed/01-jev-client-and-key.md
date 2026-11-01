@@ -1,4 +1,4 @@
-# 01 — Jev types, config, key vault, client and store
+# 01, Jev types, config, key vault, client and store
 
 > Part of the **Stowage Master × Jev** plan set. Read [00-jev-overview.md](00-jev-overview.md) first.
 > Depends on: nothing. Blocks: 02 (types), 03 (store), 04.

@@ -2,15 +2,15 @@
 
 ## Context
 
-The reach stacker in box-empire is currently rendered entirely with procedural Three.js geometry (BoxGeometry meshes). Trucks and vessels already use GLB models with a procedural fallback pattern — the same approach should now be applied to the reach stacker.
+The reach stacker in box-empire is currently rendered entirely with procedural Three.js geometry (BoxGeometry meshes). Trucks and vessels already use GLB models with a procedural fallback pattern, the same approach should now be applied to the reach stacker.
 
 A source model `reach-stacker-rivana.3mf` (7.2 MB) exists in `available-media/3d-models/`. A previously converted GLB (`reach-stacker-spreaker.glb`, 48 MB) was deemed too large for web use. The goal is to compress/convert it to a usable size (< ~10 MB) and wire it in using the exact same pattern as `truckRenderer.ts`.
 
 ---
 
-## Step 0 — One-Time Manual Conversion (pre-requisite, outside code)
+## Step 0, One-Time Manual Conversion (pre-requisite, outside code)
 
-**Option A — gltf-pipeline CLI (fastest, from existing GLB):**
+**Option A, gltf-pipeline CLI (fastest, from existing GLB):**
 ```
 npx gltf-pipeline -i available-media/3d-models/reach-stacker-spreaker.glb \
   -o src/sims/box-empire/assets/models/reach-stacker-rivana.glb \
@@ -18,14 +18,14 @@ npx gltf-pipeline -i available-media/3d-models/reach-stacker-spreaker.glb \
 ```
 Target: under 8 MB. If still too large, increase compression level to 10.
 
-**Option B — Blender re-export from 3MF (best quality control):**
+**Option B, Blender re-export from 3MF (best quality control):**
 1. File > Import > 3MF → `reach-stacker-rivana.3mf`
 2. Object > Apply > All Transforms
 3. File > Export > glTF 2.0, enable Draco compression, limit textures to 1024px
 4. Name the boom/arm assembly node **"Boom"** in the Outliner before exporting
 5. Save to `src/sims/box-empire/assets/models/reach-stacker-rivana.glb`
 
-**After conversion — inspect the GLB** at https://gltf.report and record:
+**After conversion, inspect the GLB** at https://gltf.report and record:
 - Overall height in metres (for `targetHeight`)
 - Forward direction (which axis faces +Z in Three.js terms → sets `rotationY`)
 - Name of the boom/arm node in the scene hierarchy (for `boomNodeName`)
@@ -36,7 +36,7 @@ Target: under 8 MB. If still too large, increase compression level to 10.
 
 ---
 
-## Step 1 — (If Draco) Add DRACOLoader to `modelLoader.ts`
+## Step 1, (If Draco) Add DRACOLoader to `modelLoader.ts`
 
 **File:** `src/sims/box-empire/modules/modelLoader.ts`
 
@@ -54,7 +54,7 @@ No other changes to `modelLoader.ts`.
 
 ---
 
-## Step 2 — Add `RS_GLB` Constants to `config.ts`
+## Step 2, Add `RS_GLB` Constants to `config.ts`
 
 **File:** `src/sims/box-empire/modules/config.ts`
 
@@ -62,7 +62,7 @@ Add after the existing `VESSEL_GLB` block:
 
 ```typescript
 export const RS_GLB = {
-  /** Uniform scale target — set after inspecting converted GLB height in gltf.report */
+  /** Uniform scale target, set after inspecting converted GLB height in gltf.report */
   targetHeight: 5.4,
   /** rotation.y to align GLB forward axis to +Z. Try Math.PI if model faces backward. */
   rotationY: 0,
@@ -75,11 +75,11 @@ Tune `targetHeight`, `rotationY`, and `boomNodeName` after inspecting the conver
 
 ---
 
-## Step 3 — Modify `equipmentRenderer.ts`
+## Step 3, Modify `equipmentRenderer.ts`
 
 **File:** `src/sims/box-empire/modules/equipmentRenderer.ts`
 
-### 3a — New imports and URL export
+### 3a, New imports and URL export
 
 Add at the top alongside existing imports:
 
@@ -93,7 +93,7 @@ export const RS_GLB_URL = new URL(
 ).href
 ```
 
-### 3b — New `buildReachStackerFromGLB()` module-level function
+### 3b, New `buildReachStackerFromGLB()` module-level function
 
 Add before the `EquipmentRenderer` class definition, following the same structure as `buildTruckGroupFromGLB()` in `truckRenderer.ts`:
 
@@ -118,7 +118,7 @@ function buildReachStackerFromGLB(
   group.userData['isGlb'] = true
   group.add(glbRoot)
 
-  // Locate boom node — exact name match first, then partial match
+  // Locate boom node, exact name match first, then partial match
   let boomGroup: THREE.Group | null = null
   glbRoot.traverse(obj => {
     if (!boomGroup && obj.name === RS_GLB.boomNodeName && obj instanceof THREE.Group) {
@@ -133,14 +133,14 @@ function buildReachStackerFromGLB(
     })
   }
   if (!boomGroup) {
-    console.warn('Box Empire: RS GLB — boom node not found; boom will not animate')
+    console.warn('Box Empire: RS GLB, boom node not found; boom will not animate')
   }
 
   return { group, boomGroup }
 }
 ```
 
-### 3c — Rename existing `createReachStacker()` → `createProceduralReachStacker()`
+### 3c, Rename existing `createReachStacker()` → `createProceduralReachStacker()`
 
 The existing procedural method becomes the fallback. Rename it (private) so the new entry-point can use it:
 
@@ -148,7 +148,7 @@ The existing procedural method becomes the fallback. Rename it (private) so the 
 private createProceduralReachStacker(): THREE.Group { ... }
 ```
 
-### 3d — New `createReachStackerMesh()` private method
+### 3d, New `createReachStackerMesh()` private method
 
 ```typescript
 private createReachStackerMesh(): { group: THREE.Group; boomGroup: THREE.Group | undefined } {
@@ -162,7 +162,7 @@ private createReachStackerMesh(): { group: THREE.Group; boomGroup: THREE.Group |
 }
 ```
 
-### 3e — Update call site and add async GLB swap
+### 3e, Update call site and add async GLB swap
 
 In the `update()` method, where equipment meshes are created (the `if (!mesh)` block):
 
@@ -204,7 +204,7 @@ if (!group.userData['isGlb'] && eq.type === 'reach_stacker') {
 }
 ```
 
-### 3f — Boom animation (no change needed)
+### 3f, Boom animation (no change needed)
 
 The existing animation code in `update()` already uses `p?.boomGroup` guard:
 ```typescript
@@ -213,11 +213,11 @@ if (p?.boomGroup && eq.type === 'reach_stacker') {
   p.boomGroup.rotation.x = -0.15 - t * 0.60
 }
 ```
-This works for both the procedural and GLB paths. If the GLB has no detectable boom node, `boomGroup` is `undefined` and the guard silently skips animation — acceptable first-pass behaviour.
+This works for both the procedural and GLB paths. If the GLB has no detectable boom node, `boomGroup` is `undefined` and the guard silently skips animation, acceptable first-pass behaviour.
 
 ---
 
-## Step 4 — Pre-Warm in `useThreeScene.ts`
+## Step 4, Pre-Warm in `useThreeScene.ts`
 
 **File:** `src/sims/box-empire/composables/useThreeScene.ts`
 
@@ -237,9 +237,9 @@ loadModel(RS_GLB_URL).catch(e => console.warn('Box Empire: RS GLB pre-warm faile
 
 | File | Change |
 |------|--------|
-| `src/sims/box-empire/assets/models/reach-stacker-rivana.glb` | New — place converted GLB here |
+| `src/sims/box-empire/assets/models/reach-stacker-rivana.glb` | New, place converted GLB here |
 | `src/sims/box-empire/modules/config.ts` | Add `RS_GLB` constants |
-| `src/sims/box-empire/modules/equipmentRenderer.ts` | Main change — GLB loading + swap |
+| `src/sims/box-empire/modules/equipmentRenderer.ts` | Main change, GLB loading + swap |
 | `src/sims/box-empire/composables/useThreeScene.ts` | Add pre-warm call |
 | `src/sims/box-empire/modules/modelLoader.ts` | Add DRACOLoader (only if Draco used) |
 
@@ -249,7 +249,7 @@ loadModel(RS_GLB_URL).catch(e => console.warn('Box Empire: RS GLB pre-warm faile
 
 1. Run `npm run dev` and open box-empire
 2. In the browser devtools Network tab, confirm `reach-stacker-rivana.glb` loads successfully
-3. Start the tutorial — a reach stacker should appear in the yard
+3. Start the tutorial, a reach stacker should appear in the yard
 4. The reach stacker should display the GLB model (not the blocky procedural version)
 5. When the RS picks up a container, the boom should angle upward (if boom node was found)
 6. Check console for any `Box Empire: RS GLB` warnings
@@ -257,7 +257,7 @@ loadModel(RS_GLB_URL).catch(e => console.warn('Box Empire: RS GLB pre-warm faile
 
 ## Known Uncertainties (resolve during Step 0)
 
-- `boomNodeName`: depends on GLB hierarchy — update `RS_GLB.boomNodeName` in config after inspection
-- `rotationY`: depends on GLB's exported orientation — start with `0`, try `Math.PI` if model faces wrong way
+- `boomNodeName`: depends on GLB hierarchy, update `RS_GLB.boomNodeName` in config after inspection
+- `rotationY`: depends on GLB's exported orientation, start with `0`, try `Math.PI` if model faces wrong way
 - `targetHeight`: measure actual GLB height in gltf.report
 - Draco vs. no Draco: if gltf-pipeline produces a small enough GLB without Draco, skip `modelLoader.ts` changes entirely

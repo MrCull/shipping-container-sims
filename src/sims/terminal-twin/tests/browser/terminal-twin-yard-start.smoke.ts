@@ -4,6 +4,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openSetupTab } from './scenarioPicker'
 
 const SCENARIO = 'landside-morning-peak'
 
@@ -14,6 +15,7 @@ async function openDialog(page: Page) {
   await page.getByRole('button', { name: /new scenario/i }).click()
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await expect(dialog).toBeVisible()
+  await openSetupTab(dialog, 'yard')
   return dialog
 }
 

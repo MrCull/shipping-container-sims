@@ -31,7 +31,7 @@ const emit = defineEmits<{
         You've mastered the basics of terminal operations!
       </p>
       <p class="next-level-hint">
-        Ready for what comes after the lesson? Continue to the next chapter — your own terminal story.
+        Ready for what comes after the lesson? Continue to the next chapter, your own terminal story.
       </p>
 
       <div class="stats-grid">
@@ -79,7 +79,7 @@ const emit = defineEmits<{
           class="next-level-btn"
           @click="emit('continueCareer')"
         >
-          Next: Full Game Mode — Build Your First Terminal
+          Next: Full Game Mode, Build Your First Terminal
         </button>
         <button
           type="button"

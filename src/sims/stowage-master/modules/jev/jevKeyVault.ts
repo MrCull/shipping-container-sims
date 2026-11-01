@@ -6,7 +6,7 @@
 // - The Pinia store (`store/jevStore.ts`) mirrors only a boolean `hasKey`, so Vue devtools
 //   never shows the key.
 // - The key lives in this module-scoped variable only, so it is lost on a full page reload
-//   but survives in-app (SPA) route changes — that counts as "in memory for this tab".
+//   but survives in-app (SPA) route changes, that counts as "in memory for this tab".
 // - `clearApiKey()` runs on "Forget key", on "Disable Jev", and automatically on a 401/403.
 // - The key input field must be `type="password"`, `autocomplete="off"`, `spellcheck="false"`,
 //   with no `name` attribute (so browsers don't offer to save it); clear the input's ref as

@@ -2,8 +2,13 @@
 import { ref, computed, watch } from 'vue'
 import { useGameStore } from '../../store/gameStore'
 import { SOUNDS } from '../../modules/audio'
+import { useAudioStore } from '@/stores/audio'
+
+/** The briefing voice's own gain at full master volume. */
+const BRIEFING_VOICE_VOLUME = 0.85
 
 const store = useGameStore()
+const audioStore = useAudioStore()
 const pageIndex = ref(0)
 const playedCueKeys = ref(new Set<string>())
 
@@ -26,8 +31,10 @@ watch(currentPage, page => {
   playedCueKeys.value.add(cueKey)
   const soundUrl = SOUNDS[page.soundCue]
   if (!soundUrl) return
+  // Honours mute and the master volume like every other sound in the app.
+  if (audioStore.masterGain === 0) return
   const sound = new Audio(soundUrl)
-  sound.volume = 0.85
+  sound.volume = audioStore.gainFor(BRIEFING_VOICE_VOLUME)
   void sound.play().catch(() => {})
 }, { immediate: true })
 

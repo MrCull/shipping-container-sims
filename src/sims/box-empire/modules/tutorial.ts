@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Tutorial step definitions
+// Box Empire, Tutorial step definitions
 // ---------------------------------------------------------------------------
 
 import type { TutorialStep, BoxEmpireState } from '../types'
@@ -15,7 +15,7 @@ export function createTutorialSteps(): TutorialStep[] {
     {
       id: 'accept-vessel',
       stepNumber: 2,
-      prompt: "A vessel has been announced: Tiny Feeder — inbound with 5 import containers and ready to load 5 exports. Accept the vessel call to bring her in.",
+      prompt: "A vessel has been announced: Tiny Feeder, inbound with 5 import containers and ready to load 5 exports. Accept the vessel call to bring her in.",
       condition: (s: BoxEmpireState) => {
         const vessel = s.vesselVisits[0]
         return !!vessel && vessel.state !== 'announced'
@@ -39,14 +39,14 @@ export function createTutorialSteps(): TutorialStep[] {
     {
       id: 'open-gate',
       stepNumber: 4,
-      prompt: 'First container is on the quay! Open the gatehouse — export trucks with containers are waiting outside, and import pickup trucks are ready to collect.',
+      prompt: 'First container is on the quay! Open the gatehouse, export trucks with containers are waiting outside, and import pickup trucks are ready to collect.',
       condition: (s: BoxEmpireState) => s.gatehouse.exportLaneOpen && s.gatehouse.importLaneOpen,
     },
     {
       id: 'trucks-arriving',
       stepNumber: 5,
       prompt: 'Trucks are rolling in! The reach stacker handles export deliveries into the yard and loads import pickups onto trucks.',
-      // Advance when the vessel enters loading phase — guaranteed to happen before
+      // Advance when the vessel enters loading phase, guaranteed to happen before
       // tutorial completion and avoids snapshot-count races on export lifecycle states.
       condition: (s: BoxEmpireState) => {
         const vessel = s.vesselVisits[0]

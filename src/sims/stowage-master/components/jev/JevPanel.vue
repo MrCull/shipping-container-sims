@@ -36,7 +36,7 @@ const nextMoveDisabled = computed(() =>
 )
 
 const playAllDisabled = computed(() => {
-  if (jev.autoPlay) return false // always clickable — it becomes the Stop button
+  if (jev.autoPlay) return false // always clickable, it becomes the Stop button
   return !jev.hasKey || isRequestBusy.value
 })
 
@@ -268,7 +268,7 @@ onUnmounted(() => {
   position: absolute;
   right: 12px;
   /* Clears KeyboardHint's box, which grows by two rows (and sits at a higher z-index) once
-     Jev is enabled — the same condition this panel is mounted under. */
+     Jev is enabled, the same condition this panel is mounted under. */
   bottom: 300px;
   z-index: 15;
   width: 220px;

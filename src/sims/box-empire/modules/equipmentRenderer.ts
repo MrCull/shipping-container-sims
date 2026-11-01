@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Equipment mesh management (improved quality)
+// Box Empire, Equipment mesh management (improved quality)
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three'
@@ -58,7 +58,7 @@ export class EquipmentRenderer {
     const stepMat      = new THREE.MeshPhongMaterial({ color: 0x777777, shininess: 25 })
 
     // -------------------------------------------------------------------------
-    // 1. MAIN FRAME — two side box-rails + cross members
+    // 1. MAIN FRAME, two side box-rails + cross members
     // -------------------------------------------------------------------------
     for (const sx of [-1, 1]) {
       const rail = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.55, 6.2), orangeDkMat)
@@ -70,7 +70,7 @@ export class EquipmentRenderer {
     }
 
     // -------------------------------------------------------------------------
-    // 2. MAIN BODY — engine + hydraulic bay
+    // 2. MAIN BODY, engine + hydraulic bay
     // -------------------------------------------------------------------------
     const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.70, 3.8), orangeMat)
     body.position.set(0, 2.15, -0.65); body.castShadow = true; group.add(body)
@@ -105,7 +105,7 @@ export class EquipmentRenderer {
     exhCap.position.set(-0.9, 4.76, -1.8); group.add(exhCap)
 
     // -------------------------------------------------------------------------
-    // 3. OPERATOR CAB — right-forward, large glass
+    // 3. OPERATOR CAB, right-forward, large glass
     // -------------------------------------------------------------------------
     const cab = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.60, 1.65), darkMat)
     cab.position.set(0.82, 2.65, 0.72); cab.castShadow = true; group.add(cab)
@@ -134,7 +134,7 @@ export class EquipmentRenderer {
     }
 
     // -------------------------------------------------------------------------
-    // 4. COUNTERWEIGHT — heavy rear block with hazard stripes
+    // 4. COUNTERWEIGHT, heavy rear block with hazard stripes
     // -------------------------------------------------------------------------
     const cw = new THREE.Mesh(new THREE.BoxGeometry(3.3, 1.80, 1.55), cwMat)
     cw.position.set(0, 1.50, -3.15); cw.castShadow = true; group.add(cw)
@@ -151,7 +151,7 @@ export class EquipmentRenderer {
     }
 
     // -------------------------------------------------------------------------
-    // 5. BOOM LIFT CYLINDERS — two large chrome rams from body to boom pivot
+    // 5. BOOM LIFT CYLINDERS, two large chrome rams from body to boom pivot
     //    Fixed in main group; give the A-frame support visual.
     // -------------------------------------------------------------------------
     for (const bx of [-0.30, 0.30]) {
@@ -169,9 +169,9 @@ export class EquipmentRenderer {
     }
 
     // -------------------------------------------------------------------------
-    // 6. TIRES — 4 large single tires (the most distinctive RS feature)
+    // 6. TIRES, 4 large single tires (the most distinctive RS feature)
     // -------------------------------------------------------------------------
-    const tyreR = 0.92      // ~1850mm OD — close to real Kalmar RS tyre
+    const tyreR = 0.92      // ~1850mm OD, close to real Kalmar RS tyre
     const tyreW = 0.62
     const tyreGeo = new THREE.CylinderGeometry(tyreR, tyreR, tyreW, 22)
     const rimGeo  = new THREE.CylinderGeometry(0.45, 0.45, tyreW + 0.04, 16)
@@ -221,7 +221,7 @@ export class EquipmentRenderer {
     }
 
     // -------------------------------------------------------------------------
-    // 8. BOOM GROUP — wide box-section arm (pivot at top-center-front)
+    // 8. BOOM GROUP, wide box-section arm (pivot at top-center-front)
     //    Container positioning formula uses: pivot (0, 3.50, 0.90)
     // -------------------------------------------------------------------------
     const boomGroup = new THREE.Group()
@@ -233,7 +233,7 @@ export class EquipmentRenderer {
     const pivPin = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.1, 10), chromeMat)
     pivPin.rotation.z = Math.PI / 2; pivPin.position.set(0, 0, 0); boomGroup.add(pivPin)
 
-    // Main boom — wide flat box section (real RS boom is wide in X, not tall)
+    // Main boom, wide flat box section (real RS boom is wide in X, not tall)
     const boomOuter = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.55, 5.8), orangeMat)
     boomOuter.position.set(0, 0, 2.9); boomOuter.castShadow = true; boomGroup.add(boomOuter)
     const boomInner = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.35, 5.6), orangeDkMat)
@@ -264,7 +264,7 @@ export class EquipmentRenderer {
     }
 
     // -------------------------------------------------------------------------
-    // 9. SPREADER / HEADBLOCK — large frame with hazard markings
+    // 9. SPREADER / HEADBLOCK, large frame with hazard markings
     //    Stays at boomGroup z=9.2 to keep container-positioning formula valid.
     // -------------------------------------------------------------------------
     // Main crossbar

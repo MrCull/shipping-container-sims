@@ -7,7 +7,7 @@ import type { ContainerState, RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/shc-1sts-2shc-1wtp.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import { sampleFrames, simPerWallSecond, advancedFraction, neverBackwards } from './frameSampling'
-import { pickScenario } from './scenarioPicker'
+import { openSetupTab, pickScenario } from './scenarioPicker'
 
 const FIXTURE = 'shc-1sts-2shc-1wtp'
 
@@ -149,6 +149,7 @@ test('the setup dialog sets the SHC count and kinematics', async ({ page }) => {
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await expect(dialog).toBeVisible()
   await pickScenario(dialog, FIXTURE)
+  await openSetupTab(dialog, 'yard')
   await expect(dialog.getByRole('group', { name: /shuttle carriers/i })).toBeVisible()
   const readout = dialog.getByTestId('tt-shc-readout')
   const before = await readout.textContent()

@@ -1,5 +1,9 @@
 /// <reference types="vite/client" />
 
+/** Injected by Vite `define` (vite.config.ts): ISO build time and short commit hash ("" without git). */
+declare const __BUILD_TIME__: string
+declare const __BUILD_COMMIT__: string
+
 interface ImportMetaEnv {
   /** Optional absolute site URL for canonical/OG tags (e.g. https://staging.example.com). */
   readonly VITE_SITE_ORIGIN?: string

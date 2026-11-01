@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Box Empire — Sim-specific Three.js scene setup
+// Box Empire, Sim-specific Three.js scene setup
 // ---------------------------------------------------------------------------
 
 import { onBeforeUnmount, ref, nextTick, watch, type Ref } from 'vue'

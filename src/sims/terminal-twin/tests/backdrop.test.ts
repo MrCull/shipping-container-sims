@@ -1,3 +1,4 @@
+import { Box3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { buildBackdrop, GENERIC_SCENERY, sceneryFor } from '../modules/backdrop'
 import { presets } from '../scenario/presets'
@@ -5,7 +6,7 @@ import { presets } from '../scenario/presets'
 describe('backdrop', () => {
   it('uses the Algeciras backdrop for the TTI presets only', () => {
     const kinds = Object.fromEntries(Object.keys(presets).map((name) => [name, sceneryFor(name).kind]))
-    expect(kinds).toEqual({ 'TTI Algeciras baseline': 'tti', 'Small automated': 'generic', 'TTI Algeciras — peak day': 'tti' })
+    expect(kinds).toEqual({ 'TTI Algeciras baseline': 'tti', 'Small automated': 'generic', 'TTI Algeciras, peak day': 'tti' })
     expect(sceneryFor('tracer').kind).toBe('generic')
   })
 
@@ -26,5 +27,17 @@ describe('backdrop', () => {
     slab.geometry.computeBoundingBox()
     const bb = slab.geometry.boundingBox!
     expect(bb.max.x - bb.min.x).toBe(550)
+  })
+
+  it('puts the North Quay at the north end (x < 0) and the ground parts on TTI only (#147)', () => {
+    const b = buildBackdrop(sceneryFor('TTI Algeciras baseline'), 1000)
+    b.group.updateMatrixWorld(true)
+    const box = new Box3().setFromObject(b.group.getObjectByName('northQuay')!)
+    expect(box.max.x).toBeLessThanOrEqual(1)
+    expect(box.min.x).toBeLessThan(-60)
+    expect(box.max.z - box.min.z).toBeCloseTo(550, 0)
+    for (const part of ['tarmacSouth', 'seaChannel', 'greenLand', 'northMountains']) expect(b.group.getObjectByName(part)).toBeDefined()
+    b.dispose()
+    for (const part of ['tarmacSouth', 'seaChannel', 'greenLand', 'northMountains', 'northQuay']) expect(GENERIC_SCENERY.parts).not.toContain(part)
   })
 })

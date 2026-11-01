@@ -22,20 +22,22 @@ import { EXPORT_FILES, ScenarioValidationError, validateScenario, type Container
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { createLocationNotation } from '../modules/locationNotation'
-import { defaultBay, type BayViewData } from '../modules/bayView'
+import { defaultBay, type BayPlan, type BayViewData } from '../modules/bayView'
+import { bayViewDataAt } from '../modules/bayViewScene'
 import { loadColourBySettings, saveColourBySettings, type ColourBy } from '../modules/colourBySettings'
 import { describeEntity, entityKind, entityQueryKind, transitWorldOf, type EntityExtras, type EntityView } from '../modules/entityInspector'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
 import { FEED_BUFFER_CAP } from '../modules/eventFeed'
 import type { Bucketing, KpiGroupId } from '../modules/dashboardModel'
-import { makeConfigSave, makeSnapshotSave, parseSaveFile, planLoad, saveFileName, SaveFormatError, type SaveFile, type SaveMeta, type SaveType } from '../persistence/saves'
+import { defaultSaveName as plainSaveName, exportFileName, makeConfigSave, makeSnapshotSave, parseSaveFile, planLoad, saveFileName, SaveFormatError, type SaveFile, type SaveMeta, type SaveType } from '../persistence/saves'
 import { openSaveStore, StorageUnavailableError, type SaveStore } from '../persistence/saveStore'
-import { SPEEDS, TwinController } from '../modules/twinController'
+import { DEFAULT_SPEED, TwinController } from '../modules/twinController'
 import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/display'
 import { createFormatter } from '../i18n/format'
 import { t, type MessageKey, type MessageParams } from '../i18n/messages'
 import { defaultStartDate } from '../modules/time'
+import { DEFAULT_SCENARIO_NAME } from '../terminals'
 import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
 import { CuePlanner } from '../modules/cues'
@@ -171,9 +173,10 @@ export interface InspectedEvent {
 
 export const useTwinStore = defineStore('terminal-twin', () => {
   const phase = ref<TwinPhase>('setup')
+  // #156: a fresh load selects the TTI baseline preset with its own seed (the picker opens on Scenarios)
   const choice = ref<ScenarioChoice>({
-    name: Object.keys(fixtures)[0] ?? '',
-    seed: fixtures[Object.keys(fixtures)[0]]?.seed ?? 1,
+    name: DEFAULT_SCENARIO_NAME,
+    seed: resolveScenario(DEFAULT_SCENARIO_NAME).seed,
     startDateTime: defaultStartDate().toISOString(),
   })
   /** Whether a scenario has been loaded (so the setup dialog can be cancelled). */
@@ -182,7 +185,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const hasShcs = ref(false)
   const loading = ref(false)
   const displayTime = ref(0)
-  const speed = ref(10)
+  const speed = ref(DEFAULT_SPEED)
   const paused = ref(true)
   const busy = ref(false)
   const info = shallowRef<EngineInfo | null>(null)
@@ -243,9 +246,11 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const bayViewerVesselId = ref<string | null>(null)
   const bayViewerBay = ref(0)
   const bayViewData = shallowRef<BayViewData | null>(null)
+  /** Load plan | Discharge plan (#162): Load on every run start, kept while clicking between vessels in a run. */
+  const bayPlan = ref<BayPlan>('load')
   let bayViewBusy = false
 
-  /** Re-read the shown vessel from the engine (the viewer calls this at a low rate while open). */
+  /** Re-read the shown vessel from the engine, at the 3D display time (the viewer calls this at a low rate while open). */
   async function refreshBayView(): Promise<void> {
     const id = bayViewerVesselId.value
     const c = controller
@@ -253,7 +258,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayViewBusy = true
     try {
       const data = await c.query<BayViewData>('bayView', id)
-      if (bayViewerVesselId.value === id) bayViewData.value = markRaw(data)
+      // the engine runs ahead of the display: show the vessel as the 3D scene draws it now (#159)
+      if (bayViewerVesselId.value === id && c.model) bayViewData.value = markRaw(bayViewDataAt(data, c.model, c.displayTime))
     } catch {
       // the scenario was replaced meanwhile: the next refresh shows the new state
     } finally {
@@ -267,7 +273,11 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayViewerVesselId.value = vesselId
     if (!same) bayViewData.value = null
     await refreshBayView()
-    if (!same && bayViewData.value) bayViewerBay.value = defaultBay(bayViewData.value)
+    if (!same && bayViewData.value) bayViewerBay.value = defaultBay(bayViewData.value, bayPlan.value)
+  }
+
+  function setBayPlan(plan: BayPlan): void {
+    bayPlan.value = plan
   }
 
   function closeBayViewer(): void {
@@ -306,7 +316,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       positional.applyGain()
     },
   )
-  /** Keep the sun daylight all day (default on for the TTI Algeciras — peak day preset). */
+  /** Keep the sun daylight all day (default on for the TTI Algeciras, peak day preset). */
   const lockDaylight = ref(false)
   const banner = ref<TwinBanner | null>(null)
   const cues = markRaw(new CuePlanner())
@@ -481,7 +491,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       const blob = new Blob([text], { type: file.mime })
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `${choice.value.name}-seed${choice.value.seed}-${file.suffix}`
+      a.download = exportFileName(choice.value.name, choice.value.seed, file.suffix)
       a.click()
       setTimeout(() => URL.revokeObjectURL(a.href), 1000)
     } catch (err) {
@@ -528,6 +538,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       selectedId.value = null
       entityView.value = null
       closeBayViewer()
+      bayPlan.value = 'load'
       inspectedEvent.value = null
       following.value = false
       hasScenario.value = true
@@ -553,6 +564,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   async function reset(): Promise<void> {
     await run(() => ctl().reset())
+    bayPlan.value = 'load'
     cues.reset()
     sounds.reset()
     banner.value = null
@@ -752,8 +764,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   }
 
   function defaultSaveName(type: SaveType): string {
-    const base = `${choice.value.name} / seed ${choice.value.seed}`
-    return type === 'snapshot' ? `${base} / ${fmt.value.clock(choice.value.startDateTime, displayTime.value).elapsed}` : base
+    const { name, seed, startDateTime } = choice.value
+    return plainSaveName(name, seed, type === 'snapshot' ? fmt.value.clock(startDateTime, displayTime.value).elapsed : undefined)
   }
 
   /** The save document of the current run: its config, or the engine's full snapshot. */
@@ -932,12 +944,6 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     if (config.value) config.value = markRaw({ ...config.value, display: { ...display.value } })
   }
 
-  /** Speed step by index into SPEEDS (keyboard 1–9); out of range is ignored. */
-  function setSpeedStep(index: number): void {
-    const s = SPEEDS[index]
-    if (s !== undefined) setSpeed(s)
-  }
-
   function pause(): void {
     ctl().pause()
     sync()
@@ -1090,6 +1096,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     refreshEntity,
     bayViewerVesselId,
     bayViewerBay,
+    bayPlan,
+    setBayPlan,
     colourBy,
     hideRob,
     setColourBy,
@@ -1174,7 +1182,6 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     dismissVersionPrompt,
     rewindTo,
     setRewindInterval,
-    setSpeedStep,
     pause,
     step,
     toggleFollow,

@@ -1,4 +1,4 @@
-// Every Jev tunable lives here — never inline in client/store/controller code.
+// Every Jev tunable lives here, never inline in client/store/controller code.
 
 export const JEV_CONFIG = {
   endpoint: 'https://openrouter.ai/api/alpha/decisions',

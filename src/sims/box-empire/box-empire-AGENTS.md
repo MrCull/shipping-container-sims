@@ -1,4 +1,4 @@
-# Box Empire — Sim-Specific Agent Guide
+# Box Empire, Sim-Specific Agent Guide
 
 ## Overview
 
@@ -19,10 +19,10 @@ Performance note: the large mutable simulation collections in `store/gameStore.t
 
 Follows the four-layer architecture from `threejs-vue3-animation` skill:
 
-1. **Domain Model** (`modules/`) — Pure TypeScript: scenario setup, simulation orchestration, operations, allocators, movement/occupancy, jobs, equipment, yard, vessels, trucks, economy, pathfinding, and scene construction
-2. **Application State** (`store/gameStore.ts`) — Pinia facade bridging domain, UI state, rendering, events, narrator state, and camera cues
-3. **Scene Adapter** (`composables/useThreeScene.ts`) — Translates Pinia state to Three.js; owns all renderers
-4. **Render Loop** (`composables/useGameLoop.ts`) — Fixed-step 20Hz sim tick + RAF render
+1. **Domain Model** (`modules/`), Pure TypeScript: scenario setup, simulation orchestration, operations, allocators, movement/occupancy, jobs, equipment, yard, vessels, trucks, economy, pathfinding, and scene construction
+2. **Application State** (`store/gameStore.ts`), Pinia facade bridging domain, UI state, rendering, events, narrator state, and camera cues
+3. **Scene Adapter** (`composables/useThreeScene.ts`), Translates Pinia state to Three.js; owns all renderers
+4. **Render Loop** (`composables/useGameLoop.ts`), Fixed-step 20Hz sim tick + RAF render
 
 ## Key Files
 
@@ -66,7 +66,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 
 | Component | Purpose |
 |-----------|---------|
-| `BoxEmpire.vue` | Root component — mounts canvas, wires composables, renders HUD |
+| `BoxEmpire.vue` | Root component, mounts canvas, wires composables, renders HUD |
 | `components/GameCanvas.vue` | Three.js canvas wrapper |
 | `components/TopBar.vue` | Money display, time controls, gate buttons, shared god-mode toggle, audio control |
 | `components/EventFeed.vue` | Scrolling live event log |
@@ -86,7 +86,7 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 |-----------|---------|
 | `composables/useThreeScene.ts` | Scene setup, renderer instantiation, per-frame `updateEntities()`, `spawnFloatingText()`, `triggerVesselShake()`, tutorial/narrator camera cue pans, animated gate barrier updates, container raycasting, WebGL failure detection (`webglFailed` ref) |
 | `composables/useGameLoop.ts` | RAF loop with fixed-step accumulator; delegates sim ticks to store and render to scene |
-| `composables/useAudio.ts` | Sound effect playback mapped via `SOUND_MAP` in config |
+| `composables/useAudio.ts` | Sound effect playback mapped via `SOUND_MAP` in config; each sound plays at its own gain times the shared master gain (`gainFor`), the background music and the narrator voice (`composables/useNarratorAudio.ts`) follow the volume slider live (`followMasterGain`) |
 | `composables/useInput.ts` | Mouse/pointer event handling for container selection |
 
 ## Simulation Flow (Tutorial)
@@ -108,12 +108,12 @@ Follows the four-layer architecture from `threejs-vue3-animation` skill:
 
 ## Terminal Layout
 
-- **In-gate** — `GATE_INGATE_POSITION` `{ x: -38, z: 54 }` in the front fence; truck queue lane runs along X outside the terminal
-- **Out-gate** — `GATE_OUTGATE_POSITION` `{ x: 42, z: 88 }` on the right/back edge of the compact tutorial terminal; import trucks exit here after pickup
-- **Yard truck stand** — trucks stop on the landside road no closer than 1.5 reach-stacker lengths from the yard stack line; RS serves them from either truck side based on the shorter approach
-- **Quay buffer** — separate discharge `{ x: -5, z: 3 }` and load `{ x: 5, z: 3 }` spots
-- **Berth** — first vessel berth is offset to the left of centre and later god-mode berths step along +X behind it, with wide spacing so multiple feeder hulls do not overlap
-- **Terminal bounds** — X: -50 → 50, Z: -60 → 118
+- **In-gate**, `GATE_INGATE_POSITION` `{ x: -38, z: 54 }` in the front fence; truck queue lane runs along X outside the terminal
+- **Out-gate**, `GATE_OUTGATE_POSITION` `{ x: 42, z: 88 }` on the right/back edge of the compact tutorial terminal; import trucks exit here after pickup
+- **Yard truck stand**, trucks stop on the landside road no closer than 1.5 reach-stacker lengths from the yard stack line; RS serves them from either truck side based on the shorter approach
+- **Quay buffer**, separate discharge `{ x: -5, z: 3 }` and load `{ x: 5, z: 3 }` spots
+- **Berth**, first vessel berth is offset to the left of centre and later god-mode berths step along +X behind it, with wide spacing so multiple feeder hulls do not overlap
+- **Terminal bounds**, X: -50 → 50, Z: -60 → 118
 
 Trucks use axis-aligned waypoint routes (stored in `TruckVisit.waypoints`), updated by `truckManager`. Truck movement is clamped to one axis per tick even if a direct hold target has both X and Z differences, so trucks should never point or move diagonally. The RS uses side-aware routes from `movement/reachStackerRouting.ts` and validates movement through `movement/occupancyWorld.ts`; its body heading follows the current travel axis while driving, then turns to face the work target only once parked. Reach stackers are allowed to pass through each other, but trucks, mobile harbor cranes, and yard stack zones remain occupancy blockers. Yard stack zones are static occupancy obstacles, and service lanes are derived from `movement/terminalGeometry.ts`, so vehicles cannot drive through storage stacks even if a future route is generated incorrectly.
 
@@ -143,8 +143,8 @@ Containers use individual `THREE.Mesh` with per-container `createContainerMateri
 
 ## Equipment Types
 
-- **Reach Stacker** (`rs-1`): Yard operations — unladen 5 m/s, laden 4 m/s, 8s pick/place. Uses axis-aligned waypoints, can access yard stacks from both landside and waterside, and can approach trucks from either side based on the shorter path. `canServeLandside` gates truck ↔ yard jobs, `canServeWaterside` gates quay ↔ yard jobs, both default to enabled, and both are overridden by the main `enabled` toggle. `armTargetY` / `armDropStartY` drive boom tip animation; `headingY` drives body rotation.
-- **Mobile Harbor Crane** (`mhc-1`): Vessel operations — 45s full cycle. The base travels along the quay only while empty to line up with vessel bays, keeps at least two container lengths from other MHCs, and carries out pickup/drop reach with the upper works, boom, trolley, hoist, and spreader. The paired import/export quay exchange markings move with the crane base. `spreaderZ` is used as a signed reach command, and `craneMode` controls whether it discharges, loads, or both. Each MHC also has per-vessel and per-bay permissions used by job assignment; newly spawned vessels are enabled by default on all existing MHCs.
+- **Reach Stacker** (`rs-1`): Yard operations, unladen 5 m/s, laden 4 m/s, 8s pick/place. Uses axis-aligned waypoints, can access yard stacks from both landside and waterside, and can approach trucks from either side based on the shorter path. `canServeLandside` gates truck ↔ yard jobs, `canServeWaterside` gates quay ↔ yard jobs, both default to enabled, and both are overridden by the main `enabled` toggle. `armTargetY` / `armDropStartY` drive boom tip animation; `headingY` drives body rotation.
+- **Mobile Harbor Crane** (`mhc-1`): Vessel operations, 45s full cycle. The base travels along the quay only while empty to line up with vessel bays, keeps at least two container lengths from other MHCs, and carries out pickup/drop reach with the upper works, boom, trolley, hoist, and spreader. The paired import/export quay exchange markings move with the crane base. `spreaderZ` is used as a signed reach command, and `craneMode` controls whether it discharges, loads, or both. Each MHC also has per-vessel and per-bay permissions used by job assignment; newly spawned vessels are enabled by default on all existing MHCs.
 - **Vessel stowage**: The small feeder cargo grid is 4 bays × 3 rows × 2 tiers (24 slots), matching the usable deck area of the shared small feeder GLB and avoiding the aft deckhouse. Slot references are ordered tier-first, then bay, then row, so initial/spawned containers fill a whole tier before stacking above another container. God-mode spawned vessels use the first 12 slots for import containers and add 12 export containers at the export gate so road trucks deliver them through the normal truck-to-yard flow.
 
 ## Economy
@@ -160,8 +160,8 @@ Containers use individual `THREE.Mesh` with per-container `createContainerMateri
 ## Gatehouse State
 
 `GatehouseState` has two independent lanes:
-- `exportLaneOpen` — controls whether export delivery trucks can enter through the in-gate
-- `importLaneOpen` — controls whether import pickup trucks can enter and use the out-gate flow
+- `exportLaneOpen`, controls whether export delivery trucks can enter through the in-gate
+- `importLaneOpen`, controls whether import pickup trucks can enter and use the out-gate flow
 
 Both flags are checked in the tutorial flow and reflected in the `TopBar` gate-open buttons.
 The gate barriers are animated in the scene layer: they raise before nearby trucks pass through the respective gate lane and settle back down once the truck has cleared the boom.
@@ -192,6 +192,6 @@ Eight shipping lines are defined in `containerMaterials.ts` (`SHIPPING_LINE_LIVE
 - Trucks depart via the out-gate at `GATE_OUTGATE_POSITION.z`, clearing the terminal
 - Yard destination allocation reserves whole stacks around in-progress conflicting work: stacks with an active outbound yard pickup are skipped as new destinations, and yard pickup jobs from a stack remain blocked while another active move is inbound to that same stack.
 - `movement/occupancyWorld.ts` is rebuilt during simulation ticks from current moving entity positions plus static yard stack zones; extend it when adding richer traffic, route reservations, or additional blocked zones
-- The ocean mesh in `sceneBuilder.ts` is animated each frame via `animateOcean(time)` using vertex displacement — call this from the render loop
+- The ocean mesh in `sceneBuilder.ts` is animated each frame via `animateOcean(time)` using vertex displacement, call this from the render loop
 - `FloatingTextRenderer.update()` must be called each animation frame to advance fade/drift
 - WebGL availability is tested at startup; if it fails, `webglFailed` ref is set and the scene is not initialised

@@ -19,7 +19,6 @@ import { indexYardSlotAdded } from '../yardIndex'
 import { prefillSteps, type PrefillImport, type PrefillPlan } from '../prefill'
 import { POOL_VESSEL_ID, planCargo } from '../../scenario/bayPlan'
 import { makeContainerState } from '../../scenario/containerFactory'
-import { drawContainerProps } from '../../scenario/containerProps'
 import type { ScenarioConfig } from '../../scenario/types'
 import type { ExportPlacement } from '../../scenario/exportYard'
 import type { SimState } from '../state'
@@ -84,16 +83,7 @@ export function createPrefillDriver(getState: () => SimState, config: ScenarioCo
       yardSince: -imp.ageS,
       pickupReadyAt: imp.pickupReadyAt,
       reefer: imp.reefer,
-      props: drawContainerProps(ctx.config, state.propsSeed, {
-        id: imp.id,
-        size: imp.size,
-        full: true,
-        line: imp.line,
-        reefer: imp.reefer === true,
-        direction: 'IMPORT',
-        inbound: { kind: 'vessel' }, // discharged before the scenario starts, from a vessel outside it
-        arrivalS: -imp.ageS,
-      }),
+      props: imp.props, // drawn by the pre-fill: the box was discharged before the scenario starts, from a vessel outside it
     })
   }
 
