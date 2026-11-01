@@ -3,9 +3,9 @@
   "seed": 11,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "19ce7a1cf88c33",
+  "eventLogHash": "0e2311cf691717",
   "kpis": {
-    "simTimeS": 860.838,
+    "simTimeS": 864.307,
     "eventsProcessed": 146,
     "movesCompleted": 4,
     "vesselsCompleted": 1,
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 860.838,
-        "turnaroundS": 800.838,
+        "departedAtS": 864.307,
+        "turnaroundS": 804.307,
         "sts": [
           "STS01"
         ]
@@ -173,14 +173,14 @@
       "shcs": {
         "SHC01": {
           "jobs": 4,
-          "emptyDistanceM": 848.5,
+          "emptyDistanceM": 968.5,
           "loadedDistanceM": 336.5,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 510.671,
-            "moving-to-collect": 96.082,
+            "parked": 487.886,
+            "moving-to-collect": 108.161,
             "queuing-to-collect": 0,
-            "collecting": 86.739,
+            "collecting": 100.914,
             "moving-to-deliver": 14,
             "queuing-to-deliver": 0,
             "delivering": 153.347
@@ -195,7 +195,7 @@
           "loadedDistanceM": 0,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 860.838,
+            "parked": 864.307,
             "moving-to-collect": 0,
             "queuing-to-collect": 0,
             "collecting": 0,
@@ -209,7 +209,7 @@
         }
       },
       "stsGroundPositionWaitS": {
-        "STS01": 157.424
+        "STS01": 160.893
       }
     },
     "yard": {
@@ -253,14 +253,14 @@
       "EXPORT": {
         "count": 4,
         "departed": 4,
-        "meanS": 89667.316,
-        "maxS": 131962.583
+        "meanS": 89670.784,
+        "maxS": 131966.051
       },
       "STORAGE": {
         "count": 12,
         "departed": 0,
-        "meanS": 328796.255,
-        "maxS": 562501.838
+        "meanS": 328799.724,
+        "maxS": 562505.307
       }
     },
     "workPackages": {

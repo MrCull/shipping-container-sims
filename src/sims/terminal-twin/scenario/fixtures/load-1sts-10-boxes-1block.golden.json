@@ -3,9 +3,9 @@
   "seed": 42,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "0988279ef19130",
+  "eventLogHash": "1835f3e68f201b",
   "kpis": {
-    "simTimeS": 1765.847,
+    "simTimeS": 1781.441,
     "eventsProcessed": 352,
     "movesCompleted": 10,
     "vesselsCompleted": 1,
@@ -14,7 +14,7 @@
         "moves": 10,
         "cycles": 10,
         "twinLifts": 0,
-        "grossMovesPerHour": 24.453,
+        "grossMovesPerHour": 24.286,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1765.847,
-        "turnaroundS": 1705.847,
+        "departedAtS": 1781.441,
+        "turnaroundS": 1721.441,
         "sts": [
           "STS01"
         ]
@@ -152,17 +152,17 @@
       "shcs": {
         "SHC01": {
           "jobs": 10,
-          "emptyDistanceM": 2469.5,
-          "loadedDistanceM": 1035.5,
+          "emptyDistanceM": 2756,
+          "loadedDistanceM": 1024,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 840.488,
-            "moving-to-collect": 281.064,
+            "parked": 779.533,
+            "moving-to-collect": 311.108,
             "queuing-to-collect": 0,
-            "collecting": 211.074,
+            "collecting": 251.165,
             "moving-to-deliver": 35,
             "queuing-to-deliver": 0,
-            "delivering": 398.222
+            "delivering": 404.635
           },
           "handovers": 20,
           "parkingReturns": 10,
@@ -174,7 +174,7 @@
           "loadedDistanceM": 0,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 1765.847,
+            "parked": 1781.441,
             "moving-to-collect": 0,
             "queuing-to-collect": 0,
             "collecting": 0,
@@ -188,7 +188,7 @@
         }
       },
       "stsGroundPositionWaitS": {
-        "STS01": 154.882
+        "STS01": 160.338
       }
     },
     "yard": {
@@ -222,7 +222,7 @@
         "B01-ASC1": {
           "jobs": 10,
           "gantryM": 1098,
-          "trolleyM": 64.3,
+          "trolleyM": 57.9,
           "hoistM": 371.52,
           "padWaitS": 0
         }
@@ -232,16 +232,16 @@
       "EXPORT": {
         "count": 10,
         "departed": 10,
-        "meanS": 1017.387,
-        "maxS": 1687.077
+        "meanS": 1030.248,
+        "maxS": 1702.67
       }
     },
     "workPackages": {
       "released": 7,
       "started": 7,
       "completed": 7,
-      "leadTimeMeanS": 405.35,
-      "leadTimeMaxS": 614.922,
+      "leadTimeMeanS": 409.841,
+      "leadTimeMaxS": 905.795,
       "boxesLoaded": 10
     },
     "ordering": {

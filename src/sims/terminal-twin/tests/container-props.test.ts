@@ -217,7 +217,8 @@ describe('every creator sets consistent properties', () => {
 
 describe('the new stream leaves existing boxes alone', () => {
   it('the bay plan keeps every id, size, line, slot and flow whatever the property settings', () => {
-    const strip = (c: ScenarioConfig) => planCargo(c, c.seed).containers.map((x) => ({ ...x, props: undefined }))
+    // slots move on purpose when container props change (the POL/weight pass, #148); the event log below is the real check
+    const strip = (c: ScenarioConfig) => planCargo(c, c.seed).containers.map((x) => ({ ...x, props: undefined, slotId: undefined }))
     const config = fixtures['mixed-discharge-then-load']
     const changed: ScenarioConfig = {
       ...config,
