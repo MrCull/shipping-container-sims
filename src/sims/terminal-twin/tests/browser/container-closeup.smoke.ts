@@ -3,7 +3,7 @@
  * are above zero with the camera close to boxes and zero from far away (where the draw breakdown holds no close-up
  * meshes), and faces never exceed the quality level's budget (400 on High). A yard block edge close up shows markings
  * on its visible faces on Low (48 faces within 18 m, #158: Auto settles there on a laptop) and on High (screenshots to
- * review). The last spec (`@load`, never in CI) compares the frame time of the
+ * review). Roofs print no text (#170; the painter's roof is checked by `tests/container-markings.test.ts`). The last spec (`@load`, never in CI) compares the frame time of the
  * view about 10 boxes wide with the Overview camera. Run with `pnpm run test:smoke`.
  */
 import { expect, test } from '@playwright/test'
