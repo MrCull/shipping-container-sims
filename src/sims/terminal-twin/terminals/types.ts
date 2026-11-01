@@ -44,8 +44,6 @@ export interface TerminalPresetInfo {
   copy: { name: MessageKey; tagline: MessageKey; description: MessageKey; watch: MessageKey }
   /** The bay count comes from a published capacity, not a layout drawing: the setup dialog says so. */
   derivedBays?: boolean
-  /** The daylight lock starts on (a long run should stay readable). */
-  daylightLockDefault?: boolean
 }
 
 export interface TerminalProfile {

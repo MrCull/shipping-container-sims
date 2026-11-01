@@ -45,7 +45,6 @@ import { SoundPlayer } from '../modules/soundPlayer'
 import { PositionalSound } from '../modules/positionalSound'
 import type { AtmosphereState } from '../modules/atmosphereRig'
 import type { BackdropKind } from '../modules/backdrop'
-import { daylightLockDefault } from '../modules/atmosphere'
 
 export type TwinPhase = 'setup' | 'running'
 export type DashboardTab = 'charts' | 'report'
@@ -329,8 +328,12 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       positional.applyGain()
     },
   )
-  /** Keep the sun daylight all day (default on for the TTI Algeciras, peak day preset). */
-  const lockDaylight = ref(false)
+  /** Keep the sun daylight all day. On at every run launch (#171); a toggle lasts for that run only. */
+  const lockDaylight = ref(true)
+  /** Sound on entry (#171): the mute before entering, or null when not inside; and whether the owner changed it inside. */
+  let soundBeforeEntry: boolean | null = null
+  let soundChangedInside = false
+  let forcingSoundMute = false
   const banner = ref<TwinBanner | null>(null)
   const cues = markRaw(new CuePlanner())
   let bannerTimer: ReturnType<typeof setTimeout> | null = null
@@ -395,6 +398,36 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   function toggleLockDaylight(): void {
     lockDaylight.value = !lockDaylight.value
     showToast(lockDaylight.value ? 'twin.toast.daylightLocked' : 'twin.toast.daylightFollows')
+  }
+
+  // Any change to the mute while inside, other than the sim's own mute on entry, is the owner's choice (sync, so none is missed).
+  watch(
+    () => audio.soundMuted,
+    () => {
+      if (soundBeforeEntry !== null && !forcingSoundMute) soundChangedInside = true
+    },
+    { flush: 'sync' },
+  )
+
+  /** Entering Terminal Twin mutes the shared audio store, on every entry (#171). */
+  function enterSim(): void {
+    if (soundBeforeEntry !== null) return
+    soundBeforeEntry = audio.soundMuted
+    soundChangedInside = false
+    forcingSoundMute = true
+    try {
+      audio.setSoundMuted(true)
+    } finally {
+      forcingSoundMute = false
+    }
+  }
+
+  /** Leaving restores the mute from before entry, unless the owner changed it while inside (their latest choice stays). */
+  function leaveSim(): void {
+    if (soundBeforeEntry === null) return
+    const before = soundBeforeEntry
+    soundBeforeEntry = null
+    if (!soundChangedInside) audio.setSoundMuted(before)
   }
 
   /** Copy the controller's playback state into reactive refs (once per frame and after actions). */
@@ -562,7 +595,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       })
       sounds.reset()
       banner.value = null
-      lockDaylight.value = daylightLockDefault(next.name)
+      lockDaylight.value = true
       hasShcs.value = (runConfig.shcs?.length ?? 0) > 0
       phase.value = 'running'
       if (options.autoplay ?? true) ctl().play()
@@ -1157,6 +1190,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     positional,
     lockDaylight,
     toggleLockDaylight,
+    enterSim,
+    leaveSim,
     banner,
     toast,
     kpi,

@@ -409,6 +409,12 @@ View only: no event, state field or golden changes (the engine's `VesselState` i
 
 **Next steps (not done):** (1) an invariant for ASC jobs that cannot progress (the B12 deadlock has none); (2) load staging on the WTP pads, not the ground positions; (3) a yard reserve so pre-fill and discharge cannot fill a block to its last stacks; (4) a pick-only truck is admitted to a block only when its rehandles have room. `ENGINE_VERSION` is unchanged: the only engine change is a performance change with the same events.
 
+## Daylight and sound on entry (spec #166, #171)
+
+- Every run launch starts with the daylight lock on (`store.lockDaylight = true` in `launch`), for fixtures and presets alike; the top-bar Daylight toggle changes it for that run only. The per-preset `daylightLockDefault` flag is gone.
+- Entering the sim mutes the shared audio store (`store.enterSim()` in `TerminalTwin.vue`'s `onMounted`), on every entry. Leaving (`store.leaveSim()` in `onBeforeUnmount`) restores the mute from before entry, unless the owner changed it while inside. Other sims are untouched.
+- Proof: `tests/daylight-and-mute.test.ts`; the atmosphere smoke spec covers both in the browser.
+
 ## Known gaps
 
 Deliberately not built, or built differently from the spec (the code review accepted these):

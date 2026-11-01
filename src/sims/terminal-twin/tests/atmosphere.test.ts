@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ambientIntensity, daylightLockDefault, hourOfDay, lightingFor } from '../modules/atmosphere'
+import { ambientIntensity, hourOfDay, lightingFor } from '../modules/atmosphere'
 
 describe('night stays readable (V11-03)', () => {
   it('keeps a night ambient level at least as strong as the day one', () => {
@@ -47,11 +47,5 @@ describe('lighting follows the sim clock', () => {
     const start = new Date(2026, 0, 5, 6, 0, 0).toISOString()
     expect(hourOfDay(start, 3600)).toBeCloseTo(7, 5)
     expect(hourOfDay(start, 20 * 3600)).toBeCloseTo(2, 5)
-  })
-
-  it('locks daylight by default only for the TTI Algeciras, peak day preset', () => {
-    expect(daylightLockDefault('TTI Algeciras, peak day')).toBe(true)
-    expect(daylightLockDefault('TTI Algeciras baseline')).toBe(false)
-    expect(daylightLockDefault('Small automated')).toBe(false)
   })
 })

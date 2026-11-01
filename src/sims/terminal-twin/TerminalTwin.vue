@@ -47,6 +47,7 @@ const quietNote = computed(() => {
 })
 
 onMounted(async () => {
+  store.enterSim()
   if (import.meta.env.DEV) {
     const { installDevApi } = await import('./dev/devApi')
     if (!unmounted) uninstallDevApi = installDevApi(store)
@@ -56,6 +57,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   unmounted = true
   uninstallDevApi?.()
+  store.leaveSim()
   store.dispose()
 })
 </script>
