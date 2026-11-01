@@ -4,6 +4,7 @@ import type { StsState } from '../../engine'
 import type { EntityView } from '../entityInspector'
 import { STS } from '../equipmentDims'
 import { stsBeaconOffsets } from '../gantryBeacons'
+import { spreaderModeFor } from '../spreaderMode'
 import { loadStsTemplate, StsModel, type SpreaderMode } from '../stsAssets'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
 
@@ -102,7 +103,7 @@ class StsRenderer implements KindRenderer {
     for (const [id, m] of this.stsModels) {
       const pose = model.stsPose(id, t)
       const l = frame.loads.get(`sts:${id}`)
-      const mode: SpreaderMode = !l ? (this.lastSpreader.get(id) ?? '40') : l.count > 1 ? 'twin-20' : l.size === '20' ? '20' : '40'
+      const mode: SpreaderMode = spreaderModeFor(l, { canTwin: true, previous: this.lastSpreader.get(id) })
       this.lastSpreader.set(id, mode)
       m.carrying = l?.count ?? 0
       m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l })

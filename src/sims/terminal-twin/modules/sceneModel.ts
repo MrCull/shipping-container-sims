@@ -49,6 +49,7 @@ import { drawContainerProps, isoTypeOf, type ContainerProps } from '../scenario/
 import { subjectOfBox, type ColourSubject } from './colourBy'
 import type { RobBox } from '../scenario/robBays'
 import { planExportYard } from '../scenario/exportYard'
+import { driveYaw, shcSpawnYaw } from './shcSpawn'
 import type { ContainerSize, ScenarioConfig, VesselConfig } from '../scenario/types'
 import {
   HATCH_THICKNESS_M,
@@ -506,9 +507,10 @@ export class SceneModel {
     const d = seg.to - seg.from
     if (d === 0) return
     const prev = list[list.length - 1]
-    const target = seg.axis === 'x' ? (d > 0 ? 0 : Math.PI) : d > 0 ? -Math.PI / 2 : Math.PI / 2
-    // a truck appears facing its first drive (the access road, #146: north; the terminal road: towards the gate)
-    const yawPrev = prev ? prev.yaw1 : this.truckIds.includes(shcId) ? (seg.axis === 'x' ? target : Math.PI / 2) : 0
+    const target = driveYaw(seg.axis as 'x' | 'z', seg.from, seg.to)
+    // a truck appears facing its first drive (the access road, #146: north; the terminal road: towards the gate);
+    // a shuttle carrier too (#142), so its first move needs no turn on the spot
+    const yawPrev = prev ? prev.yaw1 : this.truckIds.includes(shcId) ? (seg.axis === 'x' ? target : Math.PI / 2) : shcSpawnYaw({ axis: seg.axis as 'x' | 'z', from: seg.from, to: seg.to })
     const delta = wrapPi(target - yawPrev)
     const reverse = Math.abs(delta) > (3 * Math.PI) / 4
     const odoPrev = prev ? prev.odoStart + prev.fwd * Math.abs(prev.to - prev.from) : 0
@@ -642,7 +644,8 @@ export class SceneModel {
   private driveState(shcId: string, time: number): Pick<ShcPose, 'yaw' | 'steerRad' | 'odometerM' | 'travelling'> {
     const list = this.drives[shcId] ?? []
     const i = lastAtOrBefore(list, time, (l) => l.t0)
-    if (i < 0) return { yaw: 0, steerRad: 0, odometerM: 0, travelling: false }
+    // before the first leg: facing it (#142), or along the parking row towards the work when none is known yet
+    if (i < 0) return { yaw: list.length > 0 && !this.truckIds.includes(shcId) ? list[0].yaw0 : shcSpawnYaw(null), steerRad: 0, odometerM: 0, travelling: false }
     const leg = list[i]
     const swing = leg.yaw1 - leg.yaw0
     const turnS = Math.max(1e-6, Math.min(TURN_S, (leg.t1 - leg.t0) * 0.6))

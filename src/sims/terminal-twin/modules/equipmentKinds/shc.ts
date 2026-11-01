@@ -5,6 +5,7 @@ import type { EntityView } from '../entityInspector'
 import { SHC } from '../equipmentDims'
 import { CONTAINER_DIMS } from '../sceneModel'
 import { loadShcModel, ShcRig, SHC_RIG } from '../shcAssets'
+import { spreaderLengthRatio, spreaderModeFor, type SpreaderMode } from '../spreaderMode'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
 
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
@@ -13,6 +14,9 @@ const EMPTY_HOIST_MPS = 1.5
 const EMPTY_SPREADER_DOWN_Y = CONTAINER_DIMS['40'].height
 
 class ShcRenderer implements KindRenderer {
+  /** Custody loads decide each carrier's spreader mode (#142). */
+  readonly wantsContainerOwners = true
+  private lastSpreader = new Map<string, SpreaderMode>()
   private shcs = new Map<string, { group: THREE.Group; spreader: THREE.Mesh; rig?: ShcRig }>()
   private hoistEase = new Map<string, { t: number; y: number }>()
 
@@ -75,6 +79,9 @@ class ShcRenderer implements KindRenderer {
     const { t, cameraPosition } = frame
     for (const [id, parts] of this.shcs) {
       const pose = model.shcPose(id, t)
+      // An SHC carries one box (no twin-20): 20 ft takes the short spreader, telescoped before the lift and kept after.
+      const spreader = spreaderModeFor(frame.loads.get(`shc:${id}`), { canTwin: false, previous: this.lastSpreader.get(id) })
+      this.lastSpreader.set(id, spreader)
       if (frame.live && model.isReversing(id, t)) frame.sounds.push({ id, machine: 'shc', x: pose.x, y: 3, z: pose.z, motion: 'reversing' })
       if (parts.rig) {
         const boxHeight = frame.carried.get(id)
@@ -87,6 +94,7 @@ class ShcRenderer implements KindRenderer {
           odometerM: pose.odometerM,
           attachY: this.spreaderPlane(id, t, pose.lift, pose.travelling || model.statusAt('shc', id, t) === 'parked', boxHeight),
           carrying: boxHeight !== undefined,
+          spreader,
         })
         continue
       }
@@ -94,6 +102,7 @@ class ShcRenderer implements KindRenderer {
       parts.group.rotation.y = pose.heading === 'z' ? Math.PI / 2 : 0
       // the spreader sits on top of the (possible) box: box bottom = lift
       parts.spreader.position.y = pose.lift + CONTAINER_DIMS['40'].height + 0.2
+      parts.spreader.scale.x = spreaderLengthRatio(spreader)
     }
   }
 

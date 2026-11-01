@@ -10,6 +10,7 @@
  */
 import * as THREE from 'three'
 import { loadGltf } from './containerAssets'
+import { spreaderLengthM, spreaderLengthRatio, type SpreaderMode } from './spreaderMode'
 import meta from '../assets/models/shc/shc.meta.json'
 
 /** GLTFLoader renames duplicate node names (`wheel_fl_1`); the file's own name is kept in `userData.name`. */
@@ -73,6 +74,8 @@ export interface ShcRigPose {
   attachY: number
   /** True while a box hangs from the spreader. */
   carrying: boolean
+  /** Spreader length for the load (#142); omitted = 40 ft. */
+  spreader?: SpreaderMode
 }
 
 /** What the rig was last told (dev API / smoke tests). */
@@ -82,6 +85,9 @@ export interface ShcRigState {
   wheelRollRad: number
   hoistM: number
   carrying: boolean
+  /** Spreader mode and its twist-lock pattern length (m) as last drawn (#142). */
+  spreaderMode: SpreaderMode
+  spreaderLengthM: number
 }
 
 export interface ShcModel {
@@ -121,9 +127,12 @@ export class ShcRig {
   private readonly hoist: THREE.Object3D[] = []
   private readonly hoistRestY: number[] = []
   private readonly twistlocks: THREE.Object3D[] = []
+  /** Spreader meshes and each twist-lock's rest X: the spreader's long axis is X (along the carrier). */
+  private readonly spreaderGeo: { o: THREE.Object3D; pos: number; scale: number }[] = []
+  private readonly lockRestX: number[] = []
   private readonly plates: THREE.Material[] = []
   private lod: 0 | 1 | 2 = 0
-  private state: ShcRigState = { lod: 0, steerRad: 0, wheelRollRad: 0, hoistM: 0, carrying: false }
+  private state: ShcRigState = { lod: 0, steerRad: 0, wheelRollRad: 0, hoistM: 0, carrying: false, spreaderMode: '40', spreaderLengthM: spreaderLengthM('40') }
 
   constructor(model: ShcModel, id: string) {
     this.root.name = id
@@ -152,7 +161,11 @@ export class ShcRig {
         if (name === 'hoist') {
           this.hoist.push(o)
           this.hoistRestY.push(o.position.y)
-        } else if (name.startsWith('twistlock_')) this.twistlocks.push(o)
+        } else if (name === 'spreader_geo') this.spreaderGeo.push({ o, pos: o.position.x, scale: o.scale.x })
+        else if (name.startsWith('twistlock_')) {
+          this.twistlocks.push(o)
+          this.lockRestX.push(o.position.x)
+        }
       })
       this.root.add(lod)
     }
@@ -188,7 +201,16 @@ export class ShcRig {
     const hoistM = Math.min(SHC_RIG.hoistMaxM, Math.max(SHC_RIG.hoistMinM, p.attachY - SHC_RIG.attachRestY))
     this.hoist.forEach((n, i) => (n.position.y = this.hoistRestY[i] + hoistM))
     for (const n of this.twistlocks) n.rotation.y = p.carrying ? SHC_RIG.twistLockedRad : 0
-    this.state = { lod: this.lod, steerRad: p.steerRad, wheelRollRad: roll, hoistM, carrying: p.carrying }
+    // Telescope to the load (#142): the spreader body and the lock pattern shorten along the carrier for a 20.
+    const mode = p.spreader ?? '40'
+    const ratio = spreaderLengthRatio(mode)
+    // the mesh node carries the meshopt dequantisation offset and scale, so scale both about the spreader centre
+    for (const g of this.spreaderGeo) {
+      g.o.scale.x = g.scale * ratio
+      g.o.position.x = g.pos * ratio
+    }
+    this.twistlocks.forEach((n, i) => (n.position.x = this.lockRestX[i] * ratio))
+    this.state = { lod: this.lod, steerRad: p.steerRad, wheelRollRad: roll, hoistM, carrying: p.carrying, spreaderMode: mode, spreaderLengthM: spreaderLengthM(mode) }
   }
 
   /** Frees this SHC's own plate materials (geometry and the atlas material are shared). */

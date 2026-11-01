@@ -12,6 +12,7 @@
 import * as THREE from 'three'
 import { loadGltf } from './containerAssets'
 import { ASC_MODEL, ascRigValues, ascScaleY } from './ascRig'
+import { spreaderLengthM, spreaderLengthRatio, type SpreaderMode } from './spreaderMode'
 import meta from '../assets/models/asc/asc.meta.json'
 
 /** GLTFLoader renames duplicate node names (`hoist_1`); the file's own name is kept in `userData.name`. */
@@ -35,6 +36,8 @@ export interface AscRigPose {
   carrying: boolean
   /** Number of tiers the block was configured with (decides the vertical stretch). */
   tiers: number
+  /** Spreader length for the load (#142); omitted = 40 ft. */
+  spreader?: SpreaderMode
 }
 
 /** What the rig was last told (dev API / smoke tests). */
@@ -46,6 +49,9 @@ export interface AscRigState {
   ropeScale: number
   scaleY: number
   carrying: boolean
+  /** Spreader mode and its twist-lock pattern length (m) as last drawn (#142). */
+  spreaderMode: SpreaderMode
+  spreaderLengthM: number
 }
 
 export interface AscModel {
@@ -92,8 +98,11 @@ export class AscRig {
   private readonly hoist: Rest[] = []
   private readonly ropes: THREE.Object3D[] = []
   private readonly twistlocks: THREE.Object3D[] = []
+  /** Spreader meshes and each twist-lock's rest Z: the spreader's long axis is Z (along the rails). */
+  private readonly spreaderGeo: { o: THREE.Object3D; pos: number; scale: number }[] = []
+  private readonly lockRestZ: number[] = []
   private lod: 0 | 1 | 2 = 0
-  private state: AscRigState = { lod: 0, gantryZ: 0, trolleyX: 0, hoistM: 0, ropeScale: 1, scaleY: 1, carrying: false }
+  private state: AscRigState = { lod: 0, gantryZ: 0, trolleyX: 0, hoistM: 0, ropeScale: 1, scaleY: 1, carrying: false, spreaderMode: '40', spreaderLengthM: spreaderLengthM('40') }
 
   constructor(model: AscModel, id: string) {
     this.root.name = id
@@ -111,7 +120,11 @@ export class AscRig {
         else if (name === 'trolley') this.trolley.push(rest)
         else if (name === 'hoist') this.hoist.push(rest)
         else if (name === 'ropes') this.ropes.push(o)
-        else if (name.startsWith('twistlock_')) this.twistlocks.push(o)
+        else if (name === 'spreader_geo') this.spreaderGeo.push({ o, pos: o.position.z, scale: o.scale.z })
+        else if (name.startsWith('twistlock_')) {
+          this.twistlocks.push(o)
+          this.lockRestZ.push(o.position.z)
+        }
       })
       this.root.add(lod)
     }
@@ -145,7 +158,16 @@ export class AscRig {
     for (const r of this.hoist) r.o.position.y = r.y + v.hoistM
     for (const o of this.ropes) o.scale.y = v.ropeScale
     for (const o of this.twistlocks) o.rotation.y = v.twistRad
-    this.state = { lod: this.lod, gantryZ: v.gantryZ, trolleyX: v.trolleyX, hoistM: v.hoistM, ropeScale: v.ropeScale, scaleY, carrying: p.carrying }
+    // Telescope to the load (#142): the spreader body and the lock pattern shorten along the rails for a 20.
+    const mode = p.spreader ?? '40'
+    const ratio = spreaderLengthRatio(mode)
+    // the mesh node carries the meshopt dequantisation offset and scale, so scale both about the spreader centre
+    for (const g of this.spreaderGeo) {
+      g.o.scale.z = g.scale * ratio
+      g.o.position.z = g.pos * ratio
+    }
+    this.twistlocks.forEach((o, i) => (o.position.z = this.lockRestZ[i] * ratio))
+    this.state = { lod: this.lod, gantryZ: v.gantryZ, trolleyX: v.trolleyX, hoistM: v.hoistM, ropeScale: v.ropeScale, scaleY, carrying: p.carrying, spreaderMode: mode, spreaderLengthM: spreaderLengthM(mode) }
   }
 
   get rigState(): AscRigState {

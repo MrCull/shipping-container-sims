@@ -7,6 +7,7 @@ import type { EntityView } from '../entityInspector'
 import { ASC, ascHeightM } from '../equipmentDims'
 import { ascBeaconOffsets } from '../gantryBeacons'
 import { CONTAINER_DIMS } from '../sceneModel'
+import { spreaderLengthRatio, spreaderModeFor, type SpreaderMode } from '../spreaderMode'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
 
 interface AscParts {
@@ -21,7 +22,10 @@ interface AscParts {
 }
 
 class AscRenderer implements KindRenderer {
+  /** Custody loads decide each crane's spreader mode (#142). */
+  readonly wantsContainerOwners = true
   private ascs = new Map<string, AscParts>()
+  private lastSpreader = new Map<string, SpreaderMode>()
 
   constructor(private host: KindRendererHost) {
     for (const id of host.model.ascIds) {
@@ -91,6 +95,9 @@ class AscRenderer implements KindRenderer {
       if (frame.live && model.isWorking(id, t)) frame.sounds.push({ id, machine: 'asc', x: pose.x, y: parts.height, z: pose.z, motion: 'working' })
       const lx = pose.x - parts.blockX
       const boxHeight = frame.carried.get(id)
+      // An ASC carries one box at a time (no twin-20): 20 ft takes the short spreader, telescoped before the lift and kept after.
+      const spreader = spreaderModeFor(frame.loads.get(`asc:${id}`), { canTwin: false, previous: this.lastSpreader.get(id) })
+      this.lastSpreader.set(id, spreader)
       if (parts.rig) {
         parts.rig.chooseLod(Math.hypot(cameraPosition.x - pose.x, cameraPosition.y - 12, cameraPosition.z - pose.z) / frame.lodScale)
         // Twist-lock plane: the top of the carried box; empty, where the top of a high-cube box would be.
@@ -101,6 +108,7 @@ class AscRenderer implements KindRenderer {
           attachY: pose.hoistY + (boxHeight ?? HC_HEIGHT_M),
           carrying: boxHeight !== undefined,
           tiers: parts.tiers,
+          spreader,
         })
         continue
       }
@@ -108,6 +116,7 @@ class AscRenderer implements KindRenderer {
       parts.trolley.position.x = lx
       const spreaderY = pose.hoistY + CONTAINER_DIMS['40HC'].height + 0.2
       parts.spreader.position.set(lx, spreaderY, 0)
+      parts.spreader.scale.x = spreaderLengthRatio(spreader)
       const ropeLen = Math.max(0.1, parts.height - spreaderY)
       parts.ropes.scale.y = ropeLen
       parts.ropes.position.set(lx, parts.height - ropeLen / 2, 0)
