@@ -775,6 +775,38 @@ export const INVARIANTS: Invariant[] = [
     },
   },
   {
+    id: 'stowage.cell-free',
+    reads: ['vessel', 'container'],
+    description:
+      'Cell free (#202): a box is never loaded on board into a cell (bay, row, tier; either half for a 40, the same half for a 20) ' +
+      'that already holds a box, whether a slot box or a ROB box. Two filled slots or ROB boxes never overlap in a cell.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      // nothing on a vessel the event did not touch is checked: skip the scan of every slot
+      if (scope && scope.vessels.size === 0) return messages
+      const cells = new Map<string, { label: string; half: 'aft' | 'fore' | null }[]>()
+      const put = (vesselId: string, bay: number, row: number, tier: number, label: string, half: 'aft' | 'fore' | null) => {
+        const key = `${vesselId}:${bay}:${row}:${tier}`
+        const held = cells.get(key) ?? []
+        for (const h of held)
+          if (h.half === null || half === null || h.half === half) messages.push(`${vesselId}: ${label} shares bay ${bay} row ${row} tier ${tier} with ${h.label}`)
+        held.push({ label, half })
+        cells.set(key, held)
+      }
+      for (const s of Object.values(state.vesselSlots)) {
+        if (!s.containerId) continue
+        if (scope && !scope.vessels.has(s.vesselId)) continue
+        put(s.vesselId, s.bay, s.row, s.tier, `box ${s.containerId} in slot ${s.id}`, s.half)
+      }
+      for (const vessel of Object.values(state.vessels)) {
+        if (scope && !scope.vessels.has(vessel.id)) continue
+        for (const b of vessel.robBoxes ?? []) put(vessel.id, b.bay, b.row, b.tier, `ROB box in slot ${b.slotId}`, b.half)
+      }
+      return messages
+    },
+  },
+  {
     id: 'hull.profile',
     reads: ['vessel', 'container'],
     description:
