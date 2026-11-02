@@ -6,7 +6,7 @@
 import type { ContainerState, SimQuery, TransitWorld } from '../engine'
 import { resolveContainerProps } from '../scenario/containerProps'
 import type { ScenarioConfig } from '../scenario/types'
-import type { BayBox, BayViewData } from './bayView'
+import { presentShared, type BayBox, type BayViewData, type SharedCell } from './bayView'
 import { subjectOfBox } from './colourBy'
 
 function boxOf(c: Readonly<ContainerState>, world: TransitWorld, now: number, vessels: ReadonlySet<string>): BayBox {
@@ -47,26 +47,37 @@ export function collectBayViewData(
   const boxOf_ = (c: Readonly<ContainerState>): BayBox => boxOf(c, world, now, vessels)
   const slots = [...q.vesselSlots(vesselId)]
   const boxes: BayViewData['boxes'] = {}
-  const lost = new Set<string>()
-  for (const s of slots) {
+  // a discharged slot no longer names its box: it is the first owner in the box's custody history
+  const arrived = new Map<string, Readonly<ContainerState>>()
+  for (const c of q.containers()) {
+    if (c.vesselId !== vesselId) continue
+    const first = c.custodyHistory[0]?.owner
+    if (first && first.kind === 'vesselSlot') arrived.set(first.id, c)
+  }
+  const shared: Record<string, SharedCell> = {}
+  slots.forEach((s, i) => {
+    const arrival = arrived.get(s.id)
+    if (arrival && (s.loadPurpose || s.purpose !== 'discharge')) {
+      // a cell shared by a discharge box and a load booking (#203)
+      const loadId = s.loadPurpose ? s.plannedContainerId : (s.containerId ?? s.plannedContainerId)
+      const cell: SharedCell = { slot: s, arrival: boxOf_(arrival), ...(loadId ? { load: boxOf_(q.container(loadId)) } : {}) }
+      const shown = presentShared(cell)
+      shared[s.id] = cell
+      slots[i] = shown.slot
+      boxes[s.id] = shown.box
+      return
+    }
     const id = s.containerId ?? s.plannedContainerId
     if (id) boxes[s.id] = boxOf_(q.container(id))
-    else if (s.purpose === 'discharge') lost.add(s.id)
-  }
-  // a discharged slot no longer names its box: it is the first owner in the box's custody history
-  if (lost.size > 0) {
-    for (const c of q.containers()) {
-      if (c.vesselId !== vesselId) continue
-      const first = c.custodyHistory[0]?.owner
-      if (first && first.kind === 'vesselSlot' && lost.has(first.id)) boxes[first.id] = boxOf_(c)
-    }
-  }
+    else if (arrival && s.purpose === 'discharge') boxes[s.id] = boxOf_(arrival)
+  })
   return {
     vesselId,
     sizeClass: v.sizeClass,
     status: v.status,
     slots,
     boxes,
+    ...(Object.keys(shared).length > 0 ? { shared } : {}),
     packages: q.workPackages().filter((p) => p.vesselId === vesselId),
     robBoxes: [...(v.robBoxes ?? [])],
     now,

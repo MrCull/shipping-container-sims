@@ -212,8 +212,8 @@ describe('tier stow sequence on the vessel-ordering fixture (#174)', () => {
   /** Each box's cell (discharge: on board; load: its booked slot). */
   const cellOfBox = new Map<string, { tier: number }>()
   for (const s of initial.query.vesselSlots('V001')) {
-    const id = s.purpose === 'discharge' ? s.containerId : s.plannedContainerId
-    if (id) cellOfBox.set(id, s)
+    // a shared cell (#203) holds a discharge box and a load booking
+    for (const id of [s.containerId, s.plannedContainerId]) if (id) cellOfBox.set(id, s)
   }
   const packages = (s: Simulation) => s.query.workPackages().filter((p) => (p.kind === 'discharge' || p.kind === 'load') && !p.emptyReq)
 

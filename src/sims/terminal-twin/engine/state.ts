@@ -85,6 +85,12 @@ export interface VesselSlotState {
   half: CellHalf
   /** What the bay plan uses the slot for. Load/transshipment slots are reserved (empty) until TT-10. */
   purpose: SlotPurpose
+  /**
+   * Shared cell (#203): a discharge slot that also carries a load booking of the same shape. `plannedContainerId` /
+   * `emptyReq` are that booking; once the discharge box has left (`StsPicked`) the slot's `purpose` becomes this and
+   * the field is cleared.
+   */
+  loadPurpose?: Exclude<SlotPurpose, 'discharge'>
   containerId: string | null
   /** Load slots: the export box booked to this slot (it is `containerId` once loaded). */
   plannedContainerId?: string | null

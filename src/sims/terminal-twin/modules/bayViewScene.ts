@@ -6,7 +6,7 @@
  * the scene model's replayed custody, the same record the 3D boxes are posed from, and takes the ROB boxes from the
  * scene model too, so the bay view and the 3D vessel show the same boxes in the same cells. Pure: no Vue, no Three.js.
  */
-import type { BayBox, BayViewData } from './bayView'
+import { presentShared, type BayBox, type BayViewData } from './bayView'
 import type { SceneModel } from './sceneModel'
 
 export type BayViewScene = Pick<SceneModel, 'custodyAt' | 'robBoxesOf'>
@@ -15,6 +15,14 @@ export type BayViewScene = Pick<SceneModel, 'custodyAt' | 'robBoxesOf'>
 export function bayViewDataAt(data: BayViewData, scene: BayViewScene, t: number): BayViewData {
   const boxes: Record<string, BayBox> = {}
   const slots = data.slots.map((s) => {
+    const sc = data.shared?.[s.id]
+    if (sc) {
+      // a shared cell (#203): both boxes at display time, then the cell as the viewer presents it
+      const kindAt = (b: BayBox) => scene.custodyAt(b.id, t)?.kind ?? 'external'
+      const shown = presentShared({ slot: sc.slot, arrival: { ...sc.arrival, custody: kindAt(sc.arrival) }, ...(sc.load ? { load: { ...sc.load, custody: kindAt(sc.load) } } : {}) })
+      boxes[s.id] = shown.box
+      return shown.slot
+    }
     const box = data.boxes[s.id]
     if (!box) return s
     const at = scene.custodyAt(box.id, t)
