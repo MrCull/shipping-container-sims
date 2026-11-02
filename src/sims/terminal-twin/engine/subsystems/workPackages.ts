@@ -120,15 +120,17 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
     const made: WorkPackage[] = []
     let current: WorkPackage | null = null
     for (const s of group) {
+      // a shared cell's `emptyReq` is its load booking: a discharge package never reads it (#203)
+      const req = kind === 'load' ? s.emptyReq : undefined
       if (
         !current ||
         current.bay !== s.bay ||
         current.section !== section(s.deck) ||
-        (current.emptyReq?.index ?? -1) !== (s.emptyReq?.index ?? -1)
+        (current.emptyReq?.index ?? -1) !== (req?.index ?? -1)
       ) {
         current = make(kind, s.bay, section(s.deck))
-        if (s.emptyReq)
-          current.emptyReq = { index: s.emptyReq.index, size: s.emptyReq.size, line: s.emptyReq.line, isoType: s.emptyReq.isoType, count: 0, slotIds: [], stage: 'pending' }
+        if (req)
+          current.emptyReq = { index: req.index, size: req.size, line: req.line, isoType: req.isoType, count: 0, slotIds: [], stage: 'pending' }
         made.push(current)
       }
       if (current.emptyReq) {
