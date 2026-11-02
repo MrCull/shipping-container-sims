@@ -8,11 +8,10 @@
  * last leg or the last departure through the truck's own outbound lane.
  */
 import { describe, expect, it } from 'vitest'
-import { createSimulation, type Simulation } from '../engine'
+import { createSimulation, STALL_STRAND_LIMIT_S, stuckYardBlocks, type Simulation } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import { ScenarioBuilder } from '../scenario/builder'
 import type { ScenarioConfig } from '../scenario/types'
-import { STALL_STRAND_LIMIT_S, stuckYardBlocks } from '../engine/invariants'
 
 const NO_PROGRESS = 'yard.no-progress'
 const STRANDED = 'landside.stranded-truck'
