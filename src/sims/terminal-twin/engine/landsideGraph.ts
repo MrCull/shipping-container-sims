@@ -46,6 +46,8 @@ export const TRUCK_ZONE_CLEARANCE_M = 10
 /** Gap between the road and the stalls' spur junctions, and between the two roads (m). */
 const ROAD_GAP_M = 10
 const ROAD_PITCH_M = 8
+/** [A] Longest conflict zone on the outbound road (m): longer sections are cut into pieces so trucks leaving pipeline (about the inbound stall pitch). */
+export const OUT_ROAD_SECTION_M = 40
 /** Gate kiosks sit this far landside of the outbound road, lane entries / exits this far (m). */
 const KIOSK_DZ = 14
 const ENTRY_DZ = 26
@@ -287,10 +289,23 @@ export function buildLandsideGraph(config: ScenarioConfig): LandsideGraph {
     edge('ls:end', roadId('O', eastX), 'ls:end')
   }
   // westbound outbound road
+  // A section longer than OUT_ROAD_SECTION_M is cut into pieces of that length (one conflict zone each), so trucks
+  // leaving follow each other in a pipeline like they do on the inbound road, whose spurs cut it into short sections.
   for (let i = roSorted.length - 1; i > 0; i--) {
-    const id = `ls:SO@${roSorted[i - 1]}`
-    zone(id, 'road', roSorted[i - 1] + 2, roSorted[i] - 2, roadOutZ - 2, roadOutZ + 2)
-    edge(roadId('O', roSorted[i]), roadId('O', roSorted[i - 1]), id)
+    const east = roSorted[i]
+    const west = roSorted[i - 1]
+    const pieces = Math.max(1, Math.ceil((east - west) / OUT_ROAD_SECTION_M - 1e-9))
+    const xAt = (k: number) => r3(east - (k * (east - west)) / pieces)
+    let prev = roadId('O', east)
+    for (let k = 0; k < pieces; k++) {
+      const last = k === pieces - 1
+      const id = pieces === 1 ? `ls:SO@${west}` : `ls:SO@${west}.${k}`
+      const toId = last ? roadId('O', west) : `ls:RO@${west}.${k}`
+      if (!last) node(toId, xAt(k + 1), roadOutZ, 'road', null)
+      zone(id, 'road', k === pieces - 1 ? west + 2 : xAt(k + 1), k === 0 ? east - 2 : xAt(k), roadOutZ - 2, roadOutZ + 2)
+      edge(prev, toId, id)
+      prev = toId
+    }
   }
 
   // transfer stalls: a spur off the inbound road, in and out (the truck reverses out)

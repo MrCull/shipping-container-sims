@@ -351,8 +351,8 @@ function requestAllocation(ctx: EngineContext, job: AscJob): void {
       topVessels: yard.topVessels.slice(),
       stackSpans: stackSpansOf(state, block.id),
       ...reeferFields(block, box.reefer),
-      // truck drops may use the reserve (the gate queue must never wait on it); discharge may not
-      ...(stall ? {} : reserveFields(block)),
+      // #184: truck drops keep out of the reserve too (the stall room check does the same), so it stays free for rehandles
+      ...reserveFields(block),
       ...(yardGroupingOn(ctx.config) ? { box: yardBoxView(box), stackTops: stackTopsOf(state, block.id) } : {}),
       random: ctx.random(),
     },
