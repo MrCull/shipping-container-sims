@@ -14,3 +14,15 @@ Phase 1 merged in #190. Fast mode (lint, build, test:related per ticket; full ve
 Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 
 - Peak day at 0.1: green after the exit road zones, drop reroute and wider gate bypass (0.42.0). #183 and #184 acceptance now met; both close with the phase 2 PR.
+
+## Spec #193 (faster agent loops), same branch, fast mode
+
+| Ticket | Title | Blocked by | Status | Claimed by |
+|---|---|---|---|---|
+| #194 | heavy-run lock in bg.sh | none | claimed | implementer |
+| #195 | merge script resolves ENGINE_VERSION-only conflicts | none | claimed | implementer |
+| #196 | brief rules (scale first, snapshots, absolute paths) | none | to do | |
+| #197 | smoke timing report | none | to do | |
+| #198 | Chromium cache in CI | none | to do | |
+| #199 | parallel proof runner | #194 | to do | |
+| #200 | final: CI workflow_dispatch check | #194 to #199 | to do | |
