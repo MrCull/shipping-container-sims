@@ -512,10 +512,13 @@ function planQueueMoves(ctx: EngineContext): void {
 }
 
 /**
- * TT-184: a truck at the head of the queue that no stall can take whatever the stalls' occupancy (a drop where every
- * block is without room for its box, a pick whose rehandles have no room) must not stop the picks behind it: their
- * lifts are what frees room. The first queued truck with a pick leg
- * that some stall can take moves to the head. Otherwise the queue stays first come, first served.
+ * TT-184: the head of the queue must not stop the trucks behind it when it cannot move and they can. The head has no free
+ * stall it may use (a drop where every block with a free stall is without room for its box, a pick whose block has every
+ * stall taken or no room for its rehandles) and either it is a drop-only truck (it would only wait in a holding position
+ * for room that the picks behind it make) or no holding position is free (it cannot even wait) or no stall of any
+ * occupancy could take it. The first queued truck (however far back) with a pick leg that has a free stall it may use then moves to the head
+ * (the peak day at 0.1: six holding positions full of picks for one block with all stalls taken, picks for a nearly empty
+ * block 3,000 s behind them). Otherwise the queue stays first come, first served.
  */
 function bypassBlockedHead(ctx: EngineContext): void {
   const { state } = ctx
@@ -524,10 +527,19 @@ function bypassBlockedHead(ctx: EngineContext): void {
   const head = state.trucks[ls.queue[0]]
   if (head.stallId !== null || head.holdingId !== null) return
   const room = roomReader(ctx)
-  const blockIds = [...new Set(graphOf(ctx).stalls.map((s) => s.blockId))]
-  const canGo = (truck: TruckState): boolean => blockIds.some((b) => stallLegal(ctx, truck, b, room))
+  const stalls = graphOf(ctx).stalls
+  const freeBlocks = new Set(stalls.filter((s) => ls.stalls[s.id].truckId === null).map((s) => s.blockId))
+  // a truck with a pick is bound to its box's block: only that block's stalls need checking
+  const canGo = (truck: TruckState): boolean => {
+    const bound = truck.legs.some((l) => l.kind === 'pick') ? legalBlocks(ctx, truck) : null
+    for (const b of bound ?? freeBlocks) if (freeBlocks.has(b) && stallLegal(ctx, truck, b, room)) return true
+    return false
+  }
   if (canGo(head)) return
-  const at = ls.queue.findIndex((id, i) => i > 0 && i <= 60 && state.trucks[id].legs.some((l) => l.kind === 'pick') && canGo(state.trucks[id]))
+  const picks = head.legs.some((l) => l.kind === 'pick')
+  const holdingFree = Object.values(ls.holding).some((h) => h.truckId === null)
+  if (picks && holdingFree && stalls.some((s) => stallLegal(ctx, head, s.blockId, room))) return // it can wait in a holding position
+  const at = ls.queue.findIndex((id, i) => i > 0 && state.trucks[id].legs.some((l) => l.kind === 'pick') && canGo(state.trucks[id]))
   if (at <= 0) return
   const [id] = ls.queue.splice(at, 1)
   ls.queue.unshift(id)
@@ -620,11 +632,11 @@ function resolveLane(ctx: EngineContext, truckId: string, laneId: string | null)
 
 // ── transfer stalls ─────────────────────────────────────────────────────────
 
-const stallOptions = (ctx: EngineContext, from: string) => {
+const stallOptions = (ctx: EngineContext, from: string, only: (s: LandsideGraph['stalls'][number]) => boolean = () => true) => {
   const { state } = ctx
   const graph = graphOf(ctx)
   const ls = landside(state)
-  return graph.stalls.map((s) => ({
+  return graph.stalls.filter(only).map((s) => ({
     stallId: s.id,
     blockId: s.blockId,
     x: s.x,
@@ -769,6 +781,8 @@ function askStall(ctx: EngineContext, truck: TruckState): void {
     const b = legalBlocks(ctx, state.trucks[other])
     if (b !== null) for (const x of b) blockLoad[x]++
   }
+  // TT-184: a truck whose drop met "full" is offered the stalls of the other blocks only
+  const ahead = reachableStall(ctx, truck)
   ls.stallAsking = truck.id
   ctx.requestDecision(
     'transferStallSelection',
@@ -785,7 +799,7 @@ function askStall(ctx: EngineContext, truck: TruckState): void {
           blockId: l.kind === 'pick' && box.custody.kind === 'yardSlot' ? blockOfSlot(box.custody.id) : null,
         }
       }),
-      stalls: stallOptions(ctx, truck.nodeId).filter((o) => stallLegal(ctx, truck, o.blockId, room)),
+      stalls: stallOptions(ctx, truck.nodeId, ahead).filter((o) => stallLegal(ctx, truck, o.blockId, room)),
       blockLoad,
     },
     { equipment: [truck.id] },
@@ -799,7 +813,7 @@ function askStall(ctx: EngineContext, truck: TruckState): void {
 function pumpStalls(ctx: EngineContext): void {
   const { state } = ctx
   const ls = landside(state)
-  if (ls.stallAsking !== null || ls.stallWaiting.length === 0) return
+  if (ls.stallAsking !== null || (ls.stallWaiting.length === 0 && !ls.fullDrops?.length)) return
   const graph = graphOf(ctx)
   const room = roomReader(ctx)
   for (const id of ls.stallWaiting) {
@@ -808,6 +822,55 @@ function pumpStalls(ctx: EngineContext): void {
     askStall(ctx, truck)
     return
   }
+  // TT-184: a drop that met "full" at its stall goes to a free stall of another block that takes it
+  const full = ls.fullDrops
+  if (!full) return
+  for (const id of full.slice()) {
+    const truck = state.trucks[id]
+    if (!truck || !rerouting(ctx, truck)) {
+      full.splice(full.indexOf(id), 1)
+      continue
+    }
+    const ahead = reachableStall(ctx, truck)
+    if (!graph.stalls.some((s) => ahead(s) && ls.stalls[s.id].truckId === null && stallLegal(ctx, truck, s.blockId, room))) continue
+    askStall(ctx, truck)
+    return
+  }
+}
+
+/**
+ * TT-184: a drop-only truck stands at its stall and every drop it has met "full" in the block (`allocation` full, no ASC
+ * started): it may take another block's stall. Not for a truck that has a pick (its box is in this block) or has begun.
+ */
+function rerouting(ctx: EngineContext, truck: TruckState): boolean {
+  if (truck.stallId === null || truck.atStallAt === null || truck.status !== 'at-stall') return false
+  if (!truck.legs.every((l) => l.kind === 'drop' && !l.done)) return false
+  const jobs = Object.values(ctx.state.ascJobs).filter((j) => j.truckId === truck.id)
+  return jobs.length === truck.legs.length && jobs.every((j) => j.allocation === 'full' && j.ascId === null)
+}
+
+/**
+ * TT-184: the stalls a truck may be sent to from where it stands. The inbound road runs one way (east), so a truck
+ * standing at a stall (or a holding position) reaches only the stalls further east, and a truck whose drop met "full"
+ * only those of another block. A truck that is not rerouting may use every stall (every one is reachable from the gate
+ * and from the holding positions, which lie west of all stall spurs).
+ */
+function reachableStall(ctx: EngineContext, truck: TruckState): (s: LandsideGraph['stalls'][number]) => boolean {
+  if (!rerouting(ctx, truck)) return () => true
+  const here = landside(ctx.state).stalls[truck.stallId as string]
+  const from = graphOf(ctx).stalls.find((s) => s.id === here.id) as LandsideGraph['stalls'][number]
+  return (s) => s.x > from.x + 1e-9 && s.blockId !== here.blockId
+}
+
+/** TT-184: the yardAllocation reply for a truck's drop was "full": the truck is sent elsewhere when a stall of another block takes it. */
+export function dropMetFull(ctx: EngineContext, job: AscJob): void {
+  if (ctx.state.landside === null || job.truckId === undefined) return
+  const truck = ctx.state.trucks[job.truckId]
+  if (!truck || !rerouting(ctx, truck)) return
+  const ls = landside(ctx.state)
+  const list = (ls.fullDrops ??= [])
+  if (!list.includes(truck.id)) list.push(truck.id)
+  pumpStalls(ctx)
 }
 
 /** TT-175: a block has room again (an ASC took a box out of its stacks): the trucks waiting for a stall are asked again. */
@@ -887,6 +950,23 @@ function resolveStall(ctx: EngineContext, truckId: string, stallId: string | nul
   if (!stall) throw new Error(`transferStallSelection handler returned ${stallId}, which is not a transfer stall`)
   if (stall.truckId !== null) throw new Error(`transferStallSelection handler returned ${stallId} for ${truckId}, but ${stall.truckId} holds it`)
   const truck = state.trucks[truckId]
+  if (truck && ls.fullDrops?.includes(truckId)) {
+    // TT-184: leave the stall whose block is full for one that takes the box
+    if (!rerouting(ctx, truck) || !reachableStall(ctx, truck)(graphOf(ctx).stalls.find((s) => s.id === stallId) as LandsideGraph['stalls'][number])) {
+      pumpStalls(ctx)
+      return
+    }
+    ls.fullDrops.splice(ls.fullDrops.indexOf(truckId), 1)
+    for (const job of Object.values(state.ascJobs)) if (job.truckId === truckId) delete state.ascJobs[job.id]
+    ls.stalls[truck.stallId as string].truckId = null
+    truck.atStallAt = null
+    stall.truckId = truckId
+    truck.stallId = stallId
+    planStallTrip(ctx, truck, stallId)
+    pumpStalls(ctx)
+    if (holdingOn(ctx)) pumpGate(ctx)
+    return
+  }
   const admitting = holdingOn(ctx) && truck?.status === 'queued' && ls.queue[0] === truckId
   if (!admitting && !ls.stallWaiting.includes(truckId)) {
     pumpStalls(ctx)

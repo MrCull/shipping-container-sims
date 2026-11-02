@@ -496,6 +496,11 @@ export interface LandsideState {
    * not a block, while a blocked slot is reported although trucks leave by other lanes.
    */
   lastDepartureByLane?: Record<string, number>
+  /**
+   * TT-184 (0.42.0): drop-only trucks standing at a stall whose box met "full" in its block (their ids, in order): each is
+   * sent to a stall of another block that takes the box, as soon as there is one. Absent until the first such truck.
+   */
+  fullDrops?: string[]
   /** Own RNG stream (arrivals, transactions, boxes, dwell): the landside never disturbs the other subsystems' draws. */
   rngState: number
   nextTruck: number

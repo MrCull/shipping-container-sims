@@ -29,7 +29,7 @@ import type { EngineContext, ReactorMap } from '../context'
 import { ascPoseAt, type PlannedType } from './ascReservations'
 import { maybeDispatchAsc, resolveDispatch } from './ascDispatch'
 import { claimSlot, placeInStack, removeFromStack, jobOfBox, isTruckJob, pumpAllocation, reopenFullJobs, resolveRehandleTarget } from './ascStorage'
-import { stallRoomAppeared } from './landside'
+import { dropMetFull, stallRoomAppeared } from './landside'
 export { ascPoseAt, maybeDispatchAsc, pumpAllocation, isTruckJob }
 import type { EventOf } from '../events'
 import type { PredictedReady } from '../predictions'
@@ -176,6 +176,7 @@ export const ascReactors: ReactorMap = {
     if (slotId === null) {
       job.allocation = 'full' // the block is full: the box stays on its pad
       if (state.kpis.yard) state.kpis.yard.allocationFailures++
+      dropMetFull(ctx, job)
     } else {
       claimSlot(ctx, job, slotId)
       job.allocation = 'claimed'
