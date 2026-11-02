@@ -92,6 +92,44 @@ export function presentShared(c: SharedCell): { slot: VesselSlotState; box: BayB
   }
 }
 
+/**
+ * The cell a plan shows for a shared cell (#205): the Discharge plan the arrival box (planned, in progress, discharged),
+ * the Load plan the booked load box (planned, in progress, loaded). `presentShared` is the one-picture version (no plan).
+ */
+export function presentSharedFor(c: SharedCell, plan: BayPlan): { slot: VesselSlotState; box: BayBox | undefined } {
+  if (plan === 'discharge') {
+    return {
+      slot: { ...c.slot, purpose: 'discharge', loadPurpose: undefined, containerId: c.arrival.custody === 'vesselSlot' ? c.arrival.id : null, plannedContainerId: undefined, emptyReq: undefined },
+      box: c.arrival,
+    }
+  }
+  const purpose = c.slot.purpose === 'discharge' ? (c.slot.loadPurpose ?? 'load') : c.slot.purpose
+  return {
+    slot: { ...c.slot, purpose, containerId: c.load?.custody === 'vesselSlot' ? c.load.id : null, plannedContainerId: c.load?.id ?? c.slot.plannedContainerId },
+    box: c.load,
+  }
+}
+
+/**
+ * `data` as one plan shows it: every shared cell presented for the plan (#205). Without a plan, or with no shared cell,
+ * `data` itself. The result holds no `shared`, so presenting it again changes nothing.
+ */
+export function dataForPlan(data: BayViewData, plan: BayPlan | undefined): BayViewData {
+  if (plan === undefined || !data.shared) return data
+  const boxes = { ...data.boxes }
+  const slots = data.slots.map((s) => {
+    const sc = data.shared![s.id]
+    if (!sc) return s
+    const shown = presentSharedFor(sc, plan)
+    if (shown.box) boxes[s.id] = shown.box
+    else delete boxes[s.id]
+    return shown.slot
+  })
+  const rest = { ...data, slots, boxes }
+  delete rest.shared
+  return rest
+}
+
 export interface BayViewData {
   vesselId: string
   sizeClass: VesselSizeClass
@@ -286,7 +324,8 @@ export function stepBay(sizeClass: VesselSizeClass, bay: number, direction: -1 |
 }
 
 /** The first bay that has work to do (or is being worked) in the plan, else the bow-most bay: where the viewer opens. */
-export function defaultBay(data: BayViewData, plan?: BayPlan): number {
+export function defaultBay(raw: BayViewData, plan?: BayPlan): number {
+  const data = dataForPlan(raw, plan)
   const order = bayOrder(data.sizeClass)
   const entries = stripOf(data, plan)
   const active = entries.find((e) => e.state === 'active') ?? entries.find((e) => e.state === 'idle')
@@ -298,7 +337,8 @@ function slotBox(data: BayViewData, slot: VesselSlotState): BayBox | undefined {
 }
 
 /** The bay strip: one entry per bay, bow first, with progress (of the plan's move, or both). */
-export function stripOf(data: BayViewData, plan?: BayPlan): StripEntry[] {
+export function stripOf(raw: BayViewData, plan?: BayPlan): StripEntry[] {
+  const data = dataForPlan(raw, plan)
   const spec = VESSEL_CLASSES[data.sizeClass]
   const robBays = new Set(data.robBoxes.map((b) => b.bay))
   const total = new Map<number, number>()
@@ -345,7 +385,8 @@ function subjectOf(d: CellDetails, box: BayBox | undefined): ColourSubject {
 }
 
 /** One bay of a vessel as cross-sections, strip and package list. */
-export function buildBayView(data: BayViewData, bay: number, opts: BayViewOptions): BayView {
+export function buildBayView(raw: BayViewData, bay: number, opts: BayViewOptions): BayView {
+  const data = dataForPlan(raw, opts.plan)
   const spec = VESSEL_CLASSES[data.sizeClass]
   if (!(bay >= 0 && bay < spec.bays)) throw new Error(`Bay ${bay} is not a bay of a ${data.sizeClass}`)
   const locate = opts.locate ?? ((id: string) => id)

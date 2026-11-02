@@ -6,7 +6,7 @@
  * the scene model's replayed custody, the same record the 3D boxes are posed from, and takes the ROB boxes from the
  * scene model too, so the bay view and the 3D vessel show the same boxes in the same cells. Pure: no Vue, no Three.js.
  */
-import { presentShared, type BayBox, type BayViewData } from './bayView'
+import { presentShared, type BayBox, type BayViewData, type SharedCell } from './bayView'
 import type { SceneModel } from './sceneModel'
 
 export type BayViewScene = Pick<SceneModel, 'custodyAt' | 'robBoxesOf'>
@@ -14,12 +14,15 @@ export type BayViewScene = Pick<SceneModel, 'custodyAt' | 'robBoxesOf'>
 /** `data` (the engine's, read at `data.now`) as the scene draws the vessel at display time `t`. */
 export function bayViewDataAt(data: BayViewData, scene: BayViewScene, t: number): BayViewData {
   const boxes: Record<string, BayBox> = {}
+  const shared: Record<string, SharedCell> = {}
   const slots = data.slots.map((s) => {
     const sc = data.shared?.[s.id]
     if (sc) {
       // a shared cell (#203): both boxes at display time, then the cell as the viewer presents it
       const kindAt = (b: BayBox) => scene.custodyAt(b.id, t)?.kind ?? 'external'
-      const shown = presentShared({ slot: sc.slot, arrival: { ...sc.arrival, custody: kindAt(sc.arrival) }, ...(sc.load ? { load: { ...sc.load, custody: kindAt(sc.load) } } : {}) })
+      const at: SharedCell = { slot: sc.slot, arrival: { ...sc.arrival, custody: kindAt(sc.arrival) }, ...(sc.load ? { load: { ...sc.load, custody: kindAt(sc.load) } } : {}) }
+      shared[s.id] = at // the raw parts at display time, for the plan a viewer shows (#205)
+      const shown = presentShared(at)
       boxes[s.id] = shown.box
       return shown.slot
     }
@@ -32,5 +35,5 @@ export function bayViewDataAt(data: BayViewData, scene: BayViewScene, t: number)
     // a load slot not loaded yet at `t` is still booked to its box
     return here ? { ...s, containerId: box.id } : { ...s, containerId: null, plannedContainerId: s.plannedContainerId ?? box.id }
   })
-  return { ...data, slots, boxes, robBoxes: scene.robBoxesOf(data.vesselId), now: Math.min(t, data.now ?? t) }
+  return { ...data, slots, boxes, ...(data.shared ? { shared } : {}), robBoxes: scene.robBoxesOf(data.vesselId), now: Math.min(t, data.now ?? t) }
 }

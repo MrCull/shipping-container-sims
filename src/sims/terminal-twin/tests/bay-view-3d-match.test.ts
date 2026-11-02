@@ -6,7 +6,7 @@
  * back to the display time with the scene model (`bayViewDataAt`). The ROB display `hide` removes ROB in both.
  */
 import { describe, expect, it } from 'vitest'
-import { buildBayView, bayOrder, type BayView, type BayViewData } from '../modules/bayView'
+import { buildBayView, bayOrder, type BayPlan, type BayView, type BayViewData } from '../modules/bayView'
 import { bayViewDataAt } from '../modules/bayViewScene'
 import { SceneModel } from '../modules/sceneModel'
 import { TTI_PRESET_NAME, presets } from '../scenario/presets'
@@ -92,6 +92,30 @@ describe('bay view and 3D vessel show the same boxes (TTI preset)', async () => 
       }
     }
     expect(compared).toBeGreaterThan(0)
+  })
+
+  it('shared cells (#205): the two plans together hold the 3D boxes, a cell never in both, and a shared cell shows in both plans', () => {
+    let shared = 0
+    for (const id of ids) {
+      for (const t of times) {
+        const synced = bayViewDataAt(data[id], model, t)
+        const cellsOf = (plan: BayPlan) => {
+          const out: string[] = []
+          for (const bay of bayOrder(synced.sizeClass))
+            for (const sec of buildBayView(synced, bay, { colourMode: 'status', plan, robDisplay: 'hide' }).sections)
+              for (const tr of sec.tiers)
+                for (const p of tr.positions)
+                  for (const c of p.cells) if (c.status === 'planned-discharge' || (plan === 'load' && c.status === 'done')) out.push(key(bay, p.row, tr.tier, c.half, synced.sizeClass))
+          return out
+        }
+        const dis = cellsOf('discharge')
+        const load = cellsOf('load')
+        expect(dis.filter((k) => load.includes(k)), `${id} at ${t}`).toEqual([]) // a box is aboard in one plan's view only
+        expect([...dis, ...load].sort(), `${id} at ${t}`).toEqual(sceneCells(model, id, t, { hide: true }))
+      }
+      shared += Object.keys(data[id].shared ?? {}).length
+    }
+    expect(shared).toBeGreaterThan(0)
   })
 
   it('the 3D ROB boxes are the live ROB boxes the bay view reads', () => {
