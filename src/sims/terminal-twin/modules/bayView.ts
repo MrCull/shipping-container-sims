@@ -86,9 +86,8 @@ export interface SharedCell {
 /** The slot and box the viewer draws for a shared cell: the load once it is aboard, else the discharge box and its slot. */
 export function presentShared(c: SharedCell): { slot: VesselSlotState; box: BayBox } {
   if (c.load?.custody === 'vesselSlot') return { slot: { ...c.slot, containerId: c.load.id }, box: c.load }
-  const { loadPurpose: _drop, ...rest } = c.slot
   return {
-    slot: { ...rest, purpose: 'discharge', containerId: c.arrival.custody === 'vesselSlot' ? c.arrival.id : null, plannedContainerId: undefined, emptyReq: undefined },
+    slot: { ...c.slot, purpose: 'discharge', loadPurpose: undefined, containerId: c.arrival.custody === 'vesselSlot' ? c.arrival.id : null, plannedContainerId: undefined, emptyReq: undefined },
     box: c.arrival,
   }
 }
