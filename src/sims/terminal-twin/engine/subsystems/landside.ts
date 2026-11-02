@@ -631,8 +631,16 @@ const blockOfSlot = (slotId: string): string => parseYardSlotId(slotId).blockId
 function legalBlocks(ctx: EngineContext, truck: TruckState): Set<string> | null {
   const blocks = new Set<string>()
   for (const leg of truck.legs) {
+    if (leg.kind !== 'pick') continue
+    // TT-183: the block the pick's retrieval job was made for (the box's block when the truck arrived). A box that is not in
+    // a slot at this moment (in an ASC's hands) used to leave every stall legal, and a stall in another block is never served
+    const job = Object.values(ctx.state.ascJobs).find((j) => j.truckId === truck.id && j.containerId === leg.containerId)
+    if (job) {
+      blocks.add(job.blockId)
+      continue
+    }
     const box = ctx.state.containers[leg.containerId]
-    if (leg.kind === 'pick' && box.custody.kind === 'yardSlot') blocks.add(blockOfSlot(box.custody.id))
+    if (box.custody.kind === 'yardSlot') blocks.add(blockOfSlot(box.custody.id))
   }
   return blocks.size > 0 ? blocks : null
 }
