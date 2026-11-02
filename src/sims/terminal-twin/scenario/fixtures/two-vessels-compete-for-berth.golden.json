@@ -3,25 +3,25 @@
   "seed": 7,
   "status": "ended",
   "endReason": "vesselsCompleted >= 2",
-  "eventLogHash": "1b8437e48392bd",
+  "eventLogHash": "08f1bc26da2dcd",
   "kpis": {
-    "simTimeS": 4387.106,
-    "eventsProcessed": 235,
+    "simTimeS": 4538.203,
+    "eventsProcessed": 239,
     "movesCompleted": 24,
     "vesselsCompleted": 2,
     "sts": {
       "STS01": {
         "moves": 12,
-        "cycles": 10,
-        "twinLifts": 2,
-        "grossMovesPerHour": 13.638,
+        "cycles": 11,
+        "twinLifts": 1,
+        "grossMovesPerHour": 13.017,
         "railWaitS": 0
       },
       "STS02": {
         "moves": 12,
-        "cycles": 9,
-        "twinLifts": 3,
-        "grossMovesPerHour": 14.39,
+        "cycles": 10,
+        "twinLifts": 2,
+        "grossMovesPerHour": 13.7,
         "railWaitS": 0
       }
     },
@@ -32,8 +32,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 600,
-        "departedAtS": 2260.678,
-        "turnaroundS": 1660.678,
+        "departedAtS": 2411.776,
+        "turnaroundS": 1811.776,
         "sts": [
           "STS01",
           "STS02"
@@ -42,10 +42,10 @@
       "V002": {
         "sizeClass": "panamax",
         "arrivedAtS": 300,
-        "anchorageWaitS": 1960.678,
+        "anchorageWaitS": 2111.776,
         "berthX": 0,
-        "berthedAtS": 2860.678,
-        "departedAtS": 4387.106,
+        "berthedAtS": 3011.776,
+        "departedAtS": 4538.203,
         "turnaroundS": 1526.428,
         "sts": [
           "STS01",
@@ -56,9 +56,9 @@
     "quay": {
       "vesselsWaited": 1,
       "anchorageWaitS": {
-        "total": 1960.678,
-        "mean": 980.339,
-        "max": 1960.678
+        "total": 2111.776,
+        "mean": 1055.888,
+        "max": 2111.776
       }
     },
     "handlers": {
@@ -151,22 +151,22 @@
       "IMPORT": {
         "count": 21,
         "departed": 0,
-        "meanS": 2134.626,
-        "maxS": 3606.845
+        "meanS": 2162.903,
+        "maxS": 3757.943
       },
       "STORAGE": {
         "count": 3,
         "departed": 0,
-        "meanS": 2726.176,
-        "maxS": 3696.953
+        "meanS": 2826.908,
+        "maxS": 3848.05
       }
     },
     "workPackages": {
       "released": 18,
       "started": 18,
       "completed": 18,
-      "leadTimeMeanS": 275.738,
-      "leadTimeMaxS": 513.792,
+      "leadTimeMeanS": 300.361,
+      "leadTimeMaxS": 661.89,
       "boxesLoaded": 0
     },
     "ordering": {
@@ -183,7 +183,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 234,
+    "checks": 238,
     "violations": 0,
     "first": null
   },

@@ -3,32 +3,32 @@
   "seed": 1,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "01e7b8a9c85fdc",
+  "eventLogHash": "12cb2a826a8b7c",
   "kpis": {
-    "simTimeS": 3471.884,
-    "eventsProcessed": 455,
+    "simTimeS": 3613.836,
+    "eventsProcessed": 465,
     "movesCompleted": 60,
     "vesselsCompleted": 1,
     "sts": {
       "STS01": {
         "moves": 14,
-        "cycles": 10,
-        "twinLifts": 4,
-        "grossMovesPerHour": 33.092,
+        "cycles": 13,
+        "twinLifts": 1,
+        "grossMovesPerHour": 25.852,
         "railWaitS": 0
       },
       "STS02": {
         "moves": 14,
-        "cycles": 12,
-        "twinLifts": 2,
-        "grossMovesPerHour": 27.904,
+        "cycles": 13,
+        "twinLifts": 1,
+        "grossMovesPerHour": 25.525,
         "railWaitS": 0
       },
       "STS03": {
         "moves": 16,
-        "cycles": 14,
-        "twinLifts": 2,
-        "grossMovesPerHour": 25.734,
+        "cycles": 15,
+        "twinLifts": 1,
+        "grossMovesPerHour": 24.057,
         "railWaitS": 0
       },
       "STS04": {
@@ -46,8 +46,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 600,
-        "departedAtS": 3471.884,
-        "turnaroundS": 2871.884,
+        "departedAtS": 3613.836,
+        "turnaroundS": 3013.836,
         "sts": [
           "STS01",
           "STS02",
@@ -154,21 +154,21 @@
       "IMPORT": {
         "count": 58,
         "departed": 0,
-        "meanS": 1913.696,
-        "maxS": 2826.192
+        "meanS": 1943.657,
+        "maxS": 2968.144
       },
       "STORAGE": {
         "count": 2,
         "departed": 0,
-        "meanS": 2589.565,
-        "maxS": 2795.791
+        "meanS": 2664.019,
+        "maxS": 2802.745
       }
     },
     "workPackages": {
       "released": 30,
       "started": 30,
       "completed": 30,
-      "leadTimeMeanS": 399.102,
+      "leadTimeMeanS": 437.938,
       "leadTimeMaxS": 834.775,
       "boxesLoaded": 0
     },
@@ -186,7 +186,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 454,
+    "checks": 464,
     "violations": 0,
     "first": null
   },
