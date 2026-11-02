@@ -26,3 +26,12 @@ Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 | #198 | Chromium cache in CI | none | merged in branch | |
 | #199 | parallel proof runner | #194 | merged in branch | |
 | #200 | final: CI workflow_dispatch check | #194 to #199 | to do | |
+
+## Spec #201 and follow-ups (same branch, fast mode). Ticket bodies: scratchpad impl201/<N>.md
+
+| Ticket | Title | Blocked by | Status | Claimed by |
+|---|---|---|---|---|
+| #202 | invariant stowage.cell-free | none | claimed | agent |
+| #207 | engine: yard allocation spreads across blocks | none | claimed | agent |
+| #208 | engine: gate-queue bypass only at queue head | none | to do | |
+| #209 | invariant: yard.no-progress wait from gate-in | none | to do | |
