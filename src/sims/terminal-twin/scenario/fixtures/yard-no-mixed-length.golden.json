@@ -3,18 +3,18 @@
   "seed": 6,
   "status": "ended",
   "endReason": "simDurationS >= 3600",
-  "eventLogHash": "1594084e1c46f6",
+  "eventLogHash": "0c691f604a32b7",
   "kpis": {
     "simTimeS": 3600,
-    "eventsProcessed": 983,
+    "eventsProcessed": 977,
     "movesCompleted": 24,
     "vesselsCompleted": 1,
     "sts": {
       "STS01": {
         "moves": 24,
-        "cycles": 21,
-        "twinLifts": 3,
-        "grossMovesPerHour": 29.575,
+        "cycles": 18,
+        "twinLifts": 6,
+        "grossMovesPerHour": 34.718,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 3060.032,
-        "turnaroundS": 3000.032,
+        "departedAtS": 2630.009,
+        "turnaroundS": 2570.009,
         "sts": [
           "STS01"
         ]
@@ -193,39 +193,39 @@
       "boxesToWtp": 24,
       "shcs": {
         "SHC01": {
-          "jobs": 21,
-          "emptyDistanceM": 5415,
-          "loadedDistanceM": 2755,
-          "reservationWaitS": 0,
+          "jobs": 18,
+          "emptyDistanceM": 4695.5,
+          "loadedDistanceM": 2364.5,
+          "reservationWaitS": 3.226,
           "stateS": {
-            "parked": 1457.552,
-            "moving-to-collect": 441.759,
+            "parked": 1751.875,
+            "moving-to-collect": 383.226,
             "queuing-to-collect": 0,
-            "collecting": 724.035,
-            "moving-to-deliver": 73.5,
+            "collecting": 626.275,
+            "moving-to-deliver": 63,
             "queuing-to-deliver": 0,
-            "delivering": 903.154
+            "delivering": 775.624
           },
-          "handovers": 42,
-          "parkingReturns": 21,
+          "handovers": 36,
+          "parkingReturns": 18,
           "queueArrivals": 0
         },
         "SHC02": {
-          "jobs": 3,
-          "emptyDistanceM": 833,
-          "loadedDistanceM": 409,
+          "jobs": 6,
+          "emptyDistanceM": 1587.5,
+          "loadedDistanceM": 746.5,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 3296.692,
-            "moving-to-collect": 60.904,
+            "parked": 2996.234,
+            "moving-to-collect": 131.192,
             "queuing-to-collect": 0,
-            "collecting": 104.87,
-            "moving-to-deliver": 10.5,
+            "collecting": 202.943,
+            "moving-to-deliver": 21,
             "queuing-to-deliver": 0,
-            "delivering": 127.035
+            "delivering": 248.632
           },
-          "handovers": 6,
-          "parkingReturns": 3,
+          "handovers": 12,
+          "parkingReturns": 6,
           "queueArrivals": 0
         }
       },
@@ -239,8 +239,8 @@
       "allocationFailures": 0,
       "grouping": {
         "placements": 24,
-        "mixedStack": 4,
-        "orderBroken": 5,
+        "mixedStack": 5,
+        "orderBroken": 1,
         "mixedBay": 4
       },
       "rehandles": {
@@ -263,9 +263,9 @@
       "ascs": {
         "B01-ASC1": {
           "jobs": 24,
-          "gantryM": 2097.9,
-          "trolleyM": 355.05,
-          "hoistM": 764.224,
+          "gantryM": 2231.9,
+          "trolleyM": 306.55,
+          "hoistM": 775.808,
           "padWaitS": 0
         }
       }
@@ -274,22 +274,22 @@
       "IMPORT": {
         "count": 80,
         "departed": 0,
-        "meanS": 107886.113,
+        "meanS": 107956.629,
         "maxS": 633534
       },
       "STORAGE": {
         "count": 1,
         "departed": 0,
-        "meanS": 1448.001,
-        "maxS": 1448.001
+        "meanS": 1708.681,
+        "maxS": 1708.681
       }
     },
     "workPackages": {
       "released": 9,
       "started": 9,
       "completed": 9,
-      "leadTimeMeanS": 570.186,
-      "leadTimeMaxS": 1092.241,
+      "leadTimeMeanS": 495.412,
+      "leadTimeMaxS": 809.406,
       "boxesLoaded": 0
     },
     "ordering": {
@@ -306,7 +306,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 869,
+    "checks": 863,
     "violations": 0,
     "first": null
   },
