@@ -12,9 +12,9 @@ Phase 2 and specs #193 and #201 merged in #210. Fast mode (lint, build, test:rel
 | Ticket | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
 | #212 | three-crane rail yield | none | claimed | agent |
-| #213 | release-ahead keeps a WTP pad for each crane's head box | none | to do | |
+| #213 | release-ahead keeps a WTP pad for each crane head box | none | claimed | agent |
 | #214 | retry a rehandle-full retrieval when its block gains room | none | to do | |
 | #215 | stall legality counts room promised to admitted picks | none | to do | |
-| #216 | tt:run --snapshot on large runs | none | claimed | agent |
+| #216 | tt:run --snapshot on large runs | none | merged in branch (no ENGINE_VERSION change; snapshot 1.4 GB at 0.25 sim 7200 s, resume may need NODE_OPTIONS=--max-old-space-size) | |
 | #188 | scale 0.5 then 1 (0.25 done) | #212 to #216 | blocked | |
 | #217 | final: smoke suite and goldens | #188, #212 to #216 | blocked | |
