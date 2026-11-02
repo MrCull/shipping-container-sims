@@ -35,6 +35,14 @@ When the owner asks for it (to save wall-clock time on a long spec), a brief tha
 - **Done means checked:** for every acceptance criterion, name the evidence you looked at (a test, a log line, what the screenshot shows). A screenshot that does not show the criterion (the far end of a road, a distant label) is not evidence: re-frame it or report the criterion unmet. Stop only with a committed deliverable and the report below; diagnostics still running are not a result.
 - **Report** (at most 12 lines): branch, tip SHA, worktree path, verify result, unmet criteria and follow-ups. Before it, stop every process you started (`sleep` loops, dev servers, watchers); the orchestrator cannot remove a worktree that still has one.
 
+## Time box
+
+No single stretch of agent work or wait runs past about 10 minutes without a checkpoint:
+
+- **Waits:** `scripts/bg.sh wait` returns after 600 s by default (exit 124 means still running); the agent reads `scripts/bg.sh tail <log>`, then waits again. A job that needs hours (the smoke suite, a peak-day run) keeps running in the background; only the waiting is chunked.
+- **Slices:** the orchestrator sizes a ticket to one slice of about 10 minutes of agent work where it can (one invariant, one fix with its test), and splits a larger one in the ticket file before spawning. An implementer that finds its ticket larger commits what is green, reports the slice and the next step, and is resumed with `SendMessage`; it does not push on for an hour.
+- **Cycles:** a result-style ticket gets a cap (three cycles) and each cycle one bounded run.
+
 ## Gotchas no check enforces
 
 - Run anything longer than about a minute with `scripts/bg.sh run <log> <command...>` (detached; the log ends with `EXIT <code>`), then `scripts/bg.sh wait <log> [seconds]` to block until it finishes. Never write your own `sleep` loop: one left running blocks `scripts/remove-worktree.sh`. `scripts/test-bg.sh` tests it.

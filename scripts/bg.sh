@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Long commands without hand-rolled sleep loops.
 #   scripts/bg.sh run <log> <command...>   start detached, print the pid; <log> ends with "EXIT <code>"
-#   scripts/bg.sh wait <log> [seconds]     block until <log> has its EXIT line (default 1500 s), print it, exit with that code (124 on timeout)
+#   scripts/bg.sh wait <log> [seconds]     block until <log> has its EXIT line (default 600 s; exit 124 means still running, wait again), print it, exit with that code (124 on timeout)
 #   scripts/bg.sh tail <log>               last 5 lines of <log>
 set -u
 cmd=${1:-}
@@ -14,7 +14,7 @@ case "$cmd" in
     echo "$!"
     ;;
   wait)
-    log=${2:?log path}; max=${3:-1500}; waited=0
+    log=${2:?log path}; max=${3:-600}; waited=0
     while ! grep -q '^EXIT [0-9]*$' "$log" 2>/dev/null; do
       [ "$waited" -ge "$max" ] && { echo "bg: still running after ${max}s: $log" >&2; exit 124; }
       sleep 5; waited=$((waited + 5))
