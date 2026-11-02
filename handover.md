@@ -13,4 +13,4 @@ Phase 1 merged in #190. Fast mode (lint, build, test:related per ticket; full ve
 
 Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 
-- Peak day at 0.1 (new finding from #184): trucks stay `routing-to-exit` for thousands of seconds holding their stall; suspected outbound reservation chain (`planExit` / `earliestStart` in landside.ts). Fix ticket "exit-chain" in progress (implementer); it is the last blocker for the peak day acceptance.
+- Peak day at 0.1: exit chain fixed (outbound road cut to 40 m zones, ENGINE_VERSION 0.41.0, merged), still red on yard capacity: drop-only trucks meet a full stall (stranded-truck at 21,145 s with reserve 0.1) or picks wait behind a drop-only head (yard.no-progress at 38,752 s without). Next: reroute a drop to another block when it meets full, and let bypassBlockedHead skip a head with no free legal stall. Implementer in progress.
