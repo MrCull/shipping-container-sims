@@ -4,11 +4,13 @@ Phase 1 merged in #190. Fast mode (lint, build, test:related per ticket; full ve
 
 | Ticket | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
-| #184 | engine: yard reserve keeps stacks free for rehandles | none | in progress | implementer |
+| #184 | engine: yard reserve (and gate bypass) | none | merged in branch (0.38.0), partly: peak day at 0.1 still red | |
 | #185 | engine: pick-only trucks admitted when rehandles have room | none | merged in branch (ENGINE_VERSION 0.37.0) | |
-| #186 | engine: load boxes staged on WTP pads ahead of the crane | #184 | to do | |
+| #186 | engine: load boxes staged on WTP pads ahead of the crane | #184 | in progress | implementer |
 | #187 | engine: tier stow sequence keeps twin-20 pairing | #186 | to do | |
 | #188 | TTI presets at realistic volume, 0.25 then 0.5 then 1 | #184 to #187 | to do | |
 | #189 | smoke run and regressions (phase 2) | #184 to #188 | to do | |
 
 Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
+
+- Peak day at 0.1 (new finding from #184): trucks stay `routing-to-exit` for thousands of seconds holding their stall; suspected outbound reservation chain (`planExit` / `earliestStart` in landside.ts). Fix ticket "exit-chain" in progress (implementer); it is the last blocker for the peak day acceptance.
