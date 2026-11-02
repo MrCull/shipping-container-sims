@@ -400,7 +400,7 @@ View only: no event, state field or golden changes (the engine's `VesselState` i
 
 ## Silent yard deadlock (spec #178, #183, ENGINE_VERSION 0.36.0)
 
-- **Invariant `yard.no-progress`** (`engine/invariants.ts`, `stuckYardBlocks`): a block with a claimed open job, every ASC idle, no open job that can start, no pending event naming its work, and no ASC job start for `STALL_STRAND_LIMIT_S`. Never fires for a block with a working ASC.
+- **Invariant `yard.no-progress`** (`engine/invariants.ts`, `stuckYardBlocks`): a block with a claimed open job, every ASC idle, no open job that can start, no pending event naming its work, and no ASC job start for `STALL_STRAND_LIMIT_S`. The wait starts at the later of the block's last ASC job start and the gate-in (`gateInAt`) of the oldest claimed pick truck (#209): a pick truck still in the gate queue or a lane counts for nothing, and a block whose only claimed work is such a truck is skipped. Never fires for a block with a working ASC.
 - **Exit-slot wait:** `landside.stranded-truck` also reports a truck whose transfers are done and whose outbound slot has waited past the limit with no truck leaving through its lane (`LandsideState.lastDepartureByLane`).
 - **Deadlines:** a time-based invariant is checked at the time its limit is reached, not only after the next event (`invariantDeadline`, `engine/simulation.ts` `step`). Only the clock moves: no event is scheduled.
 - **Root cause and rule:** the rehandle rule forbids a stack that a truck is coming for only for a truck holding a stall (`rehandleCandidates`). Details, numbers and tests: [docs/yard-and-landside.md](docs/yard-and-landside.md), "Silent yard deadlock (TT-183)".
