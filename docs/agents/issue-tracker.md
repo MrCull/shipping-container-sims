@@ -52,3 +52,7 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (see **Count open blockers**, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
 - **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
+
+## Large tool results
+
+`list_issues` and `issue_read` with `get_sub_issues` can return more than fits in context. Pass `minimal_output: true` and a small page size first; if the result is saved to a file anyway, read it with a short Python filter (`number`, `title`, `labels`) rather than the tool again.

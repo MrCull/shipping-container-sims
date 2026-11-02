@@ -31,7 +31,8 @@ When the owner asks for it (to save wall-clock time on a long spec), a brief tha
 - **Screenshot (UI tickets):** commit one compressed PNG of the ticket's after state, from the `pnpm run screenshot` output in `.screenshots/` (gitignored), under `docs/prototypes/`, in a folder named for the issue number (issue 170 gives folder `170`). Keep it small: compress it and crop or scale it to the view that shows the change. One file per ticket.
 - **Commit early**, as soon as verify passes, and again at the end. An implementer that stops (rate limit, disk) with uncommitted work costs a full re-triage. Do not push and do not touch GitHub; the orchestrator does that.
 - **Before reporting:** merge the current integration tip, re-run `pnpm run verify`, update the sim guide and `GLOSSARY.md` for what you added.
-- **Report** (at most 12 lines): branch, tip SHA, worktree path, verify result, unmet criteria and follow-ups.
+- **Done means checked:** for every acceptance criterion, name the evidence you looked at (a test, a log line, what the screenshot shows). A screenshot that does not show the criterion (the far end of a road, a distant label) is not evidence: re-frame it or report the criterion unmet. Stop only with a committed deliverable and the report below; diagnostics still running are not a result.
+- **Report** (at most 12 lines): branch, tip SHA, worktree path, verify result, unmet criteria and follow-ups. Before it, stop every process you started (`sleep` loops, dev servers, watchers); the orchestrator cannot remove a worktree that still has one.
 
 ## Gotchas no check enforces
 
