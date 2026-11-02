@@ -1,7 +1,7 @@
 /** TT-15: the three presets load, validate cleanly and run headless to their end condition with every invariant passing. */
 import { describe, expect, it } from 'vitest'
 import { createSimulation, validateScenario } from '../engine'
-import { presets, TTI_BAYS } from '../scenario/presets'
+import { presets, TTI_BAYS, TTI_MOVES_SCALE } from '../scenario/presets'
 
 describe('presets', () => {
   it('offers TTI Algeciras baseline, Small automated and TTI Algeciras, peak day', () => {
@@ -25,9 +25,10 @@ describe('presets', () => {
     expect(ts / boxes).toBeLessThan(0.9)
   })
 
-  it.each(['TTI Algeciras baseline', 'TTI Algeciras, peak day'])('#165: %s calls carry about twice the old volumes (moves scale 0.1)', (name) => {
-    // Typical moves per call [A] (discharge plus load) at scale 0.1, each drawn from 80 to 120 %; the old scale 0.05 gave half of these.
-    const typical = { feeder: 30, feedermax: 55, panamax: 110, 'neo-panamax': 220, ulcv: 340 }
+  it.each(['TTI Algeciras baseline', 'TTI Algeciras, peak day'])('#165: %s calls carry the volumes of TTI_MOVES_SCALE (#165, #188)', (name) => {
+    // Typical moves per call [A] (discharge plus load) at scale 0.1, each drawn from 80 to 120 %; the committed scale multiplies them.
+    const k = TTI_MOVES_SCALE / 0.1
+    const typical = { feeder: 30 * k, feedermax: 55 * k, panamax: 110 * k, 'neo-panamax': 220 * k, ulcv: 340 * k }
     for (const v of presets[name]().vessels) {
       const moves = v.discharge + v.load + v.transshipment
       expect(moves, `${v.id} ${v.sizeClass}`).toBeGreaterThanOrEqual(0.78 * typical[v.sizeClass])

@@ -858,6 +858,7 @@ function askStall(ctx: EngineContext, truck: TruckState): void {
       }),
       stalls: stallOptions(ctx, truck.nodeId, ahead).filter((o) => stallLegal(ctx, truck, o.blockId, room)),
       blockLoad,
+      blockFill: Object.fromEntries(Object.values(state.yardBlocks).map((y) => [y.id, y.heights.reduce((n, h) => n + h, 0) / Math.max(1, y.heights.length * y.tiers)])),
     },
     { equipment: [truck.id] },
   )

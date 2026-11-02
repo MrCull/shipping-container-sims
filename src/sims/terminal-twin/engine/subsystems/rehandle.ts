@@ -63,7 +63,9 @@ export function nextBlocker(state: SimState, job: AscJob): YardSlotState | null 
   const yard = state.yardBlocks[slot.blockId]
   const taken = new Set(
     Object.values(state.ascJobs)
-      .filter((j) => j.kind === 'retrieve' && j.ascId !== null)
+      // #188: a retrieval whose ascDispatch decision is pending is taken as well (its ASC is assigned a moment later): a blocker
+      // that is itself such a retrieval would otherwise be rehandled by the other ASC while the first lifts it
+      .filter((j) => j.kind === 'retrieve' && (j.ascId !== null || j.dispatch === 'asked'))
       .map((j) => j.containerId),
   )
   return (
