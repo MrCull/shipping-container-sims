@@ -33,6 +33,6 @@ Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 |---|---|---|---|---|
 | #202 | invariant stowage.cell-free | none | merged in branch (fast-forward fff82d5) | |
 | #207 | engine: yard allocation spreads across blocks | none | merged in branch (0.43.0), AC2 only marginal at 0.1; slow rehandle on B02 (pick-admission seed 3) worth a look | |
-| #208 | engine: gate-queue bypass only at queue head | none | to do | |
+| #208 | engine: gate-queue bypass only at queue head | none | claimed | agent |
 | #203 | shared cells: planner and engine | #202 | claimed | agent |
 | #209 | invariant: yard.no-progress wait from gate-in | none | to do | |
