@@ -95,10 +95,23 @@ function askToYield(ctx: EngineContext, blocker: StsState, waiter: StsState, tar
   const edge = goRight ? Math.max(waiter.gantryX, targetX) + spacing : Math.min(waiter.gantryX, targetX) - spacing
   if (edge < 0 || edge > lengthM) return false
   const current = blocker.railTargetX
-  const target = current === null ? edge : goRight ? Math.max(current, edge) : Math.min(current, edge)
-  if (blocker.status === 'waiting-for-rail' && current === target) return false
+  const also = blocker.railAlsoX ?? null
+  // #212: a blocker asked from both sides (or whose own want, hatch laydown included, lies against the ask) serves the
+  // lowest rail index first: that waiter's ask replaces the blocker's target, a higher-index ask waits until it is done.
+  const against = (x: number | null): boolean => x !== null && (goRight ? x < blocker.gantryX - EPS : x > blocker.gantryX + EPS)
+  const priority = blocker.railYieldFrom ?? blocker.railIndex
+  let target: number
+  if (blocker.status === 'waiting-for-rail' && (against(current) || against(also))) {
+    if (waiter.railIndex > priority) return false
+    target = edge
+    blocker.railAlsoX = null
+  } else {
+    target = current === null ? edge : goRight ? Math.max(current, edge) : Math.min(current, edge)
+  }
+  if (blocker.status === 'waiting-for-rail' && current === target && also === (blocker.railAlsoX ?? null)) return false
   blocker.status = 'waiting-for-rail'
   blocker.railTargetX = target
+  blocker.railYieldFrom = Math.min(waiter.railIndex, blocker.railYieldFrom ?? waiter.railIndex)
   // a busy blocker steps aside by repositioning (not by moving to its pick); it resumes its work afterwards
   blocker.railYield = blocker.vesselId !== null
   return true
@@ -122,6 +135,7 @@ export function wakeRail(ctx: EngineContext, startMove: (sts: StsState) => void)
       if (blockedBy === null) {
         sts.railTargetX = null
         sts.railAlsoX = null
+        sts.railYieldFrom = null
         changed = true
         if (sts.vesselId !== null && !sts.railYield) {
           sts.status = 'moving-to-pick'

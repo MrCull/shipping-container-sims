@@ -606,6 +606,7 @@ export const quayReactors: ReactorMap = {
     const sts = ctx.state.sts[e.payload.stsId]
     releaseRail(sts)
     sts.railYield = false
+    sts.railYieldFrom = null
     sts.status = 'idle'
     // assigned to a vessel while repositioning: start its work now
     if (sts.vesselId) continueWork(ctx, sts, e.t)

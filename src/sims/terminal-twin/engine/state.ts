@@ -645,6 +645,8 @@ export interface StsState {
    * yield in `engine/subsystems/rail.ts`). It resumes that work when the reposition completes. Absent = false.
    */
   railYield?: boolean
+  /** Lowest rail index of the waiter that asked this crane to step aside (#212); the lowest index is served first. Absent or null = no ask. */
+  railYieldFrom?: number | null
   /** Boxes on the spreader (two for a twin-20 lift), aft first. */
   carrying: string[]
   /** Ground positions chosen for the carried boxes, in set-down order. */
