@@ -38,6 +38,11 @@ export const useAudioStore = defineStore('audio', () => {
     persistSoundMuted()
   }
 
+  /** Mute or unmute for this page only, without writing the stored choice (a forced mute must not outlive the tab). */
+  function setSoundMutedTransient(value: boolean): void {
+    soundMuted.value = value
+  }
+
   /** Any movement of the volume slider means "I want to hear it": it unmutes. */
   function moveVolumeSlider(value: number): void {
     setVolume(value)
@@ -67,6 +72,7 @@ export const useAudioStore = defineStore('audio', () => {
     gainFor,
     setVolume,
     setSoundMuted,
+    setSoundMutedTransient,
     moveVolumeSlider,
     toggleSound,
     musicMuted,

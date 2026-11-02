@@ -64,6 +64,15 @@ describe('daylight lock: every run launch starts in daylight', () => {
     expect(store.lockDaylight).toBe(true)
   })
 
+  it('#192: Reset returns to daylight after the owner toggled it off', async () => {
+    const store = useTwinStore()
+    await store.startScenario({ ...store.choice, name: TRACER, seed: 3 })
+    store.toggleLockDaylight()
+    expect(store.lockDaylight).toBe(false)
+    await store.reset()
+    expect(store.lockDaylight).toBe(true)
+  })
+
   it('a preset run starts lit, the TTI baseline and the small automated preset alike', async () => {
     const store = useTwinStore()
     await store.startScenario({ ...store.choice, name: SMALL_PRESET_NAME, seed: 3 })
@@ -91,6 +100,16 @@ describe('sound on entry: muted on every entry, restored on leave', () => {
     store.enterSim()
     expect(audio.soundMuted).toBe(true)
     expect(audio.masterGain).toBe(0)
+  })
+
+  it('#192: the forced mute is not written to storage, so a tab closed inside leaves the stored choice alone', () => {
+    const store = useTwinStore()
+    const audio = useAudioStore()
+    audio.setSoundMuted(false)
+    store.enterSim()
+    expect(audio.soundMuted).toBe(true)
+    expect(storedMute(data)).toBe(false)
+    audio.setSoundMuted(true)
     expect(storedMute(data)).toBe(true)
   })
 
@@ -101,7 +120,7 @@ describe('sound on entry: muted on every entry, restored on leave', () => {
     store.leaveSim()
     expect(audio.soundMuted).toBe(false)
     expect(audio.masterGain).toBe(0.4)
-    expect(storedMute(data)).toBe(false)
+    expect(storedMute(data)).not.toBe(true)
   })
 
   it('entering while already muted stays muted, and leaving keeps it muted', () => {

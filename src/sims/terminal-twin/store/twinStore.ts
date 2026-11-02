@@ -416,7 +416,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     soundChangedInside = false
     forcingSoundMute = true
     try {
-      audio.setSoundMuted(true)
+      audio.setSoundMutedTransient(true)
     } finally {
       forcingSoundMute = false
     }
@@ -427,7 +427,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     if (soundBeforeEntry === null) return
     const before = soundBeforeEntry
     soundBeforeEntry = null
-    if (!soundChangedInside) audio.setSoundMuted(before)
+    if (!soundChangedInside) audio.setSoundMutedTransient(before)
   }
 
   /** Copy the controller's playback state into reactive refs (once per frame and after actions). */
@@ -610,6 +610,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
 
   async function reset(): Promise<void> {
     await run(() => ctl().reset())
+    lockDaylight.value = true
     bayPlan.value = 'load'
     cues.reset()
     sounds.reset()
