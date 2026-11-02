@@ -36,8 +36,11 @@ export function earliestStart(state: SimState, windows: WindowSpec[], now: numbe
 /** `earliestStart` against an explicit reservation list (e.g. without the planner's own holds). */
 export function earliestStartAmong(list: readonly Reservation[], windows: WindowSpec[], now: number): number {
   const byZone = new Map<string, { from: number; to: number }[]>()
+  // only the zones the plan's windows touch are looked up below
+  const wanted = new Set<string>()
+  for (const w of windows) wanted.add(w.zone)
   for (const r of list) {
-    if (r.to <= now) continue
+    if (r.to <= now || !wanted.has(r.zone)) continue
     const list = byZone.get(r.zone) ?? []
     list.push(r)
     byZone.set(r.zone, list)
@@ -109,10 +112,20 @@ export function overlappingReservations(list: Reservation[]): [Reservation, Rese
 /** Overlapping pairs that involve a reservation with `id >= fromId` (those made since the last check). */
 export function overlappingNewReservations(list: Reservation[], fromId: number): [Reservation, Reservation][] {
   const pairs: [Reservation, Reservation][] = []
+  let byZone: Map<string, Reservation[]> | undefined
   for (const r of list) {
     if (r.id < fromId) continue
-    for (const o of list) {
-      if (o === r || o.zone !== r.zone || !overlaps(r.from, r.to, o.from, o.to)) continue
+    if (!byZone) {
+      // the list split by zone, in list order, so each new one is compared only with its own zone
+      byZone = new Map()
+      for (const x of list) {
+        const zoneList = byZone.get(x.zone)
+        if (zoneList) zoneList.push(x)
+        else byZone.set(x.zone, [x])
+      }
+    }
+    for (const o of byZone.get(r.zone) ?? []) {
+      if (o === r || !overlaps(r.from, r.to, o.from, o.to)) continue
       if (o.id >= fromId && o.id < r.id) continue // a pair of two new ones is reported once
       pairs.push(r.from < o.from || (r.from === o.from && r.id < o.id) ? [r, o] : [o, r])
     }
