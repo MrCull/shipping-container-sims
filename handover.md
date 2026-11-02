@@ -9,7 +9,7 @@ Phase 1 merged in #190. Fast mode (lint, build, test:related per ticket; full ve
 | #186 | engine: load boxes staged on WTP pads ahead of the crane | #184 | merged in branch (0.39.0) | |
 | #187 | engine: tier stow sequence keeps twin-20 pairing | #186 | merged in branch (0.40.0), partly: 24 moves and 3 twin-20 lifts in 90 min, wanted 26 and 4 | |
 | #188 | TTI presets at realistic volume, 0.25 then 0.5 then 1 | #184 to #187 | moved out of phase 2: blocked by #207, #208, #209, #206 | |
-| #189 | smoke run and regressions (phase 2) | #184 to #187 | to do | |
+| #189 | smoke run and regressions (phase 2), run together with #206 | #184 to #187 | claimed (combined with #206) | agent |
 
 Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 
@@ -38,3 +38,4 @@ Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 | #204 | late-booked exports take the lowest free cell | #203 | merged in branch (tests only, #203 already did it, 0.44.0 unchanged) | |
 | #205 | bay viewer and 3D view show shared cells in both plans | #203 | merged in branch; terminal-twin.smoke x3600 fails on load (also on base, see #191) | |
 | #209 | invariant: yard.no-progress wait from gate-in | none | merged in branch (no ENGINE_VERSION change) | |
+| #206 | smoke run and regressions (shared cells), run together with #189 | #202 to #205 | claimed (combined with #189) | agent |
