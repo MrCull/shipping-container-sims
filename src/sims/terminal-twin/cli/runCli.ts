@@ -10,6 +10,7 @@
  * Exit codes: 0 ok, 1 invariant violation or engine error, 2 usage error.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
+import { readJsonFile, writeJsonFile } from './snapshotFile'
 import { parseArgs } from 'node:util'
 import {
   createSimulation,
@@ -201,7 +202,7 @@ function decisionsFromArgs(
 }
 
 function loadSnapshot(file: string): SimSnapshot {
-  const snap = JSON.parse(readFileSync(file, 'utf8')) as SimSnapshot
+  const snap = readJsonFile<SimSnapshot>(file)
   if (snap.kind !== 'terminal-twin-snapshot') throw new UsageError(`${file} is not a Terminal Twin snapshot`)
   return snap
 }
@@ -384,17 +385,18 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
       : undefined
 
     const options = { invariants: { failFast: !values['no-fail-fast'] }, log }
+    const startNow = start ? start.state.now : 0
     const sim = start
-      ? restoreSimulation(start, handlers, options)
+      ? restoreSimulation(start, handlers, options, { adopt: true })
       : createSimulation(config, handlers, { ...options, seed })
     const firstNewEvent = sim.eventLog().length
     const result = sim.runUntil(condition)
     const summary = summarizeRun(sim)
-    const startedAt = start ? `snapshot at ${formatSimTime(start.state.now)} (after ${firstNewEvent} events)` : 'scenario start'
+    const startedAt = start ? `snapshot at ${formatSimTime(startNow)} (after ${firstNewEvent} events)` : 'scenario start'
     const headline = headlineKpis(sim.kpiSeries(), sim.kpiReport())
     for (const line of formatSummary(summary, headline, result.reason, startedAt, result.eventsProcessed, sim.asyncMode)) print(line)
     if (values.out) writeFileSync(values.out, `${JSON.stringify(summary, null, 2)}\n`)
-    if (values.snapshot) writeFileSync(values.snapshot, JSON.stringify(sim.snapshot()))
+    if (values.snapshot) writeJsonFile(values.snapshot, sim.snapshot())
     if (values.log) writeFileSync(values.log, logLines.length ? `${logLines.join('\n')}\n` : '')
     for (const [flag, kind] of [
       ['kpi-json', 'kpi-json'],
