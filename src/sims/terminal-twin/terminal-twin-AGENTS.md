@@ -30,6 +30,7 @@ Per-topic detail lives in [`docs/`](docs/), reached through the topic pointers b
 | Real frame rate | in-app browser, `dev` entry of `.claude/launch.json` (port 5174; it runs on the real GPU) | Open `/sim/terminal-twin`, wait for `window.__tt` (dev builds only), then `await __tt.load('TTI Algeciras baseline'); await __tt.runTo(4*3600); __tt.pause(); __tt.cameraTo('STS104', 1100); __tt.setQuality('high')` and average `__tt.perf().stats` over several 1 s samples per setting. Compare `stats.cpuMs` and `poseMs` with 16.7 ms: above it, fps quantises to 30 and the main thread, not the GPU, is the limit. Record numbers in `docs/scene-quality-atmosphere.md`. |
 | Engine behaviour | `pnpm test` | all Vitest suites pass, including golden summaries |
 | One scenario, by hand | `pnpm run tt:run --fixture tracer-1sts-10-boxes` | `Stopped: ended`, `0 violations`, `First error: none`, exit code 0 |
+| Several variants at once | `scripts/proof-runner.sh "--fixture <name>" "--fixture <name> --seed 7"` | one table: exit code, wall seconds, moves, violations per variant (exit 0, `0` violations); one log per variant in the printed dir; runs under the heavy lock |
 | Partial run | `pnpm run tt:run --fixture <name> --until time:600` (or `moves:5`, `vessels:1`, `event:StsPicked`) | stops at the condition |
 | Another seed | `pnpm run tt:run --fixture <name> --seed 7` | runs to the end; hash differs from the golden |
 | Inspect events | `pnpm run tt:run --fixture <name> --events /tmp/ev.jsonl --out /tmp/summary.json` | one JSON event per line; summary = golden format |
