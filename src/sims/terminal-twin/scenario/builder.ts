@@ -157,6 +157,7 @@ export function withYard(config: ScenarioConfig, setup: YardSetup): ScenarioConf
   const ascsPerBlock = setup.ascsPerBlock ?? config.yard?.ascsPerBlock
   if (ascsPerBlock) next.yard.ascsPerBlock = ascsPerBlock
   if (config.yard?.reserveShare) next.yard.reserveShare = config.yard.reserveShare
+  if (config.yard?.loadReleaseAhead) next.yard.loadReleaseAhead = config.yard.loadReleaseAhead
   if (setup.start) next.yardStart = { ...setup.start }
   next.kinematics.asc = JSON.parse(JSON.stringify(setup.asc))
   return next
@@ -340,6 +341,13 @@ export class ScenarioBuilder {
   ascsPerBlock(n: 1 | 2): this {
     this.config.yard ??= { blocks: [] }
     this.config.yard.ascsPerBlock = n
+    return this
+  }
+
+  /** Load release-ahead (#186): load boxes per crane that may wait on WTP pads before their ground position (0 = off). */
+  loadReleaseAhead(n: number): this {
+    this.config.yard ??= { blocks: [] }
+    this.config.yard.loadReleaseAhead = n
     return this
   }
 

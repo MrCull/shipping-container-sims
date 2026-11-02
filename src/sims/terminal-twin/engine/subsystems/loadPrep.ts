@@ -8,6 +8,11 @@
  *   → ASC retrieval job (asc.ts: stack → WTP pad) → SHC load job (shc.ts: pad →
  *   ground position) → StsLoadPicked (quay.ts).
  *
+ * Pad staging ahead (#186, `yard.loadReleaseAhead`): while the crane still discharges, up to N of its next load boxes
+ * (in load sequence) are retrieved to WTP pads without a ground position (stage `staging`, then `padded`). They take no
+ * ground position: the crane's discharge never waits for them. Once the crane's discharge before the box is done, a padded
+ * box asks the ground-position decision like any other and an SHC load job is created at once (no ASC retrieval left).
+ *
  * Two rules keep the flow free of deadlocks:
  * - a crane's load boxes are fetched only after its discharge packages are done
  *   (otherwise boxes waiting for the crane would fill the ground positions and
@@ -18,10 +23,13 @@
 import type { EngineContext, ReactorMap } from '../context'
 import type { AscJob, LoadOrder, SimState, StsState } from '../state'
 import { slotX, vesselClass } from '../../scenario/vesselClasses'
-import { maybeDispatchAsc } from './asc'
+import { laneGraphOf } from '../laneGraph'
+import { maybeDispatchAsc } from './ascDispatch'
 import { requestGroundPosition } from './quay'
+import { maybeDispatch } from './shc'
 import { packagesOf } from './workPackages'
 
+/** Stages that hold (or are about to hold) one of the crane's ground positions. */
 const STAGED = new Set<LoadOrder['stage']>(['gp-asked', 'gp-claimed', 'retrieving', 'on-pad', 'to-ground', 'on-ground'])
 
 /** Gantry X at which the crane loads a slot (and where its box is set down on the lane). */
@@ -35,6 +43,69 @@ export function slotGantryX(state: SimState, slotId: string): number {
 const dischargeDone = (state: SimState, sts: StsState, seq = Infinity): boolean =>
   packagesOf(state, sts).every((p) => p.kind !== 'discharge' || p.seq > seq || p.status === 'complete')
 
+/** Load boxes the crane may hold on pads (or on their way there) ahead of a ground position (0 = off). */
+const releaseAhead = (ctx: EngineContext): number => ctx.config.yard?.loadReleaseAhead ?? 0
+
+/** The SHC load job (pad to ground position) of a box standing on a WTP pad. */
+export function createLoadShcJob(ctx: EngineContext, order: LoadOrder, padId: string, readyAt: number): void {
+  const { state } = ctx
+  const id = `J${++state.nextShcJob}`
+  state.shcJobs[id] = {
+    id,
+    containerId: order.containerId,
+    groundPositionId: order.groundPositionId as string,
+    stsId: order.stsId,
+    x: slotGantryX(state, order.slotId),
+    kind: 'load',
+    readyAt,
+    shcId: null,
+    wtpPadId: padId,
+  }
+}
+
+function retrieveJobFor(state: SimState, order: LoadOrder): AscJob {
+  const box = state.containers[order.containerId]
+  const job: AscJob = {
+    id: `A${++state.nextAscJob}`,
+    blockId: box.custody.id.split(':')[0],
+    containerId: box.id,
+    wtpPadId: '',
+    vesselId: order.vesselId,
+    allocation: 'claimed',
+    yardSlotId: box.custody.id,
+    claimSeq: null,
+    cleared: true,
+    ascId: null,
+    kind: 'retrieve',
+  }
+  state.ascJobs[job.id] = job
+  return job
+}
+
+/** Retrieve the crane's next load boxes to pads ahead of their ground positions, at most `loadReleaseAhead` at a time. */
+function stageAhead(ctx: EngineContext, orders: LoadOrder[]): void {
+  const { state } = ctx
+  const limit = releaseAhead(ctx)
+  if (limit <= 0) return
+  let ahead = orders.filter((o) => o.stage === 'staging' || o.stage === 'padded').length
+  const pads = laneGraphOf(ctx.config).pads
+  for (const order of orders) {
+    if (ahead >= limit) return
+    if (order.stage !== 'released') continue
+    const box = state.containers[order.containerId]
+    if (box.custody.kind !== 'yardSlot') return // the sequence waits for this box (an empty start not delivered yet)
+    if (box.onwardVesselId && box.readyAt == null) return
+    const blockId = box.custody.id.split(':')[0]
+    // keep one pad of the block free for discharge boxes: staged loads only leave their pads after the discharge is done
+    const free = pads.filter((p) => p.blockId === blockId && state.wtpPads[p.id].containerId === null && state.wtpPads[p.id].claimedBy === null).length
+    const held = Object.values(state.ascJobs).filter((j) => j.kind === 'retrieve' && j.blockId === blockId && j.wtpPadId === '' && j.ascId === null).length
+    if (free - held < 2) return
+    order.stage = 'staging'
+    ahead++
+    maybeDispatchAsc(ctx, retrieveJobFor(state, order).blockId)
+  }
+}
+
 /** Start the next ground-position request of every crane that may stage another export box. */
 export function pumpLoadPrep(ctx: EngineContext): void {
   const { state } = ctx
@@ -44,16 +115,17 @@ export function pumpLoadPrep(ctx: EngineContext): void {
       .filter((o) => o.stsId === sts.id)
       .sort((a, b) => a.seq - b.seq)
     if (orders.length === 0) continue
+    stageAhead(ctx, orders)
     if (orders.some((o) => o.stage === 'gp-asked')) continue
     // an earlier empties package whose empties are not allocated yet keeps the later boxes back (load sequence)
     const waiting = packagesOf(state, sts).find((p) => p.emptyReq && p.emptyReq.stage !== 'allocated' && p.status === 'released')
     if (orders.filter((o) => STAGED.has(o.stage)).length >= sts.groundPositionIds.length) continue
-    const next = orders.find((o) => o.stage === 'released')
-    if (!next || !dischargeDone(state, sts, state.workPackages[next.packageId].seq)) continue
+    const next = orders.find((o) => o.stage === 'released' || o.stage === 'padded' || o.stage === 'staging')
+    if (!next || next.stage === 'staging' || !dischargeDone(state, sts, state.workPackages[next.packageId].seq)) continue
     if (waiting && state.workPackages[next.packageId].seq > waiting.seq) continue
     const box = state.containers[next.containerId]
-    if (box.custody.kind !== 'yardSlot') continue // an empty start: the booked box has not been delivered and stacked yet (asked again when it is)
-    if (box.onwardVesselId && box.readyAt == null) continue // transshipment box still dwelling (or still on its first vessel)
+    if (next.stage !== 'padded' && box.custody.kind !== 'yardSlot') continue // an empty start: the booked box has not been delivered and stacked yet (asked again when it is)
+    if (next.stage !== 'padded' && box.onwardVesselId && box.readyAt == null) continue // transshipment box still dwelling (or still on its first vessel)
     next.stage = 'gp-asked'
     requestGroundPosition(ctx, sts, next.containerId, 'load')
   }
@@ -66,8 +138,9 @@ export const loadPrepReactors: ReactorMap = {
     const { request, reply } = e.payload
     const order = state.loadOrders[request.containerId]
     if (!order) return
+    const padded = state.containers[order.containerId].custody.kind === 'wtpPad'
     if (reply.groundPositionId === null) {
-      order.stage = 'released' // asked again when a ground position frees up
+      order.stage = padded ? 'padded' : 'released' // asked again when a ground position frees up
       return
     }
     const gp = state.groundPositions[reply.groundPositionId]
@@ -77,21 +150,14 @@ export const loadPrepReactors: ReactorMap = {
     gp.claimedBy = order.containerId
     order.stage = 'gp-claimed'
     order.groundPositionId = gp.id
-    const box = state.containers[order.containerId]
-    const job: AscJob = {
-      id: `A${++state.nextAscJob}`,
-      blockId: box.custody.id.split(':')[0],
-      containerId: box.id,
-      wtpPadId: '',
-      vesselId: order.vesselId,
-      allocation: 'claimed',
-      yardSlotId: box.custody.id,
-      claimSeq: null,
-      cleared: true,
-      ascId: null,
-      kind: 'retrieve',
+    if (padded) {
+      order.stage = 'on-pad'
+      createLoadShcJob(ctx, order, state.containers[order.containerId].custody.id, e.t)
+      maybeDispatch(ctx)
+      pumpLoadPrep(ctx)
+      return
     }
-    state.ascJobs[job.id] = job
+    const job = retrieveJobFor(state, order)
     maybeDispatchAsc(ctx, job.blockId)
     pumpLoadPrep(ctx)
   },

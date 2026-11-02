@@ -98,6 +98,12 @@ export interface YardConfig {
    * a reserved stack (once they do, it holds boxes like any other). 0 = no reserve, every log unchanged.
    */
   reserveShare?: number
+  /**
+   * Load release-ahead (#186): how many of a crane's next load boxes (in load sequence) may be retrieved to WTP pads
+   * before the crane's discharge is done (integer 0 to `MAX_LOAD_RELEASE_AHEAD`, default 0). They take no ground position.
+   * 0 = loads are fetched only once their ground position is claimed, every log unchanged.
+   */
+  loadReleaseAhead?: number
 }
 
 /**
@@ -394,6 +400,7 @@ export interface YardStartConfig {
 
 /** Largest yard reserve a scenario may ask for (#184). */
 export const MAX_YARD_RESERVE = 0.5
+export const MAX_LOAD_RELEASE_AHEAD = 20
 
 export const DEFAULT_YARD_TARGET_PCT = 60
 export const DEFAULT_WARM_UP_S = 48 * 3600

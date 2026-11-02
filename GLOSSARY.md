@@ -313,3 +313,4 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Rolling corner:** a corner a vehicle takes at speed (`cornerSpeedCap`) instead of stopping first; SHCs always do, trucks only on the teardrop loop and the access-road turn.
 - **Esc stack (#169):** the one ordered Esc: each press closes only the topmost open thing (setup dialog, saves, dashboard, Colour by, Run to, help, bay viewer, inspector, then the selection). `modules/escape.ts`. *Avoid:* "deselect" for the whole stack.
 - **Yard reserve (#184):** `yard.reserveShare`, the share of each block's stacks that pre-fill and discharge never use (only rehandles do), so a rehandle always has a target. Not the 10 % block-room reserve of the SHC pad filter.
+- **Load release-ahead (#186):** `yard.loadReleaseAhead`, how many of a crane's next load boxes may stand on WTP pads (stages `staging`, `padded`) before the crane's discharge is done. They hold no ground position.

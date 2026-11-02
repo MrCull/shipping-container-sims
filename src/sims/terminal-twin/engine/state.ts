@@ -791,7 +791,7 @@ export interface LoadOrder {
   slotId: string
   /** Position in the crane's load sequence (0-based, over all its load packages). */
   seq: number
-  stage: 'released' | 'gp-asked' | 'gp-claimed' | 'retrieving' | 'on-pad' | 'to-ground' | 'on-ground'
+  stage: 'released' | 'staging' | 'padded' | 'gp-asked' | 'gp-claimed' | 'retrieving' | 'on-pad' | 'to-ground' | 'on-ground'
   groundPositionId: string | null
 }
 

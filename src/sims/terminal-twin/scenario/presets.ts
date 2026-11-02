@@ -55,6 +55,8 @@ interface TerminalSpec {
   rob?: { bayFraction: number; fill: number }
   /** Empty pool (#149): the starting stock of empties. */
   emptyPool?: EmptyPoolConfig
+  /** Load release-ahead (#186): see `YardConfig.loadReleaseAhead`; absent = off. */
+  loadReleaseAhead?: number
 }
 
 /** TTI's access road (#146): the Isla Verde carriageway, entered `TTI_ACCESS_ROAD_RUNUP_M` south of the quay's end. */
@@ -88,6 +90,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
   b.arrivalFill(NORMAL_ARRIVAL_FILL)
   if (spec.rob) b.robBays(spec.rob.bayFraction, spec.rob.fill)
   if (spec.emptyPool) b.emptyPool(spec.emptyPool)
+  if (spec.loadReleaseAhead) b.loadReleaseAhead(spec.loadReleaseAhead)
   const base = b.build()
   const sts = deriveSts({ ...base, sts: [{ id: `STS${spec.stsFirst}`, gantryX: 0, groundPositions: 3 }] }, spec.sts, spec.quayM)
   for (const s of sts) b.sts(s.id, { gantryX: s.gantryX, groundPositions: s.groundPositions })
@@ -103,6 +106,8 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
  * about a minute. Raise it again when that saturation is fixed.
  */
 export const TTI_MOVES_SCALE = 0.1
+/** #186: load boxes per crane staged on WTP pads ahead of their ground positions (an assumption, tune with `tt:profile`). */
+export const TTI_LOAD_RELEASE_AHEAD = 4
 
 /** Vessel calls for a TTI-style hub: ~85% transshipment, a spread of sizes. */
 function hubVessels(count: number, intervalS: number, jitterS: number, movesScale: number, seed: number, flowMix: FlowMix = TTI_FLOW_MIX): VesselConfig[] {
@@ -143,6 +148,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       accessRoad: ttiAccessRoad(850),
       reefers: TTI_REEFERS,
       emptyPool: { count: 1200, maxAgeS: 7 * 86400 },
+      loadReleaseAhead: TTI_LOAD_RELEASE_AHEAD,
     }),
   [SMALL_PRESET_NAME]: () =>
     terminal({
@@ -197,5 +203,6 @@ export const presets: Record<string, () => ScenarioConfig> = {
       portRotation: PEAK_DAY_ROTATION,
       rob: PEAK_DAY_ROB,
       emptyPool: { count: 1500, maxAgeS: 7 * 86400 },
+      loadReleaseAhead: TTI_LOAD_RELEASE_AHEAD,
     }),
 }
