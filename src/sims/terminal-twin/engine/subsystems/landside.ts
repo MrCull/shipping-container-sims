@@ -50,7 +50,7 @@ import type {
   TruckState,
   TruckStatus,
 } from '../state'
-import { blockSpecs, candidateSlots, parseYardSlotId, reeferFields } from '../yardLayout'
+import { blockSpecs, candidateSlots, parseYardSlotId, reeferFields, reserveFields } from '../yardLayout'
 import { stackSpansOf } from '../yardIndex'
 import { withoutPendingPickups } from './ascStorage'
 import { kpiClockOf, HOUR_S } from '../kpi/clock'
@@ -695,6 +695,7 @@ function blockTakes(ctx: EngineContext, blockId: string, box: ContainerState): b
       topVessels: yard.topVessels.slice(),
       stackSpans: stackSpansOf(state, blockId),
       ...reeferFields(spec, box.reefer),
+      ...reserveFields(spec),
     }).length > 0
   )
 }
@@ -728,7 +729,33 @@ function stallLegal(ctx: EngineContext, truck: TruckState, blockId: string, room
     }
     return true
   }
-  return truck.legs.every((l) => l.kind !== 'drop' || room(blockId, ctx.state.containers[l.containerId]))
+  if (!truck.legs.every((l) => l.kind !== 'drop' || room(blockId, ctx.state.containers[l.containerId]))) return false
+  // #184: the room a block shows counts only drops whose truck already stands at its stall (their jobs exist). Trucks still
+  // driving to a stall of the block would each find the same last cells and several would meet "full" at the stall
+  // (the peak day's stranded T0481 at B03-TS5, with the block at 90 %), so their drops come off the room first
+  const committed = committedDropCells(ctx.state, blockId, truck.id)
+  if (committed === 0) return true
+  return blockRoom(ctx.state, blockId) - committed >= dropCells(ctx.state, truck)
+}
+
+const cellsOfSize = (size: ContainerState['size']): number => (size === '20' ? 1 : 2)
+
+/** Stack cells the drop legs of `truck` still need. */
+function dropCells(state: SimState, truck: TruckState): number {
+  let n = 0
+  for (const l of truck.legs) if (l.kind === 'drop' && !l.done) n += cellsOfSize(state.containers[l.containerId].size)
+  return n
+}
+
+/** Cells that the drops of other trucks with a stall of `blockId`, not yet standing in it, will need (no job exists for them yet). */
+function committedDropCells(state: SimState, blockId: string, exceptTruckId: string): number {
+  let n = 0
+  for (const st of Object.values(landside(state).stalls)) {
+    if (st.blockId !== blockId || st.truckId === null || st.truckId === exceptTruckId) continue
+    const other = state.trucks[st.truckId]
+    if (other.atStallAt === null) n += dropCells(state, other)
+  }
+  return n
 }
 
 /** Ask transferStallSelection for `truck` (one request at a time): the stalls it may use, from where it stands now. */

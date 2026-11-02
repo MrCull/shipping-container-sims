@@ -41,6 +41,14 @@ describe('reservedStacksOf', () => {
     expect(r.filter(Boolean)).toHaveLength(24)
     for (let bay = 0; bay < 12; bay++) expect(r.slice(bay * 8, bay * 8 + 8).some(Boolean)).toBe(true)
   })
+
+  it('reserves neighbouring bays in pairs, so a 40 ft rehandle has two free stacks in a row (TT-184)', () => {
+    for (const [bays, share] of [[45, 0.1], [12, 0.25], [20, 0.5]] as const) {
+      const r = reservedStacksOf(bays, 8, share)
+      expect(r.filter(Boolean).length).toBeGreaterThan(0)
+      for (let i = 0; i < r.length; i++) if (r[i]) expect(r[i + 8] === true || r[i - 8] === true, `stack ${i} of ${bays} bays`).toBe(true)
+    }
+  })
 })
 
 describe('candidateSlots with a reserve', () => {

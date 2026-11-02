@@ -65,15 +65,30 @@ export interface BlockSpec {
 }
 
 /**
- * The reserved stacks of a block (#184): `round(share * stacks)` of them, spread evenly over the bay-major stack
- * index so every part of the block (and every row) keeps some room. Empty for a share of 0.
+ * The reserved stacks of a block (#184): about `round(share * stacks)` of them, spread evenly over the block so every part
+ * of it (and every row) keeps some room. They come in pairs of neighbouring bays in one row, so a 40 ft blocker has two
+ * free stacks to go to as well as a 20 ft one (single scattered stacks never took a 40 ft box: the peak day's B03 held 36
+ * free stacks and no room for the 40 ft boxes above a load). A block of one bay has no pairs and gets single stacks.
+ * Empty for a share of 0.
  */
 export function reservedStacksOf(bays: number, rows: number, share: number): boolean[] {
   const total = bays * rows
   const count = Math.min(total, Math.round(share * total))
   if (count <= 0) return []
   const out = new Array<boolean>(total).fill(false)
-  for (let k = 0; k < count; k++) out[Math.floor(((k + 0.5) * total) / count)] = true
+  const pairBays = Math.floor(bays / 2)
+  if (pairBays === 0) {
+    for (let k = 0; k < count; k++) out[Math.floor(((k + 0.5) * total) / count)] = true
+    return out
+  }
+  const anchors = pairBays * rows
+  const pairs = Math.min(anchors, Math.max(1, Math.round(count / 2)))
+  for (let k = 0; k < pairs; k++) {
+    const a = Math.floor(((k + 0.5) * anchors) / pairs)
+    const i = Math.floor(a / rows) * 2 * rows + (a % rows)
+    out[i] = true
+    out[i + rows] = true
+  }
   return out
 }
 
