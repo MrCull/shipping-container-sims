@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { createSimulation, type EngineEvent } from '../engine'
-import { loadPurposeOf, planCargo, type PlannedSlot } from '../scenario/bayPlan'
+import { extraLoadCell, loadPurposeOf, planCargo, type PlannedSlot } from '../scenario/bayPlan'
 import { ScenarioBuilder } from '../scenario/builder'
 import type { ScenarioConfig } from '../scenario/types'
 import { cellCapacity, stackBaseTier, vesselClass } from '../scenario/vesselClasses'
@@ -130,6 +130,21 @@ describe('shared cells: planner', () => {
   it('gives the same plan for the same config and seed', () => {
     const config = call({ discharge: 150, load: 120, sizeMix: { '20': 1, '40': 1 } })
     expect(planCargo(config, 9)).toEqual(planCargo(config, 9))
+  })
+})
+
+describe('shared cells: late booking', () => {
+  it('an export booked after planning takes the lowest free bottom-up cell of the bay with the fewest load bookings', () => {
+    const config = call({ discharge: 150, load: 120 })
+    const { slots } = planCargo(config, 5)
+    const cell = extraLoadCell('feeder', slots, '40')
+    expect(cell).not.toBeNull()
+    const booked = slots.filter((s) => loadPurposeOf(s) !== null)
+    const perBay = (bay: number) => booked.filter((s) => s.bay === bay).length
+    expect(perBay(cell!.bay)).toBe(Math.min(...[0, 1, 2, 3, 4, 5, 6].map(perBay)))
+    const stack = booked.filter((s) => s.bay === cell!.bay && s.row === cell!.row && s.deck === cell!.deck)
+    const base = stackBaseTier(vesselClass('feeder'), cell!.row, cell!.deck)
+    expect(cell!.tier).toBe(stack.reduce((m, s) => Math.max(m, s.tier + 1), base))
   })
 })
 
