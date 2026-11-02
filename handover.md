@@ -33,8 +33,8 @@ Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 |---|---|---|---|---|
 | #202 | invariant stowage.cell-free | none | merged in branch (fast-forward fff82d5) | |
 | #207 | engine: yard allocation spreads across blocks | none | merged in branch (0.43.0), AC2 only marginal at 0.1; slow rehandle on B02 (pick-admission seed 3) worth a look | |
-| #208 | engine: gate-queue bypass only at queue head | none | claimed | agent |
+| #208 | engine: gate-queue bypass only at queue head | none | merged in branch (0.45.0), peak day at 0.1 ends 04:33 (was 06:57); follow-up: stallLegal ignores room promised to admitted picks (TT-184 drop-only head test on seed 7) | |
 | #203 | shared cells: planner and engine | #202 | merged in branch (0.44.0); peak day at 0.1 needs #207 (yard.no-progress at B02 without it) | |
 | #204 | late-booked exports take the lowest free cell | #203 | merged in branch (tests only, #203 already did it, 0.44.0 unchanged) | |
-| #205 | bay viewer and 3D view show shared cells in both plans | #203 | claimed | agent |
-| #209 | invariant: yard.no-progress wait from gate-in | none | to do | |
+| #205 | bay viewer and 3D view show shared cells in both plans | #203 | merged in branch; terminal-twin.smoke x3600 fails on load (also on base, see #191) | |
+| #209 | invariant: yard.no-progress wait from gate-in | none | claimed | agent |
