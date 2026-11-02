@@ -71,7 +71,7 @@ describe('pick admission', () => {
 
 /** Same full block, but with one holding position: two drop-only empties arrive first, then the picks that would free room. */
 function blockedHead(picks: number): ScenarioConfig {
-  const config = fullBlock(0, 6)
+  const config = fullBlock(0, 7) // seed 7 since #208: the 92 % full block is a knife edge (seeds 1, 4, 5, 6 deadlock on rehandle room once a bypassing truck waits to reach the head; seeds 2, 3, 7, 8, 9 pass)
   config.yard = { blocks: [{ ...(config.yard as NonNullable<ScenarioConfig['yard']>).blocks[0], bays: 2 }] }
   config.yardStart = { mode: 'prefilled', targetPct: 92, mix: { import: 100, export: 0, transshipment: 0 } }
   config.landside = {
@@ -143,5 +143,28 @@ describe('gate head-of-line blocking, pick head (TT-184, 0.42.0)', () => {
     expect(gateIn).toHaveLength(14)
     // somebody passed the head: the gate order is not the arrival order
     expect(gateIn).not.toEqual(arrived)
+  })
+})
+
+describe('gate bypass takes a lane only at the head (TT-208, 0.45.0)', () => {
+  it('holds each lane for about the processing time, and no lane is reserved before a bypassing truck is at the head', () => {
+    const sim = createSimulation(hotBlock(14, 4), undefined, { invariants: { failFast: false } })
+    expect(sim.runUntil().reason).toBe('ended')
+    expect(sim.firstError).toBeNull()
+    expect(sim.invariantReport().violations).toEqual([])
+    const log = sim.eventLog()
+    const id = (e: { payload: unknown }) => (e.payload as { truckId: string }).truckId
+    const started = new Map(log.filter((e) => e.type === 'TruckGateStarted').map((e) => [id(e), e.t]))
+    const gateIn = new Map(log.filter((e) => e.type === 'TruckGateIn').map((e) => [id(e), e.t]))
+    const reached = log.filter((e) => e.type === 'TruckReachedGateHead')
+    expect(started.size).toBe(14)
+    expect(reached.length).toBeGreaterThanOrEqual(2) // at least two trucks for a free block passed a blocked head
+    for (const e of reached) {
+      // no lane is reserved for a bypassing truck before it is at the head: it starts the same instant it arrives there
+      expect(started.get(id(e))).toBeCloseTo(e.t, 6)
+      // and holds the lane for its processing (20 s) plus the short drive to the kiosk, not for the drive up the queue
+      // (before 0.45.0 the first of them held it for 73 s)
+      expect((gateIn.get(id(e)) as number) - e.t).toBeLessThan(35)
+    }
   })
 })

@@ -294,6 +294,8 @@ export interface EventPayloads {
   TruckAtHolding: { truckId: string; holdingId: string; segments: MotionSegment[] }
   /** The truck has no stall yet (every stall is taken): it waits at the kiosk. */
   TruckWaitingForStall: { truckId: string }
+  /** A truck that passed a blocked gate head has reached the head of the queue and may take a lane (TT-208). */
+  TruckReachedGateHead: { truckId: string }
   /** The transferStallSelection decision gave the truck a stall; the trip over the landside roads is planned and reserved. */
   TruckStallAssigned: { truckId: string; stallId: string; blockId: string; departAt: number; waitedS: number; reservations: Reservation[] }
   /** The truck leaves the gate lane for its stall. */
