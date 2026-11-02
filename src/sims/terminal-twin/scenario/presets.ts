@@ -74,7 +74,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
     .shcs(spec.shc)
     // TT-R12: queue areas near every STS and every block's pads, and chained dispatch. Capacities are assumptions [unverified].
     .queueAreas({ stsCapacity: 3, blockCapacity: 3 })
-    .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' }, wtpPadSelection: { strategy: 'nearest-box' } } })
+    .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' }, wtpPadSelection: { strategy: 'balanced' } } })
     .ascsPerBlock(2)
     .cargo(spec.reefers ? { reeferShare: spec.reefers.share } : {})
     .yardStart(spec.yardStart)
