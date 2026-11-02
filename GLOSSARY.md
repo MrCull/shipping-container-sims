@@ -250,7 +250,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Atmosphere (TT-21)
 
-- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On at every run launch (#171); a toggle lasts for that run only.
+- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On at every run launch (#171); a toggle lasts for that run only, and Reset returns it to on.
 - **Sound on entry:** entering Terminal Twin mutes the shared audio store, on every entry; leaving restores the mute from before entry, unless the owner changed it while inside (their latest choice stays).
 - **Night mode:** the cheaper lighting at night: no sun shadow pass, floodlight glow on high masts and emissive equipment lights instead of real lights.
 - **Backdrop:** the distant low-poly scenery: a terminal's own scenery (TTI Algeciras: the Rock of Gibraltar at true scale, hills, North Quay, and the surroundings) when a terminal folder owns the scenario, a generic coastline otherwise.

@@ -22,7 +22,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { jaggedRidge, ridge } from '../../modules/backdropGeometry'
 import type { SceneryContext, TerminalScenery } from '../types'
-import { NORTH_QUAY_LENGTH_M, ROCK, SURROUNDINGS, TTI_GROUND, TTI_ROAD_NORTH_END_X } from './constants'
+import { NORTH_QUAY_LENGTH_M, ROCK, SURROUNDINGS, TTI_GROUND, TTI_ROAD_NORTH_END_X, TTI_SEA_CHANNEL_Y } from './constants'
 
 export const TTI_SCENERY: TerminalScenery = {
   kind: 'tti',
@@ -74,7 +74,7 @@ export const TTI_SCENERY: TerminalScenery = {
     // South: the same grey tarmac as the terminal apron (which ends 600 m past the quay's end).
     plane('tarmacSouth', g.tarmacColour, L + 600, L + 600 + g.southTarmacM, 0, 900, 0)
     // North: the sea channel in front of the North Quay (over the shared apron, which reaches 600 m north); grey ground beyond it up to the green.
-    plane('seaChannel', g.seaColour, -(g.northQuayEdgeM + g.seaChannelM), -g.northQuayEdgeM, 0, 900, 0.04)
+    plane('seaChannel', g.seaColour, -(g.northQuayEdgeM + g.seaChannelM), -g.northQuayEdgeM, 0, 900, TTI_SEA_CHANNEL_Y)
     // From the line where the green starts, the sea also turns into land (over the water, under the apron).
     plane('greenLand', g.greenColour, -20000, -g.greenStartM, -12000, 12900, -1)
     // Green mountains running away to the north, a ridge along the water side and one inland.

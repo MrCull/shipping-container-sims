@@ -430,6 +430,7 @@ View only: no event, state field or golden changes (the engine's `VesselState` i
 
 - Every run launch starts with the daylight lock on (`store.lockDaylight = true` in `launch`), for fixtures and presets alike; the top-bar Daylight toggle changes it for that run only. The per-preset `daylightLockDefault` flag is gone.
 - Entering the sim mutes the shared audio store (`store.enterSim()` in `TerminalTwin.vue`'s `onMounted`), on every entry. Leaving (`store.leaveSim()` in `onBeforeUnmount`) restores the mute from before entry, unless the owner changed it while inside. Other sims are untouched.
+- The mute on entry and the restore on leave are transient (`audio.setSoundMutedTransient`, no write to site storage), so closing the tab inside leaves the stored choice alone (#192); only the owner's own change is stored. Reset also returns the daylight lock to on (#192).
 - Proof: `tests/daylight-and-mute.test.ts`; the atmosphere smoke spec covers both in the browser.
 
 ## Scenery road at the north land edge (spec #166, ticket #172)
@@ -438,6 +439,9 @@ View only: no event, state field or golden changes (the engine's `VesselState` i
 - **How:** the stand-in boxes start at that line. The GLB's baked road runs further north, so `TerminalScenery.modelClipX` (TTI sets `{ landside }`) cuts the loaded geometry there in `backdrop.useModels`. The cut is `clipMeshToHalfSpace` (`modules/meshClip.ts`, pure maths, shared with the hatch clip in `hullHatchOpening.ts`).
 - **Asset:** no asset is rebuilt (Blender is not needed). The generator (`build_scenery_landside`) still bakes the full road, so a regeneration needs no change and the clip stays a no-op on a cut asset.
 - **Proof:** `tests/scenery-road.test.ts` (clip cases, the stand-in and the decoded GLB both end at the land edge and reach the access road junction). Screenshot from above (`viewPreset('overview')`, then `cameraTo('gate', 700)`: the gate junction where the road meets the land beside the sea channel) in `docs/prototypes/172/road-north-end.png`. From above the clipped and unclipped roads look alike here, because the road top and the sea plane share a height (y = 0.04); the geometry test is the proof.
+
+- **#192 sea channel height:** the `seaChannel` plane is at `TTI_SEA_CHANNEL_Y` (0.08 m), not 0.04 m, so it never shares a depth with the road, rails and yard markings (`tests/scenery-road.test.ts`; `docs/prototypes/192/sea-channel-road-north-end.png`).
+- **#192 review notes (kept as is):** hatch-on also cuts LOD2 over panel bays (needed so a crane never works under a solid far cover top; LOD0 and LOD1 unchanged); the rail "bounded yield" (`sts.railYield`: a busy blocker steps aside by repositioning, then resumes its work) and `stopPropagation` on Esc in `AudioControls.vue` (the open popover closes without a sim's own Esc handling) stay. The close-up corrugation pitch (`CORRUGATION_PITCH_M` 0.25 m, the real rib pitch) stays different from the LOD0 GLB rib (0.56 m); the far-field wordmark atlas needs Blender and is open. The tier stow throughput gap (#187: 24 moves and 3 twin-20 lifts against 26 and 4 in 90 min) is open: no small safe engine change is evident.
 
 ## Known gaps
 
