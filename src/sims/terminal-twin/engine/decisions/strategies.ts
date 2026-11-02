@@ -41,6 +41,30 @@ function nearestFreePad(req: WtpPadSelectionRequest, x: number, z: number): stri
   return best?.id ?? null
 }
 
+/** `balanced` pad selection (#207): metres of walking one unit of block fill is worth (a block 10 points fuller costs 600 m). [assumed] */
+export const BALANCED_FILL_M = 6000
+/** `balanced`: metres one queued ASC job of the block is worth. [assumed] */
+export const BALANCED_QUEUED_M = 60
+
+/**
+ * Free pad with the lowest cost: plan distance from the box, plus the fill and the queued ASC work of its block (#207).
+ * Spreads a vessel's discharge over the blocks (the nearest pad sent every box to the blocks by the cranes); ties by list order.
+ */
+export function balancedPad(req: WtpPadSelectionRequest): string | null {
+  let best: ShcDispatchPad | null = null
+  let bestCost = Infinity
+  for (const p of req.wtpPads) {
+    if (!isFree(p)) continue
+    const load = req.blockLoad?.[p.blockId]
+    const cost = Math.abs(p.x - req.x) + Math.abs(p.z - req.z) + (load ? BALANCED_FILL_M * load.fill + BALANCED_QUEUED_M * load.queued : 0)
+    if (cost < bestCost - 1e-9) {
+      best = p
+      bestCost = cost
+    }
+  }
+  return best?.id ?? null
+}
+
 export interface StrategyDefinition<K extends DecisionPointId> {
   description: string
   handler: DecisionHandler<K>
@@ -137,6 +161,11 @@ export const strategies: StrategyRegistry = {
       'nearest-box': {
         description: 'The free WTP pad nearest (plan distance) to where the box stands.',
         handler: (msg) => ({ wtpPadId: nearestFreePad(msg.payload, msg.payload.x, msg.payload.z) }),
+      },
+      balanced: {
+        description:
+          'The free WTP pad with the lowest cost: plan distance from the box plus 6,000 m per unit of its block fill and 60 m per queued ASC job of the block (#207). Spreads discharge over the yard blocks; the TTI presets use it.',
+        handler: (msg) => ({ wtpPadId: balancedPad(msg.payload) }),
       },
       'last-free': {
         description: 'The last free WTP pad in list order (fills the yard from the far end).',

@@ -506,6 +506,11 @@ export const quayReactors: ReactorMap = {
     for (const p of picks) {
       const pickedSlot = state.vesselSlots[p.from.id]
       pickedSlot.containerId = null
+      if (pickedSlot.loadPurpose) {
+        // shared cell (#203): its load booking is now the slot's purpose
+        pickedSlot.purpose = pickedSlot.loadPurpose
+        delete pickedSlot.loadPurpose
+      }
       if (pickedSlot.deck) deckBoxChanged(ctx, pickedSlot.vesselId, pickedSlot.bay, pickedSlot.row, -1)
       const vessel = state.vessels[state.vesselSlots[p.from.id].vesselId]
       vessel.remainingDischarge--

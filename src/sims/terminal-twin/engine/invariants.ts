@@ -400,7 +400,20 @@ export function stuckYardBlocks(state: SimState, config: ScenarioConfig, now: nu
   for (const [blockId, open] of openByBlock) {
     const claimed = open.filter((j) => j.allocation === 'claimed')
     if (claimed.length === 0) continue
-    const progressAt = state.yardBlocks[blockId]?.progressAt ?? 0
+    // TT-185/TT-209: the wait counts from the later of the block's last job start and the moment the oldest claimed pick truck
+    // passed the gate (`gateInAt`). A pick truck still in the gate queue or a lane can reach nothing yet, so it is neither stuck
+    // nor does it make its block so; a block whose only claimed work is such a truck is skipped (the truck's own events follow)
+    let workSince = Infinity
+    for (const j of claimed) {
+      if (j.truckId === undefined) {
+        workSince = -Infinity
+        break
+      }
+      const truck = state.trucks[j.truckId]
+      workSince = Math.min(workSince, truck ? (truck.gateInAt ?? Infinity) : -Infinity)
+    }
+    if (workSince === Infinity) continue
+    const progressAt = Math.max(state.yardBlocks[blockId]?.progressAt ?? 0, workSince)
     if (now - progressAt <= minIdleS) continue
     const ascs = Object.values(state.ascs).filter((a) => a.blockId === blockId)
     if (ascs.length === 0 || ascs.some((a) => a.status !== 'idle')) continue
@@ -700,6 +713,8 @@ export const INVARIANTS: Invariant[] = [
     scoped: true,
     check(state, _config, scope) {
       const messages: string[] = []
+      // nothing on a vessel the event did not touch is checked: skip the scan of every slot
+      if (scope && scope.vessels.size === 0) return messages
       const filled = new Map<string, ('aft' | 'fore' | null)[]>()
       const loads = []
       const boxes = []
@@ -739,6 +754,8 @@ export const INVARIANTS: Invariant[] = [
     scoped: true,
     check(state, _config, scope) {
       const messages: string[] = []
+      // nothing on a vessel the event did not touch is checked: skip the scan of every slot
+      if (scope && scope.vessels.size === 0) return messages
       const occupied = new Map<string, ('aft' | 'fore' | null)[]>()
       const onBoard: { label: string; vesselId: string; bay: number; row: number; tier: number; half: 'aft' | 'fore' | null }[] = []
       for (const s of Object.values(state.vesselSlots)) {
@@ -767,6 +784,38 @@ export const INVARIANTS: Invariant[] = [
     },
   },
   {
+    id: 'stowage.cell-free',
+    reads: ['vessel', 'container'],
+    description:
+      'Cell free (#202): a box is never loaded on board into a cell (bay, row, tier; either half for a 40, the same half for a 20) ' +
+      'that already holds a box, whether a slot box or a ROB box. Two filled slots or ROB boxes never overlap in a cell.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      // nothing on a vessel the event did not touch is checked: skip the scan of every slot
+      if (scope && scope.vessels.size === 0) return messages
+      const cells = new Map<string, { label: string; half: 'aft' | 'fore' | null }[]>()
+      const put = (vesselId: string, bay: number, row: number, tier: number, label: string, half: 'aft' | 'fore' | null) => {
+        const key = `${vesselId}:${bay}:${row}:${tier}`
+        const held = cells.get(key) ?? []
+        for (const h of held)
+          if (h.half === null || half === null || h.half === half) messages.push(`${vesselId}: ${label} shares bay ${bay} row ${row} tier ${tier} with ${h.label}`)
+        held.push({ label, half })
+        cells.set(key, held)
+      }
+      for (const s of Object.values(state.vesselSlots)) {
+        if (!s.containerId) continue
+        if (scope && !scope.vessels.has(s.vesselId)) continue
+        put(s.vesselId, s.bay, s.row, s.tier, `box ${s.containerId} in slot ${s.id}`, s.half)
+      }
+      for (const vessel of Object.values(state.vessels)) {
+        if (scope && !scope.vessels.has(vessel.id)) continue
+        for (const b of vessel.robBoxes ?? []) put(vessel.id, b.bay, b.row, b.tier, `ROB box in slot ${b.slotId}`, b.half)
+      }
+      return messages
+    },
+  },
+  {
     id: 'hull.profile',
     reads: ['vessel', 'container'],
     description:
@@ -775,6 +824,8 @@ export const INVARIANTS: Invariant[] = [
     scoped: true,
     check(state, _config, scope) {
       const messages: string[] = []
+      // nothing on a vessel the event did not touch is checked: skip the scan of every slot
+      if (scope && scope.vessels.size === 0) return messages
       for (const s of Object.values(state.vesselSlots)) {
         if (!s.containerId) continue
         if (scope && !scope.vessels.has(s.vesselId)) continue

@@ -29,7 +29,7 @@ import type { EventOf, ShcPhasePayload } from '../events'
 import { cornerSpeedCap, planSegment, positionAt, travelTime, type AxisProfile, type CornerModel, type MotionSegment } from '../kinematics'
 import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph, type PathGraph, type QueueArea } from '../laneGraph'
 import { earliestStart, mergeWindows, reserve, type WindowSpec } from '../reservations'
-import type { ShcDispatchPad } from '../decisions/types'
+import type { BlockLoad, ShcDispatchPad } from '../decisions/types'
 import type { ShcJob, ShcPlannedEvent, ShcState, ShcStatus, SimState } from '../state'
 import { DEFAULT_SHC_CORNER, DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
 import { DEFAULT_PREDISPATCH_MARGIN_S, type ShcKinematics } from '../../scenario/types'
@@ -686,6 +686,18 @@ export function blockRoom(state: SimState, blockId: string): number {
   return free - BLOCK_FREE_RESERVE * y.heights.length * y.tiers
 }
 
+/** #207: every block's fill (cells in use over cells) and ASC jobs not yet done, for the `balanced` pad selection. */
+function blockLoads(state: SimState): Record<string, BlockLoad> {
+  const out: Record<string, BlockLoad> = {}
+  for (const y of Object.values(state.yardBlocks)) {
+    let used = 0
+    for (const h of y.heights) used += h
+    out[y.id] = { fill: used / Math.max(1, y.heights.length * y.tiers), queued: 0 }
+  }
+  for (const j of Object.values(state.ascJobs)) if (out[j.blockId]) out[j.blockId].queued++
+  return out
+}
+
 /** Every pad with its occupancy and claim now (the pad list of the dispatch and pad-selection requests). A pad of a block with no room reads as claimed. */
 function padOptions(ctx: EngineContext): ShcDispatchPad[] {
   const { state } = ctx
@@ -724,6 +736,7 @@ function requestPadSelection(ctx: EngineContext, shc: ShcState, job: ShcJob): vo
       x: job.x,
       z: graph.laneZ[state.groundPositions[job.groundPositionId].lane],
       wtpPads: padOptions(ctx),
+      blockLoad: blockLoads(state),
     },
     { equipment: [shc.id] },
   )

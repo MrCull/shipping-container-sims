@@ -173,3 +173,31 @@ export function rehandleCandidates(
   return out
 }
 
+/**
+ * TT-185: do the rehandles a pick needs have target room? A pick-only truck is sent to its block only when this holds.
+ * Counted in stack cells: every blocker above the box needs `span` cells (20 ft: one, 40 ft: two) of free height in a stack
+ * that is not being dug out and that no truck holding a stall is coming for (the rule `rehandleCandidates` applies). A
+ * box that is not standing in its slot, or has nothing above it, needs no room.
+ */
+export function rehandleRoomFor(state: SimState, block: BlockSpec, job: AscJob): boolean {
+  const slot = retrievalSlot(state, job)
+  if (!slot) return true
+  const blockers = blockersOf(state, slot)
+  if (blockers.length === 0) return true
+  const forbidden = new Set([slot, ...blockers].flatMap(columnsOfSlot))
+  for (const other of Object.values(state.ascJobs)) {
+    if (other === job || other.kind !== 'retrieve' || other.truckId === undefined || other.ascId !== null) continue
+    if (state.trucks[other.truckId]?.stallId == null) continue
+    const s = state.yardSlots[other.yardSlotId ?? '']
+    if (s && s.containerId === other.containerId) for (const c of columnsOfSlot(s)) forbidden.add(c)
+  }
+  const yard = state.yardBlocks[block.id]
+  let free = 0
+  for (let bay = 1; bay <= block.bays; bay++)
+    for (let row = 1; row <= block.rows; row++) {
+      if (forbidden.has(`${bay}-${row}`)) continue
+      free += Math.max(0, block.tiers - yard.heights[stackIndex(yard, bay, row)])
+    }
+  return free >= blockers.reduce((n, b) => n + b.span, 0)
+}
+

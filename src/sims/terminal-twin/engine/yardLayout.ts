@@ -60,6 +60,36 @@ export interface BlockSpec {
   wtpZ: number
   /** Z of the centre of bay 1. */
   firstBayZ: number
+  /** Reserved stacks (#184), same indexing as `stackIndex`; empty when the block has no reserve. */
+  reserved: boolean[]
+}
+
+/**
+ * The reserved stacks of a block (#184): about `round(share * stacks)` of them, spread evenly over the block so every part
+ * of it (and every row) keeps some room. They come in pairs of neighbouring bays in one row, so a 40 ft blocker has two
+ * free stacks to go to as well as a 20 ft one (single scattered stacks never took a 40 ft box: the peak day's B03 held 36
+ * free stacks and no room for the 40 ft boxes above a load). A block of one bay has no pairs and gets single stacks.
+ * Empty for a share of 0.
+ */
+export function reservedStacksOf(bays: number, rows: number, share: number): boolean[] {
+  const total = bays * rows
+  const count = Math.min(total, Math.round(share * total))
+  if (count <= 0) return []
+  const out = new Array<boolean>(total).fill(false)
+  const pairBays = Math.floor(bays / 2)
+  if (pairBays === 0) {
+    for (let k = 0; k < count; k++) out[Math.floor(((k + 0.5) * total) / count)] = true
+    return out
+  }
+  const anchors = pairBays * rows
+  const pairs = Math.min(anchors, Math.max(1, Math.round(count / 2)))
+  for (let k = 0; k < pairs; k++) {
+    const a = Math.floor(((k + 0.5) * anchors) / pairs)
+    const i = Math.floor(a / rows) * 2 * rows + (a % rows)
+    out[i] = true
+    out[i + rows] = true
+  }
+  return out
 }
 
 export function blockSpec(config: ScenarioConfig, block: BlockConfig): BlockSpec {
@@ -75,6 +105,7 @@ export function blockSpec(config: ScenarioConfig, block: BlockConfig): BlockSpec
     poweredRows: [...new Set(block.poweredRows ?? [])].sort((a, b) => a - b),
     wtpZ,
     firstBayZ: wtpZ + FIRST_BAY_GAP_M + BAY_PITCH_M / 2,
+    reserved: reservedStacksOf(block.bays ?? DEFAULT_BLOCK_BAYS, BLOCK_ROWS, config.yard?.reserveShare ?? 0),
   }
 }
 
@@ -162,6 +193,13 @@ export interface YardStacks {
   reefer?: boolean
   /** Rows with reefer plugs (R19); absent or empty = none. */
   poweredRows?: number[]
+  /** Reserved stacks (#184), same indexing as `heights`: no placement may use them. Absent = none. Rehandle requests never carry it. */
+  reservedStacks?: boolean[]
+}
+
+/** The request field a placement needs for the yard reserve: spread it into a `YardStacks` (nothing is added without a reserve). */
+export function reserveFields(block: Pick<BlockSpec, 'reserved'>): Pick<YardStacks, 'reservedStacks'> {
+  return block.reserved.length > 0 ? { reservedStacks: block.reserved.slice() } : {}
 }
 
 /** The request fields a reefer-aware placement needs: spread them into a `YardStacks` (nothing is added without reefers or powered rows). */
@@ -192,6 +230,7 @@ export function candidateSlots(stacks: YardStacks): YardCandidate[] {
       const i = (bay - 1) * stacks.rows + (row - 1)
       const h = stacks.heights[i]
       if (h >= stacks.tiers) continue
+      if (stacks.reservedStacks && (stacks.reservedStacks[i] || (span === 2 && stacks.reservedStacks[i + stacks.rows]))) continue
       // a reefer needs a plug (powered row) and goes at most REEFER_MAX_TIERS high
       if (stacks.reefer && (h >= REEFER_MAX_TIERS || !stacks.poweredRows?.includes(row))) continue
       if (span === 2 && stacks.heights[i + stacks.rows] !== h) continue

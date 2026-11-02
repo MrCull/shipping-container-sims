@@ -85,6 +85,12 @@ export interface VesselSlotState {
   half: CellHalf
   /** What the bay plan uses the slot for. Load/transshipment slots are reserved (empty) until TT-10. */
   purpose: SlotPurpose
+  /**
+   * Shared cell (#203): a discharge slot that also carries a load booking of the same shape. `plannedContainerId` /
+   * `emptyReq` are that booking; once the discharge box has left (`StsPicked`) the slot's `purpose` becomes this and
+   * the field is cleared.
+   */
+  loadPurpose?: Exclude<SlotPurpose, 'discharge'>
   containerId: string | null
   /** Load slots: the export box booked to this slot (it is `containerId` once loaded). */
   plannedContainerId?: string | null
@@ -444,6 +450,10 @@ export interface TruckState {
   arrivedAt: number
   /** Gate queue position while queued (0 = head). */
   queueIndex: number
+  /** TT-208: the truck passed a blocked gate head; it takes a lane only when it stands at the head of the queue. */
+  promoted?: true
+  /** TT-208: the time a `TruckReachedGateHead` wake-up is scheduled for (so it is scheduled once). */
+  headWakeAt?: number
   laneId: string | null
   outLaneId: string | null
   stallId: string | null
@@ -496,6 +506,11 @@ export interface LandsideState {
    * not a block, while a blocked slot is reported although trucks leave by other lanes.
    */
   lastDepartureByLane?: Record<string, number>
+  /**
+   * TT-184 (0.42.0): drop-only trucks standing at a stall whose box met "full" in its block (their ids, in order): each is
+   * sent to a stall of another block that takes the box, as soon as there is one. Absent until the first such truck.
+   */
+  fullDrops?: string[]
   /** Own RNG stream (arrivals, transactions, boxes, dwell): the landside never disturbs the other subsystems' draws. */
   rngState: number
   nextTruck: number
@@ -791,7 +806,7 @@ export interface LoadOrder {
   slotId: string
   /** Position in the crane's load sequence (0-based, over all its load packages). */
   seq: number
-  stage: 'released' | 'gp-asked' | 'gp-claimed' | 'retrieving' | 'on-pad' | 'to-ground' | 'on-ground'
+  stage: 'released' | 'staging' | 'padded' | 'gp-asked' | 'gp-claimed' | 'retrieving' | 'on-pad' | 'to-ground' | 'on-ground'
   groundPositionId: string | null
 }
 

@@ -25,7 +25,7 @@ import { yardGroupingOn, yardGroupKey, yardViewOfProps } from './decisions/yardG
 import { createQuery, type SimQuery } from './query'
 import { nextRandom, seedState } from './rng'
 import type { SimState } from './state'
-import { blockSpecs, boxSpan, parseYardSlotId, reeferFields } from './yardLayout'
+import { blockSpecs, boxSpan, parseYardSlotId, reeferFields, reserveFields } from './yardLayout'
 import { pickWeighted, POOL_VESSEL_ID, type CargoPlan } from '../scenario/bayPlan'
 import { drawContainerProps, WEIGHT_RANK, type ContainerProps } from '../scenario/containerProps'
 import { sampleDwell } from '../scenario/dwell'
@@ -67,6 +67,11 @@ const IMPORT_SERIAL0 = 700000
 const PREFILL_SALT = 0x2f6e2b1
 /** A grouped box keeps to the blocks that hold its group until they are this full, then it spills to the emptiest block. */
 const GROUP_BLOCK_MAX_FILL = 0.9
+/** #207: a vessel's booked exports take at most this many times an even share of its cells in one block before a group stops following its own block, and at least `EXPORT_BLOCK_MIN_CELLS`. */
+const EXPORT_BLOCK_SHARE_X = 1
+const EXPORT_BLOCK_MIN_CELLS = 10
+/** #207: a group follows its own block only while that block is within this share of cells of the emptiest block (before, up to `GROUP_BLOCK_MAX_FILL`, which left most blocks at 90 % and a few near empty). */
+const GROUP_BLOCK_FILL_BAND = 0.08
 
 /** The line a pre-filled import stacks under (#163): imports stack by flow and departure order, not by line. */
 const ANY_LINE = '*'
@@ -101,7 +106,8 @@ export function yardPlacerOf(config: ScenarioConfig, custom?: DecisionHandler<'y
 }
 
 /** Cells (20 ft each) of the whole yard. */
-export const yardCapacityCells = (config: ScenarioConfig): number => blockSpecs(config).reduce((n, b) => n + b.bays * b.rows * b.tiers, 0)
+export const yardCapacityCells = (config: ScenarioConfig): number =>
+  blockSpecs(config).reduce((n, b) => n + (b.bays * b.rows - b.reserved.filter(Boolean).length) * b.tiers, 0)
 
 /**
  * The pre-fill as a resumable computation: yields one `yardAllocation` request at a time and receives the reply's
@@ -123,7 +129,12 @@ export function* prefillSteps(
     spans: new Array<number>(spec.bays * spec.rows).fill(0),
     views: new Array<YardBoxView | null>(spec.bays * spec.rows).fill(null),
     groups: new Map<string, number>(),
+    vesselCells: new Map<string, number>(),
   }))
+  // #207: cells of each vessel's booked exports, so one vessel's exports are spread over the blocks (each ASC gets a share of the load work)
+  const exportCells = new Map<string, number>()
+  for (const c of plan.containers) if (c.flow === 'load') exportCells.set(c.vesselId, (exportCells.get(c.vesselId) ?? 0) + boxSpan(c.size))
+  const vesselCap = (vesselId: string) => Math.max(EXPORT_BLOCK_MIN_CELLS, Math.ceil(((exportCells.get(vesselId) ?? 0) * EXPORT_BLOCK_SHARE_X) / blocks.length))
   const grouped = yardGroupingOn(config)
   if (blocks.length === 0) return out
   let rngState = seedState((seed ^ PREFILL_SALT) >>> 0)
@@ -140,8 +151,12 @@ export function* prefillSteps(
     const key = view ? prefillBlockKey(view) : ''
     // lowest fill first (a grouped box: the blocks that hold its group first); a block without a legal slot passes the box on
     const fill = (b: (typeof blocks)[number]) => b.used / b.capacity
-    const own = (b: (typeof blocks)[number]) => (view && (b.groups.get(key) ?? 0) > 0 && fill(b) < GROUP_BLOCK_MAX_FILL ? 0 : 1)
-    const order = blocks.map((b, i) => ({ b, i })).sort((x, y) => own(x.b) - own(y.b) || fill(x.b) - fill(y.b) || x.i - y.i)
+    const minFill = Math.min(...blocks.map(fill))
+    const spreadVessel = exportCells.has(box.vesselId)
+    const cells = (b: (typeof blocks)[number]) => (spreadVessel ? (b.vesselCells.get(box.vesselId) ?? 0) : 0)
+    const own = (b: (typeof blocks)[number]) =>
+      view && (b.groups.get(key) ?? 0) > 0 && fill(b) < GROUP_BLOCK_MAX_FILL && fill(b) <= minFill + GROUP_BLOCK_FILL_BAND && (!spreadVessel || cells(b) < vesselCap(box.vesselId)) ? 0 : 1
+    const order = blocks.map((b, i) => ({ b, i })).sort((x, y) => own(x.b) - own(y.b) || cells(x.b) - cells(y.b) || fill(x.b) - fill(y.b) || x.i - y.i)
     for (const { b } of order) {
       const request: YardAllocationRequest = {
         containerId: box.id,
@@ -163,6 +178,7 @@ export function* prefillSteps(
         stackSpans: b.spans.slice(),
         ...(view ? { box: view, stackTops: b.views.slice(), ...(strict ? { sameGroupOnly: true as const } : {}) } : {}),
         ...reeferFields(b.spec, box.reefer),
+        ...reserveFields(b.spec),
         random: rng(),
       }
       const slotId = yield request
@@ -181,6 +197,7 @@ export function* prefillSteps(
       }
       if (view) b.groups.set(key, (b.groups.get(key) ?? 0) + span)
       b.used += span
+      if (spreadVessel) b.vesselCells.set(box.vesselId, (b.vesselCells.get(box.vesselId) ?? 0) + span)
       const placement: ExportPlacement = { containerId: box.id, vesselId: box.vesselId, size: box.size, blockId: b.spec.id, slotId, bay: cell.bay, row: cell.row, tier: cell.tier, span }
       out.placements.push(placement)
       return placement

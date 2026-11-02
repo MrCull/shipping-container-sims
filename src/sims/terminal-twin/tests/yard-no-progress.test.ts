@@ -8,7 +8,7 @@
  * last leg or the last departure through the truck's own outbound lane.
  */
 import { describe, expect, it } from 'vitest'
-import { createSimulation, type Simulation } from '../engine'
+import { createSimulation, STALL_STRAND_LIMIT_S, stuckYardBlocks, type Simulation } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import { ScenarioBuilder } from '../scenario/builder'
 import type { ScenarioConfig } from '../scenario/types'
@@ -89,5 +89,50 @@ describe('the exit-slot wait has the stall limit', () => {
     const sim = createSimulation(exitTerminal(20), {}, { invariants: { failFast: false } })
     expect(sim.runUntil().reason).toBe('ended')
     expect(violationsOf(sim, STRANDED)).toEqual([])
+  })
+})
+
+describe('yard.no-progress counts a queued pick truck from gate-in (TT-209)', () => {
+  /** The deadlocked rehandle fixture, with its claimed pick trucks put back where `setTrucks` says. */
+  function deadlocked(setTrucks: (trucks: { status: string; arrivedAt: number; gateInAt: number | null }[], now: number) => void) {
+    const sim = createSimulation(
+      fixtures['rehandle-random-yard'],
+      { rehandleTarget: () => ({ slotId: null }) },
+      { invariants: { failFast: false } },
+    )
+    sim.runUntil()
+    const state = sim.snapshot().state
+    const claimed = Object.values(state.ascJobs).filter((j) => j.ascId === null && j.allocation === 'claimed')
+    expect(claimed.length).toBeGreaterThan(0)
+    // the fixture's picks are pad retrievals: give each a pick truck of its own, as a truck job
+    const trucks = claimed.map((j, i) => {
+      const t = { id: `TTEST${i}`, transaction: 'pickUp', legs: [], status: 'queued', arrivedAt: 0, gateInAt: null } as never
+      state.trucks[`TTEST${i}`] = t
+      j.truckId = `TTEST${i}`
+      return t
+    })
+    setTrucks(trucks as never, state.now)
+    return stuckYardBlocks(state, sim.config, state.now, STALL_STRAND_LIMIT_S)
+  }
+
+  it('does not report a block whose pick truck is still in the gate queue, however long it has waited', () => {
+    const found = deadlocked((trucks, now) => {
+      for (const t of trucks) Object.assign(t, { status: 'queued', arrivedAt: now - 5000, gateInAt: null })
+    })
+    expect(found).toEqual([])
+  })
+
+  it('reports the block once the truck has passed the gate and the limit has run from there', () => {
+    const found = deadlocked((trucks, now) => {
+      for (const t of trucks) Object.assign(t, { status: 'waiting-for-stall', arrivedAt: now - 5000, gateInAt: now - 4000 })
+    })
+    expect(found.length).toBeGreaterThan(0)
+  })
+
+  it('does not report a truck that passed the gate less than the limit ago', () => {
+    const found = deadlocked((trucks, now) => {
+      for (const t of trucks) Object.assign(t, { status: 'waiting-for-stall', arrivedAt: now - 5000, gateInAt: now - 100 })
+    })
+    expect(found).toEqual([])
   })
 })

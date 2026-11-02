@@ -90,15 +90,37 @@ function bySection<T extends { slot: OrderCell }>(list: T[]): T[][] {
 }
 
 /**
+ * Twin-20 pairing (#187): the aft and fore 20 ft halves of one cell sort as one unit, keyed by the aft box, so they stay
+ * next to each other in the tier order and the crane can lift them together. Maps each half of a pair to its aft entry.
+ */
+function twinLeads<S extends OrderCell>(run: OrderEntry<S>[]): Map<OrderEntry<S>, OrderEntry<S>> {
+  const aft = new Map<string, OrderEntry<S>>()
+  for (const e of run) if (e.slot.half === 'aft') aft.set(`${e.slot.bay}:${e.slot.deck ? 1 : 0}:${e.slot.row}:${e.slot.tier}`, e)
+  const lead = new Map<OrderEntry<S>, OrderEntry<S>>()
+  for (const e of run) {
+    const a = e.slot.half === 'fore' ? aft.get(`${e.slot.bay}:${e.slot.deck ? 1 : 0}:${e.slot.row}:${e.slot.tier}`) : undefined
+    if (a) lead.set(e, a)
+  }
+  return lead
+}
+
+/**
  * Discharge order `tier` (#174): highest tier first across all stacks of the section, so no stack is emptied to its
  * floor while another still stands high. Inside one tier the yard groups come together (the group key, imports by
- * line, then by planned departure, then row, aft half before fore half), so a tier still runs group by group.
+ * line, then by planned departure, then row, aft half before fore half), so a tier still runs group by group. Twin-20
+ * pairs (see `twinLeads`) come first inside their tier, so a short window or a stalled crane still gets its pairs (#187).
  */
 function dischargeByTier<S extends OrderCell>(run: OrderEntry<S>[], ports: readonly string[]): OrderEntry<S>[] {
-  const keyed = run.map((e) => ({ e, group: yardGroupOrderKey(e.box, ports), dep: e.box?.props?.plannedDepartureS ?? 0 }))
+  const lead = twinLeads(run)
+  const leads = new Set(lead.values())
+  const keyed = run.map((e) => {
+    const k = lead.get(e) ?? e
+    return { e, twin: k !== e || leads.has(e) ? 0 : 1, group: yardGroupOrderKey(k.box, ports), dep: k.box?.props?.plannedDepartureS ?? 0 }
+  })
   keyed.sort(
     (a, b) =>
       b.e.slot.tier - a.e.slot.tier ||
+      a.twin - b.twin ||
       (a.group < b.group ? -1 : a.group > b.group ? 1 : 0) ||
       a.dep - b.dep ||
       a.e.slot.row - b.e.slot.row ||
@@ -130,11 +152,12 @@ export function orderLoad<S extends OrderCell>(entries: OrderEntry<S>[], ports: 
   for (const run of bySection(entries)) {
     const boxes = run.filter((e) => e.box)
     const rest = run.filter((e) => !e.box)
+    const key = (e: OrderEntry<S>) => e
     boxes.sort(
       (a, b) =>
         a.slot.tier - b.slot.tier ||
-        podRank(ports, b.box?.props?.pod) - podRank(ports, a.box?.props?.pod) ||
-        grossOf(b.box) - grossOf(a.box) ||
+        podRank(ports, key(b).box?.props?.pod) - podRank(ports, key(a).box?.props?.pod) ||
+        grossOf(key(b).box) - grossOf(key(a).box) ||
         a.slot.row - b.slot.row ||
         aftFirst(a.slot.half) - aftFirst(b.slot.half),
     )

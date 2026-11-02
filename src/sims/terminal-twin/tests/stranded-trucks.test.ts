@@ -112,3 +112,42 @@ describe('the invariant catches a truck that stays stranded', () => {
     expect(violations[0].message).toMatch(/has waited .* s at stall B01-TS\d .*no job that can start/)
   })
 })
+
+describe('a drop that meets "full" at its stall goes to another block (TT-184, 0.42.0)', () => {
+  it('sends the truck to a stall of a block that takes the box; nothing is stranded', () => {
+    // the TOS refuses every truck drop in the block of the first truck (the block filled between the offer and the arrival)
+    let refusedBlock: string | null = null
+    const sim = createSimulation(
+      terminal(
+        [
+          { id: 'B01', x: 20, bays: 2, tiers: 2 },
+          { id: 'B02', x: 60, bays: 2, tiers: 2 },
+        ],
+        ['dropEmpty'],
+      ),
+      {
+        yardAllocation: (msg, query) => {
+          if (msg.payload.stallId === undefined) return defaultHandlers.yardAllocation(msg, query)
+          refusedBlock ??= msg.payload.blockId
+          return msg.payload.blockId === refusedBlock ? { slotId: null } : defaultHandlers.yardAllocation(msg, query)
+        },
+      },
+    )
+    expect(sim.runUntil().reason).toBe('ended')
+    expect(sim.firstError).toBeNull()
+    expect(strandedViolations(sim)).toEqual([])
+    expect(sim.invariantReport().violations).toEqual([])
+    const assigned = sim.eventLog().flatMap((e) => (e.type === 'TruckStallAssigned' ? [e.payload.blockId] : []))
+    expect(assigned).toHaveLength(2)
+    expect(assigned[1]).not.toBe(assigned[0])
+    expect(sim.eventLog().filter((e) => e.type === 'TruckDeparted')).toHaveLength(1)
+  })
+
+  it('keeps the truck at its stall when no other block takes the box (the single-block case stays as before)', () => {
+    const sim = createSimulation(terminal([{ id: 'B01', x: 20, bays: 2, tiers: 1 }], ['dropEmpty']), {
+      yardAllocation: (msg, query) => (msg.payload.stallId !== undefined ? { slotId: null } : defaultHandlers.yardAllocation(msg, query)),
+    })
+    sim.runUntil()
+    expect(sim.eventLog().filter((e) => e.type === 'TruckStallAssigned')).toHaveLength(1)
+  })
+})

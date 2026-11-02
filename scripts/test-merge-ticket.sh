@@ -93,5 +93,34 @@ check "merge without a #182 row still exits 0" "$code"
 check "missing row leaves handover.md unchanged" "$(git -C "$repo" show HEAD:handover.md | cmp -s - "$scratch/norow-before.md"; echo $?)"
 check "missing row is reported in the log" "$(grep -q 'no row for #182' "$repo/.merge-ticket.log"; echo $?)"
 
+# Cases 4 and 5: both sides bumped ENGINE_VERSION. Only that line conflicting is resolved by the script (higher, minor +1);
+# another conflicting line stops the merge as before.
+conflict_repo() { # conflict_repo <name> <extra: yes|no>
+  local d f=src/sims/terminal-twin/engine/simulation.ts
+  d="$(make_repo "$1")"
+  git -C "$d" checkout -q tt/182-worktree-cleanup
+  echo "export const ENGINE_VERSION = '1.3.0'" > "$d/$f"
+  [ "$2" = yes ] && echo ticket-side > "$d/base.txt"
+  git -C "$d" commit -qam "ticket: bump"
+  git -C "$d" checkout -q integ
+  echo "export const ENGINE_VERSION = '1.5.0'" > "$d/$f"
+  [ "$2" = yes ] && echo integ-side > "$d/base.txt"
+  git -C "$d" commit -qam "integ: bump" && git -C "$d" push -q origin integ
+  echo "$d"
+}
+vf=src/sims/terminal-twin/engine/simulation.ts
+repo="$(conflict_repo vconf no)"
+run_merge "$repo"; code=$?
+check "ENGINE_VERSION-only conflict merges and exits 0" "$code"
+check "resolved version is above both (1.6.0)" "$(grep -q "'1.6.0'" "$repo/$vf"; echo $?)"
+check "no conflict markers remain" "$(! grep -q '^<<<<<<<' "$repo/$vf"; echo $?)"
+check "result is a merge commit with the ticket as second parent" "$([ "$(git -C "$repo" rev-parse --short HEAD^^2)" = "$(git -C "$repo" rev-parse --short tt/182-worktree-cleanup)" ]; echo $?)"
+
+repo="$(conflict_repo vconf2 yes)"
+run_merge "$repo"; code=$?
+check "extra conflicting line stops the merge (non-zero)" "$([ "$code" -ne 0 ]; echo $?)"
+check "extra conflict logs the usual CONFLICT message" "$(grep -q 'CONFLICT merging tt/182-worktree-cleanup into integ' "$repo/.merge-ticket.log"; echo $?)"
+check "extra conflict leaves the merge uncommitted" "$([ -f "$repo/.git/MERGE_HEAD" ]; echo $?)"
+
 echo "$fails failing"
 [ "$fails" -eq 0 ]

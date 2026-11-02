@@ -31,7 +31,19 @@ export const releaseAhead = (ctx: EngineContext): number => ctx.config.workPacka
 
 /** A slot that still has a box to load: booked export / transshipment box, or an empties requirement. */
 export const isLoadSlot = (s: VesselSlotState): boolean =>
-  (s.purpose === 'load' || s.purpose === 'transshipment') && s.containerId === null && (!!s.plannedContainerId || !!s.emptyReq)
+  (!!s.loadPurpose || ((s.purpose === 'load' || s.purpose === 'transshipment') && s.containerId === null)) && (!!s.plannedContainerId || !!s.emptyReq)
+
+/**
+ * True when no slot of the cell (bay, row, tier; either half) still holds a box that arrived on the vessel: a load box
+ * may go into a shared cell (#203) only once its discharge box has left. Load boxes already in the cell (the other half
+ * of a twin-20 pair) do not count.
+ */
+export const cellIsEmpty = (state: SimState, slotId: string): boolean => {
+  const at = state.vesselSlots[slotId]
+  return !Object.values(state.vesselSlots).some(
+    (o) => o.vesselId === at.vesselId && o.bay === at.bay && o.row === at.row && o.tier === at.tier && o.containerId !== null && o.purpose === 'discharge',
+  )
+}
 
 /** Boxes a package moves (an empties package counts its required empties before they are allocated). */
 export const packageMoves = (p: WorkPackage): number => (p.emptyReq ? p.emptyReq.count : p.containerIds.length) // 0 for a hatch package
@@ -108,15 +120,17 @@ export function createPackages(ctx: EngineContext, sts: StsState, vesselId: stri
     const made: WorkPackage[] = []
     let current: WorkPackage | null = null
     for (const s of group) {
+      // a shared cell's `emptyReq` is its load booking: a discharge package never reads it (#203)
+      const req = kind === 'load' ? s.emptyReq : undefined
       if (
         !current ||
         current.bay !== s.bay ||
         current.section !== section(s.deck) ||
-        (current.emptyReq?.index ?? -1) !== (s.emptyReq?.index ?? -1)
+        (current.emptyReq?.index ?? -1) !== (req?.index ?? -1)
       ) {
         current = make(kind, s.bay, section(s.deck))
-        if (s.emptyReq)
-          current.emptyReq = { index: s.emptyReq.index, size: s.emptyReq.size, line: s.emptyReq.line, isoType: s.emptyReq.isoType, count: 0, slotIds: [], stage: 'pending' }
+        if (req)
+          current.emptyReq = { index: req.index, size: req.size, line: req.line, isoType: req.isoType, count: 0, slotIds: [], stage: 'pending' }
         made.push(current)
       }
       if (current.emptyReq) {

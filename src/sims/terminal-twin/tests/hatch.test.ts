@@ -47,9 +47,10 @@ const lastOf = (events: EngineEvent[], type: string): EngineEvent => {
 function fullBay(sim: Simulation): number {
   const sections = new Map<number, Set<string>>()
   for (const s of sim.query.vesselSlots('V001')) {
-    const kind = `${s.purpose === 'discharge' ? 'discharge' : 'load'}-${s.deck ? 'deck' : 'hold'}`
     if (!sections.has(s.bay)) sections.set(s.bay, new Set())
-    sections.get(s.bay)?.add(kind)
+    // a shared cell (#203) is both a discharge and a load slot
+    if (s.purpose === 'discharge') sections.get(s.bay)?.add(`discharge-${s.deck ? 'deck' : 'hold'}`)
+    if (s.purpose !== 'discharge' || s.loadPurpose) sections.get(s.bay)?.add(`load-${s.deck ? 'deck' : 'hold'}`)
   }
   const bay = [...sections.entries()].find(([, kinds]) => kinds.size === 4)
   if (!bay) throw new Error('the fixture has no bay with all four sections')
@@ -102,7 +103,7 @@ describe('hatch cover configuration (vessel classes)', () => {
 
 describe('hatch-cover-cycle: remove, hold work, replace, deck load in one bay', () => {
   const sim = run(cycle)
-  const bay = fullBay(sim)
+  const bay = fullBay(createSimulation(cycle)) // before the run: a discharged shared cell becomes a load slot (#203)
   const panelIds = Object.values(sim.snapshot().state.hatchPanels)
     .filter((p) => p.bay === bay)
     .map((p) => p.id)

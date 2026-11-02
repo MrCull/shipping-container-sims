@@ -42,6 +42,9 @@ export {
   blockSpecs,
   boxSpan,
   candidateSlots,
+  reservedStacksOf,
+  reserveFields,
+  stackIndex,
   REEFER_MAX_TIERS,
   parseYardSlotId,
   yardSlotId,
@@ -69,7 +72,7 @@ export { ascPoseAt } from './subsystems/asc'
 export { ascIdOf, ascIndexOf, resolveSubsystemModes } from './state'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, apronLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
-export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, queueSlotAt, QUEUE_PITCH_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, GATE_ISLAND_W_M, HOLDING_PITCH_M } from './landsideGraph'
+export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, queueSlotAt, QUEUE_PITCH_M, OUT_ROAD_SECTION_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, GATE_ISLAND_W_M, HOLDING_PITCH_M } from './landsideGraph'
 export type { LandsideGraph, LandsideNode, LandsideEdge, LandsideZone, GateLaneLayout, HoldingLayout } from './landsideGraph'
 export { truckPositionAt } from './subsystems/landside'
 export { appointmentCap, planAppointments } from './appointments'
@@ -127,7 +130,7 @@ export type { HandlerKpiReport } from './kpis'
 export type { SimQuery } from './query'
 export type { InvariantViolation } from './invariants'
 export type { PredictedReady } from './predictions'
-export { checkInvariants, DEFAULT_SWEEP_EVERY, INVARIANTS, InvariantTracker } from './invariants'
+export { checkInvariants, DEFAULT_SWEEP_EVERY, INVARIANTS, InvariantTracker, STALL_STRAND_LIMIT_S, stuckYardBlocks } from './invariants'
 export type { KpiReport, HorizontalKpiReport, WorkPackageKpiReport, OrderingKpiReport, LandsideKpiReport } from './kpis'
 export type { WorkPackage, WorkPackageKind, WorkPackageStatus, LoadOrder } from './state'
 export type { HatchPanelState, HatchPanelStatus, HatchLaydownSite } from './state'
@@ -180,7 +183,7 @@ export { buildTimeline } from './kpi/timeline'
 export type { TimelineReport, VesselTimelineRow, TimelinePackage, TimelineWorkPackage, TimelineWindow } from './kpi/timeline'
 export { yardCapacityCells, planPrefill, prefillOf, yardPlacerOf } from './prefill'
 export { yardIndexOf, indexYardSlotAdded, indexYardSlotRemoved } from './yardIndex'
-export { blockersOf, boxesAbove } from './subsystems/rehandle'
+export { blockersOf, boxesAbove, rehandleRoomFor } from './subsystems/rehandle'
 export type { PrefillPlan, PrefillImport, YardPlacer } from './prefill'
 export { validateScenario, validateSubsystemModes, assertValidScenario, ScenarioValidationError, peakTrucksPerHour } from '../scenario/validate'
 export type { ScenarioCheck } from '../scenario/validate'

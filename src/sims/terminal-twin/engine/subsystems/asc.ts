@@ -29,14 +29,14 @@ import type { EngineContext, ReactorMap } from '../context'
 import { ascPoseAt, type PlannedType } from './ascReservations'
 import { maybeDispatchAsc, resolveDispatch } from './ascDispatch'
 import { claimSlot, placeInStack, removeFromStack, jobOfBox, isTruckJob, pumpAllocation, reopenFullJobs, resolveRehandleTarget } from './ascStorage'
-import { stallRoomAppeared } from './landside'
+import { dropMetFull, stallRoomAppeared } from './landside'
 export { ascPoseAt, maybeDispatchAsc, pumpAllocation, isTruckJob }
 import type { EventOf } from '../events'
 import type { PredictedReady } from '../predictions'
 import { type AscJob, type AscState, type AscStatus } from '../state'
 import { parseVesselSlotId } from '../../scenario/vesselClasses'
 import { maybeDispatch } from './shc'
-import { pumpLoadPrep, slotGantryX } from './loadPrep'
+import { createLoadShcJob, pumpLoadPrep } from './loadPrep'
 
 const STATUS_AFTER: Record<PlannedType, AscStatus> = {
   AscRoutingToStack: 'routing-to-slot',
@@ -176,6 +176,7 @@ export const ascReactors: ReactorMap = {
     if (slotId === null) {
       job.allocation = 'full' // the block is full: the box stays on its pad
       if (state.kpis.yard) state.kpis.yard.allocationFailures++
+      dropMetFull(ctx, job)
     } else {
       claimSlot(ctx, job, slotId)
       job.allocation = 'claimed'
@@ -255,20 +256,13 @@ export const ascReactors: ReactorMap = {
     ctx.transferCustody(e.payload.containerId, { kind: 'wtpPad', id: pad.id })
     const order = state.loadOrders[e.payload.containerId]
     if (!order) return
-    order.stage = 'on-pad'
-    const gp = state.groundPositions[order.groundPositionId as string]
-    const id = `J${++state.nextShcJob}`
-    state.shcJobs[id] = {
-      id,
-      containerId: order.containerId,
-      groundPositionId: gp.id,
-      stsId: order.stsId,
-      x: slotGantryX(state, order.slotId),
-      kind: 'load',
-      readyAt: e.t,
-      shcId: null,
-      wtpPadId: pad.id,
+    if (order.groundPositionId === null) {
+      order.stage = 'padded' // staged ahead (#186): the ground position is asked for when the crane's discharge is done
+      pumpLoadPrep(ctx)
+      return
     }
+    order.stage = 'on-pad'
+    createLoadShcJob(ctx, order, pad.id, e.t)
     maybeDispatch(ctx)
   }),
   AscRoutingToTruck: phase(),

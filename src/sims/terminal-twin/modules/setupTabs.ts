@@ -30,6 +30,8 @@ export const CHECK_KEY_TABS: Record<string, SetupTab> = {
   'setup.check.block': 'yard',
   'setup.check.poweredRows': 'yard',
   'setup.check.reeferShare': 'yard',
+  'setup.check.yardReserve': 'yard',
+  'setup.check.loadReleaseAhead': 'yard',
   'setup.check.containerProps': 'yard',
   'setup.check.reeferNoPower': 'yard',
   'setup.check.blockOffQuay': 'yard',
