@@ -22,7 +22,7 @@ Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 | #194 | heavy-run lock in bg.sh | none | merged in branch | |
 | #195 | merge script resolves ENGINE_VERSION-only conflicts | none | merged in branch (0c9490c) | |
 | #196 | brief rules (scale first, snapshots, absolute paths) | none | merged in branch | |
-| #197 | smoke timing report | none | claimed | implementer |
-| #198 | Chromium cache in CI | none | to do | |
+| #197 | smoke timing report | none | merged in branch | |
+| #198 | Chromium cache in CI | none | claimed | implementer |
 | #199 | parallel proof runner | #194 | claimed | implementer |
 | #200 | final: CI workflow_dispatch check | #194 to #199 | to do | |
