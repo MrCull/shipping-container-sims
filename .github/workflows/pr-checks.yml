@@ -88,3 +88,20 @@ jobs:
 
       - name: Smoke tests
         run: pnpm run test:smoke --grep-invert @load
+        env:
+          SMOKE_JSON_REPORT: ${{ github.workspace }}/smoke-report/report.json
+
+      - name: Smoke timing report
+        if: always()
+        run: |
+          if [ -f smoke-report/report.json ]; then
+            { echo '## Smoke timing'; node scripts/smoke-timing.mjs smoke-report/report.json; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report
+          path: smoke-report/report.json
+          if-no-files-found: ignore

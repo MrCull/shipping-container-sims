@@ -47,7 +47,8 @@ export default defineConfig({
   workers: Number(process.env.SMOKE_WORKERS) || 1,
   // CI runners are slower than a dev machine: a spec that fails once and passes on retry is reported as flaky, not red.
   retries: process.env.CI ? 2 : 0,
-  reporter: [['list']],
+  // SMOKE_JSON_REPORT=<file> also writes a JSON report there (CI sets it; scripts/smoke-timing.mjs reads it). Unset: list only.
+  reporter: process.env.SMOKE_JSON_REPORT ? [['list'], ['json', { outputFile: process.env.SMOKE_JSON_REPORT }]] : [['list']],
   outputDir: '.smoke-results',
   use: { viewport: { width: 1280, height: 720 }, launchOptions: { executablePath: chromiumExecutable() } },
   projects: [
