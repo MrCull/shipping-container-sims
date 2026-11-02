@@ -67,6 +67,7 @@ import { DEFAULT_LANDSIDE } from '../../scenario/builder'
 import { vesselSlotId } from '../../scenario/vesselClasses'
 import { appointmentWindowS, planAppointments } from '../appointments'
 import { maybeDispatchAsc, pumpAllocation } from './asc'
+import { rehandleRoomFor } from './rehandle'
 import { TripBuilder, blockRoom, waypoints } from './shc'
 
 type PlannedType = TruckPlannedEvent['type']
@@ -694,7 +695,15 @@ function roomReader(ctx: EngineContext): (blockId: string, box: ContainerState) 
 function stallLegal(ctx: EngineContext, truck: TruckState, blockId: string, room: (blockId: string, box: ContainerState) => boolean): boolean {
   if (truck.legs.some((l) => l.kind === 'pick')) {
     const blocks = legalBlocks(ctx, truck)
-    return blocks === null || blocks.has(blockId)
+    if (blocks !== null && !blocks.has(blockId)) return false
+    // TT-185: a pick-only truck goes to its block only when the rehandles its boxes need have target room there (a dual
+    // transaction's own drop is another matter: its pick frees room)
+    if (truck.legs.every((l) => l.kind === 'pick' && !l.done)) {
+      const spec = blockSpecs(ctx.config).find((b) => b.id === blockId)
+      if (spec)
+        for (const job of Object.values(ctx.state.ascJobs)) if (job.truckId === truck.id && job.blockId === blockId && !rehandleRoomFor(ctx.state, spec, job)) return false
+    }
+    return true
   }
   return truck.legs.every((l) => l.kind !== 'drop' || room(blockId, ctx.state.containers[l.containerId]))
 }

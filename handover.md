@@ -5,7 +5,7 @@ Phase 1 merged in #190. Fast mode (lint, build, test:related per ticket; full ve
 | Ticket | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
 | #184 | engine: yard reserve keeps stacks free for rehandles | none | in progress | implementer |
-| #185 | engine: pick-only trucks admitted when rehandles have room | none | in progress | implementer |
+| #185 | engine: pick-only trucks admitted when rehandles have room | none | merged in branch (ENGINE_VERSION 0.37.0) | |
 | #186 | engine: load boxes staged on WTP pads ahead of the crane | #184 | to do | |
 | #187 | engine: tier stow sequence keeps twin-20 pairing | #186 | to do | |
 | #188 | TTI presets at realistic volume, 0.25 then 0.5 then 1 | #184 to #187 | to do | |

@@ -400,7 +400,11 @@ export function stuckYardBlocks(state: SimState, config: ScenarioConfig, now: nu
   for (const [blockId, open] of openByBlock) {
     const claimed = open.filter((j) => j.allocation === 'claimed')
     if (claimed.length === 0) continue
-    const progressAt = state.yardBlocks[blockId]?.progressAt ?? 0
+    // TT-185: the wait counts from the later of the block's last job start and the arrival of the oldest truck whose pick is
+    // claimed. A block with no work for hours that then gets one queued pick is not stuck: the truck is still at the gate
+    let workSince = Infinity
+    for (const j of claimed) workSince = Math.min(workSince, j.truckId === undefined ? -Infinity : (state.trucks[j.truckId]?.arrivedAt ?? -Infinity))
+    const progressAt = Math.max(state.yardBlocks[blockId]?.progressAt ?? 0, workSince)
     if (now - progressAt <= minIdleS) continue
     const ascs = Object.values(state.ascs).filter((a) => a.blockId === blockId)
     if (ascs.length === 0 || ascs.some((a) => a.status !== 'idle')) continue
