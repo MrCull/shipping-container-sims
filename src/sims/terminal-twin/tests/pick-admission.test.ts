@@ -68,3 +68,39 @@ describe('pick admission', () => {
     expect(waited).toBeGreaterThan(0)
   })
 })
+
+/** Same full block, but with one holding position: two drop-only empties arrive first, then the picks that would free room. */
+function blockedHead(picks: number): ScenarioConfig {
+  const config = fullBlock(0, 6)
+  config.yard = { blocks: [{ ...(config.yard as NonNullable<ScenarioConfig['yard']>).blocks[0], bays: 2 }] }
+  config.yardStart = { mode: 'prefilled', targetPct: 92, mix: { import: 100, export: 0, transshipment: 0 } }
+  config.landside = {
+    ...(config.landside as NonNullable<ScenarioConfig['landside']>),
+    holding: { positions: 1 },
+    scripted: [
+      { atS: 600, transaction: 'dropEmpty' as const },
+      { atS: 630, transaction: 'dropEmpty' as const },
+      ...Array.from({ length: picks }, (_, i) => ({ atS: 660 + i * 30, transaction: 'pickImport' as const })),
+    ],
+  }
+  return config
+}
+
+describe('gate head-of-line blocking (TT-184)', () => {
+  it('lets a pick pass a drop-only head that no stall admits, so the picks free room for the drops', () => {
+    const sim = createSimulation(blockedHead(8), undefined, { invariants: { failFast: false } })
+    const result = sim.runUntil()
+    expect(sim.firstError).toBeNull()
+    expect(sim.invariantReport().violations).toEqual([])
+    expect(result.reason).toBe('ended')
+    expect(sim.eventLog().filter((e) => e.type === 'TruckDeparted')).toHaveLength(10)
+  })
+
+  it('keeps first come, first served when the head can be admitted', () => {
+    const config = fullBlock(4, 7)
+    const sim = createSimulation(config)
+    sim.runUntil()
+    const gateIn = sim.eventLog().filter((e) => e.type === 'TruckGateIn').map((e) => (e.payload as { truckId: string }).truckId)
+    expect(gateIn).toEqual([...gateIn].sort())
+  })
+})

@@ -511,6 +511,29 @@ function planQueueMoves(ctx: EngineContext): void {
   })
 }
 
+/**
+ * TT-184: a truck at the head of the queue that no stall can take whatever the stalls' occupancy (a drop where every
+ * block is without room for its box, a pick whose rehandles have no room) must not stop the picks behind it: their
+ * lifts are what frees room. The first queued truck with a pick leg
+ * that some stall can take moves to the head. Otherwise the queue stays first come, first served.
+ */
+function bypassBlockedHead(ctx: EngineContext): void {
+  const { state } = ctx
+  const ls = landside(state)
+  if (ls.queue.length < 2) return
+  const head = state.trucks[ls.queue[0]]
+  if (head.stallId !== null || head.holdingId !== null) return
+  const room = roomReader(ctx)
+  const blockIds = [...new Set(graphOf(ctx).stalls.map((s) => s.blockId))]
+  const canGo = (truck: TruckState): boolean => blockIds.some((b) => stallLegal(ctx, truck, b, room))
+  if (canGo(head)) return
+  const at = ls.queue.findIndex((id, i) => i > 0 && i <= 60 && state.trucks[id].legs.some((l) => l.kind === 'pick') && canGo(state.trucks[id]))
+  if (at <= 0) return
+  const [id] = ls.queue.splice(at, 1)
+  ls.queue.unshift(id)
+  planQueueMoves(ctx)
+}
+
 /** Ask gateLaneAssignment for the head of the queue when a lane is free (one request at a time). */
 function pumpGate(ctx: EngineContext): void {
   const { state } = ctx
@@ -518,6 +541,7 @@ function pumpGate(ctx: EngineContext): void {
   if (ls.laneAsking !== null || ls.queue.length === 0) return
   const graph = graphOf(ctx)
   if (!graph.inLanes.some((l) => ls.inLanes[l.id].truckId === null)) return
+  if (holdingOn(ctx)) bypassBlockedHead(ctx)
   const truck = state.trucks[ls.queue[0]]
   if (holdingOn(ctx)) {
     // TT-R16: a truck passes the gate only with a stall or a holding position reserved; one decision at a time
