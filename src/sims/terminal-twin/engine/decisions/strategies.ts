@@ -11,7 +11,7 @@ import { minFutureRehandles, nearestValidRehandle } from './rehandleStrategies'
 import { balancedAscDispatch, preRetrievalDispatch, watersideFirstDispatch } from './ascStrategies'
 import { groupedSlot, nearestWtpSlot, randomSlot } from './yardStrategies'
 import { isoTypeBestPositionEmpties, nearestWtpEmpties, oldestFirstEmpties } from './emptyStrategies'
-import { leastLoadedBlockStall, leastUsedLane, lowestFreeLane, nearestToBoxStall } from './landsideStrategies'
+import { leastLoadedBlockStall, leastUsedLane, lowestFreeLane, nearestToBoxStall, spreadDropsStall } from './landsideStrategies'
 import { justInTimeRelease, keepKAheadRelease } from './workPackageStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
 import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchJob, ShcDispatchPad, WtpPadSelectionRequest } from './types'
@@ -273,6 +273,11 @@ export const strategies: StrategyRegistry = {
       'nearest-to-box': {
         description: 'A free stall in the block that holds the box to pick (drops: nearest the gate), nearest the gate within the block.',
         handler: (msg) => nearestToBoxStall(msg.payload),
+      },
+      'spread-drops': {
+        description:
+          'A truck that picks goes to the stalls of its box block; a truck that only drops takes the free stall of lowest cost: road distance from the gate plus 6,000 m per unit of its block fill and 60 m per truck of the block (#188). Spreads truck-delivered boxes over the yard blocks; the TTI presets use it.',
+        handler: (msg) => spreadDropsStall(msg.payload),
       },
       'least-loaded-block': {
         description: 'A free stall in the block with the fewest trucks holding or waiting for a stall, whatever the box.',

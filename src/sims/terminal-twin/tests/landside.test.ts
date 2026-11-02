@@ -494,7 +494,7 @@ describe('decision points', () => {
   it('registers strategies for both decision points with a default each', () => {
     expect(Object.keys(strategies.gateLaneAssignment.strategies).sort()).toEqual(['least-used-lane', 'lowest-free-lane'])
     expect(strategies.gateLaneAssignment.default).toBe('lowest-free-lane')
-    expect(Object.keys(strategies.transferStallSelection.strategies).sort()).toEqual(['least-loaded-block', 'nearest-to-box'])
+    expect(Object.keys(strategies.transferStallSelection.strategies).sort()).toEqual(['least-loaded-block', 'nearest-to-box', 'spread-drops'])
     expect(strategies.transferStallSelection.default).toBe('nearest-to-box')
   })
 

@@ -57,6 +57,8 @@ interface TerminalSpec {
   emptyPool?: EmptyPoolConfig
   /** Load release-ahead (#186): see `YardConfig.loadReleaseAhead`; absent = off. */
   loadReleaseAhead?: number
+  /** Yard reserve (#184, #188): see `YardConfig.reserveShare`; absent = none. */
+  yardReserve?: number
 }
 
 /** TTI's access road (#146): the Isla Verde carriageway, entered `TTI_ACCESS_ROAD_RUNUP_M` south of the quay's end. */
@@ -74,7 +76,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
     .shcs(spec.shc)
     // TT-R12: queue areas near every STS and every block's pads, and chained dispatch. Capacities are assumptions [unverified].
     .queueAreas({ stsCapacity: 3, blockCapacity: 3 })
-    .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' }, wtpPadSelection: { strategy: 'balanced' } } })
+    .decisions({ points: { shcDispatch: { strategy: 'chained-nearest' }, wtpPadSelection: { strategy: 'balanced' }, transferStallSelection: { strategy: 'spread-drops' } } })
     .ascsPerBlock(2)
     .cargo(spec.reefers ? { reeferShare: spec.reefers.share } : {})
     .yardStart(spec.yardStart)
@@ -91,6 +93,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
   if (spec.rob) b.robBays(spec.rob.bayFraction, spec.rob.fill)
   if (spec.emptyPool) b.emptyPool(spec.emptyPool)
   if (spec.loadReleaseAhead) b.loadReleaseAhead(spec.loadReleaseAhead)
+  if (spec.yardReserve) b.yardReserve(spec.yardReserve)
   const base = b.build()
   const sts = deriveSts({ ...base, sts: [{ id: `STS${spec.stsFirst}`, gantryX: 0, groundPositions: 3 }] }, spec.sts, spec.quayM)
   for (const s of sts) b.sts(s.id, { gantryX: s.gantryX, groundPositions: s.groundPositions })
@@ -99,15 +102,16 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
 }
 
 /**
- * Moves scale of the TTI presets (#165): a Feedermax then discharges about 30 and a Neo-Panamax about 120 (it was
- * 0.05: 14 and 65). Full size (1) and the ticket's floor (0.5) both fail: at 0.25 the baseline stops on a stranded truck
- * about 24 hours into the run (a yard block saturated because loads lag discharge), and the peak day at 0.1 stops idle
- * with one of five vessels done. The sim guide ("Realistic volumes", #176) has the measurements. 0.1 completes in
- * about a minute. Raise it again when that saturation is fixed.
+ * Moves scale of the TTI presets (#165, #188): a call then carries 2.5 times the moves of scale 0.1 (it was
+ * 0.05, then 0.1). 0.25 completes the baseline and the peak day with the yard reserve and the `spread-drops` stall
+ * strategy below; the ticket's floor (0.5) and full size (1) are not reached. The sim guide ("Realistic volumes") has the
+ * measurements and `docs/realistic-volume-reports.md` the reports of each step.
  */
-export const TTI_MOVES_SCALE = 0.1
+export const TTI_MOVES_SCALE = 0.25
 /** #186: load boxes per crane staged on WTP pads ahead of their ground positions (an assumption, tune with `tt:profile`). */
 export const TTI_LOAD_RELEASE_AHEAD = 4
+/** #188: share of every TTI block's stacks kept free of pre-fill and discharge (pairs of bays), so a dig always finds room for its blockers. [assumed] */
+export const TTI_YARD_RESERVE = 0.1
 
 /** Vessel calls for a TTI-style hub: ~85% transshipment, a spread of sizes. */
 function hubVessels(count: number, intervalS: number, jitterS: number, movesScale: number, seed: number, flowMix: FlowMix = TTI_FLOW_MIX): VesselConfig[] {
@@ -149,6 +153,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       reefers: TTI_REEFERS,
       emptyPool: { count: 1200, maxAgeS: 7 * 86400 },
       loadReleaseAhead: TTI_LOAD_RELEASE_AHEAD,
+      yardReserve: TTI_YARD_RESERVE,
     }),
   [SMALL_PRESET_NAME]: () =>
     terminal({
@@ -204,5 +209,6 @@ export const presets: Record<string, () => ScenarioConfig> = {
       rob: PEAK_DAY_ROB,
       emptyPool: { count: 1500, maxAgeS: 7 * 86400 },
       loadReleaseAhead: TTI_LOAD_RELEASE_AHEAD,
+      yardReserve: TTI_YARD_RESERVE,
     }),
 }
