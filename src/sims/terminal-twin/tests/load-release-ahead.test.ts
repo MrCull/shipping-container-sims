@@ -18,7 +18,8 @@ function scenario(ahead: number | undefined): ScenarioConfig {
     .moveVariation(10)
     .quay(400, { mooringS: 60, unmooringS: 60 })
     .sts('STS01', { gantryX: 60, groundPositions: 3 })
-    .vesselCall('V001', { name: 'First', sizeClass: 'feeder', discharge: 20, load: 8, maxSts: 1, sizeMix: { '20': 1, '40': 1 } })
+    // 40 ft boxes only: twin-20 lifts (#187) discharge faster than a pad frees, which is not what this test is about
+    .vesselCall('V001', { name: 'First', sizeClass: 'feeder', discharge: 20, load: 8, maxSts: 1, sizeMix: { '40': 1 } })
     .shcs(3)
     .block('B01', { x: 20, bays: 12, tiers: 4 })
     .yardStart({ mode: 'prefilled', targetPct: 40 })
