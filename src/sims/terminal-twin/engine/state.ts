@@ -444,6 +444,10 @@ export interface TruckState {
   arrivedAt: number
   /** Gate queue position while queued (0 = head). */
   queueIndex: number
+  /** TT-208: the truck passed a blocked gate head; it takes a lane only when it stands at the head of the queue. */
+  promoted?: true
+  /** TT-208: the time a `TruckReachedGateHead` wake-up is scheduled for (so it is scheduled once). */
+  headWakeAt?: number
   laneId: string | null
   outLaneId: string | null
   stallId: string | null

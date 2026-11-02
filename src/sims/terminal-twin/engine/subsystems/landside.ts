@@ -558,11 +558,31 @@ function bypassBlockedHead(ctx: EngineContext): void {
   const picks = head.legs.some((l) => l.kind === 'pick')
   const holdingFree = Object.values(ls.holding).some((h) => h.truckId === null)
   if (picks && holdingFree && stalls.some((s) => stallLegal(ctx, head, s.blockId, room))) return // it can wait in a holding position
-  const at = ls.queue.findIndex((id, i) => i > 0 && state.trucks[id].legs.some((l) => l.kind === 'pick') && canGo(state.trucks[id]))
-  if (at <= 0) return
-  const [id] = ls.queue.splice(at, 1)
-  ls.queue.unshift(id)
+  // TT-208: queued trucks with a pick and a free stall pass the head, at most one per free stall of their block (and per
+  // free lane); each keeps its queue order among the promoted and takes a lane only once it is physically at the head
+  // (`pumpGate`)
+  const stallsLeft = new Map<string, number>()
+  for (const s of stalls) if (ls.stalls[s.id].truckId === null) stallsLeft.set(s.blockId, (stallsLeft.get(s.blockId) ?? 0) + 1)
+  let lanesLeft = 1
+  const promoted: string[] = []
+  for (let i = 1; i < ls.queue.length && lanesLeft > 0; i++) {
+    const t = state.trucks[ls.queue[i]]
+    if (!t.legs.some((l) => l.kind === 'pick') || !canGo(t)) continue
+    const block = [...(legalBlocks(ctx, t) ?? [])].find((b) => (stallsLeft.get(b) ?? 0) > 0 && stallLegal(ctx, t, b, room))
+    if (block === undefined) continue
+    stallsLeft.set(block, (stallsLeft.get(block) ?? 0) - 1)
+    lanesLeft--
+    promoted.push(t.id)
+  }
+  if (promoted.length === 0) return
+  ls.queue = [...promoted, ...ls.queue.filter((id) => !promoted.includes(id))]
+  for (const id of promoted) state.trucks[id].promoted = true
   planQueueMoves(ctx)
+}
+
+/** When the truck stands at its queue slot: the end of its last run on both axes. */
+function atSlotAt(truck: TruckState): number {
+  return Math.max(restOf(truck, 'x')?.at ?? 0, restOf(truck, 'z')?.at ?? 0)
 }
 
 /** Ask gateLaneAssignment for the head of the queue when a lane is free (one request at a time). */
@@ -578,6 +598,17 @@ function pumpGate(ctx: EngineContext): void {
     // TT-R16: a truck passes the gate only with a stall or a holding position reserved; one decision at a time
     if (ls.stallAsking !== null) return
     if (truck.stallId === null && truck.holdingId === null && !admit(ctx, truck)) return
+  }
+  if (truck.promoted) {
+    // TT-208: a truck that passed a blocked head is admitted (stall or holding position) at once but takes a lane only when it stands at the head of the queue
+    const at = atSlotAt(truck)
+    if (at > state.now + 1e-9) {
+      if (truck.headWakeAt !== at) {
+        truck.headWakeAt = at
+        ctx.schedule('TruckReachedGateHead', at, { equipment: [truck.id] }, { truckId: truck.id })
+      }
+      return
+    }
   }
   ls.laneAsking = truck.id
   ctx.requestDecision(
@@ -630,6 +661,8 @@ function resolveLane(ctx: EngineContext, truckId: string, laneId: string | null)
   truck.laneId = laneId
   truck.gateStartedAt = state.now
   truck.queueIndex = -1
+  delete truck.promoted
+  delete truck.headWakeAt
   const k = counters(state)
   const waited = state.now - truck.arrivedAt
   k.gateWaitSumS += waited
@@ -1343,6 +1376,9 @@ export const landsideReactors: ReactorMap = {
   },
 
   TruckWaitingForStall: () => {},
+
+  /** A truck that passed a blocked gate head has reached the head of the queue (TT-208): it may take a lane now. */
+  TruckReachedGateHead: (_e, ctx) => pumpGate(ctx),
 
   TruckStallAssigned: (e, ctx) => scheduleNext(ctx, ctx.state.trucks[e.payload.truckId]),
 
