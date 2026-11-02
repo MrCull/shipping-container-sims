@@ -22,8 +22,8 @@ Ticket texts for implementers: `scratchpad/tickets-r4.md` (scratchpad of the orc
 | #180 | workflow docs: ticket files, committed screenshots, profile first, commit attribution (#178) | none | merged in branch (c5f35ef) | |
 | #181 | test:related and tt:golden checks (#178) | none | merged in branch (90d6ccc) | |
 | #182 | dead worktree cleanup, merge updates handover (#178) | #179 | merged in branch (47de117) | |
-| #183 | engine: no silent yard deadlock, peak day finishes at 0.1 (#178) | none | merged in branch (2c86893), partly: peak day at 0.1 still red (B10, yard.no-progress, 1 of 5 vessels) | |
-| #177 | smoke run and regressions | #170 to #173, #183 | to do | |
+| #183 | engine: no silent yard deadlock (peak day at 0.1 parked for phase 2 by owner) | none | merged in branch (2c86893), partly | |
+| #177 | smoke run and regressions | #170 to #173, #183 | in progress | implementer (final) |
 
 Phase 2 of #178 (#184 to #189, realistic volumes) starts on a fresh integration branch after the round 4 PR merges; not tracked here.
 
