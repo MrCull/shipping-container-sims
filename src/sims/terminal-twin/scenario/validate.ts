@@ -11,7 +11,7 @@ import { validateRob } from './robBays'
 import { BLOCK_ROWS } from '../engine/yardLayout'
 import { BLOCK_FRONTAGE_M, SCALE_LIMITS, STRESS_SCALE } from './limits'
 import { validateOverrides, type CheckMessage, type OverrideCheck } from './overrides'
-import type { ScenarioConfig, SubsystemModes } from './types'
+import { MAX_YARD_RESERVE, type ScenarioConfig, type SubsystemModes } from './types'
 
 export type ScenarioCheck = OverrideCheck
 
@@ -64,6 +64,8 @@ export function validateScenario(config: ScenarioConfig, overrides: SubsystemMod
       if ((b.poweredRows ?? []).some((r) => !Number.isInteger(r) || r < 1 || r > BLOCK_ROWS)) err('setup.check.poweredRows', { n: i + 1, rows: BLOCK_ROWS })
     })
   }
+  const reserve = config.yard?.reserveShare ?? 0
+  if (typeof reserve !== 'number' || !(reserve >= 0 && reserve <= MAX_YARD_RESERVE)) err('setup.check.yardReserve', { max: MAX_YARD_RESERVE })
   const reeferShare = config.cargo.reeferShare ?? 0
   if (!(reeferShare >= 0 && reeferShare <= 1)) err('setup.check.reeferShare')
   else if (reeferShare > 0 && blocks.length > 0 && !blocks.some((b) => (b.poweredRows ?? []).length > 0)) err('setup.check.reeferNoPower')
@@ -112,6 +114,7 @@ const ENGINE_ERROR_KEYS: readonly MessageKey[] = [
   'setup.check.trucks',
   'setup.check.frontage',
   'setup.check.startNeedsLandside',
+  'setup.check.yardReserve',
   'setup.check.modeNoSts',
   'setup.check.modeNoBlocks',
   'setup.check.modeYardOff',

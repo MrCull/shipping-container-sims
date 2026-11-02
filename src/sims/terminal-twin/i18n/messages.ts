@@ -316,6 +316,7 @@ const en = {
   'setup.check.block': 'Block {n}: bays 1–{maxBays}, tiers 1–{maxTiers}, WTP pads 1–{maxPads}, transfer stalls 0–{maxStalls} (whole numbers)',
   'setup.check.poweredRows': 'Block {n}: powered rows must be whole numbers from 1 to {rows}',
   'setup.check.reeferShare': 'Reefer share must be between 0 and 1',
+  'setup.check.yardReserve': 'Yard reserve must be a share from 0 to {max}',
   'setup.check.containerProps': 'Container properties: {detail}',
   'setup.check.reeferNoPower': 'Reefers need at least one block with powered rows',
   'setup.check.blockOffQuay': 'Block {n} lies outside the quay length',

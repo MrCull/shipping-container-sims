@@ -92,6 +92,12 @@ export interface YardConfig {
    * (waterside `<block>-ASC1`, landside `<block>-ASC2`).
    */
   ascsPerBlock?: 1 | 2
+  /**
+   * Yard reserve (#184): the share (0 to `MAX_YARD_RESERVE`, default 0) of every block's stacks kept free of
+   * pre-fill, discharge and truck-drop placement, so rehandles always have somewhere to go. Only rehandles may use
+   * a reserved stack (once they do, it holds boxes like any other). 0 = no reserve, every log unchanged.
+   */
+  reserveShare?: number
 }
 
 /**
@@ -385,6 +391,9 @@ export interface YardStartConfig {
    */
   mix?: { import: number; export: number; transshipment: number }
 }
+
+/** Largest yard reserve a scenario may ask for (#184). */
+export const MAX_YARD_RESERVE = 0.5
 
 export const DEFAULT_YARD_TARGET_PCT = 60
 export const DEFAULT_WARM_UP_S = 48 * 3600

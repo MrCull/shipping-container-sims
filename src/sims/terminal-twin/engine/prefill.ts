@@ -25,7 +25,7 @@ import { yardGroupingOn, yardGroupKey, yardViewOfProps } from './decisions/yardG
 import { createQuery, type SimQuery } from './query'
 import { nextRandom, seedState } from './rng'
 import type { SimState } from './state'
-import { blockSpecs, boxSpan, parseYardSlotId, reeferFields } from './yardLayout'
+import { blockSpecs, boxSpan, parseYardSlotId, reeferFields, reserveFields } from './yardLayout'
 import { pickWeighted, POOL_VESSEL_ID, type CargoPlan } from '../scenario/bayPlan'
 import { drawContainerProps, WEIGHT_RANK, type ContainerProps } from '../scenario/containerProps'
 import { sampleDwell } from '../scenario/dwell'
@@ -101,7 +101,8 @@ export function yardPlacerOf(config: ScenarioConfig, custom?: DecisionHandler<'y
 }
 
 /** Cells (20 ft each) of the whole yard. */
-export const yardCapacityCells = (config: ScenarioConfig): number => blockSpecs(config).reduce((n, b) => n + b.bays * b.rows * b.tiers, 0)
+export const yardCapacityCells = (config: ScenarioConfig): number =>
+  blockSpecs(config).reduce((n, b) => n + (b.bays * b.rows - b.reserved.filter(Boolean).length) * b.tiers, 0)
 
 /**
  * The pre-fill as a resumable computation: yields one `yardAllocation` request at a time and receives the reply's
@@ -163,6 +164,7 @@ export function* prefillSteps(
         stackSpans: b.spans.slice(),
         ...(view ? { box: view, stackTops: b.views.slice(), ...(strict ? { sameGroupOnly: true as const } : {}) } : {}),
         ...reeferFields(b.spec, box.reefer),
+        ...reserveFields(b.spec),
         random: rng(),
       }
       const slotId = yield request
