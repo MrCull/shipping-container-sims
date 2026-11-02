@@ -37,4 +37,10 @@ grep -q 'waiting for heavy lock' "$d/r2.txt"; check "second runner waits" "$?" 0
 wait "$p1"; wait "$p2"
 check "no overlap across runners" "$(sort -n "$d/s/counts" | tail -1)" 1
 grep -q '^01 ' "$d/r2.txt"; check "second runner then ran" "$?" 0
+# inside scripts/bg.sh run --heavy the lock is already held by the same job: the runner must not wait on it
+rm -f "$d/s/counts"
+export STUB_SLEEP=0
+"$here/bg.sh" run --heavy "$d/nest.log" "$here/proof-runner.sh" --out "$d/n1" aa >/dev/null
+"$here/bg.sh" wait "$d/nest.log" 30 >/dev/null 2>&1; check "proof-runner under bg.sh --heavy finishes" "$?" 0
+grep -q '^01 ' "$d/nest.log"; check "and prints its table" "$?" 0
 [ $fail = 0 ] && echo "test-proof-runner: ok"; exit $fail

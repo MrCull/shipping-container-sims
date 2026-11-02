@@ -28,12 +28,15 @@ mkdir -p "$out"
 
 # heavy lock, same file and holder format as scripts/bg.sh run --heavy
 lock=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/bg-heavy
-exec 9>>"$lock.lock"
-if ! flock -n 9; then
-  echo "proof-runner: waiting for heavy lock held by $(cat "$lock.holder" 2>/dev/null || echo unknown)" >&2
-  flock 9
+# Run under scripts/bg.sh run --heavy (BG_HEAVY_HELD=1) the lock is already held by this very job: taking it again would wait forever.
+if [ "${BG_HEAVY_HELD:-}" != 1 ]; then
+  exec 9>>"$lock.lock"
+  if ! flock -n 9; then
+    echo "proof-runner: waiting for heavy lock held by $(cat "$lock.holder" 2>/dev/null || echo unknown)" >&2
+    flock 9
+  fi
+  echo "proof-runner $out" > "$lock.holder"
 fi
-echo "proof-runner $out" > "$lock.holder"
 
 n=0
 for v in "$@"; do

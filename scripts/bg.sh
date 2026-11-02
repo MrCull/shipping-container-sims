@@ -24,7 +24,7 @@ case "$cmd" in
           flock 9
         fi
         echo "log $log" > "$lock.holder"
-        "$@" >> "$log" 2>&1 9>&-; echo "EXIT $?" >> "$log"' bg "$log" "$heavy" "$@" >/dev/null 2>&1 &
+        BG_HEAVY_HELD=1 "$@" >> "$log" 2>&1 9>&-; echo "EXIT $?" >> "$log"' bg "$log" "$heavy" "$@" >/dev/null 2>&1 &
     else
       nohup bash -c '"$@" >> "$0" 2>&1; echo "EXIT $?" >> "$0"' "$log" "$@" >/dev/null 2>&1 &
     fi
