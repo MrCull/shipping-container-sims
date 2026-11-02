@@ -190,7 +190,7 @@ export function undeliveredBookings(ctx: EngineContext, vesselId: string): Conta
   const { state } = ctx
   const found: { key: number[]; box: ContainerState }[] = []
   for (const slot of Object.values(state.vesselSlots)) {
-    if (slot.vesselId !== vesselId || !slot.plannedContainerId || slot.containerId !== null) continue
+    if (slot.vesselId !== vesselId || !slot.plannedContainerId || (slot.containerId !== null && !slot.loadPurpose)) continue
     const box = state.containers[slot.plannedContainerId]
     if (box && box.custody.kind === 'external' && box.truckClaim === undefined) found.push({ key: loadSequenceKey(slot), box })
   }
@@ -239,7 +239,12 @@ function bookExtraExport(ctx: EngineContext, box: ContainerState, vesselId: stri
   const { state } = ctx
   const cell = extraLoadCellOf(ctx, vesselId, box.size) as NonNullable<ReturnType<typeof extraLoadCellOf>>
   const id = vesselSlotId(vesselId, cell.bay, cell.row, cell.tier, cell.half)
-  state.vesselSlots[id] = { id, vesselId, ...cell, purpose: 'load', containerId: null, plannedContainerId: box.id }
+  const shared = state.vesselSlots[id]
+  if (shared && shared.purpose === 'discharge') {
+    // the cell's discharge slot has the same shape: it takes the booking (#203)
+    shared.loadPurpose = 'load'
+    shared.plannedContainerId = box.id
+  } else state.vesselSlots[id] = { id, vesselId, ...cell, purpose: 'load', containerId: null, plannedContainerId: box.id }
   if (state.subsystems.shc !== 'off' && state.subsystems.asc !== 'off') state.vessels[vesselId].remainingLoad++
   return id
 }

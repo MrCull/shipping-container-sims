@@ -31,7 +31,19 @@ export const releaseAhead = (ctx: EngineContext): number => ctx.config.workPacka
 
 /** A slot that still has a box to load: booked export / transshipment box, or an empties requirement. */
 export const isLoadSlot = (s: VesselSlotState): boolean =>
-  (s.purpose === 'load' || s.purpose === 'transshipment') && s.containerId === null && (!!s.plannedContainerId || !!s.emptyReq)
+  (!!s.loadPurpose || ((s.purpose === 'load' || s.purpose === 'transshipment') && s.containerId === null)) && (!!s.plannedContainerId || !!s.emptyReq)
+
+/**
+ * True when no slot of the cell (bay, row, tier; either half) still holds a box that arrived on the vessel: a load box
+ * may go into a shared cell (#203) only once its discharge box has left. Load boxes already in the cell (the other half
+ * of a twin-20 pair) do not count.
+ */
+export const cellIsEmpty = (state: SimState, slotId: string): boolean => {
+  const at = state.vesselSlots[slotId]
+  return !Object.values(state.vesselSlots).some(
+    (o) => o.vesselId === at.vesselId && o.bay === at.bay && o.row === at.row && o.tier === at.tier && o.containerId !== null && o.purpose === 'discharge',
+  )
+}
 
 /** Boxes a package moves (an empties package counts its required empties before they are allocated). */
 export const packageMoves = (p: WorkPackage): number => (p.emptyReq ? p.emptyReq.count : p.containerIds.length) // 0 for a hatch package
