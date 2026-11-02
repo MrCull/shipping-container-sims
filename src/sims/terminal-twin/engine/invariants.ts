@@ -340,11 +340,12 @@ function jobCanStart(state: SimState, job: AscJob): boolean {
 }
 
 /**
- * TT-183: when the exit-slot wait of a truck whose transfers are all done began: its last leg, or the last departure from the
- * terminal if that is later (a queue for the outbound lanes that keeps moving is not a blocked slot).
+ * TT-183: when the exit-slot wait of a truck whose transfers are all done began: its last leg, or the last departure through
+ * its own outbound lane if that is later (a lane that keeps moving is a queue, not a blocked slot; other lanes do not count).
  */
 function exitSince(state: SimState, t: TruckState): number {
-  return Math.max(t.interchangeDoneAt ?? t.atStallAt ?? 0, state.landside?.lastDepartureAt ?? 0)
+  const laneMovedAt = t.outLaneId === null ? 0 : (state.landside?.lastDepartureByLane?.[t.outLaneId] ?? 0)
+  return Math.max(t.interchangeDoneAt ?? t.atStallAt ?? 0, laneMovedAt)
 }
 
 /**
@@ -922,13 +923,13 @@ export const INVARIANTS: Invariant[] = [
       for (const t of Object.values(state.trucks)) {
         if ((t.status !== 'at-stall' && t.status !== 'being-served') || t.stallId === null || t.atStallAt === null) continue
         // every transfer done: the truck waits for an outbound slot (its exit reservation), not for an ASC. TT-183: the exit-slot
-        // wait has the same limit as the stall wait, but only while no truck leaves the terminal (`exitSince`)
+        // wait has the same limit as the stall wait, per truck and slot (`exitSince`): trucks leaving by other lanes do not excuse it
         if (t.legs.every((l) => l.done)) {
           const exitWaitS = state.now - exitSince(state, t)
           if (exitWaitS > STALL_STRAND_LIMIT_S)
             messages.push(
               `${t.id} has waited ${exitWaitS.toFixed(0)} s at stall ${t.stallId} for an outbound slot (limit ${STALL_STRAND_LIMIT_S} s): ` +
-                'its transfers are done, its exit reservation has not started and no truck has left the terminal',
+                'its transfers are done, its exit reservation has not started and no truck has left through its lane',
             )
           continue
         }

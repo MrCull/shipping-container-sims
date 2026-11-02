@@ -491,10 +491,11 @@ export interface HoldingPositionState {
 
 export interface LandsideState {
   /**
-   * TT-183: sim time of the last truck that left the terminal (null before the first). An exit-slot wait counts as stranded
-   * only when no truck has left for the stall limit: a queue for the outbound lanes that moves is congestion, not a block.
+   * TT-183: sim time of the last truck that left through each outbound lane (absent before the first). An exit-slot wait counts
+   * as stranded only when its own lane has not moved for the stall limit: a queue on a lane that keeps moving is congestion,
+   * not a block, while a blocked slot is reported although trucks leave by other lanes.
    */
-  lastDepartureAt?: number | null
+  lastDepartureByLane?: Record<string, number>
   /** Own RNG stream (arrivals, transactions, boxes, dwell): the landside never disturbs the other subsystems' draws. */
   rngState: number
   nextTruck: number

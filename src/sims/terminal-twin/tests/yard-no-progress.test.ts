@@ -5,7 +5,7 @@
  * `idle` (the TTI peak day at 0.1 stopped with 1 of 5 vessels done). The invariant `yard.no-progress` reports it once the
  * block has gone `STALL_STRAND_LIMIT_S` without an ASC job start; the engine runs the clock to that point when the queue is
  * empty, so an idle end cannot hide it. The exit-slot wait (`landside.stranded-truck`) uses the same limit, counted from the
- * last leg while no truck leaves the terminal.
+ * last leg or the last departure through the truck's own outbound lane.
  */
 import { describe, expect, it } from 'vitest'
 import { createSimulation, type Simulation } from '../engine'
@@ -42,7 +42,7 @@ describe('yard.no-progress', () => {
 })
 
 /** One outbound lane whose gate-out takes `outProcessingS`, and two trucks that each drop an empty box. */
-function exitTerminal(outProcessingS: number): ScenarioConfig {
+function exitTerminal(outProcessingS: number, outLanes = 1, scriptedAtS = [3000, 3020], transferStalls = 2): ScenarioConfig {
   return new ScenarioBuilder('exit-slot', 'Exit slot')
     .hatch({ enabled: false })
     .seed(8)
@@ -52,16 +52,13 @@ function exitTerminal(outProcessingS: number): ScenarioConfig {
     .sts('STS01', { gantryX: 60, groundPositions: 3 })
     .vesselCall('V001', { name: 'Import Star', sizeClass: 'feeder', discharge: 4, maxSts: 1, sizeMix: { '20': 1 } })
     .shcs(2)
-    .block('B01', { x: 20, bays: 4, tiers: 3, transferStalls: 2 })
+    .block('B01', { x: 20, bays: 4, tiers: 3, transferStalls })
     .landside({
       hourlyProfile: Array.from({ length: 24 }, () => 0),
       importDwell: { kind: 'fixed', s: 300 },
       exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
-      gate: { inLanes: 2, outLanes: 1, inProcessingS: 30, outProcessingS },
-      scripted: [
-        { atS: 3000, transaction: 'dropEmpty' },
-        { atS: 3020, transaction: 'dropEmpty' },
-      ],
+      gate: { inLanes: 2, outLanes, inProcessingS: 30, outProcessingS },
+      scripted: scriptedAtS.map((atS) => ({ atS, transaction: 'dropEmpty' as const })),
     })
     .endWhen({ simDurationS: 12000 })
     .build()
@@ -76,6 +73,16 @@ describe('the exit-slot wait has the stall limit', () => {
     const found = violationsOf(sim, STRANDED).filter((v) => /for an outbound slot/.test(v.message))
     expect(found.length).toBeGreaterThan(0)
     expect(found[0].message).toMatch(/has waited 1801 s at stall B01-TS\d for an outbound slot/)
+  })
+
+  it('reports one blocked exit slot while other trucks keep leaving (per slot, not per terminal)', () => {
+    // two outbound lanes with a 2500 s gate-out: the trucks at 100 s and 1100 s take one lane each and leave at about 2700 s
+    // and 3700 s. The truck at 1700 s waits at its stall from about 1800 s for the second lane (till 3700 s, over the limit)
+    // although the first truck left in between, so a terminal-wide "no truck has left" check would hide it
+    const sim = createSimulation(exitTerminal(2500, 2, [100, 1100, 1600, 1700], 4), {}, { invariants: { failFast: false } })
+    sim.runUntil()
+    const found = violationsOf(sim, STRANDED).filter((v) => /for an outbound slot/.test(v.message))
+    expect(found.length).toBeGreaterThan(0)
   })
 
   it('does not report an exit queue that keeps moving', () => {
