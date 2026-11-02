@@ -1306,6 +1306,7 @@ export const landsideReactors: ReactorMap = {
         ctx.transferCustody(leg.containerId, { kind: 'external', id: truck.id })
       }
     delete state.trucks[truck.id]
+    if (state.landside) state.landside.lastDepartureAt = state.now
   },
 
   /** A box stacked in the yard becomes collectable (imports and empties) once its dwell has elapsed. */

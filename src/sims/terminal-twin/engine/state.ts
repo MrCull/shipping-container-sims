@@ -363,6 +363,11 @@ export interface YardBlockState {
   heights: number[]
   /** Vessel of each stack's top box (null if empty). */
   topVessels: (string | null)[]
+  /**
+   * TT-183: sim time an ASC of the block last started a job (null before the first). `yard.no-progress` measures how long
+   * the block has gone without one while it holds claimed work.
+   */
+  progressAt?: number | null
 }
 
 /** A box in the stack. The id is its anchor cell; a 40 ft box also covers the next bay. */
@@ -485,6 +490,11 @@ export interface HoldingPositionState {
 }
 
 export interface LandsideState {
+  /**
+   * TT-183: sim time of the last truck that left the terminal (null before the first). An exit-slot wait counts as stranded
+   * only when no truck has left for the stall limit: a queue for the outbound lanes that moves is congestion, not a block.
+   */
+  lastDepartureAt?: number | null
   /** Own RNG stream (arrivals, transactions, boxes, dwell): the landside never disturbs the other subsystems' draws. */
   rngState: number
   nextTruck: number

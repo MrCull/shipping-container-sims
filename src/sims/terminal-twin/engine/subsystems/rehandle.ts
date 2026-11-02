@@ -125,9 +125,13 @@ export function rehandleCandidates(
   }
   const forbidden = new Set([digging, ...blockersOf(state, digging)].flatMap(columnsOfSlot))
   // a box a truck is coming for (TT-13) is never buried again: its stack is no target either (else digging for
-  // one truck's box would bury the next truck's box, and the blockers would shuttle between the stacks)
+  // one truck's box would bury the next truck's box, and the blockers would shuttle between the stacks). TT-183: only a
+  // truck that holds a stall counts. A pick of a truck still queued at the gate forbade its stack too, so with a
+  // queue of picks every stack of a block was forbidden: no blocker found a target, the retrieval stayed "full" and no
+  // ASC moved again (the peak-day silent deadlock at B12)
   for (const job of Object.values(state.ascJobs)) {
     if (job.kind !== 'retrieve' || job.truckId === undefined || job.ascId !== null) continue
+    if (state.trucks[job.truckId]?.stallId == null) continue
     const slot = state.yardSlots[job.yardSlotId ?? '']
     if (slot && slot.containerId === job.containerId) for (const c of columnsOfSlot(slot)) forbidden.add(c)
   }
