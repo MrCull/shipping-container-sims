@@ -65,6 +65,7 @@ jobs:
     name: Browser smoke tests (Terminal Twin)
     timeout-minutes: 40
     # One job, not shards: sharding runs the same specs but bills the npm and Chromium installs once per shard.
+    # The Chromium download is cached by Playwright version; system libraries are installed on every run.
     # Frame-based assertions are ratios over a wall-clock window (tests/browser/frameSampling.ts), so they hold on a loaded
     # 2-core runner. `@load` specs (need a real frame rate) are not run in CI: run them locally.
     steps:
@@ -83,8 +84,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Cache key is the installed Playwright version, so a version bump downloads a fresh Chromium.
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      # Miss: download Chromium and install its system libraries. Hit: the browser is cached, install the system libraries only.
       - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Chromium system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
 
       - name: Smoke tests
         run: pnpm run test:smoke --grep-invert @load
