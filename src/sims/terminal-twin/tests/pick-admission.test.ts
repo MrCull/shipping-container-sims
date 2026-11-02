@@ -104,3 +104,44 @@ describe('gate head-of-line blocking (TT-184)', () => {
     expect(gateIn).toEqual([...gateIn].sort())
   })
 })
+
+/** Two blocks with one stall each and one holding position; the picks come faster than a stall serves them. */
+function hotBlock(picks: number, seed: number): ScenarioConfig {
+  return new ScenarioBuilder('hot-block', 'Hot block')
+    .hatch({ enabled: false })
+    .seed(seed)
+    .moveVariation(10)
+    .driverVariability(10)
+    .quay(400, { mooringS: 60, unmooringS: 60 })
+    .sts('STS01', { gantryX: 60, groundPositions: 3 })
+    .vesselCall('V001', { name: 'Idle', sizeClass: 'feeder', discharge: 0, load: 0, maxSts: 1 })
+    .shcs(2)
+    .block('B01', { x: 20, bays: 6, tiers: 4, transferStalls: 1 })
+    .block('B02', { x: 60, bays: 6, tiers: 4, transferStalls: 1 })
+    .yardStart({ mode: 'prefilled', targetPct: 50, mix: { import: 100, export: 0, transshipment: 0 } })
+    .landside({
+      hourlyProfile: Array.from({ length: 24 }, () => 0),
+      importDwell: { kind: 'fixed', s: 60 },
+      exportWindow: { minBeforeEtaS: 3600, maxBeforeEtaS: 36000 },
+      gate: { inLanes: 3, outLanes: 2, inProcessingS: 20, outProcessingS: 20 },
+      holding: { positions: 1 },
+      scripted: Array.from({ length: picks }, (_, i) => ({ atS: 600 + i * 5, transaction: 'pickImport' as const })),
+    })
+    .endWhen({ simDurationS: 4 * HOUR })
+    .build()
+}
+
+describe('gate head-of-line blocking, pick head (TT-184, 0.42.0)', () => {
+  it('lets a pick for a free block pass a pick head whose block has every stall taken and no holding position is free', () => {
+    const sim = createSimulation(hotBlock(14, 3), undefined, { invariants: { failFast: false } })
+    expect(sim.runUntil().reason).toBe('ended')
+    expect(sim.firstError).toBeNull()
+    expect(sim.invariantReport().violations).toEqual([])
+    expect(sim.eventLog().filter((e) => e.type === 'TruckDeparted')).toHaveLength(14)
+    const arrived = sim.eventLog().filter((e) => e.type === 'TruckArrived').map((e) => (e.payload as { truckId: string }).truckId)
+    const gateIn = sim.eventLog().filter((e) => e.type === 'TruckGateStarted').map((e) => (e.payload as { truckId: string }).truckId)
+    expect(gateIn).toHaveLength(14)
+    // somebody passed the head: the gate order is not the arrival order
+    expect(gateIn).not.toEqual(arrived)
+  })
+})
