@@ -8,8 +8,8 @@ Phase 1 merged in #190. Fast mode (lint, build, test:related per ticket; full ve
 | #185 | engine: pick-only trucks admitted when rehandles have room | none | merged in branch (ENGINE_VERSION 0.37.0) | |
 | #186 | engine: load boxes staged on WTP pads ahead of the crane | #184 | merged in branch (0.39.0) | |
 | #187 | engine: tier stow sequence keeps twin-20 pairing | #186 | merged in branch (0.40.0), partly: 24 moves and 3 twin-20 lifts in 90 min, wanted 26 and 4 | |
-| #188 | TTI presets at realistic volume, 0.25 then 0.5 then 1 | #184 to #187 | blocked: peak day at 0.25 stalls (yard.no-progress, hot blocks); see issue comment | |
-| #189 | smoke run and regressions (phase 2) | #184 to #188 | to do | |
+| #188 | TTI presets at realistic volume, 0.25 then 0.5 then 1 | #184 to #187 | moved out of phase 2: blocked by #207, #208, #209, #206 | |
+| #189 | smoke run and regressions (phase 2) | #184 to #187 | to do | |
 
 Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 
