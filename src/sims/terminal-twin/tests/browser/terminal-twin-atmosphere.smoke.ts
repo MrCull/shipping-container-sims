@@ -38,12 +38,19 @@ async function open(page: Page, name: string, startDateTime: string): Promise<vo
 
 const atmosphere = (page: Page) => page.evaluate(() => window.__tt!.atmosphere())
 
+/** Every launch starts in daylight (#171): switch the lock off so the sun follows the clock. */
+async function followClock(page: Page): Promise<void> {
+  if ((await atmosphere(page)).lockDaylight) await page.getByTestId('tt-daylight-toggle').click()
+  await expect.poll(async () => (await atmosphere(page)).lockDaylight).toBe(false)
+}
+
 test('the sun follows the sim clock: day at 13:00, cheaper night mode at 02:00', async ({ page }) => {
   await open(page, TRACER, '2026-10-26T13:00:00.000Z')
   let a = await atmosphere(page)
   expect(a.scene).toMatchObject({ mode: 'day', shadows: true, masts: 0, equipmentLights: 0 })
 
   await open(page, TRACER, '2026-10-26T02:00:00.000Z')
+  await followClock(page)
   await page.evaluate(() => window.__tt!.step())
   a = await atmosphere(page)
   expect(a.scene).toMatchObject({ mode: 'night', shadows: false })
@@ -51,17 +58,24 @@ test('the sun follows the sim clock: day at 13:00, cheaper night mode at 02:00',
   expect(a.scene!.equipmentLights).toBeGreaterThan(0)
 })
 
-test('lock to daylight holds daylight at night', async ({ page }) => {
+test('every launch starts in daylight at 02:00; the toggle lets night fall for that run only', async ({ page }) => {
   await open(page, TRACER, '2026-10-26T02:00:00.000Z')
-  expect((await atmosphere(page)).lockDaylight).toBe(false)
-  await page.getByTestId('tt-daylight-toggle').click()
+  expect((await atmosphere(page)).lockDaylight).toBe(true)
   await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('day')
   expect((await atmosphere(page)).scene).toMatchObject({ shadows: true, masts: 0 })
+
+  await page.getByTestId('tt-daylight-toggle').click()
+  await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('night')
+
+  await open(page, TRACER, '2026-10-26T02:00:00.000Z')
+  expect((await atmosphere(page)).lockDaylight).toBe(true)
+  await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('day')
 })
 
 test('night mode costs no more draw calls than day', async ({ page }) => {
   const calls = async (start: string): Promise<number> => {
     await open(page, TRACER, start)
+    await followClock(page)
     await page.evaluate(() => window.__tt!.runTo(300))
     const f0 = (await page.evaluate(() => window.__tt!.scene()))!.frames
     await page.waitForFunction((n) => window.__tt!.scene()!.frames > n + 2, f0)
@@ -101,9 +115,19 @@ test('a global mute set elsewhere is honoured: nothing plays, no audio is create
   expect(await audioCreated(page)).toBe(0)
 })
 
-test('sound is on by default at 40% and follows the shared volume; effects play and are throttled at x600', async ({ page }) => {
+test('entering with sound on shows muted and no sound plays; unmuting inside plays at the master volume', async ({ page }) => {
   await spyOnAudio(page)
   await open(page, TRACER, '2026-10-26T13:00:00.000Z')
+  expect((await atmosphere(page)).soundGain).toBe(0)
+  await expect(page.getByTestId('audio-button')).toHaveText('🔇')
+  await page.evaluate(() => window.__tt!.setSpeed(60))
+  await page.evaluate(() => window.__tt!.play())
+  await page.waitForFunction(() => window.__tt!.clock().displayTime > 400)
+  expect((await atmosphere(page)).sound.played).toBe(0)
+  expect(await audioCreated(page)).toBe(0)
+
+  await page.evaluate(() => window.__tt!.pause())
+  await page.getByTestId('audio-button').click()
   expect((await atmosphere(page)).soundGain).toBeCloseTo(0.4)
   await page.evaluate(() => window.__tt!.setSpeed(10))
   await page.evaluate(() => window.__tt!.play())
@@ -127,6 +151,15 @@ test('sound is on by default at 40% and follows the shared volume; effects play 
   const landed = a.sound.recent.filter((s) => s.kind === 'landed').length
   expect(landed).toBeLessThanOrEqual(Math.ceil(seconds / 2.5) + 1)
   expect(a.sound.played - before).toBeLessThanOrEqual(Math.ceil(seconds / 2.5) + 3)
+})
+
+test('leaving restores the sound on the main menu', async ({ page }) => {
+  await open(page, TRACER, '2026-10-26T13:00:00.000Z')
+  expect((await atmosphere(page)).soundGain).toBe(0)
+  await page.locator('.back-btn').click()
+  await page.waitForURL((url) => url.pathname === '/')
+  const stored = await page.evaluate(() => JSON.parse(window.localStorage.getItem('shipping-container-sims') ?? '{}').global?.soundMuted)
+  expect(stored).toBe(false)
 })
 
 test('a departure shows a banner that does not block clicks', async ({ page }) => {

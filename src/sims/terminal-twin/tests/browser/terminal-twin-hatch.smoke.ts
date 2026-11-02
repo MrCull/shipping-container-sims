@@ -6,7 +6,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { HatchPanelState } from '../../engine'
 import type {} from '../../dev/devApi' // window.__tt typing
-import { HATCH_THICKNESS_M } from '../../scenario/vesselClasses'
+import { HATCH_THICKNESS_M, VESSEL_CLASSES } from '../../scenario/vesselClasses'
 
 const FIXTURE = 'hatch-cover-cycle'
 const HALF = HATCH_THICKNESS_M / 2
@@ -120,12 +120,18 @@ test('a panel in the laydown is drawn, can be clicked, and is inspected; hatch m
   expect(errors).toEqual([])
 })
 
-test('with hatch covers off no panel is drawn and the hull keeps its baked covers', async ({ page }) => {
+test('with hatch covers off no panel is drawn and the hull has no covers over any bay', async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, 'tracer-1sts-10-boxes')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
   const state = (await page.evaluate(() => window.__tt!.sceneState()))!
   expect(state.hatchPanels).toEqual({})
   expect((await page.evaluate(() => window.__tt!.scene()))!.hatchPanels).toBe(0)
+  // every bay of every vessel is cut open at every LOD (#173): no baked cover, a hole in the deck, a liner in each hold
+  const hulls = Object.entries(state.vesselHulls)
+  expect(hulls.length).toBeGreaterThan(0)
+  for (const [id, hull] of hulls) {
+    expect(hull.openHatchBays, id).toEqual(Array.from({ length: VESSEL_CLASSES[hull.sizeClass].bays }, (_, bay) => bay))
+  }
   expect(errors).toEqual([])
 })

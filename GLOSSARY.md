@@ -176,7 +176,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Truck livery:** a tile of the truck atlas: cab colour, maker wordmark (Volvo, Scania, DAF, MAN, Mercedes-Benz) and chassis colour. The truck's id picks its cab shape and livery.
 - **Follow next truck:** the camera action that selects the next truck to arrive at or after the display time and follows it through the gate and its transfer stall until it leaves (button, `N`, `__tt.followNextTruck()`). Waits while no arrival is known yet.
 - **Asset viewer:** the dev-only page `/sim/terminal-twin?viewer=<asset>` (or `?viewer=yard`), with its API `window.__ttAssets`.
-- **Hull asset:** the generated GLB of a vessel size class (`vessel-ulcv`, …), with nodes `hull`, `hatch_covers`, `lashing_bridges` and `bay_grid`. Its **bay grid** (in the sidecar) is the origin and pitches that put a deck or hold slot exactly where the engine's bay plan does.
+- **Hull asset:** the generated GLB of a vessel size class (`vessel-ulcv`, …), with nodes `hull`, `hatch_covers`, `lashing_bridges` and `bay_grid`. Its **bay grid** (in the sidecar) is the origin and pitches that put a deck or hold slot exactly where the engine's bay plan does. The GLB's baked covers are cut from the drawn hull over its **open bays** (`openHatchBays`): with hatch covers off, every bay at every LOD (#173), so no cover stands over a hold; with them on, the bays with panels.
 - **Vessel livery:** the hull colour, funnel mark and hull-side wordmark of a shipping line, from the **vessel livery atlas** (one tile per line, like the container atlas). The line comes from `VesselConfig.line` or from the vessel name's style ("HMM Tarifa").
 
 ## Dashboard (TT-16)
@@ -241,20 +241,22 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Performance overlay:** the toggleable (key P) readout of FPS, draw calls, triangles, frame CPU time and the quality in force.
 - **Close-up LOD:** the detail level above the box LODs (about 35 m on High): the visible faces of nearby boxes get their markings (box number, door end, plate, wear) as decals from a texture atlas, up to a **face budget** (High 400, Medium 120, Low 48 within 18 m), nearest first, with hysteresis. The plain instanced box underneath is the fallback for every other face.
 - **Exposed faces:** which of a box's six faces can be seen. A stacked yard box loses its underside and every face a neighbouring box touches (the top only when nothing is stacked on it); vessel, truck and spreader boxes show all six. The close-up level spends its face budget on exposed faces turned towards the camera.
-- **Container markings:** the face-by-face description of what is printed on one box (door end with ISO id, weight plate, SUPER HEAVY triangle, CSC plate, laden-only bolt seal; box number and line name on sides and roof; seeded wear), a pure function of the box's data (`describeMarkings`).
+- **Container markings:** the face-by-face description of what is printed on one box (door end with ISO id, weight plate, SUPER HEAVY triangle, CSC plate, laden-only bolt seal; box number and line name on sides, no text on roofs (#170); seeded wear), a pure function of the box's data (`describeMarkings`).
 - **Instance culling:** boxes outside the camera frustum are not written to the instanced meshes.
 - **Static batch:** scenery that never moves, merged into one mesh per material to save draw calls.
 - **Yard index:** the per-block and per-column lookup of yard slots that keeps rehandle queries off a whole-yard scan.
 
 ## Atmosphere (TT-21)
 
-- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On by default in the TTI Algeciras, peak day preset.
+- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On at every run launch (#171); a toggle lasts for that run only.
+- **Sound on entry:** entering Terminal Twin mutes the shared audio store, on every entry; leaving restores the mute from before entry, unless the owner changed it while inside (their latest choice stays).
 - **Night mode:** the cheaper lighting at night: no sun shadow pass, floodlight glow on high masts and emissive equipment lights instead of real lights.
 - **Backdrop:** the distant low-poly scenery: a terminal's own scenery (TTI Algeciras: the Rock of Gibraltar at true scale, hills, North Quay, and the surroundings) when a terminal folder owns the scenario, a generic coastline otherwise.
 - **Surroundings:** the TTI Algeciras scenery beyond the Rock and hills: the Gibraltar and La Línea shore, vessels at anchor, storage tanks, the Isla Verde road and rail with warehouses, and Algeciras town blocks. Five merged `scenery-*` GLBs, one draw call each, inside the `tti-surroundings` group budget.
 - **Group budget:** a cap in `assets/budgets.json` (`groups`) on the summed triangles and draw calls of a named set of assets, checked by `tt:assets:check` beside the per-asset budgets.
 - **Terminal folder:** `terminals/<id>/`, the home of one real terminal's constants, preset presentation and scenery; generic modules reach it through the registry in `terminals/index.ts`.
 - **North Quay:** TTI's 550 m of quay beside the working berths, drawn idle (non-operational).
+- **North land edge:** the terminal's northern limit of land, the North Quay's water face (scene x = -70 m). A 200 m sea channel lies beyond it, so the scenery's Isla Verde road stops there (#172). *Avoid:* "shoreline" for it, since the channel is not the coast.
 - **Cue:** a moment (box landed, vessel horn, scenario complete) that may make a sound or banner when the display clock reaches it.
 - **Master gain:** the single level every Terminal Twin sound is scaled by: the shared volume, or 0 while muted.
 - **Sound mixer:** the pure module (`modules/soundMixer.ts`) that maps the camera and the active sound sources (machine position plus motion state) to *voices* with gains: distance attenuation, at most 12 voices (loudest first). `positionalSound.ts` plays them through Web Audio. *Avoid:* "audio engine".

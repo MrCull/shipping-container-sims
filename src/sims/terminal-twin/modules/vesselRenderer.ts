@@ -17,7 +17,8 @@ import { vesselLine } from '../scenario/vesselNames'
 import { liveryMaterial } from './containerAssets'
 import type { SceneModel, Vec3 } from './sceneModel'
 import { hullMeta, loadHullModel, VESSEL_LIVERY_ATLAS, vesselHullColour, vesselLiveryIndex, type HullModel } from './vesselAssets'
-import { holdLinerOutline, hullHatchOpenings, hullWithOpenHatches } from './hullHatchOpening'
+import { holdLinerOutline, hullHatchOpenings, hullWithOpenHatches, openHatchBays } from './hullHatchOpening'
+import { hatchEnabled } from '../engine'
 import { hullPlacement, type HullMeta } from './vesselHull'
 import { buildRobMesh, type RobMesh } from './robBoxes'
 import type { ColourBy, ColourContext, RobDisplay } from './colourBy'
@@ -37,8 +38,10 @@ export interface VesselHullState {
   assets: 'placeholder' | 'loaded'
   /** LOD drawn (null while the placeholder shows or the vessel is not in the scene). */
   lod: 0 | 1 | 2 | null
-  /** Triangles of the hull drawn at that LOD (null like `lod`). With hatch panels drawn by the twin (TT-R10) the hull has none baked in over their bays, so this is below the sidecar's count for LOD0 and LOD1. */
+  /** Triangles of the hull drawn at that LOD (null like `lod`). Below the sidecar's count wherever covers are cut (`openHatchBays`). */
   triangles: number | null
+  /** Bays whose baked hatch covers are cut from this hull at every LOD (#173): every bay with hatch covers off; with them on, the bays with panels, which the twin draws (TT-R10). Empty = the hull is drawn as the GLB has it. */
+  openHatchBays: number[]
   /** ROB boxes (spec #106) drawn in this vessel's hull: display-only remain-on-board boxes of its ROB bays. */
   robBoxes: number
   /** The ROB boxes are hidden (ROB display `hide`, #168). */
@@ -79,8 +82,10 @@ export class VesselHulls {
   private shared: { dispose(): void }[] = []
   private disposed = false
   private readonly box = new THREE.Box3()
-  /** Per vessel, the bays whose hatch panels the twin draws itself (TT-R10): the hull drawn here has no baked covers over them. */
+  /** Per vessel, the bays whose hatch panels the twin draws itself (TT-R10). */
   private readonly panelBays = new Map<string, Set<number>>()
+  /** Per vessel, the bays whose baked covers are cut from the hull at every LOD (#173, `openHatchBays`). */
+  private readonly openBays = new Map<string, Set<number>>()
 
   constructor(private model: SceneModel) {
     this.group.name = 'vessels'
@@ -91,7 +96,9 @@ export class VesselHulls {
       if (!bays) this.panelBays.set(panel.vesselId, (bays = new Set()))
       bays.add(panel.bay)
     }
+    const hatchCovers = hatchEnabled(model.config)
     for (const v of model.config.vessels) {
+      this.openBays.set(v.id, openHatchBays(hatchCovers, model.vesselSpec(v.id).bays, this.panelBays.get(v.id) ?? new Set()))
       const line = vesselLine(v) ?? null
       const liveryIndex = vesselLiveryIndex(line)
       const entry: VesselEntry = {
@@ -176,7 +183,7 @@ export class VesselHulls {
     const hatchMat = this.track(new THREE.MeshStandardMaterial({ color: '#5b6470', roughness: 0.8 }))
     const hatchGeo = this.track(new THREE.BoxGeometry(BAY_PITCH_M - 1.2, 0.8, spec.rows * ROW_PITCH_M))
     for (let bay = 0; bay < spec.bays; bay++) {
-      if (this.panelBays.get(id)?.has(bay)) continue // drawn as panels (HatchPanels)
+      if (this.openBays.get(id)?.has(bay)) continue // cut open (#173), or drawn as panels (HatchPanels)
       const hatch = new THREE.Mesh(hatchGeo, hatchMat)
       hatch.position.set(slotX(spec, 0, bay), spec.deckHeightM - 0.4, slotZ(spec, (spec.rows - 1) / 2))
       group.add(hatch)
@@ -195,18 +202,18 @@ export class VesselHulls {
     const p = hullPlacement(model.meta, 0)
     hull.position.set(p.x, p.y, p.z)
     const boards = this.nameBoards(e, model.meta)
-    const panelBays = this.panelBays.get(e.id)
+    const open = this.openBays.get(e.id) ?? new Set<number>()
     e.levels = model.lods.map((lodGeometry, i) => {
       let geometry = lodGeometry
-      if (panelBays && i < 2) {
-        // the twin draws this vessel's hatch panels itself: this copy of the hull has no baked covers over their bays, and a hole in the deck
+      if (open.size > 0) {
+        // this copy of the hull has no baked covers over the open bays (#173, and the panels the twin draws, TT-R10), and a hole in the deck
         const attributes = Object.fromEntries(
           Object.entries(lodGeometry.attributes).map(([name, a]) => [name, { array: a.array as ArrayLike<number>, itemSize: a.itemSize }]),
         )
         const index = lodGeometry.getIndex()
-        const open = hullWithOpenHatches(model.meta, i as 0 | 1, { index: index ? (index.array as ArrayLike<number>) : null, attributes }, panelBays)
+        const cut = hullWithOpenHatches(model.meta, i as 0 | 1 | 2, { index: index ? (index.array as ArrayLike<number>) : null, attributes }, open)
         geometry = new THREE.BufferGeometry()
-        for (const [name, array] of Object.entries(open)) geometry.setAttribute(name, new THREE.BufferAttribute(array, lodGeometry.attributes[name].itemSize))
+        for (const [name, array] of Object.entries(cut)) geometry.setAttribute(name, new THREE.BufferAttribute(array, lodGeometry.attributes[name].itemSize))
         geometry.computeBoundingBox()
         geometry.computeBoundingSphere()
         e.disposables.push(geometry)
@@ -226,7 +233,7 @@ export class VesselHulls {
     marker.name = 'bay_grid'
     marker.position.copy(model.bayGrid)
     hull.add(marker)
-    if (panelBays) hull.add(this.holdLiners(model.meta, panelBays))
+    if (open.size > 0) hull.add(this.holdLiners(model.meta, open))
     e.marker = marker
     e.hull = hull
     e.lod = 0
@@ -379,6 +386,7 @@ export class VesselHulls {
         assets: e.hull ? 'loaded' : 'placeholder',
         lod: e.hull && e.root.visible ? e.lod : null,
         triangles: e.hull && e.root.visible ? this.triangles(e) : null,
+        openHatchBays: [...(this.openBays.get(e.id) ?? [])].sort((a, b) => a - b),
         robBoxes: e.rob && !e.rob.mesh.visible ? 0 : e.robBoxes,
         robHidden: e.rob ? !e.rob.mesh.visible : false,
         bayGrid,

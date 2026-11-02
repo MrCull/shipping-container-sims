@@ -11,17 +11,17 @@ Ticket texts for implementers: `scratchpad/tickets-r4.md` (scratchpad of the orc
 | #167 | tt:profile | none | merged in branch (10982ae) | |
 | #168 | ROB switch, popup closes | none | merged in branch | |
 | #169 | Esc order incl. inspector | #168 | merged in branch (36b967a) | |
-| #170 | livery and corrugation at distance, no roof text | none | to do | |
-| #171 | daylight start, mute on entry | none | to do | |
-| #172 | scenery road stops at land edge | none | to do | |
-| #173 | no hatch covers when hatch ops off | none | to do | |
+| #170 | livery and corrugation at distance, no roof text | none | merged in branch (1c82e5e), partly: wordmark at yard overview open, see the issue | |
+| #171 | daylight start, mute on entry | none | merged in branch (40eed57) | |
+| #172 | scenery road stops at land edge | none | merged in branch (1d1216f), partly: from-above screenshot does not show the north end (road and sea plane z-fight) | |
+| #173 | no hatch covers when hatch ops off | none | merged in branch (9bc2f83) | |
 | #174 | no floating box, tier stow sequence | none | merged in branch | |
 | #175 | trucks never stranded at ASC transfer points | none | merged in branch | |
 | #176 | realistic volumes: blockers measured (narrowed by #178) | | merged in branch (a4f3827) | |
-| #179 | worktrees start on the integration branch (#178) | none | in progress | implementer (wave 1) |
-| #180 | workflow docs: ticket files, screenshots, profile first, attribution (#178) | none | to do | |
-| #181 | test:related and tt:golden checks (#178) | none | to do | |
-| #182 | dead worktree cleanup, merge updates handover (#178) | #179 | to do | |
+| #179 | worktrees start on the integration branch (#178) | none | merged in branch (747ec1f) | |
+| #180 | workflow docs: ticket files, committed screenshots, profile first, commit attribution (#178) | none | merged in branch (c5f35ef) | |
+| #181 | test:related and tt:golden checks (#178) | none | merged in branch (90d6ccc) | |
+| #182 | dead worktree cleanup, merge updates handover (#178) | #179 | merged in branch (47de117) | |
 | #183 | engine: no silent yard deadlock, peak day finishes at 0.1 (#178) | none | in progress | implementer (wave 1) |
 | #177 | smoke run and regressions | #170 to #173, #183 | to do | |
 

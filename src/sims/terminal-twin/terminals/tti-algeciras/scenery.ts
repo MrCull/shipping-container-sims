@@ -22,7 +22,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { jaggedRidge, ridge } from '../../modules/backdropGeometry'
 import type { SceneryContext, TerminalScenery } from '../types'
-import { NORTH_QUAY_LENGTH_M, ROCK, SURROUNDINGS, TTI_GROUND } from './constants'
+import { NORTH_QUAY_LENGTH_M, ROCK, SURROUNDINGS, TTI_GROUND, TTI_ROAD_NORTH_END_X } from './constants'
 
 export const TTI_SCENERY: TerminalScenery = {
   kind: 'tti',
@@ -37,6 +37,8 @@ export const TTI_SCENERY: TerminalScenery = {
     landside: 'scenery-landside',
     town: 'scenery-town',
   },
+  // Ticket #172: the road stops at the north land edge; the GLB's baked road runs further north, so it is cut there on load.
+  modelClipX: { landside: TTI_ROAD_NORTH_END_X },
   // The Rock's far foot is ~9.8 km out; at 24 km the fog is still only ~40% there, so it reads as haze, not a sky-coloured void.
   fogFarM: 24000,
   // From the apron, a low pose facing the water (about 12 degrees down): the Rock sits on the horizon, 33 degrees wide, in the frame.
@@ -54,7 +56,12 @@ export const TTI_SCENERY: TerminalScenery = {
     ctx.add('shore', boxes([[-1500, 0, 540, 5800, 6, 400], [-4900, 0, 1000, 2900, 6, 1400]]), ctx.flat('#b9ae8a'), midX + at.shore.x, at.shore.y, at.shore.z)
     ctx.add('anchorage', boxes([[-2900, 0, -900, 245, 12, 42], [-300, 0, 1300, 330, 14, 58], [1500, 0, 1500, 260, 14, 40], [3100, 0, 900, 200, 10, 32]]), ctx.flat('#3a3f46'), midX + at.anchorage.x, at.anchorage.y, at.anchorage.z)
     ctx.add('tanks', boxes([[-100, 0, 0, 220, 20, 90], [100, 0, 0, 120, 20, 90]]), ctx.flat('#d8d8d4'), at.tanks.x, at.tanks.y, at.tanks.z)
-    ctx.add('landside', boxes([[0, 0, -10, 6000, 0.1, 30], [0, 0, 12, 6000, 0.3, 16]]), ctx.flat('#4a4d52'), midX + at.landside.x, at.landside.y, at.landside.z)
+    // the road and its kerb run from the north land edge (ticket #172) to the south end, 3 000 m past the terminal's middle
+    const roadWestX = TTI_ROAD_NORTH_END_X - (midX + at.landside.x)
+    const roadEastX = 3000
+    const roadMidX = (roadWestX + roadEastX) / 2
+    const roadLenM = roadEastX - roadWestX
+    ctx.add('landside', boxes([[roadMidX, 0, -10, roadLenM, 0.1, 30], [roadMidX, 0, 12, roadLenM, 0.3, 16]]), ctx.flat('#4a4d52'), midX + at.landside.x, at.landside.y, at.landside.z)
     ctx.add('town', boxes([[0, 0, 1300, 7000, 25, 2400]]), ctx.flat('#a8a28a'), midX + at.town.x, at.town.y, at.town.z)
     // The ground around the terminal (#147), after the aerial photo: tarmac south, a sea channel then grey ground north, green land and mountains beyond.
     const g = TTI_GROUND
