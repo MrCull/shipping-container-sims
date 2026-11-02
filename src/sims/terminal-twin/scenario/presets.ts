@@ -104,7 +104,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
 /**
  * Moves scale of the TTI presets (#165, #188): a call then carries 2.5 times the moves of scale 0.1 (it was
  * 0.05, then 0.1). 0.25 completes the baseline and the peak day with the yard reserve and the `spread-drops` stall
- * strategy below; the ticket's floor (0.5) and full size (1) are not reached. The sim guide ("Realistic volumes") has the
+ * strategy below; the ticket's floor (0.5) and full size (1) are not reached (rail wait and pad starvation, see the guide). The sim guide ("Realistic volumes") has the
  * measurements and `docs/realistic-volume-reports.md` the reports of each step.
  */
 export const TTI_MOVES_SCALE = 0.25

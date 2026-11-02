@@ -296,3 +296,18 @@ Top waits (longest first):
   HDMU2642697   load       horizontal        75318   16836.6
   HDMU2644093   load       horizontal       105755   14955.0
 ```
+
+## Re-run at 0.25 on engine 0.47.0 (rehandle race fix), and the 0.5 attempt (not committed)
+
+Engine 0.47.0 at 0.25: peak day 5 of 5 vessels, 2,293 moves, 0 violations, event-log hash 1bac62fee786af, 216 s wall; baseline 4 of 4, 1,156 moves, 0 violations, 53 s wall. At 0.1 the peak day completes (916 moves, 5 of 5, 0 violations, 114 s wall on a shared machine).
+
+Scale 0.5 (`TT_SCALE` override in a local edit, not committed), engine 0.46.0 then 0.47.0:
+
+| run | result | wall |
+|---|---|---|
+| peak day, 0.46.0 | failed at 23,732 s, 0 of 5 vessels: `B01-ASC2: box ONEU4452828 is not in B01:05-1-5` (rehandle race, fixed in 0.47.0) | 83 s |
+| peak day, 0.47.0 | stopped `idle` at 89,151 s, 1 of 5 vessels, 1,117 moves, 0 violations: STS105, 106 and 107 `waiting-for-rail` for ever | 162 s |
+| baseline, 0.46.0 | failed `yard.no-progress` in B14 at 80,200 s, 2 of 4 vessels, 1,688 moves | 76 s |
+| baseline, 0.47.0 | failed `yard.no-progress` in B14 at 81,017 s, 2 of 4 vessels, 1,684 moves: all five WTP pads of B14 hold load boxes of packages that are not at the head of their crane | 80 s |
+
+No `tt:profile` report is committed for 0.5: neither run completes. The state dumps behind the root causes are in the sim guide ("Realistic volumes").
