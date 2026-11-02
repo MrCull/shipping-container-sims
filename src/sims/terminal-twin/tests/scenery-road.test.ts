@@ -15,7 +15,7 @@ import { buildBackdrop, sceneryFor } from '../modules/backdrop'
 import { clipMeshToHalfSpace, type HullMeshData } from '../modules/meshClip'
 import type { InfraAssets } from '../modules/infrastructureAssets'
 import { presets } from '../scenario/presets'
-import { TTI_GROUND, TTI_PRESET_NAME, TTI_ROAD_NORTH_END_X } from '../terminals/tti-algeciras/constants'
+import { TTI_GROUND, TTI_PRESET_NAME, TTI_ROAD_NORTH_END_X, TTI_SEA_CHANNEL_Y } from '../terminals/tti-algeciras/constants'
 
 /** Every triangle corner of a mesh's positions, as a flat array (non-indexed or indexed). */
 function xsOf(mesh: HullMeshData): number[] {
@@ -75,6 +75,14 @@ describe('TTI scenery road and the north land edge', () => {
     expect(TTI_ROAD_NORTH_END_X).toBe(-TTI_GROUND.northQuayEdgeM)
     // the engine's access road junction (the terminal road's start) and everything south of it stay on the road
     expect(graph.nodes['ls:AJ'].x).toBeGreaterThan(TTI_ROAD_NORTH_END_X)
+  })
+
+  it('#192: the sea channel plane is not at the 0.04 m height of the road, rails and markings (no z-fight)', () => {
+    const b = buildBackdrop(sceneryFor(TTI_PRESET_NAME), config.quay.lengthM)
+    const sea = b.group.getObjectByName('seaChannel') as THREE.Mesh
+    expect(sea.position.y).toBe(TTI_SEA_CHANNEL_Y)
+    expect(Math.abs(sea.position.y - 0.04)).toBeGreaterThanOrEqual(0.03)
+    b.dispose()
   })
 
   it('stand-in: the road spans from the land edge to the south end, never north of it', () => {
