@@ -6,11 +6,19 @@
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 
+/** Terminal Twin opens muted whatever the shared setting (#171): these specs are about the volume, so they unmute inside. */
+async function unmute(page: Page): Promise<void> {
+  const speaker = page.getByTestId('audio-button')
+  if ((await speaker.getAttribute('aria-pressed')) === 'true') await speaker.click()
+  await expect(speaker).toHaveAttribute('aria-pressed', 'false')
+}
+
 async function open(page: Page): Promise<void> {
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
   await page.evaluate(() => window.__tt!.load('tracer-1sts-10-boxes'))
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 3)
+  await unmute(page)
 }
 
 async function setVolume(page: Page, percent: number): Promise<void> {
@@ -57,6 +65,9 @@ test('volume and mute drive Terminal Twin playback level, and survive a reload a
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
   await page.evaluate(() => window.__tt!.load('tracer-1sts-10-boxes'))
+  // entering Terminal Twin muted the shared sound (#171); unmuting inside keeps the 20% volume
+  await expect(page.getByTestId('audio-button')).toHaveAttribute('aria-pressed', 'true')
+  await unmute(page)
   expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBeCloseTo(0.2)
 })
 

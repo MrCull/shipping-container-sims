@@ -121,6 +121,8 @@ test('the setup dialog end conditions stop the run at the first one met', async 
   await page.locator('input[name="end-moves"]').fill('3')
   await page.locator('input[name="end-hours"]').fill('10')
   await page.getByRole('button', { name: 'Start' }).click()
+  // the run starts at its own speed once the dialog is gone: set the speed after that, or the start resets it
+  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.evaluate(() => window.__tt!.setSpeed(600))
   await page.waitForFunction(() => window.__tt!.report().ended, undefined, { timeout: 30_000 })
   await expect(page.getByTestId('tt-report-reason')).toContainText('Reached 3 container moves')

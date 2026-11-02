@@ -52,14 +52,16 @@ test('vessel status: a mooring vessel counts down to 08:30 and a vessel at ancho
   await expect.poll(async () => (await labels(page)).map((l) => `${l.id}:${l.phase}`)).toEqual(['V001:mooring', 'V002:mooring', 'V003:waiting'])
   await page.screenshot({ path: '.screenshots/vessel-status.png' })
 
-  // berthed at 08:30 (1,800 s) with no move yet: the label stays and says so (#141)
+  // berthed at 08:30 (1,800 s): the crane starts its first discharge move at the berth time itself (STS102 at 1,800 s on this call),
+  // so there is no berthed-and-waiting stretch here (the 'Berthed, starting soon' phase is covered by
+  // vessel-status.test.ts); at once the popup says Working and the label is gone
   await page.evaluate(() => window.__tt!.runTo(1801))
   await page.evaluate(() => window.__tt!.pause())
   await select(page, 'V001')
-  await expect(page.getByTestId('tt-vessel-phase')).toHaveText('Berthed, starting soon')
-  await expect.poll(async () => (await labels(page)).map((l) => `${l.id}:${l.phase}`)).toContain('V001:berthed')
+  await expect(page.getByTestId('tt-vessel-phase')).toHaveText('Working')
+  await expect.poll(async () => (await labels(page)).map((l) => l.id)).not.toContain('V001')
 
-  // from the first move on the label disappears and the popup says Working
+  // and it stays so
   await page.evaluate(() => window.__tt!.runTo(2400))
   await page.evaluate(() => window.__tt!.pause())
   await select(page, 'V001')

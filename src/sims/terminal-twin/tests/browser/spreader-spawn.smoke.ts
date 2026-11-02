@@ -19,7 +19,8 @@ test('ASC and SHC spreaders are 20 ft long for a 20 ft box and 40 ft long for a 
   test.slow()
   await open(page, 'asc-1sts-10-boxes-1block') // 20 ft and 40 ft boxes mixed, STS to SHC to WTP pad to ASC
   await page.waitForFunction(() => window.__tt!.scene()?.ascAssets === 'loaded' && window.__tt!.scene()?.shcAssets === 'loaded')
-  await page.evaluate(() => window.__tt!.setSpeed(10))
+  // The first picks are 40s and the pair of 20s comes at about 735 s: run past it (x30, 40 s wall)
+  await page.evaluate(() => window.__tt!.setSpeed(30))
   const samples = await page.evaluate(async () => {
     const tt = window.__tt!
     const sizes = Object.fromEntries(((await tt.query('containers')) as { id: string; size: string }[]).map((c) => [c.id, c.size]))

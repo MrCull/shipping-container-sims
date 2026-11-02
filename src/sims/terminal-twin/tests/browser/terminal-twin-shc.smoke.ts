@@ -114,9 +114,9 @@ test('SHCs animate smoothly at ×1 and keep animating every frame at ×600', asy
 test('lane-graph and reservation overlays toggle on and off', async ({ page }) => {
   const errors = collectErrors(page)
   await openShc(page)
-  // 15 s into SHC01's first trip, paused: it holds reservations on the zones ahead of it.
+  // 45 s into SHC01's first trip (reservations show from about 30 s on this fixture), paused: it holds reservations on the zones ahead of it.
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingEmpty' }))
-  await page.evaluate(() => window.__tt!.runTo(window.__tt!.clock().displayTime + 15))
+  await page.evaluate(() => window.__tt!.runTo(window.__tt!.clock().displayTime + 45))
   await page.evaluate(() => window.__tt!.pause())
   const lanes = page.getByRole('button', { name: 'Lane graph' })
   const reservations = page.getByRole('button', { name: 'Reservations' })

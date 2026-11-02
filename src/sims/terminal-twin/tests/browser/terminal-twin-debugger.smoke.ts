@@ -152,14 +152,15 @@ test('Esc closes one thing per press, in order, the inspector included; it never
   const clockNow = () => page.evaluate(() => window.__tt!.clock())
   const before = await clockNow()
 
-  // Open in turn: a selection (its inspector comes with it), Colour by and Run to (opened by a click, so focus stays on
-  // their buttons, outside the popups), shortcut help, and the dashboard (B).
+  // Open in turn: a selection (its inspector comes with it), Run to and Colour by (opened by a click, so focus stays on
+  // their buttons, outside the popups; Run to first, because a pointer-down outside the Colour by panel closes it, #168),
+  // shortcut help, and the dashboard (B).
   await page.evaluate(() => window.__tt!.select('SHC01'))
   await expect.poll(async () => (await ui()).inspectorOpen).toBe(true)
-  await page.getByTestId('tt-colour-by').click()
-  await expect(page.getByTestId('tt-colour-by-panel')).toBeVisible()
   await page.getByRole('button', { name: 'Run to…' }).click()
   await expect(page.getByLabel('Target sim time')).toBeVisible()
+  await page.getByTestId('tt-colour-by').click()
+  await expect(page.getByTestId('tt-colour-by-panel')).toBeVisible()
   await page.keyboard.press('?')
   await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible()
   await page.keyboard.press('b')

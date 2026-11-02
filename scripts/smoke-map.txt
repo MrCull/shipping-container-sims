@@ -25,3 +25,6 @@ skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => ter
 (^|/)(vesselStatus|vesselCountdownLabels|InspectorPanel)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-vessel-status bay-viewer
 (^|/)(HomePage\.vue|buildStamp\.ts|vite\.config\.ts)$ => build-stamp
 (^|/)(useMenuMusic|AudioControls|audio|HomePage)(\.test)?\.(ts|vue)$ => menu-music-volume
+(^|/)(escape|useTwinShortcuts|shortcuts)\.ts$ => terminal-twin-debugger terminal-twin-display terminal-twin-follow-truck terminal-twin-volume-fps
+(^|/)(meshClip|hullHatchOpening|backdrop)\.ts$ => vessel-hulls terminal-twin-hatch container-closeup terminal-twin-atmosphere
+(^|/)twinStore\.ts$ => terminal-twin-atmosphere terminal-twin-volume-fps colour-by terminal-twin-debugger
