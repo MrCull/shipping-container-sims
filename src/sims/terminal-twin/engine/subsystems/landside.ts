@@ -146,18 +146,38 @@ export function hasEligiblePickup(state: SimState, full: boolean): boolean {
   return scanPickups(state, full, () => true)
 }
 
+/** The slot's box when a truck may collect it now (dwell elapsed, unclaimed, in this very slot), else null. */
+function pickupBox(state: SimState, slot: SimState['yardSlots'][string]): ContainerState | null {
+  if (!slot.containerId) return null
+  const box = state.containers[slot.containerId]
+  if (box.pickupReadyAt === undefined || box.pickupReadyAt > state.now) return null
+  if (box.truckClaim !== undefined || box.allocatedTo !== undefined) return null
+  if (box.custody.kind !== 'yardSlot' || box.custody.id !== slot.id) return null
+  return box
+}
+
 /** Visits the eligible boxes in slot order until `visit` returns true (then true). */
 function scanPickups(state: SimState, full: boolean, visit: (box: ContainerState) => boolean): boolean {
-  for (const slot of Object.values(state.yardSlots)) {
-    if (!slot.containerId) continue
-    const box = state.containers[slot.containerId]
-    if (box.full !== full) continue
-    if (box.pickupReadyAt === undefined || box.pickupReadyAt > state.now) continue
-    if (box.truckClaim !== undefined || box.allocatedTo !== undefined) continue
-    if (box.custody.kind !== 'yardSlot' || box.custody.id !== slot.id) continue
-    if (visit(box)) return true
+  // for-in keeps Object.values' order without allocating an array of every yard slot per call
+  for (const key in state.yardSlots) {
+    const box = pickupBox(state, state.yardSlots[key])
+    if (box && box.full === full && visit(box)) return true
   }
   return false
+}
+
+/** `hasEligiblePickup` for imports and empties in one pass over the yard (stops once both are found). */
+export function hasEligiblePickups(state: SimState): { imports: boolean; empties: boolean } {
+  let imports = false
+  let empties = false
+  for (const key in state.yardSlots) {
+    const box = pickupBox(state, state.yardSlots[key])
+    if (!box) continue
+    if (box.full) imports = true
+    else empties = true
+    if (imports && empties) break
+  }
+  return { imports, empties }
 }
 
 /** An empty or warm-up yard start (TT-14): the boxes booked to the vessels are delivered by trucks. */
@@ -270,8 +290,7 @@ interface Plan {
 function feasibleKinds(ctx: EngineContext): Record<TruckTransactionKind, boolean> {
   const { state } = ctx
   const exports = exportVessels(ctx).length > 0
-  const imports = hasEligiblePickup(state, true)
-  const empties = hasEligiblePickup(state, false)
+  const { imports, empties } = hasEligiblePickups(state)
   return { dropExport: exports, pickImport: imports, dropEmpty: true, pickEmpty: empties, dual: exports && imports }
 }
 
