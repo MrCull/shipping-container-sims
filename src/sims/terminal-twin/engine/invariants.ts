@@ -704,6 +704,8 @@ export const INVARIANTS: Invariant[] = [
     scoped: true,
     check(state, _config, scope) {
       const messages: string[] = []
+      // nothing on a vessel the event did not touch is checked: skip the scan of every slot
+      if (scope && scope.vessels.size === 0) return messages
       const filled = new Map<string, ('aft' | 'fore' | null)[]>()
       const loads = []
       const boxes = []
@@ -743,6 +745,8 @@ export const INVARIANTS: Invariant[] = [
     scoped: true,
     check(state, _config, scope) {
       const messages: string[] = []
+      // nothing on a vessel the event did not touch is checked: skip the scan of every slot
+      if (scope && scope.vessels.size === 0) return messages
       const occupied = new Map<string, ('aft' | 'fore' | null)[]>()
       const onBoard: { label: string; vesselId: string; bay: number; row: number; tier: number; half: 'aft' | 'fore' | null }[] = []
       for (const s of Object.values(state.vesselSlots)) {
@@ -779,6 +783,8 @@ export const INVARIANTS: Invariant[] = [
     scoped: true,
     check(state, _config, scope) {
       const messages: string[] = []
+      // nothing on a vessel the event did not touch is checked: skip the scan of every slot
+      if (scope && scope.vessels.size === 0) return messages
       for (const s of Object.values(state.vesselSlots)) {
         if (!s.containerId) continue
         if (scope && !scope.vessels.has(s.vesselId)) continue
