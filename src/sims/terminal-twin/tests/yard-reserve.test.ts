@@ -1,5 +1,5 @@
 /**
- * #184 yard reserve: a share of every block's stacks is kept free of pre-fill, discharge and drop placement so
+ * #184 yard reserve: a share of every block's stacks is kept free of pre-fill and discharge placement so
  * rehandles always have somewhere to go. Headless engine API plus the `yardReserve` scenario field.
  */
 import { describe, expect, it } from 'vitest'

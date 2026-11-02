@@ -94,7 +94,7 @@ export interface YardConfig {
   ascsPerBlock?: 1 | 2
   /**
    * Yard reserve (#184): the share (0 to `MAX_YARD_RESERVE`, default 0) of every block's stacks kept free of
-   * pre-fill, discharge and truck-drop placement, so rehandles always have somewhere to go. Only rehandles may use
+   * pre-fill and discharge placement, so rehandles always have somewhere to go. Only rehandles may use
    * a reserved stack (once they do, it holds boxes like any other). 0 = no reserve, every log unchanged.
    */
   reserveShare?: number

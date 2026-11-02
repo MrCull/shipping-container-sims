@@ -50,7 +50,7 @@ import type {
   TruckState,
   TruckStatus,
 } from '../state'
-import { blockSpecs, candidateSlots, parseYardSlotId, reeferFields, reserveFields } from '../yardLayout'
+import { blockSpecs, candidateSlots, parseYardSlotId, reeferFields } from '../yardLayout'
 import { stackSpansOf } from '../yardIndex'
 import { withoutPendingPickups } from './ascStorage'
 import { kpiClockOf, HOUR_S } from '../kpi/clock'
@@ -671,7 +671,6 @@ function blockTakes(ctx: EngineContext, blockId: string, box: ContainerState): b
       topVessels: yard.topVessels.slice(),
       stackSpans: stackSpansOf(state, blockId),
       ...reeferFields(spec, box.reefer),
-      ...reserveFields(spec),
     }).length > 0
   )
 }
