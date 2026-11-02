@@ -54,7 +54,7 @@ describe.each(BIG)('yard mix: %s', (name) => {
     }
     const big = [...blocksOf].filter(([key]) => (count.get(key) as number) >= 100)
     expect(big.length).toBeGreaterThan(0)
-    for (const [, blocks] of big) expect(blocks.size).toBeLessThanOrEqual(8)
+    for (const [, blocks] of big) expect(blocks.size).toBeLessThanOrEqual(10) // #207: 8 before the exports and groups were spread over the blocks (of 16)
   })
 })
 

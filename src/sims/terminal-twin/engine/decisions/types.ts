@@ -110,6 +110,14 @@ export interface WtpPadSelectionRequest {
   z: number
   /** Every pad, in list order, with its occupancy and claim at the time of the request. */
   wtpPads: ShcDispatchPad[]
+  /** #207: each block's load at the time of the request (the `balanced` strategy reads it). */
+  blockLoad?: Record<string, BlockLoad>
+}
+
+/** A block's load for pad selection: share of its cells in use (0 to 1) and its ASC jobs not yet done (stack, retrieve and rehandle). */
+export interface BlockLoad {
+  fill: number
+  queued: number
 }
 
 export interface WtpPadSelectionReply {
