@@ -74,4 +74,15 @@ describe('golden updates', () => {
     expect(cli('--dir', dir).exitCode).toBe(0)
     expect(cli('--fixture', 'nope').exitCode).toBe(2)
   }, 60000)
+
+  it('a literal "--" before the flags is ignored, so `pnpm run tt:golden -- --update` updates like `--update`', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tt-golden-'))
+    const file = join(dir, `${NAME}.golden.json`)
+    const withSeparator = cli('--', '--dir', dir, '--update', '--fixture', NAME)
+    expect(withSeparator.exitCode).toBe(0)
+    expect(withSeparator.text).toContain(`${NAME}: created`)
+    expect(withSeparator.text).not.toContain('Usage:')
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(summary())
+    expect(cli('--', '--dir', dir, '--fixture', NAME).exitCode).toBe(0)
+  }, 60000)
 })

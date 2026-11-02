@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /**
- * Colour by menu (#130, spec #116): a button in the overlay bar that opens a panel with the mode dropdown, the legend
- * of the mode and the Hide ROB checkbox. The mode colours the containers in 3D and the bay viewer; Hide ROB hides the
- * remain-on-board boxes on the vessels in 3D and in the bay viewer (#159). Colours and keys come from `modules/colourBy.ts`.
+ * Colour by menu (#130, spec #116): a button in the overlay bar that opens a panel with the mode dropdown and the legend
+ * of the mode. The mode colours the containers in 3D and the bay viewer. The remain-on-board boxes have their own
+ * control (the ROB display in the top bar, #168). The panel closes when a mode is picked and on a pointer-down outside
+ * it (#168). Colours and keys come from `modules/colourBy.ts`.
  */
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import TtIcon from './ui/TtIcon.vue'
 import { useTwinStore } from '../store/twinStore'
 import { t, type MessageKey } from '../i18n/messages'
@@ -12,7 +13,9 @@ import { COLOUR_BY_MODES, colourContextOf, legendOf, type ColourBy } from '../mo
 import { colourKeyLabel } from '../modules/colourLabels'
 
 const store = useTwinStore()
-const open = ref(false)
+/** The open state lives in the store: the shared Esc handling (#169) closes the panel from anywhere. */
+const open = computed(() => store.colourByOpen)
+const root = ref<HTMLElement | null>(null)
 
 const legend = computed(() => {
   const config = store.config
@@ -21,13 +24,23 @@ const legend = computed(() => {
 
 function onSelect(e: Event): void {
   store.setColourBy((e.target as HTMLSelectElement).value as ColourBy)
+  store.setColourByOpen(false)
 }
+
+/** A pointer-down anywhere outside the menu (its button and panel) closes the panel. Capture, so a canvas stopping the event still closes it. */
+function onPointerDown(e: PointerEvent): void {
+  if (open.value && root.value && !root.value.contains(e.target as Node)) store.setColourByOpen(false)
+}
+
+onMounted(() => document.addEventListener('pointerdown', onPointerDown, true))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onPointerDown, true))
 </script>
 
 <template>
   <div
+    ref="root"
     class="colour-by"
-    @keydown.esc.stop="open = false"
+    data-tt-popup
   >
     <button
       type="button"
@@ -37,7 +50,7 @@ function onSelect(e: Event): void {
       aria-haspopup="true"
       data-testid="tt-colour-by"
       :title="t('colourBy.hint')"
-      @click="open = !open"
+      @click="store.setColourByOpen(!open)"
     >
       <TtIcon name="layers" />
       {{ t('colourBy.label') }}
@@ -86,18 +99,6 @@ function onSelect(e: Event): void {
           <span>{{ colourKeyLabel(store.colourBy, e.key) }}</span>
         </li>
       </ul>
-      <label
-        class="row check"
-        :title="t('colourBy.hideRobHint')"
-      >
-        <input
-          type="checkbox"
-          data-testid="tt-hide-rob"
-          :checked="store.hideRob"
-          @change="store.setHideRob(($event.target as HTMLInputElement).checked)"
-        >
-        <span>{{ t('colourBy.hideRob') }}</span>
-      </label>
     </div>
   </div>
 </template>
@@ -154,12 +155,6 @@ function onSelect(e: Event): void {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-}
-
-.row.check {
-  flex-direction: row;
-  align-items: center;
-  gap: 0.4rem;
 }
 
 .label {

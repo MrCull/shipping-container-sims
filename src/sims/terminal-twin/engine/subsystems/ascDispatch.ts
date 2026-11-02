@@ -30,6 +30,8 @@ export function startJob(ctx: EngineContext, asc: AscState, job: AscJob, plan: J
 
   job.ascId = asc.id
   asc.jobId = job.id
+  const yardBlock = state.yardBlocks[job.blockId]
+  if (yardBlock) yardBlock.progressAt = state.now
   if (job.kind === 'retrieve' && !isTruckJob(job)) state.wtpPads[job.wtpPadId].claimedBy = asc.id
   if (job.kind === 'retrieve' || job.kind === 'rehandle') lockStack(state, job)
   state.reservations = truncateParkHolds(state.reservations, asc.id, start)

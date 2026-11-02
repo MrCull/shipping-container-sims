@@ -24,6 +24,10 @@ async function open(page: Page): Promise<void> {
   await page.waitForFunction(() => !!window.__tt)
   await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 3)
+  // Terminal Twin opens muted (#171); the alarm voices only exist once the sound is on
+  const speaker = page.getByTestId('audio-button')
+  if ((await speaker.getAttribute('aria-pressed')) === 'true') await speaker.click()
+  await expect(speaker).toHaveAttribute('aria-pressed', 'false')
 }
 
 /** Play until a crane is gantrying (the sim clock runs, so the display time reaches a gantry segment). */

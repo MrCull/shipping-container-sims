@@ -21,6 +21,7 @@ Before handing work back after code changes, run **`pnpm run verify`** (dependen
 - **Cloud sessions:** a SessionStart hook (`.claude/hooks/session-start.sh`) runs `pnpm install`; it does nothing locally.
 - **Visual checks:** `pnpm run screenshot --path /sim/<sim-id> --wait 8000` saves a PNG to `.screenshots/` and reports page errors (headless Chromium, software WebGL, so no real frame rates). Options: header of `scripts/screenshot.mjs`.
 - **README media:** `pnpm run capture-readme-media` (after `pnpm run build && pnpm run preview`).
+- **Implementer worktrees:** the brief's first step is `scripts/worktree-base.sh <integration-branch>`, which puts the worktree on the integration tip or refuses with a one-line reason (`scripts/test-worktree-base.sh` tests it). Workflow: `docs/agents/implementing.md`. `scripts/merge-ticket.sh` sets the ticket's `handover.md` row after a green merge (`scripts/test-merge-ticket.sh`); `scripts/remove-worktree.sh` removes a finished agent's worktree, locked or not, and refuses one in use (`scripts/test-remove-worktree.sh`).
 
 ## Project structure
 
@@ -62,6 +63,7 @@ Each sim that has grown beyond a trivial prototype maintains its own agent guide
 - **Composition API only**: Always use `<script setup lang="ts">`. No Options API.
 - **Scoped styles**: Use `<style scoped>` in all components.
 - **CSS variables**: Use the design tokens defined in `src/assets/main.css` (e.g. `--color-primary`).
+- **Commit trailers**: a commit message's only trailer is the session link, `Claude-Session: <session link>`. No model name in commits, code or docs, and no `Co-Authored-By` line.
 - **No em dash**: never write the em dash character (U+2014) in any text (code, strings, comments, docs, commits, issues, PR bodies); use a comma, colon, full stop, brackets or "to". `scripts/check-no-em-dash.mjs` (part of `verify` and CI) fails on it.
 - **Master volume**: the shared audio control (`src/components/AudioControls.vue`) sets one volume and mute in `src/stores/audio.ts`; `masterGain` is the volume, or 0 when muted. Every sound plays at its own gain times the master gain: `gainFor(soundGain)` for a one-shot sound or a Web Audio gain node, `followMasterGain(element, soundGain)` for an element that keeps playing (music, narration), so the slider changes it live. A new sim sound goes through one of these, never a fixed `volume`. Smoke: `src/tests/browser/menu-music-volume.smoke.ts`.
 - **Build stamp**: the main menu footer (`src/pages/HomePage.vue` only, never a sim) shows the build time and short commit hash. `vite.config.ts` injects `__BUILD_TIME__` and `__BUILD_COMMIT__` via `define` (commit from `git rev-parse`, else `GITHUB_SHA`, else empty so the stamp shows time only); `src/utils/buildStamp.ts` formats it, and the dev server shows "dev".

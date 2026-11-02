@@ -392,7 +392,7 @@ describe('yard KPIs, modes, determinism', () => {
     for (const t of types(real)) if (t.startsWith('Asc')) expect(types(instant).has(t), t).toBe(true)
   })
 
-  it('a full block is skipped at allocation: the box stays on its pad and no allocation failure is counted', () => {
+  it('a full block is skipped at allocation: the boxes with no room wait on the quay, no pad is taken, no allocation failure is counted', () => {
     const cfg = clone(fixture)
     cfg.yard!.blocks[0].bays = 1
     cfg.yard!.blocks[0].tiers = 1
@@ -402,6 +402,15 @@ describe('yard KPIs, modes, determinism', () => {
     expect(sim.query.yardSlots()).toHaveLength(8)
     // the block-room filter (#165) drops a full block before allocation, so nothing reaches the failure path
     expect(sim.kpiReport().yard!.allocationFailures).toBe(0)
+    // intent: a full block never deadlocks the run. The two boxes with no room wait on the quay (their SHCs skip the
+    // pads of a full block, #165), every ASC is idle at the end and no ASC job is left open, so nothing waits on work that
+    // can never come; the discharge itself is complete (no box left on the vessel)
+    expect(sim.query.containers().filter((c) => c.custody.kind === 'groundPosition')).toHaveLength(2)
+    expect(sim.query.containers().filter((c) => c.custody.kind === 'wtpPad')).toHaveLength(0)
+    const state = sim.snapshot().state
+    expect(Object.values(state.ascs).every((a) => a.status === 'idle')).toBe(true)
+    expect(Object.keys(state.ascJobs)).toEqual([])
+    expect(Object.values(state.vesselSlots).filter((s) => s.containerId !== null)).toHaveLength(0)
     expect(sim.invariantReport().violations).toEqual([])
   })
 

@@ -363,6 +363,11 @@ export interface YardBlockState {
   heights: number[]
   /** Vessel of each stack's top box (null if empty). */
   topVessels: (string | null)[]
+  /**
+   * TT-183: sim time an ASC of the block last started a job (null before the first). `yard.no-progress` measures how long
+   * the block has gone without one while it holds claimed work.
+   */
+  progressAt?: number | null
 }
 
 /** A box in the stack. The id is its anchor cell; a 40 ft box also covers the next bay. */
@@ -485,6 +490,12 @@ export interface HoldingPositionState {
 }
 
 export interface LandsideState {
+  /**
+   * TT-183: sim time of the last truck that left through each outbound lane (absent before the first). An exit-slot wait counts
+   * as stranded only when its own lane has not moved for the stall limit: a queue on a lane that keeps moving is congestion,
+   * not a block, while a blocked slot is reported although trucks leave by other lanes.
+   */
+  lastDepartureByLane?: Record<string, number>
   /** Own RNG stream (arrivals, transactions, boxes, dwell): the landside never disturbs the other subsystems' draws. */
   rngState: number
   nextTruck: number
@@ -614,6 +625,11 @@ export interface StsState {
   railTargetX: number | null
   /** A second gantry position the waiting move needs as well (a hatch move visiting the laydown, TT-R09). */
   railAlsoX?: number | null
+  /**
+   * The crane is repositioning out of the way of a waiting neighbour while it still holds vessel work (#174, the bounded
+   * yield in `engine/subsystems/rail.ts`). It resumes that work when the reposition completes. Absent = false.
+   */
+  railYield?: boolean
   /** Boxes on the spreader (two for a twin-20 lift), aft first. */
   carrying: string[]
   /** Ground positions chosen for the carried boxes, in set-down order. */

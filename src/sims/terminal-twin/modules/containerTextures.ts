@@ -4,7 +4,7 @@
  * a roughness map (wear). Needs a DOM canvas, so it is exercised by the browser smoke specs, not Vitest.
  *
  * Faces are painted in metres (the canvas context is scaled per region), so print sizes are real: the box number is
- * about 0.25 m high, the plate text about 0.07 m.
+ * about 0.25 m high, the plate text about 0.07 m. Roofs get dust and wear only, no text (#170).
  */
 import * as THREE from 'three'
 import type { ContainerSize } from '../scenario/types'
@@ -110,7 +110,7 @@ function drawWear(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: numb
 /** Paints one box. `bodyColour` is the livery body colour. */
 export function paintContainer(ctx: CanvasRenderingContext2D, markings: ContainerMarkings, size: ContainerSize, bodyColour: string): void {
   const { length: L, height: H, width: W } = DIMS[size]
-  const { door, side, roof, wear } = markings
+  const { door, side, wear } = markings
   const paint = mix(bodyColour, '#d8d4c8', wear.fade * 0.4)
   const ink = side.lineColour
   ctx.fillStyle = paint
@@ -131,9 +131,8 @@ export function paintContainer(ctx: CanvasRenderingContext2D, markings: Containe
     ctx.fillRect(0, H - 0.12, L, 0.12)
   })
   inRegion(ctx, TEXTURE_LAYOUT.roof, L, W, () => {
-    ctx.fillStyle = 'rgba(70,70,60,0.18)' // dust and grime
+    ctx.fillStyle = 'rgba(70,70,60,0.18)' // dust and grime; a roof prints nothing (#170)
     ctx.fillRect(0, 0, L, W)
-    text(ctx, roof.boxNumber, L * 0.5, W * 0.5, W * 0.4, ink, '700', 'center')
   })
 
   // Door end, seen from behind the box: left leaf x in 0..W/2, right leaf W/2..W (y down from the top).

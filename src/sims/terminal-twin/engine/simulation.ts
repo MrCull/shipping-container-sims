@@ -9,7 +9,7 @@ import { heapPop, heapPush } from './eventQueue'
 import type { EngineEvent, EventOf, EventPayloads, EventSubjects, EventType } from './events'
 import type { HandlerSet } from './handlers'
 import { hashDigest, hashUpdate } from './hash'
-import { DEFAULT_SWEEP_EVERY, InvariantTracker, type InvariantViolation } from './invariants'
+import { DEFAULT_SWEEP_EVERY, InvariantTracker, type InvariantViolation, invariantDeadline } from './invariants'
 import { buildKpiReport, type KpiReport } from './kpis'
 import { kpiClockOf } from './kpi/clock'
 import { createKpiCollector, type KpiSeriesReport } from './kpi/collector'
@@ -34,7 +34,7 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.33.0'
+export const ENGINE_VERSION = '0.36.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
@@ -424,9 +424,22 @@ export function createSimulation(
     if (decisions.waiting()) return null
     const next = state.queue[0]
     const duration = durationEnd()
+    // TT-183: a time-based invariant (a truck's stall or exit-slot wait, an idle yard deadlock) that reaches its limit before
+    // the next event, or before the run ends, is checked at that time: no event may fall inside the wait to report it
+    const horizon = Math.min(next ? next.t : Infinity, duration ?? Infinity)
+    const deadline = invariantsEnabled && log.length > 0 ? invariantDeadline(state, config, horizon, !next) : null
+    if (deadline !== null) {
+      state.now = deadline
+      if (checkInvariants(log[log.length - 1], true, false)) return log[log.length - 1]
+    }
     if (duration !== undefined && (!next || next.t > duration)) {
-      // the run's last event is always swept, even when the run ends on its duration instead of on an event
-      if (invariantsEnabled && sinceSweep > 0 && log.length > 0 && checkInvariants(log[log.length - 1], true, false)) return log[log.length - 1]
+      // the run's last event is always swept, even when the run ends on its duration instead of on an event. The clock
+      // moves to the end first, so a time-based invariant sees the time that passed after the last event (TT-175: a truck
+      // silent at its stall until the end, `landside.stranded-truck`)
+      if (invariantsEnabled && log.length > 0 && (sinceSweep > 0 || state.now < duration)) {
+        state.now = Math.max(state.now, duration)
+        if (checkInvariants(log[log.length - 1], true, false)) return log[log.length - 1]
+      }
       endScenario(`simDurationS >= ${config.endConditions.simDurationS}`, Math.max(state.now, duration), null)
       return log[log.length - 1]
     }

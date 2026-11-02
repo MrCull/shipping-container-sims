@@ -24,7 +24,7 @@ import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../m
 import { createLocationNotation } from '../modules/locationNotation'
 import { defaultBay, type BayPlan, type BayViewData } from '../modules/bayView'
 import { bayViewDataAt } from '../modules/bayViewScene'
-import { loadColourBySettings, saveColourBySettings, type ColourBy } from '../modules/colourBySettings'
+import { loadColourBySettings, saveColourBySettings, type ColourBy, type RobDisplay } from '../modules/colourBySettings'
 import { describeEntity, entityKind, entityQueryKind, transitWorldOf, type EntityExtras, type EntityView } from '../modules/entityInspector'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
 import { describeEvent, type EventDescription } from '../modules/eventInspector'
@@ -45,7 +45,6 @@ import { SoundPlayer } from '../modules/soundPlayer'
 import { PositionalSound } from '../modules/positionalSound'
 import type { AtmosphereState } from '../modules/atmosphereRig'
 import type { BackdropKind } from '../modules/backdrop'
-import { daylightLockDefault } from '../modules/atmosphere'
 
 export type TwinPhase = 'setup' | 'running'
 export type DashboardTab = 'charts' | 'report'
@@ -289,19 +288,32 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayViewerBay.value = bay
   }
 
-  /** Colour by (#130): one mode for the 3D boxes and the bay viewer, and Hide ROB for the vessels in 3D; both remembered (a per-viewer convenience). */
+  /** Colour by (#130): one mode for the 3D boxes and the bay viewer; the ROB display (#168, show, grey or hide) for the remain-on-board boxes in both. Both remembered (a per-viewer convenience). */
   const colourBySettings = loadColourBySettings(browserStorage())
   const colourBy = ref<ColourBy>(colourBySettings.mode)
-  const hideRob = ref(colourBySettings.hideRob)
+  const robDisplay = ref<RobDisplay>(colourBySettings.robDisplay)
 
   function setColourBy(mode: ColourBy): void {
     colourBy.value = mode
-    saveColourBySettings(browserStorage(), { mode, hideRob: hideRob.value })
+    saveColourBySettings(browserStorage(), { mode, robDisplay: robDisplay.value })
   }
 
-  function setHideRob(hide: boolean): void {
-    hideRob.value = hide
-    saveColourBySettings(browserStorage(), { mode: colourBy.value, hideRob: hide })
+  function setRobDisplay(display: RobDisplay): void {
+    robDisplay.value = display
+    saveColourBySettings(browserStorage(), { mode: colourBy.value, robDisplay: display })
+  }
+
+  /** The Colour by popup is open (#169: the shared Esc closes it, so its state lives here). */
+  const colourByOpen = ref(false)
+  /** The Run to popup is open (#169: the shared Esc closes it, so its state lives here). */
+  const runToOpen = ref(false)
+
+  function setColourByOpen(open: boolean): void {
+    colourByOpen.value = open
+  }
+
+  function setRunToOpen(open: boolean): void {
+    runToOpen.value = open
   }
 
   /** Sound effects (TT-21): one master gain, the shared volume and mute (`stores/audio.ts`), scales all playback. */
@@ -316,8 +328,12 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       positional.applyGain()
     },
   )
-  /** Keep the sun daylight all day (default on for the TTI Algeciras, peak day preset). */
-  const lockDaylight = ref(false)
+  /** Keep the sun daylight all day. On at every run launch (#171); a toggle lasts for that run only. */
+  const lockDaylight = ref(true)
+  /** Sound on entry (#171): the mute before entering, or null when not inside; and whether the owner changed it inside. */
+  let soundBeforeEntry: boolean | null = null
+  let soundChangedInside = false
+  let forcingSoundMute = false
   const banner = ref<TwinBanner | null>(null)
   const cues = markRaw(new CuePlanner())
   let bannerTimer: ReturnType<typeof setTimeout> | null = null
@@ -382,6 +398,36 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   function toggleLockDaylight(): void {
     lockDaylight.value = !lockDaylight.value
     showToast(lockDaylight.value ? 'twin.toast.daylightLocked' : 'twin.toast.daylightFollows')
+  }
+
+  // Any change to the mute while inside, other than the sim's own mute on entry, is the owner's choice (sync, so none is missed).
+  watch(
+    () => audio.soundMuted,
+    () => {
+      if (soundBeforeEntry !== null && !forcingSoundMute) soundChangedInside = true
+    },
+    { flush: 'sync' },
+  )
+
+  /** Entering Terminal Twin mutes the shared audio store, on every entry (#171). */
+  function enterSim(): void {
+    if (soundBeforeEntry !== null) return
+    soundBeforeEntry = audio.soundMuted
+    soundChangedInside = false
+    forcingSoundMute = true
+    try {
+      audio.setSoundMuted(true)
+    } finally {
+      forcingSoundMute = false
+    }
+  }
+
+  /** Leaving restores the mute from before entry, unless the owner changed it while inside (their latest choice stays). */
+  function leaveSim(): void {
+    if (soundBeforeEntry === null) return
+    const before = soundBeforeEntry
+    soundBeforeEntry = null
+    if (!soundChangedInside) audio.setSoundMuted(before)
   }
 
   /** Copy the controller's playback state into reactive refs (once per frame and after actions). */
@@ -549,7 +595,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       })
       sounds.reset()
       banner.value = null
-      lockDaylight.value = daylightLockDefault(next.name)
+      lockDaylight.value = true
       hasShcs.value = (runConfig.shcs?.length ?? 0) > 0
       phase.value = 'running'
       if (options.autoplay ?? true) ctl().play()
@@ -1062,6 +1108,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     toast.value = null
     config.value = null
     savesOpen.value = false
+    colourByOpen.value = false
+    runToOpen.value = false
     breakpoints.value = []
     breakHit.value = null
     inspectedEvent.value = null
@@ -1099,9 +1147,13 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayPlan,
     setBayPlan,
     colourBy,
-    hideRob,
+    robDisplay,
     setColourBy,
-    setHideRob,
+    setRobDisplay,
+    colourByOpen,
+    setColourByOpen,
+    runToOpen,
+    setRunToOpen,
     bayViewData,
     openBayViewer,
     closeBayViewer,
@@ -1138,6 +1190,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     positional,
     lockDaylight,
     toggleLockDaylight,
+    enterSim,
+    leaveSim,
     banner,
     toast,
     kpi,

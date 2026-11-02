@@ -19,7 +19,7 @@ class VesselRenderer implements KindRenderer {
   }
 
   update(frame: KindFrame): void {
-    this.vessels.setColour(frame.colour.mode, frame.colour.hideRob, frame.colour.ctx)
+    this.vessels.setColour(frame.colour.mode, frame.colour.robDisplay, frame.colour.ctx)
     this.vessels.update(frame.t, frame.cameraPosition)
     this.countdowns.update(frame.t)
   }

@@ -60,6 +60,12 @@ describe('keymap', () => {
     expect(cameraKeyFor(key('w', { target: new FakeElement() as unknown as EventTarget }))).toBe('forward')
   })
 
+  it('leaves Esc to the one ordered Esc stack (#169), still listed in the help', () => {
+    expect(shortcutFor(key('Escape'))).toBeNull()
+    expect(shortcutFor(key('Esc'))).toBeNull()
+    expect(SHORTCUT_HELP.map((r) => r.keys)).toContain('shortcuts.key.esc')
+  })
+
   it('lists the camera keys in the help', () => {
     const actions = SHORTCUT_HELP.map((r) => r.action)
     for (const a of ['shortcuts.camPan', 'shortcuts.camOrbit', 'shortcuts.camTilt', 'shortcuts.camZoom']) expect(actions).toContain(a)

@@ -13,7 +13,6 @@ describe('terminal registry', () => {
     expect(terminalForScenario(PEAK_DAY_PRESET_NAME)?.id).toBe('tti-algeciras')
     expect(terminalForScenario(SMALL_PRESET_NAME)).toBeNull()
     expect(terminalForScenario('tracer')).toBeNull()
-    expect(terminalPresetInfo(PEAK_DAY_PRESET_NAME)?.daylightLockDefault).toBe(true)
     expect(terminalPresetInfo(TTI_PRESET_NAME)?.derivedBays).toBe(true)
     expect(terminalPresetInfo(SMALL_PRESET_NAME)).toBeNull()
   })

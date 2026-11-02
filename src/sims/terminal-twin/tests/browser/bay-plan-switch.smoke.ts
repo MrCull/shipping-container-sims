@@ -1,6 +1,6 @@
 /**
- * #162: the bay viewer's Load plan | Discharge plan switch. Fixture `two-vessels-compete-for-berth` (two panamax calls,
- * each with discharge and load). The viewer opens on Load (planned-load cells only, plus ROB), the switch shows the
+ * #162: the bay viewer's Load plan | Discharge plan switch. Fixture `rob-bays` (it has a yard, so the Load plan has planned-load
+ * cells: V001 discharges 16 and loads 6, V002 loads 4; the ROB bays are drawn too). The viewer opens on Load (planned-load cells only, plus ROB), the switch shows the
  * Discharge plan (planned-discharge cells only), the choice stays when another vessel is opened, and a new run (Reset)
  * goes back to Load. The state key lists only the plan's statuses plus ROB.
  * Run with `pnpm run test:smoke --project=dev --grep "bay plan switch"`.
@@ -33,7 +33,7 @@ test('bay plan switch: opens on Load, shows one plan at a time, keeps the choice
   const errors = collectErrors(page)
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('two-vessels-compete-for-berth'))
+  await page.evaluate(() => window.__tt!.load('rob-bays'))
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'VesselBerthed' }))
 

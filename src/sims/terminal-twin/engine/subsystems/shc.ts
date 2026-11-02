@@ -677,7 +677,7 @@ export const BLOCK_FREE_RESERVE = 0.1
  * or below 0 is offered no pad: its boxes would sit on the pad with no slot and no room to rehandle, and the quay
  * would starve (full-size calls on a 60 % pre-filled yard did this to the first block).
  */
-function blockRoom(state: SimState, blockId: string): number {
+export function blockRoom(state: SimState, blockId: string): number {
   const y = state.yardBlocks[blockId]
   if (!y) return Infinity
   let free = 0

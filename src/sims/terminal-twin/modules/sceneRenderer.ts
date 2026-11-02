@@ -24,7 +24,7 @@ import { NO_OVERLAYS, type OverlayState } from './overlays'
 export type { OverlayState }
 import { ContainerInstancer } from './containerInstancer'
 import { describeMarkings } from './containerMarkings'
-import { colourContextOf, colourOf, DEFAULT_COLOUR_BY, hexToInt, isTimeBased, type ColourBy, type ColourContext } from './colourBy'
+import { colourContextOf, colourOf, DEFAULT_COLOUR_BY, DEFAULT_ROB_DISPLAY, hexToInt, isTimeBased, type ColourBy, type ColourContext, type RobDisplay } from './colourBy'
 import { liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { beaconFlashOn, GantryBeacons } from './gantryBeacons'
@@ -119,7 +119,7 @@ export class SceneRenderer {
   private containerLivery: number[]
   /** Colour by (#130): the mode, the facts its legend needs, and per box the tint drawn (0xRRGGBB, -1 = livery) with the epoch and time bucket it was computed for. */
   private colourBy: ColourBy = DEFAULT_COLOUR_BY
-  private hideRob = false
+  private robDisplay: RobDisplay = DEFAULT_ROB_DISPLAY
   private colourCtx: ColourContext
   private colourEpoch = 1
   private tint: number[] = []
@@ -477,9 +477,9 @@ export class SceneRenderer {
     return { ...this.atmosphere.state(), backdrop: { kind: this.backdrop.kind, parts: [...this.backdrop.parts], models: this.backdrop.models } }
   }
 
-  /** Colour by (#130): applies to yard, vessel and vehicle boxes in 3D (all LODs, the close-up too) and to the ROB boxes; `hideRob` hides the ROB boxes on vessels. */
-  setColourBy(mode: ColourBy, hideRob: boolean): void {
-    this.hideRob = hideRob
+  /** Colour by (#130): applies to yard, vessel and vehicle boxes in 3D (all LODs, the close-up too) and to the ROB boxes; the ROB display (#168) says how the ROB boxes are drawn (`hide` removes them). */
+  setColourBy(mode: ColourBy, robDisplay: RobDisplay): void {
+    this.robDisplay = robDisplay
     if (mode === this.colourBy) return
     this.colourBy = mode
     this.colourEpoch++
@@ -534,7 +534,7 @@ export class SceneRenderer {
     this.lastT = t
     this.atmosphere.update(t)
     this.sounds.length = 0
-    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), colour: { mode: this.colourBy, hideRob: this.hideRob, ctx: this.colourCtx }, sounds: this.sounds }
+    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), colour: { mode: this.colourBy, robDisplay: this.robDisplay, ctx: this.colourCtx }, sounds: this.sounds }
     for (const { renderer } of this.renderers) renderer.update(frame)
     this.shots.update(model, t, this.live, performance.now(), this.sounds) // twistlock clunk, landing thud, air brake
     this.sounds.push(HARBOUR_SOURCE) // harbour ambience: not positional, always faint

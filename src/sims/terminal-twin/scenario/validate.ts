@@ -71,6 +71,8 @@ export function validateScenario(config: ScenarioConfig, overrides: SubsystemMod
   const ordering = config.vesselPlanning?.ordering
   if (ordering !== undefined && ordering !== 'as-today' && ordering !== 'pod-weight')
     err('setup.check.containerProps', { detail: `vesselPlanning.ordering must be as-today or pod-weight, got ${String(ordering)}` })
+  const stow = config.vesselPlanning?.stowSequence
+  if (stow !== undefined && stow !== 'tier') err('setup.check.containerProps', { detail: `vesselPlanning.stowSequence must be tier, got ${String(stow)}` })
   const shc = config.shcs?.length ?? 0
   if (shc > lim.shc.max) err('setup.check.shcCount', { min: lim.shc.min, max: lim.shc.max })
   const peak = peakTrucksPerHour(config)

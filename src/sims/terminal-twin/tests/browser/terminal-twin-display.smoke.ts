@@ -204,7 +204,7 @@ test.describe('British browser', () => {
     await page.keyboard.press('o')
     expect((await ui()).overlaysVisible).toBe(true)
 
-    // F: follow the selection; Esc: deselect (and stop following)
+    // F: follow the selection; Esc: closes the inspector the selection opened, then deselects (and stops following)
     await page.keyboard.press('f')
     await expect(page.getByTestId('tt-toast')).toHaveText('Select something to follow first')
     expect((await ui()).following).toBe(false)
@@ -212,13 +212,15 @@ test.describe('British browser', () => {
     await page.keyboard.press('f')
     expect(await ui()).toMatchObject({ selectedId: 'STS01', following: true })
     await page.keyboard.press('Escape')
+    expect(await ui()).toMatchObject({ selectedId: 'STS01', inspectorOpen: false, following: true })
+    await page.keyboard.press('Escape')
     expect(await ui()).toMatchObject({ selectedId: null, following: false })
 
     // ?: help overlay lists every shortcut; Esc closes it
     await page.keyboard.press('?')
     const help = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
     await expect(help).toBeVisible()
-    for (const key of ['Space', '1–9', '0', '.', 'F', 'Esc', 'B', 'O', '?', 'WASD', 'Shift + AD', 'Shift + WS', '= / -']) {
+    for (const key of ['Space', '0', '.', 'F', 'Esc', 'B', 'O', '?', 'WASD', 'Shift + AD', 'Shift + WS', '= / -']) {
       await expect(help.locator('kbd', { hasText: new RegExp(`^${key.replace(/[.?+]/g, '\\$&')}$`) })).toHaveCount(1)
     }
     await page.keyboard.press('Escape')

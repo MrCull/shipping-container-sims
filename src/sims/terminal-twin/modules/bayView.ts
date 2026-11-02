@@ -21,7 +21,7 @@ import type { CustodyKind, TransitStatus, VesselSlotState, VesselStatus, WorkPac
 import type { RobBox } from '../scenario/robBays'
 import type { ContainerSize, VesselSizeClass } from '../scenario/types'
 import { isCellUsable, vesselSlotId, VESSEL_CLASSES, type CellHalf } from '../scenario/vesselClasses'
-import { colourOf, legendOf, type ColourBy, type ColourContext, type ColourSubject } from './colourBy'
+import { colourOf, DEFAULT_ROB_DISPLAY, legendOf, robColourOf, type ColourBy, type ColourContext, type ColourSubject, type RobDisplay } from './colourBy'
 import { vesselBayNumber, vesselRowNumber, vesselTierNumber } from './locationNotation'
 
 export type CellStatus = 'planned-discharge' | 'planned-load' | 'in-progress' | 'done' | 'rob' | 'empty'
@@ -89,8 +89,8 @@ export interface BayViewOptions {
   colourMode: ColourMode
   /** Maritime notation of a vessel slot id (default: the id itself). */
   locate?: (slotId: string) => string
-  /** Hide ROB (colour by menu, #159): ROB cells show as empty, as the 3D hull hides its ROB boxes; the strip still marks ROB bays. */
-  hideRob?: boolean
+  /** ROB display (#168, the ROB control; default `grey`): `hide` draws no ROB cell, as the 3D hull draws none (the strip still marks ROB bays); `grey` the ROB grey; `show` the colour the mode gives any box. */
+  robDisplay?: RobDisplay
   /** Show one plan (#162): the other move's slots show as empty. Absent: both moves. */
   plan?: BayPlan
 }
@@ -304,7 +304,7 @@ function contextOf(data: BayViewData): ColourContext {
 }
 
 /** What a colour mode needs about a cell's box (its slot's booked empty counts as an empty of its line). */
-function subjectOf(d: CellDetails, box: BayBox | undefined, rob: boolean): ColourSubject {
+function subjectOf(d: CellDetails, box: BayBox | undefined): ColourSubject {
   return {
     line: d.line ?? '',
     full: d.full ?? false,
@@ -317,7 +317,6 @@ function subjectOf(d: CellDetails, box: BayBox | undefined, rob: boolean): Colou
     arrivedS: box?.arrivedS,
     leftS: box?.leftS,
     onCall: box?.onCall ?? false,
-    rob,
   }
 }
 
@@ -330,12 +329,15 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
   const now = data.now ?? 0
   const statusMode = byStatus(opts.colourMode)
   const mode = opts.colourMode as ColourBy
+  const robDisplay = opts.robDisplay ?? DEFAULT_ROB_DISPLAY
+  /** The ROB boxes take the colour their mode gives any box (`show`); the state view colours them as the default mode (the line). */
+  const robMode: ColourBy = statusMode ? 'default' : mode
   const legendEntries = statusMode ? [] : legendOf(mode, ctx)
   /** Key, legend position and fill of a cell in the property modes. A cell without a box says nothing where its mode has no value ("unknown", "other", "none"). */
   const paint = (details: CellDetails, box: BayBox | undefined, rob: boolean): { key: string | null; index: number | null; colour: string | null } => {
     const hasBox = box !== undefined || rob || details.emptyFor !== undefined
     if (!hasBox) return { key: null, index: null, colour: null }
-    const c = colourOf(mode, subjectOf(details, box, rob), now, ctx)
+    const c = rob ? robColourOf(robDisplay, robMode, subjectOf(details, undefined), now, ctx) : colourOf(mode, subjectOf(details, box), now, ctx)
     if (box === undefined && !rob && (c.key === 'unknown' || c.key === 'other' || c.key === 'none')) return { key: null, index: null, colour: null }
     const i = legendEntries.findIndex((e) => e.key === c.key)
     return { key: c.key, index: i < 0 ? null : i, colour: c.hex }
@@ -348,7 +350,7 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
     slotsHere.set(k, [...(slotsHere.get(k) ?? []), s])
   }
   const robHere = new Map<string, RobBox[]>()
-  for (const b of opts.hideRob ? [] : data.robBoxes) {
+  for (const b of robDisplay === 'hide' ? [] : data.robBoxes) {
     if (b.bay !== bay) continue
     const k = `${b.row}:${b.tier}`
     robHere.set(k, [...(robHere.get(k) ?? []), b])
@@ -411,7 +413,8 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
       weightClass: b.weightClass,
       grossKg: b.grossKg,
     }
-    if (statusMode) return { slotId: b.slotId, half: b.half, status: 'rob', colourKey: 'rob', colourIndex: null, colour: null, details, rob: true, continuation: false, absent: false }
+    // the state view keeps the hatched ROB state when grey; shown, a ROB box takes its line colour
+    if (statusMode && robDisplay === 'grey') return { slotId: b.slotId, half: b.half, status: 'rob', colourKey: 'rob', colourIndex: null, colour: null, details, rob: true, continuation: false, absent: false }
     const p = paint(details, undefined, true)
     return { slotId: b.slotId, half: b.half, status: 'rob', colourKey: p.key, colourIndex: p.index, colour: p.colour, details, rob: true, continuation: false, absent: false }
   }

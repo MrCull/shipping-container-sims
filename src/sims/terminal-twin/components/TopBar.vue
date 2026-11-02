@@ -4,7 +4,8 @@ import { computed, ref } from 'vue'
 import { useTwinStore } from '../store/twinStore'
 import { SPEEDS } from '../modules/twinController'
 import { fromLocalInputValue, simDate, toLocalInputValue } from '../modules/time'
-import { t } from '../i18n/messages'
+import { t, type MessageKey } from '../i18n/messages'
+import { ROB_DISPLAY_MODES } from '../modules/colourBy'
 import PerfPanel from './PerfPanel.vue'
 import LocaleDateTimeInput from './LocaleDateTimeInput.vue'
 
@@ -24,12 +25,13 @@ const status = computed<'running' | 'failed' | 'complete' | 'paused' | 'live'>((
   return store.paused ? 'paused' : 'live'
 })
 
-const runToOpen = ref(false)
+/** The popup's open state is in the store (#169: the shared Esc handling closes it). */
+const runToOpen = computed(() => store.runToOpen)
 const runToValue = ref('')
 const runToError = ref<string | null>(null)
 
 function openRunTo(): void {
-  runToOpen.value = !runToOpen.value
+  store.setRunToOpen(!runToOpen.value)
   runToError.value = null
   if (runToOpen.value) {
     runToValue.value = toLocalInputValue(simDate(store.choice.startDateTime, store.displayTime + 600), true)
@@ -37,7 +39,7 @@ function openRunTo(): void {
 }
 
 async function submitRunToDeparture(): Promise<void> {
-  runToOpen.value = false
+  store.setRunToOpen(false)
   await store.runToNextDeparture().catch(() => {})
 }
 
@@ -52,7 +54,7 @@ async function submitRunTo(): Promise<void> {
     runToError.value = t('topbar.runToPast')
     return
   }
-  runToOpen.value = false
+  store.setRunToOpen(false)
   await store.runTo(simT).catch(() => {})
 }
 </script>
@@ -117,7 +119,10 @@ async function submitRunTo(): Promise<void> {
         >
           {{ t('debug.step') }}
         </button>
-        <div class="run-to">
+        <div
+          class="run-to"
+          data-tt-popup
+        >
           <button
             class="action-btn"
             :disabled="store.busy || ended"
@@ -158,7 +163,7 @@ async function submitRunTo(): Promise<void> {
               <button
                 type="button"
                 class="action-btn"
-                @click="runToOpen = false"
+                @click="store.setRunToOpen(false)"
               >
                 {{ t('setup.cancel') }}
               </button>
@@ -228,6 +233,28 @@ async function submitRunTo(): Promise<void> {
       data-hud-region="settings"
       data-testid="tt-settings"
     >
+      <div
+        class="rob-display"
+        role="group"
+        :aria-label="t('topbar.rob')"
+        :title="t('topbar.robHint')"
+        data-testid="tt-rob-display"
+        :data-mode="store.robDisplay"
+      >
+        <span class="rob-label">{{ t('topbar.rob') }}</span>
+        <button
+          v-for="m in ROB_DISPLAY_MODES"
+          :key="m"
+          type="button"
+          class="action-btn rob-btn"
+          :class="{ active: store.robDisplay === m }"
+          :aria-pressed="store.robDisplay === m"
+          :data-testid="`tt-rob-${m}`"
+          @click="store.setRobDisplay(m)"
+        >
+          {{ t(`topbar.rob.${m}` as MessageKey) }}
+        </button>
+      </div>
       <button
         class="action-btn"
         :class="{ active: store.lockDaylight }"
@@ -270,6 +297,22 @@ async function submitRunTo(): Promise<void> {
   flex: 1 1 0;
   flex-wrap: wrap;
   min-width: 0;
+}
+
+.rob-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.rob-label {
+  color: var(--tt-text-muted);
+  font-size: 0.78rem;
+  margin-right: 0.1rem;
+}
+
+.rob-btn {
+  padding: 0.35rem 0.5rem;
 }
 
 .settings {

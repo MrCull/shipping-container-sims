@@ -57,7 +57,10 @@ describe('ascDispatch decision point', () => {
     }
     const side = split('waterside-first')
     const balanced = split('balanced')
-    expect(side).toEqual({ 'B01-ASC1': 30, 'B01-ASC2': 0 })
+    // 28, not 30: the tier stow sequence (#174) changes the discharge order, and with it the job count for the same 30
+    // moves (as-today gives 30; no reposition happens, so the rail change is not involved). All 30 moves still complete
+    // and the balanced split is unchanged (14 and 14)
+    expect(side).toEqual({ 'B01-ASC1': 28, 'B01-ASC2': 0 })
     expect(balanced['B01-ASC1']).toBeGreaterThan(8)
     expect(balanced['B01-ASC2']).toBeGreaterThan(8)
   })

@@ -44,6 +44,10 @@ When your output names a domain concept (in an issue title, a refactor proposal,
 
 If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
 
+## Profile before a load or scale decision
+
+A spec decision that raises load or scale (a volume preset, a scale target, a higher entity count) is checked against a measured run first. Run Terminal Twin's profiler, `pnpm run tt:profile <preset> --until <sim seconds>` (usage in `src/sims/terminal-twin/terminal-twin-AGENTS.md`, "How to prove a change works"), and put its result in the spec, so the target's feasibility is known before tickets are written.
+
 ## Flag ADR conflicts
 
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:

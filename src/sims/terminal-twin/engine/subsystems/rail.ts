@@ -11,7 +11,9 @@
  *   over (STS picked / reposition completed).
  * - A free, idle crane in the way of a waiting crane is asked to step aside
  *   (it waits for the rail itself, with the position it must reach); a chain
- *   of free cranes moves one after another. Busy cranes are never pushed.
+ *   of free cranes moves one after another. A busy crane that waits empty-handed and stationary may also step aside (#174,
+ *   bounded yield): it repositions to the edge the blocked neighbour needs and then resumes its work, so two busy cranes
+ *   whose targets lie on each other's side can never wait for each other forever.
  */
 import type { EngineContext } from '../context'
 import { planSegment, positionAt } from '../kinematics'
@@ -73,9 +75,15 @@ export function startReposition(ctx: EngineContext, sts: StsState, toX: number):
   ctx.schedule('StsRepositionCompleted', seg.t1, { equipment: [sts.id] }, { stsId: sts.id, gantryX: toX, segments: [seg] })
 }
 
-/** A crane that holds no vessel work and stands still may be asked to step aside. */
+/**
+ * A crane that stands still may be asked to step aside: a free crane (no vessel work), or a crane with vessel work that
+ * waits for the rail empty-handed (#174). The second case is what breaks a mutual wait: two cranes whose targets lie on
+ * each other's side of the spacing would otherwise wait for each other forever (the `crane-split` stall).
+ */
 function yieldable(sts: StsState): boolean {
-  return sts.vesselId === null && (sts.status === 'idle' || sts.status === 'waiting-for-rail') && sts.railLo === sts.railHi
+  if (sts.railLo !== sts.railHi) return false
+  if (sts.vesselId === null) return sts.status === 'idle' || sts.status === 'waiting-for-rail'
+  return sts.status === 'waiting-for-rail' && sts.carrying.length === 0
 }
 
 /** Ask the free crane `blocker` to clear the way for `waiter`, which wants to reach `targetX`. */
@@ -91,6 +99,8 @@ function askToYield(ctx: EngineContext, blocker: StsState, waiter: StsState, tar
   if (blocker.status === 'waiting-for-rail' && current === target) return false
   blocker.status = 'waiting-for-rail'
   blocker.railTargetX = target
+  // a busy blocker steps aside by repositioning (not by moving to its pick); it resumes its work afterwards
+  blocker.railYield = blocker.vesselId !== null
   return true
 }
 
@@ -113,7 +123,7 @@ export function wakeRail(ctx: EngineContext, startMove: (sts: StsState) => void)
         sts.railTargetX = null
         sts.railAlsoX = null
         changed = true
-        if (sts.vesselId !== null) {
+        if (sts.vesselId !== null && !sts.railYield) {
           sts.status = 'moving-to-pick'
           startMove(sts)
         } else {

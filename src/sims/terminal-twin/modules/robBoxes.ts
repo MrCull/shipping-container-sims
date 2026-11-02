@@ -1,14 +1,14 @@
 /**
  * ROB boxes in the 3D hull (spec #106, #110): the display-only remain-on-board boxes of a vessel's ROB bays as one
  * InstancedMesh of plain boxes, a child of the vessel's root so it moves with the hull. They are slot data, not
- * containers: no picking, no custody, no pose over time. Every ROB box is the shared ROB grey (`ROB_HEX`, `--tt-data-rob`,
- * #159) in every colour mode, the colour the bay viewer gives ROB cells: quiet next to the boxes being worked.
- * Nothing here is reactive (never put these objects in Vue state).
+ * containers: no picking, no custody, no pose over time. The ROB display (#168) sets their colour: `grey` is the shared
+ * ROB grey (`ROB_HEX`, #159), `show` the colour the mode gives any box, and `hide` leaves the mesh hidden (the vessel
+ * renderer toggles its visibility). Nothing here is reactive (never put these objects in Vue state).
  */
 import * as THREE from 'three'
 import type { RobBox } from '../scenario/robBays'
 import { slotCentre, type VesselClassSpec } from '../scenario/vesselClasses'
-import { colourOf, type ColourBy, type ColourContext } from './colourBy'
+import { DEFAULT_ROB_DISPLAY, robColourOf, type ColourBy, type ColourContext, type RobDisplay } from './colourBy'
 import { CONTAINER_DIMS } from './sceneModel'
 
 
@@ -16,8 +16,8 @@ export interface RobMesh {
   mesh: THREE.InstancedMesh
   /** Boxes drawn. */
   count: number
-  /** Colour by (#130): the ROB grey in every mode (#159; kept so the renderer's call stays mode-agnostic). */
-  setColour(mode: ColourBy, ctx: ColourContext): void
+  /** Colour by (#130) and ROB display (#168): the boxes' colours for this mode and display. */
+  setColour(mode: ColourBy, robDisplay: RobDisplay, ctx: ColourContext): void
   dispose(): void
 }
 
@@ -32,9 +32,9 @@ export function buildRobMesh(spec: VesselClassSpec, boxes: readonly RobBox[]): R
   mesh.receiveShadow = true
   const m = new THREE.Matrix4()
   const colour = new THREE.Color()
-  const paint = (mode: ColourBy, ctx: ColourContext): void => {
+  const paint = (mode: ColourBy, robDisplay: RobDisplay, ctx: ColourContext): void => {
     boxes.forEach((b, i) => {
-      colour.set(colourOf(mode, { line: b.line, full: b.full, isoType: b.isoType, pod: b.pod, weightClass: b.weightClass, direction: 'TRANSSHIPMENT', onCall: false, rob: true }, 0, ctx).hex)
+      colour.set(robColourOf(robDisplay, mode, { line: b.line, full: b.full, isoType: b.isoType, pod: b.pod, weightClass: b.weightClass, direction: 'TRANSSHIPMENT', onCall: false }, 0, ctx).hex)
       mesh.setColorAt(i, colour)
     })
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
@@ -46,7 +46,7 @@ export function buildRobMesh(spec: VesselClassSpec, boxes: readonly RobBox[]): R
     m.compose(new THREE.Vector3(c.x, c.y, c.z), new THREE.Quaternion(), new THREE.Vector3(d.length - 0.1, d.height - 0.05, d.width - 0.05))
     mesh.setMatrixAt(i, m)
   })
-  paint('default', { ports: [] })
+  paint('default', DEFAULT_ROB_DISPLAY, { ports: [] })
   mesh.instanceMatrix.needsUpdate = true
   mesh.frustumCulled = false
   return {

@@ -10,7 +10,7 @@ import type { SceneModel } from '../sceneModel'
 import type { SceneStats } from '../sceneRenderer'
 import type { GantryBeacons } from '../gantryBeacons'
 import type { SoundSource } from '../soundMixer'
-import type { ColourBy, ColourContext } from '../colourBy'
+import type { ColourBy, ColourContext, RobDisplay } from '../colourBy'
 
 /** What a kind's renderer gets from the scene renderer when it is built. */
 export interface KindRendererHost {
@@ -38,8 +38,8 @@ export interface KindFrame {
   live: boolean
   /** The beacons' flash phase this frame (wall clock). */
   flashOn: boolean
-  /** Colour by (#130): the mode, whether ROB boxes are hidden, and the scenario facts the legends need. */
-  colour: { mode: ColourBy; hideRob: boolean; ctx: ColourContext }
+  /** Colour by (#130): the mode, the ROB display (#168) and the scenario facts the legends need. */
+  colour: { mode: ColourBy; robDisplay: RobDisplay; ctx: ColourContext }
   /** Output: a kind that makes positional sound pushes its sources (position and motion state) here. */
   sounds: SoundSource[]
 }

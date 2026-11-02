@@ -22,17 +22,20 @@ import type { EngineEvent } from './events'
 import { columnKey, yardIndexOf } from './yardIndex'
 import {
   ascIndexOf,
+  type AscJob,
   type AscState,
   type CustodyRef,
   type HatchPanelState,
   type SimState,
+  type TruckState,
   type VesselSlotState,
   type YardSlotState,
 } from './state'
 import { ascPoseAt } from './subsystems/asc'
+import { blockedByOlderClaim, isRetrievable, isTruckJob } from './subsystems/ascStorage'
 import { gantryPositionAt, railOrder } from './subsystems/rail'
 import { shcPositionAt } from './subsystems/shc'
-import { truckPositionAt } from './subsystems/landside'
+import { truckPositionAt, truckReadyForPick } from './subsystems/landside'
 import { ASC_MIN_SEPARATION_M, blockSpecs, REEFER_MAX_TIERS, travelHoistM } from './yardLayout'
 import type { ScenarioConfig } from '../scenario/types'
 import { hatchPanelId, hatchPanelOfRow, isCellUsable, isStackBase, vesselClass, vesselSlotId } from '../scenario/vesselClasses'
@@ -296,9 +299,164 @@ function blockSpecsById(config: ScenarioConfig) {
   return by
 }
 
+type LandsideGraphOf = ReturnType<typeof landsideGraphOf>
+type RoadZone = LandsideGraphOf['zones'][string]
+const roadZoneCache = new WeakMap<LandsideGraphOf, RoadZone[]>()
+
+/**
+ * TT-176: the road and junction zones of a landside graph, found once: `landside.waiting-off-road` runs after every
+ * event, and scanning every zone of the graph for each waiting truck was half the run time of the peak day.
+ */
+function roadZonesOf(graph: LandsideGraphOf): RoadZone[] {
+  let zones = roadZoneCache.get(graph)
+  if (!zones) {
+    zones = Object.values(graph.zones).filter((z) => z.kind === 'road' || z.kind === 'intersection')
+    roadZoneCache.set(graph, zones)
+  }
+  return zones
+}
+
 /** Half-extent (m) of a WTP pad's lifting envelope across X and along Z. */
 const PAD_HALF_X_M = 1.6
 const PAD_HALF_Z_M = 6.5
+
+/**
+ * TT-175: how long a truck may stand at its transfer stall with its block's ASCs idle before it counts as stranded
+ * (`landside.stranded-truck`). [A]: a box waiting for an ASC that is busy is not stranded, so only real stalls reach it.
+ */
+export const STALL_STRAND_LIMIT_S = 1800
+
+/**
+ * TT-175: can an open job of its block start (or is it still pending a decision, an earlier job or the trucks' own
+ * progress)? A stacking job whose yardAllocation said "full" cannot; neither can a retrieval that is out of rehandle
+ * targets, or a truck pick held up by its own drop while the truck stands at the stall.
+ */
+function jobCanStart(state: SimState, job: AscJob): boolean {
+  if (job.allocation === 'full') return false
+  if (job.kind === 'retrieve' && job.rehandle === 'full') return false
+  const truck = job.truckId === undefined ? undefined : state.trucks[job.truckId]
+  if (job.kind === 'retrieve' && truck && (truck.status === 'at-stall' || truck.status === 'being-served')) return truckReadyForPick(state, job)
+  return true
+}
+
+/**
+ * TT-183: when the exit-slot wait of a truck whose transfers are all done began: its last leg, or the last departure through
+ * its own outbound lane if that is later (a lane that keeps moving is a queue, not a blocked slot; other lanes do not count).
+ */
+function exitSince(state: SimState, t: TruckState): number {
+  const laneMovedAt = t.outLaneId === null ? 0 : (state.landside?.lastDepartureByLane?.[t.outLaneId] ?? 0)
+  return Math.max(t.interchangeDoneAt ?? t.atStallAt ?? 0, laneMovedAt)
+}
+
+/**
+ * TT-183: can an open job of its block start now? These are the candidates the dispatcher offers an idle ASC
+ * (`candidateJobs`, `engine/subsystems/ascDispatch.ts`), read without side effects: a cleared stack that is claimed, a
+ * rehandle with a target, a retrieval whose box is on top with no rehandle of that box open (a truck pick at its stall, or
+ * a pad retrieval while a pad is free). `rehandleBoxes` and `freePads` are read once per check, not per job.
+ */
+function jobStartable(state: SimState, job: AscJob, rehandleBoxes: ReadonlySet<string>, freePads: boolean): boolean {
+  if (job.kind === undefined) return job.cleared && job.claimSeq !== null && !blockedByOlderClaim(state, job)
+  if (job.kind === 'rehandle') return job.targetSlotId != null && !blockedByOlderClaim(state, job)
+  if (!isRetrievable(state, job) || rehandleBoxes.has(job.containerId)) return false
+  if (isTruckJob(job)) return truckReadyForPick(state, job)
+  return freePads
+}
+
+/** TT-183: is an event waiting in the queue whose subjects name one of `ids` (an ASC, job, box, truck or stall of the block)? */
+function pendingEventFor(state: SimState, ids: ReadonlySet<string>): boolean {
+  return state.queue.some(
+    (ev) =>
+      (ev.subjects.containers ?? []).some((id) => ids.has(id)) ||
+      (ev.subjects.equipment ?? []).some((id) => ids.has(id)) ||
+      (ev.subjects.jobs ?? []).some((id) => ids.has(id)),
+  )
+}
+
+/** A block that looks deadlocked (`yard.no-progress`): its claimed work, the ids that could still move it, and when its ASCs last started a job. */
+interface StuckYardBlock {
+  blockId: string
+  claimed: AscJob[]
+  open: AscJob[]
+  progressAt: number
+}
+
+/**
+ * TT-183: the blocks that look deadlocked, without the time limit. A block qualifies with a claimed open job, every ASC idle,
+ * no decision or allocation in flight, no open job that can start, and no pending event that names its ASCs, jobs, boxes,
+ * trucks or stalls. `minIdleS` keeps only the blocks that have gone that long without an ASC job start (the per-event check
+ * passes the limit, so the cheap idle test runs first).
+ */
+export function stuckYardBlocks(state: SimState, config: ScenarioConfig, now: number, minIdleS: number): StuckYardBlock[] {
+  if (state.subsystems.asc === 'off') return []
+  const openByBlock = new Map<string, AscJob[]>()
+  for (const j of Object.values(state.ascJobs)) {
+    if (j.ascId !== null) continue
+    const list = openByBlock.get(j.blockId)
+    if (list) list.push(j)
+    else openByBlock.set(j.blockId, [j])
+  }
+  const out: StuckYardBlock[] = []
+  let rehandleBoxes: Set<string> | null = null
+  for (const [blockId, open] of openByBlock) {
+    const claimed = open.filter((j) => j.allocation === 'claimed')
+    if (claimed.length === 0) continue
+    const progressAt = state.yardBlocks[blockId]?.progressAt ?? 0
+    if (now - progressAt <= minIdleS) continue
+    const ascs = Object.values(state.ascs).filter((a) => a.blockId === blockId)
+    if (ascs.length === 0 || ascs.some((a) => a.status !== 'idle')) continue
+    if (open.some((j) => j.allocation === 'asked' || j.allocation === 'waiting' || j.dispatch === 'asked')) continue
+    rehandleBoxes ??= new Set(Object.values(state.ascJobs).filter((r) => r.kind === 'rehandle').map((r) => r.containerId))
+    const freePads = laneGraphOf(config).pads.some((p) => p.blockId === blockId && state.wtpPads[p.id].containerId === null && state.wtpPads[p.id].claimedBy === null)
+    if (open.some((j) => jobStartable(state, j, rehandleBoxes as ReadonlySet<string>, freePads))) continue
+    const ids = new Set<string>(ascs.map((a) => a.id))
+    for (const j of open) {
+      ids.add(j.id)
+      ids.add(j.containerId)
+      if (j.truckId !== undefined) ids.add(j.truckId)
+      if (j.stallId !== undefined) ids.add(j.stallId)
+    }
+    for (const st of Object.values(state.landside?.stalls ?? {})) {
+      if (st.blockId !== blockId) continue
+      ids.add(st.id)
+      if (st.truckId) ids.add(st.truckId) // a truck holding a stall is waiting for the block too (exit or pick)
+    }
+    if (pendingEventFor(state, ids)) continue
+    out.push({ blockId, claimed, open, progressAt })
+  }
+  return out
+}
+
+/**
+ * TT-183: when an idle run (empty queue) may still hold a yard deadlock that has not yet waited out its limit, the sim
+ * time at which it has. `engine/simulation.ts` runs the clock on to this time and checks once, so a deadlock never ends a
+ * run as a quiet `idle`. Null when no block is stuck.
+ */
+export function yardNoProgressDeadline(state: SimState, config: ScenarioConfig): number | null {
+  const stuck = stuckYardBlocks(state, config, state.now, -Infinity)
+  if (stuck.length === 0) return null
+  return Math.max(...stuck.map((b) => b.progressAt)) + STALL_STRAND_LIMIT_S + 1
+}
+
+/**
+ * TT-183: the next sim time, before `horizon` (the next queued event or the run's end), at which a time-based invariant
+ * reaches its limit with no event in between, or null. A truck at its stall reaches it `STALL_STRAND_LIMIT_S` after it
+ * arrived there (or after its last leg, for an exit-slot wait); an idle queue (`queueEmpty`) may hold a yard deadlock.
+ * Only the clock moves: nothing is scheduled, so the event log and its hash are unchanged.
+ */
+export function invariantDeadline(state: SimState, config: ScenarioConfig, horizon: number, queueEmpty: boolean): number | null {
+  const candidates: number[] = []
+  for (const t of Object.values(state.trucks)) {
+    if ((t.status !== 'at-stall' && t.status !== 'being-served') || t.stallId === null || t.atStallAt === null) continue
+    const since = t.legs.every((l) => l.done) ? exitSince(state, t) : t.atStallAt
+    candidates.push(since + STALL_STRAND_LIMIT_S + 1)
+  }
+  if (queueEmpty) {
+    const yard = yardNoProgressDeadline(state, config)
+    if (yard !== null) candidates.push(yard)
+  }
+  const due = candidates.filter((t) => t > state.now && t < horizon)
+  return due.length > 0 ? Math.min(...due) : null
+}
 
 export const INVARIANTS: Invariant[] = [
   {
@@ -572,6 +730,43 @@ export const INVARIANTS: Invariant[] = [
     },
   },
   {
+    id: 'stowage.no-floating',
+    reads: ['vessel', 'container'],
+    description:
+      'No floating box (#174): every box on board (discharge, load, transshipment and ROB) above its stack base has a box ' +
+      'directly below it in the same bay and row (a half needs a half or a whole cell below). Stack bases are the hull floor ' +
+      'or hatch cover (`isStackBase`). Checked on arrival and after every vessel move.',
+    scoped: true,
+    check(state, _config, scope) {
+      const messages: string[] = []
+      const occupied = new Map<string, ('aft' | 'fore' | null)[]>()
+      const onBoard: { label: string; vesselId: string; bay: number; row: number; tier: number; half: 'aft' | 'fore' | null }[] = []
+      for (const s of Object.values(state.vesselSlots)) {
+        if (!s.containerId) continue
+        if (scope && !scope.vessels.has(s.vesselId)) continue
+        const key = `${s.vesselId}:${s.bay}:${s.row}:${s.tier}`
+        occupied.set(key, [...(occupied.get(key) ?? []), s.half])
+        onBoard.push({ label: `box ${s.containerId} in ${s.id}`, vesselId: s.vesselId, bay: s.bay, row: s.row, tier: s.tier, half: s.half })
+      }
+      for (const vessel of Object.values(state.vessels)) {
+        if (scope && !scope.vessels.has(vessel.id)) continue
+        for (const b of vessel.robBoxes ?? []) {
+          const key = `${vessel.id}:${b.bay}:${b.row}:${b.tier}`
+          occupied.set(key, [...(occupied.get(key) ?? []), b.half])
+          onBoard.push({ label: `ROB box ${b.slotId}`, vesselId: vessel.id, bay: b.bay, row: b.row, tier: b.tier, half: b.half })
+        }
+      }
+      for (const b of onBoard) {
+        const spec = vesselClass(state.vessels[b.vesselId].sizeClass)
+        if (isStackBase(spec, b.row, b.tier)) continue
+        const below = occupied.get(`${b.vesselId}:${b.bay}:${b.row}:${b.tier - 1}`) ?? []
+        if (!below.some((h) => h === null || b.half === null || h === b.half))
+          messages.push(`${b.label} floats (bay ${b.bay} row ${b.row} tier ${b.tier}): nothing below it`)
+      }
+      return messages
+    },
+  },
+  {
     id: 'hull.profile',
     reads: ['vessel', 'container'],
     description:
@@ -690,8 +885,7 @@ export const INVARIANTS: Invariant[] = [
           if (!h || Math.abs(p.x - h.x) > 1e-6 || Math.abs(p.z - h.z) > 1e-6)
             messages.push(`${t.id} is holding but stands at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}), not in its holding position ${t.holdingId ?? 'none'}`)
         }
-        for (const zone of Object.values(graph.zones)) {
-          if (zone.kind !== 'road' && zone.kind !== 'intersection') continue
+        for (const zone of roadZonesOf(graph)) {
           if (p.x > zone.x0 && p.x < zone.x1 && p.z > zone.z0 && p.z < zone.z1) {
             messages.push(`${t.id} (${t.status}) stands at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}) inside ${zone.kind} zone ${zone.id}`)
             break
@@ -711,6 +905,69 @@ export const INVARIANTS: Invariant[] = [
         if (t.status !== 'routing-to-exit') continue
         const open = t.legs.filter((l) => !l.done)
         if (open.length > 0) messages.push(`${t.id} is leaving with ${open.length} unfinished transfer(s): ${open.map((l) => `${l.kind} ${l.containerId}`).join(', ')}`)
+      }
+      return messages
+    },
+  },
+  {
+    id: 'landside.stranded-truck',
+    reads: ['equipment', 'time'],
+    description:
+      `A truck that has stood at its transfer stall for more than ${STALL_STRAND_LIMIT_S} s is stranded when no ASC of its block is working ` +
+      'and no open job of the block can start (TT-175): a stacking job waiting on "full" is retried when room appears, and a truck never ' +
+      'holds a stall for a drop into a block without room.',
+    check(state, config) {
+      const messages: string[] = []
+      const ls = state.landside
+      if (!ls || !hasLandside(config) || state.subsystems.asc === 'off') return messages
+      for (const t of Object.values(state.trucks)) {
+        if ((t.status !== 'at-stall' && t.status !== 'being-served') || t.stallId === null || t.atStallAt === null) continue
+        // every transfer done: the truck waits for an outbound slot (its exit reservation), not for an ASC. TT-183: the exit-slot
+        // wait has the same limit as the stall wait, per truck and slot (`exitSince`): trucks leaving by other lanes do not excuse it
+        if (t.legs.every((l) => l.done)) {
+          const exitWaitS = state.now - exitSince(state, t)
+          if (exitWaitS > STALL_STRAND_LIMIT_S)
+            messages.push(
+              `${t.id} has waited ${exitWaitS.toFixed(0)} s at stall ${t.stallId} for an outbound slot (limit ${STALL_STRAND_LIMIT_S} s): ` +
+                'its transfers are done, its exit reservation has not started and no truck has left through its lane',
+            )
+          continue
+        }
+        const waitedS = state.now - t.atStallAt
+        if (waitedS <= STALL_STRAND_LIMIT_S) continue
+        const blockId = ls.stalls[t.stallId]?.blockId
+        if (blockId === undefined) continue
+        if (Object.values(state.ascs).some((a) => a.blockId === blockId && a.status !== 'idle')) continue
+        const open = Object.values(state.ascJobs).filter((j) => j.blockId === blockId && j.ascId === null)
+        if (open.some((j) => jobCanStart(state, j))) continue
+        const jobs = open.map((j) => `${j.id} (${j.kind ?? 'stack'}, ${j.allocation})`).join(', ') || 'no open job'
+        messages.push(
+          `${t.id} has waited ${waitedS.toFixed(0)} s at stall ${t.stallId} (limit ${STALL_STRAND_LIMIT_S} s) with no ASC of ${blockId} working ` +
+            `and no job that can start: ${jobs}`,
+        )
+      }
+      return messages
+    },
+  },
+  {
+    id: 'yard.no-progress',
+    reads: ['equipment', 'time'],
+    description:
+      `A block that holds a claimed job, with all its ASCs idle, has made no ASC progress for more than ${STALL_STRAND_LIMIT_S} s, ` +
+      'and no pending event can start any of its jobs, is deadlocked (TT-183). A job in flight (an asked decision or a pending ' +
+      'allocation) or a pending event of its block, its ASCs, boxes, trucks or stalls is not: the block is still moving.',
+    check(state, config) {
+      const messages: string[] = []
+      for (const b of stuckYardBlocks(state, config, state.now, STALL_STRAND_LIMIT_S)) {
+        const idleS = state.now - b.progressAt
+        const sample = b.claimed
+          .slice(0, 3)
+          .map((j) => `${j.id} ${j.containerId}${j.kind === undefined ? '' : ` (${j.kind})`}`)
+          .join(', ')
+        messages.push(
+          `${b.blockId} has ${b.claimed.length} claimed job(s) (${sample}) and ${b.open.length - b.claimed.length} other open, ` +
+            `no ASC working for ${idleS.toFixed(0)} s (limit ${STALL_STRAND_LIMIT_S} s), and no job can start or event pending`,
+        )
       }
       return messages
     },

@@ -8,6 +8,7 @@
  * Asset frame: see `vesselHull.ts`.
  */
 import { rowRange, vesselClass } from '../scenario/vesselClasses'
+import { clipPolygon, type HullMeshData, type Polygon, type Vertex } from './meshClip'
 import type { HullMeta } from './vesselHull'
 
 /** [A] Gap between the hatches of neighbouring bays (m): `HATCH_GAP` in `assets/generators/tt_assets/vessels.py`. */
@@ -52,6 +53,14 @@ export function hullHatchOpenings(meta: HullMeta, bays: Iterable<number>): HullH
 }
 
 /**
+ * The bays of a hull whose baked covers are cut (#173): every bay of the class when hatch covers are off, so no cover
+ * stands over any hold; with hatch covers on, the bays that have panels (the twin draws those panels itself, TT-R10).
+ */
+export function openHatchBays(hatchCovers: boolean, bayCount: number, panelBays: ReadonlySet<number>): Set<number> {
+  return hatchCovers ? new Set(panelBays) : new Set(Array.from({ length: bayCount }, (_, bay) => bay))
+}
+
+/**
  * Cross-section of a hold under an opening (hull profile, #131), as (z, y) points in the asset frame: the stepped V the
  * lower tiers make when they lose their outer rows. Starts on the quay-side wall at the floor, goes up that wall, across
  * the top and down the seaward wall; the renderer extrudes it along the bay. `inset` pulls the walls in so they do not
@@ -75,41 +84,23 @@ export function holdLinerOutline(meta: HullMeta, o: HullHatchOpening, inset = 0.
   return [...quay, ...sea.reverse()]
 }
 
-/** Vertex data of a hull LOD: attribute arrays by name (`position` is required, 3 floats per vertex), triangles by `index` or in order. */
-export interface HullMeshData {
-  index: ArrayLike<number> | null
-  attributes: Record<string, { array: ArrayLike<number>; itemSize: number }>
-}
-
-type Vertex = number[]
-type Polygon = Vertex[]
-
-const lerp = (a: Vertex, b: Vertex, t: number): Vertex => a.map((x, i) => x + (b[i] - x) * t)
-
-/** The part of a convex polygon where `side(v) >= 0` (Sutherland-Hodgman); keeps the winding, interpolates every attribute. */
-function clip(poly: Polygon, side: (v: Vertex) => number): Polygon {
-  const out: Polygon = []
-  for (let i = 0; i < poly.length; i++) {
-    const a = poly[i]
-    const b = poly[(i + 1) % poly.length]
-    const da = side(a)
-    const db = side(b)
-    if (da >= 0) out.push(a)
-    if (da >= 0 !== db >= 0) out.push(lerp(a, b, da / (da - db)))
-  }
-  return out
-}
+export type { HullMeshData }
 
 /** The parts of a triangle outside the rectangle of an opening, as triangles. */
 function outsideOpening(tri: Polygon, o: HullHatchOpening): Polygon[] {
   const xs = tri.map((v) => v[0])
   const zs = tri.map((v) => v[2])
   if (Math.max(...xs) <= o.x0 || Math.min(...xs) >= o.x1 || Math.max(...zs) <= o.zSea || Math.min(...zs) >= o.zQuay) return [tri]
-  const strip = clip(
-    clip(tri, (v) => v[0] - o.x0),
+  const strip = clipPolygon(
+    clipPolygon(tri, (v) => v[0] - o.x0),
     (v) => o.x1 - v[0],
   )
-  const parts = [clip(tri, (v) => o.x0 - v[0]), clip(tri, (v) => v[0] - o.x1), clip(strip, (v) => o.zSea - v[2]), clip(strip, (v) => v[2] - o.zQuay)]
+  const parts = [
+    clipPolygon(tri, (v) => o.x0 - v[0]),
+    clipPolygon(tri, (v) => v[0] - o.x1),
+    clipPolygon(strip, (v) => o.zSea - v[2]),
+    clipPolygon(strip, (v) => v[2] - o.zQuay),
+  ]
   const out: Polygon[] = []
   for (const poly of parts) for (let i = 1; i + 1 < poly.length; i++) out.push([poly[0], poly[i], poly[i + 1]])
   return out
@@ -120,9 +111,10 @@ function outsideOpening(tri: Polygon, o: HullHatchOpening): Polygon[] {
  * Triangles of the covers go: all corners inside the bay's hatch footprint (plan view, with the gap to the neighbour) and
  * at or above the panel bottom (LOD0 panels start at the hold top, so the coaming walls below stay; LOD1 panels are boxes
  * from the main deck up). Flat main-deck triangles are clipped to the outside of the opening.
- * LOD2 is one box across all bays and is not handled (over 1 km away).
+ * LOD2 is one box across all bays (its top is two triangles over the whole span, at the cover top): that top is clipped to
+ * the outside of every open bay, and its walls stay, as the coamings they stand for. Its gaps keep a strip of top.
  */
-export function hullWithOpenHatches(meta: HullMeta, lod: 0 | 1, mesh: HullMeshData, bays: ReadonlySet<number>): Record<string, Float32Array> {
+export function hullWithOpenHatches(meta: HullMeta, lod: 0 | 1 | 2, mesh: HullMeshData, bays: ReadonlySet<number>): Record<string, Float32Array> {
   const openings = hullHatchOpenings(meta, bays)
   const names = Object.keys(mesh.attributes)
   const offsets: number[] = []
@@ -142,9 +134,16 @@ export function hullWithOpenHatches(meta: HullMeta, lod: 0 | 1, mesh: HullMeshDa
     return out
   }
   const deckY = meta.bayGrid.holdTopY - HULL_COAMING_M
+  // the hatch-cover top is the sidecar origin's height (the deck-stack base)
+  const coverTopY = meta.bayGrid.origin[1]
   const panelYMin = lod === 0 ? meta.bayGrid.holdTopY - EPS_M : deckY - EPS_M
   // the panel boxes reach the coaming inset (0.1 m) beyond the opening on every side; the lashing bridges in the gaps stay
   const slack = COAMING_INSET_M + EPS_M
+  const outsideAll = (tri: Polygon): Polygon[] => {
+    let pieces: Polygon[] = [tri]
+    for (const o of openings) pieces = pieces.flatMap((piece) => outsideOpening(piece, o))
+    return pieces
+  }
   const kept: Polygon[] = []
   for (let t = 0; t + 2 < count; t += 3) {
     const tri = [vertexAt(t), vertexAt(t + 1), vertexAt(t + 2)]
@@ -157,13 +156,16 @@ export function hullWithOpenHatches(meta: HullMeta, lod: 0 | 1, mesh: HullMeshDa
       (lod === 0 || maxY > deckY + EPS_M) &&
       openings.some((o) => minX >= o.x0 - slack && maxX <= o.x1 + slack && minZ >= o.zSea - slack && maxZ <= o.zQuay + slack)
     if (isCover) continue
+    if (minY >= coverTopY - EPS_M && maxY <= coverTopY + EPS_M) {
+      // a flat piece of cover top (LOD2's one box): what is over an open bay goes, the rest stays
+      kept.push(...outsideAll(tri))
+      continue
+    }
     if (minY < deckY - EPS_M || maxY > deckY + EPS_M) {
       kept.push(tri)
       continue
     }
-    let pieces: Polygon[] = [tri]
-    for (const o of openings) pieces = pieces.flatMap((piece) => outsideOpening(piece, o))
-    kept.push(...pieces)
+    kept.push(...outsideAll(tri))
   }
   const result: Record<string, Float32Array> = {}
   names.forEach((n, k) => {
