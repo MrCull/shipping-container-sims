@@ -146,7 +146,7 @@ describe('gate head-of-line blocking, pick head (TT-184, 0.42.0)', () => {
   })
 })
 
-describe('gate bypass takes a lane only at the head (TT-208, 0.44.0)', () => {
+describe('gate bypass takes a lane only at the head (TT-208, 0.45.0)', () => {
   it('holds each lane for about the processing time, and no lane is reserved before a bypassing truck is at the head', () => {
     const sim = createSimulation(hotBlock(14, 4), undefined, { invariants: { failFast: false } })
     expect(sim.runUntil().reason).toBe('ended')
@@ -163,7 +163,7 @@ describe('gate bypass takes a lane only at the head (TT-208, 0.44.0)', () => {
       // no lane is reserved for a bypassing truck before it is at the head: it starts the same instant it arrives there
       expect(started.get(id(e))).toBeCloseTo(e.t, 6)
       // and holds the lane for its processing (20 s) plus the short drive to the kiosk, not for the drive up the queue
-      // (before 0.44.0 the first of them held it for 73 s)
+      // (before 0.45.0 the first of them held it for 73 s)
       expect((gateIn.get(id(e)) as number) - e.t).toBeLessThan(35)
     }
   })
