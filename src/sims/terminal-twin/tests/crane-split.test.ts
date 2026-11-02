@@ -164,6 +164,25 @@ describe('crane split decision point', () => {
     expect(sim.invariantReport().violations).toEqual([])
   })
 
+  it('three cranes whose rail wants conflict resolve in a fixed order: no rail wait for ever (#212)', () => {
+    // seed 2, cranes at 100/160/220 m on a feeder with the hatch cycle on: STS105 wants the right, STS106 is asked to
+    // yield both ways, STS107 wants the hatch laydown on its left. The stall passes every invariant, so the move count is the check.
+    const build = () => {
+      const b = new ScenarioBuilder('three-crane-rail', 'three cranes with conflicting rail wants').seed(2)
+        .quay(600, { mooringS: 60, unmooringS: 60 })
+      for (const [i, x] of [100, 160, 220].entries()) b.sts(`STS10${5 + i}`, { gantryX: x, groundPositions: 30 })
+      return b.vesselCall('V001', { sizeClass: 'feeder', discharge: 24, maxSts: 3 }).build()
+    }
+    const sim = createSimulation(build())
+    expect(sim.runUntil().reason).toBe('ended')
+    expect(sim.kpiReport().movesCompleted).toBe(24)
+    expect(sim.invariantReport().violations).toEqual([])
+    expect(sim.query.stsList().filter((s) => s.status === 'waiting-for-rail')).toEqual([])
+    const again = createSimulation(build())
+    again.runUntil()
+    expect(again.eventLogHash()).toBe(sim.eventLogHash())
+  })
+
   it('rejects a split whose bay order contradicts the cranes’ rail order', () => {
     const sim = createSimulation(craneSplit, {
       craneSplit: (msg) => {
