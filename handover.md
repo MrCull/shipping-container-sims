@@ -31,7 +31,7 @@ Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 
 | Ticket | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
-| #202 | invariant stowage.cell-free | none | claimed | agent |
+| #202 | invariant stowage.cell-free | none | merged in branch (fast-forward fff82d5) | |
 | #207 | engine: yard allocation spreads across blocks | none | claimed | agent |
 | #208 | engine: gate-queue bypass only at queue head | none | to do | |
 | #209 | invariant: yard.no-progress wait from gate-in | none | to do | |
