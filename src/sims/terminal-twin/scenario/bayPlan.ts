@@ -43,10 +43,21 @@ export interface PlannedSlot {
   deck: boolean
   half: CellHalf
   purpose: SlotPurpose
+  /**
+   * Shared cell (#203): a discharge slot that also carries a load booking of the same shape. The booking
+   * (`plannedContainerId` or `emptyReq`, and this purpose) becomes the slot's `purpose` once the discharge box has left.
+   * A load booking of the other shape (two 20s where a 40 was, or the reverse) is a separate slot of the same cell.
+   */
+  loadPurpose?: Exclude<SlotPurpose, 'discharge'>
   /** Empty-container slot (TT-11): which requirement (index in `VesselConfig.empties`) it is booked for. */
   emptyReq?: { index: number; size: ContainerSize; line: string; isoType?: string }
   /** Transshipment slot linked to a box that arrives on an earlier vessel (TT-11). */
   plannedContainerId?: string
+}
+
+/** The purpose a slot has as a load booking: its own when it is a load slot, `loadPurpose` on a shared cell, else null. */
+export function loadPurposeOf(s: Pick<PlannedSlot, 'purpose' | 'loadPurpose'>): Exclude<SlotPurpose, 'discharge'> | null {
+  return s.loadPurpose ?? (s.purpose === 'discharge' ? null : s.purpose)
 }
 
 export interface PlannedContainer {
@@ -234,12 +245,12 @@ function planVessel(
   const withLoad = loadFlowEnabled(config)
   const reserved = withLoad ? 0 : v.load + v.transshipment
   const capacity = workableCells(v, [...robBays])
+  const robNote =
+    robBays.size > 0 ? `; ${robBays.size} bay(s) are set aside for ROB (robBayFraction ${robBayFractionOf(config)}), lower robBayFraction` : ''
+  // The discharge and the load share the bay's cells (#203), so each is checked against the non-ROB cells on its own.
   if (units.length + reserved > capacity)
     throw new Error(
-      `Vessel ${v.id} (${spec.label}): ${units.length} discharge cells + ${reserved} load/transshipment slots do not fit (capacity ${capacity} cells)` +
-        (robBays.size > 0
-          ? `; ${robBays.size} bay(s) are set aside for ROB (robBayFraction ${robBayFractionOf(config)}), lower robBayFraction`
-          : ''),
+      `Vessel ${v.id} (${spec.label}): ${units.length} discharge cells ${reserved > 0 ? `+ ${reserved} load/transshipment slots ` : ''}do not fit (capacity ${capacity} cells)` + robNote,
     )
 
   // 2. Discharge cells: spread over bays with jitter, hold/deck in proportion, bottom-up.
@@ -381,16 +392,12 @@ function planVessel(
     })
   })
 
-  // 2b. Load boxes (load flow): exports, transshipment boxes and empties each go to a slot whose stack held no
-  // discharge box, filled bottom-up, so the slot below is always loaded first and nothing is left floating once the
-  // discharge is out. Empties are placed after everything else, so they never lie below a box loaded with them.
+  // 2b. Load boxes (load flow): exports, transshipment boxes and empties fill every non-ROB cell of each bay bottom-up
+  // (hold before deck, lowest tier first, level across the stacks). They share cells with the discharge (#203): the
+  // engine loads a cell only once its discharge box has left. Empties are placed after everything else, so they never
+  // lie below a box loaded with them.
   const emptiesTotal = (v.empties ?? []).reduce((n, e) => n + e.count, 0)
   if (withLoad && v.load + v.transshipment + emptiesTotal > 0) {
-    const stackHasDischarge = (bay: number, row: number, deck: boolean): boolean => {
-      for (let tier = deck ? spec.holdTiers : 0; tier < (deck ? tiers : spec.holdTiers); tier++)
-        if (occupied.has(`${bay}:${row}:${tier}`)) return true
-      return false
-    }
     interface LoadBox {
       size: ContainerSize
       full: boolean
@@ -440,17 +447,17 @@ function planVessel(
       for (const deck of robBays.has(bay) ? [] : [false, true]) {
         const from = deck ? spec.holdTiers : 0
         for (let tier = from; tier < (deck ? tiers : spec.holdTiers); tier++)
-          for (let row = rowRange(spec, tier).from; row < rowRange(spec, tier).to; row++)
-            if (!stackHasDischarge(bay, row, deck)) {
-              list.push({ row, tier, deck })
-              stacks.set(`${bay}:${row}:${deck}`, { next: stackBaseTier(spec, row, deck), state: 'open' })
-            }
+          for (let row = rowRange(spec, tier).from; row < rowRange(spec, tier).to; row++) {
+            list.push({ row, tier, deck })
+            if (!stacks.has(`${bay}:${row}:${deck}`)) stacks.set(`${bay}:${row}:${deck}`, { next: stackBaseTier(spec, row, deck), state: 'open' })
+          }
       }
       clean.push(list)
     }
     const room = clean.reduce((n, l) => n + l.length, 0)
     if (loadUnits.length > room)
-      throw new Error(`Vessel ${v.id} (${spec.label}): ${loadUnits.length} export cells do not fit beside the discharge boxes (room for ${room})`)
+      throw new Error(`Vessel ${v.id} (${spec.label}): ${loadUnits.length} load cells do not fit (capacity ${room} cells)` + robNote)
+    const slotsHere = new Map(plan.slots.filter((x) => x.vesselId === v.id).map((x) => [x.id, x]))
     /** First cell of a bay (lowest tier first) whose stack takes this kind of cell on top (TT-R07: no 20 on a 40). */
     const findCell = (bay: number, kind: CellKind): number => {
       for (let i = 0; i < clean[bay].length; i++) {
@@ -477,9 +484,21 @@ function planVessel(
       occupied.add(`${b}:${cell.row}:${cell.tier}`)
       unit.boxes.forEach((box, k) => {
         const half: CellHalf = box.size === '20' ? (k === 0 ? 'aft' : 'fore') : null
-        const slotId = addSlot(b, cell.row, cell.tier, half, box.kind === 'ts' ? 'transshipment' : 'load')
+        const purpose = box.kind === 'ts' ? 'transshipment' : 'load'
+        // a booking of the same shape as the cell's discharge slot reuses that slot; the other shape is a slot of its own
+        const shared = slotsHere.get(vesselSlotId(v.id, b, cell.row, cell.tier, half))
+        let slotId: string
+        let slot: PlannedSlot
+        if (shared && shared.purpose === 'discharge') {
+          shared.loadPurpose = purpose
+          slotId = shared.id
+          slot = shared
+        } else {
+          slotId = addSlot(b, cell.row, cell.tier, half, purpose)
+          slot = plan.slots[plan.slots.length - 1]
+        }
         if (box.kind === 'empty') {
-          plan.slots[plan.slots.length - 1].emptyReq = { index: box.req as number, size: box.size, line: box.line, isoType: box.isoType as string }
+          slot.emptyReq = { index: box.req as number, size: box.size, line: box.line, isoType: box.isoType as string }
           return
         }
         const prefix = LINE_OWNER_PREFIX[box.line]
@@ -531,21 +550,24 @@ export interface ExtraLoadCell {
 
 /**
  * The cell for one more export box booked to a vessel after planning (a box a truck delivers with any yard start).
- * Same rule as the planner: a stack that holds no discharge box and no empties slot, filled bottom-up, so the load
- * order (bay, hold before deck, tier) never leaves a box floating. A 20 ft box first completes a lone aft half.
- * Spreads over the bays (fewest slots first). Null when the vessel has no such cell left.
+ * Same rule as the planner (#203): the load bookings of a stack are filled bottom-up over every non-ROB cell, whether or
+ * not the cell holds a discharge box at arrival, so the load order (bay, hold before deck, tier) never leaves a box
+ * floating. A stack with an empties booking is skipped. A 20 ft box first completes a lone aft half. Spreads over the
+ * bays (fewest load bookings first). Null when the vessel has no such cell left. The caller reuses the cell's discharge
+ * slot when one of the same shape stands there.
  */
 export function extraLoadCell(
   sizeClass: VesselConfig['sizeClass'],
-  slots: readonly Pick<PlannedSlot, 'bay' | 'row' | 'tier' | 'deck' | 'half' | 'purpose' | 'emptyReq'>[],
+  allSlots: readonly Pick<PlannedSlot, 'bay' | 'row' | 'tier' | 'deck' | 'half' | 'purpose' | 'loadPurpose' | 'emptyReq'>[],
   size: ContainerSize,
   robBays: readonly number[] = [],
 ): ExtraLoadCell | null {
   const spec = vesselClass(sizeClass)
   const tiers = spec.holdTiers + spec.deckTiers
+  const slots = allSlots.filter((s) => loadPurposeOf(s) !== null)
   if (size === '20') {
     const lone = slots
-      .filter((s) => s.half === 'aft' && s.purpose === 'load' && !s.emptyReq)
+      .filter((s) => s.half === 'aft' && loadPurposeOf(s) === 'load' && !s.emptyReq)
       .sort((a, b) => a.bay - b.bay || Number(a.deck) - Number(b.deck) || a.tier - b.tier || a.row - b.row)
       .find((s) => !slots.some((o) => o !== s && o.bay === s.bay && o.row === s.row && o.deck === s.deck && o.tier >= s.tier))
     if (lone) return { bay: lone.bay, row: lone.row, tier: lone.tier, deck: lone.deck, half: 'fore' }
@@ -560,7 +582,7 @@ export function extraLoadCell(
       let best: ExtraLoadCell | null = null
       for (let row = 0; row < spec.rows; row++) {
         const stack = slots.filter((s) => s.bay === bay && s.row === row && s.deck === deck)
-        if (stack.some((s) => s.purpose === 'discharge' || s.emptyReq)) continue
+        if (stack.some((s) => s.emptyReq)) continue
         const base = stackBaseTier(spec, row, deck)
         const tier = stack.reduce((m, s) => Math.max(m, s.tier + 1), base)
         if (tier >= to || !isCellUsable(spec, row, tier)) continue
@@ -686,7 +708,7 @@ function stowLoadByPodWeight(config: ScenarioConfig, plan: CargoPlan): void {
   const items: StowItem[] = []
   for (const c of plan.containers) {
     const slot = slots.get(c.slotId)
-    if (c.flow !== 'load' || !slot || slot.purpose !== 'load' || slot.emptyReq) continue
+    if (c.flow !== 'load' || !slot || loadPurposeOf(slot) !== 'load' || slot.emptyReq) continue
     items.push({ boxId: c.id, slotId: slot.id, cell: slot, size: c.size, reefer: c.reefer === true, props: c.props })
   }
   const moved = stowByPodWeight(items, resolveContainerProps(config).portRotation.ports)
@@ -741,7 +763,7 @@ function linkTransshipment(config: ScenarioConfig, plan: CargoPlan, sources: Pla
   const used = new Set<string>()
   const replaced = new Set<string>()
   const targets = plan.containers
-    .filter((c) => c.flow === 'load' && slots.get(c.slotId)?.purpose === 'transshipment')
+    .filter((c) => c.flow === 'load' && loadPurposeOf(slots.get(c.slotId) ?? { purpose: 'discharge' }) === 'transshipment')
     .sort((a, b) => (arrival.get(a.vesselId) as number) - (arrival.get(b.vesselId) as number))
   for (const target of targets) {
     const limit = arrival.get(target.vesselId) as number

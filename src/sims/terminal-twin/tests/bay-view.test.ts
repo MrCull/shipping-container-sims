@@ -27,6 +27,9 @@ const totals = (data: BayViewData, mode: ColourMode = 'status'): Record<string, 
   return sum
 }
 const worked = (data: BayViewData): number => data.slots.filter((s) => s.purpose === 'discharge' || s.containerId !== null || s.plannedContainerId || s.emptyReq).length
+/** Slots that share a cell with a slot of the other shape (#203: a 40 slot and two 20 slots): the cell draws one shape only. */
+const hidden = (data: BayViewData): number =>
+  data.slots.filter((s) => data.slots.some((o) => o.bay === s.bay && o.row === s.row && o.tier === s.tier && (o.half === null) !== (s.half === null))).length
 
 describe('slot status', () => {
   const slot = (o: Partial<Parameters<typeof slotStatus>[0]>): Parameters<typeof slotStatus>[0] => ({ purpose: 'discharge', containerId: null, ...o })
@@ -70,7 +73,8 @@ describe('bay view of a running vessel', () => {
     expect(t['planned-load']).toBeGreaterThan(0)
     expect(t['in-progress'] + t.done).toBe(0)
     expect(t.rob).toBe(before.robBoxes.length)
-    expect(t['planned-discharge'] + t['planned-load']).toBe(worked(before))
+    expect(t['planned-discharge'] + t['planned-load']).toBeLessThanOrEqual(worked(before))
+    expect(t['planned-discharge'] + t['planned-load']).toBeGreaterThanOrEqual(worked(before) - hidden(before))
   })
 
   it('shows ROB bays as ROB cells only, with POD, line and weight class in the hover details', () => {
@@ -87,7 +91,10 @@ describe('bay view of a running vessel', () => {
   })
 
   it('goes planned, in progress, done as the run proceeds, and ends with everything worked done', () => {
-    const slot = before.slots.find((s) => s.purpose === 'discharge' && s.containerId)!
+    // a cell shared with a load booking is drawn as the loaded box once it is loaded (#203): follow a discharge-only cell
+    const slot = before.slots.find(
+      (s) => s.purpose === 'discharge' && s.containerId && !before.shared?.[s.id] && !before.slots.some((o) => o.id !== s.id && o.bay === s.bay && o.row === s.row && o.tier === s.tier),
+    )!
     const cellOf = (data: BayViewData): BayCell => allCells(view(data, slot.bay)).find((c) => c.slotId === slot.id)!
     expect(cellOf(before).status).toBe('planned-discharge')
     let saw = false
@@ -104,7 +111,8 @@ describe('bay view of a running vessel', () => {
     const end = dataOf(sim)
     const t = totals(end)
     expect(t['planned-discharge'] + t['planned-load'] + t['in-progress']).toBe(0)
-    expect(t.done).toBe(worked(end)) // truck exports book extra load slots while the run goes
+    expect(t.done).toBeLessThanOrEqual(worked(end)) // truck exports book extra load slots while the run goes
+    expect(t.done).toBeGreaterThanOrEqual(worked(end) - hidden(end))
     expect(worked(end)).toBeGreaterThanOrEqual(worked(before))
     // a discharged box keeps its properties on the done cell (they come from the box's history)
     expect(cellOf(end).details).toMatchObject({ status: 'done', boxId: expect.any(String), pod: expect.any(String) })

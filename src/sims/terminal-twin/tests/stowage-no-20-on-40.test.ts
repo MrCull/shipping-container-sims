@@ -1,7 +1,7 @@
 /** TT-R07: on board, a 20 never sits on a 40, and a 40 rests only on a 40 or on two filled 20 halves. */
 import { describe, expect, it } from 'vitest'
 import { createSimulation, restoreSimulation } from '../engine'
-import { planCargo, type PlannedSlot } from '../scenario/bayPlan'
+import { loadPurposeOf, planCargo, type PlannedSlot } from '../scenario/bayPlan'
 import { ScenarioBuilder } from '../scenario/builder'
 import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
@@ -9,7 +9,13 @@ import { isStackBase, vesselClass } from '../scenario/vesselClasses'
 import type { ScenarioConfig } from '../scenario/types'
 
 /** Independent check of a plan: every pair of stacked cells (same section) obeys the rule. */
-function violations(config: ScenarioConfig, slots: readonly PlannedSlot[]): string[] {
+function violations(config: ScenarioConfig, all: readonly PlannedSlot[]): string[] {
+  // the discharge and the load share cells (#203): each is a stowage of its own (the discharge is gone before the load)
+  const sets = [all.filter((s) => s.purpose === 'discharge'), all.filter((s) => loadPurposeOf(s) !== null)]
+  return [...new Set(sets.flatMap((slots) => stackViolations(config, slots)))]
+}
+
+function stackViolations(config: ScenarioConfig, slots: readonly PlannedSlot[]): string[] {
   const out: string[] = []
   for (const v of config.vessels) {
     const spec = vesselClass(v.sizeClass)

@@ -67,9 +67,15 @@ describe('stowage.no-floating invariant', () => {
 
   it('fails a tampered snapshot with a floating load box (a box put in a slot whose lower cell is empty)', () => {
     const ids = tamperedViolations('vessel-ordering-pod-weight', (state) => {
-      const hit = aboveBase(state, (s) => s.purpose === 'load' && s.plannedContainerId != null && s.containerId === null)
-      expect(hit, 'a booked load slot above an empty cell').not.toBeNull()
-      hit!.upper.containerId = hit!.upper.plannedContainerId as string
+      // load boxes fill the bays bottom up and share cells with discharge boxes (#203): move a booked load slot one tier
+      // up, empty the cell it left, and load it, so its lower cell is empty
+      const hit = Object.values(state.vesselSlots).find((s) => (s.purpose === 'load' || !!s.loadPurpose) && s.plannedContainerId != null)
+      expect(hit, 'a booked load slot').toBeDefined()
+      for (const o of Object.values(state.vesselSlots)) if (o.vesselId === hit!.vesselId && o.bay === hit!.bay && o.row === hit!.row && o.tier === hit!.tier) o.containerId = null
+      hit!.tier += 1
+      hit!.purpose = 'load'
+      delete hit!.loadPurpose
+      hit!.containerId = hit!.plannedContainerId as string
     })
     expect(ids).toContain(ID)
   })

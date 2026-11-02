@@ -27,7 +27,7 @@ import { laneGraphOf } from '../laneGraph'
 import { maybeDispatchAsc } from './ascDispatch'
 import { requestGroundPosition } from './quay'
 import { maybeDispatch } from './shc'
-import { packagesOf } from './workPackages'
+import { cellIsEmpty, packagesOf } from './workPackages'
 
 /** Stages that hold (or are about to hold) one of the crane's ground positions. */
 const STAGED = new Set<LoadOrder['stage']>(['gp-asked', 'gp-claimed', 'retrieving', 'on-pad', 'to-ground', 'on-ground'])
@@ -123,6 +123,7 @@ export function pumpLoadPrep(ctx: EngineContext): void {
     const next = orders.find((o) => o.stage === 'released' || o.stage === 'padded' || o.stage === 'staging')
     if (!next || next.stage === 'staging' || !dischargeDone(state, sts, state.workPackages[next.packageId].seq)) continue
     if (waiting && state.workPackages[next.packageId].seq > waiting.seq) continue
+    if (!cellIsEmpty(state, next.slotId)) continue // a shared cell (#203): the discharge box has not left yet
     const box = state.containers[next.containerId]
     if (next.stage !== 'padded' && box.custody.kind !== 'yardSlot') continue // an empty start: the booked box has not been delivered and stacked yet (asked again when it is)
     if (next.stage !== 'padded' && box.onwardVesselId && box.readyAt == null) continue // transshipment box still dwelling (or still on its first vessel)

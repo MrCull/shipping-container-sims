@@ -70,6 +70,28 @@ export interface BayBox {
 }
 
 /** Everything the viewer needs about one vessel, in plain data (a worker query result). */
+/**
+ * A cell shared by a discharge box and a load booking (#203): the engine slot holds both, the viewer shows the arrival
+ * box until the load box is aboard (the Discharge plan only; the Load plan shows the cell once it is loaded).
+ */
+export interface SharedCell {
+  /** The engine slot as it is (purpose load once the discharge box has left). */
+  slot: VesselSlotState
+  /** The box booked to load into the cell, if any (an empties booking has none until allocated). */
+  load?: BayBox
+  /** The box that arrived on the vessel in this cell. */
+  arrival: BayBox
+}
+
+/** The slot and box the viewer draws for a shared cell: the load once it is aboard, else the discharge box and its slot. */
+export function presentShared(c: SharedCell): { slot: VesselSlotState; box: BayBox } {
+  if (c.load?.custody === 'vesselSlot') return { slot: { ...c.slot, containerId: c.load.id }, box: c.load }
+  return {
+    slot: { ...c.slot, purpose: 'discharge', loadPurpose: undefined, containerId: c.arrival.custody === 'vesselSlot' ? c.arrival.id : null, plannedContainerId: undefined, emptyReq: undefined },
+    box: c.arrival,
+  }
+}
+
 export interface BayViewData {
   vesselId: string
   sizeClass: VesselSizeClass
@@ -77,6 +99,8 @@ export interface BayViewData {
   slots: VesselSlotState[]
   /** The box a slot holds, held, or is booked for, by slot id. */
   boxes: Record<string, BayBox>
+  /** Shared cells (#203) by slot id: `slots` and `boxes` hold their presentation; this the raw parts, to present them again at another time. */
+  shared?: Record<string, SharedCell>
   packages: WorkPackage[]
   robBoxes: RobBox[]
   /** Sim time (s) the data was read at (the time-based colour modes count from it). Absent on data from before #130: 0. */
@@ -424,7 +448,18 @@ export function buildBayView(data: BayViewData, bay: number, opts: BayViewOption
     const k = `${row}:${tier}`
     const own = (slotsHere.get(k) ?? []).map((s) => ({ cell: cellOfSlot(s), purpose: s.purpose as VesselSlotState['purpose'] | null }))
     const rob = (robHere.get(k) ?? []).map((b) => ({ cell: cellOfRob(b), purpose: null as VesselSlotState['purpose'] | null }))
-    const found = [...own, ...rob]
+    let found = [...own, ...rob]
+    // a cell can hold slots of both shapes (#203: a 40 discharge slot and two 20 load slots, or the reverse): draw the
+    // shape whose slot holds a box now, else the one a plan shows, else the discharge slot
+    if (found.some((f) => f.cell.half === null) && found.some((f) => f.cell.half !== null)) {
+      const score = (list: typeof found): number =>
+        Math.max(...list.map((f) => (f.cell.status === 'planned-discharge' || f.cell.status === 'in-progress' || (f.cell.status === 'done' && f.purpose !== 'discharge') ? 2 : f.cell.status !== 'empty' ? 1 : 0)))
+      const wholes = found.filter((f) => f.cell.half === null)
+      const halves = found.filter((f) => f.cell.half !== null)
+      const dischargeFirst = (list: typeof found) => list.some((f) => f.purpose === 'discharge')
+      const [a, b] = dischargeFirst(wholes) ? [wholes, halves] : [halves, wholes]
+      found = score(b) > score(a) ? b : a
+    }
     let cells: BayCell[]
     const whole = found.find((f) => f.cell.half === null)
     if (whole) cells = [whole.cell]
