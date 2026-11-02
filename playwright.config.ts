@@ -43,7 +43,8 @@ export default defineConfig({
   // Dev-server chunks (the lazy dashboard, GLBs) and software-WebGL frames are slow on a loaded 2-core runner.
   expect: { timeout: 20_000 },
   fullyParallel: false,
-  workers: 1,
+  // One at a time by default: browser tests are CPU-bound on software WebGL. SMOKE_WORKERS=2 trades speed for timeouts on a 4-core box; try it on an idle machine and re-run failures alone.
+  workers: Number(process.env.SMOKE_WORKERS) || 1,
   // CI runners are slower than a dev machine: a spec that fails once and passes on retry is reported as flaky, not red.
   retries: process.env.CI ? 2 : 0,
   reporter: [['list']],

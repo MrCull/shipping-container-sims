@@ -37,7 +37,8 @@ When the owner asks for it (to save wall-clock time on a long spec), a brief tha
 
 ## Gotchas no check enforces
 
-- Run anything longer than about a minute in the background with its output in a log file. A foreground command past the tool timeout leaves no output.
+- Run anything longer than about a minute with `scripts/bg.sh run <log> <command...>` (detached; the log ends with `EXIT <code>`), then `scripts/bg.sh wait <log> [seconds]` to block until it finishes. Never write your own `sleep` loop: one left running blocks `scripts/remove-worktree.sh`. `scripts/test-bg.sh` tests it.
+- The smoke suite is serial; `SMOKE_WORKERS=2` runs two spec files at once (idle machine only; re-run any failure alone before believing it).
 - Each `pnpm run test:smoke` picks free ports itself (`playwright.config.ts`), so parallel agents never share one; leave `SMOKE_DEV_PORT` and `SMOKE_PROD_PORT` unset. Stop only processes you started, with `kill <pid>`; never `pkill -f` or `fuser -k`.
 - Disk is shared: a worktree with `node_modules` is about 1.2 GB. Implementers delete their worktree's `node_modules`, `.smoke-dist` and `.smoke-results` before reporting; the orchestrator removes the worktree after the merge. Remove worktrees with `git worktree remove` (never a blanket `rm -rf`, which the permission classifier blocks).
 - Vitest's timeout is 60 s (`vitest.config.ts`), so `pnpm run verify` runs green on a busy machine; a timeout failure there is a real hang once it reproduces alone (`invariants-incremental.test.ts` has timed out under three parallel agents and passed alone).
