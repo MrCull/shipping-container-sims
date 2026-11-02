@@ -72,7 +72,7 @@ export interface BayBox {
 /** Everything the viewer needs about one vessel, in plain data (a worker query result). */
 /**
  * A cell shared by a discharge box and a load booking (#203): the engine slot holds both, the viewer shows the arrival
- * box until the load box is aboard (the Discharge plan only; the Load plan shows the cell once it is loaded).
+ * box until the load box is aboard when no plan is chosen; a plan shows its own box (`presentSharedFor`, #205).
  */
 export interface SharedCell {
   /** The engine slot as it is (purpose load once the discharge box has left). */
