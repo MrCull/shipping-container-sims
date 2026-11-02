@@ -25,7 +25,7 @@ Open: peak day at 0.1 (#183 parked) is expected to be fixed by #184.
 | #197 | smoke timing report | none | merged in branch | |
 | #198 | Chromium cache in CI | none | merged in branch | |
 | #199 | parallel proof runner | #194 | merged in branch | |
-| #200 | final: CI workflow_dispatch check | #194 to #199 | run 170 timed out at 40 min (test 130 of 163, no report, no cache saved); fixed: timeout 75, cache saved right after install; re-run pending | |
+| #200 | final: CI workflow_dispatch check | #194 to #199 | merged in branch: run 171 (f19b7ef) smoke 160 pass, 3 golden-hash specs red; attempt 2 hit the Chromium cache (install skipped), 49 min on a slower runner, +1 load failure (x3600 speed, #191); timeout 75 min | |
 
 ## Spec #201 and follow-ups (same branch, fast mode). Ticket bodies: scratchpad impl201/<N>.md
 
