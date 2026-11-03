@@ -286,7 +286,8 @@ describe('invariants (negative tests)', () => {
     expect(truck).toBeDefined()
     truck.legs[0].done = false
     const broken = restoreSimulation(snap)
-    broken.step()
+    // a state-neutral DecisionRequested is not checked (#226): step on to the first checked event
+    for (let i = 0; i < 10 && broken.status !== 'failed'; i++) broken.step()
     expect(broken.firstError?.message).toMatch(/landside\.leaves-complete.*unfinished transfer/)
   })
 })
