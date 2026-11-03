@@ -10,8 +10,8 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | #233 | per-invariant CPU cost on the 0.1 peak day (measure only, 10 min) | none | claimed | agent |
 | #227 | invariant check reuses buffers (GC 20%) | #233 | blocked | |
 | #228 | cache retrievalRanks per block (headsWithoutPad not cacheable: depends on load-order stages) | none | merged in branch: hashes unchanged at 0.1 and 0.25; wall gain small and noisy (0.25: 137 s to 110 s, 0.1 peak day no gain) | |
-| #229 | no package for a crane that must yield its rail (moves the log) | none | claimed | agent |
-| #230 | SHC dispatch tie-break to the least loaded (moves the log) | none | to do | |
+| #229 | rail waits: where STS106, STS102 and STS105 wait at 0.5 (rescoped to measure, 20 min) | none | first slice no engine change (look-ahead changed nothing at 0.1; rail 0% there; waits come from parked start positions); guard test and note merged; measuring slice to do | |
+| #230 | SHC dispatch tie-break to the least loaded (moves the log; proof at a bounded 0.25 run) | none | claimed | agent |
 | #231 | berth look-ahead for first-fit (moves the log) | #229, #230 | blocked | |
 | #222 | final: scale 1 or best scale, goldens, smoke | #226 to #231 | blocked | |
 
