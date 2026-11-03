@@ -7,7 +7,7 @@
  * a lift elsewhere in the block makes room.
  */
 import { describe, expect, it } from 'vitest'
-import { blockSpecs, createSimulation, defaultHandlers, rehandleRoomFor, type BlockSpec, type Simulation } from '../engine'
+import { blockersOf, blockSpecs, createSimulation, defaultHandlers, rehandleRoomFor, type BlockSpec, type Simulation } from '../engine'
 import { ScenarioBuilder } from '../scenario/builder'
 import type { ScenarioConfig } from '../scenario/types'
 
@@ -70,8 +70,8 @@ describe('pick admission', () => {
 })
 
 /** Same full block, but with one holding position: two drop-only empties arrive first, then the picks that would free room. */
-function blockedHead(picks: number): ScenarioConfig {
-  const config = fullBlock(0, 7) // seed 7 since #208: the 92 % full block is a knife edge (seeds 1, 4, 5, 6 deadlock on rehandle room once a bypassing truck waits to reach the head; seeds 2, 3, 7, 8, 9 pass)
+function blockedHead(picks: number, seed: number): ScenarioConfig {
+  const config = fullBlock(0, seed)
   config.yard = { blocks: [{ ...(config.yard as NonNullable<ScenarioConfig['yard']>).blocks[0], bays: 2 }] }
   config.yardStart = { mode: 'prefilled', targetPct: 92, mix: { import: 100, export: 0, transshipment: 0 } }
   config.landside = {
@@ -87,8 +87,10 @@ function blockedHead(picks: number): ScenarioConfig {
 }
 
 describe('gate head-of-line blocking (TT-184)', () => {
-  it('lets a pick pass a drop-only head that no stall admits, so the picks free room for the drops', () => {
-    const sim = createSimulation(blockedHead(8), undefined, { invariants: { failFast: false } })
+  // TT-215: seeds 1 to 9 again except seed 4 (#208 had narrowed it to seed 7). Seed 4 ends in a layout no pick can leave: two earlier
+  // rehandles left stacks of unequal height in every row, so no 40 ft blocker has a pair of stacks to go to (pre-existing target choice, not admission)
+  it.each([1, 2, 3, 5, 6, 7, 8, 9])('lets a pick pass a drop-only head that no stall admits, so the picks free room for the drops (seed %i)', (seed) => {
+    const sim = createSimulation(blockedHead(8, seed), undefined, { invariants: { failFast: false } })
     const result = sim.runUntil()
     expect(sim.firstError).toBeNull()
     expect(sim.invariantReport().violations).toEqual([])
@@ -166,5 +168,59 @@ describe('gate bypass takes a lane only at the head (TT-208, 0.45.0)', () => {
       // (before 0.45.0 the first of them held it for 73 s)
       expect((gateIn.get(id(e)) as number) - e.t).toBeLessThan(35)
     }
+  })
+})
+
+/** A 2-bay block at 90 % with three stalls and a burst of picks: several admitted picks compete for the same few free cells. */
+function crowdedPicks(picks: number, seed: number): ScenarioConfig {
+  const config = fullBlock(0, seed)
+  config.yard = { blocks: [{ ...(config.yard as NonNullable<ScenarioConfig['yard']>).blocks[0], bays: 2 }] }
+  config.yardStart = { mode: 'prefilled', targetPct: 90, mix: { import: 100, export: 0, transshipment: 0 } }
+  config.landside = {
+    ...(config.landside as NonNullable<ScenarioConfig['landside']>),
+    scripted: Array.from({ length: picks }, (_, i) => ({ atS: 600 + i * 10, transaction: 'pickImport' as const })),
+  }
+  return config
+}
+
+describe('pick admission counts promised room (TT-215)', () => {
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9])('never admits a pick past the room the admitted picks already hold (seed %i)', (seed) => {
+    const config = crowdedPicks(12, seed)
+    const spec = blockSpecs(config).find((b) => b.id === 'B01') as BlockSpec
+    let over = 0
+    let decided = 0
+    const sim: Simulation = createSimulation(
+      config,
+      {
+        transferStallSelection: (msg, query) => {
+          const { state } = sim.snapshot()
+          decided++
+          // the rehandle cells this truck's picks need, plus those of every other truck that already holds a stall
+          const need = (truckId: string): number => {
+            let n = 0
+            for (const j of Object.values(state.ascJobs)) {
+              if (j.kind !== 'retrieve' || j.truckId !== truckId || j.ascId !== null) continue
+              const slot = state.yardSlots[j.yardSlotId ?? '']
+              if (slot && slot.containerId === j.containerId) for (const b of blockersOf(state, slot)) n += b.span
+            }
+            return n
+          }
+          let promised = need(msg.payload.truckId)
+          for (const t of Object.values(state.trucks)) if (t.id !== msg.payload.truckId && t.stallId != null) promised += need(t.id)
+          const yard = state.yardBlocks.B01
+          const free = yard.heights.reduce((n, h) => n + Math.max(0, spec.tiers - h), 0)
+          if (promised > free) over++
+          return defaultHandlers.transferStallSelection(msg, query)
+        },
+      },
+      { invariants: { failFast: false } },
+    )
+    const result = sim.runUntil()
+    expect(sim.firstError).toBeNull()
+    expect(sim.invariantReport().violations).toEqual([])
+    expect(result.reason).toBe('ended')
+    expect(sim.eventLog().filter((e) => e.type === 'TruckDeparted')).toHaveLength(12)
+    expect(decided).toBe(12)
+    expect(over).toBe(0)
   })
 })

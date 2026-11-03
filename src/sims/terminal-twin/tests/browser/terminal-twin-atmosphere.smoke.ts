@@ -158,8 +158,9 @@ test('leaving restores the sound on the main menu', async ({ page }) => {
   expect((await atmosphere(page)).soundGain).toBe(0)
   await page.locator('.back-btn').click()
   await page.waitForURL((url) => url.pathname === '/')
+  // the entry mute is transient since #192: nothing is written to storage, so the owner's saved choice is never forced to muted
   const stored = await page.evaluate(() => JSON.parse(window.localStorage.getItem('shipping-container-sims') ?? '{}').global?.soundMuted)
-  expect(stored).toBe(false)
+  expect(stored === undefined || stored === false).toBe(true)
 })
 
 test('a departure shows a banner that does not block clicks', async ({ page }) => {

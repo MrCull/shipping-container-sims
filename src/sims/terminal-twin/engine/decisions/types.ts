@@ -466,6 +466,8 @@ export interface TransferStallSelectionRequest {
   stalls: TransferStallOption[]
   /** Per block: trucks that hold a stall or wait for one (the ASC work queue the truck would join). */
   blockLoad: Record<string, number>
+  /** #188: per block, the share of its cells in use (0 to 1); the `spread-drops` strategy reads it. */
+  blockFill?: Record<string, number>
 }
 
 export interface TransferStallSelectionReply {

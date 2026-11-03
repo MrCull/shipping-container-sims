@@ -67,7 +67,7 @@ import { DEFAULT_LANDSIDE } from '../../scenario/builder'
 import { vesselSlotId } from '../../scenario/vesselClasses'
 import { appointmentWindowS, planAppointments } from '../appointments'
 import { maybeDispatchAsc, pumpAllocation } from './asc'
-import { rehandleRoomFor } from './rehandle'
+import { admittedPicksKeepRoom, rehandleRoomFor } from './rehandle'
 import { TripBuilder, blockRoom, waypoints } from './shc'
 
 type PlannedType = TruckPlannedEvent['type']
@@ -793,8 +793,11 @@ function stallLegal(ctx: EngineContext, truck: TruckState, blockId: string, room
     // transaction's own drop is another matter: its pick frees room)
     if (truck.legs.every((l) => l.kind === 'pick' && !l.done)) {
       const spec = blockSpecs(ctx.config).find((b) => b.id === blockId)
-      if (spec)
+      if (spec) {
         for (const job of Object.values(ctx.state.ascJobs)) if (job.truckId === truck.id && job.blockId === blockId && !rehandleRoomFor(ctx.state, spec, job)) return false
+        // TT-215: and the picks already admitted to the block keep their room with this truck among them
+        if (!admittedPicksKeepRoom(ctx.state, spec, truck.id)) return false
+      }
     }
     return true
   }
@@ -858,6 +861,7 @@ function askStall(ctx: EngineContext, truck: TruckState): void {
       }),
       stalls: stallOptions(ctx, truck.nodeId, ahead).filter((o) => stallLegal(ctx, truck, o.blockId, room)),
       blockLoad,
+      blockFill: Object.fromEntries(Object.values(state.yardBlocks).map((y) => [y.id, y.heights.reduce((n, h) => n + h, 0) / Math.max(1, y.heights.length * y.tiers)])),
     },
     { equipment: [truck.id] },
   )

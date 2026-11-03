@@ -34,7 +34,7 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.45.0'
+export const ENGINE_VERSION = '0.52.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
@@ -186,7 +186,8 @@ export interface Simulation {
   readonly asyncMode: AsyncMode
   snapshot(): SimSnapshot
   /** Replace this simulation's state with a snapshot's (handlers, options and subscribers are kept). */
-  restore(snapshot: SimSnapshot): void
+  /** `adopt: true` takes the snapshot object itself instead of a copy (the caller must not use it again; a large snapshot needs this to fit in memory). */
+  restore(snapshot: SimSnapshot, options?: { adopt?: boolean }): void
   /** The event and its cause chain back to the root: [event, parent, …, root]. */
   why(eventId: number): EngineEvent[]
   subscribe(listener: EventListener, filter?: { types?: EventType[] }): () => void
@@ -545,8 +546,9 @@ export function createSimulation(
     step,
     runUntil,
     runUntilAsync,
+    // structuredClone, not clone(): a large run's snapshot is past the string limit JSON.stringify hits (about 512 MB).
     snapshot: () =>
-      clone({
+      structuredClone({
         kind: 'terminal-twin-snapshot',
         schemaVersion: SNAPSHOT_SCHEMA_VERSION,
         engineVersion: ENGINE_VERSION,
@@ -558,10 +560,10 @@ export function createSimulation(
         state,
         log,
       }),
-    restore(snapshot) {
+    restore(snapshot, restoreOptions) {
       const compat = checkSnapshotCompat(snapshot)
       if (!compat.ok) throw new SnapshotCompatError(compat)
-      const copy = clone(snapshot)
+      const copy = restoreOptions?.adopt ? snapshot : structuredClone(snapshot)
       state = copy.state
       log = copy.log
       byId = new Map(log.map((e) => [e.id, e]))
@@ -616,8 +618,9 @@ export function restoreSimulation(
   snapshot: SimSnapshot,
   handlers: Partial<HandlerSet> = {},
   options: Omit<SimulationOptions, 'seed'> = {},
+  restoreOptions?: { adopt?: boolean },
 ): Simulation {
   const sim = createSimulation(snapshot.config, handlers, { ...options, seed: snapshot.seed, skipPreRun: true })
-  sim.restore(snapshot)
+  sim.restore(snapshot, restoreOptions)
   return sim
 }

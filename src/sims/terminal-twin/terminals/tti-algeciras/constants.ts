@@ -133,3 +133,9 @@ export const SURROUNDINGS = {
 export const TTI_ACCESS_ROAD_Z = SURROUNDINGS.landside.z - 10
 /** [A] The trucks enter the access road this far south of the quay's south end (m): well inside the fog, outside the terminal. */
 export const TTI_ACCESS_ROAD_RUNUP_M = 100
+
+/**
+ * Ticket #192 (#172): height of the sea channel plane in scene y (m). It lies over the apron and next to the road end,
+ * and the road, rails and yard markings sit at 0.04 m, so the plane is 0.04 m above that to never share their depth.
+ */
+export const TTI_SEA_CHANNEL_Y = 0.08

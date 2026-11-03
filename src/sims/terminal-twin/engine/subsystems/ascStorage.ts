@@ -132,6 +132,9 @@ export function pumpRehandle(ctx: EngineContext, blockId: string): void {
   if (jobs.some((j) => j.kind === 'rehandle')) return
   for (const retr of jobs) {
     if (retr.kind !== 'retrieve' || retr.ascId !== null || retr.dispatch === 'asked' || retr.rehandle === 'full') continue
+    // TT-215: only a truck that holds a stall is dug for; the digs for queued trucks took the room admitted picks had
+    // been promised and shuttled boxes between stacks (a live-lock on rehandle room)
+    if (isTruckJob(retr) && state.trucks[retr.truckId as string]?.stallId == null) continue
     const blocker = nextBlocker(state, retr)
     // an earlier export retrieval that is free to go runs before any later dig: otherwise a blocker is shuttled between
     // the stacks of two pending retrievals (each dig buries the other box) and neither is ever retrieved
@@ -167,8 +170,9 @@ export function pumpRehandle(ctx: EngineContext, blockId: string): void {
         blockerIds: slot ? boxesAboveIds(state, slot) : [],
       })
     }
-    requestRehandleTarget(ctx, job, retr)
-    return
+    // TT-215: a retrieval whose blocker has no target is marked "full" and the pump goes on to the next one; stopping here
+    // starved the admitted picks behind a queued truck's dig (nothing asked again: a deadlock on rehandle room)
+    if (requestRehandleTarget(ctx, job, retr)) return
   }
 }
 
@@ -177,13 +181,13 @@ function boxesAboveIds(state: SimState, slot: NonNullable<ReturnType<typeof retr
 }
 
 /** Ask rehandleTarget where the blocker of `retr` goes (nothing is claimed until the reply). */
-function requestRehandleTarget(ctx: EngineContext, job: AscJob, retr: AscJob): void {
+function requestRehandleTarget(ctx: EngineContext, job: AscJob, retr: AscJob): boolean {
   const { state } = ctx
   const blocker = state.yardSlots[job.yardSlotId ?? '']
   const digging = retrievalSlot(state, retr)
   if (!blocker || !digging) {
     delete state.ascJobs[job.id] // the situation changed; the pump starts over
-    return
+    return true
   }
   const block = blockOf(ctx, job.blockId)
   const candidates = rehandleCandidates(state, ctx.config, block, blocker, digging)
@@ -191,7 +195,7 @@ function requestRehandleTarget(ctx: EngineContext, job: AscJob, retr: AscJob): v
     delete state.ascJobs[job.id]
     retr.rehandle = 'full' // the block has no room for the blocker: the retrieval stays blocked
     if (state.kpis.yard) state.kpis.yard.rehandleFailures++
-    return
+    return false
   }
   const box = state.containers[job.containerId]
   const ranks = retrievalRanks(state, ctx.config, job.blockId)
@@ -220,6 +224,7 @@ function requestRehandleTarget(ctx: EngineContext, job: AscJob, retr: AscJob): v
     },
     { equipment: ascs.filter((a) => a.status === 'idle').map((a) => a.id), jobs: [job.id], containers: [box.id] },
   )
+  return true
 }
 
 /** The rehandleTarget reply: claim the slot (or ask again if it was taken meanwhile). */

@@ -51,3 +51,21 @@ export function leastLoadedBlockStall(req: TransferStallSelectionRequest): Trans
   )
   return { stallId: free[0]?.stallId ?? null }
 }
+
+/** `spread-drops` (#188): metres of road one unit of block fill is worth (a block 10 points fuller costs 600 m). [assumed] */
+export const SPREAD_FILL_M = 6000
+/** `spread-drops`: metres one truck holding or waiting for a stall of the block is worth. [assumed] */
+export const SPREAD_TRUCK_M = 60
+
+/**
+ * A truck that picks goes where its box is (as `nearest-to-box`). A truck that only drops takes the free stall of lowest
+ * cost: road distance from the gate plus the fill and the trucks queued of its block, so truck-delivered exports spread over
+ * the yard instead of filling the blocks nearest the gate (#188: B01 to B04 reached 90 % while the far blocks stood at 77 %).
+ */
+export function spreadDropsStall(req: TransferStallSelectionRequest): TransferStallSelectionReply {
+  if (req.legs.some((l) => l.kind === 'pick')) return nearestToBoxStall(req)
+  const free = req.stalls.filter(isFree)
+  const cost = (s: TransferStallOption) => s.distanceM + SPREAD_FILL_M * (req.blockFill?.[s.blockId] ?? 0) + SPREAD_TRUCK_M * (req.blockLoad[s.blockId] ?? 0)
+  free.sort((a, b) => cost(a) - cost(b) || (a.stallId < b.stallId ? -1 : 1))
+  return { stallId: free[0]?.stallId ?? null }
+}

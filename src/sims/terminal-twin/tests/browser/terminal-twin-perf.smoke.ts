@@ -87,7 +87,7 @@ test('TTI preset at overview zoom: instanced containers are culled and the draw 
   const errors = watch(page)
   await open(page, 'TTI Algeciras baseline')
   await page.evaluate(() => window.__tt!.setQuality('high'))
-  await page.waitForFunction(() => (window.__tt!.scene()?.containers ?? 0) > 10_000, undefined, { timeout: 120_000 })
+  await page.waitForFunction(() => (window.__tt!.scene()?.containers ?? 0) > 8_000, undefined, { timeout: 120_000 })
   await page.waitForFunction(() => window.__tt!.scene()!.containerAssets === 'loaded', undefined, { timeout: 60_000 })
   // overview zoom: the whole terminal in view
   await page.evaluate(() => window.__tt!.cameraTo('STS104', 1100))
@@ -100,7 +100,8 @@ test('TTI preset at overview zoom: instanced containers are culled and the draw 
     description: JSON.stringify({ containers: scene.containers, culled: scene.containerLods.culled, lod0: scene.containerLods.lod0, render: scene.render, cpuMs: perf.stats.cpuMs }),
   })
   console.log('TTI overview', JSON.stringify({ render: scene.render, perf, containerLods: scene.containerLods }))
-  expect(scene.containers).toBeGreaterThan(10_000)
+  // 9,171 at scale 0.5 (the pre-fill is 68.5 % of cells, #188); the floor tracks the yard size, the budgets below are the point
+  expect(scene.containers).toBeGreaterThan(8_000)
   // main pass + shadow pass; the unbatched ground alone used to cost ~1,300 draw calls here
   expect(scene.render.calls).toBeLessThan(450)
   // Main + shadow pass. 1M was set before the TT-28 infrastructure models (about 680k of the total: yard fences, ASC rails,

@@ -82,6 +82,26 @@ function retrieveJobFor(state: SimState, order: LoadOrder): AscJob {
   return job
 }
 
+/**
+ * Cranes other than `exceptStsId` that will need a pad of `blockId` for their head load box (first in load sequence): the
+ * head is still `released` and stacked there, or the crane has load packages not complete yet but no order (its package is not
+ * released yet, so its block is not known; it counts for every block). Each such crane keeps one pad free (#213).
+ */
+function headsWithoutPad(ctx: EngineContext, blockId: string, exceptStsId: string): number {
+  const { state } = ctx
+  let n = 0
+  for (const sts of Object.values(state.sts)) {
+    if (sts.id === exceptStsId || !sts.vesselId) continue
+    let head: LoadOrder | null = null
+    for (const o of Object.values(state.loadOrders)) if (o.stsId === sts.id && (!head || o.seq < head.seq)) head = o
+    if (head) {
+      const c = state.containers[head.containerId].custody
+      if (head.stage === 'released' && c.kind === 'yardSlot' && c.id.split(':')[0] === blockId) n++
+    } else if (packagesOf(state, sts).some((p) => p.kind === 'load' && p.status !== 'complete')) n++
+  }
+  return n
+}
+
 /** Retrieve the crane's next load boxes to pads ahead of their ground positions, at most `loadReleaseAhead` at a time. */
 function stageAhead(ctx: EngineContext, orders: LoadOrder[]): void {
   const { state } = ctx
@@ -99,7 +119,9 @@ function stageAhead(ctx: EngineContext, orders: LoadOrder[]): void {
     // keep one pad of the block free for discharge boxes: staged loads only leave their pads after the discharge is done
     const free = pads.filter((p) => p.blockId === blockId && state.wtpPads[p.id].containerId === null && state.wtpPads[p.id].claimedBy === null).length
     const held = Object.values(state.ascJobs).filter((j) => j.kind === 'retrieve' && j.blockId === blockId && j.wtpPadId === '' && j.ascId === null).length
-    if (free - held < 2) return
+    // a box that is not its crane's head also leaves a pad for the head box of every crane (in this block) that has none yet (#213)
+    const reserve = order === orders[0] ? 0 : headsWithoutPad(ctx, blockId, order.stsId)
+    if (free - held - reserve < 2) return
     order.stage = 'staging'
     ahead++
     maybeDispatchAsc(ctx, retrieveJobFor(state, order).blockId)

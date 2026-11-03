@@ -63,7 +63,9 @@ export function nextBlocker(state: SimState, job: AscJob): YardSlotState | null 
   const yard = state.yardBlocks[slot.blockId]
   const taken = new Set(
     Object.values(state.ascJobs)
-      .filter((j) => j.kind === 'retrieve' && j.ascId !== null)
+      // #188: a retrieval whose ascDispatch decision is pending is taken as well (its ASC is assigned a moment later): a blocker
+      // that is itself such a retrieval would otherwise be rehandled by the other ASC while the first lifts it
+      .filter((j) => j.kind === 'retrieve' && (j.ascId !== null || j.dispatch === 'asked'))
       .map((j) => j.containerId),
   )
   return (
@@ -179,7 +181,7 @@ export function rehandleCandidates(
  * that is not being dug out and that no truck holding a stall is coming for (the rule `rehandleCandidates` applies). A
  * box that is not standing in its slot, or has nothing above it, needs no room.
  */
-export function rehandleRoomFor(state: SimState, block: BlockSpec, job: AscJob): boolean {
+export function rehandleRoomFor(state: SimState, block: BlockSpec, job: AscJob, admitting?: string): boolean {
   const slot = retrievalSlot(state, job)
   if (!slot) return true
   const blockers = blockersOf(state, slot)
@@ -187,17 +189,82 @@ export function rehandleRoomFor(state: SimState, block: BlockSpec, job: AscJob):
   const forbidden = new Set([slot, ...blockers].flatMap(columnsOfSlot))
   for (const other of Object.values(state.ascJobs)) {
     if (other === job || other.kind !== 'retrieve' || other.truckId === undefined || other.ascId !== null) continue
-    if (state.trucks[other.truckId]?.stallId == null) continue
+    if (state.trucks[other.truckId]?.stallId == null && other.truckId !== admitting) continue
     const s = state.yardSlots[other.yardSlotId ?? '']
     if (s && s.containerId === other.containerId) for (const c of columnsOfSlot(s)) forbidden.add(c)
   }
-  const yard = state.yardBlocks[block.id]
-  let free = 0
-  for (let bay = 1; bay <= block.bays; bay++)
-    for (let row = 1; row <= block.rows; row++) {
-      if (forbidden.has(`${bay}-${row}`)) continue
-      free += Math.max(0, block.tiers - yard.heights[stackIndex(yard, bay, row)])
+  // TT-215: the room is already promised to the picks of trucks that hold a stall of this block: their blockers still have
+  // to go somewhere, and the stacks they are dug out of are no target either. Without this, each admitted pick saw the
+  // same free cells and the picks together overcommitted the block (a deadlock on rehandle room)
+  const spans = blockers.map((b) => b.span)
+  for (const other of Object.values(state.ascJobs)) {
+    if (other === job || other.kind !== 'retrieve' || other.truckId === undefined || other.blockId !== block.id) continue
+    if (other.truckId === job.truckId || (state.trucks[other.truckId]?.stallId == null && other.truckId !== admitting)) continue
+    const s = retrievalSlot(state, other)
+    if (!s) continue
+    for (const b of blockersOf(state, s)) {
+      spans.push(b.span)
+      for (const c of columnsOfSlot(b)) forbidden.add(c)
     }
-  return free >= blockers.reduce((n, b) => n + b.span, 0)
+  }
+  return placesFor(state, block, spans, forbidden)
 }
 
+/**
+ * Can boxes of these lengths all be stacked in the block's stacks outside `forbidden` (columns `bay-row`)? A greedy
+ * packing under the stacking rules (`candidateSlots`): a stack takes the length of its bottom box, a 40 ft box needs
+ * two neighbouring stacks of equal height and length (or both empty), up to the tier limit. 40 ft boxes go first and
+ * prefer stacks already locked to their length, so empty stacks stay free for either length.
+ */
+function placesFor(state: SimState, block: BlockSpec, spans: number[], forbidden: Set<string>): boolean {
+  const yard = state.yardBlocks[block.id]
+  const lock = stackSpansOf(state, block.id)
+  const height = yard.heights.slice()
+  const ok = (bay: number, row: number): boolean => !forbidden.has(`${bay}-${row}`) && height[stackIndex(yard, bay, row)] < block.tiers
+  for (const span of [...spans].sort((x, y) => y - x)) {
+    let placed = false
+    if (span === 1) {
+      for (const want of [1, 0]) {
+        for (let bay = 1; bay <= block.bays && !placed; bay++)
+          for (let row = 1; row <= block.rows && !placed; row++) {
+            const i = stackIndex(yard, bay, row)
+            if (!ok(bay, row) || lock[i] !== want) continue
+            height[i]++
+            lock[i] = 1
+            placed = true
+          }
+        if (placed) break
+      }
+    } else {
+      for (const want of [2, 0]) {
+        for (let bay = 1; bay < block.bays && !placed; bay++)
+          for (let row = 1; row <= block.rows && !placed; row++) {
+            const i = stackIndex(yard, bay, row)
+            const j = stackIndex(yard, bay + 1, row)
+            if (!ok(bay, row) || !ok(bay + 1, row) || lock[i] !== want || lock[j] !== want || height[i] !== height[j]) continue
+            height[i]++
+            height[j]++
+            lock[i] = lock[j] = 2
+            placed = true
+          }
+        if (placed) break
+      }
+    }
+    if (!placed) return false
+  }
+  return true
+}
+
+/**
+ * TT-215: may `truckId` (a pick-only truck) take a stall of `block` as far as the picks that already hold one are
+ * concerned? Its box's stack stops being a rehandle target the moment it holds a stall, and its own blockers take room,
+ * so each admitted pick that still has blockers to move must keep room with the truck counted as admitted.
+ */
+export function admittedPicksKeepRoom(state: SimState, block: BlockSpec, truckId: string): boolean {
+  for (const other of Object.values(state.ascJobs)) {
+    if (other.kind !== 'retrieve' || other.truckId === undefined || other.truckId === truckId || other.blockId !== block.id) continue
+    if (state.trucks[other.truckId]?.stallId == null) continue
+    if (!rehandleRoomFor(state, block, other, truckId)) return false
+  }
+  return true
+}

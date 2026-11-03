@@ -21,6 +21,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Berth:** a vessel's stretch of the continuous quay, from its stern (`berthX`) to its bow (LOA). Vessels keep a **berth gap** apart.
 - **Anchorage:** where an arrived vessel waits when no berth is free. **Anchorage wait** = berth allocation time − arrival time.
 - **Rail reservation:** the stretch of the STS rail a crane may occupy during its current gantry motion. Neighbouring reservations stay at least the minimum STS spacing apart.
+- **Rail yield:** a crane that waits for the rail empty-handed steps aside for a blocked neighbour (it repositions, then resumes its work). When two neighbours ask a crane to step opposite ways, the ask from the lower rail index is served first and the other waits, so a chain of three cranes never waits for ever.
 - **Ground position (STS ground position):** a buffer lane under an STS where discharged boxes are set down and from which load boxes are picked (`<stsId>-GP<n>`).
 - **WTP (waterside transfer point) pad:** a buffer position at the waterside end of a yard block. SHCs drop boxes there, and the ASC picks them up (and the reverse).
 - **Transfer stall (landside transfer stall):** a truck position at the landside end of a block where the ASC serves external trucks.
@@ -154,6 +155,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Productive move:** an ASC move that stacks an arriving box or retrieves an export box for loading.
 - **Rehandle ratio:** rehandles per productive move, overall and per block (`rehandlesPerProductiveMove`).
 - **Rehandle target:** the slot the `rehandleTarget` decision picks for a blocker.
+- **Promised room:** the stack cells that the blockers of picks already holding a stall will need. A pick-only truck is admitted to a block only when its own blockers fit as well (`rehandleRoomFor`, a greedy packing under the stacking rules), and the admitted picks still fit with it.
 
 ## 3D assets (phase 2)
 
@@ -250,7 +252,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 ## Atmosphere (TT-21)
 
-- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On at every run launch (#171); a toggle lasts for that run only.
+- **Daylight lock:** keeps the scene in daylight whatever the sim clock says; the sun still moves. On at every run launch (#171); a toggle lasts for that run only, and Reset returns it to on.
 - **Sound on entry:** entering Terminal Twin mutes the shared audio store, on every entry; leaving restores the mute from before entry, unless the owner changed it while inside (their latest choice stays).
 - **Night mode:** the cheaper lighting at night: no sun shadow pass, floodlight glow on high masts and emissive equipment lights instead of real lights.
 - **Backdrop:** the distant low-poly scenery: a terminal's own scenery (TTI Algeciras: the Rock of Gibraltar at true scale, hills, North Quay, and the surroundings) when a terminal folder owns the scenario, a generic coastline otherwise.
@@ -316,5 +318,6 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Rolling corner:** a corner a vehicle takes at speed (`cornerSpeedCap`) instead of stopping first; SHCs always do, trucks only on the teardrop loop and the access-road turn.
 - **Esc stack (#169):** the one ordered Esc: each press closes only the topmost open thing (setup dialog, saves, dashboard, Colour by, Run to, help, bay viewer, inspector, then the selection). `modules/escape.ts`. *Avoid:* "deselect" for the whole stack.
 - **Yard reserve (#184):** `yard.reserveShare`, the share of each block's stacks that pre-fill and discharge never use (only rehandles do), so a rehandle always has a target. Not the 10 % block-room reserve of the SHC pad filter.
-- **Load release-ahead (#186):** `yard.loadReleaseAhead`, how many of a crane's next load boxes may stand on WTP pads (stages `staging`, `padded`) before the crane's discharge is done. They hold no ground position.
+- **Load release-ahead (#186):** `yard.loadReleaseAhead`, how many of a crane's next load boxes may stand on WTP pads (stages `staging`, `padded`) before the crane's discharge is done. They hold no ground position. A box that is not its crane's head box only takes a pad beyond one reserved per crane for its head box (#213).
 - **Balanced pad selection (#207):** the `wtpPadSelection` strategy `balanced`: the free pad with the lowest plan distance plus block fill and queued ASC work, so one vessel's discharge spreads over the yard blocks. `request.blockLoad` carries each block's fill and queued ASC jobs.
+- **Pad wait (#218):** an SHC job whose `wtpPadSelection` answered no pad (every pad taken or `block-full`) carries `ShcJob.padWait`, the pad and block-room picture at that moment. It is not offered to `shcDispatch` (or a queued SHC) again until a pad frees or `blockRoom` rises, so dispatch and pad selection cannot re-ask each other at the same sim time.

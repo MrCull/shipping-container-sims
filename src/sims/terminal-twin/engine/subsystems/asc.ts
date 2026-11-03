@@ -35,7 +35,7 @@ import type { EventOf } from '../events'
 import type { PredictedReady } from '../predictions'
 import { type AscJob, type AscState, type AscStatus } from '../state'
 import { parseVesselSlotId } from '../../scenario/vesselClasses'
-import { maybeDispatch } from './shc'
+import { maybeDispatch, padRoomMayHaveRisen } from './shc'
 import { createLoadShcJob, pumpLoadPrep } from './loadPrep'
 
 const STATUS_AFTER: Record<PlannedType, AscStatus> = {
@@ -237,6 +237,7 @@ export const ascReactors: ReactorMap = {
       maybeDispatchAsc(ctx, asc.blockId)
     }
     stallRoomAppeared(ctx)
+    padRoomMayHaveRisen(ctx) // #218: block room rose: SHC jobs parked for pad room are offered again
   }),
   AscRoutingToWtp: phase(),
   AscPositioningAtWtp: phase(),
