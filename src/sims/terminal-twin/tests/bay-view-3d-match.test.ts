@@ -100,18 +100,19 @@ describe('bay view and 3D vessel show the same boxes (TTI preset)', async () => 
       for (const t of times) {
         const synced = bayViewDataAt(data[id], model, t)
         const cellsOf = (plan: BayPlan) => {
-          const out: string[] = []
+          const out: { slotId: string; k: string }[] = []
           for (const bay of bayOrder(synced.sizeClass))
             for (const sec of buildBayView(synced, bay, { colourMode: 'status', plan, robDisplay: 'hide' }).sections)
               for (const tr of sec.tiers)
                 for (const p of tr.positions)
-                  for (const c of p.cells) if (c.status === 'planned-discharge' || (plan === 'load' && c.status === 'done')) out.push(key(bay, p.row, tr.tier, c.half, synced.sizeClass))
+                  for (const c of p.cells) if (c.status === 'planned-discharge' || (plan === 'load' && c.status === 'done')) out.push({ slotId: c.slotId, k: key(bay, p.row, tr.tier, c.half, synced.sizeClass) })
           return out
         }
         const dis = cellsOf('discharge')
         const load = cellsOf('load')
-        expect(dis.filter((k) => load.includes(k)), `${id} at ${t}`).toEqual([]) // a box is aboard in one plan's view only
-        expect([...dis, ...load].sort(), `${id} at ${t}`).toEqual(sceneCells(model, id, t, { hide: true }))
+        // by slot id: the maritime key is not unique (the fore half of bay n + 1 and the aft half of bay n print the same bay number, which the scale 1 volume fills together)
+        expect(dis.filter((d) => load.some((l) => l.slotId === d.slotId)).map((d) => d.slotId), `${id} at ${t}`).toEqual([]) // a box is aboard in one plan's view only
+        expect([...dis, ...load].map((x) => x.k).sort(), `${id} at ${t}`).toEqual(sceneCells(model, id, t, { hide: true }))
       }
       shared += Object.keys(data[id].shared ?? {}).length
     }
