@@ -99,3 +99,33 @@ Reading it: three vessel-stowage invariants (no-floating, cell-free, hull.profil
 3. **Cheap guard for asc.wtp-handover and asc.no-passing** (9.5%): skip an ASC whose spreader is at travel height or whose planned motion cannot reach a pad (the `pose.hoistY >= travel` test already does this per ASC, so the saving is the per-event `ascPoseAt` and block-spec lookups: hoist `blockSpecsById` and `laneGraphOf` out of the per-event path and bail when no SHC is within a pad envelope). Event log unchanged. Proof: same hash on the 0.1 peak day and the asc invariant tests.
 
 The tracker's own overhead (6.1%, sets and maps per event) is not a ticket: it is smaller than any of the three above.
+
+## Crane and load-box waits at 0.5 (#229 measuring slice)
+
+Run: `pnpm run tt:run --preset "TTI Algeciras, peak day" --until time:40000` (scale 0.5, seed 99): 903 moves, 118,121 events, 0 violations, event-log hash `1bf340c1f57635` (engine at integration tip f2b2bf1). Counted from the event log and `pnpm run tt:profile` of the same bounded run. Open waits are cut at 40,000 s (the KPI `railWaitS` counts closed waits only, so STS106 shows 0 s there).
+
+### Crane waits (rail 36 %, reposition 7 % of crane windows; cycle 36 %)
+
+Only 7 `StsWaitingForRail` and 3 `StsRepositionStarted` events occur. Total rail wait about 88,000 crane-seconds, two causes:
+
+1. **Neighbour works a long package and cannot yield, 62 %.** STS103 (bay 8, x 139) waits 17,639 s (1,800 s to 19,439 s) for STS102 (bay 7, x 125, 14 m away, spacing 27 m); STS106 (bay 18, x 498) waits 16,286 s for STS105 (bay 16, 161-move package), then 21,011 s more (to the end of the run, 0 moves) for STS107 (bay 19, x 512, 212-move package). The blocker is mid-package and carries boxes, so `yieldable` refuses. Parked start positions matter little: STS106 started at x 584 and its one reposition took 135 s.
+2. **Chained behind a waiting crane, 38 %.** STS107 (16,422 s) and STS108 (16,702 s) wait on STS106, which itself waits; they start only when STS106 steps aside at 18,853 s.
+Reposition is a small cause here: 3 moves, 162 s of motion in total (STS102 54 % in the profile is the bucket after its work completes, not travel).
+
+Smallest change: make the `balanced-moves` crane split give one crane every bay closer than `stsMinSpacingM` to a bay of another crane's range (bays 18 and 19 are 14 m apart, 7 and 8 are 14 m apart), so no two cranes are assigned bays they cannot work together. Strategy file only; it moves the event log (different cranes per bay). The #229 look-ahead in `prepareNextPackage` cannot help: the wait starts at the first package.
+
+### Load-box waits (horizontal stage, `AscDroppedAtWtp` to `ShcPickedAtWtp`)
+
+313 load boxes dropped at a pad; mean horizontal wait 456 s (profile: 472 s over 302 boxes entering the path; sts stage 333 s, yard 41 s). Split per box:
+
+1. **Waiting for an SHC job claim (`ShcJobAssigned`), 90 % of the wait.** 93 boxes wait over 60 s for it; during those waits 1,902 discharge jobs and 1,252 load jobs are assigned, so SHC capacity goes to other boxes first. Only 8 distinct SHCs got a job in this window. Hours 2 to 4 show 0 s, hours 5 to 8 and 1 show 400 to 1,600 s. The 4 longest (21,287 s, 9,689 s, 9,557 s, 9,327 s) are still unassigned at 40,000 s.
+2. **SHC travel to the pad, pickup and lock, 9.5 %.** Conflict-zone hold (`departAt` after assignment) is 0.2 %: pad and zone availability are not a cause.
+Not split (no time): why the claim does not come, between all assigned SHCs busy and the dispatch order (`chained-nearest`, lowest id first). #230 ruled out idle SHCs at 0.25.
+
+Smallest change: have `shcDispatch` claim the oldest waiting pad box before a new discharge job when an SHC frees (strategy file only); it moves the event log.
+
+### Proposed tickets (proof: this bounded 0.5 run, `--until time:40000`; compare hash, moves, rail share, load-box horizontal mean)
+
+1. Crane split keeps bays at least `stsMinSpacingM` apart per crane: rail share down from 36 %, STS106 gets moves.
+2. Why are most SHCs unused (8 got jobs) and four load boxes unclaimed after 9,000 s: log, per ShcJobAssigned, the SHC states at each long wait (measure only, 15 min).
+3. `shcDispatch` oldest-pad-box-first: load-box horizontal mean down from 456 s.
