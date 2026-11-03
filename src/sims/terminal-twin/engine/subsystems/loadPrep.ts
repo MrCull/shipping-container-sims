@@ -90,10 +90,15 @@ function retrieveJobFor(state: SimState, order: LoadOrder): AscJob {
 function headsWithoutPad(ctx: EngineContext, blockId: string, exceptStsId: string): number {
   const { state } = ctx
   let n = 0
+  // one pass over the orders for every crane's head (lowest seq; the first of equal seqs wins, as before)
+  const headOrders = new Map<string, LoadOrder>()
+  for (const o of Object.values(state.loadOrders)) {
+    const h = headOrders.get(o.stsId)
+    if (!h || o.seq < h.seq) headOrders.set(o.stsId, o)
+  }
   for (const sts of Object.values(state.sts)) {
     if (sts.id === exceptStsId || !sts.vesselId) continue
-    let head: LoadOrder | null = null
-    for (const o of Object.values(state.loadOrders)) if (o.stsId === sts.id && (!head || o.seq < head.seq)) head = o
+    const head = headOrders.get(sts.id) ?? null
     if (head) {
       const c = state.containers[head.containerId].custody
       if (head.stage === 'released' && c.kind === 'yardSlot' && c.id.split(':')[0] === blockId) n++

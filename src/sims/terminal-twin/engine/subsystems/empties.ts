@@ -22,6 +22,7 @@ import type { ContainerSize } from '../../scenario/types'
 import { strategies } from '../decisions/strategies'
 import { continueWork } from './quay'
 import { blockersOf } from './rehandle'
+import { notePlanChanged } from '../yardIndex'
 import { pumpLoadPrep } from './loadPrep'
 import { createLoadOrders } from './workPackages'
 
@@ -173,6 +174,7 @@ export const emptiesReactors: ReactorMap = {
       if (!valid.has(id)) throw new Error(`emptyAllocation for ${pkg.id}: ${id} is not a reachable empty ${req.size} of line ${req.line}`)
     ids.forEach((id, i) => {
       state.vesselSlots[req.slotIds[i]].plannedContainerId = id
+      notePlanChanged(state)
       state.containers[id].allocatedTo = pkg.id
       state.containers[id].props = allocateEmptyProps(ctx.config, state.propsSeed, id, state.containers[id].props, pkg.vesselId)
     })
