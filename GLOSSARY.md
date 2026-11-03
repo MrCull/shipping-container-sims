@@ -249,6 +249,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Instance culling:** boxes outside the camera frustum are not written to the instanced meshes.
 - **Static batch:** scenery that never moves, merged into one mesh per material to save draw calls.
 - **Yard index:** the per-block and per-column lookup of yard slots that keeps rehandle queries off a whole-yard scan.
+- **Vessel slot index (#234):** the per-vessel list of vessel slots (`vesselSlotsOf`) that lets the stowage invariants read only the vessels an event touched, kept current by `indexVesselSlotAdded` / `indexVesselSlotRemoved`.
 - **Retrieval-rank cache (#228):** `retrievalRanks` of a block kept in the yard index until a slot of that block is added or removed (a box placed, lifted, rehandled) or a vessel slot gets a booked box (`notePlanChanged`); exact, so the event log does not move.
 
 ## Atmosphere (TT-21)
