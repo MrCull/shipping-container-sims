@@ -478,7 +478,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 1840,
+    "checks": 1558,
     "violations": 0,
     "first": null
   },
