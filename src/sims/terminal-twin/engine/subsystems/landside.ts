@@ -52,6 +52,7 @@ import type {
   VesselSlotState,
 } from '../state'
 import { indexVesselSlotAdded } from '../vesselSlotIndex'
+import { occupancySlotCleared } from '../vesselOccupancy'
 import { blockSpecs, candidateSlots, parseYardSlotId, reeferFields, reserveFields } from '../yardLayout'
 import { notePlanChanged, stackSpansOf } from '../yardIndex'
 import { withoutPendingPickups } from './ascStorage'
@@ -251,6 +252,7 @@ function bookExtraExport(ctx: EngineContext, box: ContainerState, vesselId: stri
     const slot: VesselSlotState = { id, vesselId, ...cell, purpose: 'load', containerId: null, plannedContainerId: box.id }
     state.vesselSlots[id] = slot
     indexVesselSlotAdded(state, slot, replaced)
+    if (replaced) occupancySlotCleared(state, replaced)
   }
   notePlanChanged(state)
   if (state.subsystems.shc !== 'off' && state.subsystems.asc !== 'off') state.vessels[vesselId].remainingLoad++
