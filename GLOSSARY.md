@@ -250,6 +250,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Static batch:** scenery that never moves, merged into one mesh per material to save draw calls.
 - **Yard index:** the per-block and per-column lookup of yard slots that keeps rehandle queries off a whole-yard scan.
 - **Vessel slot index (#234):** the per-vessel list of vessel slots (`vesselSlotsOf`) that lets the stowage invariants read only the vessels an event touched, kept current by `indexVesselSlotAdded` / `indexVesselSlotRemoved`.
+- **Vessel occupancy map (#237):** the per-vessel map from a packed numeric cell key (bay, row, tier) to the boxes in that cell (`vesselOccupancyOf`), kept current by `occupancySlotFilled` / `occupancySlotCleared`, that the stowage invariants read instead of rebuilding a string-keyed map each call.
 - **Retrieval-rank cache (#228):** `retrievalRanks` of a block kept in the yard index until a slot of that block is added or removed (a box placed, lifted, rehandled) or a vessel slot gets a booked box (`notePlanChanged`); exact, so the event log does not move.
 
 ## Atmosphere (TT-21)
