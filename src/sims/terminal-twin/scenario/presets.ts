@@ -102,13 +102,13 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
 }
 
 /**
- * Moves scale of the TTI presets (#165, #188): a call carries 5 times the moves of scale 0.1 (it was 0.05, then 0.1,
- * then 0.25). 0.5 is the floor of #188: the baseline and the peak day complete with 0 violations (needs the yard
- * reserve and `spread-drops` below, plus the rail and pad fixes of #212, #213, #215). Full size (1) is not
- * reached, see the guide. The sim guide ("Realistic volumes") has the measurements and
- * `docs/realistic-volume-reports.md` the reports of each step.
+ * Moves scale of the TTI presets (#165, #188): a call carries 10 times the moves of scale 0.1 (it was 0.05, then 0.1,
+ * then 0.25, then 0.5). 0.5 was the floor of #188; spec #220 reached full size: at 1 the baseline and the peak
+ * day complete with 0 violations (needs the yard reserve and `spread-drops` below, plus the rail and pad fixes
+ * of #212, #213, #215 and the invariant speed-ups of #226, #228, #234, #237). The sim guide ("Realistic
+ * volumes") has the measurements and `docs/realistic-volume-reports.md` the reports of each step.
  */
-export const TTI_MOVES_SCALE = 0.5
+export const TTI_MOVES_SCALE = 1
 /** #186: load boxes per crane staged on WTP pads ahead of their ground positions (an assumption, tune with `tt:profile`). */
 export const TTI_LOAD_RELEASE_AHEAD = 4
 /** #188: share of every TTI block's stacks kept free of pre-fill and discharge (pairs of bays), so a dig always finds room for its blockers. [assumed] */

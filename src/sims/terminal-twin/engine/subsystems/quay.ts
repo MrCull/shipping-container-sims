@@ -20,6 +20,7 @@
  * → StsLoadPicked (ground position → STS) → hoist up, trolley over the slot, hoist down, unlock
  * → StsLoaded (STS → vessel slot) → hoist up → next box.
  */
+import { occupancySlotCleared, occupancySlotFilled } from '../vesselOccupancy'
 import type { EngineContext, ReactorMap } from '../context'
 import { planSegment, type Axis, type AxisProfile, type MotionSegment } from '../kinematics'
 import type { StsDrop, StsState } from '../state'
@@ -429,6 +430,7 @@ export const quayReactors: ReactorMap = {
     const box = state.containers[e.payload.containerId]
     const slot = state.vesselSlots[e.payload.slotId]
     slot.containerId = box.id
+    occupancySlotFilled(state, slot)
     sts.carrying = []
     ctx.transferCustody(box.id, { kind: 'vesselSlot', id: slot.id })
     if (slot.deck) deckBoxChanged(ctx, slot.vesselId, slot.bay, slot.row, 1)
@@ -506,6 +508,7 @@ export const quayReactors: ReactorMap = {
     for (const p of picks) {
       const pickedSlot = state.vesselSlots[p.from.id]
       pickedSlot.containerId = null
+      occupancySlotCleared(state, pickedSlot)
       if (pickedSlot.loadPurpose) {
         // shared cell (#203): its load booking is now the slot's purpose
         pickedSlot.purpose = pickedSlot.loadPurpose

@@ -93,19 +93,43 @@ test('×3600 from the top bar advances the sim clock accordingly; digit keys lea
   // A long scenario, so the clock does not hit the scenario end within the window.
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('landside-morning-peak'))
+  // A long scenario: the 5,400 s landside fixture runs headless in about a second and ends within two wall seconds at x3600,
+  // freezing the clock before the measurement window, which read as 0 (#191).
+  await page.evaluate(() => window.__tt!.load('Small automated', { startDateTime: '2026-10-26T13:00:00.000Z' }))
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.getByRole('button', { name: '×3600', exact: true }).click()
   expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
+  // The display clock waits for the engine's look-ahead first, so measure once it moves.
+  await page.waitForFunction(() => window.__tt!.clock().displayTime > 0, undefined, { timeout: 60_000 })
   const t0 = await page.evaluate(() => window.__tt!.clock().displayTime)
   const w0 = Date.now()
   await page.waitForTimeout(2000)
   const t1 = await page.evaluate(() => window.__tt!.clock().displayTime)
   const wallS = (Date.now() - w0) / 1000
-  // Engine-bound on a slow machine, so only require a clear multiple of x600 pace over the window.
-  expect((t1 - t0) / wallS).toBeGreaterThan(600)
+  // Functional check only: the clock advances (at least one sim second per wall second) and the speed holds. The engine gets
+  // 190 to 396 sim s/s on a 4-core software-GL container, so an absolute 600 floor is a hardware benchmark, not a regression
+  // test; that floor lives in the @load spec below (#191).
+  expect((t1 - t0) / wallS).toBeGreaterThan(1)
   await page.keyboard.press('2')
   expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
+})
+
+test('x3600 from the top bar sustains at least 600 sim s per wall s @load', async ({ page }) => {
+  // Hardware benchmark (#191): never runs in CI (--grep-invert @load); run it on real hardware. Software GL containers reach 190 to 396.
+  await page.goto('/sim/terminal-twin')
+  await page.waitForFunction(() => !!window.__tt)
+  // A long scenario: the 5,400 s landside fixture runs headless in about a second and ends within two wall seconds at x3600,
+  // freezing the clock before the measurement window, which read as 0 (#191).
+  await page.evaluate(() => window.__tt!.load('Small automated', { startDateTime: '2026-10-26T13:00:00.000Z' }))
+  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
+  await page.getByRole('button', { name: '×3600', exact: true }).click()
+  expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
+  // The display clock waits for the engine's look-ahead first, so start sampling once it moves.
+  await page.waitForFunction(() => window.__tt!.clock().displayTime > 0, undefined, { timeout: 60_000 })
+  const samples = await sampleFrames(page, { minWallMs: 5000 })
+  const rate = simPerWallSecond(samples)
+  console.log(`x3600 rate: ${rate.toFixed(1)} sim s per wall s`)
+  expect(rate).toBeGreaterThan(600)
 })
 
 test('Run to… jumps to the target and the scene matches the engine there', async ({ page }) => {

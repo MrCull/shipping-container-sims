@@ -20,6 +20,8 @@ import { hasLandside, landsideGraphOf } from './landsideGraph'
 import { overlappingNewReservations, overlappingReservations } from './reservations'
 import type { EngineEvent } from './events'
 import { columnKey, yardIndexOf } from './yardIndex'
+import { vesselSlotsOf } from './vesselSlotIndex'
+import { cellKey, cellOfKey, isSlotOccupant, vesselOccupancyOf } from './vesselOccupancy'
 import {
   ascIndexOf,
   type AscJob,
@@ -164,6 +166,60 @@ function panelsToCheck(state: SimState, scope?: InvariantScope): HatchPanelState
 /** Occupied slots covering one bay-row-tier cell of a block. */
 function cellOccupants(state: SimState, blockId: string, bay: number, row: number, tier: number): YardSlotState[] {
   return (yardIndexOf(state).byColumn.get(columnKey(blockId, bay, row)) ?? []).filter((s) => s.tier === tier && s.containerId)
+}
+
+/** #234: the filled slots of the vessels to check, from the per-vessel slot index (order: vessel, then slot creation). */
+function filledVesselSlots(state: SimState, scope: { vessels: ReadonlySet<string> } | undefined): VesselSlotState[] {
+  const out: VesselSlotState[] = []
+  for (const vesselId of Object.keys(state.vessels)) {
+    if (scope && !scope.vessels.has(vesselId)) continue
+    for (const s of vesselSlotsOf(state, vesselId)) if (s.containerId) out.push(s)
+  }
+  return out
+}
+
+/**
+ * #237: does any touched vessel violate? Answered from the per-vessel occupied-cell map (numeric cell keys, kept current as
+ * slots fill and clear), without building anything. When one does, the original scan runs, so the messages and their order stay what they were.
+ */
+function anyVesselFails(state: SimState, scope: { vessels: ReadonlySet<string> } | undefined, clean: (state: SimState, vesselId: string) => boolean): boolean {
+  for (const vesselId of Object.keys(state.vessels)) {
+    if (scope && !scope.vessels.has(vesselId)) continue
+    if (!clean(state, vesselId)) return true
+  }
+  return false
+}
+
+const halvesClash = (a: 'aft' | 'fore' | null, b: 'aft' | 'fore' | null): boolean => a === null || b === null || a === b
+
+const cellsFloatFree = (state: SimState, vesselId: string): boolean => {
+  const occ = vesselOccupancyOf(state, vesselId)
+  const spec = vesselClass(state.vessels[vesselId].sizeClass)
+  for (const [key, list] of occ.cells) {
+    const { bay, row, tier } = cellOfKey(key)
+    if (isStackBase(spec, row, tier)) continue
+    const below = occ.cells.get(cellKey(bay, row, tier - 1))
+    for (const o of list) if (!below || !below.some((h) => halvesClash(h.half, o.half))) return false
+  }
+  return true
+}
+
+const cellsFree = (state: SimState, vesselId: string): boolean => {
+  const occ = vesselOccupancyOf(state, vesselId)
+  if (occ.shared === 0) return true
+  for (const list of occ.cells.values())
+    for (let i = 1; i < list.length; i++) for (let j = 0; j < i; j++) if (halvesClash(list[i].half, list[j].half)) return false
+  return true
+}
+
+const cellsInHull = (state: SimState, vesselId: string): boolean => {
+  const occ = vesselOccupancyOf(state, vesselId)
+  const spec = vesselClass(state.vessels[vesselId].sizeClass)
+  for (const [key, list] of occ.cells) {
+    const { row, tier } = cellOfKey(key)
+    if (!isCellUsable(spec, row, tier) && list.some(isSlotOccupant)) return false
+  }
+  return true
 }
 
 /** The slots to check: those in the given columns (deduplicated), or every slot. */
@@ -718,9 +774,7 @@ export const INVARIANTS: Invariant[] = [
       const filled = new Map<string, ('aft' | 'fore' | null)[]>()
       const loads = []
       const boxes = []
-      for (const s of Object.values(state.vesselSlots)) {
-        if (!s.containerId) continue
-        if (scope && !scope.vessels.has(s.vesselId)) continue
+      for (const s of filledVesselSlots(state, scope)) {
         const key = `${s.vesselId}:${s.bay}:${s.row}:${s.tier}`
         filled.set(key, [...(filled.get(key) ?? []), s.half])
         boxes.push(s)
@@ -756,11 +810,10 @@ export const INVARIANTS: Invariant[] = [
       const messages: string[] = []
       // nothing on a vessel the event did not touch is checked: skip the scan of every slot
       if (scope && scope.vessels.size === 0) return messages
+      if (!anyVesselFails(state, scope, cellsFloatFree)) return messages
       const occupied = new Map<string, ('aft' | 'fore' | null)[]>()
       const onBoard: { label: string; vesselId: string; bay: number; row: number; tier: number; half: 'aft' | 'fore' | null }[] = []
-      for (const s of Object.values(state.vesselSlots)) {
-        if (!s.containerId) continue
-        if (scope && !scope.vessels.has(s.vesselId)) continue
+      for (const s of filledVesselSlots(state, scope)) {
         const key = `${s.vesselId}:${s.bay}:${s.row}:${s.tier}`
         occupied.set(key, [...(occupied.get(key) ?? []), s.half])
         onBoard.push({ label: `box ${s.containerId} in ${s.id}`, vesselId: s.vesselId, bay: s.bay, row: s.row, tier: s.tier, half: s.half })
@@ -794,6 +847,7 @@ export const INVARIANTS: Invariant[] = [
       const messages: string[] = []
       // nothing on a vessel the event did not touch is checked: skip the scan of every slot
       if (scope && scope.vessels.size === 0) return messages
+      if (!anyVesselFails(state, scope, cellsFree)) return messages
       const cells = new Map<string, { label: string; half: 'aft' | 'fore' | null }[]>()
       const put = (vesselId: string, bay: number, row: number, tier: number, label: string, half: 'aft' | 'fore' | null) => {
         const key = `${vesselId}:${bay}:${row}:${tier}`
@@ -803,9 +857,7 @@ export const INVARIANTS: Invariant[] = [
         held.push({ label, half })
         cells.set(key, held)
       }
-      for (const s of Object.values(state.vesselSlots)) {
-        if (!s.containerId) continue
-        if (scope && !scope.vessels.has(s.vesselId)) continue
+      for (const s of filledVesselSlots(state, scope)) {
         put(s.vesselId, s.bay, s.row, s.tier, `box ${s.containerId} in slot ${s.id}`, s.half)
       }
       for (const vessel of Object.values(state.vessels)) {
@@ -826,9 +878,8 @@ export const INVARIANTS: Invariant[] = [
       const messages: string[] = []
       // nothing on a vessel the event did not touch is checked: skip the scan of every slot
       if (scope && scope.vessels.size === 0) return messages
-      for (const s of Object.values(state.vesselSlots)) {
-        if (!s.containerId) continue
-        if (scope && !scope.vessels.has(s.vesselId)) continue
+      if (!anyVesselFails(state, scope, cellsInHull)) return messages
+      for (const s of filledVesselSlots(state, scope)) {
         const spec = vesselClass(state.vessels[s.vesselId].sizeClass)
         if (!isCellUsable(spec, s.row, s.tier))
           messages.push(`box ${s.containerId} in ${s.id} is outside the ${spec.label} hull profile (bay ${s.bay} row ${s.row} tier ${s.tier})`)
@@ -1186,6 +1237,15 @@ export function checkInvariants(state: SimState, config: ScenarioConfig): Invari
     for (const message of inv.check(state, config)) violations.push({ invariant: inv.id, message })
   return violations
 }
+
+/**
+ * Event types that change no state an invariant reads (#226): `DecisionRequested` only calls the handler and records
+ * bookkeeping in `state.decisions`; the asking subsystem acts on the reply at `DecisionResolved`, which is checked. These
+ * events are not checked one by one (the check count falls); the next checked event, the periodic sweep and the closing
+ * sweep still see any change, and the time deadline check (`invariantDeadline`) is unaffected. Every other event type is
+ * checked, scoped by its subjects (see `InvariantTracker.check`).
+ */
+export const STATE_NEUTRAL_EVENTS: ReadonlySet<string> = new Set(['DecisionRequested'])
 
 /** Events between full sweeps unless the host says otherwise; the last event of a run is always swept. */
 export const DEFAULT_SWEEP_EVERY = 1000

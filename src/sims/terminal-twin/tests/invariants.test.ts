@@ -16,8 +16,8 @@ describe('invariant checker', () => {
     const report = sim.invariantReport()
     expect(report.enabled).toBe(true)
     expect(report.violations).toEqual([])
-    // every processed event except the synthetic ScenarioEnded was checked
-    expect(report.checks).toBe(sim.eventLog().length - 1)
+    // every processed event except the synthetic ScenarioEnded and the state-neutral DecisionRequested (#226) was checked
+    expect(report.checks).toBe(sim.eventLog().filter((e) => e.type !== 'DecisionRequested').length - 1)
   })
 
   it('fail-fast: a broken handler stops the run at the offending event', () => {
@@ -64,7 +64,9 @@ function tamperedStep(sim: Simulation, tamper: (snap: SimSnapshot) => void) {
   const snap = sim.snapshot()
   tamper(snap)
   const resumed = restoreSimulation(snap)
-  const stepped = resumed.step() as EngineEvent
+  let stepped = resumed.step() as EngineEvent
+  // a state-neutral DecisionRequested is not checked (#226): the first event that is checked is the offending one
+  while (stepped.type === 'DecisionRequested' && resumed.status !== 'failed') stepped = resumed.step() as EngineEvent
   const last = resumed.eventLog().at(-1) as EngineEvent
   return { resumed, stepped, last }
 }

@@ -49,9 +49,12 @@ import type {
   TruckPlannedEvent,
   TruckState,
   TruckStatus,
+  VesselSlotState,
 } from '../state'
+import { indexVesselSlotAdded } from '../vesselSlotIndex'
+import { occupancySlotCleared } from '../vesselOccupancy'
 import { blockSpecs, candidateSlots, parseYardSlotId, reeferFields, reserveFields } from '../yardLayout'
-import { stackSpansOf } from '../yardIndex'
+import { notePlanChanged, stackSpansOf } from '../yardIndex'
 import { withoutPendingPickups } from './ascStorage'
 import { kpiClockOf, HOUR_S } from '../kpi/clock'
 import { makeIso6346Id } from '../../scenario/iso6346'
@@ -244,7 +247,14 @@ function bookExtraExport(ctx: EngineContext, box: ContainerState, vesselId: stri
     // the cell's discharge slot has the same shape: it takes the booking (#203)
     shared.loadPurpose = 'load'
     shared.plannedContainerId = box.id
-  } else state.vesselSlots[id] = { id, vesselId, ...cell, purpose: 'load', containerId: null, plannedContainerId: box.id }
+  } else {
+    const replaced = shared
+    const slot: VesselSlotState = { id, vesselId, ...cell, purpose: 'load', containerId: null, plannedContainerId: box.id }
+    state.vesselSlots[id] = slot
+    indexVesselSlotAdded(state, slot, replaced)
+    if (replaced) occupancySlotCleared(state, replaced)
+  }
+  notePlanChanged(state)
   if (state.subsystems.shc !== 'off' && state.subsystems.asc !== 'off') state.vessels[vesselId].remainingLoad++
   return id
 }

@@ -194,16 +194,20 @@ describe('colour modes', () => {
     expect(allCells(state).filter((c) => c.status === 'rob').every((c) => c.colourKey === 'rob' && c.colour === null)).toBe(true)
   })
 
-  it('show ROB cells take the colour their mode gives any box, not the ROB grey (#168)', () => {
+  it('show ROB cells are grey in every colour mode, the state view included (#223)', () => {
     const robBay = data.robBoxes[0].bay
-    for (const mode of COLOUR_BY_MODES.filter((m) => m !== 'default')) {
-      const cells = allCells(buildBayView(data, robBay, { colourMode: mode, robDisplay: 'show' })).filter((c) => c.status === 'rob')
-      expect(cells.length).toBeGreaterThan(0)
-      expect(cells.every((c) => c.colour !== null && c.colour !== ROB_HEX && c.colourKey !== 'rob'), mode).toBe(true)
+    for (const mode of COLOUR_BY_MODES) {
+      for (const robDisplay of ['show', 'grey'] as const) {
+        const cells = allCells(buildBayView(data, robBay, { colourMode: mode, robDisplay })).filter((c) => c.status === 'rob')
+        expect(cells.length, mode).toBeGreaterThan(0)
+        // `default` is the state view (hatched grey, no fill); the property modes fill with the ROB grey
+        expect(cells.every((c) => c.colourKey === 'rob' && c.colour === (mode === 'default' ? null : ROB_HEX) && c.colourIndex === null), `${mode} ${robDisplay}`).toBe(true)
+      }
     }
-    // the state view shows a ROB box in the line colour, as the 3D view does in its default mode
+    // the state view draws the grey ROB cells as the hatched state, with Show as with Grey
     const state = allCells(buildBayView(data, robBay, { colourMode: 'status', robDisplay: 'show' })).filter((c) => c.status === 'rob')
-    expect(state.every((c) => c.colour !== null && c.colour !== ROB_HEX)).toBe(true)
+    expect(state.length).toBeGreaterThan(0)
+    expect(state.every((c) => c.colourKey === 'rob' && c.colour === null)).toBe(true)
   })
 
   it('hide draws no ROB cell in the bay (the strip still marks the bay, #159)', () => {

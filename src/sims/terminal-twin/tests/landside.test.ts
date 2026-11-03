@@ -18,6 +18,11 @@ import { ScenarioBuilder } from '../scenario/builder'
 import { fixtures } from '../scenario/fixtures'
 import type { LandsideConfig, ScenarioConfig, TruckTransactionKind } from '../scenario/types'
 
+/** Step until the invariant check has run on a state-changing event: a DecisionRequested is not checked (#226). */
+const stepOn = (sim: Simulation): void => {
+  for (let i = 0; i < 10 && sim.status !== 'failed'; i++) sim.step()
+}
+
 const ofType = <T extends EngineEvent['type']>(sim: Simulation, type: T) =>
   sim.eventLog().filter((e): e is Extract<EngineEvent, { type: T }> => e.type === type)
 
@@ -362,14 +367,14 @@ describe('segregation', () => {
     const id = Object.keys(a.state.trucks)[0]
     a.state.trucks[id].nodeId = lane
     const trucks = restoreSimulation(a)
-    trucks.step()
+    stepOn(trucks)
     expect(trucks.status).toBe('failed')
     expect(trucks.firstError?.message).toMatch(/landside\.segregation.*waterside lane graph/)
 
     const b = sim.snapshot()
     b.state.shcs['SHC01'].nodeId = 'ls:IK1'
     const shcs = restoreSimulation(b)
-    shcs.step()
+    stepOn(shcs)
     expect(shcs.status).toBe('failed')
     expect(shcs.firstError?.message).toMatch(/landside\.segregation.*SHCs never use the public gate/)
 
@@ -378,7 +383,7 @@ describe('segregation', () => {
     const t = Object.values(c.state.trucks)[0]
     t.motion = [{ entityId: t.id, axis: 'z', from: 200, to: 40, t0: c.state.now, t1: c.state.now + 20, vPeak: 8, accel: 1, decel: 1 }]
     const into = restoreSimulation(c)
-    into.step()
+    stepOn(into)
     expect(into.firstError?.message).toMatch(/landside\.segregation.*waterside area/)
   })
 })

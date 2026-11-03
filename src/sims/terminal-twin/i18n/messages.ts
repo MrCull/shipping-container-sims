@@ -59,7 +59,7 @@ const en = {
   'topbar.settings': 'Settings',
   'topbar.daylight': 'Daylight',
   'topbar.rob': 'ROB',
-  'topbar.robHint': 'Remain-on-board boxes on the vessels, in 3D and in the bay viewer: Show colours them by the Colour by mode, Grey draws them light grey, Hide draws none',
+  'topbar.robHint': 'Remain-on-board boxes on the vessels, in 3D and in the bay viewer: Show colours them by the Colour by mode (3D only; the bay viewer always draws them grey), Grey draws them light grey, Hide draws none',
   'topbar.rob.show': 'Show',
   'topbar.rob.grey': 'Grey',
   'topbar.rob.hide': 'Hide',

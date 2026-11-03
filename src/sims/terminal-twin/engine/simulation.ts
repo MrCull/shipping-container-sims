@@ -9,7 +9,7 @@ import { heapPop, heapPush } from './eventQueue'
 import type { EngineEvent, EventOf, EventPayloads, EventSubjects, EventType } from './events'
 import type { HandlerSet } from './handlers'
 import { hashDigest, hashUpdate } from './hash'
-import { DEFAULT_SWEEP_EVERY, InvariantTracker, type InvariantViolation, invariantDeadline } from './invariants'
+import { DEFAULT_SWEEP_EVERY, InvariantTracker, STATE_NEUTRAL_EVENTS, type InvariantViolation, invariantDeadline } from './invariants'
 import { buildKpiReport, type KpiReport } from './kpis'
 import { kpiClockOf } from './kpi/clock'
 import { createKpiCollector, type KpiSeriesReport } from './kpi/collector'
@@ -34,7 +34,7 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.52.0'
+export const ENGINE_VERSION = '0.53.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
@@ -460,7 +460,9 @@ export function createSimulation(
     // the last pre-run event is swept (the whole starting state)
     const midPreRun = state.prefill !== undefined
     const endsPreRun = !midPreRun && (ev.payload as { preRun?: boolean }).preRun === true
-    if (invariantsEnabled && !midPreRun && checkInvariants(ev, Boolean(endReason) || endsPreRun)) return ev
+    const forceSweep = Boolean(endReason) || endsPreRun
+    const skipCheck = STATE_NEUTRAL_EVENTS.has(ev.type) && !forceSweep // #226: changes nothing an invariant reads
+    if (invariantsEnabled && !midPreRun && !skipCheck && checkInvariants(ev, forceSweep)) return ev
     if (endReason) endScenario(endReason, ev.t, ev.id)
     return ev
   }
