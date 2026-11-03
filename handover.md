@@ -18,4 +18,4 @@ Phase 2 and specs #193 and #201 merged in #210. Fast mode (lint, build, test:rel
 | #215 | stall legality counts room promised to admitted picks | none | merged in branch (0.50.0); TT-184 drop-only head test passes seeds 1,2,3,5 to 9; seed 4 is a rehandle-target layout dead end (equal-height pairs), truck turnaround +106 s baseline, +51 s peak day at 0.1 | |
 | #216 | tt:run --snapshot on large runs | none | merged in branch (no ENGINE_VERSION change; snapshot 1.4 GB at 0.25 sim 7200 s, resume may need NODE_OPTIONS=--max-old-space-size) | |
 | #188 | scale 0.5 then 1 (0.25 done) | #212 to #216 | merged in branch (0.52.0): 0.5 committed and green (baseline 2,312 moves 130 s; peak day 4,583 moves 438 s, 0 violations); scale 1 baseline completes (279 s), peak day only bounded (not required) | |
-| #217 | final: smoke suite and goldens | all | claimed | agent |
+| #217 | final: smoke suite and goldens | all | merged in branch (b8dab52): verify green, goldens regenerated once (8 fixtures), dev smoke 153 of 156 then 2 specs fixed (atmosphere mute, perf container floor), x3600 speed spec still red (#191, accepted), prod 7 of 7; code review pending | |
