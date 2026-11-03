@@ -21,6 +21,7 @@ import { overlappingNewReservations, overlappingReservations } from './reservati
 import type { EngineEvent } from './events'
 import { columnKey, yardIndexOf } from './yardIndex'
 import { vesselSlotsOf } from './vesselSlotIndex'
+import { cellKey, cellOfKey, isSlotOccupant, vesselOccupancyOf } from './vesselOccupancy'
 import {
   ascIndexOf,
   type AscJob,
@@ -175,6 +176,50 @@ function filledVesselSlots(state: SimState, scope: { vessels: ReadonlySet<string
     for (const s of vesselSlotsOf(state, vesselId)) if (s.containerId) out.push(s)
   }
   return out
+}
+
+/**
+ * #237: does any touched vessel violate? Answered from the per-vessel occupied-cell map (numeric cell keys, kept current as
+ * slots fill and clear), without building anything. When one does, the original scan runs, so the messages and their order stay what they were.
+ */
+function anyVesselFails(state: SimState, scope: { vessels: ReadonlySet<string> } | undefined, clean: (state: SimState, vesselId: string) => boolean): boolean {
+  for (const vesselId of Object.keys(state.vessels)) {
+    if (scope && !scope.vessels.has(vesselId)) continue
+    if (!clean(state, vesselId)) return true
+  }
+  return false
+}
+
+const halvesClash = (a: 'aft' | 'fore' | null, b: 'aft' | 'fore' | null): boolean => a === null || b === null || a === b
+
+const cellsFloatFree = (state: SimState, vesselId: string): boolean => {
+  const occ = vesselOccupancyOf(state, vesselId)
+  const spec = vesselClass(state.vessels[vesselId].sizeClass)
+  for (const [key, list] of occ.cells) {
+    const { bay, row, tier } = cellOfKey(key)
+    if (isStackBase(spec, row, tier)) continue
+    const below = occ.cells.get(cellKey(bay, row, tier - 1))
+    for (const o of list) if (!below || !below.some((h) => halvesClash(h.half, o.half))) return false
+  }
+  return true
+}
+
+const cellsFree = (state: SimState, vesselId: string): boolean => {
+  const occ = vesselOccupancyOf(state, vesselId)
+  if (occ.shared === 0) return true
+  for (const list of occ.cells.values())
+    for (let i = 1; i < list.length; i++) for (let j = 0; j < i; j++) if (halvesClash(list[i].half, list[j].half)) return false
+  return true
+}
+
+const cellsInHull = (state: SimState, vesselId: string): boolean => {
+  const occ = vesselOccupancyOf(state, vesselId)
+  const spec = vesselClass(state.vessels[vesselId].sizeClass)
+  for (const [key, list] of occ.cells) {
+    const { row, tier } = cellOfKey(key)
+    if (!isCellUsable(spec, row, tier) && list.some(isSlotOccupant)) return false
+  }
+  return true
 }
 
 /** The slots to check: those in the given columns (deduplicated), or every slot. */
@@ -765,6 +810,7 @@ export const INVARIANTS: Invariant[] = [
       const messages: string[] = []
       // nothing on a vessel the event did not touch is checked: skip the scan of every slot
       if (scope && scope.vessels.size === 0) return messages
+      if (!anyVesselFails(state, scope, cellsFloatFree)) return messages
       const occupied = new Map<string, ('aft' | 'fore' | null)[]>()
       const onBoard: { label: string; vesselId: string; bay: number; row: number; tier: number; half: 'aft' | 'fore' | null }[] = []
       for (const s of filledVesselSlots(state, scope)) {
@@ -801,6 +847,7 @@ export const INVARIANTS: Invariant[] = [
       const messages: string[] = []
       // nothing on a vessel the event did not touch is checked: skip the scan of every slot
       if (scope && scope.vessels.size === 0) return messages
+      if (!anyVesselFails(state, scope, cellsFree)) return messages
       const cells = new Map<string, { label: string; half: 'aft' | 'fore' | null }[]>()
       const put = (vesselId: string, bay: number, row: number, tier: number, label: string, half: 'aft' | 'fore' | null) => {
         const key = `${vesselId}:${bay}:${row}:${tier}`
@@ -831,6 +878,7 @@ export const INVARIANTS: Invariant[] = [
       const messages: string[] = []
       // nothing on a vessel the event did not touch is checked: skip the scan of every slot
       if (scope && scope.vessels.size === 0) return messages
+      if (!anyVesselFails(state, scope, cellsInHull)) return messages
       for (const s of filledVesselSlots(state, scope)) {
         const spec = vesselClass(state.vessels[s.vesselId].sizeClass)
         if (!isCellUsable(spec, s.row, s.tier))
