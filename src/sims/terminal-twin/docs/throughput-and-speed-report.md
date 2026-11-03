@@ -48,3 +48,54 @@ Per event the cost grows: 1.1 ms (0.25), 1.5 ms (0.5), 1.7 ms (1, clean figures)
 4. Rail and reposition: do not release a package to a crane that must yield; proof: 0.1 peak day, rail plus reposition share from `tt:profile` down, 0 violations (moves the log; new golden later).
 5. SHC dispatch: least-loaded tie-break in `chained-nearest`; proof: `tt:profile` at 0.1 shows jobs spread over more SHCs and the horizontal wait down.
 6. Berth look-ahead for `first-fit`; proof: peak day at 0.1 or 0.25, anchorage wait max down; blocked by 4 and 5.
+
+## Per-invariant cost (0.1 peak day, #233)
+
+Measured, not fixed: no engine change, no ENGINE_VERSION bump, and the 0.1 peak day event log hash is unchanged (`06ce35a7276076`). `TTI_MOVES_SCALE` was set to 0.1 by a temporary uncommitted edit (reverted). A throwaway wrapper (scratchpad, not committed) timed every `Invariant.check` call with `performance.now()` (`tt:run --preset "TTI Algeciras, peak day" --until vessels:5`, 86,946 incremental checks and 96 sweeps). The machine was shared with another run, so read the shares, not the wall seconds (the instrumented run took 173 s of wall).
+
+The per-invariant times sum to 98.8 s. `InvariantTracker.check` and `sweep` took 105.2 s in all, so the invariant functions are 93.9% of it (within 10%); the other 6.4 s (6.1%) is the tracker's own scope building (custody and column bookkeeping, sets and maps per event). "Calls" counts incremental checks plus sweeps; "scoped" is how many of those got a scope (so did less than a full scan).
+
+| Invariant | ms | Share | Calls (scoped) | What it scans |
+|---|---|---|---|---|
+| stowage.no-floating | 19,086 | 19.3% | 52,780 (52,684) | every vessel slot (`Object.values(state.vesselSlots)`), filtered to touched vessels; builds a string-keyed map of occupied cells |
+| landside.waiting-off-road | 12,846 | 13.0% | 87,042 (0) | every truck, with a road-zone point test for each waiting one |
+| stowage.cell-free | 10,280 | 10.4% | 52,780 (52,684) | every vessel slot, filtered to touched vessels; string-keyed cell map |
+| landside.segregation | 8,294 | 8.4% | 83,804 (83,708) | trucks and lanes (scoped to equipment) |
+| asc.wtp-handover | 6,003 | 6.1% | 87,042 (0) | every ASC, then pads, then SHC positions |
+| landside.stranded-truck | 5,841 | 5.9% | 87,042 (0) | every truck at a stall, then the open jobs of its block |
+| custody.single-owner | 5,588 | 5.7% | 52,496 (52,400) | touched custody owners |
+| yard.no-double-occupied | 3,782 | 3.8% | 52,496 (52,400) | touched yard columns |
+| asc.no-passing | 3,373 | 3.4% | 83,804 (83,708) | ASCs of the touched equipment |
+| yard.no-mixed-length-overlap | 3,341 | 3.4% | 52,496 (52,400) | touched yard columns |
+| landside.stall-exclusive | 2,530 | 2.6% | 83,804 (0) | all trucks and stalls |
+| yard.no-floating | 2,490 | 2.5% | 52,496 (52,400) | touched yard columns |
+| yard.no-mixed-length-stack | 2,260 | 2.3% | 52,496 (52,400) | touched yard columns |
+| reservation.no-overlap | 2,211 | 2.2% | 87,042 (86,946) | reservations made since the last check |
+| yard.no-progress | 1,325 | 1.3% | 87,042 (0) | yard blocks (idle deadlock) |
+| yard.reefer-powered | 1,205 | 1.2% | 52,496 (52,400) | touched yard columns |
+| yard.slot-bounds | 1,109 | 1.1% | 52,496 (52,400) | touched yard columns |
+| stowage.order | 1,045 | 1.1% | 52,780 (52,684) | touched vessels |
+| shc.waiting-positions | 1,009 | 1.0% | 83,804 (0) | all SHCs |
+| yard.stack-height | 854 | 0.9% | 52,496 (52,400) | touched yard columns |
+| hull.profile | 837 | 0.8% | 52,780 (52,684) | every vessel slot, filtered to touched vessels |
+| sts.rail-order | 701 | 0.7% | 87,042 (0) | all STS gantries |
+| landside.leaves-complete | 690 | 0.7% | 83,804 (0) | all trucks |
+| claim.single-holder | 688 | 0.7% | 83,804 (0) | all claims |
+| hatch.laydown-stack-limit | 545 | 0.6% | 83,804 (0) | all laydown bays |
+| hatch.no-removal-with-boxes-on-top | 268 | 0.3% | 83,804 (83,708) | touched hatch panels |
+| hatch.no-hold-access-through-closed-hatch | 202 | 0.2% | 83,804 (83,708) | touched hatch panels |
+| hatch.no-deck-load-on-missing-hatch | 153 | 0.2% | 52,496 (52,400) | touched boxes |
+| hatch.replace-own-hatch | 89 | 0.1% | 83,804 (83,708) | touched hatch panels |
+| hatch.no-lift-before-lashing-release | 83 | 0.1% | 83,804 (83,708) | touched hatch panels |
+| berth.no-overlap | 56 | 0.1% | 2,064 (0) | on-quay vessels |
+| hatch.no-departure-open | 19 | 0.0% | 2,064 (1,968) | touched vessels |
+
+Reading it: three vessel-stowage invariants (no-floating, cell-free, hull.profile) are 30.5% even though they skip untouched vessels, because they still walk every slot of every vessel to find the filled slots of the touched one. The landside and ASC invariants that read `time` run on every event with no scope (waiting-off-road, stranded-truck, wtp-handover, stall-exclusive: 27.8% together). The yard invariants, which are scoped by column, cost 15.2% together.
+
+### Proposed tickets (each 15 minutes, one headless proof)
+
+1. **Vessel-slot index for the stowage invariants** (stowage.no-floating, stowage.cell-free, hull.profile, 30.5% of the invariant cost): iterate only the slots of the touched vessels (a per-vessel slot id list, or a filled-slot set per vessel built once in `SimState`/the tracker) instead of `Object.values(state.vesselSlots)` filtered by vessel, and share one numeric cell key instead of building a string per slot. Reports the same messages in the same order, so the event log does not move. Proof: `tt:run` on the 0.1 peak day gives the same `eventLogHash` (`06ce35a7276076`) and invariant check count, with the three invariants' timing down.
+2. **Early exits for the time-read landside invariants** (landside.waiting-off-road, landside.stranded-truck, landside.stall-exclusive, landside.leaves-complete, 22.2%): skip the truck scan when no truck is in the statuses the invariant cares about (keep a count or list of trucks per status), and look at whether `roadZonesOf(graph)` is built per call and cache it per config. Same messages, event log unchanged. Proof: same hash and `checks` on the 0.1 peak day, plus the existing invariant tests (a planted violation is still found by the sweep).
+3. **Cheap guard for asc.wtp-handover and asc.no-passing** (9.5%): skip an ASC whose spreader is at travel height or whose planned motion cannot reach a pad (the `pose.hoistY >= travel` test already does this per ASC, so the saving is the per-event `ascPoseAt` and block-spec lookups: hoist `blockSpecsById` and `laneGraphOf` out of the per-event path and bail when no SHC is within a pad envelope). Event log unchanged. Proof: same hash on the 0.1 peak day and the asc invariant tests.
+
+The tracker's own overhead (6.1%, sets and maps per event) is not a ticket: it is smaller than any of the three above.
