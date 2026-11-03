@@ -21,7 +21,7 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | #240 | stagger neighbouring cranes (package look-ahead at 0.5) | none | NOT MERGED, closed: hash 1bf340c1f57635 and 903 moves identical, rail share unchanged; waits start at each crane first package; branch tt/240-stagger-boundary-cranes kept (guide note only) | |
 | #241 | shcDispatch oldest pad box first | #239 | WITHDRAWN: no SHC dispatch cause (the wait is for the job to exist). Optional KPI-only fix: start the load-box horizontal stage at ShcJob.readyAt | |
 | #231 | berth look-ahead for first-fit | #229, #230 | closed not planned (premise failed) | |
-| #222 | final: measure 0.5 and scale 1 on an idle machine, goldens once, verify, smoke with SMOKE_WORKERS=2, review, PR | all | blocked by #218 and #191 | |
+| #222 | final: measure 0.5 and scale 1 on an idle machine, goldens once, verify, smoke with SMOKE_WORKERS=2, review, PR | all | claimed (150 min) | agent |
 
 Tickets for the top causes are added under #220 after #221 reports.
 
@@ -30,7 +30,7 @@ Tickets for the top causes are added under #220 after #221 reports.
 | Ticket | Title | Budget | Status | Claimed by |
 |---|---|---|---|---|
 | #223 | bay view: ROB cells always grey (#168), closes #192 | 10 min | merged in branch (12 min used; 3D unchanged; other smoke specs for the diff to run in #222) | |
-| #191 | x3600 spec: functional check stays, 600 floor moves to an @load spec | 10 min | claimed | agent |
+| #191 | x3600 spec | 10 min | merged in branch (21cc402): root cause was the 5,400 s fixture ending within 2 wall seconds at x3600, not hardware; both specs on Small automated, 6 of 6 passes, @load rate 3,100 to 3,200 | |
 | #218 | prove each room-rising path unparks an SHC job (test-only) | none | closed not planned: no stuck park in a 21,600 s run sampled every 10 s; no test could be built (premise did not hold) | |
 | #224 | SMOKE_WORKERS=2 trial | 15 min | folded into #222 (its dev smoke run uses two workers and compares with the 52.6 min one-worker baseline) | |
 
