@@ -7,7 +7,7 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | #221 | profile the 0.5 peak day (measure only) | none | merged in branch (docs only): wall 54% invariant checks, 20% GC; throughput rail 17%, reposition 25%, 14 of 23 SHCs idle | |
 | #226 | per-event invariant check only for relevant event types (wall 54%) | none | claimed | agent |
 | #227 | invariant check reuses buffers (GC 20%) | #226 | blocked | |
-| #228 | cache retrievalRanks and headsWithoutPad per block | none | claimed | agent |
+| #228 | cache retrievalRanks and headsWithoutPad per block | none | done (branch tt/228-cache-retrieval-ranks) | agent |
 | #229 | no package for a crane that must yield its rail (moves the log) | none | to do | |
 | #230 | SHC dispatch tie-break to the least loaded (moves the log) | none | to do | |
 | #231 | berth look-ahead for first-fit (moves the log) | #229, #230 | blocked | |

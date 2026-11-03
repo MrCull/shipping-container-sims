@@ -51,7 +51,7 @@ import type {
   TruckStatus,
 } from '../state'
 import { blockSpecs, candidateSlots, parseYardSlotId, reeferFields, reserveFields } from '../yardLayout'
-import { stackSpansOf } from '../yardIndex'
+import { notePlanChanged, stackSpansOf } from '../yardIndex'
 import { withoutPendingPickups } from './ascStorage'
 import { kpiClockOf, HOUR_S } from '../kpi/clock'
 import { makeIso6346Id } from '../../scenario/iso6346'
@@ -245,6 +245,7 @@ function bookExtraExport(ctx: EngineContext, box: ContainerState, vesselId: stri
     shared.loadPurpose = 'load'
     shared.plannedContainerId = box.id
   } else state.vesselSlots[id] = { id, vesselId, ...cell, purpose: 'load', containerId: null, plannedContainerId: box.id }
+  notePlanChanged(state)
   if (state.subsystems.shc !== 'off' && state.subsystems.asc !== 'off') state.vessels[vesselId].remainingLoad++
   return id
 }

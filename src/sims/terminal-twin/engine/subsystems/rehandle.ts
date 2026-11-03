@@ -83,6 +83,18 @@ export function nextBlocker(state: SimState, job: AscJob): YardSlotState | null 
  * first, in load sequence (vessel order, bay, hold before deck, tier, row, aft before fore).
  */
 export function retrievalRanks(state: SimState, config: ScenarioConfig, blockId: string): Map<string, number> {
+  // #228: cached until a stack of the block changes or a booking is made; callers only read the map
+  const index = yardIndexOf(state)
+  const stack = index.stackVersion.get(blockId) ?? 0
+  const hit = index.ranks.get(blockId)
+  if (hit && hit.stack === stack && hit.plan === index.planVersion) return hit.ranks
+  const ranks = computeRetrievalRanks(state, config, blockId)
+  index.ranks.set(blockId, { stack, plan: index.planVersion, ranks })
+  return ranks
+}
+
+/** The uncached computation behind `retrievalRanks` (the cache test compares the two). */
+export function computeRetrievalRanks(state: SimState, config: ScenarioConfig, blockId: string): Map<string, number> {
   const slotOfBox = new Map<string, (typeof state.vesselSlots)[string]>()
   for (const s of Object.values(state.vesselSlots)) if (s.plannedContainerId) slotOfBox.set(s.plannedContainerId, s)
   const vesselIndex = new Map(config.vessels.map((v, i) => [v.id, i]))

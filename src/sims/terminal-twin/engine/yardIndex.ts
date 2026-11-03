@@ -16,13 +16,22 @@ export interface YardIndex {
   byBlock: Map<string, YardSlotState[]>
   /** `${blockId}|${bay}-${row}` -> slots covering that column. */
   byColumn: Map<string, YardSlotState[]>
+  /** #228: per block, how many times a slot was added or removed; keys the retrieval-rank cache (`retrievalRanks`). */
+  stackVersion: Map<string, number>
+  /** #228: bumped when a vessel slot gets a booked box (`notePlanChanged`); the other key of that cache. */
+  planVersion: number
+  /** #228: `retrievalRanks` per block with the versions it was computed at. */
+  ranks: Map<string, { stack: number; plan: number; ranks: Map<string, number> }>
 }
 
 const cache = new WeakMap<object, YardIndex>()
 
 export const columnKey = (blockId: string, bay: number, row: number): string => `${blockId}|${bay}-${row}`
 
+const bump = (index: YardIndex, blockId: string): void => void index.stackVersion.set(blockId, (index.stackVersion.get(blockId) ?? 0) + 1)
+
 function addTo(index: YardIndex, s: YardSlotState): void {
+  bump(index, s.blockId)
   let list = index.byBlock.get(s.blockId)
   if (!list) index.byBlock.set(s.blockId, (list = []))
   list.push(s)
@@ -42,7 +51,7 @@ function removeFrom(list: YardSlotState[] | undefined, s: YardSlotState): void {
 export function yardIndexOf(state: Pick<SimState, 'yardSlots'>): YardIndex {
   let index = cache.get(state.yardSlots)
   if (index) return index
-  index = { byBlock: new Map(), byColumn: new Map() }
+  index = { byBlock: new Map(), byColumn: new Map(), stackVersion: new Map(), planVersion: 0, ranks: new Map() }
   for (const s of Object.values(state.yardSlots)) addTo(index, s)
   cache.set(state.yardSlots, index)
   return index
@@ -58,6 +67,7 @@ export function indexYardSlotAdded(state: Pick<SimState, 'yardSlots'>, slot: Yar
 export function indexYardSlotRemoved(state: Pick<SimState, 'yardSlots'>, slot: YardSlotState): void {
   const index = cache.get(state.yardSlots)
   if (!index) return
+  bump(index, slot.blockId)
   removeFrom(index.byBlock.get(slot.blockId), slot)
   for (let k = 0; k < slot.span; k++) removeFrom(index.byColumn.get(columnKey(slot.blockId, slot.bay + k, slot.row)), slot)
 }
@@ -120,4 +130,10 @@ export function stackTopsOf(state: SimState, blockId: string): (YardBoxView | nu
     }
   }
   return tops
+}
+
+/** #228: call after a vessel slot's `plannedContainerId` is set (it feeds `retrievalRanks`). No-op until the index is built. */
+export function notePlanChanged(state: Pick<SimState, 'yardSlots'>): void {
+  const index = cache.get(state.yardSlots)
+  if (index) index.planVersion++
 }
