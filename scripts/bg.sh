@@ -5,8 +5,10 @@
 #       dir, so the kernel frees it when the job dies). A waiting job logs one "bg: waiting for heavy lock held by ..."
 #       line. Start peak-day runs and the smoke suite with it; light jobs never wait.
 #   scripts/bg.sh wait <log> [seconds]     block until <log> has its EXIT line (default 600 s; exit 124 means still running, wait again), print it, exit with that code (124 on timeout)
+#       With a budget started (scripts/timebox.sh start), wait also prints the minutes left (stderr, before the EXIT line).
 #   scripts/bg.sh tail <log>               last 5 lines of <log>
 set -u
+here=$(cd "$(dirname "$0")" && pwd)
 cmd=${1:-}
 case "$cmd" in
   run)
@@ -33,9 +35,10 @@ case "$cmd" in
   wait)
     log=${2:?log path}; max=${3:-600}; waited=0
     while ! grep -q '^EXIT [0-9]*$' "$log" 2>/dev/null; do
-      [ "$waited" -ge "$max" ] && { echo "bg: still running after ${max}s: $log" >&2; exit 124; }
+      [ "$waited" -ge "$max" ] && { "$here/timebox.sh" status >&2; echo "bg: still running after ${max}s: $log" >&2; exit 124; }
       sleep 5; waited=$((waited + 5))
     done
+    "$here/timebox.sh" status >&2
     last=$(grep '^EXIT [0-9]*$' "$log" | tail -1); echo "$last"; exit "${last#EXIT }"
     ;;
   tail)
