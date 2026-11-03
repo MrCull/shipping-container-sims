@@ -151,7 +151,7 @@ export interface BayViewOptions {
   colourMode: ColourMode
   /** Maritime notation of a vessel slot id (default: the id itself). */
   locate?: (slotId: string) => string
-  /** ROB display (#168, the ROB control; default `grey`): `hide` draws no ROB cell, as the 3D hull draws none (the strip still marks ROB bays); `grey` the ROB grey; `show` the colour the mode gives any box. */
+  /** ROB display (#168, the ROB control; default `grey`): `hide` draws no ROB cell, as the 3D hull draws none (the strip still marks ROB bays); `grey` and `show` both the ROB grey (#223; `show` colours by mode in 3D only). */
   robDisplay?: RobDisplay
   /** Show one plan (#162): the other move's slots show as empty. Absent: both moves. */
   plan?: BayPlan
@@ -394,9 +394,9 @@ export function buildBayView(raw: BayViewData, bay: number, opts: BayViewOptions
   const now = data.now ?? 0
   const statusMode = byStatus(opts.colourMode)
   const mode = opts.colourMode as ColourBy
-  const robDisplay = opts.robDisplay ?? DEFAULT_ROB_DISPLAY
-  /** The ROB boxes take the colour their mode gives any box (`show`); the state view colours them as the default mode (the line). */
-  const robMode: ColourBy = statusMode ? 'default' : mode
+  /** ROB cells are always grey in the bay viewer (#223): `show` and `grey` both draw the ROB grey in every mode; only `hide` differs. The 3D view still colours `show` by the mode. */
+  const robDisplay: RobDisplay = (opts.robDisplay ?? DEFAULT_ROB_DISPLAY) === 'hide' ? 'hide' : 'grey'
+  const robMode: ColourBy = mode
   const legendEntries = statusMode ? [] : legendOf(mode, ctx)
   /** Key, legend position and fill of a cell in the property modes. A cell without a box says nothing where its mode has no value ("unknown", "other", "none"). */
   const paint = (details: CellDetails, box: BayBox | undefined, rob: boolean): { key: string | null; index: number | null; colour: string | null } => {
@@ -478,8 +478,8 @@ export function buildBayView(raw: BayViewData, bay: number, opts: BayViewOptions
       weightClass: b.weightClass,
       grossKg: b.grossKg,
     }
-    // the state view keeps the hatched ROB state when grey; shown, a ROB box takes its line colour
-    if (statusMode && robDisplay === 'grey') return { slotId: b.slotId, half: b.half, status: 'rob', colourKey: 'rob', colourIndex: null, colour: null, details, rob: true, continuation: false, absent: false }
+    // the state view keeps the hatched grey ROB state
+    if (statusMode) return { slotId: b.slotId, half: b.half, status: 'rob', colourKey: 'rob', colourIndex: null, colour: null, details, rob: true, continuation: false, absent: false }
     const p = paint(details, undefined, true)
     return { slotId: b.slotId, half: b.half, status: 'rob', colourKey: p.key, colourIndex: p.index, colour: p.colour, details, rob: true, continuation: false, absent: false }
   }

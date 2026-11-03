@@ -182,12 +182,12 @@ test('colour by: the ROB display (Show, Grey, Hide) draws the ROB boxes in 3D an
   await expect(robCells).toHaveCount(0)
   await expect(page.locator('[data-testid^=tt-bay-strip-][data-state=rob]').first()).toBeVisible()
 
-  // Show: the ROB boxes come back in their mode colour, not the grey (the bay viewer's ROB cells lose the state hatch)
+  // Show: the ROB boxes come back in 3D in their mode colour; the bay viewer's ROB cells stay grey (#223)
   await page.getByTestId('tt-rob-show').click()
   await expect.poll(async () => (await hull()).robBoxes).toBeGreaterThan(30)
   await expect(robCells).toHaveCount(shown)
   await setMode(page, 'line')
-  await expect.poll(async () => robCells.first().evaluate((e) => getComputedStyle(e).backgroundColor)).not.toBe('rgb(200, 202, 205)')
+  await expect.poll(async () => robCells.first().evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(200, 202, 205)')
 
   // Grey again: the grey comes back in every mode
   await page.getByTestId('tt-rob-grey').click()
