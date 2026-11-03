@@ -6,8 +6,9 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 |---|---|---|---|---|
 | #221 | profile the 0.5 peak day (measure only) | none | merged in branch (docs only): wall 54% invariant checks, 20% GC; throughput rail 17%, reposition 25%, 14 of 23 SHCs idle | |
 | #226 | per-event invariant check only for relevant event types | none | merged in branch (partial: only DecisionRequested skipped, checks -13%, hashes unchanged at 0.1; no wall or profile numbers; goldens and cli test red on the check count until #222) | |
-| #232 | finer event-type map for the invariant check (equipment-subject events), measured by CPU share | #226 | to do | |
-| #227 | invariant check reuses buffers (GC 20%) | #232 | blocked | |
+| #232 | finer event-type map for the invariant check | #226 | NOT MERGED, closed as superseded: WIP on tt/232-invariant-event-map; the skip map proved unsafe (ShcCleared, TruckArrivalDue, AscDroppedAtWtp); CPU before: invariants.ts self 37.1%, GC 16.9% | |
+| #233 | per-invariant CPU cost on the 0.1 peak day (measure only, 10 min) | none | claimed | agent |
+| #227 | invariant check reuses buffers (GC 20%) | #233 | blocked | |
 | #228 | cache retrievalRanks per block (headsWithoutPad not cacheable: depends on load-order stages) | none | merged in branch: hashes unchanged at 0.1 and 0.25; wall gain small and noisy (0.25: 137 s to 110 s, 0.1 peak day no gain) | |
 | #229 | no package for a crane that must yield its rail (moves the log) | none | claimed | agent |
 | #230 | SHC dispatch tie-break to the least loaded (moves the log) | none | to do | |
