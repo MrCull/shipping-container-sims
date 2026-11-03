@@ -10,14 +10,14 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | #233 | per-invariant CPU cost on the 0.1 peak day (measure only) | none | merged in branch (docs): stowage 30.5%, landside time-read 22.2%, asc 9.5% of the invariant cost; hash 06ce35a7276076 unchanged | |
 | #234 | per-vessel slot index for the stowage invariants | none | merged in branch: hashes unchanged at 0.1; the three invariants 36.7 s to 31.7 s CPU (about 2.6% of total CPU); remaining cost is the per-call string-keyed cell map -> #237 | |
 | #237 | stowage invariants: per-vessel occupancy map, numeric keys | none | merged in branch: the three invariants 32.2 s to 5.7 s CPU, GC 15.8% to 9.0%, total CPU 187 s to 175 s at 0.1; hashes unchanged | |
-| #238 | truck-status index for the landside invariants (30.7 s CPU) | none | claimed | agent |
+| #238 | truck-status index for the landside invariants | none | NOT MERGED, closed: hashes unchanged, no CPU saving (27.3 s to 30.3 s, noisy); branch tt/238-truck-status-index kept | |
 | #235 | early exits for the landside invariants | none | NOT MERGED, closed: hashes unchanged but no CPU saving (30.7 s before, 34 to 36 s after, noisy); branch tt/235-landside-invariant-exits kept | |
-| #236 | asc invariants: index of ASCs that can trip them (pattern of #237) | none | claimed | agent |
+| #236 | asc invariants: index (pattern of #237) | none | parked: small share (9.5% of the invariant cost, about 5% of total CPU) and two landside attempts gave nothing | |
 | #227 | invariant check reuses buffers (GC 20%) | #237 | folded into #237 | |
 | #228 | cache retrievalRanks per block (headsWithoutPad not cacheable: depends on load-order stages) | none | merged in branch: hashes unchanged at 0.1 and 0.25; wall gain small and noisy (0.25: 137 s to 110 s, 0.1 peak day no gain) | |
 | #229 | crane split keeps different cranes bays at least stsMinSpacingM apart (rescoped to a fix after the 0.5 measurement: rail 36% of crane windows) | none | claimed | agent |
 | #230 | SHC dispatch tie-break to the least loaded | none | NOT MERGED, closed: all 23 SHCs work (8 of 23 before at 0.25) but load-box wait flat (764 s to 810 s), moves 543 to 545; moved the log and forced a test assertion out; branch tt/230-shc-least-loaded kept | |
-| #239 | why a pad box waits for an SHC job claim at 0.5 (measure only, 20 min) | none | to do | |
+| #239 | why a pad box waits for an SHC job claim at 0.5 (measure only, 20 min) | none | claimed | agent |
 | #240 | shcDispatch fix for the top reason found by #239 (moves the log) | #239 | to be written | |
 | #231 | berth look-ahead for first-fit (moves the log) | #229, #230 | blocked | |
 | #222 | final: scale 1 or best scale, goldens, smoke | #226 to #231 | blocked | |
