@@ -12,16 +12,16 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | #237 | stowage invariants: per-vessel occupancy map, numeric keys | none | merged in branch: the three invariants 32.2 s to 5.7 s CPU, GC 15.8% to 9.0%, total CPU 187 s to 175 s at 0.1; hashes unchanged | |
 | #238 | truck-status index for the landside invariants | none | NOT MERGED, closed: hashes unchanged, no CPU saving (27.3 s to 30.3 s, noisy); branch tt/238-truck-status-index kept | |
 | #235 | early exits for the landside invariants | none | NOT MERGED, closed: hashes unchanged but no CPU saving (30.7 s before, 34 to 36 s after, noisy); branch tt/235-landside-invariant-exits kept | |
-| #236 | asc invariants: index (pattern of #237) | none | parked: small share (9.5% of the invariant cost, about 5% of total CPU) and two landside attempts gave nothing | |
+| #236 | asc invariants index | none | closed not planned (small share) | |
 | #227 | invariant check reuses buffers (GC 20%) | #237 | folded into #237 | |
 | #228 | cache retrievalRanks per block (headsWithoutPad not cacheable: depends on load-order stages) | none | merged in branch: hashes unchanged at 0.1 and 0.25; wall gain small and noisy (0.25: 137 s to 110 s, 0.1 peak day no gain) | |
 | #229 | crane split spacing | none | NOT MERGED, closed: balanced-moves prefers cuts at least stsMinSpacingM apart but the 0.5 run is identical (hash 1bf340c1f57635, 903 moves, rail 36%); bays are contiguous at 14 m so no cut gives 27 m; branch tt/229-crane-split-spacing kept; replaced by #240 | |
 | #230 | SHC dispatch tie-break to the least loaded | none | NOT MERGED, closed: all 23 SHCs work (8 of 23 before at 0.25) but load-box wait flat (764 s to 810 s), moves 543 to 545; moved the log and forced a test assertion out; branch tt/230-shc-least-loaded kept | |
 | #239 | why a pad box waits for an SHC job claim at 0.5 (measure only) | none | merged in branch (docs): premise did not hold, 0 open jobs waited over 1,800 s; 304 of 313 boxes were claimed in the same second their job was created; the wait is for the job to exist (staged-ahead loads get a job when the crane finishes discharge); hash 1bf340c1f57635 unchanged | |
-| #240 | stagger neighbouring cranes at the boundary bays (package look-ahead, proven at 0.5; moves the log) | none | claimed | agent |
+| #240 | stagger neighbouring cranes (package look-ahead at 0.5) | none | NOT MERGED, closed: hash 1bf340c1f57635 and 903 moves identical, rail share unchanged; waits start at each crane first package; branch tt/240-stagger-boundary-cranes kept (guide note only) | |
 | #241 | shcDispatch oldest pad box first | #239 | WITHDRAWN: no SHC dispatch cause (the wait is for the job to exist). Optional KPI-only fix: start the load-box horizontal stage at ShcJob.readyAt | |
-| #231 | berth look-ahead for first-fit (moves the log) | #229, #230 | blocked | |
-| #222 | final: scale 1 or best scale, goldens, smoke | #226 to #231 | blocked | |
+| #231 | berth look-ahead for first-fit | #229, #230 | closed not planned (premise failed) | |
+| #222 | final: measure 0.5 and scale 1 on an idle machine, goldens once, verify, smoke with SMOKE_WORKERS=2, review, PR | all | blocked by #218 and #191 | |
 
 Tickets for the top causes are added under #220 after #221 reports.
 
@@ -30,8 +30,8 @@ Tickets for the top causes are added under #220 after #221 reports.
 | Ticket | Title | Budget | Status | Claimed by |
 |---|---|---|---|---|
 | #223 | bay view: ROB cells always grey (#168), closes #192 | 10 min | merged in branch (12 min used; 3D unchanged; other smoke specs for the diff to run in #222) | |
-| #191 | x3600 spec: functional check stays, 600 floor moves to an @load spec | 10 min | to do | |
+| #191 | x3600 spec: functional check stays, 600 floor moves to an @load spec | 10 min | claimed | agent |
 | #218 | prove each room-rising path unparks an SHC job (test-only, 15 min) | none | claimed | agent |
-| #224 | measure SMOKE_WORKERS=2 on the dev suite (heavy runs: start after #221 ends) | 15 min | to do | |
+| #224 | SMOKE_WORKERS=2 trial | 15 min | folded into #222 (its dev smoke run uses two workers and compares with the 52.6 min one-worker baseline) | |
 
 Standing rule: merge a PR I opened when CI is green and the review has no blocking finding, then fast-forward and start the next work.
