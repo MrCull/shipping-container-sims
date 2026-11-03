@@ -10,11 +10,11 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | #233 | per-invariant CPU cost on the 0.1 peak day (measure only) | none | merged in branch (docs): stowage 30.5%, landside time-read 22.2%, asc 9.5% of the invariant cost; hash 06ce35a7276076 unchanged | |
 | #234 | per-vessel slot index for the stowage invariants | none | merged in branch: hashes unchanged at 0.1; the three invariants 36.7 s to 31.7 s CPU (about 2.6% of total CPU); remaining cost is the per-call string-keyed cell map -> #237 | |
 | #237 | stowage invariants: reuse the occupied-cell map per vessel, numeric keys (also cuts GC; replaces #227) | none | to do | |
-| #235 | early exits and cached road zones for the landside invariants (22.2%) | none | claimed | agent |
+| #235 | early exits for the landside invariants | none | NOT MERGED, closed: hashes unchanged but no CPU saving (30.7 s before, 34 to 36 s after, noisy); branch tt/235-landside-invariant-exits kept | |
 | #236 | cheap guard for asc.wtp-handover and asc.no-passing (9.5%) | none | to do | |
 | #227 | invariant check reuses buffers (GC 20%) | #237 | folded into #237 | |
 | #228 | cache retrievalRanks per block (headsWithoutPad not cacheable: depends on load-order stages) | none | merged in branch: hashes unchanged at 0.1 and 0.25; wall gain small and noisy (0.25: 137 s to 110 s, 0.1 peak day no gain) | |
-| #229 | rail waits: where STS106, STS102 and STS105 wait at 0.5 (rescoped to measure, 20 min) | none | first slice no engine change (look-ahead changed nothing at 0.1; rail 0% there; waits come from parked start positions); guard test and note merged; measuring slice to do | |
+| #229 | where cranes (rail, reposition) and load boxes wait at 0.5 (measure, 20 min) | none | claimed | agent |
 | #230 | SHC dispatch tie-break to the least loaded | none | NOT MERGED, closed: all 23 SHCs work (8 of 23 before at 0.25) but load-box wait flat (764 s to 810 s), moves 543 to 545; moved the log and forced a test assertion out; branch tt/230-shc-least-loaded kept | |
 | #231 | berth look-ahead for first-fit (moves the log) | #229, #230 | blocked | |
 | #222 | final: scale 1 or best scale, goldens, smoke | #226 to #231 | blocked | |
