@@ -20,6 +20,7 @@ import { hasLandside, landsideGraphOf } from './landsideGraph'
 import { overlappingNewReservations, overlappingReservations } from './reservations'
 import type { EngineEvent } from './events'
 import { columnKey, yardIndexOf } from './yardIndex'
+import { vesselSlotsOf } from './vesselSlotIndex'
 import {
   ascIndexOf,
   type AscJob,
@@ -164,6 +165,16 @@ function panelsToCheck(state: SimState, scope?: InvariantScope): HatchPanelState
 /** Occupied slots covering one bay-row-tier cell of a block. */
 function cellOccupants(state: SimState, blockId: string, bay: number, row: number, tier: number): YardSlotState[] {
   return (yardIndexOf(state).byColumn.get(columnKey(blockId, bay, row)) ?? []).filter((s) => s.tier === tier && s.containerId)
+}
+
+/** #234: the filled slots of the vessels to check, from the per-vessel slot index (order: vessel, then slot creation). */
+function filledVesselSlots(state: SimState, scope: { vessels: ReadonlySet<string> } | undefined): VesselSlotState[] {
+  const out: VesselSlotState[] = []
+  for (const vesselId of Object.keys(state.vessels)) {
+    if (scope && !scope.vessels.has(vesselId)) continue
+    for (const s of vesselSlotsOf(state, vesselId)) if (s.containerId) out.push(s)
+  }
+  return out
 }
 
 /** The slots to check: those in the given columns (deduplicated), or every slot. */
@@ -718,9 +729,7 @@ export const INVARIANTS: Invariant[] = [
       const filled = new Map<string, ('aft' | 'fore' | null)[]>()
       const loads = []
       const boxes = []
-      for (const s of Object.values(state.vesselSlots)) {
-        if (!s.containerId) continue
-        if (scope && !scope.vessels.has(s.vesselId)) continue
+      for (const s of filledVesselSlots(state, scope)) {
         const key = `${s.vesselId}:${s.bay}:${s.row}:${s.tier}`
         filled.set(key, [...(filled.get(key) ?? []), s.half])
         boxes.push(s)
@@ -758,9 +767,7 @@ export const INVARIANTS: Invariant[] = [
       if (scope && scope.vessels.size === 0) return messages
       const occupied = new Map<string, ('aft' | 'fore' | null)[]>()
       const onBoard: { label: string; vesselId: string; bay: number; row: number; tier: number; half: 'aft' | 'fore' | null }[] = []
-      for (const s of Object.values(state.vesselSlots)) {
-        if (!s.containerId) continue
-        if (scope && !scope.vessels.has(s.vesselId)) continue
+      for (const s of filledVesselSlots(state, scope)) {
         const key = `${s.vesselId}:${s.bay}:${s.row}:${s.tier}`
         occupied.set(key, [...(occupied.get(key) ?? []), s.half])
         onBoard.push({ label: `box ${s.containerId} in ${s.id}`, vesselId: s.vesselId, bay: s.bay, row: s.row, tier: s.tier, half: s.half })
@@ -803,9 +810,7 @@ export const INVARIANTS: Invariant[] = [
         held.push({ label, half })
         cells.set(key, held)
       }
-      for (const s of Object.values(state.vesselSlots)) {
-        if (!s.containerId) continue
-        if (scope && !scope.vessels.has(s.vesselId)) continue
+      for (const s of filledVesselSlots(state, scope)) {
         put(s.vesselId, s.bay, s.row, s.tier, `box ${s.containerId} in slot ${s.id}`, s.half)
       }
       for (const vessel of Object.values(state.vessels)) {
@@ -826,9 +831,7 @@ export const INVARIANTS: Invariant[] = [
       const messages: string[] = []
       // nothing on a vessel the event did not touch is checked: skip the scan of every slot
       if (scope && scope.vessels.size === 0) return messages
-      for (const s of Object.values(state.vesselSlots)) {
-        if (!s.containerId) continue
-        if (scope && !scope.vessels.has(s.vesselId)) continue
+      for (const s of filledVesselSlots(state, scope)) {
         const spec = vesselClass(state.vessels[s.vesselId].sizeClass)
         if (!isCellUsable(spec, s.row, s.tier))
           messages.push(`box ${s.containerId} in ${s.id} is outside the ${spec.label} hull profile (bay ${s.bay} row ${s.row} tier ${s.tier})`)
