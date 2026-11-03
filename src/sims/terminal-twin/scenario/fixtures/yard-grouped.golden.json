@@ -3,7 +3,7 @@
   "seed": 31,
   "status": "ended",
   "endReason": "vesselsCompleted >= 2",
-  "eventLogHash": "1fb1bb74827ba7",
+  "eventLogHash": "065c59b824a31b",
   "kpis": {
     "simTimeS": 16796.616,
     "eventsProcessed": 5213,
@@ -294,8 +294,8 @@
           "loadedDistanceM": 7895.433,
           "reservationWaitS": 320.678,
           "stateS": {
-            "parked": 9741.787,
-            "moving-to-collect": 2084.482,
+            "parked": 9742.879,
+            "moving-to-collect": 2083.39,
             "queuing-to-collect": 27.758,
             "collecting": 1951.998,
             "moving-to-deliver": 231,
@@ -404,7 +404,7 @@
       "gateQueue": 0,
       "gateQueueMax": 1,
       "turnTimeS": {
-        "mean": 448.85,
+        "mean": 450.255,
         "max": 2019.987
       },
       "gateWaitS": {
@@ -416,7 +416,7 @@
         "max": 255.291
       },
       "stallWaitS": {
-        "mean": 177.817,
+        "mean": 179.222,
         "max": 1766.009
       },
       "gateProcessingS": {
@@ -428,14 +428,14 @@
         "max": 33.804
       },
       "totalTurnaroundS": {
-        "mean": 536.448,
+        "mean": 537.853,
         "max": 2106.117
       },
       "road": {
         "meanTrucks": 0.402,
         "maxTrucks": 3
       },
-      "serviceS": 323.727,
+      "serviceS": 325.132,
       "transactions": {
         "dropExport": 6,
         "pickImport": 26,
@@ -451,7 +451,7 @@
       "IMPORT": {
         "count": 29,
         "departed": 29,
-        "meanS": 7783.153,
+        "meanS": 7786.399,
         "maxS": 14999.139
       },
       "EXPORT": {
