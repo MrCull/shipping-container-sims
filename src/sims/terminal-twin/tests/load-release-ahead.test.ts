@@ -79,6 +79,44 @@ describe('load release-ahead (#186)', () => {
     expect(a.eventLog().map((e) => e.type)).toEqual(b.eventLog().map((e) => e.type))
   })
 
+  it('keeps one pad per crane head box: boxes released ahead only use pads beyond the reserved ones (#213)', () => {
+    const PADS = 4
+    const config = new ScenarioBuilder('head-pad', 'head box pad reserve')
+      .hatch({ enabled: false })
+      .seed(11)
+      .moveVariation(10)
+      .quay(600, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .sts('STS02', { gantryX: 120, groundPositions: 3 })
+      .sts('STS03', { gantryX: 180, groundPositions: 3 })
+      .vesselCall('V001', { name: 'First', sizeClass: 'feeder', discharge: 12, load: 18, maxSts: 3, sizeMix: { '40': 1 } })
+      .shcs(3)
+      .block('B01', { x: 20, bays: 14, tiers: 4, wtpPads: PADS })
+      .yardStart({ mode: 'prefilled', targetPct: 40 })
+      .loadReleaseAhead(6)
+      .endWhen({ simDurationS: DURATION })
+      .build()
+    const sim = createSimulation(config)
+    let worst = -PADS
+    for (let t = 20; t <= DURATION; t += 20) {
+      sim.runUntil({ time: t })
+      const orders = sim.query.loadOrders()
+      const heads = new Map<string, (typeof orders)[number]>()
+      for (const o of orders) {
+        const h = heads.get(o.stsId)
+        if (!h || o.seq < h.seq) heads.set(o.stsId, o)
+      }
+      const headIds = new Set([...heads.values()].map((o) => o.containerId))
+      const unpadded = [...heads.values()].filter((o) => o.stage === 'released').length
+      const ahead = orders.filter((o) => (o.stage === 'staging' || o.stage === 'padded') && !headIds.has(o.containerId)).length
+      // one pad stays for discharge boxes, one per crane whose head box has no pad yet
+      worst = Math.max(worst, ahead - (PADS - 1 - unpadded))
+    }
+    expect(worst).toBeLessThanOrEqual(0)
+    expect(sim.firstError).toBeNull()
+    expect(sim.invariantReport().violations).toEqual([])
+  })
+
   it('rejects a bad value', () => {
     for (const bad of [-1, 1.5, 99]) {
       const config = scenario(2)
