@@ -5,8 +5,9 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | Ticket | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
 | #221 | profile the 0.5 peak day (measure only) | none | merged in branch (docs only): wall 54% invariant checks, 20% GC; throughput rail 17%, reposition 25%, 14 of 23 SHCs idle | |
-| #226 | per-event invariant check only for relevant event types (wall 54%) | none | claimed | agent |
-| #227 | invariant check reuses buffers (GC 20%) | #226 | blocked | |
+| #226 | per-event invariant check only for relevant event types | none | merged in branch (partial: only DecisionRequested skipped, checks -13%, hashes unchanged at 0.1; no wall or profile numbers; goldens and cli test red on the check count until #222) | |
+| #232 | finer event-type map for the invariant check (equipment-subject events), measured by CPU share | #226 | to do | |
+| #227 | invariant check reuses buffers (GC 20%) | #232 | blocked | |
 | #228 | cache retrievalRanks and headsWithoutPad per block | none | claimed | agent |
 | #229 | no package for a crane that must yield its rail (moves the log) | none | to do | |
 | #230 | SHC dispatch tie-break to the least loaded (moves the log) | none | to do | |
