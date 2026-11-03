@@ -129,3 +129,19 @@ Smallest change: have `shcDispatch` claim the oldest waiting pad box before a ne
 1. Crane split keeps bays at least `stsMinSpacingM` apart per crane: rail share down from 36 %, STS106 gets moves.
 2. Why are most SHCs unused (8 got jobs) and four load boxes unclaimed after 9,000 s: log, per ShcJobAssigned, the SHC states at each long wait (measure only, 15 min).
 3. `shcDispatch` oldest-pad-box-first: load-box horizontal mean down from 456 s.
+
+## Why a pad box waits for an SHC job claim at 0.5 (#239 measuring slice)
+
+Run: the same bounded run (`--until time:40000`, scale 0.5, seed 99), twice on tip 02063df: 903 moves, event-log hash `1bf340c1f57635` both without and with a temporary read-only logging hook (reverted, not committed). The hook logged, for every open load job that waited over 1,800 s, each SHC's state (status, job, node, route cost to the pad, how many open jobs are nearer) and the job's eligibility (`padWait`), and logged every load-job claim with the job's `readyAt`.
+
+**Result: the premise did not hold. The SHCs are not the cause.** The hook logged 0 open load jobs waiting more than 1,800 s. Of 313 boxes dropped at a pad (`AscDroppedAtWtp`), 304 were claimed, every one in the same sim second its `ShcJob` was created (open-job wait 0 s for all 304), and 9 had no job at 40,000 s. So the "wait for `ShcJobAssigned`" of the section above is the wait for the job to exist: a box staged ahead of its ground position (#186, `loadReleaseAhead`, stage `padded`) gets its job only when `pumpLoadPrep` has asked `stsGroundPosition` and the crane's discharge packages are complete (`dischargeDone` in `engine/subsystems/loadPrep.ts`; job created in `loadPrepReactors.DecisionResolved`).
+
+| Pad boxes waiting over 1,800 s (drop to claim) | Count | Share | Wait | SHC states / reason class |
+|---|---|---|---|---|
+| Box on pad, job created later when its crane finishes discharge, claimed at once | 11 | 73 % | 1,843 s to 5,250 s (e.g. 5,250 s to STS108 at 29,504 s; 3,829 s to STS102 at 9,096 s) | never offered: no job existed; an SHC was free at each claim (0 s open wait) |
+| Box on pad, no job at 40,000 s | 4 | 27 % | 9,327 s to 21,287 s (open at the end) | never offered: no job existed (crane discharge not done, see the rail waits above) |
+| All SHCs busy / ranked last by the strategy / box not eligible | 0 / 0 / 0 | 0 % | none | the hook never saw an open load job older than 1,800 s |
+
+The 15 boxes over 1,800 s carry 85,787 s, 67 % of the 128,850 s total drop-to-claim time over all 313 boxes; 100 % of it is before the job exists, 0 s is SHC wait. The earlier "8 distinct SHCs got a job" only reflects that load jobs appear one at a time and a free SHC takes each at once. Which crane held each of the 4 unclaimed boxes was not checked (time box).
+
+Smallest fix: none in `shcDispatch` (`engine/subsystems/shc.ts`) or the strategies (`chained-nearest`, `predispatch`, `paired-dual-cycle`): there is no SHC wait to remove, so the "oldest pad box first" ticket above is withdrawn. The change is the measurement: start the load-box horizontal stage at job creation (`ShcJob.readyAt`, from `createLoadShcJob`) instead of `AscDroppedAtWtp`, so the load-box wait reads about 0 s; it changes the KPI only, not the event log. The long pre-job waits shrink only with earlier crane discharge (the #229 crane-split fix) or a smaller `loadReleaseAhead`, which moves the log.
