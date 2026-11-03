@@ -155,6 +155,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Productive move:** an ASC move that stacks an arriving box or retrieves an export box for loading.
 - **Rehandle ratio:** rehandles per productive move, overall and per block (`rehandlesPerProductiveMove`).
 - **Rehandle target:** the slot the `rehandleTarget` decision picks for a blocker.
+- **Promised room:** the stack cells that the blockers of picks already holding a stall will need. A pick-only truck is admitted to a block only when its own blockers fit as well (`rehandleRoomFor`, a greedy packing under the stacking rules), and the admitted picks still fit with it.
 
 ## 3D assets (phase 2)
 
