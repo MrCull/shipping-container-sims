@@ -4,7 +4,7 @@ Phase 2 and specs #193 and #201 merged in #210. Fast mode (lint, build, test:rel
 
 | Ticket | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
-| #188 | TTI presets at realistic volume, 0.25 then 0.5 then 1 | none | PARTIAL, merged in branch (0.47.0): 0.25 committed and green; 0.5 floor not reached (peak day: three-crane rail wait at 89,151 s; baseline: yard.no-progress in B14 at 81,017 s). Stays open | |
+| #188 | scale 0.5 then 1 (0.25 done) | #212 to #216 | claimed (0.5 step) | agent |
 | #192 | round 4 follow-ups (all but the #168 ROB colour, an owner decision) | none | merged in branch (smoke specs for its diff not run yet; #187 tier stow not done, root cause open; #170 atlas needs Blender) | |
 
 ## Spec #211 (TTI presets at 0.5, finish #188), same branch, fast mode. Ticket bodies: scratchpad impl211/<N>.md
@@ -17,5 +17,5 @@ Phase 2 and specs #193 and #201 merged in #210. Fast mode (lint, build, test:rel
 | #218 | SHC dispatch and pad selection zero-time re-ask loop when every pad is block-full | none | merged in branch as a guard only (0.51.0): the loop was NOT reproduced, tests never red; stays open until #188 at 0.5 confirms. Separate: landside.stranded-truck at about sim 5600 on a full block (not chased) | |
 | #215 | stall legality counts room promised to admitted picks | none | merged in branch (0.50.0); TT-184 drop-only head test passes seeds 1,2,3,5 to 9; seed 4 is a rehandle-target layout dead end (equal-height pairs), truck turnaround +106 s baseline, +51 s peak day at 0.1 | |
 | #216 | tt:run --snapshot on large runs | none | merged in branch (no ENGINE_VERSION change; snapshot 1.4 GB at 0.25 sim 7200 s, resume may need NODE_OPTIONS=--max-old-space-size) | |
-| #188 | scale 0.5 then 1 (0.25 done) | #212 to #216 | blocked | |
+| #188 | scale 0.5 then 1 (0.25 done) | #212 to #216 | claimed (0.5 step) | agent |
 | #217 | final: smoke suite and goldens | #188, #212 to #216, #218 | blocked | |
