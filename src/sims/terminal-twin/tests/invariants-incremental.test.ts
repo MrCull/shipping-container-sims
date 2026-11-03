@@ -1,6 +1,6 @@
 /** V11-18: incremental invariant checking. The injected-violation tests in `invariants.test.ts` keep proving the exact-event guarantee. */
 import { describe, expect, it } from 'vitest'
-import { checkInvariants, createSimulation, indexYardSlotAdded, InvariantTracker, type HandlerSet } from '../engine'
+import { checkInvariants, createSimulation, indexYardSlotAdded, InvariantTracker, STATE_NEUTRAL_EVENTS, type HandlerSet } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 
 const tracer = fixtures['tracer-1sts-10-boxes']
@@ -71,6 +71,35 @@ describe('incremental checking', () => {
     const removed = tracker.check(state, sim.config, { subjects: { containers: [below] } })
     expect(removed.map((v) => v.invariant)).toContain('yard.no-floating')
     expect(checkInvariants(state, sim.config).map((v) => v.invariant)).toContain('yard.no-floating')
+  })
+})
+
+describe('event-type filter (#226)', () => {
+  it('only state-neutral event types (DecisionRequested) are skipped by the per-event check', () => {
+    expect([...STATE_NEUTRAL_EVENTS]).toEqual(['DecisionRequested'])
+    const sim = createSimulation(fixtures['asc-1sts-10-boxes-1block'])
+    sim.runUntil()
+    const log = sim.eventLog()
+    const neutral = log.filter((e) => STATE_NEUTRAL_EVENTS.has(e.type)).length
+    expect(neutral).toBeGreaterThan(0)
+    const checks = sim.invariantReport().checks
+    expect(checks).toBeGreaterThan(0)
+    expect(checks).toBeLessThanOrEqual(log.length - neutral)
+    expect(sim.invariantReport().violations).toEqual([])
+  })
+
+  it('a tampered snapshot is still caught: by the next event that names the box and by the closing sweep', () => {
+    const sim = createSimulation(fixtures['asc-1sts-10-boxes-1block'])
+    sim.runUntil({ eventType: 'AscStacked' })
+    sim.runUntil({ eventType: 'AscStacked' })
+    const { state } = sim.snapshot()
+    const filled = Object.values(state.yardSlots).filter((s) => s.containerId)
+    filled[0].tier = 3 // floating
+    const tracker = new InvariantTracker()
+    tracker.sweep(state, sim.config)
+    const named = tracker.check(state, sim.config, { subjects: { containers: [filled[0].containerId as string] } })
+    expect(named.map((v) => v.invariant)).toContain('yard.no-floating')
+    expect(tracker.sweep(state, sim.config).map((v) => v.invariant)).toContain('yard.no-floating')
   })
 })
 

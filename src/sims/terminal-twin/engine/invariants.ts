@@ -1187,6 +1187,15 @@ export function checkInvariants(state: SimState, config: ScenarioConfig): Invari
   return violations
 }
 
+/**
+ * Event types that change no state an invariant reads (#226): `DecisionRequested` only calls the handler and records
+ * bookkeeping in `state.decisions`; the asking subsystem acts on the reply at `DecisionResolved`, which is checked. These
+ * events are not checked one by one (the check count falls); the next checked event, the periodic sweep and the closing
+ * sweep still see any change, and the time deadline check (`invariantDeadline`) is unaffected. Every other event type is
+ * checked, scoped by its subjects (see `InvariantTracker.check`).
+ */
+export const STATE_NEUTRAL_EVENTS: ReadonlySet<string> = new Set(['DecisionRequested'])
+
 /** Events between full sweeps unless the host says otherwise; the last event of a run is always swept. */
 export const DEFAULT_SWEEP_EVERY = 1000
 
