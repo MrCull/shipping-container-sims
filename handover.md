@@ -4,7 +4,7 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 
 | Ticket | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
-| #221 | profile the 0.5 peak day, wall time and throughput (measure only, 30 min) | none | claimed | agent |
+| #221 | profile the 0.5 peak day (measure only) | none | merged in branch (docs only): wall 54% invariant checks, 20% GC; throughput rail 17%, reposition 25%, 14 of 23 SHCs idle | |
 | #222 | final: scale 1 or best scale, goldens, smoke | #221 and the tickets it proposes | blocked | |
 
 Tickets for the top causes are added under #220 after #221 reports.
