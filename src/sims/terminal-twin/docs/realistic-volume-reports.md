@@ -801,7 +801,22 @@ Top waits (longest first):
   MAEU2265393   load       horizontal        94246   26810.3
 ```
 
-## Attempt: TTI_MOVES_SCALE 1 (not committed)
+## Step: TTI_MOVES_SCALE 1 (spec #220, #222, engine 0.53.0)
+
+Committed. The speed-ups of spec #220 (#226 `DecisionRequested` skipped in the per-event check, #228 `retrievalRanks` cache, #234 and #237 vessel slot index and occupancy map for the stowage invariants) cut the invariant cost, which the profile of #221 had at 54 % of wall (GC 20 %), so the full-size peak day now fits the 10 minute criterion. Idle machine, one run at a time, `--until vessels:4` (baseline) and `--until vessels:5` (peak day), engine 0.52.0 for the 0.5 column and 0.53.0 (scale 1, otherwise unchanged) for the 1 column; the 0.5 event-log hashes equal those before the speed-ups, so the invariant changes read state only.
+
+| | baseline 0.5 | baseline 1 | peak day 0.5 | peak day 1 |
+|---|---|---|---|---|
+| result | 4 of 4 vessels, 2,312 moves | 4 of 4 vessels, 4,624 moves | 5 of 5 vessels, 4,583 moves | 5 of 5 vessels, 9,163 moves |
+| sim time at stop | day 1 09:09:23 | day 2 10:25:42 | day 3 04:58:35 | day 3 21:56:17 |
+| wall | 112 s (was 130 s) | 222 s (was 279 s) | 318 s (was 438 s) | 554 s (9 min 14 s) |
+| violations | 0 over 115,601 checks | 0 over 216,734 checks | 0 over 228,281 checks | 0 over 399,379 checks |
+| event-log hash | 084b735c5113f9 | 168e78e8241a57 | 0c67d35d6d90b8 | 10e8cbb0541010 |
+| events | 151,282 | 267,585 | 296,635 | 489,566 |
+
+KPI comparison, peak day 0.5 to 1 (from `tt:run`): moves 4,583 to 9,163 (x2.0), sim time to the fifth vessel 2.0 to 2.9 sim days (x1.4, so throughput per sim hour rose: the quay is better used at the larger volume), anchorage wait of the latest vessel 232,604 s to 262,656 s, SHC pad boxes 2,458 to 4,915, STS gross moves/h per crane 4.1 to 10.9 (0.5) against 8.0 to 21.1 (1), the busiest crane STS107 814 moves to 1,785, hatch moves 124 to 236. Rail wait stays the largest crane loss (STS105 126,295 s, STS104 72,263 s at 1). Wall per event: 1.07 ms at 0.5, 1.13 ms at 1, so the cost is close to linear in events; the margin to the 10 minute criterion is 46 s (8 %), so a new invariant or a slower per-event path can break it. Not run at 1: a `tt:profile` (a profile of the 9 minute run is a second run of the same length; the CPU shares at 0.1 are in docs/throughput-and-speed-report.md).
+
+## Earlier attempt: TTI_MOVES_SCALE 1 (engine 0.52.0, before the speed-ups; superseded by the step above)
 
 Engine 0.52.0, local edit of `TTI_MOVES_SCALE` to 1, both runs at once on 4 cores, `NODE_OPTIONS=--max-old-space-size=6000`. Baseline to its end; peak day with `--until time:100000` (a bound that proves the run is clean, not that it completes).
 

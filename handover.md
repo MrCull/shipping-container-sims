@@ -21,7 +21,7 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | #240 | stagger neighbouring cranes (package look-ahead at 0.5) | none | NOT MERGED, closed: hash 1bf340c1f57635 and 903 moves identical, rail share unchanged; waits start at each crane first package; branch tt/240-stagger-boundary-cranes kept (guide note only) | |
 | #241 | shcDispatch oldest pad box first | #239 | WITHDRAWN: no SHC dispatch cause (the wait is for the job to exist). Optional KPI-only fix: start the load-box horizontal stage at ShcJob.readyAt | |
 | #231 | berth look-ahead for first-fit | #229, #230 | closed not planned (premise failed) | |
-| #222 | final: measure 0.5 and scale 1 on an idle machine, goldens once, verify, smoke with SMOKE_WORKERS=2, review, PR | all | claimed (150 min) | agent |
+| #222 | final: measure 0.5 and scale 1 on an idle machine, goldens once, verify, smoke with SMOKE_WORKERS=2, review, PR | all | done on tt/final-222: scale 1 committed (ENGINE_VERSION 0.53.0), goldens regenerated once, verify green, dev smoke 2 workers 153 of 156 (3 load-sensitive, pass alone), prod 7 of 7; review and PR pending | |
 
 Tickets for the top causes are added under #220 after #221 reports.
 

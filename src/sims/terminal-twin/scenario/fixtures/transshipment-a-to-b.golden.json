@@ -312,7 +312,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 618,
+    "checks": 550,
     "violations": 0,
     "first": null
   },
