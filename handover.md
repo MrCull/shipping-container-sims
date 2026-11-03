@@ -9,7 +9,7 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | #232 | finer event-type map for the invariant check (equipment-subject events), measured by CPU share | #226 | to do | |
 | #227 | invariant check reuses buffers (GC 20%) | #232 | blocked | |
 | #228 | cache retrievalRanks per block (headsWithoutPad not cacheable: depends on load-order stages) | none | merged in branch: hashes unchanged at 0.1 and 0.25; wall gain small and noisy (0.25: 137 s to 110 s, 0.1 peak day no gain) | |
-| #229 | no package for a crane that must yield its rail (moves the log) | none | to do | |
+| #229 | no package for a crane that must yield its rail (moves the log) | none | claimed | agent |
 | #230 | SHC dispatch tie-break to the least loaded (moves the log) | none | to do | |
 | #231 | berth look-ahead for first-fit (moves the log) | #229, #230 | blocked | |
 | #222 | final: scale 1 or best scale, goldens, smoke | #226 to #231 | blocked | |
