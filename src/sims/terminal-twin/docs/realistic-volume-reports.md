@@ -800,3 +800,16 @@ Top waits (longest first):
   HDMU3362690   load       horizontal       194108   30334.6
   MAEU2265393   load       horizontal        94246   26810.3
 ```
+
+## Attempt: TTI_MOVES_SCALE 1 (not committed)
+
+Engine 0.52.0, local edit of `TTI_MOVES_SCALE` to 1, both runs at once on 4 cores, `NODE_OPTIONS=--max-old-space-size=6000`. Baseline to its end; peak day with `--until time:100000` (a bound that proves the run is clean, not that it completes).
+
+| | baseline 1 | peak day 1 (to 100,000 s) |
+|---|---|---|
+| result | 4 of 4 vessels, 4,624 moves, 0 violations (sim day 2 10:25:42) | 1 of 5 vessels, 3,451 moves, 0 violations (sim day 1 03:46:40) |
+| wall | 279 s | 411 s |
+| event-log hash | 168e78e8241a57 | 1534c411c3cff2 |
+| invariant checks | 249,105 | 209,267 |
+
+No stop, no event cap with a stuck clock (the #218 watch). At 0.5 the full peak day took 2.0 sim days and 438 s, so at 1 the criterion of 10 minutes wall is expected to fail on throughput, not on a deadlock.
