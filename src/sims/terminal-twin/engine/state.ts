@@ -233,6 +233,12 @@ export interface ShcJob {
   /** Claiming SHC (null = open). */
   shcId: string | null
   wtpPadId: string | null
+  /**
+   * #218: set when `wtpPadSelection` answered no pad (every pad taken, or its block out of room). The key is the pad
+   * and block-room picture at that moment; the job is not offered again until the picture changes (a pad frees, or
+   * `blockRoom` rises), so dispatch and pad selection cannot re-ask each other at the same sim time.
+   */
+  padWait?: string
 }
 
 export interface WtpPadState {

@@ -602,7 +602,7 @@ export function maybePredispatch(ctx: EngineContext): void {
 function serveQueues(ctx: EngineContext): void {
   const { state } = ctx
   const waiting = Object.values(state.shcs)
-    .filter((s) => s.status === 'queuing-for-pad' && s.plan.length === 0)
+    .filter((s) => s.status === 'queuing-for-pad' && s.plan.length === 0 && state.shcJobs[s.jobId as string].padWait === undefined)
     .sort((a, b) => (a.id < b.id ? -1 : 1))
   if (waiting.length === 0) return
   const freePads = Object.values(state.wtpPads).filter((p) => p.containerId === null && p.claimedBy === null).length
@@ -621,7 +621,7 @@ function requestDispatch(ctx: EngineContext, shc: ShcState): void {
   const here = graph.nodes[shc.nodeId]
   shc.status = 'waiting-for-dispatch'
   const jobs = Object.values(state.shcJobs)
-    .filter((j) => j.shcId === null)
+    .filter((j) => j.shcId === null && j.padWait === undefined)
     .sort((a, b) => a.readyAt - b.readyAt || (a.id < b.id ? -1 : 1))
     .map((j) => {
       if (j.kind === 'load') {
@@ -715,6 +715,32 @@ function padOptions(ctx: EngineContext): ShcDispatchPad[] {
   })
 }
 
+/** #218: the pad and block-room picture a no-pad answer was given for; a job parked on it waits until it changes. */
+function padRoomKey(ctx: EngineContext): string {
+  return padOptions(ctx)
+    .map((p) => `${p.id}=${p.occupiedBy ?? ''}/${p.claimedBy ?? ''}`)
+    .join(';')
+}
+
+/** True while some job waits for pad room (cheap guard before building a key). */
+function anyPadWait(state: SimState): boolean {
+  for (const j of Object.values(state.shcJobs)) if (j.padWait !== undefined) return true
+  return false
+}
+
+/** #218: drop the park of every job whose picture has changed, and report whether `job` is still parked. */
+function refreshPadWaits(ctx: EngineContext): string | null {
+  if (!anyPadWait(ctx.state)) return null
+  const key = padRoomKey(ctx)
+  for (const j of Object.values(ctx.state.shcJobs)) if (j.padWait !== undefined && j.padWait !== key) delete j.padWait
+  return key
+}
+
+/** A box left a block (room rose): jobs parked for pad room are asked again if that changed the picture (#218). */
+export function padRoomMayHaveRisen(ctx: EngineContext): void {
+  if (anyPadWait(ctx.state)) maybeDispatch(ctx)
+}
+
 /**
  * V11-11: dispatch picked a discharge job. The SHC holds it (no longer open) and asks `wtpPadSelection`
  * for the pad; the trip is planned in that decision's reactor.
@@ -750,9 +776,10 @@ function requestPadSelection(ctx: EngineContext, shc: ShcState, job: ShcJob): vo
 export function maybeDispatch(ctx: EngineContext): void {
   const { state } = ctx
   if (state.subsystems.shc === 'off') return
+  refreshPadWaits(ctx)
   serveQueues(ctx)
   const shcs = Object.values(state.shcs)
-  const openJobs = Object.values(state.shcJobs).filter((j) => j.shcId === null)
+  const openJobs = Object.values(state.shcJobs).filter((j) => j.shcId === null && j.padWait === undefined)
   const open = openJobs.filter((j) => j.kind !== 'load').length
   const openLoad = openJobs.length - open
   const freePads = Object.values(state.wtpPads).filter((p) => p.containerId === null && p.claimedBy === null).length
@@ -1092,11 +1119,13 @@ export const shcReactors: ReactorMap = {
       const shc = ctx.state.shcs[request.shcId]
       if (reply.wtpPadId === null && shc.carrying) {
         shc.status = 'queuing-for-pad' // asked from a queue spot: keep waiting there
+        ctx.state.shcJobs[request.jobId].padWait = padRoomKey(ctx) // #218: not asked again until a pad frees or block room rises
         return
       }
       if (reply.wtpPadId === null) {
-        // No pad: the SHC gives the job back (open again) and parks.
+        // No pad: the SHC gives the job back (open again, parked until the pad or block-room picture changes, #218) and parks.
         ctx.state.shcJobs[request.jobId].shcId = null
+        ctx.state.shcJobs[request.jobId].padWait = padRoomKey(ctx)
         shc.jobId = null
         shc.status = 'available'
         goIdle(ctx, shc)
