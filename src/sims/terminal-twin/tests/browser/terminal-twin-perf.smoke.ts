@@ -100,7 +100,7 @@ test('TTI preset at overview zoom: instanced containers are culled and the draw 
     description: JSON.stringify({ containers: scene.containers, culled: scene.containerLods.culled, lod0: scene.containerLods.lod0, render: scene.render, cpuMs: perf.stats.cpuMs }),
   })
   console.log('TTI overview', JSON.stringify({ render: scene.render, perf, containerLods: scene.containerLods }))
-  // 9,171 at scale 0.5 (the pre-fill is 68.5 % of cells, #188); the floor tracks the yard size, the budgets below are the point
+  // 9,171 at scale 0.5 (the pre-fill is 68.5 % of cells, #188; measured before the scale 1 step of #222); the floor tracks the yard size, the budgets below are the point
   expect(scene.containers).toBeGreaterThan(8_000)
   // main pass + shadow pass; the unbatched ground alone used to cost ~1,300 draw calls here
   expect(scene.render.calls).toBeLessThan(450)

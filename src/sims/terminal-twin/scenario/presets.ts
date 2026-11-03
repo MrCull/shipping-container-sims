@@ -102,7 +102,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
 }
 
 /**
- * Moves scale of the TTI presets (#165, #188): a call carries 5 times the moves of scale 0.1 (it was 0.05, then 0.1,
+ * Moves scale of the TTI presets (#165, #188): a call carries 10 times the moves of scale 0.1 (it was 0.05, then 0.1,
  * then 0.25, then 0.5). 0.5 was the floor of #188; spec #220 reached full size: at 1 the baseline and the peak
  * day complete with 0 violations (needs the yard reserve and `spread-drops` below, plus the rail and pad fixes
  * of #212, #213, #215 and the invariant speed-ups of #226, #228, #234, #237). The sim guide ("Realistic

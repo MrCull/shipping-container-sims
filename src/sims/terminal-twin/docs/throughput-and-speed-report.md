@@ -1,6 +1,6 @@
 # Throughput and speed report (#221, spec #220)
 
-A measuring step: no engine code changed, `ENGINE_VERSION` 0.52.0, `TTI_MOVES_SCALE` 0.5. Event-log hash of the 0.5 peak day (`--until vessels:5`): **0c67d35d6d90b8** (5 of 5 vessels, 4,583 moves, 296,635 events, sim day 3 04:58:35, 263,377 checks, 0 violations), the same run as the figures in [realistic-volume-reports.md](realistic-volume-reports.md).
+A measuring step (measured before #222 raised the scale to 1; the figures below are the 0.5 state): no engine code changed, `ENGINE_VERSION` 0.52.0, `TTI_MOVES_SCALE` 0.5. Event-log hash of the 0.5 peak day (`--until vessels:5`): **0c67d35d6d90b8** (5 of 5 vessels, 4,583 moves, 296,635 events, sim day 3 04:58:35, 263,377 checks, 0 violations), the same run as the figures in [realistic-volume-reports.md](realistic-volume-reports.md).
 
 How measured: `node --cpu-prof --import tsx src/sims/terminal-twin/cli/run.ts --preset "TTI Algeciras, peak day" --until vessels:5`, summarised by a throwaway script (self time per function and file, and inclusive time of stacks containing a subsystem file; kept outside the repo). Sim-time numbers: `pnpm run tt:profile "TTI Algeciras, peak day" --until 400000`. The profiled run took 685 s wall because it shared the 4 cores with three other runs (clean 0.5 run: 438 s); shares are of profile time, not of the clean wall time.
 
@@ -41,6 +41,8 @@ State cloning and the snapshot are 0 % (a plain `tt:run` never snapshots; `--sna
 Per event the cost grows: 1.1 ms (0.25), 1.5 ms (0.5), 1.7 ms (1, clean figures). The 0.25 CPU profile gives the same split (invariants 50.5 % inclusive, GC 20.7 %). A projection: scale 1 to the end of the peak day is at least twice the 0.5 events (the 0.5 day needs 2.0 sim days for half the moves) at 1.7 ms or more each, so well over 1,500 s wall, past the 10 minute criterion; invariants and GC are 75 % of it.
 
 ## Proposed tickets (each 15 minutes, one headless proof)
+
+Status after spec #220: ticket 1 landed as #226 (only `DecisionRequested` is state-neutral, 13 % fewer checks) and its real gain came from #237 (the stowage invariants ask a per-vessel occupancy map first, 32.2 s to 5.7 s CPU); ticket 2 (buffers) folded into #237; ticket 3 landed as #228 (`retrievalRanks` cached; `headsWithoutPad` could not be); tickets 4 to 6 were tried and did not land (#229 split and #240 package look-ahead left the 0.5 run identical, #230 SHC tie-break spread the work but left the load-box wait flat, #231 withdrawn).
 
 1. Invariants: run the per-event `check` only for event types that touch what it reads; proof: 0.1 peak day hash unchanged, check count and wall time before and after.
 2. GC: reuse buffers in `check` and `slotsToCheck` (no allocation per call); proof: same hash at 0.1, profile shows GC share down.

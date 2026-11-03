@@ -5,7 +5,7 @@
  *
  * Not part of `SimState` (which stays plain JSON): cached per `vesselSlots` object, like `vesselSlotsOf`, built from a
  * scan on first use and kept current with `occupancySlotFilled` / `occupancySlotCleared` wherever a slot's `containerId`
- * is set or cleared, and `occupancySlotReplaced` where a slot object is overwritten. A restored snapshot has a new
+ * is set or cleared, and `occupancySlotCleared` where a slot object is overwritten. A restored snapshot has a new
  * `vesselSlots` object, so a tampered snapshot is scanned afresh. ROB boxes (static per vessel) are part of the map.
  */
 import type { RobBox } from '../scenario/robBays'
