@@ -13,8 +13,9 @@ Phase 2 and specs #193 and #201 merged in #210. Fast mode (lint, build, test:rel
 |---|---|---|---|---|
 | #212 | three-crane rail yield | none | merged in branch (0.48.0); 0.5 peak day passes the 89,151 s rail stop (bounded to 100,000 s, 1 of 5 vessels, 0 violations) | |
 | #213 | release-ahead keeps a WTP pad for each crane head box | none | claimed | agent |
-| #214 | retry a rehandle-full retrieval when its block gains room | none | claimed | agent |
-| #215 | stall legality counts room promised to admitted picks | none | to do | |
+| #214 | retry a rehandle-full retrieval when its block gains room | none | NOT DELIVERED: the retry already exists (reopenFullJobs, TT-175); gaps unproven; the fixture found a zero-time loop, filed as #218. Stays open | |
+| #218 | SHC dispatch and pad selection zero-time re-ask loop when every pad is block-full | none | to do | |
+| #215 | stall legality counts room promised to admitted picks | none | claimed | agent |
 | #216 | tt:run --snapshot on large runs | none | merged in branch (no ENGINE_VERSION change; snapshot 1.4 GB at 0.25 sim 7200 s, resume may need NODE_OPTIONS=--max-old-space-size) | |
 | #188 | scale 0.5 then 1 (0.25 done) | #212 to #216 | blocked | |
-| #217 | final: smoke suite and goldens | #188, #212 to #216 | blocked | |
+| #217 | final: smoke suite and goldens | #188, #212 to #216, #218 | blocked | |
