@@ -15,10 +15,11 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | #236 | asc invariants: index (pattern of #237) | none | parked: small share (9.5% of the invariant cost, about 5% of total CPU) and two landside attempts gave nothing | |
 | #227 | invariant check reuses buffers (GC 20%) | #237 | folded into #237 | |
 | #228 | cache retrievalRanks per block (headsWithoutPad not cacheable: depends on load-order stages) | none | merged in branch: hashes unchanged at 0.1 and 0.25; wall gain small and noisy (0.25: 137 s to 110 s, 0.1 peak day no gain) | |
-| #229 | crane split keeps different cranes bays at least stsMinSpacingM apart (rescoped to a fix after the 0.5 measurement: rail 36% of crane windows) | none | claimed | agent |
+| #229 | crane split spacing | none | NOT MERGED, closed: balanced-moves prefers cuts at least stsMinSpacingM apart but the 0.5 run is identical (hash 1bf340c1f57635, 903 moves, rail 36%); bays are contiguous at 14 m so no cut gives 27 m; branch tt/229-crane-split-spacing kept; replaced by #240 | |
 | #230 | SHC dispatch tie-break to the least loaded | none | NOT MERGED, closed: all 23 SHCs work (8 of 23 before at 0.25) but load-box wait flat (764 s to 810 s), moves 543 to 545; moved the log and forced a test assertion out; branch tt/230-shc-least-loaded kept | |
 | #239 | why a pad box waits for an SHC job claim at 0.5 (measure only, 20 min) | none | claimed | agent |
-| #240 | shcDispatch fix for the top reason found by #239 (moves the log) | #239 | to be written | |
+| #240 | stagger neighbouring cranes at the boundary bays (package look-ahead, proven at 0.5; moves the log) | none | claimed | agent |
+| #241 | shcDispatch fix for the top reason found by #239 (moves the log) | #239 | to be written | |
 | #231 | berth look-ahead for first-fit (moves the log) | #229, #230 | blocked | |
 | #222 | final: scale 1 or best scale, goldens, smoke | #226 to #231 | blocked | |
 
