@@ -17,9 +17,9 @@ Fast mode, budgets in minutes per ticket (scripts/timebox.sh). Ticket bodies: sc
 | #228 | cache retrievalRanks per block (headsWithoutPad not cacheable: depends on load-order stages) | none | merged in branch: hashes unchanged at 0.1 and 0.25; wall gain small and noisy (0.25: 137 s to 110 s, 0.1 peak day no gain) | |
 | #229 | crane split spacing | none | NOT MERGED, closed: balanced-moves prefers cuts at least stsMinSpacingM apart but the 0.5 run is identical (hash 1bf340c1f57635, 903 moves, rail 36%); bays are contiguous at 14 m so no cut gives 27 m; branch tt/229-crane-split-spacing kept; replaced by #240 | |
 | #230 | SHC dispatch tie-break to the least loaded | none | NOT MERGED, closed: all 23 SHCs work (8 of 23 before at 0.25) but load-box wait flat (764 s to 810 s), moves 543 to 545; moved the log and forced a test assertion out; branch tt/230-shc-least-loaded kept | |
-| #239 | why a pad box waits for an SHC job claim at 0.5 (measure only, 20 min) | none | claimed | agent |
+| #239 | why a pad box waits for an SHC job claim at 0.5 (measure only) | none | merged in branch (docs): premise did not hold, 0 open jobs waited over 1,800 s; 304 of 313 boxes were claimed in the same second their job was created; the wait is for the job to exist (staged-ahead loads get a job when the crane finishes discharge); hash 1bf340c1f57635 unchanged | |
 | #240 | stagger neighbouring cranes at the boundary bays (package look-ahead, proven at 0.5; moves the log) | none | claimed | agent |
-| #241 | shcDispatch fix for the top reason found by #239 (moves the log) | #239 | to be written | |
+| #241 | shcDispatch oldest pad box first | #239 | WITHDRAWN: no SHC dispatch cause (the wait is for the job to exist). Optional KPI-only fix: start the load-box horizontal stage at ShcJob.readyAt | |
 | #231 | berth look-ahead for first-fit (moves the log) | #229, #230 | blocked | |
 | #222 | final: scale 1 or best scale, goldens, smoke | #226 to #231 | blocked | |
 
@@ -31,7 +31,7 @@ Tickets for the top causes are added under #220 after #221 reports.
 |---|---|---|---|---|
 | #223 | bay view: ROB cells always grey (#168), closes #192 | 10 min | merged in branch (12 min used; 3D unchanged; other smoke specs for the diff to run in #222) | |
 | #191 | x3600 spec: functional check stays, 600 floor moves to an @load spec | 10 min | to do | |
-| #218 | prove each room-rising path unparks an SHC job (test-only) | 15 min | to do | |
+| #218 | prove each room-rising path unparks an SHC job (test-only, 15 min) | none | claimed | agent |
 | #224 | measure SMOKE_WORKERS=2 on the dev suite (heavy runs: start after #221 ends) | 15 min | to do | |
 
 Standing rule: merge a PR I opened when CI is green and the review has no blocking finding, then fast-forward and start the next work.
