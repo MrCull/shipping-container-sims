@@ -31,7 +31,7 @@ Tickets for the top causes are added under #220 after #221 reports.
 |---|---|---|---|---|
 | #223 | bay view: ROB cells always grey (#168), closes #192 | 10 min | merged in branch (12 min used; 3D unchanged; other smoke specs for the diff to run in #222) | |
 | #191 | x3600 spec: functional check stays, 600 floor moves to an @load spec | 10 min | claimed | agent |
-| #218 | prove each room-rising path unparks an SHC job (test-only, 15 min) | none | claimed | agent |
+| #218 | prove each room-rising path unparks an SHC job (test-only) | none | closed not planned: no stuck park in a 21,600 s run sampled every 10 s; no test could be built (premise did not hold) | |
 | #224 | SMOKE_WORKERS=2 trial | 15 min | folded into #222 (its dev smoke run uses two workers and compares with the 52.6 min one-worker baseline) | |
 
 Standing rule: merge a PR I opened when CI is green and the review has no blocking finding, then fast-forward and start the next work.
