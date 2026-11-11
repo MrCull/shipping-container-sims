@@ -104,7 +104,9 @@ AscJobAssigned -> AscRoutingToPad -> AscPositioningAtPad -> AscLocking -> AscPic
 - The whole cycle is planned at assignment (`engine/subsystems/ascReservations.ts#AscTrip`): hoist to travel height first, gantry and
   trolley together, hoist alone. Each phase event carries the `segments` that led to it (`gantry` = Z, `trolley` = X,
   `hoist` = box-bottom height). After `AscStacked` the spreader rises again; the ASC takes its next job only at
-  `AscReady`. Mode `instant` keeps the events with zero durations; `off` leaves boxes on the pads.
+  `AscReady`. Mode `instant` keeps the events with zero durations; `off` leaves boxes on the pads. Yard mode wins
+  (`engine/state.ts#resolveSubsystemModes`): yard `off` forces ASC `off`, and yard `instant` turns an ASC set to
+  `real` into `instant` (only an explicit `off` survives).
 - **Pad handover:** the ASC reserves the pad zone (`engine/reservations.ts`, holder = ASC id) from arrival over the
   pad until the spreader is clear (`padFrom` to `padTo`). An SHC planned later waits; the ASC starts later if the
   zone is held (`padWaitS`). Invariant `asc.wtp-handover`: an ASC never inside a pad's lifting envelope (below travel
