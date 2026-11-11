@@ -168,11 +168,11 @@ Rig node names come from the sidecar; the rules are in [assets-pipeline.md](asse
 | Model | Loader / rig | LOD switch (m, camera distance) | Hysteresis | `lodScale` applies |
 |---|---|---|---|---|
 | Container | `ContainerInstancer` | LOD0 within profile `lod0DistanceM`, capped | x1.15 | no (own profile fields) |
-| STS | `stsAssets.ts#loadStsTemplate`, `StsModel` | 250 / 900 (sidecar `lods.*.maxDistanceM`) to crane centre | x1.15 (`STS_LOD_HYSTERESIS`) | yes |
-| SHC | `shcAssets.ts#loadShcModel`, `ShcRig` | 110 / 380 (`SHC_LOD_DISTANCES`) | x1.15 | yes |
-| ASC | `ascAssets.ts#loadAscModel`, `AscRig` | 90 / 300 (`ASC_LOD_DISTANCES`, from the sidecar) | x1.15 | yes |
-| Truck | `truckAssets.ts#loadTruckModels`, `TruckRig` | 60 / 200 (`TRUCK_LOD_DISTANCES`) | x1.15 | no |
-| Vessel hull | `vesselAssets.ts#loadHullModel`, `VesselHulls` | 300 / 1100 to the hull's bounding box (`vesselRenderer.ts#DEFAULT_VESSEL_LOD`) | x1.1 | no |
+| STS | `modules/stsAssets.ts#loadStsTemplate`, `StsModel` | 250 / 900 (sidecar `lods.*.maxDistanceM`) to crane centre | x1.15 (`STS_LOD_HYSTERESIS`) | yes |
+| SHC | `modules/shcAssets.ts#loadShcModel`, `ShcRig` | 110 / 380 (`SHC_LOD_DISTANCES`) | x1.15 | yes |
+| ASC | `modules/ascAssets.ts#loadAscModel`, `AscRig` | 90 / 300 (`ASC_LOD_DISTANCES`, from the sidecar) | x1.15 | yes |
+| Truck | `modules/truckAssets.ts#loadTruckModels`, `TruckRig` | 60 / 200 (`TRUCK_LOD_DISTANCES`) | x1.15 | no |
+| Vessel hull | `modules/vesselAssets.ts#loadHullModel`, `VesselHulls` | 300 / 1100 to the hull's bounding box (`modules/vesselRenderer.ts#DEFAULT_VESSEL_LOD`) | x1.1 | no |
 
 `lodScale` divides the camera distance before the STS, SHC and ASC LOD choice, so Low (0.4) drops them to cheaper LODs 2.5x sooner.
 
@@ -180,7 +180,7 @@ Rig node names come from the sidecar; the rules are in [assets-pipeline.md](asse
 
 - `sts-malaccamax.glb`. Rail gauge 30.48 m, 52 m lift above rail, 68 m outreach [V]; apex 82 m, 18 m backreach, 18 m leg
   spacing, 27 m over buffers (= `quay.stsMinSpacingM`) [A]. Root mounted at (0, 0, `waterRailZ` = 3)
-  (sidecar `sceneMounting`); `equipmentDims.ts#STS.apexY` is kept in sync for picking.
+  (sidecar `sceneMounting`); `modules/equipmentDims.ts#STS.apexY` is kept in sync for picking.
 - `StsModel.setPose`: `gantry` = gantryX, `trolley` = trolleyZ - 3, `hoist` = hoistY; spreader telescope and twin-lock
   values from the sidecar's `spreaderModes`; twist-locks 90 deg while carrying; ropes by the sidecar `stretch` rule.
   Rig nodes repeat per LOD with suffixes (`trolley_lod1`, per sidecar `lodNaming`); `modules/assetRig.ts#AssetRig`
@@ -234,7 +234,7 @@ A true telescoping mesh needs a generator change.
   = top of carried box, 18.0 m at hoist 0: `hoist = (box bottom + box height) - 18.0`. 18.0 m clears a 5-high stack
   with the engine's 0.6 m travel clearance. Unit-tested over a whole fixture run: no clamping.
 - `ascScaleY(tiers)` stretches the whole rig vertically for blocks of 6 to 8 tiers. Picking uses `ASC_MODEL`
-  (29.2 x 24.7 x 10.1 m, stretched the same); `equipmentDims.ts#ASC` only sizes the placeholder.
+  (29.2 x 24.7 x 10.1 m, stretched the same); `modules/equipmentDims.ts#ASC` only sizes the placeholder.
 
 ### Gantry beacons
 
@@ -261,7 +261,7 @@ by the Blender generator (`vessels.py`) and is unchanged.
 
 **Hatch cover cutting (TT-R10, #173).** The GLB's `hatch_covers` are static, so for every LOD `VesselHulls` cuts its copy
 of the hull with `hullWithOpenHatches(meta, lod, mesh, bays)`: cover triangles inside an open bay's footprint go, flat
-main-deck triangles are clipped to outside the coaming (`meshClip.ts#clipPolygon`), and a hold liner is added.
+main-deck triangles are clipped to outside the coaming (`modules/meshClip.ts#clipPolygon`), and a hold liner is added.
 `openHatchBays(hatchCovers, bayCount, panelBays)`: hatch covers off, every bay is open (no cover over any hold at any
 LOD); on, the bays that have panels are open and the `hatch` kind draws those panels. LOD2 is one box over all bays: its
 top is clipped over every open bay (needed so a crane never works under a solid far cover), its walls stay as coamings.
@@ -281,8 +281,8 @@ top is clipped over every open bay (needed so a crane never works under a solid 
 - Lane widths match the engine's `GATE_LANE_W_M`, `GATE_OOG_LANE_W_M`, `GATE_ISLAND_W_M` (`engine/landsideGraph.ts`), so
   models and truck paths agree. The barrier boom is baked raised (closed on the unused OOG lane); trucks do not trigger it.
 - `modules/infrastructureLayout.ts` (pure: `gatePlacements`, `quayPlacements`, `yardPlacements`, `buildingPlacements`,
-  `mastSpots`), `infrastructureAssets.ts#loadInfrastructureAssets` (lazy, one material and atlas),
-  `infrastructureRenderer.ts#InfrastructureScene` (one InstancedMesh per geometry key: about 20 draw calls however long
+  `mastSpots`), `modules/infrastructureAssets.ts#loadInfrastructureAssets` (lazy, one material and atlas),
+  `modules/infrastructureRenderer.ts#InfrastructureScene` (one InstancedMesh per geometry key: about 20 draw calls however long
   the quay). `yard-markings.glb` holds two markings side by side; the loader re-centres the parts.
 - Masts (`mastSpots`, shared with the night glow; at most `MAX_MASTS` 400) stand only mid-gap between neighbouring blocks
   and beside the outermost blocks, never inside a block footprint (`BLOCK_FOOTPRINT_HALF_X_M`): a block's centre line is
