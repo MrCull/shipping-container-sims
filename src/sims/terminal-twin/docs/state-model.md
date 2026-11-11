@@ -162,7 +162,7 @@ Status chain: `scheduled -> at-anchorage -> mooring -> berthed -> unmooring -> d
 arrival spends 0 s at anchorage).
 
 `VesselSlotState`: `id`, `vesselId`, `bay`, `row`, `tier`, `deck`, `half` (`aft`/`fore`/null for a 40 ft cell),
-`purpose` (`SlotPurpose` from the bay plan: discharge, load, transshipment, empty), `containerId`,
+`purpose` (`SlotPurpose` from `scenario/bayPlan.ts`: `discharge`, `load`, `transshipment`; an empty-container slot is a load slot with `emptyReq`), `containerId`,
 `plannedContainerId?` (load slots: the booked export box), `emptyReq?` (empty slots: the requirement), `loadPurpose?`
 (#203 shared cell: a discharge slot that also carries a load booking; becomes the `purpose` once the discharge box
 has left at `StsPicked`). Slots exist only for working bays; ROB bays have none. The bay plan comes from
@@ -224,8 +224,9 @@ index `(bay-1)*rows + (row-1)`, `engine/yardLayout.ts#stackIndex`), `progressAt?
 `yard.no-progress`). **Claimed slots count in `heights`**: a slot is claimed when allocated and stacked later.
 
 `YardSlotState`: a stacked box: `id` (anchor cell), `blockId`, `bay`, `row`, `tier`, `span` (1 or 2 bays),
-`containerId`. A slot exists only while a box stands in it (created at `AscStacked`, deleted at `AscRetrieved`); an
-allocated slot that is not yet filled lives only as a claim in an `AscJob`.
+`containerId`. A slot entry exists while a box stands in it (`placeInStack` at `AscStacked`, `removeFromStack` at `AscRetrieved`,
+both in `engine/subsystems/ascStorage.ts`); an allocated slot that is not yet filled lives only as a claim in an
+`AscJob` (and in `heights`).
 
 Geometry (`engine/yardLayout.ts`): `ROW_PITCH_M` 2.9, `BAY_PITCH_M` 6.7 (20 ft bay), `TIER_PITCH_M` 2.896,
 `DEFAULT_BLOCK_BAYS` 20, `DEFAULT_BLOCK_TIERS` 5, `DEFAULT_WTP_PADS` 5, `DEFAULT_TRANSFER_STALLS` 5,

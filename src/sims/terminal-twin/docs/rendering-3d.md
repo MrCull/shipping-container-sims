@@ -409,35 +409,18 @@ server needed): loads `TTI Algeciras baseline` with seed 7 starting 10:00 local,
 pauses, hides all UI, `cameraTo('STS104', 380)`, and captures 1200x630 to `assets/home-card.png`
 (`definition.ts` `cardImage`). Re-run and commit whenever visuals change. Do not edit sim source while it runs (Vite hot reload kills the capture).
 
-## Benchmarks
+## Benchmarks and dev API
 
-- **Engine benchmark** (`pnpm run tt:bench`, `cli/benchmark.ts#runBenchmark`, local only, not in CI): headless run of a
-  preset for 24 sim-hours, compared with `perf/baseline.json`, exit 1 when any metric is more than 20% worse
-  (`REGRESSION_THRESHOLD`). It measures the engine, not the view; details, options and recorded numbers are in
-  [optimising/run-speed.md](optimising/run-speed.md). Kept here so it is not lost: options `--preset`, `--hours n`,
-  `--sweep-every n` (0 = invariants off; default `DEFAULT_SWEEP_EVERY` 1000, as in the worker), `--update-baseline`
-  (records under `<preset>|<hours>h`), `--out report.json`, `--slow-ms n` (busy-wait per event, the self-test that
-  trips the flag, `tests/benchmark.test.ts`). Timings only compare on a like machine and load: check the report's `load1`
-  before blaming code. `perf/baseline.json` (recorded 2026-10-31): TTI baseline 24 h, 38 164 events, about 1 550 events/s,
-  about 1 030 ms per sim-hour, 404 MB peak RSS, 0 violations, on an i5-1135G7 at load 0; peak day 24 h, 78 057 events,
-  about 840 events/s, about 3 890 ms per sim-hour, 757 MB, on a shared 4-vCPU Xeon at load 6.3. What it found: rehandle
-  helpers scanning all yard slots (now `engine/yardIndex.ts`; any code adding or deleting `state.yardSlots` entries
-  must call `indexYardSlotAdded` / `indexYardSlotRemoved`) and whole-state invariants per event (now incremental with a
-  periodic sweep). Still hot at TTI: `engine/subsystems/landside.ts#eligiblePickups` scans every yard slot per truck
-  arrival (`scanPickups`); an index of pickup-ready boxes is the next win.
-- **Renderer yard stress test**: the asset viewer's `?viewer=yard` (`dev/assetViewerScene.ts`, `__ttAssets.yard(count)`,
-  default 18 000 boxes in TTI-like 8-row, 5-tier blocks) through a real `ContainerInstancer`: about 264k container
-  triangles, 6 container draw calls, 14 draw calls per frame with the shadow pass. Read fps on a real GPU from the
-  viewer readout; SwiftShader renders it well under 1 fps, which says nothing.
-- **Frame rate in the twin**: the `__tt.perf()` procedure in [optimising/frame-rate.md](optimising/frame-rate.md).
-
-## Dev API (rendering parts)
-
-`__tt.scene()`: counts, `containerLods {lod0, lod1, closeup, closeupFaces, culled}`, `stsLods`, `shcLods`, `ascLods`,
-`vesselLods`, `*Assets` (`placeholder` / `loaded`), `landside`, `infrastructure`, `gantryBeacons`, `render {calls, triangles}`, `frames`.
-`__tt.sceneState()`: per kind `sceneKey` and `rigKey` maps above, `liveries[id]` (atlas index, size, LOD, tint, centre).
-`__tt.atmosphere()`: `{ lockDaylight, soundGain, sound, positional: { voices }, banner, scene: { mode, daylight, shadows, masts, equipmentLights, backdrop } }`.
-Perf calls (`perf`, `setQuality`, `drawBreakdown`, ...): [optimising/frame-rate.md](optimising/frame-rate.md).
+- **Engine benchmark** (`pnpm run tt:bench`, `cli/benchmark.ts#runBenchmark`, local only): measures the engine, not the
+  view. Exit 1 when any metric is over 20% worse than `perf/baseline.json` (`REGRESSION_THRESHOLD`); `--slow-ms n` is the
+  self-test that trips it. Compare only on a like machine and load (check `load1`). Its findings: any code adding or
+  deleting `state.yardSlots` entries must call `indexYardSlotAdded` / `indexYardSlotRemoved` (`engine/yardIndex.ts`);
+  `engine/subsystems/landside.ts#eligiblePickups` still scans every yard slot per truck arrival. Options and numbers: [optimising/run-speed.md](optimising/run-speed.md).
+- **Renderer**: the yard stress test (`?viewer=yard`) and the `__tt.perf()` procedure are in [optimising/frame-rate.md](optimising/frame-rate.md).
+- `__tt.scene()`: counts, `containerLods {lod0, lod1, closeup, closeupFaces, culled}`, `stsLods`, `shcLods`, `ascLods`,
+  `vesselLods`, `*Assets` (`placeholder` / `loaded`), `landside`, `infrastructure`, `gantryBeacons`, `render {calls, triangles}`, `frames`.
+  `__tt.sceneState()`: the `sceneKey` and `rigKey` maps above, `liveries[id]` (atlas index, size, LOD, tint, centre).
+  `__tt.atmosphere()`: `{ lockDaylight, soundGain, sound, positional: { voices }, banner, scene: { mode, daylight, shadows, masts, equipmentLights, backdrop } }`.
 
 ## Proof
 

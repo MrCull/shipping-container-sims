@@ -27,7 +27,7 @@ side and load preparation are [yard.md](yard.md). Terms: [GLOSSARY.md](../../../
 | `shcs: [{id}]` (builder `.shcs(n, kin?)`, `withShcFleet`) | none; 1 to 120 in the setup limits | `scenario/limits.ts` |
 | `kinematics.shc` | `DEFAULT_SHC_KINEMATICS` [A]: empty 8.3 m/s (a 1.0, d 1.2), loaded 6.9 m/s (a 0.7, d 0.9), lift 0.4 m/s, `liftHeightM` 1, `lockS` 2, `unlockS` 2 | `scenario/builder.ts` |
 | Cornering `cornerRadiusM`, `maxLateralAccel` | `DEFAULT_SHC_CORNER` 12 m, 1.5 m/s^2: a right-angle turn at about 4.24 m/s (15 km/h); radius 0 = stop at every turn | `scenario/builder.ts` |
-| `driverVariabilityPct` | 0 (presets 10): one factor 1 +/- pct per trip from the engine RNG | `shc.ts#driverFactor` |
+| `driverVariabilityPct` | 0 (presets 10): one factor 1 +/- pct per trip from the engine RNG | `engine/subsystems/shc.ts#driverFactor` |
 | `yard.blocks: [{id, x, wtpPads}]` | `DEFAULT_WTP_PADS` 5 pads per block | `engine/yardLayout.ts` |
 | `apron` | `DEFAULT_APRON_LAYOUT` (below) | `engine/laneGraph.ts` |
 | `queueAreas: {stsCapacity?, blockCapacity?, predispatchMarginS?}` | absent = no queue areas; margin `DEFAULT_PREDISPATCH_MARGIN_S` 15 s; TTI presets 3 / 3 [unverified] | `scenario/types.ts`, `scenario/presets.ts` |
