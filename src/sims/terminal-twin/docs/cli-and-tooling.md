@@ -198,7 +198,7 @@ Details of the generators, budgets and sidecars: [assets-pipeline.md](assets-pip
 | `scripts/smoke-specs-for.sh [base head]` + `scripts/smoke-map.txt` | smoke specs a diff needs (path pattern => spec names); `merge-ticket.sh` runs only those. Add a map line when a new area gets its own spec |
 | `pnpm run test:smoke` | Playwright, `src/**/*.smoke.ts`; `dev` project (Vite dev server) and `prod` project (`*.prod.smoke.ts`, production build); free ports unless `SMOKE_DEV_PORT`/`SMOKE_PROD_PORT`; `@load` specs need a real frame rate and never run in CI |
 
-Browser-side recipes (`window.__tt` calls inside `--eval`) are in [browser-host.md](browser-host.md#the-windowtt-dev-api).
+Browser-side recipes (`window.__tt` calls inside `--eval`) are in [browser-host.md](browser-host.md#the-window__tt-dev-api).
 
 ## Gotchas
 
