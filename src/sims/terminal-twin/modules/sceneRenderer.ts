@@ -596,6 +596,7 @@ export class SceneRenderer {
 
     this.lastT = t
     this.atmosphere.update(t)
+    this.infrastructure.update(cameraPosition) // far tier (#249)
     this.sounds.length = 0
     const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), colour: { mode: this.colourBy, robDisplay: this.robDisplay, ctx: this.colourCtx }, sounds: this.sounds }
     for (const { renderer } of this.renderers) renderer.update(frame)
