@@ -102,6 +102,8 @@ export interface TwinView {
   screenPoint(entityId: string): { x: number; y: number } | null
   /** The orbit camera: where it looks, how far, the heading and the angle from straight up; null without a 3D view. */
   cameraPose(): CameraPose | null
+  /** Put the orbit camera at a pose (the benchmark's fly-through, #254). */
+  setCameraPose(pose: CameraPose): void
   /** Hero marking resolution (#260): 'sharp' or 'standard'; the step in force. */
   setHeroMarkStep(step: 'sharp' | 'standard'): void
   readonly heroMarkStep: 'sharp' | 'standard'
