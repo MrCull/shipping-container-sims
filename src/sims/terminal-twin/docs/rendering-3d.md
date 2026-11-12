@@ -164,8 +164,13 @@ fake work items; the renderer through the instancer with a fake clock), smoke `h
 
 `modules/heroMarkings.ts` (`HeroMarkings`, owned by `HeroLevel`): a hero face's markings are painted at 4x the close-up tile
 (`HERO_MARK_SCALE.sharp` = 4: a long side 2048 x 384 px, about 168 px per metre against 42; an end 768 x 768) into their own atlas pages
-(`sharp`: 2048 px pages, 16 MB of texels each; 5 side tiles or 4 end tiles per page), as a transparent decal 3 cm off the hero face
-(`HERO_MARK_OFFSET_M`, polygon offset -4, alpha-fade with the face), so the hero paint, ribs and wear show through. Roofs print nothing.
+(`sharp`: 2048 px pages, 16 MB of texels each; 5 side tiles or 4 end tiles per page), as a transparent decal lying on the crests of the hero panel
+(`heroMarkInsetM`: 3.5 cm inside the frame on a door, so the locking bars pass in front of the lettering, 1 cm on the walls; polygon offset -4,
+alpha-fade with the face), so the hero paint, ribs and wear show through. Roofs print nothing.
+**Painted-on look:** the decal is a flat quad but is lit as the corrugated panel under it (`heroMarkProfile` gives the rib span, count and
+flank slope per instance; the fragment shader tilts the normal on a flank), receives shadows, and its tile has no flat seam, header, sill or
+rail (`frame = false`: those are hero geometry). Lettering is condensed (`condensed` / `fitText`, glyph widths squeezed to 0.8, further to fit
+a column) and chipped (`chipPaint` knocks small chips and scratches out of the stencil coat, more on a worn box).
 The content is the close-up level's: one pure `describeMarkings` result, painted by the same `drawSideMarks` / `drawDoorMarks` /
 `drawFrontMarks` / `drawWear` in `containerTextures.ts` (`paintFaceMarks`, wear speckle seeded from the close-up region so the pixels
 agree too), so number, line name, ISO type, weight plate, CSC plate, SUPER HEAVY, bolt seal and wear match the close-up face.

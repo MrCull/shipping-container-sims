@@ -29,8 +29,37 @@ export const HERO_MARK_SCALE: Record<HeroMarkStep, number> = { sharp: 4, standar
 export const HERO_MARK_PAGE_BASE_PX = 512
 /** Tile size at scale 1 (the close-up level's): long side 512 x 96, end 192 x 192. */
 export const HERO_MARK_TILE_BASE: Record<MarkKind, { w: number; h: number }> = { side: { w: 512, h: 96 }, end: { w: 192, h: 192 } }
-/** A decal sits this far off the box frame, over the hero ribs. */
-export const HERO_MARK_OFFSET_M = 0.03
+/**
+ * A decal lies on the crests of the hero panel, this far inside the box frame: 3.5 cm on a door end (the leaves are
+ * recessed, and the locking bars pass in front of the lettering), 1 cm on the walls.
+ */
+export const heroMarkInsetM = (face: Face): number => (face === 'door' ? 0.035 : 0.01)
+
+/** Generator constants the corrugation profile is rebuilt from (containers.py, hero_containers.py, liveries.py). */
+const CAST_L_M = 0.178
+const CAST_W_M = 0.162
+const RIB_DEPTH_M = 0.038
+const HERO_PITCH_M = 0.25
+const DOOR_BANDS = 4
+const RAIL_BOTTOM_M = 0.16
+const RAIL_TOP_M = 0.1
+
+/**
+ * The corrugation under a decal, for its shading: `[start, end, ribs, slope]`. `start` and `end` are the corrugated
+ * span as fractions of the face (along its width for the vertical ribs of a wall, up its height for the horizontal
+ * bands of a door, which is marked by a negative rib count), `slope` the rise of a rib flank (depth over flank width).
+ */
+export function heroMarkProfile(face: Face, widthM: number, heightM: number): [number, number, number, number] {
+  const flank = (pitchM: number): number => RIB_DEPTH_M / (0.125 * pitchM)
+  if (face === 'door') {
+    const span = heightM - RAIL_BOTTOM_M - RAIL_TOP_M
+    return [RAIL_BOTTOM_M / heightM, 1 - RAIL_TOP_M / heightM, -DOOR_BANDS, flank(span / DOOR_BANDS)]
+  }
+  const margin = face === 'front' ? CAST_W_M - 0.007 : CAST_L_M
+  const span = widthM - 2 * margin
+  const ribs = Math.max(1, Math.round(span / HERO_PITCH_M))
+  return [margin / widthM, 1 - margin / widthM, ribs, flank(span / ribs)]
+}
 
 /**
  * A hero face and its decal are drawn this much nearer the camera in depth only (view-space metres; nothing moves on
@@ -69,6 +98,7 @@ interface Page {
   mesh: THREE.InstancedMesh
   uvRect: THREE.InstancedBufferAttribute
   fade: THREE.InstancedBufferAttribute
+  profile: THREE.InstancedBufferAttribute
   cols: number
   free: number[]
   written: number
@@ -82,6 +112,22 @@ interface Slot {
 }
 
 const FADE_VERTEX = 'attribute vec4 uvRect;\nattribute float heroFade;\nvarying float vHeroFade;'
+/** The decal is a flat quad, but it is lit as the corrugated panel under it: a rib flank tilts the normal, so lettering takes the panel's light and shade. */
+const PROFILE_VERTEX_DECL = 'attribute vec4 heroProfile;\nvarying vec4 vHeroProfile;\nvarying vec3 vHeroAxis;\nvarying float vHeroS;'
+const PROFILE_VERTEX = `
+vHeroProfile = vec4(heroProfile.xy, abs(heroProfile.z), heroProfile.w);
+vHeroS = heroProfile.z < 0.0 ? uv.y : uv.x;
+vHeroAxis = normalize(normalMatrix * normalize(mat3(instanceMatrix) * (heroProfile.z < 0.0 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))));`
+const PROFILE_FRAGMENT_DECL = 'varying vec4 vHeroProfile;\nvarying vec3 vHeroAxis;\nvarying float vHeroS;'
+const PROFILE_FRAGMENT = `
+{
+  float heroS = (vHeroS - vHeroProfile.x) / (vHeroProfile.y - vHeroProfile.x);
+  if (heroS > 0.0 && heroS < 1.0) {
+    float heroT = fract(heroS * vHeroProfile.z) - 0.5;
+    float heroA = abs(heroT);
+    if (heroA > 0.175 && heroA < 0.30) normal = normalize(normal + sign(heroT) * vHeroProfile.w * vHeroAxis);
+  }
+}`
 const KINDS: readonly MarkKind[] = ['side', 'end']
 
 export class HeroMarkings {
@@ -169,9 +215,10 @@ export class HeroMarkings {
     const f = faceFrame(face, size)
     const cos = Math.cos(yaw)
     const sin = Math.sin(yaw)
-    const lx = f.c[0] + f.n[0] * HERO_MARK_OFFSET_M
-    const ly = f.c[1] + f.n[1] * HERO_MARK_OFFSET_M
-    const lz = f.c[2] + f.n[2] * HERO_MARK_OFFSET_M
+    const inset = heroMarkInsetM(face)
+    const lx = f.c[0] - f.n[0] * inset
+    const ly = f.c[1] - f.n[1] * inset
+    const lz = f.c[2] - f.n[2] * inset
     this.p.set(x + lx * cos + lz * sin, y + ly, z - lx * sin + lz * cos)
     this.q.setFromAxisAngle(this.yAxis, yaw).multiply(FACE_QUAT[face])
     this.s.set(f.w, f.h, 1)
@@ -186,6 +233,8 @@ export class HeroMarkings {
     // inset by a pixel so a neighbouring tile never bleeds in
     page.uvRect.setXYZW(n, (cx * w + 1) / px, 1 - ((cy + 1) * h - 1) / px, (w - 2) / px, (h - 2) / px)
     page.fade.setX(n, alpha)
+    const pr = heroMarkProfile(face, f.w, f.h)
+    page.profile.setXYZW(n, pr[0], pr[1], pr[2], pr[3])
   }
 
   endFrame(): void {
@@ -196,6 +245,7 @@ export class HeroMarkings {
           page.mesh.instanceMatrix.needsUpdate = true
           page.uvRect.needsUpdate = true
           page.fade.needsUpdate = true
+          page.profile.needsUpdate = true
         }
       }
     }
@@ -241,10 +291,13 @@ export class HeroMarkings {
     fade.setUsage(THREE.DynamicDrawUsage)
     geo.setAttribute('uvRect', uvRect)
     geo.setAttribute('heroFade', fade)
+    const profile = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4)
+    profile.setUsage(THREE.DynamicDrawUsage)
+    geo.setAttribute('heroProfile', profile)
     const material = new THREE.MeshStandardMaterial({
       map: atlas.texture,
-      roughness: 0.8,
-      metalness: 0.1,
+      roughness: 0.85,
+      metalness: 0,
       transparent: true,
       premultipliedAlpha: true,
       depthWrite: false,
@@ -254,12 +307,14 @@ export class HeroMarkings {
     })
     material.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\n' + FADE_VERTEX)
+        .replace('#include <common>', '#include <common>\n' + FADE_VERTEX + '\n' + PROFILE_VERTEX_DECL)
         .replace('#include <uv_vertex>', '#include <uv_vertex>\nvHeroFade = heroFade;\n#ifdef USE_MAP\n  vMapUv = uv * uvRect.zw + uvRect.xy;\n#endif')
+        .replace('#include <defaultnormal_vertex>', '#include <defaultnormal_vertex>' + PROFILE_VERTEX)
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + HERO_DEPTH_BIAS_GLSL)
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying float vHeroFade;')
+        .replace('#include <common>', '#include <common>\nvarying float vHeroFade;\n' + PROFILE_FRAGMENT_DECL)
         .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= vHeroFade;')
+        .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>' + PROFILE_FRAGMENT)
     }
     material.customProgramCacheKey = () => 'tt-hero-marks'
     const mesh = new THREE.InstancedMesh(geo, material, cap)
@@ -267,10 +322,10 @@ export class HeroMarkings {
     mesh.count = 0
     mesh.frustumCulled = false
     mesh.castShadow = false
-    mesh.receiveShadow = false
+    mesh.receiveShadow = true // lettering in a shadow is as dark as the paint around it
     mesh.renderOrder = 1 // after the opaque hero paint
     this.group.add(mesh)
-    return { atlas, mesh, uvRect, fade, cols, free: Array.from({ length: cap }, (_, i) => cap - 1 - i), written: 0 }
+    return { atlas, mesh, uvRect, fade, profile, cols, free: Array.from({ length: cap }, (_, i) => cap - 1 - i), written: 0 }
   }
 
   /** Pages and tiles held, draw calls of the last frame, and the texel memory of the pages. */

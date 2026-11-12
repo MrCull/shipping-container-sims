@@ -65,6 +65,19 @@ function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, si
   ctx.fillText(s, x, y)
 }
 
+/** Stencilled markings are condensed: the glyphs are squeezed to this share of their width. */
+const CONDENSED = 0.8
+const NARROWEST = 0.62
+
+/** `text` in condensed lettering (a squeeze of the glyph widths about the anchor). */
+function condensed(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, sizeM: number, colour: string, weight = '700', align: CanvasTextAlign = 'left', squeeze = CONDENSED): void {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.scale(squeeze, 1)
+  text(ctx, s, 0, 0, sizeM, colour, weight, align)
+  ctx.restore()
+}
+
 const fmt = (n: number): string => n.toLocaleString('en-US')
 
 function plateRows(p: WeightPlate): [string, string, string][] {
@@ -108,11 +121,32 @@ function drawWear(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: numb
   })
 }
 
+/**
+ * Stencilled lettering weathers with the box: small chips and scratches are knocked out of what has been painted so far
+ * (hero tiles only: the ground is transparent, so the paint under the lettering shows through), more on a worn box.
+ */
+function chipPaint(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: number, m: ContainerMarkings, salt: number): void {
+  const rng = stream((m.wear.seed ^ salt) + 0x9e37)
+  inRegion(ctx, r, wM, hM, () => {
+    ctx.globalCompositeOperation = 'destination-out'
+    const chips = Math.round((250 + 1400 * m.wear.fade) * wM * hM * 0.16)
+    for (let i = 0; i < chips; i++) {
+      ctx.fillStyle = `rgba(0,0,0,${0.35 + rng() * 0.65})`
+      const scratch = rng() < 0.25
+      ctx.fillRect(rng() * wM, rng() * hM, scratch ? 0.02 + rng() * 0.07 : 0.004 + rng() * 0.012, scratch ? 0.003 + rng() * 0.004 : 0.004 + rng() * 0.012)
+    }
+    // the whole stencil coat is a little thin, more so on a faded box
+    ctx.fillStyle = `rgba(0,0,0,${0.06 + 0.16 * m.wear.fade})`
+    ctx.fillRect(0, 0, wM, hM)
+  })
+}
+
 /** What a long side prints, in metres of a face `L` x `H` (y down): line name, box number, rails. Shared with the hero level. */
-function drawSideMarks(ctx: CanvasRenderingContext2D, side: ContainerMarkings['side'], L: number, H: number, ink: string): void {
+function drawSideMarks(ctx: CanvasRenderingContext2D, side: ContainerMarkings['side'], L: number, H: number, ink: string, frame = true): void {
   text(ctx, side.lineName, L * 0.5, H * 0.52, H * 0.34, ink, '800', 'center')
-  text(ctx, side.boxNumber, L - 0.5, H * 0.14, 0.2, ink, '600', 'right')
-  ctx.fillStyle = 'rgba(0,0,0,0.25)' // top and bottom side rails
+  condensed(ctx, side.boxNumber, L - 0.5, H * 0.14, 0.2, ink, '700', 'right')
+  if (!frame) return
+  ctx.fillStyle = 'rgba(0,0,0,0.25)' // top and bottom side rails (geometry on a hero face)
   ctx.fillRect(0, 0, L, 0.1)
   ctx.fillRect(0, H - 0.12, L, 0.12)
 }
@@ -125,11 +159,17 @@ export const DOOR_BAR_OUTER_M = 0.55 * DOOR_LEAF_M
 /** Clear space kept either side of a bar's centre line. */
 const BAR_CLEAR_M = 0.035
 
-/** `text`, shrunk so it is no wider than `maxW` (a line must fit between two locking bars). */
-function fitText(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, sizeM: number, maxW: number, colour: string, weight = '600', align: CanvasTextAlign = 'left'): void {
+/** Condensed lettering no wider than `maxW` (a line must fit between two locking bars): squeezed further first, then shrunk. */
+function fitText(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, sizeM: number, maxW: number, colour: string, weight = '700', align: CanvasTextAlign = 'left'): void {
   ctx.font = `${weight} ${sizeM}px Arial, Helvetica, sans-serif`
   const w = ctx.measureText?.(s)?.width ?? 0 // a test's stub context measures nothing
-  text(ctx, s, x, y, w > maxW && w > 0 ? (sizeM * maxW) / w : sizeM, colour, weight, align)
+  let squeeze = CONDENSED
+  let size = sizeM
+  if (w * squeeze > maxW) {
+    squeeze = Math.max(NARROWEST, maxW / w)
+    if (w * squeeze > maxW) size = (sizeM * maxW) / (w * squeeze)
+  }
+  condensed(ctx, s, x, y, size, colour, weight, align, squeeze)
 }
 
 /**
@@ -138,12 +178,15 @@ function fitText(ctx: CanvasRenderingContext2D, s: string, x: number, y: number,
  * the two bars, the serial, check digit, type code and the plate values beside the outer bar; the CSC plate, the roundel
  * and the SUPER HEAVY mark sit on the left leaf outside its outer bar.
  */
-function drawDoorMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['door'], W: number, H: number, ink: string): void {
-  ctx.fillStyle = 'rgba(0,0,0,0.5)'
-  ctx.fillRect(W / 2 - 0.012, 0.12, 0.024, H - 0.24) // the seam between the leaves
-  ctx.fillStyle = 'rgba(0,0,0,0.22)'
-  ctx.fillRect(0, 0, W, 0.14) // header and sill
-  ctx.fillRect(0, H - 0.14, W, 0.14)
+function drawDoorMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['door'], W: number, H: number, ink: string, frame = true): void {
+  if (frame) {
+    // the flat close-up face draws its seam, header and sill; a hero face has them as geometry
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'
+    ctx.fillRect(W / 2 - 0.012, 0.12, 0.024, H - 0.24)
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'
+    ctx.fillRect(0, 0, W, 0.14)
+    ctx.fillRect(0, H - 0.14, W, 0.14)
+  }
   // right leaf: column A between the bars, column B from the outer bar to the leaf edge
   const a0 = W / 2 + DOOR_BAR_INNER_M + BAR_CLEAR_M
   const aW = DOOR_BAR_OUTER_M - DOOR_BAR_INNER_M - 2 * BAR_CLEAR_M
@@ -152,20 +195,20 @@ function drawDoorMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['d
   const bW = b1 - b0
   // identity: prefix between the bars, serial and boxed check digit beside the outer bar, type code under the serial
   const box = 0.085
-  fitText(ctx, door.ownerPrefix, a0 + aW, 0.4, 0.095, aW, ink, '600', 'right')
-  fitText(ctx, door.serial, b0, 0.4, 0.095, bW - box - 0.015, ink)
-  text(ctx, String(door.checkDigit), b1 - box / 2, 0.4, 0.085, ink, '600', 'center')
+  fitText(ctx, door.ownerPrefix, a0 + aW, 0.4, 0.115, aW, ink, '700', 'right')
+  fitText(ctx, door.serial, b0, 0.4, 0.115, bW - box - 0.015, ink)
+  condensed(ctx, String(door.checkDigit), b1 - box / 2, 0.4, 0.095, ink, '700', 'center')
   ctx.strokeStyle = ink
   ctx.lineWidth = 0.008
   ctx.strokeRect(b1 - box, 0.4 - 0.065, box, 0.125)
-  fitText(ctx, door.isoType, b0, 0.58, 0.095, bW, ink)
+  fitText(ctx, door.isoType, b0, 0.58, 0.115, bW, ink)
   // weight plate: labels between the bars, values beside the outer bar
   const rows = door.plate ? plateRows(door.plate) : []
   rows.forEach(([label, kg, lbs], i) => {
     const y = 0.76 + i * 0.19 // the plate ends above the bar handles
-    fitText(ctx, label, a0, y + 0.045, 0.06, aW, ink, '500')
-    fitText(ctx, kg, b1, y, 0.062, bW, ink, '500', 'right')
-    fitText(ctx, lbs, b1, y + 0.09, 0.062, bW, ink, '500', 'right')
+    fitText(ctx, label, a0, y + 0.045, 0.065, aW, ink, '600')
+    fitText(ctx, kg, b1, y, 0.065, bW, ink, '600', 'right')
+    fitText(ctx, lbs, b1, y + 0.09, 0.065, bW, ink, '600', 'right')
   })
   // left leaf, outside its outer bar: CSC approval plate, the corten steel roundel, SUPER HEAVY
   const l0 = W / 2 - DOOR_LEAF_M + 0.04
@@ -215,11 +258,13 @@ function drawDoorMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['d
 }
 
 /** What the front end prints: the box number. */
-function drawFrontMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['door'], W: number, H: number, ink: string): void {
-  ctx.fillStyle = 'rgba(0,0,0,0.22)'
-  ctx.fillRect(0, 0, W, 0.14)
-  ctx.fillRect(0, H - 0.14, W, 0.14)
-  text(ctx, `${door.ownerPrefix} ${door.serial} ${door.checkDigit}`, W * 0.5, 0.36, 0.12, ink, '600', 'center')
+function drawFrontMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['door'], W: number, H: number, ink: string, frame = true): void {
+  if (frame) {
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'
+    ctx.fillRect(0, 0, W, 0.14)
+    ctx.fillRect(0, H - 0.14, W, 0.14)
+  }
+  condensed(ctx, `${door.ownerPrefix} ${door.serial} ${door.checkDigit}`, W * 0.5, 0.36, 0.13, ink, '700', 'center')
 }
 
 /** Paints one box. `bodyColour` is the livery body colour. */
@@ -366,13 +411,16 @@ export function paintFaceMarks(ctx: CanvasRenderingContext2D, markings: Containe
   if (!canon || !(HERO_FACES as readonly Face[]).includes(face)) return
   const salt = canon.x * 31 + canon.y
   if (face === 'sideP' || face === 'sideN') {
-    inRegion(ctx, rect, L, H, () => drawSideMarks(ctx, side, L, H, ink))
+    inRegion(ctx, rect, L, H, () => drawSideMarks(ctx, side, L, H, ink, false))
+    chipPaint(ctx, rect, L, H, markings, salt)
     drawWear(ctx, rect, L, H, markings, paint, salt)
   } else if (face === 'door') {
-    inRegion(ctx, rect, W, H, () => drawDoorMarks(ctx, door, W, H, ink))
+    inRegion(ctx, rect, W, H, () => drawDoorMarks(ctx, door, W, H, ink, false))
+    chipPaint(ctx, rect, W, H, markings, salt)
     drawWear(ctx, rect, W, H, markings, paint, salt)
   } else {
-    inRegion(ctx, rect, W, H, () => drawFrontMarks(ctx, door, W, H, ink))
+    inRegion(ctx, rect, W, H, () => drawFrontMarks(ctx, door, W, H, ink, false))
+    chipPaint(ctx, rect, W, H, markings, salt)
     drawWear(ctx, rect, W, H, markings, paint, salt)
   }
 }
