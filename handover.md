@@ -25,7 +25,7 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | #253 | Worker reads only the entities an event names | #246 | merged in branch (519e1b5) | |
 | #254 | One-click benchmark on a production build | #246 | merged in branch (b5ebd50) | |
 | #255 | Hero container model, per face, with asset budgets | #247 | merged in branch (f568b1c) | |
-| #256 | Far tier: far-field wordmark on containers | #247 | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
+| #256 | Far tier: far-field wordmark on containers | #247 | merged in branch (b8410a7) | |
 | #257 | Posing: cull before posing, one custody lookup per box | #250 | merged in branch (ccf3ff8) | |
 | #258 | Hero renderer: visible faces only, capped, loaded on first close zoom | #250, #248, #255 | merged in branch (8df80fd) | |
 | #259 | Hero detail arrives smoothly (frame allowance, fade-in, camera gate) | #258 | merged in branch (2903851) | |
