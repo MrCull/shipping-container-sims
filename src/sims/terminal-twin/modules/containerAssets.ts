@@ -16,6 +16,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { ContainerSize } from '../scenario/types'
 import atlas from '../assets/models/containers/livery-atlas.json'
+import { patchContactShadow } from './contactShadow'
 
 export const CONTAINER_ASSET_URLS: Record<ContainerSize, string> = {
   '20': new URL('../assets/models/containers/container-20.glb', import.meta.url).href,
@@ -116,6 +117,8 @@ export interface LiveryAtlasLayout {
 export function liveryMaterial<T extends THREE.MeshStandardMaterial>(
   source: T,
   layout: LiveryAtlasLayout = atlas,
+  /** Container boxes only (origin at the bottom): darken the lowest strip where a box meets the ground or the box below (#248). */
+  contactShadows = false,
 ): T & { userData: { liveryBase: { value: number } } } {
   const mat = source.clone() as T & { userData: { liveryBase: { value: number } } }
   const liveryBase = { value: 0 }
@@ -137,8 +140,9 @@ export function liveryMaterial<T extends THREE.MeshStandardMaterial>(
   vMapUv += vec2(mod(liveryI, liveryCols), floor(liveryI / liveryCols)) * liveryTile;
 #endif`,
       )
+    if (contactShadows) patchContactShadow(shader)
   }
-  mat.customProgramCacheKey = () => 'tt-livery'
+  mat.customProgramCacheKey = () => (contactShadows ? 'tt-livery-contact' : 'tt-livery')
   return mat
 }
 
@@ -173,8 +177,8 @@ export function loadContainerAssets(): Promise<ContainerAssets> {
         lod0Src ??= materialOf(lod0)
         lod1Src ??= materialOf(lod1)
       }
-      const lod0Material = liveryMaterial(lod0Src!)
-      const lod1Material = liveryMaterial(lod1Src!)
+      const lod0Material = liveryMaterial(lod0Src!, atlas, true)
+      const lod1Material = liveryMaterial(lod1Src!, atlas, true)
       // One atlas texture for every size and LOD (each GLB embeds the same image).
       lod1Material.map = lod0Material.map
       for (const m of [lod0Material, lod1Material]) if (m.map) m.map.anisotropy = 4

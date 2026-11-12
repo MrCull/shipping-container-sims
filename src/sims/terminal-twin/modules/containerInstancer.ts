@@ -23,6 +23,7 @@ import * as THREE from 'three'
 import type { ContainerSize } from '../scenario/types'
 import { liveryBodyColour, LIVERY_ATLAS, type ContainerAssets } from './containerAssets'
 import { CONTAINER_DIMS } from './sceneModel'
+import { patchContactShadow } from './contactShadow'
 import { ContainerCloseups, type CloseupSource } from './containerCloseups'
 import { exposedFaces, neighboursOf, type ExposedFaces, type PlacedBox } from './exposedFaces'
 
@@ -166,6 +167,8 @@ export class ContainerInstancer {
     this.capacity = { '20': capacity['20'] ?? 0, '40': capacity['40'] ?? 0, '40HC': capacity['40HC'] ?? 0 }
     this.group.name = 'containers'
     const mat = this.track(new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.1 }))
+    mat.onBeforeCompile = (shader) => patchContactShadow(shader)
+    mat.customProgramCacheKey = () => 'tt-box-contact'
     this.placeholders = {} as Record<ContainerSize, Layer>
     for (const size of SIZES) {
       const d = CONTAINER_DIMS[size]

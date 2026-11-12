@@ -36,6 +36,7 @@ import { EQUIPMENT_KINDS, type EquipmentKindDef, type KindFrame, type KindRender
 import { GROUND_ROTATION_X, StaticBatch } from './staticBatch'
 import { QUALITY_PROFILES, type QualityProfile } from './quality'
 import { AtmosphereRig, type AtmosphereState } from './atmosphereRig'
+import { setContactShadows } from './contactShadow'
 import type { Lighting } from './atmosphere'
 import { backdropModelAssets, buildBackdrop, sceneryFor, type Backdrop, type BackdropKind } from './backdrop'
 import type { TerminalScenery } from '../terminals'
@@ -451,6 +452,7 @@ export class SceneRenderer {
   setQuality(profile: QualityProfile): void {
     this.quality = profile
     this.atmosphere.setQuality(profile)
+    setContactShadows(profile.contactShadows)
     this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap, closeupDistanceM: profile.closeupDistanceM, closeupFaceBudget: profile.closeupFaceBudget })
     this.setOceanDetail(profile.oceanSegments)
   }
@@ -485,6 +487,11 @@ export class SceneRenderer {
   /** Apply the time-of-day lighting (day/dusk/night; cheap, call when it changes). */
   setLighting(l: Lighting): void {
     this.atmosphere.apply(l)
+  }
+
+  /** Gives the atmosphere the GPU renderer for the sky reflections (#248); a headless host never calls it. */
+  attachRenderer(renderer: THREE.WebGLRenderer): void {
+    this.atmosphere.attachRenderer(renderer)
   }
 
   atmosphereState(): AtmosphereState & { backdrop: { kind: BackdropKind; parts: string[]; models: Backdrop['models'] } } {
