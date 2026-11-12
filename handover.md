@@ -4,7 +4,7 @@ For the next agent. Read this file, then spec [#243](https://github.com/MrCull/s
 
 ## Status (2026-11-12, `main` at 8713553)
 
-- **Nothing is built yet.** The spec and its 18 tickets are published; no integration branch exists.
+- **Integration branch:** `claude/practical-cerf-asprbc` (orchestrator session https://claude.ai/code/session_0155BNjyJ45Cnu5X19SbvEUH). Implementers run on Sonnet, two at a time.
 - **Start here:** #246, #247, #248 and #249 have no blockers. #246 comes first in practice: it records the baseline and adds the counters and the reference test that #250 to #254 are judged against.
 - **No real GPU for the first few days** (owner, 2026-11-11). Every ticket except #262 is accepted on counts and ratios that software WebGL measures faithfully. Never judge frame rate from the headless browsers.
 - **Blender works in cloud sessions.** A trial installed `bpy` 5.2.3 on Python 3.13 in under a minute and regenerated the container group byte-identical (`pnpm run tt:assets --check --no-previews --only containers --python <venv>/bin/python`). Preview renders and the other groups are untried: that is #247.
@@ -15,8 +15,8 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 
 | Issue | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
-| #246 | Headless baseline, posing counters and drawn-box reference | none | open | |
-| #247 | Opt-in Blender install script for cloud sessions | none | open | |
+| #246 | Headless baseline, posing counters and drawn-box reference | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
+| #247 | Opt-in Blender install script for cloud sessions | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
 | #248 | Environment reflections and contact shadows | none | open | |
 | #249 | Far tier: stand-ins for fences, ASC rails and masts | none | open | |
 | #250 | Posing: boxes at rest are written only when their custody changes | #246 | open | |
