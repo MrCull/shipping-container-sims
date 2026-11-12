@@ -16,7 +16,8 @@ import { viewPresetPose, type ViewPresetName } from '../modules/viewPresets'
 import { hourOfDay, lightingFor } from '../modules/atmosphere'
 import { SceneRenderer } from '../modules/sceneRenderer'
 import type { SceneModel } from '../modules/sceneModel'
-import { AutoQuality, FpsMeter, markStepForRung, profileFor, profileForRung, type MarkStep, type QualityProfile } from '../modules/quality'
+import { AutoQuality, FpsMeter, markStepForRung, profileFor, profileForRung, type QualityProfile } from '../modules/quality'
+import type { HeroMarkStep } from '../modules/markStep'
 import { usePerfStore } from '../store/perfStore'
 import { useTwinStore } from '../store/twinStore'
 
@@ -87,7 +88,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     return perf.setting === 'auto' ? profileForRung(perf.rung) : profileFor(perf.effective)
   }
 
-  function markStepInForce(): MarkStep {
+  function markStepInForce(): HeroMarkStep {
     return perf.setting === 'auto' ? markStepForRung(perf.rung) : 'sharp'
   }
 

@@ -154,9 +154,7 @@ export function createEngineHost(options: { fullScan?: boolean } = {}) {
     if (hatchChange) (delta.hatch ??= []).push(hatchChange)
     // Equipment and vessels: only those the event names (#253), in the order of the full scan. The full scan runs at each request boundary (below).
     const named = namedEntities(ev)
-    for (const id of named.sts) scanSts(sim, id, ev.t)
-    for (const id of named.shc) scanShc(sim, id, ev.t)
-    for (const id of named.asc) scanAsc(sim, id, ev.t)
+    for (const kind of EQUIPMENT_KINDS) for (const id of named[kind]) scanEquipment(kind, sim, id, ev.t)
     if (ev.type.startsWith('Truck') || ev.type === 'AscJobAssigned') {
       for (const truck of sim.query.trucks()) {
         if (motionRefs.get(truck.id) !== truck.motion) {
@@ -185,44 +183,24 @@ export function createEngineHost(options: { fullScan?: boolean } = {}) {
     for (const id of named.vessels) scanVessel(sim, id, ev.t)
   }
 
-  function scanSts(s: Simulation, id: string, t: number): void {
-    const sts = s.query.sts(id)
-    if (motionRefs.get(id) !== sts.motion) {
-      motionRefs.set(id, sts.motion)
-      if (sts.motion.length > 0) delta.motion.push({ entityId: id, segments: sts.motion.map((m) => ({ ...m })) })
+  type EquipmentKind = 'sts' | 'shc' | 'asc'
+
+  /** Report an STS, SHC or ASC whose motion or status changed since it was last read. */
+  function scanEquipment(kind: EquipmentKind, s: Simulation, id: string, t: number): void {
+    const unit = s.query[kind](id)
+    if (motionRefs.get(id) !== unit.motion) {
+      motionRefs.set(id, unit.motion)
+      if (unit.motion.length > 0) delta.motion.push({ entityId: id, segments: unit.motion.map((m) => ({ ...m })) })
     }
-    const key = `sts:${id}`
-    if (statusRefs.get(key) !== sts.status) {
-      statusRefs.set(key, sts.status)
-      delta.entities.push({ kind: 'sts', id, t, status: sts.status })
+    const key = `${kind}:${id}`
+    if (statusRefs.get(key) !== unit.status) {
+      statusRefs.set(key, unit.status)
+      delta.entities.push({ kind, id, t, status: unit.status })
     }
   }
 
-  function scanShc(s: Simulation, id: string, t: number): void {
-    const shc = s.query.shc(id)
-    if (motionRefs.get(id) !== shc.motion) {
-      motionRefs.set(id, shc.motion)
-      if (shc.motion.length > 0) delta.motion.push({ entityId: id, segments: shc.motion.map((m) => ({ ...m })) })
-    }
-    const key = `shc:${id}`
-    if (statusRefs.get(key) !== shc.status) {
-      statusRefs.set(key, shc.status)
-      delta.entities.push({ kind: 'shc', id, t, status: shc.status })
-    }
-  }
-
-  function scanAsc(s: Simulation, id: string, t: number): void {
-    const asc = s.query.asc(id)
-    if (motionRefs.get(id) !== asc.motion) {
-      motionRefs.set(id, asc.motion)
-      if (asc.motion.length > 0) delta.motion.push({ entityId: id, segments: asc.motion.map((m) => ({ ...m })) })
-    }
-    const key = `asc:${id}`
-    if (statusRefs.get(key) !== asc.status) {
-      statusRefs.set(key, asc.status)
-      delta.entities.push({ kind: 'asc', id, t, status: asc.status })
-    }
-  }
+  const EQUIPMENT_KINDS: readonly EquipmentKind[] = ['sts', 'shc', 'asc']
+  const idsOfKind = (kind: EquipmentKind): string[] => (kind === 'sts' ? stsIds : kind === 'shc' ? shcIds : ascIds)
 
   function scanVessel(s: Simulation, id: string, t: number): void {
     const vessel = s.query.vessel(id)
@@ -241,17 +219,13 @@ export function createEngineHost(options: { fullScan?: boolean } = {}) {
   function namedEntities(ev: EngineEvent): { sts: string[]; shc: string[]; asc: string[]; vessels: string[] } {
     const out = { sts: [] as string[], shc: [] as string[], asc: [] as string[], vessels: [] as string[] }
     if (fullScan) {
-      out.sts = [...stsIds]
-      out.shc = [...shcIds]
-      out.asc = [...ascIds]
+      for (const k of EQUIPMENT_KINDS) out[k] = [...idsOfKind(k)]
       out.vessels = [...vesselIds]
       return out
     }
     const wakes = WAKES[ev.type]
     if (wakes === 'all') {
-      out.sts = [...stsIds]
-      out.shc = [...shcIds]
-      out.asc = [...ascIds]
+      for (const k of EQUIPMENT_KINDS) out[k] = [...idsOfKind(k)]
       out.vessels = [...vesselIds]
       return out
     }
@@ -261,26 +235,23 @@ export function createEngineHost(options: { fullScan?: boolean } = {}) {
     }
     for (const id of ev.subjects.vessels ?? []) if (vesselIndex.has(id)) out.vessels.push(id)
     // equipment of another kind this event type wakes without naming it: all of that kind
-    if (wakes?.includes('sts')) out.sts = [...stsIds]
-    if (wakes?.includes('shc')) out.shc = [...shcIds]
-    if (wakes?.includes('asc')) out.asc = [...ascIds]
-    for (const k of ['sts', 'shc', 'asc'] as const) if (out[k].length > 1) out[k].sort((x, y) => indexOf.get(x)! - indexOf.get(y)!)
+    for (const k of EQUIPMENT_KINDS) if (wakes?.includes(k)) out[k] = [...idsOfKind(k)]
+    for (const k of EQUIPMENT_KINDS) if (out[k].length > 1) out[k].sort((x, y) => indexOf.get(x)! - indexOf.get(y)!)
     if (out.vessels.length > 1) out.vessels.sort((x, y) => vesselIndex.get(x)! - vesselIndex.get(y)!)
     return out
   }
 
-  /** The safety net: every STS, SHC, ASC and vessel is read once at the end of each request, so a change no event named is still reported. Returns how many changes it found. */
+  /** The safety net: every STS, SHC, ASC and vessel is read once at the end of each request, so a change no event named is still reported. Counts the changes it finds into `missed`; returns nothing. */
   function sweepAll(s: Simulation): void {
     const before = delta.motion.length + delta.entities.length
     const t = s.now
-    for (const id of stsIds) scanSts(s, id, t)
-    for (const id of shcIds) scanShc(s, id, t)
-    for (const id of ascIds) scanAsc(s, id, t)
+    for (const kind of EQUIPMENT_KINDS) for (const id of idsOfKind(kind)) scanEquipment(kind, s, id, t)
     for (const id of vesselIds) scanVessel(s, id, t)
     missed += delta.motion.length + delta.entities.length - before
   }
 
   let strictChecks = false
+  const strictOf = (req: { strict?: boolean }): boolean => req.strict === true
 
   function start(config: ScenarioConfig, seed: number): void {
     // the browser checks invariants by sweeps only (#252): per-event checking was the largest engine cost; "strict checks" restores it
@@ -373,7 +344,7 @@ export function createEngineHost(options: { fullScan?: boolean } = {}) {
   async function serve(req: WorkerRequestMessage): Promise<unknown> {
     switch (req.op) {
       case 'load':
-        strictChecks = req.strict === true
+        strictChecks = strictOf(req)
         start(req.config, req.seed)
         return null
       case 'reset':
@@ -415,7 +386,7 @@ export function createEngineHost(options: { fullScan?: boolean } = {}) {
       }
       case 'restore': {
         const snap = req.snapshot
-        strictChecks = req.strict === true
+        strictChecks = strictOf(req)
         const s = await replay(snap.config, snap.seed, snap.log.length)
         const hashMatched = s.eventLogHash() === hashDigest(snap.state.logHash)
         // the replay taught the scene the history; the snapshot's exact state (now, queue, injected events) wins

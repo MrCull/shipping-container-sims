@@ -11,6 +11,8 @@
  * `markStepForRung`); the manual levels fix it at their rung.
  */
 
+import type { HeroMarkStep } from './markStep'
+
 export type QualityLevel = 'low' | 'medium' | 'high'
 export type QualitySetting = QualityLevel | 'auto'
 
@@ -98,12 +100,14 @@ export const AUTO_RUNGS = [
 ] as const
 
 export type AutoRungName = (typeof AUTO_RUNGS)[number]['name']
-/** Hero marking resolution (#260); the same two values as `HeroMarkStep` in `heroMarkings.ts`. */
-export type MarkStep = 'sharp' | 'standard'
 export const TOP_RUNG = 0
 export const BOTTOM_RUNG = AUTO_RUNGS.length - 1
 /** The rungs the manual levels fix the ladder at: High is the top, Low the bottom, Medium the Medium profile as it is (with its own hero cap). */
-export const MANUAL_RUNG: Readonly<Record<QualityLevel, number>> = { high: TOP_RUNG, medium: 6, low: BOTTOM_RUNG }
+export const MANUAL_RUNG: Readonly<Record<QualityLevel, number>> = {
+  high: TOP_RUNG,
+  medium: AUTO_RUNGS.findIndex((r) => r.name === 'medium'),
+  low: BOTTOM_RUNG,
+}
 
 export const clampRung = (rung: number): number => Math.max(TOP_RUNG, Math.min(BOTTOM_RUNG, Math.round(rung)))
 
@@ -128,7 +132,7 @@ export function profileForRung(rung: number): QualityProfile {
   return { ...base, heroBoxes }
 }
 
-export function markStepForRung(rung: number): MarkStep {
+export function markStepForRung(rung: number): HeroMarkStep {
   return AUTO_RUNGS[clampRung(rung)].marks
 }
 
