@@ -57,6 +57,9 @@ function inRegion(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: numb
   ctx.restore()
 }
 
+/** Half the cap height of Arial / Helvetica in ems: added to an alphabetic baseline it centres capitals and digits on `y`. */
+const CAP_MID = 0.358
+
 /** While set, `text` adds the canvas-pixel box of every string it draws (so `chipPaint` chips only the lettering). */
 let inkBoxes: { x0: number; y0: number; x1: number; y1: number }[] | null = null
 
@@ -64,8 +67,10 @@ function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, si
   ctx.font = `${weight} ${sizeM}px Arial, Helvetica, sans-serif`
   ctx.fillStyle = colour
   ctx.textAlign = align
-  ctx.textBaseline = 'middle'
-  ctx.fillText(s, x, y)
+  // alphabetic, not "middle": Safari rounds the font metrics of these sub-pixel (metre) font sizes, so "middle" sat on
+  // the baseline there and every line drew about a third of its height too high (the check digit rode out of its box)
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillText(s, x, y + sizeM * CAP_MID)
   const m = inkBoxes ? ctx.getTransform?.() : undefined
   if (m && inkBoxes) {
     const w = ctx.measureText?.(s)?.width ?? 0

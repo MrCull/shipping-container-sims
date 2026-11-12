@@ -2,6 +2,14 @@
 
 For the next agent. Read this file, then `src/sims/terminal-twin/docs/rendering-3d.md` (sections "Hero level", "Still-camera floor", "Paused-detail boost", "Camera controls"), then `docs/agents/implementing.md`. This is a per-run tracking file: delete it before PR #266 merges (the open points below are already issues or owner decisions, listed under "Outstanding").
 
+## Current run (2026-11-12, third request): plan and progress
+
+| # | Request | State |
+|---|---|---|
+| 7 | Check-digit box always drawn a bit low (phone photo) | done: `text()` drew with `textBaseline = 'middle'`, which puts capitals and digits about a sixth of their height too high in Chromium (more on Safari, which rounds the metrics of sub-pixel fonts). Now alphabetic baseline plus `CAP_MID` (0.358 em); measured centred within 3 mm |
+| 8 | Fix #267 (yard boxes float 0.305 m over a standard box) | in progress: subagent in a worktree, following the ticket's plan; merge into this branch, regenerate goldens on the merged tree |
+| 9 | Take the low-loss size and processing cuts from the cost table | in progress: sharp marks 4x to 3x, end-page packing, shared GLB maps (check each, keep only the cheap-to-lose ones) |
+
 ## Current run (2026-11-12, second session): plan and progress
 
 A previous session (branch `claude/cool-clarke-qnzt4q`) ran out of credits before pushing anything; its work is lost and is being redone here. Owner's requests, in order, with state:
