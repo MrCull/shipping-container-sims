@@ -2,6 +2,21 @@
 
 For the next agent. Read this file, then `src/sims/terminal-twin/docs/rendering-3d.md` (sections "Hero level", "Still-camera floor", "Paused-detail boost", "Camera controls"), then `docs/agents/implementing.md`. This is a per-run tracking file: delete it before PR #266 merges (the open points below are already issues or owner decisions, listed under "Outstanding").
 
+## Current run (2026-11-12, second session): plan and progress
+
+A previous session (branch `claude/cool-clarke-qnzt4q`) ran out of credits before pushing anything; its work is lost and is being redone here. Owner's requests, in order, with state:
+
+| # | Request | State |
+|---|---|---|
+| 1 | Triage every `needs-triage` issue (#244, #245, #267) with enough detail for a weaker agent to implement | in progress (background agent) |
+| 2 | Three container looks by distance: close-up hero, middle (close-up decal level, **missing the door locking bars**), far. The middle one stands out next to the others | todo |
+| 3 | Breakdown of hero cost (size and processing) per feature: bars, lettering, shape, weathering; where to cut with least visual loss. Owner: if wear/chipping is most of the cost, tone it down a lot | todo (earlier session measured chipped paint at about 90% of the lettering paint time) |
+| 4 | Phone pinch-zoom still slides right | todo (earlier session: OrbitControls scales its two-finger pan to a distant target) |
+| 5 | Easy way to hide/collapse the bottom overlay menu and the top stats labels | todo |
+| 6 | Phone page was 569 px wide on a 390 px screen (found by the earlier session) | todo |
+
+Keep this table current after each step and push, so a cutoff loses nothing.
+
 ## Status (2026-11-12)
 
 - **PR #266** (`claude/practical-cerf-asprbc` into `main`, ready for review, mergeable, CI green on the tip `2537f4f`) holds all of spec #243 (#246 to #261, #263) plus the follow-on work below. #265 was a subset of it and is closed.
