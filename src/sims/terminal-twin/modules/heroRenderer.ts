@@ -433,6 +433,13 @@ export class HeroLevel {
     return this.pending > 0 || this.fading
   }
 
+  /** True when nothing more is coming for this view: no model is loading and no face waits or fades (screenshots wait on this). */
+  get settled(): boolean {
+    if (this.busy) return false
+    for (const e of this.entries.values()) if (e.state === 'loading') return false
+    return true
+  }
+
   /** Boxes with at least one hero face drawn in the last frame. */
   get count(): number {
     return this.boxCount

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AutoQuality, HERO_STILL_BOXES, AUTO_DOWN_FPS, AUTO_RUNGS, BOTTOM_RUNG, MANUAL_RUNG, QUALITY_LEVELS, QUALITY_PROFILES, FpsMeter, levelOfRung, markStepForRung, profileFor, profileForRung, rungName } from '../modules/quality'
+import { AutoQuality, HERO_PAUSED_BOXES, HERO_STILL_BOXES, orbitSpeedFor, pausedDetailProfile, AUTO_DOWN_FPS, AUTO_RUNGS, BOTTOM_RUNG, MANUAL_RUNG, QUALITY_LEVELS, QUALITY_PROFILES, FpsMeter, levelOfRung, markStepForRung, profileFor, profileForRung, rungName } from '../modules/quality'
 
 /** Feeds `seconds` of frames at a steady `fps`, returns the level after. */
 function feed(auto: AutoQuality, startMs: number, seconds: number, fps: number): number {
@@ -79,6 +79,25 @@ describe('the shedding ladder (pure)', () => {
 
   it('hero marking resolution drops after the cap has shrunk; below, only the still-camera floor is drawn, sharp', () => {
     expect(AUTO_RUNGS.map((_, i) => markStepForRung(i))).toEqual(['sharp', 'sharp', 'sharp', 'standard', 'sharp', 'sharp', 'sharp', 'sharp'])
+  })
+
+  it('paused-detail boost: High close-up detail on every rung, nothing lowered, shadows and LOD distances left alone', () => {
+    for (let rung = 0; rung < AUTO_RUNGS.length; rung++) {
+      const base = profileForRung(rung)
+      const p = pausedDetailProfile(base)
+      expect(p.heroBoxes).toBe(Math.max(base.heroBoxes, HERO_PAUSED_BOXES))
+      expect(p.closeupDistanceM).toBe(QUALITY_PROFILES.high.closeupDistanceM)
+      expect(p.closeupFaceBudget).toBe(QUALITY_PROFILES.high.closeupFaceBudget)
+      expect(p.resolutionScale).toBe(1)
+      expect({ ...p, heroBoxes: 0, closeupDistanceM: 0, closeupFaceBudget: 0, resolutionScale: 0 }).toEqual({ ...base, heroBoxes: 0, closeupDistanceM: 0, closeupFaceBudget: 0, resolutionScale: 0 })
+    }
+  })
+
+  it('orbit speed falls close to the target and is never above 1', () => {
+    expect(orbitSpeedFor(8)).toBe(0.35)
+    expect(orbitSpeedFor(20)).toBe(0.5)
+    expect(orbitSpeedFor(40)).toBe(1)
+    expect(orbitSpeedFor(3000)).toBe(1)
   })
 
   it('every Auto rung keeps the still-camera hero floor; the manual levels have none', () => {

@@ -160,3 +160,4 @@ detail. Terms: [GLOSSARY.md](../../../../GLOSSARY.md).
   split with spacing-aware boundaries. [optimising/terminal-throughput.md](optimising/terminal-throughput.md)
 - **Not landed (#229, #240)**: package look-ahead for a yielding crane in `prepareNextPackage` was inert at 0.1 and
   0.5; `tests/yielding-crane-packages.test.ts` guards that no crane starts a package and waits for the rail on the 4-STS fixture.
+- **Yard boxes float above a standard-height box.** Every yard tier is one high-cube height (`engine/yardLayout.ts#tierBaseY`, `TIER_PITCH_M` 2.896), so a 2.591 m box leaves a 0.305 m gap under the box above it. The ASC hoist distances (`engine/subsystems/ascReservations.ts`) use the same grid, so settling the boxes in the renderer alone would have cranes release them in mid-air: the fix is in the engine and moves the goldens.

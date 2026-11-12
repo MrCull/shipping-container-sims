@@ -104,6 +104,8 @@ export interface TwinView {
   cameraPose(): CameraPose | null
   /** Put the orbit camera at a pose (the benchmark's fly-through, #254). */
   setCameraPose(pose: CameraPose): void
+  /** True when the hero level has nothing more to bring in for the current view. */
+  heroSettled(): boolean
   /** Hero marking resolution (#260): 'sharp' or 'standard'; the step in force. */
   setHeroMarkStep(step: 'sharp' | 'standard'): void
   readonly heroMarkStep: 'sharp' | 'standard'

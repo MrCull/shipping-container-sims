@@ -61,6 +61,7 @@ test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks g
   await page.waitForFunction(() => !!window.__tt)
   await page.evaluate(() => window.localStorage.clear())
   await page.evaluate(() => window.__tt!.setAutoRung(0))
+  await page.evaluate(() => window.__tt!.setPausedDetail(false)) // this test measures the rungs themselves, paused
   // software WebGL is far slower than Auto's thresholds: keep Auto from stepping on its own (never down, never up) so the forced rung holds
   await page.evaluate(() => window.__tt!.setAutoThresholds({ down: 0.1, up: 1000 }))
   await page.evaluate(() => window.__tt!.load('yard-no-mixed-length'))
@@ -106,6 +107,12 @@ test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks g
   const off = await at(4, 18, 'sharp')
   expect(off.faces).toBeGreaterThan(0)
   expect(off.faces).toBeLessThanOrEqual(18)
+  // paused-detail boost: with the sim paused and the camera stopped, Auto draws High close-up detail even at the bottom rung
+  await page.evaluate(() => window.__tt!.setAutoRung(7))
+  await page.evaluate(() => window.__tt!.setPausedDetail(true))
+  await page.waitForFunction(() => window.__tt!.perf().pausedDetail && window.__tt!.perf().stats.heroFaces > 18, undefined, { timeout: 120_000 })
+  expect((await page.evaluate(() => window.__tt!.perf())).rungName).toBe('low')
+  await page.evaluate(() => window.__tt!.setPausedDetail(false))
   // and back up: the cap and the sharp markings return in reverse
   const back = await at(0, 96, 'sharp')
   expect(back.step).toBe('sharp')

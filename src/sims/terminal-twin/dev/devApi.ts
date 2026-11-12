@@ -84,6 +84,8 @@ export interface PerfInfo {
   rung: number
   rungName: AutoRungName
   overlay: boolean
+  /** True while Auto's paused-detail boost is in force (sim paused, camera stopped): High close-up detail on any rung. */
+  pausedDetail: boolean
   stats: PerfStats
 }
 
@@ -140,6 +142,8 @@ export interface TwinDevApi {
   setAutoThresholds(thresholds: { down: number; up: number } | null): void
   /** Switch to Auto and force its ladder rung (0 best look; clamped), restarting its judging: proves what each rung draws without needing a slow frame rate. Returns the new perf(). */
   setAutoRung(rung: number): PerfInfo
+  /** Allow or forbid Auto's paused-detail boost (default allowed). A test that measures what a rung draws while paused forbids it. */
+  setPausedDetail(on: boolean): void
   /** Rendered counts (null if there is no 3D view). */
   scene(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** What the scene shows at the displayed time: custody per container, status and pose per STS, status per vessel. */
@@ -176,6 +180,10 @@ export interface TwinDevApi {
   screenPoint(entityId: string): { x: number; y: number } | null
   /** The orbit camera (follow-camera and keyboard-camera checks): target, distance (m), azimuth and polar angle (radians from straight up). */
   cameraPose(): CameraPose | null
+  /** Put the orbit camera at a pose (screenshots: `{ target, distance, azimuth, polar }`; distance is clamped to the controls' 8 m minimum). False without a 3D view. */
+  setCameraPose(pose: CameraPose): boolean
+  /** True when the hero level has nothing more to bring in for the current view: no model loading, no face waiting or fading. Wait on this before a close-up screenshot (about a minute in software WebGL). */
+  heroSettled(): boolean
   /** Bounding box (viewport px) of each named HUD region (`null` when not shown); see modules/hudLayout.ts. */
   hudLayout(): HudLayout
   /** Saves, snapshots and rewind (TT-17). */
@@ -332,6 +340,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     rung: perfStore.rung,
     rungName: perfStore.rungLabel,
     overlay: perfStore.overlayVisible,
+    pausedDetail: perfStore.pausedDetailActive,
     stats: { ...perfStore.stats },
   })
 
@@ -396,6 +405,9 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       perfStore.setSetting('auto')
       perfStore.setRung(rung)
       return perfInfo()
+    },
+    setPausedDetail: (on) => {
+      perfStore.pausedDetail = on
     },
     setAutoThresholds: (thresholds) => {
       perfStore.debugAuto = thresholds
@@ -510,6 +522,12 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     pickAt: (x, y) => store.view()?.pickAt(x, y) ?? null,
     screenPoint: (id) => store.view()?.screenPoint(id) ?? null,
     cameraPose: () => store.view()?.cameraPose() ?? null,
+    setCameraPose: (pose) => {
+      const v = store.view()
+      v?.setCameraPose(pose)
+      return !!v
+    },
+    heroSettled: () => store.view()?.heroSettled() ?? true,
     hudLayout: () => readHudLayout(document, { width: window.innerWidth, height: window.innerHeight }),
     saves: {
       fileText: async (type, name) => JSON.stringify(await store.buildSave(type, name)),

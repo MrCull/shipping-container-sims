@@ -50,6 +50,9 @@ jobs:
         env:
           QUARANTINE_BASE: HEAD^1
 
+      - name: Smoke summary reporter test
+        run: node --test scripts/test-smoke-summary-reporter.mjs
+
       - name: Lint
         run: pnpm run lint
 

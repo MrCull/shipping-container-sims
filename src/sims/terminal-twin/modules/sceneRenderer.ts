@@ -722,6 +722,11 @@ export class SceneRenderer {
   }
 
   /** Hero faces drawn last frame (#258). */
+  /** True when the hero level has nothing more to bring in for this view (`HeroLevel.settled`). */
+  heroSettled(): boolean {
+    return this.hero.settled
+  }
+
   heroFaceCount(): number {
     return this.containers.stats().heroFaces
   }

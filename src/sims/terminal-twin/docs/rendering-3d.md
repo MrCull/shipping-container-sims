@@ -140,6 +140,21 @@ half a second after it stops. Faces already prepared stay drawn through a move w
 lowers a higher cap or tightens its gate, and the manual levels have none (`heroStillBoxes` 0: Low still draws no hero face).
 Tests: `tests/hero-prep.test.ts` (floor through the instancer), `tests/quality.test.ts`.
 
+#### Paused-detail boost
+
+On Auto, while the sim is paused and the camera pose has not changed for `PAUSED_DETAIL_SETTLE_MS` (500 ms), `useTwinScene` puts
+`pausedDetailProfile(profile)` in force: hero cap `HERO_PAUSED_BOXES` (12), High's close-up reach and face budget, full render
+resolution, sharp markings. Nothing moves then, so frame time is free. Shadows, LOD distances and the rest stay the rung's
+(switching them recompiles shaders and would stall the first frame after play or a camera move). Auto does not judge frames under
+the boost and restarts its window when it ends. `__tt.perf().pausedDetail` says it is in force; `__tt.setPausedDetail(false)`
+forbids it (a test that measures what a rung draws while paused). Smoke: `hero-faces.smoke.ts` (ladder test).
+
+#### Camera controls
+
+`OrbitControls` with map-like handling: `screenSpacePanning = false` (a pan slides the target along the ground, never into the
+air), `zoomToCursor = true` (a wheel or pinch zoom keeps the point under the cursor or between the fingers in place), and the
+orbit speed falls close to the target (`orbitSpeedFor`: 1 from 40 m out, 0.35 at the 8 m minimum distance).
+
 #### Smooth arrival (#259)
 
 `heroPrep.ts` (pure) plus `HeroLevel`: a chosen face is drawn only once it is **prepared** (its model's meshes built, its paint and

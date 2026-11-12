@@ -35,14 +35,22 @@ export const HERO_MARK_TILE_BASE: Record<MarkKind, { w: number; h: number }> = {
  */
 export const heroMarkInsetM = (face: Face): number => (face === 'door' ? 0.035 : 0.01)
 
-/** Generator constants the corrugation profile is rebuilt from (containers.py, hero_containers.py, liveries.py). */
-const CAST_L_M = 0.178
-const CAST_W_M = 0.162
-const RIB_DEPTH_M = 0.038
-const HERO_PITCH_M = 0.25
-const DOOR_BANDS = 4
-const RAIL_BOTTOM_M = 0.16
-const RAIL_TOP_M = 0.1
+/**
+ * Generator constants the corrugation profile is rebuilt from (containers.py, hero_containers.py, liveries.py).
+ * `tests/generator-constants.test.ts` reads the generators and fails when a copy here has drifted.
+ */
+export const HERO_GENERATOR_CONSTANTS = {
+  castLengthM: 0.178,
+  castWidthM: 0.162,
+  ribDepthM: 0.038,
+  heroPitchM: 0.25,
+  doorBands: 4,
+  railBottomM: 0.16,
+  railTopM: 0.1,
+  /** The deepest hero surface inside the box frame (the door leaves' valley): `HERO_DEPTH_BIAS_M` must exceed it. */
+  doorValleyInsetM: 0.075,
+} as const
+const { castLengthM: CAST_L_M, castWidthM: CAST_W_M, ribDepthM: RIB_DEPTH_M, heroPitchM: HERO_PITCH_M, doorBands: DOOR_BANDS, railBottomM: RAIL_BOTTOM_M, railTopM: RAIL_TOP_M } = HERO_GENERATOR_CONSTANTS
 
 /**
  * The corrugation under a decal, for its shading: `[start, end, ribs, slope]`. `start` and `end` are the corrugated

@@ -74,6 +74,10 @@ export const usePerfStore = defineStore('terminal-twin-perf', () => {
   /** Dev only: retuned Auto thresholds (fps), for renderers that cannot reach 45 / 57 fps (headless software rendering). */
   const debugAuto = ref<{ down: number; up: number } | null>(null)
 
+  /** Auto's paused-detail boost (`pausedDetailProfile`): allowed (a test that measures a rung switches it off), and in force right now. */
+  const pausedDetail = ref(true)
+  const pausedDetailActive = ref(false)
+
   function setSetting(next: QualitySetting): void {
     setting.value = next
     write(KEY_QUALITY, next)
@@ -101,5 +105,5 @@ export const usePerfStore = defineStore('terminal-twin-perf', () => {
     stats.value = next
   }
 
-  return { benchmark, setting, effective, rung, rungLabel, overlayVisible, stats, autoChanges, debugLoadMs, debugAuto, setSetting, setRung, toggleOverlay, report }
+  return { benchmark, setting, effective, rung, rungLabel, overlayVisible, stats, autoChanges, debugLoadMs, debugAuto, pausedDetail, pausedDetailActive, setSetting, setRung, toggleOverlay, report }
 })

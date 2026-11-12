@@ -16,7 +16,7 @@ import { viewPresetPose, type ViewPresetName } from '../modules/viewPresets'
 import { hourOfDay, lightingFor } from '../modules/atmosphere'
 import { SceneRenderer } from '../modules/sceneRenderer'
 import type { SceneModel } from '../modules/sceneModel'
-import { AutoQuality, FpsMeter, markStepForRung, profileFor, profileForRung, type QualityProfile } from '../modules/quality'
+import { AutoQuality, FpsMeter, markStepForRung, orbitSpeedFor, PAUSED_DETAIL_SETTLE_MS, pausedDetailProfile, profileFor, profileForRung, type QualityProfile } from '../modules/quality'
 import type { HeroMarkStep } from '../modules/markStep'
 import { usePerfStore } from '../store/perfStore'
 import { useTwinStore } from '../store/twinStore'
@@ -46,6 +46,10 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   /** The part of it spent posing the scene (`view.update`), without the render submit. */
   let poseMs = 0
   let lastSetting = perf.setting
+  /** Auto's paused-detail boost (`pausedDetailProfile`): the sim is paused and the camera has stopped. */
+  let pausedDetail = false
+  let lastPoseKey = ''
+  let lastCameraMoveAt = 0
   const webglFailed = ref(false)
   let renderer: THREE.WebGLRenderer | null = null
   let camera: THREE.PerspectiveCamera | null = null
@@ -85,15 +89,17 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
 
   /** Auto puts its ladder rung in force (#261); a manual level is its own profile, with sharp hero markings. */
   function profileInForce(): QualityProfile {
-    return perf.setting === 'auto' ? profileForRung(perf.rung) : profileFor(perf.effective)
+    if (perf.setting !== 'auto') return profileFor(perf.effective)
+    const profile = profileForRung(perf.rung)
+    return pausedDetail ? pausedDetailProfile(profile) : profile
   }
 
   function markStepInForce(): HeroMarkStep {
-    return perf.setting === 'auto' ? markStepForRung(perf.rung) : 'sharp'
+    return perf.setting === 'auto' && !pausedDetail ? markStepForRung(perf.rung) : 'sharp'
   }
 
   function forceKey(): string {
-    return `${perf.setting === 'auto' ? 'auto' : perf.effective}:${perf.rung}`
+    return `${perf.setting === 'auto' ? 'auto' : perf.effective}:${perf.rung}:${pausedDetail}`
   }
 
   function aim(target: { x: number; y: number; z: number }, keepOffset: boolean, distanceM?: number, openingOffset?: { x: number; y: number; z: number } | null): void {
@@ -235,8 +241,22 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       lightingKey = key
       view.setLighting(lightingFor(hour, store.lockDaylight))
     }
+    // close to the target a swipe would swing the view round too fast: orbit speed falls with the distance
+    if (controls) controls.rotateSpeed = orbitSpeedFor(camera.position.distanceTo(controls.target))
     controls?.update()
     camera.updateMatrixWorld()
+    // Auto, paused, camera stopped: nothing moves, so frame time is free and the close-up detail goes up (#still)
+    const poseKey = `${camera.position.x},${camera.position.y},${camera.position.z},${camera.quaternion.x},${camera.quaternion.y},${camera.quaternion.z}`
+    if (poseKey !== lastPoseKey) {
+      lastPoseKey = poseKey
+      lastCameraMoveAt = now
+    }
+    const boost = perf.setting === 'auto' && perf.pausedDetail && controller.paused && now - lastCameraMoveAt >= PAUSED_DETAIL_SETTLE_MS
+    if (boost !== pausedDetail) {
+      pausedDetail = boost
+      perf.pausedDetailActive = boost
+      if (!boost) auto.reset(perf.rung) // the boosted frames say nothing about the rung
+    }
     frustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
     const cpuStart = performance.now()
     view.live = !controller.paused
@@ -262,7 +282,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     }
     if (perf.setting === 'auto' && auto.rung !== perf.rung) auto.reset(perf.rung) // the dev API forced a rung
     auto.setFpsThresholds(perf.debugAuto?.down ?? null, perf.debugAuto?.up ?? null)
-    if (perf.setting === 'auto') auto.frame(now)
+    if (perf.setting === 'auto' && !pausedDetail) auto.frame(now)
     if (appliedKey !== forceKey()) applyQuality()
     if (now - lastReportAt >= 250) {
       lastReportAt = now
@@ -289,6 +309,11 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         controls.minDistance = 8
         controls.maxDistance = 3500
         controls.maxPolarAngle = Math.PI / 2.05
+        // Map-like handling (phones especially): a pan slides the target along the ground instead of lifting it into the
+        // air (an elevated target makes later orbits and pinches swing), and a zoom keeps the point under the cursor or
+        // between the fingers in place instead of heading for the middle of the canvas.
+        controls.screenSpacePanning = false
+        controls.zoomToCursor = true
         renderer.domElement.addEventListener('pointerdown', onPointerDown)
         renderer.domElement.addEventListener('pointerup', onPointerUp)
         applyQuality()
@@ -329,6 +354,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       screenPoint,
       cameraPose: readPose,
       setCameraPose: writePose,
+      heroSettled: () => view?.heroSettled() ?? true,
       stats: () => (view ? { ...view.stats(), frames: framesRendered, render: { ...lastRender } } : null),
       liveries: () => view?.renderedLiveries() ?? null,
       rigs: () => view?.renderedRigs() ?? null,

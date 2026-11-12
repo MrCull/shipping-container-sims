@@ -83,6 +83,7 @@ test('Auto sheds down the ladder under sustained load, names the rung in the ove
   // let the first (software-rendered) frames settle, then judge from a clean slate at High
   // Software rendering tops out near 19 fps, so the thresholds are retuned: under 12 fps steps down, 15 fps or more steps up.
   await page.evaluate(() => window.__tt!.setAutoThresholds({ down: 12, up: 15 }))
+  await page.evaluate(() => window.__tt!.setPausedDetail(false)) // Auto does not judge frames under the paused-detail boost
   await page.evaluate(() => window.__tt!.setFrameLoad(150)) // about 6 fps
   await page.waitForFunction(() => window.__tt!.perf().rung > 0, undefined, { timeout: 40_000 })
   await expect(page.getByTestId('tt-perf-rung')).not.toHaveText('Full detail')

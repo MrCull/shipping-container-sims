@@ -145,6 +145,33 @@ export function profileForRung(rung: number): QualityProfile {
   return { ...base, heroBoxes, heroStillBoxes: HERO_STILL_BOXES }
 }
 
+/** Boxes' worth of hero faces while Auto is paused with a stopped camera (Medium's cap: at most 3 + 3 sharp marking pages, 96 MB). */
+export const HERO_PAUSED_BOXES = 12
+/** The camera must have been stopped this long (ms), with the sim paused, before the paused-detail boost. */
+export const PAUSED_DETAIL_SETTLE_MS = 500
+
+/**
+ * Auto's profile while the sim is paused and the camera has stopped: nothing moves, so frame time is free. Close-up
+ * detail goes to High's (hero cap `HERO_PAUSED_BOXES`, High's close-up reach and face budget, full render resolution).
+ * Shadows, LOD distances and the rest stay the rung's: switching them recompiles shaders and would stall the first
+ * frame after the user presses play or moves. Never lowers anything the rung already has.
+ */
+export function pausedDetailProfile(profile: QualityProfile): QualityProfile {
+  const high = QUALITY_PROFILES.high
+  return {
+    ...profile,
+    heroBoxes: Math.max(profile.heroBoxes, HERO_PAUSED_BOXES),
+    closeupDistanceM: Math.max(profile.closeupDistanceM, high.closeupDistanceM),
+    closeupFaceBudget: Math.max(profile.closeupFaceBudget, high.closeupFaceBudget),
+    resolutionScale: Math.max(profile.resolutionScale, high.resolutionScale),
+  }
+}
+
+/** Orbit (rotate) speed of the camera controls at `distanceM` from the target: 1 from 40 m out, falling to 0.35 close up, where a swipe would otherwise swing the view round too fast. */
+export function orbitSpeedFor(distanceM: number): number {
+  return Math.max(0.35, Math.min(1, distanceM / 40))
+}
+
 export function markStepForRung(rung: number): HeroMarkStep {
   return AUTO_RUNGS[clampRung(rung)].marks
 }
