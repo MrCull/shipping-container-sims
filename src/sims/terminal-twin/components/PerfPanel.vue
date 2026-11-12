@@ -139,8 +139,10 @@ const bench = useFrameBenchmark()
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
+  max-width: 100%;
 }
 
 .readout {

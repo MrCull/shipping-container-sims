@@ -8,6 +8,7 @@
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { applyPinchStep } from '../modules/pinchGesture'
 import { NO_OVERLAYS } from '../modules/overlays'
 import { pickEntity } from '../modules/picking'
 import { cameraMotion } from '../modules/shortcuts'
@@ -197,6 +198,40 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (id && store.controller()?.model?.vesselIds.includes(id)) void store.openBayViewer(id)
   }
 
+  // Two-finger gestures (phones): map-style pinch and pan from modules/pinchGesture, in place of OrbitControls' own,
+  // which slid the scene sideways while zooming. OrbitControls keeps one finger (orbit) and the mouse.
+  const touches = new Map<number, { x: number; y: number }>()
+  let pinchPrev: { mid: { x: number; y: number }; spread: number } | null = null
+  function pinchState(): { mid: { x: number; y: number }; spread: number } | null {
+    if (touches.size !== 2 || !renderer) return null
+    const rect = renderer.domElement.getBoundingClientRect()
+    const [a, b] = [...touches.values()]
+    return {
+      mid: { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top },
+      spread: Math.hypot(a.x - b.x, a.y - b.y),
+    }
+  }
+  function onTouchDown(e: PointerEvent): void {
+    if (e.pointerType !== 'touch') return
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    pinchPrev = pinchState()
+    if (touches.size >= 2) pressed = null // a two-finger gesture never selects
+  }
+  function onTouchMove(e: PointerEvent): void {
+    if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const now = pinchState()
+    if (!now || !pinchPrev || !camera || !controls || !renderer) return
+    const { clientWidth: w, clientHeight: h } = renderer.domElement
+    const ratio = pinchPrev.spread > 0 ? now.spread / pinchPrev.spread : 1
+    if (controls.enabled && applyPinchStep(camera, controls.target, pinchPrev.mid, now.mid, ratio, w, h, controls)) controls.update()
+    pinchPrev = now
+  }
+  function onTouchUp(e: PointerEvent): void {
+    if (!touches.delete(e.pointerId)) return
+    pinchPrev = pinchState()
+  }
+
   function rebuild(model: SceneModel | null): void {
     store.positional.update(ORIGIN, []) // the old scene's voices end with it
     view?.dispose()
@@ -314,6 +349,12 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         // between the fingers in place instead of heading for the middle of the canvas.
         controls.screenSpacePanning = false
         controls.zoomToCursor = true
+        // two fingers are handled by onTouch* below (an unknown TOUCH value leaves OrbitControls idle)
+        controls.touches.TWO = -1 as unknown as THREE.TOUCH
+        renderer.domElement.addEventListener('pointerdown', onTouchDown)
+        window.addEventListener('pointermove', onTouchMove)
+        window.addEventListener('pointerup', onTouchUp)
+        window.addEventListener('pointercancel', onTouchUp)
         renderer.domElement.addEventListener('pointerdown', onPointerDown)
         renderer.domElement.addEventListener('pointerup', onPointerUp)
         applyQuality()
@@ -372,6 +413,10 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     view?.dispose()
     renderer?.domElement.removeEventListener('pointerdown', onPointerDown)
     renderer?.domElement.removeEventListener('pointerup', onPointerUp)
+    renderer?.domElement.removeEventListener('pointerdown', onTouchDown)
+    window.removeEventListener('pointermove', onTouchMove)
+    window.removeEventListener('pointerup', onTouchUp)
+    window.removeEventListener('pointercancel', onTouchUp)
     controls?.dispose()
     renderer?.dispose()
     renderer?.domElement.remove()

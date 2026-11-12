@@ -7,11 +7,13 @@ import { fromLocalInputValue, simDate, toLocalInputValue } from '../modules/time
 import { t, type MessageKey } from '../i18n/messages'
 import { ROB_DISPLAY_MODES } from '../modules/colourBy'
 import PerfPanel from './PerfPanel.vue'
+import { useHudStore } from '../store/hudStore'
 import LocaleDateTimeInput from './LocaleDateTimeInput.vue'
 
 withDefaults(defineProps<{ showGraphics?: boolean }>(), { showGraphics: true })
 
 const store = useTwinStore()
+const hud = useHudStore()
 
 const clock = computed(() => store.fmt.clock(store.choice.startDateTime, store.displayTime))
 
@@ -118,7 +120,10 @@ async function submitRunTo(): Promise<void> {
         :title="t('topbar.achievedHint')"
       >{{ t('topbar.achieved', { speed: Math.round(store.achievedSpeed) }) }}</span>
 
-      <div class="actions">
+      <div
+        v-show="!hud.collapsed.topBar"
+        class="actions"
+      >
         <button
           class="action-btn"
           data-testid="tt-topbar-step"
@@ -236,6 +241,7 @@ async function submitRunTo(): Promise<void> {
       </div>
     </div>
     <div
+      v-show="!hud.collapsed.topBar"
       class="settings"
       role="group"
       :aria-label="t('topbar.settings')"
@@ -276,6 +282,17 @@ async function submitRunTo(): Promise<void> {
       </button>
       <PerfPanel v-if="showGraphics" />
     </div>
+    <button
+      type="button"
+      class="hud-pill topbar-toggle"
+      data-testid="tt-topbar-toggle"
+      :title="hud.collapsed.topBar ? t('hud.expandTopBar') : t('hud.collapseTopBar')"
+      :aria-label="hud.collapsed.topBar ? t('hud.expandTopBar') : t('hud.collapseTopBar')"
+      :aria-expanded="!hud.collapsed.topBar"
+      @click="hud.toggle('topBar')"
+    >
+      {{ hud.collapsed.topBar ? '▾' : '▴' }}
+    </button>
   </header>
 </template>
 
@@ -434,8 +451,57 @@ async function submitRunTo(): Promise<void> {
 .actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-left: auto;
+}
+
+.topbar-toggle {
+  flex: none;
+  align-self: flex-start;
+}
+
+/* Phones and narrow windows: everything wraps inside the screen width (an over-wide bar stretched the whole view,
+   and the 3D canvas with it, past the right edge of the screen). */
+@media (max-width: 720px) {
+  .tt-topbar {
+    flex-wrap: wrap;
+    padding: 0.4rem 3rem 0.4rem 0.5rem;
+  }
+
+  .tt-topbar-main {
+    flex-basis: 100%;
+  }
+
+  .topbar-toggle {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.5rem;
+  }
+
+  .clock {
+    min-width: 0;
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+
+  .speeds {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .speed-btn {
+    flex: none;
+  }
+
+  .actions {
+    margin-left: 0;
+  }
+
+  .settings {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .action-btn {

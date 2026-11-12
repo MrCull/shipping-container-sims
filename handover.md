@@ -8,12 +8,12 @@ A previous session (branch `claude/cool-clarke-qnzt4q`) ran out of credits befor
 
 | # | Request | State |
 |---|---|---|
-| 1 | Triage every `needs-triage` issue (#244, #245, #267) with enough detail for a weaker agent to implement | in progress (background agent) |
+| 1 | Triage every `needs-triage` issue (#244, #245, #267) with enough detail for a weaker agent to implement | done: #267 `ready-for-agent`; #244 tracks #268 to #272; #245 tracks #273 to #276 (#274 `ready-for-human`) |
 | 2 | Three container looks by distance: close-up hero, middle (close-up decal level, **missing the door locking bars**), far. The middle one stands out next to the others | todo |
 | 3 | Breakdown of hero cost (size and processing) per feature: bars, lettering, shape, weathering; where to cut with least visual loss. Owner: if wear/chipping is most of the cost, tone it down a lot | todo (earlier session measured chipped paint at about 90% of the lettering paint time) |
-| 4 | Phone pinch-zoom still slides right | todo (earlier session: OrbitControls scales its two-finger pan to a distant target) |
-| 5 | Easy way to hide/collapse the bottom overlay menu and the top stats labels | todo |
-| 6 | Phone page was 569 px wide on a 390 px screen (found by the earlier session) | todo |
+| 4 | Phone pinch-zoom still slides right | done: main cause was #6 (canvas 1,027 px wide on a 390 px phone, so its centre was off screen right). Also two fingers now use `modules/pinchGesture.ts` (zoom about the ground point under the fingers, the grabbed point follows them); OrbitControls keeps one finger and the mouse. Smoke `terminal-twin-phone.smoke.ts` fails on the old controls (31 m drift) |
+| 5 | Easy way to hide/collapse the bottom overlay menu and the top stats labels | done: `store/hudStore.ts`; a pill button on the top bar's controls row, the KPI strip and the overlay bar; H toggles all; remembered per viewer; all start collapsed below 720 px |
+| 6 | Phone page was too wide for a 390 px screen | done: top bar, actions and quality row wrap below 720 px; the speed buttons scroll sideways |
 
 Keep this table current after each step and push, so a cutoff loses nothing.
 
