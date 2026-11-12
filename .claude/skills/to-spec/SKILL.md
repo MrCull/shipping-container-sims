@@ -4,7 +4,7 @@ description: "Turn the current conversation into a spec and publish it to the pr
 disable-model-invocation: true
 ---
 
-This skill takes the current conversation context and codebase understanding and produces a spec. Do NOT interview the user; just synthesize what you already know.
+This skill takes the current conversation context and codebase understanding and produces a spec. Synthesize what you already know: the one question you put to the user is the seam check in step 2.
 
 The issue tracker and triage label vocabulary should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`.
 
@@ -16,7 +16,7 @@ The issue tracker and triage label vocabulary should have been provided to you. 
 
 Check with the user that these seams match their expectations.
 
-3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` triage label - no need for additional triage.
+3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` triage label - no need for additional triage. The spec stops at decisions: the ticket split belongs to `/to-tickets`, which publishes it as sub-issues.
 
 <spec-template>
 
