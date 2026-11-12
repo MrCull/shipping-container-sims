@@ -19,7 +19,7 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | #247 | Opt-in Blender install script for cloud sessions | none | merged in branch (a01e946) | |
 | #248 | Environment reflections and contact shadows | none | open | |
 | #249 | Far tier: stand-ins for fences, ASC rails and masts | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
-| #250 | Posing: boxes at rest are written only when their custody changes | #246 | open | |
+| #250 | Posing: boxes at rest are written only when their custody changes | #246 | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
 | #251 | Playback: even pacing with the achieved speed shown | #246 | open | |
 | #252 | Sweep-only invariant checks in the browser, "strict checks" switch | #246 | open | |
 | #253 | Worker reads only the entities an event names | #246 | open | |
@@ -39,11 +39,12 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 - **The ticket table inside spec #243 is stale.** It shows an earlier 16-ticket split with its own numbering. The sub-issues and this table are the real list.
 - **Ticket bodies exist only as issues.** Write each one to a scratchpad file before briefing an implementer (`docs/agents/implementing.md`, Frontier).
 - **No engine behaviour changes.** No event log, golden or hash may move in any ticket. If one does, the ticket has gone out of scope.
-- **#246 may reorder #251 to #253.** The claim that the engine sustains about 600 sim seconds per wall second on the full-scale TTI preset is an estimate from headless wall times. If the measurement differs much, say so on #243 before starting the playback tickets.
-- **A doc line to fix in #246:** the frame-rate guide says of the x3600 smoke spec "software GL reaches only 190 to 396". That figure came from a fixture too small to measure anything (#191); replace it with the measured rate.
+- **(Resolved, see the #243 comment: engine keeps up to x600, saturates at about 1,300 to 1,500; order kept.) #246 may reorder #251 to #253.** The claim that the engine sustains about 600 sim seconds per wall second on the full-scale TTI preset is an estimate from headless wall times. If the measurement differs much, say so on #243 before starting the playback tickets.
+- **(Done in #246.) A doc line to fix in #246:** the frame-rate guide says of the x3600 smoke spec "software GL reaches only 190 to 396". That figure came from a fixture too small to measure anything (#191); replace it with the measured rate.
 - **Caps and thresholds are provisional.** Hero caps come from #255's measured cost; Auto's thresholds stay provisional until #262.
 - **Outside this spec:** #244 (engine backlog after scale 1) and #245 (hero detail for equipment), both `needs-triage`. Leave them alone.
 
 ## Open points
 
 - **#247:** `scripts/install-bpy.sh` installs bpy into `$HOME/.cache/tt-bpy-venv` (last output line is the venv python). A full `tt:assets --check` over all 7 groups is byte-identical for every GLB and sidecar; 56 preview `.webp` files differ (Cycles on a different CPU), recorded in `assets-pipeline.md`. Use `--no-previews` for a models-only check.
+- **#246:** baseline `pnpm run tt:baseline` (heavy, about 3 min; run under `scripts/bg.sh run --heavy`). Overview posing 14.3 ms per frame, 9,895 boxes posed, 2,006,400 instance bytes per frame. Drawn-box reference: `tests/drawn-boxes.test.ts` + `drawn-boxes.reference.json` (regenerate only on purpose with `UPDATE_DRAWN_BOXES=1`); it takes about 45 s, close to the 60 s Vitest limit on a busy machine. A flat-out `run` compacts motion plans, so the reference feeds the model with `advance` steps of 900 s: a box in flight at T is posed from motion planned later (matters for #251, #253).
