@@ -233,7 +233,7 @@ export interface TwinAtmosphereState {
   positional: { voices: { key: string; gain: number }[] }
   banner: { kind: string; vesselName: string } | null
   /** The 3D view's lighting and backdrop; null without a 3D view. */
-  scene: { mode: string; daylight: number; shadows: boolean; masts: number; equipmentLights: number; backdrop: { kind: string; parts: string[]; models: string } } | null
+  scene: { mode: string; daylight: number; shadows: boolean; masts: number; equipmentLights: number; environment: boolean; environmentBuilds: number; backdrop: { kind: string; parts: string[]; models: string } } | null
 }
 
 export interface TwinUiState {

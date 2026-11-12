@@ -185,6 +185,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     view = new SceneRenderer(model)
     overlaysApplied = null
     view.setQuality(profileFor(perf.effective))
+    if (renderer) view.attachRenderer(renderer)
     lightingKey = ''
     aim(view.overviewTarget(), false, undefined, view.defaultCameraOffset())
   }
