@@ -102,6 +102,21 @@ history behind the display time (display time never goes back). Ingest details: 
 - **Colour by** is cached per box: static modes per mode, time-based modes per 30 sim s bucket (`COLOUR_BUCKET_S`),
   at most 4 000 recomputes per frame (`COLOUR_BUDGET_PER_FRAME`); the rest catch up over the next frames.
 
+### Hero level (#258)
+
+Above the close-up level, within `HERO_DISTANCE_M` (15 m, hysteresis 1.15) of the camera. `ContainerCloseups` forwards every
+`offer` to `HeroLevel` (`heroRenderer.ts`), so the instancer's offer loop is unchanged. Pure selection is
+`heroFaceSelection.ts`: exposed faces (a buried box has none), turned towards the camera, nearest first, at most
+`heroBoxes x 3` faces (`selectFaces` with hysteresis); the frustum test is the instancer's cull, and there is no line-of-sight
+test against other stacks or equipment. Each chosen face is one instance of its `hero-<size>-<kind>` model (the -Z side is the
+side model turned 180 degrees), instanced per (size, kind, part): draw calls are bounded by the kinds in use. The white paint
+takes livery or tint from the instance colour; wear (rust, scuffs) comes from the box's `wearFor` seed (per-instance detail map
+offset and amount), so a box looks the same at every zoom and after a rewind. The plain box and the close-up decals stay under
+and over it (polygon offset -1 against the decals' -2; hero markings are #260). Models are fetched the first time a face of
+that size and kind is chosen (`heroAssets.ts`, the only non-dev file that names `models/hero`); until they arrive the close-up
+level shows, and `onReady` marks the close-up pass dirty so a still camera redraws. Low draws none and requests none.
+`stats.heroFaces` (also `__tt.perf().stats`) counts faces drawn. Preparation time-slicing, fade-in and the camera gate are #259.
+
 ### Close-up markings (#119, #143)
 
 Markings are drawn per visible face, not per box, on every quality level (#158).
@@ -311,6 +326,7 @@ top is clipped over every open bay (needed so a crane never works under a solid 
 | `shadows` / `shadowMapSize` | off / 512 | on / 1024 | on / 2048 | `useTwinScene.applyQuality`, `AtmosphereRig.setQuality` |
 | `lod0DistanceM` / `lod0Cap` | 40 / 60 | 90 / 180 | 140 / 300 | `ContainerInstancer.setLodOptions` |
 | `closeupDistanceM` / `closeupFaceBudget` | 18 / 48 | 25 / 120 | 35 / 400 | same |
+| `heroBoxes` | 0 | 12 | 32 | `HeroLevel.setLimits` via `SceneRenderer.setQuality`: boxes' worth of hero faces (x3 faces; #258) |
 | `lodScale` | 0.4 | 0.7 | 1 | `KindFrame.lodScale` (STS, SHC, ASC) |
 | `resolutionScale` | 0.65 | 0.85 | 1 | pixel ratio |
 | `oceanSegments` | 1 (flat Lambert quad) | 24 | 96 (standard material, 0.18 m swell) | `SceneRenderer.setOceanDetail` |

@@ -63,7 +63,7 @@ export function loadGltf(url: string): Promise<GLTF> {
 }
 
 /** Float32, non-quantised copy of the attributes we render with. */
-function toFloatGeometry(src: THREE.BufferGeometry): THREE.BufferGeometry {
+export function toFloatGeometry(src: THREE.BufferGeometry): THREE.BufferGeometry {
   const out = new THREE.BufferGeometry()
   for (const name of ['position', 'normal', 'uv', 'uv1']) {
     const a = src.getAttribute(name)

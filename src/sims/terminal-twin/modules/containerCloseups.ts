@@ -19,6 +19,7 @@ import { CORRUGATION_PITCH_M } from './closeupGeometry'
 import { selectFaces, type FaceCandidate } from './closeupFaceBudget'
 import { canvasAtlasBackend, sharedContainerMaps } from './containerTextures'
 import { FACES, visibleFaceList, type ExposedFaces, type Face } from './exposedFaces'
+import type { HeroLevel } from './heroRenderer'
 
 /** What a close-up box is painted from. */
 export interface CloseupSource {
@@ -77,7 +78,7 @@ const FACE_QUAT: Record<Exclude<Face, 'bottom'>, THREE.Quaternion> = {
 }
 
 /** Face centre (box frame, origin at the bottom centre), outward normal and size in metres. */
-function faceFrame(face: Exclude<Face, 'bottom'>, size: ContainerSize): { c: [number, number, number]; n: [number, number, number]; w: number; h: number } {
+export function faceFrame(face: Exclude<Face, 'bottom'>, size: ContainerSize): { c: [number, number, number]; n: [number, number, number]; w: number; h: number } {
   const { length: L, height: H, width: W } = DIMS[size]
   switch (face) {
     case 'sideP':
@@ -146,6 +147,8 @@ export class ContainerCloseups {
   private offers: Offer[] = []
   private offerOf = new Map<number, number>()
   private candidates: FaceCandidate[] = []
+  /** The hero level above this one (#258): offered the same boxes, draws over the faces it takes. */
+  private hero: HeroLevel | null = null
   private maps: { normal: THREE.Texture; roughness: THREE.Texture } | null | undefined
   private quad: THREE.BufferGeometry | null = null
   private readonly q = new THREE.Quaternion()
@@ -160,6 +163,12 @@ export class ContainerCloseups {
     this.group.name = 'containers-closeup'
   }
 
+  setHero(hero: HeroLevel | null): void {
+    if (this.hero) this.group.remove(this.hero.group)
+    this.hero = hero
+    if (hero) this.group.add(hero.group)
+  }
+
   setLimits(next: Partial<CloseupLimits>): void {
     Object.assign(this.limits, next)
   }
@@ -170,6 +179,7 @@ export class ContainerCloseups {
     this.offers.length = 0
     this.offerOf.clear()
     this.candidates.length = 0
+    this.hero?.begin(camera)
   }
 
   /**
@@ -177,6 +187,7 @@ export class ContainerCloseups {
    * from the camera are dropped here. `source` is called only when a face needs painting.
    */
   offer(key: number, size: ContainerSize, x: number, y: number, z: number, yaw: number, faces: ExposedFaces, source: () => CloseupSource, tint = -1): void {
+    this.hero?.offer(key, size, x, y, z, yaw, faces, source, tint)
     if (this.limits.budget <= 0) return
     const idx = this.offers.length
     this.offers.push({ key, size, x, y, z, yaw, source, tint })
@@ -202,6 +213,7 @@ export class ContainerCloseups {
 
   /** Picks the faces within the budget, paints the new ones and writes the instances. */
   end(): void {
+    this.hero?.end()
     const { budget, distanceM, hysteresis } = this.limits
     for (const kind of Object.keys(this.pages) as Kind[]) for (const page of this.pages[kind]) page.mesh.count = 0
     this.faceCount = 0
@@ -377,6 +389,11 @@ export class ContainerCloseups {
     return this.faceCount
   }
 
+  /** Hero faces drawn in the last frame (#258). */
+  get heroFaces(): number {
+    return this.hero?.faces ?? 0
+  }
+
   /** Painted tiles held (drawn or cached). */
   get cached(): number {
     return this.slots.size
@@ -386,10 +403,12 @@ export class ContainerCloseups {
   cost(): { drawCalls: number; triangles: number } {
     let drawCalls = 0
     for (const kind of Object.keys(this.pages) as Kind[]) for (const page of this.pages[kind]) if (page.mesh.count > 0) drawCalls++
-    return { drawCalls, triangles: this.faceCount * 2 }
+    const h = this.hero?.cost() ?? { drawCalls: 0, triangles: 0 }
+    return { drawCalls: drawCalls + h.drawCalls, triangles: this.faceCount * 2 + h.triangles }
   }
 
   dispose(): void {
+    this.hero?.dispose()
     for (const kind of Object.keys(this.pages) as Kind[]) {
       for (const page of this.pages[kind]) {
         this.group.remove(page.mesh)

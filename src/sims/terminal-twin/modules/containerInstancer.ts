@@ -25,6 +25,7 @@ import { liveryBodyColour, LIVERY_ATLAS, type ContainerAssets } from './containe
 import { CONTAINER_DIMS } from './sceneModel'
 import { patchContactShadow } from './contactShadow'
 import { ContainerCloseups, type CloseupSource } from './containerCloseups'
+import type { HeroLevel } from './heroRenderer'
 import { exposedFaces, neighboursOf, type ExposedFaces, type PlacedBox } from './exposedFaces'
 
 /** Cell of the grid that finds a yard box's neighbours (a 40 ft box and its gap fit in one). */
@@ -62,6 +63,8 @@ export interface ContainerRenderStats {
   closeup: number
   /** Close-up marking faces drawn (never above the face budget). */
   closeupFaces: number
+  /** Hero faces drawn (#258; never above the quality level's hero cap). */
+  heroFaces: number
   /** Boxes outside the camera frustum, not written to the GPU (0 without a frustum). */
   culled: number
   /** Bytes the container instance buffers (matrix, livery index, colour) hand to the GPU upload this frame (#246): each buffer flagged for upload counts in full, or only its update ranges once a buffer uses them. Close-up faces are not included. */
@@ -154,7 +157,7 @@ export class ContainerInstancer {
   private immediate = false
   private stamp = 0
   private stampOf: number[] = []
-  private lastStats: ContainerRenderStats = { drawn: 0, posed: 0, lod0: 0, lod1: 0, closeup: 0, closeupFaces: 0, culled: 0, instanceBytes: 0, assets: 'placeholder' }
+  private lastStats: ContainerRenderStats = { drawn: 0, posed: 0, lod0: 0, lod1: 0, closeup: 0, closeupFaces: 0, heroFaces: 0, culled: 0, instanceBytes: 0, assets: 'placeholder' }
   private readonly matrix = new THREE.Matrix4()
   private readonly colour = new THREE.Color()
   /** Linear colour of the generic livery's body: a tint is divided by it, so the grey tile multiplied by the instance colour comes out as the tint. */
@@ -344,6 +347,12 @@ export class ContainerInstancer {
     return dx * dx + dy * dy + dz * dz <= this.reach2()
   }
 
+  /** Attaches the hero level (#258) to the close-up level's offers. */
+  setHero(hero: HeroLevel | null): void {
+    this.closeups.setHero(hero)
+    if (hero) hero.onReady = () => (this.closeupDirty = true)
+  }
+
   /** What a close-up box is painted from, by the key given to `push` (without one there are no close-ups). */
   setMarkingsSource(source: (key: number) => CloseupSource): void {
     this.markingsSource = source
@@ -461,7 +470,7 @@ export class ContainerInstancer {
       }
     })
     if (this.recording) this.recordAll()
-    this.lastStats = { drawn: this.count, posed: this.posed, lod0: this.lastLod0, lod1: this.count - this.lastLod0, closeup: this.closeups.count, closeupFaces: this.closeups.faces, culled: this.lastCulled, instanceBytes, assets: this.lods ? 'loaded' : 'placeholder' }
+    this.lastStats = { drawn: this.count, posed: this.posed, lod0: this.lastLod0, lod1: this.count - this.lastLod0, closeup: this.closeups.count, closeupFaces: this.closeups.faces, heroFaces: this.closeups.heroFaces, culled: this.lastCulled, instanceBytes, assets: this.lods ? 'loaded' : 'placeholder' }
     this.posed = 0
     return this.lastStats
   }

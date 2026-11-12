@@ -40,6 +40,8 @@ export interface PerfStats {
   closeup: number
   /** Close-up marking faces currently drawn (#143), never above the quality level's face budget. */
   closeupFaces: number
+  /** Hero faces currently drawn (#258), never above the quality level's hero cap. */
+  heroFaces: number
   /** Container boxes posed in the last frame (every box with a pose, visible or not) (#246). */
   boxesPosed: number
   /** Bytes the container instance buffers hand to the GPU upload in the last frame (#246). */
@@ -52,7 +54,7 @@ export const usePerfStore = defineStore('terminal-twin-perf', () => {
   /** The level in force: the fixed setting, or what Auto currently picked. */
   const effective = ref<QualityLevel>(setting.value === 'auto' ? 'high' : setting.value)
   const overlayVisible = ref(read(KEY_OVERLAY) === '1')
-  const stats = ref<PerfStats>({ fps: 0, calls: 0, triangles: 0, cpuMs: 0, poseMs: 0, closeup: 0, closeupFaces: 0, boxesPosed: 0, instanceBytes: 0 })
+  const stats = ref<PerfStats>({ fps: 0, calls: 0, triangles: 0, cpuMs: 0, poseMs: 0, closeup: 0, closeupFaces: 0, heroFaces: 0, boxesPosed: 0, instanceBytes: 0 })
   /** How many times Auto changed the level (dev API / tests). */
   const autoChanges = ref(0)
   /** Dev only: busy-wait this many ms every frame, to prove Auto steps down and recovers. */

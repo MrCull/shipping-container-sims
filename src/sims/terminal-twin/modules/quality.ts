@@ -31,6 +31,8 @@ export interface QualityProfile {
   closeupDistanceM: number
   /** Close-up marking faces drawn at most (#143; 0 = off, which no level uses). */
   closeupFaceBudget: number
+  /** Hero level (#258): boxes' worth of hero faces drawn at most (3 faces each; `heroCaps` in budgets.json), 0 on Low. */
+  heroBoxes: number
   /** Multiplier on the LOD switch distances of the cranes and carriers (STS, SHC, ASC): below 1 they drop to cheaper LODs sooner. */
   lodScale: number
   /** Multiplier on the device pixel ratio (render resolution), before the cap of 2. */
@@ -47,9 +49,9 @@ export interface QualityProfile {
 }
 
 export const QUALITY_PROFILES: Readonly<Record<QualityLevel, QualityProfile>> = {
-  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
-  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
-  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
+  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, heroBoxes: 0, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
+  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, heroBoxes: 12, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
+  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, heroBoxes: 32, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
 }
 
 export const profileFor = (level: QualityLevel): QualityProfile => QUALITY_PROFILES[level]

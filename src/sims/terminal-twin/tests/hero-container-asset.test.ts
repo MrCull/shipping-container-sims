@@ -69,7 +69,7 @@ describe('hero container faces', () => {
     }
   })
 
-  it('is not referenced at page load: only the dev viewer and tests mention the hero models', () => {
+  it('is not referenced at page load: only the lazy hero loader (heroAssets.ts), the dev viewer and tests mention the hero models', () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..')
     const offenders: string[] = []
     const walk = (dir: string) => {
@@ -78,7 +78,7 @@ describe('hero container faces', () => {
         if (e.isDirectory()) {
           if (['assets', 'tests', 'dev', 'docs', 'node_modules'].includes(e.name)) continue
           walk(p)
-        } else if (/\.(ts|vue)$/.test(e.name) && /models\/hero/.test(readFileSync(p, 'utf8'))) offenders.push(p)
+        } else if (e.name !== 'heroAssets.ts' && /\.(ts|vue)$/.test(e.name) && /models\/hero/.test(readFileSync(p, 'utf8'))) offenders.push(p)
       }
     }
     walk(root)

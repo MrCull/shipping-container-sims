@@ -23,6 +23,7 @@ import { NO_OVERLAYS, type OverlayState } from './overlays'
 
 export type { OverlayState }
 import { ContainerCloseups } from './containerCloseups'
+import { HeroLevel } from './heroRenderer'
 import { ContainerInstancer, type DrawnBox } from './containerInstancer'
 import { describeMarkings } from './containerMarkings'
 import { colourContextOf, colourOf, DEFAULT_COLOUR_BY, DEFAULT_ROB_DISPLAY, hexToInt, isTimeBased, type ColourBy, type ColourContext, type RobDisplay } from './colourBy'
@@ -76,7 +77,7 @@ export interface SceneStats {
   /** Occupancy and label overlay counts (zeros while those overlays are off). */
   layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
-  containerLods: { lod0: number; lod1: number; closeup: number; closeupFaces: number; culled: number }
+  containerLods: { lod0: number; lod1: number; closeup: number; closeupFaces: number; heroFaces: number; culled: number }
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -123,6 +124,8 @@ const HARBOUR_SOURCE: SoundSource = { id: 'harbour', machine: 'harbour', x: 0, y
 export class SceneRenderer {
   readonly scene = new THREE.Scene()
   private containers: ContainerInstancer
+  /** The hero level (#258): drawn over the close-up level; its cap comes from the quality profile. */
+  private readonly hero = new HeroLevel()
   private containerLivery: number[]
   /** Colour by (#130): the mode, the facts its legend needs, and per box the tint drawn (0xRRGGBB, -1 = livery) with the epoch and time bucket it was computed for. */
   private colourBy: ColourBy = DEFAULT_COLOUR_BY
@@ -217,6 +220,7 @@ export class SceneRenderer {
       for (const size of ['20', '40', '40HC'] as const) capacity[size] = (capacity[size] ?? 0) + extra
     }
     this.containers = new ContainerInstancer(capacity, {}, options.closeups)
+    this.containers.setHero(this.hero)
     this.containers.setMarkingsSource((i) => {
       const id = model.containerIds[i]
       const d = model.containerDetail[id]
@@ -461,6 +465,7 @@ export class SceneRenderer {
     this.atmosphere.setQuality(profile)
     setContactShadows(profile.contactShadows)
     this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap, closeupDistanceM: profile.closeupDistanceM, closeupFaceBudget: profile.closeupFaceBudget })
+    this.hero.setLimits({ boxes: profile.heroBoxes })
     this.setOceanDetail(profile.oceanSegments)
   }
 
@@ -706,6 +711,11 @@ export class SceneRenderer {
     return this.containers.stats().closeupFaces
   }
 
+  /** Hero faces drawn last frame (#258). */
+  heroFaceCount(): number {
+    return this.containers.stats().heroFaces
+  }
+
   /** Sound sources of the last frame (machine positions and motion states) for the sound mixer. */
   soundSources(): readonly SoundSource[] {
     return this.sounds
@@ -743,7 +753,7 @@ export class SceneRenderer {
       reservedZones: this.reservedZones,
       reservedRailSegments: this.reservedRailSegments,
       layers: this.layers.stats(),
-      containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, closeupFaces: c.closeupFaces, culled: c.culled },
+      containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, closeupFaces: c.closeupFaces, heroFaces: c.heroFaces, culled: c.culled },
       containerAssets: c.assets,
     } as SceneStats
   }
