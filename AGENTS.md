@@ -18,7 +18,7 @@ Before handing work back after code changes, run **`pnpm run verify`** (dependen
 
 ## Agent tooling
 
-- **Cloud sessions:** a SessionStart hook (`.claude/hooks/session-start.sh`) runs `pnpm install`; it does nothing locally.
+- **Cloud sessions:** a SessionStart hook (`.claude/hooks/session-start.sh`) runs `pnpm install` and sets `core.hooksPath` to `.githooks` (its `commit-msg` rejects a `Co-Authored-By` trailer); it does nothing locally.
 - **Blender in cloud sessions:** opt-in `scripts/install-bpy.sh` (once; idempotent) installs the pinned `bpy` into `$HOME/.cache/tt-bpy-venv` and prints its python path for `pnpm run tt:assets --python <path>`; the session-start hook does not. Details: Terminal Twin `docs/assets-pipeline.md`.
 - **Visual checks:** `pnpm run screenshot --path /sim/<sim-id> --wait 8000` saves a PNG to `.screenshots/` and reports page errors (headless Chromium, software WebGL, so no real frame rates). Options: header of `scripts/screenshot.mjs`.
 - **README media:** `pnpm run capture-readme-media` (after `pnpm run build && pnpm run preview`).

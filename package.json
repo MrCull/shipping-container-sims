@@ -12,7 +12,7 @@
     "screenshot": "node scripts/screenshot.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "verify": "node scripts/check-deps.mjs && node scripts/check-tracked-files.mjs && node scripts/check-no-em-dash.mjs && node scripts/check-commit-trailers.mjs && pnpm run lint && pnpm run build && pnpm test",
+    "verify": "node scripts/check-deps.mjs && node scripts/check-tracked-files.mjs && node scripts/check-no-em-dash.mjs && node scripts/check-commit-trailers.mjs && node scripts/check-no-quarantine.mjs && pnpm run lint && pnpm run build && pnpm test",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:related": "bash scripts/test-related.sh",
