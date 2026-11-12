@@ -4,6 +4,7 @@ For the next agent. Read this file, then spec [#243](https://github.com/MrCull/s
 
 ## Status (2026-11-12, `main` at 8713553)
 
+- **All agent tickets except #263 are merged** (#262 is the owner's).
 - **Integration branch:** `claude/practical-cerf-asprbc` (orchestrator session https://claude.ai/code/session_0155BNjyJ45Cnu5X19SbvEUH). Implementers run on Sonnet, two at a time.
 - **Start here:** #246, #247, #248 and #249 have no blockers. #246 comes first in practice: it records the baseline and adds the counters and the reference test that #250 to #254 are judged against.
 - **No real GPU for the first few days** (owner, 2026-11-11). Every ticket except #262 is accepted on counts and ratios that software WebGL measures faithfully. Never judge frame rate from the headless browsers.
@@ -32,7 +33,7 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | #260 | Sharp markings on hero faces | #259 | merged in branch (71bad0d) | |
 | #261 | Auto quality works from frame time and sheds in a fixed ladder | #259, #260 | merged in branch (c0d0e19) | |
 | #262 | Run the benchmark on the laptop, record the numbers, retune Auto (`ready-for-human`) | #254, #261, #257, #249, #256 | open | |
-| #263 | Run the browser smoke suite and fix regressions | #246 to #261 | open | |
+| #263 | Run the browser smoke suite and fix regressions | #246 to #261 | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
 
 ## Things the tickets do not say
 
@@ -60,3 +61,4 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 - **#253:** `worker/engineHost.ts` `observe` reads only the STS, SHC, ASC and vessels an event names, plus a `WAKES` table (in `browser-host.md`) for events that change unnamed equipment; a full read at each request end is the safety net. `createEngineHost({ fullScan: true })` and `missedByEvents()` are test seams; `host-named-entities.test.ts` proves identical deltas (TTI to 7,200 s only). In-process worker time 12 to 24 % lower; the browser `tt:baseline` run was too noisy to show it (re-measure idle in #262). A new event type changing unnamed equipment must be added to `WAKES`.
 - **#254:** Benchmark button in the perf panel (production build, no console): `modules/frameBenchmark.ts` plans 20 stages (5 views at Low, Medium, High at x60, plus x60 to x3600 at overview on High), `composables/useFrameBenchmark.ts` runs TTI baseline to 7,200 s then the tour (about 5 to 6 min) and downloads one JSON (fps, frame-time p50/p95/p99/max, poseMs, cpuMs, draw calls, triangles, boxes posed, heroFaces, achievedSpeed; machine and build header). `?benchmark=quick` for the prod smoke spec. Record results in `docs/benchmarks/` plus one line in frame-rate.md Recorded numbers (for #262). `TwinView.setCameraPose` added.
 - **#261:** Auto ladder in `modules/quality.ts`: 8 rungs (`AUTO_RUNGS`: hero-full, hero-half, hero-quarter, hero-marks-standard, hero-off, shadows-resolution, medium, low); manual levels pin a rung (High 0, Medium 6, Low 7). Marking resolution sheds before hero-off (deviation from the ticket order, documented). One-second windows judged on median and slow-frame share; PROVISIONAL thresholds for #262: median 22.2 ms down / 17.5 ms up, slow share 10 % down / 2 % up, 4 windows down / 8 up. `perf().rung`, `rungName`, `__tt.setAutoRung(n)`, overlay row `tt-perf-rung`. Fixed: `HeroLevel.setLimits` now marks the close-up pass dirty (a still camera lagged one rung).
+- **#256:** far atlas `livery-atlas-far.webp` (1024 px, same 2x6 layout as the near atlas, enlarged wordmark, 1.2 m rib shading, no owner code; Blender `liveries.py#render_atlas(far=True)`, `far` entry in `livery-atlas.json`). `liveryMaterial(..., farMap)` blends near to far per pixel over 65 to 100 m (`FAR_ATLAS_BLEND_M`), no hard switch; not quality-gated. Draw calls and triangles unchanged; one extra texture sample per fragment (frame-time cost for #262). Yard-view change is modest: at about 500 m a box is a few pixels.
