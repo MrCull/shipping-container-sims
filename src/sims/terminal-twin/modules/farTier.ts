@@ -2,7 +2,7 @@
  * Far tier of the infrastructure (#249, spec #243): beyond a distance, yard fences, ASC rails and high masts are drawn
  * as 12-triangle stand-ins instead of their GLB geometry (264, 48 and 284 triangles). They were about 680k triangles
  * of the TTI overview. The stand-in is generated in code from the real geometry: its bounding box, with the UV of the
- * source's largest triangle, so it samples the same atlas swatch (same colour, same shared material, no extra texture).
+ * source's largest upward-facing triangle, so it samples the same atlas swatch (same colour, same shared material, no extra texture).
  * The switch is per instance, with a hysteresis band, so a near instance never flickers at the boundary and nothing
  * near the camera changes. No cross-fade: at the switch distances (250 to 400 m) the box covers the same footprint as
  * the source to within a few pixels, so the swap is not visible as a pop (screenshots in docs/prototypes/249).
@@ -28,12 +28,24 @@ export const FAR_TIER: readonly FarTierSpec[] = [
 /** A camera that moved less than this (m) since the last selection cannot flip an instance worth redrawing. */
 const MOVE_EPSILON_M = 2
 
-/** A 12-triangle box around `source`, UVs from its largest triangle. */
+/** The stand-in's footprint is that of the source below this share of its height. */
+const SHAFT_FRACTION = 0.6
+
+/** A 12-triangle box as tall as `source` with the footprint of its lower part, UVs from its largest upward-facing triangle. */
 export function standInGeometry(source: THREE.BufferGeometry): THREE.BufferGeometry {
   source.computeBoundingBox()
   const b = source.boundingBox!
-  const size = b.getSize(new THREE.Vector3())
-  const centre = b.getCenter(new THREE.Vector3())
+  // Footprint from the lower part only: a mast's lamp head would otherwise fatten the whole pole into a block.
+  const shaft = new THREE.Box3()
+  const pos = source.getAttribute('position')
+  const pt = new THREE.Vector3()
+  const cutY = b.min.y + (b.max.y - b.min.y) * SHAFT_FRACTION
+  for (let i = 0; i < pos.count; i++) {
+    pt.fromBufferAttribute(pos, i)
+    if (pt.y <= cutY) shaft.expandByPoint(pt)
+  }
+  const size = new THREE.Vector3(shaft.max.x - shaft.min.x, b.max.y - b.min.y, shaft.max.z - shaft.min.z)
+  const centre = new THREE.Vector3((shaft.min.x + shaft.max.x) / 2, (b.min.y + b.max.y) / 2, (shaft.min.z + shaft.max.z) / 2)
   const box = new THREE.BoxGeometry(Math.max(size.x, 0.01), Math.max(size.y, 0.01), Math.max(size.z, 0.01))
   box.translate(centre.x, centre.y, centre.z)
   const [u, v] = dominantUv(source)
@@ -63,7 +75,9 @@ function dominantUv(g: THREE.BufferGeometry): [number, number] {
     a.fromBufferAttribute(pos, i0)
     b.fromBufferAttribute(pos, i1).sub(a)
     c.fromBufferAttribute(pos, i2).sub(a)
-    const area = b.cross(c).length()
+    const n = b.cross(c)
+    // seen from above at overview: only upward faces count (a rail's dark sides must not colour its top)
+    const area = n.y > 0 ? n.length() : 0
     if (area > best) {
       best = area
       bu = (uv.getX(i0) + uv.getX(i1) + uv.getX(i2)) / 3

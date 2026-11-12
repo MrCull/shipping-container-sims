@@ -288,7 +288,7 @@ top is clipped over every open bay (needed so a crane never works under a solid 
   and beside the outermost blocks, never inside a block footprint (`BLOCK_FOOTPRINT_HALF_X_M`): a block's centre line is
   where its ASCs travel. `tests/infrastructure.test.ts` asserts this for every preset and fixture.
 - **Far tier (#249):** `modules/farTier.ts`. Yard fences, ASC rails and masts (`FAR_TIER`: 220, 220 and 350 m) draw as
-  12-triangle box stand-ins (`standInGeometry`: the source's bounding box, UV of its largest triangle, so the same atlas
+  12-triangle box stand-ins (`standInGeometry`: the source's bounding box, UV of its largest upward-facing triangle, footprint of its lower 60 %, so the same atlas
   swatch and the same material) beyond that 3D distance from the camera. The choice is per instance (`FarTierSelector`,
   hysteresis 30 to 40 m, recomputed only after the camera moves 2 m), done in `InfrastructureScene.update(cameraPosition)`
   each frame: each tiered key has a near mesh and a far mesh, and an instance sits in exactly one. A mesh with no instances

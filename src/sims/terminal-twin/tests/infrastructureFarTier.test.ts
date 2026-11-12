@@ -16,7 +16,7 @@ const tti = presets[TTI_PRESET_NAME]()
 const input: InfraLayoutInput = { config: tti, landside: buildLandsideGraph(tti), pads: wtpPadLayout(tti), blocks: blockSpecs(tti) }
 
 describe('standInGeometry', () => {
-  it('is a 12-triangle box of the same bounds, with UVs taken from the source', () => {
+  it('is a 12-triangle box as tall as the source, with the footprint of its lower part, and UVs from the source', () => {
     const src = new THREE.CylinderGeometry(0.2, 0.3, 10, 16).translate(1, 5, 2)
     const g = standInGeometry(src)
     expect(g.index!.count / 3).toBe(12)
@@ -25,6 +25,7 @@ describe('standInGeometry', () => {
     expect(g.boundingBox!.min.x).toBeCloseTo(src.boundingBox!.min.x, 5)
     expect(g.boundingBox!.max.y).toBeCloseTo(src.boundingBox!.max.y, 5)
     expect(g.boundingBox!.max.z).toBeCloseTo(src.boundingBox!.max.z, 5)
+    expect(g.boundingBox!.max.x - g.boundingBox!.min.x).toBeLessThan(0.7) // the pole, not a block
     expect(g.getAttribute('uv').count).toBe(g.getAttribute('position').count)
   })
 })
