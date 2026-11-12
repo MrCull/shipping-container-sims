@@ -904,6 +904,8 @@ export class SceneModel {
   /** Set by `containerPose`: 0 = the box may be moving (carried, on a truck), 1 = at rest until its custody changes, 2 = on a vessel (`poseVessel`), at rest until that vessel's placement changes. */
   poseRest: 0 | 1 | 2 = 0
   poseVessel = ''
+  /** Set by `containerPose` with the custody owner it posed from (null when the box has no custody yet): the renderer reads it instead of a second `custodyAt` lookup (#257). */
+  poseOwner: CustodyRef | null = null
 
   /** Poses of stacked boxes by `${slotId}|${size}` (read-only; shared between frames). */
   private readonly yardPoses = new Map<string, ContainerPose>()
@@ -953,8 +955,10 @@ export class SceneModel {
     const list = this.custody[containerId] ?? []
     const i = lastAtOrBefore(list, time, (e) => e.t)
     this.poseRest = 1 // no custody yet: its first entry is in the change log
+    this.poseOwner = null
     if (i < 0) return null
     const entry = list[i]
+    this.poseOwner = entry.owner
     const dims = CONTAINER_DIMS[this.containerSize[containerId]]
     const { kind, id } = entry.owner
     const alongZ = Math.PI / 2

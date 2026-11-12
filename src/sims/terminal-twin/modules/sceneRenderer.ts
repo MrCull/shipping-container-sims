@@ -112,6 +112,11 @@ const COLOUR_BUCKET_S = 30
 /** ...and at most this many boxes per frame, so a flat-out clock never spends a frame on colours (the rest catch up over the next frames). */
 const COLOUR_BUDGET_PER_FRAME = 4000
 
+/** Posing cull (#257): a box carried or driven is never faster than this (m/s; trucks run 8, cranes less), so a box out of view is posed again only once it could have travelled into it. */
+const MAX_BOX_SPEED_MS = 20
+/** Extra reach (m) around a moving box's cached position before it may be skipped: a spreader hangs a few metres above its box, and the box must be posed whenever its spreader is in view. */
+const POSE_CULL_SLACK_M = 20
+
 /** The scene's ambience (gulls, water, wind): not a machine, the same level everywhere. */
 const HARBOUR_SOURCE: SoundSource = { id: 'harbour', machine: 'harbour', x: 0, y: 0, z: 0, motion: 'idle' }
 
@@ -127,6 +132,8 @@ export class SceneRenderer {
   private posedCount = 0
   private posedEpoch = -1
   private readonly moving = new Set<number>()
+  /** Sim time each moving box was last posed at (#257). */
+  private readonly posedAt: number[] = []
   private readonly vesselBoxes = new Map<string, Set<number>>()
   private readonly boxVessel: (string | undefined)[] = []
   private readonly vesselSig = new Map<string, string>()
@@ -547,7 +554,15 @@ export class SceneRenderer {
       this.vesselSig.clear()
     } else {
       const set = new Set<number>(model.custodyChanges(this.posedT as number, t, this.posedSeq))
-      for (const i of this.moving) set.add(i)
+      for (const i of this.moving) {
+        if (set.has(i) || !frustum || ids[i] === selectedId) {
+          set.add(i)
+          continue
+        }
+        // a moving box out of view, and too far from the view to have reached it since it was last posed, is not posed (its cached position stays)
+        const reach = POSE_CULL_SLACK_M + MAX_BOX_SPEED_MS * Math.abs(t - (this.posedAt[i] ?? t))
+        if (containers.nearFrustum(i, frustum, reach)) set.add(i)
+      }
       for (let i = this.posedCount; i < ids.length; i++) set.add(i)
       for (const v of model.vesselIds) {
         const p = model.vesselPlacement(v, t)
@@ -567,8 +582,10 @@ export class SceneRenderer {
       const id = ids[i]
       const c = model.containerPose(id, t)
       const rest = model.poseRest
-      if (rest === 0) this.moving.add(i)
-      else this.moving.delete(i)
+      if (rest === 0) {
+        this.moving.add(i)
+        this.posedAt[i] = t
+      } else this.moving.delete(i)
       const was = this.boxVessel[i]
       const now = rest === 2 ? model.poseVessel : undefined
       if (was !== now) {
@@ -588,7 +605,7 @@ export class SceneRenderer {
       containers.set(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget), c.yard === true)
       if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
       if (wantsOwners && rest === 0) {
-        const owner = model.custodyAt(id, t)
+        const owner = model.poseOwner // set by the pose above: no second custody lookup (#257)
         if (owner) {
           const key = `${owner.kind}:${owner.id}`
           const l = loads.get(key)
