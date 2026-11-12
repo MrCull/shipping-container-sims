@@ -178,3 +178,33 @@ test('a departure shows a banner that does not block clicks', async ({ page }) =
   })
   expect(blocked).toBe(false)
 })
+
+test('sky reflections are built once per lighting mode, never per frame, and Low draws none (#248)', async ({ page }) => {
+  await open(page, TRACER, '2026-10-26T13:00:00.000Z')
+  await page.evaluate(() => window.__tt!.setQuality('high'))
+  await expect.poll(async () => (await atmosphere(page)).scene?.environment).toBe(true)
+  expect((await atmosphere(page)).scene!.environmentBuilds).toBe(1)
+  // many frames later nothing was rebuilt
+  const f0 = (await page.evaluate(() => window.__tt!.scene()))!.frames
+  await page.waitForFunction((n) => window.__tt!.scene()!.frames > n + 20, f0)
+  expect((await atmosphere(page)).scene!.environmentBuilds).toBe(1)
+
+  // Low draws none; back to Medium reuses the day environment (no rebuild)
+  await page.evaluate(() => window.__tt!.setQuality('low'))
+  await expect.poll(async () => (await atmosphere(page)).scene?.environment).toBe(false)
+  await page.evaluate(() => window.__tt!.setQuality('medium'))
+  await expect.poll(async () => (await atmosphere(page)).scene?.environment).toBe(true)
+  expect((await atmosphere(page)).scene!.environmentBuilds).toBe(1)
+})
+
+test('the sky environment follows night: one more build, no shadow pass (#248)', async ({ page }) => {
+  await open(page, TRACER, '2026-10-26T02:00:00.000Z')
+  await page.evaluate(() => window.__tt!.setQuality('high'))
+  await expect.poll(async () => (await atmosphere(page)).scene?.environment).toBe(true)
+  expect((await atmosphere(page)).scene!.mode).toBe('day') // every launch starts locked to daylight
+  await followClock(page)
+  await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('night')
+  const a = (await atmosphere(page)).scene!
+  expect(a.environment).toBe(true)
+  expect(a.environmentBuilds).toBe(2) // day, then night
+})

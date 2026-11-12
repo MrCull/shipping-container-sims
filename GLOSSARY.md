@@ -241,8 +241,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 ## Performance and quality (TT-19)
 
 - **Engine benchmark:** `pnpm run tt:bench`, a headless run of a preset for N sim-hours that reports events/sec, wall-ms per sim-hour and peak memory and compares them with the committed baseline (a metric over 20% worse is a regression). Local only.
-- **Quality level / quality setting:** Low, Medium or High is a level (a bundle of shadows, LOD distances, resolution, ocean detail and night-light budget); the setting is a level or Auto (default).
+- **Quality level / quality setting:** Low, Medium or High is a level (a bundle of shadows, LOD distances, resolution, ocean detail, night-light budget, sky reflections and contact shadows); the setting is a level or Auto (default).
 - **Auto quality:** steps the level down when the frame rate stays under 45 fps and back up when there is headroom, with a back-off against oscillation.
+- **Sky environment:** the procedural sky dome (gradient and a sun patch, no downloaded HDR) baked once per lighting mode (day, dusk, night) into the reflection source of the standard materials; part of the quality profile (`environmentReflections`, off on Low).
+- **Contact shadow:** the soft darkening of the lowest 0.7 m of a container face, where a box meets the ground or the box below, done in the container shader (no extra pass); part of the quality profile (`contactShadows`, off on Low).
 - **Performance overlay:** the toggleable (key P) readout of FPS, draw calls, triangles, frame CPU time and the quality in force.
 - **Close-up LOD:** the detail level above the box LODs (about 35 m on High): the visible faces of nearby boxes get their markings (box number, door end, plate, wear) as decals from a texture atlas, up to a **face budget** (High 400, Medium 120, Low 48 within 18 m), nearest first, with hysteresis. The plain instanced box underneath is the fallback for every other face.
 - **Exposed faces:** which of a box's six faces can be seen. A stacked yard box loses its underside and every face a neighbouring box touches (the top only when nothing is stacked on it); vessel, truck and spreader boxes show all six. The close-up level spends its face budget on exposed faces turned towards the camera.

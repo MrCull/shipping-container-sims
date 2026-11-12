@@ -39,13 +39,17 @@ export interface QualityProfile {
   oceanSegments: number
   /** Most high-mast glow points night mode draws (the atmosphere adds no real lights; 400 = every mast). */
   nightLights: number
+  /** Sky reflections on the standard materials (#248): a procedural environment per lighting mode. */
+  environmentReflections: boolean
+  /** Soft darkening where boxes meet each other and the ground (#248), in the container shader. */
+  contactShadows: boolean
   /** Antialiasing is chosen at renderer creation, so it is not part of a live profile. */
 }
 
 export const QUALITY_PROFILES: Readonly<Record<QualityLevel, QualityProfile>> = {
-  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24 },
-  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120 },
-  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400 },
+  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
+  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
+  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
 }
 
 export const profileFor = (level: QualityLevel): QualityProfile => QUALITY_PROFILES[level]

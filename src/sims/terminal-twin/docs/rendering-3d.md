@@ -315,6 +315,8 @@ top is clipped over every open bay (needed so a crane never works under a solid 
 | `resolutionScale` | 0.65 | 0.85 | 1 | pixel ratio |
 | `oceanSegments` | 1 (flat Lambert quad) | 24 | 96 (standard material, 0.18 m swell) | `SceneRenderer.setOceanDetail` |
 | `nightLights` | 24 | 120 | 400 | mast glow points drawn at night |
+| `environmentReflections` | off | on | on | `AtmosphereRig.setQuality`: `scene.environment` is the sky environment or null (#248) |
+| `contactShadows` | off | on | on | `SceneRenderer.setQuality` sets the shared contact-shadow uniform to 0 or 0.5 (#248) |
 
 Antialiasing is chosen at renderer creation and is not part of a live profile.
 
@@ -336,6 +338,17 @@ Antialiasing is chosen at renderer creation and is not part of a live profile.
 - `modules/atmosphereRig.ts#AtmosphereRig` (owned by `SceneRenderer`): hemisphere light, sun, sky and fog colours.
   Sun shadow camera is a fixed 500 x 500 m box (near 10, far 800), `normalBias` 0.35 (container corrugation shows acne
   without it), `bias` -0.0004. The sun casts only when both the time of day and the quality allow it.
+- **Sky reflections and contact shadows (#248):** `modules/skyEnvironment.ts` (pure, `tests/skyEnvironment.test.ts`)
+  holds the sky colours per lighting mode, `environmentIntensity(daylight)` (0.12 at night to 0.67 by day) and
+  `EnvironmentCache`. `AtmosphereRig.attachRenderer` (called by `useTwinScene` after `setQuality`; headless hosts never call it, so
+  they get no reflections) bakes a procedural sky dome (gradient plus a sun patch) into a PMREM texture, once per
+  lighting mode on first use and cached (`environmentBuilds` in `atmosphere()` is at most 3, never per frame). Only
+  `scene.environmentIntensity` follows daylight each lighting change. No new draw calls or triangles (TTI overview on
+  High: 315 calls, 395,075 triangles before and after). `modules/contactShadow.ts` patches the container materials
+  (placeholder box and the `liveryMaterial(..., true)` GLB materials) so the lowest 0.7 m of every box face fades down to
+  50 % brightness (box-local height, boxes have their origin at the bottom), which darkens both box-to-ground and
+  box-to-box joins in the fragment shader: no extra pass. One shared uniform turns it off on Low without a recompile.
+  Not covered: close-up marking decals and the vessel hull. Before and after screenshots: `docs/prototypes/248/`.
 - Night is the cheaper mode: no shadow pass, no extra real lights. High-mast poles (instanced) get additive glow points
   (up to `nightLights`) and every STS, ASC and SHC gets one glow point that follows it: 2 draw calls in all.
 - **Daylight on entry (#171, #192):** every run launch sets `store.lockDaylight = true` (`launch` in
