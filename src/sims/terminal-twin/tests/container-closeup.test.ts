@@ -244,3 +244,15 @@ describe('colour by tint (#130)', () => {
     expect(painted).toEqual([0, 0])
   })
 })
+
+describe('per-frame instance counters (#246)', () => {
+  it('reports boxes posed and the instance bytes handed to the upload, in full while no buffer uses update ranges', () => {
+    const { inst } = setup(10)
+    const s = frame(inst, 10, 0, 200)
+    expect(s.drawn).toBe(10)
+    // 40 ft layers hold 10 instances each (capacity 10): matrix 16 floats, livery 1, colour 3, two LOD layers; the other sizes hold 1
+    const per40 = 10 * (16 + 1 + 3) * 4
+    const perOther = 1 * (16 + 1 + 3) * 4
+    expect(s.instanceBytes).toBe(2 * per40 + 4 * perOther)
+  })
+})

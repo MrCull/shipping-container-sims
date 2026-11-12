@@ -41,6 +41,16 @@ const store = useTwinStore()
         class="v"
         data-testid="tt-perf-cpu"
       >{{ store.fmt.number(perf.stats.cpuMs, 1) }}</span>
+      <span class="k">{{ t('perf.boxesPosed') }}</span>
+      <span
+        class="v"
+        data-testid="tt-perf-boxes"
+      >{{ store.fmt.number(perf.stats.boxesPosed, 0) }}</span>
+      <span class="k">{{ t('perf.instanceBytes') }}</span>
+      <span
+        class="v"
+        data-testid="tt-perf-upload"
+      >{{ store.fmt.number(perf.stats.instanceBytes / 1024, 0) }}</span>
       <span class="k">{{ t('perf.level') }}</span>
       <span
         class="v"

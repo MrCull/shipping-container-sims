@@ -20,6 +20,7 @@
     "tt:run": "tsx src/sims/terminal-twin/cli/run.ts",
     "tt:fixtures": "tsx src/sims/terminal-twin/cli/build-fixtures.ts",
     "tt:bench": "tsx src/sims/terminal-twin/cli/bench.ts",
+    "tt:baseline": "tsx src/sims/terminal-twin/cli/baselineCli.ts",
     "tt:diff": "tsx src/sims/terminal-twin/cli/diff.ts",
     "tt:sts": "tsx src/sims/terminal-twin/cli/sts.ts",
     "tt:profile": "tsx src/sims/terminal-twin/cli/profile.ts",

@@ -58,7 +58,22 @@ export interface ContainerRenderStats {
   closeupFaces: number
   /** Boxes outside the camera frustum, not written to the GPU (0 without a frustum). */
   culled: number
+  /** Bytes the container instance buffers (matrix, livery index, colour) hand to the GPU upload this frame (#246): each buffer flagged for upload counts in full, or only its update ranges once a buffer uses them. Close-up faces are not included. */
+  instanceBytes: number
   assets: 'placeholder' | 'loaded'
+}
+
+/** One box the instancer wrote this frame (recorded only on request, for the drawn-box reference test #246). */
+export interface DrawnBox {
+  key: number
+  /** The instanced mesh it went into (size and LOD, or the placeholder). */
+  layer: string
+  /** Column-major instance matrix, as uploaded. */
+  matrix: number[]
+  /** Atlas tile drawn (-1 for the placeholder, which has no livery attribute). */
+  livery: number
+  /** Instance colour, 0xRRGGBB. */
+  colour: number
 }
 
 interface Layer {
@@ -73,6 +88,15 @@ export interface RenderedContainer {
   lod: 0 | 1
   /** Colour-by tint (0xRRGGBB) the box was drawn in, -1 for its livery. */
   tint: number
+}
+
+/** What three.js copies to the GPU for a buffer flagged `needsUpdate`: its update ranges if it has any (count in elements), else all of it. */
+function uploadBytes(attribute: THREE.BufferAttribute): number {
+  const ranges = attribute.updateRanges
+  if (ranges.length === 0) return attribute.array.byteLength
+  let elements = 0
+  for (const r of ranges) elements += r.count
+  return elements * attribute.array.BYTES_PER_ELEMENT
 }
 
 export class ContainerInstancer {
@@ -97,13 +121,15 @@ export class ContainerInstancer {
   /** LOD per key from the previous frame (hysteresis). */
   private lastLod = new Map<number, 0 | 1>()
   private rendered = new Map<number, RenderedContainer>()
-  private lastStats: ContainerRenderStats = { drawn: 0, lod0: 0, lod1: 0, closeup: 0, closeupFaces: 0, culled: 0, assets: 'placeholder' }
+  private lastStats: ContainerRenderStats = { drawn: 0, lod0: 0, lod1: 0, closeup: 0, closeupFaces: 0, culled: 0, instanceBytes: 0, assets: 'placeholder' }
   private readonly matrix = new THREE.Matrix4()
   private readonly colour = new THREE.Color()
   /** Linear colour of the generic livery's body: a tint is divided by it, so the grey tile multiplied by the instance colour comes out as the tint. */
   private readonly genericBody = new THREE.Color(liveryBodyColour(LIVERY_ATLAS.genericIndex))
   private readonly closeups: ContainerCloseups
   private markingsSource: ((key: number) => CloseupSource) | null = null
+  private recording = false
+  private drawn: DrawnBox[] = []
 
   constructor(
     capacity: Partial<Record<ContainerSize, number>>,
@@ -172,6 +198,17 @@ export class ContainerInstancer {
     this.n = 0
   }
 
+  /** Record every box written, for `drawnBoxes()` (off by default: it allocates per box). */
+  setDrawnRecording(on: boolean): void {
+    this.recording = on
+    if (!on) this.drawn = []
+  }
+
+  /** The boxes written by the last `end()`, in write order; empty unless recording is on. */
+  drawnBoxes(): readonly DrawnBox[] {
+    return this.drawn
+  }
+
   /** One box: `key` is a stable id (e.g. container index), centre position in metres, yaw about Y (0 = length along X); `yard` marks a stacked yard box (the close-up level hides the faces its neighbours touch). */
   push(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0, tint = -1, yard = false): void {
     const i = this.n++
@@ -203,6 +240,7 @@ export class ContainerInstancer {
    */
   end(cameraPosition: THREE.Vector3, frustum?: THREE.Frustum): ContainerRenderStats {
     this.rendered.clear()
+    if (this.recording) this.drawn = []
     const counts: Record<string, number> = {}
     const write = (layer: Layer, i: number) => {
       const slot = counts[layer.mesh.name] ?? 0
@@ -220,6 +258,7 @@ export class ContainerInstancer {
           layer.mesh.setColorAt(slot, this.colour.setRGB(1, 1, 1))
         }
       } else layer.mesh.setColorAt(slot, tint >= 0 ? this.colour.setHex(tint) : this.colour.set(liveryBodyColour(this.liveries[i])))
+      if (this.recording) this.record(layer, slot, i)
     }
 
     const seen = this.cull(frustum)
@@ -254,14 +293,33 @@ export class ContainerInstancer {
     const layers: Layer[] = this.lods
       ? Object.values(this.lods).flat()
       : Object.values(this.placeholders ?? {})
+    let instanceBytes = 0
     for (const layer of layers) {
       layer.mesh.count = counts[layer.mesh.name] ?? 0
       layer.mesh.instanceMatrix.needsUpdate = true
-      if (layer.livery) layer.livery.needsUpdate = true
-      if (layer.mesh.instanceColor) layer.mesh.instanceColor.needsUpdate = true
+      instanceBytes += uploadBytes(layer.mesh.instanceMatrix)
+      if (layer.livery) {
+        layer.livery.needsUpdate = true
+        instanceBytes += uploadBytes(layer.livery)
+      }
+      if (layer.mesh.instanceColor) {
+        layer.mesh.instanceColor.needsUpdate = true
+        instanceBytes += uploadBytes(layer.mesh.instanceColor)
+      }
     }
-    this.lastStats = { drawn: this.n, lod0, lod1: this.n - lod0, closeup: this.closeups.count, closeupFaces: this.closeups.faces, culled, assets: this.lods ? 'loaded' : 'placeholder' }
+    this.lastStats = { drawn: this.n, lod0, lod1: this.n - lod0, closeup: this.closeups.count, closeupFaces: this.closeups.faces, culled, instanceBytes, assets: this.lods ? 'loaded' : 'placeholder' }
     return this.lastStats
+  }
+
+  private record(layer: Layer, slot: number, i: number): void {
+    const colour = layer.mesh.instanceColor
+    this.drawn.push({
+      key: this.keys[i],
+      layer: layer.mesh.name,
+      matrix: Array.from(layer.mesh.instanceMatrix.array.subarray(slot * 16, slot * 16 + 16)),
+      livery: layer.livery ? layer.livery.getX(slot) : -1,
+      colour: colour ? this.colour.setRGB(colour.getX(slot), colour.getY(slot), colour.getZ(slot)).getHex() : -1,
+    })
   }
 
   private readonly sphere = new THREE.Sphere()

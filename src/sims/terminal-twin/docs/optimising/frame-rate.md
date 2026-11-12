@@ -115,6 +115,45 @@ Other dev API levers: `perfOverlay(on)` (also key P, the Stats button, or a clic
 
 ## Recorded numbers
 
+**Baseline for the smooth-playback spec (#243, ticket #246), 2026-11-12, ENGINE_VERSION 0.53.0.** `pnpm run tt:baseline` on the
+full-scale `TTI Algeciras baseline` preset. Machine: 4-core Intel Xeon 2.1 GHz cloud container, Node 22, headless Chromium
+(dev server, unminified), **load average 7.7 from other agents, so both parts are pessimistic**; no real GPU. Later tickets
+compare against these on a like machine, or re-run the command first. Re-record with the same command.
+
+- *Posing per frame, Overview camera (Node, `cli/headlessPose.ts`: no render submit, no GPU), display time 14 400 s, 30 frames after 5 warm-up:*
+  mean 14.3 ms, min 12.5, max 17.6. Boxes posed per frame 9 895 (of 11 616 boxes in the scene; the rest have no pose),
+  instance bytes uploaded per frame 2 006 400 (1.9 MiB: every container instance buffer is re-uploaded in full, capacity
+  not count, today). Compare with the 8 ms posing budget above and with real-hardware 13 to 16 ms (V11-19).
+- *Engine in its worker, no rendering (a playback clock driven at the speed step, no scene built), from 7 200 s, 8 s window after a 2 s settle:*
+
+| Speed | Achieved sim s per wall s | Engine advance sim s per wall s |
+|---|---|---|
+| x60 | 60 | 60 |
+| x120 | 120 | 120 |
+| x300 | 300 | 298 |
+| x600 | 600 | 597 |
+| x1200 | 1 185 | 1 013 |
+| x1800 | 1 323 | 1 146 |
+| x3600 | 1 442 | 1 492 |
+
+The engine keeps every step to x600 exactly and saturates near 1 300 to 1 500 sim s per wall s from x1200 up: the earlier
+"about 600" estimate was low (headless Node runs the same preset at about 1 000 sim s per wall s with invariants on).
+Those are the first 2 to 4 sim hours; a busier phase of the day will be lower. The x3600 `@load` floor of 600 is therefore
+met by the engine alone; the page adds the delta application and the render on top.
+
+**Counters (#246).** `perf().stats.boxesPosed` and `stats.instanceBytes` (also in the performance readout) are the last
+frame's box count posed and container instance-buffer bytes handed to the GPU upload (matrix, livery index, colour; each
+buffer flagged for upload counts in full, or only its update ranges once a buffer uses them; close-up faces excluded).
+Posing tickets are judged by these plus `poseMs`, and by `tests/drawn-boxes.test.ts` (below).
+
+**Drawn-box reference (#246).** `tests/drawn-boxes.test.ts` runs the posing loop headless (`cli/headlessPose.ts`) and hashes
+which boxes are drawn with which matrices, liveries and colours at display times, for custody changes, a vessel arriving
+and departing, a restart, a rewind, colour by and quality; the hashes are in `tests/drawn-boxes.reference.json`. A posing
+change must leave it unchanged; regenerate (`UPDATE_DRAWN_BOXES=1`) only on purpose. Two facts it taught: the harness must
+feed the model with `advance` steps like playback (a flat-out `run` compacts motion plans, so mid-run poses differ), and a
+box in flight at display time T is posed from motion the engine plans later, so a model only replayed to T+900 s differs
+from a longer run at T (the controller's look-ahead exists for this).
+
 All on the TTI baseline preset unless stated. Headless numbers are SwiftShader: only draw calls and triangles count.
 
 **Real hardware, V11-19 (#79), 2026-10-29, ENGINE_VERSION 0.12.0.** Windows 11 laptop, Intel Iris Xe (ANGLE D3D11),
@@ -160,7 +199,7 @@ on the reference laptop; real-GPU fps on a production build. Fill them in here.
 - Specs that need a real frame rate are tagged `@load` in the title. CI runs `pnpm run test:smoke --grep-invert @load`;
   run `@load` specs locally on real hardware. Current `@load` specs: Auto steps down and recovers
   (`terminal-twin-perf.smoke.ts`, uses `setFrameLoad` and `setAutoThresholds`), x3600 sustains 600 sim s per wall s
-  (`terminal-twin.smoke.ts`, #191; software GL reaches only 190 to 396), colour-by modes pose within 1.5x the livery frame
+  (`terminal-twin.smoke.ts`, #191; the engine alone measures 1 300 to 1 450 sim s per wall s at x1800 and x3600 on the 4-core container, see the baseline below; the 190 to 396 once quoted here came from a fixture too small to measure anything), colour-by modes pose within 1.5x the livery frame
   plus 3 ms (`colour-by.smoke.ts`), and the close-up view costs no more than the Overview camera, within 1.1x plus 3 ms
   (`container-closeup.smoke.ts`). They report numbers as test annotations (`pose-ms`, `frame-ms`, `tti-overview`).
 - `@load` comparisons are ratios with a small absolute slack, never fixed ms.

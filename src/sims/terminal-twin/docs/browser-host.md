@@ -152,7 +152,7 @@ dashboard (`dashboardOpen/Tab/Data/Group/Bucketing/Rendered`), KPIs (`kpi`, `fin
   setup dialog's draft shared by its sections).
 - Frame loop (`useTwinScene.loop`): `controller.tick` -> `store.sync` -> rebuild on a new model -> (skip if busy)
   overlays, `setColourBy`, `applyCameraKeys`, follow, lighting (per sim minute) -> `view.update(displayTime, ...)` ->
-  positional sound -> render -> quality meter. `perf().stats.poseMs` and `cpuMs` are smoothed per-frame costs.
+  positional sound -> render -> quality meter. `perf().stats.poseMs` and `cpuMs` are smoothed per-frame costs; `boxesPosed` and `instanceBytes` (#246) are the last frame's counts (boxes posed, container instance-buffer bytes handed to the GPU upload), also in the performance readout.
 
 ## Setup dialog and start screen
 
