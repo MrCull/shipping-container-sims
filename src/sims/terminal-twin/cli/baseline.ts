@@ -5,7 +5,7 @@
  *  (b) achieved sim seconds per wall second for the engine in its worker at each speed step from x60 to x3600, in
  *      headless Chromium with no rendering (`tests/browser/terminal-twin-baseline.smoke.ts`, started as a child process).
  * Options: --preset <name>  --sim-time <s> (display time posed, default 14400)  --frames <n> (default 30)
- *          --skip-rate (posing only)  --skip-posing (rate only)  --out <file> (also write the report as JSON).
+ *          --skip-rate (posing only)  --skip-posing (rate only)  --strict (engine checks every event, as before #252)  --out <file> (also write the report as JSON).
  * Exit codes: 0 ok, 1 a part failed, 2 usage. Timings only compare on a like machine; record them with date, engine
  * version and machine in `docs/optimising/frame-rate.md`.
  */
@@ -55,6 +55,7 @@ export async function baselineMain(argv: string[], print: (line: string) => void
         frames: { type: 'string', default: '30' },
         'skip-rate': { type: 'boolean', default: false },
         'skip-posing': { type: 'boolean', default: false },
+        strict: { type: 'boolean', default: false },
         out: { type: 'string' },
       },
     }))
@@ -85,7 +86,7 @@ export async function baselineMain(argv: string[], print: (line: string) => void
     const file = join(mkdtempSync(join(tmpdir(), 'tt-baseline-')), 'rate.json')
     const child = spawnSync(process.execPath, [fileURLToPath(import.meta.resolve('@playwright/test/cli')), 'test', '--project=dev', '--grep', '@baseline'], {
       stdio: ['ignore', 'inherit', 'inherit'],
-      env: { ...process.env, TT_BASELINE_OUT: file, TT_BASELINE_PRESET: preset },
+      env: { ...process.env, TT_BASELINE_OUT: file, TT_BASELINE_PRESET: preset, TT_BASELINE_STRICT: values.strict ? '1' : '0' },
     })
     if (child.status === 0) rates = (JSON.parse(readFileSync(file, 'utf8')) as { rows: RateRow[] }).rows
     else {

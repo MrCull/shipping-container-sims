@@ -187,9 +187,9 @@ export class TwinController {
     }
   }
 
-  async load(config: ScenarioConfig, seed: number): Promise<void> {
+  async load(config: ScenarioConfig, seed: number, strict = false): Promise<void> {
     this.speed = DEFAULT_SPEED
-    await this.restart({ op: 'load', config, seed }, config, seed)
+    await this.restart({ op: 'load', config, seed, strict }, config, seed)
   }
 
   /** Back to t = 0 with the same config and seed. */
@@ -200,9 +200,9 @@ export class TwinController {
   }
 
   /** Resume from a snapshot of this engine version: the display starts at the snapshot's sim time, paused. Returns whether the replay matched. */
-  async restore(snapshot: SimSnapshot): Promise<boolean> {
+  async restore(snapshot: SimSnapshot, strict = false): Promise<boolean> {
     this.speed = DEFAULT_SPEED
-    const res = await this.restart({ op: 'restore', snapshot }, snapshot.config, snapshot.seed)
+    const res = await this.restart({ op: 'restore', snapshot, strict }, snapshot.config, snapshot.seed)
     this.displayTime = Math.min(snapshot.state.now, this.limit)
     return res?.hashMatched ?? false
   }

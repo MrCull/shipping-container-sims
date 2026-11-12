@@ -56,6 +56,12 @@ export interface SimulationOptions {
      * `1` sweeps after every event.
      */
     sweepEvery?: number
+    /**
+     * Check each event incrementally between sweeps (default true). `false` is sweep-only: no per-event check, a full
+     * sweep every `sweepEvery` events and at the end of the run (the browser worker's default, much cheaper). The event
+     * log is the same either way unless a violation occurs; a violation a sweep finds is reported with `foundBy: 'sweep'`.
+     */
+    perEvent?: boolean
   }
   /**
    * Subsystem modes (override `config.subsystems`): real, instant (same
@@ -233,6 +239,7 @@ export function createSimulation(
   const seed = options.seed ?? config.seed
   const invariantsEnabled = options.invariants?.enabled ?? true
   const failFast = options.invariants?.failFast ?? true
+  const perEvent = options.invariants?.perEvent ?? true
   const sweepEvery = Math.max(1, Math.floor(options.invariants?.sweepEvery ?? DEFAULT_SWEEP_EVERY))
   const tracker = new InvariantTracker()
   let invariantWallMs = 0
@@ -406,15 +413,18 @@ export function createSimulation(
     const violations = sweep ? tracker.sweep(state, config) : tracker.check(state, config, ev)
     invariantWallMs += performance.now() - started
     for (const v of violations) {
-      invariants.violations.push({ ...v, eventId: ev.id, t: ev.t })
+      // a sweep-only run finds every violation by a sweep, so say so: the event it names is the last one before the sweep, not the culprit
+      const sweepOnly = sweep && !perEvent
+      invariants.violations.push({ ...v, eventId: ev.id, t: ev.t, ...(sweepOnly ? { foundBy: 'sweep' as const } : {}) })
       commit(
         makeEvent('InvariantViolated', ev.t, ev.id, {}, {
           invariant: v.invariant,
           message: v.message,
           offendingEventId: ev.id,
+          ...(sweepOnly ? { foundBy: 'sweep' as const } : {}),
         }),
       )
-      if (failFast) fail({ eventId: ev.id, t: ev.t, message: `[${v.invariant}] ${v.message}` })
+      if (failFast) fail({ eventId: ev.id, t: ev.t, message: `[${v.invariant}] ${v.message}${sweepOnly ? ' (found by a sweep; the event named is the last before it, not necessarily the culprit)' : ''}` })
     }
     return violations.length > 0 && failFast
   }
@@ -462,7 +472,10 @@ export function createSimulation(
     const endsPreRun = !midPreRun && (ev.payload as { preRun?: boolean }).preRun === true
     const forceSweep = Boolean(endReason) || endsPreRun
     const skipCheck = STATE_NEUTRAL_EVENTS.has(ev.type) && !forceSweep // #226: changes nothing an invariant reads
-    if (invariantsEnabled && !midPreRun && !skipCheck && checkInvariants(ev, forceSweep)) return ev
+    // sweep-only: an event is checked only when it ends the run or the pre-run, or a sweep is due
+    const sweepDue = perEvent || forceSweep || sinceSweep + 1 >= sweepEvery
+    if (!perEvent && !midPreRun && !skipCheck) sinceSweep = sweepDue ? sinceSweep : sinceSweep + 1
+    if (invariantsEnabled && !midPreRun && !skipCheck && sweepDue && checkInvariants(ev, forceSweep)) return ev
     if (endReason) endScenario(endReason, ev.t, ev.id)
     return ev
   }

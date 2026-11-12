@@ -201,8 +201,11 @@ export function createEngineHost() {
     }
   }
 
+  let strictChecks = false
+
   function start(config: ScenarioConfig, seed: number): void {
-    sim = createSimulation(config, {}, { seed })
+    // the browser checks invariants by sweeps only (#252): per-event checking was the largest engine cost; "strict checks" restores it
+    sim = createSimulation(config, {}, { seed, invariants: { perEvent: strictChecks } })
     loaded = { config, seed }
     announced.clear()
     checkpoints = []
@@ -274,6 +277,7 @@ export function createEngineHost() {
   async function serve(req: WorkerRequestMessage): Promise<unknown> {
     switch (req.op) {
       case 'load':
+        strictChecks = req.strict === true
         start(req.config, req.seed)
         return null
       case 'reset':
@@ -315,6 +319,7 @@ export function createEngineHost() {
       }
       case 'restore': {
         const snap = req.snapshot
+        strictChecks = req.strict === true
         const s = await replay(snap.config, snap.seed, snap.log.length)
         const hashMatched = s.eventLogHash() === hashDigest(snap.state.logHash)
         // the replay taught the scene the history; the snapshot's exact state (now, queue, injected events) wins

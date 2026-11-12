@@ -134,6 +134,8 @@ const en = {
   'setup.rerollHint': 'Random seed',
   'setup.start': 'Start date/time',
   'setup.display': 'Display',
+  'setup.strictChecks': 'Strict checks',
+  'setup.strictChecksHint': 'Check every event for rule violations, as the command line does. Slower: the run is checked by periodic sweeps otherwise. Applies from the next run.',
   'setup.locale': 'Locale',
   'setup.localeBrowser': '{name} (browser)',
   'setup.units': 'Units',

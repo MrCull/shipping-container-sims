@@ -49,6 +49,8 @@ export interface InvariantViolation {
   /** Offending event (set by the engine). */
   eventId?: number
   t?: number
+  /** Set when a sweep-only run (no per-event check) found it: `eventId` is then the last event before the sweep, not the culprit. */
+  foundBy?: 'sweep'
 }
 
 /**

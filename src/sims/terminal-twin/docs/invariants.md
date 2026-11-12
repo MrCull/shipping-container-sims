@@ -66,7 +66,7 @@ below).
 ## When checks run
 
 `createSimulation` options (`engine/simulation.ts`): `invariants.enabled` (default true), `invariants.failFast` (default
-true), `invariants.sweepEvery` (default `DEFAULT_SWEEP_EVERY` = 1000). In `step()`:
+true), `invariants.sweepEvery` (default `DEFAULT_SWEEP_EVERY` = 1000), `invariants.perEvent` (default true; #252). In `step()`:
 
 1. After each processed event is committed, `checkInvariants(ev, forceSweep)` runs unless:
    - the event type is in `STATE_NEUTRAL_EVENTS` (only `DecisionRequested`, #226: it changes nothing an invariant reads;
@@ -85,6 +85,18 @@ true), `invariants.sweepEvery` (default `DEFAULT_SWEEP_EVERY` = 1000). In `step(
 
 `invariants.checks` (in the run summary and every golden) counts checked events, sweeps included, deadline and closing
 sweeps excluded. Changing which events are checked changes goldens even though the event log does not move.
+
+### Sweep-only checking (#252)
+
+`invariants.perEvent: false` skips the per-event (incremental) check: nothing is checked between sweeps, a full sweep runs
+every `sweepEvery` events, at the end of the pre-run and at the end of the run (time-based deadlines still sweep). The
+browser worker runs this way by default (`worker/engineHost.ts`), because the per-event check was the largest engine cost;
+the setup dialog's "strict checks" switch (remembered, `modules/strictChecksSetting.ts`, sent as `strict` in the worker's
+`load` and `restore` requests) restores `perEvent: true` for the next run. Headless runs, tests, goldens and CI never set it.
+With no violation the event log and its hash are identical either way (`tests/sweep-only-invariants.test.ts`); `checks`
+counts sweeps only, so it differs. A violation a sweep finds in this mode carries `foundBy: 'sweep'` (on the report entry
+and the `InvariantViolated` payload) and its failure message says so: the event named is the last one before the sweep,
+not necessarily the culprit. Re-run with strict checks (or headless) to pin the culprit event.
 
 ## Incremental checking (`InvariantTracker`, V11-18)
 
