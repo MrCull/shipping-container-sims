@@ -61,6 +61,34 @@ export const ASSETS: AssetEntry[] = Object.entries(glbUrls)
   .filter((a) => !!a.meta)
   .sort((a, b) => a.name.localeCompare(b.name))
 
+/** Hero container faces assembled as a box: `hero-box-<size>` shows the four faces of that size (the side twice, the far side turned 180 degrees). */
+const HERO_FACES = ['side', 'door', 'front', 'roof']
+for (const size of ['20', '40', '40hc']) {
+  const side = ASSETS.find((a) => a.name === `hero-${size}-side`)
+  if (!side) continue
+  ASSETS.push({ name: `hero-box-${size}`, url: '', meta: { ...side.meta, asset: `hero-box-${size}` } })
+}
+ASSETS.sort((a, b) => a.name.localeCompare(b.name))
+
+async function loadHeroBox(size: string): Promise<THREE.Object3D> {
+  const box = new THREE.Group()
+  box.name = `hero-box-${size}`
+  const lod0 = new THREE.Group()
+  lod0.name = 'LOD0'
+  box.add(lod0)
+  for (const face of HERO_FACES) {
+    const entry = ASSETS.find((a) => a.name === `hero-${size}-${face}`)!
+    const root = (await loadGltf(entry.url)).scene
+    lod0.add(root)
+    if (face === 'side') {
+      const far = (await loadGltf(entry.url)).scene
+      far.rotation.y = Math.PI
+      lod0.add(far)
+    }
+  }
+  return box
+}
+
 const tuple = (v: THREE.Vector3): Vec3Tuple => [v.x, v.y, v.z]
 
 function meshCost(root: THREE.Object3D, onlyVisible: boolean): { triangles: number; drawCalls: number } {
@@ -326,7 +354,8 @@ export class AssetViewerScene {
     const entry = ASSETS.find((a) => a.name === name)
     if (!entry) throw new Error(`unknown asset ${name}; known: ${ASSETS.map((a) => a.name).join(', ')}`)
     const token = ++this.loadToken
-    const gltf = await loadGltf(entry.url)
+    const heroSize = name.startsWith('hero-box-') ? name.slice('hero-box-'.length) : null
+    const gltf = heroSize ? { scene: await loadHeroBox(heroSize) } : await loadGltf(entry.url)
     if (token !== this.loadToken) throw new Error(`show(${name}) superseded by a later show/yard call`)
     this.clearYard()
     this.clearStack()
