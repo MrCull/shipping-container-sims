@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AutoQuality, AUTO_DOWN_FPS, AUTO_RUNGS, BOTTOM_RUNG, MANUAL_RUNG, QUALITY_LEVELS, QUALITY_PROFILES, FpsMeter, levelOfRung, markStepForRung, profileFor, profileForRung, rungName } from '../modules/quality'
+import { AutoQuality, HERO_STILL_BOXES, AUTO_DOWN_FPS, AUTO_RUNGS, BOTTOM_RUNG, MANUAL_RUNG, QUALITY_LEVELS, QUALITY_PROFILES, FpsMeter, levelOfRung, markStepForRung, profileFor, profileForRung, rungName } from '../modules/quality'
 
 /** Feeds `seconds` of frames at a steady `fps`, returns the level after. */
 function feed(auto: AutoQuality, startMs: number, seconds: number, fps: number): number {
@@ -77,8 +77,15 @@ describe('the shedding ladder (pure)', () => {
     for (let i = 1; i < caps.length; i++) expect(caps[i]).toBeLessThanOrEqual(caps[i - 1])
   })
 
-  it('hero marking resolution drops after the cap has shrunk, then stays standard', () => {
-    expect(AUTO_RUNGS.map((_, i) => markStepForRung(i))).toEqual(['sharp', 'sharp', 'sharp', 'standard', 'standard', 'standard', 'standard', 'standard'])
+  it('hero marking resolution drops after the cap has shrunk; below, only the still-camera floor is drawn, sharp', () => {
+    expect(AUTO_RUNGS.map((_, i) => markStepForRung(i))).toEqual(['sharp', 'sharp', 'sharp', 'standard', 'sharp', 'sharp', 'sharp', 'sharp'])
+  })
+
+  it('every Auto rung keeps the still-camera hero floor; the manual levels have none', () => {
+    expect(AUTO_RUNGS.map((_, i) => profileForRung(i).heroStillBoxes)).toEqual(AUTO_RUNGS.map(() => HERO_STILL_BOXES))
+    expect(HERO_STILL_BOXES).toBeGreaterThan(0)
+    expect(HERO_STILL_BOXES).toBeLessThan(profileForRung(2).heroBoxes) // below the smallest moving cap: the floor only bites once hero is shed
+    expect(QUALITY_LEVELS.map((l) => profileFor(l).heroStillBoxes)).toEqual([0, 0, 0])
   })
 
   it('shadows and resolution drop only after the hero rungs, and never rise down the ladder', () => {
@@ -94,14 +101,14 @@ describe('the shedding ladder (pure)', () => {
       expect(p[i].resolutionScale).toBeLessThanOrEqual(p[i - 1].resolutionScale)
       expect(p[i].lod0DistanceM).toBeLessThanOrEqual(p[i - 1].lod0DistanceM)
     }
-    expect(profileForRung(6)).toEqual({ ...QUALITY_PROFILES.medium, heroBoxes: 0 })
-    expect(profileForRung(7)).toEqual(QUALITY_PROFILES.low)
+    expect(profileForRung(6)).toEqual({ ...QUALITY_PROFILES.medium, heroBoxes: 0, heroStillBoxes: HERO_STILL_BOXES })
+    expect(profileForRung(7)).toEqual({ ...QUALITY_PROFILES.low, heroStillBoxes: HERO_STILL_BOXES })
   })
 
   it('manual levels fix the ladder at their rung', () => {
     expect(MANUAL_RUNG).toEqual({ high: 0, medium: 6, low: 7 })
     expect(AUTO_RUNGS[MANUAL_RUNG.medium].name).toBe('medium')
-    expect(profileForRung(MANUAL_RUNG.high)).toEqual(QUALITY_PROFILES.high)
+    expect(profileForRung(MANUAL_RUNG.high)).toEqual({ ...QUALITY_PROFILES.high, heroStillBoxes: HERO_STILL_BOXES })
     expect(levelOfRung(MANUAL_RUNG.medium)).toBe('medium')
     expect(levelOfRung(MANUAL_RUNG.low)).toBe('low')
   })

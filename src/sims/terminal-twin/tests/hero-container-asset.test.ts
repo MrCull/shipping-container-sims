@@ -48,9 +48,15 @@ describe('hero container faces', () => {
     expect(meta('hero-20-side').provenance.some((p: { fact: string }) => p.fact.includes('forklift pockets'))).toBe(true)
   })
 
-  it('corrugates at about the real 0.25 m pitch', () => {
+  it('corrugates the walls and roof at about the real 0.25 m pitch, and a door leaf in 4 horizontal bands', () => {
     for (const name of names) {
       const { ribs, pitchM } = meta(name).hero
+      if (name.endsWith('-door')) {
+        expect(ribs, name).toBe(4)
+        expect(pitchM, name).toBeGreaterThan(0.5)
+        expect(pitchM, name).toBeLessThan(0.7)
+        continue
+      }
       expect(ribs, name).toBeGreaterThan(5)
       expect(pitchM, name).toBeGreaterThan(0.22)
       expect(pitchM, name).toBeLessThan(0.29)

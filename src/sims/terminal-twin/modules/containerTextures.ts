@@ -117,41 +117,72 @@ function drawSideMarks(ctx: CanvasRenderingContext2D, side: ContainerMarkings['s
   ctx.fillRect(0, H - 0.12, L, 0.12)
 }
 
-/** What the door end prints, seen from behind the box: left leaf x in 0..W/2, right leaf W/2..W (y down from the top). */
+/** Width of a door leaf between the centre seam and the corner post (generators: `fy` in containers.py). */
+export const DOOR_LEAF_M = 1.064
+/** The two locking bars of a leaf, metres from the centre seam (`DOOR_BAR_FRACS` in containers.py). */
+export const DOOR_BAR_INNER_M = 0.17 * DOOR_LEAF_M
+export const DOOR_BAR_OUTER_M = 0.55 * DOOR_LEAF_M
+/** Clear space kept either side of a bar's centre line. */
+const BAR_CLEAR_M = 0.035
+
+/** `text`, shrunk so it is no wider than `maxW` (a line must fit between two locking bars). */
+function fitText(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, sizeM: number, maxW: number, colour: string, weight = '600', align: CanvasTextAlign = 'left'): void {
+  ctx.font = `${weight} ${sizeM}px Arial, Helvetica, sans-serif`
+  const w = ctx.measureText?.(s)?.width ?? 0 // a test's stub context measures nothing
+  text(ctx, s, x, y, w > maxW && w > 0 ? (sizeM * maxW) / w : sizeM, colour, weight, align)
+}
+
+/**
+ * What the door end prints, seen from behind the box: left leaf x in 0..W/2, right leaf W/2..W (y down from the top).
+ * Laid out around the locking bars as on a real door: on the right leaf the owner prefix and the plate labels sit between
+ * the two bars, the serial, check digit, type code and the plate values beside the outer bar; the CSC plate, the roundel
+ * and the SUPER HEAVY mark sit on the left leaf outside its outer bar.
+ */
 function drawDoorMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['door'], W: number, H: number, ink: string): void {
   ctx.fillStyle = 'rgba(0,0,0,0.5)'
   ctx.fillRect(W / 2 - 0.012, 0.12, 0.024, H - 0.24) // the seam between the leaves
   ctx.fillStyle = 'rgba(0,0,0,0.22)'
   ctx.fillRect(0, 0, W, 0.14) // header and sill
   ctx.fillRect(0, H - 0.14, W, 0.14)
-  // identity, top of the right leaf
-  text(ctx, `${door.ownerPrefix} ${door.serial}`, W * 0.51, 0.4, 0.16, ink, '600')
-  text(ctx, String(door.checkDigit), W * 0.94, 0.36, 0.11, ink, '600', 'center')
+  // right leaf: column A between the bars, column B from the outer bar to the leaf edge
+  const a0 = W / 2 + DOOR_BAR_INNER_M + BAR_CLEAR_M
+  const aW = DOOR_BAR_OUTER_M - DOOR_BAR_INNER_M - 2 * BAR_CLEAR_M
+  const b0 = W / 2 + DOOR_BAR_OUTER_M + BAR_CLEAR_M
+  const b1 = W / 2 + DOOR_LEAF_M - 0.04
+  const bW = b1 - b0
+  // identity: prefix between the bars, serial and boxed check digit beside the outer bar, type code under the serial
+  const box = 0.085
+  fitText(ctx, door.ownerPrefix, a0 + aW, 0.4, 0.095, aW, ink, '600', 'right')
+  fitText(ctx, door.serial, b0, 0.4, 0.095, bW - box - 0.015, ink)
+  text(ctx, String(door.checkDigit), b1 - box / 2, 0.4, 0.085, ink, '600', 'center')
   ctx.strokeStyle = ink
   ctx.lineWidth = 0.008
-  ctx.strokeRect(W * 0.94 - 0.065, 0.36 - 0.08, 0.13, 0.16)
-  text(ctx, door.isoType, W * 0.51, 0.64, 0.16, ink, '600')
-  // weight plate, right leaf, below the identity
+  ctx.strokeRect(b1 - box, 0.4 - 0.065, box, 0.125)
+  fitText(ctx, door.isoType, b0, 0.58, 0.095, bW, ink)
+  // weight plate: labels between the bars, values beside the outer bar
   const rows = door.plate ? plateRows(door.plate) : []
   rows.forEach(([label, kg, lbs], i) => {
-    const y = H * 0.33 + i * 0.27
-    text(ctx, label, W * 0.52, y + 0.06, 0.08, ink, '500')
-    text(ctx, kg, W * 0.96, y, 0.08, ink, '500', 'right')
-    text(ctx, lbs, W * 0.96, y + 0.12, 0.08, ink, '500', 'right')
+    const y = 0.76 + i * 0.19 // the plate ends above the bar handles
+    fitText(ctx, label, a0, y + 0.045, 0.06, aW, ink, '500')
+    fitText(ctx, kg, b1, y, 0.062, bW, ink, '500', 'right')
+    fitText(ctx, lbs, b1, y + 0.09, 0.062, bW, ink, '500', 'right')
   })
-  // CSC approval plate, left leaf, and the corten steel roundel
+  // left leaf, outside its outer bar: CSC approval plate, the corten steel roundel, SUPER HEAVY
+  const l0 = W / 2 - DOOR_LEAF_M + 0.04
+  const l1 = W / 2 - DOOR_BAR_OUTER_M - BAR_CLEAR_M
+  const lc = (l0 + l1) / 2
   ctx.fillStyle = '#8f9396'
-  ctx.fillRect(W * 0.08, H * 0.62, 0.2, 0.15)
+  ctx.fillRect(lc - 0.1, H * 0.62, 0.2, 0.15)
   ctx.fillStyle = '#4a4d50'
-  for (let i = 0; i < 4; i++) ctx.fillRect(W * 0.08 + 0.02, H * 0.62 + 0.025 + i * 0.03, 0.16, 0.012)
+  for (let i = 0; i < 4; i++) ctx.fillRect(lc - 0.08, H * 0.62 + 0.025 + i * 0.03, 0.16, 0.012)
   ctx.fillStyle = '#d9d9d4'
   ctx.beginPath()
-  ctx.ellipse(W * 0.14, H * 0.82, 0.11, 0.045, 0, 0, Math.PI * 2)
+  ctx.ellipse(lc, H * 0.82, 0.11, 0.045, 0, 0, Math.PI * 2)
   ctx.fill()
-  text(ctx, 'CORTEN STEEL', W * 0.14, H * 0.82 - 0.01, 0.028, '#222', '600', 'center')
-  text(ctx, 'CONTAINER', W * 0.14, H * 0.82 + 0.015, 0.028, '#222', '600', 'center')
+  text(ctx, 'CORTEN STEEL', lc, H * 0.82 - 0.01, 0.028, '#222', '600', 'center')
+  text(ctx, 'CONTAINER', lc, H * 0.82 + 0.015, 0.028, '#222', '600', 'center')
   if (door.superHeavy) {
-    const cx = W * 0.2
+    const cx = lc
     const cy = H * 0.5
     ctx.fillStyle = '#f2c318'
     ctx.strokeStyle = '#1a1a1a'
@@ -167,9 +198,9 @@ function drawDoorMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['d
     text(ctx, 'HEAVY', cx, cy + 0.065, 0.04, '#1a1a1a', '700', 'center')
   }
   if (door.boltSeal) {
-    // hangs from the inner rod's handle on the right-hand leaf (as seen from behind, the viewer's right)
-    const z = W * 0.62
-    const y = H - 0.9
+    // hangs from the handle of the right-hand leaf's inner bar (the handle runs 1.05 to 1.10 m above the floor, towards the post)
+    const z = W / 2 + DOOR_BAR_INNER_M + 0.12
+    const y = H - 1.05
     ctx.strokeStyle = '#222'
     ctx.lineWidth = 0.008
     ctx.beginPath()

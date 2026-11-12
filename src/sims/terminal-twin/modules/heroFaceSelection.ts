@@ -72,6 +72,8 @@ export function facingCandidates(key: number, box: HeroBox, faces: ExposedFaces,
 export interface HeroLimits {
   /** Quality level's cap in boxes' worth of faces (`heroCaps` in budgets.json); 0 draws none. */
   boxes: number
+  /** Still-camera floor in boxes (0 = none): drawn even when `boxes` is lower, prepared only while the camera is still. */
+  stillBoxes?: number
   distanceM: number
   hysteresis: number
 }

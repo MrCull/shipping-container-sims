@@ -53,7 +53,7 @@ for (const [level, cap] of [
   })
 }
 
-test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks go standard, none at hero-off', async ({ page }) => {
+test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks go standard, only the still-camera floor at hero-off', async ({ page }) => {
   test.slow() // software WebGL
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
@@ -102,8 +102,10 @@ test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks g
   expect(marks.step).toBe('standard')
   expect(marks.faces).toBeLessThanOrEqual(24)
   
-  const off = await at(4, 0, 'standard')
-  expect(off.faces).toBe(0)
+  // hero-off: only the still-camera floor (6 boxes, 18 faces) is left, with sharp markings again
+  const off = await at(4, 18, 'sharp')
+  expect(off.faces).toBeGreaterThan(0)
+  expect(off.faces).toBeLessThanOrEqual(18)
   // and back up: the cap and the sharp markings return in reverse
   const back = await at(0, 96, 'sharp')
   expect(back.step).toBe('sharp')

@@ -117,6 +117,29 @@ that size and kind is chosen (`heroAssets.ts`, the only non-dev file that names 
 level shows, and `onReady` marks the close-up pass dirty so a still camera redraws. Low draws none and requests none.
 `stats.heroFaces` (also `__tt.perf().stats`) counts faces drawn.
 
+- **Depth bias.** A hero face and its marking decal are drawn `HERO_DEPTH_BIAS_M` (0.1 m, view space) nearer the camera in
+  depth only (`HERO_DEPTH_BIAS_GLSL` after `project_vertex`; nothing moves on screen). The LOD0 box under a hero face has its
+  own coarser ribs and flat door leaves at about the same depth, and without the bias they show through the hero valleys and
+  the recessed door panels (a flat door with the LOD0 texture between the hero bars).
+- **Door end.** A door leaf is corrugated in 4 horizontal bands (`DOOR_BANDS`), with its two locking bars at 0.17 and 0.55
+  of the leaf width from the centre seam (`DOOR_BAR_FRACS` in `containers.py`, used by the LOD0 doors and the hero door, so a
+  bar does not move when the hero face fades in). `drawDoorMarks` lays the markings out around the bars
+  (`DOOR_BAR_INNER_M` / `DOOR_BAR_OUTER_M` in `containerTextures.ts`): owner prefix and plate labels between the bars of the
+  right leaf, serial, check digit, type code and plate values beside the outer bar, CSC plate, roundel and SUPER HEAVY on the
+  left leaf outside its outer bar; a line is shrunk to its column (`fitText`). The hardware material is mostly diffuse
+  (metallic 0.35), so bars stay galvanised grey on levels without an environment map.
+
+#### Still-camera floor
+
+On Auto every rung carries `heroStillBoxes` = `HERO_STILL_BOXES` (6 boxes, 18 faces; `quality.ts`), passed as
+`HeroLevel.setLimits({ stillBoxes })`. The cap in force is `max(heroBoxes, heroStillBoxes)`. While the floor is the cap (the
+rung has shed the hero level: `hero-off` and below), a face is prepared only once the camera has stopped: position speed at
+or below `HERO_STILL_SPEED_MPS` (0.05 m/s) for `HERO_STILL_SETTLE_MS` (400 ms), a second `CameraGate` in `HeroLevel`. So a
+slow device shows the close-up level while the camera moves and the nearest boxes in hero detail, with sharp markings, about
+half a second after it stops. Faces already prepared stay drawn through a move while they are still chosen. The floor never
+lowers a higher cap or tightens its gate, and the manual levels have none (`heroStillBoxes` 0: Low still draws no hero face).
+Tests: `tests/hero-prep.test.ts` (floor through the instancer), `tests/quality.test.ts`.
+
 #### Smooth arrival (#259)
 
 `heroPrep.ts` (pure) plus `HeroLevel`: a chosen face is drawn only once it is **prepared** (its model's meshes built, its paint and
@@ -151,7 +174,7 @@ agree too), so number, line name, ISO type, weight plate, CSC plate, SUPER HEAVY
   camera gate. A face whose tile is missing (new step, evicted) is prepared again for its tile only; its geometry stays drawn.
 - **Bounded, least recently shown reuse.** Pages per kind are capped at `maxPages(kind, step, heroBoxes)` (a box shows at most one side and
   one end to a camera): High (32 boxes) at most 7 side + 8 end pages, 240 MB of texels in the worst case, Medium (12) 3 + 3. A full kind gives
-  up the tile shown longest ago, never one shown this frame; with none to give the face shows without hero markings (the close-up decal stays).
+  up the tile shown longest ago, never one shown this frame; with none to give the face is not drawn at hero level: the close-up face keeps showing (its decal would be hidden behind the depth-biased hero paint).
   Tiles are kept while their face is cached (a face that leaves and returns repaints nothing).
 - **Close-up decal hidden under a full hero face.** `HeroLevel.covers(id)`: once a hero face is fully faded in (and has its tile, or prints
   nothing), `ContainerCloseups` skips that face's decal, so the older decal no longer shows between the hero ribs. During the fade it is
@@ -409,7 +432,8 @@ Antialiasing is chosen at renderer creation and is not part of a live profile.
   **All thresholds are provisional until the laptop benchmark ticket (#262) retunes them.**
 - **The shedding ladder** (`AUTO_RUNGS`, `profileForRung`, `markStepForRung`: pure functions of the rung). Auto sheds top
   down and recovers bottom up: 0 `hero-full` (High, hero cap 32 boxes), 1 `hero-half` (16), 2 `hero-quarter` (8),
-  3 `hero-marks-standard` (cap 8, `HeroLevel.setMarkStep('standard')`), 4 `hero-off` (cap 0), 5 `shadows-resolution`
+  3 `hero-marks-standard` (cap 8, `HeroLevel.setMarkStep('standard')`), 4 `hero-off` (cap 0 while the camera moves; from here
+  down only the still-camera floor draws hero faces, with sharp markings again, see "Still-camera floor"), 5 `shadows-resolution`
   (Medium's 1024 shadow map and 0.85 resolution), 6 `medium` (Medium profile, hero off), 7 `low`. The ticket lists marking
   resolution after hero off; it sits before it here because marking resolution sheds nothing once no hero face is
   drawn. The manual levels fix the ladder (`MANUAL_RUNG`: High 0, Medium 6 with Medium's own hero cap and sharp

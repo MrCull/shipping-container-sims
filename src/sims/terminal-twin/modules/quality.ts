@@ -38,6 +38,12 @@ export interface QualityProfile {
   closeupFaceBudget: number
   /** Hero level (#258): boxes' worth of hero faces drawn at most (3 faces each; `heroCaps` in budgets.json), 0 on Low. */
   heroBoxes: number
+  /**
+   * Still-camera floor (0 = none): boxes' worth of hero faces drawn even when `heroBoxes` is lower, prepared only once
+   * the camera has stopped (`HERO_STILL_SETTLE_MS`). Auto's rungs carry `HERO_STILL_BOXES`, so a slow device that has
+   * shed the hero level still shows the nearest boxes in full detail when the user stops to look; the manual levels carry 0.
+   */
+  heroStillBoxes: number
   /** Multiplier on the LOD switch distances of the cranes and carriers (STS, SHC, ASC): below 1 they drop to cheaper LODs sooner. */
   lodScale: number
   /** Multiplier on the device pixel ratio (render resolution), before the cap of 2. */
@@ -54,9 +60,9 @@ export interface QualityProfile {
 }
 
 export const QUALITY_PROFILES: Readonly<Record<QualityLevel, QualityProfile>> = {
-  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, heroBoxes: 0, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
-  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, heroBoxes: 12, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
-  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, heroBoxes: 32, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
+  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, heroBoxes: 0, heroStillBoxes: 0, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
+  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, heroBoxes: 12, heroStillBoxes: 0, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
+  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, heroBoxes: 32, heroStillBoxes: 0, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
 }
 
 export const profileFor = (level: QualityLevel): QualityProfile => QUALITY_PROFILES[level]
@@ -88,16 +94,23 @@ export class FpsMeter {
  * resolution only costs anything while hero faces are drawn, so the marking step sits between
  * quarter and none: after none it would shed nothing.
  */
+/**
+ * From `hero-off` down the only hero faces are the still-camera floor (`HERO_STILL_BOXES`): few, and painted while
+ * nothing moves, so their markings are sharp again.
+ */
 export const AUTO_RUNGS = [
   { name: 'hero-full', level: 'high', heroShare: 1, marks: 'sharp' },
   { name: 'hero-half', level: 'high', heroShare: 0.5, marks: 'sharp' },
   { name: 'hero-quarter', level: 'high', heroShare: 0.25, marks: 'sharp' },
   { name: 'hero-marks-standard', level: 'high', heroShare: 0.25, marks: 'standard' },
-  { name: 'hero-off', level: 'high', heroShare: 0, marks: 'standard' },
-  { name: 'shadows-resolution', level: 'high', heroShare: 0, marks: 'standard' },
-  { name: 'medium', level: 'medium', heroShare: 0, marks: 'standard' },
-  { name: 'low', level: 'low', heroShare: 0, marks: 'standard' },
+  { name: 'hero-off', level: 'high', heroShare: 0, marks: 'sharp' },
+  { name: 'shadows-resolution', level: 'high', heroShare: 0, marks: 'sharp' },
+  { name: 'medium', level: 'medium', heroShare: 0, marks: 'sharp' },
+  { name: 'low', level: 'low', heroShare: 0, marks: 'sharp' },
 ] as const
+
+/** Auto's still-camera floor: the nearest boxes that keep hero faces on every rung (18 faces, at most 2 + 2 marking pages). */
+export const HERO_STILL_BOXES = 6
 
 export type AutoRungName = (typeof AUTO_RUNGS)[number]['name']
 export const TOP_RUNG = 0
@@ -127,9 +140,9 @@ export function profileForRung(rung: number): QualityProfile {
   const heroBoxes = Math.floor(QUALITY_PROFILES.high.heroBoxes * r.heroShare)
   if (r.name === 'shadows-resolution') {
     const medium = QUALITY_PROFILES.medium
-    return { ...base, heroBoxes, shadowMapSize: medium.shadowMapSize, resolutionScale: medium.resolutionScale }
+    return { ...base, heroBoxes, heroStillBoxes: HERO_STILL_BOXES, shadowMapSize: medium.shadowMapSize, resolutionScale: medium.resolutionScale }
   }
-  return { ...base, heroBoxes }
+  return { ...base, heroBoxes, heroStillBoxes: HERO_STILL_BOXES }
 }
 
 export function markStepForRung(rung: number): HeroMarkStep {

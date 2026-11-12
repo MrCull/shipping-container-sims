@@ -22,9 +22,9 @@
   "hero": {
     "size": "40",
     "face": "door",
-    "description": "door end (+X): two corrugated leaves, gaskets, locking bars, cam keepers, handles, hinges, with its posts and castings",
-    "ribs": 8,
-    "pitchM": 0.261,
+    "description": "door end (+X): two leaves corrugated in horizontal bands, gaskets, locking bars, cam keepers, handles, hinges, with its posts and castings",
+    "ribs": 4,
+    "pitchM": 0.5827,
     "tintedNode": "paint",
     "uv0": "face 0..1: sides and roof u along +X (roof v along the width), ends u along the width; v = height / box height on sides and ends",
     "uv1": "metres / 0.5: repeating detail normal and ORM maps; rust, dents and scuffs are driven per box by the wear seed in the renderer",
@@ -84,7 +84,7 @@
       "source": "ISO 1161"
     },
     {
-      "fact": "8 corrugation ribs at 0.261 m pitch, 0.038 m deep (roof 0.016 m)",
+      "fact": "4 corrugation ribs at 0.583 m pitch, 0.038 m deep (roof 0.016 m)",
       "tag": "A",
       "source": "real pitch is about 0.25 m; depth and rib profile as the LOD0 box"
     },

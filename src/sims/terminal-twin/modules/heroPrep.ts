@@ -18,6 +18,11 @@ export const HERO_CAMERA_SPEED_MPS = 5
 /** The camera must stay at or below the speed threshold this long (ms) before preparation starts. */
 export const HERO_SETTLE_MS = 150
 
+/** Still-camera floor: at or below this camera speed (m/s) the camera counts as stopped (orbit damping drifts a little). */
+export const HERO_STILL_SPEED_MPS = 0.05
+/** The camera must have been stopped this long (ms) before a floor face is prepared. */
+export const HERO_STILL_SETTLE_MS = 400
+
 export class CameraGate {
   private last: { x: number; y: number; z: number; t: number } | null = null
   private calmSince = -1

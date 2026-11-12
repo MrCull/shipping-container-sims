@@ -920,7 +920,7 @@ const en = {
   'perf.rung.hero-half': 'Hero cap half',
   'perf.rung.hero-quarter': 'Hero cap quarter',
   'perf.rung.hero-marks-standard': 'Hero markings standard',
-  'perf.rung.hero-off': 'Hero off',
+  'perf.rung.hero-off': 'Hero when still',
   'perf.rung.shadows-resolution': 'Shadows and resolution reduced',
   'perf.rung.medium': 'Medium profile',
   'perf.rung.low': 'Low profile',

@@ -28,8 +28,8 @@ import type { ExposedFaces } from './exposedFaces'
 import { patchContactShadow } from './contactShadow'
 import { loadHeroFace, type HeroFaceLoader, type HeroPart } from './heroAssets'
 import { canvasHeroMarkBackend } from './containerTextures'
-import { HeroMarkings, markKindOf, type HeroMarkBackend, type HeroMarkStep } from './heroMarkings'
-import { CameraGate, fadeAlpha, runPrep, type PrepItem } from './heroPrep'
+import { HERO_DEPTH_BIAS_GLSL, HeroMarkings, markKindOf, type HeroMarkBackend, type HeroMarkStep } from './heroMarkings'
+import { CameraGate, fadeAlpha, HERO_STILL_SETTLE_MS, HERO_STILL_SPEED_MPS, runPrep, type PrepItem } from './heroPrep'
 import { facingCandidates, HERO_DISTANCE_M, HERO_HYSTERESIS, heroFaceOf, heroKindOf, selectHeroFaces, type HeroKind, type HeroLimits } from './heroFaceSelection'
 
 /** Instances per mesh: the largest cap (High, 32 boxes x 3 faces) with headroom. */
@@ -93,6 +93,7 @@ vec2 heroUv = vec2(position.x + position.z, position.y + 0.37 * (position.x - po
 #endif
 vHeroWear = heroWear.z;`,
       )
+      .replace('#include <project_vertex>', '#include <project_vertex>\n' + HERO_DEPTH_BIAS_GLSL)
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vHeroWear;\n' + FADE_FRAGMENT_DECL)
       .replace(
@@ -100,9 +101,12 @@ vHeroWear = heroWear.z;`,
         `#include <color_fragment>
 ${FADE_DISCARD}
 #ifdef USE_ROUGHNESSMAP
-  float heroMask = texture2D(roughnessMap, vRoughnessMapUv).r;
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.15, 0.08), smoothstep(0.62, 0.95, heroMask) * vHeroWear);
-  diffuseColor.rgb *= 1.0 - 0.3 * vHeroWear * heroMask;
+  // the wear mask repeats every 0.5 m: a second, five times coarser read of it gates the first, so rust and grime gather
+  // in irregular patches instead of a visible grid
+  float heroPatch = smoothstep(0.45, 0.85, texture2D(roughnessMap, vRoughnessMapUv * 0.19 + vec2(0.37, 0.11)).r);
+  float heroMask = texture2D(roughnessMap, vRoughnessMapUv).r * heroPatch;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.15, 0.08), smoothstep(0.7, 0.98, heroMask) * vHeroWear * 0.7);
+  diffuseColor.rgb *= 1.0 - 0.2 * vHeroWear * heroMask;
 #endif`,
       )
     patchContactShadow(shader)
@@ -112,7 +116,7 @@ ${FADE_DISCARD}
 
 function patchFixed(material: THREE.MeshStandardMaterial): void {
   material.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\n' + FADE_VERTEX_DECL).replace('#include <uv_vertex>', '#include <uv_vertex>\nvHeroFade = heroFade;')
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\n' + FADE_VERTEX_DECL).replace('#include <uv_vertex>', '#include <uv_vertex>\nvHeroFade = heroFade;').replace('#include <project_vertex>', '#include <project_vertex>\n' + HERO_DEPTH_BIAS_GLSL)
     shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\n' + FADE_FRAGMENT_DECL).replace('#include <color_fragment>', '#include <color_fragment>\n' + FADE_DISCARD)
     patchContactShadow(shader)
   }
@@ -134,6 +138,8 @@ export class HeroLevel {
   /** Faces drawn fully faded in with their markings (the close-up decal under them is not drawn). */
   private covered = new Set<number>()
   private readonly gate = new CameraGate()
+  /** The still-camera floor's gate: stricter, the camera has stopped. */
+  private readonly stillGate = new CameraGate(HERO_STILL_SPEED_MPS, HERO_STILL_SETTLE_MS)
   private pending = 0
   private fading = false
   private preparedTotal = 0
@@ -186,15 +192,29 @@ export class HeroLevel {
   }
 
   setLimits(next: Partial<HeroLimits>): void {
-    const before = this.limits.boxes
+    const before = this.cap
+    const floorBefore = this.floorMode
     Object.assign(this.limits, next)
     // a still camera does not redraw by itself: a changed cap (Auto's ladder, #261) must reach the screen on the next frame
-    if (this.limits.boxes !== before) this.onReady?.()
+    if (this.cap !== before || this.floorMode !== floorBefore) this.onReady?.()
+  }
+
+  /** Boxes' worth of faces drawn at most: the quality cap, or the still-camera floor when that is higher. */
+  private get cap(): number {
+    return Math.max(this.limits.boxes, this.limits.stillBoxes ?? 0)
+  }
+
+  /** True when the cap in force is the still-camera floor: faces are prepared only once the camera has stopped. */
+  private get floorMode(): boolean {
+    return (this.limits.stillBoxes ?? 0) > this.limits.boxes
   }
 
   begin(camera: THREE.Vector3): void {
     this.cam.copy(camera)
-    this.open = this.gate.update(camera.x, camera.y, camera.z, this.now())
+    const now = this.now()
+    const calm = this.gate.update(camera.x, camera.y, camera.z, now)
+    const still = this.stillGate.update(camera.x, camera.y, camera.z, now)
+    this.open = this.floorMode ? still : calm
     this.offers.length = 0
     this.offerOf.clear()
     this.candidates.length = 0
@@ -202,7 +222,7 @@ export class HeroLevel {
 
   /** Offers box `key` with its exposed faces (the same call the close-up level gets). */
   offer(key: number, size: ContainerSize, x: number, y: number, z: number, yaw: number, faces: ExposedFaces, source: () => CloseupSource, tint = -1): void {
-    if (this.limits.boxes <= 0) return
+    if (this.cap <= 0) return
     const before = this.candidates.length
     facingCandidates(key, { size, x, y, z, yaw }, faces, this.cam, this.candidates)
     if (this.candidates.length === before) return
@@ -214,13 +234,13 @@ export class HeroLevel {
   end(): void {
     this.covered.clear()
     this.marks.beginFrame()
-    this.marks.setBoxes(this.limits.boxes)
+    this.marks.setBoxes(this.cap)
     for (const e of this.entries.values()) if (e.state === 'ready') for (const part of e.parts) part.mesh.count = 0
     this.faceCount = 0
     this.boxCount = 0
     this.pending = 0
     this.fading = false
-    if (this.limits.boxes <= 0) {
+    if (this.cap <= 0) {
       this.previous.clear()
       this.looks.clear()
       this.readyAt.clear()
@@ -228,7 +248,7 @@ export class HeroLevel {
       this.marks.endFrame()
       return
     }
-    const boxes = Math.min(this.limits.boxes, Math.floor(HERO_CAPACITY / 3))
+    const boxes = Math.min(this.cap, Math.floor(HERO_CAPACITY / 3))
     const chosen = selectHeroFaces(this.candidates, { ...this.limits, boxes }, this.previous)
     this.previous = new Set(chosen)
     for (const id of this.looks.keys()) if (!this.previous.has(id)) this.looks.delete(id)
@@ -247,6 +267,8 @@ export class HeroLevel {
       if (!info) continue
       const readyAt = this.readyAt.get(id)
       if (readyAt === undefined) continue // not prepared yet: the close-up level shows
+      // no marking tile to be had: the close-up face keeps showing instead (its decal would be hidden behind the depth-biased hero paint)
+      if (this.markFailed.has(id)) continue
       const entry = this.entry(o.size, info.kind)
       if (entry.state !== 'ready') continue
       const look = this.lookOf(id, o)

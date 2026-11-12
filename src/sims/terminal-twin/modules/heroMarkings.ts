@@ -32,6 +32,18 @@ export const HERO_MARK_TILE_BASE: Record<MarkKind, { w: number; h: number }> = {
 /** A decal sits this far off the box frame, over the hero ribs. */
 export const HERO_MARK_OFFSET_M = 0.03
 
+/**
+ * A hero face and its decal are drawn this much nearer the camera in depth only (view-space metres; nothing moves on
+ * screen). The plain LOD0 box under a hero face has its own, coarser ribs and door leaves at about the same depth, which
+ * would otherwise poke through the hero valleys and the recessed door panels (up to 7.5 cm inside the box frame).
+ */
+export const HERO_DEPTH_BIAS_M = 0.1
+/** Goes right after `#include <project_vertex>` in a hero vertex shader. */
+export const HERO_DEPTH_BIAS_GLSL = `{
+  vec4 heroNear = projectionMatrix * (mvPosition + vec4(0.0, 0.0, ${HERO_DEPTH_BIAS_M.toFixed(2)}, 0.0));
+  gl_Position.z = heroNear.z / heroNear.w * gl_Position.w;
+}`
+
 /** The marking kind of a face (roofs and the bottom print nothing). */
 export const markKindOf = (face: Face): MarkKind | null => (face === 'sideP' || face === 'sideN' ? 'side' : face === 'door' || face === 'front' ? 'end' : null)
 
@@ -244,6 +256,7 @@ export class HeroMarkings {
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\n' + FADE_VERTEX)
         .replace('#include <uv_vertex>', '#include <uv_vertex>\nvHeroFade = heroFade;\n#ifdef USE_MAP\n  vMapUv = uv * uvRect.zw + uvRect.xy;\n#endif')
+        .replace('#include <project_vertex>', '#include <project_vertex>\n' + HERO_DEPTH_BIAS_GLSL)
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying float vHeroFade;')
         .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= vHeroFade;')

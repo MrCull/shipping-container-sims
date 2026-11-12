@@ -19,7 +19,7 @@ import math
 import bpy
 
 from .blender import MeshBuilder, empty
-from .containers import BOTTOM_RAIL_TOP, CAST_H, CAST_L, CAST_W, EDGE, POST_INSET, SIZES, TOP_RAIL_DEPTH
+from .containers import BOTTOM_RAIL_TOP, CAST_H, CAST_L, CAST_W, DOOR_BAR_FRACS, EDGE, POST_INSET, SIZES, TOP_RAIL_DEPTH
 from .liveries import RIB_BASE_HALF, RIB_DEPTH_M, RIB_TOP_HALF
 
 FACES = ('side', 'door', 'front', 'roof')
@@ -27,6 +27,7 @@ HERO_PITCH_M = 0.25          # target corrugation pitch; the actual pitch divide
 ROOF_RIB_DEPTH_M = 0.016     # roof sheet corrugation is shallow
 DETAIL_TILE_M = 0.5          # UV1 repeat length of the detail maps
 TEX_SIZE = 256
+DOOR_BANDS = 4               # horizontal corrugation bands of a door leaf
 LIFT = 0.0008                # decals (apertures) sit this far off the surface
 
 
@@ -101,7 +102,7 @@ def hero_materials(normal_image, orm_image):
     out = []
     for name, base, metallic, textured_roughness in (
             ('hero_paint', (1.0, 1.0, 1.0, 1.0), 0.0, True),
-            ('hero_hardware', (0.52, 0.54, 0.56, 1.0), 1.0, False),
+            ('hero_hardware', (0.62, 0.64, 0.66, 1.0), 0.35, False),  # galvanised: mostly diffuse, so it stays grey without an environment map (Low)
             ('hero_dark', (0.02, 0.02, 0.022, 1.0), 0.0, False)):
         mat = bpy.data.materials.new(name)
         mat.use_nodes = True
@@ -110,7 +111,7 @@ def hero_materials(normal_image, orm_image):
         bsdf = nt.nodes['Principled BSDF']
         bsdf.inputs['Base Color'].default_value = base
         bsdf.inputs['Metallic'].default_value = metallic
-        bsdf.inputs['Roughness'].default_value = 0.4 if metallic else 0.8
+        bsdf.inputs['Roughness'].default_value = 0.55 if metallic else 0.8
         uv1 = nt.nodes.new('ShaderNodeUVMap')
         uv1.uv_map = 'UV1'
         ntex = nt.nodes.new('ShaderNodeTexImage')
@@ -268,16 +269,17 @@ def _build_end(f, kind):
         valley, crest = -(hl - 0.05), -(hl - (0.05 - RIB_DEPTH_M))
         _ribbed(f, f.paint, lambda a, d, z: (d, a, z), -fy, n, pitch, valley, crest, zb, zt, (-1, 0, 0))
         return {'ribs': n, 'pitchM': pitch}
-    # Door end: two leaves of vertical ribs with a 10 mm gap to the seam and to the post.
+    # Door end: two leaves with a 10 mm gap to the seam and to the post. A door leaf is corrugated across its height
+    # (DOOR_BANDS wide horizontal bands, reference photographs), unlike the vertical ribs of the walls.
     w = fy - 0.02
-    n_leaf, pitch = rib_layout(w)
+    band = (zt - zb) / DOOR_BANDS
     valley, crest = hl - 0.075, hl - 0.075 + RIB_DEPTH_M
     cx = hl - 0.022
     for side in (1, -1):
         lo = 0.01 if side > 0 else -(fy - 0.01)
-        _ribbed(f, f.paint, lambda a, d, z: (d, a, z), lo, n_leaf, w / n_leaf, valley, crest, zb, zt, (1, 0, 0))
-        for frac in (0.24, 0.76):
-            yc = side * (0.01 + w * frac)
+        _ribbed(f, f.paint, lambda a, d, y: (d, y, a), zb, DOOR_BANDS, band, valley, crest, lo, lo + w, (1, 0, 0))
+        for frac in DOOR_BAR_FRACS:
+            yc = side * fy * frac
             f.hardware.cylinder((cx, yc, zb + 0.04), 0.018, zt - zb - 0.08, 8, (0.5, 0.5), axis='z', caps=False)
             for gz in (0.45, H * 0.5, H - 0.55):  # bar guides
                 f.box(f.hardware, (cx - 0.018, yc - 0.03, gz - 0.025), (cx + 0.004, yc + 0.03, gz + 0.025), ['+x', '+y', '-y', '+z'])
@@ -292,7 +294,7 @@ def _build_end(f, kind):
     gx = hl - 0.068
     for y0, y1, z0, z1 in ((-fy, -fy + 0.025, zb, zt), (fy - 0.025, fy, zb, zt), (-0.012, 0.012, zb, zt), (-fy, fy, zb, zb + 0.025), (-fy, fy, zt - 0.025, zt)):
         f.box(f.dark, (gx, y0, z0), (gx + 0.004, y1, z1), ['+x'])
-    return {'ribs': n_leaf * 2, 'pitchM': w / n_leaf}
+    return {'ribs': DOOR_BANDS, 'pitchM': band}
 
 
 def _build_roof(f):
@@ -338,7 +340,7 @@ NODE_DOCS = {
 }
 FACE_DOC = {
     'side': 'long side panel on the -Y (glTF +Z) side with its share of corner posts, castings and rails; the opposite side is this model turned 180 degrees about the vertical axis; 20 ft boxes also have forklift pockets',
-    'door': 'door end (+X): two corrugated leaves, gaskets, locking bars, cam keepers, handles, hinges, with its posts and castings',
+    'door': 'door end (+X): two leaves corrugated in horizontal bands, gaskets, locking bars, cam keepers, handles, hinges, with its posts and castings',
     'front': 'front end (-X): corrugated panel with its posts, castings and rails',
     'roof': 'roof (+Z): corrugated sheet, top rails and the four top castings with apertures',
 }

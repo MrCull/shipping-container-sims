@@ -10,7 +10,7 @@ import { ContainerCloseups } from '../modules/containerCloseups'
 import { ContainerInstancer } from '../modules/containerInstancer'
 import { describeMarkings } from '../modules/containerMarkings'
 import type { HeroPart } from '../modules/heroAssets'
-import { CameraGate, fadeAlpha, HERO_CAMERA_SPEED_MPS, HERO_FADE_MS, HERO_PREP_ALLOWANCE_MS, HERO_SETTLE_MS, runPrep } from '../modules/heroPrep'
+import { CameraGate, fadeAlpha, HERO_CAMERA_SPEED_MPS, HERO_FADE_MS, HERO_PREP_ALLOWANCE_MS, HERO_SETTLE_MS, HERO_STILL_SETTLE_MS, runPrep } from '../modules/heroPrep'
 import { HeroLevel } from '../modules/heroRenderer'
 import { makeIso6346Id } from '../scenario/iso6346'
 
@@ -194,6 +194,55 @@ describe('hero level arrival through the instancer', () => {
       expect(hero.faces).toBeGreaterThan(0)
     }
     expect(hero.prepared).toBe(prepared)
+  })
+
+  it('still-camera floor: a shed cap (0) draws nothing while the camera drifts, and the floor once it has stopped', async () => {
+    const { inst, hero, clock } = setup(0)
+    hero.setLimits({ boxes: 0, stillBoxes: 2 })
+    frame(inst, near)
+    await settle() // models arrive
+    // a slow orbit, 1 m/s: calm enough for the quality cap's gate, not stopped
+    for (let i = 1; i <= 60; i++) {
+      clock.t += 16
+      frame(inst, new THREE.Vector3(6 + i * 0.016, 3, 12))
+    }
+    expect(hero.prepared).toBe(0)
+    expect(hero.busy).toBe(true) // faces wait: a stopped camera keeps redrawing until they arrive
+    const still = new THREE.Vector3(6 + 60 * 0.016, 3, 12)
+    clock.t += 16
+    frame(inst, still)
+    clock.t += HERO_STILL_SETTLE_MS - 20
+    frame(inst, still)
+    expect(hero.prepared).toBe(0)
+    clock.t += 40
+    frame(inst, still)
+    clock.t += 16
+    const s = frame(inst, still)
+    expect(s.heroFaces).toBeGreaterThan(0)
+    expect(s.heroFaces).toBeLessThanOrEqual(2 * 3)
+    // the faces prepared stay through a move, and none is added while it lasts
+    const prepared = hero.prepared
+    for (let i = 1; i <= 5; i++) {
+      clock.t += 16
+      expect(frame(inst, new THREE.Vector3(still.x + i * 0.05, 3, 12)).heroFaces).toBeGreaterThan(0)
+    }
+    expect(hero.prepared).toBe(prepared)
+    // a manual level has no floor: nothing is drawn
+    hero.setLimits({ boxes: 0, stillBoxes: 0 })
+    clock.t += 16
+    expect(frame(inst, still).heroFaces).toBe(0)
+  })
+
+  it('still-camera floor never lowers a higher quality cap, nor tightens its gate', async () => {
+    const { inst, hero, clock } = setup(8)
+    hero.setLimits({ boxes: 8, stillBoxes: 1 })
+    frame(inst, near)
+    await settle()
+    for (let i = 1; i <= 30; i++) {
+      clock.t += 16
+      frame(inst, new THREE.Vector3(6 + i * 0.016, 3, 12)) // 1 m/s: under the cap's 5 m/s gate
+    }
+    expect(hero.faces).toBeGreaterThan(1 * 3)
   })
 
   it('prepares a screenful over several frames, a few faces per frame, never past the allowance', async () => {

@@ -466,7 +466,7 @@ export class SceneRenderer {
     this.atmosphere.setQuality(profile)
     setContactShadows(profile.contactShadows)
     this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap, closeupDistanceM: profile.closeupDistanceM, closeupFaceBudget: profile.closeupFaceBudget })
-    this.hero.setLimits({ boxes: profile.heroBoxes })
+    this.hero.setLimits({ boxes: profile.heroBoxes, stillBoxes: profile.heroStillBoxes })
     this.setOceanDetail(profile.oceanSegments)
   }
 

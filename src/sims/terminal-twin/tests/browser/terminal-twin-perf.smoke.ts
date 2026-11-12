@@ -65,7 +65,7 @@ test('the overlay names the rung in force; a manual level fixes it', async ({ pa
   await page.evaluate(() => window.__tt!.setAutoRung(2))
   await expect(page.getByTestId('tt-perf-rung')).toHaveText('Hero cap quarter')
   await page.evaluate(() => window.__tt!.setAutoRung(4))
-  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Hero off')
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Hero when still')
   expect((await page.evaluate(() => window.__tt!.perf())).rungName).toBe('hero-off')
   await page.evaluate(() => window.__tt!.setQuality('high'))
   await expect(page.getByTestId('tt-perf-rung')).toHaveText('Full detail')

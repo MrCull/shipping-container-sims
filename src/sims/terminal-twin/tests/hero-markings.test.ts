@@ -173,6 +173,25 @@ describe('hero markings through the hero level', () => {
     expect(closeups.faces).toBeLessThan(mid) // covered faces are not drawn twice
   })
 
+  it('a face with no marking tile to be had stays at the close-up level (its decal would hide behind the hero paint)', async () => {
+    const run = async (noTiles: boolean) => {
+      const { inst, hero, clock } = setup(8)
+      if (noTiles) hero.marks.paint = () => false
+      frame(inst, near)
+      await settle()
+      for (let i = 0; i < 6; i++) {
+        clock.t += 400
+        frame(inst, near)
+      }
+      return { faces: frame(inst, near).heroFaces, tiles: hero.marks.stats().tiles }
+    }
+    const withTiles = await run(false)
+    const without = await run(true)
+    expect(withTiles.tiles).toBeGreaterThan(0)
+    expect(without.tiles).toBe(0)
+    expect(without.faces).toBeLessThan(withTiles.faces) // only faces that print nothing (roofs) are left at hero level
+  })
+
   it('switches the marking resolution at run time and back without losing the hero geometry', async () => {
     const { inst, hero, clock, calls } = setup(8)
     frame(inst, near)

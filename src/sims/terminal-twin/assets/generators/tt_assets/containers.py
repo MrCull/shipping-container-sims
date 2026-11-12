@@ -38,6 +38,10 @@ EDGE = 0.006              # rails sit just inside the castings' outer faces
 POST_INSET = 0.008
 DOOR_PLANE = 0.03         # door leaves' outer face, inset from the door-end envelope
 HINGE_INSET = 0.01
+# [P] Locking bars of a door leaf, as fractions of the leaf width measured from the centre seam: the inner bar near the
+# seam, the outer one just past the middle, so the box number sits between the bars and beside the outer one (reference
+# photographs). The hero door (hero_containers.py) and the door markings (containerTextures.ts DOOR_BAR_*) use the same.
+DOOR_BAR_FRACS = (0.17, 0.55)
 
 
 def corrugation(length):
@@ -174,8 +178,8 @@ def build_door(size_key, side):
     pts = [(xo, ya, zb), (xo, yb, zb), (xo, yb, zt), (xo, ya, zt)]
     m.quad(pts, [door_uv(world(p)) for p in pts], outward=(1, 0, 0))
     m.quad([(xo - 0.02, ya, zb), (xo - 0.02, yb, zb), (xo - 0.02, yb, zt), (xo - 0.02, ya, zt)], dark(), outward=(-1, 0, 0))
-    # Two locking bars per leaf (at 0.24 and 0.76 of the leaf width) with handles.
-    for f in (0.24, 0.76):
+    # Two locking bars per leaf (DOOR_BAR_FRACS of the leaf width from the seam) with handles.
+    for f in DOOR_BAR_FRACS:
         yc = y_centre + (y_hinge - y_centre) * f
         m.box_faces((xo, yc - 0.018, zb + 0.05), (xo + 0.035, yc + 0.018, zt - 0.04), ['+x', '+y', '-y'], metal)
         hy0, hy1 = sorted((yc, yc + (y_hinge - y_centre) * 0.22))
