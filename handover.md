@@ -21,7 +21,7 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | #249 | Far tier: stand-ins for fences, ASC rails and masts | none | merged in branch (290113b) | |
 | #250 | Posing: boxes at rest are written only when their custody changes | #246 | merged in branch (eae8de4) | |
 | #251 | Playback: even pacing with the achieved speed shown | #246 | merged in branch (41491df) | |
-| #252 | Sweep-only invariant checks in the browser, "strict checks" switch | #246 | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
+| #252 | Sweep-only invariant checks in the browser, "strict checks" switch | #246 | merged in branch (1948079) | |
 | #253 | Worker reads only the entities an event names | #246 | open | |
 | #254 | One-click benchmark on a production build | #246 | open | |
 | #255 | Hero container model, per face, with asset budgets | #247 | merged in branch (f568b1c) | |
