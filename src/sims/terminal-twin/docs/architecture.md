@@ -152,8 +152,8 @@ store/twinStore.ts mirrors the few fields the UI shows (phase, clock, speed, Eng
   `max(MIN_LOOKAHEAD_SIM_S (5), speed x LOOKAHEAD_WALL_S (1.5))` sim seconds (`modules/twinController.ts`), so the
   motion segments for the displayed instant are always known. The display never passes the engine horizon
   (`EngineInfo.now`).
-- The browser engine runs with invariants on and default `sweepEvery` (`worker/engineHost.ts`,
-  `createSimulation(config, {}, { seed })`).
+- The browser engine runs with invariants in sweep-only mode (`invariants.perEvent: false`, default `sweepEvery`;
+  `worker/engineHost.ts`, #252) unless the setup dialog's "strict checks" is on; see [invariants.md](invariants.md).
 - Saves and rewind are replay-based: restore runs the snapshot's config and seed for `snapshot.log.length` events so
   the `SceneModel` learns every motion plan, then calls `sim.restore(snapshot)`. Checkpoints every
   `DEFAULT_CHECKPOINT_S` (900 sim s) record `{ t, events, hash }`. Details:
@@ -191,7 +191,7 @@ the worker's Delta), container `props` (no event carries them), derived indexes,
 ```ts
 const sim = createSimulation(config, handlers?, {
   seed?, asyncMode?,                                   // 'keep-running' (default) | 'pause'
-  invariants?: { enabled?, failFast?, sweepEvery? },   // defaults true, true, DEFAULT_SWEEP_EVERY (1000)
+  invariants?: { enabled?, failFast?, sweepEvery?, perEvent? },   // defaults true, true, DEFAULT_SWEEP_EVERY (1000), true
   subsystems?,                                         // override config.subsystems
   log?: { verbosity?: 'sts=debug,*=warn', write(record) },
 })

@@ -2,7 +2,7 @@
  * Engine rate per speed step in the browser (#246), the second half of `pnpm run tt:baseline`: the engine in its worker,
  * a playback clock driven as the scene drives it, and no rendering at all (no scene is built), so what limits the
  * achieved rate is the engine plus the main thread applying its deltas. Skipped unless `TT_BASELINE_OUT` names the
- * JSON file to write (the baseline command sets it); never run in CI (`@load`).
+ * JSON file to write (the baseline command sets it; `TT_BASELINE_STRICT=1` runs with "strict checks", #252); never run in CI (`@load`).
  */
 import { writeFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
@@ -26,7 +26,7 @@ test('engine rate per speed step, rendering excluded @load @baseline', async ({ 
         const { presets } = await load('/src/sims/terminal-twin/scenario/presets.ts')
         const config = presets[o.preset]()
         const controller = new TwinController()
-        await controller.load(config, config.seed)
+        await controller.load(config, config.seed, o.strict)
         await controller.runTo(o.startS)
         controller.setSpeed(o.speed)
         const timer = setInterval(() => controller.tick(performance.now()), 16)
@@ -42,7 +42,7 @@ test('engine rate per speed step, rendering excluded @load @baseline', async ({ 
         controller.dispose()
         return out
       },
-      { speed, preset, startS, windowMs },
+      { speed, preset, startS, windowMs, strict: process.env.TT_BASELINE_STRICT === '1' },
     )
     console.log(`x${speed}: achieved ${row.achieved.toFixed(0)} sim s per wall s, engine advanced ${row.engine.toFixed(0)}`)
     rows.push(row)
