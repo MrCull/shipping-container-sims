@@ -33,7 +33,7 @@ describe('hero container faces', () => {
       expect(a.kind).toBe('hero-container')
       expect(a.lods.LOD0.triangles).toBeGreaterThan(60)
       const json = readGlbJson(join(DIR, `${name}.glb`))
-      const paint = json.materials!.find((m) => m.name === 'hero_paint')!
+      const paint = (json.materials as { name?: string; pbrMetallicRoughness?: Record<string, unknown>; normalTexture?: unknown }[]).find((m) => m.name === 'hero_paint')!
       expect(paint.pbrMetallicRoughness?.baseColorFactor, 'white base colour so livery and tint multiply it').toBeUndefined()
       expect(paint.pbrMetallicRoughness?.metallicRoughnessTexture, 'roughness variation').toBeDefined()
       expect(paint.normalTexture, 'detail normal').toBeDefined()
