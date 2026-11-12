@@ -4,6 +4,7 @@
  * engine state: treat them as read-only (copy before keeping them).
  */
 import type { Reservation } from './reservations'
+import { yardSlotBaseY } from './subsystems/ascStorage'
 import type {
   Appointment,
   AscJob,
@@ -56,6 +57,8 @@ export interface SimQuery {
   /** Stacked boxes (a block's, or all). */
   yardSlots(blockId?: string): readonly Readonly<YardSlotState>[]
   yardSlot(id: string): Readonly<YardSlotState>
+  /** Height of the bottom of the box placed in yard slot `slotId` (m, #267): the top of the boxes under it. */
+  yardSlotBaseY(slotId: string): number
   /** Current and future conflict-zone reservations. */
   reservations(): readonly Readonly<Reservation>[]
   /** Work packages (TT-10) in creation order: one crane's, or all. */
@@ -126,6 +129,10 @@ export function createQuery(getState: () => SimState): SimQuery {
       return blockId === undefined ? all : all.filter((s) => s.blockId === blockId)
     },
     yardSlot: (id) => get(getState().yardSlots, id, 'yard slot'),
+    yardSlotBaseY: (slotId) => {
+      const state = getState()
+      return yardSlotBaseY(state, slotId, get(state.yardSlots, slotId, 'yard slot').span)
+    },
     reservations: () => getState().reservations.filter((r) => r.to > getState().now),
     workPackages: (stsId) => {
       const all = Object.values(getState().workPackages)

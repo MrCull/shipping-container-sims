@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import ColourByMenu from './ColourByMenu.vue'
 import { useTwinStore } from '../store/twinStore'
+import { useHudStore } from '../store/hudStore'
 import type { OverlayState } from '../modules/overlays'
 import { t, type MessageKey } from '../i18n/messages'
 import type { ViewPresetName } from '../modules/viewPresets'
 
 const store = useTwinStore()
+const hud = useHudStore()
 
 const toggles: { key: keyof OverlayState; label: MessageKey; title: MessageKey }[] = [
   { key: 'laneGraph', label: 'overlays.laneGraph', title: 'overlays.laneGraphHint' },
@@ -28,12 +30,35 @@ function toggle(key: keyof OverlayState): void {
 </script>
 
 <template>
+  <button
+    v-if="hud.collapsed.overlayBar"
+    type="button"
+    class="hud-pill overlays-pill"
+    data-testid="tt-overlays-expand"
+    :aria-label="t('overlays.group')"
+    :aria-expanded="false"
+    @click="hud.toggle('overlayBar')"
+  >
+    {{ t('overlays.label') }} ▴
+  </button>
   <div
+    v-else
     class="overlays"
     data-hud-region="overlayBar"
     role="group"
     :aria-label="t('overlays.group')"
   >
+    <button
+      type="button"
+      class="hud-pill collapse"
+      data-testid="tt-overlays-collapse"
+      :title="t('hud.collapseOverlayBar')"
+      :aria-label="t('hud.collapseOverlayBar')"
+      :aria-expanded="true"
+      @click="hud.toggle('overlayBar')"
+    >
+      ▾
+    </button>
     <span class="label">{{ t('overlays.label') }}</span>
     <button
       v-for="item in toggles"
@@ -91,6 +116,20 @@ function toggle(key: keyof OverlayState): void {
 </template>
 
 <style scoped>
+.overlays-pill {
+  grid-column: 2;
+  grid-row: 3;
+  justify-self: center;
+  align-self: end;
+  position: relative;
+  z-index: 9;
+  margin-bottom: 1rem;
+}
+
+.overlays .collapse {
+  min-height: 1.7rem;
+}
+
 .overlays {
   grid-column: 2;
   grid-row: 3;

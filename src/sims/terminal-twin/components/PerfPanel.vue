@@ -2,10 +2,12 @@
 import { QUALITY_SETTINGS } from '../modules/quality'
 import { usePerfStore } from '../store/perfStore'
 import { useTwinStore } from '../store/twinStore'
+import { useFrameBenchmark } from '../composables/useFrameBenchmark'
 import { t, type MessageKey } from '../i18n/messages'
 
 const perf = usePerfStore()
 const store = useTwinStore()
+const bench = useFrameBenchmark()
 </script>
 
 <template>
@@ -41,11 +43,26 @@ const store = useTwinStore()
         class="v"
         data-testid="tt-perf-cpu"
       >{{ store.fmt.number(perf.stats.cpuMs, 1) }}</span>
+      <span class="k">{{ t('perf.boxesPosed') }}</span>
+      <span
+        class="v"
+        data-testid="tt-perf-boxes"
+      >{{ store.fmt.number(perf.stats.boxesPosed, 0) }}</span>
+      <span class="k">{{ t('perf.instanceBytes') }}</span>
+      <span
+        class="v"
+        data-testid="tt-perf-upload"
+      >{{ store.fmt.number(perf.stats.instanceBytes / 1024, 0) }}</span>
       <span class="k">{{ t('perf.level') }}</span>
       <span
         class="v"
         data-testid="tt-perf-level"
       >{{ t(`perf.quality.${perf.effective}` as MessageKey) }}</span>
+      <span class="k">{{ t('perf.rung') }}</span>
+      <span
+        class="v"
+        data-testid="tt-perf-rung"
+      >{{ t(`perf.rung.${perf.rungLabel}` as MessageKey) }}</span>
     </div>
     <div class="row">
       <span class="label">{{ t('perf.quality') }}</span>
@@ -80,6 +97,31 @@ const store = useTwinStore()
       >
         {{ t('perf.stats') }}
       </button>
+      <button
+        v-if="!perf.benchmark"
+        type="button"
+        class="opt stats"
+        :title="t('perf.benchmarkHint')"
+        data-testid="tt-benchmark-start"
+        @click="bench.start()"
+      >
+        {{ t('perf.benchmark') }}
+      </button>
+      <template v-else>
+        <span
+          class="progress"
+          role="status"
+          data-testid="tt-benchmark-progress"
+        >{{ t('perf.benchmarkProgress', { stage: perf.benchmark.stage, total: perf.benchmark.total, label: perf.benchmark.label }) }}</span>
+        <button
+          type="button"
+          class="opt stats"
+          data-testid="tt-benchmark-cancel"
+          @click="bench.cancel()"
+        >
+          {{ t('perf.benchmarkCancel') }}
+        </button>
+      </template>
     </div>
   </div>
 </template>
@@ -97,8 +139,10 @@ const store = useTwinStore()
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
+  max-width: 100%;
 }
 
 .readout {
@@ -126,6 +170,11 @@ const store = useTwinStore()
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.progress {
+  color: var(--tt-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .seg {

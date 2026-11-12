@@ -14,6 +14,9 @@
  *   --wait <ms>           Extra wait after load and --wait-for (default 5000)
  *   --wait-for <selector> Wait until this selector is visible before the extra wait
  *   --eval <js>           Expression evaluated in the page (awaited) before the extra wait
+ *   --wait-for-fn <js>    After --eval, wait until this expression is truthy (up to --fn-timeout ms, default 180000),
+ *                         e.g. "__tt.heroSettled() && __tt.perf().stats.heroFaces > 0" for a Terminal Twin close-up
+ *   --scale <n>           Device scale factor (default 1; 2 for a picture a person will look at, about 4x slower)
  *   --width / --height    Viewport size (default 1280x720)
  *   --full-page           Capture the full scrollable page
  *   --fail-on-error       Exit 1 if the page logs console errors or throws
@@ -37,6 +40,9 @@ const { values: args } = parseArgs({
     wait: { type: 'string', default: '5000' },
     'wait-for': { type: 'string' },
     eval: { type: 'string' },
+    'wait-for-fn': { type: 'string' },
+    'fn-timeout': { type: 'string', default: '180000' },
+    scale: { type: 'string', default: '1' },
     width: { type: 'string', default: '1280' },
     height: { type: 'string', default: '720' },
     'full-page': { type: 'boolean', default: false },
@@ -110,6 +116,7 @@ async function main() {
   try {
     const page = await browser.newPage({
       viewport: { width: Number(args.width), height: Number(args.height) },
+      deviceScaleFactor: Number(args.scale),
     })
     page.on('console', (msg) => {
       if (msg.type() === 'error') errors.push(`console: ${msg.text()}`)
@@ -125,10 +132,11 @@ async function main() {
       const result = await page.evaluate(`(async () => (${args.eval}))()`)
       if (result !== undefined) console.log('eval result:', JSON.stringify(result))
     }
+    if (args['wait-for-fn']) await page.waitForFunction(args['wait-for-fn'], undefined, { timeout: Number(args['fn-timeout']), polling: 500 })
     await sleep(Number(args.wait))
 
     await mkdir(dirname(out), { recursive: true })
-    await page.screenshot({ path: out, fullPage: args['full-page'] })
+    await page.screenshot({ path: out, fullPage: args['full-page'], timeout: 300_000 })
     console.log(`Saved ${out}`)
   } finally {
     await browser.close()

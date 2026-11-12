@@ -11,6 +11,7 @@ import { onBeforeUnmount, onMounted } from 'vue'
 import { cameraKeyFor, isTypingTarget, shortcutFor, type ShortcutAction } from '../modules/shortcuts'
 import { escapeTarget, type EscapeState, type EscapeTarget } from '../modules/escape'
 import { usePerfStore } from '../store/perfStore'
+import { useHudStore } from '../store/hudStore'
 import { useTwinStore } from '../store/twinStore'
 
 /** A key event from inside a popup (Colour by, Run to): Esc there closes the popup even while its own field has focus. */
@@ -21,6 +22,7 @@ function isInPopup(target: EventTarget | null): boolean {
 export function useTwinShortcuts(): void {
   const store = useTwinStore()
   const perf = usePerfStore()
+  const hud = useHudStore()
 
   function perform(action: ShortcutAction): void {
     switch (action.kind) {
@@ -59,6 +61,9 @@ export function useTwinShortcuts(): void {
         break
       case 'help':
         store.setHelpOpen(!store.helpOpen)
+        break
+      case 'hud':
+        hud.toggleAll()
         break
     }
   }

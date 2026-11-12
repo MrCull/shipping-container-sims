@@ -58,8 +58,24 @@ test('fixed quality levels change what is drawn: Low draws less than High', asyn
   expect(errors).toEqual([])
 })
 
-test('Auto steps quality down under sustained load, shows it in the overlay, and steps back up when the load ends @load', async ({ page }) => {
-  test.setTimeout(180_000)
+test('the overlay names the rung in force; a manual level fixes it', async ({ page }) => {
+  const errors = watch(page)
+  await open(page, 'tracer-1sts-10-boxes')
+  await page.keyboard.press('p')
+  await page.evaluate(() => window.__tt!.setAutoRung(2))
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Hero cap quarter')
+  await page.evaluate(() => window.__tt!.setAutoRung(4))
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Hero when still')
+  expect((await page.evaluate(() => window.__tt!.perf())).rungName).toBe('hero-off')
+  await page.evaluate(() => window.__tt!.setQuality('high'))
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Full detail')
+  await page.evaluate(() => window.__tt!.setQuality('low'))
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Low profile')
+  expect(errors).toEqual([])
+})
+
+test('Auto sheds down the ladder under sustained load, names the rung in the overlay, and climbs back when the load ends @load', async ({ page }) => {
+  test.setTimeout(300_000)
   const errors = watch(page)
   await open(page, 'tracer-1sts-10-boxes')
   await page.keyboard.press('p')
@@ -67,17 +83,20 @@ test('Auto steps quality down under sustained load, shows it in the overlay, and
   // let the first (software-rendered) frames settle, then judge from a clean slate at High
   // Software rendering tops out near 19 fps, so the thresholds are retuned: under 12 fps steps down, 15 fps or more steps up.
   await page.evaluate(() => window.__tt!.setAutoThresholds({ down: 12, up: 15 }))
+  await page.evaluate(() => window.__tt!.setPausedDetail(false)) // Auto does not judge frames under the paused-detail boost
   await page.evaluate(() => window.__tt!.setFrameLoad(150)) // about 6 fps
-  await page.waitForFunction(() => window.__tt!.perf().effective !== 'high', undefined, { timeout: 40_000 })
-  await expect(page.getByTestId('tt-perf-level')).not.toHaveText('High')
+  await page.waitForFunction(() => window.__tt!.perf().rung > 0, undefined, { timeout: 40_000 })
+  await expect(page.getByTestId('tt-perf-rung')).not.toHaveText('Full detail')
   expect((await page.evaluate(() => window.__tt!.perf())).autoChanges).toBeGreaterThanOrEqual(1)
-  await page.waitForFunction(() => window.__tt!.perf().effective === 'low', undefined, { timeout: 40_000 })
+  // the ladder goes on to the bottom, one rung at a time
+  await page.waitForFunction(() => window.__tt!.perf().rungName === 'low', undefined, { timeout: 150_000 })
   await expect(page.getByTestId('tt-perf-level')).toHaveText('Low')
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Low profile')
   // the load ends: with headroom Auto climbs again, and the overlay shows it
   const changes = (await page.evaluate(() => window.__tt!.perf())).autoChanges
   await page.evaluate(() => window.__tt!.setFrameLoad(0))
-  await page.waitForFunction(() => window.__tt!.perf().effective !== 'low', undefined, { timeout: 90_000 })
-  await expect(page.getByTestId('tt-perf-level')).not.toHaveText('Low')
+  await page.waitForFunction(() => window.__tt!.perf().rung < 7, undefined, { timeout: 90_000 })
+  await expect(page.getByTestId('tt-perf-rung')).not.toHaveText('Low profile')
   expect((await page.evaluate(() => window.__tt!.perf())).autoChanges).toBeGreaterThan(changes)
   expect(errors).toEqual([])
 })
@@ -104,9 +123,10 @@ test('TTI preset at overview zoom: instanced containers are culled and the draw 
   expect(scene.containers).toBeGreaterThan(8_000)
   // main pass + shadow pass; the unbatched ground alone used to cost ~1,300 draw calls here
   expect(scene.render.calls).toBeLessThan(450)
-  // Main + shadow pass. 1M was set before the TT-28 infrastructure models (about 680k of the total: yard fences, ASC rails,
-  // masts); the geometry is deterministic, so this is a real budget, not a frame-rate check.
-  expect(scene.render.triangles).toBeLessThan(2_000_000)
+  // Main + shadow pass. 1.56M before the far tier (#249): yard fences, ASC rails and masts (about 680k) drew at full detail at
+  // any distance; their 12-triangle stand-ins bring the overview to about 382k (the frame-rate guide's 400k budget). The
+  // geometry is deterministic, so this is a real budget, not a frame-rate check.
+  expect(scene.render.triangles).toBeLessThan(420_000)
   // zoomed in on one crane, nearly all of the 10,000+ stacked boxes are outside the frustum and are not drawn
   await page.evaluate(() => window.__tt!.cameraTo('STS104', 60))
   const f2 = await page.evaluate(() => window.__tt!.scene()!.frames)

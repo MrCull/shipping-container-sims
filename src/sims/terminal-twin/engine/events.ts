@@ -414,7 +414,7 @@ export interface EventPayloads {
   /** The warm-up is over (TT-14): KPIs and end-condition counters restart at zero. */
   WarmUpEnded: { warmUpS: number }
   ScenarioEnded: { reason: string }
-  InvariantViolated: { invariant: string; message: string; offendingEventId: number }
+  InvariantViolated: { invariant: string; message: string; offendingEventId: number; foundBy?: 'sweep' }
 }
 
 export type EventType = keyof EventPayloads

@@ -28,6 +28,7 @@ assets/
       blender.py               scene helpers, preview renders
       parts.py                 shared modelling vocabulary: Atlas (swatch/region atlas), Part (boxes, beams, plates, revolves)
       containers.py, liveries.py
+      hero_containers.py       hero faces: geometry, procedural detail maps, sidecar
       shc.py, shc_meta.py      asc.py, asc_meta.py      sts.py, sts_atlas.py
       truck.py, truck_meta.py  vessels.py, vessel_liveries.py
       infrastructure.py, infrastructure_meta.py
@@ -42,7 +43,7 @@ cli/sounds/build.ts, synth.ts  pnpm run tt:sounds, tt:sounds:check
 dev/AssetViewer.vue, assetViewerScene.ts, assetViewerApi.ts    ?viewer=<asset>|yard
 ```
 
-Groups (`GROUPS` in both `cli/assets/build.ts` and `assets/generators/build.py`): `containers`, `shc`, `asc`, `sts`,
+Groups (`GROUPS` in both `cli/assets/build.ts` and `assets/generators/build.py`): `containers`, `hero`, `shc`, `asc`, `sts`,
 `trucks`, `vessels`, `infrastructure`. A new group must be added to both lists.
 
 ## Setup (once)
@@ -53,8 +54,11 @@ Groups (`GROUPS` in both `cli/assets/build.ts` and `assets/generators/build.py`)
 - A Blender install can run the generator too (`blender --background --python src/sims/terminal-twin/assets/generators/build.py -- --out <dir>`),
   but then you compress the GLBs yourself. `tt:assets` needs a Python that can `import bpy`.
 - Node dependencies (`@gltf-transform/*`, `meshoptimizer`) come with `pnpm install`.
-- Cloud agent sessions usually have no bpy: changes that need regeneration (outer hull lines, a larger wordmark) are
-  then out of reach; the renderer-side workarounds (hatch clip, road clip) exist for that reason.
+- **Cloud sessions:** `bpy` is not installed by the session-start hook (about 1 GB). When your ticket changes a generator or
+  needs regenerated models, run `scripts/install-bpy.sh` once (opt-in, idempotent, under a minute; it builds the venv in
+  `$HOME/.cache/tt-bpy-venv`, outside the repo, and prints its python path on the last line; `scripts/test-install-bpy.sh` tests it),
+  then `pnpm run tt:assets --python "$(scripts/install-bpy.sh | tail -n 1)" ...`. A second run does nothing. Tickets that do not
+  touch the generators never need it.
 
 ## `pnpm run tt:assets`
 
@@ -77,9 +81,19 @@ pnpm run tt:assets --samples 48                       # Cycles samples per previ
    With `--check`: compares every file byte for byte and prints `Regenerated assets are identical to the committed ones`
    (exit 0) or one line per differing file (exit 1).
 
+Reference photographs of real containers (the look the container and hero models match) are committed in `docs/reference/containers/`, with a README saying what each shows. Sidecar `source` strings that say "reference photographs (not committed)" predate them; the generators keep that wording because it is written into the committed sidecars.
+
 Determinism: two runs give byte-identical outputs. No randomness (scenery generators are seeded), Cycles seed 0, no
 denoiser, fixed sample counts. Run times: containers about 80 s (mostly previews), STS about 60 s, trucks about 90 s,
 vessels about 40 s with previews. Slow when several Blender jobs share the CPU: use `--only <group>`.
+
+**Cloud check (2026-11-12, `bpy` 5.2.3, `tt:assets --check` over all groups, about 7 minutes):** every GLB, sidecar and atlas JSON
+in all seven groups is byte-identical to the commit. Cycles previews render in a cloud session (software CPU, no GPU needed) and
+`containers` and `vessels` previews are byte-identical too, but the `.webp` previews of `asc`, `shc`, `sts`, `trucks` and
+`infrastructure` differ (56 files, reproducible: two runs of `--only shc` give the same four differing files). They are the
+same scenes rendered on a different CPU (Cycles sums floats in a thread-dependent order), so treat a preview-only difference
+there as expected and look at the images instead of byte-comparing them; previews are documentation, the runtime never loads
+them. To check models alone, or to skip the slow renders, add `--no-previews`.
 
 Format rules:
 
@@ -111,6 +125,7 @@ Budgets and current counts (from `tt:assets:check`, triangles / draw calls):
 | Kind | Budget LOD0 | Budget LOD1 | Budget LOD2 | File max | Current |
 |---|---|---|---|---|---|
 | `container` | 450 / 3 | 12 / 1 | | 400 KB | 20 ft 308 / 3, 12 / 1; 40 and 40HC 440 / 3, 12 / 1; about 135 KB each (mostly the 2048 livery atlas) |
+| `hero-container` | 520 / 3 (per face, LOD0 only) | | | 60 KB | 82 to 458 triangles, 2 to 3 draw calls; 20 to 29 KB per face (see Hero container faces) |
 | `sts` | 40 000 / 20 | 8 000 / 10 | 1 000 / 6 | 3 MB | 31 690 / 18, 5 912 / 10, 490 / 5; 561 KB |
 | `asc` | 15 000 / 10 | 4 000 / 6 | 600 / 3 | 1.5 MB | 12 998 / 9, 3 844 / 5, 556 / 3; 295 KB |
 | `shc` | 12 000 / 16 | 3 000 / 12 | 400 / 3 | 1.5 MB | 9 856 / 16, 2 154 / 12, 358 / 2; 291 KB |
@@ -123,8 +138,8 @@ Budgets and current counts (from `tt:assets:check`, triangles / draw calls):
 | `backdrop` | 4 000 / 1 | | | 400 KB | rock 2 880 / 1, hills 590, coast 472 |
 
 Group `tti-surroundings`: the five `scenery-*` assets, 8 000 triangles and 5 draw calls in all (currently about 6 070 / 5).
-It must equal `SURROUNDINGS` in `terminals/tti-algeciras/constants.ts` (`tests/surroundings.test.ts`). Library: 38
-assets, 5.37 MB. Draw calls in a budget are primitives in the GLB; the renderer may instance or merge them (see rendering-3d).
+It must equal `SURROUNDINGS` in `terminals/tti-algeciras/constants.ts` (`tests/surroundings.test.ts`). Library: 50
+assets, 5.66 MB. Draw calls in a budget are primitives in the GLB; the renderer may instance or merge them (see rendering-3d).
 
 ## Rig and sidecar conventions
 
@@ -168,11 +183,25 @@ photos into asset directories.
   generic grey. Now 11 tiles: HMM, MSC, Maersk, CMA CGM, Hapag-Lloyd, ONE, Evergreen, COSCO, ZIM, Yang Ming, generic.
   Atlas 2048x2048 with 2x6 tiles (12 at most); regions per tile `side40`, `side20`, `door`, `front`, `solid`, `dark`, `metal`.
   Wordmarks are the brand name in brand colours in an open-licence typeface close to the brand's [A], no logos.
+- **Far-field atlas** (#256): `liveryMaterial` blends `livery-atlas-far.webp` (1024 px WebP rendered by `liveries.py#render_atlas(far=True)`,
+  same tile layout, so the same UVs; enlarged wordmark, coarse 1.2 m rib shading, no owner code) over the embedded near atlas
+  between 65 and 100 m. It is not embedded in the GLBs, so the GLB bytes are unchanged; `livery-atlas.json` has a `far` entry.
 - `livery-atlas.json` (committed beside the GLBs) is the renderer's lookup; TEXCOORD_0 is authored for tile 0 (HMM) and
   the renderer offsets per instance (`modules/containerAssets.ts`).
 - **Adding a line:** append it to `LIVERIES` before the generic entry, add its prefix to `LINE_OWNER_PREFIX`, regenerate.
 - **Official logos later:** draw them into the same regions in `_draw_tile` (keep the layout) and regenerate.
 - Fixture `liveries-mixed` (12 generated boxes, equal weights over ten lines, 8 lines with seed 7, all three sizes) feeds the livery smoke test.
+
+## Hero container faces
+
+`hero` group (#255), `tt_assets/hero_containers.py`: 12 GLBs `hero-<20|40|40hc>-<side|door|front|roof>`, kind `hero-container`, `LOD0` only. They are not referenced by the page (a test guards that); the renderer (#258) fetches them on the first close zoom. Each face is modelled in the box frame (origin bottom centre) at its true position, so the four faces of a size assemble with no offsets; the far side is the side face turned 180 degrees about +Y. The underside is not modelled. Dev viewer: `?viewer=hero-box-40` (also `-20`, `-40hc`) assembles the box.
+
+- **Geometry:** corrugation at the real pitch (about 0.25 m, divided evenly into the span: 47 ribs on a 40 ft side, 0.252 m; door leaves 4 ribs each at 0.266 m; front end and roof corrugated too, roof shallow), ISO 1161 castings with aperture decals, posts, rails; door end with gaskets, locking bars, bar guides, cam keepers, handles and 4 hinges per leaf (5 on high cube); forklift pockets on the 20 ft side only.
+- **Nodes:** `paint` (white base colour: livery colour and colour-by tint multiply it), `hardware` (fixed galvanised), `dark` (fixed rubber and openings). Materials are back-face culled.
+- **Material inputs:** UV0 spans the face (markings, livery), UV1 is metres over 0.5 m for two repeating 256 px maps shared by the faces: `hero_detail_normal` (tangent space) and `hero_orm` (R wear mask, G roughness variation, B metal 0). They are procedural and tileable; rust, dents and scuffs are meant to be driven per box in the renderer from the wear seed (offset and threshold on the R mask), not baked.
+- **Measured cost (per face, compressed):** triangles 20 ft side 192, door 434, front 82, roof 164; 40 ft side 312, door 434, front 82, roof 314; 40HC side 312, door 458, front 82, roof 314. Draw calls 2 (door 3). Bytes 20.4 to 28.7 KB per face file, of which about 18 KB is the two textures embedded in every file (12 files, 0.30 MB all). A box shows at most 3 faces: worst case 458 + 312 + 314 = 1 084 triangles and 7 draw calls before instancing.
+- **Proposed caps** (`heroCaps` in `budgets.json`, checked by `tests/hero-container-asset.test.ts`): High 32 boxes, Medium 12, Low 0, as the spec's starting point. At 3 faces a box and the worst face (458) that is at most 44 000 triangles on High and 16 500 on Medium, about one STS crane's worth; instanced per face kind and material there are at most 27 draw calls. Geometry would allow about double; the binding costs are preparation time and marking atlas pages (#258, #259), so keep 32 and 12 until measured in the renderer.
+- Previews: `previews/hero-<size>-<face>-view.webp` per face and `hero-<size>-assembled.webp` (the paint is white, so the box looks pale until tinted).
 
 ## Equipment, vessels and infrastructure generators
 

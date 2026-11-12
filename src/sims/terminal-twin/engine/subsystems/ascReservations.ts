@@ -7,7 +7,7 @@
  * a partner's step-aside. Starting the job itself is ascDispatch.ts.
  */
 import type { EngineContext } from '../context'
-import { ascKpi, blockOf, isTruckJob, kinematics, partnerOf, stallOf } from './ascStorage'
+import { ascKpi, blockOf, isTruckJob, kinematics, partnerOf, stallOf, yardSlotBaseY } from './ascStorage'
 import { truckStallEta } from './landside'
 import { planSegment, positionAt, type AxisProfile, type MotionSegment } from '../kinematics'
 import { laneGraphOf } from '../laneGraph'
@@ -19,7 +19,6 @@ import {
   parseYardSlotId,
   rowX,
   slotZ,
-  tierBaseY,
   travelHoistM,
   TRUCK_DECK_M,
 } from '../yardLayout'
@@ -152,7 +151,7 @@ function buildRetrieveTrip(ctx: EngineContext, asc: AscState, job: AscJob): { tr
   trip.hoistTo(travel, k.hoistEmpty)
   trip.moveTo(slotZ(block, cell.bay, span), rowX(block, cell.row), k.gantry, k.trolley)
   trip.mark('AscPositioningAtStack')
-  trip.hoistTo(tierBaseY(cell.tier), k.hoistEmpty)
+  trip.hoistTo(yardSlotBaseY(state, job.yardSlotId as string, span), k.hoistEmpty)
   trip.mark('AscLocking')
   trip.dwell(k.lockS)
   trip.mark('AscRetrieved')
@@ -185,7 +184,7 @@ function buildRehandleTrip(ctx: EngineContext, asc: AscState, job: AscJob): { tr
   trip.hoistTo(travel, k.hoistEmpty)
   trip.moveTo(slotZ(block, from.bay, span), rowX(block, from.row), k.gantry, k.trolley)
   trip.mark('AscPositioningAtStack')
-  trip.hoistTo(tierBaseY(from.tier), k.hoistEmpty)
+  trip.hoistTo(yardSlotBaseY(state, job.yardSlotId as string, span), k.hoistEmpty)
   trip.mark('AscLocking')
   trip.dwell(k.lockS)
   trip.mark('AscRetrieved')
@@ -193,7 +192,7 @@ function buildRehandleTrip(ctx: EngineContext, asc: AscState, job: AscJob): { tr
   trip.hoistTo(travel, k.hoistLoaded)
   trip.moveTo(slotZ(block, to.bay, span), rowX(block, to.row), k.gantry, k.trolley)
   trip.mark('AscPositioningAtSlot')
-  trip.hoistTo(tierBaseY(to.tier), k.hoistLoaded)
+  trip.hoistTo(yardSlotBaseY(state, job.targetSlotId as string, span), k.hoistLoaded)
   trip.mark('AscUnlocking')
   trip.dwell(k.unlockS)
   trip.mark('AscStacked')
@@ -226,7 +225,7 @@ function buildTruckDropTrip(ctx: EngineContext, asc: AscState, job: AscJob): { t
   trip.padTo = trip.t
   trip.moveTo(slotZ(block, cell.bay, span), rowX(block, cell.row), k.gantry, k.trolley)
   trip.mark('AscPositioningAtSlot')
-  trip.hoistTo(tierBaseY(cell.tier), k.hoistLoaded)
+  trip.hoistTo(yardSlotBaseY(state, job.yardSlotId as string, span), k.hoistLoaded)
   trip.mark('AscUnlocking')
   trip.dwell(k.unlockS)
   trip.mark('AscStacked')
@@ -249,7 +248,7 @@ function buildTruckPickTrip(ctx: EngineContext, asc: AscState, job: AscJob): { t
   trip.hoistTo(travel, k.hoistEmpty)
   trip.moveTo(slotZ(block, cell.bay, span), rowX(block, cell.row), k.gantry, k.trolley)
   trip.mark('AscPositioningAtStack')
-  trip.hoistTo(tierBaseY(cell.tier), k.hoistEmpty)
+  trip.hoistTo(yardSlotBaseY(state, job.yardSlotId as string, span), k.hoistEmpty)
   trip.mark('AscLocking')
   trip.dwell(k.lockS)
   trip.mark('AscRetrieved')
@@ -303,7 +302,7 @@ function buildJobTrip(ctx: EngineContext, asc: AscState, job: AscJob): { trip: A
   trip.padTo = trip.t
   trip.moveTo(slotZm, slotXm, k.gantry, k.trolley)
   trip.mark('AscPositioningAtSlot')
-  trip.hoistTo(tierBaseY(cell.tier), k.hoistLoaded)
+  trip.hoistTo(yardSlotBaseY(state, job.yardSlotId as string, span), k.hoistLoaded)
   trip.mark('AscUnlocking')
   trip.dwell(k.unlockS)
   trip.mark('AscStacked')

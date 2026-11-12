@@ -13,6 +13,7 @@
  * lower-numbered one (its anchor).
  */
 import type { BlockConfig, ContainerSize, ScenarioConfig } from '../scenario/types'
+import { CONTAINER_HEIGHT_M } from '../scenario/vesselClasses'
 import { apronLayout } from './laneGraph'
 
 /** Rows across the block, fixed by the 25.4 m ASC span. */
@@ -20,7 +21,10 @@ export const BLOCK_ROWS = 8
 export const ROW_PITCH_M = 2.9
 /** [A] One 20 ft bay (box 6.06 m + gap). */
 export const BAY_PITCH_M = 6.7
-/** [A] Tier height: high-cube box. */
+/**
+ * [A] High-cube box height: the basis of the ASC travel clearance (`travelHoistM`) only. A yard box rests on
+ * the box below it, so its height comes from the stack (`yardBaseY`, `yardBaseHeights`, `yardSlotBaseY`), not a tier grid.
+ */
 export const TIER_PITCH_M = 2.896
 /** Gap between the WTP strip and the first bay (m). */
 export const FIRST_BAY_GAP_M = 8
@@ -139,8 +143,47 @@ export const bayZ = (block: Pick<BlockSpec, 'firstBayZ'>, bay: number): number =
 /** Z of the centre of a box spanning `span` bays from `bay`. */
 export const slotZ = (block: Pick<BlockSpec, 'firstBayZ'>, bay: number, span: 1 | 2): number =>
   bayZ(block, bay) + ((span - 1) * BAY_PITCH_M) / 2
-/** Height of the bottom of a box on `tier`. */
-export const tierBaseY = (tier: number): number => (tier - 1) * TIER_PITCH_M
+/**
+ * Bottom of a yard box (#267): the top of the taller column under it, each column given as the heights of the boxes
+ * below, tier 1 first (0 on tier 1 or empty columns). A 40 ft box covers two columns and rests on the taller one.
+ * Exact when every box below covers the same columns as its neighbours in the stack; staggered 40s compose through
+ * the box tops (`yardBaseHeights`, and `yardSlotBaseY` in the engine).
+ */
+export function yardBaseY(columnsBelow: readonly (readonly number[])[]): number {
+  let base = 0
+  for (const column of columnsBelow) {
+    let top = 0
+    for (const h of column) top += h
+    if (top > base) base = top
+  }
+  return base
+}
+
+/**
+ * Bottom height of every placed yard box (#267), from the placements alone (the scene model's initial yard): boxes
+ * are taken tier by tier, each rests on the highest box top in the columns it covers, and its own top then covers
+ * those columns. Throws on a box with an empty column under it.
+ */
+export function yardBaseHeights(placements: readonly { slotId: string; size: ContainerSize }[]): Map<string, number> {
+  const cells = placements.map((p) => ({ slotId: p.slotId, size: p.size, cell: parseYardSlotId(p.slotId) }))
+  cells.sort((a, b) => a.cell.tier - b.cell.tier)
+  const tops = new Map<string, { tier: number; top: number }>()
+  const out = new Map<string, number>()
+  for (const { slotId, size, cell } of cells) {
+    const covered = cellsOf(cell, boxSpan(size)).map((c) => `${c.blockId}|${c.bay}-${c.row}`)
+    let base = 0
+    for (const key of covered) {
+      if (cell.tier === 1) break
+      const below = tops.get(key)
+      if (!below || below.tier !== cell.tier - 1) throw new Error(`Yard box ${slotId} has no box under it in column ${key}`)
+      if (below.top > base) base = below.top
+    }
+    out.set(slotId, base)
+    const top = base + CONTAINER_HEIGHT_M[size]
+    for (const key of covered) tops.set(key, { tier: cell.tier, top })
+  }
+  return out
+}
 /** Spreader (box bottom) height for travel over the stacks. */
 export const travelHoistM = (block: Pick<BlockSpec, 'tiers'>): number => block.tiers * TIER_PITCH_M + TRAVEL_CLEARANCE_M
 

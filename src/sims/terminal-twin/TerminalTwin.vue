@@ -151,6 +151,9 @@ onBeforeUnmount(() => {
 .terminal-twin {
   position: relative;
   flex: 1;
+  /* never wider than the screen: an over-wide child would stretch the 3D canvas past the right edge */
+  min-width: 0;
+  max-width: 100vw;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 52px);

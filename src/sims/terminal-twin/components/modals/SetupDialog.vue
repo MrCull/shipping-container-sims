@@ -17,6 +17,7 @@ import SetupLandsideSection from '../setup/SetupLandsideSection.vue'
 import SetupShcSection from '../setup/SetupShcSection.vue'
 import SetupYardSection from '../setup/SetupYardSection.vue'
 import SetupModesSection from '../setup/SetupModesSection.vue'
+import SetupStrictChecks from '../setup/SetupStrictChecks.vue'
 import SetupDecisionsSection from '../setup/SetupDecisionsSection.vue'
 import { validateLayout } from '../setup/layoutValidation'
 import { validateSts } from '../setup/stsValidation'
@@ -298,6 +299,7 @@ function onTabKey(e: KeyboardEvent, id: SetupTab): void {
               </div>
             </fieldset>
             <SetupDisplaySection />
+            <SetupStrictChecks />
             <SetupDecisionsSection />
           </div>
         </section>

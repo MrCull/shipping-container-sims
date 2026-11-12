@@ -1,0 +1,100 @@
+{
+  "asset": "hero-20-side",
+  "kind": "hero-container",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only hero",
+  "units": "m",
+  "isoSizeType": "22G1",
+  "dimensions": {
+    "lengthM": 6.058,
+    "widthM": 2.438,
+    "heightM": 2.591,
+    "tag": "V",
+    "source": "ISO 668 external dimensions"
+  },
+  "axes": {
+    "up": "+Y",
+    "length": "+X (front end at -X, doors at +X)",
+    "width": "+Z",
+    "origin": "bottom centre of the box (ground contact); every face of a size is modelled in this one frame",
+    "handedness": "right-handed, glTF"
+  },
+  "hero": {
+    "size": "20",
+    "face": "side",
+    "description": "long side panel on the -Y (glTF +Z) side with its share of corner posts, castings and rails; the opposite side is this model turned 180 degrees about the vertical axis; 20 ft boxes also have forklift pockets",
+    "ribs": 23,
+    "pitchM": 0.2479,
+    "tintedNode": "paint",
+    "uv0": "face 0..1: sides and roof u along +X (roof v along the width), ends u along the width; v = height / box height on sides and ends",
+    "uv1": "metres / 0.5: repeating detail normal and ORM maps; rust, dents and scuffs are driven per box by the wear seed in the renderer",
+    "textures": {
+      "normal": "hero_detail_normal 256x256 tangent space",
+      "orm": "hero_orm 256x256: R wear mask, G roughness variation, B metal 0"
+    },
+    "opposite": "rotate 180 degrees about +Y"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "hero-20-side",
+      "role": "lod",
+      "description": "the only level: hero detail for faces within about 15 m"
+    },
+    {
+      "name": "paint",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "tinted surface: corrugated panel, castings, posts and rails; base colour is white so livery colour and colour-by tint multiply it"
+    },
+    {
+      "name": "dark",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "fixed black rubber and openings: door gaskets, casting apertures, forklift pocket openings"
+    }
+  ],
+  "travelLimits": {},
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [],
+    "tag": "V"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 192
+    }
+  },
+  "provenance": [
+    {
+      "fact": "external dimensions 6058 x 2438 x 2591 mm",
+      "tag": "V",
+      "source": "ISO 668"
+    },
+    {
+      "fact": "corner casting envelope 178 x 162 x 118 mm",
+      "tag": "V",
+      "source": "ISO 1161"
+    },
+    {
+      "fact": "23 corrugation ribs at 0.248 m pitch, 0.038 m deep (roof 0.016 m)",
+      "tag": "A",
+      "source": "real pitch is about 0.25 m; depth and rib profile as the LOD0 box"
+    },
+    {
+      "fact": "door furniture: gaskets, locking bars with guides, cam keepers, handles, 4 hinges (5 on high cube) per leaf",
+      "tag": "P",
+      "source": "reference photographs (not committed); dimensions approximated"
+    },
+    {
+      "fact": "forklift pockets 355 x 115 mm, 2.05 m apart, 20 ft only",
+      "tag": "V",
+      "source": "ISO 1496-1 (frame detail approximated)"
+    },
+    {
+      "fact": "detail maps are procedural noise, not scans",
+      "tag": "A"
+    }
+  ]
+}

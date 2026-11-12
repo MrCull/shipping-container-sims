@@ -81,8 +81,13 @@ kpiSeries kpiHeadline dashboard summary invariants eventLog checkpoints`. `kpiHe
   per entity, only reservations still open.
 - `EngineInfo`: `now` (engine horizon), `status` (`ready | ended | failed`), `endT`, `endReason`, `eventsTotal`,
   `movesCompleted`, `vesselsCompleted`, `eventLogHash`, `firstError`. Before any load the host replies `NO_INFO`.
-- Cost: `observe` scans every STS, SHC and ASC, and every vessel (with a `vesselFirstMoveS` query) per event. That is
-  the worker-side overhead on top of the engine in the browser ([optimising/frame-rate.md](optimising/frame-rate.md)).
+- Cost (#253): `observe` reads only the STS, SHC, ASC and vessels an event names in `subjects.equipment` / `subjects.vessels`
+  (in configuration order, so deltas equal the full scan's). Events that change equipment they do not name are listed in
+  `WAKES` (`worker/engineHost.ts`): all equipment of the listed kinds is read after them (`DecisionResolved`: everything).
+  At the end of every request one full read (`sweepAll`) is the safety net; `createEngineHost().missedByEvents()` counts what
+  it found that no event had named and must stay 0. `createEngineHost({ fullScan: true })` is the old per-event full scan;
+  `tests/host-named-entities.test.ts` compares the two over every fixture and the TTI preset to 7,200 s. A new event type that
+  changes equipment it does not name makes that test fail: add it to `WAKES`.
 
 ## Playback and time controls
 
@@ -97,6 +102,19 @@ kpiSeries kpiHeadline dashboard summary invariants eventLog checkpoints`. `kpiHe
   `advance { to: displayTime + lookahead }`, lookahead = `max(MIN_LOOKAHEAD_SIM_S 5, speed x LOOKAHEAD_WALL_S 1.5)`
   (90 sim minutes at x3600). While paused it does not run ahead, so the scene and dev-API queries describe the same
   instant. Then `model.prune(displayTime)`.
+- **Even pacing (#251).** Look-ahead requests are sized by wall-clock cost: each `advance` asks for at most
+  `engineRate x REQUEST_BUDGET_MS` (150 ms) of sim time (first one `INITIAL_CHUNK_SIM_S` 30, doubling while a request costs
+  under half the budget), and the controller smooths the measured worker rate (`engineRate`, sim s per wall s, time
+  constant about 1 s; only chunk-limited requests count, an unlimited one measures its own size). When `engineRate` is
+  below the chosen speed the display rate is `min(speed, engineRate x gap / margin)` with `margin = max(1, min(0.5 x
+  engineRate, 0.5 x speed x LOOKAHEAD_WALL_S))`: full speed while the display is far behind the horizon, then it
+  approaches the horizon at the engine's pace without reaching it, so the clock moves every frame. No cap while paused,
+  at a pending breakpoint (the display must reach it) or after the end. `achievedSpeed` is `engineRate` while the cap
+  applies, else the chosen speed; the top bar shows `tt-achieved-speed` ("running at x1300") when it is more than 10 %
+  below the chosen speed, and `__tt.clock().achievedSpeed` reads it. A reply bigger than `APPLY_ITEMS_PER_FRAME` (2,000)
+  is cut by `sliceDelta` (new containers, entities, motion, custody, reservations, hatch; each in order) and applied one
+  slice per `tick`, no new `advance` is sent meanwhile, and `info` (hence the display limit) moves to the reply's horizon
+  with its last slice; any other request first flushes the queue (`tests/playback-pacing.test.ts`). Restart resets the rate.
 - Flat-out (`flatOut`, `busy` = true, rendering skipped): `runTo(time)` (top bar "Run to…", resumes at the current
   speed), `runToNextDeparture()` (`eventType: 'VesselDeparted'`, `tt-run-to-departure`), `runUntil(cond)` and `step()`
   (both pause, display jumps to engine time). `runTo` rejects a time not after the display.
@@ -152,7 +170,8 @@ dashboard (`dashboardOpen/Tab/Data/Group/Bucketing/Rendered`), KPIs (`kpi`, `fin
   setup dialog's draft shared by its sections).
 - Frame loop (`useTwinScene.loop`): `controller.tick` -> `store.sync` -> rebuild on a new model -> (skip if busy)
   overlays, `setColourBy`, `applyCameraKeys`, follow, lighting (per sim minute) -> `view.update(displayTime, ...)` ->
-  positional sound -> render -> quality meter. `perf().stats.poseMs` and `cpuMs` are smoothed per-frame costs.
+  positional sound -> render -> quality meter. `perf().stats.poseMs` and `cpuMs` are smoothed per-frame costs; `boxesPosed` and `instanceBytes` (#246) are the last frame's counts (boxes posed, container instance-buffer bytes handed to the GPU upload), also in the performance readout.
+  **One-click benchmark (#254):** the Benchmark button in `PerfPanel.vue` (works in production, no `__tt`) runs `composables/useFrameBenchmark.ts` over the plan in `modules/frameBenchmark.ts` through `store.startScenario`, `store.runTo`, `perf.setSetting`, `store.setSpeed` and the `TwinView` (`viewPreset`, `cameraTo`, `cameraPose`, `setCameraPose`), samples every animation frame and downloads one JSON; progress is `perf.benchmark`. How to run and read it: [optimising/frame-rate.md](optimising/frame-rate.md).
 
 ## Setup dialog and start screen
 
@@ -403,7 +422,7 @@ from production, checked by `terminal-twin.prod.smoke.ts`). All calls are safe f
 | `select(id \| null)`, `cameraTo(id, distanceM?)`, `viewPreset(name)`, `followNextTruck()` | selection and camera (`cameraTo` false for unknown ids and absent trucks; 60 m -> LOD0, 600 m -> LOD1) |
 | `setSpeed(s)`, `pause()`, `play()`, `reset()`, `newScenario()`, `clock()` | playback; `clock` = `{ displayTime, speed, paused, busy, engine }` |
 | `overlays(partial?)` | toggle overlays, returns state |
-| `perf()`, `setQuality(setting)`, `perfOverlay(on)`, `setFrameLoad(ms)`, `drawBreakdown()`, `setAutoThresholds({down,up} \| null)` | quality and frame stats ([optimising/frame-rate.md](optimising/frame-rate.md)) |
+| `perf()`, `setQuality(setting)`, `perfOverlay(on)`, `setFrameLoad(ms)`, `drawBreakdown()`, `setAutoThresholds({down,up} \| null)`, `setAutoRung(n)` (`perf()` also has `rung`, `rungName`) | quality and frame stats ([optimising/frame-rate.md](optimising/frame-rate.md)) |
 | `scene()` | rendered counts, LOD splits, asset states, `layers`, `vesselLabels`, frames, render info |
 | `sceneState()` | at display time: `containers` custody, `reservations`, `liveries`, `colour`, and per equipment kind its `sceneKey`/`rigKey` (`sts`/`stsRendered`, `shcs`/`shcRigs`, `ascs`/`ascRigs`, `trucks`/`truckRigs`, `vessels`/`vesselHulls`, `hatchPanels`/`hatchRigs`) |
 | `display()`, `setDisplay(partial)`, `config()` | locale/units; loaded SI config with display |
@@ -430,3 +449,11 @@ The dev asset viewer (`?viewer=<asset>` or `?viewer=yard`) installs `window.__tt
   checks: rerun on a quiet one.
 - Hub debt: `twinStore.ts` is large; `devApi.ts` builds `sceneState` with a cast; `sceneModel.ts` still has a kind chain
   beside the equipment registry.
+
+## Sweep-only invariant checks and "strict checks" (#252)
+
+The worker creates the engine with `invariants.perEvent: false`: no per-event check, full sweeps at the usual interval and at
+the end of the run (`engineHost.ts`, `start`). The setup dialog's "strict checks" checkbox (`components/setup/SetupStrictChecks.vue`,
+`store.strictChecks`, remembered in localStorage under `terminal-twin.strictChecks`) is passed as `strict` in the `load` and
+`restore` requests and restores the per-event check for that run; reset and rewind keep the run's choice. A violation found
+by a sweep is reported as `foundBy: 'sweep'`. `pnpm run tt:baseline --strict` measures the rate with strict checks on.

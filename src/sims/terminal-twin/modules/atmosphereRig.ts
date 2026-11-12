@@ -9,6 +9,7 @@ import { ambientIntensity, type Lighting } from './atmosphere'
 import type { QualityProfile } from './quality'
 import type { SceneModel } from './sceneModel'
 import { MAX_MASTS, mastSpots } from './infrastructureLayout'
+import { EnvironmentCache, environmentIntensity, skyColours } from './skyEnvironment'
 
 const DAY = { sky: new THREE.Color('#a9bfd3'), hemiSky: new THREE.Color('#dfe9f5'), hemiGround: new THREE.Color('#5a5248'), sun: new THREE.Color('#fff4e0') }
 const NIGHT = { sky: new THREE.Color('#0b1424'), hemiSky: new THREE.Color('#7088bd'), hemiGround: new THREE.Color('#454859'), sun: new THREE.Color('#8fa6d6') }
@@ -25,6 +26,41 @@ export interface AtmosphereState {
   shadows: boolean
   masts: number
   equipmentLights: number
+  /** Sky reflections are in force (#248). */
+  environment: boolean
+  /** Environments built so far: at most one per lighting mode, never per frame (#248). */
+  environmentBuilds: number
+}
+
+/** Renders the sky dome for a lighting mode into a PMREM texture (the reflection source). */
+function buildSkyTexture(pmrem: THREE.PMREMGenerator, mode: Lighting['mode']): THREE.Texture {
+  const sky = skyColours(mode)
+  const geo = new THREE.SphereGeometry(50, 32, 16)
+  const pos = geo.getAttribute('position')
+  const colours = new Float32Array(pos.count * 3)
+  const top = new THREE.Color(sky.zenith.r, sky.zenith.g, sky.zenith.b)
+  const hor = new THREE.Color(sky.horizon.r, sky.horizon.g, sky.horizon.b)
+  const gnd = new THREE.Color(sky.ground.r, sky.ground.g, sky.ground.b)
+  const c = new THREE.Color()
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i) / 50
+    if (y >= 0) c.copy(hor).lerp(top, Math.pow(y, 0.6))
+    else c.copy(hor).lerp(gnd, Math.min(1, -y * 3))
+    colours.set([c.r, c.g, c.b], i * 3)
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colours, 3))
+  const dome = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide }))
+  const sunMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(sky.sun.r, sky.sun.g, sky.sun.b) })
+  const sun = new THREE.Mesh(new THREE.SphereGeometry(5, 12, 8), sunMat)
+  sun.position.set(20, 30, 25)
+  const scene = new THREE.Scene()
+  scene.add(dome, sun)
+  const target = pmrem.fromScene(scene, 0.04)
+  geo.dispose()
+  dome.material.dispose()
+  sun.geometry.dispose()
+  sunMat.dispose()
+  return target.texture
 }
 
 function glowTexture(): THREE.Texture | null {
@@ -58,6 +94,12 @@ export class AtmosphereRig {
   private shadowsAllowed = true
   private mastGlowLimit = Infinity
   private disposables: { dispose(): void }[] = []
+  /** Sky reflections (#248): one PMREM environment per lighting mode, built on first use once a renderer is attached. */
+  private envCache: EnvironmentCache<THREE.Texture> | null = null
+  private pmrem: THREE.PMREMGenerator | null = null
+  private reflectionsAllowed = true
+
+  private readonly scene: THREE.Scene
 
   constructor(
     scene: THREE.Scene,
@@ -66,6 +108,7 @@ export class AtmosphereRig {
     /** Fog far distance (m): the scenery's own, so the farthest backdrop piece stays hazy rather than erased. */
     fogFarM = 9000,
   ) {
+    this.scene = scene
     scene.background = this.background
     this.fog.far = fogFarM
     scene.fog = this.fog
@@ -138,9 +181,29 @@ export class AtmosphereRig {
     this.masts.visible = false
   }
 
+  /** Gives the rig the GPU renderer so it can bake the procedural sky into reflections (#248). Headless hosts never call it and get no reflections. */
+  attachRenderer(renderer: THREE.WebGLRenderer): void {
+    this.pmrem?.dispose()
+    this.pmrem = new THREE.PMREMGenerator(renderer)
+    const pmrem = this.pmrem
+    this.envCache = new EnvironmentCache((mode) => buildSkyTexture(pmrem, mode))
+    if (this.lighting) this.apply(this.lighting)
+  }
+
+  /** The environment follows the lighting mode (day, dusk, night), built once per mode; only its strength follows daylight. */
+  private applyEnvironment(l: Lighting): void {
+    if (!this.envCache || !this.reflectionsAllowed) {
+      this.scene.environment = null
+      return
+    }
+    this.scene.environment = this.envCache.get(l.mode)
+    this.scene.environmentIntensity = environmentIntensity(l.daylight)
+  }
+
   /** Apply a lighting state (cheap: only recolours and toggles). */
   apply(l: Lighting): void {
     this.lighting = l
+    this.applyEnvironment(l)
     const d = l.daylight
     this.background.lerpColors(NIGHT.sky, DAY.sky, d)
     this.fog.color.copy(this.background)
@@ -165,6 +228,7 @@ export class AtmosphereRig {
   setQuality(profile: QualityProfile): void {
     this.shadowsAllowed = profile.shadows
     this.mastGlowLimit = profile.nightLights
+    this.reflectionsAllowed = profile.environmentReflections
     if (this.sun.shadow.mapSize.x !== profile.shadowMapSize) {
       this.sun.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize)
       this.sun.shadow.map?.dispose()
@@ -172,6 +236,11 @@ export class AtmosphereRig {
     }
     if (this.lighting) this.apply(this.lighting)
     else this.sun.castShadow = profile.shadows
+  }
+
+  /** Test seam: environments built so far. */
+  get environmentBuilds(): number {
+    return this.envCache?.builds ?? 0
   }
 
   /** Follow the equipment with its glow points (only while the glow is visible). */
@@ -205,10 +274,17 @@ export class AtmosphereRig {
       shadows: this.sun.castShadow,
       masts: this.mastGlow.visible ? Math.min(this.mastCount, this.mastGlowLimit) : 0,
       equipmentLights: this.equipGlow.visible ? this.equipCount : 0,
+      environment: this.scene.environment !== null,
+      environmentBuilds: this.environmentBuilds,
     }
   }
 
   dispose(): void {
+    this.scene.environment = null
+    for (const t of this.envCache?.values() ?? []) t.dispose()
+    this.envCache?.clear()
+    this.pmrem?.dispose()
+    this.pmrem = null
     for (const d of this.disposables) d.dispose()
     this.disposables = []
   }

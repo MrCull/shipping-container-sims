@@ -79,7 +79,7 @@ export type QueryKind =
   | 'checkpoints'
 
 export type WorkerRequest =
-  | { op: 'load'; config: ScenarioConfig; seed: number }
+  | { op: 'load'; config: ScenarioConfig; seed: number; /** Check every event (#252); default is sweep-only. Kept for reset and rewind. */ strict?: boolean }
   | { op: 'reset' }
   /** Run until sim time `to` (playback look-ahead). Full delta. */
   | { op: 'advance'; to: number }
@@ -90,7 +90,7 @@ export type WorkerRequest =
   | { op: 'inject'; type: EventType; at: number; subjects: EventSubjects; payload: EventPayloads[EventType] }
   | { op: 'snapshot' }
   /** Resume from a snapshot (same engine version): replays its event log so the scene learns the history, then restores its exact state. Result `ReplayResult`. */
-  | { op: 'restore'; snapshot: SimSnapshot }
+  | { op: 'restore'; snapshot: SimSnapshot; strict?: boolean }
   /** Back to a rewind point: restart the loaded scenario and replay `events` events. Result `ReplayResult`. */
   | { op: 'rewind'; events: number; hash: string }
   /** Automatic rewind points every `seconds` of sim time (default `DEFAULT_CHECKPOINT_S`); kept across load/reset. */
@@ -132,6 +132,8 @@ export interface CustodyChange {
   x?: number
   /** STS only: offset of the box from the spreader centre along X (twin-20: aft −, fore +). */
   dx?: number
+  /** Yard slots only: height of the box bottom (m, #267), the top of the boxes under it when it was stacked. */
+  baseY?: number
 }
 
 /**
@@ -225,7 +227,8 @@ export interface EngineInfo {
 }
 
 export type WorkerReply =
-  | { rid: number; ok: true; result: unknown; delta: Delta; info: EngineInfo }
+  /** `workMs`: wall time the worker spent serving the request (what the playback pacing measures the engine's rate by, #251). */
+  | { rid: number; ok: true; result: unknown; delta: Delta; info: EngineInfo; workMs?: number }
   | { rid: number; ok: false; error: string }
 
 export const EVENT_SUMMARY_CAP = 200

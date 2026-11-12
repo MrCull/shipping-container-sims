@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AutoQuality, AUTO_DOWN_FPS, QUALITY_LEVELS, QUALITY_PROFILES, FpsMeter, profileFor } from '../modules/quality'
+import { AutoQuality, HERO_PAUSED_BOXES, HERO_STILL_BOXES, orbitSpeedFor, pausedDetailProfile, AUTO_DOWN_FPS, AUTO_RUNGS, BOTTOM_RUNG, MANUAL_RUNG, QUALITY_LEVELS, QUALITY_PROFILES, FpsMeter, levelOfRung, markStepForRung, profileFor, profileForRung, rungName } from '../modules/quality'
 
 /** Feeds `seconds` of frames at a steady `fps`, returns the level after. */
 function feed(auto: AutoQuality, startMs: number, seconds: number, fps: number): number {
@@ -63,24 +63,136 @@ describe('FpsMeter', () => {
   })
 })
 
-describe('AutoQuality', () => {
-  it('holds quality at a steady 60 fps', () => {
-    const auto = new AutoQuality()
-    feed(auto, 0, 60, 60)
-    expect(auto.level).toBe('high')
+describe('the shedding ladder (pure)', () => {
+  it('sheds in the listed order: hero cap, hero marks, hero off, shadows and resolution, Medium, Low', () => {
+    expect(AUTO_RUNGS.map((r) => r.name)).toEqual(['hero-full', 'hero-half', 'hero-quarter', 'hero-marks-standard', 'hero-off', 'shadows-resolution', 'medium', 'low'])
   })
 
-  it('steps down when fps stays under 45, one level per sustained window', () => {
+  it('hero cap falls full, half, quarter, none, and never returns lower down the ladder', () => {
+    const caps = AUTO_RUNGS.map((_, i) => profileForRung(i).heroBoxes)
+    expect(caps[0]).toBe(QUALITY_PROFILES.high.heroBoxes)
+    expect(caps[1]).toBe(caps[0] / 2)
+    expect(caps[2]).toBe(caps[0] / 4)
+    expect(caps[4]).toBe(0)
+    for (let i = 1; i < caps.length; i++) expect(caps[i]).toBeLessThanOrEqual(caps[i - 1])
+  })
+
+  it('hero marking resolution drops after the cap has shrunk; below, only the still-camera floor is drawn, sharp', () => {
+    expect(AUTO_RUNGS.map((_, i) => markStepForRung(i))).toEqual(['sharp', 'sharp', 'sharp', 'standard', 'sharp', 'sharp', 'sharp', 'sharp'])
+  })
+
+  it('paused-detail boost: High close-up detail on every rung, nothing lowered, shadows and LOD distances left alone', () => {
+    for (let rung = 0; rung < AUTO_RUNGS.length; rung++) {
+      const base = profileForRung(rung)
+      const p = pausedDetailProfile(base)
+      expect(p.heroBoxes).toBe(Math.max(base.heroBoxes, HERO_PAUSED_BOXES))
+      expect(p.closeupDistanceM).toBe(QUALITY_PROFILES.high.closeupDistanceM)
+      expect(p.closeupFaceBudget).toBe(QUALITY_PROFILES.high.closeupFaceBudget)
+      expect(p.resolutionScale).toBe(1)
+      expect({ ...p, heroBoxes: 0, closeupDistanceM: 0, closeupFaceBudget: 0, resolutionScale: 0 }).toEqual({ ...base, heroBoxes: 0, closeupDistanceM: 0, closeupFaceBudget: 0, resolutionScale: 0 })
+    }
+  })
+
+  it('orbit speed falls close to the target and is never above 1', () => {
+    expect(orbitSpeedFor(8)).toBe(0.35)
+    expect(orbitSpeedFor(20)).toBe(0.5)
+    expect(orbitSpeedFor(40)).toBe(1)
+    expect(orbitSpeedFor(3000)).toBe(1)
+  })
+
+  it('every Auto rung keeps the still-camera hero floor; the manual levels have none', () => {
+    expect(AUTO_RUNGS.map((_, i) => profileForRung(i).heroStillBoxes)).toEqual(AUTO_RUNGS.map(() => HERO_STILL_BOXES))
+    expect(HERO_STILL_BOXES).toBeGreaterThan(0)
+    expect(HERO_STILL_BOXES).toBeLessThan(profileForRung(2).heroBoxes) // below the smallest moving cap: the floor only bites once hero is shed
+    expect(QUALITY_LEVELS.map((l) => profileFor(l).heroStillBoxes)).toEqual([0, 0, 0])
+  })
+
+  it('shadows and resolution drop only after the hero rungs, and never rise down the ladder', () => {
+    const p = AUTO_RUNGS.map((_, i) => profileForRung(i))
+    for (let i = 0; i <= 4; i++) {
+      expect(p[i].shadowMapSize).toBe(QUALITY_PROFILES.high.shadowMapSize)
+      expect(p[i].resolutionScale).toBe(1)
+    }
+    expect(p[5].shadowMapSize).toBeLessThan(p[4].shadowMapSize)
+    expect(p[5].resolutionScale).toBeLessThan(p[4].resolutionScale)
+    for (let i = 1; i < p.length; i++) {
+      expect(p[i].shadowMapSize).toBeLessThanOrEqual(p[i - 1].shadowMapSize)
+      expect(p[i].resolutionScale).toBeLessThanOrEqual(p[i - 1].resolutionScale)
+      expect(p[i].lod0DistanceM).toBeLessThanOrEqual(p[i - 1].lod0DistanceM)
+    }
+    expect(profileForRung(6)).toEqual({ ...QUALITY_PROFILES.medium, heroBoxes: 0, heroStillBoxes: HERO_STILL_BOXES })
+    expect(profileForRung(7)).toEqual({ ...QUALITY_PROFILES.low, heroStillBoxes: HERO_STILL_BOXES })
+  })
+
+  it('manual levels fix the ladder at their rung', () => {
+    expect(MANUAL_RUNG).toEqual({ high: 0, medium: 6, low: 7 })
+    expect(AUTO_RUNGS[MANUAL_RUNG.medium].name).toBe('medium')
+    expect(profileForRung(MANUAL_RUNG.high)).toEqual({ ...QUALITY_PROFILES.high, heroStillBoxes: HERO_STILL_BOXES })
+    expect(levelOfRung(MANUAL_RUNG.medium)).toBe('medium')
+    expect(levelOfRung(MANUAL_RUNG.low)).toBe('low')
+  })
+
+  it('is a pure function of the rung, clamped at both ends', () => {
+    expect(profileForRung(-3)).toEqual(profileForRung(0))
+    expect(profileForRung(99)).toEqual(profileForRung(BOTTOM_RUNG))
+    expect(rungName(2)).toBe('hero-quarter')
+  })
+})
+
+describe('AutoQuality', () => {
+  it('holds the top rung at a steady 60 fps', () => {
     const auto = new AutoQuality()
+    feed(auto, 0, 60, 60)
+    expect(auto.rung).toBe(0)
+  })
+
+  it('steps down the ladder one rung per sustained slow window run, in order, to the floor', () => {
+    const seen: number[] = []
+    const auto = new AutoQuality((r) => seen.push(r))
     let t = feed(auto, 0, 1, 60)
     t = feed(auto, t, 1, 30) // a short dip does not step down
-    expect(auto.level).toBe('high')
-    t = feed(auto, t, 4, 30)
-    expect(auto.level).toBe('medium')
-    t = feed(auto, t, 6, 30)
-    expect(auto.level).toBe('low')
+    expect(auto.rung).toBe(0)
+    t = feed(auto, t, 80, 30)
+    expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(auto.rung).toBe(BOTTOM_RUNG)
     feed(auto, t, 20, 30)
-    expect(auto.level).toBe('low') // floor
+    expect(auto.rung).toBe(BOTTOM_RUNG) // floor
+  })
+
+  it('a good average with a high share of slow frames still steps down', () => {
+    const auto = new AutoQuality()
+    // one frame in six takes 80 ms, the rest 8 ms: median 8 ms (125 fps), average about 17 ms (58 fps)
+    let t = 0
+    auto.frame(t)
+    for (let i = 0; i < 400; i++) {
+      t += i % 6 === 5 ? 80 : 8
+      auto.frame(t)
+    }
+    expect(auto.lastWindow.medianMs).toBeLessThan(10)
+    expect(auto.lastWindow.slowShare).toBeGreaterThan(0.1)
+    expect(auto.rung).toBeGreaterThan(0)
+  })
+
+  it('a few slow frames among good ones do not step down', () => {
+    const auto = new AutoQuality()
+    let t = 0
+    auto.frame(t)
+    for (let i = 0; i < 2000; i++) {
+      t += i % 50 === 49 ? 60 : 12 // 2 % slow
+      auto.frame(t)
+    }
+    expect(auto.rung).toBe(0)
+  })
+
+  it('judges by the median, not by one stall: a window of mostly 16 ms frames holds', () => {
+    const auto = new AutoQuality()
+    let t = 0
+    auto.frame(t)
+    for (let i = 0; i < 1500; i++) {
+      t += i % 100 === 99 ? 400 : 14 // one 400 ms stall per 100 frames: 1 % slow, median 14 ms
+      auto.frame(t)
+    }
+    expect(auto.rung).toBe(0)
   })
 
   it('a single long frame (tab switch, GC) does not step down', () => {
@@ -89,39 +201,70 @@ describe('AutoQuality', () => {
     t += 3000
     auto.frame(t)
     feed(auto, t, 3, 60)
-    expect(auto.level).toBe('high')
+    expect(auto.rung).toBe(0)
   })
 
-  it('steps back up with headroom, never straight after a step down', () => {
-    const auto = new AutoQuality()
-    let t = feed(auto, 0, 6, 30)
-    expect(auto.level).not.toBe('high')
-    const down = auto.level
+  it('steps back up in reverse order with headroom, never straight after a step down', () => {
+    const seen: number[] = []
+    const auto = new AutoQuality((r) => seen.push(r))
+    let t = feed(auto, 0, 14, 30)
+    expect(auto.rung).toBe(3)
     t = feed(auto, t, 3, 60)
-    expect(auto.level).toBe(down) // cooldown
-    t = feed(auto, t, 15, 60)
-    expect(auto.level).toBe('high')
+    expect(auto.rung).toBe(3) // cooldown
+    t = feed(auto, t, 200, 60)
+    expect(auto.rung).toBe(0)
+    expect(seen).toEqual([1, 2, 3, 2, 1, 0])
     expect(t).toBeGreaterThan(0)
   })
 
   it('backs off after a step up that did not hold, so it does not oscillate', () => {
     const auto = new AutoQuality()
     let t = 0
-    const levels: string[] = []
-    // load that is fine at low/medium but too heavy at high: 70 fps below high, 30 fps at high
+    const rungs: number[] = []
+    // load that is fine below rung 3 and too heavy at rung 2 and above: 70 fps at 3 or more, 30 fps at 0 to 2
     for (let i = 0; i < 600; i++) {
-      t = feed(auto, t, 1, auto.level === 'high' ? 30 : 70)
-      levels.push(auto.level)
+      t = feed(auto, t, 1, auto.rung <= 2 ? 30 : 70)
+      rungs.push(auto.rung)
     }
-    const changes = levels.filter((l, i) => i > 0 && l !== levels[i - 1]).length
-    expect(changes).toBeLessThan(14)
+    const changes = rungs.filter((r, i) => i > 0 && r !== rungs[i - 1]).length
+    expect(changes).toBeLessThan(20) // without the back-off: about 100
     expect(AUTO_DOWN_FPS).toBe(45)
   })
 
-  it('reports each change to a listener', () => {
-    const seen: string[] = []
-    const auto = new AutoQuality((l) => seen.push(l))
+  it('the wait before the next step up doubles after an undone step up', () => {
+    const auto = new AutoQuality()
+    let t = feed(auto, 0, 5, 30) // 0 -> 1
+    expect(auto.rung).toBe(1)
+    const upStart = t
+    while (auto.rung === 1 && t - upStart < 60_000) t = feed(auto, t, 1, 70)
+    expect(auto.rung).toBe(0)
+    const firstWait = t - upStart
+    t = feed(auto, t, 5, 30) // undone within 30 s: 0 -> 1 again
+    expect(auto.rung).toBe(1)
+    const secondStart = t
+    while (auto.rung === 1 && t - secondStart < 120_000) t = feed(auto, t, 1, 70)
+    expect(auto.rung).toBe(0)
+    expect(t - secondStart).toBeGreaterThanOrEqual(firstWait * 1.8)
+  })
+
+  it('retunes the median threshold from fps for slow renderers', () => {
+    const auto = new AutoQuality()
+    auto.setFpsThresholds(12, 15)
+    feed(auto, 0, 10, 20) // 20 fps is fine against 12
+    expect(auto.rung).toBe(0)
+    feed(auto, 20_000, 10, 6)
+    expect(auto.rung).toBeGreaterThan(0)
+    auto.setFpsThresholds(null, null)
+    expect(auto.downMedianMs).toBeCloseTo(1000 / AUTO_DOWN_FPS)
+  })
+
+  it('reports each change to a listener, and reset restarts from a rung', () => {
+    const seen: number[] = []
+    const auto = new AutoQuality((r) => seen.push(r))
     feed(auto, 0, 6, 20)
-    expect(seen[0]).toBe('medium')
+    expect(seen[0]).toBe(1)
+    auto.reset(5)
+    expect(auto.rung).toBe(5)
+    expect(auto.level).toBe('high')
   })
 })

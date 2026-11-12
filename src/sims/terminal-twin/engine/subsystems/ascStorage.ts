@@ -24,6 +24,7 @@ import {
   type BlockSpec,
 } from '../yardLayout'
 import { DEFAULT_ASC_KINEMATICS } from '../../scenario/builder'
+import { CONTAINER_HEIGHT_M } from '../../scenario/vesselClasses'
 import { columnKey, indexYardSlotAdded, indexYardSlotRemoved, stackSpansOf, stackTopsOf, yardIndexOf } from '../yardIndex'
 import { yardBoxView, yardGroupBreak, yardGroupKey, yardGroupingOn } from '../decisions/yardGrouping'
 import { blockersOf, nextBlocker, rehandleCandidates, retrievalRanks, retrievalSlot } from './rehandle'
@@ -450,6 +451,26 @@ export function removeFromStack(state: SimState, yardSlotId: string): void {
       ?.find((s) => s.tier === slot.tier - 1)
     yard.topVessels[i] = below?.containerId ? state.containers[below.containerId].vesselId : null
   }
+}
+
+/**
+ * Height of the bottom of a box in `slotId` covering `span` bays (#267): the highest top of the boxes directly under
+ * it, over the columns it covers (0 on tier 1). Read from the boxes placed now; at planning time the boxes under a
+ * set-down are already stacked (`blockedByOlderClaim`) and a box's height cannot change while it stands in its slot
+ * (only the top box leaves: `isRetrievable`). Throws when a column has no box under the slot (a floating box, reported as `yard.no-floating`).
+ */
+export function yardSlotBaseY(state: SimState, slotId: string, span: 1 | 2): number {
+  const cell = parseYardSlotId(slotId)
+  if (cell.tier <= 1) return 0
+  const index = yardIndexOf(state)
+  let base = 0
+  for (let k = 0; k < span; k++) {
+    const below = index.byColumn.get(columnKey(cell.blockId, cell.bay + k, cell.row))?.find((s) => s.tier === cell.tier - 1)
+    if (!below?.containerId) throw new Error(`yard.no-floating: yard slot ${slotId} has no box under it in bay ${cell.bay + k}, row ${cell.row}`)
+    const top = yardSlotBaseY(state, below.id, below.span) + CONTAINER_HEIGHT_M[state.containers[below.containerId].size]
+    if (top > base) base = top
+  }
+  return base
 }
 
 /** AscStacked: the box now occupies its slot (heights were set when the slot was claimed). */

@@ -3,9 +3,9 @@
   "seed": 8,
   "status": "ended",
   "endReason": "vesselsCompleted >= 1",
-  "eventLogHash": "04ad3e1b87b260",
+  "eventLogHash": "0b29d107746334",
   "kpis": {
-    "simTimeS": 8405.811,
+    "simTimeS": 8404.962,
     "eventsProcessed": 1297,
     "movesCompleted": 36,
     "vesselsCompleted": 1,
@@ -14,7 +14,7 @@
         "moves": 36,
         "cycles": 36,
         "twinLifts": 0,
-        "grossMovesPerHour": 15.956,
+        "grossMovesPerHour": 15.957,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 8405.811,
-        "turnaroundS": 8345.811,
+        "departedAtS": 8404.962,
+        "turnaroundS": 8344.962,
         "sts": [
           "STS01"
         ]
@@ -240,7 +240,7 @@
           "loadedDistanceM": 3142.5,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 5220.493,
+            "parked": 5219.645,
             "moving-to-collect": 862.354,
             "queuing-to-collect": 0,
             "collecting": 900.412,
@@ -258,8 +258,8 @@
           "loadedDistanceM": 163.5,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 8217.922,
-            "moving-to-collect": 54.728,
+            "parked": 8214.794,
+            "moving-to-collect": 57.007,
             "queuing-to-collect": 0,
             "collecting": 49.166,
             "moving-to-deliver": 7,
@@ -272,7 +272,7 @@
         }
       },
       "stsGroundPositionWaitS": {
-        "STS01": 189.719
+        "STS01": 190.634
       }
     },
     "yard": {
@@ -307,7 +307,7 @@
           "jobs": 37,
           "gantryM": 1976.5,
           "trolleyM": 341.25,
-          "hoistM": 1351.456,
+          "hoistM": 1353.896,
           "padWaitS": 0
         }
       }
@@ -316,20 +316,20 @@
       "IMPORT": {
         "count": 6,
         "departed": 0,
-        "meanS": 3179.151,
-        "maxS": 7421.002
+        "meanS": 3178.868,
+        "maxS": 7420.154
       },
       "EXPORT": {
         "count": 28,
         "departed": 28,
-        "meanS": 161078.808,
-        "maxS": 435709.419
+        "meanS": 161078.275,
+        "maxS": 435708.571
       },
       "STORAGE": {
         "count": 14,
         "departed": 0,
-        "meanS": 450597.899,
-        "maxS": 596767.811
+        "meanS": 450597.111,
+        "maxS": 596766.962
       }
     },
     "hatch": {
@@ -350,8 +350,8 @@
       "released": 18,
       "started": 18,
       "completed": 18,
-      "leadTimeMeanS": 866.586,
-      "leadTimeMaxS": 3597.678,
+      "leadTimeMeanS": 866.491,
+      "leadTimeMaxS": 3596.83,
       "boxesLoaded": 28
     },
     "ordering": {

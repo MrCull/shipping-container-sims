@@ -13,3 +13,6 @@ cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}"
 # pnpm install (not --frozen-lockfile) so the cached container keeps node_modules between sessions.
 corepack enable
 pnpm install
+
+# Reject Co-Authored-By trailers at commit time (.githooks/commit-msg); worktrees share this setting.
+git config core.hooksPath .githooks

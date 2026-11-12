@@ -30,7 +30,7 @@ import {
   type PrefillImport,
   rowX,
   slotZ,
-  tierBaseY,
+  yardBaseHeights,
   travelHoistM,
   TRUCK_DECK_M,
   type BlockSpec,
@@ -119,6 +119,8 @@ interface CustodyEntry {
   x?: number
   /** STS only: offset from the spreader centre (twin-20). */
   dx?: number
+  /** Yard slots only: height of the box bottom (#267), from the custody change (or the initial yard). */
+  baseY?: number
 }
 
 interface StatusEntry {
@@ -370,16 +372,21 @@ export class SceneModel {
     // export boxes start in the stacks (TT-10); discharge boxes on board
     const placements = prefill ? prefill.placements : emptyStart ? [] : planExportYard(config, cargo)
     const exportSlot = new Map(placements.map((p) => [p.containerId, p.slotId]))
-    for (const c of cargo.containers) {
-      const owner: CustodyRef =
-        c.flow === 'discharge'
-          ? { kind: 'vesselSlot', id: c.slotId }
-          : emptyStart
-            ? { kind: 'external', id: 'outside' } // booked exports wait outside until a truck brings them
-            : { kind: 'yardSlot', id: exportSlot.get(c.id) as string }
-      this.custody[c.id] = [{ t: 0, owner }]
+    const baseY = yardBaseHeights(placements)
+    const inSlot = (id: string): CustodyEntry => {
+      const slotId = exportSlot.get(id) as string
+      return { t: 0, owner: { kind: 'yardSlot', id: slotId }, baseY: baseY.get(slotId) }
     }
-    for (const imp of prefill?.imports ?? []) this.custody[imp.id] = [{ t: 0, owner: { kind: 'yardSlot', id: exportSlot.get(imp.id) as string } }]
+    for (const c of cargo.containers) {
+      this.custody[c.id] = [
+        c.flow === 'discharge'
+          ? { t: 0, owner: { kind: 'vesselSlot', id: c.slotId } }
+          : emptyStart
+            ? { t: 0, owner: { kind: 'external', id: 'outside' } } // booked exports wait outside until a truck brings them
+            : inSlot(c.id),
+      ]
+    }
+    for (const imp of prefill?.imports ?? []) this.custody[imp.id] = [inSlot(imp.id)]
     this.robBoxes = cargo.rob
     if (hatchEnabled(config)) this.createHatchPanels(cargo.slots, cargo.robBays)
     for (const v of config.vessels) this.status[`vessel:${v.id}`] = [{ t: 0, status: 'scheduled' }]
@@ -497,7 +504,9 @@ export class SceneModel {
       const list = this.custody[c.containerId]
       if (!list) continue
       this.handoffs.push({ t: c.t, containerId: c.containerId, from: list.length > 0 ? list[list.length - 1].owner : null, to: c.owner })
-      list.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
+      list.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx, baseY: c.baseY })
+      this.logT.push(c.t)
+      this.logBox.push(this.containerIndexOf(c.containerId))
     }
     for (const e of delta.entities) {
       this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX, firstMoveS: e.firstMoveS })
@@ -856,7 +865,56 @@ export class SceneModel {
     return this.vesselPlacement(id, time) !== null
   }
 
-  /** Poses of stacked boxes by `${slotId}|${size}` (read-only; shared between frames). */
+  /** Custody changes as appended (#250): box index and the time of the entry. Entries are never dropped (a few bytes each). */
+  private readonly logT: number[] = []
+  private readonly logBox: number[] = []
+  /** Log positions in time order (merged lazily: entries mostly arrive in time order). */
+  private logSorted: number[] = []
+  private idIndex = new Map<string, number>()
+  private idIndexed = 0
+
+  /** Index of a box in `containerIds`. */
+  containerIndexOf(id: string): number {
+    for (; this.idIndexed < this.containerIds.length; this.idIndexed++) this.idIndex.set(this.containerIds[this.idIndexed], this.idIndexed)
+    return this.idIndex.get(id) ?? -1
+  }
+
+  /** How many custody changes the model has been given; pass it back to `custodyChangesSince`. */
+  custodyLogLength(): number {
+    return this.logT.length
+  }
+
+  /**
+   * Boxes (indexes into `containerIds`) whose custody changed in `(t0, t1]`, plus those whose entry was appended after
+   * log position `seq` with a time up to `t1` (it arrived late, after the display had passed it). A box is listed once.
+   */
+  custodyChanges(t0: number, t1: number, seq: number): number[] {
+    const out = new Set<number>()
+    if (this.logSorted.length < this.logT.length) {
+      const fresh: number[] = []
+      for (let i = this.logSorted.length; i < this.logT.length; i++) fresh.push(i)
+      this.logSorted = this.logSorted.concat(fresh).sort((a, b) => this.logT[a] - this.logT[b] || a - b)
+    }
+    const sorted = this.logSorted
+    let lo = 0
+    let hi = sorted.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (this.logT[sorted[mid]] <= t0) lo = mid + 1
+      else hi = mid
+    }
+    for (let k = lo; k < sorted.length && this.logT[sorted[k]] <= t1; k++) out.add(this.logBox[sorted[k]])
+    for (let i = seq; i < this.logT.length; i++) if (this.logT[i] <= t1) out.add(this.logBox[i])
+    return [...out]
+  }
+
+  /** Set by `containerPose`: 0 = the box may be moving (carried, on a truck), 1 = at rest until its custody changes, 2 = on a vessel (`poseVessel`), at rest until that vessel's placement changes. */
+  poseRest: 0 | 1 | 2 = 0
+  poseVessel = ''
+  /** Set by `containerPose` with the custody owner it posed from (null when the box has no custody yet): the renderer reads it instead of a second `custodyAt` lookup (#257). */
+  poseOwner: CustodyRef | null = null
+
+  /** Poses of stacked boxes by `${slotId}|${size}|${baseY}` (read-only; shared between frames; a slot id is reused over a different stack later). */
   private readonly yardPoses = new Map<string, ContainerPose>()
   private readonly vesselSlotCells = new Map<string, ReturnType<typeof parseVesselSlotId>>()
 
@@ -903,11 +961,15 @@ export class SceneModel {
   containerPose(containerId: string, time: number): ContainerPose | null {
     const list = this.custody[containerId] ?? []
     const i = lastAtOrBefore(list, time, (e) => e.t)
+    this.poseRest = 1 // no custody yet: its first entry is in the change log
+    this.poseOwner = null
     if (i < 0) return null
     const entry = list[i]
+    this.poseOwner = entry.owner
     const dims = CONTAINER_DIMS[this.containerSize[containerId]]
     const { kind, id } = entry.owner
     const alongZ = Math.PI / 2
+    this.poseRest = kind === 'shc' || kind === 'asc' || kind === 'sts' || kind === 'truck' ? 0 : 1
     if (kind === 'shc') {
       const p = this.shcPose(id, time)
       return { x: p.x, y: p.lift + dims.height / 2, z: p.z, yaw: p.yaw, carriedBy: id }
@@ -926,9 +988,11 @@ export class SceneModel {
       return { x: p.x, y: p.hoistY + dims.height / 2, z: p.z, yaw: alongZ, carriedBy: id }
     }
     if (kind === 'yardSlot') {
-      // A stacked box never moves: its pose is parsed once per slot and size (tens of thousands of boxes are posed every frame).
+      // A stacked box never moves: its pose is parsed once per slot, size and base (tens of thousands of boxes are posed every frame).
       const size = this.containerSize[containerId]
-      const cacheKey = `${id}|${size}`
+      const base = entry.baseY
+      if (base === undefined) throw new Error(`Yard box ${containerId} in ${id} has no base height (custody change without baseY)`)
+      const cacheKey = `${id}|${size}|${base}`
       const hit = this.yardPoses.get(cacheKey)
       if (hit) return hit
       const cell = parseYardSlotId(id)
@@ -936,7 +1000,7 @@ export class SceneModel {
       if (!block) return null
       const pose: ContainerPose = {
         x: rowX(block, cell.row),
-        y: tierBaseY(cell.tier) + dims.height / 2,
+        y: base + dims.height / 2,
         z: slotZ(block, cell.bay, boxSpan(size)),
         yaw: alongZ,
         yard: true,
@@ -947,6 +1011,8 @@ export class SceneModel {
     if (kind === 'vesselSlot') {
       let slot = this.vesselSlotCells.get(id)
       if (!slot) this.vesselSlotCells.set(id, (slot = parseVesselSlotId(id)))
+      this.poseRest = 2
+      this.poseVessel = slot.vesselId
       const placement = this.vesselPlacement(slot.vesselId, time)
       if (!placement) return null
       const c = slotCentre(this.specs[slot.vesselId], placement.x, slot, this.containerSize[containerId])

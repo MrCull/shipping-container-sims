@@ -22,10 +22,13 @@ import { OverlayLayers, type LabelScreen, type OverlayLayerStats } from './overl
 import { NO_OVERLAYS, type OverlayState } from './overlays'
 
 export type { OverlayState }
-import { ContainerInstancer } from './containerInstancer'
+import { ContainerCloseups } from './containerCloseups'
+import { HeroLevel } from './heroRenderer'
+import type { HeroMarkStep } from './heroMarkings'
+import { ContainerInstancer, type DrawnBox } from './containerInstancer'
 import { describeMarkings } from './containerMarkings'
 import { colourContextOf, colourOf, DEFAULT_COLOUR_BY, DEFAULT_ROB_DISPLAY, hexToInt, isTimeBased, type ColourBy, type ColourContext, type RobDisplay } from './colourBy'
-import { liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
+import { liveryBodyColour, liveryIndexForLine, loadContainerAssets, type ContainerAssets } from './containerAssets'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { beaconFlashOn, GantryBeacons } from './gantryBeacons'
 import type { SoundSource } from './soundMixer'
@@ -35,6 +38,7 @@ import { EQUIPMENT_KINDS, type EquipmentKindDef, type KindFrame, type KindRender
 import { GROUND_ROTATION_X, StaticBatch } from './staticBatch'
 import { QUALITY_PROFILES, type QualityProfile } from './quality'
 import { AtmosphereRig, type AtmosphereState } from './atmosphereRig'
+import { setContactShadows } from './contactShadow'
 import type { Lighting } from './atmosphere'
 import { backdropModelAssets, buildBackdrop, sceneryFor, type Backdrop, type BackdropKind } from './backdrop'
 import type { TerminalScenery } from '../terminals'
@@ -74,7 +78,7 @@ export interface SceneStats {
   /** Occupancy and label overlay counts (zeros while those overlays are off). */
   layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
-  containerLods: { lod0: number; lod1: number; closeup: number; closeupFaces: number; culled: number }
+  containerLods: { lod0: number; lod1: number; closeup: number; closeupFaces: number; heroFaces: number; heroPrepared: number; heroDrawCalls: number; heroTriangles: number; heroMarkStep: HeroMarkStep; heroMarkPages: number; heroMarkTiles: number; heroMarkDrawCalls: number; heroMarkBytes: number; culled: number }
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -110,15 +114,33 @@ const COLOUR_BUCKET_S = 30
 /** ...and at most this many boxes per frame, so a flat-out clock never spends a frame on colours (the rest catch up over the next frames). */
 const COLOUR_BUDGET_PER_FRAME = 4000
 
+/** Posing cull (#257): a box carried or driven is never faster than this (m/s; trucks run 8, cranes less), so a box out of view is posed again only once it could have travelled into it. */
+const MAX_BOX_SPEED_MS = 20
+/** Extra reach (m) around a moving box's cached position before it may be skipped: a spreader hangs a few metres above its box, and the box must be posed whenever its spreader is in view. */
+const POSE_CULL_SLACK_M = 20
+
 /** The scene's ambience (gulls, water, wind): not a machine, the same level everywhere. */
 const HARBOUR_SOURCE: SoundSource = { id: 'harbour', machine: 'harbour', x: 0, y: 0, z: 0, motion: 'idle' }
 
 export class SceneRenderer {
   readonly scene = new THREE.Scene()
   private containers: ContainerInstancer
+  /** The hero level (#258): drawn over the close-up level; its cap comes from the quality profile. */
+  private readonly hero = new HeroLevel()
   private containerLivery: number[]
   /** Colour by (#130): the mode, the facts its legend needs, and per box the tint drawn (0xRRGGBB, -1 = livery) with the epoch and time bucket it was computed for. */
   private colourBy: ColourBy = DEFAULT_COLOUR_BY
+  // What the container posing has covered (#250).
+  private posedT: number | null = null
+  private posedSeq = 0
+  private posedCount = 0
+  private posedEpoch = -1
+  private readonly moving = new Set<number>()
+  /** Sim time each moving box was last posed at (#257). */
+  private readonly posedAt: number[] = []
+  private readonly vesselBoxes = new Map<string, Set<number>>()
+  private readonly boxVessel: (string | undefined)[] = []
+  private readonly vesselSig = new Map<string, string>()
   private robDisplay: RobDisplay = DEFAULT_ROB_DISPLAY
   private colourCtx: ColourContext
   private colourEpoch = 1
@@ -155,7 +177,11 @@ export class SceneRenderer {
   /** Phase 1 procedural quay lines, ASC rails and ground markings: hidden once the phase 2 infrastructure draws. */
   private infraPlaceholders: THREE.Object3D[] = []
 
-  constructor(private model: SceneModel) {
+  /** `closeups` and `useContainerAssets` let a headless host (the drawn-box reference test, the posing baseline) run the posing loop without a canvas or the GLBs. */
+  constructor(
+    private model: SceneModel,
+    options: { closeups?: ContainerCloseups } = {},
+  ) {
     const { config } = model
     const scenery = (this.scenery = sceneryFor(config.name))
     this.atmosphere = new AtmosphereRig(this.scene, model, { quayZ: LAND_RAIL_Z + 6 }, scenery.fogFarM)
@@ -194,7 +220,8 @@ export class SceneRenderer {
       const extra = Math.min(2500, Math.ceil(perDay * 0.5) + (config.landside.scripted?.length ?? 0) + 60)
       for (const size of ['20', '40', '40HC'] as const) capacity[size] = (capacity[size] ?? 0) + extra
     }
-    this.containers = new ContainerInstancer(capacity)
+    this.containers = new ContainerInstancer(capacity, {}, options.closeups)
+    this.containers.setHero(this.hero)
     this.containers.setMarkingsSource((i) => {
       const id = model.containerIds[i]
       const d = model.containerDetail[id]
@@ -208,7 +235,7 @@ export class SceneRenderer {
     this.scene.add(this.containers.group)
     loadContainerAssets().then(
       (assets) => {
-        if (!this.disposed) this.containers.setAssets(assets)
+        if (!this.disposed) this.useContainerAssets(assets)
       },
       (err: unknown) => console.warn('Terminal Twin: container GLBs failed to load; keeping placeholders', err),
     )
@@ -437,7 +464,9 @@ export class SceneRenderer {
   setQuality(profile: QualityProfile): void {
     this.quality = profile
     this.atmosphere.setQuality(profile)
+    setContactShadows(profile.contactShadows)
     this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap, closeupDistanceM: profile.closeupDistanceM, closeupFaceBudget: profile.closeupFaceBudget })
+    this.hero.setLimits({ boxes: profile.heroBoxes, stillBoxes: profile.heroStillBoxes })
     this.setOceanDetail(profile.oceanSegments)
   }
 
@@ -471,6 +500,11 @@ export class SceneRenderer {
   /** Apply the time-of-day lighting (day/dusk/night; cheap, call when it changes). */
   setLighting(l: Lighting): void {
     this.atmosphere.apply(l)
+  }
+
+  /** Gives the atmosphere the GPU renderer for the sky reflections (#248); a headless host never calls it. */
+  attachRenderer(renderer: THREE.WebGLRenderer): void {
+    this.atmosphere.attachRenderer(renderer)
   }
 
   atmosphereState(): AtmosphereState & { backdrop: { kind: BackdropKind; parts: string[]; models: Backdrop['models'] } } {
@@ -512,27 +546,87 @@ export class SceneRenderer {
     const wantsOwners = this.renderers.some((r) => r.renderer.wantsContainerOwners)
     const loads = new Map<string, { count: number; size: string }>()
     const carried = new Map<string, number>()
-    containers.begin()
     const colourBudget = { left: COLOUR_BUDGET_PER_FRAME }
-    model.containerIds.forEach((id, i) => {
+    const ids = model.containerIds
+    // Which boxes to pose (#250): a box at rest is posed when its custody changes, a carried one every frame, a vessel's when its placement changes.
+    const timeBased = isTimeBased(this.colourBy)
+    const full = this.posedT === null || t < this.posedT || this.posedEpoch !== this.colourEpoch || timeBased
+    let visit: Iterable<number>
+    if (full) {
+      visit = ids.keys()
+      this.moving.clear()
+      this.vesselBoxes.clear()
+      this.boxVessel.length = 0
+      this.vesselSig.clear()
+    } else {
+      const set = new Set<number>(model.custodyChanges(this.posedT as number, t, this.posedSeq))
+      for (const i of this.moving) {
+        if (set.has(i) || !frustum || ids[i] === selectedId) {
+          set.add(i)
+          continue
+        }
+        // a moving box out of view, and too far from the view to have reached it since it was last posed, is not posed (its cached position stays)
+        const reach = POSE_CULL_SLACK_M + MAX_BOX_SPEED_MS * Math.abs(t - (this.posedAt[i] ?? t))
+        if (containers.nearFrustum(i, frustum, reach)) set.add(i)
+      }
+      for (let i = this.posedCount; i < ids.length; i++) set.add(i)
+      for (const v of model.vesselIds) {
+        const p = model.vesselPlacement(v, t)
+        const sig = p ? `${p.x},${p.zOffset},${p.status}` : '-'
+        if (this.vesselSig.get(v) === sig) continue
+        this.vesselSig.set(v, sig)
+        for (const i of this.vesselBoxes.get(v) ?? []) set.add(i)
+      }
+      visit = set
+    }
+    if (full) for (const v of model.vesselIds) {
+      const p = model.vesselPlacement(v, t)
+      this.vesselSig.set(v, p ? `${p.x},${p.zOffset},${p.status}` : '-')
+    }
+    this.posedSeq = model.custodyLogLength()
+    for (const i of visit) {
+      const id = ids[i]
       const c = model.containerPose(id, t)
-      if (!c) return
+      const rest = model.poseRest
+      if (rest === 0) {
+        this.moving.add(i)
+        this.posedAt[i] = t
+      } else this.moving.delete(i)
+      const was = this.boxVessel[i]
+      const now = rest === 2 ? model.poseVessel : undefined
+      if (was !== now) {
+        if (was !== undefined) this.vesselBoxes.get(was)?.delete(i)
+        if (now !== undefined) {
+          let set = this.vesselBoxes.get(now)
+          if (!set) this.vesselBoxes.set(now, (set = new Set()))
+          set.add(i)
+        }
+        this.boxVessel[i] = now
+      }
+      if (!c) {
+        containers.remove(i)
+        continue
+      }
       this.containerLivery[i] ??= liveryIndexForLine(model.containerLine[id])
-      containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget), c.yard === true)
+      containers.set(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget), c.yard === true)
       if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
-      if (wantsOwners) {
-        const owner = model.custodyAt(id, t)
+      if (wantsOwners && rest === 0) {
+        const owner = model.poseOwner // set by the pose above: no second custody lookup (#257)
         if (owner) {
           const key = `${owner.kind}:${owner.id}`
           const l = loads.get(key)
           loads.set(key, { count: (l?.count ?? 0) + 1, size: model.containerSize[id] })
         }
       }
-    })
+    }
+    this.posedT = t
+    this.posedEpoch = this.colourEpoch
+    this.posedCount = ids.length
     containers.end(cameraPosition, frustum)
 
     this.lastT = t
     this.atmosphere.update(t)
+    this.infrastructure.update(cameraPosition) // far tier (#249)
     this.sounds.length = 0
     const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), colour: { mode: this.colourBy, robDisplay: this.robDisplay, ctx: this.colourCtx }, sounds: this.sounds }
     for (const { renderer } of this.renderers) renderer.update(frame)
@@ -618,9 +712,48 @@ export class SceneRenderer {
     return this.containers.stats().closeupFaces
   }
 
+  /** Hero marking resolution (#260): `sharp` (about 4x the close-up level) or `standard` (today's); the second shedding step for Auto (#261). */
+  setHeroMarkStep(step: HeroMarkStep): void {
+    this.hero.setMarkStep(step)
+  }
+
+  get heroMarkStep(): HeroMarkStep {
+    return this.hero.markStep
+  }
+
+  /** Hero faces drawn last frame (#258). */
+  /** True when the hero level has nothing more to bring in for this view (`HeroLevel.settled`). */
+  heroSettled(): boolean {
+    return this.hero.settled
+  }
+
+  heroFaceCount(): number {
+    return this.containers.stats().heroFaces
+  }
+
   /** Sound sources of the last frame (machine positions and motion states) for the sound mixer. */
   soundSources(): readonly SoundSource[] {
     return this.sounds
+  }
+
+  /** Switch the containers from the placeholders to these LOD meshes (the GLBs, once loaded). */
+  useContainerAssets(assets: ContainerAssets): void {
+    this.containers.setAssets(assets)
+  }
+
+  /** Boxes posed and container instance bytes handed to the GPU upload in the last update (#246). */
+  poseCounters(): { boxesPosed: number; instanceBytes: number } {
+    const c = this.containers.stats()
+    return { boxesPosed: c.posed, instanceBytes: c.instanceBytes }
+  }
+
+  /** The boxes the container instancer wrote at the last update (needs `recordDrawnBoxes(true)`): the drawn-box reference test. */
+  drawnBoxes(): readonly DrawnBox[] {
+    return this.containers.drawnBoxes()
+  }
+
+  recordDrawnBoxes(on: boolean): void {
+    this.containers.setDrawnRecording(on)
   }
 
   stats(): SceneStats {
@@ -635,7 +768,7 @@ export class SceneRenderer {
       reservedZones: this.reservedZones,
       reservedRailSegments: this.reservedRailSegments,
       layers: this.layers.stats(),
-      containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, closeupFaces: c.closeupFaces, culled: c.culled },
+      containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, closeupFaces: c.closeupFaces, heroFaces: c.heroFaces, heroPrepared: c.heroPrepared, heroDrawCalls: c.heroCost.drawCalls, heroTriangles: c.heroCost.triangles, heroMarkStep: c.heroMarks.step, heroMarkPages: c.heroMarks.pages, heroMarkTiles: c.heroMarks.tiles, heroMarkDrawCalls: c.heroMarks.drawCalls, heroMarkBytes: c.heroMarks.texelBytes, culled: c.culled },
       containerAssets: c.assets,
     } as SceneStats
   }

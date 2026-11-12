@@ -3,7 +3,7 @@
   "seed": 12,
   "status": "ended",
   "endReason": "simDurationS >= 7200",
-  "eventLogHash": "0843cf13f2a5ae",
+  "eventLogHash": "06f95f246d174a",
   "kpis": {
     "simTimeS": 7200,
     "eventsProcessed": 1841,
@@ -359,20 +359,20 @@
           "jobs": 18,
           "gantryM": 578.8,
           "trolleyM": 190.25,
-          "hoistM": 628.192,
+          "hoistM": 632.462,
           "padWaitS": 0,
           "railWaitS": 0,
-          "busyS": 1631.503,
+          "busyS": 1637.908,
           "yields": 2
         },
         "B01-ASC2": {
           "jobs": 41,
           "gantryM": 3336.6,
           "trolleyM": 486.95,
-          "hoistM": 1376.088,
+          "hoistM": 1377.918,
           "padWaitS": 0,
           "railWaitS": 28.751,
-          "busyS": 4066.277,
+          "busyS": 4069.022,
           "yields": 0
         }
       }
@@ -384,8 +384,8 @@
       "gateQueue": 0,
       "gateQueueMax": 1,
       "turnTimeS": {
-        "mean": 258.506,
-        "max": 756.693
+        "mean": 258.898,
+        "max": 761.268
       },
       "gateWaitS": {
         "mean": 4.914,
@@ -396,8 +396,8 @@
         "max": 156.703
       },
       "stallWaitS": {
-        "mean": 50.997,
-        "max": 547.643
+        "mean": 51.226,
+        "max": 552.218
       },
       "gateProcessingS": {
         "mean": 45,
@@ -408,14 +408,14 @@
         "max": 29.979
       },
       "totalTurnaroundS": {
-        "mean": 351.717,
-        "max": 847.823
+        "mean": 352.109,
+        "max": 852.398
       },
       "road": {
         "meanTrucks": 0.457,
         "maxTrucks": 3
       },
-      "serviceS": 134.718,
+      "serviceS": 135.11,
       "transactions": {
         "dropExport": 9,
         "pickImport": 8,
@@ -440,19 +440,19 @@
       "IMPORT": {
         "count": 14,
         "departed": 14,
-        "meanS": 2436.129,
+        "meanS": 2436.848,
         "maxS": 3304.536
       },
       "EXPORT": {
         "count": 18,
         "departed": 0,
-        "meanS": 4553.942,
+        "meanS": 4553.841,
         "maxS": 7200
       },
       "STORAGE": {
         "count": 14,
         "departed": 1,
-        "meanS": 3649.776,
+        "meanS": 3649.645,
         "maxS": 7038.877
       }
     },

@@ -17,8 +17,10 @@ import type { ContainerMarkings } from './containerMarkings'
 import type { Region } from './closeupGeometry'
 import { CORRUGATION_PITCH_M } from './closeupGeometry'
 import { selectFaces, type FaceCandidate } from './closeupFaceBudget'
-import { canvasAtlasBackend, sharedContainerMaps } from './containerTextures'
+import { canvasAtlasBackend, DOOR_BANDS, DOOR_HEADER_M, DOOR_SILL_M, sharedContainerMaps } from './containerTextures'
 import { FACES, visibleFaceList, type ExposedFaces, type Face } from './exposedFaces'
+import type { HeroLevel } from './heroRenderer'
+import type { HeroMarkStep } from './heroMarkings'
 
 /** What a close-up box is painted from. */
 export interface CloseupSource {
@@ -68,7 +70,7 @@ const OFFSET_M = 0.006
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 
 /** Per face: the quad's orientation in the box frame (a unit quad faces +Z with u along +X). */
-const FACE_QUAT: Record<Exclude<Face, 'bottom'>, THREE.Quaternion> = {
+export const FACE_QUAT: Record<Exclude<Face, 'bottom'>, THREE.Quaternion> = {
   sideP: new THREE.Quaternion(),
   sideN: new THREE.Quaternion().setFromAxisAngle(Y_AXIS, Math.PI),
   door: new THREE.Quaternion().setFromAxisAngle(Y_AXIS, Math.PI / 2),
@@ -77,7 +79,7 @@ const FACE_QUAT: Record<Exclude<Face, 'bottom'>, THREE.Quaternion> = {
 }
 
 /** Face centre (box frame, origin at the bottom centre), outward normal and size in metres. */
-function faceFrame(face: Exclude<Face, 'bottom'>, size: ContainerSize): { c: [number, number, number]; n: [number, number, number]; w: number; h: number } {
+export function faceFrame(face: Exclude<Face, 'bottom'>, size: ContainerSize): { c: [number, number, number]; n: [number, number, number]; w: number; h: number } {
   const { length: L, height: H, width: W } = DIMS[size]
   switch (face) {
     case 'sideP':
@@ -146,6 +148,8 @@ export class ContainerCloseups {
   private offers: Offer[] = []
   private offerOf = new Map<number, number>()
   private candidates: FaceCandidate[] = []
+  /** The hero level above this one (#258): offered the same boxes, draws over the faces it takes. */
+  private hero: HeroLevel | null = null
   private maps: { normal: THREE.Texture; roughness: THREE.Texture } | null | undefined
   private quad: THREE.BufferGeometry | null = null
   private readonly q = new THREE.Quaternion()
@@ -160,6 +164,12 @@ export class ContainerCloseups {
     this.group.name = 'containers-closeup'
   }
 
+  setHero(hero: HeroLevel | null): void {
+    if (this.hero) this.group.remove(this.hero.group)
+    this.hero = hero
+    if (hero) this.group.add(hero.group)
+  }
+
   setLimits(next: Partial<CloseupLimits>): void {
     Object.assign(this.limits, next)
   }
@@ -170,6 +180,7 @@ export class ContainerCloseups {
     this.offers.length = 0
     this.offerOf.clear()
     this.candidates.length = 0
+    this.hero?.begin(camera)
   }
 
   /**
@@ -177,6 +188,7 @@ export class ContainerCloseups {
    * from the camera are dropped here. `source` is called only when a face needs painting.
    */
   offer(key: number, size: ContainerSize, x: number, y: number, z: number, yaw: number, faces: ExposedFaces, source: () => CloseupSource, tint = -1): void {
+    this.hero?.offer(key, size, x, y, z, yaw, faces, source, tint)
     if (this.limits.budget <= 0) return
     const idx = this.offers.length
     this.offers.push({ key, size, x, y, z, yaw, source, tint })
@@ -202,6 +214,7 @@ export class ContainerCloseups {
 
   /** Picks the faces within the budget, paints the new ones and writes the instances. */
   end(): void {
+    this.hero?.end()
     const { budget, distanceM, hysteresis } = this.limits
     for (const kind of Object.keys(this.pages) as Kind[]) for (const page of this.pages[kind]) page.mesh.count = 0
     this.faceCount = 0
@@ -256,6 +269,7 @@ export class ContainerCloseups {
       const slot = this.slots.get(id)
       const oi = this.offerOf.get(id)
       if (!slot || oi === undefined || slot.lastShown !== this.frame) continue
+      if (this.hero?.covers(id)) continue // a fully faded-in hero face with its markings hides this decal
       const o = this.offers[oi]
       const face = FACES[id % 8] as Exclude<Face, 'bottom'>
       const f = faceFrame(face, o.size)
@@ -277,7 +291,8 @@ export class ContainerCloseups {
       const cy = Math.floor(slot.index / page.cols)
       // inset by a pixel so a neighbouring tile never bleeds in
       page.uvRect.setXYZW(n, (cx * t.w + 1) / PAGE_PX, 1 - ((cy + 1) * t.h - 1) / PAGE_PX, (t.w - 2) / PAGE_PX, (t.h - 2) / PAGE_PX)
-      page.sizeM.setXY(n, f.w, f.h)
+      // a negative width tells the shader this is a door: banded leaves, not wall ribs
+      page.sizeM.setXY(n, face === 'door' ? -f.w : f.w, f.h)
       this.faceCount++
     }
     for (const [page, n] of written) {
@@ -352,7 +367,14 @@ export class ContainerCloseups {
   vMapUv = uv * uvRect.zw + uvRect.xy;
 #endif
 #ifdef USE_NORMALMAP
-  vNormalMapUv = uv * sizeM / ${CORRUGATION_PITCH_M.toFixed(3)};
+  if (sizeM.x < 0.0) {
+    // door leaf: ${DOOR_BANDS} wide horizontal bands between sill and header (the hero door's shape), one ridge each,
+    // the ridge's crest mid-band; the normal map's u runs up the face, so its tilt turns with it
+    float band = (sizeM.y - ${DOOR_SILL_M.toFixed(3)} - ${DOOR_HEADER_M.toFixed(3)}) / ${DOOR_BANDS.toFixed(1)};
+    vNormalMapUv = vec2((uv.y * sizeM.y - ${DOOR_SILL_M.toFixed(3)}) / band - 0.25, 0.5);
+  } else {
+    vNormalMapUv = uv * sizeM / ${CORRUGATION_PITCH_M.toFixed(3)};
+  }
 #endif`,
         )
     }
@@ -377,6 +399,27 @@ export class ContainerCloseups {
     return this.faceCount
   }
 
+  /** Draw calls and triangles of the hero faces drawn last frame. */
+  heroCost(): { drawCalls: number; triangles: number } {
+    return this.hero?.cost() ?? { drawCalls: 0, triangles: 0 }
+  }
+
+  /** Hero marking atlas figures (#260): the step, pages and tiles held, draw calls of the last frame, page memory. */
+  heroMarkStats(): { step: HeroMarkStep; pages: number; tiles: number; drawCalls: number; texelBytes: number } {
+    const h = this.hero
+    return h ? { step: h.markStep, ...h.marks.stats() } : { step: 'sharp', pages: 0, tiles: 0, drawCalls: 0, texelBytes: 0 }
+  }
+
+  /** Hero faces prepared since the start (#259). */
+  get heroPrepared(): number {
+    return this.hero?.prepared ?? 0
+  }
+
+  /** Hero faces drawn in the last frame (#258). */
+  get heroFaces(): number {
+    return this.hero?.faces ?? 0
+  }
+
   /** Painted tiles held (drawn or cached). */
   get cached(): number {
     return this.slots.size
@@ -386,10 +429,12 @@ export class ContainerCloseups {
   cost(): { drawCalls: number; triangles: number } {
     let drawCalls = 0
     for (const kind of Object.keys(this.pages) as Kind[]) for (const page of this.pages[kind]) if (page.mesh.count > 0) drawCalls++
-    return { drawCalls, triangles: this.faceCount * 2 }
+    const h = this.hero?.cost() ?? { drawCalls: 0, triangles: 0 }
+    return { drawCalls: drawCalls + h.drawCalls, triangles: this.faceCount * 2 + h.triangles }
   }
 
   dispose(): void {
+    this.hero?.dispose()
     for (const kind of Object.keys(this.pages) as Kind[]) {
       for (const page of this.pages[kind]) {
         this.group.remove(page.mesh)

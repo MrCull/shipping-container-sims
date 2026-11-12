@@ -14,6 +14,15 @@
       "maxDrawCalls": 5
     }
   },
+  "heroCaps": {
+    "$comment": "#255, proposed caps for the hero container level (renderer: #258). A box shows at most 3 faces to the camera (side, end, roof). maxTriangles = boxes x facesPerBox x the largest measured face (458 triangles, hero-40hc-door), rounded up; every level is far below the 40 000 triangle budget of one STS. Low draws no hero detail.",
+    "facesPerBox": 3,
+    "levels": {
+      "high": { "boxes": 32, "maxTriangles": 44000 },
+      "medium": { "boxes": 12, "maxTriangles": 16500 },
+      "low": { "boxes": 0, "maxTriangles": 0 }
+    }
+  },
   "requiredMetaFields": [
     "asset",
     "kind",
@@ -26,6 +35,20 @@
     "provenance"
   ],
   "kinds": {
+    "hero-container": {
+      "$comment": "#255. One GLB per size and face kind (hero-<size>-<face>), loaded on demand, never at page load. Triangles and draw calls are per face (LOD0 is the only level); maxFileBytes is per face file with its two 256 px detail maps. Per-level caps: heroCaps.",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 520,
+          "maxDrawCalls": 3
+        }
+      },
+      "maxFileBytes": 60000,
+      "requiredNodes": [
+        "LOD0",
+        "paint"
+      ]
+    },
     "container": {
       "lods": {
         "LOD0": {

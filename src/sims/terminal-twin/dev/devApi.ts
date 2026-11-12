@@ -46,7 +46,7 @@ import type {
 } from '../engine'
 import type { Breakpoint, BreakpointKind } from '../modules/breakpoints'
 import type { OverlayState } from '../modules/overlays'
-import type { QualityLevel, QualitySetting } from '../modules/quality'
+import type { AutoRungName, QualityLevel, QualitySetting } from '../modules/quality'
 import { useAudioStore } from '@/stores/audio'
 import { usePerfStore, type PerfStats } from '../store/perfStore'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
@@ -68,6 +68,8 @@ export interface TwinClock {
   /** Displayed sim time (s). */
   displayTime: number
   speed: number
+  /** The speed playback really runs at (below `speed` while the engine cannot keep up). */
+  achievedSpeed: number
   paused: boolean
   busy: boolean
   /** Engine status and horizon. */
@@ -78,7 +80,12 @@ export interface PerfInfo {
   setting: QualitySetting
   effective: QualityLevel
   autoChanges: number
+  /** The shedding-ladder rung in force (#261; 0 is the best look) and its name (`AUTO_RUNGS`); Auto's state, or the rung a manual level fixes it at. */
+  rung: number
+  rungName: AutoRungName
   overlay: boolean
+  /** True while Auto's paused-detail boost is in force (sim paused, camera stopped): High close-up detail on any rung. */
+  pausedDetail: boolean
   stats: PerfStats
 }
 
@@ -123,6 +130,8 @@ export interface TwinDevApi {
   perf(): PerfInfo
   /** Set Low / Medium / High / Auto (the same as the picker); returns the new perf(). */
   setQuality(setting: QualitySetting): PerfInfo
+  /** Hero marking resolution (#260): 'sharp' (about 4x the close-up level) or 'standard' (today's); returns the step in force. */
+  setHeroMarkings(step: 'sharp' | 'standard'): 'sharp' | 'standard' | null
   /** Show or hide the FPS / draw-call / triangle overlay. */
   perfOverlay(on: boolean): void
   /** Add `ms` of busy-wait to every frame (0 = none): proves Auto steps down under load and recovers when it ends. */
@@ -131,6 +140,10 @@ export interface TwinDevApi {
   drawBreakdown(): Record<string, { objects: number; triangles: number }> | null
   /** Retune Auto's step-down / step-up fps thresholds (default 45 / 57); null restores them. For renderers that cannot reach those rates. */
   setAutoThresholds(thresholds: { down: number; up: number } | null): void
+  /** Switch to Auto and force its ladder rung (0 best look; clamped), restarting its judging: proves what each rung draws without needing a slow frame rate. Returns the new perf(). */
+  setAutoRung(rung: number): PerfInfo
+  /** Allow or forbid Auto's paused-detail boost (default allowed). A test that measures what a rung draws while paused forbids it. */
+  setPausedDetail(on: boolean): void
   /** Rendered counts (null if there is no 3D view). */
   scene(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** What the scene shows at the displayed time: custody per container, status and pose per STS, status per vessel. */
@@ -167,6 +180,10 @@ export interface TwinDevApi {
   screenPoint(entityId: string): { x: number; y: number } | null
   /** The orbit camera (follow-camera and keyboard-camera checks): target, distance (m), azimuth and polar angle (radians from straight up). */
   cameraPose(): CameraPose | null
+  /** Put the orbit camera at a pose (screenshots: `{ target, distance, azimuth, polar }`; distance is clamped to the controls' 8 m minimum). False without a 3D view. */
+  setCameraPose(pose: CameraPose): boolean
+  /** True when the hero level has nothing more to bring in for the current view: no model loading, no face waiting or fading. Wait on this before a close-up screenshot (about a minute in software WebGL). */
+  heroSettled(): boolean
   /** Bounding box (viewport px) of each named HUD region (`null` when not shown); see modules/hudLayout.ts. */
   hudLayout(): HudLayout
   /** Saves, snapshots and rewind (TT-17). */
@@ -233,7 +250,7 @@ export interface TwinAtmosphereState {
   positional: { voices: { key: string; gain: number }[] }
   banner: { kind: string; vesselName: string } | null
   /** The 3D view's lighting and backdrop; null without a 3D view. */
-  scene: { mode: string; daylight: number; shadows: boolean; masts: number; equipmentLights: number; backdrop: { kind: string; parts: string[]; models: string } } | null
+  scene: { mode: string; daylight: number; shadows: boolean; masts: number; equipmentLights: number; environment: boolean; environmentBuilds: number; backdrop: { kind: string; parts: string[]; models: string } } | null
 }
 
 export interface TwinUiState {
@@ -320,7 +337,10 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     setting: perfStore.setting,
     effective: perfStore.effective,
     autoChanges: perfStore.autoChanges,
+    rung: perfStore.rung,
+    rungName: perfStore.rungLabel,
     overlay: perfStore.overlayVisible,
+    pausedDetail: perfStore.pausedDetailActive,
     stats: { ...perfStore.stats },
   })
 
@@ -368,6 +388,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       return {
         displayTime: c?.displayTime ?? 0,
         speed: c?.speed ?? 0,
+        achievedSpeed: c?.achievedSpeed ?? 0,
         paused: c?.paused ?? true,
         busy: c?.busy ?? false,
         engine: c?.info ?? null,
@@ -380,8 +401,21 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       perfStore.setSetting(setting)
       return perfInfo()
     },
+    setAutoRung: (rung) => {
+      perfStore.setSetting('auto')
+      perfStore.setRung(rung)
+      return perfInfo()
+    },
+    setPausedDetail: (on) => {
+      perfStore.pausedDetail = on
+    },
     setAutoThresholds: (thresholds) => {
       perfStore.debugAuto = thresholds
+    },
+    setHeroMarkings: (step) => {
+      const v = store.view()
+      v?.setHeroMarkStep(step)
+      return v?.heroMarkStep ?? null
     },
     perfOverlay: (on) => {
       if (perfStore.overlayVisible !== on) perfStore.toggleOverlay()
@@ -488,6 +522,12 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     pickAt: (x, y) => store.view()?.pickAt(x, y) ?? null,
     screenPoint: (id) => store.view()?.screenPoint(id) ?? null,
     cameraPose: () => store.view()?.cameraPose() ?? null,
+    setCameraPose: (pose) => {
+      const v = store.view()
+      v?.setCameraPose(pose)
+      return !!v
+    },
+    heroSettled: () => store.view()?.heroSettled() ?? true,
     hudLayout: () => readHudLayout(document, { width: window.innerWidth, height: window.innerHeight }),
     saves: {
       fileText: async (type, name) => JSON.stringify(await store.buildSave(type, name)),

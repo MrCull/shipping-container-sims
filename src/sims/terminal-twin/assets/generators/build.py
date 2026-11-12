@@ -16,6 +16,7 @@ Writes, under <staging>/containers/:
     container-<size>.glb        raw export (uncompressed; the Node step adds meshopt)
     container-<size>.meta.json  rig/metadata sidecar
     livery-atlas.json           atlas layout and livery index table
+    livery-atlas-far.webp       far-field atlas (1024, same layout, enlarged wordmark, coarse ribs; #256)
     previews/*.webp             Cycles CPU previews (front, side, rear, three-quarter) + atlas
 """
 import argparse
@@ -34,6 +35,7 @@ import bpy  # noqa: E402
 
 from tt_assets import blender as B  # noqa: E402
 from tt_assets import containers as C  # noqa: E402
+from tt_assets import hero_containers as HC  # noqa: E402
 from tt_assets import liveries as LV  # noqa: E402
 from tt_assets import asc as A  # noqa: E402
 from tt_assets import asc_meta as AM  # noqa: E402
@@ -47,7 +49,7 @@ from tt_assets import infrastructure as INF  # noqa: E402
 from tt_assets import infrastructure_meta as INFM  # noqa: E402
 
 FONTS = os.path.join(HERE, 'fonts')
-GROUPS = ('containers', 'shc', 'asc', 'sts', 'vessels', 'trucks', 'infrastructure')
+GROUPS = ('containers', 'hero', 'shc', 'asc', 'sts', 'vessels', 'trucks', 'infrastructure')
 from tt_assets import sts as STS  # noqa: E402
 from tt_assets import sts_atlas as STSA  # noqa: E402
 
@@ -72,6 +74,8 @@ def build_containers(out_dir, previews=True, samples=48):
     normal_png = os.path.join(tmp, 'corrugation-normal.png')
     print('[containers] rendering livery atlas', flush=True)
     LV.render_atlas(atlas_png, FONTS)
+    print('[containers] rendering far-field livery atlas', flush=True)
+    LV.render_atlas(os.path.join(out_dir, 'livery-atlas-far.webp'), FONTS, far=True)
     write_json(os.path.join(out_dir, 'livery-atlas.json'), LV.atlas_manifest())
     if previews:
         B.reset_scene()
@@ -111,6 +115,57 @@ def build_containers(out_dir, previews=True, samples=48):
         }
         for view, (loc, tgt) in views.items():
             B.render_preview(cam, loc, tgt, os.path.join(preview_dir, f'{name}-{view}.webp'), samples=samples)
+
+
+def build_hero(out_dir, previews=True, samples=32):
+    """Hero container faces (#255): 3 sizes x 4 face kinds, one GLB each, plus per-face and assembled previews."""
+    os.makedirs(out_dir, exist_ok=True)
+    preview_dir = os.path.join(out_dir, 'previews')
+    os.makedirs(preview_dir, exist_ok=True)
+    tmp = os.path.join(out_dir, '.work')
+    os.makedirs(tmp, exist_ok=True)
+    normal_png = os.path.join(tmp, 'hero-detail-normal.png')
+    orm_png = os.path.join(tmp, 'hero-orm.png')
+    B.reset_scene()
+    HC.write_detail_textures(normal_png, orm_png)
+
+    def scene_materials():
+        B.reset_scene()
+        normal = B.load_image(normal_png, non_color=True, name='hero_detail_normal')
+        orm = B.load_image(orm_png, non_color=True, name='hero_orm')
+        return HC.hero_materials(normal, orm)
+
+    for size in C.SIZES:
+        d = C.SIZES[size]
+        L, W, H = d['length'], d['width'], d['height']
+        reach = max(L, 6.0)
+        # (camera location, target) per face, looking at the face from outside; Blender axes.
+        views = {
+            'side': ((L * 0.18, -(reach * 0.75), H * 0.7), (0, 0, H * 0.45)),
+            'door': ((W * 1.5 + L / 2, -W * 1.3, H * 0.75), (L / 2, 0, H * 0.45)),
+            'front': ((-(L / 2 + W * 1.5), W * 1.3, H * 0.75), (-L / 2, 0, H * 0.45)),
+            'roof': ((-L * 0.2, -(W * 1.6), H + W * 1.7), (0, 0, H)),
+        }
+        for face in HC.FACES:
+            mats = scene_materials()
+            root, info = HC.build_face(size, face, mats)
+            name = info['name']
+            print(f'[hero] {name}: {info["triangles"]} tris, {len(info["nodes"])} meshes, {info["ribs"]} ribs', flush=True)
+            B.export_glb(root, os.path.join(out_dir, f'{name}.glb'))
+            write_json(os.path.join(out_dir, f'{name}.meta.json'), HC.sidecar(info))
+            if previews:
+                cam, _ = B.setup_preview_stage()
+                loc, tgt = views[face]
+                B.render_preview(cam, loc, tgt, os.path.join(preview_dir, f'{name}-view.webp'), samples=samples, width=640, height=480)
+        if previews:
+            mats = scene_materials()
+            for face in HC.FACES:
+                HC.build_face(size, face, mats, prefix=f'{face}_')
+            opposite, _ = HC.build_face(size, 'side', mats, prefix='opposite_')
+            opposite.rotation_euler = (0.0, 0.0, math.pi)
+            cam, _ = B.setup_preview_stage()
+            B.render_preview(cam, (L / 2 + reach * 0.75, -(reach * 1.05), H + reach * 0.55), (0, 0, H * 0.45),
+                             os.path.join(preview_dir, f'hero-{size.lower()}-assembled.webp'), samples=samples, width=640, height=480)
 
 
 def strip_lod_suffix(path):
@@ -443,6 +498,8 @@ def main(argv):
     print(f'bpy {bpy.app.version_string}', flush=True)
     if 'containers' in groups:
         build_containers(os.path.join(args.out, 'containers'), previews=not args.no_previews, samples=args.samples)
+    if 'hero' in groups:
+        build_hero(os.path.join(args.out, 'hero'), previews=not args.no_previews, samples=min(args.samples, 32))
     if 'shc' in groups:
         build_shc(os.path.join(args.out, 'shc'), previews=not args.no_previews, samples=args.samples)
     if 'asc' in groups:

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Reject a Co-Authored-By trailer when the commit is made (AGENTS.md, "Commit trailers"): the only trailer is
+# `Claude-Session: <link>`. Same rule as scripts/check-commit-trailers.mjs in verify, which checks finished commits.
+# Installed in cloud sessions by .claude/hooks/session-start.sh (git config core.hooksPath .githooks).
+if grep -qi '^co-authored-by:' "$1"; then
+  echo 'commit-msg: remove the Co-Authored-By line; the only trailer is "Claude-Session: <link>" (AGENTS.md).' >&2
+  exit 1
+fi

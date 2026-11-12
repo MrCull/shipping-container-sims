@@ -19,6 +19,7 @@ export type ShortcutAction =
   | { kind: 'perf' }
   | { kind: 'view'; preset: ViewPresetName }
   | { kind: 'help' }
+  | { kind: 'hud' }
 
 export interface ShortcutHelpRow {
   /** Catalogue key of the key label, e.g. "Space". */
@@ -40,6 +41,7 @@ export const SHORTCUT_HELP: readonly ShortcutHelpRow[] = [
   { keys: 'shortcuts.key.e', action: 'shortcuts.feed' },
   { keys: 'shortcuts.key.i', action: 'shortcuts.inspector' },
   { keys: 'shortcuts.key.p', action: 'shortcuts.perf' },
+  { keys: 'shortcuts.key.h', action: 'shortcuts.hud' },
   { keys: 'shortcuts.key.q', action: 'shortcuts.viewQuay' },
   { keys: 'shortcuts.key.y', action: 'shortcuts.viewYard' },
   { keys: 'shortcuts.key.g', action: 'shortcuts.viewGate' },
@@ -92,6 +94,8 @@ export function shortcutFor(e: KeyLike): ShortcutAction | null {
       return { kind: 'inspector' }
     case 'p':
       return { kind: 'perf' }
+    case 'h':
+      return { kind: 'hud' }
     case 'q':
       return { kind: 'view', preset: 'quay' }
     case 'y':

@@ -3,11 +3,13 @@ import { computed, onBeforeUnmount, reactive, watch } from 'vue'
 import { useTwinStore } from '../store/twinStore'
 import { crossedThreshold, prefersReducedMotion, stripItems, tween, type StripItemId } from '../modules/kpiStrip'
 import { t } from '../i18n/messages'
+import { useHudStore } from '../store/hudStore'
 
 const COUNT_UP_MS = 600
 const PULSE_MS = 900
 
 const store = useTwinStore()
+const hud = useHudStore()
 const items = computed(() => (store.kpi ? stripItems(store.kpi.headline) : []))
 
 /** Displayed (animated) value and pulse flag per item. */
@@ -74,8 +76,19 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <button
+    v-if="items.length && hud.collapsed.kpis"
+    type="button"
+    class="hud-pill kpi-pill"
+    data-testid="tt-kpi-expand"
+    :aria-label="t('kpi.strip')"
+    :aria-expanded="false"
+    @click="hud.toggle('kpis')"
+  >
+    {{ t('hud.kpisShort') }} ▾
+  </button>
   <ul
-    v-if="items.length"
+    v-else-if="items.length"
     class="kpi-strip"
     data-hud-region="kpiStrip"
     data-testid="tt-kpi-strip"
@@ -96,10 +109,38 @@ onBeforeUnmount(() => {
         :style="{ minWidth: `${item.minWidthCh}ch` }"
       >{{ shown[item.id] === undefined ? t('unit.none') : item.format(store.fmt, shown[item.id] as number) }}</span>
     </li>
+    <li class="kpi-collapse">
+      <button
+        type="button"
+        class="hud-pill"
+        data-testid="tt-kpi-collapse"
+        :title="t('hud.collapseKpis')"
+        :aria-label="t('hud.collapseKpis')"
+        :aria-expanded="true"
+        @click="hud.toggle('kpis')"
+      >
+        ▴
+      </button>
+    </li>
   </ul>
 </template>
 
 <style scoped>
+.kpi-pill {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: start;
+  align-self: start;
+  position: relative;
+  z-index: 4;
+  margin: 0.6rem 0.8rem 0;
+}
+
+.kpi-collapse {
+  align-self: center;
+  pointer-events: auto;
+}
+
 .kpi-strip {
   /* Grid cell between the side panels; wraps onto more rows rather than overflowing. */
   grid-column: 2;

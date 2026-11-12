@@ -85,6 +85,8 @@ history behind the display time (display time never goes back). Ingest details: 
 - **Capacity.** Per size, the scenario's container count. With landside trucks, every size gets
   `min(2500, ceil(daily truck profile * 0.5) + scripted trucks + 60)` extra for boxes trucks create during the run
   (`SceneRenderer` constructor). Instances beyond capacity are not drawn.
+- **Retained slots (#250):** the instancer keeps every box (`set(key, ...)`, `remove(key)`; `begin`/`push`/`end` remain as an immediate mode for the asset viewer and tests). A box keeps its slot in a size x LOD layer until it changes layer (LOD, culled in or out of the frustum); a freed slot is taken by the layer's last box. Only boxes whose data changed (a `set` with different values) or whose slot changed are written, and each buffer is uploaded by the range written (`addUpdateRange`; the whole buffer if over half of the layer). With no change and a still camera the cull and LOD pass is skipped and `stats.instanceBytes` is 0. `SceneRenderer.update` poses a box only when it must: `SceneModel.custodyChanges(t0, t1, seq)` lists the boxes whose custody entry fell in `(t0, t1]` or arrived late (log position `seq`), carried boxes (`containerPose` leaves `poseRest` 0) are posed every frame, and a vessel's boxes when its placement changes. A restart builds a new model and renderer (a full pose); a colour-by change, a time-based colour mode, a backwards jump and the first frame pose every box (unchanged ones cost nothing to the instancer). `stats.posed` / `perf().stats.boxesPosed` counts the boxes handed to the instancer.
+- **Cull before posing (#257):** a moving box (`poseRest` 0) is skipped when `ContainerInstancer.nearFrustum(key, frustum, 20 m + 20 m/s x sim seconds since it was posed)` is false, unless its custody changed or it is the selected box; its cached position stays and it is posed again once it could have entered the view, so it is drawn correctly on its first visible frame. The close-up offer (`offerCloseups`) runs only when the camera moved, an option changed or a box within reach of the camera changed, and walks `reachKeys` (the boxes within `closeupDistanceM x hysteresis + 8` of the camera, kept by `set`/`remove`), not every box.
 - **Per instance:** a matrix, a `liveryIndex` float attribute (atlas tile) and an instance colour. A colour-by tint
   switches the box to the generic tile and sets an instance colour of tint / generic body colour, so the grey tile comes
   out as the tint. The instance colour exists from the first frame so the shader never recompiles when a tint first appears.
@@ -100,6 +102,141 @@ history behind the display time (display time never goes back). Ingest details: 
 - **Colour by** is cached per box: static modes per mode, time-based modes per 30 sim s bucket (`COLOUR_BUCKET_S`),
   at most 4 000 recomputes per frame (`COLOUR_BUDGET_PER_FRAME`); the rest catch up over the next frames.
 
+### Hero level (#258)
+
+Above the close-up level, within `HERO_DISTANCE_M` (15 m, hysteresis 1.15) of the camera. `ContainerCloseups` forwards every
+`offer` to `HeroLevel` (`heroRenderer.ts`), so the instancer's offer loop is unchanged. Pure selection is
+`heroFaceSelection.ts`: exposed faces (a buried box has none), turned towards the camera, nearest first, at most
+`heroBoxes x 3` faces (`selectFaces` with hysteresis); the frustum test is the instancer's cull, and there is no line-of-sight
+test against other stacks or equipment. Each chosen face is one instance of its `hero-<size>-<kind>` model (the -Z side is the
+side model turned 180 degrees), instanced per (size, kind, part): draw calls are bounded by the kinds in use. The white paint
+takes livery or tint from the instance colour; wear (rust, scuffs) comes from the box's `wearFor` seed (per-instance detail map
+offset and amount), so a box looks the same at every zoom and after a rewind. The plain box and the close-up decals stay under
+and over it (polygon offset -1 against the decals' -2; hero markings replace the close-up decal on a full hero face, #260). Models are fetched the first time a face of
+that size and kind is chosen (`heroAssets.ts`, the only non-dev file that names `models/hero`); until they arrive the close-up
+level shows, and `onReady` marks the close-up pass dirty so a still camera redraws. Low draws none and requests none.
+`stats.heroFaces` (also `__tt.perf().stats`) counts faces drawn.
+
+- **Depth bias.** A hero face and its marking decal are drawn `HERO_DEPTH_BIAS_M` (0.1 m, view space) nearer the camera in
+  depth only (`HERO_DEPTH_BIAS_GLSL` after `project_vertex`; nothing moves on screen). The LOD0 box under a hero face has its
+  own coarser ribs and flat door leaves at about the same depth, and without the bias they show through the hero valleys and
+  the recessed door panels (a flat door with the LOD0 texture between the hero bars).
+- **Door end.** A door leaf is corrugated in 4 horizontal bands (`DOOR_BANDS`), with its two locking bars at 0.17 and 0.55
+  of the leaf width from the centre seam (`DOOR_BAR_FRACS` in `containers.py`, used by the LOD0 doors and the hero door, so a
+  bar does not move when the hero face fades in). `drawDoorMarks` lays the markings out around the bars
+  (`DOOR_BAR_INNER_M` / `DOOR_BAR_OUTER_M` in `containerTextures.ts`): owner prefix and plate labels between the bars of the
+  right leaf, serial, check digit, type code and plate values beside the outer bar, CSC plate, roundel and SUPER HEAVY on the
+  left leaf outside its outer bar; a line is shrunk to its column (`fitText`). The hardware material is mostly diffuse
+  (metallic 0.35), so bars stay galvanised grey on levels without an environment map.
+
+#### Still-camera floor
+
+On Auto every rung carries `heroStillBoxes` = `HERO_STILL_BOXES` (6 boxes, 18 faces; `quality.ts`), passed as
+`HeroLevel.setLimits({ stillBoxes })`. The cap in force is `max(heroBoxes, heroStillBoxes)`. While the floor is the cap (the
+rung has shed the hero level: `hero-off` and below), a face is prepared only once the camera has stopped: position speed at
+or below `HERO_STILL_SPEED_MPS` (0.05 m/s) for `HERO_STILL_SETTLE_MS` (400 ms), a second `CameraGate` in `HeroLevel`. So a
+slow device shows the close-up level while the camera moves and the nearest boxes in hero detail, with sharp markings, about
+half a second after it stops. Faces already prepared stay drawn through a move while they are still chosen. The floor never
+lowers a higher cap or tightens its gate, and the manual levels have none (`heroStillBoxes` 0: Low still draws no hero face).
+Tests: `tests/hero-prep.test.ts` (floor through the instancer), `tests/quality.test.ts`.
+
+#### Paused-detail boost
+
+On Auto, while the sim is paused and the camera pose has not changed for `PAUSED_DETAIL_SETTLE_MS` (500 ms), `useTwinScene` puts
+`pausedDetailProfile(profile)` in force: hero cap `HERO_PAUSED_BOXES` (12), High's close-up reach and face budget, full render
+resolution, sharp markings. Nothing moves then, so frame time is free. Shadows, LOD distances and the rest stay the rung's
+(switching them recompiles shaders and would stall the first frame after play or a camera move). Auto does not judge frames under
+the boost and restarts its window when it ends. `__tt.perf().pausedDetail` says it is in force; `__tt.setPausedDetail(false)`
+forbids it (a test that measures what a rung draws while paused). Smoke: `hero-faces.smoke.ts` (ladder test).
+
+#### Camera controls
+
+`OrbitControls` with map-like handling: `screenSpacePanning = false` (a pan slides the target along the ground, never into the
+air), `zoomToCursor = true` (a wheel zoom keeps the point under the cursor in place), and the orbit speed falls close to the
+target (`orbitSpeedFor`: 1 from 40 m out, 0.35 at the 8 m minimum distance).
+
+Two fingers are not OrbitControls' (`touches.TWO` is set to an unknown value, which leaves it idle): `useTwinScene` tracks touch
+pointers and calls `modules/pinchGesture.ts#applyPinchStep` per move. A zoom scales camera and target about the ground point
+under the finger midpoint (so it stays under the fingers and the view does not turn), then a pan moves both so the point first
+touched stays under the midpoint. Client coordinates throughout. OrbitControls' own pinch scaled its pan to the orbit target's
+distance, so the grabbed point drifted 31 m in the phone smoke's test gesture. One finger (orbit) and the mouse stay
+OrbitControls'. Tests: `tests/pinch-gesture.test.ts`, smoke `terminal-twin-phone.smoke.ts` (it fails on the old controls).
+
+Phone layout: below 720 px the top bar wraps and the speed buttons scroll sideways. An over-wide top bar once stretched the whole
+view to 1,027 px on a 390 px screen, which put the canvas centre off the right edge: the main cause of pinch-zoom sliding right.
+HUD groups (top bar controls row, KPI strip, overlay bar) collapse to small buttons (`store/hudStore.ts`, H toggles all,
+remembered per viewer); with nothing stored, a narrow screen starts with all three collapsed.
+
+#### Cost breakdown and where to scale back (2026-11-12)
+
+Measured or counted per hero box (one long side and one door end in view). Paint times are headless Chromium with a
+software canvas (`containerTextures.ts`, 40 boxes); a phone's GPU-backed canvas is faster, but the shares hold.
+
+| Part | Size | Processing | Option to scale back | Visual loss |
+|---|---|---|---|---|
+| Shape: corrugation, rails, castings (paint mesh) | 304 tris a side, 72 a door, 306 a roof | negligible | none needed | |
+| Door hardware: bars, guides, keepers, handles, hinges | 344 of the door's 434 tris | negligible | none needed | |
+| Model download and map memory | 12 GLBs, 328 KB; each embeds the same 256 px normal and ORM maps (14 KB) | once | done for GPU memory: `heroAssets.ts#shareHeroMaps` keeps the first file's map textures and drops the other files' copies (one set on the GPU instead of up to twelve). Not done: stripping the maps from the files (about half the download) needs a `tt:assets` change and regeneration | none |
+| Marking tiles (lettering), memory | sharp step: a side tile 2048x384 (3 MB), an end tile 768x768 (2.3 MB), plus a third for mipmaps; a side page is 2048 x 1920 (15.7 MB, 21 MB with mips) holding 5 sides, an end page 1536 x 1536 (9.4 MB, 12.6 MB with mips) holding 4 ends | GPU upload of each painted tile | `HERO_MARK_SCALE.sharp` 4 to 3: memory and paint time down about 44 %. Not taken: the owner's close-up phone shots read the plate text at this size | small but visible right up close: about 126 px per metre instead of 168; a 10 cm letter is 13 px instead of 17 |
+| Marking tiles, page packing | end pages used 1536 x 1536 of 2048 x 2048 (44 % unused), side pages 1920 of 2048 rows | | done: pages are exactly their tiles (`HERO_MARK_PAGE_TILES`, WebGL 2 takes any size): end pages 40 % smaller, side pages 6 % | none |
+| Lettering paint | | 1.7 to 3 ms a box | | |
+| Chipped paint | | was 8.2 ms a box (70 % of a face's paint: thousands of rectangles and a full-tile erase); now one pattern fill over the lettering's boxes only, about 0.7 ms | done | lighter look (owner asked for it toned down) |
+| Wear: speckle, rust streaks, dents (canvas) | | 0.7 to 1 ms a box; speckle 0.2 | done: fewer, fainter specks, streaks at half strength, dents much lighter | owner asked for it |
+| Wear: rust and grime (hero shader) | 2 texture reads a fragment | small | done: half strength | owner asked for it |
+| Depth bias, corrugation-lit lettering | a few shader instructions | negligible | none needed | |
+
+A full hero face paint went from 11.6 ms to 4.7 ms with the chip change. The biggest remaining lever is memory: the sharp
+marking pages. If a phone runs short of memory or stalls on the first hero frame, drop the sharp step to 3 first.
+
+#### Smooth arrival (#259)
+
+`heroPrep.ts` (pure) plus `HeroLevel`: a chosen face is drawn only once it is **prepared** (its model's meshes built, its paint and
+wear made); until then the close-up level shows, and a prepared face fades in, so a zoom shows today's look first and then sharpens.
+Named constants (all in `heroPrep.ts`):
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `HERO_PREP_ALLOWANCE_MS` | 3 | per-frame time for preparing faces; nearest first; an item is not started when the last one's cost would pass it, but one always runs so a backlog drains |
+| `HERO_FADE_MS` | 200 | a ready face fades in linearly over this; drawn as an ordered screen-door dither (`heroFade` instance attribute, `discard`), so no blending, no sorting, no pop |
+| `HERO_CAMERA_SPEED_MPS` | 5 | above this camera position speed no new face is prepared |
+| `HERO_SETTLE_MS` | 150 | the camera must stay at or below the speed for this long before preparation starts |
+
+Faces already prepared and still chosen (selection runs every frame, with its hysteresis) stay drawn through a camera move; a face
+that leaves the selection loses its prepared state and fades in again if it returns. Model files are fetched as before; building a
+model's meshes is part of preparing its first face (inside the allowance). While faces wait (gate closed, allowance spent) or fade,
+`HeroLevel.busy` keeps the instancer's close-up pass dirty so a still camera keeps redrawing. `__tt.scene().containerLods.heroPrepared`
+counts faces prepared since the start (it does not grow during a fast fly-through). Tests: `tests/hero-prep.test.ts` (fake clock and
+fake work items; the renderer through the instancer with a fake clock), smoke `hero-faces.smoke.ts` (arrival test).
+
+#### Sharp markings (#260)
+
+`modules/heroMarkings.ts` (`HeroMarkings`, owned by `HeroLevel`): a hero face's markings are painted at 4x the close-up tile
+(`HERO_MARK_SCALE.sharp` = 4: a long side 2048 x 384 px, about 168 px per metre against 42; an end 768 x 768) into their own atlas pages
+(`sharp`: a side page of 5 tiles is 2048 x 1920, an end page of 4 tiles 1536 x 1536), as a transparent decal lying on the crests of the hero panel
+(`heroMarkInsetM`: 3.5 cm inside the frame on a door, so the locking bars pass in front of the lettering, 1 cm on the walls; polygon offset -4,
+alpha-fade with the face), so the hero paint, ribs and wear show through. Roofs print nothing.
+**Painted-on look:** the decal is a flat quad but is lit as the corrugated panel under it (`heroMarkProfile` gives the rib span, count and
+flank slope per instance; the fragment shader tilts the normal on a flank), receives shadows, and its tile has no flat seam, header, sill or
+rail (`frame = false`: those are hero geometry). Lettering is condensed (`condensed` / `fitText`, glyph widths squeezed to 0.8, further to fit
+a column) and chipped (`chipPaint` knocks small chips and scratches out of the stencil coat, more on a worn box).
+The content is the close-up level's: one pure `describeMarkings` result, painted by the same `drawSideMarks` / `drawDoorMarks` /
+`drawFrontMarks` / `drawWear` in `containerTextures.ts` (`paintFaceMarks`, wear speckle seeded from the close-up region so the pixels
+agree too), so number, line name, ISO type, weight plate, CSC plate, SUPER HEAVY, bolt seal and wear match the close-up face.
+
+- **Painting is preparation.** The tile is painted in the face's `runPrep` item, so it sits inside `HERO_PREP_ALLOWANCE_MS` and behind the
+  camera gate. A face whose tile is missing (new step, evicted) is prepared again for its tile only; its geometry stays drawn.
+- **Bounded, least recently shown reuse.** Pages per kind are capped at `maxPages(kind, step, heroBoxes)` (a box shows at most one side and
+  one end to a camera): High (32 boxes) at most 7 side + 8 end pages, 240 MB of texels in the worst case, Medium (12) 3 + 3. A full kind gives
+  up the tile shown longest ago, never one shown this frame; with none to give the face is not drawn at hero level: the close-up face keeps showing (its decal would be hidden behind the depth-biased hero paint).
+  Tiles are kept while their face is cached (a face that leaves and returns repaints nothing).
+- **Close-up decal hidden under a full hero face.** `HeroLevel.covers(id)`: once a hero face is fully faded in (and has its tile, or prints
+  nothing), `ContainerCloseups` skips that face's decal, so the older decal no longer shows between the hero ribs. During the fade it is
+  still drawn underneath.
+- **Second shedding step.** `HeroLevel.setMarkStep('standard')` (`SceneRenderer.setHeroMarkStep`, `__tt.setHeroMarkings('sharp'|'standard')`)
+  repaints hero faces at today's resolution (512 px pages, 1 MB each) without losing the hero geometry; `'sharp'` switches back. Auto's ladder
+  switches it at rung 3 (#261). `__tt.scene().containerLods` adds `heroMarkStep`, `heroMarkPages`, `heroMarkTiles`, `heroMarkDrawCalls`, `heroMarkBytes`.
+- Tests: `tests/hero-markings.test.ts` (atlas, LRU, allowance, step switch, covered decal, same content); look: `docs/prototypes/260/`.
+
 ### Close-up markings (#119, #143)
 
 Markings are drawn per visible face, not per box, on every quality level (#158).
@@ -113,6 +250,11 @@ Markings are drawn per visible face, not per box, on every quality level (#158).
   hysteresis x1.15 (`modules/closeupFaceBudget.ts#selectFaces`).
 - A chosen face is one instance of a shared unit quad sampling a tile of a canvas atlas, drawn 6 mm off the plain
   instanced box, which keeps its LOD and is the fallback for every hidden or unchosen face.
+- The tile is opaque, so it covers the LOD0 door's bar geometry: a door tile paints the furniture itself
+  (`drawDoorHardware`: corner posts, gaskets, band joins, four locking bars with guides, cam keepers and handles, hinges), and
+  a door instance (negative `sizeM.x`) gets `DOOR_BANDS` horizontal bands from the normal map instead of the walls' vertical
+  ribs. So the middle distance matches the hero door nearer and the LOD0 door further out. `DOOR_SILL_M`, `DOOR_HEADER_M` and
+  `DOOR_BANDS` are checked against the generators (`tests/generator-constants.test.ts`).
 - Atlas (`modules/containerTextures.ts`): pages per face kind (long side 512x96 tiles, roof 512x64, end 192x192),
   created on demand. `paintContainer` paints a box whole into a scratch canvas (`TEXTURE_LAYOUT`, 1024x512) and the face
   regions are copied into tiles (`canvasAtlasBackend`). A tile stays while its face is cached, is repainted when the
@@ -128,7 +270,26 @@ Markings are drawn per visible face, not per box, on every quality level (#158).
 - The close-up corrugation (`modules/closeupGeometry.ts#CORRUGATION_PITCH_M`, 0.25 m, the real rib pitch) differs from
   the LOD0 GLB rib (0.56 m, an [M] for the triangle budget). Kept as is.
 
-### Far-field legibility (#170, measured, not fixed)
+### Far-field wordmark atlas (#256)
+
+Beyond about 80 m the near atlas fades to body colour (letters about 0.93 m tall are under a pixel). A second atlas,
+`assets/models/containers/livery-atlas-far.webp` (1024 px, same 2x6 tile layout, so the same UVs and the same per-instance
+`liveryIndex`), draws the side wordmark at about 94 % of the side width and 74 % of its height on a flat body-colour panel,
+with coarse rib shading above and below it, and no owner code. `liveryMaterial(..., farMap)` blends the two in the
+fragment shader: `mix(near, far, smoothstep(65, 100, length(vViewPosition)))` (`FAR_ATLAS_BLEND_M`). The blend is per
+pixel over 35 m, so there is no pop and no hysteresis; it applies to LOD0 and LOD1 alike and costs no draw call, no
+instance byte and no triangle. It costs one more texture sample per box fragment (frame time: check on the laptop, #262).
+If the far atlas fails to load the near atlas shows at every distance.
+
+Rib pitch, three levels (do not unify them):
+
+| Level | Pitch | Where |
+|---|---|---|
+| Far atlas | 1.2 m (about 10 ribs on a 40 ft side), baked shading | beyond about 80 m, survives the mip chain |
+| LOD0 geometry and LOD1 normal map | 0.56 m, an [M] for the triangle budget | up to 140 m |
+| Close-up decals and hero faces | 0.25 m, the real pitch | within about 35 m and 15 m |
+
+### Far-field legibility (#170, measured; fixed by #256)
 
 On the TTI baseline (04:00, 1280x720, software WebGL, camera 150 m from block B01) a side wordmark (letters about 0.93 m
 tall in the 2048 atlas) reads up to about 80 to 100 m on Low and High alike and fades to the body colour beyond. LOD
@@ -152,8 +313,7 @@ build and update order and the Labels overlay's priority.
 | `hatch` | `equipmentKinds/hatch.ts` | `hatchPanels` | `hatchRigs` | no | no |
 
 - `KindFrame` (built once per frame): `t`, `cameraPosition`, `lodScale` (quality), `carried` (box height per carrier),
-  `loads` (boxes per `<ownerKind>:<ownerId>`, filled only when a renderer sets `wantsContainerOwners`: it costs a
-  custody lookup per box per frame), `live` (clock running), `flashOn` (beacon phase), `colour`, and the output `sounds`.
+  `loads` (boxes per `<ownerKind>:<ownerId>`, filled only when a renderer sets `wantsContainerOwners`; the owner comes from the box's pose, `SceneModel.poseOwner`, with no second lookup, #257), `live` (clock running), `flashOn` (beacon phase), `colour`, and the output `sounds`.
 - `KindRenderer`: `update(frame)`, optional `onInfrastructureLoaded()`, `rigState()` (dev API, empty until the GLB
   loads), `stats()` (its `SceneStats` fields), `dispose()`.
 - **Adding a kind:** a module exporting an `EquipmentKindDef`, one entry in `EQUIPMENT_KINDS`, and an
@@ -287,6 +447,14 @@ top is clipped over every open bay (needed so a crane never works under a solid 
 - Masts (`mastSpots`, shared with the night glow; at most `MAX_MASTS` 400) stand only mid-gap between neighbouring blocks
   and beside the outermost blocks, never inside a block footprint (`BLOCK_FOOTPRINT_HALF_X_M`): a block's centre line is
   where its ASCs travel. `tests/infrastructure.test.ts` asserts this for every preset and fixture.
+- **Far tier (#249):** `modules/farTier.ts`. Yard fences, ASC rails and masts (`FAR_TIER`: 220, 220 and 350 m) draw as
+  12-triangle box stand-ins (`standInGeometry`: the source's bounding box, UV of its largest upward-facing triangle, footprint of its lower 60 %, so the same atlas
+  swatch and the same material) beyond that 3D distance from the camera. The choice is per instance (`FarTierSelector`,
+  hysteresis 30 to 40 m, recomputed only after the camera moves 2 m), done in `InfrastructureScene.update(cameraPosition)`
+  each frame: each tiered key has a near mesh and a far mesh, and an instance sits in exactly one. A mesh with no instances
+  is hidden, so draw calls do not rise (TTI overview 282 before and after); `InfrastructureStats.drawCalls` and `triangles`
+  count visible meshes only. No cross-fade: the box has the source's footprint and colour, so the swap at 220 m or more is
+  a few pixels (screenshots in `docs/prototypes/249`). TTI overview triangles (main plus shadow pass): 1 561 283 to 382 435.
 - Placeholders (procedural quay lines, ASC rails, pad and stall outlines, gate furniture, mast poles) stay until the GLBs
   load, then hide (`SceneRenderer` `infraPlaceholders`, `LandsideScene.useGateModels`, `AtmosphereRig.useMastModels`).
   Roads, queue approach and stall spurs stay procedural.
@@ -302,17 +470,33 @@ top is clipped over every open bay (needed so a crane never works under a solid 
 | `shadows` / `shadowMapSize` | off / 512 | on / 1024 | on / 2048 | `useTwinScene.applyQuality`, `AtmosphereRig.setQuality` |
 | `lod0DistanceM` / `lod0Cap` | 40 / 60 | 90 / 180 | 140 / 300 | `ContainerInstancer.setLodOptions` |
 | `closeupDistanceM` / `closeupFaceBudget` | 18 / 48 | 25 / 120 | 35 / 400 | same |
+| `heroBoxes` | 0 | 12 | 32 | `HeroLevel.setLimits` via `SceneRenderer.setQuality`: boxes' worth of hero faces (x3 faces; #258) |
 | `lodScale` | 0.4 | 0.7 | 1 | `KindFrame.lodScale` (STS, SHC, ASC) |
 | `resolutionScale` | 0.65 | 0.85 | 1 | pixel ratio |
 | `oceanSegments` | 1 (flat Lambert quad) | 24 | 96 (standard material, 0.18 m swell) | `SceneRenderer.setOceanDetail` |
 | `nightLights` | 24 | 120 | 400 | mast glow points drawn at night |
+| `environmentReflections` | off | on | on | `AtmosphereRig.setQuality`: `scene.environment` is the sky environment or null (#248) |
+| `contactShadows` | off | on | on | `SceneRenderer.setQuality` sets the shared contact-shadow uniform to 0 or 0.5 (#248) |
 
 Antialiasing is chosen at renderer creation and is not part of a live profile.
 
 - Setting: Auto (default), Low, Medium, High, remembered in localStorage (`store/perfStore.ts`, guarded). Auto starts at High.
-- `AutoQuality`: steps down one level when 4 consecutive one-second windows are under `AUTO_DOWN_FPS` 45; steps up when
-  8 windows are at or above `AUTO_UP_FPS` 57. A step up undone within 30 s doubles the windows needed for the next one
-  (max 240). A frame gap over 1 s (hidden tab) is skipped. History restarts after every change.
+- `AutoQuality` (#261) works from frame time. Each one-second window gets a median frame time and a slow-frame share
+  (a frame over 1.5 times the down median). It steps down one rung when 4 consecutive windows have a median over
+  `AUTO_DOWN_MEDIAN_MS` (22.2 ms, about 45 fps) or more than `AUTO_SLOW_SHARE_DOWN` (10 %) slow frames, so stutter counts
+  although the average is fine; it steps up when 8 windows have a median at or under `AUTO_UP_MEDIAN_MS` (17.5 ms, about
+  57 fps) and at most `AUTO_SLOW_SHARE_UP` (2 %) slow frames. A step up undone within 30 s doubles the windows needed
+  for the next one (max 240). A frame gap over 1 s (hidden tab) is skipped. History restarts after every change.
+  **All thresholds are provisional until the laptop benchmark ticket (#262) retunes them.**
+- **The shedding ladder** (`AUTO_RUNGS`, `profileForRung`, `markStepForRung`: pure functions of the rung). Auto sheds top
+  down and recovers bottom up: 0 `hero-full` (High, hero cap 32 boxes), 1 `hero-half` (16), 2 `hero-quarter` (8),
+  3 `hero-marks-standard` (cap 8, `HeroLevel.setMarkStep('standard')`), 4 `hero-off` (cap 0 while the camera moves; from here
+  down only the still-camera floor draws hero faces, with sharp markings again, see "Still-camera floor"), 5 `shadows-resolution`
+  (Medium's 1024 shadow map and 0.85 resolution), 6 `medium` (Medium profile, hero off), 7 `low`. The ticket lists marking
+  resolution after hero off; it sits before it here because marking resolution sheds nothing once no hero face is
+  drawn. The manual levels fix the ladder (`MANUAL_RUNG`: High 0, Medium 6 with Medium's own hero cap and sharp
+  markings, Low 7). `useTwinScene` puts the rung's profile and mark step in force; the overlay row `tt-perf-rung` names
+  the rung ("Full detail", "Hero cap half", ... "Low profile"). Dev API: `perf().rung` / `rungName`, `setAutoRung(n)`.
 - UI: `components/PerfPanel.vue` (quality picker, Stats button, key P: fps, draw calls, triangles, frame CPU ms, level).
   `components/FpsChip.vue` (`tt-fps-chip`, teleported into `SimPage`'s `#sim-header-slot`, hidden when `webglFailed`)
   shows the `FpsMeter` 1 s average; `modules/fpsChip.ts#fpsSeverity` amber below 30, red below 20; a click toggles the overlay.
@@ -327,6 +511,17 @@ Antialiasing is chosen at renderer creation and is not part of a live profile.
 - `modules/atmosphereRig.ts#AtmosphereRig` (owned by `SceneRenderer`): hemisphere light, sun, sky and fog colours.
   Sun shadow camera is a fixed 500 x 500 m box (near 10, far 800), `normalBias` 0.35 (container corrugation shows acne
   without it), `bias` -0.0004. The sun casts only when both the time of day and the quality allow it.
+- **Sky reflections and contact shadows (#248):** `modules/skyEnvironment.ts` (pure, `tests/skyEnvironment.test.ts`)
+  holds the sky colours per lighting mode, `environmentIntensity(daylight)` (0.12 at night to 0.67 by day) and
+  `EnvironmentCache`. `AtmosphereRig.attachRenderer` (called by `useTwinScene` after `setQuality`; headless hosts never call it, so
+  they get no reflections) bakes a procedural sky dome (gradient plus a sun patch) into a PMREM texture, once per
+  lighting mode on first use and cached (`environmentBuilds` in `atmosphere()` is at most 3, never per frame). Only
+  `scene.environmentIntensity` follows daylight each lighting change. No new draw calls or triangles (TTI overview on
+  High: 315 calls, 395,075 triangles before and after). `modules/contactShadow.ts` patches the container materials
+  (placeholder box and the `liveryMaterial(..., true)` GLB materials) so the lowest 0.7 m of every box face fades down to
+  50 % brightness (box-local height, boxes have their origin at the bottom), which darkens both box-to-ground and
+  box-to-box joins in the fragment shader: no extra pass. One shared uniform turns it off on Low without a recompile.
+  Not covered: close-up marking decals and the vessel hull. Before and after screenshots: `docs/prototypes/248/`.
 - Night is the cheaper mode: no shadow pass, no extra real lights. High-mast poles (instanced) get additive glow points
   (up to `nightLights`) and every STS, ASC and SHC gets one glow point that follows it: 2 draw calls in all.
 - **Daylight on entry (#171, #192):** every run launch sets `store.lockDaylight = true` (`launch` in

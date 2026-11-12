@@ -8,6 +8,7 @@
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { applyPinchStep } from '../modules/pinchGesture'
 import { NO_OVERLAYS } from '../modules/overlays'
 import { pickEntity } from '../modules/picking'
 import { cameraMotion } from '../modules/shortcuts'
@@ -16,7 +17,8 @@ import { viewPresetPose, type ViewPresetName } from '../modules/viewPresets'
 import { hourOfDay, lightingFor } from '../modules/atmosphere'
 import { SceneRenderer } from '../modules/sceneRenderer'
 import type { SceneModel } from '../modules/sceneModel'
-import { AutoQuality, FpsMeter, profileFor } from '../modules/quality'
+import { AutoQuality, FpsMeter, markStepForRung, orbitSpeedFor, PAUSED_DETAIL_SETTLE_MS, pausedDetailProfile, profileFor, profileForRung, type QualityProfile } from '../modules/quality'
+import type { HeroMarkStep } from '../modules/markStep'
 import { usePerfStore } from '../store/perfStore'
 import { useTwinStore } from '../store/twinStore'
 
@@ -35,16 +37,20 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   const store = useTwinStore()
   const perf = usePerfStore()
   const meter = new FpsMeter()
-  const auto = new AutoQuality((level) => perf.setEffective(level, true))
+  const auto = new AutoQuality((rung) => perf.setRung(rung, true))
   const frustum = new THREE.Frustum()
   const viewProjection = new THREE.Matrix4()
-  let appliedLevel: string | null = null
+  let appliedKey: string | null = null
   let lastReportAt = 0
   /** Smoothed main-thread ms per frame (pose + render submit). */
   let cpuMs = 0
   /** The part of it spent posing the scene (`view.update`), without the render submit. */
   let poseMs = 0
   let lastSetting = perf.setting
+  /** Auto's paused-detail boost (`pausedDetailProfile`): the sim is paused and the camera has stopped. */
+  let pausedDetail = false
+  let lastPoseKey = ''
+  let lastCameraMoveAt = 0
   const webglFailed = ref(false)
   let renderer: THREE.WebGLRenderer | null = null
   let camera: THREE.PerspectiveCamera | null = null
@@ -73,12 +79,28 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   /** Puts the effective quality profile in force: shadows, render resolution, and the scene's own LOD / ocean settings. */
   function applyQuality(): void {
     if (!renderer) return
-    const profile = profileFor(perf.effective)
-    appliedLevel = perf.effective
+    const profile = profileInForce()
+    appliedKey = forceKey()
     renderer.shadowMap.enabled = profile.shadows
     renderer.setPixelRatio(Math.min(window.devicePixelRatio * profile.resolutionScale, 2))
     resize()
     view?.setQuality(profile)
+    view?.setHeroMarkStep(markStepInForce())
+  }
+
+  /** Auto puts its ladder rung in force (#261); a manual level is its own profile, with sharp hero markings. */
+  function profileInForce(): QualityProfile {
+    if (perf.setting !== 'auto') return profileFor(perf.effective)
+    const profile = profileForRung(perf.rung)
+    return pausedDetail ? pausedDetailProfile(profile) : profile
+  }
+
+  function markStepInForce(): HeroMarkStep {
+    return perf.setting === 'auto' && !pausedDetail ? markStepForRung(perf.rung) : 'sharp'
+  }
+
+  function forceKey(): string {
+    return `${perf.setting === 'auto' ? 'auto' : perf.effective}:${perf.rung}:${pausedDetail}`
   }
 
   function aim(target: { x: number; y: number; z: number }, keepOffset: boolean, distanceM?: number, openingOffset?: { x: number; y: number; z: number } | null): void {
@@ -176,6 +198,40 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (id && store.controller()?.model?.vesselIds.includes(id)) void store.openBayViewer(id)
   }
 
+  // Two-finger gestures (phones): map-style pinch and pan from modules/pinchGesture, in place of OrbitControls' own,
+  // which slid the scene sideways while zooming. OrbitControls keeps one finger (orbit) and the mouse.
+  const touches = new Map<number, { x: number; y: number }>()
+  let pinchPrev: { mid: { x: number; y: number }; spread: number } | null = null
+  function pinchState(): { mid: { x: number; y: number }; spread: number } | null {
+    if (touches.size !== 2 || !renderer) return null
+    const rect = renderer.domElement.getBoundingClientRect()
+    const [a, b] = [...touches.values()]
+    return {
+      mid: { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top },
+      spread: Math.hypot(a.x - b.x, a.y - b.y),
+    }
+  }
+  function onTouchDown(e: PointerEvent): void {
+    if (e.pointerType !== 'touch') return
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    pinchPrev = pinchState()
+    if (touches.size >= 2) pressed = null // a two-finger gesture never selects
+  }
+  function onTouchMove(e: PointerEvent): void {
+    if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const now = pinchState()
+    if (!now || !pinchPrev || !camera || !controls || !renderer) return
+    const { clientWidth: w, clientHeight: h } = renderer.domElement
+    const ratio = pinchPrev.spread > 0 ? now.spread / pinchPrev.spread : 1
+    if (controls.enabled && applyPinchStep(camera, controls.target, pinchPrev.mid, now.mid, ratio, w, h, controls)) controls.update()
+    pinchPrev = now
+  }
+  function onTouchUp(e: PointerEvent): void {
+    if (!touches.delete(e.pointerId)) return
+    pinchPrev = pinchState()
+  }
+
   function rebuild(model: SceneModel | null): void {
     store.positional.update(ORIGIN, []) // the old scene's voices end with it
     view?.dispose()
@@ -184,7 +240,9 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (!model) return
     view = new SceneRenderer(model)
     overlaysApplied = null
-    view.setQuality(profileFor(perf.effective))
+    view.setQuality(profileInForce())
+    view.setHeroMarkStep(markStepInForce())
+    if (renderer) view.attachRenderer(renderer)
     lightingKey = ''
     aim(view.overviewTarget(), false, undefined, view.defaultCameraOffset())
   }
@@ -218,8 +276,22 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       lightingKey = key
       view.setLighting(lightingFor(hour, store.lockDaylight))
     }
+    // close to the target a swipe would swing the view round too fast: orbit speed falls with the distance
+    if (controls) controls.rotateSpeed = orbitSpeedFor(camera.position.distanceTo(controls.target))
     controls?.update()
     camera.updateMatrixWorld()
+    // Auto, paused, camera stopped: nothing moves, so frame time is free and the close-up detail goes up (#still)
+    const poseKey = `${camera.position.x},${camera.position.y},${camera.position.z},${camera.quaternion.x},${camera.quaternion.y},${camera.quaternion.z}`
+    if (poseKey !== lastPoseKey) {
+      lastPoseKey = poseKey
+      lastCameraMoveAt = now
+    }
+    const boost = perf.setting === 'auto' && perf.pausedDetail && controller.paused && now - lastCameraMoveAt >= PAUSED_DETAIL_SETTLE_MS
+    if (boost !== pausedDetail) {
+      pausedDetail = boost
+      perf.pausedDetailActive = boost
+      if (!boost) auto.reset(perf.rung) // the boosted frames say nothing about the rung
+    }
     frustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
     const cpuStart = performance.now()
     view.live = !controller.paused
@@ -240,18 +312,16 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     // quality: measure this frame, let Auto judge, apply a changed level on the next frame
     meter.frame(now)
     if (perf.setting !== lastSetting) {
-      if (perf.setting === 'auto') auto.reset(perf.effective)
+      if (perf.setting === 'auto') auto.reset(perf.rung)
       lastSetting = perf.setting
     }
-    if (perf.debugAuto) {
-      auto.downFps = perf.debugAuto.down
-      auto.upFps = perf.debugAuto.up
-    }
-    if (perf.setting === 'auto') auto.frame(now)
-    if (appliedLevel !== perf.effective) applyQuality()
+    if (perf.setting === 'auto' && auto.rung !== perf.rung) auto.reset(perf.rung) // the dev API forced a rung
+    auto.setFpsThresholds(perf.debugAuto?.down ?? null, perf.debugAuto?.up ?? null)
+    if (perf.setting === 'auto' && !pausedDetail) auto.frame(now)
+    if (appliedKey !== forceKey()) applyQuality()
     if (now - lastReportAt >= 250) {
       lastReportAt = now
-      perf.report({ fps: meter.fps, calls: lastRender.calls, triangles: lastRender.triangles, cpuMs, poseMs, closeup: view?.closeupCount() ?? 0, closeupFaces: view?.closeupFaceCount() ?? 0 })
+      perf.report({ fps: meter.fps, calls: lastRender.calls, triangles: lastRender.triangles, cpuMs, poseMs, closeup: view?.closeupCount() ?? 0, closeupFaces: view?.closeupFaceCount() ?? 0, heroFaces: view?.heroFaceCount() ?? 0, ...(view?.poseCounters() ?? { boxesPosed: 0, instanceBytes: 0 }) })
     }
   }
 
@@ -274,6 +344,17 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         controls.minDistance = 8
         controls.maxDistance = 3500
         controls.maxPolarAngle = Math.PI / 2.05
+        // Map-like handling (phones especially): a pan slides the target along the ground instead of lifting it into the
+        // air (an elevated target makes later orbits and pinches swing), and a zoom keeps the point under the cursor or
+        // between the fingers in place instead of heading for the middle of the canvas.
+        controls.screenSpacePanning = false
+        controls.zoomToCursor = true
+        // two fingers are handled by onTouch* below (an unknown TOUCH value leaves OrbitControls idle)
+        controls.touches.TWO = -1 as unknown as THREE.TOUCH
+        renderer.domElement.addEventListener('pointerdown', onTouchDown)
+        window.addEventListener('pointermove', onTouchMove)
+        window.addEventListener('pointerup', onTouchUp)
+        window.addEventListener('pointercancel', onTouchUp)
         renderer.domElement.addEventListener('pointerdown', onPointerDown)
         renderer.domElement.addEventListener('pointerup', onPointerUp)
         applyQuality()
@@ -307,8 +388,14 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         return true
       },
       pickAt,
+      setHeroMarkStep: (step) => view?.setHeroMarkStep(step),
+      get heroMarkStep() {
+        return view?.heroMarkStep ?? 'sharp'
+      },
       screenPoint,
       cameraPose: readPose,
+      setCameraPose: writePose,
+      heroSettled: () => view?.heroSettled() ?? true,
       stats: () => (view ? { ...view.stats(), frames: framesRendered, render: { ...lastRender } } : null),
       liveries: () => view?.renderedLiveries() ?? null,
       rigs: () => view?.renderedRigs() ?? null,
@@ -326,6 +413,10 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     view?.dispose()
     renderer?.domElement.removeEventListener('pointerdown', onPointerDown)
     renderer?.domElement.removeEventListener('pointerup', onPointerUp)
+    renderer?.domElement.removeEventListener('pointerdown', onTouchDown)
+    window.removeEventListener('pointermove', onTouchMove)
+    window.removeEventListener('pointerup', onTouchUp)
+    window.removeEventListener('pointercancel', onTouchUp)
     controls?.dispose()
     renderer?.dispose()
     renderer?.domElement.remove()

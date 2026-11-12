@@ -33,6 +33,7 @@ import type { Bucketing, KpiGroupId } from '../modules/dashboardModel'
 import { defaultSaveName as plainSaveName, exportFileName, makeConfigSave, makeSnapshotSave, parseSaveFile, planLoad, saveFileName, SaveFormatError, type SaveFile, type SaveMeta, type SaveType } from '../persistence/saves'
 import { openSaveStore, StorageUnavailableError, type SaveStore } from '../persistence/saveStore'
 import { DEFAULT_SPEED, TwinController } from '../modules/twinController'
+import { loadStrictChecks, saveStrictChecks } from '../modules/strictChecksSetting'
 import { loadDisplaySettings, runConfigFor, saveDisplaySettings } from '../i18n/display'
 import { createFormatter } from '../i18n/format'
 import { t, type MessageKey, type MessageParams } from '../i18n/messages'
@@ -101,6 +102,13 @@ export interface TwinView {
   screenPoint(entityId: string): { x: number; y: number } | null
   /** The orbit camera: where it looks, how far, the heading and the angle from straight up; null without a 3D view. */
   cameraPose(): CameraPose | null
+  /** Put the orbit camera at a pose (the benchmark's fly-through, #254). */
+  setCameraPose(pose: CameraPose): void
+  /** True when the hero level has nothing more to bring in for the current view. */
+  heroSettled(): boolean
+  /** Hero marking resolution (#260): 'sharp' or 'standard'; the step in force. */
+  setHeroMarkStep(step: 'sharp' | 'standard'): void
+  readonly heroMarkStep: 'sharp' | 'standard'
   /** Rendered entity counts plus frames rendered so far and the last frame's draw calls/triangles; null without a 3D view. */
   stats(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */
@@ -185,6 +193,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const loading = ref(false)
   const displayTime = ref(0)
   const speed = ref(DEFAULT_SPEED)
+  /** The speed playback really runs at (below `speed` while the engine cannot keep up, #251). */
+  const achievedSpeed = ref(DEFAULT_SPEED)
   const paused = ref(true)
   const busy = ref(false)
   const info = shallowRef<EngineInfo | null>(null)
@@ -194,6 +204,12 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   /** 3D debug overlays (lane graph, active reservations). */
   const overlays = ref<OverlayState>({ ...NO_OVERLAYS })
   /** Locale + units: browser defaults on first open, then the remembered choice. Display only. */
+  /** "Strict checks" (#252): the engine checks every event, not only by sweeps; applies from the next run. Remembered. */
+  const strictChecks = ref(loadStrictChecks(browserStorage()))
+  function setStrictChecks(on: boolean): void {
+    strictChecks.value = on
+    saveStrictChecks(browserStorage(), on)
+  }
   const display = ref<DisplaySettings>(loadDisplaySettings(browserStorage(), browserLanguages()))
   /** Formatter for the current display settings (Intl objects; rebuilt when they change). */
   const fmt = computed(() => markRaw(createFormatter(display.value)))
@@ -436,6 +452,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     displayTime.value = controller.displayTime
     if (followNextPending.value) resolveFollowNext()
     speed.value = controller.speed
+    achievedSpeed.value = controller.achievedSpeed
     paused.value = controller.paused
     busy.value = controller.busy
     if (info.value !== controller.info) info.value = controller.info
@@ -560,7 +577,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   async function startScenario(next: ScenarioChoice, options: { autoplay?: boolean } = {}): Promise<void> {
     const base = composeScenario(resolveScenario(next.name), next)
     const runConfig = runConfigFor(base, next.startDateTime, display.value)
-    await launch(runConfig, next, (c) => c.load(runConfig, next.seed), options)
+    await launch(runConfig, next, (c) => c.load(runConfig, next.seed, strictChecks.value), options)
   }
 
   /** Start a run from a ready config: validate, load through `load`, and reset the run's UI state. */
@@ -898,7 +915,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   /** Start a run from a config and seed (paused at t = 0). */
   async function startFromConfig(cfg: ScenarioConfig, seed: number): Promise<void> {
     const runConfig = adoptDisplay(JSON.parse(JSON.stringify(cfg)) as ScenarioConfig)
-    await launch(runConfig, { name: runConfig.name, seed, startDateTime: runConfig.startDateTime }, (c) => c.load(runConfig, seed), { autoplay: false })
+    await launch(runConfig, { name: runConfig.name, seed, startDateTime: runConfig.startDateTime }, (c) => c.load(runConfig, seed, strictChecks.value), { autoplay: false })
   }
 
   /** Apply a parsed save: start the config, resume the snapshot, or (other engine version) ask first. */
@@ -916,7 +933,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     }
     const snap = plan.snapshot
     const runConfig = adoptDisplay(JSON.parse(JSON.stringify(snap.config)) as ScenarioConfig)
-    await launch(runConfig, { name: runConfig.name, seed: snap.seed, startDateTime: runConfig.startDateTime }, (c) => c.restore({ ...snap, config: runConfig }), { autoplay: false })
+    await launch(runConfig, { name: runConfig.name, seed: snap.seed, startDateTime: runConfig.startDateTime }, (c) => c.restore({ ...snap, config: runConfig }, strictChecks.value), { autoplay: false })
     savesInfo('saves.loadedSnapshot', { name: file.name })
     return 'loaded'
   }
@@ -1129,6 +1146,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     loading,
     displayTime,
     speed,
+    achievedSpeed,
     paused,
     busy,
     info,
@@ -1215,6 +1233,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     runToNextDeparture,
     select,
     setDisplay,
+    strictChecks,
+    setStrictChecks,
     savesOpen,
     saves,
     storage,

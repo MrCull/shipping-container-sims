@@ -3,7 +3,7 @@
   "seed": 3,
   "status": "ended",
   "endReason": "simDurationS >= 4800",
-  "eventLogHash": "1e67c9eccfdfd8",
+  "eventLogHash": "107cbf63db18de",
   "kpis": {
     "simTimeS": 4800,
     "eventsProcessed": 1273,
@@ -215,17 +215,17 @@
       "shcs": {
         "SHC01": {
           "jobs": 21,
-          "emptyDistanceM": 6007.5,
-          "loadedDistanceM": 3062.5,
+          "emptyDistanceM": 6013,
+          "loadedDistanceM": 3057,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 2532.959,
-            "moving-to-collect": 449.774,
+            "parked": 2533.016,
+            "moving-to-collect": 450.506,
             "queuing-to-collect": 0,
             "collecting": 794.068,
             "moving-to-deliver": 73.5,
             "queuing-to-deliver": 0,
-            "delivering": 949.699
+            "delivering": 948.909
           },
           "handovers": 42,
           "parkingReturns": 21,
@@ -297,21 +297,21 @@
         "B01-ASC1": {
           "jobs": 15,
           "gantryM": 1639.35,
-          "trolleyM": 177.55,
-          "hoistM": 539.904,
+          "trolleyM": 170.15,
+          "hoistM": 541.734,
           "padWaitS": 0,
-          "railWaitS": 400.696,
-          "busyS": 1779.766,
+          "railWaitS": 402.48,
+          "busyS": 1782.511,
           "yields": 14
         },
         "B01-ASC2": {
           "jobs": 15,
           "gantryM": 1848.5,
-          "trolleyM": 280.05,
-          "hoistM": 551.488,
+          "trolleyM": 292.75,
+          "hoistM": 552.098,
           "padWaitS": 0,
           "railWaitS": 315.714,
-          "busyS": 1788.925,
+          "busyS": 1789.84,
           "yields": 7
         }
       }
