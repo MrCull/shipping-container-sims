@@ -28,7 +28,7 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | #256 | Far tier: far-field wordmark on containers | #247 | open | |
 | #257 | Posing: cull before posing, one custody lookup per box | #250 | merged in branch (ccf3ff8) | |
 | #258 | Hero renderer: visible faces only, capped, loaded on first close zoom | #250, #248, #255 | merged in branch (8df80fd) | |
-| #259 | Hero detail arrives smoothly (frame allowance, fade-in, camera gate) | #258 | open | |
+| #259 | Hero detail arrives smoothly (frame allowance, fade-in, camera gate) | #258 | merged in branch (2903851) | |
 | #260 | Sharp markings on hero faces | #259 | open | |
 | #261 | Auto quality works from frame time and sheds in a fixed ladder | #259, #260 | open | |
 | #262 | Run the benchmark on the laptop, record the numbers, retune Auto (`ready-for-human`) | #254, #261, #257, #249, #256 | open | |
