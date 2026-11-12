@@ -18,13 +18,13 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | #246 | Headless baseline, posing counters and drawn-box reference | none | merged in branch (87c0545) | |
 | #247 | Opt-in Blender install script for cloud sessions | none | merged in branch (a01e946) | |
 | #248 | Environment reflections and contact shadows | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
-| #249 | Far tier: stand-ins for fences, ASC rails and masts | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
+| #249 | Far tier: stand-ins for fences, ASC rails and masts | none | merged in branch (290113b) | |
 | #250 | Posing: boxes at rest are written only when their custody changes | #246 | merged in branch (eae8de4) | |
 | #251 | Playback: even pacing with the achieved speed shown | #246 | open | |
 | #252 | Sweep-only invariant checks in the browser, "strict checks" switch | #246 | open | |
 | #253 | Worker reads only the entities an event names | #246 | open | |
 | #254 | One-click benchmark on a production build | #246 | open | |
-| #255 | Hero container model, per face, with asset budgets | #247 | open | |
+| #255 | Hero container model, per face, with asset budgets | #247 | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
 | #256 | Far tier: far-field wordmark on containers | #247 | open | |
 | #257 | Posing: cull before posing, one custody lookup per box | #250 | open | |
 | #258 | Hero renderer: visible faces only, capped, loaded on first close zoom | #250, #248, #255 | open | |
@@ -49,3 +49,4 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 - **#247:** `scripts/install-bpy.sh` installs bpy into `$HOME/.cache/tt-bpy-venv` (last output line is the venv python). A full `tt:assets --check` over all 7 groups is byte-identical for every GLB and sidecar; 56 preview `.webp` files differ (Cycles on a different CPU), recorded in `assets-pipeline.md`. Use `--no-previews` for a models-only check.
 - **#246:** baseline `pnpm run tt:baseline` (heavy, about 3 min; run under `scripts/bg.sh run --heavy`). Overview posing 14.3 ms per frame, 9,895 boxes posed, 2,006,400 instance bytes per frame. Drawn-box reference: `tests/drawn-boxes.test.ts` + `drawn-boxes.reference.json` (regenerate only on purpose with `UPDATE_DRAWN_BOXES=1`); it takes about 45 s, close to the 60 s Vitest limit on a busy machine. A flat-out `run` compacts motion plans, so the reference feeds the model with `advance` steps of 900 s: a box in flight at T is posed from motion planned later (matters for #251, #253).
 - **#250:** the instancer is retained (`set`/`remove` per box, range uploads); the renderer poses only custody changes, carried boxes, new boxes and vessels whose placement changed. Overview posing 14.3 to 2.40 ms, 9 boxes posed, 0 bytes when nothing changes. Left for #257: the O(boxes) close-up offer loop still runs every frame. Not run per ticket (for #263): `terminal-twin.smoke`, bay-viewer and gantry-alarm specs; two `@load` specs (colour-by full TTI, container-closeup 10-box view) failed on software GL and were not diagnosed.
+- **#249:** far tier in `modules/farTier.ts` (fences and ASC rails beyond 220 m, masts beyond 350 m, hysteresis, code-generated 12-triangle stand-ins). TTI overview 1,561,283 to 382,435 triangles, 282 draw calls unchanged; perf smoke budget now < 420k. No cross-fade: stand-ins are visually indistinguishable at switch distance (`docs/prototypes/249/yard-all-*.png`); confirm on the laptop in #262.

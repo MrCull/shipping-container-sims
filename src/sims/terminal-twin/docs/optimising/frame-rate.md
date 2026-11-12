@@ -92,6 +92,7 @@ Other dev API levers: `perfOverlay(on)` (also key P, the Stats button, or a clic
 | Container LOD | `QUALITY_PROFILES.*.lod0DistanceM`, `lod0Cap`, `DEFAULT_LOD_OPTIONS` | LOD0 440 triangles vs LOD1 12 | at overview every box is LOD1 already |
 | Close-up faces | `closeupDistanceM`, `closeupFaceBudget` | one draw call per atlas page, none when far | budget caps canvas painting too |
 | Equipment LOD | `lodScale` (STS, SHC, ASC), `*_LOD_DISTANCES`, `DEFAULT_VESSEL_LOD` | e.g. STS LOD0 31 690 vs LOD2 490 triangles | trucks and hulls ignore `lodScale` |
+| Far tier | `modules/farTier.ts`, `InfrastructureScene.update` | fences, ASC rails and masts beyond 220 to 350 m draw as 12-triangle boxes: TTI overview 1.56M to 382k triangles, 282 draw calls both | per instance, hysteresis; headless counts only (#249) |
 | Draw calls | `StaticBatch` per material, `InfrastructureScene` one InstancedMesh per geometry key, instanced masts, hatch panels and containers | TTI overview went from 1 563 to 265 draw calls with `StaticBatch` | new static scenery must be batched or instanced |
 | Shadows | `shadows`, `shadowMapSize`; night drops the shadow pass | the shadow pass roughly doubles triangles (Low has half the triangles of Medium) | `normalBias` 0.35 must stay for containers |
 | Render resolution | `resolutionScale` (0.65 / 0.85 / 1, cap 2 x DPR) | fill-rate only | no help when main-thread bound |
@@ -109,8 +110,8 @@ Other dev API levers: `perfOverlay(on)` (also key P, the Stats button, or a clic
 - **Done in #250:** boxes at rest are posed only when their custody changes (retained instance slots, upload by dirty range; see `rendering-3d.md`, Containers).
 - **Next wins (not done):** cull before
   posing (skip `containerPose` for boxes whose cached position is outside the frustum); fold the second custody search
-  (`custodyAt` for `loads`) into `containerPose`; a far-LOD for containers or infrastructure at overview distance to cut
-  triangles (TT-28 infrastructure is about 680k triangles of the TTI overview: yard fences, ASC rails, masts).
+  (`custodyAt` for `loads`) into `containerPose`; a far-LOD for containers (the infrastructure one is done, #249:
+  the TTI overview fell from 1.56M to 382k triangles).
 - Anything that adds per-box work per frame (a new colour mode, a new per-box lookup) must be budgeted like colour by.
 
 ## Recorded numbers

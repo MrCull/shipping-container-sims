@@ -288,6 +288,14 @@ top is clipped over every open bay (needed so a crane never works under a solid 
 - Masts (`mastSpots`, shared with the night glow; at most `MAX_MASTS` 400) stand only mid-gap between neighbouring blocks
   and beside the outermost blocks, never inside a block footprint (`BLOCK_FOOTPRINT_HALF_X_M`): a block's centre line is
   where its ASCs travel. `tests/infrastructure.test.ts` asserts this for every preset and fixture.
+- **Far tier (#249):** `modules/farTier.ts`. Yard fences, ASC rails and masts (`FAR_TIER`: 220, 220 and 350 m) draw as
+  12-triangle box stand-ins (`standInGeometry`: the source's bounding box, UV of its largest upward-facing triangle, footprint of its lower 60 %, so the same atlas
+  swatch and the same material) beyond that 3D distance from the camera. The choice is per instance (`FarTierSelector`,
+  hysteresis 30 to 40 m, recomputed only after the camera moves 2 m), done in `InfrastructureScene.update(cameraPosition)`
+  each frame: each tiered key has a near mesh and a far mesh, and an instance sits in exactly one. A mesh with no instances
+  is hidden, so draw calls do not rise (TTI overview 282 before and after); `InfrastructureStats.drawCalls` and `triangles`
+  count visible meshes only. No cross-fade: the box has the source's footprint and colour, so the swap at 220 m or more is
+  a few pixels (screenshots in `docs/prototypes/249`). TTI overview triangles (main plus shadow pass): 1 561 283 to 382 435.
 - Placeholders (procedural quay lines, ASC rails, pad and stall outlines, gate furniture, mast poles) stay until the GLBs
   load, then hide (`SceneRenderer` `infraPlaceholders`, `LandsideScene.useGateModels`, `AtmosphereRig.useMastModels`).
   Roads, queue approach and stall spurs stay procedural.
