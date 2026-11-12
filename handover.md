@@ -17,12 +17,13 @@ A previous session (branch `claude/cool-clarke-qnzt4q`) ran out of credits befor
 
 Keep this table current after each step and push, so a cutoff loses nothing.
 
+All six are done and pushed. Smoke set after them: 45 passed, 2 failed (`colour-by.smoke.ts:238` and `container-closeup.smoke.ts:81`, both `@load`, which need a real frame rate). The PR description is updated. Still open for the owner: phone test of all of the above; decide on the scale-back options in the cost table (sharp marks 4x to 3x, end-page packing, shared GLB maps).
+
 ## Status (2026-11-12)
 
 - **PR #266** (`claude/practical-cerf-asprbc` into `main`, ready for review, mergeable, CI green on the tip `2537f4f`) holds all of spec #243 (#246 to #261, #263) plus the follow-on work below. #265 was a subset of it and is closed.
 - **Stage site** for the PR: https://lemon-flower-0e17fe210-266.centralus.2.azurestaticapps.net (rebuilt on every push; the main menu footer shows the commit hash).
 - **No real GPU in cloud sessions.** Screenshots come from software WebGL (about a minute for hero detail to arrive, 0 to 2 fps). The owner tests on a phone; take their reports as the ground truth for look and feel.
-- The PR description predates the follow-on commits (it still says 192 test files, 2,114 tests, and does not mention the work below). Update it before merge.
 
 ## What was done after the spec tickets
 
