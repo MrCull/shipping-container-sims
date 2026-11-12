@@ -30,7 +30,7 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | #258 | Hero renderer: visible faces only, capped, loaded on first close zoom | #250, #248, #255 | merged in branch (8df80fd) | |
 | #259 | Hero detail arrives smoothly (frame allowance, fade-in, camera gate) | #258 | merged in branch (2903851) | |
 | #260 | Sharp markings on hero faces | #259 | merged in branch (71bad0d) | |
-| #261 | Auto quality works from frame time and sheds in a fixed ladder | #259, #260 | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
+| #261 | Auto quality works from frame time and sheds in a fixed ladder | #259, #260 | merged in branch (c0d0e19) | |
 | #262 | Run the benchmark on the laptop, record the numbers, retune Auto (`ready-for-human`) | #254, #261, #257, #249, #256 | open | |
 | #263 | Run the browser smoke suite and fix regressions | #246 to #261 | open | |
 
