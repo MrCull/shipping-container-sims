@@ -15,7 +15,7 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 
 | Issue | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
-| #246 | Headless baseline, posing counters and drawn-box reference | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
+| #246 | Headless baseline, posing counters and drawn-box reference | none | merged in branch (87c0545) | |
 | #247 | Opt-in Blender install script for cloud sessions | none | merged in branch (a01e946) | |
 | #248 | Environment reflections and contact shadows | none | open | |
 | #249 | Far tier: stand-ins for fences, ASC rails and masts | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
