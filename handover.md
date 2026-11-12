@@ -46,4 +46,4 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 
 ## Open points
 
-- None yet. Add what each ticket leaves behind here.
+- **#247:** `scripts/install-bpy.sh` installs bpy into `$HOME/.cache/tt-bpy-venv` (last output line is the venv python). A full `tt:assets --check` over all 7 groups is byte-identical for every GLB and sidecar; 56 preview `.webp` files differ (Cycles on a different CPU), recorded in `assets-pipeline.md`. Use `--no-previews` for a models-only check.
