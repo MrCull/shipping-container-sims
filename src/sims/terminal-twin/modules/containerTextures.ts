@@ -57,12 +57,30 @@ function inRegion(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: numb
   ctx.restore()
 }
 
+/** While set, `text` adds the canvas-pixel box of every string it draws (so `chipPaint` chips only the lettering). */
+let inkBoxes: { x0: number; y0: number; x1: number; y1: number }[] | null = null
+
 function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, sizeM: number, colour: string, weight = '600', align: CanvasTextAlign = 'left'): void {
   ctx.font = `${weight} ${sizeM}px Arial, Helvetica, sans-serif`
   ctx.fillStyle = colour
   ctx.textAlign = align
   ctx.textBaseline = 'middle'
   ctx.fillText(s, x, y)
+  const m = inkBoxes ? ctx.getTransform?.() : undefined
+  if (m && inkBoxes) {
+    const w = ctx.measureText?.(s)?.width ?? 0
+    const lx = align === 'center' ? x - w / 2 : align === 'right' || align === 'end' ? x - w : x
+    const corners = [
+      [lx, y - sizeM * 0.6],
+      [lx + w, y + sizeM * 0.6],
+    ].map(([px, py]) => [m.a * px + m.c * py + m.e, m.b * px + m.d * py + m.f])
+    inkBoxes.push({
+      x0: Math.min(corners[0][0], corners[1][0]),
+      y0: Math.min(corners[0][1], corners[1][1]),
+      x1: Math.max(corners[0][0], corners[1][0]),
+      y1: Math.max(corners[0][1], corners[1][1]),
+    })
+  }
 }
 
 /** Stencilled markings are condensed: the glyphs are squeezed to this share of their width. */
@@ -94,15 +112,16 @@ function drawWear(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: numb
   const rng = stream(m.wear.seed ^ salt)
   inRegion(ctx, r, wM, hM, () => {
     // fine speckle: scuffs and dust
-    const specks = Math.round(60 + 240 * m.wear.fade + 80 * wM)
+    // toned down (owner, 2026-11-12): the earlier speckle, streaks and dents read as dirt blotches
+    const specks = Math.round(20 + 80 * m.wear.fade + 20 * wM)
     for (let i = 0; i < specks; i++) {
-      ctx.fillStyle = rng() < 0.5 ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.06)'
+      ctx.fillStyle = rng() < 0.5 ? 'rgba(0,0,0,0.045)' : 'rgba(255,255,255,0.04)'
       ctx.fillRect(rng() * wM, rng() * hM, 0.01 + rng() * 0.05, 0.01 + rng() * 0.03)
     }
     for (const s of m.wear.rustStreaks) {
       const x = s.x * wM
       const g = ctx.createLinearGradient(0, 0, 0, s.len * hM)
-      g.addColorStop(0, `rgba(122,58,28,${s.alpha})`)
+      g.addColorStop(0, `rgba(122,58,28,${s.alpha * 0.5})`)
       g.addColorStop(1, 'rgba(122,58,28,0)')
       ctx.fillStyle = g
       ctx.fillRect(x, 0, s.w * wM, s.len * hM)
@@ -112,8 +131,8 @@ function drawWear(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: numb
       const cy = d.y * hM
       const rad = d.r * hM
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad)
-      g.addColorStop(0, mix(body, '#000000', 0.28) + 'aa')
-      g.addColorStop(0.7, mix(body, '#ffffff', 0.12) + '44')
+      g.addColorStop(0, mix(body, '#000000', 0.2) + '40')
+      g.addColorStop(0.7, mix(body, '#ffffff', 0.08) + '1c')
       g.addColorStop(1, mix(body, '#000000', 0) + '00')
       ctx.fillStyle = g
       ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2)
@@ -121,24 +140,80 @@ function drawWear(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: numb
   })
 }
 
+/** Pixels per metre of a chip mask, and the mask's edge in metres (it repeats). */
+const CHIP_MASK_PX_PER_M = 256
+const CHIP_MASK_M = 1
+/** Chips and scratches per square metre in a mask: sparse, so the lettering reads as worn, not shot-blasted. */
+const CHIPS_PER_M2 = 70
+const CHIP_VARIANTS = 3
+/** How much of the stencil coat a mask takes everywhere (a thin coat), before the box's own strength. */
+const CHIP_COAT = 0.1
+let chipMasks: HTMLCanvasElement[] | null = null
+
+/** A few repeating 1 m masks of paint chips and short scratches, painted once and reused by every face. */
+function chipMaskFor(seed: number): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null
+  if (!chipMasks) {
+    chipMasks = []
+    for (let v = 0; v < CHIP_VARIANTS; v++) {
+      const px = CHIP_MASK_PX_PER_M * CHIP_MASK_M
+      const c = canvas(px, px)
+      const ctx = c.getContext('2d')
+      if (!ctx) return null
+      const rng = stream(0x9e37 + v * 7919)
+      // the thin stencil coat: a little of everything goes, under the chips
+      ctx.fillStyle = `rgba(0,0,0,${CHIP_COAT})`
+      ctx.fillRect(0, 0, px, px)
+      ctx.scale(CHIP_MASK_PX_PER_M, CHIP_MASK_PX_PER_M)
+      for (let i = 0; i < CHIPS_PER_M2 * CHIP_MASK_M * CHIP_MASK_M; i++) {
+        ctx.fillStyle = `rgba(0,0,0,${0.35 + rng() * 0.65})`
+        const scratch = rng() < 0.25
+        ctx.fillRect(rng() * CHIP_MASK_M, rng() * CHIP_MASK_M, scratch ? 0.02 + rng() * 0.06 : 0.004 + rng() * 0.01, scratch ? 0.003 + rng() * 0.003 : 0.004 + rng() * 0.01)
+      }
+      chipMasks.push(c)
+    }
+  }
+  return chipMasks[seed % CHIP_VARIANTS]
+}
+
 /**
- * Stencilled lettering weathers with the box: small chips and scratches are knocked out of what has been painted so far
- * (hero tiles only: the ground is transparent, so the paint under the lettering shows through), more on a worn box.
+ * Stencilled lettering weathers with the box: chips and scratches are knocked out of what has been painted so far
+ * (hero tiles only: the ground is transparent, so the paint under the lettering shows through), more on a faded box.
+ * One pattern fill from a shared mask that also carries the thin coat (it used to be thousands of rectangles and a
+ * second full fill per face: about 70% of a hero face's paint time), at a random offset per box so neighbours differ.
  */
-function chipPaint(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: number, m: ContainerMarkings, salt: number): void {
+function chipPaint(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: number, m: ContainerMarkings, salt: number, boxes: typeof inkBoxes = null): void {
   const rng = stream((m.wear.seed ^ salt) + 0x9e37)
+  const mask = chipMaskFor(m.wear.seed >>> 0)
   inRegion(ctx, r, wM, hM, () => {
     ctx.globalCompositeOperation = 'destination-out'
-    const chips = Math.round((250 + 1400 * m.wear.fade) * wM * hM * 0.16)
-    for (let i = 0; i < chips; i++) {
-      ctx.fillStyle = `rgba(0,0,0,${0.35 + rng() * 0.65})`
-      const scratch = rng() < 0.25
-      ctx.fillRect(rng() * wM, rng() * hM, scratch ? 0.02 + rng() * 0.07 : 0.004 + rng() * 0.012, scratch ? 0.003 + rng() * 0.004 : 0.004 + rng() * 0.012)
+    const pattern = mask ? ctx.createPattern?.(mask, 'repeat') : null
+    if (pattern) {
+      pattern.setTransform?.(new DOMMatrix().translateSelf(-rng() * CHIP_MASK_M, -rng() * CHIP_MASK_M).scaleSelf(1 / CHIP_MASK_PX_PER_M))
+      // a faded box loses more: chips and the thin coat (the mask's ground) both scale with it
+      ctx.globalAlpha = 0.45 + 0.55 * m.wear.fade
+      ctx.fillStyle = pattern
+      if (boxes) {
+        // only where lettering was drawn (canvas pixels back to face metres, a pixel of margin): a tenth of the tile
+        const sx = wM / r.w
+        const sy = hM / r.h
+        for (const b of boxes) ctx.fillRect((b.x0 - 1 - r.x) * sx, (b.y0 - 1 - r.y) * sy, (b.x1 - b.x0 + 2) * sx, (b.y1 - b.y0 + 2) * sy)
+      } else ctx.fillRect(0, 0, wM, hM)
+      ctx.globalAlpha = 1
     }
-    // the whole stencil coat is a little thin, more so on a faded box
-    ctx.fillStyle = `rgba(0,0,0,${0.06 + 0.16 * m.wear.fade})`
-    ctx.fillRect(0, 0, wM, hM)
   })
+}
+
+/** Draws a face's lettering with `draw`, then chips it: only the lettering's boxes are filled. */
+function letterAndChip(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: number, m: ContainerMarkings, salt: number, draw: () => void): void {
+  inkBoxes = []
+  try {
+    inRegion(ctx, r, wM, hM, draw)
+  } finally {
+    const boxes = inkBoxes
+    inkBoxes = null
+    chipPaint(ctx, r, wM, hM, m, salt, 'getTransform' in ctx ? boxes : null)
+  }
 }
 
 /** What a long side prints, in metres of a face `L` x `H` (y down): line name, box number, rails. Shared with the hero level. */
@@ -156,6 +231,76 @@ export const DOOR_LEAF_M = 1.064
 /** The two locking bars of a leaf, metres from the centre seam (`DOOR_BAR_FRACS` in containers.py). */
 export const DOOR_BAR_INNER_M = 0.17 * DOOR_LEAF_M
 export const DOOR_BAR_OUTER_M = 0.55 * DOOR_LEAF_M
+/** Door leaf corrugation: horizontal bands between the sill and the header (`DOOR_BANDS` in hero_containers.py). */
+export const DOOR_BANDS = 4
+/** Top of the bottom rail and depth of the top rail (`BOTTOM_RAIL_TOP`, `TOP_RAIL_DEPTH` in containers.py). */
+export const DOOR_SILL_M = 0.16
+export const DOOR_HEADER_M = 0.1
+/** Corner post width seen on the door end (`CAST_W - 0.007` in containers.py): the leaves start inside it. */
+const DOOR_POST_M = 0.155
+
+/**
+ * The door furniture the close-up level paints on its flat door tile (the hero level and LOD0 have it as geometry), so
+ * a door between the two looks like both: corner posts, gaskets, the band joins of the leaves, four locking bars with
+ * guides, cam keepers and handles, and the hinges. Face metres, x to the viewer's right, y down from the top.
+ */
+function drawDoorHardware(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+  const zb = H - DOOR_SILL_M // y of the sill's top
+  const zt = DOOR_HEADER_M // y of the header's bottom
+  const band = (zb - zt) / DOOR_BANDS
+  // corner posts, a shade darker, with the gasket line inside them
+  ctx.fillStyle = 'rgba(0,0,0,0.16)'
+  ctx.fillRect(0, 0, DOOR_POST_M, H)
+  ctx.fillRect(W - DOOR_POST_M, 0, DOOR_POST_M, H)
+  ctx.fillStyle = 'rgba(20,20,20,0.55)'
+  ctx.fillRect(DOOR_POST_M - 0.012, zt, 0.012, zb - zt)
+  ctx.fillRect(W - DOOR_POST_M, zt, 0.012, zb - zt)
+  // band joins: a crease (shadow) with a lit lip under it
+  for (let k = 1; k < DOOR_BANDS; k++) {
+    const y = zt + band * k
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'
+    ctx.fillRect(DOOR_POST_M, y - 0.01, W - 2 * DOOR_POST_M, 0.014)
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'
+    ctx.fillRect(DOOR_POST_M, y + 0.004, W - 2 * DOOR_POST_M, 0.008)
+  }
+  // hinges on the outer edge of each leaf (5 on a high cube)
+  const hinges = H > 2.8 ? 5 : 4
+  for (let k = 0; k < hinges; k++) {
+    const y = zb - 0.18 - ((zb - zt - 0.36) * k) / (hinges - 1)
+    for (const x of [DOOR_POST_M - 0.03, W - DOOR_POST_M - 0.05]) {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'
+      ctx.fillRect(x + 0.01, y - 0.045, 0.08, 0.1)
+      ctx.fillStyle = '#9a9ea1'
+      ctx.fillRect(x, y - 0.05, 0.08, 0.09)
+    }
+  }
+  // locking bars: galvanised rods with a shadow on the leaf, guides, cam keepers at both ends, a handle towards the hinge
+  const bars = [DOOR_BAR_INNER_M, DOOR_BAR_OUTER_M].flatMap((d) => [
+    { x: W / 2 + d, toHinge: 1 },
+    { x: W / 2 - d, toHinge: -1 },
+  ])
+  for (const { x, toHinge } of bars) {
+    const top = zt + 0.04
+    const bottom = zb - 0.05
+    ctx.fillStyle = 'rgba(0,0,0,0.32)'
+    ctx.fillRect(x - 0.006, top, 0.04, bottom - top)
+    ctx.fillStyle = '#a7abae'
+    ctx.fillRect(x - 0.018, top, 0.036, bottom - top)
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'
+    ctx.fillRect(x - 0.016, top, 0.009, bottom - top)
+    ctx.fillStyle = '#7d8184'
+    for (const y of [zt + band * 1.5, zb - band * 1.5]) ctx.fillRect(x - 0.035, y - 0.02, 0.07, 0.04) // guides
+    ctx.fillRect(x - 0.035, zt, 0.07, 0.07) // cam keeper, header
+    ctx.fillRect(x - 0.035, zb - 0.055, 0.07, 0.055) // cam keeper, sill
+    const hy = H - 1.1
+    const hx0 = toHinge > 0 ? x : x - 0.2
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'
+    ctx.fillRect(hx0, hy + 0.05, 0.2, 0.02)
+    ctx.fillStyle = '#b4b8bb'
+    ctx.fillRect(hx0, hy, 0.2, 0.05)
+  }
+}
+
 /** Clear space kept either side of a bar's centre line. */
 const BAR_CLEAR_M = 0.035
 
@@ -186,6 +331,7 @@ function drawDoorMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['d
     ctx.fillStyle = 'rgba(0,0,0,0.22)'
     ctx.fillRect(0, 0, W, 0.14)
     ctx.fillRect(0, H - 0.14, W, 0.14)
+    drawDoorHardware(ctx, W, H)
   }
   // right leaf: column A between the bars, column B from the outer bar to the leaf edge
   const a0 = W / 2 + DOOR_BAR_INNER_M + BAR_CLEAR_M
@@ -411,16 +557,13 @@ export function paintFaceMarks(ctx: CanvasRenderingContext2D, markings: Containe
   if (!canon || !(HERO_FACES as readonly Face[]).includes(face)) return
   const salt = canon.x * 31 + canon.y
   if (face === 'sideP' || face === 'sideN') {
-    inRegion(ctx, rect, L, H, () => drawSideMarks(ctx, side, L, H, ink, false))
-    chipPaint(ctx, rect, L, H, markings, salt)
+    letterAndChip(ctx, rect, L, H, markings, salt, () => drawSideMarks(ctx, side, L, H, ink, false))
     drawWear(ctx, rect, L, H, markings, paint, salt)
   } else if (face === 'door') {
-    inRegion(ctx, rect, W, H, () => drawDoorMarks(ctx, door, W, H, ink, false))
-    chipPaint(ctx, rect, W, H, markings, salt)
+    letterAndChip(ctx, rect, W, H, markings, salt, () => drawDoorMarks(ctx, door, W, H, ink, false))
     drawWear(ctx, rect, W, H, markings, paint, salt)
   } else {
-    inRegion(ctx, rect, W, H, () => drawFrontMarks(ctx, door, W, H, ink, false))
-    chipPaint(ctx, rect, W, H, markings, salt)
+    letterAndChip(ctx, rect, W, H, markings, salt, () => drawFrontMarks(ctx, door, W, H, ink, false))
     drawWear(ctx, rect, W, H, markings, paint, salt)
   }
 }

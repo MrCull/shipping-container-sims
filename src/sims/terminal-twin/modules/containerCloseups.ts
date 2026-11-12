@@ -17,7 +17,7 @@ import type { ContainerMarkings } from './containerMarkings'
 import type { Region } from './closeupGeometry'
 import { CORRUGATION_PITCH_M } from './closeupGeometry'
 import { selectFaces, type FaceCandidate } from './closeupFaceBudget'
-import { canvasAtlasBackend, sharedContainerMaps } from './containerTextures'
+import { canvasAtlasBackend, DOOR_BANDS, DOOR_HEADER_M, DOOR_SILL_M, sharedContainerMaps } from './containerTextures'
 import { FACES, visibleFaceList, type ExposedFaces, type Face } from './exposedFaces'
 import type { HeroLevel } from './heroRenderer'
 import type { HeroMarkStep } from './heroMarkings'
@@ -291,7 +291,8 @@ export class ContainerCloseups {
       const cy = Math.floor(slot.index / page.cols)
       // inset by a pixel so a neighbouring tile never bleeds in
       page.uvRect.setXYZW(n, (cx * t.w + 1) / PAGE_PX, 1 - ((cy + 1) * t.h - 1) / PAGE_PX, (t.w - 2) / PAGE_PX, (t.h - 2) / PAGE_PX)
-      page.sizeM.setXY(n, f.w, f.h)
+      // a negative width tells the shader this is a door: banded leaves, not wall ribs
+      page.sizeM.setXY(n, face === 'door' ? -f.w : f.w, f.h)
       this.faceCount++
     }
     for (const [page, n] of written) {
@@ -366,7 +367,14 @@ export class ContainerCloseups {
   vMapUv = uv * uvRect.zw + uvRect.xy;
 #endif
 #ifdef USE_NORMALMAP
-  vNormalMapUv = uv * sizeM / ${CORRUGATION_PITCH_M.toFixed(3)};
+  if (sizeM.x < 0.0) {
+    // door leaf: ${DOOR_BANDS} wide horizontal bands between sill and header (the hero door's shape), one ridge each,
+    // the ridge's crest mid-band; the normal map's u runs up the face, so its tilt turns with it
+    float band = (sizeM.y - ${DOOR_SILL_M.toFixed(3)} - ${DOOR_HEADER_M.toFixed(3)}) / ${DOOR_BANDS.toFixed(1)};
+    vNormalMapUv = vec2((uv.y * sizeM.y - ${DOOR_SILL_M.toFixed(3)}) / band - 0.25, 0.5);
+  } else {
+    vNormalMapUv = uv * sizeM / ${CORRUGATION_PITCH_M.toFixed(3)};
+  }
 #endif`,
         )
     }

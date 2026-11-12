@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { DOOR_BAR_INNER_M, DOOR_BAR_OUTER_M, DOOR_LEAF_M } from '../modules/containerTextures'
+import { DOOR_BANDS, DOOR_BAR_INNER_M, DOOR_BAR_OUTER_M, DOOR_HEADER_M, DOOR_LEAF_M, DOOR_SILL_M } from '../modules/containerTextures'
 import { HERO_DEPTH_BIAS_M, HERO_GENERATOR_CONSTANTS as C, heroMarkInsetM } from '../modules/heroMarkings'
 
 const dir = join(__dirname, '../assets/generators/tt_assets')
@@ -29,6 +29,10 @@ describe('generator constants copied into the renderer', () => {
     expect(num(liveries, 'RIB_DEPTH_M')).toBe(C.ribDepthM)
     expect(num(hero, 'HERO_PITCH_M')).toBe(C.heroPitchM)
     expect(num(hero, 'DOOR_BANDS')).toBe(C.doorBands)
+    // the close-up door tile paints and shades the same bands between the same rails
+    expect(DOOR_BANDS).toBe(C.doorBands)
+    expect(DOOR_SILL_M).toBe(C.railBottomM)
+    expect(DOOR_HEADER_M).toBe(C.railTopM)
   })
 
   it('door bars sit where the lettering is laid out around them', () => {

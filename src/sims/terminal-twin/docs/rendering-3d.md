@@ -152,8 +152,41 @@ forbids it (a test that measures what a rung draws while paused). Smoke: `hero-f
 #### Camera controls
 
 `OrbitControls` with map-like handling: `screenSpacePanning = false` (a pan slides the target along the ground, never into the
-air), `zoomToCursor = true` (a wheel or pinch zoom keeps the point under the cursor or between the fingers in place), and the
-orbit speed falls close to the target (`orbitSpeedFor`: 1 from 40 m out, 0.35 at the 8 m minimum distance).
+air), `zoomToCursor = true` (a wheel zoom keeps the point under the cursor in place), and the orbit speed falls close to the
+target (`orbitSpeedFor`: 1 from 40 m out, 0.35 at the 8 m minimum distance).
+
+Two fingers are not OrbitControls' (`touches.TWO` is set to an unknown value, which leaves it idle): `useTwinScene` tracks touch
+pointers and calls `modules/pinchGesture.ts#applyPinchStep` per move. A zoom scales camera and target about the ground point
+under the finger midpoint (so it stays under the fingers and the view does not turn), then a pan moves both so the point first
+touched stays under the midpoint. Client coordinates throughout. OrbitControls' own pinch scaled its pan to the orbit target's
+distance, so the grabbed point drifted 31 m in the phone smoke's test gesture. One finger (orbit) and the mouse stay
+OrbitControls'. Tests: `tests/pinch-gesture.test.ts`, smoke `terminal-twin-phone.smoke.ts` (it fails on the old controls).
+
+Phone layout: below 720 px the top bar wraps and the speed buttons scroll sideways. An over-wide top bar once stretched the whole
+view to 1,027 px on a 390 px screen, which put the canvas centre off the right edge: the main cause of pinch-zoom sliding right.
+HUD groups (top bar controls row, KPI strip, overlay bar) collapse to small buttons (`store/hudStore.ts`, H toggles all,
+remembered per viewer); with nothing stored, a narrow screen starts with all three collapsed.
+
+#### Cost breakdown and where to scale back (2026-11-12)
+
+Measured or counted per hero box (one long side and one door end in view). Paint times are headless Chromium with a
+software canvas (`containerTextures.ts`, 40 boxes); a phone's GPU-backed canvas is faster, but the shares hold.
+
+| Part | Size | Processing | Option to scale back | Visual loss |
+|---|---|---|---|---|
+| Shape: corrugation, rails, castings (paint mesh) | 304 tris a side, 72 a door, 306 a roof | negligible | none needed | |
+| Door hardware: bars, guides, keepers, handles, hinges | 344 of the door's 434 tris | negligible | none needed | |
+| Model download | 12 GLBs, 328 KB; each embeds the same 256 px normal and ORM maps (14 KB) | once | share the two maps: about half the download | none |
+| Marking tiles (lettering), memory | sharp step: a side tile 2048x384 (3 MB), an end tile 768x768 (2.3 MB), plus a third for mipmaps; pages are 2048 px (16 MB, 21 MB with mips) holding 5 sides or 4 ends | GPU upload of each painted tile | `HERO_MARK_SCALE.sharp` 4 to 3: memory and paint time down about 44 % | small: about 126 px per metre instead of 168; a 10 cm letter is 13 px instead of 17 |
+| Marking tiles, page packing | end pages use 1536 x 1536 of 2048 x 2048 (44 % unused) | | end tiles of 682 px, or 2048 x 1536 end pages | none |
+| Lettering paint | | 1.7 to 3 ms a box | | |
+| Chipped paint | | was 8.2 ms a box (70 % of a face's paint: thousands of rectangles and a full-tile erase); now one pattern fill over the lettering's boxes only, about 0.7 ms | done | lighter look (owner asked for it toned down) |
+| Wear: speckle, rust streaks, dents (canvas) | | 0.7 to 1 ms a box; speckle 0.2 | done: fewer, fainter specks, streaks at half strength, dents much lighter | owner asked for it |
+| Wear: rust and grime (hero shader) | 2 texture reads a fragment | small | done: half strength | owner asked for it |
+| Depth bias, corrugation-lit lettering | a few shader instructions | negligible | none needed | |
+
+A full hero face paint went from 11.6 ms to 4.7 ms with the chip change. The biggest remaining lever is memory: the sharp
+marking pages. If a phone runs short of memory or stalls on the first hero frame, drop the sharp step to 3 first.
 
 #### Smooth arrival (#259)
 
@@ -217,6 +250,11 @@ Markings are drawn per visible face, not per box, on every quality level (#158).
   hysteresis x1.15 (`modules/closeupFaceBudget.ts#selectFaces`).
 - A chosen face is one instance of a shared unit quad sampling a tile of a canvas atlas, drawn 6 mm off the plain
   instanced box, which keeps its LOD and is the fallback for every hidden or unchosen face.
+- The tile is opaque, so it covers the LOD0 door's bar geometry: a door tile paints the furniture itself
+  (`drawDoorHardware`: corner posts, gaskets, band joins, four locking bars with guides, cam keepers and handles, hinges), and
+  a door instance (negative `sizeM.x`) gets `DOOR_BANDS` horizontal bands from the normal map instead of the walls' vertical
+  ribs. So the middle distance matches the hero door nearer and the LOD0 door further out. `DOOR_SILL_M`, `DOOR_HEADER_M` and
+  `DOOR_BANDS` are checked against the generators (`tests/generator-constants.test.ts`).
 - Atlas (`modules/containerTextures.ts`): pages per face kind (long side 512x96 tiles, roof 512x64, end 192x192),
   created on demand. `paintContainer` paints a box whole into a scratch canvas (`TEXTURE_LAYOUT`, 1024x512) and the face
   regions are copied into tiles (`canvasAtlasBackend`). A tile stays while its face is cached, is repainted when the

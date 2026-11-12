@@ -105,8 +105,9 @@ ${FADE_DISCARD}
   // in irregular patches instead of a visible grid
   float heroPatch = smoothstep(0.45, 0.85, texture2D(roughnessMap, vRoughnessMapUv * 0.19 + vec2(0.37, 0.11)).r);
   float heroMask = texture2D(roughnessMap, vRoughnessMapUv).r * heroPatch;
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.15, 0.08), smoothstep(0.7, 0.98, heroMask) * vHeroWear * 0.7);
-  diffuseColor.rgb *= 1.0 - 0.2 * vHeroWear * heroMask;
+  // toned down (owner, 2026-11-12): rust spots and grime at about half the earlier strength
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.15, 0.08), smoothstep(0.75, 0.98, heroMask) * vHeroWear * 0.35);
+  diffuseColor.rgb *= 1.0 - 0.1 * vHeroWear * heroMask;
 #endif`,
       )
     patchContactShadow(shader)
