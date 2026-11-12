@@ -1,0 +1,213 @@
+{
+  "note": "Drawn-box reference (#246). Regenerate only on purpose: see drawn-boxes.test.ts.",
+  "cases": {
+    "custody overview early": [
+      {
+        "count": 9455,
+        "layers": {
+          "containers-40HC-lod1": 4321,
+          "containers-40-lod1": 2261,
+          "containers-20-lod1": 2873
+        },
+        "hash": "91801d3220805104"
+      },
+      {
+        "count": 9457,
+        "layers": {
+          "containers-40HC-lod1": 4319,
+          "containers-40-lod1": 2265,
+          "containers-20-lod1": 2873
+        },
+        "hash": "0c0f5b3edcd7debc"
+      },
+      {
+        "count": 9456,
+        "layers": {
+          "containers-40HC-lod1": 4317,
+          "containers-40-lod1": 2266,
+          "containers-20-lod1": 2873
+        },
+        "hash": "0cfe436bf604677d"
+      },
+      {
+        "count": 9450,
+        "layers": {
+          "containers-40HC-lod1": 4313,
+          "containers-40-lod1": 2266,
+          "containers-20-lod1": 2871
+        },
+        "hash": "f7d6b642e4658a45"
+      },
+      {
+        "count": 9443,
+        "layers": {
+          "containers-40HC-lod1": 4309,
+          "containers-40-lod1": 2262,
+          "containers-20-lod1": 2872
+        },
+        "hash": "9fb9fa3d7c0e2a67"
+      }
+    ],
+    "custody close early": [
+      {
+        "count": 121,
+        "layers": {
+          "containers-20-lod0": 52,
+          "containers-40HC-lod0": 43,
+          "containers-40-lod0": 26
+        },
+        "hash": "cd54a502de516369"
+      }
+    ],
+    "colour by line": [
+      {
+        "count": 9443,
+        "layers": {
+          "containers-40HC-lod1": 4309,
+          "containers-40-lod1": 2262,
+          "containers-20-lod1": 2872
+        },
+        "hash": "6ea5d84e38e13e28"
+      }
+    ],
+    "colour by dwell": [
+      {
+        "count": 9443,
+        "layers": {
+          "containers-40HC-lod1": 4309,
+          "containers-40-lod1": 2262,
+          "containers-20-lod1": 2872
+        },
+        "hash": "a273ce0ddaa918cf"
+      }
+    ],
+    "colour by flow": [
+      {
+        "count": 9443,
+        "layers": {
+          "containers-40HC-lod1": 4309,
+          "containers-40-lod1": 2262,
+          "containers-20-lod1": 2872
+        },
+        "hash": "e77c18e9789deb5f"
+      }
+    ],
+    "quality low": [
+      {
+        "count": 121,
+        "layers": {
+          "containers-20-lod1": 31,
+          "containers-40HC-lod1": 37,
+          "containers-40-lod1": 21,
+          "containers-20-lod0": 21,
+          "containers-40-lod0": 5,
+          "containers-40HC-lod0": 6
+        },
+        "hash": "bd7477d759a215fe"
+      }
+    ],
+    "quality medium": [
+      {
+        "count": 121,
+        "layers": {
+          "containers-20-lod0": 51,
+          "containers-40HC-lod0": 41,
+          "containers-40-lod0": 23,
+          "containers-20-lod1": 1,
+          "containers-40-lod1": 3,
+          "containers-40HC-lod1": 2
+        },
+        "hash": "5f95abc3caec563e"
+      }
+    ],
+    "quality high": [
+      {
+        "count": 121,
+        "layers": {
+          "containers-20-lod0": 52,
+          "containers-40HC-lod0": 43,
+          "containers-40-lod0": 26
+        },
+        "hash": "cd54a502de516369"
+      }
+    ],
+    "custody overview late": [
+      {
+        "count": 9433,
+        "layers": {
+          "containers-40HC-lod1": 4305,
+          "containers-40-lod1": 2258,
+          "containers-20-lod1": 2870
+        },
+        "hash": "b3cf23ea20b164d1"
+      },
+      {
+        "count": 9429,
+        "layers": {
+          "containers-40HC-lod1": 4304,
+          "containers-40-lod1": 2257,
+          "containers-20-lod1": 2868
+        },
+        "hash": "7b0a35debab01837"
+      }
+    ],
+    "custody close late": [
+      {
+        "count": 128,
+        "layers": {
+          "containers-20-lod0": 54,
+          "containers-40HC-lod0": 46,
+          "containers-40-lod0": 28
+        },
+        "hash": "222b3bcd67001d25"
+      }
+    ],
+    "vessel arrival and departure": [
+      {
+        "count": 12,
+        "layers": {
+          "containers-20-lod1": 5,
+          "containers-40HC-lod1": 5,
+          "containers-40-lod1": 2
+        },
+        "hash": "bd8ade2cf36b0975"
+      },
+      {
+        "count": 12,
+        "layers": {
+          "containers-20-lod1": 5,
+          "containers-40HC-lod1": 5,
+          "containers-40-lod1": 2
+        },
+        "hash": "bd8ade2cf36b0975"
+      },
+      {
+        "count": 12,
+        "layers": {
+          "containers-20-lod1": 5,
+          "containers-40HC-lod1": 5,
+          "containers-40-lod1": 2
+        },
+        "hash": "b93f704f244e9dbb"
+      },
+      {
+        "count": 24,
+        "layers": {
+          "containers-20-lod1": 11,
+          "containers-40HC-lod1": 10,
+          "containers-40-lod1": 3
+        },
+        "hash": "d2fd09465227ff55"
+      },
+      {
+        "count": 24,
+        "layers": {
+          "containers-20-lod1": 11,
+          "containers-40HC-lod1": 10,
+          "containers-40-lod1": 3
+        },
+        "hash": "618c9018987cbc6b"
+      }
+    ]
+  }
+}

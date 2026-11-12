@@ -22,10 +22,11 @@ import { OverlayLayers, type LabelScreen, type OverlayLayerStats } from './overl
 import { NO_OVERLAYS, type OverlayState } from './overlays'
 
 export type { OverlayState }
-import { ContainerInstancer } from './containerInstancer'
+import { ContainerCloseups } from './containerCloseups'
+import { ContainerInstancer, type DrawnBox } from './containerInstancer'
 import { describeMarkings } from './containerMarkings'
 import { colourContextOf, colourOf, DEFAULT_COLOUR_BY, DEFAULT_ROB_DISPLAY, hexToInt, isTimeBased, type ColourBy, type ColourContext, type RobDisplay } from './colourBy'
-import { liveryBodyColour, liveryIndexForLine, loadContainerAssets } from './containerAssets'
+import { liveryBodyColour, liveryIndexForLine, loadContainerAssets, type ContainerAssets } from './containerAssets'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { beaconFlashOn, GantryBeacons } from './gantryBeacons'
 import type { SoundSource } from './soundMixer'
@@ -155,7 +156,11 @@ export class SceneRenderer {
   /** Phase 1 procedural quay lines, ASC rails and ground markings: hidden once the phase 2 infrastructure draws. */
   private infraPlaceholders: THREE.Object3D[] = []
 
-  constructor(private model: SceneModel) {
+  /** `closeups` and `useContainerAssets` let a headless host (the drawn-box reference test, the posing baseline) run the posing loop without a canvas or the GLBs. */
+  constructor(
+    private model: SceneModel,
+    options: { closeups?: ContainerCloseups } = {},
+  ) {
     const { config } = model
     const scenery = (this.scenery = sceneryFor(config.name))
     this.atmosphere = new AtmosphereRig(this.scene, model, { quayZ: LAND_RAIL_Z + 6 }, scenery.fogFarM)
@@ -194,7 +199,7 @@ export class SceneRenderer {
       const extra = Math.min(2500, Math.ceil(perDay * 0.5) + (config.landside.scripted?.length ?? 0) + 60)
       for (const size of ['20', '40', '40HC'] as const) capacity[size] = (capacity[size] ?? 0) + extra
     }
-    this.containers = new ContainerInstancer(capacity)
+    this.containers = new ContainerInstancer(capacity, {}, options.closeups)
     this.containers.setMarkingsSource((i) => {
       const id = model.containerIds[i]
       const d = model.containerDetail[id]
@@ -208,7 +213,7 @@ export class SceneRenderer {
     this.scene.add(this.containers.group)
     loadContainerAssets().then(
       (assets) => {
-        if (!this.disposed) this.containers.setAssets(assets)
+        if (!this.disposed) this.useContainerAssets(assets)
       },
       (err: unknown) => console.warn('Terminal Twin: container GLBs failed to load; keeping placeholders', err),
     )
@@ -622,6 +627,26 @@ export class SceneRenderer {
   /** Sound sources of the last frame (machine positions and motion states) for the sound mixer. */
   soundSources(): readonly SoundSource[] {
     return this.sounds
+  }
+
+  /** Switch the containers from the placeholders to these LOD meshes (the GLBs, once loaded). */
+  useContainerAssets(assets: ContainerAssets): void {
+    this.containers.setAssets(assets)
+  }
+
+  /** Boxes posed and container instance bytes handed to the GPU upload in the last update (#246). */
+  poseCounters(): { boxesPosed: number; instanceBytes: number } {
+    const c = this.containers.stats()
+    return { boxesPosed: c.drawn, instanceBytes: c.instanceBytes }
+  }
+
+  /** The boxes the container instancer wrote at the last update (needs `recordDrawnBoxes(true)`): the drawn-box reference test. */
+  drawnBoxes(): readonly DrawnBox[] {
+    return this.containers.drawnBoxes()
+  }
+
+  recordDrawnBoxes(on: boolean): void {
+    this.containers.setDrawnRecording(on)
   }
 
   stats(): SceneStats {

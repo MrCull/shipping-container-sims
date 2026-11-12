@@ -904,6 +904,8 @@ const en = {
   'perf.drawCalls': 'Draw calls',
   'perf.triangles': 'Triangles',
   'perf.cpu': 'Frame CPU (ms)',
+  'perf.boxesPosed': 'Boxes posed',
+  'perf.instanceBytes': 'Instance upload (KB)',
   'perf.level': 'Quality in force',
   'perf.overlay': 'Performance',
   'shortcuts.key.p': 'P',

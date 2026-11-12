@@ -22,6 +22,7 @@ module that takes `argv` and a `print` callback, so tests call the logic directl
 | `tt:fixtures` | `cli/build-fixtures.ts` | Regenerate every fixture JSON from `definitions.ts` |
 | `tt:sts` | `cli/sts.ts#runStsCli` | STS productivity buckets from a saved event log |
 | `tt:profile` | `cli/profile.ts` -> `cli/profileCli.ts#runProfileCli` | Where a run's time goes (hourly moves, idle shares, box waits) |
+| `tt:baseline` | `cli/baselineCli.ts` -> `cli/baseline.ts#baselineMain` (+ `cli/headlessPose.ts`, `tests/browser/terminal-twin-baseline.smoke.ts`) | Frame-rate baseline (#246): posing ms per frame at the Overview camera in Node, plus achieved sim s per wall s per speed step x60 to x3600 for the engine in its worker in headless Chromium, no rendering. Local only, heavy (run it under `scripts/bg.sh run --heavy`). `--skip-rate` / `--skip-posing` / `--out <file>`. Numbers go in `docs/optimising/frame-rate.md` |
 | `tt:bench` | `cli/bench.ts` -> `cli/benchCli.ts#benchMain` (+ `cli/benchmark.ts`) | Engine speed benchmark against `perf/baseline.json` (local only) |
 | `tt:assets` | `cli/assets/build.ts` | Regenerate GLB assets with Blender `bpy` |
 | `tt:assets:check` | `cli/assets/check.ts` -> `cli/assets/budgetCheck.ts#runBudgetCli` | Asset budget check (CI) |

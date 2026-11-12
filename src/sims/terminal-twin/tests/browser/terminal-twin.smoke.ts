@@ -106,16 +106,15 @@ test('×3600 from the top bar advances the sim clock accordingly; digit keys lea
   await page.waitForTimeout(2000)
   const t1 = await page.evaluate(() => window.__tt!.clock().displayTime)
   const wallS = (Date.now() - w0) / 1000
-  // Functional check only: the clock advances (at least one sim second per wall second) and the speed holds. The engine gets
-  // 190 to 396 sim s/s on a 4-core software-GL container, so an absolute 600 floor is a hardware benchmark, not a regression
-  // test; that floor lives in the @load spec below (#191).
+  // Functional check only: the clock advances (at least one sim second per wall second) and the speed holds. The 600 floor is a
+  // hardware benchmark, not a regression test (the engine alone measures 1 300 to 1 450 at this speed, #246); that floor lives in the @load spec below (#191).
   expect((t1 - t0) / wallS).toBeGreaterThan(1)
   await page.keyboard.press('2')
   expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
 })
 
 test('x3600 from the top bar sustains at least 600 sim s per wall s @load', async ({ page }) => {
-  // Hardware benchmark (#191): never runs in CI (--grep-invert @load); run it on real hardware. Software GL containers reach 190 to 396.
+  // Hardware benchmark (#191): never runs in CI (--grep-invert @load); run it on real hardware. The engine alone does 1 300 to 1 450 (`pnpm run tt:baseline`); software GL in the page is the limit.
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
   // A long scenario: the 5,400 s landside fixture runs headless in about a second and ends within two wall seconds at x3600,
