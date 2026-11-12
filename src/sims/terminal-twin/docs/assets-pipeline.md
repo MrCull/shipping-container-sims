@@ -81,6 +81,8 @@ pnpm run tt:assets --samples 48                       # Cycles samples per previ
    With `--check`: compares every file byte for byte and prints `Regenerated assets are identical to the committed ones`
    (exit 0) or one line per differing file (exit 1).
 
+Reference photographs of real containers (the look the container and hero models match) are committed in `docs/reference/containers/`, with a README saying what each shows. Sidecar `source` strings that say "reference photographs (not committed)" predate them; the generators keep that wording because it is written into the committed sidecars.
+
 Determinism: two runs give byte-identical outputs. No randomness (scenery generators are seeded), Cycles seed 0, no
 denoiser, fixed sample counts. Run times: containers about 80 s (mostly previews), STS about 60 s, trucks about 90 s,
 vessels about 40 s with previews. Slow when several Blender jobs share the CPU: use `--only <group>`.
