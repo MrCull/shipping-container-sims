@@ -41,7 +41,7 @@ controller.tick + store.sync              not in cpuMs (playback, deltas, cue re
 |---|---|---|
 | `SceneModel.containerPose(id, t)` | binary search of the custody list, then a pose by owner kind | yard boxes hit the `yardPoses` cache (no parse), but still pay the search and the call |
 | `tintOf` | cheap when colour by is `default` | time-based modes recompute per 30 sim s bucket, at most 4 000 boxes per frame (`COLOUR_BUDGET_PER_FRAME`) |
-| `custodyAt(id, t)` | a second binary search | runs because STS, SHC and ASC renderers set `wantsContainerOwners` (to know spreader loads) |
+| `custodyAt(id, t)` | gone (#257): `poseOwner` | was a second binary search, run because STS, SHC and ASC renderers set `wantsContainerOwners` (to know spreader loads) |
 | `ContainerInstancer.push` | writes structure-of-arrays | |
 | `end`: `cull` | one frustum-sphere test (7.5 m) | |
 | `end`: `chooseLods` | one distance; sort only when candidates exceed `lod0Cap` | |
@@ -88,7 +88,7 @@ Other dev API levers: `perfOverlay(on)` (also key P, the Stats button, or a clic
 
 | Lever | Where | Effect | Notes |
 |---|---|---|---|
-| Per-instance culling | `ContainerInstancer.end(camera, frustum)` | culled boxes are not written | zoomed on one crane, over 80% of boxes are culled; posing still visits them |
+| Per-instance culling | `ContainerInstancer.end(camera, frustum)` | culled boxes are not written | zoomed on one crane, over 80% of boxes are culled; posing skips the moving ones out of view (#257), the others are already only visited on a custody change |
 | Container LOD | `QUALITY_PROFILES.*.lod0DistanceM`, `lod0Cap`, `DEFAULT_LOD_OPTIONS` | LOD0 440 triangles vs LOD1 12 | at overview every box is LOD1 already |
 | Close-up faces | `closeupDistanceM`, `closeupFaceBudget` | one draw call per atlas page, none when far | budget caps canvas painting too |
 | Equipment LOD | `lodScale` (STS, SHC, ASC), `*_LOD_DISTANCES`, `DEFAULT_VESSEL_LOD` | e.g. STS LOD0 31 690 vs LOD2 490 triangles | trucks and hulls ignore `lodScale` |
@@ -108,9 +108,8 @@ Other dev API levers: `perfOverlay(on)` (also key P, the Stats button, or a clic
 - **Quality steps do not touch posing.** On real hardware Low halved triangles and changed neither fps nor pose time;
   Auto churned High to Medium to Low without gaining fps and never stepped back up (#158: that is why Low draws close-ups too).
 - **Done in #250:** boxes at rest are posed only when their custody changes (retained instance slots, upload by dirty range; see `rendering-3d.md`, Containers).
-- **Next wins (not done):** cull before
-  posing (skip `containerPose` for boxes whose cached position is outside the frustum); fold the second custody search
-  (`custodyAt` for `loads`) into `containerPose`; a far-LOD for containers (the infrastructure one is done, #249:
+- **Done in #257:** a moving box (carried or on a truck) whose cached position, widened by 20 m plus 20 m/s times the sim time since it was posed, is outside the frustum is not posed (the selected box always is; a custody change always is); `containerPose` also records the custody owner (`SceneModel.poseOwner`), so the second `custodyAt` search is gone; the close-up offer runs only when the camera moved or a box within reach changed, and then visits only the boxes within reach (`reachKeys`), not every box.
+- **Next wins (not done):** a far-LOD for containers (the infrastructure one is done, #249:
   the TTI overview fell from 1.56M to 382k triangles).
 - Anything that adds per-box work per frame (a new colour mode, a new per-box lookup) must be budgeted like colour by.
 
@@ -126,6 +125,7 @@ compare against these on a like machine, or re-run the command first. Re-record 
   instance bytes uploaded per frame 2 006 400 (1.9 MiB: every container instance buffer is re-uploaded in full, capacity
   not count, today). Compare with the 8 ms posing budget above and with real-hardware 13 to 16 ms (V11-19).
 - *After #250 (posing by custody), same command with `--skip-rate`, same machine class (4-core Xeon 2.1 GHz, load average 6.6), same camera and time:* posing mean 2.40 ms per frame (min 1.21, max 5.52), **about 6 times less than 14.3**; boxes posed per frame 9 (the carried ones; was 9 895); instance bytes uploaded per frame 0 (was 2 006 400). What remains per frame is the O(boxes) close-up offer loop and the carried boxes; #257 (cull before posing) targets it. The drawn-box reference is unchanged.
+- *After #257 (cull before posing), same machine class, 4-core Xeon, 120 frames after 5 warm-up, display time 14400 s on the full-scale TTI baseline preset, a throwaway script with `makeHeadlessRenderer` (the baseline script only measures a paused clock):* posing ms per frame and boxes posed per frame, before then after. Overview paused 1.77 to 1.71 ms, 9.0 to 9.0 posed. Overview playing (10 sim s per frame, about x600): 2.65 to 2.17 ms, 13.6 to 13.6 posed (all in view). View 80 m from one moving box, paused: 1.31 to 1.56 ms (noise, load varies), 9.0 to 2.0 posed. Same view playing: 1.87 to 1.80 ms, 13.6 to 11.5 posed. The gain at this scale is small because #250 had already cut posing to the moving boxes and the engine keeps few boxes in flight at once; the saving grows with the number of moving boxes out of view. `tests/pose-cull.test.ts` proves skipped boxes are drawn where a fresh full pose puts them.
 - *Engine in its worker, no rendering (a playback clock driven at the speed step, no scene built), from 7 200 s, 8 s window after a 2 s settle:*
 
 | Speed | Achieved sim s per wall s | Engine advance sim s per wall s |

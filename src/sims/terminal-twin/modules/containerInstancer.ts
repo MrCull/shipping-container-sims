@@ -29,6 +29,9 @@ import { exposedFaces, neighboursOf, type ExposedFaces, type PlacedBox } from '.
 /** Cell of the grid that finds a yard box's neighbours (a 40 ft box and its gap fit in one). */
 const GRID_CELL_M = 14
 
+/** A 40 ft box fits in a sphere of this radius (m). */
+const BOX_SPHERE_M = 7.5
+
 const SIZES: ContainerSize[] = ['20', '40', '40HC']
 
 export interface ContainerLodOptions {
@@ -139,6 +142,11 @@ export class ContainerInstancer {
   /** Something a pass must see: box data changed, assets or options changed, first frame. */
   private passNeeded = true
   private camKey: number[] | null = null
+  // Close-up reach (#257): the keys within reach of the camera the close-up level was last offered from, kept current as boxes change, so a frame where nothing near the camera changed offers nothing and the O(boxes) scan runs only when the camera moves.
+  private reachKeys = new Set<number>()
+  private readonly reachCam = new THREE.Vector3()
+  private reachFresh = false
+  private closeupDirty = true
   private lastLod0 = 0
   private lastCulled = 0
   // Immediate mode (begin / push / end): boxes not pushed since `begin` are removed at `end`.
@@ -204,6 +212,8 @@ export class ContainerInstancer {
       if (this.has[k]) this.markWrite(k)
     }
     this.passNeeded = true
+    this.reachFresh = false
+    this.closeupDirty = true
   }
 
   /** Switches from the procedural placeholders to the GLB LODs. */
@@ -265,6 +275,13 @@ export class ContainerInstancer {
     this.posed++
     const y = cy - CONTAINER_DIMS[size].height / 2 // models have their origin at the bottom centre
     if (this.has[key] && this.sizes[key] === size && this.xs[key] === cx && this.ys[key] === y && this.zs[key] === cz && this.liveries[key] === livery && this.yaws[key] === yaw && this.tints[key] === tint && this.yards[key] === yard) return
+    if (this.reachFresh) {
+      const was = this.reachKeys.has(key)
+      const now = this.withinReach(cx, y, cz)
+      if (now) this.reachKeys.add(key)
+      else this.reachKeys.delete(key)
+      if (was || now) this.closeupDirty = true
+    }
     if (!this.has[key]) {
       this.has[key] = true
       this.count++
@@ -301,16 +318,44 @@ export class ContainerInstancer {
     this.has[key] = false
     this.count--
     this.passNeeded = true
+    if (this.reachKeys.delete(key)) this.closeupDirty = true
+  }
+
+  /** Whether the cached box `key` is inside the frustum when widened by `slackM` metres; true for a box without a cached position (#257). */
+  nearFrustum(key: number, frustum: THREE.Frustum, slackM: number): boolean {
+    if (!this.has[key]) return true
+    this.sphere.radius = BOX_SPHERE_M + slackM
+    this.sphere.center.set(this.xs[key], this.ys[key] + 1.3, this.zs[key])
+    return frustum.intersectsSphere(this.sphere)
+  }
+
+  private reach2(): number {
+    const reach = this.options.closeupDistanceM * this.options.hysteresis + 8
+    return reach * reach
+  }
+
+  private withinReach(x: number, y: number, z: number): boolean {
+    const dx = x - this.reachCam.x
+    const dy = y - this.reachCam.y
+    const dz = z - this.reachCam.z
+    return dx * dx + dy * dy + dz * dz <= this.reach2()
   }
 
   /** What a close-up box is painted from, by the key given to `push` (without one there are no close-ups). */
   setMarkingsSource(source: (key: number) => CloseupSource): void {
     this.markingsSource = source
+    this.reachFresh = false
+    this.closeupDirty = true
   }
 
   /** Retune the LOD0 range and cap (quality settings). */
   setLodOptions(next: Partial<ContainerLodOptions>): void {
-    for (const k of Object.keys(next) as (keyof ContainerLodOptions)[]) if (this.options[k] !== next[k]) this.passNeeded = true
+    for (const k of Object.keys(next) as (keyof ContainerLodOptions)[]) {
+      if (this.options[k] === next[k]) continue
+      this.passNeeded = true
+      this.reachFresh = false
+      this.closeupDirty = true
+    }
     Object.assign(this.options, next)
   }
 
@@ -368,12 +413,17 @@ export class ContainerInstancer {
     if (!prev || prev.length !== camKey.length || camKey.some((v, i) => v !== prev[i])) {
       this.camKey = camKey
       this.passNeeded = true
+      this.closeupDirty = true // the cull result, the facing of faces and the reach all depend on the camera
+      if (!prev || prev[0] !== camKey[0] || prev[1] !== camKey[1] || prev[2] !== camKey[2]) this.reachFresh = false
     }
     if (this.passNeeded) this.pass(cameraPosition, frustum)
     this.passNeeded = false
-    this.closeups.begin(cameraPosition)
-    if (this.lods && this.markingsSource && this.options.closeupFaceBudget > 0) this.offerCloseups(cameraPosition)
-    this.closeups.end()
+    if (this.closeupDirty) {
+      this.closeupDirty = false
+      this.closeups.begin(cameraPosition)
+      if (this.lods && this.markingsSource && this.options.closeupFaceBudget > 0) this.offerCloseups(cameraPosition)
+      this.closeups.end()
+    }
 
     // write the boxes whose data or slot changed
     for (const key of this.dirtyList) {
@@ -473,7 +523,7 @@ export class ContainerInstancer {
       return null
     }
     if (this.visible.length < this.n) this.visible = new Uint8Array(Math.max(this.n, this.visible.length * 2))
-    this.sphere.radius = 7.5
+    this.sphere.radius = BOX_SPHERE_M
     for (let i = 0; i < this.n; i++) {
       if (!this.has[i]) continue
       this.sphere.center.set(this.xs[i], this.ys[i] + 1.3, this.zs[i])
@@ -495,19 +545,18 @@ export class ContainerInstancer {
     const seen = this.seenCache
     const { hysteresis, closeupDistanceM, closeupFaceBudget } = this.options
     this.closeups.setLimits({ budget: closeupFaceBudget, distanceM: closeupDistanceM, hysteresis })
-    // boxes whose faces can be drawn: within the distance (plus the hysteresis band and half a box)
-    const reach = closeupDistanceM * hysteresis + 8
-    const reach2 = reach * reach
+    // boxes whose faces can be drawn: within the distance (plus the hysteresis band and half a box), kept in `reachKeys`
+    if (!this.reachFresh) {
+      this.reachCam.copy(cam)
+      this.reachKeys.clear()
+      for (let i = 0; i < this.n; i++) if (this.has[i] && this.withinReach(this.xs[i], this.ys[i], this.zs[i])) this.reachKeys.add(i)
+      this.reachFresh = true
+    }
     const grid = new Map<number, PlacedBox[]>()
     const near: number[] = []
     const placed: PlacedBox[] = []
     const cell = (x: number, z: number) => (Math.floor(x / GRID_CELL_M) * 73856093) ^ (Math.floor(z / GRID_CELL_M) * 19349663)
-    for (let i = 0; i < this.n; i++) {
-      if (!this.has[i]) continue
-      const dx = this.xs[i] - cam.x
-      const dy = this.ys[i] - cam.y
-      const dz = this.zs[i] - cam.z
-      if (dx * dx + dy * dy + dz * dz > reach2) continue
+    for (const i of Array.from(this.reachKeys).sort((a, b) => a - b)) {
       if (seen && !seen[i]) {
         // out of view, but a yard box still hides its neighbours' faces
         if (!this.yards[i]) continue
