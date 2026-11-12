@@ -443,3 +443,11 @@ The dev asset viewer (`?viewer=<asset>` or `?viewer=yard`) installs `window.__tt
   checks: rerun on a quiet one.
 - Hub debt: `twinStore.ts` is large; `devApi.ts` builds `sceneState` with a cast; `sceneModel.ts` still has a kind chain
   beside the equipment registry.
+
+## Sweep-only invariant checks and "strict checks" (#252)
+
+The worker creates the engine with `invariants.perEvent: false`: no per-event check, full sweeps at the usual interval and at
+the end of the run (`engineHost.ts`, `start`). The setup dialog's "strict checks" checkbox (`components/setup/SetupStrictChecks.vue`,
+`store.strictChecks`, remembered in localStorage under `terminal-twin.strictChecks`) is passed as `strict` in the `load` and
+`restore` requests and restores the per-event check for that run; reset and rewind keep the run's choice. A violation found
+by a sweep is reported as `foundBy: 'sweep'`. `pnpm run tt:baseline --strict` measures the rate with strict checks on.
