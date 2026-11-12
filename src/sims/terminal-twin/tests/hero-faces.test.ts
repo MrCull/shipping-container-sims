@@ -83,12 +83,15 @@ function assets(): ContainerAssets {
   return { sizes: { '20': { lod0: b(), lod1: b() }, '40': { lod0: b(), lod1: b() }, '40HC': { lod0: b(), lod1: b() } }, lod0Material: new THREE.MeshStandardMaterial(), lod1Material: new THREE.MeshStandardMaterial() }
 }
 
+// a fake clock: each frame is 200 ms, so a still camera is settled (#259) and a fade has finished by the next frame
+const clock = { t: 0 }
+
 function setup(boxes: number) {
   const requests: string[] = []
   const hero = new HeroLevel(async (size, kind) => {
     requests.push(`${size}-${kind}`)
     return stubParts()
-  })
+  }, () => clock.t)
   hero.setLimits({ boxes })
   const closeups = new ContainerCloseups({ createPage: () => ({ texture: new THREE.Texture(), ctx: null }), paint: () => {} }, () => null)
   const inst = new ContainerInstancer({ '40': 80 }, {}, closeups)
@@ -99,6 +102,7 @@ function setup(boxes: number) {
 }
 
 function frame(inst: ContainerInstancer, n: number, cam: THREE.Vector3): ReturnType<ContainerInstancer['end']> {
+  clock.t += 200
   inst.begin()
   for (let i = 0; i < n; i++) inst.push(i, '40', i * 13, 1.3, 0, 0)
   return inst.end(cam)
@@ -153,6 +157,10 @@ describe('hero level through the close-up offers', () => {
     const first = wearOf()
     frame(inst, 4, new THREE.Vector3(8, 4, 14)) // another zoom
     frame(inst, 4, nearCam)
-    expect(wearOf()).toEqual(first)
+    frame(inst, 4, nearCam) // the camera is calm again: the same faces are drawn
+    // faces chosen after the zoom may differ, but the face drawn before still has the same wear triple
+    const later = wearOf()
+    const triples = Array.from({ length: later.length / 3 }, (_, i) => later.slice(i * 3, i * 3 + 3).join())
+    expect(triples).toContain(first.slice(0, 3).join())
   })
 })

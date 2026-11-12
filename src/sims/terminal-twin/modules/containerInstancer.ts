@@ -65,6 +65,10 @@ export interface ContainerRenderStats {
   closeupFaces: number
   /** Hero faces drawn (#258; never above the quality level's hero cap). */
   heroFaces: number
+  /** Hero faces prepared since the start (#259; none while the camera moves fast). */
+  heroPrepared: number
+  /** Draw calls and triangles of the hero faces drawn last frame (#259 measurement). */
+  heroCost: { drawCalls: number; triangles: number }
   /** Boxes outside the camera frustum, not written to the GPU (0 without a frustum). */
   culled: number
   /** Bytes the container instance buffers (matrix, livery index, colour) hand to the GPU upload this frame (#246): each buffer flagged for upload counts in full, or only its update ranges once a buffer uses them. Close-up faces are not included. */
@@ -151,13 +155,14 @@ export class ContainerInstancer {
   private readonly reachCam = new THREE.Vector3()
   private reachFresh = false
   private closeupDirty = true
+  private hero: HeroLevel | null = null
   private lastLod0 = 0
   private lastCulled = 0
   // Immediate mode (begin / push / end): boxes not pushed since `begin` are removed at `end`.
   private immediate = false
   private stamp = 0
   private stampOf: number[] = []
-  private lastStats: ContainerRenderStats = { drawn: 0, posed: 0, lod0: 0, lod1: 0, closeup: 0, closeupFaces: 0, heroFaces: 0, culled: 0, instanceBytes: 0, assets: 'placeholder' }
+  private lastStats: ContainerRenderStats = { drawn: 0, posed: 0, lod0: 0, lod1: 0, closeup: 0, closeupFaces: 0, heroFaces: 0, heroPrepared: 0, heroCost: { drawCalls: 0, triangles: 0 }, culled: 0, instanceBytes: 0, assets: 'placeholder' }
   private readonly matrix = new THREE.Matrix4()
   private readonly colour = new THREE.Color()
   /** Linear colour of the generic livery's body: a tint is divided by it, so the grey tile multiplied by the instance colour comes out as the tint. */
@@ -350,6 +355,7 @@ export class ContainerInstancer {
   /** Attaches the hero level (#258) to the close-up level's offers. */
   setHero(hero: HeroLevel | null): void {
     this.closeups.setHero(hero)
+    this.hero = hero
     if (hero) hero.onReady = () => (this.closeupDirty = true)
   }
 
@@ -436,6 +442,8 @@ export class ContainerInstancer {
       if (this.lods && this.markingsSource && this.options.closeupFaceBudget > 0) this.offerCloseups(cameraPosition)
       this.closeups.end()
     }
+    // hero faces waiting for the camera to settle, for their allowance turn, or fading in: keep redrawing a still camera
+    if (this.hero?.busy) this.closeupDirty = true
 
     // write the boxes whose data or slot changed
     for (const key of this.dirtyList) {
@@ -470,7 +478,7 @@ export class ContainerInstancer {
       }
     })
     if (this.recording) this.recordAll()
-    this.lastStats = { drawn: this.count, posed: this.posed, lod0: this.lastLod0, lod1: this.count - this.lastLod0, closeup: this.closeups.count, closeupFaces: this.closeups.faces, heroFaces: this.closeups.heroFaces, culled: this.lastCulled, instanceBytes, assets: this.lods ? 'loaded' : 'placeholder' }
+    this.lastStats = { drawn: this.count, posed: this.posed, lod0: this.lastLod0, lod1: this.count - this.lastLod0, closeup: this.closeups.count, closeupFaces: this.closeups.faces, heroFaces: this.closeups.heroFaces, heroPrepared: this.closeups.heroPrepared, heroCost: this.closeups.heroCost(), culled: this.lastCulled, instanceBytes, assets: this.lods ? 'loaded' : 'placeholder' }
     this.posed = 0
     return this.lastStats
   }

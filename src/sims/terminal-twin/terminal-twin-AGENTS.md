@@ -35,7 +35,7 @@ Which doc to read for a change:
 | `tt:*` commands and helper scripts | [docs/cli-and-tooling.md](docs/cli-and-tooling.md) |
 | Worker, playback, `SceneModel`, dashboard, debugger, inspector, bay viewer, colour by, locale, shortcuts, `window.__tt` | [docs/browser-host.md](docs/browser-host.md) |
 | 3D scene, equipment rigs, hulls, quality tiers, lighting (sky environment, contact shadows), far tier, sound, scenery | [docs/rendering-3d.md](docs/rendering-3d.md) |
-| Blender generators, budgets, sidecars, liveries, synthesized sounds | [docs/assets-pipeline.md](docs/assets-pipeline.md) | Hero container faces (`hero` group, dev viewer `?viewer=hero-box-40`): same doc. Hero level renderer (#258): `docs/rendering-3d.md` (Hero level), `modules/heroRenderer.ts`.
+| Blender generators, budgets, sidecars, liveries, synthesized sounds | [docs/assets-pipeline.md](docs/assets-pipeline.md) | Hero container faces (`hero` group, dev viewer `?viewer=hero-box-40`): same doc. Hero level renderer (#258) and its smooth arrival (#259: prep allowance, fade-in, camera gate, constants in `modules/heroPrep.ts`): `docs/rendering-3d.md` (Hero level), `modules/heroRenderer.ts`.
 
 Measured runs (keep adding, do not rewrite): [docs/reports/](docs/reports/).
 

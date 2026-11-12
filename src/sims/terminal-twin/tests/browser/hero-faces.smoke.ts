@@ -2,6 +2,8 @@
  * Hero level (#258): at the overview no hero face is drawn and no hero model has been requested; at a 10 m camera on a
  * yard block the visible faces are drawn at hero level, never above the quality level's cap (3 faces per box: High 96,
  * Medium 36); Low draws none and requests none. Counts only, no frame assertions. Screenshots go to `.screenshots/`.
+ * Arrival (#259): a fast fly-through at 10 m prepares no hero face; once the camera is still the faces arrive and
+ * their count settles within the cap.
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
@@ -50,3 +52,56 @@ for (const [level, cap] of [
     expect(errors).toEqual([])
   })
 }
+
+test('arrival: nothing is prepared during a fast fly-through, faces arrive once the camera settles', async ({ page }) => {
+  test.slow() // software WebGL
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(err.message))
+  await page.goto('/sim/terminal-twin')
+  await page.waitForFunction(() => !!window.__tt)
+  await page.evaluate(() => window.localStorage.clear())
+  await page.evaluate(() => window.__tt!.setQuality('high'))
+  await page.evaluate(() => window.__tt!.load('yard-no-mixed-length'))
+  await page.evaluate(() => window.__tt!.runTo(60))
+  await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
+  await page.evaluate(() => window.__tt!.viewPreset('overview'))
+  await page.waitForTimeout(800)
+
+  // a fast fly-through: the camera swings between 10 m and 120 m every frame (software WebGL frames take a second or more, so
+  // 110 m per frame is still tens of m/s, far above the speed threshold)
+  const flown = await page.evaluate(
+    () =>
+      new Promise<{ prepared: number; faces: number }>((resolve) => {
+        let frames = 0
+        const step = () => {
+          window.__tt!.cameraTo('B01', frames % 2 ? 10 : 120)
+          if (++frames < 12) requestAnimationFrame(step)
+          else {
+            const c = window.__tt!.scene()!.containerLods
+            resolve({ prepared: c.heroPrepared, faces: c.heroFaces })
+          }
+        }
+        requestAnimationFrame(step)
+      }),
+  )
+  expect(flown).toEqual({ prepared: 0, faces: 0 })
+
+  // parked at 10 m: after the settle time the faces are prepared and drawn, within the cap, and the count stops growing
+  await page.evaluate(() => window.__tt!.cameraTo('B01', 10))
+  await page.waitForFunction(() => window.__tt!.scene()!.containerLods.heroFaces > 0, undefined, { timeout: 60_000 })
+  // frames take seconds in software WebGL and each prepares a few faces: wait until the count stops growing
+  let c1 = await page.evaluate(() => window.__tt!.scene()!.containerLods)
+  let c2 = c1
+  for (let i = 0; i < 40; i++) {
+    await page.waitForTimeout(4000)
+    c2 = await page.evaluate(() => window.__tt!.scene()!.containerLods)
+    if (c2.heroPrepared === c1.heroPrepared) break
+    c1 = c2
+  }
+  expect(c2.heroFaces).toBeGreaterThan(0)
+  expect(c2.heroFaces).toBeLessThanOrEqual(96)
+  expect(c2.heroFaces).toBe(c1.heroFaces)
+  expect(c2.heroPrepared).toBeGreaterThanOrEqual(c2.heroFaces)
+  expect(c2.heroPrepared).toBe(c1.heroPrepared)
+  expect(errors).toEqual([])
+})

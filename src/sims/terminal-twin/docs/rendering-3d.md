@@ -115,7 +115,27 @@ offset and amount), so a box looks the same at every zoom and after a rewind. Th
 and over it (polygon offset -1 against the decals' -2; hero markings are #260). Models are fetched the first time a face of
 that size and kind is chosen (`heroAssets.ts`, the only non-dev file that names `models/hero`); until they arrive the close-up
 level shows, and `onReady` marks the close-up pass dirty so a still camera redraws. Low draws none and requests none.
-`stats.heroFaces` (also `__tt.perf().stats`) counts faces drawn. Preparation time-slicing, fade-in and the camera gate are #259.
+`stats.heroFaces` (also `__tt.perf().stats`) counts faces drawn.
+
+#### Smooth arrival (#259)
+
+`heroPrep.ts` (pure) plus `HeroLevel`: a chosen face is drawn only once it is **prepared** (its model's meshes built, its paint and
+wear made); until then the close-up level shows, and a prepared face fades in, so a zoom shows today's look first and then sharpens.
+Named constants (all in `heroPrep.ts`):
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `HERO_PREP_ALLOWANCE_MS` | 3 | per-frame time for preparing faces; nearest first; an item is not started when the last one's cost would pass it, but one always runs so a backlog drains |
+| `HERO_FADE_MS` | 200 | a ready face fades in linearly over this; drawn as an ordered screen-door dither (`heroFade` instance attribute, `discard`), so no blending, no sorting, no pop |
+| `HERO_CAMERA_SPEED_MPS` | 5 | above this camera position speed no new face is prepared |
+| `HERO_SETTLE_MS` | 150 | the camera must stay at or below the speed for this long before preparation starts |
+
+Faces already prepared and still chosen (selection runs every frame, with its hysteresis) stay drawn through a camera move; a face
+that leaves the selection loses its prepared state and fades in again if it returns. Model files are fetched as before; building a
+model's meshes is part of preparing its first face (inside the allowance). While faces wait (gate closed, allowance spent) or fade,
+`HeroLevel.busy` keeps the instancer's close-up pass dirty so a still camera keeps redrawing. `__tt.scene().containerLods.heroPrepared`
+counts faces prepared since the start (it does not grow during a fast fly-through). Tests: `tests/hero-prep.test.ts` (fake clock and
+fake work items; the renderer through the instancer with a fake clock), smoke `hero-faces.smoke.ts` (arrival test).
 
 ### Close-up markings (#119, #143)
 

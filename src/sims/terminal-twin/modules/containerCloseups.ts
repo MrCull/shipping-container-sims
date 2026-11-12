@@ -389,6 +389,16 @@ export class ContainerCloseups {
     return this.faceCount
   }
 
+  /** Draw calls and triangles of the hero faces drawn last frame. */
+  heroCost(): { drawCalls: number; triangles: number } {
+    return this.hero?.cost() ?? { drawCalls: 0, triangles: 0 }
+  }
+
+  /** Hero faces prepared since the start (#259). */
+  get heroPrepared(): number {
+    return this.hero?.prepared ?? 0
+  }
+
   /** Hero faces drawn in the last frame (#258). */
   get heroFaces(): number {
     return this.hero?.faces ?? 0
