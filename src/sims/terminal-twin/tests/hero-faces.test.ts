@@ -14,7 +14,7 @@ import { exposedFaces } from '../modules/exposedFaces'
 import type { HeroPart } from '../modules/heroAssets'
 import { facingCandidates, heroFaceId, heroKindOf, HERO_FACES_PER_BOX, selectHeroFaces } from '../modules/heroFaceSelection'
 import { HeroLevel } from '../modules/heroRenderer'
-import { QUALITY_PROFILES } from '../modules/quality'
+import { QUALITY_PROFILES, markStepForRung, profileForRung } from '../modules/quality'
 import { makeIso6346Id } from '../scenario/iso6346'
 
 const FREE = exposedFaces('free')
@@ -101,10 +101,10 @@ function setup(boxes: number) {
   return { inst, hero, closeups, requests }
 }
 
-function frame(inst: ContainerInstancer, n: number, cam: THREE.Vector3): ReturnType<ContainerInstancer['end']> {
+function frame(inst: ContainerInstancer, n: number, cam: THREE.Vector3, spacing = 13): ReturnType<ContainerInstancer['end']> {
   clock.t += 200
   inst.begin()
-  for (let i = 0; i < n; i++) inst.push(i, '40', i * 13, 1.3, 0, 0)
+  for (let i = 0; i < n; i++) inst.push(i, '40', i * spacing, 1.3, 0, 0)
   return inst.end(cam)
 }
 
@@ -138,6 +138,23 @@ describe('hero level through the close-up offers', () => {
     await settle()
     expect(frame(inst, 20, nearCam).heroFaces).toBe(0)
     expect(requests).toEqual([])
+  })
+
+  it('Auto ladder (#261): faces drawn fall with the hero cap rungs and are 0 at hero-off, on the very next frame', async () => {
+    const { inst, hero } = setup(profileForRung(0).heroBoxes / 8)
+    frame(inst, 60, nearCam, 3)
+    await settle()
+    const drawn: number[] = []
+    for (const rung of [0, 1, 2, 3, 4]) {
+      hero.setLimits({ boxes: Math.floor(profileForRung(rung).heroBoxes / 8) }) // the fixture draws 13 faces, so the caps are scaled down to bite
+      hero.setMarkStep(markStepForRung(rung))
+      drawn.push(frame(inst, 60, nearCam, 3).heroFaces)
+    }
+    expect(drawn[0]).toBeGreaterThan(Math.floor(profileForRung(2).heroBoxes / 8) * HERO_FACES_PER_BOX)
+    expect(drawn[2]).toBeLessThanOrEqual(Math.floor(profileForRung(2).heroBoxes / 8) * HERO_FACES_PER_BOX)
+    expect(drawn[2]).toBeLessThan(drawn[0])
+    expect(drawn[4]).toBe(0)
+    for (let i = 1; i < drawn.length; i++) expect(drawn[i]).toBeLessThanOrEqual(drawn[i - 1])
   })
 
   it('has the caps the budget file recommends: High 32, Medium 12, Low 0', () => {

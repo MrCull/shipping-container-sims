@@ -186,7 +186,10 @@ export class HeroLevel {
   }
 
   setLimits(next: Partial<HeroLimits>): void {
+    const before = this.limits.boxes
     Object.assign(this.limits, next)
+    // a still camera does not redraw by itself: a changed cap (Auto's ladder, #261) must reach the screen on the next frame
+    if (this.limits.boxes !== before) this.onReady?.()
   }
 
   begin(camera: THREE.Vector3): void {

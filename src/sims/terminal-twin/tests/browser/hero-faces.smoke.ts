@@ -53,7 +53,7 @@ for (const [level, cap] of [
   })
 }
 
-test.fixme('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks go standard, none at hero-off', async ({ page }) => {
+test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks go standard, none at hero-off', async ({ page }) => {
   test.slow() // software WebGL
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
@@ -91,14 +91,16 @@ test.fixme('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, m
     await page.waitForTimeout(2500)
     return page.evaluate(() => ({ faces: window.__tt!.perf().stats.heroFaces, step: window.__tt!.scene()!.containerLods.heroMarkStep, name: window.__tt!.perf().rungName }))
   }
-  const quarter = await at(2, 96, 'sharp')
+  const quarter = await at(2, 24, 'sharp')
   expect(quarter.name).toBe('hero-quarter')
   expect(quarter.faces).toBeGreaterThan(0)
-  expect(quarter.faces).toBeLessThanOrEqual(full) // TODO(#261 follow-up): should be <= 24; see report
+  expect(quarter.faces).toBeLessThanOrEqual(24)
+  expect(quarter.faces).toBeLessThan(full)
   
   expect(quarter.step).toBe('sharp')
-  const marks = await at(3, 96, 'standard')
+  const marks = await at(3, 24, 'standard')
   expect(marks.step).toBe('standard')
+  expect(marks.faces).toBeLessThanOrEqual(24)
   
   const off = await at(4, 0, 'standard')
   expect(off.faces).toBe(0)
