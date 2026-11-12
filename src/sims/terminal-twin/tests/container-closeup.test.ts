@@ -245,14 +245,27 @@ describe('colour by tint (#130)', () => {
   })
 })
 
-describe('per-frame instance counters (#246)', () => {
-  it('reports boxes posed and the instance bytes handed to the upload, in full while no buffer uses update ranges', () => {
+describe('per-frame instance counters (#246, #250)', () => {
+  it('reports boxes posed and the instance bytes uploaded: the layers written in full, then nothing for an unchanged frame', () => {
     const { inst } = setup(10)
     const s = frame(inst, 10, 0, 200)
     expect(s.drawn).toBe(10)
-    // 40 ft layers hold 10 instances each (capacity 10): matrix 16 floats, livery 1, colour 3, two LOD layers; the other sizes hold 1
-    const per40 = 10 * (16 + 1 + 3) * 4
-    const perOther = 1 * (16 + 1 + 3) * 4
-    expect(s.instanceBytes).toBe(2 * per40 + 4 * perOther)
+    expect(s.posed).toBe(10)
+    // all ten boxes land in the 40 ft LOD1 layer (capacity 10): matrix 16 floats, livery 1, colour 3, uploaded whole; no other layer is written
+    expect(s.instanceBytes).toBe(10 * (16 + 1 + 3) * 4)
+    const again = frame(inst, 10, 0, 200)
+    expect(again.instanceBytes).toBe(0)
+  })
+
+  it('writes only the box that changed, by range, and keeps every box in its slot', () => {
+    const { inst } = setup(10)
+    frame(inst, 10, 0, 200)
+    const lod1 = inst.group.getObjectByName('containers-40-lod1') as THREE.InstancedMesh
+    const before = Array.from(lod1.instanceMatrix.array.subarray(0, 160))
+    inst.set(3, '40', 50, 1, 50, 0, 0)
+    const s = inst.end(new THREE.Vector3(0, 1.3, 200))
+    expect(s.instanceBytes).toBe((16 + 1 + 3) * 4)
+    expect(Array.from(lod1.instanceMatrix.array.subarray(0, 160)).filter((v, i) => v !== before[i]).length).toBeGreaterThan(0)
+    expect(s.drawn).toBe(10)
   })
 })

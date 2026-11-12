@@ -120,6 +120,15 @@ export class SceneRenderer {
   private containerLivery: number[]
   /** Colour by (#130): the mode, the facts its legend needs, and per box the tint drawn (0xRRGGBB, -1 = livery) with the epoch and time bucket it was computed for. */
   private colourBy: ColourBy = DEFAULT_COLOUR_BY
+  // What the container posing has covered (#250).
+  private posedT: number | null = null
+  private posedSeq = 0
+  private posedCount = 0
+  private posedEpoch = -1
+  private readonly moving = new Set<number>()
+  private readonly vesselBoxes = new Map<string, Set<number>>()
+  private readonly boxVessel: (string | undefined)[] = []
+  private readonly vesselSig = new Map<string, string>()
   private robDisplay: RobDisplay = DEFAULT_ROB_DISPLAY
   private colourCtx: ColourContext
   private colourEpoch = 1
@@ -517,15 +526,61 @@ export class SceneRenderer {
     const wantsOwners = this.renderers.some((r) => r.renderer.wantsContainerOwners)
     const loads = new Map<string, { count: number; size: string }>()
     const carried = new Map<string, number>()
-    containers.begin()
     const colourBudget = { left: COLOUR_BUDGET_PER_FRAME }
-    model.containerIds.forEach((id, i) => {
+    const ids = model.containerIds
+    // Which boxes to pose (#250): a box at rest is posed when its custody changes, a carried one every frame, a vessel's when its placement changes.
+    const timeBased = isTimeBased(this.colourBy)
+    const full = this.posedT === null || t < this.posedT || this.posedEpoch !== this.colourEpoch || timeBased
+    let visit: Iterable<number>
+    if (full) {
+      visit = ids.keys()
+      this.moving.clear()
+      this.vesselBoxes.clear()
+      this.boxVessel.length = 0
+      this.vesselSig.clear()
+    } else {
+      const set = new Set<number>(model.custodyChanges(this.posedT as number, t, this.posedSeq))
+      for (const i of this.moving) set.add(i)
+      for (let i = this.posedCount; i < ids.length; i++) set.add(i)
+      for (const v of model.vesselIds) {
+        const p = model.vesselPlacement(v, t)
+        const sig = p ? `${p.x},${p.zOffset},${p.status}` : '-'
+        if (this.vesselSig.get(v) === sig) continue
+        this.vesselSig.set(v, sig)
+        for (const i of this.vesselBoxes.get(v) ?? []) set.add(i)
+      }
+      visit = set
+    }
+    if (full) for (const v of model.vesselIds) {
+      const p = model.vesselPlacement(v, t)
+      this.vesselSig.set(v, p ? `${p.x},${p.zOffset},${p.status}` : '-')
+    }
+    this.posedSeq = model.custodyLogLength()
+    for (const i of visit) {
+      const id = ids[i]
       const c = model.containerPose(id, t)
-      if (!c) return
+      const rest = model.poseRest
+      if (rest === 0) this.moving.add(i)
+      else this.moving.delete(i)
+      const was = this.boxVessel[i]
+      const now = rest === 2 ? model.poseVessel : undefined
+      if (was !== now) {
+        if (was !== undefined) this.vesselBoxes.get(was)?.delete(i)
+        if (now !== undefined) {
+          let set = this.vesselBoxes.get(now)
+          if (!set) this.vesselBoxes.set(now, (set = new Set()))
+          set.add(i)
+        }
+        this.boxVessel[i] = now
+      }
+      if (!c) {
+        containers.remove(i)
+        continue
+      }
       this.containerLivery[i] ??= liveryIndexForLine(model.containerLine[id])
-      containers.push(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget), c.yard === true)
+      containers.set(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget), c.yard === true)
       if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
-      if (wantsOwners) {
+      if (wantsOwners && rest === 0) {
         const owner = model.custodyAt(id, t)
         if (owner) {
           const key = `${owner.kind}:${owner.id}`
@@ -533,7 +588,10 @@ export class SceneRenderer {
           loads.set(key, { count: (l?.count ?? 0) + 1, size: model.containerSize[id] })
         }
       }
-    })
+    }
+    this.posedT = t
+    this.posedEpoch = this.colourEpoch
+    this.posedCount = ids.length
     containers.end(cameraPosition, frustum)
 
     this.lastT = t
@@ -637,7 +695,7 @@ export class SceneRenderer {
   /** Boxes posed and container instance bytes handed to the GPU upload in the last update (#246). */
   poseCounters(): { boxesPosed: number; instanceBytes: number } {
     const c = this.containers.stats()
-    return { boxesPosed: c.drawn, instanceBytes: c.instanceBytes }
+    return { boxesPosed: c.posed, instanceBytes: c.instanceBytes }
   }
 
   /** The boxes the container instancer wrote at the last update (needs `recordDrawnBoxes(true)`): the drawn-box reference test. */

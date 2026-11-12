@@ -498,6 +498,8 @@ export class SceneModel {
       if (!list) continue
       this.handoffs.push({ t: c.t, containerId: c.containerId, from: list.length > 0 ? list[list.length - 1].owner : null, to: c.owner })
       list.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
+      this.logT.push(c.t)
+      this.logBox.push(this.containerIndexOf(c.containerId))
     }
     for (const e of delta.entities) {
       this.status[`${e.kind}:${e.id}`]?.push({ t: e.t, status: e.status, berthX: e.berthX, firstMoveS: e.firstMoveS })
@@ -856,6 +858,53 @@ export class SceneModel {
     return this.vesselPlacement(id, time) !== null
   }
 
+  /** Custody changes as appended (#250): box index and the time of the entry. Entries are never dropped (a few bytes each). */
+  private readonly logT: number[] = []
+  private readonly logBox: number[] = []
+  /** Log positions in time order (merged lazily: entries mostly arrive in time order). */
+  private logSorted: number[] = []
+  private idIndex = new Map<string, number>()
+  private idIndexed = 0
+
+  /** Index of a box in `containerIds`. */
+  containerIndexOf(id: string): number {
+    for (; this.idIndexed < this.containerIds.length; this.idIndexed++) this.idIndex.set(this.containerIds[this.idIndexed], this.idIndexed)
+    return this.idIndex.get(id) ?? -1
+  }
+
+  /** How many custody changes the model has been given; pass it back to `custodyChangesSince`. */
+  custodyLogLength(): number {
+    return this.logT.length
+  }
+
+  /**
+   * Boxes (indexes into `containerIds`) whose custody changed in `(t0, t1]`, plus those whose entry was appended after
+   * log position `seq` with a time up to `t1` (it arrived late, after the display had passed it). A box is listed once.
+   */
+  custodyChanges(t0: number, t1: number, seq: number): number[] {
+    const out = new Set<number>()
+    if (this.logSorted.length < this.logT.length) {
+      const fresh: number[] = []
+      for (let i = this.logSorted.length; i < this.logT.length; i++) fresh.push(i)
+      this.logSorted = this.logSorted.concat(fresh).sort((a, b) => this.logT[a] - this.logT[b] || a - b)
+    }
+    const sorted = this.logSorted
+    let lo = 0
+    let hi = sorted.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (this.logT[sorted[mid]] <= t0) lo = mid + 1
+      else hi = mid
+    }
+    for (let k = lo; k < sorted.length && this.logT[sorted[k]] <= t1; k++) out.add(this.logBox[sorted[k]])
+    for (let i = seq; i < this.logT.length; i++) if (this.logT[i] <= t1) out.add(this.logBox[i])
+    return [...out]
+  }
+
+  /** Set by `containerPose`: 0 = the box may be moving (carried, on a truck), 1 = at rest until its custody changes, 2 = on a vessel (`poseVessel`), at rest until that vessel's placement changes. */
+  poseRest: 0 | 1 | 2 = 0
+  poseVessel = ''
+
   /** Poses of stacked boxes by `${slotId}|${size}` (read-only; shared between frames). */
   private readonly yardPoses = new Map<string, ContainerPose>()
   private readonly vesselSlotCells = new Map<string, ReturnType<typeof parseVesselSlotId>>()
@@ -903,11 +952,13 @@ export class SceneModel {
   containerPose(containerId: string, time: number): ContainerPose | null {
     const list = this.custody[containerId] ?? []
     const i = lastAtOrBefore(list, time, (e) => e.t)
+    this.poseRest = 1 // no custody yet: its first entry is in the change log
     if (i < 0) return null
     const entry = list[i]
     const dims = CONTAINER_DIMS[this.containerSize[containerId]]
     const { kind, id } = entry.owner
     const alongZ = Math.PI / 2
+    this.poseRest = kind === 'shc' || kind === 'asc' || kind === 'sts' || kind === 'truck' ? 0 : 1
     if (kind === 'shc') {
       const p = this.shcPose(id, time)
       return { x: p.x, y: p.lift + dims.height / 2, z: p.z, yaw: p.yaw, carriedBy: id }
@@ -947,6 +998,8 @@ export class SceneModel {
     if (kind === 'vesselSlot') {
       let slot = this.vesselSlotCells.get(id)
       if (!slot) this.vesselSlotCells.set(id, (slot = parseVesselSlotId(id)))
+      this.poseRest = 2
+      this.poseVessel = slot.vesselId
       const placement = this.vesselPlacement(slot.vesselId, time)
       if (!placement) return null
       const c = slotCentre(this.specs[slot.vesselId], placement.x, slot, this.containerSize[containerId])
