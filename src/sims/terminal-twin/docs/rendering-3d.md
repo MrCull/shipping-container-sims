@@ -189,7 +189,26 @@ Markings are drawn per visible face, not per box, on every quality level (#158).
 - The close-up corrugation (`modules/closeupGeometry.ts#CORRUGATION_PITCH_M`, 0.25 m, the real rib pitch) differs from
   the LOD0 GLB rib (0.56 m, an [M] for the triangle budget). Kept as is.
 
-### Far-field legibility (#170, measured, not fixed)
+### Far-field wordmark atlas (#256)
+
+Beyond about 80 m the near atlas fades to body colour (letters about 0.93 m tall are under a pixel). A second atlas,
+`assets/models/containers/livery-atlas-far.webp` (1024 px, same 2x6 tile layout, so the same UVs and the same per-instance
+`liveryIndex`), draws the side wordmark at about 94 % of the side width and 74 % of its height on a flat body-colour panel,
+with coarse rib shading above and below it, and no owner code. `liveryMaterial(..., farMap)` blends the two in the
+fragment shader: `mix(near, far, smoothstep(65, 100, length(vViewPosition)))` (`FAR_ATLAS_BLEND_M`). The blend is per
+pixel over 35 m, so there is no pop and no hysteresis; it applies to LOD0 and LOD1 alike and costs no draw call, no
+instance byte and no triangle. It costs one more texture sample per box fragment (frame time: check on the laptop, #262).
+If the far atlas fails to load the near atlas shows at every distance.
+
+Rib pitch, three levels (do not unify them):
+
+| Level | Pitch | Where |
+|---|---|---|
+| Far atlas | 1.2 m (about 10 ribs on a 40 ft side), baked shading | beyond about 80 m, survives the mip chain |
+| LOD0 geometry and LOD1 normal map | 0.56 m, an [M] for the triangle budget | up to 140 m |
+| Close-up decals and hero faces | 0.25 m, the real pitch | within about 35 m and 15 m |
+
+### Far-field legibility (#170, measured; fixed by #256)
 
 On the TTI baseline (04:00, 1280x720, software WebGL, camera 150 m from block B01) a side wordmark (letters about 0.93 m
 tall in the 2048 atlas) reads up to about 80 to 100 m on Low and High alike and fades to the body colour beyond. LOD

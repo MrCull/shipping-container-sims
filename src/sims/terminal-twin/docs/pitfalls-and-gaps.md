@@ -143,8 +143,7 @@ detail. Terms: [GLOSSARY.md](../../../../GLOSSARY.md).
 
 - **Extra shortcuts** E, I and P and the ASC yield moves go beyond the spec (accepted scope). [browser-host.md](browser-host.md)
 - **Far-field livery and corrugation (#170)**: wordmark and rib shading fade to body colour beyond about 80 to 100 m;
-  the Yard view (about 493 m) shows no text; roofs carry no text. The far-field wordmark atlas needs Blender and is
-  open. The close-up corrugation pitch (`CORRUGATION_PITCH_M` 0.25 m) differs from the LOD0 GLB rib (0.56 m) on purpose. [assets-pipeline.md](assets-pipeline.md), [rendering-3d.md](rendering-3d.md)
+  the Yard view (about 493 m) showed no text; roofs carry no text. Fixed by the far-field wordmark atlas (#256, `livery-atlas-far.webp`, blended in by camera distance, see rendering-3d.md); a box seen from the Yard view is only a few pixels long, so the wordmark reads as a coloured band, not as letters. Frame time of the extra texture sample is for the laptop benchmark (#262). The close-up corrugation pitch (`CORRUGATION_PITCH_M` 0.25 m) differs from the LOD0 GLB rib (0.56 m) on purpose. [assets-pipeline.md](assets-pipeline.md), [rendering-3d.md](rendering-3d.md)
 - **Hub files** `store/twinStore.ts` and `engine/subsystems/asc.ts` are large; splitting them was out of scope (the ASC
   subsystem is already split into `asc.ts`, `ascStorage.ts`, `ascReservations.ts`, `ascDispatch.ts` and pure `ascRail.ts`). [architecture.md](architecture.md)
 - **Setup dialog shape**: `SetupDialog.vue` is a shell; a new setup section is a `components/setup/Setup<Section>Section.vue`

@@ -16,6 +16,7 @@ Writes, under <staging>/containers/:
     container-<size>.glb        raw export (uncompressed; the Node step adds meshopt)
     container-<size>.meta.json  rig/metadata sidecar
     livery-atlas.json           atlas layout and livery index table
+    livery-atlas-far.webp       far-field atlas (1024, same layout, enlarged wordmark, coarse ribs; #256)
     previews/*.webp             Cycles CPU previews (front, side, rear, three-quarter) + atlas
 """
 import argparse
@@ -73,6 +74,8 @@ def build_containers(out_dir, previews=True, samples=48):
     normal_png = os.path.join(tmp, 'corrugation-normal.png')
     print('[containers] rendering livery atlas', flush=True)
     LV.render_atlas(atlas_png, FONTS)
+    print('[containers] rendering far-field livery atlas', flush=True)
+    LV.render_atlas(os.path.join(out_dir, 'livery-atlas-far.webp'), FONTS, far=True)
     write_json(os.path.join(out_dir, 'livery-atlas.json'), LV.atlas_manifest())
     if previews:
         B.reset_scene()

@@ -39,6 +39,13 @@ REGIONS = {
 
 METAL = '#b4b9bf'
 
+# Far-field atlas (#256): same tile layout rendered at FAR_ATLAS_SIZE, drawn with an enlarged wordmark and a coarse rib
+# shading, blended in by the renderer beyond about 65 to 100 m. Pitches: far 1.2 m (about 10 ribs on a 40 ft side), LOD0
+# geometry 0.56 m, hero and real 0.25 m.
+FAR_ATLAS_SIZE = 1024
+FAR_RIB_PITCH_M = 1.2
+SIDE_LENGTH_M = {'side40': 12.19, 'side20': 6.06}
+
 # Order = atlas tile index = the renderer's per-instance livery index.
 # Lines and owner prefixes match scenario/builder.ts LINE_OWNER_PREFIX.
 LIVERIES = [
@@ -107,6 +114,12 @@ def atlas_manifest():
             for i, l in enumerate(LIVERIES)
         ],
         'regions': {k: list(v) for k, v in REGIONS.items()},
+        'far': {
+            'file': 'livery-atlas-far.webp',
+            'size': [FAR_ATLAS_SIZE, FAR_ATLAS_SIZE],
+            'ribPitchM': FAR_RIB_PITCH_M,
+            'note': 'same tile layout and UVs as the near atlas; the renderer blends it in by camera distance',
+        },
         'provenance': [
             {'fact': 'line wordmarks are the brand name set in an open-licence typeface close to the brand typeface, in brand colours', 'tag': 'A'},
             {'fact': 'livery body colours are approximations of each line\'s container colour', 'tag': 'A'},
@@ -170,7 +183,29 @@ class _Canvas:
         obj.location.y = -cy - (min(ys) + max(ys)) / 2
 
 
-def _draw_tile(canvas, index, liv):
+def _draw_far_sides(canvas, r, liv):
+    """Long sides of the far atlas: coarse rib shading, then a wordmark that fills most of the side."""
+    body, text = liv['body'], liv['text']
+    for name in ('side40', 'side20'):
+        x0, y0, x1, y1 = r(name)
+        w, h = x1 - x0, y1 - y0
+        count = max(1, round(SIDE_LENGTH_M[name] / FAR_RIB_PITCH_M))
+        pitch = w / count
+        for k in range(count):
+            # valley band (darkest) with a lighter slope on each flank, then the rib top left as body colour
+            vx = x0 + pitch * (k + 0.5)
+            canvas.rect(vx - pitch * 0.30, y0, vx + pitch * 0.30, y1, shade(body, 0.90))
+            canvas.rect(vx - pitch * 0.17, y0, vx + pitch * 0.17, y1, shade(body, 0.72))
+        # The wordmark sits on a flat panel of body colour so the ribs never cut through the letters.
+        pw, ph = w * (0.94 if name == 'side40' else 0.92), h * 0.74
+        canvas.rect((x0 + x1) / 2 - pw / 2, (y0 + y1) / 2 - ph / 2, (x0 + x1) / 2 + pw / 2, (y0 + y1) / 2 + ph / 2, body)
+        canvas.text(liv['wordmark'], liv['font'], text, (x0 + x1) / 2, (y0 + y1) / 2,
+                    pw * 0.94, ph * 0.86, liv['spacing'], liv['shear'])
+        if liv.get('accent'):
+            canvas.rect(x0 + w * 0.2, y1 - h * 0.1, x1 - w * 0.2, y1 - h * 0.06, liv['accent'])
+
+
+def _draw_tile(canvas, index, liv, far=False):
     ox, oy = tile_origin(index)
     body, text = liv['body'], liv['text']
 
@@ -180,7 +215,7 @@ def _draw_tile(canvas, index, liv):
 
     canvas.rect(ox, oy, ox + TILE_W, oy + TILE_H, body)
     # Long sides: big wordmark, owner code top right (as painted on real boxes).
-    for name in ('side40', 'side20'):
+    for name in () if far else ('side40', 'side20'):
         x0, y0, x1, y1 = r(name)
         w, h = x1 - x0, y1 - y0
         canvas.text(liv['wordmark'], liv['font'], text, (x0 + x1) / 2, (y0 + y1) / 2 + h * 0.02,
@@ -188,6 +223,8 @@ def _draw_tile(canvas, index, liv):
         if liv.get('accent'):
             canvas.rect(x0 + w * 0.2, y0 + h * 0.74, x1 - w * 0.2, y0 + h * 0.77, liv['accent'])
         canvas.text(liv['owner'], 'Archivo-ExtraBold.ttf', text, x1 - w * 0.08, y0 + h * 0.1, w * 0.1, h * 0.07)
+    if far:
+        _draw_far_sides(canvas, r, liv)
     # Door end: two leaves, centre seam, four locking bars, owner code + small wordmark.
     x0, y0, x1, y1 = r('door')
     w, h = x1 - x0, y1 - y0
@@ -208,14 +245,15 @@ def _draw_tile(canvas, index, liv):
     canvas.rect(*r('metal'), METAL)
 
 
-def render_atlas(path, fonts_dir, samples=16):
-    """Renders the livery atlas PNG (Cycles, emission only, orthographic)."""
+def render_atlas(path, fonts_dir, samples=16, far=False):
+    """Renders the livery atlas (Cycles, emission only, orthographic). `far` renders the far-field atlas as a lossy
+    WebP at FAR_ATLAS_SIZE (same layout, so the renderer reuses the UVs); otherwise the 2048 PNG."""
     from .blender import reset_scene
     scene = reset_scene()
     canvas = _Canvas(fonts_dir)
     canvas.rect(0, 0, ATLAS_SIZE, ATLAS_SIZE, '#808080')
     for i, liv in enumerate(LIVERIES):
-        _draw_tile(canvas, i, liv)
+        _draw_tile(canvas, i, liv, far=far)
     cam = bpy.data.objects.new('atlas-camera', bpy.data.cameras.new('atlas-camera'))
     cam.data.type = 'ORTHO'
     cam.data.ortho_scale = ATLAS_SIZE
@@ -228,16 +266,22 @@ def render_atlas(path, fonts_dir, samples=16):
     world.use_nodes = True
     world.node_tree.nodes['Background'].inputs[0].default_value = hex_to_linear('#000000')
     scene.world = world
-    scene.render.resolution_x = ATLAS_SIZE
-    scene.render.resolution_y = ATLAS_SIZE
+    size = FAR_ATLAS_SIZE if far else ATLAS_SIZE
+    scene.render.resolution_x = size
+    scene.render.resolution_y = size
     scene.render.resolution_percentage = 100
     scene.cycles.samples = samples
     scene.cycles.max_bounces = 0
     scene.cycles.filter_width = 1.2
-    scene.render.image_settings.file_format = 'PNG'
-    scene.render.image_settings.color_mode = 'RGB'
-    scene.render.image_settings.color_depth = '8'
-    scene.render.image_settings.compression = 90
+    if far:
+        scene.render.image_settings.file_format = 'WEBP'
+        scene.render.image_settings.quality = 90
+        scene.render.image_settings.color_mode = 'RGB'
+    else:
+        scene.render.image_settings.file_format = 'PNG'
+        scene.render.image_settings.color_mode = 'RGB'
+        scene.render.image_settings.color_depth = '8'
+        scene.render.image_settings.compression = 90
     scene.render.filepath = path
     bpy.ops.render.render(write_still=True)
 

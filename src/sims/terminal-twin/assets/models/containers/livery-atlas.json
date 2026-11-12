@@ -168,6 +168,15 @@
       325
     ]
   },
+  "far": {
+    "file": "livery-atlas-far.webp",
+    "size": [
+      1024,
+      1024
+    ],
+    "ribPitchM": 1.2,
+    "note": "same tile layout and UVs as the near atlas; the renderer blends it in by camera distance"
+  },
   "provenance": [
     {
       "fact": "line wordmarks are the brand name set in an open-licence typeface close to the brand typeface, in brand colours",
