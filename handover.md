@@ -33,7 +33,7 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | #260 | Sharp markings on hero faces | #259 | merged in branch (71bad0d) | |
 | #261 | Auto quality works from frame time and sheds in a fixed ladder | #259, #260 | merged in branch (c0d0e19) | |
 | #262 | Run the benchmark on the laptop, record the numbers, retune Auto (`ready-for-human`) | #254, #261, #257, #249, #256 | open | |
-| #263 | Run the browser smoke suite and fix regressions | #246 to #261 | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
+| #263 | Run the browser smoke suite and fix regressions | #246 to #261 | merged in branch (4bb7e3a) | |
 
 ## Things the tickets do not say
 
