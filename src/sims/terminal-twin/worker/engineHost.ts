@@ -65,10 +65,35 @@ function compactMotion(plans: MotionPlan[]): MotionPlan[] {
   })
 }
 
+/**
+ * Events that change the state of equipment they do not name in their subjects (found by comparing with the full scan,
+ * `host-named-entities.test.ts`): all equipment of the listed kinds is read after them. A decision resolving can wake anything.
+ */
+const WAKES: Partial<Record<EngineEvent['type'], 'all' | ('sts' | 'shc' | 'asc')[]>> = {
+  StsGrounded: ['shc'],
+  AscDroppedAtWtp: ['shc'],
+  AscPicked: ['shc'],
+  ShcCleared: ['asc'],
+  ShcPicked: ['sts'],
+  StsPicked: ['sts'],
+  DecisionResolved: 'all',
+}
+
 /** Reply info before any scenario is loaded (only settings requests are served then). */
 const NO_INFO: EngineInfo = { now: 0, status: 'ready', endT: null, endReason: null, eventsTotal: 0, movesCompleted: 0, vesselsCompleted: 0, eventLogHash: '', firstError: null }
 
-export function createEngineHost() {
+export function createEngineHost(options: { fullScan?: boolean } = {}) {
+  /** Read every entity after every event, as before #253 (tests compare it with the cut-down observation). */
+  const fullScan = options.fullScan === true
+  /** Changes the end-of-request sweep found that no event had named (should stay 0). */
+  let missed = 0
+  let stsIds: string[] = []
+  let shcIds: string[] = []
+  let ascIds: string[] = []
+  let vesselIds: string[] = []
+  let kindOf = new Map<string, 'sts' | 'shc' | 'asc'>()
+  let indexOf = new Map<string, number>()
+  let vesselIndex = new Map<string, number>()
   let sim: Simulation | null = null
   let loaded: { config: ScenarioConfig; seed: number } | null = null
   let delta = emptyDelta()
@@ -127,41 +152,11 @@ export function createEngineHost() {
     }
     const hatchChange = hatchChangeOf(ev)
     if (hatchChange) (delta.hatch ??= []).push(hatchChange)
-    for (const s of sim.config.sts) {
-      const sts = sim.query.sts(s.id)
-      if (motionRefs.get(s.id) !== sts.motion) {
-        motionRefs.set(s.id, sts.motion)
-        if (sts.motion.length > 0) delta.motion.push({ entityId: s.id, segments: sts.motion.map((m) => ({ ...m })) })
-      }
-      const key = `sts:${s.id}`
-      if (statusRefs.get(key) !== sts.status) {
-        statusRefs.set(key, sts.status)
-        delta.entities.push({ kind: 'sts', id: s.id, t: ev.t, status: sts.status })
-      }
-    }
-    for (const c of sim.config.shcs ?? []) {
-      const shc = sim.query.shc(c.id)
-      if (motionRefs.get(c.id) !== shc.motion) {
-        motionRefs.set(c.id, shc.motion)
-        if (shc.motion.length > 0) delta.motion.push({ entityId: c.id, segments: shc.motion.map((m) => ({ ...m })) })
-      }
-      const key = `shc:${c.id}`
-      if (statusRefs.get(key) !== shc.status) {
-        statusRefs.set(key, shc.status)
-        delta.entities.push({ kind: 'shc', id: c.id, t: ev.t, status: shc.status })
-      }
-    }
-    for (const asc of sim.query.ascs()) {
-      if (motionRefs.get(asc.id) !== asc.motion) {
-        motionRefs.set(asc.id, asc.motion)
-        if (asc.motion.length > 0) delta.motion.push({ entityId: asc.id, segments: asc.motion.map((m) => ({ ...m })) })
-      }
-      const key = `asc:${asc.id}`
-      if (statusRefs.get(key) !== asc.status) {
-        statusRefs.set(key, asc.status)
-        delta.entities.push({ kind: 'asc', id: asc.id, t: ev.t, status: asc.status })
-      }
-    }
+    // Equipment and vessels: only those the event names (#253), in the order of the full scan. The full scan runs at each request boundary (below).
+    const named = namedEntities(ev)
+    for (const id of named.sts) scanSts(sim, id, ev.t)
+    for (const id of named.shc) scanShc(sim, id, ev.t)
+    for (const id of named.asc) scanAsc(sim, id, ev.t)
     if (ev.type.startsWith('Truck') || ev.type === 'AscJobAssigned') {
       for (const truck of sim.query.trucks()) {
         if (motionRefs.get(truck.id) !== truck.motion) {
@@ -187,18 +182,102 @@ export function createEngineHost() {
       lastReservationId = r.id
       delta.reservations.push({ ...r })
     }
-    for (const v of sim.config.vessels) {
-      const vessel = sim.query.vessel(v.id)
-      const key = `vessel:${v.id}`
-      const firstMoveS = sim.query.vesselFirstMoveS(v.id)
-      const moveKey = `vesselMove:${v.id}`
-      const moved = firstMoveS !== null && statusRefs.get(moveKey) !== 'seen'
-      if (statusRefs.get(key) !== vessel.status || moved) {
-        statusRefs.set(key, vessel.status)
-        if (firstMoveS !== null) statusRefs.set(moveKey, 'seen')
-        delta.entities.push({ kind: 'vessel', id: v.id, t: ev.t, status: vessel.status, berthX: vessel.berthX, firstMoveS })
-      }
+    for (const id of named.vessels) scanVessel(sim, id, ev.t)
+  }
+
+  function scanSts(s: Simulation, id: string, t: number): void {
+    const sts = s.query.sts(id)
+    if (motionRefs.get(id) !== sts.motion) {
+      motionRefs.set(id, sts.motion)
+      if (sts.motion.length > 0) delta.motion.push({ entityId: id, segments: sts.motion.map((m) => ({ ...m })) })
     }
+    const key = `sts:${id}`
+    if (statusRefs.get(key) !== sts.status) {
+      statusRefs.set(key, sts.status)
+      delta.entities.push({ kind: 'sts', id, t, status: sts.status })
+    }
+  }
+
+  function scanShc(s: Simulation, id: string, t: number): void {
+    const shc = s.query.shc(id)
+    if (motionRefs.get(id) !== shc.motion) {
+      motionRefs.set(id, shc.motion)
+      if (shc.motion.length > 0) delta.motion.push({ entityId: id, segments: shc.motion.map((m) => ({ ...m })) })
+    }
+    const key = `shc:${id}`
+    if (statusRefs.get(key) !== shc.status) {
+      statusRefs.set(key, shc.status)
+      delta.entities.push({ kind: 'shc', id, t, status: shc.status })
+    }
+  }
+
+  function scanAsc(s: Simulation, id: string, t: number): void {
+    const asc = s.query.asc(id)
+    if (motionRefs.get(id) !== asc.motion) {
+      motionRefs.set(id, asc.motion)
+      if (asc.motion.length > 0) delta.motion.push({ entityId: id, segments: asc.motion.map((m) => ({ ...m })) })
+    }
+    const key = `asc:${id}`
+    if (statusRefs.get(key) !== asc.status) {
+      statusRefs.set(key, asc.status)
+      delta.entities.push({ kind: 'asc', id, t, status: asc.status })
+    }
+  }
+
+  function scanVessel(s: Simulation, id: string, t: number): void {
+    const vessel = s.query.vessel(id)
+    const key = `vessel:${id}`
+    const firstMoveS = s.query.vesselFirstMoveS(id)
+    const moveKey = `vesselMove:${id}`
+    const moved = firstMoveS !== null && statusRefs.get(moveKey) !== 'seen'
+    if (statusRefs.get(key) !== vessel.status || moved) {
+      statusRefs.set(key, vessel.status)
+      if (firstMoveS !== null) statusRefs.set(moveKey, 'seen')
+      delta.entities.push({ kind: 'vessel', id, t, status: vessel.status, berthX: vessel.berthX, firstMoveS })
+    }
+  }
+
+  /** Equipment and vessels an event names in its subjects, each kind in configuration order. */
+  function namedEntities(ev: EngineEvent): { sts: string[]; shc: string[]; asc: string[]; vessels: string[] } {
+    const out = { sts: [] as string[], shc: [] as string[], asc: [] as string[], vessels: [] as string[] }
+    if (fullScan) {
+      out.sts = [...stsIds]
+      out.shc = [...shcIds]
+      out.asc = [...ascIds]
+      out.vessels = [...vesselIds]
+      return out
+    }
+    const wakes = WAKES[ev.type]
+    if (wakes === 'all') {
+      out.sts = [...stsIds]
+      out.shc = [...shcIds]
+      out.asc = [...ascIds]
+      out.vessels = [...vesselIds]
+      return out
+    }
+    for (const id of ev.subjects.equipment ?? []) {
+      const k = kindOf.get(id)
+      if (k && !wakes?.includes(k)) out[k].push(id)
+    }
+    for (const id of ev.subjects.vessels ?? []) if (vesselIndex.has(id)) out.vessels.push(id)
+    // equipment of another kind this event type wakes without naming it: all of that kind
+    if (wakes?.includes('sts')) out.sts = [...stsIds]
+    if (wakes?.includes('shc')) out.shc = [...shcIds]
+    if (wakes?.includes('asc')) out.asc = [...ascIds]
+    for (const k of ['sts', 'shc', 'asc'] as const) if (out[k].length > 1) out[k].sort((x, y) => indexOf.get(x)! - indexOf.get(y)!)
+    if (out.vessels.length > 1) out.vessels.sort((x, y) => vesselIndex.get(x)! - vesselIndex.get(y)!)
+    return out
+  }
+
+  /** The safety net: every STS, SHC, ASC and vessel is read once at the end of each request, so a change no event named is still reported. Returns how many changes it found. */
+  function sweepAll(s: Simulation): void {
+    const before = delta.motion.length + delta.entities.length
+    const t = s.now
+    for (const id of stsIds) scanSts(s, id, t)
+    for (const id of shcIds) scanShc(s, id, t)
+    for (const id of ascIds) scanAsc(s, id, t)
+    for (const id of vesselIds) scanVessel(s, id, t)
+    missed += delta.motion.length + delta.entities.length - before
   }
 
   let strictChecks = false
@@ -209,8 +288,25 @@ export function createEngineHost() {
     loaded = { config, seed }
     announced.clear()
     checkpoints = []
+    indexEntities(sim, config)
     seedRefs(sim, config)
     sim.subscribe(observe)
+  }
+
+  function indexEntities(s: Simulation, config: ScenarioConfig): void {
+    stsIds = config.sts.map((x) => x.id)
+    shcIds = (config.shcs ?? []).map((x) => x.id)
+    ascIds = s.query.ascs().map((x) => x.id)
+    vesselIds = config.vessels.map((v) => v.id)
+    kindOf = new Map()
+    indexOf = new Map()
+    for (const [kind, ids] of [['sts', stsIds], ['shc', shcIds], ['asc', ascIds]] as const) {
+      ids.forEach((id, i) => {
+        kindOf.set(id, kind)
+        indexOf.set(id, i)
+      })
+    }
+    vesselIndex = new Map(vesselIds.map((id, i) => [id, i]))
   }
 
   /** Remember the current state of every entity, so only later changes go into deltas. */
@@ -421,6 +517,8 @@ export function createEngineHost() {
   }
 
   return {
+    /** Changes only the end-of-request sweep found (test hook; 0 when events name every entity they change). */
+    missedByEvents: () => missed,
     /** Serve one request. Callers must not overlap requests (the worker entry serialises them). */
     async handle(req: WorkerRequestMessage): Promise<WorkerReply> {
       delta = emptyDelta()
@@ -429,6 +527,7 @@ export function createEngineHost() {
         const result = await serve(req)
         if (!sim) return { rid: req.rid, ok: true, result, delta, info: NO_INFO }
         const s = requireSim()
+        sweepAll(s)
         if (delta.events.length > EVENT_SUMMARY_CAP) delta.events = delta.events.slice(-EVENT_SUMMARY_CAP)
         return { rid: req.rid, ok: true, result, delta, info: info(s), workMs: performance.now() - started }
       } catch (err) {

@@ -81,8 +81,13 @@ kpiSeries kpiHeadline dashboard summary invariants eventLog checkpoints`. `kpiHe
   per entity, only reservations still open.
 - `EngineInfo`: `now` (engine horizon), `status` (`ready | ended | failed`), `endT`, `endReason`, `eventsTotal`,
   `movesCompleted`, `vesselsCompleted`, `eventLogHash`, `firstError`. Before any load the host replies `NO_INFO`.
-- Cost: `observe` scans every STS, SHC and ASC, and every vessel (with a `vesselFirstMoveS` query) per event. That is
-  the worker-side overhead on top of the engine in the browser ([optimising/frame-rate.md](optimising/frame-rate.md)).
+- Cost (#253): `observe` reads only the STS, SHC, ASC and vessels an event names in `subjects.equipment` / `subjects.vessels`
+  (in configuration order, so deltas equal the full scan's). Events that change equipment they do not name are listed in
+  `WAKES` (`worker/engineHost.ts`): all equipment of the listed kinds is read after them (`DecisionResolved`: everything).
+  At the end of every request one full read (`sweepAll`) is the safety net; `createEngineHost().missedByEvents()` counts what
+  it found that no event had named and must stay 0. `createEngineHost({ fullScan: true })` is the old per-event full scan;
+  `tests/host-named-entities.test.ts` compares the two over every fixture and the TTI preset to 7,200 s. A new event type that
+  changes equipment it does not name makes that test fail: add it to `WAKES`.
 
 ## Playback and time controls
 
