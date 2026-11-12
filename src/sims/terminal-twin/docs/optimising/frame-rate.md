@@ -106,8 +106,8 @@ Other dev API levers: `perfOverlay(on)` (also key P, the Stats button, or a clic
   mesh and canvas per box (#143), close-ups on every level (#158).
 - **Quality steps do not touch posing.** On real hardware Low halved triangles and changed neither fps nor pose time;
   Auto churned High to Medium to Low without gaining fps and never stepped back up (#158: that is why Low draws close-ups too).
-- **Next wins (not done):** skip posing unchanged boxes (a yard box only moves when its custody changes: keep its
-  instance slot and rewrite only on custody change, instead of rewriting every instance buffer every frame); cull before
+- **Done in #250:** boxes at rest are posed only when their custody changes (retained instance slots, upload by dirty range; see `rendering-3d.md`, Containers).
+- **Next wins (not done):** cull before
   posing (skip `containerPose` for boxes whose cached position is outside the frustum); fold the second custody search
   (`custodyAt` for `loads`) into `containerPose`; a far-LOD for containers or infrastructure at overview distance to cut
   triangles (TT-28 infrastructure is about 680k triangles of the TTI overview: yard fences, ASC rails, masts).
@@ -124,6 +124,7 @@ compare against these on a like machine, or re-run the command first. Re-record 
   mean 14.3 ms, min 12.5, max 17.6. Boxes posed per frame 9 895 (of 11 616 boxes in the scene; the rest have no pose),
   instance bytes uploaded per frame 2 006 400 (1.9 MiB: every container instance buffer is re-uploaded in full, capacity
   not count, today). Compare with the 8 ms posing budget above and with real-hardware 13 to 16 ms (V11-19).
+- *After #250 (posing by custody), same command with `--skip-rate`, same machine class (4-core Xeon 2.1 GHz, load average 6.6), same camera and time:* posing mean 2.40 ms per frame (min 1.21, max 5.52), **about 6 times less than 14.3**; boxes posed per frame 9 (the carried ones; was 9 895); instance bytes uploaded per frame 0 (was 2 006 400). What remains per frame is the O(boxes) close-up offer loop and the carried boxes; #257 (cull before posing) targets it. The drawn-box reference is unchanged.
 - *Engine in its worker, no rendering (a playback clock driven at the speed step, no scene built), from 7 200 s, 8 s window after a 2 s settle:*
 
 | Speed | Achieved sim s per wall s | Engine advance sim s per wall s |
