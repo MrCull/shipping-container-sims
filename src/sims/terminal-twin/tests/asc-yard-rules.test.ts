@@ -14,7 +14,6 @@ import {
   rowX,
   slotZ,
   strategies,
-  tierBaseY,
   yardSlotId,
   type Simulation,
   type YardAllocationRequest,
@@ -85,7 +84,7 @@ describe('ASC motion', () => {
       const pose = ascPoseAt(sim.query.asc(e.payload.ascId), e.t)
       expect(pose.x).toBeCloseTo(rowX(block, slot.row), 6)
       expect(pose.z).toBeCloseTo(slotZ(block, slot.bay, slot.span), 6)
-      expect(pose.hoistY).toBeCloseTo(tierBaseY(slot.tier), 6)
+      expect(pose.hoistY).toBeCloseTo(sim.query.yardSlotBaseY(slot.id), 6)
       for (const s of e.payload.segments) {
         expect(s.entityId).toBe('B01-ASC1')
         expect(['gantry', 'trolley', 'hoist']).toContain(s.axis)

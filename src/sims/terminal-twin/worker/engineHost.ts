@@ -133,7 +133,9 @@ export function createEngineHost(options: { fullScan?: boolean } = {}) {
       if (first.eventId !== null && !announced.has(id)) {
         announced.add(id)
         ;(delta.newContainers ??= []).push({ id, size: box.size, line: box.line, full: box.full, isoType: box.props?.isoType, heavy: box.props?.weightClass === 'HEAVY', props: box.props })
-        delta.custody.push({ containerId: id, t: first.t, owner: { ...first.owner }, eventId: first.eventId })
+        const firstChange: CustodyChange = { containerId: id, t: first.t, owner: { ...first.owner }, eventId: first.eventId }
+        if (first.owner.kind === 'yardSlot' && first === box.custodyHistory[box.custodyHistory.length - 1]) firstChange.baseY = sim.query.yardSlotBaseY(first.owner.id)
+        delta.custody.push(firstChange)
       }
       const last = box.custodyHistory[box.custodyHistory.length - 1]
       if (last && last.eventId === ev.id) {
@@ -144,6 +146,7 @@ export function createEngineHost(options: { fullScan?: boolean } = {}) {
               ? ev.payload.x
               : sim.query.sts(sim.query.groundPosition(last.owner.id).stsId).gantryX
         }
+        if (last.owner.kind === 'yardSlot') change.baseY = sim.query.yardSlotBaseY(last.owner.id)
         if (last.owner.kind === 'sts' && ev.type === 'StsPicked' && ev.payload.twin) {
           change.dx = id === ev.payload.twin.containerId ? HALF_OFFSET_M : -HALF_OFFSET_M
         }

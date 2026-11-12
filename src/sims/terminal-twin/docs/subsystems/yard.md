@@ -45,13 +45,21 @@ A block lies perpendicular to the quay, centred on its X. Z grows landside.
 | `BLOCK_ROWS` | 8 | rows across X (25.4 m ASC span) |
 | `ROW_PITCH_M` | 2.9 | row pitch |
 | `BAY_PITCH_M` | 6.7 [A] | one 20 ft bay |
-| `TIER_PITCH_M` | 2.896 [A] | high-cube tier |
+| `TIER_PITCH_M` | 2.896 [A] | high-cube height: basis of the travel clearance only, not a tier grid |
 | `FIRST_BAY_GAP_M` | 8 | WTP strip to bay 1 |
 | `DEFAULT_BLOCK_BAYS` / `DEFAULT_BLOCK_TIERS` | 20 / 5 | `BlockConfig.bays` / `tiers` |
 | `DEFAULT_WTP_PADS` / `DEFAULT_TRANSFER_STALLS` | 5 / 5 | at most 5 fit the span at the 5.5 m pitch (`STALL_PITCH_M`) |
 | `REEFER_MAX_TIERS` | 4 | reefers stack at most this high |
-| `travelHoistM(block)` | tiers x 2.896 + 0.6 | spreader travel height |
+| `travelHoistM(block)` | tiers x 2.896 + 0.6 | spreader travel height (a clearance: all high cubes) |
 
+- **Box height in a stack (#267):** a box rests on the boxes under it (2.591 m for 20 and 40, 2.896 m for 40HC,
+  `CONTAINER_HEIGHT_M`); there is no fixed tier grid. Its bottom is the highest top of the boxes one tier below in the
+  columns it covers (a staggered 40 rests on the taller column): `engine/subsystems/ascStorage.ts#yardSlotBaseY`
+  (from placed boxes, recursive through box tops), `SimQuery.yardSlotBaseY`, and the pure `yardLayout.ts#yardBaseY`
+  (column sums) and `#yardBaseHeights` (a placement list, the scene model's initial yard). It is fixed while the box
+  stands in its slot (boxes under a set-down are stacked first, `blockedByOlderClaim`; only the top box leaves). The
+  ASC picks and sets down at it; the worker sends it on the yard custody change (`CustodyChange.baseY`) and the scene
+  model poses from it (pose cache key `slot|size|baseY`: a slot id is reused over a different stack).
 - **Slot id** `<block>:<bay>-<row>-<tier>` (bay zero-padded to 2): `yardSlotId`, `parseYardSlotId`. A 40 ft box covers
   two bays and is named by its lower bay (`cellsOf`, `boxSpan`).
 - **State:** `SimState.yardSlots` holds stacked boxes (`span` 1 or 2). `SimState.yardBlocks[id]` holds per-stack

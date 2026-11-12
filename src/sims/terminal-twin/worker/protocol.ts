@@ -132,6 +132,8 @@ export interface CustodyChange {
   x?: number
   /** STS only: offset of the box from the spreader centre along X (twin-20: aft −, fore +). */
   dx?: number
+  /** Yard slots only: height of the box bottom (m, #267), the top of the boxes under it when it was stacked. */
+  baseY?: number
 }
 
 /**

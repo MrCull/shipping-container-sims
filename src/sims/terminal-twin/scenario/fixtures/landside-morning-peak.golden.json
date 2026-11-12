@@ -3,7 +3,7 @@
   "seed": 21,
   "status": "ended",
   "endReason": "simDurationS >= 5400",
-  "eventLogHash": "102e38ce9ae342",
+  "eventLogHash": "140c2a103d9d98",
   "kpis": {
     "simTimeS": 5400,
     "eventsProcessed": 2744,
@@ -386,10 +386,10 @@
           "jobs": 25,
           "gantryM": 1106.75,
           "trolleyM": 319.35,
-          "hoistM": 917.216,
+          "hoistM": 918.436,
           "padWaitS": 0,
           "railWaitS": 154.169,
-          "busyS": 2454.436,
+          "busyS": 2456.266,
           "yields": 4
         },
         "B01-ASC2": {
@@ -416,53 +416,53 @@
           "jobs": 13,
           "gantryM": 714.95,
           "trolleyM": 93.35,
-          "hoistM": 443.384,
+          "hoistM": 443.994,
           "padWaitS": 0,
           "railWaitS": 0,
-          "busyS": 1215.14,
+          "busyS": 1216.055,
           "yields": 0
         }
       }
     },
     "landside": {
       "trucksIn": 58,
-      "trucksOut": 47,
+      "trucksOut": 46,
       "trucksInside": 14,
       "gateQueue": 0,
       "gateQueueMax": 8,
       "turnTimeS": {
-        "mean": 651.092,
-        "max": 1891.913
+        "mean": 658.633,
+        "max": 1892.828
       },
       "gateWaitS": {
-        "mean": 148.577,
-        "max": 761.329
+        "mean": 149.004,
+        "max": 762.244
       },
       "stallAllocWaitS": {
-        "mean": 169.613,
-        "max": 882.378
+        "mean": 169.711,
+        "max": 883.293
       },
       "stallWaitS": {
-        "mean": 193.423,
-        "max": 1160.899
+        "mean": 193.514,
+        "max": 1161.814
       },
       "gateProcessingS": {
         "mean": 40,
         "max": 40
       },
       "internalDriveS": {
-        "mean": 33.173,
-        "max": 37.329
+        "mean": 33.082,
+        "max": 36.841
       },
       "totalTurnaroundS": {
-        "mean": 863.715,
-        "max": 1978.043
+        "mean": 867.499,
+        "max": 1978.958
       },
       "road": {
         "meanTrucks": 1.029,
         "maxTrucks": 4
       },
-      "serviceS": 391.069,
+      "serviceS": 399.729,
       "transactions": {
         "dropExport": 25,
         "pickImport": 11,
@@ -478,13 +478,13 @@
       "IMPORT": {
         "count": 22,
         "departed": 17,
-        "meanS": 2839.577,
+        "meanS": 2840.2,
         "maxS": 4814.903
       },
       "EXPORT": {
         "count": 33,
         "departed": 0,
-        "meanS": 2883.861,
+        "meanS": 2883.389,
         "maxS": 5400
       },
       "STORAGE": {

@@ -30,7 +30,7 @@ import {
   type PrefillImport,
   rowX,
   slotZ,
-  tierBaseY,
+  yardBaseHeights,
   travelHoistM,
   TRUCK_DECK_M,
   type BlockSpec,
@@ -119,6 +119,8 @@ interface CustodyEntry {
   x?: number
   /** STS only: offset from the spreader centre (twin-20). */
   dx?: number
+  /** Yard slots only: height of the box bottom (#267), from the custody change (or the initial yard). */
+  baseY?: number
 }
 
 interface StatusEntry {
@@ -370,16 +372,21 @@ export class SceneModel {
     // export boxes start in the stacks (TT-10); discharge boxes on board
     const placements = prefill ? prefill.placements : emptyStart ? [] : planExportYard(config, cargo)
     const exportSlot = new Map(placements.map((p) => [p.containerId, p.slotId]))
-    for (const c of cargo.containers) {
-      const owner: CustodyRef =
-        c.flow === 'discharge'
-          ? { kind: 'vesselSlot', id: c.slotId }
-          : emptyStart
-            ? { kind: 'external', id: 'outside' } // booked exports wait outside until a truck brings them
-            : { kind: 'yardSlot', id: exportSlot.get(c.id) as string }
-      this.custody[c.id] = [{ t: 0, owner }]
+    const baseY = yardBaseHeights(placements)
+    const inSlot = (id: string): CustodyEntry => {
+      const slotId = exportSlot.get(id) as string
+      return { t: 0, owner: { kind: 'yardSlot', id: slotId }, baseY: baseY.get(slotId) }
     }
-    for (const imp of prefill?.imports ?? []) this.custody[imp.id] = [{ t: 0, owner: { kind: 'yardSlot', id: exportSlot.get(imp.id) as string } }]
+    for (const c of cargo.containers) {
+      this.custody[c.id] = [
+        c.flow === 'discharge'
+          ? { t: 0, owner: { kind: 'vesselSlot', id: c.slotId } }
+          : emptyStart
+            ? { t: 0, owner: { kind: 'external', id: 'outside' } } // booked exports wait outside until a truck brings them
+            : inSlot(c.id),
+      ]
+    }
+    for (const imp of prefill?.imports ?? []) this.custody[imp.id] = [inSlot(imp.id)]
     this.robBoxes = cargo.rob
     if (hatchEnabled(config)) this.createHatchPanels(cargo.slots, cargo.robBays)
     for (const v of config.vessels) this.status[`vessel:${v.id}`] = [{ t: 0, status: 'scheduled' }]
@@ -497,7 +504,7 @@ export class SceneModel {
       const list = this.custody[c.containerId]
       if (!list) continue
       this.handoffs.push({ t: c.t, containerId: c.containerId, from: list.length > 0 ? list[list.length - 1].owner : null, to: c.owner })
-      list.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx })
+      list.push({ t: c.t, owner: c.owner, x: c.x, dx: c.dx, baseY: c.baseY })
       this.logT.push(c.t)
       this.logBox.push(this.containerIndexOf(c.containerId))
     }
@@ -907,7 +914,7 @@ export class SceneModel {
   /** Set by `containerPose` with the custody owner it posed from (null when the box has no custody yet): the renderer reads it instead of a second `custodyAt` lookup (#257). */
   poseOwner: CustodyRef | null = null
 
-  /** Poses of stacked boxes by `${slotId}|${size}` (read-only; shared between frames). */
+  /** Poses of stacked boxes by `${slotId}|${size}|${baseY}` (read-only; shared between frames; a slot id is reused over a different stack later). */
   private readonly yardPoses = new Map<string, ContainerPose>()
   private readonly vesselSlotCells = new Map<string, ReturnType<typeof parseVesselSlotId>>()
 
@@ -981,9 +988,11 @@ export class SceneModel {
       return { x: p.x, y: p.hoistY + dims.height / 2, z: p.z, yaw: alongZ, carriedBy: id }
     }
     if (kind === 'yardSlot') {
-      // A stacked box never moves: its pose is parsed once per slot and size (tens of thousands of boxes are posed every frame).
+      // A stacked box never moves: its pose is parsed once per slot, size and base (tens of thousands of boxes are posed every frame).
       const size = this.containerSize[containerId]
-      const cacheKey = `${id}|${size}`
+      const base = entry.baseY
+      if (base === undefined) throw new Error(`Yard box ${containerId} in ${id} has no base height (custody change without baseY)`)
+      const cacheKey = `${id}|${size}|${base}`
       const hit = this.yardPoses.get(cacheKey)
       if (hit) return hit
       const cell = parseYardSlotId(id)
@@ -991,7 +1000,7 @@ export class SceneModel {
       if (!block) return null
       const pose: ContainerPose = {
         x: rowX(block, cell.row),
-        y: tierBaseY(cell.tier) + dims.height / 2,
+        y: base + dims.height / 2,
         z: slotZ(block, cell.bay, boxSpan(size)),
         yaw: alongZ,
         yard: true,

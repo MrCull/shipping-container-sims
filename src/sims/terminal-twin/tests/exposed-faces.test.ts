@@ -40,6 +40,21 @@ describe('exposed faces of a yard box', () => {
     expect(faces(lower, [top]).top).toBe(false)
   })
 
+  it('#267: a high cube resting on a standard box covers its roof, and a neighbour row 0.61 m lower still hides its side', () => {
+    const HC = 2.896
+    const lower = box(1, 1) // standard box on tier 1: top at 2.591
+    const upper: PlacedBox = { ...box(1, 2), y: H + HC / 2, height: HC } // 40HC resting on it
+    expect(faces(lower, [upper]).top).toBe(false)
+    expect(faces(upper, [lower]).bottom).toBe(false)
+    expect(faces(upper, [lower]).top).toBe(true)
+    // the next row: two high cubes, so its tier-2 box stands 0.305 m higher; at tier 3 over two standard boxes, 0.61 m lower
+    const neighbourHigher: PlacedBox = { ...upper, x: box(0, 2).x, y: HC + HC / 2 }
+    expect(sides(visibleFaceList(faces(upper, [lower, neighbourHigher])))).toHaveLength(1)
+    const tier3: PlacedBox = { ...box(1, 3), y: 2 * HC + H / 2 } // standard box on two high cubes: bottom 5.792
+    const lowerRow: PlacedBox = { ...box(0, 3), y: 2 * H + H / 2 } // same tier over two standard boxes: bottom 5.182 (0.61 m lower)
+    expect(sides(visibleFaceList(faces(tier3, [lowerRow])))).toHaveLength(1)
+  })
+
   it('shows both ends, the roof and one side of a box at the edge of the block', () => {
     const b = box(1, 1)
     const f = faces(b, [box(0, 1)]) // a neighbour on one side only

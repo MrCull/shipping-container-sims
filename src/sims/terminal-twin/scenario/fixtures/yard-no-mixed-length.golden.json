@@ -3,7 +3,7 @@
   "seed": 6,
   "status": "ended",
   "endReason": "simDurationS >= 3600",
-  "eventLogHash": "0c691f604a32b7",
+  "eventLogHash": "0fd923d53721a8",
   "kpis": {
     "simTimeS": 3600,
     "eventsProcessed": 977,
@@ -265,7 +265,7 @@
           "jobs": 24,
           "gantryM": 2231.9,
           "trolleyM": 306.55,
-          "hoistM": 775.808,
+          "hoistM": 785.568,
           "padWaitS": 0
         }
       }

@@ -228,7 +228,7 @@ index `(bay-1)*rows + (row-1)`, `engine/yardLayout.ts#stackIndex`), `progressAt?
 both in `engine/subsystems/ascStorage.ts`); an allocated slot that is not yet filled lives only as a claim in an
 `AscJob` (and in `heights`).
 
-Geometry (`engine/yardLayout.ts`): `ROW_PITCH_M` 2.9, `BAY_PITCH_M` 6.7 (20 ft bay), `TIER_PITCH_M` 2.896,
+Geometry (`engine/yardLayout.ts`): `ROW_PITCH_M` 2.9, `BAY_PITCH_M` 6.7 (20 ft bay), `TIER_PITCH_M` 2.896 (travel clearance only; a box rests on the boxes under it, `yardSlotBaseY`),
 `DEFAULT_BLOCK_BAYS` 20, `DEFAULT_BLOCK_TIERS` 5, `DEFAULT_WTP_PADS` 5, `DEFAULT_TRANSFER_STALLS` 5,
 `ASC_MIN_SEPARATION_M` 12 (8 m portal + 4 m gap), `RAIL_SEGMENT_M` 3.35, `RAIL_MARGIN_M` 16. Reserved stacks
 (`reservedStacksOf`, share `config.yard.reserveShare`, in pairs of bays) are kept free of pre-fill and discharge.
