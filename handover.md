@@ -18,7 +18,7 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | #246 | Headless baseline, posing counters and drawn-box reference | none | merged in branch (87c0545) | |
 | #247 | Opt-in Blender install script for cloud sessions | none | merged in branch (a01e946) | |
 | #248 | Environment reflections and contact shadows | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
-| #249 | Far tier: stand-ins for fences, ASC rails and masts | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
+| #249 | Far tier: stand-ins for fences, ASC rails and masts | none | merged in branch (290113b) | |
 | #250 | Posing: boxes at rest are written only when their custody changes | #246 | merged in branch (eae8de4) | |
 | #251 | Playback: even pacing with the achieved speed shown | #246 | open | |
 | #252 | Sweep-only invariant checks in the browser, "strict checks" switch | #246 | open | |
