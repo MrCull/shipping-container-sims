@@ -5,7 +5,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 ## Conventions
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
-- **Ticket bodies: file first, then post.** Write each ticket body to a scratchpad file, then publish that file's text (`gh issue create --body-file <file>`, or the MCP tools with the same text), so the implementer's copy and the issue cannot drift.
+- **Ticket bodies: one copy.** Where `gh` can write (local sessions), write each ticket body to a scratchpad file and publish it with `gh issue create --body-file <file>`: the file is the implementer's copy. With the MCP tools the body is typed into the call, so a file would mean writing every body twice: post the issue and treat it as the single copy. `/implement-spec` writes the scratchpad files from the issues when it starts (`docs/agents/implementing.md`, **Frontier**).
 - **Read an issue**: `gh issue view <number> --json number,title,body,labels,comments`.
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
 - **Make an issue a sub-issue of a parent**: `gh issue create --parent <parent> ...`, or `gh issue edit <parent> --add-sub-issue <child>` afterwards (`gh` 2.94+). Older `gh`: `gh api --method POST repos/<owner>/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<child-db-id>` (database id, as in **Blocking** below). Without sub-issues, put `Part of #<parent>` at the top of the child body.
@@ -14,7 +14,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: post the explanation with `gh issue comment <number> --body "..."`, then `gh issue close <number>`. On an already-closed issue, `gh issue close --comment` drops the comment and still exits 0.
-- **After merging a PR**: GitHub closes the PR's `closingIssuesReferences` (`gh pr view <n> --json closingIssuesReferences`) on its own, but asynchronously, over a minute or so for a long list. Re-list open issues after that, and close by hand only finished issues missing from that list.
+- **After merging a PR**: GitHub closes the PR's `closingIssuesReferences` (`gh pr view <n> --json closingIssuesReferences`) on its own, but asynchronously, over a minute or so for a long list. Re-list open issues after that, and close by hand only finished issues missing from that list. Check again ten minutes later: after PR #241 six closed issues were open again within seven minutes, cause unknown. An issue reopened with no comment is finished work, not new work: comment and close it. Remove `merged-in-branch` from every issue the PR closed (`docs/agents/triage-labels.md`).
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone. This repo is `MrCull/shipping-container-sims`.
 
@@ -56,3 +56,7 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 ## Large tool results
 
 `list_issues` and `issue_read` with `get_sub_issues` can return more than fits in context. Pass `minimal_output: true` and a small page size first; if the result is saved to a file anyway, read it with a short Python filter (`number`, `title`, `labels`) rather than the tool again.
+
+`issue_read` with `get` returns the whole body (a spec is about 30 KB). To check that tickets are attached to a spec, or any other fact that is not in the body, use `get_sub_issues` with `minimal_output: true`, or `list_issues` with `fields`.
+
+Fact-finding over many issues (status against the code, which PR closed what) goes to a subagent on a small model (`model: "haiku"`): the default model spent about 120k tokens on eight issues.

@@ -13,3 +13,7 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
 Edit the "Label in our tracker" column to match whatever vocabulary you actually use.
+
+## Progress label
+
+`merged-in-branch` is not a triage role. During `/implement-spec` it marks a ticket whose branch is merged into the integration branch while its issue is still open (`docs/agents/implementing.md`, **Merge**). It lives from that merge until the PR merges to `main`: whoever confirms the closures after the PR merge removes it (`docs/agents/issue-tracker.md`, **After merging a PR**). An issue that is closed, or open on `main` with this label, has a stale label: remove it.
