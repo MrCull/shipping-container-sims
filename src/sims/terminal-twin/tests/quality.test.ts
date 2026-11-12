@@ -100,6 +100,7 @@ describe('the shedding ladder (pure)', () => {
 
   it('manual levels fix the ladder at their rung', () => {
     expect(MANUAL_RUNG).toEqual({ high: 0, medium: 6, low: 7 })
+    expect(AUTO_RUNGS[MANUAL_RUNG.medium].name).toBe('medium')
     expect(profileForRung(MANUAL_RUNG.high)).toEqual(QUALITY_PROFILES.high)
     expect(levelOfRung(MANUAL_RUNG.medium)).toBe('medium')
     expect(levelOfRung(MANUAL_RUNG.low)).toBe('low')

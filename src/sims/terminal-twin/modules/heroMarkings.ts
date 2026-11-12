@@ -18,8 +18,9 @@ import type { CloseupSource, AtlasPage } from './containerCloseups'
 import { FACE_QUAT, faceFrame } from './containerCloseups'
 import type { Region } from './closeupGeometry'
 import type { Face } from './exposedFaces'
+import type { HeroMarkStep } from './markStep'
 
-export type HeroMarkStep = 'sharp' | 'standard'
+export type { HeroMarkStep }
 export type MarkKind = 'side' | 'end'
 
 /** Resolution multiple of today's close-up tiles (`TILE_PX` in containerCloseups.ts) per step. */
