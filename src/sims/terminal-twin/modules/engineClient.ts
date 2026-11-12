@@ -10,6 +10,8 @@ export interface EngineResponse<T> {
   result: T
   delta: Delta
   info: EngineInfo
+  /** Wall time the worker spent serving the request, when it reports it. */
+  workMs?: number
 }
 
 type Pending = { resolve: (v: EngineResponse<unknown>) => void; reject: (e: Error) => void }
@@ -37,7 +39,7 @@ export class EngineClient {
     const p = this.pending.get(reply.rid)
     this.pending.delete(reply.rid)
     if (!p) return
-    if (reply.ok) p.resolve({ result: reply.result, delta: reply.delta, info: reply.info })
+    if (reply.ok) p.resolve({ result: reply.result, delta: reply.delta, info: reply.info, workMs: reply.workMs })
     else p.reject(new Error(reply.error))
   }
 

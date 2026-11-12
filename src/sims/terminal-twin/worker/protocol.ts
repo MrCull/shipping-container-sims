@@ -225,7 +225,8 @@ export interface EngineInfo {
 }
 
 export type WorkerReply =
-  | { rid: number; ok: true; result: unknown; delta: Delta; info: EngineInfo }
+  /** `workMs`: wall time the worker spent serving the request (what the playback pacing measures the engine's rate by, #251). */
+  | { rid: number; ok: true; result: unknown; delta: Delta; info: EngineInfo; workMs?: number }
   | { rid: number; ok: false; error: string }
 
 export const EVENT_SUMMARY_CAP = 200

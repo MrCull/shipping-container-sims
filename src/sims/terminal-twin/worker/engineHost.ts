@@ -419,12 +419,13 @@ export function createEngineHost() {
     /** Serve one request. Callers must not overlap requests (the worker entry serialises them). */
     async handle(req: WorkerRequestMessage): Promise<WorkerReply> {
       delta = emptyDelta()
+      const started = performance.now()
       try {
         const result = await serve(req)
         if (!sim) return { rid: req.rid, ok: true, result, delta, info: NO_INFO }
         const s = requireSim()
         if (delta.events.length > EVENT_SUMMARY_CAP) delta.events = delta.events.slice(-EVENT_SUMMARY_CAP)
-        return { rid: req.rid, ok: true, result, delta, info: info(s) }
+        return { rid: req.rid, ok: true, result, delta, info: info(s), workMs: performance.now() - started }
       } catch (err) {
         return { rid: req.rid, ok: false, error: err instanceof Error ? err.message : String(err) }
       }

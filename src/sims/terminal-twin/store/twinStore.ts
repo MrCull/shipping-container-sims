@@ -185,6 +185,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const loading = ref(false)
   const displayTime = ref(0)
   const speed = ref(DEFAULT_SPEED)
+  /** The speed playback really runs at (below `speed` while the engine cannot keep up, #251). */
+  const achievedSpeed = ref(DEFAULT_SPEED)
   const paused = ref(true)
   const busy = ref(false)
   const info = shallowRef<EngineInfo | null>(null)
@@ -436,6 +438,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     displayTime.value = controller.displayTime
     if (followNextPending.value) resolveFollowNext()
     speed.value = controller.speed
+    achievedSpeed.value = controller.achievedSpeed
     paused.value = controller.paused
     busy.value = controller.busy
     if (info.value !== controller.info) info.value = controller.info
@@ -1129,6 +1132,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     loading,
     displayTime,
     speed,
+    achievedSpeed,
     paused,
     busy,
     info,

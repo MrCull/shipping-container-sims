@@ -17,6 +17,9 @@ const clock = computed(() => store.fmt.clock(store.choice.startDateTime, store.d
 
 const ended = computed(() => store.runEnded)
 
+/** Shown while the engine holds playback more than 10 % below the chosen speed (#251). */
+const showAchieved = computed(() => !store.paused && !store.busy && !ended.value && store.achievedSpeed < store.speed * 0.9)
+
 /** Status pill state (also its CSS class). */
 const status = computed<'running' | 'failed' | 'complete' | 'paused' | 'live'>(() => {
   if (store.busy) return 'running'
@@ -108,6 +111,12 @@ async function submitRunTo(): Promise<void> {
           {{ t('topbar.speed', { speed: s }) }}
         </button>
       </div>
+      <span
+        v-if="showAchieved"
+        class="achieved"
+        data-testid="tt-achieved-speed"
+        :title="t('topbar.achievedHint')"
+      >{{ t('topbar.achieved', { speed: Math.round(store.achievedSpeed) }) }}</span>
 
       <div class="actions">
         <button
@@ -355,6 +364,14 @@ async function submitRunTo(): Promise<void> {
   border: 1px solid var(--tt-border);
   border-radius: 6px;
   overflow: hidden;
+}
+
+.achieved {
+  color: var(--tt-warn, var(--tt-text-muted));
+  font-family: var(--tt-font-mono);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .speed-btn {

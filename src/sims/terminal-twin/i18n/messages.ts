@@ -43,6 +43,8 @@ const en = {
   'topbar.pause': 'Pause',
   'topbar.resume': 'Resume',
   'topbar.speed': '×{speed}',
+  'topbar.achieved': 'running at ×{speed}',
+  'topbar.achievedHint': 'The engine cannot keep up with the chosen speed; playback runs at the speed it can supply.',
   'topbar.runTo': 'Run to…',
   'dateInput.hint': 'Date and time as {pattern}',
   'topbar.runToTarget': 'Target sim time',
