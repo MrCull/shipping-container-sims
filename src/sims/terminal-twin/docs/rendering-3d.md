@@ -112,7 +112,7 @@ test against other stacks or equipment. Each chosen face is one instance of its 
 side model turned 180 degrees), instanced per (size, kind, part): draw calls are bounded by the kinds in use. The white paint
 takes livery or tint from the instance colour; wear (rust, scuffs) comes from the box's `wearFor` seed (per-instance detail map
 offset and amount), so a box looks the same at every zoom and after a rewind. The plain box and the close-up decals stay under
-and over it (polygon offset -1 against the decals' -2; hero markings are #260). Models are fetched the first time a face of
+and over it (polygon offset -1 against the decals' -2; hero markings replace the close-up decal on a full hero face, #260). Models are fetched the first time a face of
 that size and kind is chosen (`heroAssets.ts`, the only non-dev file that names `models/hero`); until they arrive the close-up
 level shows, and `onReady` marks the close-up pass dirty so a still camera redraws. Low draws none and requests none.
 `stats.heroFaces` (also `__tt.perf().stats`) counts faces drawn.
@@ -136,6 +136,30 @@ model's meshes is part of preparing its first face (inside the allowance). While
 `HeroLevel.busy` keeps the instancer's close-up pass dirty so a still camera keeps redrawing. `__tt.scene().containerLods.heroPrepared`
 counts faces prepared since the start (it does not grow during a fast fly-through). Tests: `tests/hero-prep.test.ts` (fake clock and
 fake work items; the renderer through the instancer with a fake clock), smoke `hero-faces.smoke.ts` (arrival test).
+
+#### Sharp markings (#260)
+
+`modules/heroMarkings.ts` (`HeroMarkings`, owned by `HeroLevel`): a hero face's markings are painted at 4x the close-up tile
+(`HERO_MARK_SCALE.sharp` = 4: a long side 2048 x 384 px, about 168 px per metre against 42; an end 768 x 768) into their own atlas pages
+(`sharp`: 2048 px pages, 16 MB of texels each; 5 side tiles or 4 end tiles per page), as a transparent decal 3 cm off the hero face
+(`HERO_MARK_OFFSET_M`, polygon offset -4, alpha-fade with the face), so the hero paint, ribs and wear show through. Roofs print nothing.
+The content is the close-up level's: one pure `describeMarkings` result, painted by the same `drawSideMarks` / `drawDoorMarks` /
+`drawFrontMarks` / `drawWear` in `containerTextures.ts` (`paintFaceMarks`, wear speckle seeded from the close-up region so the pixels
+agree too), so number, line name, ISO type, weight plate, CSC plate, SUPER HEAVY, bolt seal and wear match the close-up face.
+
+- **Painting is preparation.** The tile is painted in the face's `runPrep` item, so it sits inside `HERO_PREP_ALLOWANCE_MS` and behind the
+  camera gate. A face whose tile is missing (new step, evicted) is prepared again for its tile only; its geometry stays drawn.
+- **Bounded, least recently shown reuse.** Pages per kind are capped at `maxPages(kind, step, heroBoxes)` (a box shows at most one side and
+  one end to a camera): High (32 boxes) at most 7 side + 8 end pages, 240 MB of texels in the worst case, Medium (12) 3 + 3. A full kind gives
+  up the tile shown longest ago, never one shown this frame; with none to give the face shows without hero markings (the close-up decal stays).
+  Tiles are kept while their face is cached (a face that leaves and returns repaints nothing).
+- **Close-up decal hidden under a full hero face.** `HeroLevel.covers(id)`: once a hero face is fully faded in (and has its tile, or prints
+  nothing), `ContainerCloseups` skips that face's decal, so the older decal no longer shows between the hero ribs. During the fade it is
+  still drawn underneath.
+- **Second shedding step.** `HeroLevel.setMarkStep('standard')` (`SceneRenderer.setHeroMarkStep`, `__tt.setHeroMarkings('sharp'|'standard')`)
+  repaints hero faces at today's resolution (512 px pages, 1 MB each) without losing the hero geometry; `'sharp'` switches back. Not wired to
+  Auto yet (#261). `__tt.scene().containerLods` adds `heroMarkStep`, `heroMarkPages`, `heroMarkTiles`, `heroMarkDrawCalls`, `heroMarkBytes`.
+- Tests: `tests/hero-markings.test.ts` (atlas, LRU, allowance, step switch, covered decal, same content); look: `docs/prototypes/260/`.
 
 ### Close-up markings (#119, #143)
 

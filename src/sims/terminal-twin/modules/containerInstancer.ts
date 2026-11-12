@@ -67,6 +67,8 @@ export interface ContainerRenderStats {
   heroFaces: number
   /** Hero faces prepared since the start (#259; none while the camera moves fast). */
   heroPrepared: number
+  /** Hero marking atlas (#260): step, pages, tiles, draw calls, page memory. */
+  heroMarks: { step: 'sharp' | 'standard'; pages: number; tiles: number; drawCalls: number; texelBytes: number }
   /** Draw calls and triangles of the hero faces drawn last frame (#259 measurement). */
   heroCost: { drawCalls: number; triangles: number }
   /** Boxes outside the camera frustum, not written to the GPU (0 without a frustum). */
@@ -162,7 +164,7 @@ export class ContainerInstancer {
   private immediate = false
   private stamp = 0
   private stampOf: number[] = []
-  private lastStats: ContainerRenderStats = { drawn: 0, posed: 0, lod0: 0, lod1: 0, closeup: 0, closeupFaces: 0, heroFaces: 0, heroPrepared: 0, heroCost: { drawCalls: 0, triangles: 0 }, culled: 0, instanceBytes: 0, assets: 'placeholder' }
+  private lastStats: ContainerRenderStats = { drawn: 0, posed: 0, lod0: 0, lod1: 0, closeup: 0, closeupFaces: 0, heroFaces: 0, heroPrepared: 0, heroMarks: { step: 'sharp', pages: 0, tiles: 0, drawCalls: 0, texelBytes: 0 }, heroCost: { drawCalls: 0, triangles: 0 }, culled: 0, instanceBytes: 0, assets: 'placeholder' }
   private readonly matrix = new THREE.Matrix4()
   private readonly colour = new THREE.Color()
   /** Linear colour of the generic livery's body: a tint is divided by it, so the grey tile multiplied by the instance colour comes out as the tint. */
@@ -478,7 +480,7 @@ export class ContainerInstancer {
       }
     })
     if (this.recording) this.recordAll()
-    this.lastStats = { drawn: this.count, posed: this.posed, lod0: this.lastLod0, lod1: this.count - this.lastLod0, closeup: this.closeups.count, closeupFaces: this.closeups.faces, heroFaces: this.closeups.heroFaces, heroPrepared: this.closeups.heroPrepared, heroCost: this.closeups.heroCost(), culled: this.lastCulled, instanceBytes, assets: this.lods ? 'loaded' : 'placeholder' }
+    this.lastStats = { drawn: this.count, posed: this.posed, lod0: this.lastLod0, lod1: this.count - this.lastLod0, closeup: this.closeups.count, closeupFaces: this.closeups.faces, heroFaces: this.closeups.heroFaces, heroPrepared: this.closeups.heroPrepared, heroMarks: this.closeups.heroMarkStats(), heroCost: this.closeups.heroCost(), culled: this.lastCulled, instanceBytes, assets: this.lods ? 'loaded' : 'placeholder' }
     this.posed = 0
     return this.lastStats
   }

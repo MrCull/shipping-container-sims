@@ -11,6 +11,7 @@ import type { ContainerSize } from '../scenario/types'
 import type { ContainerMarkings, WeightPlate } from './containerMarkings'
 import { CORRUGATION_PITCH_M, TEXTURE_LAYOUT, TEXTURE_SIZE, type Region } from './closeupGeometry'
 import type { AtlasBackend, AtlasPage, CloseupSource, PaintJob } from './containerCloseups'
+import type { HeroMarkBackend } from './heroMarkings'
 import type { Face } from './exposedFaces'
 
 const DIMS: Record<ContainerSize, { length: number; height: number; width: number }> = {
@@ -76,8 +77,8 @@ function plateRows(p: WeightPlate): [string, string, string][] {
   return rows
 }
 
-function drawWear(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: number, m: ContainerMarkings, body: string): void {
-  const rng = stream(m.wear.seed ^ (r.x * 31 + r.y))
+function drawWear(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: number, m: ContainerMarkings, body: string, salt = r.x * 31 + r.y): void {
+  const rng = stream(m.wear.seed ^ salt)
   inRegion(ctx, r, wM, hM, () => {
     // fine speckle: scuffs and dust
     const specks = Math.round(60 + 240 * m.wear.fade + 80 * wM)
@@ -107,6 +108,89 @@ function drawWear(ctx: CanvasRenderingContext2D, r: Region, wM: number, hM: numb
   })
 }
 
+/** What a long side prints, in metres of a face `L` x `H` (y down): line name, box number, rails. Shared with the hero level. */
+function drawSideMarks(ctx: CanvasRenderingContext2D, side: ContainerMarkings['side'], L: number, H: number, ink: string): void {
+  text(ctx, side.lineName, L * 0.5, H * 0.52, H * 0.34, ink, '800', 'center')
+  text(ctx, side.boxNumber, L - 0.5, H * 0.14, 0.2, ink, '600', 'right')
+  ctx.fillStyle = 'rgba(0,0,0,0.25)' // top and bottom side rails
+  ctx.fillRect(0, 0, L, 0.1)
+  ctx.fillRect(0, H - 0.12, L, 0.12)
+}
+
+/** What the door end prints, seen from behind the box: left leaf x in 0..W/2, right leaf W/2..W (y down from the top). */
+function drawDoorMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['door'], W: number, H: number, ink: string): void {
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'
+  ctx.fillRect(W / 2 - 0.012, 0.12, 0.024, H - 0.24) // the seam between the leaves
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'
+  ctx.fillRect(0, 0, W, 0.14) // header and sill
+  ctx.fillRect(0, H - 0.14, W, 0.14)
+  // identity, top of the right leaf
+  text(ctx, `${door.ownerPrefix} ${door.serial}`, W * 0.51, 0.4, 0.16, ink, '600')
+  text(ctx, String(door.checkDigit), W * 0.94, 0.36, 0.11, ink, '600', 'center')
+  ctx.strokeStyle = ink
+  ctx.lineWidth = 0.008
+  ctx.strokeRect(W * 0.94 - 0.065, 0.36 - 0.08, 0.13, 0.16)
+  text(ctx, door.isoType, W * 0.51, 0.64, 0.16, ink, '600')
+  // weight plate, right leaf, below the identity
+  const rows = door.plate ? plateRows(door.plate) : []
+  rows.forEach(([label, kg, lbs], i) => {
+    const y = H * 0.33 + i * 0.27
+    text(ctx, label, W * 0.52, y + 0.06, 0.08, ink, '500')
+    text(ctx, kg, W * 0.96, y, 0.08, ink, '500', 'right')
+    text(ctx, lbs, W * 0.96, y + 0.12, 0.08, ink, '500', 'right')
+  })
+  // CSC approval plate, left leaf, and the corten steel roundel
+  ctx.fillStyle = '#8f9396'
+  ctx.fillRect(W * 0.08, H * 0.62, 0.2, 0.15)
+  ctx.fillStyle = '#4a4d50'
+  for (let i = 0; i < 4; i++) ctx.fillRect(W * 0.08 + 0.02, H * 0.62 + 0.025 + i * 0.03, 0.16, 0.012)
+  ctx.fillStyle = '#d9d9d4'
+  ctx.beginPath()
+  ctx.ellipse(W * 0.14, H * 0.82, 0.11, 0.045, 0, 0, Math.PI * 2)
+  ctx.fill()
+  text(ctx, 'CORTEN STEEL', W * 0.14, H * 0.82 - 0.01, 0.028, '#222', '600', 'center')
+  text(ctx, 'CONTAINER', W * 0.14, H * 0.82 + 0.015, 0.028, '#222', '600', 'center')
+  if (door.superHeavy) {
+    const cx = W * 0.2
+    const cy = H * 0.5
+    ctx.fillStyle = '#f2c318'
+    ctx.strokeStyle = '#1a1a1a'
+    ctx.lineWidth = 0.012
+    ctx.beginPath()
+    ctx.moveTo(cx, cy - 0.17)
+    ctx.lineTo(cx + 0.16, cy + 0.1)
+    ctx.lineTo(cx - 0.16, cy + 0.1)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+    text(ctx, 'SUPER', cx, cy + 0.02, 0.04, '#1a1a1a', '700', 'center')
+    text(ctx, 'HEAVY', cx, cy + 0.065, 0.04, '#1a1a1a', '700', 'center')
+  }
+  if (door.boltSeal) {
+    // hangs from the inner rod's handle on the right-hand leaf (as seen from behind, the viewer's right)
+    const z = W * 0.62
+    const y = H - 0.9
+    ctx.strokeStyle = '#222'
+    ctx.lineWidth = 0.008
+    ctx.beginPath()
+    ctx.moveTo(z, y)
+    ctx.lineTo(z, y + 0.07)
+    ctx.stroke()
+    ctx.fillStyle = '#d8281c'
+    ctx.fillRect(z - 0.03, y + 0.07, 0.06, 0.1)
+    ctx.fillStyle = '#7a120c'
+    ctx.fillRect(z - 0.03, y + 0.07, 0.06, 0.02)
+  }
+}
+
+/** What the front end prints: the box number. */
+function drawFrontMarks(ctx: CanvasRenderingContext2D, door: ContainerMarkings['door'], W: number, H: number, ink: string): void {
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'
+  ctx.fillRect(0, 0, W, 0.14)
+  ctx.fillRect(0, H - 0.14, W, 0.14)
+  text(ctx, `${door.ownerPrefix} ${door.serial} ${door.checkDigit}`, W * 0.5, 0.36, 0.12, ink, '600', 'center')
+}
+
 /** Paints one box. `bodyColour` is the livery body colour. */
 export function paintContainer(ctx: CanvasRenderingContext2D, markings: ContainerMarkings, size: ContainerSize, bodyColour: string): void {
   const { length: L, height: H, width: W } = DIMS[size]
@@ -123,89 +207,15 @@ export function paintContainer(ctx: CanvasRenderingContext2D, markings: Containe
   sw(TEXTURE_LAYOUT.zinc, '#b5b8ba')
 
   // Long sides: the line name in the line colour (no logo), the box number near the door end.
-  inRegion(ctx, TEXTURE_LAYOUT.side, L, H, () => {
-    text(ctx, side.lineName, L * 0.5, H * 0.52, H * 0.34, ink, '800', 'center')
-    text(ctx, side.boxNumber, L - 0.5, H * 0.14, 0.2, ink, '600', 'right')
-    ctx.fillStyle = 'rgba(0,0,0,0.25)' // top and bottom side rails
-    ctx.fillRect(0, 0, L, 0.1)
-    ctx.fillRect(0, H - 0.12, L, 0.12)
-  })
+  inRegion(ctx, TEXTURE_LAYOUT.side, L, H, () => drawSideMarks(ctx, side, L, H, ink))
   inRegion(ctx, TEXTURE_LAYOUT.roof, L, W, () => {
     ctx.fillStyle = 'rgba(70,70,60,0.18)' // dust and grime; a roof prints nothing (#170)
     ctx.fillRect(0, 0, L, W)
   })
 
   // Door end, seen from behind the box: left leaf x in 0..W/2, right leaf W/2..W (y down from the top).
-  inRegion(ctx, TEXTURE_LAYOUT.door, W, H, () => {
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'
-    ctx.fillRect(W / 2 - 0.012, 0.12, 0.024, H - 0.24) // the seam between the leaves
-    ctx.fillStyle = 'rgba(0,0,0,0.22)'
-    ctx.fillRect(0, 0, W, 0.14) // header and sill
-    ctx.fillRect(0, H - 0.14, W, 0.14)
-    // identity, top of the right leaf
-    text(ctx, `${door.ownerPrefix} ${door.serial}`, W * 0.51, 0.4, 0.16, ink, '600')
-    text(ctx, String(door.checkDigit), W * 0.94, 0.36, 0.11, ink, '600', 'center')
-    ctx.strokeStyle = ink
-    ctx.lineWidth = 0.008
-    ctx.strokeRect(W * 0.94 - 0.065, 0.36 - 0.08, 0.13, 0.16)
-    text(ctx, door.isoType, W * 0.51, 0.64, 0.16, ink, '600')
-    // weight plate, right leaf, below the identity
-    const rows = door.plate ? plateRows(door.plate) : []
-    rows.forEach(([label, kg, lbs], i) => {
-      const y = H * 0.33 + i * 0.27
-      text(ctx, label, W * 0.52, y + 0.06, 0.08, ink, '500')
-      text(ctx, kg, W * 0.96, y, 0.08, ink, '500', 'right')
-      text(ctx, lbs, W * 0.96, y + 0.12, 0.08, ink, '500', 'right')
-    })
-    // CSC approval plate, left leaf, and the corten steel roundel
-    ctx.fillStyle = '#8f9396'
-    ctx.fillRect(W * 0.08, H * 0.62, 0.2, 0.15)
-    ctx.fillStyle = '#4a4d50'
-    for (let i = 0; i < 4; i++) ctx.fillRect(W * 0.08 + 0.02, H * 0.62 + 0.025 + i * 0.03, 0.16, 0.012)
-    ctx.fillStyle = '#d9d9d4'
-    ctx.beginPath()
-    ctx.ellipse(W * 0.14, H * 0.82, 0.11, 0.045, 0, 0, Math.PI * 2)
-    ctx.fill()
-    text(ctx, 'CORTEN STEEL', W * 0.14, H * 0.82 - 0.01, 0.028, '#222', '600', 'center')
-    text(ctx, 'CONTAINER', W * 0.14, H * 0.82 + 0.015, 0.028, '#222', '600', 'center')
-    if (door.superHeavy) {
-      const cx = W * 0.2
-      const cy = H * 0.5
-      ctx.fillStyle = '#f2c318'
-      ctx.strokeStyle = '#1a1a1a'
-      ctx.lineWidth = 0.012
-      ctx.beginPath()
-      ctx.moveTo(cx, cy - 0.17)
-      ctx.lineTo(cx + 0.16, cy + 0.1)
-      ctx.lineTo(cx - 0.16, cy + 0.1)
-      ctx.closePath()
-      ctx.fill()
-      ctx.stroke()
-      text(ctx, 'SUPER', cx, cy + 0.02, 0.04, '#1a1a1a', '700', 'center')
-      text(ctx, 'HEAVY', cx, cy + 0.065, 0.04, '#1a1a1a', '700', 'center')
-    }
-    if (door.boltSeal) {
-      // hangs from the inner rod's handle on the right-hand leaf (as seen from behind, the viewer's right)
-      const z = W * 0.62
-      const y = H - 0.9
-      ctx.strokeStyle = '#222'
-      ctx.lineWidth = 0.008
-      ctx.beginPath()
-      ctx.moveTo(z, y)
-      ctx.lineTo(z, y + 0.07)
-      ctx.stroke()
-      ctx.fillStyle = '#d8281c'
-      ctx.fillRect(z - 0.03, y + 0.07, 0.06, 0.1)
-      ctx.fillStyle = '#7a120c'
-      ctx.fillRect(z - 0.03, y + 0.07, 0.06, 0.02)
-    }
-  })
-  inRegion(ctx, TEXTURE_LAYOUT.front, W, H, () => {
-    ctx.fillStyle = 'rgba(0,0,0,0.22)'
-    ctx.fillRect(0, 0, W, 0.14)
-    ctx.fillRect(0, H - 0.14, W, 0.14)
-    text(ctx, `${door.ownerPrefix} ${door.serial} ${door.checkDigit}`, W * 0.5, 0.36, 0.12, ink, '600', 'center')
-  })
+  inRegion(ctx, TEXTURE_LAYOUT.door, W, H, () => drawDoorMarks(ctx, door, W, H, ink))
+  inRegion(ctx, TEXTURE_LAYOUT.front, W, H, () => drawFrontMarks(ctx, door, W, H, ink))
 
   drawWear(ctx, TEXTURE_LAYOUT.side, L, H, markings, paint)
   drawWear(ctx, TEXTURE_LAYOUT.door, W, H, markings, paint)
@@ -307,3 +317,52 @@ export function sharedContainerMaps(): { normal: THREE.Texture; roughness: THREE
 
 /** The ridge pitch the normal map is authored for (uv1 u is metres / pitch, so one texture repeat = one ridge). */
 export const NORMAL_MAP_PITCH_M = CORRUGATION_PITCH_M
+
+/** The tile content of one face of a box, in canvas pixels: marks and wear on a transparent ground (the hero level draws its own paint). */
+const HERO_FACES = ['sideP', 'sideN', 'door', 'front'] as const
+
+/**
+ * Paints one face's markings and wear into `rect` of `ctx` over a transparent ground (hero level, #260): the same
+ * `drawSideMarks` / `drawDoorMarks` / `drawFrontMarks` and `drawWear` the close-up level paints, in metres of the face,
+ * so a hero face and a close-up face of one box say the same. The speckle seed is the close-up region's, so the pixels match too.
+ */
+export function paintFaceMarks(ctx: CanvasRenderingContext2D, markings: ContainerMarkings, size: ContainerSize, face: Face, rect: Region, bodyColour: string): void {
+  const { length: L, height: H, width: W } = DIMS[size]
+  const { door, side, wear } = markings
+  const paint = mix(bodyColour, '#d8d4c8', wear.fade * 0.4)
+  const ink = side.lineColour
+  const canon = FACE_REGION[face as keyof typeof FACE_REGION]
+  if (!canon || !(HERO_FACES as readonly Face[]).includes(face)) return
+  const salt = canon.x * 31 + canon.y
+  if (face === 'sideP' || face === 'sideN') {
+    inRegion(ctx, rect, L, H, () => drawSideMarks(ctx, side, L, H, ink))
+    drawWear(ctx, rect, L, H, markings, paint, salt)
+  } else if (face === 'door') {
+    inRegion(ctx, rect, W, H, () => drawDoorMarks(ctx, door, W, H, ink))
+    drawWear(ctx, rect, W, H, markings, paint, salt)
+  } else {
+    inRegion(ctx, rect, W, H, () => drawFrontMarks(ctx, door, W, H, ink))
+    drawWear(ctx, rect, W, H, markings, paint, salt)
+  }
+}
+
+/** The canvas backend of the hero marking atlas (#260). Without a DOM (Vitest, workers) pages have no context and painting is a no-op. */
+export function canvasHeroMarkBackend(): HeroMarkBackend {
+  return {
+    createPage(px: number): AtlasPage {
+      if (typeof document === 'undefined') return { texture: new THREE.Texture(), ctx: null }
+      const c = canvas(px, px)
+      const texture = new THREE.CanvasTexture(c)
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.premultiplyAlpha = true // transparent ground: no dark halos at the glyph edges
+      texture.anisotropy = 8
+      return { texture, ctx: c.getContext('2d') }
+    },
+    paint(source: CloseupSource, size: ContainerSize, face: Face, page: AtlasPage, rect: Region): void {
+      const ctx = page.ctx
+      if (!ctx) return
+      ctx.clearRect(rect.x, rect.y, rect.w, rect.h)
+      paintFaceMarks(ctx, source.markings, size, face, rect, source.bodyColour)
+    },
+  }
+}

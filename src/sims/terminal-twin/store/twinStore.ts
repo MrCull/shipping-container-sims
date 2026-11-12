@@ -101,6 +101,9 @@ export interface TwinView {
   screenPoint(entityId: string): { x: number; y: number } | null
   /** The orbit camera: where it looks, how far, the heading and the angle from straight up; null without a 3D view. */
   cameraPose(): CameraPose | null
+  /** Hero marking resolution (#260): 'sharp' or 'standard'; the step in force. */
+  setHeroMarkStep(step: 'sharp' | 'standard'): void
+  readonly heroMarkStep: 'sharp' | 'standard'
   /** Rendered entity counts plus frames rendered so far and the last frame's draw calls/triangles; null without a 3D view. */
   stats(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */

@@ -20,6 +20,7 @@ import { selectFaces, type FaceCandidate } from './closeupFaceBudget'
 import { canvasAtlasBackend, sharedContainerMaps } from './containerTextures'
 import { FACES, visibleFaceList, type ExposedFaces, type Face } from './exposedFaces'
 import type { HeroLevel } from './heroRenderer'
+import type { HeroMarkStep } from './heroMarkings'
 
 /** What a close-up box is painted from. */
 export interface CloseupSource {
@@ -69,7 +70,7 @@ const OFFSET_M = 0.006
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 
 /** Per face: the quad's orientation in the box frame (a unit quad faces +Z with u along +X). */
-const FACE_QUAT: Record<Exclude<Face, 'bottom'>, THREE.Quaternion> = {
+export const FACE_QUAT: Record<Exclude<Face, 'bottom'>, THREE.Quaternion> = {
   sideP: new THREE.Quaternion(),
   sideN: new THREE.Quaternion().setFromAxisAngle(Y_AXIS, Math.PI),
   door: new THREE.Quaternion().setFromAxisAngle(Y_AXIS, Math.PI / 2),
@@ -268,6 +269,7 @@ export class ContainerCloseups {
       const slot = this.slots.get(id)
       const oi = this.offerOf.get(id)
       if (!slot || oi === undefined || slot.lastShown !== this.frame) continue
+      if (this.hero?.covers(id)) continue // a fully faded-in hero face with its markings hides this decal
       const o = this.offers[oi]
       const face = FACES[id % 8] as Exclude<Face, 'bottom'>
       const f = faceFrame(face, o.size)
@@ -392,6 +394,12 @@ export class ContainerCloseups {
   /** Draw calls and triangles of the hero faces drawn last frame. */
   heroCost(): { drawCalls: number; triangles: number } {
     return this.hero?.cost() ?? { drawCalls: 0, triangles: 0 }
+  }
+
+  /** Hero marking atlas figures (#260): the step, pages and tiles held, draw calls of the last frame, page memory. */
+  heroMarkStats(): { step: HeroMarkStep; pages: number; tiles: number; drawCalls: number; texelBytes: number } {
+    const h = this.hero
+    return h ? { step: h.markStep, ...h.marks.stats() } : { step: 'sharp', pages: 0, tiles: 0, drawCalls: 0, texelBytes: 0 }
   }
 
   /** Hero faces prepared since the start (#259). */

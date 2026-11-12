@@ -125,6 +125,8 @@ export interface TwinDevApi {
   perf(): PerfInfo
   /** Set Low / Medium / High / Auto (the same as the picker); returns the new perf(). */
   setQuality(setting: QualitySetting): PerfInfo
+  /** Hero marking resolution (#260): 'sharp' (about 4x the close-up level) or 'standard' (today's); returns the step in force. */
+  setHeroMarkings(step: 'sharp' | 'standard'): 'sharp' | 'standard' | null
   /** Show or hide the FPS / draw-call / triangle overlay. */
   perfOverlay(on: boolean): void
   /** Add `ms` of busy-wait to every frame (0 = none): proves Auto steps down under load and recovers when it ends. */
@@ -385,6 +387,11 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     },
     setAutoThresholds: (thresholds) => {
       perfStore.debugAuto = thresholds
+    },
+    setHeroMarkings: (step) => {
+      const v = store.view()
+      v?.setHeroMarkStep(step)
+      return v?.heroMarkStep ?? null
     },
     perfOverlay: (on) => {
       if (perfStore.overlayVisible !== on) perfStore.toggleOverlay()

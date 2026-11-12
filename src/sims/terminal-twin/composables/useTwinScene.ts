@@ -308,6 +308,10 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         return true
       },
       pickAt,
+      setHeroMarkStep: (step) => view?.setHeroMarkStep(step),
+      get heroMarkStep() {
+        return view?.heroMarkStep ?? 'sharp'
+      },
       screenPoint,
       cameraPose: readPose,
       stats: () => (view ? { ...view.stats(), frames: framesRendered, render: { ...lastRender } } : null),

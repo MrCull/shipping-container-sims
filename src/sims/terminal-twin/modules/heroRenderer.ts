@@ -10,6 +10,11 @@
  * seed (`wearFor`), so a box looks the same at every zoom and after a rewind. Models load on the first face that needs
  * them; until a model has arrived its faces simply show the close-up level.
  *
+ * Markings (#260): a face's box number, plates and wear are painted at about four times the close-up resolution into the
+ * hero atlas (`heroMarkings.ts`) as part of the face's preparation, drawn as a transparent decal over the hero paint, and the
+ * close-up decal under a fully faded-in hero face is not drawn (`covers`). `setMarkStep('standard')` falls back to today's
+ * marking resolution without losing the hero geometry; faces repaint through the same preparation queue.
+ *
  * Arrival is smooth (#259, `heroPrep.ts`): a chosen face is drawn only once it is prepared (model built, paint and wear
  * set up), preparation runs nearest first within a per-frame allowance and only while the camera is calm, a prepared
  * face fades in (screen-door dither over the close-up level, so no sorting and no pop), and a prepared face that stays
@@ -22,6 +27,8 @@ import type { CloseupSource } from './containerCloseups'
 import type { ExposedFaces } from './exposedFaces'
 import { patchContactShadow } from './contactShadow'
 import { loadHeroFace, type HeroFaceLoader, type HeroPart } from './heroAssets'
+import { canvasHeroMarkBackend } from './containerTextures'
+import { HeroMarkings, markKindOf, type HeroMarkBackend, type HeroMarkStep } from './heroMarkings'
 import { CameraGate, fadeAlpha, runPrep, type PrepItem } from './heroPrep'
 import { facingCandidates, HERO_DISTANCE_M, HERO_HYSTERESIS, heroFaceOf, heroKindOf, selectHeroFaces, type HeroKind, type HeroLimits } from './heroFaceSelection'
 
@@ -122,6 +129,10 @@ export class HeroLevel {
   private offerOf = new Map<number, number>()
   /** Faces prepared (model built, look made), with the time they became ready: only these are drawn. */
   private readyAt = new Map<number, number>()
+  /** Faces whose marking tile could not be had (every tile of the kind shown): not retried until they leave or the step changes. */
+  private markFailed = new Set<number>()
+  /** Faces drawn fully faded in with their markings (the close-up decal under them is not drawn). */
+  private covered = new Set<number>()
   private readonly gate = new CameraGate()
   private pending = 0
   private fading = false
@@ -145,8 +156,33 @@ export class HeroLevel {
     private readonly loader: HeroFaceLoader = loadHeroFace,
     /** Milliseconds clock for the camera gate, the allowance and the fade (a test passes a fake one). */
     private readonly now: () => number = () => performance.now(),
+    markBackend: HeroMarkBackend = canvasHeroMarkBackend(),
   ) {
     this.group.name = 'containers-hero'
+    this.marks = new HeroMarkings(markBackend)
+    this.group.add(this.marks.group)
+  }
+
+  /** The hero marking atlas (#260). */
+  readonly marks: HeroMarkings
+
+  /** Switches the marking resolution (`sharp`, about 4x the close-up level, or `standard`, today's); false when unchanged. */
+  setMarkStep(step: HeroMarkStep): boolean {
+    const changed = this.marks.setStep(step)
+    if (changed) {
+      this.markFailed.clear()
+      this.onReady?.() // redraw a still frame: the tiles repaint through preparation
+    }
+    return changed
+  }
+
+  get markStep(): HeroMarkStep {
+    return this.marks.step
+  }
+
+  /** True when the close-up decal of face `id` is hidden under a fully faded-in hero face with its markings (as of the last frame). */
+  covers(id: number): boolean {
+    return this.covered.has(id)
   }
 
   setLimits(next: Partial<HeroLimits>): void {
@@ -173,6 +209,9 @@ export class HeroLevel {
   }
 
   end(): void {
+    this.covered.clear()
+    this.marks.beginFrame()
+    this.marks.setBoxes(this.limits.boxes)
     for (const e of this.entries.values()) if (e.state === 'ready') for (const part of e.parts) part.mesh.count = 0
     this.faceCount = 0
     this.boxCount = 0
@@ -182,6 +221,8 @@ export class HeroLevel {
       this.previous.clear()
       this.looks.clear()
       this.readyAt.clear()
+      this.markFailed.clear()
+      this.marks.endFrame()
       return
     }
     const boxes = Math.min(this.limits.boxes, Math.floor(HERO_CAPACITY / 3))
@@ -189,6 +230,8 @@ export class HeroLevel {
     this.previous = new Set(chosen)
     for (const id of this.looks.keys()) if (!this.previous.has(id)) this.looks.delete(id)
     for (const id of this.readyAt.keys()) if (!this.previous.has(id)) this.readyAt.delete(id)
+    for (const id of this.markFailed) if (!this.previous.has(id)) this.markFailed.delete(id)
+    for (const id of chosen) this.marks.touch(id) // shown this frame: not to be reused by a new tile below
     this.prepare(chosen)
     const now = this.now()
     const drawnBoxes = new Set<number>()
@@ -206,6 +249,10 @@ export class HeroLevel {
       const look = this.lookOf(id, o)
       const alpha = fadeAlpha(readyAt, now)
       if (alpha < 1) this.fading = true
+      const face = heroFaceOf(id).face
+      const marked = this.marks.has(id)
+      if (marked) this.marks.place(id, face, o.size, o.x, o.y, o.z, o.yaw, alpha)
+      if (alpha >= 1 && (marked || !markKindOf(face))) this.covered.add(id)
       drawnBoxes.add(o.key)
       this.faceCount++
       // the box's pose; the -Z side is the side model turned 180 degrees about the vertical
@@ -232,6 +279,7 @@ export class HeroLevel {
         part.wear.needsUpdate = true
       }
     }
+    this.marks.endFrame()
     this.boxCount = drawnBoxes.size
   }
 
@@ -244,20 +292,26 @@ export class HeroLevel {
     for (const c of this.candidates) d2.set(c.id, c.d2)
     const items: PrepItem[] = []
     for (const id of chosen) {
-      if (this.readyAt.has(id)) continue
       const oi = this.offerOf.get(id)
-      const info = heroKindOf(heroFaceOf(id).face)
+      const { face } = heroFaceOf(id)
+      const info = heroKindOf(face)
       if (oi === undefined || !info) continue
       const o = this.offers[oi]
+      const wantsMarks = markKindOf(face) !== null && !this.marks.has(id) && !this.markFailed.has(id)
+      if (this.readyAt.has(id) && !wantsMarks) continue
       const entry = this.entry(o.size, info.kind)
       if (entry.state !== 'loaded' && entry.state !== 'ready') continue
       items.push({
         d2: d2.get(id) ?? 0,
         run: () => {
-          this.build(o.size, info.kind)
-          this.lookOf(id, o)
-          this.readyAt.set(id, this.now())
-          this.preparedTotal++
+          if (!this.readyAt.has(id)) {
+            this.build(o.size, info.kind)
+            this.lookOf(id, o)
+            this.readyAt.set(id, this.now())
+            this.preparedTotal++
+          }
+          // the face's markings, painted inside the same allowance; a face with no tile to give shows without them
+          if (wantsMarks && !this.marks.paint(id, face, o.size, o.source())) this.markFailed.add(id)
         },
       })
     }
@@ -384,5 +438,6 @@ export class HeroLevel {
       }
     }
     this.entries.clear()
+    this.marks.dispose()
   }
 }
