@@ -25,10 +25,22 @@ export type MarkKind = 'side' | 'end'
 
 /** Resolution multiple of today's close-up tiles (`TILE_PX` in containerCloseups.ts) per step. */
 export const HERO_MARK_SCALE: Record<HeroMarkStep, number> = { sharp: 4, standard: 1 }
-/** Page edge at scale 1 in pixels; a page is this times the scale (2048 px at `sharp`, 512 px at `standard`). */
-export const HERO_MARK_PAGE_BASE_PX = 512
 /** Tile size at scale 1 (the close-up level's): long side 512 x 96, end 192 x 192. */
 export const HERO_MARK_TILE_BASE: Record<MarkKind, { w: number; h: number }> = { side: { w: 512, h: 96 }, end: { w: 192, h: 192 } }
+/**
+ * Tiles per page, as columns x rows. A page is exactly that many tiles (WebGL 2 takes any texture size), so no texels
+ * go unused: at `sharp` a side page is 2048 x 1920 (5 sides) and an end page 1536 x 1536 (4 ends). Square 2048 px
+ * pages left 44 % of an end page empty.
+ */
+export const HERO_MARK_PAGE_TILES: Record<MarkKind, { cols: number; rows: number }> = { side: { cols: 1, rows: 5 }, end: { cols: 2, rows: 2 } }
+
+/** Page size in pixels for `kind` at `step`. */
+export function pageSize(kind: MarkKind, step: HeroMarkStep): { w: number; h: number } {
+  const scale = HERO_MARK_SCALE[step]
+  const t = HERO_MARK_TILE_BASE[kind]
+  const g = HERO_MARK_PAGE_TILES[kind]
+  return { w: t.w * scale * g.cols, h: t.h * scale * g.rows }
+}
 /**
  * A decal lies on the crests of the hero panel, this far inside the box frame: 3.5 cm on a door end (the leaves are
  * recessed, and the locking bars pass in front of the lettering), 1 cm on the walls.
@@ -86,20 +98,18 @@ export const markKindOf = (face: Face): MarkKind | null => (face === 'sideP' || 
 
 /** Creates atlas pages and paints one face of a box into a tile; injectable so tests need no canvas. */
 export interface HeroMarkBackend {
-  createPage(px: number): AtlasPage
+  createPage(w: number, h: number): AtlasPage
   paint(source: CloseupSource, size: ContainerSize, face: Face, page: AtlasPage, rect: Region): void
 }
 
-/** Tiles per page for `kind` at `step`. */
-export function tilesPerPage(kind: MarkKind, step: HeroMarkStep): number {
-  const scale = HERO_MARK_SCALE[step]
-  const px = HERO_MARK_PAGE_BASE_PX * scale
-  const t = HERO_MARK_TILE_BASE[kind]
-  return Math.floor(px / (t.w * scale)) * Math.floor(px / (t.h * scale))
+/** Tiles per page for `kind` (the same at every step: the page scales with its tiles). */
+export function tilesPerPage(kind: MarkKind): number {
+  const g = HERO_MARK_PAGE_TILES[kind]
+  return g.cols * g.rows
 }
 
 /** Pages that bound `kind` for a cap of `boxes` hero boxes: a box shows at most one side and one end to a camera. */
-export const maxPages = (kind: MarkKind, step: HeroMarkStep, boxes: number): number => Math.ceil(Math.max(0, boxes) / tilesPerPage(kind, step))
+export const maxPages = (kind: MarkKind, boxes: number): number => Math.ceil(Math.max(0, boxes) / tilesPerPage(kind))
 
 interface Page {
   atlas: AtlasPage
@@ -233,13 +243,13 @@ export class HeroMarkings {
     page.mesh.setMatrixAt(n, this.m.compose(this.p, this.q, this.s))
     const scale = HERO_MARK_SCALE[this.stepNow]
     const t = HERO_MARK_TILE_BASE[slot.kind]
-    const px = HERO_MARK_PAGE_BASE_PX * scale
+    const ps = pageSize(slot.kind, this.stepNow)
     const w = t.w * scale
     const h = t.h * scale
     const cx = slot.index % page.cols
     const cy = Math.floor(slot.index / page.cols)
     // inset by a pixel so a neighbouring tile never bleeds in
-    page.uvRect.setXYZW(n, (cx * w + 1) / px, 1 - ((cy + 1) * h - 1) / px, (w - 2) / px, (h - 2) / px)
+    page.uvRect.setXYZW(n, (cx * w + 1) / ps.w, 1 - ((cy + 1) * h - 1) / ps.h, (w - 2) / ps.w, (h - 2) / ps.h)
     page.fade.setX(n, alpha)
     const pr = heroMarkProfile(face, f.w, f.h)
     page.profile.setXYZW(n, pr[0], pr[1], pr[2], pr[3])
@@ -273,7 +283,7 @@ export class HeroMarkings {
       const index = page.free.pop()
       if (index !== undefined) return { kind, page, index, lastShown: this.frame }
     }
-    if (pages.length < maxPages(kind, this.stepNow, this.boxes)) {
+    if (pages.length < maxPages(kind, this.boxes)) {
       const page = this.newPage(kind)
       pages.push(page)
       return { kind, page, index: page.free.pop()!, lastShown: this.frame }
@@ -286,12 +296,10 @@ export class HeroMarkings {
   }
 
   private newPage(kind: MarkKind): Page {
-    const scale = HERO_MARK_SCALE[this.stepNow]
-    const px = HERO_MARK_PAGE_BASE_PX * scale
-    const atlas = this.backend.createPage(px)
-    const t = HERO_MARK_TILE_BASE[kind]
-    const cols = Math.floor(px / (t.w * scale))
-    const cap = cols * Math.floor(px / (t.h * scale))
+    const ps = pageSize(kind, this.stepNow)
+    const atlas = this.backend.createPage(ps.w, ps.h)
+    const cols = HERO_MARK_PAGE_TILES[kind].cols
+    const cap = tilesPerPage(kind)
     const geo = (this.quad ??= new THREE.PlaneGeometry(1, 1)).clone()
     const uvRect = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4)
     const fade = new THREE.InstancedBufferAttribute(new Float32Array(cap).fill(1), 1)
@@ -341,12 +349,12 @@ export class HeroMarkings {
     let pages = 0
     let drawCalls = 0
     let texelBytes = 0
-    const scale = HERO_MARK_SCALE[this.stepNow]
     for (const kind of KINDS) {
+      const ps = pageSize(kind, this.stepNow)
       for (const page of this.pages[kind]) {
         pages++
         if (page.mesh.count > 0) drawCalls++
-        texelBytes += (HERO_MARK_PAGE_BASE_PX * scale) ** 2 * 4
+        texelBytes += ps.w * ps.h * 4
       }
     }
     return { pages, tiles: this.slots.size, drawCalls, texelBytes }

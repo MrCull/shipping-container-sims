@@ -37,6 +37,32 @@ const URLS: Record<string, string> = {
 
 const keyOf = (size: ContainerSize, kind: HeroKind): string => `${size === '40HC' ? '40hc' : size}-${kind}`
 
+const MAP_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap'] as const
+/** Every hero GLB embeds the same detail normal and ORM maps; the first file's copies are kept and the rest dropped. */
+const sharedMaps = new Map<string, THREE.Texture>()
+
+/**
+ * Points `material` at the shared copy of each of its maps (keyed by slot and texture name) and disposes the duplicate,
+ * so the twelve files hold one set of map textures on the GPU instead of twelve. Returns how many were replaced.
+ */
+export function shareHeroMaps(material: THREE.MeshStandardMaterial, cache: Map<string, THREE.Texture> = sharedMaps): number {
+  let replaced = 0
+  for (const slot of MAP_SLOTS) {
+    const tex = material[slot]
+    if (!tex || !tex.name) continue
+    const key = `${slot}:${tex.name}`
+    const kept = cache.get(key)
+    if (!kept) {
+      cache.set(key, tex)
+    } else if (kept !== tex) {
+      material[slot] = kept
+      tex.dispose()
+      replaced++
+    }
+  }
+  return replaced
+}
+
 export const loadHeroFace: HeroFaceLoader = async (size, kind) => {
   const gltf = await loadGltf(URLS[keyOf(size, kind)])
   const root = gltf.scene
@@ -49,6 +75,7 @@ export const loadHeroFace: HeroFaceLoader = async (size, kind) => {
     const geometry = toFloatGeometry(mesh.geometry)
     geometry.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld))
     const material = mesh.material as THREE.MeshStandardMaterial
+    shareHeroMaps(material)
     const count = geometry.index ? geometry.index.count : geometry.getAttribute('position').count
     parts.push({ geometry, material, tinted: material.name === 'hero_paint', triangles: count / 3 })
   })

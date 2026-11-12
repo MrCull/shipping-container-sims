@@ -8,7 +8,7 @@ For the next agent. Read this file, then `src/sims/terminal-twin/docs/rendering-
 |---|---|---|
 | 7 | Check-digit box always drawn a bit low (phone photo) | done: `text()` drew with `textBaseline = 'middle'`, which puts capitals and digits about a sixth of their height too high in Chromium (more on Safari, which rounds the metrics of sub-pixel fonts). Now alphabetic baseline plus `CAP_MID` (0.358 em); measured centred within 3 mm |
 | 8 | Fix #267 (yard boxes float 0.305 m over a standard box) | in progress: subagent in a worktree, following the ticket's plan; merge into this branch, regenerate goldens on the merged tree |
-| 9 | Take the low-loss size and processing cuts from the cost table | in progress: sharp marks 4x to 3x, end-page packing, shared GLB maps (check each, keep only the cheap-to-lose ones) |
+| 9 | Take the low-loss size and processing cuts from the cost table | done: marking pages are exactly their tiles (end pages 2048 to 1536 square, 40 % less), hero GLB map textures shared on the GPU (`shareHeroMaps`). Not taken: sharp marks 4x to 3x (visible right up close, which is the owner's use); stripping the maps from the GLBs (download only, needs Blender regeneration) |
 
 ## Current run (2026-11-12, second session): plan and progress
 

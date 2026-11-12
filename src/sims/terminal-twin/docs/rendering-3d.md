@@ -176,9 +176,9 @@ software canvas (`containerTextures.ts`, 40 boxes); a phone's GPU-backed canvas 
 |---|---|---|---|---|
 | Shape: corrugation, rails, castings (paint mesh) | 304 tris a side, 72 a door, 306 a roof | negligible | none needed | |
 | Door hardware: bars, guides, keepers, handles, hinges | 344 of the door's 434 tris | negligible | none needed | |
-| Model download | 12 GLBs, 328 KB; each embeds the same 256 px normal and ORM maps (14 KB) | once | share the two maps: about half the download | none |
-| Marking tiles (lettering), memory | sharp step: a side tile 2048x384 (3 MB), an end tile 768x768 (2.3 MB), plus a third for mipmaps; pages are 2048 px (16 MB, 21 MB with mips) holding 5 sides or 4 ends | GPU upload of each painted tile | `HERO_MARK_SCALE.sharp` 4 to 3: memory and paint time down about 44 % | small: about 126 px per metre instead of 168; a 10 cm letter is 13 px instead of 17 |
-| Marking tiles, page packing | end pages use 1536 x 1536 of 2048 x 2048 (44 % unused) | | end tiles of 682 px, or 2048 x 1536 end pages | none |
+| Model download and map memory | 12 GLBs, 328 KB; each embeds the same 256 px normal and ORM maps (14 KB) | once | done for GPU memory: `heroAssets.ts#shareHeroMaps` keeps the first file's map textures and drops the other files' copies (one set on the GPU instead of up to twelve). Not done: stripping the maps from the files (about half the download) needs a `tt:assets` change and regeneration | none |
+| Marking tiles (lettering), memory | sharp step: a side tile 2048x384 (3 MB), an end tile 768x768 (2.3 MB), plus a third for mipmaps; a side page is 2048 x 1920 (15.7 MB, 21 MB with mips) holding 5 sides, an end page 1536 x 1536 (9.4 MB, 12.6 MB with mips) holding 4 ends | GPU upload of each painted tile | `HERO_MARK_SCALE.sharp` 4 to 3: memory and paint time down about 44 %. Not taken: the owner's close-up phone shots read the plate text at this size | small but visible right up close: about 126 px per metre instead of 168; a 10 cm letter is 13 px instead of 17 |
+| Marking tiles, page packing | end pages used 1536 x 1536 of 2048 x 2048 (44 % unused), side pages 1920 of 2048 rows | | done: pages are exactly their tiles (`HERO_MARK_PAGE_TILES`, WebGL 2 takes any size): end pages 40 % smaller, side pages 6 % | none |
 | Lettering paint | | 1.7 to 3 ms a box | | |
 | Chipped paint | | was 8.2 ms a box (70 % of a face's paint: thousands of rectangles and a full-tile erase); now one pattern fill over the lettering's boxes only, about 0.7 ms | done | lighter look (owner asked for it toned down) |
 | Wear: speckle, rust streaks, dents (canvas) | | 0.7 to 1 ms a box; speckle 0.2 | done: fewer, fainter specks, streaks at half strength, dents much lighter | owner asked for it |
@@ -212,7 +212,7 @@ fake work items; the renderer through the instancer with a fake clock), smoke `h
 
 `modules/heroMarkings.ts` (`HeroMarkings`, owned by `HeroLevel`): a hero face's markings are painted at 4x the close-up tile
 (`HERO_MARK_SCALE.sharp` = 4: a long side 2048 x 384 px, about 168 px per metre against 42; an end 768 x 768) into their own atlas pages
-(`sharp`: 2048 px pages, 16 MB of texels each; 5 side tiles or 4 end tiles per page), as a transparent decal lying on the crests of the hero panel
+(`sharp`: a side page of 5 tiles is 2048 x 1920, an end page of 4 tiles 1536 x 1536), as a transparent decal lying on the crests of the hero panel
 (`heroMarkInsetM`: 3.5 cm inside the frame on a door, so the locking bars pass in front of the lettering, 1 cm on the walls; polygon offset -4,
 alpha-fade with the face), so the hero paint, ribs and wear show through. Roofs print nothing.
 **Painted-on look:** the decal is a flat quad but is lit as the corrugated panel under it (`heroMarkProfile` gives the rib span, count and

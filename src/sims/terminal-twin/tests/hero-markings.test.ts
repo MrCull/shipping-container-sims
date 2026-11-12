@@ -12,7 +12,7 @@ import type { Region } from '../modules/closeupGeometry'
 import type { Face } from '../modules/exposedFaces'
 import type { HeroPart } from '../modules/heroAssets'
 import { HERO_FADE_MS, HERO_PREP_ALLOWANCE_MS } from '../modules/heroPrep'
-import { HERO_MARK_SCALE, HeroMarkings, maxPages, tilesPerPage, type HeroMarkBackend } from '../modules/heroMarkings'
+import { HERO_MARK_SCALE, HeroMarkings, markKindOf, maxPages, pageSize, tilesPerPage, type HeroMarkBackend } from '../modules/heroMarkings'
 import { HeroLevel } from '../modules/heroRenderer'
 import { makeIso6346Id } from '../scenario/iso6346'
 
@@ -25,7 +25,7 @@ interface PaintCall {
 function markBackend(onPaint?: () => void) {
   const calls: PaintCall[] = []
   const backend: HeroMarkBackend = {
-    createPage: (px) => ({ texture: Object.assign(new THREE.Texture(), { px }), ctx: null }),
+    createPage: (w, h) => ({ texture: Object.assign(new THREE.Texture(), { px: w, h }), ctx: null }),
     paint: (source, _size, face, page, rect) => {
       calls.push({ source, face, px: (page.texture as unknown as { px: number }).px, rect })
       onPaint?.()
@@ -48,6 +48,7 @@ describe('hero marking atlas (pure)', () => {
     expect(calls[0].rect.h).toBe(TILE_PX.side.h * 4)
     expect(calls[1].rect.w).toBe(TILE_PX.end.w * 4)
     expect(calls[0].px).toBe(2048)
+    expect(calls[1].px).toBe(TILE_PX.end.w * 4 * 2) // end pages are exactly 2 x 2 end tiles: no unused texels
     expect(marks.paint(3, 'top', '40', src(1))).toBe(false) // roofs print nothing
     expect(marks.setStep('standard')).toBe(true)
     expect(marks.has(1)).toBe(false)
@@ -64,8 +65,10 @@ describe('hero marking atlas (pure)', () => {
     const { backend } = markBackend()
     const marks = new HeroMarkings(backend)
     marks.setBoxes(5)
-    expect(maxPages('side', 'sharp', 5)).toBe(1)
-    expect(tilesPerPage('side', 'sharp')).toBe(5)
+    expect(maxPages('side', 5)).toBe(1)
+    expect(tilesPerPage('side')).toBe(5)
+    expect(pageSize('side', 'sharp')).toEqual({ w: 2048, h: 1920 })
+    expect(pageSize('end', 'sharp')).toEqual({ w: 1536, h: 1536 })
     for (let id = 1; id <= 5; id++) {
       marks.beginFrame() // one tile shown per frame: id 1 is the oldest
       expect(marks.paint(id, 'sideP', '40', src(id))).toBe(true)
@@ -202,7 +205,7 @@ describe('hero markings through the hero level', () => {
     }
     const faces = hero.faces
     expect(faces).toBeGreaterThan(0)
-    expect(calls.every((c) => c.px === 2048)).toBe(true)
+    expect(calls.every((c) => c.px === pageSize(markKindOf(c.face)!, 'sharp').w)).toBe(true)
     const painted = calls.length
     hero.setMarkStep('standard')
     expect(hero.marks.stats().pages).toBe(0)
@@ -214,13 +217,14 @@ describe('hero markings through the hero level', () => {
       frame(inst, near)
     }
     expect(calls.length).toBeGreaterThan(painted)
-    expect(calls.slice(painted).every((c) => c.px === 512 && c.rect.w <= 512)).toBe(true)
+    expect(calls.slice(painted).every((c) => c.px === pageSize(markKindOf(c.face)!, 'standard').w && c.rect.w <= 512)).toBe(true)
     hero.setMarkStep('sharp')
     for (let i = 0; i < 4; i++) {
       clock.t += 400
       frame(inst, near)
     }
-    expect(calls[calls.length - 1].px).toBe(2048)
+    const last = calls[calls.length - 1]
+    expect(last.px).toBe(pageSize(markKindOf(last.face)!, 'sharp').w)
     expect(hero.faces).toBe(faces)
   })
 })

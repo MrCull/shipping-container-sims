@@ -576,9 +576,9 @@ export function paintFaceMarks(ctx: CanvasRenderingContext2D, markings: Containe
 /** The canvas backend of the hero marking atlas (#260). Without a DOM (Vitest, workers) pages have no context and painting is a no-op. */
 export function canvasHeroMarkBackend(): HeroMarkBackend {
   return {
-    createPage(px: number): AtlasPage {
+    createPage(w: number, h: number): AtlasPage {
       if (typeof document === 'undefined') return { texture: new THREE.Texture(), ctx: null }
-      const c = canvas(px, px)
+      const c = canvas(w, h)
       const texture = new THREE.CanvasTexture(c)
       texture.colorSpace = THREE.SRGBColorSpace
       texture.premultiplyAlpha = true // transparent ground: no dark halos at the glyph edges
