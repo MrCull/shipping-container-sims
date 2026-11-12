@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup C: Daylight</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+/* Variation C. A light, daytime port: big left-aligned headline, then one wide row per game with the screen as the
+   main thing and one sentence beside it. Leaves the arcade look behind. */
+:root {
+  --bg: #eef3f6; --paper: #ffffff; --ink: #0b2233; --muted: #50677a; --line: #d3dee6;
+  --sea: #0b5c8a; --orange: #f2541b; --on-orange: #ffffff;
+  --display: 'Bricolage Grotesque', 'Arial Black', sans-serif; --body: 'DM Sans', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font: 17px/1.55 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 28px; }
+.top { display: flex; justify-content: space-between; align-items: center; padding-block: 20px; }
+.logo { display: flex; align-items: center; gap: 10px; font: 800 18px var(--display); letter-spacing: -.01em; }
+.logo i { display: grid; grid-template-columns: repeat(3, 9px); gap: 2px; }
+.logo i span { height: 6px; border-radius: 1px; background: var(--sea); }
+.logo i span:nth-child(2), .logo i span:nth-child(6) { background: var(--orange); }
+.logo i span:nth-child(4) { background: #e2a400; }
+.top nav { display: flex; gap: 22px; font-size: 15px; color: var(--muted); font-weight: 500; }
+
+.hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 44px; align-items: center; padding-block: 34px 56px; }
+.hero h1 { font: 800 68px/.98 var(--display); letter-spacing: -.035em; text-wrap: balance; }
+.hero h1 em { font-style: normal; color: var(--orange); }
+.hero p { margin-top: 18px; font-size: 20px; color: var(--muted); max-width: 34ch; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 10px; font: 700 16px var(--body); padding: 14px 24px; border-radius: 999px; background: var(--orange); color: var(--on-orange); }
+.btn.line { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
+.btn.sm { padding: 11px 20px; font-size: 15px; }
+.collage { position: relative; height: 400px; }
+.collage img { position: absolute; border-radius: 14px; object-fit: cover; box-shadow: 0 18px 40px rgba(11,34,51,.22); border: 4px solid var(--paper); }
+.collage img:nth-child(1) { width: 78%; height: 62%; right: 0; top: 0; }
+.collage img:nth-child(2) { width: 52%; height: 50%; left: 0; bottom: 0; }
+.collage img:nth-child(3) { width: 40%; height: 40%; right: 4%; bottom: 3%; }
+
+.games { display: grid; gap: 28px; }
+.game { display: grid; grid-template-columns: 1.25fr 1fr; background: var(--paper); border-radius: 20px; overflow: hidden; border: 1px solid var(--line); }
+.game:nth-child(even) { grid-template-columns: 1fr 1.25fr; }
+.game:nth-child(even) .shot { order: 2; }
+.shot { aspect-ratio: 16 / 9; }
+.shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.info { padding: 36px 40px; display: grid; align-content: center; gap: 12px; }
+.kind { font: 700 13px var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--sea); }
+.info h2 { font: 800 40px/1.02 var(--display); letter-spacing: -.03em; }
+.info p { color: var(--muted); max-width: 38ch; }
+.info .line2 { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 8px; }
+.note { font-size: 14px; color: var(--muted); }
+.note b { color: var(--ink); }
+
+.later { margin-top: 56px; display: grid; grid-template-columns: 1fr 2.4fr; gap: 32px; border-top: 2px solid var(--ink); padding-top: 22px; }
+.later h3 { font: 800 26px/1.1 var(--display); letter-spacing: -.02em; }
+.later ul { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.later li b { display: block; font-weight: 700; }
+.later li span { color: var(--muted); font-size: 15px; }
+
+footer { margin-top: 48px; padding-block: 22px 30px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; font-size: 14px; color: var(--muted); }
+.cookie { position: fixed; right: 20px; bottom: 20px; background: var(--ink); color: #e4edf3; border-radius: 14px; padding: 12px 14px 12px 18px; display: flex; gap: 14px; align-items: center; font-size: 14px; max-width: 350px; }
+.cookie b { background: #fff; color: var(--ink); border-radius: 999px; padding: 6px 16px; }
+
+@media (max-width: 720px) {
+  body { font-size: 16px; }
+  .wrap { padding: 0 16px; }
+  .top nav a:first-child { display: none; }
+  .hero { grid-template-columns: 1fr; gap: 22px; padding-block: 10px 30px; }
+  .hero h1 { font-size: 42px; }
+  .hero p { font-size: 17px; }
+  .collage { height: 230px; }
+  .btn { flex: 1; justify-content: center; }
+  .games { gap: 18px; }
+  .game, .game:nth-child(even) { grid-template-columns: 1fr; }
+  .game:nth-child(even) .shot { order: 0; }
+  .info { padding: 20px; gap: 8px; }
+  .info h2 { font-size: 30px; }
+  .info .btn { flex: 0 0 auto; }
+  .later { grid-template-columns: 1fr; gap: 16px; margin-top: 36px; }
+  .later ul { grid-template-columns: 1fr; gap: 14px; }
+  .cookie { left: 12px; right: 12px; bottom: 12px; max-width: none; justify-content: space-between; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo"><i><span></span><span></span><span></span><span></span><span></span><span></span></i>Shipping Container Sims</div>
+    <nav><a href="#">GitHub</a><a href="#">Sound on</a></nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1>Games about the <em>boxes</em> that move the world.</h1>
+      <p>Stack them, stow them, run the port. Four free games, straight in your browser.</p>
+      <div class="cta"><a class="btn" href="#">&#9654; Play Stowage Master</a><a class="btn line" href="#">See all games</a></div>
+    </div>
+    <div class="collage" aria-hidden="true"><img src="img/twin.jpg" alt=""><img src="img/stowage.jpg" alt=""><img src="img/contenga.jpg" alt=""></div>
+  </section>
+
+  <section class="games">
+    <article class="game">
+      <div class="shot"><img src="img/stowage.jpg" alt="Stowage Master: a quay crane loading a small ship"></div>
+      <div class="info"><span class="kind">Puzzle &middot; 10 levels</span><h2>Stowage Master</h2><p>Load the ship without tipping it. Heavy boxes low, the next port's boxes on top.</p>
+        <div class="line2"><a class="btn sm" href="#">Continue level 3</a><span class="note">Your best: <b>level 3</b></span></div></div>
+    </article>
+    <article class="game">
+      <div class="shot"><img src="img/contenga.jpg" alt="Contenga: a tall tower of containers"></div>
+      <div class="info"><span class="kind">Physics &middot; Quick rounds</span><h2>Contenga</h2><p>Slide a box out, stack it on top. How high before the tower falls?</p>
+        <div class="line2"><a class="btn sm" href="#">Play</a><span class="note">Your best: <b>14 moves</b></span></div></div>
+    </article>
+    <article class="game">
+      <div class="shot"><img src="img/boxempire.jpg" alt="Box Empire: a harbour crane on an empty quay"></div>
+      <div class="info"><span class="kind">Tycoon &middot; Story</span><h2>Box Empire</h2><p>Inherit a failing quay and one old crane. Turn it into a port.</p>
+        <div class="line2"><a class="btn sm" href="#">Play</a></div></div>
+    </article>
+    <article class="game">
+      <div class="shot"><img src="img/twin.jpg" alt="Terminal Twin: a container yard and quay cranes seen from above"></div>
+      <div class="info"><span class="kind">Simulation &middot; New</span><h2>Terminal Twin</h2><p>A working model of an automated terminal. Watch it run, up to an hour a second.</p>
+        <div class="line2"><a class="btn sm" href="#">Play</a></div></div>
+    </article>
+  </section>
+
+  <section class="later">
+    <h3>Still on the drawing board</h3>
+    <ul>
+      <li><b>ContainerCraft</b><span>Survive in a world made of stacked boxes.</span></li>
+      <li><b>Coblox</b><span>Build your own container games and share them.</span></li>
+      <li><b>Captain Container</b><span>Take the bridge of a boxship and bring it in.</span></li>
+    </ul>
+  </section>
+
+  <footer><span>Shipping Container Sims &copy; 2026 &middot; GitHub</span><span>Built 12 Nov 2026 22:40 &middot; 6d7cbd2</span></footer>
+</div>
+<div class="cookie"><span>This site uses a few cookies to count visits.</span><b>OK</b></div>
+</body>
+</html>
