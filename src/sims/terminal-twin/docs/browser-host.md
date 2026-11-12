@@ -421,7 +421,7 @@ from production, checked by `terminal-twin.prod.smoke.ts`). All calls are safe f
 | `select(id \| null)`, `cameraTo(id, distanceM?)`, `viewPreset(name)`, `followNextTruck()` | selection and camera (`cameraTo` false for unknown ids and absent trucks; 60 m -> LOD0, 600 m -> LOD1) |
 | `setSpeed(s)`, `pause()`, `play()`, `reset()`, `newScenario()`, `clock()` | playback; `clock` = `{ displayTime, speed, paused, busy, engine }` |
 | `overlays(partial?)` | toggle overlays, returns state |
-| `perf()`, `setQuality(setting)`, `perfOverlay(on)`, `setFrameLoad(ms)`, `drawBreakdown()`, `setAutoThresholds({down,up} \| null)` | quality and frame stats ([optimising/frame-rate.md](optimising/frame-rate.md)) |
+| `perf()`, `setQuality(setting)`, `perfOverlay(on)`, `setFrameLoad(ms)`, `drawBreakdown()`, `setAutoThresholds({down,up} \| null)`, `setAutoRung(n)` (`perf()` also has `rung`, `rungName`) | quality and frame stats ([optimising/frame-rate.md](optimising/frame-rate.md)) |
 | `scene()` | rendered counts, LOD splits, asset states, `layers`, `vesselLabels`, frames, render info |
 | `sceneState()` | at display time: `containers` custody, `reservations`, `liveries`, `colour`, and per equipment kind its `sceneKey`/`rigKey` (`sts`/`stsRendered`, `shcs`/`shcRigs`, `ascs`/`ascRigs`, `trucks`/`truckRigs`, `vessels`/`vesselHulls`, `hatchPanels`/`hatchRigs`) |
 | `display()`, `setDisplay(partial)`, `config()` | locale/units; loaded SI config with display |

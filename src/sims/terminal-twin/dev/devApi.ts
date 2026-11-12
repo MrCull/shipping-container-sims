@@ -46,7 +46,7 @@ import type {
 } from '../engine'
 import type { Breakpoint, BreakpointKind } from '../modules/breakpoints'
 import type { OverlayState } from '../modules/overlays'
-import type { QualityLevel, QualitySetting } from '../modules/quality'
+import type { AutoRungName, QualityLevel, QualitySetting } from '../modules/quality'
 import { useAudioStore } from '@/stores/audio'
 import { usePerfStore, type PerfStats } from '../store/perfStore'
 import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
@@ -80,6 +80,9 @@ export interface PerfInfo {
   setting: QualitySetting
   effective: QualityLevel
   autoChanges: number
+  /** The shedding-ladder rung in force (#261; 0 is the best look) and its name (`AUTO_RUNGS`); Auto's state, or the rung a manual level fixes it at. */
+  rung: number
+  rungName: AutoRungName
   overlay: boolean
   stats: PerfStats
 }
@@ -135,6 +138,8 @@ export interface TwinDevApi {
   drawBreakdown(): Record<string, { objects: number; triangles: number }> | null
   /** Retune Auto's step-down / step-up fps thresholds (default 45 / 57); null restores them. For renderers that cannot reach those rates. */
   setAutoThresholds(thresholds: { down: number; up: number } | null): void
+  /** Switch to Auto and force its ladder rung (0 best look; clamped), restarting its judging: proves what each rung draws without needing a slow frame rate. Returns the new perf(). */
+  setAutoRung(rung: number): PerfInfo
   /** Rendered counts (null if there is no 3D view). */
   scene(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** What the scene shows at the displayed time: custody per container, status and pose per STS, status per vessel. */
@@ -324,6 +329,8 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     setting: perfStore.setting,
     effective: perfStore.effective,
     autoChanges: perfStore.autoChanges,
+    rung: perfStore.rung,
+    rungName: perfStore.rungLabel,
     overlay: perfStore.overlayVisible,
     stats: { ...perfStore.stats },
   })
@@ -383,6 +390,11 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     drawBreakdown: () => store.view()?.drawBreakdown() ?? null,
     setQuality: (setting) => {
       perfStore.setSetting(setting)
+      return perfInfo()
+    },
+    setAutoRung: (rung) => {
+      perfStore.setSetting('auto')
+      perfStore.setRung(rung)
       return perfInfo()
     },
     setAutoThresholds: (thresholds) => {

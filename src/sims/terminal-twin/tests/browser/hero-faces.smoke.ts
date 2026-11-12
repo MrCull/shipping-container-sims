@@ -53,6 +53,53 @@ for (const [level, cap] of [
   })
 }
 
+test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks go standard, none at hero-off', async ({ page }) => {
+  test.slow() // software WebGL
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(err.message))
+  await page.goto('/sim/terminal-twin')
+  await page.waitForFunction(() => !!window.__tt)
+  await page.evaluate(() => window.localStorage.clear())
+  await page.evaluate(() => window.__tt!.setAutoRung(0))
+  await page.evaluate(() => window.__tt!.load('yard-no-mixed-length'))
+  await page.evaluate(() => window.__tt!.runTo(60))
+  await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
+  await page.evaluate(() => window.__tt!.cameraTo('B01', 10))
+  await page.waitForFunction(() => window.__tt!.perf().stats.heroFaces > 0, undefined, { timeout: 60_000 })
+  // wait until the count stops growing at the full cap
+  let faces = await page.evaluate(() => window.__tt!.perf().stats.heroFaces)
+  for (let i = 0; i < 40; i++) {
+    await page.waitForTimeout(3000)
+    const next = await page.evaluate(() => window.__tt!.perf().stats.heroFaces)
+    if (next === faces) break
+    faces = next
+  }
+  const full = faces
+  expect(full).toBeGreaterThan(24) // more than the quarter cap (8 boxes, 24 faces) allows
+  expect(await page.evaluate(() => window.__tt!.scene()!.containerLods.heroMarkStep)).toBe('sharp')
+
+  const at = async (rung: number) => {
+    await page.evaluate((r) => window.__tt!.setAutoRung(r), rung)
+    await page.waitForTimeout(3000)
+    return page.evaluate(() => ({ faces: window.__tt!.perf().stats.heroFaces, step: window.__tt!.scene()!.containerLods.heroMarkStep, name: window.__tt!.perf().rungName }))
+  }
+  const quarter = await at(2)
+  expect(quarter.name).toBe('hero-quarter')
+  expect(quarter.faces).toBeGreaterThan(0)
+  expect(quarter.faces).toBeLessThanOrEqual(24)
+  expect(quarter.faces).toBeLessThan(full)
+  expect(quarter.step).toBe('sharp')
+  const marks = await at(3)
+  expect(marks.step).toBe('standard')
+  expect(marks.faces).toBeLessThanOrEqual(24)
+  const off = await at(4)
+  expect(off.faces).toBe(0)
+  // and back up: the cap and the sharp markings return in reverse
+  const back = await at(0)
+  expect(back.step).toBe('sharp')
+  expect(errors).toEqual([])
+})
+
 test('arrival: nothing is prepared during a fast fly-through, faces arrive once the camera settles', async ({ page }) => {
   test.slow() // software WebGL
   const errors: string[] = []

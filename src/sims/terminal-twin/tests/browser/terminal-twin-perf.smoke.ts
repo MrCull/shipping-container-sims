@@ -58,8 +58,24 @@ test('fixed quality levels change what is drawn: Low draws less than High', asyn
   expect(errors).toEqual([])
 })
 
-test('Auto steps quality down under sustained load, shows it in the overlay, and steps back up when the load ends @load', async ({ page }) => {
-  test.setTimeout(180_000)
+test('the overlay names the rung in force; a manual level fixes it', async ({ page }) => {
+  const errors = watch(page)
+  await open(page, 'tracer-1sts-10-boxes')
+  await page.keyboard.press('p')
+  await page.evaluate(() => window.__tt!.setAutoRung(2))
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Hero cap quarter')
+  await page.evaluate(() => window.__tt!.setAutoRung(4))
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Hero off')
+  expect((await page.evaluate(() => window.__tt!.perf())).rungName).toBe('hero-off')
+  await page.evaluate(() => window.__tt!.setQuality('high'))
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Full detail')
+  await page.evaluate(() => window.__tt!.setQuality('low'))
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Low profile')
+  expect(errors).toEqual([])
+})
+
+test('Auto sheds down the ladder under sustained load, names the rung in the overlay, and climbs back when the load ends @load', async ({ page }) => {
+  test.setTimeout(300_000)
   const errors = watch(page)
   await open(page, 'tracer-1sts-10-boxes')
   await page.keyboard.press('p')
@@ -68,16 +84,18 @@ test('Auto steps quality down under sustained load, shows it in the overlay, and
   // Software rendering tops out near 19 fps, so the thresholds are retuned: under 12 fps steps down, 15 fps or more steps up.
   await page.evaluate(() => window.__tt!.setAutoThresholds({ down: 12, up: 15 }))
   await page.evaluate(() => window.__tt!.setFrameLoad(150)) // about 6 fps
-  await page.waitForFunction(() => window.__tt!.perf().effective !== 'high', undefined, { timeout: 40_000 })
-  await expect(page.getByTestId('tt-perf-level')).not.toHaveText('High')
+  await page.waitForFunction(() => window.__tt!.perf().rung > 0, undefined, { timeout: 40_000 })
+  await expect(page.getByTestId('tt-perf-rung')).not.toHaveText('Full detail')
   expect((await page.evaluate(() => window.__tt!.perf())).autoChanges).toBeGreaterThanOrEqual(1)
-  await page.waitForFunction(() => window.__tt!.perf().effective === 'low', undefined, { timeout: 40_000 })
+  // the ladder goes on to the bottom, one rung at a time
+  await page.waitForFunction(() => window.__tt!.perf().rungName === 'low', undefined, { timeout: 150_000 })
   await expect(page.getByTestId('tt-perf-level')).toHaveText('Low')
+  await expect(page.getByTestId('tt-perf-rung')).toHaveText('Low profile')
   // the load ends: with headroom Auto climbs again, and the overlay shows it
   const changes = (await page.evaluate(() => window.__tt!.perf())).autoChanges
   await page.evaluate(() => window.__tt!.setFrameLoad(0))
-  await page.waitForFunction(() => window.__tt!.perf().effective !== 'low', undefined, { timeout: 90_000 })
-  await expect(page.getByTestId('tt-perf-level')).not.toHaveText('Low')
+  await page.waitForFunction(() => window.__tt!.perf().rung < 7, undefined, { timeout: 90_000 })
+  await expect(page.getByTestId('tt-perf-rung')).not.toHaveText('Low profile')
   expect((await page.evaluate(() => window.__tt!.perf())).autoChanges).toBeGreaterThan(changes)
   expect(errors).toEqual([])
 })

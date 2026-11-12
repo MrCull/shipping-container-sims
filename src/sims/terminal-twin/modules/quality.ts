@@ -3,9 +3,12 @@
  * profiles and the Auto controller are unit-tested; `SceneRenderer.setQuality` and `useTwinScene`
  * apply a profile.
  *
- * Auto steps down one level when the frame rate has stayed under 45 fps for several seconds and
- * steps back up when it has had headroom for longer, with a back-off so a level that does not
- * hold is not retried every few seconds.
+ * Auto (#261) judges frame time over one-second windows (the median and the share of slow frames,
+ * so stutter counts even when the average is fine) and walks a fixed shedding ladder: hero cap,
+ * hero marking resolution, hero off, shadows and render resolution, then the Medium and Low
+ * profiles. It climbs back in the reverse order, with a back-off so a rung that does not hold is
+ * not retried every few seconds. The ladder is a pure function of the rung (`profileForRung`,
+ * `markStepForRung`); the manual levels fix it at their rung.
  */
 
 export type QualityLevel = 'low' | 'medium' | 'high'
@@ -75,81 +78,174 @@ export class FpsMeter {
   }
 }
 
+/**
+ * The shedding ladder, best look first. A rung is all there is to Auto's state: `profileForRung` and
+ * `markStepForRung` are pure functions of it.
+ *
+ * The ticket lists hero cap (full, half, quarter, none), then hero marking resolution. Marking
+ * resolution only costs anything while hero faces are drawn, so the marking step sits between
+ * quarter and none: after none it would shed nothing.
+ */
+export const AUTO_RUNGS = [
+  { name: 'hero-full', level: 'high', heroShare: 1, marks: 'sharp' },
+  { name: 'hero-half', level: 'high', heroShare: 0.5, marks: 'sharp' },
+  { name: 'hero-quarter', level: 'high', heroShare: 0.25, marks: 'sharp' },
+  { name: 'hero-marks-standard', level: 'high', heroShare: 0.25, marks: 'standard' },
+  { name: 'hero-off', level: 'high', heroShare: 0, marks: 'standard' },
+  { name: 'shadows-resolution', level: 'high', heroShare: 0, marks: 'standard' },
+  { name: 'medium', level: 'medium', heroShare: 0, marks: 'standard' },
+  { name: 'low', level: 'low', heroShare: 0, marks: 'standard' },
+] as const
+
+export type AutoRungName = (typeof AUTO_RUNGS)[number]['name']
+/** Hero marking resolution (#260); the same two values as `HeroMarkStep` in `heroMarkings.ts`. */
+export type MarkStep = 'sharp' | 'standard'
+export const TOP_RUNG = 0
+export const BOTTOM_RUNG = AUTO_RUNGS.length - 1
+/** The rungs the manual levels fix the ladder at: High is the top, Low the bottom, Medium the Medium profile as it is (with its own hero cap). */
+export const MANUAL_RUNG: Readonly<Record<QualityLevel, number>> = { high: TOP_RUNG, medium: 6, low: BOTTOM_RUNG }
+
+export const clampRung = (rung: number): number => Math.max(TOP_RUNG, Math.min(BOTTOM_RUNG, Math.round(rung)))
+
+export function rungName(rung: number): AutoRungName {
+  return AUTO_RUNGS[clampRung(rung)].name
+}
+
+/** The quality level a rung belongs to (the level shown in the picker and the dev API). */
+export function levelOfRung(rung: number): QualityLevel {
+  return AUTO_RUNGS[clampRung(rung)].level
+}
+
+/** The profile Auto puts in force at a rung. Hero caps are shares of High's; the shadows-resolution rung takes Medium's shadow map and render resolution. */
+export function profileForRung(rung: number): QualityProfile {
+  const r = AUTO_RUNGS[clampRung(rung)]
+  const base = QUALITY_PROFILES[r.level]
+  const heroBoxes = Math.floor(QUALITY_PROFILES.high.heroBoxes * r.heroShare)
+  if (r.name === 'shadows-resolution') {
+    const medium = QUALITY_PROFILES.medium
+    return { ...base, heroBoxes, shadowMapSize: medium.shadowMapSize, resolutionScale: medium.resolutionScale }
+  }
+  return { ...base, heroBoxes }
+}
+
+export function markStepForRung(rung: number): MarkStep {
+  return AUTO_RUNGS[clampRung(rung)].marks
+}
+
+/*
+ * PROVISIONAL (#261): every threshold below is a first guess, to be retuned on real hardware by the laptop benchmark ticket (#262).
+ */
+/** Step down when a window's median frame time is above this (ms, about 45 fps) ... */
+export const AUTO_DOWN_MEDIAN_MS = 1000 / 45
+/** ... or when more than this share of its frames are slow (a slow frame is over 1.5 times the down median, about 30 fps). */
+export const AUTO_SLOW_SHARE_DOWN = 0.1
+export const AUTO_SLOW_FRAME_FACTOR = 1.5
+/** Step up when a window's median is at or under this (ms, about 57 fps) and at most this share of its frames are slow. */
+export const AUTO_UP_MEDIAN_MS = 1000 / 57
+export const AUTO_SLOW_SHARE_UP = 0.02
+/** The fps the median thresholds correspond to (the dev API retunes them in fps). */
 export const AUTO_DOWN_FPS = 45
 export const AUTO_UP_FPS = 57
+/** Windows (one second each) in a row that must be bad before a step down, and good before a step up (doubled after an undone step up, up to the max). */
+export const AUTO_DOWN_WINDOWS = 4
+export const AUTO_UP_WINDOWS = 8
+export const AUTO_MAX_UP_WINDOWS = 240
 const WINDOW_MS = 1000
-const DOWN_WINDOWS = 4
-const UP_WINDOWS = 8
-const MAX_UP_WINDOWS = 240
 /** A step up that is undone within this long counts as one that did not hold. */
 const HOLD_MS = 30_000
 /** A frame gap longer than this (tab in the background, a long pause) is not load; it is skipped. */
 const HICCUP_MS = 1000
 
+interface WindowVerdict {
+  medianMs: number
+  slowShare: number
+}
+
 export class AutoQuality {
-  level: QualityLevel = 'high'
-  /** Step down below this and up at or above that (fps). Fixed in the app; tests and the dev API retune them to suit a slow renderer. */
-  downFps = AUTO_DOWN_FPS
-  upFps = AUTO_UP_FPS
+  rung = TOP_RUNG
+  /** Median frame time (ms) and slow-frame share of the last judged window. */
+  lastWindow: WindowVerdict = { medianMs: 0, slowShare: 0 }
+  /** Step down above this median or slow share; step up at or under the up median with at most the up share. Retunable by tests and the dev API. */
+  downMedianMs = AUTO_DOWN_MEDIAN_MS
+  upMedianMs = AUTO_UP_MEDIAN_MS
+  slowShareDown = AUTO_SLOW_SHARE_DOWN
+  slowShareUp = AUTO_SLOW_SHARE_UP
   private last: number | null = null
   private windowStart = 0
-  private frames = 0
-  private recent: number[] = []
-  private upWindows = UP_WINDOWS
+  private dts: number[] = []
+  private recent: WindowVerdict[] = []
+  private upWindows = AUTO_UP_WINDOWS
   private lastUpAt = -Infinity
 
-  constructor(private readonly onChange?: (level: QualityLevel) => void) {}
+  constructor(private readonly onChange?: (rung: number) => void) {}
+
+  get level(): QualityLevel {
+    return levelOfRung(this.rung)
+  }
+
+  /** Retune the median thresholds from fps (the slow-frame cut-off follows the down one); null restores the defaults. */
+  setFpsThresholds(down: number | null, up: number | null): void {
+    this.downMedianMs = down ? 1000 / down : AUTO_DOWN_MEDIAN_MS
+    this.upMedianMs = up ? 1000 / up : AUTO_UP_MEDIAN_MS
+  }
 
   /** Call once per rendered frame with a monotonic timestamp (ms). */
   frame(nowMs: number): void {
-    if (this.last !== null && nowMs - this.last > HICCUP_MS) {
-      // not load: start the window over
+    if (this.last === null || nowMs - this.last > HICCUP_MS) {
+      // first frame, or not load: start the window over
       this.windowStart = nowMs
-      this.frames = 0
+      this.dts = []
       this.last = nowMs
       return
     }
-    if (this.last === null) this.windowStart = nowMs
+    this.dts.push(nowMs - this.last)
     this.last = nowMs
-    this.frames++
     if (nowMs - this.windowStart < WINDOW_MS) return
-    const fps = (this.frames * 1000) / (nowMs - this.windowStart)
+    this.recent.push(this.judge())
     this.windowStart = nowMs
-    this.frames = 0
-    this.recent.push(fps)
-    if (this.recent.length > MAX_UP_WINDOWS) this.recent.shift()
+    this.dts = []
+    if (this.recent.length > AUTO_MAX_UP_WINDOWS) this.recent.shift()
     this.evaluate(nowMs)
   }
 
+  private judge(): WindowVerdict {
+    const sorted = [...this.dts].sort((a, b) => a - b)
+    const mid = sorted.length >> 1
+    const medianMs = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+    const slowAbove = this.downMedianMs * AUTO_SLOW_FRAME_FACTOR
+    const slowShare = sorted.filter((d) => d > slowAbove).length / sorted.length
+    this.lastWindow = { medianMs, slowShare }
+    return this.lastWindow
+  }
+
   private evaluate(nowMs: number): void {
-    const idx = QUALITY_LEVELS.indexOf(this.level)
     const tail = (n: number) => (this.recent.length >= n ? this.recent.slice(-n) : null)
-    const slow = tail(DOWN_WINDOWS)
-    if (slow && idx > 0 && slow.every((f) => f < this.downFps)) {
-      if (nowMs - this.lastUpAt < HOLD_MS) this.upWindows = Math.min(MAX_UP_WINDOWS, this.upWindows * 2)
-      this.set(QUALITY_LEVELS[idx - 1])
+    const slow = tail(AUTO_DOWN_WINDOWS)
+    if (slow && this.rung < BOTTOM_RUNG && slow.every((w) => w.medianMs > this.downMedianMs || w.slowShare > this.slowShareDown)) {
+      if (nowMs - this.lastUpAt < HOLD_MS) this.upWindows = Math.min(AUTO_MAX_UP_WINDOWS, this.upWindows * 2)
+      this.set(this.rung + 1)
       return
     }
     const fast = tail(this.upWindows)
-    if (fast && idx < QUALITY_LEVELS.length - 1 && fast.every((f) => f >= this.upFps)) {
+    if (fast && this.rung > TOP_RUNG && fast.every((w) => w.medianMs <= this.upMedianMs && w.slowShare <= this.slowShareUp)) {
       this.lastUpAt = nowMs
-      this.set(QUALITY_LEVELS[idx + 1])
+      this.set(this.rung - 1)
     }
   }
 
-  private set(level: QualityLevel): void {
-    this.level = level
-    this.recent = [] // judge the new level on its own frames
-    this.onChange?.(level)
+  private set(rung: number): void {
+    this.rung = rung
+    this.recent = [] // judge the new rung on its own frames
+    this.onChange?.(rung)
   }
 
   /** Forget the history (setting changed, scenario reloaded). */
-  reset(level: QualityLevel = 'high'): void {
-    this.level = level
+  reset(rung: number = TOP_RUNG): void {
+    this.rung = clampRung(rung)
     this.recent = []
     this.last = null
-    this.frames = 0
-    this.upWindows = UP_WINDOWS
+    this.dts = []
+    this.upWindows = AUTO_UP_WINDOWS
     this.lastUpAt = -Infinity
   }
 }

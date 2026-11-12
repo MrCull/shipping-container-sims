@@ -16,7 +16,7 @@ import { viewPresetPose, type ViewPresetName } from '../modules/viewPresets'
 import { hourOfDay, lightingFor } from '../modules/atmosphere'
 import { SceneRenderer } from '../modules/sceneRenderer'
 import type { SceneModel } from '../modules/sceneModel'
-import { AutoQuality, FpsMeter, profileFor } from '../modules/quality'
+import { AutoQuality, FpsMeter, markStepForRung, profileFor, profileForRung, type MarkStep, type QualityProfile } from '../modules/quality'
 import { usePerfStore } from '../store/perfStore'
 import { useTwinStore } from '../store/twinStore'
 
@@ -35,10 +35,10 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   const store = useTwinStore()
   const perf = usePerfStore()
   const meter = new FpsMeter()
-  const auto = new AutoQuality((level) => perf.setEffective(level, true))
+  const auto = new AutoQuality((rung) => perf.setRung(rung, true))
   const frustum = new THREE.Frustum()
   const viewProjection = new THREE.Matrix4()
-  let appliedLevel: string | null = null
+  let appliedKey: string | null = null
   let lastReportAt = 0
   /** Smoothed main-thread ms per frame (pose + render submit). */
   let cpuMs = 0
@@ -73,12 +73,26 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   /** Puts the effective quality profile in force: shadows, render resolution, and the scene's own LOD / ocean settings. */
   function applyQuality(): void {
     if (!renderer) return
-    const profile = profileFor(perf.effective)
-    appliedLevel = perf.effective
+    const profile = profileInForce()
+    appliedKey = forceKey()
     renderer.shadowMap.enabled = profile.shadows
     renderer.setPixelRatio(Math.min(window.devicePixelRatio * profile.resolutionScale, 2))
     resize()
     view?.setQuality(profile)
+    view?.setHeroMarkStep(markStepInForce())
+  }
+
+  /** Auto puts its ladder rung in force (#261); a manual level is its own profile, with sharp hero markings. */
+  function profileInForce(): QualityProfile {
+    return perf.setting === 'auto' ? profileForRung(perf.rung) : profileFor(perf.effective)
+  }
+
+  function markStepInForce(): MarkStep {
+    return perf.setting === 'auto' ? markStepForRung(perf.rung) : 'sharp'
+  }
+
+  function forceKey(): string {
+    return `${perf.setting === 'auto' ? 'auto' : perf.effective}:${perf.rung}`
   }
 
   function aim(target: { x: number; y: number; z: number }, keepOffset: boolean, distanceM?: number, openingOffset?: { x: number; y: number; z: number } | null): void {
@@ -184,7 +198,8 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     if (!model) return
     view = new SceneRenderer(model)
     overlaysApplied = null
-    view.setQuality(profileFor(perf.effective))
+    view.setQuality(profileInForce())
+    view.setHeroMarkStep(markStepInForce())
     if (renderer) view.attachRenderer(renderer)
     lightingKey = ''
     aim(view.overviewTarget(), false, undefined, view.defaultCameraOffset())
@@ -241,15 +256,13 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     // quality: measure this frame, let Auto judge, apply a changed level on the next frame
     meter.frame(now)
     if (perf.setting !== lastSetting) {
-      if (perf.setting === 'auto') auto.reset(perf.effective)
+      if (perf.setting === 'auto') auto.reset(perf.rung)
       lastSetting = perf.setting
     }
-    if (perf.debugAuto) {
-      auto.downFps = perf.debugAuto.down
-      auto.upFps = perf.debugAuto.up
-    }
+    if (perf.setting === 'auto' && auto.rung !== perf.rung) auto.reset(perf.rung) // the dev API forced a rung
+    auto.setFpsThresholds(perf.debugAuto?.down ?? null, perf.debugAuto?.up ?? null)
     if (perf.setting === 'auto') auto.frame(now)
-    if (appliedLevel !== perf.effective) applyQuality()
+    if (appliedKey !== forceKey()) applyQuality()
     if (now - lastReportAt >= 250) {
       lastReportAt = now
       perf.report({ fps: meter.fps, calls: lastRender.calls, triangles: lastRender.triangles, cpuMs, poseMs, closeup: view?.closeupCount() ?? 0, closeupFaces: view?.closeupFaceCount() ?? 0, heroFaces: view?.heroFaceCount() ?? 0, ...(view?.poseCounters() ?? { boxesPosed: 0, instanceBytes: 0 }) })

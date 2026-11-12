@@ -157,8 +157,8 @@ agree too), so number, line name, ISO type, weight plate, CSC plate, SUPER HEAVY
   nothing), `ContainerCloseups` skips that face's decal, so the older decal no longer shows between the hero ribs. During the fade it is
   still drawn underneath.
 - **Second shedding step.** `HeroLevel.setMarkStep('standard')` (`SceneRenderer.setHeroMarkStep`, `__tt.setHeroMarkings('sharp'|'standard')`)
-  repaints hero faces at today's resolution (512 px pages, 1 MB each) without losing the hero geometry; `'sharp'` switches back. Not wired to
-  Auto yet (#261). `__tt.scene().containerLods` adds `heroMarkStep`, `heroMarkPages`, `heroMarkTiles`, `heroMarkDrawCalls`, `heroMarkBytes`.
+  repaints hero faces at today's resolution (512 px pages, 1 MB each) without losing the hero geometry; `'sharp'` switches back. Auto's ladder
+  switches it at rung 3 (#261). `__tt.scene().containerLods` adds `heroMarkStep`, `heroMarkPages`, `heroMarkTiles`, `heroMarkDrawCalls`, `heroMarkBytes`.
 - Tests: `tests/hero-markings.test.ts` (atlas, LRU, allowance, step switch, covered decal, same content); look: `docs/prototypes/260/`.
 
 ### Close-up markings (#119, #143)
@@ -381,9 +381,21 @@ top is clipped over every open bay (needed so a crane never works under a solid 
 Antialiasing is chosen at renderer creation and is not part of a live profile.
 
 - Setting: Auto (default), Low, Medium, High, remembered in localStorage (`store/perfStore.ts`, guarded). Auto starts at High.
-- `AutoQuality`: steps down one level when 4 consecutive one-second windows are under `AUTO_DOWN_FPS` 45; steps up when
-  8 windows are at or above `AUTO_UP_FPS` 57. A step up undone within 30 s doubles the windows needed for the next one
-  (max 240). A frame gap over 1 s (hidden tab) is skipped. History restarts after every change.
+- `AutoQuality` (#261) works from frame time. Each one-second window gets a median frame time and a slow-frame share
+  (a frame over 1.5 times the down median). It steps down one rung when 4 consecutive windows have a median over
+  `AUTO_DOWN_MEDIAN_MS` (22.2 ms, about 45 fps) or more than `AUTO_SLOW_SHARE_DOWN` (10 %) slow frames, so stutter counts
+  although the average is fine; it steps up when 8 windows have a median at or under `AUTO_UP_MEDIAN_MS` (17.5 ms, about
+  57 fps) and at most `AUTO_SLOW_SHARE_UP` (2 %) slow frames. A step up undone within 30 s doubles the windows needed
+  for the next one (max 240). A frame gap over 1 s (hidden tab) is skipped. History restarts after every change.
+  **All thresholds are provisional until the laptop benchmark ticket (#262) retunes them.**
+- **The shedding ladder** (`AUTO_RUNGS`, `profileForRung`, `markStepForRung`: pure functions of the rung). Auto sheds top
+  down and recovers bottom up: 0 `hero-full` (High, hero cap 32 boxes), 1 `hero-half` (16), 2 `hero-quarter` (8),
+  3 `hero-marks-standard` (cap 8, `HeroLevel.setMarkStep('standard')`), 4 `hero-off` (cap 0), 5 `shadows-resolution`
+  (Medium's 1024 shadow map and 0.85 resolution), 6 `medium` (Medium profile, hero off), 7 `low`. The ticket lists marking
+  resolution after hero off; it sits before it here because marking resolution sheds nothing once no hero face is
+  drawn. The manual levels fix the ladder (`MANUAL_RUNG`: High 0, Medium 6 with Medium's own hero cap and sharp
+  markings, Low 7). `useTwinScene` puts the rung's profile and mark step in force; the overlay row `tt-perf-rung` names
+  the rung ("Full detail", "Hero cap half", ... "Low profile"). Dev API: `perf().rung` / `rungName`, `setAutoRung(n)`.
 - UI: `components/PerfPanel.vue` (quality picker, Stats button, key P: fps, draw calls, triangles, frame CPU ms, level).
   `components/FpsChip.vue` (`tt-fps-chip`, teleported into `SimPage`'s `#sim-header-slot`, hidden when `webglFailed`)
   shows the `FpsMeter` 1 s average; `modules/fpsChip.ts#fpsSeverity` amber below 30, red below 20; a click toggles the overlay.

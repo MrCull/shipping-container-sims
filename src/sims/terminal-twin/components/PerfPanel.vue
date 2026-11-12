@@ -56,6 +56,11 @@ const store = useTwinStore()
         class="v"
         data-testid="tt-perf-level"
       >{{ t(`perf.quality.${perf.effective}` as MessageKey) }}</span>
+      <span class="k">{{ t('perf.rung') }}</span>
+      <span
+        class="v"
+        data-testid="tt-perf-rung"
+      >{{ t(`perf.rung.${perf.rungLabel}` as MessageKey) }}</span>
     </div>
     <div class="row">
       <span class="label">{{ t('perf.quality') }}</span>
