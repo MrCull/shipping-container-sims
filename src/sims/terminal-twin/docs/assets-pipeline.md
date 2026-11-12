@@ -53,8 +53,11 @@ Groups (`GROUPS` in both `cli/assets/build.ts` and `assets/generators/build.py`)
 - A Blender install can run the generator too (`blender --background --python src/sims/terminal-twin/assets/generators/build.py -- --out <dir>`),
   but then you compress the GLBs yourself. `tt:assets` needs a Python that can `import bpy`.
 - Node dependencies (`@gltf-transform/*`, `meshoptimizer`) come with `pnpm install`.
-- Cloud agent sessions usually have no bpy: changes that need regeneration (outer hull lines, a larger wordmark) are
-  then out of reach; the renderer-side workarounds (hatch clip, road clip) exist for that reason.
+- **Cloud sessions:** `bpy` is not installed by the session-start hook (about 1 GB). When your ticket changes a generator or
+  needs regenerated models, run `scripts/install-bpy.sh` once (opt-in, idempotent, under a minute; it builds the venv in
+  `$HOME/.cache/tt-bpy-venv`, outside the repo, and prints its python path on the last line; `scripts/test-install-bpy.sh` tests it),
+  then `pnpm run tt:assets --python "$(scripts/install-bpy.sh | tail -n 1)" ...`. A second run does nothing. Tickets that do not
+  touch the generators never need it.
 
 ## `pnpm run tt:assets`
 
@@ -80,6 +83,14 @@ pnpm run tt:assets --samples 48                       # Cycles samples per previ
 Determinism: two runs give byte-identical outputs. No randomness (scenery generators are seeded), Cycles seed 0, no
 denoiser, fixed sample counts. Run times: containers about 80 s (mostly previews), STS about 60 s, trucks about 90 s,
 vessels about 40 s with previews. Slow when several Blender jobs share the CPU: use `--only <group>`.
+
+**Cloud check (2026-11-12, `bpy` 5.2.3, `tt:assets --check` over all groups, about 7 minutes):** every GLB, sidecar and atlas JSON
+in all seven groups is byte-identical to the commit. Cycles previews render in a cloud session (software CPU, no GPU needed) and
+`containers` and `vessels` previews are byte-identical too, but the `.webp` previews of `asc`, `shc`, `sts`, `trucks` and
+`infrastructure` differ (56 files, reproducible: two runs of `--only shc` give the same four differing files). They are the
+same scenes rendered on a different CPU (Cycles sums floats in a thread-dependent order), so treat a preview-only difference
+there as expected and look at the images instead of byte-comparing them; previews are documentation, the runtime never loads
+them. To check models alone, or to skip the slow renders, add `--no-previews`.
 
 Format rules:
 
