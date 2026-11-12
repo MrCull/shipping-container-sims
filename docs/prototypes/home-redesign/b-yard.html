@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup B: The stack</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Stencil+One&family=Saira+Condensed:wght@500;600;700&family=Saira:wght@400;500;600&display=swap">
+<style>
+/* Variation B. The page is a container stack: each game is one painted, corrugated box with stencilled markings
+   and its doors open on a screenshot. Planned games are empty ground slots. */
+:root {
+  --ground: #15181c; --ground-2: #1d2126; --line: #333a42; --ink: #f1efe9; --muted: #a9aeb5; --yellow: #f6c21c;
+  --stencil: 'Saira Stencil One', Impact, sans-serif; --cond: 'Saira Condensed', 'Arial Narrow', sans-serif; --body: 'Saira', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--ground); color: var(--ink); font: 16px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+.top { display: flex; justify-content: space-between; align-items: center; padding-block: 16px; font: 600 14px var(--cond); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.top span + span { margin-left: 22px; }
+
+.hero { padding-block: 34px 30px; display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; }
+.hero h1 { font: 400 92px/.88 var(--stencil); letter-spacing: .01em; text-transform: uppercase; }
+.hero h1 em { font-style: normal; color: var(--yellow); }
+.hero p { font-size: 19px; color: var(--muted); max-width: 30ch; padding-bottom: 8px; }
+.hero p b { color: var(--ink); font-weight: 600; }
+.hazard { height: 10px; background: repeating-linear-gradient(-45deg, var(--yellow) 0 14px, #15181c 14px 28px); border-radius: 2px; }
+
+.stack { display: grid; gap: 6px; padding-top: 22px; }
+.box { --paint: #c2410c; --dark: rgba(0,0,0,.2); position: relative; display: grid; grid-template-columns: 64px 1fr 400px; min-height: 216px; color: #fff;
+  background: repeating-linear-gradient(90deg, var(--paint) 0 15px, color-mix(in srgb, var(--paint) 84%, #000) 15px 19px, color-mix(in srgb, var(--paint) 92%, #fff) 19px 21px, var(--paint) 21px 34px);
+  border: 3px solid color-mix(in srgb, var(--paint) 62%, #000); border-radius: 3px; box-shadow: 0 5px 0 rgba(0,0,0,.35); }
+.box::before, .box::after { content: ""; position: absolute; width: 16px; height: 12px; background: color-mix(in srgb, var(--paint) 50%, #000); }
+.box::before { left: -3px; top: -3px; } .box::after { left: -3px; bottom: -3px; }
+.code { writing-mode: vertical-rl; transform: rotate(180deg); display: flex; align-items: center; justify-content: center; gap: 10px; font: 700 15px var(--cond); letter-spacing: .14em; background: var(--dark); }
+.code i { font-style: normal; border: 1.5px solid #fff; padding: 3px 1px; }
+.side { padding: 22px 28px; display: grid; align-content: space-between; gap: 14px; }
+.side h2 { font: 400 54px/.95 var(--stencil); text-transform: uppercase; letter-spacing: .01em; text-shadow: 0 2px 0 rgba(0,0,0,.18); }
+.side p { font-size: 17px; max-width: 46ch; background: var(--dark); padding: 6px 10px; border-radius: 2px; width: fit-content; }
+.meta { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.play { font: 700 17px var(--cond); letter-spacing: .12em; text-transform: uppercase; background: #fff; color: #14171a; padding: 10px 22px; border-radius: 2px; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+.spec { font: 600 13px var(--cond); letter-spacing: .12em; text-transform: uppercase; opacity: .92; }
+.door { position: relative; margin: 10px; border: 3px solid rgba(0,0,0,.45); background: #000; overflow: hidden; }
+.door img { width: 100%; height: 100%; object-fit: cover; display: block; position: absolute; inset: 0; }
+.door::after { content: ""; position: absolute; inset: 0; box-shadow: inset 14px 0 18px -8px rgba(0,0,0,.7); }
+.b1 { --paint: #1f5fa8; } .b2 { --paint: #b3261e; } .b3 { --paint: #d97706; } .b4 { --paint: #17705a; }
+
+h3.sec { font: 700 14px var(--cond); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 40px 0 12px; }
+.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.slot { border: 2px dashed #4a525c; background: var(--ground-2); padding: 16px 18px; min-height: 120px; display: grid; gap: 4px; align-content: start; position: relative; }
+.slot b { font: 400 24px var(--stencil); text-transform: uppercase; color: #cfd3d8; }
+.slot p { color: var(--muted); font-size: 15px; }
+.slot small { font: 600 12px var(--cond); letter-spacing: .14em; color: var(--yellow); text-transform: uppercase; }
+
+footer { margin-top: 40px; border-top: 1px solid var(--line); padding-block: 20px 28px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; color: #7f868e; font: 500 13px var(--cond); letter-spacing: .1em; text-transform: uppercase; }
+.cookie { position: fixed; right: 20px; bottom: 20px; background: var(--yellow); color: #14171a; padding: 12px 14px; display: flex; gap: 14px; align-items: center; font-size: 14px; max-width: 340px; box-shadow: 0 6px 0 rgba(0,0,0,.4); }
+.cookie b { background: #14171a; color: #fff; padding: 6px 14px; font: 700 14px var(--cond); letter-spacing: .1em; }
+
+@media (max-width: 720px) {
+  .wrap { padding: 0 14px; }
+  .top .hide { display: none; }
+  .hero { grid-template-columns: 1fr; padding-block: 18px 22px; gap: 12px; }
+  .hero h1 { font-size: 52px; }
+  .hero p { font-size: 16px; max-width: none; }
+  .box { grid-template-columns: 34px 1fr; min-height: 0; }
+  .code { font-size: 12px; grid-row: 1 / span 2; }
+  .door { grid-column: 2; margin: 8px 8px 0; aspect-ratio: 16 / 9; }
+  .side { grid-column: 2; padding: 12px 12px 16px; }
+  .side h2 { font-size: 34px; }
+  .side p { font-size: 15px; }
+  .slots { grid-template-columns: 1fr; }
+  .slot { min-height: 0; }
+  .cookie { left: 12px; right: 12px; bottom: 12px; max-width: none; justify-content: space-between; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top"><div>SCSU &middot; Port of play</div><div><span class="hide">GitHub</span><span>Sound on</span></div></header>
+
+  <section class="hero">
+    <h1>Shipping<br><em>Container</em><br>Sims</h1>
+    <p><b>Four games about moving boxes.</b> Free, in your browser, nothing to install.</p>
+  </section>
+  <div class="hazard"></div>
+
+  <section class="stack">
+    <article class="box b1">
+      <div class="code">SCSU 000001 <i>9</i> &nbsp;45G1</div>
+      <div class="side">
+        <h2>Stowage Master</h2>
+        <p>Load the ship without tipping it. Tetris with real stowage rules.</p>
+        <div class="meta"><a class="play" href="#">&#9654; Continue</a><span class="spec">Puzzle &middot; 10 levels &middot; You are on level 3</span></div>
+      </div>
+      <div class="door"><img src="img/stowage.jpg" alt=""></div>
+    </article>
+    <article class="box b2">
+      <div class="code">SCSU 000002 <i>4</i> &nbsp;22G1</div>
+      <div class="side">
+        <h2>Contenga</h2>
+        <p>Slide a box out, stack it on top. How high before the tower falls?</p>
+        <div class="meta"><a class="play" href="#">&#9654; Play</a><span class="spec">Physics &middot; Quick rounds &middot; Best 14 moves</span></div>
+      </div>
+      <div class="door"><img src="img/contenga.jpg" alt=""></div>
+    </article>
+    <article class="box b3">
+      <div class="code">SCSU 000003 <i>0</i> &nbsp;45G1</div>
+      <div class="side">
+        <h2>Box Empire</h2>
+        <p>Inherit a failing quay and one old crane. Turn it into a port.</p>
+        <div class="meta"><a class="play" href="#">&#9654; Play</a><span class="spec">Tycoon &middot; Story &middot; Long game</span></div>
+      </div>
+      <div class="door"><img src="img/boxempire.jpg" alt=""></div>
+    </article>
+    <article class="box b4">
+      <div class="code">SCSU 000004 <i>5</i> &nbsp;45R1</div>
+      <div class="side">
+        <h2>Terminal Twin</h2>
+        <p>A working model of an automated terminal. Watch it run, up to an hour a second.</p>
+        <div class="meta"><a class="play" href="#">&#9654; Play</a><span class="spec">Simulation &middot; Sandbox &middot; New</span></div>
+      </div>
+      <div class="door"><img src="img/twin.jpg" alt=""></div>
+    </article>
+  </section>
+
+  <h3 class="sec">Empty slots, reserved for games still being built</h3>
+  <div class="slots">
+    <div class="slot"><small>Slot 05 &middot; Planned</small><b>ContainerCraft</b><p>Survive in a world made of stacked boxes.</p></div>
+    <div class="slot"><small>Slot 06 &middot; Planned</small><b>Coblox</b><p>Build your own container games and share them.</p></div>
+    <div class="slot"><small>Slot 07 &middot; Planned</small><b>Captain Container</b><p>Take the bridge of a boxship and bring it in.</p></div>
+  </div>
+
+  <footer><span>Shipping Container Sims &copy; 2026 &middot; GitHub</span><span>Built 12 Nov 2026 22:40 &middot; 6d7cbd2</span></footer>
+</div>
+<div class="cookie"><span>This site uses a few cookies to count visits.</span><b>OK</b></div>
+</body>
+</html>
