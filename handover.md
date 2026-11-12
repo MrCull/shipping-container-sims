@@ -7,7 +7,7 @@ For the next agent. Read this file, then `src/sims/terminal-twin/docs/rendering-
 | # | Request | State |
 |---|---|---|
 | 7 | Check-digit box always drawn a bit low (phone photo) | done: `text()` drew with `textBaseline = 'middle'`, which puts capitals and digits about a sixth of their height too high in Chromium (more on Safari, which rounds the metrics of sub-pixel fonts). Now alphabetic baseline plus `CAP_MID` (0.358 em); measured centred within 3 mm |
-| 8 | Fix #267 (yard boxes float 0.305 m over a standard box) | in progress: subagent in a worktree, following the ticket's plan; merge into this branch, regenerate goldens on the merged tree |
+| 8 | Fix #267 (yard boxes float 0.305 m over a standard box) | done (`9bae429`, ENGINE_VERSION 0.54.0): base of a yard slot = top of the box(es) below (`ascStorage.ts#yardSlotBaseY`, through box tops so staggered 40s work); ASC picks and set-downs use it; `CustodyChange.baseY` carries it to the scene model. Goldens and drawn-boxes regenerated. TTI slice to 20000 s: 488 to 493 moves, 0 violations. Hoists get longer (travel height unchanged), not shorter as the ticket guessed. Follow-up worth filing: the empty ASC spreader still hangs at high-cube height (0.305 m above a standard box before it locks) |
 | 9 | Take the low-loss size and processing cuts from the cost table | done: marking pages are exactly their tiles (end pages 2048 to 1536 square, 40 % less), hero GLB map textures shared on the GPU (`shareHeroMaps`). Not taken: sharp marks 4x to 3x (visible right up close, which is the owner's use); stripping the maps from the GLBs (download only, needs Blender regeneration) |
 
 ## Current run (2026-11-12, second session): plan and progress
