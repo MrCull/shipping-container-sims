@@ -27,7 +27,7 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | #255 | Hero container model, per face, with asset budgets | #247 | merged in branch (f568b1c) | |
 | #256 | Far tier: far-field wordmark on containers | #247 | open | |
 | #257 | Posing: cull before posing, one custody lookup per box | #250 | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
-| #258 | Hero renderer: visible faces only, capped, loaded on first close zoom | #250, #248, #255 | open | |
+| #258 | Hero renderer: visible faces only, capped, loaded on first close zoom | #250, #248, #255 | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
 | #259 | Hero detail arrives smoothly (frame allowance, fade-in, camera gate) | #258 | open | |
 | #260 | Sharp markings on hero faces | #259 | open | |
 | #261 | Auto quality works from frame time and sheds in a fixed ladder | #259, #260 | open | |
