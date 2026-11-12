@@ -97,6 +97,19 @@ kpiSeries kpiHeadline dashboard summary invariants eventLog checkpoints`. `kpiHe
   `advance { to: displayTime + lookahead }`, lookahead = `max(MIN_LOOKAHEAD_SIM_S 5, speed x LOOKAHEAD_WALL_S 1.5)`
   (90 sim minutes at x3600). While paused it does not run ahead, so the scene and dev-API queries describe the same
   instant. Then `model.prune(displayTime)`.
+- **Even pacing (#251).** Look-ahead requests are sized by wall-clock cost: each `advance` asks for at most
+  `engineRate x REQUEST_BUDGET_MS` (150 ms) of sim time (first one `INITIAL_CHUNK_SIM_S` 30, doubling while a request costs
+  under half the budget), and the controller smooths the measured worker rate (`engineRate`, sim s per wall s, time
+  constant about 1 s; only chunk-limited requests count, an unlimited one measures its own size). When `engineRate` is
+  below the chosen speed the display rate is `min(speed, engineRate x gap / margin)` with `margin = max(1, min(0.5 x
+  engineRate, 0.5 x speed x LOOKAHEAD_WALL_S))`: full speed while the display is far behind the horizon, then it
+  approaches the horizon at the engine's pace without reaching it, so the clock moves every frame. No cap while paused,
+  at a pending breakpoint (the display must reach it) or after the end. `achievedSpeed` is `engineRate` while the cap
+  applies, else the chosen speed; the top bar shows `tt-achieved-speed` ("running at x1300") when it is more than 10 %
+  below the chosen speed, and `__tt.clock().achievedSpeed` reads it. A reply bigger than `APPLY_ITEMS_PER_FRAME` (2,000)
+  is cut by `sliceDelta` (new containers, entities, motion, custody, reservations, hatch; each in order) and applied one
+  slice per `tick`, no new `advance` is sent meanwhile, and `info` (hence the display limit) moves to the reply's horizon
+  with its last slice; any other request first flushes the queue (`tests/playback-pacing.test.ts`). Restart resets the rate.
 - Flat-out (`flatOut`, `busy` = true, rendering skipped): `runTo(time)` (top bar "Run to…", resumes at the current
   speed), `runToNextDeparture()` (`eventType: 'VesselDeparted'`, `tt-run-to-departure`), `runUntil(cond)` and `step()`
   (both pause, display jumps to engine time). `runTo` rejects a time not after the display.

@@ -68,6 +68,8 @@ export interface TwinClock {
   /** Displayed sim time (s). */
   displayTime: number
   speed: number
+  /** The speed playback really runs at (below `speed` while the engine cannot keep up). */
+  achievedSpeed: number
   paused: boolean
   busy: boolean
   /** Engine status and horizon. */
@@ -368,6 +370,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       return {
         displayTime: c?.displayTime ?? 0,
         speed: c?.speed ?? 0,
+        achievedSpeed: c?.achievedSpeed ?? 0,
         paused: c?.paused ?? true,
         busy: c?.busy ?? false,
         engine: c?.info ?? null,
