@@ -45,6 +45,8 @@ export interface ContainerModel {
 
 export interface ContainerAssets {
   sizes: Record<ContainerSize, ContainerModel>
+  /** Far-field atlas (same tile layout as the near atlas, enlarged wordmark and coarse rib shading); absent in tests. */
+  farAtlas?: THREE.Texture
   lod0Material: THREE.MeshStandardMaterial
   lod1Material: THREE.MeshStandardMaterial
 }
@@ -102,6 +104,11 @@ export function bakeLod(root: THREE.Object3D, node: THREE.Object3D): THREE.Buffe
   return merged
 }
 
+/** Camera distances (m) between which a box's atlas blends from the near to the far atlas (#256). */
+export const FAR_ATLAS_BLEND_M: readonly [number, number] = [65, 100]
+
+export const FAR_ATLAS_URL = new URL('../assets/models/containers/livery-atlas-far.webp', import.meta.url).href
+
 /** Tile layout of a livery atlas (the container atlas, or TT-27's vessel atlas). */
 export interface LiveryAtlasLayout {
   tileSizeUv: number[]
@@ -119,6 +126,8 @@ export function liveryMaterial<T extends THREE.MeshStandardMaterial>(
   layout: LiveryAtlasLayout = atlas,
   /** Container boxes only (origin at the bottom): darken the lowest strip where a box meets the ground or the box below (#248). */
   contactShadows = false,
+  /** Container boxes: a second atlas of the same layout, blended in by view distance (#256). */
+  farMap: THREE.Texture | null = null,
 ): T & { userData: { liveryBase: { value: number } } } {
   const mat = source.clone() as T & { userData: { liveryBase: { value: number } } }
   const liveryBase = { value: 0 }
@@ -140,9 +149,24 @@ export function liveryMaterial<T extends THREE.MeshStandardMaterial>(
   vMapUv += vec2(mod(liveryI, liveryCols), floor(liveryI / liveryCols)) * liveryTile;
 #endif`,
       )
+    if (farMap) {
+      shader.uniforms.farMap = { value: farMap }
+      shader.uniforms.farRange = { value: new THREE.Vector2(FAR_ATLAS_BLEND_M[0], FAR_ATLAS_BLEND_M[1]) }
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform sampler2D farMap;\nuniform vec2 farRange;')
+        .replace(
+          '#include <map_fragment>',
+          `#ifdef USE_MAP
+  vec4 sampledDiffuseColor = texture2D( map, vMapUv );
+  vec4 farDiffuseColor = texture2D( farMap, vMapUv );
+  sampledDiffuseColor = mix( sampledDiffuseColor, farDiffuseColor, smoothstep( farRange.x, farRange.y, length( vViewPosition ) ) );
+  diffuseColor *= sampledDiffuseColor;
+#endif`,
+        )
+    }
     if (contactShadows) patchContactShadow(shader)
   }
-  mat.customProgramCacheKey = () => (contactShadows ? 'tt-livery-contact' : 'tt-livery')
+  mat.customProgramCacheKey = () => (contactShadows ? 'tt-livery-contact' : 'tt-livery') + (farMap ? '-far' : '')
   return mat
 }
 
@@ -155,6 +179,19 @@ function findByName(root: THREE.Object3D, name: string): THREE.Object3D {
 function materialOf(node: THREE.Object3D): THREE.MeshStandardMaterial {
   const mesh = meshesUnder(node)[0]
   return mesh.material as THREE.MeshStandardMaterial
+}
+
+/** The far atlas, or null when it cannot load (the near atlas then shows at every distance). */
+async function loadFarAtlas(): Promise<THREE.Texture | null> {
+  try {
+    const tex = await new THREE.TextureLoader().loadAsync(FAR_ATLAS_URL)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.flipY = false // glTF UV convention, like the embedded near atlas
+    tex.anisotropy = 4
+    return tex
+  } catch {
+    return null
+  }
 }
 
 let cached: Promise<ContainerAssets> | null = null
@@ -177,12 +214,13 @@ export function loadContainerAssets(): Promise<ContainerAssets> {
         lod0Src ??= materialOf(lod0)
         lod1Src ??= materialOf(lod1)
       }
-      const lod0Material = liveryMaterial(lod0Src!, atlas, true)
-      const lod1Material = liveryMaterial(lod1Src!, atlas, true)
+      const farAtlas = await loadFarAtlas()
+      const lod0Material = liveryMaterial(lod0Src!, atlas, true, farAtlas)
+      const lod1Material = liveryMaterial(lod1Src!, atlas, true, farAtlas)
       // One atlas texture for every size and LOD (each GLB embeds the same image).
       lod1Material.map = lod0Material.map
       for (const m of [lod0Material, lod1Material]) if (m.map) m.map.anisotropy = 4
-      return { sizes, lod0Material, lod1Material }
+      return { sizes, farAtlas: farAtlas ?? undefined, lod0Material, lod1Material }
     })()
     cached.catch(() => {
       cached = null
