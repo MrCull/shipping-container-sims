@@ -314,6 +314,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       },
       screenPoint,
       cameraPose: readPose,
+      setCameraPose: writePose,
       stats: () => (view ? { ...view.stats(), frames: framesRendered, render: { ...lastRender } } : null),
       liveries: () => view?.renderedLiveries() ?? null,
       rigs: () => view?.renderedRigs() ?? null,

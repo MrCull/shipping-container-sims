@@ -48,6 +48,14 @@ export interface PerfStats {
   instanceBytes: number
 }
 
+/** Where the one-click benchmark is (#254); null when none runs. */
+export interface BenchmarkProgress {
+  /** 0 while the scenario loads and warms up, then 1 to `total`. */
+  stage: number
+  total: number
+  label: string
+}
+
 export const usePerfStore = defineStore('terminal-twin-perf', () => {
   const stored = read(KEY_QUALITY)
   const setting = ref<QualitySetting>(QUALITY_SETTINGS.find((s) => s === stored) ?? DEFAULT_QUALITY_SETTING)
@@ -55,6 +63,7 @@ export const usePerfStore = defineStore('terminal-twin-perf', () => {
   const effective = ref<QualityLevel>(setting.value === 'auto' ? 'high' : setting.value)
   const overlayVisible = ref(read(KEY_OVERLAY) === '1')
   const stats = ref<PerfStats>({ fps: 0, calls: 0, triangles: 0, cpuMs: 0, poseMs: 0, closeup: 0, closeupFaces: 0, heroFaces: 0, boxesPosed: 0, instanceBytes: 0 })
+  const benchmark = ref<BenchmarkProgress | null>(null)
   /** How many times Auto changed the level (dev API / tests). */
   const autoChanges = ref(0)
   /** Dev only: busy-wait this many ms every frame, to prove Auto steps down and recovers. */
@@ -83,5 +92,5 @@ export const usePerfStore = defineStore('terminal-twin-perf', () => {
     stats.value = next
   }
 
-  return { setting, effective, overlayVisible, stats, autoChanges, debugLoadMs, debugAuto, setSetting, setEffective, toggleOverlay, report }
+  return { benchmark, setting, effective, overlayVisible, stats, autoChanges, debugLoadMs, debugAuto, setSetting, setEffective, toggleOverlay, report }
 })

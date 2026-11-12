@@ -76,6 +76,40 @@ only draw calls and triangles mean anything there; CPU and pose ms are noise).
 Other dev API levers: `perfOverlay(on)` (also key P, the Stats button, or a click on the FPS chip), `setFrameLoad(ms)`
 (busy-wait per frame, dev only), `setAutoThresholds({ down, up })` (retune Auto for slow renderers; null restores 45 / 57).
 
+## One-click benchmark (production build, no console)
+
+The `__tt` procedure above needs a dev server. The **Benchmark** button in the performance panel (top bar, next to Quality
+and Stats; `components/PerfPanel.vue`) does the measuring on any build, including `pnpm run build && pnpm run preview` and
+the deployed site, and downloads one JSON file. Code: `modules/frameBenchmark.ts` (plan, summary, report; pure, unit-tested)
+and `composables/useFrameBenchmark.ts` (runner). It reads quality, camera and playback through the store and the 3D view, never `window.__tt`.
+
+How to run it:
+
+1. Open the production site (or `pnpm run build && pnpm run preview`) in the browser and on the GPU you want to measure.
+   Close other heavy tabs, keep this tab in front (a hidden tab throttles animation frames) and leave the window size alone.
+2. Click **Benchmark**. It restarts the sim on the TTI baseline preset (its own seed), runs it flat out to 7,200 s, then plays
+   the tour unattended. About 6 minutes. The button shows `Benchmark n of 20: <stage>`; **Cancel benchmark** stops it without a file.
+3. The browser downloads `terminal-twin-benchmark-<time>-<gpu>.json`. The quality setting, speed and pause state come back as they were.
+
+The tour: 20 stages of 8 s each after 3 s of settling (`FULL_BENCHMARK`). Stages 1 to 15 are the five views (Overview,
+Yard, one crane from 60 m, a yard block from 10 m, a fly-through from the Yard preset to 60 m above the quay) at each of
+Low, Medium and High, playing at x60. Stages 16 to 20 are the speed steps x60, x300, x600, x1200 and x3600 at Overview on
+High. Auto is not benchmarked (it chooses between the three). A stage lasts at least 30 frames and ends at 30 s at the latest.
+
+The file (`format` 1) has `machine` (user agent, cores, memory, pixel ratio, screen, canvas size, GPU as the browser names it),
+`build` (engine version, build time, commit, `production`), `scenario`, `settings`, and per stage: `fps`, `frameMs`
+(`p50`, `p95`, `p99`, `longest`, gaps between animation frames), `poseMs` and `cpuMs` (means of the panel's moving averages),
+`drawCalls`, `triangles` and `boxesPosed` (`mean`, `max`), `heroFaces`, `achievedSpeed` (sim seconds per wall second the display
+clock really advanced), the sim time span, and `simEnded`. Read `achievedSpeed` against `speed` in the x1200 and x3600 stages.
+
+`?benchmark=quick` in the page URL runs a shortened tour (tracer fixture, Low only, 7 stages of under a second); the prod smoke
+`terminal-twin-benchmark.prod.smoke.ts` uses it and checks the JSON is complete, never its numbers. A software-GL run
+(headless, CI) is only good for that: its fps and ms mean nothing.
+
+**Where to record the result:** put the file under `docs/benchmarks/` (create it) and add one line, date, machine,
+browser and the headline numbers (Overview High fps and p99, close-up High fps, the x3600 `achievedSpeed`), in the
+Recorded numbers section below. The laptop run is #262.
+
 ## Targets
 
 - **60 fps** for the full TTI preset at overview zoom on the reference machine: a mid-range laptop, 4-core CPU of about

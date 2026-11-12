@@ -171,6 +171,7 @@ dashboard (`dashboardOpen/Tab/Data/Group/Bucketing/Rendered`), KPIs (`kpi`, `fin
 - Frame loop (`useTwinScene.loop`): `controller.tick` -> `store.sync` -> rebuild on a new model -> (skip if busy)
   overlays, `setColourBy`, `applyCameraKeys`, follow, lighting (per sim minute) -> `view.update(displayTime, ...)` ->
   positional sound -> render -> quality meter. `perf().stats.poseMs` and `cpuMs` are smoothed per-frame costs; `boxesPosed` and `instanceBytes` (#246) are the last frame's counts (boxes posed, container instance-buffer bytes handed to the GPU upload), also in the performance readout.
+  **One-click benchmark (#254):** the Benchmark button in `PerfPanel.vue` (works in production, no `__tt`) runs `composables/useFrameBenchmark.ts` over the plan in `modules/frameBenchmark.ts` through `store.startScenario`, `store.runTo`, `perf.setSetting`, `store.setSpeed` and the `TwinView` (`viewPreset`, `cameraTo`, `cameraPose`, `setCameraPose`), samples every animation frame and downloads one JSON; progress is `perf.benchmark`. How to run and read it: [optimising/frame-rate.md](optimising/frame-rate.md).
 
 ## Setup dialog and start screen
 
