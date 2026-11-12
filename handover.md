@@ -16,9 +16,9 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 | Issue | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
 | #246 | Headless baseline, posing counters and drawn-box reference | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
-| #247 | Opt-in Blender install script for cloud sessions | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
+| #247 | Opt-in Blender install script for cloud sessions | none | merged in branch (a01e946) | |
 | #248 | Environment reflections and contact shadows | none | open | |
-| #249 | Far tier: stand-ins for fences, ASC rails and masts | none | open | |
+| #249 | Far tier: stand-ins for fences, ASC rails and masts | none | open | orchestrator session_0155BNjyJ45Cnu5X19SbvEUH |
 | #250 | Posing: boxes at rest are written only when their custody changes | #246 | open | |
 | #251 | Playback: even pacing with the achieved speed shown | #246 | open | |
 | #252 | Sweep-only invariant checks in the browser, "strict checks" switch | #246 | open | |
@@ -46,4 +46,4 @@ Rows are in dependency order. A ticket is startable when every blocker is merged
 
 ## Open points
 
-- None yet. Add what each ticket leaves behind here.
+- **#247:** `scripts/install-bpy.sh` installs bpy into `$HOME/.cache/tt-bpy-venv` (last output line is the venv python). A full `tt:assets --check` over all 7 groups is byte-identical for every GLB and sidecar; 56 preview `.webp` files differ (Cycles on a different CPU), recorded in `assets-pipeline.md`. Use `--no-previews` for a models-only check.
