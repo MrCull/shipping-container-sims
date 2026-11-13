@@ -122,8 +122,8 @@ export function useNarratorAudio() {
     }
 
     const audio = new Audio(url)
-    // Follows the master volume while the clip plays.
-    stopFollow = followMasterGain(audio, NARRATOR_VOLUME)
+    // Follows the effects volume (voice counts as effects) while the clip plays.
+    stopFollow = followMasterGain(audio, NARRATOR_VOLUME, 'sfx')
     currentAudio = audio
     // Store callback even if muted, so user can manually skip via next button
     endedCallback = onEnded ?? null

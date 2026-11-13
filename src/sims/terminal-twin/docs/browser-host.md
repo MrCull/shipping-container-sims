@@ -427,7 +427,7 @@ from production, checked by `terminal-twin.prod.smoke.ts`). All calls are safe f
 | `sceneState()` | at display time: `containers` custody, `reservations`, `liveries`, `colour`, and per equipment kind its `sceneKey`/`rigKey` (`sts`/`stsRendered`, `shcs`/`shcRigs`, `ascs`/`ascRigs`, `trucks`/`truckRigs`, `vessels`/`vesselHulls`, `hatchPanels`/`hatchRigs`) |
 | `display()`, `setDisplay(partial)`, `config()` | locale/units; loaded SI config with display |
 | `ui()` | `{ selectedId, following, followNextPending, overlaysVisible, dashboardOpen, helpOpen, reportOpen, feedOpen, inspectorOpen, colourByOpen, runToOpen }` |
-| `atmosphere()` | daylight lock, master gain, sounds played, positional voices, banner, scene lighting and backdrop |
+| `atmosphere()` | daylight lock, effects gain (`sfxGain`), sounds played, positional voices, banner, scene lighting and backdrop |
 | `dashboard()`, `openDashboard({ tab?, group?, bucketing? })` | `{ open, tab, group, bucketing, rendered }`; `rendered` = `{ chartLibLoaded, charts[], heatmap, gantt, landside }` |
 | `exportRun(kind)`, `report()` | export text; `{ ended, open, headline, highlights, reportReady }` |
 | `addBreakpoint(kind, value)`, `removeBreakpoint(id)`, `clearBreakpoints()`, `breakpoints()` | breakpoint list |

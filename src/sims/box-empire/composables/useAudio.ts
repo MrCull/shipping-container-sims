@@ -47,14 +47,14 @@ export function useAudio() {
   let seagullTimer: ReturnType<typeof setTimeout> | null = null
 
   function play(eventType: GameEventType): void {
-    if (audioStore.masterGain === 0) return
+    if (audioStore.sfxGain === 0) return
     const fileName = SOUND_MAP[eventType]
     if (!fileName) return
     const url = FILE_TO_URL[fileName]
     if (!url) return
 
     const audio = new Audio(url)
-    audio.volume = audioStore.gainFor(SFX_VOLUME)
+    audio.volume = audioStore.gainFor(SFX_VOLUME, 'sfx')
     audio.play().catch(() => { /* user hasn't interacted yet */ })
     audioPool.push(audio)
 
@@ -70,7 +70,7 @@ export function useAudio() {
     bgAudio = new Audio(bgTrackUrl)
     bgAudio.loop = true
     // The slider changes the level of music that is already playing.
-    stopBgFollow = followMasterGain(bgAudio, BG_VOLUME)
+    stopBgFollow = followMasterGain(bgAudio, BG_VOLUME, 'music')
     bgAudio.play().catch(() => { /* autoplay blocked until user interaction */ })
   }
 
@@ -89,9 +89,9 @@ export function useAudio() {
   function scheduleNextSeagull(): void {
     const delay = SEAGULL_BASE_MS + (Math.random() * 2 - 1) * SEAGULL_JITTER_MS
     seagullTimer = setTimeout(() => {
-      if (audioStore.masterGain > 0) {
+      if (audioStore.sfxGain > 0) {
         const a = new Audio(seagullUrl)
-        a.volume = audioStore.gainFor(SEAGULL_VOLUME)
+        a.volume = audioStore.gainFor(SEAGULL_VOLUME, 'sfx')
         a.play().catch(() => {})
         audioPool.push(a)
         a.addEventListener('ended', () => {

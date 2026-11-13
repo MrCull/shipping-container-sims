@@ -461,7 +461,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     },
     atmosphere: () => ({
       lockDaylight: store.lockDaylight,
-      soundGain: useAudioStore().masterGain,
+      soundGain: useAudioStore().sfxGain,
       sound: store.sounds.stats(),
       positional: store.positional.stats(),
       banner: store.banner ? { kind: store.banner.kind, vesselName: store.banner.vesselName } : null,

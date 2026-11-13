@@ -33,7 +33,7 @@ export async function ensureAudioLoaded(): Promise<void> {
 /** `volume` is the sound's own gain at full master volume; it plays at that times the shared master gain. */
 export function playStackSound(name: string, volume: number = 0.8, playbackRate: number = 1): void {
   const audioStore = useAudioStore()
-  if (audioStore.masterGain === 0) return
+  if (audioStore.sfxGain === 0) return
   if (!ctx || !buffers.has(name)) return
   if (ctx.state === 'suspended') void ctx.resume()
 
@@ -42,7 +42,7 @@ export function playStackSound(name: string, volume: number = 0.8, playbackRate:
   source.playbackRate.value = playbackRate
 
   const gainNode = ctx.createGain()
-  gainNode.gain.value = audioStore.gainFor(volume)
+  gainNode.gain.value = audioStore.gainFor(volume, 'sfx')
   source.connect(gainNode)
   gainNode.connect(ctx.destination)
   source.start(0)
