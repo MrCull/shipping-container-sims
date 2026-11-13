@@ -31,10 +31,10 @@ watch(currentPage, page => {
   playedCueKeys.value.add(cueKey)
   const soundUrl = SOUNDS[page.soundCue]
   if (!soundUrl) return
-  // Honours mute and the master volume like every other sound in the app.
-  if (audioStore.masterGain === 0) return
+  // Honours mute and the effects volume like every other sound in the app.
+  if (audioStore.sfxGain === 0) return
   const sound = new Audio(soundUrl)
-  sound.volume = audioStore.gainFor(BRIEFING_VOICE_VOLUME)
+  sound.volume = audioStore.gainFor(BRIEFING_VOICE_VOLUME, 'sfx')
   void sound.play().catch(() => {})
 }, { immediate: true })
 

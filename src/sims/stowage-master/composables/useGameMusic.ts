@@ -11,7 +11,7 @@ function getAudio(): HTMLAudioElement {
   if (!sharedAudio) {
     sharedAudio = new Audio(gameMusicUrl)
     sharedAudio.loop = true
-    sharedAudio.volume = useAudioStore().gainFor(GAME_MUSIC_VOLUME)
+    sharedAudio.volume = useAudioStore().gainFor(GAME_MUSIC_VOLUME, 'music')
   }
   return sharedAudio
 }
@@ -38,7 +38,7 @@ export function useGameMusic() {
 
   onMounted(() => {
     // The slider changes the level of music that is already playing (stopped with the component).
-    followMasterGain(getAudio(), GAME_MUSIC_VOLUME)
+    followMasterGain(getAudio(), GAME_MUSIC_VOLUME, 'music')
     tryPlay()
     watch(
       () => audioStore.musicMuted,

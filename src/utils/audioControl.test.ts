@@ -15,7 +15,7 @@ describe('audio control presentation', () => {
   })
 
   it('labels the speaker with the action a click performs', () => {
-    expect(speakerLabel(true)).toBe('Unmute')
-    expect(speakerLabel(false)).toBe('Mute')
+    expect(speakerLabel(true)).toBe('Unmute all')
+    expect(speakerLabel(false)).toBe('Mute all')
   })
 })

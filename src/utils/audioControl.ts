@@ -9,7 +9,7 @@ export function speakerIcon(muted: boolean, volume: number): string {
   return volume < 0.5 ? '🔉' : '🔊'
 }
 
-/** The speaker click toggles mute, so its label names the action. */
+/** The speaker click toggles mute for music and effects together, so its label names that action. */
 export function speakerLabel(muted: boolean): string {
-  return muted ? 'Unmute' : 'Mute'
+  return muted ? 'Unmute all' : 'Mute all'
 }

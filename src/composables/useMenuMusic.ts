@@ -17,7 +17,7 @@ function getAudio(): HTMLAudioElement {
   if (!sharedAudio) {
     sharedAudio = new Audio(menuMusicUrl)
     sharedAudio.loop = true
-    sharedAudio.volume = useAudioStore().gainFor(MENU_MUSIC_GAIN)
+    sharedAudio.volume = useAudioStore().gainFor(MENU_MUSIC_GAIN, 'music')
   }
   return sharedAudio
 }
@@ -45,7 +45,7 @@ export function useMenuMusic() {
 
   onMounted(() => {
     // The slider drives the level live while the menu is open (stopped with the component).
-    followMasterGain(getAudio(), MENU_MUSIC_GAIN)
+    followMasterGain(getAudio(), MENU_MUSIC_GAIN, 'music')
     tryPlay()
     watch(
       () => audioStore.musicMuted,

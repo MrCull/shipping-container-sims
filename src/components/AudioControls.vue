@@ -21,6 +21,8 @@ const popover = ref<HTMLElement | null>(null)
 const popoverStyle = ref<Record<string, string>>({})
 
 const volumePercent = computed(() => Math.round(audioStore.volume * 100))
+const musicPercent = computed(() => Math.round(audioStore.musicVolume * 100))
+const sfxPercent = computed(() => Math.round(audioStore.sfxVolume * 100))
 const effectivelySilent = computed(() => isSilent(audioStore.soundMuted, audioStore.volume))
 const icon = computed(() => speakerIcon(audioStore.soundMuted, audioStore.volume))
 const label = computed(() => speakerLabel(audioStore.soundMuted))
@@ -76,8 +78,20 @@ function handleToggleMute(): void {
   })
 }
 
+function sliderValue(event: Event): number {
+  return Number((event.target as HTMLInputElement).value) / 100
+}
+
 function handleVolume(event: Event): void {
-  audioStore.moveVolumeSlider(Number((event.target as HTMLInputElement).value) / 100)
+  audioStore.moveVolumeSlider(sliderValue(event))
+}
+
+function handleMusicVolume(event: Event): void {
+  audioStore.moveMusicSlider(sliderValue(event))
+}
+
+function handleSfxVolume(event: Event): void {
+  audioStore.moveSfxSlider(sliderValue(event))
 }
 
 onBeforeUnmount(close)
@@ -94,7 +108,7 @@ onBeforeUnmount(close)
       :class="{ muted: effectivelySilent }"
       :title="label"
       :aria-pressed="audioStore.soundMuted"
-      aria-label="Mute"
+      aria-label="Mute all"
       data-testid="audio-button"
       @click="handleToggleMute"
     >
@@ -121,21 +135,72 @@ onBeforeUnmount(close)
         aria-label="Volume"
         data-testid="audio-popover"
       >
-        <input
-          class="audio-slider"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          :value="volumePercent"
-          aria-label="Volume"
-          data-testid="audio-volume"
-          @input="handleVolume"
+        <label class="audio-row">
+          <span class="audio-name">Master</span>
+          <input
+            class="audio-slider"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            :value="volumePercent"
+            aria-label="Volume"
+            data-testid="audio-volume"
+            @input="handleVolume"
+          >
+          <span
+            class="audio-percent"
+            data-testid="audio-volume-label"
+          >{{ volumePercent }}%</span>
+        </label>
+        <label class="audio-row">
+          <span class="audio-name">Music</span>
+          <input
+            class="audio-slider"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            :value="musicPercent"
+            aria-label="Music volume"
+            data-testid="audio-music-volume"
+            @input="handleMusicVolume"
+          >
+          <span
+            class="audio-percent"
+            data-testid="audio-music-volume-label"
+          >{{ musicPercent }}%</span>
+        </label>
+        <label
+          class="audio-row"
+          title="Sound effects, ambience and voice"
         >
-        <span
-          class="audio-percent"
-          data-testid="audio-volume-label"
-        >{{ volumePercent }}%</span>
+          <span class="audio-name">Effects</span>
+          <input
+            class="audio-slider"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            :value="sfxPercent"
+            aria-label="Effects volume"
+            data-testid="audio-sfx-volume"
+            @input="handleSfxVolume"
+          >
+          <span
+            class="audio-percent"
+            data-testid="audio-sfx-volume-label"
+          >{{ sfxPercent }}%</span>
+        </label>
+        <button
+          class="audio-mute-all"
+          :class="{ active: audioStore.soundMuted }"
+          :aria-pressed="audioStore.soundMuted"
+          data-testid="audio-mute-all"
+          @click="handleToggleMute"
+        >
+          {{ audioStore.soundMuted ? 'Unmute all' : 'Mute all' }}
+        </button>
       </div>
     </Teleport>
   </div>
@@ -204,8 +269,9 @@ onBeforeUnmount(close)
   position: fixed;
   z-index: 10000;
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
   padding: 0.6rem 0.75rem;
   /* The popover sits in <body>: a sim themes it through the --audio-popover-* variables (Terminal Twin's skin.css). */
   background: var(--audio-popover-bg, var(--color-bg-card));
@@ -219,6 +285,16 @@ onBeforeUnmount(close)
   font-size: 0.8rem;
 }
 
+.audio-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.audio-name {
+  min-width: 3.6rem;
+}
+
 .audio-slider {
   width: 8rem;
   accent-color: var(--audio-popover-accent, var(--color-primary));
@@ -228,5 +304,25 @@ onBeforeUnmount(close)
   min-width: 2.6ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.audio-mute-all {
+  margin-top: 0.15rem;
+  padding: 0.3rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--audio-popover-border, var(--color-border));
+  border-radius: 4px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.audio-mute-all:hover {
+  border-color: var(--audio-popover-accent, var(--color-primary));
+}
+
+.audio-mute-all.active {
+  border-color: var(--audio-popover-active-border, var(--color-primary));
+  background: var(--audio-popover-active-bg, rgba(59, 130, 246, 0.15));
 }
 </style>

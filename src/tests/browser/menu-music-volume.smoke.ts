@@ -61,3 +61,25 @@ test('the volume slider on the main menu changes the menu music level live; 0 is
   await page.getByTestId('audio-button').click()
   await expect.poll(() => menuMusicVolume(page)).toBeCloseTo(0.8 * MENU_MUSIC_GAIN)
 })
+
+test('the music slider scales the menu music under the master volume, and the effects slider leaves it alone', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('audio-menu-button').click()
+  await setVolume(page, 100)
+  await expect.poll(() => menuMusicVolume(page)).toBeCloseTo(MENU_MUSIC_GAIN)
+
+  await page.getByTestId('audio-music-volume').fill('50')
+  await expect(page.getByTestId('audio-music-volume-label')).toHaveText('50%')
+  await expect.poll(() => menuMusicVolume(page)).toBeCloseTo(0.5 * MENU_MUSIC_GAIN)
+
+  await page.getByTestId('audio-sfx-volume').fill('0')
+  await expect(page.getByTestId('audio-sfx-volume-label')).toHaveText('0%')
+  await expect.poll(() => menuMusicVolume(page)).toBeCloseTo(0.5 * MENU_MUSIC_GAIN)
+
+  // Mute all, from inside the popover, silences the music and keeps the levels.
+  await page.getByTestId('audio-mute-all').click()
+  await expect.poll(() => menuMusicVolume(page)).toBe(0)
+  await expect(page.getByTestId('audio-button')).toHaveText('🔇')
+  await page.getByTestId('audio-mute-all').click()
+  await expect.poll(() => menuMusicVolume(page)).toBeCloseTo(0.5 * MENU_MUSIC_GAIN)
+})
