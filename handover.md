@@ -57,4 +57,6 @@ Rules that must keep holding:
 - Screenshot scripts used for review live only in the session scratchpad; `pnpm run screenshot` does the same job.
 - Dashboard charts: `modules/dashboardPalette.ts` is back on the dark categorical set that was validated on
   `#1a1a19` before the light skin (#122); `--tt-chart-surface` matches it (`tests/skin.test.ts` checks that).
-- The top bar must stay two rows at 1280 px wide: `terminal-twin-hud.smoke.ts` checks HUD regions do not overlap.
+- The top bar is two rows at 1280 px and wider (below 1380 px the action buttons drop their icons to fit);
+  `terminal-twin-hud.smoke.ts` checks HUD regions do not overlap. The clock markup must read day, date, time
+  (`terminal-twin-display.smoke.ts`); the time is placed first with CSS grid only.

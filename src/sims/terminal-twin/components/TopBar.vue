@@ -333,7 +333,7 @@ async function submitRunTo(): Promise<void> {
   align-items: center;
   column-gap: 0.7rem;
   row-gap: 0.15rem;
-  min-width: 17rem;
+  min-width: 15.5rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -375,7 +375,6 @@ async function submitRunTo(): Promise<void> {
 /* Transport: pause and the speeds as one segmented control. */
 .speeds {
   display: flex;
-  gap: 1px;
   padding: 2px;
   background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
@@ -383,7 +382,7 @@ async function submitRunTo(): Promise<void> {
 }
 
 .speed-btn {
-  min-width: 1.7rem;
+  min-width: 1.6rem;
   height: 1.7rem;
   padding: 0 0.32rem;
   background: transparent;
@@ -512,7 +511,7 @@ async function submitRunTo(): Promise<void> {
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  min-width: 5.6rem;
+  min-width: 4.8rem;
   height: 2rem;
   padding: 0 0.7rem;
   border: 1px solid var(--tt-hairline);
@@ -572,7 +571,7 @@ async function submitRunTo(): Promise<void> {
   gap: 0.4rem 0.5rem;
   flex: 0 1 auto;
   justify-content: flex-end;
-  max-width: 29.5rem;
+  max-width: 28rem;
 }
 
 .rob-display {
@@ -653,6 +652,17 @@ async function submitRunTo(): Promise<void> {
 .error {
   color: var(--tt-danger);
   font-size: var(--tt-text-sm);
+}
+
+/* A laptop-width window: the action buttons drop their icons so the bar stays two rows. */
+@media (max-width: 1380px) {
+  .action-btn:not(.help-btn) .tt-icon {
+    display: none;
+  }
+
+  .action-btn {
+    padding: 0 0.6rem;
+  }
 }
 
 /* Phones and narrow windows: everything wraps inside the screen width (an over-wide bar stretched the whole view,
