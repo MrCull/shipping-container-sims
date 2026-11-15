@@ -339,9 +339,9 @@ h3 {
 .btn,
 .icon-btn {
   padding: 0.3rem 0.65rem;
-  border: 1px solid var(--tt-border);
+  border: 1px solid var(--tt-hairline);
   border-radius: 6px;
-  background: var(--tt-bg);
+  background: var(--tt-control);
   color: var(--tt-text);
   font-size: 0.8rem;
 }

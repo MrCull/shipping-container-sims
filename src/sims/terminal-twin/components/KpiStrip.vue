@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from './ui/TtIcon.vue'
 import { computed, onBeforeUnmount, reactive, watch } from 'vue'
 import { useTwinStore } from '../store/twinStore'
 import { crossedThreshold, prefersReducedMotion, stripItems, tween, type StripItemId } from '../modules/kpiStrip'
@@ -85,7 +86,7 @@ onBeforeUnmount(() => {
     :aria-expanded="false"
     @click="hud.toggle('kpis')"
   >
-    {{ t('hud.kpisShort') }} ▾
+    {{ t('hud.kpisShort') }} <TtIcon name="down" />
   </button>
   <ul
     v-else-if="items.length"
@@ -119,7 +120,7 @@ onBeforeUnmount(() => {
         :aria-expanded="true"
         @click="hud.toggle('kpis')"
       >
-        ▴
+        <TtIcon name="up" />
       </button>
     </li>
   </ul>
@@ -138,9 +139,18 @@ onBeforeUnmount(() => {
 
 .kpi-collapse {
   align-self: center;
+  padding: 0 0.4rem;
   pointer-events: auto;
 }
 
+.kpi-collapse .hud-pill {
+  border-color: transparent;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* One glass strip of figures, a hairline between them. */
 .kpi-strip {
   /* Grid cell between the side panels; wraps onto more rows rather than overflowing. */
   grid-column: 2;
@@ -150,43 +160,49 @@ onBeforeUnmount(() => {
   z-index: 4;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
   min-width: 0;
-  max-width: 100%;
-  margin: 0.6rem 0.8rem 0;
+  max-width: calc(100% - 1.6rem);
+  margin: 0.7rem 0.8rem 0;
   padding: 0;
+  overflow: hidden;
   list-style: none;
   pointer-events: none;
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  background: var(--tt-panel);
+  -webkit-backdrop-filter: var(--tt-blur);
+  backdrop-filter: var(--tt-blur);
+  box-shadow: var(--tt-shadow);
   font-family: var(--tt-font);
+  color: var(--tt-text);
 }
 
 .kpi {
   display: flex;
   flex-direction: column;
+  gap: 0.15rem;
   min-width: 5.6rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: 8px;
-  border: 1px solid var(--tt-border);
-  background: var(--tt-panel);
-  -webkit-backdrop-filter: var(--tt-blur);
-  backdrop-filter: var(--tt-blur);
-  color: var(--tt-text);
-  backdrop-filter: blur(4px);
+  padding: 0.5rem 0.85rem 0.55rem;
+  box-shadow: inset -1px 0 0 var(--tt-hairline);
 }
 
 .label {
-  font-size: 0.66rem;
-  letter-spacing: 0.04em;
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: var(--tt-text-muted);
+  white-space: nowrap;
+  color: var(--tt-text-faint);
 }
 
 .value {
   font-family: var(--tt-font-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  font-size: 0.98rem;
+  font-size: 1.05rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
 }
 
 .kpi.pulse {
@@ -195,19 +211,17 @@ onBeforeUnmount(() => {
 
 @keyframes tt-kpi-pulse {
   0% {
-    border-color: var(--tt-accent);
-    box-shadow: 0 0 0 0 var(--tt-focus);
+    background: var(--tt-accent-soft);
   }
   100% {
-    border-color: var(--tt-border);
-    box-shadow: 0 0 0 0.9rem transparent;
+    background: transparent;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .kpi.pulse {
     animation: none;
-    border-color: var(--tt-accent);
+    background: var(--tt-accent-soft);
   }
 }
 </style>

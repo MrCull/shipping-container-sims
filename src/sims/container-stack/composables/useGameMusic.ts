@@ -15,7 +15,7 @@ function getAudio(): HTMLAudioElement {
     sharedAudio = new Audio(gameMusicUrl)
     sharedAudio.loop = true
     // The slider changes the level of music that is already playing.
-    stopFollow = followMasterGain(sharedAudio, GAME_MUSIC_VOLUME)
+    stopFollow = followMasterGain(sharedAudio, GAME_MUSIC_VOLUME, 'music')
   }
   return sharedAudio
 }

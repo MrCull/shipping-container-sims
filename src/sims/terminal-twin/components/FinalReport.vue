@@ -346,9 +346,9 @@ h3 {
 .close,
 .reopen,
 .export-btn {
-  border: 1px solid var(--tt-border);
+  border: 1px solid var(--tt-hairline);
   border-radius: 6px;
-  background: var(--tt-surface);
+  background: var(--tt-control);
   color: var(--tt-text);
   cursor: pointer;
   font: inherit;

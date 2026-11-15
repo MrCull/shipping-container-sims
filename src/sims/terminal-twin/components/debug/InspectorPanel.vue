@@ -547,9 +547,9 @@ h3 {
 .icon-btn,
 .chip {
   padding: 0.2rem 0.55rem;
-  border: 1px solid var(--tt-border);
+  border: 1px solid var(--tt-hairline);
   border-radius: 6px;
-  background: var(--tt-bg);
+  background: var(--tt-control);
   color: var(--tt-text);
   font-size: 0.75rem;
 }

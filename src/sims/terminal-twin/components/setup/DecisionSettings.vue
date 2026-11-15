@@ -213,7 +213,7 @@ const pct = (raw: string): number => Math.min(100, Math.max(0, Number(raw) || 0)
   gap: 0.5rem;
   align-items: end;
   padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--tt-border);
+  border-bottom: 1px solid var(--tt-hairline);
 }
 
 .dp {
@@ -232,12 +232,13 @@ const pct = (raw: string): number => Math.min(100, Math.max(0, Number(raw) || 0)
 
 .mini input,
 .mini select {
-  padding: 0.3rem 0.4rem;
+  height: 2rem;
+  padding: 0 0.5rem;
   font: inherit;
   color: var(--tt-text);
-  background: var(--tt-bg);
+  background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 @media (max-width: 700px) {

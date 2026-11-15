@@ -49,6 +49,7 @@ export class VesselCountdownLabels {
   private entries = new Map<string, Entry>()
   private shown: VesselLabelState[] = []
   private colours: { fill: string; stroke: string; ink: string } | null = null
+  private coloursTheme = ''
 
   constructor(private readonly model: SceneModel) {}
 
@@ -72,7 +73,12 @@ export class VesselCountdownLabels {
   }
 
   private draw(e: Entry, text: string): void {
-    this.colours ??= { fill: token('--tt-surface', '#fafbfd'), stroke: token('--tt-accent', '#1f5fbf'), ink: token('--tt-text', '#14253f') }
+    // re-read when the skin's theme changes (store/themeStore.ts puts it on <html>)
+    const theme = (typeof document === 'undefined' ? undefined : document.documentElement?.dataset?.ttTheme) ?? ''
+    if (!this.colours || this.coloursTheme !== theme) {
+      this.colours = { fill: token('--tt-surface', '#121a26'), stroke: token('--tt-accent', '#5eb0ff'), ink: token('--tt-text', '#e9eef6') }
+      this.coloursTheme = theme
+    }
     const ctx = e.canvas.getContext('2d')
     if (ctx) {
       ctx.clearRect(0, 0, W_PX, H_PX)

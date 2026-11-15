@@ -56,16 +56,22 @@ const d = useSetupDraft()
 }
 
 .btn {
-  padding: 0.45rem 0.9rem;
-  background: var(--tt-bg);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.25rem;
+  padding: 0 0.85rem;
+  background: var(--tt-control);
   border: 1px solid var(--tt-border);
-  border-radius: 6px;
+  border-radius: var(--tt-radius-sm);
   color: var(--tt-text);
-  font-size: 0.85rem;
+  font-size: var(--tt-text-sm);
+  font-weight: 550;
   white-space: nowrap;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--tt-accent);
+  background: var(--tt-control-hover);
+  border-color: var(--tt-border-strong);
 }
 </style>
