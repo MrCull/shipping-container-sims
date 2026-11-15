@@ -76,6 +76,8 @@ only draw calls and triangles mean anything there; CPU and pose ms are noise).
 Other dev API levers: `perfOverlay(on)` (also key P, the Stats button, or a click on the FPS chip), `setFrameLoad(ms)`
 (busy-wait per frame, dev only), `setAutoThresholds({ down, up })` (retune Auto's median frame-time thresholds, given in fps, for slow renderers; null restores 45 / 57),
 `setAutoRung(n)` (force Auto's ladder rung, 0 best look, to prove what a rung draws without a slow frame rate; `perf().rung` and `rungName` read it).
+The ladder has 9 rungs (0 to 8): rung 1, `equipment-hero-off` (#273), sheds the hero spreaders (`QualityProfile.heroEquipment`: High 3, Medium 1, Low 0;
+0 from that rung down) before any box hero detail, so `hero-half` is rung 2, `hero-off` rung 5, `medium` 7 and `low` 8. Name a rung by `rungName`, not by its index, where you can.
 The ladder and its provisional thresholds (retuned in #262) are in [rendering-3d.md](../rendering-3d.md#quality-tiers-and-auto);
 the Auto unit tests feed timestamps to `AutoQuality.frame(nowMs)`, so no real frame rate is needed.
 

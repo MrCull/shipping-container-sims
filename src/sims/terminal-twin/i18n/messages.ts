@@ -917,6 +917,7 @@ const en = {
   'perf.level': 'Quality in force',
   'perf.rung': 'Detail in force',
   'perf.rung.hero-full': 'Full detail',
+  'perf.rung.equipment-hero-off': 'Hero spreaders off',
   'perf.rung.hero-half': 'Hero cap half',
   'perf.rung.hero-quarter': 'Hero cap quarter',
   'perf.rung.hero-marks-standard': 'Hero markings standard',
