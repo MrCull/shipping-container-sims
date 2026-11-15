@@ -316,7 +316,11 @@ export class HeroEquipmentLevel {
       h.offer.mount.node.updateWorldMatrix(true, true)
       const hero = bounds(box.setFromObject(h.root))
       box.makeEmpty()
-      for (const m of h.rigMeshes) box.union(part.setFromObject(m))
+      // each rig mesh by its own geometry: the hero subtree hangs under the rig's spreader node, which may itself be a mesh
+      for (const m of h.rigMeshes) {
+        if (!m.geometry.boundingBox) m.geometry.computeBoundingBox()
+        box.union(part.copy(m.geometry.boundingBox!).applyMatrix4(m.matrixWorld))
+      }
       out.push({ id, kind: h.offer.kind, fading: h.fade !== null, rigHidden: h.rigMeshes.every((m) => !m.visible), hero, rig: bounds(box) })
     }
     return out
