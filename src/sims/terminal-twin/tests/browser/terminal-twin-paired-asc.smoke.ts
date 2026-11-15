@@ -84,7 +84,7 @@ test('the ASC rail overlay shows reserved segments and updates live', async ({ p
 
 test('the overlay toggle button turns the ASC rail overlay on and off', async ({ page }) => {
   await open(page)
-  const toggle = page.getByRole('button', { name: /asc rail/i })
+  const toggle = page.getByRole('button', { name: /stacking crane rails/i })
   await expect(toggle).toHaveAttribute('aria-pressed', 'false')
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
