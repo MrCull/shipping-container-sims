@@ -122,6 +122,7 @@ Full table of points, contracts and strategies: [../decision-points.md](../decis
 | `quay.stsMinSpacingM` | `DEFAULT_QUAY` | 27 m | the rail conflict distance |
 | `quay.mooringS` / `unmooringS` | presets | 1800 / 1200 s | dead quay time per call |
 | `quay.berthGapM` | `DEFAULT_QUAY` | 15 m | with quay length decides how many vessels berth at once |
+| `quay.berthOvertaking` | `QuayConfig`, `engine/subsystems/berth.ts` | off | on: a waiting vessel that fits a free stretch berths ahead of a larger one at the head of the queue (#272); no fairness guard |
 | hatch timings | `HATCH_DEFAULTS`, `config.hatch` | above | `hatch.enabled: false` removes cover work |
 | `vesselPlanning.ordering` | `engine/vesselOrdering.ts` | `pod-weight` | `as-today` rolls back; affects rehandles and stow order |
 | equipment counts | presets | 8 STS, 23 SHC, 16 blocks x 2 ASC (`ascsPerBlock` 1 or 2) | more of a non-bottleneck adds nothing |

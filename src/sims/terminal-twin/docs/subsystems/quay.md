@@ -36,6 +36,7 @@ choose them. `DEFAULT_MAX_STS` (`scenario/builder.ts`): feeder 2, feedermax 3, p
 ScenarioStarted -> VesselArrived (status at-anchorage, pushed on berth.queue)
   -> berthAllocation (head of queue only, one pending: berth.allocating)
      reply null    -> VesselAtAnchorage (once per vessel); asked again at every VesselDeparted
+                      (quay.berthOvertaking: the next queued vessel not yet asked is asked at once)
      reply berthX  -> validateBerth -> BerthAllocated (status mooring, panels positioned)
   -> +quay.mooringS -> VesselBerthed
      nothing to do (or quay off) -> VesselWorkComplete at once
@@ -47,8 +48,15 @@ ScenarioStarted -> VesselArrived (status at-anchorage, pushed on berth.queue)
 
 - Defaults (`DEFAULT_QUAY`, `scenario/builder.ts`, all [A]): `lengthM` 400, `berthGapM` 15, `mooringS` 1800,
   `unmooringS` 1200, `stsMinSpacingM` 27, `twinLift` true. TTI presets set mooring 1800 / unmooring 1200 explicitly.
-- Berth allocation is strictly first come, first served: only `berth.queue[0]` is asked. A vessel that never fits
+- Berth allocation is first come, first served by default: only `berth.queue[0]` is asked. A vessel that never fits
   (LOA > quay) blocks the queue for good (the setup dialog warns).
+- **Berth overtaking** (`quay.berthOvertaking: true`, off by default, #272): after a null reply the first queued
+  vessel not in `berth.asked` is asked, so a smaller vessel can take a stretch the head does not fit in. `berth.asked`
+  (vessel ids asked since the quay last changed) is cleared by `assignBerth` and at `VesselDeparted`, so every waiting
+  vessel is asked once per quay state, always in queue order (the head first). The queue order never changes and the
+  request and reply contracts are the same, so `first-fit` and `best-fit` work as they are. There is no fairness
+  guard: a large vessel can be overtaken again and again while smaller ones keep arriving. Berth mode `off`
+  (`placeFirstFit`) stays first come, first served. Fixture `berth-overtaking`, `tests/berth-overtaking.test.ts`.
 - `validateBerth` throws (the run fails) for a berth off the quay or within `berthGapM` of a vessel on the quay
   (mooring, berthed or unmooring). Anchorage wait = allocation minus arrival (`VesselState.anchorageWaitS`).
 - The quay stretch is held from `BerthAllocated` until `VesselDeparted`.

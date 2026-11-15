@@ -351,6 +351,12 @@ export interface QuayConfig {
   lengthM: number
   /** Minimum clear distance between two berthed vessels (m). */
   berthGapM: number
+  /**
+   * Berth overtaking (default off: first come, first served). When on, a waiting vessel that the
+   * head of the anchorage queue blocks is asked about too, so it can take a quay stretch the head
+   * does not fit in. There is no fairness guard: a large vessel can be overtaken repeatedly.
+   */
+  berthOvertaking?: boolean
   /** From berth allocation to all-fast: pilotage, approach and mooring (s). */
   mooringS: number
   /** From the last move to departure: unmooring (s). */
