@@ -88,6 +88,30 @@ const fixtureEntries: Record<string, FixtureDefinition> = {
       .build(),
   },
 
+  /**
+   * Berth overtaking: two ULCVs cannot share the 600 m quay, but the Feedermax that arrives third
+   * fits in the stretch the second ULCV cannot use, so it berths first.
+   */
+  'berth-overtaking': {
+    group: 'quay',
+    name: 'Small ship overtakes at anchorage',
+    summary: 'A small ship berths ahead of a big one that is waiting for room.',
+    description: 'Two very large ships cannot share the 600 m quay, so the second waits at anchorage. A small ship arrives later, fits in the free stretch and berths first, because berth overtaking is switched on.',
+    watch: 'Watch the third ship go straight to the quay while the second one stays outside.',
+    build: () =>
+    new ScenarioBuilder('berth-overtaking', 'A Feedermax overtakes a waiting ULCV on a 600 m quay (berth overtaking on)')
+      .hatch({ enabled: false })
+      .seed(11)
+      .quay(600, { mooringS: 600, unmooringS: 600, berthOvertaking: true })
+      .sts('STS01', { gantryX: 150, groundPositions: 24 })
+      .sts('STS02', { gantryX: 500, groundPositions: 24 })
+      .vesselCall('V001', { name: 'MSC Gibraltar', sizeClass: 'ulcv', arrivalS: 0, discharge: 12, load: 10, maxSts: 1 })
+      .vesselCall('V002', { name: 'Maersk Estrecho', sizeClass: 'ulcv', arrivalS: 600, discharge: 12, load: 10, maxSts: 1 })
+      .vesselCall('V003', { name: 'Tarifa Feeder', sizeClass: 'feedermax', arrivalS: 900, discharge: 8, load: 6, maxSts: 1 })
+      .endWhen({ vesselsCompleted: 3 })
+      .build(),
+  },
+
   /** One Neo-Panamax worked by 4 STS: the crane split decides who works which bays. */
   'crane-split-4sts': {
     group: 'quay',

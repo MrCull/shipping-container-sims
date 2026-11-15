@@ -1,0 +1,201 @@
+{
+  "scenario": "berth-overtaking",
+  "seed": 11,
+  "status": "ended",
+  "endReason": "vesselsCompleted >= 3",
+  "eventLogHash": "0a5628907f227a",
+  "kpis": {
+    "simTimeS": 7207.931,
+    "eventsProcessed": 335,
+    "movesCompleted": 32,
+    "vesselsCompleted": 3,
+    "sts": {
+      "STS01": {
+        "moves": 24,
+        "cycles": 21,
+        "twinLifts": 3,
+        "grossMovesPerHour": 14.428,
+        "railWaitS": 0
+      },
+      "STS02": {
+        "moves": 8,
+        "cycles": 7,
+        "twinLifts": 1,
+        "grossMovesPerHour": 24.23,
+        "railWaitS": 0
+      }
+    },
+    "vessels": {
+      "V001": {
+        "sizeClass": "ulcv",
+        "arrivedAtS": 0,
+        "anchorageWaitS": 0,
+        "berthX": 0,
+        "berthedAtS": 600,
+        "departedAtS": 3247.914,
+        "turnaroundS": 2647.914,
+        "sts": [
+          "STS01"
+        ]
+      },
+      "V002": {
+        "sizeClass": "ulcv",
+        "arrivedAtS": 600,
+        "anchorageWaitS": 2647.914,
+        "berthX": 0,
+        "berthedAtS": 3847.914,
+        "departedAtS": 7207.931,
+        "turnaroundS": 3360.017,
+        "sts": [
+          "STS01"
+        ]
+      },
+      "V003": {
+        "sizeClass": "feedermax",
+        "arrivedAtS": 900,
+        "anchorageWaitS": 0,
+        "berthX": 415,
+        "berthedAtS": 1500,
+        "departedAtS": 3308.07,
+        "turnaroundS": 1808.07,
+        "sts": [
+          "STS02"
+        ]
+      }
+    },
+    "quay": {
+      "vesselsWaited": 1,
+      "anchorageWaitS": {
+        "total": 2647.914,
+        "mean": 882.638,
+        "max": 2647.914
+      }
+    },
+    "handlers": {
+      "stsGroundPosition": {
+        "handler": "strategy:lowest-free-lane",
+        "calls": 32,
+        "resolved": 32,
+        "ok": 32,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "berthAllocation": {
+        "handler": "strategy:first-fit",
+        "calls": 5,
+        "resolved": 5,
+        "ok": 5,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "craneSplit": {
+        "handler": "strategy:balanced-moves",
+        "calls": 3,
+        "resolved": 3,
+        "ok": 3,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 2,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "workPackageRelease": {
+        "handler": "strategy:keep-k-ahead",
+        "calls": 31,
+        "resolved": 31,
+        "ok": 31,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      }
+    },
+    "dwell": {
+      "IMPORT": {
+        "count": 30,
+        "departed": 0,
+        "meanS": 4291.094,
+        "maxS": 6507.472
+      },
+      "STORAGE": {
+        "count": 2,
+        "departed": 0,
+        "meanS": 1169.798,
+        "maxS": 1611.42
+      }
+    },
+    "workPackages": {
+      "released": 28,
+      "started": 28,
+      "completed": 28,
+      "leadTimeMeanS": 367.725,
+      "leadTimeMaxS": 823.01,
+      "boxesLoaded": 0
+    },
+    "ordering": {
+      "discharge": {
+        "boxes": 32,
+        "groupSplits": 0
+      },
+      "load": {
+        "boxes": 0,
+        "podOnEarlier": 0,
+        "heavyOnLight": 0
+      }
+    }
+  },
+  "invariants": {
+    "enabled": true,
+    "checks": 263,
+    "violations": 0,
+    "first": null
+  },
+  "firstError": null
+}

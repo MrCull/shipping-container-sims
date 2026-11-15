@@ -39,6 +39,18 @@ describe('CLI runner', () => {
     expect(lines[0].type).toBe('ScenarioStarted')
   })
 
+  it('writes an event log longer than one write chunk (5,000 events) whole, in order', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tt-cli-'))
+    const events = join(dir, 'events.jsonl')
+    const whole = join(dir, 'events.json')
+    expect(cli('--fixture', 'yard-grouped', '--events', events, '--events-json', whole).exitCode).toBe(0)
+    const text = readFileSync(events, 'utf8')
+    expect(text.endsWith('}\n')).toBe(true)
+    const lines = text.trimEnd().split('\n').map((l) => JSON.parse(l))
+    expect(lines.length).toBeGreaterThan(5000)
+    expect(lines).toEqual(JSON.parse(readFileSync(whole, 'utf8')))
+  })
+
   it('honours --seed and --until', () => {
     const seeded = cli('--fixture', 'tracer-1sts-10-boxes', '--seed', '7')
     expect(seeded.text).toContain('(seed 7)')

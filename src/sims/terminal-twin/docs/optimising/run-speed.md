@@ -1,6 +1,6 @@
 # Optimising headless run speed
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.54.0.
 
 Read this when a headless run (`tt:run`, `tt:profile`, `tt:bench`, the test suite) is too slow or uses too much memory, or
 before changing anything on the per-event path (`engine/simulation.ts`, `engine/invariants.ts`, the indexes). It says
@@ -42,7 +42,24 @@ From [../reports/realistic-volume-reports.md](../reports/realistic-volume-report
 - Wall per event is about 1.1 ms (1.07 ms at 0.5, 1.13 ms at 1): close to linear in events.
 - The spec #220 criterion is a full-size peak day under 10 minutes. The margin is 46 s (8 %): one new unscoped invariant
   or a slower per-event path can break it.
-- No CPU profile exists at 0.53.0 / scale 1. Treat the shares above as the pre-fix picture; re-profile before choosing a lever.
+- The 554 s is from another machine. Scale-1 reference on the 4-core cloud container (ENGINE_VERSION 0.54.0, #268):
+  **358 s**, hash `1bb3036832c3e6`, 491,753 events, 401,145 checks (0.73 ms per event).
+
+### Scale-1 profile (ENGINE_VERSION 0.54.0, #268)
+
+Full tables: "Step: scale-1 measurements (#268)" in [../reports/throughput-and-speed-report.md](../reports/throughput-and-speed-report.md).
+
+| Cost | Share of profile | Where |
+|---|---|---|
+| Invariant checks | 49.6 % inclusive (36.7 % self in `engine/invariants.ts`); the 411 full sweeps alone are 14.1 % | `checkInvariants`, `InvariantTracker.sweep` |
+| Garbage collection | 13.0 % self | allocation under the invariants and the yard helpers |
+| Reactors | 30.7 % inclusive: `pumpLoadPrep` 10.1 %, `maybeDispatchAsc` 7.9 %, `hasLandside` 7.7 %, rehandle 5.7 %, landside 5.0 % | `engine/subsystems/`, `engine/landsideGraph.ts` |
+| Event-log hash, commit | 3.0 %, 4.3 % | `engine/simulation.ts` |
+
+Per invariant (share of invariant time): `asc.wtp-handover` 11.4 %, `stowage.order` 10.9 %, `landside.waiting-off-road`
+9.8 %, `landside.segregation` 8.8 %, `stowage.no-floating` 8.1 %, `landside.stranded-truck` 7.0 %,
+`custody.single-owner` 6.9 %, `asc.no-passing` 4.0 %. The ten unscoped invariants are 36.4 % together. Sweeps are 27 %
+of tracker time (162 ms each), tracker bookkeeping 7.1 %.
 
 ## How a step costs
 
@@ -107,25 +124,31 @@ Event-log hashes did not move for any of these: they read state only.
 
 ## Levers not yet pulled
 
-Ordered by expected gain from the #233 per-invariant table (which predates #234 and #237, so the stowage share has gone):
+Ordered by the scale-1 per-invariant table (#268). Only `landside.waiting-off-road` and `landside.stranded-truck`
+read `time` (they run after every checked event); `landside.stall-exclusive`, `landside.leaves-complete` and
+`asc.no-passing` read `equipment`.
 
-1. **Unscoped `time` invariants** (`landside.waiting-off-road`, `landside.stranded-truck`, `landside.stall-exclusive`,
-   `landside.leaves-complete`: 22.2 % of invariant time at 0.1). They scan every truck after every event. Keep a count
-   or list of trucks per status and return early when none is in a status the rule cares about; `waiting-off-road` also
-   allocates a `new Set([...])` of statuses per call (hoist it). Same messages, event log unchanged.
-2. **`asc.wtp-handover` and `asc.no-passing`** (9.5 %): per event they call `ascPoseAt` and `blockSpecsById(config)` /
-   `laneGraphOf(config)` lookups for every ASC. Hoist the lookups and bail when no SHC is inside a pad envelope
-   (`PAD_HALF_X_M` 1.6, `PAD_HALF_Z_M` 6.5).
+1. **`asc.wtp-handover`** (11.4 % of invariant time, reads `time`, unscoped): per event it calls `ascPoseAt` and the
+   `blockSpecsById(config)` / `laneGraphOf(config)` lookups for every ASC. Hoist the lookups and bail when no SHC is
+   inside a pad envelope (`PAD_HALF_X_M` 1.6, `PAD_HALF_Z_M` 6.5). `asc.no-passing` (4.0 %) rebuilds its per-block
+   lists with spread arrays.
+2. **`landside.waiting-off-road` and `landside.stranded-truck`** (9.8 % and 7.0 %): they scan every truck after every
+   event. Return early when no truck is in a status the rule cares about; `waiting-off-road` also allocates a
+   `new Set([...])` of statuses per call (hoist it). `landside.stall-exclusive` (1.8 %) and `landside.leaves-complete`
+   (0.4 %) are not worth a lever.
+   Not in any ticket yet: `stowage.order` (10.9 %) and `landside.segregation` (8.8 %), both scoped but dear.
 3. **Allocation (GC was 20 %)**: the tracker builds a `Set`, a `Map` and an `InvariantScope` per event; `columnKey`
    builds strings. Reuse buffers, numeric keys. Expect GC to fall with every invariant fix.
-4. **Sweep frequency**: `DEFAULT_SWEEP_EVERY` 1000. A larger value saves sweeps but delays detection of violations in
+4. **Sweep frequency**: `DEFAULT_SWEEP_EVERY` 1000; at scale 1 the 411 sweeps are 27 % of tracker time (#268). A larger value saves sweeps but delays detection of violations in
    state an event did not name (they are attributed to the sweep's event). `tt:bench --sweep-every N` measures it;
    `tt:run` has no flag for it (programmatic `createSimulation(config, h, {invariants: {sweepEvery}})`).
 5. **More state-neutral event types**: add a type to `STATE_NEUTRAL_EVENTS` only if its reactors and handlers change
    nothing any invariant reads. Changes the check count (goldens), not the event log.
 6. **Hashing**: stringify per event is unavoidable while the hash is over JSON; a cheaper hash input would change every
    golden hash, so it is a format change, not a speed fix.
-7. **Memory**: the in-memory log is the main growth term. Dropping `byId` or the log would break `tt:diff`, the
+7. **Config lookups in reactors** (#268): `landsideGraph.ts#hasLandside` is 7.7 % of the profile (it reaches
+   `blockSpecs` / `blockSpec`), `yardLayout.ts#reservedStacksOf` 3.5 %. Cache per config object; the hash proves it.
+8. **Memory**: the in-memory log is the main growth term. Dropping `byId` or the log would break `tt:diff`, the
    debugger and snapshots; not a free lever.
 
 ## Constraints that must hold

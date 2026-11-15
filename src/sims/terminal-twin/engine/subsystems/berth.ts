@@ -3,7 +3,8 @@
  *
  *   VesselArrived → berthAllocation decision (one vessel at a time, arrival
  *   order) → BerthAllocated (or VesselAtAnchorage; the vessel is asked about
- *   again whenever a vessel departs) → mooring → VesselBerthed → craneSplit
+ *   again whenever a vessel departs; with `quay.berthOvertaking` the vessels
+ *   behind it are asked about too) → mooring → VesselBerthed → craneSplit
  *   decision (one vessel at a time) → STS work (quay.ts) → StsWorkComplete per
  *   crane → VesselWorkComplete → unmooring → VesselDeparted.
  *
@@ -36,7 +37,13 @@ function occupied(ctx: EngineContext): BerthAllocationRequest['occupied'] {
     .sort((a, b) => a.fromX - b.fromX)
 }
 
-/** Ask for a berth for the first vessel waiting, unless a berth decision is already pending. */
+/**
+ * Ask for a berth for the first vessel waiting, unless a berth decision is already pending.
+ *
+ * First come, first served by default: only the head of the queue is asked about. With
+ * `quay.berthOvertaking` the first queued vessel not yet asked about since the quay last changed is
+ * asked instead, so a vessel further back can take a stretch the head does not fit in.
+ */
 function tryAllocateBerth(ctx: EngineContext): void {
   const { berth, vessels } = ctx.state
   if (berth.allocating !== null || berth.queue.length === 0) return
@@ -44,7 +51,14 @@ function tryAllocateBerth(ctx: EngineContext): void {
     placeFirstFit(ctx)
     return
   }
-  const vessel = vessels[berth.queue[0]]
+  let vesselId: string | undefined = berth.queue[0]
+  if (ctx.config.quay.berthOvertaking) {
+    const { asked } = berth
+    vesselId = berth.queue.find((id) => !asked.includes(id))
+    if (vesselId === undefined) return // every waiting vessel was refused on this quay state
+    asked.push(vesselId)
+  }
+  const vessel = vessels[vesselId]
   berth.allocating = vessel.id
   ctx.requestDecision(
     'berthAllocation',
@@ -98,6 +112,7 @@ function placeFirstFit(ctx: EngineContext): void {
 function assignBerth(ctx: EngineContext, vessel: VesselState, berthX: number, t: number): void {
   const { state } = ctx
   state.berth.queue = state.berth.queue.filter((id) => id !== vessel.id)
+  state.berth.asked = [] // the quay changed: every waiting vessel may be asked about again
   vessel.status = 'mooring'
   vessel.berthX = berthX
   vessel.berthAllocatedAt = t
@@ -227,7 +242,10 @@ export const berthReactors: ReactorMap = {
           vessel.anchored = true
           ctx.schedule('VesselAtAnchorage', e.t, { vessels: [vessel.id] }, { vesselId: vessel.id })
         }
-        return // first come, first served: the queue waits until a vessel departs
+        // first come, first served: the queue waits until a vessel departs. With overtaking the next
+        // vessel not yet asked about gets its turn.
+        if (ctx.config.quay.berthOvertaking) tryAllocateBerth(ctx)
+        return
       }
       validateBerth(ctx, vessel, berthX)
       assignBerth(ctx, vessel, berthX, e.t)
@@ -313,6 +331,7 @@ export const berthReactors: ReactorMap = {
     vessel.status = 'departed'
     vessel.departedAt = e.t
     ctx.state.kpis.vesselsCompleted++
+    ctx.state.berth.asked = []
     tryAllocateBerth(ctx)
   },
 }

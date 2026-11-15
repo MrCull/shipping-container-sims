@@ -9,7 +9,7 @@
  *
  * Exit codes: 0 ok, 1 invariant violation or engine error, 2 usage error.
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from 'node:fs'
 import { readJsonFile, writeJsonFile } from './snapshotFile'
 import { parseArgs } from 'node:util'
 import {
@@ -76,6 +76,9 @@ export const USAGE = `Usage: pnpm run tt:run (--fixture <name|file.json> | --pre
                          Levels: off|error|warn|info|debug. Subsystems: scenario, vessel, sts, invariants, …`
 
 export class UsageError extends Error {}
+
+/** Events per write of `--events`. */
+const EVENTS_CHUNK = 5000
 
 export function loadScenario(fixture: string | undefined, preset: string | undefined): ScenarioConfig {
   if (fixture && preset) throw new UsageError('Use either --fixture or --preset, not both')
@@ -408,8 +411,16 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
       if (file) writeFileSync(file, exportRun(sim, kind))
     }
     if (values.events) {
-      const events = sim.eventLog().slice(firstNewEvent)
-      writeFileSync(values.events, events.length ? `${events.map((e) => JSON.stringify(e)).join('\n')}\n` : '')
+      // Written in chunks: the whole log of a full-size peak day as one string is past V8's string limit.
+      const log = sim.eventLog()
+      const fd = openSync(values.events, 'w')
+      try {
+        for (let i = firstNewEvent; i < log.length; i += EVENTS_CHUNK) {
+          writeSync(fd, `${log.slice(i, i + EVENTS_CHUNK).map((e) => JSON.stringify(e)).join('\n')}\n`)
+        }
+      } finally {
+        closeSync(fd)
+      }
     }
     return summary.invariants.violations > 0 || summary.firstError ? 1 : 0
   } catch (err) {

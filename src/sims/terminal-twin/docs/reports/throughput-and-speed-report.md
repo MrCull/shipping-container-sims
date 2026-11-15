@@ -147,3 +147,117 @@ Run: the same bounded run (`--until time:40000`, scale 0.5, seed 99), twice on t
 The 15 boxes over 1,800 s carry 85,787 s, 67 % of the 128,850 s total drop-to-claim time over all 313 boxes; 100 % of it is before the job exists, 0 s is SHC wait. The earlier "8 distinct SHCs got a job" only reflects that load jobs appear one at a time and a free SHC takes each at once. Which crane held each of the 4 unclaimed boxes was not checked (time box).
 
 Smallest fix: none in `shcDispatch` (`engine/subsystems/shc.ts`) or the strategies (`chained-nearest`, `predispatch`, `paired-dual-cycle`): there is no SHC wait to remove, so the "oldest pad box first" ticket above is withdrawn. The change is the measurement: start the load-box horizontal stage at job creation (`ShcJob.readyAt`, from `createLoadShcJob`) instead of `AscDroppedAtWtp`, so the load-box wait reads about 0 s; it changes the KPI only, not the event log. The long pre-job waits shrink only with earlier crane discharge (the #229 crane-split fix) or a smaller `loadReleaseAhead`, which moves the log.
+
+## Step: scale-1 measurements (#268)
+
+Measured, not fixed: no engine change. `TTI_MOVES_SCALE` 1, ENGINE_VERSION 0.54.0, `main` at commit `41d906b`, preset "TTI Algeciras, peak day", `--until vessels:5`. Machine: 4 cores, Intel Xeon @ 2.10 GHz (cloud container, 15 GB), Node 22. Every run went alone under `scripts/bg.sh run --heavy`. The 554 s recorded for 0.53.0 was on another machine, so the wall seconds here are a new reference, not a speed-up.
+
+### 1. Plain run (the reference for later tickets)
+
+`time pnpm run tt:run --preset "TTI Algeciras, peak day" --until vessels:5`
+
+| Wall | Event-log hash | Events | Checks | Moves | Sim end | Violations |
+|---|---|---|---|---|---|---|
+| 358 s (5 min 58 s), 0.73 ms per event | `1bb3036832c3e6` | 491,753 | 401,145 | 9,163 (5 of 5 vessels) | day 3 20:35:13 (333,313 s) | 0 |
+
+The hash differs from the 0.53.0 record (`10e8cbb0541010`, 489,566 events) because #267 (yard base heights, 0.54.0) moved the log. Against the 600 s criterion of spec #220 this machine has a 40 % margin.
+
+### 2. CPU profile
+
+`node --cpu-prof --import tsx src/sims/terminal-twin/cli/run.ts --preset "TTI Algeciras, peak day" --until vessels:5` (378 s of samples, same hash), summarised by a throwaway script (self time per function and file; inclusive time of stacks that contain a function or file).
+
+| # | Cause | Share | Where |
+|---|---|---|---|
+| 1 | Invariant checks | 49.6 % inclusive (36.7 % self in `engine/invariants.ts`: the `check` functions 18.5 %, `slotsToCheck` 2.9 %, `custodyHolders` 1.4 %, `sharedCells` 1.4 %, `anyVesselFails` 1.1 %); the 411 full sweeps are 14.1 % inclusive | `checkInvariants` in `engine/simulation.ts` |
+| 2 | Garbage collection | 13.0 % self | allocation under the invariants and the yard helpers |
+| 3 | Reactors (`react`) | 30.7 % inclusive | see the subsystem rows below |
+| 4 | Event-log hash and commit | `hashedJson` 3.0 %, `commit` 4.3 % inclusive | `engine/simulation.ts` |
+
+Inclusive time per subsystem file (they overlap where one calls another): `asc.ts` 13.4 %, `loadPrep.ts` 10.5 % (`pumpLoadPrep` 10.1 %, 4.4 % self), `ascStorage.ts` 9.6 %, `ascDispatch.ts` 8.6 % (`maybeDispatchAsc` 7.9 %), `shc.ts` 7.7 %, `rehandle.ts` 5.7 % (`computeRetrievalRanks` 4.4 % self), `landside.ts` 5.0 %, `quay.ts` 3.2 %, `workPackages.ts` 3.2 %. Helpers: `landsideGraph.ts#hasLandside` 7.7 % inclusive (2.8 % self; it reaches `blockSpecs` and `blockSpec` in `yardLayout.ts`, 5.1 % each), `yardLayout.ts#reservedStacksOf` 3.5 % self, `reservations.ts` 2.9 %. Decision runtime 0.9 %, KPI collector 0.4 %.
+
+Against the 0.5 profile (#221): invariants 54 % to 49.6 %, GC 20.4 % to 13.0 %. The stowage fixes (#234, #237) took `stowage.no-floating` and `stowage.cell-free` down; the unscoped invariants and the sweeps are what is left.
+
+### 3. Per-invariant cost
+
+A throwaway wrapper (scratchpad) timed every `INVARIANTS[i].check` call and the two `InvariantTracker` entry points with `performance.now()`, then ran the same peak day through `runCli`. The timers slow the run (397 s), so read shares. 400,751 incremental checks took 176.2 s (0.44 ms each) and 411 sweeps took 66.6 s (162 ms each, 27 % of tracker time): 242.8 s in the tracker. The invariant functions sum to 225.6 s, 92.9 % of that (within 10 %); the other 17.2 s (7.1 %) is the tracker's own scope building.
+
+| Invariant | ms | Share | Calls (scoped) | Reads | What it scans |
+|---|---|---|---|---|---|
+| asc.wtp-handover | 25,611 | 11.4 % | 401,162 (0) | time | every ASC (`ascPoseAt`), then pads, then SHC positions |
+| stowage.order | 24,488 | 10.9 % | 287,252 (286,841) | vessel, container | the slots of the touched vessels (tier below each filled load slot, 20 ft over 40 ft) |
+| landside.waiting-off-road | 22,060 | 9.8 % | 401,162 (0) | equipment, time | every truck, with a road-zone point test for each waiting one |
+| landside.segregation | 19,881 | 8.8 % | 393,315 (392,904) | equipment | touched trucks and SHCs against the block stacks and lane nodes, at every motion breakpoint |
+| stowage.no-floating | 18,176 | 8.1 % | 287,252 (286,841) | vessel, container | the slots of the touched vessels |
+| landside.stranded-truck | 15,775 | 7.0 % | 401,162 (0) | equipment, time | every truck at a stall, then the open jobs of its block |
+| custody.single-owner | 15,556 | 6.9 % | 284,940 (284,529) | container | touched custody owners |
+| asc.no-passing | 9,019 | 4.0 % | 393,315 (392,904) | equipment | ASCs of the touched blocks |
+| hull.profile | 8,852 | 3.9 % | 287,252 (286,841) | vessel, container | the slots of the touched vessels |
+| yard.no-double-occupied | 8,798 | 3.9 % | 284,940 (284,529) | yardSlot | touched yard columns |
+| yard.no-mixed-length-overlap | 6,957 | 3.1 % | 284,940 (284,529) | yardSlot | touched yard columns |
+| yard.no-floating | 5,825 | 2.6 % | 284,940 (284,529) | yardSlot | touched yard columns |
+| yard.no-mixed-length-stack | 5,123 | 2.3 % | 284,940 (284,529) | yardSlot | touched yard columns |
+| reservation.no-overlap | 5,092 | 2.3 % | 401,162 (400,751) | reservation | reservations made since the last check |
+| landside.stall-exclusive | 3,971 | 1.8 % | 393,315 (0) | equipment | all trucks and stalls |
+| hatch.laydown-stack-limit | 3,384 | 1.5 % | 393,315 (0) | equipment | all laydown bays |
+| stowage.cell-free | 3,297 | 1.5 % | 287,252 (286,841) | vessel, container | the slots of the touched vessels |
+| shc.waiting-positions | 3,173 | 1.4 % | 393,315 (0) | equipment | all SHCs |
+| yard.no-progress | 2,908 | 1.3 % | 401,162 (0) | equipment, time | yard blocks (idle deadlock) |
+| yard.reefer-powered | 2,871 | 1.3 % | 284,940 (284,529) | yardSlot | touched yard columns |
+| yard.slot-bounds | 2,621 | 1.2 % | 284,940 (284,529) | yardSlot | touched yard columns |
+| hatch.no-deck-load-on-missing-hatch | 2,255 | 1.0 % | 284,940 (284,529) | container | touched boxes |
+| claim.single-holder | 2,225 | 1.0 % | 393,315 (0) | equipment | all claims |
+| yard.stack-height | 2,158 | 1.0 % | 284,940 (284,529) | yardSlot | touched yard columns |
+| sts.rail-order | 1,749 | 0.8 % | 401,162 (0) | time | all STS gantries |
+| hatch.no-removal-with-boxes-on-top | 1,639 | 0.7 % | 393,315 (392,904) | equipment | touched hatch panels |
+| landside.leaves-complete | 828 | 0.4 % | 393,315 (0) | equipment | all trucks |
+| hatch.no-hold-access-through-closed-hatch | 642 | 0.3 % | 393,315 (392,904) | equipment | touched hatch panels |
+| hatch.replace-own-hatch | 279 | 0.1 % | 393,315 (392,904) | equipment | touched hatch panels |
+| hatch.no-lift-before-lashing-release | 227 | 0.1 % | 393,315 (392,904) | equipment | touched hatch panels |
+| berth.no-overlap | 102 | 0.0 % | 20,153 (0) | vessel | on-quay vessels |
+| hatch.no-departure-open | 30 | 0.0 % | 20,153 (19,742) | vessel | touched vessels |
+
+What this says for #269 (its lever list was written from the 0.1 table):
+
+- The ten unscoped invariants together are 36.4 % of invariant time. Three carry it: `asc.wtp-handover` 11.4 %, `landside.waiting-off-road` 9.8 %, `landside.stranded-truck` 7.0 %. `landside.stall-exclusive` (1.8 %) and `landside.leaves-complete` (0.4 %) are not worth a lever.
+- Two costs are not in #269's list: `stowage.order` (10.9 %, now the dearest scoped invariant) and `landside.segregation` (8.8 %).
+- The sweeps are 27 % of tracker time (411 sweeps of 162 ms): `DEFAULT_SWEEP_EVERY` is the cheapest single lever, but it changes when a violation in untouched state is reported.
+- Outside the invariants: `hasLandside` (7.7 % of the profile) and `reservedStacksOf` (3.5 %) are lookups that could be cached per config.
+
+### 4. Throughput breakdown
+
+`pnpm run tt:profile "TTI Algeciras, peak day" --until 333314 --json <file>` (361 s wall; it runs the scenario itself and prints the same crane buckets `tt:sts` prints from a saved log).
+
+Crane time, share of each crane's window from its first package to the end (`cycle` includes lifting and the gaps between packages; `reposition` and `done` include standing by between vessels):
+
+| STS | Moves | Moves/h | cycle | hatch | lashing | ground | box | rail | reposition | done | Rail wait (s) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| STS101 | 658 | 7.1 | 26 % | 2 % | 0 % | 0 % | 4 % | 3 % | 25 % | 41 % | 9,392 |
+| STS102 | 803 | 8.7 | 31 % | 2 % | 0 % | 0 % | 3 % | 17 % | 0 % | 47 % | 56,086 |
+| STS103 | 528 | 5.7 | 20 % | 1 % | 0 % | 0 % | 3 % | 6 % | 69 % | 0 % | 20,671 |
+| STS104 | 1,348 | 14.7 | 54 % | 2 % | 0 % | 0 % | 2 % | 20 % | 21 % | 0 % | 67,691 |
+| STS105 | 933 | 10.2 | 38 % | 2 % | 0 % | 0 % | 4 % | 24 % | 31 % | 0 % | 80,481 |
+| STS106 | 1,515 | 16.5 | 58 % | 3 % | 0 % | 0 % | 5 % | 20 % | 7 % | 7 % | 65,089 |
+| STS107 | 1,785 | 19.4 | 67 % | 3 % | 0 % | 0 % | 7 % | 4 % | 0 % | 18 % | 13,666 |
+| STS108 | 1,593 | 17.3 | 59 % | 3 % | 1 % | 0 % | 6 % | 0 % | 0 % | 31 % | 1,077 |
+| ALL | 9,163 | 12.5 | 44 % | 2 % | 0 % | 0 % | 4 % | 12 % | 19 % | 18 % | 314,153 |
+
+- **Rail** is 11.9 % of crane windows at scale 1 (36 % in the 0.5 slice to 40,000 s, which covered only the busiest hours). The worst crane is STS105 with 80,481 s (the 0.53.0 record was 126,295 s).
+- **Anchorage wait per vessel:** V001 0 s, V002 0 s, V003 (ULCV) 175,714 s, V004 (Panamax) 175,015 s, V005 (Feedermax) 268,337 s; mean 123,813 s.
+- **Box waits (mean seconds per box):** discharge (4,915 boxes) yard 89.9, horizontal 47.5, STS 0.1; load (4,248 boxes) yard 44.6, horizontal 662.0, STS 387.6. The ten longest waits are all load boxes, up to 46,700 s.
+- **SHC idle:** mean idle share over the run 85.0 % (`SHC busy` 15.0 %, empty travel ratio 0.667). 7 of 23 SHCs (SHC17 to SHC23) are never used, 15 of 23 are idle 90 % or more of the time, and only SHC01 to SHC03 are busy more than half of it. This is the "14 of 23 idle" point of #244 at scale 1: the same picture, work piles on the lowest-numbered SHCs.
+- **ASC idle:** mean 80.6 % (utilisation 19.4 %); waterside ASC1 67.9 % idle, landside ASC2 93.3 %; per crane 61.3 % to 96.6 %.
+
+### 5. Pre-fill share
+
+From the pure planner, no run (`prefillOf(config, planCargo(config, config.seed), config.seed)` and `yardCapacityCells(config)`):
+
+| Preset | Target | Cells placed | Share | Placements (20 / 40 / 40HC) |
+|---|---|---|---|---|
+| TTI Algeciras baseline | 60 % | 15,552 of 25,920 | 60.0 % | 9,172 (2,792 / 2,194 / 4,186) |
+| TTI Algeciras, peak day | 75 % | 14,478 of 25,920 | 55.9 % | 8,631 (2,784 / 2,131 / 3,716) |
+
+Unchanged from 0.53.0. Why the peak day stops short is measured on #270: the booked exports and empties stand on 80 % of the usable stacks at about 2.3 boxes high, and a filler may not stand on another group, so the yard is full by stacks with 11,000 cells free.
+
+### Tooling found broken at this size
+
+`tt:run --events <file>` died after the run with `RangeError: Invalid string length`: 491,753 events as one string is past V8's string limit, and `tt:sts` read the file the same way. Both now work in chunks (`cli/runCli.ts`, `cli/eventLines.ts`); the file content is unchanged.

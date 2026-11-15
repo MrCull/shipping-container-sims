@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "name": "berth-overtaking",
+  "description": "A Feedermax overtakes a waiting ULCV on a 600 m quay (berth overtaking on)",
+  "seed": 11,
+  "startDateTime": "2026-01-05T06:00:00Z",
+  "quay": {
+    "lengthM": 600,
+    "berthGapM": 15,
+    "mooringS": 600,
+    "unmooringS": 600,
+    "stsMinSpacingM": 27,
+    "twinLift": true,
+    "berthOvertaking": true
+  },
+  "layout": {
+    "stsGroundLaneZ0M": 8,
+    "stsGroundLaneSpacingM": 3,
+    "stsSafeHoistM": 50
+  },
+  "kinematics": {
+    "sts": {
+      "gantry": {
+        "vMax": 0.75,
+        "accel": 0.25,
+        "decel": 0.25
+      },
+      "trolley": {
+        "vMax": 4,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "hoistLoaded": {
+        "vMax": 1.5,
+        "accel": 0.6,
+        "decel": 0.6
+      },
+      "hoistEmpty": {
+        "vMax": 3,
+        "accel": 0.8,
+        "decel": 0.8
+      },
+      "lockS": 3,
+      "unlockS": 3
+    }
+  },
+  "moveVariationPct": 0,
+  "sts": [
+    {
+      "id": "STS01",
+      "gantryX": 150,
+      "groundPositions": 24
+    },
+    {
+      "id": "STS02",
+      "gantryX": 500,
+      "groundPositions": 24
+    }
+  ],
+  "vessels": [
+    {
+      "id": "V001",
+      "name": "MSC Gibraltar",
+      "arrivalS": 0,
+      "sizeClass": "ulcv",
+      "discharge": 12,
+      "load": 10,
+      "transshipment": 0,
+      "maxSts": 1
+    },
+    {
+      "id": "V002",
+      "name": "Maersk Estrecho",
+      "arrivalS": 600,
+      "sizeClass": "ulcv",
+      "discharge": 12,
+      "load": 10,
+      "transshipment": 0,
+      "maxSts": 1
+    },
+    {
+      "id": "V003",
+      "name": "Tarifa Feeder",
+      "arrivalS": 900,
+      "sizeClass": "feedermax",
+      "discharge": 8,
+      "load": 6,
+      "transshipment": 0,
+      "maxSts": 1
+    }
+  ],
+  "cargo": {
+    "lines": {
+      "HMM": 30,
+      "MSC": 15,
+      "Maersk": 12,
+      "CMA CGM": 10,
+      "Hapag-Lloyd": 8,
+      "ONE": 7,
+      "Evergreen": 6,
+      "COSCO": 6,
+      "ZIM": 3,
+      "Yang Ming": 3
+    },
+    "sizeMix": {
+      "20": 0.3,
+      "40": 0.25,
+      "40HC": 0.45
+    },
+    "emptyShare": 0.1
+  },
+  "endConditions": {
+    "vesselsCompleted": 3
+  },
+  "hatch": {
+    "enabled": false
+  }
+}

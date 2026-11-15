@@ -197,6 +197,7 @@ Fixtures without SHCs give each crane enough ground positions for all its boxes,
 |---|---|---|
 | `tracer-1sts-10-boxes` | flows | 1 STS discharges 10 x 40 ft to ground positions; seed 42. The smallest end-to-end run |
 | `two-vessels-compete-for-berth` | quay | two Panamax on a 450 m quay; the second waits at anchorage |
+| `berth-overtaking` | quay | two ULCVs and a Feedermax on a 600 m quay with `quay.berthOvertaking`; the Feedermax berths ahead of the waiting ULCV |
 | `crane-split-4sts` | quay | 4 STS on one call, rail order, crane split strategies |
 | `twin-20-lift` | quay | twin-20 lifts (pairs of 20 ft in one cycle) |
 | `shc-1sts-2shc-1wtp` | shuttle | 2 SHCs carry each box from the crane to a WTP pad |

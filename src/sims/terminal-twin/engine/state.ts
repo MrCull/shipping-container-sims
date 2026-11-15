@@ -920,6 +920,11 @@ export interface BerthState {
   queue: string[]
   /** Vessel whose berth-allocation decision is pending (one at a time). */
   allocating: string | null
+  /**
+   * `quay.berthOvertaking` only: queued vessels asked about since the quay last changed (a berth
+   * was taken or a vessel departed), so each is asked once per quay state. Always empty otherwise.
+   */
+  asked: string[]
   /** Berthed vessels waiting for a crane split (no free cranes yet), in berthing order. */
   craneQueue: string[]
   /** Vessel whose crane-split decision is pending. */
@@ -1133,7 +1138,7 @@ export function createInitialState(
     containers: {},
     vesselSlots: {},
     vessels: {},
-    berth: { queue: [], allocating: null, craneQueue: [], splitting: null },
+    berth: { queue: [], allocating: null, asked: [], craneQueue: [], splitting: null },
     sts: {},
     groundPositions: {},
     shcs: {},
