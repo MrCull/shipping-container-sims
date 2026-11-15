@@ -48,6 +48,11 @@ function axisAt(motion: MotionSegment[], axis: MotionSegment['axis'], t: number,
   return first ? first.from : rest
 }
 
+/** The hoist (box bottom) height alone at `t`: `ascPoseAt(asc, t).hoistY` without the other two axes. */
+export function ascHoistAt(asc: Pick<AscState, 'motion' | 'hoistY'>, t: number): number {
+  return axisAt(asc.motion, 'hoist', t, asc.hoistY)
+}
+
 /** Where the ASC's spreader is at `t`: gantry Z, trolley X, hoist (box bottom) height. */
 export function ascPoseAt(asc: Pick<AscState, 'motion' | 'gantryZ' | 'trolleyX' | 'hoistY'>, t: number): { z: number; x: number; hoistY: number } {
   return {

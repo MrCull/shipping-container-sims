@@ -45,6 +45,18 @@ From [../reports/realistic-volume-reports.md](../reports/realistic-volume-report
 - The 554 s is from another machine. Scale-1 reference on the 4-core cloud container (ENGINE_VERSION 0.54.0, #268):
   **358 s**, hash `1bb3036832c3e6`, 491,753 events, 401,145 checks (0.73 ms per event).
 
+### After the invariant speed-ups of #269 (ENGINE_VERSION 0.54.0)
+
+Peak day `--until vessels:5`, same machine, one run at a time, before and after on the same tree:
+
+| | Wall | Hash | Events | Checks | Moves |
+|---|---|---|---|---|---|
+| Before | 345 s | `1bb3036832c3e6` | 491,753 | 401,145 | 9,163 |
+| After | 270 s (21.8 % lower, 0.55 ms per event) | `1bb3036832c3e6` | 491,753 | 401,145 | 9,163 |
+
+Invariant functions 225.6 s to about 136 s of an instrumented run. No golden, fixture or `ENGINE_VERSION` change. The
+profile and per-invariant shares in the next section are from before these speed-ups.
+
 ### Scale-1 profile (ENGINE_VERSION 0.54.0, #268)
 
 Full tables: "Step: scale-1 measurements (#268)" in [../reports/throughput-and-speed-report.md](../reports/throughput-and-speed-report.md).
@@ -119,24 +131,25 @@ checkInvariants(ev, forceSweep)         skipped for STATE_NEUTRAL_EVENTS unless 
 | Vessel occupancy map (#237) | stowage invariants 32.2 s to 5.7 s CPU; the real gain of spec #220 | f15bf48 |
 | Earlier: skip vessel-slot scan when no vessel touched; allocation-free pickup feasibility pass; reservation scans only of the needed zones | pre-report | 5192ab4, e8f4463, 823a96e |
 | Road zones cached (`roadZonesOf`, TT-176) | landside invariant made cheap | pre-report |
+| `hasLandside` kept per config; landside start Z kept per landside graph (#269) | `hasLandside` was 7.7 % of the profile (it rebuilt every block spec on each call); `landside.segregation` 19.9 s to 2.3 s | this change |
+| `asc.wtp-handover`: hoist axis first, then a box around all pad envelopes before the pad loop (#269) | the other two axes and the pad loop run only for a lowered spreader near the pads | this change |
+| `stowage.order` answered from the occupied-cell map (`cellsInOrder`), the scan only on a failure; the cell scans no longer build an object per cell (#269) | `stowage.order` 24.5 s to 13.5 s, `stowage.no-floating` 18.2 s to 11.2 s, `hull.profile` 8.9 s to 4.1 s (before the per-cell change) | this change |
+| `asc.no-passing` returns at once when the event names no ASC; `landside.waiting-off-road` and `landside.stranded-truck` no longer build a set or an array per call (#269) | `waiting-off-road` 22.1 s to 5.9 s, `stranded-truck` 15.8 s to 1.0 s, `asc.no-passing` 9.0 s to 4.6 s | this change |
+| Scoped yard slot list kept per event (`slotsToCheck`, #269) | the eight yard invariants share one list instead of building eight | this change |
 
 Event-log hashes did not move for any of these: they read state only.
 
 ## Levers not yet pulled
 
-Ordered by the scale-1 per-invariant table (#268). Only `landside.waiting-off-road` and `landside.stranded-truck`
-read `time` (they run after every checked event); `landside.stall-exclusive`, `landside.leaves-complete` and
-`asc.no-passing` read `equipment`.
+Ordered by a per-invariant run after #269 (share of the 136 s of invariant time left). Only
+`landside.waiting-off-road` and `landside.stranded-truck` read `time` (they run after every checked event);
+`landside.stall-exclusive`, `landside.leaves-complete` and `asc.no-passing` read `equipment`.
 
-1. **`asc.wtp-handover`** (11.4 % of invariant time, reads `time`, unscoped): per event it calls `ascPoseAt` and the
-   `blockSpecsById(config)` / `laneGraphOf(config)` lookups for every ASC. Hoist the lookups and bail when no SHC is
-   inside a pad envelope (`PAD_HALF_X_M` 1.6, `PAD_HALF_Z_M` 6.5). `asc.no-passing` (4.0 %) rebuilds its per-block
-   lists with spread arrays.
-2. **`landside.waiting-off-road` and `landside.stranded-truck`** (9.8 % and 7.0 %): they scan every truck after every
-   event. Return early when no truck is in a status the rule cares about; `waiting-off-road` also allocates a
-   `new Set([...])` of statuses per call (hoist it). `landside.stall-exclusive` (1.8 %) and `landside.leaves-complete`
-   (0.4 %) are not worth a lever.
-   Not in any ticket yet: `stowage.order` (10.9 %) and `landside.segregation` (8.8 %), both scoped but dear.
+1. **`asc.wtp-handover`** (15 % before the pad-box gate, not re-measured after it): still one hoist lookup per ASC
+   per event. A cheaper test needs to know which ASCs have a lowered spreader without asking each one.
+2. **`custody.single-owner`** (10.5 %), **`stowage.order`** (9.9 %) and **`stowage.no-floating`** (8.2 %): the two
+   stowage checks still walk every occupied cell of a touched vessel; checking only the cells the event touched needs
+   the touched slots in the scope. The yard column invariants are 3 to 6 % each.
 3. **Allocation (GC was 20 %)**: the tracker builds a `Set`, a `Map` and an `InvariantScope` per event; `columnKey`
    builds strings. Reuse buffers, numeric keys. Expect GC to fall with every invariant fix.
 4. **Sweep frequency**: `DEFAULT_SWEEP_EVERY` 1000; at scale 1 the 411 sweeps are 27 % of tracker time (#268). A larger value saves sweeps but delays detection of violations in
