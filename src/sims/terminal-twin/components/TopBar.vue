@@ -78,11 +78,9 @@ async function submitRunTo(): Promise<void> {
         data-testid="tt-clock"
         :title="t('topbar.elapsed', { elapsed: clock.elapsed })"
       >
+        <span class="clock-when"><span class="clock-day">{{ clock.day }}</span> <span class="clock-date">{{ clock.date }}</span></span>
         <span class="clock-time">{{ clock.time }}</span>
-        <span class="clock-meta">
-          <span class="clock-when"><span class="clock-day">{{ clock.day }}</span> <span class="clock-date">{{ clock.date }}</span></span>
-          <span class="clock-elapsed">{{ clock.elapsed }}</span>
-        </span>
+        <span class="clock-elapsed">{{ clock.elapsed }}</span>
       </div>
 
       <div
@@ -325,37 +323,36 @@ async function submitRunTo(): Promise<void> {
   min-width: 0;
 }
 
-/* The clock: the time large, the date and the elapsed run time stacked beside it. */
+/* The clock: the time large, the date and the elapsed run time stacked beside it (the markup reads day, date, time). */
 .clock {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'time when'
+    'time elapsed';
   align-items: center;
-  gap: 0.7rem;
+  column-gap: 0.7rem;
+  row-gap: 0.15rem;
   min-width: 17rem;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .clock-time {
+  grid-area: time;
   font-family: var(--tt-font-mono);
   font-size: 1.45rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1;
-  white-space: nowrap;
-}
-
-.clock-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  line-height: 1.1;
-  white-space: nowrap;
 }
 
 .clock-when {
-  font-size: var(--tt-text-xs);
+  grid-area: when;
+  align-self: end;
+  font-size: 0.74rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  line-height: 1.1;
 }
 
 .clock-day {
@@ -367,6 +364,9 @@ async function submitRunTo(): Promise<void> {
 }
 
 .clock-elapsed {
+  grid-area: elapsed;
+  align-self: start;
+  line-height: 1.1;
   color: var(--tt-text-faint);
   font-family: var(--tt-font-mono);
   font-size: var(--tt-text-xs);

@@ -36,8 +36,21 @@ Rules that must keep holding:
 | 3 | Top bar: clock, segmented transport, icon action buttons, status pill, settings | done (not yet run through verify or smoke) |
 | 4 | HUD: KPI strip (one glass strip), overlay bar, HUD pills; side panel buttons | done, same caveat |
 | 5 | Modals: saves and shortcut help restyled; dashboard chrome and dark chart palette restored | done, same caveat |
-| 6 | Visual review of: colour-by menu, run-to popup, final report, bay viewer, inspector with a selection, phone widths | next |
-| 7 | Docs (`terminal-twin-AGENTS.md`, `docs/browser-host.md` skin and palette lines say "light"), `pnpm run verify`, smoke suite, open PR | todo |
+| 6 | Visual review of colour-by menu, saves, shortcut help, dashboard, side panels at 1440 px | done |
+| 7 | Docs (`docs/browser-host.md` skin and palette), `pnpm run verify` | done, green (2145 tests) |
+| 8 | Smoke specs: presets, hud, phone, display, saves, kpi, colour-by, debugger, dashboard, bay-viewer | done: all pass except the `@load` colour-by spec, which needs a real GPU |
+| 9 | Pull request opened | done |
+
+## Still open (ideas, none blocking)
+
+- Not yet looked at closely on the dark skin: final report panel, bay viewer, inspector with a selection, the
+  departure banner, phone widths of the running HUD. They are restyled through the tokens only.
+- The rest of the smoke suite (camera, atmosphere, landside and so on) was not run here; it does not touch menus.
+  Run it from the Actions tab or with the `smoke` label on the PR.
+- The shared sim header ("Terminal Twin" in the pixel font, the Menu button) belongs to `src/pages/SimPage`, shared
+  by every sim, so it was left alone.
+- Button, segmented-control and dialog styles are repeated per component. A shared `ui/` set (TtButton, TtSegmented,
+  TtDialog) would remove the repetition.
 
 ## Notes for whoever continues
 
