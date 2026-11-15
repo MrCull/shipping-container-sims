@@ -914,6 +914,7 @@ const en = {
   'perf.cpu': 'Frame CPU (ms)',
   'perf.boxesPosed': 'Boxes posed',
   'perf.instanceBytes': 'Instance upload (KB)',
+  'perf.heroEquipment': 'Hero spreaders',
   'perf.level': 'Quality in force',
   'perf.rung': 'Detail in force',
   'perf.rung.hero-full': 'Full detail',

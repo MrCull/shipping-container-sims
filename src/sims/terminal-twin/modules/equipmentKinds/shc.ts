@@ -96,6 +96,7 @@ class ShcRenderer implements KindRenderer {
           carrying: boxHeight !== undefined,
           spreader,
         })
+        if (parts.rig.rigState.lod === 0 && parts.rig.heroMount) frame.offerHeroSpreader({ id, kind: 'shc', mount: parts.rig.heroMount })
         continue
       }
       parts.group.position.set(pose.x, 0, pose.z)

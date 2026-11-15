@@ -129,6 +129,42 @@ level shows, and `onReady` marks the close-up pass dirty so a still camera redra
   left leaf outside its outer bar; a line is shrunk to its column (`fitText`). The hardware material is mostly diffuse
   (metallic 0.35), so bars stay galvanised grey on levels without an environment map.
 
+#### Hero equipment (#273)
+
+The spreaders nearest the camera get the hero spreader model (`hero-spreader-<sts|asc|shc>`, [assets-pipeline.md](assets-pipeline.md),
+Hero spreaders). `HeroEquipmentLevel` (`modules/heroEquipment.ts`) is owned by the scene renderer, which sets its cap from the
+quality profile (`heroEquipment`: High 3, Medium 1, Low 0, and 0 from the `equipment-hero-off` rung down).
+
+- **Offers.** In `update()` the STS, ASC and SHC kinds call `frame.offerHeroSpreader({ id, kind, mount })` for each rig that is
+  at LOD0, after posing it. `mount` is the rig's `heroMount` (`heroSpreaderMount(lod0)`: the LOD0 `spreader` node and a copy
+  of it at rest, taken before the first pose). The distance is from the camera to that node's world position, not to the
+  crane centre the LOD choice uses.
+- **Selection.** `selectHeroEquipment` (`heroEquipmentSelection.ts`): within `HERO_EQUIPMENT_DISTANCE_M` (25 m), nearest
+  first, at most the cap, hysteresis 1.15.
+- **Preparation.** A chosen spreader's file is fetched on first need and attached through `runPrep` within
+  `HERO_PREP_ALLOWANCE_MS`, only while a `CameraGate` is calm (the hero faces' constants in `heroPrep.ts`): a fast camera move
+  fetches and attaches nothing.
+- **Attach.** The file's `LOD0` becomes a child of the rig's `spreader` node with an identity transform, so it follows the
+  crane (and the ASC's vertical stretch). No depth bias: `HERO_DEPTH_BIAS_M` is for faces over a box.
+- **Fade: a dither.** The hero spreader fades in over `HERO_FADE_MS` with the hero faces' screen-door dither (a discard, no
+  blending), drawn over the rig spreader. The file's material has no fade input, so during the fade each attached spreader
+  uses its own copy of the material with a `heroSpreaderFade` uniform; when the fade ends the shared material is put back,
+  the copy is disposed and the rig's own spreader meshes are hidden (`visible = false`; the rig code never sets visibility
+  on them). The STS headblock is the rig's `hoist` node and stays.
+- **Motion.** The rig code holds its own nodes and keeps moving them (twistlock turn, STS telescopes and twin unit, the 20 ft
+  squeeze of the ASC and SHC spreader body and lock pattern). Every frame each hero node with a rig node of the same name
+  gets `matrix = rigNow x rigRest^-1 x heroRest` (`matrixAutoUpdate` off), so it shows the rig's motion from rest whatever
+  the rig does, also where the two files' mesh nodes carry different dequantisation transforms.
+- **Release.** Not chosen any more (farther away, rig left LOD0, cap 0): the hero subtree is removed and the rig meshes are
+  shown again; `dispose()` does it for all. Geometry and materials belong to the loader's cache and are not disposed.
+- **Readouts.** `__tt.scene().heroEquipment` and `__tt.perf().stats.heroEquipment` (the Stats panel's "Hero spreaders",
+  `tt-perf-hero-equipment`) count attached hero spreaders. `__tt.heroSettled()` is false while a chosen spreader waits for
+  the camera gate, its file or a prep slot, or fades in.
+
+Tests: `tests/hero-equipment-level.test.ts` (fake rigs and loader), `tests/hero-equipment-selection.test.ts`.
+Close-up for a screenshot: `__tt.setCameraPose({ target: <the ASC's x, hoistY + 1.5, z from __tt.sceneState().ascs>, distance: 13, azimuth: 0.6, polar: 1.25 })`,
+then wait for `__tt.heroSettled() && __tt.perf().stats.heroEquipment > 0`.
+
 #### Still-camera floor
 
 On Auto every rung carries `heroStillBoxes` = `HERO_STILL_BOXES` (6 boxes, 18 faces; `quality.ts`), passed as
@@ -613,7 +649,7 @@ pauses, hides all UI, `cameraTo('STS104', 380)`, and captures 1200x630 to `asset
   deleting `state.yardSlots` entries must call `indexYardSlotAdded` / `indexYardSlotRemoved` (`engine/yardIndex.ts`);
   `engine/subsystems/landside.ts#eligiblePickups` still scans every yard slot per truck arrival. Options and numbers: [optimising/run-speed.md](optimising/run-speed.md).
 - **Renderer**: the yard stress test (`?viewer=yard`) and the `__tt.perf()` procedure are in [optimising/frame-rate.md](optimising/frame-rate.md).
-- `__tt.scene()`: counts, `containerLods {lod0, lod1, closeup, closeupFaces, culled}`, `stsLods`, `shcLods`, `ascLods`,
+- `__tt.scene()`: counts, `containerLods {lod0, lod1, closeup, closeupFaces, culled}`, `heroEquipment` (#273), `stsLods`, `shcLods`, `ascLods`,
   `vesselLods`, `*Assets` (`placeholder` / `loaded`), `landside`, `infrastructure`, `gantryBeacons`, `render {calls, triangles}`, `frames`.
   `__tt.sceneState()`: the `sceneKey` and `rigKey` maps above, `liveries[id]` (atlas index, size, LOD, tint, centre).
   `__tt.atmosphere()`: `{ lockDaylight, soundGain, sound, positional: { voices }, banner, scene: { mode, daylight, shadows, masts, equipmentLights, backdrop } }`.

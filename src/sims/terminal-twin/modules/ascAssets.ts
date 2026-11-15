@@ -12,6 +12,7 @@
 import * as THREE from 'three'
 import { loadGltf } from './containerAssets'
 import { ASC_MODEL, ascRigValues, ascScaleY } from './ascRig'
+import { heroSpreaderMount, type HeroSpreaderMount } from './heroEquipment'
 import { spreaderLengthM, spreaderLengthRatio, type SpreaderMode } from './spreaderMode'
 import meta from '../assets/models/asc/asc.meta.json'
 
@@ -101,6 +102,8 @@ export class AscRig {
   /** Spreader meshes and each twist-lock's rest Z: the spreader's long axis is Z (along the rails). */
   private readonly spreaderGeo: { o: THREE.Object3D; pos: number; scale: number }[] = []
   private readonly lockRestZ: number[] = []
+  /** Where the hero spreader goes (#273): the LOD0 `spreader` node and its rest pose. */
+  readonly heroMount: HeroSpreaderMount | null
   private lod: 0 | 1 | 2 = 0
   private state: AscRigState = { lod: 0, gantryZ: 0, trolleyX: 0, hoistM: 0, ropeScale: 1, scaleY: 1, carrying: false, spreaderMode: '40', spreaderLengthM: spreaderLengthM('40') }
 
@@ -128,6 +131,7 @@ export class AscRig {
       })
       this.root.add(lod)
     }
+    this.heroMount = heroSpreaderMount(this.lods[0])
     this.setLod(0)
     this.pose({ blockX: 0, trolleyX: 0, gantryZ: 0, attachY: ASC_REST_PLANE, carrying: false, tiers: 1 })
   }

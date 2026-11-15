@@ -42,6 +42,8 @@ export interface PerfStats {
   closeupFaces: number
   /** Hero faces currently drawn (#258), never above the quality level's hero cap. */
   heroFaces: number
+  /** Hero spreaders currently in the scene (#273), never above the quality level's `heroEquipment` cap. */
+  heroEquipment: number
   /** Container boxes posed in the last frame (every box with a pose, visible or not) (#246). */
   boxesPosed: number
   /** Bytes the container instance buffers hand to the GPU upload in the last frame (#246). */
@@ -65,7 +67,7 @@ export const usePerfStore = defineStore('terminal-twin-perf', () => {
   const rung = ref(setting.value === 'auto' ? TOP_RUNG : MANUAL_RUNG[setting.value])
   const rungLabel = computed<AutoRungName>(() => rungName(rung.value))
   const overlayVisible = ref(read(KEY_OVERLAY) === '1')
-  const stats = ref<PerfStats>({ fps: 0, calls: 0, triangles: 0, cpuMs: 0, poseMs: 0, closeup: 0, closeupFaces: 0, heroFaces: 0, boxesPosed: 0, instanceBytes: 0 })
+  const stats = ref<PerfStats>({ fps: 0, calls: 0, triangles: 0, cpuMs: 0, poseMs: 0, closeup: 0, closeupFaces: 0, heroFaces: 0, heroEquipment: 0, boxesPosed: 0, instanceBytes: 0 })
   const benchmark = ref<BenchmarkProgress | null>(null)
   /** How many times Auto changed the level (dev API / tests). */
   const autoChanges = ref(0)

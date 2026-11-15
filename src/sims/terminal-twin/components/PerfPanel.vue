@@ -53,6 +53,11 @@ const bench = useFrameBenchmark()
         class="v"
         data-testid="tt-perf-upload"
       >{{ store.fmt.number(perf.stats.instanceBytes / 1024, 0) }}</span>
+      <span class="k">{{ t('perf.heroEquipment') }}</span>
+      <span
+        class="v"
+        data-testid="tt-perf-hero-equipment"
+      >{{ store.fmt.number(perf.stats.heroEquipment, 0) }}</span>
       <span class="k">{{ t('perf.level') }}</span>
       <span
         class="v"

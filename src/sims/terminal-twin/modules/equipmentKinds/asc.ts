@@ -110,6 +110,7 @@ class AscRenderer implements KindRenderer {
           tiers: parts.tiers,
           spreader,
         })
+        if (parts.rig.rigState.lod === 0 && parts.rig.heroMount) frame.offerHeroSpreader({ id, kind: 'asc', mount: parts.rig.heroMount })
         continue
       }
       parts.group.position.set(parts.blockX, 0, pose.z)

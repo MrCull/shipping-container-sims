@@ -107,7 +107,7 @@ class StsRenderer implements KindRenderer {
       this.lastSpreader.set(id, mode)
       m.carrying = l?.count ?? 0
       m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l })
-      m.updateLod(cameraPosition, frame.lodScale)
+      if (m.updateLod(cameraPosition, frame.lodScale) === 0 && m.heroMount) frame.offerHeroSpreader({ id, kind: 'sts', mount: m.heroMount })
     }
     for (const [id, parts] of this.sts) {
       if (this.stsModels.has(id)) continue
