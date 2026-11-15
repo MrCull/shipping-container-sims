@@ -87,6 +87,7 @@ test('the setup dialog edits blocks, bays, tiers, pads, stalls and ASC speeds', 
   await expect(dialog.getByTestId('tt-yard-readout')).toBeVisible()
   await dialog.locator('input[name="yard-blocks"]').fill('2')
   await dialog.locator('input[name="yard-blocks"]').dispatchEvent('change')
+  await dialog.getByTestId('tt-yard-per-block').locator('summary').click() // the per-block rows start closed
   await dialog.locator('input[name="yard-bays-2"]').fill('6')
   await dialog.locator('input[name="yard-tiers-2"]').fill('2')
   await dialog.locator('input[name="yard-pads-2"]').fill('3')

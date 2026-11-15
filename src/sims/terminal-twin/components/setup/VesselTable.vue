@@ -391,18 +391,17 @@ th {
   z-index: 1;
   background: var(--tt-surface);
   box-shadow: inset 0 -1px 0 var(--tt-border);
-  color: var(--tt-text-faint);
+  color: var(--tt-text-muted);
   font-size: var(--tt-text-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   text-align: left;
-  padding: 0.6rem 0.6rem;
-  white-space: nowrap;
+  padding: 0.6rem 0.35rem;
+  line-height: 1.3;
+  vertical-align: bottom;
 }
 
 td {
-  padding: 0.45rem 0.6rem;
+  padding: 0.45rem 0.35rem;
   border-top: 1px solid var(--tt-hairline);
   vertical-align: middle;
 }
@@ -415,7 +414,11 @@ td {
 .name {
   color: var(--tt-text-muted);
   font-size: 0.72rem;
-  white-space: nowrap;
+  line-height: 1.25;
+}
+
+th:first-child {
+  width: 7rem;
 }
 
 input,
@@ -445,12 +448,28 @@ select:focus-visible {
 }
 
 td input[type='number'] {
-  width: 4.4rem;
+  width: 3.4rem;
+  padding: 0 0.4rem;
+}
+
+td select {
+  width: 10rem;
+  font-family: var(--tt-font);
+}
+
+th:first-child,
+td:first-child {
+  padding-left: 0.8rem;
 }
 
 /* Arrival (a date and time) and the mix need their width; the name column takes what is left. */
 th:nth-child(2) {
-  min-width: 13.5rem;
+  min-width: 12rem;
+}
+
+/* The mix header is a sentence: it wraps over the narrow column. */
+th:nth-last-child(2) {
+  width: 5.6rem;
 }
 
 td:nth-last-child(2) {

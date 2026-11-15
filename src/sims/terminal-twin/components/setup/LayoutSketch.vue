@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { t } from '../../i18n/messages'
+import { BLEED_M, BOOM_LAND_M, BOOM_SEA_M, SEA_DEPTH_M, shipAtQuay } from '../../modules/planPicture'
 import type { LayoutSketch } from '../../modules/scenarioPicker'
 
 /**
@@ -10,30 +11,13 @@ import type { LayoutSketch } from '../../modules/scenarioPicker'
  */
 const props = defineProps<{ sketch: LayoutSketch }>()
 
-/** Water drawn seaward of the quay edge (m): room for the vessel and the crane booms. */
-const SEA_DEPTH = 120
-const SHIP_BEAM = 46
-const BLEED = 4000
-
 const view = computed(() => {
   const [x, y, w, h] = props.sketch.viewBox.split(' ').map(Number) as [number, number, number, number]
   const bottom = y + h
-  // the water and the land run past the plan on both sides, so they fill the picture whatever its shape
-  return { x: x - BLEED, w: w + 2 * BLEED, bottom, box: `${x} ${-SEA_DEPTH} ${w} ${bottom + SEA_DEPTH}` }
+  return { x: x - BLEED_M, w: w + 2 * BLEED_M, bottom, box: `${x} ${-SEA_DEPTH_M} ${w} ${bottom + SEA_DEPTH_M}` }
 })
 
-/** A vessel alongside: about half the quay, never longer than a big container ship. */
-const ship = computed(() => {
-  const { x1, x2 } = props.sketch.quay
-  const length = Math.min((x2 - x1) * 0.55, 330)
-  const x0 = x1 + (x2 - x1 - length) * 0.3
-  const y0 = -10 - SHIP_BEAM
-  const bow = Math.min(34, length * 0.16)
-  const hull = `M${x0 + 6} ${y0} H${x0 + length - bow} Q${x0 + length} ${y0 + SHIP_BEAM / 2} ${x0 + length - bow} ${y0 + SHIP_BEAM} H${x0 + 6} Q${x0} ${y0 + SHIP_BEAM} ${x0} ${y0 + SHIP_BEAM - 6} V${y0 + 6} Q${x0} ${y0} ${x0 + 6} ${y0} Z`
-  const bays = Math.max(3, Math.floor((length - bow - 34) / 22))
-  const stacks = Array.from({ length: bays }, (_, i) => ({ x: x0 + 26 + i * 22, y: y0 + 7, w: 17, h: SHIP_BEAM - 14 }))
-  return { hull, stacks, house: { x: x0 + 8, y: y0 + 9, w: 12, h: SHIP_BEAM - 18 } }
-})
+const ship = computed(() => shipAtQuay(props.sketch.quay.x1, props.sketch.quay.x2))
 
 /** The gate is a few metres deep: drawn at least this tall so it can be seen. */
 const gate = computed(() => {
@@ -59,9 +43,9 @@ const gate = computed(() => {
       <rect
         class="water"
         :x="view.x"
-        :y="-SEA_DEPTH"
+        :y="-SEA_DEPTH_M"
         :width="view.w"
-        :height="SEA_DEPTH"
+        :height="SEA_DEPTH_M"
       />
       <rect
         class="land"
@@ -107,8 +91,8 @@ const gate = computed(() => {
         <line
           :x1="x"
           :x2="x"
-          y1="-62"
-          y2="30"
+          :y1="-BOOM_SEA_M"
+          :y2="BOOM_LAND_M"
         />
         <rect
           :x="x - 11"

@@ -26,6 +26,12 @@ function setAllBlocks(key: keyof BlockDraft, raw: string): void {
   for (const b of d.yardBlocks) b[key] = n
 }
 
+/** The per-block rows start open only when the blocks are not all alike (the "all blocks" row covers the usual case). */
+const blocksDiffer = computed(() => {
+  const first = d.yardBlocks[0]
+  return !!first && d.yardBlocks.some((b) => ALL_BLOCK_FIELDS.some((f) => b[f.key] !== first[f.key]))
+})
+
 function setBlockCount(raw: string): void {
   const n = Math.floor(Number(raw))
   if (!Number.isFinite(n) || n < 1 || n > YARD_LIMITS.blocks) return
@@ -88,60 +94,67 @@ const yardReadout = computed(() => readoutOf(d))
         >
       </label>
     </div>
-    <div class="blocklist">
-      <div
-        v-for="(b, i) in d.yardBlocks"
-        :key="i"
-        class="grid"
-        :data-testid="`tt-yard-block-${i + 1}`"
-      >
-        <span class="blockname">{{ t('setup.yard.block', { n: i + 1 }) }}</span>
-        <label class="mini">
-          <span>{{ t('setup.yard.bays') }}</span>
-          <input
-            v-model.number="b.bays"
-            type="number"
-            min="1"
-            :max="YARD_LIMITS.bays"
-            step="1"
-            :name="`yard-bays-${i + 1}`"
-          >
-        </label>
-        <label class="mini">
-          <span>{{ t('setup.yard.tiers') }}</span>
-          <input
-            v-model.number="b.tiers"
-            type="number"
-            min="1"
-            :max="YARD_LIMITS.tiers"
-            step="1"
-            :name="`yard-tiers-${i + 1}`"
-          >
-        </label>
-        <label class="mini">
-          <span>{{ t('setup.yard.wtpPads') }}</span>
-          <input
-            v-model.number="b.wtpPads"
-            type="number"
-            min="1"
-            :max="YARD_LIMITS.pads"
-            step="1"
-            :name="`yard-pads-${i + 1}`"
-          >
-        </label>
-        <label class="mini">
-          <span>{{ t('setup.yard.stalls') }}</span>
-          <input
-            v-model.number="b.transferStalls"
-            type="number"
-            min="0"
-            :max="YARD_LIMITS.stalls"
-            step="1"
-            :name="`yard-stalls-${i + 1}`"
-          >
-        </label>
+    <details
+      class="perblock"
+      data-testid="tt-yard-per-block"
+      :open="blocksDiffer"
+    >
+      <summary>{{ t('setup.yard.perBlock', { n: d.yardBlocks.length }) }}</summary>
+      <div class="blocklist">
+        <div
+          v-for="(b, i) in d.yardBlocks"
+          :key="i"
+          class="grid"
+          :data-testid="`tt-yard-block-${i + 1}`"
+        >
+          <span class="blockname">{{ t('setup.yard.block', { n: i + 1 }) }}</span>
+          <label class="mini">
+            <span>{{ t('setup.yard.bays') }}</span>
+            <input
+              v-model.number="b.bays"
+              type="number"
+              min="1"
+              :max="YARD_LIMITS.bays"
+              step="1"
+              :name="`yard-bays-${i + 1}`"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.yard.tiers') }}</span>
+            <input
+              v-model.number="b.tiers"
+              type="number"
+              min="1"
+              :max="YARD_LIMITS.tiers"
+              step="1"
+              :name="`yard-tiers-${i + 1}`"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.yard.wtpPads') }}</span>
+            <input
+              v-model.number="b.wtpPads"
+              type="number"
+              min="1"
+              :max="YARD_LIMITS.pads"
+              step="1"
+              :name="`yard-pads-${i + 1}`"
+            >
+          </label>
+          <label class="mini">
+            <span>{{ t('setup.yard.stalls') }}</span>
+            <input
+              v-model.number="b.transferStalls"
+              type="number"
+              min="0"
+              :max="YARD_LIMITS.stalls"
+              step="1"
+              :name="`yard-stalls-${i + 1}`"
+            >
+          </label>
+        </div>
       </div>
-    </div>
+    </details>
     <div
       class="grid"
       role="radiogroup"
@@ -289,12 +302,24 @@ const yardReadout = computed(() => readoutOf(d))
 <style scoped src="./setupSection.css"></style>
 
 <style scoped>
+.perblock {
+  padding: 0.6rem 0.8rem;
+  background: var(--tt-control);
+  border: 1px solid var(--tt-hairline);
+  border-radius: var(--tt-radius-sm);
+}
+
+.perblock[open] > summary {
+  margin-bottom: 0.8rem;
+}
+
 .blocklist {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  max-height: 14rem;
-  padding-right: 0.3rem;
+  max-height: 22rem;
+  padding-right: 0.4rem;
   overflow-y: auto;
+  scrollbar-width: thin;
 }
 </style>

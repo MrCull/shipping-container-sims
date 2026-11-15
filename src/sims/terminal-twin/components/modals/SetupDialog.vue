@@ -99,6 +99,8 @@ async function submit(): Promise<void> {
   if (bad) {
     invalidInputTab.value = tabOf(bad)
     if (invalidInputTab.value) tab.value = invalidInputTab.value
+    // a rejected input may sit in a closed <details> (the per-block rows): open it so the message can show
+    for (let el = bad.closest('details'); el; el = el.parentElement?.closest('details') ?? null) el.open = true
     await nextTick()
     bad.reportValidity()
     return

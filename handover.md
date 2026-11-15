@@ -59,6 +59,26 @@ draws water with a vessel at the quay, cranes reaching over it, the yard blocks 
 legend carrying the counts. New tokens `--tt-plan-water`, `--tt-plan-land`, `--tt-plan-ship` (both themes). The
 bigger plan on the Yard and equipment tab (`PlanPreview.vue`) is unchanged and could get the same treatment.
 
+## Clarity pass (fourth request)
+
+The owner asked what else in the menus was as unclear as the layout drawing, then asked for the four recommended
+fixes. Done:
+
+1. `PlanPreview.vue` (Yard and equipment tab) redrawn like the Scenario-tab picture; both share
+   `modules/planPicture.ts` (sea depth, crane boom reach, the illustrative vessel).
+2. Plain names instead of abbreviations in the setup dialog, the KPI strip, the overlay bar and the top bar
+   (`i18n/messages.ts`): quay cranes (STS), shuttle carriers (SHC), stacking or yard cranes (ASC), water-side pads
+   (WTP), truck stalls, on-board boxes (ROB). Section headings keep the abbreviation in brackets once. The dashboard,
+   the event feed and the docs still use the abbreviations (they are the domain terms in `GLOSSARY.md`).
+3. Vessel table headers spelled out (Discharge, Transship in, Load, Transship out, Max cranes, Import / export /
+   transship %); the table fits at 1440 px and scrolls sideways below that.
+4. The sixteen per-block rows sit in a closed `<details data-testid="tt-yard-per-block">` ("Set each block
+   separately"); it opens by itself when the blocks differ, and `SetupDialog.vue` opens it when one of its inputs is
+   rejected on Start. `terminal-twin-asc.smoke.ts` opens it before filling a block.
+
+Offered but not asked for yet: fewer or explained speed steps, compact switches for the subsystem modes, a better
+picture for tiny test benches, a product line in the rail intro, "Save / Load" naming the rewind.
+
 ## Still open (ideas, none blocking)
 
 - Not yet looked at closely on the dark skin: final report panel, bay viewer, inspector with a selection, the
