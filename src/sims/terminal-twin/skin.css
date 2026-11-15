@@ -107,6 +107,9 @@ body:has(.terminal-twin) {
   --tt-plan-line: #8a96a8;
   --tt-plan-pad: #86b6e0;
   --tt-plan-lane: #46546a;
+  --tt-plan-water: #163a5c;
+  --tt-plan-land: #222d3d;
+  --tt-plan-ship: #a9b8cc;
   --tt-hatch: rgba(10, 16, 26, 0.45);
   --tt-white-line: rgba(255, 255, 255, 0.9);
 
@@ -188,6 +191,9 @@ html[data-tt-theme='light'] body:has(.terminal-twin) {
   --tt-plan-quay: #1c3a5a;
   --tt-plan-line: #6b7280;
   --tt-plan-lane: #cfd6df;
+  --tt-plan-water: #c3dcf2;
+  --tt-plan-land: #e3e7ee;
+  --tt-plan-ship: #5a6b84;
 
   color-scheme: light;
 }

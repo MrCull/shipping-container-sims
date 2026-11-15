@@ -52,6 +52,13 @@ PR #281 checks: "Lint, build and test" passes. "Build and Deploy Job" (Azure pre
 staging environments": an Azure limit, not the code; the owner has to delete an old preview environment. The smoke
 job is skipped until the PR carries the `smoke` label.
 
+## Layout picture (third request)
+
+The owner could not tell what the drawing in the scenario detail pane was. `components/setup/LayoutSketch.vue` now
+draws water with a vessel at the quay, cranes reaching over it, the yard blocks and the gate, with a caption and a
+legend carrying the counts. New tokens `--tt-plan-water`, `--tt-plan-land`, `--tt-plan-ship` (both themes). The
+bigger plan on the Yard and equipment tab (`PlanPreview.vue`) is unchanged and could get the same treatment.
+
 ## Still open (ideas, none blocking)
 
 - Not yet looked at closely on the dark skin: final report panel, bay viewer, inspector with a selection, the
