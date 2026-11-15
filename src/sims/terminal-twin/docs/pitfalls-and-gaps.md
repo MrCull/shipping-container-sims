@@ -141,6 +141,14 @@ detail. Terms: [GLOSSARY.md](../../../../GLOSSARY.md).
 
 ## Known gaps (accepted, not built)
 
+- **Hero spreaders (#273), what stays open:**
+  - The STS hero file has no headblock: the headblock is the rig's `hoist` node, so the rig's `hoist_geo` stays in
+    place above the hero spreader (plain against the detailed frame below it).
+  - A 20 ft ASC or SHC hero spreader is the 40 ft model scaled along its length, as the rig's own spreader is (the hero
+    body takes the rig body's motion from rest), so the headblock, power pack and flippers are squashed to about half
+    length. Telescoping ends that slide instead would need new rig nodes in the ASC and SHC rigs and hero files.
+  - Draw calls are 12 on the STS, not the spec's 4 ([assets-pipeline.md](assets-pipeline.md), Hero spreaders).
+  [rendering-3d.md](rendering-3d.md) (Hero equipment)
 - **Extra shortcuts** E, I and P and the ASC yield moves go beyond the spec (accepted scope). [browser-host.md](browser-host.md)
 - **Far-field livery and corrugation (#170)**: wordmark and rib shading fade to body colour beyond about 80 to 100 m;
   the Yard view (about 493 m) showed no text; roofs carry no text. Fixed by the far-field wordmark atlas (#256, `livery-atlas-far.webp`, blended in by camera distance, see rendering-3d.md); a box seen from the Yard view is only a few pixels long, so the wordmark reads as a coloured band, not as letters. Frame time of the extra texture sample is for the laptop benchmark (#262). The close-up corrugation pitch (`CORRUGATION_PITCH_M` 0.25 m) differs from the LOD0 GLB rib (0.56 m) on purpose. [assets-pipeline.md](assets-pipeline.md), [rendering-3d.md](rendering-3d.md)

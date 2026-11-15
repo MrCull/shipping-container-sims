@@ -60,28 +60,45 @@ describe('selectHeroEquipment', () => {
     expect(selectHeroEquipment([{ id: 'new', distanceM: 27.5 }], 3, previous)).toEqual([])
   })
 
-  it('a previous pick keeps its place against a newcomer only a little nearer, and loses it to a clearly nearer one', () => {
-    const previous = new Set(['held'])
-    expect(
-      selectHeroEquipment(
-        [
-          { id: 'held', distanceM: 11 },
-          { id: 'new', distanceM: 10 },
-        ],
-        1,
-        previous,
-      ),
-    ).toEqual(['held'])
-    expect(
-      selectHeroEquipment(
-        [
-          { id: 'held', distanceM: 12 },
-          { id: 'new', distanceM: 10 },
-        ],
-        1,
-        previous,
-      ),
-    ).toEqual(['new'])
+  it('with the cap full, a previous pick inside the distance keeps its place against a much nearer newcomer', () => {
+    const candidates = [
+      { id: 'held', distanceM: 24 },
+      { id: 'new', distanceM: 5 },
+    ]
+    expect(selectHeroEquipment(candidates, 1, new Set(['held']))).toEqual(['held'])
+    // also in its extra reach (25 to 28.75 m)
+    expect(selectHeroEquipment([{ id: 'held', distanceM: 28 }, candidates[1]], 1, new Set(['held']))).toEqual(['held'])
+    // once it is beyond 25 x 1.15 m the newcomer takes the place
+    expect(selectHeroEquipment([{ id: 'held', distanceM: 29 }, candidates[1]], 1, new Set(['held']))).toEqual(['new'])
+  })
+
+  it('free places go to newcomers within 25 m, nearest first; the result is nearest first', () => {
+    const picked = selectHeroEquipment(
+      [
+        { id: 'held', distanceM: 27 },
+        { id: 'newFar', distanceM: 20 },
+        { id: 'newNear', distanceM: 8 },
+        { id: 'newMid', distanceM: 14 },
+        { id: 'newOut', distanceM: 26 },
+      ],
+      3,
+      new Set(['held']),
+    )
+    expect(picked).toEqual(['newNear', 'newMid', 'held'])
+  })
+
+  it('more previous picks than the cap (the cap was lowered): the nearest of them stay', () => {
+    const picked = selectHeroEquipment(
+      [
+        { id: 'a', distanceM: 20 },
+        { id: 'b', distanceM: 10 },
+        { id: 'c', distanceM: 15 },
+        { id: 'new', distanceM: 2 },
+      ],
+      2,
+      new Set(['a', 'b', 'c']),
+    )
+    expect(picked).toEqual(['b', 'c'])
   })
 
   it('does not change its inputs', () => {

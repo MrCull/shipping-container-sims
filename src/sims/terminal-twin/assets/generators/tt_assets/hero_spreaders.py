@@ -18,6 +18,8 @@ over DETAIL_TILE_M for the detail normal and ORM maps shared with the hero conta
 Geometry is written in a canonical frame (u = along the spreader, v = across, w = up, w 0 = the twist-lock plane) and
 mapped to each rig's Blender axes by `_Builder`.
 """
+import math
+
 import bpy
 
 from . import asc as A
@@ -130,6 +132,20 @@ class _Builder:
         ax = {'u': 'y' if self.swap else 'x', 'v': 'x' if self.swap else 'y', 'w': 'z'}[axis]
         self.m.cylinder(self.point(base), radius, length, segs, _swatch(colour), axis=ax, caps=True)
 
+    def cone(self, base, r_base, r_top, length, colour, segs=8):
+        """A capped frustum from `base` up canonical w: radius `r_base` at the base, `r_top` at base + length."""
+        uv = _swatch(colour)
+        bu, bv, bw = base
+
+        def at(k, top):
+            a, r = 2 * math.pi * k / segs, r_top if top else r_base
+            return self.point((bu + r * math.cos(a), bv + r * math.sin(a), bw + (length if top else 0.0)))
+        for k in range(segs):
+            mid = 2 * math.pi * (k + 0.5) / segs
+            self.m.quad([at(k, False), at(k + 1, False), at(k + 1, True), at(k, True)], [uv] * 4, outward=self.point((math.cos(mid), math.sin(mid), 0.0)))
+        for top, sign in ((False, -1), (True, 1)):
+            self.m.quad([at(k, top) for k in range(segs)], [uv] * segs, outward=(0, 0, sign))
+
 
 def _stripes(b, su, u_face, v_half, w0, w1, paint, n=10):
     """Yellow and black warning bands across an end face (thin plates just off the paint)."""
@@ -160,7 +176,7 @@ def _fixed_body(b, kind):
         for sv in (-1, 1):
             b.box((su * hl - 0.32, sv * 1.1, 0.0), (su * hl + 0.32, sv * 1.42, 0.06), 'dark')     # corner guide shoe
             b.box((su * (hl + 0.3), sv * 1.16, 0.06), (su * (hl + 0.32), sv * 1.42, 0.22), 'dark')  # corner guide lip
-            b.cyl((su * k['lock_u'], sv * k['lock_v'], 0.0), 0.1, 0.04, 'w', 'steel', 10)          # twist-lock housing collar
+            _lock_housing(b, su * k['lock_u'], sv * k['lock_v'], 0.12, 0.11, -0.012, 0.07)
             b.box((su * k['lock_u'] - 0.16, sv * k['lock_v'] - 0.14, 0.5), (su * k['lock_u'] + 0.16, sv * k['lock_v'] + 0.14, 0.58), 'dark')  # lock actuator cover
             _flipper(b, su, sv, hl + 0.3, 1.4, 0.5, 0.95, 0.0, paint)
             b.box((su * (hl - 0.9) - 0.03, sv * 0.3, 0.5), (su * (hl - 0.9) + 0.03, sv * 1.3, 0.56), 'steel')  # beam stiffener
@@ -198,9 +214,18 @@ def _fixed_body(b, kind):
     b.cyl((-3.05, 0.0, 0.83), 0.12, 0.8, 'u', 'steel', 10)
 
 
+def _lock_housing(b, u, v, half_u, half_v, w0, w1):
+    """The fixed twist-lock housing at a corner: a steel casting block standing a little proud of the guide shoe, with
+    the bearing collar the lock turns in below it."""
+    b.box((u - half_u, v - half_v, w0), (u + half_u, v + half_v, w1), 'steel')
+    b.cyl((u, v, w0 - 0.012), 0.08, 0.02, 'w', 'zinc', 10)
+
+
 def _fixed_lock(b):
-    b.cyl((0, 0, -0.06), 0.045, 0.12, 'w', 'dark', 10)
-    b.box((-0.07, -0.03, -0.08), (0.07, 0.03, -0.04), 'steel')
+    """About the pivot: shank, the oblong head that turns under the corner casting, and the tapered cone below it."""
+    b.cyl((0, 0, -0.03), 0.04, 0.09, 'w', 'dark', 10)
+    b.box((-0.07, -0.03, -0.05), (0.07, 0.03, -0.03), 'steel')
+    b.cone((0, 0, -0.08), 0.012, 0.03, 0.03, 'steel')
 
 
 def _sts_body(b):
@@ -235,7 +260,9 @@ def _sts_tele(b, sx):
         b.box((x - sx * 4.4, sv * arm_v - 0.12, 0.38), (x, sv * arm_v + 0.12, 0.78), 'steel')      # telescopic inner beam
         b.box((x - sx * 1.6 - 0.15, sv * arm_v - 0.125, 0.375), (x - sx * 1.6 + 0.15, sv * arm_v + 0.125, 0.785), 'black')  # wear pad
         b.box((lo, sv * 0.95, 0.02), (hi, sv * 1.25, 0.1), 'dark')                                 # corner guide shoe
-        b.cyl((sx * STS.TWISTLOCK_X, sv * STS.TWISTLOCK_Z, 0.04), 0.1, 0.06, 'w', 'steel', 10)     # twist-lock housing collar
+        b.box((lo, sv * 1.25, 0.02), (hi, sv * 1.27, 0.26), 'dark')                                # corner guide lip, side
+        b.box((sx * edge, sv * 0.95, 0.02), (sx * (edge + STRIPE), sv * 1.25, 0.15), 'dark')       # corner guide lip, end (below the bands)
+        _lock_housing(b, sx * STS.TWISTLOCK_X, sv * STS.TWISTLOCK_Z, 0.12, 0.1, 0.0, 0.11)
         _flipper(b, sx, sv, edge, 1.25, 0.95, 1.55, 0.3, 'yellow')
     b.cyl((x, -1.2, 0.975), 0.025, 2.4, 'v', 'dark', 6)                                            # hose along the end beam
 
@@ -252,8 +279,10 @@ def _sts_twin(b):
 
 
 def _sts_lock(b):
-    b.cyl((0, 0, -0.06), 0.065, 0.16, 'w', 'steel', 10)
-    b.box((-0.06, -0.11, -0.14), (0.06, 0.11, -0.06), 'dark')
+    """About the pivot: shank, the oblong head and the tapered cone below it."""
+    b.cyl((0, 0, -0.06), 0.055, 0.16, 'w', 'steel', 10)
+    b.box((-0.06, -0.11, -0.09), (0.06, 0.11, -0.06), 'dark')
+    b.cone((0, 0, -0.14), 0.02, 0.055, 0.05, 'dark')
 
 
 def _rig(kind):
@@ -361,7 +390,7 @@ def sidecar(info):
         'lods': {'LOD0': {'triangles': info['triangles']}},
         'provenance': [
             {'fact': 'frame, pivots and overall extents copied from the source rig spreader', 'tag': 'A', 'source': f'tt_assets/{kind}.py'},
-            {'fact': 'headblock sheaves, telescopic inner beams, guide rollers, twist-lock housings, raised flippers, hoses, festoon, warning bands',
+            {'fact': 'headblock sheaves, telescopic inner beams, guide rollers, twist-lock housings and cones, corner guides, raised flippers, hoses, festoon, warning bands',
              'tag': 'A', 'source': 'generic telescopic container spreader; no manufacturer drawing'},
             {'fact': 'detail maps are procedural noise, not scans', 'tag': 'A'},
         ],

@@ -15,7 +15,7 @@ import * as THREE from 'three'
 import meta from '../assets/models/sts/sts-malaccamax.meta.json'
 import { AssetRig, type RigMeta } from './assetRig'
 import { loadGltf } from './containerAssets'
-import { heroSpreaderMount, type HeroSpreaderMount } from './heroEquipment'
+import { heroSpreaderMount, type HeroSpreaderMount } from './heroSpreaderMount'
 
 export const STS_ASSET_URL = new URL('../assets/models/sts/sts-malaccamax.glb', import.meta.url).href
 export const STS_META = meta

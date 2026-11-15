@@ -10,9 +10,13 @@
  *   paired with the rig's, through `runPrep` within the hero prep allowance, and only while the `CameraGate` is calm
  *   (same constants as the hero faces): nothing is fetched or attached during a fast camera move.
  * - **Attach:** the hero `LOD0` becomes a child of the rig's LOD0 `spreader` node with an identity transform, so it
- *   follows the crane. It fades in over `HERO_FADE_MS` as a screen-door dither over the rig spreader (the hero faces'
- *   pattern, on a per-spreader copy of the material); when the fade ends the rig's own spreader meshes are hidden and
- *   the shared material is put back.
+ *   follows the crane. It fades in over `HERO_FADE_MS` as a screen-door dither (the hero faces' pattern, on a
+ *   per-spreader copy of the material) while the rig's own spreader meshes dither out with the complementary pattern:
+ *   every pixel shows exactly one of the two, so the two models never z-fight where their surfaces coincide. When the
+ *   fade ends the rig meshes are hidden and the shared materials are put back on both.
+ * - **Failed load:** the rig spreader stays, and the file is asked for again after a back-off (`HERO_EQUIPMENT_RETRY_MS`,
+ *   doubling to `HERO_EQUIPMENT_RETRY_MAX_MS`) for as long as the spreader stays chosen. While it waits on the back-off
+ *   the level counts as settled.
  * - **Follow the rig:** the rig code moves its own nodes (twistlock turn, telescoping, the 20 ft squeeze of the ASC
  *   and SHC spreader). Each frame every hero node that has a rig node of the same name takes that node's local
  *   transform, relative to rest: `hero = rigNow x rigRest^-1 x heroRest`. So the hero spreader shows exactly the
@@ -20,47 +24,47 @@
  * - **Release:** a spreader no longer chosen (farther away, rig left LOD0, cap lowered) loses the hero model and its
  *   rig meshes are shown again. `dispose()` does that for all of them.
  *
+ * Per-frame cost: a frame with no offer in reach and nothing attached returns before any work; the candidate list, the
+ * chosen set and the prep list are reused across frames.
+ *
  * No depth bias: a spreader is its own object, not a face over a box (`HERO_DEPTH_BIAS_M` is for hero faces only).
  */
 import * as THREE from 'three'
 import { loadHeroSpreader, type HeroEquipmentKind } from './heroEquipmentAssets'
-import { selectHeroEquipment, type HeroEquipmentCandidate } from './heroEquipmentSelection'
+import { HERO_EQUIPMENT_DISTANCE_M, HERO_EQUIPMENT_HYSTERESIS, selectHeroEquipment, type HeroEquipmentCandidate } from './heroEquipmentSelection'
 import { CameraGate, fadeAlpha, runPrep, type PrepItem } from './heroPrep'
+import { gltfNodeName as nodeName, type HeroEquipmentOffer } from './heroSpreaderMount'
 
-/** GLTFLoader renames duplicate node names (`spreader_1`); the file's own name is kept in `userData.name`. */
-const nodeName = (o: THREE.Object3D): string => (o.userData.name as string | undefined) ?? o.name
-
-/** Where a hero spreader goes on a rig: the rig's LOD0 `spreader` node, and a copy of that subtree as loaded (unposed). */
-export interface HeroSpreaderMount {
-  node: THREE.Object3D
-  rest: THREE.Object3D
-}
-
-/**
- * The mount of a rig's LOD0 subtree, or null when it has no `spreader` node. Call it before the rig is first posed:
- * the copy taken here is the rest pose that later motion is measured against.
- */
-export function heroSpreaderMount(lod0: THREE.Object3D): HeroSpreaderMount | null {
-  let node: THREE.Object3D | null = null
-  lod0.traverse((o) => {
-    if (!node && nodeName(o) === 'spreader') node = o
-  })
-  if (!node) return null
-  return { node, rest: (node as THREE.Object3D).clone(true) }
-}
-
-export interface HeroEquipmentOffer {
-  /** Stable equipment id. */
-  id: string
-  kind: HeroEquipmentKind
-  mount: HeroSpreaderMount
-}
+/** A failed load is asked for again this long (ms) after the failure, while the spreader stays chosen. */
+export const HERO_EQUIPMENT_RETRY_MS = 3000
+/** Each further failure doubles the wait, up to this (ms). */
+export const HERO_EQUIPMENT_RETRY_MAX_MS = 30000
+/** No spreader farther than this (m) can be chosen, new or kept: such an offer is dropped at once. */
+const REACH_M = HERO_EQUIPMENT_DISTANCE_M * HERO_EQUIPMENT_HYSTERESIS
 
 interface Pair {
   rig: THREE.Object3D
   hero: THREE.Object3D
-  /** `rigRest^-1 x heroRest`. */
-  k: THREE.Matrix4
+  /** `rigRest^-1 x heroRest`: the hero node's rest pose seen from the rig node's rest pose. */
+  restOffset: THREE.Matrix4
+}
+
+/** A mesh that wears a dither copy of its material during the fade, and the shared material to put back. */
+interface MaterialSwap {
+  mesh: THREE.Mesh
+  shared: THREE.Material | THREE.Material[]
+  own: THREE.Material[]
+}
+
+/** A fade in progress: the fade uniform (0 to 1) and the hero (dither in) and rig (dither out) meshes it drives. */
+interface HeroFade {
+  uniform: { value: number }
+  swaps: MaterialSwap[]
+}
+
+/** An offer as held between frames: one object per equipment id, reused. */
+interface Slot extends HeroEquipmentCandidate {
+  offer: HeroEquipmentOffer
 }
 
 interface Attached {
@@ -71,27 +75,55 @@ interface Attached {
   rigMeshes: THREE.Mesh[]
   readyAt: number
   /** While fading: the dither materials in use and the shared ones to put back. */
-  fade: { uniform: { value: number }; swaps: { mesh: THREE.Mesh; shared: THREE.Material | THREE.Material[]; own: THREE.Material[] }[] } | null
+  fade: HeroFade | null
 }
 
-type Entry = { state: 'loading' } | { state: 'failed' } | { state: 'loaded'; root: THREE.Object3D } | { state: 'attached'; hero: Attached }
+type Entry = { state: 'loading'; attempt: number } | { state: 'failed'; attempt: number; retryAt: number } | { state: 'loaded'; root: THREE.Object3D } | { state: 'attached'; hero: Attached }
 
-const FADE_DISCARD = `if (heroSpreaderFade < 0.999) {
-  float heroDither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+const DITHER = 'float heroDither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));'
+/** The hero model: drawn where the dither value is below the fade. */
+const FADE_IN_DISCARD = `if (heroSpreaderFade < 0.999) {
+  ${DITHER}
   if (heroDither >= heroSpreaderFade) discard;
 }`
+/** The rig model: drawn exactly where the hero model is not. */
+const FADE_OUT_DISCARD = `{
+  ${DITHER}
+  if (heroSpreaderFade >= 0.999 || heroDither < heroSpreaderFade) discard;
+}`
 
-/** A copy of `material` that discards by an ordered screen-door dither while `uniform.value` is below 1. */
-function ditherMaterial(material: THREE.Material, uniform: { value: number }): THREE.Material {
+/**
+ * A copy of `material` that discards by an ordered screen-door dither of `uniform.value` (0 to 1): `in` appears as the
+ * value rises, `out` disappears, and the two patterns are complementary. A shader patch the material already has
+ * (the plate materials) is kept.
+ */
+function ditherMaterial(material: THREE.Material, uniform: { value: number }, direction: 'in' | 'out'): THREE.Material {
   const own = material.clone()
-  own.onBeforeCompile = (shader) => {
+  const discard = direction === 'in' ? FADE_IN_DISCARD : FADE_OUT_DISCARD
+  own.onBeforeCompile = (shader, renderer) => {
+    material.onBeforeCompile(shader, renderer)
     shader.uniforms.heroSpreaderFade = uniform
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform float heroSpreaderFade;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\n' + FADE_DISCARD)
+      .replace('#include <color_fragment>', '#include <color_fragment>\n' + discard)
   }
-  own.customProgramCacheKey = () => 'heroSpreaderFade'
+  own.customProgramCacheKey = () => `${material.customProgramCacheKey()}|heroSpreaderFade-${direction}`
   return own
+}
+
+/** Puts dither copies on `meshes` (one copy per shared material) and records the swaps. */
+function ditherMeshes(meshes: Iterable<THREE.Mesh>, uniform: { value: number }, direction: 'in' | 'out', swaps: MaterialSwap[]): void {
+  const dithered = new Map<THREE.Material, THREE.Material>()
+  for (const mesh of meshes) {
+    const shared = mesh.material
+    const own = (Array.isArray(shared) ? shared : [shared]).map((m) => {
+      let d = dithered.get(m)
+      if (!d) dithered.set(m, (d = ditherMaterial(m, uniform, direction)))
+      return d
+    })
+    mesh.material = Array.isArray(shared) ? own : own[0]
+    swaps.push({ mesh, shared, own })
+  }
 }
 
 /** World-space box of a spreader, metres. */
@@ -126,10 +158,13 @@ export class HeroEquipmentLevel {
   private readonly now: () => number
   private readonly gate = new CameraGate()
   private cap = 0
-  private offers = new Map<string, HeroEquipmentOffer>()
-  private candidates: HeroEquipmentCandidate[] = []
-  private chosen = new Set<string>()
-  private entries = new Map<string, Entry>()
+  /** One slot per equipment id ever offered in reach (bounded by the fleet); `candidates` holds this frame's. */
+  private readonly slots = new Map<string, Slot>()
+  private readonly candidates: Slot[] = []
+  private readonly chosen = new Set<string>()
+  private readonly prep: PrepItem[] = []
+  private readonly entries = new Map<string, Entry>()
+  private frameMs = 0
   private waiting = 0
   private fading = 0
   private disposed = false
@@ -147,7 +182,6 @@ export class HeroEquipmentLevel {
 
   /** Starts a frame: forgets last frame's offers. */
   begin(): void {
-    this.offers.clear()
     this.candidates.length = 0
   }
 
@@ -156,39 +190,54 @@ export class HeroEquipmentLevel {
     if (this.cap <= 0) return
     offer.mount.node.updateWorldMatrix(true, false)
     const distanceM = this.world.setFromMatrixPosition(offer.mount.node.matrixWorld).distanceTo(cameraPosition)
-    this.offers.set(offer.id, offer)
-    this.candidates.push({ id: offer.id, distanceM })
+    if (distanceM > REACH_M) return
+    let slot = this.slots.get(offer.id)
+    if (!slot) this.slots.set(offer.id, (slot = { id: offer.id, distanceM, offer }))
+    slot.distanceM = distanceM
+    slot.offer = offer
+    this.candidates.push(slot)
   }
 
   /** Ends a frame: chooses among the offers, prepares within the allowance, attaches, follows the rigs and fades. */
   update(cameraPosition: THREE.Vector3, nowMs: number): void {
     if (this.disposed) return
+    this.frameMs = nowMs
     const calm = this.gate.update(cameraPosition.x, cameraPosition.y, cameraPosition.z, nowMs)
+    this.waiting = 0
+    this.fading = 0
+    if (this.candidates.length === 0 && this.entries.size === 0) {
+      // the common frame: no LOD0 spreader in reach and nothing attached, loading or waiting to be retried
+      if (this.chosen.size > 0) this.chosen.clear()
+      return
+    }
     const chosen = selectHeroEquipment(this.candidates, this.cap, this.chosen)
-    this.chosen = new Set(chosen)
+    this.chosen.clear()
+    for (const id of chosen) this.chosen.add(id)
     for (const [id, entry] of this.entries) {
       if (this.chosen.has(id)) continue
       if (entry.state === 'attached') this.detach(entry.hero)
       // a file still loading resolves into nothing (see `prepare`)
       this.entries.delete(id)
     }
-    const prep: PrepItem[] = []
-    this.waiting = 0
-    this.fading = 0
+    const prep = this.prep
     for (const id of chosen) {
-      const offer = this.offers.get(id)!
+      const slot = this.slots.get(id)!
+      const offer = slot.offer
       const entry = this.entries.get(id)
-      const distanceM = this.candidates.find((c) => c.id === id)!.distanceM
-      if (!entry) {
+      if (!entry || (entry.state === 'failed' && nowMs >= entry.retryAt)) {
         this.waiting++
-        if (calm) prep.push({ d2: distanceM * distanceM, run: () => this.prepare(offer) })
+        if (calm) prep.push({ d2: slot.distanceM * slot.distanceM, run: () => this.prepare(offer, entry ? entry.attempt + 1 : 1) })
       } else if (entry.state === 'loading') this.waiting++
       else if (entry.state === 'loaded') {
         this.waiting++
-        if (calm) prep.push({ d2: distanceM * distanceM, run: () => this.entries.set(id, { state: 'attached', hero: this.attach(offer, entry.root, nowMs) }) })
+        if (calm) prep.push({ d2: slot.distanceM * slot.distanceM, run: () => this.entries.set(id, { state: 'attached', hero: this.attach(offer, entry.root, nowMs) }) })
       } else if (entry.state === 'attached') entry.hero.offer = offer
+      // failed and waiting on its back-off: not counted as waiting, so the level is settled meanwhile
     }
-    if (prep.length > 0) runPrep(prep, this.now)
+    if (prep.length > 0) {
+      runPrep(prep, this.now)
+      prep.length = 0
+    }
     for (const entry of this.entries.values()) {
       if (entry.state !== 'attached') continue
       this.follow(entry.hero)
@@ -196,17 +245,22 @@ export class HeroEquipmentLevel {
     }
   }
 
-  /** Fetches the kind's file (first need only); the result waits as `loaded` for a later frame's prep slot. */
-  private prepare(offer: HeroEquipmentOffer): void {
-    const loading: Entry = { state: 'loading' }
+  /**
+   * Fetches the kind's file (first need only); the result waits as `loaded` for a later frame's prep slot. `attempt`
+   * counts the requests for this spreader since it was chosen (1 first): a failure waits
+   * `HERO_EQUIPMENT_RETRY_MS x 2^(attempt - 1)`, at most `HERO_EQUIPMENT_RETRY_MAX_MS`, before the next.
+   */
+  private prepare(offer: HeroEquipmentOffer, attempt: number): void {
+    const loading: Entry = { state: 'loading', attempt }
     this.entries.set(offer.id, loading)
     this.load(offer.kind).then(
       (root) => {
         if (!this.disposed && this.entries.get(offer.id) === loading) this.entries.set(offer.id, { state: 'loaded', root })
       },
       (err: unknown) => {
-        console.warn(`Terminal Twin: hero spreader (${offer.kind}) failed to load; keeping the rig spreader`, err)
-        if (this.entries.get(offer.id) === loading) this.entries.set(offer.id, { state: 'failed' })
+        const waitMs = Math.min(HERO_EQUIPMENT_RETRY_MAX_MS, HERO_EQUIPMENT_RETRY_MS * 2 ** (attempt - 1))
+        console.warn(`Terminal Twin: hero spreader (${offer.kind}) failed to load; keeping the rig spreader, next try in ${waitMs / 1000} s`, err)
+        if (this.entries.get(offer.id) === loading) this.entries.set(offer.id, { state: 'failed', attempt, retryAt: this.frameMs + waitMs })
       },
     )
   }
@@ -224,21 +278,12 @@ export class HeroEquipmentLevel {
       if (o !== rest) restByName.set(nodeName(o), o)
     })
     const pairs: Pair[] = []
-    const uniform = { value: 0 }
-    const swaps: NonNullable<Attached['fade']>['swaps'] = []
-    const dithered = new Map<THREE.Material, THREE.Material>()
+    const heroMeshes: THREE.Mesh[] = []
     root.traverse((o) => {
       const mesh = o as THREE.Mesh
       if (mesh.isMesh) {
         mesh.castShadow = true
-        const shared = mesh.material
-        const own = (Array.isArray(shared) ? shared : [shared]).map((m) => {
-          let d = dithered.get(m)
-          if (!d) dithered.set(m, (d = ditherMaterial(m, uniform)))
-          return d
-        })
-        mesh.material = Array.isArray(shared) ? own : own[0]
-        swaps.push({ mesh, shared, own })
+        heroMeshes.push(mesh)
       }
       if (o === root) return
       const rig = rigByName.get(nodeName(o))
@@ -247,20 +292,23 @@ export class HeroEquipmentLevel {
       rigRest.updateMatrix()
       o.updateMatrix()
       o.matrixAutoUpdate = false
-      pairs.push({ rig, hero: o, k: rigRest.matrix.clone().invert().multiply(o.matrix) })
+      pairs.push({ rig, hero: o, restOffset: rigRest.matrix.clone().invert().multiply(o.matrix) })
     })
     root.position.set(0, 0, 0)
     root.quaternion.identity()
     root.scale.set(1, 1, 1)
     node.add(root)
-    return { offer, root, pairs, rigMeshes, readyAt: nowMs, fade: { uniform, swaps } }
+    const fade: HeroFade = { uniform: { value: 0 }, swaps: [] }
+    ditherMeshes(heroMeshes, fade.uniform, 'in', fade.swaps)
+    ditherMeshes(rigMeshes, fade.uniform, 'out', fade.swaps)
+    return { offer, root, pairs, rigMeshes, readyAt: nowMs, fade }
   }
 
   /** Every paired hero node takes its rig node's local motion from rest. */
   private follow(hero: Attached): void {
     for (const p of hero.pairs) {
       p.rig.updateMatrix()
-      p.hero.matrix.multiplyMatrices(p.rig.matrix, p.k)
+      p.hero.matrix.multiplyMatrices(p.rig.matrix, p.restOffset)
       p.hero.matrixWorldNeedsUpdate = true
     }
   }
@@ -277,7 +325,7 @@ export class HeroEquipmentLevel {
     for (const m of hero.rigMeshes) m.visible = false
   }
 
-  /** Puts the shared materials back and frees the dither copies. */
+  /** Puts the shared materials back (hero and rig meshes) and frees the dither copies. */
   private endFade(hero: Attached): void {
     if (!hero.fade) return
     const freed = new Set<THREE.Material>()
@@ -326,7 +374,7 @@ export class HeroEquipmentLevel {
     return out
   }
 
-  /** True while a chosen spreader waits for its model (camera gate, fetch, prep slot) or fades in. */
+  /** True while a chosen spreader waits for its model (camera gate, fetch, prep slot, a retry that is due) or fades in; not while a failed load waits on its back-off. */
   get busy(): boolean {
     return this.waiting > 0 || this.fading > 0
   }
@@ -342,8 +390,9 @@ export class HeroEquipmentLevel {
     for (const entry of this.entries.values()) if (entry.state === 'attached') this.detach(entry.hero)
     this.entries.clear()
     this.chosen.clear()
-    this.offers.clear()
+    this.slots.clear()
     this.candidates.length = 0
+    this.prep.length = 0
     this.waiting = 0
     this.fading = 0
   }

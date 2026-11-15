@@ -11,6 +11,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
 import { MeshoptDecoder } from 'meshoptimizer'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { checkAssetLibrary, loadBudgets, MODELS_DIR } from '../cli/assets/budgetCheck'
+import { QUALITY_LEVELS, QUALITY_PROFILES } from '../modules/quality'
 
 const DIR = join(MODELS_DIR, 'hero-equipment')
 const SOURCES = { sts: 'sts/sts-malaccamax.glb', asc: 'asc/asc.glb', shc: 'shc/shc.glb' } as const
@@ -88,6 +89,29 @@ describe('hero spreaders', () => {
       expect(a.kind).toBe('hero-equipment')
       expect(a.problems).toEqual([])
       expect(a.lods.LOD0.triangles, kind).toBeGreaterThan(1500)
+    }
+  })
+
+  it('budgets.json lists the three assets and a cap per quality level that the measured spreaders fit (heroEquipmentCaps)', () => {
+    interface Cap {
+      spreaders: number
+      maxTriangles: number
+      maxDrawCalls: number
+    }
+    const caps = (loadBudgets() as unknown as { heroEquipmentCaps: { assets: string[]; levels: Record<string, Cap> } }).heroEquipmentCaps
+    const report = checkAssetLibrary()
+    const inLibrary = report.assets.filter((a) => a.kind === 'hero-equipment').map((a) => a.name)
+    expect([...caps.assets].sort()).toEqual(inLibrary.sort())
+    expect([...caps.assets].sort()).toEqual(KINDS.map((k) => `hero-spreader-${k}`).sort())
+    const lod0 = caps.assets.map((n) => report.assets.find((a) => a.name === n)!.lods.LOD0)
+    const worstTriangles = Math.max(...lod0.map((l) => l.triangles))
+    const worstDrawCalls = Math.max(...lod0.map((l) => l.drawCalls))
+    expect(Object.keys(caps.levels).sort()).toEqual([...QUALITY_LEVELS].sort())
+    for (const level of QUALITY_LEVELS) {
+      const cap = caps.levels[level]
+      expect(cap.spreaders, level).toBe(QUALITY_PROFILES[level].heroEquipment)
+      expect(cap.spreaders * worstTriangles, level).toBeLessThanOrEqual(cap.maxTriangles)
+      expect(cap.spreaders * worstDrawCalls, level).toBeLessThanOrEqual(cap.maxDrawCalls)
     }
   })
 

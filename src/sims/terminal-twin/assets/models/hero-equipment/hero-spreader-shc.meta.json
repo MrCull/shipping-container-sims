@@ -164,7 +164,7 @@
   },
   "lods": {
     "LOD0": {
-      "triangles": 2424
+      "triangles": 2584
     }
   },
   "provenance": [
@@ -174,7 +174,7 @@
       "source": "tt_assets/shc.py"
     },
     {
-      "fact": "headblock sheaves, telescopic inner beams, guide rollers, twist-lock housings, raised flippers, hoses, festoon, warning bands",
+      "fact": "headblock sheaves, telescopic inner beams, guide rollers, twist-lock housings and cones, corner guides, raised flippers, hoses, festoon, warning bands",
       "tag": "A",
       "source": "generic telescopic container spreader; no manufacturer drawing"
     },

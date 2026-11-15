@@ -9,6 +9,7 @@ import { ascBeaconOffsets } from '../gantryBeacons'
 import { CONTAINER_DIMS } from '../sceneModel'
 import { spreaderLengthRatio, spreaderModeFor, type SpreaderMode } from '../spreaderMode'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
+import { offerHeroSpreaderAtLod0 } from '../heroSpreaderMount'
 
 interface AscParts {
   group: THREE.Group
@@ -110,7 +111,7 @@ class AscRenderer implements KindRenderer {
           tiers: parts.tiers,
           spreader,
         })
-        if (parts.rig.rigState.lod === 0 && parts.rig.heroMount) frame.offerHeroSpreader({ id, kind: 'asc', mount: parts.rig.heroMount })
+        offerHeroSpreaderAtLod0(frame, id, 'asc', parts.rig.rigState.lod, parts.rig.heroMount)
         continue
       }
       parts.group.position.set(parts.blockX, 0, pose.z)

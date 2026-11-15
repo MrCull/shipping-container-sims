@@ -136,21 +136,40 @@ Hero spreaders). `HeroEquipmentLevel` (`modules/heroEquipment.ts`) is owned by t
 quality profile (`heroEquipment`: High 3, Medium 1, Low 0, and 0 from the `equipment-hero-off` rung down).
 
 - **Offers.** In `update()` the STS, ASC and SHC kinds call `frame.offerHeroSpreader({ id, kind, mount })` for each rig that is
-  at LOD0, after posing it. `mount` is the rig's `heroMount` (`heroSpreaderMount(lod0)`: the LOD0 `spreader` node and a copy
-  of it at rest, taken before the first pose). The distance is from the camera to that node's world position, not to the
-  crane centre the LOD choice uses.
+  at LOD0, after posing it, through one helper, `offerHeroSpreaderAtLod0(frame, id, kind, lod, mount)`. `mount` is the
+  rig's `heroMount` (`heroSpreaderMount(lod0)`: the LOD0 `spreader` node and a copy of it at rest, taken before the first
+  pose). Mount, offer type and helper are in `modules/heroSpreaderMount.ts`, the rig-side module: the rig models and the
+  kinds import it, not the level. The distance is from the camera to that node's world position, not to the crane centre
+  the LOD choice uses; an offer beyond 25 x 1.15 m is dropped at once.
 - **Selection.** `selectHeroEquipment` (`heroEquipmentSelection.ts`): within `HERO_EQUIPMENT_DISTANCE_M` (25 m), nearest
-  first, at most the cap, hysteresis 1.15.
+  first, at most the cap. Hysteresis, literally the spec's: a spreader chosen last frame keeps its place out to 25 x 1.15 m
+  (28.75 m), also against a nearer newcomer when the cap is full (previous picks nearest first among themselves, up to
+  the cap); only the free places go to newcomers within 25 m, nearest first. The result is nearest first.
 - **Preparation.** A chosen spreader's file is fetched on first need and attached through `runPrep` within
   `HERO_PREP_ALLOWANCE_MS`, only while a `CameraGate` is calm (the hero faces' constants in `heroPrep.ts`): a fast camera move
   fetches and attaches nothing.
+- **Failed load.** The rig spreader stays and one warning is logged per failure. The file is asked for again after a
+  back-off for as long as the spreader stays chosen: `HERO_EQUIPMENT_RETRY_MS` (3 s), doubled after each further failure
+  up to `HERO_EQUIPMENT_RETRY_MAX_MS` (30 s); a spreader that is released and chosen again starts over. Chosen for
+  `heroSettled()`: while a failed load waits on its back-off the level is **settled** (nothing more is coming for now), so
+  a file that keeps failing never hangs a `heroSettled()` wait; it is unsettled only for the moment a retry is due or in
+  flight.
+- **Per-frame cost.** A frame with no offer in reach and nothing attached, loading or waiting returns right after the
+  camera gate, with no allocation. Otherwise the candidate slots (one object per equipment id), the chosen set and the
+  prep list are reused across frames, and a chosen id finds its offer and distance through a map.
 - **Attach.** The file's `LOD0` becomes a child of the rig's `spreader` node with an identity transform, so it follows the
   crane (and the ASC's vertical stretch). No depth bias: `HERO_DEPTH_BIAS_M` is for faces over a box.
-- **Fade: a dither.** The hero spreader fades in over `HERO_FADE_MS` with the hero faces' screen-door dither (a discard, no
-  blending), drawn over the rig spreader. The file's material has no fade input, so during the fade each attached spreader
-  uses its own copy of the material with a `heroSpreaderFade` uniform; when the fade ends the shared material is put back,
-  the copy is disposed and the rig's own spreader meshes are hidden (`visible = false`; the rig code never sets visibility
-  on them). The STS headblock is the rig's `hoist` node and stays.
+- **Fade: a cross dither.** The hero spreader fades in over `HERO_FADE_MS` with the hero faces' screen-door dither (a
+  discard, no blending). The two models are different meshes with many surfaces at the same place, so drawn together they
+  would z-fight for the 200 ms. Chosen fix (of "dither the rig one out" and "hide the rig meshes at the start"): the rig's
+  own spreader meshes dither **out** with the complementary pattern (same dither value from `gl_FragCoord`, opposite
+  test), so every pixel is drawn by exactly one of the two models and no hole shows the background. Neither file's
+  material has a fade input, so during the fade the hero meshes and the rig spreader meshes each wear their own copy of
+  their material with a shared `heroSpreaderFade` uniform (`ditherMaterial`, direction `in` or `out`; a patch the rig
+  material already has, such as a plate offset, is kept, and the program cache key is the material's own plus the
+  direction). When the fade ends, or the spreader is released during it, the shared materials are put back on both, the
+  copies are disposed, and at the end of the fade the rig meshes are hidden (`visible = false`; the rig code never sets
+  visibility on them). The STS headblock is the rig's `hoist` node and stays.
 - **Motion.** The rig code holds its own nodes and keeps moving them (twistlock turn, STS telescopes and twin unit, the 20 ft
   squeeze of the ASC and SHC spreader body and lock pattern). Every frame each hero node with a rig node of the same name
   gets `matrix = rigNow x rigRest^-1 x heroRest` (`matrixAutoUpdate` off), so it shows the rig's motion from rest whatever
@@ -159,7 +178,7 @@ quality profile (`heroEquipment`: High 3, Medium 1, Low 0, and 0 from the `equip
   shown again; `dispose()` does it for all. Geometry and materials belong to the loader's cache and are not disposed.
 - **Readouts.** `__tt.scene().heroEquipment` and `__tt.perf().stats.heroEquipment` (the Stats panel's "Hero spreaders",
   `tt-perf-hero-equipment`) count attached hero spreaders. `__tt.heroSettled()` is false while a chosen spreader waits for
-  the camera gate, its file or a prep slot, or fades in.
+  the camera gate, its file or a prep slot, or fades in (not while a failed load waits on its back-off, see Failed load).
 
   `__tt.scene().heroSpreaders` lists each attached one (`id`, `kind`, `fading`, `rigHidden`) with the world bounds of the
   hero model and of the rig spreader meshes it replaces (each rig mesh by its own geometry), so a test can check place,

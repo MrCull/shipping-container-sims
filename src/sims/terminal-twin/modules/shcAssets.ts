@@ -10,7 +10,7 @@
  */
 import * as THREE from 'three'
 import { loadGltf } from './containerAssets'
-import { heroSpreaderMount, type HeroSpreaderMount } from './heroEquipment'
+import { heroSpreaderMount, type HeroSpreaderMount } from './heroSpreaderMount'
 import { spreaderLengthM, spreaderLengthRatio, type SpreaderMode } from './spreaderMode'
 import meta from '../assets/models/shc/shc.meta.json'
 

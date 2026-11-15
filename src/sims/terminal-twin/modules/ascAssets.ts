@@ -12,7 +12,7 @@
 import * as THREE from 'three'
 import { loadGltf } from './containerAssets'
 import { ASC_MODEL, ascRigValues, ascScaleY } from './ascRig'
-import { heroSpreaderMount, type HeroSpreaderMount } from './heroEquipment'
+import { heroSpreaderMount, type HeroSpreaderMount } from './heroSpreaderMount'
 import { spreaderLengthM, spreaderLengthRatio, type SpreaderMode } from './spreaderMode'
 import meta from '../assets/models/asc/asc.meta.json'
 

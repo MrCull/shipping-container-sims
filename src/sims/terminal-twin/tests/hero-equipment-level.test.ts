@@ -1,7 +1,8 @@
 /** The hero equipment level (#273) through its public interface: offers in, hero spreaders attached to the rigs out. */
 import * as THREE from 'three'
-import { describe, expect, it } from 'vitest'
-import { HeroEquipmentLevel, heroSpreaderMount, type HeroSpreaderMount } from '../modules/heroEquipment'
+import { describe, expect, it, vi } from 'vitest'
+import { HERO_EQUIPMENT_RETRY_MS, HeroEquipmentLevel } from '../modules/heroEquipment'
+import { heroSpreaderMount, type HeroSpreaderMount } from '../modules/heroSpreaderMount'
 import type { HeroEquipmentKind } from '../modules/heroEquipmentAssets'
 import { HERO_FADE_MS, HERO_SETTLE_MS } from '../modules/heroPrep'
 
@@ -43,9 +44,9 @@ function fakeRig(x: number): FakeRig {
   return { mount: heroSpreaderMount(lod0)!, spreader, body: spreader.getObjectByName('spreader_geo') as THREE.Mesh, lock: spreader.getObjectByName('twistlock_fl')! }
 }
 
-function harness(cap: number) {
+function harness(cap: number, loadModel: () => THREE.Object3D = () => spreaderTree('LOD0', 2)) {
   const loads: HeroEquipmentKind[] = []
-  const level = new HeroEquipmentLevel({ load: async (kind) => (loads.push(kind), spreaderTree('LOD0', 2)), now: () => 0 })
+  const level = new HeroEquipmentLevel({ load: async (kind) => (loads.push(kind), loadModel()), now: () => 0 })
   level.setCap(cap)
   const camera = new THREE.Vector3(0, 0, 0)
   let t = 0
@@ -112,12 +113,84 @@ describe('hero equipment level', () => {
         expect(rig.body.visible).toBe(true) // the hero dithers in over the rig spreader
         const fading = heroOf(rig)!.getObjectByName('spreader_geo') as THREE.Mesh
         expect(fading.material).not.toBe(material)
+        // the rig spreader dithers out with the complementary pattern: its own copy of the material while it fades
+        expect(rig.body.material).not.toBe(material)
+        expect(rig.body.material).not.toBe(fading.material)
       }
     }
     expect(sawFade).toBe(true)
     expect(h.level.settled).toBe(true)
     expect(rig.body.visible).toBe(false)
+    expect(rig.body.material).toBe(material)
     expect((heroOf(rig)!.getObjectByName('spreader_geo') as THREE.Mesh).material).toBe(material)
+  })
+
+  it('a spreader released in the middle of its fade gets its rig spreader back whole', async () => {
+    const h = harness(3)
+    const rig = fakeRig(10)
+    for (let i = 0; i < 20 && !heroOf(rig); i++) await h.frame({ a: rig }, 50)
+    expect(heroOf(rig)).toBeDefined()
+    expect(rig.body.material).not.toBe(material)
+    await h.frame({}, 50)
+    expect(heroOf(rig)).toBeUndefined()
+    expect(rig.body.visible).toBe(true)
+    expect(rig.body.material).toBe(material)
+  })
+
+  it('retries a failed load after a back-off while the spreader stays chosen, and is settled while it waits', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    let failures = 2
+    const h = harness(3, () => {
+      if (failures-- > 0) throw new Error('offline')
+      return spreaderTree('LOD0', 2)
+    })
+    const rig = fakeRig(10)
+    for (let i = 0; i < 10; i++) await h.frame({ a: rig }) // 1 s
+    expect(h.loads).toHaveLength(1)
+    expect(h.level.settled).toBe(true) // waiting on the back-off: nothing more is coming for now
+    expect(h.level.count).toBe(0)
+    expect(rig.body.visible).toBe(true)
+    // not retried every frame: still one request just before the back-off ends
+    for (let i = 0; i < HERO_EQUIPMENT_RETRY_MS / 100 - 10; i++) await h.frame({ a: rig })
+    expect(h.loads).toHaveLength(1)
+    for (let i = 0; i < 10; i++) await h.frame({ a: rig })
+    expect(h.loads).toHaveLength(2)
+    // the second failure waits longer; the third request succeeds and the model arrives
+    for (let i = 0; i < (HERO_EQUIPMENT_RETRY_MS * 2) / 100 + 20; i++) await h.frame({ a: rig })
+    expect(h.loads).toHaveLength(3)
+    expect(heroOf(rig)).toBeDefined()
+    expect(h.level.settled).toBe(true)
+    expect(rig.body.visible).toBe(false)
+    expect(warn).toHaveBeenCalledTimes(2)
+    warn.mockRestore()
+  })
+
+  it('a file that keeps failing never leaves the level unsettled for good', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const h = harness(3, () => {
+      throw new Error('offline')
+    })
+    const rig = fakeRig(10)
+    let settledFrames = 0
+    for (let i = 0; i < 600; i++) {
+      await h.frame({ a: rig }) // 60 s
+      if (h.level.settled) settledFrames++
+    }
+    expect(h.loads.length).toBeGreaterThanOrEqual(3)
+    expect(h.loads.length).toBeLessThanOrEqual(6)
+    expect(settledFrames).toBeGreaterThan(570)
+    expect(h.level.settled).toBe(true)
+    warn.mockRestore()
+  })
+
+  it('a frame with no offers and nothing attached does nothing, also at cap 0', async () => {
+    const h = harness(0)
+    const rig = fakeRig(10)
+    await h.settle({ a: rig })
+    await h.settle({})
+    expect(h.loads).toEqual([])
+    expect(h.level.count).toBe(0)
+    expect(h.level.settled).toBe(true)
   })
 
   it('prepares nothing while the camera moves fast', async () => {
