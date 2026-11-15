@@ -16,11 +16,15 @@ import ShortcutHelp from './components/modals/ShortcutHelp.vue'
 import { useTwinScene } from './composables/useTwinScene'
 import { useTwinShortcuts } from './composables/useTwinShortcuts'
 import { useTwinStore } from './store/twinStore'
+import { applyTheme, useThemeStore } from './store/themeStore'
 import { describeEndReason } from './modules/endReason'
 import { t } from './i18n/messages'
 import { quayNote } from './modules/microcopy'
 
 const store = useTwinStore()
+// Light or dark skin: on <html> while the sim is mounted (the FPS chip and the volume popover sit outside this root).
+const themes = useThemeStore()
+applyTheme(themes.theme)
 // Dev-only asset viewer: /sim/terminal-twin?viewer=<asset>|yard (stripped from production builds).
 const assetViewer = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('viewer') : null
 const AssetViewer = import.meta.env.DEV ? defineAsyncComponent(() => import('./dev/AssetViewer.vue')) : null
@@ -56,6 +60,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   unmounted = true
+  applyTheme(null)
   uninstallDevApi?.()
   store.leaveSim()
   store.dispose()

@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { SURFACE } from '../modules/dashboardPalette'
+import { chartPalette, SURFACE } from '../modules/dashboardPalette'
 import { DATA_PALETTE, DWELL_PALETTE, LENGTH_PALETTE, RAMP_PALETTE } from '../modules/colourBy'
 
 /**
@@ -22,9 +22,20 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const surfaceFiles = [...walk(join(root, 'components')), join(root, 'TerminalTwin.vue')]
 
-function tokens(): Map<string, string> {
+/** The token block of a theme: `skin.css` marks them `@theme dark`, `@theme light`, `@theme end`. */
+function themeBlock(theme: 'dark' | 'light'): string {
+  const start = skin.indexOf(`/* @theme ${theme} */`)
+  const end = skin.indexOf(theme === 'dark' ? '/* @theme light */' : '/* @theme end */')
+  if (start < 0 || end < start) throw new Error(`no @theme ${theme} block in skin.css`)
+  return skin.slice(start, end)
+}
+
+/** The tokens of a theme: the dark block defines every token, the light block overrides the colours. */
+function tokens(theme: 'dark' | 'light' = 'dark'): Map<string, string> {
   const map = new Map<string, string>()
-  for (const m of skin.matchAll(/(--tt-[\w-]+)\s*:\s*([^;]+);/g)) map.set(m[1]!, m[2]!.trim())
+  for (const block of theme === 'dark' ? [themeBlock('dark')] : [themeBlock('dark'), themeBlock('light')]) {
+    for (const m of block.matchAll(/(--tt-[\w-]+)\s*:\s*([^;]+);/g)) map.set(m[1]!, m[2]!.trim())
+  }
   return map
 }
 
@@ -70,8 +81,18 @@ describe('skin tokens', () => {
     expect(t.get('--tt-danger')).not.toBe(t.get('--tt-warn'))
   })
 
-  it('keeps the chart surface of the dashboard palette in step with the token', () => {
-    expect(tokens().get('--tt-chart-surface')).toBe(SURFACE)
+  it('keeps the chart surface of the dashboard palette in step with the token, in both themes', () => {
+    expect(tokens('dark').get('--tt-chart-surface')).toBe(SURFACE)
+    expect(tokens('dark').get('--tt-chart-surface')).toBe(chartPalette('dark').surface)
+    expect(tokens('light').get('--tt-chart-surface')).toBe(chartPalette('light').surface)
+  })
+
+  it('the light theme only overrides tokens the dark theme defines, and is applied from <html>', () => {
+    const dark = tokens('dark')
+    const light = [...themeBlock('light').matchAll(/(--tt-[\w-]+)\s*:/g)].map((m) => m[1]!)
+    expect(light.length).toBeGreaterThan(20)
+    expect(light.filter((name) => !dark.has(name))).toEqual([])
+    expect(themeBlock('light')).toMatch(/html\[data-tt-theme='light'\] \.terminal-twin/)
   })
 
   it('keeps the colour-by categorical and ramp palettes in step with the --tt-data-N and --tt-ramp-N tokens', () => {
@@ -115,8 +136,8 @@ const contrast = (a: Rgb, b: Rgb): number => {
 }
 const over = (top: { rgb: Rgb; a: number }, under: Rgb): Rgb => top.rgb.map((c, i) => Math.round(c * top.a + under[i]! * (1 - top.a))) as Rgb
 
-describe('WCAG AA on the frosted panels', () => {
-  const t = tokens()
+describe.each(['dark', 'light'] as const)('WCAG AA on the frosted panels (%s theme)', (theme) => {
+  const t = tokens(theme)
   const colour = (name: string) => parseColour(t.get(name) ?? '')
   // The scene behind a panel is anything from the near-black night sea to white sky.
   const backdrops: Rgb[] = [

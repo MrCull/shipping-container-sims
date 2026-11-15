@@ -2,7 +2,7 @@
 /** Outline icon set of the Terminal Twin skin (24x24 grid, 1.8 stroke, currentColor); decorative unless the parent labels it. */
 type IconExtra =
   | 'target' | 'ship' | 'grid' | 'sliders' | 'arrow' | 'help' | 'save' | 'chart' | 'reset' | 'plus' | 'step' | 'skip'
-  | 'sun' | 'up' | 'down' | 'list' | 'info' | 'eye' | 'gauge' | 'download' | 'upload' | 'trash' | 'clock' | 'logo'
+  | 'sun' | 'up' | 'down' | 'list' | 'info' | 'eye' | 'gauge' | 'download' | 'upload' | 'trash' | 'clock' | 'logo' | 'moon'
 
 defineProps<{ name: 'close' | 'prev' | 'next' | 'play' | 'pause' | 'check' | 'alert' | 'warn' | 'refresh' | 'layers' | IconExtra }>()
 
@@ -40,6 +40,7 @@ const PATHS: Record<string, string> = {
   upload: 'M12 15V4M7.5 8.5L12 4l4.5 4.5M5 19.5h14',
   trash: 'M5 7h14M9.5 7V4.5h5V7M7 7l.8 12.5h8.4L17 7',
   clock: 'M12 12m-8.5 0a8.5 8.5 0 1017 0a8.5 8.5 0 10-17 0M12 7.5V12l3 2',
+  moon: 'M19.5 14.2A8 8 0 019.8 4.5a8 8 0 109.7 9.7z',
   logo: 'M4 19.5h16M6.5 19.5V9.5M6.5 9.5L18.5 6M6.5 6v3.5M18.5 6v4.5M16.5 10.5h4v3h-4zM3.5 13h6v3.5h-6z',
 }
 </script>

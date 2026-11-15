@@ -41,6 +41,17 @@ Rules that must keep holding:
 | 8 | Smoke specs: presets, hud, phone, display, saves, kpi, colour-by, debugger, dashboard, bay-viewer | done: all pass except the `@load` colour-by spec, which needs a real GPU |
 | 9 | Pull request opened | done |
 
+## Light and dark toggle (second request)
+
+Done: `store/themeStore.ts`, a light token block in `skin.css` (`/* @theme light */`), theme buttons in the top bar
+(`tt-theme-toggle`) and the setup dialog rail (`tt-setup-theme-toggle`), theme-aware chart palette
+(`chartPalette(theme)`), tests (`tests/theme-store.test.ts`, both themes in `tests/skin.test.ts`, a smoke test in
+`terminal-twin-hud.smoke.ts`). Details: "Skin and landing page" in `docs/browser-host.md`.
+
+PR #281 checks: "Lint, build and test" passes. "Build and Deploy Job" (Azure preview) fails with "maximum number of
+staging environments": an Azure limit, not the code; the owner has to delete an old preview environment. The smoke
+job is skipped until the PR carries the `smoke` label.
+
 ## Still open (ideas, none blocking)
 
 - Not yet looked at closely on the dark skin: final report panel, bay viewer, inspector with a selection, the

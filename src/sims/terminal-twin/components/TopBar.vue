@@ -8,12 +8,14 @@ import { t, type MessageKey } from '../i18n/messages'
 import { ROB_DISPLAY_MODES } from '../modules/colourBy'
 import PerfPanel from './PerfPanel.vue'
 import { useHudStore } from '../store/hudStore'
+import { useThemeStore } from '../store/themeStore'
 import LocaleDateTimeInput from './LocaleDateTimeInput.vue'
 
 withDefaults(defineProps<{ showGraphics?: boolean }>(), { showGraphics: true })
 
 const store = useTwinStore()
 const hud = useHudStore()
+const themes = useThemeStore()
 
 const clock = computed(() => store.fmt.clock(store.choice.startDateTime, store.displayTime))
 
@@ -278,6 +280,17 @@ async function submitRunTo(): Promise<void> {
         @click="store.toggleLockDaylight()"
       >
         <TtIcon name="sun" /> {{ t('topbar.daylight') }}
+      </button>
+      <button
+        class="action-btn help-btn theme-btn"
+        type="button"
+        :title="themes.theme === 'dark' ? t('theme.toLight') : t('theme.toDark')"
+        :aria-label="themes.theme === 'dark' ? t('theme.toLight') : t('theme.toDark')"
+        :data-theme="themes.theme"
+        data-testid="tt-theme-toggle"
+        @click="themes.toggle()"
+      >
+        <TtIcon :name="themes.theme === 'dark' ? 'moon' : 'sun'" />
       </button>
       <PerfPanel v-if="showGraphics" />
     </div>

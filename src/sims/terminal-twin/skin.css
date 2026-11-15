@@ -7,6 +7,7 @@
  * other sims keep the global tokens of `src/assets/main.css`. Components use `--tt-*` only (tests/skin.test.ts).
  * Every text token is checked against the panel on light and dark backdrops for WCAG AA (4.5:1) in the same test.
  */
+/* @theme dark */
 .terminal-twin,
 .tt-skin,
 body:has(.terminal-twin) {
@@ -134,6 +135,63 @@ body:has(.terminal-twin) {
   color: var(--tt-text);
   color-scheme: dark;
 }
+
+/* @theme light */
+/*
+ * Light theme (store/themeStore.ts sets `data-tt-theme` on <html> while the sim is mounted): the same token names
+ * with light values. Only colours, blur and shadows change; type, shape and the data colours are shared.
+ */
+html[data-tt-theme='light'] .terminal-twin,
+html[data-tt-theme='light'] .tt-skin,
+html[data-tt-theme='light'] body:has(.terminal-twin) {
+  --tt-text: #14253f;
+  --tt-text-muted: #46556f;
+  --tt-text-faint: #5b6a84;
+  --tt-on-accent: #ffffff;
+
+  --tt-bg: #e9eef5;
+  --tt-surface: #f6f8fb;
+  --tt-surface-hover: #e6edf6;
+  --tt-surface-sunken: #eceff5;
+  --tt-surface-raised: #ffffff;
+  --tt-control: rgba(20, 37, 63, 0.04);
+  --tt-control-hover: rgba(20, 37, 63, 0.09);
+  --tt-panel: rgba(250, 251, 253, 0.88);
+  --tt-panel-strong: rgba(250, 251, 253, 0.96);
+  --tt-blur: blur(14px) saturate(1.2);
+  --tt-scrim: rgba(20, 37, 63, 0.38);
+  --tt-chart-surface: #fcfcfb;
+  --tt-border: #d3dae6;
+  --tt-border-strong: #aebad0;
+  --tt-hairline: rgba(20, 37, 63, 0.1);
+
+  --tt-accent: #0b5cad;
+  --tt-accent-hover: #084a8c;
+  --tt-accent-soft: rgba(11, 92, 173, 0.1);
+  --tt-accent-line: rgba(11, 92, 173, 0.4);
+  --tt-focus: rgba(11, 92, 173, 0.35);
+  --tt-glow: 0 0 0 1px rgba(11, 92, 173, 0.25), 0 6px 20px rgba(11, 92, 173, 0.22);
+
+  --tt-warn: #8a4a05;
+  --tt-warn-bg: #fdf0d4;
+  --tt-warn-border: #d99a2b;
+  --tt-danger: #b01e1e;
+  --tt-danger-bg: #fde4e4;
+  --tt-danger-border: #d95757;
+  --tt-success: #17653a;
+  --tt-success-bg: #dff3e6;
+  --tt-success-border: #3fa56a;
+
+  --tt-shadow: 0 6px 20px rgba(20, 37, 63, 0.16);
+  --tt-shadow-lg: 0 18px 50px rgba(20, 37, 63, 0.28);
+
+  --tt-plan-quay: #1c3a5a;
+  --tt-plan-line: #6b7280;
+  --tt-plan-lane: #cfd6df;
+
+  color-scheme: light;
+}
+/* @theme end */
 
 /*
  * The shared volume popover (src/components/AudioControls.vue) is teleported to <body>, outside `.terminal-twin`, so it

@@ -429,7 +429,6 @@ select {
   font-family: var(--tt-font-mono);
   font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
-  color-scheme: dark;
   min-width: 0;
 }
 

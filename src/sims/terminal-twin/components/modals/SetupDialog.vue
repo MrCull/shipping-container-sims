@@ -3,6 +3,7 @@ import TtIcon from '../ui/TtIcon.vue'
 import { provideSetupDraft } from '../../composables/useSetupDraft'
 import { t, type MessageKey } from '../../i18n/messages'
 import { useTwinStore } from '../../store/twinStore'
+import { useThemeStore } from '../../store/themeStore'
 import { endConditionsFromFields } from '../../modules/endConditions'
 import { scenarioDisplayName } from '../../modules/scenarioPicker'
 import { SETUP_TABS, setupIssues, tabOfCheckKey, tabsWithIssues, type SetupTab } from '../../modules/setupTabs'
@@ -35,6 +36,7 @@ import heroImage from '../../assets/home-card.png?url'
  * its field, where it is listed, and marks that tab.
  */
 const store = useTwinStore()
+const themes = useThemeStore()
 const d = provideSetupDraft()
 const form = ref<HTMLFormElement | null>(null)
 const tab = ref<SetupTab>('scenario')
@@ -210,6 +212,19 @@ function onTabKey(e: KeyboardEvent, id: SetupTab): void {
           />
         </button>
       </div>
+
+      <button
+        type="button"
+        class="theme"
+        :title="themes.theme === 'dark' ? t('theme.toLight') : t('theme.toDark')"
+        :aria-label="themes.theme === 'dark' ? t('theme.toLight') : t('theme.toDark')"
+        :data-theme="themes.theme"
+        data-testid="tt-setup-theme-toggle"
+        @click="themes.toggle()"
+      >
+        <TtIcon :name="themes.theme === 'dark' ? 'moon' : 'sun'" />
+        <span class="theme-label">{{ themes.theme === 'dark' ? t('theme.dark') : t('theme.light') }}</span>
+      </button>
 
       <div
         class="body"
@@ -406,7 +421,7 @@ function onTabKey(e: KeyboardEvent, id: SetupTab): void {
   grid-template-areas:
     'hero body'
     'tabs body'
-    'tabs footer';
+    'theme footer';
   overflow: hidden;
   background: var(--tt-surface);
   border: 1px solid var(--tt-border);
@@ -554,6 +569,32 @@ h2 {
 .tab.bad.on {
   background: var(--tt-danger-bg);
   border-color: var(--tt-danger-border);
+}
+
+/* Light or dark: the foot of the rail on a wide screen, a small button on the title row on a narrow one. */
+.theme {
+  grid-area: theme;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1.55rem;
+  background: var(--tt-surface-sunken);
+  border: none;
+  border-top: 1px solid var(--tt-border);
+  border-right: 1px solid var(--tt-border);
+  color: var(--tt-text-muted);
+  font: inherit;
+  font-size: var(--tt-text-sm);
+  font-weight: 550;
+  text-align: left;
+}
+
+.theme:hover {
+  color: var(--tt-text);
+}
+
+.theme:focus-visible {
+  outline-offset: -3px;
 }
 
 /* The only part that scrolls. */
@@ -753,6 +794,26 @@ h2 {
   .hero,
   .tabs {
     border-right: none;
+  }
+
+  .theme {
+    grid-area: hero;
+    justify-self: end;
+    align-self: start;
+    position: relative;
+    z-index: 1;
+    width: 2.2rem;
+    height: 2.2rem;
+    margin: 0.6rem 0.8rem 0 0;
+    padding: 0;
+    justify-content: center;
+    background: var(--tt-control);
+    border: 1px solid var(--tt-hairline);
+    border-radius: var(--tt-radius-sm);
+  }
+
+  .theme-label {
+    display: none;
   }
 
   .hero-img,

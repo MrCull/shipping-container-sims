@@ -101,6 +101,27 @@ test('the Quality control sits in the settings region beside Daylight', async ({
   await expect(settings.getByTestId('tt-perf-toggle')).toBeVisible()
 })
 
+test('the theme toggle switches light and dark, is remembered, and leaves the other pages alone', async ({ page }) => {
+  await open(page, 'Small automated')
+  const theme = () => page.evaluate(() => document.documentElement.dataset.ttTheme)
+  const panel = () => page.getByTestId('tt-topbar').evaluate((el) => getComputedStyle(el).backgroundColor)
+  const toggle = page.getByTestId('tt-theme-toggle')
+  await expect(toggle).toHaveAttribute('data-theme', 'dark')
+  expect(await theme()).toBe('dark')
+  const dark = await panel()
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('data-theme', 'light')
+  expect(await theme()).toBe('light')
+  expect(await panel()).not.toBe(dark)
+  // remembered across a reload: the setup dialog opens light, and its own toggle shows it
+  await page.reload()
+  await expect(page.getByTestId('tt-setup-theme-toggle')).toHaveAttribute('data-theme', 'light')
+  expect(await theme()).toBe('light')
+  // the attribute belongs to this sim only
+  await page.goto('/')
+  expect(await theme()).toBeUndefined()
+})
+
 test('the sim header reads Menu once', async ({ page }) => {
   await open(page, 'Small automated')
   const back = page.locator('.sim-header .back-btn')

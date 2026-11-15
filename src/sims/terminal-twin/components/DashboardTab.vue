@@ -28,7 +28,8 @@ import {
   phaseLabelKey,
   type ChartFormat,
 } from '../modules/dashboardOptions'
-import { PHASE_COLOURS, SEQUENTIAL_BLUE, seriesStyle, type TimelinePhase } from '../modules/dashboardPalette'
+import { chartPalette, PHASE_COLOURS, SEQUENTIAL_BLUE, seriesStyle, type TimelinePhase } from '../modules/dashboardPalette'
+import { useThemeStore } from '../store/themeStore'
 import { t } from '../i18n/messages'
 
 type ChartLib = typeof import('../modules/chartLib')
@@ -36,6 +37,8 @@ type Instance = ReturnType<ChartLib['echarts']['init']>
 
 const store = useTwinStore()
 const fmt = computed(() => store.fmt)
+const themes = useThemeStore()
+const palette = computed(() => chartPalette(themes.theme))
 const data = computed(() => store.dashboardData)
 
 const lib = shallowRef<ChartLib | null>(null)
@@ -114,9 +117,9 @@ const options = computed(() => {
   const out = new Map<string, EChartsCoreOption>()
   if (!data.value) return out
   const f = chartFormat.value
-  for (const c of charts.value) out.set(`kpi:${c.kpiId}`, lineChartOption(c, f))
-  if (showYard.value && heatmap.value && heatmap.value.blocks.length > 0) out.set('heatmap', heatmapOption(heatmap.value, f))
-  if (showGantt.value && gantt.value && gantt.value.rows.length > 0) out.set('gantt', ganttOption(gantt.value, f))
+  for (const c of charts.value) out.set(`kpi:${c.kpiId}`, lineChartOption(c, f, themes.theme))
+  if (showYard.value && heatmap.value && heatmap.value.blocks.length > 0) out.set('heatmap', heatmapOption(heatmap.value, f, themes.theme))
+  if (showGantt.value && gantt.value && gantt.value.rows.length > 0) out.set('gantt', ganttOption(gantt.value, f, themes.theme))
   return out
 })
 
@@ -367,7 +370,7 @@ const tabs: ('charts' | 'report')[] = ['charts', 'report']
                 <span
                   class="swatch"
                   :class="`pattern-${p}`"
-                  :style="{ background: PHASE_COLOURS[p] }"
+                  :style="{ background: palette.phases[p] }"
                 />
                 {{ t(phaseLabelKey(p)) }}
               </li>
@@ -507,7 +510,7 @@ const tabs: ('charts' | 'report')[] = ['charts', 'report']
                     <th scope="row">
                       <span
                         class="swatch"
-                        :style="{ background: seriesStyle(i).colour }"
+                        :style="{ background: seriesStyle(i, themes.theme).colour }"
                       />
                       {{ line.entity }}
                     </th>

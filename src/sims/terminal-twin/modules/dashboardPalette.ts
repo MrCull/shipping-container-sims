@@ -25,6 +25,26 @@ export const SERIES_COLOURS = [
 
 export const MAX_SERIES = SERIES_COLOURS.length
 
+/** The skin's theme a chart is drawn for (store/themeStore.ts): dark is the default. */
+export type ChartTheme = 'dark' | 'light'
+
+/**
+ * The light theme's set: the skill's light categorical column, validated with `validate_palette.js --mode light` on
+ * the surface #fcfcfb. Three slots (aqua, yellow, magenta) sit under 3:1 on it, so the relief rule applies: legend,
+ * marker symbols and the table view always carry identity.
+ */
+export const LIGHT_SURFACE = '#fcfcfb'
+export const LIGHT_SERIES_COLOURS = [
+  '#2a78d6', // blue
+  '#eb6834', // orange
+  '#1baf7a', // aqua
+  '#eda100', // yellow
+  '#e87ba4', // magenta
+  '#008300', // green
+  '#6250d6', // violet
+  '#e34948', // red
+] as const
+
 export type MarkerSymbol = 'circle' | 'rect' | 'triangle' | 'diamond' | 'roundRect' | 'pin' | 'arrow' | 'emptyCircle'
 export type DashStyle = 'solid' | 'dashed' | 'dotted'
 
@@ -47,9 +67,9 @@ export interface SeriesStyle {
   dash: DashStyle
 }
 
-export function seriesStyle(slot: number): SeriesStyle {
+export function seriesStyle(slot: number, theme: ChartTheme = 'dark'): SeriesStyle {
   const i = Math.min(Math.max(0, Math.floor(slot)), MAX_SERIES - 1)
-  return { colour: SERIES_COLOURS[i], symbol: SERIES_SYMBOLS[i], dash: SERIES_DASHES[i] }
+  return { colour: (theme === 'light' ? LIGHT_SERIES_COLOURS : SERIES_COLOURS)[i], symbol: SERIES_SYMBOLS[i], dash: SERIES_DASHES[i] }
 }
 
 /** One-hue sequential ramp (blue, light to dark steps 250 to 700) for the heatmap: low = recedes. */
@@ -76,4 +96,53 @@ export const PHASE_PATTERNS: Record<TimelinePhase, { symbol: string; rotation: n
   work: { symbol: 'none', rotation: 0 },
   unmooring: { symbol: 'rect', rotation: -Math.PI / 4 },
   package: { symbol: 'triangle', rotation: 0 },
+}
+
+/** Everything a chart needs to draw in one theme: surface, data colours and the ink for text and grid lines. */
+export interface ChartPalette {
+  surface: string
+  series: readonly string[]
+  phases: Record<TimelinePhase, string>
+  /** Legend and category text. */
+  text: string
+  /** Axis text: a secondary ink that still clears AA on the surface. */
+  muted: string
+  grid: string
+  tooltipSurface: string
+  tooltipBorder: string
+  /** Text printed on the dark steps of the heatmap ramp. */
+  onDarkStep: string
+}
+
+const PHASE_ORDER = Object.keys(PHASE_COLOURS) as TimelinePhase[]
+const phasesOf = (series: readonly string[]): Record<TimelinePhase, string> =>
+  Object.fromEntries(PHASE_ORDER.map((phase, i) => [phase, series[i]])) as Record<TimelinePhase, string>
+
+const CHART_PALETTES: Record<ChartTheme, ChartPalette> = {
+  dark: {
+    surface: SURFACE,
+    series: SERIES_COLOURS,
+    phases: PHASE_COLOURS,
+    text: '#e5e7eb',
+    muted: '#a3b0c4',
+    grid: 'rgba(156, 163, 175, 0.18)',
+    tooltipSurface: '#182231',
+    tooltipBorder: '#3d4d68',
+    onDarkStep: '#f0efec',
+  },
+  light: {
+    surface: LIGHT_SURFACE,
+    series: LIGHT_SERIES_COLOURS,
+    phases: phasesOf(LIGHT_SERIES_COLOURS),
+    text: '#14253f',
+    muted: '#52514e',
+    grid: '#e1e0d9',
+    tooltipSurface: '#fcfcfb',
+    tooltipBorder: '#d3dae6',
+    onDarkStep: '#ffffff',
+  },
+}
+
+export function chartPalette(theme: ChartTheme = 'dark'): ChartPalette {
+  return CHART_PALETTES[theme]
 }

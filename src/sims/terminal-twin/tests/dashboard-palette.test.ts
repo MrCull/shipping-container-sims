@@ -10,6 +10,7 @@ import {
   PHASE_COLOURS,
   PHASE_PATTERNS,
   SERIES_COLOURS,
+  chartPalette,
   SERIES_DASHES,
   SERIES_SYMBOLS,
   SURFACE,
@@ -20,6 +21,18 @@ describe('dashboard palette', () => {
   it('is exactly the validated dark categorical set, in order', () => {
     expect(SURFACE).toBe('#1a1a19')
     expect([...SERIES_COLOURS].join(',')).toBe('#3987e5,#d95926,#199e70,#c98500,#d55181,#008300,#9085e9,#e66767')
+  })
+
+  it('has the validated light set for the light theme, with the same slots and phases', () => {
+    const light = chartPalette('light')
+    expect(light.surface).toBe('#fcfcfb')
+    expect(light.series.join(',')).toBe('#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300,#6250d6,#e34948')
+    expect(light.series).toHaveLength(MAX_SERIES)
+    expect(Object.values(light.phases)).toEqual(light.series.slice(0, 5))
+    expect(seriesStyle(0, 'light').colour).toBe('#2a78d6')
+    expect(seriesStyle(0, 'light').symbol).toBe(seriesStyle(0).symbol)
+    expect(chartPalette().series).toBe(SERIES_COLOURS)
+    expect(chartPalette('dark').phases).toBe(PHASE_COLOURS)
   })
 
   it('gives every series slot a distinct marker symbol as well as a colour', () => {
