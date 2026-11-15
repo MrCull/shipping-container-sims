@@ -92,23 +92,23 @@ test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks g
     await page.waitForTimeout(2500)
     return page.evaluate(() => ({ faces: window.__tt!.perf().stats.heroFaces, step: window.__tt!.scene()!.containerLods.heroMarkStep, name: window.__tt!.perf().rungName }))
   }
-  const quarter = await at(2, 24, 'sharp')
+  const quarter = await at(3, 24, 'sharp')
   expect(quarter.name).toBe('hero-quarter')
   expect(quarter.faces).toBeGreaterThan(0)
   expect(quarter.faces).toBeLessThanOrEqual(24)
   expect(quarter.faces).toBeLessThan(full)
   
   expect(quarter.step).toBe('sharp')
-  const marks = await at(3, 24, 'standard')
+  const marks = await at(4, 24, 'standard')
   expect(marks.step).toBe('standard')
   expect(marks.faces).toBeLessThanOrEqual(24)
   
   // hero-off: only the still-camera floor (6 boxes, 18 faces) is left, with sharp markings again
-  const off = await at(4, 18, 'sharp')
+  const off = await at(5, 18, 'sharp')
   expect(off.faces).toBeGreaterThan(0)
   expect(off.faces).toBeLessThanOrEqual(18)
   // paused-detail boost: with the sim paused and the camera stopped, Auto draws High close-up detail even at the bottom rung
-  await page.evaluate(() => window.__tt!.setAutoRung(7))
+  await page.evaluate(() => window.__tt!.setAutoRung(8))
   await page.evaluate(() => window.__tt!.setPausedDetail(true))
   await page.waitForFunction(() => window.__tt!.perf().pausedDetail && window.__tt!.perf().stats.heroFaces > 18, undefined, { timeout: 120_000 })
   expect((await page.evaluate(() => window.__tt!.perf())).rungName).toBe('low')

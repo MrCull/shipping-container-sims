@@ -194,4 +194,40 @@ describe('hero equipment level', () => {
     expect(rig.lock.children[0].visible).toBe(true)
     expect(h.level.count).toBe(0)
   })
+
+  it('describes each attached spreader: world bounds of the hero model and of the rig spreader it replaces', async () => {
+    const h = harness(3)
+    const rig = fakeRig(10)
+    rig.body.geometry = new THREE.BoxGeometry(1, 1, 1) // 6.35 m after the body scale, centred at (10, 0.5, 0)
+    const hero = spreaderTree('LOD0', 2)
+    ;(hero.getObjectByName('spreader_geo') as THREE.Mesh).geometry = new THREE.BoxGeometry(1, 1, 1)
+    const level = new HeroEquipmentLevel({ load: async () => hero, now: () => 0 })
+    level.setCap(1)
+    expect(level.describe()).toEqual([])
+    let t = 0
+    for (let i = 0; i < 10; i++) {
+      t += 100
+      level.begin()
+      level.offer({ id: 'a', kind: 'shc', mount: rig.mount }, h.camera)
+      level.update(h.camera, t)
+      await Promise.resolve()
+      await Promise.resolve()
+    }
+    const [info] = level.describe()
+    expect(info).toMatchObject({ id: 'a', kind: 'shc', fading: false, rigHidden: true })
+    // the hero body follows the rig body (same motion from rest), so it keeps its own 2 m size at the rig's place
+    expect(info.rig.min[0]).toBeCloseTo(10 - 3.175, 5)
+    expect(info.rig.max[0]).toBeCloseTo(10 + 3.175, 5)
+    expect(info.hero.min[0]).toBeCloseTo(9, 5)
+    expect(info.hero.max[0]).toBeCloseTo(11, 5)
+    expect(info.hero.min[1]).toBeCloseTo(-0.5, 5)
+    // a 20 ft squeeze of the rig body squeezes the hero body by the same factor
+    rig.body.scale.z *= 0.5
+    level.begin()
+    level.offer({ id: 'a', kind: 'shc', mount: rig.mount }, h.camera)
+    level.update(h.camera, t + 100)
+    const squeezed = level.describe()[0]
+    expect(squeezed.hero.max[2] - squeezed.hero.min[2]).toBeCloseTo(1, 5)
+    expect(squeezed.rig.max[2] - squeezed.rig.min[2]).toBeCloseTo(3.175, 5)
+  })
 })

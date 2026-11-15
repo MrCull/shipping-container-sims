@@ -23,7 +23,7 @@ import { NO_OVERLAYS, type OverlayState } from './overlays'
 
 export type { OverlayState }
 import { ContainerCloseups } from './containerCloseups'
-import { HeroEquipmentLevel } from './heroEquipment'
+import { HeroEquipmentLevel, type HeroSpreaderInfo } from './heroEquipment'
 import { HeroLevel } from './heroRenderer'
 import type { HeroMarkStep } from './heroMarkings'
 import { ContainerInstancer, type DrawnBox } from './containerInstancer'
@@ -82,6 +82,8 @@ export interface SceneStats {
   containerLods: { lod0: number; lod1: number; closeup: number; closeupFaces: number; heroFaces: number; heroPrepared: number; heroDrawCalls: number; heroTriangles: number; heroMarkStep: HeroMarkStep; heroMarkPages: number; heroMarkTiles: number; heroMarkDrawCalls: number; heroMarkBytes: number; culled: number }
   /** Hero spreaders in the scene (#273), never above the quality level's `heroEquipment` cap. */
   heroEquipment: number
+  /** Each hero spreader with its world bounds and those of the rig spreader it replaces (#273). */
+  heroSpreaders: HeroSpreaderInfo[]
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -785,6 +787,7 @@ export class SceneRenderer {
       containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, closeupFaces: c.closeupFaces, heroFaces: c.heroFaces, heroPrepared: c.heroPrepared, heroDrawCalls: c.heroCost.drawCalls, heroTriangles: c.heroCost.triangles, heroMarkStep: c.heroMarks.step, heroMarkPages: c.heroMarks.pages, heroMarkTiles: c.heroMarks.tiles, heroMarkDrawCalls: c.heroMarks.drawCalls, heroMarkBytes: c.heroMarks.texelBytes, culled: c.culled },
       containerAssets: c.assets,
       heroEquipment: this.heroEquipment.count,
+      heroSpreaders: this.heroEquipment.describe(),
     } as SceneStats
   }
 

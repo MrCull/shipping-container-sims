@@ -94,6 +94,26 @@ function ditherMaterial(material: THREE.Material, uniform: { value: number }): T
   return own
 }
 
+/** World-space box of a spreader, metres. */
+export interface HeroSpreaderBounds {
+  min: [number, number, number]
+  max: [number, number, number]
+}
+
+/** One attached hero spreader as last drawn (`__tt.scene().heroSpreaders`): where it is against the rig spreader it replaces. */
+export interface HeroSpreaderInfo {
+  id: string
+  kind: HeroEquipmentKind
+  /** True while it fades in over the rig spreader. */
+  fading: boolean
+  /** True once the rig's own spreader meshes are hidden. */
+  rigHidden: boolean
+  /** World bounds of the hero spreader. */
+  hero: HeroSpreaderBounds
+  /** World bounds of the rig's own spreader meshes (hidden or not). */
+  rig: HeroSpreaderBounds
+}
+
 export interface HeroEquipmentOptions {
   /** The cloned `LOD0` subtree of a kind's hero spreader (tests pass a fake). */
   load?: (kind: HeroEquipmentKind) => Promise<THREE.Object3D>
@@ -282,6 +302,24 @@ export class HeroEquipmentLevel {
     let n = 0
     for (const e of this.entries.values()) if (e.state === 'attached') n++
     return n
+  }
+
+  /** The attached hero spreaders with their world bounds and their rig spreader's, for readouts and tests (not per frame). */
+  describe(): HeroSpreaderInfo[] {
+    const box = new THREE.Box3()
+    const part = new THREE.Box3()
+    const bounds = (b: THREE.Box3): HeroSpreaderBounds => ({ min: [b.min.x, b.min.y, b.min.z], max: [b.max.x, b.max.y, b.max.z] })
+    const out: HeroSpreaderInfo[] = []
+    for (const [id, entry] of this.entries) {
+      if (entry.state !== 'attached') continue
+      const h = entry.hero
+      h.offer.mount.node.updateWorldMatrix(true, true)
+      const hero = bounds(box.setFromObject(h.root))
+      box.makeEmpty()
+      for (const m of h.rigMeshes) box.union(part.setFromObject(m))
+      out.push({ id, kind: h.offer.kind, fading: h.fade !== null, rigHidden: h.rigMeshes.every((m) => !m.visible), hero, rig: bounds(box) })
+    }
+    return out
   }
 
   /** True while a chosen spreader waits for its model (camera gate, fetch, prep slot) or fades in. */

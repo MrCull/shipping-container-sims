@@ -62,9 +62,9 @@ test('the overlay names the rung in force; a manual level fixes it', async ({ pa
   const errors = watch(page)
   await open(page, 'tracer-1sts-10-boxes')
   await page.keyboard.press('p')
-  await page.evaluate(() => window.__tt!.setAutoRung(2))
+  await page.evaluate(() => window.__tt!.setAutoRung(3))
   await expect(page.getByTestId('tt-perf-rung')).toHaveText('Hero cap quarter')
-  await page.evaluate(() => window.__tt!.setAutoRung(4))
+  await page.evaluate(() => window.__tt!.setAutoRung(5))
   await expect(page.getByTestId('tt-perf-rung')).toHaveText('Hero when still')
   expect((await page.evaluate(() => window.__tt!.perf())).rungName).toBe('hero-off')
   await page.evaluate(() => window.__tt!.setQuality('high'))
@@ -95,7 +95,7 @@ test('Auto sheds down the ladder under sustained load, names the rung in the ove
   // the load ends: with headroom Auto climbs again, and the overlay shows it
   const changes = (await page.evaluate(() => window.__tt!.perf())).autoChanges
   await page.evaluate(() => window.__tt!.setFrameLoad(0))
-  await page.waitForFunction(() => window.__tt!.perf().rung < 7, undefined, { timeout: 90_000 })
+  await page.waitForFunction(() => window.__tt!.perf().rung < 8, undefined, { timeout: 90_000 })
   await expect(page.getByTestId('tt-perf-rung')).not.toHaveText('Low profile')
   expect((await page.evaluate(() => window.__tt!.perf())).autoChanges).toBeGreaterThan(changes)
   expect(errors).toEqual([])
