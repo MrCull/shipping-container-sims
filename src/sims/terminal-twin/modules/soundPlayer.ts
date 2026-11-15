@@ -27,7 +27,7 @@ export interface PlayedSound {
 
 export class SoundPlayer {
   private active = new Set<{ audio: HTMLAudioElement; base: number }>()
-  /** `masterGain` reads the shared volume (0 while muted). */
+  /** `masterGain` reads the shared effects gain: master volume times effects level, 0 while muted. */
   constructor(private masterGain: () => number = () => 1) {}
 
   private throttle = new SoundThrottle()

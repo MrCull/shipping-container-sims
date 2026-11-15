@@ -70,7 +70,7 @@ export class PositionalSound {
   private running = new Map<string, Running>()
   private disposed = false
 
-  /** `masterGain` reads the shared volume (0 while muted). */
+  /** `masterGain` reads the shared effects gain: master volume times effects level, 0 while muted. */
   constructor(
     private masterGain: () => number,
     private opts: PositionalSoundOptions = {},

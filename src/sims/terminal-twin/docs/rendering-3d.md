@@ -562,8 +562,8 @@ Antialiasing is chosen at renderer creation and is not part of a live profile.
 
 ## Sound
 
-Every sound goes through the shared master gain (`useAudioStore().masterGain`: volume, or 0 while muted; default
-unmuted at 40%). Terminal Twin has no sound toggle of its own.
+Every sound goes through the shared effects gain (`useAudioStore().sfxGain`: master volume times the effects level,
+or 0 while muted; default unmuted at 40% master, 100% effects). Terminal Twin has no sound toggle of its own.
 
 - **Cues** (`modules/cues.ts#CuePlanner`): `StsGrounded` / `StsLoaded` landed, `VesselArrived` / `VesselDeparted` horn
   (departure also shows `components/DepartureBanner.vue`, 3.5 s, click-through, shown regardless of mute),

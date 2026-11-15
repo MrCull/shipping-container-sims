@@ -139,7 +139,7 @@ describe('sound on entry: muted on every entry, restored on leave', () => {
     store.enterSim()
     audio.toggleSound()
     expect(audio.soundMuted).toBe(false)
-    expect(audio.gainFor(0.5)).toBeCloseTo(0.2)
+    expect(audio.gainFor(0.5, 'sfx')).toBeCloseTo(0.2)
     store.leaveSim()
     expect(audio.soundMuted).toBe(false)
   })

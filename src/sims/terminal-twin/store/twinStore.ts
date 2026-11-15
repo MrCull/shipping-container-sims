@@ -332,13 +332,13 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     runToOpen.value = open
   }
 
-  /** Sound effects (TT-21): one master gain, the shared volume and mute (`stores/audio.ts`), scales all playback. */
+  /** Sound effects (TT-21): the shared effects gain (master volume times effects level, 0 while muted; `stores/audio.ts`) scales all playback. */
   const audio = useAudioStore()
-  const sounds = markRaw(new SoundPlayer(() => audio.masterGain))
-  /** Positional sound (#125): looping voices placed by the sound mixer, through the same master gain. */
-  const positional = markRaw(new PositionalSound(() => audio.masterGain))
+  const sounds = markRaw(new SoundPlayer(() => audio.sfxGain))
+  /** Positional sound (#125): looping voices placed by the sound mixer, through the same effects gain. */
+  const positional = markRaw(new PositionalSound(() => audio.sfxGain))
   watch(
-    () => audio.masterGain,
+    () => audio.sfxGain,
     () => {
       sounds.applyGain()
       positional.applyGain()
