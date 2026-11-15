@@ -49,6 +49,20 @@
         "paint"
       ]
     },
+    "hero-equipment": {
+      "$comment": "#273. One hero spreader GLB per source rig (hero-spreader-sts|asc|shc), loaded on demand, never at page load; LOD0 is the only level and is the source rig's `spreader` frame. One material; one mesh (draw call) per moving rig node, because meshes of rig nodes cannot be merged: main frame 1 + twist-locks 4 (ASC, SHC), or main frame, 2 telescopes, twin-lock unit and 8 twist-locks (STS, 12). The spec's 4 draw calls would need the twist-locks baked into the frame (no rotation); see docs/assets-pipeline.md. Caps per quality level: High 3, Medium 1, Low 0 (modules/quality.ts).",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 8000,
+          "maxDrawCalls": 12
+        }
+      },
+      "maxFileBytes": 300000,
+      "requiredNodes": [
+        "LOD0",
+        "spreader_geo"
+      ]
+    },
     "container": {
       "lods": {
         "LOD0": {

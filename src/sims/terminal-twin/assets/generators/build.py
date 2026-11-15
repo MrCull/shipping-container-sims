@@ -6,7 +6,7 @@ copies everything into assets/models/). Direct use:
     python build.py --out <staging dir> [--only containers] [--no-previews]
     blender --background --python build.py -- --out <staging dir>
 
-Groups: containers, shc, asc, sts, trucks, vessels, infrastructure (needs --vessel-classes <json>: the engine class table + bay grid). Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
+Groups: containers, hero, hero-equipment, shc, asc, sts, trucks, vessels, infrastructure (needs --vessel-classes <json>: the engine class table + bay grid). Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
 Writes, under <staging>/sts/:
     sts-malaccamax.glb / .meta.json   rigged Malaccamax quay crane (LOD0-2)
     sts-atlas.json                    paint/branding atlas layout (crane-number plates)
@@ -36,6 +36,7 @@ import bpy  # noqa: E402
 from tt_assets import blender as B  # noqa: E402
 from tt_assets import containers as C  # noqa: E402
 from tt_assets import hero_containers as HC  # noqa: E402
+from tt_assets import hero_spreaders as HS  # noqa: E402
 from tt_assets import liveries as LV  # noqa: E402
 from tt_assets import asc as A  # noqa: E402
 from tt_assets import asc_meta as AM  # noqa: E402
@@ -49,7 +50,7 @@ from tt_assets import infrastructure as INF  # noqa: E402
 from tt_assets import infrastructure_meta as INFM  # noqa: E402
 
 FONTS = os.path.join(HERE, 'fonts')
-GROUPS = ('containers', 'hero', 'shc', 'asc', 'sts', 'vessels', 'trucks', 'infrastructure')
+GROUPS = ('containers', 'hero', 'hero-equipment', 'shc', 'asc', 'sts', 'vessels', 'trucks', 'infrastructure')
 from tt_assets import sts as STS  # noqa: E402
 from tt_assets import sts_atlas as STSA  # noqa: E402
 
@@ -166,6 +167,37 @@ def build_hero(out_dir, previews=True, samples=32):
             cam, _ = B.setup_preview_stage()
             B.render_preview(cam, (L / 2 + reach * 0.75, -(reach * 1.05), H + reach * 0.55), (0, 0, H * 0.45),
                              os.path.join(preview_dir, f'hero-{size.lower()}-assembled.webp'), samples=samples, width=640, height=480)
+
+
+def build_hero_equipment(out_dir, previews=True, samples=32):
+    """Hero spreaders (#273): one GLB per source rig (STS, ASC, SHC), each with one preview."""
+    os.makedirs(out_dir, exist_ok=True)
+    preview_dir = os.path.join(out_dir, 'previews')
+    os.makedirs(preview_dir, exist_ok=True)
+    tmp = os.path.join(out_dir, '.work')
+    os.makedirs(tmp, exist_ok=True)
+    normal_png = os.path.join(tmp, 'hero-detail-normal.png')
+    orm_png = os.path.join(tmp, 'hero-orm.png')
+    palette_png = os.path.join(tmp, 'hero-spreader-palette.png')
+    B.reset_scene()
+    HC.write_detail_textures(normal_png, orm_png)
+    HS.write_palette(palette_png)
+    for kind in HS.KINDS:
+        B.reset_scene()
+        material = HS.spreader_material(
+            B.load_image(palette_png, name='hero_spreader_palette'),
+            B.load_image(normal_png, non_color=True, name='hero_detail_normal'),
+            B.load_image(orm_png, non_color=True, name='hero_orm'))
+        root, info = HS.build_spreader(kind, material)
+        name = info['name']
+        print(f'[hero-equipment] {name}: {info["triangles"]} tris, {sum(1 for n in info["nodes"] if n["role"] == "mesh")} meshes', flush=True)
+        B.export_glb(root, os.path.join(out_dir, f'{name}.glb'))
+        write_json(os.path.join(out_dir, f'{name}.meta.json'), HS.sidecar(info))
+        if previews:
+            root.location = (0.0, 0.0, 1.5)  # previews only: lift it off the ground plane
+            cam, _ = B.setup_preview_stage()
+            loc = {'sts': (5.5, -9.0, 6.5), 'asc': (13.0, -8.0, 8.5), 'shc': (8.0, -13.0, 8.5)}[kind]
+            B.render_preview(cam, loc, (0, 0, 1.9), os.path.join(preview_dir, f'{name}-view.webp'), samples=samples, width=640, height=480)
 
 
 def strip_lod_suffix(path):
@@ -500,6 +532,8 @@ def main(argv):
         build_containers(os.path.join(args.out, 'containers'), previews=not args.no_previews, samples=args.samples)
     if 'hero' in groups:
         build_hero(os.path.join(args.out, 'hero'), previews=not args.no_previews, samples=min(args.samples, 32))
+    if 'hero-equipment' in groups:
+        build_hero_equipment(os.path.join(args.out, 'hero-equipment'), previews=not args.no_previews, samples=min(args.samples, 32))
     if 'shc' in groups:
         build_shc(os.path.join(args.out, 'shc'), previews=not args.no_previews, samples=args.samples)
     if 'asc' in groups:

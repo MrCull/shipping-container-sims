@@ -84,7 +84,7 @@ describe('hero container faces', () => {
         if (e.isDirectory()) {
           if (['assets', 'tests', 'dev', 'docs', 'node_modules'].includes(e.name)) continue
           walk(p)
-        } else if (e.name !== 'heroAssets.ts' && /\.(ts|vue)$/.test(e.name) && /models\/hero/.test(readFileSync(p, 'utf8'))) offenders.push(p)
+        } else if (e.name !== 'heroAssets.ts' && /\.(ts|vue)$/.test(e.name) && /models\/hero\//.test(readFileSync(p, 'utf8'))) offenders.push(p)
       }
     }
     walk(root)

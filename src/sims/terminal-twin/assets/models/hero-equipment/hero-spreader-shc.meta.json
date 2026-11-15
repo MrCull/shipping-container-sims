@@ -1,0 +1,186 @@
+{
+  "asset": "hero-spreader-shc",
+  "kind": "hero-equipment",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only hero-equipment",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 12.64,
+    "widthM": 2.84,
+    "heightM": 1.08,
+    "boundsMin": [
+      -6.32,
+      -0.08,
+      -1.42
+    ],
+    "boundsMax": [
+      6.32,
+      1.0,
+      1.42
+    ],
+    "tag": "A",
+    "source": "the LOD0 spreader of shc at rest (same origin, axes and extents; tests/hero-equipment-asset.test.ts compares them)"
+  },
+  "axes": {
+    "up": "+Y",
+    "length": "X (the source rig's spreader long axis)",
+    "origin": "the source rig's `spreader` node: centre of the twist-lock plane (STS: the container attach point)",
+    "handedness": "right-handed, glTF"
+  },
+  "heroEquipment": {
+    "kind": "shc",
+    "sourceAsset": "shc",
+    "attachUnder": "spreader",
+    "attach": "add LOD0 as a child of the source rig's LOD0 `spreader` node with an identity transform, hide that node's own meshes, and drive the rig nodes below LOD0 with the same values as the source rig's nodes of the same name",
+    "flippers": "modelled raised, no node",
+    "material": "hero_spreader: UV0 = palette swatch, UV1 = metres / 0.5 for hero_detail_normal and hero_orm (256x256, shared with the hero container faces)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "hero-spreader-shc",
+      "role": "lod",
+      "description": "the only level; this node is the source rig's `spreader` frame"
+    },
+    {
+      "name": "spreader_geo",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "main frame: beams, headblock or its seat, hoses, festoon, fixed fittings"
+    },
+    {
+      "name": "twistlock_fl",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        6.0,
+        0.0,
+        -1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_fl_geo",
+      "parent": "twistlock_fl",
+      "role": "mesh",
+      "description": "mesh of twistlock_fl"
+    },
+    {
+      "name": "twistlock_fr",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        6.0,
+        0.0,
+        1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_fr_geo",
+      "parent": "twistlock_fr",
+      "role": "mesh",
+      "description": "mesh of twistlock_fr"
+    },
+    {
+      "name": "twistlock_rl",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        -6.0,
+        0.0,
+        -1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_rl_geo",
+      "parent": "twistlock_rl",
+      "role": "mesh",
+      "description": "mesh of twistlock_rl"
+    },
+    {
+      "name": "twistlock_rr",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        -6.0,
+        0.0,
+        1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_rr_geo",
+      "parent": "twistlock_rr",
+      "role": "mesh",
+      "description": "mesh of twistlock_rr"
+    }
+  ],
+  "travelLimits": {
+    "twistlock_fl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "twistlock_fr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "twistlock_rl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "twistlock_rr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    }
+  },
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [],
+    "tag": "A",
+    "note": "y 0 is the twist-lock plane, not the ground"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 2424
+    }
+  },
+  "provenance": [
+    {
+      "fact": "frame, pivots and overall extents copied from the source rig spreader",
+      "tag": "A",
+      "source": "tt_assets/shc.py"
+    },
+    {
+      "fact": "headblock sheaves, telescopic inner beams, guide rollers, twist-lock housings, raised flippers, hoses, festoon, warning bands",
+      "tag": "A",
+      "source": "generic telescopic container spreader; no manufacturer drawing"
+    },
+    {
+      "fact": "detail maps are procedural noise, not scans",
+      "tag": "A"
+    }
+  ]
+}
