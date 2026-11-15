@@ -23,6 +23,19 @@
       "low": { "boxes": 0, "maxTriangles": 0 }
     }
   },
+  "heroEquipmentCaps": {
+    "$comment": "#273, the hero spreaders: the three assets of the hero-equipment kind and how many are drawn at most per quality level (modules/quality.ts `heroEquipment`; 0 from the equipment-hero-off rung down). maxTriangles and maxDrawCalls = spreaders x the kind's per-spreader budget (8 000 triangles, 12 draw calls); tests/hero-equipment-asset.test.ts checks the list against the library, the levels against the quality profiles and the measured spreaders against the caps.",
+    "assets": [
+      "hero-spreader-sts",
+      "hero-spreader-asc",
+      "hero-spreader-shc"
+    ],
+    "levels": {
+      "high": { "spreaders": 3, "maxTriangles": 24000, "maxDrawCalls": 36 },
+      "medium": { "spreaders": 1, "maxTriangles": 8000, "maxDrawCalls": 12 },
+      "low": { "spreaders": 0, "maxTriangles": 0, "maxDrawCalls": 0 }
+    }
+  },
   "requiredMetaFields": [
     "asset",
     "kind",
@@ -47,6 +60,20 @@
       "requiredNodes": [
         "LOD0",
         "paint"
+      ]
+    },
+    "hero-equipment": {
+      "$comment": "#273. One hero spreader GLB per source rig (hero-spreader-sts|asc|shc), loaded on demand, never at page load; LOD0 is the only level and is the source rig's `spreader` frame. One material; one mesh (draw call) per moving rig node, because meshes of rig nodes cannot be merged: main frame 1 + twist-locks 4 (ASC, SHC), or main frame, 2 telescopes, twin-lock unit and 8 twist-locks (STS, 12). The spec's 4 draw calls would need the twist-locks baked into the frame (no rotation); see docs/assets-pipeline.md. The three assets and the caps per quality level: heroEquipmentCaps.",
+      "lods": {
+        "LOD0": {
+          "maxTriangles": 8000,
+          "maxDrawCalls": 12
+        }
+      },
+      "maxFileBytes": 300000,
+      "requiredNodes": [
+        "LOD0",
+        "spreader_geo"
       ]
     },
     "container": {

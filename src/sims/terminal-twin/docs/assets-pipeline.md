@@ -29,6 +29,7 @@ assets/
       parts.py                 shared modelling vocabulary: Atlas (swatch/region atlas), Part (boxes, beams, plates, revolves)
       containers.py, liveries.py
       hero_containers.py       hero faces: geometry, procedural detail maps, sidecar
+      hero_spreaders.py        hero spreaders (STS, ASC, SHC): geometry in the source rig's spreader frame, sidecar
       shc.py, shc_meta.py      asc.py, asc_meta.py      sts.py, sts_atlas.py
       truck.py, truck_meta.py  vessels.py, vessel_liveries.py
       infrastructure.py, infrastructure_meta.py
@@ -43,7 +44,7 @@ cli/sounds/build.ts, synth.ts  pnpm run tt:sounds, tt:sounds:check
 dev/AssetViewer.vue, assetViewerScene.ts, assetViewerApi.ts    ?viewer=<asset>|yard
 ```
 
-Groups (`GROUPS` in both `cli/assets/build.ts` and `assets/generators/build.py`): `containers`, `hero`, `shc`, `asc`, `sts`,
+Groups (`GROUPS` in both `cli/assets/build.ts` and `assets/generators/build.py`): `containers`, `hero`, `hero-equipment`, `shc`, `asc`, `sts`,
 `trucks`, `vessels`, `infrastructure`. A new group must be added to both lists.
 
 ## Setup (once)
@@ -126,6 +127,7 @@ Budgets and current counts (from `tt:assets:check`, triangles / draw calls):
 |---|---|---|---|---|---|
 | `container` | 450 / 3 | 12 / 1 | | 400 KB | 20 ft 308 / 3, 12 / 1; 40 and 40HC 440 / 3, 12 / 1; about 135 KB each (mostly the 2048 livery atlas) |
 | `hero-container` | 520 / 3 (per face, LOD0 only) | | | 60 KB | 82 to 458 triangles, 2 to 3 draw calls; 20 to 29 KB per face (see Hero container faces) |
+| `hero-equipment` | 8 000 / 12 (per spreader, LOD0 only) | | | 300 KB | STS 2 408 / 12, ASC 2 512 / 5, SHC 2 584 / 5; 59 to 63 KB (see Hero spreaders) |
 | `sts` | 40 000 / 20 | 8 000 / 10 | 1 000 / 6 | 3 MB | 31 690 / 18, 5 912 / 10, 490 / 5; 561 KB |
 | `asc` | 15 000 / 10 | 4 000 / 6 | 600 / 3 | 1.5 MB | 12 998 / 9, 3 844 / 5, 556 / 3; 295 KB |
 | `shc` | 12 000 / 16 | 3 000 / 12 | 400 / 3 | 1.5 MB | 9 856 / 16, 2 154 / 12, 358 / 2; 291 KB |
@@ -138,8 +140,8 @@ Budgets and current counts (from `tt:assets:check`, triangles / draw calls):
 | `backdrop` | 4 000 / 1 | | | 400 KB | rock 2 880 / 1, hills 590, coast 472 |
 
 Group `tti-surroundings`: the five `scenery-*` assets, 8 000 triangles and 5 draw calls in all (currently about 6 070 / 5).
-It must equal `SURROUNDINGS` in `terminals/tti-algeciras/constants.ts` (`tests/surroundings.test.ts`). Library: 50
-assets, 5.66 MB. Draw calls in a budget are primitives in the GLB; the renderer may instance or merge them (see rendering-3d).
+It must equal `SURROUNDINGS` in `terminals/tti-algeciras/constants.ts` (`tests/surroundings.test.ts`). Library: 53
+assets, 5.83 MB. Draw calls in a budget are primitives in the GLB; the renderer may instance or merge them (see rendering-3d).
 
 ## Rig and sidecar conventions
 
@@ -202,6 +204,18 @@ photos into asset directories.
 - **Measured cost (per face, compressed):** triangles 20 ft side 192, door 434, front 82, roof 164; 40 ft side 312, door 434, front 82, roof 314; 40HC side 312, door 458, front 82, roof 314. Draw calls 2 (door 3). Bytes 20.4 to 28.7 KB per face file, of which about 18 KB is the two textures embedded in every file (12 files, 0.30 MB all). A box shows at most 3 faces: worst case 458 + 312 + 314 = 1 084 triangles and 7 draw calls before instancing.
 - **Proposed caps** (`heroCaps` in `budgets.json`, checked by `tests/hero-container-asset.test.ts`): High 32 boxes, Medium 12, Low 0, as the spec's starting point. At 3 faces a box and the worst face (458) that is at most 44 000 triangles on High and 16 500 on Medium, about one STS crane's worth; instanced per face kind and material there are at most 27 draw calls. Geometry would allow about double; the binding costs are preparation time and marking atlas pages (#258, #259), so keep 32 and 12 until measured in the renderer.
 - Previews: `previews/hero-<size>-<face>-view.webp` per face and `hero-<size>-assembled.webp` (the paint is white, so the box looks pale until tinted).
+
+## Hero spreaders
+
+`hero-equipment` group (#273), `tt_assets/hero_spreaders.py`: 3 GLBs `hero-spreader-<sts|asc|shc>` in `assets/models/hero-equipment/`, kind `hero-equipment`, `LOD0` only. (The spec named `assets/models/hero/`; a group is replaced wholesale, so the new group has its own folder and the hero faces stay untouched.) They are not referenced by the page: `modules/heroEquipmentAssets.ts` (`loadHeroSpreader(kind)`) fetches a file on first need and returns a clone of its `LOD0` subtree; `tests/hero-equipment-asset.test.ts` guards both.
+
+- **Frame:** `LOD0` is the source rig's `spreader` node frame (origin, axes and overall extents of `sts.py#spreader_part` with its telescopes and twin unit, `asc.py#spreader_mesh`, `shc.py#spreader_mesh`). The renderer adds `LOD0` under that rig's LOD0 `spreader` node with an identity transform and hides the rig's own spreader meshes. The asset test decodes the hero GLB and the source rig GLB and fails when a pivot differs by a millimetre or the bounds by more than 1 cm.
+- **Rig nodes** keep the source names and pivots, each an empty with a `<name>_geo` mesh child: ASC and SHC `twistlock_fl|fr|rl|rr`; STS `spreader_tele_fore|aft` (with `twistlock_{fore|aft}_{land|sea}` below them), `twin_locks` (with `twistlock_twin_{aft|fore}_{land|sea}`). `spreader_geo` is the fixed frame. Flippers are modelled raised and have no node. The source rig code does not reach these copies by itself: the hero level (`modules/heroEquipment.ts`) gives each one its rig node's motion from rest every frame ([rendering-3d.md](rendering-3d.md), Hero equipment).
+- **Detail:** ASC and SHC: headblock plate with four sheaves, main beam with lightening holes and ribs, telescopic inner beams with collars, wear pads and guide rollers, a twist-lock housing block with its bearing collar at each corner, twist-locks with shank, oblong head and tapered cone, corner guides (shoe and lip), raised flippers with hinge and cylinder, hoses, a cable festoon, a power pack, warning bands on the end beams. STS: the same on its main frame, two telescopes (corner guide shoe with a side and an end lip) and twin-lock unit; its headblock stays the rig's `hoist` node, so the hero file has only the seat.
+- **Material:** one, `hero_spreader`: UV0 picks a swatch of a 64 x 8 palette (`PALETTE`), UV1 is metres over 0.5 m for `hero_detail_normal` and `hero_orm`, the same two maps as the hero container faces (same names, so `heroAssets.ts#shareHeroMaps` can share them).
+- **Draw calls:** one mesh per moving rig node, on one material: ASC and SHC 5 (frame and 4 twist-locks), STS 12 (frame, 2 telescopes, twin unit, 8 twist-locks). The spec asked for 4; that is only possible with the twist-locks baked into the frame, which stops them turning, so the budget is 12 and the owner decides on #273 or #274 (a renderer may also merge the twist-locks of a spreader that is not locking).
+- **Budget:** the kind `hero-equipment` (per spreader) and `heroEquipmentCaps` in `budgets.json`: the three assets and, per quality level, the spreaders drawn at most with their triangle and draw-call totals (High 3, Medium 1, Low 0). `tests/hero-equipment-asset.test.ts` checks the list against the library, the levels against `QUALITY_PROFILES` and the measured files against the caps.
+- Previews: `previews/hero-spreader-<kind>-view.webp`.
 
 ## Equipment, vessels and infrastructure generators
 

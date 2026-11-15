@@ -23,6 +23,7 @@ import { NO_OVERLAYS, type OverlayState } from './overlays'
 
 export type { OverlayState }
 import { ContainerCloseups } from './containerCloseups'
+import { HeroEquipmentLevel, type HeroSpreaderInfo } from './heroEquipment'
 import { HeroLevel } from './heroRenderer'
 import type { HeroMarkStep } from './heroMarkings'
 import { ContainerInstancer, type DrawnBox } from './containerInstancer'
@@ -79,6 +80,10 @@ export interface SceneStats {
   layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
   containerLods: { lod0: number; lod1: number; closeup: number; closeupFaces: number; heroFaces: number; heroPrepared: number; heroDrawCalls: number; heroTriangles: number; heroMarkStep: HeroMarkStep; heroMarkPages: number; heroMarkTiles: number; heroMarkDrawCalls: number; heroMarkBytes: number; culled: number }
+  /** Hero spreaders in the scene (#273), never above the quality level's `heroEquipment` cap. */
+  heroEquipment: number
+  /** Each hero spreader with its world bounds and those of the rig spreader it replaces (#273). */
+  heroSpreaders: HeroSpreaderInfo[]
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -127,6 +132,8 @@ export class SceneRenderer {
   private containers: ContainerInstancer
   /** The hero level (#258): drawn over the close-up level; its cap comes from the quality profile. */
   private readonly hero = new HeroLevel()
+  /** The hero equipment level (#273): hero spreaders on the nearest rigs; its cap comes from the quality profile. */
+  private readonly heroEquipment = new HeroEquipmentLevel()
   private containerLivery: number[]
   /** Colour by (#130): the mode, the facts its legend needs, and per box the tint drawn (0xRRGGBB, -1 = livery) with the epoch and time bucket it was computed for. */
   private colourBy: ColourBy = DEFAULT_COLOUR_BY
@@ -467,6 +474,7 @@ export class SceneRenderer {
     setContactShadows(profile.contactShadows)
     this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap, closeupDistanceM: profile.closeupDistanceM, closeupFaceBudget: profile.closeupFaceBudget })
     this.hero.setLimits({ boxes: profile.heroBoxes, stillBoxes: profile.heroStillBoxes })
+    this.heroEquipment.setCap(profile.heroEquipment)
     this.setOceanDetail(profile.oceanSegments)
   }
 
@@ -628,8 +636,10 @@ export class SceneRenderer {
     this.atmosphere.update(t)
     this.infrastructure.update(cameraPosition) // far tier (#249)
     this.sounds.length = 0
-    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), colour: { mode: this.colourBy, robDisplay: this.robDisplay, ctx: this.colourCtx }, sounds: this.sounds }
+    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), colour: { mode: this.colourBy, robDisplay: this.robDisplay, ctx: this.colourCtx }, offerHeroSpreader: (offer) => this.heroEquipment.offer(offer, cameraPosition), sounds: this.sounds }
+    this.heroEquipment.begin()
     for (const { renderer } of this.renderers) renderer.update(frame)
+    this.heroEquipment.update(cameraPosition, performance.now())
     this.shots.update(model, t, this.live, performance.now(), this.sounds) // twistlock clunk, landing thud, air brake
     this.sounds.push(HARBOUR_SOURCE) // harbour ambience: not positional, always faint
     this.reservedZones = 0
@@ -721,11 +731,17 @@ export class SceneRenderer {
     return this.hero.markStep
   }
 
-  /** Hero faces drawn last frame (#258). */
-  /** True when the hero level has nothing more to bring in for this view (`HeroLevel.settled`). */
+  /** True when the hero levels have nothing more to bring in for this view (`HeroLevel.settled`, `HeroEquipmentLevel.settled`). */
   heroSettled(): boolean {
-    return this.hero.settled
+    return this.hero.settled && this.heroEquipment.settled
   }
+
+  /** Hero spreaders in the scene last frame (#273). */
+  heroEquipmentCount(): number {
+    return this.heroEquipment.count
+  }
+
+  /** Hero faces drawn last frame (#258). */
 
   heroFaceCount(): number {
     return this.containers.stats().heroFaces
@@ -770,6 +786,8 @@ export class SceneRenderer {
       layers: this.layers.stats(),
       containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, closeupFaces: c.closeupFaces, heroFaces: c.heroFaces, heroPrepared: c.heroPrepared, heroDrawCalls: c.heroCost.drawCalls, heroTriangles: c.heroCost.triangles, heroMarkStep: c.heroMarks.step, heroMarkPages: c.heroMarks.pages, heroMarkTiles: c.heroMarks.tiles, heroMarkDrawCalls: c.heroMarks.drawCalls, heroMarkBytes: c.heroMarks.texelBytes, culled: c.culled },
       containerAssets: c.assets,
+      heroEquipment: this.heroEquipment.count,
+      heroSpreaders: this.heroEquipment.describe(),
     } as SceneStats
   }
 
@@ -791,6 +809,7 @@ export class SceneRenderer {
 
   dispose(): void {
     this.disposed = true
+    this.heroEquipment.dispose()
     this.atmosphere.dispose()
     this.backdrop.dispose()
     this.infrastructure.dispose()

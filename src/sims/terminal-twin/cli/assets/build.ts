@@ -34,7 +34,7 @@ import {
 import { ASSETS_DIR, MODELS_DIR, runBudgetCli } from './budgetCheck'
 
 const GENERATOR = join(ASSETS_DIR, 'generators', 'build.py')
-const GROUPS = ['containers', 'hero', 'shc', 'asc', 'sts', 'trucks', 'vessels', 'infrastructure']
+const GROUPS = ['containers', 'hero', 'hero-equipment', 'shc', 'asc', 'sts', 'trucks', 'vessels', 'infrastructure']
 
 /** What the hull generator needs from the engine's vessel model (so hulls are built on the engine's bay grid). */
 function vesselClassTable() {

@@ -15,6 +15,7 @@ import * as THREE from 'three'
 import meta from '../assets/models/sts/sts-malaccamax.meta.json'
 import { AssetRig, type RigMeta } from './assetRig'
 import { loadGltf } from './containerAssets'
+import { heroSpreaderMount, type HeroSpreaderMount } from './heroSpreaderMount'
 
 export const STS_ASSET_URL = new URL('../assets/models/sts/sts-malaccamax.glb', import.meta.url).href
 export const STS_META = meta
@@ -97,6 +98,8 @@ export class StsModel {
   lod: StsLod = 0
   spreaderMode: SpreaderMode = '40'
   carrying = 0
+  /** Where the hero spreader goes (#273): the LOD0 `spreader` node and its rest pose. */
+  readonly heroMount: HeroSpreaderMount | null
   private readonly rig: AssetRig
   private readonly lods: THREE.Object3D[]
   private readonly spreaders: THREE.Object3D[]
@@ -121,6 +124,7 @@ export class StsModel {
       mesh.material = Array.isArray(mesh.material) ? patched : patched[0]
     })
     this.lods = ['LOD0', 'LOD1', 'LOD2'].map((n) => this.root.getObjectByName(n)!)
+    this.heroMount = heroSpreaderMount(this.lods[0]) // before the rig first moves a node
     this.rig = new AssetRig(this.root, meta as unknown as RigMeta)
     this.spreaders = this.rig.objects('spreader')
     this.trolleys = this.rig.objects('trolley')

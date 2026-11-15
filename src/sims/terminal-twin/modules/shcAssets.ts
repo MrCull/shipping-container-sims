@@ -10,6 +10,7 @@
  */
 import * as THREE from 'three'
 import { loadGltf } from './containerAssets'
+import { heroSpreaderMount, type HeroSpreaderMount } from './heroSpreaderMount'
 import { spreaderLengthM, spreaderLengthRatio, type SpreaderMode } from './spreaderMode'
 import meta from '../assets/models/shc/shc.meta.json'
 
@@ -131,6 +132,8 @@ export class ShcRig {
   private readonly spreaderGeo: { o: THREE.Object3D; pos: number; scale: number }[] = []
   private readonly lockRestX: number[] = []
   private readonly plates: THREE.Material[] = []
+  /** Where the hero spreader goes (#273): the LOD0 `spreader` node and its rest pose. */
+  readonly heroMount: HeroSpreaderMount | null
   private lod: 0 | 1 | 2 = 0
   private state: ShcRigState = { lod: 0, steerRad: 0, wheelRollRad: 0, hoistM: 0, carrying: false, spreaderMode: '40', spreaderLengthM: spreaderLengthM('40') }
 
@@ -169,6 +172,7 @@ export class ShcRig {
       })
       this.root.add(lod)
     }
+    this.heroMount = heroSpreaderMount(this.lods[0])
     this.setLod(0)
   }
 

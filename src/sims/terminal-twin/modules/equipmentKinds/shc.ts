@@ -7,6 +7,7 @@ import { CONTAINER_DIMS } from '../sceneModel'
 import { loadShcModel, ShcRig, SHC_RIG } from '../shcAssets'
 import { spreaderLengthRatio, spreaderModeFor, type SpreaderMode } from '../spreaderMode'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
+import { offerHeroSpreaderAtLod0 } from '../heroSpreaderMount'
 
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
 const EMPTY_HOIST_MPS = 1.5
@@ -96,6 +97,7 @@ class ShcRenderer implements KindRenderer {
           carrying: boxHeight !== undefined,
           spreader,
         })
+        offerHeroSpreaderAtLod0(frame, id, 'shc', parts.rig.rigState.lod, parts.rig.heroMount)
         continue
       }
       parts.group.position.set(pose.x, 0, pose.z)

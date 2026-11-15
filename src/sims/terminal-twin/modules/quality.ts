@@ -4,7 +4,7 @@
  * apply a profile.
  *
  * Auto (#261) judges frame time over one-second windows (the median and the share of slow frames,
- * so stutter counts even when the average is fine) and walks a fixed shedding ladder: hero cap,
+ * so stutter counts even when the average is fine) and walks a fixed shedding ladder: hero spreaders, hero cap,
  * hero marking resolution, hero off, shadows and render resolution, then the Medium and Low
  * profiles. It climbs back in the reverse order, with a back-off so a rung that does not hold is
  * not retried every few seconds. The ladder is a pure function of the rung (`profileForRung`,
@@ -44,6 +44,8 @@ export interface QualityProfile {
    * shed the hero level still shows the nearest boxes in full detail when the user stops to look; the manual levels carry 0.
    */
   heroStillBoxes: number
+  /** Hero spreaders (#273): spreaders drawn with the hero model at most (`selectHeroEquipment`'s cap), 0 on Low. */
+  heroEquipment: number
   /** Multiplier on the LOD switch distances of the cranes and carriers (STS, SHC, ASC): below 1 they drop to cheaper LODs sooner. */
   lodScale: number
   /** Multiplier on the device pixel ratio (render resolution), before the cap of 2. */
@@ -60,9 +62,9 @@ export interface QualityProfile {
 }
 
 export const QUALITY_PROFILES: Readonly<Record<QualityLevel, QualityProfile>> = {
-  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, heroBoxes: 0, heroStillBoxes: 0, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
-  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, heroBoxes: 12, heroStillBoxes: 0, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
-  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, heroBoxes: 32, heroStillBoxes: 0, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
+  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, heroBoxes: 0, heroStillBoxes: 0, heroEquipment: 0, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
+  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, heroBoxes: 12, heroStillBoxes: 0, heroEquipment: 1, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
+  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, heroBoxes: 32, heroStillBoxes: 0, heroEquipment: 3, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
 }
 
 export const profileFor = (level: QualityLevel): QualityProfile => QUALITY_PROFILES[level]
@@ -93,6 +95,9 @@ export class FpsMeter {
  * The ticket lists hero cap (full, half, quarter, none), then hero marking resolution. Marking
  * resolution only costs anything while hero faces are drawn, so the marking step sits between
  * quarter and none: after none it would shed nothing.
+ *
+ * Hero spreaders (#273) go first, at `equipment-hero-off`, before any box hero detail: they are fewer, larger objects,
+ * and their detail is less visible than a box face. From that rung down `heroEquipment` is 0.
  */
 /**
  * From `hero-off` down the only hero faces are the still-camera floor (`HERO_STILL_BOXES`): few, and painted while
@@ -100,6 +105,7 @@ export class FpsMeter {
  */
 export const AUTO_RUNGS = [
   { name: 'hero-full', level: 'high', heroShare: 1, marks: 'sharp' },
+  { name: 'equipment-hero-off', level: 'high', heroShare: 1, marks: 'sharp' },
   { name: 'hero-half', level: 'high', heroShare: 0.5, marks: 'sharp' },
   { name: 'hero-quarter', level: 'high', heroShare: 0.25, marks: 'sharp' },
   { name: 'hero-marks-standard', level: 'high', heroShare: 0.25, marks: 'standard' },
@@ -122,6 +128,9 @@ export const MANUAL_RUNG: Readonly<Record<QualityLevel, number>> = {
   low: BOTTOM_RUNG,
 }
 
+/** From this rung down Auto draws no hero spreader. */
+const EQUIPMENT_HERO_OFF_RUNG = AUTO_RUNGS.findIndex((r) => r.name === 'equipment-hero-off')
+
 export const clampRung = (rung: number): number => Math.max(TOP_RUNG, Math.min(BOTTOM_RUNG, Math.round(rung)))
 
 export function rungName(rung: number): AutoRungName {
@@ -133,16 +142,18 @@ export function levelOfRung(rung: number): QualityLevel {
   return AUTO_RUNGS[clampRung(rung)].level
 }
 
-/** The profile Auto puts in force at a rung. Hero caps are shares of High's; the shadows-resolution rung takes Medium's shadow map and render resolution. */
+/** The profile Auto puts in force at a rung. Hero caps are shares of High's; hero spreaders are drawn on the top rung only; the shadows-resolution rung takes Medium's shadow map and render resolution. */
 export function profileForRung(rung: number): QualityProfile {
-  const r = AUTO_RUNGS[clampRung(rung)]
+  const at = clampRung(rung)
+  const r = AUTO_RUNGS[at]
   const base = QUALITY_PROFILES[r.level]
+  const heroEquipment = at < EQUIPMENT_HERO_OFF_RUNG ? base.heroEquipment : 0
   const heroBoxes = Math.floor(QUALITY_PROFILES.high.heroBoxes * r.heroShare)
   if (r.name === 'shadows-resolution') {
     const medium = QUALITY_PROFILES.medium
-    return { ...base, heroBoxes, heroStillBoxes: HERO_STILL_BOXES, shadowMapSize: medium.shadowMapSize, resolutionScale: medium.resolutionScale }
+    return { ...base, heroBoxes, heroEquipment, heroStillBoxes: HERO_STILL_BOXES, shadowMapSize: medium.shadowMapSize, resolutionScale: medium.resolutionScale }
   }
-  return { ...base, heroBoxes, heroStillBoxes: HERO_STILL_BOXES }
+  return { ...base, heroBoxes, heroEquipment, heroStillBoxes: HERO_STILL_BOXES }
 }
 
 /** Boxes' worth of hero faces while Auto is paused with a stopped camera (Medium's cap: at most 3 + 3 sharp marking pages, 96 MB). */
@@ -153,7 +164,7 @@ export const PAUSED_DETAIL_SETTLE_MS = 500
 /**
  * Auto's profile while the sim is paused and the camera has stopped: nothing moves, so frame time is free. Close-up
  * detail goes to High's (hero cap `HERO_PAUSED_BOXES`, High's close-up reach and face budget, full render resolution).
- * Shadows, LOD distances and the rest stay the rung's: switching them recompiles shaders and would stall the first
+ * Shadows, LOD distances, the hero spreader cap (`heroEquipment`) and the rest stay the rung's: switching them recompiles shaders and would stall the first
  * frame after the user presses play or moves. Never lowers anything the rung already has.
  */
 export function pausedDetailProfile(profile: QualityProfile): QualityProfile {

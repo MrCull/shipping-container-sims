@@ -3,9 +3,9 @@
 # Patterns match a file or folder name, never a substring of a path (the word "tests" contains "sts").
 # Add a line when a new area gets its own spec. A changed tests/browser/*.smoke.ts always runs itself.
 (^|/)(bay|Bay|rob|Rob|hullProfile)[A-Za-z-]*\.(ts|vue)$ => bay-viewer rob-bays bay-plan-switch
-(^|/)[A-Za-z-]*(shc|Shc)[A-Za-z-]*\.(ts|vue|py)$|models/shc/ => shc-model terminal-twin-shc
-(^|/)(sts|Sts)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/sts|models/sts/ => sts-asset
-(^|/)(asc|Asc)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/asc|models/asc/ => asc-model terminal-twin-asc terminal-twin-paired-asc
+(^|/)[A-Za-z-]*(shc|Shc)[A-Za-z-]*\.(ts|vue|py)$|models/shc/ => shc-model terminal-twin-shc hero-equipment
+(^|/)(sts|Sts)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/sts|models/sts/ => sts-asset hero-equipment
+(^|/)(asc|Asc)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/asc|models/asc/ => asc-model terminal-twin-asc terminal-twin-paired-asc hero-equipment
 (^|/)container(Markings|Textures|Closeups|Assets|Lod)[A-Za-z]*\.ts$|models/container/ => container-assets container-closeup
 (^|/)(truck|Truck)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/truck|models/truck/ => truck-model terminal-twin-landside terminal-twin-follow-truck
 (^|/)(vessel|Vessel)[A-Za-z-]*\.(ts|vue|py)$|models/vessel => vessel-hulls
@@ -29,7 +29,7 @@ skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => ter
 (^|/)(meshClip|hullHatchOpening|backdrop)\.ts$ => vessel-hulls terminal-twin-hatch container-closeup terminal-twin-atmosphere
 (^|/)twinStore\.ts$ => terminal-twin-atmosphere terminal-twin-volume-fps colour-by terminal-twin-debugger
 (^|/)(twinController|engineHost|sliceDelta|TopBar)[A-Za-z-]*\.(ts|vue)$|/worker/ => terminal-twin-pacing terminal-twin-strict-checks terminal-twin-hud terminal-twin\.smoke
-(^|/)hero[A-Za-z-]*\.(ts|vue|py)$|models/hero/ => hero-faces container-closeup terminal-twin-perf
+(^|/)hero[A-Za-z-]*\.(ts|vue|py)$|models/hero/ => hero-faces container-closeup terminal-twin-perf hero-equipment
 (^|/)(farTier|contactShadow|skyEnvironment|quality)\.ts$ => terminal-twin-perf terminal-twin-atmosphere terminal-twin-volume-fps
 (^|/)(frameBenchmark|useFrameBenchmark)\.ts$|PerfPanel => terminal-twin-benchmark\.prod terminal-twin-fps-chip\.prod terminal-twin-perf
 (^|/)[A-Za-z-]*(Strict|strict)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-strict-checks

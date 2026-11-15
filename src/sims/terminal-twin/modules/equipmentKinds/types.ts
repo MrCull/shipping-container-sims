@@ -11,6 +11,7 @@ import type { SceneStats } from '../sceneRenderer'
 import type { GantryBeacons } from '../gantryBeacons'
 import type { SoundSource } from '../soundMixer'
 import type { ColourBy, ColourContext, RobDisplay } from '../colourBy'
+import type { HeroEquipmentOffer } from '../heroSpreaderMount'
 
 /** What a kind's renderer gets from the scene renderer when it is built. */
 export interface KindRendererHost {
@@ -40,6 +41,8 @@ export interface KindFrame {
   flashOn: boolean
   /** Colour by (#130): the mode, the ROB display (#168) and the scenario facts the legends need. */
   colour: { mode: ColourBy; robDisplay: RobDisplay; ctx: ColourContext }
+  /** Hero equipment (#273): a kind offers each rig that is at LOD0, after posing it; the nearest get the hero spreader. */
+  offerHeroSpreader(offer: HeroEquipmentOffer): void
   /** Output: a kind that makes positional sound pushes its sources (position and motion state) here. */
   sounds: SoundSource[]
 }

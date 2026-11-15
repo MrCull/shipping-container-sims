@@ -182,7 +182,7 @@ export interface TwinDevApi {
   cameraPose(): CameraPose | null
   /** Put the orbit camera at a pose (screenshots: `{ target, distance, azimuth, polar }`; distance is clamped to the controls' 8 m minimum). False without a 3D view. */
   setCameraPose(pose: CameraPose): boolean
-  /** True when the hero level has nothing more to bring in for the current view: no model loading, no face waiting or fading. Wait on this before a close-up screenshot (about a minute in software WebGL). */
+  /** True when the hero level has nothing more to bring in for the current view: no model loading, no face and no hero spreader (#273) waiting or fading. Wait on this before a close-up screenshot (about a minute in software WebGL). */
   heroSettled(): boolean
   /** Bounding box (viewport px) of each named HUD region (`null` when not shown); see modules/hudLayout.ts. */
   hudLayout(): HudLayout

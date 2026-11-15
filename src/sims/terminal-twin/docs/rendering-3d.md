@@ -129,6 +129,68 @@ level shows, and `onReady` marks the close-up pass dirty so a still camera redra
   left leaf outside its outer bar; a line is shrunk to its column (`fitText`). The hardware material is mostly diffuse
   (metallic 0.35), so bars stay galvanised grey on levels without an environment map.
 
+#### Hero equipment (#273)
+
+The spreaders nearest the camera get the hero spreader model (`hero-spreader-<sts|asc|shc>`, [assets-pipeline.md](assets-pipeline.md),
+Hero spreaders). `HeroEquipmentLevel` (`modules/heroEquipment.ts`) is owned by the scene renderer, which sets its cap from the
+quality profile (`heroEquipment`: High 3, Medium 1, Low 0, and 0 from the `equipment-hero-off` rung down).
+
+- **Offers.** In `update()` the STS, ASC and SHC kinds call `frame.offerHeroSpreader({ id, kind, mount })` for each rig that is
+  at LOD0, after posing it, through one helper, `offerHeroSpreaderAtLod0(frame, id, kind, lod, mount)`. `mount` is the
+  rig's `heroMount` (`heroSpreaderMount(lod0)`: the LOD0 `spreader` node and a copy of it at rest, taken before the first
+  pose). Mount, offer type and helper are in `modules/heroSpreaderMount.ts`, the rig-side module: the rig models and the
+  kinds import it, not the level. The distance is from the camera to that node's world position, not to the crane centre
+  the LOD choice uses; an offer beyond 25 x 1.15 m is dropped at once.
+- **Selection.** `selectHeroEquipment` (`heroEquipmentSelection.ts`): within `HERO_EQUIPMENT_DISTANCE_M` (25 m), nearest
+  first, at most the cap. Hysteresis, literally the spec's: a spreader chosen last frame keeps its place out to 25 x 1.15 m
+  (28.75 m), also against a nearer newcomer when the cap is full (previous picks nearest first among themselves, up to
+  the cap); only the free places go to newcomers within 25 m, nearest first. The result is nearest first.
+- **Preparation.** A chosen spreader's file is fetched on first need and attached through `runPrep` within
+  `HERO_PREP_ALLOWANCE_MS`, only while a `CameraGate` is calm (the hero faces' constants in `heroPrep.ts`): a fast camera move
+  fetches and attaches nothing.
+- **Failed load.** The rig spreader stays and one warning is logged per failure. The file is asked for again after a
+  back-off for as long as the spreader stays chosen: `HERO_EQUIPMENT_RETRY_MS` (3 s), doubled after each further failure
+  up to `HERO_EQUIPMENT_RETRY_MAX_MS` (30 s); a spreader that is released and chosen again starts over. Chosen for
+  `heroSettled()`: while a failed load waits on its back-off the level is **settled** (nothing more is coming for now), so
+  a file that keeps failing never hangs a `heroSettled()` wait; it is unsettled only for the moment a retry is due or in
+  flight.
+- **Per-frame cost.** A frame with no offer in reach and nothing attached, loading or waiting returns right after the
+  camera gate, with no allocation. Otherwise the candidate slots (one object per equipment id), the chosen set and the
+  prep list are reused across frames, and a chosen id finds its offer and distance through a map.
+- **Attach.** The file's `LOD0` becomes a child of the rig's `spreader` node with an identity transform, so it follows the
+  crane (and the ASC's vertical stretch). No depth bias: `HERO_DEPTH_BIAS_M` is for faces over a box.
+- **Fade: a cross dither.** The hero spreader fades in over `HERO_FADE_MS` with the hero faces' screen-door dither (a
+  discard, no blending). The two models are different meshes with many surfaces at the same place, so drawn together they
+  would z-fight for the 200 ms. Chosen fix (of "dither the rig one out" and "hide the rig meshes at the start"): the rig's
+  own spreader meshes dither **out** with the complementary pattern (same dither value from `gl_FragCoord`, opposite
+  test), so every pixel is drawn by exactly one of the two models and no hole shows the background. Neither file's
+  material has a fade input, so during the fade the hero meshes and the rig spreader meshes each wear their own copy of
+  their material with a shared `heroSpreaderFade` uniform (`ditherMaterial`, direction `in` or `out`; a patch the rig
+  material already has, such as a plate offset, is kept, and the program cache key is the material's own plus the
+  direction). When the fade ends, or the spreader is released during it, the shared materials are put back on both, the
+  copies are disposed, and at the end of the fade the rig meshes are hidden (`visible = false`; the rig code never sets
+  visibility on them). The STS headblock is the rig's `hoist` node and stays.
+- **Motion.** The rig code holds its own nodes and keeps moving them (twistlock turn, STS telescopes and twin unit, the 20 ft
+  squeeze of the ASC and SHC spreader body and lock pattern). Every frame each hero node with a rig node of the same name
+  gets `matrix = rigNow x rigRest^-1 x heroRest` (`matrixAutoUpdate` off), so it shows the rig's motion from rest whatever
+  the rig does, also where the two files' mesh nodes carry different dequantisation transforms.
+- **Release.** Not chosen any more (farther away, rig left LOD0, cap 0): the hero subtree is removed and the rig meshes are
+  shown again; `dispose()` does it for all. Geometry and materials belong to the loader's cache and are not disposed.
+- **Readouts.** `__tt.scene().heroEquipment` and `__tt.perf().stats.heroEquipment` (the Stats panel's "Hero spreaders",
+  `tt-perf-hero-equipment`) count attached hero spreaders. `__tt.heroSettled()` is false while a chosen spreader waits for
+  the camera gate, its file or a prep slot, or fades in (not while a failed load waits on its back-off, see Failed load).
+
+  `__tt.scene().heroSpreaders` lists each attached one (`id`, `kind`, `fading`, `rigHidden`) with the world bounds of the
+  hero model and of the rig spreader meshes it replaces (each rig mesh by its own geometry), so a test can check place,
+  length (also the 20 ft squeeze) and twistlock plane without a screenshot.
+
+Tests: `tests/hero-equipment-level.test.ts` (fake rigs and loader), `tests/hero-equipment-selection.test.ts`. Smoke:
+`tests/browser/hero-equipment.smoke.ts` (ASC close-up within the cap, no file requested before, none on Low or at the
+`equipment-hero-off` rung; STS in place; SHC and ASC squeezed to 20 ft; fails on any console or page error, which covers a
+dither shader compile error).
+Close-up for a screenshot: `__tt.setCameraPose({ target: <the ASC's x, hoistY + 1.5, z from __tt.sceneState().ascs>, distance: 13, azimuth: 0.6, polar: 1.25 })`,
+then wait for `__tt.heroSettled() && __tt.perf().stats.heroEquipment > 0`.
+
 #### Still-camera floor
 
 On Auto every rung carries `heroStillBoxes` = `HERO_STILL_BOXES` (6 boxes, 18 faces; `quality.ts`), passed as
@@ -489,14 +551,15 @@ Antialiasing is chosen at renderer creation and is not part of a live profile.
   for the next one (max 240). A frame gap over 1 s (hidden tab) is skipped. History restarts after every change.
   **All thresholds are provisional until the laptop benchmark ticket (#262) retunes them.**
 - **The shedding ladder** (`AUTO_RUNGS`, `profileForRung`, `markStepForRung`: pure functions of the rung). Auto sheds top
-  down and recovers bottom up: 0 `hero-full` (High, hero cap 32 boxes), 1 `hero-half` (16), 2 `hero-quarter` (8),
-  3 `hero-marks-standard` (cap 8, `HeroLevel.setMarkStep('standard')`), 4 `hero-off` (cap 0 while the camera moves; from here
-  down only the still-camera floor draws hero faces, with sharp markings again, see "Still-camera floor"), 5 `shadows-resolution`
-  (Medium's 1024 shadow map and 0.85 resolution), 6 `medium` (Medium profile, hero off), 7 `low`. The ticket lists marking
+  down and recovers bottom up: 0 `hero-full` (High, hero cap 32 boxes, 3 hero spreaders), 1 `equipment-hero-off` (#273: `heroEquipment` 0
+  from here down, box hero detail untouched), 2 `hero-half` (16), 3 `hero-quarter` (8),
+  4 `hero-marks-standard` (cap 8, `HeroLevel.setMarkStep('standard')`), 5 `hero-off` (cap 0 while the camera moves; from here
+  down only the still-camera floor draws hero faces, with sharp markings again, see "Still-camera floor"), 6 `shadows-resolution`
+  (Medium's 1024 shadow map and 0.85 resolution), 7 `medium` (Medium profile, hero off), 8 `low`. The ticket lists marking
   resolution after hero off; it sits before it here because marking resolution sheds nothing once no hero face is
-  drawn. The manual levels fix the ladder (`MANUAL_RUNG`: High 0, Medium 6 with Medium's own hero cap and sharp
-  markings, Low 7). `useTwinScene` puts the rung's profile and mark step in force; the overlay row `tt-perf-rung` names
-  the rung ("Full detail", "Hero cap half", ... "Low profile"). Dev API: `perf().rung` / `rungName`, `setAutoRung(n)`.
+  drawn. The manual levels fix the ladder (`MANUAL_RUNG`: High 0, Medium 7 with Medium's own hero caps (12 boxes, 1 spreader) and sharp
+  markings, Low 8). `useTwinScene` puts the rung's profile and mark step in force; the overlay row `tt-perf-rung` names
+  the rung ("Full detail", "Hero spreaders off", "Hero cap half", ... "Low profile"). Dev API: `perf().rung` / `rungName`, `setAutoRung(n)`.
 - UI: `components/PerfPanel.vue` (quality picker, Stats button, key P: fps, draw calls, triangles, frame CPU ms, level).
   `components/FpsChip.vue` (`tt-fps-chip`, teleported into `SimPage`'s `#sim-header-slot`, hidden when `webglFailed`)
   shows the `FpsMeter` 1 s average; `modules/fpsChip.ts#fpsSeverity` amber below 30, red below 20; a click toggles the overlay.
@@ -612,7 +675,7 @@ pauses, hides all UI, `cameraTo('STS104', 380)`, and captures 1200x630 to `asset
   deleting `state.yardSlots` entries must call `indexYardSlotAdded` / `indexYardSlotRemoved` (`engine/yardIndex.ts`);
   `engine/subsystems/landside.ts#eligiblePickups` still scans every yard slot per truck arrival. Options and numbers: [optimising/run-speed.md](optimising/run-speed.md).
 - **Renderer**: the yard stress test (`?viewer=yard`) and the `__tt.perf()` procedure are in [optimising/frame-rate.md](optimising/frame-rate.md).
-- `__tt.scene()`: counts, `containerLods {lod0, lod1, closeup, closeupFaces, culled}`, `stsLods`, `shcLods`, `ascLods`,
+- `__tt.scene()`: counts, `containerLods {lod0, lod1, closeup, closeupFaces, culled}`, `heroEquipment` (#273), `stsLods`, `shcLods`, `ascLods`,
   `vesselLods`, `*Assets` (`placeholder` / `loaded`), `landside`, `infrastructure`, `gantryBeacons`, `render {calls, triangles}`, `frames`.
   `__tt.sceneState()`: the `sceneKey` and `rigKey` maps above, `liveries[id]` (atlas index, size, LOD, tint, centre).
   `__tt.atmosphere()`: `{ lockDaylight, soundGain, sound, positional: { voices }, banner, scene: { mode, daylight, shadows, masts, equipmentLights, backdrop } }`.

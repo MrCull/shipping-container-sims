@@ -1,0 +1,365 @@
+{
+  "asset": "hero-spreader-sts",
+  "kind": "hero-equipment",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only hero-equipment",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 6.188,
+    "widthM": 3.1,
+    "heightM": 1.69,
+    "boundsMin": [
+      -3.094,
+      -0.14,
+      -1.55
+    ],
+    "boundsMax": [
+      3.094,
+      1.55,
+      1.55
+    ],
+    "tag": "A",
+    "source": "the LOD0 spreader of sts-malaccamax at rest (same origin, axes and extents; tests/hero-equipment-asset.test.ts compares them)"
+  },
+  "axes": {
+    "up": "+Y",
+    "length": "X (the source rig's spreader long axis)",
+    "origin": "the source rig's `spreader` node: centre of the twist-lock plane (STS: the container attach point)",
+    "handedness": "right-handed, glTF"
+  },
+  "heroEquipment": {
+    "kind": "sts",
+    "sourceAsset": "sts-malaccamax",
+    "attachUnder": "spreader",
+    "attach": "add LOD0 as a child of the source rig's LOD0 `spreader` node with an identity transform, hide that node's own meshes, and drive the rig nodes below LOD0 with the same values as the source rig's nodes of the same name",
+    "flippers": "modelled raised, no node",
+    "material": "hero_spreader: UV0 = palette swatch, UV1 = metres / 0.5 for hero_detail_normal and hero_orm (256x256, shared with the hero container faces)"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "hero-spreader-sts",
+      "role": "lod",
+      "description": "the only level; this node is the source rig's `spreader` frame"
+    },
+    {
+      "name": "spreader_geo",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "main frame: beams, headblock or its seat, hoses, festoon, fixed fittings"
+    },
+    {
+      "name": "spreader_tele_fore",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        2.94,
+        0,
+        0
+      ],
+      "description": "fore telescope end beam, inner beams, flippers (20 ft at rest)"
+    },
+    {
+      "name": "spreader_tele_fore_geo",
+      "parent": "spreader_tele_fore",
+      "role": "mesh",
+      "description": "mesh of spreader_tele_fore"
+    },
+    {
+      "name": "spreader_tele_aft",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        -2.94,
+        0,
+        0
+      ],
+      "description": "aft telescope end beam, inner beams, flippers (20 ft at rest)"
+    },
+    {
+      "name": "spreader_tele_aft_geo",
+      "parent": "spreader_tele_aft",
+      "role": "mesh",
+      "description": "mesh of spreader_tele_aft"
+    },
+    {
+      "name": "twin_locks",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        0,
+        0.4,
+        0
+      ],
+      "description": "twin-20 centre twist-lock units (retracted at rest)"
+    },
+    {
+      "name": "twin_locks_geo",
+      "parent": "twin_locks",
+      "role": "mesh",
+      "description": "mesh of twin_locks"
+    },
+    {
+      "name": "twistlock_fore_land",
+      "parent": "spreader_tele_fore",
+      "role": "rig",
+      "pivot": [
+        2.94,
+        0.0,
+        1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_fore_land_geo",
+      "parent": "twistlock_fore_land",
+      "role": "mesh",
+      "description": "mesh of twistlock_fore_land"
+    },
+    {
+      "name": "twistlock_fore_sea",
+      "parent": "spreader_tele_fore",
+      "role": "rig",
+      "pivot": [
+        2.94,
+        0.0,
+        -1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_fore_sea_geo",
+      "parent": "twistlock_fore_sea",
+      "role": "mesh",
+      "description": "mesh of twistlock_fore_sea"
+    },
+    {
+      "name": "twistlock_aft_land",
+      "parent": "spreader_tele_aft",
+      "role": "rig",
+      "pivot": [
+        -2.94,
+        0.0,
+        1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_aft_land_geo",
+      "parent": "twistlock_aft_land",
+      "role": "mesh",
+      "description": "mesh of twistlock_aft_land"
+    },
+    {
+      "name": "twistlock_aft_sea",
+      "parent": "spreader_tele_aft",
+      "role": "rig",
+      "pivot": [
+        -2.94,
+        0.0,
+        -1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_aft_sea_geo",
+      "parent": "twistlock_aft_sea",
+      "role": "mesh",
+      "description": "mesh of twistlock_aft_sea"
+    },
+    {
+      "name": "twistlock_twin_aft_land",
+      "parent": "twin_locks",
+      "role": "rig",
+      "pivot": [
+        -0.127,
+        0.4,
+        1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_twin_aft_land_geo",
+      "parent": "twistlock_twin_aft_land",
+      "role": "mesh",
+      "description": "mesh of twistlock_twin_aft_land"
+    },
+    {
+      "name": "twistlock_twin_aft_sea",
+      "parent": "twin_locks",
+      "role": "rig",
+      "pivot": [
+        -0.127,
+        0.4,
+        -1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_twin_aft_sea_geo",
+      "parent": "twistlock_twin_aft_sea",
+      "role": "mesh",
+      "description": "mesh of twistlock_twin_aft_sea"
+    },
+    {
+      "name": "twistlock_twin_fore_land",
+      "parent": "twin_locks",
+      "role": "rig",
+      "pivot": [
+        0.127,
+        0.4,
+        1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_twin_fore_land_geo",
+      "parent": "twistlock_twin_fore_land",
+      "role": "mesh",
+      "description": "mesh of twistlock_twin_fore_land"
+    },
+    {
+      "name": "twistlock_twin_fore_sea",
+      "parent": "twin_locks",
+      "role": "rig",
+      "pivot": [
+        0.127,
+        0.4,
+        -1.138
+      ],
+      "description": "twist-lock; 90 degrees = locked"
+    },
+    {
+      "name": "twistlock_twin_fore_sea_geo",
+      "parent": "twistlock_twin_fore_sea",
+      "role": "mesh",
+      "description": "mesh of twistlock_twin_fore_sea"
+    }
+  ],
+  "travelLimits": {
+    "twistlock_fore_land": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "twistlock_fore_sea": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "twistlock_aft_land": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "twistlock_aft_sea": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "twistlock_twin_aft_land": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "twistlock_twin_aft_sea": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "twistlock_twin_fore_land": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "twistlock_twin_fore_sea": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": 0,
+      "maxDeg": 90,
+      "rest": 0,
+      "tag": "A",
+      "note": "driven by the source rig code"
+    },
+    "spreader_tele_fore": {
+      "type": "translation",
+      "axis": "+X",
+      "minM": 0,
+      "maxM": 3.067,
+      "rest": 0,
+      "tag": "V"
+    },
+    "spreader_tele_aft": {
+      "type": "translation",
+      "axis": "-X",
+      "minM": 0,
+      "maxM": 3.067,
+      "rest": 0,
+      "tag": "V"
+    },
+    "twin_locks": {
+      "type": "translation",
+      "axis": "-Y",
+      "minM": 0,
+      "maxM": 0.4,
+      "rest": 0,
+      "tag": "A"
+    }
+  },
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [],
+    "tag": "A",
+    "note": "y 0 is the twist-lock plane, not the ground"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 2408
+    }
+  },
+  "provenance": [
+    {
+      "fact": "frame, pivots and overall extents copied from the source rig spreader",
+      "tag": "A",
+      "source": "tt_assets/sts.py"
+    },
+    {
+      "fact": "headblock sheaves, telescopic inner beams, guide rollers, twist-lock housings and cones, corner guides, raised flippers, hoses, festoon, warning bands",
+      "tag": "A",
+      "source": "generic telescopic container spreader; no manufacturer drawing"
+    },
+    {
+      "fact": "detail maps are procedural noise, not scans",
+      "tag": "A"
+    }
+  ]
+}
