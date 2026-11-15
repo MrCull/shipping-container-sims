@@ -1,0 +1,95 @@
+/**
+ * Hero equipment selection (#273), pure: which spreaders near the camera get the hero model. Nearest first, within
+ * `HERO_EQUIPMENT_DISTANCE_M`, capped, and a spreader chosen last frame keeps its place out to 1.15 x the distance.
+ */
+import { describe, expect, it } from 'vitest'
+import { HERO_EQUIPMENT_DISTANCE_M, HERO_EQUIPMENT_HYSTERESIS, selectHeroEquipment } from '../modules/heroEquipmentSelection'
+
+const none: ReadonlySet<string> = new Set()
+
+describe('selectHeroEquipment', () => {
+  it('has the triage constants: 25 m, hysteresis 1.15', () => {
+    expect(HERO_EQUIPMENT_DISTANCE_M).toBe(25)
+    expect(HERO_EQUIPMENT_HYSTERESIS).toBe(1.15)
+  })
+
+  it('returns the spreaders within the distance, nearest first', () => {
+    const picked = selectHeroEquipment(
+      [
+        { id: 'ASC-2', distanceM: 20 },
+        { id: 'STS-1', distanceM: 5 },
+        { id: 'SHC-7', distanceM: 12 },
+      ],
+      3,
+      none,
+    )
+    expect(picked).toEqual(['STS-1', 'SHC-7', 'ASC-2'])
+  })
+
+  it('never returns more than the cap, and nothing at cap 0 (Low)', () => {
+    const candidates = [
+      { id: 'a', distanceM: 4 },
+      { id: 'b', distanceM: 3 },
+      { id: 'c', distanceM: 9 },
+      { id: 'd', distanceM: 6 },
+    ]
+    expect(selectHeroEquipment(candidates, 3, none)).toEqual(['b', 'a', 'd'])
+    expect(selectHeroEquipment(candidates, 1, none)).toEqual(['b'])
+    expect(selectHeroEquipment(candidates, 0, none)).toEqual([])
+    expect(selectHeroEquipment(candidates, 0, new Set(['a', 'b']))).toEqual([])
+  })
+
+  it('leaves out a spreader beyond 25 m; one at exactly 25 m is in', () => {
+    const picked = selectHeroEquipment(
+      [
+        { id: 'far', distanceM: 25.1 },
+        { id: 'edge', distanceM: 25 },
+        { id: 'near', distanceM: 10 },
+      ],
+      3,
+      none,
+    )
+    expect(picked).toEqual(['near', 'edge'])
+  })
+
+  it('keeps a previous pick at 1.1 x the distance and drops it at 1.2 x', () => {
+    const previous = new Set(['held'])
+    expect(selectHeroEquipment([{ id: 'held', distanceM: 27.5 }], 3, previous)).toEqual(['held'])
+    expect(selectHeroEquipment([{ id: 'held', distanceM: 30 }], 3, previous)).toEqual([])
+    // a newcomer at the same 27.5 m is not picked: the extra reach is only for a spreader already chosen
+    expect(selectHeroEquipment([{ id: 'new', distanceM: 27.5 }], 3, previous)).toEqual([])
+  })
+
+  it('a previous pick keeps its place against a newcomer only a little nearer, and loses it to a clearly nearer one', () => {
+    const previous = new Set(['held'])
+    expect(
+      selectHeroEquipment(
+        [
+          { id: 'held', distanceM: 11 },
+          { id: 'new', distanceM: 10 },
+        ],
+        1,
+        previous,
+      ),
+    ).toEqual(['held'])
+    expect(
+      selectHeroEquipment(
+        [
+          { id: 'held', distanceM: 12 },
+          { id: 'new', distanceM: 10 },
+        ],
+        1,
+        previous,
+      ),
+    ).toEqual(['new'])
+  })
+
+  it('does not change its inputs', () => {
+    const candidates = [
+      { id: 'b', distanceM: 8 },
+      { id: 'a', distanceM: 2 },
+    ]
+    selectHeroEquipment(candidates, 2, none)
+    expect(candidates.map((c) => c.id)).toEqual(['b', 'a'])
+  })
+})

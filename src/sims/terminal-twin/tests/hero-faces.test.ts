@@ -145,13 +145,13 @@ describe('hero level through the close-up offers', () => {
     frame(inst, 60, nearCam, 3)
     await settle()
     const drawn: number[] = []
-    for (const rung of [0, 1, 2, 3, 4]) {
+    for (const rung of [0, 2, 3, 4, 5]) {
       hero.setLimits({ boxes: Math.floor(profileForRung(rung).heroBoxes / 8) }) // the fixture draws 13 faces, so the caps are scaled down to bite
       hero.setMarkStep(markStepForRung(rung))
       drawn.push(frame(inst, 60, nearCam, 3).heroFaces)
     }
-    expect(drawn[0]).toBeGreaterThan(Math.floor(profileForRung(2).heroBoxes / 8) * HERO_FACES_PER_BOX)
-    expect(drawn[2]).toBeLessThanOrEqual(Math.floor(profileForRung(2).heroBoxes / 8) * HERO_FACES_PER_BOX)
+    expect(drawn[0]).toBeGreaterThan(Math.floor(profileForRung(3).heroBoxes / 8) * HERO_FACES_PER_BOX)
+    expect(drawn[2]).toBeLessThanOrEqual(Math.floor(profileForRung(3).heroBoxes / 8) * HERO_FACES_PER_BOX)
     expect(drawn[2]).toBeLessThan(drawn[0])
     expect(drawn[4]).toBe(0)
     for (let i = 1; i < drawn.length; i++) expect(drawn[i]).toBeLessThanOrEqual(drawn[i - 1])

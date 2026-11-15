@@ -489,14 +489,15 @@ Antialiasing is chosen at renderer creation and is not part of a live profile.
   for the next one (max 240). A frame gap over 1 s (hidden tab) is skipped. History restarts after every change.
   **All thresholds are provisional until the laptop benchmark ticket (#262) retunes them.**
 - **The shedding ladder** (`AUTO_RUNGS`, `profileForRung`, `markStepForRung`: pure functions of the rung). Auto sheds top
-  down and recovers bottom up: 0 `hero-full` (High, hero cap 32 boxes), 1 `hero-half` (16), 2 `hero-quarter` (8),
-  3 `hero-marks-standard` (cap 8, `HeroLevel.setMarkStep('standard')`), 4 `hero-off` (cap 0 while the camera moves; from here
-  down only the still-camera floor draws hero faces, with sharp markings again, see "Still-camera floor"), 5 `shadows-resolution`
-  (Medium's 1024 shadow map and 0.85 resolution), 6 `medium` (Medium profile, hero off), 7 `low`. The ticket lists marking
+  down and recovers bottom up: 0 `hero-full` (High, hero cap 32 boxes, 3 hero spreaders), 1 `equipment-hero-off` (#273: `heroEquipment` 0
+  from here down, box hero detail untouched), 2 `hero-half` (16), 3 `hero-quarter` (8),
+  4 `hero-marks-standard` (cap 8, `HeroLevel.setMarkStep('standard')`), 5 `hero-off` (cap 0 while the camera moves; from here
+  down only the still-camera floor draws hero faces, with sharp markings again, see "Still-camera floor"), 6 `shadows-resolution`
+  (Medium's 1024 shadow map and 0.85 resolution), 7 `medium` (Medium profile, hero off), 8 `low`. The ticket lists marking
   resolution after hero off; it sits before it here because marking resolution sheds nothing once no hero face is
-  drawn. The manual levels fix the ladder (`MANUAL_RUNG`: High 0, Medium 6 with Medium's own hero cap and sharp
-  markings, Low 7). `useTwinScene` puts the rung's profile and mark step in force; the overlay row `tt-perf-rung` names
-  the rung ("Full detail", "Hero cap half", ... "Low profile"). Dev API: `perf().rung` / `rungName`, `setAutoRung(n)`.
+  drawn. The manual levels fix the ladder (`MANUAL_RUNG`: High 0, Medium 7 with Medium's own hero caps (12 boxes, 1 spreader) and sharp
+  markings, Low 8). `useTwinScene` puts the rung's profile and mark step in force; the overlay row `tt-perf-rung` names
+  the rung ("Full detail", "Hero spreaders off", "Hero cap half", ... "Low profile"). Dev API: `perf().rung` / `rungName`, `setAutoRung(n)`.
 - UI: `components/PerfPanel.vue` (quality picker, Stats button, key P: fps, draw calls, triangles, frame CPU ms, level).
   `components/FpsChip.vue` (`tt-fps-chip`, teleported into `SimPage`'s `#sim-header-slot`, hidden when `webglFailed`)
   shows the `FpsMeter` 1 s average; `modules/fpsChip.ts#fpsSeverity` amber below 30, red below 20; a click toggles the overlay.

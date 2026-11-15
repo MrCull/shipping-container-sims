@@ -64,21 +64,35 @@ describe('FpsMeter', () => {
 })
 
 describe('the shedding ladder (pure)', () => {
-  it('sheds in the listed order: hero cap, hero marks, hero off, shadows and resolution, Medium, Low', () => {
-    expect(AUTO_RUNGS.map((r) => r.name)).toEqual(['hero-full', 'hero-half', 'hero-quarter', 'hero-marks-standard', 'hero-off', 'shadows-resolution', 'medium', 'low'])
+  it('sheds in the listed order: equipment hero, hero cap, hero marks, hero off, shadows and resolution, Medium, Low', () => {
+    expect(AUTO_RUNGS.map((r) => r.name)).toEqual(['hero-full', 'equipment-hero-off', 'hero-half', 'hero-quarter', 'hero-marks-standard', 'hero-off', 'shadows-resolution', 'medium', 'low'])
   })
 
   it('hero cap falls full, half, quarter, none, and never returns lower down the ladder', () => {
     const caps = AUTO_RUNGS.map((_, i) => profileForRung(i).heroBoxes)
     expect(caps[0]).toBe(QUALITY_PROFILES.high.heroBoxes)
-    expect(caps[1]).toBe(caps[0] / 2)
-    expect(caps[2]).toBe(caps[0] / 4)
-    expect(caps[4]).toBe(0)
+    expect(caps[1]).toBe(caps[0]) // equipment-hero-off sheds the hero spreaders only
+    expect(caps[2]).toBe(caps[0] / 2)
+    expect(caps[3]).toBe(caps[0] / 4)
+    expect(caps[5]).toBe(0)
     for (let i = 1; i < caps.length; i++) expect(caps[i]).toBeLessThanOrEqual(caps[i - 1])
   })
 
+  it('hero spreaders (#273): High 3, Medium 1, Low 0; Auto sheds them at equipment-hero-off, before any box hero detail, and never brings them back lower down', () => {
+    expect(QUALITY_LEVELS.map((l) => profileFor(l).heroEquipment)).toEqual([0, 1, 3])
+    expect(rungName(1)).toBe('equipment-hero-off')
+    expect(levelOfRung(1)).toBe('high')
+    expect(AUTO_RUNGS.map((_, i) => profileForRung(i).heroEquipment)).toEqual([3, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(profileForRung(1)).toEqual({ ...profileForRung(0), heroEquipment: 0 })
+  })
+
+  it('paused-detail boost leaves the hero spreader cap as the rung has it', () => {
+    expect(AUTO_RUNGS.map((_, i) => pausedDetailProfile(profileForRung(i)).heroEquipment)).toEqual([3, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(pausedDetailProfile(QUALITY_PROFILES.medium).heroEquipment).toBe(1)
+  })
+
   it('hero marking resolution drops after the cap has shrunk; below, only the still-camera floor is drawn, sharp', () => {
-    expect(AUTO_RUNGS.map((_, i) => markStepForRung(i))).toEqual(['sharp', 'sharp', 'sharp', 'standard', 'sharp', 'sharp', 'sharp', 'sharp'])
+    expect(AUTO_RUNGS.map((_, i) => markStepForRung(i))).toEqual(['sharp', 'sharp', 'sharp', 'sharp', 'standard', 'sharp', 'sharp', 'sharp', 'sharp'])
   })
 
   it('paused-detail boost: High close-up detail on every rung, nothing lowered, shadows and LOD distances left alone', () => {
@@ -103,29 +117,29 @@ describe('the shedding ladder (pure)', () => {
   it('every Auto rung keeps the still-camera hero floor; the manual levels have none', () => {
     expect(AUTO_RUNGS.map((_, i) => profileForRung(i).heroStillBoxes)).toEqual(AUTO_RUNGS.map(() => HERO_STILL_BOXES))
     expect(HERO_STILL_BOXES).toBeGreaterThan(0)
-    expect(HERO_STILL_BOXES).toBeLessThan(profileForRung(2).heroBoxes) // below the smallest moving cap: the floor only bites once hero is shed
+    expect(HERO_STILL_BOXES).toBeLessThan(profileForRung(3).heroBoxes) // below the smallest moving cap: the floor only bites once hero is shed
     expect(QUALITY_LEVELS.map((l) => profileFor(l).heroStillBoxes)).toEqual([0, 0, 0])
   })
 
   it('shadows and resolution drop only after the hero rungs, and never rise down the ladder', () => {
     const p = AUTO_RUNGS.map((_, i) => profileForRung(i))
-    for (let i = 0; i <= 4; i++) {
+    for (let i = 0; i <= 5; i++) {
       expect(p[i].shadowMapSize).toBe(QUALITY_PROFILES.high.shadowMapSize)
       expect(p[i].resolutionScale).toBe(1)
     }
-    expect(p[5].shadowMapSize).toBeLessThan(p[4].shadowMapSize)
-    expect(p[5].resolutionScale).toBeLessThan(p[4].resolutionScale)
+    expect(p[6].shadowMapSize).toBeLessThan(p[5].shadowMapSize)
+    expect(p[6].resolutionScale).toBeLessThan(p[5].resolutionScale)
     for (let i = 1; i < p.length; i++) {
       expect(p[i].shadowMapSize).toBeLessThanOrEqual(p[i - 1].shadowMapSize)
       expect(p[i].resolutionScale).toBeLessThanOrEqual(p[i - 1].resolutionScale)
       expect(p[i].lod0DistanceM).toBeLessThanOrEqual(p[i - 1].lod0DistanceM)
     }
-    expect(profileForRung(6)).toEqual({ ...QUALITY_PROFILES.medium, heroBoxes: 0, heroStillBoxes: HERO_STILL_BOXES })
-    expect(profileForRung(7)).toEqual({ ...QUALITY_PROFILES.low, heroStillBoxes: HERO_STILL_BOXES })
+    expect(profileForRung(7)).toEqual({ ...QUALITY_PROFILES.medium, heroBoxes: 0, heroEquipment: 0, heroStillBoxes: HERO_STILL_BOXES })
+    expect(profileForRung(8)).toEqual({ ...QUALITY_PROFILES.low, heroStillBoxes: HERO_STILL_BOXES })
   })
 
   it('manual levels fix the ladder at their rung', () => {
-    expect(MANUAL_RUNG).toEqual({ high: 0, medium: 6, low: 7 })
+    expect(MANUAL_RUNG).toEqual({ high: 0, medium: 7, low: 8 })
     expect(AUTO_RUNGS[MANUAL_RUNG.medium].name).toBe('medium')
     expect(profileForRung(MANUAL_RUNG.high)).toEqual({ ...QUALITY_PROFILES.high, heroStillBoxes: HERO_STILL_BOXES })
     expect(levelOfRung(MANUAL_RUNG.medium)).toBe('medium')
@@ -135,7 +149,7 @@ describe('the shedding ladder (pure)', () => {
   it('is a pure function of the rung, clamped at both ends', () => {
     expect(profileForRung(-3)).toEqual(profileForRung(0))
     expect(profileForRung(99)).toEqual(profileForRung(BOTTOM_RUNG))
-    expect(rungName(2)).toBe('hero-quarter')
+    expect(rungName(3)).toBe('hero-quarter')
   })
 })
 
@@ -153,7 +167,7 @@ describe('AutoQuality', () => {
     t = feed(auto, t, 1, 30) // a short dip does not step down
     expect(auto.rung).toBe(0)
     t = feed(auto, t, 80, 30)
-    expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
     expect(auto.rung).toBe(BOTTOM_RUNG)
     feed(auto, t, 20, 30)
     expect(auto.rung).toBe(BOTTOM_RUNG) // floor
