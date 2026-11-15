@@ -8,12 +8,14 @@ import { t, type MessageKey } from '../i18n/messages'
 import { ROB_DISPLAY_MODES } from '../modules/colourBy'
 import PerfPanel from './PerfPanel.vue'
 import { useHudStore } from '../store/hudStore'
+import { useThemeStore } from '../store/themeStore'
 import LocaleDateTimeInput from './LocaleDateTimeInput.vue'
 
 withDefaults(defineProps<{ showGraphics?: boolean }>(), { showGraphics: true })
 
 const store = useTwinStore()
 const hud = useHudStore()
+const themes = useThemeStore()
 
 const clock = computed(() => store.fmt.clock(store.choice.startDateTime, store.displayTime))
 
@@ -78,8 +80,7 @@ async function submitRunTo(): Promise<void> {
         data-testid="tt-clock"
         :title="t('topbar.elapsed', { elapsed: clock.elapsed })"
       >
-        <span class="clock-day">{{ clock.day }}</span>
-        <span class="clock-date">{{ clock.date }}</span>
+        <span class="clock-when"><span class="clock-day">{{ clock.day }}</span> <span class="clock-date">{{ clock.date }}</span></span>
         <span class="clock-time">{{ clock.time }}</span>
         <span class="clock-elapsed">{{ clock.elapsed }}</span>
       </div>
@@ -131,7 +132,7 @@ async function submitRunTo(): Promise<void> {
           :title="t('debug.stepHint')"
           @click="store.step().catch(() => {})"
         >
-          {{ t('debug.step') }}
+          <TtIcon name="step" /> {{ t('debug.step') }}
         </button>
         <div
           class="run-to"
@@ -143,7 +144,7 @@ async function submitRunTo(): Promise<void> {
             :title="ended ? t('topbar.endedHint') : undefined"
             @click="openRunTo"
           >
-            {{ t('topbar.runTo') }}
+            <TtIcon name="skip" /> {{ t('topbar.runTo') }}
           </button>
           <form
             v-if="runToOpen"
@@ -196,14 +197,14 @@ async function submitRunTo(): Promise<void> {
           :title="t('topbar.resetHint')"
           @click="store.reset()"
         >
-          {{ t('topbar.reset') }}
+          <TtIcon name="reset" /> {{ t('topbar.reset') }}
         </button>
         <button
           class="action-btn"
           :disabled="store.busy"
           @click="store.newScenario()"
         >
-          {{ t('topbar.newScenario') }}
+          <TtIcon name="plus" /> {{ t('topbar.newScenario') }}
         </button>
         <button
           class="action-btn"
@@ -212,7 +213,7 @@ async function submitRunTo(): Promise<void> {
           :title="t('topbar.savesHint')"
           @click="store.openSaves()"
         >
-          {{ t('topbar.saves') }}
+          <TtIcon name="save" /> {{ t('topbar.saves') }}
         </button>
         <button
           class="action-btn"
@@ -222,7 +223,7 @@ async function submitRunTo(): Promise<void> {
           data-testid="tt-dashboard-button"
           @click="store.toggleDashboard()"
         >
-          {{ t('topbar.dashboard') }}
+          <TtIcon name="chart" /> {{ t('topbar.dashboard') }}
         </button>
         <button
           class="action-btn help-btn"
@@ -231,7 +232,7 @@ async function submitRunTo(): Promise<void> {
           data-testid="tt-help-button"
           @click="store.setHelpOpen(!store.helpOpen)"
         >
-          ?
+          <TtIcon name="help" />
         </button>
         <span
           class="status"
@@ -278,7 +279,18 @@ async function submitRunTo(): Promise<void> {
         data-testid="tt-daylight-toggle"
         @click="store.toggleLockDaylight()"
       >
-        {{ t('topbar.daylight') }}
+        <TtIcon name="sun" /> {{ t('topbar.daylight') }}
+      </button>
+      <button
+        class="action-btn help-btn theme-btn"
+        type="button"
+        :title="themes.theme === 'dark' ? t('theme.toLight') : t('theme.toDark')"
+        :aria-label="themes.theme === 'dark' ? t('theme.toLight') : t('theme.toDark')"
+        :data-theme="themes.theme"
+        data-testid="tt-theme-toggle"
+        @click="themes.toggle()"
+      >
+        <TtIcon :name="themes.theme === 'dark' ? 'moon' : 'sun'" />
       </button>
       <PerfPanel v-if="showGraphics" />
     </div>
@@ -291,7 +303,7 @@ async function submitRunTo(): Promise<void> {
       :aria-expanded="!hud.collapsed.topBar"
       @click="hud.toggle('topBar')"
     >
-      {{ hud.collapsed.topBar ? '▾' : '▴' }}
+      <TtIcon :name="hud.collapsed.topBar ? 'down' : 'up'" />
     </button>
   </header>
 </template>
@@ -304,16 +316,15 @@ async function submitRunTo(): Promise<void> {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.5rem 1rem;
+  gap: 0.5rem 1.25rem;
   flex-wrap: nowrap;
-  padding: 0.5rem 0.9rem;
-  background: var(--tt-panel);
+  padding: 0.55rem 0.9rem;
+  background: var(--tt-panel-strong);
   -webkit-backdrop-filter: var(--tt-blur);
   backdrop-filter: var(--tt-blur);
   border-bottom: 1px solid var(--tt-border);
   font-family: var(--tt-font);
   color: var(--tt-text);
-  backdrop-filter: blur(6px);
 }
 
 .tt-topbar-main {
@@ -325,62 +336,94 @@ async function submitRunTo(): Promise<void> {
   min-width: 0;
 }
 
-.rob-display {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.rob-label {
-  color: var(--tt-text-muted);
-  font-size: 0.78rem;
-  margin-right: 0.1rem;
-}
-
-.rob-btn {
-  padding: 0.35rem 0.5rem;
-}
-
-.settings {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem 0.5rem;
-  flex: 0 1 auto;
-  justify-content: flex-end;
-  max-width: 27rem;
-}
-
+/* The clock: the time large, the date and the elapsed run time stacked beside it (the markup reads day, date, time). */
 .clock {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  font-family: var(--tt-font-mono);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'time when'
+    'time elapsed';
+  align-items: center;
+  column-gap: 0.7rem;
+  row-gap: 0.15rem;
+  min-width: 15.5rem;
   font-variant-numeric: tabular-nums;
-  min-width: 20rem;
+  white-space: nowrap;
+}
+
+.clock-time {
+  grid-area: time;
+  font-family: var(--tt-font-mono);
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.clock-when {
+  grid-area: when;
+  align-self: end;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.1;
 }
 
 .clock-day {
   color: var(--tt-accent);
-  font-weight: 600;
 }
 
-.clock-time {
-  font-size: 1.15rem;
-  font-weight: 600;
-}
-
-.clock-date,
-.clock-elapsed {
+.clock-date {
   color: var(--tt-text-muted);
-  font-size: 0.8rem;
 }
 
+.clock-elapsed {
+  grid-area: elapsed;
+  align-self: start;
+  line-height: 1.1;
+  color: var(--tt-text-faint);
+  font-family: var(--tt-font-mono);
+  font-size: var(--tt-text-xs);
+}
+
+/* Transport: pause and the speeds as one segmented control. */
 .speeds {
   display: flex;
+  padding: 2px;
+  background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
-  border-radius: 6px;
-  overflow: hidden;
+  border-radius: var(--tt-radius-sm);
+}
+
+.speed-btn {
+  min-width: 1.6rem;
+  height: 1.7rem;
+  padding: 0 0.32rem;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--tt-text-muted);
+  font-family: var(--tt-font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 0.12s var(--tt-ease),
+    color 0.12s var(--tt-ease);
+}
+
+.speed-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.speed-btn:hover:not(:disabled) {
+  background: var(--tt-control-hover);
+  color: var(--tt-text);
+}
+
+.speed-btn.active {
+  background: var(--tt-accent);
+  color: var(--tt-on-accent);
+  font-weight: 700;
 }
 
 .achieved {
@@ -391,48 +434,67 @@ async function submitRunTo(): Promise<void> {
   white-space: nowrap;
 }
 
-.speed-btn {
-  padding: 0.3rem 0.5rem;
-  background: transparent;
-  border: none;
-  border-right: 1px solid var(--tt-border);
-  color: var(--tt-text-muted);
-  font-family: var(--tt-font-mono);
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-left: auto;
 }
 
-.speed-btn:last-child {
-  border-right: none;
-}
-
-.speed-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.speed-btn:hover:not(:disabled) {
-  background: var(--tt-surface-hover);
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2rem;
+  padding: 0 0.7rem;
+  background: var(--tt-control);
+  border: 1px solid var(--tt-hairline);
+  border-radius: var(--tt-radius-sm);
   color: var(--tt-text);
+  font-size: var(--tt-text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background 0.12s var(--tt-ease),
+    border-color 0.12s var(--tt-ease);
 }
 
-.speed-btn.active {
+.action-btn .tt-icon {
+  color: var(--tt-text-muted);
+}
+
+.action-btn:hover:not(:disabled) {
+  background: var(--tt-control-hover);
+  border-color: var(--tt-border-strong);
+}
+
+.action-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.action-btn.primary {
   background: var(--tt-accent);
+  border-color: var(--tt-accent);
   color: var(--tt-on-accent);
+  font-weight: 650;
+}
+
+.action-btn.primary:hover:not(:disabled) {
+  background: var(--tt-accent-hover);
+  border-color: var(--tt-accent-hover);
 }
 
 /* State by shape as well as colour: an active toggle carries a check mark. */
 .action-btn.active::before,
-.status.live::before,
-.status.paused::before,
-.status.complete::before,
-.status.failed::before {
+.status::before {
   content: '';
   display: inline-block;
+  flex: none;
   width: 0.9em;
   height: 0.9em;
-  margin-right: 0.3em;
-  vertical-align: -0.12em;
   background: currentColor;
   -webkit-mask: var(--tt-mark) center / contain no-repeat;
   mask: var(--tt-mark) center / contain no-repeat;
@@ -440,25 +502,180 @@ async function submitRunTo(): Promise<void> {
 
 .action-btn.active::before {
   --tt-mark: var(--tt-glyph-check);
+  color: var(--tt-accent);
 }
 
 .action-btn.active {
-  background: var(--tt-accent);
-  border-color: var(--tt-accent);
-  color: var(--tt-on-accent);
+  background: var(--tt-accent-soft);
+  border-color: var(--tt-accent-line);
 }
 
-.actions {
+.action-btn.active .tt-icon {
+  display: none;
+}
+
+.help-btn {
+  width: 2rem;
+  padding: 0;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 4.8rem;
+  height: 2rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--tt-hairline);
+  border-radius: 999px;
+  font-size: var(--tt-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tt-text-muted);
+}
+
+.status.running::before {
+  --tt-mark: var(--tt-glyph-dot);
+  color: var(--tt-accent);
+}
+
+.status.live {
+  border-color: var(--tt-success-border);
+  background: var(--tt-success-bg);
+  color: var(--tt-success);
+}
+
+.status.live::before {
+  --tt-mark: var(--tt-glyph-dot);
+}
+
+.status.paused {
+  border-color: var(--tt-warn-border);
+  background: var(--tt-warn-bg);
+  color: var(--tt-warn);
+}
+
+.status.paused::before {
+  --tt-mark: var(--tt-glyph-pause);
+}
+
+.status.complete::before {
+  --tt-mark: var(--tt-glyph-check);
+  color: var(--tt-success);
+}
+
+.status.failed {
+  border-color: var(--tt-danger-border);
+  background: var(--tt-danger-bg);
+  color: var(--tt-danger);
+}
+
+.status.failed::before {
+  --tt-mark: var(--tt-glyph-close);
+}
+
+/* View settings: ROB display, daylight and the graphics controls. */
+.settings {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-left: auto;
+  gap: 0.4rem 0.5rem;
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  max-width: 28rem;
+}
+
+.rob-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  background: var(--tt-surface-sunken);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius-sm);
+}
+
+.rob-label {
+  padding: 0 0.45rem 0 0.4rem;
+  color: var(--tt-text-faint);
+  font-size: var(--tt-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rob-btn {
+  height: 1.7rem;
+  padding: 0 0.55rem;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 5px;
+  color: var(--tt-text-muted);
+  font-size: 0.76rem;
+}
+
+.rob-btn.active {
+  background: var(--tt-accent-soft);
+  border-color: var(--tt-accent-line);
+  color: var(--tt-text);
 }
 
 .topbar-toggle {
   flex: none;
   align-self: flex-start;
+}
+
+.run-to {
+  position: relative;
+}
+
+.run-to-pop {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 17rem;
+  padding: 0.9rem;
+  background: var(--tt-surface-raised);
+  border: 1px solid var(--tt-border-strong);
+  border-radius: var(--tt-radius);
+  box-shadow: var(--tt-shadow-lg);
+}
+
+.run-to-pop label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: var(--tt-text-sm);
+  font-weight: 500;
+  color: var(--tt-text-muted);
+}
+
+.pop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.error {
+  color: var(--tt-danger);
+  font-size: var(--tt-text-sm);
+}
+
+/* A laptop-width window: the action buttons drop their icons so the bar stays two rows. */
+@media (max-width: 1380px) {
+  .action-btn:not(.help-btn) .tt-icon {
+    display: none;
+  }
+
+  .action-btn {
+    padding: 0 0.6rem;
+  }
 }
 
 /* Phones and narrow windows: everything wraps inside the screen width (an over-wide bar stretched the whole view,
@@ -481,8 +698,10 @@ async function submitRunTo(): Promise<void> {
 
   .clock {
     min-width: 0;
-    flex-wrap: wrap;
-    row-gap: 0;
+  }
+
+  .clock-time {
+    font-size: 1.2rem;
   }
 
   .speeds {
@@ -502,112 +721,5 @@ async function submitRunTo(): Promise<void> {
     max-width: 100%;
     justify-content: flex-start;
   }
-}
-
-.action-btn {
-  padding: 0.35rem 0.75rem;
-  background: var(--tt-surface);
-  border: 1px solid var(--tt-border);
-  border-radius: 6px;
-  color: var(--tt-text);
-  font-size: 0.82rem;
-}
-
-.action-btn:hover:not(:disabled) {
-  border-color: var(--tt-accent);
-}
-
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.action-btn.primary {
-  background: var(--tt-accent);
-  border-color: var(--tt-accent);
-  color: var(--tt-on-accent);
-}
-
-.run-to {
-  position: relative;
-}
-
-.run-to-pop {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  left: 0;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-width: 16rem;
-  padding: 0.75rem;
-  background: var(--tt-surface);
-  border: 1px solid var(--tt-border);
-  border-radius: 8px;
-  box-shadow: var(--tt-shadow);
-}
-
-.run-to-pop label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  font-size: 0.78rem;
-  color: var(--tt-text-muted);
-}
-
-.run-to-pop input {
-  padding: 0.35rem 0.5rem;
-  background: var(--tt-bg);
-  border: 1px solid var(--tt-border);
-  border-radius: 6px;
-  color: var(--tt-text);
-  font-family: var(--tt-font-mono);
-  color-scheme: dark;
-}
-
-.pop-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.4rem;
-}
-
-.error {
-  color: var(--tt-danger);
-  font-size: 0.78rem;
-}
-
-.help-btn {
-  min-width: 2rem;
-  font-family: var(--tt-font-mono);
-}
-
-.status {
-  min-width: 5.5rem;
-  padding: 0.25rem 0.6rem;
-  border: 1px solid var(--tt-border);
-  border-radius: 999px;
-  font-size: 0.75rem;
-  text-align: center;
-  color: var(--tt-text-muted);
-}
-
-.status.live::before {
-  --tt-mark: var(--tt-glyph-dot);
-  color: var(--tt-success);
-}
-
-.status.paused::before {
-  --tt-mark: var(--tt-glyph-pause);
-}
-
-.status.complete::before {
-  --tt-mark: var(--tt-glyph-check);
-  color: var(--tt-success);
-}
-
-.status.failed::before {
-  --tt-mark: var(--tt-glyph-close);
-  color: var(--tt-danger);
 }
 </style>

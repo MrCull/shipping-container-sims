@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { planOf } from '../../modules/planModel'
+import { BLEED_M, BOOM_LAND_M, BOOM_SEA_M, SEA_DEPTH_M, shipAtQuay } from '../../modules/planPicture'
 import { t } from '../../i18n/messages'
 import type { ScenarioConfig } from '../../scenario/types'
 
-/** Live 2D plan of the scenario as edited (quay, STS rail, yard blocks, stalls, gate). Scene metres: X along the quay, Z landside. */
+/**
+ * Live top-down plan of the scenario as edited: the sea with an illustrative vessel at the quay, the quay cranes
+ * reaching over it, the yard blocks with their transfer pads and stalls, and the truck gate. The legend carries the
+ * counts. Scene metres: X along the quay, Z landside.
+ */
 const props = defineProps<{ config: ScenarioConfig | null }>()
 
 const plan = computed(() => {
@@ -16,13 +21,15 @@ const plan = computed(() => {
   }
 })
 
-/** Pixels per metre are implied by the viewBox; 1 unit = 1 m. */
+/** Pixels per metre are implied by the viewBox; 1 unit = 1 m. The water above the quay edge is part of the picture. */
 const view = computed(() => {
   const b = plan.value?.bounds
   if (!b) return '0 0 100 100'
   const pad = 20
-  return `${b.x0 - pad} ${b.z0 - pad} ${b.x1 - b.x0 + 2 * pad} ${b.z1 - b.z0 + 2 * pad}`
+  return `${b.x0 - pad} ${-SEA_DEPTH_M} ${b.x1 - b.x0 + 2 * pad} ${b.z1 + pad + SEA_DEPTH_M}`
 })
+
+const ship = computed(() => (plan.value ? shipAtQuay(plan.value.quay.x0, plan.value.quay.x1) : null))
 
 const rect = (r: { x0: number; x1: number; z0: number; z1: number }) => ({ x: r.x0, y: r.z0, width: r.x1 - r.x0, height: r.z1 - r.z0 })
 </script>
@@ -40,9 +47,43 @@ const rect = (r: { x0: number; x1: number; z0: number; z1: number }) => ({ x: r.
       preserveAspectRatio="xMidYMid meet"
     >
       <rect
-        class="sea"
-        v-bind="rect({ x0: plan.bounds.x0 - 20, x1: plan.bounds.x1 + 20, z0: plan.quay.z0, z1: 0 })"
+        class="water"
+        :x="plan.bounds.x0 - BLEED_M"
+        :y="-SEA_DEPTH_M"
+        :width="plan.bounds.x1 - plan.bounds.x0 + 2 * BLEED_M"
+        :height="SEA_DEPTH_M"
       />
+      <rect
+        class="land"
+        :x="plan.bounds.x0 - BLEED_M"
+        y="0"
+        :width="plan.bounds.x1 - plan.bounds.x0 + 2 * BLEED_M"
+        :height="plan.bounds.z1 + 40"
+      />
+      <template v-if="ship">
+        <path
+          class="ship"
+          :d="ship.hull"
+        />
+        <rect
+          v-for="(c, i) in ship.stacks"
+          :key="`c${i}`"
+          class="ship-box"
+          :x="c.x"
+          :y="c.y"
+          :width="c.w"
+          :height="c.h"
+          rx="2"
+        />
+        <rect
+          class="ship-house"
+          :x="ship.house.x"
+          :y="ship.house.y"
+          :width="ship.house.w"
+          :height="ship.house.h"
+          rx="2"
+        />
+      </template>
       <line
         class="quay-edge"
         :x1="plan.quay.x0"
@@ -57,11 +98,18 @@ const rect = (r: { x0: number; x1: number; z0: number; z1: number }) => ({ x: r.
         class="sts"
         :data-testid="`tt-plan-sts-${s.id}`"
       >
+        <line
+          :x1="s.x"
+          :x2="s.x"
+          :y1="-BOOM_SEA_M"
+          :y2="BOOM_LAND_M"
+        />
         <rect
-          :x="s.x - 9"
-          y="-6"
-          width="18"
-          height="12"
+          :x="s.x - 11"
+          y="4"
+          width="22"
+          height="20"
+          rx="3"
         />
       </g>
       <g
@@ -73,6 +121,7 @@ const rect = (r: { x0: number; x1: number; z0: number; z1: number }) => ({ x: r.
         <rect
           class="stacks"
           v-bind="rect(b.stacks)"
+          rx="3"
         />
         <rect
           class="pads"
@@ -107,11 +156,15 @@ const rect = (r: { x0: number; x1: number; z0: number; z1: number }) => ({ x: r.
     >
       {{ t('setup.plan.unavailable') }}
     </p>
-    <figcaption class="legend">
-      <span class="key sea-key" />{{ t('setup.plan.sea') }}
-      <span class="key sts-key" />{{ t('setup.plan.sts') }}
-      <span class="key block-key" />{{ t('setup.plan.blocks') }}
-      <span class="key gate-key" />{{ t('setup.plan.gate') }}
+    <figcaption
+      v-if="plan"
+      class="legend"
+    >
+      <span><span class="key ship-key" />{{ t('setup.sketch.ship') }}</span>
+      <span><span class="key sts-key" />{{ t('setup.sketch.sts', { n: plan.sts.length }) }}</span>
+      <span><span class="key block-key" />{{ t('setup.sketch.blocks', { n: plan.blocks.length }) }}</span>
+      <span><span class="key pad-key" />{{ t('setup.plan.pads') }}</span>
+      <span v-if="plan.gate"><span class="key gate-key" />{{ t('setup.sketch.gate') }}</span>
     </figcaption>
   </figure>
 </template>
@@ -124,19 +177,41 @@ const rect = (r: { x0: number; x1: number; z0: number; z1: number }) => ({ x: r.
 svg {
   display: block;
   width: 100%;
-  height: 12rem;
-  background: var(--tt-bg);
+  height: 17rem;
+  background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
-  border-radius: 6px;
+  border-radius: var(--tt-radius-sm);
 }
 
-.sea {
-  fill: var(--tt-plan-quay);
+.water {
+  fill: var(--tt-plan-water);
+}
+
+.land {
+  fill: var(--tt-plan-land);
+}
+
+.ship {
+  fill: var(--tt-plan-ship);
+}
+
+.ship-box {
+  fill: var(--tt-plan-pad);
+}
+
+.ship-house {
+  fill: var(--tt-plan-land);
 }
 
 .quay-edge {
-  stroke: var(--tt-border-strong);
-  stroke-width: 3;
+  stroke: var(--tt-plan-line);
+  stroke-width: 5;
+}
+
+.sts line {
+  stroke: var(--tt-plan-sts);
+  stroke-width: 6;
+  stroke-linecap: round;
 }
 
 .sts rect {
@@ -169,24 +244,28 @@ svg {
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 0.9rem;
+  gap: 0.25rem 1.1rem;
   align-items: center;
-  margin-top: 0.3rem;
-  font-size: 0.72rem;
+  margin-top: 0.6rem;
+  font-size: var(--tt-text-sm);
   color: var(--tt-text-muted);
 }
 
 .key {
   display: inline-block;
-  width: 0.7rem;
-  height: 0.7rem;
-  margin-right: 0.3rem;
-  border-radius: 2px;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.45rem;
+  border-radius: 3px;
   vertical-align: middle;
 }
 
-.sea-key {
-  background: var(--tt-plan-quay);
+.ship-key {
+  background: var(--tt-plan-ship);
+}
+
+.pad-key {
+  background: var(--tt-plan-pad);
 }
 
 .sts-key {

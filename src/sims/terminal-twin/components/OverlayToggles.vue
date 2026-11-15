@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TtIcon from './ui/TtIcon.vue'
 import ColourByMenu from './ColourByMenu.vue'
 import { useTwinStore } from '../store/twinStore'
 import { useHudStore } from '../store/hudStore'
@@ -39,7 +40,7 @@ function toggle(key: keyof OverlayState): void {
     :aria-expanded="false"
     @click="hud.toggle('overlayBar')"
   >
-    {{ t('overlays.label') }} ▴
+    {{ t('overlays.label') }} <TtIcon name="up" />
   </button>
   <div
     v-else
@@ -57,7 +58,7 @@ function toggle(key: keyof OverlayState): void {
       :aria-expanded="true"
       @click="hud.toggle('overlayBar')"
     >
-      ▾
+      <TtIcon name="down" />
     </button>
     <span class="label">{{ t('overlays.label') }}</span>
     <button
@@ -127,7 +128,11 @@ function toggle(key: keyof OverlayState): void {
 }
 
 .overlays .collapse {
-  min-height: 1.7rem;
+  min-height: 1.9rem;
+  border-color: transparent;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .overlays {
@@ -144,62 +149,72 @@ function toggle(key: keyof OverlayState): void {
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.5rem;
+  gap: 0.3rem;
+  padding: 0.4rem 0.5rem;
   border: 1px solid var(--tt-border);
-  border-radius: 8px;
+  border-radius: calc(var(--tt-radius) + 2px);
   background: var(--tt-panel);
   -webkit-backdrop-filter: var(--tt-blur);
   backdrop-filter: var(--tt-blur);
-  font-size: 0.8rem;
+  box-shadow: var(--tt-shadow);
+  font-size: var(--tt-text-sm);
   color: var(--tt-text);
 }
 
 .label {
-  color: var(--tt-text-muted);
-  font-size: 0.72rem;
+  color: var(--tt-text-faint);
+  font-size: var(--tt-text-xs);
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-right: 0.2rem;
+  letter-spacing: 0.08em;
+  margin: 0 0.3rem 0 0.2rem;
 }
 
 .toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--tt-border);
-  border-radius: 6px;
-  background: var(--tt-bg);
-  color: var(--tt-text);
-  font-size: 0.8rem;
+  gap: 0.4rem;
+  height: 1.9rem;
+  padding: 0 0.65rem;
+  border: 1px solid transparent;
+  border-radius: var(--tt-radius-sm);
+  background: transparent;
+  color: var(--tt-text-muted);
+  font-size: var(--tt-text-sm);
+  font-weight: 500;
+  transition:
+    background 0.12s var(--tt-ease),
+    color 0.12s var(--tt-ease);
 }
 
 .toggle:hover {
-  border-color: var(--tt-accent);
+  background: var(--tt-control-hover);
+  color: var(--tt-text);
 }
 
 .toggle.on {
-  border-color: var(--tt-accent);
+  border-color: var(--tt-accent-line);
   background: var(--tt-accent-soft);
+  color: var(--tt-text);
 }
 
 .sep {
   width: 1px;
   align-self: stretch;
-  background: var(--tt-border);
-  margin: 0 0.2rem;
+  background: var(--tt-hairline);
+  margin: 0.2rem 0.3rem;
 }
 
 .dot {
-  width: 0.55rem;
-  height: 0.55rem;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 50%;
-  border: 1px solid var(--tt-text-muted);
+  border: 1.5px solid var(--tt-text-faint);
 }
 
 .toggle.on .dot {
   background: var(--tt-accent);
   border-color: var(--tt-accent);
+  box-shadow: 0 0 0 3px var(--tt-accent-soft);
 }
 </style>

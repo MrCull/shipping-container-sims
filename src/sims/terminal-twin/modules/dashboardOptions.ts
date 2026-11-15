@@ -12,7 +12,8 @@ import {
   PHASE_PATTERNS,
   SEQUENTIAL_BLUE,
   seriesStyle,
-  SURFACE,
+  chartPalette,
+  type ChartTheme,
   type TimelinePhase,
 } from './dashboardPalette'
 
@@ -23,30 +24,36 @@ export interface ChartFormat {
   value(unit: KpiUnit, v: number): string
 }
 
-/** Chart ink on the light surface (skin.css: --tt-text, a secondary ink that clears AA for axis text, hairline grid). */
-const TEXT = '#14253f'
-const MUTED = '#52514e'
-const GRID = '#e1e0d9'
-
-const textStyle = { color: MUTED, fontFamily: 'inherit' }
-
-const axisCommon = {
-  axisLine: { lineStyle: { color: GRID } },
-  axisTick: { show: false },
-  splitLine: { lineStyle: { color: GRID } },
-}
-
-const tooltipCommon = {
-  backgroundColor: '#fcfcfb',
-  borderColor: '#d3dae6',
-  textStyle: { color: TEXT },
-  confine: true,
+/** The palette of a theme plus the option fragments every chart shares (text, axes, tooltip). */
+function chartInk(theme: ChartTheme) {
+  const pal = chartPalette(theme)
+  const { text: TEXT, muted: MUTED, grid: GRID, surface: SURFACE } = pal
+  return {
+    pal,
+    TEXT,
+    MUTED,
+    GRID,
+    SURFACE,
+    textStyle: { color: MUTED, fontFamily: 'inherit' },
+    axisCommon: {
+      axisLine: { lineStyle: { color: GRID } },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: GRID } },
+    },
+    tooltipCommon: {
+      backgroundColor: pal.tooltipSurface,
+      borderColor: pal.tooltipBorder,
+      textStyle: { color: TEXT },
+      confine: true,
+    },
+  }
 }
 
 /** Marker size for line points (>= 8 px per the dataviz spec, smaller on dense lines). */
 const MARKER_PX = 8
 
-export function lineChartOption(chart: KpiChartData, fmt: ChartFormat): EChartsCoreOption {
+export function lineChartOption(chart: KpiChartData, fmt: ChartFormat, theme: ChartTheme = 'dark'): EChartsCoreOption {
+  const { TEXT, MUTED, GRID, SURFACE, textStyle, axisCommon, tooltipCommon } = chartInk(theme)
   const keep = downsampleEvery(chart.x.length, POINT_BUDGET)
   const x = keep.map((i) => chart.x[i])
   const dense = chart.x.length > 48
@@ -55,7 +62,7 @@ export function lineChartOption(chart: KpiChartData, fmt: ChartFormat): EChartsC
     animation: false,
     aria: { enabled: true },
     textStyle,
-    color: chart.lines.map((_, i) => seriesStyle(i).colour),
+    color: chart.lines.map((_, i) => seriesStyle(i, theme).colour),
     legend: { type: 'scroll', top: 0, textStyle: { color: TEXT }, icon: 'roundRect' },
     grid: { left: 52, right: 20, top: 34, bottom: 62, containLabel: false },
     tooltip: {
@@ -98,7 +105,7 @@ export function lineChartOption(chart: KpiChartData, fmt: ChartFormat): EChartsC
       },
     ],
     series: chart.lines.map((line, i) => {
-      const style = seriesStyle(i)
+      const style = seriesStyle(i, theme)
       return {
         name: line.entity,
         type: 'line',
@@ -118,13 +125,14 @@ export function lineChartOption(chart: KpiChartData, fmt: ChartFormat): EChartsC
 
 // ------------------------------------------------------------------ heatmap
 
-export function heatmapOption(heat: YardHeatmap, fmt: ChartFormat): EChartsCoreOption {
+export function heatmapOption(heat: YardHeatmap, fmt: ChartFormat, theme: ChartTheme = 'dark'): EChartsCoreOption {
+  const { pal, TEXT, MUTED, SURFACE, textStyle, axisCommon, tooltipCommon } = chartInk(theme)
   const data: { value: [number, number, number | null]; label: { color: string } }[] = []
   heat.blocks.forEach((b, row) => {
     heat.values[b].forEach((v, col) => {
       const value = v === null ? null : Math.round(v * 10) / 10
       // dark text on the light steps, light text on the dark ones
-      data.push({ value: [col, row, value], label: { color: value !== null && value >= 50 ? '#ffffff' : '#0b0b0b' } })
+      data.push({ value: [col, row, value], label: { color: value !== null && value >= 50 ? pal.onDarkStep : '#0b0b0b' } })
     })
   })
   return {
@@ -237,7 +245,8 @@ export function bayRange(bays: readonly number[]): string {
   return sorted.length === 1 ? String(sorted[0]) : `${sorted[0]}–${sorted[sorted.length - 1]}`
 }
 
-export function ganttOption(model: GanttModel, fmt: ChartFormat): EChartsCoreOption {
+export function ganttOption(model: GanttModel, fmt: ChartFormat, theme: ChartTheme = 'dark'): EChartsCoreOption {
+  const { pal, TEXT, MUTED, GRID, SURFACE, textStyle, axisCommon, tooltipCommon } = chartInk(theme)
   const phaseName = (p: TimelinePhase) => t(PHASE_LABELS[p])
   return {
     backgroundColor: SURFACE,
@@ -281,7 +290,7 @@ export function ganttOption(model: GanttModel, fmt: ChartFormat): EChartsCoreOpt
       name: phaseName(phase),
       type: 'custom',
       encode: { x: [1, 2], y: 0 },
-      itemStyle: { color: PHASE_COLOURS[phase], borderColor: SURFACE, borderWidth: 1 },
+      itemStyle: { color: pal.phases[phase], borderColor: SURFACE, borderWidth: 1 },
       renderItem: (_params: unknown, api: GanttApi) => {
         const row = api.value(0) as number
         const start = api.coord([api.value(1), row])
@@ -292,7 +301,7 @@ export function ganttOption(model: GanttModel, fmt: ChartFormat): EChartsCoreOpt
         return {
           type: 'group',
           children: [
-            { type: 'rect', shape, style: { fill: PHASE_COLOURS[phase], stroke: SURFACE, lineWidth: 1 } },
+            { type: 'rect', shape, style: { fill: pal.phases[phase], stroke: SURFACE, lineWidth: 1 } },
             // texture on top of the colour: the phase is never conveyed by colour alone
             ...(pattern ? [{ type: 'rect', shape, style: { fill: pattern }, silent: true }] : []),
           ],

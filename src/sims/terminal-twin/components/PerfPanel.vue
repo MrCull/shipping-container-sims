@@ -149,15 +149,17 @@ const bench = useFrameBenchmark()
   display: flex;
   align-items: center;
   gap: 0.25rem 0.5rem;
-  padding: 0.2rem 0.5rem;
+  padding: 0.25rem 0.6rem;
   border: 1px solid var(--tt-border);
-  border-radius: 6px;
-  background: var(--tt-bg);
+  border-radius: var(--tt-radius-sm);
+  background: var(--tt-surface-sunken);
+  font-family: var(--tt-font-mono);
+  font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
 }
 
 .k {
-  color: var(--tt-text-muted);
+  color: var(--tt-text-faint);
 }
 
 .v {
@@ -166,10 +168,11 @@ const bench = useFrameBenchmark()
 }
 
 .label {
-  color: var(--tt-text-muted);
-  font-size: 0.7rem;
+  color: var(--tt-text-faint);
+  font-size: var(--tt-text-xs);
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
 }
 
 .progress {
@@ -179,25 +182,46 @@ const bench = useFrameBenchmark()
 
 .seg {
   display: inline-flex;
-  gap: 0.2rem;
+  gap: 1px;
+  padding: 2px;
+  background: var(--tt-surface-sunken);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius-sm);
 }
 
 .opt {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--tt-border);
-  border-radius: 6px;
-  background: var(--tt-bg);
-  color: var(--tt-text);
+  display: inline-flex;
+  align-items: center;
+  height: 1.7rem;
+  padding: 0 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--tt-text-muted);
   font-size: 0.76rem;
+  font-weight: 500;
+  transition:
+    background 0.12s var(--tt-ease),
+    color 0.12s var(--tt-ease);
 }
 
 .opt:hover {
-  border-color: var(--tt-accent);
+  background: var(--tt-control-hover);
+  color: var(--tt-text);
+}
+
+.opt.stats {
+  height: 2rem;
+  background: var(--tt-control);
+  border-color: var(--tt-hairline);
+  border-radius: var(--tt-radius-sm);
+  color: var(--tt-text);
 }
 
 .opt.on {
-  border-color: var(--tt-accent);
+  border-color: var(--tt-accent-line);
   background: var(--tt-accent-soft);
+  color: var(--tt-text);
 }
 
 /* State by shape as well as colour. */
@@ -209,6 +233,7 @@ const bench = useFrameBenchmark()
   height: 0.9em;
   margin-right: 0.3em;
   vertical-align: -0.12em;
+  color: var(--tt-accent);
   background: currentColor;
   -webkit-mask: var(--tt-mark) center / contain no-repeat;
   mask: var(--tt-mark) center / contain no-repeat;

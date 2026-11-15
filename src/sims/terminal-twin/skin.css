@@ -1,61 +1,74 @@
 /*
- * Terminal Twin skin (#122): the one place that holds the sim's colours, fonts, radii and shadows.
- * Light, professional: off-white frosted panels over the 3D view, navy text, thin grey borders, TTI crane blue as the
- * single accent, amber and red only for warnings and alerts, Inter type, outline icons.
+ * Terminal Twin skin (#122, dark "control room" pass): the one place that holds the sim's colours, fonts, radii and
+ * shadows. Dark glass panels over the 3D view, cool white text, hairline borders, one bright signal-blue accent,
+ * amber and red only for warnings and alerts, Inter type with tabular mono figures, outline icons.
  *
  * Scoped to `.terminal-twin` (and `.tt-skin` for the FPS chip, which is teleported into the shared page header), so the
- * other sims keep the global dark tokens of `src/assets/main.css`. Components use `--tt-*` only (tests/skin.test.ts).
+ * other sims keep the global tokens of `src/assets/main.css`. Components use `--tt-*` only (tests/skin.test.ts).
  * Every text token is checked against the panel on light and dark backdrops for WCAG AA (4.5:1) in the same test.
  */
+/* @theme dark */
 .terminal-twin,
 .tt-skin,
 body:has(.terminal-twin) {
   /* Type */
   --tt-font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --tt-font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --tt-text-xs: 0.6875rem;
+  --tt-text-sm: 0.8125rem;
+  --tt-text-md: 0.875rem;
+  --tt-text-lg: 1.0625rem;
 
   /* Ink */
-  --tt-text: #14253f;
-  --tt-text-muted: #46556f;
-  --tt-on-accent: #ffffff;
+  --tt-text: #e9eef6;
+  --tt-text-muted: #a3b0c4;
+  --tt-text-faint: #7f8da3;
+  --tt-on-accent: #06121f;
 
-  /* Surfaces: page, opaque card, frosted panel (translucent, blurred over the scene), scrim behind dialogs */
-  --tt-bg: #eef2f7;
-  --tt-surface: #fafbfd;
-  --tt-surface-hover: #e9eff7;
-  --tt-surface-sunken: #f0f3f8;
-  --tt-panel: rgba(250, 251, 253, 0.88);
-  --tt-panel-strong: rgba(250, 251, 253, 0.96);
-  --tt-blur: blur(10px) saturate(1.1);
-  --tt-scrim: rgba(20, 37, 63, 0.38);
-  --tt-chart-surface: #fcfcfb;
-  --tt-border: #d3dae6;
-  --tt-border-strong: #aebad0;
+  /* Surfaces: page, opaque card, raised control, glass panel (translucent, blurred over the scene), scrim behind dialogs */
+  --tt-bg: #0a0f17;
+  --tt-surface: #121a26;
+  --tt-surface-hover: #1b2636;
+  --tt-surface-sunken: #0d131d;
+  --tt-surface-raised: #182231;
+  --tt-control: rgba(255, 255, 255, 0.05);
+  --tt-control-hover: rgba(255, 255, 255, 0.1);
+  --tt-panel: rgba(14, 20, 30, 0.86);
+  --tt-panel-strong: rgba(14, 20, 30, 0.95);
+  --tt-blur: blur(18px) saturate(1.4);
+  --tt-scrim: rgba(4, 8, 14, 0.62);
+  --tt-chart-surface: #1a1a19;
+  --tt-border: #26334a;
+  --tt-border-strong: #3d4d68;
+  --tt-hairline: rgba(255, 255, 255, 0.08);
 
-  /* Accent: TTI crane blue */
-  --tt-accent: #0b5cad;
-  --tt-accent-hover: #084a8c;
-  --tt-accent-soft: rgba(11, 92, 173, 0.1);
-  --tt-focus: rgba(11, 92, 173, 0.35);
+  /* Accent: signal blue */
+  --tt-accent: #5eb0ff;
+  --tt-accent-hover: #86c4ff;
+  --tt-accent-soft: rgba(94, 176, 255, 0.14);
+  --tt-accent-line: rgba(94, 176, 255, 0.45);
+  --tt-focus: rgba(94, 176, 255, 0.4);
+  --tt-glow: 0 0 0 1px rgba(94, 176, 255, 0.35), 0 8px 28px rgba(40, 130, 255, 0.28);
 
   /* Status: amber for warnings, red for alerts, green for done */
-  --tt-warn: #8a4a05;
-  --tt-warn-bg: #fdf0d4;
-  --tt-warn-border: #d99a2b;
-  --tt-danger: #b01e1e;
-  --tt-danger-bg: #fde4e4;
-  --tt-danger-border: #d95757;
-  --tt-success: #17653a;
-  --tt-success-bg: #dff3e6;
-  --tt-success-border: #3fa56a;
+  --tt-warn: #f2b84b;
+  --tt-warn-bg: #3b2a0a;
+  --tt-warn-border: #8a6416;
+  --tt-danger: #ff8585;
+  --tt-danger-bg: #401a1d;
+  --tt-danger-border: #a03a3f;
+  --tt-success: #5fd896;
+  --tt-success-bg: #10301f;
+  --tt-success-border: #2c7a4f;
 
   /* Shape and depth */
-  --tt-radius-sm: 6px;
+  --tt-radius-sm: 7px;
   --tt-radius: 10px;
-  --tt-radius-lg: 14px;
-  --tt-shadow: 0 6px 20px rgba(20, 37, 63, 0.16);
-  --tt-shadow-lg: 0 18px 50px rgba(20, 37, 63, 0.28);
+  --tt-radius-lg: 16px;
+  --tt-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --tt-shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.6);
   --tt-ring: 0 0 0 3px var(--tt-focus);
+  --tt-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --tt-space-1: 0.25rem;
   --tt-space-2: 0.5rem;
   --tt-space-3: 0.75rem;
@@ -87,14 +100,17 @@ body:has(.terminal-twin) {
   --tt-length-0: #8ec9f2;
   --tt-length-1: #c5aef0;
   --tt-length-2: #f2aacb;
-  --tt-plan-quay: #1c3a5a;
+  --tt-plan-quay: #3f6b99;
   --tt-plan-sts: #e7b84a;
   --tt-plan-block: #4f7cac;
   --tt-plan-gate: #c0584a;
-  --tt-plan-line: #6b7280;
+  --tt-plan-line: #8a96a8;
   --tt-plan-pad: #86b6e0;
-  --tt-plan-lane: #cfd6df;
-  --tt-hatch: rgba(20, 37, 63, 0.35);
+  --tt-plan-lane: #46546a;
+  --tt-plan-water: #163a5c;
+  --tt-plan-land: #222d3d;
+  --tt-plan-ship: #a9b8cc;
+  --tt-hatch: rgba(10, 16, 26, 0.45);
   --tt-white-line: rgba(255, 255, 255, 0.9);
 
   /* State glyphs for ::before marks (state by shape as well as colour), drawn as masks so they take the text colour. */
@@ -120,7 +136,68 @@ body:has(.terminal-twin) {
 
   font-family: var(--tt-font);
   color: var(--tt-text);
+  color-scheme: dark;
 }
+
+/* @theme light */
+/*
+ * Light theme (store/themeStore.ts sets `data-tt-theme` on <html> while the sim is mounted): the same token names
+ * with light values. Only colours, blur and shadows change; type, shape and the data colours are shared.
+ */
+html[data-tt-theme='light'] .terminal-twin,
+html[data-tt-theme='light'] .tt-skin,
+html[data-tt-theme='light'] body:has(.terminal-twin) {
+  --tt-text: #14253f;
+  --tt-text-muted: #46556f;
+  --tt-text-faint: #5b6a84;
+  --tt-on-accent: #ffffff;
+
+  --tt-bg: #e9eef5;
+  --tt-surface: #f6f8fb;
+  --tt-surface-hover: #e6edf6;
+  --tt-surface-sunken: #eceff5;
+  --tt-surface-raised: #ffffff;
+  --tt-control: rgba(20, 37, 63, 0.04);
+  --tt-control-hover: rgba(20, 37, 63, 0.09);
+  --tt-panel: rgba(250, 251, 253, 0.88);
+  --tt-panel-strong: rgba(250, 251, 253, 0.96);
+  --tt-blur: blur(14px) saturate(1.2);
+  --tt-scrim: rgba(20, 37, 63, 0.38);
+  --tt-chart-surface: #fcfcfb;
+  --tt-border: #d3dae6;
+  --tt-border-strong: #aebad0;
+  --tt-hairline: rgba(20, 37, 63, 0.1);
+
+  --tt-accent: #0b5cad;
+  --tt-accent-hover: #084a8c;
+  --tt-accent-soft: rgba(11, 92, 173, 0.1);
+  --tt-accent-line: rgba(11, 92, 173, 0.4);
+  --tt-focus: rgba(11, 92, 173, 0.35);
+  --tt-glow: 0 0 0 1px rgba(11, 92, 173, 0.25), 0 6px 20px rgba(11, 92, 173, 0.22);
+
+  --tt-warn: #8a4a05;
+  --tt-warn-bg: #fdf0d4;
+  --tt-warn-border: #d99a2b;
+  --tt-danger: #b01e1e;
+  --tt-danger-bg: #fde4e4;
+  --tt-danger-border: #d95757;
+  --tt-success: #17653a;
+  --tt-success-bg: #dff3e6;
+  --tt-success-border: #3fa56a;
+
+  --tt-shadow: 0 6px 20px rgba(20, 37, 63, 0.16);
+  --tt-shadow-lg: 0 18px 50px rgba(20, 37, 63, 0.28);
+
+  --tt-plan-quay: #1c3a5a;
+  --tt-plan-line: #6b7280;
+  --tt-plan-lane: #cfd6df;
+  --tt-plan-water: #c3dcf2;
+  --tt-plan-land: #e3e7ee;
+  --tt-plan-ship: #5a6b84;
+
+  color-scheme: light;
+}
+/* @theme end */
 
 /*
  * The shared volume popover (src/components/AudioControls.vue) is teleported to <body>, outside `.terminal-twin`, so it
@@ -163,27 +240,50 @@ body:has(.terminal-twin) {
 
 .terminal-twin :focus-visible {
   outline: 2px solid var(--tt-accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 /* HUD collapse / expand button (store/hudStore.ts): a small frosted pill, big enough to tap on a phone. */
 .terminal-twin .hud-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
   min-width: 2.2rem;
   min-height: 2rem;
-  padding: 0.25rem 0.6rem;
+  padding: 0.25rem 0.65rem;
   border: 1px solid var(--tt-border);
   border-radius: 999px;
   background: var(--tt-panel);
   -webkit-backdrop-filter: var(--tt-blur);
   backdrop-filter: var(--tt-blur);
-  color: var(--tt-text);
+  color: var(--tt-text-muted);
   font-family: var(--tt-font);
   font-size: 0.78rem;
+  font-weight: 550;
   line-height: 1;
   cursor: pointer;
   pointer-events: auto;
+  transition:
+    color 0.12s var(--tt-ease),
+    border-color 0.12s var(--tt-ease);
 }
 
 .terminal-twin .hud-pill:hover {
-  border-color: var(--tt-accent);
+  border-color: var(--tt-border-strong);
+  color: var(--tt-text);
+}
+
+/* Thin, quiet scrollbars on the dark panels. */
+.terminal-twin * {
+  scrollbar-color: var(--tt-border-strong) transparent;
+}
+
+.terminal-twin button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.terminal-twin button:disabled {
+  cursor: default;
 }

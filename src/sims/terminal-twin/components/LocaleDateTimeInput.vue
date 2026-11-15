@@ -91,14 +91,27 @@ function commit(): void {
 
 <style scoped>
 .locale-datetime {
-  padding: 0.45rem 0.6rem;
-  background: var(--tt-bg);
+  height: 2.25rem;
+  padding: 0 0.7rem;
+  background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
-  border-radius: 6px;
+  border-radius: var(--tt-radius-sm);
   color: var(--tt-text);
   font-family: var(--tt-font-mono);
+  font-size: var(--tt-text-sm);
+  font-variant-numeric: tabular-nums;
   min-width: 0;
   width: 100%;
+}
+
+.locale-datetime:hover {
+  border-color: var(--tt-border-strong);
+}
+
+.locale-datetime:focus-visible {
+  outline: none;
+  border-color: var(--tt-accent);
+  box-shadow: var(--tt-ring);
 }
 
 .locale-datetime[aria-invalid='true'] {

@@ -207,10 +207,25 @@ dashboard (`dashboardOpen/Tab/Data/Group/Bucketing/Rendered`), KPIs (`kpi`, `fin
 ## Skin and landing page
 
 - Tokens: `skin.css` (imported unscoped by `TerminalTwin.vue`) defines every colour, font, radius and shadow as
-  `--tt-*` on `.terminal-twin` and `.tt-skin` (the FPS chip carries it in the shared header). Light frosted panels
-  (`--tt-panel` + `--tt-blur`), navy text, TTI crane blue accent `--tt-accent`, `--tt-warn` and `--tt-danger` only for
-  warnings and alerts, Inter (`--tt-font`, `--tt-font-mono`). Global `--color-*` tokens are remapped inside the scope,
-  so other sims keep the dark look. `AudioControls.vue` (teleported to body) reads `--audio-popover-*`, set by
+  `--tt-*` on `.terminal-twin` and `.tt-skin` (the FPS chip carries it in the shared header). Dark "control room" glass:
+  dark translucent panels (`--tt-panel` + `--tt-blur`), cool white text, hairline borders (`--tt-hairline`), one
+  signal-blue accent `--tt-accent` (dark text on it: `--tt-on-accent`), `--tt-warn` and `--tt-danger` only for
+  warnings and alerts, Inter (`--tt-font`, `--tt-font-mono`). Control surfaces: `--tt-control` (a button at rest),
+  `--tt-surface-sunken` (inputs, segmented-control wells), `--tt-surface-raised` (cards). Global `--color-*` tokens are
+  remapped inside the scope, so other sims keep their own look.
+- Themes: dark is the default; `store/themeStore.ts` (`theme`, `toggle()`, localStorage `terminal-twin.theme`) puts
+  `data-tt-theme` on `<html>` while the sim is mounted (`TerminalTwin.vue`; removed on unmount), and the
+  `/* @theme light */` block of `skin.css` overrides the colour tokens under `html[data-tt-theme='light']`. Toggles:
+  `tt-theme-toggle` (top bar settings) and `tt-setup-theme-toggle` (setup dialog rail). A new colour token needs a
+  value in both blocks; `tests/skin.test.ts` runs the WCAG checks on both. Anything drawn outside CSS must follow
+  the theme itself: charts take it as a parameter (`chartPalette(theme)`), `vesselCountdownLabels.ts` re-reads its
+  tokens when the attribute changes.
+- Patterns, repeated per component in scoped styles (no shared component yet): a segmented control is a sunken well
+  with borderless options and the chosen one on `--tt-accent-soft` with an `--tt-accent-line` border (speeds, ROB,
+  Quality, dashboard tabs, picker lists); a button is `--tt-control` with a hairline border, 2 to 2.6 rem high; the one
+  primary action of a surface is a filled `--tt-accent` button (Start, Save, Run). The setup dialog is a rail (title
+  and tabs, a column) beside the open tab on a wide screen and stacks below 900 px; its sections are cards.
+  Icons: `components/ui/TtIcon.vue` (outline, 24 grid). `AudioControls.vue` (teleported to body) reads `--audio-popover-*`, set by
   `skin.css` on `body:has(.terminal-twin)`.
 - Rules (`tests/skin.test.ts`): components never write hex or `rgb()`, a literal `font-family`, or a global
   `--color-*`/`--font-*` in styles; they use `--tt-*`. WCAG AA 4.5:1 for text, accent, warn, danger and success on the
@@ -258,8 +273,10 @@ under the KPI strip), not a region.
 - Charts: one line per entity, at most `MAX_SERIES` 8 (rest counted "N more not shown"), `sampling: 'lttb'`, inside and
   slider zoom, an HTML "Table view" of run totals per chart. Heatmap: block x hour of `yard.fill-pct`, one-hue blue
   ramp 0 to 100 %, plus a live "now" fill per block. Gantt: custom series per phase with an HTML legend.
-- Palette: `SERIES_COLOURS` are the dataviz skill's light categorical steps validated on `#fcfcfb`
-  (`validate_palette.js --mode light`: worst adjacent CVD dE 9.1); do not reorder or recolour without re-running it.
+- Palette: one validated set per theme, `chartPalette(theme)` in `modules/dashboardPalette.ts`. Dark:
+  `SERIES_COLOURS` on `#1a1a19` (`validate_palette.js --mode dark`). Light: `LIGHT_SERIES_COLOURS` on `#fcfcfb`
+  (`--mode light`). Each surface is that theme's `--tt-chart-surface`; do not reorder or recolour without re-running
+  the validator. The option builders in `dashboardOptions.ts` take the theme as their last argument.
   Gantt phases use the first five slots. Never colour alone: `SERIES_SYMBOLS`, `SERIES_DASHES`, legends, Gantt
   textures (`PHASE_PATTERNS`), heatmap values printed. Charts are `role="img"` with `aria-label`.
 - Catalogue: all `dashboard.*` keys; a KPI title is `dashboard.kpi.<id>` (`kpiLabelKey`). A new `KPI_DEFS` row fails

@@ -371,32 +371,38 @@ function generate(): void {
 }
 
 .table-wrap {
-  max-height: 14rem;
+  max-height: min(24rem, 46vh);
   overflow: auto;
+  background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
-  border-radius: 8px;
+  border-radius: var(--tt-radius-sm);
+  scrollbar-width: thin;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-size: var(--tt-text-sm);
 }
 
 th {
   position: sticky;
   top: 0;
-  background: var(--tt-surface-hover);
+  z-index: 1;
+  background: var(--tt-surface);
+  box-shadow: inset 0 -1px 0 var(--tt-border);
   color: var(--tt-text-muted);
+  font-size: var(--tt-text-xs);
   font-weight: 600;
   text-align: left;
-  padding: 0.35rem 0.4rem;
-  white-space: nowrap;
+  padding: 0.6rem 0.35rem;
+  line-height: 1.3;
+  vertical-align: bottom;
 }
 
 td {
-  padding: 0.25rem 0.4rem;
-  border-top: 1px solid var(--tt-border);
+  padding: 0.45rem 0.35rem;
+  border-top: 1px solid var(--tt-hairline);
   vertical-align: middle;
 }
 
@@ -408,24 +414,66 @@ td {
 .name {
   color: var(--tt-text-muted);
   font-size: 0.72rem;
-  white-space: nowrap;
+  line-height: 1.25;
+}
+
+th:first-child {
+  width: 7rem;
 }
 
 input,
 select {
-  padding: 0.3rem 0.4rem;
-  background: var(--tt-bg);
+  height: 2rem;
+  padding: 0 0.5rem;
+  background: var(--tt-surface);
   border: 1px solid var(--tt-border);
-  border-radius: 5px;
+  border-radius: 6px;
   color: var(--tt-text);
   font-family: var(--tt-font-mono);
   font-size: 0.78rem;
-  color-scheme: dark;
+  font-variant-numeric: tabular-nums;
   min-width: 0;
 }
 
+input:hover,
+select:hover {
+  border-color: var(--tt-border-strong);
+}
+
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--tt-accent);
+  box-shadow: var(--tt-ring);
+}
+
 td input[type='number'] {
-  width: 3.8rem;
+  width: 3.4rem;
+  padding: 0 0.4rem;
+}
+
+td select {
+  width: 10rem;
+  font-family: var(--tt-font);
+}
+
+th:first-child,
+td:first-child {
+  padding-left: 0.8rem;
+}
+
+/* Arrival (a date and time) and the mix need their width; the name column takes what is left. */
+th:nth-child(2) {
+  min-width: 12rem;
+}
+
+/* The mix header is a sentence: it wraps over the narrow column. */
+th:nth-last-child(2) {
+  width: 5.6rem;
+}
+
+td:nth-last-child(2) {
+  white-space: nowrap;
 }
 
 .icon {
@@ -449,22 +497,26 @@ td input[type='number'] {
 
 .btn {
   align-self: flex-start;
-  padding: 0.35rem 0.75rem;
-  background: var(--tt-bg);
+  height: 2.1rem;
+  padding: 0 0.85rem;
+  background: var(--tt-control);
   border: 1px solid var(--tt-border);
-  border-radius: 6px;
+  border-radius: var(--tt-radius-sm);
   color: var(--tt-text);
-  font-size: 0.8rem;
+  font-size: var(--tt-text-sm);
+  font-weight: 550;
 }
 
 .btn:hover {
-  border-color: var(--tt-accent);
+  background: var(--tt-control-hover);
+  border-color: var(--tt-border-strong);
 }
 
 .generator {
-  border: 1px dashed var(--tt-border);
-  border-radius: 8px;
-  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--tt-hairline);
+  border-radius: var(--tt-radius-sm);
+  background: var(--tt-control);
+  padding: 0.6rem 0.8rem;
 }
 
 .generator summary {
@@ -494,9 +546,8 @@ td input[type='number'] {
 
 .mix legend {
   color: var(--tt-text-muted);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: var(--tt-text-sm);
+  font-weight: 600;
 }
 
 .gen-grid label,
