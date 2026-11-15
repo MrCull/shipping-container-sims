@@ -32,8 +32,8 @@ Rules that must keep holding:
 | # | Stage | State |
 |---|-------|-------|
 | 1 | Dark tokens in `skin.css` (whole sim restyled through tokens) | done |
-| 2 | Setup dialog: layout, navigation, scenario picker, form fields | next |
-| 3 | Top bar: clock, transport, actions, settings | todo |
+| 2 | Setup dialog: rail layout, scenario cards, detail pane, form fields, vessel table | done (not yet run through verify or smoke) |
+| 3 | Top bar: clock, transport, actions, settings | next |
 | 4 | HUD: KPI strip, overlay bar, colour-by menu, events and inspector panels | todo |
 | 5 | Modals: saves, shortcut help, final report, dashboard chrome | todo |
 | 6 | Docs (`terminal-twin-AGENTS.md`, `docs/browser-host.md` skin section), `pnpm run verify`, smoke suite | todo |

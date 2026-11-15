@@ -124,10 +124,11 @@ const rect = (r: { x0: number; x1: number; z0: number; z1: number }) => ({ x: r.
 svg {
   display: block;
   width: 100%;
-  height: 12rem;
-  background: var(--tt-bg);
+  height: 13rem;
+  padding: 0.75rem;
+  background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
-  border-radius: 6px;
+  border-radius: var(--tt-radius-sm);
 }
 
 .sea {
@@ -169,10 +170,10 @@ svg {
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 0.9rem;
+  gap: 0.25rem 1.1rem;
   align-items: center;
-  margin-top: 0.3rem;
-  font-size: 0.72rem;
+  margin-top: 0.6rem;
+  font-size: var(--tt-text-xs);
   color: var(--tt-text-muted);
 }
 
@@ -180,8 +181,8 @@ svg {
   display: inline-block;
   width: 0.7rem;
   height: 0.7rem;
-  margin-right: 0.3rem;
-  border-radius: 2px;
+  margin-right: 0.4rem;
+  border-radius: 3px;
   vertical-align: middle;
 }
 

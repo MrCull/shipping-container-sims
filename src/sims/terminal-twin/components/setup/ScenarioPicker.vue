@@ -63,10 +63,10 @@ function openTab(next: PickerSection): void {
         {{ t('setup.tab.benches') }}
         <small data-testid="tt-count-benches">{{ model.benchCount }}</small>
       </button>
+      <p class="hint">
+        {{ tab === 'scenarios' ? t('setup.tab.scenariosHint') : t('setup.tab.benchesHint') }}
+      </p>
     </div>
-    <p class="hint">
-      {{ tab === 'scenarios' ? t('setup.tab.scenariosHint') : t('setup.tab.benchesHint') }}
-    </p>
 
     <div class="split">
       <div
@@ -90,7 +90,14 @@ function openTab(next: PickerSection): void {
             @keydown.enter.prevent="select(item)"
             @keydown.space.prevent="select(item)"
           >
-            {{ item.name }}
+            <span class="dot" />
+            <span class="row-text">
+              <span class="row-name">{{ item.name }}</span>
+              <span
+                v-if="item.summary"
+                class="row-sum"
+              >{{ item.summary }}</span>
+            </span>
           </div>
         </template>
         <template v-else>
@@ -115,7 +122,14 @@ function openTab(next: PickerSection): void {
               @keydown.enter.prevent="select(item)"
               @keydown.space.prevent="select(item)"
             >
-              {{ item.name }}
+              <span class="dot" />
+              <span class="row-text">
+                <span class="row-name">{{ item.name }}</span>
+                <span
+                  v-if="item.summary"
+                  class="row-sum"
+                >{{ item.summary }}</span>
+              </span>
             </div>
           </section>
         </template>
@@ -131,24 +145,39 @@ function openTab(next: PickerSection): void {
 .picker {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 1rem;
 }
 
+/* The two lists: a segmented control, with what the open list holds beside it. */
 .tabs {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 0.25rem;
-  border-bottom: 1px solid var(--tt-border);
 }
 
 .tab {
-  padding: 0.6rem 1rem;
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.25rem;
+  padding: 0 0.9rem;
+  background: var(--tt-control);
+  border: 1px solid var(--tt-border);
   color: var(--tt-text-muted);
   font: inherit;
-  font-weight: 600;
+  font-size: var(--tt-text-md);
+  font-weight: 550;
   cursor: pointer;
+}
+
+.tab:first-child {
+  border-radius: var(--tt-radius-sm) 0 0 var(--tt-radius-sm);
+}
+
+.tab:nth-child(2) {
+  margin-left: calc(-0.25rem - 1px);
+  border-radius: 0 var(--tt-radius-sm) var(--tt-radius-sm) 0;
 }
 
 .tab:hover {
@@ -158,25 +187,38 @@ function openTab(next: PickerSection): void {
 .tab:focus-visible {
   outline: none;
   box-shadow: var(--tt-ring);
+  position: relative;
 }
 
 .tab.on {
-  color: var(--tt-accent);
-  border-bottom-color: var(--tt-accent);
+  position: relative;
+  background: var(--tt-accent-soft);
+  border-color: var(--tt-accent-line);
+  color: var(--tt-text);
 }
 
 .tab small {
-  margin-left: 0.3rem;
-  padding: 0 0.45rem;
-  background: var(--tt-surface-sunken);
+  padding: 0.05rem 0.45rem;
+  background: var(--tt-control-hover);
   border-radius: 999px;
-  font-size: 0.78rem;
+  color: var(--tt-text-muted);
+  font-family: var(--tt-font-mono);
+  font-size: var(--tt-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tab.on small {
+  color: var(--tt-accent);
+}
+
+.tabs .hint {
+  margin-left: 0.75rem;
 }
 
 .split {
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  gap: 1.25rem;
   align-items: start;
 }
 
@@ -207,10 +249,14 @@ function openTab(next: PickerSection): void {
 }
 
 .list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   overflow: auto;
-  background: var(--tt-surface);
-  border: 1px solid var(--tt-border);
-  border-radius: var(--tt-radius);
+  /* room for the focus ring and the selected row's outline */
+  padding: 3px;
+  margin: -3px;
+  scrollbar-width: thin;
 }
 
 @media (max-width: 760px) {
@@ -219,42 +265,90 @@ function openTab(next: PickerSection): void {
   }
 }
 
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.group + .group {
+  margin-top: 0.6rem;
+}
+
 .group h4 {
   position: sticky;
-  top: 0;
+  top: -3px;
+  z-index: 1;
   margin: 0;
-  padding: 0.5rem 0.8rem 0.3rem;
-  background: var(--tt-surface-sunken);
-  border-bottom: 1px solid var(--tt-border);
-  color: var(--tt-text-muted);
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
+  padding: 0.4rem 0.2rem;
+  background: var(--tt-surface);
+  color: var(--tt-text-faint);
+  font-size: var(--tt-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .row-item {
-  padding: 0.6rem 0.8rem;
-  border-bottom: 1px solid var(--tt-border);
-  font-size: 0.92rem;
-  font-weight: 600;
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  background: var(--tt-surface-raised);
+  border: 1px solid var(--tt-hairline);
+  border-radius: var(--tt-radius);
   cursor: pointer;
-}
-
-.row-item:last-child {
-  border-bottom: none;
+  transition:
+    background 0.12s var(--tt-ease),
+    border-color 0.12s var(--tt-ease);
 }
 
 .row-item:hover {
   background: var(--tt-surface-hover);
+  border-color: var(--tt-border-strong);
 }
 
 .row-item:focus-visible {
   outline: none;
-  box-shadow: inset var(--tt-ring);
+  box-shadow: var(--tt-ring);
 }
 
 .row-item.active {
   background: var(--tt-accent-soft);
-  box-shadow: inset 3px 0 0 var(--tt-accent);
+  border-color: var(--tt-accent);
+}
+
+/* The radio mark: a ring, filled when chosen. */
+.dot {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.12rem;
+  border: 1.5px solid var(--tt-border-strong);
+  border-radius: 50%;
+}
+
+.row-item.active .dot {
+  border: 0.3rem solid var(--tt-accent);
+}
+
+.row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.row-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.row-sum {
+  color: var(--tt-text-muted);
+  font-size: var(--tt-text-sm);
+  line-height: 1.4;
 }
 </style>

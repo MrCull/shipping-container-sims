@@ -28,8 +28,9 @@ import heroImage from '../../assets/home-card.png?url'
 
 /**
  * Shell of the setup dialog: owns the draft (`useSetupDraft`) and composes one component per section into four tabs
- * (#161): Scenario (picker and detail), Vessels, Yard and equipment, Advanced. Only the tab body scrolls; a footer
- * pinned to the bottom holds the selected scenario's plain name, Cancel and Start. Each section exports its own
+ * (#161): Scenario (picker and detail), Vessels, Yard and equipment, Advanced. On a wide screen the title and the
+ * tabs are a rail down the left side and the open tab fills the rest; on a narrow one they stack. Only the tab body
+ * scrolls; a footer pinned to the bottom holds the selected scenario's plain name, Cancel and Start. Each section exports its own
  * validation message (`../setup/*Validation.ts`); `modules/setupTabs.ts` places every problem on the tab that holds
  * its field, where it is listed, and marks that tab.
  */
@@ -39,6 +40,13 @@ const form = ref<HTMLFormElement | null>(null)
 const tab = ref<SetupTab>('scenario')
 /** The tab holding the input the browser rejected (min, max, required) on the last Start, until every input is valid again. */
 const invalidInputTab = ref<SetupTab | null>(null)
+
+const TAB_ICONS: Record<SetupTab, 'target' | 'ship' | 'grid' | 'sliders'> = {
+  scenario: 'target',
+  vessels: 'ship',
+  yard: 'grid',
+  advanced: 'sliders',
+}
 
 const TAB_LABELS: Record<SetupTab, MessageKey> = {
   scenario: 'setup.section.scenario',
@@ -114,9 +122,9 @@ async function submit(): Promise<void> {
     .catch(() => {})
 }
 
-/** Left and right arrows move between the tabs (WAI-ARIA tabs pattern). */
+/** Arrow keys move between the tabs (WAI-ARIA tabs pattern; the tabs are a column on a wide screen, a row on a phone). */
 function onTabKey(e: KeyboardEvent, id: SetupTab): void {
-  const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+  const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0
   if (!step) return
   e.preventDefault()
   const next = SETUP_TABS[(SETUP_TABS.indexOf(id) + step + SETUP_TABS.length) % SETUP_TABS.length]
@@ -126,7 +134,10 @@ function onTabKey(e: KeyboardEvent, id: SetupTab): void {
 </script>
 
 <template>
-  <div class="backdrop">
+  <div
+    class="backdrop"
+    :class="{ first: !store.hasScenario }"
+  >
     <form
       ref="form"
       class="dialog"
@@ -151,8 +162,9 @@ function onTabKey(e: KeyboardEvent, id: SetupTab): void {
           width="1200"
           height="630"
         >
-        <div class="hero-text tt-frost">
+        <div class="hero-text">
           <p class="kicker">
+            <span class="mark"><TtIcon name="logo" /></span>
             {{ t('setup.heroKicker') }}
           </p>
           <h2 id="tt-setup-title">
@@ -186,9 +198,14 @@ function onTabKey(e: KeyboardEvent, id: SetupTab): void {
           @click="tab = id"
           @keydown="onTabKey($event, id)"
         >
-          {{ t(TAB_LABELS[id]) }}
+          <TtIcon
+            class="tab-icon"
+            :name="TAB_ICONS[id]"
+          />
+          <span class="tab-label">{{ t(TAB_LABELS[id]) }}</span>
           <TtIcon
             v-if="marked.includes(id)"
+            class="tab-alert"
             name="alert"
           />
         </button>
@@ -347,6 +364,7 @@ function onTabKey(e: KeyboardEvent, id: SetupTab): void {
             :disabled="store.loading || d.check.errors.length > 0"
           >
             {{ store.loading ? t('setup.starting') : t('setup.startButton') }}
+            <TtIcon name="arrow" />
           </button>
         </div>
       </footer>
@@ -364,18 +382,31 @@ function onTabKey(e: KeyboardEvent, id: SetupTab): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1.25rem;
   background: var(--tt-scrim);
   -webkit-backdrop-filter: var(--tt-blur);
   backdrop-filter: var(--tt-blur);
 }
 
-/* About 90% of the sim area wide (max 1440 px) and capped to its height: the dialog itself never scrolls (ticket 161). */
+/* First visit: nothing is running behind the dialog, so the terminal picture fills the screen under the scrim. */
+.backdrop.first {
+  background:
+    linear-gradient(var(--tt-scrim), var(--tt-scrim)),
+    url('../../assets/home-card.png') center / cover no-repeat,
+    var(--tt-bg);
+}
+
+/* A rail (title, tabs) beside the open tab. Capped to the sim area: the dialog itself never scrolls (ticket 161). */
 .dialog {
-  width: min(90vw, 1440px, 100%);
-  height: min(100%, 64rem);
-  display: flex;
-  flex-direction: column;
+  width: min(94vw, 1360px, 100%);
+  height: min(100%, 56rem);
+  display: grid;
+  grid-template-columns: 17.5rem minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'hero body'
+    'tabs body'
+    'tabs footer';
   overflow: hidden;
   background: var(--tt-surface);
   border: 1px solid var(--tt-border);
@@ -386,165 +417,151 @@ function onTabKey(e: KeyboardEvent, id: SetupTab): void {
 }
 
 .hero {
+  grid-area: hero;
   position: relative;
-  flex: none;
   overflow: hidden;
   background: var(--tt-surface-sunken);
+  border-right: 1px solid var(--tt-border);
 }
 
 .hero-img {
   display: block;
   width: 100%;
-  height: 9rem;
+  height: 8.5rem;
   object-fit: cover;
-  object-position: 50% 40%;
+  object-position: 32% 40%;
+  -webkit-mask-image: linear-gradient(to bottom, black 35%, transparent);
+  mask-image: linear-gradient(to bottom, black 35%, transparent);
 }
 
 .hero-text {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.8rem 1.5rem;
-  border-width: 0 0 1px;
+  gap: 0.45rem;
+  padding: 1.4rem 1.4rem 1rem;
 }
 
 .hero:not(.compact) .hero-text {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-
-@media (min-height: 960px) {
-  .hero-img {
-    height: 13rem;
-  }
-}
-
-/* Short screens and phones: no picture, so the tab body keeps the room. */
-@media (max-height: 820px), (max-width: 760px) {
-  .hero-img {
-    display: none;
-  }
-
-  .hero:not(.compact) .hero-text {
-    position: static;
-  }
+  margin-top: -2.2rem;
 }
 
 .kicker {
-  color: var(--tt-accent);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--tt-text-muted);
+  font-size: var(--tt-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  line-height: 1.35;
   text-transform: uppercase;
 }
 
+.mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9px;
+  background: var(--tt-accent);
+  color: var(--tt-on-accent);
+  font-size: 1.05rem;
+  box-shadow: var(--tt-glow);
+}
+
 h2 {
-  font-size: 1.4rem;
+  margin-top: 0.35rem;
+  font-size: 1.55rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 .intro {
   color: var(--tt-text-muted);
-  font-size: 0.85rem;
-  line-height: 1.5;
-}
-
-@media (max-width: 760px) {
-  .intro {
-    display: none;
-  }
-
-  .hero-text {
-    padding: 0.6rem 1rem;
-  }
-
-  h2 {
-    font-size: 1.15rem;
-  }
+  font-size: var(--tt-text-sm);
+  line-height: 1.55;
 }
 
 .tabs {
-  flex: none;
+  grid-area: tabs;
   display: flex;
-  gap: 0.25rem;
-  padding: 0 1.5rem;
-  border-bottom: 1px solid var(--tt-border);
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.8rem 1rem;
+  background: var(--tt-surface-sunken);
+  border-right: 1px solid var(--tt-border);
+  overflow: auto;
   scrollbar-width: none;
 }
 
 .tab {
   flex: none;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.7rem 1rem;
+  gap: 0.7rem;
+  padding: 0.65rem 0.75rem;
   background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
+  border: 1px solid transparent;
+  border-radius: var(--tt-radius);
   color: var(--tt-text-muted);
   font: inherit;
-  font-weight: 600;
-  white-space: nowrap;
+  font-size: var(--tt-text-md);
+  font-weight: 550;
+  text-align: left;
   cursor: pointer;
+  transition:
+    background 0.12s var(--tt-ease),
+    color 0.12s var(--tt-ease);
+}
+
+.tab-icon {
+  font-size: 1.1rem;
+}
+
+.tab-label {
+  flex: 1;
+  min-width: 0;
 }
 
 .tab:hover {
+  background: var(--tt-control);
   color: var(--tt-text);
 }
 
 .tab:focus-visible {
   outline: none;
-  box-shadow: inset var(--tt-ring);
+  box-shadow: var(--tt-ring);
 }
 
 .tab.on {
-  color: var(--tt-accent);
-  border-bottom-color: var(--tt-accent);
+  background: var(--tt-accent-soft);
+  border-color: var(--tt-accent-line);
+  color: var(--tt-text);
 }
 
-.tab.bad,
-.tab.bad.on {
+.tab.on .tab-icon {
+  color: var(--tt-accent);
+}
+
+.tab.bad .tab-alert,
+.tab.bad .tab-label {
   color: var(--tt-danger);
 }
 
 .tab.bad.on {
-  border-bottom-color: var(--tt-danger);
-}
-
-/* Phone: the four tabs share the width, long labels wrap. */
-@media (max-width: 480px) {
-  .tabs {
-    padding: 0 0.4rem;
-    gap: 0;
-  }
-
-  .tab {
-    flex: 1 1 0;
-    justify-content: center;
-    padding: 0.5rem 0.25rem;
-    font-size: 0.8rem;
-    line-height: 1.2;
-    text-align: center;
-    white-space: normal;
-  }
+  background: var(--tt-danger-bg);
+  border-color: var(--tt-danger-border);
 }
 
 /* The only part that scrolls. */
 .body {
-  flex: 1;
+  grid-area: body;
   min-height: 0;
   overflow: auto;
-  padding: 1rem 1.5rem;
-}
-
-@media (max-width: 480px) {
-  .body {
-    padding: 0.8rem;
-  }
+  padding: 1.5rem 1.75rem;
 }
 
 .panel {
@@ -565,47 +582,51 @@ h2 {
   }
 }
 
+/* One card per section, in a readable column. */
 .sections {
   display: flex;
   flex-direction: column;
-  gap: 1.4rem;
+  gap: 1rem;
+  max-width: 68rem;
+}
+
+.sections > :not(.hint) {
+  padding: 1.15rem 1.25rem 1.25rem;
+  background: var(--tt-surface-raised);
+  border: 1px solid var(--tt-hairline);
+  border-radius: var(--tt-radius);
 }
 
 .footer {
-  flex: none;
+  grid-area: footer;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.9rem 1.75rem;
   border-top: 1px solid var(--tt-border);
   background: var(--tt-surface-sunken);
-}
-
-@media (max-width: 480px) {
-  .footer {
-    padding: 0.6rem 0.8rem;
-    gap: 0.6rem;
-  }
 }
 
 .selected {
   display: flex;
   flex-direction: column;
+  gap: 0.1rem;
   min-width: 0;
 }
 
 .selected-label {
-  color: var(--tt-text-muted);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  color: var(--tt-text-faint);
+  font-size: var(--tt-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .selected-name {
   overflow: hidden;
-  font-size: 0.95rem;
+  font-size: 1rem;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -613,7 +634,7 @@ h2 {
 .footer-error {
   overflow: hidden;
   color: var(--tt-danger);
-  font-size: 0.8rem;
+  font-size: var(--tt-text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -622,63 +643,199 @@ h2 {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .btn {
-  padding: 0.55rem 0.9rem;
-  background: var(--tt-bg);
+  height: 2.6rem;
+  padding: 0 1.1rem;
+  background: var(--tt-control);
   border: 1px solid var(--tt-border);
-  border-radius: 6px;
+  border-radius: var(--tt-radius);
   color: var(--tt-text);
-  font-size: 0.85rem;
+  font-size: var(--tt-text-md);
+  font-weight: 550;
   white-space: nowrap;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--tt-accent);
+  background: var(--tt-control-hover);
+  border-color: var(--tt-border-strong);
 }
 
 .start {
-  padding: 0.65rem 2.2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 2.6rem;
+  padding: 0 1.4rem 0 1.6rem;
   background: var(--tt-accent);
   border: 1px solid var(--tt-accent);
   border-radius: var(--tt-radius);
   color: var(--tt-on-accent);
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
-}
-
-@media (max-width: 480px) {
-  .start {
-    padding: 0.6rem 1.4rem;
-  }
+  box-shadow: var(--tt-glow);
+  transition:
+    background 0.12s var(--tt-ease),
+    transform 0.12s var(--tt-ease);
 }
 
 .start:hover:not(:disabled) {
   background: var(--tt-accent-hover);
 }
 
+.start:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
 .start:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
+  box-shadow: none;
 }
 
 .checks {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.4rem;
   padding: 0;
   margin: 0;
+  max-width: 68rem;
 }
 
-.error {
+.error,
+.warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--tt-danger-border);
+  border-radius: var(--tt-radius-sm);
+  background: var(--tt-danger-bg);
   color: var(--tt-danger);
-  font-size: 0.85rem;
+  font-size: var(--tt-text-sm);
 }
 
 .warning {
+  border-color: var(--tt-warn-border);
+  background: var(--tt-warn-bg);
   color: var(--tt-warn);
-  font-size: 0.85rem;
+}
+
+/* Short screens: no picture, so the rail keeps room for the tabs. */
+@media (max-height: 760px) {
+  .hero-img {
+    display: none;
+  }
+
+  .hero:not(.compact) .hero-text {
+    margin-top: 0;
+  }
+}
+
+/* Narrow screens and phones: title, a row of tabs, the tab body and the footer, stacked. */
+@media (max-width: 900px) {
+  .backdrop {
+    padding: 0.6rem;
+  }
+
+  .dialog {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'hero'
+      'tabs'
+      'body'
+      'footer';
+  }
+
+  .hero,
+  .tabs {
+    border-right: none;
+  }
+
+  .hero-img,
+  .intro {
+    display: none;
+  }
+
+  .hero:not(.compact) .hero-text {
+    margin-top: 0;
+  }
+
+  .hero-text {
+    padding: 0.8rem 1rem 0.4rem;
+  }
+
+  h2 {
+    margin-top: 0;
+    font-size: 1.2rem;
+  }
+
+  .mark {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 7px;
+    font-size: 0.85rem;
+  }
+
+  .tabs {
+    flex-direction: row;
+    padding: 0.4rem 0.6rem 0.6rem;
+    border-bottom: 1px solid var(--tt-border);
+  }
+
+  .tab {
+    padding: 0.5rem 0.7rem;
+    white-space: nowrap;
+  }
+
+  .body {
+    padding: 1rem;
+  }
+
+  .footer {
+    padding: 0.7rem 1rem;
+  }
+}
+
+/* Phone: the four tabs share the width, icons go, long labels wrap. */
+@media (max-width: 480px) {
+  .tabs {
+    padding: 0.3rem 0.4rem 0.5rem;
+    gap: 0.1rem;
+  }
+
+  .tab {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 0.45rem 0.25rem;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .tab-icon {
+    display: none;
+  }
+
+  .tab-label {
+    flex: 0 1 auto;
+  }
+
+  .body {
+    padding: 0.8rem;
+  }
+
+  .footer {
+    padding: 0.6rem 0.8rem;
+    gap: 0.6rem;
+  }
+
+  .start {
+    padding: 0 1rem 0 1.2rem;
+  }
 }
 </style>

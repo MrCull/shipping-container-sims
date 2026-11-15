@@ -60,7 +60,8 @@ defineProps<{ sketch: LayoutSketch }>()
 <style scoped>
 .sketch {
   width: 100%;
-  height: 7rem;
+  height: 9rem;
+  padding: 0.6rem;
   background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
   border-radius: var(--tt-radius-sm);
@@ -76,12 +77,12 @@ defineProps<{ sketch: LayoutSketch }>()
 }
 
 .sts {
-  fill: var(--tt-accent);
+  fill: var(--tt-plan-sts);
 }
 
 .block {
-  fill: var(--tt-text-muted);
-  opacity: 0.55;
+  fill: var(--tt-plan-block);
+  opacity: 0.85;
 }
 
 .gate {

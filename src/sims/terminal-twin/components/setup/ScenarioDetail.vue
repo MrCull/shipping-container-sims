@@ -72,16 +72,18 @@ const summary = computed(() => {
     :data-scenario="d.name"
     :aria-label="t('setup.detail.title')"
   >
-    <span class="kind">{{ isBench ? t('setup.kind.bench') : t('setup.kind.scenario') }}</span>
-    <h3 data-testid="tt-detail-name">
-      {{ item?.name ?? scenarioDisplayName(d.name) }}
-    </h3>
-    <p
-      v-if="item?.summary"
-      class="lead"
-    >
-      {{ item.summary }}
-    </p>
+    <header class="head">
+      <span class="kind">{{ isBench ? t('setup.kind.bench') : t('setup.kind.scenario') }}</span>
+      <h3 data-testid="tt-detail-name">
+        {{ item?.name ?? scenarioDisplayName(d.name) }}
+      </h3>
+      <p
+        v-if="item?.summary"
+        class="lead"
+      >
+        {{ item.summary }}
+      </p>
+    </header>
 
     <LayoutSketchView
       v-if="sketch"
@@ -173,12 +175,13 @@ const summary = computed(() => {
 .detail {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 1.1rem;
   min-width: 0;
-  padding: 1.1rem 1.2rem;
-  border: 1px solid var(--tt-border);
+  padding: 1.4rem 1.5rem 1.5rem;
+  border: 1px solid var(--tt-hairline);
   border-radius: var(--tt-radius);
-  background: var(--tt-surface);
+  background: var(--tt-surface-raised);
+  scrollbar-width: thin;
 }
 
 /* The pane may scroll on its own (wide Scenario tab): its parts keep their size. */
@@ -186,61 +189,82 @@ const summary = computed(() => {
   flex: none;
 }
 
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .kind {
+  align-self: flex-start;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--tt-accent-line);
+  border-radius: 999px;
   color: var(--tt-accent);
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: var(--tt-text-xs);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 h3 {
-  font-size: 1.25rem;
+  margin-top: 0.2rem;
+  font-size: 1.6rem;
   font-weight: 700;
-  line-height: 1.25;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 h4 {
-  margin-bottom: 0.2rem;
-  color: var(--tt-text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  margin-bottom: 0.35rem;
+  color: var(--tt-text-faint);
+  font-size: var(--tt-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .lead {
-  font-weight: 600;
+  color: var(--tt-text-muted);
+  font-size: 1rem;
   line-height: 1.45;
 }
 
 .text {
-  font-size: 0.92rem;
-  line-height: 1.55;
+  max-width: 70ch;
+  font-size: var(--tt-text-md);
+  line-height: 1.6;
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  gap: 0.4rem;
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
 .chip {
-  padding: 0.1rem 0.6rem;
-  background: var(--tt-accent-soft);
-  border-radius: 999px;
-  color: var(--tt-accent);
-  font-size: 0.78rem;
+  padding: 0.3rem 0.7rem;
+  background: var(--tt-control);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius-sm);
+  color: var(--tt-text);
+  font-family: var(--tt-font-mono);
+  font-size: var(--tt-text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem 1rem;
-  font-size: 0.8rem;
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  background: var(--tt-border);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius-sm);
 }
 
 @media (max-width: 560px) {
@@ -249,15 +273,23 @@ h4 {
   }
 }
 
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.65rem 0.8rem;
+  background: var(--tt-surface-sunken);
+}
+
 .summary dt {
   color: var(--tt-text-muted);
-  font-size: 0.72rem;
+  font-size: var(--tt-text-xs);
 }
 
 .summary dd {
   margin: 0;
   font-family: var(--tt-font-mono);
+  font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
 }
-
 </style>

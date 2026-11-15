@@ -10,43 +10,62 @@ fieldset {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  font-size: 0.85rem;
+  font-size: var(--tt-text-md);
 }
 
-legend,
+/* A section heading: floated so it lays out as an ordinary block inside the fieldset. */
+legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 0.35rem;
+  color: var(--tt-text);
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
 .field > span {
   color: var(--tt-text-muted);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 0.4rem;
+  font-size: var(--tt-text-sm);
+  font-weight: 500;
 }
 
 .hint {
+  max-width: 68ch;
   color: var(--tt-text-muted);
-  font-size: 0.85rem;
-  line-height: 1.5;
+  font-size: var(--tt-text-sm);
+  line-height: 1.55;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.6rem;
-}
-
-@media (max-width: 560px) {
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: 0.75rem 0.9rem;
+  align-items: end;
 }
 
 .row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 24rem));
   gap: 1rem;
 }
 
+/* A named row (one yard block, one subsystem): the name, then its fields on one line. */
+.grid:has(> .blockname) {
+  grid-template-columns: 7.5rem repeat(4, minmax(0, 1fr));
+}
+
 @media (max-width: 560px) {
+  .grid,
+  .grid:has(> .blockname) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid > .blockname {
+    grid-column: 1 / -1;
+  }
+
   .row {
     grid-template-columns: 1fr;
   }
@@ -59,24 +78,16 @@ legend,
 .mini {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.75rem;
+  gap: 0.3rem;
+  font-size: var(--tt-text-sm);
+  font-weight: 500;
   color: var(--tt-text-muted);
 }
 
-.mini input {
-  padding: 0.4rem 0.5rem;
-  background: var(--tt-bg);
-  border: 1px solid var(--tt-border);
-  border-radius: 6px;
-  color: var(--tt-text);
-  font-family: var(--tt-font-mono);
-  color-scheme: dark;
-  min-width: 0;
-}
-
 .blockname {
-  align-self: end;
+  align-self: center;
+  color: var(--tt-text);
+  font-size: var(--tt-text-sm);
   font-weight: 600;
   min-width: 5em;
 }
@@ -91,22 +102,99 @@ legend,
 }
 
 input[type='number'],
+input[type='text'],
 input[type='datetime-local'],
-select {
-  padding: 0.45rem 0.6rem;
-  background: var(--tt-bg);
+select,
+.mini input {
+  height: 2.25rem;
+  padding: 0 0.7rem;
+  background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
-  border-radius: 6px;
+  border-radius: var(--tt-radius-sm);
   color: var(--tt-text);
   font-family: var(--tt-font-mono);
+  font-size: var(--tt-text-sm);
+  font-variant-numeric: tabular-nums;
   color-scheme: dark;
   min-width: 0;
   width: 100%;
+  transition:
+    border-color 0.12s var(--tt-ease),
+    box-shadow 0.12s var(--tt-ease),
+    background 0.12s var(--tt-ease);
 }
 
+input::placeholder {
+  color: var(--tt-text-faint);
+}
+
+input[type='number']:hover,
+input[type='text']:hover,
+input[type='datetime-local']:hover,
+select:hover,
+.mini input:hover {
+  border-color: var(--tt-border-strong);
+}
+
+input[type='number']:focus-visible,
+input[type='text']:focus-visible,
+input[type='datetime-local']:focus-visible,
+select:focus-visible,
+.mini input:focus-visible {
+  outline: none;
+  border-color: var(--tt-accent);
+  box-shadow: var(--tt-ring);
+}
+
+input:invalid {
+  border-color: var(--tt-danger-border);
+}
+
+input[type='radio'],
+input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  flex: none;
+  accent-color: var(--tt-accent);
+}
+
+/* A radio or checkbox choice: a pill that lights up when chosen. */
 .unit-choice {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  align-self: flex-start;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0 0.8rem;
+  background: var(--tt-control);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius-sm);
+  color: var(--tt-text);
+  font-size: var(--tt-text-sm);
   cursor: pointer;
+  transition:
+    border-color 0.12s var(--tt-ease),
+    background 0.12s var(--tt-ease);
+}
+
+.unit-choice:hover {
+  border-color: var(--tt-border-strong);
+  background: var(--tt-control-hover);
+}
+
+.unit-choice:has(input:checked) {
+  background: var(--tt-accent-soft);
+  border-color: var(--tt-accent-line);
+}
+
+details > summary {
+  cursor: pointer;
+  color: var(--tt-text);
+  font-size: var(--tt-text-sm);
+  font-weight: 500;
+}
+
+details > summary:hover {
+  color: var(--tt-accent);
 }
