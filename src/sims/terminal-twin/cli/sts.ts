@@ -4,9 +4,8 @@
  * Prints each crane's time per bucket (see `engine/stsProductivity.ts`) from its first work package to `--until`
  * (default: the last event).
  */
-import { readFileSync } from 'node:fs'
+import { readEventLines } from './eventLines'
 import { formatStsProductivity, stsProductivity } from '../engine'
-import type { EngineEvent } from '../engine'
 
 const USAGE = 'Usage: pnpm run tt:sts <events.jsonl> [--until <seconds>]'
 
@@ -17,10 +16,7 @@ export function runStsCli(argv: string[]): number {
     console.log(USAGE)
     return file ? 0 : 2
   }
-  const events = readFileSync(file, 'utf8')
-    .split('\n')
-    .filter((l) => l.trim())
-    .map((l) => JSON.parse(l) as EngineEvent)
+  const events = readEventLines(file)
   const until = at >= 0 ? Number(argv[at + 1]) : (events[events.length - 1]?.t ?? 0)
   if (!Number.isFinite(until)) {
     console.error(USAGE)
