@@ -15,7 +15,11 @@ From [../reports/realistic-volume-reports.md](../reports/realistic-volume-report
 5 of 5 vessels, 9,163 moves, the fifth vessel done at sim day 3 21:56 (2.9 sim days), 0 violations. STS gross
 moves/h per crane 8.0 to 21.1 (busiest STS107: 1,785 moves); the latest vessel waited 262,656 s at the anchorage; rail
 wait is the largest crane loss (STS105 126,295 s, STS104 72,263 s). Going 0.5 to 1 doubled moves but sim time only
-x1.4: the quay is better used at the larger volume. No `tt:profile` was run at scale 1; the breakdowns below are at 0.5.
+x1.4: the quay is better used at the larger volume. The scale-1 `tt:profile` (0.54.0, #268, "Step: scale-1 measurements" in
+[../reports/throughput-and-speed-report.md](../reports/throughput-and-speed-report.md)): 9,163 moves, sim end day 3
+20:35; crane windows are 44 % cycle, 12 % rail (STS105 80,481 s), 19 % reposition, 18 % done; anchorage waits 175,714 s
+(V003), 175,015 s (V004) and 268,337 s (V005); load boxes wait 662 s horizontal and 388 s at the STS on average; SHC
+idle 85 % (7 of 23 never used), ASC idle 81 %. The other breakdowns below are at 0.5.
 
 ### Where crane time goes
 
@@ -57,6 +61,10 @@ grounded). Everything above that gap is waiting.
    that would fit cannot overtake the head of the queue, and a berth frees only when its vessel leaves. 0.5 peak day:
    V003 to V005 waited 187,826 s, 187,127 s and 232,604 s (mean 121,511 s); scale 1: up to 262,656 s. Mooring is
    1,800 s and unmooring 1,200 s (`DEFAULT_QUAY`). On an 850 m quay two ULCVs (400 m each) plus a feedermax do not fit together.
+   Opt-in `quay.berthOvertaking` (#272) on the scale-1 peak day: V005 (Feedermax) berths on arrival at 610 m (wait
+   268,337 s to 0 s) but is worked by one crane, and it then blocks V004 (Panamax), whose wait grows from 175,015 s to
+   212,640 s. Mean anchorage wait 123,813 s to 77,923 s, the fifth vessel done 4 h 08 min earlier (day 3 16:27), time
+   in port summed over the five vessels 7 % lower, same 9,163 moves, 0 violations. Off in the TTI presets.
 3. **Load box supply.** By design (`engine/subsystems/loadPrep.ts`) a crane's load boxes get their SHC job only after
    its discharge before them is done (`dischargeDone`, then `pumpLoadPrep` asks `stsGroundPosition`, job from
    `createLoadShcJob`). Boxes staged ahead (`loadReleaseAhead`, TTI 4) sit on pads with no job. #239 proved the SHCs
