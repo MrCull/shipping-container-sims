@@ -36,7 +36,7 @@ body:has(.terminal-twin) {
   --tt-panel-strong: rgba(14, 20, 30, 0.95);
   --tt-blur: blur(18px) saturate(1.4);
   --tt-scrim: rgba(4, 8, 14, 0.62);
-  --tt-chart-surface: #fcfcfb;
+  --tt-chart-surface: #1a1a19;
   --tt-border: #26334a;
   --tt-border-strong: #3d4d68;
   --tt-hairline: rgba(255, 255, 255, 0.08);
@@ -176,27 +176,50 @@ body:has(.terminal-twin) {
 
 .terminal-twin :focus-visible {
   outline: 2px solid var(--tt-accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 /* HUD collapse / expand button (store/hudStore.ts): a small frosted pill, big enough to tap on a phone. */
 .terminal-twin .hud-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
   min-width: 2.2rem;
   min-height: 2rem;
-  padding: 0.25rem 0.6rem;
+  padding: 0.25rem 0.65rem;
   border: 1px solid var(--tt-border);
   border-radius: 999px;
   background: var(--tt-panel);
   -webkit-backdrop-filter: var(--tt-blur);
   backdrop-filter: var(--tt-blur);
-  color: var(--tt-text);
+  color: var(--tt-text-muted);
   font-family: var(--tt-font);
   font-size: 0.78rem;
+  font-weight: 550;
   line-height: 1;
   cursor: pointer;
   pointer-events: auto;
+  transition:
+    color 0.12s var(--tt-ease),
+    border-color 0.12s var(--tt-ease);
 }
 
 .terminal-twin .hud-pill:hover {
-  border-color: var(--tt-accent);
+  border-color: var(--tt-border-strong);
+  color: var(--tt-text);
+}
+
+/* Thin, quiet scrollbars on the dark panels. */
+.terminal-twin * {
+  scrollbar-color: var(--tt-border-strong) transparent;
+}
+
+.terminal-twin button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.terminal-twin button:disabled {
+  cursor: default;
 }

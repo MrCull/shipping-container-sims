@@ -98,9 +98,9 @@ h2 {
 .close,
 .retry {
   padding: 0.15rem 0.55rem;
-  border: 1px solid var(--tt-border);
+  border: 1px solid var(--tt-hairline);
   border-radius: 6px;
-  background: var(--tt-surface);
+  background: var(--tt-control);
   color: var(--tt-text);
   cursor: pointer;
   font: inherit;

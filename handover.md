@@ -33,13 +33,15 @@ Rules that must keep holding:
 |---|-------|-------|
 | 1 | Dark tokens in `skin.css` (whole sim restyled through tokens) | done |
 | 2 | Setup dialog: rail layout, scenario cards, detail pane, form fields, vessel table | done (not yet run through verify or smoke) |
-| 3 | Top bar: clock, transport, actions, settings | next |
-| 4 | HUD: KPI strip, overlay bar, colour-by menu, events and inspector panels | todo |
-| 5 | Modals: saves, shortcut help, final report, dashboard chrome | todo |
-| 6 | Docs (`terminal-twin-AGENTS.md`, `docs/browser-host.md` skin section), `pnpm run verify`, smoke suite | todo |
+| 3 | Top bar: clock, segmented transport, icon action buttons, status pill, settings | done (not yet run through verify or smoke) |
+| 4 | HUD: KPI strip (one glass strip), overlay bar, HUD pills; side panel buttons | done, same caveat |
+| 5 | Modals: saves and shortcut help restyled; dashboard chrome and dark chart palette restored | done, same caveat |
+| 6 | Visual review of: colour-by menu, run-to popup, final report, bay viewer, inspector with a selection, phone widths | next |
+| 7 | Docs (`terminal-twin-AGENTS.md`, `docs/browser-host.md` skin and palette lines say "light"), `pnpm run verify`, smoke suite, open PR | todo |
 
-## Known gaps
+## Notes for whoever continues
 
-- Dashboard charts still use the light chart surface (`--tt-chart-surface` = `SURFACE` in
-  `modules/dashboardPalette.ts`, palette validated for light). A dark chart surface needs `dashboardOptions.ts`
-  text and grid colours changed and the palette re-checked.
+- Screenshot scripts used for review live only in the session scratchpad; `pnpm run screenshot` does the same job.
+- Dashboard charts: `modules/dashboardPalette.ts` is back on the dark categorical set that was validated on
+  `#1a1a19` before the light skin (#122); `--tt-chart-surface` matches it (`tests/skin.test.ts` checks that).
+- The top bar must stay two rows at 1280 px wide: `terminal-twin-hud.smoke.ts` checks HUD regions do not overlap.

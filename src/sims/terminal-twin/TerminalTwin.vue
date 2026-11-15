@@ -188,14 +188,15 @@ onBeforeUnmount(() => {
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--tt-radius);
   border: 1px solid var(--tt-border);
   background: var(--tt-panel);
   -webkit-backdrop-filter: var(--tt-blur);
   backdrop-filter: var(--tt-blur);
+  box-shadow: var(--tt-shadow);
   color: var(--tt-text);
-  font-size: 0.9rem;
+  font-size: var(--tt-text-md);
 }
 
 .notice {
@@ -208,7 +209,7 @@ onBeforeUnmount(() => {
 
 .banner {
   bottom: 4.6rem;
-  border-color: var(--tt-success);
+  border-color: var(--tt-success-border);
 }
 
 .banner-complete {

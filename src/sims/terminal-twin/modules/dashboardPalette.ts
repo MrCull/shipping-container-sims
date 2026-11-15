@@ -1,27 +1,26 @@
 /**
- * Dashboard data palette (TT-16, light skin since #122). Colour-blind-safe by the repo's dataviz skill:
- * the light-mode categorical steps below are the skin's validated light column (`validate_palette.js --mode light`,
- * surface #fcfcfb: lightness band, chroma floor, adjacent CVD and normal-vision separation). Three slots (aqua,
- * yellow, magenta) sit under 3:1 on the surface, so the relief rule applies: legend, marker symbols and the
- * table view always carry identity.
+ * Dashboard data palette (TT-16; dark again with the control-room skin). Colour-blind-safe by the repo's dataviz
+ * skill: the dark-mode categorical steps below were validated with its `validate_palette.js --mode dark` on the
+ * surface #1a1a19 (lightness band, chroma floor, adjacent CVD and normal-vision separation, contrast >= 3:1 on the
+ * surface).
  *
  * Colour never carries identity alone: every series slot also has its own marker
  * symbol and line dash, and charts always show a legend.
  */
 
 /** Chart surface the palette was validated against (the dashboard panel background). */
-export const SURFACE = '#fcfcfb'
+export const SURFACE = '#1a1a19'
 
 /** Categorical slots in fixed order (never cycled; a 9th series is folded away). */
 export const SERIES_COLOURS = [
-  '#2a78d6', // blue
-  '#eb6834', // orange
-  '#1baf7a', // aqua
-  '#eda100', // yellow
-  '#e87ba4', // magenta
+  '#3987e5', // blue
+  '#d95926', // orange
+  '#199e70', // aqua
+  '#c98500', // yellow
+  '#d55181', // magenta
   '#008300', // green
-  '#6250d6', // violet
-  '#e34948', // red
+  '#9085e9', // violet
+  '#e66767', // red
 ] as const
 
 export const MAX_SERIES = SERIES_COLOURS.length
@@ -61,11 +60,11 @@ export const SEQUENTIAL_BLUE = ['#86b6ef', '#5598e7', '#2a78d6', '#1c5cab', '#18
  * is labelled in the legend.
  */
 export const PHASE_COLOURS = {
-  work: '#2a78d6',
-  anchorage: '#eb6834',
-  package: '#1baf7a',
-  mooring: '#eda100',
-  unmooring: '#e87ba4',
+  work: '#3987e5',
+  anchorage: '#d95926',
+  package: '#199e70',
+  mooring: '#c98500',
+  unmooring: '#d55181',
 } as const
 
 export type TimelinePhase = keyof typeof PHASE_COLOURS

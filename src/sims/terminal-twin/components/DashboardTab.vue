@@ -546,13 +546,16 @@ const tabs: ('charts' | 'report')[] = ['charts', 'report']
 }
 
 h2 {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
 }
 
 h3 {
-  margin-bottom: 0.4rem;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  font-size: var(--tt-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--tt-text-muted);
 }
@@ -568,10 +571,11 @@ h3 {
 }
 
 .close {
-  padding: 0.15rem 0.55rem;
-  border: 1px solid var(--tt-border);
-  border-radius: 6px;
-  background: var(--tt-surface);
+  height: 2rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--tt-hairline);
+  border-radius: var(--tt-radius-sm);
+  background: var(--tt-control);
   color: var(--tt-text);
   cursor: pointer;
   font: inherit;
@@ -598,34 +602,35 @@ h3 {
 
 .seg {
   display: inline-flex;
+  gap: 1px;
+  padding: 2px;
+  background: var(--tt-surface-sunken);
   border: 1px solid var(--tt-border);
-  border-radius: 6px;
-  overflow: hidden;
+  border-radius: var(--tt-radius-sm);
 }
 
 .seg-btn {
-  padding: 0.3rem 0.8rem;
-  border: 0;
-  border-right: 1px solid var(--tt-border);
-  background: var(--tt-surface);
+  height: 1.8rem;
+  padding: 0 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
   color: var(--tt-text-muted);
   cursor: pointer;
   font: inherit;
-  font-size: 0.85rem;
-}
-
-.seg-btn:last-child {
-  border-right: 0;
+  font-size: var(--tt-text-sm);
+  font-weight: 500;
 }
 
 .seg-btn:hover {
-  background: var(--tt-surface-hover);
+  background: var(--tt-control-hover);
   color: var(--tt-text);
 }
 
 .seg-btn.active {
-  background: var(--tt-accent);
-  color: var(--tt-on-accent);
+  background: var(--tt-accent-soft);
+  border-color: var(--tt-accent-line);
+  color: var(--tt-text);
 }
 
 .grid {
@@ -635,9 +640,9 @@ h3 {
 }
 
 .panel {
-  padding: 0.7rem 0.8rem;
-  border-radius: 8px;
-  border: 1px solid var(--tt-border);
+  padding: 0.9rem 1rem;
+  border-radius: var(--tt-radius);
+  border: 1px solid var(--tt-hairline);
   background: var(--tt-chart-surface);
   min-width: 0;
 }
