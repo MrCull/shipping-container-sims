@@ -1,0 +1,337 @@
+{
+  "asset": "hero-shc",
+  "kind": "hero-shc",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only hero-equipment",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 9.13,
+    "widthM": 7.38,
+    "heightM": 10.02,
+    "boundsMin": [
+      -4.25,
+      0.0,
+      -3.73
+    ],
+    "boundsMax": [
+      4.88,
+      10.02,
+      3.65
+    ],
+    "tag": "A",
+    "source": "shc.glb LOD0 without the spreader subtree (same origin, axes and extents; tests/hero-shc-asset.test.ts compares them)"
+  },
+  "axes": {
+    "up": "+Y",
+    "length": "+X (front, cab end)",
+    "width": "+Z",
+    "origin": "ground contact below the frame centre",
+    "handedness": "right-handed, glTF"
+  },
+  "heroEquipment": {
+    "kind": "shc-body",
+    "sourceAsset": "shc",
+    "replaces": "LOD0",
+    "attach": "add LOD0 under the SHC's root beside its own LOD0 (identity transform) and drive the rig nodes with the same values as LOD0's nodes of the same name; the spreader stays LOD0's (or the #273 hero spreader) and is not in this file",
+    "leftOut": [
+      "spreader",
+      "twistlock_fl",
+      "twistlock_fr",
+      "twistlock_rl",
+      "twistlock_rr"
+    ],
+    "materials": {
+      "shc_atlas": "the shc.glb atlas",
+      "shc_plate": "fleet-number plates; the renderer offsets the UVs per SHC as for shc.glb"
+    }
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "hero-shc",
+      "role": "lod",
+      "description": "the only level; same frame as shc.glb LOD0, without the spreader subtree"
+    },
+    {
+      "name": "frame",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "shc.py frame plus leg stiffeners, leg-head sprockets, cab glazing bars, wipers, mirrors and roof handrail, bumper warning bands"
+    },
+    {
+      "name": "plates",
+      "parent": "LOD0",
+      "role": "mesh",
+      "description": "fleet-number plates in material shc_plate (authored for tile 0, as shc.glb)"
+    },
+    {
+      "name": "steer_fl",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        3.3,
+        0.95,
+        -2.35
+      ],
+      "axis": "+Y",
+      "description": "steering knuckle and fork"
+    },
+    {
+      "name": "wheel_fl",
+      "parent": "steer_fl",
+      "role": "rig",
+      "pivot": [
+        3.3,
+        0.95,
+        -2.35
+      ],
+      "axis": "+Z",
+      "description": "tyre with tread lugs on a rim with nuts"
+    },
+    {
+      "name": "steer_fr",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        3.3,
+        0.95,
+        2.35
+      ],
+      "axis": "+Y",
+      "description": "steering knuckle and fork"
+    },
+    {
+      "name": "wheel_fr",
+      "parent": "steer_fr",
+      "role": "rig",
+      "pivot": [
+        3.3,
+        0.95,
+        2.35
+      ],
+      "axis": "+Z",
+      "description": "tyre with tread lugs on a rim with nuts"
+    },
+    {
+      "name": "steer_rl",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        -3.3,
+        0.95,
+        -2.35
+      ],
+      "axis": "+Y",
+      "description": "steering knuckle and fork"
+    },
+    {
+      "name": "wheel_rl",
+      "parent": "steer_rl",
+      "role": "rig",
+      "pivot": [
+        -3.3,
+        0.95,
+        -2.35
+      ],
+      "axis": "+Z",
+      "description": "tyre with tread lugs on a rim with nuts"
+    },
+    {
+      "name": "steer_rr",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        -3.3,
+        0.95,
+        2.35
+      ],
+      "axis": "+Y",
+      "description": "steering knuckle and fork"
+    },
+    {
+      "name": "wheel_rr",
+      "parent": "steer_rr",
+      "role": "rig",
+      "pivot": [
+        -3.3,
+        0.95,
+        2.35
+      ],
+      "axis": "+Z",
+      "description": "tyre with tread lugs on a rim with nuts"
+    },
+    {
+      "name": "hoist",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        0,
+        6.0,
+        0.0
+      ],
+      "axis": "+Y",
+      "description": "lifting frame with chain stubs and hazard bands; the hero spreader hangs below it (not in this file)"
+    },
+    {
+      "name": "steer_fl_geo",
+      "parent": "steer_fl",
+      "role": "mesh",
+      "description": "mesh of steer_fl"
+    },
+    {
+      "name": "wheel_fl_geo",
+      "parent": "wheel_fl",
+      "role": "mesh",
+      "description": "mesh of wheel_fl"
+    },
+    {
+      "name": "steer_fr_geo",
+      "parent": "steer_fr",
+      "role": "mesh",
+      "description": "mesh of steer_fr"
+    },
+    {
+      "name": "wheel_fr_geo",
+      "parent": "wheel_fr",
+      "role": "mesh",
+      "description": "mesh of wheel_fr"
+    },
+    {
+      "name": "steer_rl_geo",
+      "parent": "steer_rl",
+      "role": "mesh",
+      "description": "mesh of steer_rl"
+    },
+    {
+      "name": "wheel_rl_geo",
+      "parent": "wheel_rl",
+      "role": "mesh",
+      "description": "mesh of wheel_rl"
+    },
+    {
+      "name": "steer_rr_geo",
+      "parent": "steer_rr",
+      "role": "mesh",
+      "description": "mesh of steer_rr"
+    },
+    {
+      "name": "wheel_rr_geo",
+      "parent": "wheel_rr",
+      "role": "mesh",
+      "description": "mesh of wheel_rr"
+    },
+    {
+      "name": "hoist_geo",
+      "parent": "hoist",
+      "role": "mesh",
+      "description": "mesh of hoist"
+    }
+  ],
+  "travelLimits": {
+    "steer_fl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -35,
+      "maxDeg": 35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "wheel_fl": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "steer_fr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -35,
+      "maxDeg": 35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "wheel_fr": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "steer_rl": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -35,
+      "maxDeg": 35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "wheel_rl": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "steer_rr": {
+      "type": "rotation",
+      "axis": "+Y",
+      "minDeg": -35,
+      "maxDeg": 35,
+      "rest": 0,
+      "tag": "A"
+    },
+    "wheel_rr": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "hoist": {
+      "type": "translation",
+      "axis": "+Y",
+      "minM": -3.1,
+      "maxM": 0,
+      "rest": 0,
+      "tag": "A"
+    }
+  },
+  "attachPoints": [],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "wheel_fl",
+      "wheel_fr",
+      "wheel_rl",
+      "wheel_rr"
+    ],
+    "tag": "V"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 18092,
+      "meshes": 11
+    }
+  },
+  "provenance": [
+    {
+      "fact": "frame, pivots, tyre radius and overall extents from shc.py LOD0",
+      "tag": "A",
+      "source": "tt_assets/shc.py"
+    },
+    {
+      "fact": "chevron tread lugs, sidewall band, rim nuts, leg stiffeners, sprockets and chains, glazing bars, wipers, mirrors, handrails, warning bands",
+      "tag": "A",
+      "source": "generic shuttle carrier detail; no manufacturer drawing"
+    }
+  ]
+}

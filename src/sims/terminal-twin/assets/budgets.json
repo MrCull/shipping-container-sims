@@ -76,6 +76,14 @@
         "spreader_geo"
       ]
     },
+    "hero-shc": {
+      "$comment": "#275. The hero SHC body (hero-shc, in models/hero-equipment/): shc.glb LOD0 without the spreader subtree, loaded on demand, never at page load; LOD0 is the only level. Every moving rig node is its own mesh (frame, plates, 4 steer, 4 wheel, hoist = 11 draw calls); the #273 hero spreader stays under LOD0's spreader node. The hero-equipment kind's 8 000 triangles cannot hold a body.",
+      "lods": {
+        "LOD0": { "maxTriangles": 30000, "maxDrawCalls": 12 }
+      },
+      "maxFileBytes": 1200000,
+      "requiredNodes": ["LOD0", "frame", "plates", "hoist"]
+    },
     "container": {
       "lods": {
         "LOD0": {
