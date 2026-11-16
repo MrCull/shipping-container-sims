@@ -181,8 +181,15 @@ export function gateOf(config: ScenarioConfig): GateConfig {
 
 /** True when the scenario can have a landside: it is configured and some block has transfer stalls. */
 export function hasLandside(config: ScenarioConfig): boolean {
-  return !!config.landside && blockSpecs(config).some((b) => b.transferStalls > 0)
+  // per config object, like `landsideGraphOf`: the invariants and reactors ask after every event (#269)
+  let has = hasLandsideCache.get(config)
+  if (has === undefined) {
+    has = !!config.landside && blockSpecs(config).some((b) => b.transferStalls > 0)
+    hasLandsideCache.set(config, has)
+  }
+  return has
 }
+const hasLandsideCache = new WeakMap<ScenarioConfig, boolean>()
 
 export function buildLandsideGraph(config: ScenarioConfig): LandsideGraph {
   const gate = gateOf(config)

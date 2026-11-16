@@ -21,7 +21,7 @@ import { overlappingNewReservations, overlappingReservations } from './reservati
 import type { EngineEvent } from './events'
 import { columnKey, yardIndexOf } from './yardIndex'
 import { vesselSlotsOf } from './vesselSlotIndex'
-import { cellKey, cellOfKey, isSlotOccupant, vesselOccupancyOf } from './vesselOccupancy'
+import { isSlotOccupant, vesselOccupancyOf } from './vesselOccupancy'
 import {
   ascIndexOf,
   type AscJob,
@@ -34,6 +34,7 @@ import {
   type YardSlotState,
 } from './state'
 import { ascPoseAt } from './subsystems/asc'
+import { ascHoistAt } from './subsystems/ascReservations'
 import { blockedByOlderClaim, isRetrievable, isTruckJob } from './subsystems/ascStorage'
 import { gantryPositionAt, railOrder } from './subsystems/rail'
 import { shcPositionAt } from './subsystems/shc'
@@ -198,10 +199,37 @@ const cellsFloatFree = (state: SimState, vesselId: string): boolean => {
   const occ = vesselOccupancyOf(state, vesselId)
   const spec = vesselClass(state.vessels[vesselId].sizeClass)
   for (const [key, list] of occ.cells) {
-    const { bay, row, tier } = cellOfKey(key)
-    if (isStackBase(spec, row, tier)) continue
-    const below = occ.cells.get(cellKey(bay, row, tier - 1))
+    // `cellOfKey` without the object: tier and row are the low two base-128 digits, and the cell below is `key - 1`
+    if (isStackBase(spec, Math.floor(key / 128) % 128, key % 128)) continue
+    const below = occ.cells.get(key - 1)
     for (const o of list) if (!below || !below.some((h) => halvesClash(h.half, o.half))) return false
+  }
+  return true
+}
+
+/** #269: `stowage.order` holds for the vessel (the same three rules as its scan, over the slot occupants of each cell; ROB boxes do not count). */
+const cellsInOrder = (state: SimState, vesselId: string): boolean => {
+  const occ = vesselOccupancyOf(state, vesselId)
+  const spec = vesselClass(state.vessels[vesselId].sizeClass)
+  for (const [key, list] of occ.cells) {
+    if (isStackBase(spec, Math.floor(key / 128) % 128, key % 128)) continue
+    const below = occ.cells.get(key - 1)
+    for (const s of list) {
+      if (!isSlotOccupant(s)) continue
+      let count = 0
+      let whole = false
+      let supported = false
+      if (below)
+        for (const b of below) {
+          if (!isSlotOccupant(b)) continue
+          count++
+          if (b.half === null) whole = true
+          if (b.half === null || s.half === null || b.half === s.half) supported = true
+        }
+      if (s.half !== null && whole) return false // a 20 ft box on a 40 ft box
+      if (s.half === null && count === 1 && !whole) return false // a 40 ft box on a single 20 ft half
+      if ((s.purpose === 'load' || s.purpose === 'transshipment') && !supported) return false // above an empty cell
+    }
   }
   return true
 }
@@ -218,20 +246,30 @@ const cellsInHull = (state: SimState, vesselId: string): boolean => {
   const occ = vesselOccupancyOf(state, vesselId)
   const spec = vesselClass(state.vessels[vesselId].sizeClass)
   for (const [key, list] of occ.cells) {
-    const { row, tier } = cellOfKey(key)
-    if (!isCellUsable(spec, row, tier) && list.some(isSlotOccupant)) return false
+    if (!isCellUsable(spec, Math.floor(key / 128) % 128, key % 128) && list.some(isSlotOccupant)) return false
   }
   return true
 }
 
-/** The slots to check: those in the given columns (deduplicated), or every slot. */
-function slotsToCheck(state: SimState, columns?: ReadonlySet<string>): YardSlotState[] {
+/**
+ * The slots to check: those in the given columns (deduplicated), or every slot. Read only.
+ *
+ * #269: the eight yard invariants ask for the same columns one after another in one incremental check, so the list
+ * is kept per column set and yard index. `InvariantTracker.check` builds a new column set for every event; a caller
+ * that passes its own scope must do the same after changing the state.
+ */
+function slotsToCheck(state: SimState, columns?: ReadonlySet<string>): readonly YardSlotState[] {
   if (!columns) return Object.values(state.yardSlots)
   const index = yardIndexOf(state)
-  const slots = new Set<YardSlotState>()
-  for (const key of columns) for (const s of index.byColumn.get(key) ?? []) slots.add(s)
-  return [...slots]
+  const kept = scopedSlotsCache.get(columns)
+  if (kept && kept.index === index) return kept.slots
+  const set = new Set<YardSlotState>()
+  for (const key of columns) for (const s of index.byColumn.get(key) ?? []) set.add(s)
+  const slots = [...set]
+  scopedSlotsCache.set(columns, { index, slots })
+  return slots
 }
+const scopedSlotsCache = new WeakMap<ReadonlySet<string>, { index: ReturnType<typeof yardIndexOf>; slots: YardSlotState[] }>()
 
 function slotBounds(state: SimState, columns?: ReadonlySet<string>): string[] {
   const messages: string[] = []
@@ -357,8 +395,45 @@ function blockSpecsById(config: ScenarioConfig) {
   return by
 }
 
+/** `Object.keys(record).length === 0` without building the key array. */
+function isEmptyRecord(record: object): boolean {
+  for (const _ in record) return false
+  return true
+}
+
 type LandsideGraphOf = ReturnType<typeof landsideGraphOf>
 type RoadZone = LandsideGraphOf['zones'][string]
+/** The box around every WTP pad's lifting envelope, per lane graph: a spreader outside it is in no envelope. */
+const padBoxCache = new WeakMap<ReturnType<typeof laneGraphOf>, { x0: number; x1: number; z0: number; z1: number }>()
+function padEnvelopeBox(graph: ReturnType<typeof laneGraphOf>): { x0: number; x1: number; z0: number; z1: number } {
+  let box = padBoxCache.get(graph)
+  if (!box) {
+    box = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity }
+    for (const pad of graph.pads) {
+      box.x0 = Math.min(box.x0, pad.x - PAD_HALF_X_M)
+      box.x1 = Math.max(box.x1, pad.x + PAD_HALF_X_M)
+      box.z0 = Math.min(box.z0, pad.z - PAD_HALF_Z_M)
+      box.z1 = Math.max(box.z1, pad.z + PAD_HALF_Z_M)
+    }
+    padBoxCache.set(graph, box)
+  }
+  return box
+}
+
+/** Truck statuses `landside.waiting-off-road` checks. */
+const WAITING_TRUCK_STATUSES: ReadonlySet<string> = new Set(['queued', 'in-lane', 'waiting-for-stall', 'holding'])
+
+/** Z where the landside area starts (just waterside of the nearest transfer stall), per landside graph. */
+const landsideStartCache = new WeakMap<LandsideGraphOf, number>()
+function landsideStartZ(graph: LandsideGraphOf): number {
+  let z = landsideStartCache.get(graph)
+  if (z === undefined) {
+    z = Math.min(...graph.stalls.map((s) => s.z)) - 1e-6
+    landsideStartCache.set(graph, z)
+  }
+  return z
+}
+
 const roadZoneCache = new WeakMap<LandsideGraphOf, RoadZone[]>()
 
 /**
@@ -683,13 +758,17 @@ export const INVARIANTS: Invariant[] = [
       "An ASC never enters a WTP pad's lifting envelope (spreader below travel height over the pad) while an SHC is on the pad.",
     check(state, config) {
       const messages: string[] = []
-      if (Object.keys(state.ascs).length === 0 || Object.keys(state.shcs).length === 0) return messages
+      if (isEmptyRecord(state.ascs) || isEmptyRecord(state.shcs)) return messages
       const graph = laneGraphOf(config)
       const blocks = blockSpecsById(config)
-      for (const asc of Object.values(state.ascs)) {
+      for (const id in state.ascs) {
+        const asc = state.ascs[id]
+        // the hoist alone first: most ASCs are at travel height, and the other two axes are then not needed
+        if (ascHoistAt(asc, state.now) >= travelHoistM(blocks[asc.blockId]) - 1e-6) continue
         const pose = ascPoseAt(asc, state.now)
-        const travel = travelHoistM(blocks[asc.blockId])
-        if (pose.hoistY >= travel - 1e-6) continue
+        // outside the box around all pad envelopes: no pad to test
+        const box = padEnvelopeBox(graph)
+        if (pose.x <= box.x0 || pose.x >= box.x1 || pose.z <= box.z0 || pose.z >= box.z1) continue
         for (const pad of graph.pads) {
           if (Math.abs(pose.x - pad.x) >= PAD_HALF_X_M || Math.abs(pose.z - pad.z) >= PAD_HALF_Z_M) continue
           for (const shc of Object.values(state.shcs)) {
@@ -712,8 +791,23 @@ export const INVARIANTS: Invariant[] = [
     check(state, _config, scope) {
       const messages: string[] = []
       if (state.subsystems.asc !== 'real') return messages // instant ASCs jump: no rail to share
+      if (scope) {
+        // most events name no ASC: nothing to check, and nothing to build
+        let named = false
+        for (const id of scope.equipment)
+          if (state.ascs[id]) {
+            named = true
+            break
+          }
+        if (!named) return messages
+      }
       const byBlock = new Map<string, AscState[]>()
-      for (const a of Object.values(state.ascs)) byBlock.set(a.blockId, [...(byBlock.get(a.blockId) ?? []), a])
+      for (const id in state.ascs) {
+        const a = state.ascs[id]
+        const list = byBlock.get(a.blockId)
+        if (list) list.push(a)
+        else byBlock.set(a.blockId, [a])
+      }
       // only the blocks whose ASCs the event involved (a pair's motion plans change only in its own events)
       const touchedBlocks = scope ? new Set(Object.values(state.ascs).filter((a) => scope.equipment.has(a.id)).map((a) => a.blockId)) : null
       for (const [blockId, list] of byBlock) {
@@ -773,6 +867,7 @@ export const INVARIANTS: Invariant[] = [
       const messages: string[] = []
       // nothing on a vessel the event did not touch is checked: skip the scan of every slot
       if (scope && scope.vessels.size === 0) return messages
+      if (!anyVesselFails(state, scope, cellsInOrder)) return messages
       const filled = new Map<string, ('aft' | 'fore' | null)[]>()
       const loads = []
       const boxes = []
@@ -903,7 +998,7 @@ export const INVARIANTS: Invariant[] = [
       const lanes = laneGraphOf(config)
       if (trucks.length > 0 && hasLandside(config)) {
         const graph = landsideGraphOf(config)
-        const landsideZ = Math.min(...graph.stalls.map((s) => s.z)) - 1e-6
+        const landsideZ = landsideStartZ(graph)
         for (const t of trucks) {
           if (!graph.nodes[t.nodeId]) {
             if (lanes.nodes[t.nodeId]) messages.push(`${t.id} is on the waterside lane graph (node ${t.nodeId})`)
@@ -921,8 +1016,9 @@ export const INVARIANTS: Invariant[] = [
           }
         }
       }
-      const gateZ = hasLandside(config) ? Math.min(...landsideGraphOf(config).stalls.map((s) => s.z)) - 1e-6 : Infinity
-      for (const shc of Object.values(state.shcs)) {
+      const gateZ = hasLandside(config) ? landsideStartZ(landsideGraphOf(config)) : Infinity
+      for (const id in state.shcs) {
+        const shc = state.shcs[id]
         if (shc.nodeId.startsWith('ls:') || !lanes.nodes[shc.nodeId]) messages.push(`${shc.id} is at ${shc.nodeId}, which is not a waterside lane node (SHCs never use the public gate)`)
         else if (lanes.nodes[shc.nodeId].z >= gateZ) messages.push(`${shc.id} is at ${shc.nodeId}, in the landside area`)
       }
@@ -975,9 +1071,9 @@ export const INVARIANTS: Invariant[] = [
       const messages: string[] = []
       if (!hasLandside(config)) return messages
       const graph = landsideGraphOf(config)
-      const waiting = new Set(['queued', 'in-lane', 'waiting-for-stall', 'holding'])
-      for (const t of Object.values(state.trucks)) {
-        if (!waiting.has(t.status)) continue
+      for (const id in state.trucks) {
+        const t = state.trucks[id]
+        if (!WAITING_TRUCK_STATUSES.has(t.status)) continue
         const node = graph.nodes[t.nodeId]
         if (node?.kind === 'road') messages.push(`${t.id} (${t.status}) waits on the road node ${t.nodeId}`)
         // standing still now (no planned segment under way): its position must lie outside every road and junction
@@ -1024,7 +1120,8 @@ export const INVARIANTS: Invariant[] = [
       const messages: string[] = []
       const ls = state.landside
       if (!ls || !hasLandside(config) || state.subsystems.asc === 'off') return messages
-      for (const t of Object.values(state.trucks)) {
+      for (const id in state.trucks) {
+        const t = state.trucks[id]
         if ((t.status !== 'at-stall' && t.status !== 'being-served') || t.stallId === null || t.atStallAt === null) continue
         // every transfer done: the truck waits for an outbound slot (its exit reservation), not for an ASC. TT-183: the exit-slot
         // wait has the same limit as the stall wait, per truck and slot (`exitSince`): trucks leaving by other lanes do not excuse it
