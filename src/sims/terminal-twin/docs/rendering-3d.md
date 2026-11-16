@@ -206,8 +206,9 @@ is owned by the scene renderer, which sets the caps from the quality profile (`s
 
 Tests: `tests/hero-equipment-level.test.ts` (fake rigs and loader), `tests/hero-equipment-selection.test.ts`. Smoke:
 `tests/browser/hero-equipment.smoke.ts` (ASC close-up within the cap, no file requested before, none on Low or at the
-`equipment-hero-off` rung; STS in place; SHC and ASC squeezed to 20 ft; fails on any console or page error, which covers a
-dither shader compile error).
+`equipment-hero-off` rung; STS in place; SHC and ASC squeezed to 20 ft; the hero SHC body (#275) attached 18 m from an
+SHC on High and gone on Low, `hero-shc.glb` not requested before; fails on any console or page error, which covers a
+dither shader compile error). Screenshot pair, LOD0 against the hero body at one pose: `docs/prototypes/275/`.
 Close-up for a screenshot: `__tt.setCameraPose({ target: <the ASC's x, hoistY + 1.5, z from __tt.sceneState().ascs>, distance: 13, azimuth: 0.6, polar: 1.25 })`,
 then wait for `__tt.heroSettled() && __tt.perf().stats.heroEquipment > 0`.
 
