@@ -10,7 +10,7 @@
  */
 import * as THREE from 'three'
 import { loadGltf } from './containerAssets'
-import { heroSpreaderMount, type HeroSpreaderMount } from './heroSpreaderMount'
+import { heroBodyMount, heroSpreaderMount, type HeroMount, type HeroSpreaderMount } from './heroSpreaderMount'
 import { spreaderLengthM, spreaderLengthRatio, type SpreaderMode } from './spreaderMode'
 import meta from '../assets/models/shc/shc.meta.json'
 
@@ -134,6 +134,8 @@ export class ShcRig {
   private readonly plates: THREE.Material[] = []
   /** Where the hero spreader goes (#273): the LOD0 `spreader` node and its rest pose. */
   readonly heroMount: HeroSpreaderMount | null
+  /** Where the hero SHC body goes (#275): the LOD0 node minus its `spreader` subtree, measured to the carrier's centre. */
+  readonly heroBodyMount: HeroMount
   private lod: 0 | 1 | 2 = 0
   private state: ShcRigState = { lod: 0, steerRad: 0, wheelRollRad: 0, hoistM: 0, carrying: false, spreaderMode: '40', spreaderLengthM: spreaderLengthM('40') }
 
@@ -173,6 +175,13 @@ export class ShcRig {
       this.root.add(lod)
     }
     this.heroMount = heroSpreaderMount(this.lods[0])
+    // the hero body's `shc_plate` mesh takes this SHC's fleet-number plate material (LOD0's)
+    const lod0Plates = new Map<string, THREE.Material>()
+    this.lods[0].traverse((o) => {
+      const m = (o as THREE.Mesh).material
+      if ((o as THREE.Mesh).isMesh && !Array.isArray(m) && m.name === 'shc_plate') lod0Plates.set('shc_plate', m)
+    })
+    this.heroBodyMount = heroBodyMount(this.lods[0], new THREE.Vector3(0, SHC_RIG.heightM / 2, 0), lod0Plates)
     this.setLod(0)
   }
 

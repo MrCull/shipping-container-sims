@@ -92,26 +92,29 @@ describe('hero spreaders', () => {
     }
   })
 
-  it('budgets.json lists the three assets and a cap per quality level that the measured spreaders fit (heroEquipmentCaps)', () => {
+  it('budgets.json lists the hero spreaders and the SHC body and a cap per quality level that the measured models fit (heroEquipmentCaps)', () => {
     interface Cap {
       spreaders: number
+      shcBodies: number
       maxTriangles: number
       maxDrawCalls: number
     }
     const caps = (loadBudgets() as unknown as { heroEquipmentCaps: { assets: string[]; levels: Record<string, Cap> } }).heroEquipmentCaps
     const report = checkAssetLibrary()
-    const inLibrary = report.assets.filter((a) => a.kind === 'hero-equipment').map((a) => a.name)
+    const inLibrary = report.assets.filter((a) => a.name.startsWith('hero-spreader-') || a.name === 'hero-shc').map((a) => a.name)
     expect([...caps.assets].sort()).toEqual(inLibrary.sort())
-    expect([...caps.assets].sort()).toEqual(KINDS.map((k) => `hero-spreader-${k}`).sort())
-    const lod0 = caps.assets.map((n) => report.assets.find((a) => a.name === n)!.lods.LOD0)
+    expect([...caps.assets].sort()).toEqual([...KINDS.map((k) => `hero-spreader-${k}`), 'hero-shc'].sort())
+    const lod0 = caps.assets.filter((n) => n !== 'hero-shc').map((n) => report.assets.find((a) => a.name === n)!.lods.LOD0)
     const worstTriangles = Math.max(...lod0.map((l) => l.triangles))
     const worstDrawCalls = Math.max(...lod0.map((l) => l.drawCalls))
+    const body = report.assets.find((a) => a.name === 'hero-shc')!.lods.LOD0
     expect(Object.keys(caps.levels).sort()).toEqual([...QUALITY_LEVELS].sort())
     for (const level of QUALITY_LEVELS) {
       const cap = caps.levels[level]
       expect(cap.spreaders, level).toBe(QUALITY_PROFILES[level].heroEquipment)
-      expect(cap.spreaders * worstTriangles, level).toBeLessThanOrEqual(cap.maxTriangles)
-      expect(cap.spreaders * worstDrawCalls, level).toBeLessThanOrEqual(cap.maxDrawCalls)
+      expect(cap.shcBodies, level).toBe(QUALITY_PROFILES[level].heroShc)
+      expect(cap.spreaders * worstTriangles + cap.shcBodies * body.triangles, level).toBeLessThanOrEqual(cap.maxTriangles)
+      expect(cap.spreaders * worstDrawCalls + cap.shcBodies * body.drawCalls, level).toBeLessThanOrEqual(cap.maxDrawCalls)
     }
   })
 

@@ -129,20 +129,39 @@ level shows, and `onReady` marks the close-up pass dirty so a still camera redra
   left leaf outside its outer bar; a line is shrunk to its column (`fitText`). The hardware material is mostly diffuse
   (metallic 0.35), so bars stay galvanised grey on levels without an environment map.
 
-#### Hero equipment (#273)
+#### Hero equipment (#273, #275)
 
 The spreaders nearest the camera get the hero spreader model (`hero-spreader-<sts|asc|shc>`, [assets-pipeline.md](assets-pipeline.md),
-Hero spreaders). `HeroEquipmentLevel` (`modules/heroEquipment.ts`) is owned by the scene renderer, which sets its cap from the
-quality profile (`heroEquipment`: High 3, Medium 1, Low 0, and 0 from the `equipment-hero-off` rung down).
+Hero spreaders), and the nearest SHC gets the hero SHC body (`hero-shc`, #275). `HeroEquipmentLevel` (`modules/heroEquipment.ts`)
+is owned by the scene renderer, which sets the caps from the quality profile (`setCaps(profile)`).
 
-- **Offers.** In `update()` the STS, ASC and SHC kinds call `frame.offerHeroSpreader({ id, kind, mount })` for each rig that is
-  at LOD0, after posing it, through one helper, `offerHeroSpreaderAtLod0(frame, id, kind, lod, mount)`. `mount` is the
+- **Pieces.** A piece type is an entry of `HERO_PIECES` (`heroEquipment.ts`): its file kinds, its distance and its cap field.
+  Each piece is selected on its own lane (own cap, offers, chosen set and entries), so the SHC body never competes with the
+  spreaders for the spreader cap. Today: `spreader` (kinds `sts`, `asc`, `shc`; 25 m; `heroEquipment`: High 3, Medium 1,
+  Low 0) and `shc-body` (kind `shc-body`; `HERO_SHC_DISTANCE_M` = 30 m from the SHC centre; `heroShc`: High 1, Medium 0,
+  Low 0); both caps are 0 from the `equipment-hero-off` rung down. How a piece mounts is in its `HeroMount`
+  (`heroSpreaderMount.ts`): the rig node its `LOD0` goes under, the rest copy, an optional `skip` subtree, an optional
+  `centre` for the distance and optional `materials` adopted by name. Adding a piece (#276, the hero truck): a
+  `HERO_PIECES` entry, a quality field, a URL in `heroEquipmentAssets.ts`, and a kind hook (the rig builds a mount, the
+  kind calls `offerHeroEquipmentAtLod0`).
+- **SHC body (#275).** `ShcRig.heroBodyMount` (`heroBodyMount(lod0, centre, materials)`): the LOD0 node itself with
+  `skip: 'spreader'`, measured to (0, height / 2, 0) of LOD0, with LOD0's `shc_plate` material (the fleet number) adopted
+  by the hero plate mesh. The hero body is a sibling of the rig's LOD0 body content (child of LOD0, identity transform); the
+  rig's LOD0 meshes outside the `spreader` subtree dither out and are hidden after the fade, while the `spreader` subtree
+  stays, so the hero spreader keeps working under it at the same time. The two pieces on one SHC attach, fade and release
+  independently: each piece owns a disjoint set of rig meshes, and every hero root is marked (`userData.heroEquipmentRoot`)
+  so another piece's walk over the rig never takes its meshes for rig meshes. Motion is the same copy as the spreaders'
+  (below): `ShcRig` keeps its LOD0 node references and is unchanged (one mechanism for every hero piece).
+
+- **Offers.** In `update()` the STS, ASC and SHC kinds call `frame.offerHeroEquipment({ id, kind, mount })` for each rig that is
+  at LOD0, after posing it, through one helper, `offerHeroEquipmentAtLod0(frame, id, kind, lod, mount)` (the SHC kind offers
+  twice: `shc` with `heroMount` and `shc-body` with `heroBodyMount`). `mount` is the
   rig's `heroMount` (`heroSpreaderMount(lod0)`: the LOD0 `spreader` node and a copy of it at rest, taken before the first
   pose). Mount, offer type and helper are in `modules/heroSpreaderMount.ts`, the rig-side module: the rig models and the
-  kinds import it, not the level. The distance is from the camera to that node's world position, not to the crane centre
-  the LOD choice uses; an offer beyond 25 x 1.15 m is dropped at once.
-- **Selection.** `selectHeroEquipment` (`heroEquipmentSelection.ts`): within `HERO_EQUIPMENT_DISTANCE_M` (25 m), nearest
-  first, at most the cap. Hysteresis, literally the spec's: a spreader chosen last frame keeps its place out to 25 x 1.15 m
+  kinds import it, not the level. The distance is from the camera to that node's world position (or the mount's `centre`),
+  not to the crane centre the LOD choice uses; an offer beyond the piece's distance x 1.15 is dropped at once.
+- **Selection.** `selectHeroEquipment(candidates, cap, previous, distanceM)` (`heroEquipmentSelection.ts`), per piece: within
+  the piece's distance (`HERO_EQUIPMENT_DISTANCE_M`, 25 m, the default; `HERO_SHC_DISTANCE_M`, 30 m), nearest first, at most the cap. Hysteresis, literally the spec's: a spreader chosen last frame keeps its place out to 25 x 1.15 m
   (28.75 m), also against a nearer newcomer when the cap is full (previous picks nearest first among themselves, up to
   the cap); only the free places go to newcomers within 25 m, nearest first. The result is nearest first.
 - **Preparation.** A chosen spreader's file is fetched on first need and attached through `runPrep` within
@@ -177,12 +196,13 @@ quality profile (`heroEquipment`: High 3, Medium 1, Low 0, and 0 from the `equip
 - **Release.** Not chosen any more (farther away, rig left LOD0, cap 0): the hero subtree is removed and the rig meshes are
   shown again; `dispose()` does it for all. Geometry and materials belong to the loader's cache and are not disposed.
 - **Readouts.** `__tt.scene().heroEquipment` and `__tt.perf().stats.heroEquipment` (the Stats panel's "Hero spreaders",
-  `tt-perf-hero-equipment`) count attached hero spreaders. `__tt.heroSettled()` is false while a chosen spreader waits for
+  `tt-perf-hero-equipment`) count attached hero pieces, spreaders and SHC bodies together (`countOf(piece)` splits them). `__tt.heroSettled()` is false while a chosen spreader waits for
   the camera gate, its file or a prep slot, or fades in (not while a failed load waits on its back-off, see Failed load).
 
   `__tt.scene().heroSpreaders` lists each attached one (`id`, `kind`, `fading`, `rigHidden`) with the world bounds of the
   hero model and of the rig spreader meshes it replaces (each rig mesh by its own geometry), so a test can check place,
-  length (also the 20 ft squeeze) and twistlock plane without a screenshot.
+  length (also the 20 ft squeeze) and twistlock plane without a screenshot. `__tt.scene().heroShcBodies` (#275) lists the
+  attached hero SHC bodies the same way (kind `shc-body`; `rig` is the bounds of the LOD0 body meshes it replaces).
 
 Tests: `tests/hero-equipment-level.test.ts` (fake rigs and loader), `tests/hero-equipment-selection.test.ts`. Smoke:
 `tests/browser/hero-equipment.smoke.ts` (ASC close-up within the cap, no file requested before, none on Low or at the

@@ -80,10 +80,12 @@ export interface SceneStats {
   layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
   containerLods: { lod0: number; lod1: number; closeup: number; closeupFaces: number; heroFaces: number; heroPrepared: number; heroDrawCalls: number; heroTriangles: number; heroMarkStep: HeroMarkStep; heroMarkPages: number; heroMarkTiles: number; heroMarkDrawCalls: number; heroMarkBytes: number; culled: number }
-  /** Hero spreaders in the scene (#273), never above the quality level's `heroEquipment` cap. */
+  /** Hero pieces in the scene: spreaders (#273, at most the quality level's `heroEquipment`) plus SHC bodies (#275, at most `heroShc`). */
   heroEquipment: number
   /** Each hero spreader with its world bounds and those of the rig spreader it replaces (#273). */
   heroSpreaders: HeroSpreaderInfo[]
+  /** Each hero SHC body with its world bounds and those of the rig's LOD0 body meshes it replaces (#275). */
+  heroShcBodies: HeroSpreaderInfo[]
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -474,7 +476,7 @@ export class SceneRenderer {
     setContactShadows(profile.contactShadows)
     this.containers.setLodOptions({ lod0DistanceM: profile.lod0DistanceM, lod0Cap: profile.lod0Cap, closeupDistanceM: profile.closeupDistanceM, closeupFaceBudget: profile.closeupFaceBudget })
     this.hero.setLimits({ boxes: profile.heroBoxes, stillBoxes: profile.heroStillBoxes })
-    this.heroEquipment.setCap(profile.heroEquipment)
+    this.heroEquipment.setCaps(profile)
     this.setOceanDetail(profile.oceanSegments)
   }
 
@@ -636,7 +638,7 @@ export class SceneRenderer {
     this.atmosphere.update(t)
     this.infrastructure.update(cameraPosition) // far tier (#249)
     this.sounds.length = 0
-    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), colour: { mode: this.colourBy, robDisplay: this.robDisplay, ctx: this.colourCtx }, offerHeroSpreader: (offer) => this.heroEquipment.offer(offer, cameraPosition), sounds: this.sounds }
+    const frame: KindFrame = { t, cameraPosition, lodScale: this.quality.lodScale, carried, loads, live: this.live, flashOn: beaconFlashOn(performance.now()), colour: { mode: this.colourBy, robDisplay: this.robDisplay, ctx: this.colourCtx }, offerHeroEquipment: (offer) => this.heroEquipment.offer(offer, cameraPosition), sounds: this.sounds }
     this.heroEquipment.begin()
     for (const { renderer } of this.renderers) renderer.update(frame)
     this.heroEquipment.update(cameraPosition, performance.now())
@@ -787,7 +789,8 @@ export class SceneRenderer {
       containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, closeupFaces: c.closeupFaces, heroFaces: c.heroFaces, heroPrepared: c.heroPrepared, heroDrawCalls: c.heroCost.drawCalls, heroTriangles: c.heroCost.triangles, heroMarkStep: c.heroMarks.step, heroMarkPages: c.heroMarks.pages, heroMarkTiles: c.heroMarks.tiles, heroMarkDrawCalls: c.heroMarks.drawCalls, heroMarkBytes: c.heroMarks.texelBytes, culled: c.culled },
       containerAssets: c.assets,
       heroEquipment: this.heroEquipment.count,
-      heroSpreaders: this.heroEquipment.describe(),
+      heroSpreaders: this.heroEquipment.describe('spreader'),
+      heroShcBodies: this.heroEquipment.describe('shc-body'),
     } as SceneStats
   }
 

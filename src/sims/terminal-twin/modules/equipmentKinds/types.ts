@@ -42,7 +42,7 @@ export interface KindFrame {
   /** Colour by (#130): the mode, the ROB display (#168) and the scenario facts the legends need. */
   colour: { mode: ColourBy; robDisplay: RobDisplay; ctx: ColourContext }
   /** Hero equipment (#273): a kind offers each rig that is at LOD0, after posing it; the nearest get the hero spreader. */
-  offerHeroSpreader(offer: HeroEquipmentOffer): void
+  offerHeroEquipment(offer: HeroEquipmentOffer): void
   /** Output: a kind that makes positional sound pushes its sources (position and motion state) here. */
   sounds: SoundSource[]
 }

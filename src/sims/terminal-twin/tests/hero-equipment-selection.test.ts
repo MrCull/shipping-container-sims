@@ -3,7 +3,7 @@
  * `HERO_EQUIPMENT_DISTANCE_M`, capped, and a spreader chosen last frame keeps its place out to 1.15 x the distance.
  */
 import { describe, expect, it } from 'vitest'
-import { HERO_EQUIPMENT_DISTANCE_M, HERO_EQUIPMENT_HYSTERESIS, selectHeroEquipment } from '../modules/heroEquipmentSelection'
+import { HERO_EQUIPMENT_DISTANCE_M, HERO_EQUIPMENT_HYSTERESIS, HERO_SHC_DISTANCE_M, selectHeroEquipment } from '../modules/heroEquipmentSelection'
 
 const none: ReadonlySet<string> = new Set()
 
@@ -108,5 +108,15 @@ describe('selectHeroEquipment', () => {
     ]
     selectHeroEquipment(candidates, 2, none)
     expect(candidates.map((c) => c.id)).toEqual(['b', 'a'])
+  })
+  it('takes the reach as a parameter: the SHC body has 30 m, kept out to 30 x 1.15 m', () => {
+    expect(HERO_SHC_DISTANCE_M).toBe(30)
+    const at = (d: number) => [{ id: 'SHC01', distanceM: d }]
+    expect(selectHeroEquipment(at(28), 1, none)).toEqual([])
+    expect(selectHeroEquipment(at(28), 1, none, HERO_SHC_DISTANCE_M)).toEqual(['SHC01'])
+    expect(selectHeroEquipment(at(31), 1, none, HERO_SHC_DISTANCE_M)).toEqual([])
+    const kept = new Set(['SHC01'])
+    expect(selectHeroEquipment(at(34.4), 1, kept, HERO_SHC_DISTANCE_M)).toEqual(['SHC01'])
+    expect(selectHeroEquipment(at(34.6), 1, kept, HERO_SHC_DISTANCE_M)).toEqual([])
   })
 })

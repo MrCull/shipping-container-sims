@@ -148,6 +148,10 @@ detail. Terms: [GLOSSARY.md](../../../../GLOSSARY.md).
     body takes the rig body's motion from rest), so the headblock, power pack and flippers are squashed to about half
     length. Telescoping ends that slide instead would need new rig nodes in the ASC and SHC rigs and hero files.
   - Draw calls are 12 on the STS, not the spec's 4 ([assets-pipeline.md](assets-pipeline.md), Hero spreaders).
+  - The hero SHC body (#275) hangs under the rig's LOD0 node beside the rig's own body: code that walks an SHC's LOD0
+    (colour modes, picking, a per-mesh change) also meets the hero subtree while it is attached. Hero roots carry
+    `userData.heroEquipmentRoot`; skip them. The hero body's fleet-number plate is the rig's LOD0 `shc_plate` material,
+    adopted by material name at attach (`HeroMount.materials`), so a renamed plate material in `hero-shc.glb` shows a plain plate.
   [rendering-3d.md](rendering-3d.md) (Hero equipment)
 - **Extra shortcuts** E, I and P and the ASC yield moves go beyond the spec (accepted scope). [browser-host.md](browser-host.md)
 - **Far-field livery and corrugation (#170)**: wordmark and rib shading fade to body colour beyond about 80 to 100 m;

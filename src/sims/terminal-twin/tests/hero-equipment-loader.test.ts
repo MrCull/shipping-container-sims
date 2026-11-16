@@ -1,9 +1,11 @@
 /** The hero spreader loader (#273): fetches a kind's file on first need only and hands out clones of its LOD0 subtree. */
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { createHeroSpreaderLoader, type HeroEquipmentKind } from '../modules/heroEquipmentAssets'
 
-const URLS: Record<HeroEquipmentKind, string> = { sts: 'sts.glb', asc: 'asc.glb', shc: 'shc.glb' }
+const URLS: Record<HeroEquipmentKind, string> = { sts: 'sts.glb', asc: 'asc.glb', shc: 'shc.glb', 'shc-body': 'hero-shc.glb' }
 
 function fakeFile(): { scene: THREE.Object3D } {
   const scene = new THREE.Group()
@@ -52,5 +54,17 @@ describe('hero spreader loader', () => {
     }, URLS)
     await expect(load('asc')).rejects.toThrow('offline')
     expect((await load('asc')).name).toBe('LOD0')
+  })
+  it('fetches the SHC body (#275) from its own file, apart from the SHC spreader', async () => {
+    const fetched: string[] = []
+    const load = createHeroSpreaderLoader(async (url) => (fetched.push(url), fakeFile()), URLS)
+    await load('shc')
+    await load('shc-body')
+    expect(fetched).toEqual(['shc.glb', 'hero-shc.glb'])
+  })
+
+  it('names hero-equipment/hero-shc.glb as the default file of the SHC body', () => {
+    const src = readFileSync(fileURLToPath(new URL('../modules/heroEquipmentAssets.ts', import.meta.url)), 'utf8')
+    expect(src).toContain("'shc-body': new URL('../assets/models/hero-equipment/hero-shc.glb', import.meta.url)")
   })
 })

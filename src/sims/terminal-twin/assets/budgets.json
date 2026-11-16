@@ -24,16 +24,17 @@
     }
   },
   "heroEquipmentCaps": {
-    "$comment": "#273, the hero spreaders: the three assets of the hero-equipment kind and how many are drawn at most per quality level (modules/quality.ts `heroEquipment`; 0 from the equipment-hero-off rung down). maxTriangles and maxDrawCalls = spreaders x the kind's per-spreader budget (8 000 triangles, 12 draw calls); tests/hero-equipment-asset.test.ts checks the list against the library, the levels against the quality profiles and the measured spreaders against the caps.",
+    "$comment": "#273, #275, the hero equipment: the three hero spreaders and the hero SHC body, and how many of each are drawn at most per quality level (modules/quality.ts `heroEquipment` for spreaders, `heroShc` for SHC bodies; 0 from the equipment-hero-off rung down). maxTriangles and maxDrawCalls = spreaders x the per-spreader budget (8 000 triangles, 12 draw calls) + shcBodies x the SHC body budget (30 000 triangles, 12 draw calls); tests/hero-equipment-asset.test.ts checks the list against the library, the levels against the quality profiles and the measured spreaders against the caps.",
     "assets": [
       "hero-spreader-sts",
       "hero-spreader-asc",
-      "hero-spreader-shc"
+      "hero-spreader-shc",
+      "hero-shc"
     ],
     "levels": {
-      "high": { "spreaders": 3, "maxTriangles": 24000, "maxDrawCalls": 36 },
-      "medium": { "spreaders": 1, "maxTriangles": 8000, "maxDrawCalls": 12 },
-      "low": { "spreaders": 0, "maxTriangles": 0, "maxDrawCalls": 0 }
+      "high": { "spreaders": 3, "shcBodies": 1, "maxTriangles": 54000, "maxDrawCalls": 48 },
+      "medium": { "spreaders": 1, "shcBodies": 0, "maxTriangles": 8000, "maxDrawCalls": 12 },
+      "low": { "spreaders": 0, "shcBodies": 0, "maxTriangles": 0, "maxDrawCalls": 0 }
     }
   },
   "requiredMetaFields": [

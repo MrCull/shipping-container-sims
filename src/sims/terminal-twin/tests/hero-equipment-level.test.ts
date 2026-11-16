@@ -2,7 +2,7 @@
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 import { HERO_EQUIPMENT_RETRY_MS, HeroEquipmentLevel } from '../modules/heroEquipment'
-import { heroSpreaderMount, type HeroSpreaderMount } from '../modules/heroSpreaderMount'
+import { heroBodyMount, heroSpreaderMount, type HeroMount, type HeroSpreaderMount } from '../modules/heroSpreaderMount'
 import type { HeroEquipmentKind } from '../modules/heroEquipmentAssets'
 import { HERO_FADE_MS, HERO_SETTLE_MS } from '../modules/heroPrep'
 
@@ -302,5 +302,195 @@ describe('hero equipment level', () => {
     const squeezed = level.describe()[0]
     expect(squeezed.hero.max[2] - squeezed.hero.min[2]).toBeCloseTo(1, 5)
     expect(squeezed.rig.max[2] - squeezed.rig.min[2]).toBeCloseTo(3.175, 5)
+  })
+})
+
+/** An SHC LOD0 as `shc.glb` has it, trimmed: frame mesh, a wheel empty (mesh child), the hoist empty with the spreader under it. */
+interface FakeShc {
+  lod0: THREE.Group
+  spreaderMount: HeroSpreaderMount
+  bodyMount: HeroMount
+  frameMesh: THREE.Mesh
+  wheel: THREE.Object3D
+  hoist: THREE.Object3D
+  spreader: THREE.Object3D
+  spreaderBody: THREE.Mesh
+}
+
+function fakeShc(x: number): FakeShc {
+  const lod0 = new THREE.Group()
+  lod0.name = 'LOD0'
+  lod0.position.set(x, 0, 0)
+  const frameMesh = mesh('frame')
+  const wheel = new THREE.Group()
+  wheel.name = 'wheel_fl'
+  wheel.position.set(2, 0.8, 1)
+  wheel.add(mesh('wheel_fl_geo'))
+  const hoist = new THREE.Group()
+  hoist.name = 'hoist'
+  hoist.position.set(0, 10, 0)
+  hoist.add(mesh('hoist_geo'))
+  const spreader = spreaderTree('spreader', 1)
+  spreader.position.set(0, -2, 0)
+  hoist.add(spreader)
+  lod0.add(frameMesh, wheel, hoist)
+  return {
+    lod0,
+    spreaderMount: heroSpreaderMount(lod0)!,
+    bodyMount: heroBodyMount(lod0, new THREE.Vector3(0, 7.5, 0)),
+    frameMesh,
+    wheel,
+    hoist,
+    spreader,
+    spreaderBody: spreader.getObjectByName('spreader_geo') as THREE.Mesh,
+  }
+}
+
+/** The hero body file: the same rig nodes minus the spreader, each mesh a detailed stand-in. */
+function heroBody(): THREE.Object3D {
+  const root = new THREE.Group()
+  root.name = 'LOD0'
+  const wheel = new THREE.Group()
+  wheel.name = 'wheel_fl'
+  wheel.position.set(2, 0.8, 1)
+  wheel.add(mesh('wheel_fl_geo'))
+  const hoist = new THREE.Group()
+  hoist.name = 'hoist'
+  hoist.position.set(0, 10, 0)
+  hoist.add(mesh('hoist_geo'))
+  root.add(mesh('frame'), wheel, hoist)
+  return root
+}
+
+const heroBodyOf = (shc: FakeShc): THREE.Object3D | undefined => shc.lod0.children.find((c) => c.name === 'LOD0')
+const heroSpreaderOf = (shc: FakeShc): THREE.Object3D | undefined => shc.spreader.children.find((c) => c.name === 'LOD0')
+const bodyRigMeshes = (shc: FakeShc): THREE.Mesh[] => [shc.frameMesh, shc.wheel.children[0] as THREE.Mesh, shc.hoist.children[0] as THREE.Mesh]
+type Piece = 'spreader' | 'body'
+
+function shcHarness(caps: { spreader: number; body: number }) {
+  const loads: HeroEquipmentKind[] = []
+  const level = new HeroEquipmentLevel({ load: async (kind) => (loads.push(kind), kind === 'shc-body' ? heroBody() : spreaderTree('LOD0', 2)), now: () => 0 })
+  level.setCaps({ heroEquipment: caps.spreader, heroShc: caps.body })
+  const camera = new THREE.Vector3(0, 7.5, 0)
+  let t = 0
+  /** One frame with these SHCs offered (`pieces` chooses which pieces each offers). */
+  const frame = async (shcs: Record<string, FakeShc>, pieces: readonly Piece[] = ['spreader', 'body'], dtMs = 100) => {
+    t += dtMs
+    level.begin()
+    for (const [id, shc] of Object.entries(shcs)) {
+      if (pieces.includes('spreader')) level.offer({ id, kind: 'shc', mount: shc.spreaderMount }, camera)
+      if (pieces.includes('body')) level.offer({ id, kind: 'shc-body', mount: shc.bodyMount }, camera)
+    }
+    level.update(camera, t)
+    await Promise.resolve()
+    await Promise.resolve()
+  }
+  const settle = async (shcs: Record<string, FakeShc>, pieces?: readonly Piece[]) => {
+    for (let i = 0; i < 4 + Math.ceil((HERO_SETTLE_MS + HERO_FADE_MS) / 100); i++) await frame(shcs, pieces)
+  }
+  return { level, loads, camera, frame, settle }
+}
+
+describe('hero SHC body (#275)', () => {
+  it('attaches under the LOD0 node, hides only the body meshes after the fade, and leaves the spreader subtree alone', async () => {
+    const h = shcHarness({ spreader: 0, body: 1 })
+    const shc = fakeShc(10)
+    await h.settle({ a: shc }, ['body'])
+    const hero = heroBodyOf(shc)!
+    expect(hero).toBeDefined()
+    expect(hero.position.toArray()).toEqual([0, 0, 0])
+    for (const m of bodyRigMeshes(shc)) expect(m.visible, m.name).toBe(false)
+    expect(shc.spreaderBody.visible).toBe(true)
+    expect(shc.spreader.getObjectByName('twistlock_fl')!.children[0].visible).toBe(true)
+    hero.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) expect((o as THREE.Mesh).castShadow).toBe(true)
+    })
+    expect(h.level.count).toBe(1)
+    expect(h.level.countOf('shc-body')).toBe(1)
+    expect(h.level.describe('shc-body')).toMatchObject([{ id: 'a', kind: 'shc-body', rigHidden: true }])
+    expect(h.level.describe('spreader')).toEqual([])
+    expect(h.loads).toEqual(['shc-body'])
+  })
+
+  it('dithers the body meshes out while it fades in, never the spreader', async () => {
+    const h = shcHarness({ spreader: 0, body: 1 })
+    const shc = fakeShc(10)
+    let sawFade = false
+    for (let i = 0; i < 20 && !(h.level.settled && h.level.count === 1); i++) {
+      await h.frame({ a: shc }, ['body'], 50)
+      if (heroBodyOf(shc) && !h.level.settled) {
+        sawFade = true
+        expect(shc.frameMesh.visible).toBe(true)
+        expect(shc.frameMesh.material).not.toBe(material)
+        expect(shc.spreaderBody.material).toBe(material)
+      }
+    }
+    expect(sawFade).toBe(true)
+    expect(shc.frameMesh.material).toBe(material)
+  })
+
+  it('copies the rig motion: a wheel spin and the hoist travel show on the hero body', async () => {
+    const h = shcHarness({ spreader: 0, body: 1 })
+    const shc = fakeShc(10)
+    await h.settle({ a: shc }, ['body'])
+    const hero = heroBodyOf(shc)!
+    shc.wheel.rotation.z = 1.2
+    shc.hoist.position.y = 6
+    await h.frame({ a: shc }, ['body'])
+    const q = new THREE.Quaternion()
+    const p = new THREE.Vector3()
+    hero.getObjectByName('wheel_fl')!.matrix.decompose(p, q, new THREE.Vector3())
+    expect(new THREE.Euler().setFromQuaternion(q).z).toBeCloseTo(1.2, 6)
+    p.toArray().forEach((c, i) => expect(c).toBeCloseTo([2, 0.8, 1][i], 6))
+    hero.getObjectByName('hoist')!.matrix.decompose(p, q, new THREE.Vector3())
+    expect(p.y).toBeCloseTo(6, 6)
+  })
+
+  it('spreader and body on one SHC attach, fade and release independently', async () => {
+    const h = shcHarness({ spreader: 1, body: 1 })
+    const shc = fakeShc(10)
+    await h.settle({ a: shc })
+    expect(heroBodyOf(shc)).toBeDefined()
+    expect(heroSpreaderOf(shc)).toBeDefined()
+    expect(h.level.count).toBe(2)
+    expect(shc.spreaderBody.visible).toBe(false)
+    // the body goes: its meshes come back, the spreader's stay hidden under the hero spreader
+    await h.frame({ a: shc }, ['spreader'])
+    expect(heroBodyOf(shc)).toBeUndefined()
+    for (const m of bodyRigMeshes(shc)) expect(m.visible, m.name).toBe(true)
+    expect(shc.spreaderBody.visible).toBe(false)
+    expect(heroSpreaderOf(shc)).toBeDefined()
+    // the body comes back; then the spreader goes and leaves the body meshes hidden
+    await h.settle({ a: shc })
+    await h.frame({ a: shc }, ['body'])
+    expect(heroSpreaderOf(shc)).toBeUndefined()
+    expect(shc.spreaderBody.visible).toBe(true)
+    for (const m of bodyRigMeshes(shc)) expect(m.visible, m.name).toBe(false)
+    expect(h.level.countOf('shc-body')).toBe(1)
+    expect(h.level.countOf('spreader')).toBe(0)
+  })
+
+  it('has its own cap: a full spreader cap does not keep a body out, and a body cap of 0 (Medium, Low) draws none', async () => {
+    const h = shcHarness({ spreader: 1, body: 1 })
+    const a = fakeShc(5)
+    const b = fakeShc(12)
+    await h.settle({ a, b })
+    expect(h.level.countOf('spreader')).toBe(1)
+    expect(h.level.countOf('shc-body')).toBe(1)
+    expect(heroBodyOf(a)).toBeDefined()
+    expect(heroBodyOf(b)).toBeUndefined()
+    h.level.setCaps({ heroEquipment: 1, heroShc: 0 })
+    await h.frame({ a, b })
+    expect(h.level.countOf('shc-body')).toBe(0)
+    expect(h.level.countOf('spreader')).toBe(1)
+    for (const m of bodyRigMeshes(a)) expect(m.visible).toBe(true)
+  })
+
+  it('reaches 30 m from the SHC centre, where a spreader (25 m) does not', async () => {
+    const h = shcHarness({ spreader: 1, body: 1 })
+    const shc = fakeShc(28)
+    await h.settle({ a: shc })
+    expect(h.level.countOf('shc-body')).toBe(1)
+    expect(h.level.countOf('spreader')).toBe(0)
   })
 })

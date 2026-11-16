@@ -46,6 +46,8 @@ export interface QualityProfile {
   heroStillBoxes: number
   /** Hero spreaders (#273): spreaders drawn with the hero model at most (`selectHeroEquipment`'s cap), 0 on Low. */
   heroEquipment: number
+  /** Hero SHC bodies (#275): SHCs drawn with the hero body at most (its own cap, never shared with the spreaders): High 1, else 0. */
+  heroShc: number
   /** Multiplier on the LOD switch distances of the cranes and carriers (STS, SHC, ASC): below 1 they drop to cheaper LODs sooner. */
   lodScale: number
   /** Multiplier on the device pixel ratio (render resolution), before the cap of 2. */
@@ -62,9 +64,9 @@ export interface QualityProfile {
 }
 
 export const QUALITY_PROFILES: Readonly<Record<QualityLevel, QualityProfile>> = {
-  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, heroBoxes: 0, heroStillBoxes: 0, heroEquipment: 0, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
-  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, heroBoxes: 12, heroStillBoxes: 0, heroEquipment: 1, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
-  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, heroBoxes: 32, heroStillBoxes: 0, heroEquipment: 3, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
+  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, heroBoxes: 0, heroStillBoxes: 0, heroEquipment: 0, heroShc: 0, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
+  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, heroBoxes: 12, heroStillBoxes: 0, heroEquipment: 1, heroShc: 0, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
+  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, heroBoxes: 32, heroStillBoxes: 0, heroEquipment: 3, heroShc: 1, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
 }
 
 export const profileFor = (level: QualityLevel): QualityProfile => QUALITY_PROFILES[level]
@@ -97,7 +99,7 @@ export class FpsMeter {
  * quarter and none: after none it would shed nothing.
  *
  * Hero spreaders (#273) go first, at `equipment-hero-off`, before any box hero detail: they are fewer, larger objects,
- * and their detail is less visible than a box face. From that rung down `heroEquipment` is 0.
+ * and their detail is less visible than a box face. From that rung down `heroEquipment` and `heroShc` (#275) are 0.
  */
 /**
  * From `hero-off` down the only hero faces are the still-camera floor (`HERO_STILL_BOXES`): few, and painted while
@@ -148,12 +150,13 @@ export function profileForRung(rung: number): QualityProfile {
   const r = AUTO_RUNGS[at]
   const base = QUALITY_PROFILES[r.level]
   const heroEquipment = at < EQUIPMENT_HERO_OFF_RUNG ? base.heroEquipment : 0
+  const heroShc = at < EQUIPMENT_HERO_OFF_RUNG ? base.heroShc : 0
   const heroBoxes = Math.floor(QUALITY_PROFILES.high.heroBoxes * r.heroShare)
   if (r.name === 'shadows-resolution') {
     const medium = QUALITY_PROFILES.medium
-    return { ...base, heroBoxes, heroEquipment, heroStillBoxes: HERO_STILL_BOXES, shadowMapSize: medium.shadowMapSize, resolutionScale: medium.resolutionScale }
+    return { ...base, heroBoxes, heroEquipment, heroShc, heroStillBoxes: HERO_STILL_BOXES, shadowMapSize: medium.shadowMapSize, resolutionScale: medium.resolutionScale }
   }
-  return { ...base, heroBoxes, heroEquipment, heroStillBoxes: HERO_STILL_BOXES }
+  return { ...base, heroBoxes, heroEquipment, heroShc, heroStillBoxes: HERO_STILL_BOXES }
 }
 
 /** Boxes' worth of hero faces while Auto is paused with a stopped camera (Medium's cap: at most 3 + 3 sharp marking pages, 96 MB). */

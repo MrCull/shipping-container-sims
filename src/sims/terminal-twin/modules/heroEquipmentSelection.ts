@@ -9,6 +9,8 @@ import { HERO_HYSTERESIS } from './heroFaceSelection'
 
 /** Beyond this camera distance (m) to the spreader centre a spreader never gets the hero model (a spreader is 12 m long). */
 export const HERO_EQUIPMENT_DISTANCE_M = 25
+/** Beyond this camera distance (m) to the SHC centre an SHC never gets the hero body (#275; the carrier is about 15 m high). */
+export const HERO_SHC_DISTANCE_M = 30
 /** A chosen spreader keeps its place out to the distance times this factor (the hero faces' factor). */
 export const HERO_EQUIPMENT_HYSTERESIS = HERO_HYSTERESIS
 
@@ -19,15 +21,19 @@ export interface HeroEquipmentCandidate {
   distanceM: number
 }
 
-/** The ids to draw with the hero model this frame, nearest first; `previous` is last frame's result. */
-export function selectHeroEquipment(candidates: readonly HeroEquipmentCandidate[], cap: number, previous: ReadonlySet<string>): string[] {
+/**
+ * The ids to draw with the hero model this frame, nearest first; `previous` is last frame's result. `distanceM` is the
+ * piece's reach (`HERO_EQUIPMENT_DISTANCE_M` for spreaders, `HERO_SHC_DISTANCE_M` for the SHC body); each piece type is
+ * selected on its own, with its own cap.
+ */
+export function selectHeroEquipment(candidates: readonly HeroEquipmentCandidate[], cap: number, previous: ReadonlySet<string>, distanceM = HERO_EQUIPMENT_DISTANCE_M): string[] {
   if (cap <= 0) return []
   const byDistance = (a: HeroEquipmentCandidate, b: HeroEquipmentCandidate): number => a.distanceM - b.distanceM
-  const sticky = HERO_EQUIPMENT_DISTANCE_M * HERO_EQUIPMENT_HYSTERESIS
+  const sticky = distanceM * HERO_EQUIPMENT_HYSTERESIS
   const chosen = candidates.filter((c) => previous.has(c.id) && c.distanceM <= sticky).sort(byDistance)
   if (chosen.length > cap) chosen.length = cap
   if (chosen.length < cap) {
-    const fresh = candidates.filter((c) => !previous.has(c.id) && c.distanceM <= HERO_EQUIPMENT_DISTANCE_M).sort(byDistance)
+    const fresh = candidates.filter((c) => !previous.has(c.id) && c.distanceM <= distanceM).sort(byDistance)
     for (let i = 0; i < fresh.length && chosen.length < cap; i++) chosen.push(fresh[i])
   }
   return chosen.sort(byDistance).map((c) => c.id)
