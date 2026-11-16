@@ -128,6 +128,7 @@ Budgets and current counts (from `tt:assets:check`, triangles / draw calls):
 | `container` | 450 / 3 | 12 / 1 | | 400 KB | 20 ft 308 / 3, 12 / 1; 40 and 40HC 440 / 3, 12 / 1; about 135 KB each (mostly the 2048 livery atlas) |
 | `hero-container` | 520 / 3 (per face, LOD0 only) | | | 60 KB | 82 to 458 triangles, 2 to 3 draw calls; 20 to 29 KB per face (see Hero container faces) |
 | `hero-equipment` | 8 000 / 12 (per spreader, LOD0 only) | | | 300 KB | STS 2 408 / 12, ASC 2 512 / 5, SHC 2 584 / 5; 59 to 63 KB (see Hero spreaders) |
+| `hero-shc` | 30 000 / 12 (LOD0 only) | | | 1.2 MB | 18 092 / 11; about 300 KB (see Hero SHC body) |
 | `sts` | 40 000 / 20 | 8 000 / 10 | 1 000 / 6 | 3 MB | 31 690 / 18, 5 912 / 10, 490 / 5; 561 KB |
 | `asc` | 15 000 / 10 | 4 000 / 6 | 600 / 3 | 1.5 MB | 12 998 / 9, 3 844 / 5, 556 / 3; 295 KB |
 | `shc` | 12 000 / 16 | 3 000 / 12 | 400 / 3 | 1.5 MB | 9 856 / 16, 2 154 / 12, 358 / 2; 291 KB |
@@ -216,6 +217,15 @@ photos into asset directories.
 - **Draw calls:** one mesh per moving rig node, on one material: ASC and SHC 5 (frame and 4 twist-locks), STS 12 (frame, 2 telescopes, twin unit, 8 twist-locks). The spec asked for 4; that is only possible with the twist-locks baked into the frame, which stops them turning, so the budget is 12 and the owner decides on #273 or #274 (a renderer may also merge the twist-locks of a spreader that is not locking).
 - **Budget:** the kind `hero-equipment` (per spreader) and `heroEquipmentCaps` in `budgets.json`: the three assets and, per quality level, the spreaders drawn at most with their triangle and draw-call totals (High 3, Medium 1, Low 0). `tests/hero-equipment-asset.test.ts` checks the list against the library, the levels against `QUALITY_PROFILES` and the measured files against the caps.
 - Previews: `previews/hero-spreader-<kind>-view.webp`.
+
+## Hero SHC body
+
+Same `hero-equipment` group (#275), `tt_assets/hero_shc.py`: `assets/models/hero-equipment/hero-shc.glb` plus `hero-shc.meta.json` and `previews/hero-shc-view.webp`, kind `hero-shc`, `LOD0` only (18 092 triangles, 11 draw calls, about 300 KB). It is `shc.glb` LOD0 in the same root frame (origin on the ground below the frame centre), with the same rig nodes, pivots and axes imported from `shc.py`: `frame` and `plates` meshes, `steer_fl|fr|rl|rr` > `wheel_*` and `hoist`, each rig node an empty with a `<name>_geo` mesh child.
+
+- **Left out:** the `spreader` subtree (spreader and its four twist-locks). The #273 hero spreader already replaces those under LOD0's `spreader` node and keeps working unchanged; putting a spreader in the body would mean remounting the hero spreader under it. The sidecar lists the left-out nodes in `heroEquipment.leftOut`.
+- **Detail:** chevron tread lugs in geometry up to the full tyre radius (so rolling radius and bounds stay those of `shc.glb`), a sidewall band, rims with hub cap and 10 nuts; fork stiffeners and a steering cylinder; leg stiffeners and diaphragm lips above the hazard bands, chain sprockets at the leg heads; cab glazing bars, wipers, a second mirror, door grab and roof handrail; warning bands on the bumper rails; chain stubs and hazard bands on the hoist frame. All static detail is merged into the moving node's own mesh (the frame for everything fixed).
+- **Materials:** the two of `shc.glb`, `shc_atlas` (same swatch atlas) and `shc_plate` (fleet-number plates, authored for tile 0; the renderer finds it by name and offsets the UVs per SHC). No normal map: the tread is geometry, within budget.
+- **Budget:** kind `hero-shc` in `budgets.json` (the `hero-equipment` kind's 8 000 triangles cannot hold a body): LOD0 30 000 triangles and 12 draw calls, 1.2 MB per file. `tests/hero-shc-asset.test.ts` decodes it against `shc.glb` LOD0: every non-spreader rig node with the same world pivot (1 mm) and rotation, overall bounds without the spreader within 1 cm, no spreader or twist-lock node, `shc_plate` on `plates`, and the budget.
 
 ## Equipment, vessels and infrastructure generators
 
