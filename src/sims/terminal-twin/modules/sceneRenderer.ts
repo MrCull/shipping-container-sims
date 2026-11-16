@@ -23,7 +23,7 @@ import { NO_OVERLAYS, type OverlayState } from './overlays'
 
 export type { OverlayState }
 import { ContainerCloseups } from './containerCloseups'
-import { HeroEquipmentLevel, type HeroSpreaderInfo } from './heroEquipment'
+import { HeroEquipmentLevel, type HeroPieceInfo } from './heroEquipment'
 import { HeroLevel } from './heroRenderer'
 import type { HeroMarkStep } from './heroMarkings'
 import { ContainerInstancer, type DrawnBox } from './containerInstancer'
@@ -83,9 +83,9 @@ export interface SceneStats {
   /** Hero pieces in the scene: spreaders (#273, at most the quality level's `heroEquipment`) plus SHC bodies (#275, at most `heroShc`). */
   heroEquipment: number
   /** Each hero spreader with its world bounds and those of the rig spreader it replaces (#273). */
-  heroSpreaders: HeroSpreaderInfo[]
+  heroSpreaders: HeroPieceInfo[]
   /** Each hero SHC body with its world bounds and those of the rig's LOD0 body meshes it replaces (#275). */
-  heroShcBodies: HeroSpreaderInfo[]
+  heroShcBodies: HeroPieceInfo[]
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -738,7 +738,7 @@ export class SceneRenderer {
     return this.hero.settled && this.heroEquipment.settled
   }
 
-  /** Hero spreaders in the scene last frame (#273). */
+  /** Hero equipment pieces (spreaders and SHC bodies) in the scene last frame (#273, #275). */
   heroEquipmentCount(): number {
     return this.heroEquipment.count
   }
@@ -812,6 +812,8 @@ export class SceneRenderer {
 
   dispose(): void {
     this.disposed = true
+    // first: the hero pieces go before the kind renderers free what they share (the hero SHC body wears its rig's
+    // plate material, which `ShcRig.dispose()` frees; tests/hero-equipment-level.test.ts checks this order)
     this.heroEquipment.dispose()
     this.atmosphere.dispose()
     this.backdrop.dispose()

@@ -83,7 +83,7 @@
         "LOD0": { "maxTriangles": 30000, "maxDrawCalls": 12 }
       },
       "maxFileBytes": 1200000,
-      "requiredNodes": ["LOD0", "frame", "plates", "hoist"]
+      "requiredNodes": ["LOD0", "frame", "plates", "hoist", "steer_fl", "steer_fr", "steer_rl", "steer_rr", "wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"]
     },
     "container": {
       "lods": {

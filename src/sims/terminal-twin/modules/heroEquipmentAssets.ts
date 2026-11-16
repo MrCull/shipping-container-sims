@@ -27,7 +27,7 @@ type Fetch = (url: string) => Promise<{ scene: THREE.Object3D }>
  * A loader with its own cache: one fetch per kind, on the first call for that kind; every call resolves to a new clone
  * of the file's `LOD0` subtree. Clones share geometry and materials (never dispose them from a renderer).
  */
-export function createHeroSpreaderLoader(fetchGltf: Fetch = loadGltf, urls: Record<HeroEquipmentKind, string> = URLS): (kind: HeroEquipmentKind) => Promise<THREE.Object3D> {
+export function createHeroEquipmentLoader(fetchGltf: Fetch = loadGltf, urls: Record<HeroEquipmentKind, string> = URLS): (kind: HeroEquipmentKind) => Promise<THREE.Object3D> {
   const cache = new Map<HeroEquipmentKind, Promise<THREE.Object3D>>()
   return async (kind) => {
     let pending = cache.get(kind)
@@ -45,6 +45,4 @@ export function createHeroSpreaderLoader(fetchGltf: Fetch = loadGltf, urls: Reco
 }
 
 /** The cloned `LOD0` subtree of the hero piece for `kind`; the file is fetched on the first call for that kind. */
-export const loadHeroSpreader = createHeroSpreaderLoader()
-/** The same loader under the general name (#275): every hero piece kind, spreaders and the SHC body. */
-export const loadHeroEquipment = loadHeroSpreader
+export const loadHeroEquipment = createHeroEquipmentLoader()

@@ -7,7 +7,7 @@ import { stsBeaconOffsets } from '../gantryBeacons'
 import { spreaderModeFor } from '../spreaderMode'
 import { loadStsTemplate, StsModel, type SpreaderMode } from '../stsAssets'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
-import { offerHeroEquipmentAtLod0 } from '../heroSpreaderMount'
+import { offerHeroEquipmentAtLod0 } from '../heroEquipmentMount'
 
 /** Z of the landside crane rail. */
 const STS_LAND_RAIL_Z = STS.waterRailZ + STS.gauge

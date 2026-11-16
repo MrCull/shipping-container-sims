@@ -25,9 +25,6 @@ export interface HeroMount {
   materials?: ReadonlyMap<string, THREE.Material>
 }
 
-/** A hero spreader mount (#273): the rig's LOD0 `spreader` node. */
-export type HeroSpreaderMount = HeroMount
-
 /** The first node named `name` under `root`, or null. */
 function findNode(root: THREE.Object3D, name: string): THREE.Object3D | null {
   let node: THREE.Object3D | null = null
@@ -41,7 +38,7 @@ function findNode(root: THREE.Object3D, name: string): THREE.Object3D | null {
  * The mount of a rig's LOD0 subtree, or null when it has no `spreader` node. Call it before the rig is first posed:
  * the copy taken here is the rest pose that later motion is measured against.
  */
-export function heroSpreaderMount(lod0: THREE.Object3D): HeroSpreaderMount | null {
+export function heroSpreaderMount(lod0: THREE.Object3D): HeroMount | null {
   const node = findNode(lod0, 'spreader')
   if (!node) return null
   return { node, rest: node.clone(true) }

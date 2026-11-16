@@ -7,7 +7,7 @@ import { CONTAINER_DIMS } from '../sceneModel'
 import { loadShcModel, ShcRig, SHC_RIG } from '../shcAssets'
 import { spreaderLengthRatio, spreaderModeFor, type SpreaderMode } from '../spreaderMode'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
-import { offerHeroEquipmentAtLod0 } from '../heroSpreaderMount'
+import { offerHeroEquipmentAtLod0 } from '../heroEquipmentMount'
 
 /** [A] How fast an empty spreader rises and lowers when the engine gives it no lift motion (m/s of display time). */
 const EMPTY_HOIST_MPS = 1.5

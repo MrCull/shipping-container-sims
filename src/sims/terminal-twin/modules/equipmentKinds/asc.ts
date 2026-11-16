@@ -9,7 +9,7 @@ import { ascBeaconOffsets } from '../gantryBeacons'
 import { CONTAINER_DIMS } from '../sceneModel'
 import { spreaderLengthRatio, spreaderModeFor, type SpreaderMode } from '../spreaderMode'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
-import { offerHeroEquipmentAtLod0 } from '../heroSpreaderMount'
+import { offerHeroEquipmentAtLod0 } from '../heroEquipmentMount'
 
 interface AscParts {
   group: THREE.Group

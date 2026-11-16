@@ -140,7 +140,7 @@ is owned by the scene renderer, which sets the caps from the quality profile (`s
   spreaders for the spreader cap. Today: `spreader` (kinds `sts`, `asc`, `shc`; 25 m; `heroEquipment`: High 3, Medium 1,
   Low 0) and `shc-body` (kind `shc-body`; `HERO_SHC_DISTANCE_M` = 30 m from the SHC centre; `heroShc`: High 1, Medium 0,
   Low 0); both caps are 0 from the `equipment-hero-off` rung down. How a piece mounts is in its `HeroMount`
-  (`heroSpreaderMount.ts`): the rig node its `LOD0` goes under, the rest copy, an optional `skip` subtree, an optional
+  (`heroEquipmentMount.ts`): the rig node its `LOD0` goes under, the rest copy, an optional `skip` subtree, an optional
   `centre` for the distance and optional `materials` adopted by name. Adding a piece (#276, the hero truck): a
   `HERO_PIECES` entry, a quality field, a URL in `heroEquipmentAssets.ts`, and a kind hook (the rig builds a mount, the
   kind calls `offerHeroEquipmentAtLod0`).
@@ -157,7 +157,7 @@ is owned by the scene renderer, which sets the caps from the quality profile (`s
   at LOD0, after posing it, through one helper, `offerHeroEquipmentAtLod0(frame, id, kind, lod, mount)` (the SHC kind offers
   twice: `shc` with `heroMount` and `shc-body` with `heroBodyMount`). `mount` is the
   rig's `heroMount` (`heroSpreaderMount(lod0)`: the LOD0 `spreader` node and a copy of it at rest, taken before the first
-  pose). Mount, offer type and helper are in `modules/heroSpreaderMount.ts`, the rig-side module: the rig models and the
+  pose). Mount, offer type and helper are in `modules/heroEquipmentMount.ts`, the rig-side module: the rig models and the
   kinds import it, not the level. The distance is from the camera to that node's world position (or the mount's `centre`),
   not to the crane centre the LOD choice uses; an offer beyond the piece's distance x 1.15 is dropped at once.
 - **Selection.** `selectHeroEquipment(candidates, cap, previous, distanceM)` (`heroEquipmentSelection.ts`), per piece: within
@@ -184,20 +184,28 @@ is owned by the scene renderer, which sets the caps from the quality profile (`s
   own spreader meshes dither **out** with the complementary pattern (same dither value from `gl_FragCoord`, opposite
   test), so every pixel is drawn by exactly one of the two models and no hole shows the background. Neither file's
   material has a fade input, so during the fade the hero meshes and the rig spreader meshes each wear their own copy of
-  their material with a shared `heroSpreaderFade` uniform (`ditherMaterial`, direction `in` or `out`; a patch the rig
+  their material with a shared `heroEquipmentFade` uniform (`ditherMaterial`, direction `in` or `out`; a patch the rig
   material already has, such as a plate offset, is kept, and the program cache key is the material's own plus the
-  direction). When the fade ends, or the spreader is released during it, the shared materials are put back on both, the
-  copies are disposed, and at the end of the fade the rig meshes are hidden (`visible = false`; the rig code never sets
+  direction). When the fade-in ends the shared materials are put back on both, the copies are disposed, and the rig
+  meshes are hidden (`visible = false`; the rig code never sets
   visibility on them). The STS headblock is the rig's `hoist` node and stays.
 - **Motion.** The rig code holds its own nodes and keeps moving them (twistlock turn, STS telescopes and twin unit, the 20 ft
   squeeze of the ASC and SHC spreader body and lock pattern). Every frame each hero node with a rig node of the same name
   gets `matrix = rigNow x rigRest^-1 x heroRest` (`matrixAutoUpdate` off), so it shows the rig's motion from rest whatever
   the rig does, also where the two files' mesh nodes carry different dequantisation transforms.
-- **Release.** Not chosen any more (farther away, rig left LOD0, cap 0): the hero subtree is removed and the rig meshes are
-  shown again; `dispose()` does it for all. Geometry and materials belong to the loader's cache and are not disposed.
-- **Readouts.** `__tt.scene().heroEquipment` and `__tt.perf().stats.heroEquipment` (the Stats panel's "Hero spreaders",
-  `tt-perf-hero-equipment`) count attached hero pieces, spreaders and SHC bodies together (`countOf(piece)` splits them). `__tt.heroSettled()` is false while a chosen spreader waits for
-  the camera gate, its file or a prep slot, or fades in (not while a failed load waits on its back-off, see Failed load).
+- **Release: the same fade backwards (review of #275).** Not chosen any more (farther away, rig left LOD0, cap 0): the
+  piece fades out over `HERO_FADE_MS` with the same two dither patterns run backwards (the rig meshes are shown again at
+  once, wearing their `out` copies, and the fade value falls from where it is to 0), so the drop back has no pop; then
+  the hero subtree is removed and the shared materials are put back. The fade is one value per piece moving towards a
+  target (1 attaching, 0 releasing): a release during the fade-in, or a piece chosen again during its fade-out, turns
+  around from the value it has reached, with no new load. A releasing piece is no longer counted (`count`, `countOf`,
+  so `stats.heroEquipment` drops at once) or described (`heroSpreaders`, `heroShcBodies`), but `heroSettled()` stays
+  false until its fade-out ends. `dispose()` removes every piece at once. Geometry and materials belong to the loader's
+  cache and are not disposed. Teardown order: `SceneRenderer.dispose()` disposes the hero level before the kind
+  renderers, because the hero SHC body wears its rig's plate material, which `ShcRig.dispose()` frees.
+- **Readouts.** `__tt.scene().heroEquipment` and `__tt.perf().stats.heroEquipment` (the Stats panel's "Hero equipment",
+  `tt-perf-hero-equipment`) count attached hero pieces (fading in or shown, not fading out), spreaders and SHC bodies together (`countOf(piece)` splits them). `__tt.heroSettled()` is false while a chosen spreader waits for
+  the camera gate, its file or a prep slot, or a piece fades in or out (not while a failed load waits on its back-off, see Failed load).
 
   `__tt.scene().heroSpreaders` lists each attached one (`id`, `kind`, `fading`, `rigHidden`) with the world bounds of the
   hero model and of the rig spreader meshes it replaces (each rig mesh by its own geometry), so a test can check place,

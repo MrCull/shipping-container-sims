@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { createHeroSpreaderLoader, type HeroEquipmentKind } from '../modules/heroEquipmentAssets'
+import { createHeroEquipmentLoader, type HeroEquipmentKind } from '../modules/heroEquipmentAssets'
 
 const URLS: Record<HeroEquipmentKind, string> = { sts: 'sts.glb', asc: 'asc.glb', shc: 'shc.glb', 'shc-body': 'hero-shc.glb' }
 
@@ -24,7 +24,7 @@ function fakeFile(): { scene: THREE.Object3D } {
 describe('hero spreader loader', () => {
   it('fetches nothing until a kind is asked for, then that file once', async () => {
     const fetched: string[] = []
-    const load = createHeroSpreaderLoader(async (url) => (fetched.push(url), fakeFile()), URLS)
+    const load = createHeroEquipmentLoader(async (url) => (fetched.push(url), fakeFile()), URLS)
     expect(fetched).toEqual([])
     await Promise.all([load('asc'), load('asc')])
     await load('asc')
@@ -34,7 +34,7 @@ describe('hero spreader loader', () => {
   })
 
   it('returns a separate clone of the LOD0 subtree on every call, rig nodes included', async () => {
-    const load = createHeroSpreaderLoader(async () => fakeFile(), URLS)
+    const load = createHeroEquipmentLoader(async () => fakeFile(), URLS)
     const a = await load('shc')
     const b = await load('shc')
     expect(a.name).toBe('LOD0')
@@ -48,7 +48,7 @@ describe('hero spreader loader', () => {
 
   it('retries after a failed fetch', async () => {
     let calls = 0
-    const load = createHeroSpreaderLoader(async () => {
+    const load = createHeroEquipmentLoader(async () => {
       if (calls++ === 0) throw new Error('offline')
       return fakeFile()
     }, URLS)
@@ -57,7 +57,7 @@ describe('hero spreader loader', () => {
   })
   it('fetches the SHC body (#275) from its own file, apart from the SHC spreader', async () => {
     const fetched: string[] = []
-    const load = createHeroSpreaderLoader(async (url) => (fetched.push(url), fakeFile()), URLS)
+    const load = createHeroEquipmentLoader(async (url) => (fetched.push(url), fakeFile()), URLS)
     await load('shc')
     await load('shc-body')
     expect(fetched).toEqual(['shc.glb', 'hero-shc.glb'])

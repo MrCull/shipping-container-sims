@@ -11,7 +11,7 @@ import type { SceneStats } from '../sceneRenderer'
 import type { GantryBeacons } from '../gantryBeacons'
 import type { SoundSource } from '../soundMixer'
 import type { ColourBy, ColourContext, RobDisplay } from '../colourBy'
-import type { HeroEquipmentOffer } from '../heroSpreaderMount'
+import type { HeroEquipmentOffer } from '../heroEquipmentMount'
 
 /** What a kind's renderer gets from the scene renderer when it is built. */
 export interface KindRendererHost {

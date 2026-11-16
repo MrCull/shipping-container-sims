@@ -23,8 +23,12 @@
  *   and SHC spreader). Each frame every hero node that has a rig node of the same name takes that node's local
  *   transform, relative to rest: `hero = rigNow x rigRest^-1 x heroRest`. So the hero spreader shows exactly the
  *   motion the rig shows, whatever the rig code does to a node.
- * - **Release:** a spreader no longer chosen (farther away, rig left LOD0, cap lowered) loses the hero model and its
- *   rig meshes are shown again. `dispose()` does that for all of them.
+ * - **Release:** a spreader no longer chosen (farther away, rig left LOD0, cap lowered) fades back out over
+ *   `HERO_FADE_MS`: the same two dither patterns run backwards, the hero model dithering out while the rig meshes
+ *   dither back in, so the drop back has no pop. Then the hero model is detached and the shared materials are put
+ *   back. A release in the middle of the fade-in reverses from the alpha it has reached, and so does a piece chosen
+ *   again in the middle of its fade-out. A releasing piece is no longer counted (`count`, `countOf`) or described
+ *   (`describe`), but the level stays busy until its fade-out ends. `dispose()` detaches every piece at once.
  *
  * Per-frame cost: a frame with no offer in reach and nothing attached returns before any work; the candidate list, the
  * chosen set and the prep list are reused across frames.
@@ -34,9 +38,9 @@
 import * as THREE from 'three'
 import { loadHeroEquipment, type HeroEquipmentKind } from './heroEquipmentAssets'
 import { HERO_EQUIPMENT_DISTANCE_M, HERO_EQUIPMENT_HYSTERESIS, HERO_SHC_DISTANCE_M, selectHeroEquipment, type HeroEquipmentCandidate } from './heroEquipmentSelection'
-import { CameraGate, fadeAlpha, runPrep, type PrepItem } from './heroPrep'
-import { gltfNodeName as nodeName, type HeroEquipmentOffer } from './heroSpreaderMount'
-import type { QualityProfile } from './quality'
+import { CameraGate, HERO_FADE_MS, runPrep, type PrepItem } from './heroPrep'
+import { gltfNodeName as nodeName, type HeroEquipmentOffer } from './heroEquipmentMount'
+import type { HeroCapField, QualityProfile } from './quality'
 
 /** A failed load is asked for again this long (ms) after the failure, while the spreader stays chosen. */
 export const HERO_EQUIPMENT_RETRY_MS = 3000
@@ -51,7 +55,7 @@ export interface HeroPieceConfig {
   /** Reach (m) from the camera to the mount's centre (`HeroMount.centre`); kept out to this times the hysteresis. */
   distanceM: number
   /** The quality profile field that caps how many are drawn. */
-  cap: 'heroEquipment' | 'heroShc'
+  cap: HeroCapField
 }
 
 /**
@@ -64,8 +68,11 @@ export const HERO_PIECES: Readonly<Record<HeroPiece, HeroPieceConfig>> = {
   'shc-body': { kinds: ['shc-body'], distanceM: HERO_SHC_DISTANCE_M, cap: 'heroShc' },
 }
 
+/** `HERO_PIECES` as a typed list, in declaration order. */
+export const HERO_PIECE_LIST = Object.entries(HERO_PIECES) as readonly [HeroPiece, HeroPieceConfig][]
+
 const PIECE_OF = new Map<HeroEquipmentKind, HeroPiece>()
-for (const [piece, config] of Object.entries(HERO_PIECES) as [HeroPiece, HeroPieceConfig][]) for (const k of config.kinds) PIECE_OF.set(k, piece)
+for (const [piece, config] of HERO_PIECE_LIST) for (const k of config.kinds) PIECE_OF.set(k, piece)
 
 /** The piece a file kind belongs to. */
 export const heroPieceOf = (kind: HeroEquipmentKind): HeroPiece => PIECE_OF.get(kind)!
@@ -99,25 +106,37 @@ interface Attached {
   offer: HeroEquipmentOffer
   root: THREE.Object3D
   pairs: Pair[]
-  /** The rig's own meshes this piece replaces (hidden once the fade has ended). */
+  /** The hero model's meshes (dithered while fading). */
+  heroMeshes: THREE.Mesh[]
+  /** The rig's own meshes this piece replaces (hidden once the fade-in has ended). */
   rigMeshes: THREE.Mesh[]
-  readyAt: number
+  /** Fade alpha (0 rig model only, 1 hero model only) at `fromMs`; it moves towards `target` over `HERO_FADE_MS`. */
+  alphaFrom: number
+  fromMs: number
+  /** 1 while attaching or attached, 0 while releasing. */
+  target: 0 | 1
   /** While fading: the dither materials in use and the shared ones to put back. */
   fade: HeroFade | null
+}
+
+/** A piece's fade alpha at `nowMs`. */
+function alphaAt(hero: Attached, nowMs: number): number {
+  const step = HERO_FADE_MS > 0 ? (nowMs - hero.fromMs) / HERO_FADE_MS : 1
+  return hero.target === 1 ? Math.min(1, hero.alphaFrom + step) : Math.max(0, hero.alphaFrom - step)
 }
 
 type Entry = { state: 'loading'; attempt: number } | { state: 'failed'; attempt: number; retryAt: number } | { state: 'loaded'; root: THREE.Object3D } | { state: 'attached'; hero: Attached }
 
 const DITHER = 'float heroDither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));'
 /** The hero model: drawn where the dither value is below the fade. */
-const FADE_IN_DISCARD = `if (heroSpreaderFade < 0.999) {
+const FADE_IN_DISCARD = `if (heroEquipmentFade < 0.999) {
   ${DITHER}
-  if (heroDither >= heroSpreaderFade) discard;
+  if (heroDither >= heroEquipmentFade) discard;
 }`
 /** The rig model: drawn exactly where the hero model is not. */
 const FADE_OUT_DISCARD = `{
   ${DITHER}
-  if (heroSpreaderFade >= 0.999 || heroDither < heroSpreaderFade) discard;
+  if (heroEquipmentFade >= 0.999 || heroDither < heroEquipmentFade) discard;
 }`
 
 /**
@@ -130,12 +149,12 @@ function ditherMaterial(material: THREE.Material, uniform: { value: number }, di
   const discard = direction === 'in' ? FADE_IN_DISCARD : FADE_OUT_DISCARD
   own.onBeforeCompile = (shader, renderer) => {
     material.onBeforeCompile(shader, renderer)
-    shader.uniforms.heroSpreaderFade = uniform
+    shader.uniforms.heroEquipmentFade = uniform
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float heroSpreaderFade;')
+      .replace('#include <common>', '#include <common>\nuniform float heroEquipmentFade;')
       .replace('#include <color_fragment>', '#include <color_fragment>\n' + discard)
   }
-  own.customProgramCacheKey = () => `${material.customProgramCacheKey()}|heroSpreaderFade-${direction}`
+  own.customProgramCacheKey = () => `${material.customProgramCacheKey()}|heroEquipmentFade-${direction}`
   return own
 }
 
@@ -155,13 +174,13 @@ function ditherMeshes(meshes: Iterable<THREE.Mesh>, uniform: { value: number }, 
 }
 
 /** World-space box of a hero piece, metres. */
-export interface HeroSpreaderBounds {
+export interface HeroPieceBounds {
   min: [number, number, number]
   max: [number, number, number]
 }
 
 /** One attached hero piece as last drawn (`__tt.scene().heroSpreaders`, `heroShcBodies`): where it is against the rig meshes it replaces. */
-export interface HeroSpreaderInfo {
+export interface HeroPieceInfo {
   id: string
   kind: HeroEquipmentKind
   /** True while it fades in over the rig meshes. */
@@ -169,13 +188,10 @@ export interface HeroSpreaderInfo {
   /** True once the rig's own meshes it replaces are hidden. */
   rigHidden: boolean
   /** World bounds of the hero model. */
-  hero: HeroSpreaderBounds
+  hero: HeroPieceBounds
   /** World bounds of the rig's own meshes it replaces (hidden or not). */
-  rig: HeroSpreaderBounds
+  rig: HeroPieceBounds
 }
-
-/** The general name (#275): an attached hero piece, spreader or SHC body. */
-export type HeroPieceInfo = HeroSpreaderInfo
 
 export interface HeroEquipmentOptions {
   /** The cloned `LOD0` subtree of a kind's hero model (tests pass a fake). */
@@ -224,7 +240,7 @@ export class HeroEquipmentLevel {
   constructor(options: HeroEquipmentOptions = {}) {
     this.load = options.load ?? loadHeroEquipment
     this.now = options.now ?? (() => performance.now())
-    for (const [piece, config] of Object.entries(HERO_PIECES) as [HeroPiece, HeroPieceConfig][]) {
+    for (const [piece, config] of HERO_PIECE_LIST) {
       this.lanes.set(piece, { config, reachM: config.distanceM * HERO_EQUIPMENT_HYSTERESIS, cap: 0, slots: new Map(), candidates: [], chosen: new Set(), entries: new Map() })
     }
   }
@@ -235,7 +251,7 @@ export class HeroEquipmentLevel {
   }
 
   /** Every piece's cap from its quality profile field (`HeroPieceConfig.cap`). */
-  setCaps(profile: Pick<QualityProfile, 'heroEquipment' | 'heroShc'>): void {
+  setCaps(profile: Pick<QualityProfile, HeroCapField>): void {
     for (const [piece, lane] of this.lanes) this.setCap(profile[lane.config.cap], piece)
   }
 
@@ -274,10 +290,13 @@ export class HeroEquipmentLevel {
       this.prep.length = 0
     }
     for (const lane of this.lanes.values()) {
-      for (const entry of lane.entries.values()) {
+      for (const [id, entry] of lane.entries) {
         if (entry.state !== 'attached') continue
         this.follow(entry.hero)
-        this.fade(entry.hero, nowMs)
+        if (this.fade(entry.hero, nowMs)) {
+          this.detach(entry.hero)
+          lane.entries.delete(id)
+        }
       }
     }
   }
@@ -293,7 +312,10 @@ export class HeroEquipmentLevel {
     for (const id of chosen) lane.chosen.add(id)
     for (const [id, entry] of lane.entries) {
       if (lane.chosen.has(id)) continue
-      if (entry.state === 'attached') this.detach(entry.hero)
+      if (entry.state === 'attached') {
+        this.retarget(entry.hero, 0, nowMs) // fades out; detached when the fade-out ends (`update`)
+        continue
+      }
       // a file still loading resolves into nothing (see `prepare`)
       lane.entries.delete(id)
     }
@@ -308,7 +330,10 @@ export class HeroEquipmentLevel {
       else if (entry.state === 'loaded') {
         this.waiting++
         if (calm) this.prep.push({ d2: slot.distanceM * slot.distanceM, run: () => lane.entries.set(id, { state: 'attached', hero: this.attach(offer, entry.root, nowMs) }) })
-      } else if (entry.state === 'attached') entry.hero.offer = offer
+      } else if (entry.state === 'attached') {
+        entry.hero.offer = offer
+        this.retarget(entry.hero, 1, nowMs) // chosen again while fading out: fades back in from where it is
+      }
       // failed and waiting on its back-off: not counted as waiting, so the level is settled meanwhile
     }
   }
@@ -372,7 +397,21 @@ export class HeroEquipmentLevel {
     const fade: HeroFade = { uniform: { value: 0 }, swaps: [] }
     ditherMeshes(heroMeshes, fade.uniform, 'in', fade.swaps)
     ditherMeshes(rigMeshes, fade.uniform, 'out', fade.swaps)
-    return { offer, root, pairs, rigMeshes, readyAt: nowMs, fade }
+    return { offer, root, pairs, heroMeshes, rigMeshes, alphaFrom: 0, fromMs: nowMs, target: 1, fade }
+  }
+
+  /** Turns a piece's fade towards `target` from the alpha it has now; a fully shown piece gets its dither materials back. */
+  private retarget(hero: Attached, target: 0 | 1, nowMs: number): void {
+    if (hero.target === target) return
+    hero.alphaFrom = alphaAt(hero, nowMs)
+    hero.fromMs = nowMs
+    hero.target = target
+    if (hero.fade) return
+    const fade: HeroFade = { uniform: { value: hero.alphaFrom }, swaps: [] }
+    ditherMeshes(hero.heroMeshes, fade.uniform, 'in', fade.swaps)
+    ditherMeshes(hero.rigMeshes, fade.uniform, 'out', fade.swaps)
+    for (const m of hero.rigMeshes) m.visible = true
+    hero.fade = fade
   }
 
   /** Every paired hero node takes its rig node's local motion from rest. */
@@ -384,16 +423,19 @@ export class HeroEquipmentLevel {
     }
   }
 
-  private fade(hero: Attached, nowMs: number): void {
-    if (!hero.fade) return
-    const alpha = fadeAlpha(hero.readyAt, nowMs)
+  /** Advances a piece's fade; true when its fade-out has ended and it is to be detached. */
+  private fade(hero: Attached, nowMs: number): boolean {
+    if (!hero.fade) return false
+    const alpha = alphaAt(hero, nowMs)
     hero.fade.uniform.value = alpha
-    if (alpha < 1) {
+    if (alpha !== hero.target) {
       this.fading++
-      return
+      return false
     }
+    if (hero.target === 0) return true
     this.endFade(hero)
     for (const m of hero.rigMeshes) m.visible = false
+    return false
   }
 
   /** Puts the shared materials back (hero and rig meshes) and frees the dither copies. */
@@ -416,47 +458,47 @@ export class HeroEquipmentLevel {
     for (const m of hero.rigMeshes) m.visible = true
   }
 
-  /** Hero pieces in the scene (attached, fading or shown in full), every piece type: one number for `SceneStats.heroEquipment`. */
+  /** Hero pieces in the scene (fading in or shown in full; not fading out), every piece type: one number for `SceneStats.heroEquipment`. */
   get count(): number {
     return this.countOf()
   }
 
-  /** Hero pieces in the scene, every piece type, or only `piece`. */
+  /** Hero pieces in the scene (not fading out), every piece type, or only `piece`. */
   countOf(piece?: HeroPiece): number {
     let n = 0
-    for (const [p, lane] of this.lanes) {
-      if (piece !== undefined && p !== piece) continue
-      for (const e of lane.entries.values()) if (e.state === 'attached') n++
-    }
+    for (const entry of this.shown(piece)) if (entry) n++
     return n
   }
 
-  /** The attached hero pieces (all, or only `piece`) with their world bounds and their rig meshes', for readouts and tests (not per frame). */
-  describe(piece?: HeroPiece): HeroSpreaderInfo[] {
-    const box = new THREE.Box3()
-    const part = new THREE.Box3()
-    const bounds = (b: THREE.Box3): HeroSpreaderBounds => ({ min: [b.min.x, b.min.y, b.min.z], max: [b.max.x, b.max.y, b.max.z] })
-    const out: HeroSpreaderInfo[] = []
+  /** The attached pieces that are not fading out, every piece type or only `piece`. */
+  private *shown(piece?: HeroPiece): Generator<[string, Attached]> {
     for (const [p, lane] of this.lanes) {
       if (piece !== undefined && p !== piece) continue
-      for (const [id, entry] of lane.entries) {
-        if (entry.state !== 'attached') continue
-        const h = entry.hero
-        h.offer.mount.node.updateWorldMatrix(true, true)
-        const hero = bounds(box.setFromObject(h.root))
-        box.makeEmpty()
-        // each rig mesh by its own geometry: the hero subtree hangs under the rig node, which may itself be a mesh
-        for (const m of h.rigMeshes) {
-          if (!m.geometry.boundingBox) m.geometry.computeBoundingBox()
-          box.union(part.copy(m.geometry.boundingBox!).applyMatrix4(m.matrixWorld))
-        }
-        out.push({ id, kind: h.offer.kind, fading: h.fade !== null, rigHidden: h.rigMeshes.every((m) => !m.visible), hero, rig: bounds(box) })
+      for (const [id, e] of lane.entries) if (e.state === 'attached' && e.hero.target === 1) yield [id, e.hero]
+    }
+  }
+
+  /** The hero pieces `countOf` counts (all, or only `piece`) with their world bounds and their rig meshes', for readouts and tests (not per frame). */
+  describe(piece?: HeroPiece): HeroPieceInfo[] {
+    const box = new THREE.Box3()
+    const part = new THREE.Box3()
+    const bounds = (b: THREE.Box3): HeroPieceBounds => ({ min: [b.min.x, b.min.y, b.min.z], max: [b.max.x, b.max.y, b.max.z] })
+    const out: HeroPieceInfo[] = []
+    for (const [id, h] of this.shown(piece)) {
+      h.offer.mount.node.updateWorldMatrix(true, true)
+      const hero = bounds(box.setFromObject(h.root))
+      box.makeEmpty()
+      // each rig mesh by its own geometry: the hero subtree hangs under the rig node, which may itself be a mesh
+      for (const m of h.rigMeshes) {
+        if (!m.geometry.boundingBox) m.geometry.computeBoundingBox()
+        box.union(part.copy(m.geometry.boundingBox!).applyMatrix4(m.matrixWorld))
       }
+      out.push({ id, kind: h.offer.kind, fading: h.fade !== null, rigHidden: h.rigMeshes.every((m) => !m.visible), hero, rig: bounds(box) })
     }
     return out
   }
 
-  /** True while a chosen piece waits for its model (camera gate, fetch, prep slot, a retry that is due) or fades in; not while a failed load waits on its back-off. */
+  /** True while a chosen piece waits for its model (camera gate, fetch, prep slot, a retry that is due), or a piece fades in or out; not while a failed load waits on its back-off. */
   get busy(): boolean {
     return this.waiting > 0 || this.fading > 0
   }

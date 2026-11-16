@@ -139,6 +139,14 @@ export function rungName(rung: number): AutoRungName {
   return AUTO_RUNGS[clampRung(rung)].name
 }
 
+
+/**
+ * The profile fields that cap a hero equipment piece (`HeroPieceConfig.cap` in `heroEquipment.ts`), one per piece type.
+ * A new piece adds its field here (and to `QualityProfile`); Auto zeroes every one from `equipment-hero-off` down.
+ */
+export const HERO_CAP_FIELDS = ['heroEquipment', 'heroShc'] as const satisfies readonly (keyof QualityProfile)[]
+export type HeroCapField = (typeof HERO_CAP_FIELDS)[number]
+
 /** The quality level a rung belongs to (the level shown in the picker and the dev API). */
 export function levelOfRung(rung: number): QualityLevel {
   return AUTO_RUNGS[clampRung(rung)].level
@@ -149,14 +157,14 @@ export function profileForRung(rung: number): QualityProfile {
   const at = clampRung(rung)
   const r = AUTO_RUNGS[at]
   const base = QUALITY_PROFILES[r.level]
-  const heroEquipment = at < EQUIPMENT_HERO_OFF_RUNG ? base.heroEquipment : 0
-  const heroShc = at < EQUIPMENT_HERO_OFF_RUNG ? base.heroShc : 0
   const heroBoxes = Math.floor(QUALITY_PROFILES.high.heroBoxes * r.heroShare)
+  const profile: QualityProfile = { ...base, heroBoxes, heroStillBoxes: HERO_STILL_BOXES }
+  if (at >= EQUIPMENT_HERO_OFF_RUNG) for (const field of HERO_CAP_FIELDS) profile[field] = 0
   if (r.name === 'shadows-resolution') {
     const medium = QUALITY_PROFILES.medium
-    return { ...base, heroBoxes, heroEquipment, heroShc, heroStillBoxes: HERO_STILL_BOXES, shadowMapSize: medium.shadowMapSize, resolutionScale: medium.resolutionScale }
+    return { ...profile, shadowMapSize: medium.shadowMapSize, resolutionScale: medium.resolutionScale }
   }
-  return { ...base, heroBoxes, heroEquipment, heroShc, heroStillBoxes: HERO_STILL_BOXES }
+  return profile
 }
 
 /** Boxes' worth of hero faces while Auto is paused with a stopped camera (Medium's cap: at most 3 + 3 sharp marking pages, 96 MB). */

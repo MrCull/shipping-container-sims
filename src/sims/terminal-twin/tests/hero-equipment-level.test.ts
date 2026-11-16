@@ -1,8 +1,9 @@
 /** The hero equipment level (#273) through its public interface: offers in, hero spreaders attached to the rigs out. */
+import { readFileSync } from 'node:fs'
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 import { HERO_EQUIPMENT_RETRY_MS, HeroEquipmentLevel } from '../modules/heroEquipment'
-import { heroBodyMount, heroSpreaderMount, type HeroMount, type HeroSpreaderMount } from '../modules/heroSpreaderMount'
+import { heroBodyMount, heroSpreaderMount, type HeroMount } from '../modules/heroEquipmentMount'
 import type { HeroEquipmentKind } from '../modules/heroEquipmentAssets'
 import { HERO_FADE_MS, HERO_SETTLE_MS } from '../modules/heroPrep'
 
@@ -29,7 +30,7 @@ function spreaderTree(name: string, bodyScale: number): THREE.Object3D {
 }
 
 interface FakeRig {
-  mount: HeroSpreaderMount
+  mount: HeroMount
   spreader: THREE.Object3D
   body: THREE.Mesh
   lock: THREE.Object3D
@@ -132,9 +133,62 @@ describe('hero equipment level', () => {
     expect(heroOf(rig)).toBeDefined()
     expect(rig.body.material).not.toBe(material)
     await h.frame({}, 50)
+    // it fades back out from where its fade-in had got to, so it is gone well within one full fade
+    expect(h.level.count).toBe(0)
+    await h.frame({}, HERO_FADE_MS)
     expect(heroOf(rig)).toBeUndefined()
     expect(rig.body.visible).toBe(true)
     expect(rig.body.material).toBe(material)
+  })
+
+  it('drops back without a pop: a released spreader dithers out over the fade while the rig spreader dithers back in', async () => {
+    const h = harness(3)
+    const rig = fakeRig(10)
+    await h.settle({ a: rig })
+    const hero = heroOf(rig)!
+    const heroBody = hero.getObjectByName('spreader_geo') as THREE.Mesh
+    expect(rig.body.visible).toBe(false)
+    await h.frame({}, 100)
+    for (let i = 0; i < 2; i++) {
+      // still drawn, now through the complementary dither patterns; no longer counted or described, and the level is busy
+      expect(heroOf(rig)).toBe(hero)
+      expect(rig.body.visible).toBe(true)
+      expect(rig.lock.children[0].visible).toBe(true)
+      expect(rig.body.material).not.toBe(material)
+      expect(heroBody.material).not.toBe(material)
+      expect(heroBody.material).not.toBe(rig.body.material)
+      expect(h.level.count).toBe(0)
+      expect(h.level.describe()).toEqual([])
+      expect(h.level.settled).toBe(false)
+      await h.frame({}, HERO_FADE_MS / 4)
+    }
+    await h.frame({}, HERO_FADE_MS)
+    expect(heroOf(rig)).toBeUndefined()
+    expect(rig.body.visible).toBe(true)
+    expect(rig.body.material).toBe(material)
+    expect(heroBody.material).toBe(material)
+    expect(h.level.settled).toBe(true)
+  })
+
+  it('a spreader chosen again in the middle of its fade-out fades back in from where it is, without a new load', async () => {
+    const h = harness(3)
+    const rig = fakeRig(10)
+    await h.settle({ a: rig })
+    const hero = heroOf(rig)!
+    await h.frame({}, 50) // release starts at alpha 1
+    await h.frame({}, HERO_FADE_MS / 2) // alpha 0.5
+    await h.frame({ a: rig }, HERO_FADE_MS / 4) // chosen again at alpha 0.25
+    expect(heroOf(rig)).toBe(hero)
+    expect(h.level.count).toBe(1)
+    await h.frame({ a: rig }, HERO_FADE_MS / 2) // 0.75: a restart from 0 would be at 0.5, a jump to 1 would be settled
+    expect(h.level.settled).toBe(false)
+    expect(rig.body.visible).toBe(true)
+    await h.frame({ a: rig }, HERO_FADE_MS / 4) // 1
+    expect(h.level.settled).toBe(true)
+    expect(rig.body.visible).toBe(false)
+    expect(rig.body.material).toBe(material)
+    expect(heroOf(rig)).toBe(hero)
+    expect(h.loads).toEqual(['asc'])
   })
 
   it('retries a failed load after a back-off while the spreader stays chosen, and is settled while it waits', async () => {
@@ -242,6 +296,7 @@ describe('hero equipment level', () => {
     h.level.setCap(0)
     await h.frame({ a, b })
     expect(h.level.count).toBe(0)
+    await h.frame({ a, b }, HERO_FADE_MS)
     expect(heroOf(a)).toBeUndefined()
     expect(a.body.visible).toBe(true)
     expect(b.lock.children[0].visible).toBe(true)
@@ -253,6 +308,7 @@ describe('hero equipment level', () => {
     const rig = fakeRig(10)
     await h.settle({ a: rig })
     await h.frame({})
+    await h.frame({}, HERO_FADE_MS)
     expect(heroOf(rig)).toBeUndefined()
     expect(rig.body.visible).toBe(true)
   })
@@ -308,7 +364,7 @@ describe('hero equipment level', () => {
 /** An SHC LOD0 as `shc.glb` has it, trimmed: frame mesh, a wheel empty (mesh child), the hoist empty with the spreader under it. */
 interface FakeShc {
   lod0: THREE.Group
-  spreaderMount: HeroSpreaderMount
+  spreaderMount: HeroMount
   bodyMount: HeroMount
   frameMesh: THREE.Mesh
   wheel: THREE.Object3D
@@ -456,6 +512,7 @@ describe('hero SHC body (#275)', () => {
     expect(shc.spreaderBody.visible).toBe(false)
     // the body goes: its meshes come back, the spreader's stay hidden under the hero spreader
     await h.frame({ a: shc }, ['spreader'])
+    await h.frame({ a: shc }, ['spreader'], HERO_FADE_MS)
     expect(heroBodyOf(shc)).toBeUndefined()
     for (const m of bodyRigMeshes(shc)) expect(m.visible, m.name).toBe(true)
     expect(shc.spreaderBody.visible).toBe(false)
@@ -463,6 +520,7 @@ describe('hero SHC body (#275)', () => {
     // the body comes back; then the spreader goes and leaves the body meshes hidden
     await h.settle({ a: shc })
     await h.frame({ a: shc }, ['body'])
+    await h.frame({ a: shc }, ['body'], HERO_FADE_MS)
     expect(heroSpreaderOf(shc)).toBeUndefined()
     expect(shc.spreaderBody.visible).toBe(true)
     for (const m of bodyRigMeshes(shc)) expect(m.visible, m.name).toBe(false)
@@ -492,5 +550,28 @@ describe('hero SHC body (#275)', () => {
     await h.settle({ a: shc })
     expect(h.level.countOf('shc-body')).toBe(1)
     expect(h.level.countOf('spreader')).toBe(0)
+  })
+})
+
+describe('scene teardown (#275)', () => {
+  it('disposes the hero level before the kind renderers, so no hero SHC body still wears a plate material ShcRig.dispose() has freed', () => {
+    const src = readFileSync(new URL('../modules/sceneRenderer.ts', import.meta.url), 'utf8')
+    const body = src.slice(src.indexOf('\n  dispose(): void {'))
+    const hero = body.indexOf('this.heroEquipment.dispose()')
+    const kinds = body.indexOf('renderer.dispose()')
+    expect(hero).toBeGreaterThan(0)
+    expect(kinds).toBeGreaterThan(hero)
+  })
+
+  it('dispose detaches a hero SHC body at once, also in the middle of its fade-out, and puts the shared materials back', async () => {
+    const h = shcHarness({ spreader: 0, body: 1 })
+    const shc = fakeShc(10)
+    await h.settle({ a: shc })
+    expect(heroBodyOf(shc)).toBeDefined()
+    await h.frame({}, [], 50)
+    expect(heroBodyOf(shc)).toBeDefined()
+    h.level.dispose()
+    expect(heroBodyOf(shc)).toBeUndefined()
+    for (const m of bodyRigMeshes(shc)) expect([m.visible, m.material]).toEqual([true, material])
   })
 })
