@@ -4,13 +4,15 @@
  * before a camera is close to a spreader. Every test fails on a page error or a console error, so a shader compile or
  * WebGL program error in the dither fade fails it. The hero spreader's world bounds are compared with the rig spreader's
  * (`__tt.scene().heroSpreaders`): same place, same length (also squeezed to 20 ft), same twistlock plane.
+ * The hero SHC body (#275): following an SHC with the camera within 30 m of its centre attaches one body on High
+ * (`__tt.scene().heroShcBodies`, counted in `stats.heroEquipment`) and none on Low; `hero-shc.glb` is not requested before.
  * Counts and bounds only, no frame assertions. Screenshots go to `.screenshots/`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 
 const HIGH_CAP = 3
-const HERO_FILE = /hero-spreader-(sts|asc|shc)/
+const HERO_FILE = /hero-spreader-(sts|asc|shc)|hero-shc\./
 /** The hero model adds raised flippers and corner guides at the ends; its length stays within this of the rig spreader's. */
 const LENGTH_TOLERANCE_M = 0.6
 const CENTRE_TOLERANCE_M = 0.15
@@ -170,5 +172,43 @@ test('SHC and ASC carrying a 20 ft box: the hero spreader is squeezed to 20 ft l
     expect(size(mine!.hero, longAxis(mine!.rig)), `${kind} hero spreader at 20 ft`).toBeLessThan(7)
     await page.screenshot({ path: `.screenshots/hero-equipment-${kind}-20ft.png` })
   }
+  expect(w.errors).toEqual([])
+})
+
+test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested before, none on Low', async ({ page }) => {
+  test.slow() // software WebGL
+  const w = watch(page)
+  await open(page, 'shc-1sts-2shc-1wtp')
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingLoaded' }))
+  await page.evaluate(() => window.__tt!.pause())
+  await page.waitForFunction(() => window.__tt!.scene()?.shcAssets === 'loaded')
+  await page.evaluate(() => window.__tt!.viewPreset('overview'))
+  await page.waitForTimeout(1500)
+  expect(await page.evaluate(() => window.__tt!.scene()!.heroShcBodies)).toEqual([])
+  expect(w.heroRequests).toEqual([])
+
+  const shc = await page.evaluate(() => {
+    const s = window.__tt!.sceneState()!
+    const ids = Object.keys(s.shcs).sort()
+    const id = ids.find((i) => s.shcRigs[i]?.carrying) ?? ids[0]
+    return { id, x: s.shcs[id].x, z: s.shcs[id].z }
+  })
+  await page.evaluate((id) => window.__tt!.select(id), shc.id)
+  // about 18 m from the body's centre (half its 15 m height up), inside the 30 m hero distance
+  await page.evaluate((t) => window.__tt!.setCameraPose({ target: t, distance: 18, azimuth: 0.7, polar: 1.2 }), { x: shc.x, y: 7, z: shc.z })
+  await page.waitForFunction(() => window.__tt!.heroSettled() && window.__tt!.scene()!.heroShcBodies.length > 0, undefined, { timeout: 150_000 })
+  await page.waitForFunction(() => window.__tt!.scene()!.heroShcBodies.every((b) => !b.fading && b.rigHidden), undefined, { timeout: 60_000 })
+  const near = await page.evaluate(() => ({ stats: window.__tt!.perf().stats.heroEquipment, bodies: window.__tt!.scene()!.heroShcBodies }))
+  console.log(`hero SHC bodies: ${JSON.stringify(near.bodies)}`)
+  expect(near.bodies.length).toBeGreaterThanOrEqual(1)
+  expect(near.bodies.map((b) => b.kind)).toContain('shc-body')
+  expect(near.bodies.map((b) => b.id)).toContain(shc.id)
+  expect(near.stats).toBeGreaterThanOrEqual(1)
+  expect(w.heroRequests.some((u) => u.includes('hero-shc.'))).toBe(true)
+  await page.screenshot({ path: '.screenshots/hero-equipment-shc-body.png' })
+
+  // Low draws no body and shows LOD0 again
+  await page.evaluate(() => window.__tt!.setQuality('low'))
+  await page.waitForFunction(() => window.__tt!.scene()!.heroShcBodies.length === 0 && window.__tt!.perf().stats.heroEquipment === 0, undefined, { timeout: 60_000 })
   expect(w.errors).toEqual([])
 })
