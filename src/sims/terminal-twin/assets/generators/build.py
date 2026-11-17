@@ -217,18 +217,18 @@ def build_hero_equipment(out_dir, previews=True, samples=32):
     # Hero truck (#276): the chassis alone and the tractor of each cab shape, in the truck livery atlas (tile 0).
     truck_atlas_png = os.path.join(tmp, 'truck-atlas.png')
     TM.render_atlas(truck_atlas_png, FONTS)
-    for cab in [None] + list(TR.CABS):
+    # (cab shape or None for the chassis, builder, preview camera location and target)
+    trucks = [(None, HTR.build_chassis, (-9.0, -12.0, 4.5), (-1.0, 0, 0.9))] + \
+             [(cab, lambda atlas, cab=cab: HTR.build_cab(atlas, cab), (14.5, -7.5, 4.0), (7.5, 0, 1.6)) for cab in TR.CABS]
+    for cab, build, loc, tgt in trucks:
         B.reset_scene()
         atlas = B.load_image(truck_atlas_png, name='truck-atlas')
-        root, info = HTR.build_chassis(atlas) if cab is None else HTR.build_cab(atlas, cab)
-        source = TM.sidecar({'name': 'truck-chassis' if cab is None else f'truck-cab-{cab}', 'cab': cab,
-                             'triangles': {'LOD0': 0, 'LOD1': 0, 'LOD2': 0}, 'height': TR.CABS[cab]['height'] if cab else 1.3})
+        root, info = build(atlas)
         print(f'[hero-equipment] {info["name"]}: {info["triangles"]} tris, {info["meshes"]} meshes', flush=True)
         B.export_glb(root, os.path.join(out_dir, f'{info["name"]}.glb'))
-        write_json(os.path.join(out_dir, f'{info["name"]}.meta.json'), HTR.sidecar(info, source))
+        write_json(os.path.join(out_dir, f'{info["name"]}.meta.json'), HTR.sidecar(info, HTR.source_facts(cab)))
         if previews:
             cam, _ = B.setup_preview_stage(ground_size=80.0)
-            loc, tgt = ((-9.0, -12.0, 4.5), (-1.0, 0, 0.9)) if cab is None else ((14.5, -7.5, 4.0), (7.5, 0, 1.6))
             B.render_preview(cam, loc, tgt, os.path.join(preview_dir, f'{info["name"]}-view.webp'), samples=samples, width=640, height=480)
 
 

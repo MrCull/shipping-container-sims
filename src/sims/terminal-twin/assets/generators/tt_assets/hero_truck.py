@@ -22,6 +22,7 @@ with TEXCOORD_0 on tile 0 like the truck GLBs: the runtime puts the rig's per-sh
 import math
 
 from . import truck as T
+from . import truck_meta as TM
 from .blender import empty, textured_material
 
 TYRE_SEGS = 24
@@ -277,8 +278,22 @@ def _gl(p):
     return [round(p[0], 4), round(p[2], 4), round(-p[1] + 0.0, 4)]
 
 
+# The source sidecar fields a hero sidecar copies; for a cab also SOURCE_CAB_FIELDS.
+SOURCE_FIELDS = ('axes', 'travelLimits', 'attachPoints', 'loadConfigurations', 'wheel')
+SOURCE_CAB_FIELDS = ('cab', 'liveries', 'atlas', 'fifthWheel')
+
+
+def source_facts(cab):
+    """The rig facts of the source GLB a hero file replaces (truck-chassis.glb for cab None, else truck-cab-<cab>.glb):
+    the truck_meta.sidecar() fields in SOURCE_FIELDS, plus SOURCE_CAB_FIELDS for a cab. None of them depends on the
+    source's triangle counts, name or overall height, which the hero build does not have, so those inputs are left out
+    of truck_meta.sidecar() by passing neutral values and the fields that use them are dropped."""
+    full = TM.sidecar({'name': None, 'cab': cab, 'triangles': {f'LOD{i}': 0 for i in range(3)}, 'height': None})
+    return {k: full[k] for k in SOURCE_FIELDS + (SOURCE_CAB_FIELDS if cab is not None else ())}
+
+
 def sidecar(info, source):
-    """`source` = the truck_meta.sidecar() of the source GLB (attach points, load configurations, limits, liveries)."""
+    """`source` = source_facts(info['cab']): the source GLB's axes, limits, attach points, loads, wheel (and cab facts)."""
     name, cab = info['name'], info['cab']
     b = info['bounds']
     size = [round(b['max'][i] - b['min'][i], 3) for i in range(3)]

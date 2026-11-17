@@ -200,3 +200,13 @@ describe.each(PIECES)('hero truck piece $name', (p) => {
     expect([...names]).toEqual(['truck_atlas'])
   })
 })
+
+describe('hero truck livery by material name (#276)', () => {
+  // TruckRig's livery material is a clone of the truck-cab-<shape>.glb material and keeps its name; the hero meshes
+  // adopt it by that name (`HeroMount.materials`). A rename on either side would leave the hero truck on tile 0 silently.
+  it.each(SHAPES)('every material of trucks/truck-cab-%s.glb (the rig material TruckRig clones) is named truck_atlas, as the hero files are', async (shape) => {
+    const doc = await io.read(join(MODELS_DIR, `trucks/truck-cab-${shape}.glb`))
+    expect(doc.getRoot().listMaterials().map((m) => m.getName())).toEqual(['truck_atlas'])
+    expect(meta(`hero-equipment/hero-truck-cab-${shape}.meta.json`).livery.material).toBe('truck_atlas')
+  })
+})
