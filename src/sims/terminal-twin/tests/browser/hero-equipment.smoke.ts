@@ -6,8 +6,8 @@
  * (`__tt.scene().heroSpreaders`): same place, same length (also squeezed to 20 ft), same twistlock plane.
  * The hero SHC body (#275): following an SHC with the camera within 30 m of its centre attaches one body on High
  * (`__tt.scene().heroShcBodies`, counted in `stats.heroEquipment`) and none on Low; `hero-shc.glb` is not requested before.
- * The hero truck (#276): a truck at a transfer stall with the camera within 25 m of its centre gets the hero chassis and
- * cab on High (`__tt.scene().heroTrucks`, counted in `stats.heroEquipment`), its box drawn where it was with the hero off
+ * The hero truck (#276): the followed truck ("Follow next truck") at its transfer stall with the follow camera within
+ * 25 m of its centre gets the hero chassis and cab on High (`__tt.scene().heroTrucks`, counted in `stats.heroEquipment`), its box drawn where it was with the hero off
  * (within 1 cm), and none on Low; no `hero-truck-*` file is requested before.
  * Counts and bounds only, no frame assertions. Screenshots go to `.screenshots/`.
  */
@@ -216,30 +216,47 @@ test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested befo
   expect(w.errors).toEqual([])
 })
 
-test('truck close-up at a stall: the hero chassis and cab replace LOD0 on High, the box stays put, none on Low', async ({ page }) => {
+test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the box stays put, none on Low', async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'truck-gate-queue')
-  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'TruckAtStall' }))
   await page.evaluate(() => window.__tt!.pause())
   await page.waitForFunction(() => window.__tt!.scene()?.landside.assets === 'loaded')
   await page.evaluate(() => window.__tt!.viewPreset('overview'))
-  await page.waitForTimeout(1500)
+  const framesAt = await page.evaluate(() => window.__tt!.scene()!.frames)
+  await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 5, framesAt)
   expect(await page.evaluate(() => window.__tt!.scene()!.heroTrucks)).toEqual([])
   expect(w.heroRequests).toEqual([])
 
-  // a truck holding a box at its stall
-  const truck = await page.evaluate(async () => {
+  // Follow next truck (the follow-truck smoke's API): the camera tracks the next arrival; run on until it stands at its
+  // transfer stall with its box
+  await page.evaluate(() => window.__tt!.followNextTruck())
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'TruckArrived' }))
+  await expect.poll(async () => (await page.evaluate(() => window.__tt!.ui())).following).toBe(true)
+  const id = (await page.evaluate(() => window.__tt!.ui())).selectedId!
+  expect(id).toMatch(/^T\d+$/)
+  const atStall = async (): Promise<boolean> => page.evaluate((truckId) => window.__tt!.sceneState()!.trucks[truckId]?.status === 'at-stall', id)
+  for (let i = 0; i < 20 && !(await atStall()); i++) await page.evaluate(() => window.__tt!.runUntil({ eventType: 'TruckAtStall' }))
+  expect(await atStall(), `${id} reaches its stall`).toBe(true)
+  const truck = await page.evaluate(async (truckId) => {
     const tt = window.__tt!
-    const boxes = (await tt.query<{ id: string; custody: { kind: string; id: string } }[]>('containers')).filter((b) => b.custody.kind === 'truck')
-    const s = tt.sceneState()!
-    const b = boxes.find((x) => s.trucks[x.custody.id]?.visible) ?? null
-    return b ? { id: b.custody.id, box: b.id, x: s.trucks[b.custody.id].x, z: s.trucks[b.custody.id].z } : null
-  })
-  expect(truck, 'a truck carries a box at a stall').not.toBeNull()
-  await page.evaluate((id) => window.__tt!.select(id), truck!.id)
-  // about 12 m from the truck centre, inside the 25 m hero distance
-  await page.evaluate((t) => window.__tt!.setCameraPose({ target: t, distance: 12, azimuth: 0.7, polar: 1.2 }), { x: truck!.x, y: 1.5, z: truck!.z })
+    const boxes = (await tt.query<{ id: string; custody: { kind: string; id: string } }[]>('containers')).filter((b) => b.custody.kind === 'truck' && b.custody.id === truckId)
+    return { id: truckId, box: boxes[0]?.id ?? null }
+  }, id)
+  expect(truck.box, `${id} carries a box at its stall`).not.toBeNull()
+  // the follow camera keeps its viewing offset: close it to 12 m, inside the 25 m hero distance, and it stays on the truck
+  const pose = await page.evaluate(() => window.__tt!.cameraPose()!)
+  await page.evaluate((p) => window.__tt!.setCameraPose({ target: p.target, distance: 12, azimuth: 0.7, polar: 1.2 }), pose)
+  await page.waitForFunction(
+    (truckId) => {
+      const tt = window.__tt!
+      const t = tt.sceneState()!.trucks[truckId]
+      const cam = tt.cameraPose()
+      return tt.ui().following && !!t?.visible && !!cam && cam.distance <= 12.5 && Math.hypot(cam.target.x - t.x, cam.target.z - t.z) < 4
+    },
+    id,
+    { timeout: 30_000 },
+  )
   const drawnBox = async () => {
     const frames = await page.evaluate(() => window.__tt!.scene()!.frames)
     await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 2, frames)
