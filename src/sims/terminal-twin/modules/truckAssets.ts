@@ -10,6 +10,9 @@
  */
 import * as THREE from 'three'
 import { loadGltf } from './containerAssets'
+import { TRUCK } from './equipmentDims'
+import type { HeroEquipmentKind } from './heroEquipmentAssets'
+import { heroBodyMount, type HeroMount } from './heroEquipmentMount'
 import high from '../assets/models/trucks/truck-cab-high.meta.json'
 import mid from '../assets/models/trucks/truck-cab-mid.meta.json'
 import day from '../assets/models/trucks/truck-cab-day.meta.json'
@@ -143,6 +146,14 @@ export class TruckRig {
   private readonly wheels: THREE.Object3D[] = []
   private lod: 0 | 1 | 2 = 0
   private state: TruckRigState
+  /**
+   * Hero truck (#276): the whole LOD0 (chassis and tractor), offered to the hero equipment level at LOD0. The hero
+   * chassis and cab wear this rig's livery material (shared per shape and tile) by material name; the level copies
+   * the rig's wheel roll, steering and articulation onto the hero nodes of the same name each frame.
+   */
+  readonly heroMount: HeroMount
+  /** The hero file kind for this truck's cab shape. */
+  readonly heroKind: HeroEquipmentKind
 
   constructor(models: TruckModels, id: string) {
     this.root.name = id
@@ -170,6 +181,10 @@ export class TruckRig {
       this.body.add(lod)
     }
     this.root.add(this.body)
+    this.heroKind = `truck-${shape}`
+    // the rest pose the level measures the rig's motion against: the shape's unposed source LOD0, read once per shape
+    const template = models.sources[shape].getObjectByName('LOD0')!
+    this.heroMount = heroBodyMount(this.lods[0], template, new THREE.Vector3((TRUCK.rearX + TRUCK.frontX) / 2, TRUCK.height / 2, 0), { materials: new Map([[material.name, material]]) })
     this.state = { lod: 0, shape, livery, maker: truckMaker(livery), steerRad: 0, articulationRad: 0, wheelRollRad: 0, loadOffsetM: 0, loadCentre: [0, TRUCK_RIG.deckY, 0] }
     this.setLod(0)
   }

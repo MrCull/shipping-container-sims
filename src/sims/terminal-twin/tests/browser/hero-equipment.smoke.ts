@@ -4,13 +4,18 @@
  * before a camera is close to a spreader. Every test fails on a page error or a console error, so a shader compile or
  * WebGL program error in the dither fade fails it. The hero spreader's world bounds are compared with the rig spreader's
  * (`__tt.scene().heroSpreaders`): same place, same length (also squeezed to 20 ft), same twistlock plane.
+ * The hero SHC body (#275): following an SHC with the camera within 30 m of its centre attaches one body on High
+ * (`__tt.scene().heroShcBodies`, counted in `stats.heroEquipment`) and none on Low; `hero-shc.glb` is not requested before.
+ * The hero truck (#276): the followed truck ("Follow next truck") at its transfer stall with the follow camera within
+ * 25 m of its centre gets the hero chassis and cab on High (`__tt.scene().heroTrucks`, counted in `stats.heroEquipment`), its box drawn where it was with the hero off
+ * (within 1 cm), and none on Low; no `hero-truck-*` file is requested before.
  * Counts and bounds only, no frame assertions. Screenshots go to `.screenshots/`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 
 const HIGH_CAP = 3
-const HERO_FILE = /hero-spreader-(sts|asc|shc)/
+const HERO_FILE = /hero-spreader-(sts|asc|shc)|hero-shc\.|hero-truck-/
 /** The hero model adds raised flippers and corner guides at the ends; its length stays within this of the rig spreader's. */
 const LENGTH_TOLERANCE_M = 0.6
 const CENTRE_TOLERANCE_M = 0.15
@@ -170,5 +175,131 @@ test('SHC and ASC carrying a 20 ft box: the hero spreader is squeezed to 20 ft l
     expect(size(mine!.hero, longAxis(mine!.rig)), `${kind} hero spreader at 20 ft`).toBeLessThan(7)
     await page.screenshot({ path: `.screenshots/hero-equipment-${kind}-20ft.png` })
   }
+  expect(w.errors).toEqual([])
+})
+
+test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested before, none on Low', async ({ page }) => {
+  test.slow() // software WebGL
+  const w = watch(page)
+  await open(page, 'shc-1sts-2shc-1wtp')
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingLoaded' }))
+  await page.evaluate(() => window.__tt!.pause())
+  await page.waitForFunction(() => window.__tt!.scene()?.shcAssets === 'loaded')
+  await page.evaluate(() => window.__tt!.viewPreset('overview'))
+  await page.waitForTimeout(1500)
+  expect(await page.evaluate(() => window.__tt!.scene()!.heroShcBodies)).toEqual([])
+  expect(w.heroRequests).toEqual([])
+
+  const shc = await page.evaluate(() => {
+    const s = window.__tt!.sceneState()!
+    const ids = Object.keys(s.shcs).sort()
+    const id = ids.find((i) => s.shcRigs[i]?.carrying) ?? ids[0]
+    return { id, x: s.shcs[id].x, z: s.shcs[id].z }
+  })
+  await page.evaluate((id) => window.__tt!.select(id), shc.id)
+  // about 18 m from the body's centre (half its 15 m height up), inside the 30 m hero distance
+  await page.evaluate((t) => window.__tt!.setCameraPose({ target: t, distance: 18, azimuth: 0.7, polar: 1.2 }), { x: shc.x, y: 7, z: shc.z })
+  await page.waitForFunction(() => window.__tt!.heroSettled() && window.__tt!.scene()!.heroShcBodies.length > 0, undefined, { timeout: 150_000 })
+  await page.waitForFunction(() => window.__tt!.scene()!.heroShcBodies.every((b) => !b.fading && b.rigHidden), undefined, { timeout: 60_000 })
+  const near = await page.evaluate(() => ({ stats: window.__tt!.perf().stats.heroEquipment, bodies: window.__tt!.scene()!.heroShcBodies }))
+  console.log(`hero SHC bodies: ${JSON.stringify(near.bodies)}`)
+  expect(near.bodies.length).toBeGreaterThanOrEqual(1)
+  expect(near.bodies.map((b) => b.kind)).toContain('shc-body')
+  expect(near.bodies.map((b) => b.id)).toContain(shc.id)
+  expect(near.stats).toBeGreaterThanOrEqual(1)
+  expect(w.heroRequests.some((u) => u.includes('hero-shc.'))).toBe(true)
+  await page.screenshot({ path: '.screenshots/hero-equipment-shc-body.png' })
+
+  // Low draws no body and shows LOD0 again
+  await page.evaluate(() => window.__tt!.setQuality('low'))
+  await page.waitForFunction(() => window.__tt!.scene()!.heroShcBodies.length === 0 && window.__tt!.perf().stats.heroEquipment === 0, undefined, { timeout: 60_000 })
+  expect(w.errors).toEqual([])
+})
+
+test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the box stays put, none on Low', async ({ page }) => {
+  test.slow() // software WebGL
+  const w = watch(page)
+  await open(page, 'truck-gate-queue')
+  await page.evaluate(() => window.__tt!.pause())
+  await page.waitForFunction(() => window.__tt!.scene()?.landside.assets === 'loaded')
+  await page.evaluate(() => window.__tt!.viewPreset('overview'))
+  const framesAt = await page.evaluate(() => window.__tt!.scene()!.frames)
+  await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 5, framesAt)
+  expect(await page.evaluate(() => window.__tt!.scene()!.heroTrucks)).toEqual([])
+  expect(w.heroRequests).toEqual([])
+
+  // Follow next truck (the follow-truck smoke's API): the camera tracks the next arrival; run on until it stands at its
+  // transfer stall with its box. The fixture's first truck (3000 s) comes empty to pick an import; the second (3010 s)
+  // drops an export, so follow the next truck from 3005 s.
+  await page.evaluate(() => window.__tt!.runUntil({ time: 3005 }))
+  await page.evaluate(() => window.__tt!.followNextTruck())
+  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'TruckArrived' }))
+  await expect.poll(async () => (await page.evaluate(() => window.__tt!.ui())).following).toBe(true)
+  const id = (await page.evaluate(() => window.__tt!.ui())).selectedId!
+  expect(id).toMatch(/^T\d+$/)
+  const atStall = async (): Promise<boolean> => page.evaluate((truckId) => window.__tt!.sceneState()!.trucks[truckId]?.status === 'at-stall', id)
+  for (let i = 0; i < 20 && !(await atStall()); i++) await page.evaluate(() => window.__tt!.runUntil({ eventType: 'TruckAtStall' }))
+  expect(await atStall(), `${id} reaches its stall`).toBe(true)
+  const truck = await page.evaluate(async (truckId) => {
+    const tt = window.__tt!
+    const boxes = (await tt.query<{ id: string; custody: { kind: string; id: string } }[]>('containers')).filter((b) => b.custody.kind === 'truck' && b.custody.id === truckId)
+    return { id: truckId, box: boxes[0]?.id ?? null }
+  }, id)
+  expect(truck.box, `${id} carries a box at its stall`).not.toBeNull()
+  // the follow camera keeps its viewing offset: close it to 12 m, inside the 25 m hero distance, and it stays on the truck
+  // (on Low first, so nothing hero is requested before the High step)
+  await page.evaluate(() => window.__tt!.setQuality('low'))
+  const pose = await page.evaluate(() => window.__tt!.cameraPose()!)
+  await page.evaluate((p) => window.__tt!.setCameraPose({ target: p.target, distance: 12, azimuth: 0.7, polar: 1.2 }), pose)
+  await page.waitForFunction(
+    (truckId) => {
+      const tt = window.__tt!
+      const t = tt.sceneState()!.trucks[truckId]
+      const cam = tt.cameraPose()
+      return tt.ui().following && !!t?.visible && !!cam && cam.distance <= 12.5 && Math.hypot(cam.target.x - t.x, cam.target.z - t.z) < 4
+    },
+    id,
+    { timeout: 30_000 },
+  )
+  const drawnBox = async () => {
+    const frames = await page.evaluate(() => window.__tt!.scene()!.frames)
+    await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 2, frames)
+    return page.evaluate((id) => window.__tt!.sceneState()!.liveries[id], truck!.box)
+  }
+
+  // hero off: Low draws LOD0 with the box on it
+  await page.evaluate(() => window.__tt!.setQuality('low'))
+  await page.waitForFunction(() => window.__tt!.scene()!.landside.lods.lod0 >= 1)
+  const off = await drawnBox()
+  expect(await page.evaluate(() => window.__tt!.scene()!.heroTrucks)).toEqual([])
+  expect(w.heroRequests).toEqual([])
+
+  // High: the hero chassis and cab replace LOD0
+  await page.evaluate(() => window.__tt!.setQuality('high'))
+  await page.waitForFunction((id) => window.__tt!.heroSettled() && window.__tt!.scene()!.heroTrucks.some((t) => t.id === id), truck!.id, { timeout: 150_000 })
+  await page.waitForFunction(() => window.__tt!.scene()!.heroTrucks.every((t) => !t.fading && t.rigHidden), undefined, { timeout: 60_000 })
+  const near = await page.evaluate(() => ({ stats: window.__tt!.perf().stats.heroEquipment, trucks: window.__tt!.scene()!.heroTrucks }))
+  console.log(`hero trucks: ${JSON.stringify(near.trucks)}`)
+  expect(near.stats).toBeGreaterThanOrEqual(1)
+  expect(near.trucks.length).toBeLessThanOrEqual(2) // the High cap
+  const mine = near.trucks.find((t) => t.id === truck!.id)!
+  expect(mine.kind).toMatch(/^truck-(day|mid|high)$/)
+  // chassis and cab both attached: the hero spans the rig's whole LOD0 (tractor front to chassis rear) and its height
+  const long = longAxis(mine.rig)
+  expect(Math.abs(size(mine.hero, long) - size(mine.rig, long)), 'hero truck length').toBeLessThan(LENGTH_TOLERANCE_M)
+  expect(Math.abs(centre(mine.hero, long) - centre(mine.rig, long)), 'hero truck centre').toBeLessThan(LENGTH_TOLERANCE_M / 2)
+  expect(Math.abs(mine.hero.max[1] - mine.rig.max[1]), 'hero cab height').toBeLessThan(LENGTH_TOLERANCE_M)
+  expect(Math.abs(mine.hero.min[1] - mine.rig.min[1]), 'hero tyres on the ground').toBeLessThan(CENTRE_TOLERANCE_M)
+  expect(w.heroRequests.some((u) => u.includes('hero-truck-chassis'))).toBe(true)
+  expect(w.heroRequests.some((u) => /hero-truck-cab-(day|mid|high)/.test(u))).toBe(true)
+  // the box is drawn where it was with the hero off
+  const on = await drawnBox()
+  expect(on.size).toBe(off.size)
+  expect(Math.hypot(on.centre.x - off.centre.x, on.centre.y - off.centre.y, on.centre.z - off.centre.z), 'box centre hero on vs off').toBeLessThan(0.01)
+  await page.screenshot({ path: '.screenshots/hero-equipment-truck.png' })
+
+  // Low draws no hero truck and shows LOD0 again
+  await page.evaluate(() => window.__tt!.setQuality('low'))
+  await page.waitForFunction(() => window.__tt!.scene()!.heroTrucks.length === 0 && window.__tt!.perf().stats.heroEquipment === 0, undefined, { timeout: 60_000 })
   expect(w.errors).toEqual([])
 })

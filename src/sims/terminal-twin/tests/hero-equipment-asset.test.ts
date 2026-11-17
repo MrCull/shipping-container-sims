@@ -11,7 +11,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
 import { MeshoptDecoder } from 'meshoptimizer'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { checkAssetLibrary, loadBudgets, MODELS_DIR } from '../cli/assets/budgetCheck'
-import { QUALITY_LEVELS, QUALITY_PROFILES } from '../modules/quality'
+import { HERO_CAP_FIELDS, QUALITY_LEVELS, QUALITY_PROFILES, type HeroCapField } from '../modules/quality'
 
 const DIR = join(MODELS_DIR, 'hero-equipment')
 const SOURCES = { sts: 'sts/sts-malaccamax.glb', asc: 'asc/asc.glb', shc: 'shc/shc.glb' } as const
@@ -92,26 +92,40 @@ describe('hero spreaders', () => {
     }
   })
 
-  it('budgets.json lists the three assets and a cap per quality level that the measured spreaders fit (heroEquipmentCaps)', () => {
-    interface Cap {
-      spreaders: number
-      maxTriangles: number
-      maxDrawCalls: number
-    }
+  it('budgets.json lists the hero spreaders, the SHC body and the hero truck files and a cap per quality level that the measured models fit (heroEquipmentCaps)', () => {
+    // keyed by the quality profile's cap field of each piece (HERO_CAP_FIELDS), so a new piece adds one name
+    type Cap = Record<HeroCapField | 'maxTriangles' | 'maxDrawCalls', number>
     const caps = (loadBudgets() as unknown as { heroEquipmentCaps: { assets: string[]; levels: Record<string, Cap> } }).heroEquipmentCaps
     const report = checkAssetLibrary()
-    const inLibrary = report.assets.filter((a) => a.kind === 'hero-equipment').map((a) => a.name)
+    const isHero = (n: string): boolean => n.startsWith('hero-spreader-') || n === 'hero-shc' || n.startsWith('hero-truck-')
+    const inLibrary = report.assets.filter((a) => isHero(a.name)).map((a) => a.name)
+    const truckFiles = ['hero-truck-chassis', 'hero-truck-cab-day', 'hero-truck-cab-mid', 'hero-truck-cab-high']
+    // the hero truck files come from #276 slice A: until they are generated this test fails here, on the library
     expect([...caps.assets].sort()).toEqual(inLibrary.sort())
-    expect([...caps.assets].sort()).toEqual(KINDS.map((k) => `hero-spreader-${k}`).sort())
-    const lod0 = caps.assets.map((n) => report.assets.find((a) => a.name === n)!.lods.LOD0)
+    expect([...caps.assets].sort()).toEqual([...KINDS.map((k) => `hero-spreader-${k}`), 'hero-shc', ...truckFiles].sort())
+    const lod0Of = (name: string) => report.assets.find((a) => a.name === name)!.lods.LOD0
+    const lod0 = caps.assets.filter((n) => n.startsWith('hero-spreader-')).map(lod0Of)
     const worstTriangles = Math.max(...lod0.map((l) => l.triangles))
     const worstDrawCalls = Math.max(...lod0.map((l) => l.drawCalls))
+    const body = lod0Of('hero-shc')
+    // a hero truck is the chassis plus the cab of its shape: budget the worst cab
+    const chassis = lod0Of('hero-truck-chassis')
+    const cabs = truckFiles.slice(1).map(lod0Of)
+    const truckTriangles = chassis.triangles + Math.max(...cabs.map((l) => l.triangles))
+    const truckDrawCalls = chassis.drawCalls + Math.max(...cabs.map((l) => l.drawCalls))
     expect(Object.keys(caps.levels).sort()).toEqual([...QUALITY_LEVELS].sort())
+    const cost: Record<HeroCapField, { triangles: number; drawCalls: number }> = {
+      heroEquipment: { triangles: worstTriangles, drawCalls: worstDrawCalls },
+      heroShc: body,
+      heroTrucks: { triangles: truckTriangles, drawCalls: truckDrawCalls },
+    }
     for (const level of QUALITY_LEVELS) {
       const cap = caps.levels[level]
-      expect(cap.spreaders, level).toBe(QUALITY_PROFILES[level].heroEquipment)
-      expect(cap.spreaders * worstTriangles, level).toBeLessThanOrEqual(cap.maxTriangles)
-      expect(cap.spreaders * worstDrawCalls, level).toBeLessThanOrEqual(cap.maxDrawCalls)
+      expect(Object.keys(cap).sort(), level).toEqual([...HERO_CAP_FIELDS, 'maxTriangles', 'maxDrawCalls'].sort())
+      for (const field of HERO_CAP_FIELDS) expect(cap[field], `${level} ${field}`).toBe(QUALITY_PROFILES[level][field])
+      const sum = (k: 'triangles' | 'drawCalls'): number => HERO_CAP_FIELDS.reduce((n, f) => n + cap[f] * cost[f][k], 0)
+      expect(sum('triangles'), level).toBeLessThanOrEqual(cap.maxTriangles)
+      expect(sum('drawCalls'), level).toBeLessThanOrEqual(cap.maxDrawCalls)
     }
   })
 

@@ -7,7 +7,7 @@ import { stsBeaconOffsets } from '../gantryBeacons'
 import { spreaderModeFor } from '../spreaderMode'
 import { loadStsTemplate, StsModel, type SpreaderMode } from '../stsAssets'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
-import { offerHeroSpreaderAtLod0 } from '../heroSpreaderMount'
+import { offerHeroEquipmentAtLod0 } from '../heroEquipmentMount'
 
 /** Z of the landside crane rail. */
 const STS_LAND_RAIL_Z = STS.waterRailZ + STS.gauge
@@ -108,7 +108,7 @@ class StsRenderer implements KindRenderer {
       this.lastSpreader.set(id, mode)
       m.carrying = l?.count ?? 0
       m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l })
-      offerHeroSpreaderAtLod0(frame, id, 'sts', m.updateLod(cameraPosition, frame.lodScale), m.heroMount)
+      offerHeroEquipmentAtLod0(frame, id, 'sts', m.updateLod(cameraPosition, frame.lodScale), m.heroMount)
     }
     for (const [id, parts] of this.sts) {
       if (this.stsModels.has(id)) continue

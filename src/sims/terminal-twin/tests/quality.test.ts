@@ -80,10 +80,17 @@ describe('the shedding ladder (pure)', () => {
 
   it('hero spreaders (#273): High 3, Medium 1, Low 0; Auto sheds them at equipment-hero-off, before any box hero detail, and never brings them back lower down', () => {
     expect(QUALITY_LEVELS.map((l) => profileFor(l).heroEquipment)).toEqual([0, 1, 3])
+    expect(QUALITY_LEVELS.map((l) => profileFor(l).heroShc)).toEqual([0, 0, 1])
     expect(rungName(1)).toBe('equipment-hero-off')
     expect(levelOfRung(1)).toBe('high')
     expect(AUTO_RUNGS.map((_, i) => profileForRung(i).heroEquipment)).toEqual([3, 0, 0, 0, 0, 0, 0, 0, 0])
-    expect(profileForRung(1)).toEqual({ ...profileForRung(0), heroEquipment: 0 })
+    expect(AUTO_RUNGS.map((_, i) => profileForRung(i).heroShc)).toEqual([1, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(profileForRung(1)).toEqual({ ...profileForRung(0), heroEquipment: 0, heroShc: 0, heroTrucks: 0 })
+  })
+
+  it('hero trucks (#276): High 2, Medium 1, Low 0, on their own field; Auto sheds them at equipment-hero-off with the other hero equipment', () => {
+    expect(QUALITY_LEVELS.map((l) => profileFor(l).heroTrucks)).toEqual([0, 1, 2])
+    expect(AUTO_RUNGS.map((_, i) => profileForRung(i).heroTrucks)).toEqual([2, 0, 0, 0, 0, 0, 0, 0, 0])
   })
 
   it('paused-detail boost leaves the hero spreader cap as the rung has it', () => {
@@ -134,7 +141,7 @@ describe('the shedding ladder (pure)', () => {
       expect(p[i].resolutionScale).toBeLessThanOrEqual(p[i - 1].resolutionScale)
       expect(p[i].lod0DistanceM).toBeLessThanOrEqual(p[i - 1].lod0DistanceM)
     }
-    expect(profileForRung(7)).toEqual({ ...QUALITY_PROFILES.medium, heroBoxes: 0, heroEquipment: 0, heroStillBoxes: HERO_STILL_BOXES })
+    expect(profileForRung(7)).toEqual({ ...QUALITY_PROFILES.medium, heroBoxes: 0, heroEquipment: 0, heroShc: 0, heroTrucks: 0, heroStillBoxes: HERO_STILL_BOXES })
     expect(profileForRung(8)).toEqual({ ...QUALITY_PROFILES.low, heroStillBoxes: HERO_STILL_BOXES })
   })
 

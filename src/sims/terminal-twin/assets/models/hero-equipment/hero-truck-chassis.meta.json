@@ -1,0 +1,379 @@
+{
+  "asset": "hero-truck-chassis",
+  "kind": "hero-truck-chassis",
+  "version": 1,
+  "generator": "src/sims/terminal-twin/assets/generators/build.py --only hero-equipment",
+  "units": "m",
+  "dimensions": {
+    "lengthM": 12.738,
+    "widthM": 3.159,
+    "heightM": 1.35,
+    "boundsMin": [
+      -6.625,
+      0.0,
+      -1.5795
+    ],
+    "boundsMax": [
+      6.1125,
+      1.35,
+      1.5795
+    ],
+    "tag": "A",
+    "source": "truck-chassis.glb LOD0 (same origin, axes and extents; tests/hero-truck-asset.test.ts compares them)"
+  },
+  "axes": {
+    "up": "+Y",
+    "length": "+X (cab end)",
+    "width": "+Z",
+    "origin": "ground contact below the centre of a 40 ft box on the chassis",
+    "handedness": "right-handed, glTF"
+  },
+  "heroEquipment": {
+    "kind": "truck-chassis",
+    "sourceAsset": "truck-chassis",
+    "replaces": "LOD0 > chassis, wheel_t1, wheel_t2, wheel_t3",
+    "attach": "add LOD0's children under the truck root beside its own LOD0 (identity transform) and drive the rig nodes with the same values as LOD0's nodes of the same name; the `_geo` children are meshes, not rig nodes",
+    "materials": {
+      "truck_atlas": "the truck livery atlas, TEXCOORD_0 on tile 0 as in the truck GLBs; the runtime replaces it with the rig material for the truck shape and livery"
+    }
+  },
+  "livery": {
+    "material": "truck_atlas",
+    "mesh": "chassis",
+    "tile": 0,
+    "tileCols": 4,
+    "tileRows": 2,
+    "note": "chassis colour swatch on this mesh; every mesh of the file uses the same material, so the rig material for the shape and livery goes on all of them"
+  },
+  "nodes": [
+    {
+      "name": "LOD0",
+      "parent": "hero-truck-chassis",
+      "role": "lod",
+      "description": "the only level; same frame as the truck GLBs LOD0"
+    },
+    {
+      "name": "chassis",
+      "parent": "LOD0",
+      "role": "mesh",
+      "livery": true,
+      "description": "truck.py chassis plus twist-lock castings, cross tubes, gooseneck gussets, landing-leg pads and cranks, mudguard stays, lamps, ABS and air lines"
+    },
+    {
+      "name": "wheel_t1",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        -3.4,
+        0.5,
+        0.0
+      ],
+      "axis": "+Z",
+      "description": "trailer axle: tyres with tread lugs on rims with nuts"
+    },
+    {
+      "name": "wheel_t2",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        -4.7,
+        0.5,
+        0.0
+      ],
+      "axis": "+Z",
+      "description": "trailer axle: tyres with tread lugs on rims with nuts"
+    },
+    {
+      "name": "wheel_t3",
+      "parent": "LOD0",
+      "role": "rig",
+      "pivot": [
+        -6.0,
+        0.5,
+        0.0
+      ],
+      "axis": "+Z",
+      "description": "trailer axle: tyres with tread lugs on rims with nuts"
+    },
+    {
+      "name": "wheel_t1_geo",
+      "parent": "wheel_t1",
+      "role": "mesh",
+      "description": "mesh of wheel_t1"
+    },
+    {
+      "name": "wheel_t2_geo",
+      "parent": "wheel_t2",
+      "role": "mesh",
+      "description": "mesh of wheel_t2"
+    },
+    {
+      "name": "wheel_t3_geo",
+      "parent": "wheel_t3",
+      "role": "mesh",
+      "description": "mesh of wheel_t3"
+    }
+  ],
+  "travelLimits": {
+    "wheel_t1": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "wheel_t2": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    },
+    "wheel_t3": {
+      "type": "rotation",
+      "axis": "+Z",
+      "minDeg": -360,
+      "maxDeg": 360,
+      "rest": 0,
+      "continuous": true,
+      "tag": "A"
+    }
+  },
+  "attachPoints": [
+    {
+      "name": "load_40",
+      "position": [
+        0,
+        1.3,
+        0.0
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "description": "bottom centre of a 40 ft box (20 ft + 20 ft pairs use load_20_twin_*); the model origin is directly below it"
+    },
+    {
+      "name": "load_20_front",
+      "position": [
+        3.0675,
+        1.3,
+        0.0
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "description": "bottom centre of a single 20 ft box on the front pins (the pin at the centre line plus the front end pins)"
+    },
+    {
+      "name": "load_20_rear",
+      "position": [
+        -3.0675,
+        1.3,
+        0.0
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "description": "a single 20 ft box on the rear pins"
+    },
+    {
+      "name": "load_20_twin_a",
+      "position": [
+        3.0675,
+        1.3,
+        0.0
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "description": "front 20 ft box of a twin pair"
+    },
+    {
+      "name": "load_20_twin_b",
+      "position": [
+        -3.0675,
+        1.3,
+        0.0
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "description": "rear 20 ft box of a twin pair"
+    },
+    {
+      "name": "pin_40_fl",
+      "position": [
+        5.9925,
+        1.3,
+        -1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "ISO 1161 corner casting centres of a 40 ft box"
+    },
+    {
+      "name": "pin_40_fr",
+      "position": [
+        5.9925,
+        1.3,
+        1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "ISO 1161 corner casting centres of a 40 ft box"
+    },
+    {
+      "name": "pin_40_rl",
+      "position": [
+        -5.9925,
+        1.3,
+        -1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "ISO 1161 corner casting centres of a 40 ft box"
+    },
+    {
+      "name": "pin_40_rr",
+      "position": [
+        -5.9925,
+        1.3,
+        1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "ISO 1161 corner casting centres of a 40 ft box"
+    },
+    {
+      "name": "pin_20_mid_fl",
+      "position": [
+        0.1405,
+        1.3,
+        -1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "inner castings of two 20 ft boxes standing end to end (76 mm gap)"
+    },
+    {
+      "name": "pin_20_mid_fr",
+      "position": [
+        0.1405,
+        1.3,
+        1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "inner castings of two 20 ft boxes standing end to end (76 mm gap)"
+    },
+    {
+      "name": "pin_20_mid_rl",
+      "position": [
+        -0.1405,
+        1.3,
+        -1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "inner castings of two 20 ft boxes standing end to end (76 mm gap)"
+    },
+    {
+      "name": "pin_20_mid_rr",
+      "position": [
+        -0.1405,
+        1.3,
+        1.1295
+      ],
+      "parent": "chassis",
+      "tag": "V",
+      "source": "inner castings of two 20 ft boxes standing end to end (76 mm gap)"
+    }
+  ],
+  "loadConfigurations": [
+    {
+      "mode": "40",
+      "seats": [
+        "load_40"
+      ],
+      "pins": [
+        "pin_40_fl",
+        "pin_40_fr",
+        "pin_40_rl",
+        "pin_40_rr"
+      ],
+      "tag": "V",
+      "description": "one 40 ft box (also 40 ft high-cube) on the four end castings"
+    },
+    {
+      "mode": "20",
+      "seats": [
+        "load_20_front",
+        "load_20_rear"
+      ],
+      "pins": [
+        "pin_40_fl",
+        "pin_40_fr",
+        "pin_20_mid_fl",
+        "pin_20_mid_fr"
+      ],
+      "tag": "V",
+      "description": "one 20 ft box on the front pins (load_20_front) or the rear pins (load_20_rear)"
+    },
+    {
+      "mode": "twin-20",
+      "seats": [
+        "load_20_twin_a",
+        "load_20_twin_b"
+      ],
+      "pins": [
+        "pin_40_fl",
+        "pin_40_fr",
+        "pin_20_mid_fl",
+        "pin_20_mid_fr",
+        "pin_20_mid_rl",
+        "pin_20_mid_rr",
+        "pin_40_rl",
+        "pin_40_rr"
+      ],
+      "tag": "V",
+      "description": "two 20 ft boxes end to end, meeting at the middle castings"
+    }
+  ],
+  "groundContact": {
+    "y": 0,
+    "points": [
+      "wheel_t1",
+      "wheel_t2",
+      "wheel_t3"
+    ],
+    "tag": "V"
+  },
+  "wheel": {
+    "radiusM": 0.5,
+    "tyreWidthM": {
+      "front": 0.315,
+      "drive": 0.295,
+      "trailer": 0.385
+    },
+    "tag": "A",
+    "note": "roll angle = -distance / radius about +Z"
+  },
+  "lods": {
+    "LOD0": {
+      "triangles": 8188,
+      "meshes": 4,
+      "material": "truck_atlas"
+    }
+  },
+  "provenance": [
+    {
+      "fact": "pivots, tyre radius, attach points, load configurations and overall extents from truck.py / truck_meta.py LOD0",
+      "tag": "A",
+      "source": "tt_assets/truck.py"
+    },
+    {
+      "fact": "tread lugs, rim nuts, twist-lock castings, cross tubes, gussets, landing-leg pads and cranks, lamps, ABS lines, glazing seals, wipers, mirrors, grille bars, step treads, grab handles, exhaust shield, fifth-wheel ramps and lock",
+      "tag": "A",
+      "source": "generic European tractor and skeletal chassis detail; no manufacturer drawing"
+    }
+  ]
+}

@@ -148,6 +148,17 @@ detail. Terms: [GLOSSARY.md](../../../../GLOSSARY.md).
     body takes the rig body's motion from rest), so the headblock, power pack and flippers are squashed to about half
     length. Telescoping ends that slide instead would need new rig nodes in the ASC and SHC rigs and hero files.
   - Draw calls are 12 on the STS, not the spec's 4 ([assets-pipeline.md](assets-pipeline.md), Hero spreaders).
+  - The hero SHC body (#275) hangs under the rig's LOD0 node beside the rig's own body: code that walks an SHC's LOD0
+    (colour modes, picking, a per-mesh change) also meets the hero subtree while it is attached. Hero roots carry
+    `userData.heroEquipmentRoot`; skip them. The hero body's fleet-number plate is the rig's LOD0 `shc_plate` material,
+    adopted by material name at attach (`HeroMount.materials`), so a renamed plate material in `hero-shc.glb` shows a plain plate.
+  - The hero truck (#276) wears the rig's livery material by the name `truck_atlas`: the hero chassis and cab meshes
+    adopt `TruckRig`'s material (a clone of the `truck-cab-<shape>.glb` material, named after it) by that name at attach.
+    A rename in either the truck GLBs or the hero files breaks the livery silently (the hero shows tile 0, the first
+    livery); `tests/hero-truck-asset.test.ts` fails if the rig material is not named `truck_atlas`.
+  - The truck GLBs' wheel origins are quantized: they sit up to 4 cm outboard of the true wheel pivot. The hero copies
+    the rig's motion relative to rest (`hero = rigNow x rigRest^-1 x heroRest`), so the offset cancels out; a change to
+    copying absolute rig transforms would shift the hero wheels by that much.
   [rendering-3d.md](rendering-3d.md) (Hero equipment)
 - **Extra shortcuts** E, I and P and the ASC yield moves go beyond the spec (accepted scope). [browser-host.md](browser-host.md)
 - **Far-field livery and corrugation (#170)**: wordmark and rib shading fade to body colour beyond about 80 to 100 m;
