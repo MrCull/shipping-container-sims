@@ -261,8 +261,8 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const bayViewerVesselId = ref<string | null>(null)
   const bayViewerBay = ref(0)
   const bayViewData = shallowRef<BayViewData | null>(null)
-  /** Load plan | Discharge plan (#162): Load on every run start, kept while clicking between vessels in a run. */
-  const bayPlan = ref<BayPlan>('load')
+  /** Discharge plan | Load plan (#162): Discharge on every run start, kept while clicking between vessels in a run. */
+  const bayPlan = ref<BayPlan>('discharge')
   let bayViewBusy = false
 
   /** Re-read the shown vessel from the engine, at the 3D display time (the viewer calls this at a low rate while open). */
@@ -601,7 +601,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       selectedId.value = null
       entityView.value = null
       closeBayViewer()
-      bayPlan.value = 'load'
+      bayPlan.value = 'discharge'
       inspectedEvent.value = null
       following.value = false
       hasScenario.value = true
@@ -628,7 +628,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   async function reset(): Promise<void> {
     await run(() => ctl().reset())
     lockDaylight.value = true
-    bayPlan.value = 'load'
+    bayPlan.value = 'discharge'
     cues.reset()
     sounds.reset()
     banner.value = null

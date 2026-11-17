@@ -342,9 +342,9 @@ in the vessel inspector; X or Esc closes; a new scenario closes it. Text: `bayVi
   `defaultBay`, `planStatuses`. Cell status: `planned-discharge`, `planned-load`, `in-progress` (box on an STS
   spreader), `done` (a discharged slot finds its box as the first owner in custody history), `rob`, `empty`. Cells
   outside the hull profile are `absent` (`tt-bay-absent`), so the hold reads as a V.
-- Load plan | Discharge plan (#162, `tt-bay-plan`, `tt-bay-plan-load|discharge`): `load` shows non-discharge slots,
-  `discharge` discharge slots; the other move's slots read `empty`; ROB shows in both. `store.bayPlan` is `load` on
-  every run start and kept across vessels.
+- Discharge plan | Load plan (#162, `tt-bay-plan`, `tt-bay-plan-discharge|load`): `discharge` shows discharge slots,
+  `load` non-discharge slots; the other move's slots read `empty`; ROB shows in both. `store.bayPlan` is `discharge`
+  on every run start and kept across vessels.
 - Paired panels (#127): the component draws `view.panels`: `fore` (even-1, left) and `aft` (even+1, right) odd bays
   around a 40 ft bay. A 40 is the fore cell plus an aft `continuation` (hatched, "40′ ▸"). Selectors
   `tt-bay-panel-fore|aft`, `data-continuation`, `data-rob`; exclude `[data-continuation]` when counting.

@@ -55,10 +55,9 @@ test('bay viewer: opens from a vessel click, steps between bays, shows ROB bays 
   await expect(viewer(page)).toBeVisible()
   await expect(heading(page)).toContainText(/bay \d\d/i)
   await expect(page.getByTestId('tt-entity-heading')).toContainText('V001')
-  // the viewer opens on the Load plan (#162); this test follows a discharge box, so show the Discharge plan and go to
-  // the first bay with discharge work (the strip follows the plan)
-  await expect(page.getByTestId('tt-bay-plan')).toHaveAttribute('data-plan', 'load')
-  await page.getByTestId('tt-bay-plan-discharge').click()
+  // the viewer opens on the Discharge plan (#162); this test follows a discharge box, so go to the first bay with
+  // discharge work (the strip follows the plan)
+  await expect(page.getByTestId('tt-bay-plan')).toHaveAttribute('data-plan', 'discharge')
   await page.locator('[data-testid^=tt-bay-strip-][data-state=idle]').first().click()
 
   // hold and deck cross-sections: 8 rows, 3 deck tiers and 4 hold tiers of cells (some are 20 ft halves)

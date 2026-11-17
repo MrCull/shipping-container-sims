@@ -1,8 +1,9 @@
 /**
- * #162: the bay viewer's Load plan | Discharge plan switch. Fixture `rob-bays` (it has a yard, so the Load plan has planned-load
- * cells: V001 discharges 16 and loads 6, V002 loads 4; the ROB bays are drawn too). The viewer opens on Load (planned-load cells only, plus ROB), the switch shows the
- * Discharge plan (planned-discharge cells only), the choice stays when another vessel is opened, and a new run (Reset)
- * goes back to Load. The state key lists only the plan's statuses plus ROB.
+ * #162: the bay viewer's Discharge plan | Load plan switch. Fixture `rob-bays` (it has a yard, so the Load plan has
+ * planned-load cells: V001 discharges 16 and loads 6, V002 loads 4; the ROB bays are drawn too). The viewer opens on
+ * Discharge (planned-discharge cells only, plus ROB), the switch shows the Load plan (planned-load cells only), the
+ * choice stays when another vessel is opened, and a new run (Reset) goes back to Discharge. The state key lists only the
+ * plan's statuses plus ROB.
  * Run with `pnpm run test:smoke --project=dev --grep "bay plan switch"`.
  */
 import { expect, test, type Page } from '@playwright/test'
@@ -28,7 +29,7 @@ async function openViewer(page: Page, vesselId: string): Promise<void> {
   await expect(page.getByTestId('tt-bay-heading')).toContainText(/bay \d\d/i)
 }
 
-test('bay plan switch: opens on Load, shows one plan at a time, keeps the choice across vessels, Load again on a new run', async ({ page }) => {
+test('bay plan switch: opens on Discharge, shows one plan at a time, keeps the choice across vessels, Discharge again on a new run', async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await page.goto('/sim/terminal-twin')
@@ -37,40 +38,41 @@ test('bay plan switch: opens on Load, shows one plan at a time, keeps the choice
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'VesselBerthed' }))
 
-  // default: Load plan, planned-load cells and no planned-discharge cells
+  // default: Discharge plan (first in the switch), planned-discharge cells and no planned-load cells
   await openViewer(page, 'V001')
-  await expect(plan(page)).toHaveAttribute('data-plan', 'load')
-  await expect(page.getByTestId('tt-bay-plan-load')).toHaveAttribute('aria-checked', 'true')
-  await expect(cells(page, 'planned-load').first()).toBeVisible()
-  await expect(cells(page, 'planned-discharge')).toHaveCount(0)
-  const legend = page.getByTestId('tt-bay-legend')
-  await expect(legend).toContainText('Planned load')
-  await expect(legend).toContainText('Loaded')
-  await expect(legend).toContainText('Remain on board')
-  await expect(legend).not.toContainText('Planned discharge')
-  await page.screenshot({ path: '.screenshots/bay-plan-load.png' })
-
-  // Discharge plan: planned-discharge cells, no planned-load cells (the strip follows the plan)
-  await page.getByTestId('tt-bay-plan-discharge').click()
   await expect(plan(page)).toHaveAttribute('data-plan', 'discharge')
-  await page.locator('[data-testid^=tt-bay-strip-][data-state=idle]').first().click()
+  await expect(page.getByTestId('tt-bay-plan-discharge')).toHaveAttribute('aria-checked', 'true')
+  await expect(plan(page).getByRole('radio').first()).toHaveAttribute('data-testid', 'tt-bay-plan-discharge')
   await expect(cells(page, 'planned-discharge').first()).toBeVisible()
   await expect(cells(page, 'planned-load')).toHaveCount(0)
+  const legend = page.getByTestId('tt-bay-legend')
   await expect(legend).toContainText('Planned discharge')
   await expect(legend).toContainText('Discharged')
+  await expect(legend).toContainText('Remain on board')
   await expect(legend).not.toContainText('Planned load')
   await page.screenshot({ path: '.screenshots/bay-plan-discharge.png' })
+
+  // Load plan: planned-load cells, no planned-discharge cells (the strip follows the plan)
+  await page.getByTestId('tt-bay-plan-load').click()
+  await expect(plan(page)).toHaveAttribute('data-plan', 'load')
+  await page.locator('[data-testid^=tt-bay-strip-][data-state=idle]').first().click()
+  await expect(cells(page, 'planned-load').first()).toBeVisible()
+  await expect(cells(page, 'planned-discharge')).toHaveCount(0)
+  await expect(legend).toContainText('Planned load')
+  await expect(legend).toContainText('Loaded')
+  await expect(legend).not.toContainText('Planned discharge')
+  await page.screenshot({ path: '.screenshots/bay-plan-load.png' })
 
   // another vessel in the same run keeps the choice
   await page.getByTestId('tt-bay-close').click()
   await expect(viewer(page)).toBeHidden()
   await openViewer(page, 'V002')
-  await expect(plan(page)).toHaveAttribute('data-plan', 'discharge')
+  await expect(plan(page)).toHaveAttribute('data-plan', 'load')
   await page.getByTestId('tt-bay-close').click()
 
-  // a new run (Reset) starts on Load again
+  // a new run (Reset) starts on Discharge again
   await page.evaluate(() => window.__tt!.reset())
   await openViewer(page, 'V001')
-  await expect(plan(page)).toHaveAttribute('data-plan', 'load')
+  await expect(plan(page)).toHaveAttribute('data-plan', 'discharge')
   expect(errors).toEqual([])
 })
