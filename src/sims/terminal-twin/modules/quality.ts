@@ -48,6 +48,8 @@ export interface QualityProfile {
   heroEquipment: number
   /** Hero SHC bodies (#275): SHCs drawn with the hero body at most (its own cap, never shared with the spreaders): High 1, else 0. */
   heroShc: number
+  /** Hero trucks (#276): trucks drawn with the hero chassis and cab at most (its own cap): High 2, Medium 1, Low 0. */
+  heroTrucks: number
   /** Multiplier on the LOD switch distances of the cranes and carriers (STS, SHC, ASC): below 1 they drop to cheaper LODs sooner. */
   lodScale: number
   /** Multiplier on the device pixel ratio (render resolution), before the cap of 2. */
@@ -64,9 +66,9 @@ export interface QualityProfile {
 }
 
 export const QUALITY_PROFILES: Readonly<Record<QualityLevel, QualityProfile>> = {
-  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, heroBoxes: 0, heroStillBoxes: 0, heroEquipment: 0, heroShc: 0, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
-  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, heroBoxes: 12, heroStillBoxes: 0, heroEquipment: 1, heroShc: 0, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
-  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, heroBoxes: 32, heroStillBoxes: 0, heroEquipment: 3, heroShc: 1, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
+  low: { shadows: false, shadowMapSize: 512, lod0DistanceM: 40, lod0Cap: 60, closeupDistanceM: 18, closeupFaceBudget: 48, heroBoxes: 0, heroStillBoxes: 0, heroEquipment: 0, heroShc: 0, heroTrucks: 0, lodScale: 0.4, resolutionScale: 0.65, oceanSegments: 1, nightLights: 24, environmentReflections: false, contactShadows: false },
+  medium: { shadows: true, shadowMapSize: 1024, lod0DistanceM: 90, lod0Cap: 180, closeupDistanceM: 25, closeupFaceBudget: 120, heroBoxes: 12, heroStillBoxes: 0, heroEquipment: 1, heroShc: 0, heroTrucks: 1, lodScale: 0.7, resolutionScale: 0.85, oceanSegments: 24, nightLights: 120, environmentReflections: true, contactShadows: true },
+  high: { shadows: true, shadowMapSize: 2048, lod0DistanceM: 140, lod0Cap: 300, closeupDistanceM: 35, closeupFaceBudget: 400, heroBoxes: 32, heroStillBoxes: 0, heroEquipment: 3, heroShc: 1, heroTrucks: 2, lodScale: 1, resolutionScale: 1, oceanSegments: 96, nightLights: 400, environmentReflections: true, contactShadows: true },
 }
 
 export const profileFor = (level: QualityLevel): QualityProfile => QUALITY_PROFILES[level]
@@ -99,7 +101,7 @@ export class FpsMeter {
  * quarter and none: after none it would shed nothing.
  *
  * Hero spreaders (#273) go first, at `equipment-hero-off`, before any box hero detail: they are fewer, larger objects,
- * and their detail is less visible than a box face. From that rung down `heroEquipment` and `heroShc` (#275) are 0.
+ * and their detail is less visible than a box face. From that rung down `heroEquipment`, `heroShc` (#275) and `heroTrucks` (#276) are 0.
  */
 /**
  * From `hero-off` down the only hero faces are the still-camera floor (`HERO_STILL_BOXES`): few, and painted while
@@ -144,7 +146,7 @@ export function rungName(rung: number): AutoRungName {
  * The profile fields that cap a hero equipment piece (`HeroPieceConfig.cap` in `heroEquipment.ts`), one per piece type.
  * A new piece adds its field here (and to `QualityProfile`); Auto zeroes every one from `equipment-hero-off` down.
  */
-export const HERO_CAP_FIELDS = ['heroEquipment', 'heroShc'] as const satisfies readonly (keyof QualityProfile)[]
+export const HERO_CAP_FIELDS = ['heroEquipment', 'heroShc', 'heroTrucks'] as const satisfies readonly (keyof QualityProfile)[]
 export type HeroCapField = (typeof HERO_CAP_FIELDS)[number]
 
 /** The quality level a rung belongs to (the level shown in the picker and the dev API). */

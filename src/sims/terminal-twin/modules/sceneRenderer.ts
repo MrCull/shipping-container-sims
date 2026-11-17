@@ -80,12 +80,14 @@ export interface SceneStats {
   layers: OverlayLayerStats
   /** Container instances per LOD (placeholders count as LOD1). */
   containerLods: { lod0: number; lod1: number; closeup: number; closeupFaces: number; heroFaces: number; heroPrepared: number; heroDrawCalls: number; heroTriangles: number; heroMarkStep: HeroMarkStep; heroMarkPages: number; heroMarkTiles: number; heroMarkDrawCalls: number; heroMarkBytes: number; culled: number }
-  /** Hero pieces in the scene: spreaders (#273, at most the quality level's `heroEquipment`) plus SHC bodies (#275, at most `heroShc`). */
+  /** Hero pieces in the scene: spreaders (#273, at most the quality level's `heroEquipment`) plus SHC bodies (#275, at most `heroShc`) plus trucks (#276, at most `heroTrucks`). */
   heroEquipment: number
   /** Each hero spreader with its world bounds and those of the rig spreader it replaces (#273). */
   heroSpreaders: HeroPieceInfo[]
   /** Each hero SHC body with its world bounds and those of the rig's LOD0 body meshes it replaces (#275). */
   heroShcBodies: HeroPieceInfo[]
+  /** Each hero truck (chassis and cab) with its world bounds and those of the rig's LOD0 meshes it replaces (#276). */
+  heroTrucks: HeroPieceInfo[]
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -791,6 +793,7 @@ export class SceneRenderer {
       heroEquipment: this.heroEquipment.count,
       heroSpreaders: this.heroEquipment.describe('spreader'),
       heroShcBodies: this.heroEquipment.describe('shc-body'),
+      heroTrucks: this.heroEquipment.describe('truck'),
     } as SceneStats
   }
 

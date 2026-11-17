@@ -6,6 +6,7 @@ import { HERO_EQUIPMENT_RETRY_MS, HeroEquipmentLevel } from '../modules/heroEqui
 import { heroBodyMount, heroSpreaderMount, type HeroMount } from '../modules/heroEquipmentMount'
 import type { HeroEquipmentKind } from '../modules/heroEquipmentAssets'
 import { HERO_FADE_MS, HERO_SETTLE_MS } from '../modules/heroPrep'
+import { TruckRig, truckVariant, type TruckModels, type TruckShape } from '../modules/truckAssets'
 
 const material = new THREE.MeshStandardMaterial()
 const mesh = (name: string): THREE.Mesh => {
@@ -426,7 +427,7 @@ type Piece = 'spreader' | 'body'
 function shcHarness(caps: { spreader: number; body: number }) {
   const loads: HeroEquipmentKind[] = []
   const level = new HeroEquipmentLevel({ load: async (kind) => (loads.push(kind), kind === 'shc-body' ? heroBody() : spreaderTree('LOD0', 2)), now: () => 0 })
-  level.setCaps({ heroEquipment: caps.spreader, heroShc: caps.body })
+  level.setCaps({ heroEquipment: caps.spreader, heroShc: caps.body, heroTrucks: 0 })
   const camera = new THREE.Vector3(0, 7.5, 0)
   let t = 0
   /** One frame with these SHCs offered (`pieces` chooses which pieces each offers). */
@@ -537,7 +538,7 @@ describe('hero SHC body (#275)', () => {
     expect(h.level.countOf('shc-body')).toBe(1)
     expect(heroBodyOf(a)).toBeDefined()
     expect(heroBodyOf(b)).toBeUndefined()
-    h.level.setCaps({ heroEquipment: 1, heroShc: 0 })
+    h.level.setCaps({ heroEquipment: 1, heroShc: 0, heroTrucks: 0 })
     await h.frame({ a, b })
     expect(h.level.countOf('shc-body')).toBe(0)
     expect(h.level.countOf('spreader')).toBe(1)
@@ -573,5 +574,197 @@ describe('scene teardown (#275)', () => {
     h.level.dispose()
     expect(heroBodyOf(shc)).toBeUndefined()
     for (const m of bodyRigMeshes(shc)) expect([m.visible, m.material]).toEqual([true, material])
+  })
+})
+
+/** A truck source as the GLBs have it: LOD0 to LOD2, each with the chassis, a trailer wheel and the tractor under `fifth_wheel`. */
+function truckSource(): THREE.Object3D {
+  const root = new THREE.Group()
+  for (const n of ['LOD0', 'LOD1', 'LOD2']) {
+    const lod = new THREE.Group()
+    lod.name = n
+    const atlas = new THREE.MeshStandardMaterial({ name: 'truck_atlas' })
+    const m = (name: string): THREE.Mesh => {
+      const o = new THREE.Mesh(new THREE.BufferGeometry(), atlas)
+      o.name = name
+      return o
+    }
+    const chassis = m('chassis')
+    chassis.position.set(-0.25, 0.78, 0)
+    const wheelT1 = m('wheel_t1')
+    wheelT1.position.set(-3.4, 0.5, 0)
+    const fifth = new THREE.Group()
+    fifth.name = 'fifth_wheel'
+    fifth.position.set(4.9, 0, 0)
+    const steer = new THREE.Group()
+    steer.name = 'steer_fl'
+    steer.position.set(3.5, 0.5, -1)
+    steer.add(m('wheel_fl'))
+    fifth.add(steer, m('tractor'))
+    lod.add(chassis, wheelT1, fifth)
+    root.add(lod)
+  }
+  return root
+}
+
+/** Fake truck models: one source per shape, one material per shape and livery tile (shared, as `loadTruckModels` has it). */
+function truckModels(): TruckModels & { materials: Map<string, THREE.Material> } {
+  const materials = new Map<string, THREE.Material>()
+  const source = truckSource()
+  return {
+    materials,
+    sources: { high: source, mid: source, day: source },
+    materialFor(shape: TruckShape, livery: number) {
+      const key = `${shape}:${livery}`
+      if (!materials.has(key)) materials.set(key, new THREE.MeshStandardMaterial({ name: 'truck_atlas' }))
+      return materials.get(key)!
+    },
+  }
+}
+
+/** The hero truck file pair as the loader merges it: chassis nodes and the cab subtree, detailed meshes in `_geo` children; the cab glazing has its own material. */
+function heroTruck(): THREE.Object3D {
+  const root = new THREE.Group()
+  root.name = 'LOD0'
+  const atlas = new THREE.MeshStandardMaterial({ name: 'truck_atlas' })
+  const glass = new THREE.MeshStandardMaterial({ name: 'hero_glass' })
+  const node = (name: string, x: number, y: number, z: number, mat: THREE.Material = atlas): THREE.Object3D => {
+    const g = new THREE.Group()
+    g.name = name
+    g.position.set(x, y, z)
+    const geo = new THREE.Mesh(new THREE.BufferGeometry(), mat)
+    geo.name = `${name}_geo`
+    g.add(geo)
+    return g
+  }
+  const fifth = node('fifth_wheel', 4.9, 0, 0)
+  const steer = node('steer_fl', 3.5, 0.5, -1)
+  steer.add(node('wheel_fl', 0, 0, 0))
+  fifth.add(steer, node('tractor', 1.34, 1.77, 0), node('glazing', 2, 2.5, 0, glass))
+  root.add(node('chassis', -0.25, 0.78, 0), node('wheel_t1', -3.4, 0.5, 0), fifth)
+  return root
+}
+
+function truckHarness(caps: { trucks: number; spreaders?: number }) {
+  const models = truckModels()
+  const loads: HeroEquipmentKind[] = []
+  const level = new HeroEquipmentLevel({ load: async (kind) => (loads.push(kind), kind.startsWith('truck-') ? heroTruck() : spreaderTree('LOD0', 2)), now: () => 0 })
+  level.setCaps({ heroEquipment: caps.spreaders ?? 0, heroShc: 0, heroTrucks: caps.trucks })
+  const camera = new THREE.Vector3(0, 2, 0)
+  let t = 0
+  const rig = (id: string, x: number): TruckRig => {
+    const r = new TruckRig(models, id)
+    r.pose({ x, z: 0, yaw: 0, steerRad: 0, odometerM: 0, articulationRad: 0, loadOffsetM: 0 })
+    r.root.updateMatrixWorld(true)
+    return r
+  }
+  const frame = async (trucks: Record<string, TruckRig>, spreaders: Record<string, FakeRig> = {}, dtMs = 100) => {
+    t += dtMs
+    level.begin()
+    for (const [id, r] of Object.entries(trucks)) level.offer({ id, kind: r.heroKind, mount: r.heroMount }, camera)
+    for (const [id, r] of Object.entries(spreaders)) level.offer({ id, kind: 'asc', mount: r.mount }, camera)
+    level.update(camera, t)
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+  }
+  const settle = async (trucks: Record<string, TruckRig>, spreaders?: Record<string, FakeRig>) => {
+    for (let i = 0; i < 4 + Math.ceil((HERO_SETTLE_MS + HERO_FADE_MS) / 100); i++) await frame(trucks, spreaders)
+  }
+  return { models, level, loads, camera, frame, settle, rig }
+}
+
+const truckLod0 = (r: TruckRig): THREE.Object3D => r.heroMount.node
+const heroTruckOf = (r: TruckRig): THREE.Object3D | undefined => truckLod0(r).children.find((c) => c.userData.heroEquipmentRoot)
+const truckRigMeshes = (r: TruckRig): THREE.Mesh[] => {
+  const out: THREE.Mesh[] = []
+  truckLod0(r).traverse((o) => {
+    if ((o as THREE.Mesh).isMesh && !heroTruckOf(r)?.getObjectById(o.id)) out.push(o as THREE.Mesh)
+  })
+  return out
+}
+
+describe('hero truck (#276)', () => {
+  it('attaches the hero chassis and cab together under the rig LOD0 of a truck within 25 m, the kind of its cab shape, and hides the rig meshes', async () => {
+    const h = truckHarness({ trucks: 2 })
+    const truck = h.rig('T1', 10)
+    await h.settle({ T1: truck })
+    const hero = heroTruckOf(truck)!
+    expect(hero).toBeDefined()
+    expect(hero.getObjectByName('chassis')).toBeDefined()
+    expect(hero.getObjectByName('tractor')).toBeDefined()
+    expect(h.loads).toEqual([`truck-${truckVariant('T1').shape}`])
+    for (const m of truckRigMeshes(truck)) expect(m.visible, m.name).toBe(false)
+    expect(h.level.countOf('truck')).toBe(1)
+    expect(h.level.describe('truck')).toMatchObject([{ id: 'T1', kind: `truck-${truck.shape}`, rigHidden: true, fading: false }])
+  })
+
+  it('caps trucks at 2 (High), nearest first, and reaches 25 m from the truck centre only', async () => {
+    const h = truckHarness({ trucks: 2 })
+    // the truck centre is 2.3 m ahead of the pose origin (TRUCK rearX and frontX)
+    const trucks = { T1: h.rig('T1', 5), T2: h.rig('T2', 12), T3: h.rig('T3', -20), T4: h.rig('T4', 26) }
+    await h.settle(trucks)
+    expect(h.level.describe('truck').map((d) => d.id)).toEqual(['T1', 'T2'])
+    expect(heroTruckOf(trucks.T3)).toBeUndefined()
+    const far = truckHarness({ trucks: 2 })
+    const out = far.rig('T9', 23.5) // centre at 25.8 m
+    await far.settle({ T9: out })
+    expect(far.level.countOf('truck')).toBe(0)
+  })
+
+  it('the hero chassis and cab wear the rig livery material (shared, by reference), other hero materials stay their own', async () => {
+    const h = truckHarness({ trucks: 1 })
+    const truck = h.rig('T5', 8)
+    await h.settle({ T5: truck })
+    const livery = h.models.materialFor(truck.shape, truck.livery)
+    const hero = heroTruckOf(truck)!
+    expect((hero.getObjectByName('chassis_geo') as THREE.Mesh).material).toBe(livery)
+    expect((hero.getObjectByName('tractor_geo') as THREE.Mesh).material).toBe(livery)
+    expect(((hero.getObjectByName('glazing_geo') as THREE.Mesh).material as THREE.Material).name).toBe('hero_glass')
+  })
+
+  it('copies the rig motion: wheel roll, steering and articulation from TruckRig.pose() show on the hero nodes', async () => {
+    const h = truckHarness({ trucks: 1 })
+    const truck = h.rig('T1', 10)
+    await h.settle({ T1: truck })
+    truck.pose({ x: 10, z: 0, yaw: 0, steerRad: 0.3, odometerM: 0.5, articulationRad: 0.2, loadOffsetM: 0 })
+    await h.frame({ T1: truck })
+    const hero = heroTruckOf(truck)!
+    const rotation = (name: string): THREE.Euler => {
+      const q = new THREE.Quaternion()
+      hero.getObjectByName(name)!.matrix.decompose(new THREE.Vector3(), q, new THREE.Vector3())
+      return new THREE.Euler().setFromQuaternion(q)
+    }
+    expect(rotation('steer_fl').y).toBeCloseTo(0.3, 6)
+    expect(rotation('fifth_wheel').y).toBeCloseTo(0.2, 6)
+    expect(rotation('wheel_t1').z).toBeCloseTo(truck.rigState.wheelRollRad, 6)
+    expect(rotation('wheel_fl').z).toBeCloseTo(truck.rigState.wheelRollRad, 6)
+  })
+
+  it('releases chassis and cab together, fading out, when the truck leaves LOD0 or reach', async () => {
+    const h = truckHarness({ trucks: 1 })
+    const truck = h.rig('T1', 10)
+    await h.settle({ T1: truck })
+    await h.frame({})
+    expect(h.level.countOf('truck')).toBe(0)
+    expect(heroTruckOf(truck)).toBeDefined() // fading out
+    await h.frame({}, {}, HERO_FADE_MS)
+    expect(heroTruckOf(truck)).toBeUndefined()
+    for (const m of truckRigMeshes(truck)) expect(m.visible, m.name).toBe(true)
+  })
+
+  it('has its own lane: a full spreader cap does not keep a truck out, and a truck cap of 0 (Low) draws none while spreaders stay', async () => {
+    const h = truckHarness({ trucks: 1, spreaders: 1 })
+    const truck = h.rig('T1', 6)
+    const spreader = fakeRig(4)
+    await h.settle({ T1: truck }, { a: spreader })
+    expect(h.level.countOf('truck')).toBe(1)
+    expect(h.level.countOf('spreader')).toBe(1)
+    h.level.setCaps({ heroEquipment: 1, heroShc: 0, heroTrucks: 0 })
+    await h.frame({ T1: truck }, { a: spreader })
+    await h.frame({ T1: truck }, { a: spreader }, HERO_FADE_MS)
+    expect(h.level.countOf('truck')).toBe(0)
+    expect(heroTruckOf(truck)).toBeUndefined()
+    expect(h.level.countOf('spreader')).toBe(1)
   })
 })

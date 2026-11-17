@@ -129,21 +129,22 @@ level shows, and `onReady` marks the close-up pass dirty so a still camera redra
   left leaf outside its outer bar; a line is shrunk to its column (`fitText`). The hardware material is mostly diffuse
   (metallic 0.35), so bars stay galvanised grey on levels without an environment map.
 
-#### Hero equipment (#273, #275)
+#### Hero equipment (#273, #275, #276)
 
 The spreaders nearest the camera get the hero spreader model (`hero-spreader-<sts|asc|shc>`, [assets-pipeline.md](assets-pipeline.md),
-Hero spreaders), and the nearest SHC gets the hero SHC body (`hero-shc`, #275). `HeroEquipmentLevel` (`modules/heroEquipment.ts`)
+Hero spreaders), the nearest SHC gets the hero SHC body (`hero-shc`, #275), and the nearest trucks get the hero chassis and cab (`hero-truck-*`, #276). `HeroEquipmentLevel` (`modules/heroEquipment.ts`)
 is owned by the scene renderer, which sets the caps from the quality profile (`setCaps(profile)`).
 
 - **Pieces.** A piece type is an entry of `HERO_PIECES` (`heroEquipment.ts`): its file kinds, its distance and its cap field.
   Each piece is selected on its own lane (own cap, offers, chosen set and entries), so the SHC body never competes with the
   spreaders for the spreader cap. Today: `spreader` (kinds `sts`, `asc`, `shc`; 25 m; `heroEquipment`: High 3, Medium 1,
   Low 0) and `shc-body` (kind `shc-body`; `HERO_SHC_DISTANCE_M` = 30 m from the SHC centre; `heroShc`: High 1, Medium 0,
-  Low 0); both caps are 0 from the `equipment-hero-off` rung down. How a piece mounts is in its `HeroMount`
+  Low 0) and `truck` (kinds `truck-day`, `truck-mid`, `truck-high`, one per cab shape; `HERO_TRUCK_DISTANCE_M` = 25 m from
+  the truck centre; `heroTrucks`: High 2, Medium 1, Low 0); every cap is 0 from the `equipment-hero-off` rung down. How a piece mounts is in its `HeroMount`
   (`heroEquipmentMount.ts`): the rig node its `LOD0` goes under, the rest copy, an optional `skip` subtree, an optional
   `centre` for the distance and optional `materials` adopted by name. Adding a piece (#276, the hero truck): a
-  `HERO_PIECES` entry, a quality field, a URL in `heroEquipmentAssets.ts`, and a kind hook (the rig builds a mount, the
-  kind calls `offerHeroEquipmentAtLod0`).
+  `HERO_PIECES` entry, a quality field (`HERO_CAP_FIELDS`), a URL (or a list of files merged into one `LOD0`) in
+  `heroEquipmentAssets.ts`, and a kind hook (the rig builds a mount, the kind calls `offerHeroEquipmentAtLod0`).
 - **SHC body (#275).** `ShcRig.heroBodyMount` (`heroBodyMount(lod0, centre, materials)`): the LOD0 node itself with
   `skip: 'spreader'`, measured to (0, height / 2, 0) of LOD0, with LOD0's `shc_plate` material (the fleet number) adopted
   by the hero plate mesh. The hero body is a sibling of the rig's LOD0 body content (child of LOD0, identity transform); the
@@ -152,8 +153,20 @@ is owned by the scene renderer, which sets the caps from the quality profile (`s
   independently: each piece owns a disjoint set of rig meshes, and every hero root is marked (`userData.heroEquipmentRoot`)
   so another piece's walk over the rig never takes its meshes for rig meshes. Motion is the same copy as the spreaders'
   (below): `ShcRig` keeps its LOD0 node references and is unchanged (one mechanism for every hero piece).
+- **Truck (#276).** One piece per truck, so the cap counts trucks: the kind `truck-<shape>` is two files,
+  `hero-truck-chassis.glb` (shared by the three shapes, fetched once) and `hero-truck-cab-<shape>.glb`, which the loader
+  merges into one `LOD0` (the chassis nodes and the cab's `fifth_wheel` subtree side by side, as in the rig's LOD0), so
+  chassis and cab attach, fade and release together. `TruckRig.heroMount` (`heroTruckMount(lod0, centre, materials)`): the
+  rig's whole LOD0 (no `skip`), measured to the truck centre ((`TRUCK.rearX` + `TRUCK.frontX`) / 2, `TRUCK.height` / 2 in
+  LOD0's frame), taken in the constructor before the first pose. Livery: `materials` maps the rig's material name
+  (`truck_atlas`) to the rig's livery material (`materialFor(shape, livery)`, shared per shape and livery tile), so every
+  hero mesh with that material name wears the same material by reference and shows the same tile; nothing shared is
+  mutated (the fade dithers per-piece copies, as for every piece). Motion is the copy below: the wheel roll, front
+  steering and the tractor's swing about `fifth_wheel` that `TruckRig.pose()` drives. `LandsideScene.update(t, camera,
+  frame)` offers each GLB truck at LOD0 after `chooseLod`; the procedural fallback trucks are never offered. A truck always
+  has both chassis and tractor in the rig (no bobtail state), so there is no chassis-only or tractor-only case.
 
-- **Offers.** In `update()` the STS, ASC and SHC kinds call `frame.offerHeroEquipment({ id, kind, mount })` for each rig that is
+- **Offers.** In `update()` the STS, ASC, SHC and truck kinds call `frame.offerHeroEquipment({ id, kind, mount })` for each rig that is
   at LOD0, after posing it, through one helper, `offerHeroEquipmentAtLod0(frame, id, kind, lod, mount)` (the SHC kind offers
   twice: `shc` with `heroMount` and `shc-body` with `heroBodyMount`). `mount` is the
   rig's `heroMount` (`heroSpreaderMount(lod0)`: the LOD0 `spreader` node and a copy of it at rest, taken before the first
@@ -199,18 +212,19 @@ is owned by the scene renderer, which sets the caps from the quality profile (`s
   the hero subtree is removed and the shared materials are put back. The fade is one value per piece moving towards a
   target (1 attaching, 0 releasing): a release during the fade-in, or a piece chosen again during its fade-out, turns
   around from the value it has reached, with no new load. A releasing piece is no longer counted (`count`, `countOf`,
-  so `stats.heroEquipment` drops at once) or described (`heroSpreaders`, `heroShcBodies`), but `heroSettled()` stays
+  so `stats.heroEquipment` drops at once) or described (`heroSpreaders`, `heroShcBodies`, `heroTrucks`), but `heroSettled()` stays
   false until its fade-out ends. `dispose()` removes every piece at once. Geometry and materials belong to the loader's
   cache and are not disposed. Teardown order: `SceneRenderer.dispose()` disposes the hero level before the kind
   renderers, because the hero SHC body wears its rig's plate material, which `ShcRig.dispose()` frees.
 - **Readouts.** `__tt.scene().heroEquipment` and `__tt.perf().stats.heroEquipment` (the Stats panel's "Hero equipment",
-  `tt-perf-hero-equipment`) count attached hero pieces (fading in or shown, not fading out), spreaders and SHC bodies together (`countOf(piece)` splits them). `__tt.heroSettled()` is false while a chosen spreader waits for
+  `tt-perf-hero-equipment`) count attached hero pieces (fading in or shown, not fading out), spreaders, SHC bodies and trucks together (`countOf(piece)` splits them). `__tt.heroSettled()` is false while a chosen spreader waits for
   the camera gate, its file or a prep slot, or a piece fades in or out (not while a failed load waits on its back-off, see Failed load).
 
   `__tt.scene().heroSpreaders` lists each attached one (`id`, `kind`, `fading`, `rigHidden`) with the world bounds of the
   hero model and of the rig spreader meshes it replaces (each rig mesh by its own geometry), so a test can check place,
   length (also the 20 ft squeeze) and twistlock plane without a screenshot. `__tt.scene().heroShcBodies` (#275) lists the
-  attached hero SHC bodies the same way (kind `shc-body`; `rig` is the bounds of the LOD0 body meshes it replaces).
+  attached hero SHC bodies the same way (kind `shc-body`; `rig` is the bounds of the LOD0 body meshes it replaces), and
+  `__tt.scene().heroTrucks` (#276) the hero trucks (kind `truck-<shape>`; `rig` is the bounds of the truck's LOD0 meshes).
 
 Tests: `tests/hero-equipment-level.test.ts` (fake rigs and loader), `tests/hero-equipment-selection.test.ts`. Smoke:
 `tests/browser/hero-equipment.smoke.ts` (ASC close-up within the cap, no file requested before, none on Low or at the

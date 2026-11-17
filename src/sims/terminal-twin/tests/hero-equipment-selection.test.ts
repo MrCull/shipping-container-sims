@@ -3,7 +3,7 @@
  * `HERO_EQUIPMENT_DISTANCE_M`, capped, and a spreader chosen last frame keeps its place out to 1.15 x the distance.
  */
 import { describe, expect, it } from 'vitest'
-import { HERO_EQUIPMENT_DISTANCE_M, HERO_EQUIPMENT_HYSTERESIS, HERO_SHC_DISTANCE_M, selectHeroEquipment } from '../modules/heroEquipmentSelection'
+import { HERO_EQUIPMENT_DISTANCE_M, HERO_EQUIPMENT_HYSTERESIS, HERO_SHC_DISTANCE_M, HERO_TRUCK_DISTANCE_M, selectHeroEquipment } from '../modules/heroEquipmentSelection'
 
 const none: ReadonlySet<string> = new Set()
 
@@ -11,6 +11,7 @@ describe('selectHeroEquipment', () => {
   it('has the triage constants: 25 m, hysteresis 1.15', () => {
     expect(HERO_EQUIPMENT_DISTANCE_M).toBe(25)
     expect(HERO_EQUIPMENT_HYSTERESIS).toBe(1.15)
+    expect(HERO_TRUCK_DISTANCE_M).toBe(25) // #276, from the truck centre
   })
 
   it('returns the spreaders within the distance, nearest first', () => {

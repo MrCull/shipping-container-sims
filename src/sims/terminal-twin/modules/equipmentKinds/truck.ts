@@ -23,7 +23,7 @@ class TruckRenderer implements KindRenderer {
   }
 
   update(frame: KindFrame): void {
-    this.landside.update(frame.t, frame.cameraPosition)
+    this.landside.update(frame.t, frame.cameraPosition, frame)
     if (!frame.live) return
     const { model } = this.host
     for (const id of model.truckIds) {
