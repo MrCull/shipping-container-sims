@@ -229,7 +229,9 @@ test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the 
   expect(w.heroRequests).toEqual([])
 
   // Follow next truck (the follow-truck smoke's API): the camera tracks the next arrival; run on until it stands at its
-  // transfer stall with its box
+  // transfer stall with its box. The fixture's first truck (3000 s) comes empty to pick an import; the second (3010 s)
+  // drops an export, so follow the next truck from 3005 s.
+  await page.evaluate(() => window.__tt!.runUntil({ time: 3005 }))
   await page.evaluate(() => window.__tt!.followNextTruck())
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'TruckArrived' }))
   await expect.poll(async () => (await page.evaluate(() => window.__tt!.ui())).following).toBe(true)
