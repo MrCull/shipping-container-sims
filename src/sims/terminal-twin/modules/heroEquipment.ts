@@ -1,10 +1,11 @@
 /**
- * The hero equipment level (#273, #275): the spreaders nearest the camera are drawn with the detailed hero spreader model
- * instead of their rig's LOD0 spreader, and the nearest SHC with the hero SHC body instead of its LOD0 body. Each piece
+ * The hero equipment level (#273, #275, #276): the spreaders nearest the camera are drawn with the detailed hero spreader model
+ * instead of their rig's LOD0 spreader, the nearest SHC with the hero SHC body instead of its LOD0 body, and the
+ * nearest trucks with the hero chassis and cab instead of their LOD0. Each piece
  * type (`HERO_PIECES`) is selected on its own lane with its own cap and distance; everything below applies per piece,
  * with "spreader" standing for any piece. Framework-free; the scene renderer owns one `HeroEquipmentLevel`.
  *
- * Each frame the equipment kinds (`equipmentKinds/sts.ts`, `asc.ts`, `shc.ts`) offer every rig that is at LOD0, after
+ * Each frame the equipment kinds (`equipmentKinds/sts.ts`, `asc.ts`, `shc.ts`, `truck.ts`) offer every rig that is at LOD0, after
  * posing it; `update()` then chooses (`selectHeroEquipment`, at most the quality profile's `heroEquipment`), prepares,
  * attaches and fades:
  *
@@ -37,7 +38,7 @@
  */
 import * as THREE from 'three'
 import { loadHeroEquipment, type HeroEquipmentKind } from './heroEquipmentAssets'
-import { HERO_EQUIPMENT_DISTANCE_M, HERO_EQUIPMENT_HYSTERESIS, HERO_SHC_DISTANCE_M, selectHeroEquipment, type HeroEquipmentCandidate } from './heroEquipmentSelection'
+import { HERO_EQUIPMENT_DISTANCE_M, HERO_EQUIPMENT_HYSTERESIS, HERO_SHC_DISTANCE_M, HERO_TRUCK_DISTANCE_M, selectHeroEquipment, type HeroEquipmentCandidate } from './heroEquipmentSelection'
 import { CameraGate, HERO_FADE_MS, runPrep, type PrepItem } from './heroPrep'
 import { gltfNodeName as nodeName, type HeroEquipmentOffer } from './heroEquipmentMount'
 import type { HeroCapField, QualityProfile } from './quality'
@@ -47,7 +48,7 @@ export const HERO_EQUIPMENT_RETRY_MS = 3000
 /** Each further failure doubles the wait, up to this (ms). */
 export const HERO_EQUIPMENT_RETRY_MAX_MS = 30000
 /** A piece type: selected on its own, with its own cap and distance, so pieces never compete for each other's places. */
-export type HeroPiece = 'spreader' | 'shc-body'
+export type HeroPiece = 'spreader' | 'shc-body' | 'truck'
 
 export interface HeroPieceConfig {
   /** The file kinds (`heroEquipmentAssets.ts`) offered for this piece. */
@@ -66,6 +67,8 @@ export interface HeroPieceConfig {
 export const HERO_PIECES: Readonly<Record<HeroPiece, HeroPieceConfig>> = {
   spreader: { kinds: ['sts', 'asc', 'shc'], distanceM: HERO_EQUIPMENT_DISTANCE_M, cap: 'heroEquipment' },
   'shc-body': { kinds: ['shc-body'], distanceM: HERO_SHC_DISTANCE_M, cap: 'heroShc' },
+  // #276: one piece per truck, the hero chassis and the hero cab of the truck's shape loaded as one LOD0 (`heroEquipmentAssets.ts`)
+  truck: { kinds: ['truck-day', 'truck-mid', 'truck-high'], distanceM: HERO_TRUCK_DISTANCE_M, cap: 'heroTrucks' },
 }
 
 /** `HERO_PIECES` as a typed list, in declaration order. */
@@ -179,7 +182,7 @@ export interface HeroPieceBounds {
   max: [number, number, number]
 }
 
-/** One attached hero piece as last drawn (`__tt.scene().heroSpreaders`, `heroShcBodies`): where it is against the rig meshes it replaces. */
+/** One attached hero piece as last drawn (`__tt.scene().heroSpreaders`, `heroShcBodies`, `heroTrucks`): where it is against the rig meshes it replaces. */
 export interface HeroPieceInfo {
   id: string
   kind: HeroEquipmentKind

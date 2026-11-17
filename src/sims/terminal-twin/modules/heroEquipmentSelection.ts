@@ -11,6 +11,8 @@ import { HERO_HYSTERESIS } from './heroFaceSelection'
 export const HERO_EQUIPMENT_DISTANCE_M = 25
 /** Beyond this camera distance (m) to the SHC centre an SHC never gets the hero body (#275; the carrier is about 15 m high). */
 export const HERO_SHC_DISTANCE_M = 30
+/** Beyond this camera distance (m) to the truck centre a truck never gets the hero chassis and cab (#276). */
+export const HERO_TRUCK_DISTANCE_M = 25
 /** A chosen spreader keeps its place out to the distance times this factor (the hero faces' factor). */
 export const HERO_EQUIPMENT_HYSTERESIS = HERO_HYSTERESIS
 

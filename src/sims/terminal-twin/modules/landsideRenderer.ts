@@ -13,6 +13,7 @@ import { STALL_LENGTH_M, TRUCK_DECK_M } from '../engine'
 import { TRUCK } from './equipmentDims'
 import type { SceneModel } from './sceneModel'
 import { TruckRig, type TruckModels, type TruckRigState } from './truckAssets'
+import { offerHeroEquipmentAtLod0, type HeroEquipmentOffer } from './heroEquipmentMount'
 
 export interface LandsideStats {
   /** Trucks drawn at the last update. */
@@ -261,7 +262,8 @@ export class LandsideScene {
     for (const m of gate.build((x) => this.track(x))) this.gatePlaceholder.add(m)
   }
 
-  update(t: number, cameraPosition: THREE.Vector3): void {
+  /** Poses the trucks for time `t`; each GLB truck drawn at LOD0 is offered to `hero` (the kind's frame) for the hero truck (#276). */
+  update(t: number, cameraPosition: THREE.Vector3, hero?: { offerHeroEquipment(offer: HeroEquipmentOffer): void }): void {
     const model = this.model
     let drawn = 0
     let queued = 0
@@ -286,6 +288,7 @@ export class LandsideScene {
         meshes.rig.pose(pose)
         const lod = meshes.rig.chooseLod(Math.hypot(pose.x - cameraPosition.x, cameraPosition.y, pose.z - cameraPosition.z))
         lods[`lod${lod}` as keyof typeof lods]++
+        if (hero) offerHeroEquipmentAtLod0(hero, id, meshes.rig.heroKind, lod, meshes.rig.heroMount)
         continue
       }
       meshes.group.position.set(pose.x, 0, pose.z)

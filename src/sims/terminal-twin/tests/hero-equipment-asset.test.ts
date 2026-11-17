@@ -92,29 +92,45 @@ describe('hero spreaders', () => {
     }
   })
 
-  it('budgets.json lists the hero spreaders and the SHC body and a cap per quality level that the measured models fit (heroEquipmentCaps)', () => {
+  it('budgets.json caps hero trucks (#276) per quality level as the quality profiles do (heroEquipmentCaps.levels.*.trucks)', () => {
+    const caps = (loadBudgets() as unknown as { heroEquipmentCaps: { levels: Record<string, { trucks: number }> } }).heroEquipmentCaps
+    for (const level of QUALITY_LEVELS) expect(caps.levels[level].trucks, level).toBe(QUALITY_PROFILES[level].heroTrucks)
+  })
+
+  it('budgets.json lists the hero spreaders, the SHC body and the hero truck files and a cap per quality level that the measured models fit (heroEquipmentCaps)', () => {
     interface Cap {
       spreaders: number
       shcBodies: number
+      trucks: number
       maxTriangles: number
       maxDrawCalls: number
     }
     const caps = (loadBudgets() as unknown as { heroEquipmentCaps: { assets: string[]; levels: Record<string, Cap> } }).heroEquipmentCaps
     const report = checkAssetLibrary()
-    const inLibrary = report.assets.filter((a) => a.name.startsWith('hero-spreader-') || a.name === 'hero-shc').map((a) => a.name)
+    const isHero = (n: string): boolean => n.startsWith('hero-spreader-') || n === 'hero-shc' || n.startsWith('hero-truck-')
+    const inLibrary = report.assets.filter((a) => isHero(a.name)).map((a) => a.name)
+    const truckFiles = ['hero-truck-chassis', 'hero-truck-cab-day', 'hero-truck-cab-mid', 'hero-truck-cab-high']
+    // the hero truck files come from #276 slice A: until they are generated this test fails here, on the library
     expect([...caps.assets].sort()).toEqual(inLibrary.sort())
-    expect([...caps.assets].sort()).toEqual([...KINDS.map((k) => `hero-spreader-${k}`), 'hero-shc'].sort())
-    const lod0 = caps.assets.filter((n) => n !== 'hero-shc').map((n) => report.assets.find((a) => a.name === n)!.lods.LOD0)
+    expect([...caps.assets].sort()).toEqual([...KINDS.map((k) => `hero-spreader-${k}`), 'hero-shc', ...truckFiles].sort())
+    const lod0Of = (name: string) => report.assets.find((a) => a.name === name)!.lods.LOD0
+    const lod0 = caps.assets.filter((n) => n.startsWith('hero-spreader-')).map(lod0Of)
     const worstTriangles = Math.max(...lod0.map((l) => l.triangles))
     const worstDrawCalls = Math.max(...lod0.map((l) => l.drawCalls))
-    const body = report.assets.find((a) => a.name === 'hero-shc')!.lods.LOD0
+    const body = lod0Of('hero-shc')
+    // a hero truck is the chassis plus the cab of its shape: budget the worst cab
+    const chassis = lod0Of('hero-truck-chassis')
+    const cabs = truckFiles.slice(1).map(lod0Of)
+    const truckTriangles = chassis.triangles + Math.max(...cabs.map((l) => l.triangles))
+    const truckDrawCalls = chassis.drawCalls + Math.max(...cabs.map((l) => l.drawCalls))
     expect(Object.keys(caps.levels).sort()).toEqual([...QUALITY_LEVELS].sort())
     for (const level of QUALITY_LEVELS) {
       const cap = caps.levels[level]
       expect(cap.spreaders, level).toBe(QUALITY_PROFILES[level].heroEquipment)
       expect(cap.shcBodies, level).toBe(QUALITY_PROFILES[level].heroShc)
-      expect(cap.spreaders * worstTriangles + cap.shcBodies * body.triangles, level).toBeLessThanOrEqual(cap.maxTriangles)
-      expect(cap.spreaders * worstDrawCalls + cap.shcBodies * body.drawCalls, level).toBeLessThanOrEqual(cap.maxDrawCalls)
+      expect(cap.trucks, level).toBe(QUALITY_PROFILES[level].heroTrucks)
+      expect(cap.spreaders * worstTriangles + cap.shcBodies * body.triangles + cap.trucks * truckTriangles, level).toBeLessThanOrEqual(cap.maxTriangles)
+      expect(cap.spreaders * worstDrawCalls + cap.shcBodies * body.drawCalls + cap.trucks * truckDrawCalls, level).toBeLessThanOrEqual(cap.maxDrawCalls)
     }
   })
 

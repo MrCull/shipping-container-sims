@@ -42,7 +42,7 @@ export interface PerfStats {
   closeupFaces: number
   /** Hero faces currently drawn (#258), never above the quality level's hero cap. */
   heroFaces: number
-  /** Hero equipment pieces currently in the scene (#273, #275: spreaders and SHC bodies), each piece type within its own quality cap (`heroEquipment`, `heroShc`). */
+  /** Hero equipment pieces currently in the scene (#273, #275, #276: spreaders, SHC bodies and trucks), each piece type within its own quality cap (`heroEquipment`, `heroShc`, `heroTrucks`). */
   heroEquipment: number
   /** Container boxes posed in the last frame (every box with a pose, visible or not) (#246). */
   boxesPosed: number

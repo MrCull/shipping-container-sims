@@ -1,6 +1,6 @@
 /**
- * The rig side of the hero equipment level (#273, #275): where a hero piece goes on a rig, and the one call a kind
- * makes to offer a rig. The rig models (`stsAssets.ts`, `ascAssets.ts`, `shcAssets.ts`) and the kinds import this
+ * The rig side of the hero equipment level (#273, #275, #276): where a hero piece goes on a rig, and the one call a kind
+ * makes to offer a rig. The rig models (`stsAssets.ts`, `ascAssets.ts`, `shcAssets.ts`, `truckAssets.ts`) and the kinds import this
  * module, not the level (`heroEquipment.ts`), which consumes the offers.
  */
 import type * as THREE from 'three'
@@ -51,6 +51,15 @@ export function heroSpreaderMount(lod0: THREE.Object3D): HeroMount | null {
  */
 export function heroBodyMount(lod0: THREE.Object3D, centre: THREE.Vector3, materials?: ReadonlyMap<string, THREE.Material>): HeroMount {
   return { node: lod0, rest: lod0.clone(true), skip: 'spreader', centre, materials }
+}
+
+/**
+ * The mount of a hero truck (#276): the rig's whole LOD0 node (chassis, wheels and the tractor under `fifth_wheel`),
+ * with the camera distance measured to `centre`. Call it before the rig is first posed. `materials` are the rig's
+ * livery materials by name (shared per cab shape and livery tile), which the hero chassis and cab wear by reference.
+ */
+export function heroTruckMount(lod0: THREE.Object3D, centre: THREE.Vector3, materials: ReadonlyMap<string, THREE.Material>): HeroMount {
+  return { node: lod0, rest: lod0.clone(true), centre, materials }
 }
 
 export interface HeroEquipmentOffer {
