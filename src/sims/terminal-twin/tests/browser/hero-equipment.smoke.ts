@@ -247,6 +247,8 @@ test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the 
   }, id)
   expect(truck.box, `${id} carries a box at its stall`).not.toBeNull()
   // the follow camera keeps its viewing offset: close it to 12 m, inside the 25 m hero distance, and it stays on the truck
+  // (on Low first, so nothing hero is requested before the High step)
+  await page.evaluate(() => window.__tt!.setQuality('low'))
   const pose = await page.evaluate(() => window.__tt!.cameraPose()!)
   await page.evaluate((p) => window.__tt!.setCameraPose({ target: p.target, distance: 12, azimuth: 0.7, polar: 1.2 }), pose)
   await page.waitForFunction(
