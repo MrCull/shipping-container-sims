@@ -85,6 +85,22 @@
       "maxFileBytes": 1200000,
       "requiredNodes": ["LOD0", "frame", "plates", "hoist", "steer_fl", "steer_fr", "steer_rl", "steer_rr", "wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"]
     },
+    "hero-truck-chassis": {
+      "$comment": "#276. The hero truck chassis (hero-truck-chassis, in models/hero-equipment/): truck-chassis.glb LOD0 with static detail, loaded on demand, never at page load; LOD0 is the only level. Every moving rig node is its own mesh (chassis + 3 trailer axles = 4 draw calls).",
+      "lods": {
+        "LOD0": { "maxTriangles": 10000, "maxDrawCalls": 6 }
+      },
+      "maxFileBytes": 800000,
+      "requiredNodes": ["LOD0", "chassis", "wheel_t1", "wheel_t2", "wheel_t3"]
+    },
+    "hero-truck-cab": {
+      "$comment": "#276. The hero truck cabs (hero-truck-cab-high|mid|day, in models/hero-equipment/): the fifth_wheel subtree of truck-cab-<shape>.glb LOD0 with static detail, loaded on demand, never at page load; LOD0 is the only level. Every moving rig node is its own mesh (tractor, wheel_fl, wheel_fr, wheel_r = 4 draw calls; fifth_wheel and steer_* are empties).",
+      "lods": {
+        "LOD0": { "maxTriangles": 15000, "maxDrawCalls": 8 }
+      },
+      "maxFileBytes": 800000,
+      "requiredNodes": ["LOD0", "fifth_wheel", "tractor", "steer_fl", "steer_fr", "wheel_fl", "wheel_fr", "wheel_r"]
+    },
     "container": {
       "lods": {
         "LOD0": {

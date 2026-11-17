@@ -30,6 +30,7 @@ assets/
       containers.py, liveries.py
       hero_containers.py       hero faces: geometry, procedural detail maps, sidecar
       hero_spreaders.py        hero spreaders (STS, ASC, SHC): geometry in the source rig's spreader frame, sidecar
+      hero_shc.py, hero_truck.py  hero SHC body; hero truck chassis and cabs (truck.py frame and rig, sidecar)
       shc.py, shc_meta.py      asc.py, asc_meta.py      sts.py, sts_atlas.py
       truck.py, truck_meta.py  vessels.py, vessel_liveries.py
       infrastructure.py, infrastructure_meta.py
@@ -129,6 +130,8 @@ Budgets and current counts (from `tt:assets:check`, triangles / draw calls):
 | `hero-container` | 520 / 3 (per face, LOD0 only) | | | 60 KB | 82 to 458 triangles, 2 to 3 draw calls; 20 to 29 KB per face (see Hero container faces) |
 | `hero-equipment` | 8 000 / 12 (per spreader, LOD0 only) | | | 300 KB | STS 2 408 / 12, ASC 2 512 / 5, SHC 2 584 / 5; 59 to 63 KB (see Hero spreaders) |
 | `hero-shc` | 30 000 / 12 (LOD0 only) | | | 1.2 MB | 18 092 / 11; about 300 KB (see Hero SHC body) |
+| `hero-truck-chassis` | 10 000 / 6 (LOD0 only) | | | 800 KB | 8 188 / 4; about 130 KB (see Hero truck) |
+| `hero-truck-cab` | 15 000 / 8 (LOD0 only) | | | 800 KB | about 7 700 / 4 per cab shape; about 196 KB each (see Hero truck) |
 | `sts` | 40 000 / 20 | 8 000 / 10 | 1 000 / 6 | 3 MB | 31 690 / 18, 5 912 / 10, 490 / 5; 561 KB |
 | `asc` | 15 000 / 10 | 4 000 / 6 | 600 / 3 | 1.5 MB | 12 998 / 9, 3 844 / 5, 556 / 3; 295 KB |
 | `shc` | 12 000 / 16 | 3 000 / 12 | 400 / 3 | 1.5 MB | 9 856 / 16, 2 154 / 12, 358 / 2; 291 KB |
@@ -226,6 +229,15 @@ Same `hero-equipment` group (#275), `tt_assets/hero_shc.py`: `assets/models/hero
 - **Detail:** chevron tread lugs in geometry up to the full tyre radius (so rolling radius and bounds stay those of `shc.glb`), a sidewall band, rims with hub cap and 10 nuts; fork stiffeners and a steering cylinder; leg stiffeners and diaphragm lips above the hazard bands, chain sprockets at the leg heads; cab glazing bars, wipers, a second mirror, door grab and roof handrail; warning bands on the bumper rails; chain stubs and hazard bands on the hoist frame. All static detail is merged into the moving node's own mesh (the frame for everything fixed).
 - **Materials:** the two of `shc.glb`, `shc_atlas` (same swatch atlas) and `shc_plate` (fleet-number plates, authored for tile 0; the renderer finds it by name and offsets the UVs per SHC). No normal map: the tread is geometry, within budget.
 - **Budget:** kind `hero-shc` in `budgets.json` (the `hero-equipment` kind's 8 000 triangles cannot hold a body): LOD0 30 000 triangles and 12 draw calls, 1.2 MB per file. `tests/hero-shc-asset.test.ts` decodes it against `shc.glb` LOD0: every non-spreader rig node with the same world pivot (1 mm) and rotation, overall bounds without the spreader within 1 cm, no spreader or twist-lock node, `shc_plate` on `plates`, and the budget.
+
+## Hero truck
+
+Same `hero-equipment` group (#276), `tt_assets/hero_truck.py`: `assets/models/hero-equipment/hero-truck-chassis.glb` and `hero-truck-cab-high|mid|day.glb`, each with a sidecar and `previews/<name>-view.webp`, `LOD0` only. A truck GLB holds the tractor and the chassis, so the hero pieces split them and swap on their own: `hero-truck-chassis` replaces LOD0's `chassis` and `wheel_t1|t2|t3`, `hero-truck-cab-<shape>` replaces LOD0's `fifth_wheel` subtree (`tractor`, `steer_fl|fr` > `wheel_fl|fr`, `wheel_r`). Same root frame as the truck GLBs (origin on the ground below the centre of a 40 ft box), with dimensions, node names, pivots and axes imported from `truck.py`, and `attachPoints`, `loadConfigurations`, `travelLimits`, `wheel`, `liveries` and `atlas` copied into the sidecar from `truck_meta.sidecar()` (so a box sits on the same `load_*` seats). `wheel_*` nodes are empties with a `<name>_geo` mesh child; `fifth_wheel` and `steer_*` are empties as in the truck GLBs.
+
+- **Detail:** tyres with staggered tread lugs up to the full radius (rolling radius unchanged) and a rim with 10 nuts on the outer face. Chassis: twist-lock castings (collar, cone, apertures) at every pin under the `load_*` seats, cross tubes, gooseneck gussets and tunnel plate, landing-leg sand shoes, bands, crank grip and cross shaft, mudguard stays and mud-flap hangers, rear lamp bezels, reversing and fog lamps, front outline markers, number-plate lamp, ABS and air lines to each axle and an ABS modulator. Cabs: windscreen and side-window seals, wiper pivots and blades, mirror glass and a kerb mirror, grille surround and bars, step treads and grab handles, exhaust heat shield, clamps and rain cap, fifth-wheel ramps, lock handle and grease grooves. All static.
+- **Livery:** one material, `truck_atlas`, the truck livery atlas with TEXCOORD_0 on tile 0 as in the truck GLBs, on every mesh. The cab colour, `cab_dark` and wordmark are on `tractor`, the chassis colour on `chassis`; the sidecar's `livery.mesh` names that mesh. The runtime gives the hero meshes the rig's material for the shape and livery tile (`TruckModels.materialFor`), as for LOD0.
+- **Quantization:** in the truck GLBs a wheel is a mesh node, and mesh quantization moves its origin along the axle (`wheel_fl` sits 4 cm outboard of its sidecar pivot); the hero `wheel_*` empties sit on the sidecar pivots. Both roll about the same axle line.
+- **Budget:** kinds `hero-truck-chassis` (LOD0 10 000 triangles, 6 draw calls) and `hero-truck-cab` (15 000, 8), 800 KB per file. Each piece has 4 draw calls (one per moving node plus the static mesh). `tests/hero-truck-asset.test.ts` decodes each piece against the source LOD0 part: rig node names, world pivots (1 mm, against the source sidecar, and the axle line against the source GLB) and rotations, `load_*` attach points (1 mm) and load configurations, overall bounds within 1 cm, `truck_atlas` with tile 0 UVs on the livery mesh, and the budget.
 
 ## Equipment, vessels and infrastructure generators
 

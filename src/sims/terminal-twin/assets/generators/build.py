@@ -37,6 +37,7 @@ from tt_assets import blender as B  # noqa: E402
 from tt_assets import containers as C  # noqa: E402
 from tt_assets import hero_containers as HC  # noqa: E402
 from tt_assets import hero_shc as HSHC  # noqa: E402
+from tt_assets import hero_truck as HTR  # noqa: E402
 from tt_assets import hero_spreaders as HS  # noqa: E402
 from tt_assets import liveries as LV  # noqa: E402
 from tt_assets import asc as A  # noqa: E402
@@ -171,7 +172,8 @@ def build_hero(out_dir, previews=True, samples=32):
 
 
 def build_hero_equipment(out_dir, previews=True, samples=32):
-    """Hero spreaders (#273): one GLB per source rig (STS, ASC, SHC), each with one preview; the hero SHC body (#275)."""
+    """Hero spreaders (#273): one GLB per source rig (STS, ASC, SHC), each with one preview; the hero SHC body (#275);
+    the hero truck chassis and three hero cabs (#276)."""
     os.makedirs(out_dir, exist_ok=True)
     preview_dir = os.path.join(out_dir, 'previews')
     os.makedirs(preview_dir, exist_ok=True)
@@ -212,6 +214,22 @@ def build_hero_equipment(out_dir, previews=True, samples=32):
     if previews:
         cam, _ = B.setup_preview_stage(ground_size=120.0)
         B.render_preview(cam, (13.0, -14.0, 9.0), (0, 0, 4.0), os.path.join(preview_dir, f'{info["name"]}-view.webp'), samples=samples, width=640, height=480)
+    # Hero truck (#276): the chassis alone and the tractor of each cab shape, in the truck livery atlas (tile 0).
+    truck_atlas_png = os.path.join(tmp, 'truck-atlas.png')
+    TM.render_atlas(truck_atlas_png, FONTS)
+    for cab in [None] + list(TR.CABS):
+        B.reset_scene()
+        atlas = B.load_image(truck_atlas_png, name='truck-atlas')
+        root, info = HTR.build_chassis(atlas) if cab is None else HTR.build_cab(atlas, cab)
+        source = TM.sidecar({'name': 'truck-chassis' if cab is None else f'truck-cab-{cab}', 'cab': cab,
+                             'triangles': {'LOD0': 0, 'LOD1': 0, 'LOD2': 0}, 'height': TR.CABS[cab]['height'] if cab else 1.3})
+        print(f'[hero-equipment] {info["name"]}: {info["triangles"]} tris, {info["meshes"]} meshes', flush=True)
+        B.export_glb(root, os.path.join(out_dir, f'{info["name"]}.glb'))
+        write_json(os.path.join(out_dir, f'{info["name"]}.meta.json'), HTR.sidecar(info, source))
+        if previews:
+            cam, _ = B.setup_preview_stage(ground_size=80.0)
+            loc, tgt = ((-9.0, -12.0, 4.5), (-1.0, 0, 0.9)) if cab is None else ((14.5, -7.5, 4.0), (7.5, 0, 1.6))
+            B.render_preview(cam, loc, tgt, os.path.join(preview_dir, f'{info["name"]}-view.webp'), samples=samples, width=640, height=480)
 
 
 def strip_lod_suffix(path):
