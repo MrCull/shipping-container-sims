@@ -11,7 +11,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
 import { MeshoptDecoder } from 'meshoptimizer'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { checkAssetLibrary, loadBudgets, MODELS_DIR } from '../cli/assets/budgetCheck'
-import { QUALITY_LEVELS, QUALITY_PROFILES } from '../modules/quality'
+import { HERO_CAP_FIELDS, QUALITY_LEVELS, QUALITY_PROFILES, type HeroCapField } from '../modules/quality'
 
 const DIR = join(MODELS_DIR, 'hero-equipment')
 const SOURCES = { sts: 'sts/sts-malaccamax.glb', asc: 'asc/asc.glb', shc: 'shc/shc.glb' } as const
@@ -92,19 +92,9 @@ describe('hero spreaders', () => {
     }
   })
 
-  it('budgets.json caps hero trucks (#276) per quality level as the quality profiles do (heroEquipmentCaps.levels.*.trucks)', () => {
-    const caps = (loadBudgets() as unknown as { heroEquipmentCaps: { levels: Record<string, { trucks: number }> } }).heroEquipmentCaps
-    for (const level of QUALITY_LEVELS) expect(caps.levels[level].trucks, level).toBe(QUALITY_PROFILES[level].heroTrucks)
-  })
-
   it('budgets.json lists the hero spreaders, the SHC body and the hero truck files and a cap per quality level that the measured models fit (heroEquipmentCaps)', () => {
-    interface Cap {
-      spreaders: number
-      shcBodies: number
-      trucks: number
-      maxTriangles: number
-      maxDrawCalls: number
-    }
+    // keyed by the quality profile's cap field of each piece (HERO_CAP_FIELDS), so a new piece adds one name
+    type Cap = Record<HeroCapField | 'maxTriangles' | 'maxDrawCalls', number>
     const caps = (loadBudgets() as unknown as { heroEquipmentCaps: { assets: string[]; levels: Record<string, Cap> } }).heroEquipmentCaps
     const report = checkAssetLibrary()
     const isHero = (n: string): boolean => n.startsWith('hero-spreader-') || n === 'hero-shc' || n.startsWith('hero-truck-')
@@ -124,13 +114,18 @@ describe('hero spreaders', () => {
     const truckTriangles = chassis.triangles + Math.max(...cabs.map((l) => l.triangles))
     const truckDrawCalls = chassis.drawCalls + Math.max(...cabs.map((l) => l.drawCalls))
     expect(Object.keys(caps.levels).sort()).toEqual([...QUALITY_LEVELS].sort())
+    const cost: Record<HeroCapField, { triangles: number; drawCalls: number }> = {
+      heroEquipment: { triangles: worstTriangles, drawCalls: worstDrawCalls },
+      heroShc: body,
+      heroTrucks: { triangles: truckTriangles, drawCalls: truckDrawCalls },
+    }
     for (const level of QUALITY_LEVELS) {
       const cap = caps.levels[level]
-      expect(cap.spreaders, level).toBe(QUALITY_PROFILES[level].heroEquipment)
-      expect(cap.shcBodies, level).toBe(QUALITY_PROFILES[level].heroShc)
-      expect(cap.trucks, level).toBe(QUALITY_PROFILES[level].heroTrucks)
-      expect(cap.spreaders * worstTriangles + cap.shcBodies * body.triangles + cap.trucks * truckTriangles, level).toBeLessThanOrEqual(cap.maxTriangles)
-      expect(cap.spreaders * worstDrawCalls + cap.shcBodies * body.drawCalls + cap.trucks * truckDrawCalls, level).toBeLessThanOrEqual(cap.maxDrawCalls)
+      expect(Object.keys(cap).sort(), level).toEqual([...HERO_CAP_FIELDS, 'maxTriangles', 'maxDrawCalls'].sort())
+      for (const field of HERO_CAP_FIELDS) expect(cap[field], `${level} ${field}`).toBe(QUALITY_PROFILES[level][field])
+      const sum = (k: 'triangles' | 'drawCalls'): number => HERO_CAP_FIELDS.reduce((n, f) => n + cap[f] * cost[f][k], 0)
+      expect(sum('triangles'), level).toBeLessThanOrEqual(cap.maxTriangles)
+      expect(sum('drawCalls'), level).toBeLessThanOrEqual(cap.maxDrawCalls)
     }
   })
 

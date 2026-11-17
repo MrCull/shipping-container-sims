@@ -135,17 +135,36 @@ The spreaders nearest the camera get the hero spreader model (`hero-spreader-<st
 Hero spreaders), the nearest SHC gets the hero SHC body (`hero-shc`, #275), and the nearest trucks get the hero chassis and cab (`hero-truck-*`, #276). `HeroEquipmentLevel` (`modules/heroEquipment.ts`)
 is owned by the scene renderer, which sets the caps from the quality profile (`setCaps(profile)`).
 
-- **Pieces.** A piece type is an entry of `HERO_PIECES` (`heroEquipment.ts`): its file kinds, its distance and its cap field.
-  Each piece is selected on its own lane (own cap, offers, chosen set and entries), so the SHC body never competes with the
-  spreaders for the spreader cap. Today: `spreader` (kinds `sts`, `asc`, `shc`; 25 m; `heroEquipment`: High 3, Medium 1,
-  Low 0) and `shc-body` (kind `shc-body`; `HERO_SHC_DISTANCE_M` = 30 m from the SHC centre; `heroShc`: High 1, Medium 0,
-  Low 0) and `truck` (kinds `truck-day`, `truck-mid`, `truck-high`, one per cab shape; `HERO_TRUCK_DISTANCE_M` = 25 m from
-  the truck centre; `heroTrucks`: High 2, Medium 1, Low 0); every cap is 0 from the `equipment-hero-off` rung down. How a piece mounts is in its `HeroMount`
-  (`heroEquipmentMount.ts`): the rig node its `LOD0` goes under, the rest copy, an optional `skip` subtree, an optional
-  `centre` for the distance and optional `materials` adopted by name. Adding a piece (#276, the hero truck): a
-  `HERO_PIECES` entry, a quality field (`HERO_CAP_FIELDS`), a URL (or a list of files merged into one `LOD0`) in
-  `heroEquipmentAssets.ts`, and a kind hook (the rig builds a mount, the kind calls `offerHeroEquipmentAtLod0`).
-- **SHC body (#275).** `ShcRig.heroBodyMount` (`heroBodyMount(lod0, centre, materials)`): the LOD0 node itself with
+- **Pieces.** A piece type is an entry of `HERO_PIECES` (`heroEquipment.ts`): its file kinds, its distance (`distanceM`,
+  from the camera to the mount's `centre`) and its cap field; `HeroPiece` is its key type. Each piece is selected on its
+  own lane (own cap, offers, chosen set and entries), so the SHC body never competes with the spreaders for the spreader
+  cap. Today: `spreader` (kinds `sts`, `asc`, `shc`; 25 m; `heroEquipment`: High 3, Medium 1, Low 0), `shc-body` (kind
+  `shc-body`; 30 m from the SHC centre; `heroShc`: High 1, Medium 0, Low 0) and `truck` (kinds `truck-day`, `truck-mid`,
+  `truck-high`, one per cab shape; 25 m from the truck centre; `heroTrucks`: High 2, Medium 1, Low 0); every cap is 0 from
+  the `equipment-hero-off` rung down. How a piece mounts is in its `HeroMount` (`heroEquipmentMount.ts`): the rig node its
+  `LOD0` goes under, a lazy rest pose, an optional `skip` subtree, an optional `centre` for the distance and optional
+  `materials` adopted by name. Two factories: `heroSpreaderMount(lod0)` (a rig's `spreader` node) and
+  `heroBodyMount(lod0, template, centre, { skip, materials })` (a rig's whole LOD0; the SHC body and the truck).
+  `__tt.scene().heroPieces` holds `describe(piece)` for every entry, filled by one loop (`describeAll()`);
+  `heroSpreaders`, `heroShcBodies` and `heroTrucks` are aliases of three of its lists (`heroPieceAliases`), kept for the
+  smoke specs that read them.
+- **Adding a piece.** The edits a new piece needs (checked against #276, the hero truck):
+  1. `heroEquipment.ts`: an entry in `HERO_PIECES` (kinds, `distanceM`, cap field).
+  2. `heroEquipmentAssets.ts`: each new kind in `HeroEquipmentKind` and its URL in `URLS` (or a list of files, merged
+     into one `LOD0`).
+  3. `quality.ts`: the cap field in `QualityProfile`, its value in each of `QUALITY_PROFILES`, and its name in
+     `HERO_CAP_FIELDS` (Auto zeroes it from `equipment-hero-off` down).
+  4. `assets/budgets.json`: the files in `heroEquipmentCaps.assets`, the cap field as a key of each
+     `heroEquipmentCaps.levels.*` (the same name, with `maxTriangles` and `maxDrawCalls` raised to fit), and a budget
+     kind for the files; `tests/hero-equipment-asset.test.ts` then wants the piece's cost in its `cost` table (a type
+     error until it is there).
+  5. The kind hook: the rig builds a `HeroMount` with one of the two factories, before its first pose, and the kind
+     calls `offerHeroEquipmentAtLod0(frame, id, kind, lod, mount)` after posing each rig (`frame` is a
+     `HeroOfferSink`; a kind that poses through a helper, as the truck kind through `LandsideScene.update`, passes the
+     frame on as that type).
+  Nothing else: no distance constant, no `SceneStats` field (a piece is in `heroPieces` by its key), no `perfStore`
+  change.
+- **SHC body (#275).** `ShcRig.heroBodyMount` (`heroBodyMount(lod0, template, centre, { skip: 'spreader', materials })`): the LOD0 node itself with
   `skip: 'spreader'`, measured to (0, height / 2, 0) of LOD0, with LOD0's `shc_plate` material (the fleet number) adopted
   by the hero plate mesh. The hero body is a sibling of the rig's LOD0 body content (child of LOD0, identity transform); the
   rig's LOD0 meshes outside the `spreader` subtree dither out and are hidden after the fade, while the `spreader` subtree
@@ -156,9 +175,9 @@ is owned by the scene renderer, which sets the caps from the quality profile (`s
 - **Truck (#276).** One piece per truck, so the cap counts trucks: the kind `truck-<shape>` is two files,
   `hero-truck-chassis.glb` (shared by the three shapes, fetched once) and `hero-truck-cab-<shape>.glb`, which the loader
   merges into one `LOD0` (the chassis nodes and the cab's `fifth_wheel` subtree side by side, as in the rig's LOD0), so
-  chassis and cab attach, fade and release together. `TruckRig.heroMount` (`heroTruckMount(lod0, centre, materials)`): the
+  chassis and cab attach, fade and release together. `TruckRig.heroMount` (`heroBodyMount(lod0, template, centre, { materials })`): the
   rig's whole LOD0 (no `skip`), measured to the truck centre ((`TRUCK.rearX` + `TRUCK.frontX`) / 2, `TRUCK.height` / 2 in
-  LOD0's frame), taken in the constructor before the first pose. Livery: `materials` maps the rig's material name
+  LOD0's frame), built in the constructor. Livery: `materials` maps the rig's material name
   (`truck_atlas`) to the rig's livery material (`materialFor(shape, livery)`, shared per shape and livery tile), so every
   hero mesh with that material name wears the same material by reference and shows the same tile; nothing shared is
   mutated (the fade dithers per-piece copies, as for every piece). Motion is the copy below: the wheel roll, front
@@ -169,12 +188,15 @@ is owned by the scene renderer, which sets the caps from the quality profile (`s
 - **Offers.** In `update()` the STS, ASC, SHC and truck kinds call `frame.offerHeroEquipment({ id, kind, mount })` for each rig that is
   at LOD0, after posing it, through one helper, `offerHeroEquipmentAtLod0(frame, id, kind, lod, mount)` (the SHC kind offers
   twice: `shc` with `heroMount` and `shc-body` with `heroBodyMount`). `mount` is the
-  rig's `heroMount` (`heroSpreaderMount(lod0)`: the LOD0 `spreader` node and a copy of it at rest, taken before the first
-  pose). Mount, offer type and helper are in `modules/heroEquipmentMount.ts`, the rig-side module: the rig models and the
+  rig's `heroMount` (`heroSpreaderMount(lod0)`: the LOD0 `spreader` node and its rest pose, taken before the first pose).
+  The rest pose is a map from glTF node name to local matrix, not a copy of the subtree: the spreader mount reads it from
+  its own small subtree at once; a body mount (`heroBodyMount`) reads it on the first attach from `template`, the unposed
+  source LOD0 every rig of that model clones, and shares it between all rigs of the model (`sharedRestPose`), so a rig
+  never offered builds none (`restPoseStats` counts builds for the tests). Mount, offer type and helper are in `modules/heroEquipmentMount.ts`, the rig-side module: the rig models and the
   kinds import it, not the level. The distance is from the camera to that node's world position (or the mount's `centre`),
   not to the crane centre the LOD choice uses; an offer beyond the piece's distance x 1.15 is dropped at once.
 - **Selection.** `selectHeroEquipment(candidates, cap, previous, distanceM)` (`heroEquipmentSelection.ts`), per piece: within
-  the piece's distance (`HERO_EQUIPMENT_DISTANCE_M`, 25 m, the default; `HERO_SHC_DISTANCE_M`, 30 m), nearest first, at most the cap. Hysteresis, literally the spec's: a spreader chosen last frame keeps its place out to 25 x 1.15 m
+  the piece's distance (`HERO_PIECES[piece].distanceM`: 25 m for spreaders and trucks, 30 m for the SHC body), nearest first, at most the cap. Hysteresis, literally the spec's: a spreader chosen last frame keeps its place out to 25 x 1.15 m
   (28.75 m), also against a nearer newcomer when the cap is full (previous picks nearest first among themselves, up to
   the cap); only the free places go to newcomers within 25 m, nearest first. The result is nearest first.
 - **Preparation.** A chosen spreader's file is fetched on first need and attached through `runPrep` within

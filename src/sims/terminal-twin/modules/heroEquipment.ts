@@ -38,7 +38,7 @@
  */
 import * as THREE from 'three'
 import { loadHeroEquipment, type HeroEquipmentKind } from './heroEquipmentAssets'
-import { HERO_EQUIPMENT_DISTANCE_M, HERO_EQUIPMENT_HYSTERESIS, HERO_SHC_DISTANCE_M, HERO_TRUCK_DISTANCE_M, selectHeroEquipment, type HeroEquipmentCandidate } from './heroEquipmentSelection'
+import { HERO_EQUIPMENT_HYSTERESIS, selectHeroEquipment, type HeroEquipmentCandidate } from './heroEquipmentSelection'
 import { CameraGate, HERO_FADE_MS, runPrep, type PrepItem } from './heroPrep'
 import { gltfNodeName as nodeName, type HeroEquipmentOffer } from './heroEquipmentMount'
 import type { HeroCapField, QualityProfile } from './quality'
@@ -47,9 +47,6 @@ import type { HeroCapField, QualityProfile } from './quality'
 export const HERO_EQUIPMENT_RETRY_MS = 3000
 /** Each further failure doubles the wait, up to this (ms). */
 export const HERO_EQUIPMENT_RETRY_MAX_MS = 30000
-/** A piece type: selected on its own, with its own cap and distance, so pieces never compete for each other's places. */
-export type HeroPiece = 'spreader' | 'shc-body' | 'truck'
-
 export interface HeroPieceConfig {
   /** The file kinds (`heroEquipmentAssets.ts`) offered for this piece. */
   kinds: readonly HeroEquipmentKind[]
@@ -61,15 +58,33 @@ export interface HeroPieceConfig {
 
 /**
  * The hero pieces. A new piece is an entry here (its kinds, distance and cap field), a loader URL per kind
- * (`heroEquipmentAssets.ts`) and a kind hook: the rig builds a `HeroMount` and the kind offers it at LOD0
- * (`offerHeroEquipmentAtLod0`). How it mounts (which node, which subtree it leaves alone) is in the mount.
+ * (`heroEquipmentAssets.ts`), a quality cap field and a kind hook: the rig builds a `HeroMount` and the kind offers it
+ * at LOD0 (`offerHeroEquipmentAtLod0`). How it mounts (which node, which subtree it leaves alone) is in the mount. The
+ * full list of edits: docs/rendering-3d.md, Hero equipment, Adding a piece.
  */
-export const HERO_PIECES: Readonly<Record<HeroPiece, HeroPieceConfig>> = {
-  spreader: { kinds: ['sts', 'asc', 'shc'], distanceM: HERO_EQUIPMENT_DISTANCE_M, cap: 'heroEquipment' },
-  'shc-body': { kinds: ['shc-body'], distanceM: HERO_SHC_DISTANCE_M, cap: 'heroShc' },
-  // #276: one piece per truck, the hero chassis and the hero cab of the truck's shape loaded as one LOD0 (`heroEquipmentAssets.ts`)
-  truck: { kinds: ['truck-day', 'truck-mid', 'truck-high'], distanceM: HERO_TRUCK_DISTANCE_M, cap: 'heroTrucks' },
+export const HERO_PIECES = {
+  // #273: 25 m from the spreader centre (a spreader is 12 m long)
+  spreader: { kinds: ['sts', 'asc', 'shc'], distanceM: 25, cap: 'heroEquipment' },
+  // #275: 30 m from the SHC centre (the carrier is about 15 m high)
+  'shc-body': { kinds: ['shc-body'], distanceM: 30, cap: 'heroShc' },
+  // #276: one piece per truck, the hero chassis and the hero cab of the truck's shape loaded as one LOD0 (`heroEquipmentAssets.ts`); 25 m from the truck centre
+  truck: { kinds: ['truck-day', 'truck-mid', 'truck-high'], distanceM: 25, cap: 'heroTrucks' },
+} as const satisfies Record<string, HeroPieceConfig>
+
+/** A piece type (a `HERO_PIECES` key): selected on its own, with its own cap and distance, so pieces never compete for each other's places. */
+export type HeroPiece = keyof typeof HERO_PIECES
+
+/**
+ * The older per-piece names in `__tt.scene()` that smoke specs read (`heroSpreaders`, `heroShcBodies`, `heroTrucks`),
+ * each the `heroPieces` list of its piece. A new piece needs none: specs read `heroPieces[piece]`.
+ */
+export interface HeroPieceAliases {
+  heroSpreaders: HeroPieceInfo[]
+  heroShcBodies: HeroPieceInfo[]
+  heroTrucks: HeroPieceInfo[]
 }
+
+export const heroPieceAliases = (pieces: Record<HeroPiece, HeroPieceInfo[]>): HeroPieceAliases => ({ heroSpreaders: pieces.spreader, heroShcBodies: pieces['shc-body'], heroTrucks: pieces.truck })
 
 /** `HERO_PIECES` as a typed list, in declaration order. */
 export const HERO_PIECE_LIST = Object.entries(HERO_PIECES) as readonly [HeroPiece, HeroPieceConfig][]
@@ -182,7 +197,7 @@ export interface HeroPieceBounds {
   max: [number, number, number]
 }
 
-/** One attached hero piece as last drawn (`__tt.scene().heroSpreaders`, `heroShcBodies`, `heroTrucks`): where it is against the rig meshes it replaces. */
+/** One attached hero piece as last drawn (`__tt.scene().heroPieces[piece]`): where it is against the rig meshes it replaces. */
 export interface HeroPieceInfo {
   id: string
   kind: HeroEquipmentKind
@@ -369,10 +384,7 @@ export class HeroEquipmentLevel {
       if (o !== node) rigByName.set(nodeName(o), o)
       if ((o as THREE.Mesh).isMesh && o.visible) rigMeshes.push(o as THREE.Mesh)
     })
-    const restByName = new Map<string, THREE.Object3D>()
-    walk(rest, skip, (o) => {
-      if (o !== rest) restByName.set(nodeName(o), o)
-    })
+    const restByName = rest()
     const pairs: Pair[] = []
     const heroMeshes: THREE.Mesh[] = []
     root.traverse((o) => {
@@ -387,10 +399,9 @@ export class HeroEquipmentLevel {
       const rig = rigByName.get(nodeName(o))
       const rigRest = restByName.get(nodeName(o))
       if (!rig || !rigRest) return
-      rigRest.updateMatrix()
       o.updateMatrix()
       o.matrixAutoUpdate = false
-      pairs.push({ rig, hero: o, restOffset: rigRest.matrix.clone().invert().multiply(o.matrix) })
+      pairs.push({ rig, hero: o, restOffset: rigRest.clone().invert().multiply(o.matrix) })
     })
     root.position.set(0, 0, 0)
     root.quaternion.identity()
@@ -479,6 +490,11 @@ export class HeroEquipmentLevel {
       if (piece !== undefined && p !== piece) continue
       for (const [id, e] of lane.entries) if (e.state === 'attached' && e.hero.target === 1) yield [id, e.hero]
     }
+  }
+
+  /** `describe` per piece type, one list per `HERO_PIECES` entry (`__tt.scene().heroPieces`). */
+  describeAll(): Record<HeroPiece, HeroPieceInfo[]> {
+    return Object.fromEntries(HERO_PIECE_LIST.map(([piece]) => [piece, this.describe(piece)])) as Record<HeroPiece, HeroPieceInfo[]>
   }
 
   /** The hero pieces `countOf` counts (all, or only `piece`) with their world bounds and their rig meshes', for readouts and tests (not per frame). */

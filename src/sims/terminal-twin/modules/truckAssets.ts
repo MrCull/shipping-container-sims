@@ -12,7 +12,7 @@ import * as THREE from 'three'
 import { loadGltf } from './containerAssets'
 import { TRUCK } from './equipmentDims'
 import type { HeroEquipmentKind } from './heroEquipmentAssets'
-import { heroTruckMount, type HeroMount } from './heroEquipmentMount'
+import { heroBodyMount, type HeroMount } from './heroEquipmentMount'
 import high from '../assets/models/trucks/truck-cab-high.meta.json'
 import mid from '../assets/models/trucks/truck-cab-mid.meta.json'
 import day from '../assets/models/trucks/truck-cab-day.meta.json'
@@ -182,8 +182,9 @@ export class TruckRig {
     }
     this.root.add(this.body)
     this.heroKind = `truck-${shape}`
-    // taken before the first pose: the rest pose the level measures the rig's motion against
-    this.heroMount = heroTruckMount(this.lods[0], new THREE.Vector3((TRUCK.rearX + TRUCK.frontX) / 2, TRUCK.height / 2, 0), new Map([[material.name, material]]))
+    // the rest pose the level measures the rig's motion against: the shape's unposed source LOD0, read once per shape
+    const template = models.sources[shape].getObjectByName('LOD0')!
+    this.heroMount = heroBodyMount(this.lods[0], template, new THREE.Vector3((TRUCK.rearX + TRUCK.frontX) / 2, TRUCK.height / 2, 0), { materials: new Map([[material.name, material]]) })
     this.state = { lod: 0, shape, livery, maker: truckMaker(livery), steerRad: 0, articulationRad: 0, wheelRollRad: 0, loadOffsetM: 0, loadCentre: [0, TRUCK_RIG.deckY, 0] }
     this.setLod(0)
   }

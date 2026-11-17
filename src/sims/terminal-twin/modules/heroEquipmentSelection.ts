@@ -1,18 +1,12 @@
 /**
  * Hero equipment selection (#273), pure: which spreaders near the camera get the hero model. A kind offers each rig
  * at LOD0 with the distance from the camera to its spreader; at most `cap` are chosen (`QualityProfile.heroEquipment`),
- * nearest first, within `HERO_EQUIPMENT_DISTANCE_M`. Hysteresis (spec #273 step 5): a spreader chosen last frame keeps
+ * nearest first, within the piece's reach (`HERO_PIECES` in `heroEquipment.ts`). Hysteresis (spec #273 step 5): a spreader chosen last frame keeps
  * its place out to 1.15 x that distance, also against a nearer newcomer when the cap is full, so a model does not swap
  * back and forth at the edge or when two spreaders are about equally near. Newcomers get only the free places.
  */
 import { HERO_HYSTERESIS } from './heroFaceSelection'
 
-/** Beyond this camera distance (m) to the spreader centre a spreader never gets the hero model (a spreader is 12 m long). */
-export const HERO_EQUIPMENT_DISTANCE_M = 25
-/** Beyond this camera distance (m) to the SHC centre an SHC never gets the hero body (#275; the carrier is about 15 m high). */
-export const HERO_SHC_DISTANCE_M = 30
-/** Beyond this camera distance (m) to the truck centre a truck never gets the hero chassis and cab (#276). */
-export const HERO_TRUCK_DISTANCE_M = 25
 /** A chosen spreader keeps its place out to the distance times this factor (the hero faces' factor). */
 export const HERO_EQUIPMENT_HYSTERESIS = HERO_HYSTERESIS
 
@@ -25,10 +19,9 @@ export interface HeroEquipmentCandidate {
 
 /**
  * The ids to draw with the hero model this frame, nearest first; `previous` is last frame's result. `distanceM` is the
- * piece's reach (`HERO_EQUIPMENT_DISTANCE_M` for spreaders, `HERO_SHC_DISTANCE_M` for the SHC body); each piece type is
- * selected on its own, with its own cap.
+ * piece's reach (`HeroPieceConfig.distanceM`); each piece type is selected on its own, with its own cap.
  */
-export function selectHeroEquipment(candidates: readonly HeroEquipmentCandidate[], cap: number, previous: ReadonlySet<string>, distanceM = HERO_EQUIPMENT_DISTANCE_M): string[] {
+export function selectHeroEquipment(candidates: readonly HeroEquipmentCandidate[], cap: number, previous: ReadonlySet<string>, distanceM: number): string[] {
   if (cap <= 0) return []
   const byDistance = (a: HeroEquipmentCandidate, b: HeroEquipmentCandidate): number => a.distanceM - b.distanceM
   const sticky = distanceM * HERO_EQUIPMENT_HYSTERESIS

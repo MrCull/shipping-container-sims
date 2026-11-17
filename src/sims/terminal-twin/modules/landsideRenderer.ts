@@ -13,7 +13,7 @@ import { STALL_LENGTH_M, TRUCK_DECK_M } from '../engine'
 import { TRUCK } from './equipmentDims'
 import type { SceneModel } from './sceneModel'
 import { TruckRig, type TruckModels, type TruckRigState } from './truckAssets'
-import { offerHeroEquipmentAtLod0, type HeroEquipmentOffer } from './heroEquipmentMount'
+import { offerHeroEquipmentAtLod0, type HeroOfferSink } from './heroEquipmentMount'
 
 export interface LandsideStats {
   /** Trucks drawn at the last update. */
@@ -263,7 +263,7 @@ export class LandsideScene {
   }
 
   /** Poses the trucks for time `t`; each GLB truck drawn at LOD0 is offered to `hero` (the kind's frame) for the hero truck (#276). */
-  update(t: number, cameraPosition: THREE.Vector3, hero?: { offerHeroEquipment(offer: HeroEquipmentOffer): void }): void {
+  update(t: number, cameraPosition: THREE.Vector3, hero?: HeroOfferSink): void {
     const model = this.model
     let drawn = 0
     let queued = 0

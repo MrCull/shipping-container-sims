@@ -24,7 +24,7 @@
     }
   },
   "heroEquipmentCaps": {
-    "$comment": "#273, #275, #276, the hero equipment: the three hero spreaders, the hero SHC body and the hero truck files (one chassis, three cabs; a hero truck is the chassis plus the cab of its shape), and how many of each are drawn at most per quality level (modules/quality.ts `heroEquipment` for spreaders, `heroShc` for SHC bodies, `heroTrucks` for trucks; 0 from the equipment-hero-off rung down). maxTriangles and maxDrawCalls = spreaders x the per-spreader budget (8 000 triangles, 12 draw calls) + shcBodies x the SHC body budget (30 000 triangles, 12 draw calls) + trucks x the truck budget (chassis 10 000 + cab 15 000 = 25 000 triangles, 6 + 8 = 14 draw calls); tests/hero-equipment-asset.test.ts checks the list against the library, the levels against the quality profiles and the measured spreaders against the caps.",
+    "$comment": "#273, #275, #276, the hero equipment: the three hero spreaders, the hero SHC body and the hero truck files (one chassis, three cabs; a hero truck is the chassis plus the cab of its shape), and how many of each are drawn at most per quality level (modules/quality.ts `heroEquipment` for spreaders, `heroShc` for SHC bodies, `heroTrucks` for trucks; 0 from the equipment-hero-off rung down). each level is keyed by the quality profile field of each piece (a new piece adds its field name). maxTriangles and maxDrawCalls = heroEquipment x the per-spreader budget (8 000 triangles, 12 draw calls) + heroShc x the SHC body budget (30 000 triangles, 12 draw calls) + heroTrucks x the truck budget (chassis 10 000 + cab 15 000 = 25 000 triangles, 6 + 8 = 14 draw calls); tests/hero-equipment-asset.test.ts checks the list against the library, the levels against the quality profiles and the measured spreaders against the caps.",
     "assets": [
       "hero-spreader-sts",
       "hero-spreader-asc",
@@ -36,9 +36,9 @@
       "hero-truck-cab-high"
     ],
     "levels": {
-      "high": { "spreaders": 3, "shcBodies": 1, "trucks": 2, "maxTriangles": 104000, "maxDrawCalls": 76 },
-      "medium": { "spreaders": 1, "shcBodies": 0, "trucks": 1, "maxTriangles": 33000, "maxDrawCalls": 26 },
-      "low": { "spreaders": 0, "shcBodies": 0, "trucks": 0, "maxTriangles": 0, "maxDrawCalls": 0 }
+      "high": { "heroEquipment": 3, "heroShc": 1, "heroTrucks": 2, "maxTriangles": 104000, "maxDrawCalls": 76 },
+      "medium": { "heroEquipment": 1, "heroShc": 0, "heroTrucks": 1, "maxTriangles": 33000, "maxDrawCalls": 26 },
+      "low": { "heroEquipment": 0, "heroShc": 0, "heroTrucks": 0, "maxTriangles": 0, "maxDrawCalls": 0 }
     }
   },
   "requiredMetaFields": [

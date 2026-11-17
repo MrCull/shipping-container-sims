@@ -23,7 +23,7 @@ import { NO_OVERLAYS, type OverlayState } from './overlays'
 
 export type { OverlayState }
 import { ContainerCloseups } from './containerCloseups'
-import { HeroEquipmentLevel, type HeroPieceInfo } from './heroEquipment'
+import { HeroEquipmentLevel, heroPieceAliases, type HeroPiece, type HeroPieceAliases, type HeroPieceInfo } from './heroEquipment'
 import { HeroLevel } from './heroRenderer'
 import type { HeroMarkStep } from './heroMarkings'
 import { ContainerInstancer, type DrawnBox } from './containerInstancer'
@@ -46,7 +46,7 @@ import type { TerminalScenery } from '../terminals'
 import { InfrastructureScene, type InfrastructureStats } from './infrastructureRenderer'
 import { loadInfrastructureAssets } from './infrastructureAssets'
 
-export interface SceneStats {
+export interface SceneStats extends HeroPieceAliases {
   /** Container instances drawn. */
   containers: number
   /** Trucks drawn and queued at the gate (TT-13). */
@@ -82,12 +82,8 @@ export interface SceneStats {
   containerLods: { lod0: number; lod1: number; closeup: number; closeupFaces: number; heroFaces: number; heroPrepared: number; heroDrawCalls: number; heroTriangles: number; heroMarkStep: HeroMarkStep; heroMarkPages: number; heroMarkTiles: number; heroMarkDrawCalls: number; heroMarkBytes: number; culled: number }
   /** Hero pieces in the scene: spreaders (#273, at most the quality level's `heroEquipment`) plus SHC bodies (#275, at most `heroShc`) plus trucks (#276, at most `heroTrucks`). */
   heroEquipment: number
-  /** Each hero spreader with its world bounds and those of the rig spreader it replaces (#273). */
-  heroSpreaders: HeroPieceInfo[]
-  /** Each hero SHC body with its world bounds and those of the rig's LOD0 body meshes it replaces (#275). */
-  heroShcBodies: HeroPieceInfo[]
-  /** Each hero truck (chassis and cab) with its world bounds and those of the rig's LOD0 meshes it replaces (#276). */
-  heroTrucks: HeroPieceInfo[]
+  /** Each hero piece per piece type (`HERO_PIECES`) with its world bounds and those of the rig meshes it replaces. */
+  heroPieces: Record<HeroPiece, HeroPieceInfo[]>
   /** SHC objects per LOD (all 0 until the SHC GLB has loaded). */
   shcLods: { lod0: number; lod1: number; lod2: number }
   /** 'placeholder' until the SHC GLB has loaded. */
@@ -778,7 +774,8 @@ export class SceneRenderer {
 
   stats(): SceneStats {
     const c = this.containers.stats()
-    const kinds = Object.assign({}, ...this.renderers.map((r) => r.renderer.stats())) as Partial<SceneStats>
+    const heroPieces = this.heroEquipment.describeAll()
+    const kinds =Object.assign({}, ...this.renderers.map((r) => r.renderer.stats())) as Partial<SceneStats>
     return {
       ...kinds,
       containers: c.drawn,
@@ -791,9 +788,8 @@ export class SceneRenderer {
       containerLods: { lod0: c.lod0, lod1: c.lod1, closeup: c.closeup, closeupFaces: c.closeupFaces, heroFaces: c.heroFaces, heroPrepared: c.heroPrepared, heroDrawCalls: c.heroCost.drawCalls, heroTriangles: c.heroCost.triangles, heroMarkStep: c.heroMarks.step, heroMarkPages: c.heroMarks.pages, heroMarkTiles: c.heroMarks.tiles, heroMarkDrawCalls: c.heroMarks.drawCalls, heroMarkBytes: c.heroMarks.texelBytes, culled: c.culled },
       containerAssets: c.assets,
       heroEquipment: this.heroEquipment.count,
-      heroSpreaders: this.heroEquipment.describe('spreader'),
-      heroShcBodies: this.heroEquipment.describe('shc-body'),
-      heroTrucks: this.heroEquipment.describe('truck'),
+      heroPieces,
+      ...heroPieceAliases(heroPieces),
     } as SceneStats
   }
 

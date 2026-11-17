@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 import { HERO_EQUIPMENT_RETRY_MS, HeroEquipmentLevel } from '../modules/heroEquipment'
-import { heroBodyMount, heroSpreaderMount, type HeroMount } from '../modules/heroEquipmentMount'
+import { heroBodyMount, heroSpreaderMount, restPoseStats, type HeroMount } from '../modules/heroEquipmentMount'
 import type { HeroEquipmentKind } from '../modules/heroEquipmentAssets'
 import { HERO_FADE_MS, HERO_SETTLE_MS } from '../modules/heroPrep'
 import { TruckRig, truckVariant, type TruckModels, type TruckShape } from '../modules/truckAssets'
@@ -394,7 +394,7 @@ function fakeShc(x: number): FakeShc {
   return {
     lod0,
     spreaderMount: heroSpreaderMount(lod0)!,
-    bodyMount: heroBodyMount(lod0, new THREE.Vector3(0, 7.5, 0)),
+    bodyMount: heroBodyMount(lod0, lod0.clone(true), new THREE.Vector3(0, 7.5, 0), { skip: 'spreader' }),
     frameMesh,
     wheel,
     hoist,
@@ -739,6 +739,20 @@ describe('hero truck (#276)', () => {
     expect(rotation('fifth_wheel').y).toBeCloseTo(0.2, 6)
     expect(rotation('wheel_t1').z).toBeCloseTo(truck.rigState.wheelRollRad, 6)
     expect(rotation('wheel_fl').z).toBeCloseTo(truck.rigState.wheelRollRad, 6)
+  })
+
+  it('keeps no rest copy per rig: a truck never offered builds no rest pose, and trucks of one shape share one built on the first attach', async () => {
+    const h = truckHarness({ trucks: 2 })
+    const before = restPoseStats.built
+    const a = h.rig('T1', 10)
+    const b = h.rig('T2', 12)
+    h.rig('T3', 200) // never offered
+    expect(restPoseStats.built).toBe(before)
+    await h.settle({ T1: a, T2: b })
+    expect(heroTruckOf(a)).toBeDefined()
+    expect(heroTruckOf(b)).toBeDefined()
+    expect(restPoseStats.built).toBe(before + 1) // the fake models share one source for every shape
+    expect(a.heroMount.rest()).toBe(b.heroMount.rest())
   })
 
   it('releases chassis and cab together, fading out, when the truck leaves LOD0 or reach', async () => {

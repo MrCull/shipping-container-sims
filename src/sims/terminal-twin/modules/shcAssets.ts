@@ -181,7 +181,7 @@ export class ShcRig {
       this.root.add(lod)
     }
     this.heroMount = heroSpreaderMount(this.lods[0])
-    this.heroBodyMount = heroBodyMount(this.lods[0], new THREE.Vector3(0, SHC_RIG.heightM / 2, 0), lod0Plates)
+    this.heroBodyMount = heroBodyMount(this.lods[0], model.source.getObjectByName('LOD0')!, new THREE.Vector3(0, SHC_RIG.heightM / 2, 0), { skip: 'spreader', materials: lod0Plates })
     this.setLod(0)
   }
 
