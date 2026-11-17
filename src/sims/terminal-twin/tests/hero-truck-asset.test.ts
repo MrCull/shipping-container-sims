@@ -157,7 +157,7 @@ describe.each(PIECES)('hero truck piece $name', (p) => {
   it('keeps the load_* attach points and load configurations of the source within 1 mm', () => {
     const src = meta(p.sourceFile.replace('.glb', '.meta.json'))
     const m = meta(`hero-equipment/${p.name}.meta.json`)
-    const loads = (x: { attachPoints: { name: string; position: number[] }[] }) => x.attachPoints.filter((a) => a.name.startsWith('load_'))
+    const loads = (x: Record<string, any>): { name: string; position: number[] }[] => x.attachPoints.filter((a: { name: string }) => a.name.startsWith('load_')) // eslint-disable-line @typescript-eslint/no-explicit-any
     expect(loads(m).map((a) => a.name)).toEqual(loads(src).map((a) => a.name))
     expect(loads(src)).toHaveLength(5)
     loads(src).forEach((a, i) => a.position.forEach((c, k) => expect(Math.abs(loads(m)[i].position[k] - c), `${a.name} ${k}`).toBeLessThanOrEqual(0.001)))
