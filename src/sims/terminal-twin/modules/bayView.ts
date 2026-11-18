@@ -358,6 +358,15 @@ export function stripOf(raw: BayViewData, plan?: BayPlan): StripEntry[] {
   })
 }
 
+/**
+ * Boxes the vessel still has to move in each plan: the plan's slots not yet done (planned or on a spreader), over every
+ * bay. The plan switch shows it after each plan's name, e.g. "Load plan (67)".
+ */
+export function remainingByPlan(raw: BayViewData): Record<BayPlan, number> {
+  const left = (plan: BayPlan): number => stripOf(raw, plan).reduce((n, e) => n + e.total - e.done, 0)
+  return { discharge: left('discharge'), load: left('load') }
+}
+
 /** The colour context of a vessel's data: the scenario's ports, else the ports on this vessel. */
 function contextOf(data: BayViewData): ColourContext {
   if (data.ports && data.ports.length > 0) return { ports: data.ports }

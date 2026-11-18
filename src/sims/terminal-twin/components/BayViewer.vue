@@ -8,7 +8,7 @@ import TtIcon from './ui/TtIcon.vue'
  * Refreshes a few times a second while open (never per frame).
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { BAY_PLANS, buildBayView, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
+import { BAY_PLANS, buildBayView, remainingByPlan, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
 import { useTwinStore } from '../store/twinStore'
 import { t, type MessageKey } from '../i18n/messages'
 import { colourKeyLabel } from '../modules/colourLabels'
@@ -23,6 +23,9 @@ const MAX_CELL_PX = 24
 let timer: ReturnType<typeof setInterval> | null = null
 
 const vesselName = computed(() => store.config?.vessels.find((v) => v.id === store.bayViewerVesselId)?.name ?? store.bayViewerVesselId ?? '')
+
+/** Boxes still to move per plan, over the whole vessel (shown after each plan's name on the switch). */
+const remaining = computed(() => (store.bayViewData ? remainingByPlan(store.bayViewData) : null))
 
 const view = computed<BayView | null>(() => {
   const data = store.bayViewData
@@ -186,6 +189,11 @@ onBeforeUnmount(() => {
             @click="store.setBayPlan(p)"
           >
             {{ t(`bayViewer.plan.${p}` as MessageKey) }}
+            <span
+              v-if="remaining"
+              class="seg-count"
+              :data-testid="`tt-bay-plan-count-${p}`"
+            >({{ remaining[p] }})</span>
           </button>
         </div>
         <p
@@ -509,6 +517,10 @@ h2 {
   color: var(--tt-text-muted);
   font: inherit;
   font-size: 0.78rem;
+}
+
+.seg-count {
+  font-variant-numeric: tabular-nums;
 }
 
 .seg-btn:last-child {
