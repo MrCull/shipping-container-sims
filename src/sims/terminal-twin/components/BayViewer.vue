@@ -4,7 +4,7 @@ import TtIcon from './ui/TtIcon.vue'
  * Bay viewer popup (spec #106, #115): one bay of a vessel at a time as hold and deck cross-sections (row x tier),
  * prev/next buttons and a bay strip, a hover tooltip with the box's properties and a side list of the bay's work
  * packages. All the grouping and status logic is the pure view-model in `modules/bayView.ts`; this only draws it.
- * A Load plan | Discharge plan switch (#162) shows one plan at a time (the store keeps the choice for the run).
+ * A Discharge plan | Load plan switch (#162) shows one plan at a time (the store keeps the choice for the run).
  * Refreshes a few times a second while open (never per frame).
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'

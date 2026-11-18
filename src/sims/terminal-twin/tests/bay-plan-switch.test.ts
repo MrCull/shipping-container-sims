@@ -1,5 +1,5 @@
 /**
- * #162: the bay viewer's Load plan | Discharge plan switch. Load shows planned-load and loaded cells, Discharge shows
+ * #162: the bay viewer's Discharge plan | Load plan switch. Load shows planned-load and loaded cells, Discharge shows
  * planned-discharge and discharged cells, ROB shows in both (subject to the ROB display); a box on a spreader shows in the plan
  * of its move. The view-model is the seam for what each plan shows; the twin store (over the engine host in-process) for
  * the default, keeping the choice across vessels and going back to Load on a new run.
@@ -60,7 +60,7 @@ function midRun(): { data: BayViewData; discharging: string; discharged: string;
   return { data: { ...before, slots, boxes }, discharging: disSlot.id, discharged: dischargedSlot.id, loading: loadSlot.id, loaded: loadedSlot.id }
 }
 
-describe('Load plan | Discharge plan (view-model)', () => {
+describe('Discharge plan | Load plan (view-model)', () => {
   it('Load shows planned-load, loaded and ROB cells only; Discharge shows planned-discharge, discharged and ROB only', () => {
     const { data } = midRun()
     expect(statuses(cellsOf(data, 'load'))).toEqual(new Set(['planned-load', 'in-progress', 'done', 'rob']))
@@ -124,29 +124,29 @@ describe('Load plan | Discharge plan (view-model)', () => {
   })
 })
 
-describe('Load plan | Discharge plan (store)', () => {
+describe('Discharge plan | Load plan (store)', () => {
   beforeEach(() => setActivePinia(createPinia()))
   const SCENARIO = 'two-vessels-compete-for-berth'
 
-  it('defaults to Load, keeps the choice across vessels in a run, and goes back to Load on a new run', async () => {
+  it('defaults to Discharge, keeps the choice across vessels in a run, and goes back to Discharge on a new run', async () => {
     const store = useTwinStore()
-    expect(store.bayPlan).toBe('load')
+    expect(store.bayPlan).toBe('discharge')
     await store.startScenario({ ...store.choice, name: SCENARIO, seed: 3 })
     await store.openBayViewer('V001')
-    expect(store.bayPlan).toBe('load')
-    store.setBayPlan('discharge')
-    await store.openBayViewer('V002')
     expect(store.bayPlan).toBe('discharge')
+    store.setBayPlan('load')
+    await store.openBayViewer('V002')
+    expect(store.bayPlan).toBe('load')
     store.closeBayViewer()
     await store.openBayViewer('V001')
-    expect(store.bayPlan).toBe('discharge')
+    expect(store.bayPlan).toBe('load')
 
     await store.reset()
-    expect(store.bayPlan).toBe('load')
+    expect(store.bayPlan).toBe('discharge')
 
-    store.setBayPlan('discharge')
+    store.setBayPlan('load')
     store.newScenario()
     await store.startScenario({ ...store.choice, name: SCENARIO, seed: 4 })
-    expect(store.bayPlan).toBe('load')
+    expect(store.bayPlan).toBe('discharge')
   })
 })

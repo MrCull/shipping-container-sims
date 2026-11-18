@@ -11,8 +11,8 @@
  *  - done: a discharged slot that is empty again, or a load slot that now holds its box;
  *  - ROB: a display-only remain-on-board box (never worked here);
  *  - empty: nothing planned.
- * Plan (#162): the viewer shows one plan at a time, Load (planned load, in progress, loaded) or Discharge (planned
- * discharge, in progress, discharged); ROB shows in both. A slot of the other plan's move shows as empty, and a box on a
+ * Plan (#162): the viewer shows one plan at a time, Discharge (planned discharge, in progress, discharged) or Load
+ * (planned load, in progress, loaded); ROB shows in both. A slot of the other plan's move shows as empty, and a box on a
  * spreader shows in the plan of its move. Without a plan (tests, the 3D match check) both moves show.
  * Positions use the maritime notation (`modules/locationNotation.ts`): bay, row and tier numbers on the axes, the
  * notation of each slot in the hover details (through the `locate` callback).
@@ -34,9 +34,9 @@ export const CELL_STATUSES: readonly CellStatus[] = ['planned-discharge', 'plann
 export type ColourMode = 'status' | ColourBy
 const byStatus = (mode: ColourMode): boolean => mode === 'status' || mode === 'default'
 
-/** Which plan the viewer shows (#162): the load plan (the default) or the discharge plan. */
+/** Which plan the viewer shows (#162): the discharge plan (the default, first) or the load plan. */
 export type BayPlan = 'load' | 'discharge'
-export const BAY_PLANS: readonly BayPlan[] = ['load', 'discharge']
+export const BAY_PLANS: readonly BayPlan[] = ['discharge', 'load']
 
 /** The statuses a plan shows, in legend order: its own move's planned, in progress and done, then ROB. */
 export function planStatuses(plan: BayPlan): CellStatus[] {
