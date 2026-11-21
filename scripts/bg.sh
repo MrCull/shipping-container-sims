@@ -21,12 +21,24 @@ case "$cmd" in
       nohup bash -c '
         log=$1; lock=$2; shift 2
         exec 9>>"$lock.lock"
-        if ! flock -n 9; then
-          echo "bg: waiting for heavy lock held by $(cat "$lock.holder" 2>/dev/null || echo unknown)" >> "$log"
-          flock 9
+        if command -v flock >/dev/null; then
+          if ! flock -n 9; then
+            echo "bg: waiting for heavy lock held by $(cat "$lock.holder" 2>/dev/null || echo unknown)" >> "$log"
+            flock 9
+          fi
+        else
+          # No flock (Git Bash on Windows): an atomic mkdir lock holding the owner pid; a dead owner is stale.
+          d="$lock.d"; said=""
+          until mkdir "$d" 2>/dev/null; do
+            p=$(cat "$d/pid" 2>/dev/null)
+            if [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; then rm -rf "$d"; continue; fi
+            [ -n "$said" ] || echo "bg: waiting for heavy lock held by $(cat "$lock.holder" 2>/dev/null || echo unknown)" >> "$log"
+            said=1; sleep 1
+          done
+          echo $$ > "$d/pid"
         fi
         echo "log $log" > "$lock.holder"
-        BG_HEAVY_HELD=1 "$@" >> "$log" 2>&1 9>&-; echo "EXIT $?" >> "$log"' bg "$log" "$heavy" "$@" >/dev/null 2>&1 &
+        BG_HEAVY_HELD=1 "$@" >> "$log" 2>&1 9>&-; rc=$?; [ -z "${d:-}" ] || rm -rf "$d"; echo "EXIT $rc" >> "$log"' bg "$log" "$heavy" "$@" >/dev/null 2>&1 &
     else
       nohup bash -c '"$@" >> "$0" 2>&1; echo "EXIT $?" >> "$0"' "$log" "$@" >/dev/null 2>&1 &
     fi

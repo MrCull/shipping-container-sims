@@ -17,3 +17,7 @@ Edit the "Label in our tracker" column to match whatever vocabulary you actually
 ## Progress label
 
 `merged-in-branch` is not a triage role. During `/implement-spec` it marks a ticket whose branch is merged into the integration branch while its issue is still open (`docs/agents/implementing.md`, **Merge**). It lives from that merge until the PR merges to `main`: whoever confirms the closures after the PR merge removes it (`docs/agents/issue-tracker.md`, **After merging a PR**). An issue that is closed, or open on `main` with this label, has a stale label: remove it.
+
+## Hardware label
+
+`needs-gpu` is not a triage role. It marks an issue only the owner can finish on the reference laptop (a real GPU, a frame-rate run or a judgement by eye) and goes with `ready-for-human`. `gh issue list --label needs-gpu` is the list of laptop-only work. Remove it when the GPU step is done.

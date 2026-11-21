@@ -9,6 +9,8 @@ import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { applyPinchStep } from '../modules/pinchGesture'
+import { sceneCamera } from '../modules/sceneCamera'
+import { WheelZoom } from '../modules/wheelZoom'
 import { NO_OVERLAYS } from '../modules/overlays'
 import { pickEntity } from '../modules/picking'
 import { cameraMotion } from '../modules/shortcuts'
@@ -109,11 +111,28 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       ? camera.position.clone().sub(controls.target)
       : new THREE.Vector3(openingOffset?.x ?? 95, openingOffset?.y ?? 70, openingOffset?.z ?? 115)
     if (distanceM !== undefined) offset.setLength(Math.max(controls.minDistance, distanceM))
+    placeCamera(target, offset)
+  }
+
+  const wheelZoom = new WheelZoom() // pending mouse-wheel zoom, see onWheel
+
+  /** Every pose writer goes through here: a set pose is final, so any wheel zoom still easing in is dropped. */
+  function placeCamera(target: { x: number; y: number; z: number }, offset: THREE.Vector3): void {
+    if (!camera || !controls) return
+    wheelZoom.clear()
     controls.target.set(target.x, target.y, target.z)
     camera.position.copy(controls.target).add(offset)
     controls.update()
   }
 
+  /** Follow camera: moves camera and target together onto `centre`, keeping the offset and any wheel zoom in progress. */
+  function recentre(centre: { x: number; y: number; z: number }): void {
+    if (!camera || !controls) return
+    const offset = camera.position.clone().sub(controls.target)
+    controls.target.set(centre.x, centre.y, centre.z)
+    camera.position.copy(controls.target).add(offset)
+    controls.update()
+  }
   const offsetScratch = new THREE.Vector3()
   const sphericalScratch = new THREE.Spherical()
 
@@ -130,19 +149,21 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   }
 
   function writePose(pose: CameraPose): void {
-    if (!camera || !controls) return
-    controls.target.set(pose.target.x, pose.target.y, pose.target.z)
     sphericalScratch.set(pose.distance, pose.polar, pose.azimuth)
-    camera.position.copy(controls.target).add(offsetScratch.setFromSpherical(sphericalScratch))
-    controls.update()
+    placeCamera(pose.target, offsetScratch.setFromSpherical(sphericalScratch))
   }
 
   let lastFrameMs = 0
 
-  /** Held camera keys (TT-R03) move the camera every frame, by elapsed time, so the speed does not depend on the frame rate. */
-  function applyCameraKeys(nowMs: number): void {
+  /** Seconds since the previous frame (0 on the first, at most 0.1 after a stall). */
+  function frameDt(nowMs: number): number {
     const dt = lastFrameMs === 0 ? 0 : Math.min((nowMs - lastFrameMs) / 1000, 0.1)
     lastFrameMs = nowMs
+    return dt
+  }
+
+  /** Held camera keys (TT-R03) move the camera every frame, by elapsed time, so the speed does not depend on the frame rate. */
+  function applyCameraKeys(dt: number): void {
     if (!controls || store.cameraKeys.held.size === 0 || dt === 0) return
     const pose = readPose()
     if (!pose) return
@@ -232,6 +253,22 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     pinchPrev = pinchState()
   }
 
+  // Mouse wheel (spec #293, modules/wheelZoom.ts; why not OrbitControls': docs/rendering-3d.md, Camera controls).
+  // Registered before OrbitControls, so stopping it here keeps the wheel from OrbitControls' zoom.
+  function onWheel(e: WheelEvent): void {
+    e.stopImmediatePropagation()
+    e.preventDefault() // the page must not scroll under the view
+    if (!controls?.enabled || !renderer) return
+    const rect = renderer.domElement.getBoundingClientRect()
+    wheelZoom.add(e.deltaY, e.deltaMode, { x: e.clientX - rect.left, y: e.clientY - rect.top })
+  }
+  function drainWheelZoom(dt: number): void {
+    if (!wheelZoom.active || !camera || !controls || !renderer) return
+    if (!controls.enabled) return wheelZoom.clear()
+    const { clientWidth: w, clientHeight: h } = renderer.domElement
+    wheelZoom.step(camera, controls.target, w, h, controls, dt)
+  }
+
   function rebuild(model: SceneModel | null): void {
     store.positional.update(ORIGIN, []) // the old scene's voices end with it
     view?.dispose()
@@ -262,11 +299,13 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       view.setOverlays(overlays)
     }
     view.setColourBy(store.colourBy, store.robDisplay)
-    applyCameraKeys(now)
+    const dt = frameDt(now)
+    applyCameraKeys(dt)
+    drainWheelZoom(dt)
     if (store.following && store.selectedId) {
       // Follow camera (F): keep the selection centred, keeping the user's viewing offset.
       const centre = controller.model?.entityCentre(store.selectedId, controller.displayTime)
-      if (centre) aim(centre, true)
+      if (centre) recentre(centre)
       else if (controller.model?.truckPhase(store.selectedId, controller.displayTime) !== 'waiting') store.toggleFollow() // a truck still to arrive keeps the camera where it is; otherwise the followed entity left the scene (a truck exited the gate): release, the view stays put
     }
     // Time of day: the sun follows the sim clock (re-applied when the clock moves a minute or the lock changes).
@@ -337,7 +376,9 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         renderer.outputColorSpace = THREE.SRGBColorSpace
         el.appendChild(renderer.domElement)
         renderer.domElement.classList.add('tt-canvas')
-        camera = new THREE.PerspectiveCamera(45, 1, 1, 14000)
+        camera = sceneCamera(1)
+        // before OrbitControls connects: onWheel stops the event so only it zooms on the wheel (middle-drag still dollies)
+        renderer.domElement.addEventListener('wheel', onWheel, { passive: false })
         controls = new OrbitControls(camera, renderer.domElement)
         controls.enableDamping = true
         controls.dampingFactor = 0.08
@@ -345,10 +386,8 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         controls.maxDistance = 3500
         controls.maxPolarAngle = Math.PI / 2.05
         // Map-like handling (phones especially): a pan slides the target along the ground instead of lifting it into the
-        // air (an elevated target makes later orbits and pinches swing), and a zoom keeps the point under the cursor or
-        // between the fingers in place instead of heading for the middle of the canvas.
+        // air (an elevated target makes later orbits and pinches swing).
         controls.screenSpacePanning = false
-        controls.zoomToCursor = true
         // two fingers are handled by onTouch* below (an unknown TOUCH value leaves OrbitControls idle)
         controls.touches.TWO = -1 as unknown as THREE.TOUCH
         renderer.domElement.addEventListener('pointerdown', onTouchDown)
@@ -382,9 +421,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         const pose = viewPresetPose(model, preset, camera.aspect)
         if (!pose) return false
         const offset = new THREE.Vector3(pose.direction.x, pose.direction.y, pose.direction.z).multiplyScalar(pose.distanceM)
-        controls.target.set(pose.target.x, pose.target.y, pose.target.z)
-        camera.position.copy(controls.target).add(offset)
-        controls.update()
+        placeCamera(pose.target, offset)
         return true
       },
       pickAt,
@@ -414,6 +451,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     renderer?.domElement.removeEventListener('pointerdown', onPointerDown)
     renderer?.domElement.removeEventListener('pointerup', onPointerUp)
     renderer?.domElement.removeEventListener('pointerdown', onTouchDown)
+    renderer?.domElement.removeEventListener('wheel', onWheel)
     window.removeEventListener('pointermove', onTouchMove)
     window.removeEventListener('pointerup', onTouchUp)
     window.removeEventListener('pointercancel', onTouchUp)
