@@ -6,13 +6,12 @@
 import { expect, test, type Page } from '@playwright/test'
 import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 async function open(page: Page, scenario: string): Promise<void> {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), scenario)
+  await openTwin(page, { scenario })
   await page.evaluate(() => window.__tt!.runUntil({ maxEvents: 400 }))
   await expect(page.getByTestId('tt-kpi-strip')).toBeVisible()
 }

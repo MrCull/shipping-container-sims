@@ -1,12 +1,11 @@
 /** Even playback pacing (#251): the top bar shows the achieved speed when the engine cannot supply the chosen one. */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 test('at the top speed on the TTI preset the achieved speed shows next to the chosen one and the clock keeps moving', async ({ page }) => {
   test.setTimeout(240_000)
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('TTI Algeciras baseline'))
+  await openTwin(page, { scenario: 'TTI Algeciras baseline' })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.getByRole('button', { name: '×3600', exact: true }).click()
   const readout = page.getByTestId('tt-achieved-speed')

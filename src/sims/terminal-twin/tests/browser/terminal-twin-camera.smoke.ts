@@ -4,15 +4,14 @@
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'landside-morning-peak'
 
 test('cameraTo works for every entity kind and follow ends when the truck leaves', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE })
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'TruckArrived' }))
   const ids = await page.evaluate(() => {
     const s = window.__tt!.sceneState()!

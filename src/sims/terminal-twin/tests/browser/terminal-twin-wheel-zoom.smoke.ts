@@ -9,6 +9,7 @@ import * as THREE from 'three'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { groundPointUnder } from '../../modules/pinchGesture'
 import { cameraAtPose, canvasPixelOf } from '../../modules/sceneCamera'
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'landside-morning-peak'
 /** About 10 degrees below the horizon at the centre: shallower than OrbitControls' tilt limit. */
@@ -39,9 +40,7 @@ async function settled(page: Page): Promise<Pose> {
 
 async function open(page: Page, errors: string[]): Promise<{ x: number; y: number; width: number; height: number }> {
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE })
   await page.evaluate(() => window.__tt!.pause())
   return (await page.locator('canvas.tt-canvas').boundingBox())!
 }

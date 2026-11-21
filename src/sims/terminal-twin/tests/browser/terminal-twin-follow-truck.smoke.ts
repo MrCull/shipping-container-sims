@@ -6,13 +6,12 @@
 import { expect, test, type Page } from '@playwright/test'
 import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 async function open(page: Page): Promise<string[]> {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('landside-morning-peak'))
+  await openTwin(page, { scenario: 'landside-morning-peak' })
   await page.evaluate(() => window.__tt!.pause())
   return errors
 }
@@ -79,7 +78,7 @@ test('the button and N work, and the HUD regions still do not overlap', async ({
     { width: 1280, height: 720 },
     { width: 1920, height: 1080 },
   ]) {
-    await page.setViewportSize(size)
+    await page.setViewportSize(size) // HUD layout check at both sizes
     expect(overlappingRegions((await page.evaluate(() => window.__tt!.hudLayout()))!), `${size.width}x${size.height}`).toEqual([])
   }
   expect(errors).toEqual([])
