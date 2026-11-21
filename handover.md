@@ -6,7 +6,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | --- | --- | --- | --- | --- |
 | #321 | 01 Retries, failure cap, durable timings, 30 s flag, fast-job timeout | none | merged in branch (1741e27) | |
 | #322 | 02 `?quality=`, `?render=off`, `__tt.renderOnce()` | none | merged in branch (f7aa45c) | |
-| #323 | 06 Smoke build | none | in progress | implementer (tt/323-smoke-build) |
+| #323 | 06 Smoke build | none | merged in branch (7580300) | |
 | #324 | 19 Unit-test speed-up | none | open | |
 | #325 | 03 `openTwin` helper, first migration | #322 | in progress | implementer (tt/325-open-twin) |
 | #326 | 18 Rendering-budget guard | #322 | open | |
