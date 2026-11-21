@@ -84,7 +84,7 @@ test('asset viewer: STS rig sliders drive gantry, trolley, hoist, spreader and b
     window.__ttAssets!.setRig('boom', 0)
     window.__ttAssets!.setRig('hoist', 20)
   })
-  await page.waitForTimeout(300)
+  await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/sts-viewer.png' })
   expect(errors).toEqual([])
 })

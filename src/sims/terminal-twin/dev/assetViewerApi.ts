@@ -9,6 +9,11 @@
  *   __ttAssets.setStack(5)                              // ASC: reference stack height in tiers; stats().stack reports the fit
  *   __ttAssets.pose()                                   // world positions of the rig nodes + the reference container
  *   await __ttAssets.yard(18000)                        // instanced TTI-size yard: LOD split, draw calls, triangles, fps
+ *   __ttAssets.renderOnce()                             // draw one frame now (needed with ?render=off); its { calls, triangles }
+ *   __ttAssets.frames()                                 // { frames, render }: frames updated, counts of the last drawn frame
+ *
+ * The viewer honours the twin's URL switches (#345, `viewerRender.ts`): `?render=off` keeps every frame update but
+ * skips the draw, and a fixed `?quality=low|medium` takes that level's shadows and resolution.
  */
 export type ViewerLod = 'LOD0' | 'LOD1' | 'LOD2' | 'auto'
 /** Truck / chassis viewers: the reference boxes on the chassis (`20front`/`20rear` = a single 20 ft box on those pins, `20twin` = two end to end). */
@@ -109,7 +114,7 @@ export interface YardStats {
   /** Whole frame, from renderer.info (main pass + shadow pass). */
   drawCalls: number
   triangles: number
-  /** Frames per second measured over ~1.5 s (headless SwiftShader is far slower than a GPU). */
+  /** Frames per second measured over ~1.5 s (headless SwiftShader is far slower than a GPU); with `?render=off` the frames are not drawn. */
   fps: number
 }
 
@@ -125,6 +130,10 @@ export interface AssetViewerApi {
   stats(): AssetViewStats | null
   pose(): AssetPose | null
   yard(count?: number): Promise<YardStats>
+  /** Draws exactly one frame now and returns its draw calls and triangles (main pass plus shadow pass). */
+  renderOnce(): { calls: number; triangles: number }
+  /** Frames updated (they advance with `?render=off` too) and the draw counts of the last drawn frame (0 until one is drawn). */
+  frames(): { frames: number; render: { calls: number; triangles: number } }
 }
 
 declare global {
