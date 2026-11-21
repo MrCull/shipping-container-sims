@@ -26,7 +26,7 @@ async function openShc(page: Page): Promise<void> {
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
-test('the SHC fixture runs in the browser: golden hash, custody chain, rendered SHCs match the engine', async ({ page }) => {
+test('the SHC fixture runs in the browser: golden hash, custody chain, rendered SHCs match the engine', { tag: '@engine' }, async ({ page }) => {
   const errors = collectErrors(page)
   await openShc(page)
   expect((await page.evaluate(() => window.__tt!.runUntil())).reason).toBe('ended')
@@ -59,7 +59,7 @@ test('the SHC fixture runs in the browser: golden hash, custody chain, rendered 
   expect(errors).toEqual([])
 })
 
-test('paused mid-trip, the scene shows each SHC and box where the engine has them', async ({ page }) => {
+test('paused mid-trip, the scene shows each SHC and box where the engine has them', { tag: '@engine' }, async ({ page }) => {
   await openShc(page)
   // Stop while the first box is on its way to the WTP pad (runUntil pauses at the engine time).
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingLoaded' }))
@@ -73,7 +73,7 @@ test('paused mid-trip, the scene shows each SHC and box where the engine has the
   expect(boxes.some((b) => b.custody.kind === 'shc')).toBe(true)
 })
 
-test('SHCs animate smoothly at ×1 and keep animating every frame at ×600', async ({ page }) => {
+test('SHCs animate smoothly at ×1 and keep animating every frame at ×600', { tag: '@engine' }, async ({ page }) => {
   await openShc(page)
   // Start as SHC01 sets off empty towards the first box.
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingEmpty' }))
@@ -110,7 +110,7 @@ test('SHCs animate smoothly at ×1 and keep animating every frame at ×600', asy
   expect(changed).toBe(true)
 })
 
-test('lane-graph and reservation overlays toggle on and off', async ({ page }) => {
+test('lane-graph and reservation overlays toggle on and off', { tag: '@engine' }, async ({ page }) => {
   const errors = collectErrors(page)
   await openShc(page)
   // Step through SHC01's first trip in 5 s runs until it holds reservations (they come and go as it moves), then pause.
@@ -147,7 +147,7 @@ test('lane-graph and reservation overlays toggle on and off', async ({ page }) =
   expect(errors).toEqual([])
 })
 
-test('the setup dialog sets the SHC count and kinematics', async ({ page }) => {
+test('the setup dialog sets the SHC count and kinematics', { tag: '@engine' }, async ({ page }) => {
   await openTwin(page)
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await expect(dialog).toBeVisible()

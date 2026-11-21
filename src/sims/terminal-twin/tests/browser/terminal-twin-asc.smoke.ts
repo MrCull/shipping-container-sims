@@ -25,7 +25,7 @@ async function openAsc(page: Page, options?: Parameters<NonNullable<typeof windo
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
-test('the import fixture runs in the browser: golden hash, full custody chain, boxes in their slots', async ({ page }) => {
+test('the import fixture runs in the browser: golden hash, full custody chain, boxes in their slots', { tag: '@engine' }, async ({ page }) => {
   const errors = collectErrors(page)
   await openAsc(page)
   expect((await page.evaluate(() => window.__tt!.runUntil())).reason).toBe('ended')
@@ -56,7 +56,7 @@ test('the import fixture runs in the browser: golden hash, full custody chain, b
   expect(errors).toEqual([])
 })
 
-test('paused mid-cycle, the scene shows the ASC where the engine has it and the box in its spreader', async ({ page }) => {
+test('paused mid-cycle, the scene shows the ASC where the engine has it and the box in its spreader', { tag: '@engine' }, async ({ page }) => {
   await openAsc(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'AscRoutingToSlot' }))
   const state = await page.evaluate(() => window.__tt!.sceneState())
@@ -66,7 +66,7 @@ test('paused mid-cycle, the scene shows the ASC where the engine has it and the 
   expect(state!.containers[ascs[0].carrying as string]).toEqual({ kind: 'asc', id: ascs[0].id })
 })
 
-test('the spreader follows the planned hoist: it is down at the pad and raised in travel', async ({ page }) => {
+test('the spreader follows the planned hoist: it is down at the pad and raised in travel', { tag: '@engine' }, async ({ page }) => {
   await openAsc(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'AscPicked' }))
   const atPad = await page.evaluate(() => window.__tt!.sceneState()!.ascs['B01-ASC1'])
@@ -76,7 +76,7 @@ test('the spreader follows the planned hoist: it is down at the pad and raised i
   expect(atSlot.hoistY).toBeGreaterThan(5) // travel height over the stacks
 })
 
-test('the setup dialog edits blocks, bays, tiers, pads, stalls and ASC speeds', async ({ page }) => {
+test('the setup dialog edits blocks, bays, tiers, pads, stalls and ASC speeds', { tag: '@engine' }, async ({ page }) => {
   await openTwin(page)
   await page.evaluate(() => window.__tt!.newScenario())
   const dialog = page.getByRole('dialog', { name: /new scenario/i })

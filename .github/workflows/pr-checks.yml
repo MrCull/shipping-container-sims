@@ -61,9 +61,11 @@ jobs:
         run: node scripts/check-no-quarantine.mjs && node --test scripts/test-check-no-quarantine.mjs
         env:
           QUARANTINE_BASE: HEAD^1
+      - name: Check every smoke spec has exactly one group tag
+        run: node scripts/check-smoke-groups.mjs
 
-      - name: Smoke reporter, timing, server and merge script tests
-        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs scripts/test-smoke-merge.mjs
+      - name: Smoke reporter, timing, server, merge, group check and selection script tests
+        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs scripts/test-smoke-merge.mjs scripts/test-check-smoke-groups.mjs scripts/test-smoke-select.mjs
 
       - name: Lint
         run: pnpm run lint

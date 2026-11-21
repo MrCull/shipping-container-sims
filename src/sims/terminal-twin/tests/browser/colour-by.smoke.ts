@@ -51,7 +51,7 @@ async function tints(page: Page): Promise<Record<string, number>> {
   return page.evaluate(() => Object.fromEntries(Object.entries(window.__tt!.sceneState()!.liveries).map(([id, l]) => [id, l.tint])))
 }
 
-test('colour by: the menu recolours the 3D boxes and the bay viewer, with a legend', async ({ page }) => {
+test('colour by: the menu recolours the 3D boxes and the bay viewer, with a legend', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await open(page)
@@ -111,7 +111,7 @@ test('colour by: the menu recolours the 3D boxes and the bay viewer, with a lege
   expect(errors).toEqual([])
 })
 
-test('colour by: Length and the light Dwell ramp recolour 3D and the bay viewer (#140)', async ({ page }) => {
+test('colour by: Length and the light Dwell ramp recolour 3D and the bay viewer (#140)', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await open(page)
@@ -142,7 +142,7 @@ test('colour by: Length and the light Dwell ramp recolour 3D and the bay viewer 
   expect(errors).toEqual([])
 })
 
-test('colour by: time-based modes follow the sim clock', async ({ page }) => {
+test('colour by: time-based modes follow the sim clock', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await open(page)
@@ -154,7 +154,7 @@ test('colour by: time-based modes follow the sim clock', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
-test('colour by: the ROB display (Show, Grey, Hide) draws the ROB boxes in 3D and the bay viewer', async ({ page }) => {
+test('colour by: the ROB display (Show, Grey, Hide) draws the ROB boxes in 3D and the bay viewer', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await open(page)
@@ -196,7 +196,7 @@ test('colour by: the ROB display (Show, Grey, Hide) draws the ROB boxes in 3D an
   expect(errors).toEqual([])
 })
 
-test('colour by: the menu closes on a pick and on a click outside it (#168)', async ({ page }) => {
+test('colour by: the menu closes on a pick and on a click outside it (#168)', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await open(page)
@@ -217,7 +217,7 @@ test('colour by: the menu closes on a pick and on a click outside it (#168)', as
   expect(errors).toEqual([])
 })
 
-test('colour by: the mode and the ROB display survive a reload', async ({ page }) => {
+test('colour by: the mode and the ROB display survive a reload', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await open(page)
@@ -235,7 +235,7 @@ test('colour by: the mode and the ROB display survive a reload', async ({ page }
   expect(errors).toEqual([])
 })
 
-test('colour by: switching modes on the full TTI yard costs no frame time @load', async ({ page }) => {
+test('colour by: switching modes on the full TTI yard costs no frame time @load', { tag: '@vessel' }, async ({ page }) => {
   test.setTimeout(900_000)
   const errors = collectErrors(page)
   await open(page, 'TTI Algeciras baseline')

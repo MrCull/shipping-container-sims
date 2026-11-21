@@ -35,7 +35,7 @@ async function openAsc(page: Page): Promise<void> {
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 }
 
-test('paired ASCs use the GLB with LOD switching and are posed from the engine motion', async ({ page }) => {
+test('paired ASCs use the GLB with LOD switching and are posed from the engine motion', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // three camera moves, each waiting on a software-rendered frame
   const { errors, external } = watch(page)
   await openAsc(page)
@@ -71,7 +71,7 @@ test('paired ASCs use the GLB with LOD switching and are posed from the engine m
   expect(errors).toEqual([])
 })
 
-test('while an ASC carries a box, the box hangs at the twist-lock plane and the ropes follow the hoist', async ({ page }) => {
+test('while an ASC carries a box, the box hangs at the twist-lock plane and the ropes follow the hoist', { tag: '@equipment' }, async ({ page }) => {
   const { errors } = watch(page)
   await openAsc(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'AscRoutingToSlot' }))
@@ -90,7 +90,7 @@ test('while an ASC carries a box, the box hangs at the twist-lock plane and the 
   expect(errors).toEqual([])
 })
 
-test('the asset viewer shows the ASC with working rig sliders and 8 rows of reference containers fitting under the span', async ({ page }) => {
+test('the asset viewer shows the ASC with working rig sliders and 8 rows of reference containers fitting under the span', { tag: '@equipment' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await page.goto(twinUrl({ params: { viewer: 'asc' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)

@@ -34,7 +34,7 @@ async function openShc(page: Page): Promise<void> {
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 }
 
-test('SHCs in the twin use the GLB with LOD switching, carry the box at the attach point and roll their wheels', async ({ page }) => {
+test('SHCs in the twin use the GLB with LOD switching, carry the box at the attach point and roll their wheels', { tag: '@equipment' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await openShc(page)
 
@@ -73,7 +73,7 @@ test('SHCs in the twin use the GLB with LOD switching, carry the box at the atta
   expect(errors).toEqual([])
 })
 
-test('SHCs steer through the corners of the lane graph', async ({ page }) => {
+test('SHCs steer through the corners of the lane graph', { tag: '@equipment' }, async ({ page }) => {
   const { errors } = watch(page)
   await openShc(page)
   // Sample the rig every frame while the sim plays: some SHC must steer, wheels must roll consistently with the distance driven.
@@ -100,7 +100,7 @@ test('SHCs steer through the corners of the lane graph', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
-test('the asset viewer shows the SHC with working rig sliders and a 40 ft box fitting the tunnel at true scale', async ({ page }) => {
+test('the asset viewer shows the SHC with working rig sliders and a 40 ft box fitting the tunnel at true scale', { tag: '@equipment' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await page.goto(twinUrl({ params: { viewer: 'shc' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)

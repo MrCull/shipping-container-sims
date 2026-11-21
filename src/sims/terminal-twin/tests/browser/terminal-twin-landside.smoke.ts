@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 
-test('trucks render, queue at the gate, stand in stalls and exit', async ({ page }) => {
+test('trucks render, queue at the gate, stand in stalls and exit', { tag: '@engine' }, async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   await openTwin(page, { scenario: 'truck-gate-queue' })
@@ -27,7 +27,7 @@ test('trucks render, queue at the gate, stand in stalls and exit', async ({ page
   expect(errors).toEqual([])
 })
 
-test('holding positions are drawn and admitted trucks wait in them off the roads (TT-R16)', async ({ page }) => {
+test('holding positions are drawn and admitted trucks wait in them off the roads (TT-R16)', { tag: '@engine' }, async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   await openTwin(page, { scenario: 'truck-holding-overflow' })

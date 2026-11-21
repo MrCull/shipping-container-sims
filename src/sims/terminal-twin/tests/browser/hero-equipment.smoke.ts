@@ -71,7 +71,7 @@ function expectInPlace(s: { id: string; hero: Bounds; rig: Bounds }): void {
   expect(Math.abs(s.hero.min[1] - s.rig.min[1]), `${s.id} underside`).toBeLessThan(CENTRE_TOLERANCE_M)
 }
 
-test('ASC close-up: hero spreaders within the High cap, none requested before, none on Low or below equipment-hero-off', async ({ page }) => {
+test('ASC close-up: hero spreaders within the High cap, none requested before, none on Low or below equipment-hero-off', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'yard-no-mixed-length')
@@ -119,7 +119,7 @@ test('ASC close-up: hero spreaders within the High cap, none requested before, n
   expect(w.errors).toEqual([])
 })
 
-test('STS close-up: the hero spreader is in place on the crane rig', async ({ page }) => {
+test('STS close-up: the hero spreader is in place on the crane rig', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'twin-20-lift')
@@ -143,7 +143,7 @@ test('STS close-up: the hero spreader is in place on the crane rig', async ({ pa
   expect(w.errors).toEqual([])
 })
 
-test('SHC and ASC carrying a 20 ft box: the hero spreader is squeezed to 20 ft like the rig spreader', async ({ page }) => {
+test('SHC and ASC carrying a 20 ft box: the hero spreader is squeezed to 20 ft like the rig spreader', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'asc-1sts-10-boxes-1block') // 20 ft and 40 ft boxes mixed, STS to SHC to WTP pad to ASC
@@ -181,7 +181,7 @@ test('SHC and ASC carrying a 20 ft box: the hero spreader is squeezed to 20 ft l
   expect(w.errors).toEqual([])
 })
 
-test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested before, none on Low', async ({ page }) => {
+test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested before, none on Low', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'shc-1sts-2shc-1wtp')
@@ -220,7 +220,7 @@ test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested befo
   expect(w.errors).toEqual([])
 })
 
-test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the box stays put, none on Low', async ({ page }) => {
+test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the box stays put, none on Low', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'truck-gate-queue')

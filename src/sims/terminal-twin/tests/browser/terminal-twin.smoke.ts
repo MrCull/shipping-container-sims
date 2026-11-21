@@ -25,7 +25,7 @@ async function openTracer(page: Page): Promise<void> {
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
-test('the home page lists Terminal Twin and its route loads without console errors', async ({ page }) => {
+test('the home page lists Terminal Twin and its route loads without console errors', { tag: '@core' }, async ({ page }) => {
   const errors = collectErrors(page)
   await page.goto('/')
   const card = page.getByText('Terminal Twin', { exact: true }).first()
@@ -36,7 +36,7 @@ test('the home page lists Terminal Twin and its route loads without console erro
   expect(errors).toEqual([])
 })
 
-test('the tracer fixture runs to completion in the browser: golden hash, rendered counts match the engine', async ({ page }) => {
+test('the tracer fixture runs to completion in the browser: golden hash, rendered counts match the engine', { tag: '@core' }, async ({ page }) => {
   const errors = collectErrors(page)
   await openTracer(page)
 
@@ -69,7 +69,7 @@ test('the tracer fixture runs to completion in the browser: golden hash, rendere
   expect(errors).toEqual([])
 })
 
-test('×1 runs one sim second per wall second; ×600 keeps animating every frame', async ({ page }) => {
+test('×1 runs one sim second per wall second; ×600 keeps animating every frame', { tag: '@core' }, async ({ page }) => {
   await openTracer(page)
   // Load-proof (V11-07): ratios over a minimum wall-clock window sampled on animation frames, never absolute frame counts.
   await page.evaluate(() => window.__tt!.setSpeed(1))
@@ -90,7 +90,7 @@ test('×1 runs one sim second per wall second; ×600 keeps animating every frame
   expect(rate).toBeLessThan(600 * 1.1)
 })
 
-test('×3600 from the top bar advances the sim clock accordingly; digit keys leave the speed unchanged', async ({ page }) => {
+test('×3600 from the top bar advances the sim clock accordingly; digit keys leave the speed unchanged', { tag: '@core' }, async ({ page }) => {
   // A long scenario, so the clock does not hit the scenario end within the window.
   // A long scenario: the 5,400 s landside fixture runs headless in about a second and ends within two wall seconds at x3600,
   // freezing the clock before the measurement window, which read as 0 (#191).
@@ -112,7 +112,7 @@ test('×3600 from the top bar advances the sim clock accordingly; digit keys lea
   expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
 })
 
-test('x3600 from the top bar sustains at least 600 sim s per wall s @load', async ({ page }) => {
+test('x3600 from the top bar sustains at least 600 sim s per wall s @load', { tag: '@core' }, async ({ page }) => {
   // Hardware benchmark (#191): never runs in CI (--grep-invert @load); run it on real hardware. The engine alone does 1 300 to 1 450 (`pnpm run tt:baseline`); software GL in the page is the limit.
   // A long scenario: the 5,400 s landside fixture runs headless in about a second and ends within two wall seconds at x3600,
   // freezing the clock before the measurement window, which read as 0 (#191).
@@ -129,7 +129,7 @@ test('x3600 from the top bar sustains at least 600 sim s per wall s @load', asyn
   expect(rate).toBeGreaterThan(600)
 })
 
-test('Run to… jumps to the target and the scene matches the engine there', async ({ page }) => {
+test('Run to… jumps to the target and the scene matches the engine there', { tag: '@core' }, async ({ page }) => {
   const errors = collectErrors(page)
   await openTracer(page)
   await page.evaluate(() => window.__tt!.setSpeed(5))
@@ -161,7 +161,7 @@ test('Run to… jumps to the target and the scene matches the engine there', asy
   expect(errors).toEqual([])
 })
 
-test('the Run to… popup sits above the 3D view: its buttons take real clicks and Run runs', async ({ page }) => {
+test('the Run to… popup sits above the 3D view: its buttons take real clicks and Run runs', { tag: '@core' }, async ({ page }) => {
   const errors = collectErrors(page)
   for (const size of [
     { width: 1280, height: 720 },
@@ -186,7 +186,7 @@ test('the Run to… popup sits above the 3D view: its buttons take real clicks a
   expect(errors).toEqual([])
 })
 
-test('Reset returns to t = 0 with the same seed; New Scenario reopens the setup dialog', async ({ page }) => {
+test('Reset returns to t = 0 with the same seed; New Scenario reopens the setup dialog', { tag: '@core' }, async ({ page }) => {
   await openTracer(page)
   await page.evaluate(() => window.__tt!.runTo(500))
   await page.getByRole('button', { name: 'Reset' }).click()
@@ -216,7 +216,7 @@ test('Reset returns to t = 0 with the same seed; New Scenario reopens the setup 
   expect(other.eventLogHash).not.toBe(golden.eventLogHash)
 })
 
-test('every run start (Start, Reset, loading a save) resets the speed to ×10; pause and dialogs keep it (#157)', async ({ page }) => {
+test('every run start (Start, Reset, loading a save) resets the speed to ×10; pause and dialogs keep it (#157)', { tag: '@core' }, async ({ page }) => {
   const x600 = page.getByRole('button', { name: '×600', exact: true })
   const x10 = page.getByRole('button', { name: '×10', exact: true })
   const speed = () => page.evaluate(() => window.__tt!.clock().speed)
@@ -263,7 +263,7 @@ test('every run start (Start, Reset, loading a save) resets the speed to ×10; p
   await expect(x10).toHaveAttribute('aria-pressed', 'true')
 })
 
-test('vessels render at their berth (or anchorage) and STS cranes gantry along the rail to their bays', async ({ page }) => {
+test('vessels render at their berth (or anchorage) and STS cranes gantry along the rail to their bays', { tag: '@core' }, async ({ page }) => {
   const errors = collectErrors(page)
   // Two vessels compete for one berth: at t = 1200 V001 is alongside, V002 waits at anchorage.
   await openTwin(page, { scenario: 'two-vessels-compete-for-berth' })
@@ -302,7 +302,7 @@ test('vessels render at their berth (or anchorage) and STS cranes gantry along t
   expect(errors).toEqual([])
 })
 
-test('mid-run screenshot', async ({ page }) => {
+test('mid-run screenshot', { tag: '@core' }, async ({ page }) => {
   await openTracer(page)
   await page.evaluate(() => window.__tt!.runTo(420))
   await page.evaluate(() => window.__tt!.pause())

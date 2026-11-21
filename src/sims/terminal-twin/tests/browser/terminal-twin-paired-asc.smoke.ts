@@ -26,7 +26,7 @@ async function open(page: Page): Promise<void> {
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
-test('the conflict fixture runs in the browser: golden hash, two ASCs per block drawn, no violations', async ({ page }) => {
+test('the conflict fixture runs in the browser: golden hash, two ASCs per block drawn, no violations', { tag: '@engine' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
   expect((await page.evaluate(() => window.__tt!.runUntil())).reason).toBe('ended')
@@ -41,7 +41,7 @@ test('the conflict fixture runs in the browser: golden hash, two ASCs per block 
   expect(errors).toEqual([])
 })
 
-test('the scene keeps the two ASCs 12 m apart at every step', async ({ page }) => {
+test('the scene keeps the two ASCs 12 m apart at every step', { tag: '@engine' }, async ({ page }) => {
   await open(page)
   for (let i = 0; i < 25; i++) {
     await page.evaluate(() => window.__tt!.step())
@@ -56,7 +56,7 @@ test('the scene keeps the two ASCs 12 m apart at every step', async ({ page }) =
   }
 })
 
-test('the ASC rail overlay shows reserved segments and updates live', async ({ page }) => {
+test('the ASC rail overlay shows reserved segments and updates live', { tag: '@engine' }, async ({ page }) => {
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'AscJobAssigned' }))
   await page.evaluate(() => window.__tt!.overlays({ ascRail: false }))
@@ -81,7 +81,7 @@ test('the ASC rail overlay shows reserved segments and updates live', async ({ p
     .toBe(heldLater.length)
 })
 
-test('the overlay toggle button turns the ASC rail overlay on and off', async ({ page }) => {
+test('the overlay toggle button turns the ASC rail overlay on and off', { tag: '@engine' }, async ({ page }) => {
   await open(page)
   const toggle = page.getByRole('button', { name: /stacking crane rails/i })
   await expect(toggle).toHaveAttribute('aria-pressed', 'false')
@@ -90,7 +90,7 @@ test('the overlay toggle button turns the ASC rail overlay on and off', async ({
   expect((await page.evaluate(() => window.__tt!.overlays())).ascRail).toBe(true)
 })
 
-test('the setup dialog offers 1 or 2 ASCs per block, default 2', async ({ page }) => {
+test('the setup dialog offers 1 or 2 ASCs per block, default 2', { tag: '@engine' }, async ({ page }) => {
   await openTwin(page)
   await page.evaluate(() => window.__tt!.newScenario())
   const dialog = page.getByRole('dialog', { name: /new scenario/i })

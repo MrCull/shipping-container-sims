@@ -6,7 +6,7 @@
 import { expect, test } from '@playwright/test'
 import { openTwin } from '../../sims/terminal-twin/tests/browser/openTwin'
 
-test('the main menu build stamp reads "dev" on the dev server and the build time on the smoke build', async ({ page }) => {
+test('the main menu build stamp reads "dev" on the dev server and the build time on the smoke build', { tag: '@core' }, async ({ page }) => {
   await page.goto('/')
   const stamp = page.getByTestId('build-stamp')
   await expect(stamp).toBeVisible()
@@ -19,7 +19,7 @@ test('the main menu build stamp reads "dev" on the dev server and the build time
   }
 })
 
-test('a sim page has no build stamp', async ({ page }) => {
+test('a sim page has no build stamp', { tag: '@core' }, async ({ page }) => {
   await openTwin(page)
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeVisible()
   await expect(page.getByTestId('build-stamp')).toHaveCount(0)

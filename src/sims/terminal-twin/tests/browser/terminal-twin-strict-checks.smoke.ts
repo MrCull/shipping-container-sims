@@ -7,7 +7,7 @@ import type {} from '../../dev/devApi' // window.__tt typing
 import { openAdvanced } from './scenarioPicker'
 import { openTwin } from './openTwin'
 
-test('strict checks is off by default and remembered', async ({ page }) => {
+test('strict checks is off by default and remembered', { tag: '@shell' }, async ({ page }) => {
   await openTwin(page)
   await openAdvanced(page)
   const box = page.getByTestId('tt-strict-checks')

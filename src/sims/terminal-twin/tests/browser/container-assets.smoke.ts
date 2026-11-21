@@ -30,7 +30,7 @@ function watch(page: Page): { errors: string[]; external: string[] } {
   return { errors, external }
 }
 
-test('the twin renders containers from the GLBs with each box in its own line livery, offline', async ({ page }) => {
+test('the twin renders containers from the GLBs with each box in its own line livery, offline', { tag: '@yard' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await openTwin(page, { scenario: 'liveries-mixed', quality: 'high' }) // the LOD distances it checks are High's (Low scales them by 0.4)
   await page.evaluate(() => window.__tt!.runTo(200))
@@ -69,7 +69,7 @@ test('the twin renders containers from the GLBs with each box in its own line li
   expect(errors).toEqual([])
 })
 
-test('the asset viewer loads every container asset, switches LODs and moves the rig', async ({ page }) => {
+test('the asset viewer loads every container asset, switches LODs and moves the rig', { tag: '@yard' }, async ({ page }) => {
   test.slow() // shows and screenshots every asset in the pack, each on software WebGL
   const { errors, external } = watch(page)
   await page.goto(twinUrl({ params: { viewer: 'container-20' } })) // the asset viewer has no __tt to wait for
@@ -99,7 +99,7 @@ test('the asset viewer loads every container asset, switches LODs and moves the 
   expect(errors).toEqual([])
 })
 
-test('a TTI-size yard of instanced containers stays within the triangle and draw-call budget', async ({ page }) => {
+test('a TTI-size yard of instanced containers stays within the triangle and draw-call budget', { tag: '@yard' }, async ({ page }) => {
   test.slow() // 18,000 instances render at under 1 fps on software WebGL
   const { errors } = watch(page)
   await page.goto(twinUrl({ params: { viewer: 'yard' } })) // the asset viewer has no __tt to wait for

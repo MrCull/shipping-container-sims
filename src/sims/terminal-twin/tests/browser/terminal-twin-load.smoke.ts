@@ -24,7 +24,7 @@ async function openLoad(page: Page): Promise<void> {
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
-test('export boxes start in the stacks and end in their vessel slots, matching the golden run', async ({ page }) => {
+test('export boxes start in the stacks and end in their vessel slots, matching the golden run', { tag: '@engine' }, async ({ page }) => {
   const errors = collectErrors(page)
   await openLoad(page)
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
@@ -54,7 +54,7 @@ test('export boxes start in the stacks and end in their vessel slots, matching t
   expect(errors).toEqual([])
 })
 
-test('paused mid-load, the scene shows an SHC carrying an export box and the engine agrees', async ({ page }) => {
+test('paused mid-load, the scene shows an SHC carrying an export box and the engine agrees', { tag: '@engine' }, async ({ page }) => {
   await openLoad(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcPickedAtWtp' }))
   const shcs = await page.evaluate(() => window.__tt!.query<{ id: string; carrying: string | null }[]>('shcList'))

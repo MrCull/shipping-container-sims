@@ -10,7 +10,7 @@ import { expect, test } from '@playwright/test'
 const OUT = process.env.TT_BASELINE_OUT
 const SPEEDS = [60, 120, 300, 600, 1200, 1800, 3600]
 
-test('engine rate per speed step, rendering excluded @load @baseline', async ({ page }) => {
+test('engine rate per speed step, rendering excluded @load @baseline', { tag: '@engine' }, async ({ page }) => {
   test.skip(!OUT, 'run through pnpm run tt:baseline')
   test.setTimeout(1_200_000)
   const preset = process.env.TT_BASELINE_PRESET ?? 'TTI Algeciras baseline'

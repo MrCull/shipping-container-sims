@@ -19,7 +19,7 @@ function collectErrors(page: Page): string[] {
   return errors
 }
 
-test('a rehandle lifts a blocker out of its stack, carries it, and sets it down; the run matches its golden', async ({ page }) => {
+test('a rehandle lifts a blocker out of its stack, carries it, and sets it down; the run matches its golden', { tag: '@engine' }, async ({ page }) => {
   const errors = collectErrors(page)
   await openTwin(page, { scenario: FIXTURE })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()

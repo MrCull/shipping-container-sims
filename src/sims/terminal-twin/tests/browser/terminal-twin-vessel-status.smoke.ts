@@ -25,7 +25,7 @@ async function select(page: Page, id: string): Promise<void> {
 
 const labels = (page: Page) => page.evaluate(() => window.__tt!.scene()?.vesselLabels ?? [])
 
-test('vessel status: a mooring vessel counts down to 08:30 and a vessel at anchorage waits for a berth', async ({ page }) => {
+test('vessel status: a mooring vessel counts down to 08:30 and a vessel at anchorage waits for a berth', { tag: '@analysis' }, async ({ page }) => {
   test.slow()
   await open(page)
   await page.evaluate(() => window.__tt!.runTo(300)) // 08:05

@@ -49,7 +49,7 @@ async function playUntilGantrying(page: Page): Promise<string> {
   })
 }
 
-test('beacons flash only on cranes that are gantrying, and the alarm voice follows the camera', async ({ page }) => {
+test('beacons flash only on cranes that are gantrying, and the alarm voice follows the camera', { tag: '@equipment' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
   // stopped at the start: no beacons, no machine voices (the harbour ambience may already play, faintly)
@@ -92,7 +92,7 @@ test('beacons flash only on cranes that are gantrying, and the alarm voice follo
   expect(errors).toEqual([])
 })
 
-test('the alarm is quiet when far and silent when muted', async ({ page }) => {
+test('the alarm is quiet when far and silent when muted', { tag: '@equipment' }, async ({ page }) => {
   await open(page)
   const id = await playUntilGantrying(page)
   await page.evaluate((e) => window.__tt!.cameraTo(e, 60), id)

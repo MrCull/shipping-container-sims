@@ -66,7 +66,7 @@ async function checkPanels(page: Page): Promise<{ engine: HatchPanelState[]; sta
   return { engine, statuses: engine.map((p) => p.status) }
 }
 
-test('panels follow the engine through a remove and replace cycle, and the laydown draws what is off the vessel', async ({ page }) => {
+test('panels follow the engine through a remove and replace cycle, and the laydown draws what is off the vessel', { tag: '@vessel' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
@@ -95,7 +95,7 @@ test('panels follow the engine through a remove and replace cycle, and the laydo
   expect(errors).toEqual([])
 })
 
-test('a panel in the laydown is drawn, can be clicked, and is inspected; hatch moves are in the event feed', async ({ page }) => {
+test('a panel in the laydown is drawn, can be clicked, and is inspected; hatch moves are in the event feed', { tag: '@vessel' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
   await page.keyboard.press('e')
@@ -119,7 +119,7 @@ test('a panel in the laydown is drawn, can be clicked, and is inspected; hatch m
   expect(errors).toEqual([])
 })
 
-test('with hatch covers off no panel is drawn and the hull has no covers over any bay', async ({ page }) => {
+test('with hatch covers off no panel is drawn and the hull has no covers over any bay', { tag: '@vessel' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, 'tracer-1sts-10-boxes')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)

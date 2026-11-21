@@ -33,7 +33,7 @@ async function openTrucks(page: Page): Promise<void> {
   await page.waitForFunction(() => window.__tt!.scene()?.landside.assets === 'loaded' && Object.keys(window.__tt!.sceneState()?.truckRigs ?? {}).length > 5)
 }
 
-test('trucks in the twin use the GLB models with cab and livery variety and LOD switching', async ({ page }) => {
+test('trucks in the twin use the GLB models with cab and livery variety and LOD switching', { tag: '@equipment' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await openTrucks(page)
   const state = await page.evaluate(() => window.__tt!.sceneState()!)
@@ -57,7 +57,7 @@ test('trucks in the twin use the GLB models with cab and livery variety and LOD 
   expect(errors).toEqual([])
 })
 
-test('trucks roll, steer, articulate through turns and carry their box on the chassis attach point', async ({ page }) => {
+test('trucks roll, steer, articulate through turns and carry their box on the chassis attach point', { tag: '@equipment' }, async ({ page }) => {
   test.slow()
   const { errors } = watch(page)
   await openTrucks(page)
@@ -111,7 +111,7 @@ test('trucks roll, steer, articulate through turns and carry their box on the ch
   expect(errors).toEqual([])
 })
 
-test('the asset viewer rolls and steers the wheels, articulates the chassis and seats 20 ft and 40 ft boxes on the twist-locks', async ({ page }) => {
+test('the asset viewer rolls and steers the wheels, articulates the chassis and seats 20 ft and 40 ft boxes on the twist-locks', { tag: '@equipment' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await page.goto(twinUrl({ params: { viewer: 'truck-cab-mid' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)

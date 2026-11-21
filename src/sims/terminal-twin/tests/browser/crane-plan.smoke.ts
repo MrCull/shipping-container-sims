@@ -17,7 +17,7 @@ function collectErrors(page: Page): string[] {
   return errors
 }
 
-test('crane plan: the Crane plan view shows a band per crane and the now line, and a package click opens its bay', async ({ page }) => {
+test('crane plan: the Crane plan view shows a band per crane and the now line, and a package click opens its bay', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await page.setViewportSize({ width: 1500, height: 960 })

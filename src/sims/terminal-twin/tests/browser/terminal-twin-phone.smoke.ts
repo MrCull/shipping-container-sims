@@ -52,7 +52,7 @@ function anchorOf(a: Pose, b: Pose): { x: number; z: number } {
   return { x: a.target.x + (b.target.x - a.target.x) / (1 - s), z: a.target.z + (b.target.z - a.target.z) / (1 - s) }
 }
 
-test('phone: the view fits the screen, HUD collapses, pinch zooms about the fingers', async ({ page }) => {
+test('phone: the view fits the screen, HUD collapses, pinch zooms about the fingers', { tag: '@shell' }, async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   await openTwin(page, { scenario: FIXTURE }) // the phone viewport comes from test.use above

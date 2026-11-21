@@ -24,7 +24,7 @@ async function open(page: Page, options?: Parameters<NonNullable<typeof window._
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
-test('the KPI strip is over the 3D view and shows the engine headline KPIs', async ({ page }) => {
+test('the KPI strip is over the 3D view and shows the engine headline KPIs', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
   await page.evaluate(() => window.__tt!.runTo(900))
@@ -44,7 +44,7 @@ test('the KPI strip is over the 3D view and shows the engine headline KPIs', asy
   expect(errors).toEqual([])
 })
 
-test('an end condition ends the run: report shown, time controls locked, scene still inspectable', async ({ page }) => {
+test('an end condition ends the run: report shown, time controls locked, scene still inspectable', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, { endConditions: { moves: 4 } })
   await page.evaluate(() => window.__tt!.runUntil())
@@ -88,7 +88,7 @@ test('an end condition ends the run: report shown, time controls locked, scene s
   expect(errors).toEqual([])
 })
 
-test('the report exports the KPI report and the event log as JSON and CSV downloads', async ({ page }) => {
+test('the report exports the KPI report and the event log as JSON and CSV downloads', { tag: '@analysis' }, async ({ page }) => {
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil())
   await expect(page.getByTestId('tt-final-report')).toBeVisible()
@@ -112,7 +112,7 @@ test('the report exports the KPI report and the event log as JSON and CSV downlo
   expect((await download('events-csv')).text.trim().split('\n').length).toBeGreaterThan(events.length)
 })
 
-test('the setup dialog end conditions stop the run at the first one met', async ({ page }) => {
+test('the setup dialog end conditions stop the run at the first one met', { tag: '@analysis' }, async ({ page }) => {
   await openTwin(page)
   await pickScenario(page, FIXTURE)
   await openAdvanced(page)

@@ -31,7 +31,7 @@ const clockText = (page: Page) => page.getByTestId('tt-clock').innerText()
 test.describe('US browser', () => {
   test.use({ locale: 'en-US' })
 
-  test('defaults to en-US and imperial on first open; the summary shows ft and mi/h', async ({ page }) => {
+  test('defaults to en-US and imperial on first open; the summary shows ft and mi/h', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     const dialog = page.getByRole('dialog', { name: /new scenario/i })
     await expect(dialog).toBeVisible()
@@ -49,7 +49,7 @@ test.describe('US browser', () => {
 test.describe('German browser', () => {
   test.use({ locale: 'de-DE' })
 
-  test('defaults to de-DE and metric on first open', async ({ page }) => {
+  test('defaults to de-DE and metric on first open', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     await openAdvanced(page)
     await expect(page.getByTestId('tt-locale')).toHaveValue('de-DE')
@@ -65,7 +65,7 @@ test.describe('German browser', () => {
 test.describe('British browser', () => {
   test.use({ locale: 'en-GB' })
 
-  test('units switch the displayed values; the saved config and engine stay SI; the choice persists', async ({ page }) => {
+  test('units switch the displayed values; the saved config and engine stay SI; the choice persists', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     await expect(page.getByTestId('tt-summary-quay')).toHaveText('400 m')
     await openAdvanced(page)
@@ -98,7 +98,7 @@ test.describe('British browser', () => {
     await expect(page.getByTestId('tt-units-imperial')).toBeChecked()
   })
 
-  test('switching locale changes the clock, date and numbers live', async ({ page }) => {
+  test('switching locale changes the clock, date and numbers live', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     await loadTracerAt(page, 17 * 60 + 3) // 14:02:03 UTC on Monday 26 Oct 2026 (the tracer ends at ~1169 s)
 
@@ -124,7 +124,7 @@ test.describe('British browser', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Scenario complete' })).toContainText('10 moves')
   })
 
-  test('setup start and Run to… read and parse in the chosen locale', async ({ page }) => {
+  test('setup start and Run to… read and parse in the chosen locale', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     await loadTracerAt(page, 17 * 60 + 3) // 14:02:03 UTC; start is Mon 26 Oct 2026 13:45
 
@@ -157,7 +157,7 @@ test.describe('British browser', () => {
     await expect.poll(async () => (await page.evaluate(() => window.__tt!.clock())).displayTime).toBeCloseTo(18 * 60 + 30, 0)
   })
 
-  test('keyboard shortcuts drive the sim, the help overlay lists them, typing in a field does not', async ({ page }) => {
+  test('keyboard shortcuts drive the sim, the help overlay lists them, typing in a field does not', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     await loadTracerAt(page, 60)
     const clock = () => page.evaluate(() => window.__tt!.clock())

@@ -41,7 +41,7 @@ async function open(page: Page, vessels: VesselConfig[], quayLengthM: number): P
   })
 }
 
-test('every size class renders its hull GLB and deck containers sit on its bay grid', async ({ page }) => {
+test('every size class renders its hull GLB and deck containers sit on its bay grid', { tag: '@vessel' }, async ({ page }) => {
   test.setTimeout(120_000)
   const errors = watchErrors(page)
   for (const sizeClass of CLASSES) {
@@ -76,7 +76,7 @@ test('every size class renders its hull GLB and deck containers sit on its bay g
   expect(errors).toEqual([])
 })
 
-test('livery and name follow each vessel’s line from the scenario', async ({ page }) => {
+test('livery and name follow each vessel’s line from the scenario', { tag: '@vessel' }, async ({ page }) => {
   const errors = watchErrors(page)
   const vessels = [
     call('V001', 'feeder', { name: 'Ever Lucent' }),
@@ -100,7 +100,7 @@ test('livery and name follow each vessel’s line from the scenario', async ({ p
   expect(errors).toEqual([])
 })
 
-test('hulls switch LOD with distance, at berth and at anchorage', async ({ page }) => {
+test('hulls switch LOD with distance, at berth and at anchorage', { tag: '@vessel' }, async ({ page }) => {
   const errors = watchErrors(page)
   // The quay fits one Panamax: the ULCV waits at anchorage.
   await open(page, [call('V001', 'panamax', { name: 'HMM Tarifa' }), call('V002', 'ulcv', { name: 'ONE Harmony', arrivalS: 30 })], 320)

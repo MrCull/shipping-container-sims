@@ -8,7 +8,7 @@ import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 
-test('ROB boxes are drawn in the hull of a vessel with ROB bays, and not in one without', async ({ page }) => {
+test('ROB boxes are drawn in the hull of a vessel with ROB bays, and not in one without', { tag: '@vessel' }, async ({ page }) => {
   test.setTimeout(120_000)
   const errors: string[] = []
   page.on('console', (msg) => {

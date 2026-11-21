@@ -12,7 +12,7 @@ const TRACER = 'tracer-1sts-10-boxes'
 
 const isNumber = (x: unknown): boolean => typeof x === 'number' && Number.isFinite(x)
 
-test('the Benchmark button runs the tour in a production build and downloads a complete report', async ({ page }) => {
+test('the Benchmark button runs the tour in a production build and downloads a complete report', { tag: '@core' }, async ({ page }) => {
   test.setTimeout(240_000)
   // Opts in to drawing: the tour measures drawn frames (draw calls, triangles) per stage.
   await openTwin(page, { devApi: false, render: true, params: { benchmark: 'quick' } })

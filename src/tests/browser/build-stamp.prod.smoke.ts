@@ -1,7 +1,7 @@
 /** #136 production-build check: the main menu shows the build time and a commit link (the commit part needs git at build time). */
 import { expect, test } from '@playwright/test'
 
-test('the main menu build stamp shows the build time and a commit link in a production build', async ({ page }) => {
+test('the main menu build stamp shows the build time and a commit link in a production build', { tag: '@core' }, async ({ page }) => {
   await page.goto('/')
   const stamp = page.getByTestId('build-stamp')
   await expect(stamp).toBeVisible()
