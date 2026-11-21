@@ -21,3 +21,5 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 
 - #304 needs one real-GPU `__tt.perf()` run by the owner.
 - #302 limits: only work-cycle gantry moves check the bridge (step-aside repositions do not); with `canGantryWithBoomRaised: false` a blocked crane stays idle with no retry, so its vessel never finishes (default true, TTI unaffected).
+- For #305: `terminal-twin-atmosphere.smoke.ts` "a departure shows a banner that does not block clicks" failed once alone after the #301 merge (line 173: computed `pointerEvents` was `""`, i.e. the banner was likely detached between the visible check and evaluate). Unknown whether it is a regression: check against main 0207d27 or bisect. "entering with sound on shows muted" passed alone.
+- #301 follow-up: bridge-passage boom time counts only the boom turns, not the boom-up gantry between them.
