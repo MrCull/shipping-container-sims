@@ -1,16 +1,16 @@
 /**
- * Close-up containers with markings (#119, #143): `__tt.perf().stats.closeup` (boxes) and `closeupFaces` (marking faces)
- * are above zero with the camera close to boxes and zero from far away (where the draw breakdown holds no close-up
- * meshes), and faces never exceed the quality level's budget (400 on High). A yard block edge close up shows markings
- * on its visible faces on Low (48 faces within 18 m, #158: Auto settles there on a laptop) and on High (screenshots to
- * review). Roofs print no text (#170; the painter's roof is checked by `tests/container-markings.test.ts`). The last spec (`@load`, never in CI) compares the frame time of the
- * view about 10 boxes wide with the Overview camera. Run with `pnpm run test:smoke`.
+ * Close-up containers with markings (#119, #143): near a quay crane the browser draws close-up boxes with markings and
+ * `__tt.perf().stats` reports them (wiring, one screenshot to review). Close-up and face counts by camera pose, the
+ * per-level budgets and the yard block edge on Low and High are Node tests on the headless scene
+ * (`tests/headless-scene-yard.test.ts`, #336). Roofs print no text (#170; `tests/container-markings.test.ts`). The last
+ * spec (`@load`, never in CI) compares the frame time of the view about 10 boxes wide with the Overview camera. Run with
+ * `pnpm run test:smoke`.
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 
-test('boxes within about 35 m become close-ups, from far away none are', { tag: '@yard' }, async ({ page }) => {
+test('close-up boxes with markings are drawn near the quay crane and reported by perf stats', { tag: '@yard' }, async ({ page }) => {
   test.slow() // software WebGL
   const errors: string[] = []
   page.on('console', (msg) => {
@@ -24,60 +24,16 @@ test('boxes within about 35 m become close-ups, from far away none are', { tag: 
   await page.evaluate(() => window.__tt!.runTo(200))
   await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
 
-  await page.evaluate(() => window.__tt!.cameraTo('STS01', 600))
-  await page.waitForFunction(() => window.__tt!.scene()!.containerLods.lod1 === window.__tt!.scene()!.containers)
-  await page.waitForTimeout(600)
-  expect(await page.evaluate(() => window.__tt!.perf().stats.closeup)).toBe(0)
-  expect(await page.evaluate(() => window.__tt!.scene()!.containerLods.closeup)).toBe(0)
-  expect(Object.keys((await page.evaluate(() => window.__tt!.drawBreakdown())) ?? {}).filter((k) => k.includes('closeup'))).toEqual([])
-
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 22))
   await page.waitForFunction(() => window.__tt!.perf().stats.closeup > 0)
+  // the browser's perf stats report the same close-ups the scene counts (counts by pose: headless-scene-yard.test.ts)
   const near = await page.evaluate(() => ({ perf: window.__tt!.perf().stats.closeup, scene: window.__tt!.scene()!.containerLods }))
   expect(near.scene.closeup).toBe(near.perf)
-  const faces = await page.evaluate(() => window.__tt!.perf().stats.closeupFaces)
-  expect(faces).toBeGreaterThanOrEqual(near.perf) // at least one face per box drawn
-  expect(faces).toBeLessThanOrEqual(400)
   await page.waitForTimeout(500)
   await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/twin-closeup.png' })
-
-  await page.evaluate(() => window.__tt!.cameraTo('STS01', 600))
-  await page.waitForFunction(() => window.__tt!.perf().stats.closeup === 0)
-  expect(await page.evaluate(() => window.__tt!.perf().stats.closeupFaces)).toBe(0)
   expect(errors).toEqual([])
 })
-
-for (const [level, budget, distanceM] of [['low', 48, 12], ['high', 400, 22]] as const) {
-  test(`a yard block edge close up draws faces on ${level}, none from far, never above the budget`, { tag: '@yard' }, async ({ page }) => {
-    test.slow() // software WebGL
-    const errors: string[] = []
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') errors.push(`console: ${msg.text()}`)
-    })
-    page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`))
-    await openTwin(page)
-    await page.evaluate(() => window.localStorage.clear())
-    await page.evaluate((l) => window.__tt!.setQuality(l), level)
-    await page.evaluate(() => window.__tt!.load('yard-no-mixed-length')) // a half-full block B01
-    await page.evaluate(() => window.__tt!.runTo(60))
-    await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
-
-    await page.evaluate((d) => window.__tt!.cameraTo('B01', d), distanceM)
-    await page.waitForFunction(() => window.__tt!.perf().stats.closeupFaces > 0)
-    const near = await page.evaluate(() => window.__tt!.perf().stats)
-    expect(near.closeupFaces).toBeGreaterThan(0)
-    expect(near.closeupFaces).toBeLessThanOrEqual(budget)
-    expect(near.closeup).toBeGreaterThan(0)
-    await page.waitForTimeout(500)
-    await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
-    await page.screenshot({ path: `.screenshots/assets/twin-closeup-block-edge-${level}.png` })
-
-    await page.evaluate(() => window.__tt!.cameraTo('B01', 600))
-    await page.waitForFunction(() => window.__tt!.perf().stats.closeupFaces === 0)
-    expect(errors).toEqual([])
-  })
-}
 
 test('the view about 10 boxes wide costs no more frame time than the Overview camera @load', { tag: '@yard' }, async ({ page }) => {
   test.setTimeout(900_000)

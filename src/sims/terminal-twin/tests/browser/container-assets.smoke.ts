@@ -1,7 +1,8 @@
 /**
  * Phase 2 container assets in the browser (seam 3 + seam 4):
- * the twin's instanced renderer uses the GLBs (LOD0 near, LOD1 far, livery per
- * line), assets load without any external request, and the dev-only asset
+ * the twin's instanced renderer loads the container GLBs without any external
+ * request and draws the liveries (LOD by distance and livery per line in detail:
+ * `tests/headless-scene-yard.test.ts`, #336), and the dev-only asset
  * viewer shows every asset (screenshots in .screenshots/assets/).
  * Run with `pnpm run test:smoke`.
  */
@@ -30,37 +31,18 @@ function watch(page: Page): { errors: string[]; external: string[] } {
   return { errors, external }
 }
 
-test('the twin renders containers from the GLBs with each box in its own line livery, offline', { tag: '@yard' }, async ({ page }) => {
+test('the twin loads the container GLBs offline and draws each box in its line livery', { tag: '@yard' }, async ({ page }) => {
   const { errors, external } = watch(page)
-  await openTwin(page, { scenario: 'liveries-mixed', quality: 'high' }) // the LOD distances it checks are High's (Low scales them by 0.4)
+  await openTwin(page, { scenario: 'liveries-mixed', quality: 'high' }) // High draws LOD0 out to the screenshot distance
   await page.evaluate(() => window.__tt!.runTo(200))
   await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 
-  const boxes = await page.evaluate(() => window.__tt!.query<{ id: string; line: string; size: string }[]>('containers'))
+  // the worker's boxes reach the drawn liveries (livery per line, size and LOD by distance: headless-scene-yard.test.ts, #336)
+  const boxes = await page.evaluate(() => window.__tt!.query<{ id: string; line: string }[]>('containers'))
   const state = await page.evaluate(() => window.__tt!.sceneState())
-  const scene = await page.evaluate(() => window.__tt!.scene())
-  expect(new Set(boxes.map((b) => b.line)).size).toBeGreaterThanOrEqual(5)
-  expect(new Set(boxes.map((b) => b.size))).toEqual(new Set(['20', '40', '40HC']))
-  for (const box of boxes) {
-    const rendered = state!.liveries[box.id]
-    expect(rendered, box.id).toBeDefined()
-    expect(atlas.liveries[rendered.index].line, box.id).toBe(box.line)
-    expect(rendered.size, box.id).toBe(box.size)
-  }
-  expect(scene!.containerLods.lod0 + scene!.containerLods.lod1).toBe(scene!.containers)
-  expect(scene!.containers).toBe(boxes.length)
-
-  // Close up, the boxes use LOD0; from far away, LOD1 (and the liveries stay put).
-  await page.evaluate(() => window.__tt!.cameraTo('STS01', 60))
-  await page.waitForFunction(() => window.__tt!.scene()!.containerLods.lod0 + window.__tt!.scene()!.containerLods.culled === window.__tt!.scene()!.containers) // boxes outside the view are culled, not LOD0
-  await page.waitForTimeout(400)
-  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
-  await page.screenshot({ path: '.screenshots/assets/twin-liveries-near.png' })
-  await page.evaluate(() => window.__tt!.cameraTo('STS01', 600))
-  await page.waitForFunction(() => window.__tt!.scene()!.containerLods.lod1 === window.__tt!.scene()!.containers)
-  const far = await page.evaluate(() => window.__tt!.sceneState())
-  for (const box of boxes) expect(far!.liveries[box.id].index).toBe(state!.liveries[box.id].index)
+  expect(boxes.length).toBeGreaterThan(0)
+  for (const box of boxes) expect(atlas.liveries[state!.liveries[box.id].index].line, box.id).toBe(box.line)
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 140))
   await page.waitForTimeout(400)
   await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
