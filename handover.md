@@ -1,0 +1,40 @@
+# Handover: spec #320, fast CI
+
+Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the PR merges to `main`.
+
+| Ticket | Title | Blocked by | Status | Claimed by |
+| --- | --- | --- | --- | --- |
+| #321 | 01 Retries, failure cap, durable timings, 30 s flag, fast-job timeout | none | merged to main (PR #341) | |
+| #322 | 02 `?quality=`, `?render=off`, `__tt.renderOnce()` | none | merged to main (PR #341) | |
+| #323 | 06 Smoke build | none | merged to main (PR #341) | |
+| #324 | 19 Unit-test speed-up | none | merged to main (PR #341) | |
+| #325 | 03 `openTwin` helper, first migration | #322 | merged to main (PR #341) | |
+| #326 | 18 Rendering-budget guard | #322 | merged to main (PR #341) | |
+| #327 | 08 Six balanced shards | #321, #323 | merged to main (PR #341) | |
+| #328 | 04 Migrate remaining specs | #325 | merged to main (PR #341) | |
+| #329 | 05 One page per worker | #328 | open | |
+| #330 | 07 Groups, tags, selection script | #328 | open | |
+| #331 | 11 Headless scene, parity, vessel moves | #328 | open | |
+| #332 | 14 Component tests | #328 | open | |
+| #333 | 16 Engine fixtures to unit tests | #328 | open | |
+| #334 | 17 Smallest fixture | #328 | open | |
+| #335 | 09 CI selection and triggers, red main opens an issue | #330, #327 | open | |
+| #336 | 12 Yard moves | #331 | open | |
+| #337 | 13 Equipment moves | #331 | open | |
+| #338 | 15 Remaining component moves | #332 | open | |
+| #339 | 10 Docs and review rules | #325, #335 | open | |
+| #340 | 20 Final smoke run and timing report | all | open | |
+
+## Next steps
+
+- Phase 1 (#321 to #328) merged to `main` in PR #341 (a28a9bc). This branch restarted from that merge.
+- First full sharded CI run: `SMOKE: 190 passed, 0 failed, 1 flaky`, workflow 9 min 11 s. Shards are uneven (about 7, 4.6, 1.5, 2, 1.5, 1.6 min of tests): a few slow tests dominate.
+- Unblocked next: #329, #330, #331, #332, #333, #334 (all blocked only by #328). At most two at a time; #329 needs two full smoke runs, so it runs when nothing else is testing.
+
+## Open points
+
+- Native GitHub issue dependencies cannot be set from cloud sessions; blockers are in each ticket's `## Blocked by` and `## Blocks` sections.
+- The `?viewer=yard` asset viewer ignores `?quality=` and `?render=`, so its 18,000-box test (container-assets) still draws every frame, about 259 s. Fold into #334 or a small follow-up.
+- Some hero and close-up specs call `setQuality` or `setAutoRung` after boot without a one-line reason comment (#328 partial miss).
+- One test was flaky in run 44929542332; the merged smoke report artifact names it.
+- #327's "shards within about 30 %" criterion is not met yet; re-measure after #329 and #334.
