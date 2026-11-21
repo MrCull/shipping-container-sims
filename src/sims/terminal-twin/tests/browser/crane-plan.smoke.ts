@@ -37,6 +37,31 @@ test('crane plan: the Crane plan view shows a band per crane and the now line, a
   await expect(page.getByTestId('tt-crane-plan-summary')).toContainText('as-today')
   await expect(page.getByTestId('tt-crane-plan-key')).toBeVisible()
   for (const k of ['discharge', 'load', 'hatch', 'ghost', 'conflict', 'obstacle', 'now']) await expect(page.getByTestId(`tt-crane-plan-key-${k}`)).toBeVisible()
+  // every bay column names its crane; hovering a crane in the key dims the other cranes' packages
+  const colSts = await page.locator('[data-testid^=tt-crane-plan-col-]').first().getAttribute('data-sts')
+  expect(colSts).toMatch(/^STS\d+$/)
+  await expect(page.getByTestId('tt-crane-plan-key-crane-STS01')).toBeVisible()
+  await page.getByTestId('tt-crane-plan-key-crane-STS01').hover()
+  await expect(page.locator('[data-testid^=tt-crane-plan-pkg-][data-sts=STS02]').first()).toHaveClass(/dim/)
+  await expect(page.locator('[data-testid^=tt-crane-plan-pkg-][data-sts=STS01]').first()).not.toHaveClass(/dim/)
+  await page.mouse.move(0, 0)
+  // wide panel: the key sits right of the chart, not under it
+  const chartBox = await page.locator('.crane-plan .scroll').boundingBox()
+  const keyBox = await page.getByTestId('tt-crane-plan-key').boundingBox()
+  expect(keyBox!.x).toBeGreaterThanOrEqual(chartBox!.x + chartBox!.width - 2)
+  // drag the header, resize from the corner, and the geometry is remembered
+  const viewer = page.getByTestId('tt-bay-viewer')
+  const before = await viewer.boundingBox()
+  const head = (await page.getByTestId('tt-bay-head').boundingBox())!
+  await page.mouse.move(head.x + 150, head.y + 10)
+  await page.mouse.down()
+  await page.mouse.move(head.x + 250, head.y + 60, { steps: 5 })
+  await page.mouse.up()
+  const moved = await viewer.boundingBox()
+  expect(moved!.x).toBeGreaterThan(before!.x + 50)
+  expect(moved!.y).toBeGreaterThan(before!.y + 30)
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('tt.cranePlan.panel') ?? 'null'))
+  expect(stored).toMatchObject({ left: expect.any(Number), top: expect.any(Number) })
   await page.screenshot({ path: '.screenshots/crane-plan.png' })
 
   // a click on a package opens that bay in the Bays view

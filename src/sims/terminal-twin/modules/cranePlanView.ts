@@ -10,6 +10,8 @@ import type { VesselSizeClass } from '../scenario/types'
 import { vesselBayNumber } from './locationNotation'
 
 export interface PlanColumn {
+  /** The crane that works this bay. */
+  stsId: string
   bay: number
   /** Bay number in maritime notation. */
   number: number
@@ -38,8 +40,10 @@ export interface PlanBar {
 
 export interface PlanBand {
   stsId: string
-  /** 0-based colour index in rail order. */
+  /** Stable colour slot 0 to 7 of the crane (`craneColour`). */
   colour: number
+  /** Bay numbers of the crane, in quay order. */
+  bayNumbers: number[]
   colFrom: number
   colTo: number
 }
@@ -69,6 +73,8 @@ export interface CranePlanModel {
   columns: PlanColumn[]
   bands: PlanBand[]
   bars: PlanBar[]
+  /** Time ticks (s), every hour when the span allows it. */
+  ticks: number[]
   conflicts: PlanConflictMark[]
   obstacles: PlanObstacleMark[]
   /** Time axis, seconds. */
@@ -76,6 +82,26 @@ export interface CranePlanModel {
   t1: number
   nowS: number
   conflictS: number
+}
+
+export const CRANE_COLOURS = 8
+
+/** A crane keeps its colour slot on every vessel: the number in its id (STS103 gives 103), else a hash of the id. */
+export function craneColour(stsId: string): number {
+  const n = Number(/(\d+)$/.exec(stsId)?.[1])
+  if (Number.isFinite(n)) return n % CRANE_COLOURS
+  let h = 0
+  for (const ch of stsId) h = (h * 31 + ch.charCodeAt(0)) % 997
+  return h % CRANE_COLOURS
+}
+
+/** Hour ticks when at most 14 fit, else the next coarser step. */
+export function timeTicks(t0: number, t1: number): number[] {
+  const span = t1 - t0
+  const step = [60, 300, 600, 1800, 3600, 7200, 14400, 21600, 43200].find((s) => span / s <= 14 && (s >= 3600 || span < 3600 * 2)) ?? 86400
+  const out: number[] = []
+  for (let s = Math.ceil(t0 / step) * step; s <= t1; s += step) out.push(s)
+  return out
 }
 
 /** Obstacles further than this many minimum spacings from the vessel's work span are left out. */
@@ -88,16 +114,23 @@ const OBSTACLE_REACH = 2
 export function buildCranePlanModel(view: CranePlanView, sizeClass: VesselSizeClass, displayS: number = view.now): CranePlanModel {
   const spec = VESSEL_CLASSES[sizeClass]
   const bays = [...new Set(view.cranes.flatMap((c) => c.bays))].sort((a, b) => (view.bayX[a] ?? 0) - (view.bayX[b] ?? 0))
-  const columns: PlanColumn[] = bays.map((bay) => ({ bay, number: vesselBayNumber(bay, spec.bays, null), x: view.bayX[bay] ?? 0 }))
+  const owner = new Map(view.cranes.flatMap((c) => c.bays.map((b) => [b, c.stsId] as const)))
+  const columns: PlanColumn[] = bays.map((bay) => ({ stsId: owner.get(bay) as string, bay, number: vesselBayNumber(bay, spec.bays, null), x: view.bayX[bay] ?? 0 }))
   const colOf = new Map(columns.map((c, i) => [c.bay, i]))
   const pitch = columns.length > 1 ? (columns[columns.length - 1].x - columns[0].x) / (columns.length - 1) : view.minSpacingM || 1
   const colAt = (x: number): number => (columns.length ? (x - columns[0].x) / pitch : 0)
 
   const bands: PlanBand[] = []
   const bars: PlanBar[] = []
-  view.cranes.forEach((c, i) => {
+  view.cranes.forEach((c) => {
     const cols = c.bays.map((b) => colOf.get(b) as number)
-    bands.push({ stsId: c.stsId, colour: i, colFrom: Math.min(...cols), colTo: Math.max(...cols) })
+    bands.push({
+      stsId: c.stsId,
+      colour: craneColour(c.stsId),
+      bayNumbers: cols.map((i) => columns[i].number),
+      colFrom: Math.min(...cols),
+      colTo: Math.max(...cols),
+    })
     for (const p of c.packages) {
       const started = p.actualStartS !== null && p.actualStartS <= displayS
       const fromS = started ? (p.actualStartS as number) : p.predictedStartS
@@ -148,6 +181,7 @@ export function buildCranePlanModel(view: CranePlanView, sizeClass: VesselSizeCl
     columns,
     bands,
     bars,
+    ticks: timeTicks(t0, t1),
     conflicts,
     obstacles,
     t0,

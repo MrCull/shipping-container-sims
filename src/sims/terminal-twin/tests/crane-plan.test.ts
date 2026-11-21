@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildCranePlanModel } from '../modules/cranePlanView'
+import { clampPanel } from '../composables/useFloatingPanel'
+import { craneColour, timeTicks } from '../modules/cranePlanView'
 import { runPlanCli } from '../cli/planCli'
 import { createSimulation, estimateTimes, predictConflicts, validatePlan, type PlanPackage } from '../engine'
 import { fixtures } from '../scenario/fixtures'
@@ -238,5 +240,34 @@ describe('crane plan: view model and CLI', () => {
     expect(more.join(NL)).toMatch(/strategy equal-bays/)
     expect(more.join(NL)).toMatch(/Plan accuracy/)
     expect(runPlanCli(['--fixture', 'crane-split-4sts'], () => {})).toBe(2)
+  })
+})
+
+describe('crane plan: panel and labels', () => {
+  it('keeps a moved or resized panel inside its container', () => {
+    const bounds = { width: 1000, height: 600 }
+    expect(clampPanel({ left: -50, top: -10, width: 700, height: 400 }, bounds)).toEqual({ left: 0, top: 0, width: 700, height: 400 })
+    expect(clampPanel({ left: 900, top: 500, width: 700, height: 400 }, bounds)).toEqual({ left: 300, top: 200, width: 700, height: 400 })
+    expect(clampPanel({ left: 0, top: 0, width: 5000, height: 5000 }, bounds)).toMatchObject({ width: 1000, height: 600 })
+    expect(clampPanel({ left: 0, top: 0, width: 10, height: 10 }, bounds)).toMatchObject({ width: 360, height: 240 })
+  })
+
+  it('gives a crane the same colour on every vessel and ticks the time axis hourly', () => {
+    expect(craneColour('STS103')).toBe(craneColour('STS103'))
+    expect(craneColour('STS103')).toBe(103 % 8)
+    expect(craneColour('STS104')).not.toBe(craneColour('STS103'))
+    expect(timeTicks(0, 3 * 3600 + 5)).toEqual([0, 3600, 7200, 10800])
+    expect(timeTicks(100, 1500).every((s) => s % 60 === 0)).toBe(true)
+  })
+
+  it('heads every bay column with its crane and lists a crane colour per band', () => {
+    const sim = createSimulation(fixtures['crane-split-4sts'])
+    while (!sim.cranePlan('V001') && sim.step()) {
+      /* step */
+    }
+    const model = buildCranePlanModel(sim.cranePlan('V001')!, sim.config.vessels[0].sizeClass)
+    expect(model.columns.every((c) => /^STS\d+$/.test(c.stsId))).toBe(true)
+    expect(new Set(model.bands.map((b) => b.colour)).size).toBe(model.bands.length)
+    for (const b of model.bands) expect(b.bayNumbers.length).toBeGreaterThan(0)
   })
 })

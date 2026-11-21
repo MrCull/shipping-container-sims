@@ -2,19 +2,24 @@
 /**
  * Crane plan view (#288): the whole vessel's plan, bays across in quay order, time down, one band per crane, the
  * actual progress over the plan, a now line and the predicted conflicts. All the geometry is the pure model in
- * `modules/cranePlanView.ts`; this only draws it. Click a package to land on its bay in the Bays view.
+ * `modules/cranePlanView.ts`; this only draws it. Every bay column is headed by its crane id (each crane has a stable
+ * colour); hover a crane (header, bar or key) to highlight all its packages, click it to pin the highlight and select the
+ * crane in the 3D view. Click a package to land on its bay in the Bays view. The key sits right of the chart when the
+ * panel is wide enough (a container query), under it otherwise.
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { buildCranePlanModel, type PlanBar } from '../modules/cranePlanView'
 import { useTwinStore } from '../store/twinStore'
 import { t, type MessageKey } from '../i18n/messages'
 
 const store = useTwinStore()
 
-const COL_PX = 46
+const COL_PX = 50
 const GUTTER_PX = 70
-const MAX_HEIGHT_PX = 420
-const MIN_HEIGHT_PX = 140
+const MAX_HEIGHT_PX = 640
+const MIN_HEIGHT_PX = 160
+/** A bar at least this tall (px) shows its move count. */
+const LABEL_MIN_PX = 13
 
 const model = computed(() => {
   const data = store.cranePlanData
@@ -38,16 +43,19 @@ const widthPx = computed(() => GUTTER_PX + (model.value?.columns.length ?? 0) * 
 const y = (s: number): number => (s - (model.value?.t0 ?? 0)) * scale.value
 const pad2 = (n: number): string => String(n).padStart(2, '0')
 const dur = (s: number): string => store.fmt.duration(s)
+const colourOf = (sts: string): number | undefined => model.value?.bands.find((b) => b.stsId === sts)?.colour
 
-const ticks = computed(() => {
-  const m = model.value
-  if (!m) return []
-  const span = m.t1 - m.t0
-  const step = [60, 300, 600, 1800, 3600, 7200, 14400, 21600].find((s) => span / s <= 8) ?? 21600
-  const out: number[] = []
-  for (let s = Math.ceil(m.t0 / step) * step; s <= m.t1; s += step) out.push(s)
-  return out
-})
+/** Highlight: the crane under the pointer, or the one pinned by a click (the pin wins while the pointer is away). */
+const hoverSts = ref<string | null>(null)
+const pinnedSts = ref<string | null>(null)
+const lit = computed(() => hoverSts.value ?? pinnedSts.value)
+const dim = (sts: string): boolean => lit.value !== null && lit.value !== sts
+
+function pin(sts: string): void {
+  const same = pinnedSts.value === sts
+  pinnedSts.value = same ? null : sts
+  if (!same) store.select(sts) // the crane in the 3D view and the inspector
+}
 
 function range(from: number, to: number | null): string {
   return to === null ? t('cranePlan.rangeOpen', { from: dur(from) }) : t('cranePlan.range', { from: dur(from), to: dur(to) })
@@ -70,7 +78,10 @@ function barTitle(b: PlanBar): string {
   return lines.join('\n')
 }
 
-/** The key under the chart: one entry per mark, drawn with the same classes as the chart. */
+const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS: number; toS: number }): string =>
+  t(c.obstacle ? 'cranePlan.conflictObstacle' : 'cranePlan.conflict', { a: c.stsA, b: c.stsB, from: dur(c.fromS), to: dur(c.toS) })
+
+/** The key's mark entries: one per mark, drawn with the same classes as the chart. */
 const KEY: { id: string; swatch: string[] }[] = [
   { id: 'discharge', swatch: ['bar', 'kind-discharge'] },
   { id: 'load', swatch: ['bar', 'kind-load'] },
@@ -82,12 +93,15 @@ const KEY: { id: string; swatch: string[] }[] = [
   { id: 'conflict', swatch: ['conflict'] },
   { id: 'obstacle', swatch: ['obstacle'] },
   { id: 'now', swatch: ['now'] },
-  { id: 'band', swatch: ['band', 'crane-0'] },
-  { id: 'bay', swatch: ['bayno'] },
 ]
 
-const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS: number; toS: number }): string =>
-  t(c.obstacle ? 'cranePlan.conflictObstacle' : 'cranePlan.conflict', { a: c.stsA, b: c.stsB, from: dur(c.fromS), to: dur(c.toS) })
+/** A bay range as text: "18 to 12". */
+function bayRangeText(nums: number[]): string {
+  if (nums.length === 0) return ''
+  const a = pad2(nums[0])
+  const b = pad2(nums[nums.length - 1])
+  return a === b ? a : t('cranePlan.key.bays', { from: a, to: b })
+}
 </script>
 
 <template>
@@ -109,127 +123,176 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
       >
         {{ t('cranePlan.summary', { strategy: model.strategy, revision: model.revision, windows: model.conflicts.length, seconds: Math.round(model.conflictS) }) }}
       </p>
-      <div class="scroll">
-        <div
-          class="chart"
-          :style="{ width: `${widthPx}px` }"
-        >
+      <div class="layout">
+        <div class="scroll">
           <div
-            class="head-row"
-            :aria-label="t('cranePlan.bayAxis')"
+            class="chart"
+            :style="{ width: `${widthPx}px` }"
           >
-            <span
-              v-for="(c, i) in model.columns"
-              :key="c.bay"
-              class="col-head"
-              :style="{ left: `${GUTTER_PX + i * COL_PX}px`, width: `${COL_PX}px` }"
-            >{{ pad2(c.number) }}</span>
-          </div>
-          <div
-            class="body"
-            :style="{ height: `${heightPx}px` }"
-            :aria-label="t('cranePlan.timeAxis')"
-          >
-            <span
-              v-for="s in ticks"
-              :key="s"
-              class="tick"
-              :style="{ top: `${y(s)}px` }"
-            >{{ dur(s) }}</span>
             <div
-              v-for="b in model.bands"
-              :key="b.stsId"
-              class="band"
-              :class="`crane-${b.colour % 6}`"
-              :data-testid="`tt-crane-plan-band-${b.stsId}`"
-              :style="{ left: `${GUTTER_PX + b.colFrom * COL_PX}px`, width: `${(b.colTo - b.colFrom + 1) * COL_PX}px` }"
+              class="head-row"
+              :aria-label="t('cranePlan.bayAxis')"
             >
-              <span class="band-label">{{ b.stsId }}</span>
-            </div>
-            <div
-              v-for="c in model.conflicts"
-              :key="`${c.stsA}-${c.stsB}-${c.fromS}`"
-              class="conflict"
-              data-testid="tt-crane-plan-conflict"
-              :title="conflictTitle(c)"
-              :style="{
-                left: `${GUTTER_PX + (Math.min(c.colA, c.colB) + 0.5) * COL_PX}px`,
-                width: `${Math.max(6, Math.abs(c.colB - c.colA) * COL_PX)}px`,
-                top: `${y(c.fromS)}px`,
-                height: `${Math.max(2, (c.toS - c.fromS) * scale)}px`,
-              }"
-            />
-            <template
-              v-for="b in model.bars"
-              :key="b.id"
-            >
-              <div
-                v-if="b.ghost"
-                class="ghost"
-                :style="{
-                  left: `${GUTTER_PX + b.col * COL_PX + 1}px`,
-                  width: `${COL_PX - 2}px`,
-                  top: `${y(b.ghost.fromS)}px`,
-                  height: `${Math.max(3, (b.ghost.toS - b.ghost.fromS) * scale)}px`,
-                }"
-              />
               <button
+                v-for="(c, i) in model.columns"
+                :key="c.bay"
                 type="button"
-                class="bar"
-                :class="[`kind-${b.kind}`, `status-${b.status}`, { actual: b.actual }]"
-                :data-testid="`tt-crane-plan-pkg-${b.id}`"
-                :data-kind="b.kind"
-                :data-status="b.status"
-                :title="barTitle(b)"
-                :style="{
-                  left: `${GUTTER_PX + b.col * COL_PX + 3}px`,
-                  width: `${COL_PX - 6}px`,
-                  top: `${y(b.fromS)}px`,
-                  height: `${Math.max(3, (b.toS - b.fromS) * scale)}px`,
-                }"
-                @click="store.showBayFromPlan(b.bay)"
-              />
-            </template>
-            <div
-              v-for="o in model.obstacles"
-              :key="o.stsId"
-              class="obstacle"
-              data-testid="tt-crane-plan-obstacle"
-              :title="t('cranePlan.obstacle', { sts: o.stsId, vessel: o.vesselId })"
-              :style="{ left: `${GUTTER_PX + (o.col + 0.5) * COL_PX}px` }"
-            >
-              <span>{{ o.stsId }}</span>
+                class="col-head"
+                :class="[`crane-${colourOf(c.stsId)}`, { dim: dim(c.stsId), pinned: pinnedSts === c.stsId }]"
+                :data-testid="`tt-crane-plan-col-${c.number}`"
+                :data-sts="c.stsId"
+                :style="{ left: `${GUTTER_PX + i * COL_PX}px`, width: `${COL_PX}px` }"
+                :title="t('cranePlan.colTip', { sts: c.stsId, bay: pad2(c.number) })"
+                @mouseenter="hoverSts = c.stsId"
+                @mouseleave="hoverSts = null"
+                @click="pin(c.stsId)"
+              >
+                <span class="col-sts">{{ c.stsId }}</span>
+                <span class="col-bay">{{ pad2(c.number) }}</span>
+              </button>
             </div>
             <div
-              class="now"
-              data-testid="tt-crane-plan-now"
-              :style="{ top: `${y(model.nowS)}px` }"
+              class="body"
+              :style="{ height: `${heightPx}px` }"
+              :aria-label="t('cranePlan.timeAxis')"
             >
-              <span>{{ t('cranePlan.now') }}</span>
+              <template
+                v-for="s in model.ticks"
+                :key="s"
+              >
+                <span
+                  class="grid"
+                  :style="{ top: `${y(s)}px`, left: `${GUTTER_PX}px`, width: `${model.columns.length * COL_PX}px` }"
+                />
+                <span
+                  class="tick"
+                  :style="{ top: `${y(s)}px` }"
+                >{{ dur(s) }}</span>
+              </template>
+              <div
+                v-for="b in model.bands"
+                :key="b.stsId"
+                class="band"
+                :class="[`crane-${b.colour}`, { dim: dim(b.stsId) }]"
+                :data-testid="`tt-crane-plan-band-${b.stsId}`"
+                :style="{ left: `${GUTTER_PX + b.colFrom * COL_PX}px`, width: `${(b.colTo - b.colFrom + 1) * COL_PX}px` }"
+              />
+              <div
+                v-for="c in model.conflicts"
+                :key="`${c.stsA}-${c.stsB}-${c.fromS}`"
+                class="conflict"
+                data-testid="tt-crane-plan-conflict"
+                :title="conflictTitle(c)"
+                :style="{
+                  left: `${GUTTER_PX + (Math.min(c.colA, c.colB) + 0.5) * COL_PX}px`,
+                  width: `${Math.max(6, Math.abs(c.colB - c.colA) * COL_PX)}px`,
+                  top: `${y(c.fromS)}px`,
+                  height: `${Math.max(2, (c.toS - c.fromS) * scale)}px`,
+                }"
+              />
+              <template
+                v-for="b in model.bars"
+                :key="b.id"
+              >
+                <div
+                  v-if="b.ghost"
+                  class="ghost"
+                  :class="{ dim: dim(b.stsId) }"
+                  :style="{
+                    left: `${GUTTER_PX + b.col * COL_PX + 1}px`,
+                    width: `${COL_PX - 2}px`,
+                    top: `${y(b.ghost.fromS)}px`,
+                    height: `${Math.max(3, (b.ghost.toS - b.ghost.fromS) * scale)}px`,
+                  }"
+                />
+                <button
+                  type="button"
+                  class="bar"
+                  :class="[`kind-${b.kind}`, `status-${b.status}`, `crane-${colourOf(b.stsId)}`, { actual: b.actual, dim: dim(b.stsId), lit: lit === b.stsId }]"
+                  :data-testid="`tt-crane-plan-pkg-${b.id}`"
+                  :data-kind="b.kind"
+                  :data-status="b.status"
+                  :data-sts="b.stsId"
+                  :title="barTitle(b)"
+                  :style="{
+                    left: `${GUTTER_PX + b.col * COL_PX + 3}px`,
+                    width: `${COL_PX - 6}px`,
+                    top: `${y(b.fromS)}px`,
+                    height: `${Math.max(3, (b.toS - b.fromS) * scale)}px`,
+                  }"
+                  @mouseenter="hoverSts = b.stsId"
+                  @mouseleave="hoverSts = null"
+                  @click="store.showBayFromPlan(b.bay)"
+                >
+                  <span
+                    v-if="(b.toS - b.fromS) * scale >= LABEL_MIN_PX && b.moves > 0"
+                    class="moves"
+                  >{{ b.moves }}</span>
+                </button>
+              </template>
+              <div
+                v-for="o in model.obstacles"
+                :key="o.stsId"
+                class="obstacle"
+                data-testid="tt-crane-plan-obstacle"
+                :title="t('cranePlan.obstacle', { sts: o.stsId, vessel: o.vesselId })"
+                :style="{ left: `${GUTTER_PX + (o.col + 0.5) * COL_PX}px` }"
+              >
+                <span>{{ o.stsId }}</span>
+              </div>
+              <div
+                class="now"
+                data-testid="tt-crane-plan-now"
+                :style="{ top: `${y(model.nowS)}px` }"
+              >
+                <span>{{ t('cranePlan.now') }} {{ dur(model.nowS) }}</span>
+              </div>
             </div>
           </div>
         </div>
+        <aside
+          class="key"
+          data-testid="tt-crane-plan-key"
+        >
+          <h4>{{ t('cranePlan.key') }}</h4>
+          <h5>{{ t('cranePlan.key.cranes') }}</h5>
+          <ul class="cranes">
+            <li
+              v-for="b in model.bands"
+              :key="b.stsId"
+            >
+              <button
+                type="button"
+                class="crane-chip"
+                :class="[`crane-${b.colour}`, { dim: dim(b.stsId), pinned: pinnedSts === b.stsId }]"
+                :data-testid="`tt-crane-plan-key-crane-${b.stsId}`"
+                :title="t('cranePlan.chipTip', { sts: b.stsId })"
+                @mouseenter="hoverSts = b.stsId"
+                @mouseleave="hoverSts = null"
+                @click="pin(b.stsId)"
+              >
+                <span class="dot" />
+                <span class="chip-sts">{{ b.stsId }}</span>
+                <span class="chip-bays">{{ t('cranePlan.key.baysOf', { bays: bayRangeText(b.bayNumbers) }) }}</span>
+              </button>
+            </li>
+          </ul>
+          <h5>{{ t('cranePlan.key.marks') }}</h5>
+          <ul>
+            <li
+              v-for="k in KEY"
+              :key="k.id"
+              :data-testid="`tt-crane-plan-key-${k.id}`"
+            >
+              <span
+                class="swatch"
+                :class="k.swatch"
+              />
+              <span>{{ t(`cranePlan.key.${k.id}` as MessageKey) }}</span>
+            </li>
+          </ul>
+        </aside>
       </div>
-      <details
-        class="key"
-        open
-        data-testid="tt-crane-plan-key"
-      >
-        <summary>{{ t('cranePlan.key') }}</summary>
-        <ul>
-          <li
-            v-for="k in KEY"
-            :key="k.id"
-            :data-testid="`tt-crane-plan-key-${k.id}`"
-          >
-            <span
-              class="swatch"
-              :class="k.swatch"
-            >{{ k.id === 'bay' ? pad2(12) : '' }}</span>
-            <span>{{ t(`cranePlan.key.${k.id}` as MessageKey) }}</span>
-          </li>
-        </ul>
-      </details>
     </template>
   </div>
 </template>
@@ -240,6 +303,7 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  container-type: inline-size;
 }
 .muted,
 .summary {
@@ -247,9 +311,31 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
   color: var(--tt-text-muted);
   font-size: 12px;
 }
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+@container (min-width: 640px) {
+  .layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .key {
+    flex: 0 0 220px;
+    border-top: 0;
+    border-left: 1px solid var(--tt-border);
+    padding: 0 0 0 10px;
+  }
+  .key ul {
+    grid-template-columns: 1fr;
+  }
+}
 .scroll {
   overflow: auto;
-  max-height: 460px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .chart {
   position: relative;
@@ -257,20 +343,53 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
 .head-row {
   position: sticky;
   top: 0;
-  z-index: 3;
-  height: 20px;
+  z-index: 5;
+  height: 34px;
   background: var(--tt-panel-strong);
 }
 .col-head {
   position: absolute;
   top: 0;
-  text-align: center;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 1px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.15;
+  background: color-mix(in srgb, var(--band) 22%, transparent);
+  border: 0;
+  border-bottom: 2px solid var(--band);
+  color: var(--tt-text);
+  cursor: pointer;
+  font: inherit;
+}
+.col-head.dim,
+.crane-chip.dim {
+  opacity: 0.35;
+}
+.col-head.pinned,
+.crane-chip.pinned {
+  outline: 2px solid var(--band);
+  outline-offset: -2px;
+}
+.col-sts {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--band);
+}
+.col-bay {
   font-size: 11px;
   color: var(--tt-text-muted);
 }
 .body {
   position: relative;
-  border-top: 1px solid var(--tt-border);
+}
+.grid {
+  position: absolute;
+  height: 0;
+  border-top: 1px solid var(--tt-hairline);
 }
 .tick {
   position: absolute;
@@ -287,14 +406,10 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
   bottom: 0;
   border-left: 1px solid var(--tt-border);
   border-right: 1px solid var(--tt-border);
-  background: color-mix(in srgb, var(--band) 14%, transparent);
+  background: color-mix(in srgb, var(--band) 12%, transparent);
 }
-.band-label {
-  position: absolute;
-  top: 2px;
-  left: 3px;
-  font-size: 10px;
-  color: var(--band);
+.band.dim {
+  background: transparent;
 }
 .crane-0 { --band: var(--tt-data-0); }
 .crane-1 { --band: var(--tt-data-1); }
@@ -302,23 +417,47 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
 .crane-3 { --band: var(--tt-data-3); }
 .crane-4 { --band: var(--tt-data-4); }
 .crane-5 { --band: var(--tt-data-5); }
+.crane-6 { --band: var(--tt-data-6); }
+.crane-7 { --band: var(--tt-data-7); }
 .bar {
   position: absolute;
   padding: 0;
+  overflow: hidden;
   border: 1px solid var(--tt-border);
+  border-left: 3px solid var(--band, var(--tt-border));
   border-radius: 2px;
   cursor: pointer;
   background: color-mix(in srgb, var(--tt-data-discharge) 35%, transparent);
   opacity: 0.8;
+  color: var(--tt-text);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  text-align: center;
 }
 .bar.actual {
   opacity: 1;
 }
+.bar.dim {
+  opacity: 0.2;
+}
+.bar.lit {
+  box-shadow: 0 0 0 2px var(--band);
+  opacity: 1;
+  z-index: 2;
+}
+.bar .moves {
+  display: block;
+  padding-top: 1px;
+  text-shadow: 0 0 2px var(--tt-bg);
+}
 .bar.status-complete {
   border-color: var(--tt-data-done);
+  border-left-color: var(--band, var(--tt-data-done));
 }
 .bar.status-active {
   border-color: var(--tt-data-active);
+  border-left-color: var(--band, var(--tt-data-active));
   box-shadow: 0 0 0 1px var(--tt-data-active);
 }
 .bar.kind-discharge { background: color-mix(in srgb, var(--tt-data-discharge) 70%, transparent); }
@@ -333,11 +472,14 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
   border-radius: 2px;
   pointer-events: none;
 }
+.ghost.dim {
+  opacity: 0.25;
+}
 .conflict {
   position: absolute;
   background: color-mix(in srgb, var(--tt-danger) 35%, transparent);
   border: 1px solid var(--tt-danger);
-  z-index: 2;
+  z-index: 3;
 }
 .obstacle {
   position: absolute;
@@ -356,28 +498,48 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 2px solid var(--tt-data-active);
+  border-top: 3px solid var(--tt-data-active);
   z-index: 4;
   pointer-events: none;
 }
 .now span {
+  position: absolute;
+  left: 0;
+  top: -9px;
+  padding: 0 4px;
+  border-radius: 3px;
   font-size: 10px;
-  color: var(--tt-data-active);
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--tt-bg);
+  background: var(--tt-data-active);
 }
 
+/* key */
 .key {
   font-size: 11px;
   color: var(--tt-text-muted);
+  border-top: 1px solid var(--tt-border);
+  padding-top: 6px;
+  min-width: 0;
 }
-.key summary {
-  cursor: pointer;
+.key h4,
+.key h5 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  color: var(--tt-text);
+}
+.key h5 {
+  margin-top: 8px;
+  font-weight: 500;
+  color: var(--tt-text-muted);
 }
 .key ul {
   list-style: none;
-  margin: 4px 0 0;
+  margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 3px 10px;
 }
 .key li {
@@ -395,9 +557,7 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
 }
 .key .swatch.bar {
   opacity: 1;
-}
-.key .swatch.conflict {
-  position: static;
+  border-left-width: 1px;
 }
 .key .swatch.obstacle {
   width: 0;
@@ -408,13 +568,36 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
 .key .swatch.now {
   height: 0;
   margin: 6px 0;
-  border-top: 2px solid var(--tt-data-active);
+  border-top: 3px solid var(--tt-data-active);
 }
-.key .swatch.band {
-  border: 1px solid var(--tt-border);
+.crane-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--tt-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
-.key .swatch.bayno {
-  font-size: 10px;
-  width: auto;
+.crane-chip:hover {
+  background: var(--tt-surface-hover);
+}
+.crane-chip .dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--band);
+}
+.chip-sts {
+  font-weight: 600;
+}
+.chip-bays {
+  color: var(--tt-text-muted);
 }
 </style>

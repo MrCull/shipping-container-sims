@@ -9,6 +9,7 @@ import TtIcon from './ui/TtIcon.vue'
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import CranePlanView from './CranePlanView.vue'
+import { useFloatingPanel } from '../composables/useFloatingPanel'
 import { BAY_PLANS, BAY_VIEW_MODES, buildBayView, remainingByPlan, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
 import { useTwinStore } from '../store/twinStore'
 import { t, type MessageKey } from '../i18n/messages'
@@ -22,6 +23,11 @@ const SECTION_WIDTH_PX = 210
 const MAX_CELL_PX = 24
 
 let timer: ReturnType<typeof setInterval> | null = null
+
+/** The Crane plan view floats: drag the header, resize from the corner, remembered for the session (#288). */
+const viewerEl = ref<HTMLElement | null>(null)
+const floating = computed(() => store.bayViewMode === 'crane-plan')
+const float = useFloatingPanel(viewerEl, 'tt.cranePlan.panel', () => floating.value)
 
 const vesselName = computed(() => store.config?.vessels.find((v) => v.id === store.bayViewerVesselId)?.name ?? store.bayViewerVesselId ?? '')
 
@@ -107,6 +113,7 @@ function go(bay: number | null): void {
 }
 
 onMounted(() => {
+  float.watch()
   timer = setInterval(() => {
     if (store.bayViewerVesselId && !store.busy) void store.refreshBayView()
   }, REFRESH_MS)
@@ -118,13 +125,24 @@ onBeforeUnmount(() => {
 
 <template>
   <section
+    ref="viewerEl"
     class="bay-viewer"
+    :class="{ floating }"
+    :style="float.style.value"
     data-testid="tt-bay-viewer"
     role="dialog"
     :aria-label="t('bayViewer.title')"
     @mouseleave="hovered = null"
   >
-    <header class="head">
+    <header
+      class="head"
+      :class="{ draggable: floating }"
+      data-testid="tt-bay-head"
+      @pointerdown="float.startDrag"
+      @pointermove="float.moveDrag"
+      @pointerup="float.endDrag"
+      @pointercancel="float.endDrag"
+    >
       <h2 data-testid="tt-bay-heading">
         {{ view ? t('bayViewer.heading', { vessel: vesselName, bay: pad2(view.bayNumber) }) : t('bayViewer.title') }}
       </h2>
@@ -938,5 +956,18 @@ h2 {
 .tip dd {
   font-variant-numeric: tabular-nums;
   word-break: break-word;
+}
+
+.bay-viewer.floating {
+  resize: both;
+  min-width: 360px;
+  min-height: 240px;
+  max-width: calc(100% - 0.4rem);
+}
+
+.head.draggable {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
 }
 </style>
