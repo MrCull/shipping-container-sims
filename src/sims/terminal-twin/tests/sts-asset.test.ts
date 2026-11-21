@@ -319,11 +319,11 @@ describe('STS model (Malaccamax quay crane)', () => {
         for (let t = 0; t < idx.getCount(); t += 3) {
           const corners = [0, 1, 2].map((k) => idx.getScalar(t + k))
           const inside = corners.every((i) => {
-            const [u, v] = uv.getElement(i, [])
+            const [u, v] = uv.getElement(i, [0, 0])
             const [x, y] = [u * atlas.size[0], v * atlas.size[1]]
             return x >= rect[0] && x <= rect[2] && y >= rect[1] && y <= rect[3]
           })
-          if (inside) out.push(corners.map((i) => worldPoint(m, pos.getElement(i, []))))
+          if (inside) out.push(corners.map((i) => worldPoint(m, pos.getElement(i, [0, 0, 0]))))
         }
       }
       return out
@@ -360,7 +360,7 @@ describe('STS model (Malaccamax quay crane)', () => {
         for (const prim of node.getMesh()!.listPrimitives()) {
           const pos = prim.getAttribute('POSITION')!
           for (let i = 0; i < pos.getCount(); i++) {
-            const p = worldPoint(m, pos.getElement(i, []))
+            const p = worldPoint(m, pos.getElement(i, [0, 0, 0]))
             if (p.z <= plate.zM[1] + 0.01 && p.z >= plate.zM[0] - 0.01) minY = Math.min(minY, p.y)
           }
         }
