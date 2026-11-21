@@ -2,14 +2,17 @@
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useAudioStore } from '@/stores/audio'
 import { trackEvent } from '@/utils/analytics'
-import { isSilent, speakerIcon, speakerLabel } from '@/utils/audioControl'
+import { isSilent, litLevelBars, speakerIcon, speakerLabel } from '@/utils/audioControl'
 
 interface Props {
   placement?: 'absolute' | 'inline'
+  /** Show a small volume meter (four bars) on the button that opens the sliders. */
+  showLevel?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   placement: 'absolute',
+  showLevel: false,
 })
 
 const audioStore = useAudioStore()
@@ -26,6 +29,7 @@ const sfxPercent = computed(() => Math.round(audioStore.sfxVolume * 100))
 const effectivelySilent = computed(() => isSilent(audioStore.soundMuted, audioStore.volume))
 const icon = computed(() => speakerIcon(audioStore.soundMuted, audioStore.volume))
 const label = computed(() => speakerLabel(audioStore.soundMuted))
+const litBars = computed(() => litLevelBars(audioStore.soundMuted, audioStore.volume))
 
 function place(): void {
   const rect = root.value?.getBoundingClientRect()
@@ -123,6 +127,18 @@ onBeforeUnmount(close)
       data-testid="audio-menu-button"
       @click="togglePopover"
     >
+      <span
+        v-if="props.showLevel"
+        class="audio-level"
+        aria-hidden="true"
+        data-testid="audio-level"
+      >
+        <i
+          v-for="n in 4"
+          :key="n"
+          :class="{ lit: n <= litBars }"
+        />
+      </span>
       ▾
     </button>
     <Teleport to="body">
@@ -259,6 +275,31 @@ onBeforeUnmount(close)
 .audio-menu-btn {
   padding: 4px 5px;
   font-size: 0.7rem;
+}
+
+.audio-level {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 13px;
+  margin-right: 5px;
+}
+
+.audio-level i {
+  width: 3px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.25;
+}
+
+.audio-level i:nth-child(1) { height: 4px; }
+.audio-level i:nth-child(2) { height: 7px; }
+.audio-level i:nth-child(3) { height: 10px; }
+.audio-level i:nth-child(4) { height: 13px; }
+
+.audio-level i.lit {
+  background: var(--audio-level-color, currentColor);
+  opacity: 1;
 }
 
 .absolute .audio-menu-btn {
