@@ -17,6 +17,10 @@
  * Assignment: longest test first, each to the shard with the least time so far (ties: the lower shard number).
  * Every listed test lands in exactly one shard. Prints one line per shard with its test count and predicted time.
  *
+ * `--shards auto` scales the count to the work (shardCountFor): one shard per `--target-minutes` (default 2.5) of
+ * predicted test time, at least 1 and at most `--max-shards` (default 6), so a small PR selection runs on one shard and
+ * the full suite on six. `--count-out FILE` writes the count used (CI turns it into the shard matrix).
+ *
  * Test: node --test scripts/test-smoke-shards.mjs
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -95,6 +99,20 @@ export function assignShards(tests, timings, count) {
   }
 }
 
+/**
+ * How many shards a run of `totalMs` predicted test time needs: one per `targetMs`, clamped to 1..max.
+ * @param {number} totalMs
+ * @param {{ max?: number, targetMs?: number }} [opts]
+ */
+export function shardCountFor(totalMs, { max = 6, targetMs = 150_000 } = {}) {
+  return Math.max(1, Math.min(max, Math.ceil(totalMs / targetMs)))
+}
+
+/** Predicted total test time of `tests`: known timings, the average of those for the rest (as assignShards counts). */
+export function totalMsOf(tests, timings) {
+  return assignShards(tests, timings, 1).shards[0].ms
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const args = process.argv.slice(2)
   const opt = (name, def) => (args.includes(name) ? args[args.indexOf(name) + 1] : def)
@@ -104,7 +122,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     console.error(`smoke-shards: test list not found: ${listPath ?? '(no --list given)'}`)
     process.exit(1)
   }
-  const count = Number(opt('--shards', '6'))
   const out = opt('--out', '.smoke-shards')
   const fallback = opt('--fallback', 'scripts/smoke-timings.jsonl')
   const sources = [...history, fallback].filter((p) => existsSync(p))
@@ -113,7 +130,15 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     console.error(`smoke-shards: no tests in ${listPath}`)
     process.exit(1)
   }
-  const { shards, unknown, averageMs } = assignShards(tests, timingsOf(sources.map((p) => readFileSync(p, 'utf8'))), count)
+  const timings = timingsOf(sources.map((p) => readFileSync(p, 'utf8')))
+  const asked = opt('--shards', '6')
+  const count =
+    asked === 'auto'
+      ? shardCountFor(totalMsOf(tests, timings), { max: Number(opt('--max-shards', '6')), targetMs: Number(opt('--target-minutes', '2.5')) * 60_000 })
+      : Number(asked)
+  const { shards, unknown, averageMs } = assignShards(tests, timings, count)
+  const countOut = opt('--count-out')
+  if (countOut) writeFileSync(countOut, `${count}\n`)
   mkdirSync(out, { recursive: true })
   const min = (ms) => `${(ms / 60_000).toFixed(1)} min`
   console.log(`smoke-shards: ${tests.length} tests, timings from ${sources.join(', ') || '(none)'}, ${unknown} without a time (counted as ${(averageMs / 1000).toFixed(1)} s)`)

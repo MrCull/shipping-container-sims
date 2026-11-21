@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { assignShards, parseList, timingsOf } from './smoke-shards.mjs'
+import { assignShards, parseList, shardCountFor, timingsOf, totalMsOf } from './smoke-shards.mjs'
 
 const listLine = (file, title, project = 'dev', describe) =>
   `  [${project}] › ${file}:10:1 › ${describe ? `${describe} › ` : ''}${title}`
@@ -94,4 +94,34 @@ test('CLI: missing history file is skipped, one list file per shard, every test 
 test('the committed fallback covers the current suite', () => {
   const fallback = timingsOf([readFileSync('scripts/smoke-timings.jsonl', 'utf8')])
   assert.ok(fallback.size >= 150, `fallback has ${fallback.size} tests`)
+})
+
+test('shardCountFor: one shard per target of predicted time, at least 1, at most max', () => {
+  assert.equal(shardCountFor(0), 1)
+  assert.equal(shardCountFor(30_000), 1)
+  assert.equal(shardCountFor(150_001), 2)
+  assert.equal(shardCountFor(14 * 60_000), 6)
+  assert.equal(shardCountFor(60 * 60_000), 6)
+  assert.equal(shardCountFor(60 * 60_000, { max: 4 }), 4)
+  assert.equal(shardCountFor(10 * 60_000, { targetMs: 5 * 60_000 }), 2)
+})
+
+test('the full committed suite scales to 6 shards; a handful of short tests to 1', () => {
+  const text = readFileSync('scripts/smoke-timings.jsonl', 'utf8')
+  const rows = text.trim().split('\n').map((l) => JSON.parse(l))
+  const all = parseList(rows.map((r) => listLine(r.file, r.title, r.project)).join('\n'))
+  assert.equal(shardCountFor(totalMsOf(all, timingsOf([text]))), 6)
+  const few = all.slice(0, 5)
+  assert.equal(shardCountFor(totalMsOf(few, new Map(few.map((t) => [t.key, 20_000])))), 1)
+})
+
+test('CLI: --shards auto writes as many shard files as the predicted time needs, and the count to --count-out', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'smoke-shards-'))
+  const { list, rows } = sample()
+  writeFileSync(join(dir, 'list.txt'), list)
+  writeFileSync(join(dir, 'fallback.jsonl'), jsonl(rows))
+  // 789 s predicted: 5 min per shard gives 3.
+  execFileSync(process.execPath, ['scripts/smoke-shards.mjs', '--list', join(dir, 'list.txt'), '--shards', 'auto', '--target-minutes', '5', '--out', join(dir, 'shards'), '--count-out', join(dir, 'count.txt'), '--fallback', join(dir, 'fallback.jsonl')], { encoding: 'utf8' })
+  assert.equal(readFileSync(join(dir, 'count.txt'), 'utf8').trim(), '3')
+  assert.deepEqual(readdirSync(join(dir, 'shards')).sort(), ['shard-1.txt', 'shard-2.txt', 'shard-3.txt'])
 })

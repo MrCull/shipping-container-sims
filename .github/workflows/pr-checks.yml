@@ -5,19 +5,23 @@ on:
     types: [opened, synchronize, reopened, labeled]
     branches:
       - main
-  # Browser smoke tests are slow (software WebGL; 6 shards in CI) and bill Actions minutes per run, so they do not run on every push:
-  # start them from the Actions tab ("Run workflow"), or add the `smoke` label to a PR (they re-run on pushes while it is set).
+  # Browser smoke tests: a PR that changes src/ runs `core` plus the groups its `smoke:<group>` labels and changed files
+  # select (scripts/smoke-ci.mjs plan, on scripts/smoke-select.mjs); the plain `smoke` label, a manual "Run workflow" and
+  # every push to main (a merge) run every group. A label event re-runs the selection (and the whole workflow).
+  push:
+    branches:
+      - main
   workflow_dispatch:
-  # Label events must be listed here for the label gate below to see them.
 
+# A newer push (or label event) on a PR or branch cancels the older run. Pushes to main never cancel each other: every
+# merge gets its full run, and a red one opens an issue (smoke-red-main).
 concurrency:
-  group: pr-checks-${{ github.ref }}
+  group: ${{ github.event_name == 'push' && format('pr-checks-push-{0}', github.run_id) || format('pr-checks-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    # Adding the `smoke` label re-triggers this workflow; skip the fast checks then, they just ran.
-    if: github.event.action != 'labeled'
+    # Runs on label events too: a label event cancels the run in flight, and a skipped check would read as passed.
     runs-on: ubuntu-latest
     name: Lint, build and test
     # Normally about 10 min; run 41302517094 once hung for 4 h 28 min with no timeout.
@@ -64,8 +68,8 @@ jobs:
       - name: Check every smoke spec has exactly one group tag
         run: node scripts/check-smoke-groups.mjs
 
-      - name: Smoke reporter, timing, shards, server, merge, group check and selection script tests
-        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-shards.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs scripts/test-smoke-merge.mjs scripts/test-check-smoke-groups.mjs scripts/test-smoke-select.mjs
+      - name: Smoke reporter, timing, shards, server, merge, group check, selection and CI script tests
+        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-shards.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs scripts/test-smoke-merge.mjs scripts/test-check-smoke-groups.mjs scripts/test-smoke-select.mjs scripts/test-smoke-ci.mjs
 
       - name: Lint
         run: pnpm run lint
@@ -82,12 +86,54 @@ jobs:
       - name: Sounds (regenerate and compare the synthesized Terminal Twin sounds)
         run: pnpm run tt:sounds:check
 
-  # Browser smoke tests run in three jobs: `smoke-build` makes both bundles once, `smoke-shard` runs the suite in 6
-  # shards against them, and `smoke` merges the shards' per-test results into one SMOKE line, one timing table and one
-  # pass or fail. Run them by hand or label the PR `smoke`; they are required before merging a browser UI change.
+  # Browser smoke tests run in four jobs: `smoke-select` picks the groups (and comments on the PR why), `smoke-build`
+  # makes both bundles once and splits the selected tests into 1 to 6 shards by recorded time, `smoke-shard` runs them,
+  # and `smoke` merges the shards' per-test results into one SMOKE line, one timing table and one pass or fail. `smoke`
+  # (Browser smoke tests (Terminal Twin)) is the required check: it passes as a no-op when no file under src/ changed.
   # `@load` specs (need a real frame rate) are not run in CI: run them locally.
+  smoke-select:
+    runs-on: ubuntu-latest
+    name: Smoke selection
+    timeout-minutes: 5
+    # pull-requests: read lists the PR's files; issues: write and pull-requests: write post the selection comment.
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+      grep: ${{ steps.plan.outputs.grep }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The API's file list, not a diff: no size limit below 3000 files, and no deep fetch.
+      - name: List the PR's changed files
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename' > .smoke-changed.txt
+
+      # Labels come from the event payload, which already holds the label a `labeled` event added.
+      - name: Select smoke groups
+        id: plan
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          EVENT: ${{ github.event_name }}
+        run: node scripts/smoke-ci.mjs plan --event "$EVENT" --labels "$LABELS" --files-from .smoke-changed.txt --github-output "$GITHUB_OUTPUT" --comment-out .smoke-comment.md
+
+      # One comment per PR, updated in place. A fork PR's token cannot write: the selection still runs.
+      - name: Comment the selection on the PR
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: node scripts/smoke-ci.mjs comment --repo "$GITHUB_REPOSITORY" --pr "$PR" --body-file .smoke-comment.md
+
   smoke-build:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'smoke')
+    needs: smoke-select
+    if: needs.smoke-select.outputs.run == 'true'
     runs-on: ubuntu-latest
     name: Smoke build
     timeout-minutes: 15
@@ -97,6 +143,8 @@ jobs:
       actions: read
     outputs:
       tests: ${{ steps.count.outputs.tests }}
+      shards: ${{ steps.count.outputs.shards }}
+      shard-count: ${{ steps.count.outputs.shard-count }}
     steps:
       - uses: actions/checkout@v4
 
@@ -134,18 +182,26 @@ jobs:
           done
           echo "No smoke timings found in the last 20 green runs; using scripts/smoke-timings.jsonl"
 
-      # How many tests the full run holds (the merge job fails when fewer are reported: a shard cancelled or timed out), and
-      # one test-list file per shard, balanced by time (scripts/smoke-shards.mjs: longest first, each test to the shard with
-      # the least time so far; times from the history above, then the committed fallback, else the average).
-      - name: List smoke tests and balance the shards
+      # How many tests the selected run holds (the merge job fails when fewer are reported: a shard cancelled or timed out),
+      # and one test-list file per shard, balanced by time (scripts/smoke-shards.mjs: longest first, each test to the shard
+      # with the least time so far; times from the history above, then the committed fallback, else the average). The
+      # shard count scales to the predicted time (`--shards auto`: one per 2.5 min, 1 to 6); the matrix is built from it.
+      - name: List the selected smoke tests and balance the shards
         id: count
+        env:
+          GREP: ${{ needs.smoke-select.outputs.grep }}
         run: |
-          pnpm exec playwright test --list --grep-invert @load > .smoke-list.txt
+          args=(--list --grep-invert @load)
+          if [ -n "$GREP" ]; then args+=(--grep "$GREP"); fi
+          pnpm exec playwright test "${args[@]}" > .smoke-list.txt
           tests=$(awk '/^Total:/ {print $2}' .smoke-list.txt)
-          echo "Smoke tests: $tests"
+          echo "Smoke tests: $tests (grep: ${GREP:-every group})"
           test -n "$tests"
           echo "tests=$tests" >> "$GITHUB_OUTPUT"
-          node scripts/smoke-shards.mjs --list .smoke-list.txt --shards 6 --out .smoke-shards $(find .smoke-history -name '*.jsonl' 2>/dev/null)
+          node scripts/smoke-shards.mjs --list .smoke-list.txt --shards auto --max-shards 6 --count-out .smoke-shard-count --out .smoke-shards $(find .smoke-history -name '*.jsonl' 2>/dev/null)
+          count=$(cat .smoke-shard-count)
+          echo "shard-count=$count" >> "$GITHUB_OUTPUT"
+          echo "shards=$(jq -nc "[range(1; $count + 1)]")" >> "$GITHUB_OUTPUT"
 
       - name: Upload bundles
         uses: actions/upload-artifact@v4
@@ -162,10 +218,10 @@ jobs:
   smoke-shard:
     needs: smoke-build
     runs-on: ubuntu-latest
-    name: Browser smoke tests (shard ${{ matrix.shard }}/6)
+    name: Browser smoke tests (shard ${{ matrix.shard }}/${{ needs.smoke-build.outputs.shard-count }})
     timeout-minutes: 45
     # Each shard runs the test-list file smoke-build made for it (`--test-list`, balanced by recorded test time), not
-    # `--shard=i/6`: equal-count slices in file order put the slow asset specs together (PR #341: 7.2 min on shard 1,
+    # `--shard=i/N`: equal-count slices in file order put the slow asset specs together (PR #341: 7.2 min on shard 1,
     # 1.5 min on shard 3). fullyParallel keeps every test its own unit. Every shard runs to the end even when another
     # fails, so the merged table is complete.
     # Each shard pays the install and Chromium setup; that is why the bundles come from smoke-build, not from each shard.
@@ -174,7 +230,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: ${{ fromJSON(needs.smoke-build.outputs.shards) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -250,17 +306,33 @@ jobs:
           if-no-files-found: ignore
 
   smoke:
-    # Same name as the single smoke job it replaces, so a required check on it keeps working.
-    needs: [smoke-build, smoke-shard]
-    if: always() && needs.smoke-build.result != 'skipped'
+    # The required check (branch protection names it). Always runs, so it always reports: a no-op pass when the selection
+    # ran nothing (no file under src/ changed), else the merged result of the shards.
+    needs: [smoke-select, smoke-build, smoke-shard]
+    if: always()
     runs-on: ubuntu-latest
     name: Browser smoke tests (Terminal Twin)
     timeout-minutes: 10
+    env:
+      RUN: ${{ needs.smoke-select.outputs.run }}
     steps:
+      - name: Fail when the selection failed
+        if: needs.smoke-select.result != 'success'
+        run: |
+          echo "smoke-select: ${{ needs.smoke-select.result }}"
+          exit 1
+
+      - name: No smoke run needed
+        if: env.RUN != 'true'
+        run: |
+          echo "No file under src/ changed: no smoke tests selected, nothing to run." | tee -a "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v4
+        if: env.RUN == 'true'
 
       # No artifact at all (every shard died before its tests) is not an error here: the merge then reports no results.
       - name: Download shard results
+        if: env.RUN == 'true'
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -270,19 +342,49 @@ jobs:
       # One SMOKE line and one timing table (tests over 30 s flagged as warnings) in the step summary, written before the
       # exit code: red when a test failed, fewer tests were reported than the build job counted, or a test ran twice.
       - name: Merge smoke results
+        if: env.RUN == 'true'
         run: node scripts/smoke-merge.mjs smoke-report/*/results.jsonl --expect "${{ needs.smoke-build.outputs.tests }}" --summary "$GITHUB_STEP_SUMMARY"
 
       # A shard can fail outside its tests (install, server start) with every result green or missing.
       - name: Fail when a shard or the build failed
-        if: needs.smoke-build.result != 'success' || needs.smoke-shard.result != 'success'
+        if: env.RUN == 'true' && (needs.smoke-build.result != 'success' || needs.smoke-shard.result != 'success')
         run: |
           echo "smoke-build: ${{ needs.smoke-build.result }}, smoke-shard: ${{ needs.smoke-shard.result }}"
           exit 1
 
       - name: Upload merged smoke report
-        if: always()
+        if: always() && env.RUN == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: smoke-report
           path: smoke-report
           if-no-files-found: ignore
+
+  # A red full run on main opens a new issue (label needs-triage) with the failing specs, the commit, its PR and the run.
+  # Dry run: node scripts/smoke-ci.mjs red-main --dry-run --repo o/r --sha <sha> --run-url <url> <results.jsonl>...
+  smoke-red-main:
+    needs: [smoke-build, smoke]
+    if: always() && github.event_name == 'push' && needs.smoke.result == 'failure'
+    runs-on: ubuntu-latest
+    name: Open an issue for a red main
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the merged smoke report
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: smoke-report
+          path: smoke-report
+
+      - name: Open the issue
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EXPECT: ${{ needs.smoke-build.outputs.tests }}
+        run: node scripts/smoke-ci.mjs red-main --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA" --run-url "$RUN_URL" --expect "${EXPECT:-0}" $(find smoke-report -name results.jsonl 2>/dev/null)
