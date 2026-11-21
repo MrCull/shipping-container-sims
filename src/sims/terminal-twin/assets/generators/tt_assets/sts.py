@@ -1,4 +1,4 @@
-"""STS quay crane: ZPMC-style Malaccamax, three LODs, fully rigged.
+"""STS quay crane: ZPMC-style Malaccamax or Super Post-Panamax (`configure(cls)`), three LODs, fully rigged.
 
 All geometry here is written in the glTF frame ("G"): X along the quay rail,
 Y up, Z landward (the sea is at -Z), metres. Origin: the waterside rail
@@ -32,6 +32,13 @@ Hierarchy (LOD0 names; LOD1/LOD2 append `_lod1` / `_lod2` to every node):
               twin_locks     twin-20 centre locks drop (-Y)
                 twistlock_twin_{aft|fore}_{land|sea}    (LOD0 only)
 
+Classes (#303): the geometry below is written for the 52 m Malaccamax (the "design frame"). The Super
+Post-Panamax is the same structure 9 m lower and with a 3 m shorter boom, which is what the 2021 to 2023
+heightening changed on cranes 104 to 108 (knowledge file section 1: +9 m structure, +3 m boom): `ry()` maps every
+design-frame height to the class (unchanged up to the sills, the leg section between the sills and the portal
+shortened, everything from the portal up lowered by the lift difference), and OUTREACH sets the boom length. Every
+polygon vertex and every rig pivot passes through `ry()`, so hard-coded heights follow the class.
+
 Rig nodes are empties (no mesh, no rotation, no scale), so the meshopt
 quantisation transforms that gltf-transform writes on mesh nodes never move a
 pivot. Geometry lives in the `*_geo` children.
@@ -45,8 +52,21 @@ from . import sts_atlas as SA
 
 NAME = 'sts-malaccamax'
 
+# ---- Classes (#303) ----------------------------------------------------------
+# [V] knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1: lift above rail, outreach, rows covered.
+CLASSES = {
+    'malaccamax': {'name': 'sts-malaccamax', 'label': 'Malaccamax', 'liftM': 52.0, 'outreachM': 68.0, 'rows': 25,
+                   'cranes': '104 to 108'},
+    'super-post-panamax': {'name': 'sts-super-post-panamax', 'label': 'Super Post-Panamax', 'liftM': 43.0, 'outreachM': 65.0,
+                           'rows': 24, 'cranes': '101 to 103'},
+}
+DESIGN_LIFT = 52.0       # the geometry below is written for this lift (Malaccamax)
+DESIGN_OUTREACH = 68.0
+CLASS = 'malaccamax'
+DY = 0.0                 # class lift - DESIGN_LIFT
+
 # ---- Dimensions -------------------------------------------------------------
-# [V] TTI reference pack (Malaccamax builder version, all eight cranes).
+# [V] TTI reference pack (Malaccamax builder version); per class: CLASSES.
 RAIL_GAUGE = 30.48
 LIFT_ABOVE_RAIL = 52.0
 OUTREACH = 68.0          # waterside rail -> spreader centre at full outreach
@@ -89,6 +109,31 @@ TWIN_DROP = 0.4
 HEADBLOCK_SHEAVE_Y = 2.25           # rope ends above the spreader underside
 
 TELE_X = TWISTLOCK_X
+
+
+def ry(y):
+    """Design-frame (Malaccamax) height -> this class's height: unchanged up to the sill top, the leg section between
+    the sill top and the portal underside shortened by -DY, everything from the portal up moved by DY."""
+    if DY == 0.0 or y <= SILL_Y[1]:
+        return y
+    if y >= PORTAL_Y[0]:
+        return y + DY
+    return SILL_Y[1] + (y - SILL_Y[1]) * (PORTAL_Y[0] + DY - SILL_Y[1]) / (PORTAL_Y[0] - SILL_Y[1])
+
+
+def ryp(p):
+    """ry() on a glTF (x, y, z) point."""
+    return (p[0], ry(p[1]), p[2])
+
+
+def configure(cls):
+    """Selects the crane class the build, sidecar and preview functions use (module state; call before build_sts)."""
+    global CLASS, NAME, LIFT_ABOVE_RAIL, OUTREACH, DY, BOOM_TIP_Z, FORESTAY_END
+    c = CLASSES[cls]
+    CLASS, NAME, LIFT_ABOVE_RAIL, OUTREACH = cls, c['name'], c['liftM'], c['outreachM']
+    DY = LIFT_ABOVE_RAIL - DESIGN_LIFT
+    BOOM_TIP_Z = -(OUTREACH + 6.0)
+    FORESTAY_END = (58.0, BOOM_TIP_Z + 0.4)
 
 # Amber gantry-alarm beacon mount points [A, glTF frame, node `gantry`]: the beacon lamp base on each leg (outer X face)
 # and on the portal-beam ends. The gantry alarm ticket attaches its lights here.
@@ -138,6 +183,8 @@ class GMesh:
         if outward is not None and _newell(pts).dot(_v(outward)) < 0:
             pts.reverse()
             uvs.reverse()
+        if DY != 0.0:
+            pts = [Vector(ryp(p)) for p in pts]
         base = len(self.verts)
         self.verts.extend(pts)
         self.faces.append(tuple(range(base, base + len(pts))))
@@ -822,6 +869,7 @@ class _Rig:
 
     def empty(self, name, parent_name, world, role, rig=None, axis=None, description=None):
         parent_obj, parent_world = self.objects[parent_name]
+        world = ryp(world)
         local = tuple(world[i] - parent_world[i] for i in range(3))
         obj = empty(name, parent_obj, _b(local))
         self.objects[name] = (obj, world)
@@ -942,7 +990,7 @@ def sidecar(info, scene_water_rail_z):
         'trolley': {'type': 'translation', 'axis': '+Z', 'minM': -OUTREACH, 'maxM': round(RAIL_GAUGE + BACKREACH, 2), 'rest': 0, 'tag': 'V',
                     'note': f'from the waterside rail; {OUTREACH:g} m outreach [V], {BACKREACH:g} m backreach behind the landside rail [A]'},
         'hoist': {'type': 'translation', 'axis': '+Y', 'minM': -20, 'maxM': LIFT_ABOVE_RAIL, 'rest': 0, 'tag': 'V',
-                  'note': 'spreader underside height above the rail: 52 m lift [V]; 20 m below the rail into the hold [A]'},
+                  'note': f'spreader underside height above the rail: {LIFT_ABOVE_RAIL:g} m lift [V]; 20 m below the rail into the hold [A]'},
         'spreader': {'type': 'rotation', 'axis': '+Y', 'minDeg': -5, 'maxDeg': 5, 'rest': 0, 'tag': 'A', 'note': 'skew'},
         'spreader_tele_fore': {'type': 'translation', 'axis': '+X', 'minM': 0, 'maxM': round(TELE_STROKE, 4), 'rest': 0, 'tag': 'V',
                                'note': '0 = 20 ft, max = 40 ft (ISO 668 lengths)'},
@@ -960,6 +1008,9 @@ def sidecar(info, scene_water_rail_z):
     return {
         'asset': NAME,
         'kind': 'sts',
+        'craneClass': {'id': CLASS, 'label': CLASSES[CLASS]['label'], 'cranes': CLASSES[CLASS]['cranes'],
+                       'rows': CLASSES[CLASS]['rows'], 'tag': 'V',
+                       'source': 'knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1'},
         'version': 1,
         'generator': 'src/sims/terminal-twin/assets/generators/build.py --only sts',
         'units': 'm',
@@ -970,11 +1021,12 @@ def sidecar(info, scene_water_rail_z):
         'geometry': {
             'railGaugeM': g(RAIL_GAUGE, 'V', source='TTI reference pack, STS table'),
             'liftHeightAboveRailM': g(LIFT_ABOVE_RAIL, 'V', source='TTI reference pack (operator height above rail)'),
-            'outreachM': g(OUTREACH, 'V', source='TTI reference pack (Malaccamax seaward outreach)'),
+            'outreachM': g(OUTREACH, 'V', source=f'TTI reference pack ({CLASSES[CLASS]["label"]} seaward outreach)'),
             'backreachM': g(BACKREACH, 'A', reason='not verified; functional backreach behind the landside rail'),
-            'apexHeightM': g(APEX[1], 'A', reason='overall steel height not verified; proportional structure above the 52 m envelope'),
-            'trolleyRailHeightM': g(TROLLEY_RAIL_Y, 'A', reason='52 m lift + spreader/headblock + clearance'),
-            'boomHingeM': {'y': HINGE[0], 'z': HINGE[1], 'tag': 'A'},
+            'apexHeightM': g(ry(APEX[1]), 'A', reason=f'overall steel height not verified; proportional structure above the {LIFT_ABOVE_RAIL:g} m envelope'),
+            'trolleyRailHeightM': g(ry(TROLLEY_RAIL_Y), 'A', reason=f'{LIFT_ABOVE_RAIL:g} m lift + spreader/headblock + clearance'),
+            'boomHingeM': {'y': round(ry(HINGE[0]), 3), 'z': HINGE[1], 'tag': 'A'},
+            'boomUndersideM': g(ry(HINGE[0]), 'A', reason='boom hinge pin height: the lowered-boom clearance reference of the engine (craneClass boomUndersideM)'),
             'legSpacingM': g(2 * LEG_X, 'A', reason='leg centres along the rail; mechanical-clearance approximation'),
             'overBuffersM': g(2 * BUFFER_X, 'A', reason='matches quay.stsMinSpacingM (27 m)'),
             'boomTipM': g(-BOOM_TIP_Z, 'A'),
@@ -1013,7 +1065,7 @@ def sidecar(info, scene_water_rail_z):
              'description': 'top centre of the fore box of a twin-20 lift'},
         ],
         'beaconMounts': [
-            {'name': name, 'node': 'gantry', 'position': [round(c, 3) for c in pos],
+            {'name': name, 'node': 'gantry', 'position': [round(c, 3) for c in ryp(pos)],
              'colour': SA.PALETTE['amber'], 'lens': 'amber', 'tag': 'A',
              'description': ('on the outer X face of a leg at gantry-alarm height' if '_leg_' in name else 'on the end of a portal beam')
              + f', {"seaward" if "_sea_" in name else "landward"} side; rides with the gantry'}
@@ -1033,7 +1085,7 @@ def sidecar(info, scene_water_rail_z):
             'placement': 'TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces and on the boom side plate outer faces (white on blue), ZPMC builder plates on the legs',
             'boomSidePlate': {
                 'node': 'boom_geo', 'material': 'sts_paint', 'region': 'tti_on_blue', 'lods': ['LOD0', 'LOD1'],
-                'yM': [round(v, 3) for v in BOOM_PLATE_Y], 'zM': [round(v, 3) for v in BOOM_PLATE_Z],
+                'yM': [round(ry(v), 3) for v in BOOM_PLATE_Y], 'zM': [round(v, 3) for v in BOOM_PLATE_Z],
                 'textM': list(BOOM_PLATE_TEXT), 'tag': 'P',
                 'note': 'solid plate on both boom girders seaward of the hinge (every LOD, so the silhouette matches); '
                         'TTI ALGECIRAS lettering on its outer faces at LOD0 and LOD1, from the sts-atlas region, in the paint '
@@ -1052,7 +1104,12 @@ def sidecar(info, scene_water_rail_z):
             {'fact': f'rail gauge {RAIL_GAUGE} m', 'tag': 'V', 'source': 'TTI reference pack, STS table'},
             {'fact': f'{LIFT_ABOVE_RAIL:g} m lift height above rail (hoist travel maximum)', 'tag': 'V', 'source': 'TTI reference pack'},
             {'fact': f'{OUTREACH:g} m seaward outreach from the waterside rail (trolley travel minimum)', 'tag': 'V', 'source': 'TTI reference pack'},
-            {'fact': 'Malaccamax geometry on every crane', 'tag': 'M', 'reason': 'builder version: real fleet is 5 Malaccamax + 3 Super Post-Panamax'},
+            {'fact': f'{CLASSES[CLASS]["label"]} class (TTI cranes {CLASSES[CLASS]["cranes"]}, up to {CLASSES[CLASS]["rows"]} rows)', 'tag': 'V',
+             'source': 'knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1'},
+            *([{'fact': f'Super Post-Panamax = the Malaccamax structure {-DY:g} m lower (leg section between the sills and the portal '
+                        f'shortened, everything from the portal up lowered) with a {DESIGN_OUTREACH - OUTREACH:g} m shorter boom',
+                'tag': 'A', 'reason': 'the 2021 to 2023 heightening made cranes 104 to 108 9 m taller with 3 m boom extensions '
+                                      '(knowledge file section 1); the reverse of that change, not a stretch'}] if DY else []),
             {'fact': 'blue steelwork, white machinery house, yellow spreader, lattice boom, ties, ladders, catwalks, floodlights',
              'tag': 'P', 'source': 'reference photographs (not committed)'},
             {'fact': 'apex, trolley-rail and hinge heights, leg spacing, backreach, bogie layout, house size', 'tag': 'A'},

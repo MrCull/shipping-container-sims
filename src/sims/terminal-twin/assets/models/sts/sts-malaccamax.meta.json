@@ -1,6 +1,14 @@
 {
   "asset": "sts-malaccamax",
   "kind": "sts",
+  "craneClass": {
+    "id": "malaccamax",
+    "label": "Malaccamax",
+    "cranes": "104 to 108",
+    "rows": 25,
+    "tag": "V",
+    "source": "knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1"
+  },
   "version": 1,
   "generator": "src/sims/terminal-twin/assets/generators/build.py --only sts",
   "units": "m",
@@ -46,6 +54,11 @@
       "y": 55.6,
       "z": -3.2,
       "tag": "A"
+    },
+    "boomUndersideM": {
+      "value": 55.6,
+      "tag": "A",
+      "reason": "boom hinge pin height: the lowered-boom clearance reference of the engine (craneClass boomUndersideM)"
     },
     "legSpacingM": {
       "value": 18.0,
@@ -1310,9 +1323,9 @@
       "source": "TTI reference pack"
     },
     {
-      "fact": "Malaccamax geometry on every crane",
-      "tag": "M",
-      "reason": "builder version: real fleet is 5 Malaccamax + 3 Super Post-Panamax"
+      "fact": "Malaccamax class (TTI cranes 104 to 108, up to 25 rows)",
+      "tag": "V",
+      "source": "knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1"
     },
     {
       "fact": "blue steelwork, white machinery house, yellow spreader, lattice boom, ties, ladders, catwalks, floodlights",

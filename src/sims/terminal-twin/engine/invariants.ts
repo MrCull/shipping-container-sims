@@ -26,6 +26,8 @@ import { isSlotOccupant, vesselOccupancyOf } from './vesselOccupancy'
 import {
   ascIndexOf,
   stsBoom,
+  stsLimits,
+  STS_WATER_RAIL_Z,
   type AscJob,
   type AscState,
   type CustodyRef,
@@ -880,6 +882,27 @@ export const INVARIANTS: Invariant[] = [
           // a move that is over (ended by now) is history: the boom may have been planned up after it
           if ((m.axis === 'hoist' || m.axis === 'trolley') && (during || (m.t1 > state.now + 1e-9 && Math.abs(angleAt((m.t0 + m.t1) / 2) - working) > 1e-9)))
             messages.push(`${s.id} ${m.axis} moves at ${m.t0.toFixed(1)} s with the boom off its working angle`)
+        }
+      }
+      return messages
+    },
+  },
+  {
+    id: 'sts.class-limits',
+    reads: ['time'],
+    description:
+      'STS class limits (#303): no hoist segment ends above the crane\'s lift height and no trolley segment ends seaward of ' +
+      'its outreach (measured from the waterside rail).',
+    check(state, config) {
+      const messages: string[] = []
+      const eps = 1e-6
+      for (const s of Object.values(state.sts)) {
+        const { liftHeightM, outreachM, craneClass } = stsLimits(config, s.id)
+        for (const m of s.motion) {
+          if (m.axis === 'hoist' && Math.max(m.from, m.to) > liftHeightM + eps)
+            messages.push(`${s.id} (${craneClass}) hoists to ${Math.max(m.from, m.to).toFixed(2)} m, above its ${liftHeightM} m lift height`)
+          if (m.axis === 'trolley' && STS_WATER_RAIL_Z - Math.min(m.from, m.to) > outreachM + eps)
+            messages.push(`${s.id} (${craneClass}) trolleys ${(STS_WATER_RAIL_Z - Math.min(m.from, m.to)).toFixed(2)} m out, beyond its ${outreachM} m outreach`)
         }
       }
       return messages

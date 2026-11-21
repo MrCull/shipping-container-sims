@@ -27,11 +27,19 @@ export function stsIdFor(first: string | undefined, index: number): string {
 export function deriveSts(config: ScenarioConfig, count: number, lengthM: number): StsConfig[] {
   const groundPositions = config.sts[0]?.groundPositions ?? 3
   const pitch = lengthM / count
-  return Array.from({ length: count }, (_, i) => ({
-    id: stsIdFor(config.sts[0]?.id, i),
-    gantryX: Math.round((i + 0.5) * pitch * 10) / 10,
-    groundPositions,
-  }))
+  return Array.from({ length: count }, (_, i) => {
+    const id = stsIdFor(config.sts[0]?.id, i)
+    // #303: a crane keeps its class (and limits) when the crane list is re-derived.
+    const { craneClass, liftHeightM, outreachM } = config.sts.find((s) => s.id === id) ?? {}
+    return {
+      id,
+      gantryX: Math.round((i + 0.5) * pitch * 10) / 10,
+      groundPositions,
+      ...(craneClass ? { craneClass } : {}),
+      ...(liftHeightM !== undefined ? { liftHeightM } : {}),
+      ...(outreachM !== undefined ? { outreachM } : {}),
+    }
+  })
 }
 
 /** Re-derive the block positions from the quay length and the block count (a new config). */

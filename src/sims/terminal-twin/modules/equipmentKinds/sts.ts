@@ -5,7 +5,7 @@ import type { EntityView } from '../entityInspector'
 import { STS } from '../equipmentDims'
 import { stsBeaconOffsets } from '../gantryBeacons'
 import { spreaderModeFor } from '../spreaderMode'
-import { loadStsTemplate, StsModel, type SpreaderMode } from '../stsAssets'
+import { loadStsTemplate, STS_CLASS_ASSETS, stsApexY, stsCraneClass, StsModel, type SpreaderMode } from '../stsAssets'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
 import { offerHeroEquipmentAtLod0 } from '../heroEquipmentMount'
 
@@ -32,20 +32,24 @@ class StsRenderer implements KindRenderer {
       // Amber beacons at the model's `beaconMounts` (legs and portal beam ends).
       host.beacons.add(s.id, stsBeaconOffsets())
     }
-    loadStsTemplate().then(
-      (template) => {
-        if (host.isDisposed()) return
-        config.sts.forEach((s, i) => {
-          const m = new StsModel(template, i)
-          m.root.name = `${s.id}-model`
-          host.scene.add(m.root)
-          this.stsModels.set(s.id, m)
-          const placeholder = this.sts.get(s.id)
-          if (placeholder) placeholder.group.visible = false
-        })
-      },
-      (err: unknown) => console.warn('Terminal Twin: STS GLB failed to load; keeping procedural cranes', err),
-    )
+    // #303: one GLB per crane class in use (the Super Post-Panamax one only when a crane has that class).
+    const classes = new Set(config.sts.map((s) => stsCraneClass(config, s.id)))
+    for (const craneClass of classes)
+      loadStsTemplate(craneClass).then(
+        (template) => {
+          if (host.isDisposed()) return
+          config.sts.forEach((s, i) => {
+            if (stsCraneClass(config, s.id) !== craneClass) return
+            const m = new StsModel(template, i, STS_CLASS_ASSETS[craneClass].meta)
+            m.root.name = `${s.id}-model`
+            host.scene.add(m.root)
+            this.stsModels.set(s.id, m)
+            const placeholder = this.sts.get(s.id)
+            if (placeholder) placeholder.group.visible = false
+          })
+        },
+        (err: unknown) => console.warn(`Terminal Twin: STS GLB (${craneClass}) failed to load; keeping procedural cranes`, err),
+      )
   }
 
   private addSts(id: string): void {
@@ -171,7 +175,7 @@ export const stsKind: EquipmentKindDef<'sts'> = {
   ids: (model) => model.stsIds,
   bounds(model, id, time) {
     const p = model.stsPose(id, time)
-    const height = STS.apexY + 1.3
+    const height = stsApexY(stsCraneClass(model.config, id)) + 1.3
     return { x: p.gantryX, y: height / 2, z: STS.waterRailZ + STS.gauge / 2, sx: STS.legSpacingX + 4, sy: height, sz: STS.gauge + 6, yaw: 0 }
   },
   sceneState: (model, id, t) => ({ status: model.statusAt('sts', id, t), ...model.stsPose(id, t), gantrying: model.isGantrying(id, t) }),

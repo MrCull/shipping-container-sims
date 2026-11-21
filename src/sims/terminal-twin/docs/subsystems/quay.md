@@ -439,7 +439,8 @@ TTI presets and the `boom-berthing` fixture.
   `houseFromM` to `houseToM` from the stern, and `airDraftM`, mast top above the quay; mirrored from the hull sidecars and
   cross-checked in `tests/vessel-hulls.test.ts`). When a work cycle's gantry move (`StsMoveStarted`, `StsLoadStarted`)
   crosses a vessel on the quay whose house X range lies on the path, and the lowered boom's underside
-  (`boomUndersideM`, default 55.6 m [A], the Malaccamax hinge) is below its air draft plus
+  (`boomUndersideM`, default 55.6 m [A], the Malaccamax hinge; per crane class since #303, 46.6 m on a Super
+  Post-Panamax, `stsLimits(config, id).boomUndersideM`) is below its air draft plus
   `boomSuperstructureClearanceM` (2 m [A]), `passSuperstructure` (boom.ts) makes the cycle: hoist to travel height,
   park the trolley, raise, gantry boom up, lower, then the rest of the cycle, all in one planned sequence (no overlap).
   Otherwise the crane gantries boom down; a step to the next clear bay never raises. Only the ULCV (air draft 59.1 m)
@@ -490,3 +491,25 @@ Request and reply shapes, latency model: [../decision-points.md](../decision-poi
 - **Measure**: `pnpm run tt:run --preset "TTI Algeciras, peak day" --until time:7200 --events /tmp/peak.jsonl`, then
   `pnpm run tt:sts /tmp/peak.jsonl --until 7200`; `pnpm run tt:profile <fixture> --until T`. Compare strategies with
   `--strategy craneSplit=equal-bays`, `--ordering as-today`.
+
+## Crane classes (#303)
+
+- Each `StsConfig` may carry `craneClass` (`'malaccamax'` default, or `'super-post-panamax'`) and optional
+  `liftHeightM` / `outreachM` overrides. `STS_CRANE_CLASSES` (`scenario/types.ts`) holds the [V] numbers from
+  `knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md` section 1: Malaccamax 52 m lift above rail, 68 m outreach,
+  25 rows; Super Post-Panamax 43 m, 65 m, 24 rows. `stsLimits(config, id)` (`engine/state.ts`) resolves a crane's
+  class, lift height, outreach and boom underside (55.6 m / 46.6 m [A], the GLB hinge heights, both moved by a
+  scenario-wide `boomUndersideM` override).
+- **Hoist and trolley within the class:** the spreader travel height is `stsSafeHoist(config, id)` =
+  `min(layout.stsSafeHoistM, liftHeightM)` (50 m layout default, so a 43 m crane travels at 43 m: shorter hoists,
+  faster cycles). Invariant `sts.class-limits`: no hoist segment ends above the lift height, no trolley segment ends
+  more than the outreach seaward of the waterside rail (`STS_WATER_RAIL_Z` = 3 m).
+- **Crane split:** `stsCanWork(config, id, sizeClass)` (`subsystems/berth.ts`) is false when the top of a high-cube box
+  in the vessel's top deck tier is above the lift height or the outer row is beyond the outreach. Such a crane gets
+  `outOfReach: true` in the `craneSplit` request (the field is absent otherwise, so event logs of fleets that reach
+  every vessel are unchanged); the built-in strategies skip it and never choose cranes on both sides of it, and
+  `validateSplit` rejects a reply that assigns it. With the default vessel classes only the ULCV (top box 48.0 m) is
+  out of reach of a 43 m crane; the Neo-Panamax top box is at 40.3 m.
+- **TTI:** `TTI_STS_CLASSES` (`terminals/tti-algeciras/constants.ts`) makes STS101 to STS103 Super Post-Panamax in both
+  TTI presets; every other terminal and fixture is Malaccamax. Tests: `tests/sts-classes.test.ts`.
+

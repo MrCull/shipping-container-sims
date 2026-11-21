@@ -467,8 +467,13 @@ Rig node names come from the sidecar; the rules are in [assets-pipeline.md](asse
 
 `lodScale` divides the camera distance before the STS, SHC and ASC LOD choice, so Low (0.4) drops them to cheaper LODs 2.5x sooner.
 
-### STS (Malaccamax)
+### STS (Malaccamax and Super Post-Panamax)
 
+- #303: one GLB per crane class, same rig node names, LODs and livery: `sts-malaccamax.glb` and
+  `sts-super-post-panamax.glb` (43 m lift, 65 m outreach, apex 73 m, hinge 46.6 m). `STS_CLASS_ASSETS`
+  (`modules/stsAssets.ts`) maps a class to its GLB and sidecar; the STS kind renderer loads one template per class in
+  use (the second GLB only when a crane has that class) and builds each `StsModel` with its class's sidecar. Bounds use
+  the class apex (`stsApexY`). The procedural placeholder stays Malaccamax-sized.
 - `sts-malaccamax.glb`. Rail gauge 30.48 m, 52 m lift above rail, 68 m outreach [V]; apex 82 m, 18 m backreach, 18 m leg
   spacing, 27 m over buffers (= `quay.stsMinSpacingM`) [A]. Root mounted at (0, 0, `waterRailZ` = 3)
   (sidecar `sceneMounting`); `modules/equipmentDims.ts#STS.apexY` is kept in sync for picking.

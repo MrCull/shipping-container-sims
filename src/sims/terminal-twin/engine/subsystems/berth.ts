@@ -15,14 +15,15 @@
 import type { EngineContext, ReactorMap } from '../context'
 import type { BerthAllocationRequest, CraneSplitReply, CraneSplitRequest } from '../decisions/types'
 import type { VesselState } from '../state'
-import { slotX, vesselClass } from '../../scenario/vesselClasses'
+import { CONTAINER_HEIGHT_M, slotX, slotZ, tierBaseY, vesselClass } from '../../scenario/vesselClasses'
+import type { ScenarioConfig, VesselSizeClass } from '../../scenario/types'
 import { continueWork, wakeQuayRail } from './quay'
 import { askRelease, createPackages, isLoadSlot, loadActive } from './workPackages'
 import { railOrder } from './rail'
 import { closeCrane, finishPlan, registerCrane } from '../cranePlan/plan'
 import { positionHatchPanels } from '../hatch'
 import { boomReal, raiseOver, startBoom } from './boom'
-import { stsBoom } from '../state'
+import { STS_WATER_RAIL_Z, stsBoom, stsLimits } from '../state'
 
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
 
@@ -154,6 +155,19 @@ function workBays(ctx: EngineContext, vessel: VesselState): CraneSplitRequest['b
     .map(([bay, n]) => ({ bay, x: slotX(spec, vessel.berthX ?? 0, bay), moves: n }))
 }
 
+/**
+ * #303: can this crane work a vessel of this class? Its lift height must clear the top of a high-cube box in the top
+ * deck tier and its outreach (from the waterside rail) must reach the outer row. Cranes that cannot are left out of
+ * the vessel's crane split.
+ */
+export function stsCanWork(config: ScenarioConfig, stsId: string, sizeClass: VesselSizeClass): boolean {
+  const spec = vesselClass(sizeClass)
+  const limits = stsLimits(config, stsId)
+  const boxTopM = tierBaseY(spec, spec.holdTiers + spec.deckTiers - 1) + CONTAINER_HEIGHT_M['40HC']
+  const outerRowM = STS_WATER_RAIL_Z - slotZ(spec, spec.rows - 1)
+  return boxTopM <= limits.liftHeightM && outerRowM <= limits.outreachM
+}
+
 /** Ask for a crane split for the first berthed vessel without cranes, unless one is pending. */
 function trySplit(ctx: EngineContext): void {
   const { berth, vessels, sts } = ctx.state
@@ -175,6 +189,8 @@ function trySplit(ctx: EngineContext): void {
         gantryX: c.gantryX,
         vesselId: c.vesselId,
         vesselBerthX: c.vesselId ? vessels[c.vesselId].berthX : null,
+        // Only when true, so the event log of a fleet that reaches every vessel is unchanged (#303).
+        ...(stsCanWork(ctx.config, c.id, vessel.sizeClass) ? {} : { outOfReach: true as const }),
       })),
     },
     { vessels: [vessel.id] },
@@ -198,6 +214,8 @@ function validateSplit(ctx: EngineContext, req: CraneSplitRequest, reply: CraneS
     seen.add(x.stsId)
     if (crane.vesselId !== null) fail(`${x.stsId} is busy with ${crane.vesselId}`)
     if (x.bays.length === 0) fail(`${x.stsId} has no bays`)
+    if (!stsCanWork(ctx.config, x.stsId, vessels[req.vesselId].sizeClass))
+      fail(`${x.stsId} cannot reach the top deck tier or the outer row of ${req.vesselId} (class limits)`)
   }
   const byRail = [...a].sort((p, q) => sts[p.stsId].railIndex - sts[q.stsId].railIndex)
   const covered: number[] = []

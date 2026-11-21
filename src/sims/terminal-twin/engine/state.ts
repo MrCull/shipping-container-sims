@@ -21,7 +21,7 @@ import { makeContainerState } from '../scenario/containerFactory'
 import type { ContainerProps } from '../scenario/containerProps'
 import { sampleDwell } from '../scenario/dwell'
 import { planExportYard, type ExportPlacement } from '../scenario/exportYard'
-import { DEFAULT_STS_BOOM, DEFAULT_WARM_UP_S } from '../scenario/types'
+import { DEFAULT_STS_BOOM, DEFAULT_STS_CRANE_CLASS, DEFAULT_WARM_UP_S, STS_CRANE_CLASSES } from '../scenario/types'
 import type { BoomMode, ContainerSize, ScenarioConfig, SubsystemMode, SubsystemModes, TruckTransactionKind, VesselSizeClass } from '../scenario/types'
 import { vesselSlotId as makeVesselSlotId, type CellHalf } from '../scenario/vesselClasses'
 
@@ -1047,6 +1047,29 @@ function validateRail(config: ScenarioConfig): void {
   })
 }
 
+/** [A] Z of the waterside STS rail (m), from which outreach is measured: `waterRailZ` in `modules/equipmentDims.ts`. */
+export const STS_WATER_RAIL_Z = 3
+
+/** One crane's class limits (#303): its class, lift height, outreach and lowered boom underside. */
+export function stsLimits(config: ScenarioConfig, stsId: string) {
+  const s = config.sts.find((c) => c.id === stsId)
+  const craneClass = s?.craneClass ?? DEFAULT_STS_CRANE_CLASS
+  const spec = STS_CRANE_CLASSES[craneClass]
+  // A scenario-wide boomUndersideM override (#302) moves every class by the same amount.
+  const undersideShift = (config.kinematics.sts.boomUndersideM ?? DEFAULT_STS_BOOM.undersideM) - DEFAULT_STS_BOOM.undersideM
+  return {
+    craneClass,
+    liftHeightM: s?.liftHeightM ?? spec.liftHeightM,
+    outreachM: s?.outreachM ?? spec.outreachM,
+    boomUndersideM: spec.boomUndersideM + undersideShift,
+  }
+}
+
+/** The spreader travel height of one crane: the layout's safe hoist height, capped at the crane's lift height (#303). */
+export function stsSafeHoist(config: ScenarioConfig, stsId: string): number {
+  return Math.min(config.layout.stsSafeHoistM, stsLimits(config, stsId).liftHeightM)
+}
+
 /** STS boom settings (#298) with defaults filled in. */
 export function stsBoom(config: ScenarioConfig) {
   const k = config.kinematics.sts
@@ -1295,7 +1318,7 @@ export function createInitialState(
       workQueue: [],
       gantryX: s.gantryX,
       trolleyZ: config.layout.stsGroundLaneZ0M,
-      hoistY: config.layout.stsSafeHoistM,
+      hoistY: stsSafeHoist(config, s.id),
       railLo: s.gantryX,
       railHi: s.gantryX,
       railTargetX: null,

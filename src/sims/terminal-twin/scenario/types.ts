@@ -230,6 +230,33 @@ export interface SubsystemModes {
 /** STS boom subsystem mode (#298). */
 export type BoomMode = 'real' | 'off'
 
+/** STS size class (#303); sets the crane's lift height, outreach and boom underside. */
+export type StsCraneClass = 'malaccamax' | 'super-post-panamax'
+
+export interface StsCraneClassSpec {
+  label: string
+  /** Lift height above the rail (m): the hoist never goes higher. */
+  liftHeightM: number
+  /** Outreach from the waterside rail (m): the trolley never goes further seaward. */
+  outreachM: number
+  /** Container rows covered (published). */
+  rows: number
+  /** Lowered boom underside above the quay (m): the GLB's boom hinge height (sidecar `geometry.boomUndersideM`). */
+  boomUndersideM: number
+}
+
+/**
+ * STS classes (#303). [V] lift, outreach and rows: knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1
+ * (TTI cranes 101 to 103 Super Post-Panamax, 104 to 108 Malaccamax). [A] boom underside: the GLB hinge heights.
+ */
+export const STS_CRANE_CLASSES: Record<StsCraneClass, StsCraneClassSpec> = {
+  malaccamax: { label: 'Malaccamax', liftHeightM: 52, outreachM: 68, rows: 25, boomUndersideM: 55.6 },
+  'super-post-panamax': { label: 'Super Post-Panamax', liftHeightM: 43, outreachM: 65, rows: 24, boomUndersideM: 46.6 },
+}
+
+/** STS class when a crane config names none. */
+export const DEFAULT_STS_CRANE_CLASS: StsCraneClass = 'malaccamax'
+
 /** STS cranes are listed in rail order (ascending `gantryX`); they never pass each other. */
 export interface StsConfig {
   id: string
@@ -237,6 +264,12 @@ export interface StsConfig {
   gantryX: number
   /** Number of STS ground positions (lanes) under the crane. */
   groundPositions: number
+  /** Size class (#303). Default `DEFAULT_STS_CRANE_CLASS`. */
+  craneClass?: StsCraneClass
+  /** Lift height above the rail (m). Default: the class's. */
+  liftHeightM?: number
+  /** Outreach from the waterside rail (m). Default: the class's. */
+  outreachM?: number
 }
 
 /** Vessel size classes, smallest first (dimensions in `VESSEL_CLASSES`, `vesselClasses.ts`). */

@@ -14,7 +14,7 @@
  */
 import type { EngineContext, ReactorMap } from '../context'
 import type { AxisProfile } from '../kinematics'
-import { stsBoom, type StsState, type VesselState } from '../state'
+import { stsBoom, stsLimits, stsSafeHoist, type StsState, type VesselState } from '../state'
 import { vesselClass } from '../../scenario/vesselClasses'
 import { continueWork, isInstant, planSequence, wakeQuayRail } from './quay'
 
@@ -44,7 +44,7 @@ export function startBoom(ctx: EngineContext, sts: StsState, at: number, op: 'ra
   const moves: Parameters<typeof planSequence>[3] =
     op === 'raise'
       ? [
-          { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: k.hoistEmpty },
+          { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: k.hoistEmpty },
           { axis: 'trolley', to: config.layout.stsGroundLaneZ0M, profile: k.trolley },
           { axis: 'boom', to: b.stowedDeg, profile },
         ]
@@ -90,14 +90,21 @@ const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
  * `[fromX, toX]` and is taller than the lowered boom can clear (boom underside below air draft plus clearance), or
  * null. The boom is taken as a line at the gantry position [A].
  */
-export function superstructureOnPath(ctx: Pick<EngineContext, 'state' | 'config'>, fromX: number, toX: number): VesselState | null {
+export function superstructureOnPath(
+  ctx: Pick<EngineContext, 'state' | 'config'>,
+  fromX: number,
+  toX: number,
+  stsId?: string,
+): VesselState | null {
   const b = stsBoom(ctx.config)
+  // #303: each crane class has its own boom underside height.
+  const undersideM = stsId === undefined ? b.undersideM : stsLimits(ctx.config, stsId).boomUndersideM
   const lo = Math.min(fromX, toX)
   const hi = Math.max(fromX, toX)
   for (const v of Object.values(ctx.state.vessels)) {
     if (v.berthX === null || !ON_QUAY.has(v.status)) continue
     const s = vesselClass(v.sizeClass).superstructure
-    if (b.undersideM >= s.airDraftM + b.superstructureClearanceM) continue
+    if (undersideM >= s.airDraftM + b.superstructureClearanceM) continue
     if (lo <= v.berthX + s.houseToM && hi >= v.berthX + s.houseFromM) return v
   }
   return null
@@ -129,7 +136,7 @@ export function passSuperstructure(ctx: EngineContext, sts: StsState, moves: Mov
 /** #302: the superstructure a lowered boom would hit on the gantry move to `targetX` (boom mode real, boom down), or null. */
 function crossing(ctx: EngineContext, sts: StsState, targetX: number): VesselState | null {
   if (!boomReal(ctx) || needsLowering(ctx, sts)) return null
-  return superstructureOnPath(ctx, sts.gantryX, targetX)
+  return superstructureOnPath(ctx, sts.gantryX, targetX, sts.id)
 }
 
 /** #302: the vessel whose superstructure blocks the gantry move to `targetX` when `canGantryWithBoomRaised` is false, or null. */

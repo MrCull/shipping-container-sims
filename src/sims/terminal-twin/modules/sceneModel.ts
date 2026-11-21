@@ -45,6 +45,7 @@ import {
   type LandsideGraph,
   type MotionSegment,
   type Reservation,
+  stsSafeHoist,
 } from '../engine'
 import { planCargo } from '../scenario/bayPlan'
 import { isoTypeOf, type ContainerProps } from '../scenario/containerProps'
@@ -346,7 +347,7 @@ export class SceneModel {
     this.initialPose = Object.fromEntries(
       config.sts.map((s) => [
         s.id,
-        { gantryX: s.gantryX, trolleyZ: config.layout.stsGroundLaneZ0M, hoistY: config.layout.stsSafeHoistM },
+        { gantryX: s.gantryX, trolleyZ: config.layout.stsGroundLaneZ0M, hoistY: stsSafeHoist(config, s.id) },
       ]),
     )
     for (const s of config.sts) this.axisSegments[s.id] = emptyAxes()

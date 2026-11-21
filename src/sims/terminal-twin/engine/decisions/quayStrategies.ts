@@ -45,11 +45,12 @@ export function bestFitBerth(req: BerthAllocationRequest): BerthAllocationReply 
 
 /**
  * The free cranes a vessel may use: a contiguous run in rail order that has
- * every crane of a vessel further along the quay on the correct side.
+ * every crane of a vessel further along the quay on the correct side, and
+ * not out of reach of the vessel (#303).
  */
 export function eligibleCranes(req: CraneSplitRequest): CraneSplitRequest['cranes'] {
   return req.cranes.filter((c) => {
-    if (c.vesselId !== null) return false
+    if (c.vesselId !== null || c.outOfReach) return false
     return req.cranes.every((o) => {
       if (o.vesselId === null || o.vesselId === req.vesselId || o.vesselBerthX === null) return true
       return o.railIndex < c.railIndex ? o.vesselBerthX < req.berthX : o.vesselBerthX > req.berthX
@@ -63,9 +64,13 @@ function chooseCranes(req: CraneSplitRequest, n: number): string[] {
   if (n <= 0 || free.length === 0) return []
   n = Math.min(n, free.length)
   const workCentre = req.bays.reduce((s, b) => s + b.x, 0) / req.bays.length
-  let best = 0
+  let best = -1
   let bestCost = Infinity
+  // #303: a free crane that is out of reach stays idle; never choose cranes on both sides of it.
+  const idle = req.cranes.filter((c) => c.vesselId === null && c.outOfReach).map((c) => c.railIndex)
+  const spansIdle = (i: number) => idle.some((r) => r > free[i].railIndex && r < free[i + n - 1].railIndex)
   for (let i = 0; i + n <= free.length; i++) {
+    if (spansIdle(i)) continue
     const mean = free.slice(i, i + n).reduce((s, c) => s + c.gantryX, 0) / n
     const cost = Math.abs(mean - workCentre)
     if (cost < bestCost - 1e-9) {
@@ -73,6 +78,7 @@ function chooseCranes(req: CraneSplitRequest, n: number): string[] {
       best = i
     }
   }
+  if (best < 0) return chooseCranes(req, n - 1)
   return free.slice(best, best + n).map((c) => c.stsId)
 }
 
