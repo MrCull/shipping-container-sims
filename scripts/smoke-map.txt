@@ -6,6 +6,7 @@
 # unit tests (*.test.ts). Patterns match a file or folder name, never a substring of a path (the word "tests"
 # contains "sts"). Add a line when a new area gets its own spec.
 (^|/)tests/browser/(openTwin|frameSampling)\.ts$ => all
+(^|/)(sceneDriver|sceneState|useTwinScene)\.ts$ => all
 (^|/)tests/browser/scenarioPicker\.ts$ => setup
 (^|/)tests/browser/renderBudget[A-Za-z.]*\.ts$ => core
 (^|/)(bay|Bay|rob|Rob|hullProfile)[A-Za-z-]*\.(ts|vue)$ => vessel
