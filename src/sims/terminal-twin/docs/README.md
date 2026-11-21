@@ -37,6 +37,7 @@ Written for AI agents that need to learn the Terminal Twin quickly and help deci
 | [pitfalls-and-gaps.md](pitfalls-and-gaps.md) | Which known behaviours, pitfalls and gaps should an agent know before changing anything? |
 | [reports/realistic-volume-reports.md](reports/realistic-volume-reports.md) | Measured runs per `TTI_MOVES_SCALE` step (run lines, KPIs, profiles, failure analyses). |
 | [reports/throughput-and-speed-report.md](reports/throughput-and-speed-report.md) | Measured CPU profile and sim-time breakdown of the peak day (engine 0.52.0, scale 0.5). |
+| [reports/crane-plan-report.md](reports/crane-plan-report.md) | Crane plan (#288): peak-day cost against main, predicted against actual finish, conflict and rail wait. |
 
 ## Keeping these docs current
 

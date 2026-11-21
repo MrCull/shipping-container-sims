@@ -48,6 +48,9 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Mooring / unmooring:** the time from berth allocation to all-fast, and from the last move to departure.
 - **Vessel status (#126):** the view of one vessel the popup and label show: phase (approaching, waiting for berth, mooring, berthed (no move yet, "starting soon"), working, unmooring, departed), ETA, **operations start** (the berth time once berthed, else berth allocation plus the mooring time, an estimate; unknown while waiting) and the **countdown** to it, and moves done and remaining per STS. Display only: not in the event log.
 - **Crane split:** which STS cranes work which bays of a vessel (a decision point). Cranes keep rail order, so bay ranges follow crane order.
+- **Crane plan (#288):** per vessel, the crane split and each crane's ordered packages as one record (`SimState.cranePlans`), with a predicted start and end per package. The engine works packages in plan order; the times are advisory and never enforced.
+- **Conflict window (#288):** a predicted time interval in which two neighbouring cranes are planned closer than the minimum STS spacing (cranes of another vessel count as fixed obstacles). Marks where rail wait is likely.
+- **Plan accuracy (#288):** predicted against actual finish, predicted conflict seconds against actual rail wait, and mean package start error, per vessel.
 - **Twin-20 lift:** an STS lift of the two 20 ft boxes of one cell in one cycle; each box gets its own ground position.
 - **Deck before hold:** within a bay, an STS discharges the deck stacks (top tier first) before the hold.
 - **Bay work order (with hatch covers):** within a 40 ft bay: deck discharge → hatch removal → hold discharge → hold load → hatch replacement → deck load. A hatch is opened only when its bay has hold work under it.

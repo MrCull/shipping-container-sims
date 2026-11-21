@@ -8,7 +8,9 @@ import TtIcon from './ui/TtIcon.vue'
  * Refreshes a few times a second while open (never per frame).
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { BAY_PLANS, buildBayView, remainingByPlan, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
+import CranePlanView from './CranePlanView.vue'
+import { useFloatingPanel } from '../composables/useFloatingPanel'
+import { BAY_PLANS, BAY_VIEW_MODES, buildBayView, remainingByPlan, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
 import { useTwinStore } from '../store/twinStore'
 import { t, type MessageKey } from '../i18n/messages'
 import { colourKeyLabel } from '../modules/colourLabels'
@@ -21,6 +23,11 @@ const SECTION_WIDTH_PX = 210
 const MAX_CELL_PX = 24
 
 let timer: ReturnType<typeof setInterval> | null = null
+
+/** The Crane plan view floats: drag the header, resize from the corner, remembered for the session (#288). */
+const viewerEl = ref<HTMLElement | null>(null)
+const floating = computed(() => store.bayViewMode === 'crane-plan')
+const float = useFloatingPanel(viewerEl, 'tt.cranePlan.panel', () => floating.value)
 
 const vesselName = computed(() => store.config?.vessels.find((v) => v.id === store.bayViewerVesselId)?.name ?? store.bayViewerVesselId ?? '')
 
@@ -117,13 +124,24 @@ onBeforeUnmount(() => {
 
 <template>
   <section
+    ref="viewerEl"
     class="bay-viewer"
+    :class="{ floating }"
+    :style="float.style.value"
     data-testid="tt-bay-viewer"
     role="dialog"
     :aria-label="t('bayViewer.title')"
     @mouseleave="hovered = null"
   >
-    <header class="head">
+    <header
+      class="head"
+      :class="{ draggable: floating }"
+      data-testid="tt-bay-head"
+      @pointerdown="float.startDrag"
+      @pointermove="float.moveDrag"
+      @pointerup="float.endDrag"
+      @pointercancel="float.endDrag"
+    >
       <h2 data-testid="tt-bay-heading">
         {{ view ? t('bayViewer.heading', { vessel: vesselName, bay: pad2(view.bayNumber) }) : t('bayViewer.title') }}
       </h2>
@@ -146,7 +164,36 @@ onBeforeUnmount(() => {
       {{ t('bayViewer.noVessel') }}
     </p>
 
-    <template v-else>
+    <div
+      v-if="view"
+      class="nav mode-row"
+    >
+      <div
+        class="seg"
+        role="radiogroup"
+        data-testid="tt-bay-mode"
+        :data-mode="store.bayViewMode"
+        :aria-label="t('bayViewer.mode')"
+      >
+        <button
+          v-for="m in BAY_VIEW_MODES"
+          :key="m"
+          type="button"
+          role="radio"
+          class="seg-btn"
+          :class="{ active: store.bayViewMode === m }"
+          :aria-checked="store.bayViewMode === m"
+          :data-testid="`tt-bay-mode-${m}`"
+          @click="store.setBayViewMode(m)"
+        >
+          {{ t(`bayViewer.mode.${m}` as MessageKey) }}
+        </button>
+      </div>
+    </div>
+
+    <CranePlanView v-if="view && store.bayViewMode === 'crane-plan'" />
+
+    <template v-else-if="view">
       <div class="nav">
         <button
           type="button"
@@ -398,6 +445,21 @@ onBeforeUnmount(() => {
         </aside>
       </div>
     </template>
+
+    <div
+      v-if="floating"
+      class="resize-anchor"
+    >
+      <span
+        class="resize-handle"
+        data-testid="tt-bay-resize"
+        :title="t('bayViewer.resize')"
+        @pointerdown="float.startResize"
+        @pointermove="float.moveResize"
+        @pointerup="float.endResize"
+        @pointercancel="float.endResize"
+      />
+    </div>
 
     <div
       v-if="hovered"
@@ -908,5 +970,35 @@ h2 {
 .tip dd {
   font-variant-numeric: tabular-nums;
   word-break: break-word;
+}
+
+.bay-viewer.floating {
+  max-height: calc(100% - 12rem); /* clear of the overlay bar at the bottom */
+  min-width: 360px;
+  min-height: 240px;
+  max-width: calc(100% - 0.4rem);
+}
+
+.head.draggable {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.resize-anchor {
+  position: sticky;
+  bottom: -0.55rem;
+  height: 0;
+}
+
+.resize-handle {
+  position: absolute;
+  right: -0.45rem;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 0 55%, var(--tt-text-muted) 55% 62%, transparent 62% 72%, var(--tt-text-muted) 72% 79%, transparent 79%);
 }
 </style>
