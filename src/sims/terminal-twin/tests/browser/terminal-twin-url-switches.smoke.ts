@@ -82,10 +82,11 @@ test('TTI baseline with render=off and quality=low: the scene updates at a usabl
   test.setTimeout(180_000)
   const errors = watch(page)
   await open(page, '?render=off&quality=low', 'TTI Algeciras baseline')
+  await page.waitForFunction(() => (window.__tt!.scene()?.containers ?? 0) > 8_000, undefined, { timeout: 120_000 }) // the full yard, as terminal-twin-perf measures it
   await page.evaluate(() => window.__tt!.viewPreset('overview'))
   const fps = await frameRate(page, 4000)
   console.log(`render=off quality=low TTI baseline: ${fps.toFixed(1)} scene frames per second`)
-  expect(fps).toBeGreaterThan(2.78) // the measured Low rate with drawing on (#320)
+  expect(fps).toBeGreaterThan(2.78) // the measured Low rate with drawing on (#320); High with drawing on is about 0.5
   expect((await page.evaluate(() => window.__tt!.renderOnce()))!.calls).toBeGreaterThan(0)
   expect(errors).toEqual([])
 })
