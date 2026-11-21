@@ -25,16 +25,12 @@ test('high: hero faces within the cap at 10 m, none at the overview', { tag: '@y
   await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
 
   await page.evaluate(() => window.__tt!.viewPreset('overview'))
-  await page.waitForTimeout(800)
-  expect(await page.evaluate(() => window.__tt!.perf().stats.heroFaces)).toBe(0)
+  await expect.poll(() => page.evaluate(() => window.__tt!.perf().stats.heroFaces)).toBe(0)
   expect(heroRequests).toEqual([])
 
   await page.evaluate(() => window.__tt!.cameraTo('B01', 10))
-  await page.waitForFunction(() => window.__tt!.perf().stats.heroFaces > 0, undefined, { timeout: 60_000 })
-  await page.waitForTimeout(800)
-  const near = await page.evaluate(() => window.__tt!.perf().stats)
-  expect(near.heroFaces).toBeGreaterThan(0)
-  expect(near.heroFaces).toBeLessThanOrEqual(96) // High's cap
+  await expect.poll(() => page.evaluate(() => window.__tt!.perf().stats.heroFaces), { timeout: 60_000 }).toBeGreaterThan(0)
+  expect(await page.evaluate(() => window.__tt!.perf().stats.heroFaces)).toBeLessThanOrEqual(96) // High's cap
   expect(heroRequests.length).toBeGreaterThan(0)
   await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/hero-yard-high.png' })

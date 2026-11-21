@@ -25,9 +25,16 @@ test('a PR touching only the bay viewer runs core and vessel, and the comment sa
 })
 
 test('a docs-only PR runs nothing, and the comment says so', () => {
-  const p = plan('pull_request', ['smoke:camera'], ['README.md', 'docs/agents/tooling.md'])
+  const p = plan('pull_request', ['bug'], ['README.md', 'docs/agents/tooling.md'])
   assert.equal(p.run, false)
   assert.match(commentBody(p), /No smoke tests ran: no file under src\/ changed/)
+})
+
+test('the smoke label on a docs-only PR runs every group', () => {
+  const p = plan('pull_request', ['smoke'], ['README.md'])
+  assert.equal(p.run, true)
+  assert.equal(p.all, true)
+  assert.equal(p.grep, '')
 })
 
 test('the smoke label runs every group with no grep; a smoke:<group> label shows as a label source', () => {

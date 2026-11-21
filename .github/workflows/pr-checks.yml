@@ -2,12 +2,12 @@ name: PR checks
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     branches:
       - main
-  # Browser smoke tests: a PR that changes src/ runs `core` plus the groups its `smoke:<group>` labels and changed files
-  # select (scripts/smoke-ci.mjs plan, on scripts/smoke-select.mjs); the plain `smoke` label, a manual "Run workflow" and
-  # every push to main (a merge) run every group. A label event re-runs the selection (and the whole workflow).
+  # Browser smoke tests: a PR that changes src/ or carries a smoke label runs `core` plus the groups its `smoke:<group>`
+  # labels and changed files select (scripts/smoke-ci.mjs plan, on scripts/smoke-select.mjs); the plain `smoke` label, a manual "Run workflow" and
+  # every push to main (a merge) run every group. Adding or removing a label re-runs the selection (and the whole workflow).
   push:
     branches:
       - main
@@ -89,7 +89,7 @@ jobs:
   # Browser smoke tests run in four jobs: `smoke-select` picks the groups (and comments on the PR why), `smoke-build`
   # makes both bundles once and splits the selected tests into 1 to 6 shards by recorded time, `smoke-shard` runs them,
   # and `smoke` merges the shards' per-test results into one SMOKE line, one timing table and one pass or fail. `smoke`
-  # (Browser smoke tests (Terminal Twin)) is the required check: it passes as a no-op when no file under src/ changed.
+  # (Browser smoke tests (Terminal Twin)) is the required check: it passes as a no-op when nothing was selected.
   # `@load` specs (need a real frame rate) are not run in CI: run them locally.
   smoke-select:
     runs-on: ubuntu-latest
@@ -307,7 +307,7 @@ jobs:
 
   smoke:
     # The required check (branch protection names it). Always runs, so it always reports: a no-op pass when the selection
-    # ran nothing (no file under src/ changed), else the merged result of the shards.
+    # ran nothing (no file under src/ changed and no smoke label), else the merged result of the shards.
     needs: [smoke-select, smoke-build, smoke-shard]
     if: always()
     runs-on: ubuntu-latest
@@ -325,7 +325,7 @@ jobs:
       - name: No smoke run needed
         if: env.RUN != 'true'
         run: |
-          echo "No file under src/ changed: no smoke tests selected, nothing to run." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "No file under src/ changed and no smoke label: no smoke tests selected, nothing to run." | tee -a "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/checkout@v4
         if: env.RUN == 'true'

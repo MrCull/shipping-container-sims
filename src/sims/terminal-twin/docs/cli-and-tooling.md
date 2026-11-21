@@ -198,7 +198,7 @@ Details of the generators, budgets and sidecars: [assets-pipeline.md](assets-pip
 | `scripts/check-engine-version.sh [base]` | fails if `ENGINE_VERSION` on HEAD is lower than on base (default `HEAD^1`); run after resolving a merge |
 | `pnpm run test:related [--allow-empty] [base]` | only the Vitest suites that import changed files |
 | `node scripts/smoke-select.mjs [--labels a,b] [--base B --head H] [--grep]` + `scripts/smoke-map.txt` | smoke groups a change needs, with the reason for each (path pattern => groups; labels `smoke`, `smoke:<group>`); `merge-ticket.sh --smoke` runs only those. Every spec carries one group tag (`scripts/check-smoke-groups.mjs`, in verify). Add a map line when a new area gets its own spec |
-| `pnpm run test:smoke` | Playwright, `src/**/*.smoke.ts`; `dev` project (Vite dev server) and `prod` project (`*.prod.smoke.ts`, production build); free ports unless `SMOKE_DEV_PORT`/`SMOKE_PROD_PORT`; `@load` specs need a real frame rate and never run in CI |
+| `pnpm run test:smoke` | Playwright, `src/**/*.smoke.ts`; `dev` project (the smoke build by default, a bundled `vite build --mode smoke` that keeps `window.__tt`; `SMOKE_SERVER=dev` opts in to the Vite dev server) and `prod` project (`*.prod.smoke.ts`, production build); free ports unless `SMOKE_DEV_PORT`/`SMOKE_PROD_PORT`; `@load` specs need a real frame rate and never run in CI |
 
 Browser-side recipes (`window.__tt` calls inside `--eval`) are in [browser-host.md](browser-host.md#the-window__tt-dev-api).
 

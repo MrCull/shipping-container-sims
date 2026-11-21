@@ -17,7 +17,7 @@ async function open(page: Page, fixture: string): Promise<void> {
 }
 
 test('ASC and SHC spreaders are 20 ft long for a 20 ft box and 40 ft long for a 40', { tag: '@equipment' }, async ({ page }) => {
-  test.slow()
+  test.slow() // up to 40 s wall: waits until the ASC and the SHC have each carried a 20 and a 40
   await open(page, 'asc-1sts-10-boxes-1block') // 20 ft and 40 ft boxes mixed, STS to SHC to WTP pad to ASC
   await page.waitForFunction(() => window.__tt!.scene()?.ascAssets === 'loaded' && window.__tt!.scene()?.shcAssets === 'loaded')
   // The first picks are 40s and the pair of 20s comes at about 735 s: run past it (x30, until each kind has carried both, 40 s wall at most)

@@ -37,10 +37,17 @@ test('the plain smoke label runs every group', () => {
   assert.deepEqual(names(r), GROUPS)
 })
 
-test('no change under src/ runs nothing, even with labels', () => {
-  const r = pick(['smoke:camera'], ['README.md', 'scripts/foo.sh', '.github/workflows/pr-checks.yml'])
+test('no change under src/ and no smoke label runs nothing', () => {
+  const r = pick(['bug'], ['README.md', 'scripts/foo.sh', '.github/workflows/pr-checks.yml'])
   assert.deepEqual(names(r), [])
   assert.match(r.why, /no file under src\//)
+})
+
+test('labels win over the no-src rule: smoke runs every group, smoke:<group> runs core and that group', () => {
+  const docs = ['README.md', 'docs/agents/tooling.md']
+  assert.deepEqual(names(pick(['smoke'], docs)), GROUPS)
+  assert.deepEqual(names(pick(['smoke:camera'], docs)), ['core', 'camera'])
+  assert.deepEqual(names(pick(['smoke:camera'], [])), ['core', 'camera'])
 })
 
 test('CLI-only, Markdown and unit-test changes run core only', () => {

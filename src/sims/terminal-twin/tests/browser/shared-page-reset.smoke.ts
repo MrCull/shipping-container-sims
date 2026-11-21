@@ -1,7 +1,9 @@
 /**
  * The worker's shared page (#329, `twinTest.ts`): state one test leaves behind (an open panel, a selection, a colour-by
  * mode, overlays, speed, storage, a console listener) is gone after the reset that runs before the next test, and the
- * reset reuses the page (no page load). The test runs the reset itself, so it does not depend on test order.
+ * reset reuses the page (no page load). One test runs the reset itself instead of a test A that leaves state and a
+ * test B that checks it is gone: `playwright.config.ts` sets `fullyParallel: true` and CI shards by test, so A and B
+ * may run on different workers or shards, in either order, and a serial describe is not allowed (`docs/agents/tooling.md`).
  * Run with `pnpm run test:smoke --project=dev shared-page-reset`.
  */
 import type {} from '../../dev/devApi' // window.__tt typing

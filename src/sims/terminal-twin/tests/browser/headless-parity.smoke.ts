@@ -36,7 +36,7 @@ function comparable(state: SceneState): Record<string, unknown> {
 }
 
 test('the headless scene reports the same scene state as the browser for the same fixture, seed and time', { tag: '@core' }, async ({ page }) => {
-  test.setTimeout(120_000)
+  test.setTimeout(120_000) // over the 30 s budget: the browser run plus a second, headless run of the fixture in a Node child (tsx start-up included)
   await openTwin(page, { scenario: FIXTURE })
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'StsMoveStarted' }))
   // two more frame updates, so what is drawn is the state at the paused time

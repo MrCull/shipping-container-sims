@@ -8,7 +8,7 @@
  *   node scripts/smoke-ci.mjs red-main --repo owner/name --sha S --run-url U [--dry-run] <results.jsonl>...
  *
  * plan: a pull_request event runs scripts/smoke-select.mjs's groups for its labels and changed files (none when no
- * file under src/ changed); push (a merge to main) and workflow_dispatch run every group. Writes `run=true|false` and
+ * file under src/ changed and no `smoke` or `smoke:<group>` label is set); push (a merge to main) and workflow_dispatch run every group. Writes `run=true|false` and
  * `grep=<pattern>` (empty: every group) to `--github-output`, and the PR comment body to `--comment-out`.
  * comment: creates the PR's one smoke comment (found by its hidden marker) or updates it in place. Needs GITHUB_TOKEN.
  * red-main: opens an issue (label needs-triage) naming the failing specs, the commit, its PR (from the merge commit
@@ -20,8 +20,7 @@ import { existsSync, readFileSync, appendFileSync, writeFileSync } from 'node:fs
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { GROUPS } from './smoke-groups.mjs'
-import { parseMap, selectGroups } from './smoke-select.mjs'
-import { groupOfSource } from './check-smoke-groups.mjs'
+import { loadSelectionInputs, selectGroups } from './smoke-select.mjs'
 import { mergeShards } from './smoke-merge.mjs'
 
 export const COMMENT_MARKER = '<!-- smoke-selection -->'
@@ -143,8 +142,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     const labels = (opt('--labels', '') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
     const from = opt('--files-from')
     const files = from && existsSync(from) ? readFileSync(from, 'utf8').split('\n').map((s) => s.trim()).filter(Boolean) : []
-    const map = parseMap(readFileSync(join(root, 'scripts/smoke-map.txt'), 'utf8'))
-    const specGroup = (f) => (existsSync(join(root, f)) ? groupOfSource(readFileSync(join(root, f), 'utf8')) : null)
+    const { map, specGroup } = loadSelectionInputs(root)
     const plan = planSmoke({ event: opt('--event', 'pull_request'), labels, files, map, specGroup })
     for (const w of plan.warnings) console.error(`smoke-ci: ${w}`)
     console.log(`smoke-ci: ${plan.run ? `run ${plan.all ? 'every group' : plan.grep}` : 'no smoke run'} (${plan.why})`)

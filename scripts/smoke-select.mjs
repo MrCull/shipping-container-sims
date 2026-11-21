@@ -5,7 +5,8 @@
  *   node scripts/smoke-select.mjs [--labels a,b] [--base <ref>] [--head <ref>] [--files-from FILE] [--grep]
  *
  * Changed files come from `--files-from` (one path per line) or `git diff --name-only <base> <head>` (default
- * HEAD^1 HEAD, the last merge). Rules: nothing when no file under src/ changed; otherwise `core`, plus every
+ * HEAD^1 HEAD, the last merge). Rules: nothing when no file under src/ changed and no `smoke` or `smoke:<group>`
+ * label is set; otherwise `core`, plus every
  * `smoke:<group>` label, plus every group scripts/smoke-map.txt assigns to a changed path, plus the group of each
  * changed smoke spec (its tag); every group when the plain `smoke` label is present. Markdown, docs/ folders,
  * Node-only CLI code (src/sims/*\/cli/) and unit tests (*.test.ts) never select a group beyond core.
@@ -21,6 +22,17 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { GROUPS } from './smoke-groups.mjs'
 import { groupOfSource } from './check-smoke-groups.mjs'
+
+/**
+ * The repo's smoke map (scripts/smoke-map.txt) and a `specGroup(file)` that reads a changed spec's group tag (null
+ * when the file is gone), the inputs `selectGroups` takes besides labels and files. Shared with scripts/smoke-ci.mjs.
+ * @param {string} root the repo root
+ */
+export function loadSelectionInputs(root) {
+  const map = parseMap(readFileSync(join(root, 'scripts/smoke-map.txt'), 'utf8'))
+  const specGroup = (f) => (existsSync(join(root, f)) ? groupOfSource(readFileSync(join(root, f), 'utf8')) : null)
+  return { map, specGroup }
+}
 
 /** Map lines `pattern => group group` (comments and blank lines skipped) as `{ re, groups }`. */
 export function parseMap(text) {
@@ -42,7 +54,8 @@ const SPEC = /\.smoke\.ts$/
  */
 export function selectGroups({ labels, files, map, specGroup }) {
   const warnings = []
-  if (!files.some((f) => f.startsWith('src/'))) return { groups: [], warnings, why: 'no file under src/ changed: no smoke run' }
+  const labelled = labels.some((l) => l === 'smoke' || l.startsWith('smoke:'))
+  if (!labelled && !files.some((f) => f.startsWith('src/'))) return { groups: [], warnings, why: 'no file under src/ changed: no smoke run' }
   const reasons = new Map(GROUPS.map((g) => [g, []]))
   const add = (g, why) => reasons.get(g).push(why)
   add('core', 'always')
@@ -81,8 +94,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ? readFileSync(from, 'utf8')
     : execFileSync('git', ['diff', '--name-only', opt('--base') ?? 'HEAD^1', opt('--head') ?? 'HEAD'], { cwd: root, encoding: 'utf8' })
   const files = text.split('\n').map((s) => s.trim()).filter(Boolean)
-  const map = parseMap(readFileSync(join(root, 'scripts/smoke-map.txt'), 'utf8'))
-  const specGroup = (f) => (existsSync(join(root, f)) ? groupOfSource(readFileSync(join(root, f), 'utf8')) : null)
+  const { map, specGroup } = loadSelectionInputs(root)
   const r = selectGroups({ labels, files, map, specGroup })
   for (const w of r.warnings) console.error(`smoke-select: ${w}`)
   if (args.includes('--grep')) console.log(r.groups.map((g) => `@${g.group}`).join('|'))

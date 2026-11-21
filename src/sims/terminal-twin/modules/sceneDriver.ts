@@ -60,19 +60,18 @@ export class SceneDriver {
     return this.builtFor
   }
 
-  /** Builds the view for `model` if it is not the one built for; true when a new view was built (or the old one dropped). */
-  sync(model: SceneModel | null, quality: QualityProfile, markStep: HeroMarkStep): boolean {
-    if (model === this.builtFor) return false
+  /** Builds the view for `model` if it is not the one built for (drops the old one; none for a null model). */
+  sync(model: SceneModel | null, quality: QualityProfile, markStep: HeroMarkStep): void {
+    if (model === this.builtFor) return
     this.view?.dispose()
     this.view = null
     this.builtFor = model
     this.overlaysApplied = null
     this.lightingKey = ''
-    if (!model) return true
+    if (!model) return
     this.view = this.create(model)
     this.view.setQuality(quality)
     this.view.setHeroMarkStep(markStep)
-    return true
   }
 
   /** One frame update: overlays, colour by, lighting (re-applied when the clock moves a minute), then the pose. */

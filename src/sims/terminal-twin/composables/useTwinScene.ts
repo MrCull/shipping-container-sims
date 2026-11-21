@@ -9,7 +9,7 @@ import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { applyPinchStep } from '../modules/pinchGesture'
-import { sceneCamera } from '../modules/sceneCamera'
+import { ORBIT_MIN_DISTANCE_M, sceneCamera } from '../modules/sceneCamera'
 import { WheelZoom } from '../modules/wheelZoom'
 import { NO_OVERLAYS } from '../modules/overlays'
 import { pickEntity } from '../modules/picking'
@@ -384,7 +384,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         controls = new OrbitControls(camera, renderer.domElement)
         controls.enableDamping = true
         controls.dampingFactor = 0.08
-        controls.minDistance = 8
+        controls.minDistance = ORBIT_MIN_DISTANCE_M
         controls.maxDistance = 3500
         controls.maxPolarAngle = Math.PI / 2.05
         // Map-like handling (phones especially): a pan slides the target along the ground instead of lifting it into the

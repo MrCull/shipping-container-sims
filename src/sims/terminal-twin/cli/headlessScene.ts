@@ -22,7 +22,7 @@ import { DEFAULT_COLOUR_BY, DEFAULT_ROB_DISPLAY, type ColourBy, type RobDisplay 
 import type { EngineResponse } from '../modules/engineClient'
 import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import { profileFor, type QualityLevel } from '../modules/quality'
-import { cameraAtPose } from '../modules/sceneCamera'
+import { cameraAtPose, ORBIT_MIN_DISTANCE_M } from '../modules/sceneCamera'
 import { openingCamera, SceneDriver, sceneStateOf } from '../modules/sceneDriver'
 import type { SceneRenderer, SceneStats } from '../modules/sceneRenderer'
 import type { SceneState } from '../modules/sceneState'
@@ -129,6 +129,7 @@ export async function headlessScene(name: string, options: HeadlessSceneOptions 
   function placed(at: THREE.Vector3, offset: THREE.Vector3): THREE.PerspectiveCamera {
     target = at.clone()
     const cam = new THREE.PerspectiveCamera()
+    // the dummy pose only lends its projection (fov, aspect, near, far); position and aim are set below
     cam.copy(cameraAtPose({ target: at, distance: 1, azimuth: 0, polar: 1 }, VIEWPORT.width, VIEWPORT.height))
     cam.position.copy(at).add(offset)
     cam.lookAt(at)
@@ -181,9 +182,9 @@ export async function headlessScene(name: string, options: HeadlessSceneOptions 
     cameraTo(entityId, distanceM) {
       const centre = model.entityCentre(entityId, controller.displayTime)
       if (!centre) return false
-      // the browser's aim(): keep the view direction, optionally at a new distance (never closer than the orbit minimum, 8 m)
+      // the browser's aim(): keep the view direction, optionally at a new distance (never closer than the orbit minimum)
       const offset = camera.position.clone().sub(target)
-      if (distanceM !== undefined) offset.setLength(Math.max(8, distanceM))
+      if (distanceM !== undefined) offset.setLength(Math.max(ORBIT_MIN_DISTANCE_M, distanceM))
       camera = placed(new THREE.Vector3(centre.x, centre.y, centre.z), offset)
       return true
     },
