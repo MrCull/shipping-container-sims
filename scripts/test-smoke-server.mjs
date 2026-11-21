@@ -1,7 +1,7 @@
 // Run: node --test scripts/test-smoke-server.mjs
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { smokeDevServer } from './smoke-server.mjs'
+import { smokeDevServer, smokeProdServer } from './smoke-server.mjs'
 
 const opts = { port: 5199, vite: 'VITE' }
 
@@ -36,4 +36,18 @@ test('SMOKE_BUILD_PREBUILT=1 serves an existing smoke build without rebuilding (
 
 test('an unknown SMOKE_SERVER value is an error, not a silent fallback', () => {
   assert.throws(() => smokeDevServer({ SMOKE_SERVER: 'prod' }, opts), /SMOKE_SERVER must be "dev" or "build"/)
+})
+
+test('the prod project builds the production bundle into .smoke-dist, then serves it', () => {
+  const s = smokeProdServer({}, opts)
+  assert.equal(s.url, 'http://127.0.0.1:5199')
+  assert.equal(
+    s.command,
+    'VITE build --outDir .smoke-dist --emptyOutDir --logLevel warn && VITE preview --outDir .smoke-dist --host 127.0.0.1 --port 5199 --strictPort',
+  )
+})
+
+test('SMOKE_PROD_PREBUILT=1 serves an existing production build (a CI shard handed the artifact)', () => {
+  const s = smokeProdServer({ SMOKE_PROD_PREBUILT: '1', SMOKE_PROD_DIR: 'out/prod' }, opts)
+  assert.equal(s.command, 'VITE preview --outDir out/prod --host 127.0.0.1 --port 5199 --strictPort')
 })

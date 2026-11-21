@@ -1,5 +1,6 @@
 import type { SimDefinition } from '@/types/sim'
 import { getStowageMasterProgressSummary } from './modules/progressStorage'
+import cardImage from './assets/home-cover.jpg?url'
 
 export const definition: SimDefinition = {
   id: 'stowage-master',
@@ -13,6 +14,7 @@ export const definition: SimDefinition = {
   status: 'playable',
   order: 1,
   color: '#3b82f6',
+  cardImage,
   tags: ['3D', 'Puzzle', 'Logistics'],
   progressSummary: getStowageMasterProgressSummary,
   component: () => import('./StowageMaster.vue'),

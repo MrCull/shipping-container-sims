@@ -1,5 +1,6 @@
 import type { SimDefinition } from '@/types/sim'
 import boxEmpireLogo from './assets/logo.svg?url'
+import cardImage from './assets/home-cover.jpg?url'
 
 export const definition: SimDefinition = {
   id: 'box-empire',
@@ -14,6 +15,7 @@ export const definition: SimDefinition = {
   status: 'playable',
   order: 3,
   color: '#f59e0b',
+  cardImage,
   tags: ['Tycoon', 'Strategy', 'Economy'],
   component: () => import('./BoxEmpire.vue'),
 }
