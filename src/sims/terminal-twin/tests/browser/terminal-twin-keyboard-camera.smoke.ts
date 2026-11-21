@@ -65,7 +65,11 @@ test('held keys pan, orbit and zoom; release stops; typing is ignored; follow is
   await page.keyboard.down('w')
   await page.waitForTimeout(300)
   await page.keyboard.up('w')
-  expect(await pose(page)).toEqual(p3)
+  const p4 = await pose(page) // compare with a tolerance: the pose carries float noise (3.0000000000000027 vs 3.000000000000002)
+  expect(p4.distance).toBeCloseTo(p3.distance, 6)
+  expect(p4.azimuth).toBeCloseTo(p3.azimuth, 6)
+  expect(p4.polar).toBeCloseTo(p3.polar, 6)
+  for (const k of ['x', 'y', 'z'] as const) expect(p4.target[k], `target ${k}`).toBeCloseTo(p3.target[k], 6)
   await page.keyboard.press('Escape')
 
   // A camera key releases follow mode.

@@ -36,10 +36,11 @@ async function open(page: Page, vessels: VesselConfig[], quayLengthM: number): P
   )
   // Berthed (mooring takes a while), before the cranes have taken much off.
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'StsMoveStarted' }))
-  await page.waitForFunction(() => {
+  // Wait for this load's hulls by id: on the shared page an empty or previous map would pass an `every` check.
+  await page.waitForFunction((ids) => {
     const s = window.__tt!.sceneState()
-    return !!s && Object.values(s.vesselHulls).every((h) => h.assets === 'loaded')
-  })
+    return !!s && ids.every((id) => s.vesselHulls[id]?.assets === 'loaded')
+  }, vessels.map((v) => v.id))
 }
 
 test('every size class renders its hull GLB and deck containers sit on its bay grid', { tag: '@vessel' }, async ({ page }) => {

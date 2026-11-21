@@ -16,6 +16,9 @@ import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 
+// Fresh page (#340): every test checks which hero files are requested, and a shared page has them cached from an earlier test.
+test.use({ fresh: true })
+
 const HIGH_CAP = 3
 const HERO_FILE = /hero-spreader-(sts|asc|shc)|hero-shc[.-]|hero-truck-/
 /** The hero model adds raised flippers and corner guides at the ends; its length stays within this of the rig spreader's. */
@@ -205,6 +208,8 @@ test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested befo
   await page.evaluate((t) => window.__tt!.setCameraPose({ target: t, distance: 18, azimuth: 0.7, polar: 1.2 }), { x: shc.x, y: 7, z: shc.z })
   await page.waitForFunction(() => window.__tt!.heroSettled() && window.__tt!.scene()!.heroShcBodies.length > 0, undefined, { timeout: 150_000 })
   await page.waitForFunction(() => window.__tt!.scene()!.heroShcBodies.every((b) => !b.fading && b.rigHidden), undefined, { timeout: 60_000 })
+  // the hero count in perf stats follows the frame that attached the body: poll it
+  await expect.poll(() => page.evaluate(() => window.__tt!.perf().stats.heroEquipment), { timeout: 30_000 }).toBeGreaterThanOrEqual(1)
   const near = await page.evaluate(() => ({ stats: window.__tt!.perf().stats.heroEquipment, bodies: window.__tt!.scene()!.heroShcBodies }))
   console.log(`hero SHC bodies: ${JSON.stringify(near.bodies)}`)
   expect(near.bodies.length).toBeGreaterThanOrEqual(1)
@@ -283,6 +288,8 @@ test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the 
   await page.evaluate(() => window.__tt!.setQuality('high'))
   await page.waitForFunction((id) => window.__tt!.heroSettled() && window.__tt!.scene()!.heroTrucks.some((t) => t.id === id), truck!.id, { timeout: 150_000 })
   await page.waitForFunction(() => window.__tt!.scene()!.heroTrucks.every((t) => !t.fading && t.rigHidden), undefined, { timeout: 60_000 })
+  // the hero count in perf stats follows the frame that attached the trucks: poll it
+  await expect.poll(() => page.evaluate(() => window.__tt!.perf().stats.heroEquipment), { timeout: 30_000 }).toBeGreaterThanOrEqual(1)
   const near = await page.evaluate(() => ({ stats: window.__tt!.perf().stats.heroEquipment, trucks: window.__tt!.scene()!.heroTrucks }))
   console.log(`hero trucks: ${JSON.stringify(near.trucks)}`)
   expect(near.stats).toBeGreaterThanOrEqual(1)
