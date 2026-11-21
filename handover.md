@@ -16,8 +16,8 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #330 | 07 Groups, tags, selection script | #328 | merged in branch (c81dd49) | |
 | #331 | 11 Headless scene, parity, vessel moves | #328 | merged in branch (67fdfde) | |
 | #332 | 14 Component tests | #328 | in progress | session 3 implementer |
-| #333 | 16 Engine fixtures to unit tests | #328 | open | |
-| #334 | 17 Smallest fixture | #328 | open | |
+| #333 | 16 Engine fixtures to unit tests | #328 | in progress | session 3 implementer |
+| #334 | 17 Smallest fixture | #328 | in progress | session 3 implementer |
 | #335 | 09 CI selection and triggers, red main opens an issue | #330, #327, #346 | open | |
 | #336 | 12 Yard moves | #331 | open | |
 | #337 | 13 Equipment moves | #331 | open | |
