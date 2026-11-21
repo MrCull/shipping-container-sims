@@ -66,8 +66,21 @@ describe('heatmap and gantt options', () => {
     sim.runUntil()
     const model = buildGanttModel(buildTimeline(sim.eventLog(), sim.now))
     const o = ganttOption(model, fmt) as { series: { name: string }[]; yAxis: { data: string[] } }
-    expect(o.series).toHaveLength(5)
+    expect(o.series).toHaveLength(7)
     expect(o.yAxis.data).toEqual(model.rows.map((r) => r.label))
     expect(model.rows.filter((r) => r.kind === 'vessel')).toHaveLength(2)
+  })
+
+  it('draws each crane package as its own bar, coloured by kind (#288)', () => {
+    const sim = createSimulation(fixtures['hatch-cover-cycle'])
+    sim.runUntil()
+    const timeline = buildTimeline(sim.eventLog(), sim.now)
+    const model = buildGanttModel(timeline)
+    const craneRows = new Set(model.rows.map((r, i) => (r.kind === 'crane' ? i : -1)).filter((i) => i >= 0))
+    const bars = model.bars.filter((b) => craneRows.has(b.row))
+    const worked = timeline.vessels.flatMap((v) => v.workPackages).filter((w) => w.endS > w.startS)
+    expect(bars).toHaveLength(worked.length)
+    expect(new Set(bars.map((b) => b.phase))).toContain('packageHatch')
+    expect(new Set(bars.map((b) => b.phase))).toContain('package')
   })
 })
