@@ -213,7 +213,7 @@ dashboard (`dashboardOpen/Tab/Data/Group/Bucketing/Rendered`), KPIs (`kpi`, `fin
   warnings and alerts, Inter (`--tt-font`, `--tt-font-mono`). Control surfaces: `--tt-control` (a button at rest),
   `--tt-surface-sunken` (inputs, segmented-control wells), `--tt-surface-raised` (cards). Global `--color-*` tokens are
   remapped inside the scope, so other sims keep their own look.
-- Themes: dark is the default; `store/themeStore.ts` (`theme`, `toggle()`, localStorage `terminal-twin.theme`) puts
+- Themes: light is the default; `store/themeStore.ts` (`theme`, `toggle()`, localStorage `terminal-twin.theme`) puts
   `data-tt-theme` on `<html>` while the sim is mounted (`TerminalTwin.vue`; removed on unmount), and the
   `/* @theme light */` block of `skin.css` overrides the colour tokens under `html[data-tt-theme='light']`. Toggles:
   `tt-theme-toggle` (top bar settings) and `tt-setup-theme-toggle` (setup dialog rail). A new colour token needs a

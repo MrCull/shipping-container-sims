@@ -1,14 +1,14 @@
 /**
  * Light or dark skin of the sim's UI (the 3D scene is not affected). The choice is remembered in localStorage (a
  * per-viewer convenience: every access is guarded, so a blocked storage just forgets) and applied as
- * `data-tt-theme` on `<html>` while the sim is mounted, where `skin.css` reads it. Dark is the default.
+ * `data-tt-theme` on `<html>` while the sim is mounted, where `skin.css` reads it. Light is the default.
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export type Theme = 'dark' | 'light'
 export const THEMES: readonly Theme[] = ['dark', 'light']
-export const DEFAULT_THEME: Theme = 'dark'
+export const DEFAULT_THEME: Theme = 'light'
 export const THEME_STORAGE_KEY = 'terminal-twin.theme'
 
 /** The stored value as a theme; anything else (nothing stored, an old value) is the default. */

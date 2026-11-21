@@ -23,30 +23,30 @@ describe('theme store', () => {
     vi.unstubAllGlobals()
   })
 
-  it('is dark unless a valid choice is stored', () => {
-    expect(DEFAULT_THEME).toBe('dark')
-    expect(parseTheme(null)).toBe('dark')
-    expect(parseTheme('sepia')).toBe('dark')
-    expect(parseTheme('light')).toBe('light')
-    expect(useThemeStore().theme).toBe('dark')
+  it('is light unless a valid choice is stored', () => {
+    expect(DEFAULT_THEME).toBe('light')
+    expect(parseTheme(null)).toBe('light')
+    expect(parseTheme('sepia')).toBe('light')
+    expect(parseTheme('dark')).toBe('dark')
+    expect(useThemeStore().theme).toBe('light')
   })
 
   it('toggles, remembers the choice and puts it on <html>', () => {
     const themes = useThemeStore()
     themes.toggle()
-    expect(themes.theme).toBe('light')
-    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light')
-    expect(document.documentElement.dataset.ttTheme).toBe('light')
-    themes.toggle()
     expect(themes.theme).toBe('dark')
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark')
     expect(document.documentElement.dataset.ttTheme).toBe('dark')
+    themes.toggle()
+    expect(themes.theme).toBe('light')
+    expect(document.documentElement.dataset.ttTheme).toBe('light')
   })
 
   it('starts from the stored choice, and leaving the sim clears the attribute', () => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, 'light')
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'dark')
     setActivePinia(createPinia())
-    expect(useThemeStore().theme).toBe('light')
-    applyTheme('light')
+    expect(useThemeStore().theme).toBe('dark')
+    applyTheme('dark')
     applyTheme(null)
     expect(document.documentElement.dataset.ttTheme).toBeUndefined()
   })
