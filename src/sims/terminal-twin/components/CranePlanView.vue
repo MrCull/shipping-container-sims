@@ -21,7 +21,7 @@ const model = computed(() => {
   const size = store.config?.vessels.find((v) => v.id === store.bayViewerVesselId)?.sizeClass
   if (!data || !size) return null
   try {
-    return buildCranePlanModel(data, size)
+    return buildCranePlanModel(data, size, store.displayTime)
   } catch {
     return null
   }
@@ -69,6 +69,22 @@ function barTitle(b: PlanBar): string {
   lines.push(t('cranePlan.tip.open'))
   return lines.join('\n')
 }
+
+/** The key under the chart: one entry per mark, drawn with the same classes as the chart. */
+const KEY: { id: string; swatch: string[] }[] = [
+  { id: 'discharge', swatch: ['bar', 'kind-discharge'] },
+  { id: 'load', swatch: ['bar', 'kind-load'] },
+  { id: 'hatch', swatch: ['bar', 'kind-hatch-remove'] },
+  { id: 'actual', swatch: ['bar', 'kind-discharge', 'actual', 'status-complete'] },
+  { id: 'active', swatch: ['bar', 'kind-discharge', 'actual', 'status-active'] },
+  { id: 'predicted', swatch: ['bar', 'kind-discharge'] },
+  { id: 'ghost', swatch: ['ghost'] },
+  { id: 'conflict', swatch: ['conflict'] },
+  { id: 'obstacle', swatch: ['obstacle'] },
+  { id: 'now', swatch: ['now'] },
+  { id: 'band', swatch: ['band', 'crane-0'] },
+  { id: 'bay', swatch: ['bayno'] },
+]
 
 const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS: number; toS: number }): string =>
   t(c.obstacle ? 'cranePlan.conflictObstacle' : 'cranePlan.conflict', { a: c.stsA, b: c.stsB, from: dur(c.fromS), to: dur(c.toS) })
@@ -194,6 +210,26 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
           </div>
         </div>
       </div>
+      <details
+        class="key"
+        open
+        data-testid="tt-crane-plan-key"
+      >
+        <summary>{{ t('cranePlan.key') }}</summary>
+        <ul>
+          <li
+            v-for="k in KEY"
+            :key="k.id"
+            :data-testid="`tt-crane-plan-key-${k.id}`"
+          >
+            <span
+              class="swatch"
+              :class="k.swatch"
+            >{{ k.id === 'bay' ? pad2(12) : '' }}</span>
+            <span>{{ t(`cranePlan.key.${k.id}` as MessageKey) }}</span>
+          </li>
+        </ul>
+      </details>
     </template>
   </div>
 </template>
@@ -327,5 +363,58 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
 .now span {
   font-size: 10px;
   color: var(--tt-data-active);
+}
+
+.key {
+  font-size: 11px;
+  color: var(--tt-text-muted);
+}
+.key summary {
+  cursor: pointer;
+}
+.key ul {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 3px 10px;
+}
+.key li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.key .swatch {
+  position: static;
+  flex: none;
+  display: inline-block;
+  width: 22px;
+  height: 12px;
+  box-sizing: border-box;
+}
+.key .swatch.bar {
+  opacity: 1;
+}
+.key .swatch.conflict {
+  position: static;
+}
+.key .swatch.obstacle {
+  width: 0;
+  height: 12px;
+  margin: 0 11px;
+  border-left: 2px dashed var(--tt-text-muted);
+}
+.key .swatch.now {
+  height: 0;
+  margin: 6px 0;
+  border-top: 2px solid var(--tt-data-active);
+}
+.key .swatch.band {
+  border: 1px solid var(--tt-border);
+}
+.key .swatch.bayno {
+  font-size: 10px;
+  width: auto;
 }
 </style>

@@ -21,15 +21,15 @@ export interface CranePath {
   fixed?: boolean
 }
 
-/** The piecewise linear path of a crane: travel to the bay (just before the package starts), stand, travel on. */
+/** The piecewise linear path of a crane: travel to the bay (at the start of the package), stand, travel on. */
 export function pathOf(c: CranePath, gantry: AxisProfile): PathPoint[] {
   const pts: PathPoint[] = [{ s: c.from.s, x: c.from.x }]
   let x = c.from.x
   for (const p of c.packages) {
     if (Math.abs(p.bayX - x) > 1e-9) {
-      const travel = travelTime(p.bayX - x, gantry)
-      pts.push({ s: Math.max(pts[pts.length - 1].s, p.startS - travel), x })
-      pts.push({ s: p.startS, x: p.bayX })
+      // the gantry travel is the first part of the package
+      pts.push({ s: p.startS, x })
+      pts.push({ s: Math.min(p.endS, p.startS + travelTime(p.bayX - x, gantry)), x: p.bayX })
     }
     pts.push({ s: p.endS, x: p.bayX })
     x = p.bayX

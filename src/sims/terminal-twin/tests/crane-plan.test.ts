@@ -29,8 +29,8 @@ describe('crane plan: pure functions', () => {
       { kind: 'discharge', moves: 2, bayX: 4 },
     ])
     expect(t[0]).toEqual({ startS: 0, endS: 60 })
-    expect(t[1].startS).toBeCloseTo(65, 6) // 4 m: 1 s up (0.5 m), 3 m at 1 m/s, 1 s down
-    expect(t[1].endS).toBeCloseTo(85, 6)
+    expect(t[1].startS).toBeCloseTo(60, 6) // the package starts when the crane takes it
+    expect(t[1].endS).toBeCloseTo(85, 6) // 5 s of gantry travel (1 s up, 3 m at 1 m/s, 1 s down) plus 2 x 10 s
   })
 
   it('finds a known conflict window', () => {
@@ -208,6 +208,22 @@ describe('crane plan: view model and CLI', () => {
     expect(model.bars.some((b) => b.actual)).toBe(true) // the actual progress overlays the plan
     expect(model.bars.some((b) => !b.actual)).toBe(true)
     for (const b of model.bars) expect(b.col).toBeGreaterThanOrEqual(0)
+  })
+
+  it('draws the now line at the display time and shows later actual work as predicted', () => {
+    const sim = createSimulation(fixtures['crane-split-4sts'])
+    while (!sim.cranePlan('V001') && sim.step()) {
+      /* step */
+    }
+    sim.runUntil({ time: sim.now + 900 })
+    const view = sim.cranePlan('V001')!
+    const size = sim.config.vessels[0].sizeClass
+    const behind = view.now - 400
+    const model = buildCranePlanModel(view, size, behind)
+    expect(model.nowS).toBe(behind)
+    const full = buildCranePlanModel(view, size)
+    expect(model.bars.filter((b) => b.actual).length).toBeLessThan(full.bars.filter((b) => b.actual).length)
+    for (const b of model.bars) if (b.actual) expect(b.fromS).toBeLessThanOrEqual(behind)
   })
 
   it('tt:plan prints the table, the conflict list and, with --until, the accuracy', () => {

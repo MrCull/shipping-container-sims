@@ -81,7 +81,11 @@ export interface CranePlanModel {
 /** Obstacles further than this many minimum spacings from the vessel's work span are left out. */
 const OBSTACLE_REACH = 2
 
-export function buildCranePlanModel(view: CranePlanView, sizeClass: VesselSizeClass): CranePlanModel {
+/**
+ * `displayS`: the sim time the 3D scene draws (the engine runs ahead of it). The now line sits there and what the engine
+ * has done since is not shown as done: a package that started after it reads as predicted, and an open one is drawn at least up to it.
+ */
+export function buildCranePlanModel(view: CranePlanView, sizeClass: VesselSizeClass, displayS: number = view.now): CranePlanModel {
   const spec = VESSEL_CLASSES[sizeClass]
   const bays = [...new Set(view.cranes.flatMap((c) => c.bays))].sort((a, b) => (view.bayX[a] ?? 0) - (view.bayX[b] ?? 0))
   const columns: PlanColumn[] = bays.map((bay) => ({ bay, number: vesselBayNumber(bay, spec.bays, null), x: view.bayX[bay] ?? 0 }))
@@ -95,9 +99,10 @@ export function buildCranePlanModel(view: CranePlanView, sizeClass: VesselSizeCl
     const cols = c.bays.map((b) => colOf.get(b) as number)
     bands.push({ stsId: c.stsId, colour: i, colFrom: Math.min(...cols), colTo: Math.max(...cols) })
     for (const p of c.packages) {
-      const started = p.actualStartS !== null
+      const started = p.actualStartS !== null && p.actualStartS <= displayS
       const fromS = started ? (p.actualStartS as number) : p.predictedStartS
-      const toS = p.actualEndS ?? Math.max(p.predictedEndS, fromS)
+      const finished = started && p.actualEndS !== null && p.actualEndS <= displayS
+      const toS = finished ? (p.actualEndS as number) : Math.max(p.predictedEndS, fromS, started ? displayS : fromS)
       const differs = Math.abs(p.plannedStartS - fromS) > 1 || Math.abs(p.plannedEndS - toS) > 1
       bars.push({
         id: p.id,
@@ -134,8 +139,8 @@ export function buildCranePlanModel(view: CranePlanView, sizeClass: VesselSizeCl
     .map((o) => ({ stsId: o.stsId, vesselId: o.vesselId, col: colAt(o.x) }))
 
   const times = bars.flatMap((b) => [b.fromS, b.toS, ...(b.ghost ? [b.ghost.fromS, b.ghost.toS] : [])])
-  const t0 = Math.min(view.now, ...times)
-  const t1 = Math.max(view.now, ...times, t0 + 1)
+  const t0 = Math.min(displayS, ...times)
+  const t1 = Math.max(displayS, ...times, t0 + 1)
   return {
     vesselId: view.vesselId,
     strategy: view.strategy,
@@ -147,7 +152,7 @@ export function buildCranePlanModel(view: CranePlanView, sizeClass: VesselSizeCl
     obstacles,
     t0,
     t1,
-    nowS: view.now,
+    nowS: displayS,
     conflictS: conflicts.reduce((n, w) => n + (w.toS - w.fromS), 0),
   }
 }

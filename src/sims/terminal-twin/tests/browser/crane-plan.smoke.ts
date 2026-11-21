@@ -35,6 +35,8 @@ test('crane plan: the Crane plan view shows a band per crane and the now line, a
   for (const id of ['STS01', 'STS02', 'STS03', 'STS04']) await expect(page.getByTestId(`tt-crane-plan-band-${id}`)).toBeVisible()
   await expect(page.getByTestId('tt-crane-plan-now')).toBeVisible()
   await expect(page.getByTestId('tt-crane-plan-summary')).toContainText('as-today')
+  await expect(page.getByTestId('tt-crane-plan-key')).toBeVisible()
+  for (const k of ['discharge', 'load', 'hatch', 'ghost', 'conflict', 'obstacle', 'now']) await expect(page.getByTestId(`tt-crane-plan-key-${k}`)).toBeVisible()
   await page.screenshot({ path: '.screenshots/crane-plan.png' })
 
   // a click on a package opens that bay in the Bays view
