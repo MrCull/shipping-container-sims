@@ -121,7 +121,7 @@ function endConditionsFromArgs(args: string[]): EndConditions | undefined {
   return out
 }
 
-const SUBSYSTEM_NAMES = ['quay', 'berth', 'yard', 'shc', 'asc', 'landside'] as const
+const SUBSYSTEM_NAMES = ['quay', 'berth', 'yard', 'shc', 'asc', 'landside', 'boom'] as const
 
 /** `--subsystem quay=instant`: merged over the scenario's own `subsystems`; impossible combinations are usage errors. */
 function subsystemsFromArgs(base: SubsystemModes | undefined, args: string[]): SubsystemModes | undefined {
@@ -131,8 +131,13 @@ function subsystemsFromArgs(base: SubsystemModes | undefined, args: string[]): S
     const [name, mode] = arg.split('=')
     if (!(SUBSYSTEM_NAMES as readonly string[]).includes(name))
       throw new UsageError(`Bad --subsystem "${arg}" (subsystems: ${SUBSYSTEM_NAMES.join(', ')})`)
+    if (name === 'boom') {
+      if (mode !== 'real' && mode !== 'off') throw new UsageError(`Bad --subsystem "${arg}" (boom modes: real, off)`)
+      out.boom = mode
+      continue
+    }
     if (mode !== 'real' && mode !== 'instant' && mode !== 'off') throw new UsageError(`Bad --subsystem "${arg}" (modes: real, instant, off)`)
-    out[name as (typeof SUBSYSTEM_NAMES)[number]] = mode as SubsystemMode
+    out[name as Exclude<(typeof SUBSYSTEM_NAMES)[number], 'boom'>] = mode as SubsystemMode
   }
   return out
 }

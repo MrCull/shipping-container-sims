@@ -94,7 +94,8 @@ function cases(run: HeadlessRun, which: 'early' | 'late'): Record<string, Snapsh
 }
 
 describe('drawn-box reference', async () => {
-  const config = presets[TTI_PRESET_NAME]()
+  // booms off (#298): the reference pins box posing, not crane timing, so the TTI preset's boom mode stays out of it
+  const config = { ...presets[TTI_PRESET_NAME](), subsystems: { ...presets[TTI_PRESET_NAME]().subsystems, boom: 'off' as const } }
   const original = await startHeadlessRun(config)
   await original.runTo(7200)
   const early = cases(original, 'early')

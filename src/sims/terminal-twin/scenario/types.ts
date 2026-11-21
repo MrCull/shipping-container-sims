@@ -25,7 +25,30 @@ export interface StsKinematics {
   lockS: number
   /** Spreader twist-lock unlock time (s). */
   unlockS: number
+  /** Boom raise or lower time, each way (s; #298, boom mode real). Default `DEFAULT_STS_BOOM.transitionS`. */
+  boomTransitionS?: number
+  /** Boom angle while working (degrees above horizontal). Default `DEFAULT_STS_BOOM.workingDeg`. */
+  boomWorkingDeg?: number
+  /** Boom angle when raised (stowed, degrees). Default `DEFAULT_STS_BOOM.stowedDeg`. */
+  boomStowedDeg?: number
+  /** A crane is "over" a vessel when its body overlaps the vessel's quay stretch widened by this on each side (m). Default `DEFAULT_STS_BOOM.clearanceMarginM`. */
+  boomClearanceMarginM?: number
 }
+
+/**
+ * STS boom defaults (#298). [R] transition time: external reference (BCT Poland 2024 example), not a TTI measurement.
+ * [A] angles and clearance margin: assumptions until verified.
+ */
+export const DEFAULT_STS_BOOM = {
+  /** [R] Raise or lower, each way (s). */
+  transitionS: 150,
+  /** [A] Working angle (degrees). */
+  workingDeg: 0,
+  /** [A] Stowed (raised) angle (degrees), the rig's limit. */
+  stowedDeg: 80,
+  /** [A] Clearance margin either side of a vessel's quay stretch (m). */
+  clearanceMarginM: 10,
+} as const
 
 /** SHC (shuttle carrier) kinematics. Drive axes are along X or Z; `lift` raises the box. */
 export interface ShcKinematics {
@@ -184,7 +207,16 @@ export interface SubsystemModes {
   asc?: SubsystemMode
   /** Landside: trucks, gate and transfer stalls (TT-13; default real when `landside` is configured and a block has stalls). */
   landside?: SubsystemMode
+  /**
+   * STS booms (#298; default off). real: booms raise before a vessel moors or unmoors under them, stay up while the
+   * crane is idle and lower before its first move on a vessel; off: every boom stays at the working angle, no boom
+   * motion and no gating (every log unchanged).
+   */
+  boom?: BoomMode
 }
+
+/** STS boom subsystem mode (#298). */
+export type BoomMode = 'real' | 'off'
 
 /** STS cranes are listed in rail order (ascending `gantryX`); they never pass each other. */
 export interface StsConfig {

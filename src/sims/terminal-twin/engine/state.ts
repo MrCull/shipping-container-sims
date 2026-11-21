@@ -20,8 +20,8 @@ import { makeContainerState } from '../scenario/containerFactory'
 import type { ContainerProps } from '../scenario/containerProps'
 import { sampleDwell } from '../scenario/dwell'
 import { planExportYard, type ExportPlacement } from '../scenario/exportYard'
-import { DEFAULT_WARM_UP_S } from '../scenario/types'
-import type { ContainerSize, ScenarioConfig, SubsystemMode, SubsystemModes, TruckTransactionKind, VesselSizeClass } from '../scenario/types'
+import { DEFAULT_STS_BOOM, DEFAULT_WARM_UP_S } from '../scenario/types'
+import type { BoomMode, ContainerSize, ScenarioConfig, SubsystemMode, SubsystemModes, TruckTransactionKind, VesselSizeClass } from '../scenario/types'
 import { vesselSlotId as makeVesselSlotId, type CellHalf } from '../scenario/vesselClasses'
 
 /** Kinds of custody owner. `external`: the box left the terminal on a truck (id = the truck). */
@@ -149,6 +149,8 @@ export type StsStatus =
   | 'waiting-for-box'
   /** Load flow: picking the box from its ground position and putting it into its slot. */
   | 'loading'
+  /** Boom mode real (#298): parking the trolley and spreader, then raising or lowering the boom. */
+  | 'boom'
 
 /**
  * SHC state machine (TT-05):
@@ -405,6 +407,8 @@ export interface ResolvedSubsystemModes {
   asc: SubsystemMode
   /** Trucks, gate and transfer stalls (TT-13). */
   landside: SubsystemMode
+  /** STS booms (#298): real raises and lowers them around berthing, off keeps them at the working angle. */
+  boom: BoomMode
 }
 
 // ── landside (TT-13) ───────────────────────────────────────────────────────
@@ -679,6 +683,10 @@ export interface StsState {
   hatchWaitPanel?: string | null
   /** Since when the crane has waited for a hatch (lashing release or securing). */
   hatchWaitSince?: number | null
+  /** Boom mode real (#298): boom angle (degrees) at the end of the planned boom motion. Absent = working angle (mode off). */
+  boomDeg?: number
+  /** Boom mode real: when the planned boom motion ends (s). Absent = no boom motion planned. */
+  boomUntil?: number
 }
 
 /** One hatch move of an STS. */
@@ -1033,6 +1041,17 @@ function validateRail(config: ScenarioConfig): void {
   })
 }
 
+/** STS boom settings (#298) with defaults filled in. */
+export function stsBoom(config: ScenarioConfig) {
+  const k = config.kinematics.sts
+  return {
+    transitionS: k.boomTransitionS ?? DEFAULT_STS_BOOM.transitionS,
+    workingDeg: k.boomWorkingDeg ?? DEFAULT_STS_BOOM.workingDeg,
+    stowedDeg: k.boomStowedDeg ?? DEFAULT_STS_BOOM.stowedDeg,
+    clearanceMarginM: k.boomClearanceMarginM ?? DEFAULT_STS_BOOM.clearanceMarginM,
+  }
+}
+
 /** Subsystem modes: config, then overrides. Each defaults to real when its equipment exists. `yard` caps the ASC and landside modes. */
 export function resolveSubsystemModes(config: ScenarioConfig, overrides: SubsystemModes = {}): ResolvedSubsystemModes {
   const hasShc = (config.shcs?.length ?? 0) > 0 && (config.yard?.blocks.length ?? 0) > 0
@@ -1045,6 +1064,7 @@ export function resolveSubsystemModes(config: ScenarioConfig, overrides: Subsyst
     shc: pick('shc', hasShc ? 'real' : 'off'),
     asc: pick('asc', hasShc ? 'real' : 'off'),
     landside: pick('landside', hasLandside(config) ? 'real' : 'off'),
+    boom: overrides.boom ?? config.subsystems?.boom ?? 'off',
   }
   if (!hasYard) modes.yard = 'off'
   if (config.sts.length === 0) modes.quay = 'off'
@@ -1272,6 +1292,8 @@ export function createInitialState(
       carrying: [],
       drops: [],
       motion: [],
+      // boom mode real (#298): every crane starts boom up; a crane assigned at t0 (a pre-filled working vessel) snaps down
+      ...(subsystems.boom === 'real' ? { boomDeg: stsBoom(config).stowedDeg } : {}),
       groundPositionIds: gpIds,
       packageIds: [],
       activePackageId: null,

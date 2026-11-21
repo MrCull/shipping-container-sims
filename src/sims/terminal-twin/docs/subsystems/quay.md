@@ -1,6 +1,6 @@
 # Quay subsystem: vessels, berths, STS cranes, hatch covers
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.55.0.
 
 Read this when you change or tune anything between a vessel's arrival and its departure: berth allocation, the
 crane split, the shared STS rail, the STS discharge and load cycles, work packages, the vessel work order (POD and
@@ -373,7 +373,7 @@ planned boxes). `firstMoveS` ships to the scene model as a view field on the ves
 (`worker/engineHost.ts`): no event, state field or golden depends on it. Phases, labels and popup:
 [../browser-host.md](../browser-host.md).
 
-## Subsystem modes (quay, berth)
+## Subsystem modes (quay, berth, boom)
 
 `config.subsystems.quay|berth` (overridden by `SimulationOptions.subsystems`, resolved by `resolveSubsystemModes` into
 `SimState.subsystems`; validated by `validateSubsystemModes`; CLI `--subsystem quay=instant`):
@@ -382,6 +382,38 @@ planned boxes). `firstMoveS` ships to the scene model as a view field on the ves
 - quay `off`: no STS work; vessels berth and `VesselWorkComplete` fires at once; the load flow is inactive.
 - berth `instant`: mooring and unmooring zero. berth `off`: no `berthAllocation` decision (first fit, anchorage if none)
   and instant mooring.
+- boom `real` / `off` (no `instant`): see STS booms above.
+
+## STS booms (`engine/subsystems/boom.ts`, subsystem mode `boom`, #298)
+
+`config.subsystems.boom` is `'real' | 'off'` (default `off`, every existing fixture; CLI `--subsystem boom=real`).
+`off` keeps every boom at the working angle: no boom segments, no gating, every log unchanged. `real` is used by the
+TTI presets and the `boom-berthing` fixture.
+
+- **Axis:** `boom`, an angle in degrees above horizontal, planned by `planSequence` like gantry, trolley and hoist and
+  carried in the motion Delta. `StsState.boomDeg` is the angle at the end of the planned boom motion (absent = working,
+  mode off) and `boomUntil` when that motion ends. A transition is a symmetric triangular profile that turns
+  working to stowed in exactly `boomTransitionS` (`boomProfile`).
+- **Config** (`StsKinematics`, defaults `DEFAULT_STS_BOOM`, read through `stsBoom(config)`): `boomTransitionS` 150 s
+  each way [R] (BCT Poland 2024 example, not a TTI measurement), `boomWorkingDeg` 0 and `boomStowedDeg` 80 [A],
+  `boomClearanceMarginM` 10 m [A].
+- **Over a vessel** (`craneOverVessel`): the crane body (`stsMinSpacingM` long, centred on the gantry, over its rail
+  reservation) overlaps the vessel's quay stretch widened by `boomClearanceMarginM` each side.
+- **States:** boom **down** (working angle), **raising**, **up** (stowed), **lowering**; the crane's status is `boom`
+  while it parks its spreader and turns its boom, so it is not asked to step aside and never gantries meanwhile.
+- **When:** at t0 every crane is up; a crane assigned at t0 (a pre-filled working vessel) starts down. On
+  `BerthAllocated` idle cranes over the vessel raise if down, and `VesselBerthed` fires at the later of mooring
+  complete and all those booms up. `continueWork` lowers a crane's boom just before its first move on a vessel
+  (`StsBoomStarted` op `lower`, then work at `StsBoomCompleted`). On `StsWorkComplete` the crane, now idle, raises
+  (idle cranes stay up until assigned). On `VesselWorkComplete` idle cranes over the vessel raise if down and
+  `VesselDeparted` fires `unmooringS` after the last of them is up (the vessel is `unmooring` from
+  `VesselWorkComplete`).
+- **Raise:** the spreader hoists to `stsSafeHoistM`, the trolley parks at `stsGroundLaneZ0M` (landside of the hinge),
+  then the boom turns. Hoist and trolley never move while the boom is off the working angle (invariant
+  `sts.boom-working`). Rail order, reservations and `stsMinSpacingM` ignore the boom angle.
+- **Limits (until later tickets of spec #297):** cranes working another vessel are never raised for a neighbour's
+  mooring; no boom-up gantry past a superstructure (#302); no `boom` productivity category (#301); the GLB's forestays
+  turn with the boom (#299).
 
 ## Decision points used here
 

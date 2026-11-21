@@ -22,6 +22,7 @@ import {
   laydownTopY,
   parseYardSlotId,
   positionAt,
+  stsBoom,
   railEndZ,
   railSegmentIds,
   railSegmentSpan,
@@ -240,7 +241,7 @@ export interface ContainerPose extends Vec3 {
   yard?: true
 }
 
-const emptyAxes = (): Record<Axis, MotionSegment[]> => ({ gantry: [], trolley: [], hoist: [], x: [], z: [], lift: [] })
+const emptyAxes = (): Record<Axis, MotionSegment[]> => ({ gantry: [], trolley: [], hoist: [], boom: [], x: [], z: [], lift: [] })
 
 /** Index of the last entry with t <= time (entries sorted by t), or -1. */
 function lastAtOrBefore<T>(list: T[], time: number, getT: (item: T) => number): number {
@@ -775,6 +776,18 @@ export class SceneModel {
       trolleyZ: value('trolley', pose.trolleyZ),
       hoistY: value('hoist', pose.hoistY),
     }
+  }
+
+  /**
+   * Boom angle of an STS at `time` (degrees above horizontal, #298), from its boom motion segments. Before the first
+   * segment it is that segment's start angle; a crane with no boom segment so far is at the working angle in boom
+   * mode off and stowed (raised, idle) in boom mode real.
+   */
+  boomAngleDeg(stsId: string, time: number): number {
+    const list = this.axisSegments[stsId]?.boom ?? []
+    if (list.length === 0) return this.config.subsystems?.boom === 'real' ? stsBoom(this.config).stowedDeg : stsBoom(this.config).workingDeg
+    const i = lastAtOrBefore(list, time, (s) => s.t0)
+    return i < 0 ? list[0].from : positionAt(list[i], time)
   }
 
   /** The panel's state change in force at `time` (undefined = secured since the start). */

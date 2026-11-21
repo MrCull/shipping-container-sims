@@ -39,6 +39,8 @@ export interface StsRigPose {
   spreader: SpreaderMode
   /** Twist-locks turned (carrying a box). */
   locked: boolean
+  /** Boom angle (degrees above horizontal, #298; the scene model's `boomAngleDeg`). Absent = 0 (working). */
+  boomDeg?: number
 }
 
 /** What one crane looks like right now (dev API). */
@@ -49,6 +51,8 @@ export interface StsRenderState {
   /** World positions in the drawn LOD. */
   spreader: [number, number, number]
   trolley: [number, number, number]
+  /** Boom angle drawn (degrees, the `boom` rig node, #298). */
+  boomAngleDeg: number
 }
 
 let cached: Promise<THREE.Object3D> | null = null
@@ -136,6 +140,7 @@ export class StsModel {
     rig.set('gantry', p.gantryX, false)
     rig.set('trolley', p.trolleyZ - STS_WATER_RAIL_Z, false)
     rig.set('hoist', p.hoistY, false)
+    rig.set('boom', p.boomDeg ?? 0, false)
     this.spreaderMode = p.spreader
     for (const [node, value] of Object.entries(meta.spreaderModes[this.spreaderMode])) rig.set(node, value)
     const lock = p.locked ? 90 : 0
@@ -171,6 +176,7 @@ export class StsModel {
       carrying: this.carrying,
       spreader: at(this.spreaders[this.lod]),
       trolley: at(this.trolleys[this.lod]),
+      boomAngleDeg: this.rig.values.boom ?? 0,
     }
   }
 

@@ -59,6 +59,8 @@ interface TerminalSpec {
   loadReleaseAhead?: number
   /** Yard reserve (#184, #188): see `YardConfig.reserveShare`; absent = none. */
   yardReserve?: number
+  /** STS booms raise and lower around berthing (#298, subsystem mode `boom: 'real'`); absent = off. */
+  booms?: boolean
 }
 
 /** TTI's access road (#146): the Isla Verde carriageway, entered `TTI_ACCESS_ROAD_RUNUP_M` south of the quay's end. */
@@ -94,6 +96,7 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
   if (spec.emptyPool) b.emptyPool(spec.emptyPool)
   if (spec.loadReleaseAhead) b.loadReleaseAhead(spec.loadReleaseAhead)
   if (spec.yardReserve) b.yardReserve(spec.yardReserve)
+  if (spec.booms) b.subsystems({ boom: 'real' })
   const base = b.build()
   const sts = deriveSts({ ...base, sts: [{ id: `STS${spec.stsFirst}`, gantryX: 0, groundPositions: 3 }] }, spec.sts, spec.quayM)
   for (const s of sts) b.sts(s.id, { gantryX: s.gantryX, groundPositions: s.groundPositions })
@@ -155,6 +158,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       emptyPool: { count: 1200, maxAgeS: 7 * 86400 },
       loadReleaseAhead: TTI_LOAD_RELEASE_AHEAD,
       yardReserve: TTI_YARD_RESERVE,
+      booms: true,
     }),
   [SMALL_PRESET_NAME]: () =>
     terminal({
@@ -211,5 +215,6 @@ export const presets: Record<string, () => ScenarioConfig> = {
       emptyPool: { count: 1500, maxAgeS: 7 * 86400 },
       loadReleaseAhead: TTI_LOAD_RELEASE_AHEAD,
       yardReserve: TTI_YARD_RESERVE,
+      booms: true,
     }),
 }

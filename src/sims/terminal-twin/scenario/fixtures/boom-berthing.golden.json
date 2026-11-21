@@ -1,0 +1,198 @@
+{
+  "scenario": "boom-berthing",
+  "seed": 3,
+  "status": "ended",
+  "endReason": "vesselsCompleted >= 2",
+  "eventLogHash": "16386fe861353f",
+  "kpis": {
+    "simTimeS": 5337.025,
+    "eventsProcessed": 262,
+    "movesCompleted": 24,
+    "vesselsCompleted": 2,
+    "sts": {
+      "STS01": {
+        "moves": 11,
+        "cycles": 9,
+        "twinLifts": 2,
+        "grossMovesPerHour": 11.164,
+        "railWaitS": 192.583
+      },
+      "STS02": {
+        "moves": 13,
+        "cycles": 11,
+        "twinLifts": 2,
+        "grossMovesPerHour": 12.304,
+        "railWaitS": 130.927
+      },
+      "STS03": {
+        "moves": 0,
+        "cycles": 0,
+        "twinLifts": 0,
+        "grossMovesPerHour": null,
+        "railWaitS": 0
+      }
+    },
+    "vessels": {
+      "V001": {
+        "sizeClass": "panamax",
+        "arrivedAtS": 0,
+        "anchorageWaitS": 0,
+        "berthX": 0,
+        "berthedAtS": 600,
+        "departedAtS": 2456.645,
+        "turnaroundS": 1856.645,
+        "sts": [
+          "STS01",
+          "STS02"
+        ]
+      },
+      "V002": {
+        "sizeClass": "panamax",
+        "arrivedAtS": 300,
+        "anchorageWaitS": 2156.645,
+        "berthX": 0,
+        "berthedAtS": 3056.645,
+        "departedAtS": 5337.025,
+        "turnaroundS": 2280.38,
+        "sts": [
+          "STS01",
+          "STS02"
+        ]
+      }
+    },
+    "quay": {
+      "vesselsWaited": 1,
+      "anchorageWaitS": {
+        "total": 2156.645,
+        "mean": 1078.322,
+        "max": 2156.645
+      }
+    },
+    "handlers": {
+      "stsGroundPosition": {
+        "handler": "strategy:lowest-free-lane",
+        "calls": 24,
+        "resolved": 24,
+        "ok": 24,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "berthAllocation": {
+        "handler": "strategy:first-fit",
+        "calls": 3,
+        "resolved": 3,
+        "ok": 3,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "craneSplit": {
+        "handler": "strategy:balanced-moves",
+        "calls": 2,
+        "resolved": 2,
+        "ok": 2,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 1,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      },
+      "workPackageRelease": {
+        "handler": "strategy:keep-k-ahead",
+        "calls": 23,
+        "resolved": 23,
+        "ok": 23,
+        "fallbacks": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "lateReplies": 0,
+        "pending": 0,
+        "maxPending": 2,
+        "simLatencyS": {
+          "mean": 0,
+          "max": 0
+        },
+        "wallLatencyMs": {
+          "mean": 0,
+          "max": 0
+        },
+        "equipmentIdleS": 0
+      }
+    },
+    "dwell": {
+      "IMPORT": {
+        "count": 22,
+        "departed": 0,
+        "meanS": 2822.272,
+        "maxS": 4499.996
+      },
+      "STORAGE": {
+        "count": 2,
+        "departed": 0,
+        "meanS": 2589.498,
+        "maxS": 4107.923
+      }
+    },
+    "workPackages": {
+      "released": 19,
+      "started": 19,
+      "completed": 19,
+      "leadTimeMeanS": 389.719,
+      "leadTimeMaxS": 686.767,
+      "boxesLoaded": 0
+    },
+    "ordering": {
+      "discharge": {
+        "boxes": 24,
+        "groupSplits": 1
+      },
+      "load": {
+        "boxes": 0,
+        "podOnEarlier": 0,
+        "heavyOnLight": 0
+      }
+    }
+  },
+  "invariants": {
+    "enabled": true,
+    "checks": 209,
+    "violations": 0,
+    "first": null
+  },
+  "firstError": null
+}

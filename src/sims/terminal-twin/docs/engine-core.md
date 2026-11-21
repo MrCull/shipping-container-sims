@@ -1,6 +1,6 @@
 # Engine core: the discrete-event loop
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.55.0.
 
 Read this when you change or debug how events are scheduled, processed, hashed, logged, snapshotted or replayed;
 when you add an event type or reactor; or when you hunt headless run time per event. The state the loop mutates is
@@ -106,7 +106,7 @@ set: the run ends when every vessel has departed. A warm-up start counts nothing
 
 ## Event catalogue
 
-100 types in `engine/events.ts#EventPayloads`. "Reacts" lists the reactor maps that handle the type (decision
+102 types in `engine/events.ts#EventPayloads`. "Reacts" lists the reactor maps that handle the type (decision
 runtime = `engine/decisions/runtime.ts`). Log subsystem = lower-cased first word of the type unless
 `EVENT_LOG_META` says otherwise.
 
@@ -118,6 +118,7 @@ runtime = `engine/decisions/runtime.ts`). Log subsystem = lower-cased first word
 | Work packages | `WorkPackageReleased`, `WorkPackageStarted`, `WorkPackageCompleted` | workPackages |
 | STS discharge | `StsMoveStarted` (level `debug`), `StsPicked`, `StsGrounded`, `StsWaitingForGroundPosition` (level `warn`), `StsGroundPositionWaitBackoff`, `StsGroundPositionWaitEnded`, `StsWorkComplete` | quay (shc also on `StsMoveStarted`, `StsGrounded`; berth on `StsWorkComplete`) |
 | STS rail | `StsWaitingForRail`, `StsRepositionStarted`, `StsRepositionCompleted` | quay |
+| STS boom (#298, boom mode real only) | `StsBoomStarted` (`{stsId, op: raise or lower, toDeg, segments}`), `StsBoomCompleted` | boom |
 | STS load | `StsLoadStarted`, `StsWaitingForBox`, `StsBoxWaitEnded`, `StsLoadPicked`, `StsLoaded` | quay |
 | Hatch covers | `StsHatchStarted`, `StsWaitingForHatch`, `HatchLashingReleased`, `HatchLifted`, `HatchSetInLaydown`, `HatchReplaced`, `HatchSecured` | hatch (shc also on `StsHatchStarted`) |
 | SHC trip | `ShcJobAssigned`, `ShcRoutingEmpty`, `ShcPositioningAtPickup`, `ShcLocking`, `ShcPicked`, `ShcPickedAtWtp`, `ShcRoutingLoaded`, `ShcPositioningAtDropoff`, `ShcLowering`, `ShcUnlocking`, `ShcDroppedAtWtp`, `ShcDroppedAtGround`, `ShcCleared` | shc (asc on `ShcDroppedAtWtp`, `ShcCleared`) |
@@ -170,7 +171,7 @@ determinism, but their draws are correlated.
 - `positionAt(seg, t)` interpolates (clamped); renderers and `ascPoseAt`/`truckPositionAt` use it. A zero-length
   (instant mode) segment is at `to` from `t0` on.
 - `travelTime(distance, profile)` is rest to rest.
-- Axes: `gantry`, `trolley`, `hoist` (cranes), `x`, `z`, `lift` (vehicles). Each crane move plans one segment per
+- Axes: `gantry`, `trolley`, `hoist`, `boom` (cranes; `boom` is the STS boom angle in degrees, #298), `x`, `z`, `lift` (vehicles). Each crane move plans one segment per
   axis; the event is scheduled at the end of the last one plus lock/unlock time.
 - Instant subsystem mode sets `t1 = t0` (same events, zero durations).
 

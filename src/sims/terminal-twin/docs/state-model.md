@@ -1,6 +1,6 @@
 # State model: SimState, entities and indexes
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.55.0.
 
 Read this when you read or write engine state: adding a field or entity, writing a reactor, invariant, KPI or
 strategy that looks at state, debugging a snapshot, or replacing a whole-state scan with an index. All types are in
@@ -172,12 +172,14 @@ has left at `StsPicked`). Slots exist only for working bays; ROB bays have none.
 
 `StsState`: `railIndex` (fixed order on the rail), `status` (`idle`, `moving-to-pick`, `carrying`, `returning`,
 `repositioning`, `waiting-for-rail`, `waiting-for-decision`, `waiting-for-ground-position`, `waiting-for-box`,
-`loading`), `vesselId`, `bays`, `workQueue` (boxes of the active package in work order), axis positions at the end of
+`loading`, `boom`: parking and turning the boom, #298), `vesselId`, `bays`, `workQueue` (boxes of the active package in work order), axis positions at the end of
 the planned motion (`gantryX`, `trolleyZ`, `hoistY`), rail reservation `railLo`/`railHi` and `railTargetX`,
 `railAlsoX?`, `railYield?`, `railYieldFrom?` (bounded yield, #174, #212), `carrying` (two for a twin-20 lift),
 `drops: StsDrop[]` (chosen ground positions, `groundAt` once the carry is planned), `motion`, `groundPositionIds`,
 `waitingSince?`, `packageIds`, `activePackageId`, `releasing?`, hatch fields (`hatchJob?`, `carryingPanel?`,
-`hatchWaitPanel?`, `hatchWaitSince?`).
+`hatchWaitPanel?`, `hatchWaitSince?`), boom fields (#298, boom mode real only: `boomDeg?`, the boom angle at the end
+of the planned boom motion, absent = working angle; `boomUntil?`, when that motion ends). `SimState.subsystems.boom`
+is `'real' | 'off'`.
 
 `GroundPositionState`: `stsId`, `lane`, `containerId`, `claimedBy` (load flow: the export box reserved for it).
 

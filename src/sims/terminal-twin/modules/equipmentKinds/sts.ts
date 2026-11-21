@@ -107,7 +107,7 @@ class StsRenderer implements KindRenderer {
       const mode: SpreaderMode = spreaderModeFor(l, { canTwin: true, previous: this.lastSpreader.get(id) })
       this.lastSpreader.set(id, mode)
       m.carrying = l?.count ?? 0
-      m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l })
+      m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l, boomDeg: model.boomAngleDeg(id, t) })
       offerHeroEquipmentAtLod0(frame, id, 'sts', m.updateLod(cameraPosition, frame.lodScale), m.heroMount)
     }
     for (const [id, parts] of this.sts) {

@@ -38,6 +38,7 @@ import { stsCycleGeometry, stsNominalCycle } from '../cycleTime'
 import { hatchEnabled, hatchSettings } from '../hatch'
 import { pumpLoadPrep, slotGantryX } from './loadPrep'
 import { prepareNextPackage } from './workPackages'
+import { needsLowering, startBoom } from './boom'
 import { deckBoxChanged } from './hatch'
 import { laneGraphOf, laneZonesAt } from '../laneGraph'
 import { earliestStart, reserve } from '../reservations'
@@ -71,6 +72,18 @@ export function planSequence(
   const segments: MotionSegment[] = []
   let t = t0
   for (const m of moves) {
+    if (m.axis === 'boom') {
+      // #298: the boom angle (degrees), absent = working angle 0 (boom mode off never plans a boom move)
+      const from = sts.boomDeg ?? 0
+      if (from === m.to) continue
+      const seg = planSegment(sts.id, 'boom', from, m.to, t, scaled(m.profile, f))
+      if (instant) seg.t1 = seg.t0
+      segments.push(seg)
+      sts.boomDeg = m.to
+      sts.boomUntil = seg.t1
+      t = seg.t1
+      continue
+    }
     const key = m.axis === 'gantry' ? 'gantryX' : m.axis === 'trolley' ? 'trolleyZ' : 'hoistY'
     if (sts[key] === m.to) continue
     const seg = planSegment(sts.id, m.axis, sts[key], m.to, t, scaled(m.profile, f))
@@ -111,6 +124,11 @@ function liftX(ctx: EngineContext, vesselId: string, containerIds: string[]): nu
 export function continueWork(ctx: EngineContext, sts: StsState, at: number, segments: MotionSegment[] = []): void {
   if (!sts.vesselId) {
     sts.status = 'idle'
+    return
+  }
+  // boom mode real (#298): lower the boom just before the first move on the vessel
+  if (needsLowering(ctx, sts)) {
+    startBoom(ctx, sts, at, 'lower')
     return
   }
   const vesselId = sts.vesselId

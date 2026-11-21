@@ -70,7 +70,7 @@ export {
 } from './yardLayout'
 export type { BlockSpec, YardCandidate, YardStacks, TransferStallLayout } from './yardLayout'
 export { ascPoseAt } from './subsystems/asc'
-export { ascIdOf, ascIndexOf, resolveSubsystemModes } from './state'
+export { ascIdOf, ascIndexOf, resolveSubsystemModes, stsBoom } from './state'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, apronLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'
 export { buildLandsideGraph, landsideGraphOf, hasLandside, queueSlotZ, queueSlotAt, QUEUE_PITCH_M, OUT_ROAD_SECTION_M, GATE_LANE_W_M, GATE_OOG_LANE_W_M, GATE_ISLAND_W_M, HOLDING_PITCH_M } from './landsideGraph'

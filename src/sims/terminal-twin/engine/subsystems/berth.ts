@@ -20,6 +20,8 @@ import { continueWork, wakeQuayRail } from './quay'
 import { askRelease, createPackages, isLoadSlot, loadActive } from './workPackages'
 import { railOrder } from './rail'
 import { positionHatchPanels } from '../hatch'
+import { boomReal, raiseOver, startBoom } from './boom'
+import { stsBoom } from '../state'
 
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
 
@@ -268,6 +270,8 @@ export const berthReactors: ReactorMap = {
           createPackages(ctx, sts, vessel.id, x.bays)
           vessel.stsIds.push(sts.id)
           vessel.stsHistory.push(sts.id)
+          // boom mode real (#298): a crane assigned at t0 (a pre-filled working vessel) starts boom down
+          if (boomReal(ctx) && e.t === 0 && sts.status === 'idle') sts.boomDeg = stsBoom(ctx.config).workingDeg
           if (sts.status === 'waiting-for-rail') {
             // it was stepping aside for another crane: drop that and start work
             sts.status = 'idle'
@@ -286,7 +290,9 @@ export const berthReactors: ReactorMap = {
   },
 
   BerthAllocated: (e, ctx) => {
-    ctx.schedule('VesselBerthed', e.t + mooringS(ctx), { vessels: [e.payload.vesselId] }, {
+    // boom mode real (#298): all fast once mooring is complete and every boom over the vessel is up
+    const boomsUp = boomReal(ctx) ? raiseOver(ctx, ctx.state.vessels[e.payload.vesselId]) : e.t
+    ctx.schedule('VesselBerthed', Math.max(e.t + mooringS(ctx), boomsUp), { vessels: [e.payload.vesselId] }, {
       vesselId: e.payload.vesselId,
       berthX: e.payload.berthX,
     })
@@ -310,6 +316,7 @@ export const berthReactors: ReactorMap = {
     sts.vesselId = null
     sts.bays = []
     sts.status = 'idle'
+    if (boomReal(ctx)) startBoom(ctx, sts, e.t, 'raise') // boom mode real (#298): idle cranes park boom up
     const vessel = state.vessels[e.payload.vesselId]
     vessel.stsIds = vessel.stsIds.filter((id) => id !== sts.id)
     if (vessel.stsIds.length === 0 && vessel.remainingDischarge === 0 && (vessel.remainingLoad === 0 || !loadActive(state)) && vessel.status === 'berthed') {
@@ -323,7 +330,9 @@ export const berthReactors: ReactorMap = {
     const vessel = ctx.state.vessels[e.payload.vesselId]
     vessel.status = 'unmooring'
     vessel.workCompletedAt = e.t
-    ctx.schedule('VesselDeparted', e.t + unmooringS(ctx), { vessels: [vessel.id] }, { vesselId: vessel.id })
+    // boom mode real (#298): unmooring starts once every boom over the vessel is up
+    const boomsUp = boomReal(ctx) ? raiseOver(ctx, vessel) : e.t
+    ctx.schedule('VesselDeparted', boomsUp + unmooringS(ctx), { vessels: [vessel.id] }, { vesselId: vessel.id })
   },
 
   VesselDeparted: (e, ctx) => {

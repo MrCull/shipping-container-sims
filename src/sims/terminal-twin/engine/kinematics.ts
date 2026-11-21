@@ -17,8 +17,8 @@ export interface AxisProfile {
   decel: number
 }
 
-/** Crane axes (gantry/trolley/hoist) and vehicle axes (x/z drive along the lane graph, lift). */
-export type Axis = 'gantry' | 'trolley' | 'hoist' | 'x' | 'z' | 'lift'
+/** Crane axes (gantry/trolley/hoist; boom = STS boom angle in degrees, #298) and vehicle axes (x/z drive along the lane graph, lift). */
+export type Axis = 'gantry' | 'trolley' | 'hoist' | 'boom' | 'x' | 'z' | 'lift'
 
 export interface MotionSegment {
   entityId: string
