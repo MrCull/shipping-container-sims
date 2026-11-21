@@ -28,3 +28,4 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 - #305 paused (owner, 21 Nov): spec #320 restructures the smoke suite; rerun #305 on the new harness once its remaining tickets are on main. origin/main merged (Fast CI phase 1); `sts-boom-frames.smoke.ts` moved to `openTwin`. When #330 lands, tag it (`equipment` group) and map it.
 - Old-harness partial dev run (84 of 178, stopped): failed `gantry-alarm.smoke.ts:53`, `terminal-twin-atmosphere.smoke.ts:166` (departure banner), `terminal-twin-debugger.smoke.ts:246` (follow camera SHC). Not yet checked against main.
 - Code review done early (21 Nov) while #305 waits for #320: findings in scratchpad `review-297.md`; implementer on `tt/review-297` (75 min budget).
+- Review fixes merged (tt/review-297 at 3cab1a9): all 14 items, ENGINE_VERSION 0.58.0, goldens boom-berthing and boom-bridge regenerated (new park pose). Remaining: #305 on the #320 harness, then PR ready.
