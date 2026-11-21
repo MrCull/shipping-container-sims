@@ -4,7 +4,8 @@
  * external requests, and the Algeciras backdrop meshes apply to the TTI preset only. Screenshots: .screenshots/assets/.
  * Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

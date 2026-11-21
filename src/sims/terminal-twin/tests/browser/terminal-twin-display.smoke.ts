@@ -2,7 +2,8 @@
  * Locale, units and keyboard shortcuts (seam 3: UI + dev API `window.__tt`).
  * Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import fixture from '../../scenario/fixtures/tracer-1sts-10-boxes.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openAdvanced, openSetupTab, pickScenario } from './scenarioPicker'
@@ -13,6 +14,8 @@ const TRACER = 'tracer-1sts-10-boxes'
 const START = '2026-10-26T13:45:00.000Z'
 
 test.use({ timezoneId: 'UTC' })
+// Fresh page: locale and time zone are browser-context options, which the worker's shared page cannot take per test (#329).
+test.use({ fresh: true })
 
 /** Opens the sim and selects the tracer (a fresh load selects the TTI baseline since #156; the expected values are the tracer's). */
 async function openSim(page: Page): Promise<void> {

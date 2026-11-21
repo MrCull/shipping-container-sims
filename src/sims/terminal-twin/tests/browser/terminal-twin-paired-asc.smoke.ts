@@ -4,7 +4,7 @@
  * (`headless-scene-engine.test.ts`) and the setup dialog in `terminal-twin-setup-equipment.smoke.ts` (#333).
  * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

@@ -4,7 +4,8 @@
  * clicking a package lands on its bay in the Bays view; the dashboard Gantt draws package bars.
  * Run with `pnpm run test:smoke --project=dev --grep "crane plan"`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

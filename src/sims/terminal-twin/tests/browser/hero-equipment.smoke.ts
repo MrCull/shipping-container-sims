@@ -11,7 +11,8 @@
  * (within 1 cm), and none on Low; no `hero-truck-*` file is requested before.
  * Counts and bounds only, no frame assertions. Screenshots go to `.screenshots/`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

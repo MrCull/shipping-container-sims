@@ -5,7 +5,7 @@
  * Arrival (#259): a fast fly-through at 10 m prepares no hero face; once the camera is still the faces arrive and
  * their count settles within the cap.
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

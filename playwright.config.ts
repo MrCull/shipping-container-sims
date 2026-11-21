@@ -60,7 +60,8 @@ export default defineConfig({
   expect: { timeout: 20_000 },
   // Every test is its own unit of work, so a CI shard (a `--test-list` file, or `--shard=i/n`) is a set of tests, not files (CI runs 6 shards; split by
   // file they were 7, 9 and 19 min). No spec shares state between tests (no serial describe, no shared page in beforeAll);
-  // keep it that way. Locally workers stay at 1, so a run is still one test at a time.
+  // keep it that way. The Terminal Twin's worker-scoped page (tests/browser/twinTest.ts, #329) is reset before every test,
+  // so a test passes alone and in any order (`--shuffle <seed>` checks it). Locally workers stay at 1, so a run is still one test at a time.
   fullyParallel: true,
   // One at a time by default: browser tests are CPU-bound on software WebGL. SMOKE_WORKERS=2 trades speed for timeouts on a 4-core box; try it on an idle machine and re-run failures alone.
   workers: Number(process.env.SMOKE_WORKERS) || 1,

@@ -3,7 +3,7 @@
  * Moved out of the engine group's specs by #333 (spec #320), which keeps one browser worker test in that group.
  * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type { RunSummary } from '../../engine'
 import shcGolden from '../../scenario/fixtures/shc-1sts-2shc-1wtp.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing

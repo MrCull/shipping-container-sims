@@ -6,7 +6,7 @@
  * review). Roofs print no text (#170; the painter's roof is checked by `tests/container-markings.test.ts`). The last spec (`@load`, never in CI) compares the frame time of the
  * view about 10 boxes wide with the Overview camera. Run with `pnpm run test:smoke`.
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

@@ -4,7 +4,7 @@
  * are unit tests (`golden.test.ts`, `asc-yard.test.ts`) and the scene checks run in the headless scene
  * (`headless-scene-engine.test.ts`). Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type { RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/asc-1sts-10-boxes-1block.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing

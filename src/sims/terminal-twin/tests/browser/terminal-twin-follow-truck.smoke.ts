@@ -3,7 +3,8 @@
  * once the engine runs on; the camera tracks the truck until it is gone, then follow releases (here at x60).
  * Dev-only `window.__tt` API. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'

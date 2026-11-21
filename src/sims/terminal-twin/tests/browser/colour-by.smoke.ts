@@ -9,7 +9,8 @@
  * CI) checks that switching modes on the full TTI yard does not cost frame time. Screenshot: .screenshots/colour-by.png.
  * Run with `pnpm run test:smoke --project=dev --grep "colour by"`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

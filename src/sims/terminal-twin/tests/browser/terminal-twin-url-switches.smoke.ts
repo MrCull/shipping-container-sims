@@ -4,7 +4,8 @@
  * and `?quality=low` boots at the Low level. Frame rates are rates over a minimum wall-clock window (frameSampling.ts).
  * Run with `pnpm run test:smoke --project=dev terminal-twin-url-switches`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { sampleFrames } from './frameSampling'
 import { openTwin, type OpenTwinOptions } from './openTwin'

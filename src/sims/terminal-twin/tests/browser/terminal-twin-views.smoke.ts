@@ -3,7 +3,8 @@
  * with Labels on has no two visible labels overlapping; the HUD regions still do not overlap with the new controls.
  * Dev-only `window.__tt` API. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'

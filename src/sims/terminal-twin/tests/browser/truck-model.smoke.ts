@@ -4,7 +4,8 @@
  * (rig sliders, 20 ft and 40 ft reference boxes on the chassis twist-locks). Screenshots go to .screenshots/assets/.
  * Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
 import { openTwin, twinUrl } from './openTwin'

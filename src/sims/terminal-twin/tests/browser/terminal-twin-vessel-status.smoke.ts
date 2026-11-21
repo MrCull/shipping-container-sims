@@ -5,7 +5,8 @@
  * Driven through `window.__tt` (select, runTo, scene().vesselLabels).
  * Run with `pnpm run test:smoke --project=dev --grep "vessel status"`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

@@ -3,9 +3,13 @@
  * gone), volume and mute persist across a reload and carry to another sim, and the FPS chip shows, takes
  * threshold colours, toggles the perf panel, and is hidden when WebGL fails. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
+
+// Fresh page (#329): volume and mute persist across a reload and another sim, and one spec stubs audio with addInitScript.
+test.use({ fresh: true })
 
 /** Terminal Twin opens muted whatever the shared setting (#171): these specs are about the volume, so they unmute inside. */
 async function unmute(page: Page): Promise<void> {

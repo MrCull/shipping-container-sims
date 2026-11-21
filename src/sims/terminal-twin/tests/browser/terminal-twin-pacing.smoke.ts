@@ -1,5 +1,5 @@
 /** Even playback pacing (#251): the top bar shows the achieved speed when the engine cannot supply the chosen one. */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

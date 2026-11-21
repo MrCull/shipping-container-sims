@@ -4,14 +4,16 @@
  * about the ground point between the fingers without turning or sliding the view (modules/pinchGesture.ts).
  * Dev-only `window.__tt` API. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type CDPSession, type Page } from '@playwright/test'
+import { type CDPSession, type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import * as THREE from 'three'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 
 const FIXTURE = 'landside-morning-peak'
 
-test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+// Fresh page: touch and mobile are browser-context options, which the worker's shared page cannot take per test (#329).
+test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, fresh: true })
 
 /** Two fingers `from` px apart around (cx, cy), spreading to `to` px while their midpoint moves by (dx, dy). */
 async function pinch(page: Page, cdp: CDPSession, cx: number, cy: number, from: number, to: number, dx = 0, dy = 0, steps = 8): Promise<void> {

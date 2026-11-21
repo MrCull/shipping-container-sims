@@ -5,7 +5,8 @@
  * rows of reference containers under the span at a 5-high stack). Screenshots
  * go to .screenshots/assets/. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import fixture from '../../scenario/fixtures/asc-2asc-block-conflict.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing

@@ -6,7 +6,8 @@
  * plan's statuses plus ROB.
  * Run with `pnpm run test:smoke --project=dev --grep "bay plan switch"`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

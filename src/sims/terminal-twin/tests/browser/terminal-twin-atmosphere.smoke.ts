@@ -2,13 +2,16 @@
  * Atmosphere and polish (TT-21): day/night, daylight lock, backdrops, sound, departure banner.
  * Seam: UI + dev API `window.__tt` (`__tt.atmosphere()`). Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin, type OpenTwinOptions } from './openTwin'
 
 const TRACER = 'tracer-1sts-10-boxes'
 
 test.use({ timezoneId: 'UTC' })
+// Fresh page: the time zone is a browser-context option, and addInitScript would stay on a shared page (#329).
+test.use({ fresh: true })
 
 /** Count every `new Audio(...)` the page makes (a muted shared control means none are made). */
 async function spyOnAudio(page: Page): Promise<void> {

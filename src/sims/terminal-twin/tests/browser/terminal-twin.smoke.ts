@@ -2,7 +2,8 @@
  * Terminal Twin browser smoke tests (seam 3: the dev-only `window.__tt` API).
  * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type { RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/tracer-1sts-10-boxes.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing

@@ -5,7 +5,8 @@
  * switching, animated from the engine's motion segments (twin-20 included).
  * Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import meta from '../../assets/models/sts/sts-malaccamax.meta.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
