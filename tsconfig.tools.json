@@ -20,5 +20,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.test.ts", "src/**/*.smoke.ts", "src/sims/*/cli/**/*.ts"]
+  "include": ["env.d.ts", "src/**/*.test.ts", "src/**/*.smoke.ts", "src/sims/*/cli/**/*.ts"]
 }

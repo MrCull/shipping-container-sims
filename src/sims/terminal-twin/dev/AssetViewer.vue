@@ -93,6 +93,8 @@ onMounted(() => {
       ready.value = true
       return s
     },
+    renderOnce: () => view!.renderOnce(),
+    frames: () => ({ frames: view?.frames.frames ?? 0, render: { ...(view?.frames.render ?? { calls: 0, triangles: 0 }) } }),
   }
   window.__ttAssets = api
   void open(props.initial && (props.initial === 'yard' || names.includes(props.initial)) ? props.initial : names[0])

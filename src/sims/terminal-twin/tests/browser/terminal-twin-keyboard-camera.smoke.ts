@@ -3,7 +3,8 @@
  * stops it, typing in a field never moves it, a camera key releases follow mode, and the dashboard is on B.
  * Dev-only `window.__tt` API. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 
@@ -16,7 +17,7 @@ async function open(page: Page): Promise<void> {
   await page.evaluate(() => window.__tt!.viewPreset('overview'))
 }
 
-test('held keys pan, orbit and zoom; release stops; typing is ignored; follow is released', async ({ page }) => {
+test('held keys pan, orbit and zoom; release stops; typing is ignored; follow is released', { tag: '@camera' }, async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   await open(page)
@@ -64,7 +65,11 @@ test('held keys pan, orbit and zoom; release stops; typing is ignored; follow is
   await page.keyboard.down('w')
   await page.waitForTimeout(300)
   await page.keyboard.up('w')
-  expect(await pose(page)).toEqual(p3)
+  const p4 = await pose(page) // compare with a tolerance: the pose carries float noise (3.0000000000000027 vs 3.000000000000002)
+  expect(p4.distance).toBeCloseTo(p3.distance, 6)
+  expect(p4.azimuth).toBeCloseTo(p3.azimuth, 6)
+  expect(p4.polar).toBeCloseTo(p3.polar, 6)
+  for (const k of ['x', 'y', 'z'] as const) expect(p4.target[k], `target ${k}`).toBeCloseTo(p3.target[k], 6)
   await page.keyboard.press('Escape')
 
   // A camera key releases follow mode.

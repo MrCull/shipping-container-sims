@@ -1,10 +1,13 @@
 // Which server the Playwright `dev` smoke project runs against (playwright.config.ts). Test: node --test scripts/test-smoke-server.mjs
 //
-// - `dev`: the Vite dev server (unbundled modules; slow page boots, but no build step). The local default.
-// - `build`: the smoke build, a bundled production build made with `vite build --mode smoke`, which keeps the dev API
-//   (`window.__tt`, the `?viewer=` asset viewer), served statically by `vite preview`. The CI default.
+// - `build` (the default, locally and in CI): the smoke build, a bundled production build made with
+//   `vite build --mode smoke`, which keeps the dev API (`window.__tt`, the `?viewer=` asset viewer), served statically by
+//   `vite preview`. Local runs and CI serve the same bundle, so a spec that passes locally passes in CI (hashed asset
+//   names such as `hero-shc-<hash>.glb` included).
+// - `dev`: the Vite dev server (unbundled modules, hot reload; slow page boots, no build step). Opt-in only, for
+//   debugging a spec while editing the app.
 //
-// SMOKE_SERVER=dev|build overrides the default. SMOKE_BUILD_DIR (default `.smoke-build`) is the build's directory;
+// SMOKE_SERVER=dev|build picks the server explicitly. SMOKE_BUILD_DIR (default `.smoke-build`) is the build's directory;
 // SMOKE_BUILD_PREBUILT=1 serves that directory as it is (built earlier with `pnpm run build:smoke`, or handed to a CI
 // shard as an artifact) instead of rebuilding it.
 
@@ -14,7 +17,7 @@
  * @returns {{ mode: 'dev' | 'build', buildDir: string, command: string, url: string }}
  */
 export function smokeDevServer(env, { port, vite }) {
-  const mode = env.SMOKE_SERVER || (env.CI ? 'build' : 'dev')
+  const mode = env.SMOKE_SERVER || 'build'
   if (mode !== 'dev' && mode !== 'build') throw new Error(`SMOKE_SERVER must be "dev" or "build", got "${mode}"`)
   const buildDir = env.SMOKE_BUILD_DIR || '.smoke-build'
   const host = `--host 127.0.0.1 --port ${port} --strictPort`

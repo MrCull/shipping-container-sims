@@ -4,7 +4,8 @@
  * Headless Chromium renders with SwiftShader, so frame RATES here say nothing about a real GPU: the
  * assertions are about draw calls, triangles, culling and the Auto controller. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin, type OpenTwinOptions } from './openTwin'
 
@@ -24,7 +25,7 @@ async function open(page: Page, scenario: string, options: Omit<OpenTwinOptions,
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 }
 
-test('overlay shows live fps, draw calls and triangles and can be toggled; quality defaults to Auto', async ({ page }) => {
+test('overlay shows live fps, draw calls and triangles and can be toggled; quality defaults to Auto', { tag: '@yard' }, async ({ page }) => {
   const errors = watch(page)
   // the default quality is what it checks, and the overlay's fps and draw calls need drawn frames
   await open(page, 'tracer-1sts-10-boxes', { quality: null, render: true })
@@ -42,7 +43,7 @@ test('overlay shows live fps, draw calls and triangles and can be toggled; quali
   expect(errors).toEqual([])
 })
 
-test('fixed quality levels change what is drawn: Low draws less than High', async ({ page }) => {
+test('fixed quality levels change what is drawn: Low draws less than High', { tag: '@yard' }, async ({ page }) => {
   const errors = watch(page)
   await open(page, 'tracer-1sts-10-boxes')
   const measure = async (level: 'low' | 'high') => {
@@ -59,7 +60,7 @@ test('fixed quality levels change what is drawn: Low draws less than High', asyn
   expect(errors).toEqual([])
 })
 
-test('the overlay names the rung in force; a manual level fixes it', async ({ page }) => {
+test('the overlay names the rung in force; a manual level fixes it', { tag: '@yard' }, async ({ page }) => {
   const errors = watch(page)
   await open(page, 'tracer-1sts-10-boxes')
   await page.keyboard.press('p')
@@ -75,7 +76,7 @@ test('the overlay names the rung in force; a manual level fixes it', async ({ pa
   expect(errors).toEqual([])
 })
 
-test('Auto sheds down the ladder under sustained load, names the rung in the overlay, and climbs back when the load ends @load', async ({ page }) => {
+test('Auto sheds down the ladder under sustained load, names the rung in the overlay, and climbs back when the load ends @load', { tag: '@yard' }, async ({ page }) => {
   test.setTimeout(300_000)
   const errors = watch(page)
   await open(page, 'tracer-1sts-10-boxes', { render: true }) // @load: Auto judges the real drawn frame rate
@@ -102,7 +103,7 @@ test('Auto sheds down the ladder under sustained load, names the rung in the ove
   expect(errors).toEqual([])
 })
 
-test('TTI preset at overview zoom: instanced containers are culled and the draw budget holds', async ({ page }) => {
+test('TTI preset at overview zoom: instanced containers are culled and the draw budget holds', { tag: '@yard' }, async ({ page }) => {
   test.setTimeout(240_000)
   const errors = watch(page)
   await open(page, 'TTI Algeciras baseline')

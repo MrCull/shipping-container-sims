@@ -33,7 +33,6 @@ import { readHudLayout, type HudLayout } from '../modules/hudLayout'
 import type { ScenarioOverrides } from '../scenario/overrides'
 import type { DisplaySettings, ScenarioConfig } from '../scenario/types'
 import type {
-  CustodyRef,
   EngineEvent,
   EventPayloads,
   EventSubjects,
@@ -49,17 +48,10 @@ import type { OverlayState } from '../modules/overlays'
 import type { AutoRungName, QualityLevel, QualitySetting } from '../modules/quality'
 import { useAudioStore } from '@/stores/audio'
 import { usePerfStore, type PerfStats } from '../store/perfStore'
-import { EQUIPMENT_KINDS } from '../modules/equipmentKinds'
-import type { RenderedLivery, SceneStats } from '../modules/sceneRenderer'
-import type { ShcRigState } from '../modules/shcAssets'
-import type { TruckRigState } from '../modules/truckAssets'
-import type { AscRigState } from '../modules/ascAssets'
-import type { VesselHullState } from '../modules/vesselRenderer'
-import type { HatchRigState } from '../modules/equipmentKinds/hatch'
-import type { AscPose, ShcPose, StsPose, TruckPose } from '../modules/sceneModel'
+import { sceneStateOf } from '../modules/sceneDriver'
+import type { SceneState } from '../modules/sceneState'
+import type { SceneStats } from '../modules/sceneRenderer'
 import type { TwinController } from '../modules/twinController'
-import type { ColourBy, RobDisplay } from '../modules/colourBy'
-import type { StsRenderState } from '../modules/stsAssets'
 import { resolveScenario, type DashboardRendered, type RenderInfo, type ScenarioChoice, type useTwinStore } from '../store/twinStore'
 import type { SaveMeta, SaveType } from '../persistence/saves'
 import type { BreakpointHit, Checkpoint, EngineInfo, EventSummary, QueryKind, WorkerRunCondition } from '../worker/protocol'
@@ -269,42 +261,7 @@ export interface TwinUiState {
   runToOpen: boolean
 }
 
-/**
- * What the dev API reports about the scene. The equipment-kind entries (`sts`, `shcs`, `ascs`, `trucks`, `vessels` and their
- * rig keys) are filled from the registry (`modules/equipmentKinds/`); a new kind appears under its own keys, typed here only if wanted.
- */
-export interface SceneState {
-  [kind: string]: unknown
-  displayTime: number
-  containers: Record<string, CustodyRef | null>
-  sts: Record<string, { status: string; gantrying: boolean } & StsPose>
-  shcs: Record<string, { status: string } & ShcPose>
-  /** The ASCs of every yard block (1 or 2 each): status and spreader pose (gantry Z, trolley X, hoist height). */
-  ascs: Record<string, { status: string; gantrying: boolean } & AscPose>
-  /** Trucks in the scene (TT-13): status and pose; `visible` false once they have left. */
-  trucks: Record<string, { status: string } & TruckPose>
-  vessels: Record<string, { status: string }>
-  /** Conflict zones reserved at the displayed time (zone → holder). */
-  reservations: Record<string, string>
-  /** Per container: livery atlas index, model size, LOD and centre actually drawn (phase 2 assets). */
-  liveries: Record<string, RenderedLivery>
-  /** Per SHC, the phase 2 rig as last drawn: LOD, steering, wheel roll, hoist travel, carrying (empty until the GLB loads). */
-  shcRigs: Record<string, ShcRigState>
-  /** Truck GLB rig state (LOD, cab shape, livery, steering, articulation, wheel roll, load offset) per visible truck. */
-  truckRigs: Record<string, TruckRigState>
-  /** Per ASC, the phase 2 rig as last drawn: LOD, gantry Z, trolley X, hoist travel, rope scale, vertical stretch, carrying (empty until the GLB loads). */
-  ascRigs: Record<string, AscRigState>
-  /** Per STS as drawn by the GLB model: LOD, spreader configuration (20 / 40 / twin-20), boxes carried, spreader and trolley world positions. */
-  stsRendered: Record<string, StsRenderState>
-  /** Per vessel: hull class, line, livery tile, name, hull LOD and the rendered bay grid (TT-27). */
-  vesselHulls: Record<string, VesselHullState>
-  /** Per hatch panel (TT-R10): engine-driven state and the centre (top face minus half the thickness) it should be drawn at, null while its vessel is not in the scene. */
-  hatchPanels: Record<string, { status: string; x: number | null; y: number | null; z: number | null; lengthM: number | null; widthM: number | null; stsId: string | null }>
-  /** Per hatch panel the renderer drew at the last frame: status and centre (absent while not drawn). */
-  hatchRigs: Record<string, HatchRigState>
-  /** Colour by mode and ROB display (#168, show, grey or hide) the 3D view and the bay viewer draw with. */
-  colour: { mode: ColourBy; robDisplay: RobDisplay }
-}
+export type { SceneState }
 
 declare global {
   interface Window {
@@ -429,23 +386,9 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
     renderOnce: () => store.view()?.renderOnce() ?? null,
     sceneState: () => {
       const c = store.controller()
-      const model = c?.model
-      if (!c || !model) return null
-      const t = c.displayTime
-      const state: Record<string, unknown> = {
-        displayTime: t,
-        containers: Object.fromEntries(model.containerIds.map((id) => [id, model.custodyAt(id, t)])),
-        reservations: model.activeReservations(t),
-        liveries: store.view()?.liveries() ?? {},
-        colour: { mode: store.colourBy, robDisplay: store.robDisplay },
-      }
-      // Equipment kinds (modules/equipmentKinds/): status and pose per id, and the rig state as drawn.
-      const rigs = store.view()?.rigs()
-      for (const def of EQUIPMENT_KINDS) {
-        state[def.sceneKey] = Object.fromEntries(def.ids(model).map((id) => [id, def.sceneState(model, id, t)]))
-        state[def.rigKey] = rigs?.[def.kind] ?? {}
-      }
-      return state as unknown as SceneState
+      if (!c?.model) return null
+      const v = store.view()
+      return sceneStateOf(c.model, c.displayTime, { mode: store.colourBy, robDisplay: store.robDisplay }, v ? { liveries: () => v.liveries(), rigs: () => v.rigs() } : null)
     },
     display: () => ({ ...store.display }),
     setDisplay: (next) => {

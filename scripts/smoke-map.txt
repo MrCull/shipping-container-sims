@@ -1,37 +1,47 @@
-# Path pattern (extended regex on a changed file path) => smoke spec names (regex fragments, space separated).
-# scripts/smoke-specs-for.sh prints the specs a diff needs; merge-ticket.sh runs them instead of the whole suite.
-# Patterns match a file or folder name, never a substring of a path (the word "tests" contains "sts").
-# Add a line when a new area gets its own spec. A changed tests/browser/*.smoke.ts always runs itself.
-(^|/)(bay|Bay|rob|Rob|hullProfile)[A-Za-z-]*\.(ts|vue)$ => bay-viewer rob-bays bay-plan-switch
-(^|/)(cranePlan|CranePlan)[A-Za-z-]*\.(ts|vue)$|engine/cranePlan/ => crane-plan
-(^|/)[A-Za-z-]*(shc|Shc)[A-Za-z-]*\.(ts|vue|py)$|models/shc/ => shc-model terminal-twin-shc hero-equipment
-(^|/)(sts|Sts)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/sts|models/sts/ => sts-asset hero-equipment
-(^|/)(asc|Asc)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/asc|models/asc/ => asc-model terminal-twin-asc terminal-twin-paired-asc hero-equipment
-(^|/)container(Markings|Textures|Closeups|Assets|Lod)[A-Za-z]*\.ts$|models/container/ => container-assets container-closeup
-(^|/)(truck|Truck)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/truck|models/truck/ => truck-model terminal-twin-landside terminal-twin-follow-truck
-(^|/)(vessel|Vessel)[A-Za-z-]*\.(ts|vue|py)$|models/vessel => vessel-hulls
-(^|/)(hatch|Hatch)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-hatch
-(^|/)(Kpi|kpi|Dashboard|dashboard|FinalReport)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-kpi terminal-twin-dashboard\.smoke
-components/debug/ => terminal-twin-debugger
-(^|/)(persistence|saves)/ => terminal-twin-saves
-(^|/)(atmosphere|backdrop)[A-Za-z-]*\.ts$|terminals/ => terminal-twin-atmosphere
-(^|/)(FpsChip|PerfPanel|AudioControls|positionalSound|soundMixer|audio)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-volume-fps
-(^|/)(positionalSound|soundMixer|soundShots|sceneModel|synth|gantryBeacons)\.ts$|assets/sounds/ => gantry-alarm
-components/setup/|(^|/)scenarioPicker|(^|/)scenario/ => terminal-twin-presets terminal-twin-yard-start terminal-twin-subsystem-modes
-skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => terminal-twin-hud terminal-twin-views
-(^|/)[A-Za-z-]*(camera|Camera)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-camera terminal-twin-keyboard-camera
-(^|/)(i18n|LocaleDate)[A-Za-z/-]*\.(ts|vue)$|/i18n/ => terminal-twin-display
-(^|/)infrastructure[A-Za-z-]*\.(ts|py)$|models/infrastructure/ => infrastructure\.smoke terminal-twin-atmosphere
-(^|/)(colour|Colour)[A-Za-z-]*\.(ts|vue)$|(^|/)(containerInstancer|robBoxes|sceneRenderer)\.ts$ => colour-by bay-viewer container-closeup rob-bays
-(^|/)(vesselStatus|vesselCountdownLabels|InspectorPanel)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-vessel-status bay-viewer
-(^|/)(HomePage\.vue|buildStamp\.ts|vite\.config\.ts)$ => build-stamp
-(^|/)(useMenuMusic|AudioControls|audio|HomePage)(\.test)?\.(ts|vue)$ => menu-music-volume
-(^|/)(HomePage|GameTile|SimPage)\.vue$|(^|/)lastPlayed\.ts$ => home-wall
-(^|/)(escape|useTwinShortcuts|shortcuts)\.ts$ => terminal-twin-debugger terminal-twin-display terminal-twin-follow-truck terminal-twin-volume-fps
-(^|/)(meshClip|hullHatchOpening|backdrop)\.ts$ => vessel-hulls terminal-twin-hatch container-closeup terminal-twin-atmosphere
-(^|/)twinStore\.ts$ => terminal-twin-atmosphere terminal-twin-volume-fps colour-by terminal-twin-debugger
-(^|/)(twinController|engineHost|sliceDelta|TopBar)[A-Za-z-]*\.(ts|vue)$|/worker/ => terminal-twin-pacing terminal-twin-strict-checks terminal-twin-hud terminal-twin\.smoke
-(^|/)hero[A-Za-z-]*\.(ts|vue|py)$|models/hero/ => hero-faces container-closeup terminal-twin-perf hero-equipment
-(^|/)(farTier|contactShadow|skyEnvironment|quality)\.ts$ => terminal-twin-perf terminal-twin-atmosphere terminal-twin-volume-fps
-(^|/)(frameBenchmark|useFrameBenchmark)\.ts$|PerfPanel => terminal-twin-benchmark\.prod terminal-twin-fps-chip\.prod terminal-twin-perf
-(^|/)[A-Za-z-]*(Strict|strict)[A-Za-z-]*\.(ts|vue)$ => terminal-twin-strict-checks
+# Path pattern (extended regex on a changed file path) => smoke groups (space separated; `all` means every group).
+# scripts/smoke-select.mjs prints the groups a change needs; CI and merge-ticket.sh run them. `core` always runs.
+# A group is a Playwright tag on every test of a spec file (`{ tag: '@camera' }`); scripts/check-smoke-groups.mjs
+# (part of verify) fails when a spec has no group tag or more than one. A changed *.smoke.ts selects its own group.
+# Ignored before the map: paths outside src/, Markdown, docs/ folders, Node-only CLI code (src/sims/*/cli/) and
+# unit tests (*.test.ts). Patterns match a file or folder name, never a substring of a path (the word "tests"
+# contains "sts"). Add a line when a new area gets its own spec.
+(^|/)tests/browser/(openTwin|frameSampling)\.ts$ => all
+(^|/)(sceneDriver|sceneState|useTwinScene)\.ts$ => all
+(^|/)tests/browser/scenarioPicker\.ts$ => setup
+(^|/)tests/browser/renderBudget[A-Za-z.]*\.ts$ => core
+(^|/)(bay|Bay|rob|Rob|hullProfile)[A-Za-z-]*\.(ts|vue)$ => vessel
+(^|/)(cranePlan|CranePlan)[A-Za-z-]*\.(ts|vue)$|engine/cranePlan/ => vessel
+(^|/)[A-Za-z-]*(shc|Shc)[A-Za-z-]*\.(ts|vue|py)$|models/shc/ => equipment engine
+(^|/)(sts|Sts)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/sts|models/sts/ => equipment
+(^|/)(asc|Asc)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/asc|models/asc/ => equipment engine
+(^|/)(spreader|Spreader)[A-Za-z-]*\.(ts|vue|py)$|models/spreader/ => equipment
+(^|/)container(Markings|Textures|Closeups|Assets|Lod)[A-Za-z]*\.ts$|models/container/ => yard
+(^|/)(truck|Truck)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/truck|models/truck/ => equipment engine camera
+(^|/)(vessel|Vessel)[A-Za-z-]*\.(ts|vue|py)$|models/vessel => vessel
+(^|/)(hatch|Hatch)[A-Za-z-]*\.(ts|vue)$ => vessel
+(^|/)(Kpi|kpi|Dashboard|dashboard|FinalReport)[A-Za-z-]*\.(ts|vue)$|engine/kpi/ => analysis
+components/debug/ => analysis
+(^|/)(persistence|saves)/ => setup
+(^|/)(atmosphere|backdrop)[A-Za-z-]*\.ts$|terminals/ => yard
+(^|/)(FpsChip|PerfPanel|AudioControls|positionalSound|soundMixer|audio)[A-Za-z-]*\.(ts|vue)$ => shell
+(^|/)(positionalSound|soundMixer|soundShots|sceneModel|synth|gantryBeacons)\.ts$|assets/sounds/ => equipment
+components/setup/|(^|/)scenarioPicker|(^|/)scenario/[^/]*\.ts$ => setup
+scenario/fixtures/|(^|/)engine/ => engine
+skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => shell
+(^|/)[A-Za-z-]*(camera|Camera|pinch|Pinch|wheelZoom|WheelZoom)[A-Za-z-]*\.(ts|vue)$ => camera
+(^|/)(i18n|LocaleDate)[A-Za-z/-]*\.(ts|vue)$|/i18n/ => shell
+(^|/)infrastructure[A-Za-z-]*\.(ts|py)$|models/infrastructure/ => yard
+(^|/)(colour|Colour)[A-Za-z-]*\.(ts|vue)$|(^|/)(containerInstancer|robBoxes|sceneRenderer)\.ts$ => vessel yard
+(^|/)(vesselStatus|vesselCountdownLabels|InspectorPanel)[A-Za-z-]*\.(ts|vue)$ => analysis vessel
+(^|/)(HomePage\.vue|buildStamp\.ts|vite\.config\.ts)$ => core
+(^|/)(useMenuMusic|AudioControls|audio|HomePage)\.(ts|vue)$ => core
+(^|/)(HomePage|GameTile|SimPage)\.vue$|(^|/)lastPlayed\.ts$ => core
+(^|/)(escape|useTwinShortcuts|shortcuts)\.ts$ => analysis shell camera
+(^|/)(meshClip|hullHatchOpening|backdrop)\.ts$ => vessel yard
+(^|/)twinStore\.ts$ => yard shell vessel analysis
+(^|/)(twinController|engineHost|sliceDelta|TopBar)[A-Za-z-]*\.(ts|vue)$|/worker/ => shell engine
+(^|/)hero[A-Za-z-]*\.(ts|vue|py)$|models/hero/ => yard equipment
+(^|/)(farTier|contactShadow|skyEnvironment|quality)\.ts$ => yard shell
+(^|/)(frameBenchmark|useFrameBenchmark)\.ts$|PerfPanel => yard
+(^|/)[A-Za-z-]*(Strict|strict)[A-Za-z-]*\.(ts|vue)$ => shell
+(^|/)(phone|Phone|touch|Touch|viewport)[A-Za-z-]*\.(ts|vue)$ => shell camera

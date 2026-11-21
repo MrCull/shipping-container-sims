@@ -5,7 +5,8 @@
  * switching, animated from the engine's motion segments (twin-20 included).
  * Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import meta from '../../assets/models/sts/sts-malaccamax.meta.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
@@ -27,7 +28,7 @@ function near(actual: number[], expected: number[], tol = 0.01): void {
   actual.forEach((v, i) => expect(Math.abs(v - expected[i]), `[${i}] ${v} vs ${expected[i]}`).toBeLessThan(tol))
 }
 
-test('asset viewer: STS rig sliders drive gantry, trolley, hoist, spreader and boom; a 40 ft box hangs under the spreader', async ({ page }) => {
+test('asset viewer: STS rig sliders drive gantry, trolley, hoist, spreader and boom; a 40 ft box hangs under the spreader', { tag: '@equipment' }, async ({ page }) => {
   const errors = watch(page)
   await page.goto(twinUrl({ params: { viewer: 'sts-malaccamax' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
@@ -84,12 +85,12 @@ test('asset viewer: STS rig sliders drive gantry, trolley, hoist, spreader and b
     window.__ttAssets!.setRig('boom', 0)
     window.__ttAssets!.setRig('hoist', 20)
   })
-  await page.waitForTimeout(300)
+  await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/sts-viewer.png' })
   expect(errors).toEqual([])
 })
 
-test('the twin draws every STS from the GLB, switches LODs and animates it from the engine motion (twin-20 shows two boxes)', async ({ page }) => {
+test('the twin draws every STS from the GLB, switches LODs and animates it from the engine motion (twin-20 shows two boxes)', { tag: '@equipment' }, async ({ page }) => {
   const errors = watch(page)
   await openTwin(page, { scenario: 'twin-20-lift', quality: 'high' }) // the LOD distances it checks are High's (Low scales them by 0.4)
   await page.waitForFunction(() => window.__tt!.scene()?.stsAssets === 'loaded')
@@ -130,7 +131,7 @@ test('the twin draws every STS from the GLB, switches LODs and animates it from 
   expect(errors).toEqual([])
 })
 
-test('eight STS on a long quay stay within the overview triangle and draw-call budget', async ({ page }) => {
+test('eight STS on a long quay stay within the overview triangle and draw-call budget', { tag: '@equipment' }, async ({ page }) => {
   const errors = watch(page)
   // High: the budget is for the main and shadow passes users get by default
   await openTwin(page, { scenario: 'crane-split-4sts', load: { overrides: { stsCount: 8, quayLengthM: 850 } }, quality: 'high' })

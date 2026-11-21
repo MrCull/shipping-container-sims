@@ -1,11 +1,13 @@
 /**
  * Phase 2 container assets in the browser (seam 3 + seam 4):
- * the twin's instanced renderer uses the GLBs (LOD0 near, LOD1 far, livery per
- * line), assets load without any external request, and the dev-only asset
+ * the twin's instanced renderer loads the container GLBs without any external
+ * request and draws the liveries (LOD by distance and livery per line in detail:
+ * `tests/headless-scene-yard.test.ts`, #336), and the dev-only asset
  * viewer shows every asset (screenshots in .screenshots/assets/).
  * Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import atlas from '../../assets/models/containers/livery-atlas.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
@@ -30,37 +32,18 @@ function watch(page: Page): { errors: string[]; external: string[] } {
   return { errors, external }
 }
 
-test('the twin renders containers from the GLBs with each box in its own line livery, offline', async ({ page }) => {
+test('the twin loads the container GLBs offline and draws each box in its line livery', { tag: '@yard' }, async ({ page }) => {
   const { errors, external } = watch(page)
-  await openTwin(page, { scenario: 'liveries-mixed', quality: 'high' }) // the LOD distances it checks are High's (Low scales them by 0.4)
+  await openTwin(page, { scenario: 'liveries-mixed', quality: 'high' }) // High draws LOD0 out to the screenshot distance
   await page.evaluate(() => window.__tt!.runTo(200))
   await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 
-  const boxes = await page.evaluate(() => window.__tt!.query<{ id: string; line: string; size: string }[]>('containers'))
+  // the worker's boxes reach the drawn liveries (livery per line, size and LOD by distance: headless-scene-yard.test.ts, #336)
+  const boxes = await page.evaluate(() => window.__tt!.query<{ id: string; line: string }[]>('containers'))
   const state = await page.evaluate(() => window.__tt!.sceneState())
-  const scene = await page.evaluate(() => window.__tt!.scene())
-  expect(new Set(boxes.map((b) => b.line)).size).toBeGreaterThanOrEqual(5)
-  expect(new Set(boxes.map((b) => b.size))).toEqual(new Set(['20', '40', '40HC']))
-  for (const box of boxes) {
-    const rendered = state!.liveries[box.id]
-    expect(rendered, box.id).toBeDefined()
-    expect(atlas.liveries[rendered.index].line, box.id).toBe(box.line)
-    expect(rendered.size, box.id).toBe(box.size)
-  }
-  expect(scene!.containerLods.lod0 + scene!.containerLods.lod1).toBe(scene!.containers)
-  expect(scene!.containers).toBe(boxes.length)
-
-  // Close up, the boxes use LOD0; from far away, LOD1 (and the liveries stay put).
-  await page.evaluate(() => window.__tt!.cameraTo('STS01', 60))
-  await page.waitForFunction(() => window.__tt!.scene()!.containerLods.lod0 + window.__tt!.scene()!.containerLods.culled === window.__tt!.scene()!.containers) // boxes outside the view are culled, not LOD0
-  await page.waitForTimeout(400)
-  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
-  await page.screenshot({ path: '.screenshots/assets/twin-liveries-near.png' })
-  await page.evaluate(() => window.__tt!.cameraTo('STS01', 600))
-  await page.waitForFunction(() => window.__tt!.scene()!.containerLods.lod1 === window.__tt!.scene()!.containers)
-  const far = await page.evaluate(() => window.__tt!.sceneState())
-  for (const box of boxes) expect(far!.liveries[box.id].index).toBe(state!.liveries[box.id].index)
+  expect(boxes.length).toBeGreaterThan(0)
+  for (const box of boxes) expect(atlas.liveries[state!.liveries[box.id].index].line, box.id).toBe(box.line)
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 140))
   await page.waitForTimeout(400)
   await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
@@ -69,11 +52,19 @@ test('the twin renders containers from the GLBs with each box in its own line li
   expect(errors).toEqual([])
 })
 
-test('the asset viewer loads every container asset, switches LODs and moves the rig', async ({ page }) => {
+test('the asset viewer loads every container asset, switches LODs and moves the rig', { tag: '@yard' }, async ({ page }) => {
   test.slow() // shows and screenshots every asset in the pack, each on software WebGL
   const { errors, external } = watch(page)
   await page.goto(twinUrl({ params: { viewer: 'container-20' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
+  // render is off (#345): the frame counter still advances, nothing is drawn until renderOnce()
+  const start = await page.evaluate(() => window.__ttAssets!.frames().frames)
+  await page.waitForFunction((n) => window.__ttAssets!.frames().frames > n + 2, start)
+  expect((await page.evaluate(() => window.__ttAssets!.frames())).render).toEqual({ calls: 0, triangles: 0 })
+  const once = await page.evaluate(() => window.__ttAssets!.renderOnce())
+  expect(once.calls).toBeGreaterThan(0)
+  expect(once.triangles).toBeGreaterThan(0)
+  expect((await page.evaluate(() => window.__ttAssets!.frames())).render).toEqual(once)
   const names = await page.evaluate(() => window.__ttAssets!.list())
   expect(names).toEqual(expect.arrayContaining(['container-20', 'container-40', 'container-40hc']))
 
@@ -92,17 +83,18 @@ test('the asset viewer loads every container asset, switches LODs and moves the 
       const moved = await page.evaluate(([n, v]) => window.__ttAssets!.setRig(n as string, v as number), [rig.node, rig.max] as const)
       expect(moved.rigValues[rig.node]).toBe(rig.max)
     }
-    await page.waitForTimeout(250)
+    await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
     await page.screenshot({ path: `.screenshots/assets/${name}.png` })
   }
   expect(external).toEqual([])
   expect(errors).toEqual([])
 })
 
-test('a TTI-size yard of instanced containers stays within the triangle and draw-call budget', async ({ page }) => {
-  test.slow() // 18,000 instances render at under 1 fps on software WebGL
+test('a TTI-size yard of instanced containers stays within the triangle and draw-call budget', { tag: '@yard' }, async ({ page }) => {
+  test.slow() // 18,000 instances render at under 1 fps on software WebGL; with render off only the one measured frame is drawn
   const { errors } = watch(page)
-  await page.goto(twinUrl({ params: { viewer: 'yard' } })) // the asset viewer has no __tt to wait for
+  // High quality keeps the sun's shadow pass in the measured frame, so the budget below counts the same passes as before
+  await page.goto(twinUrl({ quality: 'high', params: { viewer: 'yard' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
   const yard = await page.evaluate(() => window.__ttAssets!.yard(18000))
   expect(yard.instances).toBe(18000)
@@ -114,6 +106,7 @@ test('a TTI-size yard of instanced containers stays within the triangle and draw
   expect(yard.drawCalls).toBeLessThan(40)
   expect(yard.triangles).toBeLessThan(1_500_000)
   console.log(`yard: ${JSON.stringify(yard)}`)
+  await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/yard.png' })
   expect(errors).toEqual([])
 })

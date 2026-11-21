@@ -4,7 +4,8 @@
  * cursor; a set pose drops a wheel zoom still easing in; middle-button drag still zooms without turning.
  * Dev-only `window.__tt` API. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import * as THREE from 'three'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { groundPointUnder } from '../../modules/pinchGesture'
@@ -45,7 +46,7 @@ async function open(page: Page, errors: string[]): Promise<{ x: number; y: numbe
   return (await page.locator('canvas.tt-canvas').boundingBox())!
 }
 
-test('wheel zoom near either edge of a low-angle view keeps heading, tilt and the point under the cursor', async ({ page }) => {
+test('wheel zoom near either edge of a low-angle view keeps heading, tilt and the point under the cursor', { tag: '@camera' }, async ({ page }) => {
   const errors: string[] = []
   const box = await open(page, errors)
 
@@ -73,7 +74,7 @@ test('wheel zoom near either edge of a low-angle view keeps heading, tilt and th
   expect(errors).toEqual([])
 })
 
-test('a set pose drops a wheel zoom still easing in, and middle-button drag still zooms without turning', async ({ page }) => {
+test('a set pose drops a wheel zoom still easing in, and middle-button drag still zooms without turning', { tag: '@camera' }, async ({ page }) => {
   const errors: string[] = []
   const box = await open(page, errors)
 
