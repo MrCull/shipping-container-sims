@@ -27,7 +27,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 
 ## Next steps
 
-- Merged: #321, #322, #323, #325, #326, main (#306). Running: #324. Unblocked next: #327, #328.
+- Merged: #321, #322, #323, #324, #325, #326, main (#306). Nothing running. Unblocked next: #327 (shards), #328 (migrate remaining specs). Paused here for the owner.
 
 ## Open points
 
