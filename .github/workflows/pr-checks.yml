@@ -64,8 +64,8 @@ jobs:
       - name: Check every smoke spec has exactly one group tag
         run: node scripts/check-smoke-groups.mjs
 
-      - name: Smoke reporter, timing, server, merge, group check and selection script tests
-        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs scripts/test-smoke-merge.mjs scripts/test-check-smoke-groups.mjs scripts/test-smoke-select.mjs
+      - name: Smoke reporter, timing, shards, server, merge, group check and selection script tests
+        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-shards.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs scripts/test-smoke-merge.mjs scripts/test-check-smoke-groups.mjs scripts/test-smoke-select.mjs
 
       - name: Lint
         run: pnpm run lint
@@ -91,6 +91,10 @@ jobs:
     runs-on: ubuntu-latest
     name: Smoke build
     timeout-minutes: 15
+    # actions: read lets `gh run download` fetch the last green run's smoke timings.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       tests: ${{ steps.count.outputs.tests }}
     steps:
@@ -118,14 +122,30 @@ jobs:
       - name: Build production bundle
         run: node node_modules/vite/bin/vite.js build --outDir .smoke-dist --emptyOutDir --logLevel warn
 
-      # How many tests the full run holds: the merge job fails when fewer are reported (a shard cancelled or timed out).
-      - name: Count smoke tests
+      # Per-test times of the last green run that ran the smoke suite: its merged `smoke-report` artifact (one JSONL per
+      # shard). Optional: with none (first run, artifacts expired) the committed scripts/smoke-timings.jsonl balances alone.
+      - name: Download smoke timings of the last green run
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for id in $(gh run list --workflow pr-checks.yml --status success --limit 20 --json databaseId --jq '.[].databaseId'); do
+            if gh run download "$id" --name smoke-report --dir .smoke-history 2>/dev/null; then echo "Smoke timings from run $id"; exit 0; fi
+          done
+          echo "No smoke timings found in the last 20 green runs; using scripts/smoke-timings.jsonl"
+
+      # How many tests the full run holds (the merge job fails when fewer are reported: a shard cancelled or timed out), and
+      # one test-list file per shard, balanced by time (scripts/smoke-shards.mjs: longest first, each test to the shard with
+      # the least time so far; times from the history above, then the committed fallback, else the average).
+      - name: List smoke tests and balance the shards
         id: count
         run: |
-          tests=$(pnpm exec playwright test --list --grep-invert @load | awk '/^Total:/ {print $2}')
+          pnpm exec playwright test --list --grep-invert @load > .smoke-list.txt
+          tests=$(awk '/^Total:/ {print $2}' .smoke-list.txt)
           echo "Smoke tests: $tests"
           test -n "$tests"
           echo "tests=$tests" >> "$GITHUB_OUTPUT"
+          node scripts/smoke-shards.mjs --list .smoke-list.txt --shards 6 --out .smoke-shards $(find .smoke-history -name '*.jsonl' 2>/dev/null)
 
       - name: Upload bundles
         uses: actions/upload-artifact@v4
@@ -134,6 +154,7 @@ jobs:
           path: |
             .smoke-build
             .smoke-dist
+            .smoke-shards
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
@@ -143,8 +164,10 @@ jobs:
     runs-on: ubuntu-latest
     name: Browser smoke tests (shard ${{ matrix.shard }}/6)
     timeout-minutes: 45
-    # playwright.config.ts sets fullyParallel, so `--shard` splits by test, not by file (split by file on 29 Oct, three
-    # shards took 7, 9 and 19 min). Every shard runs to the end even when another fails, so the merged table is complete.
+    # Each shard runs the test-list file smoke-build made for it (`--test-list`, balanced by recorded test time), not
+    # `--shard=i/6`: equal-count slices in file order put the slow asset specs together (PR #341: 7.2 min on shard 1,
+    # 1.5 min on shard 3). fullyParallel keeps every test its own unit. Every shard runs to the end even when another
+    # fails, so the merged table is complete.
     # Each shard pays the install and Chromium setup; that is why the bundles come from smoke-build, not from each shard.
     # Frame-based assertions are ratios over a wall-clock window (tests/browser/frameSampling.ts), so they hold on a loaded
     # 2-core runner.
@@ -206,8 +229,12 @@ jobs:
 
       # CI is set, so playwright.config.ts uses 1 retry and stops this shard after 5 failures. Per-test results are
       # appended to the JSONL file as each test ends, so the merge job still has them when this step times out or is cancelled.
+      # A shard with an empty list (fewer tests than shards) has nothing to run.
       - name: Smoke tests
-        run: pnpm run test:smoke --grep-invert @load --shard=${{ matrix.shard }}/6
+        run: |
+          list=.smoke-shards/shard-${{ matrix.shard }}.txt
+          if ! grep -q . "$list"; then echo "No tests in $list"; exit 0; fi
+          pnpm run test:smoke --grep-invert @load --test-list "$list"
         env:
           SMOKE_SERVER: build
           SMOKE_BUILD_PREBUILT: '1'

@@ -14,8 +14,8 @@
  *   `*.prod.smoke.ts`), for checks that dev-only code is absent. SMOKE_PROD_PREBUILT=1 serves an existing build
  *   (SMOKE_PROD_DIR, default `.smoke-dist`) without rebuilding.
  *
- * CI runs the suite in 6 shards (`--shard=i/6`, .github/workflows/pr-checks.yml); `fullyParallel` makes a shard a set of
- * tests, not files. scripts/smoke-merge.mjs merges the shards' JSONL files into one SMOKE line and timing table.
+ * CI runs the suite in 6 shards, each from a test-list file balanced by recorded test time (`--test-list`,
+ * scripts/smoke-shards.mjs, .github/workflows/pr-checks.yml); `fullyParallel` makes a shard a set of tests, not files. scripts/smoke-merge.mjs merges the shards' JSONL files into one SMOKE line and timing table.
  *
  * Tests titled `@load` need a real frame rate (only the Auto-quality fps spec today): CI runs them as an advisory job
  * (`pnpm run test:smoke --grep @load`); everything else is a required check (`--grep-invert @load`). Frame-based
@@ -58,7 +58,7 @@ export default defineConfig({
   timeout: 120_000,
   // Dev-server chunks (the lazy dashboard, GLBs) and software-WebGL frames are slow on a loaded 2-core runner.
   expect: { timeout: 20_000 },
-  // Every test is its own unit of work, so `--shard=i/n` splits the suite by test, not by file (CI runs 6 shards; split by
+  // Every test is its own unit of work, so a CI shard (a `--test-list` file, or `--shard=i/n`) is a set of tests, not files (CI runs 6 shards; split by
   // file they were 7, 9 and 19 min). No spec shares state between tests (no serial describe, no shared page in beforeAll);
   // keep it that way. Locally workers stay at 1, so a run is still one test at a time.
   fullyParallel: true,
