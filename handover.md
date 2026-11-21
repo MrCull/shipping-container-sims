@@ -20,7 +20,7 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 
 ## Open points
 
-- #304 real-GPU run DONE (21 Nov, Iris Xe, 06205b9): draw calls booms up <= booms down, cpuMs within noise of 0207d27, numbers in frame-rate.md and perf/baseline.json `frames`. Caveats: 967x845 pane, dev server, per-crane LOD0 triangles not measured.
+- #304 real-GPU run DONE (21 Nov, Iris Xe, c197cf6): draw calls booms up <= booms down, cpuMs within noise of 0207d27, numbers in frame-rate.md and perf/baseline.json `frames`. Caveats: 967x845 pane, dev server, per-crane LOD0 triangles not measured.
 - #302 limits: only work-cycle gantry moves check the bridge (step-aside repositions do not); with `canGantryWithBoomRaised: false` a blocked crane stays idle with no retry, so its vessel never finishes (default true, TTI unaffected).
 - For #305: `terminal-twin-atmosphere.smoke.ts` "a departure shows a banner that does not block clicks" failed once alone after the #301 merge (line 173: computed `pointerEvents` was `""`, i.e. the banner was likely detached between the visible check and evaluate). Unknown whether it is a regression: check against main 0207d27 or bisect. "entering with sound on shows muted" passed alone.
 - #301 follow-up: bridge-passage boom time counts only the boom turns, not the boom-up gantry between them.
