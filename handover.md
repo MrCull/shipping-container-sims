@@ -24,7 +24,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #338 | 15 Remaining component moves | #332 | open | |
 | #339 | 10 Docs and review rules | #325, #335, #348 | open | |
 | #344 | 21 Smoke build as the local default | none | merged in branch (f170cab) | |
-| #345 | 22 Asset viewer honours URL switches | none | in progress | implementer-345 |
+| #345 | 22 Asset viewer honours URL switches | none | done, not merged (tt/345-viewer-url-switches, 01f3934) | |
 | #346 | 23 Shards balanced by recorded test time | none (blocks #335) | open | |
 | #347 | 24 bg.sh cleans up its process group | none | open | |
 | #348 | 25 CI smoke per merge, frame-loop review rule, doc fixes | none (blocks #339) | merged in branch (7cafd11) | |
@@ -38,7 +38,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
   - after #330: green (run 44932418994);
   - after #331 + #348: green, `SMOKE: 189 passed, 0 failed, 0 flaky` (run 44933311179);
   - after #344: **not run yet**. Start one first thing.
-- **Still running when the session stopped:** #345 (asset viewer honours `?quality=` / `?render=off`), branch `tt/345-viewer-url-switches`, worktree `.claude/worktrees/agent-a91b4af6722734e60`. Its implementer may have committed partial work. Next session: check `git log claude/hopeful-hawking-s9i8uh..tt/345-viewer-url-switches` and the worktree status; finish it (ticket file content is in issue #345) or merge if complete, with `scripts/merge-ticket.sh --push tt/345-viewer-url-switches`.
+- **#345 is complete but not merged** (it reported after the session stopped): branch `tt/345-viewer-url-switches`, tip 01f3934, worktree `.claude/worktrees/agent-a91b4af6722734e60`, verify green (2370 tests). Next session: `scripts/merge-ticket.sh --push tt/345-viewer-url-switches`, label #345 `merged-in-branch`, remove the worktree, start a CI run. Viewer calls live on `window.__ttAssets` (`renderOnce()`, `frames()`), not `__tt`, since the viewer has no `__tt`. Viewer smoke `SMOKE: 6 passed`; container viewer 224.1 s to 20.1 s, yard 51.1 s to 23.8 s, ASC/SHC/STS/truck viewers 6 to 15 s to 2 to 3 s each. The yard spec opts in to High so its budget frame keeps the shadow pass; budget unchanged (26 calls, 1,055,442 triangles).
 - #344's worktree `.claude/worktrees/agent-a504b8c16b0f012fc` is merged; remove it with `scripts/remove-worktree.sh agent-a504b8c16b0f012fc`.
 - PR #349 body lists #330, #331, #348; add #344 (smoke build is now the local default, `SMOKE_SERVER=dev` opts in to the Vite dev server; `scripts/test-smoke-server.mjs` 7 of 7; sample `SMOKE: 12 passed`) and the CI results above.
 - Unblocked next, in order: #346 (time-balanced shards, best after #345), then #332, #333, #334, #347; #329 needs two full smoke runs, so run it when nothing else is testing. #346 must land before #335; #348 is done, so #339 waits only on #335.
