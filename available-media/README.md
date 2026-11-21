@@ -21,6 +21,7 @@ The `available-media/` folder contains pre-sourced assets that can be copied int
 | `container-ship-medium-with-own-cranes/` | GLB + textures | Medium vessel with onboard cranes and branded container textures |
 | `quay-cranes-six-different-types.glb` | GLB | Six STS quay crane variants (~56 MB) |
 | `crane-rubber-tired-gantry-rtd.glb` | GLB | RTG yard crane (~36 MB) |
+| `sts-crane-tevy-harbour-crane-lod0-cc0.glb` | GLB | Articulated STS crane, **CC0** ([tevy.dev](https://tevy.dev/models/harbour-crane), v2 LOD0, 2.6 MB, 64.6k tris). Named nodes: `boom` (hinged, children `boom_mesh`, `boom_fittings`), `forestay`, `trolley` (children `hoist_ropes`, `spreader`, `door_cab`), `cable_reel`, `body`. About 51 m tall, 30 m rail separation, 50 m boom reach (generic, not TTI). Downloaded 2026-11-21, unmodified. Notes: [knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md](../knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md) |
 | `reach-stacker-spreaker.glb` | GLB | Reach stacker with spreader (~47 MB) |
 | `truck-no-trailer.glb`, `truck-no-trailer2.glb` | GLB | Terminal tractor / truck cab (no chassis) |
 | `toll-which-might-be-able-to-be-used-as-gatehouse.glb` | GLB | Toll booth structure, usable as a gatehouse (~37 MB) |

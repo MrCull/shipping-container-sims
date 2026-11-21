@@ -12,7 +12,7 @@ sources:
   - Europa Sur, Diario del Puerto, Cadena de Suministro press photography (see image index)
   - BCT Poland STS technical specifications (2024 and earlier procurement), used only as external timing examples
   - Quay crane scheduling literature (non-crossing and safety clearance constraints)
-  - Attached modelling reference "TTI Algeciras STS Crane Line: Visual and Operational Modelling Reference" (21 Nov 2026)
+  - Attached modelling references "TTI Algeciras STS Crane Line" (editorial links) and "CC0 Asset and Operational Modelling Reference" (21 Nov 2026)
 ---
 
 ## Summary
@@ -28,7 +28,7 @@ This is a **modelling brief, not a crane operating or safety manual**. It extend
 - **[A]** modelling assumption. Configurable. Do not hard-code it in an engine.
 - **[U]** not established for TTI. Parameterise, never state as fact.
 
-Photos are stored in `knowledge-base/images/tti-algeciras-sts/` (index in the last section).
+CC0 photos are stored in `knowledge-base/images/tti-algeciras-sts/cc0/` and a CC0 crane model in `available-media/3d-models/`. The TTI editorial photos are **link-only** (see section 9).
 
 ---
 
@@ -60,7 +60,7 @@ Photos are stored in `knowledge-base/images/tti-algeciras-sts/` (index in the la
 
 ### Permanent heightening is not boom raising
 
-In 2021 to 2023 five entire crane structures were made permanently **9 m taller** and their booms received **3 m extensions**. Photos with red jacking towers, cut leg sections or mobile cranes (images D01 to D03) show **construction works**. Never draw them in an operational crane line, and never mix them into the routine boom-up animation. Normal boom raising rotates the hinged shipward boom; the portal legs never change height. Crane 108 was moved along the terminal and 101 to 107 shifted during the first heightening, an exceptional relocation with marine operations interrupted, not a per-bay delay.
+In 2021 to 2023 five entire crane structures were made permanently **9 m taller** and their booms received **3 m extensions**. Photos with red jacking towers, cut leg sections or mobile cranes (editorial photos D01 to D03 in section 9) show **construction works**. Never draw them in an operational crane line, and never mix them into the routine boom-up animation. Normal boom raising rotates the hinged shipward boom; the portal legs never change height. Crane 108 was moved along the terminal and 101 to 107 shifted during the first heightening, an exceptional relocation with marine operations interrupted, not a per-bay delay.
 
 ---
 
@@ -260,53 +260,72 @@ Not verified for individual TTI cranes: boom hoist time, maximum gantry and trol
 
 ---
 
-## 9. Image index
+## 9. Reference images and 3D assets
 
-Folder: `knowledge-base/images/tti-algeciras-sts/`. All files are press or editorial photographs fetched from the publisher links on 21 Nov 2026 and are kept here **as private visual reference for modelling only**. Copyright stays with each photographer and publisher, and the links are **not a commercial reuse licence**. Do not ship these in the built app, put them in `assets/` of a sim, or commit them into a public release without clearing rights. Source pages are listed so a CDN change can be recovered.
+### 9.1 What is stored in the repo (CC0 only)
 
-### A. Main appearance
+CC0 1.0 is a public-domain dedication: modify, redistribute and use commercially without attribution. Licence of each photo was checked on the Wikimedia Commons file page API on 21 Nov 2026; the GLB carries a CC0 tag in its own metadata. Photos are 1920 px wide copies from Commons (`Special:FilePath?width=1600`), so originals are larger.
 
-| File | What it shows | Source page |
+**None of these photos or models is TTI Algeciras equipment.** They are generic STS references. P01 is the Algeciras port, but its cranes are light blue and are not TTI's dark-blue ZPMC cranes. Never present any of them as TTI, and keep trademark and logo use separate from the copyright status.
+
+Folder: `knowledge-base/images/tti-algeciras-sts/cc0/`
+
+| File | Place | Useful for | File page |
+|---|---|---|---|
+| `P01.jpg` | Algeciras, Spain | Port setting and Gibraltar backdrop. Light-blue cranes, **not TTI** | [Commons](https://commons.wikimedia.org/wiki/File:Cranes_in_the_Port_of_Algeciras_and_Gibraltar.jpg) |
+| `P02.jpg` | Gothenburg | STS trusses, bracing, suspension geometry, proportions | [Commons](https://commons.wikimedia.org/wiki/File:Container_cranes_at_Skandiahamnen_1.jpg) |
+| `P03.jpg` | Gothenburg | Crane line, alternative perspective (portrait) | [Commons](https://commons.wikimedia.org/wiki/File:Container_cranes_at_Skandiahamnen_2.jpg) |
+| `P04.jpg` | Antwerp | Legs, running gear, crane line | [Commons](https://commons.wikimedia.org/wiki/File:Container_cranes_at_Antwerp_harbor.JPG) |
+| `P05.jpg` | Antwerp | Close-up of framing and structural detail | [Commons](https://commons.wikimedia.org/wiki/File:Container_cranes_at_Antwerp_harbor_Close-up.JPG) |
+| `P06.jpg` | Antwerp | Extra quayside viewpoint (portrait) | [Commons](https://commons.wikimedia.org/wiki/File:Container_crane_at_Antwerp_harbour_pic2.JPG) |
+| `P07.jpg` | Rio de Janeiro | Terminal cranes in operational context | [Commons](https://commons.wikimedia.org/wiki/File:Container_cranes_at_the_Port_of_Rio_de_Janeiro,_Brazil_2.jpg) |
+| `P08.jpg` | Rio de Janeiro | Alternative view of cranes | [Commons](https://commons.wikimedia.org/wiki/File:Container_cranes_at_the_Port_of_Rio_de_Janeiro,_Brazil_3.jpg) |
+| `P09.jpg` | Gothenburg | Ship and terminal, crane-to-ship scale | [Commons](https://commons.wikimedia.org/wiki/File:Container_ship_Annaba_at_Skandiahamnen_1.jpg) |
+| `P10.jpg` | Rio de Janeiro | Waterfront composition. Check crane type before using as STS geometry | [Commons](https://commons.wikimedia.org/wiki/File:Port_cranes_on_the_Rio_de_Janeiro_waterfront,_Brazil.jpg) |
+| `P11.jpg` | Gothenburg | Ship proportions at the quay | [Commons](https://commons.wikimedia.org/wiki/File:Container_ship_OOCL_Malaysia_at_Skandiahamnen_1.jpg) |
+
+Model: `available-media/3d-models/sts-crane-tevy-harbour-crane-lod0-cc0.glb` (tevy.dev Harbour Container Crane, v2 LOD0, CC0, unmodified, downloaded 21 Nov 2026).
+
+- Node hierarchy (checked in the file): root `harbour-crane` with children `body`, `boom` (hinge, with `boom_mesh` and `boom_fittings`), `cable_reel`, `fittings`, `forestay`, and `trolley` (with `hoist_ropes`, `spreader`, `door_cab`).
+- The boom is a separate hinged node and the trolley is **not** its child, so a boom raise can be a pure rotation of `boom` about the X axis at the hinge. Forestay and trolley need their own handling when the boom goes up (a raised boom with a trolley hanging in mid-air is wrong, see the checklist in section 2).
+- Generic geometry: about 51 m tall, 30 m rail separation, 50 m reach. Rescale or remodel against the TTI numbers in section 1 (65 m and 68 m outreach, 30.48 m gauge) rather than stretching the mesh. Axes and pivots are tevy's own, inspect before mapping to the section 3 axes.
+- 64,556 triangles at LOD0, lighter LOD1 and LOD2 exist on the source page.
+- No TTI livery. A TTI look needs a cobalt-blue repaint, white machine house and neutral numbers. Branding or the TTI logo needs separate trademark clearance.
+
+### 9.2 Linked only, not stored (CC0, not downloaded)
+
+| Asset | Page | Notes |
 |---|---|---|
-| `A01.jpg` | Boom side close-up: dark blue beam, large white TTI ALGECIRAS, overhead bracing, walkway | [Diario del Puerto](https://www.diariodelpuerto.com/maritimo/tti-algeciras-formaliza-la-entrada-de-cma-cgm-en-su-accionariado-NVGD16146766731235680) |
-| `A02.jpg` | Long line of horizontal booms, white machinery houses, crane spacing and perspective | [Europa Sur](https://www.europasur.es/maritimas/TTI-Algeciras-operador-economico-autorizado_0_1825918096.html) |
-| `A03.webp` | Low angle along several working booms: trusses, wheels, IDs | [Europa Sur](https://www.europasur.es/maritimas/video-recrecido-cinco-gruas-TTI-Algeciras_0_1636037453.html) |
-| `A04.jpg` | Frontal TTI boom branding on overlapping booms, tip details and railings | [Europa Sur](https://www.europasur.es/maritimas/inversion-Puerto-TTI-Algeciras-recrecido-gruas-buques-grandes-mundo_0_1578144384.html) |
-| `A05.jpg` | Rows of STS cranes with projecting horizontal booms: side elevation and cable stays | [Europa Sur](https://www.europasur.es/maritimas/inversion-Puerto-TTI-Algeciras-recrecido-gruas-buques-grandes-mundo_0_1578144384.html) |
-| `A06.jpg` | Crane in operation with suspended container, spreader and load | editorial image, source page not recorded |
-| `A07.jpg` | Quay-level crane view under clear sky, general scene reference | editorial image, source page not recorded |
+| Innerscene Container Gantry Crane | [page](https://www.innerscene.com/tools/library/3d-parts/container-gantry-crane-c8a04a92) | Page states CC0. Real-scale generic STS, 30.48 m gauge, about 50.2 m outreach, 15 m backreach, cab, 40 ft box and spreader. Download through the page |
+| Innerscene Gantry Crane Rail | [page](https://www.innerscene.com/tools/library/3d-parts/gantry-crane-rail-3a0762fe) | Rail geometry. Verify gauge and scale |
+| tevy Quay Crane Rail Strip, Quay Wall Straight | [catalogue](https://tevy.dev/models) | Light quay scene pieces (rail strip about 966 triangles). Licence not individually re-checked here, confirm on the model page |
 
-### B. Raised booms and structure
+### 9.3 TTI editorial photos: link-only, NOT in the repo
 
-| File | What it shows | Source page |
+Press photographs of the real TTI cranes (Europa Sur, Diario del Puerto, Cadena de Suministro and others) show the actual livery and are the best appearance reference, but public access is not reuse permission. They are **not stored in the repo**. Open the pages to look at them.
+
+| ID | Shows | Page |
 |---|---|---|
-| `B01.jpg` | **Best raised vs lowered reference**: two booms near vertical (left, cranes 107 area), crane 108 boomed out (right). Also shows white machine house and logo, leg stairs, crane number and ZPMC plate | [Europa Sur](https://www.europasur.es/algeciras/Comienza-recrecido-gruas-portacontenedores-TTI-Puerto-Algeciras_0_1581142244.html) |
-| `B02.jpg` | Raised boom behind a horizontal crane: raised shape against normal working shape | [Europa Sur](https://www.europasur.es/maritimas/TTI-Algeciras-recrecido-primera-gruas-buques-grandes-mundo_0_1613240480.html) |
-| `B04.jpg` | Blue structural close-up with yellow cable reel, bracing and wheel gantry. **Not TTI Algeciras** (Piraeus Container Terminal), secondary engineering reference only | [PCT gallery](https://www.pct.com.gr/fotografies) |
+| A01 | Boom side close-up, white TTI ALGECIRAS lettering, walkway, bracing | [Diario del Puerto](https://www.diariodelpuerto.com/maritimo/tti-algeciras-formaliza-la-entrada-de-cma-cgm-en-su-accionariado-NVGD16146766731235680) |
+| A02 | Line of horizontal booms, white machine houses, spacing | [Europa Sur](https://www.europasur.es/maritimas/TTI-Algeciras-operador-economico-autorizado_0_1825918096.html) |
+| A03 | Low angle along several working booms | [Europa Sur](https://www.europasur.es/maritimas/video-recrecido-cinco-gruas-TTI-Algeciras_0_1636037453.html) |
+| A04, A05 | Frontal boom branding, rows of booms, cable stays | [Europa Sur](https://www.europasur.es/maritimas/inversion-Puerto-TTI-Algeciras-recrecido-gruas-buques-grandes-mundo_0_1578144384.html) |
+| B01 | **Best raised vs lowered reference**: two booms near vertical (left) and crane 108 boomed out (right). Also white machine house and logo, leg stairs, crane number, ZPMC plate | [Europa Sur](https://www.europasur.es/algeciras/Comienza-recrecido-gruas-portacontenedores-TTI-Puerto-Algeciras_0_1581142244.html) |
+| B02 | Raised boom behind a horizontal crane | [Europa Sur](https://www.europasur.es/maritimas/TTI-Algeciras-recrecido-primera-gruas-buques-grandes-mundo_0_1613240480.html) |
+| C03 | Broad landscape of terminal and blue cranes | [Cadena de Suministro](https://www.cadenadesuministro.es/) |
+| C04 | 27-photo gallery | [Europa Sur gallery](https://www.europasur.es/algeciras/mejores-fotos-TTI-Algeciras-contenedores-estiba_3_1509179068.html) |
+| D01 to D03 | **Construction only**: red jacking towers, crane 104 on temporary supports, floodlit upgrade. Never draw in an operational line | [heightening article](https://www.europasur.es/maritimas/video-recrecido-cinco-gruas-TTI-Algeciras_0_1636037453.html), [gallery](https://www.europasur.es/maritimas/fotos-Proceso-recrecido-gruas-portacontenedores-TTI-Algeciras_3_1636066394.html) |
 
-The reference file's item B03 is the same photo as A01 and is not duplicated.
+A Liverpool (Seaforth) raised-boom photo exists on Commons but is **CC BY-SA 2.0**, so it needs attribution and ShareAlike on adaptations. It is deliberately not stored. There is no CC0 close-up of a raised TTI boom: generate the boom-up pose from the articulated model.
 
-### C. Aerials and ship scale
+### 9.4 Asset manifest rule
 
-| File | What it shows | Source page |
-|---|---|---|
-| `C01.jpg` | Aerial of TTI terminal operation: several cranes and quay layout | industry editorial image, source page not recorded |
-| `C02.jpg` | Large container ship alongside TTI cranes, ship-to-crane scale | editorial image, source page not recorded |
-| `C03.jpg` | Broad landscape of terminal and blue cranes | [Cadena de Suministro](https://www.cadenadesuministro.es/) |
+When an asset is added, record asset id, source URL, file version, licence, download date and any edits (the tables above are that manifest). If a licence or URL cannot be confirmed, link the file page and mark it as needing manual verification rather than swapping in a similar copyrighted image.
 
-More angles: [Europa Sur 27-photo gallery](https://www.europasur.es/algeciras/mejores-fotos-TTI-Algeciras-contenedores-estiba_3_1509179068.html).
-
-### D. Construction and upgrade (geometry only, NOT normal operation)
-
-| File | What it shows | Source page |
-|---|---|---|
-| `D01.jpg` | Lower leg structure on red temporary jacking towers | [Europa Sur](https://www.europasur.es/maritimas/video-recrecido-cinco-gruas-TTI-Algeciras_0_1636037453.html) |
-| `D02.jpg` | Upgrade under floodlights: lattice detail and night lighting | [Europa Sur gallery](https://www.europasur.es/maritimas/fotos-Proceso-recrecido-gruas-portacontenedores-TTI-Algeciras_3_1636066394.html) |
-| `D03.jpg` | Crane 104 with temporary steel supports | [Europa Sur](https://www.europasur.es/maritimas/TTI-Algeciras-recrecido-cinco-gruas-portacontenedores_0_1736828294.html) |
-
-### Official and video references
+### 9.5 Official and other references
 
 - [TTI equipment specifications](https://www.ttialgeciras.com/en/equipment/), [terminal and fleet](https://www.ttialgeciras.com/en/the-company/), [five-crane heightening](https://www.ttialgeciras.com/en/behind-the-scenes-sts-crane-extension-project-unveiled/), [crane 108 upgrade](https://www.ttialgeciras.com/en/tti-algeciras-successfully-finalizes-heightening-works-for-the-first-malaccamax-crane/).
-- Videos (construction, not routine operation): [TTI / ZPMC upgrade footage](https://www.youtube.com/watch?v=ESGdKF64r7U), [first Malaccamax heightening](https://www.youtube.com/watch?v=Ph_vHjbMuoA). A generic STS boom-up video, [https://www.youtube.com/watch?v=_8hdSrUyENM](https://www.youtube.com/watch?v=_8hdSrUyENM), is not validated as TTI.
+- Videos (construction, not routine operation): [TTI / ZPMC upgrade footage](https://www.youtube.com/watch?v=ESGdKF64r7U), [first Malaccamax heightening](https://www.youtube.com/watch?v=Ph_vHjbMuoA). A generic STS boom-up video, [link](https://www.youtube.com/watch?v=_8hdSrUyENM), is not validated as TTI.
 - Non-TTI principles: [Liebherr STS description](https://www.liebherr.com/en-gb/maritime-cranes/products/port-equipment/ship-to-shore-container-cranes-4311239), [Konecranes concept crane raising boom to clear superstructure](https://www.porttechnology.org/news/global-trade/ctac2018_konecranes_reveals_sts_crane_concept/), [boomed-down cranes while a vessel berths](https://www.marine-pilots.com/articles/13503-safe-working-with-harbour-cranes).
 - Scheduling: [rich quay crane scheduling problems](https://www.sciencedirect.com/science/article/pii/S0305054811002875), [non-crossing and safety clearance](https://www.sciencedirect.com/science/article/pii/S0305054819300747).
+- Timing sources: [BCT Poland 2024 STS specification](https://cdnweb.bct.gdynia.pl/s3fs-public/inline-files/ToR%20STS%20Schedule%205%20%20Technical%20Specification%20EU_30_2024%20KPO%201.pdf) (boom 2.5 min each way, gantry 50 m/min, 6 s ramps), [earlier BCT procurement](https://pl.openprocurements.com/tender/2013-zakup-sprzetu-suwnica-nabrzezowa-quayside-sts-crane/) (boom about 5 min one way).
