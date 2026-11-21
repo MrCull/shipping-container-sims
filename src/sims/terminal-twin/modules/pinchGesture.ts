@@ -59,7 +59,8 @@ export function groundPointUnder(
  *
  * `spreadRatio` is the new finger distance over the previous one (above 1 means fingers moved apart: zoom in).
  * `prevMid` and `mid` are the finger midpoints before and after, in canvas pixels. The camera's distance to the
- * target is kept within `limits`. Returns true when anything moved.
+ * target is kept within `limits`. The ground point under `prevMid` anchors the step only within `anchorRange` metres
+ * of the camera; farther, the step zooms about the target. Returns true when anything moved.
  */
 export function applyPinchStep(
   camera: THREE.PerspectiveCamera,
@@ -70,11 +71,12 @@ export function applyPinchStep(
   width: number,
   height: number,
   limits: PinchLimits,
+  anchorRange = 20000,
 ): boolean {
   if (!(spreadRatio > 0) || !Number.isFinite(spreadRatio)) return false
   const groundY = target.y
   const anchor = new THREE.Vector3()
-  const haveAnchor = groundPointUnder(camera, prevMid, width, height, groundY, anchor) !== null
+  const haveAnchor = groundPointUnder(camera, prevMid, width, height, groundY, anchor, anchorRange) !== null
   const centre = haveAnchor ? anchor : target.clone()
 
   // 1. Zoom: scale camera and target about the anchor. The scale is clamped so the orbit radius stays in limits.
