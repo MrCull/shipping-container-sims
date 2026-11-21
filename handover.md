@@ -20,7 +20,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #334 | 17 Smallest fixture | #328 | merged in branch (a1fe7f9) | |
 | #335 | 09 CI selection and triggers, red main opens an issue | #330, #327, #346 | merged in branch (6970177) | |
 | #336 | 12 Yard moves | #331 | in progress | session 3 implementer |
-| #337 | 13 Equipment moves | #331 | open | |
+| #337 | 13 Equipment moves | #331 | in progress | session 3 implementer |
 | #338 | 15 Remaining component moves | #332 | open | |
 | #339 | 10 Docs and review rules | #325, #335, #348 | in progress | session 3 implementer |
 | #344 | 21 Smoke build as the local default | none | merged in branch (f170cab) | |
@@ -33,7 +33,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 ## Next steps
 
 - Open PR for this phase: #349 (`claude/hopeful-hawking-s9i8uh` into `main`). Phase 1 (#321 to #328) merged to `main` in PR #341. Do not merge #349 until the phase is done; delete this file first and add `Closes #N` for each finished ticket.
-- Merged in branch this phase: #330, #331, #348, #344, #345, #346, #332, #333, #334, #347, plus `main` (#343) at cb4047e. Label `merged-in-branch` set on all of them.
+- Merged in branch this phase: #330, #331, #348, #344, #345, #346, #332, #333, #334, #347, #335, #329, plus `main` (#343) at cb4047e. Label `merged-in-branch` set on all of them.
 - CI after each merge (the #348 rule: start `pr-checks.yml` with workflow_dispatch on this branch, read the merged `SMOKE:` line before the next merge):
   - after #330: green (run 44932418994);
   - after #331 + #348: green, `SMOKE: 189 passed, 0 failed, 0 flaky` (run 44933311179);
@@ -42,9 +42,13 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
   - after #332: green, `SMOKE: 185 passed, 0 failed, 0 flaky` (run 44938348036);
   - after #333: green, `SMOKE: 173 passed, 0 failed, 0 flaky` (run 44939175719);
   - after #334: green, `SMOKE: 173 passed, 0 failed, 0 flaky` (run 44940091330);
-  - after #347: running.
-- In progress: #329 (`tt/329-page-per-worker`, worktree agent-a90f3329d44735079; it runs the reversed-order full smoke locally, CI gives normal order after merge) and #335 (`tt/335-ci-selection-triggers`, worktree agent-a91bb61a706a77c97; workflow only, needs GitHub checks after merge: labels, test PRs, red-main dry run). Both stopped at a usage limit once and were resumed.
-- Next: #336, #337 (yard and equipment moves to the headless scene; ticket files written), #338 (after #332, done), #339 (after #335), #340 last.
+  - after #347: green, `SMOKE: 172 passed, 0 failed, 1 flaky` (run 44949388411);
+  - after #335: green, `SMOKE: 173 passed, 0 failed, 0 flaky` (run 44950271579, auto shard count: 5 shards);
+  - after #329: running.
+- In progress: #336 (yard), #337 (equipment). #339 (docs) done on `tt/339-smoke-docs` (14c4ff2, worktree agent-a770427af9894b8b1), merge after #329's CI.
+- #335 owner tasks (no tool here can do them): create labels `smoke:core`, `smoke:shell`, `smoke:camera`, `smoke:setup`, `smoke:analysis`, `smoke:vessel`, `smoke:equipment`, `smoke:yard`, `smoke:engine` (colour 1d76db); make `Browser smoke tests (Terminal Twin)` a required check on `main`. GitHub checks still to do: a bay-viewer-only PR runs core + vessel with the comment, a docs-only PR passes as a no-op, the `smoke` label runs all groups, first push to `main` runs all groups (red-main issue via `node scripts/smoke-ci.mjs red-main --dry-run`).
+- #329 notes: local shuffled run (`--shuffle 329`) 156 of 166 passed, all failures the sandbox proxy console error except one load-sensitive KPI export test that passed on re-run; shared page 37.8 s vs 45.0 s fresh on a 15-test sample; `SMOKE_FRESH_PAGES=1` turns it off; IndexedDB is not reset (saves spec uses a fresh page).
+- Next: #338 (component moves, after #336/#337 free a slot), then #340 last (full smoke locally twice and in CI, timing report on #320).
 - At most two implementers at once (4-core box). Ticket files for implementers live in the session scratchpad (lost with the container): rewrite them from the issues (`docs/agents/issue-tracker.md`, Ticket bodies).
 - #346 follow-up: `scripts/smoke-timings.jsonl` (fallback timings) is an estimate and still lists times for specs #333 deleted; CI uses the last green run's artifact first, so refresh the file from a green run's `smoke-report` when convenient.
 - #332 note: the colour-by smoke wiring tests check console errors strictly, so they fail locally in the sandbox on `ERR_TUNNEL_CONNECTION_FAILED` (proxy blocks an external fetch); CI is the check.
