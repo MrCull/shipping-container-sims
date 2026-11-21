@@ -18,18 +18,23 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #332 | 14 Component tests | #328 | open | |
 | #333 | 16 Engine fixtures to unit tests | #328 | open | |
 | #334 | 17 Smallest fixture | #328 | open | |
-| #335 | 09 CI selection and triggers, red main opens an issue | #330, #327 | open | |
+| #335 | 09 CI selection and triggers, red main opens an issue | #330, #327, #346 | open | |
 | #336 | 12 Yard moves | #331 | open | |
 | #337 | 13 Equipment moves | #331 | open | |
 | #338 | 15 Remaining component moves | #332 | open | |
-| #339 | 10 Docs and review rules | #325, #335 | open | |
+| #339 | 10 Docs and review rules | #325, #335, #348 | open | |
+| #344 | 21 Smoke build as the local default | none | open | |
+| #345 | 22 Asset viewer honours URL switches | none | open | |
+| #346 | 23 Shards balanced by recorded test time | none (blocks #335) | open | |
+| #347 | 24 bg.sh cleans up its process group | none | open | |
+| #348 | 25 CI smoke per merge, frame-loop review rule, doc fixes | none (blocks #339) | open | |
 | #340 | 20 Final smoke run and timing report | all | open | |
 
 ## Next steps
 
 - Phase 1 (#321 to #328) merged to `main` in PR #341 (a28a9bc). This branch restarted from that merge.
 - First full sharded CI run: `SMOKE: 190 passed, 0 failed, 1 flaky`, workflow 9 min 11 s. Shards are uneven (about 7, 4.6, 1.5, 2, 1.5, 1.6 min of tests): a few slow tests dominate.
-- Unblocked next: #329, #330, #331, #332, #333, #334 (all blocked only by #328). At most two at a time; #329 needs two full smoke runs, so it runs when nothing else is testing.
+- Unblocked next: #329, #332, #333, #334, and the retro tickets #344 to #348 (no blockers). Order: #348 and #344 first, #345 before #346, #346 before #335, #347 when a slot is free. At most two at a time; #329 needs two full smoke runs, so it runs when nothing else is testing.
 
 ## Open points
 
