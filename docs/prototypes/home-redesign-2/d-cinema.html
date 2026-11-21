@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup D: Cinema</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Sora:wght@400;500;600;700;800&display=swap">
+<style>
+/* Variation D. The first screen is the games themselves: a full-width hero that cross-fades between the four
+   screens (pure CSS, four slides, 6 s each), the headline over it, and a game switcher strip pinned to its bottom edge. */
+:root {
+  --bg: #080c16; --card: #0f1626; --line: #232d44; --ink: #f2f5fb; --muted: #a6b1c6;
+  --amber: #f59e0b; --on-amber: #1d1200; --blue: #4a90ff;
+  --retro: 'Press Start 2P', monospace; --body: 'Sora', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+
+.hero { position: relative; height: min(86vh, 760px); min-height: 560px; overflow: hidden; isolation: isolate; }
+.slide { position: absolute; inset: 0; opacity: 0; animation: fade 24s infinite; }
+.slide img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.04); animation: drift 24s infinite; }
+.slide:nth-child(1) { animation-delay: 0s; } .slide:nth-child(1) img { animation-delay: 0s; }
+.slide:nth-child(2) { animation-delay: 6s; } .slide:nth-child(2) img { animation-delay: 6s; }
+.slide:nth-child(3) { animation-delay: 12s; } .slide:nth-child(3) img { animation-delay: 12s; }
+.slide:nth-child(4) { animation-delay: 18s; } .slide:nth-child(4) img { animation-delay: 18s; }
+@keyframes fade { 0% { opacity: 0; } 4% { opacity: 1; } 25% { opacity: 1; } 29% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes drift { 0% { transform: scale(1.04); } 29% { transform: scale(1.12); } 100% { transform: scale(1.12); } }
+.hero::after { content: ""; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(90deg, rgba(8,12,22,.94) 0%, rgba(8,12,22,.7) 42%, rgba(8,12,22,0) 74%), linear-gradient(0deg, rgba(8,12,22,1) 0%, rgba(8,12,22,0) 38%); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 28px; }
+.top { position: absolute; z-index: 3; left: 0; right: 0; top: 0; }
+.top .wrap { display: flex; justify-content: space-between; align-items: center; padding-block: 20px; }
+.logo { font: 12px/1.5 var(--retro); letter-spacing: .04em; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+.logo b { color: var(--amber); font-weight: 400; }
+.chips { display: flex; gap: 8px; }
+.chip { font: 500 13px var(--body); color: #dfe6f3; background: rgba(8,12,22,.55); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,.18); border-radius: 8px; padding: 8px 12px; }
+
+.copy { position: absolute; z-index: 2; left: 0; right: 0; bottom: 150px; }
+.copy .wrap { display: grid; gap: 16px; }
+.kicker { font: 10px var(--retro); letter-spacing: .1em; color: var(--amber); }
+.copy h1 { font: 800 76px/.98 var(--body); letter-spacing: -.035em; max-width: 12ch; text-wrap: balance; text-shadow: 0 4px 30px rgba(0,0,0,.5); }
+.copy p { font-size: 19px; color: #d9e0ee; max-width: 44ch; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; font: 700 16px var(--body); padding: 14px 26px; border-radius: 10px; background: var(--amber); color: var(--on-amber); }
+.btn.ghost { background: rgba(255,255,255,.1); color: var(--ink); border: 1px solid rgba(255,255,255,.22); }
+.btn.sm { padding: 10px 18px; font-size: 14px; }
+
+.strip { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; }
+.strip .wrap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding-bottom: 26px; }
+.tab { position: relative; padding: 12px 14px 12px 14px; border-radius: 12px; background: rgba(12,18,32,.72); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12); display: grid; grid-template-columns: 78px 1fr; gap: 12px; align-items: center; overflow: hidden; }
+.tab img { width: 78px; height: 50px; object-fit: cover; border-radius: 6px; display: block; }
+.tab b { display: block; font: 700 15px var(--body); }
+.tab span { font-size: 12px; color: var(--muted); }
+.tab::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--amber); transform: scaleX(0); transform-origin: left; animation: bar 24s linear infinite; }
+.tab:nth-child(1)::after { animation-delay: 0s; } .tab:nth-child(2)::after { animation-delay: 6s; }
+.tab:nth-child(3)::after { animation-delay: 12s; } .tab:nth-child(4)::after { animation-delay: 18s; }
+@keyframes bar { 0% { transform: scaleX(0); } 25% { transform: scaleX(1); } 25.01%, 100% { transform: scaleX(0); } }
+
+.sec { padding-block: 56px 8px; }
+h2 { font: 11px var(--retro); letter-spacing: .08em; color: var(--muted); margin-bottom: 18px; display: flex; gap: 12px; align-items: center; }
+h2::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+.card .pic { aspect-ratio: 4 / 3; overflow: hidden; }
+.card .pic img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s; }
+.card:hover .pic img { transform: scale(1.06); }
+.card .in { padding: 16px 18px 18px; display: grid; gap: 6px; flex: 1; align-content: start; }
+.card .kind { font: 600 11px var(--body); letter-spacing: .09em; text-transform: uppercase; color: var(--blue); }
+.card h3 { font: 700 20px/1.2 var(--body); letter-spacing: -.01em; }
+.card p { color: var(--muted); font-size: 14px; }
+.card .foot { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.card .foot b { color: #8fb8ff; font-weight: 600; }
+
+.soon { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px dashed var(--line); border-radius: 14px; }
+.soon div { padding: 18px 20px; display: grid; gap: 4px; }
+.soon div + div { border-left: 1px dashed var(--line); }
+.soon span { font: 9px var(--retro); color: #6f7b92; letter-spacing: .08em; }
+.soon h3 { font: 600 16px var(--body); }
+.soon p { color: var(--muted); font-size: 14px; }
+footer { margin-top: 48px; border-top: 1px solid var(--line); padding-block: 22px 28px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; color: #7c879c; font-size: 13px; }
+
+@media (max-width: 900px) {
+  .strip .wrap { grid-template-columns: repeat(2, 1fr); }
+  .cards { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  .wrap { padding: 0 16px; }
+  .hero { height: auto; min-height: 0; }
+  .hero > .slide { position: relative; height: 56vw; animation: none; opacity: 0; display: none; }
+  .hero > .slide:first-of-type { display: block; opacity: 1; }
+  .hero .slide img { animation: none; transform: none; }
+  .hero::after { display: none; }
+  .top { position: static; }
+  .copy { position: static; padding-block: 18px 6px; }
+  .copy h1 { font-size: 40px; }
+  .copy p { font-size: 16px; }
+  .btn { flex: 1; justify-content: center; }
+  .strip { position: static; }
+  .strip .wrap { padding-bottom: 8px; gap: 10px; }
+  .tab { grid-template-columns: 1fr; }
+  .tab img { display: none; }
+  .tab::after { display: none; }
+  .cards { grid-template-columns: 1fr; }
+  .soon { grid-template-columns: 1fr; }
+  .soon div + div { border-left: 0; border-top: 1px dashed var(--line); }
+  .logo { font-size: 9px; }
+  .chip.gh { display: none; }
+}
+</style>
+</head>
+<body>
+<section class="hero">
+  <div class="slide"><img src="img/stowage-ship.jpg" alt="Stowage Master: a loaded feeder at the quay, with a quay crane and trucks"></div>
+  <div class="slide"><img src="img/boxempire-wide.jpg" alt="Box Empire: two harbour cranes working a feeder, reach stackers on the quay"></div>
+  <div class="slide"><img src="img/contenga.jpg" alt="Contenga: a tower of containers"></div>
+  <div class="slide"><img src="img/twin.jpg" alt="Terminal Twin: a container yard and quay cranes from above"></div>
+
+  <div class="top"><div class="wrap"><div class="logo">SHIPPING <b>CONTAINER</b> SIMS</div><div class="chips"><a class="chip gh" href="#">GitHub</a><a class="chip" href="#">Sound on</a></div></div></div>
+
+  <div class="copy"><div class="wrap">
+    <div class="kicker">FREE GAMES FOR YOUR BROWSER</div>
+    <h1>Run the port. Stack the boxes.</h1>
+    <p>Four games about shipping containers: puzzle, physics, tycoon and a live digital twin. Nothing to install, plays on a phone too.</p>
+    <div class="row"><a class="btn" href="#">&#9654; Continue Stowage Master</a><a class="btn ghost" href="#games">Browse all 4 games</a></div>
+  </div></div>
+
+  <div class="strip"><div class="wrap">
+    <a class="tab" href="#"><img src="img/stowage-ship.jpg" alt=""><div><b>Stowage Master</b><span>Puzzle &middot; 10 levels</span></div></a>
+    <a class="tab" href="#"><img src="img/boxempire-wide.jpg" alt=""><div><b>Box Empire</b><span>Tycoon &middot; Story</span></div></a>
+    <a class="tab" href="#"><img src="img/contenga.jpg" alt=""><div><b>Contenga</b><span>Physics &middot; Quick rounds</span></div></a>
+    <a class="tab" href="#"><img src="img/twin.jpg" alt=""><div><b>Terminal Twin</b><span>Simulation &middot; New</span></div></a>
+  </div></div>
+</section>
+
+<div class="wrap" id="games">
+  <section class="sec">
+    <h2>READY TO PLAY</h2>
+    <div class="cards">
+      <article class="card"><div class="pic"><img src="img/stowage-deck.jpg" alt=""></div><div class="in"><span class="kind">Puzzle &middot; 3D</span><h3>Stowage Master</h3><p>Load the ship without tipping it. Tetris with real stowage rules.</p><div class="foot"><span>Level <b>3</b> of 10</span><a class="btn sm" href="#">Continue</a></div></div></article>
+      <article class="card"><div class="pic"><img src="img/boxempire-quay.jpg" alt=""></div><div class="in"><span class="kind">Tycoon &middot; Strategy</span><h3>Box Empire</h3><p>Inherit a failing quay and one old crane. Turn it into a port.</p><div class="foot"><span>Not played yet</span><a class="btn sm" href="#">Play</a></div></div></article>
+      <article class="card"><div class="pic"><img src="img/contenga.jpg" alt=""></div><div class="in"><span class="kind">Physics &middot; 3D</span><h3>Contenga</h3><p>Slide a box out, stack it on top. How high before the tower falls?</p><div class="foot"><span>Best <b>14 moves</b></span><a class="btn sm" href="#">Play</a></div></div></article>
+      <article class="card"><div class="pic"><img src="img/twin.jpg" alt=""></div><div class="in"><span class="kind">Simulation &middot; New</span><h3>Terminal Twin</h3><p>A working model of an automated terminal, built to test the software that runs one.</p><div class="foot"><span>Not played yet</span><a class="btn sm" href="#">Play</a></div></div></article>
+    </div>
+  </section>
+  <section class="sec">
+    <h2>ON THE HORIZON</h2>
+    <div class="soon">
+      <div><span>PLANNED</span><h3>ContainerCraft</h3><p>Survive in a world made of stacked boxes.</p></div>
+      <div><span>PLANNED</span><h3>Coblox</h3><p>Build your own container games and share them.</p></div>
+      <div><span>PLANNED</span><h3>Captain Container</h3><p>Take the bridge of a boxship and bring it in.</p></div>
+    </div>
+  </section>
+  <footer><span>Shipping Container Sims &copy; 2026 &middot; GitHub</span><span>Built 21 Nov 2026 09:10 &middot; 2b1b3f9</span></footer>
+</div>
+</body>
+</html>

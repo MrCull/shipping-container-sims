@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup F: Poster wall</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Sora:wght@400;500;600;700;800&display=swap">
+<style>
+/* Variation F. A poster wall: the screens are the page. Uneven tiles (one big, two tall, one wide), the words sit on
+   the picture, and the planned games are a quiet row of chips. Almost no chrome, so the sims' own colours carry it. */
+:root {
+  --bg: #0b0e15; --line: #232a39; --ink: #f4f6fa; --muted: #aab3c5; --amber: #f59e0b; --on-amber: #1c1100;
+  --retro: 'Press Start 2P', monospace; --body: 'Sora', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 24px; }
+.top { display: flex; justify-content: space-between; align-items: center; padding-block: 18px; }
+.logo { font: 12px/1.5 var(--retro); letter-spacing: .04em; }
+.logo b { color: var(--amber); font-weight: 400; }
+.top nav { display: flex; gap: 22px; color: var(--muted); font-size: 14px; font-weight: 500; }
+
+.head { display: flex; justify-content: space-between; align-items: end; gap: 28px; padding-block: 14px 22px; }
+.head h1 { font: 800 60px/.98 var(--body); letter-spacing: -.04em; }
+.head h1 span { color: var(--amber); }
+.head p { color: var(--muted); max-width: 36ch; font-size: 17px; padding-bottom: 6px; }
+
+.wall { display: grid; grid-template-columns: repeat(12, 1fr); grid-auto-rows: 150px; gap: 14px; }
+.tile { position: relative; border-radius: 16px; overflow: hidden; display: flex; align-items: flex-end; background: #111; isolation: isolate; }
+.tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .6s ease; z-index: -2; }
+.tile::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(0deg, rgba(5,8,14,.92) 0%, rgba(5,8,14,.55) 30%, rgba(5,8,14,0) 58%); }
+.t4::before { background: linear-gradient(90deg, rgba(5,8,14,.86) 0%, rgba(5,8,14,.5) 30%, rgba(5,8,14,0) 56%), linear-gradient(0deg, rgba(5,8,14,.55) 0%, rgba(5,8,14,0) 36%); }
+.tile:hover img { transform: scale(1.05); }
+.t1 { grid-column: span 7; grid-row: span 4; }
+.t2 { grid-column: span 5; grid-row: span 2; }
+.t3 { grid-column: span 5; grid-row: span 2; }
+.t4 { grid-column: span 12; grid-row: span 3; }
+.inner { padding: 24px 26px; width: 100%; display: grid; gap: 6px; }
+.t1 .inner { padding: 34px; gap: 10px; }
+.t4 .inner { padding: 30px 34px; max-width: 700px; }
+.kind { font: 600 11px var(--body); letter-spacing: .1em; text-transform: uppercase; color: #ffc766; }
+.tile h2 { font: 800 28px/1.05 var(--body); letter-spacing: -.02em; }
+.t1 h2 { font-size: 52px; letter-spacing: -.035em; }
+.t4 h2 { font-size: 40px; }
+.tile p { color: #d9e0ee; font-size: 15px; max-width: 42ch; }
+.t1 p, .t4 p { font-size: 18px; }
+.go { display: flex; gap: 12px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 8px; font: 700 14px var(--body); padding: 10px 20px; border-radius: 999px; background: var(--amber); color: var(--on-amber); }
+.t1 .btn, .t4 .btn { padding: 13px 26px; font-size: 16px; }
+.meta { font-size: 13px; color: #c7d0e1; }
+.meta b { color: #fff; }
+.badge { position: absolute; z-index: 1; top: 16px; left: 16px; font: 9px var(--retro); letter-spacing: .08em; background: var(--amber); color: var(--on-amber); padding: 7px 9px; border-radius: 4px; }
+
+.later { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; padding-block: 30px 6px; color: var(--muted); font-size: 14px; }
+.later .lab { font: 10px var(--retro); letter-spacing: .08em; color: #6d788f; margin-right: 8px; }
+.chip { border: 1px dashed #38425a; border-radius: 10px; padding: 9px 14px; }
+.chip b { color: var(--ink); font-weight: 600; display: block; }
+footer { margin-top: 30px; border-top: 1px solid var(--line); padding-block: 22px 28px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; color: #7b869b; font-size: 13px; }
+
+@media (max-width: 960px) {
+  .wall { grid-auto-rows: 130px; }
+  .t1 { grid-column: span 12; grid-row: span 3; }
+  .t2, .t3 { grid-column: span 6; grid-row: span 2; }
+  .t4 { grid-row: span 3; }
+  .head { flex-direction: column; align-items: start; gap: 10px; }
+  .head h1 { font-size: 44px; }
+}
+@media (max-width: 720px) {
+  .wrap { padding: 0 14px; }
+  .logo { font-size: 9px; }
+  .top nav a:first-child { display: none; }
+  .head h1 { font-size: 34px; }
+  .wall { grid-template-columns: 1fr; grid-auto-rows: auto; gap: 12px; }
+  .tile, .t1, .t2, .t3, .t4 { grid-column: auto; grid-row: auto; min-height: 250px; }
+  .t1 { min-height: 340px; }
+  .t1 h2 { font-size: 38px; }
+  .t4 h2 { font-size: 32px; }
+  .t1 .inner, .t4 .inner { padding: 20px; }
+  .badge { left: auto; right: 14px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top"><div class="logo">SHIPPING <b>CONTAINER</b> SIMS</div><nav><a href="#">GitHub</a><a href="#">Sound on</a></nav></header>
+
+  <section class="head">
+    <h1>Games about the<br><span>boxes</span> that move the world.</h1>
+    <p>Stack them, stow them, run the port. Four free games, straight in your browser.</p>
+  </section>
+
+  <section class="wall">
+    <a class="tile t1" href="#"><img src="img/stowage-ship.jpg" alt="Stowage Master: a loaded feeder at the quay"><span class="badge">CONTINUE</span>
+      <div class="inner"><span class="kind">Puzzle &middot; 10 levels</span><h2>Stowage Master</h2><p>Load the ship without tipping it. Heavy boxes low, the next port's boxes on top.</p><div class="go"><span class="btn">&#9654; Continue level 3</span><span class="meta">Your best: <b>level 3</b></span></div></div></a>
+    <a class="tile t2" href="#"><img src="img/boxempire-wide.jpg" alt="Box Empire: harbour cranes and reach stackers on the quay"><div class="inner"><span class="kind">Tycoon &middot; Story</span><h2>Box Empire</h2><p>Inherit a failing quay and one old crane. Turn it into a port.</p><div class="go"><span class="btn">Play</span></div></div></a>
+    <a class="tile t3" href="#"><img src="img/contenga.jpg" alt="Contenga: a tower of containers"><div class="inner"><span class="kind">Physics &middot; Quick rounds</span><h2>Contenga</h2><p>Slide a box out, stack it on top. How high before it falls?</p><div class="go"><span class="btn">Play</span><span class="meta">Best: <b>14 moves</b></span></div></div></a>
+    <a class="tile t4" href="#"><img src="img/twin.jpg" alt="Terminal Twin: a container yard and quay cranes"><span class="badge">NEW</span>
+      <div class="inner"><span class="kind">Simulation &middot; Digital twin</span><h2>Terminal Twin</h2><p>A working model of an automated terminal. Watch the cranes work the ship and the yard fill, up to an hour a second.</p><div class="go"><span class="btn">&#9654; Play</span></div></div></a>
+  </section>
+
+  <section class="later"><span class="lab">STILL BEING BUILT</span>
+    <span class="chip"><b>ContainerCraft</b>Survive in a world made of stacked boxes</span>
+    <span class="chip"><b>Coblox</b>Build your own container games and share them</span>
+    <span class="chip"><b>Captain Container</b>Take the bridge of a boxship and bring it in</span>
+  </section>
+  <footer><span>Shipping Container Sims &copy; 2026 &middot; GitHub</span><span>Built 21 Nov 2026 09:10 &middot; 2b1b3f9</span></footer>
+</div>
+</body>
+</html>
