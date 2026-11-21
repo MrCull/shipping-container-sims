@@ -19,6 +19,7 @@ function collectErrors(page: Page): string[] {
 test('crane plan: the Crane plan view shows a band per crane and the now line, and a package click opens its bay', async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
+  await page.setViewportSize({ width: 1500, height: 960 })
   await page.goto('/sim/terminal-twin')
   await page.waitForFunction(() => !!window.__tt)
   await page.evaluate(() => window.__tt!.load('crane-split-4sts'))
@@ -49,6 +50,7 @@ test('crane plan: the Crane plan view shows a band per crane and the now line, a
   const chartBox = await page.locator('.crane-plan .scroll').boundingBox()
   const keyBox = await page.getByTestId('tt-crane-plan-key').boundingBox()
   expect(keyBox!.x).toBeGreaterThanOrEqual(chartBox!.x + chartBox!.width - 2)
+  await page.screenshot({ path: '.screenshots/crane-plan.png' })
   // drag the header, resize from the corner, and the geometry is remembered
   const viewer = page.getByTestId('tt-bay-viewer')
   const before = await viewer.boundingBox()
@@ -62,7 +64,18 @@ test('crane plan: the Crane plan view shows a band per crane and the now line, a
   expect(moved!.y).toBeGreaterThan(before!.y + 30)
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('tt.cranePlan.panel') ?? 'null'))
   expect(stored).toMatchObject({ left: expect.any(Number), top: expect.any(Number) })
-  await page.screenshot({ path: '.screenshots/crane-plan.png' })
+  // resize from the corner handle
+  const box = (await viewer.boundingBox())!
+  const grip = (await page.getByTestId('tt-bay-resize').boundingBox())!
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width + 120, box.y + box.height + 80, { steps: 5 })
+  await page.mouse.up()
+  const grown = await viewer.boundingBox()
+  expect(grown!.width).toBeGreaterThan(box.width + 60)
+  expect(grown!.height).toBeGreaterThan(box.height + 40)
+  const stored2 = await page.evaluate(() => JSON.parse(localStorage.getItem('tt.cranePlan.panel') ?? 'null'))
+  expect(stored2.width).toBeGreaterThan(box.width + 60)
 
   // a click on a package opens that bay in the Bays view
   await page.locator('[data-testid^=tt-crane-plan-pkg-]').first().click()

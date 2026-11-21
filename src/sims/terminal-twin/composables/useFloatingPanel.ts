@@ -1,9 +1,9 @@
 /**
- * A panel the user can drag by its header and resize from its corner, kept inside its container (#288). Position and size
+ * A panel the user can drag by its header and resize from a corner handle, kept inside its container (#288). Position and size
  * are remembered for the session in `localStorage` (a per-viewer convenience: every access is guarded). The pure clamp is
  * exported for tests.
  */
-import { computed, onBeforeUnmount, ref, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 
 export interface PanelRect {
   left: number
@@ -48,8 +48,6 @@ function save(key: string, r: PanelRect): void {
 export function useFloatingPanel(el: Ref<HTMLElement | null>, key: string, active: () => boolean = () => true) {
   const rect = ref<PanelRect | null>(load(key))
   let drag: { dx: number; dy: number } | null = null
-  let observer: ResizeObserver | null = null
-  let settling = true
 
   const bounds = () => {
     const p = el.value?.offsetParent as HTMLElement | null
@@ -59,11 +57,6 @@ export function useFloatingPanel(el: Ref<HTMLElement | null>, key: string, activ
     const e = el.value as HTMLElement
     return { left: e.offsetLeft, top: e.offsetTop, width: e.offsetWidth, height: e.offsetHeight }
   }
-  function commit(r: PanelRect): void {
-    rect.value = clampPanel(r, bounds())
-    save(key, rect.value)
-  }
-
   function startDrag(e: PointerEvent): void {
     if (!active() || !el.value || (e.target as HTMLElement).closest('button')) return
     const c = current()
@@ -80,21 +73,24 @@ export function useFloatingPanel(el: Ref<HTMLElement | null>, key: string, activ
     drag = null
   }
 
-  /** Start watching the panel's own size (the corner handle is the native `resize: both`). */
-  function watch(): void {
-    if (!el.value || typeof ResizeObserver === 'undefined') return
-    observer = new ResizeObserver(() => {
-      if (settling) {
-        settling = false // the first call is the initial layout, not a user resize
-        return
-      }
-      if (drag || !el.value || !active()) return
-      const c = current()
-      if (!rect.value || Math.abs(c.width - rect.value.width) > 1 || Math.abs(c.height - rect.value.height) > 1) commit(c)
-    })
-    observer.observe(el.value)
+  /** Resize from the corner handle: the size follows the pointer, clamped to the container, and is remembered on release. */
+  let grab: { w: number; h: number; x: number; y: number } | null = null
+  function startResize(e: PointerEvent): void {
+    if (!active() || !el.value) return
+    const c = current()
+    grab = { w: c.width, h: c.height, x: e.clientX, y: e.clientY }
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    e.preventDefault()
   }
-  onBeforeUnmount(() => observer?.disconnect())
+  function moveResize(e: PointerEvent): void {
+    if (!grab || !el.value) return
+    const c = current()
+    rect.value = clampPanel({ ...c, width: grab.w + e.clientX - grab.x, height: grab.h + e.clientY - grab.y }, bounds())
+  }
+  function endResize(): void {
+    if (grab && rect.value) save(key, rect.value)
+    grab = null
+  }
 
   /** Inline style: absent until the panel has been moved or resized (then the CSS default placement applies). */
   const style = computed(() =>
@@ -102,5 +98,5 @@ export function useFloatingPanel(el: Ref<HTMLElement | null>, key: string, activ
       ? { left: `${rect.value.left}px`, top: `${rect.value.top}px`, width: `${rect.value.width}px`, height: `${rect.value.height}px`, maxHeight: 'none' }
       : {},
   )
-  return { style, startDrag, moveDrag, endDrag, watch }
+  return { style, startDrag, moveDrag, endDrag, startResize, moveResize, endResize }
 }

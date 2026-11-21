@@ -776,6 +776,7 @@ const en = {
   'bayViewer.tip.whole': '40 ft cell',
   'bayViewer.counts': '{n} boxes',
   'bayViewer.mode': 'View',
+  'bayViewer.resize': 'Drag to resize',
   'bayViewer.mode.bays': 'Bays',
   'bayViewer.mode.crane-plan': 'Crane plan',
   'cranePlan.key': 'Key',

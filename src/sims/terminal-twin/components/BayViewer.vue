@@ -113,7 +113,6 @@ function go(bay: number | null): void {
 }
 
 onMounted(() => {
-  float.watch()
   timer = setInterval(() => {
     if (store.bayViewerVesselId && !store.busy) void store.refreshBayView()
   }, REFRESH_MS)
@@ -446,6 +445,21 @@ onBeforeUnmount(() => {
         </aside>
       </div>
     </template>
+
+    <div
+      v-if="floating"
+      class="resize-anchor"
+    >
+      <span
+        class="resize-handle"
+        data-testid="tt-bay-resize"
+        :title="t('bayViewer.resize')"
+        @pointerdown="float.startResize"
+        @pointermove="float.moveResize"
+        @pointerup="float.endResize"
+        @pointercancel="float.endResize"
+      />
+    </div>
 
     <div
       v-if="hovered"
@@ -959,7 +973,7 @@ h2 {
 }
 
 .bay-viewer.floating {
-  resize: both;
+  max-height: calc(100% - 12rem); /* clear of the overlay bar at the bottom */
   min-width: 360px;
   min-height: 240px;
   max-width: calc(100% - 0.4rem);
@@ -969,5 +983,22 @@ h2 {
   cursor: move;
   touch-action: none;
   user-select: none;
+}
+
+.resize-anchor {
+  position: sticky;
+  bottom: -0.55rem;
+  height: 0;
+}
+
+.resize-handle {
+  position: absolute;
+  right: -0.45rem;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 0 55%, var(--tt-text-muted) 55% 62%, transparent 62% 72%, var(--tt-text-muted) 72% 79%, transparent 79%);
 }
 </style>
