@@ -7,7 +7,16 @@ set -u
 common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || { echo "preflight: not in a git repo" >&2; exit 2; }
 lock="$common/bg-heavy.lock"
 holder="$common/bg-heavy.holder"
-command -v flock >/dev/null || { echo "preflight: UNKNOWN, no flock in this shell so the heavy lock cannot be checked. Check Task Manager and the running agent sessions by hand." >&2; exit 3; }
+if ! command -v flock >/dev/null; then
+  # bg.sh falls back to an mkdir lock directory holding the owner pid when flock is missing
+  d="$common/bg-heavy.d"; p=$(cat "$d/pid" 2>/dev/null)
+  if [ -d "$d" ] && { [ -z "$p" ] || kill -0 "$p" 2>/dev/null; }; then
+    echo "preflight: BUSY, heavy lock held by $(cat "$holder" 2>/dev/null || echo unknown). Wait for it, then benchmark." >&2
+    exit 1
+  fi
+  echo "preflight: no heavy job running"
+  exit 0
+fi
 [ -e "$lock" ] || { echo "preflight: no heavy job has ever run here, machine looks quiet"; exit 0; }
 exec 9>>"$lock"
 if flock -n 9; then

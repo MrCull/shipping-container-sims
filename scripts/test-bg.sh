@@ -29,6 +29,8 @@ check "no overlap" "$(tr '\n' ' ' < "$stamp")" "start end start end "
 pid=$("$here/bg.sh" run --heavy "$d/k1.log" bash -c 'sleep 60')
 sleep 1; "$here/bg.sh" run --heavy "$d/k2.log" bash -c 'echo ran' >/dev/null
 sleep 1; grep -q 'waiting for heavy lock' "$d/k2.log"; check "k2 waits" "$?" 0
+"$here/bench-preflight.sh" >/dev/null 2>&1; check "preflight busy" "$?" 1
 kill "$pid"; "$here/bg.sh" wait "$d/k2.log" 30 >/dev/null; check "killed frees lock" "$?" 0
+"$here/bench-preflight.sh" >/dev/null 2>&1; check "preflight free" "$?" 0
 [ -n "$wt" ] && git -C "$repo" worktree remove --force "$wt"
 [ $fail = 0 ] && echo "test-bg: ok"; exit $fail

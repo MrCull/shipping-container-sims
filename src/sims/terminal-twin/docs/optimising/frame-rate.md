@@ -90,7 +90,7 @@ and `composables/useFrameBenchmark.ts` (runner). It reads quality, camera and pl
 
 How to run it:
 
-0. **Quiet machine.** Run `scripts/bench-preflight.sh` (exit 1: a heavy job holds the machine, wait; exit 3: no `flock` in the shell, so the lock cannot be checked) and make sure no agent session is building or testing on the same machine. A run beside another job gives pessimistic numbers; say so next to any number you record.
+0. **Quiet machine.** Run `scripts/bench-preflight.sh` (exit 1: a heavy job holds the machine, wait). It cannot see a plain `pnpm run verify` or a dev server, so also confirm no agent session is working here (`list_sessions` with `linked: true`, or ask the owner). A run beside another job gives pessimistic numbers; say so next to any number you record.
 1. Open the production site (or `pnpm run build && pnpm run preview`, then `/sim/terminal-twin`) in the browser and on the GPU you want to measure.
    Close other heavy tabs, keep this tab in front (a hidden tab throttles animation frames). "1080p window" means a maximised
    browser on a 1920x1080 screen; do not resize it during the run. The JSON records the canvas size, so a short viewport is visible.
