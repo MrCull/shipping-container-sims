@@ -2,7 +2,8 @@
  * TT-07 browser smoke tests: KPI strip, end conditions, final report and export.
  * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type { HeadlineKpis } from '../../engine'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openAdvanced, pickScenario } from './scenarioPicker'

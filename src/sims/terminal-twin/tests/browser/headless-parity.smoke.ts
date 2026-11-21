@@ -6,7 +6,7 @@
  * Run with `pnpm run test:smoke --project=dev headless-parity`.
  */
 import { execFileSync } from 'node:child_process'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import type { SceneState } from '../../modules/sceneState'
 import { openTwin } from './openTwin'

@@ -3,7 +3,8 @@
  * the dev-only `window.__tt` API. The SHC scene checks run in the headless scene (`headless-scene-engine.test.ts`) and
  * the setup dialog in `terminal-twin-setup-equipment.smoke.ts` (#333). Run with `pnpm run test:smoke` (not `pnpm test`).
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { sampleFrames, simPerWallSecond, advancedFraction, neverBackwards } from './frameSampling'
 import { openTwin } from './openTwin'

@@ -12,7 +12,7 @@
  * (`SMOKE_SERVER=dev`) gives the same counts. Run alone with `pnpm run test:smoke --project=dev terminal-twin-render-budget`.
  * Belongs to the core smoke set (`@core`): it runs on every PR that changes `src/`.
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import type { CameraPose } from '../../modules/cameraKeys'
 import { openTwin } from './openTwin'
