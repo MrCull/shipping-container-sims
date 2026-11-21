@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSimulation } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
-import { bayOrder, buildBayView, defaultBay, stripOf, type BayCell, type BayPlan, type BayView, type BayViewData, type CellStatus } from '../modules/bayView'
+import { bayOrder, buildBayView, defaultBay, remainingByPlan, stripOf, type BayCell, type BayPlan, type BayView, type BayViewData, type CellStatus } from '../modules/bayView'
 import type { RobDisplay } from '../modules/colourBy'
 import { collectBayViewData } from '../modules/bayViewData'
 import type { EngineResponse } from '../modules/engineClient'
@@ -96,6 +96,18 @@ describe('Discharge plan | Load plan (view-model)', () => {
     expect(count(dis, 'planned-discharge')).toBeGreaterThan(0)
     expect(count(load, 'rob')).toBe(before.robBoxes.length)
     expect(count(dis, 'rob')).toBe(before.robBoxes.length)
+  })
+
+  it('counts the boxes left to move per plan over the whole vessel: planned and in progress, not done or ROB', () => {
+    const { data } = midRun()
+    const left = (plan: BayPlan): number => cellsOf(data, plan).filter((c) => !c.continuation && (c.status === (plan === 'load' ? 'planned-load' : 'planned-discharge') || c.status === 'in-progress')).length
+    const r = remainingByPlan(data)
+    expect(r.discharge).toBe(left('discharge'))
+    expect(r.load).toBe(left('load'))
+    // one discharge box has been discharged and one load box loaded since the start (the two on spreaders still count)
+    const r0 = remainingByPlan(before)
+    expect(r0.discharge - r.discharge).toBe(1)
+    expect(r0.load - r.load).toBe(1)
   })
 
   it('the ROB display hide removes ROB in both plans', () => {

@@ -344,7 +344,9 @@ in the vessel inspector; X or Esc closes; a new scenario closes it. Text: `bayVi
   outside the hull profile are `absent` (`tt-bay-absent`), so the hold reads as a V.
 - Discharge plan | Load plan (#162, `tt-bay-plan`, `tt-bay-plan-discharge|load`): `discharge` shows discharge slots,
   `load` non-discharge slots; the other move's slots read `empty`; ROB shows in both. `store.bayPlan` is `discharge`
-  on every run start and kept across vessels.
+  on every run start and kept across vessels. Each button ends with the boxes the vessel still has to move in that plan,
+  over all bays (`remainingByPlan`, `tt-bay-plan-count-discharge|load`, e.g. "Load plan (67)"; a box on a spreader still
+  counts).
 - Paired panels (#127): the component draws `view.panels`: `fore` (even-1, left) and `aft` (even+1, right) odd bays
   around a 40 ft bay. A 40 is the fore cell plus an aft `continuation` (hatched, "40′ ▸"). Selectors
   `tt-bay-panel-fore|aft`, `data-continuation`, `data-rob`; exclude `[data-continuation]` when counting.
