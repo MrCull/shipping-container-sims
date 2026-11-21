@@ -65,7 +65,9 @@ async function run(): Promise<{ model: SceneModel; data: Record<string, BayViewD
     return reply
   }
   await call({ op: 'load', config, seed: config.seed })
-  await call({ op: 'run', condition: { time: ENGINE_S } })
+  // Playback's look-ahead `advance` steps, whose deltas keep every custody change: a flat-out `run` compacts the delta to
+  // each box's latest custody (engineHost compactDelta), so display times behind the engine would see stale boxes.
+  for (let to = 900; to <= ENGINE_S; to += 900) await call({ op: 'advance', to })
   const data: Record<string, BayViewData> = {}
   for (const v of config.vessels) data[v.id] = (await call({ op: 'query', kind: 'bayView', id: v.id })).result as BayViewData
   return { model, data }
