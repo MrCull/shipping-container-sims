@@ -7,9 +7,9 @@
  *
  * Why the `dev` project and not `prod`: the real production build has no dev API, so it cannot fix the run point or
  * the camera pose, nor draw one frame on demand (the in-app Benchmark plays at speed and is not deterministic). The
- * guard runs on the smoke build instead (`SMOKE_SERVER=build`, the CI default for `dev`, #323): a production bundle
- * with the dev API kept, so the renderer code it measures is the one users get. Locally the Vite dev server gives the
- * same counts. Run alone with `pnpm run test:smoke --project=dev terminal-twin-render-budget`.
+ * guard runs on the smoke build instead (the default server for `dev`, locally and in CI, #323, #344): a production
+ * bundle with the dev API kept, so the renderer code it measures is the one users get. The opt-in Vite dev server
+ * (`SMOKE_SERVER=dev`) gives the same counts. Run alone with `pnpm run test:smoke --project=dev terminal-twin-render-budget`.
  * Belongs to the core smoke set (`@core`): it runs on every PR that changes `src/`.
  */
 import { expect, test } from '@playwright/test'

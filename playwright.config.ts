@@ -4,11 +4,12 @@
  *
  * - `dev` project: specs that use the dev API (`window.__tt`, `?viewer=`). It runs against one of two servers
  *   (scripts/smoke-server.mjs, chosen by SMOKE_SERVER=dev|build):
- *   - `dev` (local default): the Vite dev server. No build step, so best for one or two specs, but every page open
- *     loads hundreds of unbundled modules.
- *   - `build` (CI default, i.e. when CI is set): the smoke build, `vite build --mode smoke` into `.smoke-build/`
- *     (SMOKE_BUILD_DIR), a bundled build that keeps the dev API, served by `vite preview`. Pages boot faster; use it
- *     locally for long runs. SMOKE_BUILD_PREBUILT=1 serves an existing build (`pnpm run build:smoke`) without rebuilding.
+ *   - `build` (the default, locally and in CI): the smoke build, `vite build --mode smoke` into `.smoke-build/`
+ *     (SMOKE_BUILD_DIR), a bundled build that keeps the dev API, served by `vite preview`. A run builds it once at start;
+ *     SMOKE_BUILD_PREBUILT=1 serves an existing build (`pnpm run build:smoke`, or a CI shard's artifact) without rebuilding.
+ *     Local runs and CI serve the same bundle, so asset URLs carry the same hashed names (`hero-shc-<hash>.glb`).
+ *   - `dev` (opt-in, SMOKE_SERVER=dev): the Vite dev server, for hot-reload debugging. Every page open loads hundreds of
+ *     unbundled modules, and asset names are unhashed, so a pass there does not prove a pass in CI.
  * - `prod` project: a production build served by `vite preview` (specs named
  *   `*.prod.smoke.ts`), for checks that dev-only code is absent. SMOKE_PROD_PREBUILT=1 serves an existing build
  *   (SMOKE_PROD_DIR, default `.smoke-dist`) without rebuilding.
