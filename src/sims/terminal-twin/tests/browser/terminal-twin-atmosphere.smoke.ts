@@ -51,6 +51,8 @@ test('the sun follows the sim clock: day at 13:00, cheaper night mode at 02:00',
   await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' })
   await followClock(page)
   await page.evaluate(() => window.__tt!.step())
+  // the scene picks up the new lighting mode on a later frame, so wait for it (CI read day here)
+  await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('night')
   a = await atmosphere(page)
   expect(a.scene).toMatchObject({ mode: 'night', shadows: false })
   expect(a.scene!.masts).toBeGreaterThan(0)

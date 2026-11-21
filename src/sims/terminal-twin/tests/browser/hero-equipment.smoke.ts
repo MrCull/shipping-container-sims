@@ -16,7 +16,7 @@ import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 
 const HIGH_CAP = 3
-const HERO_FILE = /hero-spreader-(sts|asc|shc)|hero-shc\.|hero-truck-/
+const HERO_FILE = /hero-spreader-(sts|asc|shc)|hero-shc[.-]|hero-truck-/
 /** The hero model adds raised flippers and corner guides at the ends; its length stays within this of the rig spreader's. */
 const LENGTH_TOLERANCE_M = 0.6
 const CENTRE_TOLERANCE_M = 0.15
@@ -210,7 +210,7 @@ test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested befo
   expect(near.bodies.map((b) => b.kind)).toContain('shc-body')
   expect(near.bodies.map((b) => b.id)).toContain(shc.id)
   expect(near.stats).toBeGreaterThanOrEqual(1)
-  expect(w.heroRequests.some((u) => u.includes('hero-shc.'))).toBe(true)
+  expect(w.heroRequests.some((u) => /hero-shc[.-]/.test(u))).toBe(true)
   await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/hero-equipment-shc-body.png' })
 
