@@ -8,12 +8,16 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import * as THREE from 'three'
+import { NodeIO, type Node } from '@gltf-transform/core'
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
+import { MeshoptDecoder } from 'meshoptimizer'
 import { describe, expect, it } from 'vitest'
 import { checkAssetLibrary, MODELS_DIR } from '../cli/assets/budgetCheck'
 import { readGlbJson, type GltfJson } from '../cli/assets/glb'
 import { DEFAULT_LAYOUT } from '../scenario/builder'
 import { HALF_OFFSET_M, slotZ, tierBaseY, VESSEL_CLASSES } from '../scenario/vesselClasses'
 import meta from '../assets/models/sts/sts-malaccamax.meta.json'
+import atlas from '../assets/models/sts/sts-atlas.json'
 import { AssetRig, type RigMeta } from '../modules/assetRig'
 
 const DIR = join(MODELS_DIR, 'sts')
@@ -282,5 +286,86 @@ describe('STS model (Malaccamax quay crane)', () => {
         }
       })
     }
+  })
+  describe('TTI ALGECIRAS boom side plate (#300)', () => {
+    type Plate = { node: string; material: string; region: string; lods: string[]; yM: number[]; zM: number[] }
+    const plate = (meta.branding as unknown as { boomSidePlate: Plate }).boomSidePlate
+    const regions = (atlas as unknown as { regions: Record<string, number[]> }).regions
+    let doc: Awaited<ReturnType<NodeIO['read']>> | undefined
+
+    async function boomMesh(lod: string): Promise<Node> {
+      if (!doc) {
+        await MeshoptDecoder.ready
+        const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder })
+        doc = await io.read(GLB)
+      }
+      const sfx = lod === 'LOD0' ? '' : `_${lod.toLowerCase()}`
+      const geo = doc.getRoot().listNodes().find((n) => n.getName() === `${plate.node}${sfx}`)
+      expect(geo, `${lod} ${plate.node}`).toBeDefined()
+      return geo!
+    }
+
+    const worldPoint = (m: THREE.Matrix4, p: number[]) => new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(m)
+
+    /** Triangles of `node` in `material` with every corner's UV inside the atlas pixel rect, as world rest positions. */
+    function lettering(node: Node, material: string, rect: number[]): THREE.Vector3[][] {
+      const m = new THREE.Matrix4().fromArray(node.getWorldMatrix())
+      const out: THREE.Vector3[][] = []
+      for (const prim of node.getMesh()!.listPrimitives()) {
+        if (prim.getMaterial()?.getName() !== material) continue
+        const pos = prim.getAttribute('POSITION')!
+        const uv = prim.getAttribute('TEXCOORD_0')!
+        const idx = prim.getIndices()!
+        for (let t = 0; t < idx.getCount(); t += 3) {
+          const corners = [0, 1, 2].map((k) => idx.getScalar(t + k))
+          const inside = corners.every((i) => {
+            const [u, v] = uv.getElement(i, [])
+            const [x, y] = [u * atlas.size[0], v * atlas.size[1]]
+            return x >= rect[0] && x <= rect[2] && y >= rect[1] && y <= rect[3]
+          })
+          if (inside) out.push(corners.map((i) => worldPoint(m, pos.getElement(i, []))))
+        }
+      }
+      return out
+    }
+
+    it('records the plate in the sidecar: boom mesh, paint material, the white-on-blue TTI ALGECIRAS atlas region', () => {
+      expect(plate).toMatchObject({ node: 'boom_geo', material: 'sts_paint', region: 'tti_on_blue' })
+      expect(regions.tti_on_blue).toHaveLength(4)
+      expect(plate.zM[1]).toBeLessThanOrEqual(meta.geometry.boomHingeM.z)
+      expect(meta.branding.placement).toMatch(/boom side plate/)
+    })
+
+    for (const lod of ['LOD0', 'LOD1']) {
+      it(`draws TTI ALGECIRAS on both outer faces of the boom side plate at ${lod}, through the STS atlas`, async () => {
+        const tris = lettering(await boomMesh(lod), plate.material, regions[plate.region])
+        for (const sx of [-1, 1]) {
+          const side = tris.filter((t) => t.every((p) => p.x * sx > 0))
+          expect(side.length, `${lod} side ${sx}`).toBeGreaterThanOrEqual(2)
+          for (const p of side.flat()) {
+            expect(p.z, 'seaward of the hinge, on the plate').toBeLessThanOrEqual(plate.zM[1] + 0.01)
+            expect(p.z).toBeGreaterThanOrEqual(plate.zM[0] - 0.01)
+            expect(p.y).toBeGreaterThanOrEqual(plate.yM[0])
+            expect(p.y).toBeLessThanOrEqual(plate.yM[1])
+          }
+        }
+      })
+    }
+
+    it('deepens the boom silhouette to the plate underside in every LOD', async () => {
+      for (const lod of LODS) {
+        const node = await boomMesh(lod)
+        const m = new THREE.Matrix4().fromArray(node.getWorldMatrix())
+        let minY = Infinity
+        for (const prim of node.getMesh()!.listPrimitives()) {
+          const pos = prim.getAttribute('POSITION')!
+          for (let i = 0; i < pos.getCount(); i++) {
+            const p = worldPoint(m, pos.getElement(i, []))
+            if (p.z <= plate.zM[1] + 0.01 && p.z >= plate.zM[0] - 0.01) minY = Math.min(minY, p.y)
+          }
+        }
+        expect(minY, lod).toBeLessThanOrEqual(plate.yM[0] + 0.02)
+      }
+    })
   })
 })
