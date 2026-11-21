@@ -1,13 +1,13 @@
 /**
  * #331 (spec #320): the headless scene (`cli/headlessScene.ts`, Node, no WebGL) reports what the browser reports. Loads a
- * small fixture in the browser and in Node with the same seed, runs both to the same event and compares
+ * small fixture in the browser and in Node with the same seed and start date, runs both to the same event and compares
  * `__tt.sceneState()` with the factory's `sceneState()` for the fields both report. Left out: what depends on a loaded
  * GLB (hull LOD, triangles and bay grid, the rig state of STS, SHC, ASC and truck models) and the container LOD.
  * Run with `pnpm run test:smoke --project=dev headless-parity`.
  */
+import { execFileSync } from 'node:child_process'
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
-import { headlessScene } from '../../cli/headlessScene'
 import type { SceneState } from '../../modules/sceneState'
 import { openTwin } from './openTwin'
 
@@ -43,11 +43,12 @@ test('the headless scene reports the same scene state as the browser for the sam
   const frames = await page.evaluate(() => window.__tt!.scene()?.frames ?? 0)
   await page.waitForFunction((n) => (window.__tt!.scene()?.frames ?? 0) >= n + 2, frames)
   const browser = (await page.evaluate(() => window.__tt!.sceneState()))!
+  // the same start date and time (landside arrivals follow the hour of day)
+  const start = (await page.evaluate(() => window.__tt!.config()!.startDateTime))!
 
-  const node = await headlessScene(FIXTURE)
-  await node.runUntil({ eventType: 'StsMoveStarted' })
-  const headless = node.sceneState()
-  node.dispose()
+  // the headless scene in a Node child (tsx), as Playwright's loader cannot import the scene's module graph (JSON imports)
+  const out = execFileSync('node_modules/.bin/tsx', ['src/sims/terminal-twin/cli/headlessSceneCli.ts', FIXTURE, 'StsMoveStarted', start], { maxBuffer: 64 * 1024 * 1024, encoding: 'utf8' })
+  const headless = JSON.parse(out) as SceneState
 
   expect(headless.displayTime).toBe(browser.displayTime)
   expect(Object.keys(headless.liveries).length).toBeGreaterThan(10)

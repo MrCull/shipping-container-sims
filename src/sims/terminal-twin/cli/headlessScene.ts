@@ -27,6 +27,7 @@ import { openingCamera, SceneDriver, sceneStateOf } from '../modules/sceneDriver
 import type { SceneStats } from '../modules/sceneRenderer'
 import type { SceneState } from '../modules/sceneState'
 import { TwinController, type EngineLink } from '../modules/twinController'
+import { runConfigFor } from '../i18n/display'
 import { composeScenario, type ScenarioEdits } from '../scenario/compose'
 import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
@@ -93,7 +94,8 @@ function inProcessLink(): EngineLink {
 }
 
 export async function headlessScene(name: string, options: HeadlessSceneOptions = {}): Promise<HeadlessScene> {
-  const config = { ...composeScenario(resolve(name), options), startDateTime: options.startDateTime ?? START }
+  // the run config `__tt.load` builds (start date and time, KPI clock), in en-GB metric display
+  const config = runConfigFor(composeScenario(resolve(name), options), options.startDateTime ?? START, { locale: 'en-GB', units: 'metric' })
   const seed = options.seed ?? config.seed
   const controller = new TwinController(() => {}, inProcessLink(), { now: () => 0 })
   await controller.load(config, seed)
@@ -128,7 +130,9 @@ export async function headlessScene(name: string, options: HeadlessSceneOptions 
     return cameraAtPose(pose, VIEWPORT.width, VIEWPORT.height)
   }
 
+  /** One frame of the browser's loop: the controller's tick (paused: applies waiting slices, prunes what left the scene), then the update. */
   function frame(): void {
+    controller.tick(0)
     camera.updateMatrixWorld()
     camera.updateProjectionMatrix()
     const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
@@ -137,7 +141,7 @@ export async function headlessScene(name: string, options: HeadlessSceneOptions 
       overlays,
       colourBy: colour.mode,
       robDisplay: colour.robDisplay,
-      hour: hourOfDay(config.startDateTime, controller.displayTime),
+      hour: hourOfDay(config.startDateTime ?? START, controller.displayTime),
       lockDaylight: true,
       live: false,
       selectedId: null,
