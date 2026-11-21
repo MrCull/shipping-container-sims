@@ -18,7 +18,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #332 | 14 Component tests | #328 | merged in branch (10a14e3) | |
 | #333 | 16 Engine fixtures to unit tests | #328 | merged in branch (35683a6) | |
 | #334 | 17 Smallest fixture | #328 | merged in branch (a1fe7f9) | |
-| #335 | 09 CI selection and triggers, red main opens an issue | #330, #327, #346 | open | |
+| #335 | 09 CI selection and triggers, red main opens an issue | #330, #327, #346 | in progress | session 3 implementer |
 | #336 | 12 Yard moves | #331 | open | |
 | #337 | 13 Equipment moves | #331 | open | |
 | #338 | 15 Remaining component moves | #332 | open | |
