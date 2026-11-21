@@ -147,7 +147,7 @@ test('the asset viewer shows the ASC with working rig sliders and 8 rows of refe
     v.setRig('trolley', 0)
     v.setRig('hoist', 0)
   })
-  await page.waitForTimeout(300)
+  await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/asc-viewer.png' })
   expect(external).toEqual([])
   expect(errors).toEqual([])

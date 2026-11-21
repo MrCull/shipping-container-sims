@@ -13,6 +13,7 @@ import { CONTAINER_DIMS } from '../modules/sceneModel'
 import { AssetRig, type RigMeta } from '../modules/assetRig'
 import { ASC_MODEL, HC_HEIGHT_M } from '../modules/ascRig'
 import type { AssetPose, AssetViewStats, RigControl, Vec3Tuple, ViewerLoad, ViewerLod, YardStats } from './assetViewerApi'
+import { ViewerFrames, viewerRenderSettings, type ViewerRenderInfo, type ViewerRenderSettings } from './viewerRender'
 
 const glbUrls = import.meta.glob('../assets/models/**/*.glb', { query: '?url', import: 'default', eager: true }) as Record<string, string>
 const sidecars = import.meta.glob('../assets/models/**/*.meta.json', { import: 'default', eager: true }) as Record<string, Sidecar>
@@ -113,6 +114,9 @@ export class AssetViewerScene {
   readonly camera = new THREE.PerspectiveCamera(40, 1, 0.1, 5000)
   readonly controls: OrbitControls
   private frame = 0
+  /** `?quality=` and `?render=` (#345): the same switches as the twin. */
+  readonly settings: ViewerRenderSettings
+  readonly frames: ViewerFrames
   private asset: { entry: AssetEntry; root: THREE.Object3D; lods: Record<string, THREE.Object3D>; rig: AssetRig } | null = null
   private lod: ViewerLod = 'LOD0'
   private shownLod = 'LOD0'
@@ -133,12 +137,14 @@ export class AssetViewerScene {
   private loadToken = 0
   private materials = new Set<THREE.Material & { userData: { liveryBase?: { value: number } } }>()
 
-  constructor(host: HTMLElement) {
+  constructor(host: HTMLElement, settings: ViewerRenderSettings = viewerRenderSettings(window.location.search)) {
+    this.settings = settings
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio * settings.resolutionScale, 2))
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
-    this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.enabled = settings.shadows
+    this.frames = new ViewerFrames(settings.draw, () => this.draw())
     host.appendChild(this.renderer.domElement)
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
@@ -147,7 +153,7 @@ export class AssetViewerScene {
     const sun = new THREE.DirectionalLight('#fff4e0', 2.2)
     sun.position.set(-40, 80, 50)
     sun.castShadow = true
-    sun.shadow.mapSize.set(2048, 2048)
+    sun.shadow.mapSize.set(settings.shadowMapSize, settings.shadowMapSize)
     sun.shadow.normalBias = 0.06
     sun.shadow.bias = -0.0003
     Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 300 })
@@ -175,11 +181,24 @@ export class AssetViewerScene {
     this.resize(host)
     const loop = () => {
       this.frame = requestAnimationFrame(loop)
-      this.updateAutoLod()
-      this.controls.update()
-      this.renderer.render(this.scene, this.camera)
+      // `?render=off`: the update still runs every frame; only the draw is skipped (`renderOnce` draws on demand)
+      this.frames.frame(() => {
+        this.updateAutoLod()
+        this.controls.update()
+      })
     }
     this.frame = requestAnimationFrame(loop)
+  }
+
+  /** Draws the scene as it stands and reads the frame's draw calls and triangles (main pass plus shadow pass). */
+  private draw(): ViewerRenderInfo {
+    this.renderer.render(this.scene, this.camera)
+    return { calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles }
+  }
+
+  /** Draws exactly one frame now (the way to see the viewer with `?render=off`) and returns its draw counts. */
+  renderOnce(): ViewerRenderInfo {
+    return this.frames.renderOnce()
   }
 
   private setReferenceSize(size: ContainerSize): void {
@@ -623,8 +642,7 @@ export class AssetViewerScene {
       return inst.end(this.camera.position)
     }
     let s = draw()
-    this.renderer.render(this.scene, this.camera)
-    const info = { calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles }
+    const info = this.renderOnce() // one frame for the budget, drawn whatever `?render=` says
     const t0 = performance.now()
     let frames = 0
     await new Promise<void>((resolve) => {

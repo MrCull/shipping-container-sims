@@ -151,7 +151,7 @@ test('the asset viewer rolls and steers the wheels, articulates the chassis and 
     for (const b of s.load!.boxes) expect(b.bottomY).toBeCloseTo(1.3, 3)
   }
   await page.evaluate(() => window.__ttAssets!.setLoad('40'))
-  await page.waitForTimeout(300)
+  await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/truck-viewer.png' })
 
   // The chassis alone, every cab shape and every LOD show without errors.

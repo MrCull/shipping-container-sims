@@ -133,7 +133,7 @@ test('the asset viewer shows the SHC with working rig sliders and a 40 ft box fi
   const lod1 = await page.evaluate(() => window.__ttAssets!.stats()!)
   expect(lod1.triangles).toBe(lod1.lods.LOD1.triangles)
   await page.evaluate(() => window.__ttAssets!.setLod('LOD0'))
-  await page.waitForTimeout(300)
+  await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/shc-viewer.png' })
   expect(external).toEqual([])
   expect(errors).toEqual([])
