@@ -8,7 +8,7 @@
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { applyPinchStep } from '../modules/pinchGesture'
+import { applyPinchStep, WheelZoom } from '../modules/pinchGesture'
 import { NO_OVERLAYS } from '../modules/overlays'
 import { pickEntity } from '../modules/picking'
 import { cameraMotion } from '../modules/shortcuts'
@@ -114,6 +114,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     controls.update()
   }
 
+  const wheelZoom = new WheelZoom() // pending mouse-wheel zoom, see onWheel
   const offsetScratch = new THREE.Vector3()
   const sphericalScratch = new THREE.Spherical()
 
@@ -131,6 +132,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
 
   function writePose(pose: CameraPose): void {
     if (!camera || !controls) return
+    wheelZoom.clear() // a set pose is final: no wheel zoom still easing in on top
     controls.target.set(pose.target.x, pose.target.y, pose.target.z)
     sphericalScratch.set(pose.distance, pose.polar, pose.azimuth)
     camera.position.copy(controls.target).add(offsetScratch.setFromSpherical(sphericalScratch))
@@ -232,6 +234,21 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     pinchPrev = pinchState()
   }
 
+  // Mouse wheel (spec #293): eases towards the ground point under the cursor without turning the view, in place of
+  // OrbitControls' zoomToCursor, which turned low-angle views (modules/pinchGesture.ts, WheelZoom).
+  function onWheel(e: WheelEvent): void {
+    if (!controls?.enabled || !renderer) return
+    e.preventDefault() // the page must not scroll under the view
+    const rect = renderer.domElement.getBoundingClientRect()
+    wheelZoom.add(e.deltaY, e.deltaMode, { x: e.clientX - rect.left, y: e.clientY - rect.top })
+  }
+  function drainWheelZoom(): void {
+    if (!wheelZoom.active || !camera || !controls || !renderer) return
+    if (!controls.enabled) return wheelZoom.clear()
+    const { clientWidth: w, clientHeight: h } = renderer.domElement
+    wheelZoom.step(camera, controls.target, w, h, controls)
+  }
+
   function rebuild(model: SceneModel | null): void {
     store.positional.update(ORIGIN, []) // the old scene's voices end with it
     view?.dispose()
@@ -263,6 +280,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     }
     view.setColourBy(store.colourBy, store.robDisplay)
     applyCameraKeys(now)
+    drainWheelZoom()
     if (store.following && store.selectedId) {
       // Follow camera (F): keep the selection centred, keeping the user's viewing offset.
       const centre = controller.model?.entityCentre(store.selectedId, controller.displayTime)
@@ -345,10 +363,12 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         controls.maxDistance = 3500
         controls.maxPolarAngle = Math.PI / 2.05
         // Map-like handling (phones especially): a pan slides the target along the ground instead of lifting it into the
-        // air (an elevated target makes later orbits and pinches swing), and a zoom keeps the point under the cursor or
-        // between the fingers in place instead of heading for the middle of the canvas.
+        // air (an elevated target makes later orbits and pinches swing).
         controls.screenSpacePanning = false
-        controls.zoomToCursor = true
+        // The wheel is handled by onWheel below (OrbitControls' zoomToCursor turned low-angle views); the keyboard =/-
+        // zoom and the pinch do not go through OrbitControls' zoom either.
+        controls.enableZoom = false
+        renderer.domElement.addEventListener('wheel', onWheel, { passive: false })
         // two fingers are handled by onTouch* below (an unknown TOUCH value leaves OrbitControls idle)
         controls.touches.TWO = -1 as unknown as THREE.TOUCH
         renderer.domElement.addEventListener('pointerdown', onTouchDown)
@@ -382,6 +402,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         const pose = viewPresetPose(model, preset, camera.aspect)
         if (!pose) return false
         const offset = new THREE.Vector3(pose.direction.x, pose.direction.y, pose.direction.z).multiplyScalar(pose.distanceM)
+        wheelZoom.clear()
         controls.target.set(pose.target.x, pose.target.y, pose.target.z)
         camera.position.copy(controls.target).add(offset)
         controls.update()
@@ -414,6 +435,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     renderer?.domElement.removeEventListener('pointerdown', onPointerDown)
     renderer?.domElement.removeEventListener('pointerup', onPointerUp)
     renderer?.domElement.removeEventListener('pointerdown', onTouchDown)
+    renderer?.domElement.removeEventListener('wheel', onWheel)
     window.removeEventListener('pointermove', onTouchMove)
     window.removeEventListener('pointerup', onTouchUp)
     window.removeEventListener('pointercancel', onTouchUp)
