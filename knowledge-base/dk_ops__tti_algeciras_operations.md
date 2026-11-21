@@ -23,6 +23,8 @@ How the **TTI Algeciras** terminal (automated, ASC yard blocks perpendicular to 
 - **[S]** a value the sim ships (code or spec); it is configuration, not a measurement of TTI.
 - **[U]** unverified TTI-specific claim or figure. Treat as configurable. Do not hard-code it in the engine: site numbers belong in scenario/preset config.
 
+STS crane appearance, dimensions, gantry and boom behaviour for TTI are in [dk_equipment__tti_algeciras_sts_cranes.md](dk_equipment__tti_algeciras_sts_cranes.md).
+
 The engine stays generic. Nothing below is a rule of the engine unless the Sim deviations section or a topic doc says so.
 
 ---

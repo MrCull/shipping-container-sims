@@ -992,7 +992,7 @@ Optional high-value animations:
 - Add detailed hatch-lid and lashing coordination penalties from vessel-work files
 - Add cabin visibility / deep-hold penalties by vessel class and slot depth
 - Add power-consumption and regen-braking approximations for energy-aware sims
-- Add adjacent-crane interference and spacing rules in more detail
+- Add adjacent-crane interference and spacing rules in more detail (first pass for TTI Algeciras, with photos: [dk_equipment__tti_algeciras_sts_cranes.md](dk_equipment__tti_algeciras_sts_cranes.md))
 - Add OEM-specific presets:
   - Konecranes
   - Liebherr

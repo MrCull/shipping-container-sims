@@ -44,7 +44,7 @@ available-media/
 ├── 3d-models/       Pre-sourced 3D assets (inventory: `available-media/README.md`)
 └── sound-samples/   Sound effects for gameplay feedback
 
-knowledge-base/      Domain knowledge reference files (dk_*.md); TTI Algeciras operations: dk_ops__tti_algeciras_operations.md
+knowledge-base/      Domain knowledge reference files (dk_*.md); TTI Algeciras operations: dk_ops__tti_algeciras_operations.md; TTI STS cranes and CC0 reference photos (`knowledge-base/images/tti-algeciras-sts/cc0/`): dk_equipment__tti_algeciras_sts_cranes.md
 ```
 
 **Sim isolation is the #1 structural rule.** All code, components, composables, stores, types, and media for a sim live inside its own `src/sims/<sim-id>/` folder. Only logic genuinely reused by multiple sims belongs in the top-level `src/composables/` or `src/components/`. When a sim needs media from `available-media/`, copy the files into the sim's own `assets/` folder.
