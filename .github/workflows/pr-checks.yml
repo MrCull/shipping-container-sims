@@ -41,6 +41,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Vitest's per-file durations from the last run (a few KB): with them it starts the slowest files first, so a
+      # long engine file does not start last and run on alone. Without them it orders by file size. Restored after
+      # the install so the install cannot touch it; saved at the end of the job under a new key every run.
+      - name: Restore vitest durations
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.vite/vitest
+          key: vitest-results-${{ github.run_id }}
+          restore-keys: vitest-results-
+
       - name: Check dependencies and lockfile
         run: node scripts/check-deps.mjs
       - name: Check no local-only files are tracked
