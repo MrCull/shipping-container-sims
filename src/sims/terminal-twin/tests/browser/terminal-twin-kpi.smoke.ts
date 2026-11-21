@@ -36,8 +36,7 @@ test('the KPI strip is over the 3D view and shows the engine headline KPIs', { t
   // the strip polls once a second; wait for it to settle on the engine's numbers
   await expect(page.getByTestId('tt-kpi-moves')).toHaveAttribute('data-value', String(headline.movesDone))
   await expect(page.getByTestId('tt-kpi-moves')).toContainText(String(headline.movesDone))
-  await expect(page.getByTestId('tt-kpi-asc')).toBeVisible()
-  await expect(page.getByTestId('tt-kpi-yard')).toBeVisible()
+  // every card's label and value: tests/components/kpi-strip.test.ts (#338)
   const box = await strip.boundingBox()
   const scene = await page.getByTestId('tt-scene').boundingBox()
   expect(box!.y).toBeGreaterThanOrEqual(scene!.y)
