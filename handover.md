@@ -15,6 +15,8 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 
 ## Next steps
 
+- Owner asked for screenshots of the new STS cranes, some boom up: after #304 reports (no smoke running), take fresh twin close-ups (boom up and down, Super Post-Panamax vs Malaccamax side by side, a bridge passage) and send them.
+
 - #300 and #302 running; #301 next when a slot frees.
 
 ## Open points
