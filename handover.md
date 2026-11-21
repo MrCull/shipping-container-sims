@@ -15,7 +15,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #329 | 05 One page per worker | #328 | open | |
 | #330 | 07 Groups, tags, selection script | #328 | merged in branch (c81dd49) | |
 | #331 | 11 Headless scene, parity, vessel moves | #328 | merged in branch (67fdfde) | |
-| #332 | 14 Component tests | #328 | open | |
+| #332 | 14 Component tests | #328 | in progress | session 3 implementer |
 | #333 | 16 Engine fixtures to unit tests | #328 | open | |
 | #334 | 17 Smallest fixture | #328 | open | |
 | #335 | 09 CI selection and triggers, red main opens an issue | #330, #327, #346 | open | |
@@ -24,8 +24,8 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #338 | 15 Remaining component moves | #332 | open | |
 | #339 | 10 Docs and review rules | #325, #335, #348 | open | |
 | #344 | 21 Smoke build as the local default | none | merged in branch (f170cab) | |
-| #345 | 22 Asset viewer honours URL switches | none | done, not merged (tt/345-viewer-url-switches, 01f3934) | |
-| #346 | 23 Shards balanced by recorded test time | none (blocks #335) | open | |
+| #345 | 22 Asset viewer honours URL switches | none | merged in branch (0e0f5fd) | |
+| #346 | 23 Shards balanced by recorded test time | none (blocks #335) | in progress | session 3 implementer |
 | #347 | 24 bg.sh cleans up its process group | none | open | |
 | #348 | 25 CI smoke per merge, frame-loop review rule, doc fixes | none (blocks #339) | merged in branch (7cafd11) | |
 | #340 | 20 Final smoke run and timing report | all | open | |
