@@ -38,6 +38,10 @@ const byStatus = (mode: ColourMode): boolean => mode === 'status' || mode === 'd
 export type BayPlan = 'load' | 'discharge'
 export const BAY_PLANS: readonly BayPlan[] = ['discharge', 'load']
 
+/** Bays | Crane plan (#288): the bay viewer shows one bay at a time, or the whole vessel's crane plan. */
+export type BayViewMode = 'bays' | 'crane-plan'
+export const BAY_VIEW_MODES: readonly BayViewMode[] = ['bays', 'crane-plan']
+
 /** The statuses a plan shows, in legend order: its own move's planned, in progress and done, then ROB. */
 export function planStatuses(plan: BayPlan): CellStatus[] {
   return [plan === 'load' ? 'planned-load' : 'planned-discharge', 'in-progress', 'done', 'rob']

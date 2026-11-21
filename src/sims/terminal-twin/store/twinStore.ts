@@ -18,11 +18,11 @@ import { composeScenario } from '../scenario/compose'
 import { presets } from '../scenario/presets'
 import type { YardSetup } from '../scenario/builder'
 import type { ContainerSize, DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
-import { EXPORT_FILES, ScenarioValidationError, validateScenario, type ContainerState, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport, type TruckState, type VesselState } from '../engine'
+import { EXPORT_FILES, ScenarioValidationError, validateScenario, type ContainerState, type CranePlanView, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport, type TruckState, type VesselState } from '../engine'
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { createLocationNotation } from '../modules/locationNotation'
-import { defaultBay, type BayPlan, type BayViewData } from '../modules/bayView'
+import { defaultBay, type BayPlan, type BayViewData, type BayViewMode } from '../modules/bayView'
 import { bayViewDataAt } from '../modules/bayViewScene'
 import { loadColourBySettings, saveColourBySettings, type ColourBy, type RobDisplay } from '../modules/colourBySettings'
 import { describeEntity, entityKind, entityQueryKind, transitWorldOf, type EntityExtras, type EntityView } from '../modules/entityInspector'
@@ -263,6 +263,9 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   const bayViewData = shallowRef<BayViewData | null>(null)
   /** Discharge plan | Load plan (#162): Discharge on every run start, kept while clicking between vessels in a run. */
   const bayPlan = ref<BayPlan>('discharge')
+  /** Bays | Crane plan (#288): kept for the run like the plan switch. */
+  const bayViewMode = ref<BayViewMode>('bays')
+  const cranePlanData = shallowRef<CranePlanView | null>(null)
   let bayViewBusy = false
 
   /** Re-read the shown vessel from the engine, at the 3D display time (the viewer calls this at a low rate while open). */
@@ -272,6 +275,10 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     if (!id || !c?.model || bayViewBusy) return
     bayViewBusy = true
     try {
+      if (bayViewMode.value === 'crane-plan') {
+        const plan = await c.query<CranePlanView | null>('cranePlan', id)
+        if (bayViewerVesselId.value === id) cranePlanData.value = plan ? markRaw(plan) : null
+      }
       const data = await c.query<BayViewData>('bayView', id)
       // the engine runs ahead of the display: show the vessel as the 3D scene draws it now (#159)
       if (bayViewerVesselId.value === id && c.model) bayViewData.value = markRaw(bayViewDataAt(data, c.model, c.displayTime))
@@ -291,6 +298,17 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     if (!same && bayViewData.value) bayViewerBay.value = defaultBay(bayViewData.value, bayPlan.value)
   }
 
+  function setBayViewMode(mode: BayViewMode): void {
+    bayViewMode.value = mode
+    if (mode === 'crane-plan') void refreshBayView()
+  }
+
+  /** A package of the Crane plan view was clicked: land on its bay in the Bays view. */
+  function showBayFromPlan(bay: number): void {
+    bayViewerBay.value = bay
+    bayViewMode.value = 'bays'
+  }
+
   function setBayPlan(plan: BayPlan): void {
     bayPlan.value = plan
   }
@@ -298,6 +316,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
   function closeBayViewer(): void {
     bayViewerVesselId.value = null
     bayViewData.value = null
+    cranePlanData.value = null
   }
 
   function setBayViewerBay(bay: number): void {
@@ -602,6 +621,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       entityView.value = null
       closeBayViewer()
       bayPlan.value = 'discharge'
+      bayViewMode.value = 'bays'
       inspectedEvent.value = null
       following.value = false
       hasScenario.value = true
@@ -629,6 +649,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     await run(() => ctl().reset())
     lockDaylight.value = true
     bayPlan.value = 'discharge'
+    bayViewMode.value = 'bays'
     cues.reset()
     sounds.reset()
     banner.value = null
@@ -1164,6 +1185,10 @@ export const useTwinStore = defineStore('terminal-twin', () => {
     bayViewerVesselId,
     bayViewerBay,
     bayPlan,
+    bayViewMode,
+    cranePlanData,
+    setBayViewMode,
+    showBayFromPlan,
     setBayPlan,
     colourBy,
     robDisplay,

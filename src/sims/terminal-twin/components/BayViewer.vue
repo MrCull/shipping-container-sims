@@ -8,7 +8,8 @@ import TtIcon from './ui/TtIcon.vue'
  * Refreshes a few times a second while open (never per frame).
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { BAY_PLANS, buildBayView, remainingByPlan, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
+import CranePlanView from './CranePlanView.vue'
+import { BAY_PLANS, BAY_VIEW_MODES, buildBayView, remainingByPlan, type BayCell, type BayView, type CellStatus } from '../modules/bayView'
 import { useTwinStore } from '../store/twinStore'
 import { t, type MessageKey } from '../i18n/messages'
 import { colourKeyLabel } from '../modules/colourLabels'
@@ -146,7 +147,36 @@ onBeforeUnmount(() => {
       {{ t('bayViewer.noVessel') }}
     </p>
 
-    <template v-else>
+    <div
+      v-if="view"
+      class="nav mode-row"
+    >
+      <div
+        class="seg"
+        role="radiogroup"
+        data-testid="tt-bay-mode"
+        :data-mode="store.bayViewMode"
+        :aria-label="t('bayViewer.mode')"
+      >
+        <button
+          v-for="m in BAY_VIEW_MODES"
+          :key="m"
+          type="button"
+          role="radio"
+          class="seg-btn"
+          :class="{ active: store.bayViewMode === m }"
+          :aria-checked="store.bayViewMode === m"
+          :data-testid="`tt-bay-mode-${m}`"
+          @click="store.setBayViewMode(m)"
+        >
+          {{ t(`bayViewer.mode.${m}` as MessageKey) }}
+        </button>
+      </div>
+    </div>
+
+    <CranePlanView v-if="view && store.bayViewMode === 'crane-plan'" />
+
+    <template v-else-if="view">
       <div class="nav">
         <button
           type="button"

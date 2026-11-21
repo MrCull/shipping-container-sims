@@ -48,10 +48,9 @@ export function planPackages(state: SimState, vesselId: string): Record<string, 
   const out: Record<string, PlanPackage> = {}
   for (const p of Object.values(state.workPackages)) {
     if (p.vesselId !== vesselId) continue
-    let cells: PlanPackage['cells'] = []
-    if (p.emptyReq) cells = p.emptyReq.slotIds.map((id) => state.vesselSlots[id]).filter(Boolean).map((s) => ({ row: s.row, tier: s.tier }))
-    else
-      cells = p.containerIds.map((id) => byBox.get(id)).filter((s): s is VesselSlotState => !!s).map((s) => ({ row: s.row, tier: s.tier }))
+    const cells: PlanPackage['cells'] = p.emptyReq
+      ? p.emptyReq.slotIds.map((id) => state.vesselSlots[id]).filter(Boolean).map((s) => ({ row: s.row, tier: s.tier }))
+      : p.containerIds.map((id) => byBox.get(id)).filter((s): s is VesselSlotState => !!s).map((s) => ({ row: s.row, tier: s.tier }))
     out[p.id] = {
       id: p.id,
       kind: p.kind,
