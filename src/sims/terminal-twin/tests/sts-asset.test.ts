@@ -7,12 +7,14 @@
  */
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { checkAssetLibrary, MODELS_DIR } from '../cli/assets/budgetCheck'
 import { readGlbJson, type GltfJson } from '../cli/assets/glb'
 import { DEFAULT_LAYOUT } from '../scenario/builder'
 import { HALF_OFFSET_M, slotZ, tierBaseY, VESSEL_CLASSES } from '../scenario/vesselClasses'
 import meta from '../assets/models/sts/sts-malaccamax.meta.json'
+import { AssetRig, type RigMeta } from '../modules/assetRig'
 
 const DIR = join(MODELS_DIR, 'sts')
 const GLB = join(DIR, 'sts-malaccamax.glb')
@@ -25,6 +27,7 @@ interface SidecarNode {
   role: string
   pivot?: number[]
   rig?: string
+  description?: string
 }
 
 const nodes = meta.nodes as SidecarNode[]
@@ -41,6 +44,32 @@ function worldTranslations(json: GltfJson): Map<string, number[]> {
   }
   for (const r of json.scenes![json.scene ?? 0].nodes ?? []) visit(r, [0, 0, 0])
   return out
+}
+
+/** The GLB node tree as Three.js objects (names, TRS only; no meshes needed for rig maths). */
+function objectTree(json: GltfJson): THREE.Object3D {
+  const root = new THREE.Object3D()
+  const make = (i: number): THREE.Object3D => {
+    const n = json.nodes![i]
+    const o = new THREE.Object3D()
+    o.name = n.name ?? ''
+    if (n.translation) o.position.fromArray(n.translation)
+    if (n.rotation) o.quaternion.fromArray(n.rotation)
+    if (n.scale) o.scale.fromArray(n.scale)
+    for (const c of n.children ?? []) o.add(make(c))
+    return o
+  }
+  for (const r of json.scenes![json.scene ?? 0].nodes ?? []) root.add(make(r))
+  return root
+}
+
+/** A point at (y, z) on the boom at rest, raised by `deg` about the hinge (+X axis), by hand. */
+function raised(y: number, z: number, deg: number): [number, number] {
+  const [hy, hz] = [meta.geometry.boomHingeM.y, meta.geometry.boomHingeM.z]
+  const a = (deg * Math.PI) / 180
+  const dy = y - hy
+  const dz = z - hz
+  return [hy + dy * Math.cos(a) - dz * Math.sin(a), hz + dy * Math.sin(a) + dz * Math.cos(a)]
 }
 
 function subtreeNames(json: GltfJson, name: string): string[] {
@@ -162,7 +191,7 @@ describe('STS model (Malaccamax quay crane)', () => {
     expect(twin[1]).toBeCloseTo(HALF_OFFSET_M, 3)
   })
 
-  it('has committed previews: front, side, rear, three-quarter and a trolley/spreader close-up', () => {
+  it('has committed previews: front, side, rear, three-quarter, a trolley/spreader close-up and the boom raised', () => {
     for (const view of ['front', 'side', 'rear', 'three-quarter', 'closeup']) {
       expect(existsSync(join(DIR, 'previews', `sts-malaccamax-${view}.webp`)), view).toBe(true)
     }
@@ -191,5 +220,67 @@ describe('STS model (Malaccamax quay crane)', () => {
     expect([...zs].sort((a, b) => a - b)).toEqual([0, meta.geometry.railGaugeM.value])
     expect(mounts.some((b) => b.position[0] < 0) && mounts.some((b) => b.position[0] > 0)).toBe(true)
     expect(Math.max(...mounts.map((b) => b.position[1]))).toBeGreaterThan(40) // the portal pair sits high
+  })
+
+  describe('forestays and boom-hoist ropes stay attached as the boom rises (#299)', () => {
+    type AimRule = { node: string; to: string; mode?: string; axis: string; unitLengthM: number }
+    const rules = (meta as { stretch: AimRule[] }).stretch
+    const STAYS = [
+      { node: 'forestays', anchor: 'forestay_anchor' },
+      { node: 'boom_hoist_ropes', anchor: 'boom_hoist_anchor' },
+    ]
+
+    it('has the stay nodes on the gantry and their anchors on the boom, in every LOD', () => {
+      for (const lod of LODS) {
+        const sfx = lod === 'LOD0' ? '' : `_${lod.toLowerCase()}`
+        const names = subtreeNames(json, lod)
+        for (const { node, anchor } of STAYS) {
+          expect(names, `${lod} ${node}`).toContain(`${node}${sfx}`)
+          expect(names, `${lod} ${anchor}`).toContain(`${anchor}${sfx}`)
+        }
+        // Simplified, but every LOD draws its forestays.
+        expect(names, `${lod} forestays_geo`).toContain(`forestays_geo${sfx}`)
+      }
+      for (const { node, anchor } of STAYS) {
+        expect(nodes.find((n) => n.name === node)?.parent).toBe('gantry')
+        expect(nodes.find((n) => n.name === anchor)?.parent).toBe('boom')
+        expect(rules.find((r) => r.node === node)).toMatchObject({ to: anchor, mode: 'aim', axis: '+Y', unitLengthM: 1 })
+      }
+      // The boom mesh no longer carries the forestays.
+      expect(nodes.find((n) => n.name === 'boom_geo')?.description).not.toMatch(/forestay/)
+      expect(JSON.stringify(meta.provenance)).not.toMatch(/detach/)
+    })
+
+    it('starts the stays at the apex and ends the forestays at the boom nose', () => {
+      const w = worldTranslations(json)
+      for (const { node } of STAYS) expect(w.get(node)![1]).toBeGreaterThan(meta.geometry.apexHeightM.value - 2)
+      expect(w.get('forestay_anchor')![2]).toBeLessThan(-meta.geometry.outreachM.value)
+      expect(w.get('boom_hoist_anchor')![2]).toBeLessThan(-20)
+    })
+
+    for (const deg of [0, 40, 80]) {
+      it(`keeps both ends of every stay on its anchors with the boom at ${deg} degrees, in every LOD`, () => {
+        const root = objectTree(json)
+        const rig = new AssetRig(root, meta as unknown as RigMeta)
+        rig.set('boom', deg)
+        rig.applyStretch()
+        root.updateMatrixWorld(true)
+        const w = worldTranslations(json)
+        for (const lod of LODS) {
+          const sfx = lod === 'LOD0' ? '' : `_${lod.toLowerCase()}`
+          for (const { node, anchor } of STAYS) {
+            const stay = root.getObjectByName(node + sfx)!
+            const start = stay.getWorldPosition(new THREE.Vector3())
+            const end = stay.localToWorld(new THREE.Vector3(0, 1, 0)) // the unit-length mesh's far end
+            // The apex end does not move.
+            expect(start.distanceTo(new THREE.Vector3(...w.get(node + sfx)!)), `${lod} ${node} start`).toBeLessThan(0.01)
+            // The boom end follows the anchor, raised about the hinge.
+            const a = w.get(anchor + sfx)!
+            const [y, z] = raised(a[1], a[2], deg)
+            expect(end.distanceTo(new THREE.Vector3(a[0], y, z)), `${lod} ${node} end at ${deg}`).toBeLessThan(0.05)
+          }
+        }
+      })
+    }
   })
 })

@@ -12,7 +12,13 @@ Hierarchy (LOD0 names; LOD1/LOD2 append `_lod1` / `_lod2` to every node):
       gantry                 travels along the rail (+X); pivot at the origin
         gantry_geo           legs, portal, sills, bogies, girders, A-frame, house, ...
         boom                 raising hinge (+X axis), seaward of the waterside legs
-          boom_geo           lattice boom, forestays, catwalks, floodlights
+          boom_geo           lattice boom, overhead frames, catwalks, floodlights
+          forestay_anchor    forestay ends on the boom nose (aim target)
+          boom_hoist_anchor  boom-hoist rope sheave block on the outer overhead frame (aim target)
+        forestays            apex end of the forestay rods; unit length along local +Y,
+          forestays_geo      aimed at forestay_anchor and scaled to the distance (sidecar `stretch`, mode aim)
+        boom_hoist_ropes     apex head sheaves; unit length along local +Y, aimed at boom_hoist_anchor
+          boom_hoist_ropes_geo   (LOD0 and LOD1; LOD2 has the empty only)
         trolley              along the boom/backreach (+Z); pivot on the trolley rails at Z = 0
           trolley_geo        frame, wheels, operator cab
           ropes              hoist ropes, unit length downwards: scale Y = rope length
@@ -58,6 +64,13 @@ HINGE = (55.6, -3.2)     # boom hinge pin (Y, Z)
 BOOM_TIP_Z = -(OUTREACH + 6.0)
 GIRDER_END_Z = RAIL_GAUGE + BACKREACH + 12.5
 APEX = (4.2, 82.0, 4.0)  # half-width, height, Z
+# [A] Forestays (#299): from the apex beam to the boom nose; boom-hoist ropes from the apex head sheaves to a sheave
+# block on the outer overhead frame. Both are separate gantry children aimed at anchors on the boom, so they stay
+# attached at every boom angle. (Y, Z) of each end; X offsets are per member.
+FORESTAY_TOP = (APEX[1] - 1.0, APEX[2] - 0.6)
+FORESTAY_END = (58.0, BOOM_TIP_Z + 0.4)
+BOOM_HOIST_TOP = (APEX[1] + 0.45, APEX[2] - 0.7)
+BOOM_HOIST_END = (63.4, -48.0)
 HOUSE = {'x': 6.2, 'y': (57.4, 64.8), 'z': (51.8, 60.6)}
 BUFFER_X = LEG_X + 4.5   # over buffers = 27 m (= quay.stsMinSpacingM)
 # Spreader / headblock.
@@ -209,6 +222,15 @@ class GMesh:
             pts.append(p)
         for a, b in zip(pts, pts[1:]):
             self.cyl(a, b, r, n, uv, caps=False)
+
+    def merge(self, other):
+        """Appends another mesh's polygons (same coordinate frame)."""
+        base = len(self.verts)
+        self.verts.extend(other.verts)
+        self.faces.extend(tuple(i + base for i in f) for f in other.faces)
+        self.uvs.extend(other.uvs)
+        self.mats.extend(other.mats)
+        return self
 
     def bounds(self, offset=(0, 0, 0)):
         if not self.verts:
@@ -528,16 +550,14 @@ def boom_structure(d):
     for z in frames:
         for sx in (-1, 1):
             m.beam((sx * GIRDER_X, GIRDER_Y[1], z), (sx * GIRDER_X, 63.0, z), 0.8, 0.8, blue, up=(0, 0, 1), caps=d < 2)
-            # Forestays (tension members) up to the apex.
-            m.beam((sx * GIRDER_X, 63.0, z), (sx * ax, ay - 1.0, az - 0.6), 0.45, 0.45, blue, up=(1, 0, 0), caps=d < 2)
         m.box((-GIRDER_X - 0.4, 62.6, z - 0.4), (GIRDER_X + 0.4, 63.4, z + 0.4), blue)
         if d == 2:
             break
     m.box((-GIRDER_X - GIRDER_HALF_W, 54.4, tip - 0.8), (GIRDER_X + GIRDER_HALF_W, GIRDER_Y[1], tip), blue)
-    # TT-124: the long forestay tension rods from the apex to the boom nose (a pair per side; twin cables at LOD0).
-    for sx in (-1, 1):
-        for ox in ((-0.25, 0.25) if d == 0 else (0.0,)):
-            m.beam((sx * ax + ox, ay - 1.0, az - 0.6), (sx * GIRDER_X + ox, 58.0, tip + 0.4), 0.3, 0.3, blue, up=(1, 0, 0), caps=d < 2)
+    # The forestays and boom-hoist ropes are separate stretch nodes (forestays_part, boom_hoist_part, #299).
+    if d == 0:
+        y, z = BOOM_HOIST_END
+        m.box((-1.4, y, z - 0.5), (1.4, y + 0.6, z + 0.5), dark)  # boom-hoist sheave block
     if d == 2:
         return m
     # Hinge lugs and pins.
@@ -588,6 +608,35 @@ def trolley_part(d):
         m.decal((-0.7, y - 2.8, -2.4), (0, -1, 0), 2.0, 1.4, win, up=(0, 0, 1))
         for sx in (-1, 1):
             _handrail(m, sx * 5.2, y + 3.0, -2.8, 2.8, d, post_every=1.4)
+    return m
+
+
+def forestays_part(d):
+    """Unit-length forestay rods (+Y from the apex end), world rest coordinates around (0, *FORESTAY_TOP).
+
+    The `forestays` node aims +Y at `forestay_anchor` and scales Y to the distance, so the rods keep their X
+    offsets (apex half-width at the top, girder centres at the boom end) at every boom angle."""
+    m = GMesh()
+    blue = P('blue')
+    y, z = FORESTAY_TOP
+    for sx in (-1, 1):
+        for ox in ((-0.25, 0.25) if d == 0 else (0.0,)):
+            if d == 2:
+                m.beam((sx * APEX[0], y, z), (sx * GIRDER_X, y + 1.0, z), 0.5, 0.5, blue, up=(1, 0, 0), caps=False)
+            else:
+                m.beam((sx * APEX[0] + ox, y, z), (sx * GIRDER_X + ox, y + 1.0, z), 0.3, 0.3, blue, up=(1, 0, 0), caps=False)
+    return m
+
+
+def boom_hoist_part(d):
+    """Unit-length boom-hoist ropes (+Y from the apex head sheaves), world rest coordinates around (0, *BOOM_HOIST_TOP)."""
+    m = GMesh()
+    if d == 2:
+        return m
+    dark = P('dark')
+    y, z = BOOM_HOIST_TOP
+    for x in ((-1.1, -0.8, 0.8, 1.1) if d == 0 else (-0.95, 0.95)):
+        m.cyl((x, y, z), (x, y + 1.0, z), 0.06 if d == 0 else 0.1, 6 if d == 0 else 4, dark, caps=False, up=(1, 0, 0))
     return m
 
 
@@ -741,7 +790,18 @@ def build_sts(atlas_image):
         rig.geo(n('gantry_geo'), n('gantry'), gantry_mesh, mats, lod, 'legs, portal, sills, bogies, girders, A-frame, machinery house, ladders, festoon')
         rig.empty(n('boom'), n('gantry'), (0.0, HINGE[0], HINGE[1]), 'rig', 'boom', '+X', 'boom hinge pin; positive rotation raises the boom')
         boom_mesh = boom_structure(level)
-        rig.geo(n('boom_geo'), n('boom'), boom_mesh, mats, lod, 'seaward lattice boom, forestays, catwalks, floodlights')
+        rig.geo(n('boom_geo'), n('boom'), boom_mesh, mats, lod, 'seaward lattice boom, overhead frames, catwalks, floodlights')
+        rig.empty(n('forestay_anchor'), n('boom'), (0.0, *FORESTAY_END), 'anchor', description='forestay ends on the boom nose (aim target of forestays)')
+        rig.empty(n('boom_hoist_anchor'), n('boom'), (0.0, *BOOM_HOIST_END), 'anchor',
+                  description='boom-hoist sheave block on the outer overhead frame (aim target of boom_hoist_ropes)')
+        rig.empty(n('forestays'), n('gantry'), (0.0, *FORESTAY_TOP), 'stretch',
+                  description='apex end of the forestays; unit length along +Y, aimed at forestay_anchor (see stretch)')
+        rig.geo(n('forestays_geo'), n('forestays'), forestays_part(level), mats, lod,
+                'forestay rods (unit length; twin rods per side at LOD0, one per side at LOD1 and LOD2)')
+        rig.empty(n('boom_hoist_ropes'), n('gantry'), (0.0, *BOOM_HOIST_TOP), 'stretch',
+                  description='apex head sheaves; unit length along +Y, aimed at boom_hoist_anchor (see stretch)')
+        rig.geo(n('boom_hoist_ropes_geo'), n('boom_hoist_ropes'), boom_hoist_part(level), mats, lod,
+                'boom-hoist ropes (unit length; four at LOD0, two at LOD1, none at LOD2)')
         if level == 0:
             bounds = (gantry_mesh.bounds(), boom_mesh.bounds())
         rig.empty(n('trolley'), n('gantry'), (0.0, TROLLEY_RAIL_Y, 0.0), 'rig', 'trolley', '+Z', 'on the trolley rails; Z = trolley position from the waterside rail')
@@ -749,16 +809,21 @@ def build_sts(atlas_image):
         rig.empty(n('ropes'), n('trolley'), (0.0, TROLLEY_RAIL_Y, 0.0), 'rig', 'ropes', '-Y', 'hoist ropes, 1 m long at rest: scale Y = rope length (see stretch)')
         rig.geo(n('ropes_geo'), n('ropes'), ropes_part(level), mats, lod, 'hoist ropes (unit length)')
         rig.empty(n('hoist'), n('trolley'), (0.0, 0.0, 0.0), 'rig', 'hoist', '+Y', 'spreader underside centre; Y = height above the rail')
-        rig.geo(n('hoist_geo'), n('hoist'), headblock_part(level) if level < 2 else GMesh(), mats, lod, 'headblock')
+        # LOD1 folds the headblock and the twin-lift housing into the spreader mesh (draw-call cap 10, #299).
+        rig.geo(n('hoist_geo'), n('hoist'), headblock_part(level) if level == 0 else GMesh(), mats, lod, 'headblock')
         rig.empty(n('spreader'), n('hoist'), (0.0, 0.0, 0.0), 'rig', 'spreader', '+Y', 'container attach point (top centre of the box); skew rotation')
-        rig.geo(n('spreader_geo'), n('spreader'), spreader_part(level), mats, lod, 'telescopic spreader main frame')
+        spreader_mesh = spreader_part(level)
+        if level == 1:
+            spreader_mesh.merge(headblock_part(level)).merge(twin_part(level))
+        rig.geo(n('spreader_geo'), n('spreader'), spreader_mesh, mats, lod,
+                'telescopic spreader main frame' + (' with the headblock and twin-lift housing' if level == 1 else ''))
         for side, sx in (('fore', 1), ('aft', -1)):
             node = f'spreader_tele_{side}'
             rig.empty(n(node), n('spreader'), (sx * TELE_X, 0.0, 0.0), 'rig', node, RIG_AXES[node], f'{side} telescope end beam (20 ft at rest)')
             if level < 2:
                 rig.geo(n(f'{node}_geo'), n(node), tele_part(level, sx), mats, lod, f'{side} telescope end beam and arms')
         rig.empty(n('twin_locks'), n('spreader'), (0.0, TWIN_DROP, 0.0), 'rig', 'twin_locks', '-Y', 'twin-20 centre twist-lock units (retracted at rest)')
-        if level < 2:
+        if level == 0:
             rig.geo(n('twin_locks_geo'), n('twin_locks'), twin_part(level), mats, lod, 'twin-lift housing')
         if level == 0:
             for lock, (parent, pivot) in LOCKS.items():
@@ -842,6 +907,12 @@ def sidecar(info, scene_water_rail_z):
         'stretch': [
             {'node': 'ropes', 'to': 'hoist', 'axis': 'Y', 'offsetM': HEADBLOCK_SHEAVE_Y, 'unitLengthM': 1.0,
              'note': 'ropes.scale.y = ropes.y - (hoist.y + offsetM), both children of the trolley'},
+            {'node': 'forestays', 'to': 'forestay_anchor', 'mode': 'aim', 'axis': '+Y', 'unitLengthM': 1.0,
+             'note': 'rotate forestays so local +Y points at forestay_anchor (a boom child) and set scale.y = distance; '
+                     'the rods stay on the apex and the boom nose at every boom angle'},
+            {'node': 'boom_hoist_ropes', 'to': 'boom_hoist_anchor', 'mode': 'aim', 'axis': '+Y', 'unitLengthM': 1.0,
+             'note': 'rotate boom_hoist_ropes so local +Y points at boom_hoist_anchor and set scale.y = distance; '
+                     'the ropes run from the apex head sheaves to the boom sheave block and shorten as the boom rises'},
         ],
         'spreaderModes': SPREADER_MODES,
         'attachPoints': [
@@ -893,8 +964,11 @@ def sidecar(info, scene_water_rail_z):
              'tag': 'P', 'source': 'TTI Algeciras reference photographs of the STS cranes (git-ignored, not committed)'},
             {'fact': 'no TTI emblem or logo artwork', 'tag': 'M', 'reason': 'text names only'},
             {'fact': 'beacon mount positions', 'tag': 'A', 'reason': 'photos show amber beacons low on the legs; exact heights are estimated'},
-            {'fact': 'forestays rotate with the boom (they detach from the apex when the boom is raised)', 'tag': 'M',
-             'reason': 'boom raising is a viewer-only pose; real tie bars fold'},
+            {'fact': 'forestays are straight rods that stretch to stay on the apex and the boom nose; boom-hoist ropes run '
+                     'straight from the apex to a sheave block on the outer overhead frame (no reeving)', 'tag': 'M',
+             'reason': 'real forestays are hinged links that fold as the boom rises; simplified to one aimed stretch node each'},
+            {'fact': 'LOD1 headblock and twin-lift housing merged into the spreader mesh; no boom-hoist ropes at LOD2', 'tag': 'M',
+             'reason': 'per-LOD draw-call caps (10 at LOD1, 6 at LOD2)'},
             {'fact': 'ladder cages, handrail posts and festoon loops simplified', 'tag': 'M', 'reason': 'triangle budget'},
         ],
     }

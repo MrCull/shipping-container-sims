@@ -32,6 +32,7 @@ sys.path.insert(0, HERE)
 sys.dont_write_bytecode = True  # keep __pycache__ out of the sim folder
 
 import bpy  # noqa: E402
+from mathutils import Vector  # noqa: E402
 
 from tt_assets import blender as B  # noqa: E402
 from tt_assets import containers as C  # noqa: E402
@@ -306,6 +307,18 @@ def pose_sts(objects, trolley_z, hoist_y, mode='40', boom_deg=0.0):
     o['spreader_tele_aft'].location = _gl_to_blender((-STS.TELE_X - modes['spreader_tele_aft'], 0, 0))
     o['twin_locks'].location = _gl_to_blender((0, STS.TWIN_DROP - modes['twin_locks'], 0))
     o['boom'].rotation_euler = (math.radians(boom_deg), 0, 0)
+    # Aim stretch (sidecar `stretch`, mode aim): forestays and boom-hoist ropes from the apex to their boom anchors.
+    hy, hz = STS.HINGE
+    a = math.radians(boom_deg)
+    for node, (ty, tz), (ey, ez) in (('forestays', STS.FORESTAY_TOP, STS.FORESTAY_END),
+                                     ('boom_hoist_ropes', STS.BOOM_HOIST_TOP, STS.BOOM_HOIST_END)):
+        dy, dz = ey - hy, ez - hz
+        ry, rz = hy + dy * math.cos(a) - dz * math.sin(a), hz + dy * math.sin(a) + dz * math.cos(a)
+        d = Vector(_gl_to_blender((0.0, ry - ty, rz - tz)))
+        obj = o[node]
+        obj.rotation_mode = 'QUATERNION'
+        obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d.normalized())
+        obj.scale = (1, 1, d.length)
 
 
 def build_sts(out_dir, previews=True, samples=48):
@@ -380,6 +393,12 @@ def build_sts(out_dir, previews=True, samples=48):
         del b
     B.render_preview(cam, _gl_to_blender((27, 53, -52)), _gl_to_blender((0, 50.5, -30)),
                      os.path.join(preview_dir, f'{STS.NAME}-closeup.webp'), samples=samples)
+    # Raised boom (#299): trolley parked on the backreach, spreader up, forestays and boom-hoist ropes attached.
+    for i in range(2):
+        bpy.data.objects[f'box-20-{i}'].hide_render = True
+    pose_sts(info['objects'], trolley_z=STS.RAIL_GAUGE + 6.0, hoist_y=STS.LIFT_ABOVE_RAIL - 2.0, mode='40', boom_deg=80.0)
+    B.render_preview(cam, _gl_to_blender((300, 75, -40)), _gl_to_blender((0, 62, 4)),
+                     os.path.join(preview_dir, f'{STS.NAME}-raised.webp'), samples=samples)
 
 
 def save_atlas_preview(png, path, size=1024):
