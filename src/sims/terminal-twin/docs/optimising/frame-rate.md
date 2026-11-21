@@ -260,6 +260,26 @@ Overview (`cameraTo('STS104', 1100)`): before 277 calls, 1 578 380 triangles; af
 (+6 069, +0.4%). Default camera: 717 to 721 calls, 1 870 172 to 1 875 623 triangles. The five scenery meshes are static,
 cast and receive no shadows, are frustum-culled and share the infrastructure atlas material: no per-frame posing.
 
+**STS booms, real-GPU check (spec #297, ticket #304), 2026-11-21, ENGINE_VERSION 0.58.0.** Windows 11 laptop, Intel Iris Xe
+(ANGLE D3D11), Claude desktop in-app pane 967x845 (not 1080p), dpr 1, Vite dev server (unminified), TTI baseline, High, paused,
+`cameraTo('STS104', 1100 | 60)`, 8 one-second samples each. Before = `0207d27`, after = branch at `1fe31a5`, measured back to back in
+one tab with the machine at 20 to 35 % CPU (an earlier pair at 93 % CPU was discarded: everything ran at 30 fps). Full rows in
+`perf/baseline.json` under `frames`.
+
+| Build, camera | fps | Draw calls | Triangles | cpuMs | poseMs |
+|---|---|---|---|---|---|
+| before, overview | 59.4 | 279 | 381 787 | 6.11 | 1.11 |
+| after (booms up), overview | 60.0 / 58.9 | 293 | 381 879 | 5.99 / 6.08 | 1.32 / 1.20 |
+| booms down, overview | 59.7 | 294 | 381 895 | 5.39 | 1.02 |
+| before, 60 m | 59.9 | 150 | 680 405 | 5.51 | 1.19 |
+| after (booms up), 60 m | 59.5 / 60.0 | 161 | 678 769 | 6.09 / 5.22 | 1.48 / 1.14 |
+| booms down, 60 m | 60.0 | 170 | 682 633 | 5.40 | 1.28 |
+
+Two "after" runs are shown (first / repeat); the spread, about 0.5 ms, is the noise. The booms down row is from an earlier
+quiet run. Acceptance: draw calls with booms up are not above booms down at either camera (293 vs 294, 161 vs 170); `cpuMs`
+after is within noise of before and of booms down; scene triangles within 0.3 % of before. Not measured: per-crane LOD0
+triangles (covered by `sts-asset.test.ts` caps), a 1080p window, a production build. Booms up report 80 degrees and a stay gap near 0.
+
 **Not measured yet:** real-GPU fps at night (night has no shadow pass); the close-up `@load` spec on a real GPU (Overview
 camera vs about 10 boxes wide, `cameraTo('B01', 40)`, annotation `frame-ms`); the frame cost of Low's 48 close-up faces
 on the reference laptop; real-GPU fps on a production build. Fill them in here.
