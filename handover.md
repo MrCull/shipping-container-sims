@@ -9,7 +9,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #323 | 06 Smoke build | none | merged in branch (7580300) | |
 | #324 | 19 Unit-test speed-up | none | open | |
 | #325 | 03 `openTwin` helper, first migration | #322 | merged in branch (bd45064) | |
-| #326 | 18 Rendering-budget guard | #322 | in progress | implementer (tt/326-render-budget) |
+| #326 | 18 Rendering-budget guard | #322 | merged in branch (8057771) | |
 | #327 | 08 Six balanced shards | #321, #323 | open | |
 | #328 | 04 Migrate remaining specs | #325 | open | |
 | #329 | 05 One page per worker | #328 | open | |
