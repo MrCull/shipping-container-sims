@@ -126,6 +126,7 @@ Full detail: [docs/architecture.md#extending](docs/architecture.md#extending) an
 - New invariant: append to `INVARIANTS` with a dotted id, `reads` and (if it reads a lot) `scoped: true`; add a test that triggers it.
 - New strategy: register it for its decision point. Note that some strategies (chained, paired, predispatch SHC dispatch, ASC pre-retrieval, grouped decking, ISO empties) are switched on in the engine by the configured strategy name, so a named handler set is not the same as choosing a strategy.
 - New fixture: `scenario/fixtures/definitions.ts`, `pnpm run tt:fixtures`, import in `fixtures/index.ts`, `UPDATE_GOLDEN=1 pnpm test`.
+- New smoke spec: load the smallest fixture that proves the behaviour (`tracer-1sts-10-boxes` for HUD and DOM checks; a named fixture such as `two-vessels-compete-for-berth` for one behaviour). A TTI preset (baseline or peak day) costs 4 to 7.5 s of load and the heaviest scene, so keep it for scale only: draw and frame budgets, the overview at TTI size, scenery that exists only in TTI, the HUD fit of TTI's KPI strip, or an engine that cannot keep up (#334).
 - New KPI: `KPI_DEFS` and an `observe` case in `engine/kpi/collector.ts`, `KPI_GROUPS` in `modules/dashboardModel.ts`, a `dashboard.kpi.<id>` catalogue key.
 - New equipment kind: one `modules/equipmentKinds/<kind>.ts` added to `EQUIPMENT_KINDS`.
 - Any change that moves an event log: bump `ENGINE_VERSION`, update goldens deliberately, and update the docs.
