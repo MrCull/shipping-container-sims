@@ -25,7 +25,7 @@ export const SERIES_COLOURS = [
 
 export const MAX_SERIES = SERIES_COLOURS.length
 
-/** The skin's theme a chart is drawn for (store/themeStore.ts): dark is the default. */
+/** The skin's theme a chart is drawn for (store/themeStore.ts). */
 export type ChartTheme = 'dark' | 'light'
 
 /**
