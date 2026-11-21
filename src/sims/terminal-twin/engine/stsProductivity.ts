@@ -16,11 +16,15 @@
  * | `box`         | StsWaitingForBox                                    | load: the export box is not on its ground position yet   |
  * | `rail`        | StsWaitingForRail                                   | a neighbouring crane is closer than `stsMinSpacingM`     |
  * | `reposition`  | StsRepositionStarted                                | stepping aside for another crane                         |
+ * | `boom`        | StsBoomStarted (until StsBoomCompleted, then back   | boom mode real (#301): parking the spreader and turning  |
+ * |               | to `done` after the last move, else `cycle`)        | the boom; also the boom turns planned inside a cycle to  |
+ * |               |                                                     | pass a vessel's bridge (#302), moved out of `cycle`      |
  * | `done`        | StsWorkComplete                                     | the crane has no more work on its vessel                 |
  */
 import type { EngineEvent } from './events'
+import type { MotionSegment } from './kinematics'
 
-export const STS_TIME_BUCKETS = ['cycle', 'hatch', 'lashing', 'ground', 'box', 'rail', 'reposition', 'done'] as const
+export const STS_TIME_BUCKETS = ['cycle', 'hatch', 'lashing', 'ground', 'box', 'rail', 'reposition', 'boom', 'done'] as const
 export type StsTimeBucket = (typeof STS_TIME_BUCKETS)[number]
 
 export interface StsTimeRow {
@@ -59,12 +63,16 @@ const ENTER: Partial<Record<EngineEvent['type'], StsTimeBucket>> = {
   StsWaitingForBox: 'box',
   StsWaitingForRail: 'rail',
   StsRepositionStarted: 'reposition',
+  StsBoomStarted: 'boom',
   StsWorkComplete: 'done',
 }
 
 /** The crane time breakdown of `events` (sim-time order) up to `endS`. */
 export function stsProductivity(events: readonly EngineEvent[], endS: number): StsProductivityReport {
-  const cranes = new Map<string, { startS: number; bucket: StsTimeBucket; since: number; buckets: Record<StsTimeBucket, number>; moves: number }>()
+  const cranes = new Map<
+    string,
+    { startS: number; bucket: StsTimeBucket; since: number; buckets: Record<StsTimeBucket, number>; moves: number; beforeBoom: StsTimeBucket; boomInCycle: number }
+  >()
   for (const e of events) {
     if (e.t > endS) break
     const stsId = (e.payload as { stsId?: string }).stsId
@@ -72,11 +80,16 @@ export function stsProductivity(events: readonly EngineEvent[], endS: number): S
     let c = cranes.get(stsId)
     if (!c) {
       if (e.type !== 'WorkPackageStarted') continue
-      c = { startS: e.t, bucket: 'cycle', since: e.t, buckets: zero(), moves: 0 }
+      c = { startS: e.t, bucket: 'cycle', since: e.t, buckets: zero(), moves: 0, beforeBoom: 'cycle', boomInCycle: 0 }
       cranes.set(stsId, c)
     }
     if (e.type === 'StsGrounded' || e.type === 'StsLoaded') c.moves++
-    const next = ENTER[e.type]
+    if (e.type === 'StsMoveStarted' || e.type === 'StsLoadStarted') {
+      // a bridge passage turns the boom inside the planned cycle (#302): that time is boom, not cycle
+      for (const s of (e.payload as { segments?: MotionSegment[] }).segments ?? []) if (s.axis === 'boom') c.boomInCycle += Math.max(0, Math.min(s.t1, endS) - s.t0)
+    }
+    if (e.type === 'StsBoomStarted') c.beforeBoom = c.bucket
+    const next = e.type === 'StsBoomCompleted' ? (c.beforeBoom === 'done' ? 'done' : 'cycle') : ENTER[e.type]
     if (!next) continue
     c.buckets[c.bucket] += e.t - c.since
     c.bucket = next
@@ -85,6 +98,9 @@ export function stsProductivity(events: readonly EngineEvent[], endS: number): S
   const rows: StsTimeRow[] = [...cranes.entries()]
     .map(([stsId, c]) => {
       c.buckets[c.bucket] += endS - c.since
+      const turned = Math.min(c.boomInCycle, c.buckets.cycle)
+      c.buckets.cycle -= turned
+      c.buckets.boom += turned
       const windowS = endS - c.startS
       return { stsId, startS: c.startS, windowS, buckets: c.buckets, moves: c.moves, grossMovesPerHour: windowS > 0 ? (c.moves * 3600) / windowS : 0 }
     })

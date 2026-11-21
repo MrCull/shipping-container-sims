@@ -12,6 +12,28 @@ export const STS = {
   boomOutreachZ: -72,
   boomBackreachZ: 22,
   apexY: 82,
+  /** Boom hinge pin (sts-malaccamax.meta.json `boom` pivot: y 55.6, z -3.2 from the waterside rail). */
+  boomHingeY: 55.6,
+  boomHingeZ: -0.2,
+}
+
+/**
+ * The STS box for picking and the selection outline (#301), in the crane's frame (z across the quay, y up): the portal
+ * up to just above the apex, grown to the boom tip once the boom is off its working angle (the tip of a boom at 80
+ * degrees is about 126 m up and 12.5 m seaward of the hinge). A boom down stays out of the box so the vessel and the
+ * boxes under it stay pickable.
+ */
+export function stsBoundsYZ(boomDeg: number): { y0: number; y1: number; z0: number; z1: number } {
+  const y1 = STS.apexY + 1.3
+  const z0 = STS.waterRailZ - 3
+  const z1 = STS.waterRailZ + STS.gauge + 3
+  if (boomDeg <= 0) return { y0: 0, y1, z0, z1 }
+  const a = (boomDeg * Math.PI) / 180
+  const length = STS.boomHingeZ - STS.boomOutreachZ
+  const margin = 2
+  const tipY = STS.boomHingeY + length * Math.sin(a) + margin
+  const tipZ = STS.boomHingeZ - length * Math.cos(a) - margin
+  return { y0: 0, y1: Math.max(y1, tipY), z0: Math.min(z0, tipZ), z1 }
 }
 
 /** [A] Shuttle-carrier proportions (m): length along travel, width across, height. */

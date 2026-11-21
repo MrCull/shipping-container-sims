@@ -31,7 +31,7 @@ export interface Fact {
   link?: boolean
   unit?: 'length' | 'time' | 'mass' | 'duration'
   /** The value is a token with catalogue texts `inspector.<token>.<value>` (otherwise shown as is). */
-  token?: 'load' | 'shcState' | 'direction' | 'weightClass' | 'transitStatus' | 'contentStatus'
+  token?: 'load' | 'shcState' | 'direction' | 'weightClass' | 'transitStatus' | 'contentStatus' | 'boomState'
   /** The value is a custody owner; the UI shows a slot in maritime notation (`modules/locationNotation.ts`). */
   owner?: { kind: string; id: string; size: ContainerSize }
 }

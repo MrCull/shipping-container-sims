@@ -423,8 +423,12 @@ TTI presets and the `boom-berthing` fixture.
   false the move is not started: `StsGantryBlocked` (`{stsId, vesselId, targetX}`) reports it and the crane idles where
   it stands (the crane split is unchanged). The boom is taken as a line at the gantry position [A]. Fixture
   `boom-bridge` (ULCV, STS01 starts aft of the house) and `tests/boom-bridge.test.ts`.
+- **Seen from outside (#301):** the entity inspector shows the boom fact (state and angle at the view time, from the
+  crane's boom segments; boom mode real only), STS productivity and the KPI report JSON have a `boom` bucket
+  ([kpis-and-reports.md](../kpis-and-reports.md)), and bounds, picking and the sun shadow follow a raised boom
+  ([rendering-3d.md](../rendering-3d.md)).
 - **Limits (until later tickets of spec #297):** cranes working another vessel are never raised for a neighbour's
-  mooring; no `boom` productivity category (#301). Bridge passage covers work-cycle gantry moves only: a rail
+  mooring. Bridge passage covers work-cycle gantry moves only: a rail
   reposition (step aside, `StsRepositionStarted`) gantries boom down even past a house, and a crane assigned while
   parked boom up over a house lowers there before its first move.
 

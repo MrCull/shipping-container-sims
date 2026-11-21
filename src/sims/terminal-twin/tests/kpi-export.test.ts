@@ -88,6 +88,14 @@ describe('export', () => {
     expect(report.highlights.length).toBeGreaterThan(0)
   })
 
+  it('#301: KPI report JSON carries the STS time breakdown, with its boom category', () => {
+    const boom = finished('boom-berthing')
+    const report = JSON.parse(kpiReportJson(boom)) as { stsProductivity: { total: { buckets: Record<string, number> } } }
+    expect(report.stsProductivity.total.buckets.boom).toBeGreaterThan(0)
+    const off = JSON.parse(kpiReportJson(sim)) as { stsProductivity: { total: { buckets: Record<string, number> } } }
+    expect(off.stsProductivity.total.buckets.boom).toBe(0)
+  })
+
   it('KPI CSV has one row per series entity bucket (hours, shifts and total)', () => {
     const series = sim.kpiSeries()
     const rows = parseCsv(kpiReportCsv(sim))
