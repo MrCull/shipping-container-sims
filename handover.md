@@ -13,7 +13,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #327 | 08 Six balanced shards | #321, #323 | merged to main (PR #341) | |
 | #328 | 04 Migrate remaining specs | #325 | merged to main (PR #341) | |
 | #329 | 05 One page per worker | #328 | open | |
-| #330 | 07 Groups, tags, selection script | #328 | in progress | implementer-330 |
+| #330 | 07 Groups, tags, selection script | #328 | merged in branch (c81dd49) | |
 | #331 | 11 Headless scene, parity, vessel moves | #328 | in progress | implementer-331 |
 | #332 | 14 Component tests | #328 | open | |
 | #333 | 16 Engine fixtures to unit tests | #328 | open | |
