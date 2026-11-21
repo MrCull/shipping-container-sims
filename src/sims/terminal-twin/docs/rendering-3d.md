@@ -474,6 +474,10 @@ Rig node names come from the sidecar; the rules are in [assets-pipeline.md](asse
   (sidecar `sceneMounting`); `modules/equipmentDims.ts#STS.apexY` is kept in sync for picking.
 - `StsModel.setPose`: `gantry` = gantryX, `trolley` = trolleyZ - 3, `hoist` = hoistY; spreader telescope and twin-lock
   values from the sidecar's `spreaderModes`; twist-locks 90 deg while carrying; ropes by the sidecar `stretch` rule.
+  The forestays and boom-hoist ropes (#299) are gantry-child stretch nodes with `mode: 'aim'` rules: `applyStretch` turns
+  each towards its anchor on the `boom` node and scales it to the distance, so a raised boom keeps them attached with no
+  STS-specific code and no extra draw calls (every LOD is at its cap: 20 / 10 / 6). The aim walks local transforms from
+  the anchor up to the stretch node's parent, so it needs no world-matrix update.
   Rig nodes repeat per LOD with suffixes (`trolley_lod1`, per sidecar `lodNaming`); `modules/assetRig.ts#AssetRig`
   accepts both suffixed names and identical names that GLTFLoader renames (found via `userData.name`).
 - Crane number (101, 102, ...) via an own plate material per crane (tiles of `sts-atlas.json`).
