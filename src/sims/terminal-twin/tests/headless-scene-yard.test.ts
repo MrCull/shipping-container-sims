@@ -95,3 +95,47 @@ describe('headless scene: infrastructure instances (was infrastructure.smoke.ts)
     }
   })
 })
+
+describe('headless scene: lighting per sim hour and the daylight lock (was terminal-twin-atmosphere.smoke.ts)', () => {
+  const TRACER = 'tracer-1sts-10-boxes'
+  const at = async (startDateTime: string, lockDaylight: boolean) => {
+    const s = await headlessScene(TRACER, { quality: 'high', startDateTime, lockDaylight }) // day shadows are a High (and Medium) feature
+    try {
+      await s.step()
+      return s.atmosphere()
+    } finally {
+      s.dispose()
+    }
+  }
+
+  it('the sun follows the sim clock: day with shadows at 13:00, cheaper night mode with lights at 02:00', async () => {
+    expect(await at('2026-10-26T13:00:00.000Z', false)).toMatchObject({ mode: 'day', shadows: true, masts: 0, equipmentLights: 0 })
+    const night = await at('2026-10-26T02:00:00.000Z', false)
+    expect(night).toMatchObject({ mode: 'night', shadows: false })
+    expect(night.masts).toBeGreaterThan(0)
+    expect(night.equipmentLights).toBeGreaterThan(0)
+  })
+
+  it('the daylight lock holds day at 02:00 and lifting it lets night fall', async () => {
+    expect(await at('2026-10-26T02:00:00.000Z', true)).toMatchObject({ mode: 'day', shadows: true, masts: 0 })
+    const s = await headlessScene(TRACER, { quality: 'high', startDateTime: '2026-10-26T02:00:00.000Z' })
+    try {
+      expect(s.atmosphere().mode).toBe('day') // the default, as every launch
+      s.setLockDaylight(false)
+      expect(s.atmosphere().mode).toBe('night')
+    } finally {
+      s.dispose()
+    }
+  })
+
+  it('a generic preset keeps the procedural backdrop', async () => {
+    const s = await headlessScene('truck-gate-queue')
+    try {
+      const { backdrop } = s.atmosphere()
+      expect(backdrop).toMatchObject({ kind: 'generic', models: 'procedural' })
+      for (const part of ['shore', 'anchorage', 'tanks', 'landside', 'town']) expect(backdrop.parts).not.toContain(part)
+    } finally {
+      s.dispose()
+    }
+  })
+})

@@ -1,6 +1,8 @@
 /**
  * Atmosphere and polish (TT-21): day/night, daylight lock, backdrops, sound, departure banner.
- * Seam: UI + dev API `window.__tt` (`__tt.atmosphere()`). Run with `pnpm run test:smoke`.
+ * Seam: UI + dev API `window.__tt` (`__tt.atmosphere()`). Lighting mode per sim hour, night lights and the daylight
+ * lock's effect are Node tests on the headless scene (`tests/headless-scene-yard.test.ts`, #336); this spec keeps the
+ * toggle's wiring. Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
@@ -42,22 +44,6 @@ async function followClock(page: Page): Promise<void> {
   if ((await atmosphere(page)).lockDaylight) await page.getByTestId('tt-daylight-toggle').click()
   await expect.poll(async () => (await atmosphere(page)).lockDaylight).toBe(false)
 }
-
-test('the sun follows the sim clock: day at 13:00, cheaper night mode at 02:00', { tag: '@yard' }, async ({ page }) => {
-  await open(page, TRACER, '2026-10-26T13:00:00.000Z', { quality: 'high' }) // day shadows are a High (and Medium) feature
-  let a = await atmosphere(page)
-  expect(a.scene).toMatchObject({ mode: 'day', shadows: true, masts: 0, equipmentLights: 0 })
-
-  await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' })
-  await followClock(page)
-  await page.evaluate(() => window.__tt!.step())
-  // the scene picks up the new lighting mode on a later frame, so wait for it (CI read day here)
-  await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('night')
-  a = await atmosphere(page)
-  expect(a.scene).toMatchObject({ mode: 'night', shadows: false })
-  expect(a.scene!.masts).toBeGreaterThan(0)
-  expect(a.scene!.equipmentLights).toBeGreaterThan(0)
-})
 
 test('every launch starts in daylight at 02:00; the toggle lets night fall for that run only', { tag: '@yard' }, async ({ page }) => {
   await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' }) // day shadows are a High (and Medium) feature

@@ -24,7 +24,7 @@ import { NO_OVERLAYS, type OverlayState } from '../modules/overlays'
 import { profileFor, type QualityLevel } from '../modules/quality'
 import { cameraAtPose } from '../modules/sceneCamera'
 import { openingCamera, SceneDriver, sceneStateOf } from '../modules/sceneDriver'
-import type { SceneStats } from '../modules/sceneRenderer'
+import type { SceneRenderer, SceneStats } from '../modules/sceneRenderer'
 import type { SceneState } from '../modules/sceneState'
 import { TwinController, type EngineLink } from '../modules/twinController'
 import { runConfigFor } from '../i18n/display'
@@ -51,6 +51,8 @@ export interface HeadlessSceneOptions extends ScenarioEdits {
   camera?: CameraPose
   /** Start date and time (only the lighting reads it). */
   startDateTime?: string
+  /** The daylight lock (default true, as every launch starts, #171); false lets the sun follow the sim clock. */
+  lockDaylight?: boolean
 }
 
 export interface HeadlessScene {
@@ -67,6 +69,10 @@ export interface HeadlessScene {
   cameraTo(entityId: string, distanceM?: number): boolean
   /** Updates one frame at the display time and returns `__tt.sceneState()`'s shape. */
   sceneState(): SceneState
+  /** Same as the daylight toggle. */
+  setLockDaylight(lock: boolean): void
+  /** `__tt.atmosphere().scene` (lighting mode, shadows, night lights, backdrop), after one frame update. */
+  atmosphere(): ReturnType<SceneRenderer['atmosphereState']>
   /** The draw-independent counts `__tt.scene()` reports (containers, vessels, hatch panels...), after one frame update. */
   stats(): SceneStats
   dispose(): void
@@ -109,6 +115,7 @@ export async function headlessScene(name: string, options: HeadlessSceneOptions 
   let camera = options.camera ? atPose(options.camera) : openingPose()
   let colour: { mode: ColourBy; robDisplay: RobDisplay } = { mode: DEFAULT_COLOUR_BY, robDisplay: DEFAULT_ROB_DISPLAY }
   let overlays: OverlayState = NO_OVERLAYS
+  let lockDaylight = options.lockDaylight ?? true
 
   function openingPose(): THREE.PerspectiveCamera {
     const { target, offset } = openingCamera(view)
@@ -142,7 +149,7 @@ export async function headlessScene(name: string, options: HeadlessSceneOptions 
       colourBy: colour.mode,
       robDisplay: colour.robDisplay,
       hour: hourOfDay(config.startDateTime ?? START, controller.displayTime),
-      lockDaylight: true,
+      lockDaylight,
       live: false,
       selectedId: null,
       cameraPosition: camera.position,
@@ -177,6 +184,13 @@ export async function headlessScene(name: string, options: HeadlessSceneOptions 
     sceneState() {
       frame()
       return sceneStateOf(model, controller.displayTime, colour, { liveries: () => view.renderedLiveries(), rigs: () => view.renderedRigs() })
+    },
+    setLockDaylight(lock) {
+      lockDaylight = lock
+    },
+    atmosphere() {
+      frame()
+      return view.atmosphereState()
     },
     stats() {
       frame()
