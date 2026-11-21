@@ -28,12 +28,12 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #346 | 23 Shards balanced by recorded test time | none (blocks #335) | merged in branch (fa0ccaf) | |
 | #347 | 24 bg.sh cleans up its process group | none | merged in branch (3adfcf9) | |
 | #348 | 25 CI smoke per merge, frame-loop review rule, doc fixes | none (blocks #339) | merged in branch (7cafd11) | |
-| #340 | 20 Final smoke run and timing report | all | open | |
+| #340 | 20 Final smoke run and timing report | all | in progress | session 3 implementer |
 
 ## Next steps
 
 - Open PR for this phase: #349 (`claude/hopeful-hawking-s9i8uh` into `main`). Phase 1 (#321 to #328) merged to `main` in PR #341. Do not merge #349 until the phase is done; delete this file first and add `Closes #N` for each finished ticket.
-- Merged in branch this phase: #330, #331, #348, #344, #345, #346, #332, #333, #334, #347, #335, #329, #339, #336, #337 (partial), plus `main` (#343) at cb4047e. Label `merged-in-branch` set on all of them.
+- Merged in branch this phase: #330, #331, #348, #344, #345, #346, #332, #333, #334, #347, #335, #329, #339, #336, #337 (partial), #338, plus `main` (#343) at cb4047e. Label `merged-in-branch` set on all of them.
 - CI after each merge (the #348 rule: start `pr-checks.yml` with workflow_dispatch on this branch, read the merged `SMOKE:` line before the next merge):
   - after #330: green (run 44932418994);
   - after #331 + #348: green, `SMOKE: 189 passed, 0 failed, 0 flaky` (run 44933311179);
@@ -47,8 +47,9 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
   - after #329: green, `SMOKE: 171 passed, 0 failed, 3 flaky` (run 44951105589);
   - after #339: green, `SMOKE: 173 passed, 0 failed, 1 flaky` (run 44951985194);
   - after #336: green, `SMOKE: 164 passed, 0 failed, 3 flaky` (run 44952922747);
-  - after #337: running.
-- In progress: #338 (6 of 9 panels done on `tt/338-component-moves`, worktree agent-aa3e1c4340830afee; finishing final report and locale moves, plus the dashboard flake fix below).
+  - after #337: RED, `SMOKE: 162 passed, 1 failed, 3 flaky` (run 44953776611): `gantry-alarm.smoke.ts:66` read the gain once mid camera ease; fixed in 81e9bae (poll), green `SMOKE: 163 passed, 0 failed, 3 flaky` (run 44954571390);
+  - after #338: running.
+- In progress: #340 (final full smoke run, fix the flakes below; ticket file in the session scratchpad). #338 merged with all 9 panels and the dashboard `fresh: true` fix.
 - Flaky since #329 (found in runs 44951105589 and 44952922747): `terminal-twin-dashboard.smoke.ts:35` and `:220` (shared page keeps loaded chunks in Chromium's module map, so chunk counts read 0 and `route.abort` never fires; fix: `fresh: true`, sent with #338); `vessel-hulls.smoke.ts:45` (`vesselHulls.V001` undefined, maybe stale scene state); `terminal-twin-keyboard-camera.smoke.ts:20` (float noise in `toEqual` on a pose: use `toBeCloseTo`); `hero-equipment.smoke.ts:224` (`heroEquipment` 0, timing). #340 must end with these gone.
 - #337 is partly done: SHC spawn yaw and gantry beacons moved to `tests/headless-scene-equipment.test.ts`; every other equipment check reads GLB rig state the headless scene does not build (it loads no GLBs in Node). Follow-up: load committed GLBs in Node (`GLTFLoader.parse` from disk) or expose per-crane spreader mode in `sceneState`, then move LOD, ropes, wheel roll, hero choice. Keep #337 open (no `Closes`) unless that lands.
 - #335 owner tasks (no tool here can do them): create labels `smoke:core`, `smoke:shell`, `smoke:camera`, `smoke:setup`, `smoke:analysis`, `smoke:vessel`, `smoke:equipment`, `smoke:yard`, `smoke:engine` (colour 1d76db); make `Browser smoke tests (Terminal Twin)` a required check on `main`. GitHub checks still to do: a bay-viewer-only PR runs core + vessel with the comment, a docs-only PR passes as a no-op, the `smoke` label runs all groups, first push to `main` runs all groups (red-main issue via `node scripts/smoke-ci.mjs red-main --dry-run`).
