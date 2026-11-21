@@ -25,3 +25,19 @@ export function smokeDevServer(env, { port, vite }) {
     env.SMOKE_BUILD_PREBUILT === '1' ? preview : `${vite} build --mode smoke --outDir ${buildDir} --emptyOutDir --logLevel warn && ${preview}`
   return { mode, buildDir, command, url }
 }
+
+/**
+ * The `prod` smoke project's server: a production build (no dev API) into SMOKE_PROD_DIR (default `.smoke-dist`),
+ * served by `vite preview`. SMOKE_PROD_PREBUILT=1 serves that directory as it is (built once by the CI build job and
+ * handed to every shard, which starts both servers whatever specs it runs).
+ *
+ * @param {Record<string, string | undefined>} env
+ * @param {{ port: number, vite: string }} opts
+ * @returns {{ dir: string, command: string, url: string }}
+ */
+export function smokeProdServer(env, { port, vite }) {
+  const dir = env.SMOKE_PROD_DIR || '.smoke-dist'
+  const preview = `${vite} preview --outDir ${dir} --host 127.0.0.1 --port ${port} --strictPort`
+  const command = env.SMOKE_PROD_PREBUILT === '1' ? preview : `${vite} build --outDir ${dir} --emptyOutDir --logLevel warn && ${preview}`
+  return { dir, command, url: `http://127.0.0.1:${port}` }
+}
