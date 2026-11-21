@@ -7,7 +7,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #321 | 01 Retries, failure cap, durable timings, 30 s flag, fast-job timeout | none | merged in branch (1741e27) | |
 | #322 | 02 `?quality=`, `?render=off`, `__tt.renderOnce()` | none | merged in branch (f7aa45c) | |
 | #323 | 06 Smoke build | none | merged in branch (7580300) | |
-| #324 | 19 Unit-test speed-up | none | in progress | implementer (tt/324-unit-speed) |
+| #324 | 19 Unit-test speed-up | none | merged in branch (82d2515) | |
 | #325 | 03 `openTwin` helper, first migration | #322 | merged in branch (bd45064) | |
 | #326 | 18 Rendering-budget guard | #322 | merged in branch (8057771) | |
 | #327 | 08 Six balanced shards | #321, #323 | open | |
