@@ -20,6 +20,8 @@ jobs:
     if: github.event.action != 'labeled'
     runs-on: ubuntu-latest
     name: Lint, build and test
+    # Normally about 10 min; run 41302517094 once hung for 4 h 28 min with no timeout.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,8 +52,8 @@ jobs:
         env:
           QUARANTINE_BASE: HEAD^1
 
-      - name: Smoke summary reporter test
-        run: node --test scripts/test-smoke-summary-reporter.mjs
+      - name: Smoke reporter and timing script tests
+        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-timing.mjs
 
       - name: Lint
         run: pnpm run lint
@@ -124,16 +126,19 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
 
+      # CI is set, so playwright.config.ts uses 1 retry and stops after 5 failures. Per-test results are appended to the
+      # JSONL file as each test ends, so the steps below still have them when this step times out or is cancelled.
       - name: Smoke tests
         run: pnpm run test:smoke --grep-invert @load
         env:
-          SMOKE_JSON_REPORT: ${{ github.workspace }}/smoke-report/report.json
+          SMOKE_JSONL_REPORT: ${{ github.workspace }}/smoke-report/results.jsonl
 
+      # Tests over 30 s are flagged as a warning in the summary; the step does not fail on them.
       - name: Smoke timing report
         if: always()
         run: |
-          if [ -f smoke-report/report.json ]; then
-            { echo '## Smoke timing'; node scripts/smoke-timing.mjs smoke-report/report.json; } >> "$GITHUB_STEP_SUMMARY"
+          if [ -f smoke-report/results.jsonl ]; then
+            { echo '## Smoke timing'; node scripts/smoke-timing.mjs smoke-report/results.jsonl; } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload smoke report
@@ -141,5 +146,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: smoke-report
-          path: smoke-report/report.json
+          path: smoke-report/results.jsonl
           if-no-files-found: ignore
