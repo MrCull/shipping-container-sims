@@ -21,6 +21,10 @@ Use this template for writing the PR body:
 - **Before:** <screenshot/output/failing test run>
   **After:** <screenshot/output/passing test run>
 
+## Smoke labels
+
+<`smoke:<group>` labels added, or "none: no `src/` change">
+
 ## Merge Danger
 
 **Door:** <one-way or two-way>
@@ -162,6 +166,10 @@ Concrete evidence that the change works. Show a before and after.
 Screenshots are S-tier - when the environment is set up for it and the change is visual.
 
 Execution-based evidence is A-tier. Test results, console output. Show the exact test that now fails and passes, using pseudocode.
+
+### Smoke labels
+
+A PR that changes `src/` carries the `smoke:<group>` label of each area it touches (table: `AGENTS.md`, **Smoke labels**); add them to the PR and list them here.
 
 ### Merge Danger
 
