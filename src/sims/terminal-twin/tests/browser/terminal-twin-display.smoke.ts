@@ -34,7 +34,7 @@ const clockText = (page: Page) => page.getByTestId('tt-clock').innerText()
 test.describe('US browser', () => {
   test.use({ locale: 'en-US' })
 
-  test('defaults to en-US and imperial on first open; the summary shows ft and mi/h', { tag: '@shell' }, async ({ page }) => {
+  test('defaults to en-US and imperial on first open', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     const dialog = page.getByRole('dialog', { name: /new scenario/i })
     await expect(dialog).toBeVisible()
@@ -43,9 +43,6 @@ test.describe('US browser', () => {
     await expect(page.getByTestId('tt-locale')).toHaveValue('en-US')
     await expect(page.getByTestId('tt-units-imperial')).toBeChecked()
     await expect(page.getByTestId('tt-display-preview')).toContainText('week starts Sunday')
-    await openSetupTab(page, 'scenario')
-    await expect(page.getByTestId('tt-summary-quay')).toHaveText('1,312 ft')
-    await expect(page.getByTestId('tt-summary-trolley')).toHaveText('8.9 mi/h')
   })
 })
 
@@ -59,9 +56,6 @@ test.describe('German browser', () => {
     await expect(page.getByTestId('tt-units-metric')).toBeChecked()
     // Weekday names are locale-formatted too.
     await expect(page.getByTestId('tt-display-preview')).toContainText('week starts Montag')
-    await openSetupTab(page, 'scenario')
-    await expect(page.getByTestId('tt-summary-quay')).toHaveText('400 m')
-    await expect(page.getByTestId('tt-summary-trolley')).toHaveText('14,4 km/h')
   })
 })
 
@@ -69,14 +63,10 @@ test.describe('British browser', () => {
   test.use({ locale: 'en-GB' })
 
   test('units switch the displayed values; the saved config and engine stay SI; the choice persists', { tag: '@shell' }, async ({ page }) => {
+    // the summary in each locale and unit system: tests/components/locale-format.test.ts (#338)
     await openSim(page)
-    await expect(page.getByTestId('tt-summary-quay')).toHaveText('400 m')
     await openAdvanced(page)
     await page.getByTestId('tt-units-imperial').check()
-    await openSetupTab(page, 'scenario')
-    await expect(page.getByTestId('tt-summary-quay')).toHaveText('1,312 ft')
-    await expect(page.getByTestId('tt-summary-gantry')).toHaveText('1.7 mi/h')
-    await openAdvanced(page)
     await page.getByTestId('tt-locale').selectOption('de-DE')
     await openSetupTab(page, 'scenario')
     await expect(page.getByTestId('tt-summary-quay')).toHaveText('1.312 ft')
@@ -127,28 +117,12 @@ test.describe('British browser', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Scenario complete' })).toContainText('10 moves')
   })
 
-  test('setup start and Run to… read and parse in the chosen locale', { tag: '@shell' }, async ({ page }) => {
+  test('Run to… reads and parses in the chosen locale', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     await loadTracerAt(page, 17 * 60 + 3) // 14:02:03 UTC; start is Mon 26 Oct 2026 13:45
 
-    await page.getByRole('button', { name: 'New Scenario' }).click()
-    await openAdvanced(page)
-    const start = page.getByTestId('tt-setup-start')
-    await expect(start).toHaveValue('26/10/2026, 13:45')
-
-    await page.getByTestId('tt-locale').selectOption('en-US')
-    await expect(start).toHaveValue(/^10\/26\/2026, 1:45.PM$/)
-    // 03/04 is 3 April in en-GB but 4 March in en-US: the typed text follows the chosen locale.
-    await start.fill('03/04/2026, 9:30 AM')
-    await start.blur()
-    await expect(start).toHaveValue(/^03\/04\/2026, 9:30.AM$/)
-    await expect(start).not.toHaveAttribute('aria-invalid', 'true')
-    await page.getByTestId('tt-locale').selectOption('de-DE')
-    await expect(start).toHaveValue('04.03.2026, 09:30')
-    await start.fill('31.02.2026, 09:30')
-    await start.blur()
-    await expect(start).toHaveAttribute('aria-invalid', 'true')
-    await page.getByRole('button', { name: 'Cancel' }).click()
+    // the setup start field in each locale (shows, parses, flags an impossible date): tests/components/locale-format.test.ts (#338)
+    await page.evaluate(() => window.__tt!.setDisplay({ locale: 'de-DE' }))
 
     // Run to…: pre-filled with the chosen locale (de-DE now, seconds shown), parsed the same way.
     await page.getByRole('button', { name: 'Run to…' }).click()
@@ -160,89 +134,24 @@ test.describe('British browser', () => {
     await expect.poll(async () => (await page.evaluate(() => window.__tt!.clock())).displayTime).toBeCloseTo(18 * 60 + 30, 0)
   })
 
-  test('keyboard shortcuts drive the sim, the help overlay lists them, typing in a field does not', { tag: '@shell' }, async ({ page }) => {
+  // Every key, the help overlay's list and typing in a field: tests/components/shortcuts.test.ts (#338). Here one key
+  // reaches the running twin, and the help button opens the overlay.
+  test('keyboard shortcuts reach the running twin and the help button opens the shortcut list', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     await loadTracerAt(page, 60)
     const clock = () => page.evaluate(() => window.__tt!.clock())
-    const ui = () => page.evaluate(() => window.__tt!.ui())
     await page.locator('body').click({ position: { x: 5, y: 300 } }) // focus the page, not a field
-
-    // Space: pause / resume
     expect((await clock()).paused).toBe(true)
     await page.keyboard.press('Space')
     expect((await clock()).paused).toBe(false)
-    await page.keyboard.press('Space')
-    expect((await clock()).paused).toBe(true)
     // Space with a top-bar button focused toggles once (it does not also click the button).
     await page.getByRole('button', { name: '×10' }).click()
-    expect((await clock()).paused).toBe(false)
     await page.keyboard.press('Space')
     expect((await clock()).paused).toBe(true)
-
-    // Digit keys 1-9 no longer change speed (#138); the top bar buttons do; 0: pause
-    await page.getByRole('button', { name: '×5', exact: true }).click()
-    expect(await clock()).toMatchObject({ speed: 5, paused: false })
-    for (const d of ['3', '9', '1']) await page.keyboard.press(d)
-    expect(await clock()).toMatchObject({ speed: 5, paused: false })
-    await page.keyboard.press('0')
-    expect((await clock()).paused).toBe(true)
-
-    // '.': single-step to the next event
-    const before = (await clock()).engine!.eventsTotal
-    await page.keyboard.press('.')
-    await expect.poll(async () => (await clock()).engine!.eventsTotal).toBe(before + 1)
-    expect((await clock()).paused).toBe(true)
-
-    // B: dashboard tab
-    await page.keyboard.press('b')
-    await expect(page.getByTestId('tt-dashboard')).toBeVisible()
-    await page.keyboard.press('b')
-    await expect(page.getByTestId('tt-dashboard')).toBeHidden()
-
-    // O: overlays
-    expect((await ui()).overlaysVisible).toBe(true)
-    await page.keyboard.press('o')
-    expect((await ui()).overlaysVisible).toBe(false)
-    await expect(page.getByTestId('tt-toast')).toHaveText('Overlays off')
-    await page.keyboard.press('o')
-    expect((await ui()).overlaysVisible).toBe(true)
-
-    // F: follow the selection; Esc: closes the inspector the selection opened, then deselects (and stops following)
-    await page.keyboard.press('f')
-    await expect(page.getByTestId('tt-toast')).toHaveText('Select something to follow first')
-    expect((await ui()).following).toBe(false)
-    await page.evaluate(() => window.__tt!.select('STS01'))
-    await page.keyboard.press('f')
-    expect(await ui()).toMatchObject({ selectedId: 'STS01', following: true })
-    await page.keyboard.press('Escape')
-    expect(await ui()).toMatchObject({ selectedId: 'STS01', inspectorOpen: false, following: true })
-    await page.keyboard.press('Escape')
-    expect(await ui()).toMatchObject({ selectedId: null, following: false })
-
-    // ?: help overlay lists every shortcut; Esc closes it
-    await page.keyboard.press('?')
     const help = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
-    await expect(help).toBeVisible()
-    for (const key of ['Space', '0', '.', 'F', 'Esc', 'B', 'O', '?', 'WASD', 'Shift + AD', 'Shift + WS', '= / -']) {
-      await expect(help.locator('kbd', { hasText: new RegExp(`^${key.replace(/[.?+]/g, '\\$&')}$`) })).toHaveCount(1)
-    }
-    await page.keyboard.press('Escape')
-    await expect(help).toBeHidden()
     await page.getByTestId('tt-help-button').click()
     await expect(help).toBeVisible()
     await page.keyboard.press('Escape')
-
-    // Typing in a field triggers nothing.
-    const stateBefore = { clock: await clock(), ui: await ui() }
-    await page.getByRole('button', { name: 'Run to…' }).click()
-    const field = page.getByLabel('Target sim time')
-    await field.focus()
-    for (const key of ['Space', '3', '0', '.', 'f', 'b', 'w', 'a', 'o', '?', 'Escape']) await field.press(key)
-    const after = await clock()
-    expect(after.paused).toBe(stateBefore.clock.paused)
-    expect(after.speed).toBe(stateBefore.clock.speed)
-    expect(after.engine!.eventsTotal).toBe(stateBefore.clock.engine!.eventsTotal)
-    expect(await ui()).toEqual(stateBefore.ui)
-    await expect(page.getByTestId('tt-dashboard')).toBeHidden()
+    await expect(help).toBeHidden()
   })
 })

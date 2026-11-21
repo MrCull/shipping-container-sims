@@ -1,7 +1,8 @@
 /**
- * #288: the bay viewer's Bays | Crane plan switch. Fixture `crane-split-4sts` (one vessel, four cranes). Opening a vessel
- * and switching to Crane plan shows a band per crane and the now line; the choice is kept while the viewer is open;
- * clicking a package lands on its bay in the Bays view; the dashboard Gantt draws package bars.
+ * #288: the bay viewer's Bays | Crane plan switch in the real app. Fixture `crane-split-4sts` (one vessel, four cranes).
+ * Switching to Crane plan shows the chart with the key beside it in a wide panel; the floating panel drags and resizes
+ * and remembers its geometry; a package click lands on its bay. What the chart draws (a band per crane, the now line,
+ * the key and labels, hover dimming) is the component test `tests/components/crane-plan-view.test.ts` (#338).
  * Run with `pnpm run test:smoke --project=dev --grep "crane plan"`.
  */
 import { type Page } from '@playwright/test'
@@ -18,7 +19,7 @@ function collectErrors(page: Page): string[] {
   return errors
 }
 
-test('crane plan: the Crane plan view shows a band per crane and the now line, and a package click opens its bay', { tag: '@vessel' }, async ({ page }) => {
+test('crane plan: the Crane plan view opens beside its key, drags and resizes, and a package click opens its bay', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await page.setViewportSize({ width: 1500, height: 960 })
@@ -33,19 +34,8 @@ test('crane plan: the Crane plan view shows a band per crane and the now line, a
   await expect(page.getByTestId('tt-bay-mode')).toHaveAttribute('data-mode', 'bays')
   await page.getByTestId('tt-bay-mode-crane-plan').click()
   await expect(page.getByTestId('tt-crane-plan')).toBeVisible()
-  for (const id of ['STS01', 'STS02', 'STS03', 'STS04']) await expect(page.getByTestId(`tt-crane-plan-band-${id}`)).toBeVisible()
-  await expect(page.getByTestId('tt-crane-plan-now')).toBeVisible()
-  await expect(page.getByTestId('tt-crane-plan-summary')).toContainText('as-today')
-  await expect(page.getByTestId('tt-crane-plan-key')).toBeVisible()
-  for (const k of ['discharge', 'load', 'hatch', 'ghost', 'conflict', 'obstacle', 'now']) await expect(page.getByTestId(`tt-crane-plan-key-${k}`)).toBeVisible()
-  // every bay column names its crane; hovering a crane in the key dims the other cranes' packages
-  const colSts = await page.locator('[data-testid^=tt-crane-plan-col-]').first().getAttribute('data-sts')
-  expect(colSts).toMatch(/^STS\d+$/)
-  await expect(page.getByTestId('tt-crane-plan-key-crane-STS01')).toBeVisible()
-  await page.getByTestId('tt-crane-plan-key-crane-STS01').hover()
-  await expect(page.locator('[data-testid^=tt-crane-plan-pkg-][data-sts=STS02]').first()).toHaveClass(/dim/)
-  await expect(page.locator('[data-testid^=tt-crane-plan-pkg-][data-sts=STS01]').first()).not.toHaveClass(/dim/)
-  await page.mouse.move(0, 0)
+  // the bands, now line, key and labels, the hover dimming and the package click: tests/components/crane-plan-view.test.ts (#338)
+  await expect(page.getByTestId('tt-crane-plan-band-STS01')).toBeVisible()
   // wide panel: the key sits right of the chart, not under it
   const chartBox = await page.locator('.crane-plan .scroll').boundingBox()
   const keyBox = await page.getByTestId('tt-crane-plan-key').boundingBox()

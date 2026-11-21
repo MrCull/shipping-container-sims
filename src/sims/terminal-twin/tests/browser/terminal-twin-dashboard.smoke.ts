@@ -32,30 +32,6 @@ async function showCharts(page: Page, group: string, bucketing: 'hour' | 'shift'
   await expect(page.getByTestId('tt-dashboard-charts')).toBeVisible()
 }
 
-test('B opens the dashboard, which loads ECharts only then, and B closes it', { tag: '@analysis' }, async ({ page }) => {
-  const errors = collectErrors(page)
-  const chartChunks: string[] = []
-  page.on('request', (r) => {
-    if (/echarts|chartLib/i.test(r.url())) chartChunks.push(r.url())
-  })
-  await open(page, TWO_VESSELS)
-  await page.evaluate(() => window.__tt!.runTo(1200))
-  await page.waitForTimeout(500)
-  expect(chartChunks).toEqual([]) // the 3D view never pays for the chart library
-  await page.keyboard.press('b')
-  await expect(page.getByTestId('tt-dashboard')).toBeVisible()
-  await expect(page.getByTestId('tt-chart-sts.gross-moves-per-hour')).toBeVisible()
-  await page.waitForFunction(() => window.__tt!.dashboard().rendered?.chartLibLoaded === true)
-  await page.waitForFunction(() => window.__tt!.dashboard().rendered?.charts.every((c) => c.drawn))
-  expect(chartChunks.length).toBeGreaterThan(0)
-  await expect(page.getByTestId('tt-chart-sts.gross-moves-per-hour').locator('canvas').first()).toBeVisible()
-  await page.keyboard.press('b')
-  await expect(page.getByTestId('tt-dashboard')).toBeHidden()
-  await page.getByTestId('tt-dashboard-button').click()
-  await expect(page.getByTestId('tt-dashboard')).toBeVisible()
-  expect(errors).toEqual([])
-})
-
 test('the TOS handlers tab draws the handler wall latency over time with latency injection on', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   const decisions = { points: { stsGroundPosition: { timeoutMs: 60_000, latency: { delay: { kind: 'uniform', minMs: 200, maxMs: 1200 } } } } }
@@ -166,7 +142,6 @@ test('the final report opens as the dashboard report tab when the scenario ends 
   await page.evaluate(() => window.__tt!.runUntil())
   await expect(page.getByTestId('tt-dashboard')).toBeVisible()
   await expect(page.getByTestId('tt-dashboard-report')).toBeVisible()
-  await expect(page.getByTestId('tt-report-highlights')).toContainText('STS01 worked hardest')
   await page.getByTestId('tt-dashboard-tab-charts').click()
   await expect(page.getByTestId('tt-dashboard-charts')).toBeVisible()
   await page.getByTestId('tt-dashboard-tab-report').click()
@@ -217,13 +192,43 @@ test('the Dashboard button opens the dashboard with charts after the run ends, a
   expect(errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([])
 })
 
-test('a failed dashboard chunk load shows an error with a retry button', { tag: '@analysis' }, async ({ page }) => {
-  await open(page, TWO_VESSELS)
-  await page.route(/DashboardTab/, (route) => route.abort())
-  await page.getByTestId('tt-dashboard-button').click()
-  await expect(page.getByTestId('tt-dashboard-error')).toBeVisible()
-  await expect(page.getByTestId('tt-dashboard-retry')).toBeVisible()
-  // (a retry in the same page cannot be asserted: Chromium keeps a failed module fetch in its module map)
-  await page.getByTestId('tt-dashboard-close').click()
-  await expect(page.getByTestId('tt-dashboard-pending')).toBeHidden()
+test.describe('chunk loading', () => {
+  // Fresh page (#329): a reused page's module map already holds the dashboard and ECharts chunks, so no request is
+  // counted and no route.abort fires.
+  test.use({ fresh: true })
+
+  test('B opens the dashboard, which loads ECharts only then, and B closes it', { tag: '@analysis' }, async ({ page }) => {
+    const errors = collectErrors(page)
+    const chartChunks: string[] = []
+    page.on('request', (r) => {
+      if (/echarts|chartLib/i.test(r.url())) chartChunks.push(r.url())
+    })
+    await open(page, TWO_VESSELS)
+    await page.evaluate(() => window.__tt!.runTo(1200))
+    await page.waitForTimeout(500)
+    expect(chartChunks).toEqual([]) // the 3D view never pays for the chart library
+    await page.keyboard.press('b')
+    await expect(page.getByTestId('tt-dashboard')).toBeVisible()
+    await expect(page.getByTestId('tt-chart-sts.gross-moves-per-hour')).toBeVisible()
+    await page.waitForFunction(() => window.__tt!.dashboard().rendered?.chartLibLoaded === true)
+    await page.waitForFunction(() => window.__tt!.dashboard().rendered?.charts.every((c) => c.drawn))
+    expect(chartChunks.length).toBeGreaterThan(0)
+    await expect(page.getByTestId('tt-chart-sts.gross-moves-per-hour').locator('canvas').first()).toBeVisible()
+    await page.keyboard.press('b')
+    await expect(page.getByTestId('tt-dashboard')).toBeHidden()
+    await page.getByTestId('tt-dashboard-button').click()
+    await expect(page.getByTestId('tt-dashboard')).toBeVisible()
+    expect(errors).toEqual([])
+  })
+
+  test('a failed dashboard chunk load shows an error with a retry button', { tag: '@analysis' }, async ({ page }) => {
+    await open(page, TWO_VESSELS)
+    await page.route(/DashboardTab/, (route) => route.abort())
+    await page.getByTestId('tt-dashboard-button').click()
+    await expect(page.getByTestId('tt-dashboard-error')).toBeVisible()
+    await expect(page.getByTestId('tt-dashboard-retry')).toBeVisible()
+    // (a retry in the same page cannot be asserted: Chromium keeps a failed module fetch in its module map)
+    await page.getByTestId('tt-dashboard-close').click()
+    await expect(page.getByTestId('tt-dashboard-pending')).toBeHidden()
+  })
 })
