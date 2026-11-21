@@ -5,6 +5,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const ASC = 'asc-1sts-10-boxes-1block'
 const TWO_VESSELS = 'two-vessels-compete-for-berth'
@@ -19,9 +20,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function open(page: Page, fixture: string, options?: Parameters<NonNullable<typeof window.__tt>['load']>[1]): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(([name, opts]) => window.__tt!.load(name as string, opts as never), [fixture, options ?? {}])
+  await openTwin(page, { scenario: fixture, load: options })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
@@ -194,6 +193,7 @@ test('the Landside group charts the truck turnaround metrics and its summary tab
   expect(rows.roadMax).toBe(report.landside.road.maxTrucks)
   expect(rows.heldOutside).toBe(report.landside.holding.heldOutside)
   await expect(page.locator('[data-testid="tt-dashboard-landside"] [data-metric="turnaroundMean"]')).toContainText(/\d/)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/tt-r18-landside-dashboard.png' })
   expect(errors).toEqual([])
 })

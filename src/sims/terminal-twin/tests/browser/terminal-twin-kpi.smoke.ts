@@ -6,6 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { HeadlineKpis } from '../../engine'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openAdvanced, pickScenario } from './scenarioPicker'
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'asc-1sts-10-boxes-1block'
 
@@ -19,9 +20,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function open(page: Page, options?: Parameters<NonNullable<typeof window.__tt>['load']>[1]): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(([name, opts]) => window.__tt!.load(name as string, opts as never), [FIXTURE, options ?? {}])
+  await openTwin(page, { scenario: FIXTURE, load: options })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
@@ -114,8 +113,7 @@ test('the report exports the KPI report and the event log as JSON and CSV downlo
 })
 
 test('the setup dialog end conditions stop the run at the first one met', async ({ page }) => {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   await pickScenario(page, FIXTURE)
   await openAdvanced(page)
   await page.locator('input[name="end-moves"]').fill('3')

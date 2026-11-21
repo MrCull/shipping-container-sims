@@ -5,15 +5,14 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const PEAK = 'TTI Algeciras, peak day'
 
 async function open(page: Page): Promise<void> {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name, { startDateTime: '2026-03-02T08:00:00' }), PEAK)
+  await openTwin(page, { scenario: PEAK, load: { startDateTime: '2026-03-02T08:00:00' } })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   expect(errors).toEqual([])
 }
@@ -50,6 +49,7 @@ test('vessel status: a mooring vessel counts down to 08:30 and a vessel at ancho
   await expect(page.getByTestId('tt-vessel-phase')).toHaveText('Waiting for berth')
   await expect(page.getByTestId('tt-vessel-countdown')).toBeHidden()
   await expect.poll(async () => (await labels(page)).map((l) => `${l.id}:${l.phase}`)).toEqual(['V001:mooring', 'V002:mooring', 'V003:waiting'])
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/vessel-status.png' })
 
   // berthed at 08:30 (1,800 s): the crane starts its first discharge move at the berth time itself (STS102 at 1,800 s on this call),

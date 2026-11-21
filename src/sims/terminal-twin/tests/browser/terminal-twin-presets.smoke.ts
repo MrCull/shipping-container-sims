@@ -5,10 +5,10 @@
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openAdvanced, openSetupTab, pickScenario } from './scenarioPicker'
+import { openTwin } from './openTwin'
 
 async function openDialog(page: Page) {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   // A fresh page opens the dialog itself; only reopen it when a scenario is already loaded.
   if (!(await dialog.isVisible())) await page.getByRole('button', { name: /new scenario/i }).click()

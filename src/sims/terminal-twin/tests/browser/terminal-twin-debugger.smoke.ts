@@ -6,6 +6,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { EngineEvent } from '../../engine'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'shc-1sts-2shc-1wtp'
 
@@ -19,9 +20,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function open(page: Page, fixture = FIXTURE): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), fixture)
+  await openTwin(page, { scenario: fixture })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
