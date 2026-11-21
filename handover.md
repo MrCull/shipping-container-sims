@@ -27,7 +27,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #345 | 22 Asset viewer honours URL switches | none | open | |
 | #346 | 23 Shards balanced by recorded test time | none (blocks #335) | open | |
 | #347 | 24 bg.sh cleans up its process group | none | open | |
-| #348 | 25 CI smoke per merge, frame-loop review rule, doc fixes | none (blocks #339) | in progress | implementer-348 |
+| #348 | 25 CI smoke per merge, frame-loop review rule, doc fixes | none (blocks #339) | merged in branch (7cafd11) | |
 | #340 | 20 Final smoke run and timing report | all | open | |
 
 ## Next steps
