@@ -1,6 +1,6 @@
 # Browser host
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.54.0.
 
 Read this when you change the engine Web Worker or its protocol, playback and time controls, `SceneModel`, the Pinia
 store, any component or composable, the dashboard, debugger, inspector, picking, overlays, bay viewer, Colour by,
@@ -354,6 +354,17 @@ in the vessel inspector; X or Esc closes; a new scenario closes it. Text: `bayVi
   notation and POL, POD, ISO type, line, direction, weight, weight class. Strip lists bays bow first; it opens on the
   first bay with work (`defaultBay`). Packages show crane, state and done of planned (hatch steps have no count).
 - Limits: cannot be moved; a snapshot from before spec #106 shows boxes without properties.
+
+### Crane plan view (#288)
+
+A Bays | Crane plan switch (`tt-bay-mode`) sits at the top of the bay viewer; `store.bayViewMode` keeps it for the run (back to
+Bays at a run start). Crane plan shows the whole vessel: bays across in quay order, time down, a band per crane, a bar per
+package (actual times once started, a dashed ghost where it drifted from the plan), predicted conflicts, neighbouring
+vessels' cranes as obstacle lines and a now line. Every bay column is headed by its crane id and each crane has a stable colour (`craneColour`: the number in its id modulo 8, on the `--tt-data-*` tokens); hovering a crane (column head, bar or key entry) highlights all its packages, a click pins that and selects the crane in the 3D view (`store.select`). The key sits right of the chart when the panel is at least 640 px wide (a container query), else under it, and lists the cranes with their bays and every mark. While Crane plan is shown the viewer floats: drag the header, resize from the corner handle (`composables/useFloatingPanel.ts`, clamped to the scene, geometry kept in `localStorage` under `tt.cranePlan.panel`, guarded); the Bays view keeps its fixed placement. Time ticks fall on whole hours when at most 14 fit (`timeTicks`), bars show their move count when tall enough and the now line carries its time. The Discharge | Load switch and the remaining counts belong to Bays and are
+hidden in Crane plan. A package click calls `showBayFromPlan`. Data: worker query `cranePlan` (read at the viewer's 1 s
+refresh, engine time, not display time); model: `modules/cranePlanView.ts` (tests: `tests/crane-plan.test.ts`, smoke
+`tests/browser/crane-plan.smoke.ts`). The dashboard Gantt draws each crane's packages as bars coloured by kind (phases
+`package`, `packageLoad`, `packageHatch`). The final report has a Plan accuracy table (`planAccuracy` query).
 
 ## Colour by and the ROB display
 

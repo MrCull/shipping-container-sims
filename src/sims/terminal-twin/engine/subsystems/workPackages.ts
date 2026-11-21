@@ -19,6 +19,7 @@ import { compareKeys, loadSequenceKey } from '../../scenario/exportYard'
 import { resolveContainerProps } from '../../scenario/containerProps'
 import { countDischargeSplits, countLoadBreaks, orderDischarge, orderLoad, stowSequenceOf, vesselOrderingOf } from '../vesselOrdering'
 import { continueWork } from './quay'
+import { cranePackageIds, maybeReplan } from '../cranePlan/plan'
 import { pumpLoadPrep } from './loadPrep'
 import { raiseEmptiesRequired } from './empties'
 import { hatchActive, hatchBlocker, hatchOpenPanel, openingPanels, prepareHatches, startHatchJob, waitForHatch } from './hatch'
@@ -51,7 +52,7 @@ export const packageMoves = (p: WorkPackage): number => (p.emptyReq ? p.emptyReq
 const section = (deck: boolean): 'deck' | 'hold' => (deck ? 'deck' : 'hold')
 
 /** The crane's packages in work order. */
-export const packagesOf = (state: SimState, sts: StsState): WorkPackage[] => sts.packageIds.map((id) => state.workPackages[id])
+export const packagesOf = (state: SimState, sts: StsState): WorkPackage[] => cranePackageIds(state, sts).map((id) => state.workPackages[id])
 
 /** Create the packages of a crane for its bays of a vessel (all `planned`). */
 export function createPackages(ctx: EngineContext, sts: StsState, vesselId: string, bays: number[]): void {
@@ -303,7 +304,10 @@ export function createLoadOrders(state: SimState, pkg: WorkPackage): void {
 
 export const workPackageReactors: ReactorMap = {
   WorkPackageStarted: (e, ctx) => askRelease(ctx, ctx.state.sts[e.payload.stsId]),
-  WorkPackageCompleted: (e, ctx) => askRelease(ctx, ctx.state.sts[e.payload.stsId]),
+  WorkPackageCompleted: (e, ctx) => {
+    maybeReplan(ctx, e.payload.vesselId) // v1 policy: keep the plan
+    askRelease(ctx, ctx.state.sts[e.payload.stsId])
+  },
 
   DecisionResolved: (e, ctx) => {
     if (e.payload.decisionPoint !== 'workPackageRelease') return

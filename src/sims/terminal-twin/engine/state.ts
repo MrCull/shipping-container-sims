@@ -3,6 +3,7 @@
  * instances, Maps or functions) so a snapshot is a deep copy of it, and it
  * includes the event queue, RNG state and running event-log hash.
  */
+import type { CranePlanRecord } from './cranePlan/types'
 import { createDecisionState, type DecisionState } from './decisions/runtime'
 import { yardGroupingOn } from './decisions/yardGrouping'
 import type { EngineEvent } from './events'
@@ -794,6 +795,9 @@ export interface WorkPackage {
   emptyReq?: EmptiesRequirement
   /** Hatch packages (TT-R09): the panel this package removes or replaces. */
   hatchPanelId?: string
+  /** Crane plan (#288): the start and end predicted when the plan was made (never changed afterwards). */
+  predictedStartS?: number
+  predictedEndS?: number
 }
 
 export interface EmptiesRequirement {
@@ -980,6 +984,8 @@ export interface SimState {
   yardSlots: Record<string, YardSlotState>
   workPackages: Record<string, WorkPackage>
   nextWorkPackage: number
+  /** Crane plans (#288), by vessel id. */
+  cranePlans: Record<string, CranePlanRecord>
   /** Hatch panels of the vessels' bays, by id (TT-R09). Not containers. */
   hatchPanels: Record<string, HatchPanelState>
   /** Laydown bays in use on the quay (created on first use). */
@@ -1177,6 +1183,7 @@ export function createInitialState(
     yardSlots: {},
     workPackages: {},
     nextWorkPackage: 0,
+    cranePlans: {},
     hatchPanels: {},
     hatchLaydown: {},
     emptiesAsking: null,

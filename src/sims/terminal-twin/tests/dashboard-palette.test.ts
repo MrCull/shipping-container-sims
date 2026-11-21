@@ -28,7 +28,7 @@ describe('dashboard palette', () => {
     expect(light.surface).toBe('#fcfcfb')
     expect(light.series.join(',')).toBe('#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300,#6250d6,#e34948')
     expect(light.series).toHaveLength(MAX_SERIES)
-    expect(Object.values(light.phases)).toEqual(light.series.slice(0, 5))
+    expect(Object.values(light.phases)).toEqual(light.series.slice(0, 7))
     expect(seriesStyle(0, 'light').colour).toBe('#2a78d6')
     expect(seriesStyle(0, 'light').symbol).toBe(seriesStyle(0).symbol)
     expect(chartPalette().series).toBe(SERIES_COLOURS)
@@ -50,7 +50,7 @@ describe('dashboard palette', () => {
   it('gives every Gantt phase a distinct colour and a distinct pattern', () => {
     const colours = Object.values(PHASE_COLOURS)
     expect(new Set(colours).size).toBe(colours.length)
-    // the first five validated slots, in order (validated as a set with the skill's script)
+    // the first seven validated slots, in order (validated as a set with the skill's script)
     expect(colours).toEqual(SERIES_COLOURS.slice(0, colours.length))
     const patterns = Object.values(PHASE_PATTERNS).map((p) => `${p.symbol}/${p.rotation}`)
     expect(new Set(patterns).size).toBe(patterns.length)

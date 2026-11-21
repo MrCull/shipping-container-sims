@@ -156,7 +156,7 @@ test('the Gantt timeline shows the berth and anchorage windows of the two-vessel
   expect(vessels.filter((v) => v.anchorageWaitS > 0)).toHaveLength(1)
   // the legend names every phase in words, and the table view lists the windows
   await expect(page.getByTestId('tt-gantt-legend')).toContainText('Anchorage')
-  await expect(page.getByTestId('tt-gantt-legend')).toContainText('Crane work package')
+  await expect(page.getByTestId('tt-gantt-legend')).toContainText('Discharge package')
   expect(errors).toEqual([])
 })
 

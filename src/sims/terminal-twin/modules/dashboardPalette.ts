@@ -85,6 +85,8 @@ export const PHASE_COLOURS = {
   package: '#199e70',
   mooring: '#c98500',
   unmooring: '#d55181',
+  packageLoad: '#008300',
+  packageHatch: '#9085e9',
 } as const
 
 export type TimelinePhase = keyof typeof PHASE_COLOURS
@@ -96,6 +98,8 @@ export const PHASE_PATTERNS: Record<TimelinePhase, { symbol: string; rotation: n
   work: { symbol: 'none', rotation: 0 },
   unmooring: { symbol: 'rect', rotation: -Math.PI / 4 },
   package: { symbol: 'triangle', rotation: 0 },
+  packageLoad: { symbol: 'rect', rotation: 0 },
+  packageHatch: { symbol: 'cross', rotation: 0 },
 }
 
 /** Everything a chart needs to draw in one theme: surface, data colours and the ink for text and grid lines. */

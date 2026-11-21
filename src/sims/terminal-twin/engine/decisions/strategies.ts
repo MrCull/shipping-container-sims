@@ -305,6 +305,10 @@ export const strategies: StrategyRegistry = {
         description: 'Up to max STS free cranes nearest the vessel; contiguous bay ranges with near-equal moves.',
         handler: (msg) => balancedMovesSplit(msg.payload),
       },
+      'as-today': {
+        description: 'The crane plan as it was before the plan module (#288): the balanced-moves split with the package order unchanged.',
+        handler: (msg) => balancedMovesSplit(msg.payload),
+      },
       'equal-bays': {
         description: 'Up to max STS free cranes nearest the vessel; contiguous bay ranges with equal numbers of bays.',
         handler: (msg) => equalBaysSplit(msg.payload),
