@@ -11,7 +11,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #325 | 03 `openTwin` helper, first migration | #322 | merged in branch (bd45064) | |
 | #326 | 18 Rendering-budget guard | #322 | merged in branch (8057771) | |
 | #327 | 08 Six balanced shards | #321, #323 | merged in branch (317720c) | |
-| #328 | 04 Migrate remaining specs | #325 | in progress | implementer-328 |
+| #328 | 04 Migrate remaining specs | #325 | merged in branch (1aab4c3) | |
 | #329 | 05 One page per worker | #328 | open | |
 | #330 | 07 Groups, tags, selection script | #328 | open | |
 | #331 | 11 Headless scene, parity, vessel moves | #328 | open | |
