@@ -60,10 +60,10 @@ test('the alarm voice sounds only while a crane gantries and follows the camera'
   const id = await playUntilGantrying(page)
   await page.evaluate((e) => window.__tt!.cameraTo(e, 60), id)
 
-  // audible near the camera
-  await page.waitForFunction((e) => window.__tt!.atmosphere().positional.voices.some((v) => v.key === `gantryAlarm:${e}`), id, { timeout: 15_000 })
-  const near = (await page.evaluate(() => window.__tt!.atmosphere())).positional.voices.find((v) => v.key === `gantryAlarm:${id}`)!
-  expect(near.gain).toBeGreaterThan(0.2)
+  // audible near the camera: poll, since cameraTo eases over several frames and the gain follows the camera (frame-loop read)
+  await expect
+    .poll(async () => (await page.evaluate(() => window.__tt!.atmosphere())).positional.voices.find((v) => v.key === `gantryAlarm:${id}`)?.gain ?? 0, { timeout: 15_000 })
+    .toBeGreaterThan(0.2)
 
   // pausing stops the crane: no machine voices (the ambience stays)
   await page.evaluate(() => window.__tt!.pause())
