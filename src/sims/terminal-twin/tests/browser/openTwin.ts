@@ -56,7 +56,8 @@ export async function openTwin(page: Page, options: OpenTwinOptions = {}): Promi
   const url = twinUrl(options)
   if (options.viewport) await page.setViewportSize(options.viewport)
   const devApi = options.devApi ?? true
-  const reuse = options.freshPage === false && new URL(page.url(), 'http://x').pathname + new URL(page.url(), 'http://x').search === url
+  const current = new URL(page.url(), 'http://localhost')
+  const reuse = options.freshPage === false && current.pathname + current.search === url
   if (!reuse) await page.goto(url)
   if (!devApi) {
     await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeVisible()
