@@ -260,12 +260,12 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
   font-size: 10px;
   color: var(--band);
 }
-.crane-0 { --band: #4f9dde; }
-.crane-1 { --band: #e0a030; }
-.crane-2 { --band: #5cb85c; }
-.crane-3 { --band: #c065c0; }
-.crane-4 { --band: #d9534f; }
-.crane-5 { --band: #3bb7b0; }
+.crane-0 { --band: var(--tt-data-0); }
+.crane-1 { --band: var(--tt-data-1); }
+.crane-2 { --band: var(--tt-data-2); }
+.crane-3 { --band: var(--tt-data-3); }
+.crane-4 { --band: var(--tt-data-4); }
+.crane-5 { --band: var(--tt-data-5); }
 .bar {
   position: absolute;
   padding: 0;
@@ -299,8 +299,8 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
 }
 .conflict {
   position: absolute;
-  background: color-mix(in srgb, #d9534f 35%, transparent);
-  border: 1px solid #d9534f;
+  background: color-mix(in srgb, var(--tt-danger) 35%, transparent);
+  border: 1px solid var(--tt-danger);
   z-index: 2;
 }
 .obstacle {
