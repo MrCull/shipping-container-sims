@@ -697,6 +697,16 @@ h3 {
   background-image: linear-gradient(90deg, var(--tt-hatch) 0 2px, transparent 2px 5px);
 }
 
+.pattern-packageLoad {
+  background-image: linear-gradient(0deg, var(--tt-hatch) 0 2px, transparent 2px 5px);
+}
+
+.pattern-packageHatch {
+  background-image:
+    linear-gradient(90deg, var(--tt-hatch) 0 1px, transparent 1px 5px),
+    linear-gradient(0deg, var(--tt-hatch) 0 1px, transparent 1px 5px);
+}
+
 .table-view {
   margin-top: 0.4rem;
   font-size: 0.8rem;

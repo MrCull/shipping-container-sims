@@ -1,6 +1,6 @@
 # CLI and tooling
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.54.0.
 
 Read this when you run or change a `pnpm run tt:*` command or a file in `cli/`, need a flag, an output format or an
 exit code, or want to run heavy jobs (peak-day runs, the smoke suite) without colliding with other agents.
@@ -21,6 +21,7 @@ module that takes `argv` and a `print` callback, so tests call the logic directl
 | `tt:golden` | `cli/golden-cli.ts` -> `cli/golden.ts#runGoldenCli` | Check or rewrite fixture golden summaries |
 | `tt:fixtures` | `cli/build-fixtures.ts` | Regenerate every fixture JSON from `definitions.ts` |
 | `tt:sts` | `cli/sts.ts#runStsCli` | STS productivity buckets from a saved event log |
+| `tt:plan` | `cli/plan.ts` -> `cli/planCli.ts#runPlanCli` | A vessel's crane plan as a text table with predicted conflict windows; `--until` adds actual times and plan accuracy (#288) |
 | `tt:profile` | `cli/profile.ts` -> `cli/profileCli.ts#runProfileCli` | Where a run's time goes (hourly moves, idle shares, box waits) |
 | `tt:baseline` | `cli/baselineCli.ts` -> `cli/baseline.ts#baselineMain` (+ `cli/headlessPose.ts`, `tests/browser/terminal-twin-baseline.smoke.ts`) | Frame-rate baseline (#246): posing ms per frame at the Overview camera in Node, plus achieved sim s per wall s per speed step x60 to x3600 for the engine in its worker in headless Chromium, no rendering. Local only, heavy (run it under `scripts/bg.sh run --heavy`). `--skip-rate` / `--skip-posing` / `--out <file>`. Numbers go in `docs/optimising/frame-rate.md` |
 | `tt:bench` | `cli/bench.ts` -> `cli/benchCli.ts#benchMain` (+ `cli/benchmark.ts`) | Engine speed benchmark against `perf/baseline.json` (local only) |

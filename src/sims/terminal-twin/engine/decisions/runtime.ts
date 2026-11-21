@@ -169,7 +169,7 @@ const nowMs = () => performance.now()
 export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntime {
   const { getState, asyncMode, query } = deps
   const scale = deps.config?.simSecondsPerWallSecond ?? 1
-  const pointConfig = (dp: DecisionPointId): DecisionPointConfig => deps.config?.points?.[dp] ?? {}
+  const pointConfig = (dp: DecisionPointId): DecisionPointConfig => deps.config?.points?.[dp] ?? (dp === 'craneSplit' ? deps.config?.points?.cranePlan : undefined) ?? {}
   const timeoutMs = (dp: DecisionPointId) => pointConfig(dp).timeoutMs ?? DEFAULT_DECISION_TIMEOUT_MS
 
   // Resolve every decision point's handler and fallback up front, so a bad

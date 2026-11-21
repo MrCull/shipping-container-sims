@@ -214,6 +214,8 @@ const PHASE_LABELS: Record<TimelinePhase, MessageKey> = {
   work: 'dashboard.gantt.work',
   unmooring: 'dashboard.gantt.unmooring',
   package: 'dashboard.gantt.package',
+  packageLoad: 'dashboard.gantt.packageLoad',
+  packageHatch: 'dashboard.gantt.packageHatch',
 }
 
 export const phaseLabelKey = (p: TimelinePhase): MessageKey => PHASE_LABELS[p]
@@ -233,10 +235,19 @@ export function buildGanttModel(timeline: TimelineReport): GanttModel {
     push(vr, 'unmooring', v.unmooring.startS, v.unmooring.endS, v.vesselId)
     for (const p of v.packages) {
       const cr = rows.push({ id: `${v.vesselId}:${p.stsId}`, label: `${v.vesselId} · ${p.stsId}`, kind: 'crane' }) - 1
-      push(cr, 'package', p.startS, p.endS, t('dashboard.gantt.bays', { bays: bayRange(p.bays) }))
+      // #288: the actual work packages of the crane, coloured by kind (what happened across the quay)
+      const worked = v.workPackages.filter((w) => w.stsId === p.stsId)
+      if (worked.length === 0) push(cr, 'package', p.startS, p.endS, t('dashboard.gantt.bays', { bays: bayRange(p.bays) }))
+      for (const w of worked)
+        push(cr, w.kind === 'discharge' ? 'package' : w.kind === 'load' ? 'packageLoad' : 'packageHatch', w.startS, w.endS, packageDetail(w))
     }
   }
   return { rows, bars, endS: timeline.nowS }
+}
+
+/** Hover text of a package bar: kind, section, bay and moves. */
+function packageDetail(w: { kind: string; section: string; bay: number; moves: number }): string {
+  return t('dashboard.gantt.packageDetail', { kind: t(`bayViewer.pkg.${w.kind}` as MessageKey), section: t(`bayViewer.${w.section}` as MessageKey), bay: w.bay, moves: w.moves })
 }
 
 export function bayRange(bays: readonly number[]): string {
@@ -345,6 +356,16 @@ function patternFill(phase: TimelinePhase): { image: HTMLCanvasElement; repeat: 
       } else if (spec.symbol === 'triangle') {
         ctx.moveTo(size / 2, 0)
         ctx.lineTo(size / 2, size)
+        ctx.stroke()
+      } else if (spec.symbol === 'cross') {
+        ctx.moveTo(0, size / 2)
+        ctx.lineTo(size, size / 2)
+        ctx.moveTo(size / 2, 0)
+        ctx.lineTo(size / 2, size)
+        ctx.stroke()
+      } else if (spec.symbol === 'rect' && spec.rotation === 0) {
+        ctx.moveTo(0, size / 2)
+        ctx.lineTo(size, size / 2)
         ctx.stroke()
       } else if (spec.rotation > 0) {
         ctx.moveTo(0, size)

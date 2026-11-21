@@ -1,6 +1,6 @@
 # Quay subsystem: vessels, berths, STS cranes, hatch covers
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.54.0.
 
 Read this when you change or tune anything between a vessel's arrival and its departure: berth allocation, the
 crane split, the shared STS rail, the STS discharge and load cycles, work packages, the vessel work order (POD and
@@ -87,6 +87,30 @@ ascending bay list.
 bay lists, bay ranges out of rail order, bays not exactly covering the work bays, a busy crane between the assigned
 ones, or a busy crane that would have to pass them. On acceptance each crane gets `createPackages`, `askRelease` and
 `continueWork` (a crane that was stepping aside drops that; a repositioning crane starts at `StsRepositionCompleted`).
+
+### Crane plan (`engine/cranePlan/`, #288)
+
+The crane split and the package order of one vessel are one **plan**, `SimState.cranePlans[vesselId]`: strategy, revision,
+per crane its bays and ordered package ids, the predicted conflict seconds and the rail wait counters used by the accuracy
+report. Each package carries `predictedStartS` / `predictedEndS` (set once, never changed). The plan adds no events and
+no event payload changed, so every event log and golden is byte-identical (no `ENGINE_VERSION` bump).
+
+- `plan.ts`: `registerCrane` (called per assigned crane right after `createPackages`) and `finishPlan` (after the last
+  crane: validates, predicts times, predicts conflicts) in the `craneSplit` reactor of `berth.ts`; `cranePackageIds` (the
+  engine reads a crane's next package from the plan, `packagesOf`); `readCranePlan` (the plan read: times of the
+  remaining packages recalculated lazily from each crane's position and active package, planned times kept beside them);
+  `planAccuracy`; the re-plan hook `maybeReplan` called at `WorkPackageCompleted` (v1 policy `keepPolicy`: keep).
+- `estimate.ts`: `estimateTimes`: moves x nominal STS cycle, hatch cycle for a hatch package, gantry travel between bays.
+  An optimistic lower bound (no horizontal transport delay). `validate.ts`: `validatePlan` (bays covered once in rail order,
+  each crane's packages are exactly its bays', hatch off before hold work and on after hold load, a shared cell's
+  discharge before its load, stacks load bottom up, a package no longer `planned` keeps its place). `conflicts.ts`:
+  `predictConflicts` (windows where neighbouring cranes' planned gantry paths are closer than `stsMinSpacingM`).
+- The decision point stays `craneSplit` in the event log (reply = assignments); `cranePlan` is accepted as an alias in
+  `decisions.points` and `--strategy cranePlan=...`. Strategies: `balanced-moves` (default), `as-today` (the same),
+  `equal-bays`. A strategy that supplies its own package order needs the reply and request to carry packages, which changes
+  the event log: a successor ticket with an `ENGINE_VERSION` bump.
+- Reads: `Simulation.cranePlan(vesselId)`, `planAccuracy()`; worker query kinds `cranePlan`, `planAccuracy`; the bay viewer's
+  Crane plan view (`modules/cranePlanView.ts`, `components/CranePlanView.vue`); CLI `pnpm run tt:plan`.
 
 ## Vessel geometry, slots and the hull profile
 

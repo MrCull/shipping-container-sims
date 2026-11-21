@@ -23,6 +23,7 @@
     "tt:baseline": "tsx src/sims/terminal-twin/cli/baselineCli.ts",
     "tt:diff": "tsx src/sims/terminal-twin/cli/diff.ts",
     "tt:sts": "tsx src/sims/terminal-twin/cli/sts.ts",
+    "tt:plan": "tsx src/sims/terminal-twin/cli/plan.ts",
     "tt:profile": "tsx src/sims/terminal-twin/cli/profile.ts",
     "tt:golden": "tsx src/sims/terminal-twin/cli/golden-cli.ts",
     "test:smoke": "playwright test",

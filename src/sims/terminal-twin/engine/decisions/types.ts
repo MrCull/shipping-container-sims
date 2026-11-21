@@ -591,7 +591,10 @@ export interface DecisionsConfig {
    * sim seconds per wall second (default 1 = real time).
    */
   simSecondsPerWallSecond?: number
-  points?: { [K in DecisionPointId]?: DecisionPointConfig }
+  points?: { [K in DecisionPointId]?: DecisionPointConfig } & {
+    /** Alias of `craneSplit` (#288): the crane plan strategy. `craneSplit` wins when both are set. */
+    cranePlan?: DecisionPointConfig
+  }
 }
 
 export const DEFAULT_DECISION_TIMEOUT_MS = 5000

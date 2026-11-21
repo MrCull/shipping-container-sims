@@ -34,6 +34,7 @@ import {
 } from '../../scenario/vesselClasses'
 import { releaseRail, reserveRail, startReposition, wakeRail } from './rail'
 import type { PredictedReady } from '../predictions'
+import { cranePackageIds } from '../cranePlan/plan'
 import { stsCycleGeometry, stsNominalCycle } from '../cycleTime'
 import { hatchEnabled, hatchSettings } from '../hatch'
 import { pumpLoadPrep, slotGantryX } from './loadPrep'
@@ -261,7 +262,7 @@ export function predictedGroundings(ctx: Pick<EngineContext, 'state' | 'config'>
     const hatchS = isInstant(ctx) ? 0 : hatchSettings(config, state.vessels[sts.vesselId].sizeClass).cycleS
     const carried = new Set(sts.carrying)
     let upcoming = 0
-    for (const id of sts.packageIds) {
+    for (const id of cranePackageIds(state, sts)) {
       const pkg = state.workPackages[id]
       if (pkg.status === 'complete') continue
       if (pkg.kind === 'load') break
