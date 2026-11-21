@@ -28,9 +28,14 @@ interface TwinWorkerFixtures {
 
 const DEFAULT_VIEWPORT = { width: 1280, height: 720 }
 
+/** Node's environment (this helper is also type-checked by the app config, which has no Node types). */
+function env(): Record<string, string | undefined> {
+  return (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
+}
+
 export const test = base.extend<TwinTestOptions, TwinWorkerFixtures>({
   // SMOKE_FRESH_PAGES=1 gives every test a fresh page (the pre-#329 behaviour), to compare timings or rule out a leak.
-  fresh: [process.env.SMOKE_FRESH_PAGES === '1', { option: true }],
+  fresh: [env().SMOKE_FRESH_PAGES === '1', { option: true }],
   sharedTwinPage: [
     async ({ browser }, use, workerInfo) => {
       const { baseURL, viewport } = workerInfo.project.use
