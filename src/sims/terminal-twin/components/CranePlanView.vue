@@ -12,7 +12,7 @@ import { t, type MessageKey } from '../i18n/messages'
 const store = useTwinStore()
 
 const COL_PX = 46
-const GUTTER_PX = 52
+const GUTTER_PX = 70
 const MAX_HEIGHT_PX = 420
 const MIN_HEIGHT_PX = 140
 
@@ -239,7 +239,8 @@ const conflictTitle = (c: { stsA: string; stsB: string; obstacle: boolean; fromS
 .tick {
   position: absolute;
   left: 0;
-  width: 48px;
+  width: 66px;
+  white-space: nowrap;
   font-size: 10px;
   color: var(--tt-text-muted);
   transform: translateY(-50%);

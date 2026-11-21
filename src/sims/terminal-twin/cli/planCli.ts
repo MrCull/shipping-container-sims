@@ -10,8 +10,7 @@
  * Exit codes: 0 ok, 1 the vessel never got a plan (or the run failed), 2 usage error.
  */
 import { parseArgs } from 'node:util'
-import { createSimulation } from '../engine'
-import { getStrategy } from '../engine/decisions/strategies'
+import { createSimulation, getStrategy } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
 import { formatCranePlan, formatPlanAccuracy } from './planFormat'
