@@ -1,5 +1,6 @@
 /**
- * V11-10 browser smoke test: the setup dialog's Subsystem modes fieldset.
+ * V11-10 browser smoke test: the setup dialog's Subsystem modes fieldset, wired to the running twin. The fieldset's
+ * defaults and the request Start sends are the component test (tests/components/setup-dialog.test.ts, #332).
  * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
 import { expect, test } from '@playwright/test'
@@ -18,7 +19,6 @@ test('quay, berth and yard modes set in the dialog reach the config and the run 
   await openSetupTab(dialog, 'yard')
   const modes = dialog.getByTestId('tt-subsystem-modes')
   await modes.scrollIntoViewIfNeeded()
-  await expect(modes.getByTestId('tt-mode-quay-real')).toBeChecked()
   await modes.getByTestId('tt-mode-quay-instant').check()
   await modes.getByTestId('tt-mode-berth-off').check()
   await modes.getByTestId('tt-mode-yard-instant').check()

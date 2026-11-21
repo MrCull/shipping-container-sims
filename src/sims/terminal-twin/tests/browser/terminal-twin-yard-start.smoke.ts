@@ -34,8 +34,7 @@ test('the dialog defaults to a pre-filled yard and the run starts with boxes in 
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   const dialog = await openDialog(page)
-  await expect(dialog.getByTestId('tt-yard-start-prefilled')).toBeChecked()
-  await expect(dialog.getByTestId('tt-yard-target')).toHaveValue('60')
+  // the defaults (pre-filled, 60 %) are the component test (tests/components/setup-dialog.test.ts, #332)
   await dialog.getByTestId('tt-yard-target').fill('30')
   await dialog.getByRole('button', { name: 'Start', exact: true }).click()
   await expect(dialog).toBeHidden()

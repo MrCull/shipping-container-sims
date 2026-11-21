@@ -1,7 +1,10 @@
 import { defineConfig } from 'vitest/config'
+import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
+  // Component tests (`tests/components/`) mount `.vue` files.
+  plugins: [vue()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -10,6 +13,7 @@ export default defineConfig({
   test: {
     // Only this checkout's sources (never .claude/worktrees/*).
     include: ['src/**/*.test.ts'],
+    // Node for every file; a component test opts in to the DOM per file with a `// @vitest-environment happy-dom` first line.
     environment: 'node',
     // Heavy engine runs (TTI preset, goldens, benchmarks) exceed the 5 s default when the machine is busy (parallel agents, CI).
     testTimeout: 60_000,
