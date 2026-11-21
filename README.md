@@ -90,7 +90,7 @@ This repo is a **Vue 3 + TypeScript** app: **Vite**, **Pinia**, **Vue Router**, 
 ```
 src/
 ├── assets/              # Global CSS, fonts, design tokens
-├── components/          # Shared UI (SimCard, HeroBackground, …)
+├── components/          # Shared UI (GameTile, AudioControls, …)
 ├── composables/         # useThreeScene, useSimRegistry, useMenuMusic
 ├── pages/               # HomePage, SimPage
 ├── router/

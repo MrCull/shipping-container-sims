@@ -146,7 +146,7 @@ src/
     useThreeScene.ts            # shared baseline Three.js setup
     useSimRegistry.ts           # auto-discovers sims
     useMenuMusic.ts             # main-menu music
-  components/                   # shared UI components (SimCard, etc.)
+  components/                   # shared UI components (GameTile, etc.)
   stores/                       # shared Pinia stores
   types/                        # shared interfaces (SimDefinition, etc.)
 ```

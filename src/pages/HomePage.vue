@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useSimsStore } from '@/stores/sims'
 import { useSimRegistry } from '@/composables/useSimRegistry'
 import { setHomePageMeta } from '@/composables/useSiteHead'
 import { useMenuMusic } from '@/composables/useMenuMusic'
-import HeroBackground from '@/components/HeroBackground.vue'
-import SimCard from '@/components/SimCard.vue'
-import FutureGameCard from '@/components/FutureGameCard.vue'
+import GameTile from '@/components/GameTile.vue'
 import GithubRepoLink from '@/components/GithubRepoLink.vue'
 import AudioControls from '@/components/AudioControls.vue'
 import { futureGameTeasers } from '@/data/future-game-teasers'
 import { trackEvent } from '@/utils/analytics'
 import { formatBuildStamp } from '@/utils/buildStamp'
+import { orderWithFeaturedFirst, readLastPlayed } from '@/utils/lastPlayed'
 
 const buildStamp = formatBuildStamp({
   buildTime: __BUILD_TIME__,
@@ -22,15 +21,49 @@ const store = useSimsStore()
 const { registerAll } = useSimRegistry()
 const cookieNoticeVisible = ref(false)
 const cookieConsentKey = 'shipping-container-sims-cookie-notice-dismissed'
+const lastPlayedId = ref<string | null>(null)
+
+/** Playable games, the one opened last first (it becomes the big tile). */
+const games = computed(() => orderWithFeaturedFirst(store.playable, lastPlayedId.value))
+const playableCount = computed(() => store.playable.length)
+
+/** Not-yet-playable sims and the future game teasers, shown together as quiet chips. */
+const stillBeingBuilt = computed(() => [
+  ...store.comingSoon.map(s => ({ id: s.id, title: s.title, tagline: s.tagline })),
+  ...futureGameTeasers.map(t => ({ id: t.id, title: t.title, tagline: t.tagline })),
+])
 
 useMenuMusic()
 
 onMounted(() => {
   setHomePageMeta()
   registerAll()
+  lastPlayedId.value = readLastPlayed()
+  setAudioPopoverTheme(true)
 
   cookieNoticeVisible.value = window.localStorage.getItem(cookieConsentKey) !== 'true'
 })
+
+/** The volume popover is teleported to <body>, outside this page: theme it light through its CSS variables. */
+const AUDIO_POPOVER_THEME: Record<string, string> = {
+  '--audio-popover-bg': '#ffffff',
+  '--audio-popover-border': '#d3d9e3',
+  '--audio-popover-text': '#0d1b2e',
+  '--audio-popover-accent': '#1f6fd1',
+  '--audio-popover-active-border': '#1f6fd1',
+  '--audio-popover-active-bg': 'rgba(31, 111, 209, 0.12)',
+  '--audio-popover-shadow': '0 10px 30px rgba(13, 27, 46, 0.18)',
+}
+
+function setAudioPopoverTheme(on: boolean): void {
+  const style = document.documentElement.style
+  for (const [name, value] of Object.entries(AUDIO_POPOVER_THEME)) {
+    if (on) style.setProperty(name, value)
+    else style.removeProperty(name)
+  }
+}
+
+onUnmounted(() => setAudioPopoverTheme(false))
 
 function dismissCookieNotice(): void {
   cookieNoticeVisible.value = false
@@ -43,108 +76,80 @@ function dismissCookieNotice(): void {
 
 <template>
   <div class="home">
-    <header class="hero">
-      <HeroBackground />
-      <AudioControls />
-      <div class="hero-content">
-        <h1 class="hero-title">
-          <span class="title-line">SHIPPING</span>
-          <span class="title-line accent">CONTAINER</span>
-          <span class="title-line">SIMS</span>
-        </h1>
-        <p class="hero-sub">
-          Stack &bull; Ship &bull; Simulate
+    <div class="wrap">
+      <header class="top">
+        <div class="logo">
+          SHIPPING <b>CONTAINER</b> SIMS
+        </div>
+        <nav class="top-nav">
+          <GithubRepoLink variant="header" />
+          <AudioControls
+            placement="inline"
+            show-level
+          />
+        </nav>
+      </header>
+
+      <section class="head">
+        <h1>Games about the<br><span>boxes</span> that move the world.</h1>
+        <p>
+          Stack them, stow them, run the port.
+          <template v-if="playableCount">
+            {{ playableCount }} free games,
+          </template>
+          straight in your browser.
         </p>
-        <div class="hero-divider">
+      </section>
+
+      <main>
+        <section
+          v-if="games.length"
+          class="wall"
+          aria-label="Games"
+        >
+          <GameTile
+            v-for="(sim, index) in games"
+            :key="sim.id"
+            :sim="sim"
+            :featured="index === 0"
+            :resume="index === 0 && sim.id === lastPlayedId"
+          />
+        </section>
+
+        <section
+          v-if="stillBeingBuilt.length"
+          class="later"
+          aria-label="Still being built"
+        >
+          <span class="later-label">STILL BEING BUILT</span>
           <span
-            v-for="n in 20"
-            :key="n"
-            class="divider-pixel"
-          />
-        </div>
-      </div>
-    </header>
+            v-for="item in stillBeingBuilt"
+            :key="item.id"
+            class="chip"
+          ><b>{{ item.title }}</b>{{ item.tagline }}</span>
+        </section>
 
-    <main class="content">
-      <section
-        v-if="store.playable.length"
-        class="sim-section"
-      >
-        <h2 class="section-title">
-          <span class="blink">►</span> READY TO PLAY
-        </h2>
-        <div class="sim-grid">
-          <SimCard
-            v-for="sim in store.playable"
-            :key="sim.id"
-            :sim="sim"
-          />
-        </div>
-      </section>
-
-      <section
-        v-if="store.comingSoon.length"
-        class="sim-section"
-      >
-        <h2 class="section-title">
-          <span class="lock-icon">🔒</span> COMING SOON
-        </h2>
-        <div class="sim-grid">
-          <SimCard
-            v-for="sim in store.comingSoon"
-            :key="sim.id"
-            :sim="sim"
-          />
-        </div>
-      </section>
-
-      <section class="sim-section future-section">
-        <h2 class="section-title">
-          <span class="horizon-icon">◇</span> ON THE HORIZON
-        </h2>
-        <p class="section-lede">
-          Planned games&mdash;no release dates yet. These are teasers, not playable builds.
-        </p>
-        <div class="sim-grid">
-          <FutureGameCard
-            v-for="teaser in futureGameTeasers"
-            :key="teaser.id"
-            :teaser="teaser"
-          />
-        </div>
-      </section>
-
-      <section
-        v-if="cookieNoticeVisible"
-        class="cookie-notice"
-        aria-label="Cookie and analytics notice"
-      >
-        <div class="cookie-copy">
-          <p class="cookie-kicker">
-            SITE NOTICE
-          </p>
+        <section
+          v-if="cookieNoticeVisible"
+          class="cookie-notice"
+          aria-label="Cookie and analytics notice"
+        >
           <p class="cookie-text">
             This site uses a small number of cookies to understand visits and improve the experience.
           </p>
-        </div>
-        <button
-          type="button"
-          class="cookie-dismiss"
-          @click="dismissCookieNotice"
-        >
-          OK
-        </button>
-      </section>
+          <button
+            type="button"
+            class="cookie-dismiss"
+            @click="dismissCookieNotice"
+          >
+            OK
+          </button>
+        </section>
+      </main>
 
       <footer class="site-footer">
-        <p>SHIPPING CONTAINER SIMS &copy; {{ new Date().getFullYear() }}</p>
-        <p class="footer-github">
-          <GithubRepoLink variant="footer" />
-        </p>
-        <p class="footer-sub">
-          INSERT COIN TO CONTINUE...
-        </p>
-        <p
+        <span>Shipping Container Sims &copy; {{ new Date().getFullYear() }} &middot; <GithubRepoLink variant="footer" /></span>
+        <span
           class="build-stamp"
           data-testid="build-stamp"
         >
@@ -158,90 +163,177 @@ function dismissCookieNotice(): void {
               data-testid="build-stamp-commit"
             >{{ buildStamp.commit }}</a>
           </template>
-        </p>
+        </span>
       </footer>
-    </main>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* The home page is light (paper and navy, blue accent); the sims keep the dark site tokens from main.css. */
 .home {
+  --home-bg: #eef1f5;
+  --home-line: #d3d9e3;
+  --home-ink: #0d1b2e;
+  --home-muted: #4a5870;
+  --home-accent: #1f6fd1;
+  --home-dim: #66738a;
   min-height: 100vh;
+  background: var(--home-bg);
+  color: var(--home-ink);
+  font-family: var(--font-body);
 }
 
-.hero {
-  position: relative;
-  min-height: 28vh;
+.wrap {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.top {
   display: flex;
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 18px;
 }
 
-.hero-content {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-  padding: 1.5rem 1.5rem 1rem;
+.logo {
+  font: 12px/1.5 var(--font-retro);
+  letter-spacing: 0.04em;
 }
 
-.hero-title {
+.logo b {
+  color: var(--home-accent);
+  font-weight: 400;
+}
+
+.top-nav {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  align-items: center;
+  gap: 18px;
 }
 
-.title-line {
-  font-family: var(--font-retro);
-  font-size: clamp(0.9rem, 3vw, 1.8rem);
-  letter-spacing: 0.15em;
-  text-shadow:
-    0 0 10px rgba(59, 130, 246, 0.5),
-    0 0 40px rgba(59, 130, 246, 0.2);
+.top-nav :deep(.github-repo-link) {
+  font: 600 14px var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--home-muted);
+  opacity: 1;
 }
 
-.title-line.accent {
-  color: var(--color-accent);
-  text-shadow:
-    0 0 10px rgba(245, 158, 11, 0.6),
-    0 0 40px rgba(245, 158, 11, 0.3);
+.top-nav :deep(.github-repo-link:hover) {
+  color: var(--home-ink);
 }
 
-.hero-sub {
-  margin-top: 0.6rem;
-  font-family: var(--font-retro);
-  font-size: 0.6rem;
-  letter-spacing: 0.3em;
-  color: var(--color-text-muted);
+/* The shared volume control (speaker button and the slider popover button), restyled for the light page. */
+.top-nav :deep(.audio-btn) {
+  height: 36px;
+  min-width: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--home-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--home-ink);
+  font-size: 1rem;
 }
 
-.hero-divider {
+.top-nav :deep(.audio-btn:hover) {
+  border-color: var(--home-accent);
+  background: #fff;
+}
+
+.top-nav :deep(.audio-menu-btn) {
+  padding: 0 10px 0 12px;
+  font-size: 0.7rem;
+  color: var(--home-muted);
+  --audio-level-color: var(--home-accent);
+}
+
+.head {
   display: flex;
-  justify-content: center;
-  gap: 4px;
-  margin-top: 0.75rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  padding-block: 14px 22px;
 }
 
-.divider-pixel {
-  width: 8px;
-  height: 4px;
-  background: var(--color-primary);
-  opacity: 0.5;
+.head h1 {
+  font-size: 60px;
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.04em;
 }
 
-.divider-pixel:nth-child(even) {
-  background: var(--color-accent);
-  opacity: 0.7;
+.head h1 span {
+  color: var(--home-accent);
 }
 
-.content {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1.25rem 1.5rem 1.5rem;
+.head p {
+  max-width: 36ch;
+  padding-bottom: 6px;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--home-muted);
 }
 
-.sim-section {
-  margin-bottom: 1.25rem;
+/* The wall: the first game big on the left, the next two stacked on its right, the fourth full width,
+   any further games half width. */
+.wall {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: 150px;
+  gap: 14px;
+}
+
+.wall > :deep(.tile) {
+  grid-column: span 6;
+  grid-row: span 3;
+}
+
+.wall > :deep(.tile:nth-child(1)) {
+  grid-column: span 7;
+  grid-row: span 4;
+}
+
+.wall > :deep(.tile:nth-child(2)),
+.wall > :deep(.tile:nth-child(3)) {
+  grid-column: span 5;
+  grid-row: span 2;
+}
+
+.wall > :deep(.tile:nth-child(4):last-child),
+.wall > :deep(.tile:nth-child(1):last-child) {
+  grid-column: 1 / -1;
+}
+
+.later {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding-block: 30px 6px;
+  font-size: 14px;
+  color: var(--home-muted);
+}
+
+.later-label {
+  margin-right: 8px;
+  font: 10px var(--font-retro);
+  letter-spacing: 0.08em;
+  color: var(--home-dim);
+}
+
+.chip {
+  padding: 9px 14px;
+  border: 1px dashed #a9b4c6;
+  border-radius: 10px;
+}
+
+.chip b {
+  display: block;
+  font-weight: 600;
+  color: var(--home-ink);
 }
 
 .cookie-notice {
@@ -249,137 +341,53 @@ function dismissCookieNotice(): void {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin: 1.1rem 0 0.9rem;
-  padding: 0.8rem 0.95rem;
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  background:
-    linear-gradient(90deg, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.82)),
-    rgba(15, 23, 42, 0.9);
-  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.18);
-}
-
-.cookie-copy {
-  min-width: 0;
-}
-
-.cookie-kicker {
-  margin: 0 0 0.2rem;
-  font-family: var(--font-retro);
-  font-size: 0.55rem;
-  letter-spacing: 0.18em;
-  color: var(--color-accent);
+  margin-top: 24px;
+  padding: 12px 16px;
+  border: 1px solid var(--home-line);
+  border-radius: 10px;
+  background: #fff;
 }
 
 .cookie-text {
-  margin: 0;
-  font-size: 0.72rem;
-  line-height: 1.5;
-  color: var(--color-text-muted);
+  font-size: 14px;
+  color: var(--home-muted);
 }
 
 .cookie-dismiss {
   flex: 0 0 auto;
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--color-accent);
-  font-family: var(--font-retro);
-  font-size: 0.6rem;
-  letter-spacing: 0.14em;
-  padding: 0.55rem 0.8rem;
-  cursor: pointer;
-  transition:
-    transform 120ms ease,
-    background-color 120ms ease,
-    border-color 120ms ease;
-}
-
-.cookie-dismiss:hover,
-.cookie-dismiss:focus-visible {
-  background: rgba(245, 158, 11, 0.2);
-  border-color: rgba(245, 158, 11, 0.7);
-  transform: translateY(-1px);
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--home-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .cookie-dismiss:focus-visible {
-  outline: 2px solid rgba(245, 158, 11, 0.45);
+  outline: 3px solid color-mix(in srgb, var(--home-accent) 45%, transparent);
   outline-offset: 2px;
 }
 
-.section-title {
-  font-family: var(--font-retro);
-  font-size: 0.65rem;
-  letter-spacing: 0.15em;
-  color: var(--color-text-muted);
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.blink {
-  animation: blink 1s step-end infinite;
-  color: var(--color-success);
-}
-
-@keyframes blink {
-  50% { opacity: 0; }
-}
-
-.lock-icon {
-  font-style: normal;
-}
-
-.horizon-icon {
-  color: var(--color-primary);
-  font-style: normal;
-  animation: pulse-soft 2.5s ease-in-out infinite;
-}
-
-@keyframes pulse-soft {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
-}
-
-.section-lede {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-  margin: -0.35rem 0 0.65rem;
-  max-width: 36rem;
-}
-
-.future-section {
-  padding-top: 0.25rem;
-  border-top: 1px dashed var(--color-border);
-}
-
-.sim-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.85rem;
-}
-
 .site-footer {
-  text-align: center;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-border);
-  font-family: var(--font-retro);
-  font-size: 0.55rem;
-  letter-spacing: 0.15em;
-  color: var(--color-text-muted);
-  line-height: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+  margin-top: 30px;
+  padding-block: 22px 28px;
+  border-top: 1px solid var(--home-line);
+  font-size: 13px;
+  color: var(--home-dim);
 }
 
-.footer-github {
-  margin: 0;
-  line-height: 1.6;
-}
-
-.build-stamp {
-  margin: 0.25rem 0 0;
-  font-size: 0.5rem;
-  letter-spacing: 0.1em;
-  opacity: 0.8;
+.site-footer :deep(.github-repo-link) {
+  font: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+  color: inherit;
+  opacity: 1;
+  vertical-align: bottom;
 }
 
 .build-stamp a {
@@ -387,19 +395,73 @@ function dismissCookieNotice(): void {
   text-decoration: underline;
 }
 
-.footer-sub {
-  animation: blink 1.5s step-end infinite;
-  color: var(--color-accent);
-}
-
-@media (max-width: 780px) {
-  .cookie-notice {
-    align-items: flex-start;
-    flex-direction: column;
+@media (max-width: 960px) {
+  .wall {
+    grid-auto-rows: 130px;
   }
 
-  .cookie-dismiss {
-    width: 100%;
+  .wall > :deep(.tile:nth-child(1)) {
+    grid-column: span 12;
+    grid-row: span 3;
+  }
+
+  .wall > :deep(.tile:nth-child(2)),
+  .wall > :deep(.tile:nth-child(3)) {
+    grid-column: span 6;
+  }
+
+  .head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .head h1 {
+    font-size: 44px;
+  }
+}
+
+@media (max-width: 720px) {
+  .wrap {
+    padding: 0 14px;
+  }
+
+  .logo {
+    font-size: 9px;
+  }
+
+  .top-nav {
+    gap: 10px;
+  }
+
+  .top-nav :deep(.github-label) {
+    display: none;
+  }
+
+  .head h1 {
+    font-size: 34px;
+  }
+
+  .wall {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    gap: 12px;
+  }
+
+  .wall > :deep(.tile),
+  .wall > :deep(.tile:nth-child(n)) {
+    grid-column: auto;
+    grid-row: auto;
+    min-height: 250px;
+  }
+
+  .wall > :deep(.tile:nth-child(1)) {
+    min-height: 340px;
+  }
+
+  .cookie-notice {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>
