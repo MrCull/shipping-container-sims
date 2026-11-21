@@ -7,6 +7,7 @@ import { planSegment } from '../engine'
 import { SceneModel } from '../modules/sceneModel'
 import { fixtures } from '../scenario/fixtures'
 import { emptyDelta } from './delta'
+import { entityBounds, pickEntity } from '../modules/picking'
 
 const PROFILE = { vMax: 80 / 75, accel: (4 * 80) / (150 * 150), decel: (4 * 80) / (150 * 150) }
 
@@ -47,5 +48,39 @@ describe('scene model boom angle', () => {
     expect(m.stsPose(sts, 75)).toEqual(before)
     expect(m.isGantrying(sts, 75)).toBe(false)
     expect(m.isWorking(sts, 75)).toBe(false)
+  })
+})
+
+describe('STS bounds and picking follow the boom (#301)', () => {
+  const config = fixtures['boom-berthing']
+  const sts = config.sts[0].id
+  /** A model whose first crane lowers from 80 to 0 degrees over [100, 250] s. */
+  const lowered = () => {
+    const m = new SceneModel(config)
+    m.apply(emptyDelta({ motion: [{ entityId: sts, segments: [planSegment(sts, 'boom', 80, 0, 100, PROFILE)] }] }))
+    return m
+  }
+
+  it('boom down: the box ends just above the 82 m apex and stays on the portal (the vessel under the boom stays pickable)', () => {
+    const b = entityBounds(lowered(), sts, 1000)!
+    expect(b.y + b.sy / 2).toBeCloseTo(83.3, 1)
+    expect(b.z - b.sz / 2).toBeGreaterThan(-5) // not out over the water
+  })
+
+  it('boom at 80 degrees: the box reaches the raised boom tip (about 125 m) and covers it seaward', () => {
+    const b = entityBounds(lowered(), sts, 50)!
+    const top = b.y + b.sy / 2
+    expect(top).toBeGreaterThan(124)
+    expect(top).toBeLessThan(132)
+    expect(b.z - b.sz / 2).toBeLessThan(-12) // the tip leans about 12.5 m seaward of the hinge
+  })
+
+  it('a ray through the raised boom picks its crane; the same ray misses once the boom is down', () => {
+    const m = lowered()
+    const x = m.stsPose(sts, 50).gantryX
+    // a ray across the quay at 110 m, through the raised boom only (the apex is at 82 m)
+    const ray = { origin: { x, y: 110, z: -500 }, dir: { x: 0, y: 0, z: 1 } }
+    expect(pickEntity(m, 50, ray)).toBe(sts)
+    expect(pickEntity(m, 1000, ray)).toBeNull()
   })
 })
