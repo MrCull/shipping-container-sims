@@ -16,7 +16,7 @@
   --retro: 'Press Start 2P', monospace; --body: 'Sora', system-ui, sans-serif;
 }
 /* Scheme 2, Harbour day: a light page (paper and navy) with signal orange. The tiles keep a dark navy scrim. */
-[data-scheme=day] { --bg: #eef1f5; --line: #d3d9e3; --ink: #0d1b2e; --muted: #4a5870; --amber: #ea580c; --on-amber: #fff;
+[data-scheme^=day] { --bg: #eef1f5; --line: #d3d9e3; --ink: #0d1b2e; --muted: #4a5870; --amber: #ea580c; --on-amber: #fff;
   --scrim: 10, 24, 46; --kind: #ffb27a; --chip-line: #a9b4c6; --dim: #7b879c; --foot: #66738a; }
 /* Scheme 3, Hazard: black and safety yellow, square corners, stencil headings. Loud and very on-theme. */
 [data-scheme=hazard] { --bg: #0c0c0c; --line: #2b2b2b; --ink: #fafafa; --muted: #b3b3b3; --amber: #ffd400; --on-amber: #111;
@@ -31,12 +31,24 @@
 /* Scheme 6, Livery: the four container colours from mockup G, one per game, on graphite. Each tile has its own accent. */
 [data-scheme=livery] { --bg: #101215; --line: #262a31; --ink: #f2f4f7; --muted: #a5adba; --amber: #f6c21c; --on-amber: #1b1400;
   --scrim: 10, 12, 16; --chip-line: #3a404b; --dim: #6f7785; --foot: #6f7785; --radius: 8px; --btn-radius: 6px; }
-[data-scheme=livery] .t1 { --amber: #4a90e2; --on-amber: #fff; --kind: #9cc4ff; --stripe: #2a6fc4; }
-[data-scheme=livery] .t2 { --amber: #f59e0b; --kind: #ffc766; --stripe: #e0830c; }
-[data-scheme=livery] .t3 { --amber: #ef5a4c; --on-amber: #fff; --kind: #ff9d93; --stripe: #c23a2e; }
-[data-scheme=livery] .t4 { --amber: #2fbf8f; --on-amber: #022016; --kind: #8de6c4; --stripe: #1f8a6e; }
-[data-scheme=livery] .tile::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 8px; z-index: 1; background: repeating-linear-gradient(90deg, var(--stripe) 0 12px, color-mix(in srgb, var(--stripe) 70%, #000) 12px 16px); }
-[data-scheme=livery] .badge { background: #f6c21c; color: #1b1400; top: 22px; }
+:is([data-scheme=livery],[data-scheme=day-livery]) .t1 { --amber: #4a90e2; --on-amber: #fff; --kind: #9cc4ff; --stripe: #2a6fc4; }
+:is([data-scheme=livery],[data-scheme=day-livery]) .t2 { --amber: #f59e0b; --kind: #ffc766; --stripe: #e0830c; }
+:is([data-scheme=livery],[data-scheme=day-livery]) .t3 { --amber: #ef5a4c; --on-amber: #fff; --kind: #ff9d93; --stripe: #c23a2e; }
+:is([data-scheme=livery],[data-scheme=day-livery]) .t4 { --amber: #2fbf8f; --on-amber: #022016; --kind: #8de6c4; --stripe: #1f8a6e; }
+:is([data-scheme=livery],[data-scheme=day-livery]) .tile::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 8px; z-index: 1; background: repeating-linear-gradient(90deg, var(--stripe) 0 12px, color-mix(in srgb, var(--stripe) 70%, #000) 12px 16px); }
+:is([data-scheme=livery],[data-scheme=day-livery]) .badge { background: #f6c21c; color: #1b1400; top: 22px; }
+
+/* Light variants: the Harbour day page with a different accent instead of orange. --hl colours the words on the light
+   page; --amber is the button and badge colour; --kind is the small label on the dark tile scrim. */
+[data-scheme=day-navy]   { --amber: #12305e; --on-amber: #fff; --hl: #1f5fae; --kind: #9cc4ff; }
+[data-scheme=day-blue]   { --amber: #1f6fd1; --on-amber: #fff; --hl: #1f6fd1; --kind: #9cc4ff; }
+[data-scheme=day-teal]   { --amber: #0e7c86; --on-amber: #fff; --hl: #0e7c86; --kind: #7fe0d6; }
+[data-scheme=day-green]  { --amber: #13795b; --on-amber: #fff; --hl: #13795b; --kind: #8de6c4; }
+[data-scheme=day-red]    { --amber: #c23a2e; --on-amber: #fff; --hl: #c23a2e; --kind: #ff9d93; }
+[data-scheme=day-yellow] { --amber: #f6c21c; --on-amber: #1b1400; --hl: #0d1b2e; --kind: #ffd84d; }
+[data-scheme=day-yellow] .head h1 span { background: linear-gradient(transparent 58%, #f6c21c 58% 92%, transparent 92%); padding: 0 .06em; }
+[data-scheme=day-yellow] .logo b { background: #f6c21c; padding: 0 3px; }
+[data-scheme=day-livery] { --amber: #12305e; --on-amber: #fff; --hl: #12305e; --radius: 8px; --btn-radius: 6px; }
 
 .schemes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 0 0; font-size: 12px; color: var(--muted); }
 .schemes a { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; display: inline-flex; gap: 6px; align-items: center; }
@@ -48,12 +60,12 @@ a { color: inherit; text-decoration: none; }
 .wrap { max-width: 1320px; margin: 0 auto; padding: 0 24px; }
 .top { display: flex; justify-content: space-between; align-items: center; padding-block: 18px; }
 .logo { font: 12px/1.5 var(--retro); letter-spacing: .04em; }
-.logo b { color: var(--amber); font-weight: 400; }
+.logo b { color: var(--hl, var(--amber)); font-weight: 400; }
 .top nav { display: flex; gap: 22px; color: var(--muted); font-size: 14px; font-weight: 500; }
 
 .head { display: flex; justify-content: space-between; align-items: end; gap: 28px; padding-block: 14px 22px; }
 .head h1 { font: var(--head-weight) 60px/.98 var(--head-font); letter-spacing: -.04em; }
-.head h1 span { color: var(--amber); }
+.head h1 span { color: var(--hl, var(--amber)); }
 .head p { color: var(--muted); max-width: 36ch; font-size: 17px; padding-bottom: 6px; }
 
 .wall { display: grid; grid-template-columns: repeat(12, 1fr); grid-auto-rows: 150px; gap: 14px; }
@@ -117,6 +129,13 @@ footer { margin-top: 30px; border-top: 1px solid var(--line); padding-block: 22p
   <nav class="schemes" aria-label="Colour scheme (mockup only)">Scheme:
     <a href="?scheme=night"><i style="background:#f59e0b"></i>Night amber</a>
     <a href="?scheme=day"><i style="background:#ea580c"></i>Harbour day</a>
+    <a href="?scheme=day-navy"><i style="background:#12305e"></i>Day navy</a>
+    <a href="?scheme=day-blue"><i style="background:#1f6fd1"></i>Day blue</a>
+    <a href="?scheme=day-teal"><i style="background:#0e7c86"></i>Day teal</a>
+    <a href="?scheme=day-green"><i style="background:#13795b"></i>Day green</a>
+    <a href="?scheme=day-red"><i style="background:#c23a2e"></i>Day red</a>
+    <a href="?scheme=day-yellow"><i style="background:#f6c21c"></i>Day yellow</a>
+    <a href="?scheme=day-livery"><i style="background:conic-gradient(#2a6fc4 0 25%,#e0830c 0 50%,#c23a2e 0 75%,#1f8a6e 0)"></i>Day livery</a>
     <a href="?scheme=hazard"><i style="background:#ffd400"></i>Hazard</a>
     <a href="?scheme=sea"><i style="background:#ff7a59"></i>Deep water</a>
     <a href="?scheme=rust"><i style="background:#2fb8a6"></i>Rust and steel</a>

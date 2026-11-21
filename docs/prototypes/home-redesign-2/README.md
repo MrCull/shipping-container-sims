@@ -23,12 +23,15 @@ Four more static mockups of the main menu (`src/pages/HomePage.vue`), a follow-u
 |---|---|
 | `night` (default) | The original: near-black navy with amber |
 | `day` | Light page (paper and navy) with signal orange; tiles keep a dark scrim so the words stay readable |
+| `day-navy`, `day-blue`, `day-teal`, `day-green`, `day-red` | The `day` page with that accent instead of orange, for the headline word and the buttons |
+| `day-yellow` | The `day` page with safety-yellow buttons; the headline word gets a yellow highlighter band, since yellow text is unreadable on white |
+| `day-livery` | The `day` page with each game in its own container colour, as in `livery` |
 | `hazard` | Black and safety yellow, square corners, stencil headings |
 | `sea` | Dark teal with a coral call to action, matching the sims' blue water |
 | `rust` | Warm corten brown, cream text, teal buttons |
 | `livery` | Graphite, and each game wears its container colour from mockup G (blue, orange, red, green) as a corrugated top edge and button |
 
-Renders: `shots/f-scheme-<name>-{desktop,phone}.jpg`, and all six side by side in `shots/f-schemes-sheet.jpg`.
+Renders: `shots/f-scheme-<name>-{desktop,phone}.jpg`, and the dark ones side by side in `shots/f-schemes-sheet.jpg`, the light ones in `shots/f-schemes-light-sheet.jpg` (top halves enlarged in `f-schemes-light-closeup.jpg`).
 
 Progress lines ("level 3", "14 moves") and the build stamp are example values.
 
