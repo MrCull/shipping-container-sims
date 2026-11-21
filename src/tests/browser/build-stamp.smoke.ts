@@ -4,6 +4,7 @@
  * stamps its build time like production (build-stamp.prod.smoke.ts checks the commit link there).
  */
 import { expect, test } from '@playwright/test'
+import { openTwin } from '../../sims/terminal-twin/tests/browser/openTwin'
 
 test('the main menu build stamp reads "dev" on the dev server and the build time on the smoke build', async ({ page }) => {
   await page.goto('/')
@@ -19,7 +20,7 @@ test('the main menu build stamp reads "dev" on the dev server and the build time
 })
 
 test('a sim page has no build stamp', async ({ page }) => {
-  await page.goto('/sim/terminal-twin')
+  await openTwin(page)
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeVisible()
   await expect(page.getByTestId('build-stamp')).toHaveCount(0)
 })

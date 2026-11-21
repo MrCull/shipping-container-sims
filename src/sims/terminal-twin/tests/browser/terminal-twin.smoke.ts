@@ -8,6 +8,8 @@ import golden from '../../scenario/fixtures/tracer-1sts-10-boxes.golden.json' wi
 import type {} from '../../dev/devApi' // window.__tt typing
 import { sampleFrames, simPerWallSecond, advancedFraction, neverBackwards } from './frameSampling'
 import { openAdvanced } from './scenarioPicker'
+import { openTwin } from './openTwin'
+
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = []
@@ -19,9 +21,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function openTracer(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('tracer-1sts-10-boxes'))
+  await openTwin(page, { scenario: 'tracer-1sts-10-boxes' })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
@@ -64,6 +64,7 @@ test('the tracer fixture runs to completion in the browser: golden hash, rendere
 
   await page.evaluate(() => window.__tt!.cameraTo('STS01'))
   await page.waitForTimeout(500)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/terminal-twin-smoke-end.png' })
   expect(errors).toEqual([])
 })
@@ -91,11 +92,9 @@ test('×1 runs one sim second per wall second; ×600 keeps animating every frame
 
 test('×3600 from the top bar advances the sim clock accordingly; digit keys leave the speed unchanged', async ({ page }) => {
   // A long scenario, so the clock does not hit the scenario end within the window.
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
   // A long scenario: the 5,400 s landside fixture runs headless in about a second and ends within two wall seconds at x3600,
   // freezing the clock before the measurement window, which read as 0 (#191).
-  await page.evaluate(() => window.__tt!.load('Small automated', { startDateTime: '2026-10-26T13:00:00.000Z' }))
+  await openTwin(page, { scenario: 'Small automated', load: { startDateTime: '2026-10-26T13:00:00.000Z' } })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.getByRole('button', { name: '×3600', exact: true }).click()
   expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
@@ -115,11 +114,10 @@ test('×3600 from the top bar advances the sim clock accordingly; digit keys lea
 
 test('x3600 from the top bar sustains at least 600 sim s per wall s @load', async ({ page }) => {
   // Hardware benchmark (#191): never runs in CI (--grep-invert @load); run it on real hardware. The engine alone does 1 300 to 1 450 (`pnpm run tt:baseline`); software GL in the page is the limit.
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
   // A long scenario: the 5,400 s landside fixture runs headless in about a second and ends within two wall seconds at x3600,
   // freezing the clock before the measurement window, which read as 0 (#191).
-  await page.evaluate(() => window.__tt!.load('Small automated', { startDateTime: '2026-10-26T13:00:00.000Z' }))
+  // Opts in to drawing at the remembered quality: this benchmark measures the real page, as a user sees it.
+  await openTwin(page, { scenario: 'Small automated', load: { startDateTime: '2026-10-26T13:00:00.000Z' }, quality: null, render: true })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.getByRole('button', { name: '×3600', exact: true }).click()
   expect(await page.evaluate(() => window.__tt!.clock().speed)).toBe(3600)
@@ -169,7 +167,7 @@ test('the Run to… popup sits above the 3D view: its buttons take real clicks a
     { width: 1280, height: 720 },
     { width: 1920, height: 1080 },
   ]) {
-    await page.setViewportSize(size)
+    await page.setViewportSize(size) // layout check: the popup must sit above the canvas at both sizes
     await openTracer(page)
     await page.getByRole('button', { name: /run to/i }).first().click()
     const run = page.locator('.run-to-pop button[type="submit"]')
@@ -226,9 +224,7 @@ test('every run start (Start, Reset, loading a save) resets the speed to ×10; p
     if (await page.evaluate(() => window.__tt!.clock().paused)) await page.getByRole('button', { name: 'Resume', exact: true }).click()
   }
   // A long scenario, so x600 does not reach the scenario end (which disables the speed buttons).
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('landside-morning-peak'))
+  await openTwin(page, { scenario: 'landside-morning-peak' })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 
   // Mid-run speed survives pause, the dashboard and New Scenario then Cancel.
@@ -269,11 +265,8 @@ test('every run start (Start, Reset, loading a save) resets the speed to ×10; p
 
 test('vessels render at their berth (or anchorage) and STS cranes gantry along the rail to their bays', async ({ page }) => {
   const errors = collectErrors(page)
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-
   // Two vessels compete for one berth: at t = 1200 V001 is alongside, V002 waits at anchorage.
-  await page.evaluate(() => window.__tt!.load('two-vessels-compete-for-berth'))
+  await openTwin(page, { scenario: 'two-vessels-compete-for-berth' })
   await page.evaluate(() => window.__tt!.runTo(1200))
   await page.evaluate(() => window.__tt!.pause())
   const vessels = await page.evaluate(() =>
@@ -304,6 +297,7 @@ test('vessels render at their berth (or anchorage) and STS cranes gantry along t
   }
   // they left their parking positions (40, 140, 240, 340 m) for their bays
   expect(xs.some((x, i) => Math.abs(x - [40, 140, 240, 340][i]) > 1)).toBe(true)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/terminal-twin-smoke-crane-split.png' })
   expect(errors).toEqual([])
 })
@@ -313,5 +307,6 @@ test('mid-run screenshot', async ({ page }) => {
   await page.evaluate(() => window.__tt!.runTo(420))
   await page.evaluate(() => window.__tt!.pause())
   await page.waitForTimeout(500)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/terminal-twin-smoke-midrun.png' })
 })
