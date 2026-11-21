@@ -70,6 +70,8 @@ export function getHighestStowageMasterLevelReached(): number {
   return nextUnlockedId + 1
 }
 
-export function getStowageMasterProgressSummary(): string {
+/** The home tile's "Your best": null until the player has finished (or scored on) a level. */
+export function getStowageMasterProgressSummary(): string | null {
+  if (loadCompletedLevelIds().length === 0 && loadBestLevelIds().length === 0) return null
   return `Level ${getHighestStowageMasterLevelReached()}`
 }
