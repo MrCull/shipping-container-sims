@@ -8,7 +8,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #322 | 02 `?quality=`, `?render=off`, `__tt.renderOnce()` | none | merged in branch (f7aa45c) | |
 | #323 | 06 Smoke build | none | in progress | implementer (tt/323-smoke-build) |
 | #324 | 19 Unit-test speed-up | none | open | |
-| #325 | 03 `openTwin` helper, first migration | #322 | open | |
+| #325 | 03 `openTwin` helper, first migration | #322 | in progress | implementer (tt/325-open-twin) |
 | #326 | 18 Rendering-budget guard | #322 | open | |
 | #327 | 08 Six balanced shards | #321, #323 | open | |
 | #328 | 04 Migrate remaining specs | #325 | open | |
@@ -27,7 +27,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 
 ## Next steps
 
-- Merged: #321. Running: #322, #323. Next: #324 (when a slot frees), then #325 and #326 after #322.
+- Merged: #321, #322. Running: #323, #325. Next: #324, #326 as slots free.
 
 ## Open points
 
