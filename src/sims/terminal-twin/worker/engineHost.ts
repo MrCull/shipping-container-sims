@@ -423,6 +423,8 @@ export function createEngineHost(options: { fullScan?: boolean } = {}) {
         return s.config.vessels.map((v) => s.query.vessel(v.id))
       case 'bayView':
         return collectBayViewData(s.query, need(), s.config)
+      case 'planAccuracy':
+        return s.planAccuracy()
       case 'cranePlan':
         return s.cranePlan(need())
       case 'vesselStatus':

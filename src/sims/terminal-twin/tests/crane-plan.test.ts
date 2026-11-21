@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { buildCranePlanModel } from '../modules/cranePlanView'
+import { runPlanCli } from '../cli/planCli'
 import { createSimulation, estimateTimes, predictConflicts, validatePlan, type PlanPackage } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 
@@ -54,7 +56,7 @@ describe('crane plan: pure functions', () => {
         { stsId: 'S1', railIndex: 0, bays: [0], packageIds: ['a'] },
         { stsId: 'S2', railIndex: 1, bays: [1], packageIds: ['b'] },
       ],
-      packages: { a: pkg('a', { bay: 0 }), b: pkg('b', { bay: 1 }) },
+      packages: { a: pkg('a', { bay: 0 }), b: pkg('b', { bay: 1 }) } as Record<string, PlanPackage>,
     })
     it('accepts a sound plan', () => expect(validatePlan(base())).toBeNull())
     it('rejects an uncovered bay', () => {
@@ -184,5 +186,41 @@ describe('crane plan: engine run', () => {
     planned(alias)
     expect(alias.cranePlan('V001')!.strategy).toBe('equal-bays')
     expect(() => createSimulation({ ...fixtures['crane-split-4sts'], decisions: { points: { cranePlan: { strategy: 'nope' } } } })).toThrow(/Unknown craneSplit strategy/)
+  })
+})
+
+const NL = String.fromCharCode(10)
+
+describe('crane plan: view model and CLI', () => {
+  it('has a band per crane, a bar per package, columns in quay order and a now line', () => {
+    const sim = createSimulation(fixtures['crane-split-4sts'])
+    while (!sim.cranePlan('V001') && sim.step()) {
+      /* step */
+    }
+    sim.runUntil({ time: sim.now + 900 })
+    const view = sim.cranePlan('V001')!
+    const model = buildCranePlanModel(view, sim.config.vessels[0].sizeClass)
+    expect(model.bands).toHaveLength(view.cranes.length)
+    expect(model.bars).toHaveLength(view.cranes.reduce((n, c) => n + c.packages.length, 0))
+    const xs = model.columns.map((c) => c.x)
+    expect(xs).toEqual([...xs].sort((a, b) => a - b))
+    expect(model.nowS).toBe(view.now)
+    expect(model.bars.some((b) => b.actual)).toBe(true) // the actual progress overlays the plan
+    expect(model.bars.some((b) => !b.actual)).toBe(true)
+    for (const b of model.bars) expect(b.col).toBeGreaterThanOrEqual(0)
+  })
+
+  it('tt:plan prints the table, the conflict list and, with --until, the accuracy', () => {
+    const out: string[] = []
+    expect(runPlanCli(['--fixture', 'crane-split-4sts', '--vessel', 'V001'], (l) => out.push(l))).toBe(0)
+    const text = out.join(NL)
+    expect(text).toMatch(/Crane plan for V001: strategy as-today/)
+    expect(text).toMatch(/STS01\s+WP1\s+discharge/)
+    expect(text).toMatch(/Predicted conflict windows/)
+    const more: string[] = []
+    expect(runPlanCli(['--fixture', 'crane-split-4sts', '--vessel', 'V001', '--strategy', 'equal-bays', '--until', 'end'], (l) => more.push(l))).toBe(0)
+    expect(more.join(NL)).toMatch(/strategy equal-bays/)
+    expect(more.join(NL)).toMatch(/Plan accuracy/)
+    expect(runPlanCli(['--fixture', 'crane-split-4sts'], () => {})).toBe(2)
   })
 })

@@ -36,6 +36,7 @@ import {
 } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import { presets } from '../scenario/presets'
+import { formatPlanAccuracy } from './planFormat'
 import type { EndConditions, ScenarioConfig, SubsystemMode, SubsystemModes } from '../scenario/types'
 import { validateSubsystemModes } from '../scenario/validate'
 import { t } from '../i18n/messages'
@@ -139,7 +140,8 @@ function subsystemsFromArgs(base: SubsystemModes | undefined, args: string[]): S
 
 function splitPoint(text: string, flag: string): [DecisionPointId, string] {
   const eq = text.indexOf('=')
-  const dp = text.slice(0, eq) as DecisionPointId
+  const named = text.slice(0, eq)
+  const dp = (named === 'cranePlan' ? 'craneSplit' : named) as DecisionPointId // #288: cranePlan is the craneSplit point
   if (eq < 1 || !DECISION_POINT_IDS.includes(dp))
     throw new UsageError(`Bad ${flag} "${text}" (decision points: ${DECISION_POINT_IDS.join(', ')})`)
   return [dp, text.slice(eq + 1)]
@@ -398,6 +400,7 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
     const startedAt = start ? `snapshot at ${formatSimTime(startNow)} (after ${firstNewEvent} events)` : 'scenario start'
     const headline = headlineKpis(sim.kpiSeries(), sim.kpiReport())
     for (const line of formatSummary(summary, headline, result.reason, startedAt, result.eventsProcessed, sim.asyncMode)) print(line)
+    for (const line of formatPlanAccuracy(sim.planAccuracy())) print(line)
     if (values.out) writeFileSync(values.out, `${JSON.stringify(summary, null, 2)}\n`)
     if (values.snapshot) writeJsonFile(values.snapshot, sim.snapshot())
     if (values.log) writeFileSync(values.log, logLines.length ? `${logLines.join('\n')}\n` : '')

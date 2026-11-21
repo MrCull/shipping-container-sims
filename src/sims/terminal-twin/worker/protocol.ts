@@ -47,6 +47,8 @@ export type QueryKind =
   | 'bayView'
   /** `CranePlanView` of one vessel (#288): the crane plan with recalculated times and predicted conflicts, or null. */
   | 'cranePlan'
+  /** `PlanAccuracy[]` (#288): predicted against actual per vessel with a plan. */
+  | 'planAccuracy'
   /** `VesselStatusInput` of one vessel (spec #126): ETA, berth times, mooring time and moves per STS. */
   | 'vesselStatus'
   | 'sts'

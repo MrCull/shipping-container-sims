@@ -18,7 +18,7 @@ import { composeScenario } from '../scenario/compose'
 import { presets } from '../scenario/presets'
 import type { YardSetup } from '../scenario/builder'
 import type { ContainerSize, DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
-import { EXPORT_FILES, ScenarioValidationError, validateScenario, type ContainerState, type CranePlanView, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport, type TruckState, type VesselState } from '../engine'
+import { EXPORT_FILES, ScenarioValidationError, validateScenario, type ContainerState, type CranePlanView, type PlanAccuracy, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport, type TruckState, type VesselState } from '../engine'
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { createLocationNotation } from '../modules/locationNotation'
@@ -88,6 +88,8 @@ export interface FinalReportData extends KpiHeadlineState {
   kpis: KpiReport
   series: KpiSeriesReport
   eventLogHash: string
+  /** Plan accuracy per vessel (#288). */
+  planAccuracy: PlanAccuracy[]
 }
 
 /** What the 3D view registers so the dev API can reach it. */
@@ -500,9 +502,9 @@ export const useTwinStore = defineStore('terminal-twin', () => {
       kpi.value = markRaw(await c.query<KpiHeadlineState>('kpiHeadline'))
       kpiEvents = eventsAt
       if (c.info.status !== 'ready' && finalReport.value?.eventLogHash !== c.info.eventLogHash) {
-        const [kpis, series] = await Promise.all([c.query<KpiReport>('kpis'), c.query<KpiSeriesReport>('kpiSeries')])
+        const [kpis, series, planAccuracy] = await Promise.all([c.query<KpiReport>('kpis'), c.query<KpiSeriesReport>('kpiSeries'), c.query<PlanAccuracy[]>('planAccuracy')])
         const first = finalReport.value === null
-        finalReport.value = markRaw({ ...kpi.value, kpis, series, eventLogHash: c.info.eventLogHash })
+        finalReport.value = markRaw({ ...kpi.value, kpis, series, planAccuracy, eventLogHash: c.info.eventLogHash })
         // the run is over: the final report opens as the dashboard's report tab and stays browsable
         if (first) {
           dashboardTab.value = 'report'

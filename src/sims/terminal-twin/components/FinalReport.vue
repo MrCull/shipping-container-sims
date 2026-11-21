@@ -86,6 +86,21 @@ const vessels = computed(() => {
   }))
 })
 
+const planRows = computed(() => {
+  const r = report.value
+  if (!r) return []
+  const at = (s: number | null) => (s === null ? t('unit.none') : fmt.value.duration(s))
+  return (r.planAccuracy ?? []).map((a) => ({
+    id: a.vesselId,
+    strategy: a.strategy,
+    predictedFinish: at(a.predictedFinishS),
+    actualFinish: a.actualFinishS === null ? t('report.plan.open') : at(a.actualFinishS),
+    predictedConflict: fmt.value.duration(a.predictedConflictS),
+    railWait: fmt.value.duration(a.actualRailWaitS),
+    startError: at(a.meanStartErrorS),
+  }))
+})
+
 const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
   { kind: 'kpi-json', label: 'report.export.kpiJson' },
   { kind: 'kpi-csv', label: 'report.export.kpiCsv' },
@@ -231,6 +246,43 @@ const EXPORTS: { kind: ExportKind; label: Parameters<typeof t>[0] }[] = [
               <td>{{ v.sizeClass }}</td>
               <td>{{ v.anchorage }}</td>
               <td>{{ v.turnaround }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section
+        v-if="planRows.length > 0"
+        class="card"
+        data-testid="tt-report-plan-accuracy"
+      >
+        <h3>{{ t('report.plan') }}</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('report.col.vessel') }}</th>
+              <th>{{ t('report.col.planStrategy') }}</th>
+              <th>{{ t('report.col.predictedFinish') }}</th>
+              <th>{{ t('report.col.actualFinish') }}</th>
+              <th>{{ t('report.col.predictedConflict') }}</th>
+              <th>{{ t('report.col.railWait') }}</th>
+              <th>{{ t('report.col.startError') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="p in planRows"
+              :key="p.id"
+            >
+              <th scope="row">
+                {{ p.id }}
+              </th>
+              <td>{{ p.strategy }}</td>
+              <td>{{ p.predictedFinish }}</td>
+              <td>{{ p.actualFinish }}</td>
+              <td>{{ p.predictedConflict }}</td>
+              <td>{{ p.railWait }}</td>
+              <td>{{ p.startError }}</td>
             </tr>
           </tbody>
         </table>
