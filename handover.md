@@ -12,7 +12,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #326 | 18 Rendering-budget guard | #322 | merged to main (PR #341) | |
 | #327 | 08 Six balanced shards | #321, #323 | merged to main (PR #341) | |
 | #328 | 04 Migrate remaining specs | #325 | merged to main (PR #341) | |
-| #329 | 05 One page per worker | #328 | in progress | session 3 implementer |
+| #329 | 05 One page per worker | #328 | merged in branch (d66d065) | |
 | #330 | 07 Groups, tags, selection script | #328 | merged in branch (c81dd49) | |
 | #331 | 11 Headless scene, parity, vessel moves | #328 | merged in branch (67fdfde) | |
 | #332 | 14 Component tests | #328 | merged in branch (10a14e3) | |
