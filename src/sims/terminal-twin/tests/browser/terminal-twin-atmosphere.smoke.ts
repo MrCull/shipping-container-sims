@@ -44,11 +44,11 @@ async function followClock(page: Page): Promise<void> {
 }
 
 test('the sun follows the sim clock: day at 13:00, cheaper night mode at 02:00', async ({ page }) => {
-  await open(page, TRACER, '2026-10-26T13:00:00.000Z')
+  await open(page, TRACER, '2026-10-26T13:00:00.000Z', { quality: 'high' }) // day shadows are a High (and Medium) feature
   let a = await atmosphere(page)
   expect(a.scene).toMatchObject({ mode: 'day', shadows: true, masts: 0, equipmentLights: 0 })
 
-  await open(page, TRACER, '2026-10-26T02:00:00.000Z')
+  await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' })
   await followClock(page)
   await page.evaluate(() => window.__tt!.step())
   a = await atmosphere(page)
@@ -58,7 +58,7 @@ test('the sun follows the sim clock: day at 13:00, cheaper night mode at 02:00',
 })
 
 test('every launch starts in daylight at 02:00; the toggle lets night fall for that run only', async ({ page }) => {
-  await open(page, TRACER, '2026-10-26T02:00:00.000Z')
+  await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' }) // day shadows are a High (and Medium) feature
   expect((await atmosphere(page)).lockDaylight).toBe(true)
   await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('day')
   expect((await atmosphere(page)).scene).toMatchObject({ shadows: true, masts: 0 })
@@ -66,7 +66,7 @@ test('every launch starts in daylight at 02:00; the toggle lets night fall for t
   await page.getByTestId('tt-daylight-toggle').click()
   await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('night')
 
-  await open(page, TRACER, '2026-10-26T02:00:00.000Z')
+  await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' })
   expect((await atmosphere(page)).lockDaylight).toBe(true)
   await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('day')
 })
