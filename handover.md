@@ -23,7 +23,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #337 | 13 Equipment moves | #331 | open | |
 | #338 | 15 Remaining component moves | #332 | open | |
 | #339 | 10 Docs and review rules | #325, #335, #348 | open | |
-| #344 | 21 Smoke build as the local default | none | in progress | implementer-344 |
+| #344 | 21 Smoke build as the local default | none | merged in branch (f170cab) | |
 | #345 | 22 Asset viewer honours URL switches | none | in progress | implementer-345 |
 | #346 | 23 Shards balanced by recorded test time | none (blocks #335) | open | |
 | #347 | 24 bg.sh cleans up its process group | none | open | |
