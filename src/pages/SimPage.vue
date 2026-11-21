@@ -6,6 +6,7 @@ import { useSimRegistry } from '@/composables/useSimRegistry'
 import { watchSimHead } from '@/composables/useSiteHead'
 import { useGameStore as useStowageMasterStore } from '@/sims/stowage-master/store/gameStore'
 import { useSimsStore } from '@/stores/sims'
+import { rememberLastPlayed } from '@/utils/lastPlayed'
 
 const props = defineProps<{
   simId: string
@@ -43,6 +44,11 @@ function handleMenuClick() {
     return
   }
   goHome()
+}
+
+// The home page puts the game opened last first, as its big "Continue" tile.
+if (sim.value?.status === 'playable') {
+  rememberLastPlayed(props.simId)
 }
 
 const stopHeadWatch = watchSimHead(

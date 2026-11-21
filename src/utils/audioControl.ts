@@ -13,3 +13,9 @@ export function speakerIcon(muted: boolean, volume: number): string {
 export function speakerLabel(muted: boolean): string {
   return muted ? 'Unmute all' : 'Mute all'
 }
+
+/** How many of the volume meter's bars (out of `bars`) are lit: none when silent, else at least one. */
+export function litLevelBars(muted: boolean, volume: number, bars = 4): number {
+  if (isSilent(muted, volume)) return 0
+  return Math.min(bars, Math.max(1, Math.ceil(volume * bars)))
+}
