@@ -28,7 +28,7 @@ function watchErrors(page: Page): string[] {
 }
 
 async function open(page: Page, vessels: VesselConfig[], quayLengthM: number): Promise<void> {
-  await openTwin(page)
+  await openTwin(page, { quality: 'high' }) // the hull LOD distances it checks are High's (Low scales them by 0.4)
   await page.evaluate(
     ({ vessels, quayLengthM }) => window.__tt!.load('tracer-1sts-10-boxes', { overrides: { vessels, quayLengthM, stsCount: 2 } }),
     { vessels, quayLengthM },

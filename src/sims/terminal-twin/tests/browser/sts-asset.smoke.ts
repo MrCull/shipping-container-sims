@@ -91,7 +91,7 @@ test('asset viewer: STS rig sliders drive gantry, trolley, hoist, spreader and b
 
 test('the twin draws every STS from the GLB, switches LODs and animates it from the engine motion (twin-20 shows two boxes)', async ({ page }) => {
   const errors = watch(page)
-  await openTwin(page, { scenario: 'twin-20-lift' })
+  await openTwin(page, { scenario: 'twin-20-lift', quality: 'high' }) // the LOD distances it checks are High's (Low scales them by 0.4)
   await page.waitForFunction(() => window.__tt!.scene()?.stsAssets === 'loaded')
 
   // Run to the first twin-20 pick, then a few seconds into the hoist/trolley move.

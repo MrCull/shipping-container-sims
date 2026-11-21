@@ -27,7 +27,7 @@ function watch(page: Page): { errors: string[]; external: string[] } {
 }
 
 async function openTrucks(page: Page): Promise<void> {
-  await openTwin(page, { scenario: FIXTURE })
+  await openTwin(page, { scenario: FIXTURE, quality: 'high' }) // the LOD distances it checks are High's (Low scales them by 0.4)
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
   await page.evaluate(() => window.__tt!.runTo(3300))
   await page.waitForFunction(() => window.__tt!.scene()?.landside.assets === 'loaded' && Object.keys(window.__tt!.sceneState()?.truckRigs ?? {}).length > 5)

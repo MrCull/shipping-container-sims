@@ -32,7 +32,7 @@ function watch(page: Page): { errors: string[]; external: string[] } {
 
 test('the twin renders containers from the GLBs with each box in its own line livery, offline', async ({ page }) => {
   const { errors, external } = watch(page)
-  await openTwin(page, { scenario: 'liveries-mixed' })
+  await openTwin(page, { scenario: 'liveries-mixed', quality: 'high' }) // the LOD distances it checks are High's (Low scales them by 0.4)
   await page.evaluate(() => window.__tt!.runTo(200))
   await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
