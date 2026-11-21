@@ -10,6 +10,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { sampleFrames, type FrameSample } from './frameSampling'
+import { openTwin } from './openTwin'
 
 function watch(page: Page): string[] {
   const errors: string[] = []
@@ -77,8 +78,8 @@ async function measure(page: Page, boom: 'real' | 'off'): Promise<Measure> {
 test('TTI booms up: forestays attached, no extra draw calls and no lower frame ratio than booms down', async ({ page }) => {
   test.setTimeout(480_000)
   const errors = watch(page)
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  // render and High: the spec counts draw calls and frames at the High LOD distances it measures.
+  await openTwin(page, { quality: 'high', render: true })
   await page.evaluate(() => window.localStorage.clear())
 
   // Warm-up load: the first load pays GLB fetch and shader compile, which would count against whichever mode ran first.
