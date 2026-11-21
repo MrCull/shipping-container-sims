@@ -8,6 +8,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
+import { openTwin, twinUrl } from './openTwin'
 
 const FIXTURE = 'shc-1sts-2shc-1wtp'
 
@@ -27,9 +28,7 @@ function watch(page: Page): { errors: string[]; external: string[] } {
 }
 
 async function openShc(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE })
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingLoaded' }))
   await page.waitForFunction(() => window.__tt!.scene()?.shcAssets === 'loaded')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
@@ -61,6 +60,7 @@ test('SHCs in the twin use the GLB with LOD switching, carry the box at the atta
   await page.evaluate((id) => window.__tt!.cameraTo(id, 50), carrier)
   await page.waitForTimeout(500)
   await page.waitForFunction(() => window.__tt!.scene()!.shcLods.lod0 >= 1)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/twin-shc-near.png' })
   await page.evaluate((id) => window.__tt!.cameraTo(id, 250), carrier)
   await page.waitForFunction(() => window.__tt!.scene()!.shcLods.lod1 >= 1)
@@ -102,7 +102,7 @@ test('SHCs steer through the corners of the lane graph', async ({ page }) => {
 
 test('the asset viewer shows the SHC with working rig sliders and a 40 ft box fitting the tunnel at true scale', async ({ page }) => {
   const { errors, external } = watch(page)
-  await page.goto('/sim/terminal-twin?viewer=shc')
+  await page.goto(twinUrl({ params: { viewer: 'shc' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
   expect(await page.evaluate(() => window.__ttAssets!.list())).toContain('shc')
 

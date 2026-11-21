@@ -6,6 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/rehandle-random-yard.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'rehandle-random-yard'
 
@@ -20,9 +21,7 @@ function collectErrors(page: Page): string[] {
 
 test('a rehandle lifts a blocker out of its stack, carries it, and sets it down; the run matches its golden', async ({ page }) => {
   const errors = collectErrors(page)
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 

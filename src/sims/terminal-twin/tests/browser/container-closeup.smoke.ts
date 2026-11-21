@@ -8,6 +8,7 @@
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 test('boxes within about 35 m become close-ups, from far away none are', async ({ page }) => {
   test.slow() // software WebGL
@@ -16,8 +17,7 @@ test('boxes within about 35 m become close-ups, from far away none are', async (
     if (msg.type() === 'error') errors.push(`console: ${msg.text()}`)
   })
   page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   await page.evaluate(() => window.localStorage.clear())
   await page.evaluate(() => window.__tt!.setQuality('high')) // pin the level: Auto steps down under a slow software frame rate, and Low reaches only 18 m
   await page.evaluate(() => window.__tt!.load('liveries-mixed'))
@@ -39,6 +39,7 @@ test('boxes within about 35 m become close-ups, from far away none are', async (
   expect(faces).toBeGreaterThanOrEqual(near.perf) // at least one face per box drawn
   expect(faces).toBeLessThanOrEqual(400)
   await page.waitForTimeout(500)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/twin-closeup.png' })
 
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 600))
@@ -55,8 +56,7 @@ for (const [level, budget, distanceM] of [['low', 48, 12], ['high', 400, 22]] as
       if (msg.type() === 'error') errors.push(`console: ${msg.text()}`)
     })
     page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`))
-    await page.goto('/sim/terminal-twin')
-    await page.waitForFunction(() => !!window.__tt)
+    await openTwin(page)
     await page.evaluate(() => window.localStorage.clear())
     await page.evaluate((l) => window.__tt!.setQuality(l), level)
     await page.evaluate(() => window.__tt!.load('yard-no-mixed-length')) // a half-full block B01
@@ -70,6 +70,7 @@ for (const [level, budget, distanceM] of [['low', 48, 12], ['high', 400, 22]] as
     expect(near.closeupFaces).toBeLessThanOrEqual(budget)
     expect(near.closeup).toBeGreaterThan(0)
     await page.waitForTimeout(500)
+    await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
     await page.screenshot({ path: `.screenshots/assets/twin-closeup-block-edge-${level}.png` })
 
     await page.evaluate(() => window.__tt!.cameraTo('B01', 600))
@@ -80,8 +81,7 @@ for (const [level, budget, distanceM] of [['low', 48, 12], ['high', 400, 22]] as
 
 test('the view about 10 boxes wide costs no more frame time than the Overview camera @load', async ({ page }) => {
   test.setTimeout(900_000)
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   await page.evaluate(() => window.__tt!.setQuality('high'))
   await page.evaluate(() => window.__tt!.load('TTI Algeciras baseline'))
   await page.waitForFunction(() => (window.__tt!.scene()?.containers ?? 0) > 10_000, undefined, { timeout: 120_000 })

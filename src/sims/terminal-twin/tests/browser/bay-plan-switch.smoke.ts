@@ -8,6 +8,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = []
@@ -32,9 +33,7 @@ async function openViewer(page: Page, vesselId: string): Promise<void> {
 test('bay plan switch: opens on Discharge, shows one plan at a time, keeps the choice across vessels, Discharge again on a new run', async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('rob-bays'))
+  await openTwin(page, { scenario: 'rob-bays' })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'VesselBerthed' }))
 
@@ -58,6 +57,7 @@ test('bay plan switch: opens on Discharge, shows one plan at a time, keeps the c
   await expect(legend).toContainText('Discharged')
   await expect(legend).toContainText('Remain on board')
   await expect(legend).not.toContainText('Planned load')
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/bay-plan-discharge.png' })
 
   // Load plan: planned-load cells, no planned-discharge cells (the strip follows the plan)
@@ -69,6 +69,7 @@ test('bay plan switch: opens on Discharge, shows one plan at a time, keeps the c
   await expect(legend).toContainText('Planned load')
   await expect(legend).toContainText('Loaded')
   await expect(legend).not.toContainText('Planned discharge')
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/bay-plan-load.png' })
 
   // another vessel in the same run keeps the choice

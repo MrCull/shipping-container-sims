@@ -7,6 +7,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { sampleFrames } from './frameSampling'
+import { openTwin, type OpenTwinOptions } from './openTwin'
 
 function watch(page: Page): string[] {
   const errors: string[] = []
@@ -17,10 +18,9 @@ function watch(page: Page): string[] {
   return errors
 }
 
-async function open(page: Page, search: string, scenario: string): Promise<void> {
-  await page.goto(`/sim/terminal-twin${search}`)
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), scenario)
+/** Each test opts in to exactly the switches it checks (this spec is about the switches themselves). */
+async function open(page: Page, switches: Pick<OpenTwinOptions, 'quality' | 'render'>, scenario: string): Promise<void> {
+  await openTwin(page, { ...switches, scenario })
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 }
 
@@ -32,7 +32,7 @@ async function frameRate(page: Page, minWallMs: number): Promise<number> {
 
 test('render=off: the frame counter advances quickly and box poses still move, with nothing drawn', async ({ page }) => {
   const errors = watch(page)
-  await open(page, '?render=off', 'tracer-1sts-10-boxes')
+  await open(page, { quality: null }, 'tracer-1sts-10-boxes') // `?render=off` alone
   const centres = () => page.evaluate(() => Object.fromEntries(Object.entries(window.__tt!.sceneState()!.liveries).map(([id, l]) => [id, l.centre])))
   await page.evaluate(() => {
     window.__tt!.setSpeed(30) // slow enough to catch the boxes on the move (a fast run ends with them gone)
@@ -56,7 +56,7 @@ test('render=off: the frame counter advances quickly and box poses still move, w
 
 test('renderOnce() with render=off draws one frame: perf() reports draw calls and triangles', async ({ page }) => {
   const errors = watch(page)
-  await open(page, '?render=off', 'tracer-1sts-10-boxes')
+  await open(page, { quality: null }, 'tracer-1sts-10-boxes') // `?render=off` alone
   expect((await page.evaluate(() => window.__tt!.perf())).stats.calls).toBe(0)
   const info = await page.evaluate(() => window.__tt!.renderOnce())
   expect(info!.calls).toBeGreaterThan(0)
@@ -70,7 +70,7 @@ test('renderOnce() with render=off draws one frame: perf() reports draw calls an
 
 test('quality=low boots at the Low level without changing the remembered setting', async ({ page }) => {
   const errors = watch(page)
-  await open(page, '?quality=low', 'tracer-1sts-10-boxes')
+  await open(page, { render: true }, 'tracer-1sts-10-boxes') // `?quality=low` alone
   const perf = await page.evaluate(() => window.__tt!.perf())
   expect(perf.setting).toBe('low')
   expect(perf.effective).toBe('low')
@@ -81,7 +81,7 @@ test('quality=low boots at the Low level without changing the remembered setting
 test('TTI baseline with render=off and quality=low: the scene updates at a usable frame rate', async ({ page }) => {
   test.setTimeout(180_000)
   const errors = watch(page)
-  await open(page, '?render=off&quality=low', 'TTI Algeciras baseline')
+  await open(page, {}, 'TTI Algeciras baseline') // the defaults: `?quality=low&render=off`
   await page.waitForFunction(() => (window.__tt!.scene()?.containers ?? 0) > 8_000, undefined, { timeout: 120_000 }) // the full yard, as terminal-twin-perf measures it
   await page.evaluate(() => window.__tt!.viewPreset('overview'))
   const fps = await frameRate(page, 4000)

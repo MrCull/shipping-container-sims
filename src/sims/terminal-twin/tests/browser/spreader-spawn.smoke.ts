@@ -4,14 +4,13 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const SHORT_M = 5.853
 const LONG_M = 11.985
 
 async function open(page: Page, fixture: string): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), fixture)
+  await openTwin(page, { scenario: fixture })
   await page.waitForFunction(() => window.__tt!.scene()?.ascAssets === 'loaded' || window.__tt!.scene()?.shcAssets === 'loaded', undefined, { timeout: 30_000 }).catch(() => undefined)
 }
 

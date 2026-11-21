@@ -9,6 +9,7 @@ import { expect, test, type Page } from '@playwright/test'
 import fixture from '../../scenario/fixtures/asc-2asc-block-conflict.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
+import { openTwin, twinUrl } from './openTwin'
 
 const FIXTURE = 'asc-2asc-block-conflict'
 
@@ -28,9 +29,7 @@ function watch(page: Page): { errors: string[]; external: string[] } {
 }
 
 async function openAsc(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE })
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'AscLocking' }))
   await page.waitForFunction(() => window.__tt!.scene()?.ascAssets === 'loaded')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
@@ -59,6 +58,7 @@ test('paired ASCs use the GLB with LOD switching and are posed from the engine m
   await page.evaluate((id) => window.__tt!.cameraTo(id, 60), working)
   await page.waitForTimeout(500)
   await page.waitForFunction(() => window.__tt!.scene()!.ascLods.lod0 >= 1)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/twin-asc-near.png' })
   await page.evaluate((id) => window.__tt!.cameraTo(id, 200), working)
   await page.waitForFunction(() => window.__tt!.scene()!.ascLods.lod1 >= 1)
@@ -85,13 +85,14 @@ test('while an ASC carries a box, the box hangs at the twist-lock plane and the 
   expect(rig.scaleY).toBe(1) // the fixture's block is at most 5 tiers high
   await page.evaluate((i) => window.__tt!.cameraTo(i, 45), id)
   await page.waitForTimeout(500)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/twin-asc-carrying.png' })
   expect(errors).toEqual([])
 })
 
 test('the asset viewer shows the ASC with working rig sliders and 8 rows of reference containers fitting under the span', async ({ page }) => {
   const { errors, external } = watch(page)
-  await page.goto('/sim/terminal-twin?viewer=asc')
+  await page.goto(twinUrl({ params: { viewer: 'asc' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
   expect(await page.evaluate(() => window.__ttAssets!.list())).toContain('asc')
 

@@ -15,6 +15,7 @@
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import type { CameraPose } from '../../modules/cameraKeys'
+import { openTwin } from './openTwin'
 import { renderBudgetFailures } from './renderBudget'
 import { RENDER_BUDGETS, RENDER_BUDGET_FILE, RENDER_BUDGET_TOLERANCE } from './renderBudget.budget'
 
@@ -36,9 +37,7 @@ test('TTI baseline on High at fixed cameras stays within the rendering budget @c
   test.setTimeout(300_000)
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`))
-  await page.goto('/sim/terminal-twin?render=off&quality=high')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('TTI Algeciras baseline'))
+  await openTwin(page, { scenario: 'TTI Algeciras baseline', quality: 'high' }) // the budget is for High; draws only via renderOnce
   await page.evaluate((n) => window.__tt!.runUntil({ maxEvents: n }), RUN_EVENTS)
   await page.evaluate(() => window.__tt!.pause())
   await page.waitForFunction(() => {

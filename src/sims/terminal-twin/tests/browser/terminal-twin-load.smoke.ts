@@ -6,6 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { ContainerState, RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/load-1sts-10-boxes-1block.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'load-1sts-10-boxes-1block'
 
@@ -19,9 +20,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function openLoad(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 

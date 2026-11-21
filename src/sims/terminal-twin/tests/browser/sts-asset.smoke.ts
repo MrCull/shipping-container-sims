@@ -9,6 +9,7 @@ import { expect, test, type Page } from '@playwright/test'
 import meta from '../../assets/models/sts/sts-malaccamax.meta.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
+import { openTwin, twinUrl } from './openTwin'
 
 const WATER_RAIL_Z = meta.sceneMounting.waterRailZ
 
@@ -28,7 +29,7 @@ function near(actual: number[], expected: number[], tol = 0.01): void {
 
 test('asset viewer: STS rig sliders drive gantry, trolley, hoist, spreader and boom; a 40 ft box hangs under the spreader', async ({ page }) => {
   const errors = watch(page)
-  await page.goto('/sim/terminal-twin?viewer=sts-malaccamax')
+  await page.goto(twinUrl({ params: { viewer: 'sts-malaccamax' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
   const shown = await page.evaluate(() => window.__ttAssets!.show('sts-malaccamax', { lod: 'LOD0' }))
   expect(shown.kind).toBe('sts')
@@ -90,9 +91,7 @@ test('asset viewer: STS rig sliders drive gantry, trolley, hoist, spreader and b
 
 test('the twin draws every STS from the GLB, switches LODs and animates it from the engine motion (twin-20 shows two boxes)', async ({ page }) => {
   const errors = watch(page)
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('twin-20-lift'))
+  await openTwin(page, { scenario: 'twin-20-lift' })
   await page.waitForFunction(() => window.__tt!.scene()?.stsAssets === 'loaded')
 
   // Run to the first twin-20 pick, then a few seconds into the hoist/trolley move.
@@ -124,6 +123,7 @@ test('the twin draws every STS from the GLB, switches LODs and animates it from 
   await page.evaluate((box) => window.__tt!.cameraTo(box, 40), onSpreader[0][0])
   await page.waitForFunction((id) => window.__tt!.sceneState()!.stsRendered[id].lod === 0, craneId)
   await page.waitForTimeout(400)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/twin-sts-twin20.png' })
   await page.evaluate((id) => window.__tt!.cameraTo(id, 2000), craneId)
   await page.waitForFunction((id) => window.__tt!.sceneState()!.stsRendered[id].lod === 2, craneId)
@@ -132,14 +132,14 @@ test('the twin draws every STS from the GLB, switches LODs and animates it from 
 
 test('eight STS on a long quay stay within the overview triangle and draw-call budget', async ({ page }) => {
   const errors = watch(page)
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('crane-split-4sts', { overrides: { stsCount: 8, quayLengthM: 850 } }))
+  // High: the budget is for the main and shadow passes users get by default
+  await openTwin(page, { scenario: 'crane-split-4sts', load: { overrides: { stsCount: 8, quayLengthM: 850 } }, quality: 'high' })
   await page.waitForFunction(() => window.__tt!.scene()?.stsAssets === 'loaded')
   await page.evaluate(() => window.__tt!.runTo(900))
   await page.evaluate(() => window.__tt!.cameraTo('STS04', 700))
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
   await page.waitForTimeout(500)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw one frame to count its triangles and draw calls
   const scene = (await page.evaluate(() => window.__tt!.scene()))!
   expect(scene.sts).toBe(8)
   console.log(`overview: ${JSON.stringify({ render: scene.render, stsLods: scene.stsLods })}`)
