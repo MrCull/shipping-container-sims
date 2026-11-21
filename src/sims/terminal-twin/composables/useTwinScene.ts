@@ -20,7 +20,7 @@ import type { SceneModel } from '../modules/sceneModel'
 import { AutoQuality, FpsMeter, markStepForRung, orbitSpeedFor, PAUSED_DETAIL_SETTLE_MS, pausedDetailProfile, profileFor, profileForRung, type QualityProfile } from '../modules/quality'
 import type { HeroMarkStep } from '../modules/markStep'
 import { usePerfStore } from '../store/perfStore'
-import { useTwinStore } from '../store/twinStore'
+import { useTwinStore, type RenderInfo } from '../store/twinStore'
 
 function webglAvailable(): boolean {
   try {
@@ -60,7 +60,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
   let overlaysApplied: object | null = null
   let lightingKey = ''
   let frame = 0
-  /** Frames actually rendered (dev API: proves the view keeps animating). */
+  /** Frames updated, and drawn unless `?render=off` (dev API: proves the view keeps animating). */
   let framesRendered = 0
   /** Draw calls and triangles of the last frame (main + shadow pass). */
   let lastRender = { calls: 0, triangles: 0 }
@@ -247,6 +247,14 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     aim(view.overviewTarget(), false, undefined, view.defaultCameraOffset())
   }
 
+  /** Draws the scene as last updated and records the draw calls and triangles; null before the view exists. */
+  function draw(): RenderInfo | null {
+    if (!renderer || !camera || !view) return null
+    renderer.render(view.scene, camera)
+    lastRender = { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }
+    return { ...lastRender }
+  }
+
   function loop(now: number): void {
     frame = requestAnimationFrame(loop)
     const controller = store.controller()
@@ -305,9 +313,9 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
         /* dev-only artificial frame cost */
       }
     }
-    renderer.render(view.scene, camera)
+    // `?render=off` (#322): the whole update above still runs; only the draw is skipped (`renderOnce` draws on demand)
+    if (perf.renderEnabled) draw()
     cpuMs = cpuMs === 0 ? performance.now() - cpuStart : cpuMs * 0.9 + (performance.now() - cpuStart) * 0.1
-    lastRender = { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }
     framesRendered++
     // quality: measure this frame, let Auto judge, apply a changed level on the next frame
     meter.frame(now)
@@ -396,6 +404,11 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
       cameraPose: readPose,
       setCameraPose: writePose,
       heroSettled: () => view?.heroSettled() ?? true,
+      renderOnce() {
+        const info = draw()
+        if (info) perf.report({ ...perf.stats, calls: info.calls, triangles: info.triangles })
+        return info
+      },
       stats: () => (view ? { ...view.stats(), frames: framesRendered, render: { ...lastRender } } : null),
       liveries: () => view?.renderedLiveries() ?? null,
       rigs: () => view?.renderedRigs() ?? null,

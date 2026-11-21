@@ -3,9 +3,12 @@
  * level actually in force, the live frame stats the overlay shows, and the overlay switch.
  * `useTwinScene` feeds it; `PerfOverlay.vue` and `QualityPicker.vue` read it. The setting and the
  * overlay switch are remembered in localStorage (a per-viewer convenience: every access is guarded).
+ * The URL switches (#322, `modules/urlSwitches.ts`) can start it at a quality setting (`?quality=`, not
+ * remembered) and with the final draw off (`?render=off`, `renderEnabled`).
  */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { urlSwitches } from '../modules/urlSwitches'
 import { DEFAULT_QUALITY_SETTING, MANUAL_RUNG, QUALITY_SETTINGS, TOP_RUNG, clampRung, levelOfRung, rungName, type AutoRungName, type QualityLevel, type QualitySetting } from '../modules/quality'
 
 const KEY_QUALITY = 'terminal-twin.quality'
@@ -60,7 +63,10 @@ export interface BenchmarkProgress {
 
 export const usePerfStore = defineStore('terminal-twin-perf', () => {
   const stored = read(KEY_QUALITY)
-  const setting = ref<QualitySetting>(QUALITY_SETTINGS.find((s) => s === stored) ?? DEFAULT_QUALITY_SETTING)
+  const switches = urlSwitches()
+  const setting = ref<QualitySetting>(switches.quality ?? QUALITY_SETTINGS.find((s) => s === stored) ?? DEFAULT_QUALITY_SETTING)
+  /** False with `?render=off` (#322): every frame updates the scene but skips the draw; `__tt.renderOnce()` draws one. */
+  const renderEnabled = ref(switches.render)
   /** The level in force: the fixed setting, or what Auto currently picked. */
   const effective = ref<QualityLevel>(setting.value === 'auto' ? 'high' : setting.value)
   /** The ladder rung in force (#261): Auto's current rung, or the rung a manual level fixes it at. 0 is the best look. */
@@ -107,5 +113,5 @@ export const usePerfStore = defineStore('terminal-twin-perf', () => {
     stats.value = next
   }
 
-  return { benchmark, setting, effective, rung, rungLabel, overlayVisible, stats, autoChanges, debugLoadMs, debugAuto, pausedDetail, pausedDetailActive, setSetting, setRung, toggleOverlay, report }
+  return { benchmark, renderEnabled, setting, effective, rung, rungLabel, overlayVisible, stats, autoChanges, debugLoadMs, debugAuto, pausedDetail, pausedDetailActive, setSetting, setRung, toggleOverlay, report }
 })
