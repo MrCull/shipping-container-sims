@@ -62,6 +62,8 @@ export interface HeadlessScene {
   /** Same as the Colour by menu and the ROB display buttons. */
   setColourBy(mode: ColourBy, robDisplay?: RobDisplay): void
   setOverlays(overlays: OverlayState): void
+  /** Same as playback running (true) or paused (false, the default): idle details, gantry beacons and alarms only animate while live. */
+  setLive(live: boolean): void
   /** Same as `__tt.setCameraPose` and `__tt.cameraTo` (keeps the view direction). */
   setCameraPose(pose: CameraPose): void
   cameraTo(entityId: string, distanceM?: number): boolean
@@ -109,6 +111,7 @@ export async function headlessScene(name: string, options: HeadlessSceneOptions 
   let camera = options.camera ? atPose(options.camera) : openingPose()
   let colour: { mode: ColourBy; robDisplay: RobDisplay } = { mode: DEFAULT_COLOUR_BY, robDisplay: DEFAULT_ROB_DISPLAY }
   let overlays: OverlayState = NO_OVERLAYS
+  let live = false
 
   function openingPose(): THREE.PerspectiveCamera {
     const { target, offset } = openingCamera(view)
@@ -143,7 +146,7 @@ export async function headlessScene(name: string, options: HeadlessSceneOptions 
       robDisplay: colour.robDisplay,
       hour: hourOfDay(config.startDateTime ?? START, controller.displayTime),
       lockDaylight: true,
-      live: false,
+      live,
       selectedId: null,
       cameraPosition: camera.position,
       frustum,
@@ -161,6 +164,9 @@ export async function headlessScene(name: string, options: HeadlessSceneOptions 
     },
     setOverlays(next) {
       overlays = next
+    },
+    setLive(next) {
+      live = next
     },
     setCameraPose(pose) {
       camera = atPose(pose)
