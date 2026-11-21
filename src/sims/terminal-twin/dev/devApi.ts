@@ -144,6 +144,8 @@ export interface TwinDevApi {
   setAutoRung(rung: number): PerfInfo
   /** Allow or forbid Auto's paused-detail boost (default allowed). A test that measures what a rung draws while paused forbids it. */
   setPausedDetail(on: boolean): void
+  /** Draw exactly one frame now (#322; the way to see the scene with `?render=off`) and refresh the draw calls and triangles `perf()` and `scene().render` report; null without a 3D view. */
+  renderOnce(): RenderInfo | null
   /** Rendered counts (null if there is no 3D view). */
   scene(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** What the scene shows at the displayed time: custody per container, status and pose per STS, status per vessel. */
@@ -424,6 +426,7 @@ export function installDevApi(store: ReturnType<typeof useTwinStore>): () => voi
       perfStore.debugLoadMs = Math.max(0, ms)
     },
     scene: () => store.view()?.stats() ?? null,
+    renderOnce: () => store.view()?.renderOnce() ?? null,
     sceneState: () => {
       const c = store.controller()
       const model = c?.model

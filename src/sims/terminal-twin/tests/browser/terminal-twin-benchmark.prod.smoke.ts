@@ -6,6 +6,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { pickScenario } from './scenarioPicker'
+import { openTwin } from './openTwin'
 
 const TRACER = 'tracer-1sts-10-boxes'
 
@@ -13,8 +14,8 @@ const isNumber = (x: unknown): boolean => typeof x === 'number' && Number.isFini
 
 test('the Benchmark button runs the tour in a production build and downloads a complete report', async ({ page }) => {
   test.setTimeout(240_000)
-  await page.goto('/sim/terminal-twin?benchmark=quick')
-  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeVisible()
+  // Opts in to drawing: the tour measures drawn frames (draw calls, triangles) per stage.
+  await openTwin(page, { devApi: false, render: true, params: { benchmark: 'quick' } })
   await pickScenario(page, TRACER)
   await page.getByRole('button', { name: 'Start' }).click()
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()

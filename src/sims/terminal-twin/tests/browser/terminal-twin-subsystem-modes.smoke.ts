@@ -5,14 +5,13 @@
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openSetupTab } from './scenarioPicker'
+import { openTwin } from './openTwin'
 
 test('quay, berth and yard modes set in the dialog reach the config and the run ends cleanly', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.setViewportSize({ width: 1280, height: 720 })
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('landside-morning-peak'))
+  // The dialog screenshot below is DOM only (no drawing needed), taken at a fixed size.
+  await openTwin(page, { scenario: 'landside-morning-peak', viewport: { width: 1280, height: 720 } })
   await page.getByRole('button', { name: /new scenario/i }).click()
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await expect(dialog).toBeVisible()

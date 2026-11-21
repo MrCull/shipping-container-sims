@@ -7,6 +7,7 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test'
 import * as THREE from 'three'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'landside-morning-peak'
 
@@ -54,9 +55,7 @@ function anchorOf(a: Pose, b: Pose): { x: number; z: number } {
 test('phone: the view fits the screen, HUD collapses, pinch zooms about the fingers', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE }) // the phone viewport comes from test.use above
   await page.evaluate(() => window.__tt!.pause())
   await expect(page.getByTestId('tt-topbar')).toBeVisible()
 

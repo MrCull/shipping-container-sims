@@ -9,6 +9,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = []
@@ -20,9 +21,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function open(page: Page, scenario = 'rob-bays'): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), scenario)
+  await openTwin(page, { scenario })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 }
@@ -102,6 +101,7 @@ test('colour by: the menu recolours the 3D boxes and the bay viewer, with a lege
   await setMode(page, 'pod')
   await expect(page.getByTestId('tt-bay-colour-mode')).toContainText('POD')
   await expect.poll(async () => (await cells.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.key))).some((k) => /^[A-Z]{5}$/.test(k ?? ''))).toBe(true)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/colour-by.png' })
 
   // default again: the bay viewer shows the state of each cell and 3D goes back to the livery

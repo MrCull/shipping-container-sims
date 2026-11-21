@@ -5,13 +5,12 @@
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openSetupTab } from './scenarioPicker'
+import { openTwin } from './openTwin'
 
 const SCENARIO = 'landside-morning-peak'
 
 async function openDialog(page: Page) {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), SCENARIO)
+  await openTwin(page, { scenario: SCENARIO })
   await page.getByRole('button', { name: /new scenario/i }).click()
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await expect(dialog).toBeVisible()

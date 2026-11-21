@@ -25,9 +25,12 @@ const store = useTwinStore()
 // Light or dark skin: on <html> while the sim is mounted (the FPS chip and the volume popover sit outside this root).
 const themes = useThemeStore()
 applyTheme(themes.theme)
-// Dev-only asset viewer: /sim/terminal-twin?viewer=<asset>|yard (stripped from production builds).
-const assetViewer = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('viewer') : null
-const AssetViewer = import.meta.env.DEV ? defineAsyncComponent(() => import('./dev/AssetViewer.vue')) : null
+// The dev API (`window.__tt`) and the asset viewer ship in the dev server and the smoke build (`vite build --mode smoke`,
+// what CI's smoke tests run against), and are stripped from production builds (the expression folds to false there).
+const devApiEnabled = import.meta.env.DEV || import.meta.env.MODE === 'smoke'
+// Dev-only asset viewer: /sim/terminal-twin?viewer=<asset>|yard.
+const assetViewer = devApiEnabled ? new URLSearchParams(window.location.search).get('viewer') : null
+const AssetViewer = devApiEnabled ? defineAsyncComponent(() => import('./dev/AssetViewer.vue')) : null
 const sceneHost = ref<HTMLElement | null>(null)
 const { webglFailed } = useTwinScene(sceneHost)
 useTwinShortcuts()
@@ -52,7 +55,7 @@ const quietNote = computed(() => {
 
 onMounted(async () => {
   store.enterSim()
-  if (import.meta.env.DEV) {
+  if (devApiEnabled) {
     const { installDevApi } = await import('./dev/devApi')
     if (!unmounted) uninstallDevApi = installDevApi(store)
   }

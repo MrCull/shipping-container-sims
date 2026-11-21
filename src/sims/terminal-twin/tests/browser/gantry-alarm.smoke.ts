@@ -5,6 +5,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'asc-1sts-10-boxes-1block'
 /** The harbour ambience's voice (#129): always on and faint, whatever the cranes do. */
@@ -20,9 +21,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function open(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE })
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 3)
   // Terminal Twin opens muted (#171); the alarm voices only exist once the sound is on
   const speaker = page.getByTestId('audio-button')

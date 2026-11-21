@@ -6,6 +6,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const PRESETS = ['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras, peak day']
 // The tight 1280x720 layout is checked on every preset; 1920x1080 only on the small one (software WebGL makes the
@@ -15,10 +16,9 @@ const CASES = [
   { preset: 'Small automated', viewport: { width: 1920, height: 1080 } },
 ]
 
-async function open(page: Page, preset: string): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), preset)
+/** Render off is fine here: the HUD layout is DOM layout; the viewport is the opt-in (each case checks its own size). */
+async function open(page: Page, preset: string, viewport?: { width: number; height: number }): Promise<void> {
+  await openTwin(page, { scenario: preset, viewport })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.evaluate(() => window.__tt!.runUntil({ maxEvents: 300 }))
   await expect(page.getByTestId('tt-kpi-strip')).toBeVisible()
@@ -35,8 +35,7 @@ async function setPanels(page: Page, feed: boolean, inspector: boolean): Promise
 for (const { preset, viewport } of CASES) {
   test(`no two HUD regions overlap: ${preset} at ${viewport.width}x${viewport.height}`, async ({ page }) => {
     test.slow() // software WebGL at 1920x1080 on the big presets renders a frame in seconds on a loaded runner
-    await page.setViewportSize(viewport)
-    await open(page, preset)
+    await open(page, preset, viewport)
     for (const [feed, inspector] of [
       [false, false],
       [true, false],
@@ -55,8 +54,7 @@ for (const { preset, viewport } of CASES) {
 }
 
 test('every KPI card shows its label and value in full at 1280x720, with both panels open', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 720 })
-  await open(page, 'TTI Algeciras baseline')
+  await open(page, 'TTI Algeciras baseline', { width: 1280, height: 720 }) // clipping is checked at the tight layout
   await setPanels(page, true, true)
   const cards = await page.getByTestId('tt-kpi-strip').locator('li').evaluateAll((els) =>
     els.map((el) => {

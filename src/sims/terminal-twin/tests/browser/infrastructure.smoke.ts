@@ -6,6 +6,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 function watch(page: Page): { errors: string[]; external: string[] } {
   const errors: string[] = []
@@ -23,9 +24,7 @@ function watch(page: Page): { errors: string[]; external: string[] } {
 }
 
 async function open(page: Page, name: string): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((n) => window.__tt!.load(n), name)
+  await openTwin(page, { scenario: name })
   await page.waitForFunction(() => window.__tt!.scene()?.infrastructure.assets === 'loaded', undefined, { timeout: 60_000 })
 }
 
@@ -40,6 +39,7 @@ test('the gate fixture draws instanced infrastructure models within the draw-cal
   expect(infra.triangles).toBeGreaterThan(1000)
   await page.evaluate(() => window.__tt!.cameraTo('gate', 45))
   await page.waitForTimeout(1500)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/infrastructure-gate.png' })
   expect(external).toEqual([])
   expect(errors).toEqual([])

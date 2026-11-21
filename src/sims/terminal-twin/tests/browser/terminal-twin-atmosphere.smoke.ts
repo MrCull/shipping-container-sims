@@ -4,6 +4,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin, type OpenTwinOptions } from './openTwin'
 
 const TRACER = 'tracer-1sts-10-boxes'
 
@@ -29,10 +30,8 @@ async function spyOnAudio(page: Page): Promise<void> {
   })
 }
 
-async function open(page: Page, name: string, startDateTime: string): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(([n, start]) => window.__tt!.load(n, { startDateTime: start }), [name, startDateTime] as const)
+async function open(page: Page, name: string, startDateTime: string, options: Omit<OpenTwinOptions, 'scenario' | 'load'> = {}): Promise<void> {
+  await openTwin(page, { ...options, scenario: name, load: { startDateTime } })
   await page.waitForFunction(() => window.__tt!.atmosphere().scene !== null)
 }
 
@@ -45,13 +44,15 @@ async function followClock(page: Page): Promise<void> {
 }
 
 test('the sun follows the sim clock: day at 13:00, cheaper night mode at 02:00', async ({ page }) => {
-  await open(page, TRACER, '2026-10-26T13:00:00.000Z')
+  await open(page, TRACER, '2026-10-26T13:00:00.000Z', { quality: 'high' }) // day shadows are a High (and Medium) feature
   let a = await atmosphere(page)
   expect(a.scene).toMatchObject({ mode: 'day', shadows: true, masts: 0, equipmentLights: 0 })
 
-  await open(page, TRACER, '2026-10-26T02:00:00.000Z')
+  await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' })
   await followClock(page)
   await page.evaluate(() => window.__tt!.step())
+  // the scene picks up the new lighting mode on a later frame, so wait for it (CI read day here)
+  await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('night')
   a = await atmosphere(page)
   expect(a.scene).toMatchObject({ mode: 'night', shadows: false })
   expect(a.scene!.masts).toBeGreaterThan(0)
@@ -59,7 +60,7 @@ test('the sun follows the sim clock: day at 13:00, cheaper night mode at 02:00',
 })
 
 test('every launch starts in daylight at 02:00; the toggle lets night fall for that run only', async ({ page }) => {
-  await open(page, TRACER, '2026-10-26T02:00:00.000Z')
+  await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' }) // day shadows are a High (and Medium) feature
   expect((await atmosphere(page)).lockDaylight).toBe(true)
   await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('day')
   expect((await atmosphere(page)).scene).toMatchObject({ shadows: true, masts: 0 })
@@ -67,19 +68,19 @@ test('every launch starts in daylight at 02:00; the toggle lets night fall for t
   await page.getByTestId('tt-daylight-toggle').click()
   await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('night')
 
-  await open(page, TRACER, '2026-10-26T02:00:00.000Z')
+  await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' })
   expect((await atmosphere(page)).lockDaylight).toBe(true)
   await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('day')
 })
 
 test('night mode costs no more draw calls than day', async ({ page }) => {
   const calls = async (start: string): Promise<number> => {
-    await open(page, TRACER, start)
+    await open(page, TRACER, start, { quality: 'high' }) // High draws the day's shadow pass that night mode drops
     await followClock(page)
     await page.evaluate(() => window.__tt!.runTo(300))
     const f0 = (await page.evaluate(() => window.__tt!.scene()))!.frames
     await page.waitForFunction((n) => window.__tt!.scene()!.frames > n + 2, f0)
-    return (await page.evaluate(() => window.__tt!.scene()))!.render.calls
+    return (await page.evaluate(() => window.__tt!.renderOnce()))!.calls // render is off: draw one frame to count its draw calls
   }
   const day = await calls('2026-10-26T13:00:00.000Z')
   const night = await calls('2026-10-26T01:00:00.000Z')

@@ -7,6 +7,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { HatchPanelState } from '../../engine'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { HATCH_THICKNESS_M, VESSEL_CLASSES } from '../../scenario/vesselClasses'
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'hatch-cover-cycle'
 const HALF = HATCH_THICKNESS_M / 2
@@ -21,9 +22,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function open(page: Page, fixture = FIXTURE): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), fixture)
+  await openTwin(page, { scenario: fixture })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 

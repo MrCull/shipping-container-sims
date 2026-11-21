@@ -7,6 +7,7 @@
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 for (const [level, cap] of [
   ['high', 96],
@@ -21,8 +22,7 @@ for (const [level, cap] of [
     })
     const errors: string[] = []
     page.on('pageerror', (err) => errors.push(err.message))
-    await page.goto('/sim/terminal-twin')
-    await page.waitForFunction(() => !!window.__tt)
+    await openTwin(page)
     await page.evaluate(() => window.localStorage.clear())
     await page.evaluate((l) => window.__tt!.setQuality(l), level)
     await page.evaluate(() => window.__tt!.load('yard-no-mixed-length'))
@@ -47,6 +47,7 @@ for (const [level, cap] of [
       expect(near.heroFaces).toBeGreaterThan(0)
       expect(near.heroFaces).toBeLessThanOrEqual(cap)
       expect(heroRequests.length).toBeGreaterThan(0)
+      await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
       await page.screenshot({ path: `.screenshots/hero-yard-${level}.png` })
     }
     expect(errors).toEqual([])
@@ -57,8 +58,7 @@ test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks g
   test.slow() // software WebGL
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   await page.evaluate(() => window.localStorage.clear())
   await page.evaluate(() => window.__tt!.setAutoRung(0))
   await page.evaluate(() => window.__tt!.setPausedDetail(false)) // this test measures the rungs themselves, paused
@@ -123,8 +123,7 @@ test('arrival: nothing is prepared during a fast fly-through, faces arrive once 
   test.slow() // software WebGL
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   await page.evaluate(() => window.localStorage.clear())
   await page.evaluate(() => window.__tt!.setQuality('high'))
   await page.evaluate(() => window.__tt!.load('yard-no-mixed-length'))

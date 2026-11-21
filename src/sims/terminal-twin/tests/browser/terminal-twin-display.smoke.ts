@@ -6,6 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 import fixture from '../../scenario/fixtures/tracer-1sts-10-boxes.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openAdvanced, openSetupTab, pickScenario } from './scenarioPicker'
+import { openTwin } from './openTwin'
 
 const TRACER = 'tracer-1sts-10-boxes'
 // Monday 26 Oct 2026, 13:45 UTC; the browser runs in UTC (timezoneId below).
@@ -15,8 +16,7 @@ test.use({ timezoneId: 'UTC' })
 
 /** Opens the sim and selects the tracer (a fresh load selects the TTI baseline since #156; the expected values are the tracer's). */
 async function openSim(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   await pickScenario(page.getByRole('dialog', { name: /new scenario/i }), TRACER)
 }
 

@@ -4,13 +4,12 @@
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 test('trucks render, queue at the gate, stand in stalls and exit', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('truck-gate-queue'))
+  await openTwin(page, { scenario: 'truck-gate-queue' })
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 
   await page.evaluate(() => window.__tt!.runTo(3300))
@@ -31,9 +30,7 @@ test('trucks render, queue at the gate, stand in stalls and exit', async ({ page
 test('holding positions are drawn and admitted trucks wait in them off the roads (TT-R16)', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('truck-holding-overflow'))
+  await openTwin(page, { scenario: 'truck-holding-overflow' })
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 
   // the two configured positions are drawn
@@ -52,6 +49,7 @@ test('holding positions are drawn and admitted trucks wait in them off the roads
   // look at the holding area (a screenshot to inspect by eye)
   await page.evaluate(() => window.__tt!.cameraTo('holding', 90))
   await page.waitForTimeout(1500)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: process.env.TT_HOLDING_SHOT ?? 'test-results/holding.png' })
 
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'TruckDeparted' }))

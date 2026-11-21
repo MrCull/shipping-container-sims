@@ -6,6 +6,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = []
@@ -17,9 +18,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function open(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('rob-bays'))
+  await openTwin(page, { scenario: 'rob-bays' })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
@@ -138,6 +137,7 @@ test('bay viewer: opens from a vessel click, steps between bays, shows ROB bays 
   const entries = await strip.count()
   for (let i = 0; i < entries && (await cell.count()) === 0; i++) await strip.nth(i).click()
   await expect(cell).toHaveCount(1)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/bay-viewer.png' })
   await page.evaluate(() => window.__tt!.runUntil({ vesselsCompleted: 1 }))
   // the viewer refreshes by itself while open
