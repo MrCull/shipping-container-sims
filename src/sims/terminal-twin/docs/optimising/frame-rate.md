@@ -254,8 +254,9 @@ on the reference laptop; real-GPU fps on a production build. Fill them in here.
   plus 3 ms (`colour-by.smoke.ts`), and the close-up view costs no more than the Overview camera, within 1.1x plus 3 ms
   (`container-closeup.smoke.ts`). They report numbers as test annotations (`pose-ms`, `frame-ms`, `tti-overview`).
 - `@load` comparisons are ratios with a small absolute slack, never fixed ms.
-- Smoke suite timing: `SMOKE_JSON_REPORT=<file>` writes a Playwright JSON report; `node scripts/smoke-timing.mjs <file>`
-  turns it into a duration table.
+- Smoke suite timing: `SMOKE_JSONL_REPORT=<file>` appends one line per finished test (kept by a cancelled run;
+  `SMOKE_JSON_REPORT=<file>` writes a JSON report at the end); `node scripts/smoke-timing.mjs <file>` turns either into a
+  duration table that flags tests over the 30 s budget.
 
 ## Gotchas
 

@@ -45,11 +45,20 @@ export default defineConfig({
   fullyParallel: false,
   // One at a time by default: browser tests are CPU-bound on software WebGL. SMOKE_WORKERS=2 trades speed for timeouts on a 4-core box; try it on an idle machine and re-run failures alone.
   workers: Number(process.env.SMOKE_WORKERS) || 1,
-  // CI runners are slower than a dev machine: a spec that fails once and passes on retry is reported as flaky, not red.
-  retries: process.env.CI ? 2 : 0,
-  // SMOKE_JSON_REPORT=<file> also writes a JSON report there (CI sets it; scripts/smoke-timing.mjs reads it). Unset: list only.
-  // the summary reporter ends every run with one `SMOKE: n passed, n failed, ...` line, which survives a pipe that eats the exit code
-  reporter: [['list'], ['./scripts/smoke-summary-reporter.mjs'], ...(process.env.SMOKE_JSON_REPORT ? [['json', { outputFile: process.env.SMOKE_JSON_REPORT }] as const] : [])],
+  // CI: one retry (a spec that fails once and passes on retry is reported as flaky, not red) and stop after 5 failures,
+  // so a broken build does not burn the whole job timeout. Local runs: no retries, no cap.
+  retries: process.env.CI ? 1 : 0,
+  maxFailures: process.env.CI ? 5 : 0,
+  // The summary reporter ends every run with one `SMOKE: n passed, n failed, ...` line, which survives a pipe that eats the exit code.
+  // SMOKE_JSONL_REPORT=<file> appends one line per finished test attempt (scripts/smoke-jsonl-reporter.mjs; CI sets it), so a
+  // cancelled or timed-out run keeps its timings. SMOKE_JSON_REPORT=<file> writes a JSON report, but only when the run ends.
+  // scripts/smoke-timing.mjs reads either. Unset: list only.
+  reporter: [
+    ['list'],
+    ['./scripts/smoke-summary-reporter.mjs'],
+    ...(process.env.SMOKE_JSONL_REPORT ? [['./scripts/smoke-jsonl-reporter.mjs', { outputFile: process.env.SMOKE_JSONL_REPORT }] as const] : []),
+    ...(process.env.SMOKE_JSON_REPORT ? [['json', { outputFile: process.env.SMOKE_JSON_REPORT }] as const] : []),
+  ],
   outputDir: '.smoke-results',
   use: { viewport: { width: 1280, height: 720 }, launchOptions: { executablePath: chromiumExecutable() } },
   projects: [
