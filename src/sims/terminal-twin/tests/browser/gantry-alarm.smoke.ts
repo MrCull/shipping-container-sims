@@ -3,7 +3,8 @@
  * they gantry, the alarm is louder near the camera, and it follows the shared volume and mute. Run with
  * `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

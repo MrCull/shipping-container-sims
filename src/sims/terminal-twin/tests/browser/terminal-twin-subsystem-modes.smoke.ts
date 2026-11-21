@@ -3,7 +3,7 @@
  * defaults and the request Start sends are the component test (tests/components/setup-dialog.test.ts, #332).
  * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openSetupTab } from './scenarioPicker'
 import { openTwin } from './openTwin'

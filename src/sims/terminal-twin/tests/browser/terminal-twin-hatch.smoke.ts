@@ -5,7 +5,8 @@
  * #331); this spec keeps what needs a browser: a drawn panel picked by a click, inspected, and the event feed.
  * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type { HatchPanelState } from '../../engine'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'

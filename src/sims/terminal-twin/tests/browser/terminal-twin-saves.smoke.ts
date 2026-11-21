@@ -4,9 +4,13 @@
  * Run with `pnpm run test:smoke`.
  */
 import { readFileSync } from 'node:fs'
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
+
+// Fresh page (#329): saves live in IndexedDB, which the shared-page reset does not clear, and the specs reload and stub IndexedDB with addInitScript.
+test.use({ fresh: true })
 
 const FIXTURE = 'asc-1sts-10-boxes-1block'
 

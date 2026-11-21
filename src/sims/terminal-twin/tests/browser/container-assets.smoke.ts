@@ -6,7 +6,8 @@
  * viewer shows every asset (screenshots in .screenshots/assets/).
  * Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import atlas from '../../assets/models/containers/livery-atlas.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing

@@ -5,7 +5,7 @@
  * JSON file to write (the baseline command sets it; `TT_BASELINE_STRICT=1` runs with "strict checks", #252); never run in CI (`@load`).
  */
 import { writeFileSync } from 'node:fs'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 
 const OUT = process.env.TT_BASELINE_OUT
 const SPEEDS = [60, 120, 300, 600, 1200, 1800, 3600]

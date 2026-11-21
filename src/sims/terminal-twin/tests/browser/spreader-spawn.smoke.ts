@@ -2,7 +2,8 @@
  * #142 browser smoke tests: the ASC and SHC spreaders telescope to the box they carry (20 ft short, 40 ft long, like
  * the STS), and shuttle carriers spawn facing their first leg. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

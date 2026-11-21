@@ -3,7 +3,8 @@
  * preset, Events and Inspector panels open or closed) and every KPI card is fully visible. Driven by the dev-only
  * `window.__tt.hudLayout()` query. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'

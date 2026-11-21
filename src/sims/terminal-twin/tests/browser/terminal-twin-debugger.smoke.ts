@@ -3,7 +3,8 @@
  * selection, follow camera, feed throttling and the live overlays, driven by
  * the dev-only `window.__tt` API plus real clicks. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type { EngineEvent } from '../../engine'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'

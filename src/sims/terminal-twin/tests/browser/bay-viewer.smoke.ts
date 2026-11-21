@@ -4,7 +4,8 @@
  * from planned to in progress to done while the run proceeds. Screenshot: .screenshots/bay-viewer.png.
  * Run with `pnpm run test:smoke --project=dev --grep "bay viewer"`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

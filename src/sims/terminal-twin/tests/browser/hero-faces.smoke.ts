@@ -5,7 +5,7 @@
  * and arrival (nothing prepared during a fast fly-through, faces once the camera settles) are Node tests
  * (`tests/hero-faces.test.ts`, `tests/hero-prep.test.ts`, `tests/quality.test.ts`; #336).
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

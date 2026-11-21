@@ -4,7 +4,7 @@
  * #331); this spec keeps the screenshot of the loaded hull with its ROB boxes: .screenshots/assets/rob-bays.png.
  * Run with `pnpm run test:smoke --project=dev --grep "ROB"`.
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 

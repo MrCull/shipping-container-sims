@@ -4,7 +4,8 @@
  * Headless Chromium renders with SwiftShader, so frame RATES here say nothing about a real GPU: the
  * assertions are about draw calls, triangles, culling and the Auto controller. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin, type OpenTwinOptions } from './openTwin'
 
