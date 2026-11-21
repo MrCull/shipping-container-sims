@@ -4,7 +4,7 @@
 # Output goes to the terminal and to .merge-ticket.log; the last line is "EXIT <code>", so a background run
 # is finished when `tail -1 .merge-ticket.log` shows it. --push pushes the integration branch after a verified merge.
 # Smoke specs do not run per merge: the spec's final ticket runs the whole suite once, after every other ticket is merged.
-# --smoke runs only the specs for the paths this merge changed (scripts/smoke-specs-for.sh, map in scripts/smoke-map.txt);
+# --smoke runs only the smoke groups this merge needs (scripts/smoke-select.mjs, map in scripts/smoke-map.txt);
 # --smoke-all runs every dev spec except @load (about 40 minutes).
 # An ENGINE_VERSION-only conflict in the engine simulation module is resolved by the script (higher version, minor +1).
 # Stops (without committing) on any other conflict, conflict markers or a failed check. A verified merge then sets the
@@ -93,9 +93,9 @@ pnpm run verify
 if [ "$smoke" = "all" ]; then
   pnpm run test:smoke --project dev --grep-invert @load
 elif [ -n "$smoke" ]; then
-  mapfile -t specs < <(scripts/smoke-specs-for.sh HEAD^1 HEAD)
-  echo "Smoke specs: ${specs[*]}"
-  pnpm run test:smoke --project dev --grep-invert @load "${specs[@]}"
+  node scripts/smoke-select.mjs --base HEAD^1 --head HEAD
+  grep="$(node scripts/smoke-select.mjs --base HEAD^1 --head HEAD --grep)"
+  if [ -n "$grep" ]; then pnpm run test:smoke --project dev --grep "$grep" --grep-invert @load; fi
 fi
 echo "OK: $branch merged into $current and verified."
 mark_handover "$branch" "$merged"

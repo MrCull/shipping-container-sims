@@ -16,7 +16,7 @@ async function open(page: Page): Promise<void> {
   await page.evaluate(() => window.__tt!.viewPreset('overview'))
 }
 
-test('held keys pan, orbit and zoom; release stops; typing is ignored; follow is released', async ({ page }) => {
+test('held keys pan, orbit and zoom; release stops; typing is ignored; follow is released', { tag: '@camera' }, async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   await open(page)

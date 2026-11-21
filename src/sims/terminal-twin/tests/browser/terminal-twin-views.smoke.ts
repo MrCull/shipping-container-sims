@@ -16,7 +16,7 @@ async function open(page: Page, scenario: string): Promise<void> {
   await expect(page.getByTestId('tt-kpi-strip')).toBeVisible()
 }
 
-test('presets frame each region; the dev API, buttons and shortcuts set them', async ({ page }) => {
+test('presets frame each region; the dev API, buttons and shortcuts set them', { tag: '@shell' }, async ({ page }) => {
   await open(page, 'landside-morning-peak')
   const targets: Record<string, { x: number; z: number }> = {}
   for (const name of ['quay', 'yard', 'gate', 'overview']) {
@@ -44,7 +44,7 @@ test('presets frame each region; the dev API, buttons and shortcuts set them', a
   for (const text of ['View: quay', 'View: yard', 'View: landside and gate', 'View: whole terminal']) await expect(help).toContainText(text)
 })
 
-test('with Labels on, the TTI Overview shows no two overlapping labels', async ({ page }) => {
+test('with Labels on, the TTI Overview shows no two overlapping labels', { tag: '@shell' }, async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 })
   await open(page, 'TTI Algeciras baseline')
   await page.evaluate(() => window.__tt!.overlays({ labels: true }))

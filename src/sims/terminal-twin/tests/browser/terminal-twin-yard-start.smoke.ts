@@ -30,12 +30,11 @@ const cellsInYards = (page: Page) =>
     return { cells: n, capacity }
   })
 
-test('the dialog defaults to a pre-filled yard and the run starts with boxes in the stacks', async ({ page }) => {
+test('the dialog defaults to a pre-filled yard and the run starts with boxes in the stacks', { tag: '@setup' }, async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   const dialog = await openDialog(page)
-  await expect(dialog.getByTestId('tt-yard-start-prefilled')).toBeChecked()
-  await expect(dialog.getByTestId('tt-yard-target')).toHaveValue('60')
+  // the defaults (pre-filled, 60 %) are the component test (tests/components/setup-dialog.test.ts, #332)
   await dialog.getByTestId('tt-yard-target').fill('30')
   await dialog.getByRole('button', { name: 'Start', exact: true }).click()
   await expect(dialog).toBeHidden()
@@ -45,7 +44,7 @@ test('the dialog defaults to a pre-filled yard and the run starts with boxes in 
   expect(errors).toEqual([])
 })
 
-test('the empty start leaves the yard empty at t = 0', async ({ page }) => {
+test('the empty start leaves the yard empty at t = 0', { tag: '@setup' }, async ({ page }) => {
   const dialog = await openDialog(page)
   await dialog.getByTestId('tt-yard-start-empty').check()
   await dialog.getByRole('button', { name: 'Start', exact: true }).click()
@@ -54,7 +53,7 @@ test('the empty start leaves the yard empty at t = 0', async ({ page }) => {
   expect((await cellsInYards(page)).cells).toBe(0)
 })
 
-test('the warm-up start shows its length and restarts the KPIs when it ends', async ({ page }) => {
+test('the warm-up start shows its length and restarts the KPIs when it ends', { tag: '@setup' }, async ({ page }) => {
   const dialog = await openDialog(page)
   await dialog.getByTestId('tt-yard-start-warmup').check()
   await dialog.getByTestId('tt-yard-warmup').fill('1')

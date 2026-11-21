@@ -38,7 +38,7 @@ async function vesselPoint(page: Page, id: string): Promise<{ x: number; y: numb
 const viewer = (page: Page) => page.getByTestId('tt-bay-viewer')
 const heading = (page: Page) => page.getByTestId('tt-bay-heading')
 
-test('bay viewer: opens from a vessel click, steps between bays, shows ROB bays and a cell going planned to done', async ({ page }) => {
+test('bay viewer: opens from a vessel click, steps between bays, shows ROB bays and a cell going planned to done', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await open(page)
@@ -151,7 +151,7 @@ test('bay viewer: opens from a vessel click, steps between bays, shows ROB bays 
   expect(errors).toEqual([])
 })
 
-test('bay viewer: the inspector opens it, the work package list follows the run, Escape closes it', async ({ page }) => {
+test('bay viewer: the inspector opens it, the work package list follows the run, Escape closes it', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await open(page)

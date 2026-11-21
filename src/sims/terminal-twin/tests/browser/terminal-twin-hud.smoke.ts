@@ -8,7 +8,8 @@ import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 
-const PRESETS = ['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras, peak day']
+// TTI baseline for the fit of TTI's KPI strip; the peak day added only load time (same HUD), so the tracer took its place (#334).
+const PRESETS = ['TTI Algeciras baseline', 'Small automated', 'tracer-1sts-10-boxes']
 // The tight 1280x720 layout is checked on every preset; 1920x1080 only on the small one (software WebGL makes the
 // big presets at that size take minutes, and the extra room cannot cause an overlap the small viewport does not).
 const CASES = [
@@ -33,7 +34,7 @@ async function setPanels(page: Page, feed: boolean, inspector: boolean): Promise
 }
 
 for (const { preset, viewport } of CASES) {
-  test(`no two HUD regions overlap: ${preset} at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+  test(`no two HUD regions overlap: ${preset} at ${viewport.width}x${viewport.height}`, { tag: '@shell' }, async ({ page }) => {
     test.slow() // software WebGL at 1920x1080 on the big presets renders a frame in seconds on a loaded runner
     await open(page, preset, viewport)
     for (const [feed, inspector] of [
@@ -53,7 +54,7 @@ for (const { preset, viewport } of CASES) {
   })
 }
 
-test('every KPI card shows its label and value in full at 1280x720, with both panels open', async ({ page }) => {
+test('every KPI card shows its label and value in full at 1280x720, with both panels open', { tag: '@shell' }, async ({ page }) => {
   await open(page, 'TTI Algeciras baseline', { width: 1280, height: 720 }) // clipping is checked at the tight layout
   await setPanels(page, true, true)
   const cards = await page.getByTestId('tt-kpi-strip').locator('li').evaluateAll((els) =>
@@ -74,8 +75,8 @@ test('every KPI card shows its label and value in full at 1280x720, with both pa
   }
 })
 
-test('KPI values keep a fixed minimum width and tabular figures so the strip does not shift', async ({ page }) => {
-  await open(page, 'TTI Algeciras baseline')
+test('KPI values keep a fixed minimum width and tabular figures so the strip does not shift', { tag: '@shell' }, async ({ page }) => {
+  await open(page, 'tracer-1sts-10-boxes') // CSS of the strip, the same on every scenario
   const values = await page.getByTestId('tt-kpi-strip').locator('.value').evaluateAll((els) =>
     els.map((el) => {
       const cs = getComputedStyle(el)
@@ -90,7 +91,7 @@ test('KPI values keep a fixed minimum width and tabular figures so the strip doe
   }
 })
 
-test('the Quality control sits in the settings region beside Daylight', async ({ page }) => {
+test('the Quality control sits in the settings region beside Daylight', { tag: '@shell' }, async ({ page }) => {
   await open(page, 'Small automated')
   const settings = page.locator('[data-hud-region="settings"]')
   await expect(settings.getByTestId('tt-daylight-toggle')).toBeVisible()
@@ -99,7 +100,7 @@ test('the Quality control sits in the settings region beside Daylight', async ({
   await expect(settings.getByTestId('tt-perf-toggle')).toBeVisible()
 })
 
-test('the theme toggle switches light and dark, is remembered, and leaves the other pages alone', async ({ page }) => {
+test('the theme toggle switches light and dark, is remembered, and leaves the other pages alone', { tag: '@shell' }, async ({ page }) => {
   await open(page, 'Small automated')
   const theme = () => page.evaluate(() => document.documentElement.dataset.ttTheme)
   const panel = () => page.getByTestId('tt-topbar').evaluate((el) => getComputedStyle(el).backgroundColor)
@@ -120,7 +121,7 @@ test('the theme toggle switches light and dark, is remembered, and leaves the ot
   expect(await theme()).toBeUndefined()
 })
 
-test('the sim header reads Menu once', async ({ page }) => {
+test('the sim header reads Menu once', { tag: '@shell' }, async ({ page }) => {
   await open(page, 'Small automated')
   const back = page.locator('.sim-header .back-btn')
   await expect(back).toHaveText(/^\s*<?\s*MENU\s*$/i)

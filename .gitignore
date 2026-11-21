@@ -158,6 +158,7 @@ __pycache__/
 .smoke-dist/
 .smoke-build/
 .smoke-results/
+.smoke-shards/
 test-results/
 
 .merge-ticket.log

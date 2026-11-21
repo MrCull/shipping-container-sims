@@ -14,7 +14,7 @@ for (const [level, cap] of [
   ['medium', 36],
   ['low', 0],
 ] as const) {
-  test(`${level}: hero faces within the cap at 10 m, none at the overview`, async ({ page }) => {
+  test(`${level}: hero faces within the cap at 10 m, none at the overview`, { tag: '@yard' }, async ({ page }) => {
     test.slow() // software WebGL
     const heroRequests: string[] = []
     page.on('request', (r) => {
@@ -54,7 +54,7 @@ for (const [level, cap] of [
   })
 }
 
-test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks go standard, only the still-camera floor at hero-off', async ({ page }) => {
+test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks go standard, only the still-camera floor at hero-off', { tag: '@yard' }, async ({ page }) => {
   test.slow() // software WebGL
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
@@ -119,7 +119,7 @@ test('Auto ladder (#261): hero faces drawn fall with the hero cap rungs, marks g
   expect(errors).toEqual([])
 })
 
-test('arrival: nothing is prepared during a fast fly-through, faces arrive once the camera settles', async ({ page }) => {
+test('arrival: nothing is prepared during a fast fly-through, faces arrive once the camera settles', { tag: '@yard' }, async ({ page }) => {
   test.slow() // software WebGL
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))

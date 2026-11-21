@@ -30,7 +30,7 @@ function watch(page: Page): { errors: string[]; external: string[] } {
   return { errors, external }
 }
 
-test('the twin renders containers from the GLBs with each box in its own line livery, offline', async ({ page }) => {
+test('the twin renders containers from the GLBs with each box in its own line livery, offline', { tag: '@yard' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await openTwin(page, { scenario: 'liveries-mixed', quality: 'high' }) // the LOD distances it checks are High's (Low scales them by 0.4)
   await page.evaluate(() => window.__tt!.runTo(200))
@@ -69,11 +69,19 @@ test('the twin renders containers from the GLBs with each box in its own line li
   expect(errors).toEqual([])
 })
 
-test('the asset viewer loads every container asset, switches LODs and moves the rig', async ({ page }) => {
+test('the asset viewer loads every container asset, switches LODs and moves the rig', { tag: '@yard' }, async ({ page }) => {
   test.slow() // shows and screenshots every asset in the pack, each on software WebGL
   const { errors, external } = watch(page)
   await page.goto(twinUrl({ params: { viewer: 'container-20' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
+  // render is off (#345): the frame counter still advances, nothing is drawn until renderOnce()
+  const start = await page.evaluate(() => window.__ttAssets!.frames().frames)
+  await page.waitForFunction((n) => window.__ttAssets!.frames().frames > n + 2, start)
+  expect((await page.evaluate(() => window.__ttAssets!.frames())).render).toEqual({ calls: 0, triangles: 0 })
+  const once = await page.evaluate(() => window.__ttAssets!.renderOnce())
+  expect(once.calls).toBeGreaterThan(0)
+  expect(once.triangles).toBeGreaterThan(0)
+  expect((await page.evaluate(() => window.__ttAssets!.frames())).render).toEqual(once)
   const names = await page.evaluate(() => window.__ttAssets!.list())
   expect(names).toEqual(expect.arrayContaining(['container-20', 'container-40', 'container-40hc']))
 
@@ -92,17 +100,18 @@ test('the asset viewer loads every container asset, switches LODs and moves the 
       const moved = await page.evaluate(([n, v]) => window.__ttAssets!.setRig(n as string, v as number), [rig.node, rig.max] as const)
       expect(moved.rigValues[rig.node]).toBe(rig.max)
     }
-    await page.waitForTimeout(250)
+    await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
     await page.screenshot({ path: `.screenshots/assets/${name}.png` })
   }
   expect(external).toEqual([])
   expect(errors).toEqual([])
 })
 
-test('a TTI-size yard of instanced containers stays within the triangle and draw-call budget', async ({ page }) => {
-  test.slow() // 18,000 instances render at under 1 fps on software WebGL
+test('a TTI-size yard of instanced containers stays within the triangle and draw-call budget', { tag: '@yard' }, async ({ page }) => {
+  test.slow() // 18,000 instances render at under 1 fps on software WebGL; with render off only the one measured frame is drawn
   const { errors } = watch(page)
-  await page.goto(twinUrl({ params: { viewer: 'yard' } })) // the asset viewer has no __tt to wait for
+  // High quality keeps the sun's shadow pass in the measured frame, so the budget below counts the same passes as before
+  await page.goto(twinUrl({ quality: 'high', params: { viewer: 'yard' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
   const yard = await page.evaluate(() => window.__ttAssets!.yard(18000))
   expect(yard.instances).toBe(18000)
@@ -114,6 +123,7 @@ test('a TTI-size yard of instanced containers stays within the triangle and draw
   expect(yard.drawCalls).toBeLessThan(40)
   expect(yard.triangles).toBeLessThan(1_500_000)
   console.log(`yard: ${JSON.stringify(yard)}`)
+  await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/yard.png' })
   expect(errors).toEqual([])
 })

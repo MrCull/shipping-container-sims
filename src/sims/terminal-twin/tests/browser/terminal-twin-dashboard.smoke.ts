@@ -31,7 +31,7 @@ async function showCharts(page: Page, group: string, bucketing: 'hour' | 'shift'
   await expect(page.getByTestId('tt-dashboard-charts')).toBeVisible()
 }
 
-test('B opens the dashboard, which loads ECharts only then, and B closes it', async ({ page }) => {
+test('B opens the dashboard, which loads ECharts only then, and B closes it', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   const chartChunks: string[] = []
   page.on('request', (r) => {
@@ -55,7 +55,7 @@ test('B opens the dashboard, which loads ECharts only then, and B closes it', as
   expect(errors).toEqual([])
 })
 
-test('the TOS handlers tab draws the handler wall latency over time with latency injection on', async ({ page }) => {
+test('the TOS handlers tab draws the handler wall latency over time with latency injection on', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   const decisions = { points: { stsGroundPosition: { timeoutMs: 60_000, latency: { delay: { kind: 'uniform', minMs: 200, maxMs: 1200 } } } } }
   await open(page, ASC, { endConditions: { simDurationS: 3 * 3600 }, overrides: { decisions } as never })
@@ -68,7 +68,7 @@ test('the TOS handlers tab draws the handler wall latency over time with latency
   expect(errors).toEqual([])
 })
 
-test('a 24 h run draws hourly series that zoom', async ({ page }) => {
+test('a 24 h run draws hourly series that zoom', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, ASC, { endConditions: { simDurationS: 24 * 3600 } })
   await page.evaluate(() => window.__tt!.runUntil())
@@ -98,7 +98,7 @@ test('a 24 h run draws hourly series that zoom', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
-test('the yard heatmap matches the engine fill of every block', async ({ page }) => {
+test('the yard heatmap matches the engine fill of every block', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, ASC)
   await page.evaluate(() => window.__tt!.runUntil())
@@ -129,7 +129,7 @@ test('the yard heatmap matches the engine fill of every block', async ({ page })
   expect(errors).toEqual([])
 })
 
-test('the Gantt timeline shows the berth and anchorage windows of the two-vessel fixture', async ({ page }) => {
+test('the Gantt timeline shows the berth and anchorage windows of the two-vessel fixture', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, TWO_VESSELS)
   await page.evaluate(() => window.__tt!.runUntil())
@@ -159,7 +159,7 @@ test('the Gantt timeline shows the berth and anchorage windows of the two-vessel
   expect(errors).toEqual([])
 })
 
-test('the final report opens as the dashboard report tab when the scenario ends and stays browsable', async ({ page }) => {
+test('the final report opens as the dashboard report tab when the scenario ends and stays browsable', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, ASC, { endConditions: { moves: 4 } })
   await page.evaluate(() => window.__tt!.runUntil())
@@ -175,7 +175,7 @@ test('the final report opens as the dashboard report tab when the scenario ends 
   expect(errors).toEqual([])
 })
 
-test('the Landside group charts the truck turnaround metrics and its summary table matches the engine report (TT-R18)', async ({ page }) => {
+test('the Landside group charts the truck turnaround metrics and its summary table matches the engine report (TT-R18)', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, 'truck-holding-overflow')
   await page.evaluate(() => window.__tt!.runUntil())
@@ -198,7 +198,7 @@ test('the Landside group charts the truck turnaround metrics and its summary tab
   expect(errors).toEqual([])
 })
 
-test('the Dashboard button opens the dashboard with charts after the run ends, and closes it again', async ({ page }) => {
+test('the Dashboard button opens the dashboard with charts after the run ends, and closes it again', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, TWO_VESSELS, { endConditions: { simDurationS: 1800 } })
   await page.evaluate(() => window.__tt!.runUntil())
@@ -216,7 +216,7 @@ test('the Dashboard button opens the dashboard with charts after the run ends, a
   expect(errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([])
 })
 
-test('a failed dashboard chunk load shows an error with a retry button', async ({ page }) => {
+test('a failed dashboard chunk load shows an error with a retry button', { tag: '@analysis' }, async ({ page }) => {
   await open(page, TWO_VESSELS)
   await page.route(/DashboardTab/, (route) => route.abort())
   await page.getByTestId('tt-dashboard-button').click()

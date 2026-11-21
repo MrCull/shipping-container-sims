@@ -10,7 +10,7 @@ import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 
-test('boxes within about 35 m become close-ups, from far away none are', async ({ page }) => {
+test('boxes within about 35 m become close-ups, from far away none are', { tag: '@yard' }, async ({ page }) => {
   test.slow() // software WebGL
   const errors: string[] = []
   page.on('console', (msg) => {
@@ -49,7 +49,7 @@ test('boxes within about 35 m become close-ups, from far away none are', async (
 })
 
 for (const [level, budget, distanceM] of [['low', 48, 12], ['high', 400, 22]] as const) {
-  test(`a yard block edge close up draws faces on ${level}, none from far, never above the budget`, async ({ page }) => {
+  test(`a yard block edge close up draws faces on ${level}, none from far, never above the budget`, { tag: '@yard' }, async ({ page }) => {
     test.slow() // software WebGL
     const errors: string[] = []
     page.on('console', (msg) => {
@@ -79,7 +79,7 @@ for (const [level, budget, distanceM] of [['low', 48, 12], ['high', 400, 22]] as
   })
 }
 
-test('the view about 10 boxes wide costs no more frame time than the Overview camera @load', async ({ page }) => {
+test('the view about 10 boxes wide costs no more frame time than the Overview camera @load', { tag: '@yard' }, async ({ page }) => {
   test.setTimeout(900_000)
   await openTwin(page)
   await page.evaluate(() => window.__tt!.setQuality('high'))

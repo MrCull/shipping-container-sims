@@ -14,7 +14,7 @@ async function open(page: Page, fixture: string): Promise<void> {
   await page.waitForFunction(() => window.__tt!.scene()?.ascAssets === 'loaded' || window.__tt!.scene()?.shcAssets === 'loaded', undefined, { timeout: 30_000 }).catch(() => undefined)
 }
 
-test('ASC and SHC spreaders are 20 ft long for a 20 ft box and 40 ft long for a 40', async ({ page }) => {
+test('ASC and SHC spreaders are 20 ft long for a 20 ft box and 40 ft long for a 40', { tag: '@equipment' }, async ({ page }) => {
   test.slow()
   await open(page, 'asc-1sts-10-boxes-1block') // 20 ft and 40 ft boxes mixed, STS to SHC to WTP pad to ASC
   await page.waitForFunction(() => window.__tt!.scene()?.ascAssets === 'loaded' && window.__tt!.scene()?.shcAssets === 'loaded')
@@ -57,7 +57,7 @@ test('ASC and SHC spreaders are 20 ft long for a 20 ft box and 40 ft long for a 
   }
 })
 
-test('each SHC faces its first leg before it moves: no turn on the first move', async ({ page }) => {
+test('each SHC faces its first leg before it moves: no turn on the first move', { tag: '@equipment' }, async ({ page }) => {
   await open(page, 'shc-1sts-2shc-1wtp')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
   await page.evaluate(() => window.__tt!.setSpeed(10))

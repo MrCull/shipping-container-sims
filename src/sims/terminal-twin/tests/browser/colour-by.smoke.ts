@@ -1,10 +1,12 @@
 /**
- * Spec #116 / #130 / #168: the Colour by menu and the ROB display (Show, Grey, Hide, in the top bar). Fixture `rob-bays`
- * (a feeder with 3 ROB bays of 7). The mode is changed through the menu, which closes on the pick and on a click outside
- * it: the 3D boxes (`sceneState().liveries[id].tint`) and the bay viewer cells change colour, the legend follows. The ROB
- * display hides the ROB boxes in 3D and in the bay viewer (Hide), greys them (Grey, the default) or colours them by the
- * mode (Show). The mode and the ROB display survive a reload. The last test (`@load`, never in CI) checks that switching
- * modes on the full TTI yard does not cost frame time. Screenshot: .screenshots/colour-by.png.
+ * Spec #116 / #130 / #168: the Colour by menu and the ROB display (Show, Grey, Hide, in the top bar), wired to the running
+ * twin. Fixture `rob-bays` (a feeder with 3 ROB bays of 7). A mode picked in the menu reaches the scene
+ * (`sceneState().colour`) and the bay viewer cells change colour; the ROB display hides the ROB cells in the bay viewer
+ * (Hide), greys them (Grey, the default) or keeps them (Show). The menu itself (modes, legend per mode, closing on a pick
+ * and on an outside click, the remembered mode and ROB display) is a component test (`tests/components/colour-by-menu.test.ts`,
+ * #332); the bay viewer colour per mode is `tests/bay-view.test.ts`; the 3D tints per mode, time-based modes and the ROB
+ * boxes per display are checked in Node (`tests/headless-scene-vessel.test.ts`, #331). The last test (`@load`, never in
+ * CI) checks that switching modes on the full TTI yard does not cost frame time. Screenshot: .screenshots/colour-by.png.
  * Run with `pnpm run test:smoke --project=dev --grep "colour by"`.
  */
 import { expect, test, type Page } from '@playwright/test'
@@ -44,41 +46,14 @@ async function setMode(page: Page, mode: string): Promise<void> {
 /** The ROB display the 3D view and the bay viewer draw with (`show`, `grey` or `hide`), as the dev API reports it. */
 const robDisplayOf = (page: Page) => page.evaluate(() => window.__tt!.sceneState()!.colour.robDisplay)
 
-/** The tints drawn this frame, per container (-1 = livery). */
-async function tints(page: Page): Promise<Record<string, number>> {
-  const frames = await page.evaluate(() => window.__tt!.scene()!.frames)
-  await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 2, frames)
-  return page.evaluate(() => Object.fromEntries(Object.entries(window.__tt!.sceneState()!.liveries).map(([id, l]) => [id, l.tint])))
-}
-
-test('colour by: the menu recolours the 3D boxes and the bay viewer, with a legend', async ({ page }) => {
+test('colour by: the menu recolours the 3D boxes and the bay viewer', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'VesselBerthed' }))
 
-  // default: line livery, no tint
-  const before = await tints(page)
-  expect(Object.keys(before).length).toBeGreaterThan(10)
-  expect(Object.values(before).every((v) => v === -1)).toBe(true)
-
-  await openMenu(page)
-  await expect(select(page)).toHaveValue('default')
-  await expect(page.getByTestId('tt-colour-by-legend').locator('li').first()).toBeVisible()
-
-  // POD: boxes take one colour per port, the legend lists the ports
-  await setMode(page, 'pod')
-  await expect.poll(async () => new Set(Object.values(await tints(page)).filter((v) => v >= 0)).size).toBeGreaterThan(1)
-  await openMenu(page)
-  await expect(page.getByTestId('tt-colour-by-legend')).toContainText(/[A-Z]{5}/)
-  const pod = await tints(page)
-  expect(Object.values(pod).every((v) => v >= 0)).toBe(true)
-
-  // weight class: another set of colours for the same boxes
+  // weight class (the legend per mode is the component test)
   await setMode(page, 'weight')
-  await expect.poll(async () => JSON.stringify(await tints(page))).not.toBe(JSON.stringify(pod))
-  await openMenu(page)
-  await expect(page.getByTestId('tt-colour-by-legend')).toContainText('Heavy')
 
   // the bay viewer uses the same mode and legend
   await page.evaluate(() => window.__tt!.select('V001'))
@@ -104,66 +79,20 @@ test('colour by: the menu recolours the 3D boxes and the bay viewer, with a lege
   await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/colour-by.png' })
 
-  // default again: the bay viewer shows the state of each cell and 3D goes back to the livery
+  // default again: the bay viewer shows the state of each cell
   await setMode(page, 'default')
   await expect(page.getByTestId('tt-bay-colour-mode')).toContainText('State')
-  await expect.poll(async () => Object.values(await tints(page)).every((v) => v === -1)).toBe(true)
   expect(errors).toEqual([])
 })
 
-test('colour by: Length and the light Dwell ramp recolour 3D and the bay viewer (#140)', async ({ page }) => {
+test('colour by: the ROB display (Show, Grey, Hide) draws the ROB cells in the bay viewer', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'VesselBerthed' }))
-  await page.evaluate(() => window.__tt!.select('V001'))
-  await page.getByTestId('tt-open-bay-viewer').click()
-  await expect(page.getByTestId('tt-bay-viewer')).toBeVisible()
-  const cells = page.locator('[data-testid=tt-bay-cell]:not([data-continuation])[data-key]:not([data-key=""])')
-  const fills = () => cells.evaluateAll((els) => [...new Set(els.map((e) => getComputedStyle(e).backgroundColor))].sort())
-
-  await setMode(page, 'length')
-  await openMenu(page)
-  await expect(page.getByTestId('tt-colour-by-legend')).toContainText('20 ft')
-  await expect(page.getByTestId('tt-colour-by-legend')).toContainText('40 ft')
-  await expect(page.getByTestId('tt-colour-by-legend')).toContainText('45')
-  await expect.poll(async () => new Set(Object.values(await tints(page)).filter((v) => v >= 0)).size).toBeGreaterThan(1)
-  await expect(page.getByTestId('tt-bay-colour-mode')).toContainText('Length')
-  const lengthTints = await tints(page)
-  const lengthFills = await fills()
-  expect(lengthFills.length).toBeGreaterThan(0)
-
-  await setMode(page, 'dwell')
-  await openMenu(page)
-  await expect(page.getByTestId('tt-colour-by-legend')).toContainText('Over 7 days')
-  await expect.poll(async () => JSON.stringify(await tints(page))).not.toBe(JSON.stringify(lengthTints))
-  await expect(page.getByTestId('tt-bay-colour-mode')).toContainText('Dwell')
-  await expect.poll(async () => JSON.stringify(await fills())).not.toBe(JSON.stringify(lengthFills))
-  expect(errors).toEqual([])
-})
-
-test('colour by: time-based modes follow the sim clock', async ({ page }) => {
-  test.slow()
-  const errors = collectErrors(page)
-  await open(page)
-  await setMode(page, 'transit')
-  await expect.poll(async () => Object.values(await tints(page)).some((v) => v >= 0)).toBe(true)
-  const early = await tints(page)
-  await page.evaluate(() => window.__tt!.runUntil({ vesselsCompleted: 1 }))
-  await expect.poll(async () => JSON.stringify(await tints(page))).not.toBe(JSON.stringify(early))
-  expect(errors).toEqual([])
-})
-
-test('colour by: the ROB display (Show, Grey, Hide) draws the ROB boxes in 3D and the bay viewer', async ({ page }) => {
-  test.slow()
-  const errors = collectErrors(page)
-  await open(page)
-  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'VesselBerthed' }))
-  const hull = () => page.evaluate(() => window.__tt!.sceneState()!.vesselHulls.V001)
-  // default: Grey, the ROB boxes drawn in the ROB grey, the state view hatches the ROB cells
+  // default: Grey, the state view hatches the ROB cells
   expect(await robDisplayOf(page)).toBe('grey')
   await expect(page.getByTestId('tt-rob-display')).toHaveAttribute('data-mode', 'grey')
-  expect((await hull()).robBoxes).toBeGreaterThan(30)
 
   await page.evaluate(() => window.__tt!.select('V001'))
   await page.getByTestId('tt-open-bay-viewer').click()
@@ -174,17 +103,16 @@ test('colour by: the ROB display (Show, Grey, Hide) draws the ROB boxes in 3D an
   expect(shown).toBeGreaterThan(10)
   expect(await robCells.first().evaluate((e) => getComputedStyle(e).backgroundImage)).toContain('repeating-linear-gradient')
 
-  // Hide: no ROB box in 3D, no ROB cell in the bay viewer, the strip still marks the ROB bay (#159)
+  // Hide: the scene takes it, no ROB cell in the bay viewer, the strip still marks the ROB bay (#159)
   await page.getByTestId('tt-rob-hide').click()
   await expect(page.getByTestId('tt-rob-display')).toHaveAttribute('data-mode', 'hide')
-  await expect.poll(async () => (await hull()).robBoxes).toBe(0)
-  expect((await hull()).robHidden).toBe(true)
+  await expect.poll(() => robDisplayOf(page)).toBe('hide')
   await expect(robCells).toHaveCount(0)
   await expect(page.locator('[data-testid^=tt-bay-strip-][data-state=rob]').first()).toBeVisible()
 
-  // Show: the ROB boxes come back in 3D in their mode colour; the bay viewer's ROB cells stay grey (#223)
+  // Show: the ROB cells come back; the bay viewer's ROB cells stay grey (#223)
   await page.getByTestId('tt-rob-show').click()
-  await expect.poll(async () => (await hull()).robBoxes).toBeGreaterThan(30)
+  await expect.poll(() => robDisplayOf(page)).toBe('show')
   await expect(robCells).toHaveCount(shown)
   await setMode(page, 'line')
   await expect.poll(async () => robCells.first().evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(200, 202, 205)')
@@ -196,46 +124,7 @@ test('colour by: the ROB display (Show, Grey, Hide) draws the ROB boxes in 3D an
   expect(errors).toEqual([])
 })
 
-test('colour by: the menu closes on a pick and on a click outside it (#168)', async ({ page }) => {
-  test.slow()
-  const errors = collectErrors(page)
-  await open(page)
-  await openMenu(page)
-  await select(page).selectOption('pod')
-  await expect(page.getByTestId('tt-colour-by-panel')).toBeHidden()
-  await expect.poll(() => page.evaluate(() => window.__tt!.sceneState()!.colour.mode)).toBe('pod')
-
-  await openMenu(page)
-  await page.mouse.click(10, 10) // a click on the page, outside the menu
-  await expect(page.getByTestId('tt-colour-by-panel')).toBeHidden()
-
-  // the button still opens and closes it
-  await page.getByTestId('tt-colour-by').click()
-  await expect(page.getByTestId('tt-colour-by-panel')).toBeVisible()
-  await page.getByTestId('tt-colour-by').click()
-  await expect(page.getByTestId('tt-colour-by-panel')).toBeHidden()
-  expect(errors).toEqual([])
-})
-
-test('colour by: the mode and the ROB display survive a reload', async ({ page }) => {
-  test.slow()
-  const errors = collectErrors(page)
-  await open(page)
-  await setMode(page, 'flow')
-  await page.getByTestId('tt-rob-hide').click()
-  await page.reload()
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('rob-bays'))
-  await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
-  await expect(page.getByTestId('tt-rob-display')).toHaveAttribute('data-mode', 'hide')
-  expect(await robDisplayOf(page)).toBe('hide')
-  await openMenu(page)
-  await expect(select(page)).toHaveValue('flow')
-  await expect.poll(async () => Object.values(await tints(page)).some((v) => v >= 0)).toBe(true)
-  expect(errors).toEqual([])
-})
-
-test('colour by: switching modes on the full TTI yard costs no frame time @load', async ({ page }) => {
+test('colour by: switching modes on the full TTI yard costs no frame time @load', { tag: '@vessel' }, async ({ page }) => {
   test.setTimeout(900_000)
   const errors = collectErrors(page)
   await open(page, 'TTI Algeciras baseline')

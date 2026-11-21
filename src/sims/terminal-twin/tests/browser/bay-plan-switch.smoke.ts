@@ -30,7 +30,7 @@ async function openViewer(page: Page, vesselId: string): Promise<void> {
   await expect(page.getByTestId('tt-bay-heading')).toContainText(/bay \d\d/i)
 }
 
-test('bay plan switch: opens on Discharge, shows one plan at a time, keeps the choice across vessels, Discharge again on a new run', async ({ page }) => {
+test('bay plan switch: opens on Discharge, shows one plan at a time, keeps the choice across vessels, Discharge again on a new run', { tag: '@vessel' }, async ({ page }) => {
   test.slow()
   const errors = collectErrors(page)
   await openTwin(page, { scenario: 'rob-bays' })

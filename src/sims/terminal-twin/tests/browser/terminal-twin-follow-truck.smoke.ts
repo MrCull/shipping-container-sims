@@ -18,7 +18,7 @@ async function open(page: Page): Promise<string[]> {
 
 const ui = (page: Page) => page.evaluate(() => window.__tt!.ui())
 
-test('paused: waits for the next arrival, then follows that truck until it is gone', async ({ page }) => {
+test('paused: waits for the next arrival, then follows that truck until it is gone', { tag: '@camera' }, async ({ page }) => {
   const errors = await open(page)
   // nothing is known at t = 0: the request stays pending
   expect(await page.evaluate(() => window.__tt!.followNextTruck())).toBeNull()
@@ -52,7 +52,7 @@ test('paused: waits for the next arrival, then follows that truck until it is go
   expect(errors).toEqual([])
 })
 
-test('the button and N work, and the HUD regions still do not overlap', async ({ page }) => {
+test('the button and N work, and the HUD regions still do not overlap', { tag: '@camera' }, async ({ page }) => {
   const errors = await open(page)
   await page.getByTestId('tt-follow-next-truck').click()
   expect((await ui(page)).followNextPending).toBe(true)

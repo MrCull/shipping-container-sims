@@ -24,7 +24,7 @@ async function open(page: Page, fixture = FIXTURE): Promise<void> {
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
-test('a breakpoint on an event type pauses playback exactly at that event and the inspector shows it', async ({ page }) => {
+test('a breakpoint on an event type pauses playback exactly at that event and the inspector shows it', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
   await page.keyboard.press('e')
@@ -61,7 +61,7 @@ test('a breakpoint on an event type pauses playback exactly at that event and th
   expect(errors).toEqual([])
 })
 
-test('breakpoints on container, equipment and decision point stop at matching events', async ({ page }) => {
+test('breakpoints on container, equipment and decision point stop at matching events', { tag: '@analysis' }, async ({ page }) => {
   await open(page)
   const boxes = await page.evaluate(() => window.__tt!.query<{ id: string }[]>('containers'))
   const cases: { kind: 'container' | 'equipment' | 'decision'; value: string; check: (e: EngineEvent) => boolean }[] = [
@@ -86,7 +86,7 @@ test('breakpoints on container, equipment and decision point stop at matching ev
   }
 })
 
-test('single-step processes exactly one event per press at any speed setting', async ({ page }) => {
+test('single-step processes exactly one event per press at any speed setting', { tag: '@analysis' }, async ({ page }) => {
   await open(page)
   await page.evaluate(() => window.__tt!.setSpeed(600))
   await page.evaluate(() => window.__tt!.pause())
@@ -104,7 +104,7 @@ test('single-step processes exactly one event per press at any speed setting', a
   await page.waitForFunction((n) => window.__tt!.clock().engine!.eventsTotal === n + 1, before)
 })
 
-test('the cause chain reaches the root event and equals the engine why; each link can be inspected', async ({ page }) => {
+test('the cause chain reaches the root event and equals the engine why; each link can be inspected', { tag: '@analysis' }, async ({ page }) => {
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcDroppedAtWtp' }))
   const log = await page.evaluate(() => window.__tt!.query<{ id: number; type: string }[]>('eventLog'))
@@ -130,7 +130,7 @@ test('the cause chain reaches the root event and equals the engine why; each lin
   await expect(page.getByTestId('tt-event-heading')).toContainText(target.type)
 })
 
-test('a decision event shows the handler, its request and its reply', async ({ page }) => {
+test('a decision event shows the handler, its request and its reply', { tag: '@analysis' }, async ({ page }) => {
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'DecisionResolved' }))
   const log = await page.evaluate(() => window.__tt!.query<{ id: number; type: string }[]>('eventLog'))
@@ -141,7 +141,7 @@ test('a decision event shows the handler, its request and its reply', async ({ p
   await expect(page.getByTestId('tt-decision-reply')).toBeVisible()
 })
 
-test('Esc closes one thing per press, in order, the inspector included; it never pauses, steps or changes speed (#169)', async ({ page }) => {
+test('Esc closes one thing per press, in order, the inspector included; it never pauses, steps or changes speed (#169)', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcDroppedAtWtp' }))
@@ -196,7 +196,7 @@ test('Esc closes one thing per press, in order, the inspector included; it never
   expect(errors).toEqual([])
 })
 
-test('clicking a container in 3D selects it and shows its custody history', async ({ page }) => {
+test('clicking a container in 3D selects it and shows its custody history', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcDroppedAtWtp' }))
@@ -242,7 +242,7 @@ test('clicking a container in 3D selects it and shows its custody history', asyn
   expect(errors).toEqual([])
 })
 
-test('the follow camera tracks a moving SHC smoothly', async ({ page }) => {
+test('the follow camera tracks a moving SHC smoothly', { tag: '@analysis' }, async ({ page }) => {
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingLoaded' }))
   const shcId = await page.evaluate(() => {
@@ -277,7 +277,7 @@ test('the follow camera tracks a moving SHC smoothly', async ({ page }) => {
   expect(Math.max(...samples.map((s) => s.jump))).toBeLessThan(40)
 })
 
-test('at x600 the feed stays capped, summarises bursts and refreshes at a throttled rate', async ({ page }) => {
+test('at x600 the feed stays capped, summarises bursts and refreshes at a throttled rate', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
   await page.keyboard.press('e')
@@ -302,7 +302,7 @@ test('at x600 the feed stays capped, summarises bursts and refreshes at a thrott
   expect(errors).toEqual([])
 })
 
-test('each overlay toggles independently and reflects live engine state', async ({ page }) => {
+test('each overlay toggles independently and reflects live engine state', { tag: '@analysis' }, async ({ page }) => {
   await open(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcDroppedAtWtp' }))
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 3)

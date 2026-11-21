@@ -30,7 +30,7 @@ async function referenceHash(page: Page): Promise<string> {
   return runToEnd(page)
 }
 
-test('config round-trip: save, reload the page, load, run: same event-log hash', async ({ page }) => {
+test('config round-trip: save, reload the page, load, run: same event-log hash', { tag: '@setup' }, async ({ page }) => {
   const hash = await referenceHash(page)
   await page.evaluate(() => window.__tt!.reset())
   const saved = await page.evaluate(() => window.__tt!.saves.saveToBrowser('config', 'Round trip'))
@@ -46,7 +46,7 @@ test('config round-trip: save, reload the page, load, run: same event-log hash',
   expect(await runToEnd(page)).toBe(hash)
 })
 
-test('snapshot resume through the dialog continues identically to an uninterrupted run', async ({ page }) => {
+test('snapshot resume through the dialog continues identically to an uninterrupted run', { tag: '@setup' }, async ({ page }) => {
   const hash = await referenceHash(page)
   await page.evaluate(() => window.__tt!.reset())
   await page.evaluate(() => window.__tt!.runUntil({ maxEvents: 60 }))
@@ -68,7 +68,7 @@ test('snapshot resume through the dialog continues identically to an uninterrupt
   expect(await runToEnd(page)).toBe(hash)
 })
 
-test('exported files import in a fresh browser profile (config and snapshot)', async ({ page, browser }) => {
+test('exported files import in a fresh browser profile (config and snapshot)', { tag: '@setup' }, async ({ page, browser }) => {
   const hash = await referenceHash(page)
   await page.evaluate(() => window.__tt!.reset())
   const configText = await page.evaluate(() => window.__tt!.saves.fileText('config', 'File config'))
@@ -90,7 +90,7 @@ test('exported files import in a fresh browser profile (config and snapshot)', a
   }
 })
 
-test('the Import button loads a file; an old-format fixture migrates and runs', async ({ page }) => {
+test('the Import button loads a file; an old-format fixture migrates and runs', { tag: '@setup' }, async ({ page }) => {
   await open(page)
   await loadFixture(page)
   await page.getByTestId('tt-saves-button').click()
@@ -105,7 +105,7 @@ test('the Import button loads a file; an old-format fixture migrates and runs', 
   expect((await page.evaluate(() => window.__tt!.clock().engine!.status))).toBe('ended')
 })
 
-test('a snapshot from another engine version warns and offers a restart from its config', async ({ page }) => {
+test('a snapshot from another engine version warns and offers a restart from its config', { tag: '@setup' }, async ({ page }) => {
   const hash = await referenceHash(page)
   await page.evaluate(() => window.__tt!.reset())
   await page.evaluate(() => window.__tt!.runUntil({ maxEvents: 60 }))
@@ -127,7 +127,7 @@ test('a snapshot from another engine version warns and offers a restart from its
   expect(await runToEnd(page)).toBe(hash)
 })
 
-test('rewind: jumping to an automatic snapshot and running on reproduces the original run', async ({ page }) => {
+test('rewind: jumping to an automatic snapshot and running on reproduces the original run', { tag: '@setup' }, async ({ page }) => {
   await open(page)
   await page.evaluate(() => window.__tt!.saves.setRewindInterval(1))
   await loadFixture(page)
@@ -151,7 +151,7 @@ test.describe('IndexedDB unavailable', () => {
     })
   })
 
-  test('the UI says so and file export and import still work', async ({ page }) => {
+  test('the UI says so and file export and import still work', { tag: '@setup' }, async ({ page }) => {
     const hash = await referenceHash(page)
     await page.evaluate(() => window.__tt!.reset())
     await page.getByTestId('tt-saves-button').click()
