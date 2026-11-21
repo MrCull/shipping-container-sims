@@ -21,7 +21,9 @@ case "$cmd" in
       nohup bash -c '
         log=$1; lock=$2; shift 2
         exec 9>>"$lock.lock"
-        if ! flock -n 9; then
+        if ! command -v flock >/dev/null; then
+          echo "bg: WARNING no flock in this shell, the heavy lock is NOT enforced; check nothing else heavy is running" >> "$log"
+        elif ! flock -n 9; then
           echo "bg: waiting for heavy lock held by $(cat "$lock.holder" 2>/dev/null || echo unknown)" >> "$log"
           flock 9
         fi
