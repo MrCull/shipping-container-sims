@@ -283,8 +283,27 @@ forbids it (a test that measures what a rung draws while paused). Smoke: `hero-f
 #### Camera controls
 
 `OrbitControls` with map-like handling: `screenSpacePanning = false` (a pan slides the target along the ground, never into the
-air), `zoomToCursor = true` (a wheel zoom keeps the point under the cursor in place), and the orbit speed falls close to the
-target (`orbitSpeedFor`: 1 from 40 m out, 0.35 at the 8 m minimum distance).
+air), and the orbit speed falls close to the target (`orbitSpeedFor`: 1 from 40 m out, 0.35 at the 8 m minimum distance).
+
+The mouse wheel is not OrbitControls' zoom: a non-passive canvas `wheel` listener, registered before OrbitControls connects,
+stops the event (`stopImmediatePropagation` and `preventDefault`, so neither OrbitControls nor the page sees it; nothing happens
+while `controls.enabled` is false) and feeds `modules/wheelZoom.ts#WheelZoom`. `enableZoom` stays on, so a middle-button drag
+still dollies straight towards the target (no `zoomToCursor`, so it never turns the view); the keyboard `=`/`-` zoom and the pinch
+never used OrbitControls' zoom. Each wheel event adds to a pending zoom in log scale (one 100 px notch is 0.95, OrbitControls'
+default; trackpad deltas proportional; `DOM_DELTA_LINE` counts three lines a notch, `DOM_DELTA_PAGE` 800 px, at most three
+notches an event), and the render loop drains it by elapsed time (a quarter per 1/60 s, so a notch takes the same wall time at
+any frame rate) through `applyPinchStep` with both midpoints at the latest cursor, snapping to zero when negligible. So heading
+and tilt never change, the ground point under the cursor stays put, the orbit target stays the ground point at screen centre,
+and at the 8 m / 3,500 m limits the zoom stops and the pending rest is dropped. With no usable ground under the cursor (sky, or
+a grazing ray whose ground point lies more than `WHEEL_ANCHOR_RANGE` (5) orbit radii from the camera) it zooms straight to the
+target. Every pose writer (`setCameraPose`, the keyboard camera, view presets, `cameraTo`, a scene rebuild) goes through
+`placeCamera`, which drops a pending wheel zoom; the follow camera only re-centres and keeps it.
+Root cause of the old turning (spec #293, three.js OrbitControls source): `zoomToCursor` moved the camera down the cursor ray,
+but with `screenSpacePanning = false` it re-seated the target only when the view direction was more than 20 degrees below the
+horizon (`_TILT_LIMIT`); in shallower views the target stayed and `camera.lookAt(target)` turned the view towards the cursor's
+side. Tests: `tests/wheel-zoom.test.ts`, smoke `terminal-twin-wheel-zoom.smoke.ts` (it fails on the old controls: the view
+turned 0.066 rad on the first notch pair). The view's camera settings (field of view, clip planes) are `modules/sceneCamera.ts`,
+shared with the tests that reproject points.
 
 Two fingers are not OrbitControls' (`touches.TWO` is set to an unknown value, which leaves it idle): `useTwinScene` tracks touch
 pointers and calls `modules/pinchGesture.ts#applyPinchStep` per move. A zoom scales camera and target about the ground point
