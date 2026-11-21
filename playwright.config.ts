@@ -2,7 +2,13 @@
  * Browser smoke tests (`pnpm run test:smoke`), kept out of `pnpm test` so CI
  * does not need a browser. Specs: `src/sims/<sim>/tests/browser/*.smoke.ts`.
  *
- * - `dev` project: Vite dev server, so dev-only APIs such as `window.__tt` exist.
+ * - `dev` project: specs that use the dev API (`window.__tt`, `?viewer=`). It runs against one of two servers
+ *   (scripts/smoke-server.mjs, chosen by SMOKE_SERVER=dev|build):
+ *   - `dev` (local default): the Vite dev server. No build step, so best for one or two specs, but every page open
+ *     loads hundreds of unbundled modules.
+ *   - `build` (CI default, i.e. when CI is set): the smoke build, `vite build --mode smoke` into `.smoke-build/`
+ *     (SMOKE_BUILD_DIR), a bundled build that keeps the dev API, served by `vite preview`. Pages boot faster; use it
+ *     locally for long runs. SMOKE_BUILD_PREBUILT=1 serves an existing build (`pnpm run build:smoke`) without rebuilding.
  * - `prod` project: a production build served by `vite preview` (specs named
  *   `*.prod.smoke.ts`), for checks that dev-only code is absent.
  *
@@ -16,6 +22,7 @@
 import { chromium, defineConfig } from '@playwright/test'
 import { existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
+import { smokeDevServer } from './scripts/smoke-server.mjs'
 
 /**
  * Free ports by default, so parallel checkouts and stale servers from a killed run never collide. The choice is
@@ -31,6 +38,9 @@ process.env.SMOKE_PROD_PORT ??= String(freePort())
 const DEV_PORT = Number(process.env.SMOKE_DEV_PORT)
 const PROD_PORT = Number(process.env.SMOKE_PROD_PORT)
 const vite = 'node node_modules/vite/bin/vite.js'
+const devServer = smokeDevServer(process.env, { port: DEV_PORT, vite })
+// Written back like the ports, so a spec can tell which server it runs against (build-stamp.smoke.ts does).
+process.env.SMOKE_SERVER = devServer.mode
 
 function chromiumExecutable(): string | undefined {
   if (existsSync(chromium.executablePath())) return undefined
@@ -75,10 +85,11 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `${vite} --host 127.0.0.1 --port ${DEV_PORT} --strictPort`,
-      url: `http://127.0.0.1:${DEV_PORT}`,
+      command: devServer.command,
+      url: devServer.url,
       reuseExistingServer: false,
-      timeout: 60_000,
+      // The smoke build bundles the app first (about a minute on a busy 4-core box).
+      timeout: devServer.mode === 'build' ? 180_000 : 60_000,
     },
     {
       command: `${vite} build --outDir .smoke-dist --emptyOutDir --logLevel warn && ${vite} preview --outDir .smoke-dist --host 127.0.0.1 --port ${PROD_PORT} --strictPort`,

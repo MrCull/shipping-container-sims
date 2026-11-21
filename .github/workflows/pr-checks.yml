@@ -53,7 +53,7 @@ jobs:
           QUARANTINE_BASE: HEAD^1
 
       - name: Smoke reporter and timing script tests
-        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-timing.mjs
+        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs
 
       - name: Lint
         run: pnpm run lint
@@ -126,11 +126,19 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
 
-      # CI is set, so playwright.config.ts uses 1 retry and stops after 5 failures. Per-test results are appended to the
-      # JSONL file as each test ends, so the steps below still have them when this step times out or is cancelled.
+      # The `dev` project runs against the smoke build (a bundled build that keeps the dev API `window.__tt`), not the Vite
+      # dev server: pages boot faster. Built once here into .smoke-build/, the directory a sharded run hands to each shard.
+      - name: Build smoke bundle
+        run: pnpm run build:smoke
+
+      # CI is set, so playwright.config.ts uses 1 retry, stops after 5 failures and serves the smoke build for `dev`
+      # (SMOKE_BUILD_PREBUILT: the step above built it). Per-test results are appended to the JSONL file as each test
+      # ends, so the steps below still have them when this step times out or is cancelled.
       - name: Smoke tests
         run: pnpm run test:smoke --grep-invert @load
         env:
+          SMOKE_SERVER: build
+          SMOKE_BUILD_PREBUILT: '1'
           SMOKE_JSONL_REPORT: ${{ github.workspace }}/smoke-report/results.jsonl
 
       # Tests over 30 s are flagged as a warning in the summary; the step does not fail on them.
