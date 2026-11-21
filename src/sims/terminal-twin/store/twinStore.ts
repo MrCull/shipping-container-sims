@@ -111,6 +111,8 @@ export interface TwinView {
   /** Hero marking resolution (#260): 'sharp' or 'standard'; the step in force. */
   setHeroMarkStep(step: 'sharp' | 'standard'): void
   readonly heroMarkStep: 'sharp' | 'standard'
+  /** Draw exactly one frame of the scene as last updated (works with `?render=off`) and refresh the draw-call and triangle counters; null without a 3D view. */
+  renderOnce(): RenderInfo | null
   /** Rendered entity counts plus frames rendered so far and the last frame's draw calls/triangles; null without a 3D view. */
   stats(): (SceneStats & { frames: number; render: RenderInfo }) | null
   /** Livery index, size and LOD drawn per container; null without a 3D view. */

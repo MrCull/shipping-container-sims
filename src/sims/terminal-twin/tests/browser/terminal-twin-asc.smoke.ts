@@ -7,6 +7,7 @@ import type { ContainerState, RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/asc-1sts-10-boxes-1block.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openSetupTab, pickScenario } from './scenarioPicker'
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'asc-1sts-10-boxes-1block'
 
@@ -20,9 +21,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function openAsc(page: Page, options?: Parameters<NonNullable<typeof window.__tt>['load']>[1]): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(([name, opts]) => window.__tt!.load(name as string, opts as never), [FIXTURE, options ?? {}])
+  await openTwin(page, { scenario: FIXTURE, load: options })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
@@ -78,8 +77,7 @@ test('the spreader follows the planned hoist: it is down at the pad and raised i
 })
 
 test('the setup dialog edits blocks, bays, tiers, pads, stalls and ASC speeds', async ({ page }) => {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   await page.evaluate(() => window.__tt!.newScenario())
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await pickScenario(dialog, 'asc-1sts-10-boxes-1block')

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup E: Bridge</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Sora:wght@400;500;600;700;800&display=swap">
+<style>
+/* Variation E. One big screen, four channels. A numbered list of games on the left, one large preview on the right
+   that follows the selected game (radio buttons and :has(), no script). Click or tab to another game to switch.
+   On a phone the list becomes a row of tabs above the preview. */
+:root {
+  --bg: #070b14; --panel: #0e1525; --line: #222c43; --ink: #f2f5fb; --muted: #a2adc2;
+  --amber: #f59e0b; --on-amber: #1d1200; --blue: #4a90ff;
+  --retro: 'Press Start 2P', monospace; --body: 'Sora', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 28px; }
+.top { display: flex; justify-content: space-between; align-items: center; padding-block: 20px; }
+.logo { font: 12px/1.5 var(--retro); letter-spacing: .04em; }
+.logo b { color: var(--amber); font-weight: 400; }
+.chips { display: flex; gap: 8px; }
+.chip { font: 500 13px var(--body); color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+
+.intro { padding-block: 18px 26px; display: flex; justify-content: space-between; align-items: end; gap: 30px; }
+.intro h1 { font: 800 52px/1 var(--body); letter-spacing: -.035em; max-width: 15ch; }
+.intro h1 em { font-style: normal; color: var(--amber); }
+.intro p { color: var(--muted); max-width: 34ch; font-size: 17px; padding-bottom: 6px; }
+
+.stage { position: relative; display: grid; grid-template-columns: 380px 1fr; gap: 0; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--panel); min-height: 600px; }
+.stage input { position: absolute; opacity: 0; pointer-events: none; }
+.list { display: grid; grid-auto-rows: 1fr; border-right: 1px solid var(--line); }
+.list label { cursor: pointer; display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--line); border-left: 4px solid transparent; transition: background .2s; }
+.list label:last-child { border-bottom: 0; }
+.list label:hover { background: rgba(255,255,255,.03); }
+.num { font: 11px var(--retro); color: #5d6a84; }
+.list b { display: block; font: 700 19px/1.2 var(--body); letter-spacing: -.01em; }
+.list small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.list em { font-style: normal; color: #8fb8ff; }
+
+.view { position: relative; min-height: 600px; }
+.slide { position: absolute; inset: 0; opacity: 0; transition: opacity .45s; display: flex; align-items: flex-end; }
+.slide img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.slide::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(7,11,20,.96) 0%, rgba(7,11,20,.55) 34%, rgba(7,11,20,0) 62%); }
+.slide .txt { position: relative; z-index: 1; padding: 34px 38px; display: grid; gap: 10px; max-width: 640px; }
+.slide .tags { display: flex; gap: 6px; }
+.tag { font: 500 11px var(--body); letter-spacing: .05em; text-transform: uppercase; background: rgba(7,11,20,.7); border: 1px solid rgba(255,255,255,.2); padding: 4px 9px; border-radius: 6px; }
+.slide h2 { font: 800 44px/1 var(--body); letter-spacing: -.03em; }
+.slide p { color: #d6deec; font-size: 17px; }
+.slide .row { display: flex; gap: 14px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 10px; font: 700 15px var(--body); padding: 13px 24px; border-radius: 10px; background: var(--amber); color: var(--on-amber); }
+.note { font-size: 14px; color: #c3cde0; }
+.note b { color: #fff; }
+
+#g1:checked ~ .view .s1, #g2:checked ~ .view .s2, #g3:checked ~ .view .s3, #g4:checked ~ .view .s4 { opacity: 1; z-index: 1; }
+#g1:checked ~ .list label[for=g1], #g2:checked ~ .list label[for=g2], #g3:checked ~ .list label[for=g3], #g4:checked ~ .list label[for=g4] { background: rgba(245,158,11,.1); border-left-color: var(--amber); }
+#g1:checked ~ .list label[for=g1] .num, #g2:checked ~ .list label[for=g2] .num, #g3:checked ~ .list label[for=g3] .num, #g4:checked ~ .list label[for=g4] .num { color: var(--amber); }
+.stage input:focus-visible ~ .list label { outline: none; }
+#g1:focus-visible ~ .list label[for=g1], #g2:focus-visible ~ .list label[for=g2], #g3:focus-visible ~ .list label[for=g3], #g4:focus-visible ~ .list label[for=g4] { outline: 2px solid var(--blue); outline-offset: -4px; }
+
+.sec { padding-block: 38px 6px; }
+.soon { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; color: var(--muted); font-size: 14px; }
+.soon .lab { font: 10px var(--retro); letter-spacing: .08em; color: #6f7b92; margin-right: 6px; }
+.pill { border: 1px dashed #364158; border-radius: 999px; padding: 7px 14px; }
+.pill b { color: var(--ink); font-weight: 600; }
+footer { margin-top: 34px; border-top: 1px solid var(--line); padding-block: 22px 28px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; color: #7c879c; font-size: 13px; }
+
+@media (max-width: 900px) {
+  .stage { grid-template-columns: 1fr; min-height: 0; }
+  .list { grid-auto-flow: column; grid-auto-rows: auto; grid-auto-columns: 1fr; border-right: 0; border-bottom: 1px solid var(--line); }
+  .list label { grid-template-columns: 1fr; padding: 12px; border-bottom: 0; border-left: 0; border-bottom: 3px solid transparent; text-align: center; }
+  .list small, .num { display: none; }
+  .list b { font-size: 14px; }
+  #g1:checked ~ .list label[for=g1], #g2:checked ~ .list label[for=g2], #g3:checked ~ .list label[for=g3], #g4:checked ~ .list label[for=g4] { border-left-color: transparent; border-bottom-color: var(--amber); }
+  .view { min-height: 440px; }
+  .intro { flex-direction: column; align-items: start; gap: 12px; }
+  .intro h1 { font-size: 38px; }
+}
+@media (max-width: 720px) {
+  .wrap { padding: 0 16px; }
+  .logo { font-size: 9px; }
+  .chip.gh { display: none; }
+  .slide .txt { padding: 20px; }
+  .slide h2 { font-size: 32px; }
+  .slide p { font-size: 15px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top"><div class="logo">SHIPPING <b>CONTAINER</b> SIMS</div><div class="chips"><a class="chip gh" href="#">GitHub</a><a class="chip" href="#">Sound on</a></div></header>
+
+  <section class="intro">
+    <h1>Four games about <em>moving boxes.</em></h1>
+    <p>Free, in your browser, nothing to install. Pick a game to see it running.</p>
+  </section>
+
+  <section class="stage">
+    <input type="radio" name="g" id="g1" checked><input type="radio" name="g" id="g2"><input type="radio" name="g" id="g3"><input type="radio" name="g" id="g4">
+    <div class="list">
+      <label for="g1"><span class="num">01</span><span><b>Stowage Master</b><small>Puzzle &middot; 10 levels &middot; <em>you are on level 3</em></small></span></label>
+      <label for="g2"><span class="num">02</span><span><b>Box Empire</b><small>Tycoon &middot; Story &middot; Long game</small></span></label>
+      <label for="g3"><span class="num">03</span><span><b>Contenga</b><small>Physics &middot; Quick rounds &middot; <em>best 14 moves</em></small></span></label>
+      <label for="g4"><span class="num">04</span><span><b>Terminal Twin</b><small>Simulation &middot; Sandbox &middot; New</small></span></label>
+    </div>
+    <div class="view">
+      <div class="slide s1"><img src="img/stowage-ship.jpg" alt="Stowage Master: a loaded feeder at the quay"><div class="txt"><div class="tags"><span class="tag">Puzzle</span><span class="tag">3D</span></div><h2>Stowage Master</h2><p>Load the ship without tipping it. Heavy boxes low, the next port's boxes on top. Tetris with real stowage rules.</p><div class="row"><a class="btn" href="#">&#9654; Continue level 3</a><span class="note">Your best so far: <b>level 3 of 10</b></span></div></div></div>
+      <div class="slide s2"><img src="img/boxempire-wide.jpg" alt="Box Empire: harbour cranes working a feeder"><div class="txt"><div class="tags"><span class="tag">Tycoon</span><span class="tag">Strategy</span></div><h2>Box Empire</h2><p>Inherit a failing quay and one old crane. Open the gates, hire the kit, and turn it into a port.</p><div class="row"><a class="btn" href="#">&#9654; Play</a><span class="note">Not played yet</span></div></div></div>
+      <div class="slide s3"><img src="img/contenga.jpg" alt="Contenga: a tower of containers"><div class="txt"><div class="tags"><span class="tag">Physics</span><span class="tag">3D</span></div><h2>Contenga</h2><p>Slide a box out, stack it on top. How high can you go before the tower falls?</p><div class="row"><a class="btn" href="#">&#9654; Play</a><span class="note">Best: <b>14 moves</b></span></div></div></div>
+      <div class="slide s4"><img src="img/twin.jpg" alt="Terminal Twin: a container yard and quay cranes"><div class="txt"><div class="tags"><span class="tag">Simulation</span><span class="tag">Digital twin</span></div><h2>Terminal Twin</h2><p>A working model of an automated terminal. Watch cranes work the ship and the yard fill, up to an hour a second.</p><div class="row"><a class="btn" href="#">&#9654; Play</a><span class="note">Not played yet</span></div></div></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="soon"><span class="lab">ON THE HORIZON</span><span class="pill"><b>ContainerCraft</b> survive in a world of stacked boxes</span><span class="pill"><b>Coblox</b> build and share container games</span><span class="pill"><b>Captain Container</b> take the bridge of a boxship</span></div>
+  </section>
+  <footer><span>Shipping Container Sims &copy; 2026 &middot; GitHub</span><span>Built 21 Nov 2026 09:10 &middot; 2b1b3f9</span></footer>
+</div>
+</body>
+</html>

@@ -13,9 +13,10 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const HIGH_CAP = 3
-const HERO_FILE = /hero-spreader-(sts|asc|shc)|hero-shc\.|hero-truck-/
+const HERO_FILE = /hero-spreader-(sts|asc|shc)|hero-shc[.-]|hero-truck-/
 /** The hero model adds raised flippers and corner guides at the ends; its length stays within this of the rig spreader's. */
 const LENGTH_TOLERANCE_M = 0.6
 const CENTRE_TOLERANCE_M = 0.15
@@ -38,8 +39,7 @@ function watch(page: Page): Watch {
 }
 
 async function open(page: Page, fixture: string): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   await page.evaluate(() => window.localStorage.clear())
   await page.evaluate(() => window.__tt!.setQuality('high'))
   await page.evaluate((name) => window.__tt!.load(name), fixture)
@@ -99,6 +99,7 @@ test('ASC close-up: hero spreaders within the High cap, none requested before, n
   expect(w.heroRequests.every((u) => u.includes('hero-spreader-asc'))).toBe(true)
   await page.keyboard.press('p')
   await expect(page.getByTestId('tt-perf-hero-equipment')).toContainText(String(near.count))
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/hero-equipment-asc.png' })
 
   // Low draws none and shows the rig spreader again
@@ -137,6 +138,7 @@ test('STS close-up: the hero spreader is in place on the crane rig', async ({ pa
   const mine = (await page.evaluate(() => window.__tt!.scene()!.heroSpreaders)).find((s) => s.id === sts.id)
   expect(mine?.kind).toBe('sts')
   expectInPlace(mine!)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/hero-equipment-sts.png' })
   expect(w.errors).toEqual([])
 })
@@ -173,6 +175,7 @@ test('SHC and ASC carrying a 20 ft box: the hero spreader is squeezed to 20 ft l
     expect(mine?.kind).toBe(kind)
     expectInPlace(mine!)
     expect(size(mine!.hero, longAxis(mine!.rig)), `${kind} hero spreader at 20 ft`).toBeLessThan(7)
+    await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
     await page.screenshot({ path: `.screenshots/hero-equipment-${kind}-20ft.png` })
   }
   expect(w.errors).toEqual([])
@@ -207,7 +210,8 @@ test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested befo
   expect(near.bodies.map((b) => b.kind)).toContain('shc-body')
   expect(near.bodies.map((b) => b.id)).toContain(shc.id)
   expect(near.stats).toBeGreaterThanOrEqual(1)
-  expect(w.heroRequests.some((u) => u.includes('hero-shc.'))).toBe(true)
+  expect(w.heroRequests.some((u) => /hero-shc[.-]/.test(u))).toBe(true)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/hero-equipment-shc-body.png' })
 
   // Low draws no body and shows LOD0 again
@@ -296,6 +300,7 @@ test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the 
   const on = await drawnBox()
   expect(on.size).toBe(off.size)
   expect(Math.hypot(on.centre.x - off.centre.x, on.centre.y - off.centre.y, on.centre.z - off.centre.z), 'box centre hero on vs off').toBeLessThan(0.01)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/hero-equipment-truck.png' })
 
   // Low draws no hero truck and shows LOD0 again

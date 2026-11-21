@@ -3,6 +3,7 @@
  * the sim opens, only when the dashboard first opens (served by `vite preview`).
  */
 import { expect, test } from '@playwright/test'
+import { openTwin } from './openTwin'
 import { pickScenario } from './scenarioPicker'
 
 /** A fresh load selects the TTI baseline (#156); these checks run on the small tracer fixture. */
@@ -13,8 +14,7 @@ test('ECharts is not in the initial load and is fetched when the dashboard first
   page.on('request', (r) => {
     if (r.resourceType() === 'script') scripts.push(r.url())
   })
-  await page.goto('/sim/terminal-twin')
-  await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeVisible()
+  await openTwin(page, { devApi: false })
   await pickScenario(page, TRACER)
   await page.getByRole('button', { name: 'Start' }).click()
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
@@ -33,7 +33,7 @@ test('ECharts is not in the initial load and is fetched when the dashboard first
 })
 
 test('the Dashboard button opens the dashboard with its charts in the production build', async ({ page }) => {
-  await page.goto('/sim/terminal-twin')
+  await openTwin(page, { devApi: false })
   await pickScenario(page, TRACER)
   await page.getByRole('button', { name: 'Start' }).click()
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
@@ -44,7 +44,7 @@ test('the Dashboard button opens the dashboard with its charts in the production
 })
 
 test('a failed dashboard chunk load shows an error in the production build', async ({ page }) => {
-  await page.goto('/sim/terminal-twin')
+  await openTwin(page, { devApi: false })
   await pickScenario(page, TRACER)
   await page.getByRole('button', { name: 'Start' }).click()
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()

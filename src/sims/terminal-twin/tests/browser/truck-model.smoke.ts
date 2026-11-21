@@ -7,6 +7,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
+import { openTwin, twinUrl } from './openTwin'
 
 const FIXTURE = 'truck-gate-queue'
 
@@ -26,9 +27,7 @@ function watch(page: Page): { errors: string[]; external: string[] } {
 }
 
 async function openTrucks(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE, quality: 'high' }) // the LOD distances it checks are High's (Low scales them by 0.4)
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
   await page.evaluate(() => window.__tt!.runTo(3300))
   await page.waitForFunction(() => window.__tt!.scene()?.landside.assets === 'loaded' && Object.keys(window.__tt!.sceneState()?.truckRigs ?? {}).length > 5)
@@ -46,6 +45,7 @@ test('trucks in the twin use the GLB models with cab and livery variety and LOD 
   const id = rigs[0][0]
   await page.evaluate((i) => window.__tt!.cameraTo(i, 30), id)
   await page.waitForFunction(() => window.__tt!.scene()!.landside.lods.lod0 >= 1)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/twin-truck-near.png' })
   await page.evaluate((i) => window.__tt!.cameraTo(i, 110), id)
   await page.waitForFunction(() => window.__tt!.scene()!.landside.lods.lod1 >= 1)
@@ -113,7 +113,7 @@ test('trucks roll, steer, articulate through turns and carry their box on the ch
 
 test('the asset viewer rolls and steers the wheels, articulates the chassis and seats 20 ft and 40 ft boxes on the twist-locks', async ({ page }) => {
   const { errors, external } = watch(page)
-  await page.goto('/sim/terminal-twin?viewer=truck-cab-mid')
+  await page.goto(twinUrl({ params: { viewer: 'truck-cab-mid' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
   const list = await page.evaluate(() => window.__ttAssets!.list())
   for (const n of ['truck-cab-high', 'truck-cab-mid', 'truck-cab-day', 'truck-chassis']) expect(list).toContain(n)

@@ -130,19 +130,15 @@ describe('drawn-box reference', async () => {
     expect(v1.departedS).not.toBeNull()
   })
 
-  it('restart: a fresh model replaying the same run draws the same boxes', async () => {
-    const restarted = await startHeadlessRun(config)
-    await restarted.runTo(7200)
-    expect(cases(restarted, 'early')).toEqual(early)
-    expect(cases(restarted, 'late')).toEqual(late)
-  })
-
-  it('rewind: a model replayed only to a little past an earlier time draws the same boxes there, and again after running on', async () => {
-    const rewound = await startHeadlessRun(config)
-    await rewound.runTo(6600) // a box in flight at 3600 is posed from motion the engine plans later (the controller's look-ahead is 1.5 wall s of playback)
-    expect(cases(rewound, 'early')).toEqual(early)
-    await rewound.runTo(7200)
-    expect(cases(rewound, 'late')).toEqual(late)
+  // One fresh model serves both cases (each used to replay the TTI run itself, #324): rewound to 6600 it is the
+  // rewind case, and run on to 7200 it is a restarted model that replayed the same run, checked at both times.
+  it('rewind and restart: a fresh model replayed only to a little past an earlier time draws the same boxes there, and once it has replayed the whole run it draws the same boxes at every time', async () => {
+    const fresh = await startHeadlessRun(config)
+    await fresh.runTo(6600) // a box in flight at 3600 is posed from motion the engine plans later (the controller's look-ahead is 1.5 wall s of playback)
+    expect(cases(fresh, 'early')).toEqual(early)
+    await fresh.runTo(7200)
+    expect(cases(fresh, 'early')).toEqual(early)
+    expect(cases(fresh, 'late')).toEqual(late)
   })
 
   it('colour by changes the colours drawn and quality changes the LOD layers, never the matrices of the boxes drawn at the same LOD', () => {

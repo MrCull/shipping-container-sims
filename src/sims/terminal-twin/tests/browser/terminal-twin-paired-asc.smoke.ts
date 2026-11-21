@@ -8,6 +8,7 @@ import type { RunSummary } from '../../engine'
 import golden from '../../scenario/fixtures/asc-2asc-block-conflict.golden.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openSetupTab, pickScenario } from './scenarioPicker'
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'asc-2asc-block-conflict'
 
@@ -21,9 +22,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function open(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
@@ -92,8 +91,7 @@ test('the overlay toggle button turns the ASC rail overlay on and off', async ({
 })
 
 test('the setup dialog offers 1 or 2 ASCs per block, default 2', async ({ page }) => {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   await page.evaluate(() => window.__tt!.newScenario())
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await pickScenario(dialog, 'asc-1sts-10-boxes-1block')

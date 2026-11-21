@@ -9,6 +9,7 @@ import { expect, test, type Page } from '@playwright/test'
 import atlas from '../../assets/models/containers/livery-atlas.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
+import { openTwin, twinUrl } from './openTwin'
 
 /** Asset or decoder files (GLB/glTF, textures, wasm/JS decoders): these must never come from another host. */
 const ASSET_REQUEST = /\.(glb|gltf|bin|webp|png|ktx2|basis|wasm|drc)(\?|$)|draco|meshopt|basis_transcoder/i
@@ -31,9 +32,7 @@ function watch(page: Page): { errors: string[]; external: string[] } {
 
 test('the twin renders containers from the GLBs with each box in its own line livery, offline', async ({ page }) => {
   const { errors, external } = watch(page)
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('liveries-mixed'))
+  await openTwin(page, { scenario: 'liveries-mixed', quality: 'high' }) // the LOD distances it checks are High's (Low scales them by 0.4)
   await page.evaluate(() => window.__tt!.runTo(200))
   await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
@@ -56,6 +55,7 @@ test('the twin renders containers from the GLBs with each box in its own line li
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 60))
   await page.waitForFunction(() => window.__tt!.scene()!.containerLods.lod0 + window.__tt!.scene()!.containerLods.culled === window.__tt!.scene()!.containers) // boxes outside the view are culled, not LOD0
   await page.waitForTimeout(400)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/twin-liveries-near.png' })
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 600))
   await page.waitForFunction(() => window.__tt!.scene()!.containerLods.lod1 === window.__tt!.scene()!.containers)
@@ -63,6 +63,7 @@ test('the twin renders containers from the GLBs with each box in its own line li
   for (const box of boxes) expect(far!.liveries[box.id].index).toBe(state!.liveries[box.id].index)
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 140))
   await page.waitForTimeout(400)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/twin-liveries.png' })
   expect(external).toEqual([])
   expect(errors).toEqual([])
@@ -71,7 +72,7 @@ test('the twin renders containers from the GLBs with each box in its own line li
 test('the asset viewer loads every container asset, switches LODs and moves the rig', async ({ page }) => {
   test.slow() // shows and screenshots every asset in the pack, each on software WebGL
   const { errors, external } = watch(page)
-  await page.goto('/sim/terminal-twin?viewer=container-20')
+  await page.goto(twinUrl({ params: { viewer: 'container-20' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
   const names = await page.evaluate(() => window.__ttAssets!.list())
   expect(names).toEqual(expect.arrayContaining(['container-20', 'container-40', 'container-40hc']))
@@ -101,7 +102,7 @@ test('the asset viewer loads every container asset, switches LODs and moves the 
 test('a TTI-size yard of instanced containers stays within the triangle and draw-call budget', async ({ page }) => {
   test.slow() // 18,000 instances render at under 1 fps on software WebGL
   const { errors } = watch(page)
-  await page.goto('/sim/terminal-twin?viewer=yard')
+  await page.goto(twinUrl({ params: { viewer: 'yard' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
   const yard = await page.evaluate(() => window.__ttAssets!.yard(18000))
   expect(yard.instances).toBe(18000)

@@ -8,6 +8,7 @@ import golden from '../../scenario/fixtures/shc-1sts-2shc-1wtp.golden.json' with
 import type {} from '../../dev/devApi' // window.__tt typing
 import { sampleFrames, simPerWallSecond, advancedFraction, neverBackwards } from './frameSampling'
 import { openSetupTab, pickScenario } from './scenarioPicker'
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'shc-1sts-2shc-1wtp'
 
@@ -21,9 +22,7 @@ function collectErrors(page: Page): string[] {
 }
 
 async function openShc(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), FIXTURE)
+  await openTwin(page, { scenario: FIXTURE })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
@@ -136,6 +135,7 @@ test('lane-graph and reservation overlays toggle on and off', async ({ page }) =
   await expect.poll(() => page.evaluate(() => window.__tt!.scene()?.reservedZones ?? 0)).toBe(Object.keys(active).length)
   await page.evaluate(() => window.__tt!.cameraTo('SHC01'))
   await page.waitForTimeout(400)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/terminal-twin-smoke-shc-overlays.png' })
 
   await lanes.click()
@@ -148,7 +148,7 @@ test('lane-graph and reservation overlays toggle on and off', async ({ page }) =
 })
 
 test('the setup dialog sets the SHC count and kinematics', async ({ page }) => {
-  await page.goto('/sim/terminal-twin')
+  await openTwin(page)
   const dialog = page.getByRole('dialog', { name: /new scenario/i })
   await expect(dialog).toBeVisible()
   await pickScenario(dialog, FIXTURE)

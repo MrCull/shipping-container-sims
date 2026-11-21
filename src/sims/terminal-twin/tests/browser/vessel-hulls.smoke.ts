@@ -9,6 +9,7 @@ import { expect, test, type Page } from '@playwright/test'
 import atlas from '../../assets/models/vessels/vessel-livery-atlas.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type { VesselConfig, VesselSizeClass } from '../../scenario/types'
+import { openTwin } from './openTwin'
 
 const CLASSES: VesselSizeClass[] = ['feeder', 'feedermax', 'panamax', 'neo-panamax', 'ulcv']
 const HEIGHT: Record<string, number> = { '20': 2.591, '40': 2.591, '40HC': 2.896 }
@@ -27,8 +28,7 @@ function watchErrors(page: Page): string[] {
 }
 
 async function open(page: Page, vessels: VesselConfig[], quayLengthM: number): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page, { quality: 'high' }) // the hull LOD distances it checks are High's (Low scales them by 0.4)
   await page.evaluate(
     ({ vessels, quayLengthM }) => window.__tt!.load('tracer-1sts-10-boxes', { overrides: { vessels, quayLengthM, stsCount: 2 } }),
     { vessels, quayLengthM },
@@ -70,6 +70,7 @@ test('every size class renders its hull GLB and deck containers sit on its bay g
     expect(deck, `${sizeClass} deck containers`).toBeGreaterThan(0)
     await page.evaluate(() => window.__tt!.cameraTo('V001', 260))
     await page.waitForTimeout(500)
+    await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
     await page.screenshot({ path: `.screenshots/assets/vessel-${sizeClass}.png` })
   }
   expect(errors).toEqual([])
@@ -94,6 +95,7 @@ test('livery and name follow each vessel’s line from the scenario', async ({ p
   }
   await page.evaluate(() => window.__tt!.cameraTo('V002', 120))
   await page.waitForTimeout(500)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/vessel-liveries.png' })
   expect(errors).toEqual([])
 })
@@ -118,6 +120,7 @@ test('hulls switch LOD with distance, at berth and at anchorage', async ({ page 
   expect(scene!.vesselAssets).toBe('loaded')
   await page.evaluate(() => window.__tt!.cameraTo('V002', 450))
   await page.waitForTimeout(500)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/vessel-anchorage.png' })
   expect(errors).toEqual([])
 })

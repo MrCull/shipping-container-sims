@@ -6,6 +6,7 @@
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 test('ROB boxes are drawn in the hull of a vessel with ROB bays, and not in one without', async ({ page }) => {
   test.setTimeout(120_000)
@@ -15,9 +16,7 @@ test('ROB boxes are drawn in the hull of a vessel with ROB bays, and not in one 
   })
   page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`))
 
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('rob-bays'))
+  await openTwin(page, { scenario: 'rob-bays' })
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'StsMoveStarted' }))
   await page.waitForFunction(() => {
     const s = window.__tt!.sceneState()
@@ -28,6 +27,7 @@ test('ROB boxes are drawn in the hull of a vessel with ROB bays, and not in one 
   expect(state.vesselHulls.V001.robBoxes).toBeGreaterThan(30)
   await page.evaluate(() => window.__tt!.cameraTo('V001', 200))
   await page.waitForTimeout(600)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/rob-bays.png' })
 
   await page.evaluate(() => window.__tt!.load('hatch-cover-cycle'))

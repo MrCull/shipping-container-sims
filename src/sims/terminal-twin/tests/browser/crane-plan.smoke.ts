@@ -6,6 +6,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = []
@@ -20,9 +21,7 @@ test('crane plan: the Crane plan view shows a band per crane and the now line, a
   test.slow()
   const errors = collectErrors(page)
   await page.setViewportSize({ width: 1500, height: 960 })
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('crane-split-4sts'))
+  await openTwin(page, { scenario: 'crane-split-4sts' })
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
   await page.evaluate(() => window.__tt!.runTo(1500))
   await page.evaluate(() => window.__tt!.pause())
@@ -50,6 +49,7 @@ test('crane plan: the Crane plan view shows a band per crane and the now line, a
   const chartBox = await page.locator('.crane-plan .scroll').boundingBox()
   const keyBox = await page.getByTestId('tt-crane-plan-key').boundingBox()
   expect(keyBox!.x).toBeGreaterThanOrEqual(chartBox!.x + chartBox!.width - 2)
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/crane-plan.png' })
   // drag the header, resize from the corner, and the geometry is remembered
   const viewer = page.getByTestId('tt-bay-viewer')

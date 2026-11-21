@@ -116,12 +116,13 @@ describe('events declare the boxes they change (what incremental checking relies
     '%s: every container whose custody or yard slot changed is a subject of the event',
     (name) => {
       const sim = createSimulation(fixtures[name])
+      // Read the live state through the query view, not a snapshot: a snapshot clones the state and the whole event log
+      // on every event, which made this loop quadratic in the run length. The maps below are fresh copies either way.
       const view = () => {
-        const { state } = sim.snapshot()
         const custody: Record<string, string> = {}
-        for (const c of Object.values(state.containers)) custody[c.id] = `${c.custody.kind}:${c.custody.id}`
+        for (const c of sim.query.containers()) custody[c.id] = `${c.custody.kind}:${c.custody.id}`
         const slotOf: Record<string, string> = {}
-        for (const sl of Object.values(state.yardSlots)) if (sl.containerId) slotOf[sl.containerId] = sl.id
+        for (const sl of sim.query.yardSlots()) if (sl.containerId) slotOf[sl.containerId] = sl.id
         return { custody, slotOf }
       }
       let before = view()

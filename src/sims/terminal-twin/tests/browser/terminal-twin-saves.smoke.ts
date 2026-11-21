@@ -6,12 +6,12 @@
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const FIXTURE = 'asc-1sts-10-boxes-1block'
 
 async function open(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
 }
 
 async function loadFixture(page: Page): Promise<void> {

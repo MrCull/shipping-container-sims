@@ -5,13 +5,12 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 const pose = (page: Page) => page.evaluate(() => window.__tt!.cameraPose()!)
 
 async function open(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate((name) => window.__tt!.load(name), 'landside-morning-peak')
+  await openTwin(page, { scenario: 'landside-morning-peak' })
   await page.evaluate(() => window.__tt!.runUntil({ maxEvents: 400 }))
   await expect(page.getByTestId('tt-kpi-strip')).toBeVisible()
   await page.evaluate(() => window.__tt!.viewPreset('overview'))

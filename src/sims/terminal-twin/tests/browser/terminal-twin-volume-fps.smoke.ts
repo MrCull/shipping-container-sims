@@ -5,6 +5,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin } from './openTwin'
 
 /** Terminal Twin opens muted whatever the shared setting (#171): these specs are about the volume, so they unmute inside. */
 async function unmute(page: Page): Promise<void> {
@@ -14,9 +15,7 @@ async function unmute(page: Page): Promise<void> {
 }
 
 async function open(page: Page): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('tracer-1sts-10-boxes'))
+  await openTwin(page, { scenario: 'tracer-1sts-10-boxes' })
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 3)
   await unmute(page)
 }
@@ -62,9 +61,7 @@ test('volume and mute drive Terminal Twin playback level, and survive a reload a
   await setVolume(page, 20)
   await expect(page.getByTestId('audio-button')).toHaveAttribute('aria-pressed', 'false')
 
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
-  await page.evaluate(() => window.__tt!.load('tracer-1sts-10-boxes'))
+  await openTwin(page, { scenario: 'tracer-1sts-10-boxes' })
   // entering Terminal Twin muted the shared sound (#171); unmuting inside keeps the 20% volume
   await expect(page.getByTestId('audio-button')).toHaveAttribute('aria-pressed', 'true')
   await unmute(page)
@@ -146,8 +143,7 @@ test('the FPS chip is hidden when WebGL fails', async ({ page }) => {
       return (original as (...a: unknown[]) => unknown).call(this, type, ...rest)
     } as typeof original
   })
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+  await openTwin(page)
   await expect(page.getByText(/webgl/i).first()).toBeVisible()
   await expect(page.getByTestId('tt-fps-chip')).toHaveCount(0)
 })

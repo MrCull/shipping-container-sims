@@ -6,6 +6,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
+import { openTwin, type OpenTwinOptions } from './openTwin'
 
 function watch(page: Page): string[] {
   const errors: string[] = []
@@ -16,9 +17,8 @@ function watch(page: Page): string[] {
   return errors
 }
 
-async function open(page: Page, scenario: string): Promise<void> {
-  await page.goto('/sim/terminal-twin')
-  await page.waitForFunction(() => !!window.__tt)
+async function open(page: Page, scenario: string, options: Omit<OpenTwinOptions, 'scenario'> = {}): Promise<void> {
+  await openTwin(page, options)
   await page.evaluate(() => window.localStorage.clear())
   await page.evaluate((name) => window.__tt!.load(name), scenario)
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
@@ -26,7 +26,8 @@ async function open(page: Page, scenario: string): Promise<void> {
 
 test('overlay shows live fps, draw calls and triangles and can be toggled; quality defaults to Auto', async ({ page }) => {
   const errors = watch(page)
-  await open(page, 'tracer-1sts-10-boxes')
+  // the default quality is what it checks, and the overlay's fps and draw calls need drawn frames
+  await open(page, 'tracer-1sts-10-boxes', { quality: null, render: true })
   expect((await page.evaluate(() => window.__tt!.perf())).setting).toBe('auto')
   await expect(page.getByTestId('tt-perf-overlay')).toHaveCount(0)
   await page.keyboard.press('p')
@@ -48,7 +49,7 @@ test('fixed quality levels change what is drawn: Low draws less than High', asyn
     await page.getByTestId(`tt-quality-${level}`).click()
     const frames = await page.evaluate(() => window.__tt!.scene()!.frames)
     await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 4, frames)
-    return page.evaluate(() => window.__tt!.scene()!.render)
+    return page.evaluate(() => window.__tt!.renderOnce()!) // render is off: draw one frame to count its draw calls
   }
   const high = await measure('high')
   const low = await measure('low')
@@ -77,7 +78,7 @@ test('the overlay names the rung in force; a manual level fixes it', async ({ pa
 test('Auto sheds down the ladder under sustained load, names the rung in the overlay, and climbs back when the load ends @load', async ({ page }) => {
   test.setTimeout(300_000)
   const errors = watch(page)
-  await open(page, 'tracer-1sts-10-boxes')
+  await open(page, 'tracer-1sts-10-boxes', { render: true }) // @load: Auto judges the real drawn frame rate
   await page.keyboard.press('p')
   await page.evaluate(() => window.__tt!.setQuality('auto'))
   // let the first (software-rendered) frames settle, then judge from a clean slate at High
@@ -112,6 +113,7 @@ test('TTI preset at overview zoom: instanced containers are culled and the draw 
   await page.evaluate(() => window.__tt!.cameraTo('STS104', 1100))
   const frames = await page.evaluate(() => window.__tt!.scene()!.frames)
   await page.waitForFunction((f) => window.__tt!.scene()!.frames > f + 8, frames, { timeout: 120_000 })
+  await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw one frame to count its draw calls
   const scene = await page.evaluate(() => window.__tt!.scene()!)
   const perf = await page.evaluate(() => window.__tt!.perf())
   test.info().annotations.push({

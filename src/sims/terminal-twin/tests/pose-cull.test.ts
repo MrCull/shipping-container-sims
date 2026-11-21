@@ -2,17 +2,24 @@
  * Posing cull (#257): a moving box outside the view is not posed until it could have reached it, and when it is drawn
  * again it is where a fresh full pose puts it. The spreader's carried height and the box owner come from the one pose.
  */
-import { describe, expect, it } from 'vitest'
-import { closeView, makeHeadlessRenderer, startHeadlessRun } from '../cli/headlessPose'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { closeView, makeHeadlessRenderer, startHeadlessRun, type HeadlessRun } from '../cli/headlessPose'
 import { TTI_PRESET_NAME, presets } from '../scenario/presets'
 import * as THREE from 'three'
 import { DEFAULT_LOD_OPTIONS } from '../modules/containerInstancer'
 
+const T0 = 4 * 3600
+
 describe('pose cull', () => {
-  it('skips moving boxes out of view and draws them correctly once they enter it', async () => {
-    const run = await startHeadlessRun(presets[TTI_PRESET_NAME]())
-    const T0 = 4 * 3600
+  // One TTI run to T0 + 1200 serves both tests (each used to start its own): the scene model keeps the whole history,
+  // so both read display times up to T0 + 1200 from it, and neither test changes the run.
+  let run: HeadlessRun
+  beforeAll(async () => {
+    run = await startHeadlessRun(presets[TTI_PRESET_NAME]())
     await run.runTo(T0 + 1200)
+  }, 120000)
+
+  it('skips moving boxes out of view and draws them correctly once they enter it', () => {
     const model = run.model
     // a box moving at T0
     const moving: string[] = []
@@ -58,14 +65,12 @@ describe('pose cull', () => {
     fresh.dispose()
   }, 120000)
 
-  it('records the custody owner from the pose lookup', async () => {
-    const run = await startHeadlessRun(presets[TTI_PRESET_NAME]())
-    await run.runTo(4 * 3600)
+  it('records the custody owner from the pose lookup', () => {
     const model = run.model
     let checked = 0
     for (const id of model.containerIds) {
-      model.containerPose(id, 4 * 3600)
-      expect(model.poseOwner).toEqual(model.custodyAt(id, 4 * 3600))
+      model.containerPose(id, T0)
+      expect(model.poseOwner).toEqual(model.custodyAt(id, T0))
       if (++checked > 2000) break
     }
   }, 120000)
