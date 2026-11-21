@@ -301,6 +301,17 @@ for (const c of CLASSES) {
           }
         })
       }
+      it('reports how far each aimed stay is from its anchor, near zero once stretched and metres when not (#304)', () => {
+        const root = objectTree(json)
+        const rig = new AssetRig(root, meta as unknown as RigMeta)
+        rig.applyStretch()
+        rig.set('boom', 80) // raised but not re-stretched: the stays point at where the anchors were
+        const stale = rig.aimGapsM()
+        expect(Object.keys(stale)).toEqual(expect.arrayContaining(['forestays', 'forestays_lod1', 'forestays_lod2']))
+        expect(Math.max(...Object.values(stale))).toBeGreaterThan(5)
+        rig.applyStretch()
+        for (const [node, gap] of Object.entries(rig.aimGapsM())) expect(gap, node).toBeLessThan(0.05)
+      })
     })
     describe('TTI ALGECIRAS boom side plate (#300)', () => {
       type Plate = { node: string; material: string; region: string; lods: string[]; yM: number[]; zM: number[] }

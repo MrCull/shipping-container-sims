@@ -135,6 +135,24 @@ export class AssetRig {
     }
   }
 
+  /**
+   * Per `aim` stretch node (every LOD copy, by node name), the world distance (m) from its far end to its target:
+   * near zero when attached, metres when the rig moved without `applyStretch` (#304; read by `__tt` rig state).
+   */
+  aimGapsM(): Record<string, number> {
+    const out: Record<string, number> = {}
+    const end = new THREE.Vector3()
+    const target = new THREE.Vector3()
+    for (const { node, to, rule } of this.stretch) {
+      if (rule.mode !== 'aim') continue
+      node.obj.updateWorldMatrix(true, false)
+      to.obj.updateWorldMatrix(true, false)
+      node.obj.localToWorld(end.copy(axisVector(rule.axis)).multiplyScalar(rule.unitLengthM))
+      out[node.obj.name] = end.distanceTo(to.obj.getWorldPosition(target))
+    }
+    return out
+  }
+
   /** Points the node's local `axis` at the target's origin and scales it along that axis to the distance. */
   private aim(node: Bound, target: THREE.Object3D, rule: StretchRule): void {
     // Target origin in the node's parent frame: walk up from the target through local transforms (no world matrices).

@@ -81,6 +81,31 @@ The ladder has 9 rungs (0 to 8): rung 1, `equipment-hero-off` (#273), sheds the 
 The ladder and its provisional thresholds (retuned in #262) are in [rendering-3d.md](../rendering-3d.md#quality-tiers-and-auto);
 the Auto unit tests feed timestamps to `AutoQuality.frame(nowMs)`, so no real frame rate is needed.
 
+### STS booms: the owner's real-GPU check (spec #297, ticket #304)
+
+Raising a boom must cost nothing. CI and the smoke suite prove the proxies (`sts-boom-frames.smoke.ts`: forestays attached,
+draw calls with booms up no more than booms down, frame ratio not lower; `sts-asset.test.ts`: per-LOD caps). One run on a
+real GPU by the project owner closes the spec. `perf/baseline.json` holds `tt:bench` engine numbers only (no `cpuMs`, no draw
+calls), so the comparison is the same machine before and after, and a frame entry is added to that file only after this run.
+
+1. Quiet machine (`scripts/bench-preflight.sh`), real GPU, Chrome, 1080p window, dev server as in step 1 above.
+2. After (current branch): in the console, for each mode, `real` (booms up: idle cranes park at 80 degrees at t0) then `off`
+   (every boom down, the same boxes):
+   ```
+   await __tt.load('TTI Algeciras baseline')                                            // booms real
+   await __tt.load('TTI Algeciras baseline', { overrides: { subsystems: { boom: 'off' } } }) // booms down
+   __tt.setQuality('high'); __tt.pause(); __tt.cameraTo('STS104', 1100)   // overview; repeat at 60 m for LOD0
+   Object.values(__tt.sceneState().stsRendered).map((s) => [s.boomAngleDeg, s.stayGapM])  // angles; gaps near 0
+   ```
+   Take eight one-second samples of `__tt.perf().stats` (`fps`, `calls`, `triangles`, `cpuMs`, `poseMs`) per mode and camera and average them.
+3. Before: check out `0207d27` (pre-spec main) in a separate worktree and repeat the `__tt.load('TTI Algeciras baseline')`
+   overview and 60 m samples (no boom mode there).
+4. Acceptance bar: draw calls with booms up no more than booms down (both cameras); LOD0 triangles per crane at most 5 per cent
+   above the pre-spec model (31 690 pre-spec; the committed GLBs are 32 218 Malaccamax and 32 186 Super Post-Panamax, about
+   1.7 per cent; at 60 m the scene triangle total moves by the crane delta only); `cpuMs` after within noise (10 per cent) of before
+   and of booms down.
+5. Record the numbers in Recorded numbers below (date, machine, browser, build), then add the frame entry to `perf/baseline.json`.
+
 ## One-click benchmark (production build, no console)
 
 The `__tt` procedure above needs a dev server. The **Benchmark** button in the performance panel (top bar, next to Quality

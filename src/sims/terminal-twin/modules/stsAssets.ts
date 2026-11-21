@@ -78,6 +78,8 @@ export interface StsRenderState {
   trolley: [number, number, number]
   /** Boom angle drawn (degrees, the `boom` rig node, #298). */
   boomAngleDeg: number
+  /** Largest gap (m) between an aimed stay's far end and its anchor, over every LOD: near 0 while forestays and boom-hoist ropes stay attached (#304). */
+  stayGapM: number
 }
 
 const cache = new Map<StsCraneClass, Promise<THREE.Object3D>>()
@@ -202,6 +204,7 @@ export class StsModel {
       spreader: at(this.spreaders[this.lod]),
       trolley: at(this.trolleys[this.lod]),
       boomAngleDeg: this.rig.values.boom ?? 0,
+      stayGapM: Math.max(0, ...Object.values(this.rig.aimGapsM())),
     }
   }
 
