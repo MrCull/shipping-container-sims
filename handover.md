@@ -32,14 +32,23 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 
 ## Next steps
 
-- Phase 1 (#321 to #328) merged to `main` in PR #341 (a28a9bc). This branch restarted from that merge.
-- First full sharded CI run: `SMOKE: 190 passed, 0 failed, 1 flaky`, workflow 9 min 11 s. Shards are uneven (about 7, 4.6, 1.5, 2, 1.5, 1.6 min of tests): a few slow tests dominate.
-- Unblocked next: #329, #332, #333, #334, and the retro tickets #344 to #348 (no blockers). Order: #348 and #344 first, #345 before #346, #346 before #335, #347 when a slot is free. At most two at a time; #329 needs two full smoke runs, so it runs when nothing else is testing.
+- Open PR for this phase: #349 (`claude/hopeful-hawking-s9i8uh` into `main`). Phase 1 (#321 to #328) merged to `main` in PR #341. Do not merge #349 until the phase is done; delete this file first and add `Closes #N` for each finished ticket.
+- Merged in branch this phase: #330, #331, #348, #344, plus `main` (#343) at cb4047e. Labels `merged-in-branch` set on #330, #331, #348; **#344 still needs the label** (session stopped before it).
+- CI after each merge (the #348 rule: start `pr-checks.yml` with workflow_dispatch on this branch, read the merged `SMOKE:` line before the next merge):
+  - after #330: green (run 44932418994);
+  - after #331 + #348: green, `SMOKE: 189 passed, 0 failed, 0 flaky` (run 44933311179);
+  - after #344: **not run yet**. Start one first thing.
+- **Still running when the session stopped:** #345 (asset viewer honours `?quality=` / `?render=off`), branch `tt/345-viewer-url-switches`, worktree `.claude/worktrees/agent-a91b4af6722734e60`. Its implementer may have committed partial work. Next session: check `git log claude/hopeful-hawking-s9i8uh..tt/345-viewer-url-switches` and the worktree status; finish it (ticket file content is in issue #345) or merge if complete, with `scripts/merge-ticket.sh --push tt/345-viewer-url-switches`.
+- #344's worktree `.claude/worktrees/agent-a504b8c16b0f012fc` is merged; remove it with `scripts/remove-worktree.sh agent-a504b8c16b0f012fc`.
+- PR #349 body lists #330, #331, #348; add #344 (smoke build is now the local default, `SMOKE_SERVER=dev` opts in to the Vite dev server; `scripts/test-smoke-server.mjs` 7 of 7; sample `SMOKE: 12 passed`) and the CI results above.
+- Unblocked next, in order: #346 (time-balanced shards, best after #345), then #332, #333, #334, #347; #329 needs two full smoke runs, so run it when nothing else is testing. #346 must land before #335; #348 is done, so #339 waits only on #335.
+- At most two implementers at once (4-core box). Ticket files for implementers were in the session scratchpad (lost with the container): rewrite them from the issues (`docs/agents/issue-tracker.md`, Ticket bodies).
 
 ## Open points
 
-- Native GitHub issue dependencies cannot be set from cloud sessions; blockers are in each ticket's `## Blocked by` and `## Blocks` sections.
-- The `?viewer=yard` asset viewer ignores `?quality=` and `?render=`, so its 18,000-box test (container-assets) still draws every frame, about 259 s. Fold into #334 or a small follow-up.
+- Native GitHub issue dependencies cannot be set from cloud sessions; blockers are in each ticket's `## Blocked by` and `## Blocks` sections. Dependency summary comments on #320.
+- #331 follow-ups: the headless scene does not load GLBs in Node, so `vessel-hulls.smoke.ts` (52 to 62 s) stays in the browser; bay viewer, bay plan switch and crane plan specs are DOM checks, candidates for #332/#338 component tests; some colour-by test titles still say "3D".
+- #330 follow-ups: asc/shc/truck path patterns also add `engine`/`camera` for asset-only files (conservative); a group tag must sit on the same line as `test(`. The scene path (`sceneDriver`, `sceneState`, `useTwinScene`) was mapped to `all` at the #331 merge.
 - Some hero and close-up specs call `setQuality` or `setAutoRung` after boot without a one-line reason comment (#328 partial miss).
-- One test was flaky in run 44929542332; the merged smoke report artifact names it.
-- #327's "shards within about 30 %" criterion is not met yet; re-measure after #329 and #334.
+- #327's "shards within about 30 %" criterion is not met; it moved to #346 (first run: 7.2, 4.6, 1.5, 2, 1.5, 1.6 min of test time).
+- CI still sets `SMOKE_SERVER: build` explicitly; harmless after #344.
