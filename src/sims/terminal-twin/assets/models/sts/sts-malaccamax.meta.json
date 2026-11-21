@@ -6,7 +6,7 @@
   "units": "m",
   "dimensions": {
     "lengthM": 27.3,
-    "widthM": 136.6,
+    "widthM": 136.9,
     "heightM": 83.3,
     "tag": "A",
     "note": "overall LOD0 extents at rest (boom down): length along the rail (over buffers), width across (boom tip to backreach end), height to the apex"
@@ -1232,16 +1232,16 @@
   },
   "lods": {
     "LOD0": {
-      "triangles": 31686,
+      "triangles": 32218,
       "maxDistanceM": 250,
       "note": "camera to crane centre; the renderer adds 15 % hysteresis"
     },
     "LOD1": {
-      "triangles": 5872,
+      "triangles": 5788,
       "maxDistanceM": 900
     },
     "LOD2": {
-      "triangles": 474
+      "triangles": 494
     }
   },
   "materials": {
@@ -1252,7 +1252,30 @@
     "wordmark": "ZPMC",
     "livery": "TTI ALGECIRAS",
     "typeface": "Archivo-ExtraBold",
-    "placement": "TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces (white on blue), ZPMC builder plates on the legs",
+    "placement": "TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces and on the boom side plate outer faces (white on blue), ZPMC builder plates on the legs",
+    "boomSidePlate": {
+      "node": "boom_geo",
+      "material": "sts_paint",
+      "region": "tti_on_blue",
+      "lods": [
+        "LOD0",
+        "LOD1"
+      ],
+      "yM": [
+        53.4,
+        57.2
+      ],
+      "zM": [
+        -21.4,
+        -4.0
+      ],
+      "textM": [
+        14.4,
+        1.8
+      ],
+      "tag": "P",
+      "note": "solid plate on both boom girders seaward of the hinge (every LOD, so the silhouette matches); TTI ALGECIRAS lettering on its outer faces at LOD0 and LOD1, from the sts-atlas region, in the paint material (no extra draw call); rides with the boom"
+    },
     "craneNumbers": {
       "first": 101,
       "count": 24,
@@ -1333,6 +1356,16 @@
       "fact": "ladder cages, handrail posts and festoon loops simplified",
       "tag": "M",
       "reason": "triangle budget"
+    },
+    {
+      "fact": "#300 added: deeper boom side plate with TTI ALGECIRAS lettering (every LOD; lettering LOD0 and LOD1), extra A-frame and apex diagonal bracing (LOD0), zig-zag service stairs on the landward face of the -X landside leg (LOD0), a slightly larger machinery house (every LOD, no extra triangles)",
+      "tag": "P",
+      "source": "TTI reference photographs A01, A04, B01 (link-only) and the CC0 set; sizes [A]"
+    },
+    {
+      "fact": "#300 skipped for budget: nothing; LOD1 and LOD2 gain only the side plate (lettering also at LOD1); the house grows at every LOD so it does not pop at the LOD switch",
+      "tag": "M",
+      "reason": "spec #297 LOD0 ceiling 33,274 triangles (5 % over the 31,690 before the spec) and the per-LOD draw-call caps"
     }
   ]
 }

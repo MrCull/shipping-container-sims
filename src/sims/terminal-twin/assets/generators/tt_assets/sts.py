@@ -71,7 +71,14 @@ FORESTAY_TOP = (APEX[1] - 1.0, APEX[2] - 0.6)
 FORESTAY_END = (58.0, BOOM_TIP_Z + 0.4)
 BOOM_HOIST_TOP = (APEX[1] + 0.45, APEX[2] - 0.7)
 BOOM_HOIST_END = (63.4, -48.0)
-HOUSE = {'x': 6.2, 'y': (57.4, 64.8), 'z': (51.8, 60.6)}
+# [A] #300: the house is slightly larger than before (6.2 m half-width, 64.8 m roof, 60.6 m landward end); the seaward
+# end stays at 51.8 m, where the trolley parks at full backreach.
+HOUSE = {'x': 6.8, 'y': (57.4, 65.6), 'z': (51.8, 60.9)}
+# [P] #300: deeper solid side plate on the inboard boom (TTI photos A01, A04) carrying TTI ALGECIRAS in white;
+# [A] its length and depth. (Y, Z) ranges; it spans the girder width either side of GIRDER_X.
+BOOM_PLATE_Y = (53.4, GIRDER_Y[1])
+BOOM_PLATE_Z = (-21.4, HINGE[1] - 0.8)
+BOOM_PLATE_TEXT = (14.4, 1.8)   # lettering width x height (the atlas region is 8:1)
 BUFFER_X = LEG_X + 4.5   # over buffers = 27 m (= quay.stsMinSpacingM)
 # Spreader / headblock.
 TWISTLOCK_X = 6.058 / 2 - 0.089    # [V] ISO 1161 casting centres of a 20 ft box
@@ -424,6 +431,8 @@ def gantry_structure(d):
         xf = LEG_X + (ax - LEG_X) * t
         for z in (az * t, RAIL_GAUGE + (az - RAIL_GAUGE) * t):
             m.beam((-xf, 67.0, z), (xf, 67.0, z), 0.7, 0.7, blue)
+    if d == 0 and EXTRAS['apex_bracing']:
+        _apex_bracing(m, blue)
     m.box((-ax - 0.8, ay - 1.6, az - 0.9), (ax + 0.8, ay, az + 0.9), blue)
     if d == 0:
         m.box((-1.4, ay, az - 0.7), (1.4, ay + 0.9, az + 0.7), dark)       # head sheaves
@@ -512,7 +521,74 @@ def gantry_structure(d):
         for x, z in legs:
             sx = 1 if x > 0 else -1
             _ladder(m, x + sx * 1.2, sx, z, BOGIE_TOP + 0.3, PORTAL_Y[0] - 0.4, d)
+    if d == 0 and EXTRAS['leg_stairs']:
+        _leg_stairs(m, -LEG_X, RAIL_GAUGE)
     return m
+
+
+# #300 detail extras, LOD0 only, added in this order while LOD0 stays within the spec ceiling (sidecar provenance
+# lists what was added and what was skipped). The larger machinery house (HOUSE) costs no triangles.
+EXTRAS = {'apex_bracing': True, 'leg_stairs': True}
+
+
+def _aframe_at(y, z_leg):
+    """(|x|, z) of an A-frame leg at height y; z_leg = 0 (seaward leg) or RAIL_GAUGE (landward leg)."""
+    ax, ay, az = APEX
+    t = (y - PORTAL_Y[1]) / (ay - 0.8 - PORTAL_Y[1])
+    return LEG_X + (ax - LEG_X) * t, z_leg + (az - z_leg) * t
+
+
+def _apex_bracing(m, blue):
+    """[P] Extra diagonals in the A-frame (the reference silhouette is full of them): an X in each side frame below
+    the 67 m tie, a king post from the tie to the apex beam, and plan diagonals in the 67 m tie frame (above the
+    trolley, which passes through the A-frame below 62 m)."""
+    ax, ay, az = APEX
+    lo, hi = PORTAL_Y[1] + 1.2, 66.6
+    for sx in (-1, 1):
+        (xs0, zs0), (xl0, zl0) = _aframe_at(lo, 0.0), _aframe_at(lo, RAIL_GAUGE)
+        (xs1, zs1), (xl1, zl1) = _aframe_at(hi, 0.0), _aframe_at(hi, RAIL_GAUGE)
+        m.beam((sx * xs0, lo, zs0), (sx * xl1, hi, zl1), 0.5, 0.5, blue, up=(1, 0, 0))
+        m.beam((sx * xl0, lo, zl0), (sx * xs1, hi, zs1), 0.5, 0.5, blue, up=(1, 0, 0))
+        (xt, zt), (_, zr) = _aframe_at(67.0, 0.0), _aframe_at(67.0, RAIL_GAUGE)
+        m.beam((sx * xt, 67.35, (zt + zr) / 2), (sx * ax, ay - 1.6, az + 0.6), 0.55, 0.55, blue, up=(1, 0, 0))
+    (xt, zt), (_, zr) = _aframe_at(67.0, 0.0), _aframe_at(67.0, RAIL_GAUGE)
+    m.beam((-xt, 67.0, zt), (xt, 67.0, zr), 0.45, 0.45, blue)
+    m.beam((xt, 67.0, zt), (-xt, 67.0, zr), 0.45, 0.45, blue)
+
+
+STAIR_RISE = 4.0     # [A] per flight
+STAIR_RUN = 4.0
+STAIR_W = 0.9
+
+
+def _leg_stairs(m, x_leg, z_leg):
+    """[P] Zig-zag service stairs on the landward face of one leg, from the bogie to the portal, with a landing at
+    each turn and one handrail. Flights run along X across the leg face."""
+    grey = P('grey')
+    zf = z_leg + 1.35                    # clear of the tapered leg's landward face (1.2 m at the foot)
+    z0, z1 = zf, zf + STAIR_W
+    zc = (z0 + z1) / 2
+    xa, xb = x_leg - STAIR_RUN / 2, x_leg + STAIR_RUN / 2
+    y = BOGIE_TOP + 0.3
+    k = 0
+    while y + STAIR_RISE <= PORTAL_Y[0] - 0.2:
+        x_from, x_to = (xa, xb) if k % 2 == 0 else (xb, xa)
+        # Stringers on both sides and the handrail on the outer side.
+        for zz in (z0 + 0.05, z1 - 0.05):
+            m.beam((x_from, y, zz), (x_to, y + STAIR_RISE, zz), 0.1, 0.3, grey, up=(0, 0, 1), caps=False)
+        m.beam((x_from, y + 1.0, z1), (x_to, y + STAIR_RISE + 1.0, z1), 0.05, 0.05, grey, up=(0, 0, 1), caps=False)
+        steps = 8
+        for i in range(1, steps):
+            t = i / steps
+            xs = x_from + (x_to - x_from) * t
+            ys = y + STAIR_RISE * t
+            m.box((xs - 0.14, ys - 0.04, z0 + 0.1), (xs + 0.14, ys, z1 - 0.1), grey, faces=['+y'])
+        # Landing at the top of the flight, beyond its end, with a corner post.
+        lx = x_to + (0.6 if x_to > x_from else -0.6)
+        m.box((min(x_to, lx), y + STAIR_RISE - 0.08, z0), (max(x_to, lx), y + STAIR_RISE, z1), grey, faces=['+y', '-y', '+z', '-x', '+x'])
+        m.beam((lx, y + STAIR_RISE, z1), (lx, y + STAIR_RISE + 1.1, z1), 0.05, 0.05, grey, up=(1, 0, 0), caps=False)
+        y += STAIR_RISE
+        k += 1
 
 
 def boom_structure(d):
@@ -521,8 +597,19 @@ def boom_structure(d):
     hz = HINGE[1]
     tip = BOOM_TIP_Z
     frames = (-24.0, -48.0)
+    pz0, pz1 = BOOM_PLATE_Z
+    py0, py1 = BOOM_PLATE_Y
+
+    def on_plate(z):
+        return pz0 - 0.2 < z < pz1 + 0.2
+
     for sx in (-1, 1):
         x = sx * GIRDER_X
+        # Deeper solid side plate (box girder) on the inboard boom, every LOD (#300); TTI ALGECIRAS on its outer face.
+        m.box((x - GIRDER_HALF_W, py0, pz0), (x + GIRDER_HALF_W, py1, pz1), blue, faces=None if d < 2 else ['+x', '-x', '-y', '+z', '-z'])
+        if d < 2:
+            tw, th = BOOM_PLATE_TEXT
+            m.decal((x + sx * GIRDER_HALF_W, (py0 + py1) / 2, (pz0 + pz1) / 2), (sx, 0, 0), tw, th, SA.region_uv('tti_on_blue'))
         if d == 2:
             m.box((x - GIRDER_HALF_W, 54.4, tip), (x + GIRDER_HALF_W, GIRDER_Y[1], hz), blue)
             continue
@@ -534,6 +621,8 @@ def boom_structure(d):
         for k in range(bays + 1):
             z = hz + (tip - hz) * k / bays
             yb = 54.5 + (55.5 - 54.5) * k / bays
+            if on_plate(z) or (k < bays and on_plate(hz + (tip - hz) * (k + 1) / bays)):
+                continue  # the side plate replaces the lattice web here
             m.beam((x, yb + 0.5, z), (x, 56.0, z), 0.45, 0.45, dblue, up=(0, 0, 1), caps=False)
             if k < bays:
                 zn = hz + (tip - hz) * (k + 1) / bays
@@ -566,7 +655,7 @@ def boom_structure(d):
     if d < 2:
         for sx in (-1, 1):
             for z in (-14.0, -30.0, -46.0, -62.0):
-                _floodlight(m, (sx * GIRDER_X, 54.2, z))
+                _floodlight(m, (sx * GIRDER_X, BOOM_PLATE_Y[0] - 0.2 if on_plate(z) else 54.2, z))
         m.box((-1.0, 57.2, tip + 0.2), (1.0, 58.4, tip + 1.0), dark)  # tip sheave housing
     return m
 
@@ -941,7 +1030,15 @@ def sidecar(info, scene_water_rail_z):
             'wordmark': SA.WORDMARK,
             'livery': SA.OPERATOR_NAME,
             'typeface': SA.WORDMARK_FONT.replace('.ttf', ''),
-            'placement': 'TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces (white on blue), ZPMC builder plates on the legs',
+            'placement': 'TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces and on the boom side plate outer faces (white on blue), ZPMC builder plates on the legs',
+            'boomSidePlate': {
+                'node': 'boom_geo', 'material': 'sts_paint', 'region': 'tti_on_blue', 'lods': ['LOD0', 'LOD1'],
+                'yM': [round(v, 3) for v in BOOM_PLATE_Y], 'zM': [round(v, 3) for v in BOOM_PLATE_Z],
+                'textM': list(BOOM_PLATE_TEXT), 'tag': 'P',
+                'note': 'solid plate on both boom girders seaward of the hinge (every LOD, so the silhouette matches); '
+                        'TTI ALGECIRAS lettering on its outer faces at LOD0 and LOD1, from the sts-atlas region, in the paint '
+                        'material (no extra draw call); rides with the boom',
+            },
             'craneNumbers': {
                 'first': SA.PLATE_FIRST, 'count': SA.PLATE_COUNT,
                 'placement': 'seaward and landward portal beams, landside end of the machinery house',
@@ -970,5 +1067,13 @@ def sidecar(info, scene_water_rail_z):
             {'fact': 'LOD1 headblock and twin-lift housing merged into the spreader mesh; no boom-hoist ropes at LOD2', 'tag': 'M',
              'reason': 'per-LOD draw-call caps (10 at LOD1, 6 at LOD2)'},
             {'fact': 'ladder cages, handrail posts and festoon loops simplified', 'tag': 'M', 'reason': 'triangle budget'},
+            {'fact': '#300 added: deeper boom side plate with TTI ALGECIRAS lettering (every LOD; lettering LOD0 and LOD1), '
+                     + ', '.join(n for n, on in (('extra A-frame and apex diagonal bracing (LOD0)', EXTRAS['apex_bracing']),
+                                                 ('zig-zag service stairs on the landward face of the -X landside leg (LOD0)', EXTRAS['leg_stairs'])) if on)
+                     + ', a slightly larger machinery house (every LOD, no extra triangles)',
+             'tag': 'P', 'source': 'TTI reference photographs A01, A04, B01 (link-only) and the CC0 set; sizes [A]'},
+            {'fact': '#300 skipped for budget: ' + (', '.join(n for n, on in (('apex bracing', EXTRAS['apex_bracing']), ('leg stairs', EXTRAS['leg_stairs'])) if not on) or 'nothing')
+                     + '; LOD1 and LOD2 gain only the side plate (lettering also at LOD1); the house grows at every LOD so it does not pop at the LOD switch',
+             'tag': 'M', 'reason': 'spec #297 LOD0 ceiling 33,274 triangles (5 % over the 31,690 before the spec) and the per-LOD draw-call caps'},
         ],
     }
