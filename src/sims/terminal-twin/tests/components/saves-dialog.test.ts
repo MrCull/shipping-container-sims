@@ -35,7 +35,7 @@ vi.mock('../../persistence/saveStore', async (importOriginal) => {
   return {
     ...real,
     openSaveStore: async () => {
-      if (fake.blocked) throw new real.StorageUnavailableError()
+      if (fake.blocked) throw new real.StorageUnavailableError('blocked in this test')
       return {
         list: async () => [...fake.files.entries()].reverse().map(([id, f]) => meta(id, f as SaveFile)),
         get: async (id: string) => (fake.files.get(id) as SaveFile | undefined) ?? null,

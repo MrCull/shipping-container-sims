@@ -160,89 +160,24 @@ test.describe('British browser', () => {
     await expect.poll(async () => (await page.evaluate(() => window.__tt!.clock())).displayTime).toBeCloseTo(18 * 60 + 30, 0)
   })
 
-  test('keyboard shortcuts drive the sim, the help overlay lists them, typing in a field does not', { tag: '@shell' }, async ({ page }) => {
+  // Every key, the help overlay's list and typing in a field: tests/components/shortcuts.test.ts (#338). Here one key
+  // reaches the running twin, and the help button opens the overlay.
+  test('keyboard shortcuts reach the running twin and the help button opens the shortcut list', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     await loadTracerAt(page, 60)
     const clock = () => page.evaluate(() => window.__tt!.clock())
-    const ui = () => page.evaluate(() => window.__tt!.ui())
     await page.locator('body').click({ position: { x: 5, y: 300 } }) // focus the page, not a field
-
-    // Space: pause / resume
     expect((await clock()).paused).toBe(true)
     await page.keyboard.press('Space')
     expect((await clock()).paused).toBe(false)
-    await page.keyboard.press('Space')
-    expect((await clock()).paused).toBe(true)
     // Space with a top-bar button focused toggles once (it does not also click the button).
     await page.getByRole('button', { name: '×10' }).click()
-    expect((await clock()).paused).toBe(false)
     await page.keyboard.press('Space')
     expect((await clock()).paused).toBe(true)
-
-    // Digit keys 1-9 no longer change speed (#138); the top bar buttons do; 0: pause
-    await page.getByRole('button', { name: '×5', exact: true }).click()
-    expect(await clock()).toMatchObject({ speed: 5, paused: false })
-    for (const d of ['3', '9', '1']) await page.keyboard.press(d)
-    expect(await clock()).toMatchObject({ speed: 5, paused: false })
-    await page.keyboard.press('0')
-    expect((await clock()).paused).toBe(true)
-
-    // '.': single-step to the next event
-    const before = (await clock()).engine!.eventsTotal
-    await page.keyboard.press('.')
-    await expect.poll(async () => (await clock()).engine!.eventsTotal).toBe(before + 1)
-    expect((await clock()).paused).toBe(true)
-
-    // B: dashboard tab
-    await page.keyboard.press('b')
-    await expect(page.getByTestId('tt-dashboard')).toBeVisible()
-    await page.keyboard.press('b')
-    await expect(page.getByTestId('tt-dashboard')).toBeHidden()
-
-    // O: overlays
-    expect((await ui()).overlaysVisible).toBe(true)
-    await page.keyboard.press('o')
-    expect((await ui()).overlaysVisible).toBe(false)
-    await expect(page.getByTestId('tt-toast')).toHaveText('Overlays off')
-    await page.keyboard.press('o')
-    expect((await ui()).overlaysVisible).toBe(true)
-
-    // F: follow the selection; Esc: closes the inspector the selection opened, then deselects (and stops following)
-    await page.keyboard.press('f')
-    await expect(page.getByTestId('tt-toast')).toHaveText('Select something to follow first')
-    expect((await ui()).following).toBe(false)
-    await page.evaluate(() => window.__tt!.select('STS01'))
-    await page.keyboard.press('f')
-    expect(await ui()).toMatchObject({ selectedId: 'STS01', following: true })
-    await page.keyboard.press('Escape')
-    expect(await ui()).toMatchObject({ selectedId: 'STS01', inspectorOpen: false, following: true })
-    await page.keyboard.press('Escape')
-    expect(await ui()).toMatchObject({ selectedId: null, following: false })
-
-    // ?: help overlay lists every shortcut; Esc closes it
-    await page.keyboard.press('?')
     const help = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
-    await expect(help).toBeVisible()
-    for (const key of ['Space', '0', '.', 'F', 'Esc', 'B', 'O', '?', 'WASD', 'Shift + AD', 'Shift + WS', '= / -']) {
-      await expect(help.locator('kbd', { hasText: new RegExp(`^${key.replace(/[.?+]/g, '\\$&')}$`) })).toHaveCount(1)
-    }
-    await page.keyboard.press('Escape')
-    await expect(help).toBeHidden()
     await page.getByTestId('tt-help-button').click()
     await expect(help).toBeVisible()
     await page.keyboard.press('Escape')
-
-    // Typing in a field triggers nothing.
-    const stateBefore = { clock: await clock(), ui: await ui() }
-    await page.getByRole('button', { name: 'Run to…' }).click()
-    const field = page.getByLabel('Target sim time')
-    await field.focus()
-    for (const key of ['Space', '3', '0', '.', 'f', 'b', 'w', 'a', 'o', '?', 'Escape']) await field.press(key)
-    const after = await clock()
-    expect(after.paused).toBe(stateBefore.clock.paused)
-    expect(after.speed).toBe(stateBefore.clock.speed)
-    expect(after.engine!.eventsTotal).toBe(stateBefore.clock.engine!.eventsTotal)
-    expect(await ui()).toEqual(stateBefore.ui)
-    await expect(page.getByTestId('tt-dashboard')).toBeHidden()
+    await expect(help).toBeHidden()
   })
 })
