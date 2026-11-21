@@ -4,14 +4,44 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mockup F: Poster wall</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Sora:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Saira+Stencil+One&family=Sora:wght@400;500;600;700;800&display=swap">
 <style>
 /* Variation F. A poster wall: the screens are the page. Uneven tiles (one big, two tall, one wide), the words sit on
    the picture, and the planned games are a quiet row of chips. Almost no chrome, so the sims' own colours carry it. */
 :root {
+  /* Page colours, then the tile scrim (an RGB triplet so it can fade), then the small accents on the tiles. */
   --bg: #0b0e15; --line: #232a39; --ink: #f4f6fa; --muted: #aab3c5; --amber: #f59e0b; --on-amber: #1c1100;
+  --scrim: 5, 8, 14; --kind: #ffc766; --tile-p: #d9e0ee; --chip-line: #38425a; --dim: #6d788f; --foot: #7b869b;
+  --head-font: 'Sora', system-ui, sans-serif; --head-weight: 800; --radius: 16px; --btn-radius: 999px;
   --retro: 'Press Start 2P', monospace; --body: 'Sora', system-ui, sans-serif;
 }
+/* Scheme 2, Harbour day: a light page (paper and navy) with signal orange. The tiles keep a dark navy scrim. */
+[data-scheme=day] { --bg: #eef1f5; --line: #d3d9e3; --ink: #0d1b2e; --muted: #4a5870; --amber: #ea580c; --on-amber: #fff;
+  --scrim: 10, 24, 46; --kind: #ffb27a; --chip-line: #a9b4c6; --dim: #7b879c; --foot: #66738a; }
+/* Scheme 3, Hazard: black and safety yellow, square corners, stencil headings. Loud and very on-theme. */
+[data-scheme=hazard] { --bg: #0c0c0c; --line: #2b2b2b; --ink: #fafafa; --muted: #b3b3b3; --amber: #ffd400; --on-amber: #111;
+  --scrim: 0, 0, 0; --kind: #ffd400; --tile-p: #e6e6e6; --chip-line: #555; --dim: #8a8a8a; --foot: #8a8a8a;
+  --head-font: 'Saira Stencil One', Impact, sans-serif; --head-weight: 400; --radius: 4px; --btn-radius: 3px; }
+/* Scheme 4, Deep water: dark teal and sea green with a coral call to action. Calm, matches the sims' blue sea. */
+[data-scheme=sea] { --bg: #06171c; --line: #143039; --ink: #eafaf8; --muted: #93b6b5; --amber: #ff7a59; --on-amber: #2a0b00;
+  --scrim: 3, 20, 26; --kind: #7fe0cc; --tile-p: #d3ecea; --chip-line: #24505a; --dim: #5d8a8c; --foot: #5d8a8c; }
+/* Scheme 5, Rust and steel: warm corten brown with cream text and a teal accent, like a weathered box. */
+[data-scheme=rust] { --bg: #1a1210; --line: #3a2a24; --ink: #f6ece2; --muted: #c4ad9c; --amber: #2fb8a6; --on-amber: #04201c;
+  --scrim: 26, 14, 10; --kind: #f0a875; --tile-p: #eadbd0; --chip-line: #5a4034; --dim: #8f7565; --foot: #8f7565; }
+/* Scheme 6, Livery: the four container colours from mockup G, one per game, on graphite. Each tile has its own accent. */
+[data-scheme=livery] { --bg: #101215; --line: #262a31; --ink: #f2f4f7; --muted: #a5adba; --amber: #f6c21c; --on-amber: #1b1400;
+  --scrim: 10, 12, 16; --chip-line: #3a404b; --dim: #6f7785; --foot: #6f7785; --radius: 8px; --btn-radius: 6px; }
+[data-scheme=livery] .t1 { --amber: #4a90e2; --on-amber: #fff; --kind: #9cc4ff; --stripe: #2a6fc4; }
+[data-scheme=livery] .t2 { --amber: #f59e0b; --kind: #ffc766; --stripe: #e0830c; }
+[data-scheme=livery] .t3 { --amber: #ef5a4c; --on-amber: #fff; --kind: #ff9d93; --stripe: #c23a2e; }
+[data-scheme=livery] .t4 { --amber: #2fbf8f; --on-amber: #022016; --kind: #8de6c4; --stripe: #1f8a6e; }
+[data-scheme=livery] .tile::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 8px; z-index: 1; background: repeating-linear-gradient(90deg, var(--stripe) 0 12px, color-mix(in srgb, var(--stripe) 70%, #000) 12px 16px); }
+[data-scheme=livery] .badge { background: #f6c21c; color: #1b1400; top: 22px; }
+
+.schemes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 0 0; font-size: 12px; color: var(--muted); }
+.schemes a { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; display: inline-flex; gap: 6px; align-items: center; }
+.schemes a i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.schemes a[aria-current] { border-color: var(--amber); color: var(--ink); }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
@@ -22,15 +52,15 @@ a { color: inherit; text-decoration: none; }
 .top nav { display: flex; gap: 22px; color: var(--muted); font-size: 14px; font-weight: 500; }
 
 .head { display: flex; justify-content: space-between; align-items: end; gap: 28px; padding-block: 14px 22px; }
-.head h1 { font: 800 60px/.98 var(--body); letter-spacing: -.04em; }
+.head h1 { font: var(--head-weight) 60px/.98 var(--head-font); letter-spacing: -.04em; }
 .head h1 span { color: var(--amber); }
 .head p { color: var(--muted); max-width: 36ch; font-size: 17px; padding-bottom: 6px; }
 
 .wall { display: grid; grid-template-columns: repeat(12, 1fr); grid-auto-rows: 150px; gap: 14px; }
-.tile { position: relative; border-radius: 16px; overflow: hidden; display: flex; align-items: flex-end; background: #111; isolation: isolate; }
+.tile { position: relative; border-radius: var(--radius); overflow: hidden; display: flex; align-items: flex-end; background: #111; isolation: isolate; }
 .tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .6s ease; z-index: -2; }
-.tile::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(0deg, rgba(5,8,14,.92) 0%, rgba(5,8,14,.55) 30%, rgba(5,8,14,0) 58%); }
-.t4::before { background: linear-gradient(90deg, rgba(5,8,14,.86) 0%, rgba(5,8,14,.5) 30%, rgba(5,8,14,0) 56%), linear-gradient(0deg, rgba(5,8,14,.55) 0%, rgba(5,8,14,0) 36%); }
+.tile::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(0deg, rgba(var(--scrim),.92) 0%, rgba(var(--scrim),.55) 30%, rgba(var(--scrim),0) 58%); }
+.t4::before { background: linear-gradient(90deg, rgba(var(--scrim),.86) 0%, rgba(var(--scrim),.5) 30%, rgba(var(--scrim),0) 56%), linear-gradient(0deg, rgba(var(--scrim),.55) 0%, rgba(var(--scrim),0) 36%); }
 .tile:hover img { transform: scale(1.05); }
 .t1 { grid-column: span 7; grid-row: span 4; }
 .t2 { grid-column: span 5; grid-row: span 2; }
@@ -39,24 +69,24 @@ a { color: inherit; text-decoration: none; }
 .inner { padding: 24px 26px; width: 100%; display: grid; gap: 6px; }
 .t1 .inner { padding: 34px; gap: 10px; }
 .t4 .inner { padding: 30px 34px; max-width: 700px; }
-.kind { font: 600 11px var(--body); letter-spacing: .1em; text-transform: uppercase; color: #ffc766; }
-.tile h2 { font: 800 28px/1.05 var(--body); letter-spacing: -.02em; }
+.kind { font: 600 11px var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--kind); }
+.tile h2 { font: var(--head-weight) 28px/1.05 var(--head-font); color: #fff; letter-spacing: -.02em; }
 .t1 h2 { font-size: 52px; letter-spacing: -.035em; }
 .t4 h2 { font-size: 40px; }
-.tile p { color: #d9e0ee; font-size: 15px; max-width: 42ch; }
+.tile p { color: var(--tile-p); font-size: 15px; max-width: 42ch; }
 .t1 p, .t4 p { font-size: 18px; }
 .go { display: flex; gap: 12px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
-.btn { display: inline-flex; align-items: center; gap: 8px; font: 700 14px var(--body); padding: 10px 20px; border-radius: 999px; background: var(--amber); color: var(--on-amber); }
+.btn { display: inline-flex; align-items: center; gap: 8px; font: 700 14px var(--body); padding: 10px 20px; border-radius: var(--btn-radius); background: var(--amber); color: var(--on-amber); }
 .t1 .btn, .t4 .btn { padding: 13px 26px; font-size: 16px; }
-.meta { font-size: 13px; color: #c7d0e1; }
+.meta { font-size: 13px; color: var(--tile-p); }
 .meta b { color: #fff; }
 .badge { position: absolute; z-index: 1; top: 16px; left: 16px; font: 9px var(--retro); letter-spacing: .08em; background: var(--amber); color: var(--on-amber); padding: 7px 9px; border-radius: 4px; }
 
 .later { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; padding-block: 30px 6px; color: var(--muted); font-size: 14px; }
-.later .lab { font: 10px var(--retro); letter-spacing: .08em; color: #6d788f; margin-right: 8px; }
-.chip { border: 1px dashed #38425a; border-radius: 10px; padding: 9px 14px; }
+.later .lab { font: 10px var(--retro); letter-spacing: .08em; color: var(--dim); margin-right: 8px; }
+.chip { border: 1px dashed var(--chip-line); border-radius: 10px; padding: 9px 14px; }
 .chip b { color: var(--ink); font-weight: 600; display: block; }
-footer { margin-top: 30px; border-top: 1px solid var(--line); padding-block: 22px 28px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; color: #7b869b; font-size: 13px; }
+footer { margin-top: 30px; border-top: 1px solid var(--line); padding-block: 22px 28px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; color: var(--foot); font-size: 13px; }
 
 @media (max-width: 960px) {
   .wall { grid-auto-rows: 130px; }
@@ -78,11 +108,20 @@ footer { margin-top: 30px; border-top: 1px solid var(--line); padding-block: 22p
   .t4 h2 { font-size: 32px; }
   .t1 .inner, .t4 .inner { padding: 20px; }
   .badge { left: auto; right: 14px; }
+  .tile::before, .t4::before { background: linear-gradient(0deg, rgba(var(--scrim),.95) 0%, rgba(var(--scrim),.8) 50%, rgba(var(--scrim),0) 88%); }
 }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <nav class="schemes" aria-label="Colour scheme (mockup only)">Scheme:
+    <a href="?scheme=night"><i style="background:#f59e0b"></i>Night amber</a>
+    <a href="?scheme=day"><i style="background:#ea580c"></i>Harbour day</a>
+    <a href="?scheme=hazard"><i style="background:#ffd400"></i>Hazard</a>
+    <a href="?scheme=sea"><i style="background:#ff7a59"></i>Deep water</a>
+    <a href="?scheme=rust"><i style="background:#2fb8a6"></i>Rust and steel</a>
+    <a href="?scheme=livery"><i style="background:conic-gradient(#2a6fc4 0 25%,#e0830c 0 50%,#c23a2e 0 75%,#1f8a6e 0)"></i>Livery</a>
+  </nav>
   <header class="top"><div class="logo">SHIPPING <b>CONTAINER</b> SIMS</div><nav><a href="#">GitHub</a><a href="#">Sound on</a></nav></header>
 
   <section class="head">
@@ -106,5 +145,11 @@ footer { margin-top: 30px; border-top: 1px solid var(--line); padding-block: 22p
   </section>
   <footer><span>Shipping Container Sims &copy; 2026 &middot; GitHub</span><span>Built 21 Nov 2026 09:10 &middot; 2b1b3f9</span></footer>
 </div>
+<script>
+  // Mockup only: pick the colour scheme from ?scheme= so each one has a shareable link.
+  const s = new URLSearchParams(location.search).get('scheme') || 'night'
+  document.documentElement.dataset.scheme = s
+  document.querySelector(`.schemes a[href="?scheme=${s}"]`)?.setAttribute('aria-current', 'true')
+</script>
 </body>
 </html>

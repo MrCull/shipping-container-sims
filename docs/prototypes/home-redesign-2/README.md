@@ -15,6 +15,21 @@ Four more static mockups of the main menu (`src/pages/HomePage.vue`), a follow-u
 - **Box Empire** (`boxempire-wide.jpg`, `boxempire-quay.jpg`, `boxempire-low.jpg`): sandbox mode with two mobile harbour cranes working a laden feeder, three reach stackers and a truck, HUD hidden.
 - **Contenga** and **Terminal Twin**: the crops from PR #278.
 
+### Colour schemes for F
+
+`f-bento.html` takes `?scheme=` (or use the switcher strip at the top of the page). Every colour is a CSS variable, so a scheme is one block of overrides:
+
+| `?scheme=` | Look |
+|---|---|
+| `night` (default) | The original: near-black navy with amber |
+| `day` | Light page (paper and navy) with signal orange; tiles keep a dark scrim so the words stay readable |
+| `hazard` | Black and safety yellow, square corners, stencil headings |
+| `sea` | Dark teal with a coral call to action, matching the sims' blue water |
+| `rust` | Warm corten brown, cream text, teal buttons |
+| `livery` | Graphite, and each game wears its container colour from mockup G (blue, orange, red, green) as a corrugated top edge and button |
+
+Renders: `shots/f-scheme-<name>-{desktop,phone}.jpg`, and all six side by side in `shots/f-schemes-sheet.jpg`.
+
 Progress lines ("level 3", "14 moves") and the build stamp are example values.
 
 ## How the screenshots were taken
