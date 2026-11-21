@@ -6,7 +6,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | --- | --- | --- | --- | --- |
 | #321 | 01 Retries, failure cap, durable timings, 30 s flag, fast-job timeout | none | merged in branch (1741e27) | |
 | #322 | 02 `?quality=`, `?render=off`, `__tt.renderOnce()` | none | in progress | implementer (tt/322-url-switches) |
-| #323 | 06 Smoke build | none | open | |
+| #323 | 06 Smoke build | none | in progress | implementer (tt/323-smoke-build) |
 | #324 | 19 Unit-test speed-up | none | open | |
 | #325 | 03 `openTwin` helper, first migration | #322 | open | |
 | #326 | 18 Rendering-budget guard | #322 | open | |
@@ -27,7 +27,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 
 ## Next steps
 
-- Frontier now: #321, #322 running (at most two implementers at once); #323, #324 next.
+- Merged: #321. Running: #322, #323. Next: #324 (when a slot frees), then #325 and #326 after #322.
 
 ## Open points
 
