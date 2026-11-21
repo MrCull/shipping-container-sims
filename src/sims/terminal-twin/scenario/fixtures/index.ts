@@ -37,12 +37,14 @@ import twin20Lift from './twin-20-lift.json'
 import twoVesselsCompeteForBerth from './two-vessels-compete-for-berth.json'
 import berthOvertaking from './berth-overtaking.json'
 import boomBerthing from './boom-berthing.json'
+import boomBridge from './boom-bridge.json'
 
 export const fixtures: Record<string, ScenarioConfig> = {
   'tracer-1sts-10-boxes': tracer1Sts10Boxes as ScenarioConfig,
   'two-vessels-compete-for-berth': twoVesselsCompeteForBerth as ScenarioConfig,
   'berth-overtaking': berthOvertaking as ScenarioConfig,
   'boom-berthing': boomBerthing as ScenarioConfig,
+  'boom-bridge': boomBridge as ScenarioConfig,
   'crane-split-4sts': craneSplit4Sts as ScenarioConfig,
   'vessel-ordering-pod-weight': vesselOrderingPodWeight as ScenarioConfig,
   'twin-20-lift': twin20Lift as ScenarioConfig,

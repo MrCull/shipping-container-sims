@@ -1,6 +1,6 @@
 # Quay subsystem: vessels, berths, STS cranes, hatch covers
 
-Checked against ENGINE_VERSION 0.55.0.
+Checked against ENGINE_VERSION 0.56.0.
 
 Read this when you change or tune anything between a vessel's arrival and its departure: berth allocation, the
 crane split, the shared STS rail, the STS discharge and load cycles, work packages, the vessel work order (POD and
@@ -411,9 +411,22 @@ TTI presets and the `boom-berthing` fixture.
 - **Raise:** the spreader hoists to `stsSafeHoistM`, the trolley parks at `stsGroundLaneZ0M` (landside of the hinge),
   then the boom turns. Hoist and trolley never move while the boom is off the working angle (invariant
   `sts.boom-working`). Rail order, reservations and `stsMinSpacingM` ignore the boom angle.
+- **Passing a bridge (#302):** each vessel class has a `superstructure` (`VesselClassSpec`: accommodation block X range
+  `houseFromM` to `houseToM` from the stern, and `airDraftM`, mast top above the quay; mirrored from the hull sidecars and
+  cross-checked in `tests/vessel-hulls.test.ts`). When a work cycle's gantry move (`StsMoveStarted`, `StsLoadStarted`)
+  crosses a vessel on the quay whose house X range lies on the path, and the lowered boom's underside
+  (`boomUndersideM`, default 55.6 m [A], the Malaccamax hinge) is below its air draft plus
+  `boomSuperstructureClearanceM` (2 m [A]), `passSuperstructure` (boom.ts) makes the cycle: hoist to travel height,
+  park the trolley, raise, gantry boom up, lower, then the rest of the cycle, all in one planned sequence (no overlap).
+  Otherwise the crane gantries boom down; a step to the next clear bay never raises. Only the ULCV (air draft 59.1 m)
+  needs it with the default underside; the Neo-Panamax (51.3 m) and smaller clear. With `canGantryWithBoomRaised`
+  false the move is not started: `StsGantryBlocked` (`{stsId, vesselId, targetX}`) reports it and the crane idles where
+  it stands (the crane split is unchanged). The boom is taken as a line at the gantry position [A]. Fixture
+  `boom-bridge` (ULCV, STS01 starts aft of the house) and `tests/boom-bridge.test.ts`.
 - **Limits (until later tickets of spec #297):** cranes working another vessel are never raised for a neighbour's
-  mooring; no boom-up gantry past a superstructure (#302); no `boom` productivity category (#301); the GLB's forestays
-  turn with the boom (#299).
+  mooring; no `boom` productivity category (#301). Bridge passage covers work-cycle gantry moves only: a rail
+  reposition (step aside, `StsRepositionStarted`) gantries boom down even past a house, and a crane assigned while
+  parked boom up over a house lowers there before its first move.
 
 ## Decision points used here
 

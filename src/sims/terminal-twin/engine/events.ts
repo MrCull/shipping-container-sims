@@ -134,6 +134,11 @@ export interface EventPayloads {
   /** The boom reached its angle (`boomDeg`). */
   StsBoomCompleted: { stsId: string; op: 'raise' | 'lower'; boomDeg: number }
   /**
+   * Boom mode real with `canGantryWithBoomRaised` false (#302): the gantry move to `targetX` would cross the
+   * superstructure of `vesselId` that the lowered boom cannot clear, so the crane stays where it is.
+   */
+  StsGantryBlocked: { stsId: string; vesselId: string; targetX: number }
+  /**
    * Spreader locked: custody vessel slot → STS. A twin-20 lift picks a
    * second box (`twin`) in the same cycle.
    */

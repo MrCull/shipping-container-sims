@@ -33,6 +33,12 @@ export interface StsKinematics {
   boomStowedDeg?: number
   /** A crane is "over" a vessel when its body overlaps the vessel's quay stretch widened by this on each side (m). Default `DEFAULT_STS_BOOM.clearanceMarginM`. */
   boomClearanceMarginM?: number
+  /** Height of the lowered boom's underside above the quay (m; #302). Default `DEFAULT_STS_BOOM.undersideM`. */
+  boomUndersideM?: number
+  /** Vertical clearance the lowered boom keeps above a vessel's air draft (m; #302). Default `DEFAULT_STS_BOOM.superstructureClearanceM`. */
+  boomSuperstructureClearanceM?: number
+  /** May a crane gantry with its boom raised (#302)? false: a crossing of a superstructure is blocked. Default true. */
+  canGantryWithBoomRaised?: boolean
 }
 
 /**
@@ -48,6 +54,12 @@ export const DEFAULT_STS_BOOM = {
   stowedDeg: 80,
   /** [A] Clearance margin either side of a vessel's quay stretch (m). */
   clearanceMarginM: 10,
+  /** [A] Lowered boom underside above the quay (m): the Malaccamax GLB's boom hinge height. */
+  undersideM: 55.6,
+  /** [A] Vertical clearance above a vessel's air draft (m, #302). */
+  superstructureClearanceM: 2,
+  /** [A] Gantry travel with the boom raised is allowed (#302). */
+  canGantryWithBoomRaised: true,
 } as const
 
 /** SHC (shuttle carrier) kinematics. Drive axes are along X or Z; `lift` raises the box. */

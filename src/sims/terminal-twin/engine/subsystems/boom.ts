@@ -83,7 +83,64 @@ export function raiseOver(ctx: EngineContext, vessel: VesselState): number {
   return ready
 }
 
+const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
+
+/**
+ * #302: the first vessel on the quay whose superstructure (accommodation block X range) lies on the gantry path
+ * `[fromX, toX]` and is taller than the lowered boom can clear (boom underside below air draft plus clearance), or
+ * null. The boom is taken as a line at the gantry position [A].
+ */
+export function superstructureOnPath(ctx: Pick<EngineContext, 'state' | 'config'>, fromX: number, toX: number): VesselState | null {
+  const b = stsBoom(ctx.config)
+  const lo = Math.min(fromX, toX)
+  const hi = Math.max(fromX, toX)
+  for (const v of Object.values(ctx.state.vessels)) {
+    if (v.berthX === null || !ON_QUAY.has(v.status)) continue
+    const s = vesselClass(v.sizeClass).superstructure
+    if (b.undersideM >= s.airDraftM + b.superstructureClearanceM) continue
+    if (lo <= v.berthX + s.houseToM && hi >= v.berthX + s.houseFromM) return v
+  }
+  return null
+}
+
+type Moves = Parameters<typeof planSequence>[3]
+
+/**
+ * #302: a work cycle's moves (spreader to travel height first, then the gantry move) adjusted for a superstructure on
+ * the gantry path: park the trolley, raise, gantry boom up, lower, then the rest. Boom mode off, a boom not at the
+ * working angle or a clear path: the moves unchanged.
+ */
+export function passSuperstructure(ctx: EngineContext, sts: StsState, moves: Moves): Moves {
+  const g = moves.findIndex((m) => m.axis === 'gantry')
+  if (g < 0 || !crossing(ctx, sts, moves[g].to)) return moves
+  const b = stsBoom(ctx.config)
+  const k = ctx.config.kinematics.sts
+  const profile = boomProfile(b.stowedDeg - b.workingDeg, b.transitionS)
+  return [
+    ...moves.slice(0, g),
+    { axis: 'trolley', to: ctx.config.layout.stsGroundLaneZ0M, profile: k.trolley },
+    { axis: 'boom', to: b.stowedDeg, profile },
+    moves[g],
+    { axis: 'boom', to: b.workingDeg, profile },
+    ...moves.slice(g + 1),
+  ]
+}
+
+/** #302: the superstructure a lowered boom would hit on the gantry move to `targetX` (boom mode real, boom down), or null. */
+function crossing(ctx: EngineContext, sts: StsState, targetX: number): VesselState | null {
+  if (!boomReal(ctx) || needsLowering(ctx, sts)) return null
+  return superstructureOnPath(ctx, sts.gantryX, targetX)
+}
+
+/** #302: the vessel whose superstructure blocks the gantry move to `targetX` when `canGantryWithBoomRaised` is false, or null. */
+export function gantryBlockedBy(ctx: EngineContext, sts: StsState, targetX: number): string | null {
+  if (stsBoom(ctx.config).canGantryWithBoomRaised) return null
+  return crossing(ctx, sts, targetX)?.id ?? null
+}
+
 export const boomReactors: ReactorMap = {
+  StsGantryBlocked: () => undefined,
+
   StsBoomStarted: (e, ctx) => {
     const sts = ctx.state.sts[e.payload.stsId]
     sts.motion = e.payload.segments

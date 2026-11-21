@@ -110,6 +110,26 @@ const fixtureEntries: Record<string, FixtureDefinition> = {
       .build(),
   },
 
+  /** STS booms real (#302): a crane crossing a ULCV's accommodation block raises, gantries boom up and lowers. */
+  'boom-bridge': {
+    group: 'quay',
+    name: 'Booms up past the bridge',
+    summary: 'A crane raises its boom to pass a big ship\'s bridge, then lowers it to work.',
+    description: 'A ULCV berths at a 600 m quay with two cranes and booms switched on. The first crane waits aft of the ship, so its first move to the aft bays crosses the accommodation block: the bridge and mast are taller than its lowered boom, so it parks its trolley, raises the boom, drives past and lowers again. The second crane works the forward bays and steps from bay to bay with its boom down.',
+    watch: 'Watch the aft crane lift its boom over the bridge and drop it on the far side.',
+    build: () =>
+    new ScenarioBuilder('boom-bridge', 'One ULCV, two STS, booms real: the aft crane raises to pass the bridge')
+      .hatch({ enabled: false })
+      .seed(5)
+      .quay(600, { mooringS: 600, unmooringS: 600 })
+      .sts('STS01', { gantryX: 14, groundPositions: 24 })
+      .sts('STS02', { gantryX: 300, groundPositions: 24 })
+      .subsystems({ boom: 'real' })
+      .vesselCall('V001', { name: 'MSC Gibraltar', sizeClass: 'ulcv', arrivalS: 0, discharge: 16, maxSts: 2 })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+  },
+
   /**
    * Berth overtaking: two ULCVs cannot share the 600 m quay, but the Feedermax that arrives third
    * fits in the stretch the second ULCV cannot use, so it berths first.

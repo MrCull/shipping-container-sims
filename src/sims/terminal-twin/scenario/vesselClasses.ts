@@ -38,6 +38,21 @@ export interface VesselClassSpec {
   deckHeightM: number
   /** Hatch covers over each 40 ft bay (TT-R09). */
   hatch: HatchClassSpec
+  /** Accommodation block and air draft (#302): what a lowered STS boom must clear. */
+  superstructure: SuperstructureSpec
+}
+
+/**
+ * The accommodation block of a vessel class (#302, all [A]), mirrored from the hull generator's sidecar
+ * (`assets/models/vessels/vessel-<class>.meta.json`, cross-checked in `tests/vessel-hulls.test.ts`).
+ */
+export interface SuperstructureSpec {
+  /** Aft end of the accommodation block, measured forward from the stern (m). */
+  houseFromM: number
+  /** Fore end of the accommodation block (wheelhouse front), measured forward from the stern (m). */
+  houseToM: number
+  /** Air draft: mast top above quay level (m; the sidecar's `airDraftM` is above the waterline). */
+  airDraftM: number
 }
 
 /**
@@ -75,11 +90,11 @@ const HATCH_DEFAULTS = {
 
 /** [A] Size classes, smallest first. */
 export const VESSEL_CLASSES: Record<VesselSizeClass, VesselClassSpec> = {
-  feeder: { label: 'Feeder', loaM: 140, beamM: 23, bays: 7, rows: 8, holdRows: [4, 6, 6, 8], holdTiers: 4, deckTiers: 3, deckHeightM: 12, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 12 } },
-  feedermax: { label: 'Feedermax', loaM: 180, beamM: 28, bays: 10, rows: 10, holdRows: [4, 6, 8, 8, 10], holdTiers: 5, deckTiers: 4, deckHeightM: 14, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 16 } },
-  panamax: { label: 'Panamax', loaM: 294, beamM: 32.3, bays: 17, rows: 12, holdRows: [6, 8, 8, 10, 10, 12, 12], holdTiers: 7, deckTiers: 5, deckHeightM: 18, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 24 } },
-  'neo-panamax': { label: 'Neo-Panamax', loaM: 366, beamM: 48.2, bays: 20, rows: 18, holdRows: [8, 10, 12, 14, 14, 16, 18, 18], holdTiers: 8, deckTiers: 7, deckHeightM: 20, hatch: { ...HATCH_DEFAULTS, panels: 3, panelWeightT: 28 } },
-  ulcv: { label: 'ULCV', loaM: 400, beamM: 61.5, bays: 24, rows: 23, holdRows: [11, 13, 15, 17, 17, 19, 21, 21, 23, 23], holdTiers: 10, deckTiers: 9, deckHeightM: 22, hatch: { ...HATCH_DEFAULTS, panels: 4, panelWeightT: 32 } },
+  feeder: { label: 'Feeder', loaM: 140, beamM: 23, bays: 7, rows: 8, holdRows: [4, 6, 6, 8], holdTiers: 4, deckTiers: 3, deckHeightM: 12, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 12 }, superstructure: { houseFromM: 11.7, houseToM: 20.5, airDraftM: 31.688 } },
+  feedermax: { label: 'Feedermax', loaM: 180, beamM: 28, bays: 10, rows: 10, holdRows: [4, 6, 8, 8, 10], holdTiers: 5, deckTiers: 4, deckHeightM: 14, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 16 }, superstructure: { houseFromM: 10.5, houseToM: 18.5, airDraftM: 36.584 } },
+  panamax: { label: 'Panamax', loaM: 294, beamM: 32.3, bays: 17, rows: 12, holdRows: [6, 8, 8, 10, 10, 12, 12], holdTiers: 7, deckTiers: 5, deckHeightM: 18, hatch: { ...HATCH_DEFAULTS, panels: 2, panelWeightT: 24 }, superstructure: { houseFromM: 20.1, houseToM: 34.5, airDraftM: 43.48 } },
+  'neo-panamax': { label: 'Neo-Panamax', loaM: 366, beamM: 48.2, bays: 20, rows: 18, holdRows: [8, 10, 12, 14, 14, 16, 18, 18], holdTiers: 8, deckTiers: 7, deckHeightM: 20, hatch: { ...HATCH_DEFAULTS, panels: 3, panelWeightT: 28 }, superstructure: { houseFromM: 48.5, houseToM: 64.5, airDraftM: 51.272 } },
+  ulcv: { label: 'ULCV', loaM: 400, beamM: 61.5, bays: 24, rows: 23, holdRows: [11, 13, 15, 17, 17, 19, 21, 21, 23, 23], holdTiers: 10, deckTiers: 9, deckHeightM: 22, hatch: { ...HATCH_DEFAULTS, panels: 4, panelWeightT: 32 }, superstructure: { houseFromM: 26.5, houseToM: 42.5, airDraftM: 59.064 } },
 }
 
 export const VESSEL_SIZE_CLASSES = Object.keys(VESSEL_CLASSES) as VesselSizeClass[]

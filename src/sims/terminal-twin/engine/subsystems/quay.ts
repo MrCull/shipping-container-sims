@@ -38,7 +38,7 @@ import { stsCycleGeometry, stsNominalCycle } from '../cycleTime'
 import { hatchEnabled, hatchSettings } from '../hatch'
 import { pumpLoadPrep, slotGantryX } from './loadPrep'
 import { prepareNextPackage } from './workPackages'
-import { needsLowering, startBoom } from './boom'
+import { gantryBlockedBy, needsLowering, passSuperstructure, startBoom } from './boom'
 import { deckBoxChanged } from './hatch'
 import { laneGraphOf, laneZonesAt } from '../laneGraph'
 import { earliestStart, reserve } from '../reservations'
@@ -113,6 +113,19 @@ function liftX(ctx: EngineContext, vesselId: string, containerIds: string[]): nu
   const slot = ctx.state.vesselSlots[ctx.state.containers[containerIds[0]].custody.id]
   const spec = vesselClass(vessel.sizeClass)
   return slotX(spec, vessel.berthX ?? 0, slot.bay, containerIds.length === 1 ? slot.half : null)
+}
+
+/**
+ * Boom mode real with `canGantryWithBoomRaised` false (#302): a gantry move to `targetX` that would cross a
+ * superstructure the lowered boom cannot clear is not started. StsGantryBlocked reports it and the crane stays idle
+ * where it is (the crane split is unchanged). True when stopped.
+ */
+function gantryStopped(ctx: EngineContext, sts: StsState, targetX: number, at: number): boolean {
+  const vesselId = gantryBlockedBy(ctx, sts, targetX)
+  if (vesselId === null) return false
+  sts.status = 'idle'
+  ctx.schedule('StsGantryBlocked', at, { equipment: [sts.id], vessels: [vesselId] }, { stsId: sts.id, vesselId, targetX })
+  return true
 }
 
 /**
@@ -343,6 +356,7 @@ export const quayReactors: ReactorMap = {
     }
     const kpi = state.kpis.perSts[sts.id]
     const targetX = slotGantryX(state, e.payload.slotId)
+    if (gantryStopped(ctx, sts, targetX, e.t)) return
     const blockedBy = reserveRail(state, config, sts, targetX)
     if (blockedBy !== null) {
       sts.status = 'waiting-for-rail'
@@ -366,12 +380,12 @@ export const quayReactors: ReactorMap = {
     const k = stsKinematics(ctx)
     const f = variation(ctx)
     const height = CONTAINER_HEIGHT_M[box.size]
-    const moves = [
+    const moves = passSuperstructure(ctx, sts, [
       { axis: 'hoist' as const, to: config.layout.stsSafeHoistM, profile: k.hoistEmpty },
       { axis: 'gantry' as const, to: targetX, profile: k.gantry },
       { axis: 'trolley' as const, to: config.layout.stsGroundLaneZ0M + gp.lane * config.layout.stsGroundLaneSpacingM, profile: k.trolley },
       { axis: 'hoist' as const, to: height, profile: k.hoistEmpty },
-    ]
+    ])
     // With SHCs the lane section under the box is a conflict zone: the pick starts once the SHC that put
     // the box down has driven out of it, and holds it until the box is lifted clear.
     let begin = e.t
@@ -472,6 +486,7 @@ export const quayReactors: ReactorMap = {
     const ids = e.payload.containerIds
     const targetX = liftX(ctx, vessel.id, ids)
     const kpi = state.kpis.perSts[sts.id]
+    if (gantryStopped(ctx, sts, targetX, e.t)) return
     const blockedBy = reserveRail(state, config, sts, targetX)
     if (blockedBy !== null) {
       sts.status = 'waiting-for-rail'
@@ -498,12 +513,12 @@ export const quayReactors: ReactorMap = {
     const slot = state.vesselSlots[box.custody.id]
     const tallest = Math.max(...ids.map((id) => CONTAINER_HEIGHT_M[state.containers[id].size]))
     const k = stsKinematics(ctx)
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), [
+    const { segments, end } = planSequence(sts, e.t, variation(ctx), passSuperstructure(ctx, sts, [
       { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: k.hoistEmpty },
       { axis: 'gantry', to: targetX, profile: k.gantry },
       { axis: 'trolley', to: slotZ(spec, slot.row), profile: k.trolley },
       { axis: 'hoist', to: tierBaseY(spec, slot.tier) + tallest, profile: k.hoistEmpty },
-    ], isInstant(ctx))
+    ]), isInstant(ctx))
     const twin = ids[1] ? { containerId: ids[1], from: { ...state.containers[ids[1]].custody } } : undefined
     ctx.schedule('StsPicked', end + k.lockS, { equipment: [sts.id], containers: ids, vessels: [vessel.id] }, {
       stsId: sts.id,

@@ -1049,6 +1049,9 @@ export function stsBoom(config: ScenarioConfig) {
     workingDeg: k.boomWorkingDeg ?? DEFAULT_STS_BOOM.workingDeg,
     stowedDeg: k.boomStowedDeg ?? DEFAULT_STS_BOOM.stowedDeg,
     clearanceMarginM: k.boomClearanceMarginM ?? DEFAULT_STS_BOOM.clearanceMarginM,
+    undersideM: k.boomUndersideM ?? DEFAULT_STS_BOOM.undersideM,
+    superstructureClearanceM: k.boomSuperstructureClearanceM ?? DEFAULT_STS_BOOM.superstructureClearanceM,
+    canGantryWithBoomRaised: k.canGantryWithBoomRaised ?? DEFAULT_STS_BOOM.canGantryWithBoomRaised,
   }
 }
 

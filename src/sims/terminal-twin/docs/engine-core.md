@@ -1,6 +1,6 @@
 # Engine core: the discrete-event loop
 
-Checked against ENGINE_VERSION 0.55.0.
+Checked against ENGINE_VERSION 0.56.0.
 
 Read this when you change or debug how events are scheduled, processed, hashed, logged, snapshotted or replayed;
 when you add an event type or reactor; or when you hunt headless run time per event. The state the loop mutates is
@@ -118,7 +118,7 @@ runtime = `engine/decisions/runtime.ts`). Log subsystem = lower-cased first word
 | Work packages | `WorkPackageReleased`, `WorkPackageStarted`, `WorkPackageCompleted` | workPackages |
 | STS discharge | `StsMoveStarted` (level `debug`), `StsPicked`, `StsGrounded`, `StsWaitingForGroundPosition` (level `warn`), `StsGroundPositionWaitBackoff`, `StsGroundPositionWaitEnded`, `StsWorkComplete` | quay (shc also on `StsMoveStarted`, `StsGrounded`; berth on `StsWorkComplete`) |
 | STS rail | `StsWaitingForRail`, `StsRepositionStarted`, `StsRepositionCompleted` | quay |
-| STS boom (#298, boom mode real only) | `StsBoomStarted` (`{stsId, op: raise or lower, toDeg, segments}`), `StsBoomCompleted` | boom |
+| STS boom (#298, boom mode real only) | `StsBoomStarted` (`{stsId, op: raise or lower, toDeg, segments}`), `StsBoomCompleted`, `StsGantryBlocked` (#302, `{stsId, vesselId, targetX}`: a superstructure crossing with `canGantryWithBoomRaised` false; raised by quay) | boom |
 | STS load | `StsLoadStarted`, `StsWaitingForBox`, `StsBoxWaitEnded`, `StsLoadPicked`, `StsLoaded` | quay |
 | Hatch covers | `StsHatchStarted`, `StsWaitingForHatch`, `HatchLashingReleased`, `HatchLifted`, `HatchSetInLaydown`, `HatchReplaced`, `HatchSecured` | hatch (shc also on `StsHatchStarted`) |
 | SHC trip | `ShcJobAssigned`, `ShcRoutingEmpty`, `ShcPositioningAtPickup`, `ShcLocking`, `ShcPicked`, `ShcPickedAtWtp`, `ShcRoutingLoaded`, `ShcPositioningAtDropoff`, `ShcLowering`, `ShcUnlocking`, `ShcDroppedAtWtp`, `ShcDroppedAtGround`, `ShcCleared` | shc (asc on `ShcDroppedAtWtp`, `ShcCleared`) |
