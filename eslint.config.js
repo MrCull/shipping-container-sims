@@ -18,7 +18,7 @@ const ENGINE_PURITY = [
 ]
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'scripts/**', '.claude/**', '.smoke-dist/**', '.smoke-results/**'] },
+  { ignores: ['dist/**', 'node_modules/**', 'scripts/**', '.claude/**', '.smoke-dist/**', '.smoke-build/**', '.smoke-results/**'] },
 
   js.configs.recommended,
 

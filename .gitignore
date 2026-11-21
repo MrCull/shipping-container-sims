@@ -156,6 +156,7 @@ __pycache__/
 
 # Browser smoke tests (pnpm run test:smoke)
 .smoke-dist/
+.smoke-build/
 .smoke-results/
 test-results/
 

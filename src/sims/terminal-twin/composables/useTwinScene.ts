@@ -346,7 +346,7 @@ export function useTwinScene(host: Ref<HTMLElement | null>) {
     store.positional.update(camera.position, view.soundSources())
     const poseDone = performance.now()
     poseMs = poseMs === 0 ? poseDone - cpuStart : poseMs * 0.9 + (poseDone - cpuStart) * 0.1
-    if (import.meta.env.DEV && perf.debugLoadMs > 0) {
+    if ((import.meta.env.DEV || import.meta.env.MODE === 'smoke') && perf.debugLoadMs > 0) {
       const until = performance.now() + perf.debugLoadMs
       while (performance.now() < until) {
         /* dev-only artificial frame cost */
