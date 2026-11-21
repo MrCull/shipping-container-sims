@@ -45,6 +45,8 @@ export type QueryKind =
   | 'vesselSlots'
   /** `BayViewData` of one vessel (spec #106, #115): slots, their boxes, work packages and ROB boxes. */
   | 'bayView'
+  /** `CranePlanView` of one vessel (#288): the crane plan with recalculated times and predicted conflicts, or null. */
+  | 'cranePlan'
   /** `VesselStatusInput` of one vessel (spec #126): ETA, berth times, mooring time and moves per STS. */
   | 'vesselStatus'
   | 'sts'

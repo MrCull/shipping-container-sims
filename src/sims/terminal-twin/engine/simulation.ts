@@ -17,6 +17,7 @@ import { warmUpReactors } from './subsystems/warmUp'
 import { createPrefillDriver } from './subsystems/prefill'
 import { createEventLogger, type LogOptions } from './logging'
 import { createQuery, type SimQuery } from './query'
+import { planAccuracy, readCranePlan, type CranePlanView, type PlanAccuracy } from './cranePlan/plan'
 import { nextRandom } from './rng'
 import { createInitialState, resolveSubsystemModes, type CustodyRef, type SimState } from './state'
 import { ascReactors } from './subsystems/asc'
@@ -205,6 +206,10 @@ export interface Simulation {
   /** Every KPI as hourly, per-shift and whole-run series (the collector behind the KPI strip, report and exports). */
   kpiSeries(): KpiSeriesReport
   invariantReport(): InvariantReport
+  /** A vessel's crane plan with times recalculated from where each crane is now (#288), or null before its split. */
+  cranePlan(vesselId: string): CranePlanView | null
+  /** Plan accuracy per vessel with a plan (#288). */
+  planAccuracy(): PlanAccuracy[]
   /** Predicted ready times of upcoming boxes (STS ground positions, WTP pads), soonest first (TT-R13). */
   predictedReady(): PredictedReady[]
   /** Cost of invariant checking so far (not part of the report or snapshots: wall time is not deterministic). */
@@ -623,6 +628,8 @@ export function createSimulation(
     },
     kpiSeries: () => collector.report(Math.max(0, state.now - warmUpS())),
     invariantReport: () => clone(invariants),
+    cranePlan: (vesselId) => readCranePlan({ state, config }, vesselId),
+    planAccuracy: () => planAccuracy(state),
     predictedReady: () => predictedReady({ state, config }),
     invariantStats: () => ({ ...tracker.stats, wallMs: invariantWallMs }),
   }

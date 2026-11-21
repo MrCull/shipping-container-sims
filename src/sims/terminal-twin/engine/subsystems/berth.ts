@@ -19,6 +19,7 @@ import { slotX, vesselClass } from '../../scenario/vesselClasses'
 import { continueWork, wakeQuayRail } from './quay'
 import { askRelease, createPackages, isLoadSlot, loadActive } from './workPackages'
 import { railOrder } from './rail'
+import { closeCrane, finishPlan, registerCrane } from '../cranePlan/plan'
 import { positionHatchPanels } from '../hatch'
 
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
@@ -266,6 +267,7 @@ export const berthReactors: ReactorMap = {
           sts.bays = [...x.bays]
           sts.workQueue = []
           createPackages(ctx, sts, vessel.id, x.bays)
+          registerCrane(ctx, vessel.id, planStrategyName(ctx), sts, x.bays)
           vessel.stsIds.push(sts.id)
           vessel.stsHistory.push(sts.id)
           if (sts.status === 'waiting-for-rail') {
@@ -277,6 +279,7 @@ export const berthReactors: ReactorMap = {
           if (sts.status === 'idle') continueWork(ctx, sts, e.t)
           // a repositioning crane starts its work at StsRepositionCompleted
         }
+        finishPlan(ctx, vessel.id)
         vessel.stsIds.sort((p, q) => state.sts[p].railIndex - state.sts[q].railIndex)
         trySplit(ctx) // the next vessel in the queue
       }
@@ -310,6 +313,7 @@ export const berthReactors: ReactorMap = {
     sts.vesselId = null
     sts.bays = []
     sts.status = 'idle'
+    closeCrane(state, e.payload.vesselId, sts.id)
     const vessel = state.vessels[e.payload.vesselId]
     vessel.stsIds = vessel.stsIds.filter((id) => id !== sts.id)
     if (vessel.stsIds.length === 0 && vessel.remainingDischarge === 0 && (vessel.remainingLoad === 0 || !loadActive(state)) && vessel.status === 'berthed') {
@@ -334,4 +338,10 @@ export const berthReactors: ReactorMap = {
     ctx.state.berth.asked = []
     tryAllocateBerth(ctx)
   },
+}
+
+/** The configured plan strategy (`craneSplit`, or its alias `cranePlan`); `as-today` when none. */
+function planStrategyName(ctx: EngineContext): string {
+  const pts = ctx.config.decisions?.points
+  return pts?.craneSplit?.strategy ?? pts?.cranePlan?.strategy ?? 'as-today'
 }
