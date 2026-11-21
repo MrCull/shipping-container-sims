@@ -20,7 +20,7 @@ test('ASC and SHC spreaders are 20 ft long for a 20 ft box and 40 ft long for a 
   test.slow()
   await open(page, 'asc-1sts-10-boxes-1block') // 20 ft and 40 ft boxes mixed, STS to SHC to WTP pad to ASC
   await page.waitForFunction(() => window.__tt!.scene()?.ascAssets === 'loaded' && window.__tt!.scene()?.shcAssets === 'loaded')
-  // The first picks are 40s and the pair of 20s comes at about 735 s: run past it (x30, 40 s wall)
+  // The first picks are 40s and the pair of 20s comes at about 735 s: run past it (x30, until each kind has carried both, 40 s wall at most)
   await page.evaluate(() => window.__tt!.setSpeed(30))
   const samples = await page.evaluate(async () => {
     const tt = window.__tt!
@@ -42,7 +42,9 @@ test('ASC and SHC spreaders are 20 ft long for a 20 ft box and 40 ft long for a 
             if (box) seen.push({ kind, size: sizes[box[0]], mode: rig.spreaderMode, lengthM: rig.spreaderLengthM })
           }
         }
-        if (performance.now() - t0 < 40_000) requestAnimationFrame(tick)
+        // done once each kind has carried a 20 and a 40 (the 30 s budget, #340); 40 s wall at most
+        const both = (['asc', 'shc'] as const).every((k) => seen.some((x) => x.kind === k && x.size === '20') && seen.some((x) => x.kind === k && x.size !== '20'))
+        if (!both && performance.now() - t0 < 40_000) requestAnimationFrame(tick)
         else resolve()
       }
       requestAnimationFrame(tick)

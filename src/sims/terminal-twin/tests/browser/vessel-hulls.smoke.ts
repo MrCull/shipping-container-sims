@@ -48,6 +48,11 @@ test('every size class renders its hull GLB and deck containers sit on its bay g
   const errors = watchErrors(page)
   for (const sizeClass of CLASSES) {
     await open(page, [call('V001', sizeClass, { name: 'HMM Tarifa' })], 900)
+    // the bay grid reads null until a frame has shown the hull (render is off): wait for this class's hull to be shown
+    await page.waitForFunction((c) => {
+      const h = window.__tt!.sceneState()?.vesselHulls.V001
+      return h?.sizeClass === c && h.bayGrid !== null
+    }, sizeClass)
     const state = (await page.evaluate(() => window.__tt!.sceneState()))!
     const hull = state.vesselHulls.V001
     expect(hull.sizeClass).toBe(sizeClass)
