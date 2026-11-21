@@ -26,23 +26,26 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #344 | 21 Smoke build as the local default | none | merged in branch (f170cab) | |
 | #345 | 22 Asset viewer honours URL switches | none | merged in branch (0e0f5fd) | |
 | #346 | 23 Shards balanced by recorded test time | none (blocks #335) | merged in branch (fa0ccaf) | |
-| #347 | 24 bg.sh cleans up its process group | none | open | |
+| #347 | 24 bg.sh cleans up its process group | none | in progress | session 3 implementer |
 | #348 | 25 CI smoke per merge, frame-loop review rule, doc fixes | none (blocks #339) | merged in branch (7cafd11) | |
 | #340 | 20 Final smoke run and timing report | all | open | |
 
 ## Next steps
 
 - Open PR for this phase: #349 (`claude/hopeful-hawking-s9i8uh` into `main`). Phase 1 (#321 to #328) merged to `main` in PR #341. Do not merge #349 until the phase is done; delete this file first and add `Closes #N` for each finished ticket.
-- Merged in branch this phase: #330, #331, #348, #344, plus `main` (#343) at cb4047e. Labels `merged-in-branch` set on #330, #331, #348; **#344 still needs the label** (session stopped before it).
+- Merged in branch this phase: #330, #331, #348, #344, #345, #346, #332, plus `main` (#343) at cb4047e. Label `merged-in-branch` set on all of them.
 - CI after each merge (the #348 rule: start `pr-checks.yml` with workflow_dispatch on this branch, read the merged `SMOKE:` line before the next merge):
   - after #330: green (run 44932418994);
   - after #331 + #348: green, `SMOKE: 189 passed, 0 failed, 0 flaky` (run 44933311179);
-  - after #344: **not run yet**. Start one first thing.
-- **#345 is complete but not merged** (it reported after the session stopped): branch `tt/345-viewer-url-switches` (pushed to origin), tip 01f3934, worktree `.claude/worktrees/agent-a91b4af6722734e60`, verify green (2370 tests). Next session: `scripts/merge-ticket.sh --push tt/345-viewer-url-switches`, label #345 `merged-in-branch`, remove the worktree, start a CI run. Viewer calls live on `window.__ttAssets` (`renderOnce()`, `frames()`), not `__tt`, since the viewer has no `__tt`. Viewer smoke `SMOKE: 6 passed`; container viewer 224.1 s to 20.1 s, yard 51.1 s to 23.8 s, ASC/SHC/STS/truck viewers 6 to 15 s to 2 to 3 s each. The yard spec opts in to High so its budget frame keeps the shadow pass; budget unchanged (26 calls, 1,055,442 triangles).
-- #344's worktree `.claude/worktrees/agent-a504b8c16b0f012fc` is merged; remove it with `scripts/remove-worktree.sh agent-a504b8c16b0f012fc`.
-- PR #349 body lists #330, #331, #348; add #344 (smoke build is now the local default, `SMOKE_SERVER=dev` opts in to the Vite dev server; `scripts/test-smoke-server.mjs` 7 of 7; sample `SMOKE: 12 passed`) and the CI results above.
-- Unblocked next, in order: #346 (time-balanced shards, best after #345), then #332, #333, #334, #347; #329 needs two full smoke runs, so run it when nothing else is testing. #346 must land before #335; #348 is done, so #339 waits only on #335.
-- At most two implementers at once (4-core box). Ticket files for implementers were in the session scratchpad (lost with the container): rewrite them from the issues (`docs/agents/issue-tracker.md`, Ticket bodies).
+  - after #344 + #345: green, `SMOKE: 187 passed, 0 failed, 2 flaky` (run 44936225573); shard test steps 3:45, 4:04, 1:07, 1:28, 2:00, 2:45 (count-based shards);
+  - after #346: green, `SMOKE: 189 passed, 0 failed, 0 flaky` (run 44937334219); time-balanced shard test steps 2:19, 2:50, 2:15, 2:25, 2:48, 2:59 (within about 30 %), whole run 4 min 40 s;
+  - after #332: running.
+- Done, waiting to merge (one at a time, CI between): #333 (`tt/333-engine-checks-to-unit`, 898e362, worktree agent-ad7b92fc498c31f5e; engine smoke 19 tests 1.1 min to 1 test 13.7 s; mapping in the session scratchpad 333-mapping.md), #334 (`tt/334-smallest-fixture`, 12ec0ce, worktree agent-ad08518113787d545; 3 specs 48.5 s to 12.1 s; table in 334-table.md).
+- In progress: #347.
+- Next: #329 (needs two full smoke runs, run it when nothing else is testing), then #335, #336, #337, #338, #339, #340 last.
+- At most two implementers at once (4-core box). Ticket files for implementers live in the session scratchpad (lost with the container): rewrite them from the issues (`docs/agents/issue-tracker.md`, Ticket bodies).
+- #346 follow-up: `scripts/smoke-timings.jsonl` (fallback timings) is an estimate and still lists times for specs #333 deleted; CI uses the last green run's artifact first, so refresh the file from a green run's `smoke-report` when convenient.
+- #332 note: the colour-by smoke wiring tests check console errors strictly, so they fail locally in the sandbox on `ERR_TUNNEL_CONNECTION_FAILED` (proxy blocks an external fetch); CI is the check.
 
 ## Open points
 
