@@ -5,11 +5,11 @@ import cardImage from './assets/home-cover.jpg?url'
 export const definition: SimDefinition = {
   id: 'box-empire',
   title: 'Box Empire',
-  tagline: 'Build your shipping empire from a single container',
+  tagline: 'Inherit a rusty old terminal and turn it into a real port',
   description:
-    'Start with one rusty container and grow a global logistics empire. ' +
-    'Buy routes, upgrade ports, manage fleets, and outsmart rival ' +
-    'shipping companies in this strategic tycoon sim.',
+    'The family container terminal is yours now, and it has seen better days. ' +
+    'Bring trucks through the gate, stack boxes in the yard, work ships at the quay, ' +
+    'and turn the old place into a busy port in this terminal tycoon sim.',
   icon: '🚢',
   logoSrc: boxEmpireLogo,
   status: 'playable',
