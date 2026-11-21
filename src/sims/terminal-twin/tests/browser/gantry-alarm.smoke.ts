@@ -1,6 +1,7 @@
 /**
- * #125 browser smoke tests: gantry alarm and amber beacons. Cranes sound the alarm and flash their beacons only while
- * they gantry, the alarm is louder near the camera, and it follows the shared volume and mute. Run with
+ * #125 browser smoke tests: the gantry alarm. Cranes sound the alarm only while they gantry, it is louder near the
+ * camera, and it follows the shared volume and mute. The amber beacons (on for exactly the gantrying cranes, flashing,
+ * off when paused) are checked in the headless scene (`headless-scene-equipment.test.ts`, #337). Run with
  * `pnpm run test:smoke`.
  */
 import { type Page } from '@playwright/test'
@@ -50,46 +51,23 @@ async function playUntilGantrying(page: Page): Promise<string> {
   })
 }
 
-test('beacons flash only on cranes that are gantrying, and the alarm voice follows the camera', { tag: '@equipment' }, async ({ page }) => {
+test('the alarm voice sounds only while a crane gantries and follows the camera', { tag: '@equipment' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
-  // stopped at the start: no beacons, no machine voices (the harbour ambience may already play, faintly)
-  let scene = (await page.evaluate(() => window.__tt!.scene()))!
-  expect(scene.gantryBeacons).toEqual({ gantrying: [], lit: [] })
+  // stopped at the start: no machine voices (the harbour ambience may already play, faintly)
   expect((await page.evaluate(() => window.__tt!.atmosphere())).positional.voices.filter((v) => v.key !== AMBIENCE)).toEqual([])
 
   const id = await playUntilGantrying(page)
   await page.evaluate((e) => window.__tt!.cameraTo(e, 60), id)
-
-  // the beacons are active for exactly the gantrying machines and flash (lit on, then off)
-  await page.waitForFunction(
-    () => {
-      const w = window as unknown as { __lit?: { on: boolean; off: boolean } }
-      const lit = (w.__lit ??= { on: false, off: false })
-      const s = window.__tt!.scene()!.gantryBeacons
-      if (s.gantrying.length > 0) {
-        if (s.lit.length > 0) lit.on = true
-        else lit.off = true
-      }
-      return lit.on && lit.off
-    },
-    undefined,
-    { timeout: 15_000, polling: 50 },
-  )
-  scene = (await page.evaluate(() => window.__tt!.scene()))!
-  const state = (await page.evaluate(() => window.__tt!.sceneState()))!
-  const gantrying = [...Object.entries(state.sts), ...Object.entries(state.ascs)].filter(([, v]) => v.gantrying).map(([k]) => k)
-  expect(scene.gantryBeacons.gantrying.sort()).toEqual(gantrying.sort())
-  expect(scene.gantryBeacons.lit.every((l) => scene.gantryBeacons.gantrying.includes(l))).toBe(true)
 
   // audible near the camera
   await page.waitForFunction((e) => window.__tt!.atmosphere().positional.voices.some((v) => v.key === `gantryAlarm:${e}`), id, { timeout: 15_000 })
   const near = (await page.evaluate(() => window.__tt!.atmosphere())).positional.voices.find((v) => v.key === `gantryAlarm:${id}`)!
   expect(near.gain).toBeGreaterThan(0.2)
 
-  // pausing stops the crane: no beacons, no machine voices (the ambience stays)
+  // pausing stops the crane: no machine voices (the ambience stays)
   await page.evaluate(() => window.__tt!.pause())
-  await page.waitForFunction(() => window.__tt!.atmosphere().positional.voices.every((v) => v.key === 'harbourAmbience:harbour') && window.__tt!.scene()!.gantryBeacons.gantrying.length === 0, undefined, { timeout: 10_000 })
+  await page.waitForFunction(() => window.__tt!.atmosphere().positional.voices.every((v) => v.key === 'harbourAmbience:harbour'), undefined, { timeout: 10_000 })
   expect(errors).toEqual([])
 })
 
