@@ -3,9 +3,9 @@
 # Usage: scripts/merge-ticket.sh [--push] [--smoke | --smoke-all] tt/<N>-<slug>
 # Output goes to the terminal and to .merge-ticket.log; the last line is "EXIT <code>", so a background run
 # is finished when `tail -1 .merge-ticket.log` shows it. --push pushes the integration branch after a verified merge.
-# Smoke specs do not run per merge: the spec's final ticket runs the whole suite once, after every other ticket is merged.
+# Smoke specs do not run here: CI runs them after each pushed merge (docs/agents/implementing.md, step 3).
 # --smoke runs only the smoke groups this merge needs (scripts/smoke-select.mjs, map in scripts/smoke-map.txt);
-# --smoke-all runs every dev spec except @load (about 40 minutes).
+# --smoke-all runs every dev spec except @load (hours on one local worker).
 # An ENGINE_VERSION-only conflict in the engine simulation module is resolved by the script (higher version, minor +1).
 # Stops (without committing) on any other conflict, conflict markers or a failed check. A verified merge then sets the
 # ticket's row in handover.md to "merged in branch (<merge sha>)" and commits that alone (tested by
