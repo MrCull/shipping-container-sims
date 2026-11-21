@@ -7,7 +7,7 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 | #298 | Booms raise and lower around berthing | none | merged in branch (543fefb) | |
 | #299 | Forestays and boom-hoist ropes stay attached | none | merged in branch (9274f54) | |
 | #300 | Boom side plate and detail within budget | #299 | open | implementer-300 |
-| #301 | Inspector, productivity, picking, shadows follow the boom | #298 | open | |
+| #301 | Inspector, productivity, picking, shadows follow the boom | #298 | open | implementer-301 |
 | #302 | Raise to pass a vessel's bridge | #298 | merged in branch (525e657) | |
 | #303 | Super Post-Panamax class for cranes 101 to 103 | #298, #300 | open | |
 | #304 | Frame-rate proof | #299 to #303 | open | |
@@ -20,3 +20,4 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 ## Open points
 
 - #304 needs one real-GPU `__tt.perf()` run by the owner.
+- #302 limits: only work-cycle gantry moves check the bridge (step-aside repositions do not); with `canGantryWithBoomRaised: false` a blocked crane stays idle with no retry, so its vessel never finishes (default true, TTI unaffected).
