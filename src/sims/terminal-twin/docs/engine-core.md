@@ -1,6 +1,6 @@
 # Engine core: the discrete-event loop
 
-Checked against ENGINE_VERSION 0.56.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when you change or debug how events are scheduled, processed, hashed, logged, snapshotted or replayed;
 when you add an event type or reactor; or when you hunt headless run time per event. The state the loop mutates is

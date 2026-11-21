@@ -70,7 +70,7 @@ export {
 } from './yardLayout'
 export type { BlockSpec, YardCandidate, YardStacks, TransferStallLayout } from './yardLayout'
 export { ascPoseAt } from './subsystems/asc'
-export { ascIdOf, ascIndexOf, resolveSubsystemModes, stsBoom, stsLimits, stsSafeHoist, STS_WATER_RAIL_Z } from './state'
+export { ascIdOf, ascIndexOf, resolveSubsystemModes, stsBoom, stsLimits, stsParkPose, stsSafeHoist, STS_LAND_RAIL_Z, STS_RAIL_GAUGE_M, STS_WATER_RAIL_Z } from './state'
 export { stsCanWork } from './subsystems/berth'
 export { buildLaneGraph, laneGraphOf, shortestPath, wtpPadLayout, apronLayout, DEFAULT_APRON_LAYOUT } from './laneGraph'
 export type { LaneGraph, LaneNode, LaneEdge, ConflictZone, WtpPadLayout } from './laneGraph'

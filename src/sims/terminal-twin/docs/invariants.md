@@ -1,6 +1,6 @@
 # Invariants
 
-Checked against ENGINE_VERSION 0.55.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when a run fails with an invariant violation, when you add a rule the engine must never break, or when you want
 to make headless runs faster (invariant checking is the largest single cost of a long run). Everything here lives in
@@ -42,8 +42,8 @@ below).
 | `asc.wtp-handover` | an ASC never enters a WTP pad's lifting envelope (spreader below travel height within `PAD_HALF_X_M` 1.6 m / `PAD_HALF_Z_M` 6.5 m of the pad) while an SHC is on the pad | time | no |
 | `asc.no-passing` | the two ASCs of a block never pass or collide: waterside stays waterside, centres at least `ASC_MIN_SEPARATION_M` apart, now and at every breakpoint (start, middle, end of each planned segment) | equipment | yes: blocks whose ASCs the event named; skipped unless `subsystems.asc` is `real` |
 | `sts.rail-order` | STS cranes keep rail order: each crane inside its rail reservation, reservations on the quay and `stsMinSpacingM` apart | time | no |
-| `sts.class-limits` | STS class limits (#303): no hoist segment ends above the crane's lift height and no trolley segment ends seaward of its outreach from the waterside rail. Test: `tests/sts-classes.test.ts` | time | no |
-| `sts.boom-working` | STS booms (#298): no hoist or trolley motion still under way unless the boom is at its working angle, and no gantry segment overlapping a boom transition (always holds in boom mode off). Test: `tests/boom.test.ts` | time | no |
+| `sts.class-limits` | STS class limits (#303): no hoist segment ends above the crane's lift height and no trolley segment ends seaward of its outreach from the waterside rail. It checks planned segment ends only, so it reads `equipment`, not `time`. Test: `tests/sts-classes.test.ts` | equipment | no |
+| `sts.boom-working` | STS booms (#298): no hoist or trolley motion still under way unless the boom is at its working angle, and no gantry segment overlapping a boom transition. Early exit: returns at once in boom mode off, and skips a crane with no boom segment whose boom is at the working angle. Test: `tests/boom.test.ts` | time | no |
 | `stowage.order` | no box on board above an empty cell; a 20 ft never on a 40 ft; a 40 ft rests on a 40 ft or two filled 20 ft halves | vessel, container | yes: touched vessels |
 | `stowage.no-floating` | no floating box on board (#174): every box above its stack base (`isStackBase`: hull floor or hatch cover) has a box below in the same bay and row (a half needs a half or a whole cell) | vessel, container | yes |
 | `stowage.cell-free` | a box is never loaded into a cell that already holds a box, slot or ROB (#202) | vessel, container | yes |

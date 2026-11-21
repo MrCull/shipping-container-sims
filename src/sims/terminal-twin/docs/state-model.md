@@ -1,6 +1,6 @@
 # State model: SimState, entities and indexes
 
-Checked against ENGINE_VERSION 0.55.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when you read or write engine state: adding a field or entity, writing a reactor, invariant, KPI or
 strategy that looks at state, debugging a snapshot, or replacing a whole-state scan with an index. All types are in
@@ -178,7 +178,9 @@ the planned motion (`gantryX`, `trolleyZ`, `hoistY`), rail reservation `railLo`/
 `drops: StsDrop[]` (chosen ground positions, `groundAt` once the carry is planned), `motion`, `groundPositionIds`,
 `waitingSince?`, `packageIds`, `activePackageId`, `releasing?`, hatch fields (`hatchJob?`, `carryingPanel?`,
 `hatchWaitPanel?`, `hatchWaitSince?`), boom fields (#298, boom mode real only: `boomDeg?`, the boom angle at the end
-of the planned boom motion, absent = working angle; `boomUntil?`, when that motion ends). `SimState.subsystems.boom`
+of the planned boom motion, absent in boom mode off; `boomUntil?`, when that motion ends; `boomHolds?`, vessels mooring
+or unmooring under this busy crane, which keep it boom up until each has berthed or departed). `VesselState.boomWait?`
+(boom mode real): the `VesselBerthed` or `VesselDeparted` waiting for held busy cranes. `SimState.subsystems.boom`
 is `'real' | 'off'`.
 
 `GroundPositionState`: `stsId`, `lane`, `containerId`, `claimedBy` (load flow: the export box reserved for it).

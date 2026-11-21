@@ -1,16 +1,16 @@
 /** STS quay crane: bounds, inspector view, dev-API state and its scene renderer (procedural placeholder, then the rigged GLB). */
 import * as THREE from 'three'
-import { positionAt, type StsState } from '../../engine'
+import { boomAngleAt, stsBoom, stsLimits, type StsState } from '../../engine'
+import { DEFAULT_STS_BOOM } from '../../scenario/types'
 import type { EntityExtras, EntityView, Fact } from '../entityInspector'
 import { STS, stsBoundsYZ } from '../equipmentDims'
 import { stsBeaconOffsets } from '../gantryBeacons'
 import { spreaderModeFor } from '../spreaderMode'
-import { loadStsTemplate, STS_CLASS_ASSETS, stsApexY, stsCraneClass, StsModel, type SpreaderMode } from '../stsAssets'
+import { loadStsTemplate, STS_CLASS_ASSETS, StsModel, type SpreaderMode } from '../stsAssets'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
 import { offerHeroEquipmentAtLod0 } from '../heroEquipmentMount'
 
-/** Z of the landside crane rail. */
-const STS_LAND_RAIL_Z = STS.waterRailZ + STS.gauge
+import { STS_LAND_RAIL_Z } from '../../engine'
 
 interface StsParts {
   group: THREE.Group
@@ -33,13 +33,13 @@ class StsRenderer implements KindRenderer {
       host.beacons.add(s.id, stsBeaconOffsets())
     }
     // #303: one GLB per crane class in use (the Super Post-Panamax one only when a crane has that class).
-    const classes = new Set(config.sts.map((s) => stsCraneClass(config, s.id)))
+    const classes = new Set(config.sts.map((s) => stsLimits(config, s.id).craneClass))
     for (const craneClass of classes)
       loadStsTemplate(craneClass).then(
         (template) => {
           if (host.isDisposed()) return
           config.sts.forEach((s, i) => {
-            if (stsCraneClass(config, s.id) !== craneClass) return
+            if (stsLimits(config, s.id).craneClass !== craneClass) return
             const m = new StsModel(template, i, STS_CLASS_ASSETS[craneClass].meta)
             m.root.name = `${s.id}-model`
             host.scene.add(m.root)
@@ -149,26 +149,14 @@ class StsRenderer implements KindRenderer {
  * #301: boom state (down, raising, up, lowering) and angle at the view time `now`, from the crane's boom segments; none
  * in boom mode off (no `boomDeg`). A boom segment planned but not yet started (the spreader still parking) holds its start angle.
  */
-function boomFacts(sts: Readonly<StsState>, now: number | undefined): Fact[] {
+function boomFacts(sts: Readonly<StsState>, now: number | undefined, workingDeg: number): Fact[] {
   if (sts.boomDeg === undefined) return []
-  let angle = sts.boomDeg
-  let state: 'down' | 'raising' | 'up' | 'lowering' | null = null
-  if (now !== undefined) {
-    for (const seg of sts.motion) {
-      if (seg.axis !== 'boom') continue
-      if (now < seg.t0) {
-        angle = seg.from
-        break
-      }
-      angle = positionAt(seg, now)
-      if (now < seg.t1) {
-        state = seg.to > seg.from ? 'raising' : 'lowering'
-        break
-      }
-    }
-  }
+  const booms = sts.motion.filter((s) => s.axis === 'boom')
+  const angle = now === undefined ? sts.boomDeg : boomAngleAt(booms, now, sts.boomDeg)
+  const moving = now === undefined ? undefined : booms.find((s) => s.t0 <= now && now < s.t1)
+  const state = moving ? (moving.to > moving.from ? 'raising' : 'lowering') : Math.abs(angle - workingDeg) < 1e-6 ? 'down' : 'up'
   return [
-    { label: 'inspector.fact.boom', value: state ?? (angle > 0 ? 'up' : 'down'), token: 'boomState' },
+    { label: 'inspector.fact.boom', value: state, token: 'boomState' },
     { label: 'inspector.fact.boomAngle', value: `${Math.round(angle)}°` },
   ]
 }
@@ -183,7 +171,8 @@ function stsView(sts: Readonly<StsState>, extras: EntityExtras = {}): EntityView
       { label: 'inspector.fact.vessel', value: sts.vesselId, link: sts.vesselId !== null },
       { label: 'inspector.fact.gantry', value: sts.gantryX, unit: 'length' },
       { label: 'inspector.fact.bays', value: sts.bays.join(', ') || null },
-      ...boomFacts(sts, extras.now),
+      // the configured working angle (twinStore passes it; the default when a caller does not)
+      ...boomFacts(sts, extras.now, typeof extras.boomWorkingDeg === 'number' ? extras.boomWorkingDeg : DEFAULT_STS_BOOM.workingDeg),
     ],
     job: working
       ? [
@@ -204,8 +193,8 @@ export const stsKind: EquipmentKindDef<'sts'> = {
   ids: (model) => model.stsIds,
   bounds(model, id, time) {
     const p = model.stsPose(id, time)
-    // #303: a Super Post-Panamax stands lower than the Malaccamax the dims describe (class apex from its sidecar)
-    const b = stsBoundsYZ(model.boomAngleDeg(id, time), stsApexY(stsCraneClass(model.config, id)) - STS.apexY)
+    // #303: class height, boom length and tip (a Super Post-Panamax stands 9 m lower, 65 m outreach)
+    const b = stsBoundsYZ(model.boomAngleDeg(id, time), stsLimits(model.config, id).craneClass, stsBoom(model.config).workingDeg)
     return { x: p.gantryX, y: (b.y0 + b.y1) / 2, z: (b.z0 + b.z1) / 2, sx: STS.legSpacingX + 4, sy: b.y1 - b.y0, sz: b.z1 - b.z0, yaw: 0 }
   },
   sceneState: (model, id, t) => ({ status: model.statusAt('sts', id, t), ...model.stsPose(id, t), gantrying: model.isGantrying(id, t) }),

@@ -41,6 +41,9 @@ export interface StsKinematics {
   canGantryWithBoomRaised?: boolean
 }
 
+/** [A] The Malaccamax GLB's boom hinge height (m, sidecar `geometry.boomUndersideM`): one source for the boom default and the class. */
+const MALACCAMAX_BOOM_UNDERSIDE_M = 55.6
+
 /**
  * STS boom defaults (#298). [R] transition time: external reference (BCT Poland 2024 example), not a TTI measurement.
  * [A] angles and clearance margin: assumptions until verified.
@@ -55,7 +58,7 @@ export const DEFAULT_STS_BOOM = {
   /** [A] Clearance margin either side of a vessel's quay stretch (m). */
   clearanceMarginM: 10,
   /** [A] Lowered boom underside above the quay (m): the Malaccamax GLB's boom hinge height. */
-  undersideM: 55.6,
+  undersideM: MALACCAMAX_BOOM_UNDERSIDE_M,
   /** [A] Vertical clearance above a vessel's air draft (m, #302). */
   superstructureClearanceM: 2,
   /** [A] Gantry travel with the boom raised is allowed (#302). */
@@ -241,6 +244,8 @@ export interface StsCraneClassSpec {
   outreachM: number
   /** Container rows covered (published). */
   rows: number
+  /** Backreach behind the landside rail (m; sidecar `geometry.backreachM`): where the trolley parks before a raise. */
+  backreachM: number
   /** Lowered boom underside above the quay (m): the GLB's boom hinge height (sidecar `geometry.boomUndersideM`). */
   boomUndersideM: number
 }
@@ -250,8 +255,8 @@ export interface StsCraneClassSpec {
  * (TTI cranes 101 to 103 Super Post-Panamax, 104 to 108 Malaccamax). [A] boom underside: the GLB hinge heights.
  */
 export const STS_CRANE_CLASSES: Record<StsCraneClass, StsCraneClassSpec> = {
-  malaccamax: { label: 'Malaccamax', liftHeightM: 52, outreachM: 68, rows: 25, boomUndersideM: 55.6 },
-  'super-post-panamax': { label: 'Super Post-Panamax', liftHeightM: 43, outreachM: 65, rows: 24, boomUndersideM: 46.6 },
+  malaccamax: { label: 'Malaccamax', liftHeightM: 52, outreachM: 68, rows: 25, boomUndersideM: MALACCAMAX_BOOM_UNDERSIDE_M, backreachM: 18 },
+  'super-post-panamax': { label: 'Super Post-Panamax', liftHeightM: 43, outreachM: 65, rows: 24, boomUndersideM: 46.6, backreachM: 18 },
 }
 
 /** STS class when a crane config names none. */

@@ -54,6 +54,13 @@ export async function sampleFrames(page: Page, options: SampleOptions): Promise<
   }, opts)
 }
 
+/** Frames rendered per wall second between the first and last sample (a rate: compare it only as a ratio, never absolute). */
+export function framesPerWallSecond(samples: FrameSample[]): number {
+  const first = samples[0]
+  const last = samples[samples.length - 1]
+  return (last.frames - first.frames) / ((last.wall - first.wall) / 1000)
+}
+
 /** Sim seconds per wall second between the first and last sample. */
 export function simPerWallSecond(samples: FrameSample[]): number {
   const first = samples[0]

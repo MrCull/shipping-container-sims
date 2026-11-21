@@ -21,6 +21,7 @@ import {
   laydownCentreZ,
   laydownTopY,
   parseYardSlotId,
+  boomAngleAt,
   positionAt,
   stsBoom,
   railEndZ,
@@ -785,10 +786,8 @@ export class SceneModel {
    * mode off and stowed (raised, idle) in boom mode real.
    */
   boomAngleDeg(stsId: string, time: number): number {
-    const list = this.axisSegments[stsId]?.boom ?? []
-    if (list.length === 0) return this.config.subsystems?.boom === 'real' ? stsBoom(this.config).stowedDeg : stsBoom(this.config).workingDeg
-    const i = lastAtOrBefore(list, time, (s) => s.t0)
-    return i < 0 ? list[0].from : positionAt(list[i], time)
+    const b = stsBoom(this.config)
+    return boomAngleAt(this.axisSegments[stsId]?.boom ?? [], time, this.config.subsystems?.boom === 'real' ? b.stowedDeg : b.workingDeg)
   }
 
   /** The panel's state change in force at `time` (undefined = secured since the start). */

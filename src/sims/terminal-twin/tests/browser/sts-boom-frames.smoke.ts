@@ -9,7 +9,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
-import { sampleFrames, type FrameSample } from './frameSampling'
+import { framesPerWallSecond, sampleFrames } from './frameSampling'
 import { openTwin } from './openTwin'
 
 function watch(page: Page): string[] {
@@ -32,13 +32,6 @@ interface Measure {
   framesPerWallS: number
 }
 
-/** Frames rendered per wall second between the first and last sample (a rate, compared only as a ratio). */
-function framesPerWallSecond(s: FrameSample[]): number {
-  const a = s[0]
-  const b = s[s.length - 1]
-  return (b.frames - a.frames) / ((b.wall - a.wall) / 1000)
-}
-
 async function waitFrames(page: Page, n: number): Promise<void> {
   const f = await page.evaluate(() => window.__tt!.scene()!.frames)
   await page.waitForFunction(([f0, k]) => window.__tt!.scene()!.frames > f0 + k, [f, n] as const, { timeout: 120_000 })
@@ -46,11 +39,15 @@ async function waitFrames(page: Page, n: number): Promise<void> {
 
 /** Loads the TTI preset with booms `real` (the preset's own mode) or forced `off`, and measures the overview camera. */
 async function measure(page: Page, boom: 'real' | 'off'): Promise<Measure> {
-  await page.evaluate(
-    (mode) => window.__tt!.load('TTI Algeciras baseline', mode === 'off' ? { overrides: { subsystems: { boom: 'off' } } } : {}),
-    boom,
-  )
-  await page.evaluate(() => window.__tt!.setQuality('high'))
+  // render and High: the spec counts draw calls and frames at the High LOD distances it measures. freshPage false: one
+  // page for every measure, so the GLBs and shaders the warm-up load paid for stay compiled.
+  await openTwin(page, {
+    scenario: 'TTI Algeciras baseline',
+    load: boom === 'off' ? { overrides: { subsystems: { boom: 'off' } } } : {},
+    quality: 'high',
+    render: true,
+    freshPage: false,
+  })
   await page.waitForFunction(() => (window.__tt!.scene()?.containers ?? 0) > 8_000, undefined, { timeout: 120_000 })
   await page.waitForFunction(() => window.__tt!.scene()!.containerAssets === 'loaded', undefined, { timeout: 60_000 })
   await page.waitForFunction(() => Object.keys(window.__tt!.sceneState()!.stsRendered).length >= 8, undefined, { timeout: 60_000 })
@@ -78,7 +75,6 @@ async function measure(page: Page, boom: 'real' | 'off'): Promise<Measure> {
 test('TTI booms up: forestays attached, no extra draw calls and no lower frame ratio than booms down', async ({ page }) => {
   test.setTimeout(480_000)
   const errors = watch(page)
-  // render and High: the spec counts draw calls and frames at the High LOD distances it measures.
   await openTwin(page, { quality: 'high', render: true })
   await page.evaluate(() => window.localStorage.clear())
 

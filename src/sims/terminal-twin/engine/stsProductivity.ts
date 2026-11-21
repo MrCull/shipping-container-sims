@@ -67,12 +67,24 @@ const ENTER: Partial<Record<EngineEvent['type'], StsTimeBucket>> = {
   StsWorkComplete: 'done',
 }
 
+/** One crane's running tally while `stsProductivity` walks the events. */
+interface CraneTally {
+  /** First WorkPackageStarted (s). */
+  startS: number
+  /** The bucket the crane is in now, and since when (s). */
+  bucket: StsTimeBucket
+  since: number
+  buckets: Record<StsTimeBucket, number>
+  moves: number
+  /** The bucket before the current boom transition (#298), restored at StsBoomCompleted. */
+  beforeBoom: StsTimeBucket
+  /** Boom time inside planned cycles (#302 bridge passages), moved from cycle to boom (s). */
+  boomInCycle: number
+}
+
 /** The crane time breakdown of `events` (sim-time order) up to `endS`. */
 export function stsProductivity(events: readonly EngineEvent[], endS: number): StsProductivityReport {
-  const cranes = new Map<
-    string,
-    { startS: number; bucket: StsTimeBucket; since: number; buckets: Record<StsTimeBucket, number>; moves: number; beforeBoom: StsTimeBucket; boomInCycle: number }
-  >()
+  const cranes = new Map<string, CraneTally>()
   for (const e of events) {
     if (e.t > endS) break
     const stsId = (e.payload as { stsId?: string }).stsId

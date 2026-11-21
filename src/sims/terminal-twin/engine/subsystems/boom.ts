@@ -3,20 +3,24 @@
  * the working angle, no segments, no gating, every log unchanged).
  *
  *   t0: every crane boom up (stowed); a crane assigned at t0 (a pre-filled working vessel) starts boom down.
- *   BerthAllocated: idle cranes over the vessel raise if down; VesselBerthed = later of mooring and those booms up.
+ *   BerthAllocated: every crane over the vessel raises if down; VesselBerthed = later of mooring and those booms up.
  *   First move on a vessel: the crane lowers its boom (`continueWork` in quay.ts).
  *   StsWorkComplete: the crane, now idle, raises (idle cranes stay up until assigned).
- *   VesselWorkComplete: idle cranes over the vessel raise if down; unmooring ends `unmooringS` after all are up.
+ *   VesselWorkComplete: every crane over the vessel raises if down; unmooring ends `unmooringS` after all are up.
  *
- * A raise first hoists the spreader to its travel height and parks the trolley at the first ground lane (landside of
- * the boom hinge); hoist and trolley never move while the boom is off the working angle, and the crane never gantries
+ * A free crane over the vessel raises at once. A busy crane (working another vessel) over it is held (`boomHolds`):
+ * it finishes its current cycle, raises, waits boom up and lowers again once VesselBerthed or VesselDeparted releases
+ * it, then carries on with its own vessel. The vessel event waits for it (`VesselState.boomWait`, `checkBoomWaits`).
+ *
+ * A raise first hoists the spreader to the crane's lift height and parks the trolley on the backreach (class geometry,
+ * `stsParkPose`); hoist and trolley never move while the boom is off the working angle, and the crane never gantries
  * during a transition (status `boom`: it is not asked to step aside). Rail order and spacing ignore the boom angle.
  */
 import type { EngineContext, ReactorMap } from '../context'
 import type { AxisProfile } from '../kinematics'
-import { stsBoom, stsLimits, stsSafeHoist, type StsState, type VesselState } from '../state'
+import { stsBoom, stsLimits, stsParkPose, type StsState, type VesselState } from '../state'
 import { vesselClass } from '../../scenario/vesselClasses'
-import { continueWork, isInstant, planSequence, wakeQuayRail } from './quay'
+import { isInstant, planSequence, type StsMove } from './stsMotion'
 
 export const boomReal = (ctx: Pick<EngineContext, 'state'>): boolean => ctx.state.subsystems.boom === 'real'
 
@@ -27,9 +31,25 @@ export function boomProfile(spanDeg: number, seconds: number): AxisProfile {
   return { vMax: (2 * d) / seconds, accel, decel: accel }
 }
 
+/** The configured raise or lower profile: working to stowed in `transitionS`. */
+function configuredBoomProfile(ctx: Pick<EngineContext, 'config'>): AxisProfile {
+  const b = stsBoom(ctx.config)
+  return boomProfile(b.stowedDeg - b.workingDeg, b.transitionS)
+}
+
 /** True when the crane must lower its boom before working (boom mode real, boom not at the working angle). */
 export function needsLowering(ctx: EngineContext, sts: StsState): boolean {
-  return boomReal(ctx) && (sts.boomDeg ?? 0) !== stsBoom(ctx.config).workingDeg
+  return boomReal(ctx) && sts.boomDeg !== stsBoom(ctx.config).workingDeg
+}
+
+/** The park moves before a raise (#298): spreader to the crane's lift height, trolley onto its backreach. */
+function parkMoves(ctx: EngineContext, sts: StsState): StsMove[] {
+  const k = ctx.config.kinematics.sts
+  const park = stsParkPose(ctx.config, sts.id)
+  return [
+    { axis: 'hoist', to: park.hoistY, profile: k.hoistEmpty },
+    { axis: 'trolley', to: park.trolleyZ, profile: k.trolley },
+  ]
 }
 
 /**
@@ -37,24 +57,17 @@ export function needsLowering(ctx: EngineContext, sts: StsState): boolean {
  * end time (`boomUntil`) is known at once; StsBoomStarted makes them the crane's live motion.
  */
 export function startBoom(ctx: EngineContext, sts: StsState, at: number, op: 'raise' | 'lower'): void {
-  const { config } = ctx
-  const b = stsBoom(config)
-  const profile = boomProfile(b.stowedDeg - b.workingDeg, b.transitionS)
-  const k = config.kinematics.sts
-  const moves: Parameters<typeof planSequence>[3] =
-    op === 'raise'
-      ? [
-          { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: k.hoistEmpty },
-          { axis: 'trolley', to: config.layout.stsGroundLaneZ0M, profile: k.trolley },
-          { axis: 'boom', to: b.stowedDeg, profile },
-        ]
-      : [{ axis: 'boom', to: b.workingDeg, profile }]
+  const b = stsBoom(ctx.config)
+  const profile = configuredBoomProfile(ctx)
+  const moves: StsMove[] =
+    op === 'raise' ? [...parkMoves(ctx, sts), { axis: 'boom', to: b.stowedDeg, profile }] : [{ axis: 'boom', to: b.workingDeg, profile }]
   const live = sts.motion
   const { segments, end } = planSequence(sts, at, 1, moves, isInstant(ctx))
-  sts.motion = live
+  // the motion still under way (a cycle's last hoist) stays live; the boom segments follow it, so the angle before them is known
+  sts.motion = [...live, ...segments]
   sts.boomUntil = end
   sts.status = 'boom'
-  ctx.schedule('StsBoomStarted', at, { equipment: [sts.id] }, { stsId: sts.id, op, toDeg: sts.boomDeg ?? 0, segments })
+  ctx.schedule('StsBoomStarted', at, { equipment: [sts.id] }, { stsId: sts.id, op, toDeg: sts.boomDeg ?? b.workingDeg, segments })
 }
 
 /** True when the crane body (`stsMinSpacingM` long, centred on the gantry, over its rail reservation) overlaps the vessel's stretch widened by the clearance margin. */
@@ -67,20 +80,86 @@ export function craneOverVessel(ctx: Pick<EngineContext, 'config'>, sts: StsStat
   return sts.railLo - half < hi && sts.railHi + half > lo
 }
 
+/** True while a vessel mooring or unmooring under this busy crane holds its boom up (#297 review). */
+export const boomHeld = (sts: StsState): boolean => (sts.boomHolds?.length ?? 0) > 0
+
 /**
- * Raise the booms of the free cranes over `vessel` that are down and return when the last of them is up (`now` when
- * none is raising). Cranes working another vessel are left alone (they are over their own vessel).
+ * Raise the booms over `vessel`. Free cranes that are down raise now; busy cranes are held (they raise after their
+ * current cycle). Returns when the last free crane is up (`now` when none is raising), or null when a busy crane is
+ * held and the vessel must wait for it.
  */
-export function raiseOver(ctx: EngineContext, vessel: VesselState): number {
+function raiseOver(ctx: EngineContext, vessel: VesselState): number | null {
   const { state } = ctx
   const b = stsBoom(ctx.config)
   let ready = state.now
+  let held = false
   for (const sts of Object.values(state.sts)) {
-    if (sts.vesselId !== null || !craneOverVessel(ctx, sts, vessel)) continue
-    if ((sts.boomDeg ?? 0) !== b.stowedDeg && sts.status === 'idle') startBoom(ctx, sts, state.now, 'raise')
-    if ((sts.boomDeg ?? 0) === b.stowedDeg) ready = Math.max(ready, sts.boomUntil ?? state.now)
+    if (!craneOverVessel(ctx, sts, vessel)) continue
+    if (sts.vesselId !== null) {
+      const holds = (sts.boomHolds ??= [])
+      if (!holds.includes(vessel.id)) holds.push(vessel.id)
+      held = true
+      // idle between cycles (waiting for a package release, or held already): raise now
+      if (sts.status === 'idle' && sts.boomDeg !== b.stowedDeg) startBoom(ctx, sts, state.now, 'raise')
+      continue
+    }
+    if (sts.boomDeg !== b.stowedDeg && sts.status === 'idle') startBoom(ctx, sts, state.now, 'raise')
+    if (sts.boomDeg === b.stowedDeg) ready = Math.max(ready, sts.boomUntil ?? state.now)
   }
-  return ready
+  return held ? null : ready
+}
+
+type VesselBoomEvent = 'VesselBerthed' | 'VesselDeparted'
+
+function scheduleVesselEvent(ctx: EngineContext, vessel: VesselState, event: VesselBoomEvent, at: number): void {
+  if (event === 'VesselBerthed') ctx.schedule('VesselBerthed', at, { vessels: [vessel.id] }, { vesselId: vessel.id, berthX: vessel.berthX ?? 0 })
+  else ctx.schedule('VesselDeparted', at, { vessels: [vessel.id] }, { vesselId: vessel.id })
+}
+
+/**
+ * Schedule VesselBerthed or VesselDeparted once every boom over the vessel is up: `delayS` after the booms are up and
+ * never before `notBefore`. Boom mode off: at `max(notBefore, now + delayS)`.
+ */
+export function whenBoomsUp(ctx: EngineContext, vessel: VesselState, event: VesselBoomEvent, notBefore: number, delayS: number): void {
+  const up = boomReal(ctx) ? raiseOver(ctx, vessel) : ctx.state.now
+  if (up !== null) {
+    scheduleVesselEvent(ctx, vessel, event, Math.max(notBefore, up + delayS))
+    return
+  }
+  vessel.boomWait = { event, notBefore, delayS, upAt: Math.max(ctx.state.now, upOfFree(ctx, vessel)) }
+  checkBoomWaits(ctx)
+}
+
+/** When the free cranes raised over `vessel` are up (the held ones are tracked by `boomHolds`). */
+function upOfFree(ctx: EngineContext, vessel: VesselState): number {
+  let up = ctx.state.now
+  for (const sts of Object.values(ctx.state.sts))
+    if (sts.vesselId === null && craneOverVessel(ctx, sts, vessel)) up = Math.max(up, sts.boomUntil ?? up)
+  return up
+}
+
+/** Schedule the vessel event of every vessel waiting for held busy cranes whose booms are now all up. */
+export function checkBoomWaits(ctx: EngineContext): void {
+  const { state } = ctx
+  const stowed = stsBoom(ctx.config).stowedDeg
+  for (const vessel of Object.values(state.vessels)) {
+    const wait = vessel.boomWait
+    if (!wait) continue
+    const holders = Object.values(state.sts).filter((s) => s.boomHolds?.includes(vessel.id))
+    if (holders.some((s) => s.status === 'boom' || s.boomDeg !== stowed || (s.boomUntil ?? 0) > state.now)) continue
+    delete vessel.boomWait
+    scheduleVesselEvent(ctx, vessel, wait.event, Math.max(wait.notBefore, Math.max(wait.upAt, state.now) + wait.delayS))
+  }
+}
+
+/** VesselBerthed or VesselDeparted: release the busy cranes held for `vesselId`; each lowers and carries on with its work. */
+export function releaseBoomHolds(ctx: EngineContext, vesselId: string, resume: (sts: StsState) => void): void {
+  for (const sts of Object.values(ctx.state.sts)) {
+    if (!sts.boomHolds?.includes(vesselId)) continue
+    sts.boomHolds = sts.boomHolds.filter((id) => id !== vesselId)
+    if (sts.boomHolds.length === 0) delete sts.boomHolds
+    if (sts.status === 'idle' && sts.vesselId !== null) resume(sts)
+  }
 }
 
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
@@ -110,22 +189,19 @@ export function superstructureOnPath(
   return null
 }
 
-type Moves = Parameters<typeof planSequence>[3]
-
 /**
  * #302: a work cycle's moves (spreader to travel height first, then the gantry move) adjusted for a superstructure on
  * the gantry path: park the trolley, raise, gantry boom up, lower, then the rest. Boom mode off, a boom not at the
  * working angle or a clear path: the moves unchanged.
  */
-export function passSuperstructure(ctx: EngineContext, sts: StsState, moves: Moves): Moves {
+export function passSuperstructure(ctx: EngineContext, sts: StsState, moves: StsMove[]): StsMove[] {
   const g = moves.findIndex((m) => m.axis === 'gantry')
   if (g < 0 || !crossing(ctx, sts, moves[g].to)) return moves
   const b = stsBoom(ctx.config)
-  const k = ctx.config.kinematics.sts
-  const profile = boomProfile(b.stowedDeg - b.workingDeg, b.transitionS)
+  const profile = configuredBoomProfile(ctx)
   return [
     ...moves.slice(0, g),
-    { axis: 'trolley', to: ctx.config.layout.stsGroundLaneZ0M, profile: k.trolley },
+    ...parkMoves(ctx, sts),
     { axis: 'boom', to: b.stowedDeg, profile },
     moves[g],
     { axis: 'boom', to: b.workingDeg, profile },
@@ -145,6 +221,7 @@ export function gantryBlockedBy(ctx: EngineContext, sts: StsState, targetX: numb
   return crossing(ctx, sts, targetX)?.id ?? null
 }
 
+/** StsBoomCompleted lives in quay.ts (it resumes the crane's work), so this file never imports quay.ts. */
 export const boomReactors: ReactorMap = {
   StsGantryBlocked: () => undefined,
 
@@ -154,15 +231,7 @@ export const boomReactors: ReactorMap = {
     ctx.schedule('StsBoomCompleted', sts.boomUntil ?? e.t, { equipment: [sts.id] }, {
       stsId: sts.id,
       op: e.payload.op,
-      boomDeg: sts.boomDeg ?? 0,
+      boomDeg: sts.boomDeg ?? stsBoom(ctx.config).workingDeg,
     })
-  },
-
-  StsBoomCompleted: (e, ctx) => {
-    const sts = ctx.state.sts[e.payload.stsId]
-    sts.status = 'idle'
-    // assigned to a vessel meanwhile: lower (if it was raising) and start work
-    if (sts.vesselId) continueWork(ctx, sts, e.t)
-    wakeQuayRail(ctx)
   },
 }

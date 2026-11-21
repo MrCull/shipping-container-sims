@@ -1,6 +1,6 @@
 # KPIs, end conditions and reports
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when you need to measure a run (moves per hour, waits, utilisation), stop a run at a condition, read or change
 a golden summary, export KPIs or events, or find out where crane and box time goes (`tt:profile`, `tt:sts`). The dashboard

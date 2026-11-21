@@ -93,7 +93,7 @@ const fixtureEntries: Record<string, FixtureDefinition> = {
     group: 'quay',
     name: 'Booms up for berthing',
     summary: 'Crane booms go up while ships moor and unmoor, and come down to work.',
-    description: 'Two Panamax ships call one after the other at a 600 m quay with three cranes and booms switched on. Two cranes work each ship: they lower their booms just before the first move and raise them when done, and the ship unmoors only once every boom over it is up. The third crane stands clear of the berth and keeps its boom up all day.',
+    description: 'Two Panamax ships call one after the other at a 600 m quay with three cranes and booms switched on. Two cranes work each ship: they lower their booms just before the first move and raise them when done, and the ship unmoors only once every boom over it is up. The third crane stands clear of the berth and keeps its boom up all day. Two Panamax ships (294 m each plus the berth gap) do not fit the 600 m quay together, so the second waits at anchorage until the first departs (its last boom up plus the 600 s unmooring) and is berthed 600 s of mooring later, near 3,057 s.',
     watch: 'Watch the booms pivot up and down around each berthing, and the third crane stay boom up.',
     build: () =>
     new ScenarioBuilder('boom-berthing', 'Two Panamax calls, three STS, booms real: raise, lower and idle up')

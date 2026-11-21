@@ -22,7 +22,7 @@ import { askRelease, createPackages, isLoadSlot, loadActive } from './workPackag
 import { railOrder } from './rail'
 import { closeCrane, finishPlan, registerCrane } from '../cranePlan/plan'
 import { positionHatchPanels } from '../hatch'
-import { boomReal, raiseOver, startBoom } from './boom'
+import { boomReal, releaseBoomHolds, startBoom, whenBoomsUp } from './boom'
 import { STS_WATER_RAIL_Z, stsBoom, stsLimits } from '../state'
 
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
@@ -312,17 +312,14 @@ export const berthReactors: ReactorMap = {
 
   BerthAllocated: (e, ctx) => {
     // boom mode real (#298): all fast once mooring is complete and every boom over the vessel is up
-    const boomsUp = boomReal(ctx) ? raiseOver(ctx, ctx.state.vessels[e.payload.vesselId]) : e.t
-    ctx.schedule('VesselBerthed', Math.max(e.t + mooringS(ctx), boomsUp), { vessels: [e.payload.vesselId] }, {
-      vesselId: e.payload.vesselId,
-      berthX: e.payload.berthX,
-    })
+    whenBoomsUp(ctx, ctx.state.vessels[e.payload.vesselId], 'VesselBerthed', e.t + mooringS(ctx), 0)
   },
 
   VesselBerthed: (e, ctx) => {
     const vessel = ctx.state.vessels[e.payload.vesselId]
     vessel.status = 'berthed'
     vessel.berthedAt = e.t
+    releaseBoomHolds(ctx, vessel.id, (sts) => continueWork(ctx, sts, e.t)) // #297 review: held busy cranes lower and carry on
     if (ctx.state.subsystems.quay === 'off' || (vessel.remainingDischarge === 0 && (vessel.remainingLoad === 0 || !loadActive(ctx.state)))) {
       ctx.schedule('VesselWorkComplete', e.t, { vessels: [vessel.id] }, { vesselId: vessel.id })
       return
@@ -353,14 +350,14 @@ export const berthReactors: ReactorMap = {
     vessel.status = 'unmooring'
     vessel.workCompletedAt = e.t
     // boom mode real (#298): unmooring starts once every boom over the vessel is up
-    const boomsUp = boomReal(ctx) ? raiseOver(ctx, vessel) : e.t
-    ctx.schedule('VesselDeparted', boomsUp + unmooringS(ctx), { vessels: [vessel.id] }, { vesselId: vessel.id })
+    whenBoomsUp(ctx, vessel, 'VesselDeparted', e.t, unmooringS(ctx))
   },
 
   VesselDeparted: (e, ctx) => {
     const vessel = ctx.state.vessels[e.payload.vesselId]
     vessel.status = 'departed'
     vessel.departedAt = e.t
+    releaseBoomHolds(ctx, vessel.id, (sts) => continueWork(ctx, sts, e.t))
     ctx.state.kpis.vesselsCompleted++
     ctx.state.berth.asked = []
     tryAllocateBerth(ctx)

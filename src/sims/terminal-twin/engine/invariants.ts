@@ -15,7 +15,7 @@
  * `reads`. When a ticket adds a new custody owner kind, extend `custodyHolders`
  * and `heldAt`.
  */
-import { positionAt } from './kinematics'
+import { boomAngleAt } from './kinematics'
 import { laneGraphOf } from './laneGraph'
 import { hasLandside, landsideGraphOf } from './landsideGraph'
 import { overlappingNewReservations, overlappingReservations } from './reservations'
@@ -867,14 +867,13 @@ export const INVARIANTS: Invariant[] = [
       'during a boom transition. Mode off has no boom motion, so it always holds there.',
     check(state, config) {
       const messages: string[] = []
+      // early exit: mode off has no boom motion, and with no boom segment planned no move can overlap one
+      if (state.subsystems.boom !== 'real') return messages
       const working = stsBoom(config).workingDeg
       for (const s of Object.values(state.sts)) {
+        if (!s.motion.some((m) => m.axis === 'boom') && s.boomDeg === working) continue
         const booms = s.motion.filter((m) => m.axis === 'boom' && m.t1 > m.t0)
-        const angleAt = (t: number): number => {
-          let angle = booms.length > 0 ? booms[0].from : (s.boomDeg ?? working)
-          for (const b of booms) if (t >= b.t0) angle = positionAt(b, t)
-          return angle
-        }
+        const angleAt = (t: number): number => boomAngleAt(booms, t, s.boomDeg ?? working)
         for (const m of s.motion) {
           if (m.axis === 'boom' || m.t1 <= m.t0 || m.from === m.to) continue
           const during = booms.find((b) => m.t0 < b.t1 && b.t0 < m.t1)
@@ -889,7 +888,7 @@ export const INVARIANTS: Invariant[] = [
   },
   {
     id: 'sts.class-limits',
-    reads: ['time'],
+    reads: ['equipment'],
     description:
       'STS class limits (#303): no hoist segment ends above the crane\'s lift height and no trolley segment ends seaward of ' +
       'its outreach (measured from the waterside rail).',

@@ -5,7 +5,7 @@
  * `canGantryWithBoomRaised: false` the crossing is blocked.
  */
 import { describe, expect, it } from 'vitest'
-import { createSimulation, type EngineEvent, type MotionSegment } from '../engine'
+import { createSimulation, stsParkPose, type EngineEvent, type MotionSegment } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig, VesselSizeClass } from '../scenario/types'
 
@@ -59,10 +59,10 @@ describe('STS booms pass a vessel bridge (#302)', () => {
     const raise = before.filter((s) => s.axis === 'boom').at(-1)!
     expect(raise.to).toBe(80)
     expect(raise.t1).toBeLessThanOrEqual(gantry.t0)
-    // trolley parked landside of the hinge before the raise
+    // trolley parked on the backreach before the raise (#297 review: `stsParkPose`, class geometry)
     // (no trolley segment: it was still parked there from the start)
     const park = before.filter((s) => s.axis === 'trolley').at(-1)
-    expect(park?.to ?? createSimulation(bridgeFixture).query.sts('STS01').trolleyZ).toBe(bridgeFixture.layout.stsGroundLaneZ0M)
+    expect(park?.to ?? createSimulation(bridgeFixture).query.sts('STS01').trolleyZ).toBeCloseTo(stsParkPose(bridgeFixture, 'STS01').trolleyZ, 6)
     expect(park?.t1 ?? 0).toBeLessThanOrEqual(raise.t0)
     for (const s of before.filter((x) => x.axis === 'hoist')) expect(s.t1).toBeLessThanOrEqual(raise.t0)
     const lower = segs.slice(i + 1).find((s) => s.axis === 'boom')!

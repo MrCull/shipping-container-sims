@@ -27,7 +27,8 @@ import {
   type HatchSettings,
 } from '../hatch'
 import { hatchPanelId, hatchPanelOfRow, vesselClass } from '../../scenario/vesselClasses'
-import { continueWork, isInstant, planSequence, stsKinematics, variation, wakeQuayRail } from './quay'
+import { continueWork, stsKinematics, variation, wakeQuayRail } from './quay'
+import { isInstant, planSequence } from './stsMotion'
 import { releaseRail, reserveRail } from './rail'
 
 /** Hatch covers apply when enabled in the scenario and the quay subsystem runs. */

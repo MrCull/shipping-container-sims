@@ -112,6 +112,11 @@ export interface VesselState {
   status: VesselStatus
   arrivedAt: number | null
   berthAllocatedAt: number | null
+  /**
+   * Boom mode real (#297 review): VesselBerthed or VesselDeparted waits for busy cranes held boom up over this vessel
+   * (`StsState.boomHolds`). Scheduled at `max(notBefore, max(upAt, all held booms up) + delayS)`. Absent = no wait.
+   */
+  boomWait?: { event: 'VesselBerthed' | 'VesselDeparted'; notBefore: number; delayS: number; upAt: number }
   /** Stern position along the quay (m), once a berth is allocated. */
   berthX: number | null
   berthedAt: number | null
@@ -688,6 +693,11 @@ export interface StsState {
   boomDeg?: number
   /** Boom mode real: when the planned boom motion ends (s). Absent = no boom motion planned. */
   boomUntil?: number
+  /**
+   * Boom mode real (#297 review): vessels mooring or unmooring under this busy crane. While any is listed the crane
+   * raises after its current cycle and waits boom up; VesselBerthed or VesselDeparted removes the vessel. Absent = none.
+   */
+  boomHolds?: string[]
 }
 
 /** One hatch move of an STS. */
@@ -1047,8 +1057,16 @@ function validateRail(config: ScenarioConfig): void {
   })
 }
 
-/** [A] Z of the waterside STS rail (m), from which outreach is measured: `waterRailZ` in `modules/equipmentDims.ts`. */
+/**
+ * [A] Z of the waterside STS rail (m), from which outreach is measured. The renderer reads the same value from the STS
+ * sidecar (`modules/stsAssets.ts#STS_WATER_RAIL_Z`, `modules/equipmentDims.ts#STS`); `tests/sts-geometry-sync.test.ts`
+ * pins them equal.
+ */
 export const STS_WATER_RAIL_Z = 3
+/** [V] STS rail gauge (m; sidecar `geometry.railGaugeM`, pinned by `tests/sts-geometry-sync.test.ts`). */
+export const STS_RAIL_GAUGE_M = 30.48
+/** Z of the landside STS rail (m). */
+export const STS_LAND_RAIL_Z = STS_WATER_RAIL_Z + STS_RAIL_GAUGE_M
 
 /** One crane's class limits (#303): its class, lift height, outreach and lowered boom underside. */
 export function stsLimits(config: ScenarioConfig, stsId: string) {
@@ -1063,6 +1081,15 @@ export function stsLimits(config: ScenarioConfig, stsId: string) {
     outreachM: s?.outreachM ?? spec.outreachM,
     boomUndersideM: spec.boomUndersideM + undersideShift,
   }
+}
+
+/**
+ * Where a crane parks before a raise (#298): the trolley on its backreach (the class's backreach behind the landside
+ * rail, scene Z) and the spreader at its lift height.
+ */
+export function stsParkPose(config: ScenarioConfig, stsId: string): { trolleyZ: number; hoistY: number } {
+  const limits = stsLimits(config, stsId)
+  return { trolleyZ: STS_LAND_RAIL_Z + STS_CRANE_CLASSES[limits.craneClass].backreachM, hoistY: limits.liftHeightM }
 }
 
 /** The spreader travel height of one crane: the layout's safe hoist height, capped at the crane's lift height (#303). */

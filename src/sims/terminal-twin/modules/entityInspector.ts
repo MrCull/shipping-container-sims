@@ -65,6 +65,8 @@ export interface EntityExtras {
   now?: number
   /** Container: the carriers' state, for the derived transit status (absent = not shown). */
   transit?: TransitWorld
+  /** STS: the configured boom working angle (degrees, `stsBoom(config).workingDeg`), for the boom up or down fact. */
+  boomWorkingDeg?: number
   /** SHC: the job it holds, from the `shcJobs` query. */
   job?: Readonly<ShcJob>
   /** Extras of other kinds (see `EquipmentKindDef.loadExtras`). */

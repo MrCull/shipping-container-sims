@@ -1,6 +1,6 @@
 # Quay subsystem: vessels, berths, STS cranes, hatch covers
 
-Checked against ENGINE_VERSION 0.56.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when you change or tune anything between a vessel's arrival and its departure: berth allocation, the
 crane split, the shared STS rail, the STS discharge and load cycles, work packages, the vessel work order (POD and
@@ -415,8 +415,11 @@ planned boxes). `firstMoveS` ships to the scene model as a view field on the ves
 TTI presets and the `boom-berthing` fixture.
 
 - **Axis:** `boom`, an angle in degrees above horizontal, planned by `planSequence` like gantry, trolley and hoist and
-  carried in the motion Delta. `StsState.boomDeg` is the angle at the end of the planned boom motion (absent = working,
-  mode off) and `boomUntil` when that motion ends. A transition is a symmetric triangular profile that turns
+  carried in the motion Delta (planned in `engine/subsystems/stsMotion.ts`, shared by quay, hatch and boom so neither
+  `quay.ts` nor `boom.ts` imports the other's planner). `StsState.boomDeg` is the angle at the end of the planned boom
+  motion (absent in mode off, where no boom move is ever planned; `planSequence` throws on one) and `boomUntil` when
+  that motion ends. Code compares angles with the configured `stsBoom(config).workingDeg`, never with 0. The angle at a
+  time comes from one helper, `engine/kinematics.ts#boomAngleAt` (invariant, inspector and scene model). A transition is a symmetric triangular profile that turns
   working to stowed in exactly `boomTransitionS` (`boomProfile`).
 - **Config** (`StsKinematics`, defaults `DEFAULT_STS_BOOM`, read through `stsBoom(config)`): `boomTransitionS` 150 s
   each way [R] (BCT Poland 2024 example, not a TTI measurement), `boomWorkingDeg` 0 and `boomStowedDeg` 80 [A],
@@ -426,14 +429,19 @@ TTI presets and the `boom-berthing` fixture.
 - **States:** boom **down** (working angle), **raising**, **up** (stowed), **lowering**; the crane's status is `boom`
   while it parks its spreader and turns its boom, so it is not asked to step aside and never gantries meanwhile.
 - **When:** at t0 every crane is up; a crane assigned at t0 (a pre-filled working vessel) starts down. On
-  `BerthAllocated` idle cranes over the vessel raise if down, and `VesselBerthed` fires at the later of mooring
-  complete and all those booms up. `continueWork` lowers a crane's boom just before its first move on a vessel
+  `BerthAllocated` every crane over the vessel raises if down, and `VesselBerthed` fires at the later of mooring
+  complete and all those booms up (`whenBoomsUp`). A free crane raises at once. A **busy** crane (working another
+  vessel) is held (`StsState.boomHolds`): it finishes its current cycle, raises at its next `continueWork`, waits boom
+  up, and lowers again once `VesselBerthed` (or `VesselDeparted`) releases it (`releaseBoomHolds`), then carries on
+  with its own vessel. While a busy crane is held the vessel event waits in `VesselState.boomWait` and
+  `checkBoomWaits` (run at every `StsBoomCompleted`) schedules it once every held boom is up. `continueWork` lowers a crane's boom just before its first move on a vessel
   (`StsBoomStarted` op `lower`, then work at `StsBoomCompleted`). On `StsWorkComplete` the crane, now idle, raises
-  (idle cranes stay up until assigned). On `VesselWorkComplete` idle cranes over the vessel raise if down and
-  `VesselDeparted` fires `unmooringS` after the last of them is up (the vessel is `unmooring` from
+  (idle cranes stay up until assigned). On `VesselWorkComplete` every crane over the vessel raises if down (busy
+  ones held as above) and `VesselDeparted` fires `unmooringS` after the last of them is up (the vessel is `unmooring` from
   `VesselWorkComplete`).
-- **Raise:** the spreader hoists to `stsSafeHoistM`, the trolley parks at `stsGroundLaneZ0M` (landside of the hinge),
-  then the boom turns. Hoist and trolley never move while the boom is off the working angle (invariant
+- **Raise:** the spreader hoists to the crane's lift height and the trolley parks on its backreach
+  (`stsParkPose`: landside rail Z + the class's `backreachM`, 18 m [A], so Z 51.48), then the boom turns. A bridge
+  passage (#302) parks the same way. Hoist and trolley never move while the boom is off the working angle (invariant
   `sts.boom-working`). Rail order, reservations and `stsMinSpacingM` ignore the boom angle.
 - **Passing a bridge (#302):** each vessel class has a `superstructure` (`VesselClassSpec`: accommodation block X range
   `houseFromM` to `houseToM` from the stern, and `airDraftM`, mast top above the quay; mirrored from the hull sidecars and

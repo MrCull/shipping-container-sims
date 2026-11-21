@@ -10,7 +10,7 @@ import { STS, stsBoundsYZ } from '../modules/equipmentDims'
 
 describe('sun shadow camera', () => {
   it('holds every corner of a raised STS box (boom at 80 degrees) at every shadow-casting hour', () => {
-    const raised = stsBoundsYZ(80)
+    const raised = stsBoundsYZ(80, 'malaccamax', 0)
     expect(raised.y1).toBeGreaterThan(124)
     let checked = 0
     for (let hour = 0; hour < 24; hour += 0.5) {

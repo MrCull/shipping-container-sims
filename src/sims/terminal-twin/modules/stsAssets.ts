@@ -16,7 +16,7 @@
 import * as THREE from 'three'
 import meta from '../assets/models/sts/sts-malaccamax.meta.json'
 import sppMeta from '../assets/models/sts/sts-super-post-panamax.meta.json'
-import { DEFAULT_STS_CRANE_CLASS, type ScenarioConfig, type StsCraneClass } from '../scenario/types'
+import { DEFAULT_STS_CRANE_CLASS, type StsCraneClass } from '../scenario/types'
 import { AssetRig, type RigMeta } from './assetRig'
 import { loadGltf } from './containerAssets'
 import { heroSpreaderMount, type HeroMount } from './heroEquipmentMount'
@@ -38,15 +38,6 @@ export const STS_CLASS_ASSETS: Record<StsCraneClass, { url: string; meta: StsMet
   },
 }
 
-/** A crane's class from the scenario config (default Malaccamax). */
-export function stsCraneClass(config: Pick<ScenarioConfig, 'sts'>, id: string): StsCraneClass {
-  return config.sts.find((s) => s.id === id)?.craneClass ?? DEFAULT_STS_CRANE_CLASS
-}
-
-/** Apex height of a class's crane (m above the rail; sidecar `geometry.apexHeightM`). */
-export function stsApexY(craneClass: StsCraneClass): number {
-  return STS_CLASS_ASSETS[craneClass].meta.geometry.apexHeightM.value
-}
 
 export type SpreaderMode = keyof typeof meta.spreaderModes
 export type StsLod = 0 | 1 | 2
@@ -64,7 +55,7 @@ export interface StsRigPose {
   spreader: SpreaderMode
   /** Twist-locks turned (carrying a box). */
   locked: boolean
-  /** Boom angle (degrees above horizontal, #298; the scene model's `boomAngleDeg`). Absent = 0 (working). */
+  /** Boom angle (degrees above horizontal, #298; the scene model's `boomAngleDeg`, which knows the configured working angle). Absent = horizontal (the rig's rest, 0). */
   boomDeg?: number
 }
 

@@ -3,8 +3,9 @@
  * crane is idle and lower just before the first move on a vessel. Mode off (every existing fixture) has no boom motion.
  */
 import { describe, expect, it } from 'vitest'
-import { createSimulation, planSegment, restoreSimulation, type EngineEvent, type EventOf } from '../engine'
+import { createSimulation, planSegment, restoreSimulation, STS_LAND_RAIL_Z, stsParkPose, type EngineEvent, type EventOf } from '../engine'
 import { fixtures } from '../scenario/fixtures'
+import { ScenarioBuilder } from '../scenario/builder'
 import type { ScenarioConfig } from '../scenario/types'
 
 const boomFixture = fixtures['boom-berthing']
@@ -63,6 +64,29 @@ describe('STS booms (boom mode real)', () => {
     }
   })
 
+  it('before a raise the trolley parks on the backreach and the spreader hoists to the class lift height', () => {
+    const config = structuredClone(boomFixture)
+    config.sts[0].craneClass = 'super-post-panamax'
+    const { log } = run(config)
+    for (const stsId of ['STS01', 'STS02']) {
+      const park = stsParkPose(config, stsId)
+      expect(park.trolleyZ).toBeCloseTo(STS_LAND_RAIL_Z + 18, 6)
+      expect(park.hoistY).toBe(stsId === 'STS01' ? 43 : 52)
+      const raises = boomStarts(log).filter((e) => e.payload.op === 'raise' && e.payload.stsId === stsId)
+      expect(raises.length).toBeGreaterThan(0)
+      for (const r of raises) {
+        const boom = r.payload.segments.find((s) => s.axis === 'boom')!
+        const trolley = r.payload.segments.filter((s) => s.axis === 'trolley').at(-1)
+        const hoist = r.payload.segments.filter((s) => s.axis === 'hoist').at(-1)
+        expect(trolley?.to).toBeCloseTo(park.trolleyZ, 6)
+        // no hoist segment: the spreader is at the lift height already (SPP: its 43 m cap is the travel height)
+        expect(hoist?.to ?? park.hoistY).toBe(park.hoistY)
+        if (stsId === 'STS02') expect(hoist?.to).toBe(52)
+        expect(trolley!.t1).toBeLessThanOrEqual(boom.t0)
+      }
+    }
+  })
+
   it('VesselBerthed waits for every boom over the vessel to be up (mooring alone would be shorter)', () => {
     const config = structuredClone(boomFixture)
     config.kinematics.sts.boomTransitionS = 900 // longer than the 600 s mooring
@@ -110,6 +134,71 @@ describe('STS booms (boom mode real)', () => {
     expect(log.some((e) => e.type.startsWith('StsBoom'))).toBe(false)
     expect(sim.query.sts('STS01').boomDeg).toBeUndefined()
     expect(vesselEvent(log, 'VesselBerthed', 'V001').t).toBe(config.quay.mooringS)
+  })
+})
+
+/** Two Panamax ships side by side; a 300 m clearance margin puts every crane over both, so V002 moors and unmoors under the cranes working V001. */
+function sideBySide(): ScenarioConfig {
+  return new ScenarioBuilder('boom-side-by-side', 'Two Panamax ships side by side, booms real')
+    .hatch({ enabled: false })
+    .seed(3)
+    .quay(900, { mooringS: 600, unmooringS: 600 })
+    .sts('STS01', { gantryX: 80, groundPositions: 24 })
+    .sts('STS02', { gantryX: 250, groundPositions: 24 })
+    .sts('STS03', { gantryX: 700, groundPositions: 24 })
+    .subsystems({ boom: 'real' }).stsKinematics({ boomClearanceMarginM: 300 })
+    .vesselCall('V001', { name: 'HMM Tarifa', sizeClass: 'panamax', arrivalS: 0, discharge: 40, maxSts: 2 })
+    .vesselCall('V002', { name: 'Maersk Alboran', sizeClass: 'panamax', arrivalS: 1200, discharge: 4, maxSts: 1 })
+    .endWhen({ vesselsCompleted: 2 })
+    .build()
+}
+
+describe('busy cranes over a neighbouring vessel (#297 review)', () => {
+  const runSide = () => run(sideBySide())
+  /** Raises inside [from, to] by a crane still working `workingOn` (its StsWorkComplete for that vessel comes later). */
+  const busyRaises = (log: readonly EngineEvent[], from: number, to: number, workingOn: string) =>
+    boomStarts(log).filter((e) => {
+      if (e.payload.op !== 'raise' || e.t < from || e.t > to) return false
+      const done = log.find(
+        (x) => x.seq > e.seq && x.type === 'StsWorkComplete' && x.subjects.equipment?.includes(e.payload.stsId) && x.subjects.vessels?.includes(workingOn),
+      )
+      const before = log.some(
+        (x) => x.seq < e.seq && x.type === 'StsWorkComplete' && x.subjects.equipment?.includes(e.payload.stsId) && x.subjects.vessels?.includes(workingOn),
+      )
+      return done !== undefined && !before
+    })
+  const raiseDone = (log: readonly EngineEvent[], r: EventOf<'StsBoomStarted'>) =>
+    boomDones(log).find((e) => e.seq > r.seq && e.payload.stsId === r.payload.stsId)!
+
+  it('a busy crane over a mooring vessel raises after its cycle; VesselBerthed waits for it; it lowers after and carries on', () => {
+    const { log } = runSide()
+    const allocated = vesselEvent(log, 'BerthAllocated', 'V002')
+    const berthed = vesselEvent(log, 'VesselBerthed', 'V002')
+    const raises = busyRaises(log, allocated.t, berthed.t, 'V001')
+    expect(raises.length).toBeGreaterThan(0)
+    for (const r of raises) {
+      const stsId = r.payload.stsId
+      const done = raiseDone(log, r)
+      expect(done.payload.op).toBe('raise')
+      expect(berthed.t).toBeGreaterThanOrEqual(done.t)
+      // no boom or work move between the raise and VesselBerthed, then a lower and more moves on V001
+      const after = log.filter((e) => e.seq > done.seq && e.subjects.equipment?.includes(stsId))
+      const nextStart = after.find((e) => e.type === 'StsBoomStarted' || e.type === 'StsMoveStarted') as EventOf<'StsBoomStarted'>
+      expect(nextStart.type).toBe('StsBoomStarted')
+      expect(nextStart.payload.op).toBe('lower')
+      expect(nextStart.seq).toBeGreaterThan(berthed.seq)
+      expect(after.some((e) => e.type === 'StsMoveStarted' && e.subjects.vessels?.includes('V001'))).toBe(true)
+    }
+  })
+
+  it('a busy crane over a departing vessel raises too; VesselDeparted is unmooringS after its raise', () => {
+    const { log } = runSide()
+    const done2 = vesselEvent(log, 'VesselWorkComplete', 'V002')
+    const departed = vesselEvent(log, 'VesselDeparted', 'V002')
+    const raises = busyRaises(log, done2.t, departed.t, 'V001')
+    expect(raises.length).toBeGreaterThan(0)
+    const lastUp = Math.max(...raises.map((r) => raiseDone(log, r).t))
+    expect(departed.t).toBeGreaterThanOrEqual(lastUp + sideBySide().quay.unmooringS - 1e-6)
   })
 })
 

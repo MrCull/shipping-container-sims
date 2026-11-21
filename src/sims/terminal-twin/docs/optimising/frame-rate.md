@@ -1,6 +1,6 @@
 # Optimising browser frame rate
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when the 3D view is slow, before you change posing, instancing, LODs, quality profiles or shadows, and when
 you write a smoke test that looks at frames. The pipeline itself is described in [../rendering-3d.md](../rendering-3d.md);
