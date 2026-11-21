@@ -4,7 +4,7 @@ Regions (pixel rects, origin top-left):
   palette        16 flat swatches of 64 px in one row: steel blue, shaded blue,
                  white, galvanised grey, dark, spreader yellow, buffer red,
                  lamp, beacon amber, window glass
-  tti_on_blue    TTI ALGECIRAS in white on blue (main girder outer faces)
+  tti_on_blue    TTI ALGECIRAS in white on blue (main girder outer faces, boom side plates)
   zpmc_on_white  ZPMC in blue on white (builder plates on the legs)
   tti_on_white   TTI over ALGECIRAS in blue on white, two lines (machinery house)
   plates         crane-number plates 101..124: 6 columns x 4 rows; plate
@@ -85,6 +85,8 @@ def manifest():
         'palette': {k: {'colour': v, 'tag': 'A' if k not in ('blue', 'white', 'yellow', 'amber') else 'P'} for k, v in PALETTE.items()},
         'wordmark': WORDMARK,
         'operator': OPERATOR_NAME,
+        'regions': {k: list(v) for k, v in REGIONS.items()},
+        'regionsNote': 'pixel rects [x0, y0, x1, y1], origin top-left (the glTF UV convention times the atlas size)',
         'plates': {
             'first': PLATE_FIRST,
             'count': PLATE_COUNT,
