@@ -11,11 +11,10 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 | #302 | Raise to pass a vessel's bridge | #298 | merged in branch (525e657) | |
 | #303 | Super Post-Panamax class for cranes 101 to 103 | #298, #300 | merged in branch (103e79f) | |
 | #304 | Frame-rate proof | #299 to #303 | merged in branch (49d83e7) | |
-| #305 | Browser smoke suite and regressions | #298 to #304 | open | |
+| #305 | Browser smoke suite and regressions | #298 to #304 | open | implementer-305 |
 
 ## Next steps
 
-- Owner asked for screenshots of the new STS cranes, some boom up: after #304 reports (no smoke running), take fresh twin close-ups (boom up and down, Super Post-Panamax vs Malaccamax side by side, a bridge passage) and send them.
 
 - #300 and #302 running; #301 next when a slot frees.
 
