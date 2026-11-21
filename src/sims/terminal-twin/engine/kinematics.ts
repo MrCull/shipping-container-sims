@@ -17,8 +17,8 @@ export interface AxisProfile {
   decel: number
 }
 
-/** Crane axes (gantry/trolley/hoist) and vehicle axes (x/z drive along the lane graph, lift). */
-export type Axis = 'gantry' | 'trolley' | 'hoist' | 'x' | 'z' | 'lift'
+/** Crane axes (gantry/trolley/hoist; boom = STS boom angle in degrees, #298) and vehicle axes (x/z drive along the lane graph, lift). */
+export type Axis = 'gantry' | 'trolley' | 'hoist' | 'boom' | 'x' | 'z' | 'lift'
 
 export interface MotionSegment {
   entityId: string
@@ -114,6 +114,26 @@ export function planSegment(
   if (v0 > 0) seg.v0 = v0
   if (v1 > 0) seg.v1 = v1
   return seg
+}
+
+/**
+ * #298: a crane's boom angle (degrees) at `t` from its boom segments, sorted by `t0`: the position of the last segment
+ * started by `t`, the first segment's start angle before any has started, and `rest` when there are none. The one
+ * helper the invariant, the inspector and the scene model share.
+ */
+export function boomAngleAt(booms: readonly MotionSegment[], t: number, rest: number): number {
+  if (booms.length === 0) return rest
+  let lo = 0
+  let hi = booms.length - 1
+  let i = -1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    if (booms[mid].t0 <= t) {
+      i = mid
+      lo = mid + 1
+    } else hi = mid - 1
+  }
+  return i < 0 ? booms[0].from : positionAt(booms[i], t)
 }
 
 /** Axis coordinate of a segment at sim time `t` (clamped to the segment). */

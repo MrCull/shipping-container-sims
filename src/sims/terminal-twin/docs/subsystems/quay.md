@@ -1,6 +1,6 @@
 # Quay subsystem: vessels, berths, STS cranes, hatch covers
 
-Checked against ENGINE_VERSION 0.54.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when you change or tune anything between a vessel's arrival and its departure: berth allocation, the
 crane split, the shared STS rail, the STS discharge and load cycles, work packages, the vessel work order (POD and
@@ -397,7 +397,7 @@ planned boxes). `firstMoveS` ships to the scene model as a view field on the ves
 (`worker/engineHost.ts`): no event, state field or golden depends on it. Phases, labels and popup:
 [../browser-host.md](../browser-host.md).
 
-## Subsystem modes (quay, berth)
+## Subsystem modes (quay, berth, boom)
 
 `config.subsystems.quay|berth` (overridden by `SimulationOptions.subsystems`, resolved by `resolveSubsystemModes` into
 `SimState.subsystems`; validated by `validateSubsystemModes`; CLI `--subsystem quay=instant`):
@@ -406,6 +406,64 @@ planned boxes). `firstMoveS` ships to the scene model as a view field on the ves
 - quay `off`: no STS work; vessels berth and `VesselWorkComplete` fires at once; the load flow is inactive.
 - berth `instant`: mooring and unmooring zero. berth `off`: no `berthAllocation` decision (first fit, anchorage if none)
   and instant mooring.
+- boom `real` / `off` (no `instant`): see STS booms above.
+
+## STS booms (`engine/subsystems/boom.ts`, subsystem mode `boom`, #298)
+
+`config.subsystems.boom` is `'real' | 'off'` (default `off`, every existing fixture; CLI `--subsystem boom=real`).
+`off` keeps every boom at the working angle: no boom segments, no gating, every log unchanged. `real` is used by the
+TTI presets and the `boom-berthing` fixture.
+
+- **Axis:** `boom`, an angle in degrees above horizontal, planned by `planSequence` like gantry, trolley and hoist and
+  carried in the motion Delta (planned in `engine/subsystems/stsMotion.ts`, shared by quay, hatch and boom so neither
+  `quay.ts` nor `boom.ts` imports the other's planner). `StsState.boomDeg` is the angle at the end of the planned boom
+  motion (absent in mode off, where no boom move is ever planned; `planSequence` throws on one) and `boomUntil` when
+  that motion ends. Code compares angles with the configured `stsBoom(config).workingDeg`, never with 0. The angle at a
+  time comes from one helper, `engine/kinematics.ts#boomAngleAt` (invariant, inspector and scene model). A transition is a symmetric triangular profile that turns
+  working to stowed in exactly `boomTransitionS` (`boomProfile`).
+- **Config** (`StsKinematics`, defaults `DEFAULT_STS_BOOM`, read through `stsBoom(config)`): `boomTransitionS` 150 s
+  each way [R] (BCT Poland 2024 example, not a TTI measurement), `boomWorkingDeg` 0 and `boomStowedDeg` 80 [A],
+  `boomClearanceMarginM` 10 m [A].
+- **Over a vessel** (`craneOverVessel`): the crane body (`stsMinSpacingM` long, centred on the gantry, over its rail
+  reservation) overlaps the vessel's quay stretch widened by `boomClearanceMarginM` each side.
+- **States:** boom **down** (working angle), **raising**, **up** (stowed), **lowering**; the crane's status is `boom`
+  while it parks its spreader and turns its boom, so it is not asked to step aside and never gantries meanwhile.
+- **When:** at t0 every crane is up; a crane assigned at t0 (a pre-filled working vessel) starts down. On
+  `BerthAllocated` every crane over the vessel raises if down, and `VesselBerthed` fires at the later of mooring
+  complete and all those booms up (`whenBoomsUp`). A free crane raises at once. A **busy** crane (working another
+  vessel) is held (`StsState.boomHolds`): it finishes its current cycle, raises at its next `continueWork`, waits boom
+  up, and lowers again once `VesselBerthed` (or `VesselDeparted`) releases it (`releaseBoomHolds`), then carries on
+  with its own vessel. While a busy crane is held the vessel event waits in `VesselState.boomWait` and
+  `checkBoomWaits` (run at every `StsBoomCompleted`) schedules it once every held boom is up. `continueWork` lowers a crane's boom just before its first move on a vessel
+  (`StsBoomStarted` op `lower`, then work at `StsBoomCompleted`). On `StsWorkComplete` the crane, now idle, raises
+  (idle cranes stay up until assigned). On `VesselWorkComplete` every crane over the vessel raises if down (busy
+  ones held as above) and `VesselDeparted` fires `unmooringS` after the last of them is up (the vessel is `unmooring` from
+  `VesselWorkComplete`).
+- **Raise:** the spreader hoists to the crane's lift height and the trolley parks on its backreach
+  (`stsParkPose`: landside rail Z + the class's `backreachM`, 18 m [A], so Z 51.48), then the boom turns. A bridge
+  passage (#302) parks the same way. Hoist and trolley never move while the boom is off the working angle (invariant
+  `sts.boom-working`). Rail order, reservations and `stsMinSpacingM` ignore the boom angle.
+- **Passing a bridge (#302):** each vessel class has a `superstructure` (`VesselClassSpec`: accommodation block X range
+  `houseFromM` to `houseToM` from the stern, and `airDraftM`, mast top above the quay; mirrored from the hull sidecars and
+  cross-checked in `tests/vessel-hulls.test.ts`). When a work cycle's gantry move (`StsMoveStarted`, `StsLoadStarted`)
+  crosses a vessel on the quay whose house X range lies on the path, and the lowered boom's underside
+  (`boomUndersideM`, default 55.6 m [A], the Malaccamax hinge; per crane class since #303, 46.6 m on a Super
+  Post-Panamax, `stsLimits(config, id).boomUndersideM`) is below its air draft plus
+  `boomSuperstructureClearanceM` (2 m [A]), `passSuperstructure` (boom.ts) makes the cycle: hoist to travel height,
+  park the trolley, raise, gantry boom up, lower, then the rest of the cycle, all in one planned sequence (no overlap).
+  Otherwise the crane gantries boom down; a step to the next clear bay never raises. Only the ULCV (air draft 59.1 m)
+  needs it with the default underside; the Neo-Panamax (51.3 m) and smaller clear. With `canGantryWithBoomRaised`
+  false the move is not started: `StsGantryBlocked` (`{stsId, vesselId, targetX}`) reports it and the crane idles where
+  it stands (the crane split is unchanged). The boom is taken as a line at the gantry position [A]. Fixture
+  `boom-bridge` (ULCV, STS01 starts aft of the house) and `tests/boom-bridge.test.ts`.
+- **Seen from outside (#301):** the entity inspector shows the boom fact (state and angle at the view time, from the
+  crane's boom segments; boom mode real only), STS productivity and the KPI report JSON have a `boom` bucket
+  ([kpis-and-reports.md](../kpis-and-reports.md)), and bounds, picking and the sun shadow follow a raised boom
+  ([rendering-3d.md](../rendering-3d.md)).
+- **Limits (until later tickets of spec #297):** cranes working another vessel are never raised for a neighbour's
+  mooring. Bridge passage covers work-cycle gantry moves only: a rail
+  reposition (step aside, `StsRepositionStarted`) gantries boom down even past a house, and a crane assigned while
+  parked boom up over a house lowers there before its first move.
 
 ## Decision points used here
 
@@ -445,3 +503,25 @@ Request and reply shapes, latency model: [../decision-points.md](../decision-poi
 - **Measure**: `pnpm run tt:run --preset "TTI Algeciras, peak day" --until time:7200 --events /tmp/peak.jsonl`, then
   `pnpm run tt:sts /tmp/peak.jsonl --until 7200`; `pnpm run tt:profile <fixture> --until T`. Compare strategies with
   `--strategy craneSplit=equal-bays`, `--ordering as-today`.
+
+## Crane classes (#303)
+
+- Each `StsConfig` may carry `craneClass` (`'malaccamax'` default, or `'super-post-panamax'`) and optional
+  `liftHeightM` / `outreachM` overrides. `STS_CRANE_CLASSES` (`scenario/types.ts`) holds the [V] numbers from
+  `knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md` section 1: Malaccamax 52 m lift above rail, 68 m outreach,
+  25 rows; Super Post-Panamax 43 m, 65 m, 24 rows. `stsLimits(config, id)` (`engine/state.ts`) resolves a crane's
+  class, lift height, outreach and boom underside (55.6 m / 46.6 m [A], the GLB hinge heights, both moved by a
+  scenario-wide `boomUndersideM` override).
+- **Hoist and trolley within the class:** the spreader travel height is `stsSafeHoist(config, id)` =
+  `min(layout.stsSafeHoistM, liftHeightM)` (50 m layout default, so a 43 m crane travels at 43 m: shorter hoists,
+  faster cycles). Invariant `sts.class-limits`: no hoist segment ends above the lift height, no trolley segment ends
+  more than the outreach seaward of the waterside rail (`STS_WATER_RAIL_Z` = 3 m).
+- **Crane split:** `stsCanWork(config, id, sizeClass)` (`subsystems/berth.ts`) is false when the top of a high-cube box
+  in the vessel's top deck tier is above the lift height or the outer row is beyond the outreach. Such a crane gets
+  `outOfReach: true` in the `craneSplit` request (the field is absent otherwise, so event logs of fleets that reach
+  every vessel are unchanged); the built-in strategies skip it and never choose cranes on both sides of it, and
+  `validateSplit` rejects a reply that assigns it. With the default vessel classes only the ULCV (top box 48.0 m) is
+  out of reach of a 43 m crane; the Neo-Panamax top box is at 40.3 m.
+- **TTI:** `TTI_STS_CLASSES` (`terminals/tti-algeciras/constants.ts`) makes STS101 to STS103 Super Post-Panamax in both
+  TTI presets; every other terminal and fixture is Malaccamax. Tests: `tests/sts-classes.test.ts`.
+

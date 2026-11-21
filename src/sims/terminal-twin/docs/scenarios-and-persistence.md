@@ -1,6 +1,6 @@
 # Scenarios and persistence
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when you add or change a preset, a fixture or a golden, touch `ScenarioConfig`, layout derivation or
 scenario validation, or change saves, snapshots, replay-based restore or rewind. Terms: [GLOSSARY.md](../../../../GLOSSARY.md).
@@ -48,14 +48,14 @@ The engine imports `scenario/` (types, bay plan, fixtures for tests); `scenario/
 | `layout` | `DEFAULT_LAYOUT`: stsGroundLaneZ0M 8, stsGroundLaneSpacingM 3, stsSafeHoistM 50, `stsGroundRetryS` (30) |
 | `kinematics` | `{ sts, shc?, asc? }`: `DEFAULT_STS_KINEMATICS`, `DEFAULT_SHC_KINEMATICS`, `DEFAULT_ASC_KINEMATICS` |
 | `moveVariationPct`, `driverVariabilityPct?` | +/- % random variation per STS move / per SHC trip |
-| `sts[]` | `{ id, gantryX, groundPositions }` in rail order |
+| `sts[]` | `{ id, gantryX, groundPositions, craneClass?, liftHeightM?, outreachM? }` in rail order. `craneClass` (#303): `malaccamax` (default) or `super-post-panamax`, which sets lift height, outreach, backreach and boom underside (`scenario/types.ts#STS_CRANE_CLASSES`; read through `engine/state.ts#stsLimits`). `liftHeightM` and `outreachM` override the class's values for one crane (spec #297 asks for them on each crane config; no preset sets them today). The TTI presets set STS101 to STS103 to Super Post-Panamax. |
 | `vessels[]` | the vessel table (`VesselConfig`: id, sizeClass, arrivalS, discharge, load, transshipment, maxSts, empties, ...) |
 | `cargo` | lines weights, sizeMix, emptyShare, `reeferShare` (drawn by id hash, not an RNG stream) |
 | `endConditions` | `{ vesselsCompleted?, simDurationS?, moves? }`; first met ends the run; none set = all scheduled vessels |
 | `shcs?`, `yard?` | SHC fleet; blocks (+ `ascsPerBlock` 1 or 2, `reserveShare` 0 to `MAX_YARD_RESERVE` 0.5, `loadReleaseAhead` 0 to `MAX_LOAD_RELEASE_AHEAD` 20) |
 | `yardStart?` | `{ mode: 'prefilled' \| 'warmup' \| 'empty', targetPct (60), warmUpS (48 h), mix? }`; absent = legacy start (`scenario/exportYard.ts#planExportYard`) |
 | `apron?`, `queueAreas?` | lane-graph geometry overrides; SHC queue areas (see [subsystems/horizontal.md](subsystems/horizontal.md)) |
-| `subsystems?` | `real \| instant \| off` per quay, berth, yard, shc, asc, landside |
+| `subsystems?` | `real \| instant \| off` per quay, berth, yard, shc, asc, landside; `boom`: `real \| off` (#298, default `off`). `real` moves STS booms (raise before mooring and unmooring, lower before work, idle cranes boom up, settings in `kinematics.sts.boom*`, see [subsystems/quay.md](subsystems/quay.md)); `off` keeps every boom at the working angle with no boom events. The TTI presets set `boom: 'real'`. |
 | `decisions?` | async mode, strategy, latency per decision point ([decision-points.md](decision-points.md)) |
 | `transshipment?`, `emptyPool?`, `emptyAllocation?` | dwell distribution (`DEFAULT_TRANSSHIPMENT`: lognormal median 2 days, sigma 0.6), starting empties, `matchLine` |
 | `containerProps?` | port rotation, direction mix, weights, weight classes, expected dwell |

@@ -3,9 +3,10 @@
 # Patterns match a file or folder name, never a substring of a path (the word "tests" contains "sts").
 # Add a line when a new area gets its own spec. A changed tests/browser/*.smoke.ts always runs itself.
 (^|/)(bay|Bay|rob|Rob|hullProfile)[A-Za-z-]*\.(ts|vue)$ => bay-viewer rob-bays bay-plan-switch
+(^|/)(boom|Boom)[A-Za-z-]*\.(ts|vue)$ => sts-boom-frames
 (^|/)(cranePlan|CranePlan)[A-Za-z-]*\.(ts|vue)$|engine/cranePlan/ => crane-plan
 (^|/)[A-Za-z-]*(shc|Shc)[A-Za-z-]*\.(ts|vue|py)$|models/shc/ => shc-model terminal-twin-shc hero-equipment
-(^|/)(sts|Sts)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/sts|models/sts/ => sts-asset hero-equipment
+(^|/)(sts|Sts)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/sts|models/sts/ => sts-asset sts-boom-frames hero-equipment
 (^|/)(asc|Asc)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/asc|models/asc/ => asc-model terminal-twin-asc terminal-twin-paired-asc hero-equipment
 (^|/)container(Markings|Textures|Closeups|Assets|Lod)[A-Za-z]*\.ts$|models/container/ => container-assets container-closeup
 (^|/)(truck|Truck)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/truck|models/truck/ => truck-model terminal-twin-landside terminal-twin-follow-truck

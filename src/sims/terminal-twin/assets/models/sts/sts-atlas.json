@@ -47,6 +47,27 @@
   },
   "wordmark": "ZPMC",
   "operator": "TTI ALGECIRAS",
+  "regions": {
+    "tti_on_blue": [
+      0,
+      64,
+      1024,
+      192
+    ],
+    "zpmc_on_white": [
+      0,
+      192,
+      1024,
+      448
+    ],
+    "tti_on_white": [
+      0,
+      448,
+      512,
+      640
+    ]
+  },
+  "regionsNote": "pixel rects [x0, y0, x1, y1], origin top-left (the glTF UV convention times the atlas size)",
   "plates": {
     "first": 101,
     "count": 24,

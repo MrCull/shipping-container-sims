@@ -25,8 +25,7 @@ import {
 
 /** [A] Half the width of an SHC (m); keep in sync with `SHC.width` in `modules/equipmentDims.ts`. */
 export const SHC_HALF_WIDTH_M = 2.45
-/** [A] Z of the landside STS rail (m): `waterRailZ + gauge` of the STS model in `modules/equipmentDims.ts`. */
-export const STS_LAND_RAIL_Z = 33.48
+import { STS_LAND_RAIL_Z } from './state'
 /** Half the width of a rail beam (m). */
 const RAIL_HALF_M = 0.75
 /** Clearance kept between a laydown panel and any vehicle path, lane or rail (m). */

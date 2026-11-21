@@ -1,6 +1,6 @@
 # Rendering (3D view)
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when you change anything drawn in the Three.js view: containers, equipment rigs, vessel hulls, hatch panels,
 infrastructure, quality tiers, lighting, the backdrop and scenery, positional sound, or the home card. Pipeline, budgets
@@ -486,13 +486,27 @@ Rig node names come from the sidecar; the rules are in [assets-pipeline.md](asse
 
 `lodScale` divides the camera distance before the STS, SHC and ASC LOD choice, so Low (0.4) drops them to cheaper LODs 2.5x sooner.
 
-### STS (Malaccamax)
+### STS (Malaccamax and Super Post-Panamax)
 
+- #303: one GLB per crane class, same rig node names, LODs and livery: `sts-malaccamax.glb` and
+  `sts-super-post-panamax.glb` (43 m lift, 65 m outreach, apex 73 m, hinge 46.6 m). `STS_CLASS_ASSETS`
+  (`modules/stsAssets.ts`) maps a class to its GLB and sidecar; the STS kind renderer loads one template per class in
+  use (the second GLB only when a crane has that class) and builds each `StsModel` with its class's sidecar. Bounds and
+  picking (`stsBoundsYZ(boomDeg, craneClass, workingDeg)`) use the class geometry (`stsClassBoom`: hinge at the class's
+  boom underside, -9 m for a Super Post-Panamax, the same offset as its apex; boom length and tip Z from its outreach,
+  65 m), and leave the boom out of the box at the configured working angle. The procedural placeholder stays Malaccamax-sized.
 - `sts-malaccamax.glb`. Rail gauge 30.48 m, 52 m lift above rail, 68 m outreach [V]; apex 82 m, 18 m backreach, 18 m leg
   spacing, 27 m over buffers (= `quay.stsMinSpacingM`) [A]. Root mounted at (0, 0, `waterRailZ` = 3)
-  (sidecar `sceneMounting`); `modules/equipmentDims.ts#STS.apexY` is kept in sync for picking.
+  (sidecar `sceneMounting`); `modules/equipmentDims.ts#STS.apexY` is kept in sync for picking. Bounds and picking follow the boom (#301):
+  `stsBoundsYZ(boomDeg, craneClass, workingDeg)` is the portal up to just above the apex while the boom is down (so the vessel and boxes under
+  it stay pickable), grown to the boom tip (hinge `STS.boomHingeY/Z` from the sidecar's `boom` pivot) once it is off the
+  working angle: about 128 m tall and 15 m seaward of the rail at 80 degrees (`tests/boom-scene.test.ts`).
 - `StsModel.setPose`: `gantry` = gantryX, `trolley` = trolleyZ - 3, `hoist` = hoistY; spreader telescope and twin-lock
   values from the sidecar's `spreaderModes`; twist-locks 90 deg while carrying; ropes by the sidecar `stretch` rule.
+  The forestays and boom-hoist ropes (#299) are gantry-child stretch nodes with `mode: 'aim'` rules: `applyStretch` turns
+  each towards its anchor on the `boom` node and scales it to the distance, so a raised boom keeps them attached with no
+  STS-specific code and no extra draw calls (every LOD is at its cap: 20 / 10 / 6). The aim walks local transforms from
+  the anchor up to the stretch node's parent, so it needs no world-matrix update.
   Rig nodes repeat per LOD with suffixes (`trolley_lod1`, per sidecar `lodNaming`); `modules/assetRig.ts#AssetRig`
   accepts both suffixed names and identical names that GLTFLoader renames (found via `userData.name`).
 - Crane number (101, 102, ...) via an own plate material per crane (tiles of `sts-atlas.json`).
@@ -660,8 +674,9 @@ Antialiasing is chosen at renderer creation and is not part of a live profile.
   `ambientIntensity(daylight)` = 1.4 + 0.5 (1 - daylight): brighter at night (1.9), with brighter night colours, so
   boxes, trucks and cranes stay distinguishable.
 - `modules/atmosphereRig.ts#AtmosphereRig` (owned by `SceneRenderer`): hemisphere light, sun, sky and fog colours.
-  Sun shadow camera is a fixed 500 x 500 m box (near 10, far 800), `normalBias` 0.35 (container corrugation shows acne
-  without it), `bias` -0.0004. The sun casts only when both the time of day and the quality allow it.
+  Sun shadow camera (`configureSunShadow`) is a fixed 500 x 500 m box (near 10, far 2000: a raised STS boom at a low sun
+  throws its shadow over 1 km, #301, `tests/sun-shadow.test.ts`), `normalBias` 0.35 (container corrugation shows acne
+  without it), `bias` -0.00016 (the former -0.0004 over far 800, the same depth in metres). The sun casts only when both the time of day and the quality allow it.
 - **Sky reflections and contact shadows (#248):** `modules/skyEnvironment.ts` (pure, `tests/skyEnvironment.test.ts`)
   holds the sky colours per lighting mode, `environmentIntensity(daylight)` (0.12 at night to 0.67 by day) and
   `EnvironmentCache`. `AtmosphereRig.attachRenderer` (called by `useTwinScene` after `setQuality`; headless hosts never call it, so

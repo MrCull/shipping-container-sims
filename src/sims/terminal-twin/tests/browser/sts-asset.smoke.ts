@@ -46,7 +46,7 @@ test('asset viewer: STS rig sliders drive gantry, trolley, hoist, spreader and b
   // gantry → X, trolley → Z (from the waterside rail), hoist → spreader underside height above the rail.
   near(pose.nodes.spreader, [10, 30, -40])
   near(pose.nodes.trolley, [10, meta.geometry.trolleyRailHeightM.value, -40])
-  expect(pose.stretch.ropes).toBeCloseTo(meta.geometry.trolleyRailHeightM.value - 30 - meta.stretch[0].offsetM, 2)
+  expect(pose.stretch.ropes).toBeCloseTo(meta.geometry.trolleyRailHeightM.value - 30 - meta.stretch.find((r) => r.node === 'ropes')!.offsetM!, 2)
   // Reference: a 40 ft ISO box hanging from the spreader, its top centre at the attach point.
   expect(pose.reference.hangingFrom).toBe('spreader')
   near(pose.reference.size, [12.192, 2.591, 2.438], 0.001)

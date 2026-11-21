@@ -23,6 +23,7 @@ import { createInitialState, resolveSubsystemModes, type CustodyRef, type SimSta
 import { ascReactors } from './subsystems/asc'
 import { berthReactors } from './subsystems/berth'
 import { quayReactors } from './subsystems/quay'
+import { boomReactors } from './subsystems/boom'
 import { loadPrepReactors } from './subsystems/loadPrep'
 import { workPackageReactors } from './subsystems/workPackages'
 import { hatchReactors } from './subsystems/hatch'
@@ -35,11 +36,11 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.54.0'
+export const ENGINE_VERSION = '0.58.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
-const REACTORS: ReactorMap[] = [berthReactors, workPackageReactors, hatchReactors, quayReactors, loadPrepReactors, shcReactors, ascReactors, emptiesReactors, transshipmentReactors, landsideReactors, warmUpReactors]
+const REACTORS: ReactorMap[] = [berthReactors, workPackageReactors, hatchReactors, quayReactors, boomReactors, loadPrepReactors, shcReactors, ascReactors, emptiesReactors, transshipmentReactors, landsideReactors, warmUpReactors]
 
 export interface SimulationOptions {
   /** Overrides `config.seed`. */

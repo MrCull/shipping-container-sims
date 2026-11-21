@@ -9,6 +9,7 @@ copies everything into assets/models/). Direct use:
 Groups: containers, hero, hero-equipment, shc, asc, sts, trucks, vessels, infrastructure (needs --vessel-classes <json>: the engine class table + bay grid). Writes, under <staging>/shc/: shc.glb, shc.meta.json, previews/shc-<view>.webp.
 Writes, under <staging>/sts/:
     sts-malaccamax.glb / .meta.json   rigged Malaccamax quay crane (LOD0-2)
+    sts-super-post-panamax.glb / .meta.json   the same rig, Super Post-Panamax class (43 m lift, 65 m outreach, #303)
     sts-atlas.json                    paint/branding atlas layout (crane-number plates)
     previews/*.webp                   front, side, rear, three-quarter, trolley/spreader close-up
 
@@ -32,6 +33,7 @@ sys.path.insert(0, HERE)
 sys.dont_write_bytecode = True  # keep __pycache__ out of the sim folder
 
 import bpy  # noqa: E402
+from mathutils import Vector  # noqa: E402
 
 from tt_assets import blender as B  # noqa: E402
 from tt_assets import containers as C  # noqa: E402
@@ -298,17 +300,39 @@ def pose_sts(objects, trolley_z, hoist_y, mode='40', boom_deg=0.0):
     """Poses LOD0 like the renderer does (rig values in the sidecar's units)."""
     import math
     o = {name: obj for name, (obj, _) in objects.items()}
-    o['trolley'].location = _gl_to_blender((0, STS.TROLLEY_RAIL_Y, trolley_z))
-    o['hoist'].location = _gl_to_blender((0, hoist_y - STS.TROLLEY_RAIL_Y, 0))
-    o['ropes'].scale = (1, 1, STS.TROLLEY_RAIL_Y - (hoist_y + STS.HEADBLOCK_SHEAVE_Y))
+    rail_y = STS.ry(STS.TROLLEY_RAIL_Y)
+    o['trolley'].location = _gl_to_blender((0, rail_y, trolley_z))
+    o['hoist'].location = _gl_to_blender((0, hoist_y - rail_y, 0))
+    o['ropes'].scale = (1, 1, rail_y - (hoist_y + STS.HEADBLOCK_SHEAVE_Y))
     modes = STS.SPREADER_MODES[mode]
     o['spreader_tele_fore'].location = _gl_to_blender((STS.TELE_X + modes['spreader_tele_fore'], 0, 0))
     o['spreader_tele_aft'].location = _gl_to_blender((-STS.TELE_X - modes['spreader_tele_aft'], 0, 0))
     o['twin_locks'].location = _gl_to_blender((0, STS.TWIN_DROP - modes['twin_locks'], 0))
     o['boom'].rotation_euler = (math.radians(boom_deg), 0, 0)
+    # Aim stretch (sidecar `stretch`, mode aim): forestays and boom-hoist ropes from the apex to their boom anchors.
+    hy, hz = STS.ry(STS.HINGE[0]), STS.HINGE[1]
+    a = math.radians(boom_deg)
+    for node, (ty, tz), (ey, ez) in (('forestays', STS.FORESTAY_TOP, STS.FORESTAY_END),
+                                     ('boom_hoist_ropes', STS.BOOM_HOIST_TOP, STS.BOOM_HOIST_END)):
+        ty, ey = STS.ry(ty), STS.ry(ey)
+        dy, dz = ey - hy, ez - hz
+        ry, rz = hy + dy * math.cos(a) - dz * math.sin(a), hz + dy * math.sin(a) + dz * math.cos(a)
+        d = Vector(_gl_to_blender((0.0, ry - ty, rz - tz)))
+        obj = o[node]
+        obj.rotation_mode = 'QUATERNION'
+        obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d.normalized())
+        obj.scale = (1, 1, d.length)
 
 
 def build_sts(out_dir, previews=True, samples=48):
+    """One GLB per crane class (#303): sts-malaccamax and sts-super-post-panamax, sharing sts-atlas."""
+    for cls in STS.CLASSES:
+        STS.configure(cls)
+        _build_sts_class(out_dir, previews, samples)
+    STS.configure('malaccamax')
+
+
+def _build_sts_class(out_dir, previews, samples):
     os.makedirs(out_dir, exist_ok=True)
     preview_dir = os.path.join(out_dir, 'previews')
     os.makedirs(preview_dir, exist_ok=True)
@@ -373,13 +397,19 @@ def build_sts(out_dir, previews=True, samples=48):
     for view, (loc, tgt) in views.items():
         B.render_preview(cam, loc, tgt, os.path.join(preview_dir, f'{STS.NAME}-{view}.webp'), samples=samples)
     # Close-up: trolley and spreader near the top, twin-20 configuration.
-    pose_sts(info['objects'], trolley_z=-30.0, hoist_y=44.0, mode='twin-20')
+    pose_sts(info['objects'], trolley_z=-30.0, hoist_y=STS.ry(44.0), mode='twin-20')
     bpy.data.objects['box-40'].hide_render = True
     for i, cx in enumerate((-STS.HALF_OFFSET, STS.HALF_OFFSET)):
         b = slab(f'box-20-{i}', (cx - 3.029, -2.591, -1.219), (cx + 3.029, 0.0, 1.219), box_mat, parent=spreader)
         del b
-    B.render_preview(cam, _gl_to_blender((27, 53, -52)), _gl_to_blender((0, 50.5, -30)),
+    B.render_preview(cam, _gl_to_blender((27, STS.ry(53), -52)), _gl_to_blender((0, STS.ry(50.5), -30)),
                      os.path.join(preview_dir, f'{STS.NAME}-closeup.webp'), samples=samples)
+    # Raised boom (#299): trolley parked on the backreach, spreader up, forestays and boom-hoist ropes attached.
+    for i in range(2):
+        bpy.data.objects[f'box-20-{i}'].hide_render = True
+    pose_sts(info['objects'], trolley_z=STS.RAIL_GAUGE + 6.0, hoist_y=STS.LIFT_ABOVE_RAIL - 2.0, mode='40', boom_deg=80.0)
+    B.render_preview(cam, _gl_to_blender((300, 75, -40)), _gl_to_blender((0, 62, 4)),
+                     os.path.join(preview_dir, f'{STS.NAME}-raised.webp'), samples=samples)
 
 
 def save_atlas_preview(png, path, size=1024):

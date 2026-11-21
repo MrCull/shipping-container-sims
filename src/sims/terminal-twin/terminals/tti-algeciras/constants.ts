@@ -2,9 +2,20 @@
  * TTI Algeciras constants: preset names, the capacity-derived yard layout, assumptions of the TTI presets and the
  * figures of its scenery. No THREE here: the engine and the CLI import this file.
  */
-import type { FlowMix, PortRotation } from '../../scenario/types'
+import type { FlowMix, PortRotation, StsCraneClass } from '../../scenario/types'
 
 export const TTI_PRESET_NAME = 'TTI Algeciras baseline'
+
+/**
+ * [V] STS classes by crane number (#303, knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1): 101 to 103
+ * Super Post-Panamax (43 m lift, 65 m outreach), 104 to 108 Malaccamax (52 m, 68 m; the default class). The numbering
+ * is inferred from the upgrade chronology ([V]/[A] in the knowledge file).
+ */
+export const TTI_STS_CLASSES: Record<string, StsCraneClass> = {
+  STS101: 'super-post-panamax',
+  STS102: 'super-post-panamax',
+  STS103: 'super-post-panamax',
+}
 export const PEAK_DAY_PRESET_NAME = 'TTI Algeciras, peak day'
 
 /** TTI Algeciras' published capacity (TEU): the source of the bay count. */

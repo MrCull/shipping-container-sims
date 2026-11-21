@@ -125,3 +125,23 @@ describe('vessel hull assets', () => {
     expect(lashing.min[0]).toBeGreaterThan(ox)
   })
 })
+
+/**
+ * #302: the engine's superstructure figures (`VesselClassSpec.superstructure`) mirror the committed hull sidecars, so
+ * the boom clearance check runs against the hull that is drawn. The sidecar records the bay grid origin and the air
+ * draft; the generator (`vessels.py`, `build_superstructure`) puts the accommodation block's fore end 1.5 m aft of bay 0
+ * and makes it 0.4 x that distance long, clamped to 8 to 16 m.
+ */
+describe('vessel superstructure figures', () => {
+  it.each(VESSEL_SIZE_CLASSES)('%s: house X range and air draft match the hull sidecar', (sizeClass) => {
+    const m = meta(sizeClass)
+    const s = VESSEL_CLASSES[sizeClass].superstructure
+    const gx0 = m.bayGrid.origin[0]
+    const length = Math.min(16, Math.max(8, 0.4 * gx0))
+    expect(s.houseToM).toBeCloseTo(gx0 - 1.5, 3)
+    expect(s.houseFromM).toBeCloseTo(gx0 - 1.5 - length, 3)
+    expect(s.airDraftM).toBeCloseTo(m.dimensions.airDraftM - m.waterline.quayLevelAboveWaterlineM, 3)
+    // the mast top is the highest point of the drawn hull
+    expect(meshBounds(glb(sizeClass), 'hull').max[1]).toBeCloseTo(m.dimensions.airDraftM, 1)
+  })
+})

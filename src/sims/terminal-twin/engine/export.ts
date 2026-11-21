@@ -5,6 +5,7 @@
  */
 import { headlineKpis, highlightsOf } from './kpi/headline'
 import type { Simulation } from './simulation'
+import { stsProductivity } from './stsProductivity'
 
 export const KPI_REPORT_FORMAT = 'terminal-twin-kpi-report'
 
@@ -16,7 +17,7 @@ function cell(value: string | number | null | undefined): string {
 }
 const row = (cells: (string | number | null | undefined)[]) => `${cells.map(cell).join(',')}\n`
 
-/** The KPI report: summary counters, every KPI series, the headline KPIs and highlights. */
+/** The KPI report: summary counters, every KPI series, the headline KPIs and highlights, and the STS time breakdown (#301). */
 export function kpiReportJson(sim: Simulation): string {
   const kpis = sim.kpiReport()
   const series = sim.kpiSeries()
@@ -31,6 +32,7 @@ export function kpiReportJson(sim: Simulation): string {
       series,
       headline: headlineKpis(series, kpis),
       highlights: highlightsOf(series, kpis),
+      stsProductivity: stsProductivity(sim.eventLog(), sim.now),
     },
     null,
     2,
