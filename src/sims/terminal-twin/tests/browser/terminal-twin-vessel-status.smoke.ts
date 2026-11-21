@@ -35,9 +35,7 @@ test('vessel status: a mooring vessel counts down to 08:10 and a vessel at ancho
 
   await select(page, 'V001')
   await expect(page.getByTestId('tt-vessel-phase')).toHaveText('Mooring')
-  await expect(page.getByTestId('tt-vessel-ops-start')).toContainText(/8:10/)
-  await expect(page.getByTestId('tt-vessel-countdown')).toHaveText(/^0[78]:\d\d$/)
-  await expect(page.getByTestId('tt-vessel-moves')).toContainText(/\d+ done, \d+ remaining/)
+  // ops start, countdown, moves and the later phases of the popup: tests/components/vessel-status-popup.test.ts (#338)
 
   // the label floats over the mooring vessel only
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
@@ -49,7 +47,6 @@ test('vessel status: a mooring vessel counts down to 08:10 and a vessel at ancho
   await page.evaluate(() => window.__tt!.pause())
   await select(page, 'V002')
   await expect(page.getByTestId('tt-vessel-phase')).toHaveText('Waiting for berth')
-  await expect(page.getByTestId('tt-vessel-countdown')).toBeHidden()
   await expect.poll(async () => (await labels(page)).map((l) => `${l.id}:${l.phase}`)).toEqual(['V001:mooring', 'V002:waiting'])
   await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/vessel-status.png' })
@@ -60,13 +57,5 @@ test('vessel status: a mooring vessel counts down to 08:10 and a vessel at ancho
   await page.evaluate(() => window.__tt!.pause())
   await select(page, 'V001')
   await expect(page.getByTestId('tt-vessel-phase')).toHaveText('Working')
-  await expect.poll(async () => (await labels(page)).map((l) => l.id)).not.toContain('V001')
-
-  // and it stays so
-  await page.evaluate(() => window.__tt!.runTo(1000))
-  await page.evaluate(() => window.__tt!.pause())
-  await select(page, 'V001')
-  await expect(page.getByTestId('tt-vessel-phase')).toHaveText('Working')
-  await expect(page.getByTestId('tt-vessel-countdown')).toBeHidden()
   await expect.poll(async () => (await labels(page)).map((l) => l.id)).not.toContain('V001')
 })
