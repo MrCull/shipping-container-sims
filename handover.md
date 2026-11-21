@@ -20,7 +20,7 @@ Integration branch: `claude/hopeful-hawking-s9i8uh`. Delete this file before the
 | #334 | 17 Smallest fixture | #328 | merged in branch (a1fe7f9) | |
 | #335 | 09 CI selection and triggers, red main opens an issue | #330, #327, #346 | merged in branch (6970177) | |
 | #336 | 12 Yard moves | #331 | merged in branch (8d82563) | |
-| #337 | 13 Equipment moves | #331 | partly done, merging | |
+| #337 | 13 Equipment moves | #331 | merged in branch (3c9669b), partly done: GLB rig checks stay in smoke | |
 | #338 | 15 Remaining component moves | #332 | in progress | session 3 implementer |
 | #339 | 10 Docs and review rules | #325, #335, #348 | merged in branch (c3c1093) | |
 | #344 | 21 Smoke build as the local default | none | merged in branch (f170cab) | |
