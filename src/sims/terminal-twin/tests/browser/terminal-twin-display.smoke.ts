@@ -34,7 +34,7 @@ const clockText = (page: Page) => page.getByTestId('tt-clock').innerText()
 test.describe('US browser', () => {
   test.use({ locale: 'en-US' })
 
-  test('defaults to en-US and imperial on first open; the summary shows ft and mi/h', { tag: '@shell' }, async ({ page }) => {
+  test('defaults to en-US and imperial on first open', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     const dialog = page.getByRole('dialog', { name: /new scenario/i })
     await expect(dialog).toBeVisible()
@@ -43,9 +43,6 @@ test.describe('US browser', () => {
     await expect(page.getByTestId('tt-locale')).toHaveValue('en-US')
     await expect(page.getByTestId('tt-units-imperial')).toBeChecked()
     await expect(page.getByTestId('tt-display-preview')).toContainText('week starts Sunday')
-    await openSetupTab(page, 'scenario')
-    await expect(page.getByTestId('tt-summary-quay')).toHaveText('1,312 ft')
-    await expect(page.getByTestId('tt-summary-trolley')).toHaveText('8.9 mi/h')
   })
 })
 
@@ -59,9 +56,6 @@ test.describe('German browser', () => {
     await expect(page.getByTestId('tt-units-metric')).toBeChecked()
     // Weekday names are locale-formatted too.
     await expect(page.getByTestId('tt-display-preview')).toContainText('week starts Montag')
-    await openSetupTab(page, 'scenario')
-    await expect(page.getByTestId('tt-summary-quay')).toHaveText('400 m')
-    await expect(page.getByTestId('tt-summary-trolley')).toHaveText('14,4 km/h')
   })
 })
 
@@ -69,14 +63,10 @@ test.describe('British browser', () => {
   test.use({ locale: 'en-GB' })
 
   test('units switch the displayed values; the saved config and engine stay SI; the choice persists', { tag: '@shell' }, async ({ page }) => {
+    // the summary in each locale and unit system: tests/components/locale-format.test.ts (#338)
     await openSim(page)
-    await expect(page.getByTestId('tt-summary-quay')).toHaveText('400 m')
     await openAdvanced(page)
     await page.getByTestId('tt-units-imperial').check()
-    await openSetupTab(page, 'scenario')
-    await expect(page.getByTestId('tt-summary-quay')).toHaveText('1,312 ft')
-    await expect(page.getByTestId('tt-summary-gantry')).toHaveText('1.7 mi/h')
-    await openAdvanced(page)
     await page.getByTestId('tt-locale').selectOption('de-DE')
     await openSetupTab(page, 'scenario')
     await expect(page.getByTestId('tt-summary-quay')).toHaveText('1.312 ft')
@@ -127,28 +117,12 @@ test.describe('British browser', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Scenario complete' })).toContainText('10 moves')
   })
 
-  test('setup start and Run to… read and parse in the chosen locale', { tag: '@shell' }, async ({ page }) => {
+  test('Run to… reads and parses in the chosen locale', { tag: '@shell' }, async ({ page }) => {
     await openSim(page)
     await loadTracerAt(page, 17 * 60 + 3) // 14:02:03 UTC; start is Mon 26 Oct 2026 13:45
 
-    await page.getByRole('button', { name: 'New Scenario' }).click()
-    await openAdvanced(page)
-    const start = page.getByTestId('tt-setup-start')
-    await expect(start).toHaveValue('26/10/2026, 13:45')
-
-    await page.getByTestId('tt-locale').selectOption('en-US')
-    await expect(start).toHaveValue(/^10\/26\/2026, 1:45.PM$/)
-    // 03/04 is 3 April in en-GB but 4 March in en-US: the typed text follows the chosen locale.
-    await start.fill('03/04/2026, 9:30 AM')
-    await start.blur()
-    await expect(start).toHaveValue(/^03\/04\/2026, 9:30.AM$/)
-    await expect(start).not.toHaveAttribute('aria-invalid', 'true')
-    await page.getByTestId('tt-locale').selectOption('de-DE')
-    await expect(start).toHaveValue('04.03.2026, 09:30')
-    await start.fill('31.02.2026, 09:30')
-    await start.blur()
-    await expect(start).toHaveAttribute('aria-invalid', 'true')
-    await page.getByRole('button', { name: 'Cancel' }).click()
+    // the setup start field in each locale (shows, parses, flags an impossible date): tests/components/locale-format.test.ts (#338)
+    await page.evaluate(() => window.__tt!.setDisplay({ locale: 'de-DE' }))
 
     // Run to…: pre-filled with the chosen locale (de-DE now, seconds shown), parsed the same way.
     await page.getByRole('button', { name: 'Run to…' }).click()
