@@ -59,7 +59,8 @@ export function groundPointUnder(
  *
  * `spreadRatio` is the new finger distance over the previous one (above 1 means fingers moved apart: zoom in).
  * `prevMid` and `mid` are the finger midpoints before and after, in canvas pixels. The camera's distance to the
- * target is kept within `limits`. Returns true when anything moved.
+ * target is kept within `limits`. The ground point under `prevMid` anchors the step only within `anchorRange` metres
+ * of the camera; farther, the step zooms about the target. Returns true when anything moved.
  */
 export function applyPinchStep(
   camera: THREE.PerspectiveCamera,
@@ -70,11 +71,12 @@ export function applyPinchStep(
   width: number,
   height: number,
   limits: PinchLimits,
+  anchorRange = 20000,
 ): boolean {
   if (!(spreadRatio > 0) || !Number.isFinite(spreadRatio)) return false
   const groundY = target.y
   const anchor = new THREE.Vector3()
-  const haveAnchor = groundPointUnder(camera, prevMid, width, height, groundY, anchor) !== null
+  const haveAnchor = groundPointUnder(camera, prevMid, width, height, groundY, anchor, anchorRange) !== null
   const centre = haveAnchor ? anchor : target.clone()
 
   // 1. Zoom: scale camera and target about the anchor. The scale is clamped so the orbit radius stays in limits.
@@ -108,67 +110,4 @@ export function applyPinchStep(
   }
   camera.updateMatrixWorld()
   return moved
-}
-
-/** Zoom factor of one mouse-wheel notch (100 px of deltaY), the same as OrbitControls' default wheel zoom. */
-export const WHEEL_NOTCH_ZOOM = 0.95
-/** Pixels per wheel line (deltaMode 1): Firefox sends three lines a notch, so three lines make one 100 px notch. */
-const WHEEL_LINE_PX = 100 / 3
-/** Pixels per wheel page (deltaMode 2). */
-const WHEEL_PAGE_PX = 800
-/** Largest deltaY one wheel event may carry (three notches), so a page step or a driver burst cannot leap. */
-const WHEEL_MAX_PX = 300
-/** Share of the pending zoom applied each frame: a notch eases in over about a dozen frames. */
-const WHEEL_DRAIN = 0.25
-/** Pending zoom (natural log of the zoom factor) small enough to apply in one go. */
-const WHEEL_SNAP = 1e-3
-
-/**
- * Mouse-wheel zoom for the 3D view (spec #293). OrbitControls' `zoomToCursor` moved the camera towards the cursor
- * but, with `screenSpacePanning` off, re-seated the orbit target only when the view was steeper than its tilt limit
- * (more than 20 degrees below the horizon); in shallower views the target stayed and `camera.lookAt(target)` turned
- * the view left or right. This instead keeps a pending zoom (log scale) that each wheel event adds to, and drains it
- * a fixed share per frame through `applyPinchStep` at the latest cursor position: the ground point under the cursor
- * stays put, the heading and tilt never change, and the orbit target stays the ground point at screen centre.
- */
-export class WheelZoom {
-  private pending = 0
-  private cursor: CanvasPoint = { x: 0, y: 0 }
-
-  /** True while some zoom is still to be applied. */
-  get active(): boolean {
-    return this.pending !== 0
-  }
-
-  /** Adds one wheel event (`deltaY` in `deltaMode` units, negative zooms in) at `cursor` in canvas pixels. */
-  add(deltaY: number, deltaMode: number, cursor: CanvasPoint): void {
-    if (!Number.isFinite(deltaY) || deltaY === 0) return
-    const unit = deltaMode === 1 ? WHEEL_LINE_PX : deltaMode === 2 ? WHEEL_PAGE_PX : 1
-    const px = Math.max(-WHEEL_MAX_PX, Math.min(WHEEL_MAX_PX, deltaY * unit))
-    this.pending += (-px / 100) * -Math.log(WHEEL_NOTCH_ZOOM)
-    this.cursor = { x: cursor.x, y: cursor.y }
-  }
-
-  /** Drops any pending zoom. */
-  clear(): void {
-    this.pending = 0
-  }
-
-  /** Applies one frame's share of the pending zoom to `camera` and `target` in place. Returns true when anything moved. */
-  step(camera: THREE.PerspectiveCamera, target: THREE.Vector3, width: number, height: number, limits: PinchLimits): boolean {
-    if (this.pending === 0) return false
-    const radius = camera.position.distanceTo(target)
-    const zoomIn = this.pending > 0
-    if ((zoomIn && radius <= limits.minDistance + 1e-9) || (!zoomIn && radius >= limits.maxDistance - 1e-9)) {
-      this.pending = 0 // at a limit: stop cleanly, nothing left to slide
-      return false
-    }
-    const share = Math.abs(this.pending) <= WHEEL_SNAP ? this.pending : this.pending * WHEEL_DRAIN
-    this.pending -= share
-    if (Math.abs(this.pending) < 1e-12) this.pending = 0
-    const ratio = Math.exp(share)
-    const wanted = radius / ratio
-    if (wanted <= limits.minDistance || wanted >= limits.maxDistance) this.pending = 0
-    return applyPinchStep(camera, target, this.cursor, this.cursor, ratio, width, height, limits)
-  }
 }
