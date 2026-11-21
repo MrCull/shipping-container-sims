@@ -4,7 +4,7 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 
 | Ticket | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
-| #298 | Booms raise and lower around berthing | none | open | implementer-298 |
+| #298 | Booms raise and lower around berthing | none | merged in branch (543fefb) | |
 | #299 | Forestays and boom-hoist ropes stay attached | none | open | implementer-299 |
 | #300 | Boom side plate and detail within budget | #299 | open | |
 | #301 | Inspector, productivity, picking, shadows follow the boom | #298 | open | |
