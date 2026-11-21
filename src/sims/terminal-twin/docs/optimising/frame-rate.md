@@ -90,9 +90,12 @@ and `composables/useFrameBenchmark.ts` (runner). It reads quality, camera and pl
 
 How to run it:
 
-1. Open the production site (or `pnpm run build && pnpm run preview`) in the browser and on the GPU you want to measure.
-   Close other heavy tabs, keep this tab in front (a hidden tab throttles animation frames) and leave the window size alone.
-2. Click **Benchmark**. It restarts the sim on the TTI baseline preset (its own seed), runs it flat out to 7,200 s, then plays
+0. **Quiet machine.** Run `scripts/bench-preflight.sh` (exit 1: a heavy job holds the machine, wait). It cannot see a plain `pnpm run verify` or a dev server, so also confirm no agent session is working here (`list_sessions` with `linked: true`, or ask the owner). A run beside another job gives pessimistic numbers; say so next to any number you record.
+1. Open the production site (or `pnpm run build && pnpm run preview`, then `/sim/terminal-twin`) in the browser and on the GPU you want to measure.
+   Close other heavy tabs, keep this tab in front (a hidden tab throttles animation frames). "1080p window" means a maximised
+   browser on a 1920x1080 screen; do not resize it during the run. The JSON records the canvas size, so a short viewport is visible.
+2. Press **Start** on any scenario, open the performance panel (the FPS button in the top bar, or press P) and click
+   **Benchmark**; the button only exists in a running sim. It restarts the sim on the TTI baseline preset (its own seed), runs it flat out to 7,200 s, then plays
    the tour unattended. About 6 minutes. The button shows `Benchmark n of 20: <stage>`; **Cancel benchmark** stops it without a file.
 3. The browser downloads `terminal-twin-benchmark-<time>-<gpu>.json`. The quality setting, speed and pause state come back as they were.
 
@@ -111,7 +114,9 @@ clock really advanced), the sim time span, and `simEnded`. Read `achievedSpeed` 
 `terminal-twin-benchmark.prod.smoke.ts` uses it and checks the JSON is complete, never its numbers. A software-GL run
 (headless, CI) is only good for that: its fps and ms mean nothing.
 
-**Where to record the result:** put the file under `docs/benchmarks/` (create it) and add one line, date, machine,
+**Reading the file:** `pnpm run tt:frame-report <file.json>` prints the machine, build, one row per stage and the headline numbers below; `--record` also copies the file into `docs/benchmarks/`. Do not hand-roll a reader.
+
+**Where to record the result:** `docs/benchmarks/` holds the file (`--record` creates it); add one line, date, machine,
 browser and the headline numbers (Overview High fps and p99, close-up High fps, the x3600 `achievedSpeed`), in the
 Recorded numbers section below. The laptop run is #262.
 
