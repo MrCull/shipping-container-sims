@@ -77,7 +77,8 @@ export interface ExperimentFile {
   primary: { kpi: string }
   /** KPIs that must not get worse than a tolerance, absolute (KPI units) or percent of the baseline mean. */
   guards?: ExperimentGuard[]
-  configs: ExperimentConfig[]
+  /** Explicit configs (optional when `grid` gives at least one). */
+  configs?: ExperimentConfig[]
   /** Expands into extra configs, the cross product of the factor values, after the explicit configs. */
   grid?: ExperimentGrid
 }
@@ -470,13 +471,15 @@ export function validateExperiment(file: ExperimentFile): { warnings: string[] }
   if (!EXPERIMENT_KPIS[kpi])
     throw new ExperimentError(`Unknown KPI "${kpi}" (available: ${Object.keys(EXPERIMENT_KPIS).join(', ')})`)
   validateGuards(file.guards)
-  if (!Array.isArray(file.configs) || file.configs.length === 0) throw new ExperimentError('"configs" must list at least one config')
+  if (file.configs !== undefined && !Array.isArray(file.configs)) throw new ExperimentError('"configs" must be a list')
   resolveSeeds(file.seeds)
   const base = resolveBase(file.base)
   const names = new Set<string>()
   const warnings: string[] = []
   const length = runLengthOf(file)
-  for (const c of expandConfigs(file)) {
+  const expanded = expandConfigs(file)
+  if (expanded.length === 0) throw new ExperimentError('The experiment needs at least one config, in "configs" or from "grid"')
+  for (const c of expanded) {
     if (typeof c?.name !== 'string' || !c.name) throw new ExperimentError('Every config needs a "name"')
     if (names.has(c.name)) throw new ExperimentError(`Config name "${c.name}" is used twice`)
     names.add(c.name)
@@ -649,7 +652,7 @@ export function planExperiment(file: ExperimentFile): ExperimentPlan {
     for (const seed of seeds)
       replicates.push({ config: config.name, seed, scenario, command: commandFor(base.flag, config, seed, length) })
   }
-  return { file, warnings, configs, seeds, baseline: file.baseline ?? file.configs[0].name, ...length, base: file.base, replicates }
+  return { file, warnings, configs, seeds, baseline: file.baseline ?? configs[0].name, ...length, base: file.base, replicates }
 }
 
 /** Run one replicate; an executor that throws gives an `invalid: error` result instead of ending the experiment. */

@@ -57,6 +57,20 @@ describe('experiment config overrides and grid (seam B)', () => {
     expect(plans[4].command).toContain('--param shcDispatch.PAIRING_RADIUS_M=500')
   })
 
+  it('runs a grid-only experiment (no explicit configs), the first grid config as the default baseline', () => {
+    const { plans, executeReplicate } = recorder()
+    const report = runExperiment(
+      experiment({ configs: undefined, grid: { factors: { 'strategies.yardAllocation': ['nearest-wtp', 'grouped'] } } }),
+      { executeReplicate },
+    )
+    expect(plans.map((p) => p.config)).toEqual(['yardAllocation=nearest-wtp', 'yardAllocation=grouped'])
+    expect(report.expanded.baseline).toBe('yardAllocation=nearest-wtp')
+    expect(Object.keys(report.primary.verdicts)).toEqual(['yardAllocation=grouped'])
+    expect(() => runExperiment(experiment({ configs: [] }), { executeReplicate })).toThrow(
+      /at least one config, in "configs" or from "grid"/,
+    )
+  })
+
   it('applies a JSON Merge Patch, a latency shorthand and a patch grid factor', () => {
     const { plans, executeReplicate } = recorder()
     runExperiment(
