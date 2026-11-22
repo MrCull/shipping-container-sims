@@ -17,16 +17,16 @@ interface BerthCandidate {
   gapLength: number
 }
 
-/** Every stern position that fits: at the quay start or just past a berthed vessel (plus the gap). */
+/** Every stern position that fits: at the quay start or just past a berthed vessel (plus the gap), within the crane reach window (#365). */
 export function berthCandidates(req: BerthAllocationRequest): BerthCandidate[] {
   const occ = [...req.occupied].sort((a, b) => a.fromX - b.fromX)
   const out: BerthCandidate[] = []
   let gapStart = 0
   for (let i = 0; i <= occ.length; i++) {
     const next = occ[i]
-    const lo = i === 0 ? 0 : gapStart + req.berthGapM
+    const lo = Math.max(i === 0 ? 0 : gapStart + req.berthGapM, req.minBerthX ?? 0)
     const hi = next ? next.fromX - req.berthGapM : req.quayLengthM
-    if (hi - lo >= req.loaM - 1e-9) out.push({ x: lo, gapLength: (next ? next.fromX : req.quayLengthM) - gapStart })
+    if (hi - lo >= req.loaM - 1e-9 && lo <= (req.maxBerthX ?? Infinity) + 1e-9) out.push({ x: lo, gapLength: (next ? next.fromX : req.quayLengthM) - gapStart })
     if (next) gapStart = next.toX
   }
   return out

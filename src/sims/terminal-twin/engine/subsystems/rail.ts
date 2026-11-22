@@ -27,6 +27,16 @@ export function railOrder(state: SimState): StsState[] {
   return Object.values(state.sts).sort((a, b) => a.railIndex - b.railIndex)
 }
 
+/**
+ * The gantry X range a crane can ever reach (#365): cranes never pass, so the crane at rail index i stays at least
+ * `i x stsMinSpacingM` from the quay start and `(n-1-i) x stsMinSpacingM` from its end.
+ */
+export function railReach(state: SimState, config: ScenarioConfig, sts: StsState): { lo: number; hi: number } {
+  const n = Object.keys(state.sts).length
+  const spacing = config.quay.stsMinSpacingM
+  return { lo: sts.railIndex * spacing, hi: config.quay.lengthM - (n - 1 - sts.railIndex) * spacing }
+}
+
 /** Gantry position of a crane at sim time `t` (from its current motion plan). */
 export function gantryPositionAt(sts: StsState, t: number): number {
   const seg = sts.motion.find((m) => m.axis === 'gantry')

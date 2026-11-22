@@ -74,6 +74,7 @@ function tryAllocateBerth(ctx: EngineContext): void {
       berthGapM: ctx.config.quay.berthGapM,
       occupied: occupied(ctx),
       arrivedAtS: vessel.arrivedAt ?? ctx.state.now,
+      ...reachWindow(ctx, vessel),
     },
     { vessels: [vessel.id] },
   )
@@ -127,6 +128,26 @@ function assignBerth(ctx: EngineContext, vessel: VesselState, berthX: number, t:
     berthX,
     anchorageWaitS: vessel.anchorageWaitS,
   })
+}
+
+/**
+ * #365: the stern positions at which the cranes that can work the vessel (#303) reach every bay. Cranes never pass, so
+ * the crane at rail index i stands at least `i x stsMinSpacingM` from the quay start (and likewise from the far end):
+ * three small cranes at the low end kept a ULCV berthed at 0 m from ever having its first bays worked (the peak day
+ * went idle at 2 of 5 vessels). Only the bounds tighter than the quay itself are returned.
+ */
+function reachWindow(ctx: EngineContext, vessel: VesselState): Pick<BerthAllocationRequest, 'minBerthX' | 'maxBerthX'> {
+  const order = railOrder(ctx.state)
+  const able = order.flatMap((c, i) => (stsCanWork(ctx.config, c.id, vessel.sizeClass) ? [i] : []))
+  if (able.length === 0) return {}
+  const spec = vesselClass(vessel.sizeClass)
+  const { lengthM, stsMinSpacingM } = ctx.config.quay
+  const lo = able[0] * stsMinSpacingM - slotX(spec, 0, 0, 'aft')
+  const hi = lengthM - (order.length - 1 - able[able.length - 1]) * stsMinSpacingM - slotX(spec, 0, spec.bays - 1, 'fore')
+  return {
+    ...(lo > 1e-9 ? { minBerthX: lo } : {}),
+    ...(hi < lengthM - spec.loaM - 1e-9 ? { maxBerthX: hi } : {}),
+  }
 }
 
 function validateBerth(ctx: EngineContext, vessel: VesselState, berthX: number): void {

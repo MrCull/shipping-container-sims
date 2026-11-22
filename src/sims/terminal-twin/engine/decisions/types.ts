@@ -255,6 +255,13 @@ export interface BerthAllocationRequest {
   /** Quay stretches taken by vessels mooring, berthed or unmooring (stern X → bow X), ascending. */
   occupied: { vesselId: string; fromX: number; toX: number }[]
   arrivedAtS: number
+  /**
+   * #365: the lowest and highest stern positions at which the cranes that can work this vessel reach every bay (cranes
+   * never pass, so a crane stands at least `railIndex x stsMinSpacingM` from the quay start). Present only when tighter
+   * than the quay itself.
+   */
+  minBerthX?: number
+  maxBerthX?: number
 }
 
 export interface BerthAllocationReply {

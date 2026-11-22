@@ -40,7 +40,7 @@ import {
 import { ascPoseAt } from './subsystems/asc'
 import { ascHoistAt } from './subsystems/ascReservations'
 import { blockedByOlderClaim, isRetrievable, isTruckJob } from './subsystems/ascStorage'
-import { gantryPositionAt, railOrder } from './subsystems/rail'
+import { gantryPositionAt, railOrder, railReach } from './subsystems/rail'
 import { shcPositionAt } from './subsystems/shc'
 import { truckPositionAt, truckReadyForPick } from './subsystems/landside'
 import { ASC_MIN_SEPARATION_M, blockSpecs, REEFER_MAX_TIERS, travelHoistM } from './yardLayout'
@@ -856,6 +856,27 @@ export const INVARIANTS: Invariant[] = [
             `${s.id} (${s.railLo.toFixed(2)}–${s.railHi.toFixed(2)} m) and ${next.id} (${next.railLo.toFixed(2)}–${next.railHi.toFixed(2)} m) are closer than ${config.quay.stsMinSpacingM} m or out of rail order`,
           )
       })
+      return messages
+    },
+  },
+  {
+    id: 'sts.rail-reachable',
+    reads: ['time'],
+    description:
+      'A crane waiting for the rail wants a gantry X it can ever reach: cranes never pass, so the crane at rail index i ' +
+      'stays at least i x stsMinSpacingM from the quay start and (n-1-i) x stsMinSpacingM from its end (#365: otherwise ' +
+      'the crane and every neighbour behind it wait forever and the run goes idle with open work).',
+    check(state, config) {
+      const messages: string[] = []
+      const eps = 1e-6
+      for (const s of railOrder(state)) {
+        if (s.status !== 'waiting-for-rail' || s.railTargetX === null) continue
+        const { lo, hi } = railReach(state, config, s)
+        if (s.railTargetX < lo - eps || s.railTargetX > hi + eps)
+          messages.push(
+            `${s.id} waits for the rail to reach ${s.railTargetX.toFixed(2)} m, outside the ${lo.toFixed(2)}–${hi.toFixed(2)} m its rail index leaves it${s.vesselId ? ` (vessel ${s.vesselId})` : ''}`,
+          )
+      }
       return messages
     },
   },
