@@ -25,6 +25,5 @@ test('the engine worker runs the ASC import fixture to the end with its golden h
   expect(summary.kpis).toEqual(golden.kpis)
   expect(summary.invariants.violations).toBe(0)
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
-  // a sandbox proxy refusing an external fetch is not an engine or worker error (it never happens on CI)
-  expect(errors.filter((e) => !e.includes('net::ERR_TUNNEL_CONNECTION_FAILED'))).toEqual([])
+  expect(errors).toEqual([])
 })
