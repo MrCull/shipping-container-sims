@@ -68,7 +68,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const m = mergeShards(shards, { expect })
   console.log(`smoke-merge: ${shards.length} shard file${shards.length === 1 ? '' : 's'}, ${m.rows.length} tests`)
   for (const p of m.problems) console.log(`smoke-merge: ${p}`)
-  // Failed and flaky tests by name, then the SMOKE line last: a 20-line tail of the CI job log holds the whole result.
+  // Failed and flaky tests by name, then the SMOKE line last: a 25-line tail of the CI job log holds the whole result.
   for (const r of m.rows) if (r.status === 'unexpected' || r.status === 'flaky') console.log(`smoke-merge: ${r.status === 'flaky' ? 'flaky' : 'failed'}: ${r.file} > ${r.title}`)
   console.log(m.summary)
   const summaryFile = opt('--summary')

@@ -341,7 +341,7 @@ jobs:
           pattern: smoke-report-shard-*
           path: smoke-report
 
-      # Uploaded before the merge step, so the merge's failed tests and SMOKE line end the job log (a 20-line tail).
+      # Uploaded before the merge step, so the merge's failed tests and SMOKE line end the job log (a 25-line tail).
       - name: Upload shard results as one report
         if: always() && env.RUN == 'true'
         uses: actions/upload-artifact@v4
