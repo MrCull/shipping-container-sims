@@ -4,7 +4,7 @@
  * strategy no longer reshuffles crane cycle times or driver variability on the same seed.
  */
 import { beforeAll, describe, expect, it } from 'vitest'
-import { createSimulation, nextRandom, type Simulation } from '../engine'
+import { createSimulation, nextRandom, type SeededStream, type Simulation } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
 
@@ -39,7 +39,7 @@ function drawsPerEquipment(config: ScenarioConfig): { sim: Simulation; draws: Ma
       if (prev === value) continue
       const list = draws.get(name) ?? []
       // A stream first used in this event starts from its seeded state.
-      list.push(...drawsBetween(prev ?? sim.query.rngStreamSeedState(name), value))
+      list.push(...drawsBetween(prev ?? sim.query.rngStreamSeedState(name as SeededStream), value))
       draws.set(name, list)
       last.set(name, value)
     }
@@ -76,7 +76,7 @@ describe('RNG streams', () => {
   })
 
   it('every equipment stream starts from its own seed', () => {
-    const seeds = Object.keys(a.sim.query.rngStreams()).map((n) => a.sim.query.rngStreamSeedState(n))
+    const seeds = Object.keys(a.sim.query.rngStreams()).map((n) => a.sim.query.rngStreamSeedState(n as SeededStream))
     expect(new Set(seeds).size).toBe(seeds.length)
   })
 

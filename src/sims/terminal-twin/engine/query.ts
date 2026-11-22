@@ -5,7 +5,7 @@
  */
 import type { Reservation } from './reservations'
 import { yardSlotBaseY } from './subsystems/ascStorage'
-import { streamSeedState } from './rng'
+import { streamSeedState, type SeededStream } from './rng'
 import type {
   Appointment,
   AscJob,
@@ -34,7 +34,7 @@ export interface SimQuery {
   /** Current state of every reactor RNG stream drawn from so far (`engine/rng.ts`), by name. */
   rngStreams(): Readonly<Record<string, number>>
   /** First state of RNG stream `name` (`sts:<id>`, `shc:<id>`, `decisions`, `reactor`, `latency`, `landside`) for this run's seed. */
-  rngStreamSeedState(name: string): number
+  rngStreamSeedState(name: SeededStream): number
   container(id: string): Readonly<ContainerState>
   containers(): readonly Readonly<ContainerState>[]
   vessel(id: string): Readonly<VesselState>

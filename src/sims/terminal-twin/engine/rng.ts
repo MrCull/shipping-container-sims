@@ -33,8 +33,16 @@ export function nextRandom(state: number): [number, number] {
 /** A reactor stream: one per STS, one per SHC, decision requests, and the rest. */
 export type RngStream = `sts:${string}` | `shc:${string}` | 'decisions' | 'reactor'
 
+/** A side stream kept in its own state: injected decision latency, and the landside (trucks, transactions, dwell). */
+export type SideStream = 'latency' | 'landside'
+
+/** Any stream `streamSeedState` seeds: a reactor stream or a side stream. */
+export type SeededStream = RngStream | SideStream
+
+type NamedStream = Exclude<SeededStream, `sts:${string}` | `shc:${string}`>
+
 /** Salts of the named streams. `latency` used the landside salt 0x5bd1e995 before 0.59.0, so their draws correlated. */
-const SALTS: Record<string, number> = {
+const SALTS: Record<NamedStream, number> = {
   latency: 0x1b873593,
   landside: 0x5bd1e995,
   decisions: 0x27d4eb2f,
@@ -49,8 +57,9 @@ function nameHash(name: string): number {
 }
 
 /** The first state of stream `name` for a scenario seed. */
-export function streamSeedState(seed: number, name: string): number {
-  return seedState((seed ^ (SALTS[name] ?? nameHash(name))) >>> 0)
+export function streamSeedState(seed: number, name: SeededStream): number {
+  const salt = name in SALTS ? SALTS[name as NamedStream] : nameHash(name)
+  return seedState((seed ^ salt) >>> 0)
 }
 
 /** The reactor streams of one run: the scenario seed and each stream's current state. */

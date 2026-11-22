@@ -139,7 +139,7 @@ export type { HatchPanelState, HatchPanelStatus, HatchLaydownSite } from './stat
 export type { HatchKpiReport } from './kpis'
 export { hatchEnabled, hatchSettings, hatchLaydownProblems, laydownSites, laydownRect, laydownCentreZ, laydownTopY } from './hatch'
 export { hashDigest } from './hash'
-export { nextRandom, streamSeedState, type RngStream, type RngStreams } from './rng'
+export { nextRandom, streamSeedState, type RngStream, type RngStreams, type SeededStream, type SideStream } from './rng'
 export {
   createSimulation,
   restoreSimulation,
