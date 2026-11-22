@@ -250,9 +250,9 @@ describe('runExperiment: warm-up and horizon (#316)', () => {
 
   it('replicate KPIs exclude the warm-up, as a direct engine run with the same measurement warm-up', () => {
     const report = runExperiment(prefilled)
-    const direct = (measurementWarmUpS: number) => {
+    const direct = (measurementWarmUpS: number, simDurationS = 1800) => {
       const sim = createSimulation(
-        { ...fixtures['yard-no-mixed-length'], measurementWarmUpS, endConditions: { simDurationS: 1800 } },
+        { ...fixtures['yard-no-mixed-length'], measurementWarmUpS, endConditions: { simDurationS } },
         {},
         { seed: 1, asyncMode: 'pause', invariants: { failFast: false, sweepEvery: 10000 } },
       )
@@ -266,8 +266,10 @@ describe('runExperiment: warm-up and horizon (#316)', () => {
     expect(r.status).toBe('ok')
     expect(r.kpis.movesDone).toBe(warm.kpiReport().movesCompleted)
     expect(r.kpis.grossMovesPerHour).toBe(headlineKpis(warm.kpiSeries(), warm.kpiReport()).grossMovesPerHour)
-    const cold = direct(0)
-    expect(r.kpis.movesDone).not.toBe(cold.kpiReport().movesCompleted)
+    // A cold run to the same end time counts the warm-up's moves too, so it counts more.
+    const cold = direct(0, 2400)
+    expect(cold.now).toBe(2400)
+    expect(r.kpis.movesDone).toBeLessThan(cold.kpiReport().movesCompleted)
     expect(r.command).toContain('--warm-up 600 --end time:1800')
   })
 
