@@ -26,8 +26,9 @@ from .blender import emission_material, hex_to_linear
 ATLAS_W = 2048
 TILE_COLS = 2
 TILE_ROWS = 9
+BASE_TILE_ROWS = 6                        # the original 2x6 grid of a square atlas, which fixes the tile height
 TILE_W = ATLAS_W // TILE_COLS             # 1024
-TILE_H = ATLAS_W / 6                      # 341.33
+TILE_H = ATLAS_W / BASE_TILE_ROWS         # 341.33
 ATLAS_H = round(TILE_H * TILE_ROWS)       # 3072
 
 REGIONS = {

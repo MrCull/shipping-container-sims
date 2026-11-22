@@ -13,7 +13,6 @@
  * Modes: `default` (the line's livery, textured in 3D), `line`, `pod`, `weight`, `iso`, `special`, `flow`, `dwell`,
  * `departure`, `transit`, `call`, `length`. `dwell`, `departure` and `transit` depend on the sim time (`isTimeBased`).
  */
-import atlas from '../assets/models/containers/livery-atlas.json'
 import { terminalArrivalS, terminalExitS, transitStatus, type ContainerState, type TransitStatus, type TransitWorld } from '../engine'
 import { resolveContainerProps, type WeightClass } from '../scenario/containerProps'
 import type { ScenarioConfig } from '../scenario/types'
@@ -95,8 +94,24 @@ export interface ColourEntry {
 /** ISO types the twin produces (`isoTypeOf`): 20 / 40 / 40 HC, dry and reefer. */
 export const ISO_TYPES = ['22G1', '22R1', '42G1', '42R1', '45G1', '45R1'] as const
 
-const LINES = atlas.liveries.filter((l) => l.line !== null)
-const lineBody = (line: string): string | null => LINES.find((l) => l.line === line)?.body ?? null
+/**
+ * Colour by line: each line's bright brand colour, its own data palette (the livery bodies as they were before spec
+ * #356 muted the default yard). Not read from `livery-atlas.json`, so a livery retune never moves this mode or its legend.
+ */
+export const LINE_PALETTE: Readonly<Record<string, string>> = {
+  HMM: '#f47b20',
+  MSC: '#d8c9a3',
+  Maersk: '#42b0d5',
+  'CMA CGM': '#1f3f8f',
+  'Hapag-Lloyd': '#ef7d00',
+  ONE: '#d6007f',
+  Evergreen: '#00843d',
+  COSCO: '#2f5fae',
+  ZIM: '#c9ccd1',
+  'Yang Ming': '#f2c318',
+}
+const LINES = Object.keys(LINE_PALETTE)
+const lineBody = (line: string): string | null => (Object.hasOwn(LINE_PALETTE, line) ? LINE_PALETTE[line] : null)
 
 const H = 3600
 const D = 86400
@@ -116,7 +131,7 @@ const indexed =
   }
 
 const lineMode: ModeDef = {
-  keys: () => [...LINES.map((l) => l.line as string), 'other'],
+  keys: () => [...LINES, 'other'],
   keyOf: (s) => (lineBody(s.line) ? s.line : 'other'),
   hexOf: (key) => lineBody(key) ?? UNKNOWN_HEX,
 }
