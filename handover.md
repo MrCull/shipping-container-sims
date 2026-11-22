@@ -5,7 +5,7 @@ Integration branch: `claude/gallant-curie-3so8w0`. Orchestrator steps: `docs/age
 | Ticket | Title | Blocked by | Status | Claimed by |
 | --- | --- | --- | --- | --- |
 | #310 | One RNG stream per source | | open | |
-| #311 | Measurement warm-up for any yard start mode | | open | |
+| #311 | Measurement warm-up for any yard start mode | | merged in branch (f289569) | |
 | #312 | Strategy parameters per decision point | | merged in branch (b846cc4) | |
 | #313 | Tracer, minimal tt:experiment end to end | | merged in branch (c346589) | |
 | #314 | Guards, KPI catalogue and invalid replicates | #313 | merged in branch (187a5a5) | |
