@@ -38,6 +38,8 @@ export const CHECK_KEY_TABS: Record<string, SetupTab> = {
   'setup.check.shcCount': 'yard',
   'setup.check.trucks': 'yard',
   'setup.check.startNeedsLandside': 'yard',
+  'setup.check.measurementWarmUp': 'yard',
+  'setup.check.warmUpOverridden': 'yard',
   'setup.check.modeNoSts': 'yard',
   'setup.check.modeNoBlocks': 'yard',
   'setup.check.modeYardOff': 'yard',

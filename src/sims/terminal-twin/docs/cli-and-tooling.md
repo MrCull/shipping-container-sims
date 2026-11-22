@@ -1,6 +1,6 @@
 # CLI and tooling
 
-Checked against ENGINE_VERSION 0.54.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when you run or change a `pnpm run tt:*` command or a file in `cli/`, need a flag, an output format or an
 exit code, or want to run heavy jobs (peak-day runs, the smoke suite) without colliding with other agents.
@@ -48,7 +48,7 @@ Scenario source (exactly one):
 - `--preset <name>`: a key of `scenario/presets.ts#presets` (quote names with spaces: `--preset "TTI Algeciras, peak day"`).
 - `--from-snapshot <file>`: resume a snapshot written by `--snapshot` (read with `readJsonFile`, restored with
   `adopt: true`). It takes scenario, seed, decisions, end conditions, subsystems, ordering and match-line from the
-  snapshot: combining it with `--fixture/--preset/--seed/--async-mode/--strategy/--param/--latency/--end/--match-line/
+  snapshot: combining it with `--fixture/--preset/--seed/--async-mode/--strategy/--param/--latency/--end/--warm-up/--match-line/
   --subsystem/--ordering` is a usage error. `--events` and `--log` then hold only the window's events.
 
 | Flag | Values | Effect |
@@ -56,6 +56,7 @@ Scenario source (exactly one):
 | `--seed <n>` | integer | override the scenario seed |
 | `--until <cond>` | `end` (default), `time:<s>`, `moves:<n>`, `vessels:<n>`, `event:<Type>` | stop condition (`parseUntil`); `time:T` leaves `now = T` exactly |
 | `--end <cond>` | `moves:<n>`, `vessels:<n>`, `time:<s>`; repeatable | replaces `config.endConditions`; the first met ends the run |
+| `--warm-up <s>` | seconds, 0 or more | sets `config.measurementWarmUpS` (#311): KPIs and end conditions count only after it, from any yard start; overrides a `warmup` start's `warmUpS`; 0 = none. `--until time:` stays absolute sim time |
 | `--handlers <name>` | `default`, `highest-free-lane`, `nearest-job`, `broken-first-lane` | handler set (`cli/handlerSets.ts`) |
 | `--async-mode <m>` | `keep-running` (default), `pause` | decision async mode |
 | `--strategy <dp>=<name>` | repeatable | built-in strategy per decision point (validated with `getStrategy`) |

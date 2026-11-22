@@ -54,6 +54,7 @@ The engine imports `scenario/` (types, bay plan, fixtures for tests); `scenario/
 | `endConditions` | `{ vesselsCompleted?, simDurationS?, moves? }`; first met ends the run; none set = all scheduled vessels |
 | `shcs?`, `yard?` | SHC fleet; blocks (+ `ascsPerBlock` 1 or 2, `reserveShare` 0 to `MAX_YARD_RESERVE` 0.5, `loadReleaseAhead` 0 to `MAX_LOAD_RELEASE_AHEAD` 20) |
 | `yardStart?` | `{ mode: 'prefilled' \| 'warmup' \| 'empty', targetPct (60), warmUpS (48 h), mix? }`; absent = legacy start (`scenario/exportYard.ts#planExportYard`) |
+| `measurementWarmUpS?` | measurement warm-up (s, #311) for any yard start: KPIs and end conditions count only after it; overrides a `warmup` start's `warmUpS`; 0 = none (`measurementWarmUpOf`) |
 | `apron?`, `queueAreas?` | lane-graph geometry overrides; SHC queue areas (see [subsystems/horizontal.md](subsystems/horizontal.md)) |
 | `subsystems?` | `real \| instant \| off` per quay, berth, yard, shc, asc, landside; `boom`: `real \| off` (#298, default `off`). `real` moves STS booms (raise before mooring and unmooring, lower before work, idle cranes boom up, settings in `kinematics.sts.boom*`, see [subsystems/quay.md](subsystems/quay.md)); `off` keeps every boom at the working angle with no boom events. The TTI presets set `boom: 'real'`. |
 | `decisions?` | async mode, strategy, latency per decision point ([decision-points.md](decision-points.md)) |
@@ -170,10 +171,11 @@ minutes: run them under `scripts/bg.sh run --heavy` ([cli-and-tooling.md](cli-an
 | yard reserve outside 0 to 0.5; release-ahead not integer 0 to 20 | `yardReserve`; `loadReleaseAhead` | yes |
 | SHC > 120; peak trucks/h > 600 | `shcCount`; `trucks` | yes |
 | `empty` or `warmup` start without landside | `setup.check.startNeedsLandside` | yes |
+| `measurementWarmUpS` negative or not a finite number | `setup.check.measurementWarmUp` | yes |
 | instant quay with no STS, instant yard with no blocks, yard off with asc/landside on | `modeNoSts modeNoBlocks modeYardOff` | yes |
 | container props, ROB (`validateRob`), ordering, stowSequence | `setup.check.containerProps` | no |
 | dwell median <= 0; empty pool count < 0 | `setup.check.dwell`; `setup.check.pool` | no |
-| warnings: vessel LOA > quay (`tooLong`), block X off quay (`blockOffQuay`), above `STRESS_SCALE` (sts 12, blocks 24, bays 60, shc 40, vessels 20, trucks/h 250) (`heavy`) | | never |
+| warnings: vessel LOA > quay (`tooLong`), block X off quay (`blockOffQuay`), above `STRESS_SCALE` (sts 12, blocks 24, bays 60, shc 40, vessels 20, trucks/h 250) (`heavy`), both a `warmup` start and `measurementWarmUpS` (`warmUpOverridden`: the measurement warm-up is used) | | never |
 
 `createSimulation` calls `assertValidScenario`, which throws `ScenarioValidationError` only for `ENGINE_ERROR_KEYS`
 (the "yes" rows). The browser (`store.launch`) throws for any error, and the dialog disables Start while any error
