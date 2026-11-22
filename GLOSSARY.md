@@ -161,6 +161,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Grid (experiment):** `grid.factors`, config paths mapped to value lists; it adds one config per combination (the cross product), named from its factor values, e.g. `yardAllocation=grouped,shcDispatch.PAIRING_RADIUS_M=0`.
 - **Baseline config:** the config every other config is compared with (default the first).
 - **Replicate:** one run of one config on one seed. It is `ok` or invalid (`invariant`, `failed`, `error`); an invalid replicate drops its seed from that config's pairing.
+- **Cost guard (experiment):** `tt:experiment` estimates its wall time before running (replicates x sim-hours x ms per sim-hour / jobs) and, above 10 minutes, asks on a TTY or refuses (exit 2) without `--yes`.
 - **Guard KPI:** a KPI an experiment config must not make worse than a tolerance (absolute, or percent of the baseline mean). Its status is held, breached, uncertain or insufficient data, from the 95% CI of the per-seed degradation.
 - **Primary KPI:** the one KPI an experiment's verdict is about. Each experiment KPI has a direction (higher or lower is better); the verdict is better, worse, no difference detected or insufficient data, from the 95% CI of the per-seed difference.
 

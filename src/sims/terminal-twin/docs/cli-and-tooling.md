@@ -18,7 +18,7 @@ module that takes `argv` and a `print` callback, so tests call the logic directl
 |---|---|---|
 | `tt:run` | `cli/run.ts` -> `cli/runCli.ts#runCli` | Headless run of a fixture, preset, JSON config or snapshot |
 | `tt:diff` | `cli/diff.ts` -> `cli/diffCli.ts#runDiffCli` | First diverging event between two logs or two runs |
-| `tt:experiment` | `cli/experimentRun.ts` -> `cli/experimentCli.ts#runExperimentCli` (core: `cli/experiment.ts#runExperiment`) | Run configs x seeds and compare each config with the baseline, paired by seed (spec #309) |
+| `tt:experiment` | `cli/experimentRun.ts` -> `cli/experimentCli.ts#runExperimentCli` (core: `cli/experiment.ts#runExperiment`) | Run configs x seeds in parallel under the heavy lock and compare each config with the baseline, paired by seed (spec #309) |
 | `tt:golden` | `cli/golden-cli.ts` -> `cli/golden.ts#runGoldenCli` | Check or rewrite fixture golden summaries |
 | `tt:fixtures` | `cli/build-fixtures.ts` | Regenerate every fixture JSON from `definitions.ts` |
 | `tt:sts` | `cli/sts.ts#runStsCli` | STS productivity buckets from a saved event log |
@@ -100,17 +100,50 @@ equals that slice of the uninterrupted run. Handlers are not in snapshots: pass 
 ## tt:experiment
 
 ```
-pnpm run tt:experiment <experiment.json> [--out DIR]
+pnpm run tt:experiment <experiment.json> [--jobs N] [--out DIR] [--yes] [--dry-run]
 ```
 
-Runs every config of an experiment file on every seed, one replicate after another, then compares each config with
-the baseline config seed by seed. Writes `report.json` (format `terminal-twin-experiment-report`, version 3; version 2 added
-`guards`, version 3 `expanded.warmUpS` and `warnings`) and `report.md` (warm-up and horizon, verdict table, guards table, full KPI table, invalid and dropped replicates, notes,
-provenance, one `tt:run` line per replicate) to `--out` (default `.tt-experiments/<timestamp>/`, gitignored). Exit
-codes: 0 completed with every replicate valid, 1 completed with at least one invalid replicate, 2 usage or validation
-error (unknown preset, fixture, KPI, decision point or strategy; a bad guard tolerance or `warmUpS`; a missing or
-unreadable file). Validation warnings (a yardStart warm-up the experiment's warm-up replaces) print as `Warning: ...`
-lines and go into the report's `warnings` and the `## Warnings` section of `report.md`.
+Runs every config of an experiment file on every seed, then compares each config with the baseline config seed by
+seed. Flags (#317):
+
+- `--jobs N` (default the CPU count): replicates run at once, each in a forked worker process
+  (`cli/experimentWorker.ts`, under the tsx loader). `--jobs 1` runs them in process, one after another. Results come
+  back in plan order, so the report does not depend on scheduling (`tests/experiment-parallel.test.ts`).
+- `--out DIR` (default `.tt-experiments/<timestamp>/`, gitignored, printed at the start): `report.json`, `report.md` and
+  `replicates/<config>/<seed>.summary.json` (each replicate's `RunSummary`; a config name's characters outside
+  `A-Za-z0-9._=,+-` become `_` in its folder name).
+- `--yes`: skip the cost question.
+- `--dry-run`: validate, print the expanded configs (baseline marked), the replicate count and the estimate, then exit 0
+  without taking the lock or running anything.
+
+Before running it prints validation warnings, the configs, the replicate count and the estimate. Estimate =
+replicates x (warm-up + horizon) sim-hours x ms per sim-hour / jobs (jobs capped at the replicate count). Ms per
+sim-hour comes from the `perf/baseline.json` entry for the base preset (`pnpm run tt:bench`), with its sweep share
+(taken as half its invariant time) scaled down to the experiment's `sweepEvery` 10000, else 4000 ms
+(`DEFAULT_MS_PER_SIM_HOUR`, about a peak day). Cost guard: above 10 minutes without `--yes`, it asks `Run it? [y/N]` on
+a TTY and exits 2 on anything but yes; on a non-TTY it exits 2 with a hint to pass `--yes`.
+
+Then it takes the machine-wide heavy lock (`cli/heavyLock.ts`: the same `bg-heavy.lock` flock and `bg-heavy.holder`
+line as `scripts/bg.sh run --heavy` and `scripts/proof-runner.sh`, holder `tt:experiment <out>`), so it waits behind a
+smoke suite or another heavy run (printing `tt:experiment: waiting for heavy lock held by ...`) and they wait behind it.
+Under `BG_HEAVY_HELD=1` (inside `scripts/bg.sh run --heavy`) it does not take the lock again; without a `flock` binary it
+runs unlocked. Progress: one line per finished replicate, `N/M replicates done, K invalid, about X min left`.
+
+`report.json` is format `terminal-twin-experiment-report`, version 4 (version 2 added `guards`, version 3
+`expanded.warmUpS` and `warnings`, version 4 each replicate's `eventLogHash`). Provenance: `ENGINE_VERSION`, commit,
+Node, CPU, start and end time. Each replicate carries the `tt:run` command that reproduces it: running it prints the
+same `Event-log hash:` as the replicate's `eventLogHash` (`tests/experiment-cli.test.ts`). `report.md`: warm-up and
+horizon, verdict table, guards table, full KPI table, invalid and dropped replicates, notes, provenance, one `tt:run`
+line per replicate. Exit codes: 0 completed with every replicate valid, 1 completed with at least one invalid
+replicate, 2 usage or validation error (unknown preset, fixture, KPI, decision point or strategy; a bad guard tolerance,
+`warmUpS` or `--jobs`; a missing or unreadable file) or a refused cost confirmation. Validation warnings (a yardStart
+warm-up the experiment's warm-up replaces) print as `Warning: ...` lines before the run and go into the report's
+`warnings` and the `## Warnings` section of `report.md`.
+
+In process: `runExperimentCli(args, print, options)` resolves to the exit code; `options.executeReplicate` runs
+replicates in process with that executor, `interactive` and `confirm` stand in for the TTY, `heavyLock: false` skips the
+lock. The core splits into `planExperiment` (validate, expand, one `ReplicatePlan` per config and seed),
+`executeSafely` and `assembleReport(plan, results, provenance)`; `runExperiment` chains them sequentially.
 
 Experiment file (format `terminal-twin-experiment`, version 1):
 
