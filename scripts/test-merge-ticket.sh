@@ -122,5 +122,15 @@ check "extra conflicting line stops the merge (non-zero)" "$([ "$code" -ne 0 ]; 
 check "extra conflict logs the usual CONFLICT message" "$(grep -q 'CONFLICT merging tt/182-worktree-cleanup into integ' "$repo/.merge-ticket.log"; echo $?)"
 check "extra conflict leaves the merge uncommitted" "$([ -f "$repo/.git/MERGE_HEAD" ]; echo $?)"
 
+# Case 6: CLAUDE_SESSION_URL set: the handover commit carries the session link as its only trailer; unset (case 1), none.
+repo="$(make_repo trailer)"
+CLAUDE_SESSION_URL=https://claude.ai/code/session_test run_merge "$repo"; code=$?
+check "merge with CLAUDE_SESSION_URL exits 0" "$code"
+check "handover commit's only trailer is Claude-Session: <url>" "$([ "$(git -C "$repo" log -1 --format='%(trailers:only,unfold)' | sed '/^$/d')" = "Claude-Session: https://claude.ai/code/session_test" ]; echo $?)"
+check "handover commit subject unchanged" "$(git -C "$repo" log -1 --format=%s | grep -q '^handover: #182 merged in branch'; echo $?)"
+repo="$(make_repo notrailer)"
+(unset CLAUDE_SESSION_URL; run_merge "$repo")
+check "without CLAUDE_SESSION_URL the handover commit has no trailer" "$([ -z "$(git -C "$repo" log -1 --format='%(trailers:only)' | sed '/^$/d')" ]; echo $?)"
+
 echo "$fails failing"
 [ "$fails" -eq 0 ]

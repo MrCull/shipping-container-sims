@@ -9,7 +9,8 @@
 # An ENGINE_VERSION-only conflict in the engine simulation module is resolved by the script (higher version, minor +1).
 # Stops (without committing) on any other conflict, conflict markers or a failed check. A verified merge then sets the
 # ticket's row in handover.md to "merged in branch (<merge sha>)" and commits that alone (tested by
-# scripts/test-merge-ticket.sh). The GitHub merged-in-branch label stays a manual step (docs/agents/implementing.md).
+# scripts/test-merge-ticket.sh), with a `Claude-Session: $CLAUDE_SESSION_URL` trailer when that variable is set
+# (export it to the session link before running). The GitHub merged-in-branch label stays a manual step (docs/agents/implementing.md).
 set -euo pipefail
 if [ -z "${MERGE_TICKET_LOGGING:-}" ]; then
   export MERGE_TICKET_LOGGING=1
@@ -42,7 +43,10 @@ mark_handover() { # mark_handover <ticket-branch> <merge-sha>
     !done && $2 ~ "^ *" n " *$" {$5 = " merged in branch (" sha ") "; $6 = " "; done = 1}
     {print}' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
   if ! git diff --quiet -- "$file"; then
-    git commit -q -m "handover: #$n merged in branch ($2)" -- "$file"
+    # AGENTS.md: a commit's only trailer is the session link; CLAUDE_SESSION_URL supplies it (none when unset).
+    local trailer=()
+    [ -n "${CLAUDE_SESSION_URL:-}" ] && trailer=(-m "Claude-Session: $CLAUDE_SESSION_URL")
+    git commit -q -m "handover: #$n merged in branch ($2)" "${trailer[@]}" -- "$file"
   fi
   echo "handover: #$n row reads merged in branch ($2)."
 }
