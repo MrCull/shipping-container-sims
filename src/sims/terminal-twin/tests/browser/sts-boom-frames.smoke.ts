@@ -81,6 +81,15 @@ async function measure(page: Page, boom: 'real' | 'off'): Promise<Measure> {
 async function still(page: Page, boom: 'real' | 'off'): Promise<Omit<Measure, 'framesPerWallS'>> {
   await openTwin(page, { scenario: 'boom-berthing', load: boom === 'off' ? { overrides: { subsystems: { boom: 'off' } } } : {} })
   await page.waitForFunction(() => Object.keys(window.__tt!.sceneState()!.stsRendered).length >= 3, undefined, { timeout: 30_000 })
+  // Draw only once the models are in: a GLB still loading draws a placeholder with another draw-call count.
+  await page.waitForFunction(
+    () => {
+      const s = window.__tt!.scene()!
+      return s.stsAssets === 'loaded' && s.vesselAssets === 'loaded' && s.containerAssets === 'loaded'
+    },
+    undefined,
+    { timeout: 30_000 },
+  )
   await page.evaluate(() => window.__tt!.cameraTo('STS02', 400)) // every crane in view
   await waitFrames(page, 4)
   return page.evaluate(() => {
@@ -98,6 +107,8 @@ async function still(page: Page, boom: 'real' | 'off'): Promise<Omit<Measure, 'f
 
 test('booms raised on boom-berthing: forestays attached, no extra draw calls than booms down', { tag: '@equipment' }, async ({ page }) => {
   const errors = watch(page)
+  // Warm-up load: the first load pays GLB fetches and shader compiles (CI once drew 52 calls up against 48 down without it).
+  await still(page, 'off')
   const down = await still(page, 'off')
   const up = await still(page, 'real')
   expect(Object.values(down.booms).every((d) => d === 0), JSON.stringify(down.booms)).toBe(true)

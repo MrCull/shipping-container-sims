@@ -17,7 +17,7 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 
 
 - 22 Nov: origin/main merged (spec #320 complete: groups, shared page, headless scene, sharded CI). `smoke-map.txt` now maps paths to groups (`boom` files run `equipment`). `sts-boom-frames.smoke.ts` split: an `@equipment` CI test on `boom-berthing` (raised booms, stays attached, no extra draw calls; 3.7 s, passes with `--repeat-each=2`) and the TTI frame-rate proof as `@load` (local only). The STS booms row of the sim guide moved to its own section (the 1500-character line check).
-- #305 next: read the full CI smoke run on PR #307 (`smoke` label) and fix any red test; the old-harness failures below may already be gone.
+- #305, first full CI run on the new harness (run 45033647640): `SMOKE: 155 passed, 1 failed, 1 flaky`. The three old-harness failures below are gone. Fixed: the render budget guard (overview 310 draw calls against 299: 9 from the new crane class and boom detail, 2 from raised booms; budgets set to the measured counts, start and close-up lowered) and the new boom test's first-load flake (warm-up load, wait for STS, vessel and container GLBs). Next: the CI run on that fix.
 
 ## Open points
 
