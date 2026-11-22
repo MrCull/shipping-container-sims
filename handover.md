@@ -11,13 +11,14 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 | #302 | Raise to pass a vessel's bridge | #298 | merged in branch (525e657) | |
 | #303 | Super Post-Panamax class for cranes 101 to 103 | #298, #300 | merged in branch (103e79f) | |
 | #304 | Frame-rate proof | #299 to #303 | merged in branch (49d83e7) | |
-| #305 | Browser smoke suite and regressions | #298 to #304 | in progress: main merged (Fast CI, spec #320); full CI smoke run on PR #307 | |
+| #305 | Browser smoke suite and regressions | #298 to #304 | done on branch (c1a11ac): full CI smoke run 45034417767 `SMOKE: 157 passed, 0 failed, 0 flaky` | |
 
 ## Next steps
 
 
 - 22 Nov: origin/main merged (spec #320 complete: groups, shared page, headless scene, sharded CI). `smoke-map.txt` now maps paths to groups (`boom` files run `equipment`). `sts-boom-frames.smoke.ts` split: an `@equipment` CI test on `boom-berthing` (raised booms, stays attached, no extra draw calls; 3.7 s, passes with `--repeat-each=2`) and the TTI frame-rate proof as `@load` (local only). The STS booms row of the sim guide moved to its own section (the 1500-character line check).
-- #305, first full CI run on the new harness (run 45033647640): `SMOKE: 155 passed, 1 failed, 1 flaky`. The three old-harness failures below are gone. Fixed: the render budget guard (overview 310 draw calls against 299: 9 from the new crane class and boom detail, 2 from raised booms; budgets set to the measured counts, start and close-up lowered) and the new boom test's first-load flake (warm-up load, wait for STS, vessel and container GLBs). Next: the CI run on that fix.
+- #305, first full CI run on the new harness (run 45033647640): `SMOKE: 155 passed, 1 failed, 1 flaky`. The three old-harness failures below are gone. Fixed: the render budget guard (overview 310 draw calls against 299: 9 from the new crane class and boom detail, 2 from raised booms; budgets set to the measured counts, start and close-up lowered) and the new boom test's first-load flake (warm-up load, wait for STS, vessel and container GLBs). The run on that fix (45034417767) is green: 157 passed, 0 failed, 0 flaky.
+- Every ticket of spec #297 is done. Before merging PR #307: the owner reviews the render budget raise (overview 299 to 310 draw calls), then delete handover.md, add `Closes #297` to `Closes #305` to the PR body, mark the PR ready and confirm CI is green.
 
 ## Open points
 
