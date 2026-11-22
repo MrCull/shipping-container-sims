@@ -129,4 +129,14 @@ describe('CLI runner', () => {
     }
     expect(status).toBe(1)
   }, 30_000)
+
+  it('--warm-up sets the measurement warm-up: KPIs restart at it and the summary reports it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tt-cli-'))
+    const out = join(dir, 'summary.json')
+    expect(cli('--fixture', 'tracer-1sts-10-boxes', '--warm-up', '300', '--until', 'time:400', '--out', out).exitCode).toBe(0)
+    const kpis = JSON.parse(readFileSync(out, 'utf8')).kpis
+    expect(kpis.warmUp).toEqual({ durationS: 300, ended: true })
+    expect(kpis.simTimeS).toBe(100)
+    expect(cli('--fixture', 'tracer-1sts-10-boxes', '--warm-up', '-5').exitCode).toBe(2)
+  })
 })

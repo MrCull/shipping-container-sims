@@ -493,6 +493,15 @@ export const MAX_LOAD_RELEASE_AHEAD = 20
 export const DEFAULT_YARD_TARGET_PCT = 60
 export const DEFAULT_WARM_UP_S = 48 * 3600
 
+/**
+ * The measured period's start (s), or null for a run measured from t = 0 (#311): the explicit
+ * `measurementWarmUpS` if set (0 = none), else a `warmup` yard start's `warmUpS` (default 48 h).
+ */
+export function measurementWarmUpOf(config: Pick<ScenarioConfig, 'measurementWarmUpS' | 'yardStart'>): number | null {
+  if (config.measurementWarmUpS !== undefined) return config.measurementWarmUpS > 0 ? config.measurementWarmUpS : null
+  return config.yardStart?.mode === 'warmup' ? (config.yardStart.warmUpS ?? DEFAULT_WARM_UP_S) : null
+}
+
 export interface EndConditions {
   /** End when this many vessels have departed. */
   vesselsCompleted?: number
@@ -536,6 +545,12 @@ export interface ScenarioConfig {
   yard?: YardConfig
   /** How the yard starts (TT-14); optional (legacy start). */
   yardStart?: YardStartConfig
+  /**
+   * Measurement warm-up (s, #311), for any yard start: at this time `WarmUpEnded` restarts the KPIs and the
+   * end-condition counters, so the start-up transient is not measured. Absent: none, unless `yardStart.mode` is
+   * `warmup` (which means `warmUpS`). Set together with a yard warm-up, this one wins (validation warns). 0 = none.
+   */
+  measurementWarmUpS?: number
   /** Waterside lane-graph geometry overrides. */
   apron?: Partial<ApronLayout>
   /** SHC queue areas near each STS and each block's WTP pads (TT-R12); optional (none). */

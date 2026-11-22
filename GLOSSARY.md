@@ -253,6 +253,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Pre-fill:** the starting population of a pre-filled yard: boxes booked to the scenario's vessels, imports awaiting pickup with their dwell partly elapsed, and the empty pool. The big presets add filler boxes in set shares (imports, exports, transshipment) and stack them group by group: no stack mixes groups.
 - **Pre-run:** the phase before `ScenarioStarted` in which a pre-filled start asks `yardAllocation` for each starting box through the decision runtime. Its decision events carry `preRun: true`, sit at sim time 0 and are not in the KPI series.
 - **Warm-up / measured period:** the first `warmUpS` of a warm-up start / everything after it. At `WarmUpEnded` the KPI and end-condition counters restart at zero.
+- **Measurement warm-up:** a scenario-level warm-up (`measurementWarmUpS`, `tt:run --warm-up`) for any yard start mode, so a pre-filled run can exclude its start-up transient. A warm-up yard start is an empty start plus a measurement warm-up; when both are set, the measurement warm-up wins.
 
 ## Presets and layout (TT-15)
 

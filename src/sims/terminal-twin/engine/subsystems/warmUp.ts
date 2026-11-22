@@ -1,6 +1,7 @@
 /**
- * Warm-up start (TT-14): the run starts with an empty yard and `warmUpS` of normal truck and vessel activity. At
- * that time `WarmUpEnded` restarts the measured period: every KPI counter and the end-condition counters (vessels
+ * Measurement warm-up (TT-14, #311): `measurementWarmUpOf(config)` seconds of normal truck and vessel activity run
+ * before the measured period, from any yard start (a `warmup` yard start is an empty start plus a measurement warm-up
+ * of its `warmUpS`). At that time `WarmUpEnded` restarts the measured period: every KPI counter and the end-condition counters (vessels
  * completed, moves) go back to zero, the KPI series restart (see `simulation.ts`), and `simDurationS` counts from
  * here. Equipment, boxes, queues and the yard keep their state; only the counters restart.
  */

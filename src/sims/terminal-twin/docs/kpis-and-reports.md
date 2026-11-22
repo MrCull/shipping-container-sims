@@ -99,7 +99,7 @@ busiest SHC (most `shc.jobs`), longest wait (anchorage, ground-position wait or 
 
 | Field | Content |
 |---|---|
-| `simTimeS`, `eventsProcessed`, `movesCompleted`, `vesselsCompleted` | measured period (after a warm-up: from its end); `warmUp { durationS, ended }` only for a warm-up start (TT-14) |
+| `simTimeS`, `eventsProcessed`, `movesCompleted`, `vesselsCompleted` | measured period (after a warm-up: from its end); `warmUp { durationS, ended }` only with a measurement warm-up (a `warmup` yard start or `measurementWarmUpS`, TT-14, #311) |
 | `sts[id]` | `moves, cycles, twinLifts, grossMovesPerHour, railWaitS` |
 | `vessels[id]` | `sizeClass, arrivedAtS, anchorageWaitS, berthX, berthedAtS, departedAtS, turnaroundS` (berthed to departed), `sts[]` |
 | `quay` | `vesselsWaited`, `anchorageWaitS { total, mean, max }` |
