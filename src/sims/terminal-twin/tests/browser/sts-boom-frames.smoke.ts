@@ -1,16 +1,21 @@
 /**
- * #304 frame-rate proof for the STS booms (spec #297): the TTI preset with booms up draws the same number of draw calls
- * as the same scene with every boom down, the forestays and boom-hoist ropes stay attached to the raised boom (read
- * through `__tt.sceneState().stsRendered[id].stayGapM`), and the frame ratio is not lower. Booms down is the same
- * preset with the `boom` subsystem forced `off` (every boom at the working angle), so the box count does not move the
- * draw calls. Headless Chromium renders with SwiftShader: frame RATES say nothing about a real GPU, so the frame check
- * is a ratio of frames per wall second over a minimum wall-clock window (`frameSampling.ts`), never an absolute count.
- * The real-GPU check is the owner's `__tt.perf()` run in `docs/optimising/frame-rate.md`.
+ * STS booms in the browser (spec #297, #304). The GLB rig state they read (`__tt.sceneState().stsRendered`) exists only
+ * once the STS GLB loads, which the headless scene never does (sim guide, "Test levels"), so these checks stay here.
+ *
+ * - `@equipment` (CI): on the small `boom-berthing` fixture, idle cranes park with the boom raised, the forestays and
+ *   boom-hoist ropes stay on their anchors (`stayGapM`, #299), and raising adds no draw calls against the same fixture
+ *   with the `boom` subsystem forced `off` (every boom at the working angle). Render off: `__tt.renderOnce()` draws the
+ *   one frame whose counters it reads.
+ * - `@load` (local only, never in CI): the #304 frame-rate proof on the TTI preset at High with drawing on: the same
+ *   checks at full scale plus a frame ratio not lower with booms up. Headless Chromium renders with SwiftShader, so the
+ *   frame check is a ratio of frames per wall second over a minimum wall-clock window (`frameSampling.ts`), never an
+ *   absolute count. The real-GPU check is the owner's `__tt.perf()` run in `docs/optimising/frame-rate.md`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { framesPerWallSecond, sampleFrames } from './frameSampling'
 import { openTwin } from './openTwin'
+import { expect, test } from './twinTest'
 
 function watch(page: Page): string[] {
   const errors: string[] = []
@@ -72,7 +77,38 @@ async function measure(page: Page, boom: 'real' | 'off'): Promise<Measure> {
   return { ...still, framesPerWallS: framesPerWallSecond(samples) }
 }
 
-test('TTI booms up: forestays attached, no extra draw calls and no lower frame ratio than booms down', async ({ page }) => {
+/** Loads `boom-berthing` with booms `real` or forced `off` and reads the rig state and one drawn frame's counters. */
+async function still(page: Page, boom: 'real' | 'off'): Promise<Omit<Measure, 'framesPerWallS'>> {
+  await openTwin(page, { scenario: 'boom-berthing', load: boom === 'off' ? { overrides: { subsystems: { boom: 'off' } } } : {} })
+  await page.waitForFunction(() => Object.keys(window.__tt!.sceneState()!.stsRendered).length >= 3, undefined, { timeout: 30_000 })
+  await page.evaluate(() => window.__tt!.cameraTo('STS02', 400)) // every crane in view
+  await waitFrames(page, 4)
+  return page.evaluate(() => {
+    const tt = window.__tt!
+    const drawn = tt.renderOnce()!
+    const rendered = tt.sceneState()!.stsRendered as Record<string, { boomAngleDeg: number; stayGapM: number }>
+    return {
+      calls: drawn.calls,
+      triangles: drawn.triangles,
+      booms: Object.fromEntries(Object.entries(rendered).map(([id, r]) => [id, r.boomAngleDeg])),
+      stayGapM: Math.max(...Object.values(rendered).map((r) => r.stayGapM)),
+    }
+  })
+}
+
+test('booms raised on boom-berthing: forestays attached, no extra draw calls than booms down', { tag: '@equipment' }, async ({ page }) => {
+  const errors = watch(page)
+  const down = await still(page, 'off')
+  const up = await still(page, 'real')
+  expect(Object.values(down.booms).every((d) => d === 0), JSON.stringify(down.booms)).toBe(true)
+  expect(Object.values(up.booms).filter((d) => d >= 70).length, JSON.stringify(up.booms)).toBeGreaterThan(0)
+  expect(up.stayGapM).toBeLessThan(0.05)
+  expect(down.stayGapM).toBeLessThan(0.05)
+  expect(up.calls).toBeLessThanOrEqual(down.calls)
+  expect(errors).toEqual([])
+})
+
+test('TTI booms up: forestays attached, no extra draw calls and no lower frame ratio than booms down @load', { tag: '@equipment' }, async ({ page }) => {
   test.setTimeout(480_000)
   const errors = watch(page)
   await openTwin(page, { quality: 'high', render: true })

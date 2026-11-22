@@ -11,12 +11,13 @@ Integration branch: `claude/wizardly-gates-dyv0lu`. Per-run tracking file; delet
 | #302 | Raise to pass a vessel's bridge | #298 | merged in branch (525e657) | |
 | #303 | Super Post-Panamax class for cranes 101 to 103 | #298, #300 | merged in branch (103e79f) | |
 | #304 | Frame-rate proof | #299 to #303 | merged in branch (49d83e7) | |
-| #305 | Browser smoke suite and regressions | #298 to #304 | paused: waits for spec #320 (Fast CI) to land on main | |
+| #305 | Browser smoke suite and regressions | #298 to #304 | in progress: main merged (Fast CI, spec #320); full CI smoke run on PR #307 | |
 
 ## Next steps
 
 
-- #300 and #302 running; #301 next when a slot frees.
+- 22 Nov: origin/main merged (spec #320 complete: groups, shared page, headless scene, sharded CI). `smoke-map.txt` now maps paths to groups (`boom` files run `equipment`). `sts-boom-frames.smoke.ts` split: an `@equipment` CI test on `boom-berthing` (raised booms, stays attached, no extra draw calls; 3.7 s, passes with `--repeat-each=2`) and the TTI frame-rate proof as `@load` (local only). The STS booms row of the sim guide moved to its own section (the 1500-character line check).
+- #305 next: read the full CI smoke run on PR #307 (`smoke` label) and fix any red test; the old-harness failures below may already be gone.
 
 ## Open points
 
