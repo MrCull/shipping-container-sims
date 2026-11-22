@@ -37,12 +37,12 @@ test('TTI baseline on High at fixed cameras stays within the rendering budget @c
   test.setTimeout(300_000)
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`))
-  await openTwin(page, { scenario: 'TTI Algeciras baseline', quality: 'high' }) // the budget is for High; draws only via renderOnce
+  await openTwin(page, { scenario: 'TTI Algeciras baseline', quality: 'high', assets: ['sts', 'vessel', 'container', 'shc', 'asc'] }) // the budget is for High; draws only via renderOnce
   await page.evaluate((n) => window.__tt!.runUntil({ maxEvents: n }), RUN_EVENTS)
   await page.evaluate(() => window.__tt!.pause())
   await page.waitForFunction(() => {
     const s = window.__tt!.scene()
-    return !!s && s.containers > 8_000 && s.containerAssets === 'loaded' && s.vesselAssets === 'loaded'
+    return !!s && s.containers > 8_000
   }, undefined, { timeout: 150_000 })
   expect((await page.evaluate(() => window.__tt!.perf())).effective).toBe('high')
 

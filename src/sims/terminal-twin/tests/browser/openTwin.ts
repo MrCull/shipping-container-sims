@@ -13,6 +13,10 @@
  *
  * `devApi: false` is for production-build specs (no `window.__tt`): it waits for the setup dialog instead, and a
  * scenario is then picked in the dialog by the spec.
+ * `assets: [...]` waits, after the load, until those GLB sets read `loaded` in `__tt.scene()` (`stsAssets`...). A spec that
+ *   counts draw calls or triangles (`renderOnce()`, `scene().render`) names every set its view draws: a set still loading
+ *   draws a placeholder with another count, and only the first test on a worker's page pays the load (CI once drew 52
+ *   calls against 48 for that reason alone, #305).
  * `freshPage: false` reuses a page that already shows the twin at the same URL.
  * On the worker's shared page (`twinTest.ts`, #329) the page sits on the reset route after its reset, and the twin is
  * opened by routing there in-app (`window.__appVisit`), with no page load.
@@ -23,6 +27,9 @@ import type { QualitySetting } from '../../modules/quality'
 import { RESET_PATH } from '../../../../utils/smokeReset'
 
 export type LoadOptions = NonNullable<Parameters<TwinDevApi['load']>[1]>
+
+/** GLB sets the scene loads after a scenario (`<kind>Assets` in `__tt.scene()`: 'placeholder' until loaded). */
+export type TwinAssetKind = 'sts' | 'vessel' | 'container' | 'shc' | 'asc'
 
 export interface OpenTwinOptions {
   /** Fixture or preset to load through `__tt.load` (none: stay at the setup dialog). */
@@ -41,6 +48,8 @@ export interface OpenTwinOptions {
   devApi?: boolean
   /** False reuses a page already at this URL with the twin booted (default true: always navigate). */
   freshPage?: boolean
+  /** After the load, wait until these GLB sets are loaded (default none). Required before counting draw calls. */
+  assets?: TwinAssetKind[]
 }
 
 /** The sim URL with the switches for these options (Low quality and render off unless the spec opts in). */
@@ -69,4 +78,14 @@ export async function openTwin(page: Page, options: OpenTwinOptions = {}): Promi
   }
   await page.waitForFunction(() => !!window.__tt)
   if (options.scenario) await page.evaluate(([name, load]) => window.__tt!.load(name, load), [options.scenario, options.load ?? {}] as const)
+  if (options.assets?.length) {
+    await page.waitForFunction(
+      (kinds) => {
+        const scene = window.__tt!.scene() as unknown as Record<string, unknown> | null
+        return !!scene && kinds.every((k) => scene[`${k}Assets`] === 'loaded')
+      },
+      options.assets,
+      { timeout: 60_000 },
+    )
+  }
 }
