@@ -110,7 +110,7 @@ provenance, one `tt:run` line per replicate) to `--out` (default `.tt-experiment
 codes: 0 completed with every replicate valid, 1 completed with at least one invalid replicate, 2 usage or validation
 error (unknown preset, fixture, KPI, decision point or strategy; a bad guard tolerance; a missing or unreadable file).
 
-Experiment file (format `terminal-twin-experiment`, version 1; v1 tracer, spec #309 adds the rest):
+Experiment file (format `terminal-twin-experiment`, version 1):
 
 ```json
 {
@@ -129,8 +129,39 @@ Experiment file (format `terminal-twin-experiment`, version 1; v1 tracer, spec #
 
 - `base`: `{ "preset": <name> }` or `{ "fixture": <name> }`. `horizonS` (default 86400) replaces the end conditions
   (`simDurationS`). `seeds`: a list or `{ count, from }` (default 10 seeds from 1). `baseline`: default the first config.
-- A config sets only `strategies` per decision point for now. Every replicate runs with `asyncMode: 'pause'`,
-  invariants `failFast: false` and `sweepEvery` 10000 (`executeReplicateHeadless`).
+- A config overrides the base four ways (#315), applied in this order to build its `ScenarioConfig`:
+  - `patch`: a JSON Merge Patch (RFC 7396) on the base: objects merge key by key, `null` deletes a key, anything else
+    (arrays included) replaces. `{ "patch": { "shcs": [{ "id": "SHC01" }] } }` runs with one SHC. The patched config
+    must pass the engine's scenario check (`assertValidScenario`), and a patch may not set `endConditions` (every
+    replicate runs the same horizon).
+  - `strategies`: `{ "<dp>": "<strategy>" }`, a built-in strategy per decision point.
+  - `params`: `{ "<dp>": { "<NAME>": n } }`, strategy params (`--param`), checked against the point's strategy (this
+    config's, else the patched base's, else the default) by `resolveStrategyParams`.
+  - `latency`: `{ "<dp>": "<spec>" }`, the `tt:run --latency` syntax (`none`, `fixed:<ms>`, `uniform:<min>-<max>`,
+    `exp:<mean>`, then `,timeout:<pct>`, `,error:<pct>`, `,timeoutMs:<ms>`; `cli/latencySpec.ts`).
+  The last three write into `decisions.points`, over whatever the patch set.
+- `grid.factors` (optional) maps config paths to value lists and adds the cross product after the explicit configs:
+  `strategies.<dp>`, `params.<dp>.<name>`, `latency.<dp>`, `patch.<path>` (dots into the patch). Each grid config is
+  named from its values in factor order: the path without its first segment (`latency.<dp>` keeps it), `=`, the value
+  (strings bare, others as JSON). Names must be unique across explicit and grid configs.
+
+  ```json
+  "configs": [{ "name": "A" }],
+  "grid": { "factors": {
+    "strategies.yardAllocation": ["nearest-wtp", "grouped"],
+    "params.shcDispatch.PAIRING_RADIUS_M": [0, 500]
+  } }
+  ```
+
+  gives `A`, `yardAllocation=nearest-wtp,shcDispatch.PAIRING_RADIUS_M=0`, ... (5 configs). `report.expanded.configs`
+  lists them all.
+- Every config, grid ones included, is resolved before any replicate runs. Errors name the config and field, e.g.
+  `Config "X": params.shcDispatch.NOPE: shcDispatch strategy "paired-dual-cycle" has no param "NOPE" (...)`: unknown
+  decision point, strategy or param, a param out of range, a bad latency spec, a patch that makes an invalid
+  scenario, a patch with `endConditions`, a bad grid factor path, duplicate names. A replicate's `command` adds
+  `--param` and `--latency` flags; a patch cannot be written as `tt:run` flags, so the command says so.
+- Every replicate runs with `asyncMode: 'pause'`, invariants `failFast: false` and `sweepEvery` 10000
+  (`executeReplicateHeadless`).
 - KPI catalogue (`EXPERIMENT_KPIS`, read by `readExperimentKpis` from the headline KPIs, the `KpiReport` and the
   invariant count). Higher is better: `grossMovesPerHour`, `netMovesPerHour`, `movesDone`, `vesselsDone`. Lower is
   better: `meanVesselTurnaroundS` (berth to departure), `meanAnchorageWaitS`, `truckTurnaroundS`, `shcEmptyTravelRatio`,
@@ -154,6 +185,7 @@ Experiment file (format `terminal-twin-experiment`, version 1; v1 tracer, spec #
 - In-process: `runExperiment(file, { executeReplicate })` takes an injectable executor (tests pass a fake one with
   synthetic KPIs); `runExperimentCli(args, print)` mirrors `runCli`. Only `provenance.startedAt`, `endedAt` and each
   replicate's `wallMs` differ between two runs of the same file. Tests: `tests/experiment.test.ts`,
+  `tests/experiment-grid.test.ts` (overrides, grid, validation, a patch and a param changing real KPIs),
   `tests/experiment-cli.test.ts`.
 
 ## tt:diff

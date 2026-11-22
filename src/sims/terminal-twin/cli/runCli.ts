@@ -12,6 +12,7 @@
  */
 import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from 'node:fs'
 import { readJsonFile, writeJsonFile } from './snapshotFile'
+import { parseLatencySpec } from './latencySpec'
 import { parseArgs } from 'node:util'
 import {
   createSimulation,
@@ -159,31 +160,11 @@ function splitPoint(text: string, flag: string): [DecisionPointId, string] {
 }
 
 function parseLatency(text: string): { latency: LatencySpec; timeoutMs?: number } {
-  const bad = () => new UsageError(`Bad --latency spec "${text}"`)
-  const num = (s: string | undefined) => {
-    const n = Number(s)
-    if (s === undefined || s === '' || !Number.isFinite(n) || n < 0) throw bad()
-    return n
+  try {
+    return parseLatencySpec(text)
+  } catch {
+    throw new UsageError(`Bad --latency spec "${text}"`)
   }
-  const [delay, ...extras] = text.split(',')
-  const [kind, arg] = delay.split(':')
-  const latency: LatencySpec = {}
-  if (kind === 'none') latency.delay = { kind: 'none' }
-  else if (kind === 'fixed') latency.delay = { kind: 'fixed', ms: num(arg) }
-  else if (kind === 'exp') latency.delay = { kind: 'exponential', meanMs: num(arg) }
-  else if (kind === 'uniform') {
-    const [min, max] = (arg ?? '').split('-')
-    latency.delay = { kind: 'uniform', minMs: num(min), maxMs: num(max) }
-  } else throw bad()
-  let timeoutMs: number | undefined
-  for (const extra of extras) {
-    const [key, value] = extra.split(':')
-    if (key === 'timeout') latency.timeoutPct = num(value)
-    else if (key === 'error') latency.errorPct = num(value)
-    else if (key === 'timeoutMs') timeoutMs = num(value)
-    else throw bad()
-  }
-  return { latency, timeoutMs }
 }
 
 /** Merge --async-mode / --strategy / --param / --latency over the scenario's own decisions config. */

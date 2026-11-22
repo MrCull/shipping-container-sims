@@ -156,7 +156,8 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 ## Experiments (spec #309)
 
 - **Experiment:** a JSON file (format `terminal-twin-experiment`) that runs several configs of one base preset or fixture on the same seeds and compares them (`pnpm run tt:experiment`).
-- **Config (experiment):** one named variant in an experiment, written as overrides on the base (v1: `strategies` per decision point). Not the `ScenarioConfig` itself.
+- **Config (experiment):** one named variant in an experiment, written as overrides on the base (`patch`, a JSON Merge Patch on the base scenario, and the `strategies`, `params` and `latency` shorthand per decision point). Not the `ScenarioConfig` itself.
+- **Grid (experiment):** `grid.factors`, config paths mapped to value lists; it adds one config per combination (the cross product), named from its factor values, e.g. `yardAllocation=grouped,shcDispatch.PAIRING_RADIUS_M=0`.
 - **Baseline config:** the config every other config is compared with (default the first).
 - **Replicate:** one run of one config on one seed. It is `ok` or invalid (`invariant`, `failed`, `error`); an invalid replicate drops its seed from that config's pairing.
 - **Guard KPI:** a KPI an experiment config must not make worse than a tolerance (absolute, or percent of the baseline mean). Its status is held, breached, uncertain or insufficient data, from the 95% CI of the per-seed degradation.
