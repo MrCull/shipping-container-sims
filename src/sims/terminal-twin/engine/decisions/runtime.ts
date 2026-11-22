@@ -180,11 +180,14 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
     const cfg = pointConfig(dp)
     const custom = deps.handlers[dp]
     const strategy = cfg.strategy ?? strategies[dp].default
+    // params belong to the selected strategy and are checked even when a custom handler answers (#312)
+    const configured = getStrategy(dp, strategy, cfg.params)
     resolved[dp] = custom
       ? { fn: custom as DecisionHandler<DecisionPointId>, name: 'custom' }
-      : { fn: getStrategy(dp, strategy), name: `strategy:${strategy}` }
+      : { fn: configured, name: `strategy:${strategy}` }
+    // the fallback takes the params only when it is the selected strategy
     const fb = cfg.fallbackStrategy ?? strategies[dp].default
-    fallbacks[dp] = { fn: getStrategy(dp, fb), name: `fallback:${fb}` }
+    fallbacks[dp] = { fn: getStrategy(dp, fb, fb === strategy ? cfg.params : undefined), name: `fallback:${fb}` }
   }
 
   // In-flight async decisions (not in SimState: Promises are not JSON).
