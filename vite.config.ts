@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
@@ -18,12 +18,32 @@ function shortCommit(): string {
   return /^[0-9a-f]{7,40}$/.test(sha) ? sha.slice(0, 7) : ''
 }
 
-export default defineConfig({
+/** index.html's Google tag: the gtag.js loader and its inline config script. */
+const GOOGLE_TAG = /\s*<!-- Google tag \(gtag\.js\) -->\s*<script async src="https:\/\/www\.googletagmanager\.com[^"]*"><\/script>\s*<script>[\s\S]*?<\/script>/
+
+/**
+ * Drops the Google tag from index.html in the smoke build (`--mode smoke`) and on the dev server, so test runs and
+ * local work send nothing to Google Analytics, and a sandbox proxy that refuses googletagmanager.com cannot fail a
+ * smoke test's console-error check. The production build keeps it; `src/utils/analytics.ts` copes with no `gtag`.
+ */
+function dropGoogleTag(mode: string): Plugin {
+  return {
+    name: 'drop-google-tag',
+    transformIndexHtml(html, ctx) {
+      if (mode !== 'smoke' && !ctx.server) return html
+      const out = html.replace(GOOGLE_TAG, '')
+      if (out === html) throw new Error('drop-google-tag: no Google tag found in index.html; update GOOGLE_TAG in vite.config.ts')
+      return out
+    },
+  }
+}
+
+export default defineConfig(({ mode }) => ({
   define: {
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     __BUILD_COMMIT__: JSON.stringify(shortCommit()),
   },
-  plugins: [vue()],
+  plugins: [vue(), dropGoogleTag(mode)],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -44,4 +64,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

@@ -61,6 +61,8 @@ jobs:
         run: node scripts/check-tracked-files.mjs
       - name: Check no em dash in tracked text
         run: node scripts/check-no-em-dash.mjs
+      - name: Check no Markdown line is over 1500 characters
+        run: node scripts/check-md-line-length.mjs && node --test scripts/test-check-md-line-length.mjs
       - name: Check no quarantined or focused tests added
         run: node scripts/check-no-quarantine.mjs && node --test scripts/test-check-no-quarantine.mjs
         env:
@@ -339,6 +341,15 @@ jobs:
           pattern: smoke-report-shard-*
           path: smoke-report
 
+      # Uploaded before the merge step, so the merge's failed tests and SMOKE line end the job log (a 25-line tail).
+      - name: Upload shard results as one report
+        if: always() && env.RUN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report
+          path: smoke-report
+          if-no-files-found: ignore
+
       # One SMOKE line and one timing table (tests over 30 s flagged as warnings) in the step summary, written before the
       # exit code: red when a test failed, fewer tests were reported than the build job counted, or a test ran twice.
       - name: Merge smoke results
@@ -351,14 +362,6 @@ jobs:
         run: |
           echo "smoke-build: ${{ needs.smoke-build.result }}, smoke-shard: ${{ needs.smoke-shard.result }}"
           exit 1
-
-      - name: Upload merged smoke report
-        if: always() && env.RUN == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-report
-          path: smoke-report
-          if-no-files-found: ignore
 
   # A red full run on main opens a new issue (label needs-triage) with the failing specs, the commit, its PR and the run.
   # Dry run: node scripts/smoke-ci.mjs red-main --dry-run --repo o/r --sha <sha> --run-url <url> <results.jsonl>...
