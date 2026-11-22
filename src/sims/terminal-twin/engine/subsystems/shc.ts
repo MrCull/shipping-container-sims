@@ -24,6 +24,7 @@
  * Modes: real (kinematics), instant (same events, zero durations), off (no
  * jobs; boxes stay on the ground positions).
  */
+import { spreadFactor } from '../rng'
 import type { EngineContext, ReactorMap } from '../context'
 import type { EventOf, ShcPhasePayload } from '../events'
 import { cornerSpeedCap, planSegment, positionAt, travelTime, type AxisProfile, type CornerModel, type MotionSegment } from '../kinematics'
@@ -92,9 +93,7 @@ function scaled(p: AxisProfile, f: number): AxisProfile {
 
 /** Driver-variability factor for one trip (1 ± driverVariabilityPct %). */
 function driverFactor(ctx: EngineContext, shcId: string): number {
-  const pct = ctx.config.driverVariabilityPct ?? 0
-  if (pct === 0) return 1
-  return 1 + ((ctx.random(`shc:${shcId}`) * 2 - 1) * pct) / 100
+  return spreadFactor(ctx, `shc:${shcId}`, ctx.config.driverVariabilityPct ?? 0)
 }
 
 export interface Waypoint {

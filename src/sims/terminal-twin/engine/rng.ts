@@ -62,6 +62,15 @@ export function streamSeedState(seed: number, name: SeededStream): number {
   return seedState((seed ^ salt) >>> 0)
 }
 
+/**
+ * A random duration factor 1 +/- `pct` % from `stream` (uniform). `pct` 0 gives 1 without a draw, so turning the
+ * spread off never moves the stream.
+ */
+export function spreadFactor(source: { random(stream: RngStream): number }, stream: RngStream, pct: number): number {
+  if (pct === 0) return 1
+  return 1 + ((source.random(stream) * 2 - 1) * pct) / 100
+}
+
 /** The reactor streams of one run: the scenario seed and each stream's current state. */
 export interface RngStreams {
   seed: number

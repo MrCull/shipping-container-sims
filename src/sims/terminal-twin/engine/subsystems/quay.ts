@@ -20,6 +20,7 @@
  * → StsLoadPicked (ground position → STS) → hoist up, trolley over the slot, hoist down, unlock
  * → StsLoaded (STS → vessel slot) → hoist up → next box.
  */
+import { spreadFactor } from '../rng'
 import { occupancySlotCleared, occupancySlotFilled } from '../vesselOccupancy'
 import type { EngineContext, ReactorMap } from '../context'
 import { planSegment, type MotionSegment } from '../kinematics'
@@ -50,9 +51,7 @@ const CONTAINER_LENGTH_M = { '20': 6.058, '40': 12.192, '40HC': 12.192 } as cons
 
 /** Random duration factor for one move phase (1 ± moveVariationPct %). */
 export function variation(ctx: EngineContext, stsId: string): number {
-  const pct = ctx.config.moveVariationPct
-  if (pct === 0) return 1
-  return 1 + ((ctx.random(`sts:${stsId}`) * 2 - 1) * pct) / 100
+  return spreadFactor(ctx, `sts:${stsId}`, ctx.config.moveVariationPct)
 }
 
 /** The next lift of a crane: its next box, plus the fore half of the same cell for a twin-20 lift. */
