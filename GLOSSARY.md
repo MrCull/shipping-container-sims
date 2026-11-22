@@ -21,6 +21,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Berth:** a vessel's stretch of the continuous quay, from its stern (`berthX`) to its bow (LOA). Vessels keep a **berth gap** apart.
 - **Anchorage:** where an arrived vessel waits when no berth is free. **Anchorage wait** = berth allocation time − arrival time.
 - **Rail reservation:** the stretch of the STS rail a crane may occupy during its current gantry motion. Neighbouring reservations stay at least the minimum STS spacing apart.
+- **Rail reach:** the gantry X range a crane can ever reach on the shared rail (`railReach`). Cranes never pass, so the crane at rail index i stays at least i x the minimum STS spacing from the quay start and (n-1-i) x it from the end; berth allocation keeps a vessel where its able cranes reach every bay, and `sts.rail-reachable` fails a crane waiting for an X outside it.
 - **Rail yield:** a crane that waits for the rail empty-handed steps aside for a blocked neighbour (it repositions, then resumes its work). When two neighbours ask a crane to step opposite ways, the ask from the lower rail index is served first and the other waits, so a chain of three cranes never waits for ever.
 - **Ground position (STS ground position):** a buffer lane under an STS where discharged boxes are set down and from which load boxes are picked (`<stsId>-GP<n>`).
 - **WTP (waterside transfer point) pad:** a buffer position at the waterside end of a yard block. SHCs drop boxes there, and the ASC picks them up (and the reverse).

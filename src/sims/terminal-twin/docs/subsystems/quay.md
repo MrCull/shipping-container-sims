@@ -57,13 +57,15 @@ ScenarioStarted -> VesselArrived (status at-anchorage, pushed on berth.queue)
   request and reply contracts are the same, so `first-fit` and `best-fit` work as they are. There is no fairness
   guard: a large vessel can be overtaken again and again while smaller ones keep arriving. Berth mode `off`
   (`placeFirstFit`) stays first come, first served. Fixture `berth-overtaking`, `tests/berth-overtaking.test.ts`.
-- **Crane reach window** (#365, `reachWindow` in `berth.ts`): cranes never pass, so the crane at rail index i stands at
-  least `i x stsMinSpacingM` from the quay start (and `(n-1-i) x` that from the far end). The request carries
-  `minBerthX` / `maxBerthX` (only when tighter than the quay) so that the lowest and highest crane able to work the
-  vessel (#303 `stsCanWork`) reach its first and last bay; `first-fit` and `best-fit` keep to them. Without it the TTI
-  peak day berthed a ULCV at 0 m: STS101 to STS103 (out of reach of a ULCV) filled the quay start, STS104 could never
-  reach bay 1 at 65 m, and every V003 crane waited for the rail behind it (idle at 2 of 5 vessels). Berth mode `off`
-  (`placeFirstFit`) ignores the window. Test: `tests/berth-reach.test.ts`.
+- **Crane reach window** (#365, `reachWindow` in `berth.ts`): from each crane's **rail reach** (`railReach` in
+  `rail.ts`, the one rule: cranes never pass, so the crane at rail index i stands at least `i x stsMinSpacingM` from the
+  quay start and `(n-1-i) x` that from the far end). The request carries `minBerthX` / `maxBerthX` (only when tighter
+  than the quay) so that the lowest and highest crane able to work the vessel (#303 `stsCanWork`) reach its first and
+  last bay; `first-fit`, `best-fit` and berth mode `off` (`placeFirstFit`, which uses `first-fit` on the same request)
+  keep to them. Without it the TTI peak day berthed a ULCV at 0 m: STS101 to STS103 (out of reach of a ULCV) filled
+  the quay start, STS104 could never reach bay 1 at 65 m, and every V003 crane waited for the rail behind it (idle at
+  2 of 5 vessels). A vessel whose window holds no stern position on the quay fails the run (`reachWindow` throws when
+  the vessel queues) instead of waiting at the anchorage for ever. Test: `tests/berth-reach.test.ts`.
 - `validateBerth` throws (the run fails) for a berth off the quay or within `berthGapM` of a vessel on the quay
   (mooring, berthed or unmooring). Anchorage wait = allocation minus arrival (`VesselState.anchorageWaitS`).
 - The quay stretch is held from `BerthAllocated` until `VesselDeparted`.

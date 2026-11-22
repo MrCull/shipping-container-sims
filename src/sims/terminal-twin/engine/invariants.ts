@@ -40,7 +40,7 @@ import {
 import { ascPoseAt } from './subsystems/asc'
 import { ascHoistAt } from './subsystems/ascReservations'
 import { blockedByOlderClaim, isRetrievable, isTruckJob } from './subsystems/ascStorage'
-import { gantryPositionAt, railOrder, railReach } from './subsystems/rail'
+import { gantryPositionAt, inRailReach, railOrder, railReach } from './subsystems/rail'
 import { shcPositionAt } from './subsystems/shc'
 import { truckPositionAt, truckReadyForPick } from './subsystems/landside'
 import { ASC_MIN_SEPARATION_M, blockSpecs, REEFER_MAX_TIERS, travelHoistM } from './yardLayout'
@@ -863,21 +863,21 @@ export const INVARIANTS: Invariant[] = [
     id: 'sts.rail-reachable',
     reads: ['time'],
     description:
-      'A crane waiting for the rail wants a gantry X it can ever reach: cranes never pass, so the crane at rail index i ' +
-      'stays at least i x stsMinSpacingM from the quay start and (n-1-i) x stsMinSpacingM from its end (#365: otherwise ' +
-      'the crane and every neighbour behind it wait forever and the run goes idle with open work).',
+      'A crane waiting for the rail wants a gantry X its rail index can ever reach (`railReach`: cranes never pass; #365: ' +
+      'otherwise the crane and every neighbour behind it wait forever and the run goes idle with open work).',
     check(state, config) {
-      const messages: string[] = []
-      const eps = 1e-6
-      for (const s of railOrder(state)) {
+      // Runs after every event: nothing is allocated unless a crane waits for the rail.
+      let messages: string[] | undefined
+      for (const id in state.sts) {
+        const s = state.sts[id]
         if (s.status !== 'waiting-for-rail' || s.railTargetX === null) continue
-        const { lo, hi } = railReach(state, config, s)
-        if (s.railTargetX < lo - eps || s.railTargetX > hi + eps)
-          messages.push(
-            `${s.id} waits for the rail to reach ${s.railTargetX.toFixed(2)} m, outside the ${lo.toFixed(2)}–${hi.toFixed(2)} m its rail index leaves it${s.vesselId ? ` (vessel ${s.vesselId})` : ''}`,
-          )
+        const reach = railReach(config, s.railIndex)
+        if (inRailReach(reach, s.railTargetX)) continue
+        ;(messages ??= []).push(
+          `${s.id} waits for the rail to reach ${s.railTargetX.toFixed(2)} m, outside the ${reach.lo.toFixed(2)}–${reach.hi.toFixed(2)} m its rail index leaves it${s.vesselId ? ` (vessel ${s.vesselId})` : ''}`,
+        )
       }
-      return messages
+      return messages ?? []
     },
   },
   {
