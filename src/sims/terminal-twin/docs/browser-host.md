@@ -384,6 +384,9 @@ refresh, engine time, not display time); model: `modules/cranePlanView.ts` (test
 - 3D: `SceneRenderer.setColourBy(mode, robDisplay)` every frame (idempotent). Static modes are computed once per mode
   switch; time-based ones per box per `COLOUR_BUCKET_S` 30 sim seconds within `COLOUR_BUDGET_PER_FRAME` 4,000 boxes.
   A tinted box uses the generic livery tile with an instance colour; `sceneState().liveries[id].tint` (-1 = livery).
+  Coupled to the liveries: `line` mode takes each line's body colour from `livery-atlas.json`, and every tint is an
+  instance colour divided by the generic tile body, so a livery palette change also moves Colour by line, dwell and flow
+  (and `tests/drawn-boxes.reference.json`). A spec that keeps the Colour by palettes fixed must decouple them first.
   ROB boxes: `modules/robBoxes.ts` (one InstancedMesh per vessel). Rendering detail: [rendering-3d.md](rendering-3d.md).
 - Limit: 3D colour properties are those at planning time (a later-allocated empty keeps its storage direction in 3D,
   while the bay viewer uses live engine state); a trucked-in box is coloured from its scene entry on.

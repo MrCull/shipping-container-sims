@@ -27,14 +27,15 @@ done
 branch="${1:?usage: scripts/merge-ticket.sh <ticket-branch>}"
 
 # The ticket's row in handover.md (its "| #<N> |" line) gets "merged in branch (<sha>)" as its Status and an empty
-# Claimed by cell; every other byte of the file is kept. The change is committed on its own. A missing row or file
-# is a warning, not a failure: the merge itself is green.
+# Claimed by cell; every other byte of the file is kept. The change is committed on its own. A missing row is a
+# warning, not a failure: the merge itself is green. No handover.md at all is silent.
 mark_handover() { # mark_handover <ticket-branch> <merge-sha>
   local n file=handover.md
   if [[ "$1" =~ ^tt/([0-9]+)- ]]; then n="${BASH_REMATCH[1]}"; else
     echo "handover: $1 is not tt/<N>-<slug>; handover.md not updated" >&2; return 0
   fi
-  if [ ! -f "$file" ] || ! awk -F'|' -v n="#$n" '$2 ~ "^ *" n " *$" {found = 1} END {exit !found}' "$file"; then
+  [ -f "$file" ] || return 0 # a run that fits in one session has no handover.md: nothing to mark, nothing to warn
+  if ! awk -F'|' -v n="#$n" '$2 ~ "^ *" n " *$" {found = 1} END {exit !found}' "$file"; then
     echo "handover: no row for #$n in $file; handover.md not updated, set the row by hand" >&2
     return 0
   fi
