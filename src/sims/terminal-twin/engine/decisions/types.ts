@@ -590,6 +590,12 @@ export interface DecisionPointConfig {
   timeoutMs?: number
   /** Latency injector (default: none). */
   latency?: LatencySpec
+  /**
+   * Tuning parameters of the selected strategy (#312), by name: each built-in strategy declares its own
+   * (`strategies.<dp>.strategies.<name>.params`, with default, unit and range). An unknown name or an out-of-range
+   * value throws at createSimulation. Unset names keep their defaults, so no params means today's behaviour.
+   */
+  params?: Record<string, number>
 }
 
 export interface DecisionsConfig {

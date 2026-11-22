@@ -48,7 +48,7 @@ Scenario source (exactly one):
 - `--preset <name>`: a key of `scenario/presets.ts#presets` (quote names with spaces: `--preset "TTI Algeciras, peak day"`).
 - `--from-snapshot <file>`: resume a snapshot written by `--snapshot` (read with `readJsonFile`, restored with
   `adopt: true`). It takes scenario, seed, decisions, end conditions, subsystems, ordering and match-line from the
-  snapshot: combining it with `--fixture/--preset/--seed/--async-mode/--strategy/--latency/--end/--match-line/
+  snapshot: combining it with `--fixture/--preset/--seed/--async-mode/--strategy/--param/--latency/--end/--match-line/
   --subsystem/--ordering` is a usage error. `--events` and `--log` then hold only the window's events.
 
 | Flag | Values | Effect |
@@ -59,6 +59,7 @@ Scenario source (exactly one):
 | `--handlers <name>` | `default`, `highest-free-lane`, `nearest-job`, `broken-first-lane` | handler set (`cli/handlerSets.ts`) |
 | `--async-mode <m>` | `keep-running` (default), `pause` | decision async mode |
 | `--strategy <dp>=<name>` | repeatable | built-in strategy per decision point (validated with `getStrategy`) |
+| `--param <dp>.<name>=<value>` | repeatable | strategy parameter (#312) of the point's selected strategy (after `--strategy`, else the scenario's, else the default), merged into `points.<dp>.params`; an unknown name, a name of another strategy, a non-number or an out-of-range value is a usage error (exit 2). Names, defaults and ranges: [decision-points.md](decision-points.md#strategy-parameters). Example: `pnpm run tt:run --fixture asc-1sts-10-boxes-1block --strategy yardAllocation=nearest-wtp --param yardAllocation.TIER_COST_M=20` |
 | `--latency <dp>=<spec>` | repeatable | `none`, `fixed:<ms>`, `uniform:<min>-<max>`, `exp:<mean>`, then `,timeout:<pct>`, `,error:<pct>`, `,timeoutMs:<ms>` |
 | `--match-line` | flag | `emptyAllocation.matchLine = true` |
 | `--subsystem <name>=<mode>` | repeatable; quay, berth, yard, shc, asc, landside = real, instant, off | merged over `config.subsystems`; impossible combinations exit 2 |

@@ -579,7 +579,8 @@ export function maybePredispatch(ctx: EngineContext): void {
   if (!isPredispatch(ctx) || state.subsystems.shc === 'off') return
   const graph = laneGraphOf(ctx.config)
   if (graph.queueAreas.length === 0) return
-  const margin = ctx.config.queueAreas?.predispatchMarginS ?? DEFAULT_PREDISPATCH_MARGIN_S
+  const margin =
+    ctx.config.decisions?.points?.shcDispatch?.params?.predispatchMarginS ?? ctx.config.queueAreas?.predispatchMarginS ?? DEFAULT_PREDISPATCH_MARGIN_S
   const empty = kinematics(ctx).driveEmpty
   const { deficits, spare } = predictionDeficits(ctx)
   for (const { pred, area } of deficits) {

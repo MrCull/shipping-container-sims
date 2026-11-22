@@ -95,6 +95,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Decision point:** a place where the sim asks the TOS for a decision (berth allocation, crane split, yard allocation, ground-position selection, dispatch, …).
 - **Handler:** a function that answers a decision point. Handlers are swappable, and a **handler set** maps decision points to handlers.
 - **Strategy (built-in strategy):** a named built-in handler for a decision point (1–3 each, e.g. `lowest-free-lane`), selected per scenario.
+- **Strategy parameter (param):** a named numeric tuning constant of a built-in strategy (e.g. `TIER_COST_M` of `nearest-wtp`), declared with default, unit, description and range, set per decision point with `config.decisions.points.<dp>.params` or `tt:run --param <dp>.<name>=<value>`. Unset params keep their defaults (today's constants), so a run without params is unchanged.
 - **Correlation id:** the id that ties a decision's request, failure and reply events together (`<decisionPoint>-<n>`).
 - **Async mode:** what the sim does while a decision is pending: **keep running** (equipment waiting on it idles) or **pause** (the sim clock freezes).
 - **Latency injector:** a per-decision-point wrapper that delays replies (none / fixed / random ms) and injects a % of timeouts or errors.
