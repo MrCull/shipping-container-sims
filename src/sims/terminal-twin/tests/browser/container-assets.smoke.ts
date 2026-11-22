@@ -12,7 +12,6 @@ import atlas from '../../assets/models/containers/livery-atlas.json' with { type
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
 import { openTwin, twinUrl } from './openTwin'
-import { isLeasingTile, liveryIndexForBox } from '../../modules/boxLivery'
 
 /** Asset or decoder files (GLB/glTF, textures, wasm/JS decoders): these must never come from another host. */
 const ASSET_REQUEST = /\.(glb|gltf|bin|webp|png|ktx2|basis|wasm|drc)(\?|$)|draco|meshopt|basis_transcoder/i
@@ -33,22 +32,23 @@ function watch(page: Page): { errors: string[]; external: string[] } {
   return { errors, external }
 }
 
-test('the twin loads the container GLBs offline and draws each box in its line livery', { tag: '@yard' }, async ({ page }) => {
+test('the twin loads the container GLBs offline and draws every worker box with an atlas livery', { tag: '@yard' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await openTwin(page, { scenario: 'liveries-mixed', quality: 'high' }) // High draws LOD0 out to the screenshot distance
   await page.evaluate(() => window.__tt!.runTo(200))
   await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 
-  // the worker's boxes reach the drawn liveries (livery per line, size and LOD by distance: headless-scene-yard.test.ts, #336)
-  const boxes = await page.evaluate(() => window.__tt!.query<{ id: string; line: string }[]>('containers'))
+  // wiring only: every worker box reaches the drawn liveries as an atlas tile, untinted in the default mode (which tile a
+  // box gets, line or #360 leasing variant, and size and LOD by distance: headless-scene-yard.test.ts, #336)
+  const boxes = await page.evaluate(() => window.__tt!.query<{ id: string }[]>('containers'))
   const state = await page.evaluate(() => window.__tt!.sceneState())
   expect(boxes.length).toBeGreaterThan(0)
-  // default mode: each box in its line tile or a #360 leasing variant picked from its id
   for (const box of boxes) {
-    const index = state!.liveries[box.id].index
-    expect(index, box.id).toBe(liveryIndexForBox(box.id, box.line))
-    if (!isLeasingTile(index)) expect(atlas.liveries[index].line, box.id).toBe(box.line)
+    const livery = state!.liveries[box.id]
+    expect(livery, box.id).toBeDefined()
+    expect(Number.isInteger(livery.index) && livery.index >= 0 && livery.index < atlas.liveries.length, `${box.id} tile ${livery.index}`).toBe(true)
+    expect(livery.tint, box.id).toBe(-1)
   }
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 140))
   await page.waitForTimeout(400)

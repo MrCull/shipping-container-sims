@@ -17,7 +17,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { ContainerSize } from '../scenario/types'
 import atlas from '../assets/models/containers/livery-atlas.json'
 import { patchContactShadow } from './contactShadow'
-import { TONE_BRIGHTNESS_RANGE, TONE_LEVELS, TONE_SATURATION_RANGE } from './boxLivery'
+import { TONE_BRIGHTNESS_RANGE, TONE_HALF, TONE_RADIX, TONE_SATURATION_RANGE, TONE_SCALE, TONE_ZERO } from './boxLivery'
 
 export const CONTAINER_ASSET_URLS: Record<ContainerSize, string> = {
   '20': new URL('../assets/models/containers/container-20.glb', import.meta.url).href,
@@ -26,10 +26,6 @@ export const CONTAINER_ASSET_URLS: Record<ContainerSize, string> = {
 }
 
 export const LIVERY_ATLAS = atlas
-
-export { liveryIndexForBox, liveryIndexForLine } from './boxLivery'
-
-const TONE_HALF = (TONE_LEVELS - 1) / 2
 
 /** Body colour of a livery (for the procedural placeholders before the GLBs load). */
 export function liveryBodyColour(index: number): string {
@@ -145,8 +141,8 @@ export function liveryMaterial<T extends THREE.MeshStandardMaterial>(
         '#include <uv_vertex>',
         `#include <uv_vertex>
   // fractional part: the packed per-box tone (#361, boxLivery#toneFraction), 0 = none
-  float liveryCode = floor( fract( liveryIndex ) * 256.0 + 0.5 );
-  vLiveryTone = liveryCode < 0.5 ? vec2( 0.0 ) : ( vec2( floor( liveryCode / 16.0 ), mod( liveryCode, 16.0 ) ) - 8.0 ) * liveryToneStep;
+  float liveryCode = floor( fract( liveryIndex ) * ${TONE_SCALE.toFixed(1)} + 0.5 );
+  vLiveryTone = liveryCode < 0.5 ? vec2( 0.0 ) : ( vec2( floor( liveryCode / ${TONE_RADIX.toFixed(1)} ), mod( liveryCode, ${TONE_RADIX.toFixed(1)} ) ) - ${TONE_ZERO.toFixed(1)} ) * liveryToneStep;
 #ifdef USE_MAP
   float liveryI = floor( liveryIndex ) + liveryBase;
   vMapUv += vec2(mod(liveryI, liveryCols), floor(liveryI / liveryCols)) * liveryTile;

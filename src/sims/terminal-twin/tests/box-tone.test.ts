@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { TONE_BRIGHTNESS_RANGE, TONE_LEVELS, TONE_SATURATION_RANGE, boxTone, tonedColour, toneFraction } from '../modules/boxLivery'
 import atlas from '../assets/models/containers/livery-atlas.json'
+import { ContainerInstancer } from '../modules/containerInstancer'
 
 const ids = Array.from({ length: 5000 }, (_, i) => `TGHU${String(i).padStart(6, '0')}${i % 10}`)
 
@@ -40,6 +41,11 @@ describe('box tone (#361)', () => {
     const shifted = ids.map((_, i) => i).filter((i) => b[i] !== 0 && s[i] !== 0)
     const sameSign = shifted.filter((i) => Math.sign(b[i]) === Math.sign(s[i])).length / shifted.length
     expect(Math.abs(sameSign - 0.5)).toBeLessThan(0.05)
+  })
+
+  it('fits every tone step in one packed digit (codes 1 to 15, 0 reserved for no tone)', () => {
+    expect(TONE_LEVELS).toBeLessThanOrEqual(15)
+    expect(TONE_LEVELS % 2).toBe(1)
   })
 
   it('packs into the fraction of the livery index: no tone is 0, every tone a distinct fraction that keeps the tile', () => {
@@ -79,5 +85,24 @@ describe('box tone (#361)', () => {
   it('leaves a colour as it is with no tone or a zero tone (colour by tints)', () => {
     expect(tonedColour('#8a3b2a', null)).toBe('#8a3b2a')
     expect(tonedColour('#8a3b2a', { brightness: 0, saturation: 0 })).toBe('#8a3b2a')
+  })
+
+  // a placeholder box (before the GLBs load) must take the tone the GLB box will get, or it jumps in tone when they load
+  it('tones the placeholder box drawn before the GLBs load; a colour-by tint stays flat', () => {
+    const tone = boxTone('TGHU0000123')
+    expect(tone.brightness !== 0 || tone.saturation !== 0).toBe(true)
+    const inst = new ContainerInstancer({ '40': 3 })
+    inst.setDrawnRecording(true)
+    inst.begin()
+    inst.push(0, '40', 0, 1.3, 0, 2, 0, -1, false, tone)
+    inst.push(1, '40', 13, 1.3, 0, 2)
+    inst.push(2, '40', 26, 1.3, 0, 2, 0, 0x4c9be8, false, null)
+    inst.end(new THREE.Vector3(0, 1.3, 20))
+    const colour = (key: number) => inst.drawnBoxes().find((b) => b.key === key)!.colour
+    const body = atlas.liveries[2].body
+    expect(colour(0)).toBe(new THREE.Color(tonedColour(body, tone)).getHex())
+    expect(colour(0)).not.toBe(new THREE.Color(body).getHex())
+    expect(colour(1)).toBe(new THREE.Color(body).getHex())
+    expect(colour(2)).toBe(0x4c9be8)
   })
 })

@@ -111,7 +111,7 @@ export const LINE_PALETTE: Readonly<Record<string, string>> = {
   'Yang Ming': '#f2c318',
 }
 const LINES = Object.keys(LINE_PALETTE)
-const lineBody = (line: string): string | null => (Object.hasOwn(LINE_PALETTE, line) ? LINE_PALETTE[line] : null)
+const lineBody = (line: string): string | null => (Object.prototype.hasOwnProperty.call(LINE_PALETTE, line) ? LINE_PALETTE[line] : null)
 
 const H = 3600
 const D = 86400

@@ -34,6 +34,9 @@ interface Sidecar extends RigMeta {
   lods?: Record<string, { maxDistanceM?: number }>
 }
 
+/** Every livery tile but the generic fallback (line and #360 leasing tiles), for the yard stress view. */
+const YARD_TILES = LIVERY_ATLAS.liveries.map((l) => l.index).filter((i) => i !== LIVERY_ATLAS.genericIndex)
+
 /** ISO 1161 casting centre spacing (m) by box size (length between the castings; width is 2.259 m). */
 const CASTING_SPACING_M: Record<string, number> = { '20': 5.853, '40': 11.985, '40HC': 11.985 }
 const CASTING_WIDTH_M = 2.259
@@ -624,7 +627,7 @@ export class AssetViewerScene {
         x: bay * 12.8 - (bays * 12.8) / 2,
         y: tier * 2.9 + d.height / 2,
         z: (block - blocks / 2) * 34.4 + row * 2.75,
-        livery: (i * 7 + block * 3) % (LIVERY_ATLAS.liveries.length - 1),
+        livery: YARD_TILES[(i * 7 + block * 3) % YARD_TILES.length],
       })
     }
     const capacity: Partial<Record<ContainerSize, number>> = {}

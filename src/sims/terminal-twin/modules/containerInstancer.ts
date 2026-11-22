@@ -22,7 +22,7 @@
 import * as THREE from 'three'
 import type { ContainerSize } from '../scenario/types'
 import { liveryBodyColour, LIVERY_ATLAS, type ContainerAssets } from './containerAssets'
-import { toneFraction, type BoxTone } from './boxLivery'
+import { tonedColour, toneFraction, type BoxTone } from './boxLivery'
 import { CONTAINER_DIMS } from './sceneModel'
 import { patchContactShadow } from './contactShadow'
 import { ContainerCloseups, type CloseupSource } from './containerCloseups'
@@ -417,7 +417,7 @@ export class ContainerInstancer {
         layer.livery.setX(slot, this.liveries[i] + toneFraction(this.tones[i])) // tile + packed tone (#361); colour by above keeps its flat tint
         layer.mesh.setColorAt(slot, this.colour.setRGB(1, 1, 1))
       }
-    } else layer.mesh.setColorAt(slot, tint >= 0 ? this.colour.setHex(tint) : this.colour.set(liveryBodyColour(this.liveries[i])))
+    } else layer.mesh.setColorAt(slot, tint >= 0 ? this.colour.setHex(tint) : this.colour.set(tonedColour(liveryBodyColour(this.liveries[i]), this.tones[i]))) // placeholder: the same tone as the GLB box (#361)
   }
 
   /**

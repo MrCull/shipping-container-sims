@@ -101,9 +101,12 @@ history behind the display time (display time never goes back). Ingest details: 
   `tests/box-livery.test.ts`.
 - **Per-box tone (#361):** in the default colour mode each box gets a small, stable brightness (within 12 %) and
   saturation (within 15 %) shift, `boxTone(id)` in `modules/boxLivery.ts` (hashes the id, 15 steps each). It rides in the
-  fractional part of `liveryIndex` (`toneFraction`: `(b * 16 + s) / 256`, 0 = no tone), so it adds no attribute, no byte
-  and no draw call; the livery shader floors the index for the tile and decodes the tone after `color_fragment`. A tinted
-  box writes no tone; a mesh without the attribute (vessel hulls) reads 0. The drawn-box record floors the index.
+  fractional part of `liveryIndex` (`toneFraction`: `(b * TONE_RADIX + s) / TONE_SCALE`, 16 and 256, 0 = no tone; the
+  shader string is built from the same exported constants, and `TONE_LEVELS` must stay at most 15), so it adds no
+  attribute, no byte and no draw call; the livery shader floors the index for the tile and decodes the tone after
+  `color_fragment`. A tinted box writes no tone; a mesh without the attribute (vessel hulls) reads 0. The drawn-box
+  record floors the index. The placeholder boxes drawn before the GLBs load take the same tone (`tonedColour`), so a box
+  does not change tone when they load.
   The close-up and hero faces drawn over a near box get the same tone (#362): the markings source hands them
   `tonedColour(body, tone)`, the same maths in linear space on the CPU, so a box keeps its colour as it changes level of
   detail, with no extra draw call. Tests: `tests/box-tone.test.ts`.

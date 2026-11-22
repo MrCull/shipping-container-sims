@@ -4,7 +4,7 @@
  * boxes. Render-only: the engine line (`ContainerState.line`) is untouched, and Colour by line and the other colour-by
  * modes keep using it. The choice hashes the box id only, so a box looks the same every frame and every reload.
  */
-import atlas from '../assets/models/containers/livery-atlas.json' with { type: 'json' } // the attribute lets Playwright's Node import it
+import atlas from '../assets/models/containers/livery-atlas.json'
 import { boxUnit } from './boxHash'
 
 /** Share of boxes with a known line drawn as a leasing variant. */
@@ -50,27 +50,36 @@ export interface BoxTone {
   saturation: number
 }
 
-const HALF = (TONE_LEVELS - 1) / 2
-const step = (u: number) => Math.min(TONE_LEVELS - 1, Math.floor(u * TONE_LEVELS)) - HALF // -HALF..HALF
+/** Steps either side of no shift. */
+export const TONE_HALF = (TONE_LEVELS - 1) / 2
+/**
+ * Tone packing (#361), shared by `toneFraction` and the livery shader (`containerAssets#liveryMaterial`): each tone part
+ * is stored as a code 1 to TONE_LEVELS (TONE_ZERO = no shift; 0 is kept for "no tone"), in base TONE_RADIX, so
+ * TONE_LEVELS must stay below TONE_RADIX. The pair is the fraction `(b * TONE_RADIX + s) / TONE_SCALE`.
+ */
+export const TONE_RADIX = 16
+export const TONE_SCALE = TONE_RADIX * TONE_RADIX
+export const TONE_ZERO = TONE_HALF + 1
+const step = (u: number) => Math.min(TONE_LEVELS - 1, Math.floor(u * TONE_LEVELS)) - TONE_HALF // -TONE_HALF..TONE_HALF
 
 /** Small, stable tone shift of box `id` in the default colour mode (slightly faded or dirty), a pure function of the id, in TONE_LEVELS steps. */
 export function boxTone(id: string): BoxTone {
   return {
-    brightness: (step(boxUnit(id, 'tone-brightness')) / HALF) * TONE_BRIGHTNESS_RANGE,
-    saturation: (step(boxUnit(id, 'tone-saturation')) / HALF) * TONE_SATURATION_RANGE,
+    brightness: (step(boxUnit(id, 'tone-brightness')) / TONE_HALF) * TONE_BRIGHTNESS_RANGE,
+    saturation: (step(boxUnit(id, 'tone-saturation')) / TONE_HALF) * TONE_SATURATION_RANGE,
   }
 }
 
 /**
  * The tone packed into the fractional part of the `liveryIndex` instance attribute (#361), so it costs no extra
- * per-instance data: `(b * 16 + s) / 256` with each step stored as 1 to 15 (8 = no shift), and 0 meaning no tone
- * (a tinted box, a plain mesh). `containerAssets#liveryMaterial` decodes it.
+ * per-instance data: `(b * TONE_RADIX + s) / TONE_SCALE` with each step stored as 1 to TONE_LEVELS (TONE_ZERO = no
+ * shift), and 0 meaning no tone (a tinted box, a plain mesh). `containerAssets#liveryMaterial` decodes it.
  */
 export function toneFraction(tone: BoxTone | null): number {
   if (!tone) return 0
-  const b = Math.round((tone.brightness / TONE_BRIGHTNESS_RANGE) * HALF) + 8
-  const s = Math.round((tone.saturation / TONE_SATURATION_RANGE) * HALF) + 8
-  return (b * 16 + s) / 256
+  const b = Math.round((tone.brightness / TONE_BRIGHTNESS_RANGE) * TONE_HALF) + TONE_ZERO
+  const s = Math.round((tone.saturation / TONE_SATURATION_RANGE) * TONE_HALF) + TONE_ZERO
+  return (b * TONE_RADIX + s) / TONE_SCALE
 }
 
 const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
