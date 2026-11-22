@@ -1,6 +1,6 @@
 # Overview: what the Terminal Twin models
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.59.0.
 
 Read this when you are new to the Terminal Twin and need the big picture before touching code: what is simulated,
 at what fidelity, which real terminal it is modelled on, where it deliberately differs from reality and what it does
@@ -93,7 +93,7 @@ work packages per crane (deck discharge, hatch removal, hold discharge, hold loa
   6.9 m/s loaded, corner cap from `DEFAULT_SHC_CORNER` (12 m radius, 1.5 m/s2, about 4.2 m/s); `DEFAULT_ASC_KINEMATICS`
   gantry 4 m/s, trolley 1 m/s, hoist 0.5 m/s loaded / 1 m/s empty, lock and unlock 2 s; trucks 8 m/s.
 - **Variability** is opt-in: `ScenarioConfig.moveVariationPct` (STS phases, `engine/subsystems/quay.ts#variation`)
-  and `driverVariabilityPct` (SHC trips). Both draw from the seeded engine RNG.
+  and `driverVariabilityPct` (SHC trips). Each STS and each SHC draws from its own seeded RNG stream (`sts:<id>`, `shc:<id>`, engine-core.md **RNG**).
 - **Subsystem modes** (`ScenarioConfig.subsystems`, `engine/state.ts#resolveSubsystemModes`): `real`, `instant`
   (same events, zero durations) or `off`, per `quay`, `berth`, `yard`, `shc`, `asc`, `landside`. Each defaults to
   `real` when its equipment exists; `yard` caps `asc` and `landside`.

@@ -90,10 +90,10 @@ function scaled(p: AxisProfile, f: number): AxisProfile {
 }
 
 /** Driver-variability factor for one trip (1 ± driverVariabilityPct %). */
-function driverFactor(ctx: EngineContext): number {
+function driverFactor(ctx: EngineContext, shcId: string): number {
   const pct = ctx.config.driverVariabilityPct ?? 0
   if (pct === 0) return 1
-  return 1 + ((ctx.random() * 2 - 1) * pct) / 100
+  return 1 + ((ctx.random(`shc:${shcId}`) * 2 - 1) * pct) / 100
 }
 
 export interface Waypoint {
@@ -393,7 +393,7 @@ function goPark(ctx: EngineContext, shc: ShcState): void {
   const k = kinematics(ctx)
   const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant, cornerOf(ctx))
   const path = route(graph, shc.nodeId, target)
-  trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx)))
+  trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx, shc.id)))
   trip.mark('ShcParked')
   const windows = trip.windows()
   const start = earliestStart(ctx.state, windows, ctx.state.now)
@@ -507,7 +507,7 @@ function goQueue(ctx: EngineContext, shc: ShcState, spot: string, predicted?: Sh
   const k = kinematics(ctx)
   const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant, cornerOf(ctx))
   const path = route(graph, shc.nodeId, spot)
-  trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx)))
+  trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx, shc.id)))
   trip.mark('ShcQueued')
   const windows = trip.windows()
   const start = earliestStart(ctx.state, windows, ctx.state.now)
@@ -822,7 +822,7 @@ function assignJob(ctx: EngineContext, shc: ShcState, jobId: string, padId: stri
   shc.jobId = job.id
 
   const k = kinematics(ctx)
-  const f = driverFactor(ctx)
+  const f = driverFactor(ctx, shc.id)
   const empty = scaled(k.driveEmpty, f)
   const loaded = scaled(k.driveLoaded, f)
   const instant = state.subsystems.shc === 'instant'
@@ -934,7 +934,7 @@ function assignQueuedJob(ctx: EngineContext, shc: ShcState, job: ShcJob, spot: s
   job.shcId = shc.id
   shc.jobId = job.id
   const k = kinematics(ctx)
-  const f = driverFactor(ctx)
+  const f = driverFactor(ctx, shc.id)
   const empty = scaled(k.driveEmpty, f)
   const loaded = scaled(k.driveLoaded, f)
   const instant = state.subsystems.shc === 'instant'
@@ -973,7 +973,7 @@ function resumeFromQueue(ctx: EngineContext, shc: ShcState, job: ShcJob, padId: 
   pad.claimedBy = shc.id
   releaseQueue(state, shc.id)
   const k = kinematics(ctx)
-  const f = driverFactor(ctx)
+  const f = driverFactor(ctx, shc.id)
   const empty = scaled(k.driveEmpty, f)
   const loaded = scaled(k.driveLoaded, f)
   const instant = state.subsystems.shc === 'instant'
@@ -1007,7 +1007,7 @@ function assignLoadJob(ctx: EngineContext, shc: ShcState, job: ShcJob): void {
   shc.jobId = job.id
   releaseQueue(state, shc.id)
   const k = kinematics(ctx)
-  const f = driverFactor(ctx)
+  const f = driverFactor(ctx, shc.id)
   const empty = scaled(k.driveEmpty, f)
   const loaded = scaled(k.driveLoaded, f)
   const instant = state.subsystems.shc === 'instant'

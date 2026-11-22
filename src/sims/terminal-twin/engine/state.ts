@@ -13,7 +13,7 @@ import { createHatchPanels, hatchEnabled, hatchLaydownProblems } from './hatch'
 import { laneGraphOf, validateLaneLayout } from './laneGraph'
 import { hasLandside, landsideGraphOf } from './landsideGraph'
 import type { Reservation } from './reservations'
-import { nextRandom, seedState } from './rng'
+import { nextRandom, streamSeedState, type RngStreams } from './rng'
 import { ascStartZ, blockSpecs, PARK_UNTIL_S, railSegmentIds, travelHoistM } from './yardLayout'
 import { planCargo, POOL_VESSEL_ID, type SlotPurpose } from '../scenario/bayPlan'
 import type { RobBox } from '../scenario/robBays'
@@ -968,7 +968,8 @@ export interface SimState {
   now: number
   nextEventId: number
   nextSeq: number
-  rngState: number
+  /** The reactor RNG streams (`engine/rng.ts`): one per STS, one per SHC, decision requests, the rest. */
+  rng: RngStreams
   /** Seed of the container-property streams (spec #106); they are keyed by it and the container id. */
   propsSeed: number
   logHash: HashState
@@ -1139,7 +1140,7 @@ function initLandside(state: SimState, config: ScenarioConfig, seed: number): vo
   const graph = landsideGraphOf(config)
   const landside = config.landside as NonNullable<ScenarioConfig['landside']>
   const ls: LandsideState = {
-    rngState: seedState((seed ^ 0x5bd1e995) >>> 0),
+    rngState: streamSeedState(seed, 'landside'),
     nextTruck: 0,
     nextBox: 0,
     nextScripted: 0,
@@ -1211,7 +1212,7 @@ export function createInitialState(
     now: 0,
     nextEventId: 0,
     nextSeq: 0,
-    rngState: seedState(seed),
+    rng: { seed: seed >>> 0, streams: {} },
     propsSeed: seed,
     logHash: [...HASH_SEED],
     queue: [],

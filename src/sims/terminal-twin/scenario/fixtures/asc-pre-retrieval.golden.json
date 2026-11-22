@@ -3,7 +3,7 @@
   "seed": 8,
   "status": "ended",
   "endReason": "simDurationS >= 6500",
-  "eventLogHash": "1c2f47910e3f9c",
+  "eventLogHash": "172af7b2fd7f2d",
   "kpis": {
     "simTimeS": 6500,
     "eventsProcessed": 504,
@@ -14,7 +14,7 @@
         "moves": 8,
         "cycles": 6,
         "twinLifts": 2,
-        "grossMovesPerHour": 31.743,
+        "grossMovesPerHour": 31.38,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 1047.414,
-        "turnaroundS": 987.414,
+        "departedAtS": 1058.388,
+        "turnaroundS": 998.388,
         "sts": [
           "STS01"
         ]
@@ -261,13 +261,13 @@
           "loadedDistanceM": 880,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 5864.017,
-            "moving-to-collect": 125.402,
+            "parked": 5864.171,
+            "moving-to-collect": 122.186,
             "queuing-to-collect": 0,
-            "collecting": 218.638,
+            "collecting": 219.944,
             "moving-to-deliver": 21,
             "queuing-to-deliver": 0,
-            "delivering": 270.944
+            "delivering": 272.7
           },
           "handovers": 12,
           "parkingReturns": 6,
@@ -277,15 +277,15 @@
           "jobs": 2,
           "emptyDistanceM": 561,
           "loadedDistanceM": 267,
-          "reservationWaitS": 3.906,
+          "reservationWaitS": 3.212,
           "stateS": {
-            "parked": 6293.615,
-            "moving-to-collect": 43.41,
-            "queuing-to-collect": 3.906,
-            "collecting": 69.891,
+            "parked": 6284.761,
+            "moving-to-collect": 44.071,
+            "queuing-to-collect": 3.212,
+            "collecting": 73.998,
             "moving-to-deliver": 7,
             "queuing-to-deliver": 0,
-            "delivering": 82.177
+            "delivering": 86.959
           },
           "handovers": 4,
           "parkingReturns": 2,
@@ -413,22 +413,22 @@
       "IMPORT": {
         "count": 6,
         "departed": 6,
-        "meanS": 3278.073,
-        "maxS": 3628.303
+        "meanS": 3267.759,
+        "maxS": 3624.48
       },
       "STORAGE": {
         "count": 2,
         "departed": 0,
-        "meanS": 5931.88,
-        "maxS": 6232.359
+        "meanS": 5919.572,
+        "maxS": 6228.536
       }
     },
     "workPackages": {
       "released": 6,
       "started": 6,
       "completed": 6,
-      "leadTimeMeanS": 235.619,
-      "leadTimeMaxS": 336.3,
+      "leadTimeMeanS": 240.695,
+      "leadTimeMaxS": 345.711,
       "boxesLoaded": 0
     },
     "ordering": {

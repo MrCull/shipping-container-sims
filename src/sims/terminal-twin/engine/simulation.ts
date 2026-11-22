@@ -18,7 +18,7 @@ import { createPrefillDriver } from './subsystems/prefill'
 import { createEventLogger, type LogOptions } from './logging'
 import { createQuery, type SimQuery } from './query'
 import { planAccuracy, readCranePlan, type CranePlanView, type PlanAccuracy } from './cranePlan/plan'
-import { nextRandom } from './rng'
+import { drawFrom } from './rng'
 import { createInitialState, resolveSubsystemModes, type CustodyRef, type SimState } from './state'
 import { ascReactors } from './subsystems/asc'
 import { berthReactors } from './subsystems/berth'
@@ -36,7 +36,7 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.58.0'
+export const ENGINE_VERSION = '0.59.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
@@ -384,11 +384,7 @@ export function createSimulation(
         return ev
       },
       requestDecision: (dp, request, subjects, opts) => decisions.request(ctx, dp, request, subjects, opts),
-      random: () => {
-        const [value, next] = nextRandom(state.rngState)
-        state.rngState = next
-        return value
-      },
+      random: (stream) => drawFrom(state.rng, stream),
       transferCustody: (containerId: string, to: CustodyRef) => {
         const box = state.containers[containerId]
         if (!box) throw new Error(`transferCustody: unknown container ${containerId}`)

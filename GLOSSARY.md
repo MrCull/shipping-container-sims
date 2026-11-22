@@ -164,6 +164,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Cost guard (experiment):** `tt:experiment` estimates its wall time before running (replicates x sim-hours x ms per sim-hour / jobs) and, above 10 minutes, asks on a TTY or refuses (exit 2) without `--yes`.
 - **Guard KPI:** a KPI an experiment config must not make worse than a tolerance (absolute, or percent of the baseline mean). Its status is held, breached, uncertain or insufficient data, from the 95% CI of the per-seed degradation.
 - **Primary KPI:** the one KPI an experiment's verdict is about. Each experiment KPI has a direction (higher or lower is better); the verdict is better, worse, no difference detected or insufficient data, from the 95% CI of the per-seed difference.
+- **RNG stream:** one seeded mulberry32 state (a uint32 in `SimState`) that a single source of randomness draws from: `sts:<id>` (that STS's move variation), `shc:<id>` (that SHC's driver variability), `decisions` (the `random` field of yard and ASC requests), `reactor` (the rest), plus the latency, landside, bay-plan, pre-fill and container-property side streams. Each starts from the scenario seed and its own salt, so the same seed gives each STS and SHC the same luck whatever the strategies (#310).
 
 ## Rehandles (TT-12)
 

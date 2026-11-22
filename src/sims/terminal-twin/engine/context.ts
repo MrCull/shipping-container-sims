@@ -11,6 +11,7 @@ import type { DecisionPointId, DecisionRequests } from './decisions/types'
 import type { SimQuery } from './query'
 import type { CustodyRef, SimState } from './state'
 import type { ScenarioConfig } from '../scenario/types'
+import type { RngStream } from './rng'
 
 export interface EngineContext {
   readonly state: SimState
@@ -20,8 +21,8 @@ export interface EngineContext {
   readonly current: EngineEvent
   /** Schedule an event at sim time `at` (>= now). */
   schedule<K extends EventType>(type: K, at: number, subjects: EventSubjects, payload: EventPayloads[K]): EventOf<K>
-  /** Uniform [0, 1) from the single seeded RNG. */
-  random(): number
+  /** Uniform [0, 1) from one seeded stream (`engine/rng.ts`): `sts:<id>`, `shc:<id>`, `decisions` or `reactor`. */
+  random(stream: RngStream): number
   /**
    * Ask a decision point. Schedules `DecisionRequested` now and returns the
    * correlation id. The reply arrives later as a `DecisionResolved` event,
