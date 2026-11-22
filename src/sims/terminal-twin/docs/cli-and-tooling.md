@@ -104,11 +104,13 @@ pnpm run tt:experiment <experiment.json> [--out DIR]
 ```
 
 Runs every config of an experiment file on every seed, one replicate after another, then compares each config with
-the baseline config seed by seed. Writes `report.json` (format `terminal-twin-experiment-report`, version 2; version 2 added
-`guards`) and `report.md` (verdict table, guards table, full KPI table, invalid and dropped replicates, notes,
+the baseline config seed by seed. Writes `report.json` (format `terminal-twin-experiment-report`, version 3; version 2 added
+`guards`, version 3 `expanded.warmUpS` and `warnings`) and `report.md` (warm-up and horizon, verdict table, guards table, full KPI table, invalid and dropped replicates, notes,
 provenance, one `tt:run` line per replicate) to `--out` (default `.tt-experiments/<timestamp>/`, gitignored). Exit
 codes: 0 completed with every replicate valid, 1 completed with at least one invalid replicate, 2 usage or validation
-error (unknown preset, fixture, KPI, decision point or strategy; a bad guard tolerance; a missing or unreadable file).
+error (unknown preset, fixture, KPI, decision point or strategy; a bad guard tolerance or `warmUpS`; a missing or
+unreadable file). Validation warnings (a yardStart warm-up the experiment's warm-up replaces) print as `Warning: ...`
+lines and go into the report's `warnings` and the `## Warnings` section of `report.md`.
 
 Experiment file (format `terminal-twin-experiment`, version 1):
 
@@ -118,6 +120,7 @@ Experiment file (format `terminal-twin-experiment`, version 1):
   "version": 1,
   "name": "Pad choice",
   "base": { "fixture": "tracer-1sts-10-boxes" },
+  "warmUpS": 0,
   "horizonS": 3600,
   "seeds": { "count": 10, "from": 1 },
   "baseline": "A",
@@ -127,13 +130,16 @@ Experiment file (format `terminal-twin-experiment`, version 1):
 }
 ```
 
-- `base`: `{ "preset": <name> }` or `{ "fixture": <name> }`. `horizonS` (default 86400) replaces the end conditions
-  (`simDurationS`). `seeds`: a list or `{ count, from }` (default 10 seeds from 1). `baseline`: default the first config.
+- `base`: `{ "preset": <name> }` or `{ "fixture": <name> }`. `warmUpS` (default 7200, 0 = none) is every replicate's
+  measurement warm-up (`measurementWarmUpS`, `tt:run --warm-up`), excluded from KPIs and the horizon with any yard
+  start mode (#316); on a `yardStart.mode: 'warmup'` scenario it replaces that warm-up, and validation warns.
+  `horizonS` (default 86400) replaces the end conditions (`simDurationS`, measured time counted after the warm-up), so
+  a replicate ends at sim time `warmUpS + horizonS`. `seeds`: a list or `{ count, from }` (default 10 seeds from 1). `baseline`: default the first config.
 - A config overrides the base four ways (#315), applied in this order to build its `ScenarioConfig`:
   - `patch`: a JSON Merge Patch (RFC 7396) on the base: objects merge key by key, `null` deletes a key, anything else
     (arrays included) replaces. `{ "patch": { "shcs": [{ "id": "SHC01" }] } }` runs with one SHC. The patched config
-    must pass the engine's scenario check (`assertValidScenario`), and a patch may not set `endConditions` (every
-    replicate runs the same horizon).
+    must pass the engine's scenario check (`assertValidScenario`), and a patch may not set `endConditions` or
+    `measurementWarmUpS` (every replicate runs the same warm-up and horizon).
   - `strategies`: `{ "<dp>": "<strategy>" }`, a built-in strategy per decision point.
   - `params`: `{ "<dp>": { "<NAME>": n } }`, strategy params (`--param`), checked against the point's strategy (this
     config's, else the patched base's, else the default) by `resolveStrategyParams`.
