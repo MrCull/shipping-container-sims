@@ -9,7 +9,7 @@ import { pickScenario } from './scenarioPicker'
 /** A fresh load selects the TTI baseline (#156); these checks run on the small tracer fixture. */
 const TRACER = 'tracer-1sts-10-boxes'
 
-test('ECharts is not in the initial load and is fetched when the dashboard first opens', async ({ page }) => {
+test('ECharts is not in the initial load and is fetched when the dashboard first opens', { tag: '@core' }, async ({ page }) => {
   const scripts: string[] = []
   page.on('request', (r) => {
     if (r.resourceType() === 'script') scripts.push(r.url())
@@ -32,7 +32,7 @@ test('ECharts is not in the initial load and is fetched when the dashboard first
   }
 })
 
-test('the Dashboard button opens the dashboard with its charts in the production build', async ({ page }) => {
+test('the Dashboard button opens the dashboard with its charts in the production build', { tag: '@core' }, async ({ page }) => {
   await openTwin(page, { devApi: false })
   await pickScenario(page, TRACER)
   await page.getByRole('button', { name: 'Start' }).click()
@@ -43,7 +43,7 @@ test('the Dashboard button opens the dashboard with its charts in the production
   await expect(page.getByTestId('tt-dashboard-gantt').locator('canvas').first()).toBeVisible()
 })
 
-test('a failed dashboard chunk load shows an error in the production build', async ({ page }) => {
+test('a failed dashboard chunk load shows an error in the production build', { tag: '@core' }, async ({ page }) => {
   await openTwin(page, { devApi: false })
   await pickScenario(page, TRACER)
   await page.getByRole('button', { name: 'Start' }).click()

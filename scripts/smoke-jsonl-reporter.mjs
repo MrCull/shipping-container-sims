@@ -15,7 +15,8 @@ import { dirname, relative } from 'node:path'
 
 export default class SmokeJsonlReporter {
   constructor(options = {}) {
-    this.outputFile = options.outputFile
+    // Named on the command line (`--reporter=...,./scripts/smoke-jsonl-reporter.mjs`, which replaces the config's reporters) it takes the env file.
+    this.outputFile = options.outputFile ?? process.env.SMOKE_JSONL_REPORT
     this.rootDir = ''
   }
 

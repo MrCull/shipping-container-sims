@@ -5,7 +5,8 @@
  * box inside the tunnel at true scale). Screenshots go to .screenshots/assets/.
  * Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
 import { openTwin, twinUrl } from './openTwin'
@@ -34,7 +35,7 @@ async function openShc(page: Page): Promise<void> {
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 }
 
-test('SHCs in the twin use the GLB with LOD switching, carry the box at the attach point and roll their wheels', async ({ page }) => {
+test('SHCs in the twin use the GLB with LOD switching, carry the box at the attach point and roll their wheels', { tag: '@equipment' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await openShc(page)
 
@@ -73,7 +74,7 @@ test('SHCs in the twin use the GLB with LOD switching, carry the box at the atta
   expect(errors).toEqual([])
 })
 
-test('SHCs steer through the corners of the lane graph', async ({ page }) => {
+test('SHCs steer through the corners of the lane graph', { tag: '@equipment' }, async ({ page }) => {
   const { errors } = watch(page)
   await openShc(page)
   // Sample the rig every frame while the sim plays: some SHC must steer, wheels must roll consistently with the distance driven.
@@ -100,7 +101,7 @@ test('SHCs steer through the corners of the lane graph', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
-test('the asset viewer shows the SHC with working rig sliders and a 40 ft box fitting the tunnel at true scale', async ({ page }) => {
+test('the asset viewer shows the SHC with working rig sliders and a 40 ft box fitting the tunnel at true scale', { tag: '@equipment' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await page.goto(twinUrl({ params: { viewer: 'shc' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
@@ -133,7 +134,7 @@ test('the asset viewer shows the SHC with working rig sliders and a 40 ft box fi
   const lod1 = await page.evaluate(() => window.__ttAssets!.stats()!)
   expect(lod1.triangles).toBe(lod1.lods.LOD1.triangles)
   await page.evaluate(() => window.__ttAssets!.setLod('LOD0'))
-  await page.waitForTimeout(300)
+  await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/shc-viewer.png' })
   expect(external).toEqual([])
   expect(errors).toEqual([])

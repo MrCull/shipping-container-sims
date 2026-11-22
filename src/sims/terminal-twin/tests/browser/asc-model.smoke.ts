@@ -5,7 +5,8 @@
  * rows of reference containers under the span at a 5-high stack). Screenshots
  * go to .screenshots/assets/. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import fixture from '../../scenario/fixtures/asc-2asc-block-conflict.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
@@ -35,7 +36,7 @@ async function openAsc(page: Page): Promise<void> {
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 }
 
-test('paired ASCs use the GLB with LOD switching and are posed from the engine motion', async ({ page }) => {
+test('paired ASCs use the GLB with LOD switching and are posed from the engine motion', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // three camera moves, each waiting on a software-rendered frame
   const { errors, external } = watch(page)
   await openAsc(page)
@@ -71,7 +72,7 @@ test('paired ASCs use the GLB with LOD switching and are posed from the engine m
   expect(errors).toEqual([])
 })
 
-test('while an ASC carries a box, the box hangs at the twist-lock plane and the ropes follow the hoist', async ({ page }) => {
+test('while an ASC carries a box, the box hangs at the twist-lock plane and the ropes follow the hoist', { tag: '@equipment' }, async ({ page }) => {
   const { errors } = watch(page)
   await openAsc(page)
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'AscRoutingToSlot' }))
@@ -90,7 +91,7 @@ test('while an ASC carries a box, the box hangs at the twist-lock plane and the 
   expect(errors).toEqual([])
 })
 
-test('the asset viewer shows the ASC with working rig sliders and 8 rows of reference containers fitting under the span', async ({ page }) => {
+test('the asset viewer shows the ASC with working rig sliders and 8 rows of reference containers fitting under the span', { tag: '@equipment' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await page.goto(twinUrl({ params: { viewer: 'asc' } })) // the asset viewer has no __tt to wait for
   await page.waitForFunction(() => !!window.__ttAssets)
@@ -147,7 +148,7 @@ test('the asset viewer shows the ASC with working rig sliders and 8 rows of refe
     v.setRig('trolley', 0)
     v.setRig('hoist', 0)
   })
-  await page.waitForTimeout(300)
+  await page.evaluate(() => window.__ttAssets!.renderOnce()) // render is off: draw the frame the screenshot keeps
   await page.screenshot({ path: '.screenshots/assets/asc-viewer.png' })
   expect(external).toEqual([])
   expect(errors).toEqual([])

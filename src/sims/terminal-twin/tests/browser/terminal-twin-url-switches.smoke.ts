@@ -4,7 +4,8 @@
  * and `?quality=low` boots at the Low level. Frame rates are rates over a minimum wall-clock window (frameSampling.ts).
  * Run with `pnpm run test:smoke --project=dev terminal-twin-url-switches`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { sampleFrames } from './frameSampling'
 import { openTwin, type OpenTwinOptions } from './openTwin'
@@ -30,7 +31,7 @@ async function frameRate(page: Page, minWallMs: number): Promise<number> {
   return (s[s.length - 1].frames - s[0].frames) / ((s[s.length - 1].wall - s[0].wall) / 1000)
 }
 
-test('render=off: the frame counter advances quickly and box poses still move, with nothing drawn', async ({ page }) => {
+test('render=off: the frame counter advances quickly and box poses still move, with nothing drawn', { tag: '@core' }, async ({ page }) => {
   const errors = watch(page)
   await open(page, { quality: null }, 'tracer-1sts-10-boxes') // `?render=off` alone
   const centres = () => page.evaluate(() => Object.fromEntries(Object.entries(window.__tt!.sceneState()!.liveries).map(([id, l]) => [id, l.centre])))
@@ -54,7 +55,7 @@ test('render=off: the frame counter advances quickly and box poses still move, w
   expect(errors).toEqual([])
 })
 
-test('renderOnce() with render=off draws one frame: perf() reports draw calls and triangles', async ({ page }) => {
+test('renderOnce() with render=off draws one frame: perf() reports draw calls and triangles', { tag: '@core' }, async ({ page }) => {
   const errors = watch(page)
   await open(page, { quality: null }, 'tracer-1sts-10-boxes') // `?render=off` alone
   expect((await page.evaluate(() => window.__tt!.perf())).stats.calls).toBe(0)
@@ -68,7 +69,7 @@ test('renderOnce() with render=off draws one frame: perf() reports draw calls an
   expect(errors).toEqual([])
 })
 
-test('quality=low boots at the Low level without changing the remembered setting', async ({ page }) => {
+test('quality=low boots at the Low level without changing the remembered setting', { tag: '@core' }, async ({ page }) => {
   const errors = watch(page)
   await open(page, { render: true }, 'tracer-1sts-10-boxes') // `?quality=low` alone
   const perf = await page.evaluate(() => window.__tt!.perf())
@@ -78,7 +79,7 @@ test('quality=low boots at the Low level without changing the remembered setting
   expect(errors).toEqual([])
 })
 
-test('TTI baseline with render=off and quality=low: the scene updates at a usable frame rate', async ({ page }) => {
+test('TTI baseline with render=off and quality=low: the scene updates at a usable frame rate', { tag: '@core' }, async ({ page }) => {
   test.setTimeout(180_000)
   const errors = watch(page)
   await open(page, {}, 'TTI Algeciras baseline') // the defaults: `?quality=low&render=off`

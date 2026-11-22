@@ -40,6 +40,8 @@ The Quay and Overview view presets (`modules/viewPresets.ts#viewPresetPose`) sta
 
 ## The per-frame pipeline
 
+One path builds and updates the scene for the browser and for Node (#331): `SceneDriver` (`modules/sceneDriver.ts`) builds the `SceneRenderer` when the model changes and applies each frame's overlays, colour by, lighting and pose; `useTwinScene` attaches the WebGL renderer and draws, the headless scene (`cli/headlessScene.ts`, a test level for scene checks in Node) attaches none. `sceneStateOf` builds `__tt.sceneState()` for both.
+
 ```
 rAF loop (useTwinScene)
   controller.tick(now) ; store.sync()           playback clock, deltas, cue release

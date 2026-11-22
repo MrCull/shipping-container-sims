@@ -13,11 +13,14 @@
  *
  * `devApi: false` is for production-build specs (no `window.__tt`): it waits for the setup dialog instead, and a
  * scenario is then picked in the dialog by the spec.
- * `freshPage: false` reuses a page that already shows the twin at the same URL (a later worker-scoped shared page, #329).
+ * `freshPage: false` reuses a page that already shows the twin at the same URL.
+ * On the worker's shared page (`twinTest.ts`, #329) the page sits on the reset route after its reset, and the twin is
+ * opened by routing there in-app (`window.__appVisit`), with no page load.
  */
 import { expect, type Page } from '@playwright/test'
 import type { TwinDevApi } from '../../dev/devApi'
 import type { QualitySetting } from '../../modules/quality'
+import { RESET_PATH } from '../../../../utils/smokeReset'
 
 export type LoadOptions = NonNullable<Parameters<TwinDevApi['load']>[1]>
 
@@ -58,7 +61,8 @@ export async function openTwin(page: Page, options: OpenTwinOptions = {}): Promi
   const devApi = options.devApi ?? true
   const current = new URL(page.url(), 'http://localhost')
   const reuse = options.freshPage === false && current.pathname + current.search === url
-  if (!reuse) await page.goto(url)
+  if (current.pathname === RESET_PATH) await page.evaluate((target) => window.__appVisit!(target), url)
+  else if (!reuse) await page.goto(url)
   if (!devApi) {
     await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeVisible()
     return

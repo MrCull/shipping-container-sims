@@ -5,31 +5,33 @@ import { smokeDevServer, smokeProdServer } from './smoke-server.mjs'
 
 const opts = { port: 5199, vite: 'VITE' }
 
-test('locally (no CI, no SMOKE_SERVER) the dev project uses the Vite dev server', () => {
-  const s = smokeDevServer({}, opts)
-  assert.equal(s.mode, 'dev')
-  assert.equal(s.command, 'VITE --host 127.0.0.1 --port 5199 --strictPort')
-  assert.equal(s.url, 'http://127.0.0.1:5199')
+test('with no environment variables (local or CI) the dev project serves the smoke build: build it, then vite preview', () => {
+  for (const env of [{}, { CI: 'true' }]) {
+    const s = smokeDevServer(env, opts)
+    assert.equal(s.mode, 'build')
+    assert.equal(s.buildDir, '.smoke-build')
+    assert.equal(
+      s.command,
+      'VITE build --mode smoke --outDir .smoke-build --emptyOutDir --logLevel warn && VITE preview --outDir .smoke-build --host 127.0.0.1 --port 5199 --strictPort',
+    )
+    assert.equal(s.url, 'http://127.0.0.1:5199')
+  }
 })
 
-test('in CI the dev project serves the smoke build: build it, then vite preview on its directory', () => {
-  const s = smokeDevServer({ CI: 'true' }, opts)
-  assert.equal(s.mode, 'build')
-  assert.equal(s.buildDir, '.smoke-build')
-  assert.equal(
-    s.command,
-    'VITE build --mode smoke --outDir .smoke-build --emptyOutDir --logLevel warn && VITE preview --outDir .smoke-build --host 127.0.0.1 --port 5199 --strictPort',
-  )
-  assert.equal(s.url, 'http://127.0.0.1:5199')
+test('SMOKE_SERVER=dev is the explicit opt-in to the Vite dev server (hot reload), locally or in CI', () => {
+  for (const env of [{ SMOKE_SERVER: 'dev' }, { CI: 'true', SMOKE_SERVER: 'dev' }]) {
+    const s = smokeDevServer(env, opts)
+    assert.equal(s.mode, 'dev')
+    assert.equal(s.command, 'VITE --host 127.0.0.1 --port 5199 --strictPort')
+  }
 })
 
-test('SMOKE_SERVER picks the mode explicitly, overriding CI', () => {
+test('SMOKE_SERVER=build picks the smoke build explicitly', () => {
   assert.equal(smokeDevServer({ SMOKE_SERVER: 'build' }, opts).mode, 'build')
-  assert.equal(smokeDevServer({ CI: 'true', SMOKE_SERVER: 'dev' }, opts).mode, 'dev')
 })
 
 test('SMOKE_BUILD_PREBUILT=1 serves an existing smoke build without rebuilding (a CI shard handed the artifact)', () => {
-  const s = smokeDevServer({ SMOKE_SERVER: 'build', SMOKE_BUILD_PREBUILT: '1', SMOKE_BUILD_DIR: 'out/smoke' }, opts)
+  const s = smokeDevServer({ SMOKE_BUILD_PREBUILT: '1', SMOKE_BUILD_DIR: 'out/smoke' }, opts)
   assert.equal(s.buildDir, 'out/smoke')
   assert.equal(s.command, 'VITE preview --outDir out/smoke --host 127.0.0.1 --port 5199 --strictPort')
 })

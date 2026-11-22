@@ -8,6 +8,9 @@ import type { CameraPose } from './cameraKeys'
 /** Vertical field of view (degrees) and clip planes (metres) of the 3D view's camera. */
 export const SCENE_CAMERA = { fovDeg: 45, near: 1, far: 14000 } as const
 
+/** The orbit camera's minimum distance to its target (m): the browser's OrbitControls and the headless scene's cameraTo. */
+export const ORBIT_MIN_DISTANCE_M = 8
+
 /** A new camera with the view's settings for a canvas of the given aspect ratio. */
 export function sceneCamera(aspect: number): THREE.PerspectiveCamera {
   return new THREE.PerspectiveCamera(SCENE_CAMERA.fovDeg, aspect, SCENE_CAMERA.near, SCENE_CAMERA.far)

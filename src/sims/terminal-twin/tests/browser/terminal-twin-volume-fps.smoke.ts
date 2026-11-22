@@ -3,9 +3,13 @@
  * gone), volume and mute persist across a reload and carry to another sim, and the FPS chip shows, takes
  * threshold colours, toggles the perf panel, and is hidden when WebGL fails. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
+
+// Fresh page (#329): volume and mute persist across a reload and another sim, and one spec stubs audio with addInitScript.
+test.use({ fresh: true })
 
 /** Terminal Twin opens muted whatever the shared setting (#171): these specs are about the volume, so they unmute inside. */
 async function unmute(page: Page): Promise<void> {
@@ -24,7 +28,7 @@ async function setVolume(page: Page, percent: number): Promise<void> {
   await page.getByTestId('audio-volume').fill(String(percent))
 }
 
-test('Terminal Twin shows the shared volume control top-right, with no Sound button of its own', async ({ page }) => {
+test('Terminal Twin shows the shared volume control top-right, with no Sound button of its own', { tag: '@shell' }, async ({ page }) => {
   await open(page)
   await expect(page.getByTestId('tt-sound-toggle')).toHaveCount(0)
   const button = page.getByTestId('audio-button')
@@ -35,7 +39,7 @@ test('Terminal Twin shows the shared volume control top-right, with no Sound but
   await expect(page.getByTestId('tt-fps-chip')).toBeVisible()
 })
 
-test('volume and mute drive Terminal Twin playback level, and survive a reload and another sim', async ({ page }) => {
+test('volume and mute drive Terminal Twin playback level, and survive a reload and another sim', { tag: '@shell' }, async ({ page }) => {
   await open(page)
   expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBeCloseTo(0.4)
   await page.getByTestId('audio-menu-button').click()
@@ -88,7 +92,7 @@ async function speakerClickAndSlider(page: Page): Promise<void> {
   await expect(speaker).toHaveAttribute('aria-pressed', 'false')
 }
 
-test('speaker click mutes on the first click, the arrow opens the slider, and the slider unmutes (Terminal Twin)', async ({ page }) => {
+test('speaker click mutes on the first click, the arrow opens the slider, and the slider unmutes (Terminal Twin)', { tag: '@shell' }, async ({ page }) => {
   await open(page)
   await speakerClickAndSlider(page)
   expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBeCloseTo(0.3)
@@ -97,12 +101,12 @@ test('speaker click mutes on the first click, the arrow opens the slider, and th
   expect((await page.evaluate(() => window.__tt!.atmosphere())).soundGain).toBe(0)
 })
 
-test('speaker click mutes on the first click, the arrow opens the slider, and the slider unmutes (Container Stack)', async ({ page }) => {
+test('speaker click mutes on the first click, the arrow opens the slider, and the slider unmutes (Container Stack)', { tag: '@shell' }, async ({ page }) => {
   await page.goto('/sim/container-stack')
   await speakerClickAndSlider(page)
 })
 
-test('both audio buttons are labelled and reachable by Tab', async ({ page }) => {
+test('both audio buttons are labelled and reachable by Tab', { tag: '@shell' }, async ({ page }) => {
   await open(page)
   await expect(page.getByRole('button', { name: 'Mute' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Volume' })).toBeVisible()
@@ -111,7 +115,7 @@ test('both audio buttons are labelled and reachable by Tab', async ({ page }) =>
   await expect(page.getByTestId('audio-menu-button')).toBeFocused()
 })
 
-test('the FPS chip shows a live rate, and clicking it opens and closes the perf panel (P still works)', async ({ page }) => {
+test('the FPS chip shows a live rate, and clicking it opens and closes the perf panel (P still works)', { tag: '@shell' }, async ({ page }) => {
   await open(page)
   const chip = page.getByTestId('tt-fps-chip')
   await expect(chip).toContainText(/\d+\s*FPS/)
@@ -124,7 +128,7 @@ test('the FPS chip shows a live rate, and clicking it opens and closes the perf 
   await expect(page.getByTestId('tt-perf-overlay')).toBeVisible()
 })
 
-test('the FPS chip turns amber below 30 fps and red below 20 under load', async ({ page }) => {
+test('the FPS chip turns amber below 30 fps and red below 20 under load', { tag: '@shell' }, async ({ page }) => {
   await open(page)
   const chip = page.getByTestId('tt-fps-chip')
   // Busy-wait every frame: the meter reports the real (low) rate.
@@ -135,7 +139,7 @@ test('the FPS chip turns amber below 30 fps and red below 20 under load', async 
   await page.evaluate(() => window.__tt!.setFrameLoad(0))
 })
 
-test('the FPS chip is hidden when WebGL fails', async ({ page }) => {
+test('the FPS chip is hidden when WebGL fails', { tag: '@shell' }, async ({ page }) => {
   await page.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext
     HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {

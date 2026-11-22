@@ -1,14 +1,19 @@
 /**
  * Atmosphere and polish (TT-21): day/night, daylight lock, backdrops, sound, departure banner.
- * Seam: UI + dev API `window.__tt` (`__tt.atmosphere()`). Run with `pnpm run test:smoke`.
+ * Seam: UI + dev API `window.__tt` (`__tt.atmosphere()`). Lighting mode per sim hour, night lights and the daylight
+ * lock's effect are Node tests on the headless scene (`tests/headless-scene-yard.test.ts`, #336); this spec keeps the
+ * toggle's wiring. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin, type OpenTwinOptions } from './openTwin'
 
 const TRACER = 'tracer-1sts-10-boxes'
 
 test.use({ timezoneId: 'UTC' })
+// Fresh page: the time zone is a browser-context option, and addInitScript would stay on a shared page (#329).
+test.use({ fresh: true })
 
 /** Count every `new Audio(...)` the page makes (a muted shared control means none are made). */
 async function spyOnAudio(page: Page): Promise<void> {
@@ -43,23 +48,7 @@ async function followClock(page: Page): Promise<void> {
   await expect.poll(async () => (await atmosphere(page)).lockDaylight).toBe(false)
 }
 
-test('the sun follows the sim clock: day at 13:00, cheaper night mode at 02:00', async ({ page }) => {
-  await open(page, TRACER, '2026-10-26T13:00:00.000Z', { quality: 'high' }) // day shadows are a High (and Medium) feature
-  let a = await atmosphere(page)
-  expect(a.scene).toMatchObject({ mode: 'day', shadows: true, masts: 0, equipmentLights: 0 })
-
-  await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' })
-  await followClock(page)
-  await page.evaluate(() => window.__tt!.step())
-  // the scene picks up the new lighting mode on a later frame, so wait for it (CI read day here)
-  await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('night')
-  a = await atmosphere(page)
-  expect(a.scene).toMatchObject({ mode: 'night', shadows: false })
-  expect(a.scene!.masts).toBeGreaterThan(0)
-  expect(a.scene!.equipmentLights).toBeGreaterThan(0)
-})
-
-test('every launch starts in daylight at 02:00; the toggle lets night fall for that run only', async ({ page }) => {
+test('every launch starts in daylight at 02:00; the toggle lets night fall for that run only', { tag: '@yard' }, async ({ page }) => {
   await open(page, TRACER, '2026-10-26T02:00:00.000Z', { quality: 'high' }) // day shadows are a High (and Medium) feature
   expect((await atmosphere(page)).lockDaylight).toBe(true)
   await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('day')
@@ -73,7 +62,7 @@ test('every launch starts in daylight at 02:00; the toggle lets night fall for t
   await expect.poll(async () => (await atmosphere(page)).scene?.mode).toBe('day')
 })
 
-test('night mode costs no more draw calls than day', async ({ page }) => {
+test('night mode costs no more draw calls than day', { tag: '@yard' }, async ({ page }) => {
   const calls = async (start: string): Promise<number> => {
     await open(page, TRACER, start, { quality: 'high' }) // High draws the day's shadow pass that night mode drops
     await followClock(page)
@@ -88,7 +77,7 @@ test('night mode costs no more draw calls than day', async ({ page }) => {
   expect(night).toBeLessThanOrEqual(day + 2)
 })
 
-test('the Algeciras backdrop shows for the TTI preset only', async ({ page }) => {
+test('the Algeciras backdrop shows for the TTI preset only', { tag: '@yard' }, async ({ page }) => {
   await open(page, 'TTI Algeciras baseline', '2026-10-26T13:00:00.000Z')
   let a = await atmosphere(page)
   expect(a.scene!.backdrop.kind).toBe('tti')
@@ -102,7 +91,7 @@ test('the Algeciras backdrop shows for the TTI preset only', async ({ page }) =>
 
 const audioCreated = (page: Page) => page.evaluate(() => (window as unknown as { __audioCreated: number }).__audioCreated)
 
-test('a global mute set elsewhere is honoured: nothing plays, no audio is created', async ({ page }) => {
+test('a global mute set elsewhere is honoured: nothing plays, no audio is created', { tag: '@yard' }, async ({ page }) => {
   await spyOnAudio(page)
   await page.addInitScript(() => {
     window.localStorage.setItem('shipping-container-sims', JSON.stringify({ version: 1, global: { soundMuted: true, godModeEnabled: false, volume: 0.4 }, sims: {} }))
@@ -116,7 +105,7 @@ test('a global mute set elsewhere is honoured: nothing plays, no audio is create
   expect(await audioCreated(page)).toBe(0)
 })
 
-test('entering with sound on shows muted and no sound plays; unmuting inside plays at the master volume', async ({ page }) => {
+test('entering with sound on shows muted and no sound plays; unmuting inside plays at the master volume', { tag: '@yard' }, async ({ page }) => {
   await spyOnAudio(page)
   await open(page, TRACER, '2026-10-26T13:00:00.000Z')
   expect((await atmosphere(page)).soundGain).toBe(0)
@@ -154,7 +143,7 @@ test('entering with sound on shows muted and no sound plays; unmuting inside pla
   expect(a.sound.played - before).toBeLessThanOrEqual(Math.ceil(seconds / 2.5) + 3)
 })
 
-test('leaving restores the sound on the main menu', async ({ page }) => {
+test('leaving restores the sound on the main menu', { tag: '@yard' }, async ({ page }) => {
   await open(page, TRACER, '2026-10-26T13:00:00.000Z')
   expect((await atmosphere(page)).soundGain).toBe(0)
   await page.locator('.back-btn').click()
@@ -164,7 +153,7 @@ test('leaving restores the sound on the main menu', async ({ page }) => {
   expect(stored === undefined || stored === false).toBe(true)
 })
 
-test('a departure shows a banner that does not block clicks', async ({ page }) => {
+test('a departure shows a banner that does not block clicks', { tag: '@yard' }, async ({ page }) => {
   await open(page, TRACER, '2026-10-26T13:00:00.000Z')
   await page.evaluate(() => window.__tt!.setSpeed(60))
   await page.evaluate(() => window.__tt!.play())
@@ -180,7 +169,7 @@ test('a departure shows a banner that does not block clicks', async ({ page }) =
   expect(blocked).toBe(false)
 })
 
-test('sky reflections are built once per lighting mode, never per frame, and Low draws none (#248)', async ({ page }) => {
+test('sky reflections are built once per lighting mode, never per frame, and Low draws none (#248)', { tag: '@yard' }, async ({ page }) => {
   await open(page, TRACER, '2026-10-26T13:00:00.000Z')
   await page.evaluate(() => window.__tt!.setQuality('high'))
   await expect.poll(async () => (await atmosphere(page)).scene?.environment).toBe(true)
@@ -198,7 +187,7 @@ test('sky reflections are built once per lighting mode, never per frame, and Low
   expect((await atmosphere(page)).scene!.environmentBuilds).toBe(1)
 })
 
-test('the sky environment follows night: one more build, no shadow pass (#248)', async ({ page }) => {
+test('the sky environment follows night: one more build, no shadow pass (#248)', { tag: '@yard' }, async ({ page }) => {
   await open(page, TRACER, '2026-10-26T02:00:00.000Z')
   await page.evaluate(() => window.__tt!.setQuality('high'))
   await expect.poll(async () => (await atmosphere(page)).scene?.environment).toBe(true)

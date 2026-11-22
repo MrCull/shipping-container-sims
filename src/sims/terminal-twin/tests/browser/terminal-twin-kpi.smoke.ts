@@ -2,7 +2,8 @@
  * TT-07 browser smoke tests: KPI strip, end conditions, final report and export.
  * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type { HeadlineKpis } from '../../engine'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openAdvanced, pickScenario } from './scenarioPicker'
@@ -24,7 +25,7 @@ async function open(page: Page, options?: Parameters<NonNullable<typeof window._
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
-test('the KPI strip is over the 3D view and shows the engine headline KPIs', async ({ page }) => {
+test('the KPI strip is over the 3D view and shows the engine headline KPIs', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page)
   await page.evaluate(() => window.__tt!.runTo(900))
@@ -35,8 +36,7 @@ test('the KPI strip is over the 3D view and shows the engine headline KPIs', asy
   // the strip polls once a second; wait for it to settle on the engine's numbers
   await expect(page.getByTestId('tt-kpi-moves')).toHaveAttribute('data-value', String(headline.movesDone))
   await expect(page.getByTestId('tt-kpi-moves')).toContainText(String(headline.movesDone))
-  await expect(page.getByTestId('tt-kpi-asc')).toBeVisible()
-  await expect(page.getByTestId('tt-kpi-yard')).toBeVisible()
+  // every card's label and value: tests/components/kpi-strip.test.ts (#338)
   const box = await strip.boundingBox()
   const scene = await page.getByTestId('tt-scene').boundingBox()
   expect(box!.y).toBeGreaterThanOrEqual(scene!.y)
@@ -44,15 +44,13 @@ test('the KPI strip is over the 3D view and shows the engine headline KPIs', asy
   expect(errors).toEqual([])
 })
 
-test('an end condition ends the run: report shown, time controls locked, scene still inspectable', async ({ page }) => {
+test('an end condition ends the run: report shown, time controls locked, scene still inspectable', { tag: '@analysis' }, async ({ page }) => {
   const errors = collectErrors(page)
   await open(page, { endConditions: { moves: 4 } })
   await page.evaluate(() => window.__tt!.runUntil())
   const report = page.getByTestId('tt-final-report')
   await expect(report).toBeVisible()
-  await expect(page.getByTestId('tt-report-reason')).toContainText('Reached 4 container moves')
-  await expect(page.getByTestId('tt-report-highlights')).toContainText('STS01 worked hardest')
-  await expect(page.getByTestId('tt-report-moves')).toHaveText('4')
+  // the report's reason, highlights, moves, close and reopen, and its exports: tests/components/final-report.test.ts (#338)
 
   // time controls are disabled; Reset and New Scenario still work
   await expect(page.locator('[data-speed="10"]')).toBeDisabled()
@@ -75,12 +73,6 @@ test('an end condition ends the run: report shown, time controls locked, scene s
   await expect(page.getByTestId('tt-dashboard')).toBeHidden()
   await expect(report).toBeVisible()
 
-  // close and reopen the report
-  await page.getByTestId('tt-report-close').click()
-  await expect(report).toBeHidden()
-  await page.getByTestId('tt-report-reopen').click()
-  await expect(report).toBeVisible()
-
   // Reset returns to t = 0 and unlocks the controls
   await page.getByRole('button', { name: 'Reset' }).click()
   await expect(report).toBeHidden()
@@ -88,31 +80,7 @@ test('an end condition ends the run: report shown, time controls locked, scene s
   expect(errors).toEqual([])
 })
 
-test('the report exports the KPI report and the event log as JSON and CSV downloads', async ({ page }) => {
-  await open(page)
-  await page.evaluate(() => window.__tt!.runUntil())
-  await expect(page.getByTestId('tt-final-report')).toBeVisible()
-
-  const download = async (kind: string) => {
-    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId(`tt-export-${kind}`).click()])
-    const stream = await dl.createReadStream()
-    const chunks: Buffer[] = []
-    for await (const chunk of stream) chunks.push(chunk as Buffer)
-    return { name: dl.suggestedFilename(), text: Buffer.concat(chunks).toString('utf8') }
-  }
-  const events = await page.evaluate(() => window.__tt!.query<unknown[]>('eventLog'))
-  const kpiJson = await download('kpi-json')
-  expect(kpiJson.name).toMatch(/kpi-report\.json$/)
-  const parsed = JSON.parse(kpiJson.text) as { format: string; kpis: { movesCompleted: number } }
-  expect(parsed.format).toBe('terminal-twin-kpi-report')
-  expect(parsed.kpis.movesCompleted).toBe(10)
-  const eventsJson = await download('events-json')
-  expect(JSON.parse(eventsJson.text)).toHaveLength(events.length)
-  expect((await download('kpi-csv')).text.split('\n')[0]).toBe('kpi,unit,entityKind,entity,bucket,index,startS,endS,value')
-  expect((await download('events-csv')).text.trim().split('\n').length).toBeGreaterThan(events.length)
-})
-
-test('the setup dialog end conditions stop the run at the first one met', async ({ page }) => {
+test('the setup dialog end conditions stop the run at the first one met', { tag: '@analysis' }, async ({ page }) => {
   await openTwin(page)
   await pickScenario(page, FIXTURE)
   await openAdvanced(page)

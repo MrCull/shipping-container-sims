@@ -39,7 +39,7 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test('the volume slider on the main menu changes the menu music level live; 0 is silent', async ({ page }) => {
+test('the volume slider on the main menu changes the menu music level live; 0 is silent', { tag: '@core' }, async ({ page }) => {
   await page.goto('/')
   await expect.poll(() => menuMusicVolume(page)).toBeCloseTo(0.4 * MENU_MUSIC_GAIN)
 
@@ -62,7 +62,7 @@ test('the volume slider on the main menu changes the menu music level live; 0 is
   await expect.poll(() => menuMusicVolume(page)).toBeCloseTo(0.8 * MENU_MUSIC_GAIN)
 })
 
-test('the music slider scales the menu music under the master volume, and the effects slider leaves it alone', async ({ page }) => {
+test('the music slider scales the menu music under the master volume, and the effects slider leaves it alone', { tag: '@core' }, async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('audio-menu-button').click()
   await setVolume(page, 100)

@@ -4,17 +4,18 @@
  *
  * - `dev` project: specs that use the dev API (`window.__tt`, `?viewer=`). It runs against one of two servers
  *   (scripts/smoke-server.mjs, chosen by SMOKE_SERVER=dev|build):
- *   - `dev` (local default): the Vite dev server. No build step, so best for one or two specs, but every page open
- *     loads hundreds of unbundled modules.
- *   - `build` (CI default, i.e. when CI is set): the smoke build, `vite build --mode smoke` into `.smoke-build/`
- *     (SMOKE_BUILD_DIR), a bundled build that keeps the dev API, served by `vite preview`. Pages boot faster; use it
- *     locally for long runs. SMOKE_BUILD_PREBUILT=1 serves an existing build (`pnpm run build:smoke`) without rebuilding.
+ *   - `build` (the default, locally and in CI): the smoke build, `vite build --mode smoke` into `.smoke-build/`
+ *     (SMOKE_BUILD_DIR), a bundled build that keeps the dev API, served by `vite preview`. A run builds it once at start;
+ *     SMOKE_BUILD_PREBUILT=1 serves an existing build (`pnpm run build:smoke`, or a CI shard's artifact) without rebuilding.
+ *     Local runs and CI serve the same bundle, so asset URLs carry the same hashed names (`hero-shc-<hash>.glb`).
+ *   - `dev` (opt-in, SMOKE_SERVER=dev): the Vite dev server, for hot-reload debugging. Every page open loads hundreds of
+ *     unbundled modules, and asset names are unhashed, so a pass there does not prove a pass in CI.
  * - `prod` project: a production build served by `vite preview` (specs named
  *   `*.prod.smoke.ts`), for checks that dev-only code is absent. SMOKE_PROD_PREBUILT=1 serves an existing build
  *   (SMOKE_PROD_DIR, default `.smoke-dist`) without rebuilding.
  *
- * CI runs the suite in 6 shards (`--shard=i/6`, .github/workflows/pr-checks.yml); `fullyParallel` makes a shard a set of
- * tests, not files. scripts/smoke-merge.mjs merges the shards' JSONL files into one SMOKE line and timing table.
+ * CI runs the suite in 6 shards, each from a test-list file balanced by recorded test time (`--test-list`,
+ * scripts/smoke-shards.mjs, .github/workflows/pr-checks.yml); `fullyParallel` makes a shard a set of tests, not files. scripts/smoke-merge.mjs merges the shards' JSONL files into one SMOKE line and timing table.
  *
  * Tests titled `@load` need a real frame rate (only the Auto-quality fps spec today): CI runs them as an advisory job
  * (`pnpm run test:smoke --grep @load`); everything else is a required check (`--grep-invert @load`). Frame-based
@@ -57,9 +58,10 @@ export default defineConfig({
   timeout: 120_000,
   // Dev-server chunks (the lazy dashboard, GLBs) and software-WebGL frames are slow on a loaded 2-core runner.
   expect: { timeout: 20_000 },
-  // Every test is its own unit of work, so `--shard=i/n` splits the suite by test, not by file (CI runs 6 shards; split by
+  // Every test is its own unit of work, so a CI shard (a `--test-list` file, or `--shard=i/n`) is a set of tests, not files (CI runs 6 shards; split by
   // file they were 7, 9 and 19 min). No spec shares state between tests (no serial describe, no shared page in beforeAll);
-  // keep it that way. Locally workers stay at 1, so a run is still one test at a time.
+  // keep it that way. The Terminal Twin's worker-scoped page (tests/browser/twinTest.ts, #329) is reset before every test,
+  // so a test passes alone and in any order (`--shuffle <seed>` checks it). Locally workers stay at 1, so a run is still one test at a time.
   fullyParallel: true,
   // One at a time by default: browser tests are CPU-bound on software WebGL. SMOKE_WORKERS=2 trades speed for timeouts on a 4-core box; try it on an idle machine and re-run failures alone.
   workers: Number(process.env.SMOKE_WORKERS) || 1,

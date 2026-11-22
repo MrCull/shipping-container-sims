@@ -1,13 +1,14 @@
 /**
- * V11-10 browser smoke test: the setup dialog's Subsystem modes fieldset.
+ * V11-10 browser smoke test: the setup dialog's Subsystem modes fieldset, wired to the running twin. The fieldset's
+ * defaults and the request Start sends are the component test (tests/components/setup-dialog.test.ts, #332).
  * Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openSetupTab } from './scenarioPicker'
 import { openTwin } from './openTwin'
 
-test('quay, berth and yard modes set in the dialog reach the config and the run ends cleanly', async ({ page }) => {
+test('quay, berth and yard modes set in the dialog reach the config and the run ends cleanly', { tag: '@setup' }, async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   // The dialog screenshot below is DOM only (no drawing needed), taken at a fixed size.
@@ -18,7 +19,6 @@ test('quay, berth and yard modes set in the dialog reach the config and the run 
   await openSetupTab(dialog, 'yard')
   const modes = dialog.getByTestId('tt-subsystem-modes')
   await modes.scrollIntoViewIfNeeded()
-  await expect(modes.getByTestId('tt-mode-quay-real')).toBeChecked()
   await modes.getByTestId('tt-mode-quay-instant').check()
   await modes.getByTestId('tt-mode-berth-off').check()
   await modes.getByTestId('tt-mode-yard-instant').check()

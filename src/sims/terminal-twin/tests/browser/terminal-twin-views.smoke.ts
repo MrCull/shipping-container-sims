@@ -3,7 +3,8 @@
  * with Labels on has no two visible labels overlapping; the HUD regions still do not overlap with the new controls.
  * Dev-only `window.__tt` API. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import { overlappingRegions } from '../../modules/hudLayout'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
@@ -16,7 +17,7 @@ async function open(page: Page, scenario: string): Promise<void> {
   await expect(page.getByTestId('tt-kpi-strip')).toBeVisible()
 }
 
-test('presets frame each region; the dev API, buttons and shortcuts set them', async ({ page }) => {
+test('presets frame each region; the dev API, buttons and shortcuts set them', { tag: '@shell' }, async ({ page }) => {
   await open(page, 'landside-morning-peak')
   const targets: Record<string, { x: number; z: number }> = {}
   for (const name of ['quay', 'yard', 'gate', 'overview']) {
@@ -44,7 +45,7 @@ test('presets frame each region; the dev API, buttons and shortcuts set them', a
   for (const text of ['View: quay', 'View: yard', 'View: landside and gate', 'View: whole terminal']) await expect(help).toContainText(text)
 })
 
-test('with Labels on, the TTI Overview shows no two overlapping labels', async ({ page }) => {
+test('with Labels on, the TTI Overview shows no two overlapping labels', { tag: '@shell' }, async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 })
   await open(page, 'TTI Algeciras baseline')
   await page.evaluate(() => window.__tt!.overlays({ labels: true }))

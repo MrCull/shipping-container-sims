@@ -11,9 +11,13 @@
  * (within 1 cm), and none on Low; no `hero-truck-*` file is requested before.
  * Counts and bounds only, no frame assertions. Screenshots go to `.screenshots/`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
+
+// Fresh page (#340): every test checks which hero files are requested, and a shared page has them cached from an earlier test.
+test.use({ fresh: true })
 
 const HIGH_CAP = 3
 const HERO_FILE = /hero-spreader-(sts|asc|shc)|hero-shc[.-]|hero-truck-/
@@ -71,7 +75,7 @@ function expectInPlace(s: { id: string; hero: Bounds; rig: Bounds }): void {
   expect(Math.abs(s.hero.min[1] - s.rig.min[1]), `${s.id} underside`).toBeLessThan(CENTRE_TOLERANCE_M)
 }
 
-test('ASC close-up: hero spreaders within the High cap, none requested before, none on Low or below equipment-hero-off', async ({ page }) => {
+test('ASC close-up: hero spreaders within the High cap, none requested before, none on Low or below equipment-hero-off', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'yard-no-mixed-length')
@@ -119,7 +123,7 @@ test('ASC close-up: hero spreaders within the High cap, none requested before, n
   expect(w.errors).toEqual([])
 })
 
-test('STS close-up: the hero spreader is in place on the crane rig', async ({ page }) => {
+test('STS close-up: the hero spreader is in place on the crane rig', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'twin-20-lift')
@@ -143,7 +147,7 @@ test('STS close-up: the hero spreader is in place on the crane rig', async ({ pa
   expect(w.errors).toEqual([])
 })
 
-test('SHC and ASC carrying a 20 ft box: the hero spreader is squeezed to 20 ft like the rig spreader', async ({ page }) => {
+test('SHC and ASC carrying a 20 ft box: the hero spreader is squeezed to 20 ft like the rig spreader', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'asc-1sts-10-boxes-1block') // 20 ft and 40 ft boxes mixed, STS to SHC to WTP pad to ASC
@@ -181,7 +185,7 @@ test('SHC and ASC carrying a 20 ft box: the hero spreader is squeezed to 20 ft l
   expect(w.errors).toEqual([])
 })
 
-test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested before, none on Low', async ({ page }) => {
+test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested before, none on Low', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'shc-1sts-2shc-1wtp')
@@ -204,6 +208,8 @@ test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested befo
   await page.evaluate((t) => window.__tt!.setCameraPose({ target: t, distance: 18, azimuth: 0.7, polar: 1.2 }), { x: shc.x, y: 7, z: shc.z })
   await page.waitForFunction(() => window.__tt!.heroSettled() && window.__tt!.scene()!.heroShcBodies.length > 0, undefined, { timeout: 150_000 })
   await page.waitForFunction(() => window.__tt!.scene()!.heroShcBodies.every((b) => !b.fading && b.rigHidden), undefined, { timeout: 60_000 })
+  // the hero count in perf stats follows the frame that attached the body: poll it
+  await expect.poll(() => page.evaluate(() => window.__tt!.perf().stats.heroEquipment), { timeout: 30_000 }).toBeGreaterThanOrEqual(1)
   const near = await page.evaluate(() => ({ stats: window.__tt!.perf().stats.heroEquipment, bodies: window.__tt!.scene()!.heroShcBodies }))
   console.log(`hero SHC bodies: ${JSON.stringify(near.bodies)}`)
   expect(near.bodies.length).toBeGreaterThanOrEqual(1)
@@ -220,7 +226,7 @@ test('SHC close-up: the hero SHC body replaces LOD0 on High, none requested befo
   expect(w.errors).toEqual([])
 })
 
-test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the box stays put, none on Low', async ({ page }) => {
+test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the box stays put, none on Low', { tag: '@equipment' }, async ({ page }) => {
   test.slow() // software WebGL
   const w = watch(page)
   await open(page, 'truck-gate-queue')
@@ -282,6 +288,8 @@ test('follow-truck close-up: the hero chassis and cab replace LOD0 on High, the 
   await page.evaluate(() => window.__tt!.setQuality('high'))
   await page.waitForFunction((id) => window.__tt!.heroSettled() && window.__tt!.scene()!.heroTrucks.some((t) => t.id === id), truck!.id, { timeout: 150_000 })
   await page.waitForFunction(() => window.__tt!.scene()!.heroTrucks.every((t) => !t.fading && t.rigHidden), undefined, { timeout: 60_000 })
+  // the hero count in perf stats follows the frame that attached the trucks: poll it
+  await expect.poll(() => page.evaluate(() => window.__tt!.perf().stats.heroEquipment), { timeout: 30_000 }).toBeGreaterThanOrEqual(1)
   const near = await page.evaluate(() => ({ stats: window.__tt!.perf().stats.heroEquipment, trucks: window.__tt!.scene()!.heroTrucks }))
   console.log(`hero trucks: ${JSON.stringify(near.trucks)}`)
   expect(near.stats).toBeGreaterThanOrEqual(1)

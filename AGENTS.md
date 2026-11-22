@@ -15,7 +15,25 @@ Before handing work back after code changes, run **`pnpm run verify`** (dependen
 - **Script arguments:** pnpm passes arguments after the script name straight through (`pnpm run lint --fix` works), and a `--` is handed to the script literally. In `.claude/launch.json` and similar, write `pnpm exec vite --port 5174`, not `pnpm run dev --port 5174`.
 - **Unit-test speed:** `vitest.config.ts` runs one fork per CPU (`maxWorkers: '100%'`), and CI restores vitest's per-file durations so the slowest files start first. In a test, read the engine state every event through `sim.query`, not `sim.snapshot()` (a snapshot clones the state and the whole event log), and let tests in one file share one expensive preset run in `beforeAll` when none of them changes it.
 - **Where checks run:** test files (`*.test.ts`, `*.smoke.ts`) and Node-only CLI code (`src/sims/*/cli/`) are type-checked by `tsconfig.tools.json`, not `tsconfig.app.json`. Terminal Twin scripts (`pnpm run tt:*`): the sim guide's "How to prove a change works" lists them.
-- **Browser smoke tests** (`pnpm run test:smoke`, Playwright) are not part of `verify`; run them alone with `scripts/bg.sh run --heavy ...` and report the `SMOKE:` line. In CI they run in 6 shards split by test (`fullyParallel`; locally one worker): a `Smoke build` job makes the smoke and production bundles once and hands them to every shard, each shard retries a failure once, stops after 5 failures and appends per-test results to a JSONL file as each test ends (kept when the job is cancelled), and the `Browser smoke tests (Terminal Twin)` job merges them (`scripts/smoke-merge.mjs`) into one `SMOKE:` line and one timing table that flags tests over 30 s; it is red when any shard fails or a test is missing. The `dev` project needs the dev API (`window.__tt`): locally it runs on the Vite dev server by default; `SMOKE_SERVER=build` (the CI default) serves the smoke build instead, a bundled build that keeps the dev API and boots pages faster (`pnpm run build:smoke`, `.smoke-build/`). Commands, CI dispatch and spec conventions: `docs/agents/tooling.md`.
+- **Browser smoke tests** (`pnpm run test:smoke`, Playwright) are not part of `verify`. Locally they run on the smoke build (the bundled app with the dev API `window.__tt`) at Low quality with rendering off (`openTwin`'s defaults), one worker, one shared page per worker reset between tests (#329, `tests/browser/twinTest.ts`). Run one group alone with `scripts/bg.sh run --heavy <log> pnpm run test:smoke --project=dev --grep-invert @load --grep @<group>` and report the `SMOKE:` line. CI balances its shards by recorded test time (`scripts/smoke-shards.mjs`; times from the last green run's report, then `scripts/smoke-timings.jsonl`; details in `docs/agents/tooling.md`). Run the groups a change needs, never the whole suite: `node scripts/smoke-select.mjs --base <branch> --head HEAD --grep` prints the pattern. Commands, CI jobs and spec conventions: `docs/agents/tooling.md`; which test level a behaviour belongs to: the sim guide's "Test levels".
+
+### Smoke labels
+
+Every PR that changes `src/` carries the `smoke:<group>` label of each area it touches. CI runs `core` plus the groups from those labels, from the changed paths (`scripts/smoke-map.txt`) and from changed specs, and keeps one PR comment saying why each group ran. The plain `smoke` label, a manual Run workflow and every push to `main` run every group; a red run on `main` opens a `needs-triage` issue. A PR with no `src/` change and no `smoke` or `smoke:<group>` label runs none, and the required check `Browser smoke tests (Terminal Twin)` passes as a no-op.
+
+| Label | Area of the system |
+| --- | --- |
+| `smoke:core` | boot, URL switches, render budget, production build, home page, build stamp, menu music, headless parity, shared-page reset (always runs) |
+| `smoke:shell` | HUD, top bar, views, pacing, display settings, volume and FPS chip, phone layout |
+| `smoke:camera` | camera, keyboard and wheel zoom, follow |
+| `smoke:setup` | setup dialog, scenario picker, presets, equipment and subsystem modes, yard start, saves |
+| `smoke:analysis` | KPIs, dashboard, debugger and inspector, vessel status |
+| `smoke:vessel` | hulls, bays and bay viewer, ROB, hatch covers, crane plan, colour by |
+| `smoke:equipment` | STS, ASC, SHC, trucks, spreaders, hero models, gantry alarm |
+| `smoke:yard` | containers and close-ups, infrastructure, atmosphere, hero faces, scene performance |
+| `smoke:engine` | the worker running a fixture to its golden hash (engine checks live in unit and headless tests) |
+
+Each smoke test carries exactly one group tag (`{ tag: '@camera' }`, checked in `verify`) and stays under 30 s; CI's timing table flags any test over the budget, and a test that needs more says why in a comment. Review rules for smoke specs: `docs/agents/tooling.md`.
 
 ## Agent tooling
 

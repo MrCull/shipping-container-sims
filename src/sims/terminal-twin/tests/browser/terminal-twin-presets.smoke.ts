@@ -2,7 +2,8 @@
  * TT-15 browser smoke test: presets, the live plan preview, validation and the kinematics readouts through the real
  * setup dialog; the TTI preset runs in the browser. Run with `pnpm run test:smoke` (not part of `pnpm test`).
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openAdvanced, openSetupTab, pickScenario } from './scenarioPicker'
 import { openTwin } from './openTwin'
@@ -16,7 +17,7 @@ async function openDialog(page: Page) {
   return dialog
 }
 
-test('the dialog offers the three presets and marks the TTI bay count as an assumption', async ({ page }) => {
+test('the dialog offers the three presets and marks the TTI bay count as an assumption', { tag: '@setup' }, async ({ page }) => {
   const dialog = await openDialog(page)
   for (const name of ['TTI Algeciras baseline', 'Small automated', 'TTI Algeciras, peak day']) {
     await expect(dialog.locator(`[data-testid="tt-preset-card"][data-scenario="${name}"]`)).toBeVisible()
@@ -30,7 +31,7 @@ test('the dialog offers the three presets and marks the TTI bay count as an assu
   await expect(dialog.getByTestId('tt-yard-start-prefilled')).toBeChecked()
 })
 
-test('a fresh load opens on Scenarios with the TTI baseline selected, by its plain name only', async ({ page }) => {
+test('a fresh load opens on Scenarios with the TTI baseline selected, by its plain name only', { tag: '@setup' }, async ({ page }) => {
   const dialog = await openDialog(page)
   await expect(dialog.getByTestId('tt-tab-scenarios')).toHaveAttribute('aria-selected', 'true')
   await expect(dialog.locator('[data-testid="tt-preset-card"][data-scenario="TTI Algeciras baseline"]')).toHaveAttribute('aria-checked', 'true')
@@ -42,7 +43,7 @@ test('a fresh load opens on Scenarios with the TTI baseline selected, by its pla
   await expect(detail.getByTestId('tt-detail-id')).toHaveCount(0)
 })
 
-test('two tabs with counts from the data; the detail pane shows chips and sketch, never the technical name', async ({ page }) => {
+test('two tabs with counts from the data; the detail pane shows chips and sketch, never the technical name', { tag: '@setup' }, async ({ page }) => {
   const dialog = await openDialog(page)
   await dialog.getByTestId('tt-tab-scenarios').click()
   const cards = dialog.getByTestId('tt-preset-card')
@@ -71,7 +72,7 @@ test('two tabs with counts from the data; the detail pane shows chips and sketch
   await expect(dialog).not.toContainText(benchId!)
 })
 
-test('a card is focusable and Enter selects it; the footer Start runs it', async ({ page }) => {
+test('a card is focusable and Enter selects it; the footer Start runs it', { tag: '@setup' }, async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   const dialog = await openDialog(page)
@@ -93,7 +94,7 @@ test('a card is focusable and Enter selects it; the footer Start runs it', async
   expect(errors).toEqual([])
 })
 
-test('seed and start date live under Advanced and still apply', async ({ page }) => {
+test('seed and start date live under Advanced and still apply', { tag: '@setup' }, async ({ page }) => {
   const dialog = await openDialog(page)
   await expect(dialog.locator('input[name="seed"]')).toBeHidden()
   await openAdvanced(dialog)
@@ -109,7 +110,7 @@ test('seed and start date live under Advanced and still apply', async ({ page })
   await expect(dialog.locator('input[name="seed"]')).toHaveValue('4242')
 })
 
-test('the plan preview follows the counts and an impossible configuration cannot start', async ({ page }) => {
+test('the plan preview follows the counts and an impossible configuration cannot start', { tag: '@setup' }, async ({ page }) => {
   const dialog = await openDialog(page)
   await pickScenario(dialog, 'TTI Algeciras baseline')
   await openSetupTab(dialog, 'yard')
@@ -128,7 +129,7 @@ test('the plan preview follows the counts and an impossible configuration cannot
   await expect(dialog.getByRole('button', { name: 'Start', exact: true })).toBeEnabled()
 })
 
-test('the STS cycle readout follows the kinematics', async ({ page }) => {
+test('the STS cycle readout follows the kinematics', { tag: '@setup' }, async ({ page }) => {
   const dialog = await openDialog(page)
   await pickScenario(dialog, 'TTI Algeciras baseline')
   await openSetupTab(dialog, 'yard')
@@ -138,7 +139,7 @@ test('the STS cycle readout follows the kinematics', async ({ page }) => {
   await expect(readout).not.toHaveText(before ?? '')
 })
 
-test('the decision-point settings are exposed', async ({ page }) => {
+test('the decision-point settings are exposed', { tag: '@setup' }, async ({ page }) => {
   const dialog = await openDialog(page)
   await pickScenario(dialog, 'Small automated')
   await openAdvanced(dialog)
@@ -147,7 +148,7 @@ test('the decision-point settings are exposed', async ({ page }) => {
   await expect(dialog.getByTestId('tt-dp-stsGroundPosition').locator('select').first()).toBeVisible()
 })
 
-test('the TTI preset runs in the browser', async ({ page }) => {
+test('the TTI preset runs in the browser', { tag: '@setup' }, async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   const dialog = await openDialog(page)

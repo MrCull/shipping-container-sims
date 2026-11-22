@@ -5,12 +5,12 @@
  * JSON file to write (the baseline command sets it; `TT_BASELINE_STRICT=1` runs with "strict checks", #252); never run in CI (`@load`).
  */
 import { writeFileSync } from 'node:fs'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './twinTest'
 
 const OUT = process.env.TT_BASELINE_OUT
 const SPEEDS = [60, 120, 300, 600, 1200, 1800, 3600]
 
-test('engine rate per speed step, rendering excluded @load @baseline', async ({ page }) => {
+test('engine rate per speed step, rendering excluded @load @baseline', { tag: '@engine' }, async ({ page }) => {
   test.skip(!OUT, 'run through pnpm run tt:baseline')
   test.setTimeout(1_200_000)
   const preset = process.env.TT_BASELINE_PRESET ?? 'TTI Algeciras baseline'

@@ -1,13 +1,12 @@
 /**
- * TT-05 browser smoke tests: the SHC fixture through the dev-only `window.__tt` API.
- * Run with `pnpm run test:smoke` (not part of `pnpm test`).
+ * TT-05 browser smoke tests: SHC animation in the frame loop and the lane-graph and reservation overlay buttons, through
+ * the dev-only `window.__tt` API. The SHC scene checks run in the headless scene (`headless-scene-engine.test.ts`) and
+ * the setup dialog in `terminal-twin-setup-equipment.smoke.ts` (#333). Run with `pnpm run test:smoke` (not `pnpm test`).
  */
-import { expect, test, type Page } from '@playwright/test'
-import type { ContainerState, RunSummary } from '../../engine'
-import golden from '../../scenario/fixtures/shc-1sts-2shc-1wtp.golden.json' with { type: 'json' }
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { sampleFrames, simPerWallSecond, advancedFraction, neverBackwards } from './frameSampling'
-import { openSetupTab, pickScenario } from './scenarioPicker'
 import { openTwin } from './openTwin'
 
 const FIXTURE = 'shc-1sts-2shc-1wtp'
@@ -26,54 +25,7 @@ async function openShc(page: Page): Promise<void> {
   await expect(page.getByRole('dialog', { name: /new scenario/i })).toBeHidden()
 }
 
-test('the SHC fixture runs in the browser: golden hash, custody chain, rendered SHCs match the engine', async ({ page }) => {
-  const errors = collectErrors(page)
-  await openShc(page)
-  expect((await page.evaluate(() => window.__tt!.runUntil())).reason).toBe('ended')
-
-  const summary = await page.evaluate(() => window.__tt!.query<RunSummary>('summary'))
-  expect(summary.eventLogHash).toBe(golden.eventLogHash)
-  expect(summary.kpis).toEqual(golden.kpis)
-  expect(summary.invariants.violations).toBe(0)
-
-  const boxes = await page.evaluate(() => window.__tt!.query<{ id: string }[]>('containers'))
-  for (const { id } of boxes) {
-    const box = await page.evaluate((cid) => window.__tt!.query<ContainerState>('container', cid), id)
-    expect(box.custodyHistory.slice(0, 5).map((h) => h.owner.kind), id).toEqual([
-      'vesselSlot',
-      'sts',
-      'groundPosition',
-      'shc',
-      'wtpPad',
-    ])
-  }
-
-  await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
-  const shcList = await page.evaluate(() => window.__tt!.query<{ id: string; status: string }[]>('shcList'))
-  const scene = await page.evaluate(() => window.__tt!.scene())
-  expect(scene!.shcs).toBe(shcList.length)
-  expect(scene!.shcs).toBe(2)
-  expect(scene!.containers).toBe(boxes.length)
-  const state = await page.evaluate(() => window.__tt!.sceneState())
-  for (const shc of shcList) expect(state!.shcs[shc.id].status).toBe(shc.status)
-  expect(errors).toEqual([])
-})
-
-test('paused mid-trip, the scene shows each SHC and box where the engine has them', async ({ page }) => {
-  await openShc(page)
-  // Stop while the first box is on its way to the WTP pad (runUntil pauses at the engine time).
-  await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingLoaded' }))
-  const state = await page.evaluate(() => window.__tt!.sceneState())
-  const boxes = await page.evaluate(() =>
-    window.__tt!.query<{ id: string; custody: { kind: string; id: string } }[]>('containers'),
-  )
-  const shcs = await page.evaluate(() => window.__tt!.query<{ id: string; status: string }[]>('shcList'))
-  for (const box of boxes) expect(state!.containers[box.id], box.id).toEqual(box.custody)
-  for (const shc of shcs) expect(state!.shcs[shc.id].status).toBe(shc.status)
-  expect(boxes.some((b) => b.custody.kind === 'shc')).toBe(true)
-})
-
-test('SHCs animate smoothly at ×1 and keep animating every frame at ×600', async ({ page }) => {
+test('SHCs animate smoothly at ×1 and keep animating every frame at ×600', { tag: '@equipment' }, async ({ page }) => {
   await openShc(page)
   // Start as SHC01 sets off empty towards the first box.
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'ShcRoutingEmpty' }))
@@ -110,7 +62,7 @@ test('SHCs animate smoothly at ×1 and keep animating every frame at ×600', asy
   expect(changed).toBe(true)
 })
 
-test('lane-graph and reservation overlays toggle on and off', async ({ page }) => {
+test('lane-graph and reservation overlays toggle on and off', { tag: '@equipment' }, async ({ page }) => {
   const errors = collectErrors(page)
   await openShc(page)
   // Step through SHC01's first trip in 5 s runs until it holds reservations (they come and go as it moves), then pause.
@@ -147,27 +99,3 @@ test('lane-graph and reservation overlays toggle on and off', async ({ page }) =
   expect(errors).toEqual([])
 })
 
-test('the setup dialog sets the SHC count and kinematics', async ({ page }) => {
-  await openTwin(page)
-  const dialog = page.getByRole('dialog', { name: /new scenario/i })
-  await expect(dialog).toBeVisible()
-  await pickScenario(dialog, FIXTURE)
-  await openSetupTab(dialog, 'yard')
-  await expect(dialog.getByRole('group', { name: /shuttle carriers/i })).toBeVisible()
-  const readout = dialog.getByTestId('tt-shc-readout')
-  const before = await readout.textContent()
-  await dialog.getByLabel('Count').fill('3')
-  await dialog.getByLabel(/Empty speed/).fill('5') // well below the speeds SHCs reach between turns
-  await expect(readout).not.toHaveText(before ?? '')
-  await dialog.getByRole('button', { name: 'Start' }).click()
-  await expect(dialog).toBeHidden()
-  await page.waitForFunction(() => !!window.__tt)
-  const shcs = await page.evaluate(() => window.__tt!.query<{ id: string }[]>('shcList'))
-  expect(shcs.map((s) => s.id)).toEqual(['SHC01', 'SHC02', 'SHC03'])
-  await page.evaluate(() => window.__tt!.runUntil())
-  const summary = await page.evaluate(() => window.__tt!.query<RunSummary>('summary'))
-  expect(summary.status).toBe('ended')
-  expect(summary.invariants.violations).toBe(0)
-  expect(summary.eventLogHash).not.toBe(golden.eventLogHash)
-  expect(Object.keys(summary.kpis.horizontal!.shcs)).toHaveLength(3)
-})

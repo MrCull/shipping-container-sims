@@ -5,7 +5,8 @@
  * berth and at anchorage. Screenshots go to .screenshots/assets/vessel-*.png.
  * Run with `pnpm run test:smoke`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import atlas from '../../assets/models/vessels/vessel-livery-atlas.json' with { type: 'json' }
 import type {} from '../../dev/devApi' // window.__tt typing
 import type { VesselConfig, VesselSizeClass } from '../../scenario/types'
@@ -35,17 +36,23 @@ async function open(page: Page, vessels: VesselConfig[], quayLengthM: number): P
   )
   // Berthed (mooring takes a while), before the cranes have taken much off.
   await page.evaluate(() => window.__tt!.runUntil({ eventType: 'StsMoveStarted' }))
-  await page.waitForFunction(() => {
+  // Wait for this load's hulls by id: on the shared page an empty or previous map would pass an `every` check.
+  await page.waitForFunction((ids) => {
     const s = window.__tt!.sceneState()
-    return !!s && Object.values(s.vesselHulls).every((h) => h.assets === 'loaded')
-  })
+    return !!s && ids.every((id) => s.vesselHulls[id]?.assets === 'loaded')
+  }, vessels.map((v) => v.id))
 }
 
-test('every size class renders its hull GLB and deck containers sit on its bay grid', async ({ page }) => {
+test('every size class renders its hull GLB and deck containers sit on its bay grid', { tag: '@vessel' }, async ({ page }) => {
   test.setTimeout(120_000)
   const errors = watchErrors(page)
   for (const sizeClass of CLASSES) {
     await open(page, [call('V001', sizeClass, { name: 'HMM Tarifa' })], 900)
+    // the bay grid reads null until a frame has shown the hull (render is off): wait for this class's hull to be shown
+    await page.waitForFunction((c) => {
+      const h = window.__tt!.sceneState()?.vesselHulls.V001
+      return h?.sizeClass === c && h.bayGrid !== null
+    }, sizeClass)
     const state = (await page.evaluate(() => window.__tt!.sceneState()))!
     const hull = state.vesselHulls.V001
     expect(hull.sizeClass).toBe(sizeClass)
@@ -76,7 +83,7 @@ test('every size class renders its hull GLB and deck containers sit on its bay g
   expect(errors).toEqual([])
 })
 
-test('livery and name follow each vessel’s line from the scenario', async ({ page }) => {
+test('livery and name follow each vessel’s line from the scenario', { tag: '@vessel' }, async ({ page }) => {
   const errors = watchErrors(page)
   const vessels = [
     call('V001', 'feeder', { name: 'Ever Lucent' }),
@@ -100,7 +107,7 @@ test('livery and name follow each vessel’s line from the scenario', async ({ p
   expect(errors).toEqual([])
 })
 
-test('hulls switch LOD with distance, at berth and at anchorage', async ({ page }) => {
+test('hulls switch LOD with distance, at berth and at anchorage', { tag: '@vessel' }, async ({ page }) => {
   const errors = watchErrors(page)
   // The quay fits one Panamax: the ULCV waits at anchorage.
   await open(page, [call('V001', 'panamax', { name: 'HMM Tarifa' }), call('V002', 'ulcv', { name: 'ONE Harmony', arrivalS: 30 })], 320)

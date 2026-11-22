@@ -4,14 +4,16 @@
  * about the ground point between the fingers without turning or sliding the view (modules/pinchGesture.ts).
  * Dev-only `window.__tt` API. Run with `pnpm run test:smoke`.
  */
-import { expect, test, type CDPSession, type Page } from '@playwright/test'
+import { type CDPSession, type Page } from '@playwright/test'
+import { expect, test } from './twinTest'
 import * as THREE from 'three'
 import type {} from '../../dev/devApi' // window.__tt typing
 import { openTwin } from './openTwin'
 
 const FIXTURE = 'landside-morning-peak'
 
-test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+// Fresh page: touch and mobile are browser-context options, which the worker's shared page cannot take per test (#329).
+test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, fresh: true })
 
 /** Two fingers `from` px apart around (cx, cy), spreading to `to` px while their midpoint moves by (dx, dy). */
 async function pinch(page: Page, cdp: CDPSession, cx: number, cy: number, from: number, to: number, dx = 0, dy = 0, steps = 8): Promise<void> {
@@ -52,7 +54,7 @@ function anchorOf(a: Pose, b: Pose): { x: number; z: number } {
   return { x: a.target.x + (b.target.x - a.target.x) / (1 - s), z: a.target.z + (b.target.z - a.target.z) / (1 - s) }
 }
 
-test('phone: the view fits the screen, HUD collapses, pinch zooms about the fingers', async ({ page }) => {
+test('phone: the view fits the screen, HUD collapses, pinch zooms about the fingers', { tag: '@shell' }, async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
   await openTwin(page, { scenario: FIXTURE }) // the phone viewport comes from test.use above

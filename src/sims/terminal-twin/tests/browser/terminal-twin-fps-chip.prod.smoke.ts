@@ -8,7 +8,7 @@ import { openTwin } from './openTwin'
 /** A fresh load selects the TTI baseline (#156); these checks run on the small tracer fixture. */
 const TRACER = 'tracer-1sts-10-boxes'
 
-test('the FPS chip is visible in a production build and toggles the perf panel', async ({ page }) => {
+test('the FPS chip is visible in a production build and toggles the perf panel', { tag: '@core' }, async ({ page }) => {
   await openTwin(page, { devApi: false })
   await pickScenario(page, TRACER)
   await page.getByRole('button', { name: 'Start' }).click()
