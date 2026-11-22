@@ -19,7 +19,11 @@ export const RENDER_BUDGETS: Record<'start' | 'overview' | 'yard-closeup', Rende
   // 22 Nov 2026 for spec #297 (STS booms, crane classes, boom visuals). Overview 299 to 310 calls: 9 from the new crane
   // class and boom detail (#300, #303; 308 with every boom down) and 2 from raised booms. Start (782 to 761 calls) and the
   // yard close-up (457 to 449) got lighter, so their budgets come down to keep the room from being spent silently.
-  start: { calls: 761, triangles: 1_078_015 },
-  overview: { calls: 310, triangles: 392_463 },
-  'yard-closeup': { calls: 449, triangles: 723_029 },
+  // Re-measured 22 Nov 2026 for #270 (booked boxes stack up their own group in the pre-fill): the baseline yard holds the
+  // same 60 % of cells, but booked exports and empties now stand in taller stacks, so more box sides face the cameras.
+  // Start 1,078,015 to 1,141,631 triangles (761 to 774 calls), overview 310 to 322 calls, yard close-up 449 to 464 calls
+  // and 723,029 to 742,903 triangles. Worth it: it is the yard layout the peak day needs to reach its 75 % target.
+  start: { calls: 774, triangles: 1_141_631 },
+  overview: { calls: 322, triangles: 394_095 },
+  'yard-closeup': { calls: 464, triangles: 742_903 },
 }
