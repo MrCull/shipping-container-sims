@@ -33,8 +33,17 @@ export function resetCounters(state: SimState): void {
     w.cellsAtEnd = {}
     for (const s of Object.values(state.yardSlots)) w.cellsAtEnd[s.blockId] = (w.cellsAtEnd[s.blockId] ?? 0) + s.span
   }
+  const ls = state.kpis.landside
+  const roadNow = ls?.roadNow ?? 0
   zero(state.kpis)
   zero(state.decisions.kpis)
+  if (ls) {
+    // gauges of work in progress: trucks still on the roads stay there, and the time integrals restart here
+    ls.roadNow = roadNow
+    ls.roadMax = roadNow
+    ls.roadLastT = state.now
+    ls.holdLastT = state.now
+  }
 }
 
 export const warmUpReactors: ReactorMap = {
