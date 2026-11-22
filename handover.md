@@ -13,7 +13,7 @@ Integration branch: `claude/gallant-curie-3so8w0`. Orchestrator steps: `docs/age
 | #316 | Warm-up and horizon in experiments | #311, #313 | merged in branch (907df2f) | |
 | #317 | Parallel replicates, heavy lock, cost guard and provenance | #313 | merged in branch (e860163) | |
 | #318 | Example experiments, glossary and first measured report | #310, #314, #315, #316 | merged in branch (65c4531) | |
-| #319 | Run the browser smoke suite and fix regressions | all | open | |
+| #319 | Run the browser smoke suite and fix regressions | all | done: CI run 45050346902, SMOKE: 157 passed, 0 failed, 0 flaky, 0 skipped (render budget re-measured for #310 in 79a6605) | |
 
 ## Next steps
 
