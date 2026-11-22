@@ -118,7 +118,7 @@ describe('tt:run --param', () => {
 })
 
 describe('engine-side params', () => {
-  it('predispatchMarginS overrides queueAreas.predispatchMarginS only when set', () => {
+  it('PREDISPATCH_MARGIN_S overrides queueAreas.predispatchMarginS only when set', () => {
     const fx = fixtures['shc-prepositioning']
     const point = fx.decisions?.points?.shcDispatch
     expect(point?.strategy).toBe('predispatch')
@@ -127,7 +127,9 @@ describe('engine-side params', () => {
       sim.runUntil()
       return sim.eventLogHash()
     }
-    expect(run({ predispatchMarginS: 15 })).toBe(run())
-    expect(run({ predispatchMarginS: 0 })).not.toBe(run())
+    expect(run({ PREDISPATCH_MARGIN_S: 15 })).toBe(run())
+    expect(run({ PREDISPATCH_MARGIN_S: 0 })).not.toBe(run())
+    // The old camelCase name is gone (unreleased, no shim), and the engine reads the param through the resolver.
+    expect(() => run({ predispatchMarginS: 0 })).toThrow(/has no param "predispatchMarginS"/)
   })
 })

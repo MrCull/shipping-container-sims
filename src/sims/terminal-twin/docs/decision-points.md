@@ -180,7 +180,7 @@ the same handler as before, so event logs and goldens are unchanged. CLI: `tt:ru
 | Decision point | Strategy | Param | Default | Unit | Range | Meaning |
 |---|---|---|---|---|---|---|
 | `shcDispatch` | `paired-dual-cycle` | `PAIRING_RADIUS_M` | 150 | m | 0 to 10,000 | route length within which the paired job beats the nearest job |
-| `shcDispatch` | `predispatch` | `predispatchMarginS` | 15 | s | 0 to 3,600 | engine side (`engine/subsystems/shc.ts#maybePredispatch`): slack on an idle SHC's travel time; when unset, `queueAreas.predispatchMarginS`, else 15 |
+| `shcDispatch` | `predispatch` | `PREDISPATCH_MARGIN_S` | 15 | s | 0 to 3,600 | engine side (`engine/subsystems/shc.ts#maybePredispatch`): slack on an idle SHC's travel time; when unset, `queueAreas.predispatchMarginS`, else 15 |
 | `wtpPadSelection` | `balanced` | `BALANCED_FILL_M` | 6000 | m | 0 to 1,000,000 | plan distance one unit of block fill is worth |
 | `wtpPadSelection` | `balanced` | `BALANCED_QUEUED_M` | 60 | m | 0 to 100,000 | plan distance one queued ASC job of the block is worth |
 | `yardAllocation` | `nearest-wtp`, `grouped` | `TIER_COST_M` | 6 | m | 0 to 100,000 | cost per tier above the ground (higher: lower stacks, more spread) |
@@ -197,7 +197,7 @@ the same handler as before, so event logs and goldens are unchanged. CLI: `tt:ru
 Every other strategy takes no params (its constants are orderings or ties, not weights). Not params: `BLOCK_FREE_RESERVE`
 (engine side, every pad strategy), `workPackages.releaseAhead` (already a scenario field), `rehandleTarget`'s
 lexicographic cost. Directions proved in `tests/strategy-params.test.ts`: a higher `TIER_COST_M` in `nearest-wtp` gives a
-lower mean stack height on `asc-1sts-10-boxes-1block`; `predispatchMarginS` 0 changes `shc-prepositioning`. To add a
+lower mean stack height on `asc-1sts-10-boxes-1block`; `PREDISPATCH_MARGIN_S` 0 changes `shc-prepositioning`. To add a
 param: declare it in the entry's `tunable` params with today's constant as the default, read it from the bound `params`, and
 add a row here.
 

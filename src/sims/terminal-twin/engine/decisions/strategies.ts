@@ -121,8 +121,11 @@ const yardGroupedParams: Record<string, StrategyParamSpec> = {
 }
 const yardParams = (p: StrategyParams): YardCostParams => ({ ...YARD_COST_DEFAULTS, ...p })
 
-/** Engine-side default of `predispatch`'s margin; `queueAreas.predispatchMarginS` sets it when the param is unset. */
-export const PREDISPATCH_MARGIN_PARAM = 'predispatchMarginS'
+/**
+ * Name of `predispatch`'s margin param (s), read engine side (`engine/subsystems/shc.ts#maybePredispatch`). When the
+ * scenario does not set it, `queueAreas.predispatchMarginS` applies, else `DEFAULT_PREDISPATCH_MARGIN_S`.
+ */
+export const PREDISPATCH_MARGIN_PARAM = 'PREDISPATCH_MARGIN_S'
 
 export interface DecisionPointStrategies<K extends DecisionPointId> {
   /** Used when the scenario names no strategy, and as the default fallback. */

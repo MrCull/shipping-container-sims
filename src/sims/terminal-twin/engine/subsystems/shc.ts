@@ -30,6 +30,7 @@ import { cornerSpeedCap, planSegment, positionAt, travelTime, type AxisProfile, 
 import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph, type PathGraph, type QueueArea } from '../laneGraph'
 import { earliestStart, mergeWindows, reserve, type WindowSpec } from '../reservations'
 import type { BlockLoad, ShcDispatchPad } from '../decisions/types'
+import { PREDISPATCH_MARGIN_PARAM, resolveStrategyParams } from '../decisions/strategies'
 import type { ShcJob, ShcPlannedEvent, ShcState, ShcStatus, SimState } from '../state'
 import { DEFAULT_SHC_CORNER, DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
 import { DEFAULT_PREDISPATCH_MARGIN_S, type ShcKinematics } from '../../scenario/types'
@@ -569,6 +570,14 @@ function predictionDeficits(ctx: EngineContext): { deficits: PredictionDeficit[]
   return { deficits, spare: spare.sort((a, b) => (a.id < b.id ? -1 : 1)) }
 }
 
+/** `predispatch`'s margin (s): its param when the scenario sets it (resolved and range-checked), else the queue areas', else 15. */
+function predispatchMarginS(ctx: EngineContext): number {
+  const params = ctx.config.decisions?.points?.shcDispatch?.params
+  if (params && PREDISPATCH_MARGIN_PARAM in params)
+    return resolveStrategyParams('shcDispatch', 'predispatch', params)[PREDISPATCH_MARGIN_PARAM]
+  return ctx.config.queueAreas?.predispatchMarginS ?? DEFAULT_PREDISPATCH_MARGIN_S
+}
+
 /**
  * Pre-dispatch: send an idle SHC to a queue area when a box there is predicted ready within the SHC's travel time
  * plus `queueAreas.predispatchMarginS`. The SHC claims a queue spot, not a job: the box is dispatched only once it
@@ -579,8 +588,7 @@ export function maybePredispatch(ctx: EngineContext): void {
   if (!isPredispatch(ctx) || state.subsystems.shc === 'off') return
   const graph = laneGraphOf(ctx.config)
   if (graph.queueAreas.length === 0) return
-  const margin =
-    ctx.config.decisions?.points?.shcDispatch?.params?.predispatchMarginS ?? ctx.config.queueAreas?.predispatchMarginS ?? DEFAULT_PREDISPATCH_MARGIN_S
+  const margin = predispatchMarginS(ctx)
   const empty = kinematics(ctx).driveEmpty
   const { deficits, spare } = predictionDeficits(ctx)
   for (const { pred, area } of deficits) {
