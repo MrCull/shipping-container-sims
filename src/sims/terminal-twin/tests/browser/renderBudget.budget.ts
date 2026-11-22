@@ -19,7 +19,10 @@ export const RENDER_BUDGETS: Record<'start' | 'overview' | 'yard-closeup', Rende
   // 22 Nov 2026 for spec #297 (STS booms, crane classes, boom visuals). Overview 299 to 310 calls: 9 from the new crane
   // class and boom detail (#300, #303; 308 with every boom down) and 2 from raised booms. Start (782 to 761 calls) and the
   // yard close-up (457 to 449) got lighter, so their budgets come down to keep the room from being spent silently.
-  start: { calls: 761, triangles: 1_078_015 },
-  overview: { calls: 310, triangles: 392_463 },
-  'yard-closeup': { calls: 449, triangles: 723_029 },
+  // Re-measured 22 Nov 2026 for spec #309 (#310, one RNG stream per source, engine 0.59.0): no renderer change, but the
+  // new per-source draws put different equipment and boxes in view at the fixed run point (sim time 2684 s). Start 761
+  // to 797 calls (lod0 boxes 221), yard close-up 449 to 472; overview unchanged at 310.
+  start: { calls: 797, triangles: 1_084_501 },
+  overview: { calls: 310, triangles: 392_487 },
+  'yard-closeup': { calls: 472, triangles: 727_209 },
 }
