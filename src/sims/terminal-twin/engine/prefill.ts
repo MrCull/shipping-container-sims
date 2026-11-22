@@ -146,6 +146,7 @@ export function* prefillSteps(
   function* tryPlace(
     box: { id: string; size: ContainerSize; full: boolean; line: string; vesselId: string; reefer?: true; props?: ContainerProps },
     strict = true,
+    stackUp = false,
   ): Generator<YardAllocationRequest, ExportPlacement | null, string | null> {
     const view = grouped && box.props ? prefillView(box.line, box.size, box.props) : null
     const key = view ? prefillBlockKey(view) : ''
@@ -176,7 +177,7 @@ export function* prefillSteps(
         heights: b.heights.slice(),
         topVessels: b.tops.slice(),
         stackSpans: b.spans.slice(),
-        ...(view ? { box: view, stackTops: b.views.slice(), ...(strict ? { sameGroupOnly: true as const } : {}) } : {}),
+        ...(view ? { box: view, stackTops: b.views.slice(), ...(strict ? { sameGroupOnly: true as const } : {}), ...(stackUp ? { stackOwnGroup: true as const } : {}) } : {}),
         ...reeferFields(b.spec, box.reefer),
         ...reserveFields(b.spec),
         random: rng(),
@@ -222,7 +223,7 @@ export function* prefillSteps(
   }
   const pool = plan.containers.filter((c) => c.flow === 'pool').sort((a, b) => (b.ageS ?? 0) - (a.ageS ?? 0) || (a.id < b.id ? -1 : 1))
   for (const c of [...exports, ...pool]) {
-    let p = yield* tryPlace(c)
+    let p = yield* tryPlace(c, true, true) // #270: a booked box stacks up its own group first, leaving stacks free for the filler
     if (!p && grouped) p = yield* tryPlace(c, false) // a booked box is always placed, even on another group
     if (!p) throw new Error(`The yard has no room for ${c.flow === 'load' ? 'export box' : 'empty'} ${c.id} (add yard blocks, bays or tiers)`)
   }

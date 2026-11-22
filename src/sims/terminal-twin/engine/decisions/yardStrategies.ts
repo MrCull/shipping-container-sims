@@ -133,5 +133,19 @@ export function groupedSlot(req: YardAllocationRequest): YardAllocationReply {
     return true
   }
   const candidates = candidateSlots(req)
-  return { slotId: cheapest(req.sameGroupOnly ? candidates.filter(sameGroup) : candidates, cost)?.slotId ?? null }
+  const allowed = req.sameGroupOnly ? candidates.filter(sameGroup) : candidates
+  if (req.stackOwnGroup) {
+    // #270 (pre-fill, booked boxes): on top of the own group in order, before opening a new stack
+    const onOwn = (c: YardCandidate): boolean => {
+      if (c.tier === 1) return false
+      for (let k = 0; k < c.span; k++) {
+        const below = tops[(c.bay + k - 1) * req.rows + (c.row - 1)]
+        if (!below || yardGroupBreak(box, below) !== 'none') return false
+      }
+      return true
+    }
+    const up = cheapest(allowed.filter(onOwn), cost)
+    if (up) return { slotId: up.slotId }
+  }
+  return { slotId: cheapest(allowed, cost)?.slotId ?? null }
 }
