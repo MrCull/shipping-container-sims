@@ -4,7 +4,7 @@ Integration branch: `claude/gallant-curie-3so8w0`. Orchestrator steps: `docs/age
 
 | Ticket | Title | Blocked by | Status | Claimed by |
 | --- | --- | --- | --- | --- |
-| #310 | One RNG stream per source | | open | |
+| #310 | One RNG stream per source | | merged in branch (4cff9d6) | |
 | #311 | Measurement warm-up for any yard start mode | | merged in branch (f289569) | |
 | #312 | Strategy parameters per decision point | | merged in branch (b846cc4) | |
 | #313 | Tracer, minimal tt:experiment end to end | | merged in branch (c346589) | |
@@ -17,7 +17,7 @@ Integration branch: `claude/gallant-curie-3so8w0`. Orchestrator steps: `docs/age
 
 ## Next steps
 
-- #310 regenerates every golden: run it after #311 and #312 are merged so no other ticket touches goldens in parallel.
+- #310 merged (ENGINE_VERSION 0.59.0, goldens regenerated). Its follow-up for #318: paired-dual-cycle does not save empty driving once RNG is per-source; an experiment should measure it.
 
 ## Open points
 
