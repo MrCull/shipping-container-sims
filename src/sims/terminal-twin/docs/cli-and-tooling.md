@@ -99,6 +99,8 @@ equals that slice of the uninterrupted run. Handlers are not in snapshots: pass 
 
 ## tt:experiment
 
+Guide, example files and how to read the report: [experiments.md](experiments.md). This section is the flag and field reference.
+
 ```
 pnpm run tt:experiment <experiment.json> [--jobs N] [--out DIR] [--yes] [--dry-run]
 ```

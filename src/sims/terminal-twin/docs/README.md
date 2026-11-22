@@ -28,6 +28,7 @@ Written for AI agents that need to learn the Terminal Twin quickly and help deci
 | [kpis-and-reports.md](kpis-and-reports.md) | Which KPIs and end conditions exist, and what do the summary, golden, profiler and productivity reports contain? |
 | [scenarios-and-persistence.md](scenarios-and-persistence.md) | How are presets, fixtures and layouts defined and validated; how do saves, snapshots and rewind work? |
 | [cli-and-tooling.md](cli-and-tooling.md) | What does every `tt:*` command and helper script do, with which flags and outputs? |
+| [experiments.md](experiments.md) | How do I find out whether config B is better than A: experiment file, KPI catalogue, verdict rules, example files, reading and reproducing a report? |
 | [browser-host.md](browser-host.md) | How does the browser run the engine (worker), and how do playback, dashboard, debugger, inspector, bay viewer and the `window.__tt` dev API work? |
 | [rendering-3d.md](rendering-3d.md) | How is the 3D scene built and posed each frame: instancing, equipment rigs, hulls, quality tiers, lighting, sound? |
 | [assets-pipeline.md](assets-pipeline.md) | How are the GLB models and sounds generated, budgeted and checked? |
@@ -38,6 +39,7 @@ Written for AI agents that need to learn the Terminal Twin quickly and help deci
 | [reports/realistic-volume-reports.md](reports/realistic-volume-reports.md) | Measured runs per `TTI_MOVES_SCALE` step (run lines, KPIs, profiles, failure analyses). |
 | [reports/throughput-and-speed-report.md](reports/throughput-and-speed-report.md) | Measured CPU profile and sim-time breakdown of the peak day (engine 0.52.0, scale 0.5). |
 | [reports/crane-plan-report.md](reports/crane-plan-report.md) | Crane plan (#288): peak-day cost against main, predicted against actual finish, conflict and rail wait. |
+| [reports/experiment-pad-selection-report.md](reports/experiment-pad-selection-report.md) | First measured experiment (#318): WTP pad selection `balanced` vs `nearest-box` on the TTI Algeciras baseline, paired over seeds. |
 
 ## Keeping these docs current
 
