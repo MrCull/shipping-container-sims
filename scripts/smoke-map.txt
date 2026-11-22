@@ -9,6 +9,7 @@
 (^|/)(sceneDriver|sceneState|useTwinScene)\.ts$ => all
 (^|/)tests/browser/scenarioPicker\.ts$ => setup
 (^|/)tests/browser/renderBudget[A-Za-z.]*\.ts$ => core
+(^|/)tests/drawn-boxes\.reference\.json$ => core yard
 (^|/)(bay|Bay|rob|Rob|hullProfile)[A-Za-z-]*\.(ts|vue)$ => vessel
 (^|/)(boom|Boom)[A-Za-z-]*\.(ts|vue)$ => equipment
 (^|/)(cranePlan|CranePlan)[A-Za-z-]*\.(ts|vue)$|engine/cranePlan/ => vessel
