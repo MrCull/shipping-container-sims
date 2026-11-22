@@ -30,7 +30,7 @@ import { ContainerInstancer, type DrawnBox } from './containerInstancer'
 import { describeMarkings } from './containerMarkings'
 import { colourContextOf, colourOf, DEFAULT_COLOUR_BY, DEFAULT_ROB_DISPLAY, hexToInt, isTimeBased, type ColourBy, type ColourContext, type RobDisplay } from './colourBy'
 import { liveryBodyColour, liveryIndexForBox, loadContainerAssets, type ContainerAssets } from './containerAssets'
-import { boxTone, type BoxTone } from './boxLivery'
+import { boxTone, tonedColour, type BoxTone } from './boxLivery'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { beaconFlashOn, GantryBeacons } from './gantryBeacons'
 import type { SoundSource } from './soundMixer'
@@ -245,7 +245,8 @@ export class SceneRenderer {
           heavy: d?.heavy,
           liveryIndex: this.tint[i] >= 0 ? undefined : this.containerLivery[i], // a tinted (colour by) box keeps its true line
         }),
-        bodyColour: this.tint[i] >= 0 ? `#${this.tint[i].toString(16).padStart(6, '0')}` : liveryBodyColour(this.containerLivery[i]),
+        // the default mode's per-box tone too (#362), so the close-up and hero faces keep the instanced box's colour
+        bodyColour: this.tint[i] >= 0 ? `#${this.tint[i].toString(16).padStart(6, '0')}` : tonedColour(liveryBodyColour(this.containerLivery[i]), this.containerTone[i] ?? boxTone(id)),
       }
     })
     // default-mode tile: the line's livery or a leasing variant, from the box id (#360); colour-by tints use the true line

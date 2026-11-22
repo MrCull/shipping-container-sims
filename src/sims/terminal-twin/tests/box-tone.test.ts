@@ -3,7 +3,9 @@
  * (slightly faded or dirty), a pure function of its id, so a stack is not a row of identical clones.
  */
 import { describe, expect, it } from 'vitest'
-import { TONE_BRIGHTNESS_RANGE, TONE_LEVELS, TONE_SATURATION_RANGE, boxTone, toneFraction } from '../modules/boxLivery'
+import * as THREE from 'three'
+import { TONE_BRIGHTNESS_RANGE, TONE_LEVELS, TONE_SATURATION_RANGE, boxTone, tonedColour, toneFraction } from '../modules/boxLivery'
+import atlas from '../assets/models/containers/livery-atlas.json'
 
 const ids = Array.from({ length: 5000 }, (_, i) => `TGHU${String(i).padStart(6, '0')}${i % 10}`)
 
@@ -53,5 +55,29 @@ describe('box tone (#361)', () => {
       fractions.add(f)
     }
     expect(fractions.size).toBe(TONE_LEVELS * TONE_LEVELS)
+  })
+
+  // #362: the close-up and hero faces drawn over a near box take its colour from `CloseupSource.bodyColour`, so a box
+  // must get the same tone there as the instanced box's shader gives it, or it changes colour as it changes level of detail
+  it('tones a CSS colour exactly as the livery shader tones the box (linear space), so close-up and hero faces match', () => {
+    const shader = (css: string, b: number, s: number) => {
+      const c = new THREE.Color(css) // linear
+      const grey = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+      const f = (v: number) => Math.min(Math.max(grey + (v - grey) * (1 + s), 0) * (1 + b), 1)
+      return new THREE.Color(f(c.r), f(c.g), f(c.b))
+    }
+    for (const id of ids.slice(0, 200)) {
+      const tone = boxTone(id)
+      for (const l of atlas.liveries) {
+        const want = shader(l.body, tone.brightness, tone.saturation)
+        const got = new THREE.Color(tonedColour(l.body, tone))
+        for (const k of ['r', 'g', 'b'] as const) expect(got[k]).toBeCloseTo(want[k], 2)
+      }
+    }
+  })
+
+  it('leaves a colour as it is with no tone or a zero tone (colour by tints)', () => {
+    expect(tonedColour('#8a3b2a', null)).toBe('#8a3b2a')
+    expect(tonedColour('#8a3b2a', { brightness: 0, saturation: 0 })).toBe('#8a3b2a')
   })
 })

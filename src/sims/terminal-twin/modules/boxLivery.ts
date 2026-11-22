@@ -72,3 +72,20 @@ export function toneFraction(tone: BoxTone | null): number {
   const s = Math.round((tone.saturation / TONE_SATURATION_RANGE) * HALF) + 8
   return (b * 16 + s) / 256
 }
+
+const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+const toSrgb = (c: number) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055)
+
+/**
+ * CSS colour `css` (`#rrggbb`) with box tone `tone` applied as the livery shader applies it (linear space: saturation
+ * about the luminance grey, then brightness), for the close-up and hero faces drawn over a near box (#362), so a box
+ * keeps its colour as it changes level of detail. `null` (a colour-by tint) returns `css` unchanged.
+ */
+export function tonedColour(css: string, tone: BoxTone | null): string {
+  if (!tone || (tone.brightness === 0 && tone.saturation === 0)) return css
+  const n = parseInt(css.slice(1, 7), 16)
+  const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => toLinear(v / 255))
+  const grey = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+  const out = rgb.map((v) => Math.round(toSrgb(Math.min(Math.max(grey + (v - grey) * (1 + tone.saturation), 0) * (1 + tone.brightness), 1)) * 255))
+  return `#${((out[0] << 16) | (out[1] << 8) | out[2]).toString(16).padStart(6, '0')}`
+}

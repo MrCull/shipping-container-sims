@@ -200,9 +200,8 @@ photos into asset directories.
   generic grey. 11 line tiles: HMM, MSC, Maersk, CMA CGM, Hapag-Lloyd, ONE, Evergreen, COSCO, ZIM, Yang Ming, generic.
   Then 7 leasing and old-stock tiles (#360, `LEASING_LIVERIES`): rust, oxblood, brown, dull blue, faded green, grey,
   off-white, no wordmark and no owner code, each with a pick `weight`; `livery-atlas.json` lists them under `leasing`.
-  The renderer draws about half the yard (`LEASING_SHARE` in `modules/boxLivery.ts`) in a leasing tile in the default
-  colour mode, picked by a hash of the box id (`modules/boxHash.ts`, reusable for other stable per-box choices); the
-  engine line and every Colour by mode are unchanged.
+  Which tile a box draws (the leasing share, the id hash) and its per-box tone are render-time choices:
+  [rendering-3d.md](rendering-3d.md), **Default-mode livery** and **Per-box tone**.
   Atlas 2048x3072 with 2x9 tiles (18, full; grown in height so a tile stays 1024x341.33 px and the regions are unchanged);
   regions per tile `side40`, `side20`, `door`, `front`, `solid`, `dark`, `metal`.
   Wordmarks are the brand name in brand colours in an open-licence typeface close to the brand's [A], no logos.
