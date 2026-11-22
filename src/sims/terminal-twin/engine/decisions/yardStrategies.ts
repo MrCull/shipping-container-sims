@@ -102,11 +102,13 @@ export function groupedSlot(req: YardAllocationRequest): YardAllocationReply {
   if (!box || !tops) return vesselGroupedSlot(req)
   const key = yardGroupKey(box)
   const topKeys = tops.map((t) => (t ? yardGroupKey(t) : null))
+  /** The top box of the stack under position `k` (0-based) of a candidate slot's span, or null for an empty stack. */
+  const topAt = (c: YardCandidate, k: number) => tops[(c.bay + k - 1) * req.rows + (c.row - 1)]
   const cost = (c: YardCandidate): number => {
     let group = 0
     if (c.tier > 1) {
       for (let k = 0; k < c.span; k++) {
-        const below = tops[(c.bay + k - 1) * req.rows + (c.row - 1)]
+        const below = topAt(c, k)
         if (below) group = Math.max(group, { none: 0, order: ORDER_BROKEN_COST_M, mixed: MIXED_STACK_COST_M }[yardGroupBreak(box, below)])
       }
     } else {
@@ -127,7 +129,7 @@ export function groupedSlot(req: YardAllocationRequest): YardAllocationReply {
   const sameGroup = (c: YardCandidate): boolean => {
     if (c.tier === 1) return true
     for (let k = 0; k < c.span; k++) {
-      const below = tops[(c.bay + k - 1) * req.rows + (c.row - 1)]
+      const below = topAt(c, k)
       if (below && yardGroupKey(below) !== key) return false
     }
     return true
@@ -139,7 +141,7 @@ export function groupedSlot(req: YardAllocationRequest): YardAllocationReply {
     const onOwn = (c: YardCandidate): boolean => {
       if (c.tier === 1) return false
       for (let k = 0; k < c.span; k++) {
-        const below = tops[(c.bay + k - 1) * req.rows + (c.row - 1)]
+        const below = topAt(c, k)
         if (!below || yardGroupBreak(box, below) !== 'none') return false
       }
       return true

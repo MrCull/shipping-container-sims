@@ -28,11 +28,11 @@ describe.each(BIG)('yard mix: %s', (name) => {
   it('holds all four flows, each a real share of the yard', () => {
     const cells = (d: string) => placed.filter((x) => x.direction === d).reduce((n, x) => n + x.p.span, 0)
     const total = placed.reduce((n, x) => n + x.p.span, 0)
-    // #188, #270: the TTI yard reserve (10 % of the stacks, kept free of pre-fill) keeps the pre-fill a few points under its target. A filler never stands on
-    // another group, so the booked boxes stack up their own group's stacks in the pre-fill (`stackOwnGroup`) instead of spreading flat over the stacks
-    // (before #270 the peak day stopped at 56 % of 75 %: booked boxes stood on 80 % of the usable stacks at about 2.3 high)
-    expect(total / yardCapacityCells(config)).toBeGreaterThan((config.yardStart?.targetPct ?? 60) / 100 - 0.01 - 0.08)
-    if (name === 'TTI Algeciras, peak day') expect(total / yardCapacityCells(config)).toBeGreaterThanOrEqual(0.73)
+    // #188, #270: every big preset reaches its pre-fill target (measured: baseline 60 % of 60, peak day 75 % of 75; the TTI yard reserve keeps 10 %
+    // of the stacks free). A filler never stands on another group, so the booked boxes stack up their own group's stacks (`stackOwnGroup`) to leave it room
+    const targetPct = config.yardStart?.targetPct
+    expect(targetPct, 'preset has a yard pre-fill target').toBeDefined()
+    expect(total / yardCapacityCells(config)).toBeGreaterThanOrEqual((targetPct as number) / 100 - 0.02)
     for (const d of ['IMPORT', 'EXPORT', 'TRANSSHIPMENT', 'STORAGE']) expect(cells(d) / total, d).toBeGreaterThan(0.02)
     // a hub yard is mostly transshipment, with a minority of imports
     expect(cells('TRANSSHIPMENT')).toBeGreaterThan(cells('IMPORT'))
