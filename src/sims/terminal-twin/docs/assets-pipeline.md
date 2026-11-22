@@ -200,6 +200,9 @@ photos into asset directories.
   generic grey. Now 11 tiles: HMM, MSC, Maersk, CMA CGM, Hapag-Lloyd, ONE, Evergreen, COSCO, ZIM, Yang Ming, generic.
   Atlas 2048x2048 with 2x6 tiles (12 at most); regions per tile `side40`, `side20`, `door`, `front`, `solid`, `dark`, `metal`.
   Wordmarks are the brand name in brand colours in an open-licence typeface close to the brand's [A], no logos.
+  Body colours are muted and weathered (#359), not fresh brand colours: `tests/generator-constants.test.ts` caps HSV
+  saturation at 0.65 and value at 0.85, keeps a wordmark contrast of at least 3:1, and checks the generator, the atlas
+  json and the placeholder colour (`liveryBodyColour`) agree. Retune a colour there and regenerate the `containers` group.
 - **Far-field atlas** (#256): `liveryMaterial` blends `livery-atlas-far.webp` (1024 px WebP rendered by `liveries.py#render_atlas(far=True)`,
   same tile layout, so the same UVs; enlarged wordmark, coarse 1.2 m rib shading, no owner code) over the embedded near atlas
   between 65 and 100 m. It is not embedded in the GLBs, so the GLB bytes are unchanged; `livery-atlas.json` has a `far` entry.

@@ -7,6 +7,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { DOOR_BANDS, DOOR_BAR_INNER_M, DOOR_BAR_OUTER_M, DOOR_HEADER_M, DOOR_LEAF_M, DOOR_SILL_M } from '../modules/containerTextures'
+import atlas from '../assets/models/containers/livery-atlas.json'
+import { liveryBodyColour } from '../modules/containerAssets'
 import { HERO_DEPTH_BIAS_M, HERO_GENERATOR_CONSTANTS as C, heroMarkInsetM } from '../modules/heroMarkings'
 
 const dir = join(__dirname, '../assets/generators/tt_assets')
@@ -49,5 +51,49 @@ describe('generator constants copied into the renderer', () => {
     const crestInset = C.doorValleyInsetM - C.ribDepthM
     expect(heroMarkInsetM('door')).toBeLessThanOrEqual(crestInset)
     expect(heroMarkInsetM('door')).toBeGreaterThan(0.022) // the bars' centre line is 22 mm inside the frame
+  })
+})
+
+/** Muted weathered palette (#359): a real yard is oxidised and faded, so no livery body is a clean primary. */
+const LIVERY_MAX_SATURATION = 0.65 // HSV saturation
+const LIVERY_MAX_VALUE = 0.85 // HSV value: a little darker than a fresh paint chip
+const MIN_WORDMARK_CONTRAST = 3 // WCAG ratio for large text
+
+function rgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '')
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255) as [number, number, number]
+}
+function luminance(hex: string): number {
+  const lin = rgb(hex).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+}
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+describe('livery palette (#359)', () => {
+  const generated = [...liveries.matchAll(/'body': '(#[0-9a-f]{6})', 'text': '(#[0-9a-f]{6})'/g)].map((m) => ({ body: m[1], text: m[2] }))
+
+  it('the atlas json, the placeholder colour and the generator hold the same body colours', () => {
+    expect(generated.length).toBe(atlas.liveries.length)
+    atlas.liveries.forEach((l, i) => {
+      expect(l.body, l.line ?? 'generic').toBe(generated[i].body)
+      expect(liveryBodyColour(i)).toBe(generated[i].body)
+    })
+  })
+
+  it('every body is muted: under the saturation and value ceilings', () => {
+    for (const { line, body } of atlas.liveries) {
+      const c = rgb(body)
+      const max = Math.max(...c)
+      const sat = max === 0 ? 0 : (max - Math.min(...c)) / max
+      expect(sat, `${line ?? 'generic'} ${body}`).toBeLessThanOrEqual(LIVERY_MAX_SATURATION)
+      expect(max, `${line ?? 'generic'} ${body}`).toBeLessThanOrEqual(LIVERY_MAX_VALUE)
+    }
+  })
+
+  it('every wordmark stays readable on its body', () => {
+    for (const { line, body, text } of atlas.liveries) expect(contrast(body, text), line ?? 'generic').toBeGreaterThanOrEqual(MIN_WORDMARK_CONTRAST)
   })
 })

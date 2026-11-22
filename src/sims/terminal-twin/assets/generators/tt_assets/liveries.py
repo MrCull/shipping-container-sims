@@ -48,28 +48,30 @@ SIDE_LENGTH_M = {'side40': 12.19, 'side20': 6.06}
 
 # Order = atlas tile index = the renderer's per-instance livery index.
 # Lines and owner prefixes match scenario/builder.ts LINE_OWNER_PREFIX.
+# Body colours are muted and weathered (#359): a real yard is oxidised and faded, so no body is a clean primary.
+# tests/generator-constants.test.ts holds the saturation and value ceilings and the wordmark contrast floor.
 LIVERIES = [
-    {'line': 'HMM', 'owner': 'HDMU', 'body': '#f47b20', 'text': '#ffffff', 'wordmark': 'HMM',
+    {'line': 'HMM', 'owner': 'HDMU', 'body': '#b8784a', 'text': '#ffffff', 'wordmark': 'HMM',
      'font': 'Montserrat-ExtraBold.ttf', 'spacing': 1.05, 'shear': 0.0},
-    {'line': 'MSC', 'owner': 'MSCU', 'body': '#d8c9a3', 'text': '#1d1d1b', 'wordmark': 'MSC',
+    {'line': 'MSC', 'owner': 'MSCU', 'body': '#c9bb98', 'text': '#1d1d1b', 'wordmark': 'MSC',
      'font': 'LibreBaskerville-Bold.ttf', 'spacing': 1.0, 'shear': 0.18},
-    {'line': 'Maersk', 'owner': 'MAEU', 'body': '#42b0d5', 'text': '#ffffff', 'wordmark': 'MAERSK',
+    {'line': 'Maersk', 'owner': 'MAEU', 'body': '#5f8fa8', 'text': '#ffffff', 'wordmark': 'MAERSK',
      'font': 'Montserrat-SemiBold.ttf', 'spacing': 1.25, 'shear': 0.0},
-    {'line': 'CMA CGM', 'owner': 'CMAU', 'body': '#1f3f8f', 'text': '#ffffff', 'wordmark': 'CMA CGM',
-     'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0, 'accent': '#e2001a'},
-    {'line': 'Hapag-Lloyd', 'owner': 'HLXU', 'body': '#ef7d00', 'text': '#002b5c', 'wordmark': 'Hapag-Lloyd',
+    {'line': 'CMA CGM', 'owner': 'CMAU', 'body': '#2c3f6b', 'text': '#ffffff', 'wordmark': 'CMA CGM',
+     'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0, 'accent': '#a8333a'},
+    {'line': 'Hapag-Lloyd', 'owner': 'HLXU', 'body': '#b06f42', 'text': '#002b5c', 'wordmark': 'Hapag-Lloyd',
      'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0},
-    {'line': 'ONE', 'owner': 'ONEU', 'body': '#d6007f', 'text': '#ffffff', 'wordmark': 'ONE',
+    {'line': 'ONE', 'owner': 'ONEU', 'body': '#a8445f', 'text': '#ffffff', 'wordmark': 'ONE',
      'font': 'Montserrat-ExtraBold.ttf', 'spacing': 1.3, 'shear': 0.0},
-    {'line': 'Evergreen', 'owner': 'EGHU', 'body': '#00843d', 'text': '#ffffff', 'wordmark': 'EVERGREEN',
+    {'line': 'Evergreen', 'owner': 'EGHU', 'body': '#2f6a4a', 'text': '#ffffff', 'wordmark': 'EVERGREEN',
      'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.1, 'shear': 0.0},
-    {'line': 'COSCO', 'owner': 'CSNU', 'body': '#2f5fae', 'text': '#ffffff', 'wordmark': 'COSCO SHIPPING',
+    {'line': 'COSCO', 'owner': 'CSNU', 'body': '#43618f', 'text': '#ffffff', 'wordmark': 'COSCO SHIPPING',
      'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0},
-    {'line': 'ZIM', 'owner': 'ZIMU', 'body': '#c9ccd1', 'text': '#1b2a6b', 'wordmark': 'ZIM',
+    {'line': 'ZIM', 'owner': 'ZIMU', 'body': '#b5b8bc', 'text': '#1b2a6b', 'wordmark': 'ZIM',
      'font': 'Montserrat-ExtraBold.ttf', 'spacing': 1.1, 'shear': 0.0},
-    {'line': 'Yang Ming', 'owner': 'YMLU', 'body': '#f2c318', 'text': '#1d1d1b', 'wordmark': 'YANG MING',
+    {'line': 'Yang Ming', 'owner': 'YMLU', 'body': '#bf9f45', 'text': '#1d1d1b', 'wordmark': 'YANG MING',
      'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.05, 'shear': 0.0},
-    {'line': None, 'owner': '', 'body': '#8a95a5', 'text': '#ffffff', 'wordmark': '',
+    {'line': None, 'owner': '', 'body': '#7d8794', 'text': '#ffffff', 'wordmark': '',
      'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0},
 ]
 GENERIC_INDEX = len(LIVERIES) - 1

@@ -98,7 +98,7 @@ describe('what each mode produces', () => {
   const subject = (o: Partial<ColourSubject> = {}): ColourSubject => ({ line: 'MSC', full: true, ...o })
 
   it('line: the livery body of the line; an unknown line is the generic grey', () => {
-    expect(colourOf('line', subject({ line: 'Maersk' }), 0, ctx).hex).toBe('#42b0d5')
+    expect(colourOf('line', subject({ line: 'Maersk' }), 0, ctx).hex).toBe('#5f8fa8')
     expect(colourOf('line', subject({ line: 'Nobody' }), 0, ctx).key).toBe('other')
     expect(colourOf('default', subject({ line: 'MSC' }), 0, ctx).key).toBe('MSC')
   })
@@ -136,7 +136,7 @@ describe('what each mode produces', () => {
     expect(colourOf('departure', rob, 0, ctx).key).toBe('unknown')
     expect(colourOf('transit', rob, 0, ctx).key).toBe('unknown')
     expect(colourOf('flow', rob, 0, ctx).key).toBe('transshipment')
-    expect(colourOf('line', subject({ line: 'Maersk' }), 0, ctx).hex).toBe('#42b0d5')
+    expect(colourOf('line', subject({ line: 'Maersk' }), 0, ctx).hex).toBe('#5f8fa8')
   })
 })
 
@@ -287,7 +287,7 @@ describe('ROB colour (spec #154, #159, #168)', () => {
 
   it('show: a remain-on-board box takes the colour its mode gives any box (no grey forced on it)', () => {
     for (const mode of COLOUR_BY_MODES) expect(robColourOf('show', mode, robSubject, 0, ctx), mode).toEqual(colourOf(mode, robSubject, 0, ctx))
-    expect(robColourOf('show', 'line', subject({ line: 'Maersk' }), 0, ctx).hex).toBe('#42b0d5')
+    expect(robColourOf('show', 'line', subject({ line: 'Maersk' }), 0, ctx).hex).toBe('#5f8fa8')
     expect(robColourOf('show', 'pod', robSubject, 0, ctx).hex).not.toBe(ROB_HEX)
   })
 
