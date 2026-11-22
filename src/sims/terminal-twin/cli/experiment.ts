@@ -29,16 +29,16 @@ import { fixtures } from '../scenario/fixtures'
 import { parseLatencySpec } from './latencySpec'
 import { mergePatch, shellQuote } from './scenarioPatch'
 import { presets } from '../scenario/presets'
-import { DEFAULT_WARM_UP_S as DEFAULT_YARD_WARM_UP_S, type ScenarioConfig } from '../scenario/types'
+import { DEFAULT_WARM_UP_S, type ScenarioConfig } from '../scenario/types'
 
 export { mergePatch } from './scenarioPatch'
 
 export const EXPERIMENT_FORMAT = 'terminal-twin-experiment'
 export const EXPERIMENT_REPORT_FORMAT = 'terminal-twin-experiment-report'
 export const EXPERIMENT_REPORT_VERSION = 4
-export const DEFAULT_HORIZON_S = 86400
+export const DEFAULT_EXPERIMENT_HORIZON_S = 86400
 /** Measurement warm-up per replicate (s), excluded from KPIs and the horizon, whatever the yard start. */
-export const DEFAULT_WARM_UP_S = 7200
+export const DEFAULT_EXPERIMENT_WARM_UP_S = 7200
 export const DEFAULT_SEED_COUNT = 10
 /** Full invariant sweep every Nth event during experiments (incremental checks in between). */
 export const EXPERIMENT_SWEEP_EVERY = 10000
@@ -442,8 +442,8 @@ interface RunLength {
 }
 
 const runLengthOf = (file: ExperimentFile): RunLength => ({
-  warmUpS: file.warmUpS ?? DEFAULT_WARM_UP_S,
-  horizonS: file.horizonS ?? DEFAULT_HORIZON_S,
+  warmUpS: file.warmUpS ?? DEFAULT_EXPERIMENT_WARM_UP_S,
+  horizonS: file.horizonS ?? DEFAULT_EXPERIMENT_HORIZON_S,
 })
 
 /**
@@ -483,7 +483,7 @@ export function validateExperiment(file: ExperimentFile): { warnings: string[] }
     const start = scenario.yardStart
     if (start?.mode === 'warmup')
       warnings.push(
-        `Config "${c.name}": the scenario has a yardStart warm-up (${start.warmUpS ?? DEFAULT_YARD_WARM_UP_S} s); the experiment's warmUpS (${length.warmUpS} s) replaces it`,
+        `Config "${c.name}": the scenario has a yardStart warm-up (${start.warmUpS ?? DEFAULT_WARM_UP_S} s); the experiment's warmUpS (${length.warmUpS} s) replaces it`,
       )
   }
   if (file.baseline !== undefined && !names.has(file.baseline))
