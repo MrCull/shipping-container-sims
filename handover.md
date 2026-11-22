@@ -11,7 +11,7 @@ Integration branch: `claude/gallant-curie-3so8w0`. Orchestrator steps: `docs/age
 | #314 | Guards, KPI catalogue and invalid replicates | #313 | merged in branch (187a5a5) | |
 | #315 | Full config overrides and grid expansion | #312, #313 | merged in branch (8a8b0a9) | |
 | #316 | Warm-up and horizon in experiments | #311, #313 | merged in branch (907df2f) | |
-| #317 | Parallel replicates, heavy lock, cost guard and provenance | #313 | open | |
+| #317 | Parallel replicates, heavy lock, cost guard and provenance | #313 | merged in branch (e860163) | |
 | #318 | Example experiments, glossary and first measured report | #310, #314, #315, #316 | open | |
 | #319 | Run the browser smoke suite and fix regressions | all | open | |
 
