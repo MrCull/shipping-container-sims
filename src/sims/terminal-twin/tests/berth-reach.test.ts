@@ -104,6 +104,14 @@ describe('berth allocation within crane reach (#365)', () => {
     }
   })
 
+  it('a vessel longer than the quay still waits at anchorage: the reach check is only for vessels the quay can hold', () => {
+    // 320 m quay, 400 m ULCV: it can never berth, so no window applies (the vessel-hulls smoke spec relies on this)
+    const sim = createSimulation(lowEndSmallCranes({ quayM: 320 }))
+    expect(sim.runUntil({ time: 3_600 }).reason).not.toBe('failed')
+    expect(sim.firstError).toBeNull()
+    expect(sim.kpiReport().vessels.V001.berthX ?? null).toBeNull()
+  })
+
   it('the sts.rail-reachable invariant fails a crane sent to a bay it can never reach, instead of the run going idle', () => {
     // a TOS that ignores the reach window: the ULCV at 0 m, its first bays below the 81 m STS04 can ever reach
     const sim = createSimulation(lowEndSmallCranes(), { berthAllocation: () => ({ berthX: 0 }) })

@@ -131,6 +131,7 @@ function reachWindow(ctx: EngineContext, vessel: VesselState): Pick<BerthAllocat
   if (able.length === 0) return {}
   const spec = vesselClass(vessel.sizeClass)
   const { lengthM } = ctx.config.quay
+  if (spec.loaM > lengthM) return {} // never fits the quay: it waits at anchorage, as it always has; no window applies
   const lo = railReach(ctx.config, able[0]).lo - slotX(spec, 0, 0, 'aft')
   const hi = railReach(ctx.config, able[able.length - 1]).hi - slotX(spec, 0, spec.bays - 1, 'fore')
   if (Math.max(lo, 0) > Math.min(hi, lengthM - spec.loaM) + 1e-9)
