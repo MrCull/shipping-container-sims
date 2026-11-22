@@ -7,7 +7,7 @@ Integration branch: `claude/gallant-curie-3so8w0`. Orchestrator steps: `docs/age
 | #310 | One RNG stream per source | | open | |
 | #311 | Measurement warm-up for any yard start mode | | open | |
 | #312 | Strategy parameters per decision point | | in progress | orchestrator (implementer) |
-| #313 | Tracer, minimal tt:experiment end to end | | in progress | orchestrator (implementer) |
+| #313 | Tracer, minimal tt:experiment end to end | | merged in branch (c346589) | |
 | #314 | Guards, KPI catalogue and invalid replicates | #313 | open | |
 | #315 | Full config overrides and grid expansion | #312, #313 | open | |
 | #316 | Warm-up and horizon in experiments | #311, #313 | open | |
