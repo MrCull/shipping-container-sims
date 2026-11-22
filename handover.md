@@ -8,7 +8,7 @@ Integration branch: `claude/gallant-curie-3so8w0`. Orchestrator steps: `docs/age
 | #311 | Measurement warm-up for any yard start mode | | open | |
 | #312 | Strategy parameters per decision point | | merged in branch (b846cc4) | |
 | #313 | Tracer, minimal tt:experiment end to end | | merged in branch (c346589) | |
-| #314 | Guards, KPI catalogue and invalid replicates | #313 | open | |
+| #314 | Guards, KPI catalogue and invalid replicates | #313 | merged in branch (187a5a5) | |
 | #315 | Full config overrides and grid expansion | #312, #313 | open | |
 | #316 | Warm-up and horizon in experiments | #311, #313 | open | |
 | #317 | Parallel replicates, heavy lock, cost guard and provenance | #313 | open | |
