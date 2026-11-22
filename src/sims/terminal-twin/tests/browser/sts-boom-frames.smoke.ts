@@ -79,17 +79,10 @@ async function measure(page: Page, boom: 'real' | 'off'): Promise<Measure> {
 
 /** Loads `boom-berthing` with booms `real` or forced `off` and reads the rig state and one drawn frame's counters. */
 async function still(page: Page, boom: 'real' | 'off'): Promise<Omit<Measure, 'framesPerWallS'>> {
-  await openTwin(page, { scenario: 'boom-berthing', load: boom === 'off' ? { overrides: { subsystems: { boom: 'off' } } } : {} })
+  // assets: draw only once the models are in (a GLB still loading draws a placeholder with another draw-call count).
+  const load = boom === 'off' ? { overrides: { subsystems: { boom: 'off' as const } } } : {}
+  await openTwin(page, { scenario: 'boom-berthing', load, assets: ['sts', 'vessel', 'container'] })
   await page.waitForFunction(() => Object.keys(window.__tt!.sceneState()!.stsRendered).length >= 3, undefined, { timeout: 30_000 })
-  // Draw only once the models are in: a GLB still loading draws a placeholder with another draw-call count.
-  await page.waitForFunction(
-    () => {
-      const s = window.__tt!.scene()!
-      return s.stsAssets === 'loaded' && s.vesselAssets === 'loaded' && s.containerAssets === 'loaded'
-    },
-    undefined,
-    { timeout: 30_000 },
-  )
   await page.evaluate(() => window.__tt!.cameraTo('STS02', 400)) // every crane in view
   await waitFrames(page, 4)
   return page.evaluate(() => {
