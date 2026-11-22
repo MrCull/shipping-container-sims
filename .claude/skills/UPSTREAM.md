@@ -4,4 +4,5 @@ Local additions, not from upstream: `jfdi` (runs grilling, to-spec, to-tickets, 
 
 Local edits to upstream skills (re-apply after an update):
 
+- `pr`: a **Smoke labels** section (this repo's `smoke:<group>` labels) and a **Keeping it current** section (re-read the body after each push; PR bodies went stale twice in spec #320).
 - `to-spec`: the opening line names the seam check as the one question to the user (upstream said both "do NOT interview" and "check with the user"); step 3 keeps the ticket split out of the spec (spec #243 carried a ticket table that `/to-tickets` then contradicted).

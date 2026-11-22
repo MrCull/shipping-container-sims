@@ -17,8 +17,9 @@
  * CI runs the suite in 6 shards, each from a test-list file balanced by recorded test time (`--test-list`,
  * scripts/smoke-shards.mjs, .github/workflows/pr-checks.yml); `fullyParallel` makes a shard a set of tests, not files. scripts/smoke-merge.mjs merges the shards' JSONL files into one SMOKE line and timing table.
  *
- * Tests titled `@load` need a real frame rate (only the Auto-quality fps spec today): CI runs them as an advisory job
- * (`pnpm run test:smoke --grep @load`); everything else is a required check (`--grep-invert @load`). Frame-based
+ * Tests titled `@load` need a real frame rate or a full-scale scene and never run in CI. They are left out by default
+ * (`grepInvert` below), so a plain local run never pays for one; SMOKE_LOAD=1 includes them
+ * (`SMOKE_LOAD=1 pnpm run test:smoke --grep @load`). Frame-based
  * assertions elsewhere use ratios over a wall-clock window (see tests/browser/frameSampling.ts), so they are load-proof.
  *
  * Uses Playwright's bundled Chromium, or falls back to CHROMIUM_PATH or the
@@ -67,6 +68,8 @@ export default defineConfig({
   workers: Number(process.env.SMOKE_WORKERS) || 1,
   // CI: one retry (a spec that fails once and passes on retry is reported as flaky, not red) and stop after 5 failures,
   // so a broken build does not burn the whole job timeout. Local runs: no retries, no cap.
+  // `@load` tests (real frame rates, full-scale scenes) only with SMOKE_LOAD=1. A command-line --grep-invert replaces this.
+  grepInvert: process.env.SMOKE_LOAD === '1' ? undefined : /@load/,
   retries: process.env.CI ? 1 : 0,
   maxFailures: process.env.CI ? 5 : 0,
   // The summary reporter ends every run with one `SMOKE: n passed, n failed, ...` line, which survives a pipe that eats the exit code.

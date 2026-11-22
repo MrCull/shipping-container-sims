@@ -176,3 +176,7 @@ A PR that changes `src/` carries the `smoke:<group>` label of each area it touch
 Describe whether it's a one-way or two-way door. You can walk back through two-way doors, but not one-way doors. A PR that is cheap to roll back is lower risk. Changes that involve destructive actions or hard-to-reverse decisions are one-way doors.
 
 The blast radius is the potential impact or scope of the changes introduced by this PR. Consider all possibilities. Examples are layout shift, breakages for consumers, mobile responsiveness, etc.
+
+### Keeping it current
+
+When you push to a PR whose body you wrote, re-read the body and correct every line the push made untrue (numbers, file names, unchecked boxes, "still needed" notes). A squash merge's commit message is the last chance to fix it.
