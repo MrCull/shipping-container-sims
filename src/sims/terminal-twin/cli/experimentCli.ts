@@ -52,7 +52,8 @@ export function formatExperimentMarkdown(r: ExperimentReport): string {
     '',
     ...(r.experiment.description ? [r.experiment.description, ''] : []),
     `Question: does each config beat the baseline **${r.expanded.baseline}** on **${r.primary.kpi}** (${primary.unit}, ${r.primary.direction} is better)?`,
-    `Seeds: ${r.expanded.seeds.join(', ')}. Horizon: ${r.expanded.horizonS} s of sim time per replicate.`,
+    `Seeds: ${r.expanded.seeds.join(', ')}.`,
+    `Warm-up: ${r.expanded.warmUpS} s (excluded from KPIs). Horizon: ${r.expanded.horizonS} s of measured sim time per replicate.`,
     '',
     '## Verdict',
     '',
@@ -99,6 +100,7 @@ export function formatExperimentMarkdown(r: ExperimentReport): string {
   if (invalid.length === 0 && r.droppedSeeds.length === 0) lines.push('None.')
   for (const x of invalid) lines.push(`- ${x.config}, seed ${x.seed}: ${x.status}${x.firstError ? ` (${x.firstError})` : ''}`)
   for (const d of r.droppedSeeds) lines.push(`- Dropped from ${d.config} pairing: seed ${d.seed} (${d.reason})`)
+  if (r.warnings.length) lines.push('', '## Warnings', '', ...r.warnings.map((w) => `- ${w}`))
   if (r.notes.length) lines.push('', '## Notes', '', ...r.notes.map((n) => `- ${n}`))
   const p = r.provenance
   lines.push(
@@ -150,6 +152,7 @@ export function runExperimentCli(
       commit: gitCommit(),
       onProgress: (done, total) => print(`  replicate ${done}/${total} done`),
     })
+    for (const w of report.warnings) print(`Warning: ${w}`)
     mkdirSync(out, { recursive: true })
     writeFileSync(join(out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`)
     writeFileSync(join(out, 'report.md'), formatExperimentMarkdown(report))

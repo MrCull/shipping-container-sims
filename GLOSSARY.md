@@ -157,6 +157,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Experiment:** a JSON file (format `terminal-twin-experiment`) that runs several configs of one base preset or fixture on the same seeds and compares them (`pnpm run tt:experiment`).
 - **Config (experiment):** one named variant in an experiment, written as overrides on the base (`patch`, a JSON Merge Patch on the base scenario, and the `strategies`, `params` and `latency` shorthand per decision point). Not the `ScenarioConfig` itself.
+- **Experiment warm-up and horizon:** every replicate gets a measurement warm-up of `warmUpS` (default 2 h, any yard start mode; it replaces a warm-up yard start's own) and then runs `horizonS` of measured time (default 24 h), so all replicates measure the same span.
 - **Grid (experiment):** `grid.factors`, config paths mapped to value lists; it adds one config per combination (the cross product), named from its factor values, e.g. `yardAllocation=grouped,shcDispatch.PAIRING_RADIUS_M=0`.
 - **Baseline config:** the config every other config is compared with (default the first).
 - **Replicate:** one run of one config on one seed. It is `ok` or invalid (`invariant`, `failed`, `error`); an invalid replicate drops its seed from that config's pairing.

@@ -18,6 +18,7 @@ function experiment(over: Partial<ExperimentFile> = {}): ExperimentFile {
     name: 'Grid study',
     base: { fixture: 'shc-paired-dual-cycle' },
     horizonS: 3600,
+    warmUpS: 0,
     seeds: [1],
     primary: { kpi: 'grossMovesPerHour' },
     configs: [{ name: 'A' }],

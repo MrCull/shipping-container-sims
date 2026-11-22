@@ -22,6 +22,7 @@ function writeExperiment(dir: string, over: Record<string, unknown> = {}): strin
       name: 'Tracer study',
       base: { fixture: 'tracer-1sts-10-boxes' },
       horizonS: 3600,
+      warmUpS: 0,
       seeds: [1, 2],
       primary: { kpi: 'grossMovesPerHour' },
       configs: [{ name: 'A' }, { name: 'B', strategies: { shcDispatch: 'oldest-job' } }],
@@ -59,8 +60,9 @@ describe('tt:experiment CLI (in process)', () => {
     const report = JSON.parse(readFileSync(join(out, 'report.json'), 'utf8'))
     expect(report).toMatchObject({
       format: 'terminal-twin-experiment-report',
-      version: 2,
-      expanded: { baseline: 'A', seeds: [1, 2], horizonS: 3600 },
+      version: 3,
+      expanded: { baseline: 'A', seeds: [1, 2], warmUpS: 0, horizonS: 3600 },
+      warnings: [],
       primary: { kpi: 'grossMovesPerHour', direction: 'higher' },
     })
     expect(report.replicates).toHaveLength(4)
@@ -73,7 +75,27 @@ describe('tt:experiment CLI (in process)', () => {
     expect(md).toContain('## Verdict')
     expect(md).toMatch(/\| B \| .* \|/)
     expect(md).toContain('## KPIs')
+    expect(md).toContain('Warm-up: 0 s (excluded from KPIs). Horizon: 3600 s of measured sim time per replicate.')
     expect(md).not.toContain('\u2014')
+  })
+
+  it('report.md shows the warm-up, the horizon and a yardStart warm-up warning (#316)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tt-exp-'))
+    const out = join(dir, 'out')
+    const file = writeExperiment(dir, {
+      base: { fixture: 'landside-morning-peak' },
+      warmUpS: 900,
+      horizonS: 1800,
+      seeds: [1],
+      configs: [{ name: 'A', patch: { yardStart: { mode: 'warmup', warmUpS: 3600 } } }],
+    })
+    const { text } = cli(file, '--out', out)
+    expect(text).toContain('Warning: Config "A": the scenario has a yardStart warm-up')
+    const report = JSON.parse(readFileSync(join(out, 'report.json'), 'utf8'))
+    expect(report.expanded).toMatchObject({ warmUpS: 900, horizonS: 1800 })
+    const md = readFileSync(join(out, 'report.md'), 'utf8')
+    expect(md).toContain('Warm-up: 900 s (excluded from KPIs). Horizon: 1800 s of measured sim time per replicate.')
+    expect(md).toMatch(/## Warnings\n\n- Config "A": the scenario has a yardStart warm-up \(3600 s\)/)
   })
 
   it('exits 1 when a config breaks an invariant, and report.md shows guards, every KPI and the invalid replicates', () => {
