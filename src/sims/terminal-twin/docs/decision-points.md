@@ -82,7 +82,7 @@ Configured per point as `points.<dp>.latency: LatencySpec { delay?, timeoutPct?,
 
 `drawInjection` order: timeout first (`r * 100 < timeoutPct` gives `{ kind: 'timeout' }`), then error, then the delay; a
 delay at or above `timeoutMs` also becomes a timeout. No spec means no draws at all. Draws come from a separate stream
-(`SimState.decisions.rngState`, seeded `streamSeedState(seed, 'latency')`, salt 0x5bd1e995), never a reactor stream, so injecting latency in pause mode leaves
+(`SimState.decisions.rngState`, seeded `streamSeedState(seed, 'latency')`, salt 0x1b873593, distinct from the landside salt since 0.59.0), never a reactor stream, so injecting latency in pause mode leaves
 the event log identical to the no-latency run, and in keep-running mode only the reply times move.
 
 Per-handler counters (`engine/decisions/runtime.ts#HandlerKpiCounters`, reported as `kpiReport().handlers[dp]`, `engine/kpis.ts#HandlerKpiReport`):

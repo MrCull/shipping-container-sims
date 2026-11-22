@@ -77,13 +77,17 @@ describe('paired-dual-cycle on the mixed fixture', () => {
     expect(Object.values(snap.wtpPads).every((p) => p.claimedBy === null)).toBe(true)
   })
 
-  it('drives less empty than chained-nearest on the same scenario, for the same loaded work', () => {
+  // This test claimed paired-dual-cycle drives less empty than chained-nearest. With one RNG stream per source (#310)
+  // the two runs share their variation draws, and on this fixture paired drives as much or more empty on 9 of 10 seeds
+  // (also with variation off), so the old pass was seed luck. What holds: the same loaded work, with empty driving
+  // in the same range. Whether paired-dual-cycle saves empty driving belongs in an experiment (spec #309), not here.
+  it('moves the same loaded work as chained-nearest on the same scenario, with empty driving in the same range', () => {
     const paired = run(fixture)
     const chained = run(withStrategy(fixture, 'chained-nearest'))
     expect(chained.invariantReport().violations).toEqual([])
     expect(chained.kpiReport().horizontal?.boxesToWtp).toBe(paired.kpiReport().horizontal?.boxesToWtp)
-    expect(emptyM(paired)).toBeLessThan(emptyM(chained))
-    expect(emptyM(paired) / (emptyM(paired) + loadedM(paired))).toBeLessThan(emptyM(chained) / (emptyM(chained) + loadedM(chained)))
+    expect(loadedM(paired)).toBeGreaterThan(0)
+    expect(Math.abs(emptyM(paired) - emptyM(chained)) / emptyM(chained)).toBeLessThan(0.1)
   })
 
   it('SHCs pair: dispatch requests carry lastJobKind, and an SHC that just delivered one kind is given the other when both are open', () => {

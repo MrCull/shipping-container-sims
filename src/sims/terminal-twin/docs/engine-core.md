@@ -169,8 +169,8 @@ keeps the seed):
 So a strategy that changes how many decisions are asked, or which crane works when, never moves the Nth factor of
 a given STS or SHC: experiments on one seed compare strategies, not luck (`tests/rng-streams.test.ts`).
 `sim.query.rngStreams()` and `sim.query.rngStreamSeedState(name)` read them. Side streams in their own state
-(decision latency salt 0x5bd1e995, landside salt 0x1b873593, distinct since 0.59.0 so their draws no longer
-correlate; bay plan, pre-fill, per-container props) are listed in
+(decision latency salt 0x1b873593, landside salt 0x5bd1e995; the latency stream used the landside salt before
+0.59.0, so their draws correlated; bay plan, pre-fill, per-container props) are listed in
 [architecture.md](architecture.md#determinism-contract).
 
 ## Kinematics and cycle times

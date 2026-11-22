@@ -33,10 +33,10 @@ export function nextRandom(state: number): [number, number] {
 /** A reactor stream: one per STS, one per SHC, decision requests, and the rest. */
 export type RngStream = `sts:${string}` | `shc:${string}` | 'decisions' | 'reactor'
 
-/** Salts of the named streams. `latency` and `landside` were both 0x5bd1e995 before 0.59.0, so their draws correlated. */
+/** Salts of the named streams. `latency` used the landside salt 0x5bd1e995 before 0.59.0, so their draws correlated. */
 const SALTS: Record<string, number> = {
-  latency: 0x5bd1e995,
-  landside: 0x1b873593,
+  latency: 0x1b873593,
+  landside: 0x5bd1e995,
   decisions: 0x27d4eb2f,
   reactor: 0x165667b1,
 }

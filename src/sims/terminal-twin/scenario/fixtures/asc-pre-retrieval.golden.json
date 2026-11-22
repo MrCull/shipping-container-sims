@@ -3,10 +3,10 @@
   "seed": 8,
   "status": "ended",
   "endReason": "simDurationS >= 6500",
-  "eventLogHash": "052944146f3756",
+  "eventLogHash": "172af7b2fd7f2d",
   "kpis": {
     "simTimeS": 6500,
-    "eventsProcessed": 502,
+    "eventsProcessed": 504,
     "movesCompleted": 8,
     "vesselsCompleted": 1,
     "sts": {
@@ -331,8 +331,8 @@
           "hoistM": 111.872,
           "padWaitS": 0,
           "railWaitS": 0,
-          "busyS": 499.083,
-          "yields": 1
+          "busyS": 503.46,
+          "yields": 2
         },
         "B01-ASC2": {
           "jobs": 6,
@@ -340,7 +340,7 @@
           "trolleyM": 68.35,
           "hoistM": 68.304,
           "padWaitS": 0,
-          "railWaitS": 14.087,
+          "railWaitS": 18.464,
           "busyS": 463.756,
           "yields": 0
         }
@@ -353,8 +353,8 @@
       "gateQueue": 0,
       "gateQueueMax": 1,
       "turnTimeS": {
-        "mean": 143.348,
-        "max": 158.104
+        "mean": 144.078,
+        "max": 155.315
       },
       "gateWaitS": {
         "mean": 0,
@@ -377,14 +377,14 @@
         "max": 29.291
       },
       "totalTurnaroundS": {
-        "mean": 219.478,
-        "max": 234.234
+        "mean": 220.208,
+        "max": 231.445
       },
       "road": {
         "meanTrucks": 0.086,
         "maxTrucks": 1
       },
-      "serviceS": 46.153,
+      "serviceS": 46.883,
       "transactions": {
         "dropExport": 0,
         "pickImport": 6,
@@ -413,8 +413,8 @@
       "IMPORT": {
         "count": 6,
         "departed": 6,
-        "meanS": 3267.03,
-        "maxS": 3793.403
+        "meanS": 3267.759,
+        "maxS": 3624.48
       },
       "STORAGE": {
         "count": 2,
@@ -445,7 +445,7 @@
   },
   "invariants": {
     "enabled": true,
-    "checks": 432,
+    "checks": 434,
     "violations": 0,
     "first": null
   },
