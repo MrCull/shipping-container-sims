@@ -149,7 +149,7 @@ describe('runExperiment: KPI catalogue, guards and invalid replicates (fake exec
       ),
     ),
   )('guard %s on %s (worse sign %d) with tolerance %j', (status, kpi, sign, tolerance) => {
-    const report = runExperiment(experiment({ guards: [{ kpi, tolerance }] }), {
+    const report = runExperiment(experiment({ primary: { kpi }, guards: [{ kpi, tolerance }] }), {
       executeReplicate: fake({
         [kpi]: { A: [100, 100, 100, 100], B: DEGRADATION[status].map((x) => 100 + sign * x) },
       } as never),
@@ -161,7 +161,7 @@ describe('runExperiment: KPI catalogue, guards and invalid replicates (fake exec
   })
 
   it('a guard with fewer than 2 pairs is insufficient data', () => {
-    const report = runExperiment(experiment({ seeds: [1], guards: [{ kpi: 'truckTurnaroundS', tolerance: { abs: 1 } }] }), {
+    const report = runExperiment(experiment({ seeds: [1], primary: { kpi: 'truckTurnaroundS' }, guards: [{ kpi: 'truckTurnaroundS', tolerance: { abs: 1 } }] }), {
       executeReplicate: fake({ truckTurnaroundS: { A: [100], B: [100] } } as never),
     })
     expect(report.guards[0].statuses.B.status).toBe('insufficient data')
@@ -201,6 +201,22 @@ describe('runExperiment: KPI catalogue, guards and invalid replicates (fake exec
     expect(c.n).toBe(1)
     expect(c.verdict).toBe('insufficient data')
     expect(report.primary.verdicts.B).toBe('insufficient data')
+  })
+
+  it('a primary KPI that is null on the baseline is a validation error, found by the first baseline replicate', () => {
+    const ran: string[] = []
+    // Baseline B (second config): its first replicate runs first, and stops the experiment.
+    const executeReplicate = (plan: ReplicatePlan) => {
+      ran.push(`${plan.config}/${plan.seed}`)
+      return fake({ ascUtilisationPct: { A: [50, 50, 50, 50] } } as never)(plan)
+    }
+    expect(() => runExperiment(experiment({ baseline: 'B', primary: { kpi: 'ascUtilisationPct' } }), { executeReplicate })).toThrow(
+      ExperimentError,
+    )
+    expect(() => runExperiment(experiment({ baseline: 'B', primary: { kpi: 'ascUtilisationPct' } }), { executeReplicate })).toThrow(
+      /Primary KPI "ascUtilisationPct" is null on the baseline "B" \(seed 1\)/,
+    )
+    expect(ran).toEqual(['B/1', 'B/1'])
   })
 
   it('adds the multiple-comparison notice only with more than two configs', () => {

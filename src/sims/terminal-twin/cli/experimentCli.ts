@@ -26,6 +26,7 @@ import {
   executeReplicateHeadless,
   executeSafely,
   planExperiment,
+  runPlanned,
   replicateOk,
   type ExperimentFile,
   type ExperimentPlan,
@@ -109,6 +110,7 @@ const WORKER_URL = new URL('./experimentWorker.ts', import.meta.url)
 /** Run the replicates in up to `jobs` forked worker processes; results come back in plan order. */
 function runInWorkers(plans: ReplicatePlan[], jobs: number, onDone: (r: ReplicateResult) => void): Promise<ReplicateResult[]> {
   return new Promise((resolve) => {
+    if (plans.length === 0) return resolve([])
     const results: ReplicateResult[] = new Array(plans.length)
     let next = 0
     let done = 0
@@ -339,18 +341,16 @@ export async function runExperimentCli(
         const leftMs = done < total ? ((Date.now() - started) / done) * (total - done) : 0
         print(`  ${done}/${total} replicates done, ${invalid} invalid, about ${minutes(leftMs)} left`)
       }
-      let results: ReplicateResult[]
-      if (inProcess) {
-        const execute = options.executeReplicate ?? executeReplicateHeadless
-        results = []
-        for (const p of plan.replicates) {
-          const r = executeSafely(execute, p)
-          results.push(r)
-          onDone(r)
-        }
-      } else {
-        results = await runInWorkers(plan.replicates, jobs, onDone)
-      }
+      const execute = options.executeReplicate ?? executeReplicateHeadless
+      const results = await runPlanned(plan, (batch) =>
+        inProcess
+          ? batch.map((p) => {
+              const r = executeSafely(execute, p)
+              onDone(r)
+              return r
+            })
+          : runInWorkers(batch, jobs, onDone),
+      )
       const report = assembleReport(plan, results, { commit: gitCommit(), startedAt, endedAt: new Date().toISOString() })
       mkdirSync(out, { recursive: true })
       writeFileSync(join(out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`)

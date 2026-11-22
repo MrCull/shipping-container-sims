@@ -55,6 +55,17 @@ describe('tt:experiment CLI (in process)', () => {
     expect(badKpi.text).toMatch(/Unknown KPI "vibes"/)
   })
 
+  it('exits 2 after the first replicate when the primary KPI is null on the baseline', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tt-exp-'))
+    const out = join(dir, 'out')
+    // The tracer fixture has no ASCs, so ascUtilisationPct is null on every replicate.
+    const r = await cli(writeExperiment(dir, { primary: { kpi: 'ascUtilisationPct' } }), '--out', out)
+    expect(r.exitCode).toBe(2)
+    expect(r.text).toMatch(/Primary KPI "ascUtilisationPct" is null on the baseline "A" \(seed 1\)/)
+    expect(r.text.match(/replicates done/g)).toHaveLength(1)
+    expect(existsSync(join(out, 'report.json'))).toBe(false)
+  })
+
   it('writes report.json and report.md with the documented shape', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tt-exp-'))
     const out = join(dir, 'out')

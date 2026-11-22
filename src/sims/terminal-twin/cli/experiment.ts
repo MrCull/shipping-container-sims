@@ -661,6 +661,37 @@ export function executeSafely(execute: (plan: ReplicatePlan) => ReplicateResult,
   }
 }
 
+/** Index in `plan.replicates` of the baseline's first seed: the replicate that runs first (the primary KPI probe). */
+export const baselineProbeIndex = (plan: ExperimentPlan) =>
+  plan.replicates.findIndex((r) => r.config === plan.baseline && r.seed === plan.seeds[0])
+
+/**
+ * Throws `ExperimentError` when the baseline probe ran cleanly but the primary KPI is null on it (the KPI does not
+ * apply to the base scenario, so no config could ever be compared on it). An invalid probe says nothing either way.
+ */
+export function checkBaselineProbe(plan: ExperimentPlan, result: ReplicateResult): void {
+  const kpi = plan.file.primary.kpi
+  if (classify(result) === 'ok' && (result.kpis[kpi] ?? null) === null)
+    throw new ExperimentError(
+      `Primary KPI "${kpi}" is null on the baseline "${plan.baseline}" (seed ${plan.seeds[0]}): it does not apply to this scenario; pick another primary KPI`,
+    )
+}
+
+/**
+ * Run every replicate of a plan with `runBatch` (results in the order given): the baseline probe alone first, checked
+ * with `checkBaselineProbe`, then the rest. Returns the results in plan order.
+ */
+export async function runPlanned(
+  plan: ExperimentPlan,
+  runBatch: (plans: ReplicatePlan[]) => Promise<ReplicateResult[]> | ReplicateResult[],
+): Promise<ReplicateResult[]> {
+  const probe = baselineProbeIndex(plan)
+  const [first] = await runBatch([plan.replicates[probe]])
+  checkBaselineProbe(plan, first)
+  const rest = await runBatch(plan.replicates.filter((_, i) => i !== probe))
+  return plan.replicates.map((_, i) => (i === probe ? first : rest[i < probe ? i : i - 1]))
+}
+
 /** True when a replicate result is valid (`ok`). */
 export const replicateOk = (r: ReplicateResult) => classify(r) === 'ok'
 
@@ -669,11 +700,16 @@ export function runExperiment(file: ExperimentFile, options: RunExperimentOption
   const plan = planExperiment(file)
   const startedAt = new Date().toISOString()
   const execute = options.executeReplicate ?? executeReplicateHeadless
-  const results: ReplicateResult[] = []
-  for (const r of plan.replicates) {
-    results.push(executeSafely(execute, r))
-    options.onProgress?.(results.length, plan.replicates.length)
+  const probe = baselineProbeIndex(plan)
+  const results: ReplicateResult[] = new Array(plan.replicates.length)
+  let done = 0
+  const run = (i: number) => {
+    results[i] = executeSafely(execute, plan.replicates[i])
+    options.onProgress?.(++done, plan.replicates.length)
   }
+  run(probe)
+  checkBaselineProbe(plan, results[probe])
+  for (let i = 0; i < plan.replicates.length; i++) if (i !== probe) run(i)
   return assembleReport(plan, results, { commit: options.commit ?? null, startedAt, endedAt: new Date().toISOString() })
 }
 
