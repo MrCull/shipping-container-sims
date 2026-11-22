@@ -6,9 +6,10 @@
  */
 import { describe, expect, it } from 'vitest'
 import { createSimulation, strategies } from '../engine'
+import { runCli } from '../cli/runCli'
 import { fixtures } from '../scenario/fixtures'
 import type { ScenarioConfig } from '../scenario/types'
-import type { DecisionPointConfig } from '../engine/decisions/types'
+import type { DecisionPointConfig } from '../engine'
 
 const base = fixtures['asc-1sts-10-boxes-1block']
 
@@ -85,5 +86,48 @@ describe('strategy parameters', () => {
       /TIER_COST_M = -1 is out of range \[0, /,
     )
     expect(() => createSimulation(withYard({ strategy: 'nearest-wtp', params: { TIER_COST_M: Number.NaN } }))).toThrow(/TIER_COST_M/)
+  })
+})
+
+describe('tt:run --param', () => {
+  const cli = (...args: string[]) => {
+    const out: string[] = []
+    const exitCode = runCli(args, (line) => out.push(line))
+    return { exitCode, text: out.join('\n') }
+  }
+  const hashOf = (text: string) => /hash\W+([0-9a-f]{8,})/i.exec(text)?.[1]
+  const fx = ['--fixture', 'asc-1sts-10-boxes-1block', '--strategy', 'yardAllocation=nearest-wtp']
+
+  it('sets a param of the selected strategy and changes the run', () => {
+    const plain = cli(...fx)
+    const same = cli(...fx, '--param', 'yardAllocation.TIER_COST_M=6')
+    const tuned = cli(...fx, '--param', 'yardAllocation.TIER_COST_M=1000')
+    expect([plain.exitCode, same.exitCode, tuned.exitCode]).toEqual([0, 0, 0])
+    expect(hashOf(plain.text)).toBeDefined()
+    expect(hashOf(same.text)).toBe(hashOf(plain.text))
+    expect(hashOf(tuned.text)).not.toBe(hashOf(plain.text))
+  })
+
+  it('a bad --param is a usage error (exit 2)', () => {
+    expect(cli(...fx, '--param', 'yardAllocation.TIER_COST_M').exitCode).toBe(2)
+    expect(cli(...fx, '--param', 'yardAllocation.NOPE=1').exitCode).toBe(2)
+    expect(cli(...fx, '--param', 'yardAllocation.TIER_COST_M=-5').exitCode).toBe(2)
+    expect(cli(...fx, '--param', 'noSuchPoint.X=1').exitCode).toBe(2)
+    expect(cli('--fixture', 'asc-1sts-10-boxes-1block', '--param', 'yardAllocation.MIXED_STACK_COST_M=120').exitCode).toBe(0)
+  })
+})
+
+describe('engine-side params', () => {
+  it('predispatchMarginS overrides queueAreas.predispatchMarginS only when set', () => {
+    const fx = fixtures['shc-prepositioning']
+    const point = fx.decisions?.points?.shcDispatch
+    expect(point?.strategy).toBe('predispatch')
+    const run = (params?: Record<string, number>) => {
+      const sim = createSimulation({ ...fx, decisions: { ...fx.decisions, points: { ...fx.decisions?.points, shcDispatch: { ...point, params } } } })
+      sim.runUntil()
+      return sim.eventLogHash()
+    }
+    expect(run({ predispatchMarginS: 15 })).toBe(run())
+    expect(run({ predispatchMarginS: 0 })).not.toBe(run())
   })
 })

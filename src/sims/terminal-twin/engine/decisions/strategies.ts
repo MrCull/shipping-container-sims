@@ -7,7 +7,6 @@
  * identical runs. A strategy that needs randomness must take it from the
  * request, never from Math.random.
  */
-import type { SimQuery } from '../query'
 import { DEFAULT_PREDISPATCH_MARGIN_S } from '../../scenario/types'
 import { minFutureRehandles, nearestValidRehandle } from './rehandleStrategies'
 import { balancedAscDispatch, preRetrievalDispatch, watersideFirstDispatch } from './ascStrategies'
@@ -16,7 +15,7 @@ import { isoTypeBestPositionEmpties, nearestWtpEmpties, oldestFirstEmpties } fro
 import { leastLoadedBlockStall, leastUsedLane, lowestFreeLane, nearestToBoxStall, SPREAD_FILL_M, SPREAD_TRUCK_M, spreadDropsStall } from './landsideStrategies'
 import { justInTimeRelease, keepKAheadRelease } from './workPackageStrategies'
 import { balancedMovesSplit, bestFitBerth, equalBaysSplit, firstFitBerth } from './quayStrategies'
-import type { DecisionHandler, DecisionPointId, DecisionReplies, DecisionRequestMessage, HandlerSet, ShcDispatchJob, ShcDispatchPad, WtpPadSelectionRequest } from './types'
+import type { DecisionHandler, DecisionPointId, HandlerSet, ShcDispatchJob, ShcDispatchPad, WtpPadSelectionRequest } from './types'
 
 /** `paired-dual-cycle` takes the paired job only when it is at most this far (route length, m) from the SHC; beyond that the nearest job wins. [assumed] */
 export const PAIRING_RADIUS_M = 150
@@ -54,14 +53,14 @@ export const BALANCED_QUEUED_M = 60
  */
 export function balancedPad(
   req: WtpPadSelectionRequest,
-  p: { BALANCED_FILL_M: number; BALANCED_QUEUED_M: number } = { BALANCED_FILL_M, BALANCED_QUEUED_M },
+  w: { BALANCED_FILL_M: number; BALANCED_QUEUED_M: number } = { BALANCED_FILL_M, BALANCED_QUEUED_M },
 ): string | null {
   let best: ShcDispatchPad | null = null
   let bestCost = Infinity
   for (const p of req.wtpPads) {
     if (!isFree(p)) continue
     const load = req.blockLoad?.[p.blockId]
-    const cost = Math.abs(p.x - req.x) + Math.abs(p.z - req.z) + (load ? p.BALANCED_FILL_M * load.fill + p.BALANCED_QUEUED_M * load.queued : 0)
+    const cost = Math.abs(p.x - req.x) + Math.abs(p.z - req.z) + (load ? w.BALANCED_FILL_M * load.fill + w.BALANCED_QUEUED_M * load.queued : 0)
     if (cost < bestCost - 1e-9) {
       best = p
       bestCost = cost
@@ -88,8 +87,20 @@ export interface StrategyDefinition<K extends DecisionPointId> {
   description: string
   /** Tunable constants, by name; omitted when the strategy has none. */
   params?: Record<string, StrategyParamSpec>
-  /** `params` holds every declared param (set or default); a strategy without params ignores it. */
-  handler: (message: DecisionRequestMessage<K>, query: SimQuery, params: StrategyParams) => DecisionReplies[K] | Promise<DecisionReplies[K]>
+  /** The strategy at its default params. */
+  handler: DecisionHandler<K>
+  /** The strategy bound to resolved params (every declared name); absent when its params act engine side only. */
+  withParams?: (params: StrategyParams) => DecisionHandler<K>
+}
+
+/** A strategy with tunable params: `handler` is `make` at the defaults, so a run without params is unchanged. */
+function tunable<K extends DecisionPointId>(
+  description: string,
+  params: Record<string, StrategyParamSpec>,
+  make: (params: StrategyParams) => DecisionHandler<K>,
+): StrategyDefinition<K> {
+  const defaults = Object.fromEntries(Object.entries(params).map(([k, spec]) => [k, spec.default]))
+  return { description, params, handler: make(defaults), withParams: make }
 }
 
 const metres = (d: number, description: string, max = 100_000): StrategyParamSpec => ({ default: d, unit: 'm', description, min: 0, max })
@@ -169,13 +180,12 @@ export const strategies: StrategyRegistry = {
           return { jobId: job?.jobId ?? null }
         },
       },
-      'paired-dual-cycle': {
-        description:
-          'chained-nearest with pairing (TT-R14): after delivering a discharge box to a WTP pad the SHC prefers an open load pickup, and after delivering a load box at the quay it prefers an open discharge pickup, when that job is within PAIRING_RADIUS_M of it (else the nearest job). SHCs drive loaded more often; they are reassigned freely between STS cranes and blocks. Needs queueAreas for the waiting behaviour of chained-nearest.',
-        params: {
+      'paired-dual-cycle': tunable(
+        'chained-nearest with pairing (TT-R14): after delivering a discharge box to a WTP pad the SHC prefers an open load pickup, and after delivering a load box at the quay it prefers an open discharge pickup, when that job is within PAIRING_RADIUS_M of it (else the nearest job). SHCs drive loaded more often; they are reassigned freely between STS cranes and blocks. Needs queueAreas for the waiting behaviour of chained-nearest.',
+        {
           PAIRING_RADIUS_M: metres(PAIRING_RADIUS_M, 'Route length within which the paired job (load after discharge, discharge after load) beats the nearest job.', 10_000),
         },
-        handler: (msg, _query, params) => {
+        (params) => (msg) => {
           const byNearest = (a: ShcDispatchJob, b: ShcDispatchJob) =>
             a.distanceM - b.distanceM || a.readyAt - b.readyAt || (a.jobId < b.jobId ? -1 : 1)
           const { lastJobKind, jobs } = msg.payload
@@ -184,7 +194,7 @@ export const strategies: StrategyRegistry = {
           const job = paired && paired.distanceM <= params.PAIRING_RADIUS_M ? paired : [...jobs].sort(byNearest)[0]
           return { jobId: job?.jobId ?? null }
         },
-      },
+      ),
       predispatch: {
         description:
           'chained-nearest plus pre-dispatch (TT-R13, engine side): idle SHCs are sent to the queue area of a box predicted ready within their travel time plus queueAreas.predispatchMarginS (default 15 s). The SHC claims a queue spot, never a job, so nothing is collected before the box exists. Needs queueAreas.',
@@ -217,15 +227,16 @@ export const strategies: StrategyRegistry = {
         description: 'The free WTP pad nearest (plan distance) to where the box stands.',
         handler: (msg) => ({ wtpPadId: nearestFreePad(msg.payload, msg.payload.x, msg.payload.z) }),
       },
-      balanced: {
-        description:
-          'The free WTP pad with the lowest cost: plan distance from the box plus 6,000 m per unit of its block fill and 60 m per queued ASC job of the block (#207). Spreads discharge over the yard blocks; the TTI presets use it.',
-        params: {
+      balanced: tunable(
+        'The free WTP pad with the lowest cost: plan distance from the box plus 6,000 m per unit of its block fill and 60 m per queued ASC job of the block (#207). Spreads discharge over the yard blocks; the TTI presets use it.',
+        {
           BALANCED_FILL_M: metres(BALANCED_FILL_M, 'Metres of plan distance one unit of block fill is worth (a block 10 points fuller costs 600 m at 6,000).', 1_000_000),
           BALANCED_QUEUED_M: metres(BALANCED_QUEUED_M, 'Metres of plan distance one queued ASC job of the block is worth.'),
         },
-        handler: (msg, _query, params) => ({ wtpPadId: balancedPad(msg.payload, { BALANCED_FILL_M: params.BALANCED_FILL_M, BALANCED_QUEUED_M: params.BALANCED_QUEUED_M }) }),
-      },
+        (params) => (msg) => ({
+          wtpPadId: balancedPad(msg.payload, { BALANCED_FILL_M: params.BALANCED_FILL_M, BALANCED_QUEUED_M: params.BALANCED_QUEUED_M }),
+        }),
+      ),
       'last-free': {
         description: 'The last free WTP pad in list order (fills the yard from the far end).',
         handler: (msg) => ({ wtpPadId: [...msg.payload.wtpPads].reverse().find(isFree)?.id ?? null }),
@@ -239,17 +250,16 @@ export const strategies: StrategyRegistry = {
         description: 'A random legal slot (from the seeded RNG).',
         handler: (msg) => randomSlot(msg.payload),
       },
-      'nearest-wtp': {
-        description: 'The legal slot nearest the WTP pad, spreading over low tiers before stacking high.',
-        params: yardBaseParams,
-        handler: (msg, _query, params) => nearestWtpSlot(msg.payload, yardParams(params)),
-      },
-      grouped: {
-        description:
-          'Groups boxes: imports by line (earlier departure higher), exports by outbound vessel and POD (heavy at the bottom), transshipment by onward vessel and POD, storage empties by line, size and type. A mismatch costs score, never a slot.',
-        params: yardGroupedParams,
-        handler: (msg, _query, params) => groupedSlot(msg.payload, yardParams(params)),
-      },
+      'nearest-wtp': tunable(
+        'The legal slot nearest the WTP pad, spreading over low tiers before stacking high.',
+        yardBaseParams,
+        (params) => (msg) => nearestWtpSlot(msg.payload, yardParams(params)),
+      ),
+      grouped: tunable(
+        'Groups boxes: imports by line (earlier departure higher), exports by outbound vessel and POD (heavy at the bottom), transshipment by onward vessel and POD, storage empties by line, size and type. A mismatch costs score, never a slot.',
+        yardGroupedParams,
+        (params) => (msg) => groupedSlot(msg.payload, yardParams(params)),
+      ),
     },
   },
   ascDispatch: {
@@ -335,16 +345,14 @@ export const strategies: StrategyRegistry = {
         description: 'A free stall in the block that holds the box to pick (drops: nearest the gate), nearest the gate within the block.',
         handler: (msg) => nearestToBoxStall(msg.payload),
       },
-      'spread-drops': {
-        description:
-          'A truck that picks goes to the stalls of its box block; a truck that only drops takes the free stall of lowest cost: road distance from the gate plus 6,000 m per unit of its block fill and 60 m per truck of the block (#188). Spreads truck-delivered boxes over the yard blocks; the TTI presets use it.',
-        params: {
+      'spread-drops': tunable(
+        'A truck that picks goes to the stalls of its box block; a truck that only drops takes the free stall of lowest cost: road distance from the gate plus 6,000 m per unit of its block fill and 60 m per truck of the block (#188). Spreads truck-delivered boxes over the yard blocks; the TTI presets use it.',
+        {
           SPREAD_FILL_M: metres(SPREAD_FILL_M, 'Metres of road one unit of block fill is worth for a drop-only truck.', 1_000_000),
           SPREAD_TRUCK_M: metres(SPREAD_TRUCK_M, 'Metres of road one truck holding or waiting for a stall of the block is worth.'),
         },
-        handler: (msg, _query, params) =>
-          spreadDropsStall(msg.payload, { SPREAD_FILL_M: params.SPREAD_FILL_M, SPREAD_TRUCK_M: params.SPREAD_TRUCK_M }),
-      },
+        (params) => (msg) => spreadDropsStall(msg.payload, { SPREAD_FILL_M: params.SPREAD_FILL_M, SPREAD_TRUCK_M: params.SPREAD_TRUCK_M }),
+      ),
       'least-loaded-block': {
         description: 'A free stall in the block with the fewest trucks holding or waiting for a stall, whatever the box.',
         handler: (msg) => leastLoadedBlockStall(msg.payload),
@@ -418,7 +426,7 @@ export function resolveStrategyParams(dp: DecisionPointId, name: string, params?
 export function getStrategy<K extends DecisionPointId>(dp: K, name: string, params?: Readonly<Record<string, number>>): DecisionHandler<K> {
   const s = definitionOf(dp, name)
   const resolved = resolveStrategyParams(dp, name, params)
-  return (message, query) => s.handler(message, query, resolved)
+  return s.withParams && params ? s.withParams(resolved) : s.handler
 }
 
 /** Each decision point's default strategy. */

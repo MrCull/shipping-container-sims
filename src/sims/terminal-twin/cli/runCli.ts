@@ -3,7 +3,7 @@
  *
  *   pnpm run tt:run --fixture tracer-1sts-10-boxes [--seed 7] [--until moves:5]
  *                     [--out summary.json] [--events events.jsonl] [--handlers default]
- *                     [--async-mode keep-running|pause] [--strategy dp=name] [--latency dp=spec]
+ *                     [--async-mode keep-running|pause] [--strategy dp=name] [--param dp.name=value] [--latency dp=spec]
  *                     [--log run.log.jsonl --log-level sts=debug,*=warn] [--snapshot s.json]
  *   pnpm run tt:run --from-snapshot s.json --until time:900   (run only a window)
  *
@@ -18,6 +18,8 @@ import {
   exportRun,
   headlineKpis,
   getStrategy,
+  resolveStrategyParams,
+  strategies,
   parseLogVerbosity,
   restoreSimulation,
   SHC_OPERATIONAL_STATES,
@@ -53,6 +55,7 @@ export const USAGE = `Usage: pnpm run tt:run (--fixture <name|file.json> | --pre
   --handlers <name>      Handler set: ${Object.keys(handlerSets).join(', ')}
   --async-mode <mode>    keep-running (default) | pause
   --strategy <dp>=<name> Built-in strategy for a decision point (repeatable)
+  --param <dp>.<name>=<v> Tuning parameter of the selected strategy, e.g. yardAllocation.TIER_COST_M=20 (repeatable)
   --match-line           Restrict the emptyAllocation=iso-type-best-position strategy to empties of the requesting line
   --latency <dp>=<spec>  Latency injector (repeatable). spec = none | fixed:<ms> | uniform:<min>-<max> | exp:<mean>
                          then optional ,timeout:<pct> ,error:<pct> ,timeoutMs:<ms>
@@ -180,14 +183,15 @@ function parseLatency(text: string): { latency: LatencySpec; timeoutMs?: number 
   return { latency, timeoutMs }
 }
 
-/** Merge --async-mode / --strategy / --latency over the scenario's own decisions config. */
+/** Merge --async-mode / --strategy / --param / --latency over the scenario's own decisions config. */
 function decisionsFromArgs(
   base: DecisionsConfig | undefined,
   asyncMode: string | undefined,
   strategyArgs: string[],
   latencyArgs: string[],
+  paramArgs: string[] = [],
 ): DecisionsConfig | undefined {
-  if (asyncMode === undefined && strategyArgs.length === 0 && latencyArgs.length === 0) return base
+  if (asyncMode === undefined && strategyArgs.length === 0 && latencyArgs.length === 0 && paramArgs.length === 0) return base
   const out: DecisionsConfig = { ...base, points: { ...base?.points } }
   const points = out.points as Record<DecisionPointId, NonNullable<DecisionsConfig['points']>[DecisionPointId]>
   if (asyncMode !== undefined) {
@@ -207,6 +211,23 @@ function decisionsFromArgs(
     const [dp, spec] = splitPoint(arg, '--latency')
     const { latency, timeoutMs } = parseLatency(spec)
     points[dp] = { ...points[dp], latency, ...(timeoutMs === undefined ? {} : { timeoutMs }) }
+  }
+  const tuned = new Set<DecisionPointId>()
+  for (const arg of paramArgs) {
+    // <dp>.<name>=<value>
+    const m = /^([A-Za-z]+)\.([A-Za-z][A-Za-z0-9_]*)=(.+)$/.exec(arg)
+    const value = Number(m?.[3])
+    if (!m || !Number.isFinite(value)) throw new UsageError(`Bad --param "${arg}" (expected <dp>.<name>=<number>)`)
+    const [dp] = splitPoint(`${m[1]}=`, '--param')
+    points[dp] = { ...points[dp], params: { ...points[dp]?.params, [m[2]]: value } }
+    tuned.add(dp)
+  }
+  for (const dp of tuned) {
+    try {
+      resolveStrategyParams(dp, points[dp]?.strategy ?? strategies[dp].default, points[dp]?.params)
+    } catch (err) {
+      throw new UsageError((err as Error).message)
+    }
   }
   return out
 }
@@ -336,6 +357,7 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
         events: { type: 'string' },
         'async-mode': { type: 'string' },
         strategy: { type: 'string', multiple: true, default: [] },
+        param: { type: 'string', multiple: true, default: [] },
         latency: { type: 'string', multiple: true, default: [] },
         'match-line': { type: 'boolean', default: false },
         snapshot: { type: 'string' },
@@ -359,13 +381,14 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
       throw new UsageError('--from-snapshot takes scenario and seed from the snapshot: drop --fixture/--preset/--seed')
     const start = fromFile ? loadSnapshot(fromFile) : null
     let config = start ? start.config : loadScenario(values.fixture, values.preset)
-    const decisionFlags = values['async-mode'] !== undefined || values.strategy.length > 0 || values.latency.length > 0
+    const decisionFlags =
+      values['async-mode'] !== undefined || values.strategy.length > 0 || values.latency.length > 0 || values.param.length > 0
     if (start && decisionFlags)
-      throw new UsageError('--from-snapshot takes decision settings from the snapshot: drop --async-mode/--strategy/--latency')
+      throw new UsageError('--from-snapshot takes decision settings from the snapshot: drop --async-mode/--strategy/--param/--latency')
     const endConditions = endConditionsFromArgs(values.end)
     if (start && endConditions) throw new UsageError('--from-snapshot takes end conditions from the snapshot: drop --end')
     if (endConditions) config = { ...config, endConditions }
-    const decisions = decisionsFromArgs(config.decisions, values['async-mode'], values.strategy, values.latency)
+    const decisions = decisionsFromArgs(config.decisions, values['async-mode'], values.strategy, values.latency, values.param)
     if (decisions !== config.decisions) config = { ...config, decisions }
     if (values['match-line']) {
       if (start) throw new UsageError('--from-snapshot takes the empty allocation options from the snapshot: drop --match-line')
