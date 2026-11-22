@@ -10,6 +10,7 @@
 (^|/)tests/browser/scenarioPicker\.ts$ => setup
 (^|/)tests/browser/renderBudget[A-Za-z.]*\.ts$ => core
 (^|/)(bay|Bay|rob|Rob|hullProfile)[A-Za-z-]*\.(ts|vue)$ => vessel
+(^|/)(boom|Boom)[A-Za-z-]*\.(ts|vue)$ => equipment
 (^|/)(cranePlan|CranePlan)[A-Za-z-]*\.(ts|vue)$|engine/cranePlan/ => vessel
 (^|/)[A-Za-z-]*(shc|Shc)[A-Za-z-]*\.(ts|vue|py)$|models/shc/ => equipment engine
 (^|/)(sts|Sts)[A-Za-z-]*\.(ts|vue|py)$|equipmentKinds/sts|models/sts/ => equipment

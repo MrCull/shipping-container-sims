@@ -1,4 +1,4 @@
-"""STS quay crane: ZPMC-style Malaccamax, three LODs, fully rigged.
+"""STS quay crane: ZPMC-style Malaccamax or Super Post-Panamax (`configure(cls)`), three LODs, fully rigged.
 
 All geometry here is written in the glTF frame ("G"): X along the quay rail,
 Y up, Z landward (the sea is at -Z), metres. Origin: the waterside rail
@@ -12,7 +12,13 @@ Hierarchy (LOD0 names; LOD1/LOD2 append `_lod1` / `_lod2` to every node):
       gantry                 travels along the rail (+X); pivot at the origin
         gantry_geo           legs, portal, sills, bogies, girders, A-frame, house, ...
         boom                 raising hinge (+X axis), seaward of the waterside legs
-          boom_geo           lattice boom, forestays, catwalks, floodlights
+          boom_geo           lattice boom, overhead frames, catwalks, floodlights
+          forestay_anchor    forestay ends on the boom nose (aim target)
+          boom_hoist_anchor  boom-hoist rope sheave block on the outer overhead frame (aim target)
+        forestays            apex end of the forestay rods; unit length along local +Y,
+          forestays_geo      aimed at forestay_anchor and scaled to the distance (sidecar `stretch`, mode aim)
+        boom_hoist_ropes     apex head sheaves; unit length along local +Y, aimed at boom_hoist_anchor
+          boom_hoist_ropes_geo   (LOD0 and LOD1; LOD2 has the empty only)
         trolley              along the boom/backreach (+Z); pivot on the trolley rails at Z = 0
           trolley_geo        frame, wheels, operator cab
           ropes              hoist ropes, unit length downwards: scale Y = rope length
@@ -25,6 +31,13 @@ Hierarchy (LOD0 names; LOD1/LOD2 append `_lod1` / `_lod2` to every node):
                 twistlock_{fore|aft}_{land|sea}         (LOD0 only)
               twin_locks     twin-20 centre locks drop (-Y)
                 twistlock_twin_{aft|fore}_{land|sea}    (LOD0 only)
+
+Classes (#303): the geometry below is written for the 52 m Malaccamax (the "design frame"). The Super
+Post-Panamax is the same structure 9 m lower and with a 3 m shorter boom, which is what the 2021 to 2023
+heightening changed on cranes 104 to 108 (knowledge file section 1: +9 m structure, +3 m boom): `ry()` maps every
+design-frame height to the class (unchanged up to the sills, the leg section between the sills and the portal
+shortened, everything from the portal up lowered by the lift difference), and OUTREACH sets the boom length. Every
+polygon vertex and every rig pivot passes through `ry()`, so hard-coded heights follow the class.
 
 Rig nodes are empties (no mesh, no rotation, no scale), so the meshopt
 quantisation transforms that gltf-transform writes on mesh nodes never move a
@@ -39,8 +52,21 @@ from . import sts_atlas as SA
 
 NAME = 'sts-malaccamax'
 
+# ---- Classes (#303) ----------------------------------------------------------
+# [V] knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1: lift above rail, outreach, rows covered.
+CLASSES = {
+    'malaccamax': {'name': 'sts-malaccamax', 'label': 'Malaccamax', 'liftM': 52.0, 'outreachM': 68.0, 'rows': 25,
+                   'cranes': '104 to 108'},
+    'super-post-panamax': {'name': 'sts-super-post-panamax', 'label': 'Super Post-Panamax', 'liftM': 43.0, 'outreachM': 65.0,
+                           'rows': 24, 'cranes': '101 to 103'},
+}
+DESIGN_LIFT = 52.0       # the geometry below is written for this lift (Malaccamax)
+DESIGN_OUTREACH = 68.0
+CLASS = 'malaccamax'
+DY = 0.0                 # class lift - DESIGN_LIFT
+
 # ---- Dimensions -------------------------------------------------------------
-# [V] TTI reference pack (Malaccamax builder version, all eight cranes).
+# [V] TTI reference pack (Malaccamax builder version); per class: CLASSES.
 RAIL_GAUGE = 30.48
 LIFT_ABOVE_RAIL = 52.0
 OUTREACH = 68.0          # waterside rail -> spreader centre at full outreach
@@ -58,7 +84,21 @@ HINGE = (55.6, -3.2)     # boom hinge pin (Y, Z)
 BOOM_TIP_Z = -(OUTREACH + 6.0)
 GIRDER_END_Z = RAIL_GAUGE + BACKREACH + 12.5
 APEX = (4.2, 82.0, 4.0)  # half-width, height, Z
-HOUSE = {'x': 6.2, 'y': (57.4, 64.8), 'z': (51.8, 60.6)}
+# [A] Forestays (#299): from the apex beam to the boom nose; boom-hoist ropes from the apex head sheaves to a sheave
+# block on the outer overhead frame. Both are separate gantry children aimed at anchors on the boom, so they stay
+# attached at every boom angle. (Y, Z) of each end; X offsets are per member.
+FORESTAY_TOP = (APEX[1] - 1.0, APEX[2] - 0.6)
+FORESTAY_END = (58.0, BOOM_TIP_Z + 0.4)
+BOOM_HOIST_TOP = (APEX[1] + 0.45, APEX[2] - 0.7)
+BOOM_HOIST_END = (63.4, -48.0)
+# [A] #300: the house is slightly larger than before (6.2 m half-width, 64.8 m roof, 60.6 m landward end); the seaward
+# end stays at 51.8 m, where the trolley parks at full backreach.
+HOUSE = {'x': 6.8, 'y': (57.4, 65.6), 'z': (51.8, 60.9)}
+# [P] #300: deeper solid side plate on the inboard boom (TTI photos A01, A04) carrying TTI ALGECIRAS in white;
+# [A] its length and depth. (Y, Z) ranges; it spans the girder width either side of GIRDER_X.
+BOOM_PLATE_Y = (53.4, GIRDER_Y[1])
+BOOM_PLATE_Z = (-21.4, HINGE[1] - 0.8)
+BOOM_PLATE_TEXT = (14.4, 1.8)   # lettering width x height (the atlas region is 8:1)
 BUFFER_X = LEG_X + 4.5   # over buffers = 27 m (= quay.stsMinSpacingM)
 # Spreader / headblock.
 TWISTLOCK_X = 6.058 / 2 - 0.089    # [V] ISO 1161 casting centres of a 20 ft box
@@ -69,6 +109,31 @@ TWIN_DROP = 0.4
 HEADBLOCK_SHEAVE_Y = 2.25           # rope ends above the spreader underside
 
 TELE_X = TWISTLOCK_X
+
+
+def ry(y):
+    """Design-frame (Malaccamax) height -> this class's height: unchanged up to the sill top, the leg section between
+    the sill top and the portal underside shortened by -DY, everything from the portal up moved by DY."""
+    if DY == 0.0 or y <= SILL_Y[1]:
+        return y
+    if y >= PORTAL_Y[0]:
+        return y + DY
+    return SILL_Y[1] + (y - SILL_Y[1]) * (PORTAL_Y[0] + DY - SILL_Y[1]) / (PORTAL_Y[0] - SILL_Y[1])
+
+
+def ryp(p):
+    """ry() on a glTF (x, y, z) point."""
+    return (p[0], ry(p[1]), p[2])
+
+
+def configure(cls):
+    """Selects the crane class the build, sidecar and preview functions use (module state; call before build_sts)."""
+    global CLASS, NAME, LIFT_ABOVE_RAIL, OUTREACH, DY, BOOM_TIP_Z, FORESTAY_END
+    c = CLASSES[cls]
+    CLASS, NAME, LIFT_ABOVE_RAIL, OUTREACH = cls, c['name'], c['liftM'], c['outreachM']
+    DY = LIFT_ABOVE_RAIL - DESIGN_LIFT
+    BOOM_TIP_Z = -(OUTREACH + 6.0)
+    FORESTAY_END = (58.0, BOOM_TIP_Z + 0.4)
 
 # Amber gantry-alarm beacon mount points [A, glTF frame, node `gantry`]: the beacon lamp base on each leg (outer X face)
 # and on the portal-beam ends. The gantry alarm ticket attaches its lights here.
@@ -118,6 +183,8 @@ class GMesh:
         if outward is not None and _newell(pts).dot(_v(outward)) < 0:
             pts.reverse()
             uvs.reverse()
+        if DY != 0.0:
+            pts = [Vector(ryp(p)) for p in pts]
         base = len(self.verts)
         self.verts.extend(pts)
         self.faces.append(tuple(range(base, base + len(pts))))
@@ -209,6 +276,15 @@ class GMesh:
             pts.append(p)
         for a, b in zip(pts, pts[1:]):
             self.cyl(a, b, r, n, uv, caps=False)
+
+    def merge(self, other):
+        """Appends another mesh's polygons (same coordinate frame)."""
+        base = len(self.verts)
+        self.verts.extend(other.verts)
+        self.faces.extend(tuple(i + base for i in f) for f in other.faces)
+        self.uvs.extend(other.uvs)
+        self.mats.extend(other.mats)
+        return self
 
     def bounds(self, offset=(0, 0, 0)):
         if not self.verts:
@@ -402,6 +478,8 @@ def gantry_structure(d):
         xf = LEG_X + (ax - LEG_X) * t
         for z in (az * t, RAIL_GAUGE + (az - RAIL_GAUGE) * t):
             m.beam((-xf, 67.0, z), (xf, 67.0, z), 0.7, 0.7, blue)
+    if d == 0 and EXTRAS['apex_bracing']:
+        _apex_bracing(m, blue)
     m.box((-ax - 0.8, ay - 1.6, az - 0.9), (ax + 0.8, ay, az + 0.9), blue)
     if d == 0:
         m.box((-1.4, ay, az - 0.7), (1.4, ay + 0.9, az + 0.7), dark)       # head sheaves
@@ -490,7 +568,74 @@ def gantry_structure(d):
         for x, z in legs:
             sx = 1 if x > 0 else -1
             _ladder(m, x + sx * 1.2, sx, z, BOGIE_TOP + 0.3, PORTAL_Y[0] - 0.4, d)
+    if d == 0 and EXTRAS['leg_stairs']:
+        _leg_stairs(m, -LEG_X, RAIL_GAUGE)
     return m
+
+
+# #300 detail extras, LOD0 only, added in this order while LOD0 stays within the spec ceiling (sidecar provenance
+# lists what was added and what was skipped). The larger machinery house (HOUSE) costs no triangles.
+EXTRAS = {'apex_bracing': True, 'leg_stairs': True}
+
+
+def _aframe_at(y, z_leg):
+    """(|x|, z) of an A-frame leg at height y; z_leg = 0 (seaward leg) or RAIL_GAUGE (landward leg)."""
+    ax, ay, az = APEX
+    t = (y - PORTAL_Y[1]) / (ay - 0.8 - PORTAL_Y[1])
+    return LEG_X + (ax - LEG_X) * t, z_leg + (az - z_leg) * t
+
+
+def _apex_bracing(m, blue):
+    """[P] Extra diagonals in the A-frame (the reference silhouette is full of them): an X in each side frame below
+    the 67 m tie, a king post from the tie to the apex beam, and plan diagonals in the 67 m tie frame (above the
+    trolley, which passes through the A-frame below 62 m)."""
+    ax, ay, az = APEX
+    lo, hi = PORTAL_Y[1] + 1.2, 66.6
+    for sx in (-1, 1):
+        (xs0, zs0), (xl0, zl0) = _aframe_at(lo, 0.0), _aframe_at(lo, RAIL_GAUGE)
+        (xs1, zs1), (xl1, zl1) = _aframe_at(hi, 0.0), _aframe_at(hi, RAIL_GAUGE)
+        m.beam((sx * xs0, lo, zs0), (sx * xl1, hi, zl1), 0.5, 0.5, blue, up=(1, 0, 0))
+        m.beam((sx * xl0, lo, zl0), (sx * xs1, hi, zs1), 0.5, 0.5, blue, up=(1, 0, 0))
+        (xt, zt), (_, zr) = _aframe_at(67.0, 0.0), _aframe_at(67.0, RAIL_GAUGE)
+        m.beam((sx * xt, 67.35, (zt + zr) / 2), (sx * ax, ay - 1.6, az + 0.6), 0.55, 0.55, blue, up=(1, 0, 0))
+    (xt, zt), (_, zr) = _aframe_at(67.0, 0.0), _aframe_at(67.0, RAIL_GAUGE)
+    m.beam((-xt, 67.0, zt), (xt, 67.0, zr), 0.45, 0.45, blue)
+    m.beam((xt, 67.0, zt), (-xt, 67.0, zr), 0.45, 0.45, blue)
+
+
+STAIR_RISE = 4.0     # [A] per flight
+STAIR_RUN = 4.0
+STAIR_W = 0.9
+
+
+def _leg_stairs(m, x_leg, z_leg):
+    """[P] Zig-zag service stairs on the landward face of one leg, from the bogie to the portal, with a landing at
+    each turn and one handrail. Flights run along X across the leg face."""
+    grey = P('grey')
+    zf = z_leg + 1.35                    # clear of the tapered leg's landward face (1.2 m at the foot)
+    z0, z1 = zf, zf + STAIR_W
+    zc = (z0 + z1) / 2
+    xa, xb = x_leg - STAIR_RUN / 2, x_leg + STAIR_RUN / 2
+    y = BOGIE_TOP + 0.3
+    k = 0
+    while y + STAIR_RISE <= PORTAL_Y[0] - 0.2:
+        x_from, x_to = (xa, xb) if k % 2 == 0 else (xb, xa)
+        # Stringers on both sides and the handrail on the outer side.
+        for zz in (z0 + 0.05, z1 - 0.05):
+            m.beam((x_from, y, zz), (x_to, y + STAIR_RISE, zz), 0.1, 0.3, grey, up=(0, 0, 1), caps=False)
+        m.beam((x_from, y + 1.0, z1), (x_to, y + STAIR_RISE + 1.0, z1), 0.05, 0.05, grey, up=(0, 0, 1), caps=False)
+        steps = 8
+        for i in range(1, steps):
+            t = i / steps
+            xs = x_from + (x_to - x_from) * t
+            ys = y + STAIR_RISE * t
+            m.box((xs - 0.14, ys - 0.04, z0 + 0.1), (xs + 0.14, ys, z1 - 0.1), grey, faces=['+y'])
+        # Landing at the top of the flight, beyond its end, with a corner post.
+        lx = x_to + (0.6 if x_to > x_from else -0.6)
+        m.box((min(x_to, lx), y + STAIR_RISE - 0.08, z0), (max(x_to, lx), y + STAIR_RISE, z1), grey, faces=['+y', '-y', '+z', '-x', '+x'])
+        m.beam((lx, y + STAIR_RISE, z1), (lx, y + STAIR_RISE + 1.1, z1), 0.05, 0.05, grey, up=(1, 0, 0), caps=False)
+        y += STAIR_RISE
+        k += 1
 
 
 def boom_structure(d):
@@ -499,8 +644,19 @@ def boom_structure(d):
     hz = HINGE[1]
     tip = BOOM_TIP_Z
     frames = (-24.0, -48.0)
+    pz0, pz1 = BOOM_PLATE_Z
+    py0, py1 = BOOM_PLATE_Y
+
+    def on_plate(z):
+        return pz0 - 0.2 < z < pz1 + 0.2
+
     for sx in (-1, 1):
         x = sx * GIRDER_X
+        # Deeper solid side plate (box girder) on the inboard boom, every LOD (#300); TTI ALGECIRAS on its outer face.
+        m.box((x - GIRDER_HALF_W, py0, pz0), (x + GIRDER_HALF_W, py1, pz1), blue, faces=None if d < 2 else ['+x', '-x', '-y', '+z', '-z'])
+        if d < 2:
+            tw, th = BOOM_PLATE_TEXT
+            m.decal((x + sx * GIRDER_HALF_W, (py0 + py1) / 2, (pz0 + pz1) / 2), (sx, 0, 0), tw, th, SA.region_uv('tti_on_blue'))
         if d == 2:
             m.box((x - GIRDER_HALF_W, 54.4, tip), (x + GIRDER_HALF_W, GIRDER_Y[1], hz), blue)
             continue
@@ -512,6 +668,8 @@ def boom_structure(d):
         for k in range(bays + 1):
             z = hz + (tip - hz) * k / bays
             yb = 54.5 + (55.5 - 54.5) * k / bays
+            if on_plate(z) or (k < bays and on_plate(hz + (tip - hz) * (k + 1) / bays)):
+                continue  # the side plate replaces the lattice web here
             m.beam((x, yb + 0.5, z), (x, 56.0, z), 0.45, 0.45, dblue, up=(0, 0, 1), caps=False)
             if k < bays:
                 zn = hz + (tip - hz) * (k + 1) / bays
@@ -528,16 +686,14 @@ def boom_structure(d):
     for z in frames:
         for sx in (-1, 1):
             m.beam((sx * GIRDER_X, GIRDER_Y[1], z), (sx * GIRDER_X, 63.0, z), 0.8, 0.8, blue, up=(0, 0, 1), caps=d < 2)
-            # Forestays (tension members) up to the apex.
-            m.beam((sx * GIRDER_X, 63.0, z), (sx * ax, ay - 1.0, az - 0.6), 0.45, 0.45, blue, up=(1, 0, 0), caps=d < 2)
         m.box((-GIRDER_X - 0.4, 62.6, z - 0.4), (GIRDER_X + 0.4, 63.4, z + 0.4), blue)
         if d == 2:
             break
     m.box((-GIRDER_X - GIRDER_HALF_W, 54.4, tip - 0.8), (GIRDER_X + GIRDER_HALF_W, GIRDER_Y[1], tip), blue)
-    # TT-124: the long forestay tension rods from the apex to the boom nose (a pair per side; twin cables at LOD0).
-    for sx in (-1, 1):
-        for ox in ((-0.25, 0.25) if d == 0 else (0.0,)):
-            m.beam((sx * ax + ox, ay - 1.0, az - 0.6), (sx * GIRDER_X + ox, 58.0, tip + 0.4), 0.3, 0.3, blue, up=(1, 0, 0), caps=d < 2)
+    # The forestays and boom-hoist ropes are separate stretch nodes (forestays_part, boom_hoist_part, #299).
+    if d == 0:
+        y, z = BOOM_HOIST_END
+        m.box((-1.4, y, z - 0.5), (1.4, y + 0.6, z + 0.5), dark)  # boom-hoist sheave block
     if d == 2:
         return m
     # Hinge lugs and pins.
@@ -546,7 +702,7 @@ def boom_structure(d):
     if d < 2:
         for sx in (-1, 1):
             for z in (-14.0, -30.0, -46.0, -62.0):
-                _floodlight(m, (sx * GIRDER_X, 54.2, z))
+                _floodlight(m, (sx * GIRDER_X, BOOM_PLATE_Y[0] - 0.2 if on_plate(z) else 54.2, z))
         m.box((-1.0, 57.2, tip + 0.2), (1.0, 58.4, tip + 1.0), dark)  # tip sheave housing
     return m
 
@@ -588,6 +744,35 @@ def trolley_part(d):
         m.decal((-0.7, y - 2.8, -2.4), (0, -1, 0), 2.0, 1.4, win, up=(0, 0, 1))
         for sx in (-1, 1):
             _handrail(m, sx * 5.2, y + 3.0, -2.8, 2.8, d, post_every=1.4)
+    return m
+
+
+def forestays_part(d):
+    """Unit-length forestay rods (+Y from the apex end), world rest coordinates around (0, *FORESTAY_TOP).
+
+    The `forestays` node aims +Y at `forestay_anchor` and scales Y to the distance, so the rods keep their X
+    offsets (apex half-width at the top, girder centres at the boom end) at every boom angle."""
+    m = GMesh()
+    blue = P('blue')
+    y, z = FORESTAY_TOP
+    for sx in (-1, 1):
+        for ox in ((-0.25, 0.25) if d == 0 else (0.0,)):
+            if d == 2:
+                m.beam((sx * APEX[0], y, z), (sx * GIRDER_X, y + 1.0, z), 0.5, 0.5, blue, up=(1, 0, 0), caps=False)
+            else:
+                m.beam((sx * APEX[0] + ox, y, z), (sx * GIRDER_X + ox, y + 1.0, z), 0.3, 0.3, blue, up=(1, 0, 0), caps=False)
+    return m
+
+
+def boom_hoist_part(d):
+    """Unit-length boom-hoist ropes (+Y from the apex head sheaves), world rest coordinates around (0, *BOOM_HOIST_TOP)."""
+    m = GMesh()
+    if d == 2:
+        return m
+    dark = P('dark')
+    y, z = BOOM_HOIST_TOP
+    for x in ((-1.1, -0.8, 0.8, 1.1) if d == 0 else (-0.95, 0.95)):
+        m.cyl((x, y, z), (x, y + 1.0, z), 0.06 if d == 0 else 0.1, 6 if d == 0 else 4, dark, caps=False, up=(1, 0, 0))
     return m
 
 
@@ -684,6 +869,7 @@ class _Rig:
 
     def empty(self, name, parent_name, world, role, rig=None, axis=None, description=None):
         parent_obj, parent_world = self.objects[parent_name]
+        world = ryp(world)
         local = tuple(world[i] - parent_world[i] for i in range(3))
         obj = empty(name, parent_obj, _b(local))
         self.objects[name] = (obj, world)
@@ -741,7 +927,18 @@ def build_sts(atlas_image):
         rig.geo(n('gantry_geo'), n('gantry'), gantry_mesh, mats, lod, 'legs, portal, sills, bogies, girders, A-frame, machinery house, ladders, festoon')
         rig.empty(n('boom'), n('gantry'), (0.0, HINGE[0], HINGE[1]), 'rig', 'boom', '+X', 'boom hinge pin; positive rotation raises the boom')
         boom_mesh = boom_structure(level)
-        rig.geo(n('boom_geo'), n('boom'), boom_mesh, mats, lod, 'seaward lattice boom, forestays, catwalks, floodlights')
+        rig.geo(n('boom_geo'), n('boom'), boom_mesh, mats, lod, 'seaward lattice boom, overhead frames, catwalks, floodlights')
+        rig.empty(n('forestay_anchor'), n('boom'), (0.0, *FORESTAY_END), 'anchor', description='forestay ends on the boom nose (aim target of forestays)')
+        rig.empty(n('boom_hoist_anchor'), n('boom'), (0.0, *BOOM_HOIST_END), 'anchor',
+                  description='boom-hoist sheave block on the outer overhead frame (aim target of boom_hoist_ropes)')
+        rig.empty(n('forestays'), n('gantry'), (0.0, *FORESTAY_TOP), 'stretch',
+                  description='apex end of the forestays; unit length along +Y, aimed at forestay_anchor (see stretch)')
+        rig.geo(n('forestays_geo'), n('forestays'), forestays_part(level), mats, lod,
+                'forestay rods (unit length; twin rods per side at LOD0, one per side at LOD1 and LOD2)')
+        rig.empty(n('boom_hoist_ropes'), n('gantry'), (0.0, *BOOM_HOIST_TOP), 'stretch',
+                  description='apex head sheaves; unit length along +Y, aimed at boom_hoist_anchor (see stretch)')
+        rig.geo(n('boom_hoist_ropes_geo'), n('boom_hoist_ropes'), boom_hoist_part(level), mats, lod,
+                'boom-hoist ropes (unit length; four at LOD0, two at LOD1, none at LOD2)')
         if level == 0:
             bounds = (gantry_mesh.bounds(), boom_mesh.bounds())
         rig.empty(n('trolley'), n('gantry'), (0.0, TROLLEY_RAIL_Y, 0.0), 'rig', 'trolley', '+Z', 'on the trolley rails; Z = trolley position from the waterside rail')
@@ -749,16 +946,21 @@ def build_sts(atlas_image):
         rig.empty(n('ropes'), n('trolley'), (0.0, TROLLEY_RAIL_Y, 0.0), 'rig', 'ropes', '-Y', 'hoist ropes, 1 m long at rest: scale Y = rope length (see stretch)')
         rig.geo(n('ropes_geo'), n('ropes'), ropes_part(level), mats, lod, 'hoist ropes (unit length)')
         rig.empty(n('hoist'), n('trolley'), (0.0, 0.0, 0.0), 'rig', 'hoist', '+Y', 'spreader underside centre; Y = height above the rail')
-        rig.geo(n('hoist_geo'), n('hoist'), headblock_part(level) if level < 2 else GMesh(), mats, lod, 'headblock')
+        # LOD1 folds the headblock and the twin-lift housing into the spreader mesh (draw-call cap 10, #299).
+        rig.geo(n('hoist_geo'), n('hoist'), headblock_part(level) if level == 0 else GMesh(), mats, lod, 'headblock')
         rig.empty(n('spreader'), n('hoist'), (0.0, 0.0, 0.0), 'rig', 'spreader', '+Y', 'container attach point (top centre of the box); skew rotation')
-        rig.geo(n('spreader_geo'), n('spreader'), spreader_part(level), mats, lod, 'telescopic spreader main frame')
+        spreader_mesh = spreader_part(level)
+        if level == 1:
+            spreader_mesh.merge(headblock_part(level)).merge(twin_part(level))
+        rig.geo(n('spreader_geo'), n('spreader'), spreader_mesh, mats, lod,
+                'telescopic spreader main frame' + (' with the headblock and twin-lift housing' if level == 1 else ''))
         for side, sx in (('fore', 1), ('aft', -1)):
             node = f'spreader_tele_{side}'
             rig.empty(n(node), n('spreader'), (sx * TELE_X, 0.0, 0.0), 'rig', node, RIG_AXES[node], f'{side} telescope end beam (20 ft at rest)')
             if level < 2:
                 rig.geo(n(f'{node}_geo'), n(node), tele_part(level, sx), mats, lod, f'{side} telescope end beam and arms')
         rig.empty(n('twin_locks'), n('spreader'), (0.0, TWIN_DROP, 0.0), 'rig', 'twin_locks', '-Y', 'twin-20 centre twist-lock units (retracted at rest)')
-        if level < 2:
+        if level == 0:
             rig.geo(n('twin_locks_geo'), n('twin_locks'), twin_part(level), mats, lod, 'twin-lift housing')
         if level == 0:
             for lock, (parent, pivot) in LOCKS.items():
@@ -788,7 +990,7 @@ def sidecar(info, scene_water_rail_z):
         'trolley': {'type': 'translation', 'axis': '+Z', 'minM': -OUTREACH, 'maxM': round(RAIL_GAUGE + BACKREACH, 2), 'rest': 0, 'tag': 'V',
                     'note': f'from the waterside rail; {OUTREACH:g} m outreach [V], {BACKREACH:g} m backreach behind the landside rail [A]'},
         'hoist': {'type': 'translation', 'axis': '+Y', 'minM': -20, 'maxM': LIFT_ABOVE_RAIL, 'rest': 0, 'tag': 'V',
-                  'note': 'spreader underside height above the rail: 52 m lift [V]; 20 m below the rail into the hold [A]'},
+                  'note': f'spreader underside height above the rail: {LIFT_ABOVE_RAIL:g} m lift [V]; 20 m below the rail into the hold [A]'},
         'spreader': {'type': 'rotation', 'axis': '+Y', 'minDeg': -5, 'maxDeg': 5, 'rest': 0, 'tag': 'A', 'note': 'skew'},
         'spreader_tele_fore': {'type': 'translation', 'axis': '+X', 'minM': 0, 'maxM': round(TELE_STROKE, 4), 'rest': 0, 'tag': 'V',
                                'note': '0 = 20 ft, max = 40 ft (ISO 668 lengths)'},
@@ -806,6 +1008,9 @@ def sidecar(info, scene_water_rail_z):
     return {
         'asset': NAME,
         'kind': 'sts',
+        'craneClass': {'id': CLASS, 'label': CLASSES[CLASS]['label'], 'cranes': CLASSES[CLASS]['cranes'],
+                       'rows': CLASSES[CLASS]['rows'], 'tag': 'V',
+                       'source': 'knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1'},
         'version': 1,
         'generator': 'src/sims/terminal-twin/assets/generators/build.py --only sts',
         'units': 'm',
@@ -816,11 +1021,12 @@ def sidecar(info, scene_water_rail_z):
         'geometry': {
             'railGaugeM': g(RAIL_GAUGE, 'V', source='TTI reference pack, STS table'),
             'liftHeightAboveRailM': g(LIFT_ABOVE_RAIL, 'V', source='TTI reference pack (operator height above rail)'),
-            'outreachM': g(OUTREACH, 'V', source='TTI reference pack (Malaccamax seaward outreach)'),
+            'outreachM': g(OUTREACH, 'V', source=f'TTI reference pack ({CLASSES[CLASS]["label"]} seaward outreach)'),
             'backreachM': g(BACKREACH, 'A', reason='not verified; functional backreach behind the landside rail'),
-            'apexHeightM': g(APEX[1], 'A', reason='overall steel height not verified; proportional structure above the 52 m envelope'),
-            'trolleyRailHeightM': g(TROLLEY_RAIL_Y, 'A', reason='52 m lift + spreader/headblock + clearance'),
-            'boomHingeM': {'y': HINGE[0], 'z': HINGE[1], 'tag': 'A'},
+            'apexHeightM': g(ry(APEX[1]), 'A', reason=f'overall steel height not verified; proportional structure above the {LIFT_ABOVE_RAIL:g} m envelope'),
+            'trolleyRailHeightM': g(ry(TROLLEY_RAIL_Y), 'A', reason=f'{LIFT_ABOVE_RAIL:g} m lift + spreader/headblock + clearance'),
+            'boomHingeM': {'y': round(ry(HINGE[0]), 3), 'z': HINGE[1], 'tag': 'A'},
+            'boomUndersideM': g(ry(HINGE[0]), 'A', reason='boom hinge pin height: the lowered-boom clearance reference of the engine (craneClass boomUndersideM)'),
             'legSpacingM': g(2 * LEG_X, 'A', reason='leg centres along the rail; mechanical-clearance approximation'),
             'overBuffersM': g(2 * BUFFER_X, 'A', reason='matches quay.stsMinSpacingM (27 m)'),
             'boomTipM': g(-BOOM_TIP_Z, 'A'),
@@ -842,6 +1048,12 @@ def sidecar(info, scene_water_rail_z):
         'stretch': [
             {'node': 'ropes', 'to': 'hoist', 'axis': 'Y', 'offsetM': HEADBLOCK_SHEAVE_Y, 'unitLengthM': 1.0,
              'note': 'ropes.scale.y = ropes.y - (hoist.y + offsetM), both children of the trolley'},
+            {'node': 'forestays', 'to': 'forestay_anchor', 'mode': 'aim', 'axis': '+Y', 'unitLengthM': 1.0,
+             'note': 'rotate forestays so local +Y points at forestay_anchor (a boom child) and set scale.y = distance; '
+                     'the rods stay on the apex and the boom nose at every boom angle'},
+            {'node': 'boom_hoist_ropes', 'to': 'boom_hoist_anchor', 'mode': 'aim', 'axis': '+Y', 'unitLengthM': 1.0,
+             'note': 'rotate boom_hoist_ropes so local +Y points at boom_hoist_anchor and set scale.y = distance; '
+                     'the ropes run from the apex head sheaves to the boom sheave block and shorten as the boom rises'},
         ],
         'spreaderModes': SPREADER_MODES,
         'attachPoints': [
@@ -853,7 +1065,7 @@ def sidecar(info, scene_water_rail_z):
              'description': 'top centre of the fore box of a twin-20 lift'},
         ],
         'beaconMounts': [
-            {'name': name, 'node': 'gantry', 'position': [round(c, 3) for c in pos],
+            {'name': name, 'node': 'gantry', 'position': [round(c, 3) for c in ryp(pos)],
              'colour': SA.PALETTE['amber'], 'lens': 'amber', 'tag': 'A',
              'description': ('on the outer X face of a leg at gantry-alarm height' if '_leg_' in name else 'on the end of a portal beam')
              + f', {"seaward" if "_sea_" in name else "landward"} side; rides with the gantry'}
@@ -870,7 +1082,15 @@ def sidecar(info, scene_water_rail_z):
             'wordmark': SA.WORDMARK,
             'livery': SA.OPERATOR_NAME,
             'typeface': SA.WORDMARK_FONT.replace('.ttf', ''),
-            'placement': 'TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces (white on blue), ZPMC builder plates on the legs',
+            'placement': 'TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces and on the boom side plate outer faces (white on blue), ZPMC builder plates on the legs',
+            'boomSidePlate': {
+                'node': 'boom_geo', 'material': 'sts_paint', 'region': 'tti_on_blue', 'lods': ['LOD0', 'LOD1'],
+                'yM': [round(ry(v), 3) for v in BOOM_PLATE_Y], 'zM': [round(v, 3) for v in BOOM_PLATE_Z],
+                'textM': list(BOOM_PLATE_TEXT), 'tag': 'P',
+                'note': 'solid plate on both boom girders seaward of the hinge (every LOD, so the silhouette matches); '
+                        'TTI ALGECIRAS lettering on its outer faces at LOD0 and LOD1, from the sts-atlas region, in the paint '
+                        'material (no extra draw call); rides with the boom',
+            },
             'craneNumbers': {
                 'first': SA.PLATE_FIRST, 'count': SA.PLATE_COUNT,
                 'placement': 'seaward and landward portal beams, landside end of the machinery house',
@@ -884,7 +1104,12 @@ def sidecar(info, scene_water_rail_z):
             {'fact': f'rail gauge {RAIL_GAUGE} m', 'tag': 'V', 'source': 'TTI reference pack, STS table'},
             {'fact': f'{LIFT_ABOVE_RAIL:g} m lift height above rail (hoist travel maximum)', 'tag': 'V', 'source': 'TTI reference pack'},
             {'fact': f'{OUTREACH:g} m seaward outreach from the waterside rail (trolley travel minimum)', 'tag': 'V', 'source': 'TTI reference pack'},
-            {'fact': 'Malaccamax geometry on every crane', 'tag': 'M', 'reason': 'builder version: real fleet is 5 Malaccamax + 3 Super Post-Panamax'},
+            {'fact': f'{CLASSES[CLASS]["label"]} class (TTI cranes {CLASSES[CLASS]["cranes"]}, up to {CLASSES[CLASS]["rows"]} rows)', 'tag': 'V',
+             'source': 'knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1'},
+            *([{'fact': f'Super Post-Panamax = the Malaccamax structure {-DY:g} m lower (leg section between the sills and the portal '
+                        f'shortened, everything from the portal up lowered) with a {DESIGN_OUTREACH - OUTREACH:g} m shorter boom',
+                'tag': 'A', 'reason': 'the 2021 to 2023 heightening made cranes 104 to 108 9 m taller with 3 m boom extensions '
+                                      '(knowledge file section 1); the reverse of that change, not a stretch'}] if DY else []),
             {'fact': 'blue steelwork, white machinery house, yellow spreader, lattice boom, ties, ladders, catwalks, floodlights',
              'tag': 'P', 'source': 'reference photographs (not committed)'},
             {'fact': 'apex, trolley-rail and hinge heights, leg spacing, backreach, bogie layout, house size', 'tag': 'A'},
@@ -893,8 +1118,19 @@ def sidecar(info, scene_water_rail_z):
              'tag': 'P', 'source': 'TTI Algeciras reference photographs of the STS cranes (git-ignored, not committed)'},
             {'fact': 'no TTI emblem or logo artwork', 'tag': 'M', 'reason': 'text names only'},
             {'fact': 'beacon mount positions', 'tag': 'A', 'reason': 'photos show amber beacons low on the legs; exact heights are estimated'},
-            {'fact': 'forestays rotate with the boom (they detach from the apex when the boom is raised)', 'tag': 'M',
-             'reason': 'boom raising is a viewer-only pose; real tie bars fold'},
+            {'fact': 'forestays are straight rods that stretch to stay on the apex and the boom nose; boom-hoist ropes run '
+                     'straight from the apex to a sheave block on the outer overhead frame (no reeving)', 'tag': 'M',
+             'reason': 'real forestays are hinged links that fold as the boom rises; simplified to one aimed stretch node each'},
+            {'fact': 'LOD1 headblock and twin-lift housing merged into the spreader mesh; no boom-hoist ropes at LOD2', 'tag': 'M',
+             'reason': 'per-LOD draw-call caps (10 at LOD1, 6 at LOD2)'},
             {'fact': 'ladder cages, handrail posts and festoon loops simplified', 'tag': 'M', 'reason': 'triangle budget'},
+            {'fact': '#300 added: deeper boom side plate with TTI ALGECIRAS lettering (every LOD; lettering LOD0 and LOD1), '
+                     + ', '.join(n for n, on in (('extra A-frame and apex diagonal bracing (LOD0)', EXTRAS['apex_bracing']),
+                                                 ('zig-zag service stairs on the landward face of the -X landside leg (LOD0)', EXTRAS['leg_stairs'])) if on)
+                     + ', a slightly larger machinery house (every LOD, no extra triangles)',
+             'tag': 'P', 'source': 'TTI reference photographs A01, A04, B01 (link-only) and the CC0 set; sizes [A]'},
+            {'fact': '#300 skipped for budget: ' + (', '.join(n for n, on in (('apex bracing', EXTRAS['apex_bracing']), ('leg stairs', EXTRAS['leg_stairs'])) if not on) or 'nothing')
+                     + '; LOD1 and LOD2 gain only the side plate (lettering also at LOD1); the house grows at every LOD so it does not pop at the LOD switch',
+             'tag': 'M', 'reason': 'spec #297 LOD0 ceiling 33,274 triangles (5 % over the 31,690 before the spec) and the per-LOD draw-call caps'},
         ],
     }

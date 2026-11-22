@@ -7,7 +7,7 @@ import { NORMAL_ARRIVAL_FILL } from './robBays'
 import { DEFAULT_HOURLY_PROFILE, ScenarioBuilder } from './builder'
 import { deriveBlockXs, deriveSts } from './layout'
 import { TTI_FLOW_MIX, generateVessels } from './vesselGenerator'
-import type { AccessRoadConfig, AppointmentConfig, EmptyPoolConfig, FlowMix, HoldingConfig, PortRotation, ScenarioConfig, VesselConfig, YardStartConfig } from './types'
+import type { AccessRoadConfig, AppointmentConfig, EmptyPoolConfig, FlowMix, HoldingConfig, PortRotation, ScenarioConfig, StsCraneClass, VesselConfig, YardStartConfig } from './types'
 import {
   PEAK_DAY_FLOW_MIX,
   PEAK_DAY_PRESET_NAME,
@@ -19,6 +19,7 @@ import {
   TTI_BLOCKS,
   TTI_PRESET_NAME,
   TTI_REEFERS,
+  TTI_STS_CLASSES,
   TTI_TIERS,
 } from '../terminals/tti-algeciras/constants'
 
@@ -59,6 +60,10 @@ interface TerminalSpec {
   loadReleaseAhead?: number
   /** Yard reserve (#184, #188): see `YardConfig.reserveShare`; absent = none. */
   yardReserve?: number
+  /** STS booms raise and lower around berthing (#298, subsystem mode `boom: 'real'`); absent = off. */
+  booms?: boolean
+  /** STS class by crane id (#303); cranes not listed are the default class (Malaccamax). */
+  stsClasses?: Record<string, StsCraneClass>
 }
 
 /** TTI's access road (#146): the Isla Verde carriageway, entered `TTI_ACCESS_ROAD_RUNUP_M` south of the quay's end. */
@@ -94,9 +99,13 @@ function terminal(spec: TerminalSpec): ScenarioConfig {
   if (spec.emptyPool) b.emptyPool(spec.emptyPool)
   if (spec.loadReleaseAhead) b.loadReleaseAhead(spec.loadReleaseAhead)
   if (spec.yardReserve) b.yardReserve(spec.yardReserve)
+  if (spec.booms) b.subsystems({ boom: 'real' })
   const base = b.build()
   const sts = deriveSts({ ...base, sts: [{ id: `STS${spec.stsFirst}`, gantryX: 0, groundPositions: 3 }] }, spec.sts, spec.quayM)
-  for (const s of sts) b.sts(s.id, { gantryX: s.gantryX, groundPositions: s.groundPositions })
+  for (const s of sts) {
+    const craneClass = spec.stsClasses?.[s.id]
+    b.sts(s.id, { gantryX: s.gantryX, groundPositions: s.groundPositions, ...(craneClass ? { craneClass } : {}) })
+  }
   deriveBlockXs(spec.quayM, spec.blocks).forEach((x, i) => b.block(`B${String(i + 1).padStart(2, '0')}`, { x, bays: spec.bays, tiers: spec.tiers, ...(spec.reefers ? { poweredRows: spec.reefers.poweredRows } : {}) }))
   return b.build()
 }
@@ -155,6 +164,8 @@ export const presets: Record<string, () => ScenarioConfig> = {
       emptyPool: { count: 1200, maxAgeS: 7 * 86400 },
       loadReleaseAhead: TTI_LOAD_RELEASE_AHEAD,
       yardReserve: TTI_YARD_RESERVE,
+      booms: true,
+      stsClasses: TTI_STS_CLASSES,
     }),
   [SMALL_PRESET_NAME]: () =>
     terminal({
@@ -211,5 +222,7 @@ export const presets: Record<string, () => ScenarioConfig> = {
       emptyPool: { count: 1500, maxAgeS: 7 * 86400 },
       loadReleaseAhead: TTI_LOAD_RELEASE_AHEAD,
       yardReserve: TTI_YARD_RESERVE,
+      booms: true,
+      stsClasses: TTI_STS_CLASSES,
     }),
 }

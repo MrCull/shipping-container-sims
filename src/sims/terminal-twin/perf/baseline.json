@@ -43,5 +43,86 @@
         "load1": 6.3
       }
     }
+  },
+  "frames": {
+    "STS booms (spec #297)": {
+      "recorded": "2026-11-21",
+      "engineVersion": "0.58.0",
+      "preset": "TTI Algeciras baseline",
+      "quality": "high",
+      "samples": "8 one-second samples per camera, paused, STS104",
+      "env": {
+        "gpu": "Intel Iris Xe (ANGLE D3D11)",
+        "browser": "Claude desktop in-app pane, Chromium 156",
+        "canvas": "967x845 at dpr 1",
+        "server": "Vite dev server (unminified)"
+      },
+      "before": {
+        "commit": "0207d27",
+        "overview": {
+          "fps": 59.37,
+          "drawCalls": 279,
+          "triangles": 381787,
+          "cpuMs": 6.11,
+          "poseMs": 1.11
+        },
+        "60m": {
+          "fps": 59.87,
+          "drawCalls": 150,
+          "triangles": 680405,
+          "cpuMs": 5.51,
+          "poseMs": 1.19
+        }
+      },
+      "after": {
+        "commit": "1fe31a5",
+        "overview": {
+          "fps": 60,
+          "drawCalls": 293,
+          "triangles": 381879,
+          "cpuMs": 5.99,
+          "poseMs": 1.32
+        },
+        "60m": {
+          "fps": 59.5,
+          "drawCalls": 161,
+          "triangles": 678769,
+          "cpuMs": 6.09,
+          "poseMs": 1.48
+        },
+        "repeat": {
+          "overview": {
+            "fps": 58.87,
+            "drawCalls": 293,
+            "triangles": 381879,
+            "cpuMs": 6.08,
+            "poseMs": 1.2
+          },
+          "60m": {
+            "fps": 60.01,
+            "drawCalls": 161,
+            "triangles": 678769,
+            "cpuMs": 5.22,
+            "poseMs": 1.14
+          }
+        }
+      },
+      "boomsDown": {
+        "overview": {
+          "fps": 59.74,
+          "drawCalls": 294,
+          "triangles": 381895,
+          "cpuMs": 5.39,
+          "poseMs": 1.02
+        },
+        "60m": {
+          "fps": 59.99,
+          "drawCalls": 170,
+          "triangles": 682633,
+          "cpuMs": 5.4,
+          "poseMs": 1.28
+        }
+      }
+    }
   }
 }

@@ -308,10 +308,12 @@ jobs:
           if-no-files-found: ignore
 
   smoke:
-    # The required check (branch protection names it). Always runs, so it always reports: a no-op pass when the selection
-    # ran nothing (no file under src/ changed and no smoke label), else the merged result of the shards.
+    # The required check (branch protection names it). Runs whatever the jobs it needs did, so it always reports: a no-op
+    # pass when the selection ran nothing (no file under src/ changed and no smoke label), else the merged result of the
+    # shards. `!cancelled()`, not `always()`: when a newer push or label cancels this run, the check is cancelled too,
+    # instead of reporting a failure for a selection that was only cancelled.
     needs: [smoke-select, smoke-build, smoke-shard]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     name: Browser smoke tests (Terminal Twin)
     timeout-minutes: 10

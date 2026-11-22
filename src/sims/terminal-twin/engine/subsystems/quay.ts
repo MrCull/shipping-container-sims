@@ -22,8 +22,8 @@
  */
 import { occupancySlotCleared, occupancySlotFilled } from '../vesselOccupancy'
 import type { EngineContext, ReactorMap } from '../context'
-import { planSegment, type Axis, type AxisProfile, type MotionSegment } from '../kinematics'
-import type { StsDrop, StsState } from '../state'
+import { planSegment, type MotionSegment } from '../kinematics'
+import { stsBoom, stsSafeHoist, type StsDrop, type StsState } from '../state'
 import {
   CONTAINER_HEIGHT_M,
   HALF_OFFSET_M,
@@ -39,6 +39,8 @@ import { stsCycleGeometry, stsNominalCycle } from '../cycleTime'
 import { hatchEnabled, hatchSettings } from '../hatch'
 import { pumpLoadPrep, slotGantryX } from './loadPrep'
 import { prepareNextPackage } from './workPackages'
+import { boomHeld, checkBoomWaits, gantryBlockedBy, needsLowering, passSuperstructure, startBoom } from './boom'
+import { isInstant, planSequence } from './stsMotion'
 import { deckBoxChanged } from './hatch'
 import { laneGraphOf, laneZonesAt } from '../laneGraph'
 import { earliestStart, reserve } from '../reservations'
@@ -51,37 +53,6 @@ export function variation(ctx: EngineContext): number {
   const pct = ctx.config.moveVariationPct
   if (pct === 0) return 1
   return 1 + ((ctx.random() * 2 - 1) * pct) / 100
-}
-
-/** Scale a profile so every travel time is multiplied by `f`. */
-function scaled(p: AxisProfile, f: number): AxisProfile {
-  return { vMax: p.vMax / f, accel: p.accel / (f * f), decel: p.decel / (f * f) }
-}
-
-/**
- * Plan sequential axis moves starting at `t0`; updates the crane's axis
- * positions and live `motion`. Returns the segments and the end time.
- */
-export function planSequence(
-  sts: StsState,
-  t0: number,
-  f: number,
-  moves: { axis: Axis; to: number; profile: AxisProfile }[],
-  instant = false,
-): { segments: MotionSegment[]; end: number } {
-  const segments: MotionSegment[] = []
-  let t = t0
-  for (const m of moves) {
-    const key = m.axis === 'gantry' ? 'gantryX' : m.axis === 'trolley' ? 'trolleyZ' : 'hoistY'
-    if (sts[key] === m.to) continue
-    const seg = planSegment(sts.id, m.axis, sts[key], m.to, t, scaled(m.profile, f))
-    if (instant) seg.t1 = seg.t0 // quay mode instant: the move happens at once
-    segments.push(seg)
-    sts[key] = m.to
-    t = seg.t1
-  }
-  sts.motion = segments
-  return { segments, end: t }
 }
 
 /** The next lift of a crane: its next box, plus the fore half of the same cell for a twin-20 lift. */
@@ -104,6 +75,19 @@ function liftX(ctx: EngineContext, vesselId: string, containerIds: string[]): nu
 }
 
 /**
+ * Boom mode real with `canGantryWithBoomRaised` false (#302): a gantry move to `targetX` that would cross a
+ * superstructure the lowered boom cannot clear is not started. StsGantryBlocked reports it and the crane stays idle
+ * where it is (the crane split is unchanged). True when stopped.
+ */
+function gantryStopped(ctx: EngineContext, sts: StsState, targetX: number, at: number): boolean {
+  const vesselId = gantryBlockedBy(ctx, sts, targetX)
+  if (vesselId === null) return false
+  sts.status = 'idle'
+  ctx.schedule('StsGantryBlocked', at, { equipment: [sts.id], vessels: [vesselId] }, { stsId: sts.id, vesselId, targetX })
+  return true
+}
+
+/**
  * Continue a crane's work at `at`: the next move of its active work package
  * (starting the next released package first if needed), or StsWorkComplete
  * when all its packages are complete. A crane whose next package is not
@@ -112,6 +96,19 @@ function liftX(ctx: EngineContext, vesselId: string, containerIds: string[]): nu
 export function continueWork(ctx: EngineContext, sts: StsState, at: number, segments: MotionSegment[] = []): void {
   if (!sts.vesselId) {
     sts.status = 'idle'
+    return
+  }
+  // boom mode real (#297 review): a vessel moors or unmoors under this busy crane: raise (after the cycle that just
+  // ended) and wait boom up until VesselBerthed or VesselDeparted releases it
+  if (boomHeld(sts)) {
+    releaseRail(sts)
+    if (sts.boomDeg !== stsBoom(ctx.config).stowedDeg) startBoom(ctx, sts, at, 'raise')
+    else sts.status = 'idle'
+    return
+  }
+  // boom mode real (#298): lower the boom just before the first move on the vessel
+  if (needsLowering(ctx, sts)) {
+    startBoom(ctx, sts, at, 'lower')
     return
   }
   const vesselId = sts.vesselId
@@ -159,8 +156,7 @@ export function continueWork(ctx: EngineContext, sts: StsState, at: number, segm
   })
 }
 
-/** Quay mode instant: crane motions, locks and unlocks take no time (same events, zero durations). */
-export const isInstant = (ctx: Pick<EngineContext, 'state'>): boolean => ctx.state.subsystems.quay === 'instant'
+export { isInstant, planSequence }
 
 /** Kinematics with lock/unlock times zeroed in quay mode instant. */
 export function stsKinematics(ctx: EngineContext) {
@@ -326,6 +322,7 @@ export const quayReactors: ReactorMap = {
     }
     const kpi = state.kpis.perSts[sts.id]
     const targetX = slotGantryX(state, e.payload.slotId)
+    if (gantryStopped(ctx, sts, targetX, e.t)) return
     const blockedBy = reserveRail(state, config, sts, targetX)
     if (blockedBy !== null) {
       sts.status = 'waiting-for-rail'
@@ -349,12 +346,12 @@ export const quayReactors: ReactorMap = {
     const k = stsKinematics(ctx)
     const f = variation(ctx)
     const height = CONTAINER_HEIGHT_M[box.size]
-    const moves = [
-      { axis: 'hoist' as const, to: config.layout.stsSafeHoistM, profile: k.hoistEmpty },
+    const moves = passSuperstructure(ctx, sts, [
+      { axis: 'hoist' as const, to: stsSafeHoist(config, sts.id), profile: k.hoistEmpty },
       { axis: 'gantry' as const, to: targetX, profile: k.gantry },
       { axis: 'trolley' as const, to: config.layout.stsGroundLaneZ0M + gp.lane * config.layout.stsGroundLaneSpacingM, profile: k.trolley },
       { axis: 'hoist' as const, to: height, profile: k.hoistEmpty },
-    ]
+    ])
     // With SHCs the lane section under the box is a conflict zone: the pick starts once the SHC that put
     // the box down has driven out of it, and holds it until the box is lifted clear.
     let begin = e.t
@@ -362,7 +359,7 @@ export const quayReactors: ReactorMap = {
       const dry = planSequence({ ...sts }, 0, f, moves, isInstant(ctx))
       const lift = isInstant(ctx)
         ? 0
-        : planSegment(sts.id, 'hoist', height, config.layout.stsSafeHoistM, 0, k.hoistLoaded).t1 * (1 + config.moveVariationPct / 100)
+        : planSegment(sts.id, 'hoist', height, stsSafeHoist(config, sts.id), 0, k.hoistLoaded).t1 * (1 + config.moveVariationPct / 100)
       const windows = laneZonesAt(laneGraphOf(config), gp.lane, targetX, CONTAINER_LENGTH_M[box.size] / 2).map((zone) => ({
         zone,
         from: 0,
@@ -408,7 +405,7 @@ export const quayReactors: ReactorMap = {
     const spec = vesselClass(state.vessels[slot.vesselId].sizeClass)
     const k = stsKinematics(ctx)
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
-      { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: k.hoistLoaded },
+      { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: k.hoistLoaded },
       { axis: 'trolley', to: slotZ(spec, slot.row), profile: k.trolley },
       { axis: 'hoist', to: tierBaseY(spec, slot.tier) + CONTAINER_HEIGHT_M[box.size], profile: k.hoistLoaded },
     ], isInstant(ctx))
@@ -443,7 +440,7 @@ export const quayReactors: ReactorMap = {
     kpi.lastMoveEndS = e.t
     sts.status = 'returning'
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
-      { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: config.kinematics.sts.hoistEmpty },
+      { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: config.kinematics.sts.hoistEmpty },
     ], isInstant(ctx))
     continueWork(ctx, sts, end, segments)
   },
@@ -455,6 +452,7 @@ export const quayReactors: ReactorMap = {
     const ids = e.payload.containerIds
     const targetX = liftX(ctx, vessel.id, ids)
     const kpi = state.kpis.perSts[sts.id]
+    if (gantryStopped(ctx, sts, targetX, e.t)) return
     const blockedBy = reserveRail(state, config, sts, targetX)
     if (blockedBy !== null) {
       sts.status = 'waiting-for-rail'
@@ -481,12 +479,12 @@ export const quayReactors: ReactorMap = {
     const slot = state.vesselSlots[box.custody.id]
     const tallest = Math.max(...ids.map((id) => CONTAINER_HEIGHT_M[state.containers[id].size]))
     const k = stsKinematics(ctx)
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), [
-      { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: k.hoistEmpty },
+    const { segments, end } = planSequence(sts, e.t, variation(ctx), passSuperstructure(ctx, sts, [
+      { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: k.hoistEmpty },
       { axis: 'gantry', to: targetX, profile: k.gantry },
       { axis: 'trolley', to: slotZ(spec, slot.row), profile: k.trolley },
       { axis: 'hoist', to: tierBaseY(spec, slot.tier) + tallest, profile: k.hoistEmpty },
-    ], isInstant(ctx))
+    ]), isInstant(ctx))
     const twin = ids[1] ? { containerId: ids[1], from: { ...state.containers[ids[1]].custody } } : undefined
     ctx.schedule('StsPicked', end + k.lockS, { equipment: [sts.id], containers: ids, vessels: [vessel.id] }, {
       stsId: sts.id,
@@ -572,7 +570,7 @@ export const quayReactors: ReactorMap = {
       return
     }
     sts.status = 'carrying'
-    planDrop(ctx, sts, e.t, sts.drops[0], config.layout.stsSafeHoistM)
+    planDrop(ctx, sts, e.t, sts.drops[0], stsSafeHoist(config, sts.id))
   },
 
   StsGrounded: (e, ctx) => {
@@ -597,7 +595,7 @@ export const quayReactors: ReactorMap = {
     sts.carrying = rest
     sts.status = 'returning'
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
-      { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: config.kinematics.sts.hoistEmpty },
+      { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: config.kinematics.sts.hoistEmpty },
     ], isInstant(ctx))
     continueWork(ctx, sts, end, segments)
   },
@@ -605,6 +603,15 @@ export const quayReactors: ReactorMap = {
   StsWaitingForRail: (_e, ctx) => wake(ctx),
 
   StsRepositionStarted: (e, ctx) => startReposition(ctx, ctx.state.sts[e.payload.stsId], e.payload.toX),
+
+  /** Boom mode real (#298): a raise or lower ended; a crane assigned to a vessel meanwhile carries on with its work. */
+  StsBoomCompleted: (e, ctx) => {
+    const sts = ctx.state.sts[e.payload.stsId]
+    sts.status = 'idle'
+    if (sts.vesselId) continueWork(ctx, sts, e.t)
+    wake(ctx)
+    checkBoomWaits(ctx) // a vessel mooring or unmooring under a busy crane may now go ahead
+  },
 
   StsRepositionCompleted: (e, ctx) => {
     const sts = ctx.state.sts[e.payload.stsId]

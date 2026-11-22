@@ -127,6 +127,18 @@ export interface EventPayloads {
   StsRepositionStarted: { stsId: string; toX: number }
   StsRepositionCompleted: { stsId: string; gantryX: number; segments: MotionSegment[] }
   /**
+   * Boom mode real (#298): the STS starts a boom transition. A raise first hoists the spreader to its top and parks
+   * the trolley; the boom then turns to `toDeg` (stowed for a raise, working for a lower). No gantry travel meanwhile.
+   */
+  StsBoomStarted: { stsId: string; op: 'raise' | 'lower'; toDeg: number; segments: MotionSegment[] }
+  /** The boom reached its angle (`boomDeg`). */
+  StsBoomCompleted: { stsId: string; op: 'raise' | 'lower'; boomDeg: number }
+  /**
+   * Boom mode real with `canGantryWithBoomRaised` false (#302): the gantry move to `targetX` would cross the
+   * superstructure of `vesselId` that the lowered boom cannot clear, so the crane stays where it is.
+   */
+  StsGantryBlocked: { stsId: string; vesselId: string; targetX: number }
+  /**
    * Spreader locked: custody vessel slot → STS. A twin-20 lift picks a
    * second box (`twin`) in the same cycle.
    */

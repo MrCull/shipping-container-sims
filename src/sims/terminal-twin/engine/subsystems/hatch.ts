@@ -17,7 +17,7 @@
  */
 import type { EngineContext, ReactorMap } from '../context'
 import type { MotionSegment } from '../kinematics'
-import type { HatchJob, HatchPanelState, HatchKpiCounters, StsState, WorkPackage } from '../state'
+import { stsSafeHoist, type HatchJob, type HatchPanelState, type HatchKpiCounters, type StsState, type WorkPackage } from '../state'
 import {
   hatchEnabled,
   hatchSettings,
@@ -27,7 +27,8 @@ import {
   type HatchSettings,
 } from '../hatch'
 import { hatchPanelId, hatchPanelOfRow, vesselClass } from '../../scenario/vesselClasses'
-import { continueWork, isInstant, planSequence, stsKinematics, variation, wakeQuayRail } from './quay'
+import { continueWork, stsKinematics, variation, wakeQuayRail } from './quay'
+import { isInstant, planSequence } from './stsMotion'
 import { releaseRail, reserveRail } from './rail'
 
 /** Hatch covers apply when enabled in the scenario and the quay subsystem runs. */
@@ -198,10 +199,10 @@ const siteX = (ctx: EngineContext, siteId: string): number => {
 const stackCount = (ctx: EngineContext, siteId: string): number => ctx.state.hatchLaydown[siteId]?.panelIds.length ?? 0
 
 /** Move legs of a hatch move: before the lock and carrying to the destination. */
-function legs(ctx: EngineContext, panel: HatchPanelState, op: 'remove' | 'replace', siteId: string) {
+function legs(ctx: EngineContext, sts: StsState, panel: HatchPanelState, op: 'remove' | 'replace', siteId: string) {
   const { config } = ctx
   const k = stsKinematics(ctx)
-  const safe = config.layout.stsSafeHoistM
+  const safe = stsSafeHoist(config, sts.id)
   const sx = siteX(ctx, siteId)
   const lz = laydownCentreZ(config, panel.widthM)
   const count = stackCount(ctx, siteId)
@@ -240,7 +241,7 @@ function legs(ctx: EngineContext, panel: HatchPanelState, op: 'remove' | 'replac
 function padOf(ctx: EngineContext, sts: StsState, panel: HatchPanelState, op: 'remove' | 'replace', siteId: string): number {
   if (isInstant(ctx)) return 0
   const k = stsKinematics(ctx)
-  const { leg1, leg2 } = legs(ctx, panel, op, siteId)
+  const { leg1, leg2 } = legs(ctx, sts, panel, op, siteId)
   const dry = { ...sts }
   const a = planSequence(dry, 0, 1, leg1)
   const b = planSequence(dry, a.end, 1, leg2)
@@ -276,7 +277,7 @@ export const hatchReactors: ReactorMap = {
     job.siteId ??= claimLaydown(ctx, panel)
     if (job.op === 'replace' && state.hatchLaydown[job.siteId]?.panelIds.slice(-1)[0] !== panel.id)
       throw new Error(`${panel.id} is not on top of laydown bay ${job.siteId}`)
-    const { leg1, sx } = legs(ctx, panel, job.op, job.siteId)
+    const { leg1, sx } = legs(ctx, sts, panel, job.op, job.siteId)
     const blockedBy = reserveRail(state, config, sts, job.op === 'remove' ? panel.home.x : sx, job.op === 'remove' ? sx : panel.home.x)
     if (blockedBy !== null) {
       sts.status = 'waiting-for-rail'
@@ -342,7 +343,7 @@ export const hatchReactors: ReactorMap = {
       const site = state.hatchLaydown[job.siteId as string]
       site.panelIds.pop()
     }
-    const { leg2 } = legs(ctx, panel, job.op, job.siteId as string)
+    const { leg2 } = legs(ctx, sts, panel, job.op, job.siteId as string)
     const k = stsKinematics(ctx)
     sts.status = 'carrying'
     const { segments, end } = planSequence(sts, e.t, variation(ctx), leg2, isInstant(ctx))
@@ -385,7 +386,7 @@ export const hatchReactors: ReactorMap = {
     hatchTotals(ctx).removes++
     releaseRail(sts)
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
-      { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: config.kinematics.sts.hoistEmpty },
+      { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: config.kinematics.sts.hoistEmpty },
     ], isInstant(ctx))
     finishMove(ctx, sts, segments, end, job.startedAt ?? e.t)
     wakeQuayRail(ctx)
@@ -414,7 +415,7 @@ export const hatchReactors: ReactorMap = {
       delayS: delay,
     })
     const { segments, end } = planSequence(sts, e.t, variation(ctx), [
-      { axis: 'hoist', to: config.layout.stsSafeHoistM, profile: config.kinematics.sts.hoistEmpty },
+      { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: config.kinematics.sts.hoistEmpty },
     ], isInstant(ctx))
     finishMove(ctx, sts, segments, end, job.startedAt ?? e.t)
     wakeQuayRail(ctx)

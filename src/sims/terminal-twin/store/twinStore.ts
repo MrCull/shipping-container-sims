@@ -18,7 +18,7 @@ import { composeScenario } from '../scenario/compose'
 import { presets } from '../scenario/presets'
 import type { YardSetup } from '../scenario/builder'
 import type { ContainerSize, DisplaySettings, EndConditions, ScenarioConfig, ShcKinematics } from '../scenario/types'
-import { EXPORT_FILES, ScenarioValidationError, validateScenario, type ContainerState, type CranePlanView, type PlanAccuracy, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport, type TruckState, type VesselState } from '../engine'
+import { EXPORT_FILES, ScenarioValidationError, stsBoom, validateScenario, type ContainerState, type CranePlanView, type PlanAccuracy, type EngineEvent, type SimSnapshot, type ExportKind, type HeadlineKpis, type Highlight, type KpiReport, type KpiSeriesReport, type TruckState, type VesselState } from '../engine'
 import type { BreakpointHit, Checkpoint, DashboardData, Delta, EngineInfo, EventSummary } from '../worker/protocol'
 import { parseBreakpointInput, type Breakpoint, type BreakpointKind } from '../modules/breakpoints'
 import { createLocationNotation } from '../modules/locationNotation'
@@ -740,7 +740,7 @@ export const useTwinStore = defineStore('terminal-twin', () => {
         const [vessels, trucks] = await Promise.all([c.query<VesselState[]>('vessels'), onTruck ? c.query<TruckState[]>('trucks') : Promise.resolve([] as TruckState[])])
         extras.transit = transitWorldOf(vessels, trucks)
       }
-      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, { ...extras, now: displayTime.value }))
+      if (selectedId.value === id) entityView.value = markRaw(describeEntity(kind, state, { ...extras, now: displayTime.value, boomWorkingDeg: stsBoom(c.model.config).workingDeg }))
     } catch {
       // The scenario was replaced meanwhile; the next refresh shows the new state.
     }
