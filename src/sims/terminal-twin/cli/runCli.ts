@@ -4,7 +4,7 @@
  *   pnpm run tt:run --fixture tracer-1sts-10-boxes [--seed 7] [--until moves:5]
  *                     [--out summary.json] [--events events.jsonl] [--handlers default]
  *                     [--async-mode keep-running|pause] [--strategy dp=name] [--param dp.name=value] [--latency dp=spec]
- *                     [--end time:<s>] [--warm-up <s>]
+ *                     [--end time:<s>] [--warm-up <s>] [--patch <json|file>]
  *                     [--log run.log.jsonl --log-level sts=debug,*=warn] [--snapshot s.json]
  *   pnpm run tt:run --from-snapshot s.json --until time:900   (run only a window)
  *
@@ -13,6 +13,7 @@
 import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from 'node:fs'
 import { readJsonFile, writeJsonFile } from './snapshotFile'
 import { parseLatencySpec } from './latencySpec'
+import { mergePatch, readPatchArg } from './scenarioPatch'
 import { parseArgs } from 'node:util'
 import {
   createSimulation,
@@ -53,6 +54,8 @@ export const USAGE = `Usage: pnpm run tt:run (--fixture <name|file.json> | --pre
   --from-snapshot <file> Resume from a snapshot (written by --snapshot) and run only from its time on;
                          --events/--log then hold only the window's events
   --seed <n>             Override the scenario seed (not with --from-snapshot)
+  --patch <json|file>    JSON Merge Patch (RFC 7396) on the scenario, inline ('{"quay":{"mooringS":90}}') or a file;
+                         applied first, before --end, --warm-up and the decision flags (not with --from-snapshot)
   --until <cond>         Stop condition: end (default) | time:<s> | moves:<n> | vessels:<n> | event:<Type>
   --handlers <name>      Handler set: ${Object.keys(handlerSets).join(', ')}
   --async-mode <mode>    keep-running (default) | pause
@@ -332,6 +335,7 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
         preset: { type: 'string' },
         'from-snapshot': { type: 'string' },
         seed: { type: 'string' },
+        patch: { type: 'string' },
         until: { type: 'string' },
         handlers: { type: 'string', default: 'default' },
         'no-fail-fast': { type: 'boolean', default: false },
@@ -366,6 +370,16 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
       throw new UsageError('--from-snapshot takes scenario and seed from the snapshot: drop --fixture/--preset/--seed')
     const start = fromFile ? loadSnapshot(fromFile) : null
     let config = start ? start.config : loadScenario(values.fixture, values.preset)
+    if (values.patch !== undefined) {
+      if (start) throw new UsageError('--from-snapshot takes the scenario from the snapshot: drop --patch')
+      let patch: Record<string, unknown>
+      try {
+        patch = readPatchArg(values.patch)
+      } catch (err) {
+        throw new UsageError((err as Error).message)
+      }
+      config = mergePatch(config, patch) as ScenarioConfig
+    }
     const decisionFlags =
       values['async-mode'] !== undefined || values.strategy.length > 0 || values.latency.length > 0 || values.param.length > 0
     if (start && decisionFlags)

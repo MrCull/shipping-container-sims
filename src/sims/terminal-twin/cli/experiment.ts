@@ -27,8 +27,11 @@ import {
 } from '../engine'
 import { fixtures } from '../scenario/fixtures'
 import { parseLatencySpec } from './latencySpec'
+import { mergePatch, shellQuote } from './scenarioPatch'
 import { presets } from '../scenario/presets'
 import { DEFAULT_WARM_UP_S as DEFAULT_YARD_WARM_UP_S, type ScenarioConfig } from '../scenario/types'
+
+export { mergePatch } from './scenarioPatch'
 
 export const EXPERIMENT_FORMAT = 'terminal-twin-experiment'
 export const EXPERIMENT_REPORT_FORMAT = 'terminal-twin-experiment-report'
@@ -390,17 +393,6 @@ const GRID_DEPTH: Record<GridKind, number> = { strategies: 2, params: 3, latency
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
-/** JSON Merge Patch (RFC 7396): objects merge key by key, `null` deletes, anything else replaces. */
-export function mergePatch(target: unknown, patch: unknown): unknown {
-  if (!isPlainObject(patch)) return patch
-  const out: Record<string, unknown> = isPlainObject(target) ? { ...target } : {}
-  for (const [k, v] of Object.entries(patch)) {
-    if (v === null) delete out[k]
-    else out[k] = mergePatch(out[k], v)
-  }
-  return out
-}
-
 /** A grid config's name part for one factor: the path without its kind (`latency.<dp>` keeps it, to differ from strategies). */
 const factorLabel = (path: string) => (path.startsWith('latency.') ? path : path.slice(path.indexOf('.') + 1))
 const factorValue = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v))
@@ -579,7 +571,7 @@ function commandFor(baseFlag: string, config: ExperimentConfig, seed: number, { 
   for (const [dp, params] of Object.entries(config.params ?? {}))
     for (const [name, value] of Object.entries(params)) parts.push(`--param ${dp}.${name}=${value}`)
   for (const [dp, spec] of Object.entries(config.latency ?? {})) parts.push(`--latency ${dp}=${spec}`)
-  if (config.patch !== undefined) parts.push(`(plus patch ${JSON.stringify(config.patch)}, which tt:run flags cannot express)`)
+  if (config.patch !== undefined) parts.push(`--patch ${shellQuote(JSON.stringify(config.patch))}`)
   return parts.join(' ')
 }
 

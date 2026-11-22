@@ -194,4 +194,45 @@ describe('tt:experiment CLI (in process)', () => {
     runCli(b2.command.replace(/^pnpm run tt:run /, '').split(' '), (l) => lines.push(l))
     expect(lines.join('\n')).toContain(`Event-log hash:   ${summary.eventLogHash}`)
   })
+
+  it("a patched config's tt:run command (--patch) reproduces its event-log hash", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tt-exp-'))
+    const out = join(dir, 'out')
+    const patch = { quay: { mooringS: 120 }, description: "it's patched" }
+    const { exitCode } = await cli(
+      writeExperiment(dir, { seeds: [1], configs: [{ name: 'A' }, { name: 'P', patch, strategies: { shcDispatch: 'oldest-job' } }] }),
+      '--out',
+      out,
+    )
+    const report = JSON.parse(readFileSync(join(out, 'report.json'), 'utf8'))
+    expect(report.replicates.map((r: { status: string; firstError: string }) => `${r.status} ${r.firstError}`)).toEqual(['ok null', 'ok null'])
+    expect(exitCode).toBe(0)
+    const [a, p] = report.replicates
+    expect(p.command).toContain('--patch ')
+    expect(p.command).not.toMatch(/cannot express/)
+    expect(p.eventLogHash).not.toBe(a.eventLogHash)
+    const lines: string[] = []
+    expect(runCli(shellWords(p.command).slice(3), (l) => lines.push(l))).toBe(0)
+    expect(lines.join('\n')).toContain(`Event-log hash:   ${p.eventLogHash}`)
+  })
 })
+
+/** Split a POSIX shell command line into words (spaces, single quotes and the `'\\''` escape only). */
+function shellWords(command: string): string[] {
+  const words: string[] = []
+  let word: string | null = null
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i]
+    if (ch === "'") {
+      const end = command.indexOf("'", i + 1)
+      word = (word ?? '') + command.slice(i + 1, end)
+      i = end
+    } else if (ch === '\\') word = (word ?? '') + command[++i]
+    else if (ch === ' ') {
+      if (word !== null) words.push(word)
+      word = null
+    } else word = (word ?? '') + ch
+  }
+  if (word !== null) words.push(word)
+  return words
+}
