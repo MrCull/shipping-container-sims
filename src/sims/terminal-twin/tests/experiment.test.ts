@@ -58,7 +58,7 @@ describe('runExperiment (fake executor)', () => {
     expect(c.configStats.mean).toBe(12.5)
     expect(c.configStats.ci![0]).toBeCloseTo(12.5 - 2.05426, 3)
     expect(report.format).toBe('terminal-twin-experiment-report')
-    expect(report.version).toBe(3)
+    expect(report.version).toBe(4)
     expect(report.primary).toMatchObject({ kpi: 'grossMovesPerHour', direction: 'higher', verdicts: { B: 'better' } })
   })
 
@@ -285,7 +285,7 @@ describe('runExperiment: warm-up and horizon (#316)', () => {
     expect(plan!.scenario.measurementWarmUpS).toBe(7200)
     expect(plan!.scenario.endConditions).toEqual({ simDurationS: 86400 })
     expect(report.expanded).toMatchObject({ warmUpS: 7200, horizonS: 86400 })
-    expect(report.version).toBe(3)
+    expect(report.version).toBe(4)
     expect(report.warnings).toEqual([])
   })
 

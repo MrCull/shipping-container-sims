@@ -32,7 +32,7 @@ import { DEFAULT_WARM_UP_S as DEFAULT_YARD_WARM_UP_S, type ScenarioConfig } from
 
 export const EXPERIMENT_FORMAT = 'terminal-twin-experiment'
 export const EXPERIMENT_REPORT_FORMAT = 'terminal-twin-experiment-report'
-export const EXPERIMENT_REPORT_VERSION = 3
+export const EXPERIMENT_REPORT_VERSION = 4
 export const DEFAULT_HORIZON_S = 86400
 /** Measurement warm-up per replicate (s), excluded from KPIs and the horizon, whatever the yard start. */
 export const DEFAULT_WARM_UP_S = 7200
@@ -283,6 +283,8 @@ export interface ExperimentReport {
     kpis: Record<string, number | null>
     invariantViolations: number
     firstError: string | null
+    /** The replicate's event-log hash (null when the executor failed); its `command` reproduces it. */
+    eventLogHash: string | null
     command: string
   }[]
   comparisons: Comparison[]
@@ -620,42 +622,85 @@ function classify(r: ReplicateResult): ReplicateStatus {
   return 'ok'
 }
 
-/** Run an experiment in process and return its report. Throws `ExperimentError` for an invalid file. */
-export function runExperiment(file: ExperimentFile, options: RunExperimentOptions = {}): ExperimentReport {
+/** A validated experiment, expanded and planned: one `ReplicatePlan` per config and seed, configs outer. */
+export interface ExperimentPlan {
+  file: ExperimentFile
+  warnings: string[]
+  configs: ExperimentConfig[]
+  seeds: number[]
+  baseline: string
+  warmUpS: number
+  horizonS: number
+  /** The base as given (`{ preset }` or `{ fixture }`), for the cost estimate. */
+  base: ExperimentFile['base']
+  replicates: ReplicatePlan[]
+}
+
+/** Validate, expand and plan an experiment without running anything. Throws `ExperimentError` for an invalid file. */
+export function planExperiment(file: ExperimentFile): ExperimentPlan {
   const { warnings } = validateExperiment(file)
-  const startedAt = new Date().toISOString()
-  const execute = options.executeReplicate ?? executeReplicateHeadless
   const length = runLengthOf(file)
   const seeds = resolveSeeds(file.seeds)
-  const baseline = file.baseline ?? file.configs[0].name
   const base = resolveBase(file.base)
   const configs = expandConfigs(file)
-
-  const replicates: ExperimentReport['replicates'] = []
-  const total = configs.length * seeds.length
+  const replicates: ReplicatePlan[] = []
   for (const config of configs) {
     const scenario = buildScenario(base.scenario, config, length)
-    for (const seed of seeds) {
-      const command = commandFor(base.flag, config, seed, length)
-      let result: ReplicateResult
-      try {
-        result = execute({ config: config.name, seed, scenario, command })
-      } catch (err) {
-        result = { kpis: {}, invariantViolations: 0, firstError: null, wallMs: 0, error: (err as Error).message }
-      }
-      replicates.push({
-        config: config.name,
-        seed,
-        status: classify(result),
-        wallMs: result.wallMs,
-        kpis: result.kpis,
-        invariantViolations: result.invariantViolations,
-        firstError: result.error ?? result.firstError,
-        command,
-      })
-      options.onProgress?.(replicates.length, total)
-    }
+    for (const seed of seeds)
+      replicates.push({ config: config.name, seed, scenario, command: commandFor(base.flag, config, seed, length) })
   }
+  return { file, warnings, configs, seeds, baseline: file.baseline ?? file.configs[0].name, ...length, base: file.base, replicates }
+}
+
+/** Run one replicate; an executor that throws gives an `invalid: error` result instead of ending the experiment. */
+export function executeSafely(execute: (plan: ReplicatePlan) => ReplicateResult, plan: ReplicatePlan): ReplicateResult {
+  try {
+    return execute(plan)
+  } catch (err) {
+    return { kpis: {}, invariantViolations: 0, firstError: null, wallMs: 0, error: (err as Error).message }
+  }
+}
+
+/** True when a replicate result is valid (`ok`). */
+export const replicateOk = (r: ReplicateResult) => classify(r) === 'ok'
+
+/** Run an experiment in process, one replicate after another, and return its report. Throws `ExperimentError` for an invalid file. */
+export function runExperiment(file: ExperimentFile, options: RunExperimentOptions = {}): ExperimentReport {
+  const plan = planExperiment(file)
+  const startedAt = new Date().toISOString()
+  const execute = options.executeReplicate ?? executeReplicateHeadless
+  const results: ReplicateResult[] = []
+  for (const r of plan.replicates) {
+    results.push(executeSafely(execute, r))
+    options.onProgress?.(results.length, plan.replicates.length)
+  }
+  return assembleReport(plan, results, { commit: options.commit ?? null, startedAt, endedAt: new Date().toISOString() })
+}
+
+/**
+ * The report of a planned experiment from its results (`results[i]` belongs to `plan.replicates[i]`, whatever order
+ * they ran in, so parallel runs give the same report as sequential ones apart from the timing fields).
+ */
+export function assembleReport(
+  plan: ExperimentPlan,
+  results: ReplicateResult[],
+  provenance: { commit: string | null; startedAt: string; endedAt: string },
+): ExperimentReport {
+  const { file, warnings, configs, seeds, baseline } = plan
+  const replicates: ExperimentReport['replicates'] = plan.replicates.map((p, i) => {
+    const result = results[i]
+    return {
+      config: p.config,
+      seed: p.seed,
+      status: classify(result),
+      wallMs: result.wallMs,
+      kpis: result.kpis,
+      invariantViolations: result.invariantViolations,
+      firstError: result.error ?? result.firstError,
+      eventLogHash: result.summary?.eventLogHash ?? null,
+      command: p.command,
+    }
+  })
 
   const byKey = new Map(replicates.map((r) => [`${r.config}\u0000${r.seed}`, r]))
   const valid = (config: string, seed: number) => {
@@ -718,15 +763,15 @@ export function runExperiment(file: ExperimentFile, options: RunExperimentOption
     format: EXPERIMENT_REPORT_FORMAT,
     version: EXPERIMENT_REPORT_VERSION,
     experiment: file,
-    expanded: { configs, baseline, seeds, ...length },
+    expanded: { configs, baseline, seeds, warmUpS: plan.warmUpS, horizonS: plan.horizonS },
     warnings,
     provenance: {
       engineVersion: ENGINE_VERSION,
-      commit: options.commit ?? null,
+      commit: provenance.commit,
       node: process.version,
       cpu: `${cpus()[0]?.model ?? 'unknown'} (${cpus().length} cores, ${arch()})`,
-      startedAt,
-      endedAt: new Date().toISOString(),
+      startedAt: provenance.startedAt,
+      endedAt: provenance.endedAt,
     },
     replicates,
     comparisons,
