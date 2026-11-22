@@ -18,6 +18,7 @@ module that takes `argv` and a `print` callback, so tests call the logic directl
 |---|---|---|
 | `tt:run` | `cli/run.ts` -> `cli/runCli.ts#runCli` | Headless run of a fixture, preset, JSON config or snapshot |
 | `tt:diff` | `cli/diff.ts` -> `cli/diffCli.ts#runDiffCli` | First diverging event between two logs or two runs |
+| `tt:experiment` | `cli/experimentRun.ts` -> `cli/experimentCli.ts#runExperimentCli` (core: `cli/experiment.ts#runExperiment`) | Run configs x seeds and compare each config with the baseline, paired by seed (spec #309) |
 | `tt:golden` | `cli/golden-cli.ts` -> `cli/golden.ts#runGoldenCli` | Check or rewrite fixture golden summaries |
 | `tt:fixtures` | `cli/build-fixtures.ts` | Regenerate every fixture JSON from `definitions.ts` |
 | `tt:sts` | `cli/sts.ts#runStsCli` | STS productivity buckets from a saved event log |
@@ -93,6 +94,51 @@ committed directly (not queued, not invariant-checked).
 Window reproduction: run to `--until time:T --snapshot s.json`, then `--from-snapshot s.json --until time:T2 --events
 w.jsonl --log w.log.jsonl --log-level debug`. Events at `t <= T` are in the snapshot; the window holds `t > T` and
 equals that slice of the uninterrupted run. Handlers are not in snapshots: pass the same `--handlers`.
+
+## tt:experiment
+
+```
+pnpm run tt:experiment <experiment.json> [--out DIR]
+```
+
+Runs every config of an experiment file on every seed, one replicate after another, then compares each config with
+the baseline config seed by seed. Writes `report.json` (format `terminal-twin-experiment-report`, version 1) and
+`report.md` (verdict table, KPI table, invalid and dropped replicates, provenance, one `tt:run` line per replicate) to
+`--out` (default `.tt-experiments/<timestamp>/`, gitignored). Exit codes: 0 completed, 2 usage or validation error
+(unknown preset, fixture, KPI, decision point or strategy; a missing or unreadable file).
+
+Experiment file (format `terminal-twin-experiment`, version 1; v1 tracer, spec #309 adds the rest):
+
+```json
+{
+  "format": "terminal-twin-experiment",
+  "version": 1,
+  "name": "Pad choice",
+  "base": { "fixture": "tracer-1sts-10-boxes" },
+  "horizonS": 3600,
+  "seeds": { "count": 10, "from": 1 },
+  "baseline": "A",
+  "primary": { "kpi": "grossMovesPerHour" },
+  "configs": [{ "name": "A" }, { "name": "B", "strategies": { "wtpPadSelection": "nearest-box" } }]
+}
+```
+
+- `base`: `{ "preset": <name> }` or `{ "fixture": <name> }`. `horizonS` (default 86400) replaces the end conditions
+  (`simDurationS`). `seeds`: a list or `{ count, from }` (default 10 seeds from 1). `baseline`: default the first config.
+- A config sets only `strategies` per decision point for now. Every replicate runs with `asyncMode: 'pause'`,
+  invariants `failFast: false` and `sweepEvery` 10000 (`executeReplicateHeadless`).
+- KPI catalogue (`EXPERIMENT_KPIS`): `grossMovesPerHour` (higher is better), `truckTurnaroundS` (lower is better), read
+  from the headline KPIs; null when the subsystem is absent (that pair is not compared).
+- Statistics: per seed `d = config - baseline` over seeds where both replicates are `ok` and the KPI is non-null; n,
+  mean, SD, a 95% CI with Student's t (n - 1 df), the change against the baseline mean, and each side's own mean and
+  CI. Verdict: **better** or **worse** when the CI excludes 0 on that side, else **no difference detected**;
+  **insufficient data** with n < 2.
+- A replicate is `ok`, `invalid: invariant`, `invalid: failed` (engine error) or `invalid: error` (executor threw);
+  invalid seeds are dropped from pairing and listed in `droppedSeeds`.
+- In-process: `runExperiment(file, { executeReplicate })` takes an injectable executor (tests pass a fake one with
+  synthetic KPIs); `runExperimentCli(args, print)` mirrors `runCli`. Only `provenance.startedAt`, `endedAt` and each
+  replicate's `wallMs` differ between two runs of the same file. Tests: `tests/experiment.test.ts`,
+  `tests/experiment-cli.test.ts`.
 
 ## tt:diff
 

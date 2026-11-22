@@ -94,3 +94,28 @@ describe('runExperiment (fake executor)', () => {
     expect(calls).toBe(0)
   })
 })
+
+describe('runExperiment (real executor)', () => {
+  const tiny = experiment({
+    horizonS: 3600,
+    seeds: [1, 2, 3],
+    configs: [{ name: 'A' }, { name: 'B', strategies: { shcDispatch: 'oldest-job' } }],
+  })
+  const strip = (r: ExperimentReport) => ({
+    ...r,
+    provenance: { ...r.provenance, startedAt: '', endedAt: '' },
+    replicates: r.replicates.map((x) => ({ ...x, wallMs: 0 })),
+  })
+
+  it('runs 2 configs x 3 seeds on the tracer fixture and gives the same report twice, timing aside', () => {
+    const first = runExperiment(tiny)
+    expect(first.replicates).toHaveLength(6)
+    expect(first.replicates.map((r) => r.status)).toEqual(Array(6).fill('ok'))
+    expect(first.replicates[0].kpis.grossMovesPerHour).toBeGreaterThan(0)
+    expect(first.replicates[0].command).toBe(
+      'pnpm run tt:run --fixture tracer-1sts-10-boxes --seed 1 --async-mode pause --no-fail-fast --end time:3600',
+    )
+    expect(first.primary.verdicts.B).toBeDefined()
+    expect(strip(runExperiment(tiny))).toEqual(strip(first))
+  })
+})

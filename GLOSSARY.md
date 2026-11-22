@@ -152,6 +152,14 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Highlights:** friendly facts in the final report: hardest-working crane, busiest block, longest wait.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.
 
+## Experiments (spec #309)
+
+- **Experiment:** a JSON file (format `terminal-twin-experiment`) that runs several configs of one base preset or fixture on the same seeds and compares them (`pnpm run tt:experiment`).
+- **Config (experiment):** one named variant in an experiment, written as overrides on the base (v1: `strategies` per decision point). Not the `ScenarioConfig` itself.
+- **Baseline config:** the config every other config is compared with (default the first).
+- **Replicate:** one run of one config on one seed. It is `ok` or invalid (`invariant`, `failed`, `error`); an invalid replicate drops its seed from that config's pairing.
+- **Primary KPI:** the one KPI an experiment's verdict is about. Each experiment KPI has a direction (higher or lower is better); the verdict is better, worse, no difference detected or insufficient data, from the 95% CI of the per-seed difference.
+
 ## Rehandles (TT-12)
 
 - **Buried box:** an export box with other boxes stacked on top of it, so it cannot be lifted.
