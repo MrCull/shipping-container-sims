@@ -3,8 +3,8 @@
  * replicate executor, then compares each config with the baseline seed by seed (paired) and assembles an
  * `ExperimentReport`. No file or process work here beyond calling the executor; the CLI is `experimentCli.ts`.
  *
- * File format `terminal-twin-experiment` version 1; report format `terminal-twin-experiment-report` version 2
- * (version 2 added `guards`; version 1 had no guard results).
+ * File format `terminal-twin-experiment` version 1; report format `terminal-twin-experiment-report` version 3
+ * (version 2 added `guards`; version 3 added `expanded.warmUpS` and `warnings`).
  */
 import { arch, cpus } from 'node:os'
 import {
@@ -28,12 +28,14 @@ import {
 import { fixtures } from '../scenario/fixtures'
 import { parseLatencySpec } from './latencySpec'
 import { presets } from '../scenario/presets'
-import type { ScenarioConfig } from '../scenario/types'
+import { DEFAULT_WARM_UP_S as DEFAULT_YARD_WARM_UP_S, type ScenarioConfig } from '../scenario/types'
 
 export const EXPERIMENT_FORMAT = 'terminal-twin-experiment'
 export const EXPERIMENT_REPORT_FORMAT = 'terminal-twin-experiment-report'
-export const EXPERIMENT_REPORT_VERSION = 2
+export const EXPERIMENT_REPORT_VERSION = 3
 export const DEFAULT_HORIZON_S = 86400
+/** Measurement warm-up per replicate (s), excluded from KPIs and the horizon, whatever the yard start. */
+export const DEFAULT_WARM_UP_S = 7200
 export const DEFAULT_SEED_COUNT = 10
 /** Full invariant sweep every Nth event during experiments (incremental checks in between). */
 export const EXPERIMENT_SWEEP_EVERY = 10000
@@ -46,7 +48,7 @@ export interface ExperimentConfig {
   params?: Record<string, Record<string, number>>
   /** Latency injector per decision point, in the `tt:run --latency` spec syntax (`fixed:200`, `exp:50,timeout:5`). */
   latency?: Record<string, string>
-  /** JSON Merge Patch (RFC 7396) on the base `ScenarioConfig`; may not set `endConditions`. */
+  /** JSON Merge Patch (RFC 7396) on the base `ScenarioConfig`; may not set `endConditions` or `measurementWarmUpS`. */
   patch?: Record<string, unknown>
 }
 
@@ -61,8 +63,13 @@ export interface ExperimentFile {
   name: string
   description?: string
   base: { preset: string } | { fixture: string }
-  /** Measured sim time per replicate (s), the replicate's end condition. Default 24 h. */
+  /** Measured sim time per replicate (s), the replicate's end condition, counted after the warm-up. Default 24 h. */
   horizonS?: number
+  /**
+   * Measurement warm-up per replicate (s, 0 = none), excluded from KPIs and the horizon with any yard start mode. It
+   * replaces a `yardStart.mode: 'warmup'` scenario's own warm-up (validation warns). Default 2 h.
+   */
+  warmUpS?: number
   /** An explicit list or a count and first seed. Default 10 seeds from 1. */
   seeds?: number[] | { count: number; from?: number }
   /** The config every other config is compared with. Default the first config. */
@@ -255,7 +262,9 @@ export interface ExperimentReport {
   format: typeof EXPERIMENT_REPORT_FORMAT
   version: typeof EXPERIMENT_REPORT_VERSION
   experiment: ExperimentFile
-  expanded: { configs: ExperimentConfig[]; baseline: string; seeds: number[]; horizonS: number }
+  expanded: { configs: ExperimentConfig[]; baseline: string; seeds: number[]; warmUpS: number; horizonS: number }
+  /** Validation warnings (for example a yardStart warm-up the experiment's warm-up replaces). */
+  warnings: string[]
   provenance: {
     engineVersion: string
     commit: string | null
@@ -431,14 +440,30 @@ export function expandConfigs(file: ExperimentFile): ExperimentConfig[] {
   return configs
 }
 
-/** Validate an experiment file (every config, explicit and grid, fully resolved); throws `ExperimentError`. */
-export function validateExperiment(file: ExperimentFile): void {
+/** Run settings every replicate gets: the measurement warm-up and the measured horizon (s). */
+interface RunLength {
+  warmUpS: number
+  horizonS: number
+}
+
+const runLengthOf = (file: ExperimentFile): RunLength => ({
+  warmUpS: file.warmUpS ?? DEFAULT_WARM_UP_S,
+  horizonS: file.horizonS ?? DEFAULT_HORIZON_S,
+})
+
+/**
+ * Validate an experiment file (every config, explicit and grid, fully resolved); throws `ExperimentError`, and
+ * returns the warnings (a config whose scenario has a yardStart warm-up, which the experiment's warm-up replaces).
+ */
+export function validateExperiment(file: ExperimentFile): { warnings: string[] } {
   if (!file || typeof file !== 'object') throw new ExperimentError('The experiment file must be a JSON object')
   if (file.format !== EXPERIMENT_FORMAT) throw new ExperimentError(`"format" must be "${EXPERIMENT_FORMAT}"`)
   if (file.version !== 1) throw new ExperimentError('"version" must be 1')
   if (typeof file.name !== 'string' || !file.name) throw new ExperimentError('"name" is required')
   if (file.horizonS !== undefined && !(typeof file.horizonS === 'number' && file.horizonS > 0))
     throw new ExperimentError('"horizonS" must be a positive number')
+  if (file.warmUpS !== undefined && !(typeof file.warmUpS === 'number' && Number.isFinite(file.warmUpS) && file.warmUpS >= 0))
+    throw new ExperimentError('"warmUpS" must be a number, 0 or more (seconds)')
   const kpi = file.primary?.kpi
   if (!EXPERIMENT_KPIS[kpi])
     throw new ExperimentError(`Unknown KPI "${kpi}" (available: ${Object.keys(EXPERIMENT_KPIS).join(', ')})`)
@@ -447,6 +472,8 @@ export function validateExperiment(file: ExperimentFile): void {
   resolveSeeds(file.seeds)
   const base = resolveBase(file.base)
   const names = new Set<string>()
+  const warnings: string[] = []
+  const length = runLengthOf(file)
   for (const c of expandConfigs(file)) {
     if (typeof c?.name !== 'string' || !c.name) throw new ExperimentError('Every config needs a "name"')
     if (names.has(c.name)) throw new ExperimentError(`Config name "${c.name}" is used twice`)
@@ -455,10 +482,16 @@ export function validateExperiment(file: ExperimentFile): void {
     for (const key of Object.keys(c))
       if (!allowed.has(key))
         throw new ExperimentError(`Config "${c.name}": "${key}" is not supported (only strategies, params, latency, patch)`)
-    buildScenario(base.scenario, c, file.horizonS ?? DEFAULT_HORIZON_S)
+    const scenario = buildScenario(base.scenario, c, length)
+    const start = scenario.yardStart
+    if (start?.mode === 'warmup')
+      warnings.push(
+        `Config "${c.name}": the scenario has a yardStart warm-up (${start.warmUpS ?? DEFAULT_YARD_WARM_UP_S} s); the experiment's warmUpS (${length.warmUpS} s) replaces it`,
+      )
   }
   if (file.baseline !== undefined && !names.has(file.baseline))
     throw new ExperimentError(`Baseline "${file.baseline}" is not one of the configs (${[...names].join(', ')})`)
+  return { warnings }
 }
 
 type DecisionPoints = NonNullable<DecisionsConfig['points']>
@@ -467,7 +500,7 @@ type DecisionPoints = NonNullable<DecisionsConfig['points']>
  * One config's fully resolved scenario: the patch on the base, then the strategies, params and latency shorthand into
  * `decisions.points`, then the experiment's run settings. Throws `ExperimentError` naming the config and field.
  */
-function buildScenario(base: ScenarioConfig, config: ExperimentConfig, horizonS: number): ScenarioConfig {
+function buildScenario(base: ScenarioConfig, config: ExperimentConfig, { warmUpS, horizonS }: RunLength): ScenarioConfig {
   const fail = (field: string, message: string) => new ExperimentError(`Config "${config.name}": ${field}: ${message}`)
   const point = (field: string, dp: string) => {
     if (!DECISION_POINT_IDS.includes(dp as DecisionPointId))
@@ -479,6 +512,8 @@ function buildScenario(base: ScenarioConfig, config: ExperimentConfig, horizonS:
     if (!isPlainObject(config.patch)) throw fail('patch', 'must be a JSON object (a JSON Merge Patch on the base scenario)')
     if ('endConditions' in config.patch)
       throw fail('patch.endConditions', "an experiment may not set end conditions (the horizon is every replicate's run length)")
+    if ('measurementWarmUpS' in config.patch)
+      throw fail('patch.measurementWarmUpS', 'an experiment sets the measurement warm-up with its "warmUpS" for every replicate')
     patched = mergePatch(base, config.patch) as ScenarioConfig
   }
   const points = { ...patched.decisions?.points } as DecisionPoints
@@ -518,6 +553,7 @@ function buildScenario(base: ScenarioConfig, config: ExperimentConfig, horizonS:
   }
   const scenario: ScenarioConfig = {
     ...patched,
+    measurementWarmUpS: warmUpS,
     endConditions: { simDurationS: horizonS },
     decisions: { ...patched.decisions, asyncMode: 'pause', points },
   }
@@ -532,8 +568,8 @@ function buildScenario(base: ScenarioConfig, config: ExperimentConfig, horizonS:
   return scenario
 }
 
-function commandFor(baseFlag: string, config: ExperimentConfig, seed: number, horizonS: number): string {
-  const parts = ['pnpm run tt:run', baseFlag, `--seed ${seed}`, '--async-mode pause', '--no-fail-fast', `--end time:${horizonS}`]
+function commandFor(baseFlag: string, config: ExperimentConfig, seed: number, { warmUpS, horizonS }: RunLength): string {
+  const parts = ['pnpm run tt:run', baseFlag, `--seed ${seed}`, '--async-mode pause', '--no-fail-fast', `--warm-up ${warmUpS}`, `--end time:${horizonS}`]
   for (const [dp, s] of Object.entries(config.strategies ?? {})) parts.push(`--strategy ${dp}=${s}`)
   for (const [dp, params] of Object.entries(config.params ?? {}))
     for (const [name, value] of Object.entries(params)) parts.push(`--param ${dp}.${name}=${value}`)
@@ -586,10 +622,10 @@ function classify(r: ReplicateResult): ReplicateStatus {
 
 /** Run an experiment in process and return its report. Throws `ExperimentError` for an invalid file. */
 export function runExperiment(file: ExperimentFile, options: RunExperimentOptions = {}): ExperimentReport {
-  validateExperiment(file)
+  const { warnings } = validateExperiment(file)
   const startedAt = new Date().toISOString()
   const execute = options.executeReplicate ?? executeReplicateHeadless
-  const horizonS = file.horizonS ?? DEFAULT_HORIZON_S
+  const length = runLengthOf(file)
   const seeds = resolveSeeds(file.seeds)
   const baseline = file.baseline ?? file.configs[0].name
   const base = resolveBase(file.base)
@@ -598,9 +634,9 @@ export function runExperiment(file: ExperimentFile, options: RunExperimentOption
   const replicates: ExperimentReport['replicates'] = []
   const total = configs.length * seeds.length
   for (const config of configs) {
-    const scenario = buildScenario(base.scenario, config, horizonS)
+    const scenario = buildScenario(base.scenario, config, length)
     for (const seed of seeds) {
-      const command = commandFor(base.flag, config, seed, horizonS)
+      const command = commandFor(base.flag, config, seed, length)
       let result: ReplicateResult
       try {
         result = execute({ config: config.name, seed, scenario, command })
@@ -682,7 +718,8 @@ export function runExperiment(file: ExperimentFile, options: RunExperimentOption
     format: EXPERIMENT_REPORT_FORMAT,
     version: EXPERIMENT_REPORT_VERSION,
     experiment: file,
-    expanded: { configs, baseline, seeds, horizonS },
+    expanded: { configs, baseline, seeds, ...length },
+    warnings,
     provenance: {
       engineVersion: ENGINE_VERSION,
       commit: options.commit ?? null,

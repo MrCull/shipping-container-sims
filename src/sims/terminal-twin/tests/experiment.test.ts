@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { createSimulation, headlineKpis } from '../engine'
+import { fixtures } from '../scenario/fixtures'
 import {
   ExperimentError,
   runExperiment,
+  validateExperiment,
   type ExperimentFile,
   type ExperimentReport,
   type ReplicatePlan,
@@ -27,6 +30,7 @@ function experiment(over: Partial<ExperimentFile> = {}): ExperimentFile {
     name: 'Fake study',
     base: { fixture: 'tracer-1sts-10-boxes' },
     horizonS: 3600,
+    warmUpS: 0,
     seeds: { count: 4, from: 1 },
     primary: { kpi: 'grossMovesPerHour' },
     configs: [{ name: 'A' }, { name: 'B', strategies: { stsGroundPosition: 'lowest-free-lane' } }],
@@ -54,7 +58,7 @@ describe('runExperiment (fake executor)', () => {
     expect(c.configStats.mean).toBe(12.5)
     expect(c.configStats.ci![0]).toBeCloseTo(12.5 - 2.05426, 3)
     expect(report.format).toBe('terminal-twin-experiment-report')
-    expect(report.version).toBe(2)
+    expect(report.version).toBe(3)
     expect(report.primary).toMatchObject({ kpi: 'grossMovesPerHour', direction: 'higher', verdicts: { B: 'better' } })
   })
 
@@ -211,6 +215,7 @@ describe('runExperiment: KPI catalogue, guards and invalid replicates (fake exec
 describe('runExperiment (real executor)', () => {
   const tiny = experiment({
     horizonS: 3600,
+    warmUpS: 0,
     seeds: [1, 2, 3],
     configs: [{ name: 'A' }, { name: 'B', strategies: { shcDispatch: 'oldest-job' } }],
   })
@@ -226,9 +231,88 @@ describe('runExperiment (real executor)', () => {
     expect(first.replicates.map((r) => r.status)).toEqual(Array(6).fill('ok'))
     expect(first.replicates[0].kpis.grossMovesPerHour).toBeGreaterThan(0)
     expect(first.replicates[0].command).toBe(
-      'pnpm run tt:run --fixture tracer-1sts-10-boxes --seed 1 --async-mode pause --no-fail-fast --end time:3600',
+      'pnpm run tt:run --fixture tracer-1sts-10-boxes --seed 1 --async-mode pause --no-fail-fast --warm-up 0 --end time:3600',
     )
     expect(first.primary.verdicts.B).toBeDefined()
     expect(strip(runExperiment(tiny))).toEqual(strip(first))
+  })
+})
+
+describe('runExperiment: warm-up and horizon (#316)', () => {
+  const prefilled = experiment({
+    base: { fixture: 'yard-no-mixed-length' },
+    warmUpS: 600,
+    horizonS: 1800,
+    seeds: [1],
+    configs: [{ name: 'A' }],
+  })
+  const one = (): ReplicateResult => ({ kpis: { grossMovesPerHour: 1 }, invariantViolations: 0, firstError: null, wallMs: 1 })
+
+  it('replicate KPIs exclude the warm-up, as a direct engine run with the same measurement warm-up', () => {
+    const report = runExperiment(prefilled)
+    const direct = (measurementWarmUpS: number) => {
+      const sim = createSimulation(
+        { ...fixtures['yard-no-mixed-length'], measurementWarmUpS, endConditions: { simDurationS: 1800 } },
+        {},
+        { seed: 1, asyncMode: 'pause', invariants: { failFast: false, sweepEvery: 10000 } },
+      )
+      sim.runUntil({})
+      return sim
+    }
+    const warm = direct(600)
+    expect(warm.now).toBe(2400)
+    expect(warm.kpiReport().warmUp).toEqual({ durationS: 600, ended: true })
+    const r = report.replicates[0]
+    expect(r.status).toBe('ok')
+    expect(r.kpis.movesDone).toBe(warm.kpiReport().movesCompleted)
+    expect(r.kpis.grossMovesPerHour).toBe(headlineKpis(warm.kpiSeries(), warm.kpiReport()).grossMovesPerHour)
+    const cold = direct(0)
+    expect(r.kpis.movesDone).not.toBe(cold.kpiReport().movesCompleted)
+    expect(r.command).toContain('--warm-up 600 --end time:1800')
+  })
+
+  it('defaults to a 2 h warm-up and a 24 h horizon when the fields are omitted, and records them', () => {
+    let plan: ReplicatePlan | undefined
+    const bare: ExperimentFile = { ...experiment({ seeds: [1] }) }
+    delete bare.horizonS
+    delete bare.warmUpS
+    const report = runExperiment(bare, {
+      executeReplicate: (p) => {
+        plan ??= p
+        return one()
+      },
+    })
+    expect(plan!.scenario.measurementWarmUpS).toBe(7200)
+    expect(plan!.scenario.endConditions).toEqual({ simDurationS: 86400 })
+    expect(report.expanded).toMatchObject({ warmUpS: 7200, horizonS: 86400 })
+    expect(report.version).toBe(3)
+    expect(report.warnings).toEqual([])
+  })
+
+  it('warns that the experiment warm-up replaces a yardStart warm-up', () => {
+    const file = experiment({
+      base: { fixture: 'landside-morning-peak' },
+      warmUpS: 900,
+      seeds: [1],
+      configs: [{ name: 'A', patch: { yardStart: { mode: 'warmup', warmUpS: 3600 } } }],
+    })
+    const warning = 'Config "A": the scenario has a yardStart warm-up (3600 s); the experiment\'s warmUpS (900 s) replaces it'
+    expect(validateExperiment(file).warnings).toEqual([warning])
+    let plan: ReplicatePlan | undefined
+    const report = runExperiment(file, {
+      executeReplicate: (p) => {
+        plan = p
+        return one()
+      },
+    })
+    expect(plan!.scenario.measurementWarmUpS).toBe(900)
+    expect(report.warnings).toEqual([warning])
+  })
+
+  it('rejects a bad warmUpS and a patch that sets measurementWarmUpS', () => {
+    expect(() => validateExperiment(experiment({ warmUpS: -1 }))).toThrow(/"warmUpS" must be a number, 0 or more/)
+    expect(() => validateExperiment(experiment({ configs: [{ name: 'A', patch: { measurementWarmUpS: 5 } }] }))).toThrow(
+      /patch\.measurementWarmUpS/,
+    )
   })
 })
