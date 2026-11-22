@@ -1,6 +1,6 @@
 # Terminal Twin docs index
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.59.0.
 
 Written for AI agents that need to learn the Terminal Twin quickly and help decide what to change or optimise. Each file answers one question and can be read alone. Code references are `path#symbol` relative to `src/sims/terminal-twin/` (no line numbers: grep the symbol). Domain terms: [GLOSSARY.md](../../../../GLOSSARY.md). Commands that prove a change: "How to prove a change works" in [terminal-twin-AGENTS.md](../terminal-twin-AGENTS.md).
 

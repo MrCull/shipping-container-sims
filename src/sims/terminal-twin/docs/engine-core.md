@@ -252,7 +252,7 @@ change, so diff before and after logs to locate a behaviour change.
 
 ## ENGINE_VERSION
 
-`engine/simulation.ts#ENGINE_VERSION` ("0.53.0"): bump it when engine behaviour changes in a way that invalidates
+`engine/simulation.ts#ENGINE_VERSION` ("0.59.0"): bump it when engine behaviour changes in a way that invalidates
 snapshots, in practice any change that moves an event log. `restore` refuses a snapshot whose `engineVersion`
 differs; the browser offers "Restart from its config" instead. Changes that move no event (container props, derived
 statuses, invariant or KPI reads) have shipped without a bump. `SNAPSHOT_SCHEMA_VERSION` (1) is the snapshot shape.
@@ -296,7 +296,7 @@ copies all of it. `state.reservations` is pruned only when a new reservation is 
 
 ## Gotchas
 
-- Everything a reactor does must go through `ctx`: `ctx.random()` not `Math.random`, `ctx.schedule` not a direct
+- Everything a reactor does must go through `ctx`: `ctx.random(stream)` (a named `RngStream`, `engine/context.ts`) not `Math.random`, `ctx.schedule` not a direct
   heap push (it sets `causedBy`), `ctx.transferCustody` plus the physical holder update in the same reactor.
 - `SimState` must stay plain JSON (no Map, Set, class or function); snapshots and restore assume it. Derived lookups
   go in a `WeakMap` keyed by a state object, never in the state.

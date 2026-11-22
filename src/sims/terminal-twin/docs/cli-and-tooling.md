@@ -1,6 +1,6 @@
 # CLI and tooling
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.59.0.
 
 Read this when you run or change a `pnpm run tt:*` command or a file in `cli/`, need a flag, an output format or an
 exit code, or want to run heavy jobs (peak-day runs, the smoke suite) without colliding with other agents.
@@ -48,12 +48,13 @@ Scenario source (exactly one):
 - `--preset <name>`: a key of `scenario/presets.ts#presets` (quote names with spaces: `--preset "TTI Algeciras, peak day"`).
 - `--from-snapshot <file>`: resume a snapshot written by `--snapshot` (read with `readJsonFile`, restored with
   `adopt: true`). It takes scenario, seed, decisions, end conditions, subsystems, ordering and match-line from the
-  snapshot: combining it with `--fixture/--preset/--seed/--async-mode/--strategy/--param/--latency/--end/--warm-up/--match-line/
+  snapshot: combining it with `--fixture/--preset/--seed/--patch/--async-mode/--strategy/--param/--latency/--end/--warm-up/--match-line/
   --subsystem/--ordering` is a usage error. `--events` and `--log` then hold only the window's events.
 
 | Flag | Values | Effect |
 |---|---|---|
 | `--seed <n>` | integer | override the scenario seed |
+| `--patch <json\|file>` | a JSON object inline (starts with `{`) or a JSON file | JSON Merge Patch (RFC 7396, `cli/scenarioPatch.ts#mergePatch`, the same one experiment configs use) on the loaded scenario, applied before every other flag; not with `--from-snapshot`. Example: `--patch '{"quay":{"mooringS":90}}'` |
 | `--until <cond>` | `end` (default), `time:<s>`, `moves:<n>`, `vessels:<n>`, `event:<Type>` | stop condition (`parseUntil`); `time:T` leaves `now = T` exactly |
 | `--end <cond>` | `moves:<n>`, `vessels:<n>`, `time:<s>`; repeatable | replaces `config.endConditions`; the first met ends the run |
 | `--warm-up <s>` | seconds, 0 or more | sets `config.measurementWarmUpS` (#311): KPIs and end conditions count only after it, from any yard start; overrides a `warmup` start's `warmUpS`; 0 = none. `--until time:` stays absolute sim time |
@@ -168,7 +169,8 @@ Experiment file (format `terminal-twin-experiment`, version 1):
 - `base`: `{ "preset": <name> }` or `{ "fixture": <name> }`. `warmUpS` (default 7200, 0 = none) is every replicate's
   measurement warm-up (`measurementWarmUpS`, `tt:run --warm-up`), excluded from KPIs and the horizon with any yard
   start mode (#316); on a `yardStart.mode: 'warmup'` scenario it replaces that warm-up, and validation warns.
-  `horizonS` (default 86400) replaces the end conditions (`simDurationS`, measured time counted after the warm-up), so
+  `configs` is optional when `grid` gives at least one config (a grid-only experiment);
+  the baseline then defaults to the first grid config. `horizonS` (default 86400) replaces the end conditions (`simDurationS`, measured time counted after the warm-up), so
   a replicate ends at sim time `warmUpS + horizonS`. `seeds`: a list or `{ count, from }` (default 10 seeds from 1). `baseline`: default the first config.
 - A config overrides the base four ways (#315), applied in this order to build its `ScenarioConfig`:
   - `patch`: a JSON Merge Patch (RFC 7396) on the base: objects merge key by key, `null` deletes a key, anything else
@@ -200,7 +202,11 @@ Experiment file (format `terminal-twin-experiment`, version 1):
   `Config "X": params.shcDispatch.NOPE: shcDispatch strategy "paired-dual-cycle" has no param "NOPE" (...)`: unknown
   decision point, strategy or param, a param out of range, a bad latency spec, a patch that makes an invalid
   scenario, a patch with `endConditions`, a bad grid factor path, duplicate names. A replicate's `command` adds
-  `--param` and `--latency` flags; a patch cannot be written as `tt:run` flags, so the command says so.
+  `--strategy`, `--param` and `--latency` flags and the config's patch as `--patch '<json>'` (shell-quoted), so it is
+  exact for every config.
+- The baseline's first seed runs first, alone (`runPlanned`, `baselineProbeIndex`, `checkBaselineProbe`): when it is
+  `ok` but the primary KPI is null on it, the experiment stops with an `ExperimentError` (exit 2, no report), since no
+  config could be compared on that KPI.
 - Every replicate runs with `asyncMode: 'pause'`, invariants `failFast: false` and `sweepEvery` 10000
   (`executeReplicateHeadless`).
 - KPI catalogue (`EXPERIMENT_KPIS`, read by `readExperimentKpis` from the headline KPIs, the `KpiReport` and the

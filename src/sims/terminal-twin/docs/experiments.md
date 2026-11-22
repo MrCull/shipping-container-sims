@@ -37,8 +37,8 @@ Format `terminal-twin-experiment`, version 1, plain JSON (so tools in any langua
 | `warmUpS` | 7200 | Measurement warm-up of every replicate, excluded from KPIs (any yard start mode). Set it deliberately on a short fixture: 0 when the fixture's work fits in less than the default |
 | `horizonS` | 86400 | Measured sim time per replicate; replaces the base's end conditions |
 | `seeds` | `{ "count": 10, "from": 1 }` | Or an explicit list, e.g. `[3, 7, 11]`, to reuse an earlier experiment's seeds |
-| `configs` | required, at least one | Named configs; overrides on the base (below) |
-| `baseline` | the first config | The config every other config is compared with |
+| `configs` | none | Named configs; overrides on the base (below). Optional when `grid` gives at least one config; one of the two must |
+| `baseline` | the first config (explicit, else the first grid config) | The config every other config is compared with |
 | `primary` | required | `{ "kpi": "<name>" }`: the KPI the verdict is about |
 | `guards` | none | `[{ "kpi", "tolerance": { "abs": n } \| { "pct": n } }]`: KPIs a config must not make worse than the tolerance |
 | `grid` | none | `{ "factors": { "<path>": [values] } }`: adds one config per combination |
@@ -59,7 +59,9 @@ invalid scenario, duplicate names. The error names the config and field.
 
 `EXPERIMENT_KPIS` in `cli/experiment.ts`. Every KPI is reported for every config; only the primary gets a verdict and
 only guards get a status. A KPI that is null for a replicate (its subsystem is absent, e.g. `truckTurnaroundS` on a
-fixture without trucks) is not compared for that pair.
+fixture without trucks) is not compared for that pair. A primary KPI that is null on the baseline is an error: the
+baseline's first seed runs first, and if it is `ok` with a null primary KPI the run stops there (exit 2) and asks for
+another primary KPI.
 
 | KPI | Unit | Better | Meaning |
 |---|---|---|---|
@@ -140,9 +142,8 @@ hash:` line, e.g.:
 pnpm run tt:run --preset "TTI Algeciras baseline" --seed 3 --async-mode pause --no-fail-fast --warm-up 7200 --end time:86400 --strategy wtpPadSelection=nearest-box
 ```
 
-A config with a `patch` cannot be written as `tt:run` flags; its command says so and names the patch. To inspect such a
-replicate, open its `replicates/<config>/<seed>.summary.json`, or apply the patch to the base scenario JSON and run that
-file.
+A config with a `patch` passes it as `tt:run --patch '<json>'` (the same JSON Merge Patch, shell-quoted), so every
+command is exact. `tt:run --patch` also takes a JSON file.
 
 ## Open questions an experiment can answer
 
