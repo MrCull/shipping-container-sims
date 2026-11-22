@@ -1,0 +1,722 @@
+{
+  "format": 1,
+  "startedAt": "2026-11-22T16:45:23.468Z",
+  "durationS": 232.2,
+  "scenario": {
+    "name": "TTI Algeciras baseline",
+    "seed": 2026,
+    "warmSimSeconds": 7200
+  },
+  "machine": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Claude/6.28899.6 Chrome/156.0.8078.100 Safari/537.36 MSIX",
+    "platform": "Win32",
+    "hardwareConcurrency": 8,
+    "deviceMemoryGb": 16,
+    "devicePixelRatio": 1,
+    "screen": "1920x1080",
+    "viewport": "967x607",
+    "gpu": "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x00009A49) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "gpuVendor": "Google Inc. (Intel)"
+  },
+  "build": {
+    "engineVersion": "0.58.0",
+    "builtAt": "2026-11-22T16:18:45.248Z",
+    "commit": "91b0732",
+    "production": true
+  },
+  "settings": {
+    "stageMs": 8000,
+    "warmupMs": 3000,
+    "minFrames": 30,
+    "viewSpeed": 60,
+    "viewNotes": {
+      "overview": "view preset Overview: the whole terminal in frame",
+      "yard": "view preset Yard",
+      "crane": "first STS crane from 60 m",
+      "closeup": "first yard block from 10 m (hero containers)",
+      "flythrough": "camera glides from the Yard preset to 60 m above the quay over the stage"
+    }
+  },
+  "stages": [
+    {
+      "name": "overview-low",
+      "view": "overview",
+      "quality": "low",
+      "speed": 60,
+      "frames": 462,
+      "wallMs": 7983.6,
+      "fps": 57.74,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 17.1,
+        "p99": 33.5,
+        "longest": 50.2
+      },
+      "poseMs": 2.34,
+      "cpuMs": 6.18,
+      "drawCalls": {
+        "mean": 277.6,
+        "max": 294
+      },
+      "triangles": {
+        "mean": 227219.3,
+        "max": 229433
+      },
+      "boxesPosed": {
+        "mean": 10.3,
+        "max": 17
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 7372,
+      "simEndS": 7851,
+      "simEnded": false
+    },
+    {
+      "name": "yard-low",
+      "view": "yard",
+      "quality": "low",
+      "speed": 60,
+      "frames": 472,
+      "wallMs": 7983.6,
+      "fps": 59,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 17,
+        "p99": 33.3,
+        "longest": 33.6
+      },
+      "poseMs": 2.24,
+      "cpuMs": 5.81,
+      "drawCalls": {
+        "mean": 274.8,
+        "max": 292
+      },
+      "triangles": {
+        "mean": 227612,
+        "max": 230031
+      },
+      "boxesPosed": {
+        "mean": 10.2,
+        "max": 14
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 8033,
+      "simEndS": 8512,
+      "simEnded": false
+    },
+    {
+      "name": "crane-low",
+      "view": "crane",
+      "quality": "low",
+      "speed": 60,
+      "frames": 478,
+      "wallMs": 7983.1,
+      "fps": 59.75,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 17,
+        "p99": 17.3,
+        "longest": 33.5
+      },
+      "poseMs": 1.91,
+      "cpuMs": 4.87,
+      "drawCalls": {
+        "mean": 74.8,
+        "max": 93
+      },
+      "triangles": {
+        "mean": 227335.9,
+        "max": 237297
+      },
+      "boxesPosed": {
+        "mean": 2.3,
+        "max": 4
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 8694,
+      "simEndS": 9173,
+      "simEnded": false
+    },
+    {
+      "name": "closeup-low",
+      "view": "closeup",
+      "quality": "low",
+      "speed": 60,
+      "frames": 473,
+      "wallMs": 8000.2,
+      "fps": 59,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 17.1,
+        "p99": 33.3,
+        "longest": 33.8
+      },
+      "poseMs": 2.01,
+      "cpuMs": 4.97,
+      "drawCalls": {
+        "mean": 62.2,
+        "max": 63
+      },
+      "triangles": {
+        "mean": 284730.1,
+        "max": 284757
+      },
+      "boxesPosed": {
+        "mean": 1.2,
+        "max": 5
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 9354,
+      "simEndS": 9834,
+      "simEnded": false
+    },
+    {
+      "name": "flythrough-low",
+      "view": "flythrough",
+      "quality": "low",
+      "speed": 60,
+      "frames": 462,
+      "wallMs": 7983.5,
+      "fps": 57.74,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 17.1,
+        "p99": 33.5,
+        "longest": 33.6
+      },
+      "poseMs": 2.75,
+      "cpuMs": 6.85,
+      "drawCalls": {
+        "mean": 188.1,
+        "max": 289
+      },
+      "triangles": {
+        "mean": 207479.9,
+        "max": 299555
+      },
+      "boxesPosed": {
+        "mean": 4.9,
+        "max": 10
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 10015,
+      "simEndS": 10494,
+      "simEnded": false
+    },
+    {
+      "name": "overview-medium",
+      "view": "overview",
+      "quality": "medium",
+      "speed": 60,
+      "frames": 450,
+      "wallMs": 7983.6,
+      "fps": 56.24,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 33.2,
+        "p99": 33.6,
+        "longest": 33.8
+      },
+      "poseMs": 2.6,
+      "cpuMs": 8.11,
+      "drawCalls": {
+        "mean": 324.8,
+        "max": 340
+      },
+      "triangles": {
+        "mean": 427431.6,
+        "max": 429513
+      },
+      "boxesPosed": {
+        "mean": 7.6,
+        "max": 11
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 10676,
+      "simEndS": 11155,
+      "simEnded": false
+    },
+    {
+      "name": "yard-medium",
+      "view": "yard",
+      "quality": "medium",
+      "speed": 60,
+      "frames": 433,
+      "wallMs": 7983.3,
+      "fps": 54.11,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 33.3,
+        "p99": 33.7,
+        "longest": 50
+      },
+      "poseMs": 2.85,
+      "cpuMs": 8.98,
+      "drawCalls": {
+        "mean": 313.1,
+        "max": 324
+      },
+      "triangles": {
+        "mean": 427908.2,
+        "max": 429441
+      },
+      "boxesPosed": {
+        "mean": 4.9,
+        "max": 10
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 11337,
+      "simEndS": 11816,
+      "simEnded": false
+    },
+    {
+      "name": "crane-medium",
+      "view": "crane",
+      "quality": "medium",
+      "speed": 60,
+      "frames": 404,
+      "wallMs": 8000.2,
+      "fps": 50.37,
+      "frameMs": {
+        "p50": 16.8,
+        "p95": 33.5,
+        "p99": 33.7,
+        "longest": 133.5
+      },
+      "poseMs": 2.54,
+      "cpuMs": 9.68,
+      "drawCalls": {
+        "mean": 450.8,
+        "max": 483
+      },
+      "triangles": {
+        "mean": 606042.2,
+        "max": 632051
+      },
+      "boxesPosed": {
+        "mean": 2.2,
+        "max": 7
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 11998,
+      "simEndS": 12478,
+      "simEnded": false
+    },
+    {
+      "name": "closeup-medium",
+      "view": "closeup",
+      "quality": "medium",
+      "speed": 60,
+      "frames": 448,
+      "wallMs": 7983.6,
+      "fps": 55.99,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 33.1,
+        "p99": 33.6,
+        "longest": 33.8
+      },
+      "poseMs": 2.3,
+      "cpuMs": 8.33,
+      "drawCalls": {
+        "mean": 386.8,
+        "max": 402
+      },
+      "triangles": {
+        "mean": 651809.2,
+        "max": 654601
+      },
+      "boxesPosed": {
+        "mean": 2.7,
+        "max": 7
+      },
+      "heroFaces": 23,
+      "achievedSpeed": 60,
+      "simStartS": 12660,
+      "simEndS": 13139,
+      "simEnded": false
+    },
+    {
+      "name": "flythrough-medium",
+      "view": "flythrough",
+      "quality": "medium",
+      "speed": 60,
+      "frames": 442,
+      "wallMs": 7983.4,
+      "fps": 55.24,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 33.1,
+        "p99": 33.6,
+        "longest": 33.8
+      },
+      "poseMs": 2.67,
+      "cpuMs": 8.28,
+      "drawCalls": {
+        "mean": 312.7,
+        "max": 483
+      },
+      "triangles": {
+        "mean": 415459,
+        "max": 688153
+      },
+      "boxesPosed": {
+        "mean": 10,
+        "max": 16
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 13320,
+      "simEndS": 13799,
+      "simEnded": false
+    },
+    {
+      "name": "overview-high",
+      "view": "overview",
+      "quality": "high",
+      "speed": 60,
+      "frames": 421,
+      "wallMs": 7983.6,
+      "fps": 52.61,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 33.4,
+        "p99": 33.7,
+        "longest": 49.7
+      },
+      "poseMs": 2.8,
+      "cpuMs": 8.65,
+      "drawCalls": {
+        "mean": 319.3,
+        "max": 334
+      },
+      "triangles": {
+        "mean": 431837.2,
+        "max": 433949
+      },
+      "boxesPosed": {
+        "mean": 12.3,
+        "max": 18
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 13981,
+      "simEndS": 14460,
+      "simEnded": false
+    },
+    {
+      "name": "yard-high",
+      "view": "yard",
+      "quality": "high",
+      "speed": 60,
+      "frames": 413,
+      "wallMs": 8000.2,
+      "fps": 51.5,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 33.5,
+        "p99": 49.8,
+        "longest": 50.4
+      },
+      "poseMs": 2.91,
+      "cpuMs": 9.12,
+      "drawCalls": {
+        "mean": 331.6,
+        "max": 344
+      },
+      "triangles": {
+        "mean": 454610.6,
+        "max": 456405
+      },
+      "boxesPosed": {
+        "mean": 12.7,
+        "max": 17
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 14642,
+      "simEndS": 15122,
+      "simEnded": false
+    },
+    {
+      "name": "crane-high",
+      "view": "crane",
+      "quality": "high",
+      "speed": 60,
+      "frames": 417,
+      "wallMs": 7983.2,
+      "fps": 52.11,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 33.4,
+        "p99": 33.8,
+        "longest": 50
+      },
+      "poseMs": 2.52,
+      "cpuMs": 9.6,
+      "drawCalls": {
+        "mean": 441.3,
+        "max": 472
+      },
+      "triangles": {
+        "mean": 699971.1,
+        "max": 721343
+      },
+      "boxesPosed": {
+        "mean": 2.8,
+        "max": 6
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 15304,
+      "simEndS": 15783,
+      "simEnded": false
+    },
+    {
+      "name": "closeup-high",
+      "view": "closeup",
+      "quality": "high",
+      "speed": 60,
+      "frames": 398,
+      "wallMs": 7999.9,
+      "fps": 49.63,
+      "frameMs": {
+        "p50": 16.8,
+        "p95": 33.5,
+        "p99": 33.9,
+        "longest": 49.9
+      },
+      "poseMs": 2.62,
+      "cpuMs": 10.07,
+      "drawCalls": {
+        "mean": 413.1,
+        "max": 435
+      },
+      "triangles": {
+        "mean": 758515.6,
+        "max": 761621
+      },
+      "boxesPosed": {
+        "mean": 3.1,
+        "max": 9
+      },
+      "heroFaces": 28,
+      "achievedSpeed": 60,
+      "simStartS": 15964,
+      "simEndS": 16444,
+      "simEnded": false
+    },
+    {
+      "name": "flythrough-high",
+      "view": "flythrough",
+      "quality": "high",
+      "speed": 60,
+      "frames": 398,
+      "wallMs": 7983.5,
+      "fps": 49.73,
+      "frameMs": {
+        "p50": 16.8,
+        "p95": 33.5,
+        "p99": 33.8,
+        "longest": 50.1
+      },
+      "poseMs": 3.09,
+      "cpuMs": 9.92,
+      "drawCalls": {
+        "mean": 380.5,
+        "max": 599
+      },
+      "triangles": {
+        "mean": 486183.2,
+        "max": 896631
+      },
+      "boxesPosed": {
+        "mean": 10.5,
+        "max": 16
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 16627,
+      "simEndS": 17106,
+      "simEnded": false
+    },
+    {
+      "name": "speed-x60",
+      "view": "overview",
+      "quality": "high",
+      "speed": 60,
+      "frames": 416,
+      "wallMs": 8000.1,
+      "fps": 51.87,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 33.4,
+        "p99": 33.8,
+        "longest": 50.3
+      },
+      "poseMs": 2.86,
+      "cpuMs": 8.71,
+      "drawCalls": {
+        "mean": 322.8,
+        "max": 340
+      },
+      "triangles": {
+        "mean": 432144.5,
+        "max": 434597
+      },
+      "boxesPosed": {
+        "mean": 11.5,
+        "max": 15
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 60,
+      "simStartS": 17287,
+      "simEndS": 17767,
+      "simEnded": false
+    },
+    {
+      "name": "speed-x300",
+      "view": "overview",
+      "quality": "high",
+      "speed": 300,
+      "frames": 404,
+      "wallMs": 7983.4,
+      "fps": 50.48,
+      "frameMs": {
+        "p50": 16.8,
+        "p95": 33.5,
+        "p99": 33.8,
+        "longest": 50
+      },
+      "poseMs": 2.83,
+      "cpuMs": 8.94,
+      "drawCalls": {
+        "mean": 323.5,
+        "max": 345
+      },
+      "triangles": {
+        "mean": 431968.6,
+        "max": 434813
+      },
+      "boxesPosed": {
+        "mean": 12.9,
+        "max": 18
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 300,
+      "simStartS": 18642.2,
+      "simEndS": 21037.3,
+      "simEnded": false
+    },
+    {
+      "name": "speed-x600",
+      "view": "overview",
+      "quality": "high",
+      "speed": 600,
+      "frames": 398,
+      "wallMs": 7999.4,
+      "fps": 49.63,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 33.5,
+        "p99": 33.8,
+        "longest": 116.5
+      },
+      "poseMs": 3.09,
+      "cpuMs": 9.14,
+      "drawCalls": {
+        "mean": 333,
+        "max": 357
+      },
+      "triangles": {
+        "mean": 483746.3,
+        "max": 486777
+      },
+      "boxesPosed": {
+        "mean": 15.2,
+        "max": 23
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 454.3,
+      "simStartS": 22476.9,
+      "simEndS": 26111.1,
+      "simEnded": false
+    },
+    {
+      "name": "speed-x1200",
+      "view": "overview",
+      "quality": "high",
+      "speed": 1200,
+      "frames": 384,
+      "wallMs": 7999.3,
+      "fps": 47.88,
+      "frameMs": {
+        "p50": 16.8,
+        "p95": 33.5,
+        "p99": 33.7,
+        "longest": 33.9
+      },
+      "poseMs": 3.16,
+      "cpuMs": 9.38,
+      "drawCalls": {
+        "mean": 337.3,
+        "max": 367
+      },
+      "triangles": {
+        "mean": 483329.4,
+        "max": 486903
+      },
+      "boxesPosed": {
+        "mean": 14,
+        "max": 22
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 541.5,
+      "simStartS": 27272.3,
+      "simEndS": 31604,
+      "simEnded": false
+    },
+    {
+      "name": "speed-x3600",
+      "view": "overview",
+      "quality": "high",
+      "speed": 3600,
+      "frames": 378,
+      "wallMs": 7966.9,
+      "fps": 47.32,
+      "frameMs": {
+        "p50": 16.8,
+        "p95": 33.6,
+        "p99": 33.8,
+        "longest": 50.1
+      },
+      "poseMs": 3.29,
+      "cpuMs": 9.51,
+      "drawCalls": {
+        "mean": 335.4,
+        "max": 361
+      },
+      "triangles": {
+        "mean": 477104.5,
+        "max": 488867
+      },
+      "boxesPosed": {
+        "mean": 9.3,
+        "max": 15
+      },
+      "heroFaces": 0,
+      "achievedSpeed": 684.8,
+      "simStartS": 33141.7,
+      "simEndS": 38597.7,
+      "simEnded": false
+    }
+  ]
+}
