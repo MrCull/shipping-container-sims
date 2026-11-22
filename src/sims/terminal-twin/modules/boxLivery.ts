@@ -4,7 +4,7 @@
  * boxes. Render-only: the engine line (`ContainerState.line`) is untouched, and Colour by line and the other colour-by
  * modes keep using it. The choice hashes the box id only, so a box looks the same every frame and every reload.
  */
-import atlas from '../assets/models/containers/livery-atlas.json'
+import atlas from '../assets/models/containers/livery-atlas.json' with { type: 'json' } // the attribute lets Playwright's Node import it
 import { boxUnit } from './boxHash'
 
 /** Share of boxes with a known line drawn as a leasing variant. */

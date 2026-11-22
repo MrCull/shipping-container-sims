@@ -12,6 +12,7 @@ import atlas from '../../assets/models/containers/livery-atlas.json' with { type
 import type {} from '../../dev/devApi' // window.__tt typing
 import type {} from '../../dev/assetViewerApi' // window.__ttAssets typing
 import { openTwin, twinUrl } from './openTwin'
+import { isLeasingTile, liveryIndexForBox } from '../../modules/boxLivery'
 
 /** Asset or decoder files (GLB/glTF, textures, wasm/JS decoders): these must never come from another host. */
 const ASSET_REQUEST = /\.(glb|gltf|bin|webp|png|ktx2|basis|wasm|drc)(\?|$)|draco|meshopt|basis_transcoder/i
@@ -43,7 +44,12 @@ test('the twin loads the container GLBs offline and draws each box in its line l
   const boxes = await page.evaluate(() => window.__tt!.query<{ id: string; line: string }[]>('containers'))
   const state = await page.evaluate(() => window.__tt!.sceneState())
   expect(boxes.length).toBeGreaterThan(0)
-  for (const box of boxes) expect(atlas.liveries[state!.liveries[box.id].index].line, box.id).toBe(box.line)
+  // default mode: each box in its line tile or a #360 leasing variant picked from its id
+  for (const box of boxes) {
+    const index = state!.liveries[box.id].index
+    expect(index, box.id).toBe(liveryIndexForBox(box.id, box.line))
+    if (!isLeasingTile(index)) expect(atlas.liveries[index].line, box.id).toBe(box.line)
+  }
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 140))
   await page.waitForTimeout(400)
   await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
