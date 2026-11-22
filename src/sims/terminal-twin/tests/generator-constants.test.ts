@@ -97,3 +97,37 @@ describe('livery palette (#359)', () => {
     for (const { line, body, text } of atlas.liveries) expect(contrast(body, text), line ?? 'generic').toBeGreaterThanOrEqual(MIN_WORDMARK_CONTRAST)
   })
 })
+
+describe('leasing and old-stock tiles (#360)', () => {
+  const leasingNames = [...liveries.matchAll(/\{'leasing': '([a-z -]+)', 'weight': (\d+)/g)].map((m) => ({ name: m[1], weight: Number(m[2]) }))
+
+  it('the atlas json holds the generator leasing tiles after the line tiles, with no wordmark', () => {
+    expect(leasingNames.length).toBeGreaterThanOrEqual(7)
+    expect(atlas.leasing.map(({ name, weight }) => ({ name, weight }))).toEqual(leasingNames)
+    atlas.leasing.forEach((l, i) => {
+      expect(l.index).toBe(atlas.genericIndex + 1 + i)
+      expect(atlas.liveries[l.index]).toMatchObject({ line: null, wordmark: '', ownerPrefix: '' })
+    })
+  })
+
+  it('include rust, brown and off-white, weighted towards rust, oxblood and brown', () => {
+    const body = (name: string) => atlas.liveries[atlas.leasing.find((l) => l.name === name)!.index].body
+    expect(body('rust')).toBe('#8a4a3a')
+    expect(body('brown')).toBe('#6b4a38')
+    expect(body('off-white')).toBe('#d6d3c9')
+    const w = (name: string) => atlas.leasing.find((l) => l.name === name)!.weight
+    for (const other of ['dull blue', 'faded green', 'grey', 'off-white']) {
+      for (const heavy of ['rust', 'oxblood', 'brown']) expect(w(heavy)).toBeGreaterThan(w(other))
+    }
+  })
+
+  it('the atlas grid holds every tile at the original tile size, and the far atlas has the same layout', () => {
+    const tiles = atlas.liveries.length
+    expect(tiles).toBe(atlas.genericIndex + 1 + atlas.leasing.length)
+    expect(atlas.tileCols * atlas.tileRows).toBeGreaterThanOrEqual(tiles)
+    expect(atlas.tileCols * (atlas.tileRows - 1)).toBeLessThan(tiles) // no empty row
+    expect(atlas.size[0] * atlas.tileSizeUv[0]).toBe(1024)
+    expect(atlas.size[1] * atlas.tileSizeUv[1]).toBeCloseTo(2048 / 6, 6)
+    expect(atlas.far.size[0] / atlas.far.size[1]).toBe(atlas.size[0] / atlas.size[1])
+  })
+})

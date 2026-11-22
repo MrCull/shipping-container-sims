@@ -9,6 +9,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import atlas from '../assets/models/containers/livery-atlas.json' with { type: 'json' }
 import { headlessScene, type HeadlessScene } from '../cli/headlessScene'
+import { isLeasingTile, liveryIndexForBox } from '../modules/boxLivery'
 
 type Box = { id: string; line: string; size: string }
 
@@ -30,9 +31,13 @@ describe('headless scene: container LODs, liveries and close-ups (was container-
     for (const box of boxes) {
       const rendered = state.liveries[box.id]
       expect(rendered, box.id).toBeDefined()
-      expect(atlas.liveries[rendered.index].line, box.id).toBe(box.line)
+      // #360: the line's own tile or a leasing variant, picked from the box id
+      expect(rendered.index, box.id).toBe(liveryIndexForBox(box.id, box.line))
+      if (!isLeasingTile(rendered.index)) expect(atlas.liveries[rendered.index].line, box.id).toBe(box.line)
       expect(rendered.size, box.id).toBe(box.size)
     }
+    expect(boxes.some((b) => isLeasingTile(state.liveries[b.id].index))).toBe(true)
+    expect(boxes.some((b) => !isLeasingTile(state.liveries[b.id].index))).toBe(true)
     const stats = s.stats()
     expect(stats.containers).toBe(boxes.length)
     expect(stats.containerLods.lod0 + stats.containerLods.lod1).toBe(stats.containers)

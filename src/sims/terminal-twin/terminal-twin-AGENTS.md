@@ -151,7 +151,7 @@ All three commands print usage with `--help`. Exit codes: `tt:run` 0 ok / 1 viol
   - the vessel group's colour-by tints, ROB boxes and hatch panels;
   - the engine group's ASC, paired ASC, load, rehandle, SHC and truck scene checks: `tests/headless-scene-engine.test.ts`, #333;
   - the equipment group's SHC spawn yaw and gantry beacons: `tests/headless-scene-equipment.test.ts`, #337, whose GLB rig checks stay in the browser;
-  - the yard group's container LOD and livery, close-up counts by pose, gate infrastructure instances and lighting per hour with the daylight lock: `tests/headless-scene-yard.test.ts`, #336, with hero caps, rungs and arrival in `hero-faces.test.ts` and `hero-prep.test.ts`.
+  - the yard group's container LOD and livery (a box draws its line tile or a #360 leasing variant: `tests/box-livery.test.ts`), close-up counts by pose, gate infrastructure instances and lighting per hour with the daylight lock: `tests/headless-scene-yard.test.ts`, #336, with hero caps, rungs and arrival in `hero-faces.test.ts` and `hero-prep.test.ts`.
 - The engine group's only browser test is the worker running the ASC import fixture to its golden hash, `terminal-twin-asc.smoke.ts`.
 - `headless-parity.smoke.ts` keeps the two in step.
 

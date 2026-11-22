@@ -29,7 +29,7 @@ import type { HeroMarkStep } from './heroMarkings'
 import { ContainerInstancer, type DrawnBox } from './containerInstancer'
 import { describeMarkings } from './containerMarkings'
 import { colourContextOf, colourOf, DEFAULT_COLOUR_BY, DEFAULT_ROB_DISPLAY, hexToInt, isTimeBased, type ColourBy, type ColourContext, type RobDisplay } from './colourBy'
-import { liveryBodyColour, liveryIndexForLine, loadContainerAssets, type ContainerAssets } from './containerAssets'
+import { liveryBodyColour, liveryIndexForBox, loadContainerAssets, type ContainerAssets } from './containerAssets'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { beaconFlashOn, GantryBeacons } from './gantryBeacons'
 import type { SoundSource } from './soundMixer'
@@ -233,11 +233,20 @@ export class SceneRenderer {
       const id = model.containerIds[i]
       const d = model.containerDetail[id]
       return {
-        markings: describeMarkings({ id, size: model.containerSize[id], line: model.containerLine[id], isoType: d?.isoType, laden: d?.laden ?? true, heavy: d?.heavy }),
+        markings: describeMarkings({
+          id,
+          size: model.containerSize[id],
+          line: model.containerLine[id],
+          isoType: d?.isoType,
+          laden: d?.laden ?? true,
+          heavy: d?.heavy,
+          liveryIndex: this.tint[i] >= 0 ? undefined : this.containerLivery[i], // a tinted (colour by) box keeps its true line
+        }),
         bodyColour: this.tint[i] >= 0 ? `#${this.tint[i].toString(16).padStart(6, '0')}` : liveryBodyColour(this.containerLivery[i]),
       }
     })
-    this.containerLivery = model.containerIds.map((id) => liveryIndexForLine(model.containerLine[id]))
+    // default-mode tile: the line's livery or a leasing variant, from the box id (#360); colour-by tints use the true line
+    this.containerLivery = model.containerIds.map((id) => liveryIndexForBox(id, model.containerLine[id]))
     this.colourCtx = colourContextOf(config)
     this.scene.add(this.containers.group)
     loadContainerAssets().then(
@@ -615,7 +624,7 @@ export class SceneRenderer {
         containers.remove(i)
         continue
       }
-      this.containerLivery[i] ??= liveryIndexForLine(model.containerLine[id])
+      this.containerLivery[i] ??= liveryIndexForBox(id, model.containerLine[id])
       containers.set(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget), c.yard === true)
       if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
       if (wantsOwners && rest === 0) {

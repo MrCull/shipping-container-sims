@@ -21,11 +21,14 @@ import mathutils
 
 from .blender import emission_material, hex_to_linear
 
-ATLAS_SIZE = 2048
+# The atlas grew from 2x6 to 2x9 tiles for the leasing variants (#360) by growing its height, so every tile keeps its
+# 1024 x 341.33 px size and the regions below are unchanged.
+ATLAS_W = 2048
 TILE_COLS = 2
-TILE_ROWS = 6
-TILE_W = ATLAS_SIZE // TILE_COLS          # 1024
-TILE_H = ATLAS_SIZE / TILE_ROWS           # 341.33
+TILE_ROWS = 9
+TILE_W = ATLAS_W // TILE_COLS             # 1024
+TILE_H = ATLAS_W / 6                      # 341.33
+ATLAS_H = round(TILE_H * TILE_ROWS)       # 3072
 
 REGIONS = {
     'side40': (8, 8, 1016, 222),
@@ -39,10 +42,11 @@ REGIONS = {
 
 METAL = '#b4b9bf'
 
-# Far-field atlas (#256): same tile layout rendered at FAR_ATLAS_SIZE, drawn with an enlarged wordmark and a coarse rib
+# Far-field atlas (#256): same tile layout rendered at FAR_ATLAS_W x FAR_ATLAS_H, drawn with an enlarged wordmark and a coarse rib
 # shading, blended in by the renderer beyond about 65 to 100 m. Pitches: far 1.2 m (about 10 ribs on a 40 ft side), LOD0
 # geometry 0.56 m, hero and real 0.25 m.
-FAR_ATLAS_SIZE = 1024
+FAR_ATLAS_W = 1024
+FAR_ATLAS_H = FAR_ATLAS_W * ATLAS_H // ATLAS_W   # 1536
 FAR_RIB_PITCH_M = 1.2
 SIDE_LENGTH_M = {'side40': 12.19, 'side20': 6.06}
 
@@ -76,6 +80,29 @@ LIVERIES = [
 ]
 GENERIC_INDEX = len(LIVERIES) - 1
 
+# Leasing and old-stock variants (#360): generic lessor boxes with no line wordmark and no fixed owner code (the real
+# number comes from the box id in the close-up). The renderer (modules/boxLivery.ts) draws about half the yard in these,
+# picked by a hash of the box id with `weight`: real yards are rust, oxblood and brown dominated. Tiles follow LIVERIES
+# in the atlas, so LIVERIES (and the vessel atlas that mirrors it) keep their indices and GENERIC_INDEX.
+LEASING_LIVERIES = [
+    {'leasing': 'rust', 'weight': 4, 'line': None, 'owner': '', 'body': '#8a4a3a', 'text': '#ffffff', 'wordmark': '',
+     'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0},
+    {'leasing': 'oxblood', 'weight': 3, 'line': None, 'owner': '', 'body': '#5e2a2a', 'text': '#ffffff', 'wordmark': '',
+     'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0},
+    {'leasing': 'brown', 'weight': 3, 'line': None, 'owner': '', 'body': '#6b4a38', 'text': '#ffffff', 'wordmark': '',
+     'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0},
+    {'leasing': 'dull blue', 'weight': 1, 'line': None, 'owner': '', 'body': '#3d5675', 'text': '#ffffff', 'wordmark': '',
+     'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0},
+    {'leasing': 'faded green', 'weight': 1, 'line': None, 'owner': '', 'body': '#4a6a55', 'text': '#ffffff', 'wordmark': '',
+     'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0},
+    {'leasing': 'grey', 'weight': 1, 'line': None, 'owner': '', 'body': '#8d9296', 'text': '#1d1d1b', 'wordmark': '',
+     'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0},
+    {'leasing': 'off-white', 'weight': 1, 'line': None, 'owner': '', 'body': '#d6d3c9', 'text': '#1d1d1b', 'wordmark': '',
+     'font': 'Archivo-ExtraBold.ttf', 'spacing': 1.0, 'shear': 0.0},
+]
+ATLAS_TILES = LIVERIES + LEASING_LIVERIES
+assert len(ATLAS_TILES) <= TILE_COLS * TILE_ROWS
+
 
 def tile_origin(index):
     """Top-left pixel of tile `index`."""
@@ -86,8 +113,8 @@ def region_uv_rect(name, index=0):
     """Blender UV rect (u0, v0, u1, v1) of a region in tile `index` (v up)."""
     ox, oy = tile_origin(index)
     x0, y0, x1, y1 = REGIONS[name]
-    s = ATLAS_SIZE
-    return (ox + x0) / s, 1 - (oy + y1) / s, (ox + x1) / s, 1 - (oy + y0) / s
+    w, h = ATLAS_W, ATLAS_H
+    return (ox + x0) / w, 1 - (oy + y1) / h, (ox + x1) / w, 1 - (oy + y0) / h
 
 
 def region_uv_point(name, index=0):
@@ -104,21 +131,24 @@ def atlas_manifest():
     """JSON-safe description of the atlas for the renderer (livery-atlas.json)."""
     return {
         'image': 'embedded in each container GLB (material container_lod0 / container_lod1 baseColorTexture)',
-        'size': [ATLAS_SIZE, ATLAS_SIZE],
+        'size': [ATLAS_W, ATLAS_H],
         'tileCols': TILE_COLS,
         'tileRows': TILE_ROWS,
-        'tileSizeUv': [TILE_W / ATLAS_SIZE, TILE_H / ATLAS_SIZE],
+        'tileSizeUv': [TILE_W / ATLAS_W, TILE_H / ATLAS_H],
         'uvConvention': 'glTF TEXCOORD_0 is authored for tile 0; add (index % tileCols, floor(index / tileCols)) * tileSizeUv per instance',
         'genericIndex': GENERIC_INDEX,
         'liveries': [
             {'index': i, 'line': l['line'], 'ownerPrefix': l['owner'], 'body': l['body'], 'text': l['text'],
              'wordmark': l['wordmark'], 'typeface': l['font'].replace('.ttf', ''), 'tag': 'A'}
-            for i, l in enumerate(LIVERIES)
+            for i, l in enumerate(ATLAS_TILES)
+        ],
+        'leasing': [
+            {'index': len(LIVERIES) + i, 'name': l['leasing'], 'weight': l['weight']} for i, l in enumerate(LEASING_LIVERIES)
         ],
         'regions': {k: list(v) for k, v in REGIONS.items()},
         'far': {
             'file': 'livery-atlas-far.webp',
-            'size': [FAR_ATLAS_SIZE, FAR_ATLAS_SIZE],
+            'size': [FAR_ATLAS_W, FAR_ATLAS_H],
             'ribPitchM': FAR_RIB_PITCH_M,
             'note': 'same tile layout and UVs as the near atlas; the renderer blends it in by camera distance',
         },
@@ -249,28 +279,27 @@ def _draw_tile(canvas, index, liv, far=False):
 
 def render_atlas(path, fonts_dir, samples=16, far=False):
     """Renders the livery atlas (Cycles, emission only, orthographic). `far` renders the far-field atlas as a lossy
-    WebP at FAR_ATLAS_SIZE (same layout, so the renderer reuses the UVs); otherwise the 2048 PNG."""
+    WebP at FAR_ATLAS_W x FAR_ATLAS_H (same layout, so the renderer reuses the UVs); otherwise the 2048 x 3072 PNG."""
     from .blender import reset_scene
     scene = reset_scene()
     canvas = _Canvas(fonts_dir)
-    canvas.rect(0, 0, ATLAS_SIZE, ATLAS_SIZE, '#808080')
-    for i, liv in enumerate(LIVERIES):
+    canvas.rect(0, 0, ATLAS_W, ATLAS_H, '#808080')
+    for i, liv in enumerate(ATLAS_TILES):
         _draw_tile(canvas, i, liv, far=far)
     cam = bpy.data.objects.new('atlas-camera', bpy.data.cameras.new('atlas-camera'))
     cam.data.type = 'ORTHO'
-    cam.data.ortho_scale = ATLAS_SIZE
+    cam.data.ortho_scale = max(ATLAS_W, ATLAS_H)  # sensor fit AUTO: the scale spans the longer side
     cam.data.clip_start = 0.1
     cam.data.clip_end = 100
-    cam.location = (ATLAS_SIZE / 2, -ATLAS_SIZE / 2, 50)
+    cam.location = (ATLAS_W / 2, -ATLAS_H / 2, 50)
     scene.collection.objects.link(cam)
     scene.camera = cam
     world = bpy.data.worlds.new('none')
     world.use_nodes = True
     world.node_tree.nodes['Background'].inputs[0].default_value = hex_to_linear('#000000')
     scene.world = world
-    size = FAR_ATLAS_SIZE if far else ATLAS_SIZE
-    scene.render.resolution_x = size
-    scene.render.resolution_y = size
+    scene.render.resolution_x = FAR_ATLAS_W if far else ATLAS_W
+    scene.render.resolution_y = FAR_ATLAS_H if far else ATLAS_H
     scene.render.resolution_percentage = 100
     scene.cycles.samples = samples
     scene.cycles.max_bounces = 0

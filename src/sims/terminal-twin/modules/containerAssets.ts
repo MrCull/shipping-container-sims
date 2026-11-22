@@ -26,11 +26,7 @@ export const CONTAINER_ASSET_URLS: Record<ContainerSize, string> = {
 
 export const LIVERY_ATLAS = atlas
 
-/** Atlas tile index for a shipping line (unknown lines get the generic grey tile). */
-export function liveryIndexForLine(line: string | undefined): number {
-  const hit = atlas.liveries.find((l) => l.line === line)
-  return hit ? hit.index : atlas.genericIndex
-}
+export { liveryIndexForBox, liveryIndexForLine } from './boxLivery'
 
 /** Body colour of a livery (for the procedural placeholders before the GLBs load). */
 export function liveryBodyColour(index: number): string {

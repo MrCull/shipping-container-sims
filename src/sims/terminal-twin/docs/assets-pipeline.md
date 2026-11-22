@@ -197,13 +197,19 @@ photos into asset directories.
 - **LOD1** is a 12-triangle box with a normal map on TEXCOORD_1 (128x4, repeat) of the same rib profile and pitch as LOD0.
 - **Liveries** (`tt_assets/liveries.py`): `LIVERIES` order = atlas index = per-instance livery index. Lines and owner
   prefixes match `LINE_OWNER_PREFIX` (`scenario/lines.ts`, re-exported by `scenario/builder.ts`); the last entry is the
-  generic grey. Now 11 tiles: HMM, MSC, Maersk, CMA CGM, Hapag-Lloyd, ONE, Evergreen, COSCO, ZIM, Yang Ming, generic.
-  Atlas 2048x2048 with 2x6 tiles (12 at most); regions per tile `side40`, `side20`, `door`, `front`, `solid`, `dark`, `metal`.
+  generic grey. 11 line tiles: HMM, MSC, Maersk, CMA CGM, Hapag-Lloyd, ONE, Evergreen, COSCO, ZIM, Yang Ming, generic.
+  Then 7 leasing and old-stock tiles (#360, `LEASING_LIVERIES`): rust, oxblood, brown, dull blue, faded green, grey,
+  off-white, no wordmark and no owner code, each with a pick `weight`; `livery-atlas.json` lists them under `leasing`.
+  The renderer draws about half the yard (`LEASING_SHARE` in `modules/boxLivery.ts`) in a leasing tile in the default
+  colour mode, picked by a hash of the box id (`modules/boxHash.ts`, reusable for other stable per-box choices); the
+  engine line and every Colour by mode are unchanged.
+  Atlas 2048x3072 with 2x9 tiles (18, full; grown in height so a tile stays 1024x341.33 px and the regions are unchanged);
+  regions per tile `side40`, `side20`, `door`, `front`, `solid`, `dark`, `metal`.
   Wordmarks are the brand name in brand colours in an open-licence typeface close to the brand's [A], no logos.
   Body colours are muted and weathered (#359), not fresh brand colours: `tests/generator-constants.test.ts` caps HSV
   saturation at 0.65 and value at 0.85, keeps a wordmark contrast of at least 3:1, and checks the generator, the atlas
   json and the placeholder colour (`liveryBodyColour`) agree. Retune a colour there and regenerate the `containers` group.
-- **Far-field atlas** (#256): `liveryMaterial` blends `livery-atlas-far.webp` (1024 px WebP rendered by `liveries.py#render_atlas(far=True)`,
+- **Far-field atlas** (#256): `liveryMaterial` blends `livery-atlas-far.webp` (1024x1536 WebP rendered by `liveries.py#render_atlas(far=True)`,
   same tile layout, so the same UVs; enlarged wordmark, coarse 1.2 m rib shading, no owner code) over the embedded near atlas
   between 65 and 100 m. It is not embedded in the GLBs, so the GLB bytes are unchanged; `livery-atlas.json` has a `far` entry.
 - `livery-atlas.json` (committed beside the GLBs) is the renderer's lookup; TEXCOORD_0 is authored for tile 0 (HMM) and
