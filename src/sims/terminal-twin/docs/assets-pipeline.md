@@ -1,6 +1,6 @@
 # Asset pipeline
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when you add or change a GLB model, a livery or atlas, a sidecar, an asset budget, or a synthesized sound;
 when `tt:assets:check` or `tt:sounds:check` fails in CI; or when you need the dev asset viewer. How the renderer uses
@@ -132,7 +132,7 @@ Budgets and current counts (from `tt:assets:check`, triangles / draw calls):
 | `hero-shc` | 30 000 / 12 (LOD0 only) | | | 1.2 MB | 18 092 / 11; about 300 KB (see Hero SHC body) |
 | `hero-truck-chassis` | 10 000 / 6 (LOD0 only) | | | 800 KB | 8 188 / 4; about 130 KB (see Hero truck) |
 | `hero-truck-cab` | 15 000 / 8 (LOD0 only) | | | 800 KB | about 7 700 / 4 per cab shape; about 196 KB each (see Hero truck) |
-| `sts` | 40 000 / 20 | 8 000 / 10 | 1 000 / 6 | 3 MB | 31 690 / 18, 5 912 / 10, 490 / 5; 561 KB |
+| `sts` | 40 000 / 20 | 8 000 / 10 | 1 000 / 6 | 3 MB | 31 686 / 20, 5 872 / 10, 474 / 6; 567 KB (#299: every LOD at its draw-call cap; LOD1 folds the headblock and twin-lift housing into the spreader mesh) |
 | `asc` | 15 000 / 10 | 4 000 / 6 | 600 / 3 | 1.5 MB | 12 998 / 9, 3 844 / 5, 556 / 3; 295 KB |
 | `shc` | 12 000 / 16 | 3 000 / 12 | 400 / 3 | 1.5 MB | 9 856 / 16, 2 154 / 12, 358 / 2; 291 KB |
 | `truck` | 8 000 / 8 | 2 000 / 8 | 300 / 2 | 1 MB | about 6 870 / 8, 1 850 / 8, 248 / 2 per cab |
@@ -165,6 +165,17 @@ assets, 5.83 MB. Draw calls in a budget are primitives in the GLB; the renderer 
   STS `geometry`, `sceneMounting`, `spreaderModes`, `stretch`, `beaconMounts`, `lods.*.maxDistanceM`; ASC `stack`,
   `hoist`, `stretch`, `beaconMounts`; SHC `branding.fleetNumbers`, tunnel clearances; truck `loadConfigurations`,
   `chassisDetail`; hull `bayGrid`, `waterline`; gate `module.laneWidthM`.
+- **Stretch rules** (sidecar `stretch`, applied by `modules/assetRig.ts#AssetRig.applyStretch`, no kind-specific code):
+  `axis: 'Y'` scales a node down to a sibling (`scale.y = node.y - (to.y + offsetM)`, hoist ropes); `mode: 'aim'` turns
+  the node's local `axis` (`+Y`) towards the `to` node, wherever it is in the tree, and sets that axis's scale to the
+  distance over `unitLengthM`. An aim node is an empty (role `stretch`) whose `_geo` mesh is authored unit length along
+  local +Y from the pivot; members may have different X at each end (the X offsets survive because the aim only turns
+  about the line between the two origins). Its target is an empty (role `anchor`) on the moving part. STS (#299):
+  `forestays` (apex beam to `forestay_anchor` on the boom nose) and `boom_hoist_ropes` (apex head sheaves to
+  `boom_hoist_anchor`, the sheave block on the outer overhead frame) are gantry children; their anchors are boom children,
+  so both stay attached at every boom angle. LOD0 has twin forestay rods per side and four ropes, LOD1 one rod per side and
+  two ropes, LOD2 one rod per side and the rope node as an empty only. `build.py#pose_sts` applies the same aim for the
+  previews (`raised` preview: boom at 80 degrees).
 - **Provenance tags** (TTI reference pack): `V` verified, `P` photo-supported, `A` approximated, `M` intentional
   modification (with a `reason`). Anything newly assumed is `A`. Example: container corrugation pitch is `M`, 0.56 m
   instead of about 0.28 m, to fit the triangle budget.
@@ -243,11 +254,11 @@ Same `hero-equipment` group (#276), `tt_assets/hero_truck.py`: `assets/models/he
 
 | Group | Generator | Outputs | Provenance and notes |
 |---|---|---|---|
-| `sts` | `sts.py`, `sts_atlas.py` | `sts-malaccamax.glb`, `sts-atlas.json` (16 swatches of 64 px plus crane-number tiles), previews incl. `closeup` | Gauge 30.48 m, lift 52 m, outreach 68 m [V]; the rest [A]. Cobalt legs, A-frame, lattice boom, white house and trolley, yellow spreader; text `TTI ALGECIRAS`, `ZPMC` plates. 8 `beaconMounts` (legs at 6 m, portal-beam ends). Rig incl. `spreader_tele_fore/aft` (0 to 3.067 m), `twin_locks` (0.4 m drop), `boom` (0 to 80 deg). |
+| `sts` | `sts.py`, `sts_atlas.py` | `sts-malaccamax.glb`, `sts-super-post-panamax.glb` (#303: `configure(cls)` in `sts.py`; the same geometry, `ry()` lowers everything from the portal up by 9 m and shortens the leg section between the sills and the portal, `OUTREACH` 65 m shortens the boom 3 m: the reverse of the 2021 to 2023 heightening; sidecar `craneClass`, `geometry.boomUndersideM`), `sts-atlas.json` (16 swatches of 64 px plus crane-number tiles), previews incl. `closeup` and `raised` (boom 80 deg) | Gauge 30.48 m, lift 52 m, outreach 68 m [V]; the rest [A]. Cobalt legs, A-frame, lattice boom, white house and trolley, yellow spreader; text `TTI ALGECIRAS`, `ZPMC` plates. 8 `beaconMounts` (legs at 6 m, portal-beam ends). Rig incl. `spreader_tele_fore/aft` (0 to 3.067 m), `twin_locks` (0.4 m drop), `boom` (0 to 80 deg); `forestays` and `boom_hoist_ropes` aim-stretch to anchors on the boom. Boom side plate (#300, every LOD) with `TTI ALGECIRAS` from the atlas region `tti_on_blue` at LOD0 and LOD1 (sidecar `branding.boomSidePlate`; `sts-atlas.json` lists `regions` as pixel rects); LOD0 only: extra A-frame bracing and leg stairs (switches `EXTRAS` in `sts.py`, recorded in the sidecar provenance). LOD0 is held at or under 33,274 triangles (spec #297). |
 | `shc` | `shc.py`, `shc_meta.py` | `shc.glb`, two 1024 WebP atlases (swatches and wordmarks; fleet-number plates 8x15 tiles of 128x64 for "SHC 01" to "SHC 120", material `shc_plate`) | Look [P], dimensions [A]. Single tyres (R 0.95 m), 4.0 m clear tunnel, 6.4 m high; KALMAR and TTI ALGECIRAS as text. Sill shows "SHC nn", not the real "SHC 240 H". |
 | `asc` | `asc.py`, `asc_meta.py` | `asc.glb`, one 1024 atlas | Span 25.4 m, 8 rows, 40 t [V]; the rest [A] (tune constants at the top of `asc.py`). Zig-zag stairs, sign band with unit number, `TTI ALGECIRAS`, `ZPMC`, `40 t`. 4 `beaconMounts` at 4.5 m. Sidecar `stack`: 8 rows at 2.9 m pitch, `designTiers` 5, `underBridgeM` 20.0. |
 | `trucks` | `truck.py`, `truck_meta.py` | `truck-cab-high|mid|day`, `truck-chassis`, `truck-livery-atlas.webp` (8 liveries, 2048x1024) | Proportions [A]. 4x2 cab-over plus gooseneck tri-axle chassis, about 16 m x 2.55 m. Maker wordmarks only (Volvo, Scania, DAF, MAN, Mercedes-Benz), no haulier names. Attach points `pin_40_*` (11.985 x 2.259 m), `pin_20_mid_*`, seats `load_40`, `load_20_front` (3.0675 m ahead), `load_20_rear`, `load_20_twin_a|b`. `fifth_wheel` is an empty with no position in the sidecar. |
-| `vessels` | `vessels.py`, `vessel_liveries.py` | five hull GLBs, `vessel-livery-atlas.json` (container tile order plus generic) | Sized from `--vessel-classes` (the engine's `VESSEL_CLASSES` and bay-plan pitches, `scenario/vesselClasses.ts`): change the class table, then `--only vessels`. Required nodes `hull`, `hatch_covers`, `lashing_bridges`, `bay_grid`. `HATCH_GAP` 1.4 and `COAMING_M` 1.7 are mirrored in `modules/hullHatchOpening.ts`. Colours and marks [A]. |
+| `vessels` | `vessels.py`, `vessel_liveries.py` | five hull GLBs, `vessel-livery-atlas.json` (container tile order plus generic) | Sized from `--vessel-classes` (the engine's `VESSEL_CLASSES` and bay-plan pitches, `scenario/vesselClasses.ts`): change the class table, then `--only vessels`. Required nodes `hull`, `hatch_covers`, `lashing_bridges`, `bay_grid`. `HATCH_GAP` 1.4 and `COAMING_M` 1.7 are mirrored in `modules/hullHatchOpening.ts`. The accommodation block (`build_superstructure`) and the sidecar `airDraftM` are mirrored in `VesselClassSpec.superstructure` (#302, cross-checked in `tests/vessel-hulls.test.ts`): change one, change both. Colours and marks [A]. |
 | `infrastructure` | `infrastructure.py`, `infrastructure_meta.py` | 23 GLBs on one `infra-atlas.json`, root > `LOD0` > meshes, no further LODs | Gate, quay, yard, building, backdrop and scenery kinds. `build_backdrop_rock` repeats `ROCK` from `terminals/tti-algeciras/constants.ts` (change both). `build_scenery_*` (seeded, flat swatches of the shared atlas only, so the atlas and every other GLB stay byte-identical) build the five `scenery-*` GLBs, each one merged mesh. `scenery-landside` still bakes the road past the north land edge; the renderer clips it (#172). |
 
 Terminal-specific scenery is described in the terminal's folder (`terminals/<id>/`); its GLBs stay in the

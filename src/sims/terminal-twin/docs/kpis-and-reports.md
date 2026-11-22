@@ -1,6 +1,6 @@
 # KPIs, end conditions and reports
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.58.0.
 
 Read this when you need to measure a run (moves per hour, waits, utilisation), stop a run at a condition, read or change
 a golden summary, export KPIs or events, or find out where crane and box time goes (`tt:profile`, `tt:sts`). The dashboard
@@ -166,7 +166,7 @@ To find the first effect of a change: write `--events before.jsonl` and `--event
 
 | Kind | Builder | Content | CLI flag | File suffix (UI) |
 |---|---|---|---|---|
-| `kpi-json` | `kpiReportJson` | `{ format: 'terminal-twin-kpi-report', scenario, seed, status, eventLogHash, kpis, series, headline, highlights }` | `--kpi-json <file>` | `kpi-report.json` |
+| `kpi-json` | `kpiReportJson` | `{ format: 'terminal-twin-kpi-report', scenario, seed, status, eventLogHash, kpis, series, headline, highlights, stsProductivity }` (`stsProductivity`: the STS time breakdown below, to the sim's current time, #301) | `--kpi-json <file>` | `kpi-report.json` |
 | `kpi-csv` | `kpiReportCsv` | long form, header `kpi,unit,entityKind,entity,bucket,index,startS,endS,value`; bucket `hour`, `shift` or `total`; plus a `landside.appointments-rejected` total row when appointments exist | `--kpi-csv <file>` | `kpi-series.csv` |
 | `events-json` | `eventLogJson` | the event log as one JSON array | `--events-json <file>` | `events.json` |
 | `events-csv` | `eventLogCsv` | `id,seq,t,type,causedBy,subjects,payload` (subjects and payload as JSON cells) | `--events-csv <file>` | `events.csv` |
@@ -216,6 +216,7 @@ at a time (`STS_TIME_BUCKETS`):
 | `box` | `StsWaitingForBox` | load: export box not on its ground position yet |
 | `rail` | `StsWaitingForRail` | a neighbour is closer than `stsMinSpacingM` |
 | `reposition` | `StsRepositionStarted` | stepping aside for another crane |
+| `boom` | `StsBoomStarted` (until `StsBoomCompleted`, then back to `done` after the last move, else `cycle`) | boom mode real (#301): parking the spreader and turning the boom; also the boom turns planned inside a work cycle to pass a vessel's bridge (#302), moved out of `cycle`. Always 0 with boom mode off |
 | `done` | `StsWorkComplete` | no more work on its vessel |
 
 `StsProductivityReport { endS, rows[{ stsId, startS, windowS, buckets, moves, grossMovesPerHour }], total, share }`;

@@ -8,6 +8,7 @@ import { fixtures } from '../scenario/fixtures'
 import { SceneModel } from '../modules/sceneModel'
 import { describeEntity, entityKind, eventsInvolving } from '../modules/entityInspector'
 import { summarizeEvent } from '../worker/protocol'
+import { catalogues } from '../i18n/messages'
 
 const config = fixtures['shc-1sts-2shc-1wtp']
 const model = new SceneModel(config, config.seed)
@@ -131,6 +132,39 @@ describe('describeEntity', () => {
     const view = describeEntity('sts', sts)
     expect(view.facts.find((f) => f.label === 'inspector.fact.vessel')!.value).toBe(sts.vesselId)
     expect(view.job).not.toBeNull()
+  })
+
+  it('#301: an STS shows its boom state and angle (boom mode real) at the view time; none in mode off', () => {
+    const boomConfig = fixtures['boom-berthing']
+    const sim = createSimulation(boomConfig)
+    const boomFacts = (view: ReturnType<typeof describeEntity>) => [
+      view.facts.find((f) => f.label === 'inspector.fact.boom')?.value,
+      view.facts.find((f) => f.label === 'inspector.fact.boomAngle')?.value,
+    ]
+    // t0: an idle crane parks boom up
+    expect(boomFacts(describeEntity('sts', sim.query.stsList()[0], { now: 0 }))).toEqual(['up', '80°'])
+    // the first lower: halfway through its 150 s turn the boom is at 40 degrees
+    sim.runUntil({ eventType: 'StsBoomStarted' })
+    let lower = sim.eventLog().at(-1)!
+    while ((lower.payload as { op: string }).op !== 'lower') {
+      sim.runUntil({ eventType: 'StsBoomStarted' })
+      lower = sim.eventLog().at(-1)!
+    }
+    const sts = sim.query.stsList().find((s) => s.id === (lower.payload as { stsId: string }).stsId)!
+    expect(boomFacts(describeEntity('sts', sts, { now: lower.t + 75 }))).toEqual(['lowering', '40°'])
+    expect(boomFacts(describeEntity('sts', sts, { now: lower.t + 151 }))).toEqual(['down', '0°'])
+    const view = describeEntity('sts', sts, { now: lower.t + 75 })
+    expect(view.facts.find((f) => f.label === 'inspector.fact.boom')!.token).toBe('boomState')
+    // mode off: no boom fact
+    expect(boomFacts(describeEntity('sts', simAt(0).query.stsList()[0], { now: 0 }))).toEqual([undefined, undefined])
+  })
+
+  it('#301: every boom state has a label in every catalogue', () => {
+    for (const [locale, messages] of Object.entries(catalogues)) {
+      for (const key of ['inspector.fact.boom', 'inspector.fact.boomAngle', ...['down', 'raising', 'up', 'lowering'].map((s) => `inspector.boomState.${s}`)]) {
+        expect((messages as Record<string, string>)[key], `${locale} ${key}`).toBeTruthy()
+      }
+    }
   })
 
   it('a vessel shows status, berth and remaining discharge', () => {

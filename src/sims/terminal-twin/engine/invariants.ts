@@ -15,6 +15,7 @@
  * `reads`. When a ticket adds a new custody owner kind, extend `custodyHolders`
  * and `heldAt`.
  */
+import { boomAngleAt } from './kinematics'
 import { laneGraphOf } from './laneGraph'
 import { hasLandside, landsideGraphOf } from './landsideGraph'
 import { overlappingNewReservations, overlappingReservations } from './reservations'
@@ -24,6 +25,9 @@ import { vesselSlotsOf } from './vesselSlotIndex'
 import { isSlotOccupant, vesselOccupancyOf } from './vesselOccupancy'
 import {
   ascIndexOf,
+  stsBoom,
+  stsLimits,
+  STS_WATER_RAIL_Z,
   type AscJob,
   type AscState,
   type CustodyRef,
@@ -852,6 +856,54 @@ export const INVARIANTS: Invariant[] = [
             `${s.id} (${s.railLo.toFixed(2)}–${s.railHi.toFixed(2)} m) and ${next.id} (${next.railLo.toFixed(2)}–${next.railHi.toFixed(2)} m) are closer than ${config.quay.stsMinSpacingM} m or out of rail order`,
           )
       })
+      return messages
+    },
+  },
+  {
+    id: 'sts.boom-working',
+    reads: ['time'],
+    description:
+      'STS booms (#298): no hoist or trolley motion unless the boom is at its working angle, and no gantry travel ' +
+      'during a boom transition. Mode off has no boom motion, so it always holds there.',
+    check(state, config) {
+      const messages: string[] = []
+      // early exit: mode off has no boom motion, and with no boom segment planned no move can overlap one
+      if (state.subsystems.boom !== 'real') return messages
+      const working = stsBoom(config).workingDeg
+      for (const s of Object.values(state.sts)) {
+        if (!s.motion.some((m) => m.axis === 'boom') && s.boomDeg === working) continue
+        const booms = s.motion.filter((m) => m.axis === 'boom' && m.t1 > m.t0)
+        const angleAt = (t: number): number => boomAngleAt(booms, t, s.boomDeg ?? working)
+        for (const m of s.motion) {
+          if (m.axis === 'boom' || m.t1 <= m.t0 || m.from === m.to) continue
+          const during = booms.find((b) => m.t0 < b.t1 && b.t0 < m.t1)
+          if (m.axis === 'gantry' && during) messages.push(`${s.id} gantries during a boom transition (${during.t0.toFixed(1)}–${during.t1.toFixed(1)} s)`)
+          // a move that is over (ended by now) is history: the boom may have been planned up after it
+          if ((m.axis === 'hoist' || m.axis === 'trolley') && (during || (m.t1 > state.now + 1e-9 && Math.abs(angleAt((m.t0 + m.t1) / 2) - working) > 1e-9)))
+            messages.push(`${s.id} ${m.axis} moves at ${m.t0.toFixed(1)} s with the boom off its working angle`)
+        }
+      }
+      return messages
+    },
+  },
+  {
+    id: 'sts.class-limits',
+    reads: ['equipment'],
+    description:
+      'STS class limits (#303): no hoist segment ends above the crane\'s lift height and no trolley segment ends seaward of ' +
+      'its outreach (measured from the waterside rail).',
+    check(state, config) {
+      const messages: string[] = []
+      const eps = 1e-6
+      for (const s of Object.values(state.sts)) {
+        const { liftHeightM, outreachM, craneClass } = stsLimits(config, s.id)
+        for (const m of s.motion) {
+          if (m.axis === 'hoist' && Math.max(m.from, m.to) > liftHeightM + eps)
+            messages.push(`${s.id} (${craneClass}) hoists to ${Math.max(m.from, m.to).toFixed(2)} m, above its ${liftHeightM} m lift height`)
+          if (m.axis === 'trolley' && STS_WATER_RAIL_Z - Math.min(m.from, m.to) > outreachM + eps)
+            messages.push(`${s.id} (${craneClass}) trolleys ${(STS_WATER_RAIL_Z - Math.min(m.from, m.to)).toFixed(2)} m out, beyond its ${outreachM} m outreach`)
+        }
+      }
       return messages
     },
   },

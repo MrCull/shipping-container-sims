@@ -25,7 +25,45 @@ export interface StsKinematics {
   lockS: number
   /** Spreader twist-lock unlock time (s). */
   unlockS: number
+  /** Boom raise or lower time, each way (s; #298, boom mode real). Default `DEFAULT_STS_BOOM.transitionS`. */
+  boomTransitionS?: number
+  /** Boom angle while working (degrees above horizontal). Default `DEFAULT_STS_BOOM.workingDeg`. */
+  boomWorkingDeg?: number
+  /** Boom angle when raised (stowed, degrees). Default `DEFAULT_STS_BOOM.stowedDeg`. */
+  boomStowedDeg?: number
+  /** A crane is "over" a vessel when its body overlaps the vessel's quay stretch widened by this on each side (m). Default `DEFAULT_STS_BOOM.clearanceMarginM`. */
+  boomClearanceMarginM?: number
+  /** Height of the lowered boom's underside above the quay (m; #302). Default `DEFAULT_STS_BOOM.undersideM`. */
+  boomUndersideM?: number
+  /** Vertical clearance the lowered boom keeps above a vessel's air draft (m; #302). Default `DEFAULT_STS_BOOM.superstructureClearanceM`. */
+  boomSuperstructureClearanceM?: number
+  /** May a crane gantry with its boom raised (#302)? false: a crossing of a superstructure is blocked. Default true. */
+  canGantryWithBoomRaised?: boolean
 }
+
+/** [A] The Malaccamax GLB's boom hinge height (m, sidecar `geometry.boomUndersideM`): one source for the boom default and the class. */
+const MALACCAMAX_BOOM_UNDERSIDE_M = 55.6
+
+/**
+ * STS boom defaults (#298). [R] transition time: external reference (BCT Poland 2024 example), not a TTI measurement.
+ * [A] angles and clearance margin: assumptions until verified.
+ */
+export const DEFAULT_STS_BOOM = {
+  /** [R] Raise or lower, each way (s). */
+  transitionS: 150,
+  /** [A] Working angle (degrees). */
+  workingDeg: 0,
+  /** [A] Stowed (raised) angle (degrees), the rig's limit. */
+  stowedDeg: 80,
+  /** [A] Clearance margin either side of a vessel's quay stretch (m). */
+  clearanceMarginM: 10,
+  /** [A] Lowered boom underside above the quay (m): the Malaccamax GLB's boom hinge height. */
+  undersideM: MALACCAMAX_BOOM_UNDERSIDE_M,
+  /** [A] Vertical clearance above a vessel's air draft (m, #302). */
+  superstructureClearanceM: 2,
+  /** [A] Gantry travel with the boom raised is allowed (#302). */
+  canGantryWithBoomRaised: true,
+} as const
 
 /** SHC (shuttle carrier) kinematics. Drive axes are along X or Z; `lift` raises the box. */
 export interface ShcKinematics {
@@ -184,7 +222,45 @@ export interface SubsystemModes {
   asc?: SubsystemMode
   /** Landside: trucks, gate and transfer stalls (TT-13; default real when `landside` is configured and a block has stalls). */
   landside?: SubsystemMode
+  /**
+   * STS booms (#298; default off). real: booms raise before a vessel moors or unmoors under them, stay up while the
+   * crane is idle and lower before its first move on a vessel; off: every boom stays at the working angle, no boom
+   * motion and no gating (every log unchanged).
+   */
+  boom?: BoomMode
 }
+
+/** STS boom subsystem mode (#298). */
+export type BoomMode = 'real' | 'off'
+
+/** STS size class (#303); sets the crane's lift height, outreach and boom underside. */
+export type StsCraneClass = 'malaccamax' | 'super-post-panamax'
+
+export interface StsCraneClassSpec {
+  label: string
+  /** Lift height above the rail (m): the hoist never goes higher. */
+  liftHeightM: number
+  /** Outreach from the waterside rail (m): the trolley never goes further seaward. */
+  outreachM: number
+  /** Container rows covered (published). */
+  rows: number
+  /** Backreach behind the landside rail (m; sidecar `geometry.backreachM`): where the trolley parks before a raise. */
+  backreachM: number
+  /** Lowered boom underside above the quay (m): the GLB's boom hinge height (sidecar `geometry.boomUndersideM`). */
+  boomUndersideM: number
+}
+
+/**
+ * STS classes (#303). [V] lift, outreach and rows: knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1
+ * (TTI cranes 101 to 103 Super Post-Panamax, 104 to 108 Malaccamax). [A] boom underside: the GLB hinge heights.
+ */
+export const STS_CRANE_CLASSES: Record<StsCraneClass, StsCraneClassSpec> = {
+  malaccamax: { label: 'Malaccamax', liftHeightM: 52, outreachM: 68, rows: 25, boomUndersideM: MALACCAMAX_BOOM_UNDERSIDE_M, backreachM: 18 },
+  'super-post-panamax': { label: 'Super Post-Panamax', liftHeightM: 43, outreachM: 65, rows: 24, boomUndersideM: 46.6, backreachM: 18 },
+}
+
+/** STS class when a crane config names none. */
+export const DEFAULT_STS_CRANE_CLASS: StsCraneClass = 'malaccamax'
 
 /** STS cranes are listed in rail order (ascending `gantryX`); they never pass each other. */
 export interface StsConfig {
@@ -193,6 +269,12 @@ export interface StsConfig {
   gantryX: number
   /** Number of STS ground positions (lanes) under the crane. */
   groundPositions: number
+  /** Size class (#303). Default `DEFAULT_STS_CRANE_CLASS`. */
+  craneClass?: StsCraneClass
+  /** Lift height above the rail (m). Default: the class's. */
+  liftHeightM?: number
+  /** Outreach from the waterside rail (m). Default: the class's. */
+  outreachM?: number
 }
 
 /** Vessel size classes, smallest first (dimensions in `VESSEL_CLASSES`, `vesselClasses.ts`). */

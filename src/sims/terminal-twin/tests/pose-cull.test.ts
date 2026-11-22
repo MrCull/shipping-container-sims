@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { closeView, makeHeadlessRenderer, startHeadlessRun, type HeadlessRun } from '../cli/headlessPose'
 import { TTI_PRESET_NAME, presets } from '../scenario/presets'
 import * as THREE from 'three'
+import { DEFAULT_LOD_OPTIONS } from '../modules/containerInstancer'
 
 const T0 = 4 * 3600
 
@@ -47,7 +48,19 @@ describe('pose cull', () => {
     const a = [...live.drawnBoxes()].sort((x, y) => key(x) - key(y))
     const b = [...fresh.drawnBoxes()].sort((x, y) => key(x) - key(y))
     expect(a.length).toBe(b.length)
-    expect(a.map((x) => `${x.key}|${x.layer}|${x.matrix.map((m) => m.toFixed(4))}`)).toEqual(b.map((x) => `${x.key}|${x.layer}|${x.matrix.map((m) => m.toFixed(4))}`))
+    // Key, size and matrix of every box must match. The LOD (the layer's `-lodN` suffix) is compared only outside the
+    // hysteresis band (lod0DistanceM to lod0DistanceM x hysteresis): a box that came within lod0DistanceM during the live
+    // loop (a box carried past the camera and set down just beyond it) keeps LOD0 there by design, which a fresh renderer
+    // cannot know. #257 is about posing, not LOD.
+    const { lod0DistanceM, hysteresis } = DEFAULT_LOD_OPTIONS
+    const inBand = (x: (typeof a)[number]) => {
+      const m = x.matrix
+      const d = Math.hypot(m[12] - view.position.x, m[13] - view.position.y, m[14] - view.position.z)
+      return d > lod0DistanceM && d <= lod0DistanceM * hysteresis
+    }
+    const shown = (x: (typeof a)[number], band: boolean) =>
+      `${x.key}|${band ? x.layer.replace(/-lod\d$/, '') : x.layer}|${x.matrix.map((m) => m.toFixed(4))}`
+    expect(a.map((x, i) => shown(x, inBand(x) || inBand(b[i])))).toEqual(b.map((x, i) => shown(x, inBand(a[i]) || inBand(x))))
     live.dispose()
     fresh.dispose()
   }, 120000)

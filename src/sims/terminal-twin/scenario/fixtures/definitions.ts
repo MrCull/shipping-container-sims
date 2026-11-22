@@ -88,6 +88,48 @@ const fixtureEntries: Record<string, FixtureDefinition> = {
       .build(),
   },
 
+  /** STS booms real (#298): booms raise before mooring and unmooring, lower before the first move; idle cranes stay up. */
+  'boom-berthing': {
+    group: 'quay',
+    name: 'Booms up for berthing',
+    summary: 'Crane booms go up while ships moor and unmoor, and come down to work.',
+    description: 'Two Panamax ships call one after the other at a 600 m quay with three cranes and booms switched on. Two cranes work each ship: they lower their booms just before the first move and raise them when done, and the ship unmoors only once every boom over it is up. The third crane stands clear of the berth and keeps its boom up all day. Two Panamax ships (294 m each plus the berth gap) do not fit the 600 m quay together, so the second waits at anchorage until the first departs (its last boom up plus the 600 s unmooring) and is berthed 600 s of mooring later, near 3,057 s.',
+    watch: 'Watch the booms pivot up and down around each berthing, and the third crane stay boom up.',
+    build: () =>
+    new ScenarioBuilder('boom-berthing', 'Two Panamax calls, three STS, booms real: raise, lower and idle up')
+      .hatch({ enabled: false })
+      .seed(3)
+      .quay(600, { mooringS: 600, unmooringS: 600 })
+      .sts('STS01', { gantryX: 80, groundPositions: 24 })
+      .sts('STS02', { gantryX: 220, groundPositions: 24 })
+      .sts('STS03', { gantryX: 560, groundPositions: 24 })
+      .subsystems({ boom: 'real' })
+      .vesselCall('V001', { name: 'HMM Tarifa', sizeClass: 'panamax', arrivalS: 0, discharge: 12, maxSts: 2 })
+      .vesselCall('V002', { name: 'Maersk Alboran', sizeClass: 'panamax', arrivalS: 300, discharge: 12, maxSts: 2 })
+      .endWhen({ vesselsCompleted: 2 })
+      .build(),
+  },
+
+  /** STS booms real (#302): a crane crossing a ULCV's accommodation block raises, gantries boom up and lowers. */
+  'boom-bridge': {
+    group: 'quay',
+    name: 'Booms up past the bridge',
+    summary: 'A crane raises its boom to pass a big ship\'s bridge, then lowers it to work.',
+    description: 'A ULCV berths at a 600 m quay with two cranes and booms switched on. The first crane waits aft of the ship, so its first move to the aft bays crosses the accommodation block: the bridge and mast are taller than its lowered boom, so it parks its trolley, raises the boom, drives past and lowers again. The second crane works the forward bays and steps from bay to bay with its boom down.',
+    watch: 'Watch the aft crane lift its boom over the bridge and drop it on the far side.',
+    build: () =>
+    new ScenarioBuilder('boom-bridge', 'One ULCV, two STS, booms real: the aft crane raises to pass the bridge')
+      .hatch({ enabled: false })
+      .seed(5)
+      .quay(600, { mooringS: 600, unmooringS: 600 })
+      .sts('STS01', { gantryX: 14, groundPositions: 24 })
+      .sts('STS02', { gantryX: 300, groundPositions: 24 })
+      .subsystems({ boom: 'real' })
+      .vesselCall('V001', { name: 'MSC Gibraltar', sizeClass: 'ulcv', arrivalS: 0, discharge: 16, maxSts: 2 })
+      .endWhen({ vesselsCompleted: 1 })
+      .build(),
+  },
+
   /**
    * Berth overtaking: two ULCVs cannot share the 600 m quay, but the Feedermax that arrives third
    * fits in the stretch the second ULCV cannot use, so it berths first.

@@ -1,12 +1,20 @@
 {
   "asset": "sts-malaccamax",
   "kind": "sts",
+  "craneClass": {
+    "id": "malaccamax",
+    "label": "Malaccamax",
+    "cranes": "104 to 108",
+    "rows": 25,
+    "tag": "V",
+    "source": "knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1"
+  },
   "version": 1,
   "generator": "src/sims/terminal-twin/assets/generators/build.py --only sts",
   "units": "m",
   "dimensions": {
     "lengthM": 27.3,
-    "widthM": 136.6,
+    "widthM": 136.9,
     "heightM": 83.3,
     "tag": "A",
     "note": "overall LOD0 extents at rest (boom down): length along the rail (over buffers), width across (boom tip to backreach end), height to the apex"
@@ -46,6 +54,11 @@
       "y": 55.6,
       "z": -3.2,
       "tag": "A"
+    },
+    "boomUndersideM": {
+      "value": 55.6,
+      "tag": "A",
+      "reason": "boom hinge pin height: the lowered-boom clearance reference of the engine (craneClass boomUndersideM)"
     },
     "legSpacingM": {
       "value": 18.0,
@@ -121,7 +134,63 @@
       "name": "boom_geo",
       "parent": "boom",
       "role": "mesh",
-      "description": "seaward lattice boom, forestays, catwalks, floodlights"
+      "description": "seaward lattice boom, overhead frames, catwalks, floodlights"
+    },
+    {
+      "name": "forestay_anchor",
+      "parent": "boom",
+      "role": "anchor",
+      "pivot": [
+        0.0,
+        58.0,
+        -73.6
+      ],
+      "description": "forestay ends on the boom nose (aim target of forestays)"
+    },
+    {
+      "name": "boom_hoist_anchor",
+      "parent": "boom",
+      "role": "anchor",
+      "pivot": [
+        0.0,
+        63.4,
+        -48.0
+      ],
+      "description": "boom-hoist sheave block on the outer overhead frame (aim target of boom_hoist_ropes)"
+    },
+    {
+      "name": "forestays",
+      "parent": "gantry",
+      "role": "stretch",
+      "pivot": [
+        0.0,
+        81.0,
+        3.4
+      ],
+      "description": "apex end of the forestays; unit length along +Y, aimed at forestay_anchor (see stretch)"
+    },
+    {
+      "name": "forestays_geo",
+      "parent": "forestays",
+      "role": "mesh",
+      "description": "forestay rods (unit length; twin rods per side at LOD0, one per side at LOD1 and LOD2)"
+    },
+    {
+      "name": "boom_hoist_ropes",
+      "parent": "gantry",
+      "role": "stretch",
+      "pivot": [
+        0.0,
+        82.45,
+        3.3
+      ],
+      "description": "apex head sheaves; unit length along +Y, aimed at boom_hoist_anchor (see stretch)"
+    },
+    {
+      "name": "boom_hoist_ropes_geo",
+      "parent": "boom_hoist_ropes",
+      "role": "mesh",
+      "description": "boom-hoist ropes (unit length; four at LOD0, two at LOD1, none at LOD2)"
     },
     {
       "name": "trolley",
@@ -449,7 +518,63 @@
       "name": "boom_geo_lod1",
       "parent": "boom_lod1",
       "role": "mesh",
-      "description": "seaward lattice boom, forestays, catwalks, floodlights"
+      "description": "seaward lattice boom, overhead frames, catwalks, floodlights"
+    },
+    {
+      "name": "forestay_anchor_lod1",
+      "parent": "boom_lod1",
+      "role": "anchor",
+      "pivot": [
+        0.0,
+        58.0,
+        -73.6
+      ],
+      "description": "forestay ends on the boom nose (aim target of forestays)"
+    },
+    {
+      "name": "boom_hoist_anchor_lod1",
+      "parent": "boom_lod1",
+      "role": "anchor",
+      "pivot": [
+        0.0,
+        63.4,
+        -48.0
+      ],
+      "description": "boom-hoist sheave block on the outer overhead frame (aim target of boom_hoist_ropes)"
+    },
+    {
+      "name": "forestays_lod1",
+      "parent": "gantry_lod1",
+      "role": "stretch",
+      "pivot": [
+        0.0,
+        81.0,
+        3.4
+      ],
+      "description": "apex end of the forestays; unit length along +Y, aimed at forestay_anchor (see stretch)"
+    },
+    {
+      "name": "forestays_geo_lod1",
+      "parent": "forestays_lod1",
+      "role": "mesh",
+      "description": "forestay rods (unit length; twin rods per side at LOD0, one per side at LOD1 and LOD2)"
+    },
+    {
+      "name": "boom_hoist_ropes_lod1",
+      "parent": "gantry_lod1",
+      "role": "stretch",
+      "pivot": [
+        0.0,
+        82.45,
+        3.3
+      ],
+      "description": "apex head sheaves; unit length along +Y, aimed at boom_hoist_anchor (see stretch)"
+    },
+    {
+      "name": "boom_hoist_ropes_geo_lod1",
+      "parent": "boom_hoist_ropes_lod1",
+      "role": "mesh",
+      "description": "boom-hoist ropes (unit length; four at LOD0, two at LOD1, none at LOD2)"
     },
     {
       "name": "trolley_lod1",
@@ -503,12 +628,6 @@
       "description": "spreader underside centre; Y = height above the rail"
     },
     {
-      "name": "hoist_geo_lod1",
-      "parent": "hoist_lod1",
-      "role": "mesh",
-      "description": "headblock"
-    },
-    {
       "name": "spreader_lod1",
       "parent": "hoist_lod1",
       "role": "rig",
@@ -525,7 +644,7 @@
       "name": "spreader_geo_lod1",
       "parent": "spreader_lod1",
       "role": "mesh",
-      "description": "telescopic spreader main frame"
+      "description": "telescopic spreader main frame with the headblock and twin-lift housing"
     },
     {
       "name": "spreader_tele_fore_lod1",
@@ -579,12 +698,6 @@
       "description": "twin-20 centre twist-lock units (retracted at rest)"
     },
     {
-      "name": "twin_locks_geo_lod1",
-      "parent": "twin_locks_lod1",
-      "role": "mesh",
-      "description": "twin-lift housing"
-    },
-    {
       "name": "LOD2",
       "parent": "sts-malaccamax",
       "role": "lod"
@@ -625,7 +738,57 @@
       "name": "boom_geo_lod2",
       "parent": "boom_lod2",
       "role": "mesh",
-      "description": "seaward lattice boom, forestays, catwalks, floodlights"
+      "description": "seaward lattice boom, overhead frames, catwalks, floodlights"
+    },
+    {
+      "name": "forestay_anchor_lod2",
+      "parent": "boom_lod2",
+      "role": "anchor",
+      "pivot": [
+        0.0,
+        58.0,
+        -73.6
+      ],
+      "description": "forestay ends on the boom nose (aim target of forestays)"
+    },
+    {
+      "name": "boom_hoist_anchor_lod2",
+      "parent": "boom_lod2",
+      "role": "anchor",
+      "pivot": [
+        0.0,
+        63.4,
+        -48.0
+      ],
+      "description": "boom-hoist sheave block on the outer overhead frame (aim target of boom_hoist_ropes)"
+    },
+    {
+      "name": "forestays_lod2",
+      "parent": "gantry_lod2",
+      "role": "stretch",
+      "pivot": [
+        0.0,
+        81.0,
+        3.4
+      ],
+      "description": "apex end of the forestays; unit length along +Y, aimed at forestay_anchor (see stretch)"
+    },
+    {
+      "name": "forestays_geo_lod2",
+      "parent": "forestays_lod2",
+      "role": "mesh",
+      "description": "forestay rods (unit length; twin rods per side at LOD0, one per side at LOD1 and LOD2)"
+    },
+    {
+      "name": "boom_hoist_ropes_lod2",
+      "parent": "gantry_lod2",
+      "role": "stretch",
+      "pivot": [
+        0.0,
+        82.45,
+        3.3
+      ],
+      "description": "apex head sheaves; unit length along +Y, aimed at boom_hoist_anchor (see stretch)"
     },
     {
       "name": "trolley_lod2",
@@ -891,6 +1054,22 @@
       "offsetM": 2.25,
       "unitLengthM": 1.0,
       "note": "ropes.scale.y = ropes.y - (hoist.y + offsetM), both children of the trolley"
+    },
+    {
+      "node": "forestays",
+      "to": "forestay_anchor",
+      "mode": "aim",
+      "axis": "+Y",
+      "unitLengthM": 1.0,
+      "note": "rotate forestays so local +Y points at forestay_anchor (a boom child) and set scale.y = distance; the rods stay on the apex and the boom nose at every boom angle"
+    },
+    {
+      "node": "boom_hoist_ropes",
+      "to": "boom_hoist_anchor",
+      "mode": "aim",
+      "axis": "+Y",
+      "unitLengthM": 1.0,
+      "note": "rotate boom_hoist_ropes so local +Y points at boom_hoist_anchor and set scale.y = distance; the ropes run from the apex head sheaves to the boom sheave block and shorten as the boom rises"
     }
   ],
   "spreaderModes": {
@@ -1066,16 +1245,16 @@
   },
   "lods": {
     "LOD0": {
-      "triangles": 31690,
+      "triangles": 32218,
       "maxDistanceM": 250,
       "note": "camera to crane centre; the renderer adds 15 % hysteresis"
     },
     "LOD1": {
-      "triangles": 5912,
+      "triangles": 5788,
       "maxDistanceM": 900
     },
     "LOD2": {
-      "triangles": 490
+      "triangles": 494
     }
   },
   "materials": {
@@ -1086,7 +1265,30 @@
     "wordmark": "ZPMC",
     "livery": "TTI ALGECIRAS",
     "typeface": "Archivo-ExtraBold",
-    "placement": "TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces (white on blue), ZPMC builder plates on the legs",
+    "placement": "TTI over ALGECIRAS on the machinery house sides and seaward end (blue on white), TTI ALGECIRAS on the main girder outer faces and on the boom side plate outer faces (white on blue), ZPMC builder plates on the legs",
+    "boomSidePlate": {
+      "node": "boom_geo",
+      "material": "sts_paint",
+      "region": "tti_on_blue",
+      "lods": [
+        "LOD0",
+        "LOD1"
+      ],
+      "yM": [
+        53.4,
+        57.2
+      ],
+      "zM": [
+        -21.4,
+        -4.0
+      ],
+      "textM": [
+        14.4,
+        1.8
+      ],
+      "tag": "P",
+      "note": "solid plate on both boom girders seaward of the hinge (every LOD, so the silhouette matches); TTI ALGECIRAS lettering on its outer faces at LOD0 and LOD1, from the sts-atlas region, in the paint material (no extra draw call); rides with the boom"
+    },
     "craneNumbers": {
       "first": 101,
       "count": 24,
@@ -1121,9 +1323,9 @@
       "source": "TTI reference pack"
     },
     {
-      "fact": "Malaccamax geometry on every crane",
-      "tag": "M",
-      "reason": "builder version: real fleet is 5 Malaccamax + 3 Super Post-Panamax"
+      "fact": "Malaccamax class (TTI cranes 104 to 108, up to 25 rows)",
+      "tag": "V",
+      "source": "knowledge-base/dk_equipment__tti_algeciras_sts_cranes.md section 1"
     },
     {
       "fact": "blue steelwork, white machinery house, yellow spreader, lattice boom, ties, ladders, catwalks, floodlights",
@@ -1154,14 +1356,29 @@
       "reason": "photos show amber beacons low on the legs; exact heights are estimated"
     },
     {
-      "fact": "forestays rotate with the boom (they detach from the apex when the boom is raised)",
+      "fact": "forestays are straight rods that stretch to stay on the apex and the boom nose; boom-hoist ropes run straight from the apex to a sheave block on the outer overhead frame (no reeving)",
       "tag": "M",
-      "reason": "boom raising is a viewer-only pose; real tie bars fold"
+      "reason": "real forestays are hinged links that fold as the boom rises; simplified to one aimed stretch node each"
+    },
+    {
+      "fact": "LOD1 headblock and twin-lift housing merged into the spreader mesh; no boom-hoist ropes at LOD2",
+      "tag": "M",
+      "reason": "per-LOD draw-call caps (10 at LOD1, 6 at LOD2)"
     },
     {
       "fact": "ladder cages, handrail posts and festoon loops simplified",
       "tag": "M",
       "reason": "triangle budget"
+    },
+    {
+      "fact": "#300 added: deeper boom side plate with TTI ALGECIRAS lettering (every LOD; lettering LOD0 and LOD1), extra A-frame and apex diagonal bracing (LOD0), zig-zag service stairs on the landward face of the -X landside leg (LOD0), a slightly larger machinery house (every LOD, no extra triangles)",
+      "tag": "P",
+      "source": "TTI reference photographs A01, A04, B01 (link-only) and the CC0 set; sizes [A]"
+    },
+    {
+      "fact": "#300 skipped for budget: nothing; LOD1 and LOD2 gain only the side plate (lettering also at LOD1); the house grows at every LOD so it does not pop at the LOD switch",
+      "tag": "M",
+      "reason": "spec #297 LOD0 ceiling 33,274 triangles (5 % over the 31,690 before the spec) and the per-LOD draw-call caps"
     }
   ]
 }

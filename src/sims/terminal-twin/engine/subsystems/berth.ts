@@ -15,12 +15,15 @@
 import type { EngineContext, ReactorMap } from '../context'
 import type { BerthAllocationRequest, CraneSplitReply, CraneSplitRequest } from '../decisions/types'
 import type { VesselState } from '../state'
-import { slotX, vesselClass } from '../../scenario/vesselClasses'
+import { CONTAINER_HEIGHT_M, slotX, slotZ, tierBaseY, vesselClass } from '../../scenario/vesselClasses'
+import type { ScenarioConfig, VesselSizeClass } from '../../scenario/types'
 import { continueWork, wakeQuayRail } from './quay'
 import { askRelease, createPackages, isLoadSlot, loadActive } from './workPackages'
 import { railOrder } from './rail'
 import { closeCrane, finishPlan, registerCrane } from '../cranePlan/plan'
 import { positionHatchPanels } from '../hatch'
+import { boomReal, releaseBoomHolds, startBoom, whenBoomsUp } from './boom'
+import { STS_WATER_RAIL_Z, stsBoom, stsLimits } from '../state'
 
 const ON_QUAY = new Set(['mooring', 'berthed', 'unmooring'])
 
@@ -152,6 +155,19 @@ function workBays(ctx: EngineContext, vessel: VesselState): CraneSplitRequest['b
     .map(([bay, n]) => ({ bay, x: slotX(spec, vessel.berthX ?? 0, bay), moves: n }))
 }
 
+/**
+ * #303: can this crane work a vessel of this class? Its lift height must clear the top of a high-cube box in the top
+ * deck tier and its outreach (from the waterside rail) must reach the outer row. Cranes that cannot are left out of
+ * the vessel's crane split.
+ */
+export function stsCanWork(config: ScenarioConfig, stsId: string, sizeClass: VesselSizeClass): boolean {
+  const spec = vesselClass(sizeClass)
+  const limits = stsLimits(config, stsId)
+  const boxTopM = tierBaseY(spec, spec.holdTiers + spec.deckTiers - 1) + CONTAINER_HEIGHT_M['40HC']
+  const outerRowM = STS_WATER_RAIL_Z - slotZ(spec, spec.rows - 1)
+  return boxTopM <= limits.liftHeightM && outerRowM <= limits.outreachM
+}
+
 /** Ask for a crane split for the first berthed vessel without cranes, unless one is pending. */
 function trySplit(ctx: EngineContext): void {
   const { berth, vessels, sts } = ctx.state
@@ -173,6 +189,8 @@ function trySplit(ctx: EngineContext): void {
         gantryX: c.gantryX,
         vesselId: c.vesselId,
         vesselBerthX: c.vesselId ? vessels[c.vesselId].berthX : null,
+        // Only when true, so the event log of a fleet that reaches every vessel is unchanged (#303).
+        ...(stsCanWork(ctx.config, c.id, vessel.sizeClass) ? {} : { outOfReach: true as const }),
       })),
     },
     { vessels: [vessel.id] },
@@ -196,6 +214,8 @@ function validateSplit(ctx: EngineContext, req: CraneSplitRequest, reply: CraneS
     seen.add(x.stsId)
     if (crane.vesselId !== null) fail(`${x.stsId} is busy with ${crane.vesselId}`)
     if (x.bays.length === 0) fail(`${x.stsId} has no bays`)
+    if (!stsCanWork(ctx.config, x.stsId, vessels[req.vesselId].sizeClass))
+      fail(`${x.stsId} cannot reach the top deck tier or the outer row of ${req.vesselId} (class limits)`)
   }
   const byRail = [...a].sort((p, q) => sts[p.stsId].railIndex - sts[q.stsId].railIndex)
   const covered: number[] = []
@@ -270,6 +290,8 @@ export const berthReactors: ReactorMap = {
           registerCrane(ctx, vessel.id, planStrategyName(ctx), sts, x.bays)
           vessel.stsIds.push(sts.id)
           vessel.stsHistory.push(sts.id)
+          // boom mode real (#298): a crane assigned at t0 (a pre-filled working vessel) starts boom down
+          if (boomReal(ctx) && e.t === 0 && sts.status === 'idle') sts.boomDeg = stsBoom(ctx.config).workingDeg
           if (sts.status === 'waiting-for-rail') {
             // it was stepping aside for another crane: drop that and start work
             sts.status = 'idle'
@@ -289,16 +311,15 @@ export const berthReactors: ReactorMap = {
   },
 
   BerthAllocated: (e, ctx) => {
-    ctx.schedule('VesselBerthed', e.t + mooringS(ctx), { vessels: [e.payload.vesselId] }, {
-      vesselId: e.payload.vesselId,
-      berthX: e.payload.berthX,
-    })
+    // boom mode real (#298): all fast once mooring is complete and every boom over the vessel is up
+    whenBoomsUp(ctx, ctx.state.vessels[e.payload.vesselId], 'VesselBerthed', e.t + mooringS(ctx), 0)
   },
 
   VesselBerthed: (e, ctx) => {
     const vessel = ctx.state.vessels[e.payload.vesselId]
     vessel.status = 'berthed'
     vessel.berthedAt = e.t
+    releaseBoomHolds(ctx, vessel.id, (sts) => continueWork(ctx, sts, e.t)) // #297 review: held busy cranes lower and carry on
     if (ctx.state.subsystems.quay === 'off' || (vessel.remainingDischarge === 0 && (vessel.remainingLoad === 0 || !loadActive(ctx.state)))) {
       ctx.schedule('VesselWorkComplete', e.t, { vessels: [vessel.id] }, { vesselId: vessel.id })
       return
@@ -313,6 +334,7 @@ export const berthReactors: ReactorMap = {
     sts.vesselId = null
     sts.bays = []
     sts.status = 'idle'
+    if (boomReal(ctx)) startBoom(ctx, sts, e.t, 'raise') // boom mode real (#298): idle cranes park boom up
     closeCrane(state, e.payload.vesselId, sts.id)
     const vessel = state.vessels[e.payload.vesselId]
     vessel.stsIds = vessel.stsIds.filter((id) => id !== sts.id)
@@ -327,13 +349,15 @@ export const berthReactors: ReactorMap = {
     const vessel = ctx.state.vessels[e.payload.vesselId]
     vessel.status = 'unmooring'
     vessel.workCompletedAt = e.t
-    ctx.schedule('VesselDeparted', e.t + unmooringS(ctx), { vessels: [vessel.id] }, { vesselId: vessel.id })
+    // boom mode real (#298): unmooring starts once every boom over the vessel is up
+    whenBoomsUp(ctx, vessel, 'VesselDeparted', e.t, unmooringS(ctx))
   },
 
   VesselDeparted: (e, ctx) => {
     const vessel = ctx.state.vessels[e.payload.vesselId]
     vessel.status = 'departed'
     vessel.departedAt = e.t
+    releaseBoomHolds(ctx, vessel.id, (sts) => continueWork(ctx, sts, e.t))
     ctx.state.kpis.vesselsCompleted++
     ctx.state.berth.asked = []
     tryAllocateBerth(ctx)

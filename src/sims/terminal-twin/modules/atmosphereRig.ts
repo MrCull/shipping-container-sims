@@ -113,17 +113,7 @@ export class AtmosphereRig {
     this.fog.far = fogFarM
     scene.fog = this.fog
     this.sun.castShadow = true
-    this.sun.shadow.mapSize.set(2048, 2048)
-    // ~0.25 m shadow texels: bias so container corrugation does not self-shadow (acne).
-    this.sun.shadow.normalBias = 0.35
-    this.sun.shadow.bias = -0.0004
-    const c = this.sun.shadow.camera
-    c.left = -250
-    c.right = 250
-    c.top = 250
-    c.bottom = -250
-    c.near = 10
-    c.far = 800
+    configureSunShadow(this.sun)
     scene.add(this.hemi, this.sun, this.sun.target)
 
     // High-mast poles (always visible) and their glow (night only).
@@ -215,7 +205,8 @@ export class AtmosphereRig {
     // At night the "sun" is a dim moon: same light, no shadow pass.
     this.sun.intensity = 1.2 + 1.0 * d
     this.sun.castShadow = l.shadows && this.shadowsAllowed
-    this.sun.position.set(l.sun.x, Math.max(30, l.sun.y), l.sun.z)
+    const p = sunPosition(l)
+    this.sun.position.set(p.x, p.y, p.z)
     const on = l.floodGlow > 0.02
     this.mastGlow.visible = on
     this.mastGlow.geometry.setDrawRange(0, Math.min(this.mastCount, this.mastGlowLimit))
@@ -290,4 +281,28 @@ export class AtmosphereRig {
   }
 }
 
-const lightingDay: Lighting = { mode: 'day', daylight: 1, sun: { x: 0, y: 300, z: 180 }, shadows: true, floodGlow: 0 }
+/** Where the sun light sits for a lighting state (never below 30 m, so it always shines down). */
+export function sunPosition(l: Lighting): { x: number; y: number; z: number } {
+  return { x: l.sun.x, y: Math.max(30, l.sun.y), z: l.sun.z }
+}
+
+/**
+ * The sun's shadow map: 2048 texels over a 500 m square around the origin, and a depth range that holds a raised STS
+ * boom (tip about 126 m up, #301) at every shadow-casting sun position (`tests/sun-shadow.test.ts`).
+ */
+export function configureSunShadow(sun: THREE.DirectionalLight): void {
+  sun.shadow.mapSize.set(2048, 2048)
+  // ~0.25 m shadow texels: bias so container corrugation does not self-shadow (acne).
+  sun.shadow.normalBias = 0.35
+  sun.shadow.bias = -0.00016 // the same 0.3 m depth bias as -0.0004 over the former 800 m range
+  const c = sun.shadow.camera
+  c.left = -250
+  c.right = 250
+  c.top = 250
+  c.bottom = -250
+  c.near = 10
+  c.far = 2000 // a raised boom at a low sun throws its shadow over 1 km (#301)
+  c.updateProjectionMatrix()
+}
+
+const lightingDay: Lighting ={ mode: 'day', daylight: 1, sun: { x: 0, y: 300, z: 180 }, shadows: true, floodGlow: 0 }

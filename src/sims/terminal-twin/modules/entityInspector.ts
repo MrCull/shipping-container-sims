@@ -31,7 +31,7 @@ export interface Fact {
   link?: boolean
   unit?: 'length' | 'time' | 'mass' | 'duration'
   /** The value is a token with catalogue texts `inspector.<token>.<value>` (otherwise shown as is). */
-  token?: 'load' | 'shcState' | 'direction' | 'weightClass' | 'transitStatus' | 'contentStatus'
+  token?: 'load' | 'shcState' | 'direction' | 'weightClass' | 'transitStatus' | 'contentStatus' | 'boomState'
   /** The value is a custody owner; the UI shows a slot in maritime notation (`modules/locationNotation.ts`). */
   owner?: { kind: string; id: string; size: ContainerSize }
 }
@@ -65,6 +65,8 @@ export interface EntityExtras {
   now?: number
   /** Container: the carriers' state, for the derived transit status (absent = not shown). */
   transit?: TransitWorld
+  /** STS: the configured boom working angle (degrees, `stsBoom(config).workingDeg`), for the boom up or down fact. */
+  boomWorkingDeg?: number
   /** SHC: the job it holds, from the `shcJobs` query. */
   job?: Readonly<ShcJob>
   /** Extras of other kinds (see `EquipmentKindDef.loadExtras`). */

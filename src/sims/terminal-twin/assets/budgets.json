@@ -126,7 +126,7 @@
       ]
     },
     "sts": {
-      "$comment": "TT-23. One mesh node per rig part (each a draw call): LOD0 = 10 parts + 8 twist-locks + the crane-number plate material; LOD1 drops the twist-locks; LOD2 keeps gantry, boom, trolley, ropes and spreader.",
+      "$comment": "TT-23. One mesh node per rig part (each a draw call): LOD0 = 12 parts (incl. the #299 forestays and boom-hoist ropes stretch nodes) + 8 twist-locks; LOD0 is 20 with the crane-number plate material; LOD1 drops the twist-locks and folds the headblock and twin-lift housing into the spreader (10); LOD2 keeps gantry, boom, forestays, trolley, ropes and spreader (6). All three LODs are at their draw-call cap.",
       "lods": {
         "LOD0": {
           "maxTriangles": 40000,
@@ -147,6 +147,10 @@
         "LOD1",
         "LOD2",
         "gantry",
+        "forestays",
+        "forestay_anchor",
+        "boom_hoist_ropes",
+        "boom_hoist_anchor",
         "trolley",
         "hoist",
         "spreader",

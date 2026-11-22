@@ -1,16 +1,16 @@
 /** STS quay crane: bounds, inspector view, dev-API state and its scene renderer (procedural placeholder, then the rigged GLB). */
 import * as THREE from 'three'
-import type { StsState } from '../../engine'
-import type { EntityView } from '../entityInspector'
-import { STS } from '../equipmentDims'
+import { boomAngleAt, stsBoom, stsLimits, type StsState } from '../../engine'
+import { DEFAULT_STS_BOOM } from '../../scenario/types'
+import type { EntityExtras, EntityView, Fact } from '../entityInspector'
+import { STS, stsBoundsYZ } from '../equipmentDims'
 import { stsBeaconOffsets } from '../gantryBeacons'
 import { spreaderModeFor } from '../spreaderMode'
-import { loadStsTemplate, StsModel, type SpreaderMode } from '../stsAssets'
+import { loadStsTemplate, STS_CLASS_ASSETS, StsModel, type SpreaderMode } from '../stsAssets'
 import type { EquipmentKindDef, KindFrame, KindRenderer, KindRendererHost } from './types'
 import { offerHeroEquipmentAtLod0 } from '../heroEquipmentMount'
 
-/** Z of the landside crane rail. */
-const STS_LAND_RAIL_Z = STS.waterRailZ + STS.gauge
+import { STS_LAND_RAIL_Z } from '../../engine'
 
 interface StsParts {
   group: THREE.Group
@@ -32,20 +32,24 @@ class StsRenderer implements KindRenderer {
       // Amber beacons at the model's `beaconMounts` (legs and portal beam ends).
       host.beacons.add(s.id, stsBeaconOffsets())
     }
-    loadStsTemplate().then(
-      (template) => {
-        if (host.isDisposed()) return
-        config.sts.forEach((s, i) => {
-          const m = new StsModel(template, i)
-          m.root.name = `${s.id}-model`
-          host.scene.add(m.root)
-          this.stsModels.set(s.id, m)
-          const placeholder = this.sts.get(s.id)
-          if (placeholder) placeholder.group.visible = false
-        })
-      },
-      (err: unknown) => console.warn('Terminal Twin: STS GLB failed to load; keeping procedural cranes', err),
-    )
+    // #303: one GLB per crane class in use (the Super Post-Panamax one only when a crane has that class).
+    const classes = new Set(config.sts.map((s) => stsLimits(config, s.id).craneClass))
+    for (const craneClass of classes)
+      loadStsTemplate(craneClass).then(
+        (template) => {
+          if (host.isDisposed()) return
+          config.sts.forEach((s, i) => {
+            if (stsLimits(config, s.id).craneClass !== craneClass) return
+            const m = new StsModel(template, i, STS_CLASS_ASSETS[craneClass].meta)
+            m.root.name = `${s.id}-model`
+            host.scene.add(m.root)
+            this.stsModels.set(s.id, m)
+            const placeholder = this.sts.get(s.id)
+            if (placeholder) placeholder.group.visible = false
+          })
+        },
+        (err: unknown) => console.warn(`Terminal Twin: STS GLB (${craneClass}) failed to load; keeping procedural cranes`, err),
+      )
   }
 
   private addSts(id: string): void {
@@ -107,7 +111,7 @@ class StsRenderer implements KindRenderer {
       const mode: SpreaderMode = spreaderModeFor(l, { canTwin: true, previous: this.lastSpreader.get(id) })
       this.lastSpreader.set(id, mode)
       m.carrying = l?.count ?? 0
-      m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l })
+      m.setPose({ gantryX: pose.gantryX, trolleyZ: pose.trolleyZ, hoistY: pose.hoistY, spreader: mode, locked: !!l, boomDeg: model.boomAngleDeg(id, t) })
       offerHeroEquipmentAtLod0(frame, id, 'sts', m.updateLod(cameraPosition, frame.lodScale), m.heroMount)
     }
     for (const [id, parts] of this.sts) {
@@ -141,7 +145,23 @@ class StsRenderer implements KindRenderer {
   }
 }
 
-function stsView(sts: Readonly<StsState>): EntityView {
+/**
+ * #301: boom state (down, raising, up, lowering) and angle at the view time `now`, from the crane's boom segments; none
+ * in boom mode off (no `boomDeg`). A boom segment planned but not yet started (the spreader still parking) holds its start angle.
+ */
+function boomFacts(sts: Readonly<StsState>, now: number | undefined, workingDeg: number): Fact[] {
+  if (sts.boomDeg === undefined) return []
+  const booms = sts.motion.filter((s) => s.axis === 'boom')
+  const angle = now === undefined ? sts.boomDeg : boomAngleAt(booms, now, sts.boomDeg)
+  const moving = now === undefined ? undefined : booms.find((s) => s.t0 <= now && now < s.t1)
+  const state = moving ? (moving.to > moving.from ? 'raising' : 'lowering') : Math.abs(angle - workingDeg) < 1e-6 ? 'down' : 'up'
+  return [
+    { label: 'inspector.fact.boom', value: state, token: 'boomState' },
+    { label: 'inspector.fact.boomAngle', value: `${Math.round(angle)}°` },
+  ]
+}
+
+function stsView(sts: Readonly<StsState>, extras: EntityExtras = {}): EntityView {
   const working = sts.carrying.length > 0 || sts.workQueue.length > 0
   return {
     kind: 'sts',
@@ -151,6 +171,8 @@ function stsView(sts: Readonly<StsState>): EntityView {
       { label: 'inspector.fact.vessel', value: sts.vesselId, link: sts.vesselId !== null },
       { label: 'inspector.fact.gantry', value: sts.gantryX, unit: 'length' },
       { label: 'inspector.fact.bays', value: sts.bays.join(', ') || null },
+      // the configured working angle (twinStore passes it; the default when a caller does not)
+      ...boomFacts(sts, extras.now, typeof extras.boomWorkingDeg === 'number' ? extras.boomWorkingDeg : DEFAULT_STS_BOOM.workingDeg),
     ],
     job: working
       ? [
@@ -171,10 +193,11 @@ export const stsKind: EquipmentKindDef<'sts'> = {
   ids: (model) => model.stsIds,
   bounds(model, id, time) {
     const p = model.stsPose(id, time)
-    const height = STS.apexY + 1.3
-    return { x: p.gantryX, y: height / 2, z: STS.waterRailZ + STS.gauge / 2, sx: STS.legSpacingX + 4, sy: height, sz: STS.gauge + 6, yaw: 0 }
+    // #303: class height, boom length and tip (a Super Post-Panamax stands 9 m lower, 65 m outreach)
+    const b = stsBoundsYZ(model.boomAngleDeg(id, time), stsLimits(model.config, id).craneClass, stsBoom(model.config).workingDeg)
+    return { x: p.gantryX, y: (b.y0 + b.y1) / 2, z: (b.z0 + b.z1) / 2, sx: STS.legSpacingX + 4, sy: b.y1 - b.y0, sz: b.z1 - b.z0, yaw: 0 }
   },
   sceneState: (model, id, t) => ({ status: model.statusAt('sts', id, t), ...model.stsPose(id, t), gantrying: model.isGantrying(id, t) }),
-  describe: (state) => stsView(state as StsState),
+  describe: (state, extras) => stsView(state as StsState, extras),
   createRenderer: (host) => new StsRenderer(host),
 }
