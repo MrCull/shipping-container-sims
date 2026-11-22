@@ -4,6 +4,7 @@
  *   pnpm run tt:run --fixture tracer-1sts-10-boxes [--seed 7] [--until moves:5]
  *                     [--out summary.json] [--events events.jsonl] [--handlers default]
  *                     [--async-mode keep-running|pause] [--strategy dp=name] [--param dp.name=value] [--latency dp=spec]
+ *                     [--end time:<s>] [--warm-up <s>]
  *                     [--log run.log.jsonl --log-level sts=debug,*=warn] [--snapshot s.json]
  *   pnpm run tt:run --from-snapshot s.json --until time:900   (run only a window)
  *
@@ -67,6 +68,8 @@ export const USAGE = `Usage: pnpm run tt:run (--fixture <name|file.json> | --pre
   --ordering <name>      Vessel Planning work order inside a package: pod-weight (default) | as-today
   --no-fail-fast         Keep running after an invariant violation
   --end <cond>           End condition (repeatable; the first one met ends the run): moves:<n> | vessels:<n> | time:<s>
+  --warm-up <s>          Measurement warm-up: KPIs and end conditions count only after it (any yard start;
+                         replaces a warm-up yard start's warmUpS; 0 = none)
   --out <file>           Write the run summary JSON
   --kpi-json <file>      Write the KPI report (summary, hourly/shift series, headline, highlights) as JSON
   --kpi-csv <file>       Write every KPI series as CSV (one row per KPI, entity and bucket)
@@ -364,6 +367,7 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
         log: { type: 'string' },
         'log-level': { type: 'string' },
         end: { type: 'string', multiple: true, default: [] },
+        'warm-up': { type: 'string' },
         'kpi-json': { type: 'string' },
         'kpi-csv': { type: 'string' },
         'events-json': { type: 'string' },
@@ -388,6 +392,12 @@ export function runCli(argv: string[], print: (line: string) => void = console.l
     const endConditions = endConditionsFromArgs(values.end)
     if (start && endConditions) throw new UsageError('--from-snapshot takes end conditions from the snapshot: drop --end')
     if (endConditions) config = { ...config, endConditions }
+    if (values['warm-up'] !== undefined) {
+      if (start) throw new UsageError('--from-snapshot takes the warm-up from the snapshot: drop --warm-up')
+      const warmUpS = Number(values['warm-up'])
+      if (values['warm-up'].trim() === '' || !Number.isFinite(warmUpS) || warmUpS < 0) throw new UsageError(`Bad --warm-up "${values['warm-up']}" (seconds, 0 or more)`)
+      config = { ...config, measurementWarmUpS: warmUpS }
+    }
     const decisions = decisionsFromArgs(config.decisions, values['async-mode'], values.strategy, values.latency, values.param)
     if (decisions !== config.decisions) config = { ...config, decisions }
     if (values['match-line']) {

@@ -21,7 +21,7 @@ import { makeContainerState } from '../scenario/containerFactory'
 import type { ContainerProps } from '../scenario/containerProps'
 import { sampleDwell } from '../scenario/dwell'
 import { planExportYard, type ExportPlacement } from '../scenario/exportYard'
-import { DEFAULT_STS_BOOM, DEFAULT_STS_CRANE_CLASS, DEFAULT_WARM_UP_S, STS_CRANE_CLASSES } from '../scenario/types'
+import { DEFAULT_STS_BOOM, DEFAULT_STS_CRANE_CLASS, measurementWarmUpOf, STS_CRANE_CLASSES } from '../scenario/types'
 import type { BoomMode, ContainerSize, ScenarioConfig, SubsystemMode, SubsystemModes, TruckTransactionKind, VesselSizeClass } from '../scenario/types'
 import { vesselSlotId as makeVesselSlotId, type CellHalf } from '../scenario/vesselClasses'
 
@@ -953,7 +953,7 @@ export interface BerthState {
   splitting: string | null
 }
 
-/** Warm-up start (TT-14): KPIs and end-condition counters restart at `durationS` (`WarmUpEnded`). */
+/** Measurement warm-up (TT-14, #311; `measurementWarmUpOf`): KPIs and end-condition counters restart at `durationS` (`WarmUpEnded`). */
 export interface WarmUpState {
   durationS: number
   ended: boolean
@@ -1206,6 +1206,7 @@ export function createInitialState(
   subsystems: ResolvedSubsystemModes = resolveSubsystemModes(config),
 ): SimState {
   validateRail(config)
+  const warmUpS = measurementWarmUpOf(config)
   const state: SimState = {
     now: 0,
     nextEventId: 0,
@@ -1242,10 +1243,7 @@ export function createInitialState(
     nextReservationId: 0,
     trucks: {},
     landside: null,
-    warmUp:
-      config.yardStart?.mode === 'warmup'
-        ? { durationS: config.yardStart.warmUpS ?? DEFAULT_WARM_UP_S, ended: false, vesselsCompletedBefore: 0, movesBefore: 0 }
-        : null,
+    warmUp: warmUpS === null ? null : { durationS: warmUpS, ended: false, vesselsCompletedBefore: 0, movesBefore: 0 },
     subsystems,
     kpis: {
       movesCompleted: 0,

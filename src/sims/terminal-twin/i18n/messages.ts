@@ -335,6 +335,8 @@ const en = {
   'setup.check.shcCount': 'SHC count must be {min}–{max}',
   'setup.check.trucks': 'At most {max} trucks per hour',
   'setup.check.startNeedsLandside': 'The empty and warm-up yard starts need the landside (export boxes arrive by truck)',
+  'setup.check.measurementWarmUp': 'The measurement warm-up must be a number of seconds, 0 or more',
+  'setup.check.warmUpOverridden': 'Both a yard warm-up and a measurement warm-up are set: the measurement warm-up ({s} s) is used',
   'setup.check.modeNoSts': 'The quay mode needs STS cranes; set it to off or add a crane',
   'setup.check.modeNoBlocks': 'The yard mode needs yard blocks; set it to off or add a block',
   'setup.check.modeYardOff': 'With the yard off, the {other} cannot run: set the {other} to off too',
