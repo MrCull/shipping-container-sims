@@ -49,10 +49,10 @@ import { earliestStart, reserve } from '../reservations'
 const CONTAINER_LENGTH_M = { '20': 6.058, '40': 12.192, '40HC': 12.192 } as const
 
 /** Random duration factor for one move phase (1 ± moveVariationPct %). */
-export function variation(ctx: EngineContext): number {
+export function variation(ctx: EngineContext, stsId: string): number {
   const pct = ctx.config.moveVariationPct
   if (pct === 0) return 1
-  return 1 + ((ctx.random() * 2 - 1) * pct) / 100
+  return 1 + ((ctx.random(`sts:${stsId}`) * 2 - 1) * pct) / 100
 }
 
 /** The next lift of a crane: its next box, plus the fore half of the same cell for a twin-20 lift. */
@@ -203,7 +203,7 @@ function planDrop(ctx: EngineContext, sts: StsState, t0: number, drop: StsDrop, 
   const k = stsKinematics(ctx)
   const box = state.containers[drop.containerId]
   const gp = state.groundPositions[drop.groundPositionId]
-  const f = variation(ctx)
+  const f = variation(ctx, sts.id)
   const moves = [
     { axis: 'hoist' as const, to: liftFirst, profile: k.hoistLoaded },
     { axis: 'trolley' as const, to: config.layout.stsGroundLaneZ0M + gp.lane * config.layout.stsGroundLaneSpacingM, profile: k.trolley },
@@ -344,7 +344,7 @@ export const quayReactors: ReactorMap = {
     kpi.firstMoveStartS ??= e.t
     kpi.cycles++
     const k = stsKinematics(ctx)
-    const f = variation(ctx)
+    const f = variation(ctx, sts.id)
     const height = CONTAINER_HEIGHT_M[box.size]
     const moves = passSuperstructure(ctx, sts, [
       { axis: 'hoist' as const, to: stsSafeHoist(config, sts.id), profile: k.hoistEmpty },
@@ -404,7 +404,7 @@ export const quayReactors: ReactorMap = {
     const slot = state.vesselSlots[order.slotId]
     const spec = vesselClass(state.vessels[slot.vesselId].sizeClass)
     const k = stsKinematics(ctx)
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), [
+    const { segments, end } = planSequence(sts, e.t, variation(ctx, sts.id), [
       { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: k.hoistLoaded },
       { axis: 'trolley', to: slotZ(spec, slot.row), profile: k.trolley },
       { axis: 'hoist', to: tierBaseY(spec, slot.tier) + CONTAINER_HEIGHT_M[box.size], profile: k.hoistLoaded },
@@ -439,7 +439,7 @@ export const quayReactors: ReactorMap = {
     kpi.moves++
     kpi.lastMoveEndS = e.t
     sts.status = 'returning'
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), [
+    const { segments, end } = planSequence(sts, e.t, variation(ctx, sts.id), [
       { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: config.kinematics.sts.hoistEmpty },
     ], isInstant(ctx))
     continueWork(ctx, sts, end, segments)
@@ -479,7 +479,7 @@ export const quayReactors: ReactorMap = {
     const slot = state.vesselSlots[box.custody.id]
     const tallest = Math.max(...ids.map((id) => CONTAINER_HEIGHT_M[state.containers[id].size]))
     const k = stsKinematics(ctx)
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), passSuperstructure(ctx, sts, [
+    const { segments, end } = planSequence(sts, e.t, variation(ctx, sts.id), passSuperstructure(ctx, sts, [
       { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: k.hoistEmpty },
       { axis: 'gantry', to: targetX, profile: k.gantry },
       { axis: 'trolley', to: slotZ(spec, slot.row), profile: k.trolley },
@@ -594,7 +594,7 @@ export const quayReactors: ReactorMap = {
     }
     sts.carrying = rest
     sts.status = 'returning'
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), [
+    const { segments, end } = planSequence(sts, e.t, variation(ctx, sts.id), [
       { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: config.kinematics.sts.hoistEmpty },
     ], isInstant(ctx))
     continueWork(ctx, sts, end, segments)

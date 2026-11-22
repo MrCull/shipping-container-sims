@@ -1,6 +1,6 @@
 # Decision points (TOS seams)
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.59.0.
 
 Read this when you want to change how the terminal decides (which job, which pad, which slot, which crane, which lane),
 compare strategies, plug in an external TOS, inject TOS latency, or add a strategy or a decision point. It is the main
@@ -82,7 +82,7 @@ Configured per point as `points.<dp>.latency: LatencySpec { delay?, timeoutPct?,
 
 `drawInjection` order: timeout first (`r * 100 < timeoutPct` gives `{ kind: 'timeout' }`), then error, then the delay; a
 delay at or above `timeoutMs` also becomes a timeout. No spec means no draws at all. Draws come from a separate stream
-(`SimState.decisions.rngState`, seeded `seed ^ 0x5bd1e995`), never the main RNG, so injecting latency in pause mode leaves
+(`SimState.decisions.rngState`, seeded `streamSeedState(seed, 'latency')`, salt 0x5bd1e995), never a reactor stream, so injecting latency in pause mode leaves
 the event log identical to the no-latency run, and in keep-running mode only the reply times move.
 
 Per-handler counters (`engine/decisions/runtime.ts#HandlerKpiCounters`, reported as `kpiReport().handlers[dp]`, `engine/kpis.ts#HandlerKpiReport`):
@@ -143,7 +143,7 @@ function. Shapes are abbreviated; full types are in `engine/decisions/types.ts`.
   `engine/decisions/yardGrouping.ts#yardGroupKey` (imports by line, exports and transshipment by outbound vessel and POD, storage empties by
   line, size, ISO type). The `box` and `stackTops` fields are sent only when `grouped` is selected
   (`engine/decisions/yardGrouping.ts#yardGroupingOn`); without them (old pre-fill) it falls back to keeping a vessel's boxes together.
-  Randomness only from `request.random` (engine RNG).
+  Randomness only from `request.random` (the `decisions` RNG stream).
 - **ascDispatch**: `waterside-first` gives WTP work to the waterside ASC and transfer work to the landside ASC; the other
   helps only when no step-aside is needed. `pre-retrieval` (TT-R17) is the same function, but only when it is the configured
   name does the engine offer early truck picks (`job.early`, `subsystems/landside.ts` checks the name). `balanced`: fewest

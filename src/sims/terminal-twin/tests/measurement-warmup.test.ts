@@ -69,10 +69,10 @@ describe('measurement warm-up on a pre-filled start', () => {
 })
 
 describe('yard warm-up start is an empty start plus a measurement warm-up', () => {
-  // event-log hashes of these runs before #311 (ENGINE_VERSION 0.58.0)
+  // event-log hashes of these runs before #311, re-pinned for the RNG stream split (#310, ENGINE_VERSION 0.59.0)
   const PINNED: [ScenarioConfig['endConditions'], string][] = [
-    [{ simDurationS: HOUR }, '10407d4b00cd67'],
-    [{ moves: 3 }, '0ba92c958cdf79'],
+    [{ simDurationS: HOUR }, '07bddde8581015'],
+    [{ moves: 3 }, '056cbb2a9cdd48'],
   ]
   for (const [endWhen, hash] of PINNED) {
     it(`keeps its event log byte-identical (${JSON.stringify(endWhen)})`, () => {

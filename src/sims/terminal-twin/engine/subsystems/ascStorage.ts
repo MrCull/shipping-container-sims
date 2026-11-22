@@ -221,7 +221,7 @@ function requestRehandleTarget(ctx: EngineContext, job: AscJob, retr: AscJob): b
       blockersLeft: blockersOf(state, digging).length,
       retrievalRank: ranks.get(box.id) ?? null,
       candidates,
-      random: ctx.random(),
+      random: ctx.random('decisions'),
     },
     { equipment: ascs.filter((a) => a.status === 'idle').map((a) => a.id), jobs: [job.id], containers: [box.id] },
   )
@@ -360,7 +360,7 @@ function requestAllocation(ctx: EngineContext, job: AscJob): void {
       // #184: truck drops keep out of the reserve too (the stall room check does the same), so it stays free for rehandles
       ...reserveFields(block),
       ...(yardGroupingOn(ctx.config) ? { box: yardBoxView(box), stackTops: stackTopsOf(state, block.id) } : {}),
-      random: ctx.random(),
+      random: ctx.random('decisions'),
     },
     { containers: [box.id] },
   )

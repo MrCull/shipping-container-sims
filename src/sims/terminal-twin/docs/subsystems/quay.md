@@ -1,6 +1,6 @@
 # Quay subsystem: vessels, berths, STS cranes, hatch covers
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.59.0.
 
 Read this when you change or tune anything between a vessel's arrival and its departure: berth allocation, the
 crane split, the shared STS rail, the STS discharge and load cycles, work packages, the vessel work order (POD and
@@ -247,7 +247,7 @@ are single boxes (no twin-20 on load).
 - STS defaults `DEFAULT_STS_KINEMATICS` (`scenario/builder.ts`, Malaccamax [A]): gantry 0.75 m/s (a 0.25 m/s^2,
   100 m takes about 136 s, one bay pitch about 22 s), trolley 4 m/s (0.8), hoist loaded 1.5 m/s (0.6), hoist empty
   3 m/s (0.8), `lockS` 3, `unlockS` 3. `layout.stsSafeHoistM` 50 m: every carry rises to it, the dominant hoist cost.
-- Variation: `variation(ctx)` = 1 +/- `moveVariationPct` % (uniform, engine RNG) per `planSequence` call; profiles are
+- Variation: `variation(ctx, stsId)` = 1 +/- `moveVariationPct` % (uniform, from that STS's own RNG stream `sts:<id>`) per `planSequence` call; profiles are
   scaled with `scaled` (time x f). Fixtures 0, presets 10.
 - Nominal readout `stsNominalCycle` (setup dialog; no gantry, no waits; geometry `stsCycleGeometry`: middle row,
   mid tier of the first vessel's class): about 122 s (panamax) to 125 s (feeder), about 29 moves/h per crane.

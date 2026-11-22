@@ -1,6 +1,6 @@
 # Architecture: layers, folders, data flow, determinism
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.59.0.
 
 Read this when you need to know where code belongs, what may import what, how a scenario becomes pixels on screen,
 or what you must not break to keep runs reproducible. It is the map; the loop itself is in
@@ -72,7 +72,7 @@ engine/
 ├── handlers.ts         HandlerSet re-exports + defaultHandlers
 ├── state.ts            SimState and every entity type; createInitialState; resolveSubsystemModes
 ├── query.ts            SimQuery: read-only live views (used by the API and by handlers)
-├── rng.ts              mulberry32: seedState, nextRandom
+├── rng.ts              mulberry32 streams: seedState, nextRandom, streamSeedState, drawFrom
 ├── hash.ts             Streaming cyrb53-style event-log hash
 ├── kinematics.ts       AxisProfile, MotionSegment, planSegment, positionAt, travelTime, cornerSpeedCap
 ├── cycleTime.ts        Nominal STS/SHC/ASC cycle readouts for the setup dialog
@@ -166,8 +166,8 @@ and in any browser. Everything else (goldens, run diff, replay-based saves, rewi
 
 | Rule | How it is kept |
 |---|---|
-| One seeded engine RNG | `ctx.random()` (mulberry32, `engine/rng.ts`), state in `SimState.rngState`; `Math.random` is lint-banned in `engine/`, `scenario/`, `worker/` |
-| Separate streams for side processes | decision latency `state.decisions.rngState` (seed ^ `DECISION_RNG_SALT`), landside `state.landside.rngState` (seed ^ 0x5bd1e995), bay plan (seed ^ 0x9e3779b9, `scenario/bayPlan.ts`), pre-fill (seed ^ `PREFILL_SALT`), container props (`scenario/containerProps.ts#propsStream`, keyed by seed and container id), reefers (hash of the id, no stream). Adding draws to one stream never moves another |
+| One seeded RNG stream per source (0.59.0, #310) | `ctx.random(stream)` (mulberry32, `engine/rng.ts`), states in `SimState.rng.streams`: `sts:<id>` (that STS's move variation), `shc:<id>` (that SHC's driver variability), `decisions` (the `random` field of yard and ASC requests), `reactor` (any other reactor randomness, none today); each seeded from the scenario seed with its own salt, so a strategy change never moves another source's draws; `Math.random` is lint-banned in `engine/`, `scenario/`, `worker/` |
+| Separate streams for side processes | decision latency `state.decisions.rngState` (`streamSeedState(seed, 'latency')`, salt 0x5bd1e995), landside `state.landside.rngState` (`streamSeedState(seed, 'landside')`, salt 0x1b873593; the two shared a salt before 0.59.0), bay plan (seed ^ 0x9e3779b9, `scenario/bayPlan.ts`), pre-fill (seed ^ `PREFILL_SALT`), container props (`scenario/containerProps.ts#propsStream`, keyed by seed and container id), reefers (hash of the id, no stream). Adding draws to one stream never moves another |
 | No wall clock in state | sim time is `state.now` only; `performance.now()` is used only for invariant cost stats and measured async wall latency, neither of which is hashed |
 | Fixed processing order | queue ordered by `(t, id)`; `id` is the scheduling order; reactor maps run in the fixed `REACTORS` order (`engine/simulation.ts`) |
 | Plain JSON state | `SimState` holds no Map, Set, class or function, so `structuredClone` snapshots are exact; derived indexes live outside it in `WeakMap`s |

@@ -301,7 +301,7 @@ export const hatchReactors: ReactorMap = {
     kpi.firstMoveStartS ??= e.t
     sts.status = 'moving-to-pick'
     const k = stsKinematics(ctx)
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), leg1, isInstant(ctx))
+    const { segments, end } = planSequence(sts, e.t, variation(ctx, sts.id), leg1, isInstant(ctx))
     ctx.schedule('HatchLifted', end + k.lockS + job.padS, { equipment: [sts.id, panel.id], vessels: [panel.vesselId] }, {
       stsId: sts.id,
       vesselId: panel.vesselId,
@@ -346,7 +346,7 @@ export const hatchReactors: ReactorMap = {
     const { leg2 } = legs(ctx, sts, panel, job.op, job.siteId as string)
     const k = stsKinematics(ctx)
     sts.status = 'carrying'
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), leg2, isInstant(ctx))
+    const { segments, end } = planSequence(sts, e.t, variation(ctx, sts.id), leg2, isInstant(ctx))
     const at = end + k.unlockS + job.padS
     if (job.op === 'remove') {
       const level = stackCount(ctx, job.siteId as string)
@@ -385,7 +385,7 @@ export const hatchReactors: ReactorMap = {
     sts.carryingPanel = null
     hatchTotals(ctx).removes++
     releaseRail(sts)
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), [
+    const { segments, end } = planSequence(sts, e.t, variation(ctx, sts.id), [
       { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: config.kinematics.sts.hoistEmpty },
     ], isInstant(ctx))
     finishMove(ctx, sts, segments, end, job.startedAt ?? e.t)
@@ -414,7 +414,7 @@ export const hatchReactors: ReactorMap = {
       panelId: panel.id,
       delayS: delay,
     })
-    const { segments, end } = planSequence(sts, e.t, variation(ctx), [
+    const { segments, end } = planSequence(sts, e.t, variation(ctx, sts.id), [
       { axis: 'hoist', to: stsSafeHoist(config, sts.id), profile: config.kinematics.sts.hoistEmpty },
     ], isInstant(ctx))
     finishMove(ctx, sts, segments, end, job.startedAt ?? e.t)
