@@ -1,0 +1,23 @@
+{
+  "format": "terminal-twin-experiment",
+  "version": 1,
+  "name": "Yard strategy x SHC count",
+  "description": "Grid study on the short shc-paired-dual-cycle fixture (2 vessels, about 1 sim-hour of work): yard allocation strategy x two or four SHCs, each compared with the fixture as it is (nearest-wtp, three SHCs). warmUpS is 0 on purpose: the default 2 h warm-up would use up the fixture's whole workload before measuring starts.",
+  "base": { "fixture": "shc-paired-dual-cycle" },
+  "warmUpS": 0,
+  "horizonS": 3600,
+  "seeds": { "count": 3, "from": 1 },
+  "baseline": "fixture",
+  "primary": { "kpi": "grossMovesPerHour" },
+  "guards": [{ "kpi": "shcEmptyTravelRatio", "tolerance": { "abs": 0.05 } }],
+  "configs": [{ "name": "fixture" }],
+  "grid": {
+    "factors": {
+      "strategies.yardAllocation": ["nearest-wtp", "grouped"],
+      "patch.shcs": [
+        [{ "id": "SHC01" }, { "id": "SHC02" }],
+        [{ "id": "SHC01" }, { "id": "SHC02" }, { "id": "SHC03" }, { "id": "SHC04" }]
+      ]
+    }
+  }
+}

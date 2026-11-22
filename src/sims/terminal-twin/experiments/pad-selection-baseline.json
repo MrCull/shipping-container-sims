@@ -1,0 +1,17 @@
+{
+  "format": "terminal-twin-experiment",
+  "version": 1,
+  "name": "WTP pad selection: balanced vs nearest-box",
+  "description": "Strategy study on the TTI Algeciras baseline preset: does choosing the WTP pad by distance only (nearest-box) change gross crane productivity against the preset's balanced pad choice, without hurting truck turnaround?",
+  "base": { "preset": "TTI Algeciras baseline" },
+  "warmUpS": 7200,
+  "horizonS": 86400,
+  "seeds": { "count": 10, "from": 1 },
+  "baseline": "balanced",
+  "primary": { "kpi": "grossMovesPerHour" },
+  "guards": [{ "kpi": "truckTurnaroundS", "tolerance": { "pct": 5 } }],
+  "configs": [
+    { "name": "balanced", "strategies": { "wtpPadSelection": "balanced" } },
+    { "name": "nearest-box", "strategies": { "wtpPadSelection": "nearest-box" } }
+  ]
+}
