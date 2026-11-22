@@ -163,6 +163,44 @@ function. Shapes are abbreviated; full types are in `engine/decisions/types.ts`.
   road distance + `SPREAD_FILL_M` (6000 m) x block fill + `SPREAD_TRUCK_M` (60 m) x trucks of the block. The TTI presets
   use it (blocks near the gate reached 90 % while far ones stood at 77 %).
 
+### Strategy parameters
+
+`config.decisions.points.<dp>.params` (#312) is a flat record of named numbers for the point's **selected** strategy
+(`strategy`, else the default). Each built-in strategy declares its params in its registry entry
+(`engine/decisions/strategies.ts`, `StrategyDefinition.params`: `StrategyParamSpec { default, unit, description, min, max }`);
+a strategy with params is built with `tunable(...)`, whose `handler` is the strategy at the defaults and `withParams(p)` the
+strategy bound to `p`. `getStrategy(dp, name, params?)` resolves them with `resolveStrategyParams`, so
+`createSimulation` (and the pre-fill placer, `engine/prefill.ts#yardPlacerOf`) throws on an unknown name (message lists the
+strategy's params), a param of a strategy that is not selected (same message: it is unknown to the selected one), or a value
+that is not a finite number inside `[min, max]`. Params are checked even when a custom handler answers the point. The
+fallback gets them only when it is the selected strategy. Defaults equal the old constants and a run without params calls
+the same handler as before, so event logs and goldens are unchanged. CLI: `tt:run --param <dp>.<name>=<value>`
+(repeatable, [cli-and-tooling.md](cli-and-tooling.md)).
+
+| Decision point | Strategy | Param | Default | Unit | Range | Meaning |
+|---|---|---|---|---|---|---|
+| `shcDispatch` | `paired-dual-cycle` | `PAIRING_RADIUS_M` | 150 | m | 0 to 10,000 | route length within which the paired job beats the nearest job |
+| `shcDispatch` | `predispatch` | `predispatchMarginS` | 15 | s | 0 to 3,600 | engine side (`engine/subsystems/shc.ts#maybePredispatch`): slack on an idle SHC's travel time; when unset, `queueAreas.predispatchMarginS`, else 15 |
+| `wtpPadSelection` | `balanced` | `BALANCED_FILL_M` | 6000 | m | 0 to 1,000,000 | plan distance one unit of block fill is worth |
+| `wtpPadSelection` | `balanced` | `BALANCED_QUEUED_M` | 60 | m | 0 to 100,000 | plan distance one queued ASC job of the block is worth |
+| `yardAllocation` | `nearest-wtp`, `grouped` | `TIER_COST_M` | 6 | m | 0 to 100,000 | cost per tier above the ground (higher: lower stacks, more spread) |
+| `yardAllocation` | `nearest-wtp`, `grouped` | `MISALIGNED_40_COST_M` | 30 | m | 0 to 100,000 | a 40 ft box anchored off its bay pair |
+| `yardAllocation` | `nearest-wtp`, `grouped` | `BREAK_EMPTY_PAIR_COST_M` | 12 | m | 0 to 100,000 | a 20 ft box opening a stack in an empty bay pair |
+| `yardAllocation` | `nearest-wtp`, `grouped` | `POWERED_ROW_COST_M` | 60 | m | 0 to 100,000 | a plain box in a powered (reefer) row |
+| `yardAllocation` | `grouped` | `MIXED_STACK_COST_M` | 90 | m | 0 to 100,000 | standing on another group's box |
+| `yardAllocation` | `grouped` | `ORDER_BROKEN_COST_M` | 45 | m | 0 to 100,000 | standing on the same group in the wrong order |
+| `yardAllocation` | `grouped` | `FOREIGN_BAY_COST_M` | 25 | m | 0 to 100,000 | opening a stack in a bay of other groups only |
+| `yardAllocation` | `grouped` | `OWN_BAY_BONUS_M` | 10 | m | 0 to 100,000 | bonus (subtracted) for opening a stack in a bay of this group |
+| `transferStallSelection` | `spread-drops` | `SPREAD_FILL_M` | 6000 | m | 0 to 1,000,000 | road distance one unit of block fill is worth (drop-only trucks) |
+| `transferStallSelection` | `spread-drops` | `SPREAD_TRUCK_M` | 60 | m | 0 to 100,000 | road distance one truck of the block is worth |
+
+Every other strategy takes no params (its constants are orderings or ties, not weights). Not params: `BLOCK_FREE_RESERVE`
+(engine side, every pad strategy), `workPackages.releaseAhead` (already a scenario field), `rehandleTarget`'s
+lexicographic cost. Directions proved in `tests/strategy-params.test.ts`: a higher `TIER_COST_M` in `nearest-wtp` gives a
+lower mean stack height on `asc-1sts-10-boxes-1block`; `predispatchMarginS` 0 changes `shc-prepositioning`. To add a
+param: declare it in the entry's `tunable` params with today's constant as the default, read it from the bound `params`, and
+add a row here.
+
 ### What the TTI presets select
 
 `scenario/presets.ts` `terminal()` sets `shcDispatch: chained-nearest`, `wtpPadSelection: balanced`,
@@ -175,13 +213,14 @@ says otherwise (`scenario/fixtures/definitions.ts`).
 |---|---|---|
 | `config.decisions.points.<dp>.strategy` | built-in by name; engine-side switches (chained, paired, predispatch, pre-retrieval, grouped, iso-type) follow the name | `strategy:<name>` |
 | `createSimulation(config, handlers)` | custom handler per point, overrides the configured strategy | `custom` |
+| `config.decisions.points.<dp>.params` / `tt:run --param <dp>.<name>=<value>` | tunes the selected strategy's declared params ([Strategy parameters](#strategy-parameters)) | unchanged |
 | `tt:run --strategy <dp>=<name>` (repeatable) | merged over the scenario's `points` (`cli/runCli.ts` `decisionsFromArgs`); unknown names are usage errors (exit 2) | `strategy:<name>` |
 | `tt:run --handlers <set>` | a named handler set from `cli/handlerSets.ts#handlerSets` passed as custom handlers | `custom` |
 | `tt:run --latency <dp>=<spec>` | `none \| fixed:<ms> \| uniform:<min>-<max> \| exp:<mean>`, then optional `,timeout:<pct>`, `,error:<pct>`, `,timeoutMs:<ms>` | |
 | `tt:run --async-mode keep-running\|pause` | overrides `decisions.asyncMode` | |
 | `tt:diff --a-handlers` / `--b-handlers <set>` | compare two handler sets event by event (`tt:diff` has no `--strategy`; for a named strategy write two `tt:run --events` files and diff them, see [cli-and-tooling.md](cli-and-tooling.md)) | |
 
-`--from-snapshot` refuses `--async-mode`, `--strategy` and `--latency`: decision settings come from the snapshot.
+`--from-snapshot` refuses `--async-mode`, `--strategy`, `--param` and `--latency`: decision settings come from the snapshot.
 
 Named handler sets (`cli/handlerSets.ts`):
 
@@ -214,7 +253,7 @@ No files move. To replace a module, swap its strategies or pass custom handlers;
 
 ## Add a strategy
 
-1. Add a named entry `{ description, handler }` to `strategies.<dp>.strategies` in `engine/decisions/strategies.ts`
+1. Add a named entry `{ description, handler }` (or `tunable(description, params, make)` for tunable constants) to `strategies.<dp>.strategies` in `engine/decisions/strategies.ts`
    (put a non-trivial body in the point's `*Strategies.ts` file). Keep it to a handful per point (the registry comment says
    1 to 3; `shcDispatch` has 5, `wtpPadSelection` 4).
 2. It must be synchronous and pure: payload in, reply out. No `Math.random` (use `request.random` where the request has

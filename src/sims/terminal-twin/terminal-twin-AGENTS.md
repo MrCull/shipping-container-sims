@@ -24,7 +24,7 @@ Main entry points:
 - [docs/architecture.md](docs/architecture.md): layers, folder map, data flow, determinism contract, public engine API, how to extend.
 - [docs/engine-core.md](docs/engine-core.md): event queue, step loop, reactors and handlers, causality, RNG, motion, hashing, snapshots.
 - [docs/state-model.md](docs/state-model.md): `SimState`, every entity, the derived indexes.
-- [docs/decision-points.md](docs/decision-points.md): every TOS seam with its strategies and defaults (the main operational tuning lever).
+- [docs/decision-points.md](docs/decision-points.md): every TOS seam with its strategies and defaults (the main operational tuning lever), and the strategy parameters (`points.<dp>.params`, `tt:run --param`, #312) that tune a strategy's constants.
 - [docs/invariants.md](docs/invariants.md): every invariant and its cost.
 - Optimising: [run speed](docs/optimising/run-speed.md), [terminal throughput](docs/optimising/terminal-throughput.md), [frame rate](docs/optimising/frame-rate.md).
 - [docs/pitfalls-and-gaps.md](docs/pitfalls-and-gaps.md): known behaviours, pitfalls and gaps. Read before changing engine behaviour.
