@@ -1,0 +1,59 @@
+name: Nightly peak day
+
+# Runs "TTI Algeciras, peak day" to its fifth vessel every night and on demand. A run that stops idle short of its
+# vessels passes every PR check (0 violations, no smoke failure), so this is the guardrail for it (#365). A failure opens
+# one needs-triage issue, or comments on the open one (scripts/peak-day-check.mjs). About 5 minutes; too slow for every PR.
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: peak-day
+  cancel-in-progress: false
+
+jobs:
+  peak-day:
+    runs-on: ubuntu-latest
+    name: Peak day to five vessels
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # tt:run exits 1 on a violation; the check below judges the summary either way.
+      - name: Run the peak day
+        run: |
+          set +e
+          pnpm run tt:run --preset "TTI Algeciras, peak day" --until vessels:5 --out summary.json 2>&1 | tee run.log
+          exit 0
+
+      - name: Check the run
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/peak-day-check.mjs summary.json --vessels 5 --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA" --run-url "$RUN_URL"
+
+      - name: Upload the run log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: peak-day-run
+          path: |
+            run.log
+            summary.json
+          if-no-files-found: ignore

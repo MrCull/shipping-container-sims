@@ -67,6 +67,10 @@ jobs:
         run: node scripts/check-no-quarantine.mjs && node --test scripts/test-check-no-quarantine.mjs
         env:
           QUARANTINE_BASE: HEAD^1
+      - name: Check changed Terminal Twin docs are checked against the current ENGINE_VERSION
+        run: node scripts/check-doc-engine-version.mjs && node --test scripts/test-check-doc-engine-version.mjs scripts/test-peak-day-check.mjs
+        env:
+          DOC_VERSION_BASE: HEAD^1
       - name: Check every smoke spec has exactly one group tag
         run: node scripts/check-smoke-groups.mjs
 
