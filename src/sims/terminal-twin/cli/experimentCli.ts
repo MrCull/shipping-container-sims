@@ -5,7 +5,7 @@
  *
  * Runs every config on every seed (one replicate after another, in process), then writes `report.json`
  * (format `terminal-twin-experiment-report`) and `report.md` to `--out` (default `.tt-experiments/<timestamp>/`).
- * Exit codes: 0 completed, 2 usage or validation error.
+ * Exit codes: 0 completed with every replicate valid, 1 completed with an invalid replicate, 2 usage or validation error.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -26,7 +26,7 @@ export const EXPERIMENT_USAGE = `Usage: pnpm run tt:experiment <experiment.json>
   <experiment.json>  Experiment file (format terminal-twin-experiment, version 1)
   --out <dir>        Output directory for report.json and report.md (default .tt-experiments/<timestamp>/)
 
-Exit codes: 0 completed, 2 usage or validation error.
+Exit codes: 0 completed with every replicate valid, 1 completed with an invalid replicate, 2 usage or validation error.
 KPIs: ${Object.keys(EXPERIMENT_KPIS).join(', ')}`
 
 class UsageError extends Error {}
@@ -63,6 +63,24 @@ export function formatExperimentMarkdown(r: ExperimentReport): string {
     lines.push(
       `| ${c.config} | ${c.verdict} | ${c.n} | ${signed(c.meanDiff)} | ${fmtCi(c.ci)} | ${c.relativeChangePct === null ? 'n/a' : `${signed(c.relativeChangePct)} %`} |`,
     )
+  if (r.guards.length) {
+    lines.push(
+      '',
+      '## Guards',
+      '',
+      'Degradation: config minus baseline, signed so positive is worse. Held: the CI upper bound is at or below the tolerance; breached: the CI lower bound is above it; otherwise uncertain.',
+      '',
+      '| Guard | Tolerance | Config | Status | Degradation 95% CI | Tolerance in KPI units |',
+      '| --- | --- | --- | --- | --- | --- |',
+    )
+    for (const g of r.guards) {
+      const tolerance = 'pct' in g.tolerance ? `${g.tolerance.pct} %` : `${g.tolerance.abs}`
+      for (const [config, res] of Object.entries(g.statuses))
+        lines.push(
+          `| ${g.kpi} (${EXPERIMENT_KPIS[g.kpi].unit}) | ${tolerance} | ${config} | ${res.status} | ${fmtCi(res.degradationCi)} | ${fmt(res.toleranceAbs)} |`,
+        )
+    }
+  }
   lines.push(
     '',
     '## KPIs',
@@ -136,7 +154,14 @@ export function runExperimentCli(
     writeFileSync(join(out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`)
     writeFileSync(join(out, 'report.md'), formatExperimentMarkdown(report))
     for (const [config, verdict] of Object.entries(report.primary.verdicts)) print(`${config}: ${verdict} on ${report.primary.kpi}`)
+    for (const g of report.guards)
+      for (const [config, res] of Object.entries(g.statuses)) print(`${config}: guard ${g.kpi} ${res.status}`)
     print(`Wrote ${join(out, 'report.json')} and ${join(out, 'report.md')}`)
+    const invalid = report.replicates.filter((x) => x.status !== 'ok').length
+    if (invalid > 0) {
+      print(`${invalid} of ${report.replicates.length} replicates invalid (see report.md)`)
+      return 1
+    }
     return 0
   } catch (err) {
     if (err instanceof ExperimentError) {

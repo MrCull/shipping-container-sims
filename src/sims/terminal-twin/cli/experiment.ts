@@ -3,7 +3,8 @@
  * replicate executor, then compares each config with the baseline seed by seed (paired) and assembles an
  * `ExperimentReport`. No file or process work here beyond calling the executor; the CLI is `experimentCli.ts`.
  *
- * File format `terminal-twin-experiment` version 1; report format `terminal-twin-experiment-report` version 1.
+ * File format `terminal-twin-experiment` version 1; report format `terminal-twin-experiment-report` version 2
+ * (version 2 added `guards`; version 1 had no guard results).
  */
 import { arch, cpus } from 'node:os'
 import {
@@ -15,7 +16,9 @@ import {
   summarizeRun,
   type DecisionPointId,
   type DecisionsConfig,
+  type HandlerSet,
   type HeadlineKpis,
+  type KpiReport,
   type RunSummary,
 } from '../engine'
 import { fixtures } from '../scenario/fixtures'
@@ -24,7 +27,7 @@ import type { ScenarioConfig } from '../scenario/types'
 
 export const EXPERIMENT_FORMAT = 'terminal-twin-experiment'
 export const EXPERIMENT_REPORT_FORMAT = 'terminal-twin-experiment-report'
-export const EXPERIMENT_REPORT_VERSION = 1
+export const EXPERIMENT_REPORT_VERSION = 2
 export const DEFAULT_HORIZON_S = 86400
 export const DEFAULT_SEED_COUNT = 10
 /** Full invariant sweep every Nth event during experiments (incremental checks in between). */
@@ -49,33 +52,126 @@ export interface ExperimentFile {
   /** The config every other config is compared with. Default the first config. */
   baseline?: string
   primary: { kpi: string }
+  /** KPIs that must not get worse than a tolerance, absolute (KPI units) or percent of the baseline mean. */
+  guards?: ExperimentGuard[]
   configs: ExperimentConfig[]
 }
 
+export interface ExperimentGuard {
+  kpi: string
+  tolerance: { abs: number } | { pct: number }
+}
+
 export type KpiDirection = 'higher' | 'lower'
+
+/** What a catalogue KPI is read from: one replicate's headline KPIs, full KPI report and invariant count. */
+export interface ReplicateKpiSource {
+  headline: HeadlineKpis
+  report: KpiReport
+  invariantViolations: number
+}
 
 export interface ExperimentKpi {
   unit: string
   /** Which way is better. */
   direction: KpiDirection
   description: string
-  read: (h: HeadlineKpis) => number | null
+  /** Null when the KPI does not apply to the run (subsystem absent, nothing to average). */
+  read: (src: ReplicateKpiSource) => number | null
 }
 
-/** The experiment KPI catalogue (v1 minimal set; spec #309 lists the full one). */
+const meanOrNull = (xs: (number | null)[]) => {
+  const v = xs.filter((x): x is number => x !== null)
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null
+}
+
+/** The experiment KPI catalogue (spec #309), in report order. */
 export const EXPERIMENT_KPIS: Record<string, ExperimentKpi> = {
   grossMovesPerHour: {
     unit: 'moves/h',
     direction: 'higher',
     description: 'Gross crane productivity, summed over the STS cranes',
-    read: (h) => h.grossMovesPerHour,
+    read: ({ headline }) => headline.grossMovesPerHour,
+  },
+  netMovesPerHour: {
+    unit: 'moves/h',
+    direction: 'higher',
+    description: 'Net crane productivity (working time only), summed over the STS cranes',
+    read: ({ headline }) => headline.netMovesPerHour,
+  },
+  movesDone: {
+    unit: 'moves',
+    direction: 'higher',
+    description: 'Container moves completed',
+    read: ({ headline }) => headline.movesDone,
+  },
+  vesselsDone: {
+    unit: 'vessels',
+    direction: 'higher',
+    description: 'Vessels completed',
+    read: ({ headline }) => headline.vesselsDone,
+  },
+  meanVesselTurnaroundS: {
+    unit: 's',
+    direction: 'lower',
+    description: 'Mean berth-to-departure time over the vessels that departed',
+    read: ({ report }) => meanOrNull(Object.values(report.vessels).map((v) => v.turnaroundS)),
+  },
+  meanAnchorageWaitS: {
+    unit: 's',
+    direction: 'lower',
+    description: 'Mean anchorage wait over the vessels allocated a berth',
+    read: ({ report }) => meanOrNull(Object.values(report.vessels).map((v) => v.anchorageWaitS)),
   },
   truckTurnaroundS: {
     unit: 's',
     direction: 'lower',
     description: 'Mean truck turnaround, arrival at the gate to gate-out',
-    read: (h) => h.truckTurnaroundS,
+    read: ({ headline }) => headline.truckTurnaroundS,
   },
+  shcEmptyTravelRatio: {
+    unit: 'ratio',
+    direction: 'lower',
+    description: 'Empty share of SHC travel, mean over the SHCs',
+    read: ({ headline }) => headline.shcEmptyTravelRatio,
+  },
+  shcBusyPct: {
+    unit: '%',
+    direction: 'lower',
+    description: 'Share of time the SHCs spend moving, mean over the SHCs (lower: the same work with less driving)',
+    read: ({ headline }) => headline.shcBusyPct,
+  },
+  ascUtilisationPct: {
+    unit: '%',
+    direction: 'lower',
+    description: 'ASC utilisation, mean over the ASCs (lower: the same work with less crane time)',
+    read: ({ headline }) => headline.ascUtilisationPct,
+  },
+  rehandlesPerProductiveMove: {
+    unit: 'ratio',
+    direction: 'lower',
+    description: 'Yard rehandles (blocker moves) per productive ASC move',
+    read: ({ report }) => report.yard?.rehandles.perProductiveMove ?? null,
+  },
+  equipmentIdleS: {
+    unit: 'equipment s',
+    direction: 'lower',
+    description: 'Equipment idle time caused by waiting on decisions, summed over the decision points',
+    read: ({ report }) => Object.values(report.handlers).reduce((a, h) => a + h.equipmentIdleS, 0),
+  },
+  invariantViolations: {
+    unit: 'violations',
+    direction: 'lower',
+    description: 'Invariant violations (any makes the replicate invalid)',
+    read: ({ invariantViolations }) => invariantViolations,
+  },
+}
+
+/** Read every catalogue KPI from one replicate. */
+export function readExperimentKpis(src: ReplicateKpiSource): Record<string, number | null> {
+  const kpis: Record<string, number | null> = {}
+  for (const [name, k] of Object.entries(EXPERIMENT_KPIS)) kpis[name] = k.read(src)
+  return kpis
 }
 
 export class ExperimentError extends Error {}
@@ -103,6 +199,15 @@ export interface ReplicateResult {
 
 export type ReplicateStatus = 'ok' | 'invalid: invariant' | 'invalid: failed' | 'invalid: error'
 export type Verdict = 'better' | 'worse' | 'no difference detected' | 'insufficient data'
+export type GuardStatus = 'held' | 'breached' | 'uncertain' | 'insufficient data'
+
+export interface GuardResult {
+  status: GuardStatus
+  /** The tolerance in KPI units (a percent tolerance is taken of the baseline mean); null without a baseline mean. */
+  toleranceAbs: number | null
+  /** 95% CI of the degradation (config minus baseline, signed so positive is worse). */
+  degradationCi: [number, number] | null
+}
 
 export interface MeanCi {
   n: number
@@ -155,6 +260,8 @@ export interface ExperimentReport {
   }[]
   comparisons: Comparison[]
   primary: { kpi: string; direction: KpiDirection; verdicts: Record<string, Verdict> }
+  /** One entry per guard of the file, with a result per non-baseline config. */
+  guards: (ExperimentGuard & { direction: KpiDirection; statuses: Record<string, GuardResult> })[]
   droppedSeeds: { config: string; seed: number; reason: string }[]
   notes: string[]
 }
@@ -197,6 +304,29 @@ function verdictOf(ci: [number, number] | null, direction: KpiDirection): Verdic
   return 'no difference detected'
 }
 
+function guardResult(c: Comparison, tolerance: ExperimentGuard['tolerance']): GuardResult {
+  const toleranceAbs =
+    'abs' in tolerance ? tolerance.abs : c.baseline.mean === null ? null : (Math.abs(c.baseline.mean) * tolerance.pct) / 100
+  const degradationCi: [number, number] | null = !c.ci ? null : c.direction === 'lower' ? [c.ci[0], c.ci[1]] : [-c.ci[1], -c.ci[0]]
+  if (!degradationCi || toleranceAbs === null) return { status: 'insufficient data', toleranceAbs, degradationCi }
+  const status: GuardStatus = degradationCi[1] <= toleranceAbs ? 'held' : degradationCi[0] > toleranceAbs ? 'breached' : 'uncertain'
+  return { status, toleranceAbs, degradationCi }
+}
+
+function validateGuards(guards: unknown): void {
+  if (guards === undefined) return
+  if (!Array.isArray(guards)) throw new ExperimentError('"guards" must be a list')
+  for (const g of guards as ExperimentGuard[]) {
+    if (!EXPERIMENT_KPIS[g?.kpi])
+      throw new ExperimentError(`Guard: Unknown KPI "${g?.kpi}" (available: ${Object.keys(EXPERIMENT_KPIS).join(', ')})`)
+    const t = g.tolerance as Record<string, unknown> | undefined
+    const keys = t && typeof t === 'object' ? Object.keys(t) : []
+    const value = keys.length === 1 ? t![keys[0]] : undefined
+    if (!(keys.length === 1 && (keys[0] === 'abs' || keys[0] === 'pct') && typeof value === 'number' && value >= 0))
+      throw new ExperimentError(`Guard "${g.kpi}": "tolerance" must be { "abs": <n >= 0> } or { "pct": <n >= 0> }`)
+  }
+}
+
 function resolveSeeds(seeds: ExperimentFile['seeds']): number[] {
   if (seeds === undefined) return Array.from({ length: DEFAULT_SEED_COUNT }, (_, i) => i + 1)
   if (Array.isArray(seeds)) {
@@ -234,6 +364,7 @@ export function validateExperiment(file: ExperimentFile): void {
   const kpi = file.primary?.kpi
   if (!EXPERIMENT_KPIS[kpi])
     throw new ExperimentError(`Unknown KPI "${kpi}" (available: ${Object.keys(EXPERIMENT_KPIS).join(', ')})`)
+  validateGuards(file.guards)
   if (!Array.isArray(file.configs) || file.configs.length === 0) throw new ExperimentError('"configs" must list at least one config')
   const names = new Set<string>()
   for (const c of file.configs) {
@@ -276,23 +407,26 @@ function commandFor(baseFlag: string, config: ExperimentConfig, seed: number, ho
   return parts.join(' ')
 }
 
-/** The default executor: runs the engine headless as `tt:run` does, with sparse invariant sweeps. */
-export function executeReplicateHeadless(plan: ReplicatePlan): ReplicateResult {
+/**
+ * The default executor: runs the engine headless as `tt:run` does, with sparse invariant sweeps. `handlers` replaces
+ * decision-point handlers (tests use a deliberately broken set to prove invalid replicates).
+ */
+export function executeReplicateHeadless(plan: ReplicatePlan, handlers: Partial<HandlerSet> = {}): ReplicateResult {
   const started = performance.now()
   try {
-    const sim = createSimulation(plan.scenario, {}, {
+    const sim = createSimulation(plan.scenario, handlers, {
       seed: plan.seed,
       asyncMode: 'pause',
       invariants: { failFast: false, sweepEvery: EXPERIMENT_SWEEP_EVERY },
     })
     sim.runUntil({})
     const summary = summarizeRun(sim)
-    const headline = headlineKpis(sim.kpiSeries(), sim.kpiReport())
-    const kpis: Record<string, number | null> = {}
-    for (const [name, k] of Object.entries(EXPERIMENT_KPIS)) kpis[name] = k.read(headline)
+    const report = sim.kpiReport()
+    const headline = headlineKpis(sim.kpiSeries(), report)
+    const invariantViolations = summary.invariants.violations
     return {
-      kpis,
-      invariantViolations: summary.invariants.violations,
+      kpis: readExperimentKpis({ headline, report, invariantViolations }),
+      invariantViolations,
       firstError: summary.firstError ? summary.firstError.message : null,
       wallMs: Math.round(performance.now() - started),
       summary,
@@ -331,7 +465,12 @@ export function runExperiment(file: ExperimentFile, options: RunExperimentOption
     const scenario = buildScenario(base.scenario, config, horizonS)
     for (const seed of seeds) {
       const command = commandFor(base.flag, config, seed, horizonS)
-      const result = execute({ config: config.name, seed, scenario, command })
+      let result: ReplicateResult
+      try {
+        result = execute({ config: config.name, seed, scenario, command })
+      } catch (err) {
+        result = { kpis: {}, invariantViolations: 0, firstError: null, wallMs: 0, error: (err as Error).message }
+      }
       replicates.push({
         config: config.name,
         seed,
@@ -394,6 +533,12 @@ export function runExperiment(file: ExperimentFile, options: RunExperimentOption
     }
   }
 
+  const guards: ExperimentReport['guards'] = (file.guards ?? []).map((g) => {
+    const statuses: Record<string, GuardResult> = {}
+    for (const c of comparisons) if (c.kpi === g.kpi) statuses[c.config] = guardResult(c, g.tolerance)
+    return { kpi: g.kpi, tolerance: g.tolerance, direction: EXPERIMENT_KPIS[g.kpi].direction, statuses }
+  })
+
   const notes: string[] = []
   if (file.configs.length > 2)
     notes.push('No correction for multiple comparisons: with many configs, expect some false "better" or "worse" verdicts.')
@@ -413,6 +558,7 @@ export function runExperiment(file: ExperimentFile, options: RunExperimentOption
     replicates,
     comparisons,
     primary: { kpi: file.primary.kpi, direction: primaryKpi.direction, verdicts },
+    guards,
     droppedSeeds,
     notes,
   }
