@@ -103,10 +103,11 @@ pnpm run tt:experiment <experiment.json> [--out DIR]
 ```
 
 Runs every config of an experiment file on every seed, one replicate after another, then compares each config with
-the baseline config seed by seed. Writes `report.json` (format `terminal-twin-experiment-report`, version 1) and
-`report.md` (verdict table, KPI table, invalid and dropped replicates, provenance, one `tt:run` line per replicate) to
-`--out` (default `.tt-experiments/<timestamp>/`, gitignored). Exit codes: 0 completed, 2 usage or validation error
-(unknown preset, fixture, KPI, decision point or strategy; a missing or unreadable file).
+the baseline config seed by seed. Writes `report.json` (format `terminal-twin-experiment-report`, version 2; version 2 added
+`guards`) and `report.md` (verdict table, guards table, full KPI table, invalid and dropped replicates, notes,
+provenance, one `tt:run` line per replicate) to `--out` (default `.tt-experiments/<timestamp>/`, gitignored). Exit
+codes: 0 completed with every replicate valid, 1 completed with at least one invalid replicate, 2 usage or validation
+error (unknown preset, fixture, KPI, decision point or strategy; a bad guard tolerance; a missing or unreadable file).
 
 Experiment file (format `terminal-twin-experiment`, version 1; v1 tracer, spec #309 adds the rest):
 
@@ -120,6 +121,7 @@ Experiment file (format `terminal-twin-experiment`, version 1; v1 tracer, spec #
   "seeds": { "count": 10, "from": 1 },
   "baseline": "A",
   "primary": { "kpi": "grossMovesPerHour" },
+  "guards": [{ "kpi": "truckTurnaroundS", "tolerance": { "pct": 5 } }],
   "configs": [{ "name": "A" }, { "name": "B", "strategies": { "wtpPadSelection": "nearest-box" } }]
 }
 ```
@@ -128,14 +130,26 @@ Experiment file (format `terminal-twin-experiment`, version 1; v1 tracer, spec #
   (`simDurationS`). `seeds`: a list or `{ count, from }` (default 10 seeds from 1). `baseline`: default the first config.
 - A config sets only `strategies` per decision point for now. Every replicate runs with `asyncMode: 'pause'`,
   invariants `failFast: false` and `sweepEvery` 10000 (`executeReplicateHeadless`).
-- KPI catalogue (`EXPERIMENT_KPIS`): `grossMovesPerHour` (higher is better), `truckTurnaroundS` (lower is better), read
-  from the headline KPIs; null when the subsystem is absent (that pair is not compared).
+- KPI catalogue (`EXPERIMENT_KPIS`, read by `readExperimentKpis` from the headline KPIs, the `KpiReport` and the
+  invariant count). Higher is better: `grossMovesPerHour`, `netMovesPerHour`, `movesDone`, `vesselsDone`. Lower is
+  better: `meanVesselTurnaroundS` (berth to departure), `meanAnchorageWaitS`, `truckTurnaroundS`, `shcEmptyTravelRatio`,
+  `shcBusyPct`, `ascUtilisationPct` (less crane time for the same work), `rehandlesPerProductiveMove`, `equipmentIdleS`
+  (decision-caused, summed over the decision points), `invariantViolations`. Every KPI is reported for every config.
+  A KPI that is null for a replicate (subsystem absent) is not compared for that pair.
+- Guards (`guards`, optional): `{ "kpi", "tolerance": { "abs": n } | { "pct": n } }`; a percent tolerance is taken of
+  the baseline mean. Degradation is the paired difference signed so positive is worse. **held** when the degradation
+  CI's upper bound is at or below the tolerance, **breached** when its lower bound is above it, else **uncertain**;
+  **insufficient data** with n < 2. `report.guards[i].statuses[config]` holds the status, the tolerance in KPI units
+  and the degradation CI.
 - Statistics: per seed `d = config - baseline` over seeds where both replicates are `ok` and the KPI is non-null; n,
   mean, SD, a 95% CI with Student's t (n - 1 df), the change against the baseline mean, and each side's own mean and
   CI. Verdict: **better** or **worse** when the CI excludes 0 on that side, else **no difference detected**;
   **insufficient data** with n < 2.
 - A replicate is `ok`, `invalid: invariant`, `invalid: failed` (engine error) or `invalid: error` (executor threw);
-  invalid seeds are dropped from pairing and listed in `droppedSeeds`.
+  an executor that throws gives `invalid: error` and the experiment carries on. Invalid seeds are dropped from
+  pairing and listed in `droppedSeeds`; fewer than 2 valid pairs gives insufficient data. With more than two configs
+  `notes` says there is no multiple-comparison correction. `executeReplicateHeadless(plan, handlers)` takes optional
+  handler overrides (the CLI test runs `broken-first-lane` to prove exit 1).
 - In-process: `runExperiment(file, { executeReplicate })` takes an injectable executor (tests pass a fake one with
   synthetic KPIs); `runExperimentCli(args, print)` mirrors `runCli`. Only `provenance.startedAt`, `endedAt` and each
   replicate's `wallMs` differ between two runs of the same file. Tests: `tests/experiment.test.ts`,

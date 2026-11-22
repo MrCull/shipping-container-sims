@@ -159,6 +159,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Config (experiment):** one named variant in an experiment, written as overrides on the base (v1: `strategies` per decision point). Not the `ScenarioConfig` itself.
 - **Baseline config:** the config every other config is compared with (default the first).
 - **Replicate:** one run of one config on one seed. It is `ok` or invalid (`invariant`, `failed`, `error`); an invalid replicate drops its seed from that config's pairing.
+- **Guard KPI:** a KPI an experiment config must not make worse than a tolerance (absolute, or percent of the baseline mean). Its status is held, breached, uncertain or insufficient data, from the 95% CI of the per-seed degradation.
 - **Primary KPI:** the one KPI an experiment's verdict is about. Each experiment KPI has a direction (higher or lower is better); the verdict is better, worse, no difference detected or insufficient data, from the 95% CI of the per-seed difference.
 
 ## Rehandles (TT-12)
