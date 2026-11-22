@@ -13,6 +13,10 @@ import {
   ENGINE_VERSION,
   getStrategy,
   headlineKpis,
+  resolveStrategyParams,
+  ScenarioValidationError,
+  assertValidScenario,
+  strategies as builtInStrategies,
   summarizeRun,
   type DecisionPointId,
   type DecisionsConfig,
@@ -22,6 +26,7 @@ import {
   type RunSummary,
 } from '../engine'
 import { fixtures } from '../scenario/fixtures'
+import { parseLatencySpec } from './latencySpec'
 import { presets } from '../scenario/presets'
 import type { ScenarioConfig } from '../scenario/types'
 
@@ -37,6 +42,17 @@ export interface ExperimentConfig {
   name: string
   /** Built-in strategy per decision point. */
   strategies?: Record<string, string>
+  /** Strategy params per decision point (`params.<dp>.<name>`), checked against the point's strategy. */
+  params?: Record<string, Record<string, number>>
+  /** Latency injector per decision point, in the `tt:run --latency` spec syntax (`fixed:200`, `exp:50,timeout:5`). */
+  latency?: Record<string, string>
+  /** JSON Merge Patch (RFC 7396) on the base `ScenarioConfig`; may not set `endConditions`. */
+  patch?: Record<string, unknown>
+}
+
+/** Grid factors: a config path (`strategies.<dp>`, `params.<dp>.<name>`, `latency.<dp>`, `patch.<path>`) to its values. */
+export interface ExperimentGrid {
+  factors: Record<string, unknown[]>
 }
 
 export interface ExperimentFile {
@@ -55,6 +71,8 @@ export interface ExperimentFile {
   /** KPIs that must not get worse than a tolerance, absolute (KPI units) or percent of the baseline mean. */
   guards?: ExperimentGuard[]
   configs: ExperimentConfig[]
+  /** Expands into extra configs, the cross product of the factor values, after the explicit configs. */
+  grid?: ExperimentGrid
 }
 
 export interface ExperimentGuard {
@@ -353,7 +371,67 @@ function resolveBase(base: ExperimentFile['base']): { scenario: ScenarioConfig; 
   throw new ExperimentError('"base" must be { "preset": <name> } or { "fixture": <name> }')
 }
 
-/** Validate an experiment file; throws `ExperimentError` with a readable message. */
+const GRID_KINDS = ['strategies', 'params', 'latency', 'patch'] as const
+type GridKind = (typeof GRID_KINDS)[number]
+/** Path segments a grid factor key has (0: at least two, `patch.<path>`). */
+const GRID_DEPTH: Record<GridKind, number> = { strategies: 2, params: 3, latency: 2, patch: 0 }
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+/** JSON Merge Patch (RFC 7396): objects merge key by key, `null` deletes, anything else replaces. */
+export function mergePatch(target: unknown, patch: unknown): unknown {
+  if (!isPlainObject(patch)) return patch
+  const out: Record<string, unknown> = isPlainObject(target) ? { ...target } : {}
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === null) delete out[k]
+    else out[k] = mergePatch(out[k], v)
+  }
+  return out
+}
+
+/** A grid config's name part for one factor: the path without its kind (`latency.<dp>` keeps it, to differ from strategies). */
+const factorLabel = (path: string) => (path.startsWith('latency.') ? path : path.slice(path.indexOf('.') + 1))
+const factorValue = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v))
+
+/** Set one grid factor value into a config, creating the nested objects on the way. */
+function setFactor(config: ExperimentConfig, path: string, value: unknown): void {
+  const keys = path.split('.')
+  let node = config as unknown as Record<string, unknown>
+  for (const key of keys.slice(0, -1)) {
+    const next = node[key]
+    node = node[key] = isPlainObject(next) ? { ...next } : {}
+  }
+  node[keys[keys.length - 1]] = value
+}
+
+/** The explicit configs, then the grid's cross product in factor order, each named `<factor>=<value>,...`. */
+export function expandConfigs(file: ExperimentFile): ExperimentConfig[] {
+  const configs = [...(file.configs ?? [])]
+  if (file.grid === undefined) return configs
+  const factors = file.grid?.factors
+  if (!isPlainObject(factors) || Object.keys(factors).length === 0)
+    throw new ExperimentError('"grid.factors" must map at least one config path to a list of values')
+  const entries = Object.entries(factors)
+  for (const [path, values] of entries) {
+    const parts = path.split('.')
+    const kind = parts[0] as GridKind
+    const depth = GRID_DEPTH[kind]
+    if (!GRID_KINDS.includes(kind) || (depth ? parts.length !== depth : parts.length < 2) || parts.some((p) => !p))
+      throw new ExperimentError(`Grid factor "${path}": expected strategies.<dp>, params.<dp>.<name>, latency.<dp> or patch.<path>`)
+    if (!Array.isArray(values) || values.length === 0) throw new ExperimentError(`Grid factor "${path}": values must be a non-empty list`)
+  }
+  let combos: [string, unknown][][] = [[]]
+  for (const [path, values] of entries)
+    combos = combos.flatMap((c) => (values as unknown[]).map((v) => [...c, [path, v] as [string, unknown]]))
+  for (const combo of combos) {
+    const config: ExperimentConfig = { name: combo.map(([p, v]) => `${factorLabel(p)}=${factorValue(v)}`).join(',') }
+    for (const [path, value] of combo) setFactor(config, path, value)
+    configs.push(config)
+  }
+  return configs
+}
+
+/** Validate an experiment file (every config, explicit and grid, fully resolved); throws `ExperimentError`. */
 export function validateExperiment(file: ExperimentFile): void {
   if (!file || typeof file !== 'object') throw new ExperimentError('The experiment file must be a JSON object')
   if (file.format !== EXPERIMENT_FORMAT) throw new ExperimentError(`"format" must be "${EXPERIMENT_FORMAT}"`)
@@ -366,44 +444,101 @@ export function validateExperiment(file: ExperimentFile): void {
     throw new ExperimentError(`Unknown KPI "${kpi}" (available: ${Object.keys(EXPERIMENT_KPIS).join(', ')})`)
   validateGuards(file.guards)
   if (!Array.isArray(file.configs) || file.configs.length === 0) throw new ExperimentError('"configs" must list at least one config')
+  resolveSeeds(file.seeds)
+  const base = resolveBase(file.base)
   const names = new Set<string>()
-  for (const c of file.configs) {
+  for (const c of expandConfigs(file)) {
     if (typeof c?.name !== 'string' || !c.name) throw new ExperimentError('Every config needs a "name"')
     if (names.has(c.name)) throw new ExperimentError(`Config name "${c.name}" is used twice`)
     names.add(c.name)
-    const allowed = new Set(['name', 'strategies'])
+    const allowed = new Set(['name', 'strategies', 'params', 'latency', 'patch'])
     for (const key of Object.keys(c))
-      if (!allowed.has(key)) throw new ExperimentError(`Config "${c.name}": "${key}" is not supported yet (only "strategies")`)
-    for (const [dp, strategy] of Object.entries(c.strategies ?? {})) {
-      if (!DECISION_POINT_IDS.includes(dp as DecisionPointId))
-        throw new ExperimentError(`Config "${c.name}": Unknown decision point "${dp}" (decision points: ${DECISION_POINT_IDS.join(', ')})`)
-      try {
-        getStrategy(dp as DecisionPointId, strategy)
-      } catch (err) {
-        throw new ExperimentError(`Config "${c.name}": ${(err as Error).message}`)
-      }
-    }
+      if (!allowed.has(key))
+        throw new ExperimentError(`Config "${c.name}": "${key}" is not supported (only strategies, params, latency, patch)`)
+    buildScenario(base.scenario, c, file.horizonS ?? DEFAULT_HORIZON_S)
   }
   if (file.baseline !== undefined && !names.has(file.baseline))
     throw new ExperimentError(`Baseline "${file.baseline}" is not one of the configs (${[...names].join(', ')})`)
-  resolveSeeds(file.seeds)
-  resolveBase(file.base)
 }
 
+type DecisionPoints = NonNullable<DecisionsConfig['points']>
+
+/**
+ * One config's fully resolved scenario: the patch on the base, then the strategies, params and latency shorthand into
+ * `decisions.points`, then the experiment's run settings. Throws `ExperimentError` naming the config and field.
+ */
 function buildScenario(base: ScenarioConfig, config: ExperimentConfig, horizonS: number): ScenarioConfig {
-  const points = { ...base.decisions?.points } as NonNullable<DecisionsConfig['points']>
-  for (const [dp, strategy] of Object.entries(config.strategies ?? {}))
-    points[dp as DecisionPointId] = { ...points[dp as DecisionPointId], strategy }
-  return {
-    ...base,
-    endConditions: { simDurationS: horizonS },
-    decisions: { ...base.decisions, asyncMode: 'pause', points },
+  const fail = (field: string, message: string) => new ExperimentError(`Config "${config.name}": ${field}: ${message}`)
+  const point = (field: string, dp: string) => {
+    if (!DECISION_POINT_IDS.includes(dp as DecisionPointId))
+      throw fail(field, `Unknown decision point "${dp}" (decision points: ${DECISION_POINT_IDS.join(', ')})`)
+    return dp as DecisionPointId
   }
+  let patched = base
+  if (config.patch !== undefined) {
+    if (!isPlainObject(config.patch)) throw fail('patch', 'must be a JSON object (a JSON Merge Patch on the base scenario)')
+    if ('endConditions' in config.patch)
+      throw fail('patch.endConditions', "an experiment may not set end conditions (the horizon is every replicate's run length)")
+    patched = mergePatch(base, config.patch) as ScenarioConfig
+  }
+  const points = { ...patched.decisions?.points } as DecisionPoints
+  for (const [dp, strategy] of Object.entries(config.strategies ?? {})) {
+    const id = point(`strategies.${dp}`, dp)
+    try {
+      getStrategy(id, strategy)
+    } catch (err) {
+      throw fail(`strategies.${dp}`, (err as Error).message)
+    }
+    points[id] = { ...points[id], strategy }
+  }
+  for (const [dp, params] of Object.entries(config.params ?? {})) {
+    const id = point(`params.${dp}`, dp)
+    if (!isPlainObject(params)) throw fail(`params.${dp}`, 'must map param names to numbers')
+    const strategy = points[id]?.strategy ?? builtInStrategies[id].default
+    const merged: Record<string, number> = { ...points[id]?.params }
+    for (const [name, value] of Object.entries(params)) {
+      try {
+        resolveStrategyParams(id, strategy, { [name]: value as number })
+      } catch (err) {
+        throw fail(`params.${dp}.${name}`, (err as Error).message)
+      }
+      merged[name] = value as number
+    }
+    points[id] = { ...points[id], params: merged }
+  }
+  for (const [dp, spec] of Object.entries(config.latency ?? {})) {
+    const id = point(`latency.${dp}`, dp)
+    let parsed: ReturnType<typeof parseLatencySpec>
+    try {
+      parsed = parseLatencySpec(spec)
+    } catch (err) {
+      throw fail(`latency.${dp}`, (err as Error).message)
+    }
+    points[id] = { ...points[id], latency: parsed.latency, ...(parsed.timeoutMs === undefined ? {} : { timeoutMs: parsed.timeoutMs }) }
+  }
+  const scenario: ScenarioConfig = {
+    ...patched,
+    endConditions: { simDurationS: horizonS },
+    decisions: { ...patched.decisions, asyncMode: 'pause', points },
+  }
+  if (config.patch !== undefined) {
+    try {
+      assertValidScenario(scenario)
+    } catch (err) {
+      const message = err instanceof ScenarioValidationError ? err.message : `Invalid scenario: ${(err as Error).message}`
+      throw fail('patch', message)
+    }
+  }
+  return scenario
 }
 
 function commandFor(baseFlag: string, config: ExperimentConfig, seed: number, horizonS: number): string {
   const parts = ['pnpm run tt:run', baseFlag, `--seed ${seed}`, '--async-mode pause', '--no-fail-fast', `--end time:${horizonS}`]
   for (const [dp, s] of Object.entries(config.strategies ?? {})) parts.push(`--strategy ${dp}=${s}`)
+  for (const [dp, params] of Object.entries(config.params ?? {}))
+    for (const [name, value] of Object.entries(params)) parts.push(`--param ${dp}.${name}=${value}`)
+  for (const [dp, spec] of Object.entries(config.latency ?? {})) parts.push(`--latency ${dp}=${spec}`)
+  if (config.patch !== undefined) parts.push(`(plus patch ${JSON.stringify(config.patch)}, which tt:run flags cannot express)`)
   return parts.join(' ')
 }
 
@@ -458,10 +593,11 @@ export function runExperiment(file: ExperimentFile, options: RunExperimentOption
   const seeds = resolveSeeds(file.seeds)
   const baseline = file.baseline ?? file.configs[0].name
   const base = resolveBase(file.base)
+  const configs = expandConfigs(file)
 
   const replicates: ExperimentReport['replicates'] = []
-  const total = file.configs.length * seeds.length
-  for (const config of file.configs) {
+  const total = configs.length * seeds.length
+  for (const config of configs) {
     const scenario = buildScenario(base.scenario, config, horizonS)
     for (const seed of seeds) {
       const command = commandFor(base.flag, config, seed, horizonS)
@@ -494,7 +630,7 @@ export function runExperiment(file: ExperimentFile, options: RunExperimentOption
   const comparisons: ExperimentReport['comparisons'] = []
   const primaryKpi = EXPERIMENT_KPIS[file.primary.kpi]
   const verdicts: Record<string, Verdict> = {}
-  for (const config of file.configs) {
+  for (const config of configs) {
     if (config.name === baseline) continue
     for (const seed of seeds) {
       const a = byKey.get(`${baseline}\u0000${seed}`)!
@@ -540,13 +676,13 @@ export function runExperiment(file: ExperimentFile, options: RunExperimentOption
   })
 
   const notes: string[] = []
-  if (file.configs.length > 2)
+  if (configs.length > 2)
     notes.push('No correction for multiple comparisons: with many configs, expect some false "better" or "worse" verdicts.')
   return {
     format: EXPERIMENT_REPORT_FORMAT,
     version: EXPERIMENT_REPORT_VERSION,
     experiment: file,
-    expanded: { configs: file.configs, baseline, seeds, horizonS },
+    expanded: { configs, baseline, seeds, horizonS },
     provenance: {
       engineVersion: ENGINE_VERSION,
       commit: options.commit ?? null,
