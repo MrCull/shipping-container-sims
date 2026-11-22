@@ -13,6 +13,7 @@
 import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from 'node:fs'
 import { readJsonFile, writeJsonFile } from './snapshotFile'
 import { parseLatencySpec } from './latencySpec'
+import { applyDecisionOverrides, type DecisionOverrides } from './decisionOverrides'
 import { mergePatch, readPatchArg } from './scenarioPatch'
 import { parseArgs } from 'node:util'
 import {
@@ -20,9 +21,6 @@ import {
   DECISION_POINT_IDS,
   exportRun,
   headlineKpis,
-  getStrategy,
-  resolveStrategyParams,
-  strategies,
   parseLogVerbosity,
   restoreSimulation,
   SHC_OPERATIONAL_STATES,
@@ -179,43 +177,30 @@ function decisionsFromArgs(
   paramArgs: string[] = [],
 ): DecisionsConfig | undefined {
   if (asyncMode === undefined && strategyArgs.length === 0 && latencyArgs.length === 0 && paramArgs.length === 0) return base
-  const out: DecisionsConfig = { ...base, points: { ...base?.points } }
-  const points = out.points as Record<DecisionPointId, NonNullable<DecisionsConfig['points']>[DecisionPointId]>
+  const out: DecisionsConfig = { ...base }
   if (asyncMode !== undefined) {
     if (asyncMode !== 'keep-running' && asyncMode !== 'pause') throw new UsageError(`Bad --async-mode "${asyncMode}"`)
     out.asyncMode = asyncMode as AsyncMode
   }
+  const overrides: Required<DecisionOverrides> = { strategies: {}, params: {}, latency: {} }
   for (const arg of strategyArgs) {
     const [dp, name] = splitPoint(arg, '--strategy')
-    try {
-      getStrategy(dp, name)
-    } catch (err) {
-      throw new UsageError((err as Error).message)
-    }
-    points[dp] = { ...points[dp], strategy: name }
+    overrides.strategies[dp] = name
   }
   for (const arg of latencyArgs) {
     const [dp, spec] = splitPoint(arg, '--latency')
-    const { latency, timeoutMs } = parseLatency(spec)
-    points[dp] = { ...points[dp], latency, ...(timeoutMs === undefined ? {} : { timeoutMs }) }
+    parseLatency(spec)
+    overrides.latency[dp] = spec
   }
-  const tuned = new Set<DecisionPointId>()
   for (const arg of paramArgs) {
     // <dp>.<name>=<value>
     const m = /^([A-Za-z]+)\.([A-Za-z][A-Za-z0-9_]*)=(.+)$/.exec(arg)
     const value = Number(m?.[3])
     if (!m || !Number.isFinite(value)) throw new UsageError(`Bad --param "${arg}" (expected <dp>.<name>=<number>)`)
     const [dp] = splitPoint(`${m[1]}=`, '--param')
-    points[dp] = { ...points[dp], params: { ...points[dp]?.params, [m[2]]: value } }
-    tuned.add(dp)
+    overrides.params[dp] = { ...overrides.params[dp], [m[2]]: value }
   }
-  for (const dp of tuned) {
-    try {
-      resolveStrategyParams(dp, points[dp]?.strategy ?? strategies[dp].default, points[dp]?.params)
-    } catch (err) {
-      throw new UsageError((err as Error).message)
-    }
-  }
+  out.points = applyDecisionOverrides(base?.points, overrides, (_field, message) => new UsageError(message))
   return out
 }
 

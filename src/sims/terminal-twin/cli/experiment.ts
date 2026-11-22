@@ -9,24 +9,18 @@
 import { arch, cpus } from 'node:os'
 import {
   createSimulation,
-  DECISION_POINT_IDS,
   ENGINE_VERSION,
-  getStrategy,
   headlineKpis,
-  resolveStrategyParams,
   ScenarioValidationError,
   assertValidScenario,
-  strategies as builtInStrategies,
   summarizeRun,
-  type DecisionPointId,
-  type DecisionsConfig,
   type HandlerSet,
   type HeadlineKpis,
   type KpiReport,
   type RunSummary,
 } from '../engine'
 import { fixtures } from '../scenario/fixtures'
-import { parseLatencySpec } from './latencySpec'
+import { applyDecisionOverrides } from './decisionOverrides'
 import { mergePatch, shellQuote } from './scenarioPatch'
 import { presets } from '../scenario/presets'
 import { DEFAULT_WARM_UP_S, type ScenarioConfig } from '../scenario/types'
@@ -491,19 +485,12 @@ export function validateExperiment(file: ExperimentFile): { warnings: string[] }
   return { warnings }
 }
 
-type DecisionPoints = NonNullable<DecisionsConfig['points']>
-
 /**
  * One config's fully resolved scenario: the patch on the base, then the strategies, params and latency shorthand into
  * `decisions.points`, then the experiment's run settings. Throws `ExperimentError` naming the config and field.
  */
 function buildScenario(base: ScenarioConfig, config: ExperimentConfig, { warmUpS, horizonS }: RunLength): ScenarioConfig {
   const fail = (field: string, message: string) => new ExperimentError(`Config "${config.name}": ${field}: ${message}`)
-  const point = (field: string, dp: string) => {
-    if (!DECISION_POINT_IDS.includes(dp as DecisionPointId))
-      throw fail(field, `Unknown decision point "${dp}" (decision points: ${DECISION_POINT_IDS.join(', ')})`)
-    return dp as DecisionPointId
-  }
   let patched = base
   if (config.patch !== undefined) {
     if (!isPlainObject(config.patch)) throw fail('patch', 'must be a JSON object (a JSON Merge Patch on the base scenario)')
@@ -513,41 +500,7 @@ function buildScenario(base: ScenarioConfig, config: ExperimentConfig, { warmUpS
       throw fail('patch.measurementWarmUpS', 'an experiment sets the measurement warm-up with its "warmUpS" for every replicate')
     patched = mergePatch(base, config.patch) as ScenarioConfig
   }
-  const points = { ...patched.decisions?.points } as DecisionPoints
-  for (const [dp, strategy] of Object.entries(config.strategies ?? {})) {
-    const id = point(`strategies.${dp}`, dp)
-    try {
-      getStrategy(id, strategy)
-    } catch (err) {
-      throw fail(`strategies.${dp}`, (err as Error).message)
-    }
-    points[id] = { ...points[id], strategy }
-  }
-  for (const [dp, params] of Object.entries(config.params ?? {})) {
-    const id = point(`params.${dp}`, dp)
-    if (!isPlainObject(params)) throw fail(`params.${dp}`, 'must map param names to numbers')
-    const strategy = points[id]?.strategy ?? builtInStrategies[id].default
-    const merged: Record<string, number> = { ...points[id]?.params }
-    for (const [name, value] of Object.entries(params)) {
-      try {
-        resolveStrategyParams(id, strategy, { [name]: value as number })
-      } catch (err) {
-        throw fail(`params.${dp}.${name}`, (err as Error).message)
-      }
-      merged[name] = value as number
-    }
-    points[id] = { ...points[id], params: merged }
-  }
-  for (const [dp, spec] of Object.entries(config.latency ?? {})) {
-    const id = point(`latency.${dp}`, dp)
-    let parsed: ReturnType<typeof parseLatencySpec>
-    try {
-      parsed = parseLatencySpec(spec)
-    } catch (err) {
-      throw fail(`latency.${dp}`, (err as Error).message)
-    }
-    points[id] = { ...points[id], latency: parsed.latency, ...(parsed.timeoutMs === undefined ? {} : { timeoutMs: parsed.timeoutMs }) }
-  }
+  const points = applyDecisionOverrides(patched.decisions?.points, config, fail)
   const scenario: ScenarioConfig = {
     ...patched,
     measurementWarmUpS: warmUpS,
