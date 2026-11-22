@@ -30,6 +30,7 @@ import { ContainerInstancer, type DrawnBox } from './containerInstancer'
 import { describeMarkings } from './containerMarkings'
 import { colourContextOf, colourOf, DEFAULT_COLOUR_BY, DEFAULT_ROB_DISPLAY, hexToInt, isTimeBased, type ColourBy, type ColourContext, type RobDisplay } from './colourBy'
 import { liveryBodyColour, liveryIndexForBox, loadContainerAssets, type ContainerAssets } from './containerAssets'
+import { boxTone, type BoxTone } from './boxLivery'
 import { QUAY_ABOVE_WATER_M } from '../scenario/vesselClasses'
 import { beaconFlashOn, GantryBeacons } from './gantryBeacons'
 import type { SoundSource } from './soundMixer'
@@ -135,6 +136,8 @@ export class SceneRenderer {
   /** The hero equipment level (#273): hero spreaders on the nearest rigs; its cap comes from the quality profile. */
   private readonly heroEquipment = new HeroEquipmentLevel()
   private containerLivery: number[]
+  /** Per-box tone shift in the default colour mode (#361), a pure function of the id. */
+  private containerTone: BoxTone[]
   /** Colour by (#130): the mode, the facts its legend needs, and per box the tint drawn (0xRRGGBB, -1 = livery) with the epoch and time bucket it was computed for. */
   private colourBy: ColourBy = DEFAULT_COLOUR_BY
   // What the container posing has covered (#250).
@@ -247,6 +250,7 @@ export class SceneRenderer {
     })
     // default-mode tile: the line's livery or a leasing variant, from the box id (#360); colour-by tints use the true line
     this.containerLivery = model.containerIds.map((id) => liveryIndexForBox(id, model.containerLine[id]))
+    this.containerTone = model.containerIds.map((id) => boxTone(id))
     this.colourCtx = colourContextOf(config)
     this.scene.add(this.containers.group)
     loadContainerAssets().then(
@@ -625,7 +629,8 @@ export class SceneRenderer {
         continue
       }
       this.containerLivery[i] ??= liveryIndexForBox(id, model.containerLine[id])
-      containers.set(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget), c.yard === true)
+      this.containerTone[i] ??= boxTone(id)
+      containers.set(i, model.containerSize[id], c.x, c.y, c.z, this.containerLivery[i], c.yaw, this.tintOf(i, id, t, colourBudget), c.yard === true, this.containerTone[i])
       if (c.carriedBy) carried.set(c.carriedBy, CONTAINER_DIMS[model.containerSize[id]].height)
       if (wantsOwners && rest === 0) {
         const owner = model.poseOwner // set by the pose above: no second custody lookup (#257)

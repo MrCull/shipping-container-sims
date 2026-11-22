@@ -17,6 +17,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { ContainerSize } from '../scenario/types'
 import atlas from '../assets/models/containers/livery-atlas.json'
 import { patchContactShadow } from './contactShadow'
+import { TONE_BRIGHTNESS_RANGE, TONE_LEVELS, TONE_SATURATION_RANGE } from './boxLivery'
 
 export const CONTAINER_ASSET_URLS: Record<ContainerSize, string> = {
   '20': new URL('../assets/models/containers/container-20.glb', import.meta.url).href,
@@ -27,6 +28,8 @@ export const CONTAINER_ASSET_URLS: Record<ContainerSize, string> = {
 export const LIVERY_ATLAS = atlas
 
 export { liveryIndexForBox, liveryIndexForLine } from './boxLivery'
+
+const TONE_HALF = (TONE_LEVELS - 1) / 2
 
 /** Body colour of a livery (for the procedural placeholders before the GLBs load). */
 export function liveryBodyColour(index: number): string {
@@ -132,18 +135,31 @@ export function liveryMaterial<T extends THREE.MeshStandardMaterial>(
     shader.uniforms.liveryBase = liveryBase
     shader.uniforms.liveryTile = { value: new THREE.Vector2(layout.tileSizeUv[0], layout.tileSizeUv[1]) }
     shader.uniforms.liveryCols = { value: layout.tileCols }
+    shader.uniforms.liveryToneStep = { value: new THREE.Vector2(TONE_BRIGHTNESS_RANGE / TONE_HALF, TONE_SATURATION_RANGE / TONE_HALF) }
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nattribute float liveryIndex;\nuniform float liveryBase;\nuniform vec2 liveryTile;\nuniform float liveryCols;',
+        '#include <common>\nattribute float liveryIndex;\nvarying vec2 vLiveryTone;\nuniform float liveryBase;\nuniform vec2 liveryTile;\nuniform float liveryCols;\nuniform vec2 liveryToneStep;',
       )
       .replace(
         '#include <uv_vertex>',
         `#include <uv_vertex>
+  // fractional part: the packed per-box tone (#361, boxLivery#toneFraction), 0 = none
+  float liveryCode = floor( fract( liveryIndex ) * 256.0 + 0.5 );
+  vLiveryTone = liveryCode < 0.5 ? vec2( 0.0 ) : ( vec2( floor( liveryCode / 16.0 ), mod( liveryCode, 16.0 ) ) - 8.0 ) * liveryToneStep;
 #ifdef USE_MAP
-  float liveryI = liveryIndex + liveryBase;
+  float liveryI = floor( liveryIndex ) + liveryBase;
   vMapUv += vec2(mod(liveryI, liveryCols), floor(liveryI / liveryCols)) * liveryTile;
 #endif`,
+      )
+    // per-box tone (#361): brightness and saturation shift decoded in the vertex shader; (0, 0) is the livery as authored
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vLiveryTone;')
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+  float liveryGrey = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+  diffuseColor.rgb = max( mix( vec3( liveryGrey ), diffuseColor.rgb, 1.0 + vLiveryTone.y ), 0.0 ) * ( 1.0 + vLiveryTone.x );`,
       )
     if (farMap) {
       shader.uniforms.farMap = { value: farMap }

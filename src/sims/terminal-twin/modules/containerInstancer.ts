@@ -22,6 +22,7 @@
 import * as THREE from 'three'
 import type { ContainerSize } from '../scenario/types'
 import { liveryBodyColour, LIVERY_ATLAS, type ContainerAssets } from './containerAssets'
+import { toneFraction, type BoxTone } from './boxLivery'
 import { CONTAINER_DIMS } from './sceneModel'
 import { patchContactShadow } from './contactShadow'
 import { ContainerCloseups, type CloseupSource } from './containerCloseups'
@@ -131,6 +132,7 @@ export class ContainerInstancer {
   private zs: number[] = []
   private liveries: number[] = []
   private tints: number[] = []
+  private tones: (BoxTone | null)[] = []
   private yards: boolean[] = []
   private yaws: number[] = []
   private dist2: Float64Array = new Float64Array(0)
@@ -284,10 +286,10 @@ export class ContainerInstancer {
    * One box (retained, #250): `key` is a stable id (e.g. container index), centre position in metres, yaw about Y (0 = length along X); `yard` marks a stacked yard box (the close-up level hides the faces its neighbours touch).
    * A box whose data equals what it already holds costs nothing; a changed one is written to its slot at the next `end`.
    */
-  set(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0, tint = -1, yard = false): void {
+  set(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0, tint = -1, yard = false, tone: BoxTone | null = null): void {
     this.posed++
     const y = cy - CONTAINER_DIMS[size].height / 2 // models have their origin at the bottom centre
-    if (this.has[key] && this.sizes[key] === size && this.xs[key] === cx && this.ys[key] === y && this.zs[key] === cz && this.liveries[key] === livery && this.yaws[key] === yaw && this.tints[key] === tint && this.yards[key] === yard) return
+    if (this.has[key] && this.sizes[key] === size && this.xs[key] === cx && this.ys[key] === y && this.zs[key] === cz && this.liveries[key] === livery && this.yaws[key] === yaw && this.tints[key] === tint && this.yards[key] === yard && this.tones[key] === tone) return
     if (this.reachFresh) {
       const was = this.reachKeys.has(key)
       const now = this.withinReach(cx, y, cz)
@@ -315,14 +317,15 @@ export class ContainerInstancer {
     this.yaws[key] = yaw
     this.tints[key] = tint
     this.yards[key] = yard
+    this.tones[key] = tone
     this.markWrite(key)
     this.passNeeded = true
   }
 
   /** Immediate mode: the same as `set`. */
-  push(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0, tint = -1, yard = false): void {
+  push(key: number, size: ContainerSize, cx: number, cy: number, cz: number, livery: number, yaw = 0, tint = -1, yard = false, tone: BoxTone | null = null): void {
     this.stampOf[key] = this.stamp
-    this.set(key, size, cx, cy, cz, livery, yaw, tint, yard)
+    this.set(key, size, cx, cy, cz, livery, yaw, tint, yard, tone)
   }
 
   /** The box is not in the scene any more (no custody to pose it from). */
@@ -411,7 +414,7 @@ export class ContainerInstancer {
         this.colour.setHex(tint)
         layer.mesh.setColorAt(slot, this.colour.set(this.colour.r / this.genericBody.r, this.colour.g / this.genericBody.g, this.colour.b / this.genericBody.b))
       } else {
-        layer.livery.setX(slot, this.liveries[i])
+        layer.livery.setX(slot, this.liveries[i] + toneFraction(this.tones[i])) // tile + packed tone (#361); colour by above keeps its flat tint
         layer.mesh.setColorAt(slot, this.colour.setRGB(1, 1, 1))
       }
     } else layer.mesh.setColorAt(slot, tint >= 0 ? this.colour.setHex(tint) : this.colour.set(liveryBodyColour(this.liveries[i])))
@@ -529,7 +532,7 @@ export class ContainerInstancer {
           key,
           layer: layer.mesh.name,
           matrix: Array.from(layer.mesh.instanceMatrix.array.subarray(slot * 16, slot * 16 + 16)),
-          livery: layer.livery ? layer.livery.getX(slot) : -1,
+          livery: layer.livery ? Math.floor(layer.livery.getX(slot)) : -1, // the tile, without the packed tone
           colour: colour ? this.colour.setRGB(colour.getX(slot), colour.getY(slot), colour.getZ(slot)).getHex() : -1,
         })
       })

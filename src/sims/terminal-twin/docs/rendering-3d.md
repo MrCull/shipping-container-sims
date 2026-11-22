@@ -92,6 +92,12 @@ history behind the display time (display time never goes back). Ingest details: 
 - **Per instance:** a matrix, a `liveryIndex` float attribute (atlas tile) and an instance colour. A colour-by tint
   switches the box to the generic tile and sets an instance colour of tint / generic body colour, so the grey tile comes
   out as the tint. The instance colour exists from the first frame so the shader never recompiles when a tint first appears.
+- **Per-box tone (#361):** in the default colour mode each box gets a small, stable brightness (within 12 %) and
+  saturation (within 15 %) shift, `boxTone(id)` in `modules/boxLivery.ts` (hashes the id, 15 steps each). It rides in the
+  fractional part of `liveryIndex` (`toneFraction`: `(b * 16 + s) / 256`, 0 = no tone), so it adds no attribute, no byte
+  and no draw call; the livery shader floors the index for the tile and decodes the tone after `color_fragment`. A tinted
+  box writes no tone; a mesh without the attribute (vessel hulls) reads 0. The drawn-box record floors the index.
+  Close-up faces are not toned. Tests: `tests/box-tone.test.ts`.
 - **Livery shader:** GLB TEXCOORD_0 is authored for tile 0 (HMM); `liveryMaterial()` in `modules/containerAssets.ts`
   patches the material so `vMapUv += tileOffset(liveryIndex + liveryBase)`. `liveryIndexForLine(line)` reads
   `assets/models/containers/livery-atlas.json` (11 tiles: 10 lines plus the generic grey).

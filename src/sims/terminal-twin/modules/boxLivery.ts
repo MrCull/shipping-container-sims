@@ -36,3 +36,39 @@ export function liveryIndexForBox(id: string, line: string | null | undefined): 
   }
   return LEASING[LEASING.length - 1].index
 }
+
+/** Largest brightness shift of a box's tone (#361): its colour is scaled by 1 plus or minus up to this. */
+export const TONE_BRIGHTNESS_RANGE = 0.12
+/** Largest saturation shift of a box's tone (#361): its colour is pushed from or towards its grey by up to this. */
+export const TONE_SATURATION_RANGE = 0.15
+/** Steps each tone part takes from minus to plus its range (odd, so the middle step is no shift). */
+export const TONE_LEVELS = 15
+
+/** A box's tone shift (#361), each part a signed fraction: 0 is the livery as authored. */
+export interface BoxTone {
+  brightness: number
+  saturation: number
+}
+
+const HALF = (TONE_LEVELS - 1) / 2
+const step = (u: number) => Math.min(TONE_LEVELS - 1, Math.floor(u * TONE_LEVELS)) - HALF // -HALF..HALF
+
+/** Small, stable tone shift of box `id` in the default colour mode (slightly faded or dirty), a pure function of the id, in TONE_LEVELS steps. */
+export function boxTone(id: string): BoxTone {
+  return {
+    brightness: (step(boxUnit(id, 'tone-brightness')) / HALF) * TONE_BRIGHTNESS_RANGE,
+    saturation: (step(boxUnit(id, 'tone-saturation')) / HALF) * TONE_SATURATION_RANGE,
+  }
+}
+
+/**
+ * The tone packed into the fractional part of the `liveryIndex` instance attribute (#361), so it costs no extra
+ * per-instance data: `(b * 16 + s) / 256` with each step stored as 1 to 15 (8 = no shift), and 0 meaning no tone
+ * (a tinted box, a plain mesh). `containerAssets#liveryMaterial` decodes it.
+ */
+export function toneFraction(tone: BoxTone | null): number {
+  if (!tone) return 0
+  const b = Math.round((tone.brightness / TONE_BRIGHTNESS_RANGE) * HALF) + 8
+  const s = Math.round((tone.saturation / TONE_SATURATION_RANGE) * HALF) + 8
+  return (b * 16 + s) / 256
+}
