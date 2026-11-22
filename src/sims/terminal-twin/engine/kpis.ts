@@ -292,7 +292,7 @@ function appointmentReport(book: AppointmentBook, k: LandsideKpiCounters): NonNu
   }
 }
 
-function holdingReport(ls: LandsideState, k: LandsideKpiCounters, now: number): NonNullable<LandsideKpiReport['holding']> {
+function holdingReport(ls: LandsideState, k: LandsideKpiCounters, now: number, measuredS: number): NonNullable<LandsideKpiReport['holding']> {
   const positions = Object.values(ls.holding)
   return {
     positions: positions.length,
@@ -302,7 +302,7 @@ function holdingReport(ls: LandsideState, k: LandsideKpiCounters, now: number): 
     inUse: positions.filter((h) => h.truckId !== null).length,
     maxInUse: k.holdingMax,
     waitS: { mean: k.holdingWaitCount > 0 ? r3(k.holdingWaitSumS / k.holdingWaitCount) : 0, max: r3(k.holdingWaitMaxS) },
-    utilisationPct: now > 0 ? r3((100 * (k.holdBusyS + positions.filter((h) => h.truckId !== null).length * (now - k.holdLastT))) / (positions.length * now)) : 0,
+    utilisationPct: measuredS > 0 ? r3((100 * (k.holdBusyS + positions.filter((h) => h.truckId !== null).length * (now - k.holdLastT))) / (positions.length * measuredS)) : 0,
   }
 }
 
@@ -451,6 +451,8 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     ),
   }
   const ls = state.kpis.landside
+  // the road and holding means are over the measured period (after any warm-up)
+  const measuredS = state.now - (state.warmUp?.ended ? state.warmUp.durationS : 0)
   const landside: LandsideKpiReport | undefined = ls && {
     trucksIn: ls.trucksIn,
     trucksOut: ls.trucksOut,
@@ -465,7 +467,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     internalDriveS: { mean: ls.trucksOut > 0 ? r3(ls.driveSumS / ls.trucksOut) : 0, max: r3(ls.driveMaxS) },
     totalTurnaroundS: { mean: ls.trucksOut > 0 ? r3(ls.totalTurnSumS / ls.trucksOut) : 0, max: r3(ls.totalTurnMaxS) },
     road: {
-      meanTrucks: state.now > 0 ? r3((ls.roadBusyS + ls.roadNow * (state.now - ls.roadLastT)) / state.now) : 0,
+      meanTrucks: measuredS > 0 ? r3((ls.roadBusyS + ls.roadNow * (state.now - ls.roadLastT)) / measuredS) : 0,
       maxTrucks: ls.roadMax,
     },
     serviceS: ls.trucksOut > 0 ? r3(ls.serviceSumS / ls.trucksOut) : 0,
@@ -474,7 +476,7 @@ export function buildKpiReport(state: SimState, eventsProcessed: number): KpiRep
     boxesPicked: ls.boxesPicked,
     fallbacks: ls.fallbacks,
     ...(state.landside?.appointments ? { appointments: appointmentReport(state.landside.appointments, ls) } : {}),
-    ...(state.landside && Object.keys(state.landside.holding).length > 0 ? { holding: holdingReport(state.landside, ls, state.now) } : {}),
+    ...(state.landside && Object.keys(state.landside.holding).length > 0 ? { holding: holdingReport(state.landside, ls, state.now, measuredS) } : {}),
   }
   const dwell = dwellReport(state)
   return {

@@ -112,3 +112,79 @@ describe('scenario validation of the measurement warm-up', () => {
     }
   })
 })
+
+describe('time-based KPIs after a measurement warm-up (review of #309)', () => {
+  // ground truth is read from the raw event log on the absolute clock, cut to the measured window [W, W + H)
+  const W = 2 * HOUR
+  let sim: Simulation | undefined
+  const run = (): Simulation => {
+    if (!sim) {
+      sim = createSimulation({ ...scenario({ mode: 'prefilled', targetPct: 30 }), measurementWarmUpS: W })
+      sim.runUntil()
+    }
+    return sim
+  }
+  const cut = (t0: number, t1: number) => Math.max(0, Math.min(t1, W + HOUR) - Math.max(t0, W))
+  const total = (id: string, entity: string) => run().kpiSeries().series[id].entities[entity].total
+
+  it('ASC utilisation is the busy time inside the measured window, in [0, 100] %', () => {
+    const s = run()
+    const busy: Record<string, number> = {}
+    const open: Record<string, number> = {}
+    for (const e of s.eventLog()) {
+      if (e.type === 'AscJobAssigned') open[e.payload.ascId] = e.payload.departAt
+      if (e.type === 'AscReady' && open[e.payload.ascId] !== undefined) {
+        busy[e.payload.ascId] = (busy[e.payload.ascId] ?? 0) + cut(open[e.payload.ascId], e.t)
+        delete open[e.payload.ascId]
+      }
+    }
+    for (const [id, since] of Object.entries(open)) busy[id] = (busy[id] ?? 0) + cut(since, s.now)
+    const ids = Object.keys(s.kpiSeries().series['asc.utilisation-pct'].entities)
+    expect(ids.length).toBeGreaterThan(0)
+    expect(Object.values(busy).some((b) => b > 0)).toBe(true)
+    for (const id of ids) {
+      const pct = total('asc.utilisation-pct', id) ?? 0
+      expect(pct).toBeGreaterThanOrEqual(0)
+      expect(pct).toBeLessThanOrEqual(100)
+      expect(pct).toBeCloseTo((100 * (busy[id] ?? 0)) / HOUR, 1)
+    }
+  })
+
+  it('each SHC state time sums to the measured window', () => {
+    const shcs = run().kpiReport().horizontal?.shcs ?? {}
+    expect(Object.keys(shcs).length).toBe(3)
+    for (const k of Object.values(shcs)) {
+      const states = Object.values(k.stateS ?? {})
+      for (const v of states) expect(v).toBeGreaterThanOrEqual(0)
+      expect(states.reduce((a, b) => a + b, 0)).toBeCloseTo(HOUR, 0)
+    }
+  })
+
+  it('landside stall wait counts trucks served in the window with their real wait', () => {
+    const s = run()
+    const atStall: Record<string, number> = {}
+    const served = new Set<string>()
+    let sum = 0
+    let n = 0
+    for (const e of s.eventLog()) {
+      if (e.type === 'TruckAtStall') atStall[e.payload.truckId] = e.t
+      if (e.type === 'TruckDeparted') served.delete(e.payload.truckId)
+      if (e.type !== 'AscJobAssigned' || !e.payload.truckId || served.has(e.payload.truckId)) continue
+      served.add(e.payload.truckId)
+      if (e.t < W) continue
+      sum += e.payload.early ? 0 : e.payload.departAt - (atStall[e.payload.truckId] ?? e.t)
+      n++
+    }
+    expect(n).toBeGreaterThan(0)
+    expect(total('landside.stall-wait-s', 'terminal')).toBeCloseTo(sum / n, 2)
+  })
+
+  it('road occupancy is never negative and its mean is over the measured window', () => {
+    const r = run().kpiReport().landside
+    expect(r).toBeDefined()
+    expect(r!.road.meanTrucks).toBeGreaterThanOrEqual(0)
+    expect(r!.road.meanTrucks).toBeLessThanOrEqual(r!.road.maxTrucks)
+    expect(total('landside.road-trucks', 'terminal') ?? 0).toBeGreaterThanOrEqual(0)
+    expect(r!.road.meanTrucks).toBeCloseTo(total('landside.road-trucks', 'terminal') ?? 0, 1)
+  })
+})
