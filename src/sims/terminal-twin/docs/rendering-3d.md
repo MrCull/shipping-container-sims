@@ -1,6 +1,6 @@
 # Rendering (3D view)
 
-Checked against ENGINE_VERSION 0.59.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when you change anything drawn in the Three.js view: containers, equipment rigs, vessel hulls, hatch panels,
 infrastructure, quality tiers, lighting, the backdrop and scenery, positional sound, or the home card. Pipeline, budgets
