@@ -283,6 +283,8 @@ export interface CraneSplitRequest {
    * Every STS in rail order. `vesselId` is the vessel it is assigned to (null = free);
    * `vesselBerthX` is that vessel's stern X, so a strategy can tell which side it is on. `outOfReach` (#303, present
    * only when true): the crane's class cannot reach the vessel's top deck tier or outer row, so it may not be assigned.
+   * `unreachableBays` (#369, present only when not empty): work bays with a slot outside the crane's rail reach (cranes
+   * never pass, so a crane stays its rail index x `stsMinSpacingM` from the quay start); they may not be assigned to it.
    */
   cranes: {
     stsId: string
@@ -291,6 +293,7 @@ export interface CraneSplitRequest {
     vesselId: string | null
     vesselBerthX: number | null
     outOfReach?: true
+    unreachableBays?: number[]
   }[]
 }
 

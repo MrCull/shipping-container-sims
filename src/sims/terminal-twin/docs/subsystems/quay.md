@@ -1,6 +1,6 @@
 # Quay subsystem: vessels, berths, STS cranes, hatch covers
 
-Checked against ENGINE_VERSION 0.61.0.
+Checked against ENGINE_VERSION 0.62.0.
 
 Read this when you change or tune anything between a vessel's arrival and its departure: berth allocation, the
 crane split, the shared STS rail, the STS discharge and load cycles, work packages, the vessel work order (POD and
@@ -82,15 +82,21 @@ decision and runs `firstFitBerth` in `berth.ts` (leftmost stretch, anchorage if 
 ### Crane split (`craneSplit`, default `balanced-moves`)
 
 Request: the vessel's work bays (`workBays`: bays with a discharge box on board, or a load slot when the load flow is
-active, with gantry X and move count), every crane in rail order with its vessel. Reply: assignments of crane to an
+active, with gantry X and move count), every crane in rail order with its vessel and, only when not empty,
+`unreachableBays` (#369: work bays with a 20 ft slot outside the crane's `railReach`). Reply: assignments of crane to an
 ascending bay list.
 
 1. `eligibleCranes`: free cranes for which every busy crane of another vessel stays on its correct side (a crane of a
    vessel berthed further along the quay must be at a higher rail index, and vice versa).
-2. `chooseCranes`: `n = min(maxSts, bays)` consecutive eligible cranes whose mean gantry X is nearest the mean X of
-   the work bays.
+2. `craneRuns`: every run of `n = min(maxSts, bays)` consecutive eligible cranes, the run whose mean gantry X is
+   nearest the mean X of the work bays first.
 3. `partition`: linear partition by dynamic programming, minimising the heaviest group then the sum of squares.
-   Weight per bay: moves (`balanced-moves`) or 1 (`equal-bays`).
+   Weight per bay: moves (`balanced-moves`) or 1 (`equal-bays`). A group may not hold a bay in its crane's
+   `unreachableBays` (#369); the first run with such a partition wins, then runs of `n - 1` cranes. When no run can
+   (a vessel berthed outside the #365 reach window by a custom TOS), the nearest run as before, so
+   `sts.rail-reachable` fails the run instead of the vessel waiting for ever. Without it the TTI peak day berthed
+   V005 (Feedermax) at 0 m and gave bay 0 (20 ft slots at 23.93 m) to STS102, which never goes below 27 m while
+   STS101 stood idle. Test: `tests/split-reach.test.ts`.
 
 `validateSplit` (engine) rejects: more than `maxSts` cranes, unknown / duplicate / busy cranes, empty or non-ascending
 bay lists, bay ranges out of rail order, bays not exactly covering the work bays, a busy crane between the assigned

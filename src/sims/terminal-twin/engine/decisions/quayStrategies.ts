@@ -58,32 +58,33 @@ export function eligibleCranes(req: CraneSplitRequest): CraneSplitRequest['crane
   })
 }
 
-/** Choose `n` consecutive eligible cranes whose centre is nearest the vessel's work. */
-function chooseCranes(req: CraneSplitRequest, n: number): string[] {
+/**
+ * Every run of `n` consecutive eligible cranes, nearest the vessel's work first (the mean gantry X of the run against
+ * the work centre; a tie keeps the lower run).
+ */
+function craneRuns(req: CraneSplitRequest, n: number): CraneSplitRequest['cranes'][] {
   const free = eligibleCranes(req)
-  if (n <= 0 || free.length === 0) return []
-  n = Math.min(n, free.length)
   const workCentre = req.bays.reduce((s, b) => s + b.x, 0) / req.bays.length
-  let best = -1
-  let bestCost = Infinity
   // #303: a free crane that is out of reach stays idle; never choose cranes on both sides of it.
   const idle = req.cranes.filter((c) => c.vesselId === null && c.outOfReach).map((c) => c.railIndex)
   const spansIdle = (i: number) => idle.some((r) => r > free[i].railIndex && r < free[i + n - 1].railIndex)
+  const runs: { cranes: CraneSplitRequest['cranes']; cost: number }[] = []
   for (let i = 0; i + n <= free.length; i++) {
     if (spansIdle(i)) continue
-    const mean = free.slice(i, i + n).reduce((s, c) => s + c.gantryX, 0) / n
-    const cost = Math.abs(mean - workCentre)
-    if (cost < bestCost - 1e-9) {
-      bestCost = cost
-      best = i
-    }
+    const cranes = free.slice(i, i + n)
+    runs.push({ cranes, cost: Math.abs(cranes.reduce((s, c) => s + c.gantryX, 0) / n - workCentre) })
   }
-  if (best < 0) return chooseCranes(req, n - 1)
-  return free.slice(best, best + n).map((c) => c.stsId)
+  // stable sort: a cost within 1e-9 of another counts as a tie, as the single best pick always did
+  return runs.sort((a, b) => (Math.abs(a.cost - b.cost) <= 1e-9 ? 0 : a.cost - b.cost)).map((r) => r.cranes)
 }
 
 /** Split the work bays into `n` contiguous groups whose weights are as equal as possible. */
-function partition(bays: CraneSplitRequest['bays'], n: number, weight: (b: CraneSplitRequest['bays'][number]) => number): number[][] {
+function partition(
+  bays: CraneSplitRequest['bays'],
+  n: number,
+  weight: (b: CraneSplitRequest['bays'][number]) => number,
+  canWork: (group: number, bay: number) => boolean = () => true,
+): number[][] | null {
   // Linear partition: minimise the heaviest group, then the sum of squares (dynamic programming).
   const m = bays.length
   const prefix = [0]
@@ -98,11 +99,14 @@ function partition(bays: CraneSplitRequest['bays'], n: number, weight: (b: Crane
       for (let i = g - 1; i < j; i++) {
         const prev = best[g - 1][i]
         if (prev.max === Infinity) continue
+        // #369: group g-1 takes bays i..j-1, so its crane must reach every one of them
+        if (!bays.slice(i, j).every((b) => canWork(g - 1, b.bay))) continue
         const s = sum(i, j)
         const cand = { max: Math.max(prev.max, s), sq: prev.sq + s * s, cut: i }
         const cur = best[g][j]
         if (cand.max < cur.max - 1e-9 || (Math.abs(cand.max - cur.max) <= 1e-9 && cand.sq < cur.sq - 1e-9)) best[g][j] = cand
       }
+  if (best[n][m].max === Infinity) return null
   const groups: number[][] = []
   let j = m
   for (let g = n; g >= 1; g--) {
@@ -113,11 +117,24 @@ function partition(bays: CraneSplitRequest['bays'], n: number, weight: (b: Crane
   return groups
 }
 
+/**
+ * The run of cranes nearest the work whose bays split so that each crane reaches its own (#369: a crane's
+ * `unreachableBays`, outside its rail reach, never go to it); fewer cranes when no run of `n` can. When no run can
+ * (a vessel berthed outside the reach window, #365), the nearest run as before, so `sts.rail-reachable` fails the run
+ * loudly instead of the vessel waiting for cranes for ever.
+ */
 function split(req: CraneSplitRequest, weight: (b: CraneSplitRequest['bays'][number]) => number): CraneSplitReply {
-  const cranes = chooseCranes(req, Math.min(req.maxSts, req.bays.length))
-  if (cranes.length === 0) return { assignments: [] }
-  const groups = partition(req.bays, cranes.length, weight)
-  return { assignments: cranes.map((stsId, k) => ({ stsId, bays: groups[k] })) }
+  let nearest: CraneSplitRequest['cranes'] | undefined
+  for (let n = Math.min(req.maxSts, req.bays.length); n > 0; n--) {
+    for (const cranes of craneRuns(req, n)) {
+      nearest ??= cranes
+      const groups = partition(req.bays, n, weight, (k, bay) => !cranes[k].unreachableBays?.includes(bay))
+      if (groups) return { assignments: cranes.map((c, k) => ({ stsId: c.stsId, bays: groups[k] })) }
+    }
+  }
+  if (!nearest) return { assignments: [] }
+  const groups = partition(req.bays, nearest.length, weight) as number[][]
+  return { assignments: nearest.map((c, k) => ({ stsId: c.stsId, bays: groups[k] })) }
 }
 
 /** As many cranes as allowed; contiguous bay ranges with near-equal numbers of moves. */
