@@ -21,13 +21,19 @@ x1.4: the quay is better used at the larger volume. The scale-1 `tt:profile` (0.
 (V003), 175,015 s (V004) and 268,337 s (V005); load boxes wait 662 s horizontal and 388 s at the STS on average; SHC
 idle 85 % (7 of 23 never used), ASC idle 81 %. The other breakdowns below are at 0.5.
 
-### Peak day status (ENGINE_VERSION 0.60.0)
+### Peak day status (ENGINE_VERSION 0.61.0)
 
 From 0.58.0 the peak day (`--until vessels:5`) went idle at 2 of 5 vessels: first-fit berthed the ULCV V003 at 0 m,
 below the rail reach of every crane able to work it (#303 crane classes), so its cranes waited for the rail for ever.
 The rail-reach fix (#365, 0.60.0: berth reach window, laydown within reach, `sts.rail-reachable`) berths V003 at
 33.067 m and gets past that stall; the run now fails later at a `yard.no-progress` in B14 (one claimed retrieve, every
-WTP pad taken; 5,215 moves, sim day 2 06:58). That yard stall is a separate follow-up.
+WTP pad taken; 5,215 moves, sim day 2 06:58). Cause (#367, 0.61.0): every B14 pad held a box released ahead
+(`padded`) for STS104, STS106, STS107 and STS108, all still discharging, so STS105's next box (job A9897) had no pad.
+`stageAhead` had counted only waiting retrievals with an empty `wtpPadId`, but `nextPadRetrieval` writes its pick to a
+job whose `ascDispatch` reply is still null, so that job looked like neither a taken pad nor a waiting one and boxes
+released ahead took the pad kept free. Every unstarted retrieval now counts. The run then gets 3 of 5 vessels done
+(8,321 moves, sim day 4 00:22) and fails at `sts.rail-reachable`: V005 (Feedermax) berths at 0 m and STS102 must reach
+23.93 m, below its 27 m rail limit. That is the next blocker.
 
 ### Where crane time goes
 
@@ -101,7 +107,8 @@ These end a run instead of slowing it, so they cap the usable `TTI_MOVES_SCALE`:
 - **`rehandle: full`**: `pumpRehandle` sets it when `rehandleCandidates` is empty; it is retried only when an ASC lifts a
   box (`reopenFullJobs` on `AscRetrieved`). Room that appears without a lift is an unproven gap.
 - **Pads full of non-head load boxes** (baseline 0.5 B14 at 81,017 s): fixed by the head box pad reserve (#213,
-  `stageAhead`: a non-head box takes a pad only when `free - waiting retrievals - headsWithoutPad >= 2`).
+  `stageAhead`: a non-head box takes a pad only when `free - waiting retrievals - headsWithoutPad >= 2`). A waiting
+  retrieval is every one not started yet, including one that already has a pad picked (#367, peak day B14 at 195,000 s).
 - **Three cranes waiting for each other** (0.5 peak day idle at 89,151 s): fixed by #212.
 
 What makes scale 1 work (all in `scenario/presets.ts`): `TTI_YARD_RESERVE` 0.1 (pairs of bays kept free of pre-fill and
