@@ -1,6 +1,6 @@
 # Browser host
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.59.0.
 
 Read this when you change the engine Web Worker or its protocol, playback and time controls, `SceneModel`, the Pinia
 store, any component or composable, the dashboard, debugger, inspector, picking, overlays, bay viewer, Colour by,

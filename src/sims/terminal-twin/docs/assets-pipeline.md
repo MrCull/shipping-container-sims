@@ -1,6 +1,6 @@
 # Asset pipeline
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.59.0.
 
 Read this when you add or change a GLB model, a livery or atlas, a sidecar, an asset budget, or a synthesized sound;
 when `tt:assets:check` or `tt:sounds:check` fails in CI; or when you need the dev asset viewer. How the renderer uses
