@@ -93,7 +93,8 @@ function scarce(): ScenarioConfig {
 /** Crowded: two cranes feed one block with 6 SHCs, so trips cross and compete for conflict zones. */
 function crowded(): ScenarioConfig {
   return new ScenarioBuilder('shc-crowded', '2 STS → 6 SHC → 1 WTP strip')
-    .seed(7)
+    // seed 11 (was 7 before the RNG stream split, #310): on seeds 2, 4, 6, 7, 8 and 12 no trip happens to wait
+    .seed(11)
     .moveVariation(10)
     .driverVariability(20)
     .quay(500, { mooringS: 60, unmooringS: 60 })

@@ -125,8 +125,8 @@ export type {
 } from './decisions/types'
 export { yardGroupKey, yardGroupBreak, yardGroupingOn, yardViewOfProps } from './decisions/yardGrouping'
 export type { YardGroupBreak } from './decisions/yardGrouping'
-export { strategies, getStrategy } from './decisions/strategies'
-export type { StrategyDefinition, StrategyRegistry, DecisionPointStrategies } from './decisions/strategies'
+export { strategies, getStrategy, resolveStrategyParams } from './decisions/strategies'
+export type { StrategyDefinition, StrategyRegistry, DecisionPointStrategies, StrategyParamSpec, StrategyParams } from './decisions/strategies'
 export type { DecisionRequestedPayload, DecisionResolvedPayload } from './events'
 export type { HandlerKpiReport } from './kpis'
 export type { SimQuery } from './query'
@@ -139,6 +139,7 @@ export type { HatchPanelState, HatchPanelStatus, HatchLaydownSite } from './stat
 export type { HatchKpiReport } from './kpis'
 export { hatchEnabled, hatchSettings, hatchLaydownProblems, laydownSites, laydownRect, laydownCentreZ, laydownTopY } from './hatch'
 export { hashDigest } from './hash'
+export { nextRandom, streamSeedState, type RngStream, type RngStreams, type SeededStream, type SideStream } from './rng'
 export {
   createSimulation,
   restoreSimulation,

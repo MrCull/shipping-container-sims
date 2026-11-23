@@ -16,7 +16,10 @@ async function deltas(config: ScenarioConfig, fullScan: boolean, steps: WorkerRe
   for (const req of [{ op: 'load', config, seed: config.seed } as WorkerRequest, ...steps]) {
     const reply = await h.handle({ ...req, rid: ++rid })
     if (!reply.ok) throw new Error(reply.error)
-    out.push({ delta: reply.delta, hash: reply.info.eventLogHash })
+    // Entity reports for different entities at one sim time may come from different events of the request, so their
+    // order in a delta is not part of the observation (#310 changed the event order and showed it): compare sorted.
+    const entities = [...reply.delta.entities].sort((a, b) => `${a.kind}:${a.id}`.localeCompare(`${b.kind}:${b.id}`))
+    out.push({ delta: { ...reply.delta, entities }, hash: reply.info.eventLogHash })
   }
   return { out, missed: h.missedByEvents() }
 }

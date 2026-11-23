@@ -6,7 +6,7 @@
  * that overlap it. The expected count is rounded with one draw (floor + Bernoulli of the fraction). Demand above the
  * window's cap is rejected and counted: the generator never books beyond a cap.
  */
-import type { AppointmentConfig, ScenarioConfig, TruckTransactionKind } from '../scenario/types'
+import { measurementWarmUpOf, type AppointmentConfig, type ScenarioConfig, type TruckTransactionKind } from '../scenario/types'
 import { pickWeighted } from '../scenario/bayPlan'
 import { HOUR_S, kpiClockOf } from './kpi/clock'
 import type { Appointment } from './state'
@@ -36,7 +36,7 @@ export function appointmentHorizonS(config: ScenarioConfig): number {
   if (a.horizonS !== undefined) return a.horizonS
   const end = config.endConditions?.simDurationS
   if (end === undefined) return DEFAULT_HORIZON_S
-  return end + (config.yardStart?.mode === 'warmup' ? (config.yardStart.warmUpS ?? 48 * HOUR_S) : 0)
+  return end + (measurementWarmUpOf(config) ?? 0)
 }
 
 export interface AppointmentPlan {

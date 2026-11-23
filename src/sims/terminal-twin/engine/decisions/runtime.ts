@@ -24,7 +24,7 @@
 import type { EngineContext, ReactorMap } from '../context'
 import type { EventPayloads, EventSubjects, EventType } from '../events'
 import type { SimQuery } from '../query'
-import { seedState } from '../rng'
+import { streamSeedState } from '../rng'
 import type { SimState } from '../state'
 import { decisionRng, drawInjection, type Injection } from './latency'
 import { getStrategy, strategies } from './strategies'
@@ -88,8 +88,6 @@ export interface DecisionState {
   kpis: Record<string, HandlerKpiCounters>
 }
 
-/** Mixed into the seed so the injector stream differs from the main RNG. */
-const DECISION_RNG_SALT = 0x5bd1e995
 
 export function createDecisionState(seed: number): DecisionState {
   const kpis: Record<string, HandlerKpiCounters> = {}
@@ -111,7 +109,7 @@ export function createDecisionState(seed: number): DecisionState {
       equipmentIdleS: 0,
     }
   }
-  return { nextCorrelation: 0, rngState: seedState(seed ^ DECISION_RNG_SALT), pending: {}, kpis }
+  return { nextCorrelation: 0, rngState: streamSeedState(seed, 'latency'), pending: {}, kpis }
 }
 
 /** Subjects of a decision's outcome events: the waiting equipment, plus the boxes of a pre-run decision (so invariants see them). */
@@ -180,11 +178,14 @@ export function createDecisionRuntime(deps: DecisionRuntimeDeps): DecisionRuntim
     const cfg = pointConfig(dp)
     const custom = deps.handlers[dp]
     const strategy = cfg.strategy ?? strategies[dp].default
+    // params belong to the selected strategy and are checked even when a custom handler answers (#312)
+    const configured = getStrategy(dp, strategy, cfg.params)
     resolved[dp] = custom
       ? { fn: custom as DecisionHandler<DecisionPointId>, name: 'custom' }
-      : { fn: getStrategy(dp, strategy), name: `strategy:${strategy}` }
+      : { fn: configured, name: `strategy:${strategy}` }
+    // the fallback takes the params only when it is the selected strategy
     const fb = cfg.fallbackStrategy ?? strategies[dp].default
-    fallbacks[dp] = { fn: getStrategy(dp, fb), name: `fallback:${fb}` }
+    fallbacks[dp] = { fn: getStrategy(dp, fb, fb === strategy ? cfg.params : undefined), name: `fallback:${fb}` }
   }
 
   // In-flight async decisions (not in SimState: Promises are not JSON).

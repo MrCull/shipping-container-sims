@@ -1,6 +1,6 @@
 # Yard: ASC blocks, allocation, rehandles and yard starts
 
-Checked against ENGINE_VERSION 0.59.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 Read this when you change how boxes are stacked, retrieved or dug out of an ASC block, touch ASC dispatch or the
 twin-ASC rail, tune a yard strategy (`yardAllocation`, `rehandleTarget`, `ascDispatch`, `emptyAllocation`), work on
@@ -383,11 +383,14 @@ No stacked boxes and no pool. Booked exports exist with custody `external`; truc
 until a booked box is stacked; the vessel completes once its exports arrived and loaded. Needs `config.landside` and
 the landside on (`createInitialState` throws otherwise).
 
-**Warm-up** (`warmUp.ts`): `WarmUpEnded` at `warmUpS` runs `resetCounters`: every number under `state.kpis` and the
+**Warm-up** (`warmUp.ts`): a `warmup` start is an empty start plus a measurement warm-up of `warmUpS` (#311; its event
+logs are unchanged, pinned in `tests/measurement-warmup.test.ts`). Any start can set `config.measurementWarmUpS`
+instead (a pre-filled start uses it to drop its start-up transient); `scenario/types.ts#measurementWarmUpOf` resolves
+the length (explicit value first, 0 = none, else the `warmup` start's `warmUpS`). `WarmUpEnded` at that time runs `resetCounters`: every number under `state.kpis` and the
 decision-handler KPIs is zeroed, except keys ending in `Since`; `firstMoveStartS`/`lastMoveEndS` become null. This
 includes `state.kpis.landside`. End conditions are ignored during the warm-up; `simDurationS` counts the measured
 period; the "all vessels" end counts vessels not completed at warm-up end. The collector is rebuilt on a clock moved
-by `warmUpS` (gauge starts from `warmUp.cellsAtEnd`). `kpiReport().warmUp {durationS, ended}`.
+by the warm-up (gauge starts from `warmUp.cellsAtEnd`). `kpiReport().warmUp {durationS, ended}`.
 
 ## Silent yard deadlock and `yard.no-progress`
 

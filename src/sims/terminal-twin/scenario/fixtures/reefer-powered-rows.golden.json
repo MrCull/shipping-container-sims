@@ -3,7 +3,7 @@
   "seed": 19,
   "status": "ended",
   "endReason": "simDurationS >= 3600",
-  "eventLogHash": "072b30cf32cefc",
+  "eventLogHash": "1ffa39f129744e",
   "kpis": {
     "simTimeS": 3600,
     "eventsProcessed": 1017,
@@ -14,7 +14,7 @@
         "moves": 24,
         "cycles": 20,
         "twinLifts": 4,
-        "grossMovesPerHour": 31.258,
+        "grossMovesPerHour": 31.408,
         "railWaitS": 0
       }
     },
@@ -25,8 +25,8 @@
         "anchorageWaitS": 0,
         "berthX": 0,
         "berthedAtS": 60,
-        "departedAtS": 2902.482,
-        "turnaroundS": 2842.482,
+        "departedAtS": 2891.059,
+        "turnaroundS": 2831.059,
         "sts": [
           "STS01"
         ]
@@ -198,13 +198,13 @@
           "loadedDistanceM": 2810.067,
           "reservationWaitS": 0,
           "stateS": {
-            "parked": 1493.547,
-            "moving-to-collect": 431.004,
+            "parked": 1517.147,
+            "moving-to-collect": 430.021,
             "queuing-to-collect": 0,
-            "collecting": 710.006,
+            "collecting": 699.893,
             "moving-to-deliver": 70,
             "queuing-to-deliver": 0,
-            "delivering": 895.442
+            "delivering": 882.939
           },
           "handovers": 40,
           "parkingReturns": 20,
@@ -214,15 +214,15 @@
           "jobs": 4,
           "emptyDistanceM": 1107.5,
           "loadedDistanceM": 498.5,
-          "reservationWaitS": 2.183,
+          "reservationWaitS": 0,
           "stateS": {
-            "parked": 3188.539,
-            "moving-to-collect": 84.377,
-            "queuing-to-collect": 2.183,
-            "collecting": 142.069,
+            "parked": 3196.657,
+            "moving-to-collect": 84.24,
+            "queuing-to-collect": 0,
+            "collecting": 139.622,
             "moving-to-deliver": 14,
             "queuing-to-deliver": 0,
-            "delivering": 168.833
+            "delivering": 165.482
           },
           "handovers": 8,
           "parkingReturns": 4,
@@ -274,7 +274,7 @@
       "IMPORT": {
         "count": 99,
         "departed": 0,
-        "meanS": 122766.833,
+        "meanS": 122766.974,
         "maxS": 967887
       }
     },
@@ -282,8 +282,8 @@
       "released": 11,
       "started": 11,
       "completed": 11,
-      "leadTimeMeanS": 438.691,
-      "leadTimeMaxS": 666.283,
+      "leadTimeMeanS": 438.395,
+      "leadTimeMaxS": 670.438,
       "boxesLoaded": 0
     },
     "ordering": {

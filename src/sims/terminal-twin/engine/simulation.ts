@@ -18,7 +18,7 @@ import { createPrefillDriver } from './subsystems/prefill'
 import { createEventLogger, type LogOptions } from './logging'
 import { createQuery, type SimQuery } from './query'
 import { planAccuracy, readCranePlan, type CranePlanView, type PlanAccuracy } from './cranePlan/plan'
-import { nextRandom } from './rng'
+import { drawFrom } from './rng'
 import { createInitialState, resolveSubsystemModes, type CustodyRef, type SimState } from './state'
 import { ascReactors } from './subsystems/asc'
 import { berthReactors } from './subsystems/berth'
@@ -36,7 +36,7 @@ import type { ScenarioConfig, SubsystemModes } from '../scenario/types'
 import { assertValidScenario } from '../scenario/validate'
 
 /** Bump when engine behaviour changes in a way that invalidates snapshots. */
-export const ENGINE_VERSION = '0.60.0'
+export const ENGINE_VERSION = '0.61.0'
 export const SNAPSHOT_SCHEMA_VERSION = 1
 
 /** Subsystem reactors, in call order (the decision runtime's bookkeeping reactors run first). */
@@ -225,13 +225,16 @@ export interface InvariantStats {
   wallMs: number
 }
 
-/** The event as the measured clock sees it (warm-up removed): its time and any planned motion segments move back. */
+/**
+ * The event as the measured clock sees it (warm-up removed): its time and every absolute time in its payload (a
+ * departure time `departAt`, planned motion segments) move back, so a warm-up event lands at a negative time.
+ */
 function shiftEvent(ev: EngineEvent, by: number): EngineEvent {
-  const payload = ev.payload as unknown as { segments?: { t0: number; t1: number }[] }
-  const shifted: unknown = Array.isArray(payload.segments)
-    ? { ...payload, segments: payload.segments.map((s) => ({ ...s, t0: s.t0 - by, t1: s.t1 - by })) }
-    : ev.payload
-  return { ...ev, t: ev.t - by, payload: shifted } as EngineEvent
+  const payload = ev.payload as unknown as { segments?: { t0: number; t1: number }[]; departAt?: number }
+  let shifted = payload
+  if (Array.isArray(payload.segments)) shifted = { ...shifted, segments: payload.segments.map((s) => ({ ...s, t0: s.t0 - by, t1: s.t1 - by })) }
+  if (typeof payload.departAt === 'number') shifted = { ...shifted, departAt: payload.departAt - by }
+  return { ...ev, t: ev.t - by, payload: shifted } as unknown as EngineEvent
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
@@ -275,18 +278,19 @@ export function createSimulation(
   // a pre-filled start places its boxes in the pre-run phase: its stacks are counted once the last one is placed
   const initialCells = (): Record<string, number> => state.prefillCells ?? startCells
   // a warm-up start (TT-14): the KPI series start when the measured period does, on a clock moved by the warm-up
-  const warmUpS = (): number => (state.warmUp?.ended ? state.warmUp.durationS : 0)
+  /** Sim time on the measured clock (0 during the warm-up). */
+  const measuredNow = (): number => Math.max(0, state.now - (state.warmUp?.durationS ?? 0))
+  // A measurement warm-up (#309 review): the collector runs on the measured clock from the start and sees the
+  // warm-up as negative times, so work in progress at the warm-up end is cut there (intervals start at 0) and
+  // counts before it are dropped; nothing is rebuilt at `WarmUpEnded`.
   const newCollector = () => {
     const w = state.warmUp
-    if (!w?.ended)
-      return createKpiCollector(config, { vesselBoxes, containerSize: (id) => state.containers[id].size, initialCells: initialCells() })
+    const info = { vesselBoxes, containerSize: (id: string) => state.containers[id].size, initialCells: initialCells() }
+    if (!w) return createKpiCollector(config, info)
     const clock = kpiClockOf(config)
-    return createKpiCollector(
-      { ...config, kpi: { ...config.kpi, startTimeOfDayS: clock.startTimeOfDayS + w.durationS } },
-      { vesselBoxes, containerSize: (id) => state.containers[id].size, initialCells: w.cellsAtEnd ?? {} },
-    )
+    return createKpiCollector({ ...config, kpi: { ...config.kpi, startTimeOfDayS: clock.startTimeOfDayS + w.durationS } }, info)
   }
-  /** Feed the collector: warm-up events are dropped; measured events are shifted to the measured clock. */
+  /** Feed the collector: with a warm-up, every event is shifted to the measured clock. */
   const feed = (ev: EngineEvent): void => {
     // the pre-run phase is not part of the measured run: its decisions are in the log but not in the KPI series.
     // The collector starts from the stacks the pre-run built, so it is renewed once the last box is placed.
@@ -298,10 +302,7 @@ export function createSimulation(
       return
     }
     const w = state.warmUp
-    if (!w) return collector.ingest(ev)
-    if (ev.type === 'WarmUpEnded') collector = newCollector()
-    if (!w.ended || ev.t < w.durationS) return
-    collector.ingest(shiftEvent(ev, w.durationS))
+    collector.ingest(w ? shiftEvent(ev, w.durationS) : ev)
   }
   let collectorSeeded = false
   let collector = newCollector()
@@ -384,11 +385,7 @@ export function createSimulation(
         return ev
       },
       requestDecision: (dp, request, subjects, opts) => decisions.request(ctx, dp, request, subjects, opts),
-      random: () => {
-        const [value, next] = nextRandom(state.rngState)
-        state.rngState = next
-        return value
-      },
+      random: (stream) => drawFrom(state.rng, stream),
       transferCustody: (containerId: string, to: CustodyRef) => {
         const box = state.containers[containerId]
         if (!box) throw new Error(`transferCustody: unknown container ${containerId}`)
@@ -623,11 +620,11 @@ export function createSimulation(
     kpiReport: () => {
       const report = buildKpiReport(state, log.length)
       // time per operational state and handovers come from the collector (measured period)
-      const totals = collector.shcTotals(Math.max(0, state.now - warmUpS()))
+      const totals = collector.shcTotals(measuredNow())
       for (const [id, k] of Object.entries(report.horizontal?.shcs ?? {})) Object.assign(k, totals[id])
       return report
     },
-    kpiSeries: () => collector.report(Math.max(0, state.now - warmUpS())),
+    kpiSeries: () => collector.report(measuredNow()),
     invariantReport: () => clone(invariants),
     cranePlan: (vesselId) => readCranePlan({ state, config }, vesselId),
     planAccuracy: () => planAccuracy(state),

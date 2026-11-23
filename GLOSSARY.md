@@ -96,6 +96,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Decision point:** a place where the sim asks the TOS for a decision (berth allocation, crane split, yard allocation, ground-position selection, dispatch, …).
 - **Handler:** a function that answers a decision point. Handlers are swappable, and a **handler set** maps decision points to handlers.
 - **Strategy (built-in strategy):** a named built-in handler for a decision point (1–3 each, e.g. `lowest-free-lane`), selected per scenario.
+- **Strategy parameter (param):** a named numeric tuning constant of a built-in strategy (e.g. `TIER_COST_M` of `nearest-wtp`), declared with default, unit, description and range, set per decision point with `config.decisions.points.<dp>.params` or `tt:run --param <dp>.<name>=<value>`. Unset params keep their defaults (today's constants), so a run without params is unchanged.
 - **Correlation id:** the id that ties a decision's request, failure and reply events together (`<decisionPoint>-<n>`).
 - **Async mode:** what the sim does while a decision is pending: **keep running** (equipment waiting on it idles) or **pause** (the sim clock freezes).
 - **Latency injector:** a per-decision-point wrapper that delays replies (none / fixed / random ms) and injects a % of timeouts or errors.
@@ -152,6 +153,19 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Final report:** the panel shown when a run ends: reason, **highlights**, headline KPIs, tables and export buttons. The scene stays inspectable; only Reset and New Scenario remain of the time controls.
 - **Highlights:** friendly facts in the final report: hardest-working crane, busiest block, longest wait.
 - **TOS (terminal operating system):** the external software whose decisions the handlers stand in for.
+
+## Experiments (spec #309)
+
+- **Experiment:** a JSON file (format `terminal-twin-experiment`) that runs several configs of one base preset or fixture on the same seeds and compares them (`pnpm run tt:experiment`). Guide and examples: `src/sims/terminal-twin/docs/experiments.md`, `src/sims/terminal-twin/experiments/`.
+- **Config (experiment):** one named variant in an experiment, written as overrides on the base (`patch`, a JSON Merge Patch on the base scenario that `tt:run --patch` also takes, and the `strategies`, `params` and `latency` shorthand per decision point). Not the `ScenarioConfig` itself.
+- **Experiment warm-up and horizon:** every replicate gets a measurement warm-up of `warmUpS` (default 2 h, any yard start mode; it replaces a warm-up yard start's own) and then runs `horizonS` of measured time (default 24 h), so all replicates measure the same span.
+- **Grid (experiment):** `grid.factors`, config paths mapped to value lists; it adds one config per combination (the cross product), named from its factor values, e.g. `yardAllocation=grouped,shcDispatch.PAIRING_RADIUS_M=0`.
+- **Baseline config:** the config every other config is compared with (default the first, explicit or grid). Its first seed runs first as the probe: a primary KPI that is null there (it does not apply to the scenario) stops the experiment with an error.
+- **Replicate:** one run of one config on one seed. It is `ok` or invalid (`invariant`, `failed`, `error`); an invalid replicate drops its seed from that config's pairing.
+- **Cost guard (experiment):** `tt:experiment` estimates its wall time before running (replicates x sim-hours x ms per sim-hour / jobs) and, above 10 minutes, asks on a TTY or refuses (exit 2) without `--yes`.
+- **Guard KPI:** a KPI an experiment config must not make worse than a tolerance (absolute, or percent of the baseline mean). Its status is held, breached, uncertain or insufficient data, from the 95% CI of the per-seed degradation.
+- **Primary KPI:** the one KPI an experiment's verdict is about. Each experiment KPI has a direction (higher or lower is better); the verdict is better, worse, no difference detected or insufficient data, from the 95% CI of the per-seed difference.
+- **RNG stream:** one seeded mulberry32 state (a uint32 in `SimState`) that a single source of randomness draws from: `sts:<id>` (that STS's move variation), `shc:<id>` (that SHC's driver variability), `decisions` (the `random` field of yard and ASC requests), `reactor` (the rest), plus the latency, landside, bay-plan, pre-fill and container-property side streams. Each starts from the scenario seed and its own salt, so the same seed gives each STS and SHC the same luck whatever the strategies (#310).
 
 ## Rehandles (TT-12)
 
@@ -245,6 +259,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Pre-fill:** the starting population of a pre-filled yard: boxes booked to the scenario's vessels, imports awaiting pickup with their dwell partly elapsed, and the empty pool. The big presets add filler boxes in set shares (imports, exports, transshipment) and stack them group by group: no stack mixes groups, and booked boxes stack up their own group before opening a stack (#270), so the filler finds room.
 - **Pre-run:** the phase before `ScenarioStarted` in which a pre-filled start asks `yardAllocation` for each starting box through the decision runtime. Its decision events carry `preRun: true`, sit at sim time 0 and are not in the KPI series.
 - **Warm-up / measured period:** the first `warmUpS` of a warm-up start / everything after it. At `WarmUpEnded` the KPI and end-condition counters restart at zero.
+- **Measurement warm-up:** a scenario-level warm-up (`measurementWarmUpS`, `tt:run --warm-up`) for any yard start mode, so a pre-filled run can exclude its start-up transient. A warm-up yard start is an empty start plus a measurement warm-up; when both are set, the measurement warm-up wins.
 
 ## Presets and layout (TT-15)
 

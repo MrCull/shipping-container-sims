@@ -1,6 +1,6 @@
 # CLI and tooling
 
-Checked against ENGINE_VERSION 0.54.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 Read this when you run or change a `pnpm run tt:*` command or a file in `cli/`, need a flag, an output format or an
 exit code, or want to run heavy jobs (peak-day runs, the smoke suite) without colliding with other agents.
@@ -18,6 +18,7 @@ module that takes `argv` and a `print` callback, so tests call the logic directl
 |---|---|---|
 | `tt:run` | `cli/run.ts` -> `cli/runCli.ts#runCli` | Headless run of a fixture, preset, JSON config or snapshot |
 | `tt:diff` | `cli/diff.ts` -> `cli/diffCli.ts#runDiffCli` | First diverging event between two logs or two runs |
+| `tt:experiment` | `cli/experimentRun.ts` -> `cli/experimentCli.ts#runExperimentCli` (core: `cli/experiment.ts#runExperiment`) | Run configs x seeds in parallel under the heavy lock and compare each config with the baseline, paired by seed (spec #309) |
 | `tt:golden` | `cli/golden-cli.ts` -> `cli/golden.ts#runGoldenCli` | Check or rewrite fixture golden summaries |
 | `tt:fixtures` | `cli/build-fixtures.ts` | Regenerate every fixture JSON from `definitions.ts` |
 | `tt:sts` | `cli/sts.ts#runStsCli` | STS productivity buckets from a saved event log |
@@ -47,17 +48,20 @@ Scenario source (exactly one):
 - `--preset <name>`: a key of `scenario/presets.ts#presets` (quote names with spaces: `--preset "TTI Algeciras, peak day"`).
 - `--from-snapshot <file>`: resume a snapshot written by `--snapshot` (read with `readJsonFile`, restored with
   `adopt: true`). It takes scenario, seed, decisions, end conditions, subsystems, ordering and match-line from the
-  snapshot: combining it with `--fixture/--preset/--seed/--async-mode/--strategy/--latency/--end/--match-line/
+  snapshot: combining it with `--fixture/--preset/--seed/--patch/--async-mode/--strategy/--param/--latency/--end/--warm-up/--match-line/
   --subsystem/--ordering` is a usage error. `--events` and `--log` then hold only the window's events.
 
 | Flag | Values | Effect |
 |---|---|---|
 | `--seed <n>` | integer | override the scenario seed |
+| `--patch <json\|file>` | a JSON object inline (starts with `{`) or a JSON file | JSON Merge Patch (RFC 7396, `cli/scenarioPatch.ts#mergePatch`, the same one experiment configs use) on the loaded scenario, applied before every other flag; not with `--from-snapshot`. Example: `--patch '{"quay":{"mooringS":90}}'` |
 | `--until <cond>` | `end` (default), `time:<s>`, `moves:<n>`, `vessels:<n>`, `event:<Type>` | stop condition (`parseUntil`); `time:T` leaves `now = T` exactly |
 | `--end <cond>` | `moves:<n>`, `vessels:<n>`, `time:<s>`; repeatable | replaces `config.endConditions`; the first met ends the run |
+| `--warm-up <s>` | seconds, 0 or more | sets `config.measurementWarmUpS` (#311): KPIs and end conditions count only after it, from any yard start; overrides a `warmup` start's `warmUpS`; 0 = none. `--until time:` stays absolute sim time |
 | `--handlers <name>` | `default`, `highest-free-lane`, `nearest-job`, `broken-first-lane` | handler set (`cli/handlerSets.ts`) |
 | `--async-mode <m>` | `keep-running` (default), `pause` | decision async mode |
 | `--strategy <dp>=<name>` | repeatable | built-in strategy per decision point (validated with `getStrategy`) |
+| `--param <dp>.<name>=<value>` | repeatable | strategy parameter (#312) of the point's selected strategy (after `--strategy`, else the scenario's, else the default), merged into `points.<dp>.params`; an unknown name, a name of another strategy, a non-number or an out-of-range value is a usage error (exit 2). Names, defaults and ranges: [decision-points.md](decision-points.md#strategy-parameters). Example: `pnpm run tt:run --fixture asc-1sts-10-boxes-1block --strategy yardAllocation=nearest-wtp --param yardAllocation.TIER_COST_M=20` |
 | `--latency <dp>=<spec>` | repeatable | `none`, `fixed:<ms>`, `uniform:<min>-<max>`, `exp:<mean>`, then `,timeout:<pct>`, `,error:<pct>`, `,timeoutMs:<ms>` |
 | `--match-line` | flag | `emptyAllocation.matchLine = true` |
 | `--subsystem <name>=<mode>` | repeatable; quay, berth, yard, shc, asc, landside = real, instant, off | merged over `config.subsystems`; impossible combinations exit 2 |
@@ -93,6 +97,143 @@ committed directly (not queued, not invariant-checked).
 Window reproduction: run to `--until time:T --snapshot s.json`, then `--from-snapshot s.json --until time:T2 --events
 w.jsonl --log w.log.jsonl --log-level debug`. Events at `t <= T` are in the snapshot; the window holds `t > T` and
 equals that slice of the uninterrupted run. Handlers are not in snapshots: pass the same `--handlers`.
+
+## tt:experiment
+
+Guide, example files and how to read the report: [experiments.md](experiments.md). This section is the flag and field reference.
+
+```
+pnpm run tt:experiment <experiment.json> [--jobs N] [--out DIR] [--yes] [--dry-run]
+```
+
+Runs every config of an experiment file on every seed, then compares each config with the baseline config seed by
+seed. Flags (#317):
+
+- `--jobs N` (default the CPU count): replicates run at once, each in a forked worker process
+  (`cli/experimentWorker.ts`, under the tsx loader). `--jobs 1` runs them in process, one after another. Results come
+  back in plan order, so the report does not depend on scheduling (`tests/experiment-parallel.test.ts`).
+- `--out DIR` (default `.tt-experiments/<timestamp>/`, gitignored, printed at the start): `report.json`, `report.md` and
+  `replicates/<config>/<seed>.summary.json` (each replicate's `RunSummary`; a config name's characters outside
+  `A-Za-z0-9._=,+-` become `_` in its folder name).
+- `--yes`: skip the cost question.
+- `--dry-run`: validate, print the expanded configs (baseline marked), the replicate count and the estimate, then exit 0
+  without taking the lock or running anything.
+
+Before running it prints validation warnings, the configs, the replicate count and the estimate. Estimate =
+replicates x (warm-up + horizon) sim-hours x ms per sim-hour / jobs (jobs capped at the replicate count). Ms per
+sim-hour comes from the `perf/baseline.json` entry for the base preset (`pnpm run tt:bench`), with its sweep share
+(taken as half its invariant time) scaled down to the experiment's `sweepEvery` 10000, else 4000 ms
+(`DEFAULT_MS_PER_SIM_HOUR`, about a peak day). Cost guard: above 10 minutes without `--yes`, it asks `Run it? [y/N]` on
+a TTY and exits 2 on anything but yes; on a non-TTY it exits 2 with a hint to pass `--yes`.
+
+Then it takes the machine-wide heavy lock (`cli/heavyLock.ts`: the same `bg-heavy.lock` flock and `bg-heavy.holder`
+line as `scripts/bg.sh run --heavy` and `scripts/proof-runner.sh`, holder `tt:experiment <out>`), so it waits behind a
+smoke suite or another heavy run (printing `tt:experiment: waiting for heavy lock held by ...`) and they wait behind it.
+Under `BG_HEAVY_HELD=1` (inside `scripts/bg.sh run --heavy`) it does not take the lock again; without a `flock` binary it
+runs unlocked. Progress: one line per finished replicate, `N/M replicates done, K invalid, about X min left`.
+
+`report.json` is format `terminal-twin-experiment-report`, version 4 (version 2 added `guards`, version 3
+`expanded.warmUpS` and `warnings`, version 4 each replicate's `eventLogHash`). Provenance: `ENGINE_VERSION`, commit,
+Node, CPU, start and end time. Each replicate carries the `tt:run` command that reproduces it: running it prints the
+same `Event-log hash:` as the replicate's `eventLogHash` (`tests/experiment-cli.test.ts`). `report.md`: warm-up and
+horizon, verdict table, guards table, full KPI table, invalid and dropped replicates, notes, provenance, one `tt:run`
+line per replicate. Exit codes: 0 completed with every replicate valid, 1 completed with at least one invalid
+replicate, 2 usage or validation error (unknown preset, fixture, KPI, decision point or strategy; a bad guard tolerance,
+`warmUpS` or `--jobs`; a missing or unreadable file) or a refused cost confirmation. Validation warnings (a yardStart
+warm-up the experiment's warm-up replaces) print as `Warning: ...` lines before the run and go into the report's
+`warnings` and the `## Warnings` section of `report.md`.
+
+In process: `runExperimentCli(args, print, options)` resolves to the exit code; `options.executeReplicate` runs
+replicates in process with that executor, `interactive` and `confirm` stand in for the TTY, `heavyLock: false` skips the
+lock. The core splits into `planExperiment` (validate, expand, one `ReplicatePlan` per config and seed),
+`executeSafely` and `assembleReport(plan, results, provenance)`; `runExperiment` chains them sequentially.
+
+Experiment file (format `terminal-twin-experiment`, version 1):
+
+```json
+{
+  "format": "terminal-twin-experiment",
+  "version": 1,
+  "name": "Pad choice",
+  "base": { "fixture": "tracer-1sts-10-boxes" },
+  "warmUpS": 0,
+  "horizonS": 3600,
+  "seeds": { "count": 10, "from": 1 },
+  "baseline": "A",
+  "primary": { "kpi": "grossMovesPerHour" },
+  "guards": [{ "kpi": "truckTurnaroundS", "tolerance": { "pct": 5 } }],
+  "configs": [{ "name": "A" }, { "name": "B", "strategies": { "wtpPadSelection": "nearest-box" } }]
+}
+```
+
+- `base`: `{ "preset": <name> }` or `{ "fixture": <name> }`. `warmUpS` (default 7200, 0 = none) is every replicate's
+  measurement warm-up (`measurementWarmUpS`, `tt:run --warm-up`), excluded from KPIs and the horizon with any yard
+  start mode (#316); on a `yardStart.mode: 'warmup'` scenario it replaces that warm-up, and validation warns.
+  `configs` is optional when `grid` gives at least one config (a grid-only experiment);
+  the baseline then defaults to the first grid config. `horizonS` (default 86400) replaces the end conditions (`simDurationS`, measured time counted after the warm-up), so
+  a replicate ends at sim time `warmUpS + horizonS`. `seeds`: a list or `{ count, from }` (default 10 seeds from 1). `baseline`: default the first config.
+- A config overrides the base four ways (#315), applied in this order to build its `ScenarioConfig`:
+  - `patch`: a JSON Merge Patch (RFC 7396) on the base: objects merge key by key, `null` deletes a key, anything else
+    (arrays included) replaces. `{ "patch": { "shcs": [{ "id": "SHC01" }] } }` runs with one SHC. The patched config
+    must pass the engine's scenario check (`assertValidScenario`), and a patch may not set `endConditions` or
+    `measurementWarmUpS` (every replicate runs the same warm-up and horizon).
+  - `strategies`: `{ "<dp>": "<strategy>" }`, a built-in strategy per decision point.
+  - `params`: `{ "<dp>": { "<NAME>": n } }`, strategy params (`--param`), checked against the point's strategy (this
+    config's, else the patched base's, else the default) by `resolveStrategyParams`.
+  - `latency`: `{ "<dp>": "<spec>" }`, the `tt:run --latency` syntax (`none`, `fixed:<ms>`, `uniform:<min>-<max>`,
+    `exp:<mean>`, then `,timeout:<pct>`, `,error:<pct>`, `,timeoutMs:<ms>`; `cli/latencySpec.ts`).
+  The last three write into `decisions.points`, over whatever the patch set.
+- `grid.factors` (optional) maps config paths to value lists and adds the cross product after the explicit configs:
+  `strategies.<dp>`, `params.<dp>.<name>`, `latency.<dp>`, `patch.<path>` (dots into the patch). Each grid config is
+  named from its values in factor order: the path without its first segment (`latency.<dp>` keeps it), `=`, the value
+  (strings bare, others as JSON). Names must be unique across explicit and grid configs.
+
+  ```json
+  "configs": [{ "name": "A" }],
+  "grid": { "factors": {
+    "strategies.yardAllocation": ["nearest-wtp", "grouped"],
+    "params.shcDispatch.PAIRING_RADIUS_M": [0, 500]
+  } }
+  ```
+
+  gives `A`, `yardAllocation=nearest-wtp,shcDispatch.PAIRING_RADIUS_M=0`, ... (5 configs). `report.expanded.configs`
+  lists them all.
+- Every config, grid ones included, is resolved before any replicate runs. Errors name the config and field, e.g.
+  `Config "X": params.shcDispatch.NOPE: shcDispatch strategy "paired-dual-cycle" has no param "NOPE" (...)`: unknown
+  decision point, strategy or param, a param out of range, a bad latency spec, a patch that makes an invalid
+  scenario, a patch with `endConditions`, a bad grid factor path, duplicate names. A replicate's `command` adds
+  `--strategy`, `--param` and `--latency` flags and the config's patch as `--patch '<json>'` (shell-quoted), so it is
+  exact for every config.
+- The baseline's first seed runs first, alone (`runPlanned`, `baselineProbeIndex`, `checkBaselineProbe`): when it is
+  `ok` but the primary KPI is null on it, the experiment stops with an `ExperimentError` (exit 2, no report), since no
+  config could be compared on that KPI.
+- Every replicate runs with `asyncMode: 'pause'`, invariants `failFast: false` and `sweepEvery` 10000
+  (`executeReplicateHeadless`).
+- KPI catalogue (`EXPERIMENT_KPIS`, read by `readExperimentKpis` from the headline KPIs, the `KpiReport` and the
+  invariant count). Higher is better: `grossMovesPerHour`, `netMovesPerHour`, `movesDone`, `vesselsDone`. Lower is
+  better: `meanVesselTurnaroundS` (berth to departure), `meanAnchorageWaitS`, `truckTurnaroundS`, `shcEmptyTravelRatio`,
+  `shcBusyPct`, `ascUtilisationPct` (less crane time for the same work), `rehandlesPerProductiveMove`, `equipmentIdleS`
+  (decision-caused, summed over the decision points), `invariantViolations`. Every KPI is reported for every config.
+  A KPI that is null for a replicate (subsystem absent) is not compared for that pair.
+- Guards (`guards`, optional): `{ "kpi", "tolerance": { "abs": n } | { "pct": n } }`; a percent tolerance is taken of
+  the baseline mean. Degradation is the paired difference signed so positive is worse. **held** when the degradation
+  CI's upper bound is at or below the tolerance, **breached** when its lower bound is above it, else **uncertain**;
+  **insufficient data** with n < 2. `report.guards[i].statuses[config]` holds the status, the tolerance in KPI units
+  and the degradation CI.
+- Statistics: per seed `d = config - baseline` over seeds where both replicates are `ok` and the KPI is non-null; n,
+  mean, SD, a 95% CI with Student's t (n - 1 df), the change against the baseline mean, and each side's own mean and
+  CI. Verdict: **better** or **worse** when the CI excludes 0 on that side, else **no difference detected**;
+  **insufficient data** with n < 2.
+- A replicate is `ok`, `invalid: invariant`, `invalid: failed` (engine error) or `invalid: error` (executor threw);
+  an executor that throws gives `invalid: error` and the experiment carries on. Invalid seeds are dropped from
+  pairing and listed in `droppedSeeds`; fewer than 2 valid pairs gives insufficient data. With more than two configs
+  `notes` says there is no multiple-comparison correction. `executeReplicateHeadless(plan, handlers)` takes optional
+  handler overrides (the CLI test runs `broken-first-lane` to prove exit 1).
+- In-process: `runExperiment(file, { executeReplicate })` takes an injectable executor (tests pass a fake one with
+  synthetic KPIs); `runExperimentCli(args, print)` mirrors `runCli`. Only `provenance.startedAt`, `endedAt` and each
+  replicate's `wallMs` differ between two runs of the same file. Tests: `tests/experiment.test.ts`,
+  `tests/experiment-grid.test.ts` (overrides, grid, validation, a patch and a param changing real KPIs),
+  `tests/experiment-cli.test.ts`.
 
 ## tt:diff
 

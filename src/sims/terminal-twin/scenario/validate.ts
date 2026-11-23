@@ -83,6 +83,9 @@ export function validateScenario(config: ScenarioConfig, overrides: SubsystemMod
   if (peak > lim.trucksPerHour) err('setup.check.trucks', { max: lim.trucksPerHour })
   const mode = config.yardStart?.mode
   if ((mode === 'empty' || mode === 'warmup') && !config.landside) err('setup.check.startNeedsLandside')
+  const measured = config.measurementWarmUpS
+  if (measured !== undefined && !(typeof measured === 'number' && Number.isFinite(measured) && measured >= 0)) err('setup.check.measurementWarmUp')
+  else if (measured !== undefined && mode === 'warmup') warn('setup.check.warmUpOverridden', { s: measured })
   const maxBays = Math.max(0, ...blocks.map((b) => b.bays ?? 20))
   const heavy =
     config.sts.length > STRESS_SCALE.sts ||
@@ -116,6 +119,7 @@ const ENGINE_ERROR_KEYS: readonly MessageKey[] = [
   'setup.check.trucks',
   'setup.check.frontage',
   'setup.check.startNeedsLandside',
+  'setup.check.measurementWarmUp',
   'setup.check.yardReserve',
   'setup.check.loadReleaseAhead',
   'setup.check.modeNoSts',

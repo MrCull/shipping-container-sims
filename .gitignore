@@ -163,3 +163,6 @@ test-results/
 
 .merge-ticket.log
 /smoke-report/
+
+# Terminal Twin experiment reports (pnpm run tt:experiment default output)
+.tt-experiments/

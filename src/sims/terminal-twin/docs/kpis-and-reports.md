@@ -1,6 +1,6 @@
 # KPIs, end conditions and reports
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 Read this when you need to measure a run (moves per hour, waits, utilisation), stop a run at a condition, read or change
 a golden summary, export KPIs or events, or find out where crane and box time goes (`tt:profile`, `tt:sts`). The dashboard
@@ -23,8 +23,8 @@ the headline.
 
 ## The collector (`engine/kpi/`)
 
-- `collector.ts`: `Simulation#commit` feeds every committed event to `ingest` (warm-up events are dropped; measured events
-  are shifted to the measured clock; `WarmUpEnded` starts a fresh collector). `observe` turns events into per-hour
+- `collector.ts`: `Simulation#commit` feeds every committed event to `ingest`. With a measurement warm-up the collector runs
+  on the measured clock from the start (see **Measurement warm-up** below). `observe` turns events into per-hour
   **components** in an `Acc` (sums: counts, seconds, metres; gauges: values carried forward). Intervals that span hours
   are split across buckets (`Acc#interval`).
 - Each KPI is `value(window)` over the summed components of a window (hour, shift, run), so ratios and means are exact at
@@ -99,7 +99,7 @@ busiest SHC (most `shc.jobs`), longest wait (anchorage, ground-position wait or 
 
 | Field | Content |
 |---|---|
-| `simTimeS`, `eventsProcessed`, `movesCompleted`, `vesselsCompleted` | measured period (after a warm-up: from its end); `warmUp { durationS, ended }` only for a warm-up start (TT-14) |
+| `simTimeS`, `eventsProcessed`, `movesCompleted`, `vesselsCompleted` | measured period (after a warm-up: from its end); `warmUp { durationS, ended }` only with a measurement warm-up (a `warmup` yard start or `measurementWarmUpS`, TT-14, #311) |
 | `sts[id]` | `moves, cycles, twinLifts, grossMovesPerHour, railWaitS` |
 | `vessels[id]` | `sizeClass, arrivedAtS, anchorageWaitS, berthX, berthedAtS, departedAtS, turnaroundS` (berthed to departed), `sts[]` |
 | `quay` | `vesselsWaited`, `anchorageWaitS { total, mean, max }` |
@@ -132,6 +132,26 @@ Two different things:
 - Reasons: `vesselsCompleted >= n`, `moves >= n`, `simDurationS >= s`. `simDurationS` counts the measured period, so a
   warm-up comes first; at the duration the closing invariant sweep runs, then `ScenarioEnded`.
 - A warm-up counts toward nothing.
+
+### Measurement warm-up
+
+With a measurement warm-up (`measurementWarmUpS` or a `warmup` yard start), every event reaches the collector shifted
+back by the warm-up length (`simulation.ts#shiftEvent`): its time and every absolute time in its payload (`departAt`,
+motion segments `t0`/`t1`). Warm-up events land at negative times, and `WarmUpEnded` does not rebuild the collector
+(#309 review; before it, departure times stayed absolute, so `asc.utilisation-pct` read 0, SHC state times did not sum
+to the window and stall waits were inflated by the warm-up).
+
+- Time shares (ASC busy, SHC states and loaded/empty time, STS waits, road and holding occupancy, berth occupancy): work
+  in progress at the warm-up end is cut there (`Acc#interval` starts at 0), so a busy % stays in [0, 100] and the SHC
+  state times sum to the measured window.
+- Counts and per-completion durations (moves, jobs, cycle time, stall wait, truck and vessel turnaround): counted when
+  they complete in the measured period, with their full duration, including any part spent in the warm-up. A truck that
+  arrived during the warm-up and leaves after it counts with its whole turnaround. Warm-up events add no counts
+  (`Acc#muted`).
+- Gauges (yard cells, gate queue, vessel remaining moves, handler backlog): tracked through the warm-up; the value at its
+  end opens hour 0.
+- Engine counters (`kpiReport`): `warmUp.ts#resetCounters` zeroes them at `WarmUpEnded` but keeps the trucks still on the
+  roads; the road and holding means divide by the measured time. Tests: `tests/measurement-warmup.test.ts`.
 - Other stop reasons (`engine/simulation.ts#StopReason`): `ended`, `failed`, `idle` (empty queue), `max-events`,
   `waiting-for-decision`.
 - UI: the setup dialog's "End conditions" (`modules/endConditions.ts`) replaces the scenario's only once edited; vessels

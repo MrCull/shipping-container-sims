@@ -37,7 +37,7 @@ Each smoke test carries exactly one group tag (`{ tag: '@camera' }`, checked in 
 
 ## Agent tooling
 
-Cloud-session hooks, Blender (`bpy`), screenshots, README media, implementer worktrees, `bg.sh`, the frame-rate benchmark: `docs/agents/tooling.md`.
+Cloud-session hooks, Blender (`bpy`), screenshots, README media, implementer worktrees, `bg.sh`, the frame-rate benchmark: `docs/agents/tooling.md`. Heavy-lock tools (one heavy job at a time across worktrees): `scripts/bg.sh run --heavy`, `scripts/proof-runner.sh` and `pnpm run tt:experiment` (skips the lock under `BG_HEAVY_HELD=1`).
 
 ## Project structure
 

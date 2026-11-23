@@ -1,6 +1,7 @@
 /**
- * Warm-up start (TT-14): the run starts with an empty yard and `warmUpS` of normal truck and vessel activity. At
- * that time `WarmUpEnded` restarts the measured period: every KPI counter and the end-condition counters (vessels
+ * Measurement warm-up (TT-14, #311): `measurementWarmUpOf(config)` seconds of normal truck and vessel activity run
+ * before the measured period, from any yard start (a `warmup` yard start is an empty start plus a measurement warm-up
+ * of its `warmUpS`). At that time `WarmUpEnded` restarts the measured period: every KPI counter and the end-condition counters (vessels
  * completed, moves) go back to zero, the KPI series restart (see `simulation.ts`), and `simDurationS` counts from
  * here. Equipment, boxes, queues and the yard keep their state; only the counters restart.
  */
@@ -32,8 +33,17 @@ export function resetCounters(state: SimState): void {
     w.cellsAtEnd = {}
     for (const s of Object.values(state.yardSlots)) w.cellsAtEnd[s.blockId] = (w.cellsAtEnd[s.blockId] ?? 0) + s.span
   }
+  const ls = state.kpis.landside
+  const roadNow = ls?.roadNow ?? 0
   zero(state.kpis)
   zero(state.decisions.kpis)
+  if (ls) {
+    // gauges of work in progress: trucks still on the roads stay there, and the time integrals restart here
+    ls.roadNow = roadNow
+    ls.roadMax = roadNow
+    ls.roadLastT = state.now
+    ls.holdLastT = state.now
+  }
 }
 
 export const warmUpReactors: ReactorMap = {

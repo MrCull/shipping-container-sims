@@ -1,6 +1,6 @@
 # Engine core: the discrete-event loop
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 Read this when you change or debug how events are scheduled, processed, hashed, logged, snapshotted or replayed;
 when you add an event type or reactor; or when you hunt headless run time per event. The state the loop mutates is
@@ -77,7 +77,7 @@ state). `heapPush` and `heapPop` are O(log n).
 | `state`, `config`, `query`, `current` | the live state, the scenario, a read-only `SimQuery`, the event being processed |
 | `schedule(type, at, subjects, payload)` | new event with `causedBy = current.id`; throws if `at < now` |
 | `requestDecision(dp, request, subjects, { preRun? })` | schedules `DecisionRequested` at `now`, returns the correlation id `<dp>-<n>`; `subjects.equipment` is what idles while waiting (idle-time KPI) |
-| `random()` | uniform [0, 1) from `state.rngState` |
+| `random(stream)` | uniform [0, 1) from one RNG stream in `state.rng.streams` (`sts:<id>`, `shc:<id>`, `decisions`, `reactor`; see **RNG**) |
 | `transferCustody(containerId, to)` | sets `box.custody` and appends a `CustodyRecord { t: now, owner, eventId: current.id }`. The caller must update the physical holder (slot, `sts.carrying`, ground position, pad) in the same reactor |
 
 **Reactor errors:** a throw inside `react` still commits the event, then sets `status = 'failed'` and `firstError`
@@ -153,12 +153,25 @@ Not every event exists in every run: subsystems in `off` mode never schedule the
 ## RNG
 
 `engine/rng.ts`: mulberry32. `seedState(seed)` = `seed >>> 0`; `nextRandom(state)` returns `[value, nextState]`,
-pure, so every stream is one uint32 in plain JSON. The engine stream is `state.rngState`, drawn only through
-`ctx.random()` (STS move variation, SHC driver variability, and any reactor randomness). Side streams (decision
-latency, landside, bay plan, pre-fill, per-container props) are listed in
-[architecture.md](architecture.md#determinism-contract). Note: the decision-latency stream and the landside stream
-start from the same state (both use salt 0x5bd1e995); they are consumed independently, so this does not break
-determinism, but their draws are correlated.
+pure, so every stream is one uint32 in plain JSON. Since 0.59.0 (#310) there is one stream per source of
+randomness, each seeded `streamSeedState(seed, name)` (the scenario seed XOR the stream's salt: a fixed salt for
+the named streams, the FNV-1a hash of the name for the equipment streams). Reactors draw through
+`ctx.random(stream)`; the streams live in `state.rng.streams` (by name, created on first draw, `state.rng.seed`
+keeps the seed):
+
+| Stream | Drawn by |
+| --- | --- |
+| `sts:<id>` | that STS's move-variation factor per move phase (`quay.ts#variation`, also the hatch-cover legs) |
+| `shc:<id>` | that SHC's driver-variability factor per trip (`shc.ts#driverFactor`) |
+| `decisions` | the `random` field of yard-allocation and ASC requests (`ascStorage.ts`) |
+| `reactor` | any other reactor randomness (none today) |
+
+So a strategy that changes how many decisions are asked, or which crane works when, never moves the Nth factor of
+a given STS or SHC: experiments on one seed compare strategies, not luck (`tests/rng-streams.test.ts`).
+`sim.query.rngStreams()` and `sim.query.rngStreamSeedState(name)` read them. Side streams in their own state
+(decision latency salt 0x1b873593, landside salt 0x5bd1e995; the latency stream used the landside salt before
+0.59.0, so their draws correlated; bay plan, pre-fill, per-container props) are listed in
+[architecture.md](architecture.md#determinism-contract).
 
 ## Kinematics and cycle times
 
@@ -239,7 +252,7 @@ change, so diff before and after logs to locate a behaviour change.
 
 ## ENGINE_VERSION
 
-`engine/simulation.ts#ENGINE_VERSION` ("0.53.0"): bump it when engine behaviour changes in a way that invalidates
+`engine/simulation.ts#ENGINE_VERSION` ("0.61.0"): bump it when engine behaviour changes in a way that invalidates
 snapshots, in practice any change that moves an event log. `restore` refuses a snapshot whose `engineVersion`
 differs; the browser offers "Restart from its config" instead. Changes that move no event (container props, derived
 statuses, invariant or KPI reads) have shipped without a bump. `SNAPSHOT_SCHEMA_VERSION` (1) is the snapshot shape.
@@ -283,7 +296,7 @@ copies all of it. `state.reservations` is pruned only when a new reservation is 
 
 ## Gotchas
 
-- Everything a reactor does must go through `ctx`: `ctx.random()` not `Math.random`, `ctx.schedule` not a direct
+- Everything a reactor does must go through `ctx`: `ctx.random(stream)` (a named `RngStream`, `engine/context.ts`) not `Math.random`, `ctx.schedule` not a direct
   heap push (it sets `causedBy`), `ctx.transferCustody` plus the physical holder update in the same reactor.
 - `SimState` must stay plain JSON (no Map, Set, class or function); snapshots and restore assume it. Derived lookups
   go in a `WeakMap` keyed by a state object, never in the state.

@@ -95,8 +95,9 @@ function prefillBlockKey(view: YardBoxView): string {
 
 /** The placer for a config: a custom synchronous handler, else the configured (or default) strategy. */
 export function yardPlacerOf(config: ScenarioConfig, custom?: DecisionHandler<'yardAllocation'>): YardPlacer {
-  const name = config.decisions?.points?.yardAllocation?.strategy ?? strategies.yardAllocation.default
-  const handler = custom ?? getStrategy('yardAllocation', name)
+  const point = config.decisions?.points?.yardAllocation
+  const name = point?.strategy ?? strategies.yardAllocation.default
+  const handler = custom ?? getStrategy('yardAllocation', name, point?.params)
   return (message, query) => {
     const reply = handler(message, query)
     if (reply && typeof (reply as { then?: unknown }).then === 'function')

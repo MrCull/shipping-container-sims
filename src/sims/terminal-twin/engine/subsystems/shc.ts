@@ -24,12 +24,14 @@
  * Modes: real (kinematics), instant (same events, zero durations), off (no
  * jobs; boxes stay on the ground positions).
  */
+import { spreadFactor } from '../rng'
 import type { EngineContext, ReactorMap } from '../context'
 import type { EventOf, ShcPhasePayload } from '../events'
 import { cornerSpeedCap, planSegment, positionAt, travelTime, type AxisProfile, type CornerModel, type MotionSegment } from '../kinematics'
 import { edgeBetween, laneAccess, laneGraphOf, pathLength, shortestPath, type LaneGraph, type PathGraph, type QueueArea } from '../laneGraph'
 import { earliestStart, mergeWindows, reserve, type WindowSpec } from '../reservations'
 import type { BlockLoad, ShcDispatchPad } from '../decisions/types'
+import { PREDISPATCH_MARGIN_PARAM, resolveStrategyParams } from '../decisions/strategies'
 import type { ShcJob, ShcPlannedEvent, ShcState, ShcStatus, SimState } from '../state'
 import { DEFAULT_SHC_CORNER, DEFAULT_SHC_KINEMATICS } from '../../scenario/builder'
 import { DEFAULT_PREDISPATCH_MARGIN_S, type ShcKinematics } from '../../scenario/types'
@@ -90,10 +92,8 @@ function scaled(p: AxisProfile, f: number): AxisProfile {
 }
 
 /** Driver-variability factor for one trip (1 ± driverVariabilityPct %). */
-function driverFactor(ctx: EngineContext): number {
-  const pct = ctx.config.driverVariabilityPct ?? 0
-  if (pct === 0) return 1
-  return 1 + ((ctx.random() * 2 - 1) * pct) / 100
+function driverFactor(ctx: EngineContext, shcId: string): number {
+  return spreadFactor(ctx, `shc:${shcId}`, ctx.config.driverVariabilityPct ?? 0)
 }
 
 export interface Waypoint {
@@ -393,7 +393,7 @@ function goPark(ctx: EngineContext, shc: ShcState): void {
   const k = kinematics(ctx)
   const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant, cornerOf(ctx))
   const path = route(graph, shc.nodeId, target)
-  trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx)))
+  trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx, shc.id)))
   trip.mark('ShcParked')
   const windows = trip.windows()
   const start = earliestStart(ctx.state, windows, ctx.state.now)
@@ -507,7 +507,7 @@ function goQueue(ctx: EngineContext, shc: ShcState, spot: string, predicted?: Sh
   const k = kinematics(ctx)
   const trip = new TripBuilder(graph, shc.id, waypoints(graph, [shc.nodeId])[0], instant, cornerOf(ctx))
   const path = route(graph, shc.nodeId, spot)
-  trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx)))
+  trip.driveThrough(waypoints(graph, path).slice(1), scaled(k.driveEmpty, driverFactor(ctx, shc.id)))
   trip.mark('ShcQueued')
   const windows = trip.windows()
   const start = earliestStart(ctx.state, windows, ctx.state.now)
@@ -569,6 +569,14 @@ function predictionDeficits(ctx: EngineContext): { deficits: PredictionDeficit[]
   return { deficits, spare: spare.sort((a, b) => (a.id < b.id ? -1 : 1)) }
 }
 
+/** `predispatch`'s margin (s): its param when the scenario sets it (resolved and range-checked), else the queue areas', else 15. */
+function predispatchMarginS(ctx: EngineContext): number {
+  const params = ctx.config.decisions?.points?.shcDispatch?.params
+  if (params && PREDISPATCH_MARGIN_PARAM in params)
+    return resolveStrategyParams('shcDispatch', 'predispatch', params)[PREDISPATCH_MARGIN_PARAM]
+  return ctx.config.queueAreas?.predispatchMarginS ?? DEFAULT_PREDISPATCH_MARGIN_S
+}
+
 /**
  * Pre-dispatch: send an idle SHC to a queue area when a box there is predicted ready within the SHC's travel time
  * plus `queueAreas.predispatchMarginS`. The SHC claims a queue spot, not a job: the box is dispatched only once it
@@ -579,7 +587,7 @@ export function maybePredispatch(ctx: EngineContext): void {
   if (!isPredispatch(ctx) || state.subsystems.shc === 'off') return
   const graph = laneGraphOf(ctx.config)
   if (graph.queueAreas.length === 0) return
-  const margin = ctx.config.queueAreas?.predispatchMarginS ?? DEFAULT_PREDISPATCH_MARGIN_S
+  const margin = predispatchMarginS(ctx)
   const empty = kinematics(ctx).driveEmpty
   const { deficits, spare } = predictionDeficits(ctx)
   for (const { pred, area } of deficits) {
@@ -821,7 +829,7 @@ function assignJob(ctx: EngineContext, shc: ShcState, jobId: string, padId: stri
   shc.jobId = job.id
 
   const k = kinematics(ctx)
-  const f = driverFactor(ctx)
+  const f = driverFactor(ctx, shc.id)
   const empty = scaled(k.driveEmpty, f)
   const loaded = scaled(k.driveLoaded, f)
   const instant = state.subsystems.shc === 'instant'
@@ -933,7 +941,7 @@ function assignQueuedJob(ctx: EngineContext, shc: ShcState, job: ShcJob, spot: s
   job.shcId = shc.id
   shc.jobId = job.id
   const k = kinematics(ctx)
-  const f = driverFactor(ctx)
+  const f = driverFactor(ctx, shc.id)
   const empty = scaled(k.driveEmpty, f)
   const loaded = scaled(k.driveLoaded, f)
   const instant = state.subsystems.shc === 'instant'
@@ -972,7 +980,7 @@ function resumeFromQueue(ctx: EngineContext, shc: ShcState, job: ShcJob, padId: 
   pad.claimedBy = shc.id
   releaseQueue(state, shc.id)
   const k = kinematics(ctx)
-  const f = driverFactor(ctx)
+  const f = driverFactor(ctx, shc.id)
   const empty = scaled(k.driveEmpty, f)
   const loaded = scaled(k.driveLoaded, f)
   const instant = state.subsystems.shc === 'instant'
@@ -1006,7 +1014,7 @@ function assignLoadJob(ctx: EngineContext, shc: ShcState, job: ShcJob): void {
   shc.jobId = job.id
   releaseQueue(state, shc.id)
   const k = kinematics(ctx)
-  const f = driverFactor(ctx)
+  const f = driverFactor(ctx, shc.id)
   const empty = scaled(k.driveEmpty, f)
   const loaded = scaled(k.driveLoaded, f)
   const instant = state.subsystems.shc === 'instant'

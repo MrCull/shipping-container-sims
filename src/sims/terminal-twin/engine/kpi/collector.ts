@@ -68,8 +68,14 @@ export interface KpiCollector {
 class Acc {
   sums: Record<string, Record<string, number[]>> = {}
   gauges: Record<string, Record<string, (number | undefined)[]>> = {}
+  /** Set while an event before the measured period (a warm-up event, negative time) is observed: its counts are dropped. */
+  muted = false
 
   add(comp: string, entity: string, hour: number, v: number): void {
+    if (!this.muted) this.addAlways(comp, entity, hour, v)
+  }
+
+  private addAlways(comp: string, entity: string, hour: number, v: number): void {
     const arr = ((this.sums[comp] ??= {})[entity] ??= [])
     arr[hour] = (arr[hour] ?? 0) + v
   }
@@ -84,7 +90,7 @@ class Acc {
       const hs = (base + h) * HOUR_S - clock.startTimeOfDayS
       const from = Math.max(lo, hs)
       const to = Math.min(t1, hs + HOUR_S)
-      if (to > from) this.add(comp, entity, h, (to - from) * ratePerS)
+      if (to > from) this.addAlways(comp, entity, h, (to - from) * ratePerS)
     }
   }
 
@@ -791,6 +797,8 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
 
   return {
     ingest(e) {
+      // a warm-up event (negative time): open states are tracked, counts dropped, gauges land in hour 0
+      acc.muted = e.t < 0
       flushRail(e.t)
       observe(e)
       // geometry-carrying events: SHC distance (empty vs loaded by phase)
@@ -834,7 +842,7 @@ export function createKpiCollector(config: ScenarioConfig, info: KpiStaticInfo):
       for (const [id, o] of Object.entries(shcOp)) {
         const stateS = zeroStateS()
         for (const op of SHC_OPERATIONAL_STATES) for (const v of acc.sums[`shc.state.${op}`]?.[id] ?? []) stateS[op] += v ?? 0
-        if (now > o.since) stateS[o.op] += now - o.since
+        if (now > Math.max(0, o.since)) stateS[o.op] += now - Math.max(0, o.since)
         for (const op of SHC_OPERATIONAL_STATES) stateS[op] = r3(stateS[op])
         let handovers = 0
         for (const v of acc.sums['shc.handovers']?.[id] ?? []) handovers += v ?? 0

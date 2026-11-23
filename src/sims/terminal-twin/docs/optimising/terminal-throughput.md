@@ -1,6 +1,6 @@
 # Optimising terminal throughput
 
-Checked against ENGINE_VERSION 0.60.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 Read this when you want the simulated terminal to move more boxes per hour, idle its STS less, drive SHCs empty less,
 rehandle less or turn vessels round faster, or when you compare two TOS strategies. It says what limits throughput

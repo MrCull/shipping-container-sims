@@ -30,133 +30,145 @@
         "hash": "f530677f739cdec2"
       },
       {
-        "count": 9450,
+        "count": 9451,
         "layers": {
           "containers-40HC-lod1": 4337,
           "containers-40-lod1": 2245,
-          "containers-20-lod1": 2868
-        },
-        "hash": "350fc2634b236324"
-      },
-      {
-        "count": 9442,
-        "layers": {
-          "containers-40HC-lod1": 4331,
-          "containers-40-lod1": 2242,
           "containers-20-lod1": 2869
         },
-        "hash": "7b198a28b7423b0f"
+        "hash": "52d5f1885beed12c"
+      },
+      {
+        "count": 9449,
+        "layers": {
+          "containers-40HC-lod1": 4334,
+          "containers-40-lod1": 2242,
+          "containers-20-lod1": 2873
+        },
+        "hash": "28b096f9f15b10d1"
       }
     ],
     "custody close early": [
       {
-        "count": 108,
+        "count": 314,
         "layers": {
-          "containers-20-lod0": 27,
-          "containers-40HC-lod0": 48,
-          "containers-40-lod0": 33
+          "containers-20-lod0": 83,
+          "containers-40HC-lod0": 161,
+          "containers-20-lod1": 6,
+          "containers-40-lod0": 56,
+          "containers-40HC-lod1": 6,
+          "containers-40-lod1": 2
         },
-        "hash": "0d197eadc98082a4"
+        "hash": "5d548d34b41c3105"
       }
     ],
     "colour by line": [
       {
-        "count": 9442,
+        "count": 9449,
         "layers": {
-          "containers-40HC-lod1": 4331,
+          "containers-40HC-lod1": 4334,
           "containers-40-lod1": 2242,
-          "containers-20-lod1": 2869
+          "containers-20-lod1": 2873
         },
-        "hash": "589294b943697684"
+        "hash": "f0aeaef2aa604907"
       }
     ],
     "colour by dwell": [
       {
-        "count": 9442,
+        "count": 9449,
         "layers": {
-          "containers-40HC-lod1": 4331,
+          "containers-40HC-lod1": 4334,
           "containers-40-lod1": 2242,
-          "containers-20-lod1": 2869
+          "containers-20-lod1": 2873
         },
-        "hash": "9b816981f7c6da5a"
+        "hash": "331b6647306b17a5"
       }
     ],
     "colour by flow": [
       {
-        "count": 9442,
+        "count": 9449,
         "layers": {
-          "containers-40HC-lod1": 4331,
+          "containers-40HC-lod1": 4334,
           "containers-40-lod1": 2242,
-          "containers-20-lod1": 2869
+          "containers-20-lod1": 2873
         },
-        "hash": "24f610f8f9ad27e8"
+        "hash": "43cac8ad866a2bf3"
       }
     ],
     "quality low": [
       {
-        "count": 108,
+        "count": 314,
         "layers": {
-          "containers-20-lod1": 10,
-          "containers-40HC-lod0": 25,
-          "containers-20-lod0": 17,
-          "containers-40-lod0": 18,
-          "containers-40HC-lod1": 23,
-          "containers-40-lod1": 15
+          "containers-20-lod1": 83,
+          "containers-40HC-lod0": 19,
+          "containers-40HC-lod1": 148,
+          "containers-40-lod1": 51,
+          "containers-20-lod0": 6,
+          "containers-40-lod0": 7
         },
-        "hash": "ecf01c7bfa00876f"
+        "hash": "b551a9fa2f0b087a"
       }
     ],
     "quality medium": [
       {
-        "count": 108,
+        "count": 314,
         "layers": {
-          "containers-20-lod0": 27,
-          "containers-40HC-lod0": 48,
-          "containers-40-lod0": 33
+          "containers-20-lod0": 52,
+          "containers-40HC-lod0": 96,
+          "containers-20-lod1": 37,
+          "containers-40HC-lod1": 71,
+          "containers-40-lod1": 26,
+          "containers-40-lod0": 32
         },
-        "hash": "0d197eadc98082a4"
+        "hash": "090a9513103cfbdd"
       }
     ],
     "quality high": [
       {
-        "count": 108,
+        "count": 314,
         "layers": {
-          "containers-20-lod0": 27,
-          "containers-40HC-lod0": 48,
-          "containers-40-lod0": 33
+          "containers-20-lod0": 83,
+          "containers-40HC-lod0": 161,
+          "containers-20-lod1": 6,
+          "containers-40-lod0": 56,
+          "containers-40HC-lod1": 6,
+          "containers-40-lod1": 2
         },
-        "hash": "0d197eadc98082a4"
+        "hash": "5d548d34b41c3105"
       }
     ],
     "custody overview late": [
       {
-        "count": 9431,
+        "count": 9437,
         "layers": {
-          "containers-40HC-lod1": 4329,
+          "containers-40HC-lod1": 4331,
           "containers-40-lod1": 2237,
-          "containers-20-lod1": 2865
+          "containers-20-lod1": 2869
         },
-        "hash": "0660f740a6d1ee7e"
+        "hash": "a4b0da8b1deb2fff"
       },
       {
-        "count": 9429,
+        "count": 9434,
         "layers": {
-          "containers-40HC-lod1": 4329,
-          "containers-40-lod1": 2237,
-          "containers-20-lod1": 2863
+          "containers-40HC-lod1": 4331,
+          "containers-40-lod1": 2236,
+          "containers-20-lod1": 2867
         },
-        "hash": "190e4c25c7f96ea9"
+        "hash": "79ced5dfb852e978"
       }
     ],
     "custody close late": [
       {
-        "count": 116,
+        "count": 317,
         "layers": {
-          "containers-20-lod0": 34,
-          "containers-40HC-lod0": 49,
-          "containers-40-lod0": 33
+          "containers-20-lod0": 88,
+          "containers-40HC-lod0": 158,
+          "containers-20-lod1": 4,
+          "containers-40-lod0": 54,
+          "containers-40-lod1": 4,
+          "containers-40HC-lod1": 9
         },
-        "hash": "a1213deb5ccb38ef"
+        "hash": "71a2fd362d81ec12"
       }
     ],
     "vessel arrival and departure": [
