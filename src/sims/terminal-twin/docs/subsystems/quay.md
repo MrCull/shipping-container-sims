@@ -1,6 +1,6 @@
 # Quay subsystem: vessels, berths, STS cranes, hatch covers
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when you change or tune anything between a vessel's arrival and its departure: berth allocation, the
 crane split, the shared STS rail, the STS discharge and load cycles, work packages, the vessel work order (POD and
@@ -57,6 +57,15 @@ ScenarioStarted -> VesselArrived (status at-anchorage, pushed on berth.queue)
   request and reply contracts are the same, so `first-fit` and `best-fit` work as they are. There is no fairness
   guard: a large vessel can be overtaken again and again while smaller ones keep arriving. Berth mode `off`
   (`placeFirstFit`) stays first come, first served. Fixture `berth-overtaking`, `tests/berth-overtaking.test.ts`.
+- **Crane reach window** (#365, `reachWindow` in `berth.ts`): from each crane's **rail reach** (`railReach` in
+  `rail.ts`, the one rule: cranes never pass, so the crane at rail index i stands at least `i x stsMinSpacingM` from the
+  quay start and `(n-1-i) x` that from the far end). The request carries `minBerthX` / `maxBerthX` (only when tighter
+  than the quay) so that the lowest and highest crane able to work the vessel (#303 `stsCanWork`) reach its first and
+  last bay; `first-fit`, `best-fit` and berth mode `off` (`placeFirstFit`, which uses `first-fit` on the same request)
+  keep to them. Without it the TTI peak day berthed a ULCV at 0 m: STS101 to STS103 (out of reach of a ULCV) filled
+  the quay start, STS104 could never reach bay 1 at 65 m, and every V003 crane waited for the rail behind it (idle at
+  2 of 5 vessels). A vessel whose window holds no stern position on the quay fails the run (`reachWindow` throws when
+  the vessel queues) instead of waiting at the anchorage for ever. Test: `tests/berth-reach.test.ts`.
 - `validateBerth` throws (the run fails) for a berth off the quay or within `berthGapM` of a vessel on the quay
   (mooring, berthed or unmooring). Anchorage wait = allocation minus arrival (`VesselState.anchorageWaitS`).
 - The quay stretch is held from `BerthAllocated` until `VesselDeparted`.
@@ -362,7 +371,8 @@ Presets run with hatch covers on; most fixtures set `hatch.enabled: false`.
   `hatch.waitS`.
 - **Laydown**: `laydownSites`: one site per lane-graph station, X = -15 + pitch x k + 5 + (pitch - 5)/2 (25 k with the
   default 25 m station spacing: between an up spine and the next down spine), id `LD@<x>`. `claimLaydown` takes the
-  nearest site with room whose stack holds only panels of the same hatch (throws when none). Z: landside of the last
+  nearest site with room whose stack holds only panels of the same hatch (throws when none), sites inside the crane's
+  `railReach` first (#365: a ULCV at 33 m put bay 0's panels at 75 m, below the 81 m STS104 can reach). Z: landside of the last
   ground lane + `SHC_HALF_WIDTH_M` 2.45 + `LAYDOWN_CLEAR_M` 0.4, below the landside STS rail `STS_LAND_RAIL_Z` 33.48,
   else landside of the rail (only no-SHC scenarios with many lanes). `hatchLaydownProblems(config)` checks every site
   at the widest panel against ground lanes, rails and (with SHCs) lane-graph nodes, edges and zones;

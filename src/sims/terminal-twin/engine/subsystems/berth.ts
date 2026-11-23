@@ -19,7 +19,8 @@ import { CONTAINER_HEIGHT_M, slotX, slotZ, tierBaseY, vesselClass } from '../../
 import type { ScenarioConfig, VesselSizeClass } from '../../scenario/types'
 import { continueWork, wakeQuayRail } from './quay'
 import { askRelease, createPackages, isLoadSlot, loadActive } from './workPackages'
-import { railOrder } from './rail'
+import { railOrder, railReach } from './rail'
+import { firstFitBerth } from '../decisions/quayStrategies'
 import { closeCrane, finishPlan, registerCrane } from '../cranePlan/plan'
 import { positionHatchPanels } from '../hatch'
 import { boomReal, releaseBoomHolds, startBoom, whenBoomsUp } from './boom'
@@ -64,43 +65,33 @@ function tryAllocateBerth(ctx: EngineContext): void {
   }
   const vessel = vessels[vesselId]
   berth.allocating = vessel.id
-  ctx.requestDecision(
-    'berthAllocation',
-    {
-      vesselId: vessel.id,
-      sizeClass: vessel.sizeClass,
-      loaM: vesselClass(vessel.sizeClass).loaM,
-      quayLengthM: ctx.config.quay.lengthM,
-      berthGapM: ctx.config.quay.berthGapM,
-      occupied: occupied(ctx),
-      arrivedAtS: vessel.arrivedAt ?? ctx.state.now,
-    },
-    { vessels: [vessel.id] },
-  )
+  ctx.requestDecision('berthAllocation', berthRequest(ctx, vessel), { vessels: [vessel.id] })
+}
+
+/** The berth allocation request for a waiting vessel (also what berth mode off places it by). */
+function berthRequest(ctx: EngineContext, vessel: VesselState): BerthAllocationRequest {
+  return {
+    vesselId: vessel.id,
+    sizeClass: vessel.sizeClass,
+    loaM: vesselClass(vessel.sizeClass).loaM,
+    quayLengthM: ctx.config.quay.lengthM,
+    berthGapM: ctx.config.quay.berthGapM,
+    occupied: occupied(ctx),
+    arrivedAtS: vessel.arrivedAt ?? ctx.state.now,
+    ...reachWindow(ctx, vessel),
+  }
 }
 
 /** Mooring and unmooring take no time in the instant and off modes. */
 const mooringS = (ctx: EngineContext): number => (ctx.state.subsystems.berth === 'real' ? ctx.config.quay.mooringS : 0)
 const unmooringS = (ctx: EngineContext): number => (ctx.state.subsystems.berth === 'real' ? ctx.config.quay.unmooringS : 0)
 
-/** Leftmost stretch where `vessel` fits clear of the vessels on the quay, or null. */
-function firstFitBerth(ctx: EngineContext, vessel: VesselState): number | null {
-  const loa = vesselClass(vessel.sizeClass).loaM
-  const { lengthM, berthGapM } = ctx.config.quay
-  const candidates = [0, ...occupied(ctx).map((o) => o.toX + berthGapM)]
-  for (const x of candidates.sort((a, b) => a - b)) {
-    if (x + loa > lengthM + 1e-9) continue
-    if (occupied(ctx).every((o) => x >= o.toX + berthGapM - 1e-9 || x + loa <= o.fromX - berthGapM + 1e-9)) return x
-  }
-  return null
-}
-
-/** Berth mode off: no TOS decision, vessels take the first free stretch in arrival order. */
+/** Berth mode off: no TOS decision, vessels take the first free stretch (within the crane reach window) in arrival order. */
 function placeFirstFit(ctx: EngineContext): void {
   const { berth, vessels } = ctx.state
   while (berth.queue.length > 0) {
     const vessel = vessels[berth.queue[0]]
-    const x = firstFitBerth(ctx, vessel)
+    const x = firstFitBerth(berthRequest(ctx, vessel)).berthX
     if (x === null) {
       if (!vessel.anchored) {
         vessel.anchored = true
@@ -127,6 +118,30 @@ function assignBerth(ctx: EngineContext, vessel: VesselState, berthX: number, t:
     berthX,
     anchorageWaitS: vessel.anchorageWaitS,
   })
+}
+
+/**
+ * #365: the stern positions at which the lowest and highest crane that can work the vessel (#303) reach its first and
+ * last bay within their `railReach` (three small cranes at the low end kept a ULCV berthed at 0 m from ever having its
+ * first bays worked: the peak day went idle at 2 of 5 vessels). Only the bounds tighter than the quay itself are
+ * returned. Throws when no stern position on the quay is inside the window: the vessel could never be worked.
+ */
+function reachWindow(ctx: EngineContext, vessel: VesselState): Pick<BerthAllocationRequest, 'minBerthX' | 'maxBerthX'> {
+  const able = ctx.config.sts.flatMap((c, i) => (stsCanWork(ctx.config, c.id, vessel.sizeClass) ? [i] : [])) // config order is rail order
+  if (able.length === 0) return {}
+  const spec = vesselClass(vessel.sizeClass)
+  const { lengthM } = ctx.config.quay
+  if (spec.loaM > lengthM) return {} // never fits the quay: it waits at anchorage, as it always has; no window applies
+  const lo = railReach(ctx.config, able[0]).lo - slotX(spec, 0, 0, 'aft')
+  const hi = railReach(ctx.config, able[able.length - 1]).hi - slotX(spec, 0, spec.bays - 1, 'fore')
+  if (Math.max(lo, 0) > Math.min(hi, lengthM - spec.loaM) + 1e-9)
+    throw new Error(
+      `berth: no stern position on the ${lengthM} m quay lets the cranes able to work ${vessel.id} (${vessel.sizeClass}, LOA ${spec.loaM} m) reach every bay: the window is ${lo.toFixed(2)} to ${hi.toFixed(2)} m`,
+    )
+  return {
+    ...(lo > 1e-9 ? { minBerthX: lo } : {}),
+    ...(hi < lengthM - spec.loaM - 1e-9 ? { maxBerthX: hi } : {}),
+  }
 }
 
 function validateBerth(ctx: EngineContext, vessel: VesselState, berthX: number): void {
