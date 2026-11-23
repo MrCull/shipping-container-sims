@@ -1,6 +1,6 @@
 # Optimising terminal throughput
 
-Checked against ENGINE_VERSION 0.59.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when you want the simulated terminal to move more boxes per hour, idle its STS less, drive SHCs empty less,
 rehandle less or turn vessels round faster, or when you compare two TOS strategies. It says what limits throughput
@@ -20,6 +20,14 @@ x1.4: the quay is better used at the larger volume. The scale-1 `tt:profile` (0.
 20:35; crane windows are 44 % cycle, 12 % rail (STS105 80,481 s), 19 % reposition, 18 % done; anchorage waits 175,714 s
 (V003), 175,015 s (V004) and 268,337 s (V005); load boxes wait 662 s horizontal and 388 s at the STS on average; SHC
 idle 85 % (7 of 23 never used), ASC idle 81 %. The other breakdowns below are at 0.5.
+
+### Peak day status (ENGINE_VERSION 0.60.0)
+
+From 0.58.0 the peak day (`--until vessels:5`) went idle at 2 of 5 vessels: first-fit berthed the ULCV V003 at 0 m,
+below the rail reach of every crane able to work it (#303 crane classes), so its cranes waited for the rail for ever.
+The rail-reach fix (#365, 0.60.0: berth reach window, laydown within reach, `sts.rail-reachable`) berths V003 at
+33.067 m and gets past that stall; the run now fails later at a `yard.no-progress` in B14 (one claimed retrieve, every
+WTP pad taken; 5,215 moves, sim day 2 06:58). That yard stall is a separate follow-up.
 
 ### Where crane time goes
 
