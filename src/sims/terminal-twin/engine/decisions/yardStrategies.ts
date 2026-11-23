@@ -116,11 +116,13 @@ export function groupedSlot(req: YardAllocationRequest, p: YardCostParams = YARD
   if (!box || !tops) return vesselGroupedSlot(req, p)
   const key = yardGroupKey(box)
   const topKeys = tops.map((t) => (t ? yardGroupKey(t) : null))
+  /** The top box of the stack under position `k` (0-based) of a candidate slot's span, or null for an empty stack. */
+  const topAt = (c: YardCandidate, k: number) => tops[(c.bay + k - 1) * req.rows + (c.row - 1)]
   const cost = (c: YardCandidate): number => {
     let group = 0
     if (c.tier > 1) {
       for (let k = 0; k < c.span; k++) {
-        const below = tops[(c.bay + k - 1) * req.rows + (c.row - 1)]
+        const below = topAt(c, k)
         if (below) group = Math.max(group, { none: 0, order: p.ORDER_BROKEN_COST_M, mixed: p.MIXED_STACK_COST_M }[yardGroupBreak(box, below)])
       }
     } else {
@@ -141,11 +143,25 @@ export function groupedSlot(req: YardAllocationRequest, p: YardCostParams = YARD
   const sameGroup = (c: YardCandidate): boolean => {
     if (c.tier === 1) return true
     for (let k = 0; k < c.span; k++) {
-      const below = tops[(c.bay + k - 1) * req.rows + (c.row - 1)]
+      const below = topAt(c, k)
       if (below && yardGroupKey(below) !== key) return false
     }
     return true
   }
   const candidates = candidateSlots(req)
-  return { slotId: cheapest(req.sameGroupOnly ? candidates.filter(sameGroup) : candidates, cost)?.slotId ?? null }
+  const allowed = req.sameGroupOnly ? candidates.filter(sameGroup) : candidates
+  if (req.stackOwnGroup) {
+    // #270 (pre-fill, booked boxes): on top of the own group in order, before opening a new stack
+    const onOwn = (c: YardCandidate): boolean => {
+      if (c.tier === 1) return false
+      for (let k = 0; k < c.span; k++) {
+        const below = topAt(c, k)
+        if (!below || yardGroupBreak(box, below) !== 'none') return false
+      }
+      return true
+    }
+    const up = cheapest(allowed.filter(onOwn), cost)
+    if (up) return { slotId: up.slotId }
+  }
+  return { slotId: cheapest(allowed, cost)?.slotId ?? null }
 }

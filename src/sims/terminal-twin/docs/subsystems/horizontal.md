@@ -1,6 +1,6 @@
 # Horizontal transport: SHCs, lane graph, reservations, pads and queues
 
-Checked against ENGINE_VERSION 0.59.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when you change or tune how shuttle carriers (SHCs) move boxes between the STS ground positions and the WTP
 pads: jobs and dispatch strategies, the waterside lane graph and routing, conflict-zone reservations, pad selection,

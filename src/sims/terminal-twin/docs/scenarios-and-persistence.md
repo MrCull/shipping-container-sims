@@ -1,6 +1,6 @@
 # Scenarios and persistence
 
-Checked against ENGINE_VERSION 0.59.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when you add or change a preset, a fixture or a golden, touch `ScenarioConfig`, layout derivation or
 scenario validation, or change saves, snapshots, replay-based restore or rewind. Terms: [GLOSSARY.md](../../../../GLOSSARY.md).

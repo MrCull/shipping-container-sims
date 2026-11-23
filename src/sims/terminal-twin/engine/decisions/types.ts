@@ -174,6 +174,11 @@ export interface YardAllocationRequest extends YardStacks {
   stackTops?: (YardBoxView | null)[]
   /** Pre-fill of a grouped yard (#149): never stack the box on another group (the handler may still return null for a block with no such stack). */
   sameGroupOnly?: true
+  /**
+   * Pre-fill of a grouped yard, booked boxes only (#270): prefer stacking on a stack of the box's own group with room over opening a new stack, so booked
+   * boxes stack tall and leave stacks free for the filler (which never stands on another group). Never sent outside the pre-fill.
+   */
+  stackOwnGroup?: true
   /** Uniform [0, 1) drawn from the engine's seeded RNG (the only source of randomness for strategies). */
   random: number
 }

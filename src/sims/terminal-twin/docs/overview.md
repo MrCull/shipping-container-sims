@@ -1,6 +1,6 @@
 # Overview: what the Terminal Twin models
 
-Checked against ENGINE_VERSION 0.59.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when you are new to the Terminal Twin and need the big picture before touching code: what is simulated,
 at what fidelity, which real terminal it is modelled on, where it deliberately differs from reality and what it does

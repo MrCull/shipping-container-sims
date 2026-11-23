@@ -1,6 +1,6 @@
 # Architecture: layers, folders, data flow, determinism
 
-Checked against ENGINE_VERSION 0.59.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when you need to know where code belongs, what may import what, how a scenario becomes pixels on screen,
 or what you must not break to keep runs reproducible. It is the map; the loop itself is in

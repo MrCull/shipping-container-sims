@@ -1,6 +1,6 @@
 # Optimising terminal throughput
 
-Checked against ENGINE_VERSION 0.53.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when you want the simulated terminal to move more boxes per hour, idle its STS less, drive SHCs empty less,
 rehandle less or turn vessels round faster, or when you compare two TOS strategies. It says what limits throughput
@@ -134,7 +134,7 @@ Full table of points, contracts and strategies: [../decision-points.md](../decis
 | hatch timings | `HATCH_DEFAULTS`, `config.hatch` | above | `hatch.enabled: false` removes cover work |
 | `vesselPlanning.ordering` | `engine/vesselOrdering.ts` | `pod-weight` | `as-today` rolls back; affects rehandles and stow order |
 | equipment counts | presets | 8 STS, 23 SHC, 16 blocks x 2 ASC (`ascsPerBlock` 1 or 2) | more of a non-bottleneck adds nothing |
-| yard pre-fill | `yardStart` | baseline 60 %, peak 75 % | higher fill means more buried retrievals |
+| yard pre-fill | `yardStart` | baseline 60 %, peak 75 % (both reached in full) | higher fill means more buried retrievals |
 | `queueAreas` | presets | 3 per STS, 3 per block | needed by `chained-nearest` and `predispatch` |
 
 Full-size presets take minutes per run. For a quick loop set `TTI_MOVES_SCALE` to 0.1 locally (never commit it; the

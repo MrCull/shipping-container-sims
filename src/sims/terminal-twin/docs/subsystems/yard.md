@@ -1,6 +1,6 @@
 # Yard: ASC blocks, allocation, rehandles and yard starts
 
-Checked against ENGINE_VERSION 0.59.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when you change how boxes are stacked, retrieved or dug out of an ASC block, touch ASC dispatch or the
 twin-ASC rail, tune a yard strategy (`yardAllocation`, `rehandleTarget`, `ascDispatch`, `emptyAllocation`), work on
@@ -138,7 +138,7 @@ a truck drop `engine/subsystems/landside.ts#dropMetFull`. Shapes: [decision-poin
 
 | Strategy | Rule |
 |---|---|
-| `grouped` (default since 0.25.0) | nearest-wtp cost plus group cost (below). `sameGroupOnly` (pre-fill only) drops slots on another group |
+| `grouped` (default since 0.25.0) | nearest-wtp cost plus group cost (below). `sameGroupOnly` (pre-fill only) drops slots on another group; `stackOwnGroup` (pre-fill, booked boxes, #270) takes the cheapest slot on its own group in order before any other |
 | `nearest-wtp` (rollback) | `distanceM` + `TIER_COST_M` 6 per tier above 1 + pairing cost + powered-row cost |
 | `random` | `candidates[floor(random x n)]`; pinned by `rehandle-random-yard` and `asc-2asc-block-conflict` |
 
@@ -363,6 +363,11 @@ first filler with no slot ends the fill.
   the vessel has under `max(EXPORT_BLOCK_MIN_CELLS 10, ceil(cells x EXPORT_BLOCK_SHARE_X 1 / blocks))` cells there
   (#207); then fewest vessel cells, lowest fill, block order. A null reply moves to the next block, so one box can
   cost several requests. Under `grouped` the first pass sends `sameGroupOnly`; a booked box retries without it.
+- **Booked boxes stack tall (#270):** a booked export or empty's first pass also sends `stackOwnGroup` (pre-fill
+  only): `grouped` puts it on a stack of its own group in order with room before it opens a new stack (otherwise
+  `TIER_COST_M` would spread booked boxes flat, and a filler never stands on another group, so flat booked stacks
+  would leave it no room). The peak day pre-fill reaches 75 % of its 75 % target and the baseline 60 % of 60 %;
+  `tests/yard-mix.test.ts` requires each big preset to reach at least its target minus 0.02 (0.73 on the peak day).
 - **Mixed lines (#163):** a filler import's grouping view has line `'*'` (`prefillView`), so import stacks mix lines;
   `prefillBlockKey` lets empties share blocks by size and ISO type (each stack still one line). The run-time
   `grouped` strategy keeps imports by line, so a later import on a pre-filled stack counts as `mixedStack`.
