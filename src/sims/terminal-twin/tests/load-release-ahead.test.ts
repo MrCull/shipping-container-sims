@@ -117,6 +117,48 @@ describe('load release-ahead (#186)', () => {
     expect(sim.invariantReport().violations).toEqual([])
   })
 
+  it('counts a waiting retrieval that already has a pad picked: boxes released ahead never take the last pad (#367)', () => {
+    // a null ascDispatch reply leaves the pad nextPadRetrieval picked on the unstarted job. Before #367 the pad count
+    // skipped that job, so the next box released ahead took the pad kept free (peak day, block B14: every pad held by load
+    // boxes waiting for their cranes' discharge, and another crane's next box with no pad to go to)
+    const PADS = 3
+    const HOLD_S = 1800
+    for (const seed of [1, 4]) {
+      const config = new ScenarioBuilder('pad-tail', 'a waiting retrieval with a picked pad')
+        .hatch({ enabled: false })
+        .seed(seed)
+        .moveVariation(10)
+        .quay(400, { mooringS: 60, unmooringS: 60 })
+        .sts('STS01', { gantryX: 60, groundPositions: 3 })
+        .vesselCall('V001', { name: 'First', sizeClass: 'feeder', discharge: 20, load: 8, maxSts: 1, sizeMix: { '40': 1 } })
+        .shcs(3)
+        .block('B01', { x: 20, bays: 12, tiers: 4, wtpPads: PADS })
+        .ascsPerBlock(2)
+        .yardStart({ mode: 'prefilled', targetPct: 40 })
+        .loadReleaseAhead(6)
+        .endWhen({ simDurationS: DURATION })
+        .build()
+      let now = 0
+      // the TOS holds back export retrievals for a while, then lets any ASC that can serve take them
+      const sim = createSimulation(config, {
+        ascDispatch: (msg) => {
+          if (msg.payload.job.kind === 'retrieve' && now < HOLD_S) return { ascId: null }
+          return { ascId: msg.payload.candidates.find((c) => c.canServe)?.ascId ?? null }
+        },
+      })
+      let worst = 0
+      for (let t = 5; t <= DURATION && sim.status === 'ready'; t += 5) {
+        now = t
+        sim.runUntil({ time: t })
+        worst = Math.max(worst, sim.query.loadOrders().filter((o) => o.stage === 'staging' || o.stage === 'padded').length)
+      }
+      expect(sim.firstError).toBeNull()
+      expect(ofType(sim, 'StsLoadPicked')).toHaveLength(8)
+      // one pad of the block always stays out of reach of boxes released ahead
+      expect(worst, `seed ${seed}`).toBe(PADS - 1)
+    }
+  })
+
   it('rejects a bad value', () => {
     for (const bad of [-1, 1.5, 99]) {
       const config = scenario(2)

@@ -1,6 +1,6 @@
 # Yard: ASC blocks, allocation, rehandles and yard starts
 
-Checked against ENGINE_VERSION 0.59.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 Read this when you change how boxes are stacked, retrieved or dug out of an ASC block, touch ASC dispatch or the
 twin-ASC rail, tune a yard strategy (`yardAllocation`, `rehandleTarget`, `ascDispatch`, `emptyAllocation`), work on
@@ -283,7 +283,9 @@ maybeDispatchAsc -> pumpRehandle -> (first time) RehandleRequired {jobId, contai
   discharges (stage `staging`, then `padded`); they take no ground position. A block keeps
   `free pads - waiting retrievals - reserve >= 2`, where `reserve` (#213, `headsWithoutPad`) is 0 for the crane's head
   box and otherwise counts other cranes whose head box is `released` and stacked in this block (or whose block is
-  unknown yet). Once discharge is done a padded box asks for a ground position and gets its SHC job at once.
+  unknown yet). `waiting retrievals` is every retrieval of the block not started yet (`ascId` null), also one whose `wtpPadId`
+  `nextPadRetrieval` already set while the `ascDispatch` reply was null: that pad is not claimed until the job starts
+  (#367: skipping those let staged boxes fill every pad of B14 on the peak day). Once discharge is done a padded box asks for a ground position and gets its SHC job at once.
 
 ## Transshipment
 
