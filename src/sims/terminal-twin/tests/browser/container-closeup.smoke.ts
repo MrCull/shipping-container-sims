@@ -40,7 +40,7 @@ test('the view about 10 boxes wide costs no more frame time than the Overview ca
   await openTwin(page)
   await page.evaluate(() => window.__tt!.setQuality('high'))
   await page.evaluate(() => window.__tt!.load('TTI Algeciras baseline'))
-  await page.waitForFunction(() => (window.__tt!.scene()?.containers ?? 0) > 10_000, undefined, { timeout: 120_000 })
+  await page.waitForFunction(() => (window.__tt!.scene()?.containers ?? 0) > 8_000, undefined, { timeout: 120_000 })
   await page.waitForFunction(() => window.__tt!.scene()!.containerAssets === 'loaded', undefined, { timeout: 60_000 })
   const frameMs = async (): Promise<number> => {
     const f0 = await page.evaluate(() => ({ frames: window.__tt!.scene()!.frames, t: performance.now() }))

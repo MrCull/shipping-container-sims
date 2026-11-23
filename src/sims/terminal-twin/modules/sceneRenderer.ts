@@ -145,6 +145,9 @@ export class SceneRenderer {
   private posedSeq = 0
   private posedCount = 0
   private posedEpoch = -1
+  /** The 30 s colour bucket of the last full pass, and whether that pass left boxes on a stale tint (over the per-frame budget): either makes the next pass full in a time-based mode. */
+  private posedBucket = -1
+  private colourPending = false
   private readonly moving = new Set<number>()
   /** Sim time each moving box was last posed at (#257). */
   private readonly posedAt: number[] = []
@@ -548,7 +551,10 @@ export class SceneRenderer {
     const timeBased = isTimeBased(mode)
     const bucket = timeBased ? Math.floor(t / COLOUR_BUCKET_S) : 0
     if (this.tintEpoch[i] === this.colourEpoch && this.tintBucket[i] === bucket) return this.tint[i]
-    if (timeBased && budget.left <= 0) return this.tintEpoch[i] === this.colourEpoch ? this.tint[i] : -1 // over budget: a bucket stale (or still the livery after a mode switch), refreshed in the next frames
+    if (timeBased && budget.left <= 0) {
+      this.colourPending = true
+      return this.tintEpoch[i] === this.colourEpoch ? this.tint[i] : -1
+    } // over budget: a bucket stale (or still the livery after a mode switch), refreshed in the next frames
     budget.left--
     this.tint[i] = hexToInt(colourOf(mode, this.model.colourSubjectAt(id, t, timeBased), t, this.colourCtx).hex)
     this.tintEpoch[i] = this.colourEpoch
@@ -572,7 +578,10 @@ export class SceneRenderer {
     const ids = model.containerIds
     // Which boxes to pose (#250): a box at rest is posed when its custody changes, a carried one every frame, a vessel's when its placement changes.
     const timeBased = isTimeBased(this.colourBy)
-    const full = this.posedT === null || t < this.posedT || this.posedEpoch !== this.colourEpoch || timeBased
+    // A time-based mode re-tints only when its bucket turns over or a pass ran out of colour budget; in between, posing stays by custody (#250), not every box every frame.
+    const colourBucket = timeBased ? Math.floor(t / COLOUR_BUCKET_S) : 0
+    const full = this.posedT === null || t < this.posedT || this.posedEpoch !== this.colourEpoch || (timeBased && (colourBucket !== this.posedBucket || this.colourPending))
+    if (full) this.colourPending = false
     let visit: Iterable<number>
     if (full) {
       visit = ids.keys()
@@ -644,6 +653,7 @@ export class SceneRenderer {
     }
     this.posedT = t
     this.posedEpoch = this.colourEpoch
+    if (full) this.posedBucket = colourBucket
     this.posedCount = ids.length
     containers.end(cameraPosition, frustum)
 

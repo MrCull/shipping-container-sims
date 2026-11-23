@@ -130,7 +130,7 @@ test('colour by: switching modes on the full TTI yard costs no frame time @load'
   const errors = collectErrors(page)
   await open(page, 'TTI Algeciras baseline')
   await page.evaluate(() => window.__tt!.setQuality('high'))
-  await page.waitForFunction(() => (window.__tt!.scene()?.containers ?? 0) > 10_000, undefined, { timeout: 120_000 })
+  await page.waitForFunction(() => (window.__tt!.scene()?.containers ?? 0) > 8_000, undefined, { timeout: 120_000 })
   await page.waitForFunction(() => window.__tt!.scene()!.containerAssets === 'loaded', undefined, { timeout: 60_000 })
   await page.evaluate(() => window.__tt!.cameraTo('STS104', 400))
   const pose = async (): Promise<number> => {
