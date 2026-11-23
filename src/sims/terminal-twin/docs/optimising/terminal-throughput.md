@@ -1,6 +1,6 @@
 # Optimising terminal throughput
 
-Checked against ENGINE_VERSION 0.61.0.
+Checked against ENGINE_VERSION 0.62.0.
 
 Read this when you want the simulated terminal to move more boxes per hour, idle its STS less, drive SHCs empty less,
 rehandle less or turn vessels round faster, or when you compare two TOS strategies. It says what limits throughput
@@ -21,7 +21,7 @@ x1.4: the quay is better used at the larger volume. The scale-1 `tt:profile` (0.
 (V003), 175,015 s (V004) and 268,337 s (V005); load boxes wait 662 s horizontal and 388 s at the STS on average; SHC
 idle 85 % (7 of 23 never used), ASC idle 81 %. The other breakdowns below are at 0.5.
 
-### Peak day status (ENGINE_VERSION 0.61.0)
+### Peak day status (ENGINE_VERSION 0.62.0)
 
 From 0.58.0 the peak day (`--until vessels:5`) went idle at 2 of 5 vessels: first-fit berthed the ULCV V003 at 0 m,
 below the rail reach of every crane able to work it (#303 crane classes), so its cranes waited for the rail for ever.
@@ -33,7 +33,10 @@ WTP pad taken; 5,215 moves, sim day 2 06:58). Cause (#367, 0.61.0): every B14 pa
 job whose `ascDispatch` reply is still null, so that job looked like neither a taken pad nor a waiting one and boxes
 released ahead took the pad kept free. Every unstarted retrieval now counts. The run then gets 3 of 5 vessels done
 (8,321 moves, sim day 4 00:22) and fails at `sts.rail-reachable`: V005 (Feedermax) berths at 0 m and STS102 must reach
-23.93 m, below its 27 m rail limit. That is the next blocker.
+23.93 m, below its 27 m rail limit. Cause (#369, 0.62.0): the crane split chose STS102 to STS104, the free run nearest
+the work centre, while STS101 stood idle at 14 m, and gave bay 0 (20 ft slots at 23.93 m) to STS102. The request now
+names each crane's `unreachableBays` and the split never gives one to that crane, so V005 gets STS101 to STS103. The
+peak day now reaches 5 of 5 vessels with 0 violations (9,163 moves, sim day 4 13:41).
 
 ### Where crane time goes
 

@@ -19,7 +19,7 @@ import { CONTAINER_HEIGHT_M, slotX, slotZ, tierBaseY, vesselClass } from '../../
 import type { ScenarioConfig, VesselSizeClass } from '../../scenario/types'
 import { continueWork, wakeQuayRail } from './quay'
 import { askRelease, createPackages, isLoadSlot, loadActive } from './workPackages'
-import { railOrder, railReach } from './rail'
+import { inRailReach, railOrder, railReach } from './rail'
 import { firstFitBerth } from '../decisions/quayStrategies'
 import { closeCrane, finishPlan, registerCrane } from '../cranePlan/plan'
 import { positionHatchPanels } from '../hatch'
@@ -183,6 +183,20 @@ export function stsCanWork(config: ScenarioConfig, stsId: string, sizeClass: Ves
   return boxTopM <= limits.liftHeightM && outerRowM <= limits.outreachM
 }
 
+/**
+ * #369: the work bays with a slot (either 20 ft half included) outside the `railReach` of the crane at `railIndex`. The
+ * berth reach window (#365) only keeps the lowest and highest able crane in reach of the vessel's ends; a crane further
+ * in (STS102 on the peak day, 27 m up) can still be unable to reach a bay at the quay start.
+ */
+function unreachableBays(ctx: EngineContext, vessel: VesselState, railIndex: number, bays: CraneSplitRequest['bays']): number[] {
+  const spec = vesselClass(vessel.sizeClass)
+  const reach = railReach(ctx.config, railIndex)
+  const berthX = vessel.berthX ?? 0
+  return bays
+    .filter((b) => !inRailReach(reach, slotX(spec, berthX, b.bay, 'aft')) || !inRailReach(reach, slotX(spec, berthX, b.bay, 'fore')))
+    .map((b) => b.bay)
+}
+
 /** Ask for a crane split for the first berthed vessel without cranes, unless one is pending. */
 function trySplit(ctx: EngineContext): void {
   const { berth, vessels, sts } = ctx.state
@@ -190,6 +204,7 @@ function trySplit(ctx: EngineContext): void {
   if (!Object.values(sts).some((c) => c.vesselId === null)) return
   const vessel = vessels[berth.craneQueue[0]]
   berth.splitting = vessel.id
+  const bays = workBays(ctx, vessel)
   ctx.requestDecision(
     'craneSplit',
     {
@@ -197,8 +212,10 @@ function trySplit(ctx: EngineContext): void {
       berthX: vessel.berthX as number,
       maxSts: vesselConfig(ctx, vessel.id).maxSts,
       stsMinSpacingM: ctx.config.quay.stsMinSpacingM,
-      bays: workBays(ctx, vessel),
-      cranes: railOrder(ctx.state).map((c) => ({
+      bays,
+      cranes: railOrder(ctx.state).map((c) => {
+        const unreachable = unreachableBays(ctx, vessel, c.railIndex, bays)
+        return {
         stsId: c.id,
         railIndex: c.railIndex,
         gantryX: c.gantryX,
@@ -206,7 +223,10 @@ function trySplit(ctx: EngineContext): void {
         vesselBerthX: c.vesselId ? vessels[c.vesselId].berthX : null,
         // Only when true, so the event log of a fleet that reaches every vessel is unchanged (#303).
         ...(stsCanWork(ctx.config, c.id, vessel.sizeClass) ? {} : { outOfReach: true as const }),
-      })),
+          // #369: only when the crane's rail reach leaves out a work bay, so the event log of a split every crane can cover is unchanged.
+          ...(unreachable.length > 0 ? { unreachableBays: unreachable } : {}),
+        }
+      }),
     },
     { vessels: [vessel.id] },
   )

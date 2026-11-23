@@ -1,6 +1,6 @@
 # Engine core: the discrete-event loop
 
-Checked against ENGINE_VERSION 0.61.0.
+Checked against ENGINE_VERSION 0.62.0.
 
 Read this when you change or debug how events are scheduled, processed, hashed, logged, snapshotted or replayed;
 when you add an event type or reactor; or when you hunt headless run time per event. The state the loop mutates is
@@ -252,7 +252,7 @@ change, so diff before and after logs to locate a behaviour change.
 
 ## ENGINE_VERSION
 
-`engine/simulation.ts#ENGINE_VERSION` ("0.61.0"): bump it when engine behaviour changes in a way that invalidates
+`engine/simulation.ts#ENGINE_VERSION` ("0.62.0"): bump it when engine behaviour changes in a way that invalidates
 snapshots, in practice any change that moves an event log. `restore` refuses a snapshot whose `engineVersion`
 differs; the browser offers "Restart from its config" instead. Changes that move no event (container props, derived
 statuses, invariant or KPI reads) have shipped without a bump. `SNAPSHOT_SCHEMA_VERSION` (1) is the snapshot shape.
