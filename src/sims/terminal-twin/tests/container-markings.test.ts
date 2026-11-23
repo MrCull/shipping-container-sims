@@ -3,6 +3,7 @@
  * ISO-type plate, the laden-only seal, the heavy-only SUPER HEAVY triangle and per-box deterministic wear.
  */
 import { describe, expect, it } from 'vitest'
+import atlas from '../assets/models/containers/livery-atlas.json'
 import { describeMarkings, plateFor, type MarkingsInput, type WeightPlate } from '../modules/containerMarkings'
 import { paintContainer } from '../modules/containerTextures'
 import { TEXTURE_LAYOUT } from '../modules/closeupGeometry'
@@ -143,6 +144,15 @@ describe('sides and roof', () => {
 
   it('uses the generic grey livery for an unknown line', () => {
     expect(describeMarkings(box({ line: 'Nobody' })).side.lineColour).toBe('#ffffff')
+  })
+
+  it('a box drawn in a leasing tile prints its number but no line name (#360)', () => {
+    const offWhite = atlas.leasing.find((l) => l.name === 'off-white')!.index
+    const m = describeMarkings(box({ line: 'MSC', liveryIndex: offWhite }))
+    expect(m.side.lineName).toBe('')
+    expect(m.side.boxNumber).toBe('CSQU 305438 3')
+    expect(m.side.lineColour).toBe('#1d1d1b') // dark ink on the off-white body
+    expect(describeMarkings(box({ line: 'MSC', liveryIndex: 1 })).side.lineName).toBe('MSC') // its own line's tile
   })
 })
 

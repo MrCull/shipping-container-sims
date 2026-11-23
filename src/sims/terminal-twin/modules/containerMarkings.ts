@@ -14,6 +14,8 @@
  * (`plateFor` returns null and the door prints no weight lines): a plate never shows another type's numbers.
  */
 import atlas from '../assets/models/containers/livery-atlas.json'
+import { boxHash } from './boxHash'
+import { isLeasingTile } from './boxLivery'
 import { iso6346CheckDigit } from '../scenario/iso6346'
 import { isoTypeOf, tareKgOf } from '../scenario/containerProps'
 import type { ContainerSize } from '../scenario/types'
@@ -85,6 +87,8 @@ export interface MarkingsInput {
   laden: boolean
   /** Heavy weight class: gets the SUPER HEAVY triangle. */
   heavy?: boolean
+  /** Atlas tile the box is drawn in (`liveryIndexForBox`); a leasing tile prints no line name (#360). Absent = the line's own tile. */
+  liveryIndex?: number
 }
 
 export interface DoorMarkings {
@@ -139,15 +143,6 @@ export interface ContainerMarkings {
   wear: Wear
 }
 
-function hash32(text: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i)
-    h = Math.imul(h, 0x01000193)
-  }
-  return h >>> 0
-}
-
 /** mulberry32: small, fast, deterministic. */
 function stream(seed: number): () => number {
   let a = seed >>> 0
@@ -162,7 +157,7 @@ function stream(seed: number): () => number {
 
 /** Wear of one box: a function of its id alone. */
 export function wearFor(id: string): Wear {
-  const seed = hash32(`wear:${id}`)
+  const seed = boxHash(id, 'wear')
   const rng = stream(seed)
   const fade = Math.round(rng() * rng() * 100) / 100 // most boxes are fairly fresh, a few chalky
   const rustStreaks: RustStreak[] = Array.from({ length: Math.floor(rng() * 7) }, () => ({
@@ -186,7 +181,9 @@ export function describeMarkings(input: MarkingsInput): ContainerMarkings {
   const checkDigit = /^[0-9]$/.test(input.id[10] ?? '') ? Number(input.id[10]) : iso6346CheckDigit(first10)
   const isoType = input.isoType ?? isoTypeOf(input.size, false)
   const number = `${ownerPrefix} ${serial} ${checkDigit}`
-  const livery = atlas.liveries.find((l) => l.line === input.line) ?? atlas.liveries[atlas.genericIndex]
+  const tile = input.liveryIndex
+  const leasing = tile !== undefined && isLeasingTile(tile)
+  const livery = (leasing ? atlas.liveries[tile] : atlas.liveries.find((l) => l.line === input.line)) ?? atlas.liveries[atlas.genericIndex]
   return {
     door: {
       ownerPrefix,
@@ -198,7 +195,7 @@ export function describeMarkings(input: MarkingsInput): ContainerMarkings {
       cscPlate: true,
       boltSeal: input.laden,
     },
-    side: { boxNumber: number, lineName: livery.line ?? input.line, lineColour: livery.text },
+    side: { boxNumber: number, lineName: leasing ? '' : (livery.line ?? input.line), lineColour: livery.text },
     wear: wearFor(input.id),
   }
 }

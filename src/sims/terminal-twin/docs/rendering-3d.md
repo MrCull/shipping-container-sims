@@ -1,6 +1,6 @@
 # Rendering (3D view)
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when you change anything drawn in the Three.js view: containers, equipment rigs, vessel hulls, hatch panels,
 infrastructure, quality tiers, lighting, the backdrop and scenery, positional sound, or the home card. Pipeline, budgets
@@ -92,9 +92,27 @@ history behind the display time (display time never goes back). Ingest details: 
 - **Per instance:** a matrix, a `liveryIndex` float attribute (atlas tile) and an instance colour. A colour-by tint
   switches the box to the generic tile and sets an instance colour of tint / generic body colour, so the grey tile comes
   out as the tint. The instance colour exists from the first frame so the shader never recompiles when a tint first appears.
+- **Default-mode livery (#360):** `liveryIndexForBox(id, line)` in `modules/boxLivery.ts` draws about `LEASING_SHARE`
+  (0.5) of the boxes with a known line in one of the 7 leasing and old-stock tiles (weighted by their atlas `weight`), the
+  rest in their line's tile; unknown lines keep the generic grey. The choice hashes the box id only (`boxUnit(id, salt)`
+  in `modules/boxHash.ts`, reusable for other stable per-box choices), so a box looks the same every frame and reload.
+  Render-only: the engine line and every Colour by mode are unchanged, and the close-up markings of a leasing box carry
+  no wordmark. The tiles themselves: [assets-pipeline.md](assets-pipeline.md), **Containers and liveries**. Tests:
+  `tests/box-livery.test.ts`.
+- **Per-box tone (#361):** in the default colour mode each box gets a small, stable brightness (within 12 %) and
+  saturation (within 15 %) shift, `boxTone(id)` in `modules/boxLivery.ts` (hashes the id, 15 steps each). It rides in the
+  fractional part of `liveryIndex` (`toneFraction`: `(b * TONE_RADIX + s) / TONE_SCALE`, 16 and 256, 0 = no tone; the
+  shader string is built from the same exported constants, and `TONE_LEVELS` must stay at most 15), so it adds no
+  attribute, no byte and no draw call; the livery shader floors the index for the tile and decodes the tone after
+  `color_fragment`. A tinted box writes no tone; a mesh without the attribute (vessel hulls) reads 0. The drawn-box
+  record floors the index. The placeholder boxes drawn before the GLBs load take the same tone (`tonedColour`), so a box
+  does not change tone when they load.
+  The close-up and hero faces drawn over a near box get the same tone (#362): the markings source hands them
+  `tonedColour(body, tone)`, the same maths in linear space on the CPU, so a box keeps its colour as it changes level of
+  detail, with no extra draw call. Tests: `tests/box-tone.test.ts`.
 - **Livery shader:** GLB TEXCOORD_0 is authored for tile 0 (HMM); `liveryMaterial()` in `modules/containerAssets.ts`
   patches the material so `vMapUv += tileOffset(liveryIndex + liveryBase)`. `liveryIndexForLine(line)` reads
-  `assets/models/containers/livery-atlas.json` (11 tiles: 10 lines plus the generic grey).
+  `assets/models/containers/livery-atlas.json` (18 tiles: 10 lines, the generic grey and 7 leasing variants).
 - **Culling.** `end(camera, frustum)` tests a 7.5 m sphere per box against the frustum and never writes culled boxes to
   the GPU. Every container InstancedMesh has `frustumCulled = false` (one mesh spans the whole yard).
   `containerLods.culled` counts them.

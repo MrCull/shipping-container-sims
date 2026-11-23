@@ -32,18 +32,24 @@ function watch(page: Page): { errors: string[]; external: string[] } {
   return { errors, external }
 }
 
-test('the twin loads the container GLBs offline and draws each box in its line livery', { tag: '@yard' }, async ({ page }) => {
+test('the twin loads the container GLBs offline and draws every worker box with an atlas livery', { tag: '@yard' }, async ({ page }) => {
   const { errors, external } = watch(page)
   await openTwin(page, { scenario: 'liveries-mixed', quality: 'high' }) // High draws LOD0 out to the screenshot distance
   await page.evaluate(() => window.__tt!.runTo(200))
   await page.waitForFunction(() => window.__tt!.scene()?.containerAssets === 'loaded')
   await page.waitForFunction(() => (window.__tt!.scene()?.frames ?? 0) > 5)
 
-  // the worker's boxes reach the drawn liveries (livery per line, size and LOD by distance: headless-scene-yard.test.ts, #336)
-  const boxes = await page.evaluate(() => window.__tt!.query<{ id: string; line: string }[]>('containers'))
+  // wiring only: every worker box reaches the drawn liveries as an atlas tile, untinted in the default mode (which tile a
+  // box gets, line or #360 leasing variant, and size and LOD by distance: headless-scene-yard.test.ts, #336)
+  const boxes = await page.evaluate(() => window.__tt!.query<{ id: string }[]>('containers'))
   const state = await page.evaluate(() => window.__tt!.sceneState())
   expect(boxes.length).toBeGreaterThan(0)
-  for (const box of boxes) expect(atlas.liveries[state!.liveries[box.id].index].line, box.id).toBe(box.line)
+  for (const box of boxes) {
+    const livery = state!.liveries[box.id]
+    expect(livery, box.id).toBeDefined()
+    expect(Number.isInteger(livery.index) && livery.index >= 0 && livery.index < atlas.liveries.length, `${box.id} tile ${livery.index}`).toBe(true)
+    expect(livery.tint, box.id).toBe(-1)
+  }
   await page.evaluate(() => window.__tt!.cameraTo('STS01', 140))
   await page.waitForTimeout(400)
   await page.evaluate(() => window.__tt!.renderOnce()) // render is off: draw the frame the screenshot keeps
