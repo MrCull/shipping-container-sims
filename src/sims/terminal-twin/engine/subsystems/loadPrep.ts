@@ -123,7 +123,10 @@ function stageAhead(ctx: EngineContext, orders: LoadOrder[]): void {
     const blockId = box.custody.id.split(':')[0]
     // keep one pad of the block free for discharge boxes: staged loads only leave their pads after the discharge is done
     const free = pads.filter((p) => p.blockId === blockId && state.wtpPads[p.id].containerId === null && state.wtpPads[p.id].claimedBy === null).length
-    const held = Object.values(state.ascJobs).filter((j) => j.kind === 'retrieve' && j.blockId === blockId && j.wtpPadId === '' && j.ascId === null).length
+    // every retrieval not started yet needs a pad, also one dispatch already offered a pad (`wtpPadId` set, the pad not
+    // claimed until the ASC starts): counting only `wtpPadId === ''` staged one box too many and let staged boxes take
+    // every pad of a twin-ASC block, so a loading crane's next box could not leave the stack (#367)
+    const held = Object.values(state.ascJobs).filter((j) => j.kind === 'retrieve' && j.blockId === blockId && j.ascId === null).length
     // a box that is not its crane's head also leaves a pad for the head box of every crane (in this block) that has none yet (#213)
     const reserve = order === orders[0] ? 0 : headsWithoutPad(ctx, blockId, order.stsId)
     if (free - held - reserve < 2) return

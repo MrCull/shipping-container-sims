@@ -1,6 +1,6 @@
 # Optimising terminal throughput
 
-Checked against ENGINE_VERSION 0.60.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 Read this when you want the simulated terminal to move more boxes per hour, idle its STS less, drive SHCs empty less,
 rehandle less or turn vessels round faster, or when you compare two TOS strategies. It says what limits throughput
@@ -21,13 +21,17 @@ x1.4: the quay is better used at the larger volume. The scale-1 `tt:profile` (0.
 (V003), 175,015 s (V004) and 268,337 s (V005); load boxes wait 662 s horizontal and 388 s at the STS on average; SHC
 idle 85 % (7 of 23 never used), ASC idle 81 %. The other breakdowns below are at 0.5.
 
-### Peak day status (ENGINE_VERSION 0.60.0)
+### Peak day status (ENGINE_VERSION 0.61.0)
 
 From 0.58.0 the peak day (`--until vessels:5`) went idle at 2 of 5 vessels: first-fit berthed the ULCV V003 at 0 m,
 below the rail reach of every crane able to work it (#303 crane classes), so its cranes waited for the rail for ever.
 The rail-reach fix (#365, 0.60.0: berth reach window, laydown within reach, `sts.rail-reachable`) berths V003 at
 33.067 m and gets past that stall; the run now fails later at a `yard.no-progress` in B14 (one claimed retrieve, every
-WTP pad taken; 5,215 moves, sim day 2 06:58). That yard stall is a separate follow-up.
+WTP pad taken; 5,215 moves, sim day 2 06:58). The cause (#367, 0.61.0) was release-ahead staging: the pad count
+missed retrievals ASC dispatch had already offered a pad, so staged boxes of discharging cranes took every B14 pad and
+the loading STS105's next box could not leave the stack. With the fix the run completes V003 (88 of 88 packages) and
+fails later, at day 4 00:22:44 with 8,321 moves and 3 of 5 vessels done, on `sts.rail-reachable`: STS102 waits for
+the rail to reach 23.93 m for V005, outside its 27 to 688 m. That is a separate follow-up.
 
 ### Where crane time goes
 

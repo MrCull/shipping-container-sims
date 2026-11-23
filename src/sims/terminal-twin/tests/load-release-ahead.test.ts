@@ -117,6 +117,36 @@ describe('load release-ahead (#186)', () => {
     expect(sim.invariantReport().violations).toEqual([])
   })
 
+  it('keeps one pad of a twin-ASC block free of staged boxes, also while a retrieval holds an offered pad (#367)', () => {
+    const PADS = 4
+    const config = new ScenarioBuilder('twin-pads', 'staged boxes on a twin-ASC block')
+      .hatch({ enabled: false })
+      .seed(1)
+      .moveVariation(10)
+      .quay(360, { mooringS: 60, unmooringS: 60 })
+      .sts('STS01', { gantryX: 60, groundPositions: 3 })
+      .sts('STS02', { gantryX: 120, groundPositions: 3 })
+      .vesselCall('V001', { name: 'First', sizeClass: 'feeder', discharge: 12, load: 16, maxSts: 2, sizeMix: { '40': 1 } })
+      .shcs(3)
+      .ascsPerBlock(2)
+      .block('B01', { x: 20, bays: 14, tiers: 4, wtpPads: PADS })
+      .yardStart({ mode: 'prefilled', targetPct: 40 })
+      .loadReleaseAhead(6)
+      .endWhen({ simDurationS: DURATION })
+      .build()
+    const sim = createSimulation(config)
+    let worst = 0
+    for (let t = 10; t <= DURATION; t += 10) {
+      sim.runUntil({ time: t })
+      // staged boxes (retrieving or on a pad) of the block: the staging rule leaves at least one pad for anything else
+      const staged = sim.query.loadOrders().filter((o) => (o.stage === 'staging' || o.stage === 'padded') && sim.query.container(o.containerId).custody.id.startsWith('B01'))
+      worst = Math.max(worst, staged.length)
+    }
+    expect(worst).toBeGreaterThan(0)
+    expect(worst).toBeLessThanOrEqual(PADS - 1)
+    expect(sim.firstError).toBeNull()
+  })
+
   it('rejects a bad value', () => {
     for (const bad of [-1, 1.5, 99]) {
       const config = scenario(2)
