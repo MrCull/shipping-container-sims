@@ -32,7 +32,7 @@ WTP pad taken; 5,215 moves, sim day 2 06:58). Cause (#367, 0.61.0): every B14 pa
 `stageAhead` had counted only waiting retrievals with an empty `wtpPadId`, but `nextPadRetrieval` writes its pick to a
 job whose `ascDispatch` reply is still null, so that job looked like neither a taken pad nor a waiting one and boxes
 released ahead took the pad kept free. Every unstarted retrieval now counts. The run then gets 3 of 5 vessels done
-(8,321 moves, sim day 4 00:22) and fails at `sts.rail-reachable`: V005 (Feedermax) berths at 0 m and STS102 must reach
+(8,177 moves, sim day 3 20:40 on 0.61.0 with the #310 RNG streams) and fails at `sts.rail-reachable`: V005 (Feedermax) berths at 0 m and STS102 must reach
 23.93 m, below its 27 m rail limit. Cause (#369, 0.62.0): the crane split chose STS102 to STS104, the free run nearest
 the work centre, while STS101 stood idle at 14 m, and gave bay 0 (20 ft slots at 23.93 m) to STS102. The request now
 names each crane's `unreachableBays` and the split never gives one to that crane, so V005 gets STS101 to STS103. The
